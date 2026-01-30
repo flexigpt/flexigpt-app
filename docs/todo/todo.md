@@ -8,6 +8,14 @@
   - [ ] a tool call only and tool output only message may be rendered as a single line after this.
   - [ ] we may want to have a "assistant" like we planned before that has tool sets and autoexec config so that the "agent" loop is kind of autonomous
 
+  - [ ] backend to have flag for recommendation per tool
+  - [ ] at choice time ui can show autoexecute true/false and set default to provided one and then allow to change.
+  - [ ] rather that drop down in ui for toolcalls we ned to show them as visible chips like citations
+  - [ ] the type of chip shown can be specific to tool call like if toolcall is of type replacetext, we can have chip that shows diff and have run button there too. or generic if no other chip present.
+  - [ ] same can be for result but as of now we dont have tool results with special ui reqs.
+  - [ ] UI needs to be so that we dont waste a lot of space for tool call only or tool result only cards.
+  - [ ] autoexec should not interact with editor, but manual exec should be present in editor.
+
 ## Features
 
 - [ ] tool features
