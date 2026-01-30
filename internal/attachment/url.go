@@ -487,5 +487,6 @@ func (ref *URLRef) buildTextLinkContentBlock() *ContentBlock {
 	return &ContentBlock{
 		Kind: ContentBlockText,
 		Text: &rawURL,
+		URL:  &rawURL,
 	}
 }

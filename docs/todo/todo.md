@@ -7,12 +7,6 @@
   - [ ] major question remains as to what sort of tools should be auto exec vs not. write anything being human in loop is safest anycase. for write ones, we may want to see if we need to have a "keep old file as renamed" with some sessionid/tmp extension so that reverting is easier.
   - [ ] a tool call only and tool output only message may be rendered as a single line after this.
   - [ ] we may want to have a "assistant" like we planned before that has tool sets and autoexec config so that the "agent" loop is kind of autonomous
-- [ ] File name and details also should be sent along with file text from attachments
-  - [ ] ensure new line properly at end of file block.
-- [ ] shell tool should block all rm/curl etc. people can use specialized tools for that.
-- [ ] we should look at restricting sqlite search to last n days. ideally 30.
-- [ ] after paste cursor has again moved out someplace as of 72.
-- [ ] no scroll bar when no of tools/files chips become large.
 
 ## Features
 

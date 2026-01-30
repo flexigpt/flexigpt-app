@@ -31,8 +31,8 @@ github.com/elliotchance/pie/v2 v2.9.0 h1:BkEhh8b/avGCSpXpABSjNuytxlI/S2snkjT3vtV
 github.com/elliotchance/pie/v2 v2.9.0/go.mod h1:18t0dgGFH006g4eVdDtWfgFZPQEgl10IoEO8YWEq3Og=
 github.com/flexigpt/inference-go v0.6.4 h1:nYCJh+W/4FQUzYV/s10jv0wn9s0/upiDxwfkXl8mxeI=
 github.com/flexigpt/inference-go v0.6.4/go.mod h1:Ad5uBAmvODNwVpjJFp5OHWcQ1clI2hinGK6xyjDCmIA=
-github.com/flexigpt/llmtools-go v0.5.1 h1:SCiXQQc30lWAu/lCJqAP0vepJTNGmPrrsqY0ngacbaA=
-github.com/flexigpt/llmtools-go v0.5.1/go.mod h1:K/Gdq+WJxkBIr9ykLodM6RL9QUsqCg5mcxEozbZlvDQ=
+github.com/flexigpt/llmtools-go v0.6.0 h1:apatE5Y3anDjI71lUGuIDTRezWSY70OxaaSrDhKNwC0=
+github.com/flexigpt/llmtools-go v0.6.0/go.mod h1:K/Gdq+WJxkBIr9ykLodM6RL9QUsqCg5mcxEozbZlvDQ=
 github.com/forPelevin/gomoji v1.2.0 h1:9k4WVSSkE1ARO/BWywxgEUBvR/jMnao6EZzrql5nxJ8=
 github.com/forPelevin/gomoji v1.2.0/go.mod h1:8+Z3KNGkdslmeGZBC3tCrwMrcPy5GRzAD+gL9NAwMXg=
 github.com/glebarez/go-sqlite v1.22.0 h1:uAcMJhaA6r3LHMTFgP0SifzgXg46yJkgxqyuyec+ruQ=

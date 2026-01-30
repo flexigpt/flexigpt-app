@@ -30,20 +30,21 @@ const (
 	ContentBlockFile  AttachmentContentBlockKind = "file"
 )
 
-// ContentBlock represents a provider-agnostic chunk of content derived
-// from an Attachment. Providers (OpenAI, Anthropic, etc.) adapt this
-// into their own message/part formats.
+// ContentBlock represents a provider-agnostic chunk of content derived from an Attachment.
+// Providers (OpenAI, Anthropic, etc.) adapt this into their own message/part formats.
 type ContentBlock struct {
 	Kind AttachmentContentBlockKind `json:"kind"`
 
-	// For Kind == text: Text, MIMEType and FileName are populated.
+	// For Kind == text: Text, MIMEType and FileName are populated when read from local file.
+	// For URL based text attachments, Filename will not be present, MIMEType _may_ be present.
 	Text     *string `json:"text,omitempty"`
 	MIMEType *string `json:"mimeType,omitempty"`
 	FileName *string `json:"fileName,omitempty"`
 
-	// For Kind == image or file:
-	//   - either Base64Data, MIMEType and FileName are populated (local/file-url fetched),
-	//   - or URL (+optional MIMEType/FileName) is populated for URL-based attachments.
+	// For Kind == image or file: Base64Data will be populated for local file.
+	// For URL based attachments, Base64Data may or may not be present depending on AttachmentMode.
 	Base64Data *string `json:"base64Data,omitempty"`
-	URL        *string `json:"url,omitempty"`
+
+	// URL is populated for URL-based attachments.
+	URL *string `json:"url,omitempty"`
 }

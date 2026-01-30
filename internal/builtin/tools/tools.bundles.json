@@ -33,6 +33,17 @@
 			"createdAt": "2026-01-28T00:00:00Z",
 			"modifiedAt": "2026-01-28T00:00:00Z"
 		},
+		"019c0da2-02d2-7e71-81d7-35f2e5a0bebf": {
+			"schemaVersion": "2025-07-01",
+			"id": "019c0da2-02d2-7e71-81d7-35f2e5a0bebf",
+			"slug": "text",
+			"displayName": "Text utilities",
+			"description": "Common text processing helpers.",
+			"isEnabled": true,
+			"isBuiltIn": true,
+			"createdAt": "2026-01-30T00:00:00Z",
+			"modifiedAt": "2026-01-30T00:00:00Z"
+		},
 		"019b9293-6f00-70d7-8c91-4a7f28156479": {
 			"schemaVersion": "2025-07-01",
 			"id": "019b9293-6f00-70d7-8c91-4a7f28156479",

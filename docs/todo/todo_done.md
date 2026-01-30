@@ -673,3 +673,10 @@
   - [x] behavior is that for tool and prompts we need versions to be different. once a version is created we dont allow anything except enable disable.
 
 - [x] prompt template, role/vartype/varsource dropdown uses select
+
+- [x] File name and details also should be sent along with file text from attachments
+  - [x] ensure new line properly at end of file block.
+- [x] shell tool should block all rm/curl etc. people can use specialized tools for that.
+- [x] after paste cursor has again moved out someplace as of 72.
+- [x] we should look at restricting sqlite search to last n days. ideally 30. Not now.
+- [x] no scroll bar when no of tools/files chips become large.

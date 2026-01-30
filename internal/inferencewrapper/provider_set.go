@@ -389,10 +389,17 @@ func buildContentItemsFromAttachments(
 			if txt == "" {
 				continue
 			}
+			xmlTxt, err := attachment.FormatTextBlockAsXML(b)
+			if err != nil {
+				return nil, err
+			}
+			if xmlTxt == "" {
+				continue
+			}
 			items = append(items, inferencegoSpec.InputOutputContentItemUnion{
 				Kind: inferencegoSpec.ContentItemKindText,
 				TextItem: &inferencegoSpec.ContentItemText{
-					Text: txt,
+					Text: xmlTxt,
 				},
 			})
 

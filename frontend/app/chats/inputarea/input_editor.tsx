@@ -1329,7 +1329,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					}}
 				>
 					<div className="bg-base-100 border-base-200 flex w-full max-w-full min-w-0 overflow-hidden rounded-2xl border">
-						<div className="flex grow flex-col p-0">
+						<div className="flex min-w-0 grow flex-col p-0">
 							<TemplateToolbars />
 							{editingMessageId && (
 								<div className="flex items-center justify-end gap-2 pt-1 pr-3 pb-0 text-xs">
@@ -1368,8 +1368,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 										if (!hasTextRef.current && text.length >= LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS) {
 											editor.tf.withoutNormalizing(() => {
 												editor.tf.setValue(buildSingleParagraphValueChunked(text, LARGE_TEXT_CHUNK_SIZE));
+												editor.tf.collapse({ edge: 'end' });
 											});
-											editor.tf.select(undefined, { edge: 'end' });
+
 											hasTextRef.current = true;
 											setHasText(true);
 											return;
@@ -1386,7 +1387,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 								/>
 							</div>
 							{/* Unified chips bar: attachments, directories, tools, tool calls & outputs (scrollable) */}
-							<div className="flex w-full min-w-0 items-center gap-1 overflow-x-auto p-1 text-xs">
+							<div
+								className="scrollbar-custom-thin w-full min-w-0 items-center overflow-x-auto overscroll-contain p-1 text-xs"
+								style={{ scrollbarGutter: 'stable' }}
+							>
 								<EditorChipsBar
 									attachments={attachments}
 									directoryGroups={directoryGroups}

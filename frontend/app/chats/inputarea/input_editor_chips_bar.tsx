@@ -112,7 +112,7 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 	if (!hasAnyChips) return null;
 
 	return (
-		<div className="flex shrink-0 items-center gap-1">
+		<div className="flex w-max shrink-0 flex-nowrap items-center gap-1">
 			{/* Conversation tools (first, tinted) */}
 			<ConversationToolsChip
 				tools={conversationTools}
