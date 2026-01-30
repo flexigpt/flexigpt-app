@@ -7,14 +7,14 @@ require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.0
 	github.com/adrg/xdg v0.5.3
 	github.com/danielgtaylor/huma/v2 v2.35.0
-	github.com/flexigpt/inference-go v0.6.3
+	github.com/flexigpt/inference-go v0.6.4
 	github.com/flexigpt/llmtools-go v0.5.1
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/google/uuid v1.6.0
 	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
 	github.com/markusmobius/go-trafilatura v1.12.2
 	github.com/philippgille/chromem-go v0.7.0
-	github.com/ppipada/mapstore-go v0.1.0
+	github.com/ppipada/mapstore-go v0.1.1
 	github.com/wailsapp/wails/v2 v2.11.0
 	golang.org/x/net v0.49.0
 )
