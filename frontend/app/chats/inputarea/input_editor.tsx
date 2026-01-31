@@ -799,6 +799,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			description: node.overrides?.description ?? node.toolSnapshot?.description ?? node.toolSlug,
 			toolID: node.toolSnapshot?.id,
 			toolType: node.toolType,
+			autoExecute: node.autoExecute,
 			userArgSchemaInstance: node.userArgSchemaInstance,
 		};
 		setToolDetailsState({ kind: 'choice', choice });

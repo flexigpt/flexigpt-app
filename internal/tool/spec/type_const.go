@@ -133,6 +133,9 @@ type ToolStoreChoice struct {
 	Description string              `json:"description,omitempty"`
 	DisplayName string              `json:"displayName,omitempty"`
 
+	// AutoExecute flag tells whether the tool should be automatically invoked once a llm calls this.
+	AutoExecute bool `json:"autoExecute"`
+
 	// UserArgSchemaInstance is an optional per-choice configuration object.
 	//
 	// For SDK-backed tools (Tool.Type == "sdk"), this typically contains provider-specific options validated against

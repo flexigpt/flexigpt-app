@@ -39,6 +39,7 @@ export type ToolSelectionElementNode = {
 	toolVersion: string;
 	selectionID: string;
 	toolType: ToolStoreChoiceType;
+	autoExecute: boolean;
 	userArgSchemaInstance?: string;
 
 	toolSnapshot?: Tool;
@@ -245,6 +246,7 @@ export function editorAttachedToolToToolChoice(att: UIToolStoreChoice): ToolStor
 		description: att.description,
 		toolID: att.toolID,
 		toolType: att.toolType,
+		autoExecute: att.autoExecute,
 		userArgSchemaInstance: att.userArgSchemaInstance,
 	};
 }
@@ -308,6 +310,7 @@ export function insertToolSelectionNode(
 	opts?: {
 		toolType?: ToolStoreChoiceType;
 		choiceID?: string;
+		autoExecute: boolean;
 		userArgSchemaInstance?: string;
 	}
 ) {
@@ -331,6 +334,7 @@ export function insertToolSelectionNode(
 		toolVersion: item.toolVersion,
 
 		toolType: opts?.toolType ?? toolSnapshot?.llmToolType ?? ToolStoreChoiceType.Function,
+		autoExecute: opts?.autoExecute ?? toolSnapshot?.autoExecReco ?? false,
 		userArgSchemaInstance: opts?.userArgSchemaInstance,
 
 		selectionID,
@@ -424,6 +428,7 @@ export function getAttachedTools(editor: PlateEditor): UIToolStoreChoice[] {
 						: n.toolSlug,
 				toolID: n.toolSnapshot?.id,
 				toolType: n.toolType,
+				autoExecute: n.autoExecute,
 				userArgSchemaInstance: n.userArgSchemaInstance,
 			});
 		}

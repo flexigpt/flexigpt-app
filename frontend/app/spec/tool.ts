@@ -18,6 +18,7 @@ export interface ToolStoreChoice {
 	displayName?: string;
 	description?: string;
 
+	autoExecute: boolean;
 	userArgSchemaInstance?: JSONRawString;
 }
 

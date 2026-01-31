@@ -438,6 +438,7 @@ export function buildUIToolOutputFromToolOutput(
 				toolSlug: out.name,
 				toolVersion: '',
 				toolType: out.type as unknown as ToolStoreChoiceType,
+				autoExecute: false,
 			} as ToolStoreChoice),
 
 		isError: isError,

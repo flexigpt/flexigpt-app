@@ -536,6 +536,7 @@ export namespace spec {
 	    toolType: string;
 	    description?: string;
 	    displayName?: string;
+	    autoExecute: boolean;
 	    userArgSchemaInstance?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -553,6 +554,7 @@ export namespace spec {
 	        this.toolType = source["toolType"];
 	        this.description = source["description"];
 	        this.displayName = source["displayName"];
+	        this.autoExecute = source["autoExecute"];
 	        this.userArgSchemaInstance = source["userArgSchemaInstance"];
 	    }
 	}

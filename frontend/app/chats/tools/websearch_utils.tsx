@@ -23,6 +23,7 @@ export function webSearchTemplateFromToolListItem(item: ToolListItem): WebSearch
 		toolType: ToolStoreChoiceType.WebSearch,
 		displayName: item.toolDefinition.displayName,
 		description: item.toolDefinition.description,
+		autoExecute: false,
 		userArgSchemaInstance: undefined,
 	};
 }
