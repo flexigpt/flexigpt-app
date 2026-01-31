@@ -1,4 +1,3 @@
-// attachment_chip.tsx
 import { FiFileText, FiImage, FiLink, FiX } from 'react-icons/fi';
 
 import type { AttachmentContentBlockMode, UIAttachment } from '@/spec/attachment';

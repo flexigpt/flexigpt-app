@@ -44,7 +44,6 @@ import { LineHeightKit } from '@/components/editor/plugins/line_height_kit';
 import { ListKit } from '@/components/editor/plugins/list_kit';
 import { TabbableKit } from '@/components/editor/plugins/tabbable_kit';
 
-import { AttachmentBottomBar } from '@/chats/attachments/attachment_bottom_bar';
 import {
 	buildUIAttachmentForLocalPath,
 	buildUIAttachmentForURL,
@@ -54,6 +53,7 @@ import {
 } from '@/chats/attachments/attachment_editor_utils';
 import { useOpenToolArgs } from '@/chats/events/open_attached_toolargs';
 import { dispatchTemplateFlashEvent } from '@/chats/events/template_flash';
+import { EditorBottomBar } from '@/chats/inputarea/input_editor_bottom_bar';
 import { EditorChipsBar } from '@/chats/inputarea/input_editor_chips_bar';
 import {
 	buildSingleParagraphValue,
@@ -1572,7 +1572,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					</div>
 
 					{/* Bottom bar for template/tool/attachment pickers + tips menus */}
-					<AttachmentBottomBar
+					<EditorBottomBar
 						onAttachFiles={handleAttachFiles}
 						onAttachDirectory={handleAttachDirectory}
 						onAttachURL={handleAttachURL}

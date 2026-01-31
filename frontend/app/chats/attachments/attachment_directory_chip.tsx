@@ -1,4 +1,3 @@
-// attachment_dir_chip.tsx
 import { FiAlertTriangle, FiChevronUp, FiFolder, FiX } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore } from '@ariakit/react';

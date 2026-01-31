@@ -17,9 +17,9 @@ import { useTools } from '@/hooks/use_tool';
 
 import { promptStoreAPI } from '@/apis/baseapi';
 
-import { CommandTipsMenu } from '@/chats/attachments/attachment_command_tips_menu';
 import { UrlAttachmentModal } from '@/chats/attachments/attachment_url_modal';
 import { dispatchOpenToolArgs } from '@/chats/events/open_attached_toolargs';
+import { CommandTipsMenu } from '@/chats/inputtips/command_tips_menu';
 import { insertTemplateSelectionNode } from '@/chats/templates/template_editor_utils';
 import {
 	computeToolUserArgsStatus,
@@ -39,7 +39,7 @@ import {
 	webSearchTemplateFromToolListItem,
 } from '@/chats/tools/websearch_utils';
 
-interface AttachmentBottomBarProps {
+interface EditorBottomBarProps {
 	onAttachFiles: () => Promise<void> | void;
 	onAttachDirectory: () => Promise<void> | void;
 	onAttachURL: (url: string) => Promise<void> | void;
@@ -104,7 +104,7 @@ const toolPickerMenuItemClasses =
   Bottom bar for template/tool/attachment buttons and tips menus.
   The chips scroller now lives in a separate bar inside the editor.
 */
-export function AttachmentBottomBar({
+export function EditorBottomBar({
 	onAttachFiles,
 	onAttachDirectory,
 	onAttachURL,
@@ -120,7 +120,7 @@ export function AttachmentBottomBar({
 	attachedToolEntries,
 	webSearchTemplates,
 	setWebSearchTemplates,
-}: AttachmentBottomBarProps) {
+}: EditorBottomBarProps) {
 	const editor = useEditorRef() as PlateEditor;
 	const [isUrlModalOpen, setIsUrlModalOpen] = useState(false);
 
