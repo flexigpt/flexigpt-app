@@ -182,7 +182,7 @@ export function ConversationToolsChip({ tools, onChange, onShowToolDetails }: Co
 			<Menu
 				store={menu}
 				gutter={6}
-				className="rounded-box bg-primary/5 text-base-content border-primary/40 z-50 max-h-72 min-w-70 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
+				className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-72 min-w-70 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
 				autoFocusOnShow
 			>
 				<div className="text-base-content/70 mb-2 text-[11px] font-semibold">Conversation tools</div>
