@@ -289,6 +289,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	// Tool-call chips (assistant-suggested) + tool outputs attached to the next user message.
 	const [toolCalls, setToolCalls] = useState<UIToolCall[]>([]);
 	const [toolOutputs, setToolOutputs] = useState<UIToolOutput[]>([]);
+	const lastAutoExecuteAttemptKeyRef = useRef<string | null>(null);
 
 	// Only recompute attached-tool entries when tools change (not on every keystroke).
 	const [toolNodesVersion, setToolNodesVersion] = useState(0);
@@ -446,6 +447,26 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const hasPendingToolCalls = useMemo(() => toolCalls.some(c => c.status === 'pending'), [toolCalls]);
 	const hasRunningToolCalls = useMemo(() => toolCalls.some(c => c.status === 'running'), [toolCalls]);
 	const templateBlocked = selectionInfo.hasTemplate && selectionInfo.requiredCount > 0;
+
+	const pendingRunnableToolCalls = useMemo(() => {
+		return toolCalls.filter(
+			c => c.status === 'pending' && (c.type === ToolStoreChoiceType.Function || c.type === ToolStoreChoiceType.Custom)
+		);
+	}, [toolCalls]);
+
+	const pendingToolCallsKey = useMemo(
+		() => pendingRunnableToolCalls.map(c => c.id).join('|'),
+		[pendingRunnableToolCalls]
+	);
+
+	const shouldAutoExecutePendingToolCalls = useMemo(() => {
+		return (
+			pendingRunnableToolCalls.length > 0 &&
+			pendingRunnableToolCalls.every(c => {
+				return c.toolStoreChoice?.autoExecute;
+			})
+		);
+	}, [pendingRunnableToolCalls]);
 
 	// Populate editor with effective last-USER block for EACH template selection (once per selectionID)
 	useEffect(() => {
@@ -809,124 +830,146 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	 * Main submit logic, parameterized by whether to run pending tool calls
 	 * before sending.
 	 */
-	const doSubmit = async (options: { runPendingTools: boolean }) => {
-		const { runPendingTools } = options;
+	const doSubmit = useCallback(
+		async (options: { runPendingTools: boolean }) => {
+			const { runPendingTools } = options;
 
-		if (isSubmittingRef.current) return;
-		if (isBusy) return;
+			if (isSubmittingRef.current) return;
+			if (isBusy) return;
 
-		// 1) Templates: never allow send when required vars are missing.
-		if (templateBlocked) {
-			// Ask the toolbar (rendered via plugin) to flash.
-			dispatchTemplateFlashEvent();
+			// 1) Templates: never allow send when required vars are missing.
+			if (templateBlocked) {
+				// Ask the toolbar (rendered via plugin) to flash.
+				dispatchTemplateFlashEvent();
 
-			// Focus first pending variable pill (if any).
-			const fpv = selectionInfo.firstPendingVar;
-			if (fpv?.name && contentRef.current) {
-				const idSegment = fpv.selectionID ? `[data-selection-id="${cssEscape(fpv.selectionID)}"]` : '';
-				const sel = contentRef.current.querySelector(
-					`span[data-template-variable][data-var-name="${cssEscape(fpv.name)}"]${idSegment}`
-				);
-				if (sel && 'focus' in sel && typeof sel.focus === 'function') {
-					sel.focus();
+				// Focus first pending variable pill (if any).
+				const fpv = selectionInfo.firstPendingVar;
+				if (fpv?.name && contentRef.current) {
+					const idSegment = fpv.selectionID ? `[data-selection-id="${cssEscape(fpv.selectionID)}"]` : '';
+					const sel = contentRef.current.querySelector(
+						`span[data-template-variable][data-var-name="${cssEscape(fpv.name)}"]${idSegment}`
+					);
+					if (sel && 'focus' in sel && typeof sel.focus === 'function') {
+						sel.focus();
+					} else {
+						editor.tf.focus();
+					}
 				} else {
 					editor.tf.focus();
 				}
-			} else {
-				editor.tf.focus();
-			}
-			return;
-		}
-
-		// 2) Pure send path: if we're *not* running tools, bail out when we
-		//    don't already have something to send.
-		if (!runPendingTools && !isSendButtonEnabled) {
-			return;
-		}
-
-		// Guard explicitly here as well, so even programmatic calls respect it.
-		if (toolArgsBlocked) {
-			setSubmitError('Some attached tools require options. Fill the required tool options before sending.');
-			return;
-		}
-
-		setSubmitError(null);
-		isSubmittingRef.current = true;
-		const hadPendingTools = runPendingTools && hasPendingToolCalls;
-		let didSend = false;
-
-		try {
-			const existingOutputs = toolOutputs;
-			let newlyProducedOutputs: UIToolOutput[] = [];
-
-			// 3) Optional tool run (fast-forward path).
-			if (runPendingTools && hasPendingToolCalls) {
-				newlyProducedOutputs = await runAllPendingToolCalls();
-			}
-
-			// 4) Build final message content after tools have run.
-			const selections = getTemplateSelections(editor);
-			const hasTpl = selections.length > 0;
-
-			const textToSend = hasTpl ? toPlainTextReplacingVariables(editor) : editor.api.string([]);
-			const finalToolOutputs = [...existingOutputs, ...newlyProducedOutputs];
-
-			const hasNonEmptyText = textToSend.trim().length > 0;
-			const hasAttachmentsToSend = attachments.length > 0;
-			const hasToolOutputsToSend = finalToolOutputs.length > 0;
-
-			// Enforce the "non-empty message" invariant *after* tools have run.
-			if (!hasNonEmptyText && !hasAttachmentsToSend && !hasToolOutputsToSend) {
-				setSubmitError(
-					hadPendingTools
-						? 'Tool calls did not produce any outputs, so there is nothing to send yet.'
-						: 'Nothing to send. Add text, attachments, or tool outputs first.'
-				);
 				return;
 			}
 
-			// 5) Tool choices (editor-attached + conversation-level).
-			const attachedTools = getAttachedTools(editor);
-			const explicitChoices = attachedTools.map(editorAttachedToolToToolChoice);
-			const conversationChoices = conversationToolsToChoices(conversationToolsState);
-			const webSearchChoices = buildWebSearchChoicesForSubmit(webSearchTemplates);
-
-			const finalToolChoices = dedupeToolChoices([...explicitChoices, ...conversationChoices, ...webSearchChoices]);
-
-			const payload: EditorSubmitPayload = {
-				text: textToSend,
-				attachedTools,
-				attachments,
-				toolOutputs: finalToolOutputs,
-				finalToolChoices,
-			};
-
-			await onSubmit(payload);
-			setSubmitError(null);
-			setConversationToolsState(prev => mergeConversationToolsWithNewChoices(prev, finalToolChoices));
-			didSend = true;
-		} finally {
-			isSubmittingRef.current = false;
-
-			// Only clear the editor if we actually sent something.
-			if (didSend) {
-				editor.tf.setValue(EDITOR_EMPTY_VALUE);
-				hasTextRef.current = false;
-				setHasText(false);
-				setAttachments([]);
-				setDirectoryGroups([]);
-				setToolCalls([]);
-				setToolOutputs([]);
-				setToolDetailsState(null);
-				// If we were editing, the old snapshot is no longer relevant.
-				preEditConversationToolsRef.current = null;
-				preEditWebSearchTemplatesRef.current = null;
-
-				lastPopulatedSelectionKeyRef.current.clear();
-				editor.tf.focus();
+			// 2) Pure send path: if we're *not* running tools, bail out when we
+			//    don't already have something to send.
+			if (!runPendingTools && !isSendButtonEnabled) {
+				return;
 			}
-		}
-	};
+
+			// Guard explicitly here as well, so even programmatic calls respect it.
+			if (toolArgsBlocked) {
+				setSubmitError('Some attached tools require options. Fill the required tool options before sending.');
+				return;
+			}
+
+			setSubmitError(null);
+			isSubmittingRef.current = true;
+			const hadPendingTools = runPendingTools && hasPendingToolCalls;
+			let didSend = false;
+
+			try {
+				const existingOutputs = toolOutputs;
+				let newlyProducedOutputs: UIToolOutput[] = [];
+
+				// 3) Optional tool run (fast-forward path).
+				if (runPendingTools && hasPendingToolCalls) {
+					newlyProducedOutputs = await runAllPendingToolCalls();
+				}
+
+				// 4) Build final message content after tools have run.
+				const selections = getTemplateSelections(editor);
+				const hasTpl = selections.length > 0;
+
+				const textToSend = hasTpl ? toPlainTextReplacingVariables(editor) : editor.api.string([]);
+				const finalToolOutputs = [...existingOutputs, ...newlyProducedOutputs];
+
+				const hasNonEmptyText = textToSend.trim().length > 0;
+				const hasAttachmentsToSend = attachments.length > 0;
+				const hasToolOutputsToSend = finalToolOutputs.length > 0;
+
+				// Enforce the "non-empty message" invariant *after* tools have run.
+				if (!hasNonEmptyText && !hasAttachmentsToSend && !hasToolOutputsToSend) {
+					setSubmitError(
+						hadPendingTools
+							? 'Tool calls did not produce any outputs, so there is nothing to send yet.'
+							: 'Nothing to send. Add text, attachments, or tool outputs first.'
+					);
+					return;
+				}
+
+				// 5) Tool choices (editor-attached + conversation-level).
+				const attachedTools = getAttachedTools(editor);
+				const explicitChoices = attachedTools.map(editorAttachedToolToToolChoice);
+				const conversationChoices = conversationToolsToChoices(conversationToolsState);
+				const webSearchChoices = buildWebSearchChoicesForSubmit(webSearchTemplates);
+
+				const finalToolChoices = dedupeToolChoices([...explicitChoices, ...conversationChoices, ...webSearchChoices]);
+
+				const payload: EditorSubmitPayload = {
+					text: textToSend,
+					attachedTools,
+					attachments,
+					toolOutputs: finalToolOutputs,
+					finalToolChoices,
+				};
+
+				await onSubmit(payload);
+				setSubmitError(null);
+				setConversationToolsState(prev => mergeConversationToolsWithNewChoices(prev, finalToolChoices));
+				didSend = true;
+			} finally {
+				isSubmittingRef.current = false;
+
+				// Only clear the editor if we actually sent something.
+				if (didSend) {
+					editor.tf.setValue(EDITOR_EMPTY_VALUE);
+					hasTextRef.current = false;
+					setHasText(false);
+					setAttachments([]);
+					setDirectoryGroups([]);
+					setToolCalls([]);
+					setToolOutputs([]);
+					setToolDetailsState(null);
+					// If we were editing, the old snapshot is no longer relevant.
+					preEditConversationToolsRef.current = null;
+					preEditWebSearchTemplatesRef.current = null;
+
+					lastPopulatedSelectionKeyRef.current.clear();
+					editor.tf.focus();
+				}
+			}
+		},
+		[
+			attachments,
+			cancelEditing,
+			conversationToolsState,
+			editor,
+			hasPendingToolCalls,
+			isBusy,
+			isSendButtonEnabled,
+			onSubmit,
+			pendingRunnableToolCalls,
+			restorePreEditContext,
+			selectionInfo.firstPendingVar,
+			selectionInfo.hasTemplate,
+			selectionInfo.requiredCount,
+			templateBlocked,
+			toolArgsBlocked,
+			toolOutputs,
+			toolsDefLoading,
+			webSearchTemplates,
+		]
+	);
 	/**
 	 * Default form submit / Enter: "run pending tools, then send".
 	 */
@@ -934,6 +977,40 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		if (e) e.preventDefault();
 		void doSubmit({ runPendingTools: true });
 	};
+
+	/**
+	 * AUTO-EXECUTE LOOP:
+	 * If the LLM returns pending tool calls AND every pending runnable call's associated ToolStoreChoice
+	 * has autoExecute=true, then we automatically:
+	 *   1) run all pending tools
+	 *   2) send the resulting tool outputs back to the LLM (empty user text is allowed)
+	 *
+	 * This repeats for subsequent tool calls.
+	 */
+	useEffect(() => {
+		// Reset attempt key when nothing is pending.
+		if (pendingRunnableToolCalls.length === 0) {
+			lastAutoExecuteAttemptKeyRef.current = null;
+			return;
+		}
+		if (!shouldAutoExecutePendingToolCalls) return;
+		if (isBusy || isSubmittingRef.current || hasRunningToolCalls) return;
+		if (templateBlocked || toolArgsBlocked || toolsDefLoading) return;
+		// Avoid duplicate triggers for the same set of pending calls.
+		if (pendingToolCallsKey && lastAutoExecuteAttemptKeyRef.current === pendingToolCallsKey) return;
+		lastAutoExecuteAttemptKeyRef.current = pendingToolCallsKey;
+		void doSubmit({ runPendingTools: true });
+	}, [
+		doSubmit,
+		hasRunningToolCalls,
+		isBusy,
+		pendingRunnableToolCalls.length,
+		pendingToolCallsKey,
+		shouldAutoExecutePendingToolCalls,
+		templateBlocked,
+		toolArgsBlocked,
+		toolsDefLoading,
+	]);
 
 	const resetEditor = useCallback(() => {
 		closeAllMenus();

@@ -125,6 +125,18 @@ export function ConversationToolsChip({ tools, onChange, onShowToolDetails }: Co
 		onChange(next);
 	};
 
+	const handleToggleAutoExecute = (key: string) => {
+		if (!onChange) return;
+		const next = tools.map(entry =>
+			entry.key === key
+				? {
+						...entry,
+						toolStoreChoice: { ...entry.toolStoreChoice, autoExecute: !entry.toolStoreChoice.autoExecute },
+					}
+				: entry
+		);
+		onChange(next);
+	};
 	const handleRemoveSingle = (key: string) => {
 		if (!onChange) return;
 		const next = tools.filter(entry => entry.key !== key);
@@ -242,6 +254,21 @@ export function ConversationToolsChip({ tools, onChange, onShowToolDetails }: Co
 									<span className="whitespace-nowrap">{entry.enabled ? 'On' : 'Off'}</span>
 								</label>
 
+								{/* Auto-execute toggle (persisted into ToolStoreChoice.autoExecute) */}
+								<label
+									className="flex items-center gap-1 text-[11px]"
+									title="Automatically run tool calls for this tool"
+								>
+									<input
+										type="checkbox"
+										className="toggle toggle-xs"
+										checked={entry.toolStoreChoice.autoExecute}
+										onChange={() => {
+											handleToggleAutoExecute(key);
+										}}
+									/>
+									<span className="whitespace-nowrap">Auto</span>
+								</label>
 								{/* Args status + edit */}
 								<div className="flex items-center gap-1 px-1">
 									{hasArgs && <span className={argsClass}>{argsLabel}</span>}

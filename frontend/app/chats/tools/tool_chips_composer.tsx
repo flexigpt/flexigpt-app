@@ -114,12 +114,16 @@ function ToolCallComposerChipView({ toolCall, isBusy, onRun, onDiscard, onDetail
 	if (toolCall.errorMessage && isFailed) {
 		titleLines.push(`Error: ${toolCall.errorMessage}`);
 	}
+	if (toolCall.toolStoreChoice?.autoExecute) {
+		titleLines.push('Auto-execute: enabled');
+	}
 	const title = titleLines.join('\n');
 
 	return (
 		<div className={`${baseClasses} ${errorClasses}`} title={title} data-attachment-chip="tool-call">
 			<FiTool size={14} className={isFailed ? 'text-error' : ''} />
 			<span className="text-base-content/60 text-[10px] uppercase">Suggested</span>
+			{toolCall.toolStoreChoice?.autoExecute ? <span className="badge badge-primary badge-xs">Auto</span> : null}
 			<span className="max-w-64 truncate">{truncatedLabel}</span>
 
 			<div className="ml-auto flex items-center gap-2 p-0">

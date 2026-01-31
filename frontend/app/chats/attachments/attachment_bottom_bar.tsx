@@ -124,6 +124,23 @@ export function AttachmentBottomBar({
 	const { data: templateData, loading: templatesLoading } = usePromptTemplates();
 	const { data: toolData, loading: toolsLoading } = useTools();
 
+	/**
+	 * Per-tool UI preference for auto-execute in the picker list.
+	 * Keyed by tool identity; defaults to toolDefinition.autoExecReco.
+	 *
+	 * This is UI-only until the tool is actually inserted (at which point it becomes
+	 * a ToolSelectionElementNode.autoExecute and eventually ToolStoreChoice.autoExecute).
+	 */
+	const [toolAutoExecOverrides, setToolAutoExecOverrides] = useState<Record<string, boolean>>({});
+	const getAutoExecForTool = useMemo(() => {
+		return (item: ToolListItem): boolean => {
+			const key = toolIdentityKey(item.bundleID, item.bundleSlug, item.toolSlug, item.toolVersion);
+			const override = toolAutoExecOverrides[key];
+			if (typeof override === 'boolean') return override;
+			return item.toolDefinition.autoExecReco ?? false;
+		};
+	}, [toolAutoExecOverrides]);
+
 	const toolEntries = getToolNodesWithPath(editor);
 	const webSearchEnabled = webSearchTemplates.length > 0;
 
@@ -200,7 +217,7 @@ export function AttachmentBottomBar({
 		}
 	};
 
-	const handleToolPick = async (item: ToolListItem) => {
+	const handleToolPick = async (item: ToolListItem, autoExecute: boolean) => {
 		insertToolSelectionNode(
 			editor,
 			{
@@ -209,7 +226,10 @@ export function AttachmentBottomBar({
 				toolSlug: item.toolSlug,
 				toolVersion: item.toolVersion,
 			},
-			item.toolDefinition
+			item.toolDefinition,
+			{
+				autoExecute,
+			}
 		);
 
 		onToolsChanged?.();
@@ -359,8 +379,9 @@ export function AttachmentBottomBar({
 								<MenuItem
 									key={`${item.bundleID}-${item.toolSlug}-${item.toolVersion}`}
 									onClick={() => {
-										void handleToolPick(item);
+										void handleToolPick(item, getAutoExecForTool(item));
 									}}
+									hideOnClick={false}
 									className={menuItemClasses}
 									title={`${item.toolSlug.replace(/[-_]/g, ' ')} • ${
 										item.bundleSlug ?? item.bundleID
@@ -368,6 +389,33 @@ export function AttachmentBottomBar({
 								>
 									<FiTool size={14} />
 									<span className="truncate">{item.toolSlug.replace(/[-_]/g, ' ')}</span>
+									{/* Auto-execute toggle: function/custom tools only (websearch is excluded from this menu). */}
+									{(item.toolDefinition.llmToolType === ToolStoreChoiceType.Function ||
+										item.toolDefinition.llmToolType === ToolStoreChoiceType.Custom) && (
+										<div
+											className="ml-auto flex items-center gap-2"
+											onClick={e => {
+												// Prevent toggling from selecting/inserting the tool.
+												e.preventDefault();
+												e.stopPropagation();
+											}}
+										>
+											<span className="text-base-content/60 text-[10px] uppercase">Auto</span>
+											<input
+												type="checkbox"
+												className="toggle toggle-xs"
+												tabIndex={-1}
+												checked={getAutoExecForTool(item)}
+												onChange={e => {
+													const key = toolIdentityKey(item.bundleID, item.bundleSlug, item.toolSlug, item.toolVersion);
+													const next = e.currentTarget.checked;
+													setToolAutoExecOverrides(prev => ({ ...prev, [key]: next }));
+												}}
+												aria-label={`Auto-execute ${item.toolSlug}`}
+												title={getAutoExecForTool(item) ? 'Auto-execute enabled' : 'Auto-execute disabled'}
+											/>
+										</div>
+									)}
 									<span className="text-base-content/50 ml-auto text-[10px] uppercase" aria-hidden="true">
 										{item.toolVersion}
 									</span>

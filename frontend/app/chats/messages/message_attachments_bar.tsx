@@ -152,7 +152,8 @@ function MessageToolCallChip({ call, fullWidth = false, onClick }: MessageToolCa
 	const label = formatToolCallLabel(tmpCall);
 
 	const statusLabel = call.status ? ` (${call.status})` : '';
-	const title = `Suggested tool call: ${label}${statusLabel}`;
+	const autoLabel = call.toolStoreChoice?.autoExecute ? ' • Auto-execute: enabled' : '';
+	const title = `Suggested tool call: ${label}${statusLabel}${autoLabel}`;
 
 	const containerClasses = [
 		'bg-base-200 text-base-content flex items-center justify-between gap-2 rounded-2xl px-2 py-0',
@@ -167,6 +168,7 @@ function MessageToolCallChip({ call, fullWidth = false, onClick }: MessageToolCa
 		<div className={containerClasses} title={title} data-message-chip="tool-suggested" onClick={onClick}>
 			<FiTool size={14} />
 			<span className={labelClasses}>{label}</span>
+			{call.toolStoreChoice?.autoExecute ? <span className="badge badge-primary badge-xs">Auto</span> : null}
 			<span className="text-base-content/60 flex gap-1 text-[10px] uppercase">
 				Details <FiCode size={12} />
 			</span>

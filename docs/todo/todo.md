@@ -8,22 +8,24 @@
   - [ ] a tool call only and tool output only message may be rendered as a single line after this.
   - [ ] we may want to have a "assistant" like we planned before that has tool sets and autoexec config so that the "agent" loop is kind of autonomous
 
-  - [ ] backend to have flag for recommendation per tool
-  - [ ] at choice time ui can show autoexecute true/false and set default to provided one and then allow to change.
+  - [x] backend to have flag for recommendation per tool
+  - [x] at choice time ui can show autoexecute true/false and set default to provided one and then allow to change.
+    - [ ] Right now you can set it at insertion time (picker), and see it in details, but you can’t toggle it later from the “Tools” chip menu.
+    - [ ] toggle has a delayed view effect, i.e doesnt really show immediatly.
+    - [ ] tool menu doesnt show tick when selected. also this should be grid based display, the tick, the auto toggle aligned to some col, and version.
+
   - [ ] rather that drop down in ui for toolcalls we ned to show them as visible chips like citations
-  - [ ] the type of chip shown can be specific to tool call like if toolcall is of type replacetext, we can have chip that shows diff and have run button there too. or generic if no other chip present.
-  - [ ] same can be for result but as of now we dont have tool results with special ui reqs.
+    - [ ] the type of chip shown can be specific to tool call like if toolcall is of type replacetext, we can have chip that shows diff and have run button there too. or generic if no other chip present.
+    - [ ] same can be for result but as of now we dont have tool results with special ui reqs.
+
   - [ ] UI needs to be so that we dont waste a lot of space for tool call only or tool result only cards.
-  - [ ] autoexec should not interact with editor, but manual exec should be present in editor.
+
+- [ ] editor is starting to look very very heavy, review to see for better refactoring and perf opt.
+- [ ] When url cannot fetch content, there is no way of knowing what happened as of now. may want to see how to expose this or disable link only mode in this flow?
 
 ## Features
 
-- [ ] tool features
-  - [ ] Implementation of openai/anthropic etc built-in tools that have been analyzed and filtered.
-  - [x] Analysis of openai/anthropic etc given tools so that they can be invoked in api directly.
-  - [ ] ~~parallel tools can be created locally~~
-  - [ ] there is a reference calculator tool in claude docs
-  - [ ] When url cannot fetch content, there is no way of knowing what happened as of now. may want to see hwo to expose this or disable link only mode in this flow?
+- [ ] there is a reference calculator tool in claude docs
 
 - [ ] valid input output modalities, valid levels, valid reasoning types, etc need to be added to modelpresetspec.
 
@@ -51,9 +53,9 @@
       - [x] web search
 
     - [ ] local replacements for some builtin tools that are very vendor specific
-      - [ ] bash: yes.
-      - [ ] apply patch: No. this is very error prone, cosnidering unidiff vs V4A diff formats and compatibility issues.
-      - [ ] text editor: yes
+      - [x] bash: yes.
+      - [x] apply patch: No. this is very error prone, cosnidering unidiff vs V4A diff formats and compatibility issues.
+      - [x] text editor: yes
       - [ ] tool search tool: we may need a tool search tool that does sqlite based bm25 search or regex search like from anthropic
 
     - [x] Dont: New stateful APIs and its hooks from vendors

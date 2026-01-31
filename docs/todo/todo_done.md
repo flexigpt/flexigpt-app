@@ -680,3 +680,8 @@
 - [x] after paste cursor has again moved out someplace as of 72.
 - [x] we should look at restricting sqlite search to last n days. ideally 30. Not now.
 - [x] no scroll bar when no of tools/files chips become large.
+
+- [x] tool features
+  - [x] Implementation of openai/anthropic etc built-in tools that have been analyzed and filtered.
+  - [x] Analysis of openai/anthropic etc given tools so that they can be invoked in api directly.
+  - [ ] ~~parallel tools can be created locally~~
