@@ -1,6 +1,6 @@
-import { FiCheck, FiChevronUp, FiCode, FiTool, FiX } from 'react-icons/fi';
+import { FiChevronUp, FiTool, FiX } from 'react-icons/fi';
 
-import { Menu, MenuButton, MenuItem, useMenuStore } from '@ariakit/react';
+import { Menu, MenuButton, useMenuStore } from '@ariakit/react';
 import type { Path } from 'platejs';
 import type { PlateEditor } from 'platejs/react';
 
@@ -14,6 +14,7 @@ import {
 	toolIdentityKey,
 	type ToolSelectionElementNode,
 } from '@/chats/tools/tool_editor_utils';
+import { ToolMenuRow } from '@/chats/tools/tool_menu_row';
 
 interface ToolChoicesChipProps {
 	editor: PlateEditor;
@@ -110,126 +111,53 @@ export function ToolChoicesChip({ editor, toolEntries, onToolsChanged, onShowToo
 					const rawDisplay: string | undefined = node.toolSnapshot?.displayName ?? node.toolSlug;
 					const display = rawDisplay && rawDisplay.length > 0 ? rawDisplay : 'Tool';
 					const slug = `${node.bundleSlug ?? node.bundleID}/${node.toolSlug}@${node.toolVersion}`;
-					const truncatedDisplay = display.length > 40 ? `${display.slice(0, 37)}…` : display;
 					const schema = node.toolSnapshot?.userArgSchema;
 					const status = computeToolUserArgsStatus(schema, node.userArgSchemaInstance);
-					const hasArgs = status.hasSchema;
-					const argsLabel = !hasArgs
-						? ''
-						: status.isSatisfied
-							? 'Args: OK'
-							: `Args: ${status.missingRequired.length} missing`;
-					const argsClass =
-						!hasArgs || status.requiredKeys.length === 0
-							? 'badge badge-ghost badge-xs'
-							: status.isSatisfied
-								? 'badge badge-success badge-xs'
-								: 'badge badge-warning badge-xs';
 					const supportsAutoExecute =
 						node.toolType === ToolStoreChoiceType.Function || node.toolType === ToolStoreChoiceType.Custom;
+					const hasArgs = status?.hasSchema ?? false;
 					return (
-						<MenuItem
+						<ToolMenuRow
 							key={node.selectionID}
 							store={menu}
-							hideOnClick={false}
-							className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
-						>
-							<div
-								className="grid grid-cols-12 items-center gap-x-2 px-2 py-1"
-								title={`Tool choice: ${display} (${slug}@${node.toolVersion})`}
-								data-attachment-chip="tool-choice"
-								data-selection-id={node.selectionID}
-							>
-								<div className="col-span-8 flex items-center gap-1">
-									{/* name */}
-									<FiTool className="justify-start" size={14} />
-									<div className="flex-1 justify-start truncate">
-										<div className="truncate text-xs font-medium">{truncatedDisplay}</div>
-										<div className="text-base-content/70 truncate text-[11px]">{slug}</div>
-									</div>
-
-									{/* tick (selected/attached) */}
-									<div className="justify-end" aria-label="Selected" title="Selected">
-										<FiCheck size={14} className="text-primary" />
-									</div>
-								</div>
-								{/* auto-exec column (aligned for all tool types) */}
-								<div className="col-span-2 shrink-0 justify-self-center whitespace-nowrap">
-									{supportsAutoExecute ? (
-										<label
-											className="flex items-center gap-1 text-[11px]"
-											title="Automatically run tool calls for this tool"
-											onPointerDown={e => {
-												e.stopPropagation();
-											}}
-											onClick={e => {
-												e.stopPropagation();
-											}}
-										>
-											<span className="text-base-content/60">Auto</span>
-											<input
-												type="checkbox"
-												className="toggle toggle-xs"
-												checked={node.autoExecute}
-												onChange={() => {
-													handleToggleAutoExecute(node);
-												}}
-											/>
-										</label>
-									) : (
-										<span className="text-base-content/40 text-[11px]" title="Auto-exec not applicable">
-											—
-										</span>
-									)}
-								</div>
-
-								{/* right actions */}
-								<div className="col-span-2 flex items-center justify-end gap-1">
-									{hasArgs && <span className={argsClass}>{argsLabel}</span>}
-									{hasArgs && (
-										<button
-											type="button"
-											className="btn btn-ghost btn-xs shrink-0 px-1 py-0 shadow-none"
-											onClick={e => {
-												e.preventDefault();
-												e.stopPropagation();
-												dispatchOpenToolArgs({ kind: 'attached', selectionID: node.selectionID });
-											}}
-											title="Edit tool options"
-											aria-label="Edit tool options"
-										>
-											<FiChevronUp size={12} />
-										</button>
-									)}
-
-									{onShowToolDetails && (
-										<button
-											type="button"
-											className="btn btn-ghost btn-xs shrink-0 px-1 py-0 shadow-none"
-											onClick={() => {
-												onShowToolDetails(node);
-											}}
-											title="Show tool details"
-											aria-label="Show tool details"
-										>
-											<FiCode size={12} />
-										</button>
-									)}
-
-									<button
-										type="button"
-										className="btn btn-ghost btn-xs text-error shrink-0 px-1 py-0 shadow-none"
-										onClick={() => {
-											handleRemoveSingle(node);
-										}}
-										title="Remove tool choice"
-										aria-label="Remove tool choice"
-									>
-										<FiX size={12} />
-									</button>
-								</div>
-							</div>
-						</MenuItem>
+							menuItemClassName="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
+							contentClassName="grid grid-cols-12 items-center gap-x-2 px-2 py-1"
+							dataAttachmentChip="tool-choice"
+							dataSelectionId={node.selectionID}
+							title={`Tool choice: ${display} (${slug}@${node.toolVersion})`}
+							display={display}
+							slug={slug}
+							isSelected={true}
+							supportsAutoExecute={supportsAutoExecute}
+							autoExecute={node.autoExecute}
+							onAutoExecuteChange={() => {
+								handleToggleAutoExecute(node);
+							}}
+							argsStatus={status}
+							// Keep your existing "edit" icon if you prefer:
+							editIcon={<FiChevronUp size={12} />}
+							onEditOptions={
+								hasArgs
+									? () => {
+											dispatchOpenToolArgs({ kind: 'attached', selectionID: node.selectionID });
+										}
+									: undefined
+							}
+							onShowDetails={
+								onShowToolDetails
+									? () => {
+											onShowToolDetails(node);
+										}
+									: undefined
+							}
+							primaryAction={{
+								kind: 'remove',
+								onClick: () => {
+									handleRemoveSingle(node);
+								},
+								title: 'Remove tool choice',
+							}}
+						/>
 					);
 				})}
 			</Menu>

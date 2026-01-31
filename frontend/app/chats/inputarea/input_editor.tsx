@@ -1585,6 +1585,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						shortcutConfig={shortcutConfig}
 						currentProviderSDKType={currentProviderSDKType}
 						onToolsChanged={handleAttachedToolsChanged}
+						attachedToolEntries={attachedToolEntries}
 						webSearchTemplates={webSearchTemplates}
 						setWebSearchTemplates={setWebSearchTemplates}
 					/>

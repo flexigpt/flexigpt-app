@@ -1,8 +1,9 @@
 import { type Dispatch, type ReactNode, type RefObject, type SetStateAction, useMemo, useState } from 'react';
 
-import { FiCheck, FiFilePlus, FiFolder, FiLink, FiPaperclip, FiTool, FiUpload } from 'react-icons/fi';
+import { FiFilePlus, FiFolder, FiLink, FiPaperclip, FiTool, FiUpload } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, type MenuStore } from '@ariakit/react';
+import type { Path } from 'platejs';
 import { type PlateEditor, useEditorRef } from 'platejs/react';
 
 import type { ProviderSDKType } from '@/spec/inference';
@@ -27,7 +28,9 @@ import {
 	removeToolByKey,
 	setToolAutoExecuteByKey,
 	toolIdentityKey,
+	type ToolSelectionElementNode,
 } from '@/chats/tools/tool_editor_utils';
+import { ToolMenuRow } from '@/chats/tools/tool_menu_row';
 import { WebSearchBottomBarChip } from '@/chats/tools/web_search_bottom_bar_chip';
 import {
 	getEligibleWebSearchTools,
@@ -53,6 +56,8 @@ interface AttachmentBottomBarProps {
 	currentProviderSDKType: ProviderSDKType;
 
 	onToolsChanged?: () => void;
+	attachedToolEntries?: Array<[ToolSelectionElementNode, Path]>;
+
 	// Web-search state comes from EditorArea (separate UX/state)
 	webSearchTemplates: WebSearchChoiceTemplate[];
 	setWebSearchTemplates: Dispatch<SetStateAction<WebSearchChoiceTemplate[]>>;
@@ -91,10 +96,10 @@ const menuItemClasses =
 	'flex items-center gap-2 rounded-xl px-2 py-1 text-sm outline-none transition-colors ' +
 	'hover:bg-base-200 data-[active-item]:bg-base-300';
 
-const toolPickerItemClasses =
-	'grid grid-cols-12 items-center gap-x-2 ' +
-	'rounded-xl px-2 py-1 text-sm outline-none transition-colors ' +
+const toolPickerMenuItemClasses =
+	'rounded-xl px-0 py-0 text-sm outline-none transition-colors ' +
 	'hover:bg-base-200 data-[active-item]:bg-base-300 overflow-hidden';
+
 /**
   Bottom bar for template/tool/attachment buttons and tips menus.
   The chips scroller now lives in a separate bar inside the editor.
@@ -103,7 +108,6 @@ export function AttachmentBottomBar({
 	onAttachFiles,
 	onAttachDirectory,
 	onAttachURL,
-
 	templateMenuState,
 	toolMenuState,
 	attachmentMenuState,
@@ -113,6 +117,7 @@ export function AttachmentBottomBar({
 	shortcutConfig,
 	currentProviderSDKType,
 	onToolsChanged,
+	attachedToolEntries,
 	webSearchTemplates,
 	setWebSearchTemplates,
 }: AttachmentBottomBarProps) {
@@ -129,7 +134,7 @@ export function AttachmentBottomBar({
 	);
 	const { data: templateData, loading: templatesLoading } = usePromptTemplates();
 	const { data: toolData, loading: toolsLoading } = useTools();
-	const toolEntries = getToolNodesWithPath(editor);
+	const toolEntries = attachedToolEntries ?? getToolNodesWithPath(editor);
 
 	const attachedAutoExecByKey = useMemo(() => {
 		const map: Record<string, boolean> = {};
@@ -186,9 +191,9 @@ export function AttachmentBottomBar({
 		return computeToolUserArgsStatus(schema, activeWebSearch.userArgSchemaInstance);
 	}, [activeWebSearchDef, activeWebSearch]);
 
-	const attachedToolKeys = new Set(
-		toolEntries.map(([node]) => toolIdentityKey(node.bundleID, node.bundleSlug, node.toolSlug, node.toolVersion))
-	);
+	const attachedToolKeys = useMemo(() => {
+		return new Set(toolEntries.map(([n]) => toolIdentityKey(n.bundleID, n.bundleSlug, n.toolSlug, n.toolVersion)));
+	}, [toolEntries]);
 
 	const availableTools: ToolListItem[] = toolsLoading
 		? []
@@ -226,28 +231,23 @@ export function AttachmentBottomBar({
 			editor.tf.focus();
 		}
 	};
-	const handleToolToggle = (item: ToolListItem) => {
+	const handleAttachTool = (item: ToolListItem) => {
 		const key = toolIdentityKey(item.bundleID, item.bundleSlug, item.toolSlug, item.toolVersion);
 		if (!key) return;
 
-		const isAttached = attachedToolKeys.has(key);
+		if (attachedToolKeys.has(key)) return;
+		insertToolSelectionNode(
+			editor,
+			{ bundleID: item.bundleID, bundleSlug: item.bundleSlug, toolSlug: item.toolSlug, toolVersion: item.toolVersion },
+			item.toolDefinition,
+			{ autoExecute: getAutoExecForTool(item) }
+		);
+		onToolsChanged?.();
+	};
 
-		if (isAttached) {
-			removeToolByKey(editor, key);
-		} else {
-			insertToolSelectionNode(
-				editor,
-				{
-					bundleID: item.bundleID,
-					bundleSlug: item.bundleSlug,
-					toolSlug: item.toolSlug,
-					toolVersion: item.toolVersion,
-				},
-				item.toolDefinition,
-				{ autoExecute: getAutoExecForTool(item) }
-			);
-		}
-
+	const handleDetachToolByKey = (key: string) => {
+		if (!key) return;
+		removeToolByKey(editor, key);
 		onToolsChanged?.();
 	};
 
@@ -386,89 +386,63 @@ export function AttachmentBottomBar({
 						) : availableTools.length === 0 ? (
 							<div className={`${menuItemClasses} text-base-content/60 cursor-default`}>No tools available</div>
 						) : (
-							availableTools.map(item =>
-								// Show full identity in the tooltip; visible text stays compact.
-								// e.g. "my-tool (bundleSlug/toolSlug@version)".
-								(() => {
-									const rawDisplay: string | undefined = item.toolDefinition?.displayName ?? item.toolSlug;
-									const display = rawDisplay && rawDisplay.length > 0 ? rawDisplay : 'Tool';
-									const slug = `${item.bundleSlug ?? item.bundleID}/${item.toolSlug}@${item.toolVersion}`;
-									const truncatedDisplay = display.length > 40 ? `${display.slice(0, 37)}…` : display;
+							availableTools.map(item => {
+								const display = item.toolDefinition.displayName || item.toolSlug || 'Tool';
+								const slug = `${item.bundleSlug ?? item.bundleID}/${item.toolSlug}@${item.toolVersion}`;
+								const key = toolIdentityKey(item.bundleID, item.bundleSlug, item.toolSlug, item.toolVersion);
+								const isAttached = attachedToolKeys.has(key);
+								const supportsAutoExecute =
+									item.toolDefinition.llmToolType === ToolStoreChoiceType.Function ||
+									item.toolDefinition.llmToolType === ToolStoreChoiceType.Custom;
 
-									const key = toolIdentityKey(item.bundleID, item.bundleSlug, item.toolSlug, item.toolVersion);
-									const isAttached = attachedToolKeys.has(key);
-									const supportsAutoExecute =
-										item.toolDefinition.llmToolType === ToolStoreChoiceType.Function ||
-										item.toolDefinition.llmToolType === ToolStoreChoiceType.Custom;
-
-									return (
-										<MenuItem
-											key={`${item.bundleID}-${item.toolSlug}-${item.toolVersion}`}
-											onClick={() => {
-												handleToolToggle(item);
-											}}
-											hideOnClick={false}
-											className={`${toolPickerItemClasses} ${isAttached ? 'bg-base-200' : ''}`}
-											title={`Tool: ${display} (${slug}@${item.toolVersion})`}
-										>
-											<div className="col-span-10 flex items-center gap-1">
-												{/* name */}
-												<FiTool className="justify-start" size={14} />
-												<div className="flex-1 justify-start truncate">
-													<div className="truncate text-xs font-medium">{truncatedDisplay}</div>
-													<div className="text-base-content/70 truncate text-[11px]">{slug}</div>
-												</div>
-
-												{/* tick (selected/attached) */}
-												<div
-													className="shrink-0 justify-end"
-													title={isAttached ? 'Selected' : ''}
-													aria-label={isAttached ? 'Selected' : ''}
-												>
-													{isAttached ? <FiCheck size={14} className="text-primary justify-end" /> : null}
-												</div>
-											</div>
-											{/* Auto column aligned for all tool types */}
-											<div className="col-span-2 shrink-0 justify-self-center whitespace-nowrap">
-												{supportsAutoExecute ? (
-													<label
-														className="flex items-center gap-1 text-[11px]"
-														onPointerDown={e => {
-															e.stopPropagation();
-														}}
-														onClick={e => {
-															e.stopPropagation();
-														}}
-														title="Auto-execute"
-													>
-														<span className="text-base-content/60">Auto</span>
-														<input
-															type="checkbox"
-															className="toggle toggle-xs"
-															tabIndex={-1}
-															checked={getAutoExecForTool(item)}
-															onChange={e => {
-																const next = e.currentTarget.checked;
-																if (isAttached) {
-																	setToolAutoExecuteByKey(editor, key, next);
-																	onToolsChanged?.();
-																	return;
-																}
-																setToolAutoExecOverrides(prev => ({ ...prev, [key]: next }));
-															}}
-															aria-label={`Auto-execute ${item.toolSlug}`}
-														/>
-													</label>
-												) : (
-													<span className="text-base-content/40 text-[11px]" title="Auto-exec not applicable">
-														—
-													</span>
-												)}
-											</div>
-										</MenuItem>
-									);
-								})()
-							)
+								return (
+									<ToolMenuRow
+										key={`${item.bundleID}-${item.toolSlug}-${item.toolVersion}`}
+										menuItemClassName={`${toolPickerMenuItemClasses} ${isAttached ? 'bg-base-200' : ''}`}
+										title={`Tool: ${display} (${slug})`}
+										display={display}
+										slug={slug}
+										isSelected={isAttached}
+										supportsAutoExecute={supportsAutoExecute}
+										autoExecute={getAutoExecForTool(item)}
+										onAutoExecuteChange={next => {
+											if (isAttached) {
+												setToolAutoExecuteByKey(editor, key, next);
+												onToolsChanged?.();
+												return;
+											}
+											setToolAutoExecOverrides(prev => ({ ...prev, [key]: next }));
+										}}
+										onRowClick={
+											!isAttached
+												? () => {
+														handleAttachTool(item);
+													}
+												: () => {
+														handleDetachToolByKey(key);
+													}
+										}
+										primaryAction={
+											isAttached
+												? {
+														kind: 'detach',
+														onClick: () => {
+															handleDetachToolByKey(key);
+														},
+														title: 'Detach tool',
+													}
+												: {
+														kind: 'attach',
+														onClick: () => {
+															handleAttachTool(item);
+														},
+														title: 'Attach tool',
+														label: 'Attach',
+													}
+										}
+									/>
+								);
+							})
 						)}
 					</Menu>
 
