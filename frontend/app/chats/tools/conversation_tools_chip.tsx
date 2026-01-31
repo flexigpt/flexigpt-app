@@ -1,4 +1,4 @@
-import { FiChevronUp, FiCode, FiEdit2, FiTool, FiX } from 'react-icons/fi';
+import { FiCheck, FiChevronUp, FiCode, FiEdit2, FiTool, FiX } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore } from '@ariakit/react';
 
@@ -119,19 +119,16 @@ export function ConversationToolsChip({ tools, onChange, onShowToolDetails }: Co
 
 	const title = `Conversation tools\n${count} tool${count === 1 ? '' : 's'} in this conversation`;
 
-	const handleToggleEnabled = (key: string) => {
-		if (!onChange) return;
-		const next = tools.map(entry => (entry.key === key ? { ...entry, enabled: !entry.enabled } : entry));
-		onChange(next);
-	};
-
 	const handleToggleAutoExecute = (key: string) => {
 		if (!onChange) return;
 		const next = tools.map(entry =>
 			entry.key === key
 				? {
 						...entry,
-						toolStoreChoice: { ...entry.toolStoreChoice, autoExecute: !entry.toolStoreChoice.autoExecute },
+						toolStoreChoice: {
+							...entry.toolStoreChoice,
+							autoExecute: !entry.toolStoreChoice.autoExecute,
+						},
 					}
 				: entry
 		);
@@ -197,6 +194,10 @@ export function ConversationToolsChip({ tools, onChange, onShowToolDetails }: Co
 							: toolStoreChoice.toolSlug) || 'Tool';
 					const slug = `${toolStoreChoice.bundleID ?? 'bundle'}/${toolStoreChoice.toolSlug}@${toolStoreChoice.toolVersion}`;
 					const truncatedDisplay = display.length > 40 ? `${display.slice(0, 37)}…` : display;
+					const supportsAutoExecute =
+						toolStoreChoice.toolType === ToolStoreChoiceType.Function ||
+						toolStoreChoice.toolType === ToolStoreChoiceType.Custom;
+
 					// If argStatus is precomputed, use it; otherwise compute on the fly if we have definition.
 					const status =
 						entry.toolDefinition && entry.toolDefinition.userArgSchema
@@ -231,46 +232,55 @@ export function ConversationToolsChip({ tools, onChange, onShowToolDetails }: Co
 							className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
 						>
 							<div
-								className="flex items-center gap-2 px-2 py-1"
-								title={`Conversation tool: ${display} (${slug})`}
+								className="grid grid-cols-12 items-center gap-x-2 px-2 py-1"
+								title={`Conversation tool: ${display} (${slug}@${toolStoreChoice.toolVersion})`}
 								data-attachment-chip="conversation-tool"
 							>
-								<FiTool size={14} />
-								<div className="min-w-0 flex-1">
-									<div className="truncate text-xs font-medium">{truncatedDisplay}</div>
-									<div className="text-base-content/70 truncate text-[11px]">{slug}</div>
+								<div className="col-span-8 flex items-center gap-1">
+									<FiTool className="justify-start" size={14} />
+									<div className="flex-1 justify-start truncate">
+										<div className="truncate text-xs font-medium">{truncatedDisplay}</div>
+										<div className="text-base-content/70 truncate text-[11px]">{slug}</div>
+									</div>
+
+									{/* tick (selected/attached) */}
+									<div className="justify-end" title={entry.enabled ? 'Enabled' : 'Disabled'}>
+										{entry.enabled ? <FiCheck className="justify-end" size={14} /> : null}
+									</div>
 								</div>
 
-								{/* Enable / disable toggle (UI-only) */}
-								<label className="flex items-center gap-1 text-[11px]">
-									<input
-										type="checkbox"
-										className="toggle toggle-xs"
-										checked={entry.enabled}
-										onChange={() => {
-											handleToggleEnabled(key);
-										}}
-									/>
-									<span className="whitespace-nowrap">{entry.enabled ? 'On' : 'Off'}</span>
-								</label>
+								{/* Auto-execute column aligned for all tool types */}
+								<div className="col-span-2 shrink-0 justify-self-center whitespace-nowrap">
+									{supportsAutoExecute ? (
+										<label
+											className="flex items-center gap-1 text-[11px]"
+											title="Automatically run tool calls for this tool"
+											onPointerDown={e => {
+												e.stopPropagation();
+											}}
+											onClick={e => {
+												e.stopPropagation();
+											}}
+										>
+											<span className="text-base-content/60">Auto</span>
+											<input
+												type="checkbox"
+												className="toggle toggle-xs"
+												checked={entry.toolStoreChoice.autoExecute}
+												onChange={() => {
+													handleToggleAutoExecute(key);
+												}}
+											/>
+										</label>
+									) : (
+										<span className="text-base-content/40 text-[11px]" title="Auto-exec not applicable">
+											—
+										</span>
+									)}
+								</div>
 
-								{/* Auto-execute toggle (persisted into ToolStoreChoice.autoExecute) */}
-								<label
-									className="flex items-center gap-1 text-[11px]"
-									title="Automatically run tool calls for this tool"
-								>
-									<input
-										type="checkbox"
-										className="toggle toggle-xs"
-										checked={entry.toolStoreChoice.autoExecute}
-										onChange={() => {
-											handleToggleAutoExecute(key);
-										}}
-									/>
-									<span className="whitespace-nowrap">Auto</span>
-								</label>
-								{/* Args status + edit */}
-								<div className="flex items-center gap-1 px-1">
+								<div className="col-span-2 flex items-center justify-end gap-1">
+									{/* Args status + edit */}
 									{hasArgs && <span className={argsClass}>{argsLabel}</span>}
 									{hasArgs && (
 										<button
@@ -287,35 +297,34 @@ export function ConversationToolsChip({ tools, onChange, onShowToolDetails }: Co
 											<FiEdit2 size={12} />
 										</button>
 									)}
-								</div>
+									{/* JSON details */}
+									{onShowToolDetails && (
+										<button
+											type="button"
+											className="btn btn-ghost btn-xs shrink-0 px-1 py-0 shadow-none"
+											onClick={() => {
+												onShowToolDetails(entry);
+											}}
+											title="Show tool details"
+											aria-label="Show tool details"
+										>
+											<FiCode size={12} />
+										</button>
+									)}
 
-								{/* JSON details */}
-								{onShowToolDetails && (
+									{/* Remove from conversation tools */}
 									<button
 										type="button"
-										className="btn btn-ghost btn-xs shrink-0 px-1 py-0 shadow-none"
+										className="btn btn-ghost btn-xs text-error shrink-0 px-1 py-0 shadow-none"
 										onClick={() => {
-											onShowToolDetails(entry);
+											handleRemoveSingle(key);
 										}}
-										title="Show tool details"
-										aria-label="Show tool details"
+										title="Remove conversation tool"
+										aria-label="Remove conversation tool"
 									>
-										<FiCode size={12} />
+										<FiX size={12} />
 									</button>
-								)}
-
-								{/* Remove from conversation tools */}
-								<button
-									type="button"
-									className="btn btn-ghost btn-xs text-error shrink-0 px-1 py-0 shadow-none"
-									onClick={() => {
-										handleRemoveSingle(key);
-									}}
-									title="Remove conversation tool"
-									aria-label="Remove conversation tool"
-								>
-									<FiX size={12} />
-								</button>
+								</div>
 							</div>
 						</MenuItem>
 					);

@@ -1,4 +1,4 @@
-import { FiChevronUp, FiCode, FiTool, FiX } from 'react-icons/fi';
+import { FiCheck, FiChevronUp, FiCode, FiTool, FiX } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore } from '@ariakit/react';
 import type { Path } from 'platejs';
@@ -10,6 +10,7 @@ import { dispatchOpenToolArgs } from '@/chats/events/open_attached_toolargs';
 import {
 	computeToolUserArgsStatus,
 	removeToolByKey,
+	setToolAutoExecuteByKey,
 	toolIdentityKey,
 	type ToolSelectionElementNode,
 } from '@/chats/tools/tool_editor_utils';
@@ -37,6 +38,12 @@ export function ToolChoicesChip({ editor, toolEntries, onToolsChanged, onShowToo
 	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
 
 	const title = `Tools\n${count} tool${count === 1 ? '' : 's'} attached`;
+	const handleToggleAutoExecute = (node: ToolSelectionElementNode) => {
+		const key = toolIdentityKey(node.bundleID, node.bundleSlug, node.toolSlug, node.toolVersion);
+		if (!key) return;
+		setToolAutoExecuteByKey(editor, key, !node.autoExecute);
+		onToolsChanged?.();
+	};
 
 	const handleRemoveSingle = (node: ToolSelectionElementNode) => {
 		const key = toolIdentityKey(node.bundleID, node.bundleSlug, node.toolSlug, node.toolVersion);
@@ -94,7 +101,7 @@ export function ToolChoicesChip({ editor, toolEntries, onToolsChanged, onShowToo
 			<Menu
 				store={menu}
 				gutter={6}
-				className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
+				className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-72 min-w-80 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
 				autoFocusOnShow
 			>
 				<div className="text-base-content/70 mb-1 text-[11px] font-semibold">Tools</div>
@@ -118,6 +125,8 @@ export function ToolChoicesChip({ editor, toolEntries, onToolsChanged, onShowToo
 							: status.isSatisfied
 								? 'badge badge-success badge-xs'
 								: 'badge badge-warning badge-xs';
+					const supportsAutoExecute =
+						node.toolType === ToolStoreChoiceType.Function || node.toolType === ToolStoreChoiceType.Custom;
 					return (
 						<MenuItem
 							key={node.selectionID}
@@ -126,25 +135,64 @@ export function ToolChoicesChip({ editor, toolEntries, onToolsChanged, onShowToo
 							className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
 						>
 							<div
-								className="flex items-center gap-2 px-2 py-1"
-								title={`Tool choice: ${display} (${slug})`}
+								className="grid grid-cols-12 items-center gap-x-2 px-2 py-1"
+								title={`Tool choice: ${display} (${slug}@${node.toolVersion})`}
 								data-attachment-chip="tool-choice"
 								data-selection-id={node.selectionID}
 							>
-								<FiTool size={14} />
-								<div className="min-w-0 flex-1">
-									<div className="truncate text-xs font-medium">{truncatedDisplay}</div>
-									<div className="text-base-content/70 truncate text-[11px]">{slug}</div>
-								</div>{' '}
-								<div className="flex items-center gap-1">
+								<div className="col-span-8 flex items-center gap-1">
+									{/* name */}
+									<FiTool className="justify-start" size={14} />
+									<div className="flex-1 justify-start truncate">
+										<div className="truncate text-xs font-medium">{truncatedDisplay}</div>
+										<div className="text-base-content/70 truncate text-[11px]">{slug}</div>
+									</div>
+
+									{/* tick (selected/attached) */}
+									<div className="justify-end" aria-label="Selected" title="Selected">
+										<FiCheck size={14} className="text-primary" />
+									</div>
+								</div>
+								{/* auto-exec column (aligned for all tool types) */}
+								<div className="col-span-2 shrink-0 justify-self-center whitespace-nowrap">
+									{supportsAutoExecute ? (
+										<label
+											className="flex items-center gap-1 text-[11px]"
+											title="Automatically run tool calls for this tool"
+											onPointerDown={e => {
+												e.stopPropagation();
+											}}
+											onClick={e => {
+												e.stopPropagation();
+											}}
+										>
+											<span className="text-base-content/60">Auto</span>
+											<input
+												type="checkbox"
+												className="toggle toggle-xs"
+												checked={node.autoExecute}
+												onChange={() => {
+													handleToggleAutoExecute(node);
+												}}
+											/>
+										</label>
+									) : (
+										<span className="text-base-content/40 text-[11px]" title="Auto-exec not applicable">
+											—
+										</span>
+									)}
+								</div>
+
+								{/* right actions */}
+								<div className="col-span-2 flex items-center justify-end gap-1">
 									{hasArgs && <span className={argsClass}>{argsLabel}</span>}
 									{hasArgs && (
 										<button
 											type="button"
 											className="btn btn-ghost btn-xs shrink-0 px-1 py-0 shadow-none"
 											onClick={e => {
-												e.preventDefault(); // don’t submit the composer form
-												e.stopPropagation(); // don’t trigger any parent click handlers
+												e.preventDefault();
+												e.stopPropagation();
 												dispatchOpenToolArgs({ kind: 'attached', selectionID: node.selectionID });
 											}}
 											title="Edit tool options"
@@ -153,31 +201,33 @@ export function ToolChoicesChip({ editor, toolEntries, onToolsChanged, onShowToo
 											<FiChevronUp size={12} />
 										</button>
 									)}
-								</div>
-								{onShowToolDetails && (
+
+									{onShowToolDetails && (
+										<button
+											type="button"
+											className="btn btn-ghost btn-xs shrink-0 px-1 py-0 shadow-none"
+											onClick={() => {
+												onShowToolDetails(node);
+											}}
+											title="Show tool details"
+											aria-label="Show tool details"
+										>
+											<FiCode size={12} />
+										</button>
+									)}
+
 									<button
 										type="button"
-										className="btn btn-ghost btn-xs shrink-0 px-1 py-0 shadow-none"
+										className="btn btn-ghost btn-xs text-error shrink-0 px-1 py-0 shadow-none"
 										onClick={() => {
-											onShowToolDetails(node);
+											handleRemoveSingle(node);
 										}}
-										title="Show tool details"
-										aria-label="Show tool details"
+										title="Remove tool choice"
+										aria-label="Remove tool choice"
 									>
-										<FiCode size={12} />
+										<FiX size={12} />
 									</button>
-								)}
-								<button
-									type="button"
-									className="btn btn-ghost btn-xs text-error shrink-0 px-1 py-0 shadow-none"
-									onClick={() => {
-										handleRemoveSingle(node);
-									}}
-									title="Remove tool choice"
-									aria-label="Remove tool choice"
-								>
-									<FiX size={12} />
-								</button>
+								</div>
 							</div>
 						</MenuItem>
 					);

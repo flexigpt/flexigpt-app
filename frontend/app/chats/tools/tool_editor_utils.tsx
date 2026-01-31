@@ -347,11 +347,7 @@ export function insertToolSelectionNode(
 		// Insert the tool chip (invisible inline) and an empty text leaf after it
 		// so the caret has a cheap place to land without forcing block normalization.
 		editor.tf.insertNodes([node, { text: '' }], { select: true });
-		editor.tf.collapse({ edge: 'end' });
-		editor.tf.select(undefined, { edge: 'end' });
 	});
-
-	editor.tf.focus();
 }
 
 // List tool nodes with path in document order.
@@ -396,7 +392,6 @@ export function removeToolByKey(editor: PlateEditor, identityKey: string) {
 			// swallow
 		}
 	}
-	editor.tf.focus();
 }
 
 // Build a serializable list of attached tools for submission
@@ -637,4 +632,30 @@ export function collectToolCallsFromOutputs(
 	}
 
 	return map;
+}
+
+// Update autoExecute for all instances of a tool by identity key (bundle+slug+version).
+export function setToolAutoExecuteByKey(editor: PlateEditor, identityKey: string, autoExecute: boolean) {
+	const paths: Path[] = [];
+	for (const [el, path] of NodeApi.elements(editor)) {
+		if (ElementApi.isElementType(el, KEY_TOOL_SELECTION)) {
+			const n = el as unknown as ToolSelectionElementNode;
+			if (toolIdentityKeyFromNode(n) === identityKey) {
+				paths.push(path);
+			}
+		}
+	}
+
+	if (paths.length === 0) return;
+
+	editor.tf.withoutNormalizing(() => {
+		for (const p of paths) {
+			try {
+				// Update the hidden carrier node; chips read from this.
+				editor.tf.setNodes<ToolSelectionElementNode>({ autoExecute }, { at: p });
+			} catch {
+				// swallow
+			}
+		}
+	});
 }

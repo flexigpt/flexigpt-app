@@ -11,10 +11,10 @@
   - [x] backend to have flag for recommendation per tool
   - [x] at choice time ui can show autoexecute true/false and set default to provided one and then allow to change.
     - [ ] Right now you can set it at insertion time (picker), and see it in details, but you can’t toggle it later from the “Tools” chip menu.
-    - [ ] toggle has a delayed view effect, i.e doesnt really show immediatly.
+    - [ ] toggle has a delayed view effect, i.e doesnt really show immediately. if you click it doesnt change, but if you click next, then it changes.
     - [ ] tool menu doesnt show tick when selected. also this should be grid based display, the tick, the auto toggle aligned to some col, and version.
 
-  - [ ] rather that drop down in ui for toolcalls we ned to show them as visible chips like citations
+  - [ ] rather that drop down in ui for toolcalls we need to show them as visible chips like citations if there is some "content" (not jsut thinking content)
     - [ ] the type of chip shown can be specific to tool call like if toolcall is of type replacetext, we can have chip that shows diff and have run button there too. or generic if no other chip present.
     - [ ] same can be for result but as of now we dont have tool results with special ui reqs.
 
