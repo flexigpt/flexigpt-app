@@ -1,4 +1,4 @@
-package store
+package storehelper
 
 import (
 	"encoding/json"
@@ -11,8 +11,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
-// validateTool performs structural validation of a Tool object.
-func validateTool(t *spec.Tool) error {
+// ValidateTool performs structural validation of a Tool object.
+func ValidateTool(t *spec.Tool) error {
 	if t == nil {
 		return errors.New("tool is nil")
 	}

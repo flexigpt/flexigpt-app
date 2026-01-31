@@ -149,6 +149,7 @@ export interface Tool {
 
 	userCallable: boolean;
 	llmCallable: boolean;
+	autoExecReco: boolean;
 
 	argSchema: JSONSchema;
 	userArgSchema?: JSONSchema;

@@ -20,6 +20,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/tool/goregistry"
 	"github.com/flexigpt/flexigpt-app/internal/tool/httprunner"
 	"github.com/flexigpt/flexigpt-app/internal/tool/spec"
+	"github.com/flexigpt/flexigpt-app/internal/tool/storehelper"
 	"github.com/flexigpt/llmtools-go"
 	"github.com/ppipada/mapstore-go"
 	"github.com/ppipada/mapstore-go/ftsengine"
@@ -52,7 +53,7 @@ type ToolStore struct {
 
 	pp mapstore.PartitionProvider
 
-	slugLock *slugLocks
+	slugLock *storehelper.SlugLocks
 
 	// Cleanup loop plumbing.
 	cleanOnce sync.Once
@@ -139,7 +140,7 @@ func NewToolStore(baseDir string, opts ...Option) (*ToolStore, error) {
 		return nil, err
 	}
 
-	ts.slugLock = newSlugLocks()
+	ts.slugLock = storehelper.NewSlugLocks()
 	ts.startCleanupLoop()
 
 	slog.Info("tool-store ready", "baseDir", ts.baseDir, "fts", ts.enableFTS)
@@ -463,7 +464,7 @@ func (ts *ToolStore) PutTool(
 	dirInfo, _ := bundleitemutils.BuildBundleDir(bundle.ID, bundle.Slug)
 
 	// Per-slug lock.
-	lock := ts.slugLock.lockKey(bundle.ID, req.ToolSlug)
+	lock := ts.slugLock.LockKey(bundle.ID, req.ToolSlug)
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -499,6 +500,7 @@ func (ts *ToolStore) PutTool(
 
 		UserCallable: req.Body.UserCallable,
 		LLMCallable:  req.Body.LLMCallable,
+		AutoExecReco: req.Body.AutoExecReco,
 
 		ArgSchema: json.RawMessage(argSchemaStr),
 
@@ -511,7 +513,7 @@ func (ts *ToolStore) PutTool(
 		ModifiedAt:  now,
 	}
 
-	if err := validateTool(&t); err != nil {
+	if err := storehelper.ValidateTool(&t); err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
 
@@ -567,7 +569,7 @@ func (ts *ToolStore) PatchTool(
 	}
 
 	dirInfo, _ := bundleitemutils.BuildBundleDir(bundle.ID, bundle.Slug)
-	lock := ts.slugLock.lockKey(bundle.ID, req.ToolSlug)
+	lock := ts.slugLock.LockKey(bundle.ID, req.ToolSlug)
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -617,7 +619,7 @@ func (ts *ToolStore) DeleteTool(
 	}
 
 	dirInfo, _ := bundleitemutils.BuildBundleDir(bundle.ID, bundle.Slug)
-	lock := ts.slugLock.lockKey(bundle.ID, req.ToolSlug)
+	lock := ts.slugLock.LockKey(bundle.ID, req.ToolSlug)
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -632,7 +634,7 @@ func (ts *ToolStore) DeleteTool(
 }
 
 // InvokeTool locates a tool version and executes it according to its type.
-// - Validates struct (validateTool), bundle/tool enabled state.
+// - Validates struct (ValidateTool), bundle/tool enabled state.
 // - Dispatches to HTTP or Go runner with functional options constructed from the request body.
 func (ts *ToolStore) InvokeTool(
 	ctx context.Context,
@@ -685,7 +687,7 @@ func (ts *ToolStore) InvokeTool(
 	}
 
 	// Defensive validation of the tool record.
-	if err := validateTool(tool); err != nil {
+	if err := storehelper.ValidateTool(tool); err != nil {
 		return nil, fmt.Errorf("tool validation failed: %w", err)
 	}
 
@@ -784,7 +786,7 @@ func (ts *ToolStore) GetTool(
 		return &spec.GetToolResponse{Body: &tool}, nil
 	}
 	dirInfo, _ := bundleitemutils.BuildBundleDir(bundle.ID, bundle.Slug)
-	lock := ts.slugLock.lockKey(bundle.ID, req.ToolSlug)
+	lock := ts.slugLock.LockKey(bundle.ID, req.ToolSlug)
 	lock.RLock()
 	defer lock.RUnlock()
 

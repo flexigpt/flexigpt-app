@@ -1,4 +1,4 @@
-package store
+package storehelper
 
 import (
 	"sync"
@@ -6,21 +6,21 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 )
 
-// slugLocks keeps a RW-mutex per bundle|slug pair so that concurrent access to
+// SlugLocks keeps a RW-mutex per bundle|slug pair so that concurrent access to
 // the same (bundle, slug) is serialised while allowing full parallelism for
 // different pairs.
-type slugLocks struct {
+type SlugLocks struct {
 	mu sync.Mutex
 	m  map[string]*sync.RWMutex
 }
 
-// newSlugLocks constructs an empty slugLocks helper.
-func newSlugLocks() *slugLocks {
-	return &slugLocks{m: map[string]*sync.RWMutex{}}
+// NewSlugLocks constructs an empty slugLocks helper.
+func NewSlugLocks() *SlugLocks {
+	return &SlugLocks{m: map[string]*sync.RWMutex{}}
 }
 
-// lockKey returns (and lazily creates) the mutex for the given bundle|slug.
-func (l *slugLocks) lockKey(
+// LockKey returns (and lazily creates) the mutex for the given bundle|slug.
+func (l *SlugLocks) LockKey(
 	bundleID bundleitemutils.BundleID,
 	slug bundleitemutils.ItemSlug,
 ) *sync.RWMutex {

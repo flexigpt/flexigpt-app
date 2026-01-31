@@ -19,6 +19,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/tool/goregistry"
 	"github.com/flexigpt/flexigpt-app/internal/tool/spec"
+	"github.com/flexigpt/flexigpt-app/internal/tool/storehelper"
 	"github.com/flexigpt/llmtools-go/fstool"
 	llmtoolsgoSpec "github.com/flexigpt/llmtools-go/spec"
 	"github.com/ppipada/mapstore-go/jsonencdec"
@@ -1392,8 +1393,8 @@ func addGoToolFile(
 		CreatedAt:     now,
 		ModifiedAt:    now,
 	}
-	if err := validateTool(&tool); err != nil {
-		return fmt.Errorf("validateTool: %w", err)
+	if err := storehelper.ValidateTool(&tool); err != nil {
+		return fmt.Errorf("ValidateTool: %w", err)
 	}
 
 	mp, _ := jsonencdec.StructWithJSONTagsToMap(tool)

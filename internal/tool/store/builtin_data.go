@@ -19,7 +19,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/overlay"
+	"github.com/flexigpt/flexigpt-app/internal/tool/goregistry"
 	"github.com/flexigpt/flexigpt-app/internal/tool/spec"
+	"github.com/flexigpt/flexigpt-app/internal/tool/storehelper"
 )
 
 type builtInToolBundleID bundleitemutils.BundleID
@@ -316,7 +318,7 @@ func (d *BuiltInToolData) populateDataFromFS(ctx context.Context) error {
 			}
 			tool.IsBuiltIn = true
 
-			if err := validateTool(&tool); err != nil {
+			if err := storehelper.ValidateTool(&tool); err != nil {
 				return fmt.Errorf("%s: invalid tool: %w", inPath, err)
 			}
 
@@ -354,7 +356,7 @@ func (d *BuiltInToolData) populateDataFromFS(ctx context.Context) error {
 
 	// Inject Go builtins from llmtools-go (after reading embedded JSON tools).
 	if d.includeLLMToolsGoBuiltins {
-		if err := injectLLMToolsGoBuiltins(ctx, bundleMap, toolMap); err != nil {
+		if err := goregistry.InjectLLMToolsGo(ctx, bundleMap, toolMap); err != nil {
 			return err
 		}
 		slog.Info("built-in go tools injected from llmtools-go")

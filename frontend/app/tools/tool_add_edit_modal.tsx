@@ -87,6 +87,7 @@ export function AddEditToolModal({
 
 		userCallable: true,
 		llmCallable: true,
+		autoExecReco: false,
 
 		type: ToolImplType.HTTP as ToolImplType,
 		argSchema: '{}',
@@ -135,6 +136,7 @@ export function AddEditToolModal({
 
 				userCallable: t.userCallable,
 				llmCallable: t.llmCallable,
+				autoExecReco: t.autoExecReco,
 
 				type: t.type,
 				argSchema: JSON.stringify(t.argSchema ?? {}, null, 2),
@@ -168,6 +170,7 @@ export function AddEditToolModal({
 
 				userCallable: true,
 				llmCallable: true,
+				autoExecReco: false,
 
 				type: ToolImplType.HTTP,
 				argSchema: '{}',
@@ -489,6 +492,7 @@ export function AddEditToolModal({
 			isEnabled: formData.isEnabled,
 			userCallable: formData.userCallable,
 			llmCallable: formData.llmCallable,
+			autoExecReco: formData.autoExecReco,
 			tags: tagsArr.length ? tagsArr : undefined,
 			type: formData.type,
 			argSchema: parsedArgSchema,
@@ -690,6 +694,22 @@ export function AddEditToolModal({
 									type="checkbox"
 									name="llmCallable"
 									checked={formData.llmCallable}
+									onChange={handleInput}
+									className="toggle toggle-accent disabled:opacity-80"
+									disabled={isViewMode}
+								/>
+							</div>
+						</div>
+
+						<div className="grid grid-cols-12 items-center gap-2">
+							<label className="label col-span-3 cursor-pointer">
+								<span className="label-text text-sm">AutoExecute Recommendation</span>
+							</label>
+							<div className="col-span-9">
+								<input
+									type="checkbox"
+									name="autoExecReco"
+									checked={formData.autoExecReco}
 									onChange={handleInput}
 									className="toggle toggle-accent disabled:opacity-80"
 									disabled={isViewMode}

@@ -123,7 +123,7 @@ export function ToolBundleCard({
 		setIsToolModalOpen(true);
 	};
 
-	const handleModifySubmit = async (partial: Partial<Tool>) => {
+	const handleModifySubmitTool = async (partial: Partial<Tool>) => {
 		// Defensive: NEVER allow overwriting an existing (slug, version).
 		const slug = (toolToEdit?.slug ?? partial.slug ?? '').trim();
 		const version = (partial.version ?? '').trim();
@@ -144,6 +144,7 @@ export function ToolBundleCard({
 				partial.isEnabled ?? toolToEdit.isEnabled,
 				partial.userCallable ?? toolToEdit.userCallable,
 				partial.llmCallable ?? toolToEdit.llmCallable,
+				partial.autoExecReco ?? toolToEdit.autoExecReco,
 				partial.argSchema ?? toolToEdit.argSchema,
 				partial.type ?? toolToEdit.type,
 				partial.httpImpl ?? toolToEdit.httpImpl,
@@ -160,6 +161,7 @@ export function ToolBundleCard({
 				partial.isEnabled ?? true,
 				partial.userCallable ?? true,
 				partial.llmCallable ?? true,
+				partial.autoExecReco ?? false,
 				partial.argSchema ?? {},
 				partial.type ?? ToolImplType.HTTP,
 				partial.httpImpl,
@@ -354,7 +356,7 @@ export function ToolBundleCard({
 					setIsToolModalOpen(false);
 					setToolToEdit(undefined);
 				}}
-				onSubmit={handleModifySubmit}
+				onSubmit={handleModifySubmitTool}
 				mode={toolModalMode}
 				initialData={
 					toolToEdit
