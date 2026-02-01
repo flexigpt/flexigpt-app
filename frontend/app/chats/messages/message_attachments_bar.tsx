@@ -791,7 +791,7 @@ export function MessageAttachmentsBar({
 	}
 
 	return (
-		<div className="border-base-300 flex min-h-8 max-w-full min-w-0 flex-1 items-center gap-1 overflow-x-auto border-t px-2 py-1 text-xs">
+		<div className="flex min-h-8 max-w-full min-w-0 flex-1 items-center gap-1 overflow-x-auto text-xs">
 			{hasAttachments && <AttachmentsGroupChip attachments={attachments ?? []} />}
 
 			{/* Regular tools for this turn */}

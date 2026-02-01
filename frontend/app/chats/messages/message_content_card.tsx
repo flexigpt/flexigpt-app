@@ -62,7 +62,7 @@ export const MessageContentCard = memo(function MessageContentCard({
 
 	if (isPending && textToRender.trim() === '') {
 		return (
-			<div className="flex items-center px-4 py-2">
+			<div className="flex items-center p-0">
 				Thinking
 				<span className="loading loading-dots loading-sm ml-4" />
 			</div>
@@ -70,11 +70,11 @@ export const MessageContentCard = memo(function MessageContentCard({
 	}
 
 	if (!renderAsMarkdown) {
-		return <div className="px-4 py-2">{plainTextNodes}</div>;
+		return <div className="p-0">{plainTextNodes}</div>;
 	}
 
 	return (
-		<div className="px-4 py-2">
+		<div className="p-0">
 			<EnhancedMarkdown
 				key={`${messageID}:${renderBusy ? 'live' : 'done'}`}
 				text={textToRender}

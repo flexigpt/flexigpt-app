@@ -16,7 +16,7 @@ export function ThinkingFence({ detailsSummaryText, text, maxHeightClass = 'max-
 			onToggle={e => {
 				setOpen((e.currentTarget as HTMLDetailsElement).open);
 			}}
-			className="group bg-base-200/70 my-1 overflow-hidden rounded shadow-none"
+			className="group bg-base-200/70 mx-0 mt-0 mb-1 overflow-hidden rounded-lg shadow-none"
 		>
 			<summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-xs transition-colors select-none">
 				<span className="text-xs">{detailsSummaryText}</span>

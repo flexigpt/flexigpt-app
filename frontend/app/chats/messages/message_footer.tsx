@@ -48,7 +48,7 @@ export function MessageFooterArea({
 
 	return (
 		<>
-			<div className="px-1 py-1 pt-0">
+			<div className="p-0">
 				<div className="flex h-8 items-center justify-between">
 					<div className="flex gap-2">
 						<label

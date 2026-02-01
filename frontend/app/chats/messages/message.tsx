@@ -81,7 +81,6 @@ export const ChatMessage = memo(function ChatMessage({
 	const [renderMarkdown, setRenderMarkdown] = useState(!isUser);
 	const [toolDetailsState, setToolDetailsState] = useState<ToolDetailsState>(null);
 
-	const bubbleBase = 'bg-base-100 col-span-10 row-start-1 row-end-1 overflow-x-auto rounded-2xl lg:col-span-9';
 	const bubbleExtra = [streamedMessage ? '' : 'shadow-lg', isEditing ? 'ring-2 ring-primary/70' : '']
 		.filter(Boolean)
 		.join(' ');
@@ -89,30 +88,38 @@ export const ChatMessage = memo(function ChatMessage({
 	const effectiveContent = buildEffectiveContentWithReasoning(message);
 
 	return (
-		<div className="mb-4 grid grid-cols-12 grid-rows-[auto_auto] gap-2" style={{ fontSize: 14 }}>
+		<div className="mb-2 grid grid-cols-12 grid-rows-[auto_auto]" style={{ fontSize: 14 }}>
 			{/* Row 1 ── icon + message bubble */}
 			<div className={`${leftColSpan} row-start-1 row-end-1 flex justify-end`}>
 				{isUser && (
-					<div className="flex h-10 w-10 items-center justify-center self-end rounded-full">
+					<div className="my-0 mr-2 ml-0 flex h-8 w-8 items-center justify-center self-end">
 						<FiUser size={24} />
 					</div>
 				)}
 			</div>
 
-			<div className={`${bubbleBase} ${bubbleExtra}`}>
-				<MessageContentCard
-					messageID={message.id}
-					content={effectiveContent}
-					streamedText={streamedMessage}
-					isStreaming={!!streamedMessage}
-					isBusy={isBusy}
-					isPending={isPending}
-					align={align}
-					renderAsMarkdown={renderMarkdown}
-				/>
+			<div
+				className={`bg-base-100 col-span-10 row-start-1 row-end-1 overflow-x-auto rounded-2xl p-0 lg:col-span-9 ${bubbleExtra}`}
+			>
+				{effectiveContent !== '' && (
+					<div className="px-4 py-2">
+						<MessageContentCard
+							messageID={message.id}
+							content={effectiveContent}
+							streamedText={streamedMessage}
+							isStreaming={!!streamedMessage}
+							isBusy={isBusy}
+							isPending={isPending}
+							align={align}
+							renderAsMarkdown={renderMarkdown}
+						/>
+					</div>
+				)}
 
-				{!isUser && <MessageCitationsBar citations={message.uiCitations} />}
-				<div className="flex w-full min-w-0 overflow-x-hidden p-0">
+				{!isUser && message.uiCitations && <MessageCitationsBar citations={message.uiCitations} />}
+				<div
+					className={`flex w-full min-w-0 items-center overflow-x-hidden px-1 py-0 ${effectiveContent !== '' ? 'border-base-300 border-t' : ''}`}
+				>
 					<MessageAttachmentsBar
 						attachments={message.attachments}
 						toolChoices={message.toolStoreChoices}
@@ -133,7 +140,7 @@ export const ChatMessage = memo(function ChatMessage({
 
 			<div className={`${rightColSpan} row-start-1 row-end-1 flex justify-start`}>
 				{!isUser && (
-					<div className="flex h-10 w-10 items-center justify-center self-end rounded-full">
+					<div className="my-0 mr-0 ml-2 flex h-8 w-8 items-center justify-center self-end">
 						<FiZap size={24} />
 					</div>
 				)}

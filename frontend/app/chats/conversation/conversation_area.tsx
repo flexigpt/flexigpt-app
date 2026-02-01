@@ -806,10 +806,8 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 					style={{ scrollbarGutter: 'stable both-edges' }}
 				>
 					<div className="mx-auto w-11/12 xl:w-5/6">
-						<div className="space-y-4">
-							{renderedMessagesExceptLast}
-							{renderedLastMessage}
-						</div>
+						{renderedMessagesExceptLast}
+						{renderedLastMessage}
 					</div>
 				</div>
 
