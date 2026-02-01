@@ -5,13 +5,67 @@ import { FiUser, FiZap } from 'react-icons/fi';
 import type { ConversationMessage } from '@/spec/conversation';
 import { RoleEnum } from '@/spec/inference';
 
-import { buildEffectiveContentWithReasoning } from '@/lib/reasoning_utils';
+import { CustomMDLanguage } from '@/lib/text_utils';
 
 import { MessageAttachmentsBar } from '@/chats/messages/message_attachments_bar';
 import { MessageCitationsBar } from '@/chats/messages/message_citations_bar';
 import { MessageContentCard } from '@/chats/messages/message_content_card';
 import { MessageFooterArea } from '@/chats/messages/message_footer';
 import { ToolDetailsModal, type ToolDetailsState } from '@/chats/tools/tool_details_modal';
+
+// Builds final content string: reasoning blocks (summary + thinking) + original content.
+// - Uses `reasoningContents` if present.
+// - Ignores redactedThinking.
+export function buildEffectiveContentWithReasoning(message: ConversationMessage): string {
+	const baseContent = message.uiContent;
+	const reasoningContents = message.uiReasoningContents ?? [];
+
+	if (reasoningContents.length === 0) {
+		return baseContent;
+	}
+
+	const summaryParts: string[] = [];
+	const thinkingParts: string[] = [];
+
+	for (const rc of reasoningContents) {
+		if (Array.isArray(rc.summary) && rc.summary.length > 0) {
+			// rc.summary: string[]
+			summaryParts.push(rc.summary.join('\n'));
+		}
+
+		if (Array.isArray(rc.thinking) && rc.thinking.length > 0) {
+			// rc.thinking: string[]
+			thinkingParts.push(rc.thinking.join('\n'));
+		}
+
+		// We intentionally ignore rc.redactedThinking and rc.encryptedContent for display.
+	}
+
+	// If we still have nothing, just return the base content.
+	if (!summaryParts.length && !thinkingParts.length) {
+		return baseContent;
+	}
+
+	let reasoningText = '';
+
+	if (summaryParts.length) {
+		const summaryText = summaryParts.join('\n\n');
+		reasoningText += `\n~~~${CustomMDLanguage.ThinkingSummary}\n${summaryText}\n~~~\n`;
+	}
+
+	if (thinkingParts.length) {
+		const thinkingText = thinkingParts.join('\n\n');
+		reasoningText += `\n~~~${CustomMDLanguage.Thinking}\n${thinkingText}\n~~~\n`;
+	}
+
+	// If the message has no visible content, just return the reasoning blocks.
+	if (!baseContent.trim()) {
+		return reasoningText.trimStart();
+	}
+
+	// Otherwise: reasoning (summary + thinking) followed by the normal content.
+	return `${reasoningText}\n${baseContent}\n`;
+}
 
 interface ChatMessageProps {
 	message: ConversationMessage;
@@ -102,25 +156,27 @@ export const ChatMessage = memo(function ChatMessage({
 				className={`bg-base-100 col-span-10 row-start-1 row-end-1 overflow-x-auto rounded-2xl p-0 lg:col-span-9 ${bubbleExtra}`}
 			>
 				{effectiveContent !== '' && (
-					<div className="px-4 py-2">
-						<MessageContentCard
-							messageID={message.id}
-							content={effectiveContent}
-							streamedText={streamedMessage}
-							isStreaming={!!streamedMessage}
-							isBusy={isBusy}
-							isPending={isPending}
-							align={align}
-							renderAsMarkdown={renderMarkdown}
-						/>
-					</div>
+					<>
+						<div className="px-4 py-2">
+							<MessageContentCard
+								messageID={message.id}
+								content={effectiveContent}
+								streamedText={streamedMessage}
+								isStreaming={!!streamedMessage}
+								isBusy={isBusy}
+								isPending={isPending}
+								align={align}
+								renderAsMarkdown={renderMarkdown}
+							/>
+						</div>
+						{!isUser && message.uiCitations && (
+							<div className="border-base-300 border-t p-1">
+								<MessageCitationsBar citations={message.uiCitations} />{' '}
+							</div>
+						)}
+					</>
 				)}
 
-				{!isUser && message.uiCitations && (
-					<div className="border-base-300 border-t p-1">
-						<MessageCitationsBar citations={message.uiCitations} />{' '}
-					</div>
-				)}
 				<div
 					className={`flex w-full min-w-0 items-center overflow-x-hidden px-1 py-0 ${effectiveContent !== '' ? 'border-base-300 border-t' : ''}`}
 				>
