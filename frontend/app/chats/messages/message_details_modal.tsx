@@ -73,7 +73,6 @@ export function MessageDetailsModal({ isOpen, onClose, messageID, title, content
 							streamedText=""
 							isStreaming={false}
 							isBusy={isBusy}
-							isPending={false}
 							align="items-start text-left"
 							renderAsMarkdown={true}
 						/>

@@ -15,7 +15,6 @@ import { DefaultUIChatOptions, type UIChatOption } from '@/spec/modelpreset';
 import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
-import { getBlockQuotedLines } from '@/lib/text_utils';
 
 import { useAtTopBottom } from '@/hooks/use_at_top_bottom';
 
@@ -34,34 +33,32 @@ import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/inputar
 import { InputPane } from '@/chats/inputarea/input_pane';
 import { ChatMessage } from '@/chats/messages/message';
 
-type StreamingChunkType = 'text' | 'thinking';
-
-interface StreamingChunk {
-	type: StreamingChunkType;
-	data: string;
-}
-
-type StreamBuffer = { chunks: StreamingChunk[]; flushedIdx: number; display: string };
+type StreamChannelBuffer = { chunks: string[]; flushedIdx: number; display: string };
+type StreamBuffer = { text: StreamChannelBuffer; thinking: StreamChannelBuffer };
 
 function StreamingLastMessage(props: {
 	message: ConversationMessage;
 	rowIsBusy: boolean;
-	isPending: boolean;
+
 	isEditing: boolean;
 	onEdit: () => void;
 	onResend: () => void;
 	subscribe: (cb: () => void) => () => void;
-	getSnapshot: () => string;
+	getSnapshot: () => number;
+	getStreamText: () => string;
+	getStreamThinking: () => string;
 }) {
 	// Only this component re-renders on stream updates (not the whole ConversationArea).
-	const streamedMessage = useSyncExternalStore(props.subscribe, props.getSnapshot, () => '');
+	useSyncExternalStore(props.subscribe, props.getSnapshot, () => 0);
+	const streamedText = props.rowIsBusy ? props.getStreamText() : '';
+	const streamedThinking = props.rowIsBusy ? props.getStreamThinking() : '';
 	return (
 		<ChatMessage
 			message={props.message}
 			onEdit={props.onEdit}
 			onResend={props.onResend}
-			streamedMessage={streamedMessage}
-			isPending={props.isPending}
+			streamedText={streamedText}
+			streamedThinking={streamedThinking}
 			// IMPORTANT: only the streaming row sees busy=true (prevents EnhancedMarkdown remounts for all other rows)
 			isBusy={props.rowIsBusy}
 			isEditing={props.isEditing}
@@ -140,10 +137,15 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 	// Stream buffers (chunked to avoid expensive repeated string concatenation)
 	const streamBuffersRef = useRef(new Map<string, StreamBuffer>());
+	const streamVersionRef = useRef(new Map<string, number>());
+
 	const getStreamBuffer = useCallback((tabId: string) => {
 		let buf = streamBuffersRef.current.get(tabId);
 		if (!buf) {
-			buf = { chunks: [], flushedIdx: 0, display: '' };
+			buf = {
+				text: { chunks: [], flushedIdx: 0, display: '' },
+				thinking: { chunks: [], flushedIdx: 0, display: '' },
+			};
 			streamBuffersRef.current.set(tabId, buf);
 		}
 		return buf;
@@ -152,9 +154,13 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	const clearStreamBuffer = useCallback(
 		(tabId: string) => {
 			const buf = getStreamBuffer(tabId);
-			buf.chunks = [];
-			buf.flushedIdx = 0;
-			buf.display = '';
+			buf.text.chunks = [];
+			buf.text.flushedIdx = 0;
+			buf.text.display = '';
+
+			buf.thinking.chunks = [];
+			buf.thinking.flushedIdx = 0;
+			buf.thinking.display = '';
 		},
 		[getStreamBuffer]
 	);
@@ -162,14 +168,14 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	const flushStreamForTab = useCallback(
 		(tabId: string) => {
 			const buf = getStreamBuffer(tabId);
-			if (buf.flushedIdx < buf.chunks.length) {
-				buf.display += buf.chunks
-					.slice(buf.flushedIdx)
-					.map(chunk => chunk.data)
-					.join('');
-				buf.flushedIdx = buf.chunks.length;
-			}
-			return buf.display;
+			const flushChannel = (ch: StreamChannelBuffer) => {
+				if (ch.flushedIdx < ch.chunks.length) {
+					ch.display += ch.chunks.slice(ch.flushedIdx).join('');
+					ch.flushedIdx = ch.chunks.length;
+				}
+			};
+			flushChannel(buf.text);
+			flushChannel(buf.thinking);
 		},
 		[getStreamBuffer]
 	);
@@ -177,14 +183,21 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	const getFullStreamTextForTab = useCallback((tabId: string) => {
 		const buf = streamBuffersRef.current.get(tabId);
 		if (!buf) return '';
-		if (buf.flushedIdx >= buf.chunks.length) return buf.display;
-		return (
-			buf.display +
-			buf.chunks
-				.slice(buf.flushedIdx)
-				.map(chunk => chunk.data)
-				.join('')
-		);
+		// We flush on notify; treat display as authoritative.
+		return buf.text.display;
+	}, []);
+
+	const getFullStreamThinkingForTab = useCallback((tabId: string) => {
+		const buf = streamBuffersRef.current.get(tabId);
+		if (!buf) return '';
+		return buf.thinking.display;
+	}, []);
+	const bumpStreamVersion = useCallback((tabId: string) => {
+		const v = (streamVersionRef.current.get(tabId) ?? 0) + 1;
+		streamVersionRef.current.set(tabId, v);
+	}, []);
+	const getStreamVersionSnapshot = useCallback((tabId: string) => {
+		return streamVersionRef.current.get(tabId) ?? 0;
 	}, []);
 
 	// External-store style streaming subscriptions (only last message subscribes)
@@ -209,11 +222,13 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	const notifyStreamNow = useCallback(
 		(tabId: string) => {
 			flushStreamForTab(tabId);
+			bumpStreamVersion(tabId);
+
 			const set = streamListenersRef.current.get(tabId);
 			if (!set) return;
 			for (const cb of set) cb();
 		},
-		[flushStreamForTab]
+		[flushStreamForTab, bumpStreamVersion]
 	);
 
 	// Match MessageContentCard debounce (~128ms). Notifying faster just causes wasted work.
@@ -267,6 +282,8 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			tokensReceivedByTab.current.delete(tabId);
 
 			streamBuffersRef.current.delete(tabId);
+			streamVersionRef.current.delete(tabId);
+
 			inputRefs.current.delete(tabId);
 			scrollTopByTab.current.delete(tabId);
 
@@ -439,7 +456,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 				if (requestIdByTab.current.get(tabId) !== reqId) return; // stale stream
 				tokensReceivedByTab.current.set(tabId, true);
 
-				getStreamBuffer(tabId).chunks.push({ type: 'text', data: textData } as StreamingChunk);
+				getStreamBuffer(tabId).text.chunks.push(textData);
 
 				// Only active tab notifies, and throttled.
 				notifyStreamSoon(tabId);
@@ -450,9 +467,8 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 				if (requestIdByTab.current.get(tabId) !== reqId) return; // stale stream
 				tokensReceivedByTab.current.set(tabId, true);
 
-				const thinkingBlock = getBlockQuotedLines(thinkingData) + '\n';
-				getStreamBuffer(tabId).chunks.push({ type: 'thinking', data: thinkingBlock } as StreamingChunk);
-
+				// Keep raw thinking text; render separately in ThinkingFence.
+				getStreamBuffer(tabId).thinking.chunks.push(thinkingData);
 				notifyStreamSoon(tabId);
 			};
 
@@ -775,8 +791,8 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 					beginEditMessageForTab(activeTab.tabId, msg.id);
 				}}
 				onResend={() => void handleResendForTab(activeTab.tabId, msg.id)}
-				streamedMessage={''}
-				isPending={false}
+				streamedText={''}
+				streamedThinking={''}
 				isBusy={false}
 				isEditing={activeTab.editingMessageId === msg.id}
 			/>
@@ -792,24 +808,32 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		const isAssistant = msg.role === RoleEnum.Assistant;
 
 		const rowIsBusy = activeTab.isBusy && isAssistant;
-		const isPending = rowIsBusy && (msg.uiContent?.length ?? 0) === 0;
 
 		return (
 			<StreamingLastMessage
 				key={msg.id}
 				message={msg}
 				rowIsBusy={rowIsBusy}
-				isPending={isPending}
 				isEditing={activeTab.editingMessageId === msg.id}
 				onEdit={() => {
 					beginEditMessageForTab(activeTab.tabId, msg.id);
 				}}
 				onResend={() => void handleResendForTab(activeTab.tabId, msg.id)}
 				subscribe={cb => subscribeToStream(activeTab.tabId, cb)}
-				getSnapshot={() => (rowIsBusy ? getFullStreamTextForTab(activeTab.tabId) : '')}
+				getSnapshot={() => getStreamVersionSnapshot(activeTab.tabId)}
+				getStreamText={() => getFullStreamTextForTab(activeTab.tabId)}
+				getStreamThinking={() => getFullStreamThinkingForTab(activeTab.tabId)}
 			/>
 		);
-	}, [activeTab, beginEditMessageForTab, getFullStreamTextForTab, handleResendForTab, subscribeToStream]);
+	}, [
+		activeTab,
+		beginEditMessageForTab,
+		getFullStreamTextForTab,
+		getFullStreamThinkingForTab,
+		getStreamVersionSnapshot,
+		handleResendForTab,
+		subscribeToStream,
+	]);
 
 	return (
 		<>

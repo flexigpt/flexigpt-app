@@ -295,7 +295,6 @@ export function ToolUserArgsModal({
 								streamedText=""
 								isStreaming={false}
 								isBusy={false}
-								isPending={false}
 								align="items-start text-left"
 								renderAsMarkdown={true}
 							/>
@@ -314,7 +313,6 @@ export function ToolUserArgsModal({
 									streamedText=""
 									isStreaming={false}
 									isBusy={false}
-									isPending={false}
 									align="items-start text-left"
 									renderAsMarkdown={true}
 								/>

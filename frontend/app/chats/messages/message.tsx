@@ -5,80 +5,25 @@ import { FiUser, FiZap } from 'react-icons/fi';
 import type { ConversationMessage } from '@/spec/conversation';
 import { RoleEnum } from '@/spec/inference';
 
-import { CustomMDLanguage } from '@/lib/text_utils';
-
 import { MessageAttachmentsBar } from '@/chats/messages/message_attachments_bar';
 import { MessageCitationsBar } from '@/chats/messages/message_citations_bar';
 import { MessageContentCard } from '@/chats/messages/message_content_card';
 import { MessageFooterArea } from '@/chats/messages/message_footer';
+import { MessageThinkingSection } from '@/chats/messages/message_thinking_section';
 import { ToolDetailsModal, type ToolDetailsState } from '@/chats/tools/tool_details_modal';
-
-// Builds final content string: reasoning blocks (summary + thinking) + original content.
-// - Uses `reasoningContents` if present.
-// - Ignores redactedThinking.
-function buildEffectiveContentWithReasoning(message: ConversationMessage): string {
-	const baseContent = message.uiContent;
-	const reasoningContents = message.uiReasoningContents ?? [];
-
-	if (reasoningContents.length === 0) {
-		return baseContent;
-	}
-
-	const summaryParts: string[] = [];
-	const thinkingParts: string[] = [];
-
-	for (const rc of reasoningContents) {
-		if (Array.isArray(rc.summary) && rc.summary.length > 0) {
-			// rc.summary: string[]
-			summaryParts.push(rc.summary.join('\n'));
-		}
-
-		if (Array.isArray(rc.thinking) && rc.thinking.length > 0) {
-			// rc.thinking: string[]
-			thinkingParts.push(rc.thinking.join('\n'));
-		}
-
-		// We intentionally ignore rc.redactedThinking and rc.encryptedContent for display.
-	}
-
-	// If we still have nothing, just return the base content.
-	if (!summaryParts.length && !thinkingParts.length) {
-		return baseContent;
-	}
-
-	let reasoningText = '';
-
-	if (summaryParts.length) {
-		const summaryText = summaryParts.join('\n\n');
-		reasoningText += `\n~~~${CustomMDLanguage.ThinkingSummary}\n${summaryText}\n~~~\n`;
-	}
-
-	if (thinkingParts.length) {
-		const thinkingText = thinkingParts.join('\n\n');
-		reasoningText += `\n~~~${CustomMDLanguage.Thinking}\n${thinkingText}\n~~~\n`;
-	}
-
-	// If the message has no visible content, just return the reasoning blocks.
-	if (!baseContent.trim()) {
-		return reasoningText.trimStart();
-	}
-
-	// Otherwise: reasoning (summary + thinking) followed by the normal content.
-	return `${reasoningText}\n${baseContent}\n`;
-}
 
 interface ChatMessageProps {
 	message: ConversationMessage;
 	onEdit: () => void;
 	onResend: () => void;
-	streamedMessage: string;
-	isPending: boolean;
+
+	streamedText: string;
+	streamedThinking: string;
 	isBusy: boolean;
 	isEditing: boolean;
 }
 
 function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
-	if (prev.isPending !== next.isPending) return false;
 	if (prev.isBusy !== next.isBusy) return false;
 	if (prev.isEditing !== next.isEditing) return false;
 
@@ -107,8 +52,8 @@ function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
 	if (prev.message.outputs !== next.message.outputs) return false;
 	if (prev.message.uiCitations !== next.message.uiCitations) return false;
 
-	// We only care if THIS row’s streamed text changed.
-	if (prev.streamedMessage !== next.streamedMessage) return false;
+	if (prev.streamedText !== next.streamedText) return false;
+	if (prev.streamedThinking !== next.streamedThinking) return false;
 
 	// If the *object reference* for the ConversationMessage changes
 	// react must re-render (content edited, message appended).
@@ -122,8 +67,8 @@ export const ChatMessage = memo(function ChatMessage({
 	message,
 	onEdit,
 	onResend,
-	streamedMessage,
-	isPending,
+	streamedText,
+	streamedThinking,
 	isBusy,
 	isEditing,
 }: ChatMessageProps) {
@@ -135,12 +80,35 @@ export const ChatMessage = memo(function ChatMessage({
 	const [renderMarkdown, setRenderMarkdown] = useState(!isUser);
 	const [toolDetailsState, setToolDetailsState] = useState<ToolDetailsState>(null);
 
-	const bubbleExtra = [streamedMessage ? '' : 'shadow-lg', isEditing ? 'ring-2 ring-primary/70' : '']
+	const bubbleExtra = [streamedText || streamedThinking ? '' : 'shadow-lg', isEditing ? 'ring-2 ring-primary/70' : '']
+
 		.filter(Boolean)
 		.join(' ');
 
-	const effectiveContent = buildEffectiveContentWithReasoning(message);
+	const baseContent = message.uiContent ?? '';
+	const hasAnyContent = baseContent.trim().length > 0 || streamedText.trim().length > 0;
 
+	const hasAnyReasoning =
+		streamedThinking.trim().length > 0 ||
+		(message.uiReasoningContents?.some(rc => {
+			const sum = (rc?.summary ?? []).some(s => (s ?? '').trim().length > 0);
+			const th = (rc?.thinking ?? []).some(s => (s ?? '').trim().length > 0);
+			return sum || th;
+		}) ??
+			false);
+
+	const hasCitations = !isUser && (message.uiCitations?.length ?? 0) > 0;
+
+	const hasAttachmentsBar =
+		(message.attachments?.length ?? 0) > 0 ||
+		(message.toolStoreChoices?.length ?? 0) > 0 ||
+		(message.uiToolCalls?.length ?? 0) > 0 ||
+		(message.uiToolOutputs?.length ?? 0) > 0;
+
+	// Body wrapper should exist only if something inside can render:
+	// - content (final/streamed) OR
+	// - busy (content card will show loader while busy)
+	const showBody = isBusy || hasAnyContent;
 	return (
 		<div className="mb-2 grid grid-cols-12 grid-rows-[auto_auto]" style={{ fontSize: 14 }}>
 			{/* Row 1 ── icon + message bubble */}
@@ -155,43 +123,54 @@ export const ChatMessage = memo(function ChatMessage({
 			<div
 				className={`bg-base-100 col-span-10 row-start-1 row-end-1 overflow-x-auto rounded-2xl p-0 lg:col-span-9 ${bubbleExtra}`}
 			>
-				<div className="px-4 py-2">
-					<MessageContentCard
-						messageID={message.id}
-						content={effectiveContent}
-						streamedText={streamedMessage}
-						isStreaming={!!streamedMessage}
+				{!isUser && hasAnyReasoning && (
+					<MessageThinkingSection
 						isBusy={isBusy}
-						isPending={isPending}
-						align={align}
-						renderAsMarkdown={renderMarkdown}
+						streamedThinking={streamedThinking}
+						reasoningContents={message.uiReasoningContents}
 					/>
-				</div>
-				{!isUser && message.uiCitations && (
+				)}
+				{showBody && (
+					<div className="px-4 py-2">
+						<MessageContentCard
+							messageID={message.id}
+							content={baseContent}
+							streamedText={streamedText}
+							isStreaming={!!streamedText}
+							isBusy={isBusy}
+							align={align}
+							renderAsMarkdown={renderMarkdown}
+						/>
+					</div>
+				)}
+				{hasCitations && (
 					<div className="border-base-300 border-t p-1">
 						<MessageCitationsBar citations={message.uiCitations} />{' '}
 					</div>
 				)}
-
-				<div
-					className={`flex w-full min-w-0 items-center overflow-x-hidden px-1 py-0 ${effectiveContent !== '' ? 'border-base-300 border-t' : ''}`}
-				>
-					<MessageAttachmentsBar
-						attachments={message.attachments}
-						toolChoices={message.toolStoreChoices}
-						toolCalls={message.uiToolCalls}
-						toolOutputs={message.uiToolOutputs}
-						onToolChoiceDetails={choice => {
-							setToolDetailsState({ kind: 'choice', choice });
-						}}
-						onToolCallDetails={call => {
-							setToolDetailsState({ kind: 'call', call });
-						}}
-						onToolOutputDetails={output => {
-							setToolDetailsState({ kind: 'output', output });
-						}}
-					/>
-				</div>
+				{hasAttachmentsBar && (
+					<div
+						className={`flex w-full min-w-0 items-center overflow-x-hidden px-1 py-0 ${
+							showBody || hasCitations ? 'border-base-300 border-t' : ''
+						}`}
+					>
+						<MessageAttachmentsBar
+							attachments={message.attachments}
+							toolChoices={message.toolStoreChoices}
+							toolCalls={message.uiToolCalls}
+							toolOutputs={message.uiToolOutputs}
+							onToolChoiceDetails={choice => {
+								setToolDetailsState({ kind: 'choice', choice });
+							}}
+							onToolCallDetails={call => {
+								setToolDetailsState({ kind: 'call', call });
+							}}
+							onToolOutputDetails={output => {
+								setToolDetailsState({ kind: 'output', output });
+							}}
+						/>
+					</div>
+				)}
 			</div>
 
 			<div className={`${rightColSpan} row-start-1 row-end-1 flex justify-start`}>
@@ -212,7 +191,7 @@ export const ChatMessage = memo(function ChatMessage({
 					onEdit={onEdit}
 					onResend={onResend}
 					messageDetails={message.uiDebugDetails ?? ''}
-					isStreaming={!!streamedMessage}
+					isStreaming={!!streamedText || !!streamedThinking}
 					isBusy={isBusy}
 					disableMarkdown={!renderMarkdown}
 					onDisableMarkdownChange={checked => {

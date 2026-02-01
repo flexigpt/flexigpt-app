@@ -12,7 +12,6 @@ interface MessageContentCardProps {
 	streamedText?: string;
 	isStreaming?: boolean;
 	isBusy?: boolean;
-	isPending?: boolean;
 	align: string;
 	renderAsMarkdown?: boolean;
 }
@@ -23,7 +22,6 @@ function areEqual(prev: MessageContentCardProps, next: MessageContentCardProps) 
 		prev.streamedText === next.streamedText &&
 		prev.isStreaming === next.isStreaming &&
 		prev.isBusy === next.isBusy &&
-		prev.isPending === next.isPending &&
 		prev.align === next.align &&
 		prev.renderAsMarkdown === next.renderAsMarkdown
 	);
@@ -35,7 +33,6 @@ export const MessageContentCard = memo(function MessageContentCard({
 	streamedText = '',
 	isStreaming = false,
 	isBusy = false,
-	isPending = false,
 	align,
 	renderAsMarkdown = true,
 }: MessageContentCardProps) {
@@ -55,20 +52,22 @@ export const MessageContentCard = memo(function MessageContentCard({
 				className={`${align} wrap-break-word`}
 				style={{ whiteSpace: 'pre-wrap', lineHeight: '1.5', fontSize: '14px' }}
 			>
-				{line || '\u00A0' /* Use non-breaking space for empty lines */}
+				{line === '' ? <br /> : line}
 			</p>
 		));
 	}, [textToRender, align, renderAsMarkdown]);
 
-	if (isPending && textToRender.trim() === '') {
+	// If we truly have nothing:
+	// - while busy: show a small loader so non-streaming doesn't look "empty"
+	// - otherwise: render nothing
+	if (textToRender.trim() === '') {
+		if (!isBusy) return null;
 		return (
-			<div className="flex items-center p-0">
-				Thinking
-				<span className="loading loading-dots loading-sm ml-4" />
+			<div className="flex items-center gap-2 py-1">
+				Thinking <span className="loading loading-dots loading-sm ml-2" />
 			</div>
 		);
 	}
-
 	if (!renderAsMarkdown) {
 		return <div className="p-0">{plainTextNodes}</div>;
 	}

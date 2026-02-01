@@ -192,9 +192,9 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 				const value = raw.replace(/\r\n/g, '\n').replace(/\n$/, '');
 
 				if (language === (CustomMDLanguage.ThinkingSummary as string)) {
-					return <ThinkingFence detailsSummaryText="Thinking Summary" text={value} />;
+					return <ThinkingFence detailsSummary={<span>Thinking Summary</span>} text={value} />;
 				} else if (language === (CustomMDLanguage.Thinking as string)) {
-					return <ThinkingFence detailsSummaryText="Thinking" text={value} />;
+					return <ThinkingFence detailsSummary={<span>Thinking</span>} text={value} />;
 				} else {
 					return <CodeBlock language={language} value={value} isBusy={isBusy} />;
 				}

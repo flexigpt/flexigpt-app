@@ -31,6 +31,9 @@ export function validateTags(tags: string): string | undefined {
 	return undefined;
 }
 
+/**
+ * @public
+ */
 export function getBlockQuotedLines(content: string): string {
 	// Split the content into lines.
 	const lines = content.split('\n');
