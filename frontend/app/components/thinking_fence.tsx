@@ -89,7 +89,7 @@ export function ThinkingFence({
 				if (!isControlled) setInternalOpen(next);
 				onOpenChange?.(next);
 			}}
-			className="group bg-base-300/80 m-0 overflow-hidden px-2 py-1 shadow-none"
+			className="group bg-base-200/60 m-0 overflow-hidden px-2 py-1 shadow-none"
 		>
 			<summary
 				// Hide default disclosure marker (we render our own chevron)

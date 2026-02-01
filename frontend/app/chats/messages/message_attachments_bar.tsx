@@ -168,7 +168,7 @@ function MessageToolCallChip({ call, fullWidth = false, onClick }: MessageToolCa
 		<div className={containerClasses} title={title} data-message-chip="tool-suggested" onClick={onClick}>
 			<FiTool size={14} />
 			<span className={labelClasses}>{label}</span>
-			{call.toolStoreChoice?.autoExecute ? <span className="badge badge-primary badge-xs">Auto</span> : null}
+			{call.toolStoreChoice?.autoExecute ? <span className="badge badge-ghost badge-xs">Auto</span> : null}
 			<span className="text-base-content/60 flex gap-1 text-[10px] uppercase">
 				Details <FiCode size={12} />
 			</span>
@@ -227,7 +227,7 @@ function AttachmentsGroupChip({ attachments }: AttachmentsGroupChipProps) {
 	if (count === 0) return null;
 	return (
 		<div
-			className="bg-base-200 text-base-content flex shrink-0 items-center gap-1 rounded-2xl px-2 py-0"
+			className="bg-info/10 text-base-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
 			title={title}
 			data-message-chip="attachments-group"
 		>
@@ -247,7 +247,7 @@ function AttachmentsGroupChip({ attachments }: AttachmentsGroupChipProps) {
 			<Menu
 				store={menu}
 				gutter={6}
-				className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
+				className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
 				autoFocusOnShow
 			>
 				<div className="text-base-content/70 mb-1 text-[11px] font-semibold">Attachments</div>
@@ -283,7 +283,7 @@ function ToolChoicesGroupChip({ tools, onToolChoiceDetails }: ToolChoicesGroupCh
 
 	return (
 		<div
-			className="bg-base-200 text-base-content flex shrink-0 items-center gap-1 rounded-2xl px-2 py-0"
+			className="bg-info/10 text-base-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
 			title={title}
 			data-message-chip="tools-group"
 		>
@@ -303,7 +303,7 @@ function ToolChoicesGroupChip({ tools, onToolChoiceDetails }: ToolChoicesGroupCh
 			<Menu
 				store={menu}
 				gutter={6}
-				className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
+				className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
 				autoFocusOnShow
 			>
 				<div className="text-base-content/70 mb-1 text-[11px] font-semibold">Tools</div>
@@ -346,7 +346,7 @@ function ToolOutputsGroupChip({ outputs, onToolOutputDetails }: ToolOutputsGroup
 
 	return (
 		<div
-			className="bg-base-200 text-base-content flex shrink-0 items-center gap-1 rounded-2xl px-2 py-0"
+			className="bg-info/10 text-base-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
 			title={title}
 			data-message-chip="tool-outputs-group"
 		>
@@ -366,7 +366,7 @@ function ToolOutputsGroupChip({ outputs, onToolOutputDetails }: ToolOutputsGroup
 			<Menu
 				store={menu}
 				gutter={6}
-				className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
+				className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
 				autoFocusOnShow
 			>
 				<div className="text-base-content/70 mb-1 text-[11px] font-semibold">Tool results</div>
@@ -409,7 +409,7 @@ function ToolCallsGroupChip({ calls, onToolCallDetails }: ToolCallsGroupChipProp
 
 	return (
 		<div
-			className="bg-base-200 text-base-content flex shrink-0 items-center gap-1 rounded-2xl px-2 py-0"
+			className="bg-info/10 text-base-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
 			title={title}
 			data-message-chip="tool-calls-group"
 		>
@@ -429,7 +429,7 @@ function ToolCallsGroupChip({ calls, onToolCallDetails }: ToolCallsGroupChipProp
 			<Menu
 				store={menu}
 				gutter={6}
-				className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
+				className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
 				autoFocusOnShow
 			>
 				<div className="text-base-content/70 mb-1 text-[11px] font-semibold">Suggested tool calls</div>
@@ -471,7 +471,7 @@ function WebSearchOutputsGroupChip({ outputs, onOutputDetails }: WebSearchOutput
 
 	return (
 		<div
-			className="bg-info/10 text-info-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
+			className="bg-info/10 text-base-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
 			title={title}
 			data-message-chip="websearch-outputs-group"
 		>
@@ -491,7 +491,7 @@ function WebSearchOutputsGroupChip({ outputs, onOutputDetails }: WebSearchOutput
 			<Menu
 				store={menu}
 				gutter={6}
-				className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
+				className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
 				autoFocusOnShow
 			>
 				<div className="text-base-content/70 mb-1 text-[11px] font-semibold">Web search results</div>
@@ -563,7 +563,7 @@ function WebSearchCallsGroupChip({ calls, onCallDetails }: WebSearchCallsGroupCh
 
 	return (
 		<div
-			className="bg-info/10 text-info-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
+			className="bg-info/10 text-base-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
 			title={title}
 			data-message-chip="websearch-calls-group"
 		>
@@ -583,7 +583,7 @@ function WebSearchCallsGroupChip({ calls, onCallDetails }: WebSearchCallsGroupCh
 			<Menu
 				store={menu}
 				gutter={6}
-				className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
+				className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
 				autoFocusOnShow
 			>
 				<div className="text-base-content/70 mb-1 text-[11px] font-semibold">Web search queries</div>
@@ -663,7 +663,7 @@ function WebSearchChoicesGroupChip({ choices, onChoiceDetails }: WebSearchChoice
 
 	return (
 		<div
-			className="bg-info/10 text-info-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
+			className="bg-info/10 text-base-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
 			title={title}
 			data-message-chip="websearch-tools-group"
 		>
@@ -683,7 +683,7 @@ function WebSearchChoicesGroupChip({ choices, onChoiceDetails }: WebSearchChoice
 			<Menu
 				store={menu}
 				gutter={6}
-				className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
+				className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
 				autoFocusOnShow
 			>
 				<div className="text-base-content/70 mb-1 text-[11px] font-semibold">Web search configuration</div>
@@ -791,7 +791,7 @@ export function MessageAttachmentsBar({
 	}
 
 	return (
-		<div className="flex min-h-8 max-w-full min-w-0 flex-1 items-center gap-1 overflow-x-auto text-xs">
+		<div className="flex min-h-8 max-w-full min-w-0 items-center gap-1 overflow-x-auto text-xs">
 			{hasAttachments && <AttachmentsGroupChip attachments={attachments ?? []} />}
 
 			{/* Regular tools for this turn */}

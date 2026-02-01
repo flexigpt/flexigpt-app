@@ -40,57 +40,27 @@ export function MessageFooterArea({
 	const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
 	const hasDetails = !!messageDetails;
-
+	const hasContent = !!cardCopyContent;
 	const toggleDetailsModal = () => {
 		if (!hasDetails || isBusy) return;
 		setIsDetailsOpen(prev => !prev);
 	};
 
 	return (
-		<>
-			<div className="p-0">
-				<div className="flex h-8 items-center justify-between">
-					<div className="flex gap-2">
-						<label
-							className={`ml-1 flex items-center space-x-2 truncate ${isBusy ? 'cursor-not-allowed opacity-50' : ''}`}
-							title="Disable Markdown"
-						>
-							<input
-								type="checkbox"
-								checked={disableMarkdown}
-								onChange={e => {
-									onDisableMarkdownChange(e.target.checked);
-								}}
-								className="checkbox checkbox-xs ml-1 rounded-full"
-								spellCheck="false"
-								disabled={isBusy}
-							/>
-							<span className="text-base-content text-xs text-nowrap">Disable Markdown</span>
-						</label>
-						<button
-							className={`btn btn-sm flex shrink-0 items-center border-none bg-transparent! shadow-none ${
-								isBusy || !hasDetails ? 'btn-disabled' : ''
-							}`}
-							onClick={toggleDetailsModal}
-							aria-label="Details"
-							title={hasDetails ? 'Show details' : 'No details'}
-							disabled={isBusy || !hasDetails}
-						>
-							<FiCode size={16} />
-						</button>
-					</div>
-
-					{isStreaming && (
-						<div className="text-sm">
-							<div className="flex items-center gap-2 bg-transparent px-4 py-2">
-								Streaming
-								<FiMoreHorizontal size={14} />
-							</div>
+		<div className="grow">
+			<div className="flex items-center justify-between space-x-6">
+				{isStreaming && (
+					<div className="text-sm">
+						<div className="flex items-center gap-2 bg-transparent px-4 py-2 font-mono">
+							Streaming
+							<FiMoreHorizontal size={14} />
 						</div>
-					)}
-					{usage && !isStreaming && (
+					</div>
+				)}
+				{usage && !isStreaming && (
+					<div className="flex items-center bg-transparent p-0 text-xs">
 						<div
-							className="tooltip tooltip-top before:whitespace-pre-line"
+							className="tooltip tooltip-top flex items-center before:whitespace-pre-line"
 							data-tip={(() => {
 								const parts: string[] = [];
 
@@ -121,51 +91,80 @@ export function MessageFooterArea({
 								return parts.join('\n'); // each item on its own line
 							})()}
 						>
-							<div className="flex items-center bg-transparent px-4 py-2 text-xs">
-								<FiArrowUp size={14} /> {usage.inputTokensTotal}
-								&nbsp;&nbsp;-&nbsp;&nbsp;
-								<FiArrowDown size={14} /> {usage.outputTokens}
-							</div>
+							<FiArrowUp size={14} />
+							<span className="shrink-0">{usage.inputTokensTotal}&nbsp;&nbsp;-&nbsp;&nbsp;</span>
+							<FiArrowDown size={14} /> <span>{usage.outputTokens}</span>
 						</div>
+					</div>
+				)}
+
+				<div className={`flex items-center justify-end space-x-6 ${!isStreaming && !usage ? 'w-full' : ''}`}>
+					{hasContent && (
+						<label
+							className={`ml-1 flex h-full items-center space-x-2 truncate p-1 ${isBusy ? 'cursor-not-allowed opacity-50' : ''}`}
+							title="Disable Markdown"
+						>
+							<input
+								type="checkbox"
+								checked={disableMarkdown}
+								onChange={e => {
+									onDisableMarkdownChange(e.target.checked);
+								}}
+								className="checkbox checkbox-xs ml-1 rounded-full"
+								spellCheck="false"
+								disabled={isBusy}
+							/>
+							<span className="text-base-content text-xs text-nowrap">Disable Markdown</span>
+						</label>
 					)}
 
-					<div className="flex items-center gap-1">
-						{isUser && (
-							<button
-								className={`btn btn-sm flex items-center border-none bg-transparent! shadow-none ${
-									isBusy ? 'btn-disabled' : ''
-								}`}
-								onClick={onResend}
-								aria-label="Resend Message"
-								title="Resend Message"
-								disabled={isBusy}
-							>
-								<FiRepeat size={16} />
-							</button>
-						)}
-						{isUser && (
-							<button
-								className={`btn btn-sm flex items-center border-none bg-transparent! shadow-none ${
-									isBusy ? 'btn-disabled' : ''
-								}`}
-								onClick={onEdit}
-								aria-label="Edit Message"
-								title="Edit Message"
-								disabled={isBusy}
-							>
-								<FiEdit2 size={16} />
-							</button>
-						)}
-
-						<CopyButton
-							value={stripCustomMDFences(cardCopyContent)}
-							className={`btn btn-sm flex items-center border-none bg-transparent! shadow-none ${
+					{hasDetails && !isBusy && (
+						<button
+							className={`btn btn-sm flex items-center border-none bg-transparent! p-0 shadow-none ${
+								isBusy || !hasDetails ? 'btn-disabled' : ''
+							}`}
+							onClick={toggleDetailsModal}
+							aria-label="Details"
+							title={hasDetails ? 'Show details' : 'No details'}
+						>
+							<FiCode size={16} />
+						</button>
+					)}
+					{isUser && (
+						<button
+							className={`btn btn-sm flex items-center border-none bg-transparent! p-0 shadow-none ${
 								isBusy ? 'btn-disabled' : ''
 							}`}
-							size={16}
+							onClick={onResend}
+							aria-label="Resend Message"
+							title="Resend Message"
 							disabled={isBusy}
-						/>
-					</div>
+						>
+							<FiRepeat size={16} />
+						</button>
+					)}
+					{isUser && (
+						<button
+							className={`btn btn-sm flex items-center border-none bg-transparent! p-0 shadow-none ${
+								isBusy ? 'btn-disabled' : ''
+							}`}
+							onClick={onEdit}
+							aria-label="Edit Message"
+							title="Edit Message"
+							disabled={isBusy}
+						>
+							<FiEdit2 size={16} />
+						</button>
+					)}
+
+					<CopyButton
+						value={stripCustomMDFences(cardCopyContent)}
+						className={`btn btn-sm flex items-center border-none bg-transparent! p-0 shadow-none ${
+							isBusy ? 'btn-disabled' : ''
+						}`}
+						size={16}
+						disabled={isBusy}
+					/>
 				</div>
 			</div>
 
@@ -180,6 +179,6 @@ export function MessageFooterArea({
 				content={messageDetails}
 				isBusy={isBusy}
 			/>
-		</>
+		</div>
 	);
 }

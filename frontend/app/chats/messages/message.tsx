@@ -148,29 +148,6 @@ export const ChatMessage = memo(function ChatMessage({
 						<MessageCitationsBar citations={message.uiCitations} />{' '}
 					</div>
 				)}
-				{hasAttachmentsBar && (
-					<div
-						className={`flex w-full min-w-0 items-center overflow-x-hidden px-1 py-0 ${
-							showBody || hasCitations ? 'border-base-300 border-t' : ''
-						}`}
-					>
-						<MessageAttachmentsBar
-							attachments={message.attachments}
-							toolChoices={message.toolStoreChoices}
-							toolCalls={message.uiToolCalls}
-							toolOutputs={message.uiToolOutputs}
-							onToolChoiceDetails={choice => {
-								setToolDetailsState({ kind: 'choice', choice });
-							}}
-							onToolCallDetails={call => {
-								setToolDetailsState({ kind: 'call', call });
-							}}
-							onToolOutputDetails={output => {
-								setToolDetailsState({ kind: 'output', output });
-							}}
-						/>
-					</div>
-				)}
 			</div>
 
 			<div className={`${rightColSpan} row-start-1 row-end-1 flex justify-start`}>
@@ -184,21 +161,45 @@ export const ChatMessage = memo(function ChatMessage({
 			{/* Row 2 ── footer bar */}
 			<div className={`${leftColSpan} row-start-2 row-end-2`} />
 			<div className="col-span-10 row-start-2 row-end-2 lg:col-span-9">
-				<MessageFooterArea
-					messageID={message.id}
-					isUser={isUser}
-					cardCopyContent={message.uiContent}
-					onEdit={onEdit}
-					onResend={onResend}
-					messageDetails={message.uiDebugDetails ?? ''}
-					isStreaming={!!streamedText || !!streamedThinking}
-					isBusy={isBusy}
-					disableMarkdown={!renderMarkdown}
-					onDisableMarkdownChange={checked => {
-						setRenderMarkdown(!checked);
-					}}
-					usage={message.usage}
-				/>
+				<div className={`items-center pt-1 ${hasAttachmentsBar ? 'flex' : ''}`}>
+					{hasAttachmentsBar && (
+						<div className="flex min-w-0 items-center justify-start overflow-x-hidden px-1 py-0">
+							<MessageAttachmentsBar
+								attachments={message.attachments}
+								toolChoices={message.toolStoreChoices}
+								toolCalls={message.uiToolCalls}
+								toolOutputs={message.uiToolOutputs}
+								onToolChoiceDetails={choice => {
+									setToolDetailsState({ kind: 'choice', choice });
+								}}
+								onToolCallDetails={call => {
+									setToolDetailsState({ kind: 'call', call });
+								}}
+								onToolOutputDetails={output => {
+									setToolDetailsState({ kind: 'output', output });
+								}}
+							/>
+						</div>
+					)}
+
+					<div className={`items-center py-0 ${hasAttachmentsBar ? 'flex flex-1' : 'px-1'}`}>
+						<MessageFooterArea
+							messageID={message.id}
+							isUser={isUser}
+							cardCopyContent={message.uiContent}
+							onEdit={onEdit}
+							onResend={onResend}
+							messageDetails={message.uiDebugDetails ?? ''}
+							isStreaming={!!streamedText || !!streamedThinking}
+							isBusy={isBusy}
+							disableMarkdown={!renderMarkdown}
+							onDisableMarkdownChange={checked => {
+								setRenderMarkdown(!checked);
+							}}
+							usage={message.usage}
+						/>
+					</div>
+				</div>
 			</div>
 			<div className={`${rightColSpan} row-start-2 row-end-2`} />
 

@@ -63,7 +63,7 @@ export const MessageContentCard = memo(function MessageContentCard({
 	if (textToRender.trim() === '') {
 		if (!isBusy) return null;
 		return (
-			<div className="flex items-center gap-2 py-1">
+			<div className="flex items-center gap-2 p-0">
 				Thinking <span className="loading loading-dots loading-sm ml-2" />
 			</div>
 		);
