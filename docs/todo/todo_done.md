@@ -685,3 +685,10 @@
   - [x] Implementation of openai/anthropic etc built-in tools that have been analyzed and filtered.
   - [x] Analysis of openai/anthropic etc given tools so that they can be invoked in api directly.
   - [ ] ~~parallel tools can be created locally~~
+
+- tool auto execute
+  - [x] backend to have flag for recommendation per tool
+  - [x] at choice time ui can show autoexecute true/false and set default to provided one and then allow to change.
+    - [x] Right now you can set it at insertion time (picker), and see it in details, but you can’t toggle it later from the “Tools” chip menu.
+    - [x] toggle has a delayed view effect, i.e doesnt really show immediately. if you click it doesnt change, but if you click next, then it changes.
+    - [x] tool menu doesnt show tick when selected. also this should be grid based display, the tick, the auto toggle aligned to some col, and version.
