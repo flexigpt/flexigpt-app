@@ -116,7 +116,11 @@ export const ChatMessage = memo(function ChatMessage({
 					</div>
 				)}
 
-				{!isUser && message.uiCitations && <MessageCitationsBar citations={message.uiCitations} />}
+				{!isUser && message.uiCitations && (
+					<div className="border-base-300 border-t p-1">
+						<MessageCitationsBar citations={message.uiCitations} />{' '}
+					</div>
+				)}
 				<div
 					className={`flex w-full min-w-0 items-center overflow-x-hidden px-1 py-0 ${effectiveContent !== '' ? 'border-base-300 border-t' : ''}`}
 				>
