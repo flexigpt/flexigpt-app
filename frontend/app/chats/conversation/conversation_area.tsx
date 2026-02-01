@@ -34,7 +34,14 @@ import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/inputar
 import { InputPane } from '@/chats/inputarea/input_pane';
 import { ChatMessage } from '@/chats/messages/message';
 
-type StreamBuffer = { chunks: string[]; flushedIdx: number; display: string };
+type StreamingChunkType = 'text' | 'thinking';
+
+interface StreamingChunk {
+	type: StreamingChunkType;
+	data: string;
+}
+
+type StreamBuffer = { chunks: StreamingChunk[]; flushedIdx: number; display: string };
 
 function StreamingLastMessage(props: {
 	message: ConversationMessage;
@@ -156,7 +163,10 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		(tabId: string) => {
 			const buf = getStreamBuffer(tabId);
 			if (buf.flushedIdx < buf.chunks.length) {
-				buf.display += buf.chunks.slice(buf.flushedIdx).join('');
+				buf.display += buf.chunks
+					.slice(buf.flushedIdx)
+					.map(chunk => chunk.data)
+					.join('');
 				buf.flushedIdx = buf.chunks.length;
 			}
 			return buf.display;
@@ -168,7 +178,13 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		const buf = streamBuffersRef.current.get(tabId);
 		if (!buf) return '';
 		if (buf.flushedIdx >= buf.chunks.length) return buf.display;
-		return buf.display + buf.chunks.slice(buf.flushedIdx).join('');
+		return (
+			buf.display +
+			buf.chunks
+				.slice(buf.flushedIdx)
+				.map(chunk => chunk.data)
+				.join('')
+		);
 	}, []);
 
 	// External-store style streaming subscriptions (only last message subscribes)
@@ -423,7 +439,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 				if (requestIdByTab.current.get(tabId) !== reqId) return; // stale stream
 				tokensReceivedByTab.current.set(tabId, true);
 
-				getStreamBuffer(tabId).chunks.push(textData);
+				getStreamBuffer(tabId).chunks.push({ type: 'text', data: textData } as StreamingChunk);
 
 				// Only active tab notifies, and throttled.
 				notifyStreamSoon(tabId);
@@ -434,8 +450,8 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 				if (requestIdByTab.current.get(tabId) !== reqId) return; // stale stream
 				tokensReceivedByTab.current.set(tabId, true);
 
-				const block = getBlockQuotedLines(thinkingData) + '\n';
-				getStreamBuffer(tabId).chunks.push(block);
+				const thinkingBlock = getBlockQuotedLines(thinkingData) + '\n';
+				getStreamBuffer(tabId).chunks.push({ type: 'thinking', data: thinkingBlock } as StreamingChunk);
 
 				notifyStreamSoon(tabId);
 			};

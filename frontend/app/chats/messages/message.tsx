@@ -16,7 +16,7 @@ import { ToolDetailsModal, type ToolDetailsState } from '@/chats/tools/tool_deta
 // Builds final content string: reasoning blocks (summary + thinking) + original content.
 // - Uses `reasoningContents` if present.
 // - Ignores redactedThinking.
-export function buildEffectiveContentWithReasoning(message: ConversationMessage): string {
+function buildEffectiveContentWithReasoning(message: ConversationMessage): string {
 	const baseContent = message.uiContent;
 	const reasoningContents = message.uiReasoningContents ?? [];
 
@@ -155,26 +155,22 @@ export const ChatMessage = memo(function ChatMessage({
 			<div
 				className={`bg-base-100 col-span-10 row-start-1 row-end-1 overflow-x-auto rounded-2xl p-0 lg:col-span-9 ${bubbleExtra}`}
 			>
-				{effectiveContent !== '' && (
-					<>
-						<div className="px-4 py-2">
-							<MessageContentCard
-								messageID={message.id}
-								content={effectiveContent}
-								streamedText={streamedMessage}
-								isStreaming={!!streamedMessage}
-								isBusy={isBusy}
-								isPending={isPending}
-								align={align}
-								renderAsMarkdown={renderMarkdown}
-							/>
-						</div>
-						{!isUser && message.uiCitations && (
-							<div className="border-base-300 border-t p-1">
-								<MessageCitationsBar citations={message.uiCitations} />{' '}
-							</div>
-						)}
-					</>
+				<div className="px-4 py-2">
+					<MessageContentCard
+						messageID={message.id}
+						content={effectiveContent}
+						streamedText={streamedMessage}
+						isStreaming={!!streamedMessage}
+						isBusy={isBusy}
+						isPending={isPending}
+						align={align}
+						renderAsMarkdown={renderMarkdown}
+					/>
+				</div>
+				{!isUser && message.uiCitations && (
+					<div className="border-base-300 border-t p-1">
+						<MessageCitationsBar citations={message.uiCitations} />{' '}
+					</div>
 				)}
 
 				<div
