@@ -2,6 +2,10 @@
 
 ## Future feature ideas
 
+- [ ] Token count in build completion data may be wrong as it doesn't really account for attachments/tool calls etc.
+  - [ ] Need to rectify the FilterMessagesByTokenCount function. Look at using gpt5 bpe encoder now rather than regex compilation. [go-tokenizer](https://github.com/tiktoken-go/tokenizer)
+  - [ ] Claude has a free token counting api with some rate limits. may need to check it out too.
+
 - [ ] Start with the noted apps support
 - [ ] Observability: At least tokens and dollars need to be represented someplace
 - MCP handling
@@ -12,12 +16,10 @@
   - [ ] Docs should ideally have course work for very beginners that are users of genai, without any programming knowledge.
   - [ ] MS course is fantastic, but requires lots of tech know how.
 - [ ] Add keyboard shortcuts and some tooltips for them to know what are these.
-
   - [ ] Add AWS bedrock too. May be anthropic api as of now for claude on bedrock models?
   - [ ] Check vertex ai for google: needs google dedicated sdk
 
 - [ ] Think through and enhance tools create/edit and prompts create/edit modals
-
   - [ ] Implement a schema area using CodeMirror for defining the tool's/prompts schema. (deferred)
     - [ ] Configure CodeMirror to support JSON syntax highlighting and validation.
     - [ ] Allow users to define input and output parameters using JSON schema.
@@ -26,12 +28,10 @@
     - [ ] Allow users to write an asynchronous TypeScript function that utilizes the defined schema.
 
 - Chat attachments
-
   - [ ] Future: May need to decide later that keeping conversation attachment shapshots is better than reattach etc.
-  - [ ] Future: Check for race between build and fetch for attachment content fetch and how to resolve. For now this is ok to have as the time between these 2 is very small. If we introduce human feedback in between, we ned to look at this closely.
+  - [x] Future: Check for race between build and fetch for attachment content fetch and how to resolve. For now this is ok to have as the time between these 2 is very small. If we introduce human feedback in between, we ned to look at this closely.
 
   - [ ] Future: Attachments support
-
     - [ ] doc formats can be in one place
     - [ ] specialized urls like github/gitlab pr's
     - [ ] local git diff/commit history/etc attachments
@@ -39,12 +39,11 @@
 ## Laundry list
 
 - [ ] Chat
-
-  - [ ] Details of request are not visible immediately. We use a trapper in golang ai provider package to get req/resp details, that means until the completion returns there is no way of getting the request details. Some refactoring of workflow is needed to make this happen.
+  - [x] Details of request are not visible immediately. We use a trapper in golang ai provider package to get req/resp details, that means until the completion returns there is no way of getting the request details. Some refactoring of workflow is needed to make this happen.
   - [x] Need a stop streaming / cancel button on assistant
   - [ ] Think through:
-    - [ ] In AI replies, find a way to mention the model used and special params a bit more explicitly.
-    - [ ] Check whether current details is good enough UX or need a bit better subtle ux.
+    - [x] In AI replies, find a way to mention the model used and special params a bit more explicitly.
+    - [x] Check whether current details is good enough UX or need a bit better subtle ux.
   - [ ] Support for image/audio in chat
   - [ ] Slash commands for prompts/tools/kb in chat
     - [ ] Should model selection also be in chat commands?
@@ -58,18 +57,15 @@
       - [ ] Query level switch overrides the global switch.
 
 - [ ] Chats vs Chat with AI from home
-
   - [ ] Should one create a new chat, and other load recent chat or go to search?
   - [ ] Do we want a home page at all? should it be direct chat landing page with redirects to other pages?
 
 - [ ] responses api integration for o3-pro.
-
   - [ ] create model preset should allow the api function type
   - [ ] The responses api seems a bit weird and sdk seems immature for it as of now. Evaluate at a later time again.
   - [ ] Things not available due to not moving to responses as of now: reasoning thought process, state management on openai, prompt template usage from openai servers. Not sure if tool calls have some problems in chat completions vs this one including openai mcp servers and tools.
 
 - [ ] Windows
-
   - [ ] Signing for Win
   - [ ] Test Windows build
 
@@ -110,7 +106,6 @@ Implement a `DocStoreSet` that manages multiple `DocStore` instances within a Wa
   ```
 
 - [ ] **Implement methods for `DocStoreSet`:**
-
   - Initialize the default local filesystem docstore and add it in the set.
   - Dont implement add for now. ~~`AddDocStore(name string, adapter Adapter)`: Adds a new docstore with the specified adapter.~~
   - `GetDocStore(name string) *DocStore`: Retrieves a docstore by name.
@@ -120,7 +115,6 @@ Implement a `DocStoreSet` that manages multiple `DocStore` instances within a Wa
 ### Entity: `DocStore`
 
 - [ ] Design the `DocStore` Interface
-
   - Initialize can be independent and store specific.
 
   ```go
@@ -137,7 +131,6 @@ Implement a `DocStoreSet` that manages multiple `DocStore` instances within a Wa
   ```
 
 - [ ] Implement the Default Local File Adapter
-
   - [ ] Create a `ChromemDocStore` struct implementing the `DocStore` interface.
   - [ ] Define the fields for `ChromemDocStore`
     - [ ] `BasePath` (string): Base file path for storing documents.
@@ -177,16 +170,13 @@ Implement a `DocStoreSet` that manages multiple `DocStore` instances within a Wa
 - [ ] Can provide basic already available loaders in app, but would need a defined hook for it.
 
 - Document
-
   - Features
-
     - CRUD operations
     - Store and manage documents
     - Allow document upload and deletion
     - Provide search capabilities
 
 - [ ] **Create the `Document` struct with the following fields:**
-
   - `ID` (string): Unique identifier for the document.
   - `Content` (string): Full content of the document.
   - `Metadata` (map[string]interface{}): Document metadata.
@@ -201,12 +191,10 @@ Implement a `DocStoreSet` that manages multiple `DocStore` instances within a Wa
   ```
 
 - [ ] **Implement methods for `Document`:**
-
   - `SplitIntoChunks(chunkSize int) error`: Splits the document content into chunks.
   - `GetChunk(index int) (*Chunk, error)`: Retrieves a specific chunk by index.
 
 - [ ] Define the `Chunk` Structure
-
   - `Index` (int): The order of the chunk in the document.
   - `Content` (string): The content of the chunk.
   - `VectorID` (string): Identifier in the vector database.
@@ -220,7 +208,6 @@ Implement a `DocStoreSet` that manages multiple `DocStore` instances within a Wa
   ```
 
 - [ ] **Modify `Document.SplitIntoChunks` to:**
-
   - Split the document content into chunks of specified size.
   - For each chunk:
     - Create a `Chunk` instance.

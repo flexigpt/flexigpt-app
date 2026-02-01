@@ -687,8 +687,20 @@
   - [ ] ~~parallel tools can be created locally~~
 
 - tool auto execute
+  - [x] tools should have a configuration which says can autoexecute i.e without user consent vs not.
+    - with this config we can have a "agent loop" of sort for file edits/mods etc
+    - major question remains as to what sort of tools should be auto exec vs not. write anything being human in loop is safest anycase. for write ones, we may want to see if we need to have a "keep old file as renamed" with some sessionid/tmp extension so that reverting is easier.
+
   - [x] backend to have flag for recommendation per tool
   - [x] at choice time ui can show autoexecute true/false and set default to provided one and then allow to change.
     - [x] Right now you can set it at insertion time (picker), and see it in details, but you can’t toggle it later from the “Tools” chip menu.
     - [x] toggle has a delayed view effect, i.e doesnt really show immediately. if you click it doesnt change, but if you click next, then it changes.
     - [x] tool menu doesnt show tick when selected. also this should be grid based display, the tick, the auto toggle aligned to some col, and version.
+
+  - [x] UI needs to be so that we dont waste a lot of space for tool call only or tool result only cards.
+    - [x] a tool call only and tool output only message may be rendered as a single line after this.
+    - [x] rather that drop down in ui for toolcalls we need to show them as visible chips like citations if there is some "content" (not just thinking content)
+    - [x] the type of chip shown can be specific to tool call like if toolcall is of type replacetext, we can have chip that shows diff and have run button there too. or generic if no other chip present.
+    - [x] same can be for result but as of now we dont have tool results with special ui reqs.
+
+- [x] editor is starting to look very very heavy, review to see for better refactoring and perf opt.

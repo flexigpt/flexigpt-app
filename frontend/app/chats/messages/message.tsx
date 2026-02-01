@@ -110,60 +110,69 @@ export const ChatMessage = memo(function ChatMessage({
 	// - busy (content card will show loader while busy)
 	const showBody = isBusy || hasAnyContent;
 	return (
-		<div className="mb-2 grid grid-cols-12 grid-rows-[auto_auto]" style={{ fontSize: 14 }}>
-			{/* Row 1 ── icon + message bubble */}
-			<div className={`${leftColSpan} row-start-1 row-end-1 flex justify-end`}>
-				{isUser && (
-					<div className="my-0 mr-2 ml-0 flex h-8 w-8 items-center justify-center self-end">
+		<div className="mb-2 grid grid-cols-12" style={{ fontSize: 13 }}>
+			{/* Row 1 ── icon + message bubble (only when showCardRow) */}
+			{showBody && (
+				<>
+					<div className={`${leftColSpan} flex justify-end`}>
+						{isUser && (
+							<div className="my-0 mr-2 ml-0 flex h-8 w-8 items-center justify-center self-end">
+								<FiUser size={24} />
+							</div>
+						)}
+					</div>
+
+					<div className={`bg-base-100 col-span-10 mt-1 overflow-x-auto rounded-2xl p-0 lg:col-span-9 ${bubbleExtra}`}>
+						{!isUser && hasAnyReasoning && (
+							<MessageThinkingSection
+								isBusy={isBusy}
+								streamedThinking={streamedThinking}
+								reasoningContents={message.uiReasoningContents}
+							/>
+						)}
+						<div className="px-4 py-2">
+							<MessageContentCard
+								messageID={message.id}
+								content={baseContent}
+								streamedText={streamedText}
+								isStreaming={!!streamedText}
+								isBusy={isBusy}
+								align={align}
+								renderAsMarkdown={renderMarkdown}
+							/>
+						</div>
+						{hasCitations && (
+							<div className="border-base-300 border-t p-1">
+								<MessageCitationsBar citations={message.uiCitations} />{' '}
+							</div>
+						)}
+					</div>
+
+					<div className={`${rightColSpan} flex justify-start`}>
+						{!isUser && (
+							<div className="my-0 mr-0 ml-2 flex h-8 w-8 items-center justify-center self-end">
+								<FiZap size={24} />
+							</div>
+						)}
+					</div>
+				</>
+			)}
+
+			{/* Row 2 ── footer bar */}
+			<div className={`${leftColSpan} flex justify-end`}>
+				{/* If the card row is hidden, keep the avatar aligned with the footer row */}
+				{!showBody && isUser && (
+					<div className="my-0 mr-2 ml-0 flex h-8 w-8 items-center justify-center">
 						<FiUser size={24} />
 					</div>
 				)}
 			</div>
-
-			<div
-				className={`bg-base-100 col-span-10 row-start-1 row-end-1 overflow-x-auto rounded-2xl p-0 lg:col-span-9 ${bubbleExtra}`}
-			>
-				{!isUser && hasAnyReasoning && (
-					<MessageThinkingSection
-						isBusy={isBusy}
-						streamedThinking={streamedThinking}
-						reasoningContents={message.uiReasoningContents}
-					/>
-				)}
-				{showBody && (
-					<div className="px-4 py-2">
-						<MessageContentCard
-							messageID={message.id}
-							content={baseContent}
-							streamedText={streamedText}
-							isStreaming={!!streamedText}
-							isBusy={isBusy}
-							align={align}
-							renderAsMarkdown={renderMarkdown}
-						/>
-					</div>
-				)}
-				{hasCitations && (
-					<div className="border-base-300 border-t p-1">
-						<MessageCitationsBar citations={message.uiCitations} />{' '}
-					</div>
-				)}
-			</div>
-
-			<div className={`${rightColSpan} row-start-1 row-end-1 flex justify-start`}>
-				{!isUser && (
-					<div className="my-0 mr-0 ml-2 flex h-8 w-8 items-center justify-center self-end">
-						<FiZap size={24} />
-					</div>
-				)}
-			</div>
-
-			{/* Row 2 ── footer bar */}
-			<div className={`${leftColSpan} row-start-2 row-end-2`} />
-			<div className="col-span-10 row-start-2 row-end-2 lg:col-span-9">
-				<div className={`items-center pt-1 ${hasAttachmentsBar ? 'flex' : ''}`}>
+			<div className="col-span-10 lg:col-span-9">
+				<div
+					className={`items-center gap-2 px-2 ${hasAttachmentsBar ? 'flex' : ''} ${showBody ? 'pt-1' : isUser ? 'justify-start' : 'justify-end'}`}
+				>
 					{hasAttachmentsBar && (
-						<div className="flex min-w-0 items-center justify-start overflow-x-hidden px-1 py-0">
+						<div className={`flex min-w-0 items-center justify-start overflow-x-hidden px-1 py-0`}>
 							<MessageAttachmentsBar
 								attachments={message.attachments}
 								toolChoices={message.toolStoreChoices}
@@ -182,7 +191,7 @@ export const ChatMessage = memo(function ChatMessage({
 						</div>
 					)}
 
-					<div className={`items-center py-0 ${hasAttachmentsBar ? 'flex flex-1' : 'px-1'}`}>
+					<div className={`items-center px-1 py-0 ${hasAttachmentsBar ? (showBody ? 'flex flex-1' : 'flex') : ''}`}>
 						<MessageFooterArea
 							messageID={message.id}
 							isUser={isUser}
@@ -192,6 +201,7 @@ export const ChatMessage = memo(function ChatMessage({
 							messageDetails={message.uiDebugDetails ?? ''}
 							isStreaming={!!streamedText || !!streamedThinking}
 							isBusy={isBusy}
+							bodyPresent={showBody}
 							disableMarkdown={!renderMarkdown}
 							onDisableMarkdownChange={checked => {
 								setRenderMarkdown(!checked);
@@ -201,8 +211,14 @@ export const ChatMessage = memo(function ChatMessage({
 					</div>
 				</div>
 			</div>
-			<div className={`${rightColSpan} row-start-2 row-end-2`} />
-
+			<div className={`${rightColSpan} flex justify-start`}>
+				{/* If the card row is hidden, keep the assistant icon aligned with the footer row */}
+				{!showBody && !isUser && (
+					<div className="my-0 mr-0 ml-2 flex h-8 w-8 items-center justify-center">
+						<FiZap size={24} />
+					</div>
+				)}
+			</div>
 			{/* Tool choice/call/output details (JSON) */}
 			<ToolDetailsModal
 				state={toolDetailsState}

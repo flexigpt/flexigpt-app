@@ -2,29 +2,16 @@
 
 ## Laundry list
 
-- [ ] tools should have a configuration which says can autoexecute i.e without user consent vs not.
-  - with this config we can have a "agent loop" of sort for file edits/mods etc
-  - major question remains as to what sort of tools should be auto exec vs not. write anything being human in loop is safest anycase. for write ones, we may want to see if we need to have a "keep old file as renamed" with some sessionid/tmp extension so that reverting is easier.
-
-  - [ ] UI needs to be so that we dont waste a lot of space for tool call only or tool result only cards.
-    - [ ] a tool call only and tool output only message may be rendered as a single line after this.
-    - [ ] rather that drop down in ui for toolcalls we need to show them as visible chips like citations if there is some "content" (not just thinking content)
-    - [ ] the type of chip shown can be specific to tool call like if toolcall is of type replacetext, we can have chip that shows diff and have run button there too. or generic if no other chip present.
-    - [ ] same can be for result but as of now we dont have tool results with special ui reqs.
-
 - [ ] we may want to have a "assistant" like we planned before that has tool sets and autoexec config so that the "agent" loop is kind of autonomous
-- [ ] editor is starting to look very very heavy, review to see for better refactoring and perf opt.
 - [ ] When url cannot fetch content, there is no way of knowing what happened as of now. may want to see how to expose this or disable link only mode in this flow?
+- [ ] in message attachment bar chips, we want to not show a dropdown if there is only 1 call/result/output.
+- [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls lop is better.
 
 ## Features
 
 - [ ] there is a reference calculator tool in claude docs
 
 - [ ] valid input output modalities, valid levels, valid reasoning types, etc need to be added to modelpresetspec.
-
-- [ ] Token count in build completion data may be wrong as it doesn't really account for attachments/tool calls etc.
-  - [ ] Need to rectify the FilterMessagesByTokenCount function. Look at using gpt5 bpe encoder now rather than regex compilation. [go-tokenizer](https://github.com/tiktoken-go/tokenizer)
-  - [ ] Claude has a free token counting api with some rate limits. may need to check it out too.
 
 ## Milestone thoughts
 

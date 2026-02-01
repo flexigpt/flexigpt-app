@@ -19,6 +19,7 @@ interface MessageFooterAreaProps {
 	messageDetails: string;
 	isStreaming: boolean;
 	isBusy: boolean;
+	bodyPresent: boolean;
 	disableMarkdown: boolean;
 	onDisableMarkdownChange: (checked: boolean) => void;
 	usage?: InferenceUsage;
@@ -33,6 +34,7 @@ export function MessageFooterArea({
 	messageDetails,
 	isStreaming,
 	isBusy,
+	bodyPresent,
 	disableMarkdown,
 	onDisableMarkdownChange,
 	usage,
@@ -47,8 +49,8 @@ export function MessageFooterArea({
 	};
 
 	return (
-		<div className="grow">
-			<div className="flex items-center justify-between space-x-6">
+		<div className={bodyPresent ? 'grow' : ''}>
+			<div className={`flex items-center space-x-6 ${bodyPresent ? 'justify-between' : ''}`}>
 				{isStreaming && (
 					<div className="text-sm">
 						<div className="flex items-center gap-2 bg-transparent px-4 py-2 font-mono">
