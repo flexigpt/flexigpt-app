@@ -1,5 +1,5 @@
 import {
-	FiChevronDown,
+	FiChevronRight,
 	FiCode,
 	FiFileText,
 	FiGlobe,
@@ -414,7 +414,7 @@ function AttachmentsGroupChip({ attachments }: AttachmentsGroupChipProps) {
 				aria-label="Show attachments for this message"
 				title="Show attachments for this message"
 			>
-				<FiChevronDown size={14} />
+				<FiChevronRight size={14} />
 			</MenuButton>
 
 			<Menu
@@ -485,7 +485,7 @@ function ToolChoicesGroupChip({ tools, onToolChoiceDetails }: ToolChoicesGroupCh
 				aria-label="Show tools for this message"
 				title="Show tools for this message"
 			>
-				<FiChevronDown size={14} />
+				<FiChevronRight size={14} />
 			</MenuButton>
 
 			<Menu
@@ -563,7 +563,7 @@ function ToolOutputsGroupChip({ outputs, onToolOutputDetails }: ToolOutputsGroup
 				aria-label="Show tool results for this message"
 				title="Show tool results for this message"
 			>
-				<FiChevronDown size={14} />
+				<FiChevronRight size={14} />
 			</MenuButton>
 
 			<Menu
@@ -641,7 +641,7 @@ function ToolCallsGroupChip({ calls, onToolCallDetails }: ToolCallsGroupChipProp
 				aria-label="Show suggested tool calls for this message"
 				title="Show suggested tool calls for this message"
 			>
-				<FiChevronDown size={14} />
+				<FiChevronRight size={14} />
 			</MenuButton>
 
 			<Menu
@@ -718,7 +718,7 @@ function WebSearchOutputsGroupChip({ outputs, onOutputDetails }: WebSearchOutput
 				aria-label="Show web‑search results for this turn"
 				title="Show web‑search results for this turn"
 			>
-				<FiChevronDown size={14} />
+				<FiChevronRight size={14} />
 			</MenuButton>
 
 			<Menu
@@ -795,7 +795,7 @@ function WebSearchCallsGroupChip({ calls, onCallDetails }: WebSearchCallsGroupCh
 				aria-label="Show web‑search queries for this turn"
 				title="Show web‑search queries for this turn"
 			>
-				<FiChevronDown size={14} />
+				<FiChevronRight size={14} />
 			</MenuButton>
 
 			<Menu
@@ -874,7 +874,7 @@ function WebSearchChoicesGroupChip({ choices, onChoiceDetails }: WebSearchChoice
 				aria-label="Show web‑search configuration for this turn"
 				title="Show web‑search configuration for this turn"
 			>
-				<FiChevronDown size={14} />
+				<FiChevronRight size={14} />
 			</MenuButton>
 
 			<Menu
