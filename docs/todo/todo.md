@@ -4,13 +4,11 @@
 
 - [ ] we may want to have a "assistant" like we planned before that has tool sets and autoexec config so that the "agent" loop is kind of autonomous
 - [ ] When url cannot fetch content, there is no way of knowing what happened as of now. may want to see how to expose this or disable link only mode in this flow?
-- [ ] in message attachment bar chips, we want to not show a dropdown if there is only 1 call/result/output.
-- [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls lop is better.
+- [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls loop is better.
 
 ## Features
 
 - [ ] there is a reference calculator tool in claude docs
-
 - [ ] valid input output modalities, valid levels, valid reasoning types, etc need to be added to modelpresetspec.
 
 ## Milestone thoughts

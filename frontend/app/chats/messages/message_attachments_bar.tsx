@@ -1,4 +1,14 @@
-import { FiChevronDown, FiCode, FiFileText, FiGlobe, FiImage, FiLink, FiPaperclip, FiTool } from 'react-icons/fi';
+import {
+	FiChevronDown,
+	FiCode,
+	FiFileText,
+	FiGlobe,
+	FiImage,
+	FiLink,
+	FiPaperclip,
+	FiTerminal,
+	FiTool,
+} from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore } from '@ariakit/react';
 
@@ -9,7 +19,6 @@ import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
 import {
 	getAttachmentContentBlockModeLabel,
-	getAttachmentContentBlockModePillClasses,
 	getAttachmentContentBlockModeTooltip,
 } from '@/chats/attachments/attachment_mode_menu';
 import { formatToolCallLabel, getPrettyToolName } from '@/chats/tools/tool_editor_utils';
@@ -67,24 +76,20 @@ function MessageAttachmentInfoChip({ attachment, fullWidth = false }: MessageAtt
 	const modeLabel = getAttachmentContentBlockModeLabel(mode);
 	const modeTooltip = getAttachmentContentBlockModeTooltip(mode);
 
-	const containerClasses = [
-		'bg-base-200 text-base-content flex items-center gap-2 rounded-2xl px-2 py-0',
-		fullWidth ? 'w-full' : 'shrink-0',
-	]
-		.filter(Boolean)
-		.join(' ');
-
-	const labelClasses = fullWidth ? 'min-w-0 flex-1 truncate' : 'max-w-64 truncate';
-
 	return (
-		<div className={containerClasses} title={title} data-message-chip="attachment">
+		<div
+			className={[
+				'text-base-content border-base-content/20 mx-1 flex items-center justify-between gap-2 rounded-2xl border bg-inherit px-2 py-0',
+				fullWidth ? 'w-full' : 'shrink-0',
+			]
+				.filter(Boolean)
+				.join(' ')}
+			title={title}
+			data-message-chip="attachment"
+		>
 			<span className="shrink-0">{icon}</span>
-			<span className={labelClasses}>{truncated}</span>
-			<span
-				className={getAttachmentContentBlockModePillClasses(mode, false)}
-				title={modeTooltip}
-				data-attachment-mode-pill
-			>
+			<span className={fullWidth ? 'min-w-0 flex-1 truncate' : 'max-w-44 truncate'}>{truncated}</span>
+			<span className="badge badge-ghost badge-xs" title={modeTooltip} data-attachment-mode-pill>
 				{modeLabel}
 			</span>
 		</div>
@@ -106,20 +111,31 @@ function MessageToolChoiceChip({ tool, fullWidth = false, onClick }: MessageTool
 	const tooltipLines: string[] = [name, slug];
 	if (tool.description) tooltipLines.push(tool.description);
 
-	const containerClasses = [
-		'bg-base-200 text-base-content flex items-center justify-between gap-2 rounded-2xl px-2 py-0',
-		fullWidth ? 'w-full' : 'shrink-0',
-	]
-		.filter(Boolean)
-		.join(' ');
-
-	const labelClasses = fullWidth ? 'min-w-0 flex-1 truncate' : 'max-w-64 truncate';
-
 	return (
-		<div className={containerClasses} title={tooltipLines.join('\n')} data-message-chip="tool-choice" onClick={onClick}>
+		<div
+			className={[
+				'text-base-content border-base-content/20 mx-1 flex items-center justify-between gap-2 rounded-2xl border bg-inherit px-2 py-0',
+				fullWidth ? 'w-full' : 'shrink-0',
+				onClick ? 'cursor-pointer' : '',
+			]
+				.filter(Boolean)
+				.join(' ')}
+			title={tooltipLines.join('\n')}
+			data-message-chip="tool-choice"
+			onClick={onClick}
+			role={onClick ? 'button' : undefined}
+			tabIndex={onClick ? 0 : undefined}
+			onKeyDown={
+				onClick
+					? e => {
+							if (e.key === 'Enter' || e.key === ' ') onClick();
+						}
+					: undefined
+			}
+		>
 			<FiTool size={14} />
-			<span className={labelClasses}>{name}</span>
-			<FiCode title="Details" size={14} />
+			<span className={fullWidth ? 'min-w-0 flex-1 truncate' : 'max-w-44 truncate'}>{name}</span>
+			<FiCode className="text-base-content/60" title="Details" size={14} />
 		</div>
 	);
 }
@@ -153,21 +169,35 @@ function MessageToolCallChip({ call, fullWidth = false, onClick }: MessageToolCa
 	const autoLabel = call.toolStoreChoice?.autoExecute ? ' • Auto-execute: enabled' : '';
 	const title = `Suggested tool call: ${label}${statusLabel}${autoLabel}`;
 
-	const containerClasses = [
-		'bg-base-200 text-base-content flex items-center justify-between gap-2 rounded-2xl px-2 py-0',
-		fullWidth ? 'w-full' : 'shrink-0',
-	]
-		.filter(Boolean)
-		.join(' ');
-
-	const labelClasses = fullWidth ? 'min-w-0 flex-1 truncate' : 'max-w-64 truncate';
-
 	return (
-		<div className={containerClasses} title={title} data-message-chip="tool-suggested" onClick={onClick}>
-			<FiTool size={14} />
-			<span className={labelClasses}>{label}</span>
+		<div
+			className={[
+				'text-base-content border-base-content/20 mx-1 flex items-center justify-between gap-2 rounded-2xl border bg-inherit px-2 py-0',
+				fullWidth ? 'w-full' : 'shrink-0',
+				onClick ? 'cursor-pointer' : '',
+			]
+				.filter(Boolean)
+				.join(' ')}
+			title={title}
+			data-message-chip="tool-suggested"
+			onClick={onClick}
+			role={onClick ? 'button' : undefined}
+			tabIndex={onClick ? 0 : undefined}
+			onKeyDown={
+				onClick
+					? e => {
+							if (e.key === 'Enter' || e.key === ' ') {
+								e.preventDefault();
+								onClick();
+							}
+						}
+					: undefined
+			}
+		>
+			<FiTerminal size={14} />
+			<span className={fullWidth ? 'min-w-0 flex-1 truncate' : 'max-w-44 truncate'}>{label}</span>
 			{call.toolStoreChoice?.autoExecute ? <span className="badge badge-ghost badge-xs">Auto</span> : null}
-			<FiCode title="Details" size={14} />
+			<FiCode className="text-base-content/60" title="Details" size={14} />
 		</div>
 	);
 }
@@ -189,20 +219,165 @@ function MessageToolOutputChip({ output, fullWidth = false, onClick }: MessageTo
 	const titleLines = [label, `Tool: ${output.name}`, `Call ID: ${output.callID}`];
 	const title = titleLines.join('\n');
 
-	const containerClasses = [
-		'bg-base-200 text-base-content flex items-center justify-between gap-2 rounded-2xl px-2 py-0',
-		fullWidth ? 'w-full' : 'shrink-0',
-	]
-		.filter(Boolean)
-		.join(' ');
+	return (
+		<div
+			className={[
+				'text-base-content border-base-content/20 mx-1 flex items-center justify-between gap-2 rounded-2xl border bg-inherit px-2 py-0',
+				fullWidth ? 'w-full' : 'shrink-0',
+				onClick ? 'cursor-pointer' : '',
+			]
+				.filter(Boolean)
+				.join(' ')}
+			title={title}
+			data-message-chip="tool-output"
+			onClick={onClick}
+			role={onClick ? 'button' : undefined}
+			tabIndex={onClick ? 0 : undefined}
+			onKeyDown={
+				onClick
+					? e => {
+							if (e.key === 'Enter' || e.key === ' ') {
+								e.preventDefault();
+								onClick();
+							}
+						}
+					: undefined
+			}
+		>
+			<FiTool size={14} />
+			<span className={fullWidth ? 'min-w-0 flex-1 truncate' : 'max-w-44 truncate'}>{label}</span>
+			<FiCode className="text-base-content/60" title="Details" size={14} />
+		</div>
+	);
+}
 
-	const labelClasses = fullWidth ? 'min-w-0 flex-1 truncate' : 'max-w-64 truncate';
+interface MessageWebSearchOutputChipProps {
+	output: UIToolOutput;
+	fullWidth?: boolean;
+	onClick?: () => void;
+}
+
+function MessageWebSearchOutputChip({ output, fullWidth = false, onClick }: MessageWebSearchOutputChipProps) {
+	const resultCount = output.webSearchToolOutputItems?.length ?? 0;
+	const label = resultCount > 0 ? `${resultCount} result${resultCount === 1 ? '' : 's'}` : 'Web search results';
+
+	const title = [`Web search results`, `Tool: ${output.name}`, `Call ID: ${output.callID}`].join('\n');
 
 	return (
-		<div className={containerClasses} title={title} data-message-chip="tool-output" onClick={onClick}>
-			<FiTool size={14} />
-			<span className={labelClasses}>{label}</span>
-			<FiCode title="Details" size={14} />
+		<div
+			className={[
+				'text-base-content border-base-content/20 mx-1 flex items-center justify-between gap-2 rounded-2xl border bg-inherit px-2 py-0',
+				fullWidth ? 'w-full' : 'shrink-0',
+				onClick ? 'cursor-pointer' : '',
+			]
+				.filter(Boolean)
+				.join(' ')}
+			title={title}
+			data-message-chip="websearch-output"
+			onClick={onClick}
+			role={onClick ? 'button' : undefined}
+			tabIndex={onClick ? 0 : undefined}
+			onKeyDown={
+				onClick
+					? e => {
+							if (e.key === 'Enter' || e.key === ' ') {
+								e.preventDefault();
+								onClick();
+							}
+						}
+					: undefined
+			}
+		>
+			<FiGlobe size={14} />
+			<span className={fullWidth ? 'min-w-0 flex-1 truncate' : 'max-w-44 truncate'}>{label}</span>
+			<FiCode className="text-base-content/60" title="Details" size={14} />
+		</div>
+	);
+}
+
+interface MessageWebSearchCallChipProps {
+	call: UIToolCall;
+	fullWidth?: boolean;
+	onClick?: () => void;
+}
+
+function MessageWebSearchCallChip({ call, fullWidth = false, onClick }: MessageWebSearchCallChipProps) {
+	// Prefer web-search query if present; fall back to generic label
+	const items = call.webSearchToolCallItems ?? [];
+	const firstQuery =
+		items.find(it => it?.searchItem?.query)?.searchItem?.query ??
+		items.find(it => it?.findItem?.pattern)?.findItem?.pattern;
+
+	const fallback = formatToolCallLabel(call);
+	const label = firstQuery || fallback;
+
+	const title = `Web search query: ${label}`;
+
+	return (
+		<div
+			className={[
+				'text-base-content border-base-content/20 mx-1 flex items-center justify-between gap-2 rounded-2xl border bg-inherit px-2 py-0',
+				fullWidth ? 'w-full' : 'shrink-0',
+				onClick ? 'cursor-pointer' : '',
+			]
+				.filter(Boolean)
+				.join(' ')}
+			title={title}
+			data-message-chip="websearch-call"
+			onClick={onClick}
+			role={onClick ? 'button' : undefined}
+			tabIndex={onClick ? 0 : undefined}
+			onKeyDown={
+				onClick
+					? e => {
+							if (e.key === 'Enter' || e.key === ' ') {
+								e.preventDefault();
+								onClick();
+							}
+						}
+					: undefined
+			}
+		>
+			<FiGlobe size={14} />
+			<span className={fullWidth ? 'min-w-0 flex-1 truncate' : 'max-w-44 truncate'}>{label}</span>
+			<FiCode className="text-base-content/60" title="Details" size={14} />
+		</div>
+	);
+}
+
+function MessageWebSearchToolChoiceChip({ tool, fullWidth = false, onClick }: MessageToolChoiceChipProps) {
+	const name = tool.displayName || tool.toolSlug;
+	const slug = `${tool.bundleID}/${tool.toolSlug}@${tool.toolVersion}`;
+	const title = [name, slug, tool.description].filter(Boolean).join('\n');
+
+	return (
+		<div
+			className={[
+				'text-base-content border-base-content/20 mx-1 flex items-center justify-between gap-2 rounded-2xl border bg-inherit px-2 py-0',
+				fullWidth ? 'w-full' : 'shrink-0',
+				onClick ? 'cursor-pointer' : '',
+			]
+				.filter(Boolean)
+				.join(' ')}
+			title={title}
+			data-message-chip="websearch-tool-choice"
+			onClick={onClick}
+			role={onClick ? 'button' : undefined}
+			tabIndex={onClick ? 0 : undefined}
+			onKeyDown={
+				onClick
+					? e => {
+							if (e.key === 'Enter' || e.key === ' ') {
+								e.preventDefault();
+								onClick();
+							}
+						}
+					: undefined
+			}
+		>
+			<FiGlobe size={14} />
+			<span className={fullWidth ? 'min-w-0 flex-1 truncate' : 'max-w-44 truncate'}>{name}</span>
+			<FiCode className="text-base-content/60" title="Details" size={14} />
 		</div>
 	);
 }
@@ -219,6 +394,10 @@ function AttachmentsGroupChip({ attachments }: AttachmentsGroupChipProps) {
 	const titleLines = ['Attachments', `${count} item${count === 1 ? '' : 's'} attached`];
 	const title = titleLines.join('\n');
 	if (count === 0) return null;
+	// If there's only one item, show the single chip (no dropdown/group chip)
+	if (count === 1) {
+		return <MessageAttachmentInfoChip attachment={attachments[0]} />;
+	}
 	return (
 		<div
 			className="bg-info/10 text-base-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
@@ -274,7 +453,22 @@ function ToolChoicesGroupChip({ tools, onToolChoiceDetails }: ToolChoicesGroupCh
 	const titleLines = ['Tools', `${count} tool${count === 1 ? '' : 's'} used for this turn`];
 	const title = titleLines.join('\n');
 	if (count === 0) return null;
-
+	// If there's only one item, show the single chip (no dropdown/group chip)
+	if (count === 1) {
+		const tool = tools[0];
+		return (
+			<MessageToolChoiceChip
+				tool={tool}
+				onClick={
+					onToolChoiceDetails
+						? () => {
+								onToolChoiceDetails(tool);
+							}
+						: undefined
+				}
+			/>
+		);
+	}
 	return (
 		<div
 			className="bg-info/10 text-base-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
@@ -337,7 +531,22 @@ function ToolOutputsGroupChip({ outputs, onToolOutputDetails }: ToolOutputsGroup
 	const titleLines = ['Tool outputs', `${count} result${count === 1 ? '' : 's'} used for this turn`];
 	const title = titleLines.join('\n');
 	if (count === 0) return null;
-
+	// If there's only one item, show the single chip (no dropdown/group chip)
+	if (count === 1) {
+		const out = outputs[0];
+		return (
+			<MessageToolOutputChip
+				output={out}
+				onClick={
+					onToolOutputDetails
+						? () => {
+								onToolOutputDetails(out);
+							}
+						: undefined
+				}
+			/>
+		);
+	}
 	return (
 		<div
 			className="bg-info/10 text-base-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
@@ -400,14 +609,29 @@ function ToolCallsGroupChip({ calls, onToolCallDetails }: ToolCallsGroupChipProp
 	const titleLines = ['Suggested tool calls', `${count} suggestion${count === 1 ? '' : 's'} from assistant`];
 	const title = titleLines.join('\n');
 	if (count === 0) return null;
-
+	// If there's only one item, show the single chip (no dropdown/group chip)
+	if (count === 1) {
+		const call = calls[0];
+		return (
+			<MessageToolCallChip
+				call={call}
+				onClick={
+					onToolCallDetails
+						? () => {
+								onToolCallDetails(call);
+							}
+						: undefined
+				}
+			/>
+		);
+	}
 	return (
 		<div
 			className="bg-info/10 text-base-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
 			title={title}
 			data-message-chip="tool-calls-group"
 		>
-			<FiTool size={14} />
+			<FiTerminal size={14} />
 			<span className="max-w-24 truncate">Tool calls</span>
 			<span className="text-base-content/60 whitespace-nowrap">{count}</span>
 
@@ -462,7 +686,22 @@ function WebSearchOutputsGroupChip({ outputs, onOutputDetails }: WebSearchOutput
 
 	const title = ['Web search results', `${count} result set${count === 1 ? '' : 's'} for this turn`].join('\n');
 	if (count === 0) return null;
-
+	// If there's only one item, show the single chip (no dropdown/group chip)
+	if (count === 1) {
+		const out = outputs[0];
+		return (
+			<MessageWebSearchOutputChip
+				output={out}
+				onClick={
+					onOutputDetails
+						? () => {
+								onOutputDetails(out);
+							}
+						: undefined
+				}
+			/>
+		);
+	}
 	return (
 		<div
 			className="bg-info/10 text-base-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
@@ -512,34 +751,6 @@ function WebSearchOutputsGroupChip({ outputs, onOutputDetails }: WebSearchOutput
 	);
 }
 
-interface MessageWebSearchOutputChipProps {
-	output: UIToolOutput;
-	fullWidth?: boolean;
-	onClick?: () => void;
-}
-
-function MessageWebSearchOutputChip({ output, fullWidth = false, onClick }: MessageWebSearchOutputChipProps) {
-	const containerClasses = [
-		'bg-base-200 text-base-content flex items-center justify-between gap-2 rounded-2xl px-2 py-0',
-		fullWidth ? 'w-full' : 'shrink-0',
-	].join(' ');
-
-	const labelClasses = fullWidth ? 'min-w-0 flex-1 truncate' : 'max-w-64 truncate';
-
-	const resultCount = output.webSearchToolOutputItems?.length ?? 0;
-	const label = resultCount > 0 ? `${resultCount} result${resultCount === 1 ? '' : 's'}` : 'Web search results';
-
-	const title = [`Web search results`, `Tool: ${output.name}`, `Call ID: ${output.callID}`].join('\n');
-
-	return (
-		<div className={containerClasses} title={title} data-message-chip="websearch-output" onClick={onClick}>
-			<FiGlobe size={14} />
-			<span className={labelClasses}>{label}</span>
-			<FiCode title="Details" size={14} />
-		</div>
-	);
-}
-
 interface WebSearchCallsGroupChipProps {
 	calls: UIToolCall[];
 	onCallDetails?: (call: UIToolCall) => void;
@@ -552,7 +763,22 @@ function WebSearchCallsGroupChip({ calls, onCallDetails }: WebSearchCallsGroupCh
 
 	const title = ['Web search activity', `${count} web‑search quer${count === 1 ? 'y' : 'ies'} this turn`].join('\n');
 	if (count === 0) return null;
-
+	// If there's only one item, show the single chip (no dropdown/group chip)
+	if (count === 1) {
+		const call = calls[0];
+		return (
+			<MessageWebSearchCallChip
+				call={call}
+				onClick={
+					onCallDetails
+						? () => {
+								onCallDetails(call);
+							}
+						: undefined
+				}
+			/>
+		);
+	}
 	return (
 		<div
 			className="bg-info/10 text-base-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
@@ -602,40 +828,6 @@ function WebSearchCallsGroupChip({ calls, onCallDetails }: WebSearchCallsGroupCh
 	);
 }
 
-interface MessageWebSearchCallChipProps {
-	call: UIToolCall;
-	fullWidth?: boolean;
-	onClick?: () => void;
-}
-
-function MessageWebSearchCallChip({ call, fullWidth = false, onClick }: MessageWebSearchCallChipProps) {
-	const containerClasses = [
-		'bg-base-200 text-base-content flex items-center justify-between gap-2 rounded-2xl px-2 py-0',
-		fullWidth ? 'w-full' : 'shrink-0',
-	].join(' ');
-
-	const labelClasses = fullWidth ? 'min-w-0 flex-1 truncate' : 'max-w-64 truncate';
-
-	// Prefer web-search query if present; fall back to generic label
-	const items = call.webSearchToolCallItems ?? [];
-	const firstQuery =
-		items.find(it => it?.searchItem?.query)?.searchItem?.query ??
-		items.find(it => it?.findItem?.pattern)?.findItem?.pattern;
-
-	const fallback = formatToolCallLabel(call);
-	const label = firstQuery || fallback;
-
-	const title = `Web search query: ${label}`;
-
-	return (
-		<div className={containerClasses} title={title} data-message-chip="websearch-call" onClick={onClick}>
-			<FiGlobe size={14} />
-			<span className={labelClasses}>{label}</span>
-			<FiCode title="Details" size={14} />
-		</div>
-	);
-}
-
 interface WebSearchChoicesGroupChipProps {
 	choices: ToolStoreChoice[];
 	onChoiceDetails?: (choice: ToolStoreChoice) => void;
@@ -650,7 +842,22 @@ function WebSearchChoicesGroupChip({ choices, onChoiceDetails }: WebSearchChoice
 		'\n'
 	);
 	if (count === 0) return null;
-
+	// If there's only one item, show the single chip (no dropdown/group chip)
+	if (count === 1) {
+		const choice = choices[0];
+		return (
+			<MessageWebSearchToolChoiceChip
+				tool={choice}
+				onClick={
+					onChoiceDetails
+						? () => {
+								onChoiceDetails(choice);
+							}
+						: undefined
+				}
+			/>
+		);
+	}
 	return (
 		<div
 			className="bg-info/10 text-base-content border-info/50 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
@@ -696,24 +903,6 @@ function WebSearchChoicesGroupChip({ choices, onChoiceDetails }: WebSearchChoice
 					</MenuItem>
 				))}
 			</Menu>
-		</div>
-	);
-}
-
-function MessageWebSearchToolChoiceChip({ tool, fullWidth = false, onClick }: MessageToolChoiceChipProps) {
-	const name = tool.displayName || tool.toolSlug;
-	const slug = `${tool.bundleID}/${tool.toolSlug}@${tool.toolVersion}`;
-	const title = [name, slug, tool.description].filter(Boolean).join('\n');
-	const containerClasses = [
-		'bg-base-200 text-base-content flex items-center justify-between gap-2 rounded-2xl px-2 py-0',
-		fullWidth ? 'w-full' : 'shrink-0',
-	].join(' ');
-	const labelClasses = fullWidth ? 'min-w-0 flex-1 truncate' : 'max-w-64 truncate';
-	return (
-		<div className={containerClasses} title={title} data-message-chip="websearch-tool-choice" onClick={onClick}>
-			<FiGlobe size={14} />
-			<span className={labelClasses}>{name}</span>
-			<FiCode title="Details" size={14} />
 		</div>
 	);
 }

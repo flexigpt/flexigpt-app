@@ -209,7 +209,7 @@ export function ToolMenuRow({
 					{onShowDetails ? (
 						<button
 							type="button"
-							className="btn btn-ghost btn-xs shrink-0 px-1 py-0 shadow-none"
+							className="btn btn-ghost btn-xs text-base-content/60 shrink-0 px-1 py-0 shadow-none"
 							onClick={e => {
 								stop(e);
 								onShowDetails();

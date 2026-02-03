@@ -1,4 +1,4 @@
-import { FiAlertTriangle, FiCode, FiPlay, FiTool, FiX } from 'react-icons/fi';
+import { FiAlertTriangle, FiCode, FiPlay, FiTerminal, FiTool, FiX } from 'react-icons/fi';
 
 import { type UIToolCall, type UIToolOutput } from '@/spec/inference';
 import { ToolStoreChoiceType } from '@/spec/tool';
@@ -121,8 +121,7 @@ function ToolCallComposerChipView({ toolCall, isBusy, onRun, onDiscard, onDetail
 
 	return (
 		<div className={`${baseClasses} ${errorClasses}`} title={title} data-attachment-chip="tool-call">
-			<FiTool size={14} className={isFailed ? 'text-error' : ''} />
-			<span className="text-base-content/60 text-[10px] uppercase">Suggested</span>
+			<FiTerminal size={14} className={isFailed ? 'text-error' : ''} />
 			{toolCall.toolStoreChoice?.autoExecute ? <span className="badge badge-primary badge-xs">Auto</span> : null}
 			<span className="max-w-64 truncate">{truncatedLabel}</span>
 
@@ -146,7 +145,7 @@ function ToolCallComposerChipView({ toolCall, isBusy, onRun, onDiscard, onDetail
 
 				<button
 					type="button"
-					className="btn btn-ghost btn-xs gap-0 px-1 py-0 shadow-none"
+					className="btn btn-ghost btn-xs text-base-content/60 gap-0 px-1 py-0 shadow-none"
 					onClick={onDetails}
 					title="Show call details"
 					aria-label="Show call details"
@@ -207,13 +206,9 @@ function ToolOutputComposerChipView({ output, onOpen, onRemove, onRetry }: ToolO
 	}
 	const title = titleLines.join('\n');
 
-	const baseClasses = 'flex shrink-0 cursor-pointer items-center gap-2 rounded-2xl px-2 py-0 transition-colors';
-	const normalClasses = 'bg-base-200 text-base-content hover:bg-base-300/80';
-	const errorClasses = 'border-error/70 bg-error/5 text-error border';
-
 	return (
 		<div
-			className={`${baseClasses} ${isError ? errorClasses : normalClasses}`}
+			className={`flex shrink-0 cursor-pointer items-center gap-2 rounded-2xl px-2 py-0 transition-colors ${isError ? 'border-error/70 bg-error/5 text-error border' : 'bg-base-200 text-base-content hover:bg-base-300/80'}`}
 			title={title}
 			role="button"
 			tabIndex={0}
@@ -231,6 +226,10 @@ function ToolOutputComposerChipView({ output, onOpen, onRemove, onRetry }: ToolO
 			<span className="max-w-64 truncate">{truncatedLabel}</span>
 
 			<div className="ml-auto flex items-center gap-1">
+				<span className="text-base-content/60">
+					<FiCode size={12} />
+				</span>
+
 				{canRetry && (
 					<button
 						type="button"

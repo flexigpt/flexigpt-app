@@ -704,3 +704,4 @@
     - [x] same can be for result but as of now we dont have tool results with special ui reqs.
 
 - [x] editor is starting to look very very heavy, review to see for better refactoring and perf opt.
+- [x] in message attachment bar chips, we want to not show a dropdown if there is only 1 call/result/output.
