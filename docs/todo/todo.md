@@ -6,7 +6,9 @@
 
 - [ ] valid input output modalities, valid levels, valid reasoning types, etc need to be added to modelpresetspec.
 - [ ] additional params from apis
+
 - [ ] docx, excel support
+- [ ] Drag and drop files as attachments.
 - [ ] tool search tool
 - [ ] we may want to have a "assistant" like we planned before that has tool sets and autoexec config so that the "agent" loop is kind of autonomous
 - [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls loop is better.
