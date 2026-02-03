@@ -101,11 +101,8 @@ export function MessageFooterArea({
 				)}
 
 				<div className={`flex items-center justify-end space-x-6 ${!isStreaming && !usage ? 'w-full' : ''}`}>
-					{hasContent && (
-						<label
-							className={`ml-1 flex h-full items-center space-x-2 truncate p-1 ${isBusy ? 'cursor-not-allowed opacity-50' : ''}`}
-							title="Disable Markdown"
-						>
+					{hasContent && !isBusy && (
+						<label className={`ml-1 flex h-full items-center space-x-2 truncate p-1`} title="Disable Markdown">
 							<input
 								type="checkbox"
 								checked={disableMarkdown}
@@ -114,7 +111,6 @@ export function MessageFooterArea({
 								}}
 								className="checkbox checkbox-xs ml-1 rounded-full"
 								spellCheck="false"
-								disabled={isBusy}
 							/>
 							<span className="text-base-content text-xs text-nowrap">Disable Markdown</span>
 						</label>
@@ -132,41 +128,34 @@ export function MessageFooterArea({
 							<FiCode size={16} />
 						</button>
 					)}
-					{isUser && (
+					{isUser && !isBusy && (
 						<button
-							className={`btn btn-sm flex items-center border-none bg-transparent! p-0 shadow-none ${
-								isBusy ? 'btn-disabled' : ''
-							}`}
+							className={`btn btn-sm } flex items-center border-none bg-transparent! p-0 shadow-none`}
 							onClick={onResend}
 							aria-label="Resend Message"
 							title="Resend Message"
-							disabled={isBusy}
 						>
 							<FiRepeat size={16} />
 						</button>
 					)}
-					{isUser && (
+					{isUser && !isBusy && (
 						<button
-							className={`btn btn-sm flex items-center border-none bg-transparent! p-0 shadow-none ${
-								isBusy ? 'btn-disabled' : ''
-							}`}
+							className={`btn btn-sm } flex items-center border-none bg-transparent! p-0 shadow-none`}
 							onClick={onEdit}
 							aria-label="Edit Message"
 							title="Edit Message"
-							disabled={isBusy}
 						>
 							<FiEdit2 size={16} />
 						</button>
 					)}
 
-					<CopyButton
-						value={stripCustomMDFences(cardCopyContent)}
-						className={`btn btn-sm flex items-center border-none bg-transparent! p-0 shadow-none ${
-							isBusy ? 'btn-disabled' : ''
-						}`}
-						size={16}
-						disabled={isBusy}
-					/>
+					{cardCopyContent !== '' && !isBusy && (
+						<CopyButton
+							value={stripCustomMDFences(cardCopyContent)}
+							className={`btn btn-sm } flex items-center border-none bg-transparent! p-0 shadow-none`}
+							size={16}
+						/>
+					)}
 				</div>
 			</div>
 

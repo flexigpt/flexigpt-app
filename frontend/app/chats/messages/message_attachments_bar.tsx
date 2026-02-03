@@ -119,9 +119,7 @@ function MessageToolChoiceChip({ tool, fullWidth = false, onClick }: MessageTool
 		<div className={containerClasses} title={tooltipLines.join('\n')} data-message-chip="tool-choice" onClick={onClick}>
 			<FiTool size={14} />
 			<span className={labelClasses}>{name}</span>
-			<span className="text-base-content/60 flex gap-1 text-[10px] uppercase">
-				Details <FiCode size={12} />
-			</span>
+			<FiCode title="Details" size={14} />
 		</div>
 	);
 }
@@ -169,9 +167,7 @@ function MessageToolCallChip({ call, fullWidth = false, onClick }: MessageToolCa
 			<FiTool size={14} />
 			<span className={labelClasses}>{label}</span>
 			{call.toolStoreChoice?.autoExecute ? <span className="badge badge-ghost badge-xs">Auto</span> : null}
-			<span className="text-base-content/60 flex gap-1 text-[10px] uppercase">
-				Details <FiCode size={12} />
-			</span>
+			<FiCode title="Details" size={14} />
 		</div>
 	);
 }
@@ -206,9 +202,7 @@ function MessageToolOutputChip({ output, fullWidth = false, onClick }: MessageTo
 		<div className={containerClasses} title={title} data-message-chip="tool-output" onClick={onClick}>
 			<FiTool size={14} />
 			<span className={labelClasses}>{label}</span>
-			<span className="text-base-content/60 flex gap-1 text-[10px] uppercase">
-				Details <FiCode size={12} />
-			</span>
+			<FiCode title="Details" size={14} />
 		</div>
 	);
 }
@@ -541,9 +535,7 @@ function MessageWebSearchOutputChip({ output, fullWidth = false, onClick }: Mess
 		<div className={containerClasses} title={title} data-message-chip="websearch-output" onClick={onClick}>
 			<FiGlobe size={14} />
 			<span className={labelClasses}>{label}</span>
-			<span className="text-base-content/60 flex gap-1 text-[10px] uppercase">
-				Details <FiCode size={12} />
-			</span>
+			<FiCode title="Details" size={14} />
 		</div>
 	);
 }
@@ -639,9 +631,7 @@ function MessageWebSearchCallChip({ call, fullWidth = false, onClick }: MessageW
 		<div className={containerClasses} title={title} data-message-chip="websearch-call" onClick={onClick}>
 			<FiGlobe size={14} />
 			<span className={labelClasses}>{label}</span>
-			<span className="text-base-content/60 flex gap-1 text-[10px] uppercase">
-				Details <FiCode size={12} />
-			</span>
+			<FiCode title="Details" size={14} />
 		</div>
 	);
 }
@@ -723,9 +713,7 @@ function MessageWebSearchToolChoiceChip({ tool, fullWidth = false, onClick }: Me
 		<div className={containerClasses} title={title} data-message-chip="websearch-tool-choice" onClick={onClick}>
 			<FiGlobe size={14} />
 			<span className={labelClasses}>{name}</span>
-			<span className="text-base-content/60 flex gap-1 text-[10px] uppercase">
-				Details <FiCode size={12} />
-			</span>
+			<FiCode title="Details" size={14} />
 		</div>
 	);
 }
