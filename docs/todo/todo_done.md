@@ -705,3 +705,12 @@
 
 - [x] editor is starting to look very very heavy, review to see for better refactoring and perf opt.
 - [x] in message attachment bar chips, we want to not show a dropdown if there is only 1 call/result/output.
+
+- [x] Chats vs Chat with AI from home
+  - [x] Should one create a new chat, and other load recent chat or go to search?
+  - [x] Do we want a home page at all? should it be direct chat landing page with redirects to other pages?
+
+- [x] responses api integration for o3-pro.
+  - [x] create model preset should allow the api function type
+  - [x] The responses api seems a bit weird and sdk seems immature for it as of now. Evaluate at a later time again.
+  - [x] Things not available due to not moving to responses as of now: reasoning thought process, state management on openai, prompt template usage from openai servers. Not sure if tool calls have some problems in chat completions vs this one including openai mcp servers and tools.

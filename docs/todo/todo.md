@@ -2,14 +2,18 @@
 
 ## Laundry list
 
-- [ ] we may want to have a "assistant" like we planned before that has tool sets and autoexec config so that the "agent" loop is kind of autonomous
-- [ ] When url cannot fetch content, there is no way of knowing what happened as of now. may want to see how to expose this or disable link only mode in this flow?
-- [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls loop is better.
-
 ## Features
 
-- [ ] there is a reference calculator tool in claude docs
 - [ ] valid input output modalities, valid levels, valid reasoning types, etc need to be added to modelpresetspec.
+- [ ] additional params from apis
+- [ ] docx, excel support
+- [ ] tool search tool
+- [ ] we may want to have a "assistant" like we planned before that has tool sets and autoexec config so that the "agent" loop is kind of autonomous
+- [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls loop is better.
+  - [ ] this is a "feature" in anthropic and chargable for cache write.
+  - [ ] implement this after feature filters support and additional param support features in apis.
+- [ ] image output modality
+- [ ] check the reference calculator tool in claude docs
 
 ## Milestone thoughts
 

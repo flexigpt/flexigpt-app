@@ -56,18 +56,14 @@
       - [ ] Global on/off switch like right now
       - [ ] Query level switch overrides the global switch.
 
-- [ ] Chats vs Chat with AI from home
-  - [ ] Should one create a new chat, and other load recent chat or go to search?
-  - [ ] Do we want a home page at all? should it be direct chat landing page with redirects to other pages?
-
-- [ ] responses api integration for o3-pro.
-  - [ ] create model preset should allow the api function type
-  - [ ] The responses api seems a bit weird and sdk seems immature for it as of now. Evaluate at a later time again.
-  - [ ] Things not available due to not moving to responses as of now: reasoning thought process, state management on openai, prompt template usage from openai servers. Not sure if tool calls have some problems in chat completions vs this one including openai mcp servers and tools.
-
 - [ ] Windows
   - [ ] Signing for Win
   - [ ] Test Windows build
+
+- [ ] When url cannot fetch content, there is no way of knowing what happened as of now. may want to see how to expose this or disable link only mode in this flow?
+  - [ ] as of now content blocks are errored out only during attach tme and not during build time.
+  - [ ] whenever this is to be done, we need to see what is best ux and then design thngs accordingly.
+  - [ ] early thought is that errors definitly need to be consdiered during attach time, at that time, we should do as much as possible to tell user that something is wrong. but once that stage is done, i.e non error in attach time, may be assumethat things wil lbe correct and log and skip in next stage.
 
 ## Stricken out list
 
