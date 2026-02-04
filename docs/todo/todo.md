@@ -2,6 +2,9 @@
 
 ## Laundry list
 
+- [ ] if there is a very large table in md, the ui hangs.
+- [ ] if there are attachments in previous message and then it was changed and then we resend it, the app crashes without trace.
+
 ## Features
 
 - [ ] valid input output modalities, valid levels, valid reasoning types, etc need to be added to modelpresetspec.

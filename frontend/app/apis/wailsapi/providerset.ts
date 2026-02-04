@@ -36,12 +36,12 @@ export class WailsProviderSetAPI implements IProviderSetAPI {
 		if (onStreamTextData) {
 			textCallbackId = `text-${rid}`;
 
-			let lastText = '';
+			let lastTrimmedText = '';
 			const textCb = (t: string) => {
 				const d = t.trim();
-				if (d !== lastText) {
-					lastText = d;
-					onStreamTextData(d);
+				if (d !== lastTrimmedText) {
+					lastTrimmedText = d;
+					onStreamTextData(t);
 				}
 			};
 			EventsOn(textCallbackId, textCb);
@@ -49,12 +49,12 @@ export class WailsProviderSetAPI implements IProviderSetAPI {
 
 		if (onStreamThinkingData) {
 			thinkingCallbackId = `thinking-${rid}`;
-			let lastThinking = '';
+			let lastTrimmedThinking = '';
 			const thinkingCb = (t: string) => {
 				const d = t.trim();
-				if (d !== lastThinking) {
-					lastThinking = d;
-					onStreamThinkingData(d);
+				if (d !== lastTrimmedThinking) {
+					lastTrimmedThinking = d;
+					onStreamThinkingData(t);
 				}
 			};
 			EventsOn(thinkingCallbackId, thinkingCb);
