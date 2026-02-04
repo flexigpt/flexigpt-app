@@ -8,17 +8,22 @@
 ## Features
 
 - [ ] valid input output modalities, valid levels, valid reasoning types, etc need to be added to modelpresetspec.
+
 - [ ] additional params from apis
+  - [x] support in inference go api
+  - [ ] adapt in model preset spec and provider set
+
+- [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls loop is better.
+  - [ ] this is a "feature" in anthropic and chargable for cache write.
+  - [ ] implement this after feature filters support and additional param support features in apis.
 
 - [ ] docx, excel support
 - [ ] Drag and drop files as attachments.
 - [ ] tool search tool
-- [ ] we may want to have a "assistant" like we planned before that has tool sets and autoexec config so that the "agent" loop is kind of autonomous
-- [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls loop is better.
-  - [ ] this is a "feature" in anthropic and chargable for cache write.
-  - [ ] implement this after feature filters support and additional param support features in apis.
+
 - [ ] image output modality
 - [ ] check the reference calculator tool in claude docs
+- [ ] we may want to have a "assistant" like we planned before that has tool sets and autoexec config so that the "agent" loop is kind of autonomous
 
 ## Milestone thoughts
 
@@ -49,14 +54,6 @@
       - [x] stored responses, stored conversations, on server memory context, on server prompt templates etc.
 
   - [ ] i18n
-  - [ ] provider and model level allow disallow list of model params/capabilities etc.
-  - [ ] Some more additional params in presets and advanced params modal.
-    - [ ] tool choice tuning
-    - [ ] verbosity tuning
-    - [ ] top k
-    - [ ] Not sure: Safety parameter, that identifies a user if they violate safety policies.
-    - [ ] Not sure: stop strings
-    - [ ] Not sure: cache control in claude
 
 - [ ] M2 - Better context
   - [ ] MCP local connections and hooks
