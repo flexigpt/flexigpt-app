@@ -15,6 +15,7 @@ import { DefaultUIChatOptions, type UIChatOption } from '@/spec/modelpreset';
 import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
+import { ensureMakeID, getUUIDv7 } from '@/lib/uuid_utils';
 
 import { useAtTopBottom } from '@/hooks/use_at_top_bottom';
 
@@ -412,8 +413,13 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 			// mark busy (coarse UI only)
 			updateTab(tabId, t => ({ ...t, isBusy: true }));
+			let reqId: string;
+			try {
+				reqId = getUUIDv7();
+			} catch {
+				reqId = ensureMakeID();
+			}
 
-			const reqId = crypto.randomUUID();
 			requestIdByTab.current.set(tabId, reqId);
 
 			const controller = new AbortController();
@@ -421,7 +427,8 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 			let allMessages = updatedChatWithUserMessage.messages;
 			if (options.disablePreviousMessages) {
-				allMessages = [updatedChatWithUserMessage.messages[updatedChatWithUserMessage.messages.length - 1]];
+				const last = updatedChatWithUserMessage.messages.at(-1);
+				allMessages = last ? [last] : [];
 			}
 			if (allMessages.length === 0) {
 				updateTab(tabId, t => ({ ...t, isBusy: false }));
@@ -644,8 +651,8 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			if (tab.editingMessageId) {
 				const idx = tab.conversation.messages.findIndex(m => m.id === tab.editingMessageId);
 				if (idx !== -1) {
-					const msgs = tab.conversation.messages.slice(0, idx + 1);
-					msgs[idx] = userMsg;
+					const oldMsgs = tab.conversation.messages.slice(0, idx);
+					const msgs = [...oldMsgs, userMsg];
 
 					const updatedChat: Conversation = {
 						...tab.conversation,
@@ -723,6 +730,8 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			if (idx === -1) return;
 
 			const msg = tab.conversation.messages[idx];
+			if (msg.role !== RoleEnum.User) return;
+
 			const input = inputRefs.current.get(tabId);
 
 			// Fix: derive tool + web-search choices consistently (don’t pass mixed tool choices to web-search)

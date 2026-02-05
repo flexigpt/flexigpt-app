@@ -29,6 +29,7 @@ import { type Tool, type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/too
 import { type ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { compareEntryByPathDeepestFirst } from '@/lib/path_utils';
 import { cssEscape } from '@/lib/text_utils';
+import { ensureMakeID, getUUIDv7 } from '@/lib/uuid_utils';
 
 import { useEnterSubmit } from '@/hooks/use_enter_submit';
 
@@ -779,7 +780,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			return;
 		}
 
-		const newId = crypto.randomUUID();
+		let newId: string;
+		try {
+			newId = getUUIDv7();
+		} catch {
+			newId = ensureMakeID();
+		}
 
 		const chip: UIToolCall = {
 			id: newId,

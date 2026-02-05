@@ -98,9 +98,15 @@ function getErrorStub(
 	if (rawResponse?.inferenceResponse && rawResponse.inferenceResponse.error) {
 		assistantPlaceholder.error = rawResponse.inferenceResponse.error;
 	} else {
+		let msg: string;
+		try {
+			msg = JSON.stringify(errorObj, null, 2);
+		} catch {
+			msg = String(errorObj);
+		}
 		assistantPlaceholder.error = {
 			code: 'unknown',
-			message: JSON.stringify(errorObj, null, 2),
+			message: msg,
 		} as InferenceError;
 	}
 
@@ -296,7 +302,8 @@ export function deriveUIFieldsFromOutputUnion(
 				if (!msg || !msg.contents) break;
 				for (const c of msg.contents) {
 					if (c.kind === ContentItemKind.Text && c.textItem) {
-						const t = c.textItem.text.trim();
+						const raw = c.textItem?.text;
+						const t = typeof raw === 'string' ? raw.trim() : '';
 						if (t) textParts.push(t);
 
 						const itemCitations = c.textItem.citations;
