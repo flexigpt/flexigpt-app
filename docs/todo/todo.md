@@ -8,14 +8,19 @@
 
 ## Features
 
-- [ ] valid input output modalities, valid levels, valid reasoning types, etc need to be added to modelpresetspec.
-- [ ] additional params from apis
-  - [x] support in inference go api
-  - [ ] adapt in model preset spec and provider set
+- [ ] ModelParams enhancements
+  - [ ] valid input output modalities, valid levels, valid reasoning types, etc need to be added to modelpresetspec.
+  - [ ] additional params from apis
+    - [x] support in inference go api
+    - [ ] adapt in model preset spec and provider set
 
-- [ ] docx, excel support
-- [ ] Drag and drop files as attachments.
-- [ ] tool search tool
+- [ ] Better Attachments
+  - [ ] docx, excel support
+  - [ ] Drag and drop files as attachments.
+
+- [ ] Tools
+  - [ ] tool search tool
+  - [ ] skills tools: list, activate, readfile, run, deactivate
 
 - [ ] we may want to have a "assistant" like we planned before that has tool sets and autoexec config so that the "agent" loop is kind of autonomous
 
