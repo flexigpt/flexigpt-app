@@ -9,22 +9,19 @@
 ## Features
 
 - [ ] valid input output modalities, valid levels, valid reasoning types, etc need to be added to modelpresetspec.
-
 - [ ] additional params from apis
   - [x] support in inference go api
   - [ ] adapt in model preset spec and provider set
-
-- [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls loop is better.
-  - [ ] this is a "feature" in anthropic and chargable for cache write.
-  - [ ] implement this after feature filters support and additional param support features in apis.
 
 - [ ] docx, excel support
 - [ ] Drag and drop files as attachments.
 - [ ] tool search tool
 
-- [ ] image output modality
-- [ ] check the reference calculator tool in claude docs
 - [ ] we may want to have a "assistant" like we planned before that has tool sets and autoexec config so that the "agent" loop is kind of autonomous
+
+- [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls loop is better.
+  - [ ] this is a "feature" in anthropic and chargable for cache write.
+  - [ ] implement this after feature filters support and additional param support features in apis.
 
 ## Milestone thoughts
 
@@ -67,3 +64,4 @@
 - [ ] Deferred.
   - [ ] Image output: See inference-go notes.
   - [ ] audio in/out
+  - [ ] check the reference calculator tool in claude docs
