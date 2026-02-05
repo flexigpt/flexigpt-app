@@ -1343,10 +1343,93 @@ export namespace spec {
 		    return a;
 		}
 	}
+	export class JSONSchemaParam {
+	    name: string;
+	    description?: string;
+	    schema?: Record<string, any>;
+	    strict?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new JSONSchemaParam(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.schema = source["schema"];
+	        this.strict = source["strict"];
+	    }
+	}
+	export class OutputFormat {
+	    type: string;
+	    jsonSchemaParam?: JSONSchemaParam;
+	
+	    static createFrom(source: any = {}) {
+	        return new OutputFormat(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.jsonSchemaParam = this.convertValues(source["jsonSchemaParam"], JSONSchemaParam);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class OutputParam {
+	    format?: OutputFormat;
+	    verbosity?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new OutputParam(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.format = this.convertValues(source["format"], OutputFormat);
+	        this.verbosity = source["verbosity"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class ReasoningParam {
 	    type: string;
 	    level: string;
 	    tokens: number;
+	    summaryStyle?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ReasoningParam(source);
@@ -1357,6 +1440,7 @@ export namespace spec {
 	        this.type = source["type"];
 	        this.level = source["level"];
 	        this.tokens = source["tokens"];
+	        this.summaryStyle = source["summaryStyle"];
 	    }
 	}
 	export class ModelParam {
@@ -1368,6 +1452,8 @@ export namespace spec {
 	    reasoning?: ReasoningParam;
 	    systemPrompt: string;
 	    timeout: number;
+	    outputParam?: OutputParam;
+	    stopSequences?: string[];
 	    additionalParametersRawJSON?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -1384,6 +1470,8 @@ export namespace spec {
 	        this.reasoning = this.convertValues(source["reasoning"], ReasoningParam);
 	        this.systemPrompt = source["systemPrompt"];
 	        this.timeout = source["timeout"];
+	        this.outputParam = this.convertValues(source["outputParam"], OutputParam);
+	        this.stopSequences = source["stopSequences"];
 	        this.additionalParametersRawJSON = source["additionalParametersRawJSON"];
 	    }
 	
@@ -2745,6 +2833,7 @@ export namespace spec {
 		}
 	}
 	
+	
 	export class ListConversationsRequest {
 	    PageSize: number;
 	    PageToken: string;
@@ -3514,6 +3603,8 @@ export namespace spec {
 		    return a;
 		}
 	}
+	
+	
 	
 	
 	

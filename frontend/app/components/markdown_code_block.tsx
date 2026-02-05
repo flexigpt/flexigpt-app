@@ -44,7 +44,11 @@ export function CodeBlock({ language, value, isBusy }: CodeProps) {
 				</div>
 
 				<div className="text-code p-1" style={{ fontSize: 14, lineHeight: 1.5 }}>
-					{showFallback ? fallback : <div className="shiki-container" dangerouslySetInnerHTML={{ __html: html }} />}
+					{showFallback ? (
+						fallback
+					) : (
+						<div className="shiki-container max-w-full overflow-x-auto" dangerouslySetInnerHTML={{ __html: html }} />
+					)}
 				</div>
 			</div>
 

@@ -99,9 +99,11 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 			),
 
 			table: ({ children, className, ...rest }: CustomComponentProps) => (
-				<table {...rest} className={`w-full table-auto ${className ?? ''}`}>
-					{children}
-				</table>
+				<div className="my-2 max-w-full overflow-x-auto" style={{ contain: 'layout paint' }}>
+					<table {...rest} className={`min-w-max table-fixed ${className ?? ''}`}>
+						{children}
+					</table>
+				</div>
 			),
 			thead: ({ children, className, ...rest }: CustomComponentProps) => (
 				<thead {...rest} className={`bg-base-300 ${className ?? ''}`}>

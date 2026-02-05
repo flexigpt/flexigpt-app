@@ -122,7 +122,9 @@ export const ChatMessage = memo(function ChatMessage({
 						)}
 					</div>
 
-					<div className={`bg-base-100 col-span-10 mt-1 overflow-x-auto rounded-2xl p-0 lg:col-span-9 ${bubbleExtra}`}>
+					<div
+						className={`bg-base-100 col-span-10 mt-1 overflow-x-hidden rounded-2xl p-0 lg:col-span-9 ${bubbleExtra}`}
+					>
 						{!isUser && hasAnyReasoning && (
 							<MessageThinkingSection
 								isBusy={isBusy}

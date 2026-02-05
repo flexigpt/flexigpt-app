@@ -2,7 +2,8 @@
 
 ## Laundry list
 
-- [ ] if there is a very large table in md, the ui hangs.
+- [x] if there is a very large table in md, the ui hangs.
+  - [x] scroll conflicts fixed
 - [ ] if there are attachments in previous message and then it was changed and then we resend it, the app crashes without trace.
 
 ## Features
