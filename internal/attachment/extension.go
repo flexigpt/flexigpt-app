@@ -22,6 +22,7 @@ const (
 	ExtTxt      FileExt = ".txt"
 	ExtMd       FileExt = ".md"
 	ExtMarkdown FileExt = ".markdown"
+	ExtMdx      FileExt = ".mdx"
 	ExtLog      FileExt = ".log"
 	ExtJSON     FileExt = ".json"
 	ExtYAML     FileExt = ".yaml"
@@ -152,6 +153,7 @@ var ExtensionToMIMEType = map[FileExt]MIMEType{
 	ExtTxt:      MIMETextPlain,
 	ExtMd:       MIMETextMarkdown,
 	ExtMarkdown: MIMETextMarkdown,
+	ExtMdx:      MIMETextMarkdown,
 	ExtLog:      MIMETextPlain,
 	ExtJSON:     MIMEApplicationJSON,
 	ExtYAML:     MIMEApplicationYAML,
