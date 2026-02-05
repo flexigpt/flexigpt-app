@@ -21,9 +21,9 @@
   - [State Variables per Session](#state-variables-per-session)
   - [State Transitions](#state-transitions)
 - [Linear Turn-by-Turn Runtime Behavior](#linear-turn-by-turn-runtime-behavior)
-  - [LLM Call Construction (Each Turn)](#llm-call-construction-each-turn)
-  - [Typical Flow: Choose → Activate → Use](#typical-flow-choose--activate--use)
-  - [Skill Switching: A → B](#skill-switching-a--b)
+  - [Per Turn LLM Call Construction](#per-turn-llm-call-construction)
+  - [Typical Flow: Choose, Activate, Use](#typical-flow-choose-activate-use)
+  - [Skill Switching](#skill-switching)
 
 This document specifies a runtime protocol for using Agent Skills. It defines:
 
@@ -235,7 +235,7 @@ Output:
 
 This is the normative linear flow; it does not require rewriting prior messages.
 
-### LLM Call Construction (Each Turn)
+### Per Turn LLM Call Construction
 
 For each LLM call, orchestrator constructs:
 
@@ -246,7 +246,7 @@ For each LLM call, orchestrator constructs:
 
 2. Messages array containing chronological conversation + tool calls/results so far.
 
-### Typical Flow: Choose → Activate → Use
+### Typical Flow: Choose, Activate, Use
 
 1. LLM sees available skills (prompt or tool) and decides a skill is needed.
 2. LLM calls `skills.activate(...)`.
@@ -254,7 +254,7 @@ For each LLM call, orchestrator constructs:
 4. Next LLM call includes active `SKILL.md` instructions in top-level instructions.
 5. LLM uses `skills.read` and `skills.run_script` as needed.
 
-### Skill Switching: A → B
+### Skill Switching
 
 1. LLM calls `skills.activate(name="skill-b")`.
 2. Orchestrator updates state (`active_skill = skill-b`).
