@@ -41,7 +41,7 @@ export class WailsProviderSetAPI implements IProviderSetAPI {
 				const d = t.trim();
 				if (d !== lastTrimmedText) {
 					lastTrimmedText = d;
-					onStreamTextData(t);
+					onStreamTextData(d);
 				}
 			};
 			EventsOn(textCallbackId, textCb);
@@ -54,7 +54,7 @@ export class WailsProviderSetAPI implements IProviderSetAPI {
 				const d = t.trim();
 				if (d !== lastTrimmedThinking) {
 					lastTrimmedThinking = d;
-					onStreamThinkingData(t);
+					onStreamThinkingData(d);
 				}
 			};
 			EventsOn(thinkingCallbackId, thinkingCb);
