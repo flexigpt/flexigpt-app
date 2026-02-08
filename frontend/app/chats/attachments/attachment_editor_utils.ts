@@ -5,7 +5,7 @@ import { AttachmentContentBlockMode, AttachmentErrorReason, AttachmentKind } fro
  * @public
  */
 export const MAX_SINGLE_ATTACHMENT_BYTES = 16 * 1024 * 1024; // 16 MiB
-export const MAX_FILES_PER_DIRECTORY = 64;
+export const MAX_FILES_PER_DIRECTORY = 128;
 
 // Directory grouping is UI-only.
 export interface DirectoryAttachmentGroup {
