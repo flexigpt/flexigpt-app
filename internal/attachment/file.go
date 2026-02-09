@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	"github.com/flexigpt/llmtools-go/fstool"
 	llmtoolsgoSpec "github.com/flexigpt/llmtools-go/spec"
 )
@@ -30,7 +31,7 @@ func (ref *FileRef) PopulateRef(ctx context.Context, replaceOrig bool) error {
 	if path == "" {
 		return errors.New("file attachment missing path")
 	}
-	pathInfo, err := fstool.StatPath(ctx, fstool.StatPathArgs{
+	pathInfo, err := llmtoolsutil.StatPath(ctx, fstool.StatPathArgs{
 		Path: path,
 	})
 	if err != nil {
@@ -102,7 +103,7 @@ func (ref *FileRef) BuildContentBlock(
 
 	case AttachmentContentBlockModeFile:
 		// File mode needs to handle all kinds of supported files appropriately.
-		toolOut, err := fstool.MIMEForPath(ctx, fstool.MIMEForPathArgs{
+		toolOut, err := llmtoolsutil.MIMEForPath(ctx, fstool.MIMEForPathArgs{
 			Path: path,
 		})
 		if err != nil || toolOut == nil {
@@ -147,7 +148,7 @@ func (ref *FileRef) BuildContentBlock(
 		}
 
 	case AttachmentContentBlockModeText:
-		toolOut, err := fstool.MIMEForPath(ctx, fstool.MIMEForPathArgs{
+		toolOut, err := llmtoolsutil.MIMEForPath(ctx, fstool.MIMEForPathArgs{
 			Path: path,
 		})
 		if err != nil || toolOut == nil {
@@ -202,7 +203,7 @@ func (ref *FileRef) getTextFileContent(
 	mimeType MIMEType,
 ) (*ContentBlock, error) {
 	// Fstool supports Text extraction of pdf too.
-	toolOut, err := fstool.ReadFile(ctx, fstool.ReadFileArgs{
+	toolOut, err := llmtoolsutil.ReadFile(ctx, fstool.ReadFileArgs{
 		Path:     path,
 		Encoding: "text",
 	})
@@ -230,7 +231,7 @@ func (ref *FileRef) getBinaryFileContent(
 	path string,
 	mimeType MIMEType,
 ) (*ContentBlock, error) {
-	toolOut, err := fstool.ReadFile(ctx, fstool.ReadFileArgs{
+	toolOut, err := llmtoolsutil.ReadFile(ctx, fstool.ReadFileArgs{
 		Path:     path,
 		Encoding: "binary",
 	})

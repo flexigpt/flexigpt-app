@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/attachment"
+	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	"github.com/flexigpt/llmtools-go/fstool"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -248,7 +249,7 @@ func (a *App) openMultipleFilesAsAttachments(
 			continue
 		}
 		// Basic sanity + existence checks.
-		pathInfo, err := fstool.StatPath(context.Background(), fstool.StatPathArgs{
+		pathInfo, err := llmtoolsutil.StatPath(context.Background(), fstool.StatPathArgs{
 			Path: path,
 		})
 

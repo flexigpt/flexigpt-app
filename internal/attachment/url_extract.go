@@ -15,6 +15,7 @@ import (
 	"time"
 
 	html2md "github.com/JohannesKaufmann/html-to-markdown/v2"
+	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	"github.com/flexigpt/llmtools-go/fstool"
 	"github.com/ledongthuc/pdf"
 	"github.com/markusmobius/go-trafilatura"
@@ -434,7 +435,7 @@ func inferContentType(ctx context.Context, headerCT, rawURL string, data []byte)
 	// 2) Extension-based hint from URL path.
 	lowerURL := strings.ToLower(strings.TrimSpace(rawURL))
 	if ext := strings.TrimSpace(filepath.Ext(lowerURL)); ext != "" {
-		toolOut, err := fstool.MIMEForExtension(ctx, fstool.MIMEForExtensionArgs{
+		toolOut, err := llmtoolsutil.MIMEForExtension(ctx, fstool.MIMEForExtensionArgs{
 			Extension: ext,
 		})
 		if err == nil && toolOut != nil {

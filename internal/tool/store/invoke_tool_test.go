@@ -1198,6 +1198,11 @@ func TestInvokeTool_Go_BuiltIns(t *testing.T) {
 		t.Fatalf("write img.png: %v", err)
 	}
 
+	ft, err := fstool.NewFSTool()
+	if err != nil {
+		t.Fatalf("new file tool error")
+	}
+
 	tests := []struct {
 		name     string
 		funcName string
@@ -1206,7 +1211,7 @@ func TestInvokeTool_Go_BuiltIns(t *testing.T) {
 	}{
 		{
 			name:     "ReadFile_text_success",
-			funcName: string(fstool.ReadFileTool().GoImpl.FuncID),
+			funcName: string(ft.ReadFileTool().GoImpl.FuncID),
 			args:     fmt.Sprintf(`{"path":%q,"encoding":"text"}`, fileA),
 			verify: func(t *testing.T, body *spec.InvokeToolResponseBody) {
 				t.Helper()
@@ -1218,7 +1223,7 @@ func TestInvokeTool_Go_BuiltIns(t *testing.T) {
 		},
 		{
 			name:     "ReadFile_binary_file_output",
-			funcName: string(fstool.ReadFileTool().GoImpl.FuncID),
+			funcName: string(ft.ReadFileTool().GoImpl.FuncID),
 			args:     fmt.Sprintf(`{"path":%q,"encoding":"binary"}`, fileB),
 			verify: func(t *testing.T, body *spec.InvokeToolResponseBody) {
 				t.Helper()
@@ -1240,7 +1245,7 @@ func TestInvokeTool_Go_BuiltIns(t *testing.T) {
 		},
 		{
 			name:     "ReadFile_binary_image_output",
-			funcName: string(fstool.ReadFileTool().GoImpl.FuncID),
+			funcName: string(ft.ReadFileTool().GoImpl.FuncID),
 			args:     fmt.Sprintf(`{"path":%q,"encoding":"binary"}`, fileImg),
 			verify: func(t *testing.T, body *spec.InvokeToolResponseBody) {
 				t.Helper()
@@ -1268,7 +1273,7 @@ func TestInvokeTool_Go_BuiltIns(t *testing.T) {
 		},
 		{
 			name:     "ListDirectory_glob",
-			funcName: string(fstool.ListDirectoryTool().GoImpl.FuncID),
+			funcName: string(ft.ListDirectoryTool().GoImpl.FuncID),
 			args:     fmt.Sprintf(`{"path":%q,"pattern":"*.txt"}`, tmp),
 			verify: func(t *testing.T, body *spec.InvokeToolResponseBody) {
 				t.Helper()
@@ -1287,7 +1292,7 @@ func TestInvokeTool_Go_BuiltIns(t *testing.T) {
 		},
 		{
 			name:     "SearchFiles_regex",
-			funcName: string(fstool.SearchFilesTool().GoImpl.FuncID),
+			funcName: string(ft.SearchFilesTool().GoImpl.FuncID),
 			args:     fmt.Sprintf(`{"root":%q,"pattern":"hello"}`, tmp),
 			verify: func(t *testing.T, body *spec.InvokeToolResponseBody) {
 				t.Helper()

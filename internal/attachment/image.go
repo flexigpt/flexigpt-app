@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	"github.com/flexigpt/llmtools-go/imagetool"
 )
 
@@ -38,7 +39,7 @@ func (ref *ImageRef) PopulateRef(ctx context.Context, replaceOrig bool) error {
 		return errors.New("image attachment missing path")
 	}
 
-	toolOut, err := imagetool.ReadImage(ctx, imagetool.ReadImageArgs{
+	toolOut, err := llmtoolsutil.ReadImage(ctx, imagetool.ReadImageArgs{
 		Path:              path,
 		IncludeBase64Data: false,
 	})
@@ -93,7 +94,7 @@ func (ref *ImageRef) BuildContentBlock(ctx context.Context) (*ContentBlock, erro
 }
 
 func buildImageBlockFromLocal(ctx context.Context, path string) (*ContentBlock, error) {
-	toolOut, err := imagetool.ReadImage(ctx, imagetool.ReadImageArgs{
+	toolOut, err := llmtoolsutil.ReadImage(ctx, imagetool.ReadImageArgs{
 		Path:              path,
 		IncludeBase64Data: true,
 	})

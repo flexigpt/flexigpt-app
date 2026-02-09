@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	"github.com/flexigpt/llmtools-go/fstool"
 )
 
@@ -30,7 +31,7 @@ func BuildAttachmentForFile(ctx context.Context, pathInfo *PathInfo) (*Attachmen
 		return nil, fmt.Errorf("path %q is a directory; expected file", pathInfo.Path)
 	}
 
-	toolOut, err := fstool.MIMEForPath(ctx, fstool.MIMEForPathArgs{
+	toolOut, err := llmtoolsutil.MIMEForPath(ctx, fstool.MIMEForPathArgs{
 		Path: pathInfo.Path,
 	})
 	if err != nil || toolOut == nil {
@@ -272,7 +273,7 @@ func BuildAttachmentForURLWithContext(ctx context.Context, rawURL string) (*Atta
 	// 2) Extension-based fallback ONLY if we still are in LinkOnly mode.
 	// (i.e., content-type probe didn't identify anything).
 	if mode == AttachmentContentBlockModeTextLink && ext != "" {
-		toolOut, err := fstool.MIMEForExtension(ctx, fstool.MIMEForExtensionArgs{
+		toolOut, err := llmtoolsutil.MIMEForExtension(ctx, fstool.MIMEForExtensionArgs{
 			Extension: ext,
 		})
 		if err == nil && toolOut != nil {

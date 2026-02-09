@@ -25,9 +25,9 @@
 		"019c0415-40f7-70cb-9200-d804c9388a57": {
 			"schemaVersion": "2025-07-01",
 			"id": "019c0415-40f7-70cb-9200-d804c9388a57",
-			"slug": "shell",
-			"displayName": "Shell utilities",
-			"description": "Common shell helpers.",
+			"slug": "exec",
+			"displayName": "Command/Script execution utilities",
+			"description": "Command/Script execution utilities.",
 			"isEnabled": true,
 			"isBuiltIn": true,
 			"createdAt": "2026-01-28T00:00:00Z",

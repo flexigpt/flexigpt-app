@@ -73,9 +73,13 @@ var llmtoolsGoBuiltinCatalog = map[string]llmtoolsGoToolMeta{
 		AutoExecReco: true,
 	},
 
-	// Shelltool (dangerous by default).
-	"github.com/flexigpt/llmtools-go/shelltool/shell.ShellCommand": {
-		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsShell),
+	// Exectool (dangerous by default).
+	"github.com/flexigpt/llmtools-go/exectool/shellcommand.ShellCommand": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsExec),
+		AutoExecReco: false,
+	},
+	"github.com/flexigpt/llmtools-go/exectool/runscript.RunScript": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsExec),
 		AutoExecReco: false,
 	},
 
