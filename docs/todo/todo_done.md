@@ -714,3 +714,8 @@
   - [x] create model preset should allow the api function type
   - [x] The responses api seems a bit weird and sdk seems immature for it as of now. Evaluate at a later time again.
   - [x] Things not available due to not moving to responses as of now: reasoning thought process, state management on openai, prompt template usage from openai servers. Not sure if tool calls have some problems in chat completions vs this one including openai mcp servers and tools.
+
+- [x] if there is a very large table in md, the ui hangs.
+  - [x] scroll conflicts fixed
+- [x] if there are attachments in previous message and then it was changed and then we resend it, the app crashes without trace.
+- [x] mdx is not readable
