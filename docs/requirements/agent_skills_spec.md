@@ -217,7 +217,6 @@ Behavior:
 Behavior:
 
 - Requires at least one loaded skill (`active_skills.length > 0`).
-- If multiple skills are loaded, the tool SHOULD accept a `skill` field to disambiguate; otherwise default to the most recently loaded skill.
 - Resolve `path` relative to the selected skill’s `root_dir`.
 - Read and return file content as either text or binary as required.
 - This single tool covers both `references/` and `assets/` (and optionally other files under skill root, if the runtime allows).
@@ -230,7 +229,6 @@ Behavior:
 Behavior:
 
 - Requires at least one loaded skill.
-- If multiple skills are loaded, the tool SHOULD accept a `skill` field to disambiguate; otherwise default to the most recently loaded skill.
 - Resolve script path relative to the selected skill’s `root_dir`.
 - Execute the script according to runtime-defined execution rules (e.g., interpreter mapping by extension, or direct execution if executable).
 - Return structured results.
