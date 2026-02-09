@@ -62,15 +62,15 @@ export function Sidebar({ children }: SidebarProps) {
 							</li>
 						)}
 
-						<li className="mt-4" title="Prompts" onClick={toggle} aria-label="Prompts">
-							<Link to="/prompts/" className="flex h-12 w-12 items-center justify-center rounded-full p-0">
-								<FiFilePlus size={24} />
-							</Link>
-						</li>
-
 						<li className="mt-4" title="Tools" onClick={toggle} aria-label="Tools">
 							<Link to="/tools/" className="flex h-12 w-12 items-center justify-center rounded-full p-0">
 								<FiTool size={24} />
+							</Link>
+						</li>
+
+						<li className="mt-4" title="Prompts" onClick={toggle} aria-label="Prompts">
+							<Link to="/prompts/" className="flex h-12 w-12 items-center justify-center rounded-full p-0">
+								<FiFilePlus size={24} />
 							</Link>
 						</li>
 
