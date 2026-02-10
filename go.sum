@@ -29,10 +29,10 @@ github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkp
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/elliotchance/pie/v2 v2.9.0 h1:BkEhh8b/avGCSpXpABSjNuytxlI/S2snkjT3vtVORjw=
 github.com/elliotchance/pie/v2 v2.9.0/go.mod h1:18t0dgGFH006g4eVdDtWfgFZPQEgl10IoEO8YWEq3Og=
-github.com/flexigpt/inference-go v0.7.1 h1:p1TaYvmz5EWdpgjR07Z0skOC48sEn0lFwEEUb5xBPqo=
-github.com/flexigpt/inference-go v0.7.1/go.mod h1:hQ/xWjLhGJHWvM5UF+ut4Fe7yoH5UE4PQgiCIrmo9sw=
-github.com/flexigpt/llmtools-go v0.8.0 h1:vxMucdvEglaM0Yq/50zS7Hd5L6z1bSGHJ8mYDAU9lK0=
-github.com/flexigpt/llmtools-go v0.8.0/go.mod h1:K/Gdq+WJxkBIr9ykLodM6RL9QUsqCg5mcxEozbZlvDQ=
+github.com/flexigpt/inference-go v0.8.0 h1:5zdO4tPQDbZvpPWTVFCo6Y/1GohdORCsaC5+elCQ4tA=
+github.com/flexigpt/inference-go v0.8.0/go.mod h1:hQ/xWjLhGJHWvM5UF+ut4Fe7yoH5UE4PQgiCIrmo9sw=
+github.com/flexigpt/llmtools-go v0.9.0 h1:fXKXasSedwxrbcP4Omgzvq4RVVu7VO0R9wQLaQY4qqM=
+github.com/flexigpt/llmtools-go v0.9.0/go.mod h1:K/Gdq+WJxkBIr9ykLodM6RL9QUsqCg5mcxEozbZlvDQ=
 github.com/forPelevin/gomoji v1.2.0 h1:9k4WVSSkE1ARO/BWywxgEUBvR/jMnao6EZzrql5nxJ8=
 github.com/forPelevin/gomoji v1.2.0/go.mod h1:8+Z3KNGkdslmeGZBC3tCrwMrcPy5GRzAD+gL9NAwMXg=
 github.com/glebarez/go-sqlite v1.22.0 h1:uAcMJhaA6r3LHMTFgP0SifzgXg46yJkgxqyuyec+ruQ=
