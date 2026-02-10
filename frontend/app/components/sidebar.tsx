@@ -1,10 +1,8 @@
 import { type ReactNode, useState } from 'react';
 
-import { FiCpu, FiDatabase, FiFilePlus, FiMessageSquare, FiSettings, FiSliders, FiTool } from 'react-icons/fi';
+import { FiFilePlus, FiMessageSquare, FiSettings, FiSliders, FiTool } from 'react-icons/fi';
 
 import { Link } from 'react-router';
-
-import { FEATURE_FLAG_AGENTS, FEATURE_FLAG_DOCUMENT_STORES } from '@/lib/features';
 
 import { TitleBar } from '@/components/title_bar';
 
@@ -45,23 +43,8 @@ export function Sidebar({ children }: SidebarProps) {
 								<FiMessageSquare size={24} />
 							</Link>
 						</li>
-						{FEATURE_FLAG_AGENTS && (
-							<li className="mt-4" title="Agents" onClick={toggle} aria-label="Agents">
-								<Link to="/agents/" className="flex h-12 w-12 items-center justify-center rounded-full p-0">
-									<FiCpu size={24} />
-								</Link>
-							</li>
-						)}
 					</div>
 					<div className="mb-8 flex-col p-0">
-						{FEATURE_FLAG_DOCUMENT_STORES && (
-							<li className="mt-4" title="Document Stores" onClick={toggle} aria-label="Document Stores">
-								<Link to="/docstores/" className="flex h-12 w-12 items-center justify-center rounded-full p-0">
-									<FiDatabase size={24} />
-								</Link>
-							</li>
-						)}
-
 						<li className="mt-4" title="Tools" onClick={toggle} aria-label="Tools">
 							<Link to="/tools/" className="flex h-12 w-12 items-center justify-center rounded-full p-0">
 								<FiTool size={24} />

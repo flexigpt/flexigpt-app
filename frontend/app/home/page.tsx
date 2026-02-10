@@ -2,8 +2,6 @@ import { FiHome } from 'react-icons/fi';
 
 import { Link } from 'react-router';
 
-import { FEATURE_FLAG_AGENTS } from '@/lib/features';
-
 import { useTitleBarContent } from '@/hooks/use_title_bar';
 
 import { PageFrame } from '@/components/page_frame';
@@ -39,19 +37,6 @@ export default function HomePage() {
 							</h3>
 						</div>
 					</Link>
-					{FEATURE_FLAG_AGENTS && (
-						<Link to="/agents/">
-							<div className="bg-base-100 mb-4 transform cursor-pointer rounded-2xl p-6 text-center shadow-lg transition-transform hover:scale-105">
-								<h3 className="mb-3 text-2xl font-semibold">Explore Agents</h3>
-								<p>Discover agents and their functionalities.</p>
-								<h3 className="mt-2 text-2xl font-semibold">
-									<span className="ml-4 inline-block transform transition-transform group-hover:translate-x-1">
-										-&gt;
-									</span>
-								</h3>
-							</div>
-						</Link>
-					)}
 				</div>
 			</div>
 		</PageFrame>

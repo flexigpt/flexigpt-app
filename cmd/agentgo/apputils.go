@@ -11,7 +11,7 @@ import (
 
 const FrontendPathPrefix = "/frontend/dist"
 
-var DIRPages = []string{"/agents", "/chats", "/settings", "/404"}
+var DIRPages = []string{"/404"}
 
 func EmbeddedFSWalker(assets embed.FS) {
 	_ = fs.WalkDir(assets, ".", func(path string, d fs.DirEntry, err error) error {
