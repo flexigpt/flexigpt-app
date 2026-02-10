@@ -373,12 +373,12 @@ func (d *BuiltInData) rebuildSnapshot(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		bc := b
+
 		if ok {
-			bc.IsEnabled = flag.Value
-			bc.ModifiedAt = flag.ModifiedAt // take overlay timestamp
+			b.IsEnabled = flag.Value
+			b.ModifiedAt = flag.ModifiedAt // take overlay timestamp
 		}
-		newBundles[id] = bc
+		newBundles[id] = b
 	}
 
 	for bid, tm := range d.templates {
@@ -388,12 +388,12 @@ func (d *BuiltInData) rebuildSnapshot(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			tc := t
+
 			if ok {
-				tc.IsEnabled = flag.Value
-				tc.ModifiedAt = flag.ModifiedAt // take overlay timestamp
+				t.IsEnabled = flag.Value
+				t.ModifiedAt = flag.ModifiedAt // take overlay timestamp
 			}
-			sub[tid] = tc
+			sub[tid] = t
 		}
 		newTemplates[bid] = sub
 	}

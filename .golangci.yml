@@ -358,6 +358,10 @@ linters:
     - zerologlint
 
   settings:
+    copyloopvar:
+      # Check all assigning the loop variable to another variable.
+      check-alias: true
+
     embeddedstructfieldcheck:
       # Checks that sync.Mutex and sync.RWMutex are not used as embedded fields.
       forbid-mutex: true

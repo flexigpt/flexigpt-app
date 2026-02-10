@@ -397,12 +397,12 @@ func (d *BuiltInToolData) rebuildSnapshot(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		bc := b
+
 		if ok {
-			bc.IsEnabled = flag.Value
-			bc.ModifiedAt = flag.ModifiedAt
+			b.IsEnabled = flag.Value
+			b.ModifiedAt = flag.ModifiedAt
 		}
-		newBundles[id] = bc
+		newBundles[id] = b
 	}
 
 	for bid, tm := range d.tools {
@@ -412,12 +412,12 @@ func (d *BuiltInToolData) rebuildSnapshot(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			tc := t
+
 			if ok {
-				tc.IsEnabled = flag.Value
-				tc.ModifiedAt = flag.ModifiedAt
+				t.IsEnabled = flag.Value
+				t.ModifiedAt = flag.ModifiedAt
 			}
-			sub[tid] = tc
+			sub[tid] = t
 		}
 		newTools[bid] = sub
 	}
