@@ -13,7 +13,7 @@ const (
 	ToolDBFileName               = "tools.fts.sqlite"
 	ToolBuiltInOverlayDBFileName = "toolsbuiltin.overlay.sqlite"
 
-	DefaultHTTPTimeoutMs = 10_000
+	DefaultHTTPTimeoutMS = 10_000
 	JSONEncoding         = "json"
 	TextEncoding         = "text"
 	DefaultHTTPEncoding  = JSONEncoding
@@ -82,7 +82,7 @@ type HTTPRequest struct {
 	Headers     map[string]string `json:"headers,omitempty"`   // k:${var}
 	Body        string            `json:"body,omitempty"`      // raw or template
 	Auth        *HTTPAuth         `json:"auth,omitempty"`      // see below
-	TimeoutMs   int               `json:"timeoutMs,omitempty"` // default 10 000
+	TimeoutMS   int               `json:"timeoutMS,omitempty"` // default 10 000
 }
 
 // HTTPBodyOutputMode - how to map HTTP response body into tool outputs.

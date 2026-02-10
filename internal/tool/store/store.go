@@ -702,8 +702,8 @@ func (ts *ToolStore) InvokeTool(
 	case spec.ToolTypeHTTP:
 		var hopts []httprunner.HTTPOption
 		if req.Body.HTTPOptions != nil {
-			if req.Body.HTTPOptions.TimeoutMs > 0 {
-				hopts = append(hopts, httprunner.WithHTTPTimeoutMs(req.Body.HTTPOptions.TimeoutMs))
+			if req.Body.HTTPOptions.TimeoutMS > 0 {
+				hopts = append(hopts, httprunner.WithHTTPTimeoutMS(req.Body.HTTPOptions.TimeoutMS))
 			}
 			if len(req.Body.HTTPOptions.ExtraHeaders) > 0 {
 				hopts = append(
@@ -724,10 +724,10 @@ func (ts *ToolStore) InvokeTool(
 
 	case spec.ToolTypeGo:
 		var gopts []llmtools.CallOption
-		if req.Body.GoOptions != nil && req.Body.GoOptions.TimeoutMs != 0 {
+		if req.Body.GoOptions != nil && req.Body.GoOptions.TimeoutMS != 0 {
 			gopts = append(
 				gopts,
-				llmtools.WithCallTimeout(time.Duration(req.Body.GoOptions.TimeoutMs)*time.Millisecond),
+				llmtools.WithCallTimeout(time.Duration(req.Body.GoOptions.TimeoutMS)*time.Millisecond),
 			)
 		}
 		outputs, err = goregistry.CallUsingDefaultGoRegistry(

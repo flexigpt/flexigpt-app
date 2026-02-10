@@ -36,11 +36,11 @@ type PatchToolBundleResponse struct{}
 
 // BundlePageToken is the opaque cursor used when paging over tool-bundles.
 type BundlePageToken struct {
-	BundleIDs       []bundleitemutils.BundleID `json:"ids,omitempty"` // Optional bundle-ID filter.
-	IncludeDisabled bool                       `json:"d,omitempty"`   // Include disabled bundles?
-	PageSize        int                        `json:"s"`             // Requested page-size.
-	CursorMod       string                     `json:"t,omitempty"`   // RFC-3339-nano modification timestamp.
-	CursorID        bundleitemutils.BundleID   `json:"id,omitempty"`  // Tie-breaker for equal timestamps.
+	BundleIDs       []bundleitemutils.BundleID `json:"ids,omitempty"` //nolint:tagliatelle // Pagttoken Specific. // Optional bundle-ID filter.
+	IncludeDisabled bool                       `json:"d,omitempty"`   //nolint:tagliatelle // Pagttoken Specific. // Include disabled bundles?
+	PageSize        int                        `json:"s"`             //nolint:tagliatelle // Pagttoken Specific. // Requested page-size.
+	CursorMod       string                     `json:"t,omitempty"`   //nolint:tagliatelle // Pagttoken Specific. // RFC-3339-nano modification timestamp.
+	CursorID        bundleitemutils.BundleID   `json:"id,omitempty"`  //nolint:tagliatelle // Pagttoken Specific. // Tie-breaker for equal timestamps.
 }
 
 type ListToolBundlesRequest struct {
@@ -116,12 +116,12 @@ type GetToolResponse struct{ Body *Tool }
 // ToolPageToken is the opaque cursor used when paging over individual tool
 // versions (ListTools API).
 type ToolPageToken struct {
-	RecommendedPageSize int                        `json:"ps,omitempty"`
-	IncludeDisabled     bool                       `json:"d,omitempty"`
-	BundleIDs           []bundleitemutils.BundleID `json:"ids,omitempty"`
-	Tags                []string                   `json:"tags,omitempty"`
-	BuiltInDone         bool                       `json:"bd,omitempty"` // Built-ins already emitted?
-	DirTok              string                     `json:"dt,omitempty"` // Directory-store cursor.
+	RecommendedPageSize int                        `json:"ps,omitempty"`   //nolint:tagliatelle // PageToken specific.
+	IncludeDisabled     bool                       `json:"d,omitempty"`    //nolint:tagliatelle // PageToken specific.
+	BundleIDs           []bundleitemutils.BundleID `json:"ids,omitempty"`  //nolint:tagliatelle // PageToken specific.
+	Tags                []string                   `json:"tags,omitempty"` //nolint:tagliatelle // PageToken specific.
+	BuiltInDone         bool                       `json:"bd,omitempty"`   //nolint:tagliatelle // PageToken specific. // Built-ins already emitted?
+	DirTok              string                     `json:"dt,omitempty"`   //nolint:tagliatelle // PageToken specific. // Directory-store cursor.
 }
 
 type ListToolsRequest struct {
@@ -168,7 +168,7 @@ type SearchToolsResponse struct {
 // These are part of the HTTP request body.
 type InvokeHTTPOptions struct {
 	// Overrides the tool-level HTTP timeout (in milliseconds). Optional.
-	TimeoutMs int `json:"timeoutMs,omitempty"`
+	TimeoutMS int `json:"timeoutMS,omitempty"`
 	// ExtraHeaders will be merged into the outgoing request headers (taking precedence).
 	ExtraHeaders map[string]string `json:"extraHeaders,omitempty"`
 	// Secrets are key->value mappings used for template substitution in HTTP request
@@ -179,7 +179,7 @@ type InvokeHTTPOptions struct {
 // InvokeGoOptions contains options specific to Go tool invocations.
 type InvokeGoOptions struct {
 	// Overrides the tool invocation timeout (in milliseconds). Optional.
-	TimeoutMs int `json:"timeoutMs,omitempty"`
+	TimeoutMS int `json:"timeoutMS,omitempty"`
 }
 
 // InvokeToolRequestBody is the body for invoking a tool.

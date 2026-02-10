@@ -430,6 +430,27 @@ linters:
       # Doesnt support things like bundleID, can enable and just check for discovery, once in a while.
       # key-naming-case: "camel"
 
+    tagliatelle:
+      case:
+        rules:
+          json: goCamel
+          yaml: goCamel
+          xml: goCamel
+        extended-rules:
+          json:
+            case: goCamel
+            extra-initialisms: true
+            initialism-overrides:
+              MS: true
+              MIME: true
+          xml:
+            case: goCamel
+            extra-initialisms: true
+            initialism-overrides:
+              MS: true
+              MIME: true
+        use-field-name: true
+
     usetesting:
       os-create-temp: true
       os-mkdir-temp: true

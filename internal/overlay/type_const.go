@@ -14,14 +14,14 @@ type KeyID string
 // Flag represents one feature-flag record.
 type Flag struct {
 	Value      json.RawMessage `json:"value"`
-	CreatedAt  time.Time       `json:"created_at"`
-	ModifiedAt time.Time       `json:"modified_at"`
+	CreatedAt  time.Time       `json:"created_at"`  //nolint:tagliatelle // JSON file.
+	ModifiedAt time.Time       `json:"modified_at"` //nolint:tagliatelle // JSON file.
 }
 
 type TypedFlag[ValT any] struct {
 	Value      ValT      `json:"value"`
-	CreatedAt  time.Time `json:"created_at"`
-	ModifiedAt time.Time `json:"modified_at"`
+	CreatedAt  time.Time `json:"created_at"`  //nolint:tagliatelle // JSON file.
+	ModifiedAt time.Time `json:"modified_at"` //nolint:tagliatelle // JSON file.
 }
 
 // Root is the complete in-memory image of the file.

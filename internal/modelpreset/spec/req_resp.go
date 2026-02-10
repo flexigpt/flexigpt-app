@@ -95,10 +95,10 @@ type DeleteModelPresetRequest struct {
 type DeleteModelPresetResponse struct{}
 
 type ProviderPageToken struct {
-	Names           []inferencegoSpec.ProviderName `json:"n,omitempty"`
-	IncludeDisabled bool                           `json:"d,omitempty"`
-	PageSize        int                            `json:"s,omitempty"`
-	CursorSlug      inferencegoSpec.ProviderName   `json:"c,omitempty"`
+	Names           []inferencegoSpec.ProviderName `json:"n,omitempty"` //nolint:tagliatelle // PageToken Specific.
+	IncludeDisabled bool                           `json:"d,omitempty"` //nolint:tagliatelle // PageToken Specific.
+	PageSize        int                            `json:"s,omitempty"` //nolint:tagliatelle // PageToken Specific.
+	CursorSlug      inferencegoSpec.ProviderName   `json:"c,omitempty"` //nolint:tagliatelle // PageToken Specific.
 }
 
 type ListProviderPresetsRequest struct {

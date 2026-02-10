@@ -48,7 +48,7 @@ type ErrorState = {
 	httpHeaders?: string;
 	httpQuery?: string;
 	httpResponseCodes?: string;
-	httpTimeoutMs?: string;
+	httpTimeoutMS?: string;
 	tags?: string;
 };
 
@@ -106,7 +106,7 @@ export function AddEditToolModal({
 		httpResponseCodes: '',
 		httpResponseErrorMode: '',
 		httpResponseBodyOutputMode: HTTPBodyOutputMode.Auto,
-		httpTimeoutMs: '',
+		httpTimeoutMS: '',
 	});
 
 	const [errors, setErrors] = useState<ErrorState>({});
@@ -156,7 +156,7 @@ export function AddEditToolModal({
 				httpResponseCodes: (t.httpImpl?.response.successCodes ?? []).join(','),
 				httpResponseErrorMode: t.httpImpl?.response.errorMode ?? '',
 				httpResponseBodyOutputMode: t.httpImpl?.response.bodyOutputMode ?? HTTPBodyOutputMode.Auto,
-				httpTimeoutMs: t.httpImpl?.request.timeoutMs !== undefined ? String(t.httpImpl.request.timeoutMs) : '',
+				httpTimeoutMS: t.httpImpl?.request.timeoutMS !== undefined ? String(t.httpImpl.request.timeoutMS) : '',
 			});
 		} else {
 			setFormData({
@@ -190,7 +190,7 @@ export function AddEditToolModal({
 				httpResponseCodes: '',
 				httpResponseErrorMode: '',
 				httpResponseBodyOutputMode: HTTPBodyOutputMode.Auto,
-				httpTimeoutMs: '',
+				httpTimeoutMS: '',
 			});
 		}
 		setErrors({});
@@ -317,12 +317,12 @@ export function AddEditToolModal({
 				if (bad) newErrs.httpResponseCodes = 'Success codes must be comma-separated numbers (e.g. 200,201)';
 				else newErrs = omitManyKeys(newErrs, ['httpResponseCodes']);
 			}
-		} else if (field === 'httpTimeoutMs') {
-			if (v === '') newErrs = omitManyKeys(newErrs, ['httpTimeoutMs']);
+		} else if (field === 'httpTimeoutMS') {
+			if (v === '') newErrs = omitManyKeys(newErrs, ['httpTimeoutMS']);
 			else {
 				const n = Number(v);
-				if (!Number.isFinite(n) || n < 1) newErrs.httpTimeoutMs = 'Timeout must be a positive number (ms).';
-				else newErrs = omitManyKeys(newErrs, ['httpTimeoutMs']);
+				if (!Number.isFinite(n) || n < 1) newErrs.httpTimeoutMS = 'Timeout must be a positive number (ms).';
+				else newErrs = omitManyKeys(newErrs, ['httpTimeoutMS']);
 			}
 		} else {
 			newErrs = omitManyKeys(newErrs, [field]);
@@ -349,7 +349,7 @@ export function AddEditToolModal({
 			newErrs = validateField('httpHeaders', state.httpHeaders, newErrs);
 			newErrs = validateField('httpQuery', state.httpQuery, newErrs);
 			newErrs = validateField('httpResponseCodes', state.httpResponseCodes, newErrs);
-			newErrs = validateField('httpTimeoutMs', state.httpTimeoutMs, newErrs);
+			newErrs = validateField('httpTimeoutMS', state.httpTimeoutMS, newErrs);
 		}
 
 		return newErrs;
@@ -372,7 +372,7 @@ export function AddEditToolModal({
 				'httpHeaders',
 				'httpQuery',
 				'httpResponseCodes',
-				'httpTimeoutMs',
+				'httpTimeoutMS',
 				'tags',
 			].includes(name)
 		) {
@@ -467,7 +467,7 @@ export function AddEditToolModal({
 					headers,
 					query,
 					body: formData.httpBody || undefined,
-					timeoutMs: formData.httpTimeoutMs.trim() ? Number(formData.httpTimeoutMs.trim()) : undefined,
+					timeoutMS: formData.httpTimeoutMS.trim() ? Number(formData.httpTimeoutMS.trim()) : undefined,
 					auth: formData.httpAuthType
 						? {
 								type: formData.httpAuthType,
@@ -904,18 +904,18 @@ export function AddEditToolModal({
 									<div className="col-span-9">
 										<input
 											type="text"
-											name="httpTimeoutMs"
-											value={formData.httpTimeoutMs}
+											name="httpTimeoutMS"
+											value={formData.httpTimeoutMS}
 											onChange={handleInput}
 											readOnly={isViewMode}
-											className={`input input-bordered w-full rounded-xl ${errors.httpTimeoutMs ? 'input-error' : ''}`}
+											className={`input input-bordered w-full rounded-xl ${errors.httpTimeoutMS ? 'input-error' : ''}`}
 											spellCheck="false"
 											autoComplete="off"
 										/>
-										{errors.httpTimeoutMs && (
+										{errors.httpTimeoutMS && (
 											<div className="label">
 												<span className="label-text-alt text-error flex items-center gap-1">
-													<FiAlertCircle size={12} /> {errors.httpTimeoutMs}
+													<FiAlertCircle size={12} /> {errors.httpTimeoutMS}
 												</span>
 											</div>
 										)}

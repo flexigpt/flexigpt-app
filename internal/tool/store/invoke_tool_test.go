@@ -316,7 +316,7 @@ func TestInvokeTool(t *testing.T) {
 			},
 			args: `{}`,
 			httpOptions: &spec.InvokeHTTPOptions{
-				TimeoutMs: 20,
+				TimeoutMS: 20,
 			},
 			verify: func(t *testing.T, resp *spec.InvokeToolResponse, err error) {
 				t.Helper()
@@ -991,7 +991,7 @@ func TestInvokeGoCustomRegistered(t *testing.T) {
 			register: func(t *testing.T) string {
 				t.Helper()
 				type Args struct {
-					SleepMs int `json:"sleepMs"`
+					SleepMS int `json:"sleepMS"`
 				}
 				type Out struct {
 					Ok bool `json:"ok"`
@@ -1000,7 +1000,7 @@ func TestInvokeGoCustomRegistered(t *testing.T) {
 					select {
 					case <-ctx.Done():
 						return Out{}, ctx.Err()
-					case <-time.After(time.Duration(a.SleepMs) * time.Millisecond):
+					case <-time.After(time.Duration(a.SleepMS) * time.Millisecond):
 						return Out{Ok: true}, nil
 					}
 				}

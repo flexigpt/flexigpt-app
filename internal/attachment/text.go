@@ -6,10 +6,10 @@ import (
 )
 
 type llmTextAttachment struct {
-	XMLName    xml.Name `xml:"attachment"`
+	XMLName    xml.Name `xml:"attachment"`                //nolint:tagliatelle // XML Specific.
 	SourceFile string   `xml:"sourceFile,attr,omitempty"` // optional
 	SourceURL  string   `xml:"sourceURL,attr,omitempty"`  // optional
-	Text       string   `xml:",chardata"`                 // escaped automatically
+	Text       string   `xml:",chardata"`                 //nolint:tagliatelle // XML Specific.
 }
 
 // XML 1.0 disallows some control chars; this prevents xml.Marshal errors on odd file bytes.

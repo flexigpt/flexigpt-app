@@ -27,7 +27,7 @@ import (
 type HTTPToolRunner struct {
 	impl spec.HTTPToolImpl
 
-	overrideTimeoutMs int
+	overrideTimeoutMS int
 	extraHeaders      map[string]string
 	secrets           map[string]string
 
@@ -39,11 +39,11 @@ type HTTPToolRunner struct {
 // HTTPOption - Functional options for HTTPToolRunner.
 type HTTPOption func(*HTTPToolRunner)
 
-// WithHTTPTimeoutMs sets an invocation timeout override (milliseconds).
-func WithHTTPTimeoutMs(ms int) HTTPOption {
+// WithHTTPTimeoutMS sets an invocation timeout override (milliseconds).
+func WithHTTPTimeoutMS(ms int) HTTPOption {
 	return func(r *HTTPToolRunner) {
 		if ms > 0 {
-			r.overrideTimeoutMs = ms
+			r.overrideTimeoutMS = ms
 		}
 	}
 }
@@ -94,15 +94,15 @@ func (r *HTTPToolRunner) Run(
 ) (outputs []spec.ToolStoreOutputUnion, metaData map[string]any, err error) {
 	req := r.impl.Request
 	resp := r.impl.Response
-	timeoutMs := req.TimeoutMs
-	if timeoutMs <= 0 {
-		timeoutMs = spec.DefaultHTTPTimeoutMs
+	timeoutMS := req.TimeoutMS
+	if timeoutMS <= 0 {
+		timeoutMS = spec.DefaultHTTPTimeoutMS
 	}
-	if r.overrideTimeoutMs > 0 {
-		timeoutMs = r.overrideTimeoutMs
+	if r.overrideTimeoutMS > 0 {
+		timeoutMS = r.overrideTimeoutMS
 	}
 
-	client := r.client(timeoutMs)
+	client := r.client(timeoutMS)
 	method := strings.ToUpper(strings.TrimSpace(req.Method))
 	if method == "" {
 		method = http.MethodGet
@@ -289,9 +289,9 @@ func (r *HTTPToolRunner) Run(
 	}
 }
 
-func (r *HTTPToolRunner) client(timeoutMs int) *http.Client {
+func (r *HTTPToolRunner) client(timeoutMS int) *http.Client {
 	r.clientsMu.RLock()
-	if c, ok := r.clients[timeoutMs]; ok {
+	if c, ok := r.clients[timeoutMS]; ok {
 		r.clientsMu.RUnlock()
 		return c
 	}
@@ -299,13 +299,13 @@ func (r *HTTPToolRunner) client(timeoutMs int) *http.Client {
 
 	r.clientsMu.Lock()
 	defer r.clientsMu.Unlock()
-	if c, ok := r.clients[timeoutMs]; ok {
+	if c, ok := r.clients[timeoutMS]; ok {
 		return c
 	}
 	c := &http.Client{
-		Timeout: time.Duration(timeoutMs) * time.Millisecond,
+		Timeout: time.Duration(timeoutMS) * time.Millisecond,
 	}
-	r.clients[timeoutMs] = c
+	r.clients[timeoutMS] = c
 	return c
 }
 

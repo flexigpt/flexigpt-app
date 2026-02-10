@@ -778,7 +778,7 @@ func dummyHTTPTool() *spec.HTTPToolImpl {
 		Request: spec.HTTPRequest{
 			Method:      "GET",
 			URLTemplate: "https://example.com",
-			TimeoutMs:   1000,
+			TimeoutMS:   1000,
 		},
 		Response: spec.HTTPResponse{
 			SuccessCodes: []int{200},

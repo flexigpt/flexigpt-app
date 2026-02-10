@@ -61,7 +61,7 @@ export interface HTTPRequest {
 	headers?: Record<string, string>; // k:${var}
 	body?: string; // raw or template
 	auth?: HTTPAuth;
-	timeoutMs?: number; // default 10_000
+	timeoutMS?: number; // default 10_000
 }
 
 /**
@@ -192,13 +192,13 @@ export interface ToolListItem {
 }
 
 export interface InvokeHTTPOptions {
-	timeoutMs?: number;
+	timeoutMS?: number;
 	extraHeaders?: Record<string, string>;
 	secrets?: Record<string, string>;
 }
 
 export interface InvokeGoOptions {
-	timeoutMs?: number;
+	timeoutMS?: number;
 }
 
 export interface InvokeToolResponse {

@@ -2,7 +2,7 @@
 
 ## Laundry list
 
-- [ ] UI tables alignment for config pages
+- [x] UI tables alignment for config pages
 
 ## Features
 

@@ -33,11 +33,11 @@ type PatchPromptBundleRequest struct {
 type PatchPromptBundleResponse struct{}
 
 type BundlePageToken struct {
-	BundleIDs       []bundleitemutils.BundleID `json:"ids,omitempty"` // optional filter
-	IncludeDisabled bool                       `json:"d,omitempty"`   // include disabled bundles?
-	PageSize        int                        `json:"s"`             // page size
-	CursorMod       string                     `json:"t,omitempty"`   // RFC-3339-nano
-	CursorID        bundleitemutils.BundleID   `json:"id,omitempty"`
+	BundleIDs       []bundleitemutils.BundleID `json:"ids,omitempty"` //nolint:tagliatelle // Pagetoken specific. optional filter
+	IncludeDisabled bool                       `json:"d,omitempty"`   //nolint:tagliatelle // Pagetoken specific. include disabled bundles?
+	PageSize        int                        `json:"s"`             //nolint:tagliatelle // Pagetoken specific. page size
+	CursorMod       string                     `json:"t,omitempty"`   //nolint:tagliatelle // Pagetoken specific. RFC-3339-nano
+	CursorID        bundleitemutils.BundleID   `json:"id,omitempty"`  //nolint:tagliatelle // Pagetoken specific.
 }
 
 type ListPromptBundlesRequest struct {
@@ -104,12 +104,12 @@ type GetPromptTemplateRequest struct {
 type GetPromptTemplateResponse struct{ Body *PromptTemplate }
 
 type TemplatePageToken struct {
-	RecommendedPageSize int                        `json:"ps,omitempty"`
-	IncludeDisabled     bool                       `json:"d,omitempty"`
-	BundleIDs           []bundleitemutils.BundleID `json:"ids,omitempty"`
-	Tags                []string                   `json:"tags,omitempty"`
-	BuiltInDone         bool                       `json:"bd,omitempty"`
-	DirTok              string                     `json:"dt,omitempty"`
+	RecommendedPageSize int                        `json:"ps,omitempty"`   //nolint:tagliatelle // PageToken specific.
+	IncludeDisabled     bool                       `json:"d,omitempty"`    //nolint:tagliatelle // PageToken specific.
+	BundleIDs           []bundleitemutils.BundleID `json:"ids,omitempty"`  //nolint:tagliatelle // PageToken specific.
+	Tags                []string                   `json:"tags,omitempty"` //nolint:tagliatelle // PageToken specific.
+	BuiltInDone         bool                       `json:"bd,omitempty"`   //nolint:tagliatelle // PageToken specific.
+	DirTok              string                     `json:"dt,omitempty"`   //nolint:tagliatelle // PageToken specific.
 }
 
 type ListPromptTemplatesRequest struct {
