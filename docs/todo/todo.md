@@ -2,6 +2,8 @@
 
 ## Laundry list
 
+- [ ] UI tables alignment for config pages
+
 ## Features
 
 - [ ] Agent skills

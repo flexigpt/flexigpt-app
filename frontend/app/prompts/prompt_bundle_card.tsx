@@ -176,37 +176,17 @@ export function PromptBundleCard({
 
 	return (
 		<div className="bg-base-100 mb-8 rounded-2xl p-4 shadow-lg">
-			<div className="grid grid-cols-12 items-center gap-2">
-				<div className="col-span-4 flex items-center gap-2">
-					<h3 className="text-sm font-semibold">
+			<div className="flex items-center justify-between">
+				<div className="flex items-center">
+					<h3 className="gap-2 text-sm font-semibold">
 						<span className="capitalize">{bundle.displayName || bundle.slug}</span>
 						<span className="text-base-content/60 ml-1">({bundle.slug})</span>
 					</h3>
 				</div>
 
-				<div className="col-span-1 flex items-center gap-2">
-					<span className="text-base-content/60 text-xs tracking-wide uppercase">
-						{bundle.isBuiltIn ? 'Built-in' : 'Custom'}
-					</span>
-				</div>
-
-				<div className="col-span-3 flex items-center gap-2">
-					<label className="text-sm">Enabled</label>
-					<input
-						type="checkbox"
-						className="toggle toggle-accent"
-						checked={isBundleEnabled}
-						onChange={toggleBundleEnable}
-					/>
-				</div>
-
-				<div className="col-span-2 flex items-center text-sm">
-					<span>Templates:&nbsp;{localTemplates.length}</span>
-				</div>
-
-				<div className="col-span-2 flex items-center justify-end gap-2">
+				<div className="flex items-center justify-end gap-4">
 					<button
-						className="btn btn-sm btn-ghost rounded-2xl"
+						className="btn btn-sm btn-ghost p-0"
 						title="View bundle details"
 						onClick={e => {
 							e.stopPropagation();
@@ -216,13 +196,27 @@ export function PromptBundleCard({
 						<FiEye size={16} />
 					</button>
 
+					<span className="text-base-content/60 text-xs tracking-wide uppercase">
+						{bundle.isBuiltIn ? 'Built-in' : 'Custom'}
+					</span>
+
+					<div className="flex items-center gap-1">
+						<label className="text-sm">Enabled</label>
+						<input
+							type="checkbox"
+							className="toggle toggle-accent"
+							checked={isBundleEnabled}
+							onChange={toggleBundleEnable}
+						/>
+					</div>
+
 					<div
 						className="flex cursor-pointer items-center gap-1"
 						onClick={() => {
 							setIsExpanded(p => !p);
 						}}
 					>
-						<label className="text-sm whitespace-nowrap">Templates</label>
+						<label className="text-sm whitespace-nowrap">Templates:&nbsp;{localTemplates.length}</label>
 						{isExpanded ? <FiChevronUp /> : <FiChevronDown />}
 					</div>
 				</div>
@@ -234,19 +228,19 @@ export function PromptBundleCard({
 						<table className="table-zebra table w-full">
 							<thead>
 								<tr className="bg-base-300 text-sm font-semibold">
-									<th>Display Name</th>
-									<th>Slug</th>
-									<th className="text-center">Enabled</th>
-									<th className="text-center">Version</th>
-									<th className="text-center">Built-In</th>
-									<th className="text-center">Actions</th>
+									<th className="w-full">Display Name</th>
+									<th className="min-w-32 text-center">Slug</th>
+									<th className="text-center whitespace-nowrap">Enabled</th>
+									<th className="text-center whitespace-nowrap">Version</th>
+									<th className="text-center whitespace-nowrap">Built-In</th>
+									<th className="text-center whitespace-nowrap">Actions</th>
 								</tr>
 							</thead>
 							<tbody>
 								{localTemplates.map(tpl => (
 									<tr key={tpl.id} className="hover:bg-base-300">
 										<td>{tpl.displayName}</td>
-										<td>{tpl.slug}</td>
+										<td className="text-center">{tpl.slug}</td>
 										<td className="text-center align-middle">
 											<input
 												type="checkbox"
@@ -259,7 +253,7 @@ export function PromptBundleCard({
 										<td className="text-center">
 											{tpl.isBuiltIn ? <FiCheck className="mx-auto" /> : <FiX className="mx-auto" />}
 										</td>
-										<td className="text-center">
+										<td className="justify-end text-center">
 											<div className="inline-flex items-center gap-2">
 												<button
 													className="btn btn-sm btn-ghost rounded-2xl"

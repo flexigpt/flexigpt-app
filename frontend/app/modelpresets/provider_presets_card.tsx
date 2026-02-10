@@ -268,37 +268,37 @@ export function ProviderPresetCard({
 	};
 
 	return (
-		<div className="bg-base-100 mb-8 rounded-2xl px-4 py-2 shadow-lg">
-			<div className="grid grid-cols-12 items-center gap-2 py-2">
-				<div className="col-span-4">
+		<div className="bg-base-100 mb-8 rounded-2xl p-4 shadow-lg">
+			<div className="flex items-center justify-between">
+				<div className="flex items-center">
 					<h3 className="text-sm font-semibold capitalize">{preset.displayName || provider} </h3>
 				</div>
 
-				<div className="col-span-2">
+				<div className="flex items-center justify-end gap-4">
 					<span className="text-base-content/60 text-xs tracking-wide uppercase">
 						{preset.isBuiltIn ? 'Built-in' : 'Custom'}
 					</span>
-				</div>
 
-				<div className="col-span-2 flex items-center gap-2">
-					<label className="text-sm">Enable</label>
-					<input
-						type="checkbox"
-						className="toggle toggle-accent"
-						checked={preset.isEnabled}
-						onChange={toggleProviderEnable}
-					/>
-				</div>
-
-				<div className="col-span-4 flex cursor-pointer items-end justify-end gap-4" onClick={toggleExpand}>
-					<div className="flex items-center">
-						<span className="text-sm">API-Key</span>
-						{keySet ? <FiCheckCircle className="text-success mx-1" /> : <FiXCircle className="text-error mx-1" />}
+					<div className="flex items-center gap-1">
+						<label className="text-sm">Enable</label>
+						<input
+							type="checkbox"
+							className="toggle toggle-accent"
+							checked={preset.isEnabled}
+							onChange={toggleProviderEnable}
+						/>
 					</div>
 
-					<div className="flex items-center">
-						<span className="text-sm">Details</span>
-						{expanded ? <FiChevronUp className="mx-1" /> : <FiChevronDown className="mx-1" />}
+					<div className="flex cursor-pointer items-end justify-end gap-4" onClick={toggleExpand}>
+						<div className="flex items-center">
+							<span className="text-sm">API-Key</span>
+							{keySet ? <FiCheckCircle className="text-success mx-1" /> : <FiXCircle className="text-error mx-1" />}
+						</div>
+
+						<div className="flex items-center">
+							<span className="text-sm">Details</span>
+							{expanded ? <FiChevronUp className="mx-1" /> : <FiChevronDown className="mx-1" />}
+						</div>
 					</div>
 				</div>
 			</div>

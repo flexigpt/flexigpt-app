@@ -50,13 +50,13 @@ export function AuthKeyTable({ authKeys, onEdit, onChanged }: AuthKeyTableProps)
 
 	return (
 		<>
-			<div className="overflow-x-auto rounded-2xl">
+			<div className="border-base-content/10 overflow-x-auto rounded-2xl border">
 				<table className="table-zebra table w-full">
 					<thead className="bg-base-300 text-sm font-semibold">
 						<tr className="text-sm">
-							<th>Type</th>
-							<th>Key Name</th>
-							<th className="text-center">SHA-256</th>
+							<th className="min-w-0">Type</th>
+							<th className="w-full text-center">Key Name</th>
+							<th className="max-w-64 text-center">SHA-256</th>
 							<th className="text-center">Secret</th>
 							<th className="text-center">Actions</th>
 						</tr>
@@ -70,10 +70,10 @@ export function AuthKeyTable({ authKeys, onEdit, onChanged }: AuthKeyTableProps)
 								<tr key={`${meta.type}:${meta.keyName}`} className="hover:bg-base-300 border-none shadow-none">
 									<td className="capitalize">{meta.type}</td>
 
-									<td>{meta.keyName}</td>
+									<td className="text-center">{meta.keyName}</td>
 
-									<td className="text-center align-middle font-mono text-xs">
-										{meta.nonEmpty ? meta.sha256.slice(0, 10) + '...' : '--'}
+									<td className="max-w-64 text-center align-middle font-mono text-xs">
+										<span className="block w-full truncate">{meta.nonEmpty ? meta.sha256 : '--'} </span>
 									</td>
 
 									<td className="text-center align-middle">
