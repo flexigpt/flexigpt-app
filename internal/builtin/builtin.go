@@ -13,6 +13,9 @@ var BuiltInToolBundlesFS embed.FS
 //go:embed prompts
 var BuiltInPromptBundlesFS embed.FS
 
+//go:embed skills
+var BuiltInSkillBundlesFS embed.FS
+
 const (
 	BuiltInModelPresetsRootDir = "modelpresets"
 	BuiltInModelPresetsJSON    = "modelpresets.json"
@@ -22,6 +25,9 @@ const (
 
 	BuiltInPromptBundlesRootDir = "prompts"
 	BuiltInPromptBundlesJSON    = "prompts.bundles.json"
+
+	BuiltInSkillBundlesRootDir = "skills"
+	BuiltInSkillBundlesJSON    = "skills.json"
 )
 
 // IMPORTANT: keep these stable (match tools.bundles.json).

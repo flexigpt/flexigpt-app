@@ -10,7 +10,14 @@
   - [x] skills tools: list, activate, readfile, run, deactivate
   - [x] skills runtime
   - [ ] skills discovery/add/remove/management backend
+    - [x] store req/resp/code/test
+    - [ ] embedded fs skill provider for runtime
+    - [ ] runtime integration appropriately
+    - [ ] agentgo and httpbackend integration with api exposure
   - [ ] skills discovery/add/remove/management ui
+    - [ ] spec types, skills and skill runtime
+    - [ ] bundles page, card, add/edit/view modal
+    - [ ] skills add/edit/view modal
   - [ ] skills in chat ui.
     - [ ] most probably like websearch, enable button in bottom, with all available skills from catalog in the prompt and then progressive disclosure
     - [ ] inside the dropdown we can have a select sub skill set for progressive disclosure

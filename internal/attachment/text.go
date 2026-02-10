@@ -12,20 +12,6 @@ type llmTextAttachment struct {
 	Text       string   `xml:",chardata"`                 //nolint:tagliatelle // XML Specific.
 }
 
-// XML 1.0 disallows some control chars; this prevents xml.Marshal errors on odd file bytes.
-func sanitizeXMLText(s string) string {
-	return strings.Map(func(r rune) rune {
-		switch {
-		case r == '\t' || r == '\n' || r == '\r':
-			return r
-		case r >= 0x20:
-			return r
-		default:
-			return -1
-		}
-	}, s)
-}
-
 func FormatTextBlockAsXML(b ContentBlock) (string, error) {
 	var out llmTextAttachment
 	if b.FileName == nil && b.URL == nil && b.Text == nil {
@@ -49,4 +35,18 @@ func FormatTextBlockAsXML(b ContentBlock) (string, error) {
 		return "", err
 	}
 	return string(blob), nil
+}
+
+// XML 1.0 disallows some control chars; this prevents xml.Marshal errors on odd file bytes.
+func sanitizeXMLText(s string) string {
+	return strings.Map(func(r rune) rune {
+		switch {
+		case r == '\t' || r == '\n' || r == '\r':
+			return r
+		case r >= 0x20:
+			return r
+		default:
+			return -1
+		}
+	}, s)
 }

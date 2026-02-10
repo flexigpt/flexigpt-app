@@ -440,8 +440,15 @@ linters:
           json: goCamel
           yaml: goCamel
           xml: goCamel
+          whatever: goCamel
         extended-rules:
           json:
+            case: goCamel
+            extra-initialisms: true
+            initialism-overrides:
+              MS: true
+              MIME: true
+          whatever:
             case: goCamel
             extra-initialisms: true
             initialism-overrides:

@@ -1,0 +1,40 @@
+{
+	"schemaVersion": "2026-02-10",
+	"bundles": {
+		"builtin-bundle-1": {
+			"schemaVersion": "2026-02-10",
+			"id": "builtin-bundle-1",
+			"slug": "builtin-core",
+			"displayName": "Built-in Core",
+			"description": "Sample built-in bundle for tests",
+			"isEnabled": true,
+			"isBuiltIn": true,
+			"createdAt": "2026-02-10T00:00:00Z",
+			"modifiedAt": "2026-02-10T00:00:00Z"
+		}
+	},
+	"skills": {
+		"builtin-bundle-1": {
+			"hello": {
+				"schemaVersion": "2026-02-10",
+				"id": "builtin-skill-hello",
+				"slug": "hello",
+				"type": "embeddedfs",
+				"location": "skills/builtin-core/hello",
+				"name": "Hello",
+				"displayName": "Hello Skill",
+				"description": "A built-in hello skill",
+				"tags": ["demo", "builtin"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-02-10T00:00:02Z",
+					"lastSeenAt": "2026-02-10T00:00:02Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-02-10T00:00:02Z",
+				"modifiedAt": "2026-02-10T00:00:02Z"
+			}
+		}
+	}
+}
