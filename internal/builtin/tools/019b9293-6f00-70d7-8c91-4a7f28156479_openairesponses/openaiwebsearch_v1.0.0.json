@@ -23,13 +23,13 @@
 			"searchContextSize": {
 				"type": "string"
 			},
-			"allowed_domains": {
+			"allowedDomains": {
 				"type": "array",
 				"items": {
 					"type": "string"
 				}
 			},
-			"user_location": {
+			"userLocation": {
 				"type": "object",
 				"additionalProperties": false,
 				"properties": {

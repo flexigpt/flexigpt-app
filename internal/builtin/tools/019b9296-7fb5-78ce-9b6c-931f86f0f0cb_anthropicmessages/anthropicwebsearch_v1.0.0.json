@@ -20,23 +20,23 @@
 		"type": "object",
 		"additionalProperties": false,
 		"properties": {
-			"max_uses": {
+			"maxUses": {
 				"type": "integer",
 				"format": "int64"
 			},
-			"allowed_domains": {
+			"allowedDomains": {
 				"type": "array",
 				"items": {
 					"type": "string"
 				}
 			},
-			"blocked_domains": {
+			"blockedDomains": {
 				"type": "array",
 				"items": {
 					"type": "string"
 				}
 			},
-			"user_location": {
+			"userLocation": {
 				"type": "object",
 				"additionalProperties": false,
 				"properties": {

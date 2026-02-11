@@ -300,11 +300,11 @@ export interface WebSearchToolChoiceItemUserLocation {
 	timezone?: string;
 }
 export interface WebSearchToolChoiceItem {
-	max_uses?: number;
+	maxUses?: number;
 	searchContextSize?: string;
-	allowed_domains?: string[];
-	blocked_domains?: string[];
-	user_location?: WebSearchToolChoiceItemUserLocation;
+	allowedDomains?: string[];
+	blockedDomains?: string[];
+	userLocation?: WebSearchToolChoiceItemUserLocation;
 }
 
 export enum WebSearchToolOutputKind {

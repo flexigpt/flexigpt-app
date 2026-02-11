@@ -23,7 +23,7 @@
 			"searchContextSize": {
 				"type": "string"
 			},
-			"user_location": {
+			"userLocation": {
 				"type": "object",
 				"additionalProperties": false,
 				"properties": {
