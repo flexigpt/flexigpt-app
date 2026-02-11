@@ -83,7 +83,7 @@ func InitSkillStoreHandlers(api huma.API, store *SkillStore) {
 	huma.Register(api, huma.Operation{
 		OperationID: "list-skills",
 		Method:      http.MethodGet,
-		Path:        skillPathPrefix + "/skills",
+		Path:        skillPathPrefix,
 		Summary:     "List skills (global, with filters)",
 		Tags:        []string{skillTag},
 	}, store.ListSkills)

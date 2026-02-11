@@ -149,8 +149,13 @@ func (s *SkillStore) PutSkillBundle(
 
 	now := time.Now().UTC()
 	createdAt := now
-	if ex, ok := all.Bundles[req.BundleID]; ok && !ex.CreatedAt.IsZero() {
-		createdAt = ex.CreatedAt
+	if ex, ok := all.Bundles[req.BundleID]; ok {
+		if isSoftDeletedSkillBundle(ex) {
+			return nil, fmt.Errorf("%w: %s", spec.ErrSkillBundleDeleting, req.BundleID)
+		}
+		if !ex.CreatedAt.IsZero() {
+			createdAt = ex.CreatedAt
+		}
 	}
 
 	b := spec.SkillBundle{
@@ -333,7 +338,10 @@ func (s *SkillStore) ListSkillBundles(
 	allBundles := make([]spec.SkillBundle, 0)
 
 	if s.builtin != nil {
-		biBundles, _, _ := s.builtin.ListBuiltInSkills(ctx)
+		biBundles, _, err := s.builtin.ListBuiltInSkills(ctx)
+		if err != nil {
+			return nil, err
+		}
 		for _, b := range biBundles {
 			allBundles = append(allBundles, b)
 		}
@@ -522,25 +530,26 @@ func (s *SkillStore) PatchSkill(ctx context.Context, req *spec.PatchSkillRequest
 	// Built-in: allow enable/disable only (location is read-only).
 	if s.builtin != nil {
 		if _, err := s.builtin.GetBuiltInSkillBundle(ctx, req.BundleID); err == nil {
-			if req.Body.Location != nil && *req.Body.Location != "" {
+			// Any attempt to patch location on a built-in skill is forbidden (even empty string).
+			if req.Body.Location != nil {
 				return nil, fmt.Errorf("%w: cannot modify location for built-in", spec.ErrSkillBuiltInReadOnly)
 			}
-			if req.Body.IsEnabled != nil {
-				enabled := *req.Body.IsEnabled
-				if _, err := s.builtin.SetSkillEnabled(ctx, req.BundleID, req.SkillSlug, enabled); err != nil {
-					return nil, err
-				}
-				slog.Info(
-					"patchSkill (builtin)",
-					"bundleID",
-					req.BundleID,
-					"skillSlug",
-					req.SkillSlug,
-					"enabled",
-					req.Body.IsEnabled,
-				)
-				return &spec.PatchSkillResponse{}, nil
+			// Built-in patch must explicitly include isEnabled.
+			if req.Body.IsEnabled == nil {
+				return nil, fmt.Errorf("%w: isEnabled required for built-in patch", spec.ErrSkillInvalidRequest)
 			}
+
+			enabled := *req.Body.IsEnabled
+			if _, err := s.builtin.SetSkillEnabled(ctx, req.BundleID, req.SkillSlug, enabled); err != nil {
+				return nil, err
+			}
+			slog.Info(
+				"patchSkill (builtin)",
+				"bundleID", req.BundleID,
+				"skillSlug", req.SkillSlug,
+				"enabled", enabled,
+			)
+			return &spec.PatchSkillResponse{}, nil
 		}
 	}
 
@@ -579,7 +588,12 @@ func (s *SkillStore) PatchSkill(ctx context.Context, req *spec.PatchSkillRequest
 		sk.IsEnabled = *req.Body.IsEnabled
 	}
 
-	if req.Body.Location != nil && *req.Body.Location != "" && *req.Body.Location != sk.Location {
+	// If client provided location, require it to be non-empty after trimming.
+	if req.Body.Location != nil && strings.TrimSpace(*req.Body.Location) == "" {
+		return nil, fmt.Errorf("%w: location cannot be empty", spec.ErrSkillInvalidRequest)
+	}
+
+	if req.Body.Location != nil && *req.Body.Location != sk.Location {
 		sk.Location = *req.Body.Location
 		// Invalidate presence on location change.
 		sk.Presence = &spec.SkillPresence{Status: spec.SkillPresenceUnknown}
@@ -626,8 +640,13 @@ func (s *SkillStore) DeleteSkill(ctx context.Context, req *spec.DeleteSkillReque
 	if err != nil {
 		return nil, err
 	}
-	if _, ok := all.Bundles[req.BundleID]; !ok {
+	b, ok := all.Bundles[req.BundleID]
+
+	if !ok {
 		return nil, fmt.Errorf("%w: %s", spec.ErrSkillBundleNotFound, req.BundleID)
+	}
+	if isSoftDeletedSkillBundle(b) {
+		return nil, fmt.Errorf("%w: %s", spec.ErrSkillBundleDeleting, req.BundleID)
 	}
 	sm := all.Skills[req.BundleID]
 	if sm == nil {

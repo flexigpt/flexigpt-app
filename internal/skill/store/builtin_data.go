@@ -109,10 +109,10 @@ func NewBuiltInSkills(
 
 	b.rebuilder = builtin.NewAsyncRebuilder(
 		maxSnapshotAge,
-		func() error {
+		func() error { //nolint:contextcheck // Cannot pass app context to async builder.
 			b.mu.Lock()
 			defer b.mu.Unlock()
-			return b.rebuildSnapshot(ctx)
+			return b.rebuildSnapshot(context.Background())
 		},
 	)
 	b.rebuilder.MarkFresh()
@@ -153,7 +153,7 @@ func (b *BuiltInSkills) GetBuiltInSkillBundle(
 	if !ok {
 		return spec.SkillBundle{}, spec.ErrSkillBundleNotFound
 	}
-	return sb, nil
+	return cloneBundle(sb), nil
 }
 
 func (b *BuiltInSkills) GetBuiltInSkill(
@@ -190,15 +190,16 @@ func (b *BuiltInSkills) SetSkillBundleEnabled(
 	}
 
 	b.mu.Lock()
-	defer b.mu.Unlock()
 
 	sb := b.viewBundles[id]
 	sb.IsEnabled = enabled
 	sb.ModifiedAt = flag.ModifiedAt
 	b.viewBundles[id] = sb
 
+	b.mu.Unlock()
+
 	b.rebuilder.Trigger()
-	return sb, nil
+	return cloneBundle(sb), nil
 }
 
 func (b *BuiltInSkills) SetSkillEnabled(
@@ -221,15 +222,16 @@ func (b *BuiltInSkills) SetSkillEnabled(
 	}
 
 	b.mu.Lock()
-	defer b.mu.Unlock()
 
 	sk := b.viewSkills[bundleID][slug]
 	sk.IsEnabled = enabled
 	sk.ModifiedAt = flag.ModifiedAt
 	b.viewSkills[bundleID][slug] = sk
 
+	b.mu.Unlock()
+
 	b.rebuilder.Trigger()
-	return sk, nil
+	return cloneSkill(sk), nil
 }
 
 func (b *BuiltInSkills) loadFromFS(ctx context.Context) error {

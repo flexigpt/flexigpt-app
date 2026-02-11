@@ -128,10 +128,10 @@ func NewBuiltInPresets(
 
 	b.rebuilder = builtin.NewAsyncRebuilder(
 		maxSnapshotAge,
-		func() error {
+		func() error { //nolint:contextcheck // Cannot pass app context to async builder.
 			b.mu.Lock()
 			defer b.mu.Unlock()
-			return b.rebuildSnapshot(ctx)
+			return b.rebuildSnapshot(context.Background())
 		},
 	)
 	b.rebuilder.MarkFresh()

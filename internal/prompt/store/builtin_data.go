@@ -109,10 +109,10 @@ func NewBuiltInData(
 	}
 	data.rebuilder = builtin.NewAsyncRebuilder(
 		builtInSnapshotMaxAge,
-		func() error {
+		func() error { //nolint:contextcheck // Cannot pass app context to async builder.
 			data.mu.Lock()
 			defer data.mu.Unlock()
-			return data.rebuildSnapshot(ctx)
+			return data.rebuildSnapshot(context.Background())
 		},
 	)
 	data.rebuilder.MarkFresh()

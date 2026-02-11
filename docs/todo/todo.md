@@ -11,7 +11,10 @@
   - [x] skills runtime
   - [ ] skills discovery/add/remove/management backend
     - [x] store req/resp/code/test
-    - [ ] embedded fs skill provider for runtime
+    - [ ] embedded fs skill provider for runtime. Approach:
+      - [ ] materialize the embedded fs containing skills into a read app data dir.
+      - [ ] no symlinks, skill name and dir name should match
+      - [ ] then use current fs skill provider.
     - [ ] runtime integration appropriately
     - [ ] agentgo and httpbackend integration with api exposure
   - [ ] skills discovery/add/remove/management ui

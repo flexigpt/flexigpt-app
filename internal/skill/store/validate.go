@@ -78,6 +78,12 @@ func validateSkill(sk *spec.Skill) error {
 	if len(sk.Name) > maxNameLen {
 		return fmt.Errorf("name too long (>%d)", maxNameLen)
 	}
+	if len(sk.DisplayName) > maxDisplayNameLen {
+		return fmt.Errorf("displayName too long (>%d)", maxDisplayNameLen)
+	}
+	if len(sk.Description) > maxDescriptionLen {
+		return fmt.Errorf("description too long (>%d)", maxDescriptionLen)
+	}
 	if sk.CreatedAt.IsZero() || sk.ModifiedAt.IsZero() {
 		return errors.New("createdAt/modifiedAt is zero")
 	}
