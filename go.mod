@@ -8,7 +8,7 @@ require (
 	github.com/adrg/xdg v0.5.3
 	github.com/danielgtaylor/huma/v2 v2.35.0
 	github.com/flexigpt/inference-go v0.8.0
-	github.com/flexigpt/llmtools-go v0.9.0
+	github.com/flexigpt/llmtools-go v0.10.0
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/google/uuid v1.6.0
 	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
