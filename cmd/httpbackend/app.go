@@ -11,6 +11,7 @@ import (
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
 	promptStore "github.com/flexigpt/flexigpt-app/internal/prompt/store"
 	settingStore "github.com/flexigpt/flexigpt-app/internal/setting/store"
+	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 )
 
@@ -21,19 +22,21 @@ type BackendApp struct {
 	modelPresetStoreAPI    *modelpresetStore.ModelPresetStore
 	promptTemplateStoreAPI *promptStore.PromptTemplateStore
 	toolStoreAPI           *toolStore.ToolStore
+	skillStoreAPI          *skillStore.SkillStore
 
 	settingsDirPath      string
 	conversationsDirPath string
 	modelPresetsDirPath  string
 	promptsDirPath       string
 	toolsDirPath         string
+	skillsDirPath        string
 }
 
 func NewBackendApp(
-	settingsDirPath, conversationsDirPath, modelPresetsDirPath, promptsDirPath, toolsDirPath string,
+	settingsDirPath, conversationsDirPath, modelPresetsDirPath, promptsDirPath, toolsDirPath, skillsDirPath string,
 ) *BackendApp {
 	if settingsDirPath == "" || conversationsDirPath == "" ||
-		modelPresetsDirPath == "" || promptsDirPath == "" || toolsDirPath == "" {
+		modelPresetsDirPath == "" || promptsDirPath == "" || toolsDirPath == "" || skillsDirPath == "" {
 		slog.Error(
 			"invalid app path configuration",
 			"settingsDirPath", settingsDirPath,
@@ -41,6 +44,7 @@ func NewBackendApp(
 			"modelPresetsDirPath", modelPresetsDirPath,
 			"promptsDirPath", promptsDirPath,
 			"toolsDirPath", toolsDirPath,
+			"skillsDirPath", skillsDirPath,
 		)
 		panic("failed to initialize BackendApp: invalid path configuration")
 	}
@@ -51,11 +55,13 @@ func NewBackendApp(
 		modelPresetsDirPath:  modelPresetsDirPath,
 		promptsDirPath:       promptsDirPath,
 		toolsDirPath:         toolsDirPath,
+		skillsDirPath:        skillsDirPath,
 	}
 
 	app.initSettingsStore()
 	app.initConversationStore()
 	app.initToolStore()
+	app.initSkillStore()
 	app.initProviderSet()
 	app.initModelPresetStore()
 	app.initPromptTemplateStore()
@@ -185,6 +191,31 @@ func (a *BackendApp) initToolStore() {
 	}
 	a.toolStoreAPI = ps
 	slog.Info("tool store initialized", "directory", a.toolsDirPath)
+}
+
+// NOTE: If you already have BackendApp in your server cmd package, merge these fields/methods into it.
+func (a *BackendApp) initSkillStore() {
+	if err := os.MkdirAll(a.skillsDirPath, os.FileMode(0o770)); err != nil {
+		slog.Error(
+			"failed to create skills directory",
+			"skillsDirPath", a.skillsDirPath,
+			"error", err,
+		)
+		panic("failed to initialize BackendApp: could not create skills directory")
+	}
+
+	st, err := skillStore.NewSkillStore(a.skillsDirPath)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize skill store",
+			"skillsDirPath", a.skillsDirPath,
+			"error", err,
+		)
+		panic("failed to initialize BackendApp: skill store initialization failed")
+	}
+
+	a.skillStoreAPI = st
+	slog.Info("skill store initialized", "dir", a.skillsDirPath)
 }
 
 func (a *BackendApp) initProviderSet() {

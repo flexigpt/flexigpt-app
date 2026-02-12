@@ -28,6 +28,7 @@ type App struct {
 	promptTemplateStoreAPI *PromptTemplateStoreWrapper
 	toolStoreAPI           *ToolStoreWrapper
 	providerSetAPI         *ProviderSetWrapper
+	skillStoreAPI          *SkillStoreWrapper
 
 	dataBasePath string
 
@@ -36,6 +37,7 @@ type App struct {
 	modelPresetsDirPath  string
 	promptsDirPath       string
 	toolsDirPath         string
+	skillsDirPath        string
 }
 
 func NewApp() *App {
@@ -55,9 +57,10 @@ func NewApp() *App {
 	app.modelPresetsDirPath = filepath.Join(app.dataBasePath, "modelpresetsv1")
 	app.promptsDirPath = filepath.Join(app.dataBasePath, "prompttemplates")
 	app.toolsDirPath = filepath.Join(app.dataBasePath, "toolsv1")
+	app.skillsDirPath = filepath.Join(app.dataBasePath, "skills")
 
 	if app.settingsDirPath == "" || app.conversationsDirPath == "" ||
-		app.modelPresetsDirPath == "" || app.promptsDirPath == "" || app.toolsDirPath == "" {
+		app.modelPresetsDirPath == "" || app.promptsDirPath == "" || app.toolsDirPath == "" || app.skillsDirPath == "" {
 		slog.Error(
 			"invalid app path configuration",
 			"settingsDirPath", app.settingsDirPath,
@@ -65,6 +68,7 @@ func NewApp() *App {
 			"modelPresetsDirPath", app.modelPresetsDirPath,
 			"promptsDirPath", app.promptsDirPath,
 			"toolsDirPath", app.toolsDirPath,
+			"skillsDirPath", app.skillsDirPath,
 		)
 		panic("failed to initialize app: invalid path configuration")
 	}
@@ -77,6 +81,7 @@ func NewApp() *App {
 	app.modelPresetStoreAPI = &ModelPresetStoreWrapper{}
 	app.promptTemplateStoreAPI = &PromptTemplateStoreWrapper{}
 	app.toolStoreAPI = &ToolStoreWrapper{}
+	app.skillStoreAPI = &SkillStoreWrapper{}
 
 	if err := os.MkdirAll(app.settingsDirPath, os.FileMode(0o770)); err != nil {
 		slog.Error(
@@ -118,6 +123,15 @@ func NewApp() *App {
 		)
 		panic("failed to initialize app: could not create tools directory")
 	}
+	if err := os.MkdirAll(app.skillsDirPath, os.FileMode(0o770)); err != nil {
+		slog.Error(
+			"failed to create skills directory",
+			"skills path", app.skillsDirPath,
+			"error", err,
+		)
+		panic("failed to initialize app: could not create skills directory")
+	}
+
 	slog.Info(
 		"flexiGPT paths initialized",
 		"app data", app.dataBasePath,
@@ -126,6 +140,7 @@ func NewApp() *App {
 		"modelPresetsDirPath", app.modelPresetsDirPath,
 		"promptsDirPath", app.promptsDirPath,
 		"toolsDirPath", app.toolsDirPath,
+		"skillsDirPath", app.skillsDirPath,
 	)
 	return app
 }
@@ -349,6 +364,17 @@ func (a *App) initManagers() {
 		panic("failed to initialize managers: tool store initialization failed")
 	}
 
+	err = InitSkillStoreWrapper(a.skillStoreAPI, a.skillsDirPath)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize skill store",
+			"directory", a.skillsDirPath,
+			"error", err,
+		)
+		panic("failed to initialize managers: skill store initialization failed")
+	}
+	slog.Info("skill store initialized", "directory", a.skillsDirPath)
+
 	err = InitProviderSetWrapper(a.providerSetAPI, a.toolStoreAPI.store)
 	if err != nil {
 		slog.Error(
@@ -388,7 +414,7 @@ func (a *App) initManagers() {
 
 // startup is called at application startup.
 func (a *App) startup(ctx context.Context) { //nolint:all
-	// Perform your setup here.
+	// Perform setup here.
 	a.ctx = ctx
 	// Load the frontend.
 	runtime.WindowShow(a.ctx) //nolint:contextcheck // Use app context.
@@ -396,7 +422,7 @@ func (a *App) startup(ctx context.Context) { //nolint:all
 
 // domReady is called after front-end resources have been loaded.
 func (a *App) domReady(ctx context.Context) { //nolint:all
-	// Add your action here.
+	// Add action here.
 }
 
 // beforeClose is called when the application is about to quit,
@@ -408,7 +434,12 @@ func (a *App) beforeClose(ctx context.Context) (prevent bool) { //nolint:all
 
 // shutdown is called at application termination.
 func (a *App) shutdown(ctx context.Context) { //nolint:all
-	// Perform your teardown here.
+	// Perform any teardown here.
+
+	// Stop background goroutines + flushes for stores that need it.
+	if a.skillStoreAPI != nil {
+		a.skillStoreAPI.Close()
+	}
 }
 
 var defaultRuntimeFilters = func() []runtime.FileFilter {

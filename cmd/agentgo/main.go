@@ -101,6 +101,7 @@ func main() {
 			app.modelPresetStoreAPI,
 			app.promptTemplateStoreAPI,
 			app.toolStoreAPI,
+			app.skillStoreAPI,
 		},
 
 		Windows: &windows.Options{

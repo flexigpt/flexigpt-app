@@ -16,11 +16,11 @@
       - [ ] no symlinks, skill name and dir name should match
       - [ ] then use current fs skill provider.
     - [ ] runtime integration appropriately
-    - [ ] agentgo and httpbackend integration with api exposure
-  - [ ] skills discovery/add/remove/management ui
-    - [ ] spec types, skills and skill runtime
-    - [ ] bundles page, card, add/edit/view modal
-    - [ ] skills add/edit/view modal
+    - [x] agentgo and httpbackend integration with api exposure
+  - [x] skills discovery/add/remove/management ui
+    - [x] spec types, skills and skill runtime
+    - [x] bundles page, card, add/edit/view modal
+    - [x] skills add/edit/view modal
   - [ ] skills in chat ui.
     - [ ] most probably like websearch, enable button in bottom, with all available skills from catalog in the prompt and then progressive disclosure
     - [ ] inside the dropdown we can have a select sub skill set for progressive disclosure

@@ -1,9 +1,10 @@
 import type { ProviderName } from '@/spec/inference';
 import type { ProviderPreset } from '@/spec/modelpreset';
 import type { PromptBundle, PromptTemplateListItem } from '@/spec/prompt';
+import type { SkillBundle, SkillListItem, SkillType } from '@/spec/skill';
 import type { ToolBundle, ToolListItem } from '@/spec/tool';
 
-import { modelPresetStoreAPI, promptStoreAPI, toolStoreAPI } from '@/apis/baseapi';
+import { modelPresetStoreAPI, promptStoreAPI, skillStoreAPI, toolStoreAPI } from '@/apis/baseapi';
 
 export async function getAllProviderPresetsMap(
 	includeDisabled?: boolean
@@ -115,5 +116,50 @@ export async function getAllToolBundles(bundleIDs?: string[], includeDisabled?: 
 		pageToken = nextPageToken;
 	} while (pageToken);
 
+	return all;
+}
+
+export async function getAllSkillBundles(bundleIDs?: string[], includeDisabled?: boolean): Promise<SkillBundle[]> {
+	const all: SkillBundle[] = [];
+	let pageToken: string | undefined = undefined;
+	const pageSize = 25;
+
+	do {
+		const { skillBundles, nextPageToken } = await skillStoreAPI.listSkillBundles(
+			bundleIDs,
+			includeDisabled,
+			pageSize,
+			pageToken
+		);
+		all.push(...skillBundles);
+		if (!nextPageToken) break;
+		pageToken = nextPageToken;
+	} while (pageToken);
+	return all;
+}
+
+export async function getAllSkills(
+	bundleIDs?: string[],
+	types?: SkillType[],
+	includeDisabled?: boolean,
+	includeMissing?: boolean
+): Promise<SkillListItem[]> {
+	const all: SkillListItem[] = [];
+	let pageToken: string | undefined = undefined;
+	const pageSize = 25;
+
+	do {
+		const { skillListItems, nextPageToken } = await skillStoreAPI.listSkills(
+			bundleIDs,
+			types,
+			includeDisabled,
+			includeMissing,
+			pageSize,
+			pageToken
+		);
+		all.push(...skillListItems);
+		if (!nextPageToken) break;
+		pageToken = nextPageToken;
+	} while (pageToken);
 	return all;
 }

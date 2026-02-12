@@ -19,6 +19,7 @@ import (
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
 	promptStore "github.com/flexigpt/flexigpt-app/internal/prompt/store"
 	settingStore "github.com/flexigpt/flexigpt-app/internal/setting/store"
+	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 
 	// Run registry init.
@@ -34,6 +35,7 @@ type Options struct {
 	ModelPresetsDirPath    string `doc:"path to modelPresets data directory"`
 	PromptTemplatesDirPath string `doc:"path to prompt templates data directory"`
 	ToolsDirPath           string `doc:"path to tools data directory"`
+	SkillsDirPath          string `doc:"path to skills data directory"`
 	LogsDirPath            string `doc:"path to logs directory"`
 	Debug                  bool   `doc:"Enable debug logs"`
 }
@@ -50,6 +52,7 @@ func main() {
 			opts.ModelPresetsDirPath,
 			opts.PromptTemplatesDirPath,
 			opts.ToolsDirPath,
+			opts.SkillsDirPath,
 		)
 		settingStore.InitSettingStoreHandlers(api, app.settingStoreAPI)
 		conversationStore.InitConversationStoreHandlers(api, app.conversationStoreAPI)
@@ -57,6 +60,7 @@ func main() {
 		modelpresetStore.InitModelPresetStoreHandlers(api, app.modelPresetStoreAPI)
 		promptStore.InitPromptTemplateStoreHandlers(api, app.promptTemplateStoreAPI)
 		toolStore.InitToolStoreHandlers(api, app.toolStoreAPI)
+		skillStore.InitSkillStoreHandlers(api, app.skillStoreAPI)
 		// Create the HTTP server.
 		server := http.Server{
 			Addr:              fmt.Sprintf("%s:%d", opts.Host, opts.Port),

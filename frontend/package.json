@@ -117,6 +117,7 @@
 			"app/apis/wailsjs/go/main/ModelPresetStoreWrapper.js",
 			"app/apis/wailsjs/go/main/PromptTemplateStoreWrapper.js",
 			"app/apis/wailsjs/go/main/ToolStoreWrapper.js",
+			"app/apis/wailsjs/go/main/SkillStoreWrapper.js",
 			"app/lib/logger.ts",
 			"app/components/editor/plugins/auto_format_kit.tsx"
 		],

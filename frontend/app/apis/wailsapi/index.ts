@@ -5,4 +5,5 @@ export * from './modelpresetstore';
 export * from './promptstore';
 export * from './providerset';
 export * from './settingstore';
+export * from './skillstore';
 export * from './toolstore';

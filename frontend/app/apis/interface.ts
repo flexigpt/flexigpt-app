@@ -9,6 +9,7 @@ import type {
 } from '@/spec/modelpreset';
 import type { MessageBlock, PromptBundle, PromptTemplate, PromptTemplateListItem, PromptVariable } from '@/spec/prompt';
 import type { AppTheme, AuthKey, AuthKeyName, AuthKeyType, SettingsSchema } from '@/spec/setting';
+import type { Skill, SkillBundle, SkillListItem, SkillType } from '@/spec/skill';
 import type {
 	HTTPToolImpl,
 	InvokeGoOptions,
@@ -229,6 +230,63 @@ export interface IToolStoreAPI {
 
 	/** Get a tool version. */
 	getTool(bundleID: string, toolSlug: string, version: string): Promise<Tool | undefined>;
+}
+
+export interface ISkillStoreAPI {
+	/** List skill bundles, optionally filtered by IDs, disabled, and paginated. */
+	listSkillBundles(
+		bundleIDs?: string[],
+		includeDisabled?: boolean,
+		pageSize?: number,
+		pageToken?: string
+	): Promise<{ skillBundles: SkillBundle[]; nextPageToken?: string }>;
+
+	/** Create or update a skill bundle. */
+	putSkillBundle(
+		bundleID: string,
+		slug: string,
+		displayName: string,
+		isEnabled: boolean,
+		description?: string
+	): Promise<void>;
+
+	/** Patch (enable/disable) a bundle. */
+	patchSkillBundle(bundleID: string, isEnabled: boolean): Promise<void>;
+
+	/** Delete a bundle. */
+	deleteSkillBundle(bundleID: string): Promise<void>;
+
+	/** List skills, optionally filtered by bundleIDs/types and paginated. */
+	listSkills(
+		bundleIDs?: string[],
+		types?: SkillType[],
+		includeDisabled?: boolean,
+		includeMissing?: boolean,
+		recommendedPageSize?: number,
+		pageToken?: string
+	): Promise<{ skillListItems: SkillListItem[]; nextPageToken?: string }>;
+
+	/** Create or update a skill. */
+	putSkill(
+		bundleID: string,
+		skillSlug: string,
+		skillType: SkillType,
+		location: string,
+		name: string,
+		isEnabled: boolean,
+		displayName?: string,
+		description?: string,
+		tags?: string[]
+	): Promise<void>;
+
+	/** Patch a skill (enable/disable, location). */
+	patchSkill(bundleID: string, skillSlug: string, isEnabled?: boolean, location?: string): Promise<void>;
+
+	/** Delete a skill. */
+	deleteSkill(bundleID: string, skillSlug: string): Promise<void>;
+
+	/** Get a skill. */
+	getSkill(bundleID: string, skillSlug: string): Promise<Skill | undefined>;
 }
 
 export interface IConversationStoreAPI {

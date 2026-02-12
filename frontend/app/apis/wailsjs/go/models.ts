@@ -1890,6 +1890,56 @@ export namespace spec {
 	
 	    }
 	}
+	export class DeleteSkillBundleRequest {
+	    BundleID: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeleteSkillBundleRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	    }
+	}
+	export class DeleteSkillBundleResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new DeleteSkillBundleResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
+	export class DeleteSkillRequest {
+	    BundleID: string;
+	    SkillSlug: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeleteSkillRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	        this.SkillSlug = source["SkillSlug"];
+	    }
+	}
+	export class DeleteSkillResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new DeleteSkillResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
 	export class DeleteToolBundleRequest {
 	    BundleID: string;
 	
@@ -2325,6 +2375,149 @@ export namespace spec {
 		}
 	}
 	
+	export class GetSkillRequest {
+	    BundleID: string;
+	    SkillSlug: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new GetSkillRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	        this.SkillSlug = source["SkillSlug"];
+	    }
+	}
+	export class SkillPresence {
+	    status: string;
+	    // Go type: time
+	    lastCheckedAt?: any;
+	    // Go type: time
+	    lastSeenAt?: any;
+	    // Go type: time
+	    missingSince?: any;
+	    lastCheckError?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SkillPresence(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.status = source["status"];
+	        this.lastCheckedAt = this.convertValues(source["lastCheckedAt"], null);
+	        this.lastSeenAt = this.convertValues(source["lastSeenAt"], null);
+	        this.missingSince = this.convertValues(source["missingSince"], null);
+	        this.lastCheckError = source["lastCheckError"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Skill {
+	    schemaVersion: string;
+	    id: string;
+	    slug: string;
+	    type: string;
+	    location: string;
+	    name: string;
+	    displayName?: string;
+	    description?: string;
+	    tags?: string[];
+	    presence?: SkillPresence;
+	    isEnabled: boolean;
+	    isBuiltIn: boolean;
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    modifiedAt: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new Skill(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.schemaVersion = source["schemaVersion"];
+	        this.id = source["id"];
+	        this.slug = source["slug"];
+	        this.type = source["type"];
+	        this.location = source["location"];
+	        this.name = source["name"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.tags = source["tags"];
+	        this.presence = this.convertValues(source["presence"], SkillPresence);
+	        this.isEnabled = source["isEnabled"];
+	        this.isBuiltIn = source["isBuiltIn"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class GetSkillResponse {
+	    Body?: Skill;
+	
+	    static createFrom(source: any = {}) {
+	        return new GetSkillResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], Skill);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class GetToolRequest {
 	    BundleID: string;
 	    ToolSlug: string;
@@ -3349,6 +3542,261 @@ export namespace spec {
 		}
 	}
 	
+	export class ListSkillBundlesRequest {
+	    BundleIDs: string[];
+	    IncludeDisabled: boolean;
+	    PageSize: number;
+	    PageToken: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListSkillBundlesRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleIDs = source["BundleIDs"];
+	        this.IncludeDisabled = source["IncludeDisabled"];
+	        this.PageSize = source["PageSize"];
+	        this.PageToken = source["PageToken"];
+	    }
+	}
+	export class SkillBundle {
+	    schemaVersion: string;
+	    id: string;
+	    slug: string;
+	    displayName?: string;
+	    description?: string;
+	    isEnabled: boolean;
+	    isBuiltIn: boolean;
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    modifiedAt: any;
+	    // Go type: time
+	    softDeletedAt?: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new SkillBundle(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.schemaVersion = source["schemaVersion"];
+	        this.id = source["id"];
+	        this.slug = source["slug"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.isEnabled = source["isEnabled"];
+	        this.isBuiltIn = source["isBuiltIn"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
+	        this.softDeletedAt = this.convertValues(source["softDeletedAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ListSkillBundlesResponseBody {
+	    skillBundles: SkillBundle[];
+	    nextPageToken?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListSkillBundlesResponseBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.skillBundles = this.convertValues(source["skillBundles"], SkillBundle);
+	        this.nextPageToken = source["nextPageToken"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ListSkillBundlesResponse {
+	    Body?: ListSkillBundlesResponseBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListSkillBundlesResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], ListSkillBundlesResponseBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class ListSkillsRequest {
+	    BundleIDs: string[];
+	    Types: string[];
+	    IncludeDisabled: boolean;
+	    IncludeMissing: boolean;
+	    RecommendedPageSize: number;
+	    PageToken: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListSkillsRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleIDs = source["BundleIDs"];
+	        this.Types = source["Types"];
+	        this.IncludeDisabled = source["IncludeDisabled"];
+	        this.IncludeMissing = source["IncludeMissing"];
+	        this.RecommendedPageSize = source["RecommendedPageSize"];
+	        this.PageToken = source["PageToken"];
+	    }
+	}
+	export class SkillListItem {
+	    bundleID: string;
+	    bundleSlug: string;
+	    skillSlug: string;
+	    isBuiltIn: boolean;
+	    skillDefinition: Skill;
+	
+	    static createFrom(source: any = {}) {
+	        return new SkillListItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
+	        this.bundleSlug = source["bundleSlug"];
+	        this.skillSlug = source["skillSlug"];
+	        this.isBuiltIn = source["isBuiltIn"];
+	        this.skillDefinition = this.convertValues(source["skillDefinition"], Skill);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ListSkillsResponseBody {
+	    skillListItems: SkillListItem[];
+	    nextPageToken?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListSkillsResponseBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.skillListItems = this.convertValues(source["skillListItems"], SkillListItem);
+	        this.nextPageToken = source["nextPageToken"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ListSkillsResponse {
+	    Body?: ListSkillsResponseBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListSkillsResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], ListSkillsResponseBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class ListToolBundlesRequest {
 	    BundleIDs: string[];
 	    IncludeDisabled: boolean;
@@ -3894,6 +4342,124 @@ export namespace spec {
 	
 	    static createFrom(source: any = {}) {
 	        return new PatchProviderPresetResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
+	export class PatchSkillBundleRequestBody {
+	    isEnabled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchSkillBundleRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.isEnabled = source["isEnabled"];
+	    }
+	}
+	export class PatchSkillBundleRequest {
+	    BundleID: string;
+	    Body?: PatchSkillBundleRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchSkillBundleRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	        this.Body = this.convertValues(source["Body"], PatchSkillBundleRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class PatchSkillBundleResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchSkillBundleResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
+	export class PatchSkillRequestBody {
+	    isEnabled?: boolean;
+	    location?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchSkillRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.isEnabled = source["isEnabled"];
+	        this.location = source["location"];
+	    }
+	}
+	export class PatchSkillRequest {
+	    BundleID: string;
+	    SkillSlug: string;
+	    Body?: PatchSkillRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchSkillRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	        this.SkillSlug = source["SkillSlug"];
+	        this.Body = this.convertValues(source["Body"], PatchSkillRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class PatchSkillResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchSkillResponse(source);
 	    }
 	
 	    constructor(source: any = {}) {
@@ -4506,6 +5072,140 @@ export namespace spec {
 	
 	    }
 	}
+	export class PutSkillBundleRequestBody {
+	    slug: string;
+	    displayName: string;
+	    isEnabled: boolean;
+	    description?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PutSkillBundleRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.slug = source["slug"];
+	        this.displayName = source["displayName"];
+	        this.isEnabled = source["isEnabled"];
+	        this.description = source["description"];
+	    }
+	}
+	export class PutSkillBundleRequest {
+	    BundleID: string;
+	    Body?: PutSkillBundleRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new PutSkillBundleRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	        this.Body = this.convertValues(source["Body"], PutSkillBundleRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class PutSkillBundleResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new PutSkillBundleResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
+	export class PutSkillRequestBody {
+	    skillType: string;
+	    location: string;
+	    name: string;
+	    isEnabled: boolean;
+	    displayName?: string;
+	    description?: string;
+	    tags?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new PutSkillRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.skillType = source["skillType"];
+	        this.location = source["location"];
+	        this.name = source["name"];
+	        this.isEnabled = source["isEnabled"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.tags = source["tags"];
+	    }
+	}
+	export class PutSkillRequest {
+	    BundleID: string;
+	    SkillSlug: string;
+	    Body?: PutSkillRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new PutSkillRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	        this.SkillSlug = source["SkillSlug"];
+	        this.Body = this.convertValues(source["Body"], PutSkillRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class PutSkillResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new PutSkillResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
 	export class PutToolBundleRequestBody {
 	    slug: string;
 	    displayName: string;
@@ -5083,6 +5783,10 @@ export namespace spec {
 	
 	    }
 	}
+	
+	
+	
+	
 	
 	
 	
