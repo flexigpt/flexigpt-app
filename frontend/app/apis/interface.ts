@@ -10,17 +10,8 @@ import type {
 import type { MessageBlock, PromptBundle, PromptTemplate, PromptTemplateListItem, PromptVariable } from '@/spec/prompt';
 import type { AppTheme, AuthKey, AuthKeyName, AuthKeyType, SettingsSchema } from '@/spec/setting';
 import type { Skill, SkillBundle, SkillListItem, SkillType } from '@/spec/skill';
-import type {
-	HTTPToolImpl,
-	InvokeGoOptions,
-	InvokeHTTPOptions,
-	InvokeToolResponse,
-	Tool,
-	ToolBundle,
-	ToolImplType,
-	ToolListItem,
-	ToolStoreChoice,
-} from '@/spec/tool';
+import type { HTTPToolImpl, Tool, ToolBundle, ToolImplType, ToolListItem, ToolStoreChoice } from '@/spec/tool';
+import type { InvokeGoOptions, InvokeHTTPOptions, InvokeToolResponse } from '@/spec/toolruntime';
 
 import type { JSONRawString, JSONSchema } from '@/lib/jsonschema_utils';
 
@@ -202,16 +193,6 @@ export interface IToolStoreAPI {
 	/** Delete a tool version. */
 	deleteTool(bundleID: string, toolSlug: string, version: string): Promise<void>;
 
-	/** Invoke a tool version. */
-	invokeTool(
-		bundleID: string,
-		toolSlug: string,
-		version: string,
-		args?: JSONRawString,
-		httpOptions?: InvokeHTTPOptions,
-		goOptions?: InvokeGoOptions
-	): Promise<InvokeToolResponse>;
-
 	/** Get a tool version. */
 	getTool(bundleID: string, toolSlug: string, version: string): Promise<Tool | undefined>;
 }
@@ -271,6 +252,18 @@ export interface ISkillStoreAPI {
 
 	/** Get a skill. */
 	getSkill(bundleID: string, skillSlug: string): Promise<Skill | undefined>;
+}
+
+export interface IToolRuntimeAPI {
+	/** Invoke a tool version. */
+	invokeTool(
+		bundleID: string,
+		toolSlug: string,
+		version: string,
+		args?: JSONRawString,
+		httpOptions?: InvokeHTTPOptions,
+		goOptions?: InvokeGoOptions
+	): Promise<InvokeToolResponse>;
 }
 
 export interface IConversationStoreAPI {

@@ -27,6 +27,7 @@ type App struct {
 	modelPresetStoreAPI    *ModelPresetStoreWrapper
 	promptTemplateStoreAPI *PromptTemplateStoreWrapper
 	toolStoreAPI           *ToolStoreWrapper
+	toolRuntimeAPI         *ToolRuntimeWrapper
 	providerSetAPI         *ProviderSetWrapper
 	skillStoreAPI          *SkillStoreWrapper
 
@@ -82,6 +83,7 @@ func NewApp() *App {
 	app.promptTemplateStoreAPI = &PromptTemplateStoreWrapper{}
 	app.toolStoreAPI = &ToolStoreWrapper{}
 	app.skillStoreAPI = &SkillStoreWrapper{}
+	app.toolRuntimeAPI = &ToolRuntimeWrapper{}
 
 	if err := os.MkdirAll(app.settingsDirPath, os.FileMode(0o770)); err != nil {
 		slog.Error(
@@ -362,6 +364,15 @@ func (a *App) initManagers() {
 			"error", err,
 		)
 		panic("failed to initialize managers: tool store initialization failed")
+	}
+
+	err = InitToolRuntimeWrapper(a.toolRuntimeAPI, a.toolStoreAPI.store)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize tool runtime",
+			"error", err,
+		)
+		panic("failed to initialize managers: tool runtime initialization failed")
 	}
 
 	err = InitSkillStoreWrapper(a.skillStoreAPI, a.skillsDirPath)

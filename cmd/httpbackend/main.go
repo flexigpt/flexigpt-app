@@ -21,9 +21,10 @@ import (
 	settingStore "github.com/flexigpt/flexigpt-app/internal/setting/store"
 	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
+	"github.com/flexigpt/flexigpt-app/internal/toolruntime"
 
 	// Run registry init.
-	_ "github.com/flexigpt/flexigpt-app/internal/tool/goregistry"
+	_ "github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 )
 
 // Options for the server cli.
@@ -60,6 +61,7 @@ func main() {
 		modelpresetStore.InitModelPresetStoreHandlers(api, app.modelPresetStoreAPI)
 		promptStore.InitPromptTemplateStoreHandlers(api, app.promptTemplateStoreAPI)
 		toolStore.InitToolStoreHandlers(api, app.toolStoreAPI)
+		toolruntime.InitToolRuntimeHandlers(api, app.toolRuntimeAPI)
 		skillStore.InitSkillStoreHandlers(api, app.skillStoreAPI)
 		// Create the HTTP server.
 		server := http.Server{

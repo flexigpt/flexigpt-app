@@ -33,7 +33,7 @@ import { ensureMakeID, getUUIDv7 } from '@/lib/uuid_utils';
 
 import { useEnterSubmit } from '@/hooks/use_enter_submit';
 
-import { backendAPI, toolStoreAPI } from '@/apis/baseapi';
+import { backendAPI, toolRuntimeAPI, toolStoreAPI } from '@/apis/baseapi';
 
 import { AlignKit } from '@/components/editor/plugins/align_kit';
 import { BasicBlocksKit } from '@/components/editor/plugins/basic_blocks_kit';
@@ -695,7 +695,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		);
 
 		try {
-			const resp = await toolStoreAPI.invokeTool(bundleID, toolSlug, version, toolCall.arguments);
+			const resp = await toolRuntimeAPI.invokeTool(bundleID, toolSlug, version, toolCall.arguments);
 
 			const isError = !!resp.isError;
 			const errorMessage =

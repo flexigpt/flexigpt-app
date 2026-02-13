@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper"
+	"github.com/flexigpt/flexigpt-app/internal/toolruntime"
 	"github.com/flexigpt/inference-go/debugclient"
 
 	conversationStore "github.com/flexigpt/flexigpt-app/internal/conversation/store"
@@ -22,6 +23,7 @@ type BackendApp struct {
 	modelPresetStoreAPI    *modelpresetStore.ModelPresetStore
 	promptTemplateStoreAPI *promptStore.PromptTemplateStore
 	toolStoreAPI           *toolStore.ToolStore
+	toolRuntimeAPI         *toolruntime.ToolRuntime
 	skillStoreAPI          *skillStore.SkillStore
 
 	settingsDirPath      string
@@ -189,6 +191,8 @@ func (a *BackendApp) initToolStore() {
 	}
 	a.toolStoreAPI = ps
 	slog.Info("tool store initialized", "directory", a.toolsDirPath)
+	a.toolRuntimeAPI = toolruntime.NewToolRuntime(ps)
+	slog.Info("tool runtime initialized")
 }
 
 // NOTE: If you already have BackendApp in your server cmd package, merge these fields/methods into it.

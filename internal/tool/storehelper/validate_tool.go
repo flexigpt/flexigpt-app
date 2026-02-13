@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
-	"github.com/flexigpt/flexigpt-app/internal/tool/httprunner"
 	"github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
@@ -80,7 +80,7 @@ func ValidateTool(t *spec.Tool) error {
 		if t.SDKImpl != nil {
 			return errors.New("sdkImpl must be unset for type 'http'")
 		}
-		if err := httprunner.ValidateHTTPImpl(t.HTTPImpl); err != nil {
+		if err := ValidateHTTPImpl(t.HTTPImpl); err != nil {
 			return errors.New("invalid implementation for type 'http'")
 		}
 	case spec.ToolTypeSDK:
@@ -104,6 +104,53 @@ func ValidateTool(t *spec.Tool) error {
 
 	if err := bundleitemutils.ValidateTags(t.Tags); err != nil {
 		return err
+	}
+	return nil
+}
+
+func ValidateHTTPImpl(impl *spec.HTTPToolImpl) error {
+	if impl == nil {
+		return errors.New("httpImpl is nil")
+	}
+	if strings.TrimSpace(impl.Request.URLTemplate) == "" {
+		return errors.New("httpImpl.request.urlTemplate is empty")
+	}
+	// Enforce method sanity if set.
+	if impl.Request.Method != "" {
+		m := strings.ToUpper(strings.TrimSpace(impl.Request.Method))
+		switch m {
+		case http.MethodGet,
+			http.MethodPost,
+			http.MethodPut,
+			http.MethodPatch,
+			http.MethodDelete,
+			http.MethodHead,
+			http.MethodOptions:
+			// Ok.
+		default:
+			return fmt.Errorf("unsupported http method: %s", m)
+		}
+	}
+	// SuccessCodes sanity.
+	for _, c := range impl.Response.SuccessCodes {
+		if c < 100 || c > 599 {
+			return fmt.Errorf("invalid success code: %d", c)
+		}
+	}
+	if impl.Response.ErrorMode != "" {
+		em := strings.ToLower(impl.Response.ErrorMode)
+		if em != "fail" && em != "empty" {
+			return fmt.Errorf("invalid errorMode: %s", impl.Response.ErrorMode)
+		}
+	}
+	switch impl.Response.BodyOutputMode {
+	case "", spec.HTTPBodyOutputModeAuto,
+		spec.HTTPBodyOutputModeText,
+		spec.HTTPBodyOutputModeFile,
+		spec.HTTPBodyOutputModeImage:
+		// Ok.
+	default:
+		return fmt.Errorf("invalid bodyOutputMode: %s", impl.Response.BodyOutputMode)
 	}
 	return nil
 }

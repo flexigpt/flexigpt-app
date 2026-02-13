@@ -19,7 +19,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/logrotate"
 
 	// Run registry init.
-	_ "github.com/flexigpt/flexigpt-app/internal/tool/goregistry"
+	_ "github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 )
 
 var Version string
@@ -101,6 +101,7 @@ func main() {
 			app.modelPresetStoreAPI,
 			app.promptTemplateStoreAPI,
 			app.toolStoreAPI,
+			app.toolRuntimeAPI,
 			app.skillStoreAPI,
 		},
 

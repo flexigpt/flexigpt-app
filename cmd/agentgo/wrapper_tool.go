@@ -82,14 +82,6 @@ func (tbw *ToolStoreWrapper) PatchTool(
 	})
 }
 
-func (tbw *ToolStoreWrapper) InvokeTool(
-	req *spec.InvokeToolRequest,
-) (*spec.InvokeToolResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.InvokeToolResponse, error) {
-		return tbw.store.InvokeTool(context.Background(), req)
-	})
-}
-
 func (tbw *ToolStoreWrapper) GetTool(
 	req *spec.GetToolRequest,
 ) (*spec.GetToolResponse, error) {

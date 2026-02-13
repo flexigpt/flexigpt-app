@@ -1,4 +1,4 @@
-package store
+package toolruntime
 
 import (
 	"context"
@@ -17,11 +17,15 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
-	"github.com/flexigpt/flexigpt-app/internal/tool/goregistry"
-	"github.com/flexigpt/flexigpt-app/internal/tool/spec"
+	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
+	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
+	"github.com/flexigpt/flexigpt-app/internal/tool/store"
 	"github.com/flexigpt/flexigpt-app/internal/tool/storehelper"
+	"github.com/flexigpt/flexigpt-app/internal/toolruntime/spec"
+
 	"github.com/flexigpt/llmtools-go/fstool"
 	llmtoolsgoSpec "github.com/flexigpt/llmtools-go/spec"
+
 	"github.com/ppipada/mapstore-go/jsonencdec"
 )
 
@@ -30,14 +34,14 @@ func TestInvokeTool(t *testing.T) {
 
 	type (
 		handlerFn func(w http.ResponseWriter, r *http.Request)
-		mkToolFn  func(baseURL string) spec.HTTPToolImpl
+		mkToolFn  func(baseURL string) toolSpec.HTTPToolImpl
 		verifyFn  func(t *testing.T, resp *spec.InvokeToolResponse, err error)
 	)
 
 	// Common minimal tool builder: GET with query/header templating.
-	defaultTool := func(baseURL, pathSuffix string) spec.HTTPToolImpl {
-		return spec.HTTPToolImpl{
-			Request: spec.HTTPRequest{
+	defaultTool := func(baseURL, pathSuffix string) toolSpec.HTTPToolImpl {
+		return toolSpec.HTTPToolImpl{
+			Request: toolSpec.HTTPRequest{
 				Method:      "GET",
 				URLTemplate: baseURL + pathSuffix,
 				Query: map[string]string{
@@ -48,7 +52,7 @@ func TestInvokeTool(t *testing.T) {
 					"X-Auth": "token ${SECRET}",
 				},
 			},
-			Response: spec.HTTPResponse{},
+			Response: toolSpec.HTTPResponse{},
 		}
 	}
 
@@ -79,7 +83,7 @@ func TestInvokeTool(t *testing.T) {
 					"extra": extra,
 				})
 			},
-			mkTool: func(baseURL string) spec.HTTPToolImpl {
+			mkTool: func(baseURL string) toolSpec.HTTPToolImpl {
 				impl := defaultTool(baseURL, "/echo")
 				return impl
 			},
@@ -108,7 +112,7 @@ func TestInvokeTool(t *testing.T) {
 				if resp.Body.Meta == nil {
 					t.Fatalf("expected meta, got nil")
 				}
-				if typ, _ := resp.Body.Meta["type"].(string); typ != string(spec.ToolTypeHTTP) {
+				if typ, _ := resp.Body.Meta["type"].(string); typ != string(toolSpec.ToolTypeHTTP) {
 					t.Fatalf("meta.type = %v, want http", typ)
 				}
 				if _, ok := resp.Body.Meta["status"]; !ok {
@@ -139,20 +143,20 @@ func TestInvokeTool(t *testing.T) {
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
 			},
-			mkTool:        func(baseURL string) spec.HTTPToolImpl { return defaultTool(baseURL, "/ok") },
+			mkTool:        func(baseURL string) toolSpec.HTTPToolImpl { return defaultTool(baseURL, "/ok") },
 			args:          `{"msg":"x"}`,
 			disableBundle: true,
-			wantErrIs:     spec.ErrBundleDisabled,
+			wantErrIs:     toolSpec.ErrBundleDisabled,
 		},
 		{
 			name: "tool_disabled",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
 			},
-			mkTool:      func(baseURL string) spec.HTTPToolImpl { return defaultTool(baseURL, "/ok") },
+			mkTool:      func(baseURL string) toolSpec.HTTPToolImpl { return defaultTool(baseURL, "/ok") },
 			args:        `{"msg":"x"}`,
 			disableTool: true,
-			wantErrIs:   spec.ErrToolDisabled,
+			wantErrIs:   toolSpec.ErrToolDisabled,
 		},
 		{
 			name: "non_json_text_response_treated_as_text",
@@ -160,7 +164,7 @@ func TestInvokeTool(t *testing.T) {
 				w.Header().Set("Content-Type", "text/plain")
 				_, _ = w.Write([]byte("ok"))
 			},
-			mkTool: func(baseURL string) spec.HTTPToolImpl { return defaultTool(baseURL, "/plain") },
+			mkTool: func(baseURL string) toolSpec.HTTPToolImpl { return defaultTool(baseURL, "/plain") },
 			args:   `{}`,
 			verify: func(t *testing.T, resp *spec.InvokeToolResponse, err error) {
 				t.Helper()
@@ -185,7 +189,7 @@ func TestInvokeTool(t *testing.T) {
 				w.Header().Set("Content-Type", "application/json")
 				_, _ = w.Write([]byte("{invalid"))
 			},
-			mkTool: func(baseURL string) spec.HTTPToolImpl { return defaultTool(baseURL, "/badjson") },
+			mkTool: func(baseURL string) toolSpec.HTTPToolImpl { return defaultTool(baseURL, "/badjson") },
 			args:   `{}`,
 			verify: func(t *testing.T, resp *spec.InvokeToolResponse, err error) {
 				t.Helper()
@@ -212,7 +216,7 @@ func TestInvokeTool(t *testing.T) {
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusNoContent)
 			},
-			mkTool: func(baseURL string) spec.HTTPToolImpl { return defaultTool(baseURL, "/nocontent") },
+			mkTool: func(baseURL string) toolSpec.HTTPToolImpl { return defaultTool(baseURL, "/nocontent") },
 			args:   `{}`,
 			verify: func(t *testing.T, resp *spec.InvokeToolResponse, err error) {
 				t.Helper()
@@ -240,7 +244,7 @@ func TestInvokeTool(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 				_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
 			},
-			mkTool: func(baseURL string) spec.HTTPToolImpl {
+			mkTool: func(baseURL string) toolSpec.HTTPToolImpl {
 				impl := defaultTool(baseURL, "/status")
 				impl.Response.SuccessCodes = []int{http.StatusCreated}
 				return impl
@@ -269,7 +273,7 @@ func TestInvokeTool(t *testing.T) {
 				w.WriteHeader(http.StatusNotFound)
 				_ = json.NewEncoder(w).Encode(map[string]any{"err": "nope"})
 			},
-			mkTool: func(baseURL string) spec.HTTPToolImpl {
+			mkTool: func(baseURL string) toolSpec.HTTPToolImpl {
 				impl := defaultTool(baseURL, "/404")
 				impl.Response.ErrorMode = "empty"
 				return impl
@@ -311,7 +315,7 @@ func TestInvokeTool(t *testing.T) {
 				time.Sleep(150 * time.Millisecond)
 				_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
 			},
-			mkTool: func(baseURL string) spec.HTTPToolImpl {
+			mkTool: func(baseURL string) toolSpec.HTTPToolImpl {
 				return defaultTool(baseURL, "/slow")
 			},
 			args: `{}`,
@@ -341,9 +345,9 @@ func TestInvokeTool(t *testing.T) {
 				w.Header().Set("Content-Type", "application/octet-stream")
 				_, _ = w.Write([]byte("BINARY"))
 			},
-			mkTool: func(baseURL string) spec.HTTPToolImpl {
+			mkTool: func(baseURL string) toolSpec.HTTPToolImpl {
 				impl := defaultTool(baseURL, "/bintext")
-				impl.Response.BodyOutputMode = spec.HTTPBodyOutputModeText
+				impl.Response.BodyOutputMode = toolSpec.HTTPBodyOutputModeText
 				return impl
 			},
 			args: `{}`,
@@ -370,9 +374,9 @@ func TestInvokeTool(t *testing.T) {
 				w.Header().Set("Content-Type", "application/octet-stream")
 				_, _ = w.Write([]byte{0x01, 0x02, 0x03, 0x04})
 			},
-			mkTool: func(baseURL string) spec.HTTPToolImpl {
+			mkTool: func(baseURL string) toolSpec.HTTPToolImpl {
 				impl := defaultTool(baseURL, "/bin.dat")
-				impl.Response.BodyOutputMode = spec.HTTPBodyOutputModeFile
+				impl.Response.BodyOutputMode = toolSpec.HTTPBodyOutputModeFile
 				return impl
 			},
 			args: `{}`,
@@ -415,7 +419,7 @@ func TestInvokeTool(t *testing.T) {
 				w.Header().Set("Content-Type", "image/png")
 				_, _ = w.Write([]byte{0x89, 'P', 'N', 'G'})
 			},
-			mkTool: func(baseURL string) spec.HTTPToolImpl {
+			mkTool: func(baseURL string) toolSpec.HTTPToolImpl {
 				impl := defaultTool(baseURL, "/img.png")
 				// BodyOutputMode default (auto).
 				return impl
@@ -465,11 +469,12 @@ func TestInvokeTool(t *testing.T) {
 			defer srv.Close()
 
 			baseDir := t.TempDir()
-			ts, err := NewToolStore(baseDir)
+			ts, err := store.NewToolStore(baseDir)
 			if err != nil {
 				t.Fatalf("NewToolStore: %v", err)
 			}
 			defer ts.Close()
+			rs := NewToolRuntime(ts)
 
 			// Create bundle and tool.
 			const (
@@ -479,9 +484,9 @@ func TestInvokeTool(t *testing.T) {
 				version    = bundleitemutils.ItemVersion("v1")
 			)
 
-			if _, err := ts.PutToolBundle(t.Context(), &spec.PutToolBundleRequest{
+			if _, err := ts.PutToolBundle(t.Context(), &toolSpec.PutToolBundleRequest{
 				BundleID: bundleID,
-				Body: &spec.PutToolBundleRequestBody{
+				Body: &toolSpec.PutToolBundleRequestBody{
 					Slug:        bundleSlug,
 					DisplayName: "Bundle 1",
 					IsEnabled:   true,
@@ -493,11 +498,11 @@ func TestInvokeTool(t *testing.T) {
 
 			// Tool (HTTP-only custom tools).
 			impl := tc.mkTool(srv.URL)
-			if _, err := ts.PutTool(t.Context(), &spec.PutToolRequest{
+			if _, err := ts.PutTool(t.Context(), &toolSpec.PutToolRequest{
 				BundleID: bundleID,
 				ToolSlug: toolSlug,
 				Version:  version,
-				Body: &spec.PutToolRequestBody{
+				Body: &toolSpec.PutToolRequestBody{
 					DisplayName:  "Tool 1",
 					Description:  "test tool",
 					UserCallable: true,
@@ -506,7 +511,7 @@ func TestInvokeTool(t *testing.T) {
 					Tags:      []string{"t"},
 					IsEnabled: true,
 					ArgSchema: "{}",
-					Type:      spec.ToolTypeHTTP,
+					Type:      toolSpec.ToolTypeHTTP,
 					HTTPImpl:  &impl,
 				},
 			}); err != nil {
@@ -515,25 +520,25 @@ func TestInvokeTool(t *testing.T) {
 
 			// Optional: disable bundle or tool prior to invocation.
 			if tc.disableBundle {
-				if _, err := ts.PatchToolBundle(t.Context(), &spec.PatchToolBundleRequest{
+				if _, err := ts.PatchToolBundle(t.Context(), &toolSpec.PatchToolBundleRequest{
 					BundleID: bundleID,
-					Body:     &spec.PatchToolBundleRequestBody{IsEnabled: false},
+					Body:     &toolSpec.PatchToolBundleRequestBody{IsEnabled: false},
 				}); err != nil {
 					t.Fatalf("PatchToolBundle: %v", err)
 				}
 			}
 			if tc.disableTool {
-				if _, err := ts.PatchTool(t.Context(), &spec.PatchToolRequest{
+				if _, err := ts.PatchTool(t.Context(), &toolSpec.PatchToolRequest{
 					BundleID: bundleID,
 					ToolSlug: toolSlug,
 					Version:  version,
-					Body:     &spec.PatchToolRequestBody{IsEnabled: false},
+					Body:     &toolSpec.PatchToolRequestBody{IsEnabled: false},
 				}); err != nil {
 					t.Fatalf("PatchTool: %v", err)
 				}
 			}
 
-			resp, err := ts.InvokeTool(t.Context(), &spec.InvokeToolRequest{
+			resp, err := rs.InvokeTool(t.Context(), &spec.InvokeToolRequest{
 				BundleID: bundleID,
 				ToolSlug: toolSlug,
 				Version:  version,
@@ -567,7 +572,7 @@ func TestInvokeTool(t *testing.T) {
 			if resp.Body.Meta == nil {
 				t.Fatalf("meta is nil")
 			}
-			if typ, _ := resp.Body.Meta["type"].(string); typ != string(spec.ToolTypeHTTP) {
+			if typ, _ := resp.Body.Meta["type"].(string); typ != string(toolSpec.ToolTypeHTTP) {
 				t.Fatalf("meta.type = %v, want http", typ)
 			}
 		})
@@ -578,20 +583,21 @@ func TestInvokeTool_InvalidRequest(t *testing.T) {
 	t.Parallel()
 
 	baseDir := t.TempDir()
-	ts, err := NewToolStore(baseDir)
+	ts, err := store.NewToolStore(baseDir)
 	if err != nil {
 		t.Fatalf("NewToolStore: %v", err)
 	}
 	defer ts.Close()
+	tr := NewToolRuntime(ts)
 
 	// Missing required fields.
-	_, err = ts.InvokeTool(t.Context(), &spec.InvokeToolRequest{
+	_, err = tr.InvokeTool(t.Context(), &spec.InvokeToolRequest{
 		BundleID: "",
 		ToolSlug: "",
 		Version:  "",
 		Body:     &spec.InvokeToolRequestBody{Args: "{}"},
 	})
-	if !errors.Is(err, spec.ErrInvalidRequest) {
+	if !errors.Is(err, toolSpec.ErrInvalidRequest) {
 		t.Fatalf("err = %v, want ErrInvalidRequest", err)
 	}
 }
@@ -626,11 +632,12 @@ func TestInvokeTool_RequestBodyTemplating_PathQueryHeaderAuth(t *testing.T) {
 	defer srv.Close()
 
 	baseDir := t.TempDir()
-	ts, err := NewToolStore(baseDir)
+	ts, err := store.NewToolStore(baseDir)
 	if err != nil {
 		t.Fatalf("NewToolStore: %v", err)
 	}
 	defer ts.Close()
+	tr := NewToolRuntime(ts)
 
 	const (
 		bundleID   = bundleitemutils.BundleID("bundle-2")
@@ -639,9 +646,9 @@ func TestInvokeTool_RequestBodyTemplating_PathQueryHeaderAuth(t *testing.T) {
 		version    = bundleitemutils.ItemVersion("v1")
 	)
 
-	_, err = ts.PutToolBundle(t.Context(), &spec.PutToolBundleRequest{
+	_, err = ts.PutToolBundle(t.Context(), &toolSpec.PutToolBundleRequest{
 		BundleID: bundleID,
-		Body: &spec.PutToolBundleRequestBody{
+		Body: &toolSpec.PutToolBundleRequestBody{
 			Slug:        bundleSlug,
 			DisplayName: "Bundle 2",
 			IsEnabled:   true,
@@ -651,32 +658,32 @@ func TestInvokeTool_RequestBodyTemplating_PathQueryHeaderAuth(t *testing.T) {
 		t.Fatalf("PutToolBundle: %v", err)
 	}
 
-	impl := spec.HTTPToolImpl{
-		Request: spec.HTTPRequest{
+	impl := toolSpec.HTTPToolImpl{
+		Request: toolSpec.HTTPRequest{
 			Method:      "GET",
 			URLTemplate: srv.URL + "/items/${id}",
 			Query:       map[string]string{"id": "${id}"},
 			Headers:     map[string]string{"X-Trace": "${id}"},
-			Auth: &spec.HTTPAuth{
+			Auth: &toolSpec.HTTPAuth{
 				Type:          "bearer",
 				ValueTemplate: "${SECRET}",
 			},
 		},
-		Response: spec.HTTPResponse{},
+		Response: toolSpec.HTTPResponse{},
 	}
 
-	_, err = ts.PutTool(t.Context(), &spec.PutToolRequest{
+	_, err = ts.PutTool(t.Context(), &toolSpec.PutToolRequest{
 		BundleID: bundleID,
 		ToolSlug: toolSlug,
 		Version:  version,
-		Body: &spec.PutToolRequestBody{
+		Body: &toolSpec.PutToolRequestBody{
 			DisplayName:  "Tool 2",
 			IsEnabled:    true,
 			UserCallable: true,
 			LLMCallable:  true,
 
 			ArgSchema: "{}",
-			Type:      spec.ToolTypeHTTP,
+			Type:      toolSpec.ToolTypeHTTP,
 			HTTPImpl:  &impl,
 		},
 	})
@@ -684,7 +691,7 @@ func TestInvokeTool_RequestBodyTemplating_PathQueryHeaderAuth(t *testing.T) {
 		t.Fatalf("PutTool: %v", err)
 	}
 
-	resp, err := ts.InvokeTool(t.Context(), &spec.InvokeToolRequest{
+	resp, err := tr.InvokeTool(t.Context(), &spec.InvokeToolRequest{
 		BundleID: bundleID,
 		ToolSlug: toolSlug,
 		Version:  version,
@@ -1057,7 +1064,7 @@ func TestInvokeGoCustomRegistered(t *testing.T) {
 			},
 			args:          `{}`,
 			disableBundle: true,
-			wantErrIs:     spec.ErrBundleDisabled,
+			wantErrIs:     toolSpec.ErrBundleDisabled,
 		},
 		{
 			name: "tool_disabled",
@@ -1077,7 +1084,7 @@ func TestInvokeGoCustomRegistered(t *testing.T) {
 			},
 			args:        `{}`,
 			disableTool: true,
-			wantErrIs:   spec.ErrToolDisabled,
+			wantErrIs:   toolSpec.ErrToolDisabled,
 		},
 	}
 
@@ -1085,12 +1092,12 @@ func TestInvokeGoCustomRegistered(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			baseDir := t.TempDir()
-			ts, err := NewToolStore(baseDir)
+			ts, err := store.NewToolStore(baseDir)
 			if err != nil {
 				t.Fatalf("NewToolStore: %v", err)
 			}
 			defer ts.Close()
-
+			tr := NewToolRuntime(ts)
 			// Create a dedicated bundle per sub-test.
 			bundleID := bundleitemutils.BundleID("b-" + sanitizeID(t.Name()))
 			bundleSlug := bundleitemutils.BundleSlug("bundle-" + sanitizeID(t.Name()))
@@ -1112,19 +1119,19 @@ func TestInvokeGoCustomRegistered(t *testing.T) {
 
 			// Optional disable bundle/tool.
 			if tc.disableBundle {
-				if _, err := ts.PatchToolBundle(t.Context(), &spec.PatchToolBundleRequest{
+				if _, err := ts.PatchToolBundle(t.Context(), &toolSpec.PatchToolBundleRequest{
 					BundleID: bundleID,
-					Body:     &spec.PatchToolBundleRequestBody{IsEnabled: false},
+					Body:     &toolSpec.PatchToolBundleRequestBody{IsEnabled: false},
 				}); err != nil {
 					t.Fatalf("PatchToolBundle: %v", err)
 				}
 			}
 			if tc.disableTool {
-				if _, err := ts.PatchTool(t.Context(), &spec.PatchToolRequest{
+				if _, err := ts.PatchTool(t.Context(), &toolSpec.PatchToolRequest{
 					BundleID: bundleID,
 					ToolSlug: toolSlug,
 					Version:  version,
-					Body:     &spec.PatchToolRequestBody{IsEnabled: false},
+					Body:     &toolSpec.PatchToolRequestBody{IsEnabled: false},
 				}); err != nil {
 					t.Fatalf("PatchTool: %v", err)
 				}
@@ -1138,7 +1145,7 @@ func TestInvokeGoCustomRegistered(t *testing.T) {
 				defer cancel()
 			}
 
-			resp, err := ts.InvokeTool(ctx, &spec.InvokeToolRequest{
+			resp, err := tr.InvokeTool(ctx, &spec.InvokeToolRequest{
 				BundleID: bundleID,
 				ToolSlug: toolSlug,
 				Version:  version,
@@ -1314,12 +1321,12 @@ func TestInvokeTool_Go_BuiltIns(t *testing.T) {
 			t.Parallel()
 
 			baseDir := t.TempDir()
-			ts, err := NewToolStore(baseDir)
+			ts, err := store.NewToolStore(baseDir)
 			if err != nil {
 				t.Fatalf("NewToolStore: %v", err)
 			}
 			defer ts.Close()
-
+			tr := NewToolRuntime(ts)
 			// Bundle per case.
 			bundleID := bundleitemutils.BundleID("b-" + sanitizeID(t.Name()))
 			bundleSlug := bundleitemutils.BundleSlug("bundle-" + sanitizeID(t.Name()))
@@ -1332,7 +1339,7 @@ func TestInvokeTool_Go_BuiltIns(t *testing.T) {
 				t.Fatalf("addGoToolFile: %v", err)
 			}
 
-			resp, err := ts.InvokeTool(t.Context(), &spec.InvokeToolRequest{
+			resp, err := tr.InvokeTool(t.Context(), &spec.InvokeToolRequest{
 				BundleID: bundleID,
 				ToolSlug: toolSlug,
 				Version:  version,
@@ -1358,7 +1365,7 @@ func TestInvokeTool_Go_BuiltIns(t *testing.T) {
 // This bypasses PutTool (which only accepts HTTP tools) so we can exercise the Go path.
 func addGoToolFile(
 	t *testing.T,
-	ts *ToolStore,
+	ts *store.ToolStore,
 	bundleID bundleitemutils.BundleID,
 	bundleSlug bundleitemutils.BundleSlug,
 	toolSlug bundleitemutils.ItemSlug,
@@ -1378,8 +1385,8 @@ func addGoToolFile(
 	}
 
 	now := time.Now().UTC()
-	tool := spec.Tool{
-		SchemaVersion: spec.SchemaVersion,
+	tool := toolSpec.Tool{
+		SchemaVersion: toolSpec.SchemaVersion,
 		ID:            bundleitemutils.ItemID("go-" + string(toolSlug) + "-" + string(version)),
 		Slug:          toolSlug,
 		Version:       version,
@@ -1389,9 +1396,9 @@ func addGoToolFile(
 		UserCallable:  true,
 		LLMCallable:   true,
 		ArgSchema:     json.RawMessage(`{}`),
-		LLMToolType:   spec.ToolStoreChoiceTypeFunction,
-		Type:          spec.ToolTypeGo,
-		GoImpl:        &spec.GoToolImpl{Func: funcName},
+		LLMToolType:   toolSpec.ToolStoreChoiceTypeFunction,
+		Type:          toolSpec.ToolTypeGo,
+		GoImpl:        &toolSpec.GoToolImpl{Func: funcName},
 		HTTPImpl:      nil,
 		IsEnabled:     enabled,
 		IsBuiltIn:     false,
@@ -1403,23 +1410,20 @@ func addGoToolFile(
 	}
 
 	mp, _ := jsonencdec.StructWithJSONTagsToMap(tool)
-	return ts.toolStore.SetFileData(
-		bundleitemutils.GetBundlePartitionFileKey(finf.FileName, dirInfo.DirName),
-		mp,
-	)
+	return store.SetPreparedData(ts, finf.FileName, dirInfo.DirName, mp)
 }
 
 func putBundle(
 	t *testing.T,
-	ts *ToolStore,
+	ts *store.ToolStore,
 	id bundleitemutils.BundleID,
 	slug bundleitemutils.BundleSlug,
 	enabled bool,
 ) {
 	t.Helper()
-	if _, err := ts.PutToolBundle(t.Context(), &spec.PutToolBundleRequest{
+	if _, err := ts.PutToolBundle(t.Context(), &toolSpec.PutToolBundleRequest{
 		BundleID: id,
-		Body: &spec.PutToolBundleRequestBody{
+		Body: &toolSpec.PutToolBundleRequestBody{
 			Slug:        slug,
 			DisplayName: "bundle " + string(slug),
 			IsEnabled:   enabled,
@@ -1479,7 +1483,7 @@ func registerTypedAsTextInDefault[T, R any](
 		CreatedAt:  llmtoolsgoSpec.SchemaStartTime,
 		ModifiedAt: llmtoolsgoSpec.SchemaStartTime,
 	}
-	if err := goregistry.RegisterTypedAsTextToolUsingDefaultGoRegistry(llmTool, fn); err != nil {
+	if err := llmtoolsutil.RegisterTypedAsTextToolUsingDefaultGoRegistry(llmTool, fn); err != nil {
 		t.Fatalf("RegisterTypedAsText: %v", err)
 	}
 	return funcName
@@ -1508,7 +1512,7 @@ func registerOutputsToolInDefault[T any](
 		CreatedAt:  llmtoolsgoSpec.SchemaStartTime,
 		ModifiedAt: llmtoolsgoSpec.SchemaStartTime,
 	}
-	if err := goregistry.RegisterOutputsToolUsingDefaultGoRegistry(llmTool, fn); err != nil {
+	if err := llmtoolsutil.RegisterOutputsToolUsingDefaultGoRegistry(llmTool, fn); err != nil {
 		t.Fatalf("RegisterTypedAsText: %v", err)
 	}
 	return funcName

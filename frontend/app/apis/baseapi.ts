@@ -9,6 +9,7 @@ import type {
 	IProviderSetAPI,
 	ISettingStoreAPI,
 	ISkillStoreAPI,
+	IToolRuntimeAPI,
 	IToolStoreAPI,
 } from '@/apis/interface';
 import * as wailsImpl from '@/apis/wailsapi';
@@ -21,6 +22,7 @@ export let settingstoreAPI: ISettingStoreAPI;
 export let modelPresetStoreAPI: IModelPresetStoreAPI;
 export let promptStoreAPI: IPromptStoreAPI;
 export let toolStoreAPI: IToolStoreAPI;
+export let toolRuntimeAPI: IToolRuntimeAPI;
 export let skillStoreAPI: ISkillStoreAPI;
 
 // Conditional initialization
@@ -34,6 +36,7 @@ if (IS_WAILS_PLATFORM) {
 	modelPresetStoreAPI = new wailsImpl.WailsModelPresetStoreAPI();
 	promptStoreAPI = new wailsImpl.WailsPromptStoreAPI();
 	toolStoreAPI = new wailsImpl.WailsToolStoreAPI();
+	toolRuntimeAPI = new wailsImpl.WailsToolRuntimeAPI();
 	skillStoreAPI = new wailsImpl.WailsSkillStoreAPI();
 } else {
 	// Error for unsupported platforms

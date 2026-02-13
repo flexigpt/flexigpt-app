@@ -18,13 +18,8 @@ import (
 	"github.com/ppipada/mapstore-go/jsonencdec"
 	"github.com/ppipada/mapstore-go/uuidv7filename"
 
-	"github.com/flexigpt/llmtools-go"
-	llmtoolsgoSpec "github.com/flexigpt/llmtools-go/spec"
-
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/tool/goregistry"
-	"github.com/flexigpt/flexigpt-app/internal/tool/httprunner"
 	"github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	"github.com/flexigpt/flexigpt-app/internal/tool/storehelper"
 )
@@ -425,7 +420,7 @@ func (ts *ToolStore) PutTool(
 		return nil, err
 	}
 
-	bundle, isBI, err := ts.getAnyBundle(ctx, req.BundleID)
+	bundle, isBI, err := ts.GetAnyToolBundle(ctx, req.BundleID)
 	if err != nil {
 		return nil, err
 	}
@@ -518,7 +513,7 @@ func (ts *ToolStore) PatchTool(
 		return nil, err
 	}
 
-	bundle, isBI, err := ts.getAnyBundle(ctx, req.BundleID)
+	bundle, isBI, err := ts.GetAnyToolBundle(ctx, req.BundleID)
 	if err != nil {
 		return nil, err
 	}
@@ -580,7 +575,7 @@ func (ts *ToolStore) DeleteTool(
 	if err := bundleitemutils.ValidateItemVersion(req.Version); err != nil {
 		return nil, err
 	}
-	bundle, isBI, err := ts.getAnyBundle(ctx, req.BundleID)
+	bundle, isBI, err := ts.GetAnyToolBundle(ctx, req.BundleID)
 	if err != nil {
 		return nil, err
 	}
@@ -603,140 +598,6 @@ func (ts *ToolStore) DeleteTool(
 	return &spec.DeleteToolResponse{}, nil
 }
 
-// InvokeTool locates a tool version and executes it according to its type.
-// - Validates struct (ValidateTool), bundle/tool enabled state.
-// - Dispatches to HTTP or Go runner with functional options constructed from the request body.
-func (ts *ToolStore) InvokeTool(
-	ctx context.Context,
-	req *spec.InvokeToolRequest,
-) (*spec.InvokeToolResponse, error) {
-	if req == nil || req.Body == nil ||
-		req.BundleID == "" || req.ToolSlug == "" || req.Version == "" {
-		return nil, fmt.Errorf(
-			"%w: bundleID, toolSlug, version and body required",
-			spec.ErrInvalidRequest,
-		)
-	}
-	if err := bundleitemutils.ValidateItemSlug(req.ToolSlug); err != nil {
-		return nil, err
-	}
-	if err := bundleitemutils.ValidateItemVersion(req.Version); err != nil {
-		return nil, err
-	}
-	args := json.RawMessage(req.Body.Args)
-
-	// Load bundle and tool; re-use existing GetTool for a single source of truth.
-	bundle, isBI, err := ts.getAnyBundle(ctx, req.BundleID)
-	if err != nil {
-		return nil, err
-	}
-	if !bundle.IsEnabled {
-		return nil, fmt.Errorf("%w: bundle %s", spec.ErrBundleDisabled, req.BundleID)
-	}
-
-	gtResp, err := ts.GetTool(ctx, &spec.GetToolRequest{
-		BundleID: req.BundleID,
-		ToolSlug: req.ToolSlug,
-		Version:  req.Version,
-	})
-	if err != nil {
-		return nil, err
-	}
-	tool := gtResp.Body
-	if tool == nil {
-		return nil, fmt.Errorf("%w: nil tool body", spec.ErrToolNotFound)
-	}
-	if !tool.IsEnabled {
-		return nil, fmt.Errorf(
-			"%w: %s/%s@%s",
-			spec.ErrToolDisabled,
-			req.BundleID,
-			req.ToolSlug,
-			req.Version,
-		)
-	}
-
-	// Defensive validation of the tool record.
-	if err := storehelper.ValidateTool(tool); err != nil {
-		return nil, fmt.Errorf("tool validation failed: %w", err)
-	}
-
-	var (
-		outputs []llmtoolsgoSpec.ToolOutputUnion
-		md      map[string]any
-		isError bool
-		errMsg  string
-	)
-
-	switch tool.Type {
-	case spec.ToolTypeHTTP:
-		var hopts []httprunner.HTTPOption
-		if req.Body.HTTPOptions != nil {
-			if req.Body.HTTPOptions.TimeoutMS > 0 {
-				hopts = append(hopts, httprunner.WithHTTPTimeoutMS(req.Body.HTTPOptions.TimeoutMS))
-			}
-			if len(req.Body.HTTPOptions.ExtraHeaders) > 0 {
-				hopts = append(
-					hopts,
-					httprunner.WithHTTPExtraHeaders(req.Body.HTTPOptions.ExtraHeaders),
-				)
-			}
-			if len(req.Body.HTTPOptions.Secrets) > 0 {
-				hopts = append(hopts, httprunner.WithHTTPSecrets(req.Body.HTTPOptions.Secrets))
-			}
-		}
-		r, configErr := httprunner.NewHTTPToolRunner(*tool.HTTPImpl, hopts...)
-		if configErr != nil {
-			return nil, configErr
-		}
-
-		outputs, md, err = r.Run(ctx, args)
-
-	case spec.ToolTypeGo:
-		var gopts []llmtools.CallOption
-		if req.Body.GoOptions != nil && req.Body.GoOptions.TimeoutMS != 0 {
-			gopts = append(
-				gopts,
-				llmtools.WithCallTimeout(time.Duration(req.Body.GoOptions.TimeoutMS)*time.Millisecond),
-			)
-		}
-		outputs, err = goregistry.CallUsingDefaultGoRegistry(
-			ctx,
-			strings.TrimSpace(tool.GoImpl.Func),
-			args,
-			gopts...,
-		)
-
-		md = map[string]any{
-			"type":     "go",
-			"funcName": tool.GoImpl.Func,
-		}
-	case spec.ToolTypeSDK:
-		// SDK-backed tools are not invoked through ToolStore; they are surfaced to the model as provider server tools.
-		// Invoking them directly is a misuse.
-		return nil, fmt.Errorf("unsupported tool type for InvokeTool: %s", tool.Type)
-	default:
-		return nil, fmt.Errorf("unsupported tool type: %s", tool.Type)
-	}
-	if err != nil {
-		// Treat errors from the underlying tool runner as tool-level errors that are surfaced in the InvokeToolResponse
-		// instead of failing the entire call.
-		isError = true
-		errMsg = err.Error()
-
-	}
-
-	return &spec.InvokeToolResponse{
-		Body: &spec.InvokeToolResponseBody{
-			Outputs:      outputs,
-			Meta:         md,
-			IsBuiltIn:    isBI,
-			IsError:      isError,
-			ErrorMessage: errMsg,
-		},
-	}, nil
-}
-
 // GetTool retrieves a specific tool version.
 func (ts *ToolStore) GetTool(
 	ctx context.Context, req *spec.GetToolRequest,
@@ -744,7 +605,7 @@ func (ts *ToolStore) GetTool(
 	if req == nil || req.BundleID == "" || req.ToolSlug == "" || req.Version == "" {
 		return nil, fmt.Errorf("%w: bundleID, toolSlug, version required", spec.ErrInvalidRequest)
 	}
-	bundle, isBI, err := ts.getAnyBundle(ctx, req.BundleID)
+	bundle, isBI, err := ts.GetAnyToolBundle(ctx, req.BundleID)
 	if err != nil {
 		return nil, err
 	}
@@ -979,6 +840,20 @@ func (ts *ToolStore) ListTools(
 	}, nil
 }
 
+// GetAnyToolBundle returns either a built-in or user bundle by ID.
+func (ts *ToolStore) GetAnyToolBundle(
+	ctx context.Context,
+	id bundleitemutils.BundleID,
+) (spec.ToolBundle, bool, error) {
+	if ts.builtinData != nil {
+		if b, err := ts.builtinData.GetBuiltInToolBundle(ctx, id); err == nil {
+			return b, true, nil
+		}
+	}
+	b, err := ts.getUserBundle(id)
+	return b, false, err
+}
+
 // findTool locates (slug, version) inside the given bundle directory.
 func (ts *ToolStore) findTool(
 	bdi bundleitemutils.BundleDirInfo,
@@ -1001,20 +876,6 @@ func (ts *ToolStore) findTool(
 		return fi, "", fmt.Errorf("%w: %s", spec.ErrToolNotFound, slug)
 	}
 	return fi, filepath.Join(bdi.DirName, fi.FileName), nil
-}
-
-// getAnyBundle returns either a built-in or user bundle by ID.
-func (ts *ToolStore) getAnyBundle(
-	ctx context.Context,
-	id bundleitemutils.BundleID,
-) (spec.ToolBundle, bool, error) {
-	if ts.builtinData != nil {
-		if b, err := ts.builtinData.GetBuiltInToolBundle(ctx, id); err == nil {
-			return b, true, nil
-		}
-	}
-	b, err := ts.getUserBundle(id)
-	return b, false, err
 }
 
 // getUserBundle fetches a non-soft-deleted user bundle.
@@ -1133,6 +994,14 @@ func (ts *ToolStore) readAllBundles(force bool) (spec.AllBundles, error) {
 func (ts *ToolStore) writeAllBundles(ab spec.AllBundles) error {
 	mp, _ := jsonencdec.StructWithJSONTagsToMap(ab)
 	return ts.bundleStore.SetAll(mp)
+}
+
+func SetPreparedData(ts *ToolStore, fileName, dirName string, data map[string]any) error {
+	// Only for test runtime. Not to be exported as a store method anywhere.
+	return ts.toolStore.SetFileData(
+		bundleitemutils.GetBundlePartitionFileKey(fileName, dirName),
+		data,
+	)
 }
 
 // isSoftDeletedTool returns true if bundle is in soft-deleted state.

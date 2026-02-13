@@ -14,10 +14,6 @@ export function GetTool(arg1) {
   return window['go']['main']['ToolStoreWrapper']['GetTool'](arg1);
 }
 
-export function InvokeTool(arg1) {
-  return window['go']['main']['ToolStoreWrapper']['InvokeTool'](arg1);
-}
-
 export function ListToolBundles(arg1) {
   return window['go']['main']['ToolStoreWrapper']['ListToolBundles'](arg1);
 }

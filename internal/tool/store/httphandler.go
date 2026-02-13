@@ -70,14 +70,6 @@ func InitToolStoreHandlers(api huma.API, store *ToolStore) {
 	}, store.DeleteTool)
 
 	huma.Register(api, huma.Operation{
-		OperationID: "invoke-tool",
-		Method:      http.MethodPost,
-		Path:        toolPathPrefix + "/bundles/{bundleID}/tools/{toolSlug}/version/{version}",
-		Summary:     "Invoke a tool version",
-		Tags:        []string{toolTag},
-	}, store.InvokeTool)
-
-	huma.Register(api, huma.Operation{
 		OperationID: "get-tool",
 		Method:      http.MethodGet,
 		Path:        toolPathPrefix + "/bundles/{bundleID}/tools/{toolSlug}/version/{version}",

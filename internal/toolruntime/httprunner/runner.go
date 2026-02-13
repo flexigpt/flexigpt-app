@@ -23,6 +23,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/tool/spec"
+	"github.com/flexigpt/flexigpt-app/internal/tool/storehelper"
 )
 
 // HTTPToolRunner executes an HTTPToolImpl. Safe for concurrent use.
@@ -77,7 +78,7 @@ func WithHTTPSecrets(s map[string]string) HTTPOption {
 }
 
 func NewHTTPToolRunner(impl spec.HTTPToolImpl, opts ...HTTPOption) (*HTTPToolRunner, error) {
-	if err := ValidateHTTPImpl(&impl); err != nil {
+	if err := storehelper.ValidateHTTPImpl(&impl); err != nil {
 		return nil, err
 	}
 	r := &HTTPToolRunner{
@@ -452,53 +453,6 @@ func toSlice(v any) ([]any, bool) {
 	default:
 		return nil, false
 	}
-}
-
-func ValidateHTTPImpl(impl *spec.HTTPToolImpl) error {
-	if impl == nil {
-		return errors.New("httpImpl is nil")
-	}
-	if strings.TrimSpace(impl.Request.URLTemplate) == "" {
-		return errors.New("httpImpl.request.urlTemplate is empty")
-	}
-	// Enforce method sanity if set.
-	if impl.Request.Method != "" {
-		m := strings.ToUpper(strings.TrimSpace(impl.Request.Method))
-		switch m {
-		case http.MethodGet,
-			http.MethodPost,
-			http.MethodPut,
-			http.MethodPatch,
-			http.MethodDelete,
-			http.MethodHead,
-			http.MethodOptions:
-			// Ok.
-		default:
-			return fmt.Errorf("unsupported http method: %s", m)
-		}
-	}
-	// SuccessCodes sanity.
-	for _, c := range impl.Response.SuccessCodes {
-		if c < 100 || c > 599 {
-			return fmt.Errorf("invalid success code: %d", c)
-		}
-	}
-	if impl.Response.ErrorMode != "" {
-		em := strings.ToLower(impl.Response.ErrorMode)
-		if em != "fail" && em != "empty" {
-			return fmt.Errorf("invalid errorMode: %s", impl.Response.ErrorMode)
-		}
-	}
-	switch impl.Response.BodyOutputMode {
-	case "", spec.HTTPBodyOutputModeAuto,
-		spec.HTTPBodyOutputModeText,
-		spec.HTTPBodyOutputModeFile,
-		spec.HTTPBodyOutputModeImage:
-		// Ok.
-	default:
-		return fmt.Errorf("invalid bodyOutputMode: %s", impl.Response.BodyOutputMode)
-	}
-	return nil
 }
 
 func isTextContentType(ct string) bool {

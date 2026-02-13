@@ -8,8 +8,6 @@ export function DeleteToolBundle(arg1:spec.DeleteToolBundleRequest):Promise<spec
 
 export function GetTool(arg1:spec.GetToolRequest):Promise<spec.GetToolResponse>;
 
-export function InvokeTool(arg1:spec.InvokeToolRequest):Promise<spec.InvokeToolResponse>;
-
 export function ListToolBundles(arg1:spec.ListToolBundlesRequest):Promise<spec.ListToolBundlesResponse>;
 
 export function ListTools(arg1:spec.ListToolsRequest):Promise<spec.ListToolsResponse>;
