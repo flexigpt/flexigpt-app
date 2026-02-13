@@ -3,6 +3,7 @@
 ## Laundry list
 
 - [x] UI tables alignment for config pages
+- [ ] opus 4.6 has now adaptive thinking which is basically thinking with levels
 
 ## Features
 

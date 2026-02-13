@@ -21,6 +21,28 @@
 			},
 			"defaultModelPresetID": "sonnet45",
 			"modelPresets": {
+				"opus46": {
+					"schemaVersion": "2025-07-01",
+					"id": "opus46",
+					"name": "claude-opus-4-6",
+					"displayName": "Claude 4.6 Opus",
+					"slug": "opus46",
+					"isEnabled": true,
+					"stream": true,
+					"maxPromptLength": 200000,
+					"maxOutputLength": 128000,
+					"temperature": 0.1,
+					"reasoning": {
+						"type": "hybridWithTokens",
+						"level": "",
+						"tokens": 1024
+					},
+					"systemPrompt": "",
+					"timeout": 300,
+					"createdAt": "2026-02-13T00:00:00Z",
+					"modifiedAt": "2025-02-13T00:00:00Z",
+					"isBuiltIn": true
+				},
 				"opus45": {
 					"schemaVersion": "2025-07-01",
 					"id": "opus45",
@@ -29,7 +51,7 @@
 					"slug": "opus45",
 					"isEnabled": true,
 					"stream": true,
-					"maxPromptLength": 128000,
+					"maxPromptLength": 200000,
 					"maxOutputLength": 64000,
 					"temperature": 0.1,
 					"reasoning": {
@@ -51,29 +73,7 @@
 					"slug": "opus41",
 					"isEnabled": false,
 					"stream": true,
-					"maxPromptLength": 128000,
-					"maxOutputLength": 32000,
-					"temperature": 0.1,
-					"reasoning": {
-						"type": "hybridWithTokens",
-						"level": "",
-						"tokens": 1024
-					},
-					"systemPrompt": "",
-					"timeout": 300,
-					"createdAt": "2025-07-30T00:00:00Z",
-					"modifiedAt": "2025-07-30T00:00:00Z",
-					"isBuiltIn": true
-				},
-				"opus4": {
-					"schemaVersion": "2025-07-01",
-					"id": "opus4",
-					"name": "claude-opus-4-20250514",
-					"displayName": "Claude 4 Opus",
-					"slug": "opus4",
-					"isEnabled": false,
-					"stream": true,
-					"maxPromptLength": 128000,
+					"maxPromptLength": 200000,
 					"maxOutputLength": 32000,
 					"temperature": 0.1,
 					"reasoning": {
@@ -95,7 +95,7 @@
 					"slug": "sonnet45",
 					"isEnabled": true,
 					"stream": true,
-					"maxPromptLength": 128000,
+					"maxPromptLength": 200000,
 					"maxOutputLength": 64000,
 					"temperature": 0.1,
 					"reasoning": {
@@ -117,7 +117,7 @@
 					"slug": "sonnet4",
 					"isEnabled": false,
 					"stream": true,
-					"maxPromptLength": 128000,
+					"maxPromptLength": 200000,
 					"maxOutputLength": 64000,
 					"temperature": 0.1,
 					"reasoning": {
@@ -125,45 +125,6 @@
 						"level": "",
 						"tokens": 1024
 					},
-					"systemPrompt": "",
-					"timeout": 300,
-					"createdAt": "2025-07-30T00:00:00Z",
-					"modifiedAt": "2025-07-30T00:00:00Z",
-					"isBuiltIn": true
-				},
-				"sonnet37": {
-					"schemaVersion": "2025-07-01",
-					"id": "sonnet37",
-					"name": "claude-3-7-sonnet-20250219",
-					"displayName": "Claude 3.7 Sonnet",
-					"slug": "sonnet37",
-					"isEnabled": false,
-					"stream": true,
-					"maxPromptLength": 128000,
-					"maxOutputLength": 64000,
-					"temperature": 0.1,
-					"reasoning": {
-						"type": "hybridWithTokens",
-						"level": "",
-						"tokens": 1024
-					},
-					"systemPrompt": "",
-					"timeout": 300,
-					"createdAt": "2025-07-30T00:00:00Z",
-					"modifiedAt": "2025-07-30T00:00:00Z",
-					"isBuiltIn": true
-				},
-				"sonnet35": {
-					"schemaVersion": "2025-07-01",
-					"id": "sonnet35",
-					"name": "claude-3-5-sonnet-20241022",
-					"displayName": "Claude 3.5 Sonnet",
-					"slug": "sonnet35",
-					"isEnabled": false,
-					"stream": true,
-					"maxPromptLength": 16000,
-					"maxOutputLength": 8000,
-					"temperature": 0.1,
 					"systemPrompt": "",
 					"timeout": 300,
 					"createdAt": "2025-07-30T00:00:00Z",
@@ -178,7 +139,7 @@
 					"slug": "haiku45",
 					"isEnabled": true,
 					"stream": true,
-					"maxPromptLength": 128000,
+					"maxPromptLength": 200000,
 					"maxOutputLength": 64000,
 					"temperature": 0.1,
 					"reasoning": {
@@ -186,23 +147,6 @@
 						"level": "",
 						"tokens": 1024
 					},
-					"systemPrompt": "",
-					"timeout": 300,
-					"createdAt": "2025-07-30T00:00:00Z",
-					"modifiedAt": "2025-07-30T00:00:00Z",
-					"isBuiltIn": true
-				},
-				"haiku35": {
-					"schemaVersion": "2025-07-01",
-					"id": "haiku35",
-					"name": "claude-3-5-haiku-20241022",
-					"displayName": "Claude 3.5 Haiku",
-					"slug": "haiku35",
-					"isEnabled": false,
-					"stream": true,
-					"maxPromptLength": 128000,
-					"maxOutputLength": 8000,
-					"temperature": 0.1,
 					"systemPrompt": "",
 					"timeout": 300,
 					"createdAt": "2025-07-30T00:00:00Z",
@@ -296,7 +240,7 @@
 					"slug": "gemini3Pro",
 					"isEnabled": true,
 					"stream": true,
-					"maxPromptLength": 128000,
+					"maxPromptLength": 200000,
 					"maxOutputLength": 65536,
 					"temperature": 1.0,
 					"reasoning": {
@@ -310,26 +254,26 @@
 					"modifiedAt": "2025-11-19T00:00:00Z",
 					"isBuiltIn": true
 				},
-				"gemini25Pro": {
+				"gemini3Flash": {
 					"schemaVersion": "2025-07-01",
-					"id": "gemini25Pro",
-					"name": "gemini-2.5-pro",
-					"displayName": "GoogleAI Gemini 2.5 Pro",
-					"slug": "gemini25Pro",
+					"id": "gemini3Flash",
+					"name": "gemini-3-flash-preview",
+					"displayName": "GoogleAI Gemini 3 Flash",
+					"slug": "gemini3Flash",
 					"isEnabled": true,
 					"stream": true,
-					"maxPromptLength": 128000,
+					"maxPromptLength": 200000,
 					"maxOutputLength": 65536,
-					"temperature": 1.0,
+					"temperature": 0.1,
 					"reasoning": {
 						"type": "singleWithLevels",
-						"level": "high",
+						"level": "medium",
 						"tokens": 0
 					},
 					"systemPrompt": "",
 					"timeout": 300,
-					"createdAt": "2025-07-30T00:00:00Z",
-					"modifiedAt": "2025-07-30T00:00:00Z",
+					"createdAt": "2026-02-13T00:00:00Z",
+					"modifiedAt": "2025-02-13T00:00:00Z",
 					"isBuiltIn": true
 				},
 				"gemini25Flash": {
@@ -340,7 +284,7 @@
 					"slug": "gemini25Flash",
 					"isEnabled": true,
 					"stream": true,
-					"maxPromptLength": 128000,
+					"maxPromptLength": 200000,
 					"maxOutputLength": 65536,
 					"temperature": 0.1,
 					"reasoning": {
@@ -362,7 +306,7 @@
 					"slug": "gemini25FlashLite",
 					"isEnabled": false,
 					"stream": true,
-					"maxPromptLength": 128000,
+					"maxPromptLength": 200000,
 					"maxOutputLength": 65536,
 					"temperature": 0.1,
 					"reasoning": {
@@ -556,7 +500,7 @@
 					"slug": "gpt41",
 					"isEnabled": true,
 					"stream": true,
-					"maxPromptLength": 128000,
+					"maxPromptLength": 200000,
 					"maxOutputLength": 32768,
 					"temperature": 0.1,
 					"systemPrompt": "",
@@ -573,7 +517,7 @@
 					"slug": "gpt41Mini",
 					"isEnabled": false,
 					"stream": true,
-					"maxPromptLength": 128000,
+					"maxPromptLength": 200000,
 					"maxOutputLength": 32768,
 					"temperature": 0.1,
 					"systemPrompt": "",
@@ -636,138 +580,6 @@
 			},
 			"defaultModelPresetID": "gpt52",
 			"modelPresets": {
-				"o4Mini": {
-					"schemaVersion": "2025-07-01",
-					"id": "o4Mini",
-					"name": "o4-mini",
-					"displayName": "OpenAI o4 Mini",
-					"slug": "o4Mini",
-					"isEnabled": false,
-					"stream": true,
-					"maxPromptLength": 128000,
-					"maxOutputLength": 100000,
-					"temperature": 1.0,
-					"reasoning": {
-						"type": "singleWithLevels",
-						"level": "medium",
-						"tokens": 0
-					},
-					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
-					"timeout": 300,
-					"createdAt": "2025-07-30T00:00:00Z",
-					"modifiedAt": "2025-07-30T00:00:00Z",
-					"isBuiltIn": true
-				},
-				"o3Pro": {
-					"schemaVersion": "2025-07-01",
-					"id": "o3Pro",
-					"name": "o3-pro",
-					"displayName": "OpenAI o3 Pro",
-					"slug": "o3Pro",
-					"isEnabled": false,
-					"stream": true,
-					"maxPromptLength": 128000,
-					"maxOutputLength": 100000,
-					"temperature": 1.0,
-					"reasoning": {
-						"type": "singleWithLevels",
-						"level": "medium",
-						"tokens": 0
-					},
-					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
-					"timeout": 300,
-					"createdAt": "2025-07-30T00:00:00Z",
-					"modifiedAt": "2025-07-30T00:00:00Z",
-					"isBuiltIn": true
-				},
-				"o3": {
-					"schemaVersion": "2025-07-01",
-					"id": "o3",
-					"name": "o3",
-					"displayName": "OpenAI o3",
-					"slug": "o3",
-					"isEnabled": false,
-					"stream": true,
-					"maxPromptLength": 128000,
-					"maxOutputLength": 100000,
-					"temperature": 1.0,
-					"reasoning": {
-						"type": "singleWithLevels",
-						"level": "high",
-						"tokens": 0
-					},
-					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
-					"timeout": 600,
-					"createdAt": "2025-07-30T00:00:00Z",
-					"modifiedAt": "2025-07-30T00:00:00Z",
-					"isBuiltIn": true
-				},
-				"o3Mini": {
-					"schemaVersion": "2025-07-01",
-					"id": "o3Mini",
-					"name": "o3-mini",
-					"displayName": "OpenAI o3 Mini",
-					"slug": "o3Mini",
-					"isEnabled": false,
-					"stream": true,
-					"maxPromptLength": 128000,
-					"maxOutputLength": 100000,
-					"temperature": 1.0,
-					"reasoning": {
-						"type": "singleWithLevels",
-						"level": "high",
-						"tokens": 0
-					},
-					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
-					"timeout": 300,
-					"createdAt": "2025-07-30T00:00:00Z",
-					"modifiedAt": "2025-07-30T00:00:00Z",
-					"isBuiltIn": true
-				},
-				"gpt5": {
-					"schemaVersion": "2025-07-01",
-					"id": "gpt5",
-					"name": "gpt-5",
-					"displayName": "OpenAI GPT 5",
-					"slug": "gpt5",
-					"isEnabled": false,
-					"stream": true,
-					"maxPromptLength": 128000,
-					"maxOutputLength": 128000,
-					"temperature": 1.0,
-					"reasoning": {
-						"type": "singleWithLevels",
-						"level": "high",
-						"tokens": 0
-					},
-					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
-					"timeout": 1200,
-					"createdAt": "2025-07-30T00:00:00Z",
-					"modifiedAt": "2025-07-30T00:00:00Z",
-					"isBuiltIn": true
-				},
-				"gpt5Codex": {
-					"schemaVersion": "2025-07-01",
-					"id": "gpt5codex",
-					"name": "gpt-5-codex",
-					"displayName": "OpenAI GPT 5 Codex",
-					"slug": "gpt5codex",
-					"isEnabled": false,
-					"stream": true,
-					"maxPromptLength": 128000,
-					"maxOutputLength": 128000,
-					"temperature": 1.0,
-					"reasoning": {
-						"type": "singleWithLevels",
-						"level": "high",
-						"tokens": 0
-					},
-					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
-					"timeout": 1200,
-					"createdAt": "2025-07-30T00:00:00Z",
-					"modifiedAt": "2025-07-30T00:00:00Z",
-					"isBuiltIn": true
-				},
 				"gpt5Mini": {
 					"schemaVersion": "2025-07-01",
 					"id": "gpt5Mini",
@@ -776,7 +588,7 @@
 					"slug": "gpt5Mini",
 					"isEnabled": true,
 					"stream": true,
-					"maxPromptLength": 128000,
+					"maxPromptLength": 400000,
 					"maxOutputLength": 128000,
 					"temperature": 1.0,
 					"reasoning": {
@@ -798,7 +610,7 @@
 					"slug": "gpt51",
 					"isEnabled": true,
 					"stream": true,
-					"maxPromptLength": 128000,
+					"maxPromptLength": 400000,
 					"maxOutputLength": 128000,
 					"temperature": 1.0,
 					"reasoning": {
@@ -820,7 +632,7 @@
 					"slug": "gpt51codex",
 					"isEnabled": true,
 					"stream": true,
-					"maxPromptLength": 128000,
+					"maxPromptLength": 400000,
 					"maxOutputLength": 128000,
 					"temperature": 1.0,
 					"reasoning": {
@@ -842,7 +654,7 @@
 					"slug": "gpt51CodexMax",
 					"isEnabled": false,
 					"stream": true,
-					"maxPromptLength": 128000,
+					"maxPromptLength": 400000,
 					"maxOutputLength": 128000,
 					"temperature": 1.0,
 					"reasoning": {
@@ -864,7 +676,7 @@
 					"slug": "gpt52",
 					"isEnabled": true,
 					"stream": true,
-					"maxPromptLength": 128000,
+					"maxPromptLength": 400000,
 					"maxOutputLength": 128000,
 					"temperature": 1.0,
 					"reasoning": {
