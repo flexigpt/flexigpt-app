@@ -18,7 +18,6 @@ func InitPromptTemplateStoreWrapper(
 ) error {
 	promptStoreAPI, err := promptStore.NewPromptTemplateStore(
 		promptDir,
-		promptStore.WithFTS(true),
 	)
 	if err != nil {
 		return err
@@ -96,13 +95,5 @@ func (pbw *PromptTemplateStoreWrapper) ListPromptTemplates(
 ) (*spec.ListPromptTemplatesResponse, error) {
 	return middleware.WithRecoveryResp(func() (*spec.ListPromptTemplatesResponse, error) {
 		return pbw.store.ListPromptTemplates(context.Background(), req)
-	})
-}
-
-func (pbw *PromptTemplateStoreWrapper) SearchPromptTemplates(
-	req *spec.SearchPromptTemplatesRequest,
-) (*spec.SearchPromptTemplatesResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.SearchPromptTemplatesResponse, error) {
-		return pbw.store.SearchPromptTemplates(context.Background(), req)
 	})
 }

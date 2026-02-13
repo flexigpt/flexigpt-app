@@ -19,5 +19,3 @@ export function PatchPromptTemplate(arg1:spec.PatchPromptTemplateRequest):Promis
 export function PutPromptBundle(arg1:spec.PutPromptBundleRequest):Promise<spec.PutPromptBundleResponse>;
 
 export function PutPromptTemplate(arg1:spec.PutPromptTemplateRequest):Promise<spec.PutPromptTemplateResponse>;
-
-export function SearchPromptTemplates(arg1:spec.SearchPromptTemplatesRequest):Promise<spec.SearchPromptTemplatesResponse>;

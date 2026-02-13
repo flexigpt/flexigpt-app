@@ -136,18 +136,3 @@ type ListPromptTemplatesResponseBody struct {
 type ListPromptTemplatesResponse struct {
 	Body *ListPromptTemplatesResponseBody
 }
-type SearchPromptTemplatesRequest struct {
-	Query           string `query:"q"               required:"true"`
-	PageToken       string `query:"pageToken"`
-	PageSize        int    `query:"pageSize"`
-	IncludeDisabled bool   `query:"includeDisabled"`
-}
-
-type SearchPromptTemplatesResponseBody struct {
-	PromptTemplateListItems []PromptTemplateListItem `json:"promptTemplateListItems"`
-	NextPageToken           *string                  `json:"nextPageToken,omitempty"`
-}
-
-type SearchPromptTemplatesResponse struct {
-	Body *SearchPromptTemplatesResponseBody
-}

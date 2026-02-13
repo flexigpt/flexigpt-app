@@ -18,7 +18,6 @@ func InitToolStoreWrapper(
 ) error {
 	toolStoreAPI, err := toolStore.NewToolStore(
 		toolDir,
-		toolStore.WithFTS(true),
 	)
 	if err != nil {
 		return err
@@ -104,13 +103,5 @@ func (tbw *ToolStoreWrapper) ListTools(
 ) (*spec.ListToolsResponse, error) {
 	return middleware.WithRecoveryResp(func() (*spec.ListToolsResponse, error) {
 		return tbw.store.ListTools(context.Background(), req)
-	})
-}
-
-func (tbw *ToolStoreWrapper) SearchTools(
-	req *spec.SearchToolsRequest,
-) (*spec.SearchToolsResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.SearchToolsResponse, error) {
-		return tbw.store.SearchTools(context.Background(), req)
 	})
 }

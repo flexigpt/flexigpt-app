@@ -16,6 +16,7 @@
       - [ ] no symlinks, skill name and dir name should match
       - [ ] then use current fs skill provider.
     - [ ] runtime integration appropriately
+      - [ ] need agentskills to support allowlist of skills to get a prompt
     - [x] agentgo and httpbackend integration with api exposure
   - [x] skills discovery/add/remove/management ui
     - [x] spec types, skills and skill runtime

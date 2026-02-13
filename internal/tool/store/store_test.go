@@ -451,116 +451,6 @@ func TestToolPagination(t *testing.T) {
 	}
 }
 
-func TestSearchTools(t *testing.T) {
-	s, clean := newTestToolStoreWithFTS(t)
-	defer clean()
-
-	mustPutToolBundle(t, s, "ub1", "slug", "bundle", true)
-	mustPutTool(t, s, "ub1", "hello", "v1", "hello", true, "greet")
-	mustPutTool(t, s, "ub1", "bye", "v1", "bye", true, "farewell")
-
-	time.Sleep(150 * time.Millisecond) // Allow async index flush.
-
-	resp, err := s.SearchTools(t.Context(), &spec.SearchToolsRequest{
-		Query: "hello",
-	})
-	if err != nil {
-		t.Fatalf("search failed: %v", err)
-	}
-	if len(resp.Body.ToolListItems) < 1 {
-		t.Fatalf("expected at least one hit")
-	}
-}
-
-func TestSearchToolsWithoutEngine(t *testing.T) {
-	s, clean := newTestToolStore(t)
-	defer clean()
-
-	_, err := s.SearchTools(t.Context(), &spec.SearchToolsRequest{
-		Query: "x",
-	})
-	if !errors.Is(err, spec.ErrFTSDisabled) {
-		t.Fatalf("expected ErrFTSDisabled, got %v", err)
-	}
-}
-
-func TestSearchFindsBuiltInTool(t *testing.T) {
-	s, clean := newTestToolStoreWithFTS(t)
-	defer clean()
-
-	bid, slug, ver, ok := firstBuiltInTool(t, s)
-	if !ok {
-		t.Skip("No built-in catalogue present.")
-	}
-
-	time.Sleep(200 * time.Millisecond)
-
-	resp, err := s.SearchTools(t.Context(), &spec.SearchToolsRequest{
-		Query: string(slug),
-	})
-	if err != nil {
-		t.Fatalf("search failed: %v", err)
-	}
-
-	found := false
-	for _, it := range resp.Body.ToolListItems {
-		if it.IsBuiltIn &&
-			it.BundleID == bid &&
-			it.ToolSlug == slug &&
-			it.ToolVersion == ver {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("built-in tool %s/%s/%s not returned by search", bid, slug, ver)
-	}
-}
-
-func TestSearchRespectsBuiltInEnableDisableTool(t *testing.T) {
-	s, clean := newTestToolStoreWithFTS(t)
-	defer clean()
-
-	bid, slug, _, ok := firstBuiltInTool(t, s)
-	if !ok {
-		t.Skip("No built-in catalogue present.")
-	}
-
-	time.Sleep(200 * time.Millisecond)
-
-	_, err := s.PatchToolBundle(t.Context(), &spec.PatchToolBundleRequest{
-		BundleID: bid,
-		Body:     &spec.PatchToolBundleRequestBody{IsEnabled: false},
-	})
-	if err != nil {
-		t.Fatalf("disabling built-in bundle failed: %v", err)
-	}
-
-	time.Sleep(150 * time.Millisecond)
-
-	resp, err := s.SearchTools(t.Context(), &spec.SearchToolsRequest{
-		Query:           string(slug),
-		IncludeDisabled: false,
-	})
-	if err != nil {
-		t.Fatalf("search failed: %v", err)
-	}
-	if len(resp.Body.ToolListItems) != 0 {
-		t.Fatalf("disabled built-in bundle still appears in search results")
-	}
-
-	resp, err = s.SearchTools(t.Context(), &spec.SearchToolsRequest{
-		Query:           string(slug),
-		IncludeDisabled: true,
-	})
-	if err != nil {
-		t.Fatalf("search (includeDisabled) failed: %v", err)
-	}
-	if len(resp.Body.ToolListItems) == 0 {
-		t.Fatalf("expected built-in hit when IncludeDisabled=true")
-	}
-}
-
 func TestToolSoftDeleteBehaviour(t *testing.T) {
 	s, clean := newTestToolStore(t)
 	defer clean()
@@ -751,16 +641,6 @@ func mustPutToolBundle(
 	if err != nil {
 		t.Fatalf("PutToolBundle() failed: %v", err)
 	}
-}
-
-func newTestToolStoreWithFTS(t *testing.T) (s *ToolStore, cleanup func()) {
-	t.Helper()
-	dir := t.TempDir()
-	s, err := NewToolStore(dir, WithFTS(true))
-	if err != nil {
-		t.Fatalf("NewToolStore(FTS) failed: %v", err)
-	}
-	return s, func() { s.Close(); _ = os.RemoveAll(dir) }
 }
 
 func newTestToolStore(t *testing.T) (s *ToolStore, cleanup func()) {

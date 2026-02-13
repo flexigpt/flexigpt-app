@@ -16,14 +16,12 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/tool/fts"
 	"github.com/flexigpt/flexigpt-app/internal/tool/goregistry"
 	"github.com/flexigpt/flexigpt-app/internal/tool/httprunner"
 	"github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	"github.com/flexigpt/flexigpt-app/internal/tool/storehelper"
 	"github.com/flexigpt/llmtools-go"
 	"github.com/ppipada/mapstore-go"
-	"github.com/ppipada/mapstore-go/ftsengine"
 	"github.com/ppipada/mapstore-go/jsonencdec"
 	"github.com/ppipada/mapstore-go/uuidv7filename"
 )
@@ -48,9 +46,6 @@ type ToolStore struct {
 	// Built-in overlay.
 	builtinData *BuiltInToolData
 
-	enableFTS bool
-	fts       *ftsengine.Engine
-
 	pp mapstore.PartitionProvider
 
 	slugLock *storehelper.SlugLocks
@@ -68,14 +63,6 @@ type ToolStore struct {
 
 // Option configures a ToolStore instance.
 type Option func(*ToolStore) error
-
-// WithFTS toggles full-text search indexing.
-func WithFTS(enabled bool) Option {
-	return func(ts *ToolStore) error {
-		ts.enableFTS = enabled
-		return nil
-	}
-}
 
 // NewToolStore initialises a ToolStore rooted at baseDir.
 func NewToolStore(baseDir string, opts ...Option) (*ToolStore, error) {
@@ -113,23 +100,8 @@ func NewToolStore(baseDir string, opts ...Option) (*ToolStore, error) {
 		return nil, err
 	}
 
-	// FTS engine.
-	if ts.enableFTS {
-		var lister fts.ToolBuiltInLister
-		if ts.builtinData != nil {
-			lister = ts.builtinData.ListBuiltInToolData
-		}
-		ts.fts, err = fts.InitToolFTSListeners(ts.baseDir, lister)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	// Directory store.
 	dirOpts := []mapstore.DirOption{mapstore.WithDirLogger(slog.Default())}
-	if ts.fts != nil {
-		dirOpts = append(dirOpts, mapstore.WithDirFileListeners(fts.NewUserToolsFTSListener(ts.fts)))
-	}
 	ts.toolStore, err = mapstore.NewMapDirectoryStore(
 		ts.baseDir,
 		true,
@@ -143,7 +115,7 @@ func NewToolStore(baseDir string, opts ...Option) (*ToolStore, error) {
 	ts.slugLock = storehelper.NewSlugLocks()
 	ts.startCleanupLoop()
 
-	slog.Info("tool-store ready", "baseDir", ts.baseDir, "fts", ts.enableFTS)
+	slog.Info("tool-store ready", "baseDir", ts.baseDir)
 	return ts, nil
 }
 
@@ -548,18 +520,13 @@ func (ts *ToolStore) PatchTool(
 		return nil, err
 	}
 	if isBI {
-		tool, err := ts.builtinData.SetToolEnabled(ctx,
+		_, err := ts.builtinData.SetToolEnabled(ctx,
 			bundle.ID, req.ToolSlug, req.Version, req.Body.IsEnabled,
 		)
 		if err != nil {
 			return nil, err
 		}
-		if ts.fts != nil {
-			if err := fts.ReindexOneBuiltInTool(ctx, bundle.ID, bundle.Slug, tool, ts.fts); err != nil {
-				slog.Warn("builtin-fts reindex(one) failed",
-					"bundleID", bundle.ID, "toolID", tool.ID, "err", err)
-			}
-		}
+
 		slog.Info("patchTool (builtin)", "bundleID", req.BundleID, "slug", req.ToolSlug,
 			"ver", req.Version, "enabled", req.Body.IsEnabled)
 		return &spec.PatchToolResponse{}, nil
@@ -1009,126 +976,6 @@ func (ts *ToolStore) ListTools(
 	}, nil
 }
 
-// SearchTools executes a full-text query via FTS.
-func (ts *ToolStore) SearchTools(
-	ctx context.Context, req *spec.SearchToolsRequest,
-) (*spec.SearchToolsResponse, error) {
-	if req == nil || req.Query == "" {
-		return nil, fmt.Errorf("%w: query required", spec.ErrInvalidRequest)
-	}
-	if ts.fts == nil {
-		return nil, spec.ErrFTSDisabled
-	}
-
-	pageSize := defPageSizeTools
-	if req.PageSize > 0 && req.PageSize <= maxPageSizeTools {
-		pageSize = req.PageSize
-	}
-	searchPageSize := pageSize * 2 // Over-fetch to compensate filtering.
-
-	hits, next, err := ts.fts.Search(ctx, req.Query, req.PageToken, searchPageSize)
-	if err != nil {
-		return nil, err
-	}
-
-	items := make([]spec.ToolListItem, 0, len(hits))
-	for _, h := range hits {
-		// Built-in?
-		if strings.HasPrefix(h.ID, fts.BuiltInDocPrefix) {
-			if ts.builtinData == nil {
-				continue
-			}
-			rel := strings.TrimPrefix(h.ID, fts.BuiltInDocPrefix)
-			dir := filepath.Dir(rel)
-			file := filepath.Base(rel)
-
-			bdi, err := bundleitemutils.ParseBundleDir(dir)
-			if err != nil {
-				continue
-			}
-			finf, err := bundleitemutils.ParseItemFileName(file)
-			if err != nil {
-				continue
-			}
-			bundle, err := ts.builtinData.GetBuiltInToolBundle(ctx, bdi.ID)
-			if err != nil {
-				continue
-			}
-			t, err := ts.builtinData.GetBuiltInTool(ctx, bdi.ID, finf.Slug, finf.Version)
-			if err != nil {
-				continue
-			}
-			if !req.IncludeDisabled && (!t.IsEnabled || !bundle.IsEnabled) {
-				continue
-			}
-			items = append(items, spec.ToolListItem{
-				BundleID:       bdi.ID,
-				BundleSlug:     bdi.Slug,
-				ToolSlug:       t.Slug,
-				ToolVersion:    t.Version,
-				IsBuiltIn:      true,
-				ToolDefinition: t,
-			})
-			if len(items) >= pageSize {
-				break
-			}
-			continue
-		}
-
-		// User-tool.
-		dir := filepath.Base(filepath.Dir(h.ID))
-		bdi, err := bundleitemutils.ParseBundleDir(dir)
-		if err != nil {
-			continue
-		}
-		bundle, _, err := ts.getAnyBundle(ctx, bdi.ID)
-		if err != nil {
-			continue
-		}
-		fn := filepath.Base(h.ID)
-		_, err = bundleitemutils.ParseItemFileName(fn)
-		if err != nil {
-			continue
-		}
-
-		raw, err := ts.toolStore.GetFileData(
-			bundleitemutils.GetBundlePartitionFileKey(fn, dir), false,
-		)
-		if err != nil {
-			continue
-		}
-		var t spec.Tool
-		if err := jsonencdec.MapToStructWithJSONTags(raw, &t); err != nil {
-			continue
-		}
-		if !req.IncludeDisabled && (!t.IsEnabled || !bundle.IsEnabled) {
-			continue
-		}
-		items = append(items, spec.ToolListItem{
-			BundleID:       bdi.ID,
-			BundleSlug:     bdi.Slug,
-			ToolSlug:       t.Slug,
-			ToolVersion:    t.Version,
-			IsBuiltIn:      false,
-			ToolDefinition: t,
-		})
-		if len(items) >= pageSize {
-			break
-		}
-	}
-
-	if len(items) < pageSize {
-		next = ""
-	}
-
-	return &spec.SearchToolsResponse{
-		Body: &spec.SearchToolsResponseBody{
-			ToolListItems: items,
-			NextPageToken: nullableStr(next),
-		},
-	}, nil
-}
-
 // findTool locates (slug, version) inside the given bundle directory.
 func (ts *ToolStore) findTool(
 	bdi bundleitemutils.BundleDirInfo,
@@ -1288,12 +1135,4 @@ func (ts *ToolStore) writeAllBundles(ab spec.AllBundles) error {
 // isSoftDeletedTool returns true if bundle is in soft-deleted state.
 func isSoftDeletedTool(b spec.ToolBundle) bool {
 	return b.SoftDeletedAt != nil && !b.SoftDeletedAt.IsZero()
-}
-
-// nullableStr returns &s unless s=="" in which case it returns nil.
-func nullableStr(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
 }

@@ -84,12 +84,4 @@ func InitPromptTemplateStoreHandlers(api huma.API, store *PromptTemplateStore) {
 		Summary:     "List all prompt templates (global, with filters)",
 		Tags:        []string{tag},
 	}, store.ListPromptTemplates)
-
-	huma.Register(api, huma.Operation{
-		OperationID: "search-prompt-templates",
-		Method:      http.MethodGet,
-		Path:        pathPrefix + "/templates/search",
-		Summary:     "Full-text search for prompt templates",
-		Tags:        []string{tag},
-	}, store.SearchPromptTemplates)
 }

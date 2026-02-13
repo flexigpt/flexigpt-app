@@ -475,40 +475,6 @@ func TestTemplatePagination(t *testing.T) {
 	}
 }
 
-func TestSearchTemplates(t *testing.T) {
-	s, clean := newTestStoreWithFTS(t)
-	defer clean()
-
-	mustPutBundle(t, s, "ub1", "slug", "bundle", true)
-	mustPutTemplate(t, s, "ub1", "hello", "v1", "hello", true, "greet")
-	mustPutTemplate(t, s, "ub1", "bye", "v1", "bye", true, "farewell")
-
-	time.Sleep(150 * time.Millisecond) // allow async index flush
-
-	resp, err := s.SearchPromptTemplates(t.Context(), &spec.SearchPromptTemplatesRequest{
-		Query: "hello",
-	})
-	if err != nil {
-		t.Fatalf("search failed: %v", err)
-	}
-	if len(resp.Body.PromptTemplateListItems) < 1 {
-		t.Fatalf("expected at least one hit")
-	}
-}
-
-func TestSearchWithoutEngine(t *testing.T) {
-	s, clean := newTestStore(t)
-	defer clean()
-
-	if _, err := s.SearchPromptTemplates(t.Context(), &spec.SearchPromptTemplatesRequest{
-		Query: "x",
-	}); !errors.Is(err, spec.ErrFTSDisabled) {
-		t.Fatalf("expected ErrFTSDisabled, got %v", err)
-	}
-}
-
-/*  E.  Misc                                                             */
-
 func TestSoftDeleteBehaviour(t *testing.T) {
 	s, clean := newTestStore(t)
 	defer clean()
@@ -613,91 +579,6 @@ func TestSlugVersionValidation(t *testing.T) {
 	}
 }
 
-// Search & built-ins.
-func TestSearchFindsBuiltIn(t *testing.T) {
-	s, clean := newTestStoreWithFTS(t)
-	defer clean()
-
-	bid, slug, ver, ok := firstBuiltIn(t, s)
-	if !ok {
-		t.Skip("library compiled without built-in catalogue")
-	}
-
-	// Allow the asynchronous FTS rebuild to finish.
-	time.Sleep(200 * time.Millisecond)
-
-	resp, err := s.SearchPromptTemplates(t.Context(), &spec.SearchPromptTemplatesRequest{
-		Query: string(slug), // search by slug (always indexed)
-	})
-	if err != nil {
-		t.Fatalf("search failed: %v", err)
-	}
-
-	found := false
-	for _, it := range resp.Body.PromptTemplateListItems {
-		if it.IsBuiltIn &&
-			it.BundleID == bid &&
-			it.TemplateSlug == slug &&
-			it.TemplateVersion == ver {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("built-in template %s/%s/%s not returned by search", bid, slug, ver)
-	}
-}
-
-func TestSearchRespectsBuiltInEnableDisable(t *testing.T) {
-	s, clean := newTestStoreWithFTS(t)
-	defer clean()
-
-	bid, slug, _, ok := firstBuiltIn(t, s)
-	if !ok {
-		t.Skip("library compiled without built-in catalogue")
-	}
-
-	// Make sure everything is indexed first.
-	time.Sleep(200 * time.Millisecond)
-
-	// Disable the entire bundle - it must disappear from default search results (IncludeDisabled = false).
-	_, err := s.PatchPromptBundle(t.Context(), &spec.PatchPromptBundleRequest{
-		BundleID: bid,
-		Body: &spec.PatchPromptBundleRequestBody{
-			IsEnabled: false,
-		},
-	})
-	if err != nil {
-		t.Fatalf("disabling built-in bundle failed: %v", err)
-	}
-
-	// Wait for the background re-index to flush.
-	time.Sleep(150 * time.Millisecond)
-
-	resp, err := s.SearchPromptTemplates(t.Context(), &spec.SearchPromptTemplatesRequest{
-		Query:           string(slug),
-		IncludeDisabled: false,
-	})
-	if err != nil {
-		t.Fatalf("search failed: %v", err)
-	}
-	if len(resp.Body.PromptTemplateListItems) != 0 {
-		t.Fatalf("disabled built-in bundle still appears in search results")
-	}
-
-	// With IncludeDisabled = true the hit must show up again.
-	resp, err = s.SearchPromptTemplates(t.Context(), &spec.SearchPromptTemplatesRequest{
-		Query:           string(slug),
-		IncludeDisabled: true,
-	})
-	if err != nil {
-		t.Fatalf("search (includeDisabled) failed: %v", err)
-	}
-	if len(resp.Body.PromptTemplateListItems) == 0 {
-		t.Fatalf("expected built-in hit when IncludeDisabled=true")
-	}
-}
-
 // builtinStatistics returns how many built-in bundles / templates are embedded
 // in the library.  The helper is used to keep assertions robust, independent
 // from the actual catalogue size.
@@ -789,17 +670,6 @@ func mustPutBundle(
 	if err != nil {
 		t.Fatalf("PutPromptBundle() failed: %v", err)
 	}
-}
-
-func newTestStoreWithFTS(t *testing.T) (s *PromptTemplateStore, cleanup func()) {
-	t.Helper()
-
-	dir := t.TempDir()
-	s, err := NewPromptTemplateStore(dir, WithFTS(true))
-	if err != nil {
-		t.Fatalf("NewPromptTemplateStore(FTS) failed: %v", err)
-	}
-	return s, func() { s.Close(); _ = os.RemoveAll(dir) }
 }
 
 // newTestStore creates a store rooted in a temporary directory and returns a

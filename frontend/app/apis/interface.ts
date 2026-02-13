@@ -90,14 +90,6 @@ export interface IPromptStoreAPI {
 		pageToken?: string
 	): Promise<{ promptTemplateListItems: PromptTemplateListItem[]; nextPageToken?: string }>;
 
-	/** Search templates by query. */
-	searchPromptTemplates(
-		query: string,
-		pageToken?: string,
-		pageSize?: number,
-		includeDisabled?: boolean
-	): Promise<{ promptTemplateListItems: PromptTemplateListItem[]; nextPageToken?: string }>;
-
 	/** Create or update a template. */
 	putPromptTemplate(
 		bundleID: string,
@@ -185,14 +177,6 @@ export interface IToolStoreAPI {
 		includeDisabled?: boolean,
 		recommendedPageSize?: number,
 		pageToken?: string
-	): Promise<{ toolListItems: ToolListItem[]; nextPageToken?: string }>;
-
-	/** Search tools by query. */
-	searchTools(
-		query: string,
-		pageToken?: string,
-		pageSize?: number,
-		includeDisabled?: boolean
 	): Promise<{ toolListItems: ToolListItem[]; nextPageToken?: string }>;
 
 	/** Create or update a tool. */

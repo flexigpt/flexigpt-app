@@ -1,6 +1,5 @@
 // Package store implements the prompt template storage and management logic.
-// It provides CRUD operations for prompt bundles and templates, supports soft deletion,
-// background cleanup, and optional full-text search (FTS) integration.
+// It provides CRUD operations for prompt bundles and templates, supports soft deletion, and background cleanup.
 package store
 
 import (
@@ -18,11 +17,9 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/prompt/fts"
 	"github.com/flexigpt/flexigpt-app/internal/prompt/spec"
 	"github.com/ppipada/mapstore-go"
 
-	"github.com/ppipada/mapstore-go/ftsengine"
 	"github.com/ppipada/mapstore-go/jsonencdec"
 	"github.com/ppipada/mapstore-go/uuidv7filename"
 )
@@ -37,16 +34,13 @@ const (
 )
 
 // PromptTemplateStore is the main store for prompt bundles and templates.
-// It manages bundle and template CRUD, soft deletion, background cleanup, and FTS integration.
+// It manages bundle and template CRUD, soft deletion, background cleanup.
 type PromptTemplateStore struct {
 	baseDir       string
 	builtinData   *BuiltInData
 	bundleStore   *mapstore.MapFileStore
 	templateStore *mapstore.MapDirectoryStore
 	pp            mapstore.PartitionProvider
-
-	enableFTS bool
-	fts       *ftsengine.Engine
 
 	cleanOnce sync.Once
 	cleanKick chan struct{}
@@ -63,16 +57,6 @@ type PromptTemplateStore struct {
 // Option is a functional option for PromptTemplateStore.
 type Option func(*PromptTemplateStore) error
 
-// WithFTS enables or disables FTS integration for the store.
-func WithFTS(enabled bool) Option {
-	return func(s *PromptTemplateStore) error {
-		s.enableFTS = enabled
-		return nil
-	}
-}
-
-// NewPromptTemplateStore creates a new PromptTemplateStore at the given base directory.
-// It applies any provided options (e.g., enabling FTS).
 func NewPromptTemplateStore(baseDir string, opts ...Option) (*PromptTemplateStore, error) {
 	s := &PromptTemplateStore{
 		baseDir: filepath.Clean(baseDir),
@@ -109,27 +93,8 @@ func NewPromptTemplateStore(baseDir string, opts ...Option) (*PromptTemplateStor
 		return nil, err
 	}
 
-	// Initialize FTS engine if enabled.
-	if s.enableFTS {
-		var lister fts.BuiltInLister
-		if s.builtinData != nil {
-			lister = s.builtinData.ListBuiltInData
-		}
-		s.fts, err = fts.InitFTSListeners(
-			s.baseDir,
-			lister,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-	}
-
 	// Initialize template directory store (per-bundle folder).
 	dirOpts := []mapstore.DirOption{mapstore.WithDirLogger(slog.Default())}
-	if s.fts != nil {
-		dirOpts = append(dirOpts, mapstore.WithDirFileListeners(fts.NewUserPromptsFTSListener(s.fts)))
-	}
 	s.templateStore, err = mapstore.NewMapDirectoryStore(
 		s.baseDir,
 		true,
@@ -142,7 +107,7 @@ func NewPromptTemplateStore(baseDir string, opts ...Option) (*PromptTemplateStor
 
 	s.slugLock = newSlugLocks()
 	s.startCleanupLoop()
-	slog.Info("prompt-store ready", "baseDir", s.baseDir, "fts", s.enableFTS)
+	slog.Info("prompt-store ready", "baseDir", s.baseDir)
 	return s, nil
 }
 
@@ -626,7 +591,7 @@ func (s *PromptTemplateStore) PatchPromptTemplate(
 		return nil, err
 	}
 	if isBuiltIn {
-		tpl, err := s.builtinData.SetTemplateEnabled(
+		_, err := s.builtinData.SetTemplateEnabled(
 			ctx,
 			bundle.ID,
 			req.TemplateSlug,
@@ -636,21 +601,7 @@ func (s *PromptTemplateStore) PatchPromptTemplate(
 		if err != nil {
 			return nil, err
 		}
-		if s.fts != nil {
-			if err := fts.ReindexOneBuiltIn(
-				ctx, bundle.ID, bundle.Slug, tpl, s.fts,
-			); err != nil {
-				slog.Warn(
-					"builtin-fts reindex(one) failed",
-					"bundleId",
-					bundle.ID,
-					"templateId",
-					tpl.ID,
-					"err",
-					err,
-				)
-			}
-		}
+
 		slog.Info(
 			"patchPromptTemplate",
 			"bundleId",
@@ -963,139 +914,6 @@ func needMorePages(dirTok string, scannedUsers bool) bool {
 	}
 	// Otherwise we are done.
 	return false
-}
-
-// SearchPromptTemplates performs a full-text search for templates using the FTS engine.
-func (s *PromptTemplateStore) SearchPromptTemplates(
-	ctx context.Context, req *spec.SearchPromptTemplatesRequest,
-) (*spec.SearchPromptTemplatesResponse, error) {
-	if req == nil || req.Query == "" {
-		return nil, fmt.Errorf("%w: query required", spec.ErrInvalidRequest)
-	}
-	if s.fts == nil {
-		return nil, spec.ErrFTSDisabled
-	}
-
-	pageSize := defaultPageSize
-	if req.PageSize > 0 && req.PageSize <= maxPageSize {
-		pageSize = req.PageSize
-	}
-
-	// Fetch more results to account for filtering.
-	searchPageSize := pageSize * 2
-	hits, next, err := s.fts.Search(ctx, req.Query, req.PageToken, searchPageSize)
-	if err != nil {
-		return nil, err
-	}
-
-	items := make([]spec.PromptTemplateListItem, 0, len(hits))
-	for _, h := range hits {
-		if strings.HasPrefix(h.ID, fts.BuiltInDocPrefix) {
-			if s.builtinData == nil {
-				continue
-			}
-			rel := strings.TrimPrefix(h.ID, fts.BuiltInDocPrefix)
-			dir := filepath.Dir(rel)
-			file := filepath.Base(rel)
-
-			bdi, err := bundleitemutils.ParseBundleDir(dir)
-			if err != nil {
-				continue
-			}
-			finf, err := bundleitemutils.ParseItemFileName(file)
-			if err != nil {
-				continue
-			}
-			bundle, err := s.builtinData.GetBuiltInBundle(ctx, bdi.ID)
-			if err != nil {
-				continue
-			}
-			pt, err := s.builtinData.GetBuiltInTemplate(
-				ctx,
-				bdi.ID, finf.Slug, finf.Version,
-			)
-			if err != nil {
-				continue
-			}
-			if !req.IncludeDisabled && (!pt.IsEnabled || !bundle.IsEnabled) {
-				continue
-			}
-
-			items = append(items, spec.PromptTemplateListItem{
-				BundleID:        bdi.ID,
-				BundleSlug:      bdi.Slug,
-				TemplateSlug:    finf.Slug,
-				TemplateVersion: finf.Version,
-				IsBuiltIn:       true,
-			})
-			if len(items) >= pageSize {
-				break
-			}
-			continue // done, next hit
-		}
-
-		dir := filepath.Base(filepath.Dir(h.ID))
-		bdi, err := bundleitemutils.ParseBundleDir(dir)
-		if err != nil {
-			continue
-		}
-		bid := bdi.ID
-		bslug := bdi.Slug
-
-		bundle, _, err := s.getAnyBundle(ctx, bid)
-		if err != nil {
-			continue
-		}
-
-		fn := filepath.Base(h.ID)
-		finf, err := bundleitemutils.ParseItemFileName(fn)
-		if err != nil {
-			continue
-		}
-		tslug := finf.Slug
-		tver := finf.Version
-
-		raw, err := s.templateStore.GetFileData(
-			bundleitemutils.GetBundlePartitionFileKey(fn, dir),
-			false,
-		)
-		if err != nil {
-			continue
-		}
-		var pt spec.PromptTemplate
-		if err := jsonencdec.MapToStructWithJSONTags(raw, &pt); err != nil {
-			continue
-		}
-
-		if !req.IncludeDisabled && (!pt.IsEnabled || !bundle.IsEnabled) {
-			continue
-		}
-
-		items = append(items, spec.PromptTemplateListItem{
-			BundleID:        bid,
-			BundleSlug:      bslug,
-			TemplateSlug:    tslug,
-			TemplateVersion: tver,
-			IsBuiltIn:       false,
-		})
-
-		// Stop when we have enough results.
-		if len(items) >= pageSize {
-			break
-		}
-	}
-
-	// Adjust next page token if we have fewer results than requested.
-	if len(items) < pageSize {
-		next = ""
-	}
-
-	return &spec.SearchPromptTemplatesResponse{
-		Body: &spec.SearchPromptTemplatesResponseBody{
-			PromptTemplateListItems: items,
-			NextPageToken:           nullableStr(next),
-		},
-	}, nil
 }
 
 // findTemplate locates a template file by bundle-dir, slug **and** version.

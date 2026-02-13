@@ -41,7 +41,3 @@ export function PutTool(arg1) {
 export function PutToolBundle(arg1) {
   return window['go']['main']['ToolStoreWrapper']['PutToolBundle'](arg1);
 }
-
-export function SearchTools(arg1) {
-  return window['go']['main']['ToolStoreWrapper']['SearchTools'](arg1);
-}

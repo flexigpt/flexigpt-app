@@ -465,7 +465,7 @@ func TestInvokeTool(t *testing.T) {
 			defer srv.Close()
 
 			baseDir := t.TempDir()
-			ts, err := NewToolStore(baseDir, WithFTS(false))
+			ts, err := NewToolStore(baseDir)
 			if err != nil {
 				t.Fatalf("NewToolStore: %v", err)
 			}
@@ -578,7 +578,7 @@ func TestInvokeTool_InvalidRequest(t *testing.T) {
 	t.Parallel()
 
 	baseDir := t.TempDir()
-	ts, err := NewToolStore(baseDir, WithFTS(false))
+	ts, err := NewToolStore(baseDir)
 	if err != nil {
 		t.Fatalf("NewToolStore: %v", err)
 	}
@@ -626,7 +626,7 @@ func TestInvokeTool_RequestBodyTemplating_PathQueryHeaderAuth(t *testing.T) {
 	defer srv.Close()
 
 	baseDir := t.TempDir()
-	ts, err := NewToolStore(baseDir, WithFTS(false))
+	ts, err := NewToolStore(baseDir)
 	if err != nil {
 		t.Fatalf("NewToolStore: %v", err)
 	}
@@ -1085,7 +1085,7 @@ func TestInvokeGoCustomRegistered(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			baseDir := t.TempDir()
-			ts, err := NewToolStore(baseDir, WithFTS(false))
+			ts, err := NewToolStore(baseDir)
 			if err != nil {
 				t.Fatalf("NewToolStore: %v", err)
 			}
@@ -1314,7 +1314,7 @@ func TestInvokeTool_Go_BuiltIns(t *testing.T) {
 			t.Parallel()
 
 			baseDir := t.TempDir()
-			ts, err := NewToolStore(baseDir, WithFTS(false))
+			ts, err := NewToolStore(baseDir)
 			if err != nil {
 				t.Fatalf("NewToolStore: %v", err)
 			}

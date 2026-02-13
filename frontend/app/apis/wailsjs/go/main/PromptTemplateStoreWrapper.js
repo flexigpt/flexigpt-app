@@ -37,7 +37,3 @@ export function PutPromptBundle(arg1) {
 export function PutPromptTemplate(arg1) {
   return window['go']['main']['PromptTemplateStoreWrapper']['PutPromptTemplate'](arg1);
 }
-
-export function SearchPromptTemplates(arg1) {
-  return window['go']['main']['PromptTemplateStoreWrapper']['SearchPromptTemplates'](arg1);
-}

@@ -153,7 +153,6 @@ func (a *BackendApp) initPromptTemplateStore() {
 
 	ps, err := promptStore.NewPromptTemplateStore(
 		a.promptsDirPath,
-		promptStore.WithFTS(true),
 	)
 	if err != nil {
 		slog.Error(
@@ -179,7 +178,6 @@ func (a *BackendApp) initToolStore() {
 
 	ps, err := toolStore.NewToolStore(
 		a.toolsDirPath,
-		toolStore.WithFTS(true),
 	)
 	if err != nil {
 		slog.Error(

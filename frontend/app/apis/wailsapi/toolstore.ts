@@ -23,7 +23,6 @@ import {
 	PatchToolBundle,
 	PutTool,
 	PutToolBundle,
-	SearchTools,
 } from '@/apis/wailsjs/go/main/ToolStoreWrapper';
 import type { spec } from '@/apis/wailsjs/go/models';
 
@@ -98,25 +97,6 @@ export class WailsToolStoreAPI implements IToolStoreAPI {
 			PageToken: pageToken,
 		};
 		const resp = await ListTools(req as spec.ListToolsRequest);
-		return {
-			toolListItems: (resp.Body?.toolListItems ?? []) as ToolListItem[],
-			nextPageToken: resp.Body?.nextPageToken ?? undefined,
-		};
-	}
-
-	async searchTools(
-		query: string,
-		pageToken?: string,
-		pageSize?: number,
-		includeDisabled?: boolean
-	): Promise<{ toolListItems: ToolListItem[]; nextPageToken?: string }> {
-		const req = {
-			Query: query,
-			PageToken: pageToken,
-			PageSize: pageSize,
-			IncludeDisabled: includeDisabled,
-		};
-		const resp = await SearchTools(req as spec.SearchToolsRequest);
 		return {
 			toolListItems: (resp.Body?.toolListItems ?? []) as ToolListItem[],
 			nextPageToken: resp.Body?.nextPageToken ?? undefined,

@@ -11,7 +11,6 @@ import {
 	PatchPromptTemplate,
 	PutPromptBundle,
 	PutPromptTemplate,
-	SearchPromptTemplates,
 } from '@/apis/wailsjs/go/main/PromptTemplateStoreWrapper';
 import type { spec } from '@/apis/wailsjs/go/models';
 
@@ -86,25 +85,6 @@ export class WailsPromptStoreAPI implements IPromptStoreAPI {
 			PageToken: pageToken,
 		};
 		const resp = await ListPromptTemplates(req as spec.ListPromptTemplatesRequest);
-		return {
-			promptTemplateListItems: (resp.Body?.promptTemplateListItems ?? []) as PromptTemplateListItem[],
-			nextPageToken: resp.Body?.nextPageToken ?? undefined,
-		};
-	}
-
-	async searchPromptTemplates(
-		query: string,
-		pageToken?: string,
-		pageSize?: number,
-		includeDisabled?: boolean
-	): Promise<{ promptTemplateListItems: PromptTemplateListItem[]; nextPageToken?: string }> {
-		const req = {
-			Query: query,
-			PageToken: pageToken,
-			PageSize: pageSize,
-			IncludeDisabled: includeDisabled,
-		};
-		const resp = await SearchPromptTemplates(req as spec.SearchPromptTemplatesRequest);
 		return {
 			promptTemplateListItems: (resp.Body?.promptTemplateListItems ?? []) as PromptTemplateListItem[],
 			nextPageToken: resp.Body?.nextPageToken ?? undefined,

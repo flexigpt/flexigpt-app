@@ -149,21 +149,6 @@ type ListToolsResponse struct {
 	Body *ListToolsResponseBody
 }
 
-type SearchToolsRequest struct {
-	Query           string `query:"q"               required:"true"`
-	PageToken       string `query:"pageToken"`
-	PageSize        int    `query:"pageSize"`
-	IncludeDisabled bool   `query:"includeDisabled"`
-}
-
-type SearchToolsResponseBody struct {
-	ToolListItems []ToolListItem `json:"toolListItems"`
-	NextPageToken *string        `json:"nextPageToken,omitempty"`
-}
-type SearchToolsResponse struct {
-	Body *SearchToolsResponseBody
-}
-
 // InvokeHTTPOptions contains options specific to HTTP tool invocations.
 // These are part of the HTTP request body.
 type InvokeHTTPOptions struct {

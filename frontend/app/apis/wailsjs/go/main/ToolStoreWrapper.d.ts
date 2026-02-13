@@ -21,5 +21,3 @@ export function PatchToolBundle(arg1:spec.PatchToolBundleRequest):Promise<spec.P
 export function PutTool(arg1:spec.PutToolRequest):Promise<spec.PutToolResponse>;
 
 export function PutToolBundle(arg1:spec.PutToolBundleRequest):Promise<spec.PutToolBundleResponse>;
-
-export function SearchTools(arg1:spec.SearchToolsRequest):Promise<spec.SearchToolsResponse>;

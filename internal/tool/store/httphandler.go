@@ -92,12 +92,4 @@ func InitToolStoreHandlers(api huma.API, store *ToolStore) {
 		Summary:     "List all tools (global, with filters)",
 		Tags:        []string{toolTag},
 	}, store.ListTools)
-
-	huma.Register(api, huma.Operation{
-		OperationID: "search-tools",
-		Method:      http.MethodGet,
-		Path:        toolPathPrefix + "/tools/search",
-		Summary:     "Full-text search for tools",
-		Tags:        []string{toolTag},
-	}, store.SearchTools)
 }
