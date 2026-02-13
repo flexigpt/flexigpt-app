@@ -2875,13 +2875,13 @@ export namespace spec {
 		}
 	}
 	
-	export class ToolStoreOutputFile {
+	export class ToolOutputFile {
 	    fileName: string;
 	    fileMIME: string;
 	    fileData: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new ToolStoreOutputFile(source);
+	        return new ToolOutputFile(source);
 	    }
 	
 	    constructor(source: any = {}) {
@@ -2891,14 +2891,14 @@ export namespace spec {
 	        this.fileData = source["fileData"];
 	    }
 	}
-	export class ToolStoreOutputImage {
+	export class ToolOutputImage {
 	    detail: string;
 	    imageName: string;
 	    imageMIME: string;
 	    imageData: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new ToolStoreOutputImage(source);
+	        return new ToolOutputImage(source);
 	    }
 	
 	    constructor(source: any = {}) {
@@ -2909,11 +2909,11 @@ export namespace spec {
 	        this.imageData = source["imageData"];
 	    }
 	}
-	export class ToolStoreOutputText {
+	export class ToolOutputText {
 	    text: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new ToolStoreOutputText(source);
+	        return new ToolOutputText(source);
 	    }
 	
 	    constructor(source: any = {}) {
@@ -2921,22 +2921,22 @@ export namespace spec {
 	        this.text = source["text"];
 	    }
 	}
-	export class ToolStoreOutputUnion {
+	export class ToolOutputUnion {
 	    kind: string;
-	    textItem?: ToolStoreOutputText;
-	    imageItem?: ToolStoreOutputImage;
-	    fileItem?: ToolStoreOutputFile;
+	    textItem?: ToolOutputText;
+	    imageItem?: ToolOutputImage;
+	    fileItem?: ToolOutputFile;
 	
 	    static createFrom(source: any = {}) {
-	        return new ToolStoreOutputUnion(source);
+	        return new ToolOutputUnion(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.kind = source["kind"];
-	        this.textItem = this.convertValues(source["textItem"], ToolStoreOutputText);
-	        this.imageItem = this.convertValues(source["imageItem"], ToolStoreOutputImage);
-	        this.fileItem = this.convertValues(source["fileItem"], ToolStoreOutputFile);
+	        this.textItem = this.convertValues(source["textItem"], ToolOutputText);
+	        this.imageItem = this.convertValues(source["imageItem"], ToolOutputImage);
+	        this.fileItem = this.convertValues(source["fileItem"], ToolOutputFile);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2958,7 +2958,7 @@ export namespace spec {
 		}
 	}
 	export class InvokeToolResponseBody {
-	    outputs?: ToolStoreOutputUnion[];
+	    outputs?: ToolOutputUnion[];
 	    meta?: Record<string, any>;
 	    isBuiltIn: boolean;
 	    isError: boolean;
@@ -2970,7 +2970,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.outputs = this.convertValues(source["outputs"], ToolStoreOutputUnion);
+	        this.outputs = this.convertValues(source["outputs"], ToolOutputUnion);
 	        this.meta = source["meta"];
 	        this.isBuiltIn = source["isBuiltIn"];
 	        this.isError = source["isError"];

@@ -1,4 +1,4 @@
-import type { ToolStoreChoice, ToolStoreChoiceType, ToolStoreOutputUnion } from '@/spec/tool';
+import type { ToolOutputUnion, ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
 export type ProviderName = string;
 export enum ProviderSDKType {
@@ -464,7 +464,7 @@ export interface UIToolOutput {
 
 	/** Short human-readable label used in chips. */
 	summary: string;
-	toolStoreOutputs?: ToolStoreOutputUnion[];
+	toolOutputs?: ToolOutputUnion[];
 	webSearchToolOutputItems?: WebSearchToolOutputItemUnion[];
 
 	isError?: boolean;

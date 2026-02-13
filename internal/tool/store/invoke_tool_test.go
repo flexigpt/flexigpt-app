@@ -810,15 +810,15 @@ func TestInvokeGoCustomRegistered(t *testing.T) {
 				type Args struct {
 					N int `json:"n"`
 				}
-				fn := func(ctx context.Context, a Args) ([]llmtoolsgoSpec.ToolStoreOutputUnion, error) {
+				fn := func(ctx context.Context, a Args) ([]llmtoolsgoSpec.ToolOutputUnion, error) {
 					if a.N <= 0 {
 						a.N = 1
 					}
-					var outs []llmtoolsgoSpec.ToolStoreOutputUnion
+					var outs []llmtoolsgoSpec.ToolOutputUnion
 					for i := 0; i < a.N; i++ {
-						outs = append(outs, llmtoolsgoSpec.ToolStoreOutputUnion{
-							Kind: llmtoolsgoSpec.ToolStoreOutputKindText,
-							TextItem: &llmtoolsgoSpec.ToolStoreOutputText{
+						outs = append(outs, llmtoolsgoSpec.ToolOutputUnion{
+							Kind: llmtoolsgoSpec.ToolOutputKindText,
+							TextItem: &llmtoolsgoSpec.ToolOutputText{
 								Text: fmt.Sprintf("item-%d", i),
 							},
 						})
@@ -1438,7 +1438,7 @@ func getOneTextOutput(t *testing.T, respBody *spec.InvokeToolResponseBody) strin
 	return outputs[0].TextItem.Text
 }
 
-func getOneFileOutput(t *testing.T, respBody *spec.InvokeToolResponseBody) *spec.ToolStoreOutputFile {
+func getOneFileOutput(t *testing.T, respBody *spec.InvokeToolResponseBody) *llmtoolsgoSpec.ToolOutputFile {
 	t.Helper()
 	outputs := respBody.Outputs
 	if len(outputs) != 1 || outputs[0].FileItem == nil {
@@ -1447,7 +1447,7 @@ func getOneFileOutput(t *testing.T, respBody *spec.InvokeToolResponseBody) *spec
 	return outputs[0].FileItem
 }
 
-func getOneImageOutput(t *testing.T, respBody *spec.InvokeToolResponseBody) *spec.ToolStoreOutputImage {
+func getOneImageOutput(t *testing.T, respBody *spec.InvokeToolResponseBody) *llmtoolsgoSpec.ToolOutputImage {
 	t.Helper()
 	outputs := respBody.Outputs
 	if len(outputs) != 1 || outputs[0].ImageItem == nil {
@@ -1487,7 +1487,7 @@ func registerTypedAsTextInDefault[T, R any](
 
 func registerOutputsToolInDefault[T any](
 	t *testing.T, nameSuffix string, argSchema llmtoolsgoSpec.JSONSchema,
-	fn func(context.Context, T) ([]llmtoolsgoSpec.ToolStoreOutputUnion, error),
+	fn func(context.Context, T) ([]llmtoolsgoSpec.ToolOutputUnion, error),
 ) string {
 	t.Helper()
 	slug := sanitizeID(nameSuffix)

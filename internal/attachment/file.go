@@ -210,7 +210,7 @@ func (ref *FileRef) getTextFileContent(
 	if err != nil {
 		return nil, err
 	}
-	if len(toolOut) == 0 || toolOut[0].Kind != llmtoolsgoSpec.ToolStoreOutputKindText ||
+	if len(toolOut) == 0 || toolOut[0].Kind != llmtoolsgoSpec.ToolOutputKindText ||
 		toolOut[0].TextItem == nil {
 		return nil, ErrUnreadableFile
 	}
@@ -238,7 +238,7 @@ func (ref *FileRef) getBinaryFileContent(
 	if err != nil {
 		return nil, err
 	}
-	if len(toolOut) == 0 || toolOut[0].Kind != llmtoolsgoSpec.ToolStoreOutputKindFile ||
+	if len(toolOut) == 0 || toolOut[0].Kind != llmtoolsgoSpec.ToolOutputKindFile ||
 		toolOut[0].FileItem == nil {
 		return nil, ErrUnreadableFile
 	}

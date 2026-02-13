@@ -37,7 +37,7 @@ import type { EditorSubmitPayload } from '@/chats/inputarea/input_editor_utils';
 import {
 	collectToolCallsFromInputs,
 	collectToolCallsFromOutputs,
-	mapToolStoreOutputsToToolOutputItems,
+	mapToolOutputsToToolOutputItems,
 } from '@/chats/tools/tool_editor_utils';
 
 export function initConversation(title = 'New Conversation'): Conversation {
@@ -162,7 +162,7 @@ export function buildUserConversationMessageFromEditor(
 
 function buildToolOutputFromEditor(ui: UIToolOutput): ToolOutput | undefined {
 	// Support function, custom and web-search tool outputs.
-	// For web-search outputs we only round‑trip the textual/toolStoreOutputs
+	// For web-search outputs we only round‑trip the textual/toolOutputs
 	// representation and do not attempt to reconstruct provider‑specific metadata.
 	if (
 		ui.type !== ToolStoreChoiceType.Function &&
@@ -172,7 +172,7 @@ function buildToolOutputFromEditor(ui: UIToolOutput): ToolOutput | undefined {
 		return undefined;
 	}
 
-	const contents = mapToolStoreOutputsToToolOutputItems(ui.toolStoreOutputs);
+	const contents = mapToolOutputsToToolOutputItems(ui.toolOutputs);
 
 	return {
 		type: ui.type as unknown as ToolType,

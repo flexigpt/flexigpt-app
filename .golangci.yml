@@ -1,4 +1,4 @@
-# All linters are checked and included either in enable or disable as of v2.8.0 of golangci-lint.
+# All linters are checked and included either in enable or disable as of v2.9.0 of golangci-lint.
 # gofumpt and golines are used as formatters.
 version: "2"
 run:

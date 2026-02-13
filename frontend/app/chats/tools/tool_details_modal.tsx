@@ -11,7 +11,7 @@ import { ModalBackdrop } from '@/components/modal_backdrop';
 
 import { MessageContentCard } from '@/chats/messages/message_content_card';
 import {
-	extractPrimaryTextFromToolStoreOutputs,
+	extractPrimaryTextFromToolOutputs,
 	formatToolCallLabel,
 	formatToolOutputSummary,
 } from '@/chats/tools/tool_editor_utils';
@@ -160,10 +160,10 @@ function buildOutputPrimaryContent(output: UIToolOutput): string {
 
 	let bodyBlock: string | null = null;
 
-	const outputs = output.toolStoreOutputs;
+	const outputs = output.toolOutputs;
 
 	if (outputs && outputs.length > 0) {
-		const primaryText = extractPrimaryTextFromToolStoreOutputs(outputs);
+		const primaryText = extractPrimaryTextFromToolOutputs(outputs);
 
 		if (primaryText) {
 			const raw = primaryText.trim();

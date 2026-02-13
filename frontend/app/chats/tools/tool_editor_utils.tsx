@@ -14,10 +14,10 @@ import {
 } from '@/spec/inference';
 import {
 	type Tool,
+	ToolOutputKind,
+	type ToolOutputUnion,
 	type ToolStoreChoice,
 	ToolStoreChoiceType,
-	ToolStoreOutputKind,
-	type ToolStoreOutputUnion,
 	type UIToolStoreChoice,
 	type UIToolUserArgsStatus,
 } from '@/spec/tool';
@@ -222,11 +222,11 @@ export function formatToolOutputSummary(name: string): string {
 }
 
 // Helper: used for summaries / error messages
-export function extractPrimaryTextFromToolStoreOutputs(outputs?: ToolStoreOutputUnion[]): string | undefined {
+export function extractPrimaryTextFromToolOutputs(outputs?: ToolOutputUnion[]): string | undefined {
 	if (!outputs?.length) return undefined;
 
 	const texts = outputs
-		.filter(o => o.kind === ToolStoreOutputKind.Text && o.textItem?.text)
+		.filter(o => o.kind === ToolOutputKind.Text && o.textItem?.text)
 		.map(o => o.textItem?.text.trim())
 		.filter(Boolean);
 
@@ -446,14 +446,12 @@ function mapImageDetail(detail?: string): ImageDetail | undefined {
 }
 
 /**
- * Map inference ToolOutput.contents -> ToolStoreOutputUnion[]
+ * Map inference ToolOutput.contents -> ToolOutputUnion[]
  */
-export function mapToolOutputItemsToToolStoreOutputs(
-	contents?: ToolOutputItemUnion[]
-): ToolStoreOutputUnion[] | undefined {
+export function mapToolOutputItemsToToolOutputs(contents?: ToolOutputItemUnion[]): ToolOutputUnion[] | undefined {
 	if (!contents?.length) return undefined;
 
-	const outputs: ToolStoreOutputUnion[] = [];
+	const outputs: ToolOutputUnion[] = [];
 
 	for (const item of contents) {
 		switch (item.kind) {
@@ -461,7 +459,7 @@ export function mapToolOutputItemsToToolStoreOutputs(
 				const text = item.textItem?.text;
 				if (text != null) {
 					outputs.push({
-						kind: ToolStoreOutputKind.Text,
+						kind: ToolOutputKind.Text,
 						textItem: { text },
 					});
 				}
@@ -472,7 +470,7 @@ export function mapToolOutputItemsToToolStoreOutputs(
 				const img = item.imageItem;
 				if (img) {
 					outputs.push({
-						kind: ToolStoreOutputKind.Image,
+						kind: ToolOutputKind.Image,
 						imageItem: {
 							detail: (img.detail ?? ImageDetail.Auto) as string,
 							imageName: img.imageName ?? '',
@@ -488,7 +486,7 @@ export function mapToolOutputItemsToToolStoreOutputs(
 				const file = item.fileItem;
 				if (file) {
 					outputs.push({
-						kind: ToolStoreOutputKind.File,
+						kind: ToolOutputKind.File,
 						fileItem: {
 							fileName: file.fileName ?? '',
 							fileMIME: file.fileMIME ?? '',
@@ -509,18 +507,16 @@ export function mapToolOutputItemsToToolStoreOutputs(
 }
 
 /**
- * Map ToolStoreOutputUnion[] -> inference ToolOutputItemUnion[]
+ * Map ToolOutputUnion[] -> inference ToolOutputItemUnion[]
  */
-export function mapToolStoreOutputsToToolOutputItems(
-	outputs?: ToolStoreOutputUnion[]
-): ToolOutputItemUnion[] | undefined {
+export function mapToolOutputsToToolOutputItems(outputs?: ToolOutputUnion[]): ToolOutputItemUnion[] | undefined {
 	if (!outputs?.length) return undefined;
 
 	const contents: ToolOutputItemUnion[] = [];
 
 	for (const out of outputs) {
 		switch (out.kind) {
-			case ToolStoreOutputKind.Text: {
+			case ToolOutputKind.Text: {
 				const text = out.textItem?.text;
 				if (text != null) {
 					contents.push({
@@ -531,7 +527,7 @@ export function mapToolStoreOutputsToToolOutputItems(
 				break;
 			}
 
-			case ToolStoreOutputKind.Image: {
+			case ToolOutputKind.Image: {
 				const img = out.imageItem;
 				if (img) {
 					contents.push({
@@ -547,7 +543,7 @@ export function mapToolStoreOutputsToToolOutputItems(
 				break;
 			}
 
-			case ToolStoreOutputKind.File: {
+			case ToolOutputKind.File: {
 				const file = out.fileItem;
 				if (file) {
 					contents.push({
@@ -562,7 +558,7 @@ export function mapToolStoreOutputsToToolOutputItems(
 				break;
 			}
 
-			case ToolStoreOutputKind.None:
+			case ToolOutputKind.None:
 			default:
 				// ignore
 				break;

@@ -11,7 +11,7 @@ import (
 	llmtoolsgoSpec "github.com/flexigpt/llmtools-go/spec"
 )
 
-func ReadFile(ctx context.Context, args fstool.ReadFileArgs) ([]llmtoolsgoSpec.ToolStoreOutputUnion, error) {
+func ReadFile(ctx context.Context, args fstool.ReadFileArgs) ([]llmtoolsgoSpec.ToolOutputUnion, error) {
 	t, err := fstool.NewFSTool()
 	if err != nil || t == nil {
 		return nil, err

@@ -25,9 +25,9 @@ import { providerSetAPI } from '@/apis/baseapi';
 
 import {
 	collectToolCallsFromOutputs,
-	extractPrimaryTextFromToolStoreOutputs,
+	extractPrimaryTextFromToolOutputs,
 	formatToolOutputSummary,
-	mapToolOutputItemsToToolStoreOutputs,
+	mapToolOutputItemsToToolOutputs,
 } from '@/chats/tools/tool_editor_utils';
 
 export async function HandleCompletion(
@@ -414,9 +414,9 @@ export function buildUIToolOutputFromToolOutput(
 	const call = toolCallMap?.get(out.callID);
 	const summaryBase = formatToolOutputSummary(out.name);
 
-	const toolStoreOutputs = mapToolOutputItemsToToolStoreOutputs(out.contents);
+	const toolOutputs = mapToolOutputItemsToToolOutputs(out.contents);
 
-	const primaryText = extractPrimaryTextFromToolStoreOutputs(toolStoreOutputs);
+	const primaryText = extractPrimaryTextFromToolOutputs(toolOutputs);
 	const summary = isError && primaryText ? `Error: ${primaryText.split('\n')[0].slice(0, 80)}` : summaryBase;
 
 	let webSearchOutputs: WebSearchToolOutputItemUnion[] | undefined;
@@ -433,7 +433,7 @@ export function buildUIToolOutputFromToolOutput(
 		type: out.type as unknown as ToolStoreChoiceType,
 
 		summary: summary,
-		toolStoreOutputs: toolStoreOutputs,
+		toolOutputs: toolOutputs,
 		webSearchToolOutputItems: webSearchOutputs,
 
 		toolStoreChoice:

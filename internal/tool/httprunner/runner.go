@@ -19,6 +19,8 @@ import (
 	"sync"
 	"time"
 
+	llmtoolsgoSpec "github.com/flexigpt/llmtools-go/spec"
+
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
@@ -91,7 +93,7 @@ func NewHTTPToolRunner(impl spec.HTTPToolImpl, opts ...HTTPOption) (*HTTPToolRun
 func (r *HTTPToolRunner) Run(
 	ctx context.Context,
 	inArgs json.RawMessage,
-) (outputs []spec.ToolStoreOutputUnion, metaData map[string]any, err error) {
+) (outputs []llmtoolsgoSpec.ToolOutputUnion, metaData map[string]any, err error) {
 	req := r.impl.Request
 	resp := r.impl.Response
 	timeoutMS := req.TimeoutMS
@@ -247,42 +249,42 @@ func (r *HTTPToolRunner) Run(
 
 	switch mode {
 	case spec.HTTPBodyOutputModeText:
-		return []spec.ToolStoreOutputUnion{
+		return []llmtoolsgoSpec.ToolOutputUnion{
 			{
-				Kind: spec.ToolStoreOutputKindText,
-				TextItem: &spec.ToolStoreOutputText{
+				Kind: llmtoolsgoSpec.ToolOutputKindText,
+				TextItem: &llmtoolsgoSpec.ToolOutputText{
 					Text: string(data),
 				},
 			},
 		}, metaData, nil
 
 	case spec.HTTPBodyOutputModeFile:
-		return []spec.ToolStoreOutputUnion{
+		return []llmtoolsgoSpec.ToolOutputUnion{
 			makeFileOutput(u, ctNorm, data),
 		}, metaData, nil
 
 	case spec.HTTPBodyOutputModeImage:
-		return []spec.ToolStoreOutputUnion{
+		return []llmtoolsgoSpec.ToolOutputUnion{
 			makeImageOutput(u, ctNorm, data),
 		}, metaData, nil
 
 	default:
 		switch {
 		case isImageContentType(ctNorm):
-			return []spec.ToolStoreOutputUnion{
+			return []llmtoolsgoSpec.ToolOutputUnion{
 				makeImageOutput(u, ctNorm, data),
 			}, metaData, nil
 		case isTextContentType(ctNorm) || ctNorm == "":
-			return []spec.ToolStoreOutputUnion{
+			return []llmtoolsgoSpec.ToolOutputUnion{
 				{
-					Kind: spec.ToolStoreOutputKindText,
-					TextItem: &spec.ToolStoreOutputText{
+					Kind: llmtoolsgoSpec.ToolOutputKindText,
+					TextItem: &llmtoolsgoSpec.ToolOutputText{
 						Text: string(data),
 					},
 				},
 			}, metaData, nil
 		default:
-			return []spec.ToolStoreOutputUnion{
+			return []llmtoolsgoSpec.ToolOutputUnion{
 				makeFileOutput(u, ctNorm, data),
 			}, metaData, nil
 		}
@@ -536,7 +538,7 @@ func normalizeContentType(ct string) string {
 	return strings.TrimSpace(ct)
 }
 
-func makeFileOutput(u *url.URL, contentType string, data []byte) spec.ToolStoreOutputUnion {
+func makeFileOutput(u *url.URL, contentType string, data []byte) llmtoolsgoSpec.ToolOutputUnion {
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
@@ -546,9 +548,9 @@ func makeFileOutput(u *url.URL, contentType string, data []byte) spec.ToolStoreO
 			name = base
 		}
 	}
-	return spec.ToolStoreOutputUnion{
-		Kind: spec.ToolStoreOutputKindFile,
-		FileItem: &spec.ToolStoreOutputFile{
+	return llmtoolsgoSpec.ToolOutputUnion{
+		Kind: llmtoolsgoSpec.ToolOutputKindFile,
+		FileItem: &llmtoolsgoSpec.ToolOutputFile{
 			FileName: name,
 			FileMIME: contentType,
 			FileData: base64.StdEncoding.EncodeToString(data),
@@ -556,7 +558,7 @@ func makeFileOutput(u *url.URL, contentType string, data []byte) spec.ToolStoreO
 	}
 }
 
-func makeImageOutput(u *url.URL, contentType string, data []byte) spec.ToolStoreOutputUnion {
+func makeImageOutput(u *url.URL, contentType string, data []byte) llmtoolsgoSpec.ToolOutputUnion {
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
@@ -566,10 +568,10 @@ func makeImageOutput(u *url.URL, contentType string, data []byte) spec.ToolStore
 			name = base
 		}
 	}
-	return spec.ToolStoreOutputUnion{
-		Kind: spec.ToolStoreOutputKindImage,
-		ImageItem: &spec.ToolStoreOutputImage{
-			Detail:    spec.ImageDetailAuto,
+	return llmtoolsgoSpec.ToolOutputUnion{
+		Kind: llmtoolsgoSpec.ToolOutputKindImage,
+		ImageItem: &llmtoolsgoSpec.ToolOutputImage{
+			Detail:    llmtoolsgoSpec.ImageDetailAuto,
 			ImageName: name,
 			ImageMIME: contentType,
 			ImageData: base64.StdEncoding.EncodeToString(data),

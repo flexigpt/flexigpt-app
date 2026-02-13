@@ -708,7 +708,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				choiceID: toolCall.choiceID,
 				type: toolCall.type,
 				summary: isError ? `Error: ${formatToolOutputSummary(toolCall.name)}` : formatToolOutputSummary(toolCall.name),
-				toolStoreOutputs: resp.outputs,
+				toolOutputs: resp.outputs,
 				isError,
 				errorMessage,
 				arguments: toolCall.arguments,

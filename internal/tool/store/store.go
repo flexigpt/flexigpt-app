@@ -14,16 +14,19 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ppipada/mapstore-go"
+	"github.com/ppipada/mapstore-go/jsonencdec"
+	"github.com/ppipada/mapstore-go/uuidv7filename"
+
+	"github.com/flexigpt/llmtools-go"
+	llmtoolsgoSpec "github.com/flexigpt/llmtools-go/spec"
+
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/tool/goregistry"
 	"github.com/flexigpt/flexigpt-app/internal/tool/httprunner"
 	"github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	"github.com/flexigpt/flexigpt-app/internal/tool/storehelper"
-	"github.com/flexigpt/llmtools-go"
-	"github.com/ppipada/mapstore-go"
-	"github.com/ppipada/mapstore-go/jsonencdec"
-	"github.com/ppipada/mapstore-go/uuidv7filename"
 )
 
 const (
@@ -659,7 +662,7 @@ func (ts *ToolStore) InvokeTool(
 	}
 
 	var (
-		outputs []spec.ToolStoreOutputUnion
+		outputs []llmtoolsgoSpec.ToolOutputUnion
 		md      map[string]any
 		isError bool
 		errMsg  string

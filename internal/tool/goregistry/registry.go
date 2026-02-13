@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	"github.com/flexigpt/llmtools-go"
 	llmtoolsgoSpec "github.com/flexigpt/llmtools-go/spec"
 )
@@ -32,7 +31,7 @@ func mustNewGoRegistry(opts ...llmtools.RegistryOption) *llmtools.Registry {
 
 func RegisterOutputsToolUsingDefaultGoRegistry[T any](
 	tool llmtoolsgoSpec.Tool,
-	fn func(context.Context, T) ([]llmtoolsgoSpec.ToolStoreOutputUnion, error),
+	fn func(context.Context, T) ([]llmtoolsgoSpec.ToolOutputUnion, error),
 ) error {
 	return llmtools.RegisterOutputsTool(defaultGoRegistry, tool, fn)
 }
@@ -49,7 +48,7 @@ func CallUsingDefaultGoRegistry(
 	funcID string,
 	args json.RawMessage,
 	callOpts ...llmtools.CallOption,
-) ([]spec.ToolStoreOutputUnion, error) {
+) ([]llmtoolsgoSpec.ToolOutputUnion, error) {
 	llmtoolsOutputs, err := defaultGoRegistry.Call(
 		ctx,
 		llmtoolsgoSpec.FuncID(funcID),
@@ -63,12 +62,12 @@ func CallUsingDefaultGoRegistry(
 }
 
 // fromLLMToolsOutputUnions converts a slice.
-func fromLLMToolsOutputUnions(in []llmtoolsgoSpec.ToolStoreOutputUnion) ([]spec.ToolStoreOutputUnion, error) {
+func fromLLMToolsOutputUnions(in []llmtoolsgoSpec.ToolOutputUnion) ([]llmtoolsgoSpec.ToolOutputUnion, error) {
 	if in == nil {
 		return nil, nil
 	}
 
-	outs := make([]spec.ToolStoreOutputUnion, 0)
+	outs := make([]llmtoolsgoSpec.ToolOutputUnion, 0)
 	for i := range in {
 		o, err := fromLLMToolsOutputUnion(in[i])
 		if err != nil {
@@ -79,28 +78,30 @@ func fromLLMToolsOutputUnions(in []llmtoolsgoSpec.ToolStoreOutputUnion) ([]spec.
 	return outs, nil
 }
 
-func fromLLMToolsOutputUnion(in llmtoolsgoSpec.ToolStoreOutputUnion) (*spec.ToolStoreOutputUnion, error) {
+func fromLLMToolsOutputUnion(in llmtoolsgoSpec.ToolOutputUnion) (*llmtoolsgoSpec.ToolOutputUnion, error) {
 	switch in.Kind {
-	case llmtoolsgoSpec.ToolStoreOutputKindNone:
-		return &spec.ToolStoreOutputUnion{
-			Kind: spec.ToolStoreOutputKindNone,
+	case llmtoolsgoSpec.ToolOutputKindNone:
+		return &llmtoolsgoSpec.ToolOutputUnion{
+			Kind: llmtoolsgoSpec.ToolOutputKindNone,
 		}, nil
 
-	case llmtoolsgoSpec.ToolStoreOutputKindText:
+	case llmtoolsgoSpec.ToolOutputKindText:
 		if in.TextItem != nil {
-			return &spec.ToolStoreOutputUnion{
-				Kind:     spec.ToolStoreOutputKindText,
-				TextItem: &spec.ToolStoreOutputText{Text: in.TextItem.Text},
+			return &llmtoolsgoSpec.ToolOutputUnion{
+				Kind:     llmtoolsgoSpec.ToolOutputKindText,
+				TextItem: &llmtoolsgoSpec.ToolOutputText{Text: in.TextItem.Text},
 			}, nil
 		} else {
 			return nil, errors.New("no text item for output text")
 		}
-	case llmtoolsgoSpec.ToolStoreOutputKindImage:
+	case llmtoolsgoSpec.ToolOutputKindImage:
 		if in.ImageItem != nil {
-			return &spec.ToolStoreOutputUnion{
-				Kind: spec.ToolStoreOutputKindImage,
-				ImageItem: &spec.ToolStoreOutputImage{
-					Detail:    spec.ImageDetail(string(in.ImageItem.Detail)), // robust to new/unknown detail values
+			return &llmtoolsgoSpec.ToolOutputUnion{
+				Kind: llmtoolsgoSpec.ToolOutputKindImage,
+				ImageItem: &llmtoolsgoSpec.ToolOutputImage{
+					Detail: llmtoolsgoSpec.ImageDetail(
+						string(in.ImageItem.Detail),
+					), // robust to new/unknown detail values
 					ImageName: in.ImageItem.ImageName,
 					ImageMIME: in.ImageItem.ImageMIME,
 					ImageData: in.ImageItem.ImageData,
@@ -110,11 +111,11 @@ func fromLLMToolsOutputUnion(in llmtoolsgoSpec.ToolStoreOutputUnion) (*spec.Tool
 			return nil, errors.New("no image item for output image")
 		}
 
-	case llmtoolsgoSpec.ToolStoreOutputKindFile:
+	case llmtoolsgoSpec.ToolOutputKindFile:
 		if in.FileItem != nil {
-			return &spec.ToolStoreOutputUnion{
-				Kind: spec.ToolStoreOutputKindFile,
-				FileItem: &spec.ToolStoreOutputFile{
+			return &llmtoolsgoSpec.ToolOutputUnion{
+				Kind: llmtoolsgoSpec.ToolOutputKindFile,
+				FileItem: &llmtoolsgoSpec.ToolOutputFile{
 					FileName: in.FileItem.FileName,
 					FileMIME: in.FileItem.FileMIME,
 					FileData: in.FileItem.FileData,

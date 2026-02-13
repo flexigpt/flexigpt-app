@@ -2,6 +2,7 @@ package spec
 
 import (
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	llmtoolsgoSpec "github.com/flexigpt/llmtools-go/spec"
 )
 
 type PutToolBundleRequestBody struct {
@@ -187,7 +188,7 @@ type InvokeToolRequest struct {
 type InvokeToolResponseBody struct {
 	// Output is the JSON-serializable result produced by the tool. Its shape depends on
 	// the tool definition.
-	Outputs []ToolStoreOutputUnion `json:"outputs,omitempty"`
+	Outputs []llmtoolsgoSpec.ToolOutputUnion `json:"outputs,omitempty"`
 	// Meta contains implementation-specific metadata (e.g., HTTP status, duration, etc.).
 	Meta map[string]any `json:"meta,omitempty"`
 	// True if the tool was served from the built-in data overlay.

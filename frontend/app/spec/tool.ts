@@ -94,7 +94,7 @@ export interface HTTPToolImpl {
 /**
  * @public
  */
-export enum ToolStoreOutputKind {
+export enum ToolOutputKind {
 	None = 'none',
 	Text = 'text',
 	Image = 'image',
@@ -104,7 +104,7 @@ export enum ToolStoreOutputKind {
 /**
  * @public
  */
-export interface ToolStoreOutputFile {
+export interface ToolOutputFile {
 	fileName: string;
 	fileMIME: string;
 	fileData: string;
@@ -113,7 +113,7 @@ export interface ToolStoreOutputFile {
 /**
  * @public
  */
-export interface ToolStoreOutputImage {
+export interface ToolOutputImage {
 	detail: string;
 	imageName: string;
 	imageMIME: string;
@@ -123,18 +123,18 @@ export interface ToolStoreOutputImage {
 /**
  * @public
  */
-export interface ToolStoreOutputText {
+export interface ToolOutputText {
 	text: string;
 }
 
 /**
  * @public
  */
-export interface ToolStoreOutputUnion {
-	kind: ToolStoreOutputKind;
-	textItem?: ToolStoreOutputText;
-	imageItem?: ToolStoreOutputImage;
-	fileItem?: ToolStoreOutputFile;
+export interface ToolOutputUnion {
+	kind: ToolOutputKind;
+	textItem?: ToolOutputText;
+	imageItem?: ToolOutputImage;
+	fileItem?: ToolOutputFile;
 }
 
 export interface Tool {
@@ -202,7 +202,7 @@ export interface InvokeGoOptions {
 }
 
 export interface InvokeToolResponse {
-	outputs?: ToolStoreOutputUnion[];
+	outputs?: ToolOutputUnion[];
 	meta?: Record<string, any>;
 	isBuiltIn: boolean;
 	isError?: boolean;
