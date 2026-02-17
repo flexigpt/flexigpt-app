@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { FiArrowDown, FiArrowUp, FiCode, FiEdit2, FiMoreHorizontal, FiRepeat } from 'react-icons/fi';
+import { FiArrowDown, FiArrowUp, FiCode, FiEdit2, FiRepeat } from 'react-icons/fi';
 
 import type { InferenceUsage } from '@/spec/inference';
 
@@ -51,14 +51,6 @@ export function MessageFooterArea({
 	return (
 		<div className={bodyPresent ? 'grow' : ''}>
 			<div className={`flex items-center space-x-6 ${bodyPresent ? 'justify-between' : ''}`}>
-				{isStreaming && (
-					<div className="text-sm">
-						<div className="flex items-center gap-2 bg-transparent px-4 py-2 font-mono">
-							Streaming
-							<FiMoreHorizontal size={14} />
-						</div>
-					</div>
-				)}
 				{usage && !isStreaming && (
 					<div className="flex items-center bg-transparent p-0 text-xs">
 						<div

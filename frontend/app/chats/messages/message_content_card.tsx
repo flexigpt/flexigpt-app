@@ -69,7 +69,16 @@ export const MessageContentCard = memo(function MessageContentCard({
 		);
 	}
 	if (!renderAsMarkdown) {
-		return <div className="p-0">{plainTextNodes}</div>;
+		return (
+			<div className="p-0">
+				{plainTextNodes}
+				{isStreaming && (
+					<div className="flex items-center gap-2 p-0">
+						Streaming <span className="loading loading-dots loading-sm ml-2" />
+					</div>
+				)}
+			</div>
+		);
 	}
 
 	return (
@@ -80,6 +89,11 @@ export const MessageContentCard = memo(function MessageContentCard({
 				align={align}
 				isBusy={renderBusy}
 			/>
+			{isStreaming && (
+				<div className="flex items-center gap-2 p-0">
+					Streaming <span className="loading loading-dots loading-sm ml-2" />
+				</div>
+			)}
 		</div>
 	);
 }, areEqual);

@@ -4,6 +4,7 @@
 
 - [x] UI tables alignment for config pages
 - [ ] opus 4.6 has now adaptive thinking which is basically thinking with levels
+- [x] when thinking, dont show streaming text in bottom line, do that only when streaming actual data.
 
 ## Features
 
@@ -17,7 +18,7 @@
       - [ ] no symlinks, skill name and dir name should match
       - [ ] then use current fs skill provider.
     - [ ] runtime integration appropriately
-      - [ ] need agentskills to support allowlist of skills to get a prompt
+      - [x] need agentskills to support allowlist of skills to get a prompt
     - [x] agentgo and httpbackend integration with api exposure
   - [x] skills discovery/add/remove/management ui
     - [x] spec types, skills and skill runtime
