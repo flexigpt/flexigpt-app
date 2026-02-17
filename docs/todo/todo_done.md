@@ -719,3 +719,6 @@
   - [x] scroll conflicts fixed
 - [x] if there are attachments in previous message and then it was changed and then we resend it, the app crashes without trace.
 - [x] mdx is not readable
+
+- [x] UI tables alignment for config pages
+- [x] when thinking, dont show streaming text in bottom line, do that only when streaming actual data.

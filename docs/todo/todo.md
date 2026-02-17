@@ -2,9 +2,7 @@
 
 ## Laundry list
 
-- [x] UI tables alignment for config pages
 - [ ] opus 4.6 has now adaptive thinking which is basically thinking with levels
-- [x] when thinking, dont show streaming text in bottom line, do that only when streaming actual data.
 
 ## Features
 
