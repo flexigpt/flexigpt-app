@@ -410,6 +410,8 @@ linters:
           alias: inferencegoSpec
         - pkg: "github.com/flexigpt/llmtools-go/spec"
           alias: llmtoolsgoSpec
+        - pkg: "github.com/flexigpt/agentskills-go/spec"
+          alias: agentskillsSpec
         - pkg: github.com/flexigpt/flexigpt-app/frontend
           alias: assets
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/consts

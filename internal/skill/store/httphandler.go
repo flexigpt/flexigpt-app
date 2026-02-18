@@ -8,6 +8,7 @@ import (
 
 const (
 	skillTag        = "SkillStore"
+	skillRuntimeTag = "SkillRuntime"
 	skillPathPrefix = "/skills"
 )
 
@@ -87,4 +88,37 @@ func InitSkillStoreHandlers(api huma.API, store *SkillStore) {
 		Summary:     "List skills (global, with filters)",
 		Tags:        []string{skillTag},
 	}, store.ListSkills)
+
+	// Runtime/session/prompt APIs.
+	huma.Register(api, huma.Operation{
+		OperationID: "create-skill-session",
+		Method:      http.MethodPost,
+		Path:        skillPathPrefix + "/runtime/sessions",
+		Summary:     "Create a runtime skill session",
+		Tags:        []string{skillRuntimeTag},
+	}, store.CreateSkillSession)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "close-skill-session",
+		Method:      http.MethodDelete,
+		Path:        skillPathPrefix + "/runtime/sessions/{sessionID}",
+		Summary:     "Close a runtime skill session",
+		Tags:        []string{skillRuntimeTag},
+	}, store.CloseSkillSession)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "get-skills-prompt-xml",
+		Method:      http.MethodPost,
+		Path:        skillPathPrefix + "/runtime/promptxml",
+		Summary:     "Get skills prompt XML (runtime)",
+		Tags:        []string{skillRuntimeTag},
+	}, store.GetSkillsPromptXML)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "list-runtime-skills",
+		Method:      http.MethodPost,
+		Path:        skillPathPrefix + "/runtime/skills",
+		Summary:     "List skills from runtime catalog (filtered)",
+		Tags:        []string{skillRuntimeTag},
+	}, store.ListRuntimeSkills)
 }
