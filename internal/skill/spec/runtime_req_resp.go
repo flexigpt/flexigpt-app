@@ -2,26 +2,33 @@ package spec
 
 import agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 
-// RuntimeSkillFilter mirrors agentskills.SkillFilter fields that we want to expose over HTTP.
+// RuntimeSkillFilter mirrors the runtime prompt/list filters we expose over HTTP.
+//
+// IMPORTANT CONTRACT:
+//   - allowSkills and all lifecycle-facing selectors are SkillDef (type/name/location)
+//     which are the exact user-provided inputs registered into the runtime catalog.
+//   - LLM-facing handles (SkillHandle) are NOT used for lifecycle.
 type RuntimeSkillFilter struct {
 	Types          []string                   `json:"types,omitempty"`
 	NamePrefix     string                     `json:"namePrefix,omitempty"`
 	LocationPrefix string                     `json:"locationPrefix,omitempty"`
-	AllowKeys      []agentskillsSpec.SkillKey `json:"allowKeys,omitempty"`
-	SessionID      agentskillsSpec.SessionID  `json:"sessionID,omitempty"`
-	Activity       string                     `json:"activity,omitempty"` // any|active|inactive
+	AllowSkills    []agentskillsSpec.SkillDef `json:"allowSkills,omitempty"`
+
+	SessionID agentskillsSpec.SessionID `json:"sessionID,omitempty"`
+	Activity  string                    `json:"activity,omitempty"` // any|active|inactive
 }
 
 type CreateSkillSessionRequestBody struct {
 	MaxActivePerSession int                        `json:"maxActivePerSession,omitempty"`
-	ActiveKeys          []agentskillsSpec.SkillKey `json:"activeKeys,omitempty"`
+	ActiveSkills        []agentskillsSpec.SkillDef `json:"activeSkills,omitempty"`
 }
 type CreateSkillSessionRequest struct {
 	Body *CreateSkillSessionRequestBody
 }
+
 type CreateSkillSessionResponseBody struct {
-	SessionID    agentskillsSpec.SessionID     `json:"sessionID"`
-	ActiveSkills []agentskillsSpec.SkillHandle `json:"activeSkills"`
+	SessionID    agentskillsSpec.SessionID  `json:"sessionID"`
+	ActiveSkills []agentskillsSpec.SkillDef `json:"activeSkills"`
 }
 type CreateSkillSessionResponse struct {
 	Body *CreateSkillSessionResponseBody
@@ -52,7 +59,9 @@ type ListRuntimeSkillsRequestBody struct {
 	Filter *RuntimeSkillFilter `json:"filter,omitempty"`
 }
 type (
-	ListRuntimeSkillsRequest      struct{ Body *ListRuntimeSkillsRequestBody }
+	ListRuntimeSkillsRequest struct {
+		Body *ListRuntimeSkillsRequestBody
+	}
 	ListRuntimeSkillsResponseBody struct {
 		Skills []agentskillsSpec.SkillRecord `json:"skills"`
 	}

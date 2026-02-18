@@ -29,8 +29,8 @@ github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkp
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/elliotchance/pie/v2 v2.9.0 h1:BkEhh8b/avGCSpXpABSjNuytxlI/S2snkjT3vtVORjw=
 github.com/elliotchance/pie/v2 v2.9.0/go.mod h1:18t0dgGFH006g4eVdDtWfgFZPQEgl10IoEO8YWEq3Og=
-github.com/flexigpt/agentskills-go v0.6.0 h1:nUw8BdS2/nNPS0lpGbgFAt+hhDLsotjB2n+kcLrLVHM=
-github.com/flexigpt/agentskills-go v0.6.0/go.mod h1:q2rR4WWTdrkMlmYlo655bybmHna2M3mSQuBiS5jkBno=
+github.com/flexigpt/agentskills-go v0.7.0 h1:Br8uI+jsESknv7c4k64UsjymEH/ML9rbgBqN2iFzuuE=
+github.com/flexigpt/agentskills-go v0.7.0/go.mod h1:q2rR4WWTdrkMlmYlo655bybmHna2M3mSQuBiS5jkBno=
 github.com/flexigpt/inference-go v0.8.1 h1:oEDvJOm464vGugHGiF7F9CYU8FgQeFNLY1qsME27En4=
 github.com/flexigpt/inference-go v0.8.1/go.mod h1:R+1eSKG5xQvN8fMeO4Zu9B0KI+BHze7+f7ybireML6Q=
 github.com/flexigpt/llmtools-go v0.11.0 h1:b0SpE86k1k8ptfILVcrVIfVpiXBRarK7NukR7Axkn6w=

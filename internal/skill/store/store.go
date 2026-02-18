@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/flexigpt/agentskills-go"
-	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 
 	"github.com/ppipada/mapstore-go"
 	"github.com/ppipada/mapstore-go/jsonencdec"
@@ -62,6 +61,9 @@ type SkillStore struct {
 
 	// Sweep coordination with CRUD ops.
 	sweepMu sync.RWMutex
+
+	// Serializes runtime resync calls (best-effort reconcile).
+	rtResyncMu sync.Mutex
 }
 
 type skillStoreOptions struct {
@@ -143,17 +145,17 @@ func NewSkillStore(baseDir string, opts ...SkillStoreOption) (*SkillStore, error
 	}
 
 	s.startCleanupLoop()
-	// Runtime integration:
+
+	// Runtime integration (best-effort, must not block init):
 	// - hydrate embeddedfs → disk
-	// - populate runtime catalog from enabled bundles/skills.
+	// - reconcile runtime catalog from enabled bundles/skills.
 	if s.runtime != nil {
 		if err := s.hydrateBuiltInEmbeddedFS(ctx); err != nil {
-			return nil, err
+			slog.Error("runtime init: embeddedfs hydration failed", "err", err)
 		}
-		if err := s.syncRuntimeFromStore(ctx); err != nil {
-			return nil, err
-		}
+		s.bestEffortRuntimeResync(ctx, "init")
 	}
+
 	slog.Info("skill-store ready", "baseDir", s.baseDir)
 	return s, nil
 }
@@ -187,10 +189,16 @@ func (s *SkillStore) PutSkillBundle(
 	}
 
 	s.sweepMu.Lock()
-	defer s.sweepMu.Unlock()
-
 	s.mu.Lock()
-	defer s.mu.Unlock()
+
+	resyncRuntime := false
+	defer func() {
+		s.mu.Unlock()
+		s.sweepMu.Unlock()
+		if resyncRuntime {
+			s.bestEffortRuntimeResync(ctx, "putSkillBundle")
+		}
+	}()
 
 	all, err := s.readAllUser(false)
 	if err != nil {
@@ -205,11 +213,7 @@ func (s *SkillStore) PutSkillBundle(
 
 	now := time.Now().UTC()
 	createdAt := now
-	var prev spec.SkillBundle
-	var hadPrev bool
 	if ex, ok := all.Bundles[req.BundleID]; ok {
-		prev = ex
-		hadPrev = true
 		if isSoftDeletedSkillBundle(ex) {
 			return nil, fmt.Errorf("%w: %s", spec.ErrSkillBundleDeleting, req.BundleID)
 		}
@@ -230,7 +234,6 @@ func (s *SkillStore) PutSkillBundle(
 		ModifiedAt:    now,
 		SoftDeletedAt: nil,
 	}
-
 	if err := validateSkillBundle(&b); err != nil {
 		return nil, err
 	}
@@ -243,26 +246,9 @@ func (s *SkillStore) PutSkillBundle(
 	if err := s.writeAllUser(all); err != nil {
 		return nil, err
 	}
-	// Runtime sync: if bundle enablement changed, apply to runtime.
-	if s.runtime != nil && hadPrev && prev.IsEnabled != b.IsEnabled {
-		if b.IsEnabled {
-			// Enabling bundle -> add all enabled skills under it.
-			for _, sk := range all.Skills[req.BundleID] {
-				if !sk.IsEnabled {
-					continue
-				}
-				if err := s.runtimeAddSkillLocked(ctx, b, sk); err != nil {
-					// Best-effort rollback bundle state in store is out-of-scope here.
-					return nil, err
-				}
-			}
-		} else {
-			// Disabling bundle -> remove all skills under it.
-			for _, sk := range all.Skills[req.BundleID] {
-				_ = s.runtimeRemoveSkillLocked(ctx, b, sk)
-			}
-		}
-	}
+
+	resyncRuntime = (s.runtime != nil)
+
 	slog.Info("putSkillBundle", "bundleID", req.BundleID)
 	return &spec.PutSkillBundleResponse{}, nil
 }
@@ -282,28 +268,7 @@ func (s *SkillStore) PatchSkillBundle(
 				return nil, err
 			}
 			if s.runtime != nil {
-				_, biSkills, err := s.builtin.ListBuiltInSkills(ctx)
-				if err != nil {
-					return nil, err
-				}
-				sm := biSkills[req.BundleID]
-				if req.Body.IsEnabled {
-					for _, sk := range sm {
-						if !sk.IsEnabled {
-							continue
-						}
-						// Build-in runtime mapping: treated as fs @ hydrated path.
-						if err := s.runtimeAddBuiltInSkill(ctx, sk); err != nil {
-							// Best effort rollback overlay.
-							_, _ = s.builtin.SetSkillBundleEnabled(ctx, req.BundleID, false)
-							return nil, err
-						}
-					}
-				} else {
-					for _, sk := range sm {
-						_ = s.runtimeRemoveBuiltInSkill(ctx, sk)
-					}
-				}
+				s.bestEffortRuntimeResync(ctx, "patchSkillBundle(builtin)")
 			}
 			slog.Info("patchSkillBundle (builtin)", "bundleID", req.BundleID, "enabled", req.Body.IsEnabled)
 			return &spec.PatchSkillBundleResponse{}, nil
@@ -311,10 +276,16 @@ func (s *SkillStore) PatchSkillBundle(
 	}
 
 	s.sweepMu.Lock()
-	defer s.sweepMu.Unlock()
-
 	s.mu.Lock()
-	defer s.mu.Unlock()
+
+	resyncRuntime := false
+	defer func() {
+		s.mu.Unlock()
+		s.sweepMu.Unlock()
+		if resyncRuntime {
+			s.bestEffortRuntimeResync(ctx, "patchSkillBundle")
+		}
+	}()
 
 	all, err := s.readAllUser(false)
 	if err != nil {
@@ -327,7 +298,7 @@ func (s *SkillStore) PatchSkillBundle(
 	if isSoftDeletedSkillBundle(b) {
 		return nil, fmt.Errorf("%w: %s", spec.ErrSkillBundleDeleting, req.BundleID)
 	}
-	prevEnabled := b.IsEnabled
+
 	b.IsEnabled = req.Body.IsEnabled
 	b.ModifiedAt = time.Now().UTC()
 	all.Bundles[req.BundleID] = b
@@ -336,23 +307,7 @@ func (s *SkillStore) PatchSkillBundle(
 		return nil, err
 	}
 
-	// Runtime sync (user bundle enablement change).
-	if s.runtime != nil && prevEnabled != b.IsEnabled {
-		if b.IsEnabled {
-			for _, sk := range all.Skills[req.BundleID] {
-				if !sk.IsEnabled {
-					continue
-				}
-				if err := s.runtimeAddSkillLocked(ctx, b, sk); err != nil {
-					return nil, err
-				}
-			}
-		} else {
-			for _, sk := range all.Skills[req.BundleID] {
-				_ = s.runtimeRemoveSkillLocked(ctx, b, sk)
-			}
-		}
-	}
+	resyncRuntime = (s.runtime != nil)
 
 	slog.Info("patchSkillBundle", "bundleID", req.BundleID, "enabled", req.Body.IsEnabled)
 	return &spec.PatchSkillBundleResponse{}, nil
@@ -571,10 +526,16 @@ func (s *SkillStore) PutSkill(ctx context.Context, req *spec.PutSkillRequest) (*
 	}
 
 	s.sweepMu.Lock()
-	defer s.sweepMu.Unlock()
-
 	s.mu.Lock()
-	defer s.mu.Unlock()
+
+	resyncRuntime := false
+	defer func() {
+		s.mu.Unlock()
+		s.sweepMu.Unlock()
+		if resyncRuntime {
+			s.bestEffortRuntimeResync(ctx, "putSkill")
+		}
+	}()
 
 	all, err := s.readAllUser(false)
 	if err != nil {
@@ -629,29 +590,12 @@ func (s *SkillStore) PutSkill(ctx context.Context, req *spec.PutSkillRequest) (*
 		return nil, err
 	}
 
-	// Runtime: if enabled, index/register in runtime before committing (so invalid skills fail fast).
-	var rtKey agentskillsSpec.SkillKey
-	var rtAdded bool
-	if s.runtime != nil && b.IsEnabled && sk.IsEnabled {
-		var err error
-		rtKey, err = s.runtimeKeyForUserSkill(b, sk)
-		if err != nil {
-			return nil, err
-		}
-		if _, err := s.runtime.AddSkill(ctx, rtKey); err != nil {
-			return nil, err
-		}
-		rtAdded = true
-	}
-
 	all.Skills[req.BundleID][req.SkillSlug] = sk
 	if err := s.writeAllUser(all); err != nil {
-		// Rollback runtime add.
-		if rtAdded {
-			_, _ = s.runtime.RemoveSkill(ctx, rtKey)
-		}
 		return nil, err
 	}
+
+	resyncRuntime = (s.runtime != nil)
 
 	slog.Info("putSkill", "bundleID", req.BundleID, "skillSlug", req.SkillSlug)
 	return &spec.PutSkillResponse{}, nil
@@ -685,37 +629,28 @@ func (s *SkillStore) PatchSkill(ctx context.Context, req *spec.PatchSkillRequest
 			if _, err := s.builtin.SetSkillEnabled(ctx, req.BundleID, req.SkillSlug, enabled); err != nil {
 				return nil, err
 			}
-			// Runtime sync for built-in skill toggle.
+
 			if s.runtime != nil {
-				sk, err := s.builtin.GetBuiltInSkill(ctx, req.BundleID, req.SkillSlug)
-				if err != nil {
-					return nil, err
-				}
-				if enabled {
-					if err := s.runtimeAddBuiltInSkill(ctx, sk); err != nil {
-						_, _ = s.builtin.SetSkillEnabled(ctx, req.BundleID, req.SkillSlug, false)
-						return nil, err
-					}
-				} else {
-					_ = s.runtimeRemoveBuiltInSkill(ctx, sk)
-				}
+				s.bestEffortRuntimeResync(ctx, "patchSkill(builtin)")
 			}
-			slog.Info(
-				"patchSkill (builtin)",
-				"bundleID", req.BundleID,
-				"skillSlug", req.SkillSlug,
-				"enabled", enabled,
-			)
+
+			slog.Info("patchSkill (builtin)", "bundleID", req.BundleID, "skillSlug", req.SkillSlug, "enabled", enabled)
 			return &spec.PatchSkillResponse{}, nil
 		}
 	}
 
 	// User path.
 	s.sweepMu.Lock()
-	defer s.sweepMu.Unlock()
-
 	s.mu.Lock()
-	defer s.mu.Unlock()
+
+	resyncRuntime := false
+	defer func() {
+		s.mu.Unlock()
+		s.sweepMu.Unlock()
+		if resyncRuntime {
+			s.bestEffortRuntimeResync(ctx, "patchSkill")
+		}
+	}()
 
 	all, err := s.readAllUser(false)
 	if err != nil {
@@ -741,11 +676,6 @@ func (s *SkillStore) PatchSkill(ctx context.Context, req *spec.PatchSkillRequest
 		return nil, fmt.Errorf("%w: %s", spec.ErrSkillNotFound, req.SkillSlug)
 	}
 
-	// Runtime: capture old key if active.
-	oldEnabled := sk.IsEnabled
-	oldLocation := sk.Location
-	oldName := sk.Name
-
 	if req.Body.IsEnabled != nil {
 		sk.IsEnabled = *req.Body.IsEnabled
 	}
@@ -754,7 +684,6 @@ func (s *SkillStore) PatchSkill(ctx context.Context, req *spec.PatchSkillRequest
 	if req.Body.Location != nil && strings.TrimSpace(*req.Body.Location) == "" {
 		return nil, fmt.Errorf("%w: location cannot be empty", spec.ErrSkillInvalidRequest)
 	}
-
 	if req.Body.Location != nil && *req.Body.Location != sk.Location {
 		sk.Location = *req.Body.Location
 		// Invalidate presence on location change.
@@ -766,44 +695,14 @@ func (s *SkillStore) PatchSkill(ctx context.Context, req *spec.PatchSkillRequest
 		return nil, err
 	}
 
-	// Runtime: if skill becomes enabled (or location changed while enabled), ensure runtime can index it
-	// before committing store changes.
-	var newKey agentskillsSpec.SkillKey
-	var addedNew bool
-	locationChanged := (oldLocation != sk.Location)
-	enabledNow := sk.IsEnabled
-	enabledBefore := oldEnabled
-	if s.runtime != nil && b.IsEnabled && enabledNow && (!enabledBefore || locationChanged) {
-		var err error
-		newKey, err = s.runtimeKeyForUserSkill(b, sk)
-		if err != nil {
-			return nil, err
-		}
-		if _, err := s.runtime.AddSkill(ctx, newKey); err != nil {
-			return nil, err
-		}
-		addedNew = true
-	}
-
 	sm[req.SkillSlug] = sk
 	all.Skills[req.BundleID] = sm
 
 	if err := s.writeAllUser(all); err != nil {
-		// Rollback runtime add if we did it pre-commit.
-		if addedNew {
-			_, _ = s.runtime.RemoveSkill(ctx, newKey)
-		}
 		return nil, err
 	}
 
-	// Runtime: post-commit removals (disable or location change).
-	if s.runtime != nil && b.IsEnabled {
-		if enabledBefore && (!enabledNow) {
-			_ = s.runtimeRemoveUserSkillByParts(ctx, oldName, oldLocation)
-		} else if enabledBefore && enabledNow && locationChanged {
-			_ = s.runtimeRemoveUserSkillByParts(ctx, oldName, oldLocation)
-		}
-	}
+	resyncRuntime = (s.runtime != nil)
 
 	slog.Info("patchSkill", "bundleID", req.BundleID, "skillSlug", req.SkillSlug, "enabled", req.Body.IsEnabled)
 	return &spec.PatchSkillResponse{}, nil
@@ -825,23 +724,29 @@ func (s *SkillStore) DeleteSkill(ctx context.Context, req *spec.DeleteSkillReque
 	}
 
 	s.sweepMu.Lock()
-	defer s.sweepMu.Unlock()
-
 	s.mu.Lock()
-	defer s.mu.Unlock()
+
+	resyncRuntime := false
+	defer func() {
+		s.mu.Unlock()
+		s.sweepMu.Unlock()
+		if resyncRuntime {
+			s.bestEffortRuntimeResync(ctx, "deleteSkill")
+		}
+	}()
 
 	all, err := s.readAllUser(false)
 	if err != nil {
 		return nil, err
 	}
 	b, ok := all.Bundles[req.BundleID]
-
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", spec.ErrSkillBundleNotFound, req.BundleID)
 	}
 	if isSoftDeletedSkillBundle(b) {
 		return nil, fmt.Errorf("%w: %s", spec.ErrSkillBundleDeleting, req.BundleID)
 	}
+
 	sm := all.Skills[req.BundleID]
 	if sm == nil {
 		return nil, fmt.Errorf("%w: %s", spec.ErrSkillNotFound, req.SkillSlug)
@@ -862,10 +767,8 @@ func (s *SkillStore) DeleteSkill(ctx context.Context, req *spec.DeleteSkillReque
 		return nil, err
 	}
 
-	// Runtime sync: remove if it was enabled.
-	if s.runtime != nil && b.IsEnabled && sk.IsEnabled {
-		_ = s.runtimeRemoveSkillLocked(ctx, b, sk)
-	}
+	resyncRuntime = (s.runtime != nil)
+
 	slog.Info("deleteSkill", "bundleID", req.BundleID, "skillSlug", req.SkillSlug)
 	return &spec.DeleteSkillResponse{}, nil
 }
@@ -884,7 +787,6 @@ func (s *SkillStore) GetSkill(ctx context.Context, req *spec.GetSkillRequest) (*
 	}
 
 	// Enforce disabled checks for Get (spec has ErrSkillBundleDisabled / ErrSkillDisabled).
-	// (If you want Get to return disabled resources, remove these guards.)
 	if !b.IsEnabled {
 		return nil, fmt.Errorf("%w: %s", spec.ErrSkillBundleDisabled, req.BundleID)
 	}
@@ -1190,6 +1092,7 @@ func (s *SkillStore) startCleanupLoop() {
 			tick := time.NewTicker(cleanupIntervalSkills)
 			defer tick.Stop()
 
+			// Run once at start.
 			s.sweepSoftDeleted()
 
 			for {
@@ -1216,6 +1119,12 @@ func (s *SkillStore) kickCleanupLoop() {
 }
 
 func (s *SkillStore) sweepSoftDeleted() {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("sweepSoftDeleted: panic", "panic", r)
+		}
+	}()
+
 	s.sweepMu.Lock()
 	defer s.sweepMu.Unlock()
 
