@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"os"
 	"runtime/debug"
@@ -15,23 +14,6 @@ import (
 	"github.com/ppipada/mapstore-go"
 	"github.com/ppipada/mapstore-go/ftsengine"
 )
-
-func StartRebuild(ctx context.Context, baseDir string, e *ftsengine.Engine) {
-	go func() {
-		stat, _ := ftsengine.SyncDirToFTS(
-			ctx,
-			e,
-			baseDir,
-			// Compare column (must exist in Config.Columns).
-			"mtime",
-			1000,
-			processFTSDataForFile,
-		)
-		if stat != nil {
-			slog.Info("conversation fts rebuild", "stat", fmt.Sprintf("%v", stat))
-		}
-	}()
-}
 
 func NewFTSListner(e *ftsengine.Engine) mapstore.FileListener {
 	return func(ev mapstore.FileEvent) {

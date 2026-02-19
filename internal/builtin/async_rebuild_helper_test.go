@@ -237,22 +237,21 @@ func TestAsyncRebuilder_TriggerWithError(t *testing.T) {
 
 func TestAsyncRebuilder_TriggerWithPanic(t *testing.T) {
 	var callCount int32
-	done := make(chan struct{})
 
 	fn := func() error {
 		atomic.AddInt32(&callCount, 1)
-		close(done)
 		panic("test panic")
 	}
 
 	r := NewAsyncRebuilder(time.Hour, fn)
 	r.Trigger()
 
+	// Wait for the *rebuilder goroutine* to finish (this is what resets r.running).
 	select {
-	case <-done:
-		// Expected.
-	case <-time.After(100 * time.Millisecond):
-		t.Error("expected function to be called")
+	case <-r.IsDone():
+		// Ok.
+	case <-time.After(10 * time.Second):
+		t.Fatal("timeout waiting for async rebuild to finish after panic")
 	}
 
 	// Give some time for panic recovery.

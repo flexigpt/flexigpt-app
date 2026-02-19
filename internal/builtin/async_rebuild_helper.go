@@ -69,12 +69,13 @@ func (r *AsyncRebuilder) Trigger() {
 
 	go func() {
 		defer func() {
+			rec := recover()
+
+			// Always reset state first; logging can be slow.
 			atomic.StoreInt32(&r.running, 0)
 			close(done)
-		}()
-		// Shield caller from panics inside fn.
-		defer func() {
-			if rec := recover(); rec != nil {
+
+			if rec != nil {
 				slog.Error("panic in async rebuild",
 					"err", rec,
 					"stack", debug.Stack())

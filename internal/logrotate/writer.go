@@ -70,6 +70,9 @@ type Writer struct {
 	closing chan struct{}
 	// Signal the writer has finished writing all queued up entries.
 	done chan struct{}
+
+	closeOnce sync.Once
+	closeErr  error
 }
 
 // New creates a new concurrency safe Writer which performs log rotation.
@@ -131,19 +134,20 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 // Any accepted writes will be flushed. Any new writes will be rejected.
 // Once Close() exits, files are synchronized to disk.
 func (w *Writer) Close() error {
-	close(w.closing)
-	w.pending.Wait()
-
-	close(w.queue)
-	<-w.done
-
-	if w.f != nil {
-		if err := w.closeCurrentFile(); err != nil {
-			return err
+	w.closeOnce.Do(func() {
+		// Signal listen to stop accepting new writes.
+		close(w.closing)
+		// Wait for any pending Write() calls to finish adding to the queue.
+		w.pending.Wait()
+		// Close the queue so listen() drains and exits.
+		close(w.queue)
+		// Wait for listen() to finish processing and signal done.
+		<-w.done
+		if w.f != nil {
+			w.closeErr = w.closeCurrentFile()
 		}
-	}
-
-	return nil
+	})
+	return w.closeErr
 }
 
 func (w *Writer) listen() {
@@ -216,10 +220,26 @@ func (w *Writer) closeCurrentFile() error {
 		return err
 	}
 
+	// Close the underlying file so other processes (including RemoveAll on Windows)
+	// can delete the file. Also clear writer references.
+	if w.f != nil {
+		if err := w.f.Close(); err != nil {
+			return fmt.Errorf("failed to close current log file: %w", err)
+		}
+		w.f = nil
+	}
+	w.bw = nil
+	w.bytesWritten = 0
+
 	return nil
 }
 
 func (w *Writer) flushCurrentFile() error {
+	// If there is no open file or buffered writer, nothing to do.
+	if w.bw == nil || w.f == nil {
+		return nil
+	}
+
 	if err := w.bw.Flush(); err != nil {
 		return fmt.Errorf("failed to flush buffered writer: %w", err)
 	}
@@ -228,8 +248,8 @@ func (w *Writer) flushCurrentFile() error {
 		return fmt.Errorf("failed to sync current log file: %w", err)
 	}
 
-	w.bytesWritten = 0
-
+	// Do NOT reset bytesWritten here — bytesWritten represents the total bytes
+	// written to the current file and must only be reset when a new file is created.
 	return nil
 }
 

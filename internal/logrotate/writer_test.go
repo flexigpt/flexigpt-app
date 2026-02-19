@@ -29,9 +29,12 @@ func TestCreateTargetDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create writer: %v", err)
 	}
-	if err := w.Close(); err != nil {
-		t.Fatalf("failed to close writer: %v", err)
-	}
+	// Ensure writer is closed even on early test failure.
+	t.Cleanup(func() {
+		if err := w.Close(); err != nil {
+			t.Errorf("failed to close writer: %v", err)
+		}
+	})
 
 	f, err := os.Stat(dir)
 	if err != nil {
@@ -57,6 +60,12 @@ func TestCreateWriteClose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create writer: %v", err)
 	}
+	// Ensure writer is closed even on early test failure.
+	t.Cleanup(func() {
+		if err := w.Close(); err != nil {
+			t.Errorf("failed to close writer: %v", err)
+		}
+	})
 
 	message := []byte("message")
 	if _, err := w.Write(message); err != nil {
@@ -109,6 +118,12 @@ func TestRotateOnFileSize(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create writer: %v", err)
 			}
+			// Ensure writer is closed even on early test failure.
+			t.Cleanup(func() {
+				if err := w.Close(); err != nil {
+					t.Errorf("failed to close writer: %v", err)
+				}
+			})
 
 			for _, write := range tt.writes {
 				if _, err := w.Write([]byte(write)); err != nil {
@@ -149,6 +164,12 @@ func TestRotateOnLifetime(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create writer: %v", err)
 	}
+	// Ensure writer is closed even on early test failure.
+	t.Cleanup(func() {
+		if err := w.Close(); err != nil {
+			t.Errorf("failed to close writer: %v", err)
+		}
+	})
 
 	// Keep writing until lifetime + half of lifetime (middle of ticks) elapses.
 	end := time.Now().Add(lifetime + lifetime/2)
@@ -185,6 +206,13 @@ func TestConcurrentWrites(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create writer: %v", err)
 	}
+	// Ensure writer is closed even on early test failure.
+	t.Cleanup(func() {
+		if err := w.Close(); err != nil {
+			t.Errorf("failed to close writer: %v", err)
+		}
+	})
+
 	rows := 10000
 	writers := 10
 	messageSize := 10
@@ -251,6 +279,12 @@ func TestFlushAfterEveryWrite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create writer: %v", err)
 	}
+	// Ensure writer is closed even on early test failure.
+	t.Cleanup(func() {
+		if err := w.Close(); err != nil {
+			t.Errorf("failed to close writer: %v", err)
+		}
+	})
 
 	if _, err := w.Write([]byte("message")); err != nil {
 		t.Fatalf("failed to write: %v", err)

@@ -718,7 +718,7 @@
 					"name": "gpt-5-mini",
 					"displayName": "OpenAI GPT 5 Mini",
 					"slug": "gpt5Mini",
-					"isEnabled": false,
+					"isEnabled": true,
 					"stream": true,
 					"maxPromptLength": 400000,
 					"maxOutputLength": 128000,

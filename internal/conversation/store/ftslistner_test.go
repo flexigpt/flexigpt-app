@@ -253,6 +253,7 @@ func newCollection(t *testing.T, dir string, withFTS bool) *ConversationCollecti
 	if err != nil {
 		t.Fatalf("NewConversationCollection: %v", err)
 	}
+	t.Cleanup(func() { _ = cc.Close() })
 	return cc
 }
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/conversation/spec"
@@ -21,6 +22,10 @@ type ConversationCollection struct {
 	store     *mapstore.MapDirectoryStore
 	fts       *ftsengine.Engine
 	pp        mapstore.PartitionProvider
+
+	ftsRebuildCtx    context.Context
+	ftsRebuildCancel context.CancelFunc
+	ftsRebuildWG     sync.WaitGroup
 }
 
 type Option func(*ConversationCollection) error
@@ -84,11 +89,21 @@ func NewConversationCollection(baseDir string, opts ...Option) (*ConversationCol
 		if err != nil {
 			return nil, err
 		}
-		StartRebuild(
-			context.Background(),
-			baseDir,
-			cc.fts,
-		)
+		// Start rebuild with a cancellable context so we can shutdown cleanly.
+		cc.ftsRebuildCtx, cc.ftsRebuildCancel = context.WithCancel(context.Background())
+		cc.ftsRebuildWG.Go(func() {
+			stat, _ := ftsengine.SyncDirToFTS(
+				cc.ftsRebuildCtx,
+				cc.fts,
+				baseDir,
+				"mtime",
+				1000,
+				processFTSDataForFile,
+			)
+			if stat != nil {
+				slog.Info("conversation fts rebuild", "stat", stat)
+			}
+		})
 	}
 
 	optsDir := []mapstore.DirOption{mapstore.WithDirLogger(slog.Default())}
@@ -101,6 +116,27 @@ func NewConversationCollection(baseDir string, opts ...Option) (*ConversationCol
 	}
 	cc.store = store
 	return cc, nil
+}
+
+// Close releases resources.
+func (cc *ConversationCollection) Close() (err error) {
+	// Stop rebuild goroutine first (avoid it using the engine while we close it).
+	if cc.ftsRebuildCancel != nil {
+		cc.ftsRebuildCancel()
+		cc.ftsRebuildWG.Wait()
+		cc.ftsRebuildCancel = nil
+	}
+
+	if cc.store != nil {
+		err = cc.store.CloseAll()
+	}
+
+	// Close sqlite handle.
+	if cc.fts != nil {
+		err = cc.fts.Close()
+		cc.fts = nil
+	}
+	return err
 }
 
 func (cc *ConversationCollection) PutConversation(
