@@ -76,6 +76,25 @@ func NewModelPresetStore(baseDir string) (*ModelPresetStore, error) {
 	return s, nil
 }
 
+func (s *ModelPresetStore) Close() error {
+	if s == nil {
+		return nil
+	}
+	if s.builtinData != nil {
+		if err := s.builtinData.Close(); err != nil {
+			slog.Error("builtinData close failed", "err", err)
+		}
+		s.builtinData = nil
+	}
+	if s.userStore != nil {
+		if err := s.userStore.Close(); err != nil {
+			slog.Error("userStore close failed", "err", err)
+		}
+		s.userStore = nil
+	}
+	return nil
+}
+
 func (s *ModelPresetStore) GetDefaultProvider(
 	ctx context.Context, req *spec.GetDefaultProviderRequest,
 ) (*spec.GetDefaultProviderResponse, error) {

@@ -691,6 +691,9 @@ func newTestStore(t *testing.T) *store.ModelPresetStore {
 	if err != nil {
 		t.Fatalf("store init failed: %v", err)
 	}
+	t.Cleanup(func() {
+		_ = s.Close()
+	})
 	return s
 }
 
