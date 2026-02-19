@@ -52,7 +52,12 @@ type SkillStore struct {
 	builtin   *BuiltInSkills
 	runtime   *agentskills.Runtime
 
-	mu sync.RWMutex // guards userStore read-modify-write
+	// "writeMu" serializes ALL write operations (CRUD + sweeper). This lets us run potentially-slow runtime
+	// validation/mutations without holding mu.
+	writeMu sync.Mutex
+
+	// "mu" guards userStore I/O and in-memory schema normalization during read/write.
+	mu sync.RWMutex
 
 	// Cleanup loop plumbing.
 	cleanOnce sync.Once
@@ -60,9 +65,6 @@ type SkillStore struct {
 	cleanCtx  context.Context
 	cleanStop context.CancelFunc
 	wg        sync.WaitGroup
-
-	// Sweep coordination with CRUD ops.
-	sweepMu sync.RWMutex
 
 	// Serializes runtime resync calls (best-effort reconcile).
 	rtResyncMu sync.Mutex
@@ -352,36 +354,29 @@ func (s *SkillStore) DeleteSkillBundle(
 		}
 	}
 
-	s.sweepMu.Lock()
-	defer s.sweepMu.Unlock()
+	if err := s.withUserWriteSaga(ctx, "deleteSkillBundle", func(sc *skillStoreSchema) (userWriteSagaOutcome, error) {
+		b, ok := sc.Bundles[req.BundleID]
+		if !ok {
+			return userWriteSagaOutcome{}, fmt.Errorf("%w: %s", spec.ErrSkillBundleNotFound, req.BundleID)
+		}
+		if isSoftDeletedSkillBundle(b) {
+			return userWriteSagaOutcome{}, fmt.Errorf("%w: %s", spec.ErrSkillBundleDeleting, req.BundleID)
+		}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
+		// Must be empty.
+		if sm := sc.Skills[req.BundleID]; len(sm) > 0 {
+			return userWriteSagaOutcome{}, fmt.Errorf("%w: %s", spec.ErrSkillBundleNotEmpty, req.BundleID)
+		}
 
-	all, err := s.readAllUser(false)
-	if err != nil {
-		return nil, err
-	}
-	b, ok := all.Bundles[req.BundleID]
-	if !ok {
-		return nil, fmt.Errorf("%w: %s", spec.ErrSkillBundleNotFound, req.BundleID)
-	}
-	if isSoftDeletedSkillBundle(b) {
-		return nil, fmt.Errorf("%w: %s", spec.ErrSkillBundleDeleting, req.BundleID)
-	}
+		now := time.Now().UTC()
+		b.IsEnabled = false
+		b.SoftDeletedAt = &now
+		b.ModifiedAt = now
+		sc.Bundles[req.BundleID] = b
 
-	// Must be empty.
-	if sm := all.Skills[req.BundleID]; len(sm) > 0 {
-		return nil, fmt.Errorf("%w: %s", spec.ErrSkillBundleNotEmpty, req.BundleID)
-	}
-
-	now := time.Now().UTC()
-	b.IsEnabled = false
-	b.SoftDeletedAt = &now
-	b.ModifiedAt = now
-	all.Bundles[req.BundleID] = b
-
-	if err := s.writeAllUser(all); err != nil {
+		// No runtime resync needed: bundle is empty.
+		return userWriteSagaOutcome{}, nil
+	}); err != nil {
 		return nil, err
 	}
 

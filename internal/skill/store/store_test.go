@@ -245,12 +245,12 @@ func TestSkillStore_SweepSoftDeleted_HardDeletesAfterGrace(t *testing.T) {
 	}
 
 	// Force softDeletedAt older than grace, then run sweep.
-	s.sweepMu.Lock()
+	s.writeMu.Lock()
 	s.mu.Lock()
 	all, err := s.readAllUser(true)
 	if err != nil {
 		s.mu.Unlock()
-		s.sweepMu.Unlock()
+		s.writeMu.Unlock()
 		t.Fatalf("readAllUser: %v", err)
 	}
 	b := all.Bundles["b1"]
@@ -259,11 +259,11 @@ func TestSkillStore_SweepSoftDeleted_HardDeletesAfterGrace(t *testing.T) {
 	all.Bundles["b1"] = b
 	if err := s.writeAllUser(all); err != nil {
 		s.mu.Unlock()
-		s.sweepMu.Unlock()
+		s.writeMu.Unlock()
 		t.Fatalf("writeAllUser: %v", err)
 	}
 	s.mu.Unlock()
-	s.sweepMu.Unlock()
+	s.writeMu.Unlock()
 
 	s.sweepSoftDeleted()
 
@@ -396,12 +396,12 @@ func TestSkillStore_ListSkills_UserOnlyFiltersAndPaging(t *testing.T) {
 	}
 
 	// Mark s2 missing (so it should be excluded when IncludeMissing=false).
-	s.sweepMu.Lock()
+	s.writeMu.Lock()
 	s.mu.Lock()
 	all, err := s.readAllUser(true)
 	if err != nil {
 		s.mu.Unlock()
-		s.sweepMu.Unlock()
+		s.writeMu.Unlock()
 		t.Fatalf("readAllUser: %v", err)
 	}
 	sk2 := all.Skills["b1"]["s2"]
@@ -409,11 +409,11 @@ func TestSkillStore_ListSkills_UserOnlyFiltersAndPaging(t *testing.T) {
 	all.Skills["b1"]["s2"] = sk2
 	if err := s.writeAllUser(all); err != nil {
 		s.mu.Unlock()
-		s.sweepMu.Unlock()
+		s.writeMu.Unlock()
 		t.Fatalf("writeAllUser: %v", err)
 	}
 	s.mu.Unlock()
-	s.sweepMu.Unlock()
+	s.writeMu.Unlock()
 
 	// Add another enabled + non-missing skill so paging is guaranteed with pageSize=1.
 	time.Sleep(2 * time.Millisecond)

@@ -54,13 +54,12 @@ func (s *SkillStore) sweepSoftDeleted() {
 		}
 	}()
 
-	s.sweepMu.Lock()
-	defer s.sweepMu.Unlock()
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+	s.mu.RLock()
 	all, err := s.readAllUser(false)
+	s.mu.RUnlock()
 	if err != nil {
 		slog.Error("sweepSoftDeleted/readAllUser", "err", err)
 		return
@@ -90,7 +89,10 @@ func (s *SkillStore) sweepSoftDeleted() {
 	}
 
 	if changed {
-		if err := s.writeAllUser(all); err != nil {
+		s.mu.Lock()
+		err := s.writeAllUser(all)
+		s.mu.Unlock()
+		if err != nil {
 			slog.Error("sweepSoftDeleted/writeAllUser", "err", err)
 		}
 	}

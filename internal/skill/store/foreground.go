@@ -100,13 +100,15 @@ func (s *SkillStore) enabledDefCountsInUserBundle(
 }
 
 // withUserWriteSaga runs a strict foreground saga under the store write locks:
-//  1. read user schema
-//  2. fn does runtime strict validation/mutation + mutates the schema in-memory
-//  3. commit schema to store
-//  4. on store write failure: rollback runtime strictly to store
-//  5. after successful commit: best-effort runtime resync
+//  1. serialize writers (writeMu)
+//  2. read user schema (mu.RLock)
+//  3. fn does runtime strict validation/mutation + mutates schema in-memory (NO mu held)
+//  4. commit schema to store (mu.Lock)
+//  5. on store write failure: rollback runtime strictly to store
+//  6. after successful commit: best-effort runtime resync.
 //
-// NOTE: fn is called while holding (sweepMu + mu). Keep fn bounded and avoid external blocking.
+// NOTE: fn is called while holding writeMu (so no other writer can change the store snapshot),
+// but without holding mu (so readers are not blocked by runtime validation).
 func (s *SkillStore) withUserWriteSaga(
 	ctx context.Context,
 	op string,
@@ -119,8 +121,7 @@ func (s *SkillStore) withUserWriteSaga(
 		return fmt.Errorf("%w: nil saga func", spec.ErrSkillInvalidRequest)
 	}
 
-	s.sweepMu.Lock()
-	s.mu.Lock()
+	s.writeMu.Lock()
 
 	var (
 		outcome        userWriteSagaOutcome
@@ -131,9 +132,8 @@ func (s *SkillStore) withUserWriteSaga(
 	)
 
 	defer func() {
-		// Always unlock first.
-		s.mu.Unlock()
-		s.sweepMu.Unlock()
+		// Always unlock writer serialization first.
+		s.writeMu.Unlock()
 
 		// Then do post-actions without holding store locks.
 		if rollbackErr != nil {
@@ -145,7 +145,10 @@ func (s *SkillStore) withUserWriteSaga(
 		}
 	}()
 
+	// Read snapshot under mu, but keep mu held for as short as possible.
+	s.mu.RLock()
 	sc, err := s.readAllUser(false)
+	s.mu.RUnlock()
 	if err != nil {
 		return err
 	}
@@ -162,7 +165,11 @@ func (s *SkillStore) withUserWriteSaga(
 		return err
 	}
 
-	if err := s.writeAllUser(sc); err != nil {
+	// Commit under mu (exclusive), again held briefly.
+	s.mu.Lock()
+	err = s.writeAllUser(sc)
+	s.mu.Unlock()
+	if err != nil {
 		rollbackReason = op + "(store-failed)"
 		rollbackErr = err
 		return err
