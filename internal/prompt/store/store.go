@@ -116,7 +116,32 @@ func (s *PromptTemplateStore) Close() {
 	if s.cleanStop != nil {
 		s.cleanStop()
 	}
+	// Wait for cleanup goroutine(s) to finish.
 	s.wg.Wait()
+
+	// Close builtin data if present (stop rebuilder + close overlay store).
+	if s.builtinData != nil {
+		if err := s.builtinData.Close(); err != nil {
+			slog.Error("builtinData close failed", "err", err)
+		}
+		s.builtinData = nil
+	}
+
+	// Close the bundle meta mapstore if it implements Close().
+	if s.bundleStore != nil {
+		if err := s.bundleStore.Close(); err != nil {
+			slog.Error("bundleStore close failed", "err", err)
+		}
+		s.bundleStore = nil
+	}
+
+	// Close the template directory store if it implements Close().
+	if s.templateStore != nil {
+		if err := s.templateStore.CloseAll(); err != nil {
+			slog.Error("templateStore close failed", "err", err)
+		}
+		s.templateStore = nil
+	}
 }
 
 // PutPromptBundle creates or replaces a prompt bundle.

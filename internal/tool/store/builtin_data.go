@@ -134,6 +134,23 @@ func NewBuiltInToolData(
 	return d, nil
 }
 
+func (d *BuiltInToolData) Close() error {
+	if d == nil {
+		return nil
+	}
+
+	// Stop async rebuilder if it exposes a Stop or Close method.
+	if d.rebuilder != nil {
+		d.rebuilder.Close()
+	}
+
+	// Close overlay store if it supports Close().
+	if d.store != nil {
+		_ = d.store.Close()
+	}
+	return nil
+}
+
 // SetToolBundleEnabled toggles a bundle flag and returns the updated bundle.
 func (d *BuiltInToolData) SetToolBundleEnabled(
 	ctx context.Context,

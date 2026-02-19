@@ -3,6 +3,7 @@ package builtin
 import (
 	"log/slog"
 	"runtime/debug"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -11,12 +12,12 @@ import (
 //
 // Typical usage:
 //
-//	reb := builtin.NewAsyncRebuilder(
-//	    time.Hour,                            // max snapshot age
-//	    func() error { return rebuild() },    // the expensive work
-//	)
-//	...
-//	reb.Trigger() // cheap, may launch the goroutine if needed
+//  reb := builtin.NewAsyncRebuilder(
+//      time.Hour,                            // max snapshot age
+//      func() error { return rebuild() },    // the expensive work
+//  )
+//  ...
+//  reb.Trigger() // cheap, may launch the goroutine if needed
 //
 // The code guarantees that
 //
@@ -33,9 +34,13 @@ const alwaysStale = time.Duration(1)
 type AsyncRebuilder struct {
 	maxAge  time.Duration
 	fn      func() error
-	lastRun int64         // Unix-nanos of the successful run
-	running int32         // 0/1 - guarded with CAS
-	done    chan struct{} // closed when the current rebuild finishes
+	lastRun int64 // Unix-nanos of the successful run
+
+	mu        sync.Mutex    // protects running, done and closed
+	running   bool          // true when a rebuild goroutine is alive
+	done      chan struct{} // closed when the current rebuild finishes
+	closed    bool          // set by Close() to prevent further triggers
+	closeOnce sync.Once     // ensures Close action runs only once
 }
 
 // NewAsyncRebuilder returns a ready-to-use AsyncRebuilder.
@@ -44,36 +49,59 @@ func NewAsyncRebuilder(maxAge time.Duration, fn func() error) *AsyncRebuilder {
 	if maxAge <= 0 {
 		maxAge = alwaysStale
 	}
+	// When nothing is running, done should be a closed channel so IsDone() is ready.
+	initDone := make(chan struct{})
+	close(initDone)
+
 	r := &AsyncRebuilder{
 		maxAge: maxAge,
 		fn:     fn,
-		done:   make(chan struct{}),
+		done:   initDone,
 	}
 	return r
 }
 
-func (r *AsyncRebuilder) IsDone() <-chan struct{} { return r.done }
+func (r *AsyncRebuilder) IsDone() <-chan struct{} {
+	r.mu.Lock()
+	ch := r.done
+	r.mu.Unlock()
+	return ch
+}
 
 // Trigger starts a rebuild in the background when the stored snapshot is considered stale.
 // The call itself is cheap (non-blocking).
 func (r *AsyncRebuilder) Trigger() {
-	if time.Since(time.Unix(0, atomic.LoadInt64(&r.lastRun))) <= r.maxAge {
+	// Fast-path: if the last successful run is still fresh, return quickly.
+	last := atomic.LoadInt64(&r.lastRun)
+	if last != 0 && time.Since(time.Unix(0, last)) <= r.maxAge {
 		return // snapshot still fresh
 	}
-	if !atomic.CompareAndSwapInt32(&r.running, 0, 1) {
-		return // another rebuild already running
+
+	r.mu.Lock()
+	if r.closed || r.running {
+		r.mu.Unlock()
+		return // closed or already running
+	}
+	// Re-check freshness while holding the lock (read lastRun atomically).
+	if time.Since(time.Unix(0, atomic.LoadInt64(&r.lastRun))) <= r.maxAge {
+		r.mu.Unlock()
+		return // snapshot fresh now
 	}
 
+	r.running = true
 	done := make(chan struct{})
 	r.done = done
+	r.mu.Unlock()
 
 	go func() {
 		defer func() {
 			rec := recover()
 
-			// Always reset state first; logging can be slow.
-			atomic.StoreInt32(&r.running, 0)
+			// Reset state under lock, then close the done channel.
+			r.mu.Lock()
+			r.running = false
 			close(done)
+			r.mu.Unlock()
 
 			if rec != nil {
 				slog.Error("panic in async rebuild",
@@ -101,6 +129,23 @@ func (r *AsyncRebuilder) Force() error {
 	return nil
 }
 
+// MarkFresh updates the last successful-run timestamp.
 func (r *AsyncRebuilder) MarkFresh() {
 	atomic.StoreInt64(&r.lastRun, time.Now().UnixNano())
+}
+
+// Close prevents any new rebuilds from starting and waits for any running rebuild to finish.
+// The Close action is performed only once (sync.Once); subsequent Close calls return immediately.
+func (r *AsyncRebuilder) Close() {
+	r.closeOnce.Do(func() {
+		r.mu.Lock()
+		r.closed = true
+		ch := r.done
+		running := r.running
+		r.mu.Unlock()
+
+		if running {
+			<-ch
+		}
+	})
 }

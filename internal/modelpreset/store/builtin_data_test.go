@@ -80,6 +80,11 @@ func TestNewBuiltInPresets(t *testing.T) {
 			ctx := t.Context()
 			dir := tc.setupDir(t)
 			bi, err := NewBuiltInPresets(ctx, dir, tc.snapshotMaxAge)
+			t.Cleanup(func() {
+				if !tc.wantErr {
+					_ = bi.Close()
+				}
+			})
 
 			if tc.wantErr {
 				if err == nil {
@@ -147,6 +152,9 @@ func TestSetProviderEnabled(t *testing.T) {
 			ctx := t.Context()
 			dir := t.TempDir()
 			bi, _ := NewBuiltInPresets(ctx, dir, 0)
+			t.Cleanup(func() {
+				_ = bi.Close()
+			})
 			pname, enabled := tc.setup(t, bi)
 			_, err := bi.SetProviderEnabled(ctx, pname, enabled)
 
@@ -219,6 +227,9 @@ func TestSetModelPresetEnabled(t *testing.T) {
 			ctx := t.Context()
 			dir := t.TempDir()
 			bi, _ := NewBuiltInPresets(ctx, dir, 0)
+			t.Cleanup(func() {
+				_ = bi.Close()
+			})
 			pn, mp, enabled := tc.setup(t, bi)
 			_, err := bi.SetModelPresetEnabled(ctx, pn, mp.ID, enabled)
 
@@ -256,6 +267,9 @@ func TestListBuiltInPresets(t *testing.T) {
 	ctx := t.Context()
 	dir := t.TempDir()
 	bi, _ := NewBuiltInPresets(ctx, dir, 0)
+	t.Cleanup(func() {
+		_ = bi.Close()
+	})
 
 	t.Run("independent_copies", func(t *testing.T) {
 		p1, m1, _ := bi.ListBuiltInPresets(ctx)
@@ -307,6 +321,9 @@ func TestConcurrencyPresets(t *testing.T) {
 	ctx := t.Context()
 	dir := t.TempDir()
 	bi, _ := NewBuiltInPresets(ctx, dir, 10*time.Millisecond)
+	t.Cleanup(func() {
+		_ = bi.Close()
+	})
 
 	// Fetch sample keys.
 	prov, models, _ := bi.ListBuiltInPresets(ctx)
@@ -350,6 +367,9 @@ func TestRebuildSnapshotPresets(t *testing.T) {
 	ctx := t.Context()
 	dir := t.TempDir()
 	bi, _ := NewBuiltInPresets(ctx, dir, time.Hour)
+	t.Cleanup(func() {
+		_ = bi.Close()
+	})
 
 	prov, _, _ := bi.ListBuiltInPresets(ctx)
 	pn, p := anyProvider(prov)
@@ -372,6 +392,9 @@ func TestAsyncRebuildPresets(t *testing.T) {
 	ctx := t.Context()
 	dir := t.TempDir()
 	bi, _ := NewBuiltInPresets(ctx, dir, time.Millisecond)
+	t.Cleanup(func() {
+		_ = bi.Close()
+	})
 
 	prov, _, _ := bi.ListBuiltInPresets(ctx)
 	pn, p := anyProvider(prov)
@@ -440,6 +463,9 @@ func Test_NewBuiltInPresets_SyntheticFS_HappyAndCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
 	}
+	t.Cleanup(func() {
+		_ = bi.Close()
+	})
 
 	prov, models, _ := bi.ListBuiltInPresets(ctx)
 	if len(prov) != 1 || len(models) != 1 {
@@ -518,6 +544,9 @@ func TestSetDefaultModelPreset(t *testing.T) {
 			ctx := t.Context()
 			dir := t.TempDir()
 			bi, _ := NewBuiltInPresets(ctx, dir, 0)
+			t.Cleanup(func() {
+				_ = bi.Close()
+			})
 
 			pn, mid := tc.setup(t, bi)
 			if pn == "" {
@@ -560,6 +589,9 @@ func TestRebuildSnapshot_DefaultModelPreset(t *testing.T) {
 	ctx := t.Context()
 	dir := t.TempDir()
 	bi, _ := NewBuiltInPresets(ctx, dir, time.Hour)
+	t.Cleanup(func() {
+		_ = bi.Close()
+	})
 
 	_, models, _ := bi.ListBuiltInPresets(ctx)
 	pn, _, mp := anyModel(models)
@@ -594,6 +626,9 @@ func TestAsyncRebuild_DefaultModelPreset(t *testing.T) {
 	ctx := t.Context()
 	dir := t.TempDir()
 	bi, _ := NewBuiltInPresets(ctx, dir, 5*time.Millisecond)
+	t.Cleanup(func() {
+		_ = bi.Close()
+	})
 
 	_, models, _ := bi.ListBuiltInPresets(ctx)
 	pn, _, mp := anyModel(models)
@@ -628,6 +663,9 @@ func TestProviderModelSync_Scenarios(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
 	}
+	t.Cleanup(func() {
+		_ = bi.Close()
+	})
 
 	prov, models, _ := bi.ListBuiltInPresets(ctx)
 	pn, mid, mp := anyModel(models)
@@ -838,6 +876,9 @@ func TestScopedModelIDs_AcrossProviders_OverlayIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
 	}
+	t.Cleanup(func() {
+		_ = bi.Close()
+	})
 
 	// Sanity checks: both providers and the common model exist in their own namespaces.
 	prov, models, _ := bi.ListBuiltInPresets(ctx)
@@ -1022,7 +1063,11 @@ func anyModel(m map[inferencegoSpec.ProviderName]map[spec.ModelPresetID]spec.Mod
 func newPresetsFromFS(t *testing.T, mem fs.FS) (*BuiltInPresets, error) {
 	t.Helper()
 	ctx := t.Context()
-	return NewBuiltInPresets(ctx, t.TempDir(), time.Hour, WithModelPresetsFS(mem, "."))
+	bi, err := NewBuiltInPresets(ctx, t.TempDir(), time.Hour, WithModelPresetsFS(mem, "."))
+	t.Cleanup(func() {
+		_ = bi.Close()
+	})
+	return bi, err
 }
 
 func buildSchemaDefaultMissing(pn inferencegoSpec.ProviderName, mpid spec.ModelPresetID) []byte {

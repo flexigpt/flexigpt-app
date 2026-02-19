@@ -231,6 +231,23 @@ func (d *BuiltInData) GetBuiltInTemplate(
 	)
 }
 
+func (d *BuiltInData) Close() error {
+	if d == nil {
+		return nil
+	}
+
+	// Stop async rebuilder if it exposes a Stop or Close method.
+	if d.rebuilder != nil {
+		d.rebuilder.Close()
+	}
+
+	// Close overlay store if it supports Close().
+	if d.store != nil {
+		_ = d.store.Close()
+	}
+	return nil
+}
+
 func (d *BuiltInData) populateDataFromFS(ctx context.Context) error {
 	bundlesFS, err := resolveBundlesFS(d.bundlesFS, d.bundlesDir)
 	if err != nil {

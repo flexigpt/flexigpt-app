@@ -92,6 +92,7 @@ func TestNewBuiltInData(t *testing.T) {
 			dir := tt.setupDir(t)
 
 			bi, err := NewBuiltInData(ctx, dir, tt.snapshotMaxAge)
+			t.Cleanup(func() { _ = bi.Close() })
 
 			if tt.wantErr {
 				if err == nil {
@@ -192,6 +193,7 @@ func TestSetBundleEnabled(t *testing.T) {
 			if err != nil {
 				t.Fatalf("setup failed: %v", err)
 			}
+			t.Cleanup(func() { _ = bi.Close() })
 
 			bundleID, enabled := tt.setup(t, bi)
 
@@ -310,6 +312,7 @@ func TestSetTemplateEnabled(t *testing.T) {
 			if err != nil {
 				t.Fatalf("setup failed: %v", err)
 			}
+			t.Cleanup(func() { _ = bi.Close() })
 
 			bundleID, template, enabled := tt.setup(t, bi)
 
@@ -359,6 +362,7 @@ func TestList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
+	t.Cleanup(func() { _ = bi.Close() })
 
 	t.Run("returns_independent_copies", func(t *testing.T) {
 		b1, t1, _ := bi.ListBuiltInData(ctx)
@@ -440,6 +444,7 @@ func TestConcurrency(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
+	t.Cleanup(func() { _ = bi.Close() })
 
 	bundles, templates, _ := bi.ListBuiltInData(ctx)
 	if len(bundles) == 0 || len(templates) == 0 {
@@ -555,6 +560,7 @@ func TestRebuildSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
+	t.Cleanup(func() { _ = bi.Close() })
 
 	bundles, _, _ := bi.ListBuiltInData(ctx)
 	bundleID, bundle := anyBundle(bundles)
@@ -584,6 +590,7 @@ func TestAsyncRebuild(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
+	t.Cleanup(func() { _ = bi.Close() })
 
 	bundles, _, _ := bi.ListBuiltInData(ctx)
 	bundleID, bundle := anyBundle(bundles)
@@ -725,6 +732,7 @@ func Test_NewBuiltInData_SyntheticFS_HappyAndCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	t.Cleanup(func() { _ = bi.Close() })
 
 	bundles, tpls, _ := bi.ListBuiltInData(ctx)
 	if len(bundles) != 1 || len(tpls) != 1 {
@@ -833,7 +841,9 @@ func buildTemplate(t *testing.T, slug, ver string) (fileName string, raw []byte,
 func newFromFS(t *testing.T, mem fs.FS) (*BuiltInData, error) {
 	t.Helper()
 	ctx := t.Context()
-	return NewBuiltInData(ctx, t.TempDir(), time.Hour, WithBundlesFS(mem, "."))
+	bi, err := NewBuiltInData(ctx, t.TempDir(), time.Hour, WithBundlesFS(mem, "."))
+	t.Cleanup(func() { _ = bi.Close() })
+	return bi, err
 }
 
 // newUUID returns a v7-UUID as string or fails the test.

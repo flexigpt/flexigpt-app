@@ -59,6 +59,9 @@ type Store struct {
 	mu  sync.RWMutex
 	db  *sql.DB
 	reg map[GroupID]struct{}
+
+	closeOnce sync.Once
+	closeErr  error
 }
 
 type Option func(*Store) error
@@ -158,6 +161,22 @@ func (s *Store) DeleteKey(ctx context.Context, k Key) error {
 		string(k.ID()),
 	)
 	return err
+}
+
+// Close blocks until any in-flight Get/Set/Delete finishes (they hold s.mu),
+// then closes the underlying *sql.DB exactly once.
+func (s *Store) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.closeOnce.Do(func() {
+		if s.db != nil {
+			s.closeErr = s.db.Close()
+			s.db = nil
+		}
+	})
+
+	return s.closeErr
 }
 
 func (s *Store) ensureRegistered(group GroupID) error {

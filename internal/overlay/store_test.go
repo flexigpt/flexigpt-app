@@ -149,7 +149,10 @@ func TestPersistenceAcrossReopen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reopen: %v", err)
 	}
-	defer st2.db.Close()
+	t.Cleanup(func() {
+		_ = st2.Close()
+	})
+
 	flag, ok, err := st2.GetFlag(t.Context(), BundleID("persist"))
 	if err != nil {
 		t.Fatalf("get after reopen: %v", err)
@@ -473,6 +476,9 @@ func tmpStore(t *testing.T, opts ...Option) (s *Store, path string) {
 	if err != nil {
 		t.Fatalf("NewOverlayStore failed: %v", err)
 	}
+	t.Cleanup(func() {
+		_ = s.Close()
+	})
 	return s, path
 }
 

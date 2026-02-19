@@ -138,6 +138,23 @@ func NewBuiltInPresets(
 	return b, nil
 }
 
+func (b *BuiltInPresets) Close() error {
+	if b == nil {
+		return nil
+	}
+
+	// Stop async rebuilder if it exposes a Stop or Close method.
+	if b.rebuilder != nil {
+		b.rebuilder.Close()
+	}
+
+	// Close overlay store if it supports Close().
+	if b.store != nil {
+		_ = b.store.Close()
+	}
+	return nil
+}
+
 // ListBuiltInPresets returns deep-copied snapshots.
 func (b *BuiltInPresets) ListBuiltInPresets(ctx context.Context) (
 	providerPresets map[inferencegoSpec.ProviderName]spec.ProviderPreset,

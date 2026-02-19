@@ -92,6 +92,9 @@ func TestNewBuiltInToolData(t *testing.T) {
 			dir := tt.setupDir(t)
 
 			bi, err := NewBuiltInToolData(ctx, dir, tt.snapshotMaxAge, WithLLMToolsGoBuiltins(true))
+			t.Cleanup(func() {
+				_ = bi.Close()
+			})
 
 			if tt.wantErr {
 				if err == nil {
@@ -192,6 +195,9 @@ func TestSetToolBundleEnabled(t *testing.T) {
 			if err != nil {
 				t.Fatalf("setup failed: %v", err)
 			}
+			t.Cleanup(func() {
+				_ = bi.Close()
+			})
 
 			bundleID, enabled := tt.setup(t, bi)
 
@@ -297,6 +303,9 @@ func TestSetToolEnabled(t *testing.T) {
 			if err != nil {
 				t.Fatalf("setup failed: %v", err)
 			}
+			t.Cleanup(func() {
+				_ = bi.Close()
+			})
 
 			bundleID, tool, enabled := tt.setup(t, bi)
 
@@ -343,6 +352,9 @@ func TestListBuiltInToolData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
+	t.Cleanup(func() {
+		_ = bi.Close()
+	})
 
 	t.Run("returns_independent_copies", func(t *testing.T) {
 		b1, t1, _ := bi.ListBuiltInToolData(ctx)
@@ -424,6 +436,9 @@ func TestToolConcurrency(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
+	t.Cleanup(func() {
+		_ = bi.Close()
+	})
 
 	bundles, tools, _ := bi.ListBuiltInToolData(ctx)
 	if len(bundles) == 0 || len(tools) == 0 {
@@ -526,6 +541,9 @@ func TestRebuildToolSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
+	t.Cleanup(func() {
+		_ = bi.Close()
+	})
 
 	bundles, _, _ := bi.ListBuiltInToolData(ctx)
 	bundleID, bundle := anyToolBundle(bundles)
@@ -555,6 +573,9 @@ func TestAsyncToolRebuild(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
+	t.Cleanup(func() {
+		_ = bi.Close()
+	})
 
 	bundles, _, _ := bi.ListBuiltInToolData(ctx)
 	bundleID, bundle := anyToolBundle(bundles)
@@ -704,6 +725,9 @@ func Test_NewBuiltInToolData_SyntheticFS_HappyAndCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	t.Cleanup(func() {
+		_ = bi.Close()
+	})
 
 	bundles, tools, err := bi.ListBuiltInToolData(ctx)
 	if err != nil || len(bundles) != 1 || len(tools) != 1 {
@@ -832,7 +856,11 @@ func buildValidTool(t *testing.T, slug, ver, id string) spec.Tool {
 func newToolFromFS(t *testing.T, mem fs.FS) (*BuiltInToolData, error) {
 	t.Helper()
 	ctx := t.Context()
-	return NewBuiltInToolData(ctx, t.TempDir(), time.Hour, WithToolBundlesFS(mem, "."))
+	bi, err := NewBuiltInToolData(ctx, t.TempDir(), time.Hour, WithToolBundlesFS(mem, "."))
+	t.Cleanup(func() {
+		_ = bi.Close()
+	})
+	return bi, err
 }
 
 // newUUID returns a v7-UUID as string or fails the test.
