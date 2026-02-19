@@ -9,6 +9,7 @@ import (
 
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
 )
 
@@ -26,6 +27,76 @@ type userWriteSagaOutcome struct {
 	// If RollbackErr is nil, the returned error is used.
 	RollbackReason string
 	RollbackErr    error
+}
+
+// runtimeApplyUserBundleEnabledDelta applies the strict foreground runtime delta for a bundle enable/disable.
+// Caller is expected to run this BEFORE committing the bundle enabled state to the store.
+func (s *SkillStore) runtimeApplyUserBundleEnabledDelta(
+	ctx context.Context,
+	sc *skillStoreSchema,
+	bundleID bundleitemutils.BundleID,
+	oldEnabled, newEnabled bool,
+) error {
+	if oldEnabled == newEnabled {
+		return nil
+	}
+
+	bundleDefCounts, err := s.enabledDefCountsInUserBundle(sc, bundleID)
+	if err != nil {
+		return err
+	}
+
+	// ENABLE: validate/add all enabled skills in this bundle.
+	if newEnabled {
+		for def := range bundleDefCounts {
+			if _, rtErr := s.runtimeTryAddForeground(ctx, def); rtErr != nil {
+				return fmt.Errorf("runtime rejected bundle enable: %w", rtErr)
+			}
+		}
+		return nil
+	}
+
+	// DISABLE: remove SkillDefs only if they become undesired globally (duplicate-safe).
+	desiredCounts, err := s.runtimeDesiredDefCountsForSnapshot(ctx, *sc)
+	if err != nil {
+		return err
+	}
+	for def, n := range bundleDefCounts {
+		after := desiredCounts[def] - n
+		if after <= 0 {
+			if rtErr := s.runtimeRemoveForegroundStrict(ctx, def); rtErr != nil {
+				return fmt.Errorf("runtime remove failed: %w", rtErr)
+			}
+		}
+	}
+	return nil
+}
+
+// enabledDefCountsInUserBundle returns enabled SkillDef counts for all enabled skills in a bundle.
+// Counts are used to make runtime removals duplicate-safe (same SkillDef may appear in multiple places).
+func (s *SkillStore) enabledDefCountsInUserBundle(
+	sc *skillStoreSchema,
+	bundleID bundleitemutils.BundleID,
+) (map[agentskillsSpec.SkillDef]int, error) {
+	out := map[agentskillsSpec.SkillDef]int{}
+	if sc == nil {
+		return out, nil
+	}
+	sm := sc.Skills[bundleID]
+	if sm == nil {
+		return out, nil
+	}
+	for _, sk := range sm {
+		if !sk.IsEnabled {
+			continue
+		}
+		def, err := runtimeDefForUserSkill(sk)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", spec.ErrSkillInvalidRequest, err)
+		}
+		out[def]++
+	}
+	return out, nil
 }
 
 // withUserWriteSaga runs a strict foreground saga under the store write locks:

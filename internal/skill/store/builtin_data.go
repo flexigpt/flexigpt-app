@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -254,8 +253,13 @@ func (b *BuiltInSkills) loadFromFS(ctx context.Context) error {
 		return fmt.Errorf("schemaVersion %q not equal to %q", schema.SchemaVersion, spec.SkillSchemaVersion)
 	}
 	if len(schema.Bundles) == 0 {
-		slog.Info("builtin contains no bundles", "dir", builtin.BuiltInSkillBundlesJSON)
-		return nil
+		// Keep internal state consistent and explicit.
+		b.bundles = map[bundleitemutils.BundleID]spec.SkillBundle{}
+		b.skills = map[bundleitemutils.BundleID]map[spec.SkillSlug]spec.Skill{}
+
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		return b.rebuildSnapshot(ctx)
 	}
 
 	// Normalize + validate + mark built-in.

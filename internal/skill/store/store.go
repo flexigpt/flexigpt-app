@@ -239,46 +239,9 @@ func (s *SkillStore) PutSkillBundle(
 		//
 		// Note: this does not "add skills to the bundle"; it only ensures runtime reflects the bundle gate.
 		if enabledChanged {
-			// Count enabled SkillDefs inside this bundle (dedupe + handle duplicates correctly).
-			bundleDefCounts := map[agentskillsSpec.SkillDef]int{}
-			if sm := sc.Skills[req.BundleID]; sm != nil {
-				for _, sk := range sm {
-					if !sk.IsEnabled {
-						continue
-					}
-					def, err := runtimeDefForUserSkill(sk)
-					if err != nil {
-						return userWriteSagaOutcome{}, fmt.Errorf("%w: %w", spec.ErrSkillInvalidRequest, err)
-					}
-					bundleDefCounts[def]++
-				}
-			}
-
-			// ENABLE: validate/add all enabled skills in this bundle.
-			if newEnabled {
-				for def := range bundleDefCounts {
-					if _, rtErr := s.runtimeTryAddForeground(ctx, def); rtErr != nil {
-						// AddSkill may have partially mutated runtime; rollback back to store snapshot.
-						return userWriteSagaOutcome{RollbackReason: "putSkillBundle(runtime-enable-failed)"},
-							fmt.Errorf("%w: runtime rejected bundle enable: %w", spec.ErrSkillInvalidRequest, rtErr)
-					}
-				}
-			} else {
-				// DISABLE: remove SkillDefs only if they become undesired globally (duplicate-safe).
-				desiredCounts, err := s.runtimeDesiredDefCountsForSnapshot(ctx, *sc)
-				if err != nil {
-					return userWriteSagaOutcome{}, err
-				}
-				for def, n := range bundleDefCounts {
-					after := desiredCounts[def] - n
-					if after <= 0 {
-						if rtErr := s.runtimeRemoveForegroundStrict(ctx, def); rtErr != nil {
-							// Some removes may already have happened; rollback back to store snapshot.
-							return userWriteSagaOutcome{RollbackReason: "putSkillBundle(runtime-disable-failed)"},
-								fmt.Errorf("%w: runtime remove failed: %w", spec.ErrSkillInvalidRequest, rtErr)
-						}
-					}
-				}
+			if err := s.runtimeApplyUserBundleEnabledDelta(ctx, sc, req.BundleID, oldEnabled, newEnabled); err != nil {
+				return userWriteSagaOutcome{RollbackReason: "putSkillBundle(runtime-enabled-delta-failed)"},
+					fmt.Errorf("%w: %w", spec.ErrSkillInvalidRequest, err)
 			}
 		}
 
@@ -351,41 +314,9 @@ func (s *SkillStore) PatchSkillBundle(
 		enabledChanged := oldEnabled != newEnabled
 
 		if enabledChanged {
-			bundleDefCounts := map[agentskillsSpec.SkillDef]int{}
-			if sm := sc.Skills[req.BundleID]; sm != nil {
-				for _, sk := range sm {
-					if !sk.IsEnabled {
-						continue
-					}
-					def, err := runtimeDefForUserSkill(sk)
-					if err != nil {
-						return userWriteSagaOutcome{}, fmt.Errorf("%w: %w", spec.ErrSkillInvalidRequest, err)
-					}
-					bundleDefCounts[def]++
-				}
-			}
-
-			if newEnabled {
-				for def := range bundleDefCounts {
-					if _, rtErr := s.runtimeTryAddForeground(ctx, def); rtErr != nil {
-						return userWriteSagaOutcome{RollbackReason: "patchSkillBundle(runtime-enable-failed)"},
-							fmt.Errorf("%w: runtime rejected bundle enable: %w", spec.ErrSkillInvalidRequest, rtErr)
-					}
-				}
-			} else {
-				desiredCounts, err := s.runtimeDesiredDefCountsForSnapshot(ctx, *sc)
-				if err != nil {
-					return userWriteSagaOutcome{}, err
-				}
-				for def, n := range bundleDefCounts {
-					after := desiredCounts[def] - n
-					if after <= 0 {
-						if rtErr := s.runtimeRemoveForegroundStrict(ctx, def); rtErr != nil {
-							return userWriteSagaOutcome{RollbackReason: "patchSkillBundle(runtime-disable-failed)"},
-								fmt.Errorf("%w: runtime remove failed: %w", spec.ErrSkillInvalidRequest, rtErr)
-						}
-					}
-				}
+			if err := s.runtimeApplyUserBundleEnabledDelta(ctx, sc, req.BundleID, oldEnabled, newEnabled); err != nil {
+				return userWriteSagaOutcome{RollbackReason: "patchSkillBundle(runtime-enabled-delta-failed)"},
+					fmt.Errorf("%w: %w", spec.ErrSkillInvalidRequest, err)
 			}
 		}
 
