@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -71,7 +72,10 @@ func TestNewBuiltInPresets(t *testing.T) {
 				_ = os.MkdirAll(ro, 0o444)
 				return ro
 			},
-			wantErr: true,
+			// Unix-like systems will typically fail to create files in a 0444
+			// directory; Windows does not honor these POSIX permission bits the
+			// same way, so don't require an error there.
+			wantErr: runtime.GOOS != "windows",
 		},
 	}
 
@@ -80,8 +84,12 @@ func TestNewBuiltInPresets(t *testing.T) {
 			ctx := t.Context()
 			dir := tc.setupDir(t)
 			bi, err := NewBuiltInPresets(ctx, dir, tc.snapshotMaxAge)
+			// Always ensure any created instance is closed at test cleanup.
+			// This guards against the case where NewBuiltInPresets unexpectedly
+			// succeeds for a case that planned to fail (which would otherwise
+			// leave resources open and cause TempDir removal to fail on Windows).
 			t.Cleanup(func() {
-				if !tc.wantErr {
+				if bi != nil {
 					_ = bi.Close()
 				}
 			})
@@ -1063,11 +1071,22 @@ func anyModel(m map[inferencegoSpec.ProviderName]map[spec.ModelPresetID]spec.Mod
 func newPresetsFromFS(t *testing.T, mem fs.FS) (*BuiltInPresets, error) {
 	t.Helper()
 	ctx := t.Context()
-	bi, err := NewBuiltInPresets(ctx, t.TempDir(), time.Hour, WithModelPresetsFS(mem, "."))
+	dir := t.TempDir()
+	bi, err := NewBuiltInPresets(ctx, dir, time.Hour, WithModelPresetsFS(mem, "."))
+	if err != nil {
+		// If NewBuiltInPresets returned an error but allocated/started something,
+		// make sure to close it immediately; otherwise tests on Windows can fail
+		// during TempDir cleanup because the overlay sqlite file remains open.
+		if bi != nil {
+			_ = bi.Close()
+		}
+		return nil, err
+	}
+	// Register normal cleanup for the successful case.
 	t.Cleanup(func() {
 		_ = bi.Close()
 	})
-	return bi, err
+	return bi, nil
 }
 
 func buildSchemaDefaultMissing(pn inferencegoSpec.ProviderName, mpid spec.ModelPresetID) []byte {

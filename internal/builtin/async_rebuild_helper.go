@@ -27,7 +27,9 @@ import (
 //     older than maxAge,
 //   - panics inside the rebuild function are caught and logged.
 
-const alwaysStale = time.Duration(1)
+// alwaysStale is represented as maxAge == 0 (or generally <= 0),
+// meaning "never treat the snapshot as fresh".
+const alwaysStale = time.Duration(0)
 
 // AsyncRebuilder calls fn in a background goroutine when Trigger detects
 // that the previous successful run is older than maxAge.
@@ -72,18 +74,20 @@ func (r *AsyncRebuilder) IsDone() <-chan struct{} {
 // The call itself is cheap (non-blocking).
 func (r *AsyncRebuilder) Trigger() {
 	// Fast-path: if the last successful run is still fresh, return quickly.
-	last := atomic.LoadInt64(&r.lastRun)
-	if last != 0 && time.Since(time.Unix(0, last)) <= r.maxAge {
-		return // snapshot still fresh
+	// If maxAge <= 0 we treat it as "always stale" and skip freshness checks.
+	if r.maxAge > 0 {
+		last := atomic.LoadInt64(&r.lastRun)
+		if last != 0 && time.Since(time.Unix(0, last)) <= r.maxAge {
+			return // snapshot still fresh
+		}
 	}
-
 	r.mu.Lock()
 	if r.closed || r.running {
 		r.mu.Unlock()
 		return // closed or already running
 	}
 	// Re-check freshness while holding the lock (read lastRun atomically).
-	if time.Since(time.Unix(0, atomic.LoadInt64(&r.lastRun))) <= r.maxAge {
+	if r.maxAge > 0 && time.Since(time.Unix(0, atomic.LoadInt64(&r.lastRun))) <= r.maxAge {
 		r.mu.Unlock()
 		return // snapshot fresh now
 	}

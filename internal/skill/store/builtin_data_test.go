@@ -277,13 +277,15 @@ func TestBuiltInSkills_LoadFromFS_Errors(t *testing.T) {
 				time.Second,
 				WithBuiltInSkillsFS(tc.rawFS, "."),
 			)
+			// Windows can't delete open files. Ensure any partially-open overlay DB
+			// gets closed even when NewBuiltInSkills returns an error.
+			if b != nil {
+				t.Cleanup(func() { _ = b.Close() })
+			}
 			if tc.wantSub == "" {
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}
-				t.Cleanup(func() {
-					_ = b.Close()
-				})
 				return
 			}
 			if err == nil {

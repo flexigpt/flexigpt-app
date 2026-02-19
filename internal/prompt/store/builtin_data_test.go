@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -82,7 +83,10 @@ func TestNewBuiltInData(t *testing.T) {
 				return dir
 			},
 			snapshotMaxAge: time.Hour,
-			wantErr:        true,
+			// Unix-like systems will typically fail to create files in a 0444
+			// directory; Windows does not honor these POSIX permission bits the
+			// same way, so don't require an error there.
+			wantErr: runtime.GOOS != "windows",
 		},
 	}
 
@@ -841,9 +845,20 @@ func buildTemplate(t *testing.T, slug, ver string) (fileName string, raw []byte,
 func newFromFS(t *testing.T, mem fs.FS) (*BuiltInData, error) {
 	t.Helper()
 	ctx := t.Context()
-	bi, err := NewBuiltInData(ctx, t.TempDir(), time.Hour, WithBundlesFS(mem, "."))
+	tmp := t.TempDir()
+	bi, err := NewBuiltInData(ctx, tmp, time.Hour, WithBundlesFS(mem, "."))
+	// If the constructor returned an error but nevertheless created/opened
+	// internal resources (for example the overlay sqlite DB), close them right
+	// away instead of relying only on t.Cleanup. On Windows an open sqlite file
+	// prevents the temporary directory from being removed.
+	if err != nil {
+		if bi != nil {
+			_ = bi.Close()
+		}
+		return nil, err
+	}
 	t.Cleanup(func() { _ = bi.Close() })
-	return bi, err
+	return bi, nil
 }
 
 // newUUID returns a v7-UUID as string or fails the test.

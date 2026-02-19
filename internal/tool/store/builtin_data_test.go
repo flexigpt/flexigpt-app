@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -82,7 +83,10 @@ func TestNewBuiltInToolData(t *testing.T) {
 				return dir
 			},
 			snapshotMaxAge: time.Hour,
-			wantErr:        true,
+			// Unix-like systems will typically fail to create files in a 0444
+			// directory; Windows does not honor these POSIX permission bits the
+			// same way, so don't require an error there.
+			wantErr: runtime.GOOS != "windows",
 		},
 	}
 
