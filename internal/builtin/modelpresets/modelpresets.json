@@ -19,7 +19,7 @@
 				"accept": "application/json",
 				"anthropic-version": "2023-06-01"
 			},
-			"defaultModelPresetID": "sonnet45",
+			"defaultModelPresetID": "sonnet46",
 			"modelPresets": {
 				"opus46": {
 					"schemaVersion": "2025-07-01",
@@ -49,7 +49,7 @@
 					"name": "claude-sonnet-4-5-20250929",
 					"displayName": "Claude 4.5 Opus",
 					"slug": "opus45",
-					"isEnabled": true,
+					"isEnabled": false,
 					"stream": true,
 					"maxPromptLength": 200000,
 					"maxOutputLength": 64000,
@@ -87,13 +87,35 @@
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
 				},
+				"sonnet46": {
+					"schemaVersion": "2025-07-01",
+					"id": "sonnet46",
+					"name": "claude-sonnet-4-6",
+					"displayName": "Claude 4.6 Sonnet",
+					"slug": "sonnet46",
+					"isEnabled": true,
+					"stream": true,
+					"maxPromptLength": 200000,
+					"maxOutputLength": 64000,
+					"temperature": 0.1,
+					"reasoning": {
+						"type": "hybridWithTokens",
+						"level": "",
+						"tokens": 1024
+					},
+					"systemPrompt": "",
+					"timeout": 300,
+					"createdAt": "2025-07-30T00:00:00Z",
+					"modifiedAt": "2025-07-30T00:00:00Z",
+					"isBuiltIn": true
+				},
 				"sonnet45": {
 					"schemaVersion": "2025-07-01",
 					"id": "sonnet45",
 					"name": "claude-sonnet-4-5-20250929",
 					"displayName": "Claude 4.5 Sonnet",
 					"slug": "sonnet45",
-					"isEnabled": true,
+					"isEnabled": false,
 					"stream": true,
 					"maxPromptLength": 200000,
 					"maxOutputLength": 64000,
@@ -580,12 +602,12 @@
 			},
 			"defaultModelPresetID": "gpt52",
 			"modelPresets": {
-				"gpt5Mini": {
+				"gpt52": {
 					"schemaVersion": "2025-07-01",
-					"id": "gpt5Mini",
-					"name": "gpt-5-mini",
-					"displayName": "OpenAI GPT 5 Mini",
-					"slug": "gpt5Mini",
+					"id": "gpt52",
+					"name": "gpt-5.2",
+					"displayName": "OpenAI GPT 5.2",
+					"slug": "gpt52",
 					"isEnabled": true,
 					"stream": true,
 					"maxPromptLength": 400000,
@@ -597,7 +619,29 @@
 						"tokens": 0
 					},
 					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
-					"timeout": 300,
+					"timeout": 1200,
+					"createdAt": "2025-12-12T00:00:00Z",
+					"modifiedAt": "2025-12-12T00:00:00Z",
+					"isBuiltIn": true
+				},
+				"gpt52Codex": {
+					"schemaVersion": "2025-07-01",
+					"id": "gpt52Codex",
+					"name": "gpt-5.2-codex",
+					"displayName": "OpenAI GPT 5.2 Codex",
+					"slug": "gpt52Codex",
+					"isEnabled": true,
+					"stream": true,
+					"maxPromptLength": 400000,
+					"maxOutputLength": 128000,
+					"temperature": 1.0,
+					"reasoning": {
+						"type": "singleWithLevels",
+						"level": "high",
+						"tokens": 0
+					},
+					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
+					"timeout": 1200,
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -608,7 +652,7 @@
 					"name": "gpt-5.1",
 					"displayName": "OpenAI GPT 5.1",
 					"slug": "gpt51",
-					"isEnabled": true,
+					"isEnabled": false,
 					"stream": true,
 					"maxPromptLength": 400000,
 					"maxOutputLength": 128000,
@@ -668,13 +712,13 @@
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
 				},
-				"gpt52": {
+				"gpt5Mini": {
 					"schemaVersion": "2025-07-01",
-					"id": "gpt52",
-					"name": "gpt-5.2",
-					"displayName": "OpenAI GPT 5.2",
-					"slug": "gpt52",
-					"isEnabled": true,
+					"id": "gpt5Mini",
+					"name": "gpt-5-mini",
+					"displayName": "OpenAI GPT 5 Mini",
+					"slug": "gpt5Mini",
+					"isEnabled": false,
 					"stream": true,
 					"maxPromptLength": 400000,
 					"maxOutputLength": 128000,
@@ -685,9 +729,9 @@
 						"tokens": 0
 					},
 					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
-					"timeout": 1200,
-					"createdAt": "2025-12-12T00:00:00Z",
-					"modifiedAt": "2025-12-12T00:00:00Z",
+					"timeout": 300,
+					"createdAt": "2025-07-30T00:00:00Z",
+					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
 				}
 			}
