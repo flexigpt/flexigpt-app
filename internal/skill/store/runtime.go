@@ -32,6 +32,13 @@ const (
 	runtimeForegroundValidateTimeout = 15 * time.Second
 )
 
+type runtimeApplyMode int
+
+const (
+	runtimeApplyBestEffort runtimeApplyMode = iota
+	runtimeApplyStrict
+)
+
 func (s *SkillStore) CreateSkillSession(
 	ctx context.Context,
 	req *spec.CreateSkillSessionRequest,
@@ -190,74 +197,7 @@ func (s *SkillStore) runtimeApplyDesiredStrict(
 		}
 	}()
 
-	currentRecs, err := s.runtime.ListSkills(ctx, nil)
-	if err != nil {
-		return err
-	}
-	currentSet := make(map[agentskillsSpec.SkillDef]struct{}, len(currentRecs))
-	for _, r := range currentRecs {
-		currentSet[r.Def] = struct{}{}
-	}
-
-	// Add first.
-	var toAdd []agentskillsSpec.SkillDef
-	for def := range desired {
-		if _, ok := currentSet[def]; !ok {
-			toAdd = append(toAdd, def)
-		}
-	}
-	sortSkillDefs(toAdd)
-
-	presentAfterAdds := make(map[agentskillsSpec.SkillDef]struct{}, len(currentSet)+len(toAdd))
-	for def := range currentSet {
-		presentAfterAdds[def] = struct{}{}
-	}
-
-	for _, def := range toAdd {
-		if _, err := s.runtime.AddSkill(ctx, def); err != nil {
-			if errors.Is(err, agentskillsSpec.ErrSkillAlreadyExists) {
-				presentAfterAdds[def] = struct{}{}
-				continue
-			}
-			return err
-		}
-		presentAfterAdds[def] = struct{}{}
-	}
-
-	// Replacement safety index (same as best-effort logic).
-	desiredPresentTypeName := map[string]bool{}
-	for def := range presentAfterAdds {
-		if _, ok := desired[def]; ok {
-			desiredPresentTypeName[typeNameKey(def.Type, def.Name)] = true
-		}
-	}
-
-	// Remove.
-	var toRemove []agentskillsSpec.SkillDef
-	for def := range currentSet {
-		if _, ok := desired[def]; !ok {
-			toRemove = append(toRemove, def)
-		}
-	}
-	sortSkillDefs(toRemove)
-
-	for _, def := range toRemove {
-		tn := typeNameKey(def.Type, def.Name)
-		if _, hasReplacement := desiredByTypeName[tn]; hasReplacement && !desiredPresentTypeName[tn] {
-			// Shouldn't happen in strict mode (add would have errored),
-			// but keep safety rule.
-			continue
-		}
-
-		if _, err := s.runtime.RemoveSkill(ctx, def); err != nil {
-			if errors.Is(err, agentskillsSpec.ErrSkillNotFound) {
-				continue
-			}
-			return err
-		}
-	}
-
-	return nil
+	return s.runtimeApplyDesired(ctx, desired, desiredByTypeName, runtimeApplyStrict)
 }
 
 func (s *SkillStore) runtimeResyncFromStore(ctx context.Context) error {
@@ -271,17 +211,36 @@ func (s *SkillStore) runtimeResyncFromStore(ctx context.Context) error {
 		return err
 	}
 
+	return s.runtimeApplyDesired(ctx, desired, desiredByTypeName, runtimeApplyBestEffort)
+}
+
+// runtimeApplyDesired reconciles runtime to match desired.
+//   - In strict mode: add/remove errors fail fast (but ErrAlreadyExists/ErrNotFound are tolerated).
+//   - In best-effort mode: add/remove errors are logged and ignored.
+//
+// Replacement safety rule (both modes):
+// If a to-be-removed def has (type,name) replacements in desired, we only remove it if at least one
+// desired replacement is known-present after the add phase.
+func (s *SkillStore) runtimeApplyDesired(
+	ctx context.Context,
+	desired map[agentskillsSpec.SkillDef]struct{},
+	desiredByTypeName map[string][]agentskillsSpec.SkillDef,
+	mode runtimeApplyMode,
+) error {
+	if s == nil || s.runtime == nil {
+		return nil
+	}
+
 	currentRecs, err := s.runtime.ListSkills(ctx, nil)
 	if err != nil {
 		return err
 	}
-
 	currentSet := make(map[agentskillsSpec.SkillDef]struct{}, len(currentRecs))
 	for _, r := range currentRecs {
 		currentSet[r.Def] = struct{}{}
 	}
 
-	// Determine additions first.
+	// Determine additions.
 	var toAdd []agentskillsSpec.SkillDef
 	for def := range desired {
 		if _, ok := currentSet[def]; !ok {
@@ -290,28 +249,29 @@ func (s *SkillStore) runtimeResyncFromStore(ctx context.Context) error {
 	}
 	sortSkillDefs(toAdd)
 
-	addedOK := map[agentskillsSpec.SkillDef]struct{}{}
+	// "presentAfterAdds" tracks which defs are known present after the add phase.
+	// This is used by the replacement-safety rule for removals.
+	presentAfterAdds := make(map[agentskillsSpec.SkillDef]struct{}, len(currentSet)+len(toAdd))
+	for def := range currentSet {
+		presentAfterAdds[def] = struct{}{}
+	}
+
 	for _, def := range toAdd {
 		if _, err := s.runtime.AddSkill(ctx, def); err != nil {
 			if errors.Is(err, agentskillsSpec.ErrSkillAlreadyExists) {
-				addedOK[def] = struct{}{}
+				presentAfterAdds[def] = struct{}{}
 				continue
+			}
+			if mode == runtimeApplyStrict {
+				return err
 			}
 			slog.Error("runtime add failed", "type", def.Type, "name", def.Name, "location", def.Location, "err", err)
 			continue
 		}
-		addedOK[def] = struct{}{}
-	}
-
-	// Build "present after adds" view for safe removals.
-	presentAfterAdds := make(map[agentskillsSpec.SkillDef]struct{}, len(currentSet)+len(addedOK))
-	for def := range currentSet {
-		presentAfterAdds[def] = struct{}{}
-	}
-	for def := range addedOK {
 		presentAfterAdds[def] = struct{}{}
 	}
 
+	// Build replacement safety index (type+name that is desired and known present).
 	desiredPresentTypeName := map[string]bool{}
 	for def := range presentAfterAdds {
 		if _, ok := desired[def]; ok {
@@ -334,18 +294,24 @@ func (s *SkillStore) runtimeResyncFromStore(ctx context.Context) error {
 		// Safety rule: if this looks like a "replacement" and none of the desired
 		// replacements are present, skip removing the old one.
 		if _, hasReplacement := desiredByTypeName[tn]; hasReplacement && !desiredPresentTypeName[tn] {
-			slog.Warn(
-				"runtime remove skipped (replacement missing)",
-				"type", def.Type,
-				"name", def.Name,
-				"location", def.Location,
-			)
+			if mode == runtimeApplyBestEffort {
+				slog.Warn(
+					"runtime remove skipped (replacement missing)",
+					"type", def.Type,
+					"name", def.Name,
+					"location", def.Location,
+				)
+			}
+			// Strict mode: silent skip (keeps previous behavior).
 			continue
 		}
 
 		if _, err := s.runtime.RemoveSkill(ctx, def); err != nil {
 			if errors.Is(err, agentskillsSpec.ErrSkillNotFound) {
 				continue
+			}
+			if mode == runtimeApplyStrict {
+				return err
 			}
 			slog.Error(
 				"runtime remove failed",
