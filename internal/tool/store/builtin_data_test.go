@@ -889,6 +889,11 @@ func newToolFromFS(t *testing.T, mem fs.FS) (*BuiltInToolData, error) {
 	if bi != nil {
 		if err != nil {
 			_ = bi.Close()
+			if runtime.GOOS == "windows" {
+				// Give SQLite time to release handles on Windows.
+				t.Log("toolstore: sleeping in win")
+				time.Sleep(time.Millisecond * 100)
+			}
 			return nil, err
 		}
 		t.Cleanup(func() { _ = bi.Close() })

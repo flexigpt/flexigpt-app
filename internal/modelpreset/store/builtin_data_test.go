@@ -1080,6 +1080,11 @@ func newPresetsFromFS(t *testing.T, mem fs.FS) (*BuiltInPresets, error) {
 		// during TempDir cleanup because the overlay sqlite file remains open.
 		if bi != nil {
 			_ = bi.Close()
+			if runtime.GOOS == "windows" {
+				// Give SQLite time to release handles on Windows.
+				t.Log("modelpreset: sleeping in win")
+				time.Sleep(time.Millisecond * 100)
+			}
 		}
 		return nil, err
 	}

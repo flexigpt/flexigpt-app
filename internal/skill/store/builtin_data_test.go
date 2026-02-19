@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -277,7 +278,14 @@ func TestBuiltInSkills_LoadFromFS_Errors(t *testing.T) {
 			// Windows can't delete open files. Ensure any partially-open overlay DB
 			// gets closed even when NewBuiltInSkills returns an error.
 			if b != nil {
-				t.Cleanup(func() { _ = b.Close() })
+				t.Cleanup(func() {
+					_ = b.Close()
+					if runtime.GOOS == "windows" {
+						// Give SQLite time to release handles on Windows.
+						t.Log("skillstore: sleeping in win")
+						time.Sleep(time.Millisecond * 100)
+					}
+				})
 			}
 			if tc.wantSub == "" {
 				if err != nil {
