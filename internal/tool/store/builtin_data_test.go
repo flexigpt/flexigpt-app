@@ -860,10 +860,21 @@ func buildValidTool(t *testing.T, slug, ver, id string) spec.Tool {
 func newToolFromFS(t *testing.T, mem fs.FS) (*BuiltInToolData, error) {
 	t.Helper()
 	ctx := t.Context()
-	bi, err := NewBuiltInToolData(ctx, t.TempDir(), time.Hour, WithToolBundlesFS(mem, "."))
-	t.Cleanup(func() {
-		_ = bi.Close()
-	})
+	tmp := t.TempDir()
+	bi, err := NewBuiltInToolData(ctx, tmp, time.Hour, WithToolBundlesFS(mem, "."))
+
+	// If NewBuiltInToolData returned a non-nil instance together with an error,
+	// close it immediately so any OS file handles (e.g. sqlite file) are
+	// released before the temp dir cleanup runs (Windows cannot remove open
+	// files). If construction succeeded, register a cleanup to close it at
+	// test end.
+	if bi != nil {
+		if err != nil {
+			_ = bi.Close()
+			return nil, err
+		}
+		t.Cleanup(func() { _ = bi.Close() })
+	}
 	return bi, err
 }
 

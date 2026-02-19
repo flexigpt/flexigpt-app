@@ -61,7 +61,7 @@ func NewBuiltInSkills(
 	overlayBaseDir string,
 	maxSnapshotAge time.Duration,
 	opts ...BuiltInSkillsOption,
-) (*BuiltInSkills, error) {
+) (b *BuiltInSkills, err error) {
 	if overlayBaseDir == "" {
 		return nil, fmt.Errorf("%w: overlayBaseDir", spec.ErrSkillInvalidRequest)
 	}
@@ -82,23 +82,34 @@ func NewBuiltInSkills(
 		return nil, err
 	}
 
-	bundleFlags, err := overlay.NewTypedGroup[builtInSkillBundleID, bool](ctx, store)
-	if err != nil {
-		return nil, err
-	}
-	skillFlags, err := overlay.NewTypedGroup[builtInSkillKey, bool](ctx, store)
-	if err != nil {
-		return nil, err
-	}
-
-	b := &BuiltInSkills{
+	// Prepare partial struct so deferred cleanup can close resources on error.
+	b = &BuiltInSkills{
 		skillsFS:       builtin.BuiltInSkillBundlesFS,
 		skillsDir:      builtin.BuiltInSkillBundlesRootDir,
 		overlayBaseDir: overlayBaseDir,
 		store:          store,
-		bundleFlags:    bundleFlags,
-		skillFlags:     skillFlags,
 	}
+
+	// If initialization fails later, ensure resources are closed (important on Windows).
+	defer func() {
+		if err != nil && b != nil {
+			_ = b.Close()
+			b = nil
+		}
+	}()
+
+	bundleFlags, err := overlay.NewTypedGroup[builtInSkillBundleID, bool](ctx, store)
+	if err != nil {
+		return nil, err
+	}
+	b.bundleFlags = bundleFlags
+
+	skillFlags, err := overlay.NewTypedGroup[builtInSkillKey, bool](ctx, store)
+	if err != nil {
+		return nil, err
+	}
+	b.skillFlags = skillFlags
+
 	for _, o := range opts {
 		o(b)
 	}
@@ -116,6 +127,7 @@ func NewBuiltInSkills(
 		},
 	)
 	b.rebuilder.MarkFresh()
+
 	return b, nil
 }
 

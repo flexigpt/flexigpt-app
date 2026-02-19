@@ -63,7 +63,7 @@ func NewBuiltInData(
 	overlayBaseDir string,
 	builtInSnapshotMaxAge time.Duration,
 	opts ...BuiltInDataOption,
-) (*BuiltInData, error) {
+) (data *BuiltInData, err error) {
 	if builtInSnapshotMaxAge <= 0 {
 		builtInSnapshotMaxAge = time.Hour
 	}
@@ -73,6 +73,7 @@ func NewBuiltInData(
 	if err := os.MkdirAll(overlayBaseDir, 0o755); err != nil {
 		return nil, err
 	}
+
 	store, err := overlay.NewOverlayStore(
 		ctx,
 		filepath.Join(overlayBaseDir, spec.PromptBuiltInOverlayDBFileName),
@@ -83,23 +84,34 @@ func NewBuiltInData(
 		return nil, err
 	}
 
+	// Prepare partial struct so deferred cleanup can close resources on error.
+	data = &BuiltInData{
+		bundlesFS:      builtin.BuiltInPromptBundlesFS,
+		bundlesDir:     builtin.BuiltInPromptBundlesRootDir,
+		overlayBaseDir: overlayBaseDir,
+		store:          store,
+	}
+
+	// If initialization fails later, ensure resources are closed (important on Windows).
+	defer func() {
+		if err != nil && data != nil {
+			_ = data.Close()
+			data = nil
+		}
+	}()
+
 	bundleOverlayFlags, err := overlay.NewTypedGroup[builtInBundleID, bool](ctx, store)
 	if err != nil {
 		return nil, err
 	}
+	data.bundleOverlayFlags = bundleOverlayFlags
+
 	templateOverlayFlags, err := overlay.NewTypedGroup[builtInTemplateID, bool](ctx, store)
 	if err != nil {
 		return nil, err
 	}
+	data.templateOverlayFlags = templateOverlayFlags
 
-	data := &BuiltInData{
-		bundlesFS:            builtin.BuiltInPromptBundlesFS,
-		bundlesDir:           builtin.BuiltInPromptBundlesRootDir,
-		overlayBaseDir:       overlayBaseDir,
-		store:                store,
-		bundleOverlayFlags:   bundleOverlayFlags,
-		templateOverlayFlags: templateOverlayFlags,
-	}
 	for _, o := range opts {
 		o(data)
 	}

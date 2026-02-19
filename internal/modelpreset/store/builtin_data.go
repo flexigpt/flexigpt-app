@@ -74,7 +74,7 @@ func NewBuiltInPresets(
 	overlayBaseDir string,
 	maxSnapshotAge time.Duration,
 	opts ...PresetStoreOption,
-) (*BuiltInPresets, error) {
+) (bi *BuiltInPresets, err error) {
 	if overlayBaseDir == "" {
 		return nil, fmt.Errorf("%w: overlayBaseDir", spec.ErrInvalidDir)
 	}
@@ -95,6 +95,19 @@ func NewBuiltInPresets(
 		return nil, err
 	}
 
+	bi = &BuiltInPresets{
+		presetsFS:      builtin.BuiltInModelPresetsFS,
+		presetsDir:     builtin.BuiltInModelPresetsRootDir,
+		overlayBaseDir: overlayBaseDir,
+		store:          store,
+	}
+	defer func() {
+		if err != nil && bi != nil {
+			_ = bi.Close()
+			bi = nil
+		}
+	}()
+
 	providerOverlayFlags, err := overlay.NewTypedGroup[builtInProviderKey, bool](ctx, store)
 	if err != nil {
 		return nil, err
@@ -110,32 +123,27 @@ func NewBuiltInPresets(
 		return nil, err
 	}
 
-	b := &BuiltInPresets{
-		presetsFS:                          builtin.BuiltInModelPresetsFS,
-		presetsDir:                         builtin.BuiltInModelPresetsRootDir,
-		overlayBaseDir:                     overlayBaseDir,
-		store:                              store,
-		providerOverlayFlags:               providerOverlayFlags,
-		modelOverlayFlags:                  modelOverlayFlags,
-		providerDefaultModelIDOverlayFlags: providerDefaultModelIDOverlayFlags,
-	}
+	bi.providerOverlayFlags = providerOverlayFlags
+	bi.modelOverlayFlags = modelOverlayFlags
+	bi.providerDefaultModelIDOverlayFlags = providerDefaultModelIDOverlayFlags
+
 	for _, o := range opts {
-		o(b)
+		o(bi)
 	}
-	if err := b.loadFromFS(ctx); err != nil {
+	if err := bi.loadFromFS(ctx); err != nil {
 		return nil, err
 	}
 
-	b.rebuilder = builtin.NewAsyncRebuilder(
+	bi.rebuilder = builtin.NewAsyncRebuilder(
 		maxSnapshotAge,
 		func() error { //nolint:contextcheck // Cannot pass app context to async builder.
-			b.mu.Lock()
-			defer b.mu.Unlock()
-			return b.rebuildSnapshot(context.Background())
+			bi.mu.Lock()
+			defer bi.mu.Unlock()
+			return bi.rebuildSnapshot(context.Background())
 		},
 	)
-	b.rebuilder.MarkFresh()
-	return b, nil
+	bi.rebuilder.MarkFresh()
+	return bi, nil
 }
 
 func (b *BuiltInPresets) Close() error {

@@ -74,7 +74,7 @@ func NewBuiltInToolData(
 	overlayBaseDir string,
 	snapshotMaxAge time.Duration,
 	opts ...BuiltInToolDataOption,
-) (*BuiltInToolData, error) {
+) (d *BuiltInToolData, err error) {
 	if snapshotMaxAge <= 0 {
 		snapshotMaxAge = time.Hour
 	}
@@ -95,24 +95,35 @@ func NewBuiltInToolData(
 		return nil, err
 	}
 
-	bundleOverlayFlags, err := overlay.NewTypedGroup[builtInToolBundleID, bool](ctx, store)
-	if err != nil {
-		return nil, err
-	}
-	toolOverlayFlags, err := overlay.NewTypedGroup[builtInToolID, bool](ctx, store)
-	if err != nil {
-		return nil, err
-	}
-
-	d := &BuiltInToolData{
+	// Prepare partial struct so deferred cleanup can close resources on error.
+	d = &BuiltInToolData{
 		toolsFS:                   builtin.BuiltInToolBundlesFS,
 		toolsDir:                  builtin.BuiltInToolBundlesRootDir,
 		overlayBaseDir:            overlayBaseDir,
 		store:                     store,
-		bundleOverlayFlags:        bundleOverlayFlags,
-		toolOverlayFlags:          toolOverlayFlags,
 		includeLLMToolsGoBuiltins: false,
 	}
+
+	// If initialization fails later, ensure resources are closed (important on Windows).
+	defer func() {
+		if err != nil && d != nil {
+			_ = d.Close()
+			d = nil
+		}
+	}()
+
+	bundleOverlayFlags, err := overlay.NewTypedGroup[builtInToolBundleID, bool](ctx, store)
+	if err != nil {
+		return nil, err
+	}
+	d.bundleOverlayFlags = bundleOverlayFlags
+
+	toolOverlayFlags, err := overlay.NewTypedGroup[builtInToolID, bool](ctx, store)
+	if err != nil {
+		return nil, err
+	}
+	d.toolOverlayFlags = toolOverlayFlags
+
 	for _, o := range opts {
 		o(d)
 	}
