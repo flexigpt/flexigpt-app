@@ -282,7 +282,7 @@ func TestBuiltInSkills_LoadFromFS_Errors(t *testing.T) {
 					_ = b.Close()
 					if runtime.GOOS == "windows" {
 						// Give SQLite time to release handles on Windows.
-						t.Log("skillstore: sleeping in win")
+						t.Log("skill: sleeping in win")
 						time.Sleep(time.Millisecond * 100)
 					}
 				})
