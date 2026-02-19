@@ -111,6 +111,10 @@ tasks:
       - pnpm run touch:tmp
       - refdir ./...
 
+  lint-fix:
+    cmds:
+      - golangci-lint run --fix
+
   lint-go:
     cmds:
       - pnpm run touch:tmp

@@ -7,7 +7,7 @@ require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.0
 	github.com/adrg/xdg v0.5.3
 	github.com/danielgtaylor/huma/v2 v2.35.0
-	github.com/flexigpt/agentskills-go v0.7.0
+	github.com/flexigpt/agentskills-go v0.7.1
 	github.com/flexigpt/inference-go v0.8.1
 	github.com/flexigpt/llmtools-go v0.11.0
 	github.com/glebarez/go-sqlite v1.22.0
@@ -81,6 +81,7 @@ require (
 	golang.org/x/exp v0.0.0-20250819193227-8b4c13bb791b // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	modernc.org/libc v1.66.8 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect

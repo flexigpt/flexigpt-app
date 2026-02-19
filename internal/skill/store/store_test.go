@@ -89,52 +89,6 @@ func TestSkillCursor_RoundTripAndErrors(t *testing.T) {
 	}
 }
 
-func newTestSkillStore(t *testing.T) *SkillStore {
-	t.Helper()
-	s, err := NewSkillStore(t.TempDir())
-	if err != nil {
-		t.Fatalf("NewSkillStore: %v", err)
-	}
-	t.Cleanup(func() { s.Close() })
-	return s
-}
-
-func putBundle(t *testing.T, s *SkillStore, bid, slug, displayName string, enabled bool) {
-	t.Helper()
-	_, err := s.PutSkillBundle(t.Context(), &spec.PutSkillBundleRequest{
-		BundleID: bundleitemutils.BundleID(bid),
-		Body: &spec.PutSkillBundleRequestBody{
-			Slug:        bundleitemutils.BundleSlug(slug),
-			DisplayName: displayName,
-			IsEnabled:   enabled,
-			Description: "",
-		},
-	})
-	if err != nil {
-		t.Fatalf("PutSkillBundle: %v", err)
-	}
-}
-
-func putSkill(t *testing.T, s *SkillStore, bid, slug, loc string, enabled bool) {
-	t.Helper()
-	_, err := s.PutSkill(t.Context(), &spec.PutSkillRequest{
-		BundleID:  bundleitemutils.BundleID(bid),
-		SkillSlug: spec.SkillSlug(slug),
-		Body: &spec.PutSkillRequestBody{
-			SkillType:   spec.SkillTypeFS,
-			Location:    loc,
-			Name:        "Skill " + slug,
-			IsEnabled:   enabled,
-			DisplayName: "",
-			Description: "",
-			Tags:        []string{"t1"},
-		},
-	})
-	if err != nil {
-		t.Fatalf("PutSkill: %v", err)
-	}
-}
-
 func TestSkillStore_PutSkillBundle_Table(t *testing.T) {
 	t.Parallel()
 	s := newTestSkillStore(t)
@@ -279,19 +233,6 @@ func TestSkillStore_PatchAndDeleteSkillBundle_UserPaths(t *testing.T) {
 	}
 }
 
-func TestSkillStore_DeleteSkillBundle_NotEmpty(t *testing.T) {
-	t.Parallel()
-	s := newTestSkillStore(t)
-
-	putBundle(t, s, "b1", "bundle-1", "Bundle 1", true)
-	putSkill(t, s, "b1", "s1", "/tmp/s1", true)
-
-	_, err := s.DeleteSkillBundle(t.Context(), &spec.DeleteSkillBundleRequest{BundleID: "b1"})
-	if err == nil || !errors.Is(err, spec.ErrSkillBundleNotEmpty) {
-		t.Fatalf("expected ErrSkillBundleNotEmpty, got %v", err)
-	}
-}
-
 func TestSkillStore_SweepSoftDeleted_HardDeletesAfterGrace(t *testing.T) {
 	t.Parallel()
 	s := newTestSkillStore(t)
@@ -338,113 +279,18 @@ func TestSkillStore_SweepSoftDeleted_HardDeletesAfterGrace(t *testing.T) {
 	}
 }
 
-func TestSkillStore_PutPatchDeleteSkill_UserPaths(t *testing.T) {
-	t.Parallel()
-	s := newTestSkillStore(t)
-
-	putBundle(t, s, "b1", "bundle-1", "Bundle 1", true)
-
-	// Put invalid type.
-	_, err := s.PutSkill(t.Context(), &spec.PutSkillRequest{
-		BundleID:  "b1",
-		SkillSlug: "s1",
-		Body: &spec.PutSkillRequestBody{
-			SkillType: spec.SkillTypeEmbeddedFS,
-			Location:  "/tmp/x",
-			Name:      "X",
-			IsEnabled: true,
-		},
-	})
-	if err == nil || !errors.Is(err, spec.ErrSkillInvalidRequest) {
-		t.Fatalf("expected ErrSkillInvalidRequest, got %v", err)
-	}
-
-	// Put happy.
-	putSkill(t, s, "b1", "s1", "/tmp/s1", true)
-
-	// Conflict.
-	_, err = s.PutSkill(t.Context(), &spec.PutSkillRequest{
-		BundleID:  "b1",
-		SkillSlug: "s1",
-		Body: &spec.PutSkillRequestBody{
-			SkillType: spec.SkillTypeFS,
-			Location:  "/tmp/s1",
-			Name:      "X",
-			IsEnabled: true,
-		},
-	})
-	if err == nil || !errors.Is(err, spec.ErrSkillConflict) {
-		t.Fatalf("expected ErrSkillConflict, got %v", err)
-	}
-
-	// Patch empty patch.
-	_, err = s.PatchSkill(t.Context(), &spec.PatchSkillRequest{
-		BundleID:  "b1",
-		SkillSlug: "s1",
-		Body:      &spec.PatchSkillRequestBody{},
-	})
-	if err == nil || !errors.Is(err, spec.ErrSkillInvalidRequest) {
-		t.Fatalf("expected ErrSkillInvalidRequest, got %v", err)
-	}
-
-	// Patch location: presence should reset to unknown.
-	newLoc := "/tmp/s1-new"
-	_, err = s.PatchSkill(t.Context(), &spec.PatchSkillRequest{
-		BundleID:  "b1",
-		SkillSlug: "s1",
-		Body: &spec.PatchSkillRequestBody{
-			Location: &newLoc,
-		},
-	})
-	if err != nil {
-		t.Fatalf("PatchSkill(location): %v", err)
-	}
-
-	got, err := s.GetSkill(t.Context(), &spec.GetSkillRequest{BundleID: "b1", SkillSlug: "s1"})
-	if err != nil {
-		t.Fatalf("GetSkill: %v", err)
-	}
-	if got.Body.Location != newLoc {
-		t.Fatalf("location not updated: got=%q want=%q", got.Body.Location, newLoc)
-	}
-	if got.Body.Presence == nil || got.Body.Presence.Status != spec.SkillPresenceUnknown {
-		t.Fatalf("presence not reset: %+v", got.Body.Presence)
-	}
-
-	// Mark missing -> delete should fail.
-	s.sweepMu.Lock()
-	s.mu.Lock()
-	all, err := s.readAllUser(true)
-	if err != nil {
-		s.mu.Unlock()
-		s.sweepMu.Unlock()
-		t.Fatalf("readAllUser: %v", err)
-	}
-	sk := all.Skills["b1"]["s1"]
-	sk.Presence = &spec.SkillPresence{Status: spec.SkillPresenceMissing}
-	all.Skills["b1"]["s1"] = sk
-	if err := s.writeAllUser(all); err != nil {
-		s.mu.Unlock()
-		s.sweepMu.Unlock()
-		t.Fatalf("writeAllUser: %v", err)
-	}
-	s.mu.Unlock()
-	s.sweepMu.Unlock()
-
-	_, err = s.DeleteSkill(t.Context(), &spec.DeleteSkillRequest{BundleID: "b1", SkillSlug: "s1"})
-	if err == nil || !errors.Is(err, spec.ErrSkillIsMissing) {
-		t.Fatalf("expected ErrSkillIsMissing, got %v", err)
-	}
-}
-
 func TestSkillStore_GetSkill_DisabledChecks(t *testing.T) {
 	t.Parallel()
 	s := newTestSkillStore(t)
 
 	putBundle(t, s, "b1", "bundle-1", "Bundle 1", true)
-	putSkill(t, s, "b1", "s1", "/tmp/s1", false)
+	skillBaseDir := t.TempDir()
+	err := putSkill(t, s, "b1", "s1", skillBaseDir, "s1", "mySkill1", "My Skill 1", false)
+	if err != nil {
+		t.Fatalf("PutSkill: %v", err)
+	}
 
-	_, err := s.GetSkill(t.Context(), &spec.GetSkillRequest{BundleID: "b1", SkillSlug: "s1"})
+	_, err = s.GetSkill(t.Context(), &spec.GetSkillRequest{BundleID: "b1", SkillSlug: "s1"})
 	if err == nil || !errors.Is(err, spec.ErrSkillDisabled) {
 		t.Fatalf("expected ErrSkillDisabled, got %v", err)
 	}
@@ -532,11 +378,22 @@ func TestSkillStore_ListSkills_UserOnlyFiltersAndPaging(t *testing.T) {
 	s := newTestSkillStore(t)
 
 	putBundle(t, s, "b1", "bundle-1", "Bundle 1", true)
-	putSkill(t, s, "b1", "s1", "/tmp/s1", true)
+	skillBaseDir := t.TempDir()
+
+	err := putSkill(t, s, "b1", "s1", skillBaseDir, "s1", "mySkill1", "My Skill 1", true)
+	if err != nil {
+		t.Fatalf("PutSkill: %v", err)
+	}
 	time.Sleep(2 * time.Millisecond)
-	putSkill(t, s, "b1", "s2", "/tmp/s2", true)
+	err = putSkill(t, s, "b1", "s2", skillBaseDir, "s2", "mySkill2", "My Skill 2", true)
+	if err != nil {
+		t.Fatalf("PutSkill: %v", err)
+	}
 	time.Sleep(2 * time.Millisecond)
-	putSkill(t, s, "b1", "s3", "/tmp/s3", false)
+	err = putSkill(t, s, "b1", "s3", skillBaseDir, "s3", "mySkill3", "My Skill 3", false)
+	if err != nil {
+		t.Fatalf("PutSkill: %v", err)
+	}
 
 	// Mark s2 missing (so it should be excluded when IncludeMissing=false).
 	s.sweepMu.Lock()
@@ -560,7 +417,10 @@ func TestSkillStore_ListSkills_UserOnlyFiltersAndPaging(t *testing.T) {
 
 	// Add another enabled + non-missing skill so paging is guaranteed with pageSize=1.
 	time.Sleep(2 * time.Millisecond)
-	putSkill(t, s, "b1", "s4", "/tmp/s4", true)
+	err = putSkill(t, s, "b1", "s4", skillBaseDir, "s4", "mySkill4", "My Skill 4", true)
+	if err != nil {
+		t.Fatalf("PutSkill: %v", err)
+	}
 
 	// List only user FS skills (built-ins are embeddedfs), and only for our bundle.
 	resp1, err := s.ListSkills(t.Context(), &spec.ListSkillsRequest{
@@ -632,6 +492,7 @@ func TestSkillStore_ConcurrentPutAndList(t *testing.T) {
 
 	var wg sync.WaitGroup
 	errCh := make(chan error, n+100)
+	skillBaseDir := t.TempDir()
 
 	// Writer goroutines.
 	for i := range n {
@@ -639,16 +500,7 @@ func TestSkillStore_ConcurrentPutAndList(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			slug := "sk-" + strconv.Itoa(i)
-			_, err := s.PutSkill(ctx, &spec.PutSkillRequest{
-				BundleID:  "b1",
-				SkillSlug: spec.SkillSlug(slug),
-				Body: &spec.PutSkillRequestBody{
-					SkillType: spec.SkillTypeFS,
-					Location:  "/tmp/" + slug,
-					Name:      "N" + slug,
-					IsEnabled: true,
-				},
-			})
+			err := putSkill(t, s, "b1", slug, skillBaseDir, slug, "my "+slug, "My "+slug, true)
 			if err != nil {
 				errCh <- err
 			}

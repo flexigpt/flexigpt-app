@@ -119,7 +119,7 @@ func NewSkillStore(baseDir string, opts ...SkillStoreOption) (*SkillStore, error
 
 	s.embeddedHydrateDir = cfg.embeddedHydrateDir
 	if s.embeddedHydrateDir == "" {
-		s.embeddedHydrateDir = filepath.Join(s.baseDir, ".skills-embeddedfs-hydrated")
+		s.embeddedHydrateDir = filepath.Join(s.baseDir, "skills-embeddedfs-hydrated")
 	}
 	s.embeddedHydrateDir = filepath.Clean(s.embeddedHydrateDir)
 
@@ -519,25 +519,31 @@ func (s *SkillStore) PutSkill(ctx context.Context, req *spec.PutSkillRequest) (*
 		}
 	}
 
-	now := time.Now().UTC()
 	uuid, err := uuidv7filename.NewUUIDv7String()
 	if err != nil {
 		return nil, err
 	}
+	now := time.Now().UTC()
 
-	s.sweepMu.Lock()
-	s.mu.Lock()
+	if s.runtime == nil {
+		return nil, fmt.Errorf("%w: runtime not configured", spec.ErrSkillInvalidRequest)
+	}
 
-	resyncRuntime := false
-	defer func() {
-		s.mu.Unlock()
-		s.sweepMu.Unlock()
-		if resyncRuntime {
-			s.bestEffortRuntimeResync(ctx, "putSkill")
-		}
-	}()
+	// Stage 1: read + build proposed skill without persisting.
+	var (
+		sk spec.Skill
 
+		keepInRT bool
+
+		addedByUs   bool
+		rtValidated bool
+	)
+
+	s.sweepMu.RLock()
+	s.mu.RLock()
 	all, err := s.readAllUser(false)
+	s.mu.RUnlock()
+	s.sweepMu.RUnlock()
 	if err != nil {
 		return nil, err
 	}
@@ -564,7 +570,7 @@ func (s *SkillStore) PutSkill(ctx context.Context, req *spec.PutSkillRequest) (*
 		return nil, fmt.Errorf("%w: duplicate skillSlug in bundle", spec.ErrSkillConflict)
 	}
 
-	sk := spec.Skill{
+	sk = spec.Skill{
 		SchemaVersion: spec.SkillSchemaVersion,
 		ID:            bundleitemutils.ItemID(uuid),
 		Slug:          req.SkillSlug,
@@ -590,12 +596,89 @@ func (s *SkillStore) PutSkill(ctx context.Context, req *spec.PutSkillRequest) (*
 		return nil, err
 	}
 
-	all.Skills[req.BundleID][req.SkillSlug] = sk
-	if err := s.writeAllUser(all); err != nil {
-		return nil, err
+	// Foreground strict runtime validation:
+	// Always validate/index via runtime before persisting (even if disabled),
+	// because we want to reject invalid locations/contents for user-facing writes.
+
+	keepInRT = sk.IsEnabled // runtime should only retain enabled skills
+
+	def, err := runtimeDefForUserSkill(sk)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", spec.ErrSkillInvalidRequest, err)
+	}
+	addedByUs, err = s.runtimeTryAddForeground(ctx, def)
+	if err != nil {
+		return nil, fmt.Errorf("%w: runtime rejected skill: %w", spec.ErrSkillInvalidRequest, err)
+	}
+	rtValidated = true
+	if !keepInRT && addedByUs {
+		s.runtimeBestEffortRemoveDef(ctx, def, "putSkill(validate-disabled)")
 	}
 
-	resyncRuntime = (s.runtime != nil)
+	// Stage 2: persist (re-check under write lock).
+	s.sweepMu.Lock()
+	s.mu.Lock()
+	all2, err := s.readAllUser(false)
+	if err != nil {
+		s.mu.Unlock()
+		s.sweepMu.Unlock()
+		if rtValidated && s.runtime != nil {
+			s.bestEffortRuntimeResync(ctx, "putSkill(rollback/readAll)")
+		}
+		return nil, err
+	}
+	// Re-check bundle & conflict.
+	b2, ok := all2.Bundles[req.BundleID]
+	if !ok {
+		s.mu.Unlock()
+		s.sweepMu.Unlock()
+		if rtValidated && s.runtime != nil {
+			s.bestEffortRuntimeResync(ctx, "putSkill(rollback/bundleGone)")
+		}
+		return nil, fmt.Errorf("%w: %s", spec.ErrSkillBundleNotFound, req.BundleID)
+	}
+	if isSoftDeletedSkillBundle(b2) {
+		s.mu.Unlock()
+		s.sweepMu.Unlock()
+		if rtValidated && s.runtime != nil {
+			s.bestEffortRuntimeResync(ctx, "putSkill(rollback/bundleDeleting)")
+		}
+		return nil, fmt.Errorf("%w: %s", spec.ErrSkillBundleDeleting, req.BundleID)
+	}
+	if !b2.IsEnabled {
+		s.mu.Unlock()
+		s.sweepMu.Unlock()
+		if rtValidated && s.runtime != nil {
+			s.bestEffortRuntimeResync(ctx, "putSkill(rollback/bundleDisabled)")
+		}
+		return nil, fmt.Errorf("%w: %s", spec.ErrSkillBundleDisabled, req.BundleID)
+	}
+	if all2.Skills == nil {
+		all2.Skills = map[bundleitemutils.BundleID]map[spec.SkillSlug]spec.Skill{}
+	}
+	if all2.Skills[req.BundleID] == nil {
+		all2.Skills[req.BundleID] = map[spec.SkillSlug]spec.Skill{}
+	}
+	if _, exists := all2.Skills[req.BundleID][req.SkillSlug]; exists {
+		s.mu.Unlock()
+		s.sweepMu.Unlock()
+		if rtValidated && s.runtime != nil {
+			s.bestEffortRuntimeResync(ctx, "putSkill(rollback/conflict)")
+		}
+		return nil, fmt.Errorf("%w: duplicate skillSlug in bundle", spec.ErrSkillConflict)
+	}
+
+	all2.Skills[req.BundleID][req.SkillSlug] = sk
+	if err := s.writeAllUser(all2); err != nil {
+		s.mu.Unlock()
+		s.sweepMu.Unlock()
+		if rtValidated && s.runtime != nil {
+			s.bestEffortRuntimeResync(ctx, "putSkill(rollback/writeFailed)")
+		}
+		return nil, err
+	}
+	s.mu.Unlock()
+	s.sweepMu.Unlock()
 
 	slog.Info("putSkill", "bundleID", req.BundleID, "skillSlug", req.SkillSlug)
 	return &spec.PutSkillResponse{}, nil
@@ -626,8 +709,32 @@ func (s *SkillStore) PatchSkill(ctx context.Context, req *spec.PatchSkillRequest
 			}
 
 			enabled := *req.Body.IsEnabled
+			// Strict foreground: if enabling, ensure runtime can index the built-in before persisting overlay.
+			if enabled {
+				if s.runtime == nil {
+					return nil, fmt.Errorf("%w: runtime not configured", spec.ErrSkillInvalidRequest)
+				}
+				// Ensure embeddedfs is hydrated so runtime can read it as fs.
+				if err := s.hydrateBuiltInEmbeddedFS(ctx); err != nil {
+					return nil, fmt.Errorf("%w: hydration failed: %w", spec.ErrSkillInvalidRequest, err)
+				}
+				sk, err := s.builtin.GetBuiltInSkill(ctx, req.BundleID, req.SkillSlug)
+				if err != nil {
+					return nil, err
+				}
+				def, err := s.runtimeDefForBuiltInSkill(sk)
+				if err != nil {
+					return nil, fmt.Errorf("%w: %w", spec.ErrSkillInvalidRequest, err)
+				}
+				if _, err := s.runtimeTryAddForeground(ctx, def); err != nil {
+					return nil, fmt.Errorf("%w: runtime rejected skill: %w", spec.ErrSkillInvalidRequest, err)
+				}
+			}
+
 			if _, err := s.builtin.SetSkillEnabled(ctx, req.BundleID, req.SkillSlug, enabled); err != nil {
-				return nil, err
+				if enabled && s.runtime != nil {
+					s.bestEffortRuntimeResync(ctx, "patchSkill(builtin rollback)")
+				}
 			}
 
 			if s.runtime != nil {
@@ -639,20 +746,13 @@ func (s *SkillStore) PatchSkill(ctx context.Context, req *spec.PatchSkillRequest
 		}
 	}
 
-	// User path.
-	s.sweepMu.Lock()
-	s.mu.Lock()
-
-	resyncRuntime := false
-	defer func() {
-		s.mu.Unlock()
-		s.sweepMu.Unlock()
-		if resyncRuntime {
-			s.bestEffortRuntimeResync(ctx, "patchSkill")
-		}
-	}()
-
+	// User path (strict foreground validation on enable and/or location change).
+	// Stage 1: read and compute target record.
+	s.sweepMu.RLock()
+	s.mu.RLock()
 	all, err := s.readAllUser(false)
+	s.mu.RUnlock()
+	s.sweepMu.RUnlock()
 	if err != nil {
 		return nil, err
 	}
@@ -671,40 +771,140 @@ func (s *SkillStore) PatchSkill(ctx context.Context, req *spec.PatchSkillRequest
 	if sm == nil {
 		return nil, fmt.Errorf("%w: %s", spec.ErrSkillNotFound, req.SkillSlug)
 	}
-	sk, ok := sm[req.SkillSlug]
+	cur, ok := sm[req.SkillSlug]
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", spec.ErrSkillNotFound, req.SkillSlug)
 	}
-
+	target := cur
 	if req.Body.IsEnabled != nil {
-		sk.IsEnabled = *req.Body.IsEnabled
+		target.IsEnabled = *req.Body.IsEnabled
 	}
 
 	// If client provided location, require it to be non-empty after trimming.
 	if req.Body.Location != nil && strings.TrimSpace(*req.Body.Location) == "" {
 		return nil, fmt.Errorf("%w: location cannot be empty", spec.ErrSkillInvalidRequest)
 	}
-	if req.Body.Location != nil && *req.Body.Location != sk.Location {
-		sk.Location = *req.Body.Location
+	locationChanged := false
+	if req.Body.Location != nil && *req.Body.Location != target.Location {
+		target.Location = *req.Body.Location
 		// Invalidate presence on location change.
-		sk.Presence = &spec.SkillPresence{Status: spec.SkillPresenceUnknown}
+		target.Presence = &spec.SkillPresence{Status: spec.SkillPresenceUnknown}
+		locationChanged = true
 	}
 
-	sk.ModifiedAt = time.Now().UTC()
-	if err := validateSkill(&sk); err != nil {
+	target.ModifiedAt = time.Now().UTC()
+	if err := validateSkill(&target); err != nil {
 		return nil, err
 	}
-
-	sm[req.SkillSlug] = sk
-	all.Skills[req.BundleID] = sm
-
-	if err := s.writeAllUser(all); err != nil {
-		return nil, err
+	needRTValidate := locationChanged
+	if req.Body.IsEnabled != nil && *req.Body.IsEnabled && !cur.IsEnabled {
+		needRTValidate = true // enabling
 	}
 
-	resyncRuntime = (s.runtime != nil)
+	if needRTValidate {
+		if s.runtime == nil {
+			return nil, fmt.Errorf("%w: runtime not configured", spec.ErrSkillInvalidRequest)
+		}
+		def, err := runtimeDefForUserSkill(target)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", spec.ErrSkillInvalidRequest, err)
+		}
+		added, err := s.runtimeTryAddForeground(ctx, def)
+		if err != nil {
+			return nil, fmt.Errorf("%w: runtime rejected skill: %w", spec.ErrSkillInvalidRequest, err)
+		}
+		// If final state is disabled, do not keep it in runtime (but we still validated it).
+		if !target.IsEnabled && added {
+			s.runtimeBestEffortRemoveDef(ctx, def, "patchSkill(validate-disabled)")
+		}
+	}
+
+	// Stage 2: persist under write lock (re-apply patch on fresh read).
+	s.sweepMu.Lock()
+	s.mu.Lock()
+	all2, err := s.readAllUser(false)
+	if err != nil {
+		s.mu.Unlock()
+		s.sweepMu.Unlock()
+		if s.runtime != nil {
+			s.bestEffortRuntimeResync(ctx, "patchSkill(rollback/readAll)")
+		}
+		return nil, err
+	}
+	b2, ok := all2.Bundles[req.BundleID]
+	if !ok {
+		s.mu.Unlock()
+		s.sweepMu.Unlock()
+		if s.runtime != nil {
+			s.bestEffortRuntimeResync(ctx, "patchSkill(rollback/bundleGone)")
+		}
+		return nil, fmt.Errorf("%w: %s", spec.ErrSkillBundleNotFound, req.BundleID)
+	}
+	if isSoftDeletedSkillBundle(b2) {
+		s.mu.Unlock()
+		s.sweepMu.Unlock()
+		if s.runtime != nil {
+			s.bestEffortRuntimeResync(ctx, "patchSkill(rollback/bundleDeleting)")
+		}
+		return nil, fmt.Errorf("%w: %s", spec.ErrSkillBundleDeleting, req.BundleID)
+	}
+	if !b2.IsEnabled {
+		s.mu.Unlock()
+		s.sweepMu.Unlock()
+		if s.runtime != nil {
+			s.bestEffortRuntimeResync(ctx, "patchSkill(rollback/bundleDisabled)")
+		}
+		return nil, fmt.Errorf("%w: %s", spec.ErrSkillBundleDisabled, req.BundleID)
+	}
+	sm2 := all2.Skills[req.BundleID]
+	if sm2 == nil {
+		s.mu.Unlock()
+		s.sweepMu.Unlock()
+		if s.runtime != nil {
+			s.bestEffortRuntimeResync(ctx, "patchSkill(rollback/notFound)")
+		}
+		return nil, fmt.Errorf("%w: %s", spec.ErrSkillNotFound, req.SkillSlug)
+	}
+	sk2, ok := sm2[req.SkillSlug]
+	if !ok {
+		s.mu.Unlock()
+		s.sweepMu.Unlock()
+		if s.runtime != nil {
+			s.bestEffortRuntimeResync(ctx, "patchSkill(rollback/notFound)")
+		}
+		return nil, fmt.Errorf("%w: %s", spec.ErrSkillNotFound, req.SkillSlug)
+	}
+	if req.Body.IsEnabled != nil {
+		sk2.IsEnabled = *req.Body.IsEnabled
+	}
+	if req.Body.Location != nil && *req.Body.Location != sk2.Location {
+		sk2.Location = *req.Body.Location
+		sk2.Presence = &spec.SkillPresence{Status: spec.SkillPresenceUnknown}
+	}
+	sk2.ModifiedAt = time.Now().UTC()
+	if err := validateSkill(&sk2); err != nil {
+		s.mu.Unlock()
+		s.sweepMu.Unlock()
+		return nil, err
+	}
+	sm2[req.SkillSlug] = sk2
+	all2.Skills[req.BundleID] = sm2
+	if err := s.writeAllUser(all2); err != nil {
+		s.mu.Unlock()
+		s.sweepMu.Unlock()
+		if s.runtime != nil {
+			s.bestEffortRuntimeResync(ctx, "patchSkill(rollback/writeFailed)")
+		}
+		return nil, err
+	}
+	s.mu.Unlock()
+	s.sweepMu.Unlock()
 
 	slog.Info("patchSkill", "bundleID", req.BundleID, "skillSlug", req.SkillSlug, "enabled", req.Body.IsEnabled)
+	if s.runtime != nil {
+		s.bestEffortRuntimeResync(ctx, "patchSkill")
+	}
+
 	return &spec.PatchSkillResponse{}, nil
 }
 

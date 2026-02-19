@@ -27,6 +27,8 @@ const (
 
 	// Best-effort cap for runtime resync work done inline after store mutations.
 	runtimeResyncTimeout = 30 * time.Second
+	// Foreground validation should be quick; runtime is in-mem, but provider indexing may touch disk.
+	runtimeForegroundValidateTimeout = 15 * time.Second
 )
 
 func (s *SkillStore) CreateSkillSession(
@@ -209,9 +211,15 @@ func (s *SkillStore) runtimeResyncFromStore(ctx context.Context) error {
 		presentAfterAdds[def] = struct{}{}
 	}
 
-	presentTypeName := map[string]bool{}
+	// IMPORTANT: replacement safety should only consider replacements "present"
+	// if a DESIRED def for that (type,name) is present after attempted adds.
+	//
+	// If add fails for all desired replacements, we must NOT remove the old runtime entry.
+	desiredPresentTypeName := map[string]bool{}
 	for def := range presentAfterAdds {
-		presentTypeName[typeNameKey(def.Type, def.Name)] = true
+		if _, ok := desired[def]; ok {
+			desiredPresentTypeName[typeNameKey(def.Type, def.Name)] = true
+		}
 	}
 
 	// Determine removals.
@@ -230,7 +238,7 @@ func (s *SkillStore) runtimeResyncFromStore(ctx context.Context) error {
 		// If this looks like a "replacement" (desired contains same type+name), and none of the desired
 		// replacements are present, skip removing the old one. This prevents losing the last working
 		// skill when the new desired location can't be indexed.
-		if _, hasReplacement := desiredByTypeName[tn]; hasReplacement && !presentTypeName[tn] {
+		if _, hasReplacement := desiredByTypeName[tn]; hasReplacement && !desiredPresentTypeName[tn] {
 			slog.Warn(
 				"runtime remove skipped (replacement missing)",
 				"type", def.Type,
@@ -259,22 +267,6 @@ func (s *SkillStore) runtimeResyncFromStore(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func typeNameKey(typ, name string) string {
-	return typ + "\x00" + name
-}
-
-func sortSkillDefs(defs []agentskillsSpec.SkillDef) {
-	sort.Slice(defs, func(i, j int) bool {
-		if defs[i].Type != defs[j].Type {
-			return defs[i].Type < defs[j].Type
-		}
-		if defs[i].Name != defs[j].Name {
-			return defs[i].Name < defs[j].Name
-		}
-		return defs[i].Location < defs[j].Location
-	})
 }
 
 // runtimeDesiredSkillDefs returns the desired enabled SkillDefs and an index by (type,name).
@@ -450,6 +442,59 @@ func (s *SkillStore) hydrateBuiltInEmbeddedFS(ctx context.Context) error {
 	return nil
 }
 
+// runtimeTryAddForeground attempts to add/index a skill in runtime for strict foreground validation.
+// Returns (addedByUs=true) if we successfully added; false if it already existed.
+func (s *SkillStore) runtimeTryAddForeground(ctx context.Context, def agentskillsSpec.SkillDef) (bool, error) {
+	if s == nil || s.runtime == nil {
+		return false, fmt.Errorf("%w: runtime not configured", spec.ErrSkillInvalidRequest)
+	}
+	ctx, cancel := context.WithTimeout(ctx, runtimeForegroundValidateTimeout)
+	defer cancel()
+
+	if _, err := s.runtime.AddSkill(ctx, def); err != nil {
+		if errors.Is(err, agentskillsSpec.ErrSkillAlreadyExists) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func (s *SkillStore) runtimeBestEffortRemoveDef(ctx context.Context, def agentskillsSpec.SkillDef, reason string) {
+	if s == nil || s.runtime == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, runtimeForegroundValidateTimeout)
+	defer cancel()
+	if _, err := s.runtime.RemoveSkill(ctx, def); err != nil && !errors.Is(err, agentskillsSpec.ErrSkillNotFound) {
+		slog.Error(
+			"runtime remove failed",
+			"reason",
+			reason,
+			"type",
+			def.Type,
+			"name",
+			def.Name,
+			"location",
+			def.Location,
+			"err",
+			err,
+		)
+	}
+}
+
+func sortSkillDefs(defs []agentskillsSpec.SkillDef) {
+	sort.Slice(defs, func(i, j int) bool {
+		if defs[i].Type != defs[j].Type {
+			return defs[i].Type < defs[j].Type
+		}
+		if defs[i].Name != defs[j].Name {
+			return defs[i].Name < defs[j].Name
+		}
+		return defs[i].Location < defs[j].Location
+	})
+}
+
 func fsDigestSHA256(fsys fs.FS) (string, error) {
 	h := sha256.New()
 	var paths []string
@@ -509,4 +554,8 @@ func copyFSToDir(fsys fs.FS, dest string) error {
 		}
 		return nil
 	})
+}
+
+func typeNameKey(typ, name string) string {
+	return typ + "\x00" + name
 }
