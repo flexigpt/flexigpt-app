@@ -119,6 +119,23 @@ func NewBuiltInSkills(
 	return b, nil
 }
 
+func (b *BuiltInSkills) Close() error {
+	if b == nil {
+		return nil
+	}
+
+	// Stop async rebuilder if it exposes a Stop or Close method.
+	if b.rebuilder != nil {
+		b.rebuilder.Close()
+	}
+
+	// Close overlay store if it supports Close().
+	if b.store != nil {
+		_ = b.store.Close()
+	}
+	return nil
+}
+
 func (b *BuiltInSkills) ListBuiltInSkills(ctx context.Context) (
 	bundles map[bundleitemutils.BundleID]spec.SkillBundle,
 	skills map[bundleitemutils.BundleID]map[spec.SkillSlug]spec.Skill,

@@ -54,6 +54,9 @@ func TestBuiltInSkills_LoadFromFS_HappyPathAndClones(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewBuiltInSkills: %v", err)
 	}
+	t.Cleanup(func() {
+		_ = b.Close()
+	})
 
 	bundles, skills, err := b.ListBuiltInSkills(ctx)
 	if err != nil {
@@ -268,7 +271,7 @@ func TestBuiltInSkills_LoadFromFS_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			overlayDir := t.TempDir()
-			_, err := NewBuiltInSkills(
+			b, err := NewBuiltInSkills(
 				ctx,
 				overlayDir,
 				time.Second,
@@ -278,6 +281,9 @@ func TestBuiltInSkills_LoadFromFS_Errors(t *testing.T) {
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}
+				t.Cleanup(func() {
+					_ = b.Close()
+				})
 				return
 			}
 			if err == nil {
@@ -303,6 +309,9 @@ func TestBuiltInSkills_SetFlags_AndPersistence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewBuiltInSkills: %v", err)
 	}
+	t.Cleanup(func() {
+		_ = b1.Close()
+	})
 
 	// Toggle bundle.
 	beforeBundle, err := b1.GetBuiltInSkillBundle(ctx, "builtin-bundle-1")
@@ -335,6 +344,9 @@ func TestBuiltInSkills_SetFlags_AndPersistence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewBuiltInSkills(reopen): %v", err)
 	}
+	t.Cleanup(func() {
+		_ = b2.Close()
+	})
 	gotBundle, err := b2.GetBuiltInSkillBundle(ctx, "builtin-bundle-1")
 	if err != nil {
 		t.Fatalf("GetBuiltInSkillBundle(reopen): %v", err)
@@ -403,6 +415,9 @@ func TestBuiltInSkills_ConcurrentFlagUpdates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewBuiltInSkills: %v", err)
 	}
+	t.Cleanup(func() {
+		_ = b.Close()
+	})
 
 	var wg sync.WaitGroup
 	errCh := make(chan error, 100)

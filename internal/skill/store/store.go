@@ -190,10 +190,22 @@ func newDefaultRuntime() (*agentskills.Runtime, error) {
 }
 
 func (s *SkillStore) Close() {
+	if s == nil {
+		return
+	}
 	if s.cleanStop != nil {
 		s.cleanStop()
 	}
 	s.wg.Wait()
+
+	// Close built-in overlay sqlite store so TempDir cleanup works on Windows.
+	if s.builtin != nil {
+		_ = s.builtin.Close()
+	}
+
+	if s.userStore != nil {
+		_ = s.userStore.Close()
+	}
 }
 
 func (s *SkillStore) PutSkillBundle(
