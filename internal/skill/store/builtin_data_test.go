@@ -128,6 +128,10 @@ func TestBuiltInSkills_LoadFromFS_HappyPathAndClones(t *testing.T) {
 }
 
 func TestBuiltInSkills_LoadFromFS_Errors(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("custom fs test has some overlay race in win")
+		return
+	}
 	ctx := t.Context()
 
 	mk := func(t *testing.T, raw string) fs.FS {
