@@ -198,7 +198,6 @@ func (s *SkillStore) Close() {
 	}
 	s.wg.Wait()
 
-	// Close built-in overlay sqlite store so TempDir cleanup works on Windows.
 	if s.builtin != nil {
 		_ = s.builtin.Close()
 	}
