@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -769,98 +768,160 @@ func TestSkillStore_RuntimeIntegration_RuntimeEndpoints_Errors(t *testing.T) {
 	}
 }
 
-func newBuiltInMapFS(t *testing.T, root string, now time.Time, b biBundle, skills []biSkill) fstest.MapFS {
-	t.Helper()
+func TestRuntimeFilterConversion_ClonesAndTrims(t *testing.T) {
+	t.Parallel()
 
-	schema := skillStoreSchema{
-		SchemaVersion: spec.SkillSchemaVersion,
-		Bundles: map[bundleitemutils.BundleID]spec.SkillBundle{
-			b.ID: {
-				SchemaVersion: spec.SkillSchemaVersion,
-				ID:            b.ID,
-				Slug:          b.Slug,
-				DisplayName:   b.DisplayName,
-				Description:   b.Description,
-				IsEnabled:     b.IsEnabled,
-				IsBuiltIn:     true,
-				CreatedAt:     now,
-				ModifiedAt:    now,
-				SoftDeletedAt: nil,
+	req := &spec.GetSkillsPromptXMLRequest{
+		Body: &spec.GetSkillsPromptXMLRequestBody{
+			Filter: &spec.RuntimeSkillFilter{
+				Types:          []string{"fs"},
+				NamePrefix:     "n",
+				LocationPrefix: "l",
+				AllowSkills: []agentskillsSpec.SkillDef{
+					{Type: "fs", Name: "a", Location: "/x"},
+				},
+				SessionID: "sid",
+				Activity:  " active ",
 			},
 		},
-		Skills: map[bundleitemutils.BundleID]map[spec.SkillSlug]spec.Skill{
-			b.ID: {},
+	}
+
+	f := getSkillsReqToRuntimePromptFilter(req)
+	if f == nil {
+		t.Fatalf("expected non-nil filter")
+	}
+	if string(f.Activity) != "active" {
+		t.Fatalf("expected trimmed activity 'active', got %q", f.Activity)
+	}
+
+	const mut = "MUT"
+	// Ensure slices are cloned.
+	req.Body.Filter.Types[0] = mut
+	req.Body.Filter.AllowSkills[0] = agentskillsSpec.SkillDef{Type: "fs", Name: mut, Location: "/mut"}
+	if f.Types[0] != "fs" {
+		t.Fatalf("Types slice not cloned")
+	}
+	if f.AllowSkills[0].Name != "a" {
+		t.Fatalf("AllowSkills slice not cloned")
+	}
+
+	// List filter conversion.
+	lreq := &spec.ListRuntimeSkillsRequest{
+		Body: &spec.ListRuntimeSkillsRequestBody{
+			Filter: req.Body.Filter,
 		},
 	}
-
-	out := fstest.MapFS{}
-
-	for _, sk := range skills {
-		schema.Skills[b.ID][sk.Slug] = spec.Skill{
-			SchemaVersion: spec.SkillSchemaVersion,
-			ID:            sk.ID,
-			Slug:          sk.Slug,
-			Type:          spec.SkillTypeEmbeddedFS,
-			Location:      sk.RelDir,
-			Name:          sk.Name,
-			DisplayName:   sk.Name,
-			Description:   "STORE_SKILL_DESCRIPTION_SHOULD_NOT_AFFECT_RUNTIME",
-			Tags:          nil,
-			Presence:      nil,
-			IsEnabled:     sk.IsEnabled,
-			IsBuiltIn:     true,
-			CreatedAt:     now,
-			ModifiedAt:    now,
-		}
-
-		md := buildSkillMD(sk.Name, sk.FMDesc, sk.Body)
-		out[path.Join(root, filepath.ToSlash(sk.RelDir), "SKILL.md")] = &fstest.MapFile{
-			Data: md,
-			Mode: 0o644,
-		}
-		// Add a small extra file so fsDigestSHA256 walks more than just SKILL.md.
-		out[path.Join(root, filepath.ToSlash(sk.RelDir), "resources", "note.txt")] = &fstest.MapFile{
-			Data: []byte("resource for " + sk.Name + "\n"),
-			Mode: 0o644,
-		}
+	lf := listSkillsReqToRuntimeListFilter(lreq)
+	if lf == nil {
+		t.Fatalf("expected non-nil list filter")
 	}
-
-	raw, err := json.Marshal(schema)
-	if err != nil {
-		t.Fatalf("json.Marshal builtin schema: %v", err)
+	if string(lf.Activity) != "active" {
+		t.Fatalf("expected trimmed activity 'active', got %q", lf.Activity)
 	}
-	out[path.Join(root, builtin.BuiltInSkillBundlesJSON)] = &fstest.MapFile{
-		Data: raw,
-		Mode: 0o644,
-	}
-
-	return out
 }
 
-func listRuntimeSkills(t *testing.T, s *SkillStore) []agentskillsSpec.SkillRecord {
-	t.Helper()
+func TestFSDigestSHA256_StableAndSensitive(t *testing.T) {
+	t.Parallel()
 
-	resp, err := s.ListRuntimeSkills(t.Context(), nil)
+	fsys1 := fstest.MapFS{
+		"b.txt": &fstest.MapFile{Data: []byte("B")},
+		"a.txt": &fstest.MapFile{Data: []byte("A")},
+	}
+	d1, err := fsDigestSHA256(fsys1)
 	if err != nil {
-		t.Fatalf("ListRuntimeSkills: %v", err)
+		t.Fatalf("fsDigestSHA256: %v", err)
 	}
-	if resp == nil || resp.Body == nil {
-		t.Fatalf("ListRuntimeSkills: nil response")
+
+	// Same content => same digest.
+	d2, err := fsDigestSHA256(fsys1)
+	if err != nil {
+		t.Fatalf("fsDigestSHA256: %v", err)
 	}
-	return resp.Body.Skills
+	if d1 != d2 {
+		t.Fatalf("digest not stable: %q != %q", d1, d2)
+	}
+
+	// Different content => different digest.
+	fsys2 := fstest.MapFS{
+		"b.txt": &fstest.MapFile{Data: []byte("B_CHANGED")},
+		"a.txt": &fstest.MapFile{Data: []byte("A")},
+	}
+	d3, err := fsDigestSHA256(fsys2)
+	if err != nil {
+		t.Fatalf("fsDigestSHA256: %v", err)
+	}
+	if d1 == d3 {
+		t.Fatalf("expected digest to change when content changes")
+	}
 }
 
-func listRuntimeSkillsFiltered(t *testing.T, s *SkillStore, f *spec.RuntimeSkillFilter) []agentskillsSpec.SkillRecord {
-	t.Helper()
+func TestCopyFSToDir_CopiesNestedFiles(t *testing.T) {
+	t.Parallel()
 
-	resp, err := s.ListRuntimeSkills(t.Context(), &spec.ListRuntimeSkillsRequest{
-		Body: &spec.ListRuntimeSkillsRequestBody{Filter: f},
-	})
+	fsys := fstest.MapFS{
+		"dir/note.txt": &fstest.MapFile{Data: []byte("hello\n")},
+	}
+	dest := t.TempDir()
+
+	if err := copyFSToDir(fsys, dest); err != nil {
+		t.Fatalf("copyFSToDir: %v", err)
+	}
+
+	got, err := os.ReadFile(filepath.Join(dest, "dir", "note.txt"))
 	if err != nil {
-		t.Fatalf("ListRuntimeSkills(filtered): %v", err)
+		t.Fatalf("ReadFile: %v", err)
 	}
-	if resp == nil || resp.Body == nil {
-		t.Fatalf("ListRuntimeSkills(filtered): nil response")
+	if string(got) != "hello\n" {
+		t.Fatalf("content mismatch: %q", string(got))
 	}
-	return resp.Body.Skills
+}
+
+func TestSkillStore_HydrateBuiltInEmbeddedFS_DigestMismatchWipes(t *testing.T) {
+	t.Parallel()
+
+	baseDir := t.TempDir()
+	hydrateDir := filepath.Join(baseDir, "hydrate")
+
+	s, err := NewSkillStore(baseDir, WithEmbeddedHydrateDir(hydrateDir))
+	if err != nil {
+		t.Fatalf("NewSkillStore: %v", err)
+	}
+	t.Cleanup(s.Close)
+
+	// Minimal FS: hydration only cares about digest + copying.
+	fsys1 := fstest.MapFS{
+		builtin.BuiltInSkillBundlesJSON: &fstest.MapFile{
+			Data: []byte(`{"schemaVersion":"` + spec.SkillSchemaVersion + `","bundles":{},"skills":{}}`),
+		},
+		"x.txt": &fstest.MapFile{Data: []byte("v1")},
+	}
+	s.builtin.skillsFS = fsys1
+	s.builtin.skillsDir = "."
+
+	if err := s.hydrateBuiltInEmbeddedFS(t.Context()); err != nil {
+		t.Fatalf("hydrateBuiltInEmbeddedFS(v1): %v", err)
+	}
+
+	sentinel := filepath.Join(hydrateDir, "SENTINEL")
+	if err := os.WriteFile(sentinel, []byte("keep"), 0o600); err != nil {
+		t.Fatalf("WriteFile sentinel: %v", err)
+	}
+
+	// Change FS => digest mismatch => hydrate wipes dir => sentinel should disappear.
+	fsys2 := fstest.MapFS{
+		builtin.BuiltInSkillBundlesJSON: &fstest.MapFile{
+			Data: []byte(`{"schemaVersion":"` + spec.SkillSchemaVersion + `","bundles":{},"skills":{}}`),
+		},
+		"x.txt": &fstest.MapFile{Data: []byte("v2")},
+	}
+	s.builtin.skillsFS = fsys2
+	s.builtin.skillsDir = "."
+
+	if err := s.hydrateBuiltInEmbeddedFS(t.Context()); err != nil {
+		t.Fatalf("hydrateBuiltInEmbeddedFS(v2): %v", err)
+	}
+
+	if _, err := os.Stat(sentinel); err == nil {
+		t.Fatalf("expected sentinel to be removed on digest mismatch wipe")
+	}
 }

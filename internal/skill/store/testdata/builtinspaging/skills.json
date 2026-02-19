@@ -1,0 +1,113 @@
+{
+	"schemaVersion": "2026-02-10",
+	"bundles": {
+		"bi-b1": {
+			"schemaVersion": "2026-02-10",
+			"id": "bi-b1",
+			"slug": "bi-bundle-1",
+			"displayName": "BI Bundle 1",
+			"description": "Built-in bundle for paging tests",
+			"isEnabled": true,
+			"isBuiltIn": true,
+			"createdAt": "2026-02-10T00:00:00Z",
+			"modifiedAt": "2026-02-10T00:00:10Z"
+		},
+		"bi-b2": {
+			"schemaVersion": "2026-02-10",
+			"id": "bi-b2",
+			"slug": "bi-bundle-2",
+			"displayName": "BI Bundle 2",
+			"description": "Built-in bundle for paging tests",
+			"isEnabled": true,
+			"isBuiltIn": true,
+			"createdAt": "2026-02-10T00:00:00Z",
+			"modifiedAt": "2026-02-10T00:00:11Z"
+		}
+	},
+	"skills": {
+		"bi-b1": {
+			"skill-a": {
+				"schemaVersion": "2026-02-10",
+				"id": "bi-skill-a",
+				"slug": "skill-a",
+				"type": "embeddedfs",
+				"location": "skills/bi-bundle-1/skill-a",
+				"name": "skill-a",
+				"displayName": "Skill A",
+				"description": "Built-in skill A",
+				"tags": ["t1"],
+				"presence": { "status": "unknown" },
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-02-10T00:00:01Z",
+				"modifiedAt": "2026-02-10T00:00:01Z"
+			},
+			"skill-b-missing": {
+				"schemaVersion": "2026-02-10",
+				"id": "bi-skill-b",
+				"slug": "skill-b-missing",
+				"type": "embeddedfs",
+				"location": "skills/bi-bundle-1/skill-b-missing",
+				"name": "skill-b-missing",
+				"displayName": "Skill B Missing",
+				"description": "Built-in skill B (missing)",
+				"tags": [],
+				"presence": { "status": "missing" },
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-02-10T00:00:02Z",
+				"modifiedAt": "2026-02-10T00:00:02Z"
+			},
+			"skill-c-disabled": {
+				"schemaVersion": "2026-02-10",
+				"id": "bi-skill-c",
+				"slug": "skill-c-disabled",
+				"type": "embeddedfs",
+				"location": "skills/bi-bundle-1/skill-c-disabled",
+				"name": "skill-c-disabled",
+				"displayName": "Skill C Disabled",
+				"description": "Built-in skill C (disabled)",
+				"tags": [],
+				"presence": { "status": "unknown" },
+				"isEnabled": false,
+				"isBuiltIn": true,
+				"createdAt": "2026-02-10T00:00:03Z",
+				"modifiedAt": "2026-02-10T00:00:03Z"
+			}
+		},
+		"bi-b2": {
+			"skill-d": {
+				"schemaVersion": "2026-02-10",
+				"id": "bi-skill-d",
+				"slug": "skill-d",
+				"type": "embeddedfs",
+				"location": "skills/bi-bundle-2/skill-d",
+				"name": "skill-d",
+				"displayName": "Skill D",
+				"description": "Built-in skill D",
+				"tags": [],
+				"presence": { "status": "unknown" },
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-02-10T00:00:04Z",
+				"modifiedAt": "2026-02-10T00:00:04Z"
+			},
+			"skill-e": {
+				"schemaVersion": "2026-02-10",
+				"id": "bi-skill-e",
+				"slug": "skill-e",
+				"type": "embeddedfs",
+				"location": "skills/bi-bundle-2/skill-e",
+				"name": "skill-e",
+				"displayName": "Skill E",
+				"description": "Built-in skill E",
+				"tags": [],
+				"presence": { "status": "unknown" },
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-02-10T00:00:05Z",
+				"modifiedAt": "2026-02-10T00:00:05Z"
+			}
+		}
+	}
+}

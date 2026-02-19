@@ -14,7 +14,6 @@ import (
 
 	"github.com/flexigpt/agentskills-go"
 	"github.com/flexigpt/agentskills-go/fsskillprovider"
-	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 
 	"github.com/ppipada/mapstore-go"
 	"github.com/ppipada/mapstore-go/jsonencdec"
@@ -140,7 +139,7 @@ func NewSkillStore(baseDir string, opts ...SkillStoreOption) (*SkillStore, error
 
 	s.embeddedHydrateDir = cfg.embeddedHydrateDir
 	if s.embeddedHydrateDir == "" {
-		s.embeddedHydrateDir = filepath.Join(s.baseDir, ".skills-embeddedfs-hydrated")
+		s.embeddedHydrateDir = filepath.Join(s.baseDir, "skills-embeddedfs-hydrated")
 	}
 	s.embeddedHydrateDir = filepath.Clean(s.embeddedHydrateDir)
 
@@ -898,56 +897,4 @@ func (s *SkillStore) GetSkill(ctx context.Context, req *spec.GetSkillRequest) (*
 		return nil, fmt.Errorf("%w: %s", spec.ErrSkillDisabled, req.SkillSlug)
 	}
 	return &spec.GetSkillResponse{Body: &sk}, nil
-}
-
-// runtimeDesiredDefCountsForSnapshot builds desired counts for enabled skills across builtin + user snapshot.
-// Used for duplicate-safe runtime removals in foreground paths.
-func (s *SkillStore) runtimeDesiredDefCountsForSnapshot(
-	ctx context.Context,
-	user skillStoreSchema,
-) (map[agentskillsSpec.SkillDef]int, error) {
-	out := map[agentskillsSpec.SkillDef]int{}
-
-	// Built-ins.
-	if s.builtin != nil {
-		bundles, skills, err := s.builtin.ListBuiltInSkills(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for bid, b := range bundles {
-			if !b.IsEnabled {
-				continue
-			}
-			for _, sk := range skills[bid] {
-				if !sk.IsEnabled {
-					continue
-				}
-				def, err := s.runtimeDefForBuiltInSkill(sk)
-				if err != nil {
-					continue
-				}
-				out[def]++
-			}
-		}
-	}
-
-	// Users.
-	for bid, b := range user.Bundles {
-		if isSoftDeletedSkillBundle(b) || !b.IsEnabled {
-			continue
-		}
-		sm := user.Skills[bid]
-		for _, sk := range sm {
-			if !sk.IsEnabled {
-				continue
-			}
-			def, err := runtimeDefForUserSkill(sk)
-			if err != nil {
-				continue
-			}
-			out[def]++
-		}
-	}
-
-	return out, nil
 }

@@ -172,11 +172,14 @@ func (s *SkillStore) runtimeResyncStrictFromStore(ctx context.Context) error {
 	if s == nil || s.runtime == nil {
 		return nil
 	}
-	desired, desiredByTypeName, err := s.runtimeDesiredSkillDefs(ctx)
+	view, err := s.runtimeDesiredViewFromStore(ctx, runtimeDesiredViewOpts{
+		WantByTypeName: true,
+		LogInvalid:     true,
+	})
 	if err != nil {
 		return err
 	}
-	return s.runtimeApplyDesiredStrict(ctx, desired, desiredByTypeName)
+	return s.runtimeApplyDesiredStrict(ctx, view.Set, view.ByTypeName)
 }
 
 // runtimeApplyDesiredStrict reconciles runtime to match desired, failing fast on add/remove errors.
@@ -205,13 +208,16 @@ func (s *SkillStore) runtimeResyncFromStore(ctx context.Context) error {
 		return nil
 	}
 
-	desired, desiredByTypeName, err := s.runtimeDesiredSkillDefs(ctx)
+	view, err := s.runtimeDesiredViewFromStore(ctx, runtimeDesiredViewOpts{
+		WantByTypeName: true,
+		LogInvalid:     true,
+	})
 	if err != nil {
 		// Hard stop: do not mutate runtime if we couldn't build the desired view safely.
 		return err
 	}
 
-	return s.runtimeApplyDesired(ctx, desired, desiredByTypeName, runtimeApplyBestEffort)
+	return s.runtimeApplyDesired(ctx, view.Set, view.ByTypeName, runtimeApplyBestEffort)
 }
 
 // runtimeApplyDesired reconciles runtime to match desired.
@@ -326,18 +332,80 @@ func (s *SkillStore) runtimeApplyDesired(
 	return nil
 }
 
-// runtimeDesiredSkillDefs returns the desired enabled SkillDefs and an index by (type,name).
-func (s *SkillStore) runtimeDesiredSkillDefs(
+type runtimeDesiredView struct {
+	// Set is the desired unique SkillDefs (deduped).
+	Set map[agentskillsSpec.SkillDef]struct{}
+
+	// ByTypeName groups desired SkillDefs by (type,name) for replacement-safety rules.
+	// Optional (only built when requested).
+	ByTypeName map[string][]agentskillsSpec.SkillDef
+
+	// Counts tracks how many enabled skills resolve to the same SkillDef (duplicate-safe removals).
+	Counts map[agentskillsSpec.SkillDef]int
+}
+
+type runtimeDesiredViewOpts struct {
+	WantByTypeName bool
+	LogInvalid     bool
+}
+
+func (s *SkillStore) runtimeDesiredViewFromStore(
 	ctx context.Context,
-) (desired map[agentskillsSpec.SkillDef]struct{}, byTypeName map[string][]agentskillsSpec.SkillDef, err error) {
-	desired = map[agentskillsSpec.SkillDef]struct{}{}
-	byTypeName = map[string][]agentskillsSpec.SkillDef{}
+	opts runtimeDesiredViewOpts,
+) (runtimeDesiredView, error) {
+	s.mu.RLock()
+	user, err := s.readAllUser(false)
+	s.mu.RUnlock()
+	if err != nil {
+		return runtimeDesiredView{}, err
+	}
+	return s.runtimeDesiredViewForSnapshot(ctx, user, opts)
+}
+
+// runtimeDesiredDefCountsForSnapshot builds desired counts for enabled skills across builtin + user snapshot.
+// Used for duplicate-safe runtime removals in foreground paths.
+func (s *SkillStore) runtimeDesiredDefCountsForSnapshot(
+	ctx context.Context,
+	user skillStoreSchema,
+) (map[agentskillsSpec.SkillDef]int, error) {
+	view, err := s.runtimeDesiredViewForSnapshot(ctx, user, runtimeDesiredViewOpts{
+		WantByTypeName: false,
+		LogInvalid:     false,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return view.Counts, nil
+}
+
+// runtimeDesiredViewForSnapshot computes a consistent desired view across built-in + user snapshot.
+func (s *SkillStore) runtimeDesiredViewForSnapshot(
+	ctx context.Context,
+	user skillStoreSchema,
+	opts runtimeDesiredViewOpts,
+) (runtimeDesiredView, error) {
+	view := runtimeDesiredView{
+		Set:    map[agentskillsSpec.SkillDef]struct{}{},
+		Counts: map[agentskillsSpec.SkillDef]int{},
+	}
+	if opts.WantByTypeName {
+		view.ByTypeName = map[string][]agentskillsSpec.SkillDef{}
+	}
+
+	add := func(def agentskillsSpec.SkillDef) {
+		view.Set[def] = struct{}{}
+		view.Counts[def]++
+		if opts.WantByTypeName {
+			k := typeNameKey(def.Type, def.Name)
+			view.ByTypeName[k] = append(view.ByTypeName[k], def)
+		}
+	}
 
 	// Built-ins (overlay view).
 	if s.builtin != nil {
 		bundles, skills, err := s.builtin.ListBuiltInSkills(ctx)
 		if err != nil {
-			return nil, nil, err
+			return runtimeDesiredView{}, err
 		}
 		for bid, b := range bundles {
 			if !b.IsEnabled {
@@ -349,24 +417,22 @@ func (s *SkillStore) runtimeDesiredSkillDefs(
 				}
 				def, err := s.runtimeDefForBuiltInSkill(sk)
 				if err != nil {
-					slog.Error("runtime desired (builtin) invalid def", "bundleID", bid, "skill", sk.Slug, "err", err)
+					if opts.LogInvalid {
+						slog.Error(
+							"runtime desired (builtin) invalid def",
+							"bundleID", bid,
+							"skill", sk.Slug,
+							"err", err,
+						)
+					}
 					continue
 				}
-				desired[def] = struct{}{}
-				k := typeNameKey(def.Type, def.Name)
-				byTypeName[k] = append(byTypeName[k], def)
+				add(def)
 			}
 		}
 	}
 
-	// Users.
-	s.mu.RLock()
-	user, err := s.readAllUser(false)
-	s.mu.RUnlock()
-	if err != nil {
-		return nil, nil, err
-	}
-
+	// Users (snapshot provided).
 	for bid, b := range user.Bundles {
 		if isSoftDeletedSkillBundle(b) || !b.IsEnabled {
 			continue
@@ -377,16 +443,21 @@ func (s *SkillStore) runtimeDesiredSkillDefs(
 			}
 			def, err := runtimeDefForUserSkill(sk)
 			if err != nil {
-				slog.Error("runtime desired (user) invalid def", "bundleID", bid, "skill", sk.Slug, "err", err)
+				if opts.LogInvalid {
+					slog.Error(
+						"runtime desired (user) invalid def",
+						"bundleID", bid,
+						"skill", sk.Slug,
+						"err", err,
+					)
+				}
 				continue
 			}
-			desired[def] = struct{}{}
-			k := typeNameKey(def.Type, def.Name)
-			byTypeName[k] = append(byTypeName[k], def)
+			add(def)
 		}
 	}
 
-	return desired, byTypeName, nil
+	return view, nil
 }
 
 func runtimeDefForUserSkill(sk spec.Skill) (agentskillsSpec.SkillDef, error) {

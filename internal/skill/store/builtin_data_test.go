@@ -274,10 +274,16 @@ func TestBuiltInSkills_LoadFromFS_Errors(t *testing.T) {
 				time.Second,
 				WithBuiltInSkillsFS(tc.rawFS, "."),
 			)
-			if err == nil && tc.wantSub != "" {
+			if tc.wantSub == "" {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			if err == nil {
 				t.Fatalf("expected error")
 			}
-			if tc.wantSub != "" && !strings.Contains(err.Error(), tc.wantSub) {
+			if !strings.Contains(err.Error(), tc.wantSub) {
 				t.Fatalf("error %q does not contain %q", err.Error(), tc.wantSub)
 			}
 		})
@@ -371,9 +377,7 @@ func TestBuiltInSkills_ConcurrentFlagUpdates(t *testing.T) {
 		},
 	}
 	for i := range 50 {
-		slug := spec.SkillSlug("skill-" + strings.Repeat("a", i%5) + "-" + string(rune('a'+(i%26))))
-		// Ensure unique slugs: append i.
-		slug = spec.SkillSlug(string(slug) + "-" + strconv.Itoa(i))
+		slug := spec.SkillSlug("skill-" + strconv.Itoa(i))
 		sc.Skills["b1"][slug] = spec.Skill{
 			SchemaVersion: spec.SkillSchemaVersion,
 			ID:            spec.SkillID("id-" + strconv.Itoa(i)),
@@ -421,8 +425,14 @@ func TestBuiltInSkills_ConcurrentFlagUpdates(t *testing.T) {
 		t.Fatalf("concurrent SetSkillEnabled error: %v", e)
 	}
 
-	// Spot check a couple values.
-	_, _ = b.GetBuiltInSkill(ctx, "b1", "skill-a-a-0")
+	// Spot-check one value deterministically.
+	got, err := b.GetBuiltInSkill(ctx, "b1", "skill-0")
+	if err != nil {
+		t.Fatalf("GetBuiltInSkill: %v", err)
+	}
+	if got.IsEnabled {
+		t.Fatalf("expected skill-0 to be disabled after concurrent updates")
+	}
 }
 
 func TestResolveSkillsFS(t *testing.T) {

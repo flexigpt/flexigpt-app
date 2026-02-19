@@ -3,6 +3,7 @@ package store
 import (
 	"errors"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -330,8 +331,8 @@ func TestSkillStore_ListSkillBundles_FiltersAndPaging(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListSkillBundles: %v", err)
 	}
-	if len(resp1.Body.SkillBundles) == 0 || len(resp1.Body.SkillBundles) > 2 {
-		t.Fatalf("unexpected page size: %d", len(resp1.Body.SkillBundles))
+	if len(resp1.Body.SkillBundles) != 1 {
+		t.Fatalf("expected 1 bundle on page1, got %d", len(resp1.Body.SkillBundles))
 	}
 	for _, b := range resp1.Body.SkillBundles {
 		if b.ID != "b1" && b.ID != "b2" && b.ID != "b3" {
@@ -634,5 +635,177 @@ func TestSkillStore_BuiltInReadOnly_Guards(t *testing.T) {
 	_, _ = s.PatchSkillBundle(ctx, &spec.PatchSkillBundleRequest{
 		BundleID: bid,
 		Body:     &spec.PatchSkillBundleRequestBody{IsEnabled: orig.IsEnabled},
+	})
+}
+
+func TestSkillStore_readAllUser_HardeningAndCorruptionDetection(t *testing.T) {
+	t.Parallel()
+	s := newTestSkillStore(t)
+
+	now := time.Date(2026, 2, 10, 0, 0, 0, 0, time.UTC)
+
+	t.Run("missing-schemaVersion-defaults-and-normalizes-isBuiltIn", func(t *testing.T) {
+		t.Parallel()
+
+		setUserStoreAllLocked(t, s, map[string]any{
+			"bundles": map[string]any{
+				"b1": map[string]any{
+					"schemaVersion": spec.SkillSchemaVersion,
+					"id":            "b1",
+					"slug":          "bundle-1",
+					"displayName":   "Bundle 1",
+					"description":   "",
+					"isEnabled":     true,
+					"isBuiltIn":     true, // should be normalized to false on read
+					"createdAt":     now,
+					"modifiedAt":    now,
+				},
+			},
+			"skills": map[string]any{
+				"b1": map[string]any{
+					"s1": map[string]any{
+						"schemaVersion": spec.SkillSchemaVersion,
+						"id":            "s1",
+						"slug":          "s1",
+						"type":          "fs",
+						"location":      "/tmp/x",
+						"name":          "n",
+						"displayName":   "",
+						"description":   "",
+						"tags":          []any{},
+						"presence":      map[string]any{"status": "unknown"},
+						"isEnabled":     true,
+						"isBuiltIn":     true, // should be normalized to false on read
+						"createdAt":     now,
+						"modifiedAt":    now,
+					},
+				},
+			},
+		})
+
+		sc, err := readAllUserLocked(t, s, true)
+		if err != nil {
+			t.Fatalf("readAllUser: %v", err)
+		}
+		if sc.SchemaVersion != spec.SkillSchemaVersion {
+			t.Fatalf("schemaVersion not defaulted: got=%q want=%q", sc.SchemaVersion, spec.SkillSchemaVersion)
+		}
+		if sc.Bundles["b1"].IsBuiltIn {
+			t.Fatalf("expected bundle IsBuiltIn normalized to false")
+		}
+		if sc.Skills["b1"]["s1"].IsBuiltIn {
+			t.Fatalf("expected skill IsBuiltIn normalized to false")
+		}
+	})
+
+	t.Run("schemaVersion-mismatch-errors", func(t *testing.T) {
+		t.Parallel()
+
+		setUserStoreAllLocked(t, s, map[string]any{
+			"schemaVersion": "1900-01-01",
+			"bundles":       map[string]any{},
+			"skills":        map[string]any{},
+		})
+		_, err := readAllUserLocked(t, s, true)
+		if err == nil || !strings.Contains(err.Error(), "schemaVersion") {
+			t.Fatalf("expected schemaVersion error, got %v", err)
+		}
+	})
+
+	t.Run("bundle-key-mismatch-errors", func(t *testing.T) {
+		t.Parallel()
+
+		setUserStoreAllLocked(t, s, map[string]any{
+			"schemaVersion": spec.SkillSchemaVersion,
+			"bundles": map[string]any{
+				"b1": map[string]any{
+					"schemaVersion": spec.SkillSchemaVersion,
+					"id":            "DIFF",
+					"slug":          "bundle-1",
+					"displayName":   "Bundle 1",
+					"isEnabled":     true,
+					"createdAt":     now,
+					"modifiedAt":    now,
+				},
+			},
+			"skills": map[string]any{"b1": map[string]any{}},
+		})
+
+		_, err := readAllUserLocked(t, s, true)
+		if err == nil || !strings.Contains(err.Error(), "bundle key") {
+			t.Fatalf("expected bundle key mismatch error, got %v", err)
+		}
+	})
+
+	t.Run("skills-reference-missing-bundle-errors", func(t *testing.T) {
+		t.Parallel()
+
+		setUserStoreAllLocked(t, s, map[string]any{
+			"schemaVersion": spec.SkillSchemaVersion,
+			"bundles":       map[string]any{},
+			"skills": map[string]any{
+				"missing": map[string]any{},
+			},
+		})
+
+		_, err := readAllUserLocked(t, s, true)
+		if err == nil || !strings.Contains(err.Error(), "skills reference missing bundle") {
+			t.Fatalf("expected skills reference missing bundle error, got %v", err)
+		}
+	})
+
+	t.Run("skill-key-mismatch-errors", func(t *testing.T) {
+		t.Parallel()
+
+		setUserStoreAllLocked(t, s, map[string]any{
+			"schemaVersion": spec.SkillSchemaVersion,
+			"bundles": map[string]any{
+				"b1": map[string]any{
+					"schemaVersion": spec.SkillSchemaVersion,
+					"id":            "b1",
+					"slug":          "bundle-1",
+					"displayName":   "Bundle 1",
+					"isEnabled":     true,
+					"createdAt":     now,
+					"modifiedAt":    now,
+				},
+			},
+			"skills": map[string]any{
+				"b1": map[string]any{
+					"s1": map[string]any{
+						"schemaVersion": spec.SkillSchemaVersion,
+						"id":            "s1",
+						"slug":          "s2", // mismatch
+						"type":          "fs",
+						"location":      "/tmp/x",
+						"name":          "n",
+						"isEnabled":     true,
+						"createdAt":     now,
+						"modifiedAt":    now,
+					},
+				},
+			},
+		})
+
+		_, err := readAllUserLocked(t, s, true)
+		if err == nil || !strings.Contains(err.Error(), "skill key") {
+			t.Fatalf("expected skill key mismatch error, got %v", err)
+		}
+	})
+
+	t.Run("missing-bundles-and-skills-maps-normalize", func(t *testing.T) {
+		t.Parallel()
+
+		setUserStoreAllLocked(t, s, map[string]any{
+			"schemaVersion": spec.SkillSchemaVersion,
+		})
+
+		sc, err := readAllUserLocked(t, s, true)
+		if err != nil {
+			t.Fatalf("readAllUser: %v", err)
+		}
+		if sc.Bundles == nil || sc.Skills == nil {
+			t.Fatalf("expected bundles/skills maps to be non-nil after normalization")
+		}
 	})
 }

@@ -1,15 +1,19 @@
 package store
 
 import (
+	"encoding/json"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
+	"time"
 
 	"github.com/flexigpt/agentskills-go"
 	"github.com/flexigpt/agentskills-go/fsskillprovider"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
 )
@@ -93,6 +97,135 @@ func writeSkillPackage(t *testing.T, parentDir, name, fmDesc, body string) strin
 		t.Fatalf("write SKILL.md: %v", err)
 	}
 	return filepath.Clean(dir)
+}
+
+func writeAllUserLocked(t *testing.T, s *SkillStore, sc skillStoreSchema) {
+	t.Helper()
+	s.writeMu.Lock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	defer s.writeMu.Unlock()
+
+	if err := s.writeAllUser(sc); err != nil {
+		t.Fatalf("writeAllUser: %v", err)
+	}
+}
+
+func setUserStoreAllLocked(t *testing.T, s *SkillStore, mp map[string]any) {
+	t.Helper()
+	s.writeMu.Lock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	defer s.writeMu.Unlock()
+
+	if err := s.userStore.SetAll(mp); err != nil {
+		t.Fatalf("userStore.SetAll: %v", err)
+	}
+}
+
+func readAllUserLocked(t *testing.T, s *SkillStore, force bool) (skillStoreSchema, error) {
+	t.Helper()
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.readAllUser(force)
+}
+
+func newBuiltInMapFS(t *testing.T, root string, now time.Time, b biBundle, skills []biSkill) fstest.MapFS {
+	t.Helper()
+
+	schema := skillStoreSchema{
+		SchemaVersion: spec.SkillSchemaVersion,
+		Bundles: map[bundleitemutils.BundleID]spec.SkillBundle{
+			b.ID: {
+				SchemaVersion: spec.SkillSchemaVersion,
+				ID:            b.ID,
+				Slug:          b.Slug,
+				DisplayName:   b.DisplayName,
+				Description:   b.Description,
+				IsEnabled:     b.IsEnabled,
+				IsBuiltIn:     true,
+				CreatedAt:     now,
+				ModifiedAt:    now,
+				SoftDeletedAt: nil,
+			},
+		},
+		Skills: map[bundleitemutils.BundleID]map[spec.SkillSlug]spec.Skill{
+			b.ID: {},
+		},
+	}
+
+	out := fstest.MapFS{}
+
+	for _, sk := range skills {
+		schema.Skills[b.ID][sk.Slug] = spec.Skill{
+			SchemaVersion: spec.SkillSchemaVersion,
+			ID:            sk.ID,
+			Slug:          sk.Slug,
+			Type:          spec.SkillTypeEmbeddedFS,
+			Location:      sk.RelDir,
+			Name:          sk.Name,
+			DisplayName:   sk.Name,
+			Description:   "STORE_SKILL_DESCRIPTION_SHOULD_NOT_AFFECT_RUNTIME",
+			Tags:          nil,
+			Presence:      nil,
+			IsEnabled:     sk.IsEnabled,
+			IsBuiltIn:     true,
+			CreatedAt:     now,
+			ModifiedAt:    now,
+		}
+
+		md := buildSkillMD(sk.Name, sk.FMDesc, sk.Body)
+		out[path.Join(root, filepath.ToSlash(sk.RelDir), "SKILL.md")] = &fstest.MapFile{
+			Data: md,
+			Mode: 0o644,
+		}
+		// Add a small extra file so fsDigestSHA256 walks more than just SKILL.md.
+		out[path.Join(root, filepath.ToSlash(sk.RelDir), "resources", "note.txt")] = &fstest.MapFile{
+			Data: []byte("resource for " + sk.Name + "\n"),
+			Mode: 0o644,
+		}
+	}
+
+	raw, err := json.Marshal(schema)
+	if err != nil {
+		t.Fatalf("json.Marshal builtin schema: %v", err)
+	}
+	out[path.Join(root, builtin.BuiltInSkillBundlesJSON)] = &fstest.MapFile{
+		Data: raw,
+		Mode: 0o644,
+	}
+
+	return out
+}
+
+func listRuntimeSkills(t *testing.T, s *SkillStore) []agentskillsSpec.SkillRecord {
+	t.Helper()
+
+	resp, err := s.ListRuntimeSkills(t.Context(), nil)
+	if err != nil {
+		t.Fatalf("ListRuntimeSkills: %v", err)
+	}
+	if resp == nil || resp.Body == nil {
+		t.Fatalf("ListRuntimeSkills: nil response")
+	}
+	return resp.Body.Skills
+}
+
+func listRuntimeSkillsFiltered(t *testing.T, s *SkillStore, f *spec.RuntimeSkillFilter) []agentskillsSpec.SkillRecord {
+	t.Helper()
+
+	resp, err := s.ListRuntimeSkills(t.Context(), &spec.ListRuntimeSkillsRequest{
+		Body: &spec.ListRuntimeSkillsRequestBody{Filter: f},
+	})
+	if err != nil {
+		t.Fatalf("ListRuntimeSkills(filtered): %v", err)
+	}
+	if resp == nil || resp.Body == nil {
+		t.Fatalf("ListRuntimeSkills(filtered): nil response")
+	}
+	return resp.Body.Skills
 }
 
 func buildSkillMD(name, desc, body string) []byte {
