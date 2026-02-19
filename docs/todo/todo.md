@@ -3,6 +3,7 @@
 ## Laundry list
 
 - [ ] opus 4.6 has now adaptive thinking which is basically thinking with levels
+- [ ] when we send attachments, like go files. openai is consuming a lot of tokens, i.e if tiktoken says x, is is almsot 2x generally. check if we are sending things double or something. req debug details doesnt show double atleast, but better print and check.
 
 ## Features
 

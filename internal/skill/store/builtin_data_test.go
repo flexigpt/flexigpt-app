@@ -127,8 +127,6 @@ func TestBuiltInSkills_LoadFromFS_HappyPathAndClones(t *testing.T) {
 }
 
 func TestBuiltInSkills_LoadFromFS_Errors(t *testing.T) {
-	t.Parallel()
-
 	ctx := t.Context()
 
 	mk := func(t *testing.T, raw string) fs.FS {
@@ -269,7 +267,6 @@ func TestBuiltInSkills_LoadFromFS_Errors(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
 			overlayDir := t.TempDir()
 			b, err := NewBuiltInSkills(
 				ctx,
@@ -453,8 +450,6 @@ func TestBuiltInSkills_ConcurrentFlagUpdates(t *testing.T) {
 }
 
 func TestResolveSkillsFS(t *testing.T) {
-	t.Parallel()
-
 	fsys := fstest.MapFS{
 		"a/skills.json": &fstest.MapFile{Data: []byte(`{}`)},
 	}
@@ -472,7 +467,6 @@ func TestResolveSkillsFS(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
 			_, err := resolveSkillsFS(fsys, tc.dir)
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("err=%v wantErr=%v", err, tc.wantErr)

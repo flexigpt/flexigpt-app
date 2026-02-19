@@ -20,7 +20,10 @@ import (
 	"github.com/ppipada/mapstore-go/uuidv7filename"
 )
 
-const corrupted = "corrupted"
+const (
+	corrupted = "corrupted"
+	demo      = "demo"
+)
 
 func TestNewBuiltInToolData(t *testing.T) {
 	tests := []struct {
@@ -598,122 +601,137 @@ func TestAsyncToolRebuild(t *testing.T) {
 	}
 }
 
-func Test_NewBuiltInToolData_SyntheticFS_Errors(t *testing.T) {
+func Test_NewBuiltInToolData_SyntheticFS_MissingBundlesJSON(t *testing.T) {
+	_, err := newToolFromFS(t, fstest.MapFS{})
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("want fs.ErrNotExist, got %v", err)
+	}
+}
+
+// Test when the tool bundles json file is present but contains invalid JSON.
+func Test_NewBuiltInToolData_SyntheticFS_InvalidBundlesJSON(t *testing.T) {
+	fsys := fstest.MapFS{
+		builtin.BuiltInToolBundlesJSON: {Data: []byte("{ oops ]")},
+	}
+	_, err := newToolFromFS(t, fsys)
+	if err == nil || !strings.Contains(err.Error(), "invalid") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// Test when the manifest contains no bundles.
+func Test_NewBuiltInToolData_SyntheticFS_NoBundlesInManifest(t *testing.T) {
+	empty, _ := json.Marshal(
+		spec.AllBundles{Bundles: map[bundleitemutils.BundleID]spec.ToolBundle{}},
+	)
+	fsys := fstest.MapFS{builtin.BuiltInToolBundlesJSON: {Data: empty}}
+	_, err := newToolFromFS(t, fsys)
+	if err == nil || !strings.Contains(err.Error(), "contains no bundles") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// Test when a bundle directory is present but the bundle has no tools.
+func Test_NewBuiltInToolData_SyntheticFS_BundleHasNoTools(t *testing.T) {
 	bundleID := newUUID(t)
-	slug := "demo"
+	slug := demo
 
-	t.Run("missing_bundles_json", func(t *testing.T) {
-		_, err := newToolFromFS(t, fstest.MapFS{})
-		if !errors.Is(err, fs.ErrNotExist) {
-			t.Fatalf("want fs.ErrNotExist, got %v", err)
-		}
-	})
+	dir := fmt.Sprintf("%s_%s", bundleID, slug)
+	fsys := fstest.MapFS{
+		builtin.BuiltInToolBundlesJSON: {Data: buildToolManifest(bundleID, slug)},
+		dir:                            &fstest.MapFile{Mode: fs.ModeDir},
+	}
+	_, err := newToolFromFS(t, fsys)
+	if err == nil || !strings.Contains(err.Error(), "has no tools") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
 
-	t.Run("invalid_bundles_json", func(t *testing.T) {
-		fsys := fstest.MapFS{
-			builtin.BuiltInToolBundlesJSON: {Data: []byte("{ oops ]")},
-		}
-		_, err := newToolFromFS(t, fsys)
-		if err == nil || !strings.Contains(err.Error(), "invalid") {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
+// Test when a bundle directory exists that is not listed in the manifest.
+func Test_NewBuiltInToolData_SyntheticFS_BundleDirNotInManifest(t *testing.T) {
+	bundleID := newUUID(t)
+	slug := demo
 
-	t.Run("no_bundles_in_manifest", func(t *testing.T) {
-		empty, _ := json.Marshal(
-			spec.AllBundles{Bundles: map[bundleitemutils.BundleID]spec.ToolBundle{}},
-		)
-		fsys := fstest.MapFS{builtin.BuiltInToolBundlesJSON: {Data: empty}}
-		_, err := newToolFromFS(t, fsys)
-		if err == nil || !strings.Contains(err.Error(), "contains no bundles") {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
+	ghostID := newUUID(t)
+	ghostSlug := "ghost"
+	dir := fmt.Sprintf("%s_%s", ghostID, ghostSlug)
 
-	t.Run("bundle_has_no_tools", func(t *testing.T) {
-		dir := fmt.Sprintf("%s_%s", bundleID, slug)
-		fsys := fstest.MapFS{
-			builtin.BuiltInToolBundlesJSON: {Data: buildToolManifest(bundleID, slug)},
-			dir:                            &fstest.MapFile{Mode: fs.ModeDir},
-		}
-		_, err := newToolFromFS(t, fsys)
-		if err == nil || !strings.Contains(err.Error(), "has no tools") {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
+	fn, raw, _ := buildTool(t, ghostSlug, "v1")
+	fsys := fstest.MapFS{
+		builtin.BuiltInToolBundlesJSON: {Data: buildToolManifest(bundleID, slug)},
+		dir:                            &fstest.MapFile{Mode: fs.ModeDir},
+		dir + "/" + fn:                 {Data: raw},
+	}
+	_, err := newToolFromFS(t, fsys)
+	if err == nil ||
+		!strings.Contains(err.Error(), "not in "+builtin.BuiltInToolBundlesJSON) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
 
-	t.Run("bundle_dir_not_in_manifest", func(t *testing.T) {
-		ghostID := newUUID(t)
-		ghostSlug := "ghost"
-		dir := fmt.Sprintf("%s_%s", ghostID, ghostSlug)
+// Test when the directory slug doesn't match the manifest slug for that bundle.
+func Test_NewBuiltInToolData_SyntheticFS_SlugMismatchBetweenDirAndManifest(t *testing.T) {
+	bundleID := newUUID(t)
+	slug := demo
 
-		fn, raw, _ := buildTool(t, ghostSlug, "v1")
-		fsys := fstest.MapFS{
-			builtin.BuiltInToolBundlesJSON: {Data: buildToolManifest(bundleID, slug)},
-			dir:                            &fstest.MapFile{Mode: fs.ModeDir},
-			dir + "/" + fn:                 {Data: raw},
-		}
-		_, err := newToolFromFS(t, fsys)
-		if err == nil ||
-			!strings.Contains(
-				err.Error(),
-				"not in "+builtin.BuiltInToolBundlesJSON,
-			) {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
+	// Dir slug = wrong, manifest slug = demo.
+	dir := fmt.Sprintf("%s_%s", bundleID, "wrong")
 
-	t.Run("slug_mismatch_between_dir_and_manifest", func(t *testing.T) {
-		dir := fmt.Sprintf("%s_%s", bundleID, "wrong")
+	fn, raw, _ := buildTool(t, "wrong", "v1")
+	fsys := fstest.MapFS{
+		builtin.BuiltInToolBundlesJSON: {Data: buildToolManifest(bundleID, slug)},
+		dir:                            &fstest.MapFile{Mode: fs.ModeDir},
+		dir + "/" + fn:                 {Data: raw},
+	}
+	_, err := newToolFromFS(t, fsys)
+	if err == nil || !strings.Contains(err.Error(), "dir slug") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
 
-		fn, raw, _ := buildTool(t, "wrong", "v1")
-		fsys := fstest.MapFS{
-			builtin.BuiltInToolBundlesJSON: {Data: buildToolManifest(bundleID, slug)},
-			dir:                            &fstest.MapFile{Mode: fs.ModeDir},
-			dir + "/" + fn:                 {Data: raw},
-		}
-		_, err := newToolFromFS(t, fsys)
-		if err == nil || !strings.Contains(err.Error(), "dir slug") {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
+// Test when the filename implies a different slug/version than the JSON content.
+func Test_NewBuiltInToolData_SyntheticFS_FilenameSlugVersionMismatch(t *testing.T) {
+	bundleID := newUUID(t)
+	slug := demo
 
-	t.Run("filename_slug_version_mismatch", func(t *testing.T) {
-		dir := fmt.Sprintf("%s_%s", bundleID, slug)
+	dir := fmt.Sprintf("%s_%s", bundleID, slug)
 
-		_, raw, _ := buildTool(t, slug, "v1")
-		fsys := fstest.MapFS{
-			builtin.BuiltInToolBundlesJSON: {Data: buildToolManifest(bundleID, slug)},
-			dir:                            &fstest.MapFile{Mode: fs.ModeDir},
-			dir + "/demo_v2.json":          {Data: raw},
-		}
-		_, err := newToolFromFS(t, fsys)
-		if err == nil || !strings.Contains(err.Error(), "filename") {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
+	_, raw, _ := buildTool(t, slug, "v1")
+	fsys := fstest.MapFS{
+		builtin.BuiltInToolBundlesJSON: {Data: buildToolManifest(bundleID, slug)},
+		dir:                            &fstest.MapFile{Mode: fs.ModeDir},
+		dir + "/demo_v2.json":          {Data: raw},
+	}
+	_, err := newToolFromFS(t, fsys)
+	if err == nil || !strings.Contains(err.Error(), "filename") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
 
-	t.Run("duplicate_tool_id", func(t *testing.T) {
-		dir := fmt.Sprintf("%s_%s", bundleID, slug)
-		fn, raw, toolID := buildTool(t, slug, "v1")
-		fn2, raw2, _ := buildToolWithID(t, slug, "v2", toolID)
-		fsys := fstest.MapFS{
-			builtin.BuiltInToolBundlesJSON: {Data: buildToolManifest(bundleID, slug)},
-			dir:                            &fstest.MapFile{Mode: fs.ModeDir},
-			dir + "/" + fn:                 {Data: raw},
-			dir + "/" + fn2:                {Data: raw2},
-		}
-		_, err := newToolFromFS(t, fsys)
-		if err == nil || !strings.Contains(err.Error(), "duplicate tool ID") {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
+// Test when two tools in the same bundle share the same tool ID.
+func Test_NewBuiltInToolData_SyntheticFS_DuplicateToolID(t *testing.T) {
+	bundleID := newUUID(t)
+	slug := demo
+
+	dir := fmt.Sprintf("%s_%s", bundleID, slug)
+	fn, raw, toolID := buildTool(t, slug, "v1")
+	fn2, raw2, _ := buildToolWithID(t, slug, "v2", toolID)
+	fsys := fstest.MapFS{
+		builtin.BuiltInToolBundlesJSON: {Data: buildToolManifest(bundleID, slug)},
+		dir:                            &fstest.MapFile{Mode: fs.ModeDir},
+		dir + "/" + fn:                 {Data: raw},
+		dir + "/" + fn2:                {Data: raw2},
+	}
+	_, err := newToolFromFS(t, fsys)
+	if err == nil || !strings.Contains(err.Error(), "duplicate tool ID") {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
 
 func Test_NewBuiltInToolData_SyntheticFS_HappyAndCRUD(t *testing.T) {
 	ctx := t.Context()
 	bid := newUUID(t)
-	slug := "demo"
+	slug := demo
 
 	dir := fmt.Sprintf("%s_%s", bid, slug)
 	fn, rawTool, _ := buildTool(t, slug, "v1")

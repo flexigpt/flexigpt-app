@@ -20,7 +20,10 @@ import (
 	"github.com/ppipada/mapstore-go/uuidv7filename"
 )
 
-const corrupted = "corrupted"
+const (
+	corrupted = "corrupted"
+	demo      = "demo"
+)
 
 func TestNewBuiltInData(t *testing.T) {
 	tests := []struct {
@@ -617,109 +620,119 @@ func TestAsyncRebuild(t *testing.T) {
 	}
 }
 
-func Test_NewBuiltInData_SyntheticFS_Errors(t *testing.T) {
+func Test_NewBuiltInData_SyntheticFS_MissingBundlesJSON(t *testing.T) {
+	_, err := newFromFS(t, fstest.MapFS{})
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("want fs.ErrNotExist, got %v", err)
+	}
+}
+
+// Test when the bundles json file is present but contains invalid JSON.
+func Test_NewBuiltInData_SyntheticFS_InvalidBundlesJSON(t *testing.T) {
+	fsys := fstest.MapFS{
+		builtin.BuiltInPromptBundlesJSON: {Data: []byte("{ oops ]")},
+	}
+	_, err := newFromFS(t, fsys)
+	if err == nil || !strings.Contains(err.Error(), "invalid") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// Test when the manifest contains no bundles.
+func Test_NewBuiltInData_SyntheticFS_NoBundlesInManifest(t *testing.T) {
+	empty, _ := json.Marshal(
+		spec.AllBundles{Bundles: map[bundleitemutils.BundleID]spec.PromptBundle{}},
+	)
+	fsys := fstest.MapFS{builtin.BuiltInPromptBundlesJSON: {Data: empty}}
+	_, err := newFromFS(t, fsys)
+	if err == nil || !strings.Contains(err.Error(), "contains no bundles") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// Test when a bundle directory is present but the bundle has no templates.
+func Test_NewBuiltInData_SyntheticFS_BundleHasNoTemplates(t *testing.T) {
 	bundleID := newUUID(t)
-	slug := "demo"
+	slug := demo
 
-	t.Run("missing_bundles_json", func(t *testing.T) {
-		_, err := newFromFS(t, fstest.MapFS{})
-		if !errors.Is(err, fs.ErrNotExist) {
-			t.Fatalf("want fs.ErrNotExist, got %v", err)
-		}
-	})
+	dir := fmt.Sprintf("%s_%s", bundleID, slug)
+	fsys := fstest.MapFS{
+		builtin.BuiltInPromptBundlesJSON: {Data: buildManifest(bundleID, slug)},
+		dir:                              &fstest.MapFile{Mode: fs.ModeDir},
+	}
+	_, err := newFromFS(t, fsys)
+	if err == nil || !strings.Contains(err.Error(), "has no templates") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
 
-	t.Run("invalid_bundles_json", func(t *testing.T) {
-		fsys := fstest.MapFS{
-			builtin.BuiltInPromptBundlesJSON: {Data: []byte("{ oops ]")},
-		}
-		_, err := newFromFS(t, fsys)
-		if err == nil || !strings.Contains(err.Error(), "invalid") {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
+// Test when a bundle directory exists that is not listed in the manifest.
+func Test_NewBuiltInData_SyntheticFS_BundleDirNotInManifest(t *testing.T) {
+	bundleID := newUUID(t)
+	slug := demo
 
-	t.Run("no_bundles_in_manifest", func(t *testing.T) {
-		empty, _ := json.Marshal(
-			spec.AllBundles{Bundles: map[bundleitemutils.BundleID]spec.PromptBundle{}},
-		)
-		fsys := fstest.MapFS{builtin.BuiltInPromptBundlesJSON: {Data: empty}}
-		_, err := newFromFS(t, fsys)
-		if err == nil || !strings.Contains(err.Error(), "contains no bundles") {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
+	ghostID := newUUID(t)
+	ghostSlug := "ghost"
+	dir := fmt.Sprintf("%s_%s", ghostID, ghostSlug)
 
-	t.Run("bundle_has_no_templates", func(t *testing.T) {
-		dir := fmt.Sprintf("%s_%s", bundleID, slug)
-		fsys := fstest.MapFS{
-			builtin.BuiltInPromptBundlesJSON: {Data: buildManifest(bundleID, slug)},
-			dir:                              &fstest.MapFile{Mode: fs.ModeDir},
-		}
-		_, err := newFromFS(t, fsys)
-		if err == nil || !strings.Contains(err.Error(), "has no templates") {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
+	fn, raw, _ := buildTemplate(t, ghostSlug, "v1")
+	fsys := fstest.MapFS{
+		builtin.BuiltInPromptBundlesJSON: {Data: buildManifest(bundleID, slug)},
+		dir:                              &fstest.MapFile{Mode: fs.ModeDir},
+		dir + "/" + fn:                   {Data: raw},
+	}
+	_, err := newFromFS(t, fsys)
+	if err == nil ||
+		!strings.Contains(err.Error(), "not in "+builtin.BuiltInPromptBundlesJSON) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
 
-	t.Run("bundle_dir_not_in_manifest", func(t *testing.T) {
-		ghostID := newUUID(t)
-		ghostSlug := "ghost"
-		dir := fmt.Sprintf("%s_%s", ghostID, ghostSlug)
+// Test when the directory slug doesn't match the manifest slug for that bundle.
+func Test_NewBuiltInData_SyntheticFS_SlugMismatchBetweenDirAndManifest(t *testing.T) {
+	bundleID := newUUID(t)
+	slug := demo
 
-		fn, raw, _ := buildTemplate(t, ghostSlug, "v1")
-		fsys := fstest.MapFS{
-			builtin.BuiltInPromptBundlesJSON: {Data: buildManifest(bundleID, slug)},
-			dir:                              &fstest.MapFile{Mode: fs.ModeDir},
-			dir + "/" + fn:                   {Data: raw},
-		}
-		_, err := newFromFS(t, fsys)
-		if err == nil ||
-			!strings.Contains(
-				err.Error(),
-				"not in "+builtin.BuiltInPromptBundlesJSON,
-			) {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
+	// Dir slug = wrong, manifest slug = demo.
+	dir := fmt.Sprintf("%s_%s", bundleID, "wrong")
 
-	t.Run("slug_mismatch_between_dir_and_manifest", func(t *testing.T) {
-		// Dir slug = wrong, manifest slug = demo.
-		dir := fmt.Sprintf("%s_%s", bundleID, "wrong")
+	fn, raw, _ := buildTemplate(t, "wrong", "v1")
+	fsys := fstest.MapFS{
+		builtin.BuiltInPromptBundlesJSON: {Data: buildManifest(bundleID, slug)},
+		dir:                              &fstest.MapFile{Mode: fs.ModeDir},
+		dir + "/" + fn:                   {Data: raw},
+	}
+	_, err := newFromFS(t, fsys)
+	if err == nil || !strings.Contains(err.Error(), "dir slug") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
 
-		fn, raw, _ := buildTemplate(t, "wrong", "v1")
-		fsys := fstest.MapFS{
-			builtin.BuiltInPromptBundlesJSON: {Data: buildManifest(bundleID, slug)},
-			dir:                              &fstest.MapFile{Mode: fs.ModeDir},
-			dir + "/" + fn:                   {Data: raw},
-		}
-		_, err := newFromFS(t, fsys)
-		if err == nil || !strings.Contains(err.Error(), "dir slug") {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
+// Test when the filename implies a different slug/version than the JSON content.
+func Test_NewBuiltInData_SyntheticFS_FilenameSlugVersionMismatch(t *testing.T) {
+	bundleID := newUUID(t)
+	slug := demo
 
-	t.Run("filename_slug_version_mismatch", func(t *testing.T) {
-		dir := fmt.Sprintf("%s_%s", bundleID, slug)
+	dir := fmt.Sprintf("%s_%s", bundleID, slug)
 
-		// Template JSON says slug=demo,ver=v1.
-		_, raw, _ := buildTemplate(t, slug, "v1")
-		// But store it under file name demo_v2.json.
-		fsys := fstest.MapFS{
-			builtin.BuiltInPromptBundlesJSON: {Data: buildManifest(bundleID, slug)},
-			dir:                              &fstest.MapFile{Mode: fs.ModeDir},
-			dir + "/demo_v2.json":            {Data: raw},
-		}
-		_, err := newFromFS(t, fsys)
-		if err == nil || !strings.Contains(err.Error(), "filename") {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
+	// Template JSON says slug=demo,ver=v1.
+	_, raw, _ := buildTemplate(t, slug, "v1")
+	// But store it under file name demo_v2.json.
+	fsys := fstest.MapFS{
+		builtin.BuiltInPromptBundlesJSON: {Data: buildManifest(bundleID, slug)},
+		dir:                              &fstest.MapFile{Mode: fs.ModeDir},
+		dir + "/demo_v2.json":            {Data: raw},
+	}
+	_, err := newFromFS(t, fsys)
+	if err == nil || !strings.Contains(err.Error(), "filename") {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
 
 func Test_NewBuiltInData_SyntheticFS_HappyAndCRUD(t *testing.T) {
 	ctx := t.Context()
 	bid := newUUID(t)
-	slug := "demo"
+	slug := demo
 
 	// Build valid dir template.
 	dir := fmt.Sprintf("%s_%s", bid, slug)

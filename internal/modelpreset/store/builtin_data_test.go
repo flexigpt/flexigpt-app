@@ -416,46 +416,47 @@ func TestAsyncRebuildPresets(t *testing.T) {
 	}
 }
 
-func Test_NewBuiltInPresets_SyntheticFS_Errors(t *testing.T) {
+func Test_NewBuiltInPresets_SyntheticFS_MissingJSON(t *testing.T) {
+	_, err := newPresetsFromFS(t, fstest.MapFS{})
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("want fs.ErrNotExist, got %v", err)
+	}
+}
+
+// Test when the json file is present but contains invalid JSON.
+func Test_NewBuiltInPresets_SyntheticFS_InvalidJSON(t *testing.T) {
+	fsys := fstest.MapFS{builtin.BuiltInModelPresetsJSON: {Data: []byte("{ nope ]")}}
+	_, err := newPresetsFromFS(t, fsys)
+	if err == nil {
+		t.Fatal("want error")
+	}
+}
+
+// Test when the schema has no providers defined.
+func Test_NewBuiltInPresets_SyntheticFS_NoProviders(t *testing.T) {
+	empty, _ := json.Marshal(spec.PresetsSchema{
+		SchemaVersion:   spec.SchemaVersion,
+		ProviderPresets: map[inferencegoSpec.ProviderName]spec.ProviderPreset{},
+	})
+	fsys := fstest.MapFS{builtin.BuiltInModelPresetsJSON: {Data: empty}}
+	_, err := newPresetsFromFS(t, fsys)
+	if err == nil || (!strings.Contains(err.Error(), "no providers") &&
+		!strings.Contains(err.Error(), "no default provider in builtin")) {
+		t.Fatalf("unexpected: %v", err)
+	}
+}
+
+// Test when a provider exists but its default model preset id is missing.
+func Test_NewBuiltInPresets_SyntheticFS_DefaultModelMissing(t *testing.T) {
 	provName := inferencegoSpec.ProviderName("demoProv")
 	modelID := spec.ModelPresetID("model1")
 
-	t.Run("missing_json", func(t *testing.T) {
-		_, err := newPresetsFromFS(t, fstest.MapFS{})
-		if !errors.Is(err, fs.ErrNotExist) {
-			t.Fatalf("want fs.ErrNotExist, got %v", err)
-		}
-	})
-
-	t.Run("invalid_json", func(t *testing.T) {
-		fsys := fstest.MapFS{builtin.BuiltInModelPresetsJSON: {Data: []byte("{ nope ]")}}
-		_, err := newPresetsFromFS(t, fsys)
-		if err == nil {
-			t.Fatal("want error")
-		}
-	})
-
-	t.Run("no_providers", func(t *testing.T) {
-		empty, _ := json.Marshal(spec.PresetsSchema{
-			SchemaVersion:   spec.SchemaVersion,
-			ProviderPresets: map[inferencegoSpec.ProviderName]spec.ProviderPreset{},
-		})
-		fsys := fstest.MapFS{builtin.BuiltInModelPresetsJSON: {Data: empty}}
-		_, err := newPresetsFromFS(t, fsys)
-		if err == nil || (!strings.Contains(err.Error(), "no providers") &&
-			!strings.Contains(err.Error(), "no default provider in builtin")) {
-			t.Fatalf("unexpected: %v", err)
-		}
-	})
-
-	t.Run("default_model_missing", func(t *testing.T) {
-		s := buildSchemaDefaultMissing(provName, modelID)
-		fsys := fstest.MapFS{builtin.BuiltInModelPresetsJSON: {Data: s}}
-		_, err := newPresetsFromFS(t, fsys)
-		if err == nil || !strings.Contains(err.Error(), "defaultModelPresetID") {
-			t.Fatalf("unexpected: %v", err)
-		}
-	})
+	s := buildSchemaDefaultMissing(provName, modelID)
+	fsys := fstest.MapFS{builtin.BuiltInModelPresetsJSON: {Data: s}}
+	_, err := newPresetsFromFS(t, fsys)
+	if err == nil || !strings.Contains(err.Error(), "defaultModelPresetID") {
+		t.Fatalf("unexpected: %v", err)
+	}
 }
 
 func Test_NewBuiltInPresets_SyntheticFS_HappyAndCRUD(t *testing.T) {
