@@ -119,10 +119,23 @@ func NewToolStore(baseDir string, opts ...Option) (*ToolStore, error) {
 
 // Close shuts down the background sweep.
 func (ts *ToolStore) Close() {
+	if ts == nil {
+		return
+	}
 	if ts.cleanStop != nil {
 		ts.cleanStop()
 	}
 	ts.wg.Wait()
+
+	if ts.builtinData != nil {
+		_ = ts.builtinData.Close()
+	}
+	if ts.bundleStore != nil {
+		_ = ts.bundleStore.Close()
+	}
+	if ts.toolStore != nil {
+		_ = ts.toolStore.CloseAll()
+	}
 }
 
 // PutToolBundle creates or replaces a bundle.
