@@ -1,0 +1,71 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+#
+# Cancel outdated runs for the same branch / PR
+#
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: Go - test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            coverage: true
+          - os: windows-2022
+            coverage: false
+          - os: macos-15
+            coverage: false
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set-up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: "go.mod"
+
+      - name: Prepare embed placeholder
+        run: |
+          PLACEHOLDER="frontend/dist/client/.ci-placeholder"
+          mkdir -p "$(dirname "$PLACEHOLDER")"
+          touch "$PLACEHOLDER"
+
+      - name: test
+        run: |
+          if [[ "${{ matrix.coverage }}" == "true" ]]; then
+            go test -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./...
+            go tool cover -func=coverage.out
+          else
+            go test ./...
+          fi
+
+      - name: check test coverage
+        if: matrix.coverage == true
+        uses: vladopajic/go-test-coverage@v2
+        with:
+          config: ./.testcoverage.yml
+
+      - name: Remove embed placeholder
+        if: ${{ always() }}
+        run: rm -f frontend/dist/client/.ci-placeholder
