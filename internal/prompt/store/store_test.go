@@ -12,7 +12,6 @@ package store
 import (
 	"errors"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -682,5 +681,5 @@ func newTestStore(t *testing.T) (s *PromptTemplateStore, cleanup func()) {
 	if err != nil {
 		t.Fatalf("NewPromptTemplateStore() failed: %v", err)
 	}
-	return s, func() { s.Close(); _ = os.RemoveAll(dir) }
+	return s, func() { _ = s.Close() }
 }

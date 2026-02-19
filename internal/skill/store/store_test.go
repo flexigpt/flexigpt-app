@@ -639,14 +639,11 @@ func TestSkillStore_BuiltInReadOnly_Guards(t *testing.T) {
 }
 
 func TestSkillStore_readAllUser_HardeningAndCorruptionDetection(t *testing.T) {
-	t.Parallel()
 	s := newTestSkillStore(t)
 
 	now := time.Date(2026, 2, 10, 0, 0, 0, 0, time.UTC)
 
 	t.Run("missing-schemaVersion-defaults-and-normalizes-isBuiltIn", func(t *testing.T) {
-		t.Parallel()
-
 		setUserStoreAllLocked(t, s, map[string]any{
 			"bundles": map[string]any{
 				"b1": map[string]any{
@@ -699,8 +696,6 @@ func TestSkillStore_readAllUser_HardeningAndCorruptionDetection(t *testing.T) {
 	})
 
 	t.Run("schemaVersion-mismatch-errors", func(t *testing.T) {
-		t.Parallel()
-
 		setUserStoreAllLocked(t, s, map[string]any{
 			"schemaVersion": "1900-01-01",
 			"bundles":       map[string]any{},
@@ -713,8 +708,6 @@ func TestSkillStore_readAllUser_HardeningAndCorruptionDetection(t *testing.T) {
 	})
 
 	t.Run("bundle-key-mismatch-errors", func(t *testing.T) {
-		t.Parallel()
-
 		setUserStoreAllLocked(t, s, map[string]any{
 			"schemaVersion": spec.SkillSchemaVersion,
 			"bundles": map[string]any{
@@ -738,8 +731,6 @@ func TestSkillStore_readAllUser_HardeningAndCorruptionDetection(t *testing.T) {
 	})
 
 	t.Run("skills-reference-missing-bundle-errors", func(t *testing.T) {
-		t.Parallel()
-
 		setUserStoreAllLocked(t, s, map[string]any{
 			"schemaVersion": spec.SkillSchemaVersion,
 			"bundles":       map[string]any{},
@@ -755,8 +746,6 @@ func TestSkillStore_readAllUser_HardeningAndCorruptionDetection(t *testing.T) {
 	})
 
 	t.Run("skill-key-mismatch-errors", func(t *testing.T) {
-		t.Parallel()
-
 		setUserStoreAllLocked(t, s, map[string]any{
 			"schemaVersion": spec.SkillSchemaVersion,
 			"bundles": map[string]any{
@@ -794,8 +783,6 @@ func TestSkillStore_readAllUser_HardeningAndCorruptionDetection(t *testing.T) {
 	})
 
 	t.Run("missing-bundles-and-skills-maps-normalize", func(t *testing.T) {
-		t.Parallel()
-
 		setUserStoreAllLocked(t, s, map[string]any{
 			"schemaVersion": spec.SkillSchemaVersion,
 		})

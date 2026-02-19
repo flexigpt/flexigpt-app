@@ -112,7 +112,10 @@ func NewPromptTemplateStore(baseDir string, opts ...Option) (*PromptTemplateStor
 }
 
 // Close gracefully terminates the background cleanup goroutine.
-func (s *PromptTemplateStore) Close() {
+func (s *PromptTemplateStore) Close() error {
+	if s == nil {
+		return nil
+	}
 	if s.cleanStop != nil {
 		s.cleanStop()
 	}
@@ -142,6 +145,7 @@ func (s *PromptTemplateStore) Close() {
 		}
 		s.templateStore = nil
 	}
+	return nil
 }
 
 // PutPromptBundle creates or replaces a prompt bundle.
