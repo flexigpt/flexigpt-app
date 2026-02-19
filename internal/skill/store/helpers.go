@@ -122,6 +122,7 @@ func (s *SkillStore) getAnyBundle(ctx context.Context, id bundleitemutils.Bundle
 
 func (s *SkillStore) writeAllUser(sc skillStoreSchema) error {
 	sc.SchemaVersion = spec.SkillSchemaVersion
+
 	mp, err := jsonencdec.StructWithJSONTagsToMap(sc)
 	if err != nil {
 		return err
@@ -134,10 +135,12 @@ func (s *SkillStore) readAllUser(force bool) (skillStoreSchema, error) {
 	if err != nil {
 		return skillStoreSchema{}, err
 	}
+
 	var sc skillStoreSchema
 	if err := jsonencdec.MapToStructWithJSONTags(raw, &sc); err != nil {
 		return sc, err
 	}
+
 	if sc.SchemaVersion == "" {
 		sc.SchemaVersion = spec.SkillSchemaVersion
 	} else if sc.SchemaVersion != spec.SkillSchemaVersion {
@@ -147,15 +150,16 @@ func (s *SkillStore) readAllUser(force bool) (skillStoreSchema, error) {
 			spec.SkillSchemaVersion,
 		)
 	}
+
 	if sc.Bundles == nil {
 		sc.Bundles = map[bundleitemutils.BundleID]spec.SkillBundle{}
 	}
 	if sc.Skills == nil {
 		sc.Skills = map[bundleitemutils.BundleID]map[spec.SkillSlug]spec.Skill{}
 	}
+
 	// Validate + normalize (hardening against file corruption).
 	for bid, b := range sc.Bundles {
-		// Normalize fields that must be user-owned.
 		b.IsBuiltIn = false
 		sc.Bundles[bid] = b
 		if b.ID != bid {
@@ -165,6 +169,7 @@ func (s *SkillStore) readAllUser(force bool) (skillStoreSchema, error) {
 			return skillStoreSchema{}, fmt.Errorf("invalid bundle %q: %w", bid, err)
 		}
 	}
+
 	for bid, sm := range sc.Skills {
 		if sm == nil {
 			sc.Skills[bid] = map[spec.SkillSlug]spec.Skill{}
@@ -184,6 +189,7 @@ func (s *SkillStore) readAllUser(force bool) (skillStoreSchema, error) {
 			}
 		}
 	}
+
 	return sc, nil
 }
 

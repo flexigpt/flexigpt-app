@@ -27,6 +27,7 @@ const (
 
 	// Best-effort cap for runtime resync work done inline after store mutations.
 	runtimeResyncTimeout = 30 * time.Second
+
 	// Foreground validation should be quick; runtime is in-mem, but provider indexing may touch disk.
 	runtimeForegroundValidateTimeout = 15 * time.Second
 )
@@ -158,6 +159,107 @@ func (s *SkillStore) bestEffortRuntimeResync(ctx context.Context, reason string)
 	}
 }
 
+// runtimeResyncStrictFromStore performs a STRICT reconcile: any add/remove failure returns an error.
+// This is used for rollback after store write failures.
+func (s *SkillStore) runtimeResyncStrictFromStore(ctx context.Context) error {
+	if s == nil || s.runtime == nil {
+		return nil
+	}
+	desired, desiredByTypeName, err := s.runtimeDesiredSkillDefs(ctx)
+	if err != nil {
+		return err
+	}
+	return s.runtimeApplyDesiredStrict(ctx, desired, desiredByTypeName)
+}
+
+// runtimeApplyDesiredStrict reconciles runtime to match desired, failing fast on add/remove errors.
+func (s *SkillStore) runtimeApplyDesiredStrict(
+	ctx context.Context,
+	desired map[agentskillsSpec.SkillDef]struct{},
+	desiredByTypeName map[string][]agentskillsSpec.SkillDef,
+) (err error) {
+	if s == nil || s.runtime == nil {
+		return nil
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("runtimeApplyDesiredStrict: panic", "panic", r)
+			err = fmt.Errorf("runtimeApplyDesiredStrict panic: %v", r)
+
+		}
+	}()
+
+	currentRecs, err := s.runtime.ListSkills(ctx, nil)
+	if err != nil {
+		return err
+	}
+	currentSet := make(map[agentskillsSpec.SkillDef]struct{}, len(currentRecs))
+	for _, r := range currentRecs {
+		currentSet[r.Def] = struct{}{}
+	}
+
+	// Add first.
+	var toAdd []agentskillsSpec.SkillDef
+	for def := range desired {
+		if _, ok := currentSet[def]; !ok {
+			toAdd = append(toAdd, def)
+		}
+	}
+	sortSkillDefs(toAdd)
+
+	presentAfterAdds := make(map[agentskillsSpec.SkillDef]struct{}, len(currentSet)+len(toAdd))
+	for def := range currentSet {
+		presentAfterAdds[def] = struct{}{}
+	}
+
+	for _, def := range toAdd {
+		if _, err := s.runtime.AddSkill(ctx, def); err != nil {
+			if errors.Is(err, agentskillsSpec.ErrSkillAlreadyExists) {
+				presentAfterAdds[def] = struct{}{}
+				continue
+			}
+			return err
+		}
+		presentAfterAdds[def] = struct{}{}
+	}
+
+	// Replacement safety index (same as best-effort logic).
+	desiredPresentTypeName := map[string]bool{}
+	for def := range presentAfterAdds {
+		if _, ok := desired[def]; ok {
+			desiredPresentTypeName[typeNameKey(def.Type, def.Name)] = true
+		}
+	}
+
+	// Remove.
+	var toRemove []agentskillsSpec.SkillDef
+	for def := range currentSet {
+		if _, ok := desired[def]; !ok {
+			toRemove = append(toRemove, def)
+		}
+	}
+	sortSkillDefs(toRemove)
+
+	for _, def := range toRemove {
+		tn := typeNameKey(def.Type, def.Name)
+		if _, hasReplacement := desiredByTypeName[tn]; hasReplacement && !desiredPresentTypeName[tn] {
+			// Shouldn't happen in strict mode (add would have errored),
+			// but keep safety rule.
+			continue
+		}
+
+		if _, err := s.runtime.RemoveSkill(ctx, def); err != nil {
+			if errors.Is(err, agentskillsSpec.ErrSkillNotFound) {
+				continue
+			}
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (s *SkillStore) runtimeResyncFromStore(ctx context.Context) error {
 	if s == nil || s.runtime == nil {
 		return nil
@@ -192,7 +294,6 @@ func (s *SkillStore) runtimeResyncFromStore(ctx context.Context) error {
 	for _, def := range toAdd {
 		if _, err := s.runtime.AddSkill(ctx, def); err != nil {
 			if errors.Is(err, agentskillsSpec.ErrSkillAlreadyExists) {
-				// Harmless; treat as present.
 				addedOK[def] = struct{}{}
 				continue
 			}
@@ -211,10 +312,6 @@ func (s *SkillStore) runtimeResyncFromStore(ctx context.Context) error {
 		presentAfterAdds[def] = struct{}{}
 	}
 
-	// IMPORTANT: replacement safety should only consider replacements "present"
-	// if a DESIRED def for that (type,name) is present after attempted adds.
-	//
-	// If add fails for all desired replacements, we must NOT remove the old runtime entry.
 	desiredPresentTypeName := map[string]bool{}
 	for def := range presentAfterAdds {
 		if _, ok := desired[def]; ok {
@@ -234,10 +331,8 @@ func (s *SkillStore) runtimeResyncFromStore(ctx context.Context) error {
 	for _, def := range toRemove {
 		tn := typeNameKey(def.Type, def.Name)
 
-		// Safety rule:
-		// If this looks like a "replacement" (desired contains same type+name), and none of the desired
-		// replacements are present, skip removing the old one. This prevents losing the last working
-		// skill when the new desired location can't be indexed.
+		// Safety rule: if this looks like a "replacement" and none of the desired
+		// replacements are present, skip removing the old one.
 		if _, hasReplacement := desiredByTypeName[tn]; hasReplacement && !desiredPresentTypeName[tn] {
 			slog.Warn(
 				"runtime remove skipped (replacement missing)",
@@ -254,14 +349,10 @@ func (s *SkillStore) runtimeResyncFromStore(ctx context.Context) error {
 			}
 			slog.Error(
 				"runtime remove failed",
-				"type",
-				def.Type,
-				"name",
-				def.Name,
-				"location",
-				def.Location,
-				"err",
-				err,
+				"type", def.Type,
+				"name", def.Name,
+				"location", def.Location,
+				"err", err,
 			)
 		}
 	}
@@ -337,7 +428,7 @@ func runtimeDefForUserSkill(sk spec.Skill) (agentskillsSpec.SkillDef, error) {
 		return agentskillsSpec.SkillDef{}, fmt.Errorf("%w: empty name/location", agentskillsSpec.ErrInvalidArgument)
 	}
 	return agentskillsSpec.SkillDef{
-		Type:     string(sk.Type), // user skills are fs today
+		Type:     string(sk.Type),
 		Name:     sk.Name,
 		Location: sk.Location,
 	}, nil
@@ -348,7 +439,6 @@ func (s *SkillStore) runtimeDefForBuiltInSkill(sk spec.Skill) (agentskillsSpec.S
 
 	// Built-in embeddedfs is hydrated to disk and treated as fs in runtime.
 	if !filepath.IsAbs(loc) {
-		// Use forward-slash semantics for embedded locations, then map to OS path.
 		loc = filepath.Join(s.embeddedHydrateDir, filepath.FromSlash(path.Clean("/" + loc))[1:])
 	}
 
@@ -404,7 +494,6 @@ func (s *SkillStore) hydrateBuiltInEmbeddedFS(ctx context.Context) error {
 		}
 	}()
 
-	// Compute digest of current embedded FS snapshot.
 	sub, err := resolveSkillsFS(s.builtin.skillsFS, s.builtin.skillsDir)
 	if err != nil {
 		return err
@@ -419,12 +508,11 @@ func (s *SkillStore) hydrateBuiltInEmbeddedFS(ctx context.Context) error {
 	}
 
 	digestPath := filepath.Join(s.embeddedHydrateDir, embeddedHydrateDigestFile)
-	prev, _ := os.ReadFile(digestPath) // ignore err (first boot)
+	prev, _ := os.ReadFile(digestPath)
 	if strings.TrimSpace(string(prev)) == digest {
-		return nil // already hydrated
+		return nil
 	}
 
-	// Re-hydrate (wipe then copy).
 	if err := os.RemoveAll(s.embeddedHydrateDir); err != nil {
 		return err
 	}
@@ -458,29 +546,6 @@ func (s *SkillStore) runtimeTryAddForeground(ctx context.Context, def agentskill
 		return false, err
 	}
 	return true, nil
-}
-
-func (s *SkillStore) runtimeBestEffortRemoveDef(ctx context.Context, def agentskillsSpec.SkillDef, reason string) {
-	if s == nil || s.runtime == nil {
-		return
-	}
-	ctx, cancel := context.WithTimeout(ctx, runtimeForegroundValidateTimeout)
-	defer cancel()
-	if _, err := s.runtime.RemoveSkill(ctx, def); err != nil && !errors.Is(err, agentskillsSpec.ErrSkillNotFound) {
-		slog.Error(
-			"runtime remove failed",
-			"reason",
-			reason,
-			"type",
-			def.Type,
-			"name",
-			def.Name,
-			"location",
-			def.Location,
-			"err",
-			err,
-		)
-	}
 }
 
 func sortSkillDefs(defs []agentskillsSpec.SkillDef) {
