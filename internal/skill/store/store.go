@@ -15,6 +15,7 @@ import (
 	"github.com/flexigpt/agentskills-go"
 	"github.com/flexigpt/agentskills-go/fsskillprovider"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+
 	"github.com/ppipada/mapstore-go"
 	"github.com/ppipada/mapstore-go/jsonencdec"
 	"github.com/ppipada/mapstore-go/uuidv7filename"
