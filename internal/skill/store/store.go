@@ -93,17 +93,6 @@ func WithEmbeddedHydrateDir(dir string) SkillStoreOption {
 	}
 }
 
-func newDefaultRuntime() (*agentskills.Runtime, error) {
-	p, err := fsskillprovider.New()
-	if err != nil {
-		return nil, err
-	}
-	return agentskills.New(
-		agentskills.WithProvider(p),
-		agentskills.WithLogger(slog.Default()),
-	)
-}
-
 func NewSkillStore(baseDir string, opts ...SkillStoreOption) (*SkillStore, error) {
 	if strings.TrimSpace(baseDir) == "" {
 		return nil, fmt.Errorf("%w: baseDir is empty", spec.ErrSkillInvalidRequest)
@@ -185,6 +174,17 @@ func NewSkillStore(baseDir string, opts ...SkillStoreOption) (*SkillStore, error
 
 	slog.Info("skill-store ready", "baseDir", s.baseDir)
 	return s, nil
+}
+
+func newDefaultRuntime() (*agentskills.Runtime, error) {
+	p, err := fsskillprovider.New()
+	if err != nil {
+		return nil, err
+	}
+	return agentskills.New(
+		agentskills.WithProvider(p),
+		agentskills.WithLogger(slog.Default()),
+	)
 }
 
 func (s *SkillStore) Close() {

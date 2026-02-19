@@ -82,6 +82,19 @@ func putSkill(
 	return err
 }
 
+func writeSkillPackage(t *testing.T, parentDir, name, fmDesc, body string) string {
+	t.Helper()
+
+	dir := filepath.Join(parentDir, name)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("mkdir skill dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), buildSkillMD(name, fmDesc, body), 0o600); err != nil {
+		t.Fatalf("write SKILL.md: %v", err)
+	}
+	return filepath.Clean(dir)
+}
+
 func buildSkillMD(name, desc, body string) []byte {
 	// Must satisfy fsskillprovider index constraints:
 	// - YAML frontmatter required
@@ -94,19 +107,6 @@ func buildSkillMD(name, desc, body string) []byte {
 		"---\n" +
 		"\n" +
 		body + "\n")
-}
-
-func writeSkillPackage(t *testing.T, parentDir, name, fmDesc, body string) string {
-	t.Helper()
-
-	dir := filepath.Join(parentDir, name)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatalf("mkdir skill dir: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), buildSkillMD(name, fmDesc, body), 0o600); err != nil {
-		t.Fatalf("write SKILL.md: %v", err)
-	}
-	return filepath.Clean(dir)
 }
 
 func hydrateAbsDir(hydrateDir, relLoc string) string {
