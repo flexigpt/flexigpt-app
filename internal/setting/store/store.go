@@ -61,6 +61,17 @@ func NewSettingStore(baseDir string) (*SettingStore, error) {
 	return st, nil
 }
 
+func (s *SettingStore) Close() error {
+	if s == nil {
+		return nil
+	}
+
+	if s.store != nil {
+		_ = s.store.Close()
+	}
+	return nil
+}
+
 // Migrate ensures the store is up-to-date with built-in data.
 // - Adds missing built-in auth keys as empty entries.
 // - Updates schemaVersion if changed.
