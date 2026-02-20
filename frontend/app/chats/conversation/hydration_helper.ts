@@ -1,3 +1,5 @@
+// Adjust this import path to wherever your Attachment type lives
+import type { Attachment } from '@/spec/attachment';
 import {
 	type Conversation,
 	CONVERSATION_SCHEMA_VERSION,
@@ -138,7 +140,10 @@ export function buildUserConversationMessageFromEditor(
 		}
 	}
 
-	const attachments = payload.attachments.length > 0 ? payload.attachments.map(uiAttachmentToConversation) : undefined;
+	const attachments =
+		payload.attachments.length > 0
+			? dedupeAttachmentsByRef(payload.attachments.map(uiAttachmentToConversation))
+			: undefined;
 
 	const toolStoreChoices = payload.finalToolChoices.length > 0 ? payload.finalToolChoices : undefined;
 
@@ -328,4 +333,43 @@ function deriveUIToolOutputsFromInputUnion(
 	}
 
 	return uiOutputs;
+}
+
+function attachmentRefKey(a: Attachment): string {
+	const kind = a.kind ?? '';
+
+	if (a.fileRef) {
+		const p = a.fileRef.origPath || a.fileRef.path || a.fileRef.name || '';
+		return `${kind}|file|${p}`;
+	}
+	if (a.imageRef) {
+		const p = a.imageRef.origPath || a.imageRef.path || a.imageRef.name || '';
+		return `${kind}|image|${p}`;
+	}
+	if (a.urlRef) {
+		const u = a.urlRef.origNormalized || a.urlRef.normalized || a.urlRef.url || '';
+		return `${kind}|url|${u}`;
+	}
+	if (a.genericRef) {
+		const h = a.genericRef.origHandle || a.genericRef.handle || '';
+		return `${kind}|handle|${h}`;
+	}
+
+	// fallback
+	return `${kind}|label|${a.label ?? ''}`;
+}
+
+export function dedupeAttachmentsByRef<T extends Attachment>(attachments?: T[]): T[] | undefined {
+	if (!attachments || attachments.length === 0) return undefined;
+
+	const seen = new Set<string>();
+	const out: T[] = [];
+
+	for (const a of attachments) {
+		const key = attachmentRefKey(a);
+		if (seen.has(key)) continue;
+		seen.add(key);
+		out.push(a);
+	}
+	return out.length > 0 ? out : undefined;
 }

@@ -14,7 +14,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/attachment"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
-	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
@@ -277,7 +276,7 @@ func (ps *ProviderSetAPI) buildInputs(
 	}
 
 	// Always process attachments into content items.
-	msgContentItems, err := buildContentItemsFromAttachments(ctx, &cur)
+	msgContentItems, err := buildContentItemsFromAttachments(ctx, cur.Attachments)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -362,16 +361,16 @@ func outputToInput(o inferencegoSpec.OutputUnion) *inferencegoSpec.InputUnion {
 
 func buildContentItemsFromAttachments(
 	ctx context.Context,
-	turn *conversationSpec.ConversationMessage,
+	atts []attachment.Attachment,
 ) ([]inferencegoSpec.InputOutputContentItemUnion, error) {
 	items := make([]inferencegoSpec.InputOutputContentItemUnion, 0)
-	if len(turn.Attachments) == 0 {
+	if len(atts) == 0 {
 		return items, nil
 	}
 
 	blocks, err := attachment.BuildContentBlocks(
 		ctx,
-		turn.Attachments,
+		atts,
 		attachment.WithOverrideOriginalContentBlock(true),
 		attachment.WithOnlyTextKindContentBlock(false),
 	)
@@ -389,17 +388,17 @@ func buildContentItemsFromAttachments(
 			if txt == "" {
 				continue
 			}
-			xmlTxt, err := attachment.FormatTextBlockAsXML(b)
+			formattedTxt, err := attachment.FormatTextBlockForLLM(b)
 			if err != nil {
 				return nil, err
 			}
-			if xmlTxt == "" {
+			if formattedTxt == "" {
 				continue
 			}
 			items = append(items, inferencegoSpec.InputOutputContentItemUnion{
 				Kind: inferencegoSpec.ContentItemKindText,
 				TextItem: &inferencegoSpec.ContentItemText{
-					Text: xmlTxt,
+					Text: formattedTxt,
 				},
 			})
 

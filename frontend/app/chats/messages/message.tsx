@@ -14,13 +14,11 @@ import { ToolDetailsModal, type ToolDetailsState } from '@/chats/tools/tool_deta
 
 interface ChatMessageProps {
 	message: ConversationMessage;
-	onEdit: () => void;
-	onResend: () => void;
-
 	streamedText: string;
 	streamedThinking: string;
 	isBusy: boolean;
 	isEditing: boolean;
+	onEdit: () => void;
 }
 
 function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
@@ -65,12 +63,11 @@ function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
 
 export const ChatMessage = memo(function ChatMessage({
 	message,
-	onEdit,
-	onResend,
 	streamedText,
 	streamedThinking,
 	isBusy,
 	isEditing,
+	onEdit,
 }: ChatMessageProps) {
 	const isUser = message.role === RoleEnum.User;
 	const align = !isUser ? 'items-end text-left' : 'items-start text-left';
@@ -81,7 +78,6 @@ export const ChatMessage = memo(function ChatMessage({
 	const [toolDetailsState, setToolDetailsState] = useState<ToolDetailsState>(null);
 
 	const bubbleExtra = [streamedText || streamedThinking ? '' : 'shadow-lg', isEditing ? 'ring-2 ring-primary/70' : '']
-
 		.filter(Boolean)
 		.join(' ');
 
@@ -199,7 +195,6 @@ export const ChatMessage = memo(function ChatMessage({
 							isUser={isUser}
 							cardCopyContent={message.uiContent}
 							onEdit={onEdit}
-							onResend={onResend}
 							messageDetails={message.uiDebugDetails ?? ''}
 							isStreaming={!!streamedText || !!streamedThinking}
 							isBusy={isBusy}

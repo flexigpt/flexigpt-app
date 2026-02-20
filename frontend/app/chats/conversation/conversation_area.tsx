@@ -11,7 +11,7 @@ import {
 
 import type { Conversation, ConversationMessage } from '@/spec/conversation';
 import { ContentItemKind, type ModelParam, OutputKind, type OutputUnion, RoleEnum, Status } from '@/spec/inference';
-import { DefaultUIChatOptions, type UIChatOption } from '@/spec/modelpreset';
+import { type UIChatOption } from '@/spec/modelpreset';
 import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
@@ -25,6 +25,7 @@ import type { ChatTabState } from '@/chats/chat_tabs_persist';
 import { HandleCompletion } from '@/chats/conversation/completion_helper';
 import {
 	buildUserConversationMessageFromEditor,
+	dedupeAttachmentsByRef,
 	deriveConversationToolsFromMessages,
 	deriveWebSearchChoiceFromMessages,
 	initConversationMessage,
@@ -43,7 +44,6 @@ function StreamingLastMessage(props: {
 
 	isEditing: boolean;
 	onEdit: () => void;
-	onResend: () => void;
 	subscribe: (cb: () => void) => () => void;
 	getSnapshot: () => number;
 	getStreamText: () => string;
@@ -57,7 +57,6 @@ function StreamingLastMessage(props: {
 		<ChatMessage
 			message={props.message}
 			onEdit={props.onEdit}
-			onResend={props.onResend}
 			streamedText={streamedText}
 			streamedThinking={streamedThinking}
 			// IMPORTANT: only the streaming row sees busy=true (prevents EnhancedMarkdown remounts for all other rows)
@@ -93,7 +92,7 @@ type ConversationAreaProps = {
 	initialScrollTopByTab?: Record<string, number>;
 
 	// State mutations remain in the page; this component owns "conversation runtime":
-	// streaming buffers, abort controllers, input refs, scroll restoration, send/edit/resend.
+	// streaming buffers, abort controllers, input refs, scroll restoration, send/edit.
 	updateTab: (tabId: string, updater: (t: ChatTabState) => ChatTabState) => void;
 	saveUpdatedConversation: (tabId: string, updatedConv: Conversation, titleWasExternallyChanged?: boolean) => void;
 };
@@ -437,6 +436,11 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 			const currentUserMsg = allMessages[allMessages.length - 1];
 			const history = allMessages.slice(0, allMessages.length - 1);
+			// IMPORTANT: sanitize attachments before sending to completion.
+			const effectiveCurrentUserMsg = {
+				...currentUserMsg,
+				attachments: dedupeAttachmentsByRef(currentUserMsg.attachments),
+			};
 
 			// reset stream buffer (ref only)
 			clearStreamBuffer(tabId);
@@ -504,7 +508,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 				const { responseMessage, rawResponse } = await HandleCompletion(
 					options.providerName,
 					inputParams,
-					currentUserMsg,
+					effectiveCurrentUserMsg,
 					history,
 					toolStoreChoices,
 					assistantPlaceholder,
@@ -632,7 +636,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		]
 	);
 
-	// ---------------- Per-tab send/edit/resend ----------------
+	// ---------------- Per-tab send/edit ----------------
 	const sendMessageForTab = useCallback(
 		async (tabId: string, payload: EditorSubmitPayload, options: UIChatOption) => {
 			const tab = tabsRef.current.find(t => t.tabId === tabId);
@@ -719,42 +723,6 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		},
 		[updateTab]
 	);
-
-	const handleResendForTab = useCallback(
-		async (tabId: string, id: string) => {
-			const tab = tabsRef.current.find(t => t.tabId === tabId);
-			if (!tab) return;
-			if (tab.isBusy) return;
-
-			const idx = tab.conversation.messages.findIndex(m => m.id === id);
-			if (idx === -1) return;
-
-			const msg = tab.conversation.messages[idx];
-			if (msg.role !== RoleEnum.User) return;
-
-			const input = inputRefs.current.get(tabId);
-
-			// Fix: derive tool + web-search choices consistently (don’t pass mixed tool choices to web-search)
-			if (msg.role === RoleEnum.User) {
-				input?.setConversationToolsFromChoices(deriveConversationToolsFromMessages([msg]));
-				input?.setWebSearchFromChoices(deriveWebSearchChoiceFromMessages([msg]));
-			} else {
-				input?.setConversationToolsFromChoices([]);
-				input?.setWebSearchFromChoices([]);
-			}
-
-			const msgs = tab.conversation.messages.slice(0, idx + 1);
-			const updated = { ...tab.conversation, messages: msgs, modifiedAt: new Date() };
-			saveUpdatedConversation(tabId, updated);
-
-			let opts = { ...DefaultUIChatOptions };
-			if (input) opts = input.getUIChatOptions();
-
-			await updateStreamingMessage(tabId, updated, opts);
-		},
-		[saveUpdatedConversation, updateStreamingMessage]
-	);
-
 	// ---------------- Expose imperative API to ChatsPage ----------------
 	useImperativeHandle(
 		ref,
@@ -796,17 +764,16 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			<ChatMessage
 				key={msg.id}
 				message={msg}
-				onEdit={() => {
-					beginEditMessageForTab(activeTab.tabId, msg.id);
-				}}
-				onResend={() => void handleResendForTab(activeTab.tabId, msg.id)}
 				streamedText={''}
 				streamedThinking={''}
 				isBusy={false}
 				isEditing={activeTab.editingMessageId === msg.id}
+				onEdit={() => {
+					beginEditMessageForTab(activeTab.tabId, msg.id);
+				}}
 			/>
 		));
-	}, [activeTab, beginEditMessageForTab, handleResendForTab]);
+	}, [activeTab, beginEditMessageForTab]);
 
 	const renderedLastMessage = useMemo(() => {
 		if (!activeTab) return null;
@@ -827,7 +794,6 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 				onEdit={() => {
 					beginEditMessageForTab(activeTab.tabId, msg.id);
 				}}
-				onResend={() => void handleResendForTab(activeTab.tabId, msg.id)}
 				subscribe={cb => subscribeToStream(activeTab.tabId, cb)}
 				getSnapshot={() => getStreamVersionSnapshot(activeTab.tabId)}
 				getStreamText={() => getFullStreamTextForTab(activeTab.tabId)}
@@ -840,7 +806,6 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		getFullStreamTextForTab,
 		getFullStreamThinkingForTab,
 		getStreamVersionSnapshot,
-		handleResendForTab,
 		subscribeToStream,
 	]);
 

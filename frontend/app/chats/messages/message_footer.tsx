@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { FiArrowDown, FiArrowUp, FiCode, FiEdit2, FiRepeat } from 'react-icons/fi';
+import { FiArrowDown, FiArrowUp, FiCode, FiEdit2 } from 'react-icons/fi';
 
 import type { InferenceUsage } from '@/spec/inference';
 
@@ -15,7 +15,6 @@ interface MessageFooterAreaProps {
 	isUser: boolean;
 	cardCopyContent: string;
 	onEdit: () => void;
-	onResend: () => void;
 	messageDetails: string;
 	isStreaming: boolean;
 	isBusy: boolean;
@@ -30,7 +29,6 @@ export function MessageFooterArea({
 	isUser,
 	cardCopyContent,
 	onEdit,
-	onResend,
 	messageDetails,
 	isStreaming,
 	isBusy,
@@ -123,19 +121,9 @@ export function MessageFooterArea({
 					{isUser && !isBusy && (
 						<button
 							className={`btn btn-sm } flex items-center border-none bg-transparent! p-0 shadow-none`}
-							onClick={onResend}
-							aria-label="Resend Message"
-							title="Resend Message"
-						>
-							<FiRepeat size={16} />
-						</button>
-					)}
-					{isUser && !isBusy && (
-						<button
-							className={`btn btn-sm } flex items-center border-none bg-transparent! p-0 shadow-none`}
 							onClick={onEdit}
-							aria-label="Edit Message"
-							title="Edit Message"
+							aria-label="Edit and Send Message"
+							title="Edit and Send Message"
 						>
 							<FiEdit2 size={16} />
 						</button>
