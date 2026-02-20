@@ -1,10 +1,11 @@
-import type { Skill, SkillBundle, SkillListItem, SkillType } from '@/spec/skill';
+import type { RuntimeSkillFilter, Skill, SkillBundle, SkillListItem, SkillType } from '@/spec/skill';
 
 import type { ISkillStoreAPI } from '@/apis/interface';
 import {
 	DeleteSkill,
 	DeleteSkillBundle,
 	GetSkill,
+	GetSkillsPromptXML,
 	ListSkillBundles,
 	ListSkills,
 	PatchSkill,
@@ -141,6 +142,14 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 	async getSkill(bundleID: string, skillSlug: string): Promise<Skill | undefined> {
 		const req: spec.GetSkillRequest = { BundleID: bundleID, SkillSlug: skillSlug };
 		const resp = await GetSkill(req);
-		return resp.Body as Skill | undefined;
+		return resp?.Body as Skill;
+	}
+
+	async getSkillsPromptXML(filter?: RuntimeSkillFilter): Promise<string> {
+		const req = {
+			Body: { filter: filter as spec.RuntimeSkillFilter } as spec.GetSkillsPromptXMLRequestBody,
+		} as spec.GetSkillsPromptXMLRequest;
+		const resp = await GetSkillsPromptXML(req);
+		return resp?.Body?.xml || '';
 	}
 }

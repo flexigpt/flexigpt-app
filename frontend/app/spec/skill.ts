@@ -1,3 +1,18 @@
+export interface SkillDef {
+	type: string;
+	name: string;
+	location: string;
+}
+
+export interface RuntimeSkillFilter {
+	types?: string[];
+	namePrefix?: string;
+	locationPrefix?: string;
+	allowSkills?: SkillDef[];
+	sessionID?: string;
+	activity?: string;
+}
+
 // Mirrors Go: spec.SkillType
 export enum SkillType {
 	FS = 'fs',

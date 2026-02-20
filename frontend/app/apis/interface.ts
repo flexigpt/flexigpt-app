@@ -9,7 +9,7 @@ import type {
 } from '@/spec/modelpreset';
 import type { MessageBlock, PromptBundle, PromptTemplate, PromptTemplateListItem, PromptVariable } from '@/spec/prompt';
 import type { AppTheme, AuthKey, AuthKeyName, AuthKeyType, SettingsSchema } from '@/spec/setting';
-import type { Skill, SkillBundle, SkillListItem, SkillType } from '@/spec/skill';
+import type { RuntimeSkillFilter, Skill, SkillBundle, SkillListItem, SkillType } from '@/spec/skill';
 import type { HTTPToolImpl, Tool, ToolBundle, ToolImplType, ToolListItem, ToolStoreChoice } from '@/spec/tool';
 import type { InvokeGoOptions, InvokeHTTPOptions, InvokeToolResponse } from '@/spec/toolruntime';
 
@@ -252,6 +252,8 @@ export interface ISkillStoreAPI {
 
 	/** Get a skill. */
 	getSkill(bundleID: string, skillSlug: string): Promise<Skill | undefined>;
+
+	getSkillsPromptXML(filter?: RuntimeSkillFilter): Promise<string>;
 }
 
 export interface IToolRuntimeAPI {

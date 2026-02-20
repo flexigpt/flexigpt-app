@@ -6,6 +6,14 @@ export function Close() {
   return window['go']['main']['SkillStoreWrapper']['Close']();
 }
 
+export function CloseSkillSession(arg1) {
+  return window['go']['main']['SkillStoreWrapper']['CloseSkillSession'](arg1);
+}
+
+export function CreateSkillSession(arg1) {
+  return window['go']['main']['SkillStoreWrapper']['CreateSkillSession'](arg1);
+}
+
 export function DeleteSkill(arg1) {
   return window['go']['main']['SkillStoreWrapper']['DeleteSkill'](arg1);
 }
@@ -16,6 +24,14 @@ export function DeleteSkillBundle(arg1) {
 
 export function GetSkill(arg1) {
   return window['go']['main']['SkillStoreWrapper']['GetSkill'](arg1);
+}
+
+export function GetSkillsPromptXML(arg1) {
+  return window['go']['main']['SkillStoreWrapper']['GetSkillsPromptXML'](arg1);
+}
+
+export function ListRuntimeSkills(arg1) {
+  return window['go']['main']['SkillStoreWrapper']['ListRuntimeSkills'](arg1);
 }
 
 export function ListSkillBundles(arg1) {

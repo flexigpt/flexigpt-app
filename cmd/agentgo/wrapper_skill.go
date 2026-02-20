@@ -90,3 +90,35 @@ func (s *SkillStoreWrapper) ListSkills(req *spec.ListSkillsRequest) (*spec.ListS
 		return s.store.ListSkills(context.Background(), req)
 	})
 }
+
+func (s *SkillStoreWrapper) CreateSkillSession(
+	req *spec.CreateSkillSessionRequest,
+) (*spec.CreateSkillSessionResponse, error) {
+	return middleware.WithRecoveryResp(func() (*spec.CreateSkillSessionResponse, error) {
+		return s.store.CreateSkillSession(context.Background(), req)
+	})
+}
+
+func (s *SkillStoreWrapper) CloseSkillSession(
+	req *spec.CloseSkillSessionRequest,
+) (*spec.CloseSkillSessionResponse, error) {
+	return middleware.WithRecoveryResp(func() (*spec.CloseSkillSessionResponse, error) {
+		return s.store.CloseSkillSession(context.Background(), req)
+	})
+}
+
+func (s *SkillStoreWrapper) GetSkillsPromptXML(
+	req *spec.GetSkillsPromptXMLRequest,
+) (*spec.GetSkillsPromptXMLResponse, error) {
+	return middleware.WithRecoveryResp(func() (*spec.GetSkillsPromptXMLResponse, error) {
+		return s.store.GetSkillsPromptXML(context.Background(), req)
+	})
+}
+
+func (s *SkillStoreWrapper) ListRuntimeSkills(
+	req *spec.ListRuntimeSkillsRequest,
+) (*spec.ListRuntimeSkillsResponse, error) {
+	return middleware.WithRecoveryResp(func() (*spec.ListRuntimeSkillsResponse, error) {
+		return s.store.ListRuntimeSkills(context.Background(), req)
+	})
+}

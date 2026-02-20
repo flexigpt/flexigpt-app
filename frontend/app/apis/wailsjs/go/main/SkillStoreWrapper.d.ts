@@ -4,11 +4,19 @@ import {spec} from '../models';
 
 export function Close():Promise<void>;
 
+export function CloseSkillSession(arg1:spec.CloseSkillSessionRequest):Promise<spec.CloseSkillSessionResponse>;
+
+export function CreateSkillSession(arg1:spec.CreateSkillSessionRequest):Promise<spec.CreateSkillSessionResponse>;
+
 export function DeleteSkill(arg1:spec.DeleteSkillRequest):Promise<spec.DeleteSkillResponse>;
 
 export function DeleteSkillBundle(arg1:spec.DeleteSkillBundleRequest):Promise<spec.DeleteSkillBundleResponse>;
 
 export function GetSkill(arg1:spec.GetSkillRequest):Promise<spec.GetSkillResponse>;
+
+export function GetSkillsPromptXML(arg1:spec.GetSkillsPromptXMLRequest):Promise<spec.GetSkillsPromptXMLResponse>;
+
+export function ListRuntimeSkills(arg1:spec.ListRuntimeSkillsRequest):Promise<spec.ListRuntimeSkillsResponse>;
 
 export function ListSkillBundles(arg1:spec.ListSkillBundlesRequest):Promise<spec.ListSkillBundlesResponse>;
 

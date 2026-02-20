@@ -42,14 +42,14 @@ type CloseSkillSessionResponse struct{}
 type GetSkillsPromptXMLRequestBody struct {
 	Filter *RuntimeSkillFilter `json:"filter,omitempty"`
 }
-type (
-	GetSkillsPromptXMLRequest struct {
-		Body *GetSkillsPromptXMLRequestBody
-	}
-	GetSkillsPromptXMLResponseBody struct {
-		XML string `json:"xml"`
-	}
-)
+
+type GetSkillsPromptXMLRequest struct {
+	Body *GetSkillsPromptXMLRequestBody
+}
+
+type GetSkillsPromptXMLResponseBody struct {
+	XML string `json:"xml"`
+}
 
 type GetSkillsPromptXMLResponse struct {
 	Body *GetSkillsPromptXMLResponseBody
