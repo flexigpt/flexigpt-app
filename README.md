@@ -3,6 +3,7 @@
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/license/mpl-2-0)
 [![Go Report Card](https://goreportcard.com/badge/github.com/flexigpt/flexigpt-app)](https://goreportcard.com/report/github.com/flexigpt/flexigpt-app)
 [![lint](https://github.com/flexigpt/flexigpt-app/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/flexigpt/flexigpt-app/actions/workflows/lint.yml)
+[![test](https://github.com/flexigpt/flexigpt-app/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/flexigpt/flexigpt-app/actions/workflows/test.yml)
 
 FlexiGPT is a _cross-platform desktop client_ that lets you chat with multiple Large Language Models (LLMs) from a single, streamlined interface.
 
@@ -35,7 +36,6 @@ FlexiGPT is a _cross-platform desktop client_ that lets you chat with multiple L
 - Launch FlexiGPT, then open _Settings_.
 
 - In _Auth Keys_ -> Paste the API key for your provider. Example links to provider pages for getting API keys:
-
   - [OpenAI](https://platform.openai.com/api-keys), [Anthropic](https://platform.claude.com/settings/keys), [Google Gemini](https://aistudio.google.com/api-keys).
   - Atleast one provider needs to be configured with an API key before chatting.
   - FlexiGPT doesn’t bill you; all usage is metered by each provider on your own account.
@@ -54,7 +54,6 @@ FlexiGPT is a _cross-platform desktop client_ that lets you chat with multiple L
 
 - <details>
   <summary>Feature details</summary>
-
   - Key Concepts
 
     | Term                 | Description                                                                                                    |
@@ -69,13 +68,11 @@ FlexiGPT is a _cross-platform desktop client_ that lets you chat with multiple L
   - Supports models with multiple behaviors: non-reasoning, reasoning with levels (high/medium/low), hybrid reasoning (with reasoning tokens).
 
   - Selecting a Preset in Chat
-
     - In the chat input bar, open the dropdown and choose any preset listed.
     - The preset’s parameters appear next to the dropdown; use the slider or number fields to make conversation-specific adjustments if desired.
     - The adjusted parameters affect only the current conversation and are discarded when the session ends.
 
   - Managing Presets
-
     - Click the _Model Presets_ icon in the sidebar.
     - Select a provider or create a new one.
     - The app provides built-in presets. These will be listed.
@@ -83,7 +80,6 @@ FlexiGPT is a _cross-platform desktop client_ that lets you chat with multiple L
     - Mark one preset as _Default_ for the provider; it loads automatically when a model from that provider is first chosen.
 
   - Notes
-
     - Deleting a preset does not alter existing conversations; those sessions keep a snapshot of the parameters that were active when the message was sent.
     - Global defaults are applied for any parameter left blank in the preset.
 
@@ -96,7 +92,6 @@ FlexiGPT is a _cross-platform desktop client_ that lets you chat with multiple L
 - Attach files, images, and PDFs, use prompt templates, load and resume previous conversations, export full conversation or a full message or code/mermaid diagram or its image inside a single message seamlessly in the same interface.
 
 - Productivity tooling inside the chat
-
   - Streaming responses.
   - Code snippets with copy/export
   - Mermaid diagrams with copy/export/zoom
@@ -109,7 +104,6 @@ FlexiGPT is a _cross-platform desktop client_ that lets you chat with multiple L
 
 - <details>
   <summary>Feature details</summary>
-
   - Every chat session is persisted as a _Conversation_ containing its title, timestamps and full message sequence.
   - Conversations are stored locally; you can reload a conversation and continue from last point at any time.
   - A full-text search bar provides instant retrieval across titles and message contents. The search is fully local.
@@ -123,13 +117,11 @@ FlexiGPT is a _cross-platform desktop client_ that lets you chat with multiple L
     | Message Roles     | `system`, `user`, `assistant`; each recorded with timestamp and details.         |
 
   - Using Conversation History
-
     - Click the _Search Bar_ to open the history dropdown.
     - Recent conversations are listed chronologically; type in the search bar to filter by keywords appearing in either titles or message text.
     - Select a row to reload the full conversation and continue chatting.
 
   - Automatic Saving
-
     - A new conversation record is started automatically when you open a fresh chat window.
     - The title is generated heuristically from the first user message but can be renamed at any time.
     - Messages are appended in real-time; timestamps are stored for precise ordering.
@@ -143,15 +135,12 @@ FlexiGPT is a _cross-platform desktop client_ that lets you chat with multiple L
 
 - <details>
   <summary>Feature details</summary>
-
   - Multiple local files or a single directory can be selected at a time to attach to the message.
-
     - Code and text files become in-context text.
     - Images are sent as binary blobs.
     - Local extraction and attachment as text is supported for PDFs by default. Users can toggle the mode to send PDFs as blobs if supported by the API.
 
   - Web pages/URLs can be attached to the conversation.
-
     - By default readable content will be extracted and attached as in-context text for any web page.
     - Image URLs and PDF URLs are sent as binary blobs, with user switch available to convert them as links of extract PDF as text and send.
 
@@ -170,7 +159,6 @@ FlexiGPT is a _cross-platform desktop client_ that lets you chat with multiple L
 
 - <details>
   <summary>Feature details</summary>
-
   - Prompt Templates allow you to store complex prompts (with variables) and reuse them.
   - Templates can be organized into Bundles, which act as configurable packs that can be enabled or disabled.
   - Templates and Bundles can be disabled or removed at any time without affecting existing chat history.
@@ -183,7 +171,6 @@ FlexiGPT is a _cross-platform desktop client_ that lets you chat with multiple L
     | Prompt Bundle   | A collection of templates that can be toggled on or off as a unit and shared with other users. |
 
   - Invoking a Template
-
     - Invoke the template menu using mouse click or keyboard shortcut.
     - An auto-complete list appears, ranked by relevance.
     - Use `↑/↓` to navigate if necessary, then press **Enter**.
@@ -191,7 +178,6 @@ FlexiGPT is a _cross-platform desktop client_ that lets you chat with multiple L
     - The most relevant match is selected for processing.
 
   - Managing Prompt Templates
-
     - Click the _Prompts_ icon in the sidebar.
     - Select a current prompt bundle or create a new one.
     - The app provides built-in bundles and templates. These will be listed.
@@ -223,7 +209,6 @@ FlexiGPT is a _cross-platform desktop client_ that lets you chat with multiple L
 
 - Download the `.flatpak` release package.
 - If Flatpak is not installed, enable it for your distribution
-
   - Ubuntu/Debian/etc (APT based systems):
 
     ```shell
@@ -236,12 +221,10 @@ FlexiGPT is a _cross-platform desktop client_ that lets you chat with multiple L
   - Some additional helper commands can be found in this [script](./scripts/initialize_flatpak.sh)
 
 - Install the package
-
   - `flatpak install --user FlexiGPT-xyz.flatpak`
   - `flatpak info io.github.flexigpt.client`
 
 - Running the app
-
   - Using launcher GUI: You can launch the app from your distributions's launcher. E.g: In Ubuntu: Press the window key, type flexigpt and click on icon.
   - Using terminal: `flatpak run io.github.flexigpt.client`
   - Known issue with Nvidia drivers:
