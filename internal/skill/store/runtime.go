@@ -115,14 +115,6 @@ func (s *SkillStore) ListRuntimeSkills(
 	ctx context.Context,
 	req *spec.ListRuntimeSkillsRequest,
 ) (resp *spec.ListRuntimeSkillsResponse, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			slog.Error("listRuntimeSkills: panic", "panic", r)
-			resp = nil
-			err = fmt.Errorf("runtime panic: %v", r)
-		}
-	}()
-
 	if s.runtime == nil {
 		return nil, fmt.Errorf("%w: runtime not configured", spec.ErrSkillInvalidRequest)
 	}

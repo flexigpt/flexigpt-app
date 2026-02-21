@@ -13,6 +13,20 @@ export interface RuntimeSkillFilter {
 	activity?: string;
 }
 
+export type SkillSessionID = string;
+
+export interface SkillSession {
+	sessionID: SkillSessionID;
+	activeSkills: SkillDef[];
+}
+
+export interface SkillRecord {
+	def: SkillDef;
+	description: string;
+	properties?: Record<string, any>;
+	digest?: string;
+}
+
 // Mirrors Go: spec.SkillType
 export enum SkillType {
 	FS = 'fs',

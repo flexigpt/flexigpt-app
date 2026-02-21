@@ -9,7 +9,16 @@ import type {
 } from '@/spec/modelpreset';
 import type { MessageBlock, PromptBundle, PromptTemplate, PromptTemplateListItem, PromptVariable } from '@/spec/prompt';
 import type { AppTheme, AuthKey, AuthKeyName, AuthKeyType, SettingsSchema } from '@/spec/setting';
-import type { RuntimeSkillFilter, Skill, SkillBundle, SkillListItem, SkillType } from '@/spec/skill';
+import type {
+	RuntimeSkillFilter,
+	Skill,
+	SkillBundle,
+	SkillDef,
+	SkillListItem,
+	SkillRecord,
+	SkillSession,
+	SkillType,
+} from '@/spec/skill';
 import type { HTTPToolImpl, Tool, ToolBundle, ToolImplType, ToolListItem, ToolStoreChoice } from '@/spec/tool';
 import type { InvokeGoOptions, InvokeHTTPOptions, InvokeToolResponse } from '@/spec/toolruntime';
 
@@ -253,7 +262,17 @@ export interface ISkillStoreAPI {
 	/** Get a skill. */
 	getSkill(bundleID: string, skillSlug: string): Promise<Skill | undefined>;
 
+	/** Runtime: get a skills prompt. */
 	getSkillsPromptXML(filter?: RuntimeSkillFilter): Promise<string>;
+
+	/** Runtime: create a skill session. */
+	createSkillSession(maxActivePerSession?: number, activeSkills?: SkillDef[]): Promise<SkillSession>;
+
+	/** Runtime: close a skill session. */
+	closeSkillSession(sessionID: string): Promise<void>;
+
+	/** Runtime: list skills from the runtime catalog (optionally filtered). */
+	listRuntimeSkills(filter?: RuntimeSkillFilter): Promise<SkillRecord[]>;
 }
 
 export interface IToolRuntimeAPI {

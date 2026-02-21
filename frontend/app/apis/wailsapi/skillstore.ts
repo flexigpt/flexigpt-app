@@ -1,11 +1,23 @@
-import type { RuntimeSkillFilter, Skill, SkillBundle, SkillListItem, SkillType } from '@/spec/skill';
+import type {
+	RuntimeSkillFilter,
+	Skill,
+	SkillBundle,
+	SkillDef,
+	SkillListItem,
+	SkillRecord,
+	SkillSession,
+	SkillType,
+} from '@/spec/skill';
 
 import type { ISkillStoreAPI } from '@/apis/interface';
 import {
+	CloseSkillSession,
+	CreateSkillSession,
 	DeleteSkill,
 	DeleteSkillBundle,
 	GetSkill,
 	GetSkillsPromptXML,
+	ListRuntimeSkills,
 	ListSkillBundles,
 	ListSkills,
 	PatchSkill,
@@ -151,5 +163,34 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 		} as spec.GetSkillsPromptXMLRequest;
 		const resp = await GetSkillsPromptXML(req);
 		return resp?.Body?.xml || '';
+	}
+
+	async createSkillSession(maxActivePerSession?: number, activeSkills?: SkillDef[]): Promise<SkillSession> {
+		const req = {
+			Body: {
+				maxActivePerSession,
+				activeSkills,
+			} as spec.CreateSkillSessionRequestBody,
+		} as spec.CreateSkillSessionRequest;
+
+		const resp = await CreateSkillSession(req);
+		return {
+			sessionID: resp?.Body?.sessionID ?? '',
+			activeSkills: (resp?.Body?.activeSkills ?? []) as SkillDef[],
+		};
+	}
+
+	async closeSkillSession(sessionID: string): Promise<void> {
+		const req: spec.CloseSkillSessionRequest = { SessionID: sessionID };
+		await CloseSkillSession(req);
+	}
+
+	async listRuntimeSkills(filter?: RuntimeSkillFilter): Promise<SkillRecord[]> {
+		const req = {
+			Body: { filter: filter as spec.RuntimeSkillFilter } as spec.ListRuntimeSkillsRequestBody,
+		} as spec.ListRuntimeSkillsRequest;
+
+		const resp = await ListRuntimeSkills(req);
+		return (resp?.Body?.skills ?? []) as SkillRecord[];
 	}
 }
