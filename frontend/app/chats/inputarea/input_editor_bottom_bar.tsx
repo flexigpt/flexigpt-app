@@ -8,6 +8,7 @@ import { type PlateEditor, useEditorRef } from 'platejs/react';
 
 import type { ProviderSDKType } from '@/spec/inference';
 import type { PromptTemplateListItem } from '@/spec/prompt';
+import type { SkillDef, SkillListItem } from '@/spec/skill';
 import { ToolImplType, type ToolListItem, ToolStoreChoiceType } from '@/spec/tool';
 
 import { formatShortcut, type ShortcutConfig } from '@/lib/keyboard_shortcuts';
@@ -20,6 +21,7 @@ import { promptStoreAPI } from '@/apis/baseapi';
 import { UrlAttachmentModal } from '@/chats/attachments/attachment_url_modal';
 import { dispatchOpenToolArgs } from '@/chats/events/open_attached_toolargs';
 import { CommandTipsMenu } from '@/chats/inputtips/command_tips_menu';
+import { SkillsBottomBarChip } from '@/chats/skills/skill_bottom_bar_chip';
 import { insertTemplateSelectionNode } from '@/chats/templates/template_editor_utils';
 import {
 	computeToolUserArgsStatus,
@@ -61,6 +63,14 @@ interface EditorBottomBarProps {
 	// Web-search state comes from EditorArea (separate UX/state)
 	webSearchTemplates: WebSearchChoiceTemplate[];
 	setWebSearchTemplates: Dispatch<SetStateAction<WebSearchChoiceTemplate[]>>;
+
+	// Skills state comes from EditorArea (conversation-level)
+	allSkills: SkillListItem[];
+	skillsLoading?: boolean;
+	enabledSkills: SkillDef[];
+	setEnabledSkills: Dispatch<SetStateAction<SkillDef[]>>;
+	onEnableAllSkills: () => void;
+	onDisableAllSkills: () => void;
 }
 
 interface PickerButtonProps {
@@ -120,6 +130,12 @@ export function EditorBottomBar({
 	attachedToolEntries,
 	webSearchTemplates,
 	setWebSearchTemplates,
+	allSkills,
+	skillsLoading = false,
+	enabledSkills,
+	setEnabledSkills,
+	onEnableAllSkills,
+	onDisableAllSkills,
 }: EditorBottomBarProps) {
 	const editor = useEditorRef() as PlateEditor;
 	const [isUrlModalOpen, setIsUrlModalOpen] = useState(false);
@@ -468,6 +484,16 @@ export function EditorBottomBar({
 							if (!activeWebSearch) return;
 							dispatchOpenToolArgs({ kind: 'webSearch' });
 						}}
+					/>
+
+					{/* Skills: sits to the right of Web Search */}
+					<SkillsBottomBarChip
+						allSkills={allSkills}
+						loading={skillsLoading}
+						enabledSkills={enabledSkills}
+						setEnabledSkills={setEnabledSkills}
+						onEnableAll={onEnableAllSkills}
+						onDisableAll={onDisableAllSkills}
 					/>
 				</div>
 

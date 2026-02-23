@@ -6,6 +6,7 @@ import type { PlateEditor, usePlateEditor } from 'platejs/react';
 
 import type { Attachment, UIAttachment } from '@/spec/attachment';
 import type { UIToolOutput } from '@/spec/inference';
+import type { SkillDef } from '@/spec/skill';
 import type { ToolStoreChoice, UIToolStoreChoice } from '@/spec/tool';
 
 import { expandTabsToSpaces } from '@/lib/text_utils';
@@ -20,6 +21,7 @@ export interface EditorExternalMessage {
 	attachments?: Attachment[];
 	toolChoices?: ToolStoreChoice[];
 	toolOutputs?: UIToolOutput[];
+	enabledSkills?: SkillDef[];
 }
 
 export interface EditorSubmitPayload {
@@ -28,6 +30,7 @@ export interface EditorSubmitPayload {
 	attachments: UIAttachment[];
 	toolOutputs: UIToolOutput[];
 	finalToolChoices: ToolStoreChoice[];
+	enabledSkills?: SkillDef[];
 }
 
 type ChunkedTextNode = { text: string; __chunk: number };

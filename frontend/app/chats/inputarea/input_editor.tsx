@@ -24,6 +24,7 @@ import type {
 } from '@/spec/attachment';
 import { AttachmentKind } from '@/spec/attachment';
 import type { ProviderSDKType, UIToolCall, UIToolOutput } from '@/spec/inference';
+import type { SkillDef, SkillListItem } from '@/spec/skill';
 import { type Tool, type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
 import { type ShortcutConfig } from '@/lib/keyboard_shortcuts';
@@ -33,7 +34,7 @@ import { ensureMakeID, getUUIDv7 } from '@/lib/uuid_utils';
 
 import { useEnterSubmit } from '@/hooks/use_enter_submit';
 
-import { backendAPI, toolRuntimeAPI, toolStoreAPI } from '@/apis/baseapi';
+import { backendAPI, skillStoreAPI, toolRuntimeAPI, toolStoreAPI } from '@/apis/baseapi';
 
 import { AlignKit } from '@/components/editor/plugins/align_kit';
 import { BasicBlocksKit } from '@/components/editor/plugins/basic_blocks_kit';
@@ -69,6 +70,7 @@ import {
 	LARGE_TEXT_AUTODECHUNK_THRESHOLD_CHARS,
 	LARGE_TEXT_CHUNK_SIZE,
 } from '@/chats/inputarea/input_editor_utils';
+import { dedupeSkillDefs, skillDefFromListItem } from '@/chats/skills/skill_utils';
 import {
 	getFirstTemplateNodeWithPath,
 	getTemplateNodesWithPath,
@@ -316,6 +318,20 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	// Single “active tool args editor” target (conversation-level or attached).
 	const [toolArgsTarget, setToolArgsTarget] = useState<ToolArgsTarget | null>(null);
 	const [webSearchTemplates, setWebSearchTemplates] = useState<WebSearchChoiceTemplate[]>([]);
+	// ---- Skills (conversation-level) ----
+	const [allSkills, setAllSkills] = useState<SkillListItem[]>([]);
+	const [enabledSkills, setEnabledSkills] = useState<SkillDef[]>([]);
+	const [skillsLoading, setSkillsLoading] = useState(false);
+	const pendingEnableAllSkillsRef = useRef(false);
+	const preEditEnabledSkillsRef = useRef<SkillDef[] | null>(null);
+
+	// --- Fix: focus management for menus opened by shortcuts ---
+	const templateMenuOpen = useStoreState(templateMenu, 'open');
+	const toolMenuOpen = useStoreState(toolMenu, 'open');
+	const attachmentMenuOpen = useStoreState(attachmentMenu, 'open');
+	const templateMenuEl = useStoreState(templateMenu, 'contentElement');
+	const toolMenuEl = useStoreState(toolMenu, 'contentElement');
+	const attachmentMenuEl = useStoreState(attachmentMenu, 'contentElement');
 
 	useOpenToolArgs(target => {
 		setToolArgsTarget(target);
@@ -327,14 +343,65 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		attachmentMenu.hide();
 	}, [templateMenu, toolMenu, attachmentMenu]);
 
-	// --- Fix: focus management for menus opened by shortcuts ---
-	const templateMenuOpen = useStoreState(templateMenu, 'open');
-	const toolMenuOpen = useStoreState(toolMenu, 'open');
-	const attachmentMenuOpen = useStoreState(attachmentMenu, 'open');
+	// Fetch skills catalog (store listSkills; NOT runtime listRuntimeSkills).
+	useEffect(() => {
+		let cancelled = false;
+		setSkillsLoading(true);
 
-	const templateMenuEl = useStoreState(templateMenu, 'contentElement');
-	const toolMenuEl = useStoreState(toolMenu, 'contentElement');
-	const attachmentMenuEl = useStoreState(attachmentMenu, 'contentElement');
+		(async () => {
+			const out: SkillListItem[] = [];
+			let token: string | undefined = undefined;
+
+			for (let guard = 0; guard < 50; guard += 1) {
+				const resp = await skillStoreAPI.listSkills(
+					undefined,
+					undefined,
+					false, // includeDisabled
+					true, // includeMissing
+					200, // recommendedPageSize
+					token
+				);
+
+				out.push(...(resp.skillListItems ?? []));
+				token = resp.nextPageToken;
+				if (!token) break;
+			}
+
+			if (cancelled) return;
+			setAllSkills(out);
+		})()
+			.catch(() => {
+				if (!cancelled) setAllSkills([]);
+			})
+			.finally(() => {
+				if (!cancelled) setSkillsLoading(false);
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
+	// If user clicked "Enable skills" before the list finished loading, enable-all once loaded.
+	useEffect(() => {
+		if (!pendingEnableAllSkillsRef.current) return;
+		if (allSkills.length === 0) return;
+		pendingEnableAllSkillsRef.current = false;
+		setEnabledSkills(dedupeSkillDefs(allSkills.map(skillDefFromListItem)));
+	}, [allSkills]);
+
+	const enableAllSkills = useCallback(() => {
+		if (allSkills.length === 0) {
+			pendingEnableAllSkillsRef.current = true;
+			return;
+		}
+		setEnabledSkills(dedupeSkillDefs(allSkills.map(skillDefFromListItem)));
+	}, [allSkills]);
+
+	const disableAllSkills = useCallback(() => {
+		pendingEnableAllSkillsRef.current = false;
+		setEnabledSkills([]);
+	}, []);
 
 	useEffect(() => {
 		if (!templateMenuOpen) {
@@ -603,12 +670,15 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const restorePreEditContext = useCallback(() => {
 		const prevConv = preEditConversationToolsRef.current;
 		const prevWs = preEditWebSearchTemplatesRef.current;
+		const prevSkills = preEditEnabledSkillsRef.current;
 
 		if (prevConv) setConversationToolsState(prevConv);
 		if (prevWs) setWebSearchTemplates(prevWs);
+		if (prevSkills) setEnabledSkills(prevSkills);
 
 		preEditConversationToolsRef.current = null;
 		preEditWebSearchTemplatesRef.current = null;
+		preEditEnabledSkillsRef.current = null;
 	}, []);
 
 	// Recompute conversation-level arg blocking whenever that state changes.
@@ -927,6 +997,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					attachments,
 					toolOutputs: finalToolOutputs,
 					finalToolChoices,
+					enabledSkills,
 				};
 
 				await onSubmit(payload);
@@ -949,6 +1020,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					// If we were editing, the old snapshot is no longer relevant.
 					preEditConversationToolsRef.current = null;
 					preEditWebSearchTemplatesRef.current = null;
+					preEditEnabledSkillsRef.current = null;
 
 					lastPopulatedSelectionKeyRef.current.clear();
 					editor.tf.focus();
@@ -960,6 +1032,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			cancelEditing,
 			conversationToolsState,
 			editor,
+			enabledSkills,
 			hasPendingToolCalls,
 			isBusy,
 			isSendButtonEnabled,
@@ -1051,6 +1124,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			if (!preEditWebSearchTemplatesRef.current) {
 				preEditWebSearchTemplatesRef.current = webSearchTemplates;
 			}
+			if (!preEditEnabledSkillsRef.current) {
+				preEditEnabledSkillsRef.current = enabledSkills;
+			}
 
 			// 1) Reset document to plain text paragraphs.
 			const plain = incoming.text ?? '';
@@ -1111,6 +1187,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			const wsChoices = incomingToolChoices.filter(c => c.toolType === ToolStoreChoiceType.WebSearch);
 			setWebSearchTemplates(wsChoices.map(webSearchTemplateFromChoice));
 
+			// Restore enabled skills (conversation-level, not tool choices).
+			setEnabledSkills(incoming.enabledSkills ?? []);
+
 			// Since we no longer reconstruct attached-tool nodes from history,
 			// ensure attached-tool arg blocking resets.
 			setAttachedToolArgsBlocked(false);
@@ -1123,7 +1202,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 			editor.tf.focus();
 		},
-		[closeAllMenus, editor, conversationToolsState, webSearchTemplates]
+		[closeAllMenus, editor, conversationToolsState, webSearchTemplates, enabledSkills]
 	);
 
 	const loadToolCalls = useCallback((toolCalls: UIToolCall[]) => {
@@ -1594,6 +1673,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						attachedToolEntries={attachedToolEntries}
 						webSearchTemplates={webSearchTemplates}
 						setWebSearchTemplates={setWebSearchTemplates}
+						allSkills={allSkills}
+						skillsLoading={skillsLoading}
+						enabledSkills={enabledSkills}
+						setEnabledSkills={setEnabledSkills}
+						onEnableAllSkills={enableAllSkills}
+						onDisableAllSkills={disableAllSkills}
 					/>
 				</Plate>
 			</form>
