@@ -27,13 +27,15 @@
     - [x] bundles page, card, add/edit/view modal
     - [x] skills add/edit/view modal
   - [ ] skills in chat ui.
-    - [ ] most probably like websearch, enable button in bottom, with all available skills from catalog in the prompt and then progressive disclosure
-    - [ ] inside the dropdown we can have a select sub skill set for progressive disclosure
+    - [x] most probably like websearch, enable button in bottom, with all available skills from catalog
+    - [x] inside the dropdown we can have a select sub skill set for progressive disclosure
+    - [ ] then in the prompt and then progressive disclosure
     - [ ] when the skills functionality is enabled we inject the available skills prompt, with the load tool.
     - [ ] From load tool, when something is activated, we inject that skills body in prompt and attach, read file, run script, unload tool.
     - [ ] lifecycle of when all unloaded vs some loaded etc needs to be managed.
     - [ ] also session per convo needs to be managed.
-    - [ ] Do we need some builtin skills?? Should ew expose current tools as skills (unnecessary redirection most probably?)?
+    - [ ] Do we need some builtin skills??
+    - [ ] ~~Should ew expose current tools as skills (unnecessary redirection most probably?)?~~
 
 - [ ] ModelParams enhancements
   - [ ] valid input output modalities, valid levels, valid reasoning types, etc need to be added to modelpresetspec.
