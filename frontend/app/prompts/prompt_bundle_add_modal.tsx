@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { type SubmitEventHandler, useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
@@ -88,7 +88,7 @@ export function AddBundleModal({ isOpen, onClose, onSubmit, existingSlugs }: Add
 		return nextErrors;
 	};
 
-	const handleSubmit = (e?: FormEvent) => {
+	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
 		if (e) {
 			e.preventDefault();
 			e.stopPropagation();

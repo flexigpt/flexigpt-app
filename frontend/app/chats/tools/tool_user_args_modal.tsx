@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { type SubmitEventHandler, useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
@@ -138,7 +138,7 @@ export function ToolUserArgsModal({
 		setError(null);
 	};
 
-	const handleSubmit = (e: FormEvent) => {
+	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
 		e.preventDefault();
 		e.stopPropagation();
 

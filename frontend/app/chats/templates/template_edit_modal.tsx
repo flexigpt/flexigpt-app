@@ -1,4 +1,4 @@
-import type { FormEvent } from 'react';
+import type { SubmitEventHandler } from 'react';
 import { useEffect, useId, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
@@ -132,7 +132,7 @@ export function TemplateEditModal({
 		dialogRef.current?.close();
 	}
 
-	const handleSubmit = (e: FormEvent) => {
+	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
 		e.preventDefault();
 		e.stopPropagation();
 		saveAndClose();

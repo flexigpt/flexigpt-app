@@ -1,4 +1,4 @@
-import { type ChangeEvent, type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { type ChangeEvent, type SubmitEventHandler, useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
@@ -318,7 +318,7 @@ export function AddEditPromptTemplateModal({
 		return Object.keys(v).length === 0;
 	}, [formData, isViewMode, isEditMode]);
 
-	const handleSubmit = (e: FormEvent) => {
+	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
 		e.preventDefault();
 		e.stopPropagation();
 		if (isViewMode) return;

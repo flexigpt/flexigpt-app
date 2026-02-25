@@ -1,4 +1,4 @@
-import { type Dispatch, type FormEvent, type SetStateAction, useEffect, useRef, useState } from 'react';
+import { type Dispatch, type SetStateAction, type SubmitEventHandler, useEffect, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
@@ -78,7 +78,7 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 
 	const formHasErrors = Object.values(errors).some(Boolean);
 
-	const handleSave = (e: FormEvent) => {
+	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
 		e.preventDefault();
 
 		/* final synchronous validation */
@@ -126,7 +126,7 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 					</button>
 				</div>
 
-				<form onSubmit={handleSave} className="space-y-4">
+				<form onSubmit={handleSubmit} className="space-y-4">
 					{/* stream toggle */}
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-4 cursor-pointer">

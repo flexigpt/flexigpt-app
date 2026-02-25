@@ -1,4 +1,4 @@
-import type { ChangeEvent, FormEvent } from 'react';
+import type { ChangeEvent, SubmitEventHandler } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
@@ -277,7 +277,7 @@ export function AddEditProviderPresetModal({
 		return !hasErr && requiredFilled;
 	}, [formData, mode, isReadOnly]);
 
-	const handleSubmit = (e: FormEvent) => {
+	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
 		e.preventDefault();
 		e.stopPropagation();
 

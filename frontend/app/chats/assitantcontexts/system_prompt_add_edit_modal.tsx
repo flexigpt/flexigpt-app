@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { type SubmitEventHandler, useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
@@ -67,7 +67,7 @@ export function SystemPromptAddEditModal({
 		onClose();
 	};
 
-	const save = (e: FormEvent) => {
+	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
 		e.preventDefault();
 		const v = value.trim();
 		if (!v) return;
@@ -115,7 +115,7 @@ export function SystemPromptAddEditModal({
 					</button>
 				</div>
 
-				<form onSubmit={save} className="space-y-4">
+				<form onSubmit={handleSubmit} className="space-y-4">
 					{mode === 'add' && (
 						<div className="grid grid-cols-12 items-center gap-1">
 							<label className="col-span-2 text-sm opacity-70">Copy Existing:</label>

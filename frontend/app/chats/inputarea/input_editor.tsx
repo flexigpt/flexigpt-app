@@ -1,6 +1,6 @@
 import {
-	type FormEvent,
 	forwardRef,
+	type SubmitEventHandler,
 	useCallback,
 	useDeferredValue,
 	useEffect,
@@ -1052,7 +1052,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	/**
 	 * Default form submit / Enter: "run pending tools, then send".
 	 */
-	const handleSubmit = (e?: FormEvent) => {
+	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
 		if (e) e.preventDefault();
 		void doSubmit({ runPendingTools: true });
 	};

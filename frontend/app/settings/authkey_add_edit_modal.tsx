@@ -1,4 +1,4 @@
-import type { ChangeEvent, FormEvent } from 'react';
+import type { ChangeEvent, SubmitEventHandler } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
@@ -239,7 +239,7 @@ export function AddEditAuthKeyModal({
 		return Object.values(errors).every(v => !v);
 	}, [form, errors, noProviderAvailable]);
 
-	const submit = async (e: FormEvent) => {
+	const handleSubmit: SubmitEventHandler<HTMLFormElement> = async e => {
 		e.preventDefault();
 
 		// explicit validation trigger
@@ -276,7 +276,7 @@ export function AddEditAuthKeyModal({
 					</button>
 				</div>
 
-				<form onSubmit={submit} className="space-y-4">
+				<form onSubmit={handleSubmit} className="space-y-4">
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-3">
 							<span className="label-text text-sm">Type*</span>

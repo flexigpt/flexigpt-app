@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useRef, useState } from 'react';
+import { type SubmitEventHandler, useEffect, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
@@ -67,7 +67,7 @@ export function UrlAttachmentModal({ isOpen, onClose, onAttachURL }: UrlAttachme
 	// URL field change handler (field is required)
 	const handleUrlChange = createUrlFieldChangeHandler<FormState>('url', setFormData, setErrors, { required: true });
 
-	const handleSubmit = async (e: FormEvent) => {
+	const handleSubmit: SubmitEventHandler<HTMLFormElement> = async e => {
 		e.preventDefault();
 		e.stopPropagation();
 
