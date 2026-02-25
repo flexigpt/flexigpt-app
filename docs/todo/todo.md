@@ -3,8 +3,7 @@
 ## Laundry list
 
 - [ ] opus 4.6 has now adaptive thinking which is basically thinking with levels
-- [x] when we send attachments, like go files. openai is consuming a lot of tokens, i.e if tiktoken says x, is is almsot 2x generally. check if we are sending things double or something. req debug details doesnt show double atleast, but better print and check.
-  - [x] xml encoding caused bloat and resend did not clean hydrated inputs.
+  - [ ] inference go needs adjustment to support new anthropic sdk
 
 ## Features
 
@@ -27,7 +26,7 @@
     - [x] bundles page, card, add/edit/view modal
     - [x] skills add/edit/view modal
   - [ ] skills in chat ui.
-    - [x] most probably like websearch, enable button in bottom, with all available skills from catalog
+    - [x] most probably like web search, enable button in bottom, with all available skills from catalog
     - [x] inside the dropdown we can have a select sub skill set for progressive disclosure
     - [ ] then in the prompt and then progressive disclosure
     - [ ] when the skills functionality is enabled we inject the available skills prompt, with the load tool.

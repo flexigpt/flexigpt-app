@@ -722,3 +722,6 @@
 
 - [x] UI tables alignment for config pages
 - [x] when thinking, dont show streaming text in bottom line, do that only when streaming actual data.
+
+- [x] when we send attachments, like go files. openai is consuming a lot of tokens, i.e if tiktoken says x, is is almost 2x generally. check if we are sending things double or something. req debug details doesnt show double atleast, but better print and check.
+  - [x] xml encoding caused bloat and resend did not clean hydrated inputs.
