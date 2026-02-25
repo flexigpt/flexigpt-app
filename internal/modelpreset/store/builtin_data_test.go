@@ -246,12 +246,12 @@ func TestSetModelPresetEnabled(t *testing.T) {
 
 			if tc.wantErr {
 				if err == nil {
-					t.Fatal("expected error")
+					t.Fatalf("expected error, %v, %v", pn, mp.Slug)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("unexpected: %v", err)
+				t.Fatalf("unexpected: %v, %v, %v", err, pn, mp.Slug)
 			}
 			_, models, _ := bi.ListBuiltInPresets(ctx)
 			if models[pn][mp.ID].IsEnabled != enabled {
