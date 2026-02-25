@@ -53,6 +53,9 @@ export type ShortcutConfig = Partial<Record<ShortcutAction, ShortcutChord>>;
 
 type ShortcutGroup = 'Chat' | 'Insert' | 'Editor';
 
+/**
+ * @public
+ */
 export interface ShortcutDisplayItem {
 	action: ShortcutAction;
 	/** Short, human-friendly action name */

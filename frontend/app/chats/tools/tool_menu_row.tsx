@@ -8,7 +8,7 @@ import type { UIToolUserArgsStatus } from '@/spec/tool';
 
 type PrimaryActionKind = 'attach' | 'detach' | 'remove';
 
-export interface ToolMenuRowProps {
+interface ToolMenuRowProps {
 	store?: MenuStore;
 	disabled?: boolean;
 	dataAttachmentChip?: string;

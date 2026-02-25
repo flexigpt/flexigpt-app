@@ -23,6 +23,7 @@ tasks:
       - "{{.INSTALL_TOOL_REFDIR}}"
       - "{{.INSTALL_TOOL_GO_TEST_COVERAGE}}"
       - "{{.INSTALL_TOOL_GODEPGRAPH}}"
+      - "{{.INSTALL_TOOL_GOMAJOR}}"
 
   gomod:
     cmds:
@@ -43,6 +44,12 @@ tasks:
           --force-lang=Mustache,tmpl --force-lang=INI,env --force-lang=INI,dev --force-lang=INI,prod \
           --not-match-f='LICENSE$|\.npmrc$|\.prettierignore$|\.gitignore$|\.gitattributes$|\.gitmodules$' \
           .
+
+  checkupgrade:
+    cmds:
+      - gomajor list
+      - go-mod-upgrade -l
+      - pnpm outdated -r
 
   godepgraph:
     cmds:

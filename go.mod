@@ -1,12 +1,12 @@
 module github.com/flexigpt/flexigpt-app
 
-go 1.25
+go 1.25.0
 
 // Tools: These are installed via the taskfile. check the associated task.
 require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.0
 	github.com/adrg/xdg v0.5.3
-	github.com/danielgtaylor/huma/v2 v2.35.0
+	github.com/danielgtaylor/huma/v2 v2.37.2
 	github.com/flexigpt/agentskills-go v0.7.1
 	github.com/flexigpt/inference-go v0.8.1
 	github.com/flexigpt/llmtools-go v0.11.0
@@ -42,7 +42,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jalaali/go-jalaali v0.0.0-20210801064154-80525e88d958 // indirect
 	github.com/jchv/go-winloader v0.0.0-20250406163304-c1995be93bd1 // indirect
-	github.com/labstack/echo/v4 v4.13.4 // indirect
+	github.com/labstack/echo/v4 v4.15.0 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/leaanthony/go-ansi-parser v1.6.1 // indirect
 	github.com/leaanthony/gosod v1.0.4 // indirect
@@ -61,8 +61,8 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rs/zerolog v1.33.0 // indirect
 	github.com/samber/lo v1.51.0 // indirect
-	github.com/spf13/cobra v1.9.2-0.20250831231508-51d675196729 // indirect
-	github.com/spf13/pflag v1.0.8 // indirect
+	github.com/spf13/cobra v1.10.2 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/tetratelabs/wazero v1.8.1 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
