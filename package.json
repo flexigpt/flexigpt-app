@@ -11,9 +11,10 @@
 	"author": "Pankaj Pipada <ppipada@gmail.com>",
 	"description": "FlexiGPT - An AI application platform",
 	"engines": {
-		"node": "22.21.1"
+		"node": "24.14.0"
 	},
 	"scripts": {
+		"upnodejs": "asdf install nodejs v24.14.0; asdf set nodejs v24.14.0; corepack enable; asdf reshim nodejs; corepack prepare pnpm@10.30.2 --activate; corepack use pnpm@10.30.2; asdf reshim nodejs; echo '***Search and update builds***'",
 		"touch:tmp": "node -e \"require('fs-extra').ensureFileSync('frontend/dist/client/a.tmp')\"",
 		"check:version": "node -e \"const t=process.env.VERSION_TAG;if(!t){console.error('VERSION_TAG not set');process.exit(1);}if(!/^v\\d+\\.\\d+\\.\\d+$/.test(t)){console.error('VERSION_TAG must match vX.Y.Z');process.exit(1);}\"",
 		"build:linux": "cd ./cmd/agentgo && pnpm -F frontend run build:wails && pnpm run check:version && wails build -m -clean -s -skipbindings -tags webkit2_41 -platform linux/amd64 -ldflags=\"-X main.Version=$VERSION_TAG\"",
@@ -21,7 +22,7 @@
 		"build:win": "cd ./cmd/agentgo && pnpm -F frontend run build:wails && pnpm run check:version && wails build -m -clean -s -skipbindings -nsis -platform windows/amd64 -ldflags=\"-X main.Version=$VERSION_TAG\"",
 		"licenses:gen": "bash ./build/licenses/gen_licenses.sh"
 	},
-	"packageManager": "pnpm@10.22.0+sha512.bf049efe995b28f527fd2b41ae0474ce29186f7edcb3bf545087bd61fbbebb2bf75362d1307fda09c2d288e1e499787ac12d4fcb617a974718a6051f2eee741c",
+	"packageManager": "pnpm@10.30.2+sha512.36cdc707e7b7940a988c9c1ecf88d084f8514b5c3f085f53a2e244c2921d3b2545bc20dd4ebe1fc245feec463bb298aecea7a63ed1f7680b877dc6379d8d0cb4",
 	"devDependencies": {
 		"fs-extra": "^11.3.3"
 	},

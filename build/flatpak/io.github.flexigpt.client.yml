@@ -72,8 +72,8 @@ modules:
       - mv $(pwd)/* $NODEROOT
     sources:
       - type: archive
-        url: https://nodejs.org/dist/v22.21.1/node-v22.21.1-linux-x64.tar.xz
-        sha256: 680d3f30b24a7ff24b98db5e96f294c0070f8f9078df658da1bce1b9c9873c88
+        url: https://nodejs.org/dist/v24.14.0/node-v24.14.0-linux-x64.tar.xz
+        sha256: 41cd79bb7877c81605a9e68ec4c91547774f46a40c67a17e34d7179ef11729df
 
   - name: pnpm
     buildsystem: simple

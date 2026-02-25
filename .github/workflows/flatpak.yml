@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      NODE_VERSION: "22.21.1"
+      NODE_VERSION: "24.14.0"
     permissions:
       contents: write
     container:
