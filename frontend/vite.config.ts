@@ -148,9 +148,7 @@ export default defineConfig(({ mode }) => {
 		},
 
 		resolve: {
-			// Prefer modern entry points; keep this if it works for you
-			// You can also use: ['module', 'browser', 'exports', 'main']
-			mainFields: ['module', 'jsnext:main', 'jsnext'],
+			mainFields: ['module', 'jsnext:main', 'jsnext', 'exports'],
 		},
 
 		test: {

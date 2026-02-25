@@ -247,6 +247,19 @@
 	*::-webkit-scrollbar-track {
 		background-color: transparent;
 	}
+
+	details > summary {
+		list-style: none;
+	}
+
+	details > summary::-webkit-details-marker {
+		display: none;
+	}
+
+	details > summary::marker {
+		content: none;
+		display: none;
+	}
 }
 
 /* Shiki styling adjustments */
