@@ -36,6 +36,25 @@
     - [ ] Do we need some builtin skills??
     - [ ] ~~Should ew expose current tools as skills (unnecessary redirection most probably?)?~~
 
+  - [ ] Skill flow
+    - when user selects skills, and no skills in last message. when user selects skills, and skills selected but not loaded in last message:
+      - need to attach skills rules, extra prompt
+      - need to attach skills available prompt
+      - need to attach skills load tool
+
+    - when user selects skills, and skills selected and some loaded
+      - need to attach skills rules, extra prompt
+      - need to attach skill tools all: load/unload/read/run
+
+    - load/read/run tool called: run load and return tool result
+
+    - unload called:
+      - set skills inactive. if some skill still active, return here
+      - if no skill active return to user select skill and no skill loaded state
+
+    - user doesn't select skills,
+      - nothing to do. remove any additional prompts if some state is present somewhere.
+
 - [ ] ModelParams enhancements
   - [ ] valid input output modalities, valid levels, valid reasoning types, etc need to be added to modelpresetspec.
   - [ ] additional params from apis
