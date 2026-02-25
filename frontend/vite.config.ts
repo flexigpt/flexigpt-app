@@ -147,10 +147,6 @@ export default defineConfig(({ mode }) => {
 			format: 'es',
 		},
 
-		resolve: {
-			mainFields: ['module', 'jsnext:main', 'jsnext', 'exports'],
-		},
-
 		test: {
 			globals: true,
 			environment: 'jsdom',
