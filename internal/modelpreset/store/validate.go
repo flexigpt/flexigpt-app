@@ -88,13 +88,122 @@ func validateModelPreset(mp *spec.ModelPreset) error {
 		return errors.New("either reasoning or temperature must be set")
 	}
 
+	if mp.MaxPromptLength != nil && *mp.MaxPromptLength < 0 {
+		return errors.New("maxPromptLength must be >= 0")
+	}
+	if mp.MaxOutputLength != nil && *mp.MaxOutputLength < 0 {
+		return errors.New("maxOutputLength must be >= 0")
+	}
+	if mp.Timeout != nil && *mp.Timeout < 0 {
+		return errors.New("timeout must be >= 0")
+	}
+
 	// Reasoning checks (optional).
 	if mp.Reasoning != nil {
 		if err := validateReasoning(mp.Reasoning); err != nil {
 			return fmt.Errorf("invalid reasoning: %w", err)
 		}
 	}
+
+	if mp.OutputParam != nil {
+		if err := validateOutputParam(mp.OutputParam); err != nil {
+			return fmt.Errorf("invalid outputParam: %w", err)
+		}
+	}
+
+	if err := validateStopSequences(mp.StopSequences); err != nil {
+		return fmt.Errorf("invalid stopSequences: %w", err)
+	}
 	return nil
+}
+
+func validateStopSequences(stops []string) error {
+	// Keep this conservative across providers (OpenAI chat-completions allows up to 4).
+	if len(stops) > 4 {
+		return fmt.Errorf("too many stop sequences: %d (max 4)", len(stops))
+	}
+	for i, s := range stops {
+		if strings.TrimSpace(s) == "" {
+			return fmt.Errorf("stopSequences[%d] is empty", i)
+		}
+	}
+	return nil
+}
+
+func validateOutputParam(op *inferencegoSpec.OutputParam) error {
+	if op == nil {
+		return nil
+	}
+	if op.Verbosity != nil {
+		switch *op.Verbosity {
+		case inferencegoSpec.OutputVerbosityLow,
+			inferencegoSpec.OutputVerbosityMedium,
+			inferencegoSpec.OutputVerbosityHigh,
+			inferencegoSpec.OutputVerbosityMax:
+			// OK.
+		default:
+			return fmt.Errorf("unknown verbosity %q", *op.Verbosity)
+		}
+	}
+	if op.Format != nil {
+		if err := validateOutputFormat(op.Format); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateOutputFormat(of *inferencegoSpec.OutputFormat) error {
+	if of == nil {
+		return nil
+	}
+	switch of.Kind {
+	case inferencegoSpec.OutputFormatKindText:
+		if of.JSONSchemaParam != nil {
+			return errors.New("jsonSchemaParam must be nil when format.kind is text")
+		}
+	case inferencegoSpec.OutputFormatKindJSONSchema:
+		if of.JSONSchemaParam == nil {
+			return errors.New("jsonSchemaParam is required when format.kind is jsonSchema")
+		}
+		if err := validateJSONSchemaParam(of.JSONSchemaParam); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("unknown format.kind %q", of.Kind)
+	}
+	return nil
+}
+
+func validateJSONSchemaParam(j *inferencegoSpec.JSONSchemaParam) error {
+	if j == nil {
+		return nil
+	}
+	if !isValidJSONSchemaName(j.Name) {
+		return fmt.Errorf("invalid jsonSchemaParam.name %q", j.Name)
+	}
+	if j.Schema == nil {
+		return errors.New("jsonSchemaParam.schema is required")
+	}
+	return nil
+}
+
+func isValidJSONSchemaName(s string) bool {
+	// Must be a-z, A-Z, 0-9, underscore or dash, max length 64.
+	if s == "" || len(s) > 64 {
+		return false
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9':
+		case r == '_' || r == '-':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // validateProviderName currently only trims blanks; extend as required.
@@ -145,6 +254,18 @@ func validateReasoning(r *inferencegoSpec.ReasoningParam) error {
 		}
 	default:
 		return fmt.Errorf("unknown type %q", r.Type)
+	}
+
+	// SummaryStyle is optional (OpenAI Responses only), but if provided it must be valid.
+	if r.SummaryStyle != nil {
+		switch *r.SummaryStyle {
+		case inferencegoSpec.ReasoningSummaryStyleAuto,
+			inferencegoSpec.ReasoningSummaryStyleConcise,
+			inferencegoSpec.ReasoningSummaryStyleDetailed:
+			// OK.
+		default:
+			return fmt.Errorf("unknown summaryStyle %q", *r.SummaryStyle)
+		}
 	}
 	return nil
 }

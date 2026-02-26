@@ -81,6 +81,27 @@ export interface ReasoningParam {
 	tokens: number;
 }
 
+/**
+ * @public
+ */
+export interface JSONSchemaParam {
+	name: string;
+	description?: string;
+	schema?: Record<string, any>;
+	strict?: boolean;
+}
+
+/**
+ * @public
+ */
+export interface OutputFormat {
+	kind: string;
+	jsonSchemaParam?: JSONSchemaParam;
+}
+export interface OutputParam {
+	format?: OutputFormat;
+	verbosity?: string;
+}
 export interface ModelParam {
 	name: string;
 	stream: boolean;

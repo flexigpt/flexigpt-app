@@ -515,6 +515,8 @@ func (s *ModelPresetStore) PutModelPreset(
 		Reasoning:                   req.Body.Reasoning,
 		SystemPrompt:                req.Body.SystemPrompt,
 		Timeout:                     req.Body.Timeout,
+		OutputParam:                 req.Body.OutputParam,
+		StopSequences:               req.Body.StopSequences,
 		AdditionalParametersRawJSON: req.Body.AdditionalParametersRawJSON,
 		CreatedAt:                   now,
 		ModifiedAt:                  now,

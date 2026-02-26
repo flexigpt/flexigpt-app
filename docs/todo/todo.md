@@ -56,10 +56,11 @@
       - nothing to do. remove any additional prompts if some state is present somewhere.
 
 - [ ] ModelParams enhancements
-  - [ ] valid input output modalities, valid levels, valid reasoning types, etc need to be added to modelpresetspec.
-  - [ ] additional params from apis
+  - [x] additional params from apis
     - [x] support in inference go api
-    - [ ] adapt in model preset spec and provider set
+    - [x] adapt in model preset spec and provider set
+  - [ ] UI for additional params
+  - [ ] valid input output modalities, valid levels, valid reasoning types, etc need to be added to modelpresetspec.
 
 - [ ] Better Attachments
   - [ ] docx, excel support

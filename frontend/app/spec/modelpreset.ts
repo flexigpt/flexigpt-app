@@ -1,6 +1,7 @@
 import {
 	DefaultModelParams,
 	type ModelParam,
+	type OutputParam,
 	type ProviderName,
 	ProviderSDKType,
 	type ReasoningParam,
@@ -22,6 +23,8 @@ export interface PutModelPresetPayload {
 	maxPromptLength?: number;
 	maxOutputLength?: number;
 	temperature?: number;
+	outputParam?: OutputParam;
+	stopSequences?: string[];
 	reasoning?: ReasoningParam;
 	systemPrompt?: string;
 	timeout?: number;

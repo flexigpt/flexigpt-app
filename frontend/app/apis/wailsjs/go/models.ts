@@ -3681,6 +3681,8 @@ export namespace spec {
 	    reasoning?: ReasoningParam;
 	    systemPrompt?: string;
 	    timeout?: number;
+	    outputParam?: OutputParam;
+	    stopSequences?: string[];
 	    additionalParametersRawJSON?: string;
 	    // Go type: time
 	    createdAt: any;
@@ -3707,6 +3709,8 @@ export namespace spec {
 	        this.reasoning = this.convertValues(source["reasoning"], ReasoningParam);
 	        this.systemPrompt = source["systemPrompt"];
 	        this.timeout = source["timeout"];
+	        this.outputParam = this.convertValues(source["outputParam"], OutputParam);
+	        this.stopSequences = source["stopSequences"];
 	        this.additionalParametersRawJSON = source["additionalParametersRawJSON"];
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
@@ -5232,6 +5236,8 @@ export namespace spec {
 	    reasoning?: ReasoningParam;
 	    systemPrompt?: string;
 	    timeout?: number;
+	    outputParam?: OutputParam;
+	    stopSequences?: string[];
 	    additionalParametersRawJSON?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -5251,6 +5257,8 @@ export namespace spec {
 	        this.reasoning = this.convertValues(source["reasoning"], ReasoningParam);
 	        this.systemPrompt = source["systemPrompt"];
 	        this.timeout = source["timeout"];
+	        this.outputParam = this.convertValues(source["outputParam"], OutputParam);
+	        this.stopSequences = source["stopSequences"];
 	        this.additionalParametersRawJSON = source["additionalParametersRawJSON"];
 	    }
 	

@@ -60,14 +60,18 @@ type PutModelPresetRequestBody struct {
 	DisplayName ModelDisplayName `json:"displayName" required:"true"`
 	IsEnabled   bool             `json:"isEnabled"   required:"true"`
 
-	Stream                      *bool                           `json:"stream,omitempty"`
-	MaxPromptLength             *int                            `json:"maxPromptLength,omitempty"`
-	MaxOutputLength             *int                            `json:"maxOutputLength,omitempty"`
-	Temperature                 *float64                        `json:"temperature,omitempty"`
-	Reasoning                   *inferencegoSpec.ReasoningParam `json:"reasoning,omitempty"`
-	SystemPrompt                *string                         `json:"systemPrompt,omitempty"`
-	Timeout                     *int                            `json:"timeout,omitempty"`
-	AdditionalParametersRawJSON *string                         `json:"additionalParametersRawJSON,omitempty"`
+	Stream          *bool                           `json:"stream,omitempty"`
+	MaxPromptLength *int                            `json:"maxPromptLength,omitempty"`
+	MaxOutputLength *int                            `json:"maxOutputLength,omitempty"`
+	Temperature     *float64                        `json:"temperature,omitempty"`
+	Reasoning       *inferencegoSpec.ReasoningParam `json:"reasoning,omitempty"`
+	SystemPrompt    *string                         `json:"systemPrompt,omitempty"`
+	Timeout         *int                            `json:"timeout,omitempty"`
+
+	OutputParam   *inferencegoSpec.OutputParam `json:"outputParam,omitempty"`
+	StopSequences []string                     `json:"stopSequences,omitempty"`
+
+	AdditionalParametersRawJSON *string `json:"additionalParametersRawJSON,omitempty"`
 }
 
 type PutModelPresetRequest struct {
