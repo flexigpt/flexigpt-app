@@ -217,6 +217,9 @@ func (s *ModelPresetStore) PutProviderPreset(
 	}
 	if existing, ok := all.ProviderPresets[req.ProviderName]; ok {
 		pp.CreatedAt = existing.CreatedAt
+		// Preserve existing models + default model when updating provider metadata.
+		pp.ModelPresets = existing.ModelPresets
+		pp.DefaultModelPresetID = existing.DefaultModelPresetID
 	}
 	pp.ModifiedAt = now
 	all.ProviderPresets[req.ProviderName] = pp

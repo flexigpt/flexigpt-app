@@ -79,6 +79,7 @@ export interface ReasoningParam {
 	type: ReasoningType;
 	level: ReasoningLevel;
 	tokens: number;
+	summaryStyle?: string;
 }
 
 /**

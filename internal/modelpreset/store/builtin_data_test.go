@@ -1019,3 +1019,299 @@ func TestScopedModelIDs_AcrossProviders_OverlayIsolation(t *testing.T) {
 		})
 	}
 }
+
+func Test_NewBuiltInPresets_SyntheticFS_AdditionalValidationErrors_TableDriven(t *testing.T) {
+	if isWindows() {
+		t.Skip("synthetic fs tests are skipped on windows (known overlay flake)")
+	}
+
+	pn := inferencegoSpec.ProviderName("demoProv")
+	mid := spec.ModelPresetID("m1")
+
+	baseSchemaBytes := func(t *testing.T) []byte {
+		t.Helper()
+		return buildHappySchema(pn, mid)
+	}
+
+	makeFS := func(t *testing.T, mutate func(s *spec.PresetsSchema)) fs.FS {
+		t.Helper()
+		var s spec.PresetsSchema
+		if err := json.Unmarshal(baseSchemaBytes(t), &s); err != nil {
+			t.Fatalf("unmarshal base schema: %v", err)
+		}
+		if mutate != nil {
+			mutate(&s)
+		}
+		b, err := json.Marshal(s)
+		if err != nil {
+			t.Fatalf("marshal mutated schema: %v", err)
+		}
+		return fstest.MapFS{builtin.BuiltInModelPresetsJSON: {Data: b}}
+	}
+
+	intPtr := func(v int) *int { return &v }
+
+	tests := []struct {
+		name        string
+		fsys        func(t *testing.T) fs.FS
+		wantErrIs   error
+		wantErrText string
+	}{
+		{
+			name: "schema_version_mismatch",
+			fsys: func(t *testing.T) fs.FS {
+				t.Helper()
+				return makeFS(t, func(s *spec.PresetsSchema) {
+					s.SchemaVersion = "1999-01-01"
+				})
+			},
+			wantErrText: "schemaVersion",
+		},
+		{
+			name: "default_provider_empty",
+			fsys: func(t *testing.T) fs.FS {
+				t.Helper()
+				return makeFS(t, func(s *spec.PresetsSchema) {
+					s.DefaultProvider = ""
+				})
+			},
+			wantErrText: "no default provider in builtin",
+		},
+		{
+			name: "default_provider_not_present_in_presets",
+			fsys: func(t *testing.T) fs.FS {
+				t.Helper()
+				return makeFS(t, func(s *spec.PresetsSchema) {
+					s.DefaultProvider = inferencegoSpec.ProviderName("ghost")
+				})
+			},
+			wantErrText: "default provider not present in presets",
+		},
+		{
+			name: "provider_zero_timestamps",
+			fsys: func(t *testing.T) fs.FS {
+				t.Helper()
+				return makeFS(t, func(s *spec.PresetsSchema) {
+					pp := s.ProviderPresets[pn]
+					pp.CreatedAt = time.Time{}
+					pp.ModifiedAt = time.Time{}
+					s.ProviderPresets[pn] = pp
+				})
+			},
+			wantErrIs: spec.ErrInvalidTimestamp,
+		},
+		{
+			name: "model_missing_temp_and_reasoning",
+			fsys: func(t *testing.T) fs.FS {
+				t.Helper()
+				return makeFS(t, func(s *spec.PresetsSchema) {
+					pp := s.ProviderPresets[pn]
+					mp := pp.ModelPresets[mid]
+					mp.Temperature = nil
+					mp.Reasoning = nil
+					pp.ModelPresets[mid] = mp
+					s.ProviderPresets[pn] = pp
+				})
+			},
+			wantErrText: "either reasoning or temperature must be set",
+		},
+		{
+			name: "model_negative_max_prompt_length",
+			fsys: func(t *testing.T) fs.FS {
+				t.Helper()
+				return makeFS(t, func(s *spec.PresetsSchema) {
+					pp := s.ProviderPresets[pn]
+					mp := pp.ModelPresets[mid]
+					mp.MaxPromptLength = intPtr(-1)
+					pp.ModelPresets[mid] = mp
+					s.ProviderPresets[pn] = pp
+				})
+			},
+			wantErrText: "maxPromptLength must be >= 0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := newPresetsFromFS(t, tt.fsys(t))
+			if tt.wantErrIs != nil {
+				wantErrIs(t, err, tt.wantErrIs)
+				return
+			}
+			if tt.wantErrText != "" {
+				wantErrContains(t, err, tt.wantErrText)
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func Test_NewBuiltInPresets_SyntheticFS_SubDirResolution_TableDriven(t *testing.T) {
+	if isWindows() {
+		t.Skip("synthetic fs tests are skipped on windows (known overlay flake)")
+	}
+
+	ctx := t.Context()
+
+	pn := inferencegoSpec.ProviderName("demo")
+	mid := spec.ModelPresetID("m1")
+	schema := buildHappySchema(pn, mid)
+
+	tests := []struct {
+		name        string
+		root        string
+		fsys        fs.FS
+		wantErrIs   error
+		wantErrText string
+	}{
+		{
+			name: "happy_subdir",
+			root: "root",
+			fsys: fstest.MapFS{
+				"root/" + builtin.BuiltInModelPresetsJSON: {Data: schema},
+			},
+		},
+		{
+			name:      "missing_subdir",
+			root:      "does-not-exist",
+			fsys:      fstest.MapFS{builtin.BuiltInModelPresetsJSON: {Data: schema}},
+			wantErrIs: fs.ErrNotExist,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			bi, err := NewBuiltInPresets(ctx, dir, time.Hour, WithModelPresetsFS(tt.fsys, tt.root))
+			if bi != nil {
+				t.Cleanup(func() { closeAndSleepOnWindows(t, bi) })
+			}
+
+			if tt.wantErrIs != nil {
+				if err == nil {
+					t.Fatalf("expected error %v, got nil", tt.wantErrIs)
+				}
+				if !errors.Is(err, tt.wantErrIs) {
+					t.Fatalf("expected errors.Is(%v), got %v", tt.wantErrIs, err)
+				}
+				return
+			}
+			if tt.wantErrText != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErrText) {
+					t.Fatalf("expected error containing %q, got %v", tt.wantErrText, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestBuiltInPresets_OverlayPersistsAcrossReopen(t *testing.T) {
+	if isWindows() {
+		t.Skip("synthetic fs tests are skipped on windows (known overlay flake)")
+	}
+
+	ctx := t.Context()
+
+	pn := inferencegoSpec.ProviderName("prov")
+	m1 := spec.ModelPresetID("m1")
+	m2 := spec.ModelPresetID("m2")
+
+	// Build schema with two models so default can change.
+	now := time.Now().UTC()
+	temp := 0.2
+	mp1 := spec.ModelPreset{
+		SchemaVersion: spec.SchemaVersion,
+		ID:            m1,
+		Name:          spec.ModelName(m1),
+		DisplayName:   spec.ModelDisplayName("M1"),
+		Slug:          spec.ModelSlug(m1),
+		IsEnabled:     true,
+		Temperature:   &temp,
+		CreatedAt:     now,
+		ModifiedAt:    now,
+	}
+	mp2 := mp1
+	mp2.ID = m2
+	mp2.Name = spec.ModelName(m2)
+	mp2.DisplayName = spec.ModelDisplayName("M2")
+	mp2.Slug = spec.ModelSlug(m2)
+
+	pp := spec.ProviderPreset{
+		SchemaVersion:            spec.SchemaVersion,
+		Name:                     pn,
+		DisplayName:              "Prov",
+		SDKType:                  inferencegoSpec.ProviderSDKTypeOpenAIChatCompletions,
+		IsEnabled:                true,
+		CreatedAt:                now,
+		ModifiedAt:               now,
+		Origin:                   "https://example.test",
+		ChatCompletionPathPrefix: spec.DefaultOpenAIChatCompletionsPrefix,
+		DefaultModelPresetID:     m1,
+		ModelPresets: map[spec.ModelPresetID]spec.ModelPreset{
+			m1: mp1,
+			m2: mp2,
+		},
+	}
+
+	s := spec.PresetsSchema{
+		SchemaVersion:   spec.SchemaVersion,
+		DefaultProvider: pn,
+		ProviderPresets: map[inferencegoSpec.ProviderName]spec.ProviderPreset{pn: pp},
+	}
+	raw, err := json.Marshal(s)
+	if err != nil {
+		t.Fatalf("marshal schema: %v", err)
+	}
+	fsys := fstest.MapFS{builtin.BuiltInModelPresetsJSON: {Data: raw}}
+
+	dir := t.TempDir()
+
+	// First instance: set overlay flags.
+	bi1, err := NewBuiltInPresets(ctx, dir, time.Hour, WithModelPresetsFS(fsys, "."))
+	if err != nil {
+		t.Fatalf("NewBuiltInPresets(1): %v", err)
+	}
+	_, err = bi1.SetProviderEnabled(ctx, pn, false)
+	if err != nil {
+		t.Fatalf("SetProviderEnabled: %v", err)
+	}
+	_, err = bi1.SetModelPresetEnabled(ctx, pn, m1, false)
+	if err != nil {
+		t.Fatalf("SetModelPresetEnabled: %v", err)
+	}
+	_, err = bi1.SetDefaultModelPreset(ctx, pn, m2)
+	if err != nil {
+		t.Fatalf("SetDefaultModelPreset: %v", err)
+	}
+
+	closeAndSleepOnWindows(t, bi1)
+
+	// Second instance: must re-apply persisted overlay.
+	bi2, err := NewBuiltInPresets(ctx, dir, time.Hour, WithModelPresetsFS(fsys, "."))
+	if err != nil {
+		t.Fatalf("NewBuiltInPresets(2): %v", err)
+	}
+	t.Cleanup(func() { closeAndSleepOnWindows(t, bi2) })
+
+	prov, models, err := bi2.ListBuiltInPresets(ctx)
+	if err != nil {
+		t.Fatalf("ListBuiltInPresets: %v", err)
+	}
+
+	if prov[pn].IsEnabled != false {
+		t.Fatalf("provider enabled not persisted: got=%v want=false", prov[pn].IsEnabled)
+	}
+	if models[pn][m1].IsEnabled != false {
+		t.Fatalf("model enabled not persisted: got=%v want=false", models[pn][m1].IsEnabled)
+	}
+	if prov[pn].DefaultModelPresetID != m2 {
+		t.Fatalf("default model not persisted: got=%q want=%q", prov[pn].DefaultModelPresetID, m2)
+	}
+}
