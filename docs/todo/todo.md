@@ -3,7 +3,7 @@
 ## Laundry list
 
 - [ ] opus 4.6 has now adaptive thinking which is basically thinking with levels
-  - [ ] inference go needs adjustment to support new anthropic sdk
+  - [x] inference go needs adjustment to support new anthropic sdk
 
 ## Features
 
