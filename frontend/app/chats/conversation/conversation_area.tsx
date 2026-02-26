@@ -493,6 +493,8 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 					reasoning: options.reasoning,
 					systemPrompt: options.systemPrompt,
 					timeout: options.timeout,
+					outputParam: options.outputParam,
+					stopSequences: options.stopSequences,
 					additionalParametersRawJSON: options.additionalParametersRawJSON,
 				};
 

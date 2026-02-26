@@ -9,8 +9,8 @@ function hasApiKey(settings: SettingsSchema, providerName: ProviderName): boolea
 	return settings.authKeys.some(k => k.type === AuthKeyTypeProvider && k.keyName === providerName && k.nonEmpty);
 }
 
-//  Ensure every optional field of `ModelParam` is filled.
-//  Falls back to hard-coded defaults when the model preset does not specify a value.
+// Ensure every optional field of `ModelParam` is filled.
+// Falls back to hard-coded defaults when the model preset does not specify a value.
 function buildModelParams(modelPreset: ModelPreset): ModelParam {
 	const o: ModelParam = {
 		name: modelPreset.name,
@@ -23,8 +23,13 @@ function buildModelParams(modelPreset: ModelPreset): ModelParam {
 		// Optional fields in modelparams
 		temperature: modelPreset.temperature,
 		reasoning: modelPreset.reasoning,
+
+		outputParam: modelPreset.outputParam ?? DefaultModelParams.outputParam,
+		stopSequences: modelPreset.stopSequences ?? DefaultModelParams.stopSequences,
+
 		additionalParametersRawJSON: modelPreset.additionalParametersRawJSON,
 	};
+
 	if (o.temperature === undefined && o.reasoning === undefined) {
 		o.temperature = DefaultModelParams.temperature;
 	}

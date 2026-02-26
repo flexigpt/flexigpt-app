@@ -2,13 +2,14 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { FiSliders } from 'react-icons/fi';
 
-import { type ReasoningLevel, ReasoningType } from '@/spec/inference';
+import { type OutputVerbosity, type ReasoningLevel, ReasoningType } from '@/spec/inference';
 import { DefaultUIChatOptions, type UIChatOption } from '@/spec/modelpreset';
 
 import { AdvancedParamsModal } from '@/chats/assitantcontexts/advanced_params_modal';
 import { getChatInputOptions } from '@/chats/assitantcontexts/context_uichatoption_helper';
 import { DisablePreviousMessagesCheckbox } from '@/chats/assitantcontexts/disable_checkbox';
 import { ModelDropdown } from '@/chats/assitantcontexts/model_dropdown';
+import { OutputVerbosityDropdown } from '@/chats/assitantcontexts/output_verbosity_dropdown';
 import { HybridReasoningCheckbox } from '@/chats/assitantcontexts/reasoning_hybrid_checkbox';
 import { SingleReasoningDropdown } from '@/chats/assitantcontexts/reasoning_levels_dropdown';
 import { ReasoningTokensDropdown } from '@/chats/assitantcontexts/reasoning_tokens_dropdown';
@@ -82,48 +83,56 @@ export function AssistantContextBar({ onOptionsChange }: AssistantContextBarProp
 
 	const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
 	const [isSecondaryDropdownOpen, setIsSecondaryDropdownOpen] = useState(false);
+	const [isVerbosityDropdownOpen, setIsVerbosityDropdownOpen] = useState(false);
 	const [isSystemDropdownOpen, setIsSystemDropdownOpen] = useState(false);
 
 	const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);
 
-	const setTemperature = useCallback(
-		(temp: number) => {
-			const clampedTemp = Math.max(0, Math.min(1, temp));
-			setSelectedModel(prev => ({ ...prev, temperature: clampedTemp }));
-		},
-		[setSelectedModel]
-	);
+	const setTemperature = useCallback((temp: number) => {
+		const clampedTemp = Math.max(0, Math.min(1, temp));
+		setSelectedModel(prev => ({ ...prev, temperature: clampedTemp }));
+	}, []);
 
-	const setReasoningLevel = useCallback(
-		(newLevel: ReasoningLevel) => {
-			setSelectedModel(prev => ({
+	const setReasoningLevel = useCallback((newLevel: ReasoningLevel) => {
+		setSelectedModel(prev => ({
+			...prev,
+			reasoning: {
+				type: ReasoningType.SingleWithLevels,
+				level: newLevel,
+				tokens: 1024,
+				summaryStyle: prev.reasoning?.summaryStyle,
+			},
+		}));
+	}, []);
+
+	const setHybridTokens = useCallback((tokens: number) => {
+		setSelectedModel(prev => {
+			if (!prev.reasoning || prev.reasoning.type !== ReasoningType.HybridWithTokens) return prev;
+			return { ...prev, reasoning: { ...prev.reasoning, tokens } };
+		});
+	}, []);
+
+	const setOutputVerbosity = useCallback((verbosity?: OutputVerbosity) => {
+		setSelectedModel(prev => {
+			const next = { ...(prev.outputParam ?? {}) };
+
+			if (verbosity === undefined) {
+				delete next.verbosity;
+			} else {
+				next.verbosity = verbosity;
+			}
+
+			const hasAny = !!next.verbosity || !!next.format;
+			return {
 				...prev,
-				reasoning: {
-					type: ReasoningType.SingleWithLevels,
-					level: newLevel,
-					tokens: 1024,
-				},
-			}));
-		},
-		[setSelectedModel]
-	);
+				outputParam: hasAny ? next : undefined,
+			};
+		});
+	}, []);
 
-	const setHybridTokens = useCallback(
-		(tokens: number) => {
-			setSelectedModel(prev => {
-				if (!prev.reasoning || prev.reasoning.type !== ReasoningType.HybridWithTokens) return prev;
-				return { ...prev, reasoning: { ...prev.reasoning, tokens } };
-			});
-		},
-		[setSelectedModel]
-	);
-
-	const selectSystemPrompt = useCallback(
-		(item: SystemPromptItem) => {
-			setSelectedModel(prev => ({ ...prev, systemPrompt: item.prompt }));
-		},
-		[setSelectedModel]
-	);
+	const selectSystemPrompt = useCallback((item: SystemPromptItem) => {
+		setSelectedModel(prev => ({ ...prev, systemPrompt: item.prompt }));
+	}, []);
 
 	const clearSystemPrompt = useCallback(() => {
 		setSelectedModel(prev => ({ ...prev, systemPrompt: '' }));
@@ -189,8 +198,6 @@ export function AssistantContextBar({ onOptionsChange }: AssistantContextBarProp
 				setIsOpen={setIsModelDropdownOpen}
 			/>
 
-			{/* Reasoning / temperature / checkboxes */}
-
 			{selectedModel.reasoning?.type === ReasoningType.HybridWithTokens && (
 				<HybridReasoningCheckbox
 					isReasoningEnabled={isHybridReasoningEnabled}
@@ -230,6 +237,14 @@ export function AssistantContextBar({ onOptionsChange }: AssistantContextBarProp
 				/>
 			)}
 
+			{/* Verbosity dropdown */}
+			<OutputVerbosityDropdown
+				verbosity={selectedModel.outputParam?.verbosity}
+				setVerbosity={setOutputVerbosity}
+				isOpen={isVerbosityDropdownOpen}
+				setIsOpen={setIsVerbosityDropdownOpen}
+			/>
+
 			<SystemPromptDropdown
 				prompts={systemPrompts}
 				selectedPromptId={systemPrompts.find(i => i.prompt === (selectedModel.systemPrompt.trim() || ''))?.id}
@@ -250,8 +265,8 @@ export function AssistantContextBar({ onOptionsChange }: AssistantContextBarProp
 			{/* Advanced params button */}
 			<div className="flex items-center justify-center">
 				<div
-					className="tooltip tooltip-left too"
-					data-tip="Set advanced parameters (streaming, prompt/output length, timeout, etc.)"
+					className="tooltip tooltip-left"
+					data-tip="Advanced parameters (streaming, token limits, output format, stop sequences, raw JSON)"
 				>
 					<button
 						type="button"

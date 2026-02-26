@@ -100,9 +100,6 @@ export enum OutputFormatKind {
 	JSONSchema = 'jsonSchema',
 }
 
-/**
- * @public
- */
 export interface JSONSchemaParam {
 	name: string;
 	description?: string;
@@ -110,9 +107,6 @@ export interface JSONSchemaParam {
 	strict?: boolean;
 }
 
-/**
- * @public
- */
 export interface OutputFormat {
 	kind: OutputFormatKind;
 	jsonSchemaParam?: JSONSchemaParam;
