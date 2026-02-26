@@ -88,6 +88,18 @@ export interface ReasoningParam {
 	summaryStyle?: ReasoningSummaryStyle;
 }
 
+export enum OutputVerbosity {
+	Low = 'low',
+	Medium = 'medium',
+	High = 'high',
+	Max = 'max',
+}
+
+export enum OutputFormatKind {
+	Text = 'text',
+	JSONSchema = 'jsonSchema',
+}
+
 /**
  * @public
  */
@@ -102,12 +114,12 @@ export interface JSONSchemaParam {
  * @public
  */
 export interface OutputFormat {
-	kind: string;
+	kind: OutputFormatKind;
 	jsonSchemaParam?: JSONSchemaParam;
 }
 export interface OutputParam {
 	format?: OutputFormat;
-	verbosity?: string;
+	verbosity?: OutputVerbosity;
 }
 export interface ModelParam {
 	name: string;

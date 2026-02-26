@@ -4,12 +4,39 @@ import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiHelpCircle, FiUpload, FiX } from 'react-icons/fi';
 
-import { type ProviderName, ReasoningLevel, ReasoningSummaryStyle, ReasoningType } from '@/spec/inference';
+import {
+	OutputFormatKind,
+	OutputVerbosity,
+	type ProviderName,
+	ReasoningLevel,
+	ReasoningSummaryStyle,
+	ReasoningType,
+} from '@/spec/inference';
 import { type ModelPreset, type ModelPresetID } from '@/spec/modelpreset';
 
 import { Dropdown } from '@/components/dropdown';
 import { ModalBackdrop } from '@/components/modal_backdrop';
 import { ReadOnlyValue } from '@/components/read_only_value';
+
+const OUTPUT_FORMAT_NONE = '__none__' as const;
+type OutputFormatKindSelection = OutputFormatKind | typeof OUTPUT_FORMAT_NONE;
+
+const OUTPUT_VERBOSITY_NONE = '__none__' as const;
+type OutputVerbositySelection = OutputVerbosity | typeof OUTPUT_VERBOSITY_NONE;
+
+const outputFormatKindItems: Record<OutputFormatKindSelection, { isEnabled: boolean; displayName: string }> = {
+	[OUTPUT_FORMAT_NONE]: { isEnabled: true, displayName: 'Default / Unset' },
+	[OutputFormatKind.Text]: { isEnabled: true, displayName: 'Text' },
+	[OutputFormatKind.JSONSchema]: { isEnabled: true, displayName: 'JSON Schema' },
+};
+
+const outputVerbosityItems: Record<OutputVerbositySelection, { isEnabled: boolean; displayName: string }> = {
+	[OUTPUT_VERBOSITY_NONE]: { isEnabled: true, displayName: 'Default / Unset' },
+	[OutputVerbosity.Low]: { isEnabled: true, displayName: 'Low' },
+	[OutputVerbosity.Medium]: { isEnabled: true, displayName: 'Medium' },
+	[OutputVerbosity.High]: { isEnabled: true, displayName: 'High' },
+	[OutputVerbosity.Max]: { isEnabled: true, displayName: 'Max' },
+};
 
 const reasoningTypeItems: Record<ReasoningType, { isEnabled: boolean; displayName: string }> = {
 	[ReasoningType.SingleWithLevels]: {
@@ -77,8 +104,8 @@ interface ModelPresetFormData {
 	systemPrompt: string;
 	timeout: string;
 
-	outputFormatKind: string;
-	outputVerbosity: string;
+	outputFormatKind: OutputFormatKindSelection;
+	outputVerbosity: OutputVerbositySelection;
 	stopSequencesRaw: string;
 }
 
@@ -149,8 +176,8 @@ export function AddEditModelPresetModal({
 		reasoningTokens: '',
 		systemPrompt: '',
 		timeout: '',
-		outputFormatKind: '',
-		outputVerbosity: '',
+		outputFormatKind: OUTPUT_FORMAT_NONE,
+		outputVerbosity: OUTPUT_VERBOSITY_NONE,
 		stopSequencesRaw: '',
 	};
 
@@ -208,8 +235,8 @@ export function AddEditModelPresetModal({
 			systemPrompt: src.systemPrompt ?? prev.systemPrompt,
 			timeout: src.timeout !== undefined ? String(src.timeout) : prev.timeout,
 
-			outputFormatKind: src.outputParam?.format?.kind ?? prev.outputFormatKind,
-			outputVerbosity: src.outputParam?.verbosity ?? prev.outputVerbosity,
+			outputFormatKind: src.outputParam?.format?.kind ?? prev.outputFormatKind ?? OUTPUT_FORMAT_NONE,
+			outputVerbosity: src.outputParam?.verbosity ?? prev.outputVerbosity ?? OUTPUT_VERBOSITY_NONE,
 			stopSequencesRaw: src.stopSequences?.join('\n') ?? prev.stopSequencesRaw,
 		}));
 	};
@@ -235,8 +262,8 @@ export function AddEditModelPresetModal({
 					reasoningSummaryStyle: initialData.reasoning?.summaryStyle ?? ReasoningSummaryStyle.Auto,
 					systemPrompt: initialData.systemPrompt ?? '',
 					timeout: initialData.timeout !== undefined ? String(initialData.timeout) : '',
-					outputFormatKind: initialData.outputParam?.format?.kind ?? '',
-					outputVerbosity: initialData.outputParam?.verbosity ?? '',
+					outputFormatKind: initialData.outputParam?.format?.kind ?? OUTPUT_FORMAT_NONE,
+					outputVerbosity: initialData.outputParam?.verbosity ?? OUTPUT_VERBOSITY_NONE,
 					stopSequencesRaw: initialData.stopSequences?.join('\n') ?? '',
 				});
 				setModelPresetID(initialData.id);
@@ -256,8 +283,8 @@ export function AddEditModelPresetModal({
 					reasoningSummaryStyle: ReasoningSummaryStyle.Auto,
 					systemPrompt: '',
 					timeout: String(AddModeDefaults.timeout ?? ''),
-					outputFormatKind: '',
-					outputVerbosity: '',
+					outputFormatKind: OUTPUT_FORMAT_NONE,
+					outputVerbosity: OUTPUT_VERBOSITY_NONE,
 					stopSequencesRaw: '',
 				});
 				setModelPresetID('' as ModelPresetID);
@@ -435,9 +462,10 @@ export function AddEditModelPresetModal({
 		const stopSequences = parseStopSequencesRaw(formData.stopSequencesRaw);
 		if (stopSequences.length > 0) finalData.stopSequences = stopSequences;
 
-		const formatKind = formData.outputFormatKind.trim();
-		const verbosity = formData.outputVerbosity.trim();
-
+		const formatKind: OutputFormatKind | undefined =
+			formData.outputFormatKind !== OUTPUT_FORMAT_NONE ? formData.outputFormatKind : undefined;
+		const verbosity: OutputVerbosity | undefined =
+			formData.outputVerbosity !== OUTPUT_VERBOSITY_NONE ? formData.outputVerbosity : undefined;
 		if (formatKind || verbosity) {
 			finalData.outputParam = {
 				...(formatKind && { format: { kind: formatKind } }),
@@ -964,34 +992,54 @@ export function AddEditModelPresetModal({
 								</span>
 							</label>
 							<div className="col-span-9">
-								<input
-									name="outputFormatKind"
-									type="text"
-									className="input input-bordered w-full rounded-xl"
-									value={formData.outputFormatKind}
-									onChange={handleChange}
-									placeholder="e.g. text, json, json_schema"
-									spellCheck="false"
-									readOnly={isReadOnly}
-								/>
+								{isReadOnly ? (
+									<ReadOnlyValue
+										value={
+											formData.outputFormatKind === OUTPUT_FORMAT_NONE
+												? '—'
+												: outputFormatKindItems[formData.outputFormatKind].displayName
+										}
+									/>
+								) : (
+									<Dropdown<OutputFormatKindSelection>
+										dropdownItems={outputFormatKindItems}
+										selectedKey={formData.outputFormatKind}
+										onChange={k => {
+											setFormData(p => ({ ...p, outputFormatKind: k }));
+										}}
+										filterDisabled={false}
+										title="Select Output Format Kind"
+										getDisplayName={k => outputFormatKindItems[k].displayName}
+									/>
+								)}
 							</div>
 						</div>
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Output Verbosity</span>
+								<span className="label-text text-sm">Output Verbosity/Effort</span>
 							</label>
 							<div className="col-span-9">
-								<input
-									name="outputVerbosity"
-									type="text"
-									className="input input-bordered w-full rounded-xl"
-									value={formData.outputVerbosity}
-									onChange={handleChange}
-									placeholder="e.g. low, medium, high"
-									spellCheck="false"
-									readOnly={isReadOnly}
-								/>
+								{isReadOnly ? (
+									<ReadOnlyValue
+										value={
+											formData.outputVerbosity === OUTPUT_VERBOSITY_NONE
+												? '—'
+												: outputVerbosityItems[formData.outputVerbosity].displayName
+										}
+									/>
+								) : (
+									<Dropdown<OutputVerbositySelection>
+										dropdownItems={outputVerbosityItems}
+										selectedKey={formData.outputVerbosity}
+										onChange={v => {
+											setFormData(p => ({ ...p, outputVerbosity: v }));
+										}}
+										filterDisabled={false}
+										title="Select Output Verbosity"
+										getDisplayName={k => outputVerbosityItems[k].displayName}
+									/>
+								)}
 							</div>
 						</div>
 
