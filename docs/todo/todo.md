@@ -66,9 +66,6 @@
   - [ ] Drag and drop files as attachments.
 
 - [ ] Tools
-  - [ ] tool search tool
-    - [ ] Not needed as of now. May be a progressive disclosure runtime like skills will be better.
-    - [ ] May be like skills we can also inject a available tools prompt in the sys prompt
   - [ ] We may want to have a explicit prompt saying that use explicit tools rather than shell wherever possible.
 
 - [ ] we may want to have a "assistant" like we planned before that has tool sets and autoexec config so that the "agent" loop is kind of autonomous
@@ -100,7 +97,6 @@
       - [x] bash: yes.
       - [x] apply patch: No. this is very error prone, cosnidering unidiff vs V4A diff formats and compatibility issues.
       - [x] text editor: yes
-      - [ ] tool search tool: we may need a tool search tool that does sqlite based bm25 search or regex search like from anthropic
 
     - [x] Dont: New stateful APIs and its hooks from vendors
       - [x] stored responses, stored conversations, on server memory context, on server prompt templates etc.
@@ -119,3 +115,7 @@
   - [ ] Image output: See inference-go notes.
   - [ ] audio in/out
   - [ ] check the reference calculator tool in claude docs
+  - [ ] tool search tool: we may need a tool search tool that does sqlite based bm25 search or regex search like from anthropic
+    - [ ] Not needed as of now. May be a progressive disclosure runtime like skills will be better.
+    - [ ] May need to check when there are actually a lot of tools.
+    - [ ] May be like skills we can also inject a available tools prompt in the sys prompt
