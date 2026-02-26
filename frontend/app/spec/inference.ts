@@ -75,11 +75,17 @@ export enum Status {
 	Searching = 'searching',
 }
 
+export enum ReasoningSummaryStyle {
+	Auto = 'auto',
+	Concise = 'concise',
+	Detailed = 'detailed',
+}
+
 export interface ReasoningParam {
 	type: ReasoningType;
 	level: ReasoningLevel;
 	tokens: number;
-	summaryStyle?: string;
+	summaryStyle?: ReasoningSummaryStyle;
 }
 
 /**
@@ -112,6 +118,8 @@ export interface ModelParam {
 	reasoning?: ReasoningParam;
 	systemPrompt: string;
 	timeout: number;
+	outputParam?: OutputParam;
+	stopSequences?: string[];
 	additionalParametersRawJSON?: string;
 }
 
@@ -121,6 +129,8 @@ export const DefaultModelParams: ModelParam = {
 	maxPromptLength: 2048,
 	maxOutputLength: 1024,
 	temperature: 0.1,
+	outputParam: undefined,
+	stopSequences: undefined,
 	reasoning: {
 		type: ReasoningType.SingleWithLevels,
 		level: ReasoningLevel.Medium,

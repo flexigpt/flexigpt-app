@@ -59,7 +59,8 @@
   - [x] additional params from apis
     - [x] support in inference go api
     - [x] adapt in model preset spec and provider set
-  - [ ] UI for additional params
+  - [x] UI for additional params in modelpreset
+  - [ ] UI for additional things in chatoptions
   - [ ] valid input output modalities, valid levels, valid reasoning types, etc need to be added to modelpresetspec.
 
 - [ ] Better Attachments

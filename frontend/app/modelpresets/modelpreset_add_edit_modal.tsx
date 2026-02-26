@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiHelpCircle, FiUpload, FiX } from 'react-icons/fi';
 
-import { type ProviderName, ReasoningLevel, ReasoningType } from '@/spec/inference';
+import { type ProviderName, ReasoningLevel, ReasoningSummaryStyle, ReasoningType } from '@/spec/inference';
 import { type ModelPreset, type ModelPresetID } from '@/spec/modelpreset';
 
 import { Dropdown } from '@/components/dropdown';
@@ -31,6 +31,12 @@ const reasoningLevelItems: Record<ReasoningLevel, { isEnabled: boolean; displayN
 	[ReasoningLevel.XHigh]: { isEnabled: true, displayName: 'XHigh' },
 };
 
+const reasoningSummaryStyleItems: Record<ReasoningSummaryStyle, { isEnabled: boolean; displayName: string }> = {
+	[ReasoningSummaryStyle.Auto]: { isEnabled: true, displayName: 'Auto' },
+	[ReasoningSummaryStyle.Concise]: { isEnabled: true, displayName: 'Concise' },
+	[ReasoningSummaryStyle.Detailed]: { isEnabled: true, displayName: 'Detailed' },
+};
+
 /** Defaults we *apply* while in **Add** mode (place-holders also use them). */
 const AddModeDefaults: ModelPreset = {
 	id: '',
@@ -46,6 +52,8 @@ const AddModeDefaults: ModelPreset = {
 	reasoning: undefined,
 	systemPrompt: '',
 	timeout: 300,
+	outputParam: undefined,
+	stopSequences: undefined,
 	additionalParametersRawJSON: undefined,
 };
 
@@ -64,9 +72,14 @@ interface ModelPresetFormData {
 	reasoningType?: ReasoningType;
 	reasoningLevel?: ReasoningLevel;
 	reasoningTokens?: string;
+	reasoningSummaryStyle: ReasoningSummaryStyle;
 
 	systemPrompt: string;
 	timeout: string;
+
+	outputFormatKind: string;
+	outputVerbosity: string;
+	stopSequencesRaw: string;
 }
 
 type ModalMode = 'add' | 'edit' | 'view';
@@ -85,6 +98,17 @@ interface AddEditModelPresetModalProps {
 
 	existingModels: Record<ModelPresetID, ModelPreset>;
 	allModelPresets: Record<ProviderName, Record<ModelPresetID, ModelPreset>>;
+}
+
+function parseStopSequencesRaw(raw: string): string[] {
+	const parts = raw
+		.split(/\r?\n/)
+		.flatMap(line => line.split(','))
+		.map(s => s.trim())
+		.filter(Boolean);
+
+	// de-dupe while preserving order
+	return Array.from(new Set(parts));
 }
 
 export function AddEditModelPresetModal({
@@ -121,9 +145,13 @@ export function AddEditModelPresetModal({
 		reasoningSupport: false,
 		reasoningType: ReasoningType.SingleWithLevels,
 		reasoningLevel: ReasoningLevel.Medium,
+		reasoningSummaryStyle: ReasoningSummaryStyle.Auto,
 		reasoningTokens: '',
 		systemPrompt: '',
 		timeout: '',
+		outputFormatKind: '',
+		outputVerbosity: '',
+		stopSequencesRaw: '',
 	};
 
 	const [formData, setFormData] = useState<ModelPresetFormData>(blankForm);
@@ -175,9 +203,14 @@ export function AddEditModelPresetModal({
 			reasoningType: src.reasoning?.type ?? prev.reasoningType,
 			reasoningLevel: src.reasoning?.level ?? prev.reasoningLevel,
 			reasoningTokens: src.reasoning?.tokens !== undefined ? String(src.reasoning.tokens) : prev.reasoningTokens,
+			reasoningSummaryStyle: src.reasoning?.summaryStyle ?? prev.reasoningSummaryStyle,
 
 			systemPrompt: src.systemPrompt ?? prev.systemPrompt,
 			timeout: src.timeout !== undefined ? String(src.timeout) : prev.timeout,
+
+			outputFormatKind: src.outputParam?.format?.kind ?? prev.outputFormatKind,
+			outputVerbosity: src.outputParam?.verbosity ?? prev.outputVerbosity,
+			stopSequencesRaw: src.stopSequences?.join('\n') ?? prev.stopSequencesRaw,
 		}));
 	};
 
@@ -199,8 +232,12 @@ export function AddEditModelPresetModal({
 					reasoningType: initialData.reasoning?.type ?? ReasoningType.SingleWithLevels,
 					reasoningLevel: initialData.reasoning?.level ?? ReasoningLevel.Medium,
 					reasoningTokens: initialData.reasoning?.tokens !== undefined ? String(initialData.reasoning.tokens) : '',
+					reasoningSummaryStyle: initialData.reasoning?.summaryStyle ?? ReasoningSummaryStyle.Auto,
 					systemPrompt: initialData.systemPrompt ?? '',
 					timeout: initialData.timeout !== undefined ? String(initialData.timeout) : '',
+					outputFormatKind: initialData.outputParam?.format?.kind ?? '',
+					outputVerbosity: initialData.outputParam?.verbosity ?? '',
+					stopSequencesRaw: initialData.stopSequences?.join('\n') ?? '',
 				});
 				setModelPresetID(initialData.id);
 			} else {
@@ -216,8 +253,12 @@ export function AddEditModelPresetModal({
 					reasoningType: ReasoningType.SingleWithLevels,
 					reasoningLevel: ReasoningLevel.Medium,
 					reasoningTokens: '',
+					reasoningSummaryStyle: ReasoningSummaryStyle.Auto,
 					systemPrompt: '',
 					timeout: String(AddModeDefaults.timeout ?? ''),
+					outputFormatKind: '',
+					outputVerbosity: '',
+					stopSequencesRaw: '',
 				});
 				setModelPresetID('' as ModelPresetID);
 				setPrefillMode(false);
@@ -391,6 +432,19 @@ export function AddEditModelPresetModal({
 			}),
 		};
 
+		const stopSequences = parseStopSequencesRaw(formData.stopSequencesRaw);
+		if (stopSequences.length > 0) finalData.stopSequences = stopSequences;
+
+		const formatKind = formData.outputFormatKind.trim();
+		const verbosity = formData.outputVerbosity.trim();
+
+		if (formatKind || verbosity) {
+			finalData.outputParam = {
+				...(formatKind && { format: { kind: formatKind } }),
+				...(verbosity && { verbosity }),
+			};
+		}
+
 		if (formData.reasoningSupport) {
 			const type = formData.reasoningType ?? ReasoningType.SingleWithLevels;
 
@@ -401,6 +455,7 @@ export function AddEditModelPresetModal({
 					type === ReasoningType.HybridWithTokens
 						? parseOrDefault(formData.reasoningTokens ?? '', DEFAULT_REASONING_TOKENS)
 						: DEFAULT_REASONING_TOKENS,
+				summaryStyle: formData.reasoningSummaryStyle,
 			};
 		}
 
@@ -738,6 +793,34 @@ export function AddEditModelPresetModal({
 										</div>
 									</div>
 								)}
+								{/* Reasoning summary style */}
+								<div className="grid grid-cols-12 items-center gap-2">
+									<label className="label col-span-3">
+										<span className="label-text text-sm">Reasoning Summary</span>
+										<span
+											className="label-text-alt tooltip tooltip-right"
+											data-tip="Optional, reasoning summary style."
+										>
+											<FiHelpCircle size={12} />
+										</span>
+									</label>
+									<div className="col-span-9">
+										{isReadOnly ? (
+											<ReadOnlyValue value={reasoningSummaryStyleItems[formData.reasoningSummaryStyle].displayName} />
+										) : (
+											<Dropdown<ReasoningSummaryStyle>
+												dropdownItems={reasoningSummaryStyleItems}
+												selectedKey={formData.reasoningSummaryStyle}
+												onChange={style => {
+													setFormData(p => ({ ...p, reasoningSummaryStyle: style }));
+												}}
+												filterDisabled={false}
+												title="Select Reasoning Summary Style"
+												getDisplayName={k => reasoningSummaryStyleItems[k].displayName}
+											/>
+										)}
+									</div>
+								</div>
 							</>
 						)}
 
@@ -840,6 +923,74 @@ export function AddEditModelPresetModal({
 									placeholder="Enter instructions here…"
 									spellCheck="false"
 									disabled={isReadOnly}
+								/>
+							</div>
+						</div>
+
+						{/* Stop Sequences */}
+						<div className="grid grid-cols-12 items-start gap-2">
+							<label className="label col-span-3">
+								<span className="label-text text-sm">Stop Sequences</span>
+								<span className="label-text-alt tooltip tooltip-right" data-tip="One per line (commas also supported).">
+									<FiHelpCircle size={12} />
+								</span>
+							</label>
+							<div className="col-span-9">
+								{isReadOnly ? (
+									<ReadOnlyValue value={parseStopSequencesRaw(formData.stopSequencesRaw).join(', ') || '—'} />
+								) : (
+									<textarea
+										name="stopSequencesRaw"
+										className="textarea textarea-bordered h-20 w-full rounded-xl"
+										value={formData.stopSequencesRaw}
+										onChange={handleChange}
+										placeholder={'e.g.\n###\n</final>'}
+										spellCheck="false"
+										disabled={isReadOnly}
+									/>
+								)}
+							</div>
+						</div>
+
+						{/* Output Param */}
+						<div className="grid grid-cols-12 items-center gap-2">
+							<label className="label col-span-3">
+								<span className="label-text text-sm">Output Format Kind</span>
+								<span
+									className="label-text-alt tooltip tooltip-right"
+									data-tip="Provider-specific output format identifier (if supported)."
+								>
+									<FiHelpCircle size={12} />
+								</span>
+							</label>
+							<div className="col-span-9">
+								<input
+									name="outputFormatKind"
+									type="text"
+									className="input input-bordered w-full rounded-xl"
+									value={formData.outputFormatKind}
+									onChange={handleChange}
+									placeholder="e.g. text, json, json_schema"
+									spellCheck="false"
+									readOnly={isReadOnly}
+								/>
+							</div>
+						</div>
+
+						<div className="grid grid-cols-12 items-center gap-2">
+							<label className="label col-span-3">
+								<span className="label-text text-sm">Output Verbosity</span>
+							</label>
+							<div className="col-span-9">
+								<input
+									name="outputVerbosity"
+									type="text"
+									className="input input-bordered w-full rounded-xl"
+									value={formData.outputVerbosity}
+									onChange={handleChange}
+									placeholder="e.g. low, medium, high"
+									spellCheck="false"
+									readOnly={isReadOnly}
 								/>
 							</div>
 						</div>
