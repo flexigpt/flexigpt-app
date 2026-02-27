@@ -2,17 +2,11 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
-	"errors"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/attachment"
-	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
-	"github.com/flexigpt/flexigpt-app/internal/middleware"
-	"github.com/flexigpt/llmtools-go/fstool"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/adrg/xdg"
@@ -147,190 +141,12 @@ func NewApp() *App {
 	return app
 }
 
-// Ping - Greet returns a greeting for the given name.
 func (a *App) Ping() string {
 	return "pong"
 }
 
 func (a *App) GetAppVersion() string {
 	return Version
-}
-
-func (a *App) OpenURLAsAttachment(
-	rawURL string,
-) (att *attachment.Attachment, err error) {
-	return middleware.WithRecoveryResp(func() (*attachment.Attachment, error) {
-		return attachment.BuildAttachmentForURL(rawURL)
-	})
-}
-
-// SaveFile handles saving any content to a file.
-func (a *App) SaveFile(
-	defaultFilename string,
-	contentBase64 string,
-	additionalFilters []attachment.FileFilter,
-) error {
-	_, err := middleware.WithRecoveryResp(func() (struct{}, error) {
-		return struct{}{}, a.saveFile(defaultFilename, contentBase64, additionalFilters)
-	})
-	return err
-}
-
-// OpenMultipleFilesAsAttachments opens a native file dialog and returns selected file paths.
-// When allowMultiple is true, users can pick multiple files; otherwise at most one path is returned.
-func (a *App) OpenMultipleFilesAsAttachments(
-	allowMultiple bool,
-	additionalFilters []attachment.FileFilter,
-) (attachments []attachment.Attachment, err error) {
-	return middleware.WithRecoveryResp(func() ([]attachment.Attachment, error) {
-		return a.openMultipleFilesAsAttachments(allowMultiple, additionalFilters)
-	})
-}
-
-// OpenDirectoryAsAttachments opens a single directory pick dialog and then does WalkDirectoryWithFiles for fetching max
-// no of files.
-func (a *App) OpenDirectoryAsAttachments(maxFiles int) (*attachment.DirectoryAttachmentsResult, error) {
-	return middleware.WithRecoveryResp(func() (*attachment.DirectoryAttachmentsResult, error) {
-		return a.openDirectoryAsAttachments(maxFiles)
-	})
-}
-
-func (a *App) saveFile(
-	defaultFilename string,
-	contentBase64 string,
-	additionalFilters []attachment.FileFilter,
-) error {
-	if a.ctx == nil {
-		return errors.New("context is not initialized")
-	}
-
-	saveDialogOptions := runtime.SaveDialogOptions{
-		DefaultFilename: defaultFilename,
-		Filters:         dialogFilters(additionalFilters),
-	}
-	savePath, err := runtime.SaveFileDialog(a.ctx, saveDialogOptions)
-	if err != nil {
-		return err
-	}
-	if savePath == "" {
-		// User cancelled the dialog.
-		return nil
-	}
-
-	// Decode base64 content.
-	contentBytes, err := base64.StdEncoding.DecodeString(contentBase64)
-	if err != nil {
-		return err
-	}
-
-	// Write the content to the file.
-	return os.WriteFile(savePath, contentBytes, 0o600)
-}
-
-func (a *App) openMultipleFilesAsAttachments(
-	allowMultiple bool,
-	additionalFilters []attachment.FileFilter,
-) (attachments []attachment.Attachment, err error) {
-	if a.ctx == nil {
-		return nil, errors.New("context is not initialized")
-	}
-
-	opts := runtime.OpenDialogOptions{
-		Filters:              dialogFilters(additionalFilters),
-		ShowHiddenFiles:      true,
-		CanCreateDirectories: false,
-	}
-
-	paths := []string{}
-	if allowMultiple {
-		paths, err = runtime.OpenMultipleFilesDialog(a.ctx, opts)
-	} else {
-		p, e := runtime.OpenFileDialog(a.ctx, opts)
-		if e == nil && p != "" {
-			paths = append(paths, p)
-		}
-		err = e
-	}
-	if err != nil {
-		return nil, err
-	}
-	if len(paths) == 0 {
-		return []attachment.Attachment{}, nil
-	}
-
-	attachments = make([]attachment.Attachment, 0, len(paths))
-	for _, p := range paths {
-		path := strings.TrimSpace(p)
-		if path == "" {
-			slog.Debug("got empty path")
-			continue
-		}
-		// Basic sanity + existence checks.
-		pathInfo, err := llmtoolsutil.StatPath(context.Background(), fstool.StatPathArgs{
-			Path: path,
-		})
-
-		if err != nil || pathInfo == nil {
-			slog.Debug("failed to build attachment for file", "path", p, "error", "stat failed")
-			continue
-		}
-
-		att, attErr := attachment.BuildAttachmentForFile(context.Background(), &attachment.PathInfo{
-			Path:    pathInfo.Path,
-			Name:    pathInfo.Name,
-			Exists:  pathInfo.Exists,
-			IsDir:   pathInfo.IsDir,
-			Size:    pathInfo.SizeBytes,
-			ModTime: pathInfo.ModTime,
-		})
-		if attErr != nil || att == nil {
-			slog.Debug("failed to build attachment for file", "path", p, "error", attErr)
-			continue
-		}
-		attachments = append(attachments, *att)
-	}
-
-	return attachments, nil
-}
-
-func (a *App) openDirectoryAsAttachments(maxFiles int) (*attachment.DirectoryAttachmentsResult, error) {
-	if a.ctx == nil {
-		return nil, errors.New("context is not initialized")
-	}
-
-	dialogOpts := runtime.OpenDialogOptions{
-		ShowHiddenFiles:      false,
-		CanCreateDirectories: false,
-	}
-
-	dirPath, err := runtime.OpenDirectoryDialog(a.ctx, dialogOpts)
-	if err != nil {
-		return nil, err
-	}
-	walkRes, err := attachment.WalkDirectoryWithFiles(a.ctx, dirPath, maxFiles)
-	if err != nil {
-		return nil, err
-	}
-	out := &attachment.DirectoryAttachmentsResult{
-		DirPath:      walkRes.DirPath,
-		Attachments:  make([]attachment.Attachment, 0, len(walkRes.Files)),
-		OverflowDirs: walkRes.OverflowDirs,
-		MaxFiles:     walkRes.MaxFiles,
-		TotalSize:    walkRes.TotalSize,
-		HasMore:      walkRes.HasMore,
-	}
-	for _, pi := range walkRes.Files {
-		att, buildErr := attachment.BuildAttachmentForFile(context.Background(), &pi)
-		if buildErr != nil || att == nil {
-			slog.Debug("failed to build attachment for directory file",
-				"path", pi.Path,
-				"error", buildErr,
-			)
-			continue
-		}
-		out.Attachments = append(out.Attachments, *att)
-	}
-	return out, nil
 }
 
 func (a *App) initManagers() {
@@ -425,8 +241,8 @@ func (a *App) initManagers() {
 
 // startup is called at application startup.
 func (a *App) startup(ctx context.Context) { //nolint:all
-	// Perform setup here.
 	a.ctx = ctx
+
 	// Load the frontend.
 	runtime.WindowShow(a.ctx) //nolint:contextcheck // Use app context.
 }
@@ -451,48 +267,4 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	if a.skillStoreAPI != nil {
 		a.skillStoreAPI.Close()
 	}
-}
-
-var defaultRuntimeFilters = func() []runtime.FileFilter {
-	runtimeFilters := make([]runtime.FileFilter, 0, len(attachment.DefaultFileFilters))
-	for idx := range attachment.DefaultFileFilters {
-		runtimeFilters = append(
-			runtimeFilters,
-			runtime.FileFilter{
-				DisplayName: attachment.DefaultFileFilters[idx].DisplayName,
-				Pattern:     attachment.DefaultFileFilters[idx].Pattern(),
-			},
-		)
-	}
-	return runtimeFilters
-}()
-
-// dialogFilters returns nil when no explicit filters are provided.
-// This is important for macOS: providing filters makes NSOpenPanel/NSSavePanel
-// restrict selectable/savable file types, which can hide/disable "unknown"
-// extensions (e.g. .bazel/.cmake) and dotfiles depending on type mapping.
-func dialogFilters(additionalFilters []attachment.FileFilter) []runtime.FileFilter {
-	if len(additionalFilters) == 0 {
-		return nil
-	}
-	// Only use the explicit filters requested by the caller.
-	return getRuntimeFilters(additionalFilters, false)
-}
-
-func getRuntimeFilters(additionalFilters []attachment.FileFilter, includeDefault bool) []runtime.FileFilter {
-	runtimeFilters := make([]runtime.FileFilter, 0, len(additionalFilters)+len(attachment.DefaultFileFilters))
-
-	for idx := range additionalFilters {
-		runtimeFilters = append(
-			runtimeFilters,
-			runtime.FileFilter{
-				DisplayName: additionalFilters[idx].DisplayName,
-				Pattern:     additionalFilters[idx].Pattern(),
-			},
-		)
-	}
-	if includeDefault {
-		runtimeFilters = append(runtimeFilters, defaultRuntimeFilters...)
-	}
-	return runtimeFilters
 }

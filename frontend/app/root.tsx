@@ -1,7 +1,16 @@
 /* eslint-disable no-restricted-exports */
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 
-import { isRouteErrorResponse, Links, Meta, Outlet, Scripts, ScrollRestoration } from 'react-router';
+import {
+	isRouteErrorResponse,
+	Links,
+	Meta,
+	Outlet,
+	Scripts,
+	ScrollRestoration,
+	useLocation,
+	useNavigate,
+} from 'react-router';
 
 import { type AppTheme, ThemeType } from '@/spec/setting';
 import { CustomThemeDark, CustomThemeLight } from '@/spec/theme_consts';
@@ -12,6 +21,8 @@ import { initBuiltIns } from '@/hooks/use_builtin_provider';
 import { ensureWorker } from '@/hooks/use_highlight';
 import { getStartupThemeSync, initStartupTheme } from '@/hooks/use_startup_theme';
 import { GenericThemeProvider } from '@/hooks/use_theme_provider';
+
+import { attachmentsDropAPI } from '@/apis/baseapi';
 
 import { Sidebar } from '@/components/sidebar';
 
@@ -71,13 +82,25 @@ export function Layout({ children }: { children: ReactNode }) {
 	);
 }
 
+function domReady() {
+	if (document.readyState === 'complete' || document.readyState === 'interactive') {
+		return Promise.resolve();
+	}
+	return new Promise<void>(resolve => {
+		document.addEventListener(
+			'DOMContentLoaded',
+			() => {
+				resolve();
+			},
+			{ once: true }
+		);
+	});
+}
+
 export async function clientLoader() {
 	// Wait for DOM content to be loaded and Wails runtime to be injected
-	if (document.readyState !== 'complete' && document.readyState !== 'interactive') {
-		await new Promise(resolve => {
-			document.addEventListener('DOMContentLoaded', resolve, { once: true });
-		});
-	}
+	await domReady();
+	attachmentsDropAPI.startListener();
 	// Now it's safe to call Wails backend functions
 	await Promise.all([initBuiltIns(), initStartupTheme()]);
 	// console.log('root builtins loaded');
@@ -87,11 +110,34 @@ export async function clientLoader() {
 clientLoader.hydrate = true as const;
 
 export default function Root() {
+	const navigate = useNavigate();
+	const location = useLocation();
+	const pathnameRef = useRef(location.pathname);
+
 	// Init worker on mount.
 	useEffect(() => {
 		if ('requestIdleCallback' in window) requestIdleCallback(() => ensureWorker());
 		else setTimeout(() => ensureWorker(), 300);
 	}, []);
+
+	useEffect(() => {
+		pathnameRef.current = location.pathname;
+	}, [location.pathname]);
+
+	// If a drop occurs and no chat drop-target is registered yet (e.g. user is on Tools/Settings),
+	// navigate to /chats. The controller will keep the payload queued and flush it once the
+	// chat input registers as drop target.
+	useEffect(() => {
+		attachmentsDropAPI.setNoTargetHandler(() => {
+			const p = pathnameRef.current || '';
+			if (p.startsWith('/chats')) return;
+			navigate('/chats', { replace: false });
+		});
+
+		return () => {
+			attachmentsDropAPI.setNoTargetHandler(null);
+		};
+	}, [navigate]);
 
 	return (
 		<CustomThemeProvider>

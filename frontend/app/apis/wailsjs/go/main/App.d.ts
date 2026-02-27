@@ -4,6 +4,8 @@ import {attachment} from '../models';
 
 export function GetAppVersion():Promise<string>;
 
+export function GetPathsAsAttachments(arg1:Array<string>,arg2:number):Promise<attachment.PathAttachmentsResult>;
+
 export function OpenDirectoryAsAttachments(arg1:number):Promise<attachment.DirectoryAttachmentsResult>;
 
 export function OpenMultipleFilesAsAttachments(arg1:boolean,arg2:Array<attachment.FileFilter>):Promise<Array<attachment.Attachment>>;

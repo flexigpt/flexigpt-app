@@ -1,5 +1,6 @@
 import { forwardRef, type RefObject, useEffect, useImperativeHandle, useRef, useState } from 'react';
 
+import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { UIToolCall } from '@/spec/inference';
 import { DefaultUIChatOptions, type UIChatOption } from '@/spec/modelpreset';
 import type { ToolStoreChoice } from '@/spec/tool';
@@ -22,6 +23,7 @@ export interface InputBoxHandle {
 	loadToolCalls: (toolCalls: UIToolCall[]) => void;
 	setConversationToolsFromChoices: (tools: ToolStoreChoice[]) => void;
 	setWebSearchFromChoices: (tools: ToolStoreChoice[]) => void;
+	applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => void;
 }
 
 interface InputBoxProps {
@@ -78,6 +80,9 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 		},
 		setWebSearchFromChoices: choices => {
 			inputAreaRef.current?.setWebSearchFromChoices(choices);
+		},
+		applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => {
+			inputAreaRef.current?.applyAttachmentsDrop(payload);
 		},
 	}));
 

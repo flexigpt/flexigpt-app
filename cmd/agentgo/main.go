@@ -87,10 +87,15 @@ func main() {
 			SetWrappedProviderAppContext(app.providerSetAPI, ctx)
 		},
 
-		OnDomReady:       app.domReady,
-		OnBeforeClose:    app.beforeClose,
-		CSSDragProperty:  "--app-draggable",
-		CSSDragValue:     "drag",
+		OnDomReady:      app.domReady,
+		OnBeforeClose:   app.beforeClose,
+		CSSDragProperty: "--app-draggable",
+		CSSDragValue:    "drag",
+		DragAndDrop: &options.DragAndDrop{
+			EnableFileDrop:     true,
+			DisableWebViewDrop: false,
+		},
+
 		OnShutdown:       app.shutdown,
 		WindowStartState: options.Normal,
 		Bind: []any{

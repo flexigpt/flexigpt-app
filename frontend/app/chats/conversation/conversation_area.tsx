@@ -9,6 +9,7 @@ import {
 	useSyncExternalStore,
 } from 'react';
 
+import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { Conversation, ConversationMessage } from '@/spec/conversation';
 import { ContentItemKind, type ModelParam, OutputKind, type OutputUnion, RoleEnum, Status } from '@/spec/inference';
 import { type UIChatOption } from '@/spec/modelpreset';
@@ -18,6 +19,8 @@ import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { ensureMakeID, getUUIDv7 } from '@/lib/uuid_utils';
 
 import { useAtTopBottom } from '@/hooks/use_at_top_bottom';
+
+import { attachmentsDropAPI } from '@/apis/baseapi';
 
 import { ButtonScrollToBottom, ButtonScrollToTop } from '@/components/button_scroll_top_bottom';
 
@@ -251,11 +254,76 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 	// Input refs per tab (per-tab composer instance)
 	const inputRefs = useRef(new Map<string, InputBoxHandle | null>());
-	const setInputRef = useCallback((tabId: string) => {
-		return (inst: InputBoxHandle | null) => {
-			inputRefs.current.set(tabId, inst);
-		};
+	// If a drop arrives before the input handle is available (rare on first mount),
+	// keep it and retry shortly.
+	type PendingDrop = { tabId: string; payload: AttachmentsDroppedPayload };
+	const pendingDropsRef = useRef<PendingDrop[]>([]);
+
+	const tryApplyDropToTab = useCallback((tabId: string, payload: AttachmentsDroppedPayload): boolean => {
+		const input = inputRefs.current.get(tabId);
+		if (!input) return false;
+
+		// Requires InputBoxHandle.applyAttachmentsDrop to exist (see section 4 below).
+		input.applyAttachmentsDrop(payload);
+		return true;
 	}, []);
+
+	const flushPendingDrops = useCallback(() => {
+		const pending = pendingDropsRef.current;
+		if (!pending || pending.length === 0) return;
+
+		const remaining: PendingDrop[] = [];
+		for (const item of pending) {
+			// If tab is gone, drop it (don’t attach to the wrong conversation).
+			if (!tabExists(item.tabId)) continue;
+			if (!tryApplyDropToTab(item.tabId, item.payload)) {
+				remaining.push(item);
+			}
+		}
+		pendingDropsRef.current = remaining;
+	}, [tabExists, tryApplyDropToTab]);
+
+	const setInputRef = useCallback(
+		(tabId: string) => {
+			return (inst: InputBoxHandle | null) => {
+				inputRefs.current.set(tabId, inst);
+				// If this tab just became available, retry any pending drops.
+				if (inst) {
+					// Defer a tick so editor mount/focus is stable.
+					window.setTimeout(() => {
+						flushPendingDrops();
+					}, 0);
+				}
+			};
+		},
+		[flushPendingDrops]
+	);
+
+	// Register exactly one active drop target for the chats page.
+	// Always attach to the currently selected tab (open conversation).
+	useEffect(() => {
+		const unregister = attachmentsDropAPI.registerDropTarget((payload: AttachmentsDroppedPayload) => {
+			const tabId = selectedTabIdRef.current;
+			if (!tabId || !tabExists(tabId)) {
+				// No valid active tab: keep it pending and let it retry after tab restore.
+				pendingDropsRef.current.push({ tabId, payload });
+				window.setTimeout(() => {
+					flushPendingDrops();
+				}, 50);
+				return;
+			}
+
+			const ok = tryApplyDropToTab(tabId, payload);
+			if (!ok) {
+				pendingDropsRef.current.push({ tabId, payload });
+				window.setTimeout(() => {
+					flushPendingDrops();
+				}, 0);
+			}
+		});
+
+		return unregister;
+	}, [flushPendingDrops, tabExists, tryApplyDropToTab]);
 
 	// Scroll position restore per tab
 	const scrollTopByTab = useRef(new Map<string, number>());

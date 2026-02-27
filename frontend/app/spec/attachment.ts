@@ -159,11 +159,30 @@ export interface DirectoryAttachmentsResult {
 	hasMore: boolean;
 }
 
+export interface PathAttachmentsResult {
+	fileAttachments: Attachment[];
+	dirAttachments: DirectoryAttachmentsResult[];
+	errors?: string[];
+}
+
 export enum AttachmentErrorReason {
 	TooLargeSingle = 'too-large-single',
 	TooLargeTotal = 'too-large-total',
 	Unreadable = 'unreadable',
 }
+
+export type AttachmentsDroppedPayload = {
+	dropID: string;
+	x: number;
+	y: number;
+
+	// Built by backend (Go) already:
+	files: Attachment[];
+	directories: DirectoryAttachmentsResult[];
+
+	errors?: string[];
+	maxFilesPerDirectory: number;
+};
 
 /**
  * UIAttachment is the composer-side shape; it extends the backend

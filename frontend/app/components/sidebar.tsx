@@ -1,8 +1,10 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { FiFilePlus, FiMessageSquare, FiPackage, FiSettings, FiSliders, FiTool } from 'react-icons/fi';
 
 import { Link } from 'react-router';
+
+import { installDropGuard } from '@/lib/dropblocker';
 
 import { TitleBar } from '@/components/title_bar';
 
@@ -15,6 +17,16 @@ export function Sidebar({ children }: SidebarProps) {
 	const toggle = () => {
 		setDrawerOpen(!isDrawerOpen);
 	};
+
+	const dropRef = useRef<HTMLDivElement | null>(null);
+
+	useEffect(() => {
+		if (!dropRef.current) return;
+
+		// Ideally installDropGuard returns a cleanup function:
+		const cleanup = installDropGuard(dropRef.current);
+		return cleanup;
+	}, []);
 
 	return (
 		<div className="drawer lg:drawer-open h-screen">
@@ -32,7 +44,9 @@ export function Sidebar({ children }: SidebarProps) {
 						setDrawerOpen(o => !o);
 					}}
 				/>
-				<div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+				<div ref={dropRef} className="min-h-0 flex-1 overflow-hidden">
+					{children}
+				</div>
 			</div>
 			<div className="drawer-side z-10">
 				<label htmlFor="my-drawer" className="drawer-overlay"></label>

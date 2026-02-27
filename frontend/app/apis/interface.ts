@@ -1,4 +1,10 @@
-import type { Attachment, DirectoryAttachmentsResult, FileFilter } from '@/spec/attachment';
+import type {
+	Attachment,
+	AttachmentsDroppedPayload,
+	DirectoryAttachmentsResult,
+	FileFilter,
+	PathAttachmentsResult,
+} from '@/spec/attachment';
 import type { ConversationSearchItem, StoreConversation, StoreConversationMessage } from '@/spec/conversation';
 import type { CompletionResponseBody, ModelParam, ProviderName } from '@/spec/inference';
 import type {
@@ -47,6 +53,7 @@ export interface IBackendAPI {
 	saveFile(defaultFilename: string, contentBase64: string, additionalFilters?: Array<FileFilter>): Promise<void>;
 	openMultipleFilesAsAttachments(allowMultiple: boolean, additionalFilters?: Array<FileFilter>): Promise<Attachment[]>;
 	openDirectoryAsAttachments(maxFiles: number): Promise<DirectoryAttachmentsResult>;
+	getPathsAsAttachments(paths: string[], maxFilesPerDir: number): Promise<PathAttachmentsResult>;
 }
 
 export interface ISettingStoreAPI {
@@ -317,4 +324,23 @@ export interface IProviderSetAPI {
 	): Promise<CompletionResponseBody | undefined>;
 
 	cancelCompletion(requestId: string): Promise<void>;
+}
+
+export interface IAttachmentsDropAPI {
+	/**
+	 * Must be idempotent. Registers the underlying platform event listener. returns cleanup func.
+	 */
+	startListener(): () => void;
+
+	/**
+	 * Sets the current active target (e.g. the chat composer).
+	 * Returns an unregister function.
+	 */
+	registerDropTarget(fn: (payload: AttachmentsDroppedPayload) => void): () => void;
+
+	/**
+	 * Called when a drop happens but there is no active target yet.
+	 * Useful to navigate to /chats and let pending drops flush.
+	 */
+	setNoTargetHandler(fn: ((payload: AttachmentsDroppedPayload) => void) | null): void;
 }

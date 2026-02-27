@@ -1,10 +1,11 @@
 import { sprintf } from 'sprintf-js';
 
-import type { Attachment, DirectoryAttachmentsResult, FileFilter } from '@/spec/attachment';
+import type { Attachment, DirectoryAttachmentsResult, FileFilter, PathAttachmentsResult } from '@/spec/attachment';
 
 import type { IBackendAPI, ILogger } from '@/apis/interface';
 import {
 	GetAppVersion,
+	GetPathsAsAttachments,
 	OpenDirectoryAsAttachments,
 	OpenMultipleFilesAsAttachments,
 	OpenURLAsAttachment,
@@ -209,5 +210,10 @@ export class WailsBackendAPI implements IBackendAPI {
 			};
 			return res;
 		}
+	}
+
+	async getPathsAsAttachments(paths: string[], maxFilesPerDir: number): Promise<PathAttachmentsResult> {
+		const pathResults = await GetPathsAsAttachments(paths, maxFilesPerDir);
+		return pathResults as PathAttachmentsResult;
 	}
 }

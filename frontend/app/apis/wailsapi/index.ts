@@ -1,4 +1,5 @@
 /* eslint-disable no-restricted-imports */
+export * from './attachmentsdrop';
 export * from './backend';
 export * from './conversationstore';
 export * from './modelpresetstore';

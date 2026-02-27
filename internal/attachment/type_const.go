@@ -100,3 +100,9 @@ type DirectoryAttachmentsResult struct {
 	TotalSize    int64                   `json:"totalSize"`    // sum of Files[i].Size
 	HasMore      bool                    `json:"hasMore"`      // true if not all content included
 }
+
+type PathAttachmentsResult struct {
+	FileAttachments []Attachment                 `json:"fileAttachments"`
+	DirAttachments  []DirectoryAttachmentsResult `json:"dirAttachments"`
+	Errors          []string                     `json:"errors,omitempty"`
+}

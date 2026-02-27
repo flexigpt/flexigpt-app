@@ -83,7 +83,7 @@ export function TitleBar({ onToggleDrawer }: TitleBarProps) {
 			}}
 		>
 			{/* LEFT */}
-			<div className="flex min-w-0 items-center gap-2">
+			<div className="app-drag flex min-w-0 items-center gap-2">
 				{onToggleDrawer && (
 					<button
 						type="button"
@@ -96,7 +96,7 @@ export function TitleBar({ onToggleDrawer }: TitleBarProps) {
 					</button>
 				)}
 
-				<Link to="/" className="app-no-drag flex min-w-0 items-center gap-2">
+				<Link to="/" className="flex min-w-0 items-center gap-2">
 					<img src="/icon.png" alt="FlexiGPT" className="h-5 w-5" />
 					<div className="min-w-0 truncate text-xs">
 						<span className="opacity-70">FlexiGPT</span>
@@ -104,17 +104,17 @@ export function TitleBar({ onToggleDrawer }: TitleBarProps) {
 					</div>
 				</Link>
 
-				{slots.left ? <div className="app-no-drag">{slots.left}</div> : null}
+				{slots.left ? <div>{slots.left}</div> : null}
 			</div>
 
 			{/* CENTER */}
-			<div className="m-0 flex min-w-0 flex-1 items-center justify-center px-2 py-0">
-				{slots.center ? <div className="app-no-drag w-full min-w-0">{slots.center}</div> : null}
+			<div className="app-drag m-0 flex min-w-0 flex-1 items-center justify-center px-2 py-0">
+				{slots.center ? <div className="w-full min-w-0">{slots.center}</div> : null}
 			</div>
 
 			{/* RIGHT */}
-			<div className="flex items-center gap-2">
-				{slots.right ? <div className="app-no-drag">{slots.right}</div> : null}
+			<div className="app-drag flex items-center gap-2">
+				{slots.right ? <div className="">{slots.right}</div> : null}
 
 				<div className="app-no-drag flex items-center gap-1">
 					<button

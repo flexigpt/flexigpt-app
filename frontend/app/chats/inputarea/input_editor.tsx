@@ -19,6 +19,7 @@ import { Plate, PlateContent, usePlateEditor } from 'platejs/react';
 import type {
 	Attachment,
 	AttachmentContentBlockMode,
+	AttachmentsDroppedPayload,
 	DirectoryAttachmentsResult,
 	UIAttachment,
 } from '@/spec/attachment';
@@ -116,6 +117,7 @@ export interface EditorAreaHandle {
 	loadToolCalls: (toolCalls: UIToolCall[]) => void;
 	setConversationToolsFromChoices: (tools: ToolStoreChoice[]) => void;
 	setWebSearchFromChoices: (tools: ToolStoreChoice[]) => void;
+	applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => void;
 }
 
 const EDITOR_EMPTY_VALUE: Value = [{ type: 'p', children: [{ text: '' }] }];
@@ -1233,7 +1235,40 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			const ws = (tools ?? []).filter(t => t.toolType === ToolStoreChoiceType.WebSearch);
 			setWebSearchTemplates(ws.map(webSearchTemplateFromChoice));
 		},
+
+		applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => {
+			applyFileAttachments(payload.files ?? []);
+			for (const dir of payload.directories ?? []) {
+				applyDirectoryAttachments(dir);
+			}
+
+			// Don’t steal focus while the tab is generating; just attach chips.
+			if (!isBusy) {
+				editorRef.current.tf.focus();
+			}
+		},
 	}));
+
+	const applyFileAttachments = useCallback((results: Attachment[]) => {
+		if (!results || results.length === 0) return;
+
+		setAttachments(prev => {
+			const existing = new Set(prev.map(uiAttachmentKey));
+			const next: UIAttachment[] = [...prev];
+
+			for (const r of results) {
+				const att = buildUIAttachmentForLocalPath(r);
+				if (!att) continue;
+
+				const key = uiAttachmentKey(att);
+				if (existing.has(key)) continue;
+
+				existing.add(key);
+				next.push(att);
+			}
+			return next;
+		});
+	}, []);
 
 	const handleAttachFiles = async () => {
 		let results: Attachment[];
@@ -1243,74 +1278,36 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			return;
 		}
 
-		if (!results || results.length === 0) return;
-
-		setAttachments(prev => {
-			const existing = new Set(prev.map(uiAttachmentKey));
-			const next: UIAttachment[] = [...prev];
-
-			for (const r of results) {
-				const att = buildUIAttachmentForLocalPath(r);
-				if (!att) {
-					console.error('invalid attachment result');
-					continue;
-				}
-				const key = uiAttachmentKey(att);
-				if (existing.has(key)) continue;
-				existing.add(key);
-				next.push(att);
-			}
-			return next;
-		});
+		applyFileAttachments(results);
 		editor.tf.focus();
 	};
 
-	const handleAttachDirectory = async () => {
-		let result: DirectoryAttachmentsResult;
-		try {
-			result = await backendAPI.openDirectoryAsAttachments(MAX_FILES_PER_DIRECTORY);
-		} catch {
-			// Backend canceled or errored; nothing to do.
-			return;
-		}
-
+	const applyDirectoryAttachments = useCallback((result: DirectoryAttachmentsResult) => {
 		if (!result || !result.dirPath) return;
 
 		const { dirPath, attachments: dirAttachments, overflowDirs } = result;
-
 		if ((!dirAttachments || dirAttachments.length === 0) && (!overflowDirs || overflowDirs.length === 0)) {
-			// Nothing readable / allowed in this folder.
 			return;
 		}
 
 		const folderLabel = dirPath.trim().split(/[\\/]/).pop() || dirPath.trim();
+		const groupId = crypto.randomUUID?.() ?? `dir-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-		const groupId = crypto.randomUUID() ?? `dir-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-		// First, add or reuse attachments.
 		const attachmentKeysForGroup: string[] = [];
 		const ownedAttachmentKeysForGroup: string[] = [];
-
-		// Deduplicate paths/keys within this single directory attach
 		const seenKeysForGroup = new Set<string>();
 
 		setAttachments(prev => {
 			const existing = new Map<string, UIAttachment>();
-			for (const att of prev) {
-				existing.set(uiAttachmentKey(att), att);
-			}
+			for (const att of prev) existing.set(uiAttachmentKey(att), att);
 
 			const added: UIAttachment[] = [];
 
 			for (const r of dirAttachments ?? []) {
 				const att = buildUIAttachmentForLocalPath(r);
-				if (!att) {
-					console.error('invalid attachment result');
-					continue;
-				}
-				const key = uiAttachmentKey(att);
+				if (!att) continue;
 
-				// Skip duplicates within this folder selection
+				const key = uiAttachmentKey(att);
 				if (seenKeysForGroup.has(key)) continue;
 				seenKeysForGroup.add(key);
 
@@ -1326,7 +1323,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			return [...prev, ...added];
 		});
 
-		// Then, record the directory group that references those attachments.
 		setDirectoryGroups(prev => [
 			...prev,
 			{
@@ -1335,10 +1331,21 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				label: folderLabel,
 				attachmentKeys: attachmentKeysForGroup,
 				ownedAttachmentKeys: ownedAttachmentKeysForGroup,
-
 				overflowDirs: overflowDirs ?? [],
 			},
 		]);
+	}, []);
+
+	const handleAttachDirectory = async () => {
+		let result: DirectoryAttachmentsResult;
+		try {
+			result = await backendAPI.openDirectoryAsAttachments(MAX_FILES_PER_DIRECTORY);
+		} catch {
+			// Backend canceled or errored; nothing to do.
+			return;
+		}
+
+		applyDirectoryAttachments(result);
 
 		editor.tf.focus();
 	};
