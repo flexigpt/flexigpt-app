@@ -75,7 +75,7 @@
 		"@types/react-dom": "19.2.3",
 		"@types/sprintf-js": "^1.1.4",
 		"@types/stopword": "^2.0.3",
-		"@vitejs/plugin-rsc": "^0.5.20",
+		"@vitejs/plugin-rsc": "^0.5.21",
 		"@vitest/coverage-v8": "^4.0.18",
 		"cross-env": "^10.1.0",
 		"daisyui": "^5.5.19",

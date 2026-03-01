@@ -132,7 +132,7 @@ importers:
         version: 9.39.3
       '@react-router/dev':
         specifier: ^7.13.1
-        version: 7.13.1(@types/node@22.19.1)(@vitejs/plugin-rsc@0.5.20(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vite@7.3.1(@types/node@22.19.1)(jiti@2.6.1)(lightningcss@1.31.1)))(babel-plugin-macros@3.1.0)(jiti@2.6.1)(lightningcss@1.31.1)(react-router@7.13.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(typescript@5.9.3)(vite@7.3.1(@types/node@22.19.1)(jiti@2.6.1)(lightningcss@1.31.1))
+        version: 7.13.1(@types/node@22.19.1)(@vitejs/plugin-rsc@0.5.21(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vite@7.3.1(@types/node@22.19.1)(jiti@2.6.1)(lightningcss@1.31.1)))(babel-plugin-macros@3.1.0)(jiti@2.6.1)(lightningcss@1.31.1)(react-router@7.13.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(typescript@5.9.3)(vite@7.3.1(@types/node@22.19.1)(jiti@2.6.1)(lightningcss@1.31.1))
       '@tailwindcss/node':
         specifier: ^4.2.1
         version: 4.2.1
@@ -167,8 +167,8 @@ importers:
         specifier: ^2.0.3
         version: 2.0.3
       '@vitejs/plugin-rsc':
-        specifier: ^0.5.20
-        version: 0.5.20(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vite@7.3.1(@types/node@22.19.1)(jiti@2.6.1)(lightningcss@1.31.1))
+        specifier: ^0.5.21
+        version: 0.5.21(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vite@7.3.1(@types/node@22.19.1)(jiti@2.6.1)(lightningcss@1.31.1))
       '@vitest/coverage-v8':
         specifier: ^4.0.18
         version: 4.0.18(vitest@4.0.18(@types/node@22.19.1)(jiti@2.6.1)(jsdom@28.1.0)(lightningcss@1.31.1))
@@ -1025,8 +1025,8 @@ packages:
   '@remix-run/node-fetch-server@0.13.0':
     resolution: {integrity: sha512-1EsNo0ZpgXu/90AWoRZf/oE3RVTUS80tiTUpt+hv5pjtAkw7icN4WskDwz/KdAw5ARbJLMhZBrO1NqThmy/McA==}
 
-  '@rolldown/pluginutils@1.0.0-rc.4':
-    resolution: {integrity: sha512-1BrrmTu0TWfOP1riA8uakjFc9bpIUGzVKETsOtzY39pPga8zELGDl8eu1Dx7/gjM5CAz14UknsUMpBO8L+YntQ==}
+  '@rolldown/pluginutils@1.0.0-rc.5':
+    resolution: {integrity: sha512-RxlLX/DPoarZ9PtxVrQgZhPoor987YtKQqCo5zkjX+0S0yLJ7Vv515Wk6+xtTL67VONKJKxETWZwuZjss2idYw==}
 
   '@rollup/rollup-android-arm-eabi@4.59.0':
     resolution: {integrity: sha512-upnNBkA6ZH2VKGcBj9Fyl9IGNPULcjXRlg0LLeaioQWueH30p6IXtJEbKAgvyv+mJaMxSm1l6xwDXYjpEMiLMg==}
@@ -1578,8 +1578,8 @@ packages:
   '@ungap/structured-clone@1.3.0':
     resolution: {integrity: sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g==}
 
-  '@vitejs/plugin-rsc@0.5.20':
-    resolution: {integrity: sha512-JHPqfR8SSE2oNzCDRoyzEpbgxCxDks0PJAlo0KpK+OldYUxvozHroYpn0QtSdbZWq9YQ/ok1JUJ3GMc1xOmN0g==}
+  '@vitejs/plugin-rsc@0.5.21':
+    resolution: {integrity: sha512-uNayLT8IKvWoznvQyfwKuGiEFV28o7lxUDnw/Av36VCuGpDFZnMmvVCwR37gTvnSmnpul9V0tdJqY3tBKEaDqw==}
     peerDependencies:
       react: '*'
       react-dom: '*'
@@ -3865,8 +3865,8 @@ packages:
   sprintf-js@1.1.3:
     resolution: {integrity: sha512-Oo+0REFV59/rz3gfJNKQiBlwfHaSESl1pcGyABQsnnIfWOFt6JNj5gCog2U6MLZ//IGYD+nA8nI+mTShREReaA==}
 
-  srvx@0.11.7:
-    resolution: {integrity: sha512-p9qj9wkv/MqG1VoJpOsqXv1QcaVcYRk7ifsC6i3TEwDXFyugdhJN4J3KzQPZq2IJJ2ZCt7ASOB++85pEK38jRw==}
+  srvx@0.11.8:
+    resolution: {integrity: sha512-2n9t0YnAXPJjinytvxccNgs7rOA5gmE7Wowt/8Dy2dx2fDC6sBhfBpbrCvjYKALlVukPS/Uq3QwkolKNa7P/2Q==}
     engines: {node: '>=20.16.0'}
     hasBin: true
 
@@ -4046,8 +4046,8 @@ packages:
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
 
-  turbo-stream@3.1.0:
-    resolution: {integrity: sha512-tVI25WEXl4fckNEmrq70xU1XumxUwEx/FZD5AgEcV8ri7Wvrg2o7GEq8U7htrNx3CajciGm+kDyhRf5JB6t7/A==}
+  turbo-stream@3.2.0:
+    resolution: {integrity: sha512-EK+bZ9UVrVh7JLslVFOV0GEMsociOqVOvEMTAd4ixMyffN5YNIEdLZWXUx5PJqDbTxSIBWw04HS9gCY4frYQDQ==}
 
   type-check@0.4.0:
     resolution: {integrity: sha512-XleUoc9uwGXqjWwXaUTZAmzMcFZ5858QA2vvx1Ur5xIcixXIP+8LnFDgRplU30us6teqdlskFfu+ae4K79Ooew==}
@@ -5196,7 +5196,7 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.14
 
-  '@react-router/dev@7.13.1(@types/node@22.19.1)(@vitejs/plugin-rsc@0.5.20(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vite@7.3.1(@types/node@22.19.1)(jiti@2.6.1)(lightningcss@1.31.1)))(babel-plugin-macros@3.1.0)(jiti@2.6.1)(lightningcss@1.31.1)(react-router@7.13.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(typescript@5.9.3)(vite@7.3.1(@types/node@22.19.1)(jiti@2.6.1)(lightningcss@1.31.1))':
+  '@react-router/dev@7.13.1(@types/node@22.19.1)(@vitejs/plugin-rsc@0.5.21(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vite@7.3.1(@types/node@22.19.1)(jiti@2.6.1)(lightningcss@1.31.1)))(babel-plugin-macros@3.1.0)(jiti@2.6.1)(lightningcss@1.31.1)(react-router@7.13.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(typescript@5.9.3)(vite@7.3.1(@types/node@22.19.1)(jiti@2.6.1)(lightningcss@1.31.1))':
     dependencies:
       '@babel/core': 7.29.0
       '@babel/generator': 7.29.1
@@ -5229,7 +5229,7 @@ snapshots:
       vite: 7.3.1(@types/node@22.19.1)(jiti@2.6.1)(lightningcss@1.31.1)
       vite-node: 3.2.4(@types/node@22.19.1)(jiti@2.6.1)(lightningcss@1.31.1)
     optionalDependencies:
-      '@vitejs/plugin-rsc': 0.5.20(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vite@7.3.1(@types/node@22.19.1)(jiti@2.6.1)(lightningcss@1.31.1))
+      '@vitejs/plugin-rsc': 0.5.21(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vite@7.3.1(@types/node@22.19.1)(jiti@2.6.1)(lightningcss@1.31.1))
       typescript: 5.9.3
     transitivePeerDependencies:
       - '@types/node'
@@ -5255,7 +5255,7 @@ snapshots:
 
   '@remix-run/node-fetch-server@0.13.0': {}
 
-  '@rolldown/pluginutils@1.0.0-rc.4': {}
+  '@rolldown/pluginutils@1.0.0-rc.5': {}
 
   '@rollup/rollup-android-arm-eabi@4.59.0':
     optional: true
@@ -5789,18 +5789,18 @@ snapshots:
 
   '@ungap/structured-clone@1.3.0': {}
 
-  '@vitejs/plugin-rsc@0.5.20(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vite@7.3.1(@types/node@22.19.1)(jiti@2.6.1)(lightningcss@1.31.1))':
+  '@vitejs/plugin-rsc@0.5.21(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vite@7.3.1(@types/node@22.19.1)(jiti@2.6.1)(lightningcss@1.31.1))':
     dependencies:
-      '@rolldown/pluginutils': 1.0.0-rc.4
+      '@rolldown/pluginutils': 1.0.0-rc.5
       es-module-lexer: 2.0.0
       estree-walker: 3.0.3
       magic-string: 0.30.21
       periscopic: 4.0.2
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
-      srvx: 0.11.7
+      srvx: 0.11.8
       strip-literal: 3.1.0
-      turbo-stream: 3.1.0
+      turbo-stream: 3.2.0
       vite: 7.3.1(@types/node@22.19.1)(jiti@2.6.1)(lightningcss@1.31.1)
       vitefu: 1.1.2(vite@7.3.1(@types/node@22.19.1)(jiti@2.6.1)(lightningcss@1.31.1))
 
@@ -8649,7 +8649,7 @@ snapshots:
 
   sprintf-js@1.1.3: {}
 
-  srvx@0.11.7: {}
+  srvx@0.11.8: {}
 
   stackback@0.0.2: {}
 
@@ -8826,7 +8826,7 @@ snapshots:
 
   tslib@2.8.1: {}
 
-  turbo-stream@3.1.0: {}
+  turbo-stream@3.2.0: {}
 
   type-check@0.4.0:
     dependencies:
