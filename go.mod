@@ -16,7 +16,7 @@ require (
 	github.com/markusmobius/go-trafilatura v1.12.2
 	github.com/ppipada/mapstore-go v0.1.2
 	github.com/wailsapp/wails/v2 v2.11.0
-	golang.org/x/net v0.50.0
+	golang.org/x/net v0.51.0
 )
 
 require (
