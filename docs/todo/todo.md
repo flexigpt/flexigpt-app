@@ -4,6 +4,7 @@
 
 - [ ] opus 4.6 has now adaptive thinking which is basically thinking with levels
   - [x] inference go needs adjustment to support new anthropic sdk
+- [ ] verify and add proper model preset valid capabilities per model in inbuilt models
 
 ## Features
 
@@ -63,8 +64,6 @@
   - [x] UI for additional things in chatoptions
   - [x] validations in inference go for supporting modal capabilities verification.
   - [x] valid input output modalities, valid levels, valid reasoning types, etc need to be added to modelpresetspec.
-
-- [ ] verify and add proper model preset valid capabilities per mdoel in inbuilt models
 
 - [ ] Better Attachments
   - [ ] docx, excel support
