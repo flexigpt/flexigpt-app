@@ -455,10 +455,18 @@ export interface OutputUnion {
 	webSearchToolOutput?: ToolOutput;
 }
 
+/**
+ * @public
+ */
+export interface Warning {
+	code: string;
+	message: string;
+}
 export interface FetchCompletionResponse {
 	outputs?: OutputUnion[];
 	usage?: InferenceUsage;
 	error?: InferenceError;
+	warnings?: Warning[];
 	debugDetails?: any;
 }
 

@@ -1587,10 +1587,25 @@ export namespace spec {
 		    return a;
 		}
 	}
+	export class Warning {
+	    code: string;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Warning(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.code = source["code"];
+	        this.message = source["message"];
+	    }
+	}
 	export class FetchCompletionResponse {
 	    outputs?: OutputUnion[];
 	    usage?: Usage;
 	    error?: Error;
+	    warnings?: Warning[];
 	    debugDetails?: any;
 	
 	    static createFrom(source: any = {}) {
@@ -1602,6 +1617,7 @@ export namespace spec {
 	        this.outputs = this.convertValues(source["outputs"], OutputUnion);
 	        this.usage = this.convertValues(source["usage"], Usage);
 	        this.error = this.convertValues(source["error"], Error);
+	        this.warnings = this.convertValues(source["warnings"], Warning);
 	        this.debugDetails = source["debugDetails"];
 	    }
 	
@@ -6132,6 +6148,7 @@ export namespace spec {
 	
 	    }
 	}
+	
 	
 	
 	

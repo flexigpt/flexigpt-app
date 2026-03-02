@@ -61,11 +61,14 @@
     - [x] adapt in model preset spec and provider set
   - [x] UI for additional params in modelpreset
   - [x] UI for additional things in chatoptions
+  - [x] validations in inference go for supporting modal capabilities verification.
   - [ ] valid input output modalities, valid levels, valid reasoning types, etc need to be added to modelpresetspec.
 
 - [ ] Better Attachments
   - [ ] docx, excel support
-  - [ ] Drag and drop files as attachments.
+  - [x] Drag and drop files as attachments.
+    - [ ] while the code is ther, on linux, webkitgtk has issue wrt firing drop events with wails currently.
+    - [ ] win and mac testing is pending
 
 - [ ] Tools
   - [ ] We may want to have a explicit prompt saying that use explicit tools rather than shell wherever possible.
