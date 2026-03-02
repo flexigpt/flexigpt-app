@@ -84,7 +84,7 @@ func main() {
 		EnableDefaultContextMenu: true,
 		OnStartup: func(ctx context.Context) {
 			app.startup(ctx)
-			SetWrappedProviderAppContext(app.providerSetAPI, ctx)
+			SetWrappedProviderAppContext(app.aggregateAPI, ctx)
 		},
 
 		OnDomReady:      app.domReady,
@@ -102,12 +102,12 @@ func main() {
 			app,
 			app.settingStoreAPI,
 			app.conversationStoreAPI,
-			app.providerSetAPI,
 			app.modelPresetStoreAPI,
 			app.promptTemplateStoreAPI,
 			app.toolStoreAPI,
 			app.toolRuntimeAPI,
 			app.skillStoreAPI,
+			app.aggregateAPI,
 		},
 
 		Windows: &windows.Options{

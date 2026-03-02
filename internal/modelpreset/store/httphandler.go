@@ -80,6 +80,14 @@ func InitModelPresetStoreHandlers(api huma.API, modelPresetStoreAPI *ModelPreset
 	}, modelPresetStoreAPI.DeleteModelPreset)
 
 	huma.Register(api, huma.Operation{
+		OperationID: "get-model-preset",
+		Method:      http.MethodGet,
+		Path:        pathPrefix + "/{providerName}/models/{modelPresetID}",
+		Summary:     "Get a single model preset for a given provider",
+		Tags:        []string{tag},
+	}, modelPresetStoreAPI.GetModelPreset)
+
+	huma.Register(api, huma.Operation{
 		OperationID: "list-all-provider-presets",
 		Method:      http.MethodGet,
 		Path:        pathPrefix,

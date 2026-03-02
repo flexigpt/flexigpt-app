@@ -1,9 +1,11 @@
 package spec
 
 import (
-	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
-	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	inferencegoSpec "github.com/flexigpt/inference-go/spec"
+
+	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
+	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
+	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
 type AddProviderRequestBody struct {
@@ -64,8 +66,10 @@ type CompletionRequestBody struct {
 }
 
 type CompletionRequest struct {
-	Provider inferencegoSpec.ProviderName `path:"provider" required:"true"`
-	Body     *CompletionRequestBody
+	Provider      inferencegoSpec.ProviderName  `path:"provider"      required:"true"`
+	ModelPresetID modelpresetSpec.ModelPresetID `path:"modelPresetID" required:"true"`
+
+	Body *CompletionRequestBody
 
 	OnStreamText     func(text string) error     `json:"-"`
 	OnStreamThinking func(thinking string) error `json:"-"`

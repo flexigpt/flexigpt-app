@@ -17,11 +17,12 @@ import {
 	type UIToolCall,
 	type UIToolOutput,
 } from '@/spec/inference';
+import type { ModelPresetID } from '@/spec/modelpreset';
 import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
-import { providerSetAPI } from '@/apis/baseapi';
+import { aggregateAPI } from '@/apis/baseapi';
 
 import {
 	collectToolCallsFromOutputs,
@@ -32,6 +33,7 @@ import {
 
 export async function HandleCompletion(
 	provider: ProviderName,
+	modelPresetID: ModelPresetID,
 	modelParams: ModelParam,
 	currentUserMsg: ConversationMessage,
 	history: ConversationMessage[],
@@ -51,8 +53,9 @@ export async function HandleCompletion(
 			(toolStoreChoices ?? []).map(choice => [choice.choiceID, choice])
 		);
 
-		const resp = await providerSetAPI.fetchCompletion(
+		const resp = await aggregateAPI.fetchCompletion(
 			provider,
+			modelPresetID,
 			modelParams,
 			currentUserMsg,
 			history,

@@ -79,6 +79,9 @@ type ModelPreset struct {
 	StopSequences []string                     `json:"stopSequences,omitempty"`
 
 	AdditionalParametersRawJSON *string `json:"additionalParametersRawJSON,omitempty"`
+	// CapabilitiesOverride is a stored override for runtime capability resolution.
+	// This is NOT the derived/effective capability profile.
+	CapabilitiesOverride *ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
 
 	CreatedAt  time.Time `json:"createdAt"`
 	ModifiedAt time.Time `json:"modifiedAt"`
@@ -100,6 +103,9 @@ type ProviderPreset struct {
 	ChatCompletionPathPrefix string            `json:"chatCompletionPathPrefix" required:"true"`
 	APIKeyHeaderKey          string            `json:"apiKeyHeaderKey"          required:"true"`
 	DefaultHeaders           map[string]string `json:"defaultHeaders"`
+	// CapabilitiesOverride is a provider-wide stored override. Model overrides take precedence.
+	// This is NOT the derived/effective capability profile.
+	CapabilitiesOverride *ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
 
 	DefaultModelPresetID ModelPresetID                 `json:"defaultModelPresetID"`
 	ModelPresets         map[ModelPresetID]ModelPreset `json:"modelPresets"`

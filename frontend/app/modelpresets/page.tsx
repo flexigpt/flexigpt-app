@@ -6,7 +6,7 @@ import type { ProviderName } from '@/spec/inference';
 import { type ProviderPreset } from '@/spec/modelpreset';
 import { AuthKeyTypeProvider } from '@/spec/setting';
 
-import { modelPresetStoreAPI, settingstoreAPI } from '@/apis/baseapi';
+import { aggregateAPI, modelPresetStoreAPI, settingstoreAPI } from '@/apis/baseapi';
 import { getAllProviderPresetsMap } from '@/apis/list_helper';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
@@ -138,8 +138,8 @@ export default function ModelPresetsPage() {
 		}
 
 		try {
-			await modelPresetStoreAPI.deleteProviderPreset(name);
-			await settingstoreAPI.deleteAuthKey(AuthKeyTypeProvider, name).catch(() => void 0);
+			await aggregateAPI.deleteProviderPreset(name);
+			await aggregateAPI.deleteAuthKey(AuthKeyTypeProvider, name).catch(() => void 0);
 
 			setProviderPresets(prev => {
 				const { [name]: _removed, ...rest } = prev;
@@ -158,7 +158,7 @@ export default function ModelPresetsPage() {
 
 	const handleProviderModalSubmit = async (
 		name: ProviderName,
-		payload: Omit<ProviderPreset, 'isBuiltIn' | 'defaultModelPresetID' | 'modelPresets'>,
+		payload: Omit<ProviderPreset, 'isBuiltIn' | 'defaultModelPresetID' | 'modelPresets' | 'name'>,
 		apiKey: string | null,
 		isEdit: boolean
 	) => {
@@ -169,9 +169,9 @@ export default function ModelPresetsPage() {
 		}
 
 		try {
-			await modelPresetStoreAPI.putProviderPreset(name, payload);
+			await aggregateAPI.putProviderPreset(name, payload);
 			if (apiKey && apiKey.trim()) {
-				await settingstoreAPI.setAuthKey(AuthKeyTypeProvider, name, apiKey.trim());
+				await aggregateAPI.setAuthKey(AuthKeyTypeProvider, name, apiKey.trim());
 			}
 
 			setProviderPresets(prev => {

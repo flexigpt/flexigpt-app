@@ -48,7 +48,7 @@ interface AddEditProviderPresetModalProps {
 	onClose: () => void;
 	onSubmit: (
 		providerName: ProviderName,
-		payload: Omit<ProviderPreset, 'isBuiltIn' | 'defaultModelPresetID' | 'modelPresets'>,
+		payload: Omit<ProviderPreset, 'isBuiltIn' | 'defaultModelPresetID' | 'modelPresets' | 'name'>,
 		apiKey: string | null
 	) => void;
 	existingProviderNames: ProviderName[];
@@ -311,7 +311,6 @@ export function AddEditProviderPresetModal({
 		}
 
 		const payload = {
-			name: formData.providerName.trim(),
 			displayName: formData.displayName.trim(),
 			sdkType: formData.sdkType,
 			isEnabled: formData.isEnabled,

@@ -1,13 +1,13 @@
 import { IS_WAILS_PLATFORM } from '@/lib/features';
 
 import type {
+	IAggregateAPI,
 	IAttachmentsDropAPI,
 	IBackendAPI,
 	IConversationStoreAPI,
 	ILogger,
 	IModelPresetStoreAPI,
 	IPromptStoreAPI,
-	IProviderSetAPI,
 	ISettingStoreAPI,
 	ISkillStoreAPI,
 	IToolRuntimeAPI,
@@ -20,7 +20,7 @@ export let log: ILogger;
 export let attachmentsDropAPI: IAttachmentsDropAPI;
 export let backendAPI: IBackendAPI;
 export let conversationStoreAPI: IConversationStoreAPI;
-export let providerSetAPI: IProviderSetAPI;
+export let aggregateAPI: IAggregateAPI;
 export let settingstoreAPI: ISettingStoreAPI;
 export let modelPresetStoreAPI: IModelPresetStoreAPI;
 export let promptStoreAPI: IPromptStoreAPI;
@@ -36,7 +36,7 @@ if (IS_WAILS_PLATFORM) {
 	attachmentsDropAPI = new wailsImpl.WailsAttachmentsDropAPI();
 	backendAPI = new wailsImpl.WailsBackendAPI();
 	conversationStoreAPI = new wailsImpl.WailsConversationStoreAPI();
-	providerSetAPI = new wailsImpl.WailsProviderSetAPI();
+	aggregateAPI = new wailsImpl.WailsAggregateAPI();
 	settingstoreAPI = new wailsImpl.WailsSettingStoreAPI();
 	modelPresetStoreAPI = new wailsImpl.WailsModelPresetStoreAPI();
 	promptStoreAPI = new wailsImpl.WailsPromptStoreAPI();

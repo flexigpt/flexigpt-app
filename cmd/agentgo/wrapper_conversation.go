@@ -3,9 +3,8 @@ package main
 import (
 	"context"
 
-	conversationStore "github.com/flexigpt/flexigpt-app/internal/conversation/store"
-
 	"github.com/flexigpt/flexigpt-app/internal/conversation/spec"
+	conversationStore "github.com/flexigpt/flexigpt-app/internal/conversation/store"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 )
 

@@ -11,13 +11,35 @@ import (
 	"github.com/flexigpt/inference-go"
 	"github.com/flexigpt/inference-go/debugclient"
 	inferencegoSpec "github.com/flexigpt/inference-go/spec"
+	"github.com/google/uuid"
 
 	"github.com/flexigpt/flexigpt-app/internal/attachment"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
+	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
+	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 )
+
+type completionKeyCapabilityResolver struct {
+	key  string
+	caps *inferencegoSpec.ModelCapabilities
+}
+
+func (r completionKeyCapabilityResolver) ResolveModelCapabilities(
+	ctx context.Context,
+	req inferencegoSpec.ResolveModelCapabilitiesRequest,
+) (*inferencegoSpec.ModelCapabilities, error) {
+	if r.caps == nil {
+		return nil, errors.New("no model capabilities configured")
+	}
+	// Enforce mapping by completionKey to avoid any model-name uniqueness assumptions.
+	if r.key != "" && req.CompletionKey != r.key {
+		return nil, fmt.Errorf("capabilities not found for completionKey %q", req.CompletionKey)
+	}
+	return r.caps, nil
+}
 
 // ProviderSetAPI is a thin aggregator on top of inference-go's ProviderSetAPI.
 // It owns:
@@ -25,8 +47,10 @@ import (
 //   - attachment/tool hydration,
 //   - mapping Conversation+CurrentTurn -> inference-go FetchCompletionRequest.
 type ProviderSetAPI struct {
-	inner       *inference.ProviderSetAPI
-	toolStore   *toolStore.ToolStore
+	inner     *inference.ProviderSetAPI
+	toolStore *toolStore.ToolStore
+	mpStore   *modelpresetStore.ModelPresetStore
+
 	logger      *slog.Logger
 	debugConfig *debugclient.DebugConfig
 }
@@ -51,13 +75,15 @@ func WithDebugConfig(debugConfig *debugclient.DebugConfig) ProviderSetOption {
 //   - opts: functional options for configuring the wrapper (e.g. WithLogger, WithDebugConfig).
 func NewProviderSetAPI(
 	ts *toolStore.ToolStore,
+	modelPresetStore *modelpresetStore.ModelPresetStore,
 	opts ...ProviderSetOption,
 ) (*ProviderSetAPI, error) {
-	if ts == nil {
-		return nil, errors.New("no tool store provided to inference wrapper provider set")
+	if ts == nil || modelPresetStore == nil {
+		return nil, errors.New("no tool store or model preset store provided to inference wrapper provider set")
 	}
 	ps := &ProviderSetAPI{
 		toolStore: ts,
+		mpStore:   modelPresetStore,
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -152,6 +178,10 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		return nil, errors.New("missing provider")
 	}
 
+	if req.ModelPresetID == "" {
+		return nil, errors.New("missing modelPresetID")
+	}
+
 	body := req.Body
 
 	// Resolve model param for this call (prefer explicit body.ModelParam,
@@ -166,6 +196,16 @@ func (ps *ProviderSetAPI) FetchCompletion(
 
 	if len(body.Current.ToolChoices) > 0 {
 		return nil, errors.New("prepopulated tool choices are not allowed in fetch completion, need tool store choices")
+	}
+
+	derivedModelCapabilities, err := ps.deriveCapabilitiesFromPreset(
+		ctx,
+		req.Provider,
+		req.ModelPresetID,
+		modelParam.Name,
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	// Flatten full conversation (history + current) into InputUnion list.
@@ -189,11 +229,25 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		ToolChoices: toolChoices,
 	}
 
-	var opts *inferencegoSpec.FetchCompletionOptions
+	var ck string
+	uid, err := uuid.NewV7()
+	if err != nil {
+		// Fallback only.
+		ck = string(req.Provider) + "_" + string(req.ModelPresetID)
+	} else {
+		ck = uid.String()
+	}
+
+	opts := &inferencegoSpec.FetchCompletionOptions{
+		CompletionKey: ck,
+		CapabilityResolver: completionKeyCapabilityResolver{
+			key:  ck,
+			caps: derivedModelCapabilities,
+		},
+	}
+
 	if req.OnStreamText != nil || req.OnStreamThinking != nil {
-		opts = &inferencegoSpec.FetchCompletionOptions{
-			StreamHandler: makeStreamHandler(req.OnStreamText, req.OnStreamThinking),
-		}
+		opts.StreamHandler = makeStreamHandler(req.OnStreamText, req.OnStreamThinking)
 	}
 
 	b, err := ps.inner.FetchCompletion(ctx, req.Provider, infReq, opts)
@@ -204,6 +258,67 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	}}
 
 	return resp, err
+}
+
+func (ps *ProviderSetAPI) deriveCapabilitiesFromPreset(
+	ctx context.Context,
+	provider inferencegoSpec.ProviderName,
+	modelPresetID modelpresetSpec.ModelPresetID,
+	requestModelName inferencegoSpec.ModelName,
+) (*inferencegoSpec.ModelCapabilities, error) {
+	if ps == nil || ps.inner == nil {
+		return nil, errors.New("providerset is not initialized")
+	}
+
+	if provider == "" {
+		return nil, errors.New("provider is required for capability derivation")
+	}
+	if strings.TrimSpace(string(modelPresetID)) == "" {
+		return nil, errors.New("modelPresetID is required for capability derivation")
+	}
+	if ps.mpStore == nil {
+		return nil, errors.New("model preset store not configured on inference wrapper")
+	}
+
+	// Load preset spec (contains provider+model overrides).
+	presp, err := ps.mpStore.GetModelPreset(ctx, &modelpresetSpec.GetModelPresetRequest{
+		ProviderName:    provider,
+		ModelPresetID:   modelPresetID,
+		IncludeDisabled: false,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if presp == nil || presp.Body == nil {
+		return nil, errors.New("GetModelPresetSpec: empty response")
+	}
+
+	presetModelName := inferencegoSpec.ModelName(presp.Body.Model.Name)
+
+	// Hardening: ensure model name consistency.
+	if requestModelName != "" && presetModelName != "" && requestModelName != presetModelName {
+		return nil, fmt.Errorf("model name mismatch: request=%q preset=%q", requestModelName, presetModelName)
+	}
+
+	modelName := requestModelName
+	if modelName == "" {
+		modelName = presetModelName
+	}
+	if modelName == "" {
+		return nil, errors.New("cannot derive capabilities: model name is empty")
+	}
+
+	// Base capabilities from inference-go/provider SDK.
+	base, err := ps.inner.GetProviderCapability(ctx, provider)
+	if err != nil {
+		return nil, err
+	}
+
+	derived := cloneModelCapabilities(base)
+	applyModelCapabilitiesOverride(&derived, presp.Body.Provider.CapabilitiesOverride)
+	applyModelCapabilitiesOverride(&derived, presp.Body.Model.CapabilitiesOverride)
+
+	return &derived, nil
 }
 
 // resolveModelParam chooses the effective ModelParam for this call.

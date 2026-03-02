@@ -12,7 +12,7 @@ import { AuthKeyTypeProvider } from '@/spec/setting';
 
 import { omitManyKeys } from '@/lib/obj_utils';
 
-import { settingstoreAPI } from '@/apis/baseapi';
+import { aggregateAPI } from '@/apis/baseapi';
 import { getAllProviderPresetsMap } from '@/apis/list_helper';
 
 import type { DropdownItem } from '@/components/dropdown';
@@ -250,7 +250,7 @@ export function AddEditAuthKeyModal({
 
 		const finalType = form.type === sentinelAddNew ? form.newType.trim() : form.type;
 
-		await settingstoreAPI.setAuthKey(finalType, form.keyName.trim(), form.secret.trim());
+		await aggregateAPI.setAuthKey(finalType, form.keyName.trim(), form.secret.trim());
 
 		onChanged();
 		// Close via native dialog API; this will trigger handleDialogClose -> parent onClose()

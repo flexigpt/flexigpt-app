@@ -15,15 +15,16 @@ import (
 const AppTitle = "FlexiGPT"
 
 type App struct {
-	ctx                    context.Context
+	ctx context.Context
+
 	settingStoreAPI        *SettingStoreWrapper
 	conversationStoreAPI   *ConversationCollectionWrapper
 	modelPresetStoreAPI    *ModelPresetStoreWrapper
 	promptTemplateStoreAPI *PromptTemplateStoreWrapper
 	toolStoreAPI           *ToolStoreWrapper
 	toolRuntimeAPI         *ToolRuntimeWrapper
-	providerSetAPI         *ProviderSetWrapper
 	skillStoreAPI          *SkillStoreWrapper
+	aggregateAPI           *AggregrateWrapper
 
 	dataBasePath string
 
@@ -72,12 +73,12 @@ func NewApp() *App {
 	// Therefore, the pattern followed is to create a hollow struct in new and then init in startup.
 	app.settingStoreAPI = &SettingStoreWrapper{}
 	app.conversationStoreAPI = &ConversationCollectionWrapper{}
-	app.providerSetAPI = &ProviderSetWrapper{}
 	app.modelPresetStoreAPI = &ModelPresetStoreWrapper{}
 	app.promptTemplateStoreAPI = &PromptTemplateStoreWrapper{}
 	app.toolStoreAPI = &ToolStoreWrapper{}
 	app.skillStoreAPI = &SkillStoreWrapper{}
 	app.toolRuntimeAPI = &ToolRuntimeWrapper{}
+	app.aggregateAPI = &AggregrateWrapper{}
 
 	if err := os.MkdirAll(app.settingsDirPath, os.FileMode(0o770)); err != nil {
 		slog.Error(
@@ -202,16 +203,21 @@ func (a *App) initManagers() {
 	}
 	slog.Info("skill store initialized", "directory", a.skillsDirPath)
 
-	err = InitProviderSetWrapper(a.providerSetAPI, a.toolStoreAPI.store)
+	err = InitModelPresetStoreWrapper(
+		a.modelPresetStoreAPI,
+		a.modelPresetsDirPath,
+	)
 	if err != nil {
 		slog.Error(
-			"couldn't initialize provider set",
+			"couldn't initialize model presets store",
+			"dir", a.modelPresetsDirPath,
 			"error", err,
 		)
-		panic("failed to initialize managers: provider set initialization failed")
+		panic("failed to initialize managers: model presets store initialization failed")
 	}
+	slog.Info("model presets store initialized", "dir", a.modelPresetsDirPath)
 
-	err = InitSettingStoreWrapper(a.settingStoreAPI, a.providerSetAPI, a.settingsDirPath)
+	err = InitSettingStoreWrapper(a.settingStoreAPI, a.settingsDirPath)
 	if err != nil {
 		slog.Error(
 			"couldn't initialize settings store",
@@ -222,19 +228,18 @@ func (a *App) initManagers() {
 	}
 	slog.Info("settings store initialized", "directory", a.settingsDirPath)
 
-	err = InitModelPresetStoreWrapper(
-		a.modelPresetStoreAPI,
-		a.settingStoreAPI,
-		a.providerSetAPI,
-		a.modelPresetsDirPath,
+	err = InitAggregrateWrapper(
+		a.aggregateAPI,
+		a.modelPresetStoreAPI.store,
+		a.settingStoreAPI.store,
+		a.toolStoreAPI.store,
 	)
 	if err != nil {
 		slog.Error(
-			"couldn't initialize model presets store",
-			"dir", a.modelPresetsDirPath,
+			"couldn't initialize aggregate",
 			"error", err,
 		)
-		panic("failed to initialize managers: model presets store initialization failed")
+		panic("failed to initialize managers: aggregate initialization failed")
 	}
 	slog.Info("model presets store initialized", "dir", a.modelPresetsDirPath)
 }

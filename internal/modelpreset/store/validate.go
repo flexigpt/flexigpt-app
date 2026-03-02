@@ -35,6 +35,9 @@ func validateProviderPreset(pp *spec.ProviderPreset) error {
 	if strings.TrimSpace(pp.ChatCompletionPathPrefix) == "" {
 		return fmt.Errorf("provider %q: chatCompletionPathPrefix is empty", pp.Name)
 	}
+	if err := validateModelCapabilitiesOverride(pp.CapabilitiesOverride); err != nil {
+		return fmt.Errorf("provider %q: capabilitiesOverride: %w", pp.Name, err)
+	}
 	// Per-model validation and duplicate ID detection.
 	seenModel := map[spec.ModelPresetID]string{}
 	for mid, mp := range pp.ModelPresets {
@@ -114,6 +117,11 @@ func validateModelPreset(mp *spec.ModelPreset) error {
 	if err := validateStopSequences(mp.StopSequences); err != nil {
 		return fmt.Errorf("invalid stopSequences: %w", err)
 	}
+
+	if err := validateModelCapabilitiesOverride(mp.CapabilitiesOverride); err != nil {
+		return fmt.Errorf("capabilitiesOverride: %w", err)
+	}
+
 	return nil
 }
 
@@ -265,6 +273,187 @@ func validateReasoning(r *inferencegoSpec.ReasoningParam) error {
 			// OK.
 		default:
 			return fmt.Errorf("unknown summaryStyle %q", *r.SummaryStyle)
+		}
+	}
+	return nil
+}
+
+func validateModelCapabilitiesOverride(o *spec.ModelCapabilitiesOverride) error {
+	if o == nil {
+		return nil
+	}
+	if err := validateModalities(o.ModalitiesIn); err != nil {
+		return fmt.Errorf("modalitiesIn: %w", err)
+	}
+	if err := validateModalities(o.ModalitiesOut); err != nil {
+		return fmt.Errorf("modalitiesOut: %w", err)
+	}
+	if o.ReasoningCapabilities != nil {
+		if err := validateReasoningCapabilitiesOverride(o.ReasoningCapabilities); err != nil {
+			return fmt.Errorf("reasoningCapabilities: %w", err)
+		}
+	}
+	if o.StopSequenceCapabilities != nil {
+		if err := validateStopSequenceCapabilitiesOverride(o.StopSequenceCapabilities); err != nil {
+			return fmt.Errorf("stopSequenceCapabilities: %w", err)
+		}
+	}
+	if o.OutputCapabilities != nil {
+		if err := validateOutputCapabilitiesOverride(o.OutputCapabilities); err != nil {
+			return fmt.Errorf("outputCapabilities: %w", err)
+		}
+	}
+	if o.ToolCapabilities != nil {
+		if err := validateToolCapabilitiesOverride(o.ToolCapabilities); err != nil {
+			return fmt.Errorf("toolCapabilities: %w", err)
+		}
+	}
+	return nil
+}
+
+func validateModalities(mm []inferencegoSpec.Modality) error {
+	if mm == nil {
+		return nil
+	}
+	seen := map[inferencegoSpec.Modality]struct{}{}
+	for i, m := range mm {
+		if strings.TrimSpace(string(m)) == "" {
+			return fmt.Errorf("[%d] empty modality", i)
+		}
+		switch m {
+		case inferencegoSpec.ModalityTextIn,
+			inferencegoSpec.ModalityTextOut,
+			inferencegoSpec.ModalityImageIn,
+			inferencegoSpec.ModalityImageOut,
+			inferencegoSpec.ModalityFileIn,
+			inferencegoSpec.ModalityFileOut,
+			inferencegoSpec.ModalityAudioIn,
+			inferencegoSpec.ModalityAudioOut,
+			inferencegoSpec.ModalityVideoIn,
+			inferencegoSpec.ModalityVideoOut:
+			// OK.
+		default:
+			return fmt.Errorf("[%d] unknown modality %q", i, m)
+		}
+		if _, ok := seen[m]; ok {
+			return fmt.Errorf("[%d] duplicate modality %q", i, m)
+		}
+		seen[m] = struct{}{}
+	}
+	return nil
+}
+
+func validateReasoningCapabilitiesOverride(o *spec.ReasoningCapabilitiesOverride) error {
+	if o == nil {
+		return nil
+	}
+	if o.SupportedReasoningTypes != nil {
+		seen := map[inferencegoSpec.ReasoningType]struct{}{}
+		for i, t := range o.SupportedReasoningTypes {
+			switch t {
+			case inferencegoSpec.ReasoningTypeHybridWithTokens,
+				inferencegoSpec.ReasoningTypeSingleWithLevels:
+			default:
+				return fmt.Errorf("supportedReasoningTypes[%d] unknown type %q", i, t)
+			}
+			if _, ok := seen[t]; ok {
+				return fmt.Errorf("supportedReasoningTypes[%d] duplicate %q", i, t)
+			}
+			seen[t] = struct{}{}
+		}
+	}
+	if o.SupportedReasoningLevels != nil {
+		seen := map[inferencegoSpec.ReasoningLevel]struct{}{}
+		for i, l := range o.SupportedReasoningLevels {
+			switch l {
+			case inferencegoSpec.ReasoningLevelNone,
+				inferencegoSpec.ReasoningLevelMinimal,
+				inferencegoSpec.ReasoningLevelLow,
+				inferencegoSpec.ReasoningLevelMedium,
+				inferencegoSpec.ReasoningLevelHigh,
+				inferencegoSpec.ReasoningLevelXHigh:
+			default:
+				return fmt.Errorf("supportedReasoningLevels[%d] unknown level %q", i, l)
+			}
+			if _, ok := seen[l]; ok {
+				return fmt.Errorf("supportedReasoningLevels[%d] duplicate %q", i, l)
+			}
+			seen[l] = struct{}{}
+		}
+	}
+	return nil
+}
+
+func validateStopSequenceCapabilitiesOverride(o *spec.StopSequenceCapabilitiesOverride) error {
+	if o == nil {
+		return nil
+	}
+	if o.MaxSequences != nil && *o.MaxSequences < 0 {
+		return errors.New("maxSequences must be >= 0")
+	}
+	return nil
+}
+
+func validateOutputCapabilitiesOverride(o *spec.OutputCapabilitiesOverride) error {
+	if o == nil {
+		return nil
+	}
+	if o.SupportedOutputFormats != nil {
+		seen := map[inferencegoSpec.OutputFormatKind]struct{}{}
+		for i, k := range o.SupportedOutputFormats {
+			switch k {
+			case inferencegoSpec.OutputFormatKindText,
+				inferencegoSpec.OutputFormatKindJSONSchema:
+			default:
+				return fmt.Errorf("supportedOutputFormats[%d] unknown kind %q", i, k)
+			}
+			if _, ok := seen[k]; ok {
+				return fmt.Errorf("supportedOutputFormats[%d] duplicate %q", i, k)
+			}
+			seen[k] = struct{}{}
+		}
+	}
+	return nil
+}
+
+func validateToolCapabilitiesOverride(o *spec.ToolCapabilitiesOverride) error {
+	if o == nil {
+		return nil
+	}
+	if o.MaxForcedTools != nil && *o.MaxForcedTools < 0 {
+		return errors.New("maxForcedTools must be >= 0")
+	}
+	if o.SupportedToolTypes != nil {
+		seen := map[inferencegoSpec.ToolType]struct{}{}
+		for i, t := range o.SupportedToolTypes {
+			switch t {
+			case inferencegoSpec.ToolTypeFunction,
+				inferencegoSpec.ToolTypeCustom,
+				inferencegoSpec.ToolTypeWebSearch:
+			default:
+				return fmt.Errorf("supportedToolTypes[%d] unknown type %q", i, t)
+			}
+			if _, ok := seen[t]; ok {
+				return fmt.Errorf("supportedToolTypes[%d] duplicate %q", i, t)
+			}
+			seen[t] = struct{}{}
+		}
+	}
+	if o.SupportedToolPolicyModes != nil {
+		seen := map[inferencegoSpec.ToolPolicyMode]struct{}{}
+		for i, m := range o.SupportedToolPolicyModes {
+			switch m {
+			case inferencegoSpec.ToolPolicyModeAuto,
+				inferencegoSpec.ToolPolicyModeAny,
+				inferencegoSpec.ToolPolicyModeTool,
+				inferencegoSpec.ToolPolicyModeNone:
+			default:
+				return fmt.Errorf("supportedToolPolicyModes[%d] unknown mode %q", i, m)
+			}
+			if _, ok := seen[m]; ok {
+				return fmt.Errorf("supportedToolPolicyModes[%d] duplicate %q", i, m)
+			}
+			seen[m] = struct{}{}
 		}
 	}
 	return nil

@@ -9,13 +9,7 @@ import type {
 } from '@/spec/setting';
 
 import type { ISettingStoreAPI } from '@/apis/interface';
-import {
-	DeleteAuthKey,
-	GetAuthKey,
-	GetSettings,
-	SetAppTheme,
-	SetAuthKey,
-} from '@/apis/wailsjs/go/main/SettingStoreWrapper';
+import { GetAuthKey, GetSettings, SetAppTheme } from '@/apis/wailsjs/go/main/SettingStoreWrapper';
 import { type spec as wailsSpec } from '@/apis/wailsjs/go/models';
 
 /**
@@ -39,25 +33,6 @@ export class WailsSettingStoreAPI implements ISettingStoreAPI {
 		};
 		const resp = await GetAuthKey(r as wailsSpec.GetAuthKeyRequest);
 		return { secret: resp.Body?.secret ?? '', sha256: resp.Body?.sha256 ?? '', nonEmpty: resp.Body?.nonEmpty ?? false };
-	}
-
-	async deleteAuthKey(type: AuthKeyType, keyName: AuthKeyName): Promise<void> {
-		const r = {
-			Type: type,
-			KeyName: keyName,
-		};
-		await DeleteAuthKey(r as wailsSpec.DeleteAuthKeyRequest);
-	}
-
-	async setAuthKey(type: AuthKeyType, keyName: AuthKeyName, secret: string): Promise<void> {
-		const r = {
-			Type: type,
-			KeyName: keyName,
-			Body: {
-				secret: secret,
-			},
-		};
-		await SetAuthKey(r as wailsSpec.SetAuthKeyRequest);
 	}
 
 	async getSettings(forceFetch?: boolean): Promise<SettingsSchema> {

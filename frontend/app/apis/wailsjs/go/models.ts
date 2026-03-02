@@ -318,71 +318,6 @@ export namespace attachment {
 
 export namespace spec {
 	
-	export class AddProviderRequestBody {
-	    sdkType: string;
-	    origin: string;
-	    chatCompletionPathPrefix: string;
-	    apiKeyHeaderKey: string;
-	    defaultHeaders: Record<string, string>;
-	
-	    static createFrom(source: any = {}) {
-	        return new AddProviderRequestBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.sdkType = source["sdkType"];
-	        this.origin = source["origin"];
-	        this.chatCompletionPathPrefix = source["chatCompletionPathPrefix"];
-	        this.apiKeyHeaderKey = source["apiKeyHeaderKey"];
-	        this.defaultHeaders = source["defaultHeaders"];
-	    }
-	}
-	export class AddProviderRequest {
-	    Provider: string;
-	    Body?: AddProviderRequestBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new AddProviderRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Provider = source["Provider"];
-	        this.Body = this.convertValues(source["Body"], AddProviderRequestBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class AddProviderResponse {
-	
-	
-	    static createFrom(source: any = {}) {
-	        return new AddProviderResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	
-	    }
-	}
 	export class AppTheme {
 	    type: string;
 	    name: string;
@@ -2082,30 +2017,6 @@ export namespace spec {
 	
 	    }
 	}
-	export class DeleteProviderRequest {
-	    Provider: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new DeleteProviderRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Provider = source["Provider"];
-	    }
-	}
-	export class DeleteProviderResponse {
-	
-	
-	    static createFrom(source: any = {}) {
-	        return new DeleteProviderResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	
-	    }
-	}
 	export class DeleteSkillBundleRequest {
 	    BundleID: string;
 	
@@ -2351,6 +2262,323 @@ export namespace spec {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], GetDefaultProviderResponseBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class GetModelPresetRequest {
+	    ProviderName: string;
+	    ModelPresetID: string;
+	    IncludeDisabled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new GetModelPresetRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ProviderName = source["ProviderName"];
+	        this.ModelPresetID = source["ModelPresetID"];
+	        this.IncludeDisabled = source["IncludeDisabled"];
+	    }
+	}
+	export class ModelPreset {
+	    schemaVersion: string;
+	    id: string;
+	    name: string;
+	    displayName: string;
+	    slug: string;
+	    isEnabled: boolean;
+	    stream?: boolean;
+	    maxPromptLength?: number;
+	    maxOutputLength?: number;
+	    temperature?: number;
+	    reasoning?: ReasoningParam;
+	    systemPrompt?: string;
+	    timeout?: number;
+	    outputParam?: OutputParam;
+	    stopSequences?: string[];
+	    additionalParametersRawJSON?: string;
+	    capabilitiesOverride?: ModelCapabilitiesOverride;
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    modifiedAt: any;
+	    isBuiltIn: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ModelPreset(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.schemaVersion = source["schemaVersion"];
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.displayName = source["displayName"];
+	        this.slug = source["slug"];
+	        this.isEnabled = source["isEnabled"];
+	        this.stream = source["stream"];
+	        this.maxPromptLength = source["maxPromptLength"];
+	        this.maxOutputLength = source["maxOutputLength"];
+	        this.temperature = source["temperature"];
+	        this.reasoning = this.convertValues(source["reasoning"], ReasoningParam);
+	        this.systemPrompt = source["systemPrompt"];
+	        this.timeout = source["timeout"];
+	        this.outputParam = this.convertValues(source["outputParam"], OutputParam);
+	        this.stopSequences = source["stopSequences"];
+	        this.additionalParametersRawJSON = source["additionalParametersRawJSON"];
+	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], ModelCapabilitiesOverride);
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
+	        this.isBuiltIn = source["isBuiltIn"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ToolCapabilitiesOverride {
+	    supportedToolTypes?: string[];
+	    supportedToolPolicyModes?: string[];
+	    supportsParallelToolCalls?: boolean;
+	    maxForcedTools?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ToolCapabilitiesOverride(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supportedToolTypes = source["supportedToolTypes"];
+	        this.supportedToolPolicyModes = source["supportedToolPolicyModes"];
+	        this.supportsParallelToolCalls = source["supportsParallelToolCalls"];
+	        this.maxForcedTools = source["maxForcedTools"];
+	    }
+	}
+	export class OutputCapabilitiesOverride {
+	    supportedOutputFormats?: string[];
+	    supportsVerbosity?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new OutputCapabilitiesOverride(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supportedOutputFormats = source["supportedOutputFormats"];
+	        this.supportsVerbosity = source["supportsVerbosity"];
+	    }
+	}
+	export class StopSequenceCapabilitiesOverride {
+	    isSupported?: boolean;
+	    disallowedWithReasoning?: boolean;
+	    maxSequences?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new StopSequenceCapabilitiesOverride(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.isSupported = source["isSupported"];
+	        this.disallowedWithReasoning = source["disallowedWithReasoning"];
+	        this.maxSequences = source["maxSequences"];
+	    }
+	}
+	export class ReasoningCapabilitiesOverride {
+	    supportedReasoningTypes?: string[];
+	    supportedReasoningLevels?: string[];
+	    supportsSummaryStyle?: boolean;
+	    supportsEncryptedReasoningInput?: boolean;
+	    temperatureDisallowedWhenEnabled?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReasoningCapabilitiesOverride(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supportedReasoningTypes = source["supportedReasoningTypes"];
+	        this.supportedReasoningLevels = source["supportedReasoningLevels"];
+	        this.supportsSummaryStyle = source["supportsSummaryStyle"];
+	        this.supportsEncryptedReasoningInput = source["supportsEncryptedReasoningInput"];
+	        this.temperatureDisallowedWhenEnabled = source["temperatureDisallowedWhenEnabled"];
+	    }
+	}
+	export class ModelCapabilitiesOverride {
+	    modalitiesIn?: string[];
+	    modalitiesOut?: string[];
+	    reasoningCapabilities?: ReasoningCapabilitiesOverride;
+	    stopSequenceCapabilities?: StopSequenceCapabilitiesOverride;
+	    outputCapabilities?: OutputCapabilitiesOverride;
+	    toolCapabilities?: ToolCapabilitiesOverride;
+	
+	    static createFrom(source: any = {}) {
+	        return new ModelCapabilitiesOverride(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.modalitiesIn = source["modalitiesIn"];
+	        this.modalitiesOut = source["modalitiesOut"];
+	        this.reasoningCapabilities = this.convertValues(source["reasoningCapabilities"], ReasoningCapabilitiesOverride);
+	        this.stopSequenceCapabilities = this.convertValues(source["stopSequenceCapabilities"], StopSequenceCapabilitiesOverride);
+	        this.outputCapabilities = this.convertValues(source["outputCapabilities"], OutputCapabilitiesOverride);
+	        this.toolCapabilities = this.convertValues(source["toolCapabilities"], ToolCapabilitiesOverride);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ProviderPreset {
+	    schemaVersion: string;
+	    name: string;
+	    displayName: string;
+	    sdkType: string;
+	    isEnabled: boolean;
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    modifiedAt: any;
+	    isBuiltIn: boolean;
+	    origin: string;
+	    chatCompletionPathPrefix: string;
+	    apiKeyHeaderKey: string;
+	    defaultHeaders: Record<string, string>;
+	    capabilitiesOverride?: ModelCapabilitiesOverride;
+	    defaultModelPresetID: string;
+	    modelPresets: Record<string, ModelPreset>;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProviderPreset(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.schemaVersion = source["schemaVersion"];
+	        this.name = source["name"];
+	        this.displayName = source["displayName"];
+	        this.sdkType = source["sdkType"];
+	        this.isEnabled = source["isEnabled"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
+	        this.isBuiltIn = source["isBuiltIn"];
+	        this.origin = source["origin"];
+	        this.chatCompletionPathPrefix = source["chatCompletionPathPrefix"];
+	        this.apiKeyHeaderKey = source["apiKeyHeaderKey"];
+	        this.defaultHeaders = source["defaultHeaders"];
+	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], ModelCapabilitiesOverride);
+	        this.defaultModelPresetID = source["defaultModelPresetID"];
+	        this.modelPresets = this.convertValues(source["modelPresets"], ModelPreset, true);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class GetModelPresetResponseBody {
+	    provider: ProviderPreset;
+	    model: ModelPreset;
+	
+	    static createFrom(source: any = {}) {
+	        return new GetModelPresetResponseBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.provider = this.convertValues(source["provider"], ProviderPreset);
+	        this.model = this.convertValues(source["model"], ModelPreset);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class GetModelPresetResponse {
+	    Body?: GetModelPresetResponseBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new GetModelPresetResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], GetModelPresetResponseBody);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -3717,132 +3945,6 @@ export namespace spec {
 	        this.PageToken = source["PageToken"];
 	    }
 	}
-	export class ModelPreset {
-	    schemaVersion: string;
-	    id: string;
-	    name: string;
-	    displayName: string;
-	    slug: string;
-	    isEnabled: boolean;
-	    stream?: boolean;
-	    maxPromptLength?: number;
-	    maxOutputLength?: number;
-	    temperature?: number;
-	    reasoning?: ReasoningParam;
-	    systemPrompt?: string;
-	    timeout?: number;
-	    outputParam?: OutputParam;
-	    stopSequences?: string[];
-	    additionalParametersRawJSON?: string;
-	    // Go type: time
-	    createdAt: any;
-	    // Go type: time
-	    modifiedAt: any;
-	    isBuiltIn: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new ModelPreset(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.schemaVersion = source["schemaVersion"];
-	        this.id = source["id"];
-	        this.name = source["name"];
-	        this.displayName = source["displayName"];
-	        this.slug = source["slug"];
-	        this.isEnabled = source["isEnabled"];
-	        this.stream = source["stream"];
-	        this.maxPromptLength = source["maxPromptLength"];
-	        this.maxOutputLength = source["maxOutputLength"];
-	        this.temperature = source["temperature"];
-	        this.reasoning = this.convertValues(source["reasoning"], ReasoningParam);
-	        this.systemPrompt = source["systemPrompt"];
-	        this.timeout = source["timeout"];
-	        this.outputParam = this.convertValues(source["outputParam"], OutputParam);
-	        this.stopSequences = source["stopSequences"];
-	        this.additionalParametersRawJSON = source["additionalParametersRawJSON"];
-	        this.createdAt = this.convertValues(source["createdAt"], null);
-	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
-	        this.isBuiltIn = source["isBuiltIn"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ProviderPreset {
-	    schemaVersion: string;
-	    name: string;
-	    displayName: string;
-	    sdkType: string;
-	    isEnabled: boolean;
-	    // Go type: time
-	    createdAt: any;
-	    // Go type: time
-	    modifiedAt: any;
-	    isBuiltIn: boolean;
-	    origin: string;
-	    chatCompletionPathPrefix: string;
-	    apiKeyHeaderKey: string;
-	    defaultHeaders: Record<string, string>;
-	    defaultModelPresetID: string;
-	    modelPresets: Record<string, ModelPreset>;
-	
-	    static createFrom(source: any = {}) {
-	        return new ProviderPreset(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.schemaVersion = source["schemaVersion"];
-	        this.name = source["name"];
-	        this.displayName = source["displayName"];
-	        this.sdkType = source["sdkType"];
-	        this.isEnabled = source["isEnabled"];
-	        this.createdAt = this.convertValues(source["createdAt"], null);
-	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
-	        this.isBuiltIn = source["isBuiltIn"];
-	        this.origin = source["origin"];
-	        this.chatCompletionPathPrefix = source["chatCompletionPathPrefix"];
-	        this.apiKeyHeaderKey = source["apiKeyHeaderKey"];
-	        this.defaultHeaders = source["defaultHeaders"];
-	        this.defaultModelPresetID = source["defaultModelPresetID"];
-	        this.modelPresets = this.convertValues(source["modelPresets"], ModelPreset, true);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class ListProviderPresetsResponseBody {
 	    providers: ProviderPreset[];
 	    nextPageToken?: string;
@@ -4580,6 +4682,8 @@ export namespace spec {
 	
 	
 	
+	
+	
 	export class PatchDefaultProviderRequestBody {
 	    defaultProvider: string;
 	
@@ -4637,6 +4741,8 @@ export namespace spec {
 	}
 	export class PatchModelPresetRequestBody {
 	    isEnabled: boolean;
+	    capabilitiesOverride?: ModelCapabilitiesOverride;
+	    clearCapabilitiesOverride?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new PatchModelPresetRequestBody(source);
@@ -4645,7 +4751,27 @@ export namespace spec {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.isEnabled = source["isEnabled"];
+	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], ModelCapabilitiesOverride);
+	        this.clearCapabilitiesOverride = source["clearCapabilitiesOverride"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class PatchModelPresetRequest {
 	    ProviderName: string;
@@ -5289,6 +5415,7 @@ export namespace spec {
 	    outputParam?: OutputParam;
 	    stopSequences?: string[];
 	    additionalParametersRawJSON?: string;
+	    capabilitiesOverride?: ModelCapabilitiesOverride;
 	
 	    static createFrom(source: any = {}) {
 	        return new PutModelPresetRequestBody(source);
@@ -5310,6 +5437,7 @@ export namespace spec {
 	        this.outputParam = this.convertValues(source["outputParam"], OutputParam);
 	        this.stopSequences = source["stopSequences"];
 	        this.additionalParametersRawJSON = source["additionalParametersRawJSON"];
+	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], ModelCapabilitiesOverride);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -5537,6 +5665,7 @@ export namespace spec {
 	    chatCompletionPathPrefix: string;
 	    apiKeyHeaderKey?: string;
 	    defaultHeaders?: Record<string, string>;
+	    capabilitiesOverride?: ModelCapabilitiesOverride;
 	
 	    static createFrom(source: any = {}) {
 	        return new PutProviderPresetRequestBody(source);
@@ -5551,7 +5680,26 @@ export namespace spec {
 	        this.chatCompletionPathPrefix = source["chatCompletionPathPrefix"];
 	        this.apiKeyHeaderKey = source["apiKeyHeaderKey"];
 	        this.defaultHeaders = source["defaultHeaders"];
+	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], ModelCapabilitiesOverride);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class PutProviderPresetRequest {
 	    ProviderName: string;
@@ -5896,6 +6044,7 @@ export namespace spec {
 	
 	
 	
+	
 	export class SearchConversationsRequest {
 	    Query: string;
 	    PageToken: string;
@@ -6091,63 +6240,8 @@ export namespace spec {
 	
 	    }
 	}
-	export class SetProviderAPIKeyRequestBody {
-	    apiKey: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new SetProviderAPIKeyRequestBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.apiKey = source["apiKey"];
-	    }
-	}
-	export class SetProviderAPIKeyRequest {
-	    Provider: string;
-	    Body?: SetProviderAPIKeyRequestBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new SetProviderAPIKeyRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Provider = source["Provider"];
-	        this.Body = this.convertValues(source["Body"], SetProviderAPIKeyRequestBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class SetProviderAPIKeyResponse {
 	
 	
-	    static createFrom(source: any = {}) {
-	        return new SetProviderAPIKeyResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	
-	    }
-	}
 	
 	
 	

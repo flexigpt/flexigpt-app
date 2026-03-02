@@ -1,23 +1,66 @@
 import type { StoreConversationMessage } from '@/spec/conversation';
 import type { CompletionResponseBody, ModelParam, ProviderName } from '@/spec/inference';
+import type { ModelPresetID, PutProviderPresetPayload } from '@/spec/modelpreset';
+import type { AuthKeyName, AuthKeyType } from '@/spec/setting';
 import type { ToolStoreChoice } from '@/spec/tool';
 
 import { ensureMakeID } from '@/lib/uuid_utils';
 
-import type { IProviderSetAPI } from '@/apis/interface';
-import { CancelCompletion, FetchCompletion } from '@/apis/wailsjs/go/main/ProviderSetWrapper';
+import type { IAggregateAPI } from '@/apis/interface';
+import {
+	CancelCompletion,
+	DeleteAuthKey,
+	DeleteProviderPreset,
+	FetchCompletion,
+	PutProviderPreset,
+	SetAuthKey,
+} from '@/apis/wailsjs/go/main/AggregrateWrapper';
 import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
 import { EventsOff, EventsOn } from '@/apis/wailsjs/runtime/runtime';
 
-/**
- * @public
- */
-export class WailsProviderSetAPI implements IProviderSetAPI {
+export class WailsAggregateAPI implements IAggregateAPI {
+	async deleteAuthKey(type: AuthKeyType, keyName: AuthKeyName): Promise<void> {
+		const r = {
+			Type: type,
+			KeyName: keyName,
+		};
+		await DeleteAuthKey(r as wailsSpec.DeleteAuthKeyRequest);
+	}
+
+	async setAuthKey(type: AuthKeyType, keyName: AuthKeyName, secret: string): Promise<void> {
+		const r = {
+			Type: type,
+			KeyName: keyName,
+			Body: {
+				secret: secret,
+			},
+		};
+		await SetAuthKey(r as wailsSpec.SetAuthKeyRequest);
+	}
+
+	async putProviderPreset(providerName: ProviderName, payload: PutProviderPresetPayload): Promise<void> {
+		if (!providerName) throw new Error('Missing providerName or payload');
+		const r = {
+			ProviderName: providerName,
+			Body: payload as wailsSpec.PutProviderPresetRequestBody,
+		};
+		await PutProviderPreset(r as wailsSpec.PutProviderPresetRequest);
+	}
+
+	async deleteProviderPreset(providerName: ProviderName): Promise<void> {
+		if (!providerName) throw new Error('Missing providerName');
+		const r = {
+			ProviderName: providerName,
+		};
+		await DeleteProviderPreset(r as wailsSpec.DeleteProviderPresetRequest);
+	}
+
 	// Need an eventflow for getting completion.
 	// Implemented that in main App Wrapper than aiprovider go package.
 	// Wrapper redirects to providerSet after doing event handling
 	async fetchCompletion(
 		provider: ProviderName,
+		modelPresetID: ModelPresetID,
 		modelParams: ModelParam,
 		current: StoreConversationMessage,
 		history?: StoreConversationMessage[],
@@ -87,7 +130,7 @@ export class WailsProviderSetAPI implements IProviderSetAPI {
 		});
 
 		// Start backend call only after abort handling is attached / checked.
-		const responsePromise = FetchCompletion(provider, body, textCallbackId, thinkingCallbackId, rid);
+		const responsePromise = FetchCompletion(provider, modelPresetID, body, textCallbackId, thinkingCallbackId, rid);
 
 		try {
 			const resp = await Promise.race([responsePromise, abortPromise]);

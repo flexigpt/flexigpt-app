@@ -8,6 +8,7 @@ import type {
 import type { ConversationSearchItem, StoreConversation, StoreConversationMessage } from '@/spec/conversation';
 import type { CompletionResponseBody, ModelParam, ProviderName } from '@/spec/inference';
 import type {
+	ModelCapabilitiesOverride,
 	ModelPresetID,
 	ProviderPreset,
 	PutModelPresetPayload,
@@ -59,8 +60,6 @@ export interface IBackendAPI {
 export interface ISettingStoreAPI {
 	setAppTheme: (theme: AppTheme) => Promise<void>;
 	getAuthKey: (type: AuthKeyType, keyName: AuthKeyName) => Promise<AuthKey>;
-	deleteAuthKey: (type: AuthKeyType, keyName: AuthKeyName) => Promise<void>;
-	setAuthKey: (type: AuthKeyType, keyName: AuthKeyName, secret: string) => Promise<void>;
 	getSettings: (forceFetch?: boolean) => Promise<SettingsSchema>;
 }
 
@@ -125,15 +124,11 @@ export interface IModelPresetStoreAPI {
 
 	patchDefaultProvider(providerName: ProviderName): Promise<void>;
 
-	putProviderPreset(providerName: ProviderName, payload: PutProviderPresetPayload): Promise<void>;
-
 	patchProviderPreset(
 		providerName: ProviderName,
 		isEnabled?: boolean,
 		defaultModelPresetID?: ModelPresetID
 	): Promise<void>;
-
-	deleteProviderPreset(providerName: ProviderName): Promise<void>;
 
 	putModelPreset(
 		providerName: ProviderName,
@@ -141,7 +136,13 @@ export interface IModelPresetStoreAPI {
 		payload: PutModelPresetPayload
 	): Promise<void>;
 
-	patchModelPreset(providerName: ProviderName, modelPresetID: ModelPresetID, isEnabled: boolean): Promise<void>;
+	patchModelPreset(
+		providerName: ProviderName,
+		modelPresetID: ModelPresetID,
+		isEnabled: boolean,
+		capabilitiesOverride?: ModelCapabilitiesOverride,
+		clearCapabilitiesOverride?: boolean
+	): Promise<void>;
 
 	deleteModelPreset(providerName: ProviderName, modelPresetID: ModelPresetID): Promise<void>;
 
@@ -310,22 +311,6 @@ export interface IConversationStoreAPI {
 	) => Promise<{ conversations: ConversationSearchItem[]; nextToken?: string }>;
 }
 
-export interface IProviderSetAPI {
-	fetchCompletion(
-		provider: ProviderName,
-		modelParams: ModelParam,
-		current: StoreConversationMessage,
-		history?: StoreConversationMessage[],
-		toolStoreChoices?: ToolStoreChoice[],
-		requestId?: string,
-		signal?: AbortSignal,
-		onStreamTextData?: (textData: string) => void,
-		onStreamThinkingData?: (thinkingData: string) => void
-	): Promise<CompletionResponseBody | undefined>;
-
-	cancelCompletion(requestId: string): Promise<void>;
-}
-
 export interface IAttachmentsDropAPI {
 	/**
 	 * Must be idempotent. Registers the underlying platform event listener. returns cleanup func.
@@ -343,4 +328,26 @@ export interface IAttachmentsDropAPI {
 	 * Useful to navigate to /chats and let pending drops flush.
 	 */
 	setNoTargetHandler(fn: ((payload: AttachmentsDroppedPayload) => void) | null): void;
+}
+
+export interface IAggregateAPI {
+	putProviderPreset(providerName: ProviderName, payload: PutProviderPresetPayload): Promise<void>;
+	deleteProviderPreset(providerName: ProviderName): Promise<void>;
+	deleteAuthKey: (type: AuthKeyType, keyName: AuthKeyName) => Promise<void>;
+	setAuthKey: (type: AuthKeyType, keyName: AuthKeyName, secret: string) => Promise<void>;
+
+	fetchCompletion(
+		provider: ProviderName,
+		modelPresetID: ModelPresetID,
+		modelParams: ModelParam,
+		current: StoreConversationMessage,
+		history?: StoreConversationMessage[],
+		toolStoreChoices?: ToolStoreChoice[],
+		requestId?: string,
+		signal?: AbortSignal,
+		onStreamTextData?: (textData: string) => void,
+		onStreamThinkingData?: (thinkingData: string) => void
+	): Promise<CompletionResponseBody | undefined>;
+
+	cancelCompletion(requestId: string): Promise<void>;
 }

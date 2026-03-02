@@ -577,6 +577,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 				const { responseMessage, rawResponse } = await HandleCompletion(
 					options.providerName,
+					options.modelPresetID,
 					inputParams,
 					effectiveCurrentUserMsg,
 					history,

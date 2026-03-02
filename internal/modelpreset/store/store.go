@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -198,8 +199,9 @@ func (s *ModelPresetStore) PutProviderPreset(
 		Origin:                   req.Body.Origin,
 		ChatCompletionPathPrefix: req.Body.ChatCompletionPathPrefix,
 		APIKeyHeaderKey:          req.Body.APIKeyHeaderKey,
-		DefaultHeaders:           req.Body.DefaultHeaders,
+		DefaultHeaders:           maps.Clone(req.Body.DefaultHeaders),
 		ModelPresets:             map[spec.ModelPresetID]spec.ModelPreset{},
+		CapabilitiesOverride:     cloneModelCapabilitiesOverride(req.Body.CapabilitiesOverride),
 	}
 
 	// Validate.
@@ -220,6 +222,10 @@ func (s *ModelPresetStore) PutProviderPreset(
 		// Preserve existing models + default model when updating provider metadata.
 		pp.ModelPresets = existing.ModelPresets
 		pp.DefaultModelPresetID = existing.DefaultModelPresetID
+		// Preserve existing capabilities override if caller didn't provide a new one.
+		if req.Body.CapabilitiesOverride == nil {
+			pp.CapabilitiesOverride = existing.CapabilitiesOverride
+		}
 	}
 	pp.ModifiedAt = now
 	all.ProviderPresets[req.ProviderName] = pp
@@ -412,7 +418,9 @@ func (s *ModelPresetStore) ListProviderPresets(
 		}
 	}
 	// Collect user.
+	s.mu.RLock()
 	user, err := s.readAllUserPresets(false)
+	s.mu.RUnlock()
 	if err != nil {
 		return nil, err
 	}
@@ -521,9 +529,11 @@ func (s *ModelPresetStore) PutModelPreset(
 		OutputParam:                 req.Body.OutputParam,
 		StopSequences:               req.Body.StopSequences,
 		AdditionalParametersRawJSON: req.Body.AdditionalParametersRawJSON,
-		CreatedAt:                   now,
-		ModifiedAt:                  now,
-		IsBuiltIn:                   false,
+		CapabilitiesOverride:        cloneModelCapabilitiesOverride(req.Body.CapabilitiesOverride),
+
+		CreatedAt:  now,
+		ModifiedAt: now,
+		IsBuiltIn:  false,
 	}
 	if err := validateModelPreset(&mp); err != nil {
 		return nil, err
@@ -541,9 +551,13 @@ func (s *ModelPresetStore) PutModelPreset(
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", spec.ErrProviderNotFound, req.ProviderName)
 	}
-	// Keep createdAt if overwriting.
+	// Keep if overwriting.
 	if old, ok := pp.ModelPresets[req.ModelPresetID]; ok {
 		mp.CreatedAt = old.CreatedAt
+		// Preserve existing capabilities override if caller didn't provide a new one.
+		if req.Body.CapabilitiesOverride == nil {
+			mp.CapabilitiesOverride = old.CapabilitiesOverride
+		}
 	}
 	if pp.ModelPresets == nil {
 		pp.ModelPresets = map[spec.ModelPresetID]spec.ModelPreset{}
@@ -572,6 +586,10 @@ func (s *ModelPresetStore) PatchModelPreset(
 
 	// Built-in branch.
 	if _, err := s.builtinData.GetBuiltInProvider(ctx, req.ProviderName); err == nil {
+		if req.Body.CapabilitiesOverride != nil || req.Body.ClearCapabilitiesOverride {
+			return nil, fmt.Errorf("%w: model capabilities are read-only for built-in presets",
+				spec.ErrBuiltInReadOnly)
+		}
 		if _, err := s.builtinData.SetModelPresetEnabled(
 			ctx,
 			req.ProviderName, req.ModelPresetID, req.Body.IsEnabled,
@@ -601,11 +619,20 @@ func (s *ModelPresetStore) PatchModelPreset(
 		return nil, fmt.Errorf("%w: %s", spec.ErrModelPresetNotFound, req.ModelPresetID)
 	}
 	mp.IsEnabled = req.Body.IsEnabled
+	if req.Body.ClearCapabilitiesOverride {
+		mp.CapabilitiesOverride = nil
+	} else if req.Body.CapabilitiesOverride != nil {
+		mp.CapabilitiesOverride = cloneModelCapabilitiesOverride(req.Body.CapabilitiesOverride)
+	}
+
 	mp.ModifiedAt = time.Now().UTC()
 	pp.ModelPresets[req.ModelPresetID] = mp
 	pp.ModifiedAt = mp.ModifiedAt
 	all.ProviderPresets[req.ProviderName] = pp
 
+	if err := validateModelPreset(&mp); err != nil {
+		return nil, fmt.Errorf("invalid patched model preset: %w", err)
+	}
 	if err := s.writeAllUserPresets(all); err != nil {
 		return nil, err
 	}
@@ -658,6 +685,86 @@ func (s *ModelPresetStore) DeleteModelPreset(
 	return &spec.DeleteModelPresetResponse{}, nil
 }
 
+func (s *ModelPresetStore) GetModelPreset(
+	ctx context.Context,
+	req *spec.GetModelPresetRequest,
+) (*spec.GetModelPresetResponse, error) {
+	if req == nil || req.ProviderName == "" || req.ModelPresetID == "" {
+		return nil, fmt.Errorf("%w: providerName & modelPresetID required", spec.ErrInvalidDir)
+	}
+	if err := validateModelPresetID(req.ModelPresetID); err != nil {
+		return nil, err
+	}
+
+	includeDisabled := req.IncludeDisabled
+	provider := req.ProviderName
+	modelID := req.ModelPresetID
+
+	// 1) Prefer built-ins when provider exists there.
+	if s.builtinData != nil {
+		if pp, err := s.builtinData.GetBuiltInProvider(ctx, provider); err == nil {
+			mp, err := s.builtinData.GetBuiltInModelPreset(ctx, provider, modelID)
+			if err != nil {
+				return nil, err
+			}
+
+			if !includeDisabled {
+				if !pp.IsEnabled {
+					return nil, fmt.Errorf("%w: %s", spec.ErrProviderNotFound, provider)
+				}
+				if !mp.IsEnabled {
+					return nil, fmt.Errorf("%w: %s", spec.ErrModelPresetNotFound, modelID)
+				}
+			}
+
+			ppOut := cloneProviderPresetForInference(pp)
+			mpOut := cloneModelPresetForInference(mp)
+
+			return &spec.GetModelPresetResponse{
+				Body: &spec.GetModelPresetResponseBody{
+					Provider: ppOut,
+					Model:    mpOut,
+				},
+			}, nil
+		}
+	}
+
+	// 2) User provider/model.
+	s.mu.RLock()
+	all, err := s.readAllUserPresets(false)
+	s.mu.RUnlock()
+	if err != nil {
+		return nil, err
+	}
+	pp, ok := all.ProviderPresets[provider]
+	if !ok {
+		return nil, spec.ErrProviderNotFound
+	}
+	mp, ok := pp.ModelPresets[modelID]
+	if !ok {
+		return nil, spec.ErrModelPresetNotFound
+	}
+
+	if !includeDisabled {
+		if !pp.IsEnabled {
+			return nil, spec.ErrProviderNotFound
+		}
+		if !mp.IsEnabled {
+			return nil, spec.ErrModelPresetNotFound
+		}
+	}
+
+	ppOut := cloneProviderPresetForInference(pp)
+	mpOut := cloneModelPresetForInference(mp)
+
+	return &spec.GetModelPresetResponse{
+		Body: &spec.GetModelPresetResponseBody{
+			Provider: ppOut,
+			Model:    mpOut,
+		},
+	}, nil
+}
+
 func (s *ModelPresetStore) readAllUserPresets(force bool) (spec.PresetsSchema, error) {
 	raw, err := s.userStore.GetAll(force)
 	if err != nil {
@@ -667,10 +774,29 @@ func (s *ModelPresetStore) readAllUserPresets(force bool) (spec.PresetsSchema, e
 	if err := jsonencdec.MapToStructWithJSONTags(raw, &ps); err != nil {
 		return ps, err
 	}
+	// Harden: reject unexpected schema versions early.
+	if ps.SchemaVersion != "" && ps.SchemaVersion != spec.SchemaVersion {
+		return spec.PresetsSchema{}, fmt.Errorf("schemaVersion %q not equal to %q",
+			ps.SchemaVersion, spec.SchemaVersion)
+	}
+	if ps.ProviderPresets == nil {
+		ps.ProviderPresets = map[inferencegoSpec.ProviderName]spec.ProviderPreset{}
+	}
+	// Harden: validate on read to avoid operating on corrupted on-disk state.
+	for name, pp := range ps.ProviderPresets {
+		_ = name
+		if err := validateProviderPreset(&pp); err != nil {
+			return spec.PresetsSchema{}, fmt.Errorf("invalid stored provider preset %q: %w", pp.Name, err)
+		}
+	}
+
 	return ps, nil
 }
 
 func (s *ModelPresetStore) writeAllUserPresets(ps spec.PresetsSchema) error {
-	mp, _ := jsonencdec.StructWithJSONTagsToMap(ps)
+	mp, err := jsonencdec.StructWithJSONTagsToMap(ps)
+	if err != nil {
+		return err
+	}
 	return s.userStore.SetAll(mp)
 }

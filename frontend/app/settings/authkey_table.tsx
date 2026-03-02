@@ -6,7 +6,7 @@ import type { AuthKeyMeta } from '@/spec/setting';
 
 import { isBuiltInProviderAuthKeyName, useBuiltInsReady } from '@/hooks/use_builtin_provider';
 
-import { settingstoreAPI } from '@/apis/baseapi';
+import { aggregateAPI } from '@/apis/baseapi';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
@@ -27,7 +27,7 @@ export function AuthKeyTable({ authKeys, onEdit, onChanged }: AuthKeyTableProps)
 	}
 
 	const resetKey = async (meta: AuthKeyMeta) => {
-		await settingstoreAPI.setAuthKey(meta.type, meta.keyName, '');
+		await aggregateAPI.setAuthKey(meta.type, meta.keyName, '');
 		onChanged();
 	};
 
@@ -41,7 +41,7 @@ export function AuthKeyTable({ authKeys, onEdit, onChanged }: AuthKeyTableProps)
 
 	const confirmDelete = async () => {
 		if (!deleteTarget) return;
-		await settingstoreAPI.deleteAuthKey(deleteTarget.type, deleteTarget.keyName);
+		await aggregateAPI.deleteAuthKey(deleteTarget.type, deleteTarget.keyName);
 		setDeleteTarget(null);
 		onChanged();
 	};

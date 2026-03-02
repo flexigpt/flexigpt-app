@@ -55,14 +55,16 @@
     - user doesn't select skills,
       - nothing to do. remove any additional prompts if some state is present somewhere.
 
-- [ ] ModelParams enhancements
+- [x] ModelParams enhancements
   - [x] additional params from apis
     - [x] support in inference go api
     - [x] adapt in model preset spec and provider set
   - [x] UI for additional params in modelpreset
   - [x] UI for additional things in chatoptions
   - [x] validations in inference go for supporting modal capabilities verification.
-  - [ ] valid input output modalities, valid levels, valid reasoning types, etc need to be added to modelpresetspec.
+  - [x] valid input output modalities, valid levels, valid reasoning types, etc need to be added to modelpresetspec.
+
+- [ ] verify and add proper model preset valid capabilities per mdoel in inbuilt models
 
 - [ ] Better Attachments
   - [ ] docx, excel support

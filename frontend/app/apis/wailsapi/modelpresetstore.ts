@@ -1,22 +1,20 @@
 import type { ProviderName } from '@/spec/inference';
 import type {
+	ModelCapabilitiesOverride,
 	ModelPresetID,
 	ProviderPreset,
 	PutModelPresetPayload,
-	PutProviderPresetPayload,
 } from '@/spec/modelpreset';
 
 import type { IModelPresetStoreAPI } from '@/apis/interface';
 import {
 	DeleteModelPreset,
-	DeleteProviderPreset,
 	GetDefaultProvider,
 	ListProviderPresets,
 	PatchDefaultProvider,
 	PatchModelPreset,
 	PatchProviderPreset,
 	PutModelPreset,
-	PutProviderPreset,
 } from '@/apis/wailsjs/go/main/ModelPresetStoreWrapper';
 import type { spec } from '@/apis/wailsjs/go/models';
 
@@ -37,15 +35,6 @@ export class WailsModelPresetStoreAPI implements IModelPresetStoreAPI {
 		await PatchDefaultProvider(r as spec.PatchDefaultProviderRequest);
 	}
 
-	async putProviderPreset(providerName: ProviderName, payload: PutProviderPresetPayload): Promise<void> {
-		if (!providerName) throw new Error('Missing providerName or payload');
-		const r = {
-			ProviderName: providerName,
-			Body: payload as spec.PutProviderPresetRequestBody,
-		};
-		await PutProviderPreset(r as spec.PutProviderPresetRequest);
-	}
-
 	async patchProviderPreset(
 		providerName: ProviderName,
 		isEnabled?: boolean,
@@ -62,14 +51,6 @@ export class WailsModelPresetStoreAPI implements IModelPresetStoreAPI {
 		await PatchProviderPreset(r as spec.PatchProviderPresetRequest);
 	}
 
-	async deleteProviderPreset(providerName: ProviderName): Promise<void> {
-		if (!providerName) throw new Error('Missing providerName');
-		const r = {
-			ProviderName: providerName,
-		};
-		await DeleteProviderPreset(r as spec.DeleteProviderPresetRequest);
-	}
-
 	async putModelPreset(
 		providerName: ProviderName,
 		modelPresetID: ModelPresetID,
@@ -84,12 +65,22 @@ export class WailsModelPresetStoreAPI implements IModelPresetStoreAPI {
 		await PutModelPreset(r as spec.PutModelPresetRequest);
 	}
 
-	async patchModelPreset(providerName: ProviderName, modelPresetID: ModelPresetID, isEnabled: boolean): Promise<void> {
+	async patchModelPreset(
+		providerName: ProviderName,
+		modelPresetID: ModelPresetID,
+		isEnabled: boolean,
+		capabilitiesOverride?: ModelCapabilitiesOverride,
+		clearCapabilitiesOverride?: boolean
+	): Promise<void> {
 		if (!providerName || !modelPresetID) throw new Error('Missing arguments');
 		const r = {
 			ProviderName: providerName,
 			ModelPresetID: modelPresetID,
-			Body: { isEnabled: isEnabled } as spec.PatchModelPresetRequestBody,
+			Body: {
+				isEnabled: isEnabled,
+				capabilitiesOverride: capabilitiesOverride,
+				clearCapabilitiesOverride: clearCapabilitiesOverride,
+			} as spec.PatchModelPresetRequestBody,
 		} as spec.PatchModelPresetRequest;
 		await PatchModelPreset(r);
 	}

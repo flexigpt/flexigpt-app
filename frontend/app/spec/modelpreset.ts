@@ -14,6 +14,56 @@ export type ModelPresetID = string;
 
 export type ProviderDisplayName = string;
 
+/**
+ * @public
+ */
+export interface ToolCapabilitiesOverride {
+	supportedToolTypes?: string[];
+	supportedToolPolicyModes?: string[];
+	supportsParallelToolCalls?: boolean;
+	maxForcedTools?: number;
+}
+
+/**
+ * @public
+ */
+export interface OutputCapabilitiesOverride {
+	supportedOutputFormats?: string[];
+	supportsVerbosity?: boolean;
+}
+
+/**
+ * @public
+ */
+export interface StopSequenceCapabilitiesOverride {
+	isSupported?: boolean;
+	disallowedWithReasoning?: boolean;
+	maxSequences?: number;
+}
+
+/**
+ * @public
+ */
+export interface ReasoningCapabilitiesOverride {
+	supportedReasoningTypes?: string[];
+	supportedReasoningLevels?: string[];
+	supportsSummaryStyle?: boolean;
+	supportsEncryptedReasoningInput?: boolean;
+	temperatureDisallowedWhenEnabled?: boolean;
+}
+
+/**
+ * @public
+ */
+export interface ModelCapabilitiesOverride {
+	modalitiesIn?: string[];
+	modalitiesOut?: string[];
+	reasoningCapabilities?: ReasoningCapabilitiesOverride;
+	stopSequenceCapabilities?: StopSequenceCapabilitiesOverride;
+	outputCapabilities?: OutputCapabilitiesOverride;
+	toolCapabilities?: ToolCapabilitiesOverride;
+}
+
 export interface PutModelPresetPayload {
 	name: ModelName;
 	slug: ModelSlug;
@@ -29,6 +79,7 @@ export interface PutModelPresetPayload {
 	systemPrompt?: string;
 	timeout?: number;
 	additionalParametersRawJSON?: string;
+	capabilitiesOverride?: ModelCapabilitiesOverride;
 }
 
 export interface ModelPreset extends PutModelPresetPayload {
@@ -37,7 +88,6 @@ export interface ModelPreset extends PutModelPresetPayload {
 }
 
 export interface PutProviderPresetPayload {
-	name: ProviderName;
 	displayName: ProviderDisplayName;
 	sdkType: ProviderSDKType;
 	isEnabled: boolean;
@@ -45,8 +95,11 @@ export interface PutProviderPresetPayload {
 	chatCompletionPathPrefix: string;
 	apiKeyHeaderKey: string;
 	defaultHeaders: Record<string, string>;
+	capabilitiesOverride?: ModelCapabilitiesOverride;
 }
+
 export interface ProviderPreset extends PutProviderPresetPayload {
+	name: ProviderName;
 	isBuiltIn: boolean;
 	defaultModelPresetID: ModelPresetID;
 	modelPresets: Record<ModelPresetID, ModelPreset>;

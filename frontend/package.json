@@ -110,8 +110,9 @@
 		],
 		"ignore": [
 			"app/apis/wailsjs/runtime/runtime.js",
-			"app/apis/wailsjs/go/main/ProviderSetWrapper.js",
 			"app/apis/wailsjs/go/main/SkillStoreWrapper.js",
+			"app/apis/wailsjs/go/main/ModelPresetStoreWrapper.js",
+			"app/spec/inference_capabilities.ts",
 			"app/lib/logger.ts",
 			"app/components/editor/plugins/auto_format_kit.tsx"
 		],

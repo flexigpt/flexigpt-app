@@ -6,12 +6,12 @@ export function DeleteModelPreset(arg1) {
   return window['go']['main']['ModelPresetStoreWrapper']['DeleteModelPreset'](arg1);
 }
 
-export function DeleteProviderPreset(arg1) {
-  return window['go']['main']['ModelPresetStoreWrapper']['DeleteProviderPreset'](arg1);
-}
-
 export function GetDefaultProvider(arg1) {
   return window['go']['main']['ModelPresetStoreWrapper']['GetDefaultProvider'](arg1);
+}
+
+export function GetModelPreset(arg1) {
+  return window['go']['main']['ModelPresetStoreWrapper']['GetModelPreset'](arg1);
 }
 
 export function ListProviderPresets(arg1) {
@@ -32,8 +32,4 @@ export function PatchProviderPreset(arg1) {
 
 export function PutModelPreset(arg1) {
   return window['go']['main']['ModelPresetStoreWrapper']['PutModelPreset'](arg1);
-}
-
-export function PutProviderPreset(arg1) {
-  return window['go']['main']['ModelPresetStoreWrapper']['PutProviderPreset'](arg1);
 }

@@ -4,9 +4,9 @@ import {spec} from '../models';
 
 export function DeleteModelPreset(arg1:spec.DeleteModelPresetRequest):Promise<spec.DeleteModelPresetResponse>;
 
-export function DeleteProviderPreset(arg1:spec.DeleteProviderPresetRequest):Promise<spec.DeleteProviderPresetResponse>;
-
 export function GetDefaultProvider(arg1:spec.GetDefaultProviderRequest):Promise<spec.GetDefaultProviderResponse>;
+
+export function GetModelPreset(arg1:spec.GetModelPresetRequest):Promise<spec.GetModelPresetResponse>;
 
 export function ListProviderPresets(arg1:spec.ListProviderPresetsRequest):Promise<spec.ListProviderPresetsResponse>;
 
@@ -17,5 +17,3 @@ export function PatchModelPreset(arg1:spec.PatchModelPresetRequest):Promise<spec
 export function PatchProviderPreset(arg1:spec.PatchProviderPresetRequest):Promise<spec.PatchProviderPresetResponse>;
 
 export function PutModelPreset(arg1:spec.PutModelPresetRequest):Promise<spec.PutModelPresetResponse>;
-
-export function PutProviderPreset(arg1:spec.PutProviderPresetRequest):Promise<spec.PutProviderPresetResponse>;

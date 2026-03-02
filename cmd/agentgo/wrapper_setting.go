@@ -3,26 +3,22 @@ package main
 import (
 	"context"
 
-	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
-	inferencegoSpec "github.com/flexigpt/inference-go/spec"
 
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
 	settingStore "github.com/flexigpt/flexigpt-app/internal/setting/store"
 )
 
 type SettingStoreWrapper struct {
-	store              *settingStore.SettingStore
-	providerSetWrapper *ProviderSetWrapper
+	store *settingStore.SettingStore
 }
 
 // InitSettingStoreWrapper boots the underlying store and remembers the pointer.
 func InitSettingStoreWrapper(
 	w *SettingStoreWrapper,
-	providerSetWrapper *ProviderSetWrapper,
 	baseDir string,
 ) error {
-	if w == nil || providerSetWrapper == nil {
+	if w == nil {
 		panic("initialising SettingStoreWrapper with <nil> receivers")
 	}
 	ss, err := settingStore.NewSettingStore(baseDir)
@@ -30,7 +26,7 @@ func InitSettingStoreWrapper(
 		return err
 	}
 	w.store = ss
-	w.providerSetWrapper = providerSetWrapper
+
 	return nil
 }
 
@@ -55,48 +51,5 @@ func (w *SettingStoreWrapper) GetAuthKey(
 ) (*settingSpec.GetAuthKeyResponse, error) {
 	return middleware.WithRecoveryResp(func() (*settingSpec.GetAuthKeyResponse, error) {
 		return w.store.GetAuthKey(context.Background(), req)
-	})
-}
-
-func (w *SettingStoreWrapper) SetAuthKey(
-	req *settingSpec.SetAuthKeyRequest,
-) (*settingSpec.SetAuthKeyResponse, error) {
-	return middleware.WithRecoveryResp(func() (*settingSpec.SetAuthKeyResponse, error) {
-		if req.Type == settingSpec.AuthKeyTypeProvider {
-			_, err := w.providerSetWrapper.SetProviderAPIKey(
-				&inferencewrapperSpec.SetProviderAPIKeyRequest{
-					Provider: inferencegoSpec.ProviderName(req.KeyName),
-					Body:     &inferencewrapperSpec.SetProviderAPIKeyRequestBody{APIKey: req.Body.Secret},
-				},
-			)
-			if err != nil {
-				return nil, err
-			}
-		}
-		resp, err := w.store.SetAuthKey(context.Background(), req)
-		if err != nil {
-			return nil, err
-		}
-		return resp, nil
-	})
-}
-
-func (w *SettingStoreWrapper) DeleteAuthKey(
-	req *settingSpec.DeleteAuthKeyRequest,
-) (*settingSpec.DeleteAuthKeyResponse, error) {
-	return middleware.WithRecoveryResp(func() (*settingSpec.DeleteAuthKeyResponse, error) {
-		resp, err := w.store.DeleteAuthKey(context.Background(), req)
-		if err != nil {
-			return nil, err
-		}
-		if req.Type == settingSpec.AuthKeyTypeProvider {
-			_, _ = w.providerSetWrapper.SetProviderAPIKey(
-				&inferencewrapperSpec.SetProviderAPIKeyRequest{
-					Provider: inferencegoSpec.ProviderName(req.KeyName),
-					Body:     &inferencewrapperSpec.SetProviderAPIKeyRequestBody{APIKey: ""},
-				},
-			)
-		}
-		return resp, nil
 	})
 }

@@ -22,13 +22,14 @@ type GetDefaultProviderResponse struct {
 }
 
 type PutProviderPresetRequestBody struct {
-	DisplayName              ProviderDisplayName             `json:"displayName"               required:"true"`
-	SDKType                  inferencegoSpec.ProviderSDKType `json:"sdkType"                   required:"true"`
-	IsEnabled                bool                            `json:"isEnabled"                 required:"true"`
-	Origin                   string                          `json:"origin"                    required:"true"`
-	ChatCompletionPathPrefix string                          `json:"chatCompletionPathPrefix"  required:"true"`
+	DisplayName              ProviderDisplayName             `json:"displayName"                    required:"true"`
+	SDKType                  inferencegoSpec.ProviderSDKType `json:"sdkType"                        required:"true"`
+	IsEnabled                bool                            `json:"isEnabled"                      required:"true"`
+	Origin                   string                          `json:"origin"                         required:"true"`
+	ChatCompletionPathPrefix string                          `json:"chatCompletionPathPrefix"       required:"true"`
 	APIKeyHeaderKey          string                          `json:"apiKeyHeaderKey,omitempty"`
 	DefaultHeaders           map[string]string               `json:"defaultHeaders,omitempty"`
+	CapabilitiesOverride     *ModelCapabilitiesOverride      `json:"capabilitiesOverride,omitempty"`
 }
 type PutProviderPresetRequest struct {
 	ProviderName inferencegoSpec.ProviderName `path:"providerName" required:"true"`
@@ -71,7 +72,8 @@ type PutModelPresetRequestBody struct {
 	OutputParam   *inferencegoSpec.OutputParam `json:"outputParam,omitempty"`
 	StopSequences []string                     `json:"stopSequences,omitempty"`
 
-	AdditionalParametersRawJSON *string `json:"additionalParametersRawJSON,omitempty"`
+	AdditionalParametersRawJSON *string                    `json:"additionalParametersRawJSON,omitempty"`
+	CapabilitiesOverride        *ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
 }
 
 type PutModelPresetRequest struct {
@@ -83,6 +85,10 @@ type PutModelPresetResponse struct{}
 
 type PatchModelPresetRequestBody struct {
 	IsEnabled bool `json:"isEnabled" required:"true"`
+	// CapabilitiesOverride can only be patched for USER provider presets (not built-ins).
+	// To clear the override entirely, set ClearCapabilitiesOverride=true.
+	CapabilitiesOverride      *ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
+	ClearCapabilitiesOverride bool                       `json:"clearCapabilitiesOverride,omitempty"`
 }
 
 type PatchModelPresetRequest struct {
@@ -97,6 +103,27 @@ type DeleteModelPresetRequest struct {
 	ModelPresetID ModelPresetID                `path:"modelPresetID" required:"true"`
 }
 type DeleteModelPresetResponse struct{}
+
+type GetModelPresetRequest struct {
+	ProviderName  inferencegoSpec.ProviderName `path:"providerName"  required:"true"`
+	ModelPresetID ModelPresetID                `path:"modelPresetID" required:"true"`
+
+	// If false, disabled provider/model return an error.
+	IncludeDisabled bool `query:"includeDisabled"`
+}
+
+type GetModelPresetResponseBody struct {
+	// Provider includes CapabilitiesOverride (provider-wide).
+	// ModelPresets map is intentionally omitted/empty in store response for safety/perf.
+	Provider ProviderPreset `json:"provider"`
+
+	// Model includes Name + CapabilitiesOverride (model-specific).
+	Model ModelPreset `json:"model"`
+}
+
+type GetModelPresetResponse struct {
+	Body *GetModelPresetResponseBody
+}
 
 type ProviderPageToken struct {
 	Names           []inferencegoSpec.ProviderName `json:"n,omitempty"` //nolint:tagliatelle // PageToken Specific.
