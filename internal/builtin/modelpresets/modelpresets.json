@@ -33,12 +33,18 @@
 					"maxOutputLength": 128000,
 					"temperature": 0.1,
 					"reasoning": {
-						"type": "hybridWithTokens",
-						"level": "",
-						"tokens": 1024
+						"type": "singleWithLevels",
+						"level": "high",
+						"tokens": 0
 					},
 					"systemPrompt": "",
 					"timeout": 300,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": ["low", "medium", "high", "xhigh"]
+						}
+					},
 					"createdAt": "2026-02-13T00:00:00Z",
 					"modifiedAt": "2025-02-13T00:00:00Z",
 					"isBuiltIn": true
@@ -61,6 +67,11 @@
 					},
 					"systemPrompt": "",
 					"timeout": 300,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"supportedReasoningTypes": ["hybridWithTokens"]
+						}
+					},
 					"createdAt": "2025-11-26T00:00:00Z",
 					"modifiedAt": "2025-11-26T00:00:00Z",
 					"isBuiltIn": true
@@ -83,6 +94,11 @@
 					},
 					"systemPrompt": "",
 					"timeout": 300,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"supportedReasoningTypes": ["hybridWithTokens"]
+						}
+					},
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -99,12 +115,18 @@
 					"maxOutputLength": 64000,
 					"temperature": 0.1,
 					"reasoning": {
-						"type": "hybridWithTokens",
-						"level": "",
-						"tokens": 1024
+						"type": "singleWithLevels",
+						"level": "high",
+						"tokens": 0
 					},
 					"systemPrompt": "",
 					"timeout": 300,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": ["low", "medium", "high", "xhigh"]
+						}
+					},
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -127,6 +149,11 @@
 					},
 					"systemPrompt": "",
 					"timeout": 300,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"supportedReasoningTypes": ["hybridWithTokens"]
+						}
+					},
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -171,6 +198,11 @@
 					},
 					"systemPrompt": "",
 					"timeout": 300,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"supportedReasoningTypes": ["hybridWithTokens"]
+						}
+					},
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -252,14 +284,14 @@
 			"defaultHeaders": {
 				"content-type": "application/json"
 			},
-			"defaultModelPresetID": "gemini3Pro",
+			"defaultModelPresetID": "gemini31Pro",
 			"modelPresets": {
-				"gemini3Pro": {
+				"gemini31Pro": {
 					"schemaVersion": "2025-07-01",
-					"id": "gemini3Pro",
-					"name": "gemini-3-pro-preview",
-					"displayName": "GoogleAI Gemini 3 Pro",
-					"slug": "gemini3Pro",
+					"id": "gemini31Pro",
+					"name": "gemini-3.1-pro-preview",
+					"displayName": "GoogleAI Gemini 3.1 Pro",
+					"slug": "gemini31Pro",
 					"isEnabled": true,
 					"stream": true,
 					"maxPromptLength": 200000,
@@ -272,6 +304,14 @@
 					},
 					"systemPrompt": "",
 					"timeout": 300,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"temperatureDisallowedWhenEnabled": true,
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": ["low", "medium", "high"],
+							"supportsSummaryStyle": true
+						}
+					},
 					"createdAt": "2025-11-19T00:00:00Z",
 					"modifiedAt": "2025-11-19T00:00:00Z",
 					"isBuiltIn": true
@@ -294,6 +334,14 @@
 					},
 					"systemPrompt": "",
 					"timeout": 300,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"temperatureDisallowedWhenEnabled": true,
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": ["minimal", "low", "medium", "high"],
+							"supportsSummaryStyle": true
+						}
+					},
 					"createdAt": "2026-02-13T00:00:00Z",
 					"modifiedAt": "2025-02-13T00:00:00Z",
 					"isBuiltIn": true
@@ -316,6 +364,14 @@
 					},
 					"systemPrompt": "",
 					"timeout": 300,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"temperatureDisallowedWhenEnabled": true,
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": ["low", "medium", "high"],
+							"supportsSummaryStyle": true
+						}
+					},
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -338,6 +394,14 @@
 					},
 					"systemPrompt": "",
 					"timeout": 300,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"temperatureDisallowedWhenEnabled": true,
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": ["low", "medium", "high"],
+							"supportsSummaryStyle": true
+						}
+					},
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -527,6 +591,12 @@
 					"temperature": 0.1,
 					"systemPrompt": "",
 					"timeout": 300,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"supportedReasoningTypes": [],
+							"supportedReasoningLevels": []
+						}
+					},
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -544,6 +614,12 @@
 					"temperature": 0.1,
 					"systemPrompt": "",
 					"timeout": 300,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"supportedReasoningTypes": [],
+							"supportedReasoningLevels": []
+						}
+					},
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -561,6 +637,12 @@
 					"temperature": 0.1,
 					"systemPrompt": "",
 					"timeout": 300,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"supportedReasoningTypes": [],
+							"supportedReasoningLevels": []
+						}
+					},
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -578,6 +660,12 @@
 					"temperature": 0.1,
 					"systemPrompt": "",
 					"timeout": 300,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"supportedReasoningTypes": [],
+							"supportedReasoningLevels": []
+						}
+					},
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -602,6 +690,36 @@
 			},
 			"defaultModelPresetID": "gpt52",
 			"modelPresets": {
+				"gpt53Codex": {
+					"schemaVersion": "2025-07-01",
+					"id": "gpt53Codex",
+					"name": "gpt-5.3-codex",
+					"displayName": "OpenAI GPT 5.3 Codex",
+					"slug": "gpt53Codex",
+					"isEnabled": true,
+					"stream": true,
+					"maxPromptLength": 400000,
+					"maxOutputLength": 128000,
+					"temperature": 1.0,
+					"reasoning": {
+						"type": "singleWithLevels",
+						"level": "high",
+						"tokens": 0
+					},
+					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
+					"timeout": 1200,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"temperatureDisallowedWhenEnabled": true,
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": ["low", "medium", "high", "xhigh"],
+							"supportsSummaryStyle": true
+						}
+					},
+					"createdAt": "2025-07-30T00:00:00Z",
+					"modifiedAt": "2025-07-30T00:00:00Z",
+					"isBuiltIn": true
+				},
 				"gpt52": {
 					"schemaVersion": "2025-07-01",
 					"id": "gpt52",
@@ -620,6 +738,20 @@
 					},
 					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
 					"timeout": 1200,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"temperatureDisallowedWhenEnabled": true,
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": [
+								"none",
+								"low",
+								"medium",
+								"high",
+								"xhigh"
+							],
+							"supportsSummaryStyle": true
+						}
+					},
 					"createdAt": "2025-12-12T00:00:00Z",
 					"modifiedAt": "2025-12-12T00:00:00Z",
 					"isBuiltIn": true
@@ -642,6 +774,14 @@
 					},
 					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
 					"timeout": 1200,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"temperatureDisallowedWhenEnabled": true,
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": ["low", "medium", "high", "xhigh"],
+							"supportsSummaryStyle": true
+						}
+					},
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -664,6 +804,14 @@
 					},
 					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
 					"timeout": 1200,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"temperatureDisallowedWhenEnabled": true,
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": ["none", "low", "medium", "high"],
+							"supportsSummaryStyle": true
+						}
+					},
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -674,7 +822,7 @@
 					"name": "gpt-5.1-codex",
 					"displayName": "OpenAI GPT 5.1 Codex",
 					"slug": "gpt51codex",
-					"isEnabled": true,
+					"isEnabled": false,
 					"stream": true,
 					"maxPromptLength": 400000,
 					"maxOutputLength": 128000,
@@ -686,6 +834,14 @@
 					},
 					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
 					"timeout": 1200,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"temperatureDisallowedWhenEnabled": true,
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": ["low", "medium", "high"],
+							"supportsSummaryStyle": true
+						}
+					},
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -708,6 +864,14 @@
 					},
 					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
 					"timeout": 1200,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"temperatureDisallowedWhenEnabled": true,
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": ["low", "medium", "high"],
+							"supportsSummaryStyle": true
+						}
+					},
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -730,6 +894,14 @@
 					},
 					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
 					"timeout": 300,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"temperatureDisallowedWhenEnabled": true,
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": ["minimal", "low", "medium", "high"],
+							"supportsSummaryStyle": true
+						}
+					},
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true

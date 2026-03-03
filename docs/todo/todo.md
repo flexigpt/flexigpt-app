@@ -2,9 +2,10 @@
 
 ## Laundry list
 
-- [ ] opus 4.6 has now adaptive thinking which is basically thinking with levels
+- [x] opus 4.6 has now adaptive thinking which is basically thinking with levels
   - [x] inference go needs adjustment to support new anthropic sdk
-- [ ] verify and add proper model preset valid capabilities per model in inbuilt models
+- [x] verify and add proper model preset valid capabilities per model in inbuilt models
+- [ ] represent thinking capability overrides in ui.
 
 ## Features
 
