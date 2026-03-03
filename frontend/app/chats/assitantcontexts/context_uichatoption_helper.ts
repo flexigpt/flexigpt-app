@@ -5,6 +5,11 @@ import { AuthKeyTypeProvider, type SettingsSchema } from '@/spec/setting';
 import { modelPresetStoreAPI, settingstoreAPI } from '@/apis/baseapi';
 import { getAllProviderPresetsMap } from '@/apis/list_helper';
 
+import {
+	mergeModelCapabilitiesOverride,
+	sanitizeUIChatOptionByCapabilities,
+} from '@/chats/assitantcontexts/capabilities_override_helper';
+
 function hasApiKey(settings: SettingsSchema, providerName: ProviderName): boolean {
 	return settings.authKeys.some(k => k.type === AuthKeyTypeProvider && k.keyName === providerName && k.nonEmpty);
 }
@@ -61,6 +66,10 @@ export async function getChatInputOptions(): Promise<{
 				if (!modelPreset.isEnabled) continue;
 
 				const modelParams = buildModelParams(modelPreset);
+				const mergedCaps = mergeModelCapabilitiesOverride(
+					providerPreset.capabilitiesOverride,
+					modelPreset.capabilitiesOverride
+				);
 
 				const option: UIChatOption = {
 					...modelParams,
@@ -70,12 +79,13 @@ export async function getChatInputOptions(): Promise<{
 					providerDisplayName: providerPreset.displayName,
 					modelDisplayName: modelPreset.displayName,
 					disablePreviousMessages: false,
+					capabilitiesOverride: mergedCaps,
 				};
 
-				allOptions.push(option);
+				allOptions.push(sanitizeUIChatOptionByCapabilities(option));
 
 				if (providerName === defaultProviderName && modelPresetID === providerPreset.defaultModelPresetID) {
-					defaultOption = option;
+					defaultOption = sanitizeUIChatOptionByCapabilities(option);
 				}
 			}
 		}

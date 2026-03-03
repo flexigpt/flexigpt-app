@@ -6,6 +6,11 @@ import { type OutputVerbosity, type ReasoningLevel, ReasoningType } from '@/spec
 import { DefaultUIChatOptions, type UIChatOption } from '@/spec/modelpreset';
 
 import { AdvancedParamsModal } from '@/chats/assitantcontexts/advanced_params_modal';
+import {
+	getSupportedReasoningLevels,
+	sanitizeUIChatOptionByCapabilities,
+	supportsOutputVerbosity,
+} from '@/chats/assitantcontexts/capabilities_override_helper';
 import { getChatInputOptions } from '@/chats/assitantcontexts/context_uichatoption_helper';
 import { DisablePreviousMessagesCheckbox } from '@/chats/assitantcontexts/disable_checkbox';
 import { ModelDropdown } from '@/chats/assitantcontexts/model_dropdown';
@@ -35,7 +40,7 @@ export function AssistantContextBar({ onOptionsChange }: AssistantContextBarProp
 
 	const loadInitialItems = useCallback(async () => {
 		const r = await getChatInputOptions();
-		setSelectedModel(r.default);
+		setSelectedModel(sanitizeUIChatOptionByCapabilities(r.default));
 		setAllOptions(r.allOptions);
 		// Seed system prompts with current default if available
 		const initialSP = r.default.systemPrompt.trim();
@@ -71,10 +76,10 @@ export function AssistantContextBar({ onOptionsChange }: AssistantContextBarProp
 			if (modifiedOptions.temperature === undefined) {
 				modifiedOptions.temperature = DefaultUIChatOptions.temperature;
 			}
-			return modifiedOptions;
+			return sanitizeUIChatOptionByCapabilities(modifiedOptions);
 		}
 
-		return base;
+		return sanitizeUIChatOptionByCapabilities(base);
 	}, [selectedModel, disablePreviousMessages, isHybridReasoningEnabled]);
 
 	useEffect(() => {
@@ -129,6 +134,8 @@ export function AssistantContextBar({ onOptionsChange }: AssistantContextBarProp
 			};
 		});
 	}, []);
+
+	const verbosityEnabled = supportsOutputVerbosity(selectedModel.capabilitiesOverride);
 
 	const selectSystemPrompt = useCallback((item: SystemPromptItem) => {
 		setSelectedModel(prev => ({ ...prev, systemPrompt: item.prompt }));
@@ -225,6 +232,7 @@ export function AssistantContextBar({ onOptionsChange }: AssistantContextBarProp
 				<SingleReasoningDropdown
 					reasoningLevel={selectedModel.reasoning.level}
 					setReasoningLevel={setReasoningLevel}
+					levelOptions={getSupportedReasoningLevels(selectedModel.capabilitiesOverride)}
 					isOpen={isSecondaryDropdownOpen}
 					setIsOpen={setIsSecondaryDropdownOpen}
 				/>
@@ -238,12 +246,15 @@ export function AssistantContextBar({ onOptionsChange }: AssistantContextBarProp
 			)}
 
 			{/* Verbosity dropdown */}
-			<OutputVerbosityDropdown
-				verbosity={selectedModel.outputParam?.verbosity}
-				setVerbosity={setOutputVerbosity}
-				isOpen={isVerbosityDropdownOpen}
-				setIsOpen={setIsVerbosityDropdownOpen}
-			/>
+			{verbosityEnabled && (
+				<OutputVerbosityDropdown
+					verbosity={selectedModel.outputParam?.verbosity}
+					setVerbosity={setOutputVerbosity}
+					disabled={!verbosityEnabled}
+					isOpen={isVerbosityDropdownOpen}
+					setIsOpen={setIsVerbosityDropdownOpen}
+				/>
+			)}
 
 			<SystemPromptDropdown
 				prompts={systemPrompts}
@@ -288,7 +299,7 @@ export function AssistantContextBar({ onOptionsChange }: AssistantContextBarProp
 				}}
 				currentModel={selectedModel}
 				onSave={(updatedModel: UIChatOption) => {
-					setSelectedModel(updatedModel);
+					setSelectedModel(sanitizeUIChatOptionByCapabilities(updatedModel));
 				}}
 			/>
 		</div>

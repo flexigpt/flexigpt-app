@@ -725,3 +725,17 @@
 
 - [x] when we send attachments, like go files. openai is consuming a lot of tokens, i.e if tiktoken says x, is is almost 2x generally. check if we are sending things double or something. req debug details doesnt show double atleast, but better print and check.
   - [x] xml encoding caused bloat and resend did not clean hydrated inputs.
+
+- [x] opus 4.6 has now adaptive thinking which is basically thinking with levels
+  - [x] inference go needs adjustment to support new anthropic sdk
+- [x] verify and add proper model preset valid capabilities per model in inbuilt models
+- [x] represent thinking capability overrides in ui.
+
+- [x] ModelParams enhancements
+  - [x] additional params from apis
+    - [x] support in inference go api
+    - [x] adapt in model preset spec and provider set
+  - [x] UI for additional params in modelpreset
+  - [x] UI for additional things in chatoptions
+  - [x] validations in inference go for supporting modal capabilities verification.
+  - [x] valid input output modalities, valid levels, valid reasoning types, etc need to be added to modelpresetspec.

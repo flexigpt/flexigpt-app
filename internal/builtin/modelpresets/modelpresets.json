@@ -19,6 +19,39 @@
 				"accept": "application/json",
 				"anthropic-version": "2023-06-01"
 			},
+			"capabilitiesOverride": {
+				"modalitiesIn": ["textIn", "imageIn", "fileIn"],
+				"modalitiesOut": ["textOut"],
+				"reasoningCapabilities": {
+					"supportedReasoningTypes": ["hybridWithTokens", "singleWithLevels"],
+					"supportedReasoningLevels": [
+						"none",
+						"minimal",
+						"low",
+						"medium",
+						"high",
+						"xhigh"
+					],
+					"supportsSummaryStyle": false,
+					"supportsEncryptedReasoningInput": false,
+					"temperatureDisallowedWhenEnabled": true
+				},
+				"stopSequenceCapabilities": {
+					"isSupported": true,
+					"disallowedWithReasoning": false,
+					"maxSequences": 0
+				},
+				"outputCapabilities": {
+					"supportedOutputFormats": ["text", "jsonSchema"],
+					"supportsVerbosity": true
+				},
+				"toolCapabilities": {
+					"supportedToolTypes": ["function", "custom", "webSearch"],
+					"supportedToolPolicyModes": ["auto", "any", "tool", "none"],
+					"supportsParallelToolCalls": true,
+					"maxForcedTools": 1
+				}
+			},
 			"defaultModelPresetID": "sonnet46",
 			"modelPresets": {
 				"opus46": {
@@ -225,6 +258,39 @@
 			"defaultHeaders": {
 				"content-type": "application/json"
 			},
+			"capabilitiesOverride": {
+				"modalitiesIn": ["textIn", "imageIn", "fileIn"],
+				"modalitiesOut": ["textOut"],
+				"reasoningCapabilities": {
+					"supportedReasoningTypes": ["singleWithLevels"],
+					"supportedReasoningLevels": [
+						"none",
+						"minimal",
+						"low",
+						"medium",
+						"high",
+						"xhigh"
+					],
+					"supportsSummaryStyle": false,
+					"supportsEncryptedReasoningInput": false,
+					"temperatureDisallowedWhenEnabled": false
+				},
+				"stopSequenceCapabilities": {
+					"isSupported": true,
+					"disallowedWithReasoning": false,
+					"maxSequences": 4
+				},
+				"outputCapabilities": {
+					"supportedOutputFormats": ["text", "jsonSchema"],
+					"supportsVerbosity": true
+				},
+				"toolCapabilities": {
+					"supportedToolTypes": ["function", "custom", "webSearch"],
+					"supportedToolPolicyModes": ["auto", "any", "tool", "none"],
+					"supportsParallelToolCalls": true,
+					"maxForcedTools": 1
+				}
+			},
 			"defaultModelPresetID": "dsChat",
 			"modelPresets": {
 				"dsChat": {
@@ -283,6 +349,39 @@
 			"apiKeyHeaderKey": "Authorization",
 			"defaultHeaders": {
 				"content-type": "application/json"
+			},
+			"capabilitiesOverride": {
+				"modalitiesIn": ["textIn", "imageIn", "fileIn"],
+				"modalitiesOut": ["textOut"],
+				"reasoningCapabilities": {
+					"supportedReasoningTypes": ["singleWithLevels"],
+					"supportedReasoningLevels": [
+						"none",
+						"minimal",
+						"low",
+						"medium",
+						"high",
+						"xhigh"
+					],
+					"supportsSummaryStyle": false,
+					"supportsEncryptedReasoningInput": false,
+					"temperatureDisallowedWhenEnabled": false
+				},
+				"stopSequenceCapabilities": {
+					"isSupported": true,
+					"disallowedWithReasoning": false,
+					"maxSequences": 4
+				},
+				"outputCapabilities": {
+					"supportedOutputFormats": ["text", "jsonSchema"],
+					"supportsVerbosity": true
+				},
+				"toolCapabilities": {
+					"supportedToolTypes": ["function", "custom", "webSearch"],
+					"supportedToolPolicyModes": ["auto", "any", "tool", "none"],
+					"supportsParallelToolCalls": true,
+					"maxForcedTools": 1
+				}
 			},
 			"defaultModelPresetID": "gemini31Pro",
 			"modelPresets": {
@@ -424,6 +523,39 @@
 			"defaultHeaders": {
 				"content-type": "application/json"
 			},
+			"capabilitiesOverride": {
+				"modalitiesIn": ["textIn", "imageIn", "fileIn"],
+				"modalitiesOut": ["textOut"],
+				"reasoningCapabilities": {
+					"supportedReasoningTypes": ["singleWithLevels"],
+					"supportedReasoningLevels": [
+						"none",
+						"minimal",
+						"low",
+						"medium",
+						"high",
+						"xhigh"
+					],
+					"supportsSummaryStyle": false,
+					"supportsEncryptedReasoningInput": false,
+					"temperatureDisallowedWhenEnabled": false
+				},
+				"stopSequenceCapabilities": {
+					"isSupported": true,
+					"disallowedWithReasoning": false,
+					"maxSequences": 4
+				},
+				"outputCapabilities": {
+					"supportedOutputFormats": ["text", "jsonSchema"],
+					"supportsVerbosity": true
+				},
+				"toolCapabilities": {
+					"supportedToolTypes": ["function", "custom", "webSearch"],
+					"supportedToolPolicyModes": ["auto", "any", "tool", "none"],
+					"supportsParallelToolCalls": true,
+					"maxForcedTools": 1
+				}
+			},
 			"defaultModelPresetID": "hfGptOss20",
 			"modelPresets": {
 				"hfGptOss120": {
@@ -505,6 +637,39 @@
 			"defaultHeaders": {
 				"content-type": "application/json"
 			},
+			"capabilitiesOverride": {
+				"modalitiesIn": ["textIn", "imageIn", "fileIn"],
+				"modalitiesOut": ["textOut"],
+				"reasoningCapabilities": {
+					"supportedReasoningTypes": ["singleWithLevels"],
+					"supportedReasoningLevels": [
+						"none",
+						"minimal",
+						"low",
+						"medium",
+						"high",
+						"xhigh"
+					],
+					"supportsSummaryStyle": false,
+					"supportsEncryptedReasoningInput": false,
+					"temperatureDisallowedWhenEnabled": false
+				},
+				"stopSequenceCapabilities": {
+					"isSupported": true,
+					"disallowedWithReasoning": false,
+					"maxSequences": 4
+				},
+				"outputCapabilities": {
+					"supportedOutputFormats": ["text", "jsonSchema"],
+					"supportsVerbosity": true
+				},
+				"toolCapabilities": {
+					"supportedToolTypes": ["function", "custom", "webSearch"],
+					"supportedToolPolicyModes": ["auto", "any", "tool", "none"],
+					"supportsParallelToolCalls": true,
+					"maxForcedTools": 1
+				}
+			},
 			"defaultModelPresetID": "llama4Scout",
 			"modelPresets": {
 				"llama4Behemoth": {
@@ -575,6 +740,39 @@
 			"apiKeyHeaderKey": "Authorization",
 			"defaultHeaders": {
 				"content-type": "application/json"
+			},
+			"capabilitiesOverride": {
+				"modalitiesIn": ["textIn", "imageIn", "fileIn"],
+				"modalitiesOut": ["textOut"],
+				"reasoningCapabilities": {
+					"supportedReasoningTypes": ["singleWithLevels"],
+					"supportedReasoningLevels": [
+						"none",
+						"minimal",
+						"low",
+						"medium",
+						"high",
+						"xhigh"
+					],
+					"supportsSummaryStyle": false,
+					"supportsEncryptedReasoningInput": false,
+					"temperatureDisallowedWhenEnabled": false
+				},
+				"stopSequenceCapabilities": {
+					"isSupported": true,
+					"disallowedWithReasoning": false,
+					"maxSequences": 4
+				},
+				"outputCapabilities": {
+					"supportedOutputFormats": ["text", "jsonSchema"],
+					"supportsVerbosity": true
+				},
+				"toolCapabilities": {
+					"supportedToolTypes": ["function", "custom", "webSearch"],
+					"supportedToolPolicyModes": ["auto", "any", "tool", "none"],
+					"supportsParallelToolCalls": true,
+					"maxForcedTools": 1
+				}
 			},
 			"defaultModelPresetID": "gpt41",
 			"modelPresets": {
@@ -687,6 +885,39 @@
 			"apiKeyHeaderKey": "Authorization",
 			"defaultHeaders": {
 				"content-type": "application/json"
+			},
+			"capabilitiesOverride": {
+				"modalitiesIn": ["textIn", "imageIn", "fileIn"],
+				"modalitiesOut": ["textOut"],
+				"reasoningCapabilities": {
+					"supportedReasoningTypes": ["singleWithLevels"],
+					"supportedReasoningLevels": [
+						"none",
+						"minimal",
+						"low",
+						"medium",
+						"high",
+						"xhigh"
+					],
+					"supportsSummaryStyle": true,
+					"supportsEncryptedReasoningInput": true,
+					"temperatureDisallowedWhenEnabled": false
+				},
+				"stopSequenceCapabilities": {
+					"isSupported": false,
+					"disallowedWithReasoning": false,
+					"maxSequences": 0
+				},
+				"outputCapabilities": {
+					"supportedOutputFormats": ["text", "jsonSchema"],
+					"supportsVerbosity": true
+				},
+				"toolCapabilities": {
+					"supportedToolTypes": ["function", "custom", "webSearch"],
+					"supportedToolPolicyModes": ["auto", "any", "tool", "none"],
+					"supportsParallelToolCalls": true,
+					"maxForcedTools": 1
+				}
 			},
 			"defaultModelPresetID": "gpt52",
 			"modelPresets": {
@@ -925,6 +1156,39 @@
 				"HTTP-Referer": "https://github.com/flexigpt/flexigpt-app",
 				"X-Title": "FlexiGPT"
 			},
+			"capabilitiesOverride": {
+				"modalitiesIn": ["textIn", "imageIn", "fileIn"],
+				"modalitiesOut": ["textOut"],
+				"reasoningCapabilities": {
+					"supportedReasoningTypes": ["singleWithLevels"],
+					"supportedReasoningLevels": [
+						"none",
+						"minimal",
+						"low",
+						"medium",
+						"high",
+						"xhigh"
+					],
+					"supportsSummaryStyle": false,
+					"supportsEncryptedReasoningInput": false,
+					"temperatureDisallowedWhenEnabled": false
+				},
+				"stopSequenceCapabilities": {
+					"isSupported": true,
+					"disallowedWithReasoning": false,
+					"maxSequences": 4
+				},
+				"outputCapabilities": {
+					"supportedOutputFormats": ["text", "jsonSchema"],
+					"supportsVerbosity": true
+				},
+				"toolCapabilities": {
+					"supportedToolTypes": ["function", "custom", "webSearch"],
+					"supportedToolPolicyModes": ["auto", "any", "tool", "none"],
+					"supportsParallelToolCalls": true,
+					"maxForcedTools": 1
+				}
+			},
 			"defaultModelPresetID": "qwen3CoderFree",
 			"modelPresets": {
 				"qwen3CoderFree": {
@@ -961,6 +1225,39 @@
 			"apiKeyHeaderKey": "Authorization",
 			"defaultHeaders": {
 				"content-type": "application/json"
+			},
+			"capabilitiesOverride": {
+				"modalitiesIn": ["textIn", "imageIn", "fileIn"],
+				"modalitiesOut": ["textOut"],
+				"reasoningCapabilities": {
+					"supportedReasoningTypes": ["singleWithLevels"],
+					"supportedReasoningLevels": [
+						"none",
+						"minimal",
+						"low",
+						"medium",
+						"high",
+						"xhigh"
+					],
+					"supportsSummaryStyle": false,
+					"supportsEncryptedReasoningInput": false,
+					"temperatureDisallowedWhenEnabled": false
+				},
+				"stopSequenceCapabilities": {
+					"isSupported": true,
+					"disallowedWithReasoning": false,
+					"maxSequences": 4
+				},
+				"outputCapabilities": {
+					"supportedOutputFormats": ["text", "jsonSchema"],
+					"supportsVerbosity": true
+				},
+				"toolCapabilities": {
+					"supportedToolTypes": ["function", "custom", "webSearch"],
+					"supportedToolPolicyModes": ["auto", "any", "tool", "none"],
+					"supportsParallelToolCalls": true,
+					"maxForcedTools": 1
+				}
 			},
 			"defaultModelPresetID": "grok4FastReasoning",
 			"modelPresets": {

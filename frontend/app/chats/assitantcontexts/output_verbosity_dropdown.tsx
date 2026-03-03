@@ -9,6 +9,7 @@ import { OutputVerbosity } from '@/spec/inference';
 
 type OutputVerbosityDropdownProps = {
 	verbosity?: OutputVerbosity;
+	disabled?: boolean;
 	setVerbosity: (v?: OutputVerbosity) => void;
 	isOpen: boolean;
 	setIsOpen: Dispatch<SetStateAction<boolean>>;
@@ -30,15 +31,24 @@ function labelFor(v?: OutputVerbosity) {
 	return ': ' + l;
 }
 
-export function OutputVerbosityDropdown({ verbosity, setVerbosity, isOpen, setIsOpen }: OutputVerbosityDropdownProps) {
+export function OutputVerbosityDropdown({
+	verbosity,
+	disabled = false,
+	setVerbosity,
+	isOpen,
+	setIsOpen,
+}: OutputVerbosityDropdownProps) {
 	const select = useSelectStore({
 		value: verbosity ?? '',
 		setValue: value => {
 			if (typeof value !== 'string') return;
 			setVerbosity(value ? (value as OutputVerbosity) : undefined);
 		},
-		open: isOpen,
-		setOpen: setIsOpen,
+		open: disabled ? false : isOpen,
+		setOpen: open => {
+			if (disabled) return;
+			setIsOpen(open);
+		},
 		placement: 'top-start',
 		focusLoop: true,
 	});
@@ -50,8 +60,11 @@ export function OutputVerbosityDropdown({ verbosity, setVerbosity, isOpen, setIs
 			<div className="relative w-full">
 				<Select
 					store={select}
-					className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none text-center text-nowrap shadow-none"
-					title="Set effort/verbosity for model output"
+					disabled={disabled}
+					className={`btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none text-center text-nowrap shadow-none ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
+					title={
+						disabled ? 'Effort/Verbosity not supported by this model/provider' : 'Set effort/verbosity for model output'
+					}
 				>
 					<span className="min-w-0 truncate text-center text-xs font-normal">Effort{labelFor(verbosity)}</span>
 					{open ? (

@@ -112,6 +112,11 @@ export interface UIChatOption extends ModelParam {
 	providerDisplayName: ProviderDisplayName;
 	modelDisplayName: ModelDisplayName;
 	disablePreviousMessages: boolean;
+	/**
+	 * Effective (provider + model merged) capability overrides for this selectable option.
+	 * Model-level override wins over provider-level override.
+	 */
+	capabilitiesOverride?: ModelCapabilitiesOverride;
 }
 
 export const DefaultUIChatOptions: UIChatOption = {
@@ -122,4 +127,5 @@ export const DefaultUIChatOptions: UIChatOption = {
 	providerDisplayName: 'No Provider',
 	modelDisplayName: 'No Model configured',
 	disablePreviousMessages: false,
+	capabilitiesOverride: undefined,
 };

@@ -2,11 +2,6 @@
 
 ## Laundry list
 
-- [x] opus 4.6 has now adaptive thinking which is basically thinking with levels
-  - [x] inference go needs adjustment to support new anthropic sdk
-- [x] verify and add proper model preset valid capabilities per model in inbuilt models
-- [ ] represent thinking capability overrides in ui.
-
 ## Features
 
 - [ ] Agent skills
@@ -57,14 +52,9 @@
     - user doesn't select skills,
       - nothing to do. remove any additional prompts if some state is present somewhere.
 
-- [x] ModelParams enhancements
-  - [x] additional params from apis
-    - [x] support in inference go api
-    - [x] adapt in model preset spec and provider set
-  - [x] UI for additional params in modelpreset
-  - [x] UI for additional things in chatoptions
-  - [x] validations in inference go for supporting modal capabilities verification.
-  - [x] valid input output modalities, valid levels, valid reasoning types, etc need to be added to modelpresetspec.
+- [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls loop is better.
+  - [ ] this is a "feature" in anthropic and chargable for cache write.
+  - [ ] implement this after feature filters support and additional param support features in apis.
 
 - [ ] Better Attachments
   - [ ] docx, excel support
@@ -76,10 +66,6 @@
   - [ ] We may want to have a explicit prompt saying that use explicit tools rather than shell wherever possible.
 
 - [ ] we may want to have a "assistant" like we planned before that has tool sets and autoexec config so that the "agent" loop is kind of autonomous
-
-- [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls loop is better.
-  - [ ] this is a "feature" in anthropic and chargable for cache write.
-  - [ ] implement this after feature filters support and additional param support features in apis.
 
 ## Milestone thoughts
 

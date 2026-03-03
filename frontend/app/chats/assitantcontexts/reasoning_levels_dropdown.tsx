@@ -8,6 +8,7 @@ import { ReasoningLevel } from '@/spec/inference';
 
 type SingleReasoningDropdownProps = {
 	reasoningLevel: ReasoningLevel;
+	levelOptions?: ReasoningLevel[];
 	setReasoningLevel: (level: ReasoningLevel) => void;
 	isOpen: boolean;
 	setIsOpen: Dispatch<SetStateAction<boolean>>;
@@ -22,7 +23,7 @@ const levelDisplayNames: Record<ReasoningLevel, string> = {
 	[ReasoningLevel.XHigh]: 'XHigh',
 };
 
-const LEVEL_OPTIONS: ReasoningLevel[] = [
+const DEFAULT_LEVEL_OPTIONS: ReasoningLevel[] = [
 	ReasoningLevel.None,
 	ReasoningLevel.Minimal,
 	ReasoningLevel.Low,
@@ -32,10 +33,13 @@ const LEVEL_OPTIONS: ReasoningLevel[] = [
 
 export function SingleReasoningDropdown({
 	reasoningLevel,
+	levelOptions,
 	setReasoningLevel,
 	isOpen,
 	setIsOpen,
 }: SingleReasoningDropdownProps) {
+	const options = (levelOptions && levelOptions.length > 0 ? levelOptions : DEFAULT_LEVEL_OPTIONS).filter(Boolean);
+
 	const select = useSelectStore({
 		value: reasoningLevel,
 		setValue: value => {
@@ -77,7 +81,7 @@ export function SingleReasoningDropdown({
 					sameWidth
 					className="border-base-300 bg-base-100 z-50 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border p-1 text-xs shadow-lg outline-none"
 				>
-					{LEVEL_OPTIONS.map(level => (
+					{options.map(level => (
 						<SelectItem
 							key={level}
 							value={level}

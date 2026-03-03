@@ -17,6 +17,12 @@ import type { UIChatOption } from '@/spec/modelpreset';
 
 import { Dropdown } from '@/components/dropdown';
 
+import {
+	getStopSequencesPolicy,
+	getSupportedOutputFormats,
+	supportsReasoningSummaryStyle,
+} from '@/chats/assitantcontexts/capabilities_override_helper';
+
 type AdvancedParamsModalProps = {
 	isOpen: boolean;
 	onClose: () => void;
@@ -36,14 +42,7 @@ type ErrorKey =
 	| 'jsonSchemaName'
 	| 'jsonSchema';
 
-const MAX_STOP_SEQUENCES = 16;
 const MAX_JSON_CHARS = 50_000;
-
-const outputFormatItems: Record<OutputFormatChoice, { isEnabled: boolean; displayName: string }> = {
-	default: { isEnabled: true, displayName: 'Default' },
-	text: { isEnabled: true, displayName: 'Text' },
-	jsonSchema: { isEnabled: true, displayName: 'JSON (schema)' },
-};
 
 function parsePositiveIntAllowBlank(v: string): number | undefined {
 	const s = v.trim();
@@ -84,6 +83,20 @@ function isPlainObject(v: any): boolean {
 }
 
 export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: AdvancedParamsModalProps) {
+	const supportedOutputFormats = useMemo(
+		() => getSupportedOutputFormats(currentModel.capabilitiesOverride),
+		[currentModel.capabilitiesOverride]
+	);
+	const outputFormatItems: Record<OutputFormatChoice, { isEnabled: boolean; displayName: string }> = useMemo(() => {
+		const supportsText = !supportedOutputFormats || supportedOutputFormats.includes(OutputFormatKind.Text);
+		const supportsSchema = !supportedOutputFormats || supportedOutputFormats.includes(OutputFormatKind.JSONSchema);
+		return {
+			default: { isEnabled: true, displayName: 'Default' },
+			text: { isEnabled: supportsText, displayName: 'Text' },
+			jsonSchema: { isEnabled: supportsSchema, displayName: 'JSON (schema)' },
+		};
+	}, [supportedOutputFormats]);
+
 	// Reset only when opening OR switching to a different model preset identity.
 	const modelIdentity = useMemo(
 		() => `${currentModel.providerName}::${currentModel.modelPresetID}`,
@@ -116,15 +129,25 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 
 	// Whether reasoning is active for this model (controls summary style availability)
 	const reasoningEnabled = !!currentModel.reasoning;
+	const summaryStyleSupported = supportsReasoningSummaryStyle(currentModel.capabilitiesOverride);
+
+	const stopPolicy = useMemo(
+		() => getStopSequencesPolicy(currentModel.capabilitiesOverride),
+		[currentModel.capabilitiesOverride]
+	);
+	const stopSequencesDisabledBecauseReasoning = stopPolicy.disallowedWithReasoning && reasoningEnabled;
 
 	const reasoningSummaryStyleItems: Record<SummaryStyleChoice, { isEnabled: boolean; displayName: string }> = useMemo(
 		() => ({
 			'': { isEnabled: true, displayName: 'Default' },
-			[ReasoningSummaryStyle.Auto]: { isEnabled: reasoningEnabled, displayName: 'Auto' },
-			[ReasoningSummaryStyle.Concise]: { isEnabled: reasoningEnabled, displayName: 'Concise' },
-			[ReasoningSummaryStyle.Detailed]: { isEnabled: reasoningEnabled, displayName: 'Detailed' },
+			[ReasoningSummaryStyle.Auto]: { isEnabled: reasoningEnabled && summaryStyleSupported, displayName: 'Auto' },
+			[ReasoningSummaryStyle.Concise]: { isEnabled: reasoningEnabled && summaryStyleSupported, displayName: 'Concise' },
+			[ReasoningSummaryStyle.Detailed]: {
+				isEnabled: reasoningEnabled && summaryStyleSupported,
+				displayName: 'Detailed',
+			},
 		}),
-		[reasoningEnabled]
+		[reasoningEnabled, summaryStyleSupported]
 	);
 
 	useEffect(() => {
@@ -136,11 +159,15 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 		setTimeoutSec(String(currentModel.timeout));
 
 		// summary style seed (only meaningful if reasoning exists)
-		setReasoningSummaryStyle((currentModel.reasoning?.summaryStyle as SummaryStyleChoice) ?? '');
-
+		setReasoningSummaryStyle(
+			summaryStyleSupported ? ((currentModel.reasoning?.summaryStyle as SummaryStyleChoice) ?? '') : ''
+		);
 		// output format seed
 		const kind = currentModel.outputParam?.format?.kind;
-		if (kind === OutputFormatKind.Text) setOutputFormatChoice('text');
+		const kindIsSupported = !supportedOutputFormats || (kind ? supportedOutputFormats.includes(kind) : true);
+		if (!kindIsSupported) {
+			setOutputFormatChoice('default');
+		} else if (kind === OutputFormatKind.Text) setOutputFormatChoice('text');
 		else if (kind === OutputFormatKind.JSONSchema) setOutputFormatChoice('jsonSchema');
 		else setOutputFormatChoice('default');
 
@@ -151,13 +178,13 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 		setJsonSchemaText(jsp?.schema ? JSON.stringify(jsp.schema, null, 2) : '');
 
 		// stop sequences
-		setStopSequencesText((currentModel.stopSequences ?? []).join('\n'));
+		setStopSequencesText((currentModel.stopSequences ?? []).slice(0, stopPolicy.maxSequences).join('\n'));
 
 		// raw JSON
 		setAdditionalParametersRawJSON(currentModel.additionalParametersRawJSON ?? '');
 
 		setErrors({});
-	}, [isOpen, modelIdentity, currentModel]);
+	}, [isOpen, modelIdentity, currentModel, supportedOutputFormats, stopPolicy.maxSequences, summaryStyleSupported]);
 
 	// Open the dialog natively when isOpen becomes true
 	useEffect(() => {
@@ -200,10 +227,13 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 	};
 
 	const validateStopSequences = (raw: string): string | undefined => {
+		if (!stopPolicy.isSupported) return undefined;
+		if (stopSequencesDisabledBecauseReasoning) return undefined;
 		const parsed = parseStopSequences(raw);
 		if (!parsed) return undefined;
 
-		if (parsed.length > MAX_STOP_SEQUENCES) return `Too many stop sequences (max ${MAX_STOP_SEQUENCES}).`;
+		if (parsed.length > stopPolicy.maxSequences) return `Too many stop sequences (max ${stopPolicy.maxSequences}).`;
+
 		const tooLong = parsed.find(s => s.length > 256);
 		if (tooLong) return 'A stop sequence is too long (max 256 chars per line).';
 		return undefined;
@@ -282,21 +312,25 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 		let nextFormat: OutputParam['format'] = undefined;
 
 		if (outputFormatChoice === 'text') {
-			nextFormat = { kind: OutputFormatKind.Text };
+			if (outputFormatItems.text.isEnabled) nextFormat = { kind: OutputFormatKind.Text };
 		} else if (outputFormatChoice === 'jsonSchema') {
-			const parsedSchema = safeJSONParse(jsonSchemaText.trim());
-			if (parsedSchema.ok) {
-				const schemaObj = parsedSchema.value as Record<string, any>;
+			if (!outputFormatItems.jsonSchema.isEnabled) {
+				nextFormat = undefined;
+			} else {
+				const parsedSchema = safeJSONParse(jsonSchemaText.trim());
+				if (parsedSchema.ok) {
+					const schemaObj = parsedSchema.value as Record<string, any>;
 
-				nextFormat = {
-					kind: OutputFormatKind.JSONSchema,
-					jsonSchemaParam: {
-						name: jsonSchemaName.trim(),
-						description: jsonSchemaDescription.trim() || undefined,
-						strict: jsonSchemaStrict,
-						schema: schemaObj,
-					} as JSONSchemaParam,
-				};
+					nextFormat = {
+						kind: OutputFormatKind.JSONSchema,
+						jsonSchemaParam: {
+							name: jsonSchemaName.trim(),
+							description: jsonSchemaDescription.trim() || undefined,
+							strict: jsonSchemaStrict,
+							schema: schemaObj,
+						} as JSONSchemaParam,
+					};
+				}
 			}
 		}
 
@@ -322,6 +356,13 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 			return r as UIChatOption['reasoning'];
 		})();
 
+		const nextStopSequences = (() => {
+			if (!stopPolicy.isSupported) return undefined;
+			if (stopSequencesDisabledBecauseReasoning) return undefined;
+			const parsed = parseStopSequences(stopSequencesText);
+			return parsed ? parsed.slice(0, stopPolicy.maxSequences) : undefined;
+		})();
+
 		const updatedModel: UIChatOption = {
 			...currentModel,
 
@@ -331,7 +372,7 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 			timeout: parsePositiveIntAllowBlank(timeoutSec) ?? currentModel.timeout,
 			reasoning: mergedReasoning,
 			outputParam: mergedOutputParam,
-			stopSequences: parseStopSequences(stopSequencesText),
+			stopSequences: nextStopSequences,
 			additionalParametersRawJSON: additionalParametersRawJSON.trim() ? additionalParametersRawJSON.trim() : undefined,
 		};
 
@@ -609,38 +650,55 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 							</div>
 						</>
 					)}
-
 					{/* stop sequences */}
-					<div className="grid grid-cols-12 items-start gap-2">
-						<label className="label col-span-4">
-							<span className="label-text text-sm">Stop Sequences</span>
-							<span className="label-text-alt tooltip tooltip-right" data-tip="One per line. Empty = none.">
-								<FiHelpCircle size={12} />
-							</span>
-						</label>
-						<div className="col-span-8">
-							<textarea
-								className={`textarea textarea-bordered w-full rounded-xl ${errors.stopSequences ? 'textarea-error' : ''}`}
-								rows={4}
-								value={stopSequencesText}
-								onChange={e => {
-									const v = e.target.value;
-									setStopSequencesText(v);
-									setErrors(prev => ({ ...prev, stopSequences: validateStopSequences(v) }));
-								}}
-								placeholder={'e.g.\n\nEND\n</final>'}
-								spellCheck="false"
-							/>
-							{errors.stopSequences && (
-								<div className="label">
-									<span className="label-text-alt text-error flex items-center gap-1">
-										<FiAlertCircle size={12} /> {errors.stopSequences}
-									</span>
-								</div>
-							)}
+					{stopPolicy.isSupported && (
+						<div className="grid grid-cols-12 items-start gap-2">
+							<label className="label col-span-4">
+								<span className="label-text text-sm">Stop Sequences</span>
+								<span
+									className="label-text-alt tooltip tooltip-right"
+									data-tip={
+										stopSequencesDisabledBecauseReasoning
+											? 'Stop sequences are disabled when reasoning is enabled for this model.'
+											: `One per line. Empty = none. Max ${stopPolicy.maxSequences}.`
+									}
+								>
+									<FiHelpCircle size={12} />
+								</span>
+							</label>
+							<div className="col-span-8">
+								<textarea
+									disabled={stopSequencesDisabledBecauseReasoning}
+									className={`textarea textarea-bordered w-full rounded-xl ${
+										errors.stopSequences ? 'textarea-error' : ''
+									} ${stopSequencesDisabledBecauseReasoning ? 'cursor-not-allowed opacity-50' : ''}`}
+									rows={4}
+									value={stopSequencesText}
+									onChange={e => {
+										const v = e.target.value;
+										setStopSequencesText(v);
+										setErrors(prev => ({ ...prev, stopSequences: validateStopSequences(v) }));
+									}}
+									placeholder={'e.g.\n\nEND\n</final>'}
+									spellCheck="false"
+								/>
+								{stopSequencesDisabledBecauseReasoning && (
+									<div className="label">
+										<span className="label-text-alt opacity-70">
+											Disabled because reasoning is enabled for this model/provider.
+										</span>
+									</div>
+								)}
+								{errors.stopSequences && (
+									<div className="label">
+										<span className="label-text-alt text-error flex items-center gap-1">
+											<FiAlertCircle size={12} /> {errors.stopSequences}
+										</span>
+									</div>
+								)}
+							</div>
 						</div>
-					</div>
-
+					)}
 					{/* additional raw JSON */}
 					<div className="grid grid-cols-12 items-start gap-2">
 						<label className="label col-span-4">
