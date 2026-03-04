@@ -121,4 +121,12 @@ func InitSkillStoreHandlers(api huma.API, store *SkillStore) {
 		Summary:     "List skills from runtime catalog (filtered)",
 		Tags:        []string{skillRuntimeTag},
 	}, store.ListRuntimeSkills)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "invoke-skill-tool",
+		Method:      http.MethodPost,
+		Path:        skillPathPrefix + "/runtime/skills/invoketool",
+		Summary:     "Invoke skill tool",
+		Tags:        []string{skillRuntimeTag},
+	}, store.InvokeSkillTool)
 }

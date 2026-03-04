@@ -65,6 +65,7 @@ export class WailsAggregateAPI implements IAggregateAPI {
 		current: StoreConversationMessage,
 		history?: StoreConversationMessage[],
 		toolStoreChoices?: ToolStoreChoice[],
+		skillSessionID?: string,
 		requestId?: string,
 		signal?: AbortSignal,
 		onStreamTextData?: (text: string) => void,
@@ -108,6 +109,7 @@ export class WailsAggregateAPI implements IAggregateAPI {
 			current: current as wailsSpec.ConversationMessage,
 			history: history ? ([...history] as wailsSpec.ConversationMessage[]) : [],
 			toolStoreChoices: toolStoreChoices ? ([...toolStoreChoices] as wailsSpec.ToolStoreChoice[]) : [],
+			skillSessionID: skillSessionID ?? '',
 		} as wailsSpec.CompletionRequestBody;
 
 		const abortPromise: Promise<never> = new Promise((_, reject) => {

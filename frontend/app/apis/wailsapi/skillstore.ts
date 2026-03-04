@@ -1,4 +1,5 @@
 import type {
+	InvokeSkillToolResponse,
 	RuntimeSkillFilter,
 	Skill,
 	SkillBundle,
@@ -9,6 +10,8 @@ import type {
 	SkillType,
 } from '@/spec/skill';
 
+import type { JSONRawString } from '@/lib/jsonschema_utils';
+
 import type { ISkillStoreAPI } from '@/apis/interface';
 import {
 	CloseSkillSession,
@@ -17,6 +20,7 @@ import {
 	DeleteSkillBundle,
 	GetSkill,
 	GetSkillsPromptXML,
+	InvokeSkillTool,
 	ListRuntimeSkills,
 	ListSkillBundles,
 	ListSkills,
@@ -192,5 +196,15 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 
 		const resp = await ListRuntimeSkills(req);
 		return (resp?.Body?.skills ?? []) as SkillRecord[];
+	}
+
+	async invokeSkillTool(sessionID: string, toolName: string, args?: JSONRawString): Promise<InvokeSkillToolResponse> {
+		const req = {
+			Body: { sessionID: sessionID, toolName: toolName, args: args } as spec.InvokeSkillToolRequestBody,
+		} as spec.InvokeSkillToolRequest;
+
+		const resp = await InvokeSkillTool(req);
+
+		return resp?.Body as InvokeSkillToolResponse;
 	}
 }

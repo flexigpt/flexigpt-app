@@ -16,6 +16,8 @@ export function GetSkill(arg1:spec.GetSkillRequest):Promise<spec.GetSkillRespons
 
 export function GetSkillsPromptXML(arg1:spec.GetSkillsPromptXMLRequest):Promise<spec.GetSkillsPromptXMLResponse>;
 
+export function InvokeSkillTool(arg1:spec.InvokeSkillToolRequest):Promise<spec.InvokeSkillToolResponse>;
+
 export function ListRuntimeSkills(arg1:spec.ListRuntimeSkillsRequest):Promise<spec.ListRuntimeSkillsResponse>;
 
 export function ListSkillBundles(arg1:spec.ListSkillBundlesRequest):Promise<spec.ListSkillBundlesResponse>;

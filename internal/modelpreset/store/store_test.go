@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	inferencegoSpec "github.com/flexigpt/inference-go/spec"
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
 const renamed = "RENAMED"
@@ -51,7 +51,7 @@ func TestModelPresetStore_DefaultProvider_CRUD_AndPersistence(t *testing.T) {
 	ctx := t.Context()
 
 	// Create a user provider so PatchDefaultProvider can target user data too.
-	userProvider := inferencegoSpec.ProviderName("user-prov-default")
+	userProvider := inferenceSpec.ProviderName("user-prov-default")
 	putUserProvider(t, st, userProvider, true)
 
 	builtinName, _ := anyBuiltInProviderFromStore(t, st)
@@ -140,7 +140,7 @@ func TestModelPresetStore_PutProviderPreset_TableDriven(t *testing.T) {
 
 	okBody := &spec.PutProviderPresetRequestBody{
 		DisplayName:              "OK",
-		SDKType:                  inferencegoSpec.ProviderSDKTypeOpenAIChatCompletions,
+		SDKType:                  inferenceSpec.ProviderSDKTypeOpenAIChatCompletions,
 		IsEnabled:                true,
 		Origin:                   "https://example.test",
 		ChatCompletionPathPrefix: spec.DefaultOpenAIChatCompletionsPrefix,
@@ -298,7 +298,7 @@ func TestModelPresetStore_PatchProviderPreset_UserProvider(t *testing.T) {
 	st := newStore(t)
 	ctx := t.Context()
 
-	prov := inferencegoSpec.ProviderName("user-prov-patch")
+	prov := inferenceSpec.ProviderName("user-prov-patch")
 	putUserProvider(t, st, prov, true)
 	putUserModelPreset(t, ctx, st, prov, "m1", true)
 	putUserModelPreset(t, ctx, st, prov, "m2", true)
@@ -470,7 +470,7 @@ func TestModelPresetStore_DeleteProviderPreset_TableDriven(t *testing.T) {
 
 	builtinName, _ := anyBuiltInProviderFromStore(t, st)
 
-	userProv := inferencegoSpec.ProviderName("user-prov-del")
+	userProv := inferenceSpec.ProviderName("user-prov-del")
 	putUserProvider(t, st, userProv, true)
 	putUserModelPreset(t, ctx, st, userProv, "m1", true)
 
@@ -546,7 +546,7 @@ func TestModelPresetStore_ModelPreset_UserCRUD_TableDriven(t *testing.T) {
 	st := newStore(t)
 	ctx := t.Context()
 
-	userProv := inferencegoSpec.ProviderName("user-prov-models")
+	userProv := inferenceSpec.ProviderName("user-prov-models")
 	putUserProvider(t, st, userProv, true)
 
 	temp := 0.1
@@ -829,15 +829,15 @@ func TestModelPresetStore_ListProviderPresets_FilterAndPaging(t *testing.T) {
 	st := newStore(t)
 	ctx := t.Context()
 
-	p1 := inferencegoSpec.ProviderName("user-p1")
-	p2 := inferencegoSpec.ProviderName("user-p2")
-	p3 := inferencegoSpec.ProviderName("user-p3")
+	p1 := inferenceSpec.ProviderName("user-p1")
+	p2 := inferenceSpec.ProviderName("user-p2")
+	p3 := inferenceSpec.ProviderName("user-p3")
 
 	putUserProvider(t, st, p1, true)
 	putUserProvider(t, st, p2, false)
 	putUserProvider(t, st, p3, true)
 
-	names := []inferencegoSpec.ProviderName{p1, p2, p3}
+	names := []inferenceSpec.ProviderName{p1, p2, p3}
 
 	t.Run("disabled_filtered_out_by_default", func(t *testing.T) {
 		resp, err := st.ListProviderPresets(ctx, &spec.ListProviderPresetsRequest{
@@ -870,7 +870,7 @@ func TestModelPresetStore_ListProviderPresets_FilterAndPaging(t *testing.T) {
 	})
 
 	t.Run("paging_pageSize_1_and_token_roundtrip", func(t *testing.T) {
-		seen := map[inferencegoSpec.ProviderName]bool{}
+		seen := map[inferenceSpec.ProviderName]bool{}
 
 		req := &spec.ListProviderPresetsRequest{
 			Names:           names,
@@ -920,15 +920,15 @@ func TestModelPresetStore_ListProviderPresets_TokenPreservesFilters(t *testing.T
 	ctx := t.Context()
 
 	// Ensure >1 providers and include a disabled one.
-	p1 := inferencegoSpec.ProviderName("user-tok-1")
-	p2 := inferencegoSpec.ProviderName("user-tok-2") // disabled
-	p3 := inferencegoSpec.ProviderName("user-tok-3")
+	p1 := inferenceSpec.ProviderName("user-tok-1")
+	p2 := inferenceSpec.ProviderName("user-tok-2") // disabled
+	p3 := inferenceSpec.ProviderName("user-tok-3")
 
 	putUserProvider(t, st, p1, true)
 	putUserProvider(t, st, p2, false)
 	putUserProvider(t, st, p3, true)
 
-	names := []inferencegoSpec.ProviderName{p1, p2, p3}
+	names := []inferenceSpec.ProviderName{p1, p2, p3}
 
 	// First call to get token.
 	resp1, err := st.ListProviderPresets(ctx, &spec.ListProviderPresetsRequest{
@@ -972,10 +972,10 @@ func TestModelPresetStore_ListProviderPresets_PageSizeClamping_Heavy(t *testing.
 	ctx := t.Context()
 
 	total := spec.DefaultPageSize + 1
-	names := make([]inferencegoSpec.ProviderName, 0, total)
+	names := make([]inferenceSpec.ProviderName, 0, total)
 
 	for i := range total {
-		pn := inferencegoSpec.ProviderName("user-many-" + strconv.Itoa(i))
+		pn := inferenceSpec.ProviderName("user-many-" + strconv.Itoa(i))
 		putUserProvider(t, st, pn, true)
 		names = append(names, pn)
 	}
@@ -1006,7 +1006,7 @@ func TestModelPresetStore_PutProviderPreset_OverwritePreservesModelsAndDefault(t
 	st := newStore(t)
 	ctx := t.Context()
 
-	prov := inferencegoSpec.ProviderName("user-prov-preserve")
+	prov := inferenceSpec.ProviderName("user-prov-preserve")
 
 	// Create provider + model + set default model.
 	putUserProvider(t, st, prov, true)
@@ -1026,7 +1026,7 @@ func TestModelPresetStore_PutProviderPreset_OverwritePreservesModelsAndDefault(t
 		ProviderName: prov,
 		Body: &spec.PutProviderPresetRequestBody{
 			DisplayName:              renamed,
-			SDKType:                  inferencegoSpec.ProviderSDKTypeOpenAIChatCompletions,
+			SDKType:                  inferenceSpec.ProviderSDKTypeOpenAIChatCompletions,
 			IsEnabled:                true,
 			Origin:                   "https://changed.example.test",
 			ChatCompletionPathPrefix: spec.DefaultOpenAIChatCompletionsPrefix,
@@ -1053,7 +1053,7 @@ func TestModelPresetStore_PutProviderPreset_OverwritePreservesModelsAndDefault(t
 
 func TestModelPresetStore_PatchProviderPreset_User_BothFields_NoOp_AtomicOnError(t *testing.T) {
 	type setupOut struct {
-		prov inferencegoSpec.ProviderName
+		prov inferenceSpec.ProviderName
 	}
 
 	setup := func(t *testing.T) (*ModelPresetStore, setupOut) {
@@ -1061,7 +1061,7 @@ func TestModelPresetStore_PatchProviderPreset_User_BothFields_NoOp_AtomicOnError
 		st := newStore(t)
 		ctx := t.Context()
 
-		prov := inferencegoSpec.ProviderName("user-prov-patch-both")
+		prov := inferenceSpec.ProviderName("user-prov-patch-both")
 		putUserProvider(t, st, prov, true)
 		putUserModelPreset(t, ctx, st, prov, "m1", true)
 		putUserModelPreset(t, ctx, st, prov, "m2", true)
@@ -1327,7 +1327,7 @@ func TestModelPresetStore_DeleteModelPreset_AdditionalCases_TableDriven(t *testi
 	st := newStore(t)
 	ctx := t.Context()
 
-	userProv := inferencegoSpec.ProviderName("user-del-model")
+	userProv := inferenceSpec.ProviderName("user-del-model")
 	putUserProvider(t, st, userProv, true)
 	putUserModelPreset(t, ctx, st, userProv, "m1", true)
 	putUserModelPreset(t, ctx, st, userProv, "m2", true)
@@ -1438,7 +1438,7 @@ func TestModelPresetStore_PutModelPreset_AdditionalValidation_TableDriven(t *tes
 	st := newStore(t)
 	ctx := t.Context()
 
-	userProv := inferencegoSpec.ProviderName("user-model-validate-more")
+	userProv := inferenceSpec.ProviderName("user-model-validate-more")
 	putUserProvider(t, st, userProv, true)
 
 	temp := 0.1
@@ -1537,15 +1537,15 @@ func TestModelPresetStore_ListProviderPresets_PageTokenOverridesRequestParams(t 
 	st := newStore(t)
 	ctx := t.Context()
 
-	p2 := inferencegoSpec.ProviderName("user-override-2") // disabled, older
-	p1 := inferencegoSpec.ProviderName("user-override-1") // enabled, newer
+	p2 := inferenceSpec.ProviderName("user-override-2") // disabled, older
+	p1 := inferenceSpec.ProviderName("user-override-1") // enabled, newer
 
 	putUserProvider(t, st, p2, false)
 	time.Sleep(2 * time.Millisecond)
 	putUserProvider(t, st, p1, true)
 
 	resp1, err := st.ListProviderPresets(ctx, &spec.ListProviderPresetsRequest{
-		Names:           []inferencegoSpec.ProviderName{p1, p2},
+		Names:           []inferenceSpec.ProviderName{p1, p2},
 		IncludeDisabled: true,
 		PageSize:        1,
 	})
@@ -1565,8 +1565,8 @@ func TestModelPresetStore_ListProviderPresets_PageTokenOverridesRequestParams(t 
 	// Intentionally provide conflicting params; token must win.
 	resp2, err := st.ListProviderPresets(ctx, &spec.ListProviderPresetsRequest{
 		PageToken:       *resp1.Body.NextPageToken,
-		Names:           []inferencegoSpec.ProviderName{p1}, // would exclude p2 if not overridden
-		IncludeDisabled: false,                              // would exclude disabled if not overridden
+		Names:           []inferenceSpec.ProviderName{p1}, // would exclude p2 if not overridden
+		IncludeDisabled: false,                            // would exclude disabled if not overridden
 		PageSize:        999,
 	})
 	if err != nil {
@@ -1587,7 +1587,7 @@ func TestModelPresetStore_ListProviderPresets_Base64ButInvalidJSONToken_Ignored(
 	st := newStore(t)
 	ctx := t.Context()
 
-	disabled := inferencegoSpec.ProviderName("user-disabled-token-test")
+	disabled := inferenceSpec.ProviderName("user-disabled-token-test")
 	putUserProvider(t, st, disabled, false)
 
 	// Base64-valid, but NOT JSON.
@@ -1612,7 +1612,7 @@ func TestModelPresetStore_UserData_PersistsAcrossReopen(t *testing.T) {
 	st := newStoreAtDir(t, dir)
 	ctx := t.Context()
 
-	prov := inferencegoSpec.ProviderName("user-persist-prov")
+	prov := inferenceSpec.ProviderName("user-persist-prov")
 	putUserProvider(t, st, prov, true)
 	putUserModelPreset(t, ctx, st, prov, "m1", true)
 
@@ -1686,13 +1686,13 @@ func TestModelPresetStore_PutModelPreset_InvalidOutputParamAndReasoningErrors_Ta
 	st := newStore(t)
 	ctx := t.Context()
 
-	userProv := inferencegoSpec.ProviderName("user-model-validate-op-reason")
+	userProv := inferenceSpec.ProviderName("user-model-validate-op-reason")
 	putUserProvider(t, st, userProv, true)
 
 	// Helpers for pointers to foreign types.
-	verbPtr := func(v inferencegoSpec.OutputVerbosity) *inferencegoSpec.OutputVerbosity { return &v }
-	kindPtr := func(k inferencegoSpec.OutputFormatKind) *inferencegoSpec.OutputFormatKind { return &k }
-	summaryPtr := func(s inferencegoSpec.ReasoningSummaryStyle) *inferencegoSpec.ReasoningSummaryStyle { return &s }
+	verbPtr := func(v inferenceSpec.OutputVerbosity) *inferenceSpec.OutputVerbosity { return &v }
+	kindPtr := func(k inferenceSpec.OutputFormatKind) *inferenceSpec.OutputFormatKind { return &k }
+	summaryPtr := func(s inferenceSpec.ReasoningSummaryStyle) *inferenceSpec.ReasoningSummaryStyle { return &s }
 
 	base := func() *spec.PutModelPresetRequest {
 		temp := 0.1
@@ -1718,8 +1718,8 @@ func TestModelPresetStore_PutModelPreset_InvalidOutputParamAndReasoningErrors_Ta
 			name: "outputParam_unknown_verbosity",
 			req: func() *spec.PutModelPresetRequest {
 				r := base()
-				bad := inferencegoSpec.OutputVerbosity("weird")
-				r.Body.OutputParam = &inferencegoSpec.OutputParam{
+				bad := inferenceSpec.OutputVerbosity("weird")
+				r.Body.OutputParam = &inferenceSpec.OutputParam{
 					Verbosity: verbPtr(bad),
 				}
 				return r
@@ -1730,10 +1730,10 @@ func TestModelPresetStore_PutModelPreset_InvalidOutputParamAndReasoningErrors_Ta
 			name: "outputFormat_text_with_json_schema_param_is_invalid",
 			req: func() *spec.PutModelPresetRequest {
 				r := base()
-				r.Body.OutputParam = &inferencegoSpec.OutputParam{
-					Format: &inferencegoSpec.OutputFormat{
-						Kind: inferencegoSpec.OutputFormatKindText,
-						JSONSchemaParam: &inferencegoSpec.JSONSchemaParam{
+				r.Body.OutputParam = &inferenceSpec.OutputParam{
+					Format: &inferenceSpec.OutputFormat{
+						Kind: inferenceSpec.OutputFormatKindText,
+						JSONSchemaParam: &inferenceSpec.JSONSchemaParam{
 							Name: "x",
 							// Schema nil => still should fail because text kind forbids any JSONSchemaParam.
 						},
@@ -1747,9 +1747,9 @@ func TestModelPresetStore_PutModelPreset_InvalidOutputParamAndReasoningErrors_Ta
 			name: "outputFormat_jsonSchema_requires_jsonSchemaParam",
 			req: func() *spec.PutModelPresetRequest {
 				r := base()
-				r.Body.OutputParam = &inferencegoSpec.OutputParam{
-					Format: &inferencegoSpec.OutputFormat{
-						Kind: inferencegoSpec.OutputFormatKindJSONSchema,
+				r.Body.OutputParam = &inferenceSpec.OutputParam{
+					Format: &inferenceSpec.OutputFormat{
+						Kind: inferenceSpec.OutputFormatKindJSONSchema,
 						// JSONSchemaParam nil => invalid.
 					},
 				}
@@ -1761,10 +1761,10 @@ func TestModelPresetStore_PutModelPreset_InvalidOutputParamAndReasoningErrors_Ta
 			name: "outputFormat_unknown_kind",
 			req: func() *spec.PutModelPresetRequest {
 				r := base()
-				badKind := inferencegoSpec.OutputFormatKind("wat")
+				badKind := inferenceSpec.OutputFormatKind("wat")
 				_ = kindPtr(badKind)
-				r.Body.OutputParam = &inferencegoSpec.OutputParam{
-					Format: &inferencegoSpec.OutputFormat{
+				r.Body.OutputParam = &inferenceSpec.OutputParam{
+					Format: &inferenceSpec.OutputFormat{
 						Kind: badKind,
 					},
 				}
@@ -1777,8 +1777,8 @@ func TestModelPresetStore_PutModelPreset_InvalidOutputParamAndReasoningErrors_Ta
 			req: func() *spec.PutModelPresetRequest {
 				r := base()
 				r.Body.Temperature = nil
-				r.Body.Reasoning = &inferencegoSpec.ReasoningParam{
-					Type: inferencegoSpec.ReasoningType("ghost"),
+				r.Body.Reasoning = &inferenceSpec.ReasoningParam{
+					Type: inferenceSpec.ReasoningType("ghost"),
 				}
 				return r
 			},
@@ -1789,8 +1789,8 @@ func TestModelPresetStore_PutModelPreset_InvalidOutputParamAndReasoningErrors_Ta
 			req: func() *spec.PutModelPresetRequest {
 				r := base()
 				r.Body.Temperature = nil
-				r.Body.Reasoning = &inferencegoSpec.ReasoningParam{
-					Type:   inferencegoSpec.ReasoningTypeHybridWithTokens,
+				r.Body.Reasoning = &inferenceSpec.ReasoningParam{
+					Type:   inferenceSpec.ReasoningTypeHybridWithTokens,
 					Tokens: 0,
 				}
 				return r
@@ -1802,9 +1802,9 @@ func TestModelPresetStore_PutModelPreset_InvalidOutputParamAndReasoningErrors_Ta
 			req: func() *spec.PutModelPresetRequest {
 				r := base()
 				r.Body.Temperature = nil
-				bad := inferencegoSpec.ReasoningSummaryStyle("nope")
-				r.Body.Reasoning = &inferencegoSpec.ReasoningParam{
-					Type:         inferencegoSpec.ReasoningTypeHybridWithTokens,
+				bad := inferenceSpec.ReasoningSummaryStyle("nope")
+				r.Body.Reasoning = &inferenceSpec.ReasoningParam{
+					Type:         inferenceSpec.ReasoningTypeHybridWithTokens,
 					Tokens:       1,
 					SummaryStyle: summaryPtr(bad),
 				}

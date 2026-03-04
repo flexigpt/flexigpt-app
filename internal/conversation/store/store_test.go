@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/ppipada/mapstore-go/uuidv7filename"
 
-	inferencegoSpec "github.com/flexigpt/inference-go/spec"
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
 func TestInitConversation(t *testing.T) {
@@ -152,12 +152,12 @@ func TestConversationCollection(t *testing.T) {
 		}{
 			{
 				"Valid message",
-				newTextTurn("msg1", inferencegoSpec.RoleUser, "Hello"),
+				newTextTurn("msg1", inferenceSpec.RoleUser, "Hello"),
 				false,
 			},
 			{
 				"Empty content",
-				newTextTurn("msg2", inferencegoSpec.RoleUser, ""),
+				newTextTurn("msg2", inferenceSpec.RoleUser, ""),
 				false,
 			},
 		}
@@ -343,7 +343,7 @@ func TestConversationCollection(t *testing.T) {
 			Body: &spec.PutMessagesToConversationRequestBody{
 				Title: "nonexistent",
 				Messages: []spec.ConversationMessage{
-					newTextTurn("msg", inferencegoSpec.RoleUser, "hi"),
+					newTextTurn("msg", inferenceSpec.RoleUser, "hi"),
 				},
 			},
 		})
@@ -364,8 +364,8 @@ func TestConversationCollection(t *testing.T) {
 			t.Fatalf("Failed to save conversation: %v", err)
 		}
 		msgs := []spec.ConversationMessage{
-			newTextTurn("m1", inferencegoSpec.RoleUser, "hi"),
-			newTextTurn("m2", inferencegoSpec.RoleUser, "hello"),
+			newTextTurn("m1", inferenceSpec.RoleUser, "hi"),
+			newTextTurn("m2", inferenceSpec.RoleUser, "hello"),
 		}
 		_, err = cc.PutMessagesToConversation(ctx, &spec.PutMessagesToConversationRequest{
 			ID: convo.ID,
@@ -559,23 +559,23 @@ func getNewPutRequestFromConversation(c *spec.Conversation) *spec.PutConversatio
 	}
 }
 
-func newTextTurn(id string, role inferencegoSpec.RoleEnum, txt string) spec.ConversationMessage {
+func newTextTurn(id string, role inferenceSpec.RoleEnum, txt string) spec.ConversationMessage {
 	now := time.Now().UTC()
 	return spec.ConversationMessage{
 		ID:        id,
 		CreatedAt: now,
 		Role:      role,
-		Status:    inferencegoSpec.StatusCompleted,
-		Inputs: []inferencegoSpec.InputUnion{
+		Status:    inferenceSpec.StatusCompleted,
+		Inputs: []inferenceSpec.InputUnion{
 			{
-				Kind: inferencegoSpec.InputKindInputMessage,
-				InputMessage: &inferencegoSpec.InputOutputContent{
+				Kind: inferenceSpec.InputKindInputMessage,
+				InputMessage: &inferenceSpec.InputOutputContent{
 					ID:     id + ":0",
 					Role:   role,
-					Status: inferencegoSpec.StatusCompleted,
-					Contents: []inferencegoSpec.InputOutputContentItemUnion{{
-						Kind:     inferencegoSpec.ContentItemKindText,
-						TextItem: &inferencegoSpec.ContentItemText{Text: txt},
+					Status: inferenceSpec.StatusCompleted,
+					Contents: []inferenceSpec.InputOutputContentItemUnion{{
+						Kind:     inferenceSpec.ContentItemKindText,
+						TextItem: &inferenceSpec.ContentItemText{Text: txt},
 					}},
 				},
 			},

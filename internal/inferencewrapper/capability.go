@@ -4,11 +4,11 @@ import (
 	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	inferencegoSpec "github.com/flexigpt/inference-go/spec"
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
-func cloneModelCapabilities(in inferencegoSpec.ModelCapabilities) inferencegoSpec.ModelCapabilities {
-	out := inferencegoSpec.ModelCapabilities{
+func cloneModelCapabilities(in inferenceSpec.ModelCapabilities) inferenceSpec.ModelCapabilities {
+	out := inferenceSpec.ModelCapabilities{
 		ModalitiesIn:  slices.Clone(in.ModalitiesIn),
 		ModalitiesOut: slices.Clone(in.ModalitiesOut),
 	}
@@ -37,7 +37,7 @@ func cloneModelCapabilities(in inferencegoSpec.ModelCapabilities) inferencegoSpe
 }
 
 func applyModelCapabilitiesOverride(
-	dst *inferencegoSpec.ModelCapabilities,
+	dst *inferenceSpec.ModelCapabilities,
 	ov *spec.ModelCapabilitiesOverride,
 ) {
 	if dst == nil || ov == nil {
@@ -53,7 +53,7 @@ func applyModelCapabilitiesOverride(
 
 	if ov.ReasoningCapabilities != nil {
 		if dst.ReasoningCapabilities == nil {
-			dst.ReasoningCapabilities = &inferencegoSpec.ReasoningCapabilities{}
+			dst.ReasoningCapabilities = &inferenceSpec.ReasoningCapabilities{}
 		}
 		if ov.ReasoningCapabilities.SupportedReasoningTypes != nil {
 			dst.ReasoningCapabilities.SupportedReasoningTypes = slices.Clone(
@@ -78,7 +78,7 @@ func applyModelCapabilitiesOverride(
 
 	if ov.StopSequenceCapabilities != nil {
 		if dst.StopSequenceCapabilities == nil {
-			dst.StopSequenceCapabilities = &inferencegoSpec.StopSequenceCapabilities{}
+			dst.StopSequenceCapabilities = &inferenceSpec.StopSequenceCapabilities{}
 		}
 		if ov.StopSequenceCapabilities.IsSupported != nil {
 			dst.StopSequenceCapabilities.IsSupported = *ov.StopSequenceCapabilities.IsSupported
@@ -93,7 +93,7 @@ func applyModelCapabilitiesOverride(
 
 	if ov.OutputCapabilities != nil {
 		if dst.OutputCapabilities == nil {
-			dst.OutputCapabilities = &inferencegoSpec.OutputCapabilities{}
+			dst.OutputCapabilities = &inferenceSpec.OutputCapabilities{}
 		}
 		if ov.OutputCapabilities.SupportedOutputFormats != nil {
 			dst.OutputCapabilities.SupportedOutputFormats = slices.Clone(ov.OutputCapabilities.SupportedOutputFormats)
@@ -105,7 +105,7 @@ func applyModelCapabilitiesOverride(
 
 	if ov.ToolCapabilities != nil {
 		if dst.ToolCapabilities == nil {
-			dst.ToolCapabilities = &inferencegoSpec.ToolCapabilities{}
+			dst.ToolCapabilities = &inferenceSpec.ToolCapabilities{}
 		}
 		if ov.ToolCapabilities.SupportedToolTypes != nil {
 			dst.ToolCapabilities.SupportedToolTypes = slices.Clone(ov.ToolCapabilities.SupportedToolTypes)

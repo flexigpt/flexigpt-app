@@ -768,58 +768,6 @@ func TestSkillStore_RuntimeIntegration_RuntimeEndpoints_Errors(t *testing.T) {
 	}
 }
 
-func TestRuntimeFilterConversion_ClonesAndTrims(t *testing.T) {
-	t.Parallel()
-
-	req := &spec.GetSkillsPromptXMLRequest{
-		Body: &spec.GetSkillsPromptXMLRequestBody{
-			Filter: &spec.RuntimeSkillFilter{
-				Types:          []string{"fs"},
-				NamePrefix:     "n",
-				LocationPrefix: "l",
-				AllowSkills: []agentskillsSpec.SkillDef{
-					{Type: "fs", Name: "a", Location: "/x"},
-				},
-				SessionID: "sid",
-				Activity:  " active ",
-			},
-		},
-	}
-
-	f := getSkillsReqToRuntimePromptFilter(req)
-	if f == nil {
-		t.Fatalf("expected non-nil filter")
-	}
-	if string(f.Activity) != "active" {
-		t.Fatalf("expected trimmed activity 'active', got %q", f.Activity)
-	}
-
-	const mut = "MUT"
-	// Ensure slices are cloned.
-	req.Body.Filter.Types[0] = mut
-	req.Body.Filter.AllowSkills[0] = agentskillsSpec.SkillDef{Type: "fs", Name: mut, Location: "/mut"}
-	if f.Types[0] != "fs" {
-		t.Fatalf("Types slice not cloned")
-	}
-	if f.AllowSkills[0].Name != "a" {
-		t.Fatalf("AllowSkills slice not cloned")
-	}
-
-	// List filter conversion.
-	lreq := &spec.ListRuntimeSkillsRequest{
-		Body: &spec.ListRuntimeSkillsRequestBody{
-			Filter: req.Body.Filter,
-		},
-	}
-	lf := listSkillsReqToRuntimeListFilter(lreq)
-	if lf == nil {
-		t.Fatalf("expected non-nil list filter")
-	}
-	if string(lf.Activity) != "active" {
-		t.Fatalf("expected trimmed activity 'active', got %q", lf.Activity)
-	}
-}
-
 func TestFSDigestSHA256_StableAndSensitive(t *testing.T) {
 	t.Parallel()
 

@@ -8,7 +8,7 @@ import { type PlateEditor, useEditorRef } from 'platejs/react';
 
 import type { ProviderSDKType } from '@/spec/inference';
 import type { PromptTemplateListItem } from '@/spec/prompt';
-import type { SkillDef, SkillListItem } from '@/spec/skill';
+import type { SkillListItem, SkillRef } from '@/spec/skill';
 import { ToolImplType, type ToolListItem, ToolStoreChoiceType } from '@/spec/tool';
 
 import { formatShortcut, type ShortcutConfig } from '@/lib/keyboard_shortcuts';
@@ -67,8 +67,8 @@ interface EditorBottomBarProps {
 	// Skills state comes from EditorArea (conversation-level)
 	allSkills: SkillListItem[];
 	skillsLoading?: boolean;
-	enabledSkills: SkillDef[];
-	setEnabledSkills: Dispatch<SetStateAction<SkillDef[]>>;
+	enabledSkillRefs: SkillRef[];
+	setEnabledSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
 	onEnableAllSkills: () => void;
 	onDisableAllSkills: () => void;
 }
@@ -132,8 +132,8 @@ export function EditorBottomBar({
 	setWebSearchTemplates,
 	allSkills,
 	skillsLoading = false,
-	enabledSkills,
-	setEnabledSkills,
+	enabledSkillRefs,
+	setEnabledSkillRefs,
 	onEnableAllSkills,
 	onDisableAllSkills,
 }: EditorBottomBarProps) {
@@ -490,8 +490,8 @@ export function EditorBottomBar({
 					<SkillsBottomBarChip
 						allSkills={allSkills}
 						loading={skillsLoading}
-						enabledSkills={enabledSkills}
-						setEnabledSkills={setEnabledSkills}
+						enabledSkillRefs={enabledSkillRefs}
+						setEnabledSkillRefs={setEnabledSkillRefs}
 						onEnableAll={onEnableAllSkills}
 						onDisableAll={onDisableAllSkills}
 					/>

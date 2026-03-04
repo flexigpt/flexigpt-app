@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/llmtools-go"
-	llmtoolsgoSpec "github.com/flexigpt/llmtools-go/spec"
+	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
@@ -90,7 +90,7 @@ func (rt *ToolRuntime) InvokeTool(
 	}
 
 	var (
-		outputs []llmtoolsgoSpec.ToolOutputUnion
+		outputs []llmtoolsSpec.ToolOutputUnion
 		md      map[string]any
 		isError bool
 		errMsg  string

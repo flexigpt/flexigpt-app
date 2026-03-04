@@ -17,6 +17,7 @@ import type {
 import type { MessageBlock, PromptBundle, PromptTemplate, PromptTemplateListItem, PromptVariable } from '@/spec/prompt';
 import type { AppTheme, AuthKey, AuthKeyName, AuthKeyType, SettingsSchema } from '@/spec/setting';
 import type {
+	InvokeSkillToolResponse,
 	RuntimeSkillFilter,
 	Skill,
 	SkillBundle,
@@ -281,6 +282,8 @@ export interface ISkillStoreAPI {
 
 	/** Runtime: list skills from the runtime catalog (optionally filtered). */
 	listRuntimeSkills(filter?: RuntimeSkillFilter): Promise<SkillRecord[]>;
+
+	invokeSkillTool(sessionID: string, toolName: string, args?: JSONRawString): Promise<InvokeSkillToolResponse>;
 }
 
 export interface IToolRuntimeAPI {
@@ -343,6 +346,7 @@ export interface IAggregateAPI {
 		current: StoreConversationMessage,
 		history?: StoreConversationMessage[],
 		toolStoreChoices?: ToolStoreChoice[],
+		skillSessionID?: string,
 		requestId?: string,
 		signal?: AbortSignal,
 		onStreamTextData?: (textData: string) => void,

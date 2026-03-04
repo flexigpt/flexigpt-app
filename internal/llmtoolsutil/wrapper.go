@@ -8,10 +8,10 @@ import (
 	"github.com/flexigpt/llmtools-go/imagetool"
 	"github.com/flexigpt/llmtools-go/texttool"
 
-	llmtoolsgoSpec "github.com/flexigpt/llmtools-go/spec"
+	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 )
 
-func ReadFile(ctx context.Context, args fstool.ReadFileArgs) ([]llmtoolsgoSpec.ToolOutputUnion, error) {
+func ReadFile(ctx context.Context, args fstool.ReadFileArgs) ([]llmtoolsSpec.ToolOutputUnion, error) {
 	t, err := fstool.NewFSTool()
 	if err != nil || t == nil {
 		return nil, err

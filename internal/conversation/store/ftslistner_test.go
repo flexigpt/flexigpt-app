@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/flexigpt/flexigpt-app/internal/conversation/spec"
-	inferencegoSpec "github.com/flexigpt/inference-go/spec"
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
 func TestFTSSearchHappyPath(t *testing.T) {
@@ -48,7 +48,7 @@ func TestFTSRankingTitleVsBody(t *testing.T) {
 	// B: query term only inside a message.
 	b := newConv(t, "No match in title")
 	b.Messages = []spec.ConversationMessage{
-		newTextTurn("m1", inferencegoSpec.RoleUser, "alpha appears in body"),
+		newTextTurn("m1", inferenceSpec.RoleUser, "alpha appears in body"),
 	}
 	_, _ = cc.PutConversation(t.Context(), getNewPutRequestFromConversation(b))
 
@@ -67,7 +67,7 @@ func TestFTSPagination(t *testing.T) {
 	for i := range 14 {
 		c := newConv(t, "Kiwi talk "+strconv.Itoa(i))
 		c.Messages = []spec.ConversationMessage{
-			newTextTurn("m", inferencegoSpec.RoleUser, "kiwi everywhere"),
+			newTextTurn("m", inferenceSpec.RoleUser, "kiwi everywhere"),
 		}
 		_, _ = cc.PutConversation(t.Context(), getNewPutRequestFromConversation(c))
 	}
@@ -139,7 +139,7 @@ func TestFTSAddMessageUpdatesIndex(t *testing.T) {
 		t.Fatal("should have no hits before message added")
 	}
 
-	msg := newTextTurn("m1", inferencegoSpec.RoleAssistant, "let me whisper a secret")
+	msg := newTextTurn("m1", inferenceSpec.RoleAssistant, "let me whisper a secret")
 	_, _ = cc.PutMessagesToConversation(t.Context(),
 		&spec.PutMessagesToConversationRequest{
 			ID: c.ID,
@@ -182,9 +182,9 @@ func TestFTSScaleSearch(t *testing.T) {
 	for i := range nConvos {
 		c := newConv(t, fmt.Sprintf("Scale test fruit%d", i))
 		for m := range nMessages {
-			role := inferencegoSpec.RoleUser
+			role := inferenceSpec.RoleUser
 			if m%2 == 1 {
-				role = inferencegoSpec.RoleAssistant
+				role = inferenceSpec.RoleAssistant
 			}
 			c.Messages = append(
 				c.Messages,

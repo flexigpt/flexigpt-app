@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/llmtools-go"
-	llmtoolsgoSpec "github.com/flexigpt/llmtools-go/spec"
+	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
@@ -76,7 +76,7 @@ func injectLLMToolsGo(
 	return nil
 }
 
-func metaForLLMToolsGo(t llmtoolsgoSpec.Tool) (llmtoolsutil.LLMToolMeta, error) {
+func metaForLLMToolsGo(t llmtoolsSpec.Tool) (llmtoolsutil.LLMToolMeta, error) {
 	fid := strings.TrimSpace(string(t.GoImpl.FuncID))
 	if fid == "" {
 		return llmtoolsutil.LLMToolMeta{}, errors.New("llmtools-go tool has empty funcID")
@@ -100,7 +100,7 @@ func metaForLLMToolsGo(t llmtoolsgoSpec.Tool) (llmtoolsutil.LLMToolMeta, error) 
 	return meta, nil
 }
 
-func toAppToolFromLLMToolsGo(t llmtoolsgoSpec.Tool, meta llmtoolsutil.LLMToolMeta) (spec.Tool, error) {
+func toAppToolFromLLMToolsGo(t llmtoolsSpec.Tool, meta llmtoolsutil.LLMToolMeta) (spec.Tool, error) {
 	now := time.Now().UTC()
 	created := t.CreatedAt
 	if created.IsZero() {

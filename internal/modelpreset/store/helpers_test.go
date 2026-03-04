@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	inferencegoSpec "github.com/flexigpt/inference-go/spec"
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
 const windowsGOOS = "windows"
@@ -65,12 +65,12 @@ func newStoreAtDir(t *testing.T, dir string) *ModelPresetStore {
 	return st
 }
 
-func putUserProvider(t *testing.T, st *ModelPresetStore, name inferencegoSpec.ProviderName, enabled bool) {
+func putUserProvider(t *testing.T, st *ModelPresetStore, name inferenceSpec.ProviderName, enabled bool) {
 	t.Helper()
 
 	body := &spec.PutProviderPresetRequestBody{
 		DisplayName:              spec.ProviderDisplayName(strings.ToUpper(string(name))),
-		SDKType:                  inferencegoSpec.ProviderSDKTypeOpenAIChatCompletions,
+		SDKType:                  inferenceSpec.ProviderSDKTypeOpenAIChatCompletions,
 		IsEnabled:                enabled,
 		Origin:                   "https://api." + string(name) + ".example.test",
 		ChatCompletionPathPrefix: spec.DefaultOpenAIChatCompletionsPrefix,
@@ -91,7 +91,7 @@ func putUserModelPreset(
 	t *testing.T,
 	ctx context.Context,
 	st *ModelPresetStore,
-	provider inferencegoSpec.ProviderName,
+	provider inferenceSpec.ProviderName,
 	modelID spec.ModelPresetID,
 	enabled bool,
 ) {
@@ -118,7 +118,7 @@ func listProvidersByNames(
 	t *testing.T,
 	st *ModelPresetStore,
 	ctx context.Context,
-	names []inferencegoSpec.ProviderName,
+	names []inferenceSpec.ProviderName,
 	includeDisabled bool,
 ) []spec.ProviderPreset {
 	t.Helper()
@@ -136,11 +136,11 @@ func getProviderByName(
 	t *testing.T,
 	st *ModelPresetStore,
 	ctx context.Context,
-	name inferencegoSpec.ProviderName,
+	name inferenceSpec.ProviderName,
 	includeDisabled bool,
 ) spec.ProviderPreset {
 	t.Helper()
-	ps := listProvidersByNames(t, st, ctx, []inferencegoSpec.ProviderName{name}, includeDisabled)
+	ps := listProvidersByNames(t, st, ctx, []inferenceSpec.ProviderName{name}, includeDisabled)
 	if len(ps) != 1 {
 		t.Fatalf("expected exactly 1 provider %q, got %d", name, len(ps))
 	}
@@ -150,7 +150,7 @@ func getProviderByName(
 func anyBuiltInProviderFromStore(
 	t *testing.T,
 	st *ModelPresetStore,
-) (inferencegoSpec.ProviderName, spec.ProviderPreset) {
+) (inferenceSpec.ProviderName, spec.ProviderPreset) {
 	t.Helper()
 	if st == nil || st.builtinData == nil {
 		t.Fatalf("store has no builtinData")
@@ -171,7 +171,7 @@ func builtInProviderWithAtLeastNModelsFromStore(
 	ctx context.Context,
 	st *ModelPresetStore,
 	n int,
-) (inferencegoSpec.ProviderName, spec.ProviderPreset) {
+) (inferenceSpec.ProviderName, spec.ProviderPreset) {
 	t.Helper()
 	if st == nil || st.builtinData == nil {
 		t.Fatalf("store has no builtinData")
@@ -191,7 +191,7 @@ func builtInProviderWithAtLeastNModelsFromStore(
 
 // Helper: schema with same model ID present in two different providers (scoped uniqueness).
 func buildSchemaScopedDuplicateIDs(
-	p1, p2 inferencegoSpec.ProviderName,
+	p1, p2 inferenceSpec.ProviderName,
 	commonID spec.ModelPresetID,
 	extraID spec.ModelPresetID,
 ) []byte {
@@ -202,7 +202,7 @@ func buildSchemaScopedDuplicateIDs(
 		SchemaVersion:            spec.SchemaVersion,
 		Name:                     p1,
 		DisplayName:              "Provider A",
-		SDKType:                  inferencegoSpec.ProviderSDKTypeOpenAIChatCompletions,
+		SDKType:                  inferenceSpec.ProviderSDKTypeOpenAIChatCompletions,
 		IsEnabled:                true,
 		CreatedAt:                time.Now(),
 		ModifiedAt:               time.Now(),
@@ -218,7 +218,7 @@ func buildSchemaScopedDuplicateIDs(
 		SchemaVersion:            spec.SchemaVersion,
 		Name:                     p2,
 		DisplayName:              "Provider B",
-		SDKType:                  inferencegoSpec.ProviderSDKTypeOpenAIChatCompletions,
+		SDKType:                  inferenceSpec.ProviderSDKTypeOpenAIChatCompletions,
 		IsEnabled:                true,
 		CreatedAt:                time.Now(),
 		ModifiedAt:               time.Now(),
@@ -231,23 +231,23 @@ func buildSchemaScopedDuplicateIDs(
 	s := spec.PresetsSchema{
 		SchemaVersion:   spec.SchemaVersion,
 		DefaultProvider: p1,
-		ProviderPresets: map[inferencegoSpec.ProviderName]spec.ProviderPreset{p1: pp1, p2: pp2},
+		ProviderPresets: map[inferenceSpec.ProviderName]spec.ProviderPreset{p1: pp1, p2: pp2},
 	}
 	b, _ := json.Marshal(s)
 	return b
 }
 
 func anyProvider(
-	m map[inferencegoSpec.ProviderName]spec.ProviderPreset,
-) (inferencegoSpec.ProviderName, spec.ProviderPreset) {
+	m map[inferenceSpec.ProviderName]spec.ProviderPreset,
+) (inferenceSpec.ProviderName, spec.ProviderPreset) {
 	for n, p := range m {
 		return n, p
 	}
 	return "", spec.ProviderPreset{}
 }
 
-func anyModel(m map[inferencegoSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset,
-) (inferencegoSpec.ProviderName, spec.ModelPresetID, spec.ModelPreset) {
+func anyModel(m map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset,
+) (inferenceSpec.ProviderName, spec.ModelPresetID, spec.ModelPreset) {
 	for pn, mm := range m {
 		for mid, mp := range mm {
 			return pn, mid, mp
@@ -282,13 +282,13 @@ func newPresetsFromFS(t *testing.T, mem fs.FS) (*BuiltInPresets, error) {
 	return bi, nil
 }
 
-func buildSchemaDefaultMissing(pn inferencegoSpec.ProviderName, mpid spec.ModelPresetID) []byte {
+func buildSchemaDefaultMissing(pn inferenceSpec.ProviderName, mpid spec.ModelPresetID) []byte {
 	model := makeModelPreset(mpid)
 	pp := spec.ProviderPreset{
 		SchemaVersion:            spec.SchemaVersion,
 		Name:                     pn,
 		DisplayName:              "Demo",
-		SDKType:                  inferencegoSpec.ProviderSDKTypeOpenAIChatCompletions,
+		SDKType:                  inferenceSpec.ProviderSDKTypeOpenAIChatCompletions,
 		IsEnabled:                true,
 		CreatedAt:                time.Now(),
 		ModifiedAt:               time.Now(),
@@ -300,19 +300,19 @@ func buildSchemaDefaultMissing(pn inferencegoSpec.ProviderName, mpid spec.ModelP
 	s := spec.PresetsSchema{
 		SchemaVersion:   spec.SchemaVersion,
 		DefaultProvider: pn,
-		ProviderPresets: map[inferencegoSpec.ProviderName]spec.ProviderPreset{pn: pp},
+		ProviderPresets: map[inferenceSpec.ProviderName]spec.ProviderPreset{pn: pp},
 	}
 	b, _ := json.Marshal(s)
 	return b
 }
 
-func buildHappySchema(pn inferencegoSpec.ProviderName, mpid spec.ModelPresetID) []byte {
+func buildHappySchema(pn inferenceSpec.ProviderName, mpid spec.ModelPresetID) []byte {
 	model := makeModelPreset(mpid)
 	pp := spec.ProviderPreset{
 		SchemaVersion:            spec.SchemaVersion,
 		Name:                     pn,
 		DisplayName:              "Demo",
-		SDKType:                  inferencegoSpec.ProviderSDKTypeOpenAIChatCompletions,
+		SDKType:                  inferenceSpec.ProviderSDKTypeOpenAIChatCompletions,
 		IsEnabled:                true,
 		CreatedAt:                time.Now(),
 		ModifiedAt:               time.Now(),
@@ -324,7 +324,7 @@ func buildHappySchema(pn inferencegoSpec.ProviderName, mpid spec.ModelPresetID) 
 	s := spec.PresetsSchema{
 		SchemaVersion:   spec.SchemaVersion,
 		DefaultProvider: pp.Name,
-		ProviderPresets: map[inferencegoSpec.ProviderName]spec.ProviderPreset{pn: pp},
+		ProviderPresets: map[inferenceSpec.ProviderName]spec.ProviderPreset{pn: pp},
 	}
 	b, _ := json.Marshal(s)
 	return b

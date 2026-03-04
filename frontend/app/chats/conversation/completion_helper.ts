@@ -39,6 +39,7 @@ export async function HandleCompletion(
 	history: ConversationMessage[],
 	toolStoreChoices: ToolStoreChoice[] | undefined,
 	assistantPlaceholder: ConversationMessage,
+	skillSessionID?: string,
 	requestId?: string,
 	signal?: AbortSignal,
 	onStreamTextData?: (textData: string) => void,
@@ -60,6 +61,7 @@ export async function HandleCompletion(
 			currentUserMsg,
 			history,
 			toolStoreChoices,
+			skillSessionID,
 			requestId,
 			signal,
 			onStreamTextData,
@@ -382,8 +384,10 @@ function deriveUIToolCallFromToolCall(
 	const choiceID = toolCall.choiceID;
 	if (!choiceID) return undefined;
 
+	// NOTE: runtime-injected tools (e.g. skills.*) are not in toolStoreChoices,
+	// so they will not be present in this map. Do NOT drop the tool call.
 	const toolStoreChoice = choiceMap.get(choiceID); // ToolStoreChoice | undefined
-	if (!toolStoreChoice) return undefined;
+
 	const type = toolCall.type as unknown as ToolStoreChoiceType;
 
 	// For provider-managed web-search, the "call" appearing in outputs

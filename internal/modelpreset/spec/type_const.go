@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	inferencegoSpec "github.com/flexigpt/inference-go/spec"
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
 const (
@@ -67,16 +67,16 @@ type ModelPreset struct {
 	Slug          ModelSlug        `json:"slug"          required:"true"`
 	IsEnabled     bool             `json:"isEnabled"     required:"true"`
 
-	Stream          *bool                           `json:"stream,omitempty"`
-	MaxPromptLength *int                            `json:"maxPromptLength,omitempty"`
-	MaxOutputLength *int                            `json:"maxOutputLength,omitempty"`
-	Temperature     *float64                        `json:"temperature,omitempty"`
-	Reasoning       *inferencegoSpec.ReasoningParam `json:"reasoning,omitempty"`
-	SystemPrompt    *string                         `json:"systemPrompt,omitempty"`
-	Timeout         *int                            `json:"timeout,omitempty"`
+	Stream          *bool                         `json:"stream,omitempty"`
+	MaxPromptLength *int                          `json:"maxPromptLength,omitempty"`
+	MaxOutputLength *int                          `json:"maxOutputLength,omitempty"`
+	Temperature     *float64                      `json:"temperature,omitempty"`
+	Reasoning       *inferenceSpec.ReasoningParam `json:"reasoning,omitempty"`
+	SystemPrompt    *string                       `json:"systemPrompt,omitempty"`
+	Timeout         *int                          `json:"timeout,omitempty"`
 
-	OutputParam   *inferencegoSpec.OutputParam `json:"outputParam,omitempty"`
-	StopSequences []string                     `json:"stopSequences,omitempty"`
+	OutputParam   *inferenceSpec.OutputParam `json:"outputParam,omitempty"`
+	StopSequences []string                   `json:"stopSequences,omitempty"`
 
 	AdditionalParametersRawJSON *string `json:"additionalParametersRawJSON,omitempty"`
 	// CapabilitiesOverride is a stored override for runtime capability resolution.
@@ -89,11 +89,11 @@ type ModelPreset struct {
 }
 
 type ProviderPreset struct {
-	SchemaVersion string                          `json:"schemaVersion" required:"true"`
-	Name          inferencegoSpec.ProviderName    `json:"name"          required:"true"`
-	DisplayName   ProviderDisplayName             `json:"displayName"   required:"true"`
-	SDKType       inferencegoSpec.ProviderSDKType `json:"sdkType"       required:"true"`
-	IsEnabled     bool                            `json:"isEnabled"     required:"true"`
+	SchemaVersion string                        `json:"schemaVersion" required:"true"`
+	Name          inferenceSpec.ProviderName    `json:"name"          required:"true"`
+	DisplayName   ProviderDisplayName           `json:"displayName"   required:"true"`
+	SDKType       inferenceSpec.ProviderSDKType `json:"sdkType"       required:"true"`
+	IsEnabled     bool                          `json:"isEnabled"     required:"true"`
 
 	CreatedAt  time.Time `json:"createdAt"`
 	ModifiedAt time.Time `json:"modifiedAt"`
@@ -112,7 +112,7 @@ type ProviderPreset struct {
 }
 
 type PresetsSchema struct {
-	SchemaVersion   string                                          `json:"schemaVersion"`
-	DefaultProvider inferencegoSpec.ProviderName                    `json:"defaultProvider"`
-	ProviderPresets map[inferencegoSpec.ProviderName]ProviderPreset `json:"providerPresets"`
+	SchemaVersion   string                                        `json:"schemaVersion"`
+	DefaultProvider inferenceSpec.ProviderName                    `json:"defaultProvider"`
+	ProviderPresets map[inferenceSpec.ProviderName]ProviderPreset `json:"providerPresets"`
 }

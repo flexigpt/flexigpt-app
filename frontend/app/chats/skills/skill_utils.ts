@@ -1,26 +1,25 @@
-import type { SkillDef, SkillListItem } from '@/spec/skill';
+import type { SkillListItem, SkillRef } from '@/spec/skill';
 
-export function skillDefKey(def: SkillDef): string {
-	return `${def.type}:${def.location}:${def.name}`;
+export function skillRefKey(ref: SkillRef): string {
+	return `${ref.bundleID}:${ref.skillSlug}`;
 }
 
-export function skillDefFromListItem(item: SkillListItem): SkillDef {
-	const s = item.skillDefinition;
+export function skillRefFromListItem(item: SkillListItem): SkillRef {
 	return {
-		type: s.type,
-		name: s.name,
-		location: s.location,
+		bundleID: item.bundleID,
+		skillSlug: item.skillSlug,
+		skillID: item.skillDefinition.id,
 	};
 }
 
-export function dedupeSkillDefs(defs: SkillDef[]): SkillDef[] {
-	const out: SkillDef[] = [];
+export function dedupeSkillRefs(refs: SkillRef[]): SkillRef[] {
+	const out: SkillRef[] = [];
 	const seen = new Set<string>();
-	for (const d of defs ?? []) {
-		const k = skillDefKey(d);
+	for (const r of refs ?? []) {
+		const k = skillRefKey(r);
 		if (seen.has(k)) continue;
 		seen.add(k);
-		out.push(d);
+		out.push(r);
 	}
 	return out;
 }

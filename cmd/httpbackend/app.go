@@ -224,6 +224,7 @@ func (a *BackendApp) initProviderSet() {
 	p, err := inferencewrapper.NewProviderSetAPI(
 		a.toolStoreAPI,
 		a.modelPresetStoreAPI,
+		a.skillStoreAPI,
 		inferencewrapper.WithLogger(slog.Default()),
 		inferencewrapper.WithDebugConfig(&debugclient.DebugConfig{
 			Disable:                 false,

@@ -519,6 +519,22 @@ export namespace spec {
 	        this.reasoningTokens = source["reasoningTokens"];
 	    }
 	}
+	export class SkillRef {
+	    bundleID: string;
+	    skillSlug: string;
+	    skillID: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SkillRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
+	        this.skillSlug = source["skillSlug"];
+	        this.skillID = source["skillID"];
+	    }
+	}
 	export class ToolStoreChoice {
 	    choiceID: string;
 	    bundleID: string;
@@ -1291,6 +1307,7 @@ export namespace spec {
 	    toolChoices?: ToolChoice[];
 	    toolStoreChoices?: ToolStoreChoice[];
 	    attachments?: attachment.Attachment[];
+	    enabledSkillRefs?: SkillRef[];
 	    usage?: Usage;
 	    error?: Error;
 	    debugDetails?: any;
@@ -1312,6 +1329,7 @@ export namespace spec {
 	        this.toolChoices = this.convertValues(source["toolChoices"], ToolChoice);
 	        this.toolStoreChoices = this.convertValues(source["toolStoreChoices"], ToolStoreChoice);
 	        this.attachments = this.convertValues(source["attachments"], attachment.Attachment);
+	        this.enabledSkillRefs = this.convertValues(source["enabledSkillRefs"], SkillRef);
 	        this.usage = this.convertValues(source["usage"], Usage);
 	        this.error = this.convertValues(source["error"], Error);
 	        this.debugDetails = source["debugDetails"];
@@ -1491,6 +1509,7 @@ export namespace spec {
 	    history: ConversationMessage[];
 	    current: ConversationMessage;
 	    toolStoreChoices?: ToolStoreChoice[];
+	    skillSessionID?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new CompletionRequestBody(source);
@@ -1502,6 +1521,7 @@ export namespace spec {
 	        this.history = this.convertValues(source["history"], ConversationMessage);
 	        this.current = this.convertValues(source["current"], ConversationMessage);
 	        this.toolStoreChoices = this.convertValues(source["toolStoreChoices"], ToolStoreChoice);
+	        this.skillSessionID = source["skillSessionID"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2966,7 +2986,7 @@ export namespace spec {
 	    types?: string[];
 	    namePrefix?: string;
 	    locationPrefix?: string;
-	    allowSkills?: SkillDef[];
+	    allowSkillRefs?: SkillRef[];
 	    sessionID?: string;
 	    activity?: string;
 	
@@ -2979,7 +2999,7 @@ export namespace spec {
 	        this.types = source["types"];
 	        this.namePrefix = source["namePrefix"];
 	        this.locationPrefix = source["locationPrefix"];
-	        this.allowSkills = this.convertValues(source["allowSkills"], SkillDef);
+	        this.allowSkillRefs = this.convertValues(source["allowSkillRefs"], SkillRef);
 	        this.sessionID = source["sessionID"];
 	        this.activity = source["activity"];
 	    }
@@ -3392,56 +3412,32 @@ export namespace spec {
 	        this.secrets = source["secrets"];
 	    }
 	}
-	export class InvokeToolRequestBody {
-	    args: string;
-	    httpOptions?: InvokeHTTPOptions;
-	    goOptions?: InvokeGoOptions;
+	export class InvokeSkillToolRequestBody {
+	    sessionID: string;
+	    toolName: string;
+	    args?: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new InvokeToolRequestBody(source);
+	        return new InvokeSkillToolRequestBody(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sessionID = source["sessionID"];
+	        this.toolName = source["toolName"];
 	        this.args = source["args"];
-	        this.httpOptions = this.convertValues(source["httpOptions"], InvokeHTTPOptions);
-	        this.goOptions = this.convertValues(source["goOptions"], InvokeGoOptions);
 	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
 	}
-	export class InvokeToolRequest {
-	    BundleID: string;
-	    ToolSlug: string;
-	    Version: string;
-	    Body?: InvokeToolRequestBody;
+	export class InvokeSkillToolRequest {
+	    Body?: InvokeSkillToolRequestBody;
 	
 	    static createFrom(source: any = {}) {
-	        return new InvokeToolRequest(source);
+	        return new InvokeSkillToolRequest(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.BundleID = source["BundleID"];
-	        this.ToolSlug = source["ToolSlug"];
-	        this.Version = source["Version"];
-	        this.Body = this.convertValues(source["Body"], InvokeToolRequestBody);
+	        this.Body = this.convertValues(source["Body"], InvokeSkillToolRequestBody);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -3545,6 +3541,146 @@ export namespace spec {
 		    return a;
 		}
 	}
+	export class InvokeSkillToolResponseBody {
+	    outputs?: ToolOutputUnion[];
+	    meta?: Record<string, any>;
+	    isBuiltIn: boolean;
+	    isError: boolean;
+	    errorMessage: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new InvokeSkillToolResponseBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.outputs = this.convertValues(source["outputs"], ToolOutputUnion);
+	        this.meta = source["meta"];
+	        this.isBuiltIn = source["isBuiltIn"];
+	        this.isError = source["isError"];
+	        this.errorMessage = source["errorMessage"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class InvokeSkillToolResponse {
+	    Body?: InvokeSkillToolResponseBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new InvokeSkillToolResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], InvokeSkillToolResponseBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class InvokeToolRequestBody {
+	    args: string;
+	    httpOptions?: InvokeHTTPOptions;
+	    goOptions?: InvokeGoOptions;
+	
+	    static createFrom(source: any = {}) {
+	        return new InvokeToolRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.args = source["args"];
+	        this.httpOptions = this.convertValues(source["httpOptions"], InvokeHTTPOptions);
+	        this.goOptions = this.convertValues(source["goOptions"], InvokeGoOptions);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class InvokeToolRequest {
+	    BundleID: string;
+	    ToolSlug: string;
+	    Version: string;
+	    Body?: InvokeToolRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new InvokeToolRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	        this.ToolSlug = source["ToolSlug"];
+	        this.Version = source["Version"];
+	        this.Body = this.convertValues(source["Body"], InvokeToolRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class InvokeToolResponseBody {
 	    outputs?: ToolOutputUnion[];
 	    meta?: Record<string, any>;
@@ -6240,6 +6376,7 @@ export namespace spec {
 	
 	    }
 	}
+	
 	
 	
 	

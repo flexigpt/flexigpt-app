@@ -495,7 +495,12 @@ export interface UIToolCall {
 	type: ToolStoreChoiceType;
 	choiceID: string;
 	status: UIToolCallStatus;
-	toolStoreChoice: ToolStoreChoice;
+	/**
+	 * Optional. Some tool calls are injected at runtime (e.g. skills.*) and do not
+	 * correspond to a ToolStoreChoice in message.toolStoreChoices.
+	 */
+	toolStoreChoice?: ToolStoreChoice;
+
 	errorMessage?: string;
 }
 
@@ -506,7 +511,12 @@ export interface UIToolOutput {
 
 	type: ToolStoreChoiceType;
 	choiceID: string;
-	toolStoreChoice: ToolStoreChoice;
+
+	/**
+	 * Optional for the same reason as UIToolCall.toolStoreChoice.
+	 * For regular tool-store tools we typically hydrate this.
+	 */
+	toolStoreChoice?: ToolStoreChoice;
 
 	/** Short human-readable label used in chips. */
 	summary: string;

@@ -1,7 +1,7 @@
 package spec
 
 import (
-	inferencegoSpec "github.com/flexigpt/inference-go/spec"
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
@@ -9,22 +9,22 @@ import (
 )
 
 type AddProviderRequestBody struct {
-	SDKType                  inferencegoSpec.ProviderSDKType `json:"sdkType"`
-	Origin                   string                          `json:"origin"`
-	ChatCompletionPathPrefix string                          `json:"chatCompletionPathPrefix"`
-	APIKeyHeaderKey          string                          `json:"apiKeyHeaderKey"`
-	DefaultHeaders           map[string]string               `json:"defaultHeaders"`
+	SDKType                  inferenceSpec.ProviderSDKType `json:"sdkType"`
+	Origin                   string                        `json:"origin"`
+	ChatCompletionPathPrefix string                        `json:"chatCompletionPathPrefix"`
+	APIKeyHeaderKey          string                        `json:"apiKeyHeaderKey"`
+	DefaultHeaders           map[string]string             `json:"defaultHeaders"`
 }
 
 type AddProviderRequest struct {
-	Provider inferencegoSpec.ProviderName `path:"provider" required:"true"`
+	Provider inferenceSpec.ProviderName `path:"provider" required:"true"`
 	Body     *AddProviderRequestBody
 }
 
 type AddProviderResponse struct{}
 
 type DeleteProviderRequest struct {
-	Provider inferencegoSpec.ProviderName `path:"provider" required:"true"`
+	Provider inferenceSpec.ProviderName `path:"provider" required:"true"`
 }
 
 type DeleteProviderResponse struct{}
@@ -34,7 +34,7 @@ type SetProviderAPIKeyRequestBody struct {
 }
 
 type SetProviderAPIKeyRequest struct {
-	Provider inferencegoSpec.ProviderName `path:"provider" required:"true"`
+	Provider inferenceSpec.ProviderName `path:"provider" required:"true"`
 	Body     *SetProviderAPIKeyRequestBody
 }
 
@@ -43,7 +43,7 @@ type SetProviderAPIKeyResponse struct{}
 type CompletionRequestBody struct {
 	// Model configuration for this *call*. If nil, the aggregator can fall
 	// back to the last non-nil ModelParam from History.
-	ModelParam *inferencegoSpec.ModelParam `json:"modelParam,omitempty"`
+	ModelParam *inferenceSpec.ModelParam `json:"modelParam,omitempty"`
 
 	// Past turns of the conversation, already persisted.
 	History []conversationSpec.ConversationMessage `json:"history"`
@@ -63,10 +63,11 @@ type CompletionRequestBody struct {
 	// slice; it does NOT infer tools from History[i].ToolChoices or Current.ToolChoices.
 	// (Those are persisted for UI/analytics only.)
 	ToolStoreChoices []toolSpec.ToolStoreChoice `json:"toolStoreChoices,omitempty"`
+	SkillSessionID   string                     `json:"skillSessionID,omitempty"`
 }
 
 type CompletionRequest struct {
-	Provider      inferencegoSpec.ProviderName  `path:"provider"      required:"true"`
+	Provider      inferenceSpec.ProviderName    `path:"provider"      required:"true"`
 	ModelPresetID modelpresetSpec.ModelPresetID `path:"modelPresetID" required:"true"`
 
 	Body *CompletionRequestBody
@@ -76,8 +77,8 @@ type CompletionRequest struct {
 }
 
 type CompletionResponseBody struct {
-	InferenceResponse     *inferencegoSpec.FetchCompletionResponse `json:"inferenceResponse,omitempty"`
-	HydratedCurrentInputs []inferencegoSpec.InputUnion             `json:"hydratedCurrentInputs,omitempty"`
+	InferenceResponse     *inferenceSpec.FetchCompletionResponse `json:"inferenceResponse,omitempty"`
+	HydratedCurrentInputs []inferenceSpec.InputUnion             `json:"hydratedCurrentInputs,omitempty"`
 }
 
 type CompletionResponse struct {

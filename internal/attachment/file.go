@@ -9,7 +9,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	"github.com/flexigpt/llmtools-go/fstool"
-	llmtoolsgoSpec "github.com/flexigpt/llmtools-go/spec"
+	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 )
 
 // FileRef carries metadata for file attachments.
@@ -210,7 +210,7 @@ func (ref *FileRef) getTextFileContent(
 	if err != nil {
 		return nil, err
 	}
-	if len(toolOut) == 0 || toolOut[0].Kind != llmtoolsgoSpec.ToolOutputKindText ||
+	if len(toolOut) == 0 || toolOut[0].Kind != llmtoolsSpec.ToolOutputKindText ||
 		toolOut[0].TextItem == nil {
 		return nil, ErrUnreadableFile
 	}
@@ -238,7 +238,7 @@ func (ref *FileRef) getBinaryFileContent(
 	if err != nil {
 		return nil, err
 	}
-	if len(toolOut) == 0 || toolOut[0].Kind != llmtoolsgoSpec.ToolOutputKindFile ||
+	if len(toolOut) == 0 || toolOut[0].Kind != llmtoolsSpec.ToolOutputKindFile ||
 		toolOut[0].FileItem == nil {
 		return nil, ErrUnreadableFile
 	}

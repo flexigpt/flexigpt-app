@@ -13,6 +13,7 @@ import type {
 	UIToolOutput,
 	URLCitation,
 } from '@/spec/inference';
+import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
 
 /** Keep in sync with Go's ConversationSchemaVersion. */
@@ -33,6 +34,7 @@ export interface StoreConversationMessage {
 
 	toolStoreChoices?: ToolStoreChoice[];
 	attachments?: Attachment[];
+	enabledSkillRefs?: SkillRef[];
 
 	usage?: InferenceUsage;
 	error?: InferenceError;

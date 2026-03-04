@@ -10,7 +10,12 @@ import (
 
 	"github.com/flexigpt/inference-go"
 	"github.com/flexigpt/inference-go/debugclient"
-	inferencegoSpec "github.com/flexigpt/inference-go/spec"
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
+
+	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
+
+	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+
 	"github.com/google/uuid"
 
 	"github.com/flexigpt/flexigpt-app/internal/attachment"
@@ -18,19 +23,21 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
+	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
+	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 )
 
 type completionKeyCapabilityResolver struct {
 	key  string
-	caps *inferencegoSpec.ModelCapabilities
+	caps *inferenceSpec.ModelCapabilities
 }
 
 func (r completionKeyCapabilityResolver) ResolveModelCapabilities(
 	ctx context.Context,
-	req inferencegoSpec.ResolveModelCapabilitiesRequest,
-) (*inferencegoSpec.ModelCapabilities, error) {
+	req inferenceSpec.ResolveModelCapabilitiesRequest,
+) (*inferenceSpec.ModelCapabilities, error) {
 	if r.caps == nil {
 		return nil, errors.New("no model capabilities configured")
 	}
@@ -47,9 +54,10 @@ func (r completionKeyCapabilityResolver) ResolveModelCapabilities(
 //   - attachment/tool hydration,
 //   - mapping Conversation+CurrentTurn -> inference-go FetchCompletionRequest.
 type ProviderSetAPI struct {
-	inner     *inference.ProviderSetAPI
-	toolStore *toolStore.ToolStore
-	mpStore   *modelpresetStore.ModelPresetStore
+	inner      *inference.ProviderSetAPI
+	toolStore  *toolStore.ToolStore
+	mpStore    *modelpresetStore.ModelPresetStore
+	skillStore *skillStore.SkillStore
 
 	logger      *slog.Logger
 	debugConfig *debugclient.DebugConfig
@@ -75,15 +83,17 @@ func WithDebugConfig(debugConfig *debugclient.DebugConfig) ProviderSetOption {
 //   - opts: functional options for configuring the wrapper (e.g. WithLogger, WithDebugConfig).
 func NewProviderSetAPI(
 	ts *toolStore.ToolStore,
-	modelPresetStore *modelpresetStore.ModelPresetStore,
+	mps *modelpresetStore.ModelPresetStore,
+	ss *skillStore.SkillStore,
 	opts ...ProviderSetOption,
 ) (*ProviderSetAPI, error) {
-	if ts == nil || modelPresetStore == nil {
+	if ts == nil || mps == nil {
 		return nil, errors.New("no tool store or model preset store provided to inference wrapper provider set")
 	}
 	ps := &ProviderSetAPI{
-		toolStore: ts,
-		mpStore:   modelPresetStore,
+		toolStore:  ts,
+		mpStore:    mps,
+		skillStore: ss,
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -97,7 +107,7 @@ func NewProviderSetAPI(
 	allOpts = append(allOpts, inference.WithLogger(ps.logger))
 	if ps.debugConfig != nil {
 		allOpts = append(allOpts,
-			inference.WithDebugClientBuilder(func(p inferencegoSpec.ProviderParam) inferencegoSpec.CompletionDebugger {
+			inference.WithDebugClientBuilder(func(p inferenceSpec.ProviderParam) inferenceSpec.CompletionDebugger {
 				// Here we enable for all providers. Possible to give provider specific options later.
 				return debugclient.NewHTTPCompletionDebugger(ps.debugConfig)
 			}),
@@ -223,7 +233,59 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		return nil, err
 	}
 
-	infReq := &inferencegoSpec.FetchCompletionRequest{
+	enabledSkillRefs := body.Current.EnabledSkillRefs
+
+	skillSessionID := strings.TrimSpace(body.SkillSessionID)
+	if ps.skillStore != nil && len(enabledSkillRefs) > 0 && skillSessionID != "" {
+
+		// Active skills count in this session (restricted to allowlist).
+		activeResp, aerr := ps.skillStore.ListRuntimeSkills(ctx, &skillSpec.ListRuntimeSkillsRequest{
+			Body: &skillSpec.ListRuntimeSkillsRequestBody{
+				Filter: &skillSpec.RuntimeSkillFilter{
+					SessionID:      agentskillsSpec.SessionID(skillSessionID),
+					Activity:       "active",
+					AllowSkillRefs: enabledSkillRefs,
+				},
+			},
+		})
+		activeCount := 0
+		if aerr == nil && activeResp != nil && activeResp.Body != nil {
+			activeCount = len(activeResp.Body.Skills)
+		}
+
+		// Pick prompt activity:
+		// - if none active => show available-only (inactive)
+		// - else => show active + available (any).
+		promptActivity := "inactive"
+		if activeCount > 0 {
+			promptActivity = "any"
+		}
+
+		promptResp, perr := ps.skillStore.GetSkillsPromptXML(ctx, &skillSpec.GetSkillsPromptXMLRequest{
+			Body: &skillSpec.GetSkillsPromptXMLRequestBody{
+				Filter: &skillSpec.RuntimeSkillFilter{
+					SessionID:      agentskillsSpec.SessionID(skillSessionID),
+					Activity:       promptActivity,
+					AllowSkillRefs: enabledSkillRefs,
+				},
+			},
+		})
+		if perr == nil && promptResp != nil && promptResp.Body != nil && strings.TrimSpace(promptResp.Body.XML) != "" {
+			modelParam.SystemPrompt = appendToSystemPrompt(
+				modelParam.SystemPrompt,
+				skillsRulesPrompt(),
+				promptResp.Body.XML,
+			)
+		}
+
+		// Tool choices:
+		// - if none active => only skills.load
+		// - else => load/unload/readresource/runscript.
+		skillToolChoices, _ := buildSkillToolChoices(activeCount > 0)
+		toolChoices = append(toolChoices, skillToolChoices...)
+	}
+
+	infReq := &inferenceSpec.FetchCompletionRequest{
 		ModelParam:  *modelParam,
 		Inputs:      inputs,
 		ToolChoices: toolChoices,
@@ -238,7 +300,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		ck = uid.String()
 	}
 
-	opts := &inferencegoSpec.FetchCompletionOptions{
+	opts := &inferenceSpec.FetchCompletionOptions{
 		CompletionKey: ck,
 		CapabilityResolver: completionKeyCapabilityResolver{
 			key:  ck,
@@ -260,12 +322,55 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	return resp, err
 }
 
+func buildSkillToolChoices(includeAll bool) ([]inferenceSpec.ToolChoice, error) {
+	mk := func(choiceID, toolName string, t llmtoolsSpec.Tool) (inferenceSpec.ToolChoice, error) {
+		schema, err := decodeToolArgSchema(toolSpec.JSONRawString(t.ArgSchema))
+		if err != nil {
+			return inferenceSpec.ToolChoice{}, err
+		}
+		return inferenceSpec.ToolChoice{
+			Type:        inferenceSpec.ToolTypeFunction,
+			ID:          choiceID, // choiceID (ToolCall.choiceID)
+			Name:        toolName, // ToolCall.name
+			Description: t.Description,
+			Arguments:   schema,
+		}, nil
+	}
+
+	var out []inferenceSpec.ToolChoice
+	tc, err := mk("builtin.skills.load", "skills.load", agentskillsSpec.SkillsLoadTool())
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, tc)
+
+	if includeAll {
+		if tc, err = mk("builtin.skills.unload", "skills.unload", agentskillsSpec.SkillsUnloadTool()); err != nil {
+			return nil, err
+		}
+		out = append(out, tc)
+		if tc, err = mk("builtin.skills.unload", "skills.unload", agentskillsSpec.SkillsUnloadTool()); err != nil {
+			return nil, err
+		}
+		out = append(out, tc)
+		if tc, err = mk(
+			"builtin.skills.runscript",
+			"skills.runscript",
+			agentskillsSpec.SkillsRunScriptTool(),
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, tc)
+	}
+	return out, nil
+}
+
 func (ps *ProviderSetAPI) deriveCapabilitiesFromPreset(
 	ctx context.Context,
-	provider inferencegoSpec.ProviderName,
+	provider inferenceSpec.ProviderName,
 	modelPresetID modelpresetSpec.ModelPresetID,
-	requestModelName inferencegoSpec.ModelName,
-) (*inferencegoSpec.ModelCapabilities, error) {
+	requestModelName inferenceSpec.ModelName,
+) (*inferenceSpec.ModelCapabilities, error) {
 	if ps == nil || ps.inner == nil {
 		return nil, errors.New("providerset is not initialized")
 	}
@@ -293,7 +398,7 @@ func (ps *ProviderSetAPI) deriveCapabilitiesFromPreset(
 		return nil, errors.New("GetModelPresetSpec: empty response")
 	}
 
-	presetModelName := inferencegoSpec.ModelName(presp.Body.Model.Name)
+	presetModelName := inferenceSpec.ModelName(presp.Body.Model.Name)
 
 	// Hardening: ensure model name consistency.
 	if requestModelName != "" && presetModelName != "" && requestModelName != presetModelName {
@@ -330,8 +435,8 @@ func (ps *ProviderSetAPI) deriveCapabilitiesFromPreset(
 // If still empty, returns an error.
 func (ps *ProviderSetAPI) resolveModelParam(
 	body *spec.CompletionRequestBody,
-) (*inferencegoSpec.ModelParam, error) {
-	var mp *inferencegoSpec.ModelParam
+) (*inferenceSpec.ModelParam, error) {
+	var mp *inferenceSpec.ModelParam
 	defaultMaxPromptTokens := 8000
 	if body.ModelParam != nil {
 		mp = body.ModelParam
@@ -360,8 +465,8 @@ func (ps *ProviderSetAPI) resolveModelParam(
 func (ps *ProviderSetAPI) buildInputs(
 	ctx context.Context,
 	body *spec.CompletionRequestBody,
-) (all, current []inferencegoSpec.InputUnion, err error) {
-	out := make([]inferencegoSpec.InputUnion, 0)
+) (all, current []inferenceSpec.InputUnion, err error) {
+	out := make([]inferenceSpec.InputUnion, 0)
 
 	// 1) History: replay stored unions exactly as they were.
 	for _, turn := range body.History {
@@ -380,12 +485,12 @@ func (ps *ProviderSetAPI) buildInputs(
 	}
 
 	cur := body.Current
-	if cur.Role != inferencegoSpec.RoleUser {
+	if cur.Role != inferenceSpec.RoleUser {
 		return nil, nil, errors.New("current turn must have role=user")
 	}
 
 	// If the caller already provided normalized InputUnions, just reuse them.
-	currentOut := make([]inferencegoSpec.InputUnion, 0)
+	currentOut := make([]inferenceSpec.InputUnion, 0)
 	if len(cur.Inputs) > 0 {
 		currentOut = append(currentOut, cur.Inputs...)
 	}
@@ -401,9 +506,9 @@ func (ps *ProviderSetAPI) buildInputs(
 		merged := false
 		for i := len(currentOut) - 1; i >= 0; i-- {
 			iu := &currentOut[i]
-			if iu.Kind == inferencegoSpec.InputKindInputMessage &&
+			if iu.Kind == inferenceSpec.InputKindInputMessage &&
 				iu.InputMessage != nil &&
-				iu.InputMessage.Role == inferencegoSpec.RoleUser {
+				iu.InputMessage.Role == inferenceSpec.RoleUser {
 				iu.InputMessage.Contents = append(iu.InputMessage.Contents, msgContentItems...)
 				merged = true
 				break
@@ -411,14 +516,14 @@ func (ps *ProviderSetAPI) buildInputs(
 		}
 
 		if !merged {
-			inputMsg := inferencegoSpec.InputOutputContent{
+			inputMsg := inferenceSpec.InputOutputContent{
 				ID:       "",
-				Role:     inferencegoSpec.RoleUser,
-				Status:   inferencegoSpec.StatusNone,
+				Role:     inferenceSpec.RoleUser,
+				Status:   inferenceSpec.StatusNone,
 				Contents: msgContentItems,
 			}
-			currentOut = append(currentOut, inferencegoSpec.InputUnion{
-				Kind:         inferencegoSpec.InputKindInputMessage,
+			currentOut = append(currentOut, inferenceSpec.InputUnion{
+				Kind:         inferenceSpec.InputKindInputMessage,
 				InputMessage: &inputMsg,
 			})
 		}
@@ -436,36 +541,36 @@ func (ps *ProviderSetAPI) buildInputs(
 
 // outputToInput converts an OutputUnion from a previous completion into an
 // InputUnion so it can be replayed as prior context in the next call.
-func outputToInput(o inferencegoSpec.OutputUnion) *inferencegoSpec.InputUnion {
+func outputToInput(o inferenceSpec.OutputUnion) *inferenceSpec.InputUnion {
 	switch o.Kind {
-	case inferencegoSpec.OutputKindOutputMessage:
-		return &inferencegoSpec.InputUnion{
-			Kind:          inferencegoSpec.InputKindOutputMessage,
+	case inferenceSpec.OutputKindOutputMessage:
+		return &inferenceSpec.InputUnion{
+			Kind:          inferenceSpec.InputKindOutputMessage,
 			OutputMessage: o.OutputMessage,
 		}
-	case inferencegoSpec.OutputKindReasoningMessage:
-		return &inferencegoSpec.InputUnion{
-			Kind:             inferencegoSpec.InputKindReasoningMessage,
+	case inferenceSpec.OutputKindReasoningMessage:
+		return &inferenceSpec.InputUnion{
+			Kind:             inferenceSpec.InputKindReasoningMessage,
 			ReasoningMessage: o.ReasoningMessage,
 		}
-	case inferencegoSpec.OutputKindFunctionToolCall:
-		return &inferencegoSpec.InputUnion{
-			Kind:             inferencegoSpec.InputKindFunctionToolCall,
+	case inferenceSpec.OutputKindFunctionToolCall:
+		return &inferenceSpec.InputUnion{
+			Kind:             inferenceSpec.InputKindFunctionToolCall,
 			FunctionToolCall: o.FunctionToolCall,
 		}
-	case inferencegoSpec.OutputKindCustomToolCall:
-		return &inferencegoSpec.InputUnion{
-			Kind:           inferencegoSpec.InputKindCustomToolCall,
+	case inferenceSpec.OutputKindCustomToolCall:
+		return &inferenceSpec.InputUnion{
+			Kind:           inferenceSpec.InputKindCustomToolCall,
 			CustomToolCall: o.CustomToolCall,
 		}
-	case inferencegoSpec.OutputKindWebSearchToolCall:
-		return &inferencegoSpec.InputUnion{
-			Kind:              inferencegoSpec.InputKindWebSearchToolCall,
+	case inferenceSpec.OutputKindWebSearchToolCall:
+		return &inferenceSpec.InputUnion{
+			Kind:              inferenceSpec.InputKindWebSearchToolCall,
 			WebSearchToolCall: o.WebSearchToolCall,
 		}
-	case inferencegoSpec.OutputKindWebSearchToolOutput:
-		return &inferencegoSpec.InputUnion{
-			Kind:                inferencegoSpec.InputKindWebSearchToolOutput,
+	case inferenceSpec.OutputKindWebSearchToolOutput:
+		return &inferenceSpec.InputUnion{
+			Kind:                inferenceSpec.InputKindWebSearchToolOutput,
 			WebSearchToolOutput: o.WebSearchToolOutput,
 		}
 	default:
@@ -477,8 +582,8 @@ func outputToInput(o inferencegoSpec.OutputUnion) *inferencegoSpec.InputUnion {
 func buildContentItemsFromAttachments(
 	ctx context.Context,
 	atts []attachment.Attachment,
-) ([]inferencegoSpec.InputOutputContentItemUnion, error) {
-	items := make([]inferencegoSpec.InputOutputContentItemUnion, 0)
+) ([]inferenceSpec.InputOutputContentItemUnion, error) {
+	items := make([]inferenceSpec.InputOutputContentItemUnion, 0)
 	if len(atts) == 0 {
 		return items, nil
 	}
@@ -510,9 +615,9 @@ func buildContentItemsFromAttachments(
 			if formattedTxt == "" {
 				continue
 			}
-			items = append(items, inferencegoSpec.InputOutputContentItemUnion{
-				Kind: inferencegoSpec.ContentItemKindText,
-				TextItem: &inferencegoSpec.ContentItemText{
+			items = append(items, inferenceSpec.InputOutputContentItemUnion{
+				Kind: inferenceSpec.ContentItemKindText,
+				TextItem: &inferenceSpec.ContentItemText{
 					Text: formattedTxt,
 				},
 			})
@@ -529,7 +634,7 @@ func buildContentItemsFromAttachments(
 			if data == "" && urlStr == "" {
 				continue
 			}
-			mime := inferencegoSpec.DefaultImageDataMIME
+			mime := inferenceSpec.DefaultImageDataMIME
 			if b.MIMEType != nil && strings.TrimSpace(*b.MIMEType) != "" {
 				mime = strings.TrimSpace(*b.MIMEType)
 			}
@@ -537,7 +642,7 @@ func buildContentItemsFromAttachments(
 			if b.FileName != nil {
 				name = strings.TrimSpace(*b.FileName)
 			}
-			img := &inferencegoSpec.ContentItemImage{
+			img := &inferenceSpec.ContentItemImage{
 				ImageName: name,
 				ImageMIME: mime,
 			}
@@ -547,8 +652,8 @@ func buildContentItemsFromAttachments(
 			if urlStr != "" {
 				img.ImageURL = urlStr
 			}
-			items = append(items, inferencegoSpec.InputOutputContentItemUnion{
-				Kind:      inferencegoSpec.ContentItemKindImage,
+			items = append(items, inferenceSpec.InputOutputContentItemUnion{
+				Kind:      inferenceSpec.ContentItemKindImage,
 				ImageItem: img,
 			})
 
@@ -564,7 +669,7 @@ func buildContentItemsFromAttachments(
 			if data == "" && urlStr == "" {
 				continue
 			}
-			mime := inferencegoSpec.DefaultFileDataMIME
+			mime := inferenceSpec.DefaultFileDataMIME
 			if b.MIMEType != nil && strings.TrimSpace(*b.MIMEType) != "" {
 				mime = strings.TrimSpace(*b.MIMEType)
 			}
@@ -573,7 +678,7 @@ func buildContentItemsFromAttachments(
 				name = strings.TrimSpace(*b.FileName)
 			}
 
-			file := &inferencegoSpec.ContentItemFile{
+			file := &inferenceSpec.ContentItemFile{
 				FileName: name,
 				FileMIME: mime,
 			}
@@ -584,8 +689,8 @@ func buildContentItemsFromAttachments(
 				file.FileURL = urlStr
 			}
 
-			items = append(items, inferencegoSpec.InputOutputContentItemUnion{
-				Kind:     inferencegoSpec.ContentItemKindFile,
+			items = append(items, inferenceSpec.InputOutputContentItemUnion{
+				Kind:     inferenceSpec.ContentItemKindFile,
 				FileItem: file,
 			})
 		}
@@ -597,8 +702,8 @@ func buildContentItemsFromAttachments(
 func (ps *ProviderSetAPI) buildToolChoices(
 	ctx context.Context,
 	toolStoreChoices []toolSpec.ToolStoreChoice,
-) ([]inferencegoSpec.ToolChoice, error) {
-	out := make([]inferencegoSpec.ToolChoice, 0)
+) ([]inferenceSpec.ToolChoice, error) {
+	out := make([]inferenceSpec.ToolChoice, 0)
 	if len(toolStoreChoices) == 0 {
 		return nil, nil
 	}
@@ -633,7 +738,7 @@ func (ps *ProviderSetAPI) buildToolChoices(
 func (ps *ProviderSetAPI) hydrateToolChoice(
 	ctx context.Context,
 	sc toolSpec.ToolStoreChoice,
-) (toolChoice *inferencegoSpec.ToolChoice, err error) {
+) (toolChoice *inferenceSpec.ToolChoice, err error) {
 	if sc.ChoiceID == "" {
 		return nil, errors.New("invalid choiceID for tool store choice")
 	}
@@ -681,8 +786,8 @@ func (ps *ProviderSetAPI) hydrateToolChoice(
 		desc = sc.Description
 	}
 
-	tc := &inferencegoSpec.ToolChoice{
-		Type:        inferencegoSpec.ToolType(sc.ToolType),
+	tc := &inferenceSpec.ToolChoice{
+		Type:        inferenceSpec.ToolType(sc.ToolType),
 		ID:          sc.ChoiceID,
 		Name:        name,
 		Description: desc,
@@ -711,7 +816,7 @@ func (ps *ProviderSetAPI) hydrateToolChoice(
 		case toolSpec.ToolStoreChoiceTypeWebSearch:
 			// Decode per-choice config (if any) and map to the
 			// inference-go WebSearchToolChoiceItem.
-			var cfg inferencegoSpec.WebSearchToolChoiceItem
+			var cfg inferenceSpec.WebSearchToolChoiceItem
 			rawCfg := strings.TrimSpace(sc.UserArgSchemaInstance)
 			if rawCfg != "" {
 				if err := json.Unmarshal([]byte(rawCfg), &cfg); err != nil {
@@ -721,7 +826,7 @@ func (ps *ProviderSetAPI) hydrateToolChoice(
 					)
 				}
 			}
-			tc.Type = inferencegoSpec.ToolTypeWebSearch
+			tc.Type = inferenceSpec.ToolTypeWebSearch
 			tc.WebSearchArguments = &cfg
 
 		default:
@@ -755,22 +860,55 @@ func decodeToolArgSchema(raw toolSpec.JSONRawString) (map[string]any, error) {
 	return schema, nil
 }
 
+func skillsRulesPrompt() string {
+	// Keep this stable; changing it can affect model behavior.
+	return strings.TrimSpace(`
+You have access to "skills" tools:
+- skills.load
+- skills.unload
+- skills.readresource
+- skills.runscript
+
+Rules:
+1) Only use skills that are listed in the provided skills XML prompt.
+2) If no skills are active, you must call skills.load before skills.readresource or skills.runscript.
+3) Prefer reading skill resources (skills.readresource) before running scripts.
+4) After calling skills.load or skills.unload, rely on the updated skills context in subsequent turns.
+`)
+}
+
+func appendToSystemPrompt(base string, parts ...string) string {
+	base = strings.TrimSpace(base)
+	var out []string
+	if base != "" {
+		out = append(out, base)
+	}
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		out = append(out, p)
+	}
+	return strings.Join(out, "\n\n")
+}
+
 // makeStreamHandler adapts inference-go streaming into the legacy
 // text/thinking callback pair.
 func makeStreamHandler(
 	onText func(string) error,
 	onThinking func(string) error,
-) inferencegoSpec.StreamHandler {
+) inferenceSpec.StreamHandler {
 	if onText == nil && onThinking == nil {
 		return nil
 	}
-	return func(ev inferencegoSpec.StreamEvent) error {
+	return func(ev inferenceSpec.StreamEvent) error {
 		switch ev.Kind {
-		case inferencegoSpec.StreamContentKindText:
+		case inferenceSpec.StreamContentKindText:
 			if onText != nil && ev.Text != nil {
 				return onText(ev.Text.Text)
 			}
-		case inferencegoSpec.StreamContentKindThinking:
+		case inferenceSpec.StreamContentKindThinking:
 			if onThinking != nil && ev.Thinking != nil {
 				return onThinking(ev.Thinking.Text)
 			}

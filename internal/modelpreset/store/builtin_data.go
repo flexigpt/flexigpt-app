@@ -15,10 +15,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	"github.com/flexigpt/flexigpt-app/internal/overlay"
-	inferencegoSpec "github.com/flexigpt/inference-go/spec"
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
-type builtInProviderKey inferencegoSpec.ProviderName
+type builtInProviderKey inferenceSpec.ProviderName
 
 func (builtInProviderKey) Group() overlay.GroupID { return "providers" }
 func (k builtInProviderKey) ID() overlay.KeyID    { return overlay.KeyID(k) }
@@ -28,7 +28,7 @@ type builtInModelKey spec.ModelPresetID
 func (builtInModelKey) Group() overlay.GroupID { return "models" }
 func (k builtInModelKey) ID() overlay.KeyID    { return overlay.KeyID(k) }
 
-type builtInProviderDefaultModelIDKey inferencegoSpec.ProviderName
+type builtInProviderDefaultModelIDKey inferenceSpec.ProviderName
 
 func (builtInProviderDefaultModelIDKey) Group() overlay.GroupID { return "providerDefaultModelIDs" }
 func (k builtInProviderDefaultModelIDKey) ID() overlay.KeyID    { return overlay.KeyID(k) }
@@ -36,14 +36,14 @@ func (k builtInProviderDefaultModelIDKey) ID() overlay.KeyID    { return overlay
 // BuiltInPresets loads built-in preset assets and maintains an overlay store.
 type BuiltInPresets struct {
 	// Immutable original data.
-	defaultProvider inferencegoSpec.ProviderName
-	providers       map[inferencegoSpec.ProviderName]spec.ProviderPreset
-	models          map[inferencegoSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset
+	defaultProvider inferenceSpec.ProviderName
+	providers       map[inferenceSpec.ProviderName]spec.ProviderPreset
+	models          map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset
 
 	// View after overlay application, guarded by mu.
 	mu         sync.RWMutex
-	viewProv   map[inferencegoSpec.ProviderName]spec.ProviderPreset
-	viewModels map[inferencegoSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset
+	viewProv   map[inferenceSpec.ProviderName]spec.ProviderPreset
+	viewModels map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset
 
 	// IO.
 	presetsFS      fs.FS
@@ -165,8 +165,8 @@ func (b *BuiltInPresets) Close() error {
 
 // ListBuiltInPresets returns deep-copied snapshots.
 func (b *BuiltInPresets) ListBuiltInPresets(ctx context.Context) (
-	providerPresets map[inferencegoSpec.ProviderName]spec.ProviderPreset,
-	modelPresets map[inferencegoSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset,
+	providerPresets map[inferenceSpec.ProviderName]spec.ProviderPreset,
+	modelPresets map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset,
 	err error,
 ) {
 	b.mu.RLock()
@@ -177,7 +177,7 @@ func (b *BuiltInPresets) ListBuiltInPresets(ctx context.Context) (
 // GetBuiltInDefaultProviderName fetches the default provider name in builtin.
 func (b *BuiltInPresets) GetBuiltInDefaultProviderName(
 	ctx context.Context,
-) (inferencegoSpec.ProviderName, error) {
+) (inferenceSpec.ProviderName, error) {
 	defaultProvider := b.defaultProvider
 
 	if defaultProvider == "" {
@@ -189,7 +189,7 @@ func (b *BuiltInPresets) GetBuiltInDefaultProviderName(
 // GetBuiltInProvider fetches a provider from the snapshot.
 func (b *BuiltInPresets) GetBuiltInProvider(
 	ctx context.Context,
-	name inferencegoSpec.ProviderName,
+	name inferenceSpec.ProviderName,
 ) (spec.ProviderPreset, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
@@ -203,7 +203,7 @@ func (b *BuiltInPresets) GetBuiltInProvider(
 // SetProviderEnabled toggles a provider.
 func (b *BuiltInPresets) SetProviderEnabled(
 	ctx context.Context,
-	name inferencegoSpec.ProviderName,
+	name inferenceSpec.ProviderName,
 	enabled bool,
 ) (spec.ProviderPreset, error) {
 	if _, ok := b.providers[name]; !ok {
@@ -228,7 +228,7 @@ func (b *BuiltInPresets) SetProviderEnabled(
 // SetModelPresetEnabled toggles a model preset.
 func (b *BuiltInPresets) SetModelPresetEnabled(
 	ctx context.Context,
-	provider inferencegoSpec.ProviderName,
+	provider inferenceSpec.ProviderName,
 	modelID spec.ModelPresetID,
 	enabled bool,
 ) (spec.ModelPreset, error) {
@@ -262,7 +262,7 @@ func (b *BuiltInPresets) SetModelPresetEnabled(
 // GetBuiltInModelPreset fetches a model preset.
 func (b *BuiltInPresets) GetBuiltInModelPreset(
 	ctx context.Context,
-	provider inferencegoSpec.ProviderName,
+	provider inferenceSpec.ProviderName,
 	modelID spec.ModelPresetID,
 ) (spec.ModelPreset, error) {
 	b.mu.RLock()
@@ -280,7 +280,7 @@ func (b *BuiltInPresets) GetBuiltInModelPreset(
 
 func (b *BuiltInPresets) SetDefaultModelPreset(
 	ctx context.Context,
-	provider inferencegoSpec.ProviderName,
+	provider inferenceSpec.ProviderName,
 	modelID spec.ModelPresetID,
 ) (spec.ProviderPreset, error) {
 	// Validate provider existence.
@@ -338,8 +338,8 @@ func (b *BuiltInPresets) loadFromFS(ctx context.Context) error {
 	}
 
 	// Parse + validate.
-	prov := make(map[inferencegoSpec.ProviderName]spec.ProviderPreset, len(schema.ProviderPresets))
-	models := make(map[inferencegoSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset)
+	prov := make(map[inferenceSpec.ProviderName]spec.ProviderPreset, len(schema.ProviderPresets))
+	models := make(map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset)
 
 	for name, pp := range schema.ProviderPresets {
 		if err := validateProviderPreset(&pp); err != nil {
@@ -372,8 +372,8 @@ func (b *BuiltInPresets) loadFromFS(ctx context.Context) error {
 // rebuildSnapshot applies overlay flags onto the immutable base sets.
 // Caller must hold write lock.
 func (b *BuiltInPresets) rebuildSnapshot(ctx context.Context) error {
-	newProv := make(map[inferencegoSpec.ProviderName]spec.ProviderPreset, len(b.providers))
-	newModels := make(map[inferencegoSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset, len(b.models))
+	newProv := make(map[inferenceSpec.ProviderName]spec.ProviderPreset, len(b.providers))
+	newModels := make(map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset, len(b.models))
 
 	for pname, mm := range b.models {
 		sub := make(map[spec.ModelPresetID]spec.ModelPreset, len(mm))
@@ -418,9 +418,9 @@ func (b *BuiltInPresets) rebuildSnapshot(ctx context.Context) error {
 }
 
 func cloneModels(
-	src map[inferencegoSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset,
-) map[inferencegoSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset {
-	dst := make(map[inferencegoSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset, len(src))
+	src map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset,
+) map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset {
+	dst := make(map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset, len(src))
 	for pname, inner := range src {
 		dst[pname] = maps.Clone(inner)
 	}
@@ -434,6 +434,6 @@ func resolvePresetsFS(fsys fs.FS, dir string) (fs.FS, error) {
 	return fs.Sub(fsys, dir)
 }
 
-func getModelKey(pName inferencegoSpec.ProviderName, modelID spec.ModelPresetID) builtInModelKey {
+func getModelKey(pName inferenceSpec.ProviderName, modelID spec.ModelPresetID) builtInModelKey {
 	return builtInModelKey(fmt.Sprintf("%s::%s", pName, modelID))
 }

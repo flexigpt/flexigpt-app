@@ -1,10 +1,10 @@
 package spec
 
-import inferencegoSpec "github.com/flexigpt/inference-go/spec"
+import inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 type ReasoningCapabilitiesOverride struct {
-	SupportedReasoningTypes  []inferencegoSpec.ReasoningType  `json:"supportedReasoningTypes,omitempty"`
-	SupportedReasoningLevels []inferencegoSpec.ReasoningLevel `json:"supportedReasoningLevels,omitempty"`
+	SupportedReasoningTypes  []inferenceSpec.ReasoningType  `json:"supportedReasoningTypes,omitempty"`
+	SupportedReasoningLevels []inferenceSpec.ReasoningLevel `json:"supportedReasoningLevels,omitempty"`
 
 	SupportsSummaryStyle             *bool `json:"supportsSummaryStyle,omitempty"`
 	SupportsEncryptedReasoningInput  *bool `json:"supportsEncryptedReasoningInput,omitempty"`
@@ -18,15 +18,15 @@ type StopSequenceCapabilitiesOverride struct {
 }
 
 type OutputCapabilitiesOverride struct {
-	SupportedOutputFormats []inferencegoSpec.OutputFormatKind `json:"supportedOutputFormats,omitempty"`
-	SupportsVerbosity      *bool                              `json:"supportsVerbosity,omitempty"`
+	SupportedOutputFormats []inferenceSpec.OutputFormatKind `json:"supportedOutputFormats,omitempty"`
+	SupportsVerbosity      *bool                            `json:"supportsVerbosity,omitempty"`
 }
 
 type ToolCapabilitiesOverride struct {
-	SupportedToolTypes        []inferencegoSpec.ToolType       `json:"supportedToolTypes,omitempty"`
-	SupportedToolPolicyModes  []inferencegoSpec.ToolPolicyMode `json:"supportedToolPolicyModes,omitempty"`
-	SupportsParallelToolCalls *bool                            `json:"supportsParallelToolCalls,omitempty"`
-	MaxForcedTools            *int                             `json:"maxForcedTools,omitempty"`
+	SupportedToolTypes        []inferenceSpec.ToolType       `json:"supportedToolTypes,omitempty"`
+	SupportedToolPolicyModes  []inferenceSpec.ToolPolicyMode `json:"supportedToolPolicyModes,omitempty"`
+	SupportsParallelToolCalls *bool                          `json:"supportsParallelToolCalls,omitempty"`
+	MaxForcedTools            *int                           `json:"maxForcedTools,omitempty"`
 }
 
 // ModelCapabilitiesOverride is a "patch-like" version of inference-go's ModelCapabilities.
@@ -39,8 +39,8 @@ type ToolCapabilitiesOverride struct {
 // This struct is intended for storage and API transport as an override only.
 // The effective/derived capabilities MUST be computed at runtime and should not be stored.
 type ModelCapabilitiesOverride struct {
-	ModalitiesIn  []inferencegoSpec.Modality `json:"modalitiesIn,omitempty"`
-	ModalitiesOut []inferencegoSpec.Modality `json:"modalitiesOut,omitempty"`
+	ModalitiesIn  []inferenceSpec.Modality `json:"modalitiesIn,omitempty"`
+	ModalitiesOut []inferenceSpec.Modality `json:"modalitiesOut,omitempty"`
 
 	ReasoningCapabilities    *ReasoningCapabilitiesOverride    `json:"reasoningCapabilities,omitempty"`
 	StopSequenceCapabilities *StopSequenceCapabilitiesOverride `json:"stopSequenceCapabilities,omitempty"`

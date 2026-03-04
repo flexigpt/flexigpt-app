@@ -26,7 +26,7 @@ import type {
 } from '@/spec/attachment';
 import { AttachmentKind } from '@/spec/attachment';
 import type { ProviderSDKType, UIToolCall, UIToolOutput } from '@/spec/inference';
-import type { SkillDef, SkillListItem } from '@/spec/skill';
+import type { SkillListItem, SkillRef } from '@/spec/skill';
 import { type Tool, type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
 import { type ShortcutConfig } from '@/lib/keyboard_shortcuts';
@@ -72,7 +72,7 @@ import {
 	LARGE_TEXT_AUTODECHUNK_THRESHOLD_CHARS,
 	LARGE_TEXT_CHUNK_SIZE,
 } from '@/chats/inputarea/input_editor_utils';
-import { dedupeSkillDefs, skillDefFromListItem } from '@/chats/skills/skill_utils';
+import { dedupeSkillRefs, skillRefFromListItem } from '@/chats/skills/skill_utils';
 import {
 	getFirstTemplateNodeWithPath,
 	getTemplateNodesWithPath,
@@ -119,6 +119,7 @@ export interface EditorAreaHandle {
 	setConversationToolsFromChoices: (tools: ToolStoreChoice[]) => void;
 	setWebSearchFromChoices: (tools: ToolStoreChoice[]) => void;
 	applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => void;
+	setEnabledSkillRefsFromMessage: (refs: SkillRef[]) => void;
 }
 
 const EDITOR_EMPTY_VALUE: Value = [{ type: 'p', children: [{ text: '' }] }];
@@ -323,10 +324,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const [webSearchTemplates, setWebSearchTemplates] = useState<WebSearchChoiceTemplate[]>([]);
 	// ---- Skills (conversation-level) ----
 	const [allSkills, setAllSkills] = useState<SkillListItem[]>([]);
-	const [enabledSkills, setEnabledSkills] = useState<SkillDef[]>([]);
+	const [enabledSkillRefs, setEnabledSkillRefs] = useState<SkillRef[]>([]);
+	const [skillSessionID, setSkillSessionID] = useState<string | null>(null);
+
 	const [skillsLoading, setSkillsLoading] = useState(false);
 	const pendingEnableAllSkillsRef = useRef(false);
-	const preEditEnabledSkillsRef = useRef<SkillDef[] | null>(null);
+	const preEditEnabledSkillRefsRef = useRef<SkillRef[] | null>(null);
 
 	// --- Fix: focus management for menus opened by shortcuts ---
 	const templateMenuOpen = useStoreState(templateMenu, 'open');
@@ -390,7 +393,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		if (!pendingEnableAllSkillsRef.current) return;
 		if (allSkills.length === 0) return;
 		pendingEnableAllSkillsRef.current = false;
-		setEnabledSkills(dedupeSkillDefs(allSkills.map(skillDefFromListItem)));
+		setEnabledSkillRefs(dedupeSkillRefs(allSkills.map(skillRefFromListItem)));
 	}, [allSkills]);
 
 	const enableAllSkills = useCallback(() => {
@@ -398,13 +401,30 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			pendingEnableAllSkillsRef.current = true;
 			return;
 		}
-		setEnabledSkills(dedupeSkillDefs(allSkills.map(skillDefFromListItem)));
+		setEnabledSkillRefs(dedupeSkillRefs(allSkills.map(skillRefFromListItem)));
 	}, [allSkills]);
 
 	const disableAllSkills = useCallback(() => {
 		pendingEnableAllSkillsRef.current = false;
-		setEnabledSkills([]);
+		setEnabledSkillRefs([]);
 	}, []);
+
+	useEffect(() => {
+		if (enabledSkillRefs.length > 0) return;
+		if (!skillSessionID) return;
+		let cancelled = false;
+		(async () => {
+			try {
+				await skillStoreAPI.closeSkillSession(skillSessionID);
+			} catch {
+				// best effort
+			}
+			if (!cancelled) setSkillSessionID(null);
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [enabledSkillRefs.length, skillSessionID]);
 
 	useEffect(() => {
 		if (!templateMenuOpen) {
@@ -673,15 +693,15 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const restorePreEditContext = useCallback(() => {
 		const prevConv = preEditConversationToolsRef.current;
 		const prevWs = preEditWebSearchTemplatesRef.current;
-		const prevSkills = preEditEnabledSkillsRef.current;
+		const prevSkills = preEditEnabledSkillRefsRef.current;
 
 		if (prevConv) setConversationToolsState(prevConv);
 		if (prevWs) setWebSearchTemplates(prevWs);
-		if (prevSkills) setEnabledSkills(prevSkills);
+		if (prevSkills) setEnabledSkillRefs(prevSkills);
 
 		preEditConversationToolsRef.current = null;
 		preEditWebSearchTemplatesRef.current = null;
-		preEditEnabledSkillsRef.current = null;
+		preEditEnabledSkillRefsRef.current = null;
 	}, []);
 
 	// Recompute conversation-level arg blocking whenever that state changes.
@@ -734,72 +754,135 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		},
 	});
 
-	const runToolCallInternal = useCallback(async (toolCall: UIToolCall): Promise<UIToolOutput | null> => {
-		if (toolCall.type !== ToolStoreChoiceType.Function && toolCall.type !== ToolStoreChoiceType.Custom) {
-			const errMsg = 'This tool call type cannot be executed from the composer.';
-			setToolCalls(prev =>
-				prev.map(c => (c.id === toolCall.id ? { ...c, status: 'failed', errorMessage: errMsg } : c))
-			);
-			return null;
-		}
-
-		// Resolve identity using toolStoreChoice when available; fall back to name parsing.
-		let bundleID: string | undefined;
-		let toolSlug: string | undefined;
-		let version: string | undefined;
-
-		if (toolCall.toolStoreChoice) {
-			bundleID = toolCall.toolStoreChoice.bundleID;
-			toolSlug = toolCall.toolStoreChoice.toolSlug;
-			version = toolCall.toolStoreChoice.toolVersion;
-		}
-
-		if (!bundleID || !toolSlug || !version) {
-			const errMsg = 'Cannot resolve tool identity for this call.';
-			setToolCalls(prev =>
-				prev.map(c => (c.id === toolCall.id ? { ...c, status: 'failed', errorMessage: errMsg } : c))
-			);
-			return null;
-		}
-
-		// Mark as running (allow retry after failure by overwriting previous status).
-		setToolCalls(prev =>
-			prev.map(c => (c.id === toolCall.id ? { ...c, status: 'running', errorMessage: undefined } : c))
-		);
-
-		try {
-			const resp = await toolRuntimeAPI.invokeTool(bundleID, toolSlug, version, toolCall.arguments);
-
-			const isError = !!resp.isError;
-			const errorMessage =
-				resp.errorMessage || (isError ? 'Tool reported an error. Inspect the output for details.' : undefined);
-
-			const output: UIToolOutput = {
-				id: toolCall.id,
-				callID: toolCall.callID,
-				name: toolCall.name,
-				choiceID: toolCall.choiceID,
-				type: toolCall.type,
-				summary: isError ? `Error: ${formatToolOutputSummary(toolCall.name)}` : formatToolOutputSummary(toolCall.name),
-				toolOutputs: resp.outputs,
-				isError,
-				errorMessage,
-				arguments: toolCall.arguments,
-				webSearchToolCallItems: toolCall.webSearchToolCallItems,
-				toolStoreChoice: toolCall.toolStoreChoice,
-			};
-
-			// Remove the call chip & append the output.
-			setToolCalls(prev => prev.filter(c => c.id !== toolCall.id));
-			setToolOutputs(prev => [...prev, output]);
-
-			return output;
-		} catch (err) {
-			const msg = (err as Error)?.message || 'Tool invocation failed.';
-			setToolCalls(prev => prev.map(c => (c.id === toolCall.id ? { ...c, status: 'failed', errorMessage: msg } : c)));
-			return null;
-		}
+	const isSkillsToolName = useCallback((name: string | undefined): boolean => {
+		const n = (name ?? '').trim();
+		return n.startsWith('skills.');
 	}, []);
+
+	const runToolCallInternal = useCallback(
+		async (toolCall: UIToolCall): Promise<UIToolOutput | null> => {
+			if (toolCall.type !== ToolStoreChoiceType.Function && toolCall.type !== ToolStoreChoiceType.Custom) {
+				const errMsg = 'This tool call type cannot be executed from the composer.';
+				setToolCalls(prev =>
+					prev.map(c => (c.id === toolCall.id ? { ...c, status: 'failed', errorMessage: errMsg } : c))
+				);
+				return null;
+			}
+
+			const args = toolCall.arguments && toolCall.arguments.trim().length > 0 ? toolCall.arguments : undefined;
+
+			// ---- Skills tool path (runtime-injected tools: skills.*) ----
+			if (isSkillsToolName(toolCall.name)) {
+				if (!skillSessionID) {
+					const errMsg = 'No active skills session. Enable skills and resend, or run again after a session is created.';
+					setToolCalls(prev =>
+						prev.map(c => (c.id === toolCall.id ? { ...c, status: 'failed', errorMessage: errMsg } : c))
+					);
+					return null;
+				}
+
+				// Mark as running (allow retry after failure by overwriting previous status).
+				setToolCalls(prev =>
+					prev.map(c => (c.id === toolCall.id ? { ...c, status: 'running', errorMessage: undefined } : c))
+				);
+
+				try {
+					const resp = await skillStoreAPI.invokeSkillTool(skillSessionID, toolCall.name, args);
+
+					const isError = !!resp.isError;
+					const errorMessage =
+						resp.errorMessage ||
+						(isError ? 'Skill tool reported an error. Inspect the output for details.' : undefined);
+
+					const output: UIToolOutput = {
+						id: toolCall.id,
+						callID: toolCall.callID,
+						name: toolCall.name,
+						choiceID: toolCall.choiceID,
+						type: toolCall.type,
+						summary: isError
+							? `Error: ${formatToolOutputSummary(toolCall.name)}`
+							: formatToolOutputSummary(toolCall.name),
+						toolOutputs: resp.outputs,
+						isError,
+						errorMessage,
+						arguments: toolCall.arguments,
+						webSearchToolCallItems: toolCall.webSearchToolCallItems,
+						toolStoreChoice: toolCall.toolStoreChoice, // usually undefined for skills.*
+					};
+
+					setToolCalls(prev => prev.filter(c => c.id !== toolCall.id));
+					setToolOutputs(prev => [...prev, output]);
+					return output;
+				} catch (err) {
+					const msg = (err as Error)?.message || 'Skill tool invocation failed.';
+					setToolCalls(prev =>
+						prev.map(c => (c.id === toolCall.id ? { ...c, status: 'failed', errorMessage: msg } : c))
+					);
+					return null;
+				}
+			}
+
+			// Resolve identity using toolStoreChoice when available; fall back to name parsing.
+			let bundleID: string | undefined;
+			let toolSlug: string | undefined;
+			let version: string | undefined;
+
+			if (toolCall.toolStoreChoice) {
+				bundleID = toolCall.toolStoreChoice.bundleID;
+				toolSlug = toolCall.toolStoreChoice.toolSlug;
+				version = toolCall.toolStoreChoice.toolVersion;
+			}
+
+			if (!bundleID || !toolSlug || !version) {
+				const errMsg = 'Cannot resolve tool identity for this call.';
+				setToolCalls(prev =>
+					prev.map(c => (c.id === toolCall.id ? { ...c, status: 'failed', errorMessage: errMsg } : c))
+				);
+				return null;
+			}
+
+			// Mark as running (allow retry after failure by overwriting previous status).
+			setToolCalls(prev =>
+				prev.map(c => (c.id === toolCall.id ? { ...c, status: 'running', errorMessage: undefined } : c))
+			);
+
+			try {
+				const resp = await toolRuntimeAPI.invokeTool(bundleID, toolSlug, version, args);
+				const isError = !!resp.isError;
+				const errorMessage =
+					resp.errorMessage || (isError ? 'Tool reported an error. Inspect the output for details.' : undefined);
+
+				const output: UIToolOutput = {
+					id: toolCall.id,
+					callID: toolCall.callID,
+					name: toolCall.name,
+					choiceID: toolCall.choiceID,
+					type: toolCall.type,
+					summary: isError
+						? `Error: ${formatToolOutputSummary(toolCall.name)}`
+						: formatToolOutputSummary(toolCall.name),
+					toolOutputs: resp.outputs,
+					isError,
+					errorMessage,
+					arguments: toolCall.arguments,
+					webSearchToolCallItems: toolCall.webSearchToolCallItems,
+					toolStoreChoice: toolCall.toolStoreChoice,
+				};
+
+				// Remove the call chip & append the output.
+				setToolCalls(prev => prev.filter(c => c.id !== toolCall.id));
+				setToolOutputs(prev => [...prev, output]);
+
+				return output;
+			} catch (err) {
+				const msg = (err as Error)?.message || 'Tool invocation failed.';
+				setToolCalls(prev => prev.map(c => (c.id === toolCall.id ? { ...c, status: 'failed', errorMessage: msg } : c)));
+				return null;
+			}
+		},
+		[isSkillsToolName, skillSessionID]
+	);
 
 	/**
 	 * Run all currently pending tool calls (in sequence) and return the
@@ -837,44 +920,51 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		setToolDetailsState(current => (current && current.kind === 'output' && current.output.id === id ? null : current));
 	}, []);
 
-	const handleRetryErroredOutput = useCallback((output: UIToolOutput) => {
-		// Only support retry for function/custom tools where we still
-		// know which tool and arguments were used.
-		if (!output.isError || !output.toolStoreChoice || !output.arguments) {
-			return;
-		}
+	const handleRetryErroredOutput = useCallback(
+		(output: UIToolOutput) => {
+			// Only support retry when we still know arguments. For non-skills tools we
+			// also require toolStoreChoice; for skills.* we route via skill session.
+			if (!output.isError || !output.arguments) return;
 
-		if (output.type !== ToolStoreChoiceType.Function && output.type !== ToolStoreChoiceType.Custom) {
-			return;
-		}
+			const isSkills = isSkillsToolName(output.name);
 
-		const { bundleID, toolSlug, toolVersion } = output.toolStoreChoice;
-		if (!bundleID || !toolSlug || !toolVersion) {
-			return;
-		}
+			if (!isSkills) {
+				if (!output.toolStoreChoice) return;
+				if (output.type !== ToolStoreChoiceType.Function && output.type !== ToolStoreChoiceType.Custom) return;
 
-		let newId: string;
-		try {
-			newId = getUUIDv7();
-		} catch {
-			newId = ensureMakeID();
-		}
+				const { bundleID, toolSlug, toolVersion } = output.toolStoreChoice;
+				if (!bundleID || !toolSlug || !toolVersion) return;
+			} else {
+				// Skills retry requires an active session.
+				if (!skillSessionID) return;
+				// skills.* are expected to be Function or Custom in the inference schema;
+				// if something else slips through, don't retry.
+				if (output.type !== ToolStoreChoiceType.Function && output.type !== ToolStoreChoiceType.Custom) return;
+			}
+			let newId: string;
+			try {
+				newId = getUUIDv7();
+			} catch {
+				newId = ensureMakeID();
+			}
 
-		const chip: UIToolCall = {
-			id: newId,
-			callID: output.callID || newId,
-			name: output.name,
-			arguments: output.arguments,
-			webSearchToolCallItems: output.webSearchToolCallItems,
-			choiceID: output.choiceID,
-			type: output.type,
-			status: 'pending',
-			toolStoreChoice: output.toolStoreChoice,
-		};
+			const chip: UIToolCall = {
+				id: newId,
+				callID: output.callID || newId,
+				name: output.name,
+				arguments: output.arguments,
+				webSearchToolCallItems: output.webSearchToolCallItems,
+				choiceID: output.choiceID,
+				type: output.type,
+				status: 'pending',
+				toolStoreChoice: output.toolStoreChoice, // may be undefined for skills.*
+			};
 
-		setToolOutputs(prev => prev.filter(o => o.id !== output.id));
-		setToolCalls(prev => [...prev, chip]);
-	}, []);
+			setToolOutputs(prev => prev.filter(o => o.id !== output.id));
+			setToolCalls(prev => [...prev, chip]);
+		},
+		[isSkillsToolName, skillSessionID]
+	);
 
 	const handleOpenToolOutput = useCallback((output: UIToolOutput) => {
 		setToolDetailsState({ kind: 'output', output });
@@ -986,6 +1076,18 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					return;
 				}
 
+				let effectiveSkillSessionID: string | null = skillSessionID;
+				if ((enabledSkillRefs?.length ?? 0) > 0 && !effectiveSkillSessionID) {
+					try {
+						const sess = await skillStoreAPI.createSkillSession(undefined, undefined);
+						effectiveSkillSessionID = sess.sessionID;
+						setSkillSessionID(sess.sessionID);
+					} catch (err) {
+						setSubmitError((err as Error)?.message || 'Failed to create skills session.');
+						return;
+					}
+				}
+
 				// 5) Tool choices (editor-attached + conversation-level).
 				const attachedTools = getAttachedTools(editor);
 				const explicitChoices = attachedTools.map(editorAttachedToolToToolChoice);
@@ -1000,7 +1102,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					attachments,
 					toolOutputs: finalToolOutputs,
 					finalToolChoices,
-					enabledSkills,
+					enabledSkillRefs,
+					skillSessionID: effectiveSkillSessionID ?? undefined,
 				};
 
 				await onSubmit(payload);
@@ -1023,7 +1126,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					// If we were editing, the old snapshot is no longer relevant.
 					preEditConversationToolsRef.current = null;
 					preEditWebSearchTemplatesRef.current = null;
-					preEditEnabledSkillsRef.current = null;
+					preEditEnabledSkillRefsRef.current = null;
 
 					lastPopulatedSelectionKeyRef.current.clear();
 					editor.tf.focus();
@@ -1035,7 +1138,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			cancelEditing,
 			conversationToolsState,
 			editor,
-			enabledSkills,
+			enabledSkillRefs,
 			hasPendingToolCalls,
 			isBusy,
 			isSendButtonEnabled,
@@ -1127,8 +1230,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			if (!preEditWebSearchTemplatesRef.current) {
 				preEditWebSearchTemplatesRef.current = webSearchTemplates;
 			}
-			if (!preEditEnabledSkillsRef.current) {
-				preEditEnabledSkillsRef.current = enabledSkills;
+			if (!preEditEnabledSkillRefsRef.current) {
+				preEditEnabledSkillRefsRef.current = enabledSkillRefs;
 			}
 
 			// 1) Reset document to plain text paragraphs.
@@ -1191,7 +1294,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			setWebSearchTemplates(wsChoices.map(webSearchTemplateFromChoice));
 
 			// Restore enabled skills (conversation-level, not tool choices).
-			setEnabledSkills(incoming.enabledSkills ?? []);
+			setEnabledSkillRefs(incoming.enabledSkillRefs ?? []);
 
 			// Since we no longer reconstruct attached-tool nodes from history,
 			// ensure attached-tool arg blocking resets.
@@ -1205,7 +1308,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 			editor.tf.focus();
 		},
-		[closeAllMenus, editor, conversationToolsState, webSearchTemplates, enabledSkills]
+		[closeAllMenus, editor, conversationToolsState, webSearchTemplates, enabledSkillRefs]
 	);
 
 	const loadToolCalls = useCallback((toolCalls: UIToolCall[]) => {
@@ -1247,6 +1350,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			if (!isBusy) {
 				editorRef.current.tf.focus();
 			}
+		},
+
+		setEnabledSkillRefsFromMessage: (refs: SkillRef[]) => {
+			setEnabledSkillRefs(refs ?? []);
 		},
 	}));
 
@@ -1683,8 +1790,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						setWebSearchTemplates={setWebSearchTemplates}
 						allSkills={allSkills}
 						skillsLoading={skillsLoading}
-						enabledSkills={enabledSkills}
-						setEnabledSkills={setEnabledSkills}
+						enabledSkillRefs={enabledSkillRefs}
+						setEnabledSkillRefs={setEnabledSkillRefs}
 						onEnableAllSkills={enableAllSkills}
 						onDisableAllSkills={disableAllSkills}
 					/>

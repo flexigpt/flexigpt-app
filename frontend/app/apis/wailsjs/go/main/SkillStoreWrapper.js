@@ -30,6 +30,10 @@ export function GetSkillsPromptXML(arg1) {
   return window['go']['main']['SkillStoreWrapper']['GetSkillsPromptXML'](arg1);
 }
 
+export function InvokeSkillTool(arg1) {
+  return window['go']['main']['SkillStoreWrapper']['InvokeSkillTool'](arg1);
+}
+
 export function ListRuntimeSkills(arg1) {
   return window['go']['main']['SkillStoreWrapper']['ListRuntimeSkills'](arg1);
 }

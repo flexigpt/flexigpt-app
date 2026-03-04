@@ -4,9 +4,9 @@ import { FiChevronUp, FiX, FiZap } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore } from '@ariakit/react';
 
-import type { SkillDef, SkillListItem } from '@/spec/skill';
+import type { SkillListItem, SkillRef } from '@/spec/skill';
 
-import { dedupeSkillDefs, skillDefFromListItem, skillDefKey } from '@/chats/skills/skill_utils';
+import { dedupeSkillRefs, skillRefFromListItem, skillRefKey } from '@/chats/skills/skill_utils';
 
 type BundleGroup = {
 	bundleID: string;
@@ -53,22 +53,22 @@ function BundleCheckbox({
 export function SkillsBottomBarChip({
 	allSkills,
 	loading,
-	enabledSkills,
-	setEnabledSkills,
+	enabledSkillRefs,
+	setEnabledSkillRefs,
 	onEnableAll,
 	onDisableAll,
 }: {
 	allSkills: SkillListItem[];
 	loading: boolean;
-	enabledSkills: SkillDef[];
-	setEnabledSkills: React.Dispatch<React.SetStateAction<SkillDef[]>>;
+	enabledSkillRefs: SkillRef[];
+	setEnabledSkillRefs: React.Dispatch<React.SetStateAction<SkillRef[]>>;
 	onEnableAll: () => void;
 	onDisableAll: () => void;
 }) {
 	const menu = useMenuStore({ placement: 'top-end', focusLoop: true });
 
-	const enabledKeySet = useMemo(() => new Set(enabledSkills.map(skillDefKey)), [enabledSkills]);
-	const enabledCount = enabledSkills.length;
+	const enabledKeySet = useMemo(() => new Set(enabledSkillRefs.map(skillRefKey)), [enabledSkillRefs]);
+	const enabledCount = enabledSkillRefs.length;
 	const totalCount = allSkills.length;
 	const isEnabled = enabledCount > 0;
 
@@ -89,48 +89,48 @@ export function SkillsBottomBarChip({
 	}, [allSkills]);
 
 	const setSkillEnabled = useCallback(
-		(def: SkillDef, enabled: boolean) => {
-			const k = skillDefKey(def);
-			setEnabledSkills(prev => {
-				const byKey = new Map<string, SkillDef>();
-				for (const d of prev ?? []) byKey.set(skillDefKey(d), d);
-				if (enabled) byKey.set(k, def);
+		(ref: SkillRef, enabled: boolean) => {
+			const k = skillRefKey(ref);
+			setEnabledSkillRefs(prev => {
+				const byKey = new Map<string, SkillRef>();
+				for (const r of prev ?? []) byKey.set(skillRefKey(r), r);
+				if (enabled) byKey.set(k, ref);
 				else byKey.delete(k);
 				return Array.from(byKey.values());
 			});
 		},
-		[setEnabledSkills]
+		[setEnabledSkillRefs]
 	);
 
 	const toggleSkillItem = useCallback(
 		(item: SkillListItem) => {
-			const def = skillDefFromListItem(item);
-			const k = skillDefKey(def);
+			const ref = skillRefFromListItem(item);
+			const k = skillRefKey(ref);
 			const next = !enabledKeySet.has(k);
-			setSkillEnabled(def, next);
+			setSkillEnabled(ref, next);
 		},
 		[enabledKeySet, setSkillEnabled]
 	);
 
 	const setBundleEnabled = useCallback(
 		(group: BundleGroup, enabled: boolean) => {
-			const defs = group.skills.map(skillDefFromListItem);
-			const defKeys = defs.map(skillDefKey);
+			const refs = group.skills.map(skillRefFromListItem);
+			const refKeys = refs.map(skillRefKey);
 
-			setEnabledSkills(prev => {
-				const byKey = new Map<string, SkillDef>();
-				for (const d of prev ?? []) byKey.set(skillDefKey(d), d);
+			setEnabledSkillRefs(prev => {
+				const byKey = new Map<string, SkillRef>();
+				for (const r of prev ?? []) byKey.set(skillRefKey(r), r);
 
 				if (enabled) {
-					for (const d of defs) byKey.set(skillDefKey(d), d);
+					for (const r of refs) byKey.set(skillRefKey(r), r);
 				} else {
-					for (const k of defKeys) byKey.delete(k);
+					for (const k of refKeys) byKey.delete(k);
 				}
 
-				return dedupeSkillDefs(Array.from(byKey.values()));
+				return dedupeSkillRefs(Array.from(byKey.values()));
 			});
 		},
-		[setEnabledSkills]
+		[setEnabledSkillRefs]
 	);
 
 	const enableAndOpen = useCallback(() => {
@@ -228,9 +228,9 @@ export function SkillsBottomBarChip({
 				) : (
 					groups.map(group => {
 						const bundleLabel = group.bundleSlug ?? group.bundleID;
-						const bundleDefs = group.skills.map(skillDefFromListItem);
-						const bundleTotal = bundleDefs.length;
-						const bundleEnabled = bundleDefs.filter(d => enabledKeySet.has(skillDefKey(d))).length;
+						const bundleRefs = group.skills.map(skillRefFromListItem);
+						const bundleTotal = bundleRefs.length;
+						const bundleEnabled = bundleRefs.filter(r => enabledKeySet.has(skillRefKey(r))).length;
 
 						const bundleChecked = bundleEnabled > 0 && bundleEnabled === bundleTotal;
 						const bundleIndeterminate = bundleEnabled > 0 && bundleEnabled < bundleTotal;
@@ -263,8 +263,8 @@ export function SkillsBottomBarChip({
 
 								<div className="mt-1">
 									{group.skills.map(item => {
-										const def = skillDefFromListItem(item);
-										const k = skillDefKey(def);
+										const ref = skillRefFromListItem(item);
+										const k = skillRefKey(ref);
 										const checked = enabledKeySet.has(k);
 
 										const label =
@@ -287,7 +287,7 @@ export function SkillsBottomBarChip({
 													checked={checked}
 													onChange={e => {
 														stop(e);
-														setSkillEnabled(def, e.currentTarget.checked);
+														setSkillEnabled(ref, e.currentTarget.checked);
 													}}
 													onPointerDown={stop}
 													onClick={stop}
@@ -296,7 +296,7 @@ export function SkillsBottomBarChip({
 												<div className="min-w-0 flex-1">
 													<div className="truncate text-xs">{label}</div>
 													<div className="text-base-content/60 truncate text-[11px]">
-														{def.type} • {def.location} • {def.name}
+														{item.skillDefinition.type} • {item.skillDefinition.location} • {item.skillDefinition.name}
 													</div>
 												</div>
 											</MenuItem>

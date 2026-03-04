@@ -24,6 +24,7 @@ import {
 	type UIToolOutput,
 	type URLCitation,
 } from '@/spec/inference';
+import type { SkillRef } from '@/spec/skill';
 import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
 import { generateTitle } from '@/lib/title_utils';
@@ -148,7 +149,7 @@ export function buildUserConversationMessageFromEditor(
 	const toolStoreChoices = payload.finalToolChoices.length > 0 ? payload.finalToolChoices : undefined;
 
 	const toolOutputs = payload.toolOutputs.length > 0 ? payload.toolOutputs : undefined;
-
+	const enabledSkillRefs = payload.enabledSkillRefs ?? [];
 	const msg: ConversationMessage = {
 		id,
 		createdAt: now,
@@ -157,6 +158,7 @@ export function buildUserConversationMessageFromEditor(
 		inputs,
 		attachments,
 		toolStoreChoices,
+		enabledSkillRefs,
 		uiContent: text,
 		uiToolOutputs: toolOutputs,
 	};
@@ -333,6 +335,16 @@ function deriveUIToolOutputsFromInputUnion(
 	}
 
 	return uiOutputs;
+}
+
+export function deriveEnabledSkillRefsFromMessages(messages: ConversationMessage[]): SkillRef[] {
+	for (let i = messages.length - 1; i >= 0; i -= 1) {
+		const m = messages[i];
+		if (m.role === RoleEnum.User && m.enabledSkillRefs && m.enabledSkillRefs.length > 0) {
+			return m.enabledSkillRefs;
+		}
+	}
+	return [];
 }
 
 function attachmentRefKey(a: Attachment): string {

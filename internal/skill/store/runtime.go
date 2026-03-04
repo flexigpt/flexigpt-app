@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -19,6 +20,8 @@ import (
 	"github.com/flexigpt/agentskills-go"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
 )
 
@@ -101,7 +104,19 @@ func (s *SkillStore) GetSkillsPromptXML(
 		return nil, fmt.Errorf("%w: runtime not configured", spec.ErrSkillInvalidRequest)
 	}
 
-	filter := getSkillsReqToRuntimePromptFilter(req)
+	var filter *agentskills.SkillFilter
+	if req != nil && req.Body != nil && req.Body.Filter != nil {
+		f := req.Body.Filter
+		allow := s.runtimeDefsForSkillRefs(ctx, f.AllowSkillRefs)
+		filter = &agentskills.SkillFilter{
+			Types:          append([]string(nil), f.Types...),
+			NamePrefix:     f.NamePrefix,
+			LocationPrefix: f.LocationPrefix,
+			AllowSkills:    allow,
+			SessionID:      f.SessionID,
+			Activity:       agentskills.SkillActivity(strings.TrimSpace(f.Activity)),
+		}
+	}
 	xml, err := s.runtime.SkillsPromptXML(ctx, filter)
 	if err != nil {
 		return nil, err
@@ -119,13 +134,88 @@ func (s *SkillStore) ListRuntimeSkills(
 		return nil, fmt.Errorf("%w: runtime not configured", spec.ErrSkillInvalidRequest)
 	}
 
-	filter := listSkillsReqToRuntimeListFilter(req)
+	var filter *agentskills.SkillListFilter
+	if req != nil && req.Body != nil && req.Body.Filter != nil {
+		f := req.Body.Filter
+		allow := s.runtimeDefsForSkillRefs(ctx, f.AllowSkillRefs)
+		filter = &agentskills.SkillListFilter{
+			Types:          append([]string(nil), f.Types...),
+			NamePrefix:     f.NamePrefix,
+			LocationPrefix: f.LocationPrefix,
+			AllowSkills:    allow,
+			SessionID:      f.SessionID,
+			Activity:       agentskills.SkillActivity(strings.TrimSpace(f.Activity)),
+		}
+	}
 	recs, err := s.runtime.ListSkills(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
 	return &spec.ListRuntimeSkillsResponse{
 		Body: &spec.ListRuntimeSkillsResponseBody{Skills: recs},
+	}, nil
+}
+
+func (s *SkillStore) InvokeSkillTool(
+	ctx context.Context,
+	req *spec.InvokeSkillToolRequest,
+) (*spec.InvokeSkillToolResponse, error) {
+	if s.runtime == nil {
+		return nil, fmt.Errorf("%w: runtime not configured", spec.ErrSkillInvalidRequest)
+	}
+	if req == nil || req.Body == nil {
+		return nil, fmt.Errorf("%w: missing request", spec.ErrSkillInvalidRequest)
+	}
+
+	sid := strings.TrimSpace(string(req.Body.SessionID))
+	if sid == "" {
+		return nil, fmt.Errorf("%w: sessionID required", spec.ErrSkillInvalidRequest)
+	}
+
+	toolName := strings.TrimSpace(req.Body.ToolName)
+	if toolName == "" {
+		return nil, fmt.Errorf("%w: toolName required", spec.ErrSkillInvalidRequest)
+	}
+
+	argsStr := strings.TrimSpace(req.Body.Args)
+	if argsStr == "" {
+		return nil, fmt.Errorf("%w: args required", spec.ErrSkillInvalidRequest)
+	}
+
+	reg, err := s.runtime.NewSessionRegistry(ctx, agentskillsSpec.SessionID(sid))
+	if err != nil {
+		return nil, err
+	}
+
+	var funcID string
+	switch toolName {
+	case "skills.load":
+		funcID = string(agentskillsSpec.FuncIDSkillsLoad)
+	case "skills.unload":
+		funcID = string(agentskillsSpec.FuncIDSkillsUnload)
+	case "skills.readresource":
+		funcID = string(agentskillsSpec.FuncIDSkillsReadResource)
+	case "skills.runscript":
+		funcID = string(agentskillsSpec.FuncIDSkillsRunScript)
+	default:
+		return nil, fmt.Errorf("%w: unknown toolName %q", spec.ErrSkillInvalidRequest, toolName)
+	}
+
+	outs, callErr := llmtoolsutil.CallUsingRegistry(ctx, reg, funcID, json.RawMessage([]byte(argsStr)))
+	isErr := callErr != nil
+	errMsg := ""
+	if callErr != nil {
+		errMsg = callErr.Error()
+	}
+
+	return &spec.InvokeSkillToolResponse{
+		Body: &spec.InvokeSkillToolResponseBody{
+			Outputs:      outs,
+			Meta:         map[string]any{"toolName": toolName},
+			IsBuiltIn:    true,
+			IsError:      isErr,
+			ErrorMessage: errMsg,
+		},
 	}, nil
 }
 
@@ -482,36 +572,6 @@ func (s *SkillStore) runtimeDefForBuiltInSkill(sk spec.Skill) (agentskillsSpec.S
 	}, nil
 }
 
-func getSkillsReqToRuntimePromptFilter(req *spec.GetSkillsPromptXMLRequest) *agentskills.SkillFilter {
-	if req == nil || req.Body == nil || req.Body.Filter == nil {
-		return nil
-	}
-	f := req.Body.Filter
-	return &agentskills.SkillFilter{
-		Types:          append([]string(nil), f.Types...),
-		NamePrefix:     f.NamePrefix,
-		LocationPrefix: f.LocationPrefix,
-		AllowSkills:    append([]agentskillsSpec.SkillDef(nil), f.AllowSkills...),
-		SessionID:      f.SessionID,
-		Activity:       agentskills.SkillActivity(strings.TrimSpace(f.Activity)),
-	}
-}
-
-func listSkillsReqToRuntimeListFilter(req *spec.ListRuntimeSkillsRequest) *agentskills.SkillListFilter {
-	if req == nil || req.Body == nil || req.Body.Filter == nil {
-		return nil
-	}
-	f := req.Body.Filter
-	return &agentskills.SkillListFilter{
-		Types:          append([]string(nil), f.Types...),
-		NamePrefix:     f.NamePrefix,
-		LocationPrefix: f.LocationPrefix,
-		AllowSkills:    append([]agentskillsSpec.SkillDef(nil), f.AllowSkills...),
-		SessionID:      f.SessionID,
-		Activity:       agentskills.SkillActivity(strings.TrimSpace(f.Activity)),
-	}
-}
-
 func (s *SkillStore) hydrateBuiltInEmbeddedFS(ctx context.Context) error {
 	if s.builtin == nil {
 		return nil
@@ -575,6 +635,61 @@ func (s *SkillStore) runtimeTryAddForeground(ctx context.Context, def agentskill
 		return false, err
 	}
 	return true, nil
+}
+
+func (s *SkillStore) runtimeDefsForSkillRefs(
+	ctx context.Context,
+	refs []spec.SkillRef,
+) []agentskillsSpec.SkillDef {
+	if len(refs) == 0 {
+		return nil
+	}
+
+	// Dedupe by bundleID|skillSlug (store identity).
+	seen := map[string]struct{}{}
+	out := make([]agentskillsSpec.SkillDef, 0, len(refs))
+
+	for _, r := range refs {
+		bid := string(r.BundleID)
+		slug := string(r.SkillSlug)
+		if bid == "" || slug == "" {
+			continue
+		}
+		k := bid + "|" + slug
+		if _, ok := seen[k]; ok {
+			continue
+		}
+		seen[k] = struct{}{}
+
+		// Load the store Skill (built-in or user) and map to runtime def.
+		gs, err := s.GetSkill(ctx, &spec.GetSkillRequest{
+			BundleID:  bundleitemutils.BundleID(bid),
+			SkillSlug: spec.SkillSlug(slug),
+		})
+		if err != nil || gs == nil || gs.Body == nil {
+			continue
+		}
+		sk := *gs.Body
+
+		var def agentskillsSpec.SkillDef
+		// Built-ins are embeddedfs in store, but runtime currently treats them as fs (hydrated).
+		// Your existing runtimeDefForBuiltInSkill already returns the correct hydrated location.
+		if sk.IsBuiltIn {
+			d, derr := s.runtimeDefForBuiltInSkill(sk)
+			if derr != nil {
+				continue
+			}
+			def = d
+		} else {
+			d, derr := runtimeDefForUserSkill(sk)
+			if derr != nil {
+				continue
+			}
+			def = d
+		}
+		out = append(out, def)
+	}
+	return out
 }
 
 func sortSkillDefs(defs []agentskillsSpec.SkillDef) {

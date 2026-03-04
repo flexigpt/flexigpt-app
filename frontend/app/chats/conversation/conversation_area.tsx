@@ -30,6 +30,7 @@ import {
 	buildUserConversationMessageFromEditor,
 	dedupeAttachmentsByRef,
 	deriveConversationToolsFromMessages,
+	deriveEnabledSkillRefsFromMessages,
 	deriveWebSearchChoiceFromMessages,
 	initConversationMessage,
 } from '@/chats/conversation/hydration_helper';
@@ -377,8 +378,11 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 		const tools = deriveConversationToolsFromMessages(conv.messages);
 		const web = deriveWebSearchChoiceFromMessages(conv.messages);
+		const skills = deriveEnabledSkillRefsFromMessages(conv.messages);
+
 		input.setConversationToolsFromChoices(tools);
 		input.setWebSearchFromChoices(web);
+		input.setEnabledSkillRefsFromMessage(skills);
 	}, []);
 
 	const focusInput = useCallback((tabId: string) => inputRefs.current.get(tabId)?.focus(), []);
@@ -470,7 +474,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 	// ---------------- Streaming completion (per tab) ----------------
 	const updateStreamingMessage = useCallback(
-		async (tabId: string, updatedChatWithUserMessage: Conversation, options: UIChatOption) => {
+		async (tabId: string, updatedChatWithUserMessage: Conversation, options: UIChatOption, skillSessionID?: string) => {
 			if (!tabExists(tabId)) return;
 
 			const abortRef = getAbortRef(tabId);
@@ -583,6 +587,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 					history,
 					toolStoreChoices,
 					assistantPlaceholder,
+					skillSessionID,
 					reqId,
 					controller.signal,
 					onStreamTextData,
@@ -718,6 +723,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			const hasNonEmptyText = trimmed.length > 0;
 			const hasToolOutputs = payload.toolOutputs.length > 0;
 			const hasAttachments = payload.attachments.length > 0;
+
 			if (!hasNonEmptyText && !hasToolOutputs && !hasAttachments) return;
 
 			const editingId = tab.editingMessageId ?? undefined;
@@ -740,7 +746,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 					if (selectedTabIdRef.current === tabId) scrollToBottomSoon(tabId);
 
-					void updateStreamingMessage(tabId, updatedChat, options).catch(console.error);
+					void updateStreamingMessage(tabId, updatedChat, options, payload.skillSessionID).catch(console.error);
 					return;
 				}
 
@@ -757,7 +763,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			saveUpdatedConversation(tabId, updated);
 			if (selectedTabIdRef.current === tabId) scrollToBottomSoon(tabId);
 
-			void updateStreamingMessage(tabId, updated, options).catch(console.error);
+			void updateStreamingMessage(tabId, updated, options, payload.skillSessionID).catch(console.error);
 		},
 		[saveUpdatedConversation, scrollToBottomSoon, updateStreamingMessage, updateTab]
 	);
@@ -777,6 +783,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 				attachments: msg.attachments,
 				toolChoices: msg.toolStoreChoices,
 				toolOutputs: msg.uiToolOutputs,
+				enabledSkillRefs: msg.enabledSkillRefs,
 			};
 
 			const input = inputRefs.current.get(tabId);

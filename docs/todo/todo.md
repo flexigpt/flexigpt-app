@@ -3,6 +3,7 @@
 ## Laundry list
 
 - [ ] if you start a web search, then change model whose sdk is different that before, there is arbitrary behaviour as of now wrt web search selection.
+- [ ] in new skill flow, check about reload of a conversation and reenabling already active skills. current call to skills sessions from editor seems to not pass any active skills.
 
 ## Features
 

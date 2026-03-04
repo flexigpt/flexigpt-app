@@ -1,14 +1,25 @@
+import type { ToolOutputUnion } from '@/spec/tool';
+
+// This is the runtime identity.
 export interface SkillDef {
 	type: string;
 	name: string;
 	location: string;
 }
 
+// Store identity for selection/persistence (NOT runtime identity).
+export interface SkillRef {
+	bundleID: string;
+	skillSlug: string;
+	skillID: string;
+}
+
 export interface RuntimeSkillFilter {
 	types?: string[];
 	namePrefix?: string;
 	locationPrefix?: string;
-	allowSkills?: SkillDef[];
+	// Store identity allowlist. Backend resolves to SkillDef internally.
+	allowSkillRefs?: SkillRef[];
 	sessionID?: string;
 	activity?: string;
 }
@@ -104,4 +115,12 @@ export interface SkillListItem {
 	isBuiltIn: boolean;
 
 	skillDefinition: Skill;
+}
+
+export interface InvokeSkillToolResponse {
+	outputs?: ToolOutputUnion[];
+	meta?: Record<string, any>;
+	isBuiltIn: boolean;
+	isError?: boolean;
+	errorMessage?: string;
 }

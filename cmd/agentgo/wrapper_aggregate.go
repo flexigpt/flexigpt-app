@@ -12,7 +12,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/flexigpt/inference-go/debugclient"
-	inferencegoSpec "github.com/flexigpt/inference-go/spec"
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper"
 	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
@@ -21,6 +21,7 @@ import (
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
 	settingStore "github.com/flexigpt/flexigpt-app/internal/setting/store"
+	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 )
 
@@ -28,8 +29,8 @@ type AggregrateWrapper struct {
 	modelPresetStore *modelpresetStore.ModelPresetStore
 	settingStore     *settingStore.SettingStore
 	toolStore        *toolStore.ToolStore
-
-	providersetAPI *inferencewrapper.ProviderSetAPI
+	skillStore       *skillStore.SkillStore
+	providersetAPI   *inferencewrapper.ProviderSetAPI
 
 	appContext          context.Context
 	completionCancelMux sync.Mutex
@@ -42,6 +43,7 @@ func InitAggregrateWrapper(
 	mps *modelpresetStore.ModelPresetStore,
 	ss *settingStore.SettingStore,
 	ts *toolStore.ToolStore,
+	skillSt *skillStore.SkillStore,
 ) error {
 	if agg == nil || ts == nil || mps == nil || ss == nil {
 		panic("initializing aggregate store wrapper on nil receivers")
@@ -50,10 +52,11 @@ func InitAggregrateWrapper(
 	agg.toolStore = ts
 	agg.modelPresetStore = mps
 	agg.settingStore = ss
-
+	agg.skillStore = skillSt
 	p, err := inferencewrapper.NewProviderSetAPI(
 		agg.toolStore,
 		agg.modelPresetStore,
+		agg.skillStore,
 		inferencewrapper.WithLogger(slog.Default()),
 		inferencewrapper.WithDebugConfig(&debugclient.DebugConfig{
 			Disable:                 false,
@@ -94,14 +97,14 @@ func (w *AggregrateWrapper) PutProviderPreset(
 		_, _ = w.providersetAPI.DeleteProvider(
 			context.Background(),
 			&inferencewrapperSpec.DeleteProviderRequest{
-				Provider: inferencegoSpec.ProviderName(string(req.ProviderName)),
+				Provider: inferenceSpec.ProviderName(string(req.ProviderName)),
 			},
 		)
 		// Then try to add in provider apis, need to skip adding to store if it cannot be added.
 		if _, err := w.providersetAPI.AddProvider(
 			context.Background(),
 			&inferencewrapperSpec.AddProviderRequest{
-				Provider: inferencegoSpec.ProviderName(string(req.ProviderName)),
+				Provider: inferenceSpec.ProviderName(string(req.ProviderName)),
 				Body: &inferencewrapperSpec.AddProviderRequestBody{
 					SDKType:                  req.Body.SDKType,
 					Origin:                   req.Body.Origin,
@@ -136,7 +139,7 @@ func (w *AggregrateWrapper) DeleteProviderPreset(
 		_, _ = w.providersetAPI.DeleteProvider(
 			context.Background(),
 			&inferencewrapperSpec.DeleteProviderRequest{
-				Provider: inferencegoSpec.ProviderName(string(req.ProviderName)),
+				Provider: inferenceSpec.ProviderName(string(req.ProviderName)),
 			},
 		)
 		resp, err := w.modelPresetStore.DeleteProviderPreset(context.Background(), req)
@@ -155,7 +158,7 @@ func (w *AggregrateWrapper) SetAuthKey(
 			_, err := w.providersetAPI.SetProviderAPIKey(
 				context.Background(),
 				&inferencewrapperSpec.SetProviderAPIKeyRequest{
-					Provider: inferencegoSpec.ProviderName(req.KeyName),
+					Provider: inferenceSpec.ProviderName(req.KeyName),
 					Body:     &inferencewrapperSpec.SetProviderAPIKeyRequestBody{APIKey: req.Body.Secret},
 				},
 			)
@@ -183,7 +186,7 @@ func (w *AggregrateWrapper) DeleteAuthKey(
 			_, _ = w.providersetAPI.SetProviderAPIKey(
 				context.Background(),
 				&inferencewrapperSpec.SetProviderAPIKeyRequest{
-					Provider: inferencegoSpec.ProviderName(req.KeyName),
+					Provider: inferenceSpec.ProviderName(req.KeyName),
 					Body:     &inferencewrapperSpec.SetProviderAPIKeyRequestBody{APIKey: ""},
 				},
 			)
@@ -241,7 +244,7 @@ func (w *AggregrateWrapper) FetchCompletion(
 		}()
 
 		req := &inferencewrapperSpec.CompletionRequest{
-			Provider:      inferencegoSpec.ProviderName(provider),
+			Provider:      inferenceSpec.ProviderName(provider),
 			ModelPresetID: modelpresetSpec.ModelPresetID(modelPresetID),
 			Body:          completionData,
 		}
@@ -281,7 +284,7 @@ func (w *AggregrateWrapper) FetchCompletion(
 			// If we have a partial response, attach error info there and return it.
 			if resp != nil && resp.Body != nil && resp.Body.InferenceResponse != nil {
 				if resp.Body.InferenceResponse.Error == nil {
-					resp.Body.InferenceResponse.Error = &inferencegoSpec.Error{
+					resp.Body.InferenceResponse.Error = &inferenceSpec.Error{
 						Message: err.Error(),
 					}
 				}
@@ -456,7 +459,7 @@ func initProviders(
 			DefaultHeaders:           pp.DefaultHeaders,
 		}
 		r := &inferencewrapperSpec.AddProviderRequest{
-			Provider: inferencegoSpec.ProviderName(string(pp.Name)),
+			Provider: inferenceSpec.ProviderName(string(pp.Name)),
 			Body:     body,
 		}
 		if _, err := providerAPI.AddProvider(ctx, r); err != nil {
@@ -465,7 +468,7 @@ func initProviders(
 		providersAdded++
 		if secret, ok := secrets[string(pp.Name)]; ok {
 			_, err := providerAPI.SetProviderAPIKey(ctx, &inferencewrapperSpec.SetProviderAPIKeyRequest{
-				Provider: inferencegoSpec.ProviderName(string(pp.Name)),
+				Provider: inferenceSpec.ProviderName(string(pp.Name)),
 				Body: &inferencewrapperSpec.SetProviderAPIKeyRequestBody{
 					APIKey: secret,
 				},

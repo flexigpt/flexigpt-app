@@ -233,6 +233,7 @@ func (a *App) initManagers() {
 		a.modelPresetStoreAPI.store,
 		a.settingStoreAPI.store,
 		a.toolStoreAPI.store,
+		a.skillStoreAPI.store,
 	)
 	if err != nil {
 		slog.Error(

@@ -122,3 +122,11 @@ func (s *SkillStoreWrapper) ListRuntimeSkills(
 		return s.store.ListRuntimeSkills(context.Background(), req)
 	})
 }
+
+func (s *SkillStoreWrapper) InvokeSkillTool(
+	req *spec.InvokeSkillToolRequest,
+) (*spec.InvokeSkillToolResponse, error) {
+	return middleware.WithRecoveryResp(func() (*spec.InvokeSkillToolResponse, error) {
+		return s.store.InvokeSkillTool(context.Background(), req)
+	})
+}

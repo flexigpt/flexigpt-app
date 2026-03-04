@@ -77,6 +77,14 @@ type (
 	SkillID = bundleitemutils.ItemID
 )
 
+// SkillRef is the store identity used by the UI for selection/persistence.
+// It intentionally avoids runtime identity (type/name/location).
+type SkillRef struct {
+	BundleID  SkillBundleID `json:"bundleID"`
+	SkillSlug SkillSlug     `json:"skillSlug"`
+	SkillID   SkillID       `json:"skillID"`
+}
+
 // Skill is the storage + management record.
 // It intentionally includes fields that are useful for JSON persistence, indexing, and listing/paging.
 type Skill struct {
@@ -102,9 +110,9 @@ type Skill struct {
 }
 
 type SkillBundle struct {
-	SchemaVersion string                     `json:"schemaVersion"`
-	ID            bundleitemutils.BundleID   `json:"id"` // UUID-v7
-	Slug          bundleitemutils.BundleSlug `json:"slug"`
+	SchemaVersion string          `json:"schemaVersion"`
+	ID            SkillBundleID   `json:"id"` // UUID-v7
+	Slug          SkillBundleSlug `json:"slug"`
 
 	DisplayName string `json:"displayName,omitempty"`
 	Description string `json:"description,omitempty"`

@@ -183,6 +183,11 @@ interface ToolOutputComposerChipViewProps {
 	onRetry: () => void;
 }
 
+function isSkillsToolName(name: string | undefined): boolean {
+	const n = (name ?? '').trim();
+	return n.startsWith('skills.');
+}
+
 /**
  * Interactive chip for a single tool output in the composer.
  * - Click opens the full JSON/text in a modal.
@@ -194,7 +199,7 @@ function ToolOutputComposerChipView({ output, onOpen, onRemove, onRetry }: ToolO
 	const truncatedLabel = label.length > 64 ? `${label.slice(0, 61)}…` : label;
 
 	const isError = !!output.isError;
-	const canRetry = isError && !!output.arguments && !!output.toolStoreChoice;
+	const canRetry = isError && !!output.arguments && (isSkillsToolName(output.name) || !!output.toolStoreChoice);
 
 	const titleLines = [
 		isError ? `Errored result from: ${label}` : label,

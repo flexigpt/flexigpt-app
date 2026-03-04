@@ -24,7 +24,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/toolruntime/spec"
 
 	"github.com/flexigpt/llmtools-go/fstool"
-	llmtoolsgoSpec "github.com/flexigpt/llmtools-go/spec"
+	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 
 	"github.com/ppipada/mapstore-go/jsonencdec"
 )
@@ -762,7 +762,7 @@ func TestInvokeGoCustomRegistered(t *testing.T) {
 					}
 					return Out{Msg: b.String()}, nil
 				}
-				argSchema := llmtoolsgoSpec.JSONSchema(`{
+				argSchema := llmtoolsSpec.JSONSchema(`{
 					"$schema": "http://json-schema.org/draft-07/schema#",
 					"type": "object",
 					"properties": {
@@ -817,22 +817,22 @@ func TestInvokeGoCustomRegistered(t *testing.T) {
 				type Args struct {
 					N int `json:"n"`
 				}
-				fn := func(ctx context.Context, a Args) ([]llmtoolsgoSpec.ToolOutputUnion, error) {
+				fn := func(ctx context.Context, a Args) ([]llmtoolsSpec.ToolOutputUnion, error) {
 					if a.N <= 0 {
 						a.N = 1
 					}
-					var outs []llmtoolsgoSpec.ToolOutputUnion
+					var outs []llmtoolsSpec.ToolOutputUnion
 					for i := 0; i < a.N; i++ {
-						outs = append(outs, llmtoolsgoSpec.ToolOutputUnion{
-							Kind: llmtoolsgoSpec.ToolOutputKindText,
-							TextItem: &llmtoolsgoSpec.ToolOutputText{
+						outs = append(outs, llmtoolsSpec.ToolOutputUnion{
+							Kind: llmtoolsSpec.ToolOutputKindText,
+							TextItem: &llmtoolsSpec.ToolOutputText{
 								Text: fmt.Sprintf("item-%d", i),
 							},
 						})
 					}
 					return outs, nil
 				}
-				argSchema := llmtoolsgoSpec.JSONSchema(`{
+				argSchema := llmtoolsSpec.JSONSchema(`{
 					"$schema": "http://json-schema.org/draft-07/schema#",
 					"type": "object",
 					"properties": {
@@ -885,7 +885,7 @@ func TestInvokeGoCustomRegistered(t *testing.T) {
 				fn := func(ctx context.Context, a Args) (Out, error) {
 					return Out{Ok: a.Times > 0}, nil
 				}
-				argSchema := llmtoolsgoSpec.JSONSchema(`{
+				argSchema := llmtoolsSpec.JSONSchema(`{
 					"$schema": "http://json-schema.org/draft-07/schema#",
 					"type": "object",
 					"properties": {
@@ -934,7 +934,7 @@ func TestInvokeGoCustomRegistered(t *testing.T) {
 					}
 					return Out{}, nil
 				}
-				argSchema := llmtoolsgoSpec.JSONSchema(`{
+				argSchema := llmtoolsSpec.JSONSchema(`{
 					"$schema": "http://json-schema.org/draft-07/schema#",
 					"type": "object",
 					"properties": {
@@ -1011,7 +1011,7 @@ func TestInvokeGoCustomRegistered(t *testing.T) {
 						return Out{Ok: true}, nil
 					}
 				}
-				argSchema := llmtoolsgoSpec.JSONSchema(`{
+				argSchema := llmtoolsSpec.JSONSchema(`{
 					"$schema": "http://json-schema.org/draft-07/schema#",
 					"type": "object",
 					"properties": {
@@ -1053,7 +1053,7 @@ func TestInvokeGoCustomRegistered(t *testing.T) {
 				type Args struct{}
 				type Out struct{}
 				fn := func(ctx context.Context, a Args) (Out, error) { return Out{}, nil }
-				argSchema := llmtoolsgoSpec.JSONSchema(`{
+				argSchema := llmtoolsSpec.JSONSchema(`{
 						"$schema": "http://json-schema.org/draft-07/schema#",
 						"type": "object",
 						"properties": {},
@@ -1073,7 +1073,7 @@ func TestInvokeGoCustomRegistered(t *testing.T) {
 				type Args struct{}
 				type Out struct{}
 				fn := func(ctx context.Context, a Args) (Out, error) { return Out{}, nil }
-				argSchema := llmtoolsgoSpec.JSONSchema(`{
+				argSchema := llmtoolsSpec.JSONSchema(`{
 						"$schema": "http://json-schema.org/draft-07/schema#",
 						"type": "object",
 						"properties": {},
@@ -1442,7 +1442,7 @@ func getOneTextOutput(t *testing.T, respBody *spec.InvokeToolResponseBody) strin
 	return outputs[0].TextItem.Text
 }
 
-func getOneFileOutput(t *testing.T, respBody *spec.InvokeToolResponseBody) *llmtoolsgoSpec.ToolOutputFile {
+func getOneFileOutput(t *testing.T, respBody *spec.InvokeToolResponseBody) *llmtoolsSpec.ToolOutputFile {
 	t.Helper()
 	outputs := respBody.Outputs
 	if len(outputs) != 1 || outputs[0].FileItem == nil {
@@ -1451,7 +1451,7 @@ func getOneFileOutput(t *testing.T, respBody *spec.InvokeToolResponseBody) *llmt
 	return outputs[0].FileItem
 }
 
-func getOneImageOutput(t *testing.T, respBody *spec.InvokeToolResponseBody) *llmtoolsgoSpec.ToolOutputImage {
+func getOneImageOutput(t *testing.T, respBody *spec.InvokeToolResponseBody) *llmtoolsSpec.ToolOutputImage {
 	t.Helper()
 	outputs := respBody.Outputs
 	if len(outputs) != 1 || outputs[0].ImageItem == nil {
@@ -1461,15 +1461,15 @@ func getOneImageOutput(t *testing.T, respBody *spec.InvokeToolResponseBody) *llm
 }
 
 func registerTypedAsTextInDefault[T, R any](
-	t *testing.T, nameSuffix string, argSchema llmtoolsgoSpec.JSONSchema,
+	t *testing.T, nameSuffix string, argSchema llmtoolsSpec.JSONSchema,
 	fn func(context.Context, T) (R, error),
 ) string {
 	t.Helper()
 	slug := sanitizeID(nameSuffix)
 	funcName := "github.com/flexigpt/flexigpt-app/tests/" + slug
 
-	llmTool := llmtoolsgoSpec.Tool{
-		SchemaVersion: llmtoolsgoSpec.SchemaVersion,
+	llmTool := llmtoolsSpec.Tool{
+		SchemaVersion: llmtoolsSpec.SchemaVersion,
 		ID:            "018fe0f4-b8cd-7e55-82d5-9df0bd70e4ba",
 		Slug:          nameSuffix,
 		Version:       "v1.0.0",
@@ -1478,10 +1478,10 @@ func registerTypedAsTextInDefault[T, R any](
 		Tags:          []string{"fs", "read"},
 
 		ArgSchema: argSchema,
-		GoImpl:    llmtoolsgoSpec.GoToolImpl{FuncID: llmtoolsgoSpec.FuncID(funcName)},
+		GoImpl:    llmtoolsSpec.GoToolImpl{FuncID: llmtoolsSpec.FuncID(funcName)},
 
-		CreatedAt:  llmtoolsgoSpec.SchemaStartTime,
-		ModifiedAt: llmtoolsgoSpec.SchemaStartTime,
+		CreatedAt:  llmtoolsSpec.SchemaStartTime,
+		ModifiedAt: llmtoolsSpec.SchemaStartTime,
 	}
 	if err := llmtoolsutil.RegisterTypedAsTextToolUsingDefaultGoRegistry(llmTool, fn); err != nil {
 		t.Fatalf("RegisterTypedAsText: %v", err)
@@ -1490,15 +1490,15 @@ func registerTypedAsTextInDefault[T, R any](
 }
 
 func registerOutputsToolInDefault[T any](
-	t *testing.T, nameSuffix string, argSchema llmtoolsgoSpec.JSONSchema,
-	fn func(context.Context, T) ([]llmtoolsgoSpec.ToolOutputUnion, error),
+	t *testing.T, nameSuffix string, argSchema llmtoolsSpec.JSONSchema,
+	fn func(context.Context, T) ([]llmtoolsSpec.ToolOutputUnion, error),
 ) string {
 	t.Helper()
 	slug := sanitizeID(nameSuffix)
 	funcName := "github.com/flexigpt/flexigpt-app/tests/" + slug
 
-	llmTool := llmtoolsgoSpec.Tool{
-		SchemaVersion: llmtoolsgoSpec.SchemaVersion,
+	llmTool := llmtoolsSpec.Tool{
+		SchemaVersion: llmtoolsSpec.SchemaVersion,
 		ID:            "018fe0f4-b8cd-7e55-82d5-9df0bd70e4ba",
 		Slug:          nameSuffix,
 		Version:       "v1.0.0",
@@ -1507,10 +1507,10 @@ func registerOutputsToolInDefault[T any](
 		Tags:          []string{"fs", "read"},
 
 		ArgSchema: argSchema,
-		GoImpl:    llmtoolsgoSpec.GoToolImpl{FuncID: llmtoolsgoSpec.FuncID(funcName)},
+		GoImpl:    llmtoolsSpec.GoToolImpl{FuncID: llmtoolsSpec.FuncID(funcName)},
 
-		CreatedAt:  llmtoolsgoSpec.SchemaStartTime,
-		ModifiedAt: llmtoolsgoSpec.SchemaStartTime,
+		CreatedAt:  llmtoolsSpec.SchemaStartTime,
+		ModifiedAt: llmtoolsSpec.SchemaStartTime,
 	}
 	if err := llmtoolsutil.RegisterOutputsToolUsingDefaultGoRegistry(llmTool, fn); err != nil {
 		t.Fatalf("RegisterTypedAsText: %v", err)

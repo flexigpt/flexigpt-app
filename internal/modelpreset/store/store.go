@@ -17,7 +17,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	inferencegoSpec "github.com/flexigpt/inference-go/spec"
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
 	"github.com/ppipada/mapstore-go"
 	"github.com/ppipada/mapstore-go/jsonencdec"
 )
@@ -45,7 +45,7 @@ func NewModelPresetStore(baseDir string) (*ModelPresetStore, error) {
 		return nil, err
 	}
 	s.builtinData = bi
-	var defaultProvider inferencegoSpec.ProviderName = ""
+	var defaultProvider inferenceSpec.ProviderName = ""
 	if s.builtinData != nil {
 		defaultProvider, err = s.builtinData.GetBuiltInDefaultProviderName(ctx)
 		if err != nil {
@@ -56,7 +56,7 @@ func NewModelPresetStore(baseDir string) (*ModelPresetStore, error) {
 	def, err := jsonencdec.StructWithJSONTagsToMap(spec.PresetsSchema{
 		SchemaVersion:   spec.SchemaVersion,
 		DefaultProvider: defaultProvider,
-		ProviderPresets: map[inferencegoSpec.ProviderName]spec.ProviderPreset{},
+		ProviderPresets: map[inferenceSpec.ProviderName]spec.ProviderPreset{},
 	})
 	if err != nil {
 		return nil, err
@@ -383,8 +383,8 @@ func (s *ModelPresetStore) ListProviderPresets(
 	// Resolve parameters - defaults first.
 	pageSize := spec.DefaultPageSize
 	includeDisabled := false
-	want := map[inferencegoSpec.ProviderName]struct{}{}
-	cursor := inferencegoSpec.ProviderName("")
+	want := map[inferenceSpec.ProviderName]struct{}{}
+	cursor := inferenceSpec.ProviderName("")
 
 	// Token overrides everything.
 	if req != nil && req.PageToken != "" {
@@ -465,7 +465,7 @@ func (s *ModelPresetStore) ListProviderPresets(
 	var nextToken *string
 	if end < len(filtered) {
 		// Preserve filter parameters in token.
-		names := make([]inferencegoSpec.ProviderName, 0, len(want))
+		names := make([]inferenceSpec.ProviderName, 0, len(want))
 		for n := range want {
 			names = append(names, n)
 		}
@@ -780,7 +780,7 @@ func (s *ModelPresetStore) readAllUserPresets(force bool) (spec.PresetsSchema, e
 			ps.SchemaVersion, spec.SchemaVersion)
 	}
 	if ps.ProviderPresets == nil {
-		ps.ProviderPresets = map[inferencegoSpec.ProviderName]spec.ProviderPreset{}
+		ps.ProviderPresets = map[inferenceSpec.ProviderName]spec.ProviderPreset{}
 	}
 	// Harden: validate on read to avoid operating on corrupted on-disk state.
 	for name, pp := range ps.ProviderPresets {

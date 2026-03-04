@@ -7,7 +7,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	inferencegoSpec "github.com/flexigpt/inference-go/spec"
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
 // validateProviderPreset performs structural and referential checks for a
@@ -138,16 +138,16 @@ func validateStopSequences(stops []string) error {
 	return nil
 }
 
-func validateOutputParam(op *inferencegoSpec.OutputParam) error {
+func validateOutputParam(op *inferenceSpec.OutputParam) error {
 	if op == nil {
 		return nil
 	}
 	if op.Verbosity != nil {
 		switch *op.Verbosity {
-		case inferencegoSpec.OutputVerbosityLow,
-			inferencegoSpec.OutputVerbosityMedium,
-			inferencegoSpec.OutputVerbosityHigh,
-			inferencegoSpec.OutputVerbosityMax:
+		case inferenceSpec.OutputVerbosityLow,
+			inferenceSpec.OutputVerbosityMedium,
+			inferenceSpec.OutputVerbosityHigh,
+			inferenceSpec.OutputVerbosityMax:
 			// OK.
 		default:
 			return fmt.Errorf("unknown verbosity %q", *op.Verbosity)
@@ -161,16 +161,16 @@ func validateOutputParam(op *inferencegoSpec.OutputParam) error {
 	return nil
 }
 
-func validateOutputFormat(of *inferencegoSpec.OutputFormat) error {
+func validateOutputFormat(of *inferenceSpec.OutputFormat) error {
 	if of == nil {
 		return nil
 	}
 	switch of.Kind {
-	case inferencegoSpec.OutputFormatKindText:
+	case inferenceSpec.OutputFormatKindText:
 		if of.JSONSchemaParam != nil {
 			return errors.New("jsonSchemaParam must be nil when format.kind is text")
 		}
-	case inferencegoSpec.OutputFormatKindJSONSchema:
+	case inferenceSpec.OutputFormatKindJSONSchema:
 		if of.JSONSchemaParam == nil {
 			return errors.New("jsonSchemaParam is required when format.kind is jsonSchema")
 		}
@@ -183,7 +183,7 @@ func validateOutputFormat(of *inferencegoSpec.OutputFormat) error {
 	return nil
 }
 
-func validateJSONSchemaParam(j *inferencegoSpec.JSONSchemaParam) error {
+func validateJSONSchemaParam(j *inferenceSpec.JSONSchemaParam) error {
 	if j == nil {
 		return nil
 	}
@@ -215,7 +215,7 @@ func isValidJSONSchemaName(s string) bool {
 }
 
 // validateProviderName currently only trims blanks; extend as required.
-func validateProviderName(n inferencegoSpec.ProviderName) error {
+func validateProviderName(n inferenceSpec.ProviderName) error {
 	if strings.TrimSpace(string(n)) == "" {
 		return errors.New("name is empty")
 	}
@@ -241,21 +241,21 @@ func validateModelPresetID(id spec.ModelPresetID) error {
 }
 
 // validateReasoning verifies the type/level/tokens combos.
-func validateReasoning(r *inferencegoSpec.ReasoningParam) error {
+func validateReasoning(r *inferenceSpec.ReasoningParam) error {
 	switch r.Type {
-	case inferencegoSpec.ReasoningTypeHybridWithTokens:
+	case inferenceSpec.ReasoningTypeHybridWithTokens:
 		if r.Tokens <= 0 {
 			return errors.New("tokens must be >0 for hybridWithTokens")
 		}
-	case inferencegoSpec.ReasoningTypeSingleWithLevels:
+	case inferenceSpec.ReasoningTypeSingleWithLevels:
 		switch r.Level {
 		case
-			inferencegoSpec.ReasoningLevelNone,
-			inferencegoSpec.ReasoningLevelMinimal,
-			inferencegoSpec.ReasoningLevelLow,
-			inferencegoSpec.ReasoningLevelMedium,
-			inferencegoSpec.ReasoningLevelHigh,
-			inferencegoSpec.ReasoningLevelXHigh:
+			inferenceSpec.ReasoningLevelNone,
+			inferenceSpec.ReasoningLevelMinimal,
+			inferenceSpec.ReasoningLevelLow,
+			inferenceSpec.ReasoningLevelMedium,
+			inferenceSpec.ReasoningLevelHigh,
+			inferenceSpec.ReasoningLevelXHigh:
 			// Valid.
 		default:
 			return fmt.Errorf("invalid level %q for singleWithLevels", r.Level)
@@ -267,9 +267,9 @@ func validateReasoning(r *inferencegoSpec.ReasoningParam) error {
 	// SummaryStyle is optional (OpenAI Responses only), but if provided it must be valid.
 	if r.SummaryStyle != nil {
 		switch *r.SummaryStyle {
-		case inferencegoSpec.ReasoningSummaryStyleAuto,
-			inferencegoSpec.ReasoningSummaryStyleConcise,
-			inferencegoSpec.ReasoningSummaryStyleDetailed:
+		case inferenceSpec.ReasoningSummaryStyleAuto,
+			inferenceSpec.ReasoningSummaryStyleConcise,
+			inferenceSpec.ReasoningSummaryStyleDetailed:
 			// OK.
 		default:
 			return fmt.Errorf("unknown summaryStyle %q", *r.SummaryStyle)
@@ -311,26 +311,26 @@ func validateModelCapabilitiesOverride(o *spec.ModelCapabilitiesOverride) error 
 	return nil
 }
 
-func validateModalities(mm []inferencegoSpec.Modality) error {
+func validateModalities(mm []inferenceSpec.Modality) error {
 	if mm == nil {
 		return nil
 	}
-	seen := map[inferencegoSpec.Modality]struct{}{}
+	seen := map[inferenceSpec.Modality]struct{}{}
 	for i, m := range mm {
 		if strings.TrimSpace(string(m)) == "" {
 			return fmt.Errorf("[%d] empty modality", i)
 		}
 		switch m {
-		case inferencegoSpec.ModalityTextIn,
-			inferencegoSpec.ModalityTextOut,
-			inferencegoSpec.ModalityImageIn,
-			inferencegoSpec.ModalityImageOut,
-			inferencegoSpec.ModalityFileIn,
-			inferencegoSpec.ModalityFileOut,
-			inferencegoSpec.ModalityAudioIn,
-			inferencegoSpec.ModalityAudioOut,
-			inferencegoSpec.ModalityVideoIn,
-			inferencegoSpec.ModalityVideoOut:
+		case inferenceSpec.ModalityTextIn,
+			inferenceSpec.ModalityTextOut,
+			inferenceSpec.ModalityImageIn,
+			inferenceSpec.ModalityImageOut,
+			inferenceSpec.ModalityFileIn,
+			inferenceSpec.ModalityFileOut,
+			inferenceSpec.ModalityAudioIn,
+			inferenceSpec.ModalityAudioOut,
+			inferenceSpec.ModalityVideoIn,
+			inferenceSpec.ModalityVideoOut:
 			// OK.
 		default:
 			return fmt.Errorf("[%d] unknown modality %q", i, m)
@@ -348,11 +348,11 @@ func validateReasoningCapabilitiesOverride(o *spec.ReasoningCapabilitiesOverride
 		return nil
 	}
 	if o.SupportedReasoningTypes != nil {
-		seen := map[inferencegoSpec.ReasoningType]struct{}{}
+		seen := map[inferenceSpec.ReasoningType]struct{}{}
 		for i, t := range o.SupportedReasoningTypes {
 			switch t {
-			case inferencegoSpec.ReasoningTypeHybridWithTokens,
-				inferencegoSpec.ReasoningTypeSingleWithLevels:
+			case inferenceSpec.ReasoningTypeHybridWithTokens,
+				inferenceSpec.ReasoningTypeSingleWithLevels:
 			default:
 				return fmt.Errorf("supportedReasoningTypes[%d] unknown type %q", i, t)
 			}
@@ -363,15 +363,15 @@ func validateReasoningCapabilitiesOverride(o *spec.ReasoningCapabilitiesOverride
 		}
 	}
 	if o.SupportedReasoningLevels != nil {
-		seen := map[inferencegoSpec.ReasoningLevel]struct{}{}
+		seen := map[inferenceSpec.ReasoningLevel]struct{}{}
 		for i, l := range o.SupportedReasoningLevels {
 			switch l {
-			case inferencegoSpec.ReasoningLevelNone,
-				inferencegoSpec.ReasoningLevelMinimal,
-				inferencegoSpec.ReasoningLevelLow,
-				inferencegoSpec.ReasoningLevelMedium,
-				inferencegoSpec.ReasoningLevelHigh,
-				inferencegoSpec.ReasoningLevelXHigh:
+			case inferenceSpec.ReasoningLevelNone,
+				inferenceSpec.ReasoningLevelMinimal,
+				inferenceSpec.ReasoningLevelLow,
+				inferenceSpec.ReasoningLevelMedium,
+				inferenceSpec.ReasoningLevelHigh,
+				inferenceSpec.ReasoningLevelXHigh:
 			default:
 				return fmt.Errorf("supportedReasoningLevels[%d] unknown level %q", i, l)
 			}
@@ -399,11 +399,11 @@ func validateOutputCapabilitiesOverride(o *spec.OutputCapabilitiesOverride) erro
 		return nil
 	}
 	if o.SupportedOutputFormats != nil {
-		seen := map[inferencegoSpec.OutputFormatKind]struct{}{}
+		seen := map[inferenceSpec.OutputFormatKind]struct{}{}
 		for i, k := range o.SupportedOutputFormats {
 			switch k {
-			case inferencegoSpec.OutputFormatKindText,
-				inferencegoSpec.OutputFormatKindJSONSchema:
+			case inferenceSpec.OutputFormatKindText,
+				inferenceSpec.OutputFormatKindJSONSchema:
 			default:
 				return fmt.Errorf("supportedOutputFormats[%d] unknown kind %q", i, k)
 			}
@@ -424,12 +424,12 @@ func validateToolCapabilitiesOverride(o *spec.ToolCapabilitiesOverride) error {
 		return errors.New("maxForcedTools must be >= 0")
 	}
 	if o.SupportedToolTypes != nil {
-		seen := map[inferencegoSpec.ToolType]struct{}{}
+		seen := map[inferenceSpec.ToolType]struct{}{}
 		for i, t := range o.SupportedToolTypes {
 			switch t {
-			case inferencegoSpec.ToolTypeFunction,
-				inferencegoSpec.ToolTypeCustom,
-				inferencegoSpec.ToolTypeWebSearch:
+			case inferenceSpec.ToolTypeFunction,
+				inferenceSpec.ToolTypeCustom,
+				inferenceSpec.ToolTypeWebSearch:
 			default:
 				return fmt.Errorf("supportedToolTypes[%d] unknown type %q", i, t)
 			}
@@ -440,13 +440,13 @@ func validateToolCapabilitiesOverride(o *spec.ToolCapabilitiesOverride) error {
 		}
 	}
 	if o.SupportedToolPolicyModes != nil {
-		seen := map[inferencegoSpec.ToolPolicyMode]struct{}{}
+		seen := map[inferenceSpec.ToolPolicyMode]struct{}{}
 		for i, m := range o.SupportedToolPolicyModes {
 			switch m {
-			case inferencegoSpec.ToolPolicyModeAuto,
-				inferencegoSpec.ToolPolicyModeAny,
-				inferencegoSpec.ToolPolicyModeTool,
-				inferencegoSpec.ToolPolicyModeNone:
+			case inferenceSpec.ToolPolicyModeAuto,
+				inferenceSpec.ToolPolicyModeAny,
+				inferenceSpec.ToolPolicyModeTool,
+				inferenceSpec.ToolPolicyModeNone:
 			default:
 				return fmt.Errorf("supportedToolPolicyModes[%d] unknown mode %q", i, m)
 			}

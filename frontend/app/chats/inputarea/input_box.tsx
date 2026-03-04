@@ -3,6 +3,7 @@ import { forwardRef, type RefObject, useEffect, useImperativeHandle, useRef, use
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { UIToolCall } from '@/spec/inference';
 import { DefaultUIChatOptions, type UIChatOption } from '@/spec/modelpreset';
+import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
@@ -24,6 +25,7 @@ export interface InputBoxHandle {
 	setConversationToolsFromChoices: (tools: ToolStoreChoice[]) => void;
 	setWebSearchFromChoices: (tools: ToolStoreChoice[]) => void;
 	applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => void;
+	setEnabledSkillRefsFromMessage: (refs: SkillRef[]) => void;
 }
 
 interface InputBoxProps {
@@ -83,6 +85,9 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 		},
 		applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => {
 			inputAreaRef.current?.applyAttachmentsDrop(payload);
+		},
+		setEnabledSkillRefsFromMessage: (refs: SkillRef[]) => {
+			inputAreaRef.current?.setEnabledSkillRefsFromMessage(refs);
 		},
 	}));
 

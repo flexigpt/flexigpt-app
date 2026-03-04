@@ -407,9 +407,9 @@ linters:
         - pkg: github.com/JohannesKaufmann/html-to-markdown/v2
           alias: html2md
         - pkg: "github.com/flexigpt/inference-go/spec"
-          alias: inferencegoSpec
+          alias: inferenceSpec
         - pkg: "github.com/flexigpt/llmtools-go/spec"
-          alias: llmtoolsgoSpec
+          alias: llmtoolsSpec
         - pkg: "github.com/flexigpt/agentskills-go/spec"
           alias: agentskillsSpec
         - pkg: github.com/flexigpt/flexigpt-app/frontend
