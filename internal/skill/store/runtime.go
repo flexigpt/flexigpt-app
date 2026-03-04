@@ -33,6 +33,9 @@ const (
 
 	// Foreground validation should be quick; runtime is in-mem, but provider indexing may touch disk.
 	runtimeForegroundValidateTimeout = 15 * time.Second
+
+	// Defense-in-depth: cap JSON args size for skills tools.
+	maxSkillToolArgsBytes = 1 << 20 // 1 MiB
 )
 
 type runtimeApplyMode int
@@ -179,7 +182,18 @@ func (s *SkillStore) InvokeSkillTool(
 
 	argsStr := strings.TrimSpace(req.Body.Args)
 	if argsStr == "" {
-		return nil, fmt.Errorf("%w: args required", spec.ErrSkillInvalidRequest)
+		// Be forgiving: models (and manual retries) sometimes omit "{}".
+		argsStr = "{}"
+	}
+	if len(argsStr) > maxSkillToolArgsBytes {
+		return nil, fmt.Errorf("%w: args too large", spec.ErrSkillInvalidRequest)
+	}
+	if !json.Valid([]byte(argsStr)) {
+		return nil, fmt.Errorf("%w: args must be valid JSON", spec.ErrSkillInvalidRequest)
+	}
+	trim := strings.TrimSpace(argsStr)
+	if trim != "" && trim[0] != '{' {
+		return nil, fmt.Errorf("%w: args must be a JSON object", spec.ErrSkillInvalidRequest)
 	}
 
 	reg, err := s.runtime.NewSessionRegistry(ctx, agentskillsSpec.SessionID(sid))
@@ -254,6 +268,10 @@ func (s *SkillStore) runtimeResyncStrictFromStore(ctx context.Context) error {
 	if s == nil || s.runtime == nil {
 		return nil
 	}
+	// Strict rollback should ensure built-in hydration is present.
+	if err := s.hydrateBuiltInEmbeddedFS(ctx); err != nil {
+		return err
+	}
 	view, err := s.runtimeDesiredViewFromStore(ctx, runtimeDesiredViewOpts{
 		WantByTypeName: true,
 		LogInvalid:     true,
@@ -288,6 +306,11 @@ func (s *SkillStore) runtimeApplyDesiredStrict(
 func (s *SkillStore) runtimeResyncFromStore(ctx context.Context) error {
 	if s == nil || s.runtime == nil {
 		return nil
+	}
+
+	// Best effort: attempt hydration but don't abort resync of user skills.
+	if err := s.hydrateBuiltInEmbeddedFS(ctx); err != nil {
+		slog.Error("runtime resync: embeddedfs hydration failed", "err", err)
 	}
 
 	view, err := s.runtimeDesiredViewFromStore(ctx, runtimeDesiredViewOpts{
@@ -670,6 +693,10 @@ func (s *SkillStore) runtimeDefsForSkillRefs(
 			continue
 		}
 		sk := *gs.Body
+		// Harden against stale references: if caller provided skillID, it must match.
+		if strings.TrimSpace(string(r.SkillID)) != "" && sk.ID != r.SkillID {
+			continue
+		}
 
 		var def agentskillsSpec.SkillDef
 		// Built-ins are embeddedfs in store, but runtime currently treats them as fs (hydrated).

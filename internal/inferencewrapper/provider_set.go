@@ -59,8 +59,9 @@ type ProviderSetAPI struct {
 	mpStore    *modelpresetStore.ModelPresetStore
 	skillStore *skillStore.SkillStore
 
-	logger      *slog.Logger
-	debugConfig *debugclient.DebugConfig
+	logger                 *slog.Logger
+	debugConfig            *debugclient.DebugConfig
+	skillsRunScriptEnabled bool
 }
 
 type ProviderSetOption func(*ProviderSetAPI)
@@ -75,6 +76,12 @@ func WithDebugConfig(debugConfig *debugclient.DebugConfig) ProviderSetOption {
 	return func(ps *ProviderSetAPI) {
 		ps.debugConfig = debugConfig
 	}
+}
+
+// WithSkillsRunScriptEnabled controls whether skills.runscript is advertised to the model.
+// Default: false (safer; matches the default fsskillprovider which disables scripts).
+func WithSkillsRunScriptEnabled(enabled bool) ProviderSetOption {
+	return func(ps *ProviderSetAPI) { ps.skillsRunScriptEnabled = enabled }
 }
 
 // NewProviderSetAPI creates a new ProviderSetAPI wrapper.
@@ -271,9 +278,11 @@ func (ps *ProviderSetAPI) FetchCompletion(
 			},
 		})
 		if perr == nil && promptResp != nil && promptResp.Body != nil && strings.TrimSpace(promptResp.Body.XML) != "" {
+			includeAllTools := activeCount > 0
 			modelParam.SystemPrompt = appendToSystemPrompt(
 				modelParam.SystemPrompt,
-				skillsRulesPrompt(),
+				skillsRulesPrompt(includeAllTools, ps.skillsRunScriptEnabled),
+
 				promptResp.Body.XML,
 			)
 		}
@@ -281,7 +290,10 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		// Tool choices:
 		// - if none active => only skills.load
 		// - else => load/unload/readresource/runscript.
-		skillToolChoices, _ := buildSkillToolChoices(activeCount > 0)
+		skillToolChoices, err := buildSkillToolChoices(activeCount > 0, ps.skillsRunScriptEnabled)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build skill tool choices: %w", err)
+		}
 		toolChoices = append(toolChoices, skillToolChoices...)
 	}
 
@@ -322,7 +334,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	return resp, err
 }
 
-func buildSkillToolChoices(includeAll bool) ([]inferenceSpec.ToolChoice, error) {
+func buildSkillToolChoices(includeAll, includeRunScript bool) ([]inferenceSpec.ToolChoice, error) {
 	mk := func(choiceID, toolName string, t llmtoolsSpec.Tool) (inferenceSpec.ToolChoice, error) {
 		schema, err := decodeToolArgSchema(toolSpec.JSONRawString(t.ArgSchema))
 		if err != nil {
@@ -349,18 +361,24 @@ func buildSkillToolChoices(includeAll bool) ([]inferenceSpec.ToolChoice, error) 
 			return nil, err
 		}
 		out = append(out, tc)
-		if tc, err = mk("builtin.skills.unload", "skills.unload", agentskillsSpec.SkillsUnloadTool()); err != nil {
-			return nil, err
-		}
-		out = append(out, tc)
 		if tc, err = mk(
-			"builtin.skills.runscript",
-			"skills.runscript",
-			agentskillsSpec.SkillsRunScriptTool(),
+			"builtin.skills.readresource",
+			"skills.readresource",
+			agentskillsSpec.SkillsReadResourceTool(),
 		); err != nil {
 			return nil, err
 		}
 		out = append(out, tc)
+		if includeRunScript {
+			if tc, err = mk(
+				"builtin.skills.runscript",
+				"skills.runscript",
+				agentskillsSpec.SkillsRunScriptTool(),
+			); err != nil {
+				return nil, err
+			}
+			out = append(out, tc)
+		}
 	}
 	return out, nil
 }
@@ -860,21 +878,30 @@ func decodeToolArgSchema(raw toolSpec.JSONRawString) (map[string]any, error) {
 	return schema, nil
 }
 
-func skillsRulesPrompt() string {
-	// Keep this stable; changing it can affect model behavior.
-	return strings.TrimSpace(`
-You have access to "skills" tools:
-- skills.load
-- skills.unload
-- skills.readresource
-- skills.runscript
+func skillsRulesPrompt(includeAll, includeRunScript bool) string {
+	var tools []string
+	tools = append(tools, "- skills.load")
+	if includeAll {
+		tools = append(tools, "- skills.unload", "- skills.readresource")
+		if includeRunScript {
+			tools = append(tools, "- skills.runscript")
+		}
+	}
 
+	extra := ""
+	if !includeAll {
+		extra = "\nThis turn only exposes skills.load. After you load at least one skill, more skills tools may be available.\n"
+	}
+
+	return strings.TrimSpace(fmt.Sprintf(`
+You have access to "skills" tools:
+%s
+%s
 Rules:
 1) Only use skills that are listed in the provided skills XML prompt.
-2) If no skills are active, you must call skills.load before skills.readresource or skills.runscript.
-3) Prefer reading skill resources (skills.readresource) before running scripts.
+2) Prefer reading skill resources (skills.readresource) before running scripts.
 4) After calling skills.load or skills.unload, rely on the updated skills context in subsequent turns.
-`)
+`, strings.Join(tools, "\n"), strings.TrimSpace(extra)))
 }
 
 func appendToSystemPrompt(base string, parts ...string) string {

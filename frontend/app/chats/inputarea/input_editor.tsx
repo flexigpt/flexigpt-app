@@ -72,7 +72,7 @@ import {
 	LARGE_TEXT_AUTODECHUNK_THRESHOLD_CHARS,
 	LARGE_TEXT_CHUNK_SIZE,
 } from '@/chats/inputarea/input_editor_utils';
-import { dedupeSkillRefs, skillRefFromListItem } from '@/chats/skills/skill_utils';
+import { dedupeSkillRefs, skillRefFromListItem, skillRefKey } from '@/chats/skills/skill_utils';
 import {
 	getFirstTemplateNodeWithPath,
 	getTemplateNodesWithPath,
@@ -326,7 +326,16 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const [allSkills, setAllSkills] = useState<SkillListItem[]>([]);
 	const [enabledSkillRefs, setEnabledSkillRefs] = useState<SkillRef[]>([]);
 	const [skillSessionID, setSkillSessionID] = useState<string | null>(null);
+	// Track the allowlist fingerprint used to create the current session.
+	const enabledSkillRefsKey = useMemo(() => {
+		const keys = (enabledSkillRefs ?? []).map(skillRefKey);
+		keys.sort();
+		return keys.join('|');
+	}, [enabledSkillRefs]);
+	const sessionAllowlistKeyRef = useRef<string>('');
 
+	// Ensure we close the session on unmount (tab close / app navigation).
+	const skillSessionIDRef = useRef<string | null>(null);
 	const [skillsLoading, setSkillsLoading] = useState(false);
 	const pendingEnableAllSkillsRef = useRef(false);
 	const preEditEnabledSkillRefsRef = useRef<SkillRef[] | null>(null);
@@ -349,6 +358,18 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		attachmentMenu.hide();
 	}, [templateMenu, toolMenu, attachmentMenu]);
 
+	useEffect(() => {
+		skillSessionIDRef.current = skillSessionID;
+	}, [skillSessionID]);
+
+	useEffect(() => {
+		return () => {
+			const sid = skillSessionIDRef.current;
+			if (!sid) return;
+			void skillStoreAPI.closeSkillSession(sid).catch(() => {});
+		};
+	}, []);
+
 	// Fetch skills catalog (store listSkills; NOT runtime listRuntimeSkills).
 	useEffect(() => {
 		let cancelled = false;
@@ -363,7 +384,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					undefined,
 					undefined,
 					false, // includeDisabled
-					true, // includeMissing
+					false, // includeMissing
 					200, // recommendedPageSize
 					token
 				);
@@ -408,6 +429,37 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		pendingEnableAllSkillsRef.current = false;
 		setEnabledSkillRefs([]);
 	}, []);
+
+	// If the allowlist changes after a session is created, reset the session.
+	// This prevents the session active set drifting away from the caller's allowlist.
+	useEffect(() => {
+		if (!skillSessionID) return;
+		if ((enabledSkillRefs?.length ?? 0) === 0) return; // handled by "disable all" path
+
+		const createdWith = sessionAllowlistKeyRef.current;
+		if (!createdWith) {
+			// Session existed before we started tracking (e.g. future refactors); initialize.
+			sessionAllowlistKeyRef.current = enabledSkillRefsKey;
+			return;
+		}
+		if (enabledSkillRefsKey === createdWith) return;
+
+		let cancelled = false;
+		void (async () => {
+			try {
+				await skillStoreAPI.closeSkillSession(skillSessionID);
+			} catch {
+				// ok.
+			}
+			if (!cancelled) {
+				sessionAllowlistKeyRef.current = '';
+				setSkillSessionID(null);
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [enabledSkillRefsKey, enabledSkillRefs.length, skillSessionID]);
 
 	useEffect(() => {
 		if (enabledSkillRefs.length > 0) return;
@@ -1082,6 +1134,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						const sess = await skillStoreAPI.createSkillSession(undefined, undefined);
 						effectiveSkillSessionID = sess.sessionID;
 						setSkillSessionID(sess.sessionID);
+						// Track which allowlist this session corresponds to.
+						sessionAllowlistKeyRef.current = enabledSkillRefsKey;
 					} catch (err) {
 						setSubmitError((err as Error)?.message || 'Failed to create skills session.');
 						return;
