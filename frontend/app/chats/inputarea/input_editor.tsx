@@ -120,6 +120,7 @@ export interface EditorAreaHandle {
 	setWebSearchFromChoices: (tools: ToolStoreChoice[]) => void;
 	applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => void;
 	setEnabledSkillRefsFromMessage: (refs: SkillRef[]) => void;
+	setActiveSkillRefsFromMessage: (refs: SkillRef[]) => void;
 }
 
 const EDITOR_EMPTY_VALUE: Value = [{ type: 'p', children: [{ text: '' }] }];
@@ -325,6 +326,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	// ---- Skills (conversation-level) ----
 	const [allSkills, setAllSkills] = useState<SkillListItem[]>([]);
 	const [enabledSkillRefs, setEnabledSkillRefs] = useState<SkillRef[]>([]);
+	const [_activeSkillRefs, setActiveSkillRefs] = useState<SkillRef[]>([]);
+
 	const [skillSessionID, setSkillSessionID] = useState<string | null>(null);
 	// Track the allowlist fingerprint used to create the current session.
 	const enabledSkillRefsKey = useMemo(() => {
@@ -1408,6 +1411,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 		setEnabledSkillRefsFromMessage: (refs: SkillRef[]) => {
 			setEnabledSkillRefs(refs ?? []);
+		},
+
+		setActiveSkillRefsFromMessage: (refs: SkillRef[]) => {
+			setActiveSkillRefs(refs ?? []);
 		},
 	}));
 

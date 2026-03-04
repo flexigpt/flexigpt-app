@@ -51,6 +51,8 @@ type ConversationMessage struct {
 	// These are ref attachments; ContentBlock may or may not be hydrated.
 	Attachments      []attachment.Attachment `json:"attachments,omitempty"`
 	EnabledSkillRefs []skillSpec.SkillRef    `json:"enabledSkillRefs,omitempty"`
+	ActiveSkillRefs  []skillSpec.SkillRef    `json:"activeSkillRefs,omitempty"`
+
 	// Usage / error info from the model/provider for this turn
 	// (usually attached to assistant turns).
 	Usage        *inferenceSpec.Usage `json:"usage,omitempty"`

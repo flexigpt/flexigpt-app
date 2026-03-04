@@ -26,6 +26,7 @@ export interface InputBoxHandle {
 	setWebSearchFromChoices: (tools: ToolStoreChoice[]) => void;
 	applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => void;
 	setEnabledSkillRefsFromMessage: (refs: SkillRef[]) => void;
+	setActiveSkillRefsFromMessage: (refs: SkillRef[]) => void;
 }
 
 interface InputBoxProps {
@@ -88,6 +89,9 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 		},
 		setEnabledSkillRefsFromMessage: (refs: SkillRef[]) => {
 			inputAreaRef.current?.setEnabledSkillRefsFromMessage(refs);
+		},
+		setActiveSkillRefsFromMessage: (refs: SkillRef[]) => {
+			inputAreaRef.current?.setActiveSkillRefsFromMessage(refs);
 		},
 	}));
 

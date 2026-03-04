@@ -900,7 +900,7 @@ You have access to "skills" tools:
 Rules:
 1) Only use skills that are listed in the provided skills XML prompt.
 2) Prefer reading skill resources (skills.readresource) before running scripts.
-4) After calling skills.load or skills.unload, rely on the updated skills context in subsequent turns.
+3) After calling skills.load or skills.unload, rely on the updated skills context in subsequent turns.
 `, strings.Join(tools, "\n"), strings.TrimSpace(extra)))
 }
 

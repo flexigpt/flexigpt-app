@@ -29,6 +29,7 @@ import { HandleCompletion } from '@/chats/conversation/completion_helper';
 import {
 	buildUserConversationMessageFromEditor,
 	dedupeAttachmentsByRef,
+	deriveActiveSkillRefsFromMessages,
 	deriveConversationToolsFromMessages,
 	deriveEnabledSkillRefsFromMessages,
 	deriveWebSearchChoiceFromMessages,
@@ -379,10 +380,12 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		const tools = deriveConversationToolsFromMessages(conv.messages);
 		const web = deriveWebSearchChoiceFromMessages(conv.messages);
 		const skills = deriveEnabledSkillRefsFromMessages(conv.messages);
+		const active = deriveActiveSkillRefsFromMessages(conv.messages);
 
 		input.setConversationToolsFromChoices(tools);
 		input.setWebSearchFromChoices(web);
 		input.setEnabledSkillRefsFromMessage(skills);
+		input.setActiveSkillRefsFromMessage(active);
 	}, []);
 
 	const focusInput = useCallback((tabId: string) => inputRefs.current.get(tabId)?.focus(), []);
@@ -784,6 +787,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 				toolChoices: msg.toolStoreChoices,
 				toolOutputs: msg.uiToolOutputs,
 				enabledSkillRefs: msg.enabledSkillRefs,
+				activeSkillRefs: msg.activeSkillRefs,
 			};
 
 			const input = inputRefs.current.get(tabId);

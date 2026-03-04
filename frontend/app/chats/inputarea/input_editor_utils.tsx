@@ -22,6 +22,7 @@ export interface EditorExternalMessage {
 	toolChoices?: ToolStoreChoice[];
 	toolOutputs?: UIToolOutput[];
 	enabledSkillRefs?: SkillRef[];
+	activeSkillRefs?: SkillRef[];
 }
 
 export interface EditorSubmitPayload {
@@ -31,6 +32,7 @@ export interface EditorSubmitPayload {
 	toolOutputs: UIToolOutput[];
 	finalToolChoices: ToolStoreChoice[];
 	enabledSkillRefs?: SkillRef[];
+	activeSkillRefs?: SkillRef[];
 	skillSessionID?: string;
 }
 

@@ -35,6 +35,7 @@ export interface StoreConversationMessage {
 	toolStoreChoices?: ToolStoreChoice[];
 	attachments?: Attachment[];
 	enabledSkillRefs?: SkillRef[];
+	activeSkillRefs?: SkillRef[];
 
 	usage?: InferenceUsage;
 	error?: InferenceError;
