@@ -66,7 +66,10 @@ export function OutputVerbosityDropdown({
 						disabled ? 'Effort/Verbosity not supported by this model/provider' : 'Set effort/verbosity for model output'
 					}
 				>
-					<span className="min-w-0 truncate text-center text-xs font-normal">Effort{labelFor(verbosity)}</span>
+					<span className="min-w-0 truncate text-center text-xs font-normal">
+						<span className="hidden lg:inline">Verbosity/</span>
+						Effort{labelFor(verbosity)}
+					</span>
 					{open ? (
 						<FiChevronDown size={16} className="ml-1 shrink-0 md:ml-2" />
 					) : (

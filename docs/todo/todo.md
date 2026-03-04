@@ -2,6 +2,8 @@
 
 ## Laundry list
 
+- [ ] if you start a web search, then change model whose sdk is different that before, there is arbitrary behaviour as of now wrt web search selection.
+
 ## Features
 
 - [ ] Agent skills
@@ -34,7 +36,7 @@
     - [ ] ~~Should ew expose current tools as skills (unnecessary redirection most probably?)?~~
 
   - [ ] Skill flow
-    - when user selects skills, and no skills in last message. when user selects skills, and skills selected but not loaded in last message:
+    - when user selects skills, and no skills in last message and when user selects skills, and skills selected but not loaded in last message:
       - need to attach skills rules, extra prompt
       - need to attach skills available prompt
       - need to attach skills load tool
@@ -43,7 +45,7 @@
       - need to attach skills rules, extra prompt
       - need to attach skill tools all: load/unload/read/run
 
-    - load/read/run tool called: run load and return tool result
+    - load/read/run tool called: run/load and return tool result
 
     - unload called:
       - set skills inactive. if some skill still active, return here
