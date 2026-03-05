@@ -163,6 +163,13 @@ func (s *SkillStore) GetSkillsPromptXML(
 				}
 			}
 			res := s.resolveAllowSkillRefs(ctx, f.AllowSkillRefs)
+			// IMPORTANT: if caller provided allowSkillRefs but none resolve,
+			// treat it as "no skills allowed" (not "all skills").
+			if len(res.AllowDefs) == 0 {
+				return &spec.GetSkillsPromptXMLResponse{
+					Body: &spec.GetSkillsPromptXMLResponseBody{XML: ""},
+				}, nil
+			}
 			allow = res.AllowDefs
 		}
 

@@ -65,6 +65,7 @@ export function AddEditSkillModal({
 	const effectiveMode: ModalMode = isLockedSkill ? 'view' : requestedMode;
 	const isViewMode = effectiveMode === 'view';
 	const isEditMode = effectiveMode === 'edit';
+	const isAddMode = effectiveMode === 'add';
 
 	const [formData, setFormData] = useState({
 		displayName: '',
@@ -123,13 +124,14 @@ export function AddEditSkillModal({
 		if (!dialog.open) dialog.showModal();
 
 		window.setTimeout(() => {
-			if (!isViewMode) nameInputRef.current?.focus();
+			// Only autofocus Name when adding (since Name is read-only in edit/view)
+			if (isAddMode) nameInputRef.current?.focus();
 		}, 0);
 
 		return () => {
 			if (dialog.open) dialog.close();
 		};
-	}, [isOpen, isViewMode]);
+	}, [isOpen, isAddMode]);
 
 	const handleDialogClose = () => {
 		onClose();
@@ -299,7 +301,7 @@ export function AddEditSkillModal({
 									name="name"
 									value={formData.name}
 									onChange={handleInput}
-									readOnly={isViewMode}
+									readOnly={isViewMode || isEditMode}
 									className={`input input-bordered w-full rounded-xl ${errors.name ? 'input-error' : ''}`}
 									spellCheck="false"
 									autoComplete="off"

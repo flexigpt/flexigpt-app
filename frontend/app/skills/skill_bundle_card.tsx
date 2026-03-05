@@ -195,16 +195,14 @@ export function SkillBundleCard({
 	const handleSubmitSkill = async (partial: Partial<Skill>) => {
 		if (skillToEdit) {
 			// Edit existing skill (no versioning)
-			await skillStoreAPI.putSkill(
+			await skillStoreAPI.patchSkill(
 				bundle.id,
 				skillToEdit.slug,
-				skillToEdit.type,
-				partial.location ?? skillToEdit.location,
-				partial.name ?? skillToEdit.name,
-				partial.isEnabled ?? skillToEdit.isEnabled,
-				partial.displayName ?? skillToEdit.displayName,
-				partial.description ?? skillToEdit.description,
-				partial.tags ?? skillToEdit.tags
+				partial.isEnabled,
+				partial.location,
+				partial.displayName,
+				partial.description,
+				partial.tags
 			);
 		} else {
 			// Add new skill

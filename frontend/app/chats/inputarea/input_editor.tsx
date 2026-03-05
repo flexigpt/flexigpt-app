@@ -326,7 +326,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	// ---- Skills (conversation-level) ----
 	const [allSkills, setAllSkills] = useState<SkillListItem[]>([]);
 	const [enabledSkillRefs, setEnabledSkillRefs] = useState<SkillRef[]>([]);
-	const [_activeSkillRefs, setActiveSkillRefs] = useState<SkillRef[]>([]);
+	const [activeSkillRefs, setActiveSkillRefs] = useState<SkillRef[]>([]);
 
 	const [skillSessionID, setSkillSessionID] = useState<string | null>(null);
 	// Track the allowlist fingerprint used to create the current session.
@@ -480,6 +480,37 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			cancelled = true;
 		};
 	}, [enabledSkillRefs.length, skillSessionID]);
+
+	const listActiveSkillRefs = useCallback(
+		async (sid: string): Promise<SkillRef[]> => {
+			if (!sid || enabledSkillRefs.length === 0) return [];
+			const items = await skillStoreAPI.listRuntimeSkills({
+				sessionID: sid,
+				activity: 'active',
+				allowSkillRefs: enabledSkillRefs,
+			});
+			return (items ?? []).map(it => it.skillRef);
+		},
+		[enabledSkillRefs]
+	);
+
+	const ensureSkillSession = useCallback(async (): Promise<string | null> => {
+		if (enabledSkillRefs.length === 0) return null;
+
+		const existing = skillSessionIDRef.current;
+		if (existing && sessionAllowlistKeyRef.current === enabledSkillRefsKey) return existing;
+
+		const sess = await skillStoreAPI.createSkillSession(
+			existing ?? undefined, // closeSessionID (best-effort)
+			undefined, // maxActivePerSession
+			enabledSkillRefs, // allowSkillRefs (REQUIRED)
+			activeSkillRefs // initial active from conversation
+		);
+		setSkillSessionID(sess.sessionID);
+		sessionAllowlistKeyRef.current = enabledSkillRefsKey;
+		setActiveSkillRefs(sess.activeSkillRefs ?? []);
+		return sess.sessionID;
+	}, [enabledSkillRefs, enabledSkillRefsKey, activeSkillRefs]);
 
 	useEffect(() => {
 		if (!templateMenuOpen) {
@@ -828,7 +859,16 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 			// ---- Skills tool path (runtime-injected tools: skills.*) ----
 			if (isSkillsToolName(toolCall.name)) {
-				if (!skillSessionID) {
+				let sid = skillSessionIDRef.current;
+				if (!sid) {
+					try {
+						sid = await ensureSkillSession();
+					} catch {
+						sid = null;
+					}
+				}
+
+				if (!sid) {
 					const errMsg = 'No active skills session. Enable skills and resend, or run again after a session is created.';
 					setToolCalls(prev =>
 						prev.map(c => (c.id === toolCall.id ? { ...c, status: 'failed', errorMessage: errMsg } : c))
@@ -842,7 +882,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				);
 
 				try {
-					const resp = await skillStoreAPI.invokeSkillTool(skillSessionID, toolCall.name, args);
+					const resp = await skillStoreAPI.invokeSkillTool(sid, toolCall.name, args);
 
 					const isError = !!resp.isError;
 					const errorMessage =
@@ -868,6 +908,16 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 					setToolCalls(prev => prev.filter(c => c.id !== toolCall.id));
 					setToolOutputs(prev => [...prev, output]);
+					// Refresh active skills after load/unload.
+					void (async () => {
+						try {
+							const nextActive = await listActiveSkillRefs(sid);
+							setActiveSkillRefs(nextActive);
+						} catch {
+							// ignore
+						}
+					})();
+
 					return output;
 				} catch (err) {
 					const msg = (err as Error)?.message || 'Skill tool invocation failed.';
@@ -936,7 +986,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				return null;
 			}
 		},
-		[isSkillsToolName, skillSessionID]
+		[isSkillsToolName, ensureSkillSession, listActiveSkillRefs]
 	);
 
 	/**
@@ -1102,6 +1152,17 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			let didSend = false;
 
 			try {
+				// Ensure session exists BEFORE running any pending tools (skills.* needs it)
+				let effectiveSkillSessionID: string | null = null;
+				if (enabledSkillRefs.length > 0) {
+					try {
+						effectiveSkillSessionID = await ensureSkillSession();
+					} catch (err) {
+						setSubmitError((err as Error)?.message || 'Failed to create skills session.');
+						return;
+					}
+				}
+
 				const existingOutputs = toolOutputs;
 				let newlyProducedOutputs: UIToolOutput[] = [];
 
@@ -1131,17 +1192,14 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					return;
 				}
 
-				let effectiveSkillSessionID: string | null = skillSessionID;
-				if ((enabledSkillRefs?.length ?? 0) > 0 && !effectiveSkillSessionID) {
+				// Snapshot active skills right before send (authoritative persistence).
+				let activeForMessage: SkillRef[] = activeSkillRefs;
+				if (effectiveSkillSessionID && enabledSkillRefs.length > 0) {
 					try {
-						const sess = await skillStoreAPI.createSkillSession(undefined, undefined);
-						effectiveSkillSessionID = sess.sessionID;
-						setSkillSessionID(sess.sessionID);
-						// Track which allowlist this session corresponds to.
-						sessionAllowlistKeyRef.current = enabledSkillRefsKey;
-					} catch (err) {
-						setSubmitError((err as Error)?.message || 'Failed to create skills session.');
-						return;
+						activeForMessage = await listActiveSkillRefs(effectiveSkillSessionID);
+						setActiveSkillRefs(activeForMessage);
+					} catch {
+						// keep last-known
 					}
 				}
 
@@ -1160,6 +1218,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					toolOutputs: finalToolOutputs,
 					finalToolChoices,
 					enabledSkillRefs,
+					activeSkillRefs: activeForMessage,
 					skillSessionID: effectiveSkillSessionID ?? undefined,
 				};
 
@@ -1352,6 +1411,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 			// Restore enabled skills (conversation-level, not tool choices).
 			setEnabledSkillRefs(incoming.enabledSkillRefs ?? []);
+			setActiveSkillRefs(incoming.activeSkillRefs ?? []);
 
 			// Since we no longer reconstruct attached-tool nodes from history,
 			// ensure attached-tool arg blocking resets.
