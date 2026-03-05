@@ -53,8 +53,8 @@ type RuntimeSkillFilter struct {
 	LocationPrefix string     `json:"locationPrefix,omitempty"`
 	AllowSkillRefs []SkillRef `json:"allowSkillRefs,omitempty"`
 
-	SessionID agentskillsSpec.SessionID `json:"sessionID,omitempty"`
-	Activity  string                    `json:"activity,omitempty"` // any|active|inactive
+	SessionID agentskillsSpec.SessionID     `json:"sessionID,omitempty"`
+	Activity  agentskillsSpec.SkillActivity `json:"activity,omitempty"`
 }
 
 type CloseSkillSessionRequest struct {

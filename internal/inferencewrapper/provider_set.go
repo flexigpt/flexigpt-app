@@ -252,7 +252,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 			Body: &skillSpec.ListRuntimeSkillsRequestBody{
 				Filter: &skillSpec.RuntimeSkillFilter{
 					SessionID:      agentskillsSpec.SessionID(skillSessionID),
-					Activity:       "active",
+					Activity:       agentskillsSpec.SkillActivityActive,
 					AllowSkillRefs: enabledSkillRefs,
 				},
 			},
@@ -272,9 +272,9 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		// Pick prompt activity:
 		// - if none active => show available-only (inactive)
 		// - else => show active + available (any).
-		promptActivity := "inactive"
+		promptActivity := agentskillsSpec.SkillActivityInactive
 		if activeCount > 0 {
-			promptActivity = "any"
+			promptActivity = agentskillsSpec.SkillActivityAny
 		}
 
 		promptResp, perr := ps.skillStore.GetSkillsPromptXML(ctx, &skillSpec.GetSkillsPromptXMLRequest{

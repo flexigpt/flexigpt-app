@@ -78,18 +78,18 @@ func (s *SkillStore) runtimeRemoveForegroundStrict(ctx context.Context, def agen
 	if s == nil || s.runtime == nil {
 		return fmt.Errorf("%w: runtime not configured", spec.ErrSkillInvalidRequest)
 	}
-
 	s.rtResyncMu.Lock()
 	defer s.rtResyncMu.Unlock()
+	return s.runtimeRemoveForegroundStrictLocked(ctx, def)
+}
 
+// runtimeRemoveForegroundStrictLocked is runtimeRemoveForegroundStrict but requires rtResyncMu held.
+func (s *SkillStore) runtimeRemoveForegroundStrictLocked(ctx context.Context, def agentskillsSpec.SkillDef) error {
 	ctx, cancel := context.WithTimeout(ctx, runtimeForegroundValidateTimeout)
 	defer cancel()
 
 	_, err := s.runtime.RemoveSkill(ctx, def)
-	if err == nil {
-		return nil
-	}
-	if errors.Is(err, agentskillsSpec.ErrSkillNotFound) {
+	if err == nil || errors.Is(err, agentskillsSpec.ErrSkillNotFound) {
 		return nil
 	}
 	return err
@@ -103,7 +103,11 @@ func (s *SkillStore) runtimeTryAddForeground(ctx context.Context, def agentskill
 	}
 	s.rtResyncMu.Lock()
 	defer s.rtResyncMu.Unlock()
+	return s.runtimeTryAddForegroundLocked(ctx, def)
+}
 
+// runtimeTryAddForegroundLocked is runtimeTryAddForeground but requires rtResyncMu held.
+func (s *SkillStore) runtimeTryAddForegroundLocked(ctx context.Context, def agentskillsSpec.SkillDef) (bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, runtimeForegroundValidateTimeout)
 	defer cancel()
 
@@ -303,9 +307,13 @@ func (s *SkillStore) runtimeResyncStrictFromStore(ctx context.Context) error {
 		return nil
 	}
 	// Strict rollback should ensure built-in hydration is present.
+	s.rtResyncMu.Lock()
 	if err := s.hydrateBuiltInEmbeddedFS(ctx); err != nil {
+		s.rtResyncMu.Unlock()
 		return err
 	}
+	s.rtResyncMu.Unlock()
+
 	view, err := s.runtimeDesiredViewFromStore(ctx, runtimeDesiredViewOpts{
 		WantByTypeName: true,
 		LogInvalid:     true,
@@ -313,6 +321,8 @@ func (s *SkillStore) runtimeResyncStrictFromStore(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	s.rtResyncMu.Lock()
+	defer s.rtResyncMu.Unlock()
 	return s.runtimeApplyDesiredStrict(ctx, view.Set, view.ByTypeName)
 }
 
@@ -343,9 +353,11 @@ func (s *SkillStore) runtimeResyncFromStore(ctx context.Context) error {
 	}
 
 	// Best effort: attempt hydration but don't abort resync of user skills.
+	s.rtResyncMu.Lock()
 	if err := s.hydrateBuiltInEmbeddedFS(ctx); err != nil {
 		slog.Error("runtime resync: embeddedfs hydration failed", "err", err)
 	}
+	s.rtResyncMu.Unlock()
 
 	view, err := s.runtimeDesiredViewFromStore(ctx, runtimeDesiredViewOpts{
 		WantByTypeName: true,
@@ -356,6 +368,8 @@ func (s *SkillStore) runtimeResyncFromStore(ctx context.Context) error {
 		return err
 	}
 
+	s.rtResyncMu.Lock()
+	defer s.rtResyncMu.Unlock()
 	return s.runtimeApplyDesired(ctx, view.Set, view.ByTypeName, runtimeApplyBestEffort)
 }
 

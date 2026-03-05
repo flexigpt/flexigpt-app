@@ -101,7 +101,7 @@ func (s *SkillStore) CreateSkillSession(
 	// Query actual active skills from runtime (don’t trust input echo).
 	recs, err := s.runtime.ListSkills(ctx, &agentskills.SkillListFilter{
 		SessionID:   sid,
-		Activity:    agentskills.SkillActivityActive,
+		Activity:    agentskillsSpec.SkillActivityActive,
 		AllowSkills: res.AllowDefs, // constrain to allowlist to keep mapping well-defined
 	})
 	if err != nil {
@@ -171,7 +171,7 @@ func (s *SkillStore) GetSkillsPromptXML(
 			LocationPrefix: f.LocationPrefix,
 			AllowSkills:    allow,
 			SessionID:      f.SessionID,
-			Activity:       agentskills.SkillActivity(strings.TrimSpace(f.Activity)),
+			Activity:       f.Activity,
 		}
 	}
 	xml, err := s.runtime.SkillsPromptXML(ctx, filter)
@@ -205,11 +205,11 @@ func (s *SkillStore) ListRuntimeSkills(
 		}
 	}
 
-	act := strings.TrimSpace(f.Activity)
+	act := f.Activity
 	if act == "" {
-		act = "any"
+		act = agentskillsSpec.SkillActivityAny
 	}
-	if act == "active" && strings.TrimSpace(string(f.SessionID)) == "" {
+	if act == agentskillsSpec.SkillActivityActive && strings.TrimSpace(string(f.SessionID)) == "" {
 		return nil, fmt.Errorf("%w: activity=active requires sessionID", spec.ErrSkillInvalidRequest)
 	}
 
@@ -228,7 +228,7 @@ func (s *SkillStore) ListRuntimeSkills(
 		LocationPrefix: f.LocationPrefix,
 		AllowSkills:    res.AllowDefs,
 		SessionID:      f.SessionID,
-		Activity:       agentskills.SkillActivity(strings.TrimSpace(f.Activity)),
+		Activity:       f.Activity,
 	}
 
 	recs, err := s.runtime.ListSkills(ctx, filter)
@@ -237,11 +237,11 @@ func (s *SkillStore) ListRuntimeSkills(
 	}
 
 	activeDefSet := map[agentskillsSpec.SkillDef]struct{}{}
-	needActiveSet := strings.TrimSpace(string(f.SessionID)) != "" && act == "any"
+	needActiveSet := strings.TrimSpace(string(f.SessionID)) != "" && act == agentskillsSpec.SkillActivityAny
 	if needActiveSet {
 		activeRecs, err := s.runtime.ListSkills(ctx, &agentskills.SkillListFilter{
 			SessionID:   f.SessionID,
-			Activity:    agentskills.SkillActivityActive,
+			Activity:    agentskillsSpec.SkillActivityActive,
 			AllowSkills: res.AllowDefs,
 		})
 		if err != nil {
@@ -276,10 +276,10 @@ func (s *SkillStore) ListRuntimeSkills(
 				Description: r.Description,
 				Digest:      r.Digest,
 				IsActive: func() bool {
-					if act == "active" {
+					if act == agentskillsSpec.SkillActivityActive {
 						return true
 					}
-					if act == "inactive" || strings.TrimSpace(string(f.SessionID)) == "" {
+					if act == agentskillsSpec.SkillActivityInactive || strings.TrimSpace(string(f.SessionID)) == "" {
 						return false
 					}
 					_, ok := activeDefSet[r.Def]

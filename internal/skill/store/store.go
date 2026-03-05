@@ -14,6 +14,7 @@ import (
 
 	"github.com/flexigpt/agentskills-go"
 	"github.com/flexigpt/agentskills-go/fsskillprovider"
+	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 
 	"github.com/ppipada/mapstore-go"
 	"github.com/ppipada/mapstore-go/jsonencdec"
@@ -67,6 +68,9 @@ type SkillStore struct {
 
 	// Serializes ALL runtime catalog mutations (foreground deltas + resync + rollback).
 	rtResyncMu sync.Mutex
+
+	// Serializes embeddedfs hydration swaps.
+	embeddedHydrateMu sync.Mutex
 }
 
 type skillStoreOptions struct {
@@ -166,12 +170,7 @@ func NewSkillStore(baseDir string, opts ...SkillStoreOption) (*SkillStore, error
 
 	s.startCleanupLoop()
 
-	// Runtime integration:
-	// - hydrate embeddedfs → disk
-	// - reconcile runtime catalog from enabled bundles/skills.
-	if err := s.hydrateBuiltInEmbeddedFS(ctx); err != nil {
-		slog.Error("runtime init: embeddedfs hydration failed", "err", err)
-	}
+	// Reconcile runtime catalog from enabled bundles/skills (includes best-effort hydration).
 	s.bestEffortRuntimeResync(ctx, "init")
 
 	slog.Info("skill-store ready", "baseDir", s.baseDir)
@@ -304,12 +303,96 @@ func (s *SkillStore) PatchSkillBundle(
 
 	// Built-in path: overlay toggle.
 	if s.builtin != nil {
-		if _, err := s.builtin.GetBuiltInSkillBundle(ctx, req.BundleID); err == nil {
-			if _, err := s.builtin.SetSkillBundleEnabled(ctx, req.BundleID, req.Body.IsEnabled); err != nil {
+		if curB, err := s.builtin.GetBuiltInSkillBundle(ctx, req.BundleID); err == nil {
+			// Serialize builtin mutations with user mutations/sweeper.
+			s.writeMu.Lock()
+			var rbReason string
+			var rbErr error
+			defer func() {
+				s.writeMu.Unlock()
+				if rbErr != nil {
+					s.runtimeRollbackToStoreStrict(rbReason, rbErr)
+				}
+			}()
+
+			oldEnabled := curB.IsEnabled
+			newEnabled := req.Body.IsEnabled
+
+			// No-op still writes the flag (updates ModifiedAt); safe + idempotent.
+			// But only run runtime deltas when state changes.
+			if oldEnabled != newEnabled {
+				// Build enabled SkillDef counts in this bundle.
+				bundles, skills, err := s.builtin.ListBuiltInSkills(ctx)
+				if err != nil {
+					return nil, err
+				}
+				_ = bundles[req.BundleID]
+				defCounts := map[agentskillsSpec.SkillDef]int{}
+				for _, sk := range skills[req.BundleID] {
+					if !sk.IsEnabled {
+						continue
+					}
+					def, err := s.runtimeDefForStoreSkill(sk)
+					if err != nil {
+						return nil, fmt.Errorf("%w: %w", spec.ErrSkillInvalidRequest, err)
+					}
+					defCounts[def]++
+				}
+
+				// Global desired counts (pre-change), used for duplicate-safe removals.
+				view, err := s.runtimeDesiredViewFromStore(ctx, runtimeDesiredViewOpts{
+					WantByTypeName: false,
+					LogInvalid:     false,
+				})
+				if err != nil {
+					return nil, err
+				}
+
+				// Strict runtime delta under rtResyncMu.
+				s.rtResyncMu.Lock()
+				if newEnabled {
+					// Enabling bundle => hydrate then add all enabled skills.
+					if err := s.hydrateBuiltInEmbeddedFS(ctx); err != nil {
+						s.rtResyncMu.Unlock()
+						return nil, fmt.Errorf("%w: hydration failed: %w", spec.ErrSkillInvalidRequest, err)
+					}
+					for def := range defCounts {
+						if _, err := s.runtimeTryAddForegroundLocked(ctx, def); err != nil {
+							s.rtResyncMu.Unlock()
+							return nil, fmt.Errorf(
+								"%w: runtime rejected bundle enable: %w",
+								spec.ErrSkillInvalidRequest,
+								err,
+							)
+						}
+					}
+				} else {
+					// Disabling bundle => remove defs only if globally undesired.
+					for def, n := range defCounts {
+						after := view.Counts[def] - n
+						if after <= 0 {
+							if err := s.runtimeRemoveForegroundStrictLocked(ctx, def); err != nil {
+								s.rtResyncMu.Unlock()
+								return nil, fmt.Errorf(
+									"%w: runtime remove failed: %w",
+									spec.ErrSkillInvalidRequest,
+									err,
+								)
+							}
+						}
+					}
+				}
+				s.rtResyncMu.Unlock()
+			}
+
+			// Persist overlay.
+			if _, err := s.builtin.SetSkillBundleEnabled(ctx, req.BundleID, newEnabled); err != nil {
+				rbReason = "patchSkillBundle(builtin store-failed)"
+				rbErr = err
 				return nil, err
 			}
-			s.bestEffortRuntimeResync(ctx, "patchSkillBundle(builtin)")
-			slog.Info("patchSkillBundle (builtin)", "bundleID", req.BundleID, "enabled", req.Body.IsEnabled)
+
+			slog.Info("patchSkillBundle (builtin)", "bundleID", req.BundleID, "enabled", newEnabled)
 			return &spec.PatchSkillBundleResponse{}, nil
 		}
 	}
@@ -553,7 +636,13 @@ func (s *SkillStore) PutSkill(ctx context.Context, req *spec.PutSkillRequest) (*
 			return userWriteSagaOutcome{}, fmt.Errorf("%w: %s", spec.ErrSkillBundleDeleting, req.BundleID)
 		}
 
-		if _, exists := sc.Skills[req.BundleID][req.SkillSlug]; exists {
+		sm := sc.Skills[req.BundleID]
+		if sm == nil {
+			sm = map[spec.SkillSlug]spec.Skill{}
+			sc.Skills[req.BundleID] = sm
+		}
+
+		if _, exists := sm[req.SkillSlug]; exists {
 			return userWriteSagaOutcome{}, fmt.Errorf("%w: duplicate skillSlug in bundle", spec.ErrSkillConflict)
 		}
 
@@ -604,7 +693,8 @@ func (s *SkillStore) PutSkill(ctx context.Context, req *spec.PutSkillRequest) (*
 		}
 
 		// Store commit (strict via saga helper).
-		sc.Skills[req.BundleID][req.SkillSlug] = sk
+		sm[req.SkillSlug] = sk
+		sc.Skills[req.BundleID] = sm
 		created = sk
 		return userWriteSagaOutcome{}, nil
 	}); err != nil {
@@ -642,42 +732,80 @@ func (s *SkillStore) PatchSkill(ctx context.Context, req *spec.PatchSkillRequest
 			if req.Body.IsEnabled == nil {
 				return nil, fmt.Errorf("%w: isEnabled required for built-in patch", spec.ErrSkillInvalidRequest)
 			}
+			// Serialize builtin mutations with user mutations/sweeper.
+			s.writeMu.Lock()
+			var rbReason string
+			var rbErr error
+			defer func() {
+				s.writeMu.Unlock()
+				if rbErr != nil {
+					s.runtimeRollbackToStoreStrict(rbReason, rbErr)
+				}
+			}()
 
 			enabled := *req.Body.IsEnabled
+
+			// Need bundle + skill record to enforce bundle gate + build runtime def.
+			bun, err := s.builtin.GetBuiltInSkillBundle(ctx, req.BundleID)
+			if err != nil {
+				return nil, err
+			}
 
 			// Need skill record to build runtime def.
 			sk, err := s.builtin.GetBuiltInSkill(ctx, req.BundleID, req.SkillSlug)
 			if err != nil {
 				return nil, err
 			}
+			oldDesired := bun.IsEnabled && sk.IsEnabled
+			newDesired := bun.IsEnabled && enabled
 
-			// If enabling, ensure hydration + runtime can index before persisting overlay.
-			if enabled {
-				if err := s.hydrateBuiltInEmbeddedFS(ctx); err != nil {
-					return nil, fmt.Errorf("%w: hydration failed: %w", spec.ErrSkillInvalidRequest, err)
-				}
-				def, err := s.runtimeDefForBuiltInSkill(sk)
+			def, err := s.runtimeDefForBuiltInSkill(sk)
+			if err != nil {
+				return nil, fmt.Errorf("%w: %w", spec.ErrSkillInvalidRequest, err)
+			}
+
+			// Only mutate runtime when desired-ness changes (bundle gate enforced).
+			if oldDesired != newDesired {
+				// Pre-change global desired counts (includes this record if oldDesired=true).
+				view, err := s.runtimeDesiredViewFromStore(ctx, runtimeDesiredViewOpts{
+					WantByTypeName: false,
+					LogInvalid:     false,
+				})
 				if err != nil {
-					return nil, fmt.Errorf("%w: %w", spec.ErrSkillInvalidRequest, err)
+					return nil, err
 				}
-				if _, err := s.runtimeTryAddForeground(ctx, def); err != nil {
-					// strict: no overlay write
-					return nil, fmt.Errorf("%w: runtime rejected skill: %w", spec.ErrSkillInvalidRequest, err)
+
+				s.rtResyncMu.Lock()
+				if newDesired {
+					// Enabling => hydrate + strict add before overlay write.
+					if err := s.hydrateBuiltInEmbeddedFS(ctx); err != nil {
+						s.rtResyncMu.Unlock()
+						return nil, fmt.Errorf("%w: hydration failed: %w", spec.ErrSkillInvalidRequest, err)
+					}
+					if _, err := s.runtimeTryAddForegroundLocked(ctx, def); err != nil {
+						s.rtResyncMu.Unlock()
+						return nil, fmt.Errorf("%w: runtime rejected skill: %w", spec.ErrSkillInvalidRequest, err)
+					}
+				} else {
+					// Disabling => duplicate-safe strict remove.
+					after := view.Counts[def]
+					if oldDesired {
+						after--
+					}
+					if after <= 0 {
+						if err := s.runtimeRemoveForegroundStrictLocked(ctx, def); err != nil {
+							s.rtResyncMu.Unlock()
+							return nil, fmt.Errorf("%w: runtime remove failed: %w", spec.ErrSkillInvalidRequest, err)
+						}
+					}
 				}
-			} else {
-				// Disabling: strict runtime remove first (best effort ignore notfound).
-				def, err := s.runtimeDefForBuiltInSkill(sk)
-				if err != nil {
-					return nil, fmt.Errorf("%w: %w", spec.ErrSkillInvalidRequest, err)
-				}
-				if err := s.runtimeRemoveForegroundStrict(ctx, def); err != nil {
-					return nil, fmt.Errorf("%w: runtime remove failed: %w", spec.ErrSkillInvalidRequest, err)
-				}
+				s.rtResyncMu.Unlock()
 			}
 
 			if _, err := s.builtin.SetSkillEnabled(ctx, req.BundleID, req.SkillSlug, enabled); err != nil {
 				// Overlay write failed; rollback runtime to store (builtins included) and return error.
-				s.runtimeRollbackToStoreStrict("patchSkill(builtin store-failed)", err)
+				rbReason = "patchSkill(builtin store-failed)"
+				rbErr = err
 				return nil, err
 			}
 

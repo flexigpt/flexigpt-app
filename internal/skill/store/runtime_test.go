@@ -100,7 +100,7 @@ func listRuntimeSkillsAllow(t *testing.T, s *SkillStore, allow []spec.SkillRef) 
 		Body: &spec.ListRuntimeSkillsRequestBody{
 			Filter: &spec.RuntimeSkillFilter{
 				AllowSkillRefs: allow,
-				Activity:       "any",
+				Activity:       agentskillsSpec.SkillActivityAny,
 			},
 		},
 	})
@@ -355,7 +355,7 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 		activeResp := listRuntimeSkillsAllowFiltered(t, s, &spec.RuntimeSkillFilter{
 			AllowSkillRefs: allow,
 			SessionID:      sid,
-			Activity:       "active",
+			Activity:       agentskillsSpec.SkillActivityActive,
 		})
 		active := activeResp.Body.Skills
 		mustHaveRuntimeItemBySlug(t, active, biHello.Slug)
@@ -376,7 +376,7 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 		inactiveResp := listRuntimeSkillsAllowFiltered(t, s, &spec.RuntimeSkillFilter{
 			AllowSkillRefs: allow,
 			SessionID:      sid,
-			Activity:       "inactive",
+			Activity:       agentskillsSpec.SkillActivityInactive,
 		})
 		inactive := inactiveResp.Body.Skills
 		mustHaveRuntimeItemBySlug(t, inactive, spec.SkillSlug("user-other"))
@@ -389,7 +389,7 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 		Body: &spec.GetSkillsPromptXMLRequestBody{
 			Filter: &spec.RuntimeSkillFilter{
 				SessionID: sid,
-				Activity:  "any",
+				Activity:  agentskillsSpec.SkillActivityAny,
 			},
 		},
 	})
@@ -427,7 +427,7 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 	activeAfterBundleDisable := listRuntimeSkillsAllowFiltered(t, s, &spec.RuntimeSkillFilter{
 		AllowSkillRefs: allow,
 		SessionID:      sid,
-		Activity:       "active",
+		Activity:       agentskillsSpec.SkillActivityActive,
 	}).Body.Skills
 	mustHaveRuntimeItemBySlug(t, activeAfterBundleDisable, biHello.Slug)
 	mustNotHaveRuntimeItemBySlug(t, activeAfterBundleDisable, spec.SkillSlug("user-hello"))
@@ -467,7 +467,7 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 	activeAfterUserDisable := listRuntimeSkillsAllowFiltered(t, s, &spec.RuntimeSkillFilter{
 		AllowSkillRefs: allow,
 		SessionID:      sid,
-		Activity:       "active",
+		Activity:       agentskillsSpec.SkillActivityActive,
 	}).Body.Skills
 	mustHaveRuntimeItemBySlug(t, activeAfterUserDisable, biHello.Slug)
 	mustNotHaveRuntimeItemBySlug(t, activeAfterUserDisable, spec.SkillSlug("user-hello"))
@@ -513,7 +513,7 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 	activeAfterBIDisable := listRuntimeSkillsAllowFiltered(t, s, &spec.RuntimeSkillFilter{
 		AllowSkillRefs: allow2,
 		SessionID:      sid,
-		Activity:       "active",
+		Activity:       agentskillsSpec.SkillActivityActive,
 	}).Body.Skills
 	mustNotHaveRuntimeItemBySlug(t, activeAfterBIDisable, biHello.Slug)
 	mustNotHaveRuntimeItemBySlug(t, activeAfterBIDisable, biDisabled.Slug)
@@ -526,7 +526,7 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 		Body: &spec.GetSkillsPromptXMLRequestBody{
 			Filter: &spec.RuntimeSkillFilter{
 				SessionID: sid,
-				Activity:  "any",
+				Activity:  agentskillsSpec.SkillActivityAny,
 			},
 		},
 	})
@@ -918,7 +918,7 @@ func TestSkillStore_RuntimeIntegration_RuntimeEndpoints_Errors(t *testing.T) {
 				_, err := s.GetSkillsPromptXML(ctx, &spec.GetSkillsPromptXMLRequest{
 					Body: &spec.GetSkillsPromptXMLRequestBody{
 						Filter: &spec.RuntimeSkillFilter{
-							Activity: "active",
+							Activity: agentskillsSpec.SkillActivityActive,
 						},
 					},
 				})
@@ -949,7 +949,7 @@ func TestSkillStore_RuntimeIntegration_RuntimeEndpoints_Errors(t *testing.T) {
 					Body: &spec.ListRuntimeSkillsRequestBody{
 						Filter: &spec.RuntimeSkillFilter{
 							AllowSkillRefs: allow,
-							Activity:       "active",
+							Activity:       agentskillsSpec.SkillActivityActive,
 						},
 					},
 				})

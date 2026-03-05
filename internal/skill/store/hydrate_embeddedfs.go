@@ -20,6 +20,9 @@ func (s *SkillStore) hydrateBuiltInEmbeddedFS(ctx context.Context) error {
 		return nil
 	}
 
+	s.embeddedHydrateMu.Lock()
+	defer s.embeddedHydrateMu.Unlock()
+
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("hydrateBuiltInEmbeddedFS: panic", "panic", r)
@@ -129,17 +132,20 @@ func copyFSToDir(fsys fs.FS, dest string) error {
 		if err != nil {
 			return err
 		}
-		defer in.Close()
 
 		out, err := os.Create(outPath)
 		if err != nil {
+			_ = in.Close()
 			return err
 		}
-		defer out.Close()
 
 		if _, err := io.Copy(out, in); err != nil {
+			_ = out.Close()
+			_ = in.Close()
 			return err
 		}
+		_ = out.Close()
+		_ = in.Close()
 		return nil
 	})
 }
