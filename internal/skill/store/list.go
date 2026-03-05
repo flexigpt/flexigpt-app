@@ -43,7 +43,11 @@ func (s *SkillStore) ListSkills(ctx context.Context, req *spec.ListSkillsRequest
 	if tok.Phase != spec.ListSkillPhaseBuiltIn && tok.Phase != spec.ListSkillPhaseUser {
 		return nil, fmt.Errorf("%w: invalid phase", spec.ErrSkillInvalidRequest)
 	}
-
+	// Defensive: if built-ins are not configured, never stay in built-in phase.
+	if tok.Phase == spec.ListSkillPhaseBuiltIn && s.builtin == nil {
+		tok.Phase = spec.ListSkillPhaseUser
+		tok.BuiltInCursor = ""
+	}
 	pageSize := tok.RecommendedPageSize
 	if pageSize <= 0 || pageSize > skillsMaxPageSize {
 		pageSize = skillsDefaultPageSize
@@ -79,6 +83,9 @@ func (s *SkillStore) ListSkills(ctx context.Context, req *spec.ListSkillsRequest
 	}
 
 	out := make([]spec.SkillListItem, 0, pageSize)
+	// True when we switched phases to "user" but couldn't scan users in this call
+	// (because the page filled on the last built-in item).
+	pendingUserScan := false
 
 	// Built-ins (PAGED).
 	if tok.Phase == spec.ListSkillPhaseBuiltIn && s.builtin != nil && len(out) < pageSize {
@@ -136,7 +143,13 @@ func (s *SkillStore) ListSkills(ctx context.Context, req *spec.ListSkillsRequest
 				}
 
 				sk := sm[slug]
-				if include(b, sk) {
+				if !include(b, sk) {
+					continue
+				}
+
+				// Fill the page; once full, keep scanning until we find *one more includable*
+				// built-in item to prove there's another page.
+				if len(out) < pageSize {
 					out = append(out, spec.SkillListItem{
 						BundleID:        b.ID,
 						BundleSlug:      b.Slug,
@@ -145,12 +158,11 @@ func (s *SkillStore) ListSkills(ctx context.Context, req *spec.ListSkillsRequest
 						SkillDefinition: cloneSkill(sk),
 					})
 					lastBuiltInCursor = string(bid) + "|" + string(slug)
+					continue
 				}
-				if len(out) >= pageSize {
-					// Determine if there are more built-ins after this point.
-					moreBuiltins = true
-					break emitBuiltins
-				}
+				// We already filled the page, and found another includable item => definitely more.
+				moreBuiltins = true
+				break emitBuiltins
 			}
 		}
 
@@ -162,6 +174,11 @@ func (s *SkillStore) ListSkills(ctx context.Context, req *spec.ListSkillsRequest
 			tok.Phase = spec.ListSkillPhaseUser
 			tok.BuiltInCursor = ""
 			// Note: tok.DirTok is preserved (usually empty on first switch).
+			// If the page is already full, we did not scan users yet. Emit a next token
+			// so the caller can fetch the first user page.
+			if len(out) >= pageSize {
+				pendingUserScan = true
+			}
 		}
 	}
 
@@ -258,10 +275,11 @@ func (s *SkillStore) ListSkills(ctx context.Context, req *spec.ListSkillsRequest
 
 	var nextTok *string
 	// More pages exist if:
-	// - still in builtin phase (BuiltInCursor set), or
-	// - in user phase and DirTok set (more users), or
-	// - we just switched phases but didn't yet scan that phase fully.
-	if tok.Phase == spec.ListSkillPhaseBuiltIn || (tok.Phase == spec.ListSkillPhaseUser && tok.DirTok != "") {
+	// - more built-ins exist (cursor is set), or
+	// - more users exist (DirTok set), or
+	// - we switched to user phase but could not scan users in this call (page filled on last built-in).
+	if (tok.Phase == spec.ListSkillPhaseBuiltIn && tok.BuiltInCursor != "") ||
+		(tok.Phase == spec.ListSkillPhaseUser && (tok.DirTok != "" || pendingUserScan)) {
 		s := jsonutil.Base64JSONEncode(tok)
 		nextTok = &s
 	}

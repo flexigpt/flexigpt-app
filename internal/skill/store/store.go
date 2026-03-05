@@ -247,17 +247,8 @@ func (s *SkillStore) PutSkillBundle(
 		newEnabled := req.Body.IsEnabled
 		enabledChanged := oldEnabled != newEnabled
 
-		// If enabled state changes, we must strictly apply the runtime delta BEFORE committing store.
-		//
-		// Note: this does not "add skills to the bundle"; it only ensures runtime reflects the bundle gate.
-		if enabledChanged {
-			if err := s.runtimeApplyUserBundleEnabledDelta(ctx, sc, req.BundleID, oldEnabled, newEnabled); err != nil {
-				return userWriteSagaOutcome{RollbackReason: "putSkillBundle(runtime-enabled-delta-failed)"},
-					fmt.Errorf("%w: %w", spec.ErrSkillInvalidRequest, err)
-			}
-		}
-
-		// Commit bundle record (store).
+		// Build + validate the new bundle record BEFORE mutating runtime.
+		// Important: do not write it back into sc yet, because runtime deltas rely on the pre-change snapshot.
 		b := spec.SkillBundle{
 			SchemaVersion: spec.SkillSchemaVersion,
 			ID:            req.BundleID,
@@ -274,16 +265,20 @@ func (s *SkillStore) PutSkillBundle(
 			return userWriteSagaOutcome{}, err
 		}
 
+		// If enabled state changes, we must strictly apply the runtime delta BEFORE committing store.
+		if enabledChanged {
+			if err := s.runtimeApplyUserBundleEnabledDelta(ctx, sc, req.BundleID, oldEnabled, newEnabled); err != nil {
+				return userWriteSagaOutcome{RollbackReason: "putSkillBundle(runtime-enabled-delta-failed)"},
+					fmt.Errorf("%w: %w", spec.ErrSkillInvalidRequest, err)
+			}
+		}
+
+		// Commit bundle record (store).
 		sc.Bundles[req.BundleID] = b
 		if _, ok := sc.Skills[req.BundleID]; !ok {
 			sc.Skills[req.BundleID] = map[spec.SkillSlug]spec.Skill{}
 		}
 
-		// Runtime resync is only needed if enabled state changed.
-		// (Metadata-only updates don't affect runtime desired set.)
-		if enabledChanged {
-			return userWriteSagaOutcome{}, nil
-		}
 		return userWriteSagaOutcome{}, nil
 	}); err != nil {
 		return nil, err
@@ -903,6 +898,16 @@ func (s *SkillStore) PatchSkill(ctx context.Context, req *spec.PatchSkillRequest
 			return userWriteSagaOutcome{}, fmt.Errorf("%w: %w", spec.ErrSkillInvalidRequest, err)
 		}
 
+		needMaybeRemoveOld := curDesired && (!targetDesired || oldDef != newDef)
+		var desiredCounts map[agentskillsSpec.SkillDef]int
+		if needMaybeRemoveOld {
+			var err error
+			desiredCounts, err = s.runtimeDesiredDefCountsForSnapshot(ctx, *sc)
+			if err != nil {
+				return userWriteSagaOutcome{}, err
+			}
+		}
+
 		// 1) Strict runtime mutation only if the *target* is desired.
 		//    (Do NOT validate new location if the patch disables the skill.)
 		needAddNew := targetDesired && (locationChanged || !curDesired || oldDef != newDef)
@@ -917,12 +922,7 @@ func (s *SkillStore) PatchSkill(ctx context.Context, req *spec.PatchSkillRequest
 		}
 
 		// 2) Remove old def if it becomes globally undesired (duplicate-safe).
-		needMaybeRemoveOld := curDesired && (!targetDesired || oldDef != newDef)
 		if needMaybeRemoveOld {
-			desiredCounts, err := s.runtimeDesiredDefCountsForSnapshot(ctx, *sc)
-			if err != nil {
-				return userWriteSagaOutcome{}, err
-			}
 
 			afterOld := desiredCounts[oldDef]
 			// Remove current record contribution.

@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-func (s *SkillStore) hydrateBuiltInEmbeddedFS(ctx context.Context) error {
+func (s *SkillStore) hydrateBuiltInEmbeddedFS(ctx context.Context) (err error) {
 	if s.builtin == nil {
 		return nil
 	}
@@ -26,6 +26,8 @@ func (s *SkillStore) hydrateBuiltInEmbeddedFS(ctx context.Context) error {
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("hydrateBuiltInEmbeddedFS: panic", "panic", r)
+			err = fmt.Errorf("hydrateBuiltInEmbeddedFS panic: %v", r)
+
 		}
 	}()
 
@@ -128,12 +130,21 @@ func copyFSToDir(fsys fs.FS, dest string) error {
 		if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
 			return err
 		}
+		info, ierr := d.Info()
+		if ierr != nil {
+			return ierr
+		}
+		perm := fs.FileMode(0o644)
+		if m := info.Mode().Perm(); m != 0 {
+			perm = m
+		}
+
 		in, err := fsys.Open(p)
 		if err != nil {
 			return err
 		}
 
-		out, err := os.Create(outPath)
+		out, err := os.OpenFile(outPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, perm)
 		if err != nil {
 			_ = in.Close()
 			return err

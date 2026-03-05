@@ -400,7 +400,11 @@ func (s *SkillStore) runtimeDefForBuiltInSkill(sk spec.Skill) (agentskillsSpec.S
 
 	// Built-in embeddedfs is hydrated to disk and treated as fs in runtime.
 	if !filepath.IsAbs(loc) {
-		loc = filepath.Join(s.embeddedHydrateDir, filepath.FromSlash(path.Clean("/" + loc))[1:])
+		// Normalize any accidental Windows separators before path.Clean.
+		rel := strings.ReplaceAll(loc, "\\", "/")
+		rel = path.Clean("/" + rel)
+		rel = strings.TrimPrefix(rel, "/")
+		loc = filepath.Join(s.embeddedHydrateDir, filepath.FromSlash(rel))
 	}
 
 	if strings.TrimSpace(sk.Name) == "" || strings.TrimSpace(loc) == "" {
