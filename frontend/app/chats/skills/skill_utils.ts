@@ -1,7 +1,7 @@
 import type { SkillListItem, SkillRef } from '@/spec/skill';
 
 export function skillRefKey(ref: SkillRef): string {
-	return `${ref.bundleID}:${ref.skillSlug}`;
+	return `${ref.bundleID}:${ref.skillSlug}:${ref.skillID}`;
 }
 
 export function skillRefFromListItem(item: SkillListItem): SkillRef {

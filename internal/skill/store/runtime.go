@@ -69,8 +69,26 @@ func (s *SkillStore) CreateSkillSession(
 
 	// Resolve allowlist refs -> defs once; then resolve active refs from the allowlist mapping.
 	res := s.resolveAllowSkillRefs(ctx, req.Body.AllowSkillRefs)
+	// If none of the provided SkillRefs resolve (stale IDs, disabled skills/bundles, etc),
+	// do NOT hard-fail. Conversations are persistent but sessions are ephemeral; the correct
+	// behavior is to create an empty session and let the caller proceed without skills.
+	//
+	// Downstream prompt/list calls already treat "resolved allowlist == empty" as "no skills allowed".
 	if len(res.AllowDefs) == 0 {
-		return nil, fmt.Errorf("%w: allowSkillRefs did not resolve to any enabled skills", spec.ErrSkillInvalidRequest)
+		opts := []agentskills.SessionOption{}
+		if req.Body.MaxActivePerSession > 0 {
+			opts = append(opts, agentskills.WithSessionMaxActivePerSession(req.Body.MaxActivePerSession))
+		}
+		sid, _, err := s.runtime.NewSession(ctx, opts...)
+		if err != nil {
+			return nil, err
+		}
+		return &spec.CreateSkillSessionResponse{
+			Body: &spec.CreateSkillSessionResponseBody{
+				SessionID:       sid,
+				ActiveSkillRefs: nil,
+			},
+		}, nil
 	}
 
 	activeDefSet := map[agentskillsSpec.SkillDef]struct{}{}
