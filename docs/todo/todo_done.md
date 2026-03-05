@@ -739,3 +739,51 @@
   - [x] UI for additional things in chatoptions
   - [x] validations in inference go for supporting modal capabilities verification.
   - [x] valid input output modalities, valid levels, valid reasoning types, etc need to be added to modelpresetspec.
+
+- [x] Agent skills
+  - [x] skills tools: list, activate, readfile, run, deactivate
+  - [x] skills runtime
+  - [x] skills discovery/add/remove/management backend
+    - [x] store req/resp/code/test
+    - [x] embedded fs skill provider for runtime. Approach:
+      - [x] materialize the embedded fs containing skills into a read app data dir.
+      - [x] no symlinks, skill name and dir name should match
+      - [x] then use current fs skill provider.
+    - [x] runtime integration appropriately
+      - [x] need agentskills to support allowlist of skills to get a prompt
+      - [x] runtime lifecycle integration
+      - [x] runtime tools integration
+    - [x] agentgo and httpbackend integration with api exposure
+  - [x] skills discovery/add/remove/management ui
+    - [x] spec types, skills and skill runtime
+    - [x] bundles page, card, add/edit/view modal
+    - [x] skills add/edit/view modal
+  - [ ] skills in chat ui.
+    - [x] most probably like web search, enable button in bottom, with all available skills from catalog
+    - [x] inside the dropdown we can have a select sub skill set for progressive disclosure
+    - [x] then in the prompt and then progressive disclosure
+    - [x] when the skills functionality is enabled we inject the available skills prompt, with the load tool.
+    - [x] From load tool, when something is activated, we inject that skills body in prompt and attach, read file, run script, unload tool.
+    - [x] lifecycle of when all unloaded vs some loaded etc needs to be managed.
+    - [x] also session per convo needs to be managed.
+    - [ ] ~~Should ew expose current tools as skills (unnecessary redirection most probably?)?~~
+    - [x] in new skill flow, check about reload of a conversation and reenabling already active skills. current call to skills sessions from editor seems to not pass any active skills.
+
+  - [x] Skill flow
+    - when user selects skills, and no skills in last message and when user selects skills, and skills selected but not loaded in last message:
+      - need to attach skills rules, extra prompt
+      - need to attach skills available prompt
+      - need to attach skills load tool
+
+    - when user selects skills, and skills selected and some loaded
+      - need to attach skills rules, extra prompt
+      - need to attach skill tools all: load/unload/read/run
+
+    - load/read/run tool called: run/load and return tool result
+
+    - unload called:
+      - set skills inactive. if some skill still active, return here
+      - if no skill active return to user select skill and no skill loaded state
+
+    - user doesn't select skills,
+      - nothing to do. remove any additional prompts if some state is present somewhere.

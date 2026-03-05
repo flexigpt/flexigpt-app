@@ -926,20 +926,7 @@ func TestSkillStore_RuntimeIntegration_RuntimeEndpoints_Errors(t *testing.T) {
 			},
 			wantIs: agentskillsSpec.ErrInvalidArgument,
 		},
-		{
-			name: "ListRuntimeSkills missing filter.allowSkillRefs",
-			run: func(t *testing.T) error {
-				t.Helper()
-				s.runtime = rt
-				_, err := s.ListRuntimeSkills(ctx, &spec.ListRuntimeSkillsRequest{
-					Body: &spec.ListRuntimeSkillsRequestBody{
-						Filter: &spec.RuntimeSkillFilter{},
-					},
-				})
-				return err
-			},
-			wantIs: spec.ErrSkillInvalidRequest,
-		},
+
 		{
 			name: "ListRuntimeSkills activity=active requires sessionID",
 			run: func(t *testing.T) error {

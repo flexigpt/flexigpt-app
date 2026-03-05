@@ -3,57 +3,15 @@
 ## Laundry list
 
 - [ ] if you start a web search, then change model whose sdk is different that before, there is arbitrary behaviour as of now wrt web search selection.
-- [ ] in new skill flow, check about reload of a conversation and reenabling already active skills. current call to skills sessions from editor seems to not pass any active skills.
+- [ ] include some builtin skills and test on all platforms, full flow.
+- [x] Drag and drop files as attachments.
+  - [ ] while the code is there, on linux, webkitgtk has issue wrt firing drop events with wails currently.
+  - [ ] win and mac testing is pending
+- [ ] Sys prompt:
+  - [ ] We may want to have a explicit prompt saying that use explicit tools rather than shell wherever possible.
+  - [ ] this needs to evolve as additional/multiple system prompts and a way to send a concatend thing of all these together.
 
 ## Features
-
-- [ ] Agent skills
-  - [x] skills tools: list, activate, readfile, run, deactivate
-  - [x] skills runtime
-  - [ ] skills discovery/add/remove/management backend
-    - [x] store req/resp/code/test
-    - [x] embedded fs skill provider for runtime. Approach:
-      - [x] materialize the embedded fs containing skills into a read app data dir.
-      - [x] no symlinks, skill name and dir name should match
-      - [x] then use current fs skill provider.
-    - [ ] runtime integration appropriately
-      - [x] need agentskills to support allowlist of skills to get a prompt
-      - [x] runtime lifecycle integration
-      - [ ] runtime tools integration
-    - [x] agentgo and httpbackend integration with api exposure
-  - [x] skills discovery/add/remove/management ui
-    - [x] spec types, skills and skill runtime
-    - [x] bundles page, card, add/edit/view modal
-    - [x] skills add/edit/view modal
-  - [ ] skills in chat ui.
-    - [x] most probably like web search, enable button in bottom, with all available skills from catalog
-    - [x] inside the dropdown we can have a select sub skill set for progressive disclosure
-    - [ ] then in the prompt and then progressive disclosure
-    - [ ] when the skills functionality is enabled we inject the available skills prompt, with the load tool.
-    - [ ] From load tool, when something is activated, we inject that skills body in prompt and attach, read file, run script, unload tool.
-    - [ ] lifecycle of when all unloaded vs some loaded etc needs to be managed.
-    - [ ] also session per convo needs to be managed.
-    - [ ] Do we need some builtin skills??
-    - [ ] ~~Should ew expose current tools as skills (unnecessary redirection most probably?)?~~
-
-  - [ ] Skill flow
-    - when user selects skills, and no skills in last message and when user selects skills, and skills selected but not loaded in last message:
-      - need to attach skills rules, extra prompt
-      - need to attach skills available prompt
-      - need to attach skills load tool
-
-    - when user selects skills, and skills selected and some loaded
-      - need to attach skills rules, extra prompt
-      - need to attach skill tools all: load/unload/read/run
-
-    - load/read/run tool called: run/load and return tool result
-
-    - unload called:
-      - set skills inactive. if some skill still active, return here
-      - if no skill active return to user select skill and no skill loaded state
-
-    - user doesn't select skills,
-      - nothing to do. remove any additional prompts if some state is present somewhere.
 
 - [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls loop is better.
   - [ ] this is a "feature" in anthropic and chargable for cache write.
@@ -61,13 +19,8 @@
 
 - [ ] Better Attachments
   - [ ] docx, excel support
-  - [x] Drag and drop files as attachments.
-    - [ ] while the code is ther, on linux, webkitgtk has issue wrt firing drop events with wails currently.
-    - [ ] win and mac testing is pending
 
-- [ ] Tools
-  - [ ] We may want to have a explicit prompt saying that use explicit tools rather than shell wherever possible.
-
+- [ ] debug flag/s (maybe one for scrubbing, one for key activate etc etc) for provider in UI settings
 - [ ] we may want to have a "assistant" like we planned before that has tool sets and autoexec config so that the "agent" loop is kind of autonomous
 
 ## Milestone thoughts
@@ -105,7 +58,7 @@
   - [ ] Doc stores/vector stores connections
     - [ ] Only if MCP cannot serve this.
 
-- [ ] Agent Skills but via local "explorer" or "skills" flow???
+- [x] Agent Skills but via local "skills" flow???
 
 - [ ] Deferred.
   - [ ] Image output: See inference-go notes.

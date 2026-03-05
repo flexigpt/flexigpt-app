@@ -86,7 +86,7 @@ func (s *SkillStore) CreateSkillSession(
 		return &spec.CreateSkillSessionResponse{
 			Body: &spec.CreateSkillSessionResponseBody{
 				SessionID:       sid,
-				ActiveSkillRefs: nil,
+				ActiveSkillRefs: []spec.SkillRef{},
 			},
 		}, nil
 	}
@@ -102,6 +102,32 @@ func (s *SkillStore) CreateSkillSession(
 		activeDefs = append(activeDefs, d)
 	}
 	sortSkillDefs(activeDefs)
+
+	// Only request initial actives that actually exist in the runtime catalog.
+	// If we pass unknown defs into Runtime.NewSession(), it can fail and block conversation flow,
+	// which violates "skills optional".
+	if len(activeDefs) > 0 {
+		recs, err := s.runtime.ListSkills(ctx, &agentskills.SkillListFilter{
+			AllowSkills: res.AllowDefs,
+			Activity:    agentskillsSpec.SkillActivityAny,
+		})
+		if err != nil {
+			// Best-effort: create session with no initial actives rather than failing.
+			activeDefs = nil
+		} else {
+			known := map[agentskillsSpec.SkillDef]struct{}{}
+			for _, r := range recs {
+				known[r.Def] = struct{}{}
+			}
+			filtered := make([]agentskillsSpec.SkillDef, 0, len(activeDefs))
+			for _, d := range activeDefs {
+				if _, ok := known[d]; ok {
+					filtered = append(filtered, d)
+				}
+			}
+			activeDefs = filtered
+		}
+	}
 
 	opts := []agentskills.SessionOption{}
 	if req.Body.MaxActivePerSession > 0 {
@@ -136,6 +162,9 @@ func (s *SkillStore) CreateSkillSession(
 		actualActiveDefSet[r.Def] = struct{}{}
 	}
 	activeOutRefs := buildActiveSkillRefs(res.DefToRefs, actualActiveDefSet)
+	if activeOutRefs == nil {
+		activeOutRefs = []spec.SkillRef{}
+	}
 
 	return &spec.CreateSkillSessionResponse{
 		Body: &spec.CreateSkillSessionResponseBody{
@@ -221,7 +250,10 @@ func (s *SkillStore) ListRuntimeSkills(
 
 	f := req.Body.Filter
 	if len(f.AllowSkillRefs) == 0 {
-		return nil, fmt.Errorf("%w: filter.allowSkillRefs required", spec.ErrSkillInvalidRequest)
+		// Treat "no allowlist" as "no skills allowed" (empty list), not as an error.
+		return &spec.ListRuntimeSkillsResponse{
+			Body: &spec.ListRuntimeSkillsResponseBody{Skills: []spec.RuntimeSkillListItem{}},
+		}, nil
 	}
 
 	for _, r := range f.AllowSkillRefs {
@@ -242,10 +274,9 @@ func (s *SkillStore) ListRuntimeSkills(
 
 	// If nothing resolves (all stale/disabled/etc), return empty list (do not error).
 	if len(res.AllowDefs) == 0 {
-		body := &spec.ListRuntimeSkillsResponseBody{
-			Skills: nil,
-		}
-		return &spec.ListRuntimeSkillsResponse{Body: body}, nil
+		return &spec.ListRuntimeSkillsResponse{
+			Body: &spec.ListRuntimeSkillsResponseBody{Skills: []spec.RuntimeSkillListItem{}},
+		}, nil
 	}
 
 	filter := &agentskills.SkillListFilter{
@@ -326,6 +357,9 @@ func (s *SkillStore) ListRuntimeSkills(
 		return a.SkillID < b.SkillID
 	})
 
+	if items == nil {
+		items = []spec.RuntimeSkillListItem{}
+	}
 	out := &spec.ListRuntimeSkillsResponseBody{
 		Skills: items,
 	}

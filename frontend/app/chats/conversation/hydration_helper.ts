@@ -150,7 +150,13 @@ export function buildUserConversationMessageFromEditor(
 
 	const toolOutputs = payload.toolOutputs.length > 0 ? payload.toolOutputs : undefined;
 	const enabledSkillRefs = payload.enabledSkillRefs ?? [];
-	const activeSkillRefs = payload.activeSkillRefs ?? [];
+	let activeSkillRefs = payload.activeSkillRefs ?? [];
+
+	// Invariant: if no skills are enabled/selected, no skills can be active.
+	// This prevents persisting inconsistent conversations (active without enabled).
+	if (enabledSkillRefs.length === 0) {
+		activeSkillRefs = [];
+	}
 
 	const msg: ConversationMessage = {
 		id,

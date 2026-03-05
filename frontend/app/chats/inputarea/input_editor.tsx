@@ -342,6 +342,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const [skillsLoading, setSkillsLoading] = useState(false);
 	const pendingEnableAllSkillsRef = useRef(false);
 	const preEditEnabledSkillRefsRef = useRef<SkillRef[] | null>(null);
+	const preEditActiveSkillRefsRef = useRef<SkillRef[] | null>(null);
 
 	// --- Fix: focus management for menus opened by shortcuts ---
 	const templateMenuOpen = useStoreState(templateMenu, 'open');
@@ -431,7 +432,26 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const disableAllSkills = useCallback(() => {
 		pendingEnableAllSkillsRef.current = false;
 		setEnabledSkillRefs([]);
+		// Invariant: if nothing is enabled, nothing can be active.
+		setActiveSkillRefs([]);
 	}, []);
+
+	// Clamp activeSkillRefs to the enabled allowlist (invariant).
+	useEffect(() => {
+		if (!enabledSkillRefs || enabledSkillRefs.length === 0) {
+			// keep active empty when disabled
+			setActiveSkillRefs([]);
+			return;
+		}
+		const allow = new Set((enabledSkillRefs ?? []).map(skillRefKey));
+		setActiveSkillRefs(prev => {
+			const cur = prev ?? [];
+			const next = cur.filter(r => allow.has(skillRefKey(r)));
+			// Avoid needless state churn.
+			if (next.length === cur.length) return prev;
+			return next;
+		});
+	}, [enabledSkillRefs]);
 
 	// If the allowlist changes after a session is created, reset the session.
 	// This prevents the session active set drifting away from the caller's allowlist.
@@ -457,6 +477,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			if (!cancelled) {
 				sessionAllowlistKeyRef.current = '';
 				setSkillSessionID(null);
+				// active set is session-scoped; once session is closed, force re-derivation
+				// (we keep activeSkillRefs already clamped to enabledSkillRefs by the effect above).
 			}
 		})();
 		return () => {
@@ -467,6 +489,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	useEffect(() => {
 		if (enabledSkillRefs.length > 0) return;
 		if (!skillSessionID) return;
+		sessionAllowlistKeyRef.current = '';
 		let cancelled = false;
 		(async () => {
 			try {
@@ -474,7 +497,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			} catch {
 				// best effort
 			}
-			if (!cancelled) setSkillSessionID(null);
+			if (!cancelled) {
+				setSkillSessionID(null);
+				setActiveSkillRefs([]); // enforce invariant on disable
+			}
 		})();
 		return () => {
 			cancelled = true;
@@ -780,14 +806,17 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		const prevConv = preEditConversationToolsRef.current;
 		const prevWs = preEditWebSearchTemplatesRef.current;
 		const prevSkills = preEditEnabledSkillRefsRef.current;
+		const prevActive = preEditActiveSkillRefsRef.current;
 
 		if (prevConv) setConversationToolsState(prevConv);
 		if (prevWs) setWebSearchTemplates(prevWs);
 		if (prevSkills) setEnabledSkillRefs(prevSkills);
+		if (prevActive) setActiveSkillRefs(prevActive);
 
 		preEditConversationToolsRef.current = null;
 		preEditWebSearchTemplatesRef.current = null;
 		preEditEnabledSkillRefsRef.current = null;
+		preEditActiveSkillRefsRef.current = null;
 	}, []);
 
 	// Recompute conversation-level arg blocking whenever that state changes.
@@ -1349,7 +1378,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			if (!preEditEnabledSkillRefsRef.current) {
 				preEditEnabledSkillRefsRef.current = enabledSkillRefs;
 			}
-
+			if (!preEditActiveSkillRefsRef.current) {
+				preEditActiveSkillRefsRef.current = activeSkillRefs;
+			}
 			// 1) Reset document to plain text paragraphs.
 			const plain = incoming.text ?? '';
 			// PERF: Keep a single block and preserve newlines within the text node.
@@ -1425,7 +1456,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 			editor.tf.focus();
 		},
-		[closeAllMenus, editor, conversationToolsState, webSearchTemplates, enabledSkillRefs]
+		[closeAllMenus, editor, conversationToolsState, webSearchTemplates, enabledSkillRefs, activeSkillRefs]
 	);
 
 	const loadToolCalls = useCallback((toolCalls: UIToolCall[]) => {
