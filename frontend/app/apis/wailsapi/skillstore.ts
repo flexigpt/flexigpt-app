@@ -166,8 +166,8 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 		await DeleteSkill(req);
 	}
 
-	async getSkill(bundleID: string, skillSlug: string): Promise<Skill | undefined> {
-		const req: spec.GetSkillRequest = { BundleID: bundleID, SkillSlug: skillSlug };
+	async getSkill(bundleID: string, skillSlug: string, includeDisabled: boolean): Promise<Skill | undefined> {
+		const req: spec.GetSkillRequest = { BundleID: bundleID, SkillSlug: skillSlug, IncludeDisabled: includeDisabled };
 		const resp = await GetSkill(req);
 		return resp?.Body as Skill;
 	}

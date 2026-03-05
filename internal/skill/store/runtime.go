@@ -228,7 +228,7 @@ func (s *SkillStore) ListRuntimeSkills(
 		LocationPrefix: f.LocationPrefix,
 		AllowSkills:    res.AllowDefs,
 		SessionID:      f.SessionID,
-		Activity:       f.Activity,
+		Activity:       act,
 	}
 
 	recs, err := s.runtime.ListSkills(ctx, filter)

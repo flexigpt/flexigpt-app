@@ -21,9 +21,6 @@ const (
 )
 
 type userWriteSagaOutcome struct {
-	// ResyncReason triggers a best-effort resync after a successful store commit.
-	ResyncReason string
-
 	// RollbackReason/RollbackErr trigger a strict rollback *when returning an error*,
 	// for cases where runtime may have been mutated before the error.
 	// If RollbackErr is nil, the returned error is used.
@@ -173,10 +170,8 @@ func (s *SkillStore) withUserWriteSaga(
 
 	var (
 		outcome        userWriteSagaOutcome
-		committed      bool
 		rollbackReason string
 		rollbackErr    error
-		resyncReason   string
 	)
 
 	defer func() {
@@ -187,9 +182,6 @@ func (s *SkillStore) withUserWriteSaga(
 		if rollbackErr != nil {
 			s.runtimeRollbackToStoreStrict(rollbackReason, rollbackErr)
 			return
-		}
-		if committed && resyncReason != "" {
-			s.bestEffortRuntimeResync(ctx, resyncReason)
 		}
 	}()
 
@@ -223,8 +215,6 @@ func (s *SkillStore) withUserWriteSaga(
 		return err
 	}
 
-	committed = true
-	resyncReason = outcome.ResyncReason
 	return nil
 }
 

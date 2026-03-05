@@ -277,7 +277,7 @@ export interface ISkillStoreAPI {
 	deleteSkill(bundleID: string, skillSlug: string): Promise<void>;
 
 	/** Get a skill. */
-	getSkill(bundleID: string, skillSlug: string): Promise<Skill | undefined>;
+	getSkill(bundleID: string, skillSlug: string, includeDisabled: boolean): Promise<Skill | undefined>;
 
 	/** Runtime: get a skills prompt. */
 	getSkillsPromptXML(filter?: RuntimeSkillFilter): Promise<string>;
