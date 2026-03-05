@@ -8,43 +8,6 @@ import (
 // JSONRawString mirrors the ToolRuntime API style; it's a raw JSON string.
 type JSONRawString = string
 
-// RuntimeSkillFilter mirrors the runtime prompt/list filters we expose over HTTP.
-//
-// IMPORTANT CONTRACT:
-//   - allowSkills and all lifecycle-facing selectors are SkillDef (type/name/location)
-//     which are the exact user-provided inputs registered into the runtime catalog.
-//   - LLM-facing handles (SkillHandle) are NOT used for lifecycle.
-type RuntimeSkillFilter struct {
-	Types          []string   `json:"types,omitempty"`
-	NamePrefix     string     `json:"namePrefix,omitempty"`
-	LocationPrefix string     `json:"locationPrefix,omitempty"`
-	AllowSkillRefs []SkillRef `json:"allowSkillRefs,omitempty"`
-
-	SessionID agentskillsSpec.SessionID `json:"sessionID,omitempty"`
-	Activity  string                    `json:"activity,omitempty"` // any|active|inactive
-}
-
-type CreateSkillSessionRequestBody struct {
-	MaxActivePerSession int                        `json:"maxActivePerSession,omitempty"`
-	ActiveSkills        []agentskillsSpec.SkillDef `json:"activeSkills,omitempty"`
-}
-type CreateSkillSessionRequest struct {
-	Body *CreateSkillSessionRequestBody
-}
-
-type CreateSkillSessionResponseBody struct {
-	SessionID    agentskillsSpec.SessionID  `json:"sessionID"`
-	ActiveSkills []agentskillsSpec.SkillDef `json:"activeSkills"`
-}
-type CreateSkillSessionResponse struct {
-	Body *CreateSkillSessionResponseBody
-}
-
-type CloseSkillSessionRequest struct {
-	SessionID agentskillsSpec.SessionID `path:"sessionID" required:"true"`
-}
-type CloseSkillSessionResponse struct{}
-
 type GetSkillsPromptXMLRequestBody struct {
 	Filter *RuntimeSkillFilter `json:"filter,omitempty"`
 }
@@ -61,17 +24,73 @@ type GetSkillsPromptXMLResponse struct {
 	Body *GetSkillsPromptXMLResponseBody
 }
 
+type CreateSkillSessionRequestBody struct {
+	// Optional: close this previous session (best-effort) before creating a new one.
+	CloseSessionID agentskillsSpec.SessionID `json:"closeSessionID,omitempty"`
+
+	MaxActivePerSession int        `json:"maxActivePerSession,omitempty"`
+	AllowSkillRefs      []SkillRef `json:"allowSkillRefs,omitempty"`  // enabled allowlist (store ids)
+	ActiveSkillRefs     []SkillRef `json:"activeSkillRefs,omitempty"` // desired initial active (subset of allowlist)
+}
+
+// CreateSkillSessionRequest creates a runtime session using store identities (SkillRef),
+// so the backend can translate refs -> runtime SkillDef (including embeddedfs hydration mapping).
+type CreateSkillSessionRequest struct {
+	Body *CreateSkillSessionRequestBody
+}
+
+type CreateSkillSessionResponseBody struct {
+	SessionID       agentskillsSpec.SessionID `json:"sessionID"`
+	ActiveSkillRefs []SkillRef                `json:"activeSkillRefs"`
+}
+
+type CreateSkillSessionResponse struct {
+	Body *CreateSkillSessionResponseBody
+}
+
+type RuntimeSkillFilter struct {
+	Types          []string   `json:"types,omitempty"`
+	LocationPrefix string     `json:"locationPrefix,omitempty"`
+	AllowSkillRefs []SkillRef `json:"allowSkillRefs,omitempty"`
+
+	SessionID agentskillsSpec.SessionID `json:"sessionID,omitempty"`
+	Activity  string                    `json:"activity,omitempty"` // any|active|inactive
+}
+
+type CloseSkillSessionRequest struct {
+	SessionID agentskillsSpec.SessionID `path:"sessionID" required:"true"`
+}
+type CloseSkillSessionResponse struct{}
+
+// RuntimeSkillListItem is the public runtime listing shape keyed by store identity (SkillRef).
+// SkillDef is intentionally NOT exposed.
+type RuntimeSkillListItem struct {
+	SkillRef SkillRef `json:"skillRef"`
+
+	// Copy of the runtime-facing identity fields (excluding Location) + runtime-indexed metadata.
+	// These are read-only and exist only for display/debug.
+	Type        string `json:"type,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+	Digest      string `json:"digest,omitempty"`
+
+	// Session-scoped.
+	IsActive bool `json:"isActive,omitempty"`
+
+	// Runtime/provider error (if any) for this skill record.
+	ErrorMessage string `json:"errorMessage,omitempty"`
+}
+
 type ListRuntimeSkillsRequestBody struct {
 	Filter *RuntimeSkillFilter `json:"filter,omitempty"`
 }
-type (
-	ListRuntimeSkillsRequest struct {
-		Body *ListRuntimeSkillsRequestBody
-	}
-	ListRuntimeSkillsResponseBody struct {
-		Skills []agentskillsSpec.SkillRecord `json:"skills"`
-	}
-)
+type ListRuntimeSkillsRequest struct {
+	Body *ListRuntimeSkillsRequestBody
+}
+
+type ListRuntimeSkillsResponseBody struct {
+	Skills []RuntimeSkillListItem `json:"skills"`
+}
 
 type ListRuntimeSkillsResponse struct {
 	Body *ListRuntimeSkillsResponseBody
@@ -91,8 +110,8 @@ type InvokeSkillToolResponseBody struct {
 	Outputs      []llmtoolsSpec.ToolOutputUnion `json:"outputs,omitempty"`
 	Meta         map[string]any                 `json:"meta,omitempty"`
 	IsBuiltIn    bool                           `json:"isBuiltIn"`
-	IsError      bool                           `json:"isError,omitzero"`
-	ErrorMessage string                         `json:"errorMessage,omitzero"`
+	IsError      bool                           `json:"isError,omitempty"`
+	ErrorMessage string                         `json:"errorMessage,omitempty"`
 }
 
 type InvokeSkillToolResponse struct {

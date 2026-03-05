@@ -65,7 +65,7 @@ type SkillStore struct {
 	cleanStop context.CancelFunc
 	wg        sync.WaitGroup
 
-	// Serializes runtime resync calls (best-effort reconcile).
+	// Serializes ALL runtime catalog mutations (foreground deltas + resync + rollback).
 	rtResyncMu sync.Mutex
 }
 
@@ -283,7 +283,7 @@ func (s *SkillStore) PutSkillBundle(
 		// Runtime resync is only needed if enabled state changed.
 		// (Metadata-only updates don't affect runtime desired set.)
 		if enabledChanged {
-			return userWriteSagaOutcome{ResyncReason: "putSkillBundle"}, nil
+			return userWriteSagaOutcome{}, nil
 		}
 		return userWriteSagaOutcome{}, nil
 	}); err != nil {
@@ -338,7 +338,7 @@ func (s *SkillStore) PatchSkillBundle(
 		sc.Bundles[req.BundleID] = b
 
 		if enabledChanged {
-			return userWriteSagaOutcome{ResyncReason: "patchSkillBundle"}, nil
+			return userWriteSagaOutcome{}, nil
 		}
 		return userWriteSagaOutcome{}, nil
 	}); err != nil {
@@ -552,12 +552,7 @@ func (s *SkillStore) PutSkill(ctx context.Context, req *spec.PutSkillRequest) (*
 		if isSoftDeletedSkillBundle(b) {
 			return userWriteSagaOutcome{}, fmt.Errorf("%w: %s", spec.ErrSkillBundleDeleting, req.BundleID)
 		}
-		if !b.IsEnabled {
-			return userWriteSagaOutcome{}, fmt.Errorf("%w: %s", spec.ErrSkillBundleDisabled, req.BundleID)
-		}
-		if sc.Skills[req.BundleID] == nil {
-			sc.Skills[req.BundleID] = map[spec.SkillSlug]spec.Skill{}
-		}
+
 		if _, exists := sc.Skills[req.BundleID][req.SkillSlug]; exists {
 			return userWriteSagaOutcome{}, fmt.Errorf("%w: duplicate skillSlug in bundle", spec.ErrSkillConflict)
 		}
@@ -593,23 +588,25 @@ func (s *SkillStore) PutSkill(ctx context.Context, req *spec.PutSkillRequest) (*
 			return userWriteSagaOutcome{}, err
 		}
 
-		// Runtime check first (strict). For disabled skills we validate via AddSkill and let resync converge later.
-		def, err := runtimeDefForUserSkill(sk)
-		if err != nil {
-			return userWriteSagaOutcome{}, fmt.Errorf("%w: %w", spec.ErrSkillInvalidRequest, err)
-		}
-		if _, rtErr := s.runtimeTryAddForeground(ctx, def); rtErr != nil {
-			return userWriteSagaOutcome{}, fmt.Errorf(
-				"%w: runtime rejected skill: %w",
-				spec.ErrSkillInvalidRequest,
-				rtErr,
-			)
+		// Runtime validation/mutation ONLY if this record is desired in runtime.
+		if b.IsEnabled && sk.IsEnabled {
+			def, err := runtimeDefForUserSkill(sk)
+			if err != nil {
+				return userWriteSagaOutcome{}, fmt.Errorf("%w: %w", spec.ErrSkillInvalidRequest, err)
+			}
+			if _, rtErr := s.runtimeTryAddForeground(ctx, def); rtErr != nil {
+				return userWriteSagaOutcome{}, fmt.Errorf(
+					"%w: runtime rejected skill: %w",
+					spec.ErrSkillInvalidRequest,
+					rtErr,
+				)
+			}
 		}
 
 		// Store commit (strict via saga helper).
 		sc.Skills[req.BundleID][req.SkillSlug] = sk
 		created = sk
-		return userWriteSagaOutcome{ResyncReason: "putSkill"}, nil
+		return userWriteSagaOutcome{}, nil
 	}); err != nil {
 		return nil, err
 	}
@@ -622,7 +619,11 @@ func (s *SkillStore) PatchSkill(ctx context.Context, req *spec.PatchSkillRequest
 	if req == nil || req.Body == nil || req.BundleID == "" || req.SkillSlug == "" {
 		return nil, fmt.Errorf("%w: bundleID, skillSlug and body required", spec.ErrSkillInvalidRequest)
 	}
-	if req.Body.IsEnabled == nil && req.Body.Location == nil {
+	if req.Body.IsEnabled == nil &&
+		req.Body.Location == nil &&
+		req.Body.DisplayName == nil &&
+		req.Body.Description == nil &&
+		req.Body.Tags == nil {
 		return nil, fmt.Errorf("%w: empty patch", spec.ErrSkillInvalidRequest)
 	}
 	if err := bundleitemutils.ValidateItemSlug(req.SkillSlug); err != nil {
@@ -632,8 +633,11 @@ func (s *SkillStore) PatchSkill(ctx context.Context, req *spec.PatchSkillRequest
 	// Built-in: enable/disable only.
 	if s.builtin != nil {
 		if _, err := s.builtin.GetBuiltInSkillBundle(ctx, req.BundleID); err == nil {
-			if req.Body.Location != nil {
-				return nil, fmt.Errorf("%w: cannot modify location for built-in", spec.ErrSkillBuiltInReadOnly)
+			if req.Body.Location != nil ||
+				req.Body.DisplayName != nil ||
+				req.Body.Description != nil ||
+				req.Body.Tags != nil {
+				return nil, fmt.Errorf("%w: cannot modify metadata for built-in", spec.ErrSkillBuiltInReadOnly)
 			}
 			if req.Body.IsEnabled == nil {
 				return nil, fmt.Errorf("%w: isEnabled required for built-in patch", spec.ErrSkillInvalidRequest)
@@ -677,7 +681,6 @@ func (s *SkillStore) PatchSkill(ctx context.Context, req *spec.PatchSkillRequest
 				return nil, err
 			}
 
-			s.bestEffortRuntimeResync(ctx, "patchSkill(builtin)")
 			slog.Info("patchSkill (builtin)", "bundleID", req.BundleID, "skillSlug", req.SkillSlug, "enabled", enabled)
 			return &spec.PatchSkillResponse{}, nil
 		}
@@ -697,9 +700,6 @@ func (s *SkillStore) PatchSkill(ctx context.Context, req *spec.PatchSkillRequest
 		if isSoftDeletedSkillBundle(b) {
 			return userWriteSagaOutcome{}, fmt.Errorf("%w: %s", spec.ErrSkillBundleDeleting, req.BundleID)
 		}
-		if !b.IsEnabled {
-			return userWriteSagaOutcome{}, fmt.Errorf("%w: %s", spec.ErrSkillBundleDisabled, req.BundleID)
-		}
 
 		sm := sc.Skills[req.BundleID]
 		if sm == nil {
@@ -712,7 +712,11 @@ func (s *SkillStore) PatchSkill(ctx context.Context, req *spec.PatchSkillRequest
 
 		// Build target.
 		target := cur
+		enabledChanged := false
+
 		if req.Body.IsEnabled != nil {
+			enabledChanged = target.IsEnabled != *req.Body.IsEnabled
+
 			target.IsEnabled = *req.Body.IsEnabled
 		}
 		if req.Body.Location != nil && strings.TrimSpace(*req.Body.Location) == "" {
@@ -724,11 +728,42 @@ func (s *SkillStore) PatchSkill(ctx context.Context, req *spec.PatchSkillRequest
 			target.Presence = &spec.SkillPresence{Status: spec.SkillPresenceUnknown}
 			locationChanged = true
 		}
+		if req.Body.DisplayName != nil {
+			target.DisplayName = *req.Body.DisplayName
+		}
+		if req.Body.Description != nil {
+			target.Description = *req.Body.Description
+		}
+		if req.Body.Tags != nil {
+			// Treat provided tags as full replacement. Allow clearing with [] (or null).
+			if *req.Body.Tags == nil {
+				target.Tags = nil
+			} else {
+				target.Tags = slices.Clone(*req.Body.Tags)
+			}
+		}
 
 		now := time.Now().UTC()
 		target.ModifiedAt = now
 		if err := validateSkill(&target); err != nil {
 			return userWriteSagaOutcome{}, err
+		}
+
+		// If bundle is disabled, no runtime work is needed (bundle gate).
+		if !b.IsEnabled {
+			sm[req.SkillSlug] = target
+			sc.Skills[req.BundleID] = sm
+			return userWriteSagaOutcome{}, nil
+		}
+
+		curDesired := cur.IsEnabled && b.IsEnabled
+		targetDesired := target.IsEnabled && b.IsEnabled
+
+		// Metadata-only patch with no runtime impact.
+		if !locationChanged && !enabledChanged {
+			sm[req.SkillSlug] = target
+			sc.Skills[req.BundleID] = sm
+			return userWriteSagaOutcome{}, nil
 		}
 
 		oldDef, err := runtimeDefForUserSkill(cur)
@@ -740,11 +775,10 @@ func (s *SkillStore) PatchSkill(ctx context.Context, req *spec.PatchSkillRequest
 			return userWriteSagaOutcome{}, fmt.Errorf("%w: %w", spec.ErrSkillInvalidRequest, err)
 		}
 
-		// 1) Runtime check/mutation first (strict):
-		//    - If enabling OR location change: ensure newDef is indexable (AddSkill).
-		//    - No immediate "disabled cleanup"; resync after commit converges runtime to enabled set.
-		needValidateNew := locationChanged || (target.IsEnabled && !cur.IsEnabled)
-		if needValidateNew {
+		// 1) Strict runtime mutation only if the *target* is desired.
+		//    (Do NOT validate new location if the patch disables the skill.)
+		needAddNew := targetDesired && (locationChanged || !curDesired || oldDef != newDef)
+		if needAddNew {
 			if _, rtErr := s.runtimeTryAddForeground(ctx, newDef); rtErr != nil {
 				return userWriteSagaOutcome{}, fmt.Errorf(
 					"%w: runtime rejected skill: %w",
@@ -754,31 +788,35 @@ func (s *SkillStore) PatchSkill(ctx context.Context, req *spec.PatchSkillRequest
 			}
 		}
 
-		// Remove oldDef only if this patch makes it undesired (duplicate-safe).
-		desiredCounts, err := s.runtimeDesiredDefCountsForSnapshot(ctx, *sc)
-		if err != nil {
-			return userWriteSagaOutcome{}, err
-		}
-		afterOld := desiredCounts[oldDef]
-		if cur.IsEnabled {
+		// 2) Remove old def if it becomes globally undesired (duplicate-safe).
+		needMaybeRemoveOld := curDesired && (!targetDesired || oldDef != newDef)
+		if needMaybeRemoveOld {
+			desiredCounts, err := s.runtimeDesiredDefCountsForSnapshot(ctx, *sc)
+			if err != nil {
+				return userWriteSagaOutcome{}, err
+			}
+
+			afterOld := desiredCounts[oldDef]
+			// Remove current record contribution.
 			afterOld--
-		}
-		if target.IsEnabled && oldDef == newDef {
-			afterOld++
-		}
-		if cur.IsEnabled && afterOld <= 0 {
-			if rtErr := s.runtimeRemoveForegroundStrict(ctx, oldDef); rtErr != nil {
-				// Runtime may already contain newDef; rollback runtime back to store.
-				return userWriteSagaOutcome{
-					RollbackReason: "patchSkill(runtime-remove-old-failed)",
-				}, fmt.Errorf("%w: runtime remove failed: %w", spec.ErrSkillInvalidRequest, rtErr)
+			// Add back if still desired with same def.
+			if targetDesired && oldDef == newDef {
+				afterOld++
+			}
+
+			if afterOld <= 0 {
+				if rtErr := s.runtimeRemoveForegroundStrict(ctx, oldDef); rtErr != nil {
+					return userWriteSagaOutcome{
+						RollbackReason: "patchSkill(runtime-remove-old-failed)",
+					}, fmt.Errorf("%w: runtime remove failed: %w", spec.ErrSkillInvalidRequest, rtErr)
+				}
 			}
 		}
 
 		// 2) Store commit (strict via saga helper).
 		sm[req.SkillSlug] = target
 		sc.Skills[req.BundleID] = sm
-		return userWriteSagaOutcome{ResyncReason: "patchSkill"}, nil
+		return userWriteSagaOutcome{}, nil
 	}); err != nil {
 		return nil, err
 	}
@@ -852,7 +890,7 @@ func (s *SkillStore) DeleteSkill(ctx context.Context, req *spec.DeleteSkillReque
 		// 2) Store commit (strict via saga helper).
 		delete(sm, req.SkillSlug)
 		sc.Skills[req.BundleID] = sm
-		return userWriteSagaOutcome{ResyncReason: "deleteSkill"}, nil
+		return userWriteSagaOutcome{}, nil
 	}); err != nil {
 		return nil, err
 	}
@@ -874,8 +912,10 @@ func (s *SkillStore) GetSkill(ctx context.Context, req *spec.GetSkillRequest) (*
 		return nil, err
 	}
 
-	if !b.IsEnabled {
-		return nil, fmt.Errorf("%w: %s", spec.ErrSkillBundleDisabled, req.BundleID)
+	if !req.IncludeDisabled {
+		if !b.IsEnabled {
+			return nil, fmt.Errorf("%w: %s", spec.ErrSkillBundleDisabled, req.BundleID)
+		}
 	}
 
 	if isBI {
@@ -883,8 +923,10 @@ func (s *SkillStore) GetSkill(ctx context.Context, req *spec.GetSkillRequest) (*
 		if err != nil {
 			return nil, err
 		}
-		if !sk.IsEnabled {
-			return nil, fmt.Errorf("%w: %s", spec.ErrSkillDisabled, req.SkillSlug)
+		if !req.IncludeDisabled {
+			if !sk.IsEnabled {
+				return nil, fmt.Errorf("%w: %s", spec.ErrSkillDisabled, req.SkillSlug)
+			}
 		}
 		return &spec.GetSkillResponse{Body: &sk}, nil
 	}
@@ -904,8 +946,10 @@ func (s *SkillStore) GetSkill(ctx context.Context, req *spec.GetSkillRequest) (*
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", spec.ErrSkillNotFound, req.SkillSlug)
 	}
-	if !sk.IsEnabled {
-		return nil, fmt.Errorf("%w: %s", spec.ErrSkillDisabled, req.SkillSlug)
+	if !req.IncludeDisabled {
+		if !sk.IsEnabled {
+			return nil, fmt.Errorf("%w: %s", spec.ErrSkillDisabled, req.SkillSlug)
+		}
 	}
 	return &spec.GetSkillResponse{Body: &sk}, nil
 }

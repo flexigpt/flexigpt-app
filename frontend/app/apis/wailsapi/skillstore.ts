@@ -1,11 +1,11 @@
 import type {
 	InvokeSkillToolResponse,
 	RuntimeSkillFilter,
+	RuntimeSkillListItem,
 	Skill,
 	SkillBundle,
-	SkillDef,
 	SkillListItem,
-	SkillRecord,
+	SkillRef,
 	SkillSession,
 	SkillType,
 } from '@/spec/skill';
@@ -138,13 +138,24 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 		await PutSkill(req as spec.PutSkillRequest);
 	}
 
-	async patchSkill(bundleID: string, skillSlug: string, isEnabled?: boolean, location?: string): Promise<void> {
+	async patchSkill(
+		bundleID: string,
+		skillSlug: string,
+		isEnabled?: boolean,
+		location?: string,
+		displayName?: string,
+		description?: string,
+		tags?: string[]
+	): Promise<void> {
 		const req = {
 			BundleID: bundleID,
 			SkillSlug: skillSlug,
 			Body: {
-				isEnabled,
-				location,
+				isEnabled: isEnabled,
+				location: location,
+				displayName: displayName,
+				description: description,
+				tags: tags,
 			} as spec.PatchSkillRequestBody,
 		};
 		await PatchSkill(req as spec.PatchSkillRequest);
@@ -169,18 +180,25 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 		return resp?.Body?.xml || '';
 	}
 
-	async createSkillSession(maxActivePerSession?: number, activeSkills?: SkillDef[]): Promise<SkillSession> {
+	async createSkillSession(
+		closeSessionID?: string,
+		maxActivePerSession?: number,
+		allowSkillRefs?: SkillRef[],
+		activeSkillRefs?: SkillRef[]
+	): Promise<SkillSession> {
 		const req = {
 			Body: {
-				maxActivePerSession,
-				activeSkills,
+				closeSessionID: closeSessionID,
+				maxActivePerSession: maxActivePerSession,
+				allowSkillRefs: allowSkillRefs,
+				activeSkillRefs: activeSkillRefs,
 			} as spec.CreateSkillSessionRequestBody,
 		} as spec.CreateSkillSessionRequest;
 
 		const resp = await CreateSkillSession(req);
 		return {
 			sessionID: resp?.Body?.sessionID ?? '',
-			activeSkills: (resp?.Body?.activeSkills ?? []) as SkillDef[],
+			activeSkillRefs: (resp?.Body?.activeSkillRefs ?? []) as SkillRef[],
 		};
 	}
 
@@ -189,13 +207,13 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 		await CloseSkillSession(req);
 	}
 
-	async listRuntimeSkills(filter?: RuntimeSkillFilter): Promise<SkillRecord[]> {
+	async listRuntimeSkills(filter?: RuntimeSkillFilter): Promise<RuntimeSkillListItem[]> {
 		const req = {
 			Body: { filter: filter as spec.RuntimeSkillFilter } as spec.ListRuntimeSkillsRequestBody,
 		} as spec.ListRuntimeSkillsRequest;
 
 		const resp = await ListRuntimeSkills(req);
-		return (resp?.Body?.skills ?? []) as SkillRecord[];
+		return (resp?.Body?.skills ?? []) as RuntimeSkillListItem[];
 	}
 
 	async invokeSkillTool(sessionID: string, toolName: string, args?: JSONRawString): Promise<InvokeSkillToolResponse> {

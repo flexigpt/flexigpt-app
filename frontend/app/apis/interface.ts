@@ -19,11 +19,11 @@ import type { AppTheme, AuthKey, AuthKeyName, AuthKeyType, SettingsSchema } from
 import type {
 	InvokeSkillToolResponse,
 	RuntimeSkillFilter,
+	RuntimeSkillListItem,
 	Skill,
 	SkillBundle,
-	SkillDef,
 	SkillListItem,
-	SkillRecord,
+	SkillRef,
 	SkillSession,
 	SkillType,
 } from '@/spec/skill';
@@ -263,7 +263,15 @@ export interface ISkillStoreAPI {
 	): Promise<void>;
 
 	/** Patch a skill (enable/disable, location). */
-	patchSkill(bundleID: string, skillSlug: string, isEnabled?: boolean, location?: string): Promise<void>;
+	patchSkill(
+		bundleID: string,
+		skillSlug: string,
+		isEnabled?: boolean,
+		location?: string,
+		displayName?: string,
+		description?: string,
+		tags?: string[]
+	): Promise<void>;
 
 	/** Delete a skill. */
 	deleteSkill(bundleID: string, skillSlug: string): Promise<void>;
@@ -275,13 +283,18 @@ export interface ISkillStoreAPI {
 	getSkillsPromptXML(filter?: RuntimeSkillFilter): Promise<string>;
 
 	/** Runtime: create a skill session. */
-	createSkillSession(maxActivePerSession?: number, activeSkills?: SkillDef[]): Promise<SkillSession>;
+	createSkillSession(
+		closeSessionID?: string,
+		maxActivePerSession?: number,
+		allowSkillRefs?: SkillRef[],
+		activeSkillRefs?: SkillRef[]
+	): Promise<SkillSession>;
 
 	/** Runtime: close a skill session. */
 	closeSkillSession(sessionID: string): Promise<void>;
 
 	/** Runtime: list skills from the runtime catalog (optionally filtered). */
-	listRuntimeSkills(filter?: RuntimeSkillFilter): Promise<SkillRecord[]>;
+	listRuntimeSkills(filter?: RuntimeSkillFilter): Promise<RuntimeSkillListItem[]>;
 
 	invokeSkillTool(sessionID: string, toolName: string, args?: JSONRawString): Promise<InvokeSkillToolResponse>;
 }

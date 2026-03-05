@@ -67,7 +67,7 @@ export function MessageThinkingSection(props: {
 						setOpen(v);
 					}}
 					streaming={isBusy}
-					maxRows={5}
+					maxRows={10}
 					autoScroll={isBusy}
 					defaultOpen={isBusy}
 				/>

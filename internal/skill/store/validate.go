@@ -40,6 +40,9 @@ func validateSkillBundle(b *spec.SkillBundle) error {
 	if strings.TrimSpace(b.DisplayName) == "" {
 		return errors.New("displayName is empty")
 	}
+	if strings.TrimSpace(b.DisplayName) != b.DisplayName {
+		return errors.New("displayName has leading/trailing whitespace")
+	}
 
 	if len(b.DisplayName) > maxDisplayNameLen {
 		return fmt.Errorf("displayName too long (>%d)", maxDisplayNameLen)
@@ -69,11 +72,17 @@ func validateSkill(sk *spec.Skill) error {
 	if strings.TrimSpace(sk.Location) == "" {
 		return errors.New("location is empty")
 	}
+	if strings.TrimSpace(sk.Location) != sk.Location {
+		return errors.New("location has leading/trailing whitespace")
+	}
 	if len(sk.Location) > maxLocationLen {
 		return fmt.Errorf("location too long (>%d)", maxLocationLen)
 	}
 	if strings.TrimSpace(sk.Name) == "" {
 		return errors.New("name is empty")
+	}
+	if strings.TrimSpace(sk.Name) != sk.Name {
+		return errors.New("name has leading/trailing whitespace")
 	}
 	if len(sk.Name) > maxNameLen {
 		return fmt.Errorf("name too long (>%d)", maxNameLen)

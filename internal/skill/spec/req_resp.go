@@ -84,8 +84,13 @@ type DeleteSkillRequest struct {
 type DeleteSkillResponse struct{}
 
 type PatchSkillRequestBody struct {
-	IsEnabled *bool   `json:"isEnabled,omitempty"`
-	Location  *string `json:"location,omitempty"`
+	// Built-in skills: only IsEnabled is supported.
+	// User skills: IsEnabled, Location, and metadata fields are supported.
+	IsEnabled   *bool     `json:"isEnabled,omitempty"`
+	Location    *string   `json:"location,omitempty"`
+	DisplayName *string   `json:"displayName,omitempty"`
+	Description *string   `json:"description,omitempty"`
+	Tags        *[]string `json:"tags,omitempty"` // pointer so caller can send [] to clear
 }
 
 type PatchSkillRequest struct {
@@ -97,8 +102,9 @@ type PatchSkillRequest struct {
 type PatchSkillResponse struct{}
 
 type GetSkillRequest struct {
-	BundleID  bundleitemutils.BundleID `path:"bundleID"  required:"true"`
-	SkillSlug SkillSlug                `path:"skillSlug" required:"true"`
+	BundleID        bundleitemutils.BundleID `path:"bundleID"  required:"true"`
+	SkillSlug       SkillSlug                `path:"skillSlug" required:"true"`
+	IncludeDisabled bool                     `                                 query:"includeDisabled"`
 }
 type GetSkillResponse struct{ Body *Skill }
 

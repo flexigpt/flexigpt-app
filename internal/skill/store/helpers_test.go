@@ -200,34 +200,6 @@ func newBuiltInMapFS(t *testing.T, root string, now time.Time, b biBundle, skill
 	return out
 }
 
-func listRuntimeSkills(t *testing.T, s *SkillStore) []agentskillsSpec.SkillRecord {
-	t.Helper()
-
-	resp, err := s.ListRuntimeSkills(t.Context(), nil)
-	if err != nil {
-		t.Fatalf("ListRuntimeSkills: %v", err)
-	}
-	if resp == nil || resp.Body == nil {
-		t.Fatalf("ListRuntimeSkills: nil response")
-	}
-	return resp.Body.Skills
-}
-
-func listRuntimeSkillsFiltered(t *testing.T, s *SkillStore, f *spec.RuntimeSkillFilter) []agentskillsSpec.SkillRecord {
-	t.Helper()
-
-	resp, err := s.ListRuntimeSkills(t.Context(), &spec.ListRuntimeSkillsRequest{
-		Body: &spec.ListRuntimeSkillsRequestBody{Filter: f},
-	})
-	if err != nil {
-		t.Fatalf("ListRuntimeSkills(filtered): %v", err)
-	}
-	if resp == nil || resp.Body == nil {
-		t.Fatalf("ListRuntimeSkills(filtered): nil response")
-	}
-	return resp.Body.Skills
-}
-
 func buildSkillMD(name, desc, body string) []byte {
 	// Must satisfy fsskillprovider index constraints:
 	// - YAML frontmatter required
@@ -267,26 +239,6 @@ func mustNotHaveSkillDef(t *testing.T, recs []agentskillsSpec.SkillRecord, want 
 			t.Fatalf("expected NOT to find skill def %+v; got defs=%v", want, defsOnly(recs))
 		}
 	}
-}
-
-func mustNotHaveSkillName(t *testing.T, recs []agentskillsSpec.SkillRecord, name string) {
-	t.Helper()
-	for _, r := range recs {
-		if r.Def.Name == name {
-			t.Fatalf("expected NOT to find skill name %q; got defs=%v", name, defsOnly(recs))
-		}
-	}
-}
-
-func findByName(t *testing.T, recs []agentskillsSpec.SkillRecord, name string) agentskillsSpec.SkillRecord {
-	t.Helper()
-	for _, r := range recs {
-		if r.Def.Name == name {
-			return r
-		}
-	}
-	t.Fatalf("skill name %q not found; got defs=%v", name, defsOnly(recs))
-	return agentskillsSpec.SkillRecord{}
 }
 
 func defsOnly(recs []agentskillsSpec.SkillRecord) []agentskillsSpec.SkillDef {

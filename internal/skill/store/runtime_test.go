@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -37,6 +38,98 @@ type biBundle struct {
 	DisplayName string
 	Description string
 	IsEnabled   bool
+}
+
+func mustGetSkillRef(t *testing.T, s *SkillStore, bid bundleitemutils.BundleID, slug spec.SkillSlug) spec.SkillRef {
+	t.Helper()
+
+	gs, err := s.GetSkill(t.Context(), &spec.GetSkillRequest{
+		BundleID:  bid,
+		SkillSlug: slug,
+	})
+	if err != nil {
+		t.Fatalf("GetSkill(%s/%s): %v", bid, slug, err)
+	}
+	if gs == nil || gs.Body == nil {
+		t.Fatalf("GetSkill(%s/%s): nil response", bid, slug)
+	}
+	return spec.SkillRef{
+		BundleID:  bid,
+		SkillSlug: slug,
+		SkillID:   gs.Body.ID,
+	}
+}
+
+func mustHaveRuntimeItemBySlug(
+	t *testing.T,
+	items []spec.RuntimeSkillListItem,
+	slug spec.SkillSlug,
+) spec.RuntimeSkillListItem {
+	t.Helper()
+	for _, it := range items {
+		if it.SkillRef.SkillSlug == slug {
+			return it
+		}
+	}
+	t.Fatalf("expected runtime list to contain slug=%q; got=%v", slug, runtimeSlugs(items))
+	return spec.RuntimeSkillListItem{}
+}
+
+func mustNotHaveRuntimeItemBySlug(t *testing.T, items []spec.RuntimeSkillListItem, slug spec.SkillSlug) {
+	t.Helper()
+	for _, it := range items {
+		if it.SkillRef.SkillSlug == slug {
+			t.Fatalf("expected runtime list to NOT contain slug=%q; got=%v", slug, runtimeSlugs(items))
+		}
+	}
+}
+
+func runtimeSlugs(items []spec.RuntimeSkillListItem) []spec.SkillSlug {
+	out := make([]spec.SkillSlug, 0, len(items))
+	for _, it := range items {
+		out = append(out, it.SkillRef.SkillSlug)
+	}
+	slices.Sort(out)
+	return out
+}
+
+func listRuntimeSkillsAllow(t *testing.T, s *SkillStore, allow []spec.SkillRef) *spec.ListRuntimeSkillsResponse {
+	t.Helper()
+
+	resp, err := s.ListRuntimeSkills(t.Context(), &spec.ListRuntimeSkillsRequest{
+		Body: &spec.ListRuntimeSkillsRequestBody{
+			Filter: &spec.RuntimeSkillFilter{
+				AllowSkillRefs: allow,
+				Activity:       "any",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ListRuntimeSkills: %v", err)
+	}
+	if resp == nil || resp.Body == nil {
+		t.Fatalf("ListRuntimeSkills: nil response")
+	}
+	return resp
+}
+
+func listRuntimeSkillsAllowFiltered(
+	t *testing.T,
+	s *SkillStore,
+	f *spec.RuntimeSkillFilter,
+) *spec.ListRuntimeSkillsResponse {
+	t.Helper()
+
+	resp, err := s.ListRuntimeSkills(t.Context(), &spec.ListRuntimeSkillsRequest{
+		Body: &spec.ListRuntimeSkillsRequestBody{Filter: f},
+	})
+	if err != nil {
+		t.Fatalf("ListRuntimeSkills(filtered): %v", err)
+	}
+	if resp == nil || resp.Body == nil {
+		t.Fatalf("ListRuntimeSkills(filtered): nil response")
+	}
+	return resp
 }
 
 func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testing.T) {
@@ -133,20 +226,30 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 		t.Fatalf("expected sentinel to remain after idempotent hydrate: %v", err)
 	}
 
-	// Runtime assertions: only enabled built-in skills should be present initially.
-	recs := listRuntimeSkills(t, s)
-	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: biHello.Name, Location: biHelloHydratedDir})
-	mustNotHaveSkillName(t, recs, biDisabled.Name)
+	// Runtime endpoint assertions (store-identity based).
+	biHelloRef := mustGetSkillRef(t, s, bundle.ID, biHello.Slug)
+	biDisabledRef := spec.SkillRef{
+		BundleID:  bundle.ID,
+		SkillSlug: biDisabled.Slug,
+		SkillID:   biDisabled.ID,
+	} // disabled => won't resolve yet
 
-	// Also ensure runtime record fields come from provider indexing (SKILL.md frontmatter),
-	// not from store JSON metadata.
 	{
-		r := findByName(t, recs, biHello.Name)
-		if got, want := r.Description, biHello.FMDesc; got != want {
+		resp := listRuntimeSkillsAllow(t, s, []spec.SkillRef{biHelloRef, biDisabledRef})
+		items := resp.Body.Skills
+
+		// Only enabled built-in skills should be present initially.
+		mustHaveRuntimeItemBySlug(t, items, biHello.Slug)
+		mustNotHaveRuntimeItemBySlug(t, items, biDisabled.Slug)
+
+		// Ensure runtime record fields come from provider indexing (SKILL.md frontmatter),
+		// not from store JSON metadata.
+		it := mustHaveRuntimeItemBySlug(t, items, biHello.Slug)
+		if got, want := it.Description, biHello.FMDesc; got != want {
 			t.Fatalf("builtin description mismatch: got=%q want=%q", got, want)
 		}
-		if !strings.HasPrefix(r.Digest, "sha256:") {
-			t.Fatalf("expected digest sha256:..., got %q", r.Digest)
+		if !strings.HasPrefix(it.Digest, "sha256:") {
+			t.Fatalf("expected digest sha256:..., got %q", it.Digest)
 		}
 	}
 
@@ -210,24 +313,30 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 		t.Fatalf("PutSkill(user-other): %v", err)
 	}
 
-	recs = listRuntimeSkills(t, s)
-	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "user-hello", Location: userHelloDir})
-	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "user-other", Location: userOtherDir})
+	userHelloRef := mustGetSkillRef(t, s, userBundleID, spec.SkillSlug("user-hello"))
+	userOtherRef := mustGetSkillRef(t, s, userBundleID, spec.SkillSlug("user-other"))
+
+	allow := []spec.SkillRef{biHelloRef, userHelloRef, userOtherRef}
 
 	{
-		r := findByName(t, recs, "user-hello")
-		if got, want := r.Description, "USER hello frontmatter description"; got != want {
+		resp := listRuntimeSkillsAllow(t, s, allow)
+		items := resp.Body.Skills
+
+		mustHaveRuntimeItemBySlug(t, items, biHello.Slug)
+		mustHaveRuntimeItemBySlug(t, items, spec.SkillSlug("user-hello"))
+		mustHaveRuntimeItemBySlug(t, items, spec.SkillSlug("user-other"))
+
+		it := mustHaveRuntimeItemBySlug(t, items, spec.SkillSlug("user-hello"))
+		if got, want := it.Description, "USER hello frontmatter description"; got != want {
 			t.Fatalf("user-hello description mismatch: got=%q want=%q", got, want)
 		}
 	}
 
-	// Create session with initial active skills (built-in + one user).
+	// Create session with initial active skills (built-in + one user) using SkillRefs only.
 	createResp, err := s.CreateSkillSession(ctx, &spec.CreateSkillSessionRequest{
 		Body: &spec.CreateSkillSessionRequestBody{
-			ActiveSkills: []agentskillsSpec.SkillDef{
-				{Type: "fs", Name: biHello.Name, Location: biHelloHydratedDir},
-				{Type: "fs", Name: "user-hello", Location: userHelloDir},
-			},
+			AllowSkillRefs:  allow,
+			ActiveSkillRefs: []spec.SkillRef{biHelloRef, userHelloRef},
 		},
 	})
 	if err != nil {
@@ -237,28 +346,42 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 	if sid == "" {
 		t.Fatalf("expected non-empty sessionID")
 	}
+	if len(createResp.Body.ActiveSkillRefs) == 0 {
+		t.Fatalf("expected non-empty activeSkillRefs")
+	}
 
-	// List runtime skills with activity filters scoped to the session.
+	// List runtime skills with activity filters scoped to the session (and combined active refs).
 	{
-		active := listRuntimeSkillsFiltered(t, s, &spec.RuntimeSkillFilter{
-			SessionID: sid,
-			Activity:  "active",
+		activeResp := listRuntimeSkillsAllowFiltered(t, s, &spec.RuntimeSkillFilter{
+			AllowSkillRefs: allow,
+			SessionID:      sid,
+			Activity:       "active",
 		})
-		mustHaveSkillDef(
-			t,
-			active,
-			agentskillsSpec.SkillDef{Type: "fs", Name: biHello.Name, Location: biHelloHydratedDir},
-		)
-		mustHaveSkillDef(t, active, agentskillsSpec.SkillDef{Type: "fs", Name: "user-hello", Location: userHelloDir})
-		mustNotHaveSkillName(t, active, "user-other")
+		active := activeResp.Body.Skills
+		mustHaveRuntimeItemBySlug(t, active, biHello.Slug)
+		mustHaveRuntimeItemBySlug(t, active, spec.SkillSlug("user-hello"))
+		mustNotHaveRuntimeItemBySlug(t, active, spec.SkillSlug("user-other"))
 
-		inactive := listRuntimeSkillsFiltered(t, s, &spec.RuntimeSkillFilter{
-			SessionID: sid,
-			Activity:  "inactive",
+		activeCount := 0
+		for _, s := range activeResp.Body.Skills {
+			if s.IsActive == true {
+				activeCount++
+			}
+		}
+
+		if activeCount == 0 {
+			t.Fatalf("expected activeSkillRefs to be returned when sessionID is provided")
+		}
+
+		inactiveResp := listRuntimeSkillsAllowFiltered(t, s, &spec.RuntimeSkillFilter{
+			AllowSkillRefs: allow,
+			SessionID:      sid,
+			Activity:       "inactive",
 		})
-		mustHaveSkillDef(t, inactive, agentskillsSpec.SkillDef{Type: "fs", Name: "user-other", Location: userOtherDir})
-		mustNotHaveSkillName(t, inactive, biHello.Name)
-		mustNotHaveSkillName(t, inactive, "user-hello")
+		inactive := inactiveResp.Body.Skills
+		mustHaveRuntimeItemBySlug(t, inactive, spec.SkillSlug("user-other"))
+		mustNotHaveRuntimeItemBySlug(t, inactive, biHello.Slug)
+		mustNotHaveRuntimeItemBySlug(t, inactive, spec.SkillSlug("user-hello"))
 	}
 
 	// Prompt XML: must contain active bodies and inactive metadata.
@@ -292,20 +415,22 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 	}); err != nil {
 		t.Fatalf("PatchSkillBundle(user disable): %v", err)
 	}
-	recs = listRuntimeSkills(t, s)
-	mustNotHaveSkillName(t, recs, "user-hello")
-	mustNotHaveSkillName(t, recs, "user-other")
 
-	activeAfterBundleDisable := listRuntimeSkillsFiltered(t, s, &spec.RuntimeSkillFilter{
-		SessionID: sid,
-		Activity:  "active",
-	})
-	mustHaveSkillDef(
-		t,
-		activeAfterBundleDisable,
-		agentskillsSpec.SkillDef{Type: "fs", Name: biHello.Name, Location: biHelloHydratedDir},
-	)
-	mustNotHaveSkillName(t, activeAfterBundleDisable, "user-hello")
+	{
+		resp := listRuntimeSkillsAllow(t, s, allow)
+		items := resp.Body.Skills
+		mustHaveRuntimeItemBySlug(t, items, biHello.Slug)
+		mustNotHaveRuntimeItemBySlug(t, items, spec.SkillSlug("user-hello"))
+		mustNotHaveRuntimeItemBySlug(t, items, spec.SkillSlug("user-other"))
+	}
+
+	activeAfterBundleDisable := listRuntimeSkillsAllowFiltered(t, s, &spec.RuntimeSkillFilter{
+		AllowSkillRefs: allow,
+		SessionID:      sid,
+		Activity:       "active",
+	}).Body.Skills
+	mustHaveRuntimeItemBySlug(t, activeAfterBundleDisable, biHello.Slug)
+	mustNotHaveRuntimeItemBySlug(t, activeAfterBundleDisable, spec.SkillSlug("user-hello"))
 
 	// Re-enable user bundle -> runtime should add them back.
 	if _, err := s.PatchSkillBundle(ctx, &spec.PatchSkillBundleRequest{
@@ -316,9 +441,12 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 	}); err != nil {
 		t.Fatalf("PatchSkillBundle(user enable): %v", err)
 	}
-	recs = listRuntimeSkills(t, s)
-	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "user-hello", Location: userHelloDir})
-	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "user-other", Location: userOtherDir})
+	{
+		resp := listRuntimeSkillsAllow(t, s, allow)
+		items := resp.Body.Skills
+		mustHaveRuntimeItemBySlug(t, items, spec.SkillSlug("user-hello"))
+		mustHaveRuntimeItemBySlug(t, items, spec.SkillSlug("user-other"))
+	}
 
 	// Disable an enabled user skill -> runtime must remove it and prune from session.
 	if _, err := s.PatchSkill(ctx, &spec.PatchSkillRequest{
@@ -330,19 +458,19 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 	}); err != nil {
 		t.Fatalf("PatchSkill(user-hello disable): %v", err)
 	}
-	recs = listRuntimeSkills(t, s)
-	mustNotHaveSkillName(t, recs, "user-hello")
+	{
+		resp := listRuntimeSkillsAllow(t, s, allow)
+		items := resp.Body.Skills
+		mustNotHaveRuntimeItemBySlug(t, items, spec.SkillSlug("user-hello"))
+	}
 
-	activeAfterUserDisable := listRuntimeSkillsFiltered(t, s, &spec.RuntimeSkillFilter{
-		SessionID: sid,
-		Activity:  "active",
-	})
-	mustHaveSkillDef(
-		t,
-		activeAfterUserDisable,
-		agentskillsSpec.SkillDef{Type: "fs", Name: biHello.Name, Location: biHelloHydratedDir},
-	)
-	mustNotHaveSkillName(t, activeAfterUserDisable, "user-hello")
+	activeAfterUserDisable := listRuntimeSkillsAllowFiltered(t, s, &spec.RuntimeSkillFilter{
+		AllowSkillRefs: allow,
+		SessionID:      sid,
+		Activity:       "active",
+	}).Body.Skills
+	mustHaveRuntimeItemBySlug(t, activeAfterUserDisable, biHello.Slug)
+	mustNotHaveRuntimeItemBySlug(t, activeAfterUserDisable, spec.SkillSlug("user-hello"))
 
 	// Enable the built-in disabled skill via built-in PatchSkill path (overlay flag + resync).
 	if _, err := s.PatchSkill(ctx, &spec.PatchSkillRequest{
@@ -354,16 +482,16 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 	}); err != nil {
 		t.Fatalf("PatchSkill(builtin enable disabled skill): %v", err)
 	}
-	recs = listRuntimeSkills(t, s)
-	mustHaveSkillDef(
-		t,
-		recs,
-		agentskillsSpec.SkillDef{
-			Type:     "fs",
-			Name:     biDisabled.Name,
-			Location: hydrateAbsDir(hydrateDir, biDisabled.RelDir),
-		},
-	)
+
+	// Now disabled built-in is resolvable; include it in allowlist and ensure it appears.
+	biDisabledRef = mustGetSkillRef(t, s, bundle.ID, biDisabled.Slug)
+	allow2 := append(slices.Clone(allow), biDisabledRef)
+
+	{
+		resp := listRuntimeSkillsAllow(t, s, allow2)
+		items := resp.Body.Skills
+		mustHaveRuntimeItemBySlug(t, items, biDisabled.Slug)
+	}
 
 	// Disable entire built-in bundle -> runtime should remove both built-in skills and prune from session.
 	if _, err := s.PatchSkillBundle(ctx, &spec.PatchSkillBundleRequest{
@@ -374,16 +502,21 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 	}); err != nil {
 		t.Fatalf("PatchSkillBundle(builtin disable bundle): %v", err)
 	}
-	recs = listRuntimeSkills(t, s)
-	mustNotHaveSkillName(t, recs, biHello.Name)
-	mustNotHaveSkillName(t, recs, biDisabled.Name)
 
-	activeAfterBIDisable := listRuntimeSkillsFiltered(t, s, &spec.RuntimeSkillFilter{
-		SessionID: sid,
-		Activity:  "active",
-	})
-	mustNotHaveSkillName(t, activeAfterBIDisable, biHello.Name)
-	mustNotHaveSkillName(t, activeAfterBIDisable, biDisabled.Name)
+	{
+		resp := listRuntimeSkillsAllow(t, s, allow2)
+		items := resp.Body.Skills
+		mustNotHaveRuntimeItemBySlug(t, items, biHello.Slug)
+		mustNotHaveRuntimeItemBySlug(t, items, biDisabled.Slug)
+	}
+
+	activeAfterBIDisable := listRuntimeSkillsAllowFiltered(t, s, &spec.RuntimeSkillFilter{
+		AllowSkillRefs: allow2,
+		SessionID:      sid,
+		Activity:       "active",
+	}).Body.Skills
+	mustNotHaveRuntimeItemBySlug(t, activeAfterBIDisable, biHello.Slug)
+	mustNotHaveRuntimeItemBySlug(t, activeAfterBIDisable, biDisabled.Slug)
 
 	// Close session and ensure session-scoped APIs error out.
 	if _, err := s.CloseSkillSession(ctx, &spec.CloseSkillSessionRequest{SessionID: sid}); err != nil {
@@ -485,7 +618,11 @@ func TestSkillStore_RuntimeIntegration_ReplacementSafety_UserSkillLocationChange
 		t.Fatalf("PutSkill: %v", err)
 	}
 
-	recs := listRuntimeSkills(t, s)
+	// Internal assertion: replacement safety is a runtime-catalog property (SkillDef includes location).
+	recs, err := s.runtime.ListSkills(ctx, nil)
+	if err != nil {
+		t.Fatalf("runtime.ListSkills: %v", err)
+	}
 	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "replace-skill", Location: loc1})
 
 	// Foreground strict behavior: patch to an invalid replacement location must FAIL
@@ -502,7 +639,10 @@ func TestSkillStore_RuntimeIntegration_ReplacementSafety_UserSkillLocationChange
 		t.Fatalf("expected PatchSkill(bad replacement location) to fail")
 	}
 
-	recs = listRuntimeSkills(t, s)
+	recs, err = s.runtime.ListSkills(ctx, nil)
+	if err != nil {
+		t.Fatalf("runtime.ListSkills: %v", err)
+	}
 	// Old still present (not removed).
 	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "replace-skill", Location: loc1})
 	// Bad replacement not present.
@@ -533,7 +673,10 @@ func TestSkillStore_RuntimeIntegration_ReplacementSafety_UserSkillLocationChange
 		t.Fatalf("PatchSkill(valid replacement location): %v", err)
 	}
 
-	recs = listRuntimeSkills(t, s)
+	recs, err = s.runtime.ListSkills(ctx, nil)
+	if err != nil {
+		t.Fatalf("runtime.ListSkills: %v", err)
+	}
 	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "replace-skill", Location: loc2})
 	mustNotHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "replace-skill", Location: loc1})
 }
@@ -619,7 +762,11 @@ func TestSkillStore_RuntimeIntegration_ReplacementSafety_BackgroundDrift_DoesNot
 	}); err != nil {
 		t.Fatalf("PutSkill: %v", err)
 	}
-	recs := listRuntimeSkills(t, s)
+
+	recs, err := s.runtime.ListSkills(ctx, nil)
+	if err != nil {
+		t.Fatalf("runtime.ListSkills: %v", err)
+	}
 	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "replace-skill", Location: loc1})
 
 	// Simulate "background drift": user manually edits the store JSON to point to a bad location.
@@ -648,7 +795,11 @@ func TestSkillStore_RuntimeIntegration_ReplacementSafety_BackgroundDrift_DoesNot
 	if err := s.runtimeResyncFromStore(ctx); err != nil {
 		t.Fatalf("runtimeResyncFromStore(after drift): %v", err)
 	}
-	recs = listRuntimeSkills(t, s)
+
+	recs, err = s.runtime.ListSkills(ctx, nil)
+	if err != nil {
+		t.Fatalf("runtime.ListSkills: %v", err)
+	}
 	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "replace-skill", Location: loc1})
 	mustNotHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "replace-skill", Location: locBad})
 }
@@ -673,6 +824,35 @@ func TestSkillStore_RuntimeIntegration_RuntimeEndpoints_Errors(t *testing.T) {
 	}
 	t.Cleanup(s.Close)
 
+	// Create one valid user skill so ListRuntimeSkills can reach runtime validation paths.
+	userSkillsRoot := filepath.Join(baseDir, "user-skills")
+	loc := writeSkillPackage(t, userSkillsRoot, "err-skill", "Err skill", "ERR_SKILL_BODY")
+
+	const userBundleID = bundleitemutils.BundleID("user-bundle-id")
+	if _, err := s.PutSkillBundle(ctx, &spec.PutSkillBundleRequest{
+		BundleID: userBundleID,
+		Body: &spec.PutSkillBundleRequestBody{
+			Slug:        bundleitemutils.BundleSlug("user-bundle"),
+			DisplayName: "User Bundle",
+			IsEnabled:   true,
+		},
+	}); err != nil {
+		t.Fatalf("PutSkillBundle: %v", err)
+	}
+	if _, err := s.PutSkill(ctx, &spec.PutSkillRequest{
+		BundleID:  userBundleID,
+		SkillSlug: spec.SkillSlug("err-skill"),
+		Body: &spec.PutSkillRequestBody{
+			SkillType: spec.SkillTypeFS,
+			Location:  loc,
+			Name:      "err-skill",
+			IsEnabled: true,
+		},
+	}); err != nil {
+		t.Fatalf("PutSkill: %v", err)
+	}
+	allow := []spec.SkillRef{mustGetSkillRef(t, s, userBundleID, spec.SkillSlug("err-skill"))}
+
 	type tc struct {
 		name    string
 		run     func(t *testing.T) error
@@ -689,8 +869,20 @@ func TestSkillStore_RuntimeIntegration_RuntimeEndpoints_Errors(t *testing.T) {
 				s.runtime = nil
 				_, err := s.CreateSkillSession(
 					ctx,
-					&spec.CreateSkillSessionRequest{Body: &spec.CreateSkillSessionRequestBody{}},
+					&spec.CreateSkillSessionRequest{Body: &spec.CreateSkillSessionRequestBody{AllowSkillRefs: allow}},
 				)
+				return err
+			},
+			wantIs: spec.ErrSkillInvalidRequest,
+		},
+		{
+			name: "CreateSkillSession allowSkillRefs required",
+			run: func(t *testing.T) error {
+				t.Helper()
+				s.runtime = rt
+				_, err := s.CreateSkillSession(ctx, &spec.CreateSkillSessionRequest{
+					Body: &spec.CreateSkillSessionRequestBody{},
+				})
 				return err
 			},
 			wantIs: spec.ErrSkillInvalidRequest,
@@ -735,6 +927,20 @@ func TestSkillStore_RuntimeIntegration_RuntimeEndpoints_Errors(t *testing.T) {
 			wantIs: agentskillsSpec.ErrInvalidArgument,
 		},
 		{
+			name: "ListRuntimeSkills missing filter.allowSkillRefs",
+			run: func(t *testing.T) error {
+				t.Helper()
+				s.runtime = rt
+				_, err := s.ListRuntimeSkills(ctx, &spec.ListRuntimeSkillsRequest{
+					Body: &spec.ListRuntimeSkillsRequestBody{
+						Filter: &spec.RuntimeSkillFilter{},
+					},
+				})
+				return err
+			},
+			wantIs: spec.ErrSkillInvalidRequest,
+		},
+		{
 			name: "ListRuntimeSkills activity=active requires sessionID",
 			run: func(t *testing.T) error {
 				t.Helper()
@@ -742,13 +948,14 @@ func TestSkillStore_RuntimeIntegration_RuntimeEndpoints_Errors(t *testing.T) {
 				_, err := s.ListRuntimeSkills(ctx, &spec.ListRuntimeSkillsRequest{
 					Body: &spec.ListRuntimeSkillsRequestBody{
 						Filter: &spec.RuntimeSkillFilter{
-							Activity: "active",
+							AllowSkillRefs: allow,
+							Activity:       "active",
 						},
 					},
 				})
 				return err
 			},
-			wantIs: agentskillsSpec.ErrInvalidArgument,
+			wantIs: spec.ErrSkillInvalidRequest,
 		},
 	}
 

@@ -72,20 +72,6 @@ func TestSkillStore_PutSkill_Errors(t *testing.T) {
 			},
 			spec.ErrSkillBundleNotFound,
 		},
-		{
-			"bundle-disabled",
-			&spec.PutSkillRequest{
-				BundleID:  "bdis",
-				SkillSlug: "s1",
-				Body: &spec.PutSkillRequestBody{
-					SkillType: spec.SkillTypeFS,
-					Location:  loc,
-					Name:      "putskill-ok",
-					IsEnabled: true,
-				},
-			},
-			spec.ErrSkillBundleDisabled,
-		},
 	}
 
 	for _, tc := range tests {
@@ -125,7 +111,7 @@ func TestSkillStore_PutSkill_HappyPath_EnabledAndDisabled_RuntimeConverges(t *te
 		t.Fatalf("PutSkill(enabled): %v", err)
 	}
 
-	recs := listRuntimeSkills(t, s)
+	recs := runtimeRecs(t, s)
 	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "user-put-enabled", Location: locEnabled})
 
 	// Disabled-at-create: store persists it, but runtime must not keep it after resync.
@@ -145,7 +131,7 @@ func TestSkillStore_PutSkill_HappyPath_EnabledAndDisabled_RuntimeConverges(t *te
 		t.Fatalf("PutSkill(disabled): %v", err)
 	}
 
-	recs = listRuntimeSkills(t, s)
+	recs = runtimeRecs(t, s)
 	mustNotHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "user-put-disabled", Location: locDisabled})
 
 	// Store has it (GetSkill should fail because disabled).
@@ -250,46 +236,6 @@ func TestSkillStore_PatchSkill_EmptyPatchRejected(t *testing.T) {
 	}
 }
 
-func TestSkillStore_PatchSkill_DisabledBundleRejected(t *testing.T) {
-	t.Parallel()
-	s := newTestSkillStore(t)
-	putBundle(t, s, "b1", "bundle-1", "Bundle 1", true)
-
-	root := t.TempDir()
-	loc := writeSkillPackage(t, root, "patch-skill", "desc", "BODY")
-
-	_, err := s.PutSkill(t.Context(), &spec.PutSkillRequest{
-		BundleID:  "b1",
-		SkillSlug: "patch-skill",
-		Body: &spec.PutSkillRequestBody{
-			SkillType: spec.SkillTypeFS,
-			Location:  loc,
-			Name:      "patch-skill",
-			IsEnabled: true,
-		},
-	})
-	if err != nil {
-		t.Fatalf("PutSkill: %v", err)
-	}
-
-	_, err = s.PatchSkillBundle(t.Context(), &spec.PatchSkillBundleRequest{
-		BundleID: "b1",
-		Body:     &spec.PatchSkillBundleRequestBody{IsEnabled: false},
-	})
-	if err != nil {
-		t.Fatalf("PatchSkillBundle(disable): %v", err)
-	}
-
-	_, err = s.PatchSkill(t.Context(), &spec.PatchSkillRequest{
-		BundleID:  "b1",
-		SkillSlug: "patch-skill",
-		Body:      &spec.PatchSkillRequestBody{IsEnabled: boolPtr(false)},
-	})
-	if err == nil || !errors.Is(err, spec.ErrSkillBundleDisabled) {
-		t.Fatalf("expected ErrSkillBundleDisabled, got %v", err)
-	}
-}
-
 func TestSkillStore_PatchSkill_EnableAndLocationChange_PresenceResetAndRuntimeDelta(t *testing.T) {
 	t.Parallel()
 	s := newTestSkillStore(t)
@@ -323,7 +269,7 @@ func TestSkillStore_PatchSkill_EnableAndLocationChange_PresenceResetAndRuntimeDe
 	if err != nil {
 		t.Fatalf("PatchSkill(enable): %v", err)
 	}
-	recs := listRuntimeSkills(t, s)
+	recs := runtimeRecs(t, s)
 	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "patch-skill", Location: loc1})
 
 	// Location change -> must validate new, remove old, reset presence.
@@ -335,7 +281,7 @@ func TestSkillStore_PatchSkill_EnableAndLocationChange_PresenceResetAndRuntimeDe
 	if err != nil {
 		t.Fatalf("PatchSkill(location): %v", err)
 	}
-	recs = listRuntimeSkills(t, s)
+	recs = runtimeRecs(t, s)
 	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "patch-skill", Location: loc2})
 	mustNotHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "patch-skill", Location: loc1})
 
@@ -389,7 +335,7 @@ func TestSkillStore_RuntimeDuplicateSafeRemoval_PatchAndDelete(t *testing.T) {
 		t.Fatalf("PutSkill(dupe-2): %v", err)
 	}
 
-	recs := listRuntimeSkills(t, s)
+	recs := runtimeRecs(t, s)
 	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "dupe-skill", Location: loc1})
 
 	// Patch only one location: old def must stay because dupe-2 still wants it.
@@ -402,7 +348,7 @@ func TestSkillStore_RuntimeDuplicateSafeRemoval_PatchAndDelete(t *testing.T) {
 		t.Fatalf("PatchSkill(dupe-1 location): %v", err)
 	}
 
-	recs = listRuntimeSkills(t, s)
+	recs = runtimeRecs(t, s)
 	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "dupe-skill", Location: loc1})
 	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "dupe-skill", Location: loc2})
 
@@ -411,7 +357,7 @@ func TestSkillStore_RuntimeDuplicateSafeRemoval_PatchAndDelete(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DeleteSkill(dupe-2): %v", err)
 	}
-	recs = listRuntimeSkills(t, s)
+	recs = runtimeRecs(t, s)
 	mustNotHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "dupe-skill", Location: loc1})
 	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "dupe-skill", Location: loc2})
 }
@@ -591,4 +537,16 @@ func TestSkillStore_enabledDefCountsInUserBundle_InvalidSkillDefFails(t *testing
 	if err == nil || !errors.Is(err, spec.ErrSkillInvalidRequest) {
 		t.Fatalf("expected ErrSkillInvalidRequest, got %v", err)
 	}
+}
+
+func runtimeRecs(t *testing.T, s *SkillStore) []agentskillsSpec.SkillRecord {
+	t.Helper()
+	if s == nil || s.runtime == nil {
+		t.Fatalf("runtime not configured in test store")
+	}
+	recs, err := s.runtime.ListSkills(t.Context(), nil)
+	if err != nil {
+		t.Fatalf("runtime.ListSkills: %v", err)
+	}
+	return recs
 }

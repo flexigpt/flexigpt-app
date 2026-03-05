@@ -1,12 +1,5 @@
 import type { ToolOutputUnion } from '@/spec/tool';
 
-// This is the runtime identity.
-export interface SkillDef {
-	type: string;
-	name: string;
-	location: string;
-}
-
 // Store identity for selection/persistence (NOT runtime identity).
 export interface SkillRef {
 	bundleID: string;
@@ -16,7 +9,6 @@ export interface SkillRef {
 
 export interface RuntimeSkillFilter {
 	types?: string[];
-	namePrefix?: string;
 	locationPrefix?: string;
 	// Store identity allowlist. Backend resolves to SkillDef internally.
 	allowSkillRefs?: SkillRef[];
@@ -28,14 +20,17 @@ export type SkillSessionID = string;
 
 export interface SkillSession {
 	sessionID: SkillSessionID;
-	activeSkills: SkillDef[];
+	activeSkillRefs: SkillRef[];
 }
 
-export interface SkillRecord {
-	def: SkillDef;
-	description: string;
-	properties?: Record<string, any>;
+export interface RuntimeSkillListItem {
+	skillRef: SkillRef;
+	type?: string;
+	name?: string;
+	description?: string;
 	digest?: string;
+	isActive: boolean;
+	errorMessage?: string;
 }
 
 // Mirrors Go: spec.SkillType

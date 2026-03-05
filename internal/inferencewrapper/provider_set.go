@@ -243,8 +243,10 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	enabledSkillRefs := body.Current.EnabledSkillRefs
 
 	skillSessionID := strings.TrimSpace(body.SkillSessionID)
-	if ps.skillStore != nil && len(enabledSkillRefs) > 0 && skillSessionID != "" {
-
+	if ps.skillStore != nil && len(enabledSkillRefs) > 0 {
+		if skillSessionID == "" {
+			return nil, errors.New("enabledSkillRefs provided but skillSessionID is missing")
+		}
 		// Active skills count in this session (restricted to allowlist).
 		activeResp, aerr := ps.skillStore.ListRuntimeSkills(ctx, &skillSpec.ListRuntimeSkillsRequest{
 			Body: &skillSpec.ListRuntimeSkillsRequestBody{
@@ -256,7 +258,14 @@ func (ps *ProviderSetAPI) FetchCompletion(
 			},
 		})
 		activeCount := 0
-		if aerr == nil && activeResp != nil && activeResp.Body != nil {
+		if aerr != nil {
+			if errors.Is(aerr, agentskillsSpec.ErrSessionNotFound) {
+				return nil, fmt.Errorf("skill session %q not found", skillSessionID)
+			}
+			ps.logger.Warn("listRuntimeSkills failed; disabling skills for this turn", "err", aerr)
+			activeResp = nil
+		}
+		if activeResp != nil && activeResp.Body != nil {
 			activeCount = len(activeResp.Body.Skills)
 		}
 
@@ -277,24 +286,35 @@ func (ps *ProviderSetAPI) FetchCompletion(
 				},
 			},
 		})
-		if perr == nil && promptResp != nil && promptResp.Body != nil && strings.TrimSpace(promptResp.Body.XML) != "" {
+		if perr != nil {
+			if errors.Is(perr, agentskillsSpec.ErrSessionNotFound) {
+				return nil, fmt.Errorf("skill session %q not found", skillSessionID)
+			}
+			ps.logger.Warn("getSkillsPromptXML failed; disabling skills for this turn", "err", perr)
+		}
+
+		xmlResp := ""
+		if promptResp != nil && promptResp.Body != nil {
+			xmlResp = strings.TrimSpace(promptResp.Body.XML)
+		}
+
+		// Only expose skills tools if we also have the XML prompt.
+		if xmlResp != "" {
 			includeAllTools := activeCount > 0
 			modelParam.SystemPrompt = appendToSystemPrompt(
 				modelParam.SystemPrompt,
 				skillsRulesPrompt(includeAllTools, ps.skillsRunScriptEnabled),
-
-				promptResp.Body.XML,
+				xmlResp,
 			)
+			// Tool choices:
+			// - if none active => only skills.load
+			// - else => load/unload/readresource/runscript.
+			skillToolChoices, err := buildSkillToolChoices(activeCount > 0, ps.skillsRunScriptEnabled)
+			if err != nil {
+				return nil, fmt.Errorf("failed to build skill tool choices: %w", err)
+			}
+			toolChoices = append(toolChoices, skillToolChoices...)
 		}
-
-		// Tool choices:
-		// - if none active => only skills.load
-		// - else => load/unload/readresource/runscript.
-		skillToolChoices, err := buildSkillToolChoices(activeCount > 0, ps.skillsRunScriptEnabled)
-		if err != nil {
-			return nil, fmt.Errorf("failed to build skill tool choices: %w", err)
-		}
-		toolChoices = append(toolChoices, skillToolChoices...)
 	}
 
 	infReq := &inferenceSpec.FetchCompletionRequest{

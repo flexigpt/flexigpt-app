@@ -2,15 +2,8 @@ package store
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"io/fs"
-	"log/slog"
-	"os"
 	"path"
 	"path/filepath"
 	"sort"
@@ -21,7 +14,6 @@ import (
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
-	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
 )
 
@@ -33,9 +25,6 @@ const (
 
 	// Foreground validation should be quick; runtime is in-mem, but provider indexing may touch disk.
 	runtimeForegroundValidateTimeout = 15 * time.Second
-
-	// Defense-in-depth: cap JSON args size for skills tools.
-	maxSkillToolArgsBytes = 1 << 20 // 1 MiB
 )
 
 type runtimeApplyMode int
@@ -48,37 +37,92 @@ const (
 func (s *SkillStore) CreateSkillSession(
 	ctx context.Context,
 	req *spec.CreateSkillSessionRequest,
-) (resp *spec.CreateSkillSessionResponse, err error) {
+) (*spec.CreateSkillSessionResponse, error) {
 	if s.runtime == nil {
 		return nil, fmt.Errorf("%w: runtime not configured", spec.ErrSkillInvalidRequest)
 	}
-
-	var (
-		maxActive    int
-		activeSkills []agentskillsSpec.SkillDef
-	)
-	if req != nil && req.Body != nil {
-		maxActive = req.Body.MaxActivePerSession
-		activeSkills = req.Body.ActiveSkills
+	if req == nil || req.Body == nil {
+		return nil, fmt.Errorf("%w: missing request", spec.ErrSkillInvalidRequest)
 	}
+
+	if len(req.Body.AllowSkillRefs) == 0 {
+		return nil, fmt.Errorf("%w: allowSkillRefs required", spec.ErrSkillInvalidRequest)
+	}
+
+	for _, r := range req.Body.AllowSkillRefs {
+		if err := validateSkillRef(r); err != nil {
+			return nil, fmt.Errorf("%w: invalid allowSkillRef: %w", spec.ErrSkillInvalidRequest, err)
+		}
+	}
+	for _, r := range req.Body.ActiveSkillRefs {
+		if err := validateSkillRef(r); err != nil {
+			return nil, fmt.Errorf("%w: invalid activeSkillRef: %w", spec.ErrSkillInvalidRequest, err)
+		}
+	}
+
+	// Best-effort close an old session if requested (avoids session leaks on tab/conversation switches).
+	if sid := strings.TrimSpace(string(req.Body.CloseSessionID)); sid != "" {
+		_ = s.runtime.CloseSession(ctx, agentskillsSpec.SessionID(sid))
+	}
+
+	activeRefs := normalizeActiveRefsSubsetOfAllow(req.Body.AllowSkillRefs, req.Body.ActiveSkillRefs)
+
+	// Resolve allowlist refs -> defs once; then resolve active refs from the allowlist mapping.
+	res := s.resolveAllowSkillRefs(ctx, req.Body.AllowSkillRefs)
+	if len(res.AllowDefs) == 0 {
+		return nil, fmt.Errorf("%w: allowSkillRefs did not resolve to any enabled skills", spec.ErrSkillInvalidRequest)
+	}
+
+	activeDefSet := map[agentskillsSpec.SkillDef]struct{}{}
+	for _, r := range activeRefs {
+		if def, ok := res.RefToDef[refKey(r)]; ok {
+			activeDefSet[def] = struct{}{}
+		}
+	}
+	activeDefs := make([]agentskillsSpec.SkillDef, 0, len(activeDefSet))
+	for d := range activeDefSet {
+		activeDefs = append(activeDefs, d)
+	}
+	sortSkillDefs(activeDefs)
 
 	opts := []agentskills.SessionOption{}
-	if maxActive > 0 {
-		opts = append(opts, agentskills.WithSessionMaxActivePerSession(maxActive))
+	if req.Body.MaxActivePerSession > 0 {
+		opts = append(opts, agentskills.WithSessionMaxActivePerSession(req.Body.MaxActivePerSession))
 	}
-	if len(activeSkills) > 0 {
-		opts = append(opts, agentskills.WithSessionActiveSkills(activeSkills))
+	if len(activeDefs) > 0 {
+		opts = append(opts, agentskills.WithSessionActiveSkills(activeDefs))
 	}
 
-	sid, active, err := s.runtime.NewSession(ctx, opts...)
+	sid, _, err := s.runtime.NewSession(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
 
+	// Query actual active skills from runtime (don’t trust input echo).
+	recs, err := s.runtime.ListSkills(ctx, &agentskills.SkillListFilter{
+		SessionID:   sid,
+		Activity:    agentskills.SkillActivityActive,
+		AllowSkills: res.AllowDefs, // constrain to allowlist to keep mapping well-defined
+	})
+	if err != nil {
+		// If session somehow disappeared immediately, surface it.
+		if errors.Is(err, agentskillsSpec.ErrSessionNotFound) {
+			return nil, err
+		}
+		// Otherwise: return session but empty actives.
+		recs = nil
+	}
+
+	actualActiveDefSet := map[agentskillsSpec.SkillDef]struct{}{}
+	for _, r := range recs {
+		actualActiveDefSet[r.Def] = struct{}{}
+	}
+	activeOutRefs := buildActiveSkillRefs(res.DefToRefs, actualActiveDefSet)
+
 	return &spec.CreateSkillSessionResponse{
 		Body: &spec.CreateSkillSessionResponseBody{
-			SessionID:    sid,
-			ActiveSkills: active,
+			SessionID:       sid,
+			ActiveSkillRefs: activeOutRefs,
 		},
 	}, nil
 }
@@ -110,10 +154,20 @@ func (s *SkillStore) GetSkillsPromptXML(
 	var filter *agentskills.SkillFilter
 	if req != nil && req.Body != nil && req.Body.Filter != nil {
 		f := req.Body.Filter
-		allow := s.runtimeDefsForSkillRefs(ctx, f.AllowSkillRefs)
+
+		var allow []agentskillsSpec.SkillDef
+		if len(f.AllowSkillRefs) > 0 {
+			for _, r := range f.AllowSkillRefs {
+				if err := validateSkillRef(r); err != nil {
+					return nil, fmt.Errorf("%w: invalid filter.allowSkillRefs: %w", spec.ErrSkillInvalidRequest, err)
+				}
+			}
+			res := s.resolveAllowSkillRefs(ctx, f.AllowSkillRefs)
+			allow = res.AllowDefs
+		}
+
 		filter = &agentskills.SkillFilter{
 			Types:          append([]string(nil), f.Types...),
-			NamePrefix:     f.NamePrefix,
 			LocationPrefix: f.LocationPrefix,
 			AllowSkills:    allow,
 			SessionID:      f.SessionID,
@@ -136,444 +190,209 @@ func (s *SkillStore) ListRuntimeSkills(
 	if s.runtime == nil {
 		return nil, fmt.Errorf("%w: runtime not configured", spec.ErrSkillInvalidRequest)
 	}
+	if req == nil || req.Body == nil || req.Body.Filter == nil {
+		return nil, fmt.Errorf("%w: missing filter", spec.ErrSkillInvalidRequest)
+	}
 
-	var filter *agentskills.SkillListFilter
-	if req != nil && req.Body != nil && req.Body.Filter != nil {
-		f := req.Body.Filter
-		allow := s.runtimeDefsForSkillRefs(ctx, f.AllowSkillRefs)
-		filter = &agentskills.SkillListFilter{
-			Types:          append([]string(nil), f.Types...),
-			NamePrefix:     f.NamePrefix,
-			LocationPrefix: f.LocationPrefix,
-			AllowSkills:    allow,
-			SessionID:      f.SessionID,
-			Activity:       agentskills.SkillActivity(strings.TrimSpace(f.Activity)),
+	f := req.Body.Filter
+	if len(f.AllowSkillRefs) == 0 {
+		return nil, fmt.Errorf("%w: filter.allowSkillRefs required", spec.ErrSkillInvalidRequest)
+	}
+
+	for _, r := range f.AllowSkillRefs {
+		if err := validateSkillRef(r); err != nil {
+			return nil, fmt.Errorf("%w: invalid filter.allowSkillRefs: %w", spec.ErrSkillInvalidRequest, err)
 		}
 	}
+
+	act := strings.TrimSpace(f.Activity)
+	if act == "" {
+		act = "any"
+	}
+	if act == "active" && strings.TrimSpace(string(f.SessionID)) == "" {
+		return nil, fmt.Errorf("%w: activity=active requires sessionID", spec.ErrSkillInvalidRequest)
+	}
+
+	res := s.resolveAllowSkillRefs(ctx, f.AllowSkillRefs)
+
+	// If nothing resolves (all stale/disabled/etc), return empty list (do not error).
+	if len(res.AllowDefs) == 0 {
+		body := &spec.ListRuntimeSkillsResponseBody{
+			Skills: nil,
+		}
+		return &spec.ListRuntimeSkillsResponse{Body: body}, nil
+	}
+
+	filter := &agentskills.SkillListFilter{
+		Types:          append([]string(nil), f.Types...),
+		LocationPrefix: f.LocationPrefix,
+		AllowSkills:    res.AllowDefs,
+		SessionID:      f.SessionID,
+		Activity:       agentskills.SkillActivity(strings.TrimSpace(f.Activity)),
+	}
+
 	recs, err := s.runtime.ListSkills(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
-	return &spec.ListRuntimeSkillsResponse{
-		Body: &spec.ListRuntimeSkillsResponseBody{Skills: recs},
-	}, nil
-}
 
-func (s *SkillStore) InvokeSkillTool(
-	ctx context.Context,
-	req *spec.InvokeSkillToolRequest,
-) (*spec.InvokeSkillToolResponse, error) {
-	if s.runtime == nil {
-		return nil, fmt.Errorf("%w: runtime not configured", spec.ErrSkillInvalidRequest)
-	}
-	if req == nil || req.Body == nil {
-		return nil, fmt.Errorf("%w: missing request", spec.ErrSkillInvalidRequest)
-	}
-
-	sid := strings.TrimSpace(string(req.Body.SessionID))
-	if sid == "" {
-		return nil, fmt.Errorf("%w: sessionID required", spec.ErrSkillInvalidRequest)
-	}
-
-	toolName := strings.TrimSpace(req.Body.ToolName)
-	if toolName == "" {
-		return nil, fmt.Errorf("%w: toolName required", spec.ErrSkillInvalidRequest)
-	}
-
-	argsStr := strings.TrimSpace(req.Body.Args)
-	if argsStr == "" {
-		// Be forgiving: models (and manual retries) sometimes omit "{}".
-		argsStr = "{}"
-	}
-	if len(argsStr) > maxSkillToolArgsBytes {
-		return nil, fmt.Errorf("%w: args too large", spec.ErrSkillInvalidRequest)
-	}
-	if !json.Valid([]byte(argsStr)) {
-		return nil, fmt.Errorf("%w: args must be valid JSON", spec.ErrSkillInvalidRequest)
-	}
-	trim := strings.TrimSpace(argsStr)
-	if trim != "" && trim[0] != '{' {
-		return nil, fmt.Errorf("%w: args must be a JSON object", spec.ErrSkillInvalidRequest)
-	}
-
-	reg, err := s.runtime.NewSessionRegistry(ctx, agentskillsSpec.SessionID(sid))
-	if err != nil {
-		return nil, err
-	}
-
-	var funcID string
-	switch toolName {
-	case "skills.load":
-		funcID = string(agentskillsSpec.FuncIDSkillsLoad)
-	case "skills.unload":
-		funcID = string(agentskillsSpec.FuncIDSkillsUnload)
-	case "skills.readresource":
-		funcID = string(agentskillsSpec.FuncIDSkillsReadResource)
-	case "skills.runscript":
-		funcID = string(agentskillsSpec.FuncIDSkillsRunScript)
-	default:
-		return nil, fmt.Errorf("%w: unknown toolName %q", spec.ErrSkillInvalidRequest, toolName)
-	}
-
-	outs, callErr := llmtoolsutil.CallUsingRegistry(ctx, reg, funcID, json.RawMessage([]byte(argsStr)))
-	isErr := callErr != nil
-	errMsg := ""
-	if callErr != nil {
-		errMsg = callErr.Error()
-	}
-
-	return &spec.InvokeSkillToolResponse{
-		Body: &spec.InvokeSkillToolResponseBody{
-			Outputs:      outs,
-			Meta:         map[string]any{"toolName": toolName},
-			IsBuiltIn:    true,
-			IsError:      isErr,
-			ErrorMessage: errMsg,
-		},
-	}, nil
-}
-
-// bestEffortRuntimeResync reconciles the runtime catalog to match the store's enabled skills.
-// It must never panic and must never abort store initialization or CRUD.
-//
-// IMPORTANT:
-//   - It does NOT persist any runtime-produced canonicalization.
-//   - It uses only SkillDef (type/name/location) lifecycle selectors.
-//   - It is safe to call frequently; it serializes internally.
-func (s *SkillStore) bestEffortRuntimeResync(ctx context.Context, reason string) {
-	if s == nil || s.runtime == nil {
-		return
-	}
-
-	s.rtResyncMu.Lock()
-	defer s.rtResyncMu.Unlock()
-
-	defer func() {
-		if r := recover(); r != nil {
-			slog.Error("runtime resync: panic", "reason", reason, "panic", r)
-		}
-	}()
-
-	ctx, cancel := context.WithTimeout(ctx, runtimeResyncTimeout)
-	defer cancel()
-
-	if err := s.runtimeResyncFromStore(ctx); err != nil {
-		slog.Error("runtime resync failed", "reason", reason, "err", err)
-	}
-}
-
-// runtimeResyncStrictFromStore performs a STRICT reconcile: any add/remove failure returns an error.
-// This is used for rollback after store write failures.
-func (s *SkillStore) runtimeResyncStrictFromStore(ctx context.Context) error {
-	if s == nil || s.runtime == nil {
-		return nil
-	}
-	// Strict rollback should ensure built-in hydration is present.
-	if err := s.hydrateBuiltInEmbeddedFS(ctx); err != nil {
-		return err
-	}
-	view, err := s.runtimeDesiredViewFromStore(ctx, runtimeDesiredViewOpts{
-		WantByTypeName: true,
-		LogInvalid:     true,
-	})
-	if err != nil {
-		return err
-	}
-	return s.runtimeApplyDesiredStrict(ctx, view.Set, view.ByTypeName)
-}
-
-// runtimeApplyDesiredStrict reconciles runtime to match desired, failing fast on add/remove errors.
-func (s *SkillStore) runtimeApplyDesiredStrict(
-	ctx context.Context,
-	desired map[agentskillsSpec.SkillDef]struct{},
-	desiredByTypeName map[string][]agentskillsSpec.SkillDef,
-) (err error) {
-	if s == nil || s.runtime == nil {
-		return nil
-	}
-
-	defer func() {
-		if r := recover(); r != nil {
-			slog.Error("runtimeApplyDesiredStrict: panic", "panic", r)
-			err = fmt.Errorf("runtimeApplyDesiredStrict panic: %v", r)
-
-		}
-	}()
-
-	return s.runtimeApplyDesired(ctx, desired, desiredByTypeName, runtimeApplyStrict)
-}
-
-func (s *SkillStore) runtimeResyncFromStore(ctx context.Context) error {
-	if s == nil || s.runtime == nil {
-		return nil
-	}
-
-	// Best effort: attempt hydration but don't abort resync of user skills.
-	if err := s.hydrateBuiltInEmbeddedFS(ctx); err != nil {
-		slog.Error("runtime resync: embeddedfs hydration failed", "err", err)
-	}
-
-	view, err := s.runtimeDesiredViewFromStore(ctx, runtimeDesiredViewOpts{
-		WantByTypeName: true,
-		LogInvalid:     true,
-	})
-	if err != nil {
-		// Hard stop: do not mutate runtime if we couldn't build the desired view safely.
-		return err
-	}
-
-	return s.runtimeApplyDesired(ctx, view.Set, view.ByTypeName, runtimeApplyBestEffort)
-}
-
-// runtimeApplyDesired reconciles runtime to match desired.
-//   - In strict mode: add/remove errors fail fast (but ErrAlreadyExists/ErrNotFound are tolerated).
-//   - In best-effort mode: add/remove errors are logged and ignored.
-//
-// Replacement safety rule (both modes):
-// If a to-be-removed def has (type,name) replacements in desired, we only remove it if at least one
-// desired replacement is known-present after the add phase.
-func (s *SkillStore) runtimeApplyDesired(
-	ctx context.Context,
-	desired map[agentskillsSpec.SkillDef]struct{},
-	desiredByTypeName map[string][]agentskillsSpec.SkillDef,
-	mode runtimeApplyMode,
-) error {
-	if s == nil || s.runtime == nil {
-		return nil
-	}
-
-	currentRecs, err := s.runtime.ListSkills(ctx, nil)
-	if err != nil {
-		return err
-	}
-	currentSet := make(map[agentskillsSpec.SkillDef]struct{}, len(currentRecs))
-	for _, r := range currentRecs {
-		currentSet[r.Def] = struct{}{}
-	}
-
-	// Determine additions.
-	var toAdd []agentskillsSpec.SkillDef
-	for def := range desired {
-		if _, ok := currentSet[def]; !ok {
-			toAdd = append(toAdd, def)
-		}
-	}
-	sortSkillDefs(toAdd)
-
-	// "presentAfterAdds" tracks which defs are known present after the add phase.
-	// This is used by the replacement-safety rule for removals.
-	presentAfterAdds := make(map[agentskillsSpec.SkillDef]struct{}, len(currentSet)+len(toAdd))
-	for def := range currentSet {
-		presentAfterAdds[def] = struct{}{}
-	}
-
-	for _, def := range toAdd {
-		if _, err := s.runtime.AddSkill(ctx, def); err != nil {
-			if errors.Is(err, agentskillsSpec.ErrSkillAlreadyExists) {
-				presentAfterAdds[def] = struct{}{}
-				continue
-			}
-			if mode == runtimeApplyStrict {
-				return err
-			}
-			slog.Error("runtime add failed", "type", def.Type, "name", def.Name, "location", def.Location, "err", err)
-			continue
-		}
-		presentAfterAdds[def] = struct{}{}
-	}
-
-	// Build replacement safety index (type+name that is desired and known present).
-	desiredPresentTypeName := map[string]bool{}
-	for def := range presentAfterAdds {
-		if _, ok := desired[def]; ok {
-			desiredPresentTypeName[typeNameKey(def.Type, def.Name)] = true
-		}
-	}
-
-	// Determine removals.
-	var toRemove []agentskillsSpec.SkillDef
-	for def := range currentSet {
-		if _, ok := desired[def]; !ok {
-			toRemove = append(toRemove, def)
-		}
-	}
-	sortSkillDefs(toRemove)
-
-	for _, def := range toRemove {
-		tn := typeNameKey(def.Type, def.Name)
-
-		// Safety rule: if this looks like a "replacement" and none of the desired
-		// replacements are present, skip removing the old one.
-		if _, hasReplacement := desiredByTypeName[tn]; hasReplacement && !desiredPresentTypeName[tn] {
-			if mode == runtimeApplyBestEffort {
-				slog.Warn(
-					"runtime remove skipped (replacement missing)",
-					"type", def.Type,
-					"name", def.Name,
-					"location", def.Location,
-				)
-			}
-			// Strict mode: silent skip (keeps previous behavior).
-			continue
-		}
-
-		if _, err := s.runtime.RemoveSkill(ctx, def); err != nil {
-			if errors.Is(err, agentskillsSpec.ErrSkillNotFound) {
-				continue
-			}
-			if mode == runtimeApplyStrict {
-				return err
-			}
-			slog.Error(
-				"runtime remove failed",
-				"type", def.Type,
-				"name", def.Name,
-				"location", def.Location,
-				"err", err,
-			)
-		}
-	}
-
-	return nil
-}
-
-type runtimeDesiredView struct {
-	// Set is the desired unique SkillDefs (deduped).
-	Set map[agentskillsSpec.SkillDef]struct{}
-
-	// ByTypeName groups desired SkillDefs by (type,name) for replacement-safety rules.
-	// Optional (only built when requested).
-	ByTypeName map[string][]agentskillsSpec.SkillDef
-
-	// Counts tracks how many enabled skills resolve to the same SkillDef (duplicate-safe removals).
-	Counts map[agentskillsSpec.SkillDef]int
-}
-
-type runtimeDesiredViewOpts struct {
-	WantByTypeName bool
-	LogInvalid     bool
-}
-
-func (s *SkillStore) runtimeDesiredViewFromStore(
-	ctx context.Context,
-	opts runtimeDesiredViewOpts,
-) (runtimeDesiredView, error) {
-	s.mu.RLock()
-	user, err := s.readAllUser(false)
-	s.mu.RUnlock()
-	if err != nil {
-		return runtimeDesiredView{}, err
-	}
-	return s.runtimeDesiredViewForSnapshot(ctx, user, opts)
-}
-
-// runtimeDesiredDefCountsForSnapshot builds desired counts for enabled skills across builtin + user snapshot.
-// Used for duplicate-safe runtime removals in foreground paths.
-func (s *SkillStore) runtimeDesiredDefCountsForSnapshot(
-	ctx context.Context,
-	user skillStoreSchema,
-) (map[agentskillsSpec.SkillDef]int, error) {
-	view, err := s.runtimeDesiredViewForSnapshot(ctx, user, runtimeDesiredViewOpts{
-		WantByTypeName: false,
-		LogInvalid:     false,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return view.Counts, nil
-}
-
-// runtimeDesiredViewForSnapshot computes a consistent desired view across built-in + user snapshot.
-func (s *SkillStore) runtimeDesiredViewForSnapshot(
-	ctx context.Context,
-	user skillStoreSchema,
-	opts runtimeDesiredViewOpts,
-) (runtimeDesiredView, error) {
-	view := runtimeDesiredView{
-		Set:    map[agentskillsSpec.SkillDef]struct{}{},
-		Counts: map[agentskillsSpec.SkillDef]int{},
-	}
-	if opts.WantByTypeName {
-		view.ByTypeName = map[string][]agentskillsSpec.SkillDef{}
-	}
-
-	add := func(def agentskillsSpec.SkillDef) {
-		view.Set[def] = struct{}{}
-		view.Counts[def]++
-		if opts.WantByTypeName {
-			k := typeNameKey(def.Type, def.Name)
-			view.ByTypeName[k] = append(view.ByTypeName[k], def)
-		}
-	}
-
-	// Built-ins (overlay view).
-	if s.builtin != nil {
-		bundles, skills, err := s.builtin.ListBuiltInSkills(ctx)
+	activeDefSet := map[agentskillsSpec.SkillDef]struct{}{}
+	needActiveSet := strings.TrimSpace(string(f.SessionID)) != "" && act == "any"
+	if needActiveSet {
+		activeRecs, err := s.runtime.ListSkills(ctx, &agentskills.SkillListFilter{
+			SessionID:   f.SessionID,
+			Activity:    agentskills.SkillActivityActive,
+			AllowSkills: res.AllowDefs,
+		})
 		if err != nil {
-			return runtimeDesiredView{}, err
+			return nil, err
 		}
-		for bid, b := range bundles {
-			if !b.IsEnabled {
-				continue
-			}
-			for _, sk := range skills[bid] {
-				if !sk.IsEnabled {
-					continue
-				}
-				def, err := s.runtimeDefForBuiltInSkill(sk)
-				if err != nil {
-					if opts.LogInvalid {
-						slog.Error(
-							"runtime desired (builtin) invalid def",
-							"bundleID", bid,
-							"skill", sk.Slug,
-							"err", err,
-						)
-					}
-					continue
-				}
-				add(def)
-			}
+		for _, r := range activeRecs {
+			activeDefSet[r.Def] = struct{}{}
 		}
+
 	}
 
-	// Users (snapshot provided).
-	for bid, b := range user.Bundles {
-		if isSoftDeletedSkillBundle(b) || !b.IsEnabled {
+	items := make([]spec.RuntimeSkillListItem, 0, len(recs))
+	seenItem := map[string]struct{}{}
+
+	for _, r := range recs {
+		refs := res.DefToRefs[r.Def]
+		if len(refs) == 0 {
+			// Defensive: should not happen when AllowSkills was derived from SkillRefs.
 			continue
 		}
-		for _, sk := range user.Skills[bid] {
-			if !sk.IsEnabled {
+		for _, sr := range refs {
+			k := refKey(sr)
+			if _, ok := seenItem[k]; ok {
 				continue
 			}
-			def, err := runtimeDefForUserSkill(sk)
-			if err != nil {
-				if opts.LogInvalid {
-					slog.Error(
-						"runtime desired (user) invalid def",
-						"bundleID", bid,
-						"skill", sk.Slug,
-						"err", err,
-					)
-				}
-				continue
-			}
-			add(def)
+			seenItem[k] = struct{}{}
+
+			items = append(items, spec.RuntimeSkillListItem{
+				SkillRef:    sr,
+				Type:        r.Def.Type,
+				Name:        r.Def.Name,
+				Description: r.Description,
+				Digest:      r.Digest,
+				IsActive: func() bool {
+					if act == "active" {
+						return true
+					}
+					if act == "inactive" || strings.TrimSpace(string(f.SessionID)) == "" {
+						return false
+					}
+					_, ok := activeDefSet[r.Def]
+					return ok
+				}(),
+			})
 		}
 	}
 
-	return view, nil
+	sort.Slice(items, func(i, j int) bool {
+		a := items[i].SkillRef
+		b := items[j].SkillRef
+		if a.BundleID != b.BundleID {
+			return a.BundleID < b.BundleID
+		}
+		if a.SkillSlug != b.SkillSlug {
+			return a.SkillSlug < b.SkillSlug
+		}
+		return a.SkillID < b.SkillID
+	})
+
+	out := &spec.ListRuntimeSkillsResponseBody{
+		Skills: items,
+	}
+
+	return &spec.ListRuntimeSkillsResponse{
+		Body: out,
+	}, nil
 }
 
-func runtimeDefForUserSkill(sk spec.Skill) (agentskillsSpec.SkillDef, error) {
-	if strings.TrimSpace(sk.Name) == "" || strings.TrimSpace(sk.Location) == "" {
-		return agentskillsSpec.SkillDef{}, fmt.Errorf("%w: empty name/location", agentskillsSpec.ErrInvalidArgument)
+// resolveRuntimeDefForSkillRef resolves a store identity (SkillRef) to a runtime SkillDef.
+// If SkillID is provided, it must match the current store value (stale-ref hardening).
+func (s *SkillStore) resolveRuntimeDefForSkillRef(
+	ctx context.Context,
+	r spec.SkillRef,
+) (agentskillsSpec.SkillDef, bool) {
+	bid := strings.TrimSpace(string(r.BundleID))
+	slug := strings.TrimSpace(string(r.SkillSlug))
+	if bid == "" || slug == "" {
+		return agentskillsSpec.SkillDef{}, false
 	}
-	return agentskillsSpec.SkillDef{
-		Type:     string(sk.Type),
-		Name:     sk.Name,
-		Location: sk.Location,
-	}, nil
+
+	gs, err := s.GetSkill(ctx, &spec.GetSkillRequest{
+		BundleID:  bundleitemutils.BundleID(bid),
+		SkillSlug: spec.SkillSlug(slug),
+	})
+	if err != nil || gs == nil || gs.Body == nil {
+		return agentskillsSpec.SkillDef{}, false
+	}
+	sk := *gs.Body
+
+	// Stale ref hardening (optional).
+	if strings.TrimSpace(string(r.SkillID)) != "" && sk.ID != r.SkillID {
+		return agentskillsSpec.SkillDef{}, false
+	}
+
+	def, err := s.runtimeDefForStoreSkill(sk)
+	if err != nil {
+		return agentskillsSpec.SkillDef{}, false
+	}
+	return def, true
+}
+
+type resolvedAllowSkillRefs struct {
+	DefToRefs map[agentskillsSpec.SkillDef][]spec.SkillRef
+	RefToDef  map[string]agentskillsSpec.SkillDef
+	AllowDefs []agentskillsSpec.SkillDef // unique
+}
+
+// resolveAllowSkillRefs converts allowlist SkillRefs -> runtime SkillDefs, and builds mappings both ways.
+// Invalid/unresolvable refs are silently skipped (best-effort, stale-safe).
+func (s *SkillStore) resolveAllowSkillRefs(
+	ctx context.Context,
+	allowRefs []spec.SkillRef,
+) resolvedAllowSkillRefs {
+	out := resolvedAllowSkillRefs{
+		DefToRefs: map[agentskillsSpec.SkillDef][]spec.SkillRef{},
+		RefToDef:  map[string]agentskillsSpec.SkillDef{},
+		AllowDefs: nil,
+	}
+	if len(allowRefs) == 0 {
+		return out
+	}
+
+	seenRef := map[string]struct{}{}
+	seenDef := map[agentskillsSpec.SkillDef]struct{}{}
+
+	for _, r := range allowRefs {
+		k := refKey(r)
+		if k == "|" || k == "" {
+			continue
+		}
+		if _, ok := seenRef[k]; ok {
+			continue
+		}
+		seenRef[k] = struct{}{}
+
+		def, ok := s.resolveRuntimeDefForSkillRef(ctx, r)
+		if !ok {
+			continue
+		}
+
+		out.DefToRefs[def] = append(out.DefToRefs[def], r)
+		out.RefToDef[k] = def
+
+		if _, ok := seenDef[def]; !ok {
+			seenDef[def] = struct{}{}
+			out.AllowDefs = append(out.AllowDefs, def)
+		}
+	}
+
+	sortSkillDefs(out.AllowDefs)
+	return out
 }
 
 func (s *SkillStore) runtimeDefForBuiltInSkill(sk spec.Skill) (agentskillsSpec.SkillDef, error) {
@@ -595,203 +414,82 @@ func (s *SkillStore) runtimeDefForBuiltInSkill(sk spec.Skill) (agentskillsSpec.S
 	}, nil
 }
 
-func (s *SkillStore) hydrateBuiltInEmbeddedFS(ctx context.Context) error {
-	if s.builtin == nil {
+func buildActiveSkillRefs(
+	defToRefs map[agentskillsSpec.SkillDef][]spec.SkillRef,
+	activeDefs map[agentskillsSpec.SkillDef]struct{},
+) []spec.SkillRef {
+	if len(activeDefs) == 0 || len(defToRefs) == 0 {
 		return nil
 	}
 
-	defer func() {
-		if r := recover(); r != nil {
-			slog.Error("hydrateBuiltInEmbeddedFS: panic", "panic", r)
-		}
-	}()
-
-	sub, err := resolveSkillsFS(s.builtin.skillsFS, s.builtin.skillsDir)
-	if err != nil {
-		return err
-	}
-	digest, err := fsDigestSHA256(sub)
-	if err != nil {
-		return err
-	}
-
-	if err := os.MkdirAll(s.embeddedHydrateDir, 0o755); err != nil {
-		return err
-	}
-
-	digestPath := filepath.Join(s.embeddedHydrateDir, embeddedHydrateDigestFile)
-	prev, _ := os.ReadFile(digestPath)
-	if strings.TrimSpace(string(prev)) == digest {
-		return nil
-	}
-
-	if err := os.RemoveAll(s.embeddedHydrateDir); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(s.embeddedHydrateDir, 0o755); err != nil {
-		return err
-	}
-	if err := copyFSToDir(sub, s.embeddedHydrateDir); err != nil {
-		return err
-	}
-	if err := os.WriteFile(digestPath, []byte(digest+"\n"), 0o600); err != nil {
-		return err
-	}
-
-	slog.Info("hydrated embedded skills fs", "dir", s.embeddedHydrateDir, "digest", digest)
-	return nil
-}
-
-// runtimeTryAddForeground attempts to add/index a skill in runtime for strict foreground validation.
-// Returns (addedByUs=true) if we successfully added; false if it already existed.
-func (s *SkillStore) runtimeTryAddForeground(ctx context.Context, def agentskillsSpec.SkillDef) (bool, error) {
-	if s == nil || s.runtime == nil {
-		return false, fmt.Errorf("%w: runtime not configured", spec.ErrSkillInvalidRequest)
-	}
-	ctx, cancel := context.WithTimeout(ctx, runtimeForegroundValidateTimeout)
-	defer cancel()
-
-	if _, err := s.runtime.AddSkill(ctx, def); err != nil {
-		if errors.Is(err, agentskillsSpec.ErrSkillAlreadyExists) {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
-}
-
-func (s *SkillStore) runtimeDefsForSkillRefs(
-	ctx context.Context,
-	refs []spec.SkillRef,
-) []agentskillsSpec.SkillDef {
-	if len(refs) == 0 {
-		return nil
-	}
-
-	// Dedupe by bundleID|skillSlug (store identity).
 	seen := map[string]struct{}{}
-	out := make([]agentskillsSpec.SkillDef, 0, len(refs))
+	out := make([]spec.SkillRef, 0)
 
-	for _, r := range refs {
-		bid := string(r.BundleID)
-		slug := string(r.SkillSlug)
-		if bid == "" || slug == "" {
+	for def := range activeDefs {
+		for _, sr := range defToRefs[def] {
+			k := refKey(sr)
+			if _, ok := seen[k]; ok {
+				continue
+			}
+			seen[k] = struct{}{}
+			out = append(out, sr)
+		}
+	}
+
+	sortSkillRefs(out)
+	return out
+}
+
+func normalizeActiveRefsSubsetOfAllow(allow, active []spec.SkillRef) []spec.SkillRef {
+	if len(active) == 0 || len(allow) == 0 {
+		return nil
+	}
+	allowSet := map[string]struct{}{}
+	for _, r := range allow {
+		allowSet[refKey(r)] = struct{}{}
+	}
+	out := make([]spec.SkillRef, 0, len(active))
+	seen := map[string]struct{}{}
+	for _, r := range active {
+		k := refKey(r)
+		if _, ok := allowSet[k]; !ok {
 			continue
 		}
-		k := bid + "|" + slug
 		if _, ok := seen[k]; ok {
 			continue
 		}
 		seen[k] = struct{}{}
-
-		// Load the store Skill (built-in or user) and map to runtime def.
-		gs, err := s.GetSkill(ctx, &spec.GetSkillRequest{
-			BundleID:  bundleitemutils.BundleID(bid),
-			SkillSlug: spec.SkillSlug(slug),
-		})
-		if err != nil || gs == nil || gs.Body == nil {
-			continue
-		}
-		sk := *gs.Body
-		// Harden against stale references: if caller provided skillID, it must match.
-		if strings.TrimSpace(string(r.SkillID)) != "" && sk.ID != r.SkillID {
-			continue
-		}
-
-		var def agentskillsSpec.SkillDef
-		// Built-ins are embeddedfs in store, but runtime currently treats them as fs (hydrated).
-		// Your existing runtimeDefForBuiltInSkill already returns the correct hydrated location.
-		if sk.IsBuiltIn {
-			d, derr := s.runtimeDefForBuiltInSkill(sk)
-			if derr != nil {
-				continue
-			}
-			def = d
-		} else {
-			d, derr := runtimeDefForUserSkill(sk)
-			if derr != nil {
-				continue
-			}
-			def = d
-		}
-		out = append(out, def)
+		out = append(out, r)
 	}
 	return out
 }
 
-func sortSkillDefs(defs []agentskillsSpec.SkillDef) {
-	sort.Slice(defs, func(i, j int) bool {
-		if defs[i].Type != defs[j].Type {
-			return defs[i].Type < defs[j].Type
+func sortSkillRefs(refs []spec.SkillRef) {
+	sort.Slice(refs, func(i, j int) bool {
+		if refs[i].BundleID != refs[j].BundleID {
+			return refs[i].BundleID < refs[j].BundleID
 		}
-		if defs[i].Name != defs[j].Name {
-			return defs[i].Name < defs[j].Name
+		if refs[i].SkillSlug != refs[j].SkillSlug {
+			return refs[i].SkillSlug < refs[j].SkillSlug
 		}
-		return defs[i].Location < defs[j].Location
+		return refs[i].SkillID < refs[j].SkillID
 	})
 }
 
-func fsDigestSHA256(fsys fs.FS) (string, error) {
-	h := sha256.New()
-	var paths []string
-	if err := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			return nil
-		}
-		paths = append(paths, p)
-		return nil
-	}); err != nil {
-		return "", err
-	}
-
-	sort.Strings(paths)
-	for _, p := range paths {
-		b, err := fs.ReadFile(fsys, p)
-		if err != nil {
-			return "", err
-		}
-		_, _ = io.WriteString(h, p)
-		_, _ = h.Write([]byte{0})
-		_, _ = h.Write(b)
-		_, _ = h.Write([]byte{0})
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
+func refKey(r spec.SkillRef) string {
+	return string(r.BundleID) + "|" + string(r.SkillSlug) + "|" + string(r.SkillID)
 }
 
-func copyFSToDir(fsys fs.FS, dest string) error {
-	return fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		outPath := filepath.Join(dest, filepath.FromSlash(p))
-		if d.IsDir() {
-			return os.MkdirAll(outPath, 0o755)
-		}
-		if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
-			return err
-		}
-		in, err := fsys.Open(p)
-		if err != nil {
-			return err
-		}
-		defer in.Close()
-
-		out, err := os.Create(outPath)
-		if err != nil {
-			return err
-		}
-		defer out.Close()
-
-		if _, err := io.Copy(out, in); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-func typeNameKey(typ, name string) string {
-	return typ + "\x00" + name
+func validateSkillRef(r spec.SkillRef) error {
+	if strings.TrimSpace(string(r.BundleID)) == "" {
+		return errors.New("bundleID is empty")
+	}
+	if strings.TrimSpace(string(r.SkillSlug)) == "" {
+		return errors.New("skillSlug is empty")
+	}
+	// Require SkillID for runtime-facing refs to avoid stale-ref ambiguity.
+	if strings.TrimSpace(string(r.SkillID)) == "" {
+		return errors.New("skillID is empty")
+	}
+	return nil
 }
