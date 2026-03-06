@@ -921,6 +921,42 @@
 			},
 			"defaultModelPresetID": "gpt52",
 			"modelPresets": {
+				"gpt54": {
+					"schemaVersion": "2025-07-01",
+					"id": "gpt54",
+					"name": "gpt-5.4",
+					"displayName": "OpenAI GPT 5.4",
+					"slug": "gpt54",
+					"isEnabled": true,
+					"stream": true,
+					"maxPromptLength": 1000000,
+					"maxOutputLength": 128000,
+					"temperature": 1.0,
+					"reasoning": {
+						"type": "singleWithLevels",
+						"level": "high",
+						"tokens": 0
+					},
+					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
+					"timeout": 1200,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"temperatureDisallowedWhenEnabled": true,
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": [
+								"none",
+								"low",
+								"medium",
+								"high",
+								"xhigh"
+							],
+							"supportsSummaryStyle": true
+						}
+					},
+					"createdAt": "2026-03-06T00:00:00Z",
+					"modifiedAt": "2026-03-06T00:00:00Z",
+					"isBuiltIn": true
+				},
 				"gpt53Codex": {
 					"schemaVersion": "2025-07-01",
 					"id": "gpt53Codex",
