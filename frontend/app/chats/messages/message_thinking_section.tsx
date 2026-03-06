@@ -53,7 +53,10 @@ export function MessageThinkingSection(props: {
 				<ThinkingFence
 					detailsSummary={<span className="text-xs">Thinking Content</span>}
 					text={finalSummary}
-					defaultOpen={false}
+					streaming={isBusy}
+					maxRows={10}
+					autoScroll={isBusy}
+					defaultOpen={isBusy}
 				/>
 			) : null}
 

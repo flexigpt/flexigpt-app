@@ -10,6 +10,8 @@
 - [ ] Sys prompt:
   - [ ] We may want to have a explicit prompt saying that use explicit tools rather than shell wherever possible.
   - [ ] this needs to evolve as additional/multiple system prompts and a way to send a concatend thing of all these together.
+- [ ] with the number of skills present, maybe we dont want to enable all on click for the enable sills button, may be have a button at bottom on open that says enable all separately. also show collapsed bundles at start and then expanding if needed.
+- [ ] context deadline exceeded error or may be other errors dont show up as content box? it comes out as minimal single line item.
 
 ## Features
 

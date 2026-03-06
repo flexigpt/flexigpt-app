@@ -67,11 +67,11 @@
 					"temperature": 0.1,
 					"reasoning": {
 						"type": "singleWithLevels",
-						"level": "high",
+						"level": "medium",
 						"tokens": 0
 					},
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"supportedReasoningTypes": ["singleWithLevels"],
@@ -99,7 +99,7 @@
 						"tokens": 1024
 					},
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"supportedReasoningTypes": ["hybridWithTokens"]
@@ -126,7 +126,7 @@
 						"tokens": 1024
 					},
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"supportedReasoningTypes": ["hybridWithTokens"]
@@ -149,11 +149,11 @@
 					"temperature": 0.1,
 					"reasoning": {
 						"type": "singleWithLevels",
-						"level": "high",
+						"level": "medium",
 						"tokens": 0
 					},
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"supportedReasoningTypes": ["singleWithLevels"],
@@ -181,7 +181,7 @@
 						"tokens": 1024
 					},
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"supportedReasoningTypes": ["hybridWithTokens"]
@@ -208,7 +208,7 @@
 						"tokens": 1024
 					},
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -230,7 +230,7 @@
 						"tokens": 1024
 					},
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"supportedReasoningTypes": ["hybridWithTokens"]
@@ -305,7 +305,7 @@
 					"maxOutputLength": 8000,
 					"temperature": 0.1,
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -327,7 +327,7 @@
 						"tokens": 0
 					},
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -402,7 +402,7 @@
 						"tokens": 0
 					},
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"temperatureDisallowedWhenEnabled": true,
@@ -432,7 +432,7 @@
 						"tokens": 0
 					},
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"temperatureDisallowedWhenEnabled": true,
@@ -462,7 +462,7 @@
 						"tokens": 0
 					},
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"temperatureDisallowedWhenEnabled": true,
@@ -492,7 +492,7 @@
 						"tokens": 0
 					},
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"temperatureDisallowedWhenEnabled": true,
@@ -575,7 +575,7 @@
 						"tokens": 0
 					},
 					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
-					"timeout": 300,
+					"timeout": 1200,
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -597,7 +597,7 @@
 						"tokens": 0
 					},
 					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
-					"timeout": 300,
+					"timeout": 1200,
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -614,7 +614,7 @@
 					"maxOutputLength": 8192,
 					"temperature": 0.7,
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -684,7 +684,7 @@
 					"maxOutputLength": 4096,
 					"temperature": 0.1,
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -701,7 +701,7 @@
 					"maxOutputLength": 4096,
 					"temperature": 0.1,
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -718,7 +718,7 @@
 					"maxOutputLength": 4096,
 					"temperature": 0.1,
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -788,7 +788,7 @@
 					"maxOutputLength": 32768,
 					"temperature": 0.1,
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"supportedReasoningTypes": [],
@@ -811,7 +811,7 @@
 					"maxOutputLength": 32768,
 					"temperature": 0.1,
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"supportedReasoningTypes": [],
@@ -834,7 +834,7 @@
 					"maxOutputLength": 16384,
 					"temperature": 0.1,
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"supportedReasoningTypes": [],
@@ -857,7 +857,7 @@
 					"maxOutputLength": 16384,
 					"temperature": 0.1,
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"supportedReasoningTypes": [],
@@ -1160,7 +1160,7 @@
 						"tokens": 0
 					},
 					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
-					"timeout": 300,
+					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"temperatureDisallowedWhenEnabled": true,
@@ -1239,7 +1239,7 @@
 					"maxOutputLength": 32768,
 					"temperature": 0.1,
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -1314,7 +1314,7 @@
 						"tokens": 0
 					},
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -1331,7 +1331,7 @@
 					"maxOutputLength": 32768,
 					"temperature": 1.0,
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -1348,7 +1348,7 @@
 					"maxOutputLength": 32768,
 					"temperature": 0.1,
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -1365,7 +1365,7 @@
 					"maxOutputLength": 32768,
 					"temperature": 1.0,
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -1382,7 +1382,7 @@
 					"maxOutputLength": 32768,
 					"temperature": 1.0,
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -1404,7 +1404,7 @@
 						"tokens": 0
 					},
 					"systemPrompt": "",
-					"timeout": 300,
+					"timeout": 1200,
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
