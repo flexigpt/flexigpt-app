@@ -919,7 +919,7 @@
 					"maxForcedTools": 1
 				}
 			},
-			"defaultModelPresetID": "gpt52",
+			"defaultModelPresetID": "gpt54",
 			"modelPresets": {
 				"gpt54": {
 					"schemaVersion": "2025-07-01",
