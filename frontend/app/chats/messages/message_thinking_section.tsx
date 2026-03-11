@@ -51,7 +51,7 @@ export function MessageThinkingSection(props: {
 		<div className="m-0 p-0">
 			{finalSummary ? (
 				<ThinkingFence
-					detailsSummary={<span className="text-xs">Thinking Content</span>}
+					detailsSummary={summaryNode}
 					text={finalSummary}
 					streaming={isBusy}
 					maxRows={10}

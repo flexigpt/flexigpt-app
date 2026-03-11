@@ -10,13 +10,17 @@
 - [ ] Sys prompt:
   - [ ] We may want to have a explicit prompt saying that use explicit tools rather than shell wherever possible.
   - [ ] this needs to evolve as additional/multiple system prompts and a way to send a concatend thing of all these together.
+
 - [ ] with the number of skills present, maybe we dont want to enable all on click for the enable sills button, may be have a button at bottom on open that says enable all separately. also show collapsed bundles at start and then expanding if needed.
+
 - [ ] context deadline exceeded error or may be other errors dont show up as content box? it comes out as minimal single line item.
+- [ ] rather than ignore chat, we can have a combo option too, i.e ignore all messages, send last n messages i.e last 2/3/n etc including the user one that initiated it.
+- [ ] in skills world, especially with artifact driven dev, we can almsot get away with without sending a lot of things again and again, latest context and last 1/2 chats. attachments may pose a problem here, but can be thought through properly so that these things are persisted properly.
 
 ## Features
 
 - [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls loop is better.
-  - [ ] this is a "feature" in anthropic and chargable for cache write.
+  - [ ] this is a "feature" in anthropic and chargeable for cache write.
   - [ ] implement this after feature filters support and additional param support features in apis.
 
 - [ ] Better Attachments

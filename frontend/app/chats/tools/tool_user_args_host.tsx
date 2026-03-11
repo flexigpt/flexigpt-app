@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from 'react';
 
 import type { PlateEditor } from 'platejs/react';

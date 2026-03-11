@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { type KeyboardEvent, type MouseEvent, useMemo, useState } from 'react';
 
 import { FiEdit2 } from 'react-icons/fi';

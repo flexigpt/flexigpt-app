@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { type Dispatch, type ReactNode, type RefObject, type SetStateAction, useMemo, useState } from 'react';
 
 import { FiFilePlus, FiFolder, FiLink, FiPaperclip, FiTool, FiUpload } from 'react-icons/fi';

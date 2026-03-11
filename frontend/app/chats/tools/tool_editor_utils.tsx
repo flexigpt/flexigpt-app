@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { ElementApi, NodeApi, type Path } from 'platejs';
 import type { PlateEditor } from 'platejs/react';
 
@@ -648,7 +649,7 @@ export function setToolAutoExecuteByKey(editor: PlateEditor, identityKey: string
 		for (const p of paths) {
 			try {
 				// Update the hidden carrier node; chips read from this.
-				editor.tf.setNodes<ToolSelectionElementNode>({ autoExecute }, { at: p });
+				editor.tf.setNodes({ autoExecute }, { at: p });
 			} catch {
 				// swallow
 			}
