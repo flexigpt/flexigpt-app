@@ -15,7 +15,7 @@
 
 - [ ] context deadline exceeded error or may be other errors dont show up as content box? it comes out as minimal single line item.
 - [ ] rather than ignore chat, we can have a combo option too, i.e ignore all messages, send last n messages i.e last 2/3/n etc including the user one that initiated it.
-- [ ] in skills world, especially with artifact driven dev, we can almsot get away with without sending a lot of things again and again, latest context and last 1/2 chats. attachments may pose a problem here, but can be thought through properly so that these things are persisted properly.
+- [ ] in skills world, especially with artifact driven dev, we can almost get away with without sending a lot of things again and again, latest context and last 1/2 chats. attachments may pose a problem here, but can be thought through properly so that these things are persisted properly.
 
 ## Features
 
