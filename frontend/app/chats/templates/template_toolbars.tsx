@@ -178,7 +178,6 @@ function removeSelection(
 			editor.tf.removeNodes({ at: targetSelection[1] });
 		}
 	});
-	editor.tf.focus();
 }
 
 function buildSystemPromptFromSelection(sel: ReturnType<typeof getTemplateSelections>[number]): string {
@@ -253,7 +252,7 @@ export function TemplateToolbars() {
 										tsPath
 									);
 								});
-								editor.tf.focus();
+
 								// Ensure any badges re-render if they were visible briefly.
 								if (nodeWithPath?.[0]?.selectionID) {
 									dispatchTemplateVarsUpdated(nodeWithPath[0].selectionID);

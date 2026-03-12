@@ -289,6 +289,45 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		};
 	}, []);
 
+	const focusEditorPreservingSelection = useCallback(() => {
+		const editor = editorRef.current;
+		if (!editor || isBusy) return;
+
+		requestAnimationFrame(() => {
+			try {
+				editor.tf.focus();
+			} catch {
+				// noop
+			}
+		});
+	}, [isBusy]);
+
+	const focusEditorAtEnd = useCallback(() => {
+		const editor = editorRef.current;
+		if (!editor) return;
+
+		// No visible caret in readOnly mode.
+		if (isBusy) return;
+
+		requestAnimationFrame(() => {
+			try {
+				editor.tf.withoutNormalizing(() => {
+					editor.tf.select(undefined, { edge: 'end' });
+					editor.tf.collapse({ edge: 'end' });
+				});
+
+				editor.tf.focus();
+
+				// Keep end visible if content is long
+				if (contentRef.current) {
+					contentRef.current.scrollTop = contentRef.current.scrollHeight;
+				}
+			} catch {
+				editor.tf.focus();
+			}
+		});
+	}, [isBusy]);
+
 	const [submitError, setSubmitError] = useState<string | null>(null);
 	const [attachments, setAttachments] = useState<UIAttachment[]>([]);
 	const [directoryGroups, setDirectoryGroups] = useState<DirectoryAttachmentGroup[]>([]);
@@ -350,6 +389,13 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const templateMenuEl = useStoreState(templateMenu, 'contentElement');
 	const toolMenuEl = useStoreState(toolMenu, 'contentElement');
 	const attachmentMenuEl = useStoreState(attachmentMenu, 'contentElement');
+
+	const clearPreEditSnapshot = useCallback(() => {
+		preEditConversationToolsRef.current = null;
+		preEditWebSearchTemplatesRef.current = null;
+		preEditEnabledSkillRefsRef.current = null;
+		preEditActiveSkillRefsRef.current = null;
+	}, []);
 
 	useOpenToolArgs(target => {
 		setToolArgsTarget(target);
@@ -541,7 +587,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		if (!templateMenuOpen) {
 			if (menuOpenedByShortcutRef.current.templates) {
 				menuOpenedByShortcutRef.current.templates = false;
-				editor.tf.focus();
+				requestAnimationFrame(() => {
+					focusEditorPreservingSelection();
+				});
 			}
 			return;
 		}
@@ -550,13 +598,15 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		requestAnimationFrame(() => {
 			templateMenuEl?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
 		});
-	}, [templateMenuOpen, templateMenuEl, editor]);
+	}, [templateMenuOpen, templateMenuEl, editor, focusEditorPreservingSelection]);
 
 	useEffect(() => {
 		if (!toolMenuOpen) {
 			if (menuOpenedByShortcutRef.current.tools) {
 				menuOpenedByShortcutRef.current.tools = false;
-				editor.tf.focus();
+				requestAnimationFrame(() => {
+					focusEditorPreservingSelection();
+				});
 			}
 			return;
 		}
@@ -565,13 +615,15 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		requestAnimationFrame(() => {
 			toolMenuEl?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
 		});
-	}, [toolMenuOpen, toolMenuEl, editor]);
+	}, [toolMenuOpen, toolMenuEl, editor, focusEditorPreservingSelection]);
 
 	useEffect(() => {
 		if (!attachmentMenuOpen) {
 			if (menuOpenedByShortcutRef.current.attachments) {
 				menuOpenedByShortcutRef.current.attachments = false;
-				editor.tf.focus();
+				requestAnimationFrame(() => {
+					focusEditorPreservingSelection();
+				});
 			}
 			return;
 		}
@@ -580,7 +632,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		requestAnimationFrame(() => {
 			attachmentMenuEl?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
 		});
-	}, [attachmentMenuOpen, attachmentMenuEl, editor]);
+	}, [attachmentMenuOpen, attachmentMenuEl, editor, focusEditorPreservingSelection]);
 
 	const openTemplatePicker = useCallback(() => {
 		menuOpenedByShortcutRef.current.templates = true;
@@ -723,14 +775,14 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					if (sel && 'focus' in sel && typeof sel.focus === 'function') {
 						sel.focus();
 					} else {
-						editor.tf.focus();
+						focusEditorAtEnd();
 					}
 				} catch {
-					editor.tf.focus();
+					focusEditorAtEnd();
 				}
 			});
 		}
-	}, [editor, deferredDocVersion]);
+	}, [editor, deferredDocVersion, focusEditorAtEnd]);
 
 	// Helper to recompute attached-tool arg blocking on demand (not tied to docVersion).
 	const recomputeAttachedToolArgsBlocked = useCallback(() => {
@@ -811,12 +863,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		if (prevWs) setWebSearchTemplates(prevWs);
 		if (prevSkills) setEnabledSkillRefs(prevSkills);
 		if (prevActive) setActiveSkillRefs(prevActive);
-
-		preEditConversationToolsRef.current = null;
-		preEditWebSearchTemplatesRef.current = null;
-		preEditEnabledSkillRefsRef.current = null;
-		preEditActiveSkillRefsRef.current = null;
-	}, []);
+		clearPreEditSnapshot();
+	}, [clearPreEditSnapshot]);
 
 	// Recompute conversation-level arg blocking whenever that state changes.
 	useEffect(() => {
@@ -1154,10 +1202,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					if (sel && 'focus' in sel && typeof sel.focus === 'function') {
 						sel.focus();
 					} else {
-						editor.tf.focus();
+						focusEditorAtEnd();
 					}
 				} else {
-					editor.tf.focus();
+					focusEditorAtEnd();
 				}
 				return;
 			}
@@ -1259,21 +1307,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 				// Only clear the editor if we actually sent something.
 				if (didSend) {
-					editor.tf.setValue(EDITOR_EMPTY_VALUE);
-					hasTextRef.current = false;
-					setHasText(false);
-					setAttachments([]);
-					setDirectoryGroups([]);
-					setToolCalls([]);
-					setToolOutputs([]);
-					setToolDetailsState(null);
+					resetEditor();
 					// If we were editing, the old snapshot is no longer relevant.
-					preEditConversationToolsRef.current = null;
-					preEditWebSearchTemplatesRef.current = null;
-					preEditEnabledSkillRefsRef.current = null;
-
-					lastPopulatedSelectionKeyRef.current.clear();
-					editor.tf.focus();
+					clearPreEditSnapshot();
 				}
 			}
 		},
@@ -1297,6 +1333,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			toolOutputs,
 			toolsDefLoading,
 			webSearchTemplates,
+			focusEditorAtEnd,
+			clearPreEditSnapshot,
 		]
 	);
 	/**
@@ -1356,16 +1394,14 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		setToolNodesVersion(v => v + 1);
 		hasTextRef.current = false;
 		setHasText(false);
+
 		// Let Plate onChange bump docVersion; no need to do it here.
-		editor.tf.focus();
-	}, [closeAllMenus, editor]);
+		focusEditorAtEnd();
+	}, [closeAllMenus, editor, focusEditorAtEnd]);
 
 	const loadExternalMessage = useCallback(
 		(incoming: EditorExternalMessage) => {
-			closeAllMenus();
-			setSubmitError(null);
-			lastPopulatedSelectionKeyRef.current.clear();
-			isSubmittingRef.current = false;
+			resetEditor();
 
 			// Snapshot current context so Cancel Editing can restore it.
 			if (!preEditConversationToolsRef.current) {
@@ -1453,9 +1489,18 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			setToolDetailsState(null);
 			setToolNodesVersion(v => v + 1);
 
-			editor.tf.focus();
+			focusEditorAtEnd();
 		},
-		[closeAllMenus, editor, conversationToolsState, webSearchTemplates, enabledSkillRefs, activeSkillRefs]
+		[
+			focusEditorAtEnd,
+			resetEditor,
+			closeAllMenus,
+			editor,
+			conversationToolsState,
+			webSearchTemplates,
+			enabledSkillRefs,
+			activeSkillRefs,
+		]
 	);
 
 	const loadToolCalls = useCallback((toolCalls: UIToolCall[]) => {
@@ -1464,7 +1509,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	useImperativeHandle(ref, () => ({
 		focus: () => {
-			editor.tf.focus();
+			focusEditorAtEnd();
 		},
 		openTemplateMenu: () => {
 			openTemplatePicker();
@@ -1495,7 +1540,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 			// Don’t steal focus while the tab is generating; just attach chips.
 			if (!isBusy) {
-				editorRef.current.tf.focus();
+				focusEditorAtEnd();
 			}
 		},
 
@@ -1538,7 +1583,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		}
 
 		applyFileAttachments(results);
-		editor.tf.focus();
+		focusEditorAtEnd();
 	};
 
 	const applyDirectoryAttachments = useCallback((result: DirectoryAttachmentsResult) => {
@@ -1606,7 +1651,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 		applyDirectoryAttachments(result);
 
-		editor.tf.focus();
+		focusEditorAtEnd();
 	};
 
 	const handleAttachURL = async (rawUrl: string) => {
@@ -1623,12 +1668,16 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			if (existing.has(key)) return prev;
 			return [...prev, att];
 		});
+
+		if (!isBusy) {
+			focusEditorAtEnd();
+		}
 	};
 
 	const handleChangeAttachmentContentBlockMode = (att: UIAttachment, newMode: AttachmentContentBlockMode) => {
 		const targetKey = uiAttachmentKey(att);
 		setAttachments(prev => prev.map(a => (uiAttachmentKey(a) === targetKey ? { ...a, mode: newMode } : a)));
-		editor.tf.focus();
+		focusEditorAtEnd();
 	};
 
 	const handleRemoveAttachment = (att: UIAttachment) => {

@@ -792,7 +792,6 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 			const input = inputRefs.current.get(tabId);
 			input?.loadExternalMessage(external);
-			input?.focus();
 
 			updateTab(tabId, t => ({ ...t, editingMessageId: id }));
 		},

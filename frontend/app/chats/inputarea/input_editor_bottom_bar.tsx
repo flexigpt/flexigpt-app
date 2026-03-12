@@ -244,7 +244,6 @@ export function EditorBottomBar({
 			insertTemplateSelectionNode(editor, item.bundleID, item.templateSlug, item.templateVersion);
 		} finally {
 			closeTemplateMenu();
-			editor.tf.focus();
 		}
 	};
 	const handleAttachTool = (item: ToolListItem) => {
@@ -270,13 +269,11 @@ export function EditorBottomBar({
 	const handleAttachmentPickFiles = async () => {
 		await onAttachFiles();
 		closeAttachmentMenu();
-		editor.tf.focus();
 	};
 
 	const handleAttachmentPickDirectory = async () => {
 		await onAttachDirectory();
 		closeAttachmentMenu();
-		editor.tf.focus();
 	};
 
 	const handleAttachmentPickURL = () => {
@@ -507,7 +504,6 @@ export function EditorBottomBar({
 				isOpen={isUrlModalOpen}
 				onClose={() => {
 					setIsUrlModalOpen(false);
-					editor.tf.focus();
 				}}
 				onAttachURL={onAttachURL}
 			/>

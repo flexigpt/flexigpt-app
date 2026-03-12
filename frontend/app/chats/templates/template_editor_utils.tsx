@@ -54,7 +54,6 @@ export function insertTemplateSelectionNode(
 		editor.tf.collapse({ edge: 'end' });
 		editor.tf.select(undefined, { edge: 'end' }); // Select end of block above
 	});
-	editor.tf.focus();
 }
 
 // Utility to get selections for sending

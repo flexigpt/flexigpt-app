@@ -316,7 +316,6 @@ export function insertToolSelectionNode(
 ) {
 	const identity = toolIdentityKey(item.bundleID, item.bundleSlug, item.toolSlug, item.toolVersion);
 	if (getAttachedToolKeySet(editor).has(identity)) {
-		editor.tf.focus();
 		return;
 	}
 
@@ -648,7 +647,7 @@ export function setToolAutoExecuteByKey(editor: PlateEditor, identityKey: string
 		for (const p of paths) {
 			try {
 				// Update the hidden carrier node; chips read from this.
-				editor.tf.setNodes({ autoExecute }, { at: p });
+				editor.tf.setNodes<ToolSelectionElementNode>({ autoExecute }, { at: p });
 			} catch {
 				// swallow
 			}

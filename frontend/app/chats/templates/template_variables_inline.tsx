@@ -51,11 +51,10 @@ function findTemplateNode(
 
 // Inline variable pill renderer with inline editing
 export function TemplateVariableElement(props: PlateElementProps<any>) {
-	const { element, attributes, children, editor } = props as any;
+	const { element, attributes, children, editor } = props;
 	const el = element as TemplateVariableElementNode;
-	const plEditor = editor as PlateEditor;
 
-	const tpl = findTemplateNode(plEditor, el.bundleID, el.templateSlug, el.templateVersion, el.selectionID);
+	const tpl = findTemplateNode(editor, el.bundleID, el.templateSlug, el.templateVersion, el.selectionID);
 	const [tsenode, tsPath] = tpl ?? [];
 	const eff = tsenode ? computeEffectiveTemplate(tsenode) : undefined;
 	const variablesSchema = eff?.variablesSchema ?? [];
@@ -101,7 +100,7 @@ export function TemplateVariableElement(props: PlateElementProps<any>) {
 			nextVars[el.name] = next;
 		}
 
-		plEditor.tf.setNodes(
+		editor.tf.setNodes(
 			{
 				variables: nextVars,
 			},
@@ -132,9 +131,8 @@ export function TemplateVariableElement(props: PlateElementProps<any>) {
 						`[data-var-name="${nameEsc}"]`
 				);
 				if (pill) pill.focus();
-				else plEditor.tf.focus();
 			} catch {
-				plEditor.tf.focus();
+				// Ok.
 			}
 		});
 	}
@@ -144,7 +142,6 @@ export function TemplateVariableElement(props: PlateElementProps<any>) {
 	function focusNextVariablePill() {
 		const selId = el.selectionID as string | undefined;
 		if (!selId) {
-			plEditor.tf.focus();
 			return;
 		}
 
@@ -158,7 +155,6 @@ export function TemplateVariableElement(props: PlateElementProps<any>) {
 				);
 
 				if (!chips.length) {
-					plEditor.tf.focus();
 					return;
 				}
 
@@ -167,7 +163,6 @@ export function TemplateVariableElement(props: PlateElementProps<any>) {
 
 				if (missingInSelection.length === 0) {
 					// Nothing left to fill here -> move back to editor
-					plEditor.tf.focus();
 					return;
 				}
 
@@ -179,9 +174,8 @@ export function TemplateVariableElement(props: PlateElementProps<any>) {
 				const next = later.find(chip => chip.dataset.state === 'required') ?? missingInSelection[0]; // wrap to the first missing one
 
 				if (next) next.focus();
-				else plEditor.tf.focus();
 			} catch {
-				plEditor.tf.focus();
+				// Ok.
 			}
 		});
 	}
