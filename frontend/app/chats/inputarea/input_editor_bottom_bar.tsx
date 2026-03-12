@@ -1,8 +1,8 @@
-import { type Dispatch, type ReactNode, type RefObject, type SetStateAction, useMemo, useState } from 'react';
+import { type Dispatch, memo, type ReactNode, type RefObject, type SetStateAction, useMemo, useState } from 'react';
 
 import { FiFilePlus, FiFolder, FiLink, FiPaperclip, FiTool, FiUpload } from 'react-icons/fi';
 
-import { Menu, MenuButton, MenuItem, type MenuStore } from '@ariakit/react';
+import { Menu, MenuButton, MenuItem, type MenuStore, useStoreState } from '@ariakit/react';
 import type { Path } from 'platejs';
 import { type PlateEditor, useEditorRef } from 'platejs/react';
 
@@ -114,7 +114,7 @@ const toolPickerMenuItemClasses =
   Bottom bar for template/tool/attachment buttons and tips menus.
   The chips scroller now lives in a separate bar inside the editor.
 */
-export function EditorBottomBar({
+export const EditorBottomBar = memo(function EditorBottomBar({
 	onAttachFiles,
 	onAttachDirectory,
 	onAttachURL,
@@ -139,6 +139,8 @@ export function EditorBottomBar({
 }: EditorBottomBarProps) {
 	const editor = useEditorRef() as PlateEditor;
 	const [isUrlModalOpen, setIsUrlModalOpen] = useState(false);
+	const templateMenuOpen = useStoreState(templateMenuState, 'open');
+	const toolMenuOpen = useStoreState(toolMenuState, 'open');
 
 	const shortcutLabels = useMemo(
 		() => ({
@@ -211,22 +213,25 @@ export function EditorBottomBar({
 		return new Set(toolEntries.map(([n]) => toolIdentityKey(n.bundleID, n.bundleSlug, n.toolSlug, n.toolVersion)));
 	}, [toolEntries]);
 
-	const availableTools: ToolListItem[] = toolsLoading
-		? []
-		: toolData.filter(it => {
-				// Web search is a specially handled tool
-				if (it.toolDefinition.llmToolType === ToolStoreChoiceType.WebSearch) return false;
+	const availableTools = useMemo<ToolListItem[]>(() => {
+		if (!toolMenuOpen || toolsLoading) return [];
+		const providerSDKType = currentProviderSDKType.toString();
 
-				// If we know the provider's SDK type, restrict SDK tools to matching ones.
-				if (it.toolDefinition.type === ToolImplType.SDK && it.toolDefinition.sdkImpl) {
-					const sdkType = it.toolDefinition.sdkImpl.sdkType;
-					if (!sdkType) return false;
-					return sdkType === currentProviderSDKType.toString();
-				}
+		return toolData.filter(it => {
+			// Web search is a specially handled tool
+			if (it.toolDefinition.llmToolType === ToolStoreChoiceType.WebSearch) return false;
 
-				// Non-SDK tools (Go/HTTP/etc.) are always shown.
-				return true;
-			});
+			// If we know the provider's SDK type, restrict SDK tools to matching ones.
+			if (it.toolDefinition.type === ToolImplType.SDK && it.toolDefinition.sdkImpl) {
+				const sdkType = it.toolDefinition.sdkImpl.sdkType;
+				if (!sdkType) return false;
+				return sdkType === providerSDKType;
+			}
+
+			// Non-SDK tools (Go/HTTP/etc.) are always shown.
+			return true;
+		});
+	}, [currentProviderSDKType, toolData, toolMenuOpen, toolsLoading]);
 
 	const closeTemplateMenu = () => {
 		templateMenuState.hide();
@@ -360,7 +365,7 @@ export function EditorBottomBar({
 						shortcut={shortcutLabels.templates}
 					/>
 					<Menu store={templateMenuState} gutter={8} className={menuClasses} data-menu-kind="templates" autoFocusOnShow>
-						{templatesLoading ? (
+						{!templateMenuOpen ? null : templatesLoading ? (
 							<div className={`${menuItemClasses} text-base-content/60 cursor-default`}>Loading templates…</div>
 						) : templateData.length === 0 ? (
 							<div className={`${menuItemClasses} text-base-content/60 cursor-default`}>No templates available</div>
@@ -394,7 +399,7 @@ export function EditorBottomBar({
 						shortcut={shortcutLabels.tools}
 					/>
 					<Menu store={toolMenuState} gutter={8} className={menuClasses} data-menu-kind="tools" autoFocusOnShow>
-						{toolsLoading ? (
+						{!toolMenuOpen ? null : toolsLoading ? (
 							<div className={`${menuItemClasses} text-base-content/60 cursor-default`}>Loading tools…</div>
 						) : availableTools.length === 0 ? (
 							<div className={`${menuItemClasses} text-base-content/60 cursor-default`}>No tools available</div>
@@ -509,4 +514,4 @@ export function EditorBottomBar({
 			/>
 		</div>
 	);
-}
+});

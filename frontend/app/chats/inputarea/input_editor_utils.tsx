@@ -58,15 +58,45 @@ export function buildSingleParagraphValueChunked(text: string, chunkSize: number
 	return [{ type: 'p', children: buildChunkedTextChildren(text, chunkSize) }];
 }
 
+function areNumberPathsEqual(a: number[] | undefined, b: number[] | undefined): boolean {
+	if (!a || !b || a.length !== b.length) return false;
+	for (let i = 0; i < a.length; i += 1) {
+		if (a[i] !== b[i]) return false;
+	}
+	return true;
+}
+
 export function isCursorAtDocumentEnd(editor: PlateEditor): boolean {
 	try {
 		const sel = editor.selection;
 		if (!sel) return false;
+		// Only treat "cursor at end" as true for a collapsed selection.
+		if (
+			sel.anchor.offset !== sel.focus.offset ||
+			!areNumberPathsEqual(sel.anchor.path as number[], sel.focus.path as number[])
+		) {
+			return false;
+		}
+
 		const end = editor.api.end([]);
-		return JSON.stringify(sel.anchor.path) === JSON.stringify(end?.path) && sel.anchor.offset === end?.offset;
+		if (!end) return false;
+		return areNumberPathsEqual(sel.anchor.path as number[], end.path as number[]) && sel.anchor.offset === end.offset;
 	} catch {
 		return false;
 	}
+}
+
+export function isSimpleEmptyParagraphDocument(ed: PlateEditor | null | undefined): boolean {
+	if (!ed) return false;
+
+	const children = ed.children ?? [];
+	if (children.length !== 1) return false;
+
+	const p = children[0];
+	if (!p || p.type !== 'p' || !Array.isArray(p.children) || p.children.length !== 1) return false;
+
+	const child = p.children[0];
+	return typeof child?.text === 'string' && child.text.length === 0;
 }
 
 export const clearAllMarks = (ed: PlateEditor) => {

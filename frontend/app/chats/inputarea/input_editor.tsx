@@ -68,6 +68,7 @@ import {
 	hasNonEmptyUserText,
 	insertPlainTextAsSingleBlock,
 	isCursorAtDocumentEnd,
+	isSimpleEmptyParagraphDocument,
 	LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS,
 	LARGE_TEXT_AUTODECHUNK_THRESHOLD_CHARS,
 	LARGE_TEXT_CHUNK_SIZE,
@@ -168,6 +169,10 @@ const areSkillRefListsEqual = (a: SkillRef[] | null | undefined, b: SkillRef[] |
 	return true;
 };
 
+const conversationToolHydrationKey = (entry: ConversationToolStateEntry): string => {
+	return `${entry.toolStoreChoice.bundleID}::${entry.toolStoreChoice.toolSlug}::${entry.toolStoreChoice.toolVersion}`;
+};
+
 interface ComposerToolRuntimeState {
 	toolCalls: UIToolCall[];
 	toolOutputs: UIToolOutput[];
@@ -210,6 +215,13 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const contentRef = useRef<HTMLDivElement | null>(null);
 	const editorRef = useRef(editor);
 	editorRef.current = editor; // keep a live ref for key handlers
+	const isMountedRef = useRef(true);
+	useEffect(() => {
+		return () => {
+			isMountedRef.current = false;
+		};
+	}, []);
+
 	const templateMenu = useMenuStore({ placement: 'top-start', focusLoop: true });
 	const toolMenu = useMenuStore({ placement: 'top-start', focusLoop: true });
 	const attachmentMenu = useMenuStore({ placement: 'top-start', focusLoop: true });
@@ -428,7 +440,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const [toolDetailsState, setToolDetailsState] = useState<ToolDetailsState>(null);
 
-	const [conversationToolsState, setConversationToolsState] = useState<ConversationToolStateEntry[]>([]);
+	const [conversationToolsState, setConversationToolsStateRaw] = useState<ConversationToolStateEntry[]>([]);
+	const conversationToolsStateRef = useRef<ConversationToolStateEntry[]>([]);
+	conversationToolsStateRef.current = conversationToolsState;
+	const conversationToolDefsCacheRef = useRef<Map<string, Tool>>(new Map());
 	// When editing an earlier message we temporarily override the current
 	// conversation-tool + web-search config. Keep a snapshot so Cancel restores it.
 	const preEditConversationToolsRef = useRef<ConversationToolStateEntry[] | null>(null);
@@ -437,6 +452,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	// Count of in-flight tool-definition hydration tasks (conversation-level + attached).
 	// Used to gate sending while schemas are still loading.
 	const [toolsHydratingCount, setToolsHydratingCount] = useState(0);
+	const hydratingConversationToolKeysRef = useRef<Set<string>>(new Set());
+
 	const toolsDefLoading = toolsHydratingCount > 0;
 	// Arg-blocking state, split by attached-vs-conversation tools.
 	const [attachedToolArgsBlocked, setAttachedToolArgsBlocked] = useState(false);
@@ -937,6 +954,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	// Populate editor with effective last-USER block for EACH template selection (once per selectionID)
 	useEffect(() => {
+		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
+		if (!selectionInfo.tplNodeWithPath) return;
 		const populated = lastPopulatedSelectionKeyRef.current;
 		const nodes = getTemplateNodesWithPath(editor);
 		const insertedIds: string[] = [];
@@ -995,7 +1014,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				}
 			});
 		}
-	}, [editor, focusEditorAtEnd, deferredDocVersion]);
+	}, [editor, focusEditorAtEnd, deferredDocVersion, selectionInfo.tplNodeWithPath]);
 
 	// Helper to recompute attached-tool arg blocking on demand.
 	const recomputeAttachedToolArgsBlocked = useCallback(() => {
@@ -1023,53 +1042,102 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		}
 	}, [kickAutoExecutePendingToolCalls, recomputeAttachedToolArgsBlocked]);
 
-	// Ensure we have full Tool definitions (and argStatus) for conversation-level tools.
-	useEffect(() => {
-		const missing = conversationToolsState.filter(e => !e.toolDefinition);
-		if (!missing.length) return;
+	const primeConversationToolsFromCache = useCallback((entries: ConversationToolStateEntry[]) => {
+		let changed = false;
 
-		let cancelled = false;
-		setToolsHydratingCount(c => c + 1);
+		const next = entries.map(entry => {
+			const cacheKey = conversationToolHydrationKey(entry);
+			const def = entry.toolDefinition ?? conversationToolDefsCacheRef.current.get(cacheKey);
+			if (!def) return entry;
 
-		(async () => {
-			const results = await Promise.all(
+			const argStatus = computeToolUserArgsStatus(def.userArgSchema, entry.toolStoreChoice.userArgSchemaInstance);
+			if (entry.toolDefinition === def && entry.argStatus === argStatus) return entry;
+
+			changed = true;
+			return { ...entry, toolDefinition: def, argStatus };
+		});
+
+		return changed ? next : entries;
+	}, []);
+
+	const hydrateConversationToolsIfNeeded = useCallback(
+		(entries: ConversationToolStateEntry[]) => {
+			const inFlight = hydratingConversationToolKeysRef.current;
+			const cache = conversationToolDefsCacheRef.current;
+
+			const missing = entries.filter(entry => {
+				const cacheKey = conversationToolHydrationKey(entry);
+				return !entry.toolDefinition && !cache.has(cacheKey) && !inFlight.has(cacheKey);
+			});
+
+			if (!missing.length) return;
+
+			const requestedKeys = new Set<string>();
+			for (const entry of missing) {
+				const cacheKey = conversationToolHydrationKey(entry);
+				inFlight.add(cacheKey);
+				requestedKeys.add(cacheKey);
+			}
+
+			setToolsHydratingCount(c => c + 1);
+
+			void Promise.all(
 				missing.map(async entry => {
+					const cacheKey = conversationToolHydrationKey(entry);
 					try {
 						const def = await toolStoreAPI.getTool(
 							entry.toolStoreChoice.bundleID,
 							entry.toolStoreChoice.toolSlug,
 							entry.toolStoreChoice.toolVersion
 						);
-						return def ? { key: entry.key, def } : null;
+						return def ? { cacheKey, def } : null;
 					} catch {
 						return null;
 					}
 				})
-			);
+			)
+				.then(results => {
+					if (!isMountedRef.current) return;
 
-			if (cancelled) return;
+					let loadedAny = false;
+					for (const result of results) {
+						if (!result) continue;
+						cache.set(result.cacheKey, result.def);
+						loadedAny = true;
+					}
 
-			const loaded = results.filter((r): r is { key: string; def: Tool } => r !== null);
-			if (!loaded.length) return;
+					if (!loadedAny) return;
 
-			setConversationToolsState(prev =>
-				prev.map(e => {
-					const hit = loaded.find(l => l.key === e.key);
-					if (!hit) return e;
-					const argStatus = computeToolUserArgsStatus(hit.def.userArgSchema, e.toolStoreChoice.userArgSchemaInstance);
-					return { ...e, toolDefinition: hit.def, argStatus };
+					setConversationToolsStateRaw(prev => {
+						const next = primeConversationToolsFromCache(prev);
+						conversationToolsStateRef.current = next;
+						return next;
+					});
 				})
-			);
-		})().finally(() => {
-			if (!cancelled) {
-				setToolsHydratingCount(c => Math.max(0, c - 1));
-			}
-		});
+				.finally(() => {
+					for (const key of requestedKeys) {
+						inFlight.delete(key);
+					}
+					if (isMountedRef.current) {
+						setToolsHydratingCount(c => Math.max(0, c - 1));
+					}
+				});
+		},
+		[primeConversationToolsFromCache]
+	);
 
-		return () => {
-			cancelled = true;
-		};
-	}, [conversationToolsState]);
+	const setConversationToolsState = useCallback<Dispatch<SetStateAction<ConversationToolStateEntry[]>>>(
+		update => {
+			const prev = conversationToolsStateRef.current;
+			const requested = resolveStateUpdate(update, prev);
+			const next = primeConversationToolsFromCache(requested);
+
+			conversationToolsStateRef.current = next;
+			setConversationToolsStateRaw(next);
+			hydrateConversationToolsIfNeeded(next);
+		},
+		[hydrateConversationToolsIfNeeded, primeConversationToolsFromCache]
+	);
 
 	const restorePreEditContext = useCallback(() => {
 		const prevConv = preEditConversationToolsRef.current;
@@ -1084,7 +1152,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			applySkillSelectionState(prevSkills ?? enabledSkillRefsRef.current, prevActive ?? activeSkillRefsRef.current);
 		}
 		clearPreEditSnapshot();
-	}, [applySkillSelectionState, cancelPendingEnableAllSkills, clearPreEditSnapshot]);
+	}, [applySkillSelectionState, cancelPendingEnableAllSkills, clearPreEditSnapshot, setConversationToolsState]);
 
 	const isSendButtonEnabled = useMemo(() => {
 		if (isBusy) return false;
@@ -1617,6 +1685,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			runAllPendingToolCalls,
 			selectionInfo.firstPendingVar,
 			setActiveSkillRefs,
+			setConversationToolsState,
 			templateBlocked,
 			toolArgsBlocked,
 			toolOutputs,
@@ -1636,7 +1705,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				kickAutoExecutePendingToolCalls(1);
 			}
 		},
-		[kickAutoExecutePendingToolCalls]
+		[kickAutoExecutePendingToolCalls, setConversationToolsState]
 	);
 	const setWebSearchTemplatesAndMaybeAutoExecute = useCallback<Dispatch<SetStateAction<WebSearchChoiceTemplate[]>>>(
 		update => {
@@ -1781,7 +1850,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		});
 	}, []);
 
-	const handleAttachFiles = async () => {
+	const handleAttachFiles = useCallback(async () => {
 		let results: Attachment[];
 		try {
 			results = await backendAPI.openMultipleFilesAsAttachments(true);
@@ -1791,7 +1860,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 		applyFileAttachments(results);
 		focusEditorAtEnd();
-	};
+	}, [applyFileAttachments, focusEditorAtEnd]);
 
 	const applyDirectoryAttachments = useCallback((result: DirectoryAttachmentsResult) => {
 		if (!result || !result.dirPath) return;
@@ -1847,7 +1916,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		]);
 	}, []);
 
-	const handleAttachDirectory = async () => {
+	const handleAttachDirectory = useCallback(async () => {
 		let result: DirectoryAttachmentsResult;
 		try {
 			result = await backendAPI.openDirectoryAsAttachments(MAX_FILES_PER_DIRECTORY);
@@ -1859,35 +1928,37 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		applyDirectoryAttachments(result);
 
 		focusEditorAtEnd();
-	};
+	}, [applyDirectoryAttachments, focusEditorAtEnd]);
 
-	const handleAttachURL = async (rawUrl: string) => {
-		const trimmed = rawUrl.trim();
-		if (!trimmed) return;
+	const handleAttachURL = useCallback(
+		async (rawUrl: string) => {
+			const trimmed = rawUrl.trim();
+			if (!trimmed) return;
 
-		const bAtt = await backendAPI.openURLAsAttachment(trimmed);
-		if (!bAtt) return;
-		const att = buildUIAttachmentForURL(bAtt);
-		const key = uiAttachmentKey(att);
+			const bAtt = await backendAPI.openURLAsAttachment(trimmed);
+			if (!bAtt) return;
+			const att = buildUIAttachmentForURL(bAtt);
+			const key = uiAttachmentKey(att);
 
-		setAttachments(prev => {
-			const existing = new Set(prev.map(uiAttachmentKey));
-			if (existing.has(key)) return prev;
-			return [...prev, att];
-		});
+			setAttachments(prev => {
+				const existing = new Set(prev.map(uiAttachmentKey));
+				if (existing.has(key)) return prev;
+				return [...prev, att];
+			});
 
-		if (!isBusy) {
-			focusEditorAtEnd();
-		}
-	};
+			if (!isBusy) {
+				focusEditorAtEnd();
+			}
+		},
+		[focusEditorAtEnd, isBusy]
+	);
 
 	const handleChangeAttachmentContentBlockMode = (att: UIAttachment, newMode: AttachmentContentBlockMode) => {
 		const targetKey = uiAttachmentKey(att);
 		setAttachments(prev => prev.map(a => (uiAttachmentKey(a) === targetKey ? { ...a, mode: newMode } : a)));
 		focusEditorAtEnd();
 	};
-
-	const handleRemoveAttachment = (att: UIAttachment) => {
+	const handleRemoveAttachment = useCallback((att: UIAttachment) => {
 		const targetKey = uiAttachmentKey(att);
 
 		setAttachments(prev => prev.filter(a => uiAttachmentKey(a) !== targetKey));
@@ -1901,9 +1972,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			}));
 			return updated.filter(g => g.attachmentKeys.length > 0 || g.overflowDirs.length > 0);
 		});
-	};
+	}, []);
 
-	const handleRemoveDirectoryGroup = (groupId: string) => {
+	const handleRemoveDirectoryGroup = useCallback((groupId: string) => {
 		setDirectoryGroups(prevGroups => {
 			const groupToRemove = prevGroups.find(g => g.id === groupId);
 			if (!groupToRemove) return prevGroups;
@@ -1933,9 +2004,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 			return remainingGroups;
 		});
-	};
+	}, []);
 
-	const handleRemoveOverflowDir = (groupId: string, dirPath: string) => {
+	const handleRemoveOverflowDir = useCallback((groupId: string, dirPath: string) => {
 		setDirectoryGroups(prevGroups => {
 			const updated = prevGroups.map(g =>
 				g.id !== groupId
@@ -1947,7 +2018,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			);
 			return updated.filter(g => g.attachmentKeys.length > 0 || g.overflowDirs.length > 0);
 		});
-	};
+	}, []);
 
 	const applyAttachmentsDrop = useCallback(
 		(payload: AttachmentsDroppedPayload) => {
@@ -2108,8 +2179,13 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 										if (!text) return;
 										clearAllMarks(editor);
 
-										// PERF: if paste is huge AND editor is empty, set chunked value directly.
-										if (!hasTextRef.current && text.length >= LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS) {
+										// PERF: if paste is huge AND the doc is truly the default empty paragraph,
+										// set chunked value directly. Do not use "has text" as a proxy for
+										// emptiness, or we can blow away template/tool nodes.
+										if (
+											isSimpleEmptyParagraphDocument(editorRef.current) &&
+											text.length >= LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS
+										) {
 											editor.tf.withoutNormalizing(() => {
 												editor.tf.setValue(buildSingleParagraphValueChunked(text, LARGE_TEXT_CHUNK_SIZE));
 												editor.tf.collapse({ edge: 'end' });
