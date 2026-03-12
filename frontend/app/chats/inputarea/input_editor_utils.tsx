@@ -2,7 +2,7 @@
 // If you type huge prompts (10k+ words), a single giant text leaf becomes slow.
 // We keep ONE paragraph, but chunk its text into multiple text nodes ("leaves").
 import { NodeApi, type Value } from 'platejs';
-import type { PlateEditor, usePlateEditor } from 'platejs/react';
+import type { PlateEditor } from 'platejs/react';
 
 import type { Attachment, UIAttachment } from '@/spec/attachment';
 import type { UIToolOutput } from '@/spec/inference';
@@ -37,6 +37,7 @@ export interface EditorSubmitPayload {
 }
 
 type ChunkedTextNode = { text: string; __chunk: number };
+const NON_WHITESPACE_RE = /\S/;
 
 function buildChunkedTextChildren(text: string, chunkSize: number): ChunkedTextNode[] {
 	if (!text) return [{ text: '', __chunk: 0 }];
@@ -112,18 +113,20 @@ export const clearAllMarks = (ed: PlateEditor) => {
 	});
 };
 
-export function insertPlainTextAsSingleBlock(ed: ReturnType<typeof usePlateEditor>, text: string, tabSize = 2) {
+export function insertPlainTextAsSingleBlock(ed: PlateEditor | null | undefined, text: string, tabSize = 2) {
 	if (!ed) return;
-	const editor = ed as PlateEditor;
+	const editor = ed;
 
 	// Normalize line endings
 	const normalized = text.replace(/\r\n?/g, '\n');
 
 	// Expand tabs, but keep everything as one string
-	const expanded = normalized
-		.split('\n')
-		.map(line => expandTabsToSpaces(line, tabSize))
-		.join('\n');
+	const expanded = normalized.includes('\t')
+		? normalized
+				.split('\n')
+				.map(line => expandTabsToSpaces(line, tabSize))
+				.join('\n')
+		: normalized;
 
 	// Single transform instead of O(number of lines)
 	editor.tf.withoutNormalizing(() => {
@@ -137,7 +140,7 @@ export function hasNonEmptyUserText(ed: PlateEditor | null | undefined): boolean
 	if (!ed) return false;
 	// If NodeApi.texts exists:
 	for (const [t] of NodeApi.texts(ed)) {
-		if (t.text.trim().length > 0) return true;
+		if (NON_WHITESPACE_RE.test(t.text)) return true;
 	}
 	return false;
 }

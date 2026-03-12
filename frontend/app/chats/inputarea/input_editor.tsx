@@ -16,7 +16,7 @@ import { FiAlertTriangle, FiEdit2, FiFastForward, FiPlay, FiSend, FiSquare, FiX 
 
 import { useMenuStore, useStoreState } from '@ariakit/react';
 import { SingleBlockPlugin, type Value } from 'platejs';
-import { Plate, PlateContent, usePlateEditor } from 'platejs/react';
+import { Plate, PlateContent, type PlateEditor, usePlateEditor } from 'platejs/react';
 
 import type {
 	Attachment,
@@ -173,6 +173,26 @@ const conversationToolHydrationKey = (entry: ConversationToolStateEntry): string
 	return `${entry.toolStoreChoice.bundleID}::${entry.toolStoreChoice.toolSlug}::${entry.toolStoreChoice.toolVersion}`;
 };
 
+const isSelectionOnlyEditorChange = (editor: PlateEditor): boolean => {
+	const operations = editor.operations ?? [];
+	return operations.length > 0 && operations.every(op => op.type === 'set_selection');
+};
+
+const createEditorPlugins = () => [
+	SingleBlockPlugin,
+	...BasicBlocksKit,
+	...BasicMarksKit,
+	...LineHeightKit,
+	...AlignKit,
+	...IndentKit,
+	...ListKit,
+	// ...AutoformatKit, // Don't want any formatting on typing
+	...TabbableKit,
+	...TemplateSlashKit,
+	...ToolPlusKit,
+	...FloatingToolbarKit,
+];
+
 interface ComposerToolRuntimeState {
 	toolCalls: UIToolCall[];
 	toolOutputs: UIToolOutput[];
@@ -193,21 +213,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	ref
 ) {
 	const initialEditorValue = useMemo<Value>(() => createEmptyEditorValue(), []);
+	const editorPlugins = useMemo(() => createEditorPlugins(), []);
 	const editor = usePlateEditor({
-		plugins: [
-			SingleBlockPlugin,
-			...BasicBlocksKit,
-			...BasicMarksKit,
-			...LineHeightKit,
-			...AlignKit,
-			...IndentKit,
-			...ListKit,
-			// ...AutoformatKit, // Don't want any formatting on typing
-			...TabbableKit,
-			...TemplateSlashKit,
-			...ToolPlusKit,
-			...FloatingToolbarKit,
-		],
+		plugins: editorPlugins,
 		value: initialEditorValue,
 	});
 
@@ -2113,8 +2121,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				<Plate
 					editor={editor}
 					onChange={() => {
-						if (isAutoChunkingRef.current) {
-							// Avoid feedback loops.
+						const currentEditor = editorRef.current;
+						if (isAutoChunkingRef.current || isSelectionOnlyEditorChange(currentEditor)) {
+							// Avoid feedback loops and skip selection-only updates.
 							return;
 						}
 						scheduleDocRecompute();
@@ -2128,7 +2137,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 						// Auto-cancel editing when the editor is completely empty
 						// (no text, no tools, no attachments, no tool outputs).
-						const hasTextNow = editingMessageId ? hasNonEmptyUserText(editorRef.current) : hasTextRef.current;
+						const hasTextNow = editingMessageId ? hasNonEmptyUserText(currentEditor) : hasTextRef.current;
 
 						const hasAttachmentsLocal = attachments.length > 0;
 						const hasToolOutputsLocal = toolOutputs.length > 0;
