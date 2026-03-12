@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
 	forwardRef,
 	type SubmitEventHandler,
@@ -123,7 +122,7 @@ export interface EditorAreaHandle {
 	setActiveSkillRefsFromMessage: (refs: SkillRef[]) => void;
 }
 
-const EDITOR_EMPTY_VALUE: Value = [{ type: 'p', children: [{ text: '' }] }];
+const EDITOR_EMPTY_VALUE: Value = [{ type: 'p', children: [{ text: ' ' }] }];
 
 interface EditorAreaProps {
 	isBusy: boolean;

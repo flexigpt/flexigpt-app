@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { ElementApi, KEYS, NodeApi } from 'platejs';
 import type { PlateEditor } from 'platejs/react';
 

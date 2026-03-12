@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 // ---- Large-text perf tuning ----
 // If you type huge prompts (10k+ words), a single giant text leaf becomes slow.
 // We keep ONE paragraph, but chunk its text into multiple text nodes ("leaves").

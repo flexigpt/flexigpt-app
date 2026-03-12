@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import type { SubmitEventHandler } from 'react';
 import { useEffect, useId, useRef, useState } from 'react';
 

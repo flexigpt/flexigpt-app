@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import type { AutoformatRule } from '@platejs/autoformat';
 import {
 	autoformatArrow,
@@ -189,6 +188,7 @@ const autoformatLists: AutoformatRule[] = [
 ];
 
 export const AutoformatKit = [
+	// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 	AutoformatPlugin.configure({
 		options: {
 			enableUndoOnDelete: true,
