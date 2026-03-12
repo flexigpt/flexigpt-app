@@ -21,9 +21,11 @@ type FormState = {
 	url: string;
 };
 
+type UrlAttachmentModalContentProps = Omit<UrlAttachmentModalProps, 'isOpen'>;
+
 const INITIAL_FORM_STATE: FormState = { url: '' };
 
-export function UrlAttachmentModal({ isOpen, onClose, onAttachURL }: UrlAttachmentModalProps) {
+function UrlAttachmentModalContent({ onClose, onAttachURL }: UrlAttachmentModalContentProps) {
 	const [formData, setFormData] = useState<FormState>(INITIAL_FORM_STATE);
 	const [errors, setErrors] = useState<FieldErrorState<FormState>>({});
 	const [submitting, setSubmitting] = useState(false);
@@ -31,17 +33,7 @@ export function UrlAttachmentModal({ isOpen, onClose, onAttachURL }: UrlAttachme
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const inputRef = useRef<HTMLInputElement | null>(null);
 
-	// Reset local state whenever the modal is opened
 	useEffect(() => {
-		if (!isOpen) return;
-		setFormData(INITIAL_FORM_STATE);
-		setErrors({});
-		setSubmitting(false);
-	}, [isOpen]);
-
-	useEffect(() => {
-		if (!isOpen) return;
-
 		const dialog = dialogRef.current;
 		if (!dialog) return;
 
@@ -49,16 +41,18 @@ export function UrlAttachmentModal({ isOpen, onClose, onAttachURL }: UrlAttachme
 			dialog.showModal();
 		}
 
-		window.setTimeout(() => {
+		const focusTimer = window.setTimeout(() => {
 			inputRef.current?.focus();
 		}, 0);
 
 		return () => {
+			window.clearTimeout(focusTimer);
+
 			if (dialog.open) {
 				dialog.close();
 			}
 		};
-	}, [isOpen]);
+	}, []);
 
 	const handleDialogClose = () => {
 		onClose();
@@ -102,9 +96,8 @@ export function UrlAttachmentModal({ isOpen, onClose, onAttachURL }: UrlAttachme
 	};
 
 	const urlError = errors.url ?? null;
-	if (!isOpen) return null;
 
-	return createPortal(
+	return (
 		<dialog
 			ref={dialogRef}
 			className="modal"
@@ -183,7 +176,12 @@ export function UrlAttachmentModal({ isOpen, onClose, onAttachURL }: UrlAttachme
 				</form>
 			</div>
 			{/* NOTE: no modal-backdrop here: backdrop click should NOT close this modal */}
-		</dialog>,
-		document.body
+		</dialog>
 	);
+}
+
+export function UrlAttachmentModal({ isOpen, onClose, onAttachURL }: UrlAttachmentModalProps) {
+	if (!isOpen) return null;
+
+	return createPortal(<UrlAttachmentModalContent onClose={onClose} onAttachURL={onAttachURL} />, document.body);
 }

@@ -11,7 +11,7 @@ import { toolStoreAPI } from '@/apis/baseapi';
 import type { ConversationToolStateEntry } from '@/chats/tools/conversation_tools_chip';
 import { computeToolUserArgsStatus, getToolNodesWithPath } from '@/chats/tools/tool_editor_utils';
 import { type ToolArgsTarget, ToolUserArgsModal } from '@/chats/tools/tool_user_args_modal';
-import { type WebSearchChoiceTemplate, webSearchIdentityKey } from '@/chats/tools/websearch_utils';
+import { type WebSearchChoiceTemplate } from '@/chats/tools/websearch_utils';
 
 interface ToolArgsModalHostProps {
 	editor: PlateEditor;
@@ -45,10 +45,7 @@ export function ToolArgsModalHost({
 		() => (webSearchTemplates.length > 0 ? webSearchTemplates[0] : undefined),
 		[webSearchTemplates]
 	);
-	const activeWebSearchKey = useMemo(
-		() => (activeWebSearch ? webSearchIdentityKey(activeWebSearch) : undefined),
-		[activeWebSearch]
-	);
+
 	const [webSearchToolDef, setWebSearchToolDef] = useState<Tool | null>(null);
 
 	useEffect(() => {
@@ -71,7 +68,7 @@ export function ToolArgsModalHost({
 		return () => {
 			cancelled = true;
 		};
-	}, [toolArgsTarget?.kind, activeWebSearchKey]);
+	}, [toolArgsTarget?.kind, activeWebSearch]);
 
 	if (toolArgsTarget?.kind === 'attached') {
 		const all = getToolNodesWithPath(editor, false);

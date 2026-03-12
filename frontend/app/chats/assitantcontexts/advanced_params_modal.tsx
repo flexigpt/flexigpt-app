@@ -2,6 +2,7 @@ import {
 	type Dispatch,
 	type SetStateAction,
 	type SubmitEventHandler,
+	useCallback,
 	useEffect,
 	useMemo,
 	useRef,
@@ -41,6 +42,8 @@ type ErrorKey =
 	| 'additionalParametersRawJSON'
 	| 'jsonSchemaName'
 	| 'jsonSchema';
+
+type AdvancedParamsModalInnerProps = Omit<AdvancedParamsModalProps, 'isOpen'>;
 
 const MAX_JSON_CHARS = 50_000;
 
@@ -82,14 +85,50 @@ function isPlainObject(v: any): boolean {
 	return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: AdvancedParamsModalProps) {
+function getInitialOutputFormatChoice(
+	currentModel: UIChatOption,
+	supportedOutputFormats: OutputFormatKind[] | undefined
+): OutputFormatChoice {
+	const kind = currentModel.outputParam?.format?.kind;
+	const kindIsSupported = !supportedOutputFormats || (kind ? supportedOutputFormats.includes(kind) : true);
+
+	if (!kindIsSupported) return 'default';
+	if (kind === OutputFormatKind.Text) return 'text';
+	if (kind === OutputFormatKind.JSONSchema) return 'jsonSchema';
+	return 'default';
+}
+
+function getInitialReasoningSummaryStyle(
+	currentModel: UIChatOption,
+	summaryStyleSupported: boolean
+): SummaryStyleChoice {
+	return summaryStyleSupported ? ((currentModel.reasoning?.summaryStyle as SummaryStyleChoice) ?? '') : '';
+}
+
+function closeDialogSafely(dialog: HTMLDialogElement | null): boolean {
+	if (!dialog?.open) return false;
+
+	try {
+		dialog.close();
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+function AdvancedParamsModalInner({ onClose, currentModel, onSave }: AdvancedParamsModalInnerProps) {
+	const dialogRef = useRef<HTMLDialogElement | null>(null);
+	const isUnmountingRef = useRef(false);
+
 	const supportedOutputFormats = useMemo(
 		() => getSupportedOutputFormats(currentModel.capabilitiesOverride),
 		[currentModel.capabilitiesOverride]
 	);
+
 	const outputFormatItems: Record<OutputFormatChoice, { isEnabled: boolean; displayName: string }> = useMemo(() => {
 		const supportsText = !supportedOutputFormats || supportedOutputFormats.includes(OutputFormatKind.Text);
 		const supportsSchema = !supportedOutputFormats || supportedOutputFormats.includes(OutputFormatKind.JSONSchema);
+
 		return {
 			default: { isEnabled: true, displayName: 'Default' },
 			text: { isEnabled: supportsText, displayName: 'Text' },
@@ -97,37 +136,6 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 		};
 	}, [supportedOutputFormats]);
 
-	// Reset only when opening OR switching to a different model preset identity.
-	const modelIdentity = useMemo(
-		() => `${currentModel.providerName}::${currentModel.modelPresetID}`,
-		[currentModel.providerName, currentModel.modelPresetID]
-	);
-
-	/* local form state (strings for easy blank entry) */
-	const [stream, setStream] = useState(false);
-	const [maxPromptLength, setMaxPromptLength] = useState('');
-	const [maxOutputLength, setMaxOutputLength] = useState('');
-	const [timeoutSec, setTimeoutSec] = useState('');
-
-	const [reasoningSummaryStyle, setReasoningSummaryStyle] = useState<SummaryStyleChoice>('');
-
-	// output format (verbosity is controlled via bar dropdown)
-	const [outputFormatChoice, setOutputFormatChoice] = useState<OutputFormatChoice>('default');
-	const [jsonSchemaName, setJsonSchemaName] = useState('');
-	const [jsonSchemaDescription, setJsonSchemaDescription] = useState('');
-	const [jsonSchemaStrict, setJsonSchemaStrict] = useState(true);
-	const [jsonSchemaText, setJsonSchemaText] = useState('');
-
-	// stop sequences + raw additional JSON
-	const [stopSequencesText, setStopSequencesText] = useState('');
-	const [additionalParametersRawJSON, setAdditionalParametersRawJSON] = useState('');
-
-	/* validation errors */
-	const [errors, setErrors] = useState<Partial<Record<ErrorKey, string>>>({});
-
-	const dialogRef = useRef<HTMLDialogElement | null>(null);
-
-	// Whether reasoning is active for this model (controls summary style availability)
 	const reasoningEnabled = !!currentModel.reasoning;
 	const summaryStyleSupported = supportsReasoningSummaryStyle(currentModel.capabilitiesOverride);
 
@@ -135,6 +143,7 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 		() => getStopSequencesPolicy(currentModel.capabilitiesOverride),
 		[currentModel.capabilitiesOverride]
 	);
+
 	const stopSequencesDisabledBecauseReasoning = stopPolicy.disallowedWithReasoning && reasoningEnabled;
 
 	const reasoningSummaryStyleItems: Record<SummaryStyleChoice, { isEnabled: boolean; displayName: string }> = useMemo(
@@ -150,69 +159,73 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 		[reasoningEnabled, summaryStyleSupported]
 	);
 
+	const initialJSONSchema = currentModel.outputParam?.format?.jsonSchemaParam;
+
+	const [stream, setStream] = useState(() => currentModel.stream);
+	const [maxPromptLength, setMaxPromptLength] = useState(() => String(currentModel.maxPromptLength));
+	const [maxOutputLength, setMaxOutputLength] = useState(() => String(currentModel.maxOutputLength));
+	const [timeoutSec, setTimeoutSec] = useState(() => String(currentModel.timeout));
+
+	const [reasoningSummaryStyle, setReasoningSummaryStyle] = useState<SummaryStyleChoice>(() =>
+		getInitialReasoningSummaryStyle(currentModel, summaryStyleSupported)
+	);
+
+	const [outputFormatChoice, setOutputFormatChoice] = useState<OutputFormatChoice>(() =>
+		getInitialOutputFormatChoice(currentModel, supportedOutputFormats)
+	);
+
+	const [jsonSchemaName, setJsonSchemaName] = useState(() => initialJSONSchema?.name ?? '');
+	const [jsonSchemaDescription, setJsonSchemaDescription] = useState(() => initialJSONSchema?.description ?? '');
+	const [jsonSchemaStrict, setJsonSchemaStrict] = useState(() => initialJSONSchema?.strict ?? true);
+	const [jsonSchemaText, setJsonSchemaText] = useState(() =>
+		initialJSONSchema?.schema ? JSON.stringify(initialJSONSchema.schema, null, 2) : ''
+	);
+
+	const [stopSequencesText, setStopSequencesText] = useState(() =>
+		(currentModel.stopSequences ?? []).slice(0, stopPolicy.maxSequences).join('\n')
+	);
+
+	const [additionalParametersRawJSON, setAdditionalParametersRawJSON] = useState(
+		() => currentModel.additionalParametersRawJSON ?? ''
+	);
+
+	const [errors, setErrors] = useState<Partial<Record<ErrorKey, string>>>({});
+
 	useEffect(() => {
-		if (!isOpen) return;
-
-		setStream(currentModel.stream);
-		setMaxPromptLength(String(currentModel.maxPromptLength));
-		setMaxOutputLength(String(currentModel.maxOutputLength));
-		setTimeoutSec(String(currentModel.timeout));
-
-		// summary style seed (only meaningful if reasoning exists)
-		setReasoningSummaryStyle(
-			summaryStyleSupported ? ((currentModel.reasoning?.summaryStyle as SummaryStyleChoice) ?? '') : ''
-		);
-		// output format seed
-		const kind = currentModel.outputParam?.format?.kind;
-		const kindIsSupported = !supportedOutputFormats || (kind ? supportedOutputFormats.includes(kind) : true);
-		if (!kindIsSupported) {
-			setOutputFormatChoice('default');
-		} else if (kind === OutputFormatKind.Text) setOutputFormatChoice('text');
-		else if (kind === OutputFormatKind.JSONSchema) setOutputFormatChoice('jsonSchema');
-		else setOutputFormatChoice('default');
-
-		const jsp = currentModel.outputParam?.format?.jsonSchemaParam;
-		setJsonSchemaName(jsp?.name ?? '');
-		setJsonSchemaDescription(jsp?.description ?? '');
-		setJsonSchemaStrict(jsp?.strict ?? true);
-		setJsonSchemaText(jsp?.schema ? JSON.stringify(jsp.schema, null, 2) : '');
-
-		// stop sequences
-		setStopSequencesText((currentModel.stopSequences ?? []).slice(0, stopPolicy.maxSequences).join('\n'));
-
-		// raw JSON
-		setAdditionalParametersRawJSON(currentModel.additionalParametersRawJSON ?? '');
-
-		setErrors({});
-	}, [isOpen, modelIdentity, currentModel, supportedOutputFormats, stopPolicy.maxSequences, summaryStyleSupported]);
-
-	// Open the dialog natively when isOpen becomes true
-	useEffect(() => {
-		if (!isOpen) return;
+		isUnmountingRef.current = false;
 
 		const dialog = dialogRef.current;
 		if (!dialog) return;
 
-		if (!dialog.open) {
-			dialog.showModal();
+		try {
+			if (!dialog.open) {
+				dialog.showModal();
+			}
+		} catch {
+			// Ignore showModal errors if the dialog is already open or not ready.
 		}
 
 		return () => {
-			// If the component unmounts while the dialog is still open, close it.
-			if (dialog.open) {
-				dialog.close();
-			}
+			isUnmountingRef.current = true;
+			closeDialogSafely(dialog);
 		};
-	}, [isOpen]);
+	}, []);
 
-	// Sync parent state whenever the dialog is closed (Esc or dialog.close()).
-	const handleDialogClose = () => {
-		onClose();
-	};
+	const handleDialogClose = useCallback(() => {
+		if (!isUnmountingRef.current) {
+			onClose();
+		}
+	}, [onClose]);
+
+	const requestClose = useCallback(() => {
+		if (!closeDialogSafely(dialogRef.current)) {
+			onClose();
+		}
+	}, [onClose]);
 
 	const validateNumberField = (field: 'maxPromptLength' | 'maxOutputLength' | 'timeout', value: string) => {
 		const n = parsePositiveIntAllowBlank(value);
-		if (n === undefined) return undefined; // blank means "leave as-is"
+		if (n === undefined) return undefined;
 		if (!Number.isFinite(n)) return `${field} must be a positive integer.`;
 		return undefined;
 	};
@@ -229,13 +242,17 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 	const validateStopSequences = (raw: string): string | undefined => {
 		if (!stopPolicy.isSupported) return undefined;
 		if (stopSequencesDisabledBecauseReasoning) return undefined;
+
 		const parsed = parseStopSequences(raw);
 		if (!parsed) return undefined;
 
-		if (parsed.length > stopPolicy.maxSequences) return `Too many stop sequences (max ${stopPolicy.maxSequences}).`;
+		if (parsed.length > stopPolicy.maxSequences) {
+			return `Too many stop sequences (max ${stopPolicy.maxSequences}).`;
+		}
 
 		const tooLong = parsed.find(s => s.length > 256);
 		if (tooLong) return 'A stop sequence is too long (max 256 chars per line).';
+
 		return undefined;
 	};
 
@@ -247,22 +264,28 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 		const parsed = safeJSONParse(s);
 		if (!parsed.ok) return `Invalid JSON: ${parsed.value}`;
 
-		// hardened: require object (provider "additional params" is expected to be a JSON object)
-		if (!isPlainObject(parsed.value)) return 'Additional params must be a JSON object (e.g. { "top_p": 0.9 }).';
+		if (!isPlainObject(parsed.value)) {
+			return 'Additional params must be a JSON object (e.g. { "top_p": 0.9 }).';
+		}
 
 		return undefined;
 	};
 
-	const validateJSONSchema = (choice: OutputFormatChoice) => {
+	const validateJSONSchema = (
+		choice: OutputFormatChoice,
+		nameValue: string = jsonSchemaName,
+		schemaTextValue: string = jsonSchemaText
+	) => {
 		if (choice !== 'jsonSchema') {
 			return { nameErr: undefined as string | undefined, schemaErr: undefined as string | undefined };
 		}
 
-		const name = jsonSchemaName.trim();
+		const name = nameValue.trim();
 		if (!name) return { nameErr: 'Schema name is required.', schemaErr: undefined };
 
-		const schemaRaw = jsonSchemaText.trim();
+		const schemaRaw = schemaTextValue.trim();
 		if (!schemaRaw) return { nameErr: undefined, schemaErr: 'Schema JSON is required.' };
+
 		if (schemaRaw.length > MAX_JSON_CHARS) {
 			return { nameErr: undefined, schemaErr: `Schema JSON too large (max ${MAX_JSON_CHARS} chars).` };
 		}
@@ -270,12 +293,50 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 		const parsed = safeJSONParse(schemaRaw);
 		if (!parsed.ok) return { nameErr: undefined, schemaErr: `Invalid schema JSON: ${parsed.value}` };
 
-		if (!isPlainObject(parsed.value)) return { nameErr: undefined, schemaErr: 'Schema must be a JSON object.' };
+		if (!isPlainObject(parsed.value)) {
+			return { nameErr: undefined, schemaErr: 'Schema must be a JSON object.' };
+		}
 
 		return { nameErr: undefined, schemaErr: undefined };
 	};
 
+	const maybeRefreshJSONSchemaErrors = (nextChoice: OutputFormatChoice, nextName: string, nextSchemaText: string) => {
+		if (!errors.jsonSchemaName && !errors.jsonSchema) return;
+
+		const { nameErr, schemaErr } = validateJSONSchema(nextChoice, nextName, nextSchemaText);
+		setErrors(prev => ({
+			...prev,
+			jsonSchemaName: nameErr,
+			jsonSchema: schemaErr,
+		}));
+	};
+
 	const formHasErrors = Object.values(errors).some(Boolean);
+
+	const handleOutputFormatChange = (choice: OutputFormatChoice) => {
+		setOutputFormatChoice(choice);
+
+		if (choice !== 'jsonSchema') {
+			setErrors(prev => ({
+				...prev,
+				jsonSchemaName: undefined,
+				jsonSchema: undefined,
+			}));
+			return;
+		}
+
+		maybeRefreshJSONSchemaErrors(choice, jsonSchemaName, jsonSchemaText);
+	};
+
+	const handleJsonSchemaNameChange = (value: string) => {
+		setJsonSchemaName(value);
+		maybeRefreshJSONSchemaErrors(outputFormatChoice, value, jsonSchemaText);
+	};
+
+	const handleJsonSchemaTextChange = (value: string) => {
+		setJsonSchemaText(value);
+		maybeRefreshJSONSchemaErrors(outputFormatChoice, jsonSchemaName, value);
+	};
 
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
 		e.preventDefault();
@@ -304,7 +365,6 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 			return;
 		}
 
-		// Build outputParam.format (preserve existing verbosity from bar dropdown)
 		const baseOutputParam: OutputParam | undefined = currentModel.outputParam
 			? { ...currentModel.outputParam }
 			: undefined;
@@ -312,7 +372,9 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 		let nextFormat: OutputParam['format'] = undefined;
 
 		if (outputFormatChoice === 'text') {
-			if (outputFormatItems.text.isEnabled) nextFormat = { kind: OutputFormatKind.Text };
+			if (outputFormatItems.text.isEnabled) {
+				nextFormat = { kind: OutputFormatKind.Text };
+			}
 		} else if (outputFormatChoice === 'jsonSchema') {
 			if (!outputFormatItems.jsonSchema.isEnabled) {
 				nextFormat = undefined;
@@ -340,13 +402,13 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 			if (nextFormat === undefined) delete merged.format;
 			else merged.format = nextFormat;
 
-			// Keep verbosity untouched here (bar controls it)
 			const hasAny = !!merged.verbosity || !!merged.format;
 			return hasAny ? merged : undefined;
 		})();
 
 		const mergedReasoning = (() => {
-			if (!currentModel.reasoning) return currentModel.reasoning; // undefined
+			if (!currentModel.reasoning) return currentModel.reasoning;
+
 			const r = { ...currentModel.reasoning };
 			if (!reasoningSummaryStyle) {
 				delete r.summaryStyle;
@@ -359,13 +421,13 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 		const nextStopSequences = (() => {
 			if (!stopPolicy.isSupported) return undefined;
 			if (stopSequencesDisabledBecauseReasoning) return undefined;
+
 			const parsed = parseStopSequences(stopSequencesText);
 			return parsed ? parsed.slice(0, stopPolicy.maxSequences) : undefined;
 		})();
 
 		const updatedModel: UIChatOption = {
 			...currentModel,
-
 			stream,
 			maxPromptLength: parsePositiveIntAllowBlank(maxPromptLength) ?? currentModel.maxPromptLength,
 			maxOutputLength: parsePositiveIntAllowBlank(maxOutputLength) ?? currentModel.maxOutputLength,
@@ -377,28 +439,20 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 		};
 
 		onSave(updatedModel);
-		dialogRef.current?.close();
+		requestClose();
 	};
 
-	if (!isOpen) return null;
-
-	return createPortal(
+	return (
 		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose}>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-auto rounded-2xl">
 				<div className="mb-4 flex items-center justify-between">
 					<h3 className="text-lg font-bold">Advanced Model Parameters</h3>
-					<button
-						type="button"
-						className="btn btn-sm btn-circle bg-base-300"
-						onClick={() => dialogRef.current?.close()}
-						aria-label="Close"
-					>
+					<button type="button" className="btn btn-sm btn-circle bg-base-300" onClick={requestClose} aria-label="Close">
 						<FiX size={12} />
 					</button>
 				</div>
 
 				<form onSubmit={handleSubmit} className="space-y-4">
-					{/* stream */}
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-4 cursor-pointer">
 							<span className="label-text text-sm">Streaming</span>
@@ -418,7 +472,6 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 						</div>
 					</div>
 
-					{/* max prompt */}
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-4">
 							<span className="label-text text-sm">Max Prompt Tokens</span>
@@ -447,7 +500,6 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 						</div>
 					</div>
 
-					{/* max output */}
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-4">
 							<span className="label-text text-sm">Max Output Tokens</span>
@@ -476,7 +528,6 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 						</div>
 					</div>
 
-					{/* timeout */}
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-4">
 							<span className="label-text text-sm">Timeout (s)</span>
@@ -508,7 +559,6 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 						</div>
 					</div>
 
-					{/* Reasoning summary style (converted to inbuilt Dropdown) */}
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-4">
 							<span className="label-text text-sm">Reasoning Summary</span>
@@ -528,7 +578,6 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 								dropdownItems={reasoningSummaryStyleItems}
 								selectedKey={reasoningSummaryStyle}
 								onChange={k => {
-									// If reasoning isn't enabled, only "Default" is enabled in the items list.
 									setReasoningSummaryStyle(k);
 								}}
 								filterDisabled={false}
@@ -538,7 +587,6 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 						</div>
 					</div>
 
-					{/* Output format (converted to inbuilt Dropdown) */}
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-4">
 							<span className="label-text text-sm">Output Format</span>
@@ -553,9 +601,7 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 							<Dropdown<OutputFormatChoice>
 								dropdownItems={outputFormatItems}
 								selectedKey={outputFormatChoice}
-								onChange={k => {
-									setOutputFormatChoice(k);
-								}}
+								onChange={handleOutputFormatChange}
 								filterDisabled={false}
 								title="Select Output Format"
 								getDisplayName={k => outputFormatItems[k].displayName}
@@ -575,7 +621,7 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 										className={`input input-bordered w-full rounded-xl ${errors.jsonSchemaName ? 'input-error' : ''}`}
 										value={jsonSchemaName}
 										onChange={e => {
-											setJsonSchemaName(e.target.value);
+											handleJsonSchemaNameChange(e.target.value);
 										}}
 										placeholder="e.g. my_response"
 										spellCheck="false"
@@ -634,7 +680,7 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 										rows={8}
 										value={jsonSchemaText}
 										onChange={e => {
-											setJsonSchemaText(e.target.value);
+											handleJsonSchemaTextChange(e.target.value);
 										}}
 										placeholder={`{\n  "type": "object",\n  "properties": {\n    "answer": { "type": "string" }\n  },\n  "required": ["answer"]\n}`}
 										spellCheck="false"
@@ -650,7 +696,7 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 							</div>
 						</>
 					)}
-					{/* stop sequences */}
+
 					{stopPolicy.isSupported && (
 						<div className="grid grid-cols-12 items-start gap-2">
 							<label className="label col-span-4">
@@ -699,7 +745,7 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 							</div>
 						</div>
 					)}
-					{/* additional raw JSON */}
+
 					<div className="grid grid-cols-12 items-start gap-2">
 						<label className="label col-span-4">
 							<span className="label-text text-sm">Additional Params JSON</span>
@@ -736,7 +782,7 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 					</div>
 
 					<div className="modal-action">
-						<button type="button" className="btn bg-base-300 rounded-xl" onClick={() => dialogRef.current?.close()}>
+						<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
 							Cancel
 						</button>
 						<button type="submit" className="btn btn-primary rounded-xl" disabled={formHasErrors}>
@@ -745,7 +791,17 @@ export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: A
 					</div>
 				</form>
 			</div>
-		</dialog>,
+		</dialog>
+	);
+}
+
+export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: AdvancedParamsModalProps) {
+	if (!isOpen || typeof document === 'undefined') return null;
+
+	const modelIdentity = `${currentModel.providerName}::${currentModel.modelPresetID}`;
+
+	return createPortal(
+		<AdvancedParamsModalInner key={modelIdentity} onClose={onClose} currentModel={currentModel} onSave={onSave} />,
 		document.body
 	);
 }

@@ -40,6 +40,17 @@ type ErrorState = {
 	tags?: string;
 };
 
+type SkillFormData = {
+	displayName: string;
+	name: string;
+	slug: string;
+	type: SkillType;
+	location: string;
+	description: string;
+	tags: string;
+	isEnabled: boolean;
+};
+
 const skillTypeDropdownItems: Record<SkillType, { isEnabled: boolean; displayName: string }> = {
 	[SkillType.FS]: { isEnabled: true, displayName: 'Filesystem (fs)' },
 	// UI restriction: EmbeddedFS skills are built-in; not allowed to be created/edited.
@@ -50,14 +61,34 @@ function normalizeForUniq(s: string) {
 	return s.trim().toLowerCase();
 }
 
-export function AddEditSkillModal({
-	isOpen,
-	onClose,
-	onSubmit,
-	initialData,
-	existingSkills,
-	mode,
-}: AddEditSkillModalProps) {
+function getInitialFormData(initialData?: SkillItem): SkillFormData {
+	if (initialData) {
+		const s = initialData.skill;
+		return {
+			displayName: s.displayName ?? '',
+			name: s.name ?? '',
+			slug: s.slug ?? '',
+			type: s.type,
+			location: s.location ?? '',
+			description: s.description ?? '',
+			tags: (s.tags ?? []).join(', '),
+			isEnabled: s.isEnabled,
+		};
+	}
+
+	return {
+		displayName: '',
+		name: '',
+		slug: '',
+		type: SkillType.FS,
+		location: '',
+		description: '',
+		tags: '',
+		isEnabled: true,
+	};
+}
+
+function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkills, mode }: AddEditSkillModalProps) {
 	const requestedMode: ModalMode = mode ?? (initialData ? 'edit' : 'add');
 	// Match the Tool modal pattern: unsupported impls can exist (viewable),
 	// but cannot be created/edited in the UI.
@@ -67,77 +98,64 @@ export function AddEditSkillModal({
 	const isEditMode = effectiveMode === 'edit';
 	const isAddMode = effectiveMode === 'add';
 
-	const [formData, setFormData] = useState({
-		displayName: '',
-		name: '',
-		slug: '',
-		type: SkillType.FS as SkillType,
-		location: '',
-		description: '',
-		tags: '',
-		isEnabled: true,
-	});
-
+	const [formData, setFormData] = useState<SkillFormData>(() => getInitialFormData(initialData));
 	const [errors, setErrors] = useState<ErrorState>({});
 	const [submitError, setSubmitError] = useState<string>('');
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const nameInputRef = useRef<HTMLInputElement | null>(null);
+	const isUnmountingRef = useRef(false);
 
 	useEffect(() => {
-		if (!isOpen) return;
-
-		if (initialData) {
-			const s = initialData.skill;
-			setFormData({
-				displayName: s.displayName ?? '',
-				name: s.name ?? '',
-				slug: s.slug ?? '',
-				type: s.type,
-				location: s.location ?? '',
-				description: s.description ?? '',
-				tags: (s.tags ?? []).join(', '),
-				isEnabled: s.isEnabled,
-			});
-		} else {
-			setFormData({
-				displayName: '',
-				name: '',
-				slug: '',
-				type: SkillType.FS,
-				location: '',
-				description: '',
-				tags: '',
-				isEnabled: true,
-			});
-		}
-
-		setErrors({});
-		setSubmitError('');
-	}, [isOpen, initialData]);
-
-	useEffect(() => {
-		if (!isOpen) return;
 		const dialog = dialogRef.current;
 		if (!dialog) return;
 
-		if (!dialog.open) dialog.showModal();
+		if (!dialog.open) {
+			try {
+				dialog.showModal();
+			} catch {
+				// Ignore if the dialog cannot be shown; keep rendering safely.
+			}
+		}
 
-		window.setTimeout(() => {
-			// Only autofocus Name when adding (since Name is read-only in edit/view)
-			if (isAddMode) nameInputRef.current?.focus();
-		}, 0);
+		let focusTimer: number | undefined;
+
+		if (isAddMode) {
+			focusTimer = window.setTimeout(() => {
+				if (dialog.open) nameInputRef.current?.focus();
+			}, 0);
+		}
 
 		return () => {
-			if (dialog.open) dialog.close();
-		};
-	}, [isOpen, isAddMode]);
+			isUnmountingRef.current = true;
 
-	const handleDialogClose = () => {
+			if (focusTimer !== undefined) {
+				window.clearTimeout(focusTimer);
+			}
+
+			if (dialog.open) {
+				dialog.close();
+			}
+		};
+	}, [isAddMode]);
+
+	const requestClose = () => {
+		const dialog = dialogRef.current;
+
+		if (dialog?.open) {
+			dialog.close();
+			return;
+		}
+
 		onClose();
 	};
 
-	const validateField = (field: keyof ErrorState, val: string, currentErrors: ErrorState): ErrorState => {
+	const handleDialogClose = () => {
+		if (isUnmountingRef.current) return;
+		onClose();
+	};
+
+	const validateField = (field: keyof ErrorState, val: string | SkillType, currentErrors: ErrorState): ErrorState => {
 		let nextErrors: ErrorState = { ...currentErrors };
 		const v = val.trim();
 
@@ -180,7 +198,7 @@ export function AddEditSkillModal({
 		return nextErrors;
 	};
 
-	const validateForm = (state: typeof formData): ErrorState => {
+	const validateForm = (state: SkillFormData): ErrorState => {
 		let next: ErrorState = {};
 		next = validateField('name', state.name, next);
 		next = validateField('slug', state.slug, next);
@@ -198,7 +216,8 @@ export function AddEditSkillModal({
 	};
 
 	const handleInput = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-		const { name, value, type, checked } = e.target as HTMLInputElement;
+		const target = e.target as HTMLInputElement;
+		const { name, value, type, checked } = target;
 		const newVal = type === 'checkbox' ? checked : value;
 
 		setFormData(prev => ({ ...prev, [name]: newVal }));
@@ -218,6 +237,7 @@ export function AddEditSkillModal({
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
 		e.preventDefault();
 		e.stopPropagation();
+
 		if (isViewMode) return;
 
 		setSubmitError('');
@@ -231,7 +251,7 @@ export function AddEditSkillModal({
 			.map(t => t.trim())
 			.filter(Boolean);
 
-		onSubmit({
+		void onSubmit({
 			displayName: formData.displayName.trim() || undefined,
 			name: formData.name.trim(),
 			slug: formData.slug.trim(),
@@ -241,7 +261,9 @@ export function AddEditSkillModal({
 			tags: tagsArr.length ? tagsArr : undefined,
 			isEnabled: formData.isEnabled,
 		})
-			.then(() => dialogRef.current?.close())
+			.then(() => {
+				requestClose();
+			})
 			.catch((err: unknown) => {
 				const msg = err instanceof Error ? err.message : 'Failed to save skill.';
 				setSubmitError(msg);
@@ -250,9 +272,7 @@ export function AddEditSkillModal({
 
 	const headerTitle = effectiveMode === 'view' ? 'View Skill' : effectiveMode === 'edit' ? 'Edit Skill' : 'Add Skill';
 
-	if (!isOpen) return null;
-
-	return createPortal(
+	return (
 		<dialog
 			ref={dialogRef}
 			className="modal"
@@ -269,7 +289,7 @@ export function AddEditSkillModal({
 						<button
 							type="button"
 							className="btn btn-sm btn-circle bg-base-300"
-							onClick={() => dialogRef.current?.close()}
+							onClick={requestClose}
 							aria-label="Close"
 						>
 							<FiX size={12} />
@@ -501,7 +521,7 @@ export function AddEditSkillModal({
 						)}
 
 						<div className="modal-action">
-							<button type="button" className="btn bg-base-300 rounded-xl" onClick={() => dialogRef.current?.close()}>
+							<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
 								{isViewMode ? 'Close' : 'Cancel'}
 							</button>
 
@@ -516,7 +536,19 @@ export function AddEditSkillModal({
 			</div>
 
 			<ModalBackdrop enabled={isViewMode} />
-		</dialog>,
-		document.body
+		</dialog>
 	);
+}
+
+export function AddEditSkillModal(props: AddEditSkillModalProps) {
+	if (!props.isOpen) return null;
+	if (typeof document === 'undefined' || !document.body) return null;
+
+	const remountKey = props.initialData
+		? `${props.mode ?? 'auto'}:${props.initialData.bundleID}:${props.initialData.skill.id}:${String(
+				props.initialData.skill.modifiedAt
+			)}:${props.initialData.skill.type}:${props.initialData.skill.isBuiltIn ? '1' : '0'}`
+		: `${props.mode ?? 'auto'}:new`;
+
+	return createPortal(<AddEditSkillModalContent key={remountKey} {...props} />, document.body);
 }

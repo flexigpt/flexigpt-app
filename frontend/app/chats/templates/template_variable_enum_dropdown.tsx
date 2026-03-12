@@ -6,6 +6,7 @@ import {
 	useEffect,
 	useId,
 	useLayoutEffect,
+	useMemo,
 	useRef,
 	useState,
 } from 'react';
@@ -34,31 +35,44 @@ type EnumDropdownInlineProps = {
 	menuMaxHeightPx?: number;
 };
 
-export function EnumDropdownInline({
+function getInitialActiveIndex(options: string[], value?: string): number {
+	const selectedIdx = value ? options.findIndex(opt => opt === value) : -1;
+	return selectedIdx >= 0 ? selectedIdx : 0;
+}
+
+function EnumDropdownInlineMenu({
 	options,
 	value,
 	onChange,
-	placeholder = '-- select --',
-	clearLabel = 'Clear',
-	clearable = true,
-	disabled = false,
-	size = 'xs',
-	triggerClassName,
-	withinSlate = false,
-	autoOpen = false,
-	onCancel,
-	placement = 'auto',
-	minWidthPx = 176,
-	menuMaxHeightPx = 240,
-}: EnumDropdownInlineProps) {
-	const [open, setOpen] = useState(false);
-	const triggerRef = useRef<HTMLButtonElement | null>(null);
+	clearLabel,
+	clearable,
+	size,
+	withinSlate,
+	placement,
+	minWidthPx,
+	menuMaxHeightPx,
+	triggerRef,
+	onRequestClose,
+}: {
+	options: string[];
+	value?: string;
+	onChange: (val: string | undefined) => void;
+	clearLabel: string;
+	clearable: boolean;
+	size: 'xs' | 'sm' | 'md';
+	withinSlate: boolean;
+	onCancel?: () => void;
+	placement: 'top' | 'bottom' | 'auto';
+	minWidthPx: number;
+	menuMaxHeightPx: number;
+	triggerRef: React.RefObject<HTMLButtonElement | null>;
+	onRequestClose: (cancel?: boolean) => void;
+}) {
 	const menuRef = useRef<HTMLDivElement | null>(null);
 	const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
-	const [activeIndex, setActiveIndex] = useState<number>(-1);
+	const [activeIndex, setActiveIndex] = useState<number>(() => getInitialActiveIndex(options, value));
 	const listboxId = useId();
 
-	// Positioning: use absolute + scroll offsets (more robust with modals/backdrops/filters)
 	const [style, setStyle] = useState<CSSProperties>({
 		position: 'absolute',
 		top: -9999,
@@ -67,26 +81,18 @@ export function EnumDropdownInline({
 		visibility: 'hidden',
 	});
 
-	const sizeCls = size === 'md' ? 'btn-md' : size === 'sm' ? 'btn-sm' : 'btn-xs';
-	const defaultTrigger = `btn btn-ghost ${sizeCls} font-normal w-40 min-w-24 justify-between truncate bg-transparent`;
-
-	const display = value === undefined || value === '' ? placeholder : value;
-
 	const stopForSlate = (e: SyntheticEvent) => {
 		if (withinSlate) {
-			// Important in Slate/Plate: prevent default and stop propagation
 			e.preventDefault();
 			e.stopPropagation();
 		}
 	};
 
 	const updatePosition = useCallback(() => {
-		if (!open) return;
 		const anchor = triggerRef.current;
 		const menu = menuRef.current;
 		if (!anchor || !menu) return;
 
-		// Temporarily show the menu to measure
 		const prevVis = menu.style.visibility;
 		const prevTop = menu.style.top;
 		const prevLeft = menu.style.left;
@@ -101,14 +107,12 @@ export function EnumDropdownInline({
 		const rect = anchor.getBoundingClientRect();
 		const menuRect = menu.getBoundingClientRect();
 
-		// Decide placement
 		const spaceAbove = rect.top;
 		const spaceBelow = window.innerHeight - rect.bottom;
 		const preferTop = placement === 'top' || (placement === 'auto' && spaceAbove > spaceBelow);
 
 		let top = preferTop ? rect.top + window.scrollY - menuRect.height - GAP : rect.bottom + window.scrollY + GAP;
 
-		// flip if overflowing
 		if (preferTop && top < window.scrollY + 8 && spaceBelow >= menuRect.height + GAP) {
 			top = rect.bottom + window.scrollY + GAP;
 		} else if (
@@ -132,97 +136,59 @@ export function EnumDropdownInline({
 			visibility: 'visible',
 		});
 
-		// restore temp mutations (react owns styles via state)
 		menu.style.visibility = prevVis;
 		menu.style.position = prevPos;
 		menu.style.top = prevTop;
 		menu.style.left = prevLeft;
-	}, [open, placement, minWidthPx]);
+	}, [minWidthPx, placement, triggerRef]);
 
-	const close = useCallback(
-		(cancel = true) => {
-			setOpen(false);
-			// Return focus to trigger for accessibility
-			requestAnimationFrame(() => {
-				try {
-					triggerRef.current?.focus();
-				} catch {
-					/*swallow */
-				}
-			});
-			if (cancel) onCancel?.();
-		},
-		[onCancel]
-	);
-
-	// Ensure autoOpen opens on mount/update (not only as initial state)
-	useEffect(() => {
-		if (autoOpen) setOpen(true);
-	}, [autoOpen]);
-
-	// Use layout effect for first position calc to avoid visible jump
 	useLayoutEffect(() => {
-		if (!open) return;
 		updatePosition();
-	}, [open, updatePosition]);
+	}, [updatePosition]);
 
-	// Set initial active item and focus when menu opens
 	useEffect(() => {
-		if (!open) return;
-		const selectedIdx = value ? options.findIndex(opt => opt === value) : -1;
-		const idx = selectedIdx >= 0 ? selectedIdx : 0;
-		setActiveIndex(idx);
 		requestAnimationFrame(() => {
-			const btn = optionRefs.current[idx];
+			const btn = optionRefs.current[activeIndex];
 			if (btn) {
 				btn.focus();
 			} else {
-				// fallback
 				try {
 					menuRef.current?.focus();
 				} catch {
-					/*swallow*/
+					/* swallow */
 				}
 			}
 		});
-	}, [open, options, value]);
+	}, [activeIndex]);
 
-	// Keep active option in view as user navigates with keyboard
 	useEffect(() => {
-		if (!open) return;
 		const btn = optionRefs.current[activeIndex];
 		try {
 			btn?.scrollIntoView({ block: 'nearest' });
 		} catch {
 			// noop
 		}
-	}, [activeIndex, open]);
+	}, [activeIndex]);
 
-	// Reposition and outside click handling
 	useEffect(() => {
-		if (!open) return;
-
-		// Reposition on scroll/resize
 		const onReposition = () => {
 			updatePosition();
 		};
 
-		// Close on ESC
 		const onKey = (e: KeyboardEvent) => {
 			if (e.key === 'Escape') {
 				e.preventDefault();
-				close(true);
+				onRequestClose(true);
 			}
 		};
 
-		// Close on outside click
 		const onOutside = (e: MouseEvent | PointerEvent) => {
 			const path = e.composedPath();
-			const a = triggerRef.current;
-			const m = menuRef.current;
-			if (!a || !m) return;
-			if (!path.includes(a) && !path.includes(m)) {
-				close(true);
+			const anchor = triggerRef.current;
+			const menu = menuRef.current;
+			if (!anchor || !menu) return;
+			if (!path.includes(anchor) && !path.includes(menu)) {
+				onRequestClose(true);
 			}
 		};
 
@@ -237,19 +203,15 @@ export function EnumDropdownInline({
 			document.removeEventListener('keydown', onKey, true);
 			document.removeEventListener('pointerdown', onOutside, true);
 		};
-	}, [open, updatePosition, close]);
-
-	// Focus trigger for keyboard users
-	useEffect(() => {
-		if (!autoOpen) return;
-		requestAnimationFrame(() => triggerRef.current?.focus());
-	}, [autoOpen]);
+	}, [onRequestClose, triggerRef, updatePosition]);
 
 	const onMenuKeyDown = (e: ReactKeyBoardEvent) => {
 		if (withinSlate) {
 			e.stopPropagation();
 		}
+
 		const maxIdx = options.length - 1;
+
 		if (e.key === 'ArrowDown') {
 			e.preventDefault();
 			const next = Math.min(maxIdx, activeIndex < 0 ? 0 : activeIndex + 1);
@@ -273,13 +235,146 @@ export function EnumDropdownInline({
 			if (activeIndex >= 0 && activeIndex <= maxIdx) {
 				const opt = options[activeIndex];
 				onChange(opt);
-				close(false);
+				onRequestClose(false);
 			}
 		} else if (e.key === 'Escape') {
 			e.preventDefault();
-			close(true);
+			onRequestClose(true);
 		}
 	};
+
+	if (typeof document === 'undefined' || !document.body) {
+		return null;
+	}
+
+	return createPortal(
+		<div
+			ref={menuRef}
+			style={style}
+			className="bg-base-100 rounded-xl border p-1 shadow"
+			tabIndex={-1}
+			onMouseDown={stopForSlate}
+			onPointerDown={stopForSlate}
+			onClick={stopForSlate}
+			onKeyDown={onMenuKeyDown}
+		>
+			<ul
+				role="listbox"
+				id={listboxId}
+				className="w-full p-1"
+				style={{ maxHeight: menuMaxHeightPx, overflow: 'auto', minWidth: style.minWidth }}
+			>
+				{options.map((opt, idx) => {
+					const isActive = (value ?? '') === opt;
+					const isFocused = idx === activeIndex;
+
+					return (
+						<li key={opt} className="w-full">
+							<button
+								type="button"
+								role="option"
+								aria-selected={isActive}
+								ref={el => {
+									optionRefs.current[idx] = el;
+								}}
+								className={`w-full justify-start rounded-lg px-2 py-1 text-left font-normal ${
+									size === 'xs' ? 'text-xs' : size === 'sm' ? 'text-sm' : 'text-base'
+								} ${isFocused ? 'bg-base-200' : 'hover:bg-base-200'}`}
+								onClick={e => {
+									stopForSlate(e);
+									onChange(opt);
+									onRequestClose(false);
+								}}
+							>
+								<div className="flex justify-between">
+									<span className="truncate">{opt}</span>
+									{isActive && <FiCheck size={12} className="ml-2 inline-block" />}
+								</div>
+							</button>
+						</li>
+					);
+				})}
+				{clearable && (
+					<li className="w-full">
+						<button
+							type="button"
+							className={`text-error hover:bg-base-200 flex w-full items-center justify-center gap-1 rounded-lg px-2 py-1 text-left ${
+								size === 'xs' ? 'text-xs' : size === 'sm' ? 'text-sm' : 'text-base'
+							}`}
+							onClick={e => {
+								stopForSlate(e);
+								onChange(undefined);
+								onRequestClose(false);
+							}}
+						>
+							<FiX /> {clearLabel}
+						</button>
+					</li>
+				)}
+			</ul>
+		</div>,
+		document.body
+	);
+}
+
+export function EnumDropdownInline({
+	options,
+	value,
+	onChange,
+	placeholder = '-- select --',
+	clearLabel = 'Clear',
+	clearable = true,
+	disabled = false,
+	size = 'xs',
+	triggerClassName,
+	withinSlate = false,
+	autoOpen = false,
+	onCancel,
+	placement = 'auto',
+	minWidthPx = 176,
+	menuMaxHeightPx = 240,
+}: EnumDropdownInlineProps) {
+	const [open, setOpen] = useState<boolean>(() => autoOpen);
+	const triggerRef = useRef<HTMLButtonElement | null>(null);
+
+	const sizeCls = size === 'md' ? 'btn-md' : size === 'sm' ? 'btn-sm' : 'btn-xs';
+	const defaultTrigger = `btn btn-ghost ${sizeCls} font-normal w-40 min-w-24 justify-between truncate bg-transparent`;
+
+	const display = value === undefined || value === '' ? placeholder : value;
+
+	const stopForSlate = (e: SyntheticEvent) => {
+		if (withinSlate) {
+			e.preventDefault();
+			e.stopPropagation();
+		}
+	};
+
+	const close = useCallback(
+		(cancel = true) => {
+			setOpen(false);
+
+			requestAnimationFrame(() => {
+				try {
+					triggerRef.current?.focus();
+				} catch {
+					/* swallow */
+				}
+			});
+
+			if (cancel) onCancel?.();
+		},
+		[onCancel]
+	);
+
+	useEffect(() => {
+		if (!autoOpen) return;
+
+		requestAnimationFrame(() => {
+			triggerRef.current?.focus();
+		});
+	}, [autoOpen]);
+
+	const menuKey = useMemo(() => `${options.join('\u0000')}|${value ?? ''}`, [options, value]);
 
 	return (
 		<>
@@ -290,7 +385,6 @@ export function EnumDropdownInline({
 				aria-haspopup="listbox"
 				aria-expanded={open}
 				aria-label="Open selection menu"
-				aria-controls={open ? listboxId : undefined}
 				title="Open selection"
 				disabled={disabled}
 				onMouseDown={stopForSlate}
@@ -298,11 +392,12 @@ export function EnumDropdownInline({
 				onClick={e => {
 					stopForSlate(e);
 					if (disabled) return;
-					setOpen(o => !o);
+					setOpen(prev => !prev);
 				}}
 				onKeyDown={e => {
 					stopForSlate(e);
 					if (disabled) return;
+
 					if (e.key === 'Enter' || e.key === ' ') {
 						e.preventDefault();
 						setOpen(true);
@@ -313,7 +408,6 @@ export function EnumDropdownInline({
 						e.preventDefault();
 						setOpen(true);
 					} else if (e.key === 'ArrowUp') {
-						// Open and let initial focus go to selected or first item
 						e.preventDefault();
 						setOpen(true);
 					}
@@ -325,75 +419,24 @@ export function EnumDropdownInline({
 				{open ? <FiChevronDown size={12} /> : <FiChevronUp size={12} />}
 			</button>
 
-			{open &&
-				createPortal(
-					<div
-						ref={menuRef}
-						style={style}
-						className="bg-base-100 rounded-xl border p-1 shadow"
-						tabIndex={-1}
-						onMouseDown={stopForSlate}
-						onPointerDown={stopForSlate}
-						onClick={stopForSlate}
-						onKeyDown={onMenuKeyDown}
-					>
-						<ul
-							role="listbox"
-							id={listboxId}
-							className="w-full p-1"
-							style={{ maxHeight: menuMaxHeightPx, overflow: 'auto', minWidth: style.minWidth }}
-						>
-							{options.map((opt, idx) => {
-								const isActive = (value ?? '') === opt;
-								const isFocused = idx === activeIndex;
-
-								return (
-									<li key={opt} className="w-full">
-										<button
-											type="button"
-											role="option"
-											aria-selected={isActive}
-											ref={el => {
-												optionRefs.current[idx] = el;
-											}}
-											className={`w-full justify-start rounded-lg px-2 py-1 text-left font-normal ${
-												size === 'xs' ? 'text-xs' : size === 'sm' ? 'text-sm' : 'text-base'
-											} ${isFocused ? 'bg-base-200' : 'hover:bg-base-200'}`}
-											onClick={e => {
-												stopForSlate(e);
-												onChange(opt);
-												close(false);
-											}}
-										>
-											<div className="flex justify-between">
-												<span className="truncate">{opt}</span>
-												{isActive && <FiCheck size={12} className="ml-2 inline-block" />}
-											</div>
-										</button>
-									</li>
-								);
-							})}
-							{clearable && (
-								<li className="w-full">
-									<button
-										type="button"
-										className={`text-error hover:bg-base-200 flex w-full items-center justify-center gap-1 rounded-lg px-2 py-1 text-left ${
-											size === 'xs' ? 'text-xs' : size === 'sm' ? 'text-sm' : 'text-base'
-										}`}
-										onClick={e => {
-											stopForSlate(e);
-											onChange(undefined);
-											close(false);
-										}}
-									>
-										<FiX /> {clearLabel}
-									</button>
-								</li>
-							)}
-						</ul>
-					</div>,
-					document.body
-				)}
+			{open && (
+				<EnumDropdownInlineMenu
+					key={menuKey}
+					options={options}
+					value={value}
+					onChange={onChange}
+					clearLabel={clearLabel}
+					clearable={clearable}
+					size={size}
+					withinSlate={withinSlate}
+					onCancel={onCancel}
+					placement={placement}
+					minWidthPx={minWidthPx}
+					menuMaxHeightPx={menuMaxHeightPx}
+					triggerRef={triggerRef}
+					onRequestClose={close}
+				/>
+			)}
 		</>
 	);
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { FiPlus } from 'react-icons/fi';
 
@@ -22,6 +22,13 @@ interface BundleData {
 	templates: PromptTemplate[];
 }
 
+function getErrorMessage(error: unknown, fallback: string): string {
+	if (error instanceof Error && error.message.trim().length > 0) {
+		return error.message;
+	}
+	return fallback;
+}
+
 // eslint-disable-next-line no-restricted-exports
 export default function PromptsPage() {
 	const [bundles, setBundles] = useState<BundleData[]>([]);
@@ -32,82 +39,282 @@ export default function PromptsPage() {
 	const [alertMsg, setAlertMsg] = useState('');
 
 	/* bundle deletion modal */
-	const [bundleToDelete, setBundleToDelete] = useState<PromptBundle | null>(null);
+	const [bundleToDeleteID, setBundleToDeleteID] = useState<string | null>(null);
 
 	/* add-bundle modal */
 	const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-	const fetchAll = async () => {
+	const bundleToDelete =
+		bundleToDeleteID === null
+			? null
+			: (bundles.find(bundleData => bundleData.bundle.id === bundleToDeleteID)?.bundle ?? null);
+
+	const loadTemplatesForBundle = useCallback(async (bundleID: string): Promise<PromptTemplate[]> => {
+		const promptTemplateListItems = await getAllPromptTemplates([bundleID], undefined, true);
+
+		const templatePromises = promptTemplateListItems.map(item =>
+			promptStoreAPI.getPromptTemplate(item.bundleID, item.templateSlug, item.templateVersion)
+		);
+
+		return (await Promise.all(templatePromises)).filter(
+			(template): template is PromptTemplate => template !== undefined
+		);
+	}, []);
+
+	const refreshBundleTemplates = useCallback(
+		async (bundleID: string) => {
+			const freshTemplates = await loadTemplatesForBundle(bundleID);
+
+			setBundles(prev =>
+				prev.map(bundleData =>
+					bundleData.bundle.id === bundleID ? { ...bundleData, templates: freshTemplates } : bundleData
+				)
+			);
+		},
+		[loadTemplatesForBundle]
+	);
+
+	const fetchAll = useCallback(async () => {
 		setLoading(true);
+
 		try {
 			const promptBundles = await getAllPromptBundles(undefined, true);
 
 			const bundleResults: BundleData[] = await Promise.all(
-				promptBundles.map(async b => {
+				promptBundles.map(async bundle => {
 					try {
-						const promptTemplateListItems = await getAllPromptTemplates([b.id], undefined, true);
-
-						const tplPromises = promptTemplateListItems.map(itm =>
-							promptStoreAPI.getPromptTemplate(itm.bundleID, itm.templateSlug, itm.templateVersion)
-						);
-						const tpl = (await Promise.all(tplPromises)).filter((t): t is PromptTemplate => t !== undefined);
-						return { bundle: b, templates: tpl };
+						const templates = await loadTemplatesForBundle(bundle.id);
+						return { bundle, templates };
 					} catch {
-						return { bundle: b, templates: [] };
+						return { bundle, templates: [] };
 					}
 				})
 			);
 
 			setBundles(bundleResults);
-		} catch (err) {
-			console.error('Failed to load bundles:', err);
-			setAlertMsg('Failed to load bundles. Please try again.');
+		} catch (error) {
+			console.error('Failed to load bundles:', error);
+			setAlertMsg(getErrorMessage(error, 'Failed to load bundles. Please try again.'));
 			setShowAlert(true);
 		} finally {
 			setLoading(false);
 		}
-	};
+	}, [loadTemplatesForBundle]);
 
 	useEffect(() => {
-		fetchAll();
-	}, []);
+		void fetchAll();
+	}, [fetchAll]);
 
-	const onTemplatesChange = (bundleID: string, newTpl: PromptTemplate[]) => {
-		setBundles(prev => prev.map(bd => (bd.bundle.id === bundleID ? { ...bd, templates: newTpl } : bd)));
-	};
+	const handleToggleBundleEnabled = useCallback(
+		async (bundleID: string, enabled: boolean) => {
+			const bundleData = bundles.find(item => item.bundle.id === bundleID);
 
-	const onBundleEnableChange = (bundleID: string, enabled: boolean) => {
-		setBundles(prev =>
-			prev.map(bd => (bd.bundle.id === bundleID ? { ...bd, bundle: { ...bd.bundle, isEnabled: enabled } } : bd))
-		);
-	};
+			if (!bundleData) {
+				throw new Error('Bundle not found.');
+			}
 
-	const handleBundleDelete = async () => {
-		if (!bundleToDelete) return;
+			await promptStoreAPI.patchPromptBundle(bundleID, enabled);
+
+			setBundles(prev =>
+				prev.map(item =>
+					item.bundle.id === bundleID
+						? {
+								...item,
+								bundle: {
+									...item.bundle,
+									isEnabled: enabled,
+								},
+							}
+						: item
+				)
+			);
+		},
+		[bundles]
+	);
+
+	const handleToggleTemplateEnabled = useCallback(
+		async (bundleID: string, templateID: string) => {
+			const bundleData = bundles.find(item => item.bundle.id === bundleID);
+
+			if (!bundleData) {
+				throw new Error('Bundle not found.');
+			}
+
+			const template = bundleData.templates.find(item => item.id === templateID);
+
+			if (!template) {
+				throw new Error('Template not found.');
+			}
+
+			const nextEnabled = !template.isEnabled;
+
+			await promptStoreAPI.patchPromptTemplate(bundleID, template.slug, template.version, nextEnabled);
+
+			setBundles(prev =>
+				prev.map(item =>
+					item.bundle.id === bundleID
+						? {
+								...item,
+								templates: item.templates.map(existingTemplate =>
+									existingTemplate.id === templateID
+										? {
+												...existingTemplate,
+												isEnabled: nextEnabled,
+											}
+										: existingTemplate
+								),
+							}
+						: item
+				)
+			);
+		},
+		[bundles]
+	);
+
+	const handleDeleteTemplate = useCallback(
+		async (bundleID: string, templateID: string) => {
+			const bundleData = bundles.find(item => item.bundle.id === bundleID);
+
+			if (!bundleData) {
+				throw new Error('Bundle not found.');
+			}
+
+			if (bundleData.bundle.isBuiltIn) {
+				throw new Error('Cannot delete templates from a built-in bundle.');
+			}
+
+			const template = bundleData.templates.find(item => item.id === templateID);
+
+			if (!template) {
+				throw new Error('Template not found.');
+			}
+
+			if (template.isBuiltIn) {
+				throw new Error('Cannot delete built-in template.');
+			}
+
+			await promptStoreAPI.deletePromptTemplate(bundleID, template.slug, template.version);
+
+			setBundles(prev =>
+				prev.map(item =>
+					item.bundle.id === bundleID
+						? {
+								...item,
+								templates: item.templates.filter(existingTemplate => existingTemplate.id !== templateID),
+							}
+						: item
+				)
+			);
+		},
+		[bundles]
+	);
+
+	const handleSubmitTemplate = useCallback(
+		async (bundleID: string, templateToEditID: string | undefined, partial: Partial<PromptTemplate>) => {
+			const bundleData = bundles.find(item => item.bundle.id === bundleID);
+
+			if (!bundleData) {
+				throw new Error('Bundle not found.');
+			}
+
+			if (bundleData.bundle.isBuiltIn) {
+				throw new Error('Cannot add or edit templates in a built-in bundle.');
+			}
+
+			const templateToEdit =
+				templateToEditID === undefined ? undefined : bundleData.templates.find(item => item.id === templateToEditID);
+
+			if (templateToEditID !== undefined && !templateToEdit) {
+				throw new Error('Template not found.');
+			}
+
+			if (templateToEdit?.isBuiltIn) {
+				throw new Error('Built-in templates cannot be edited.');
+			}
+
+			const slug = (templateToEdit?.slug ?? partial.slug ?? '').trim();
+			const version = (partial.version ?? '').trim();
+
+			if (!slug) {
+				throw new Error('Missing template slug.');
+			}
+
+			if (!version) {
+				throw new Error('Version is required.');
+			}
+
+			const exists = bundleData.templates.some(template => template.slug === slug && template.version === version);
+
+			if (exists) {
+				throw new Error(`Version "${version}" already exists for slug "${slug}". Create a different version.`);
+			}
+
+			if (templateToEdit) {
+				await promptStoreAPI.putPromptTemplate(
+					bundleID,
+					templateToEdit.slug,
+					partial.displayName ?? templateToEdit.displayName,
+					partial.isEnabled ?? templateToEdit.isEnabled,
+					partial.blocks ?? templateToEdit.blocks,
+					version,
+					partial.description ?? templateToEdit.description,
+					partial.tags ?? templateToEdit.tags,
+					partial.variables ?? templateToEdit.variables
+				);
+			} else {
+				const displayName = partial.displayName?.trim() ?? '';
+
+				await promptStoreAPI.putPromptTemplate(
+					bundleID,
+					slug,
+					displayName,
+					partial.isEnabled ?? true,
+					partial.blocks ?? [],
+					version,
+					partial.description,
+					partial.tags,
+					partial.variables
+				);
+			}
+
+			await refreshBundleTemplates(bundleID);
+		},
+		[bundles, refreshBundleTemplates]
+	);
+
+	const handleBundleDelete = useCallback(async () => {
+		if (!bundleToDeleteID) {
+			return;
+		}
+
 		try {
-			await promptStoreAPI.deletePromptBundle(bundleToDelete.id);
-			setBundles(prev => prev.filter(bd => bd.bundle.id !== bundleToDelete.id));
-		} catch (err) {
-			console.error('Delete bundle failed:', err);
-			setAlertMsg('Failed to delete bundle.');
+			await promptStoreAPI.deletePromptBundle(bundleToDeleteID);
+
+			setBundles(prev => prev.filter(bundleData => bundleData.bundle.id !== bundleToDeleteID));
+		} catch (error) {
+			console.error('Delete bundle failed:', error);
+			setAlertMsg(getErrorMessage(error, 'Failed to delete bundle.'));
 			setShowAlert(true);
 		} finally {
-			setBundleToDelete(null);
+			setBundleToDeleteID(null);
 		}
-	};
+	}, [bundleToDeleteID]);
 
-	const handleAddBundle = async (slug: string, display: string, description?: string) => {
-		try {
-			const id = getUUIDv7();
-			await promptStoreAPI.putPromptBundle(id, slug, display, true, description);
-			setIsAddModalOpen(false);
-			await fetchAll();
-		} catch (err) {
-			console.error('Add bundle failed:', err);
-			setAlertMsg('Failed to add bundle.');
-			setShowAlert(true);
-		}
-	};
+	const handleAddBundle = useCallback(
+		async (slug: string, display: string, description?: string) => {
+			try {
+				const id = getUUIDv7();
+				await promptStoreAPI.putPromptBundle(id, slug, display, true, description);
+				setIsAddModalOpen(false);
+				await fetchAll();
+			} catch (error) {
+				console.error('Add bundle failed:', error);
+				setAlertMsg(getErrorMessage(error, 'Failed to add bundle.'));
+				setShowAlert(true);
+			}
+		},
+		[fetchAll]
+	);
 
 	if (loading) {
 		return <Loader text="Loading bundles…" />;
@@ -135,15 +342,17 @@ export default function PromptsPage() {
 					<div className="flex w-5/6 flex-col space-y-4 xl:w-2/3">
 						{bundles.length === 0 && <p className="mt-8 text-center text-sm">No bundles configured yet.</p>}
 
-						{bundles.map(bd => (
+						{bundles.map(bundleData => (
 							<PromptBundleCard
-								key={bd.bundle.id}
-								bundle={bd.bundle}
-								templates={bd.templates}
-								onTemplatesChange={onTemplatesChange}
-								onBundleEnableChange={onBundleEnableChange}
-								onBundleDeleted={b => {
-									setBundleToDelete(b);
+								key={bundleData.bundle.id}
+								bundle={bundleData.bundle}
+								templates={bundleData.templates}
+								onToggleBundleEnabled={handleToggleBundleEnabled}
+								onToggleTemplateEnabled={handleToggleTemplateEnabled}
+								onDeleteTemplate={handleDeleteTemplate}
+								onSubmitTemplate={handleSubmitTemplate}
+								onDeleteBundleRequested={bundleID => {
+									setBundleToDeleteID(bundleID);
 								}}
 							/>
 						))}
@@ -153,7 +362,7 @@ export default function PromptsPage() {
 				<DeleteConfirmationModal
 					isOpen={bundleToDelete !== null}
 					onClose={() => {
-						setBundleToDelete(null);
+						setBundleToDeleteID(null);
 					}}
 					onConfirm={handleBundleDelete}
 					title="Delete Prompt Bundle"
@@ -167,7 +376,7 @@ export default function PromptsPage() {
 						setIsAddModalOpen(false);
 					}}
 					onSubmit={handleAddBundle}
-					existingSlugs={bundles.map(b => b.bundle.slug)}
+					existingSlugs={bundles.map(bundleData => bundleData.bundle.slug)}
 				/>
 
 				<ActionDeniedAlertModal

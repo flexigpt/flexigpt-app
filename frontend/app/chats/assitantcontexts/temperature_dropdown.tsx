@@ -1,5 +1,4 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { useEffect, useState } from 'react';
 
 import { FiCheck, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
@@ -15,12 +14,6 @@ type TemperatureDropdownProps = {
 };
 
 export function TemperatureDropdown({ temperature, setTemperature, isOpen, setIsOpen }: TemperatureDropdownProps) {
-	const [customTemp, setCustomTemp] = useState(temperature.toString());
-
-	useEffect(() => {
-		setCustomTemp(temperature.toString());
-	}, [temperature]);
-
 	const select = useSelectStore({
 		value: temperature.toString(),
 		setValue: value => {
@@ -38,8 +31,8 @@ export function TemperatureDropdown({ temperature, setTemperature, isOpen, setIs
 
 	const open = useStoreState(select, 'open');
 
-	function clampOnBlur() {
-		let val = parseFloat(customTemp);
+	function clampTemperature(rawValue: string) {
+		let val = parseFloat(rawValue);
 		if (isNaN(val)) {
 			val = 0.1;
 		}
@@ -93,19 +86,19 @@ export function TemperatureDropdown({ temperature, setTemperature, isOpen, setIs
 								<div className="text-xs">Custom value (0.0 - 1.0)</div>
 							</div>
 							<input
+								key={temperature}
 								type="text"
 								name="temperature"
 								className="input input-xs w-full"
 								placeholder="Custom value (0.0 - 1.0)"
-								value={customTemp}
-								onChange={e => {
-									setCustomTemp(e.target.value);
+								defaultValue={temperature.toString()}
+								onBlur={e => {
+									clampTemperature(e.currentTarget.value);
 								}}
-								onBlur={clampOnBlur}
 								onKeyDown={e => {
 									if (e.key === 'Enter') {
 										e.preventDefault();
-										clampOnBlur();
+										clampTemperature(e.currentTarget.value);
 									}
 								}}
 								spellCheck="false"

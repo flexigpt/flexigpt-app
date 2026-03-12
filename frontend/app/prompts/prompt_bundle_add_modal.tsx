@@ -19,43 +19,61 @@ type ErrorState = {
 	displayName?: string;
 };
 
-export function AddBundleModal({ isOpen, onClose, onSubmit, existingSlugs }: AddBundleModalProps) {
-	const [form, setForm] = useState({
+type BundleFormData = {
+	slug: string;
+	displayName: string;
+	description: string;
+};
+
+function getInitialFormData(): BundleFormData {
+	return {
 		slug: '',
 		displayName: '',
 		description: '',
-	});
+	};
+}
+
+function AddBundleModalContent({ onClose, onSubmit, existingSlugs }: AddBundleModalProps) {
+	const [formData, setFormData] = useState<BundleFormData>(() => getInitialFormData());
 	const [errors, setErrors] = useState<ErrorState>({});
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
+	const isUnmountingRef = useRef(false);
 
-	// Reset local state whenever the modal is opened
 	useEffect(() => {
-		if (!isOpen) return;
-		setForm({ slug: '', displayName: '', description: '' });
-		setErrors({});
-	}, [isOpen]);
-
-	// Open/close the native <dialog> when isOpen changes
-	useEffect(() => {
-		if (!isOpen) return;
-
 		const dialog = dialogRef.current;
 		if (!dialog) return;
 
 		if (!dialog.open) {
-			dialog.showModal();
+			try {
+				dialog.showModal();
+			} catch {
+				// Ignore showModal errors and keep rendering safely.
+			}
 		}
 
 		return () => {
+			isUnmountingRef.current = true;
+
 			if (dialog.open) {
 				dialog.close();
 			}
 		};
-	}, [isOpen]);
+	}, []);
 
-	// Sync parent state when the dialog closes (Esc or programmatic close)
+	const requestClose = () => {
+		const dialog = dialogRef.current;
+
+		if (dialog?.open) {
+			dialog.close();
+			return;
+		}
+
+		onClose();
+	};
+
 	const handleDialogClose = () => {
+		if (isUnmountingRef.current) return;
 		onClose();
 	};
 
@@ -81,7 +99,7 @@ export function AddBundleModal({ isOpen, onClose, onSubmit, existingSlugs }: Add
 		return nextErrors;
 	};
 
-	const validateForm = (state: typeof form): ErrorState => {
+	const validateForm = (state: BundleFormData): ErrorState => {
 		let nextErrors: ErrorState = {};
 		nextErrors = validateField('slug', state.slug, nextErrors);
 		nextErrors = validateField('displayName', state.displayName, nextErrors);
@@ -89,15 +107,13 @@ export function AddBundleModal({ isOpen, onClose, onSubmit, existingSlugs }: Add
 	};
 
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
-		if (e) {
-			e.preventDefault();
-			e.stopPropagation();
-		}
+		e.preventDefault();
+		e.stopPropagation();
 
-		const trimmed = {
-			slug: form.slug.trim(),
-			displayName: form.displayName.trim(),
-			description: form.description.trim(),
+		const trimmed: BundleFormData = {
+			slug: formData.slug.trim(),
+			displayName: formData.displayName.trim(),
+			description: formData.description.trim(),
 		};
 
 		const nextErrors = validateForm(trimmed);
@@ -106,17 +122,15 @@ export function AddBundleModal({ isOpen, onClose, onSubmit, existingSlugs }: Add
 		if (Object.keys(nextErrors).length > 0) return;
 
 		onSubmit(trimmed.slug, trimmed.displayName, trimmed.description || undefined);
-		dialogRef.current?.close();
+		requestClose();
 	};
 
 	const isFormValid = useMemo(
-		() => Boolean(form.slug.trim()) && Boolean(form.displayName.trim()) && Object.keys(errors).length === 0,
-		[form.slug, form.displayName, errors]
+		() => Boolean(formData.slug.trim()) && Boolean(formData.displayName.trim()) && Object.keys(errors).length === 0,
+		[formData.slug, formData.displayName, errors]
 	);
 
-	if (!isOpen) return null;
-
-	return createPortal(
+	return (
 		<dialog
 			ref={dialogRef}
 			className="modal"
@@ -134,7 +148,7 @@ export function AddBundleModal({ isOpen, onClose, onSubmit, existingSlugs }: Add
 						<button
 							type="button"
 							className="btn btn-sm btn-circle bg-base-300"
-							onClick={() => dialogRef.current?.close()}
+							onClick={requestClose}
 							aria-label="Close"
 						>
 							<FiX size={12} />
@@ -155,10 +169,10 @@ export function AddBundleModal({ isOpen, onClose, onSubmit, existingSlugs }: Add
 								<input
 									type="text"
 									className={`input input-bordered w-full rounded-xl ${errors.slug ? 'input-error' : ''}`}
-									value={form.slug}
+									value={formData.slug}
 									onChange={e => {
 										const value = e.target.value;
-										setForm(p => ({ ...p, slug: value }));
+										setFormData(prev => ({ ...prev, slug: value }));
 										setErrors(prev => validateField('slug', value, prev));
 									}}
 									spellCheck="false"
@@ -186,10 +200,10 @@ export function AddBundleModal({ isOpen, onClose, onSubmit, existingSlugs }: Add
 								<input
 									type="text"
 									className={`input input-bordered w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
-									value={form.displayName}
+									value={formData.displayName}
 									onChange={e => {
 										const value = e.target.value;
-										setForm(p => ({ ...p, displayName: value }));
+										setFormData(prev => ({ ...prev, displayName: value }));
 										setErrors(prev => validateField('displayName', value, prev));
 									}}
 									spellCheck="false"
@@ -215,10 +229,10 @@ export function AddBundleModal({ isOpen, onClose, onSubmit, existingSlugs }: Add
 							<div className="col-span-9">
 								<textarea
 									className="textarea textarea-bordered h-24 w-full rounded-xl"
-									value={form.description}
+									value={formData.description}
 									onChange={e => {
 										const value = e.target.value;
-										setForm(p => ({ ...p, description: value }));
+										setFormData(prev => ({ ...prev, description: value }));
 									}}
 									spellCheck="false"
 								/>
@@ -227,7 +241,7 @@ export function AddBundleModal({ isOpen, onClose, onSubmit, existingSlugs }: Add
 
 						{/* Actions */}
 						<div className="modal-action">
-							<button type="button" className="btn bg-base-300 rounded-xl" onClick={() => dialogRef.current?.close()}>
+							<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
 								Cancel
 							</button>
 							<button type="submit" className="btn btn-primary rounded-xl" disabled={!isFormValid}>
@@ -238,7 +252,13 @@ export function AddBundleModal({ isOpen, onClose, onSubmit, existingSlugs }: Add
 				</div>
 			</div>
 			{/* NOTE: no modal-backdrop here: backdrop click should NOT close this modal */}
-		</dialog>,
-		document.body
+		</dialog>
 	);
+}
+
+export function AddBundleModal(props: AddBundleModalProps) {
+	if (!props.isOpen) return null;
+	if (typeof document === 'undefined' || !document.body) return null;
+
+	return createPortal(<AddBundleModalContent key="add-prompt-bundle-modal" {...props} />, document.body);
 }

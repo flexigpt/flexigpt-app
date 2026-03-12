@@ -1,11 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { FiCheck, FiChevronDown, FiChevronUp, FiEye, FiGitBranch, FiPlus, FiTrash2, FiX } from 'react-icons/fi';
 
 import type { PromptBundle, PromptTemplate } from '@/spec/prompt';
-
-import { promptStoreAPI } from '@/apis/baseapi';
-import { getAllPromptTemplates } from '@/apis/list_helper';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
@@ -19,30 +16,34 @@ interface PromptBundleCardProps {
 	bundle: PromptBundle;
 	templates: PromptTemplate[];
 
-	onTemplatesChange: (bundleID: string, newTemplates: PromptTemplate[]) => void;
-	onBundleEnableChange: (bundleID: string, enabled: boolean) => void;
-	onBundleDeleted: (bundle: PromptBundle) => void;
+	onToggleBundleEnabled: (bundleID: string, enabled: boolean) => Promise<void>;
+	onToggleTemplateEnabled: (bundleID: string, templateID: string) => Promise<void>;
+	onDeleteTemplate: (bundleID: string, templateID: string) => Promise<void>;
+	onSubmitTemplate: (
+		bundleID: string,
+		templateToEditID: string | undefined,
+		partial: Partial<PromptTemplate>
+	) => Promise<void>;
+	onDeleteBundleRequested: (bundleID: string) => void;
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+	if (error instanceof Error && error.message.trim().length > 0) {
+		return error.message;
+	}
+	return fallback;
 }
 
 export function PromptBundleCard({
 	bundle,
 	templates,
-	onTemplatesChange,
-	onBundleEnableChange,
-	onBundleDeleted,
+	onToggleBundleEnabled,
+	onToggleTemplateEnabled,
+	onDeleteTemplate,
+	onSubmitTemplate,
+	onDeleteBundleRequested,
 }: PromptBundleCardProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
-	const [localTemplates, setLocalTemplates] = useState<PromptTemplate[]>(templates);
-
-	const [isBundleEnabled, setIsBundleEnabled] = useState(bundle.isEnabled);
-
-	useEffect(() => {
-		setIsBundleEnabled(bundle.isEnabled);
-	}, [bundle.isEnabled]);
-
-	useEffect(() => {
-		setLocalTemplates(templates);
-	}, [templates]);
 
 	const [isDeleteTemplateModalOpen, setIsDeleteTemplateModalOpen] = useState(false);
 	const [templateToDelete, setTemplateToDelete] = useState<PromptTemplate | null>(null);
@@ -56,122 +57,101 @@ export function PromptBundleCard({
 	const [showAlert, setShowAlert] = useState(false);
 	const [alertMsg, setAlertMsg] = useState('');
 
-	const toggleBundleEnable = async () => {
+	const [isBundleTogglePending, setIsBundleTogglePending] = useState(false);
+	const [pendingTemplateToggleIDs, setPendingTemplateToggleIDs] = useState<Set<string>>(new Set());
+
+	const openAlert = (message: string) => {
+		setAlertMsg(message);
+		setShowAlert(true);
+	};
+
+	const setTemplateTogglePending = (templateID: string, pending: boolean) => {
+		setPendingTemplateToggleIDs(prev => {
+			const next = new Set(prev);
+
+			if (pending) {
+				next.add(templateID);
+			} else {
+				next.delete(templateID);
+			}
+
+			return next;
+		});
+	};
+
+	const handleToggleBundleEnable = async () => {
 		try {
-			const newVal = !isBundleEnabled;
-			await promptStoreAPI.patchPromptBundle(bundle.id, newVal);
-			setIsBundleEnabled(newVal);
-			onBundleEnableChange(bundle.id, newVal);
-		} catch (err) {
-			console.error('Failed to toggle bundle:', err);
-			setAlertMsg('Failed to toggle bundle enable state.');
-			setShowAlert(true);
+			setIsBundleTogglePending(true);
+			await onToggleBundleEnabled(bundle.id, !bundle.isEnabled);
+		} catch (error) {
+			console.error('Failed to toggle bundle:', error);
+			openAlert(getErrorMessage(error, 'Failed to toggle bundle enable state.'));
+		} finally {
+			setIsBundleTogglePending(false);
 		}
 	};
 
-	const patchTemplateEnable = async (tpl: PromptTemplate) => {
+	const handleTemplateEnableToggle = async (template: PromptTemplate) => {
 		try {
-			await promptStoreAPI.patchPromptTemplate(bundle.id, tpl.slug, tpl.version, !tpl.isEnabled);
-			const updated: PromptTemplate = { ...tpl, isEnabled: !tpl.isEnabled };
-			const newArr = localTemplates.map(t => (t.id === tpl.id ? updated : t));
-			setLocalTemplates(newArr);
-			onTemplatesChange(bundle.id, newArr);
-		} catch (err) {
-			console.error('Toggle template failed:', err);
-			setAlertMsg('Failed to toggle template.');
-			setShowAlert(true);
+			setTemplateTogglePending(template.id, true);
+			await onToggleTemplateEnabled(bundle.id, template.id);
+		} catch (error) {
+			console.error('Toggle template failed:', error);
+			openAlert(getErrorMessage(error, 'Failed to toggle template.'));
+		} finally {
+			setTemplateTogglePending(template.id, false);
 		}
 	};
 
-	const requestDeleteTemplate = (tpl: PromptTemplate) => {
-		if (tpl.isBuiltIn) {
-			setAlertMsg('Cannot delete built-in template.');
-			setShowAlert(true);
+	const requestDeleteTemplate = (template: PromptTemplate) => {
+		if (bundle.isBuiltIn) {
+			openAlert('Cannot delete templates from a built-in bundle.');
 			return;
 		}
-		setTemplateToDelete(tpl);
+
+		if (template.isBuiltIn) {
+			openAlert('Cannot delete built-in template.');
+			return;
+		}
+
+		setTemplateToDelete(template);
 		setIsDeleteTemplateModalOpen(true);
 	};
 
 	const confirmDeleteTemplate = async () => {
-		if (!templateToDelete) return;
+		if (!templateToDelete) {
+			return;
+		}
+
 		try {
-			await promptStoreAPI.deletePromptTemplate(bundle.id, templateToDelete.slug, templateToDelete.version);
-			const newArr = localTemplates.filter(t => t.id !== templateToDelete.id);
-			setLocalTemplates(newArr);
-			onTemplatesChange(bundle.id, newArr);
-		} catch (err) {
-			console.error('Delete template failed:', err);
-			setAlertMsg('Failed to delete template.');
-			setShowAlert(true);
+			await onDeleteTemplate(bundle.id, templateToDelete.id);
+		} catch (error) {
+			console.error('Delete template failed:', error);
+			openAlert(getErrorMessage(error, 'Failed to delete template.'));
 		} finally {
 			setIsDeleteTemplateModalOpen(false);
 			setTemplateToDelete(null);
 		}
 	};
 
-	const openTemplateModal = (mode: TemplateModalMode, tpl?: PromptTemplate) => {
+	const openTemplateModal = (mode: TemplateModalMode, template?: PromptTemplate) => {
 		if ((mode === 'add' || mode === 'edit') && bundle.isBuiltIn) {
-			setAlertMsg('Cannot add or edit templates in a built-in bundle.');
-			setShowAlert(true);
+			openAlert('Cannot add or edit templates in a built-in bundle.');
 			return;
 		}
-		if (mode === 'edit' && tpl?.isBuiltIn) {
-			setAlertMsg('Built-in templates cannot be edited.');
-			setShowAlert(true);
+
+		if (mode === 'edit' && template?.isBuiltIn) {
+			openAlert('Built-in templates cannot be edited.');
 			return;
 		}
+
 		setTemplateModalMode(mode);
-		setTemplateToEdit(tpl);
+		setTemplateToEdit(template);
 		setIsTemplateModalOpen(true);
 	};
 
 	const handleModifySubmit = async (partial: Partial<PromptTemplate>) => {
-		// Defensive: NEVER allow overwriting an existing (slug, version).
-		const slug = (templateToEdit?.slug ?? partial.slug ?? '').trim();
-		const version = (partial.version ?? '').trim();
-		if (!slug) throw new Error('Missing template slug.');
-		if (!version) throw new Error('Version is required.');
-
-		const exists = localTemplates.some(t => t.slug === slug && t.version === version);
-		if (exists) {
-			throw new Error(`Version "${version}" already exists for slug "${slug}". Create a different version.`);
-		}
-
-		if (templateToEdit) {
-			await promptStoreAPI.putPromptTemplate(
-				bundle.id,
-				templateToEdit.slug,
-				partial.displayName ?? templateToEdit.displayName,
-				partial.isEnabled ?? templateToEdit.isEnabled,
-				partial.blocks ?? templateToEdit.blocks,
-				version,
-				partial.description ?? templateToEdit.description,
-				partial.tags ?? templateToEdit.tags,
-				partial.variables ?? templateToEdit.variables
-			);
-		} else {
-			const display = partial.displayName?.trim() ?? '';
-			await promptStoreAPI.putPromptTemplate(
-				bundle.id,
-				slug,
-				display,
-				partial.isEnabled ?? true,
-				partial.blocks ?? [],
-				version,
-				partial.description,
-				partial.tags,
-				partial.variables
-			);
-		}
-
-		const promptTemplateListItems = await getAllPromptTemplates([bundle.id], undefined, true);
-		const tplPromises = promptTemplateListItems.map(li =>
-			promptStoreAPI.getPromptTemplate(li.bundleID, li.templateSlug, li.templateVersion)
-		);
-		const fresh = (await Promise.all(tplPromises)).filter((t): t is PromptTemplate => t !== undefined);
-		setLocalTemplates(fresh);
-		onTemplatesChange(bundle.id, fresh);
+		await onSubmitTemplate(bundle.id, templateToEdit?.id, partial);
 	};
 
 	return (
@@ -205,18 +185,21 @@ export function PromptBundleCard({
 						<input
 							type="checkbox"
 							className="toggle toggle-accent"
-							checked={isBundleEnabled}
-							onChange={toggleBundleEnable}
+							checked={bundle.isEnabled}
+							disabled={isBundleTogglePending}
+							onChange={() => {
+								void handleToggleBundleEnable();
+							}}
 						/>
 					</div>
 
 					<div
 						className="flex cursor-pointer items-center gap-1"
 						onClick={() => {
-							setIsExpanded(p => !p);
+							setIsExpanded(prev => !prev);
 						}}
 					>
-						<label className="text-sm whitespace-nowrap">Templates:&nbsp;{localTemplates.length}</label>
+						<label className="text-sm whitespace-nowrap">Templates:&nbsp;{templates.length}</label>
 						{isExpanded ? <FiChevronUp /> : <FiChevronDown />}
 					</div>
 				</div>
@@ -237,28 +220,31 @@ export function PromptBundleCard({
 								</tr>
 							</thead>
 							<tbody>
-								{localTemplates.map(tpl => (
-									<tr key={tpl.id} className="hover:bg-base-300">
-										<td>{tpl.displayName}</td>
-										<td className="text-center">{tpl.slug}</td>
+								{templates.map(template => (
+									<tr key={template.id} className="hover:bg-base-300">
+										<td>{template.displayName}</td>
+										<td className="text-center">{template.slug}</td>
 										<td className="text-center align-middle">
 											<input
 												type="checkbox"
 												className="toggle toggle-accent"
-												checked={tpl.isEnabled}
-												onChange={() => patchTemplateEnable(tpl)}
+												checked={template.isEnabled}
+												disabled={pendingTemplateToggleIDs.has(template.id)}
+												onChange={() => {
+													void handleTemplateEnableToggle(template);
+												}}
 											/>
 										</td>
-										<td className="text-center">{tpl.version}</td>
+										<td className="text-center">{template.version}</td>
 										<td className="text-center">
-											{tpl.isBuiltIn ? <FiCheck className="mx-auto" /> : <FiX className="mx-auto" />}
+											{template.isBuiltIn ? <FiCheck className="mx-auto" /> : <FiX className="mx-auto" />}
 										</td>
 										<td className="justify-end text-center">
 											<div className="inline-flex items-center gap-2">
 												<button
 													className="btn btn-sm btn-ghost rounded-2xl"
 													onClick={() => {
-														openTemplateModal('view', tpl);
+														openTemplateModal('view', template);
 													}}
 													title="View"
 													aria-label="View"
@@ -269,11 +255,11 @@ export function PromptBundleCard({
 												<button
 													className="btn btn-sm btn-ghost rounded-2xl"
 													onClick={() => {
-														openTemplateModal('edit', tpl);
+														openTemplateModal('edit', template);
 													}}
-													disabled={tpl.isBuiltIn || bundle.isBuiltIn}
+													disabled={template.isBuiltIn || bundle.isBuiltIn}
 													title={
-														tpl.isBuiltIn || bundle.isBuiltIn
+														template.isBuiltIn || bundle.isBuiltIn
 															? 'Built-in items cannot create new versions'
 															: 'New Version'
 													}
@@ -285,10 +271,12 @@ export function PromptBundleCard({
 												<button
 													className="btn btn-sm btn-ghost rounded-2xl"
 													onClick={() => {
-														requestDeleteTemplate(tpl);
+														requestDeleteTemplate(template);
 													}}
-													disabled={tpl.isBuiltIn || bundle.isBuiltIn}
-													title={tpl.isBuiltIn || bundle.isBuiltIn ? 'Deleting disabled for built-in items' : 'Delete'}
+													disabled={template.isBuiltIn || bundle.isBuiltIn}
+													title={
+														template.isBuiltIn || bundle.isBuiltIn ? 'Deleting disabled for built-in items' : 'Delete'
+													}
 													aria-label="Delete"
 												>
 													<FiTrash2 size={16} />
@@ -297,7 +285,8 @@ export function PromptBundleCard({
 										</td>
 									</tr>
 								))}
-								{localTemplates.length === 0 && (
+
+								{templates.length === 0 && (
 									<tr>
 										<td colSpan={6} className="py-3 text-center text-sm">
 											No templates in this bundle.
@@ -313,7 +302,7 @@ export function PromptBundleCard({
 							<button
 								className="btn btn-md btn-ghost flex items-center rounded-2xl"
 								onClick={() => {
-									onBundleDeleted(bundle);
+									onDeleteBundleRequested(bundle.id);
 								}}
 							>
 								<FiTrash2 /> <span className="ml-1">Delete Bundle</span>
@@ -322,7 +311,7 @@ export function PromptBundleCard({
 							<button
 								className="btn btn-md btn-ghost flex items-center rounded-2xl"
 								onClick={() => {
-									openTemplateModal('add', undefined);
+									openTemplateModal('add');
 								}}
 							>
 								<FiPlus /> <span className="ml-1">Add Template</span>
@@ -336,6 +325,7 @@ export function PromptBundleCard({
 				isOpen={isDeleteTemplateModalOpen}
 				onClose={() => {
 					setIsDeleteTemplateModalOpen(false);
+					setTemplateToDelete(null);
 				}}
 				onConfirm={confirmDeleteTemplate}
 				title="Delete Prompt Template"
@@ -360,10 +350,10 @@ export function PromptBundleCard({
 							}
 						: undefined
 				}
-				existingTemplates={localTemplates.map(t => ({
-					template: t,
+				existingTemplates={templates.map(template => ({
+					template,
 					bundleID: bundle.id,
-					templateSlug: t.slug,
+					templateSlug: template.slug,
 				}))}
 			/>
 

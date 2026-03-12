@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { type SetStateAction, useCallback, useEffect, useState } from 'react';
 
 import { FiSliders } from 'react-icons/fi';
 
@@ -30,6 +30,43 @@ type AssistantContextBarProps = {
 	onOptionsChange: (options: UIChatOption) => void;
 };
 
+function isHybridReasoningModel(model: UIChatOption): boolean {
+	return model.reasoning?.type === ReasoningType.HybridWithTokens;
+}
+
+function buildFinalOptions(
+	selectedModel: UIChatOption,
+	disablePreviousMessages: boolean,
+	isHybridReasoningEnabled: boolean
+): UIChatOption {
+	const base = { ...selectedModel, disablePreviousMessages };
+
+	if (selectedModel.reasoning?.type === ReasoningType.HybridWithTokens && !isHybridReasoningEnabled) {
+		const modifiedOptions = { ...base };
+		delete modifiedOptions.reasoning;
+
+		if (modifiedOptions.temperature === undefined) {
+			modifiedOptions.temperature = DefaultUIChatOptions.temperature;
+		}
+
+		return sanitizeUIChatOptionByCapabilities(modifiedOptions);
+	}
+
+	return sanitizeUIChatOptionByCapabilities(base);
+}
+
+function upsertSystemPromptItem(
+	items: SystemPromptItem[],
+	prompt: string,
+	options?: { locked?: boolean }
+): SystemPromptItem[] {
+	const trimmedPrompt = prompt.trim();
+	if (!trimmedPrompt) return items;
+	if (items.some(i => i.prompt === trimmedPrompt)) return items;
+
+	return [...items, createSystemPromptItem(trimmedPrompt, options?.locked ? { locked: true } : undefined)];
+}
+
 export function AssistantContextBar({ onOptionsChange }: AssistantContextBarProps) {
 	const [selectedModel, setSelectedModel] = useState<UIChatOption>(DefaultUIChatOptions);
 	const [allOptions, setAllOptions] = useState<UIChatOption[]>([DefaultUIChatOptions]);
@@ -38,121 +75,184 @@ export function AssistantContextBar({ onOptionsChange }: AssistantContextBarProp
 	const [disablePreviousMessages, setDisablePreviousMessages] = useState(false);
 	const [systemPrompts, setSystemPrompts] = useState<SystemPromptItem[]>([]);
 
-	const loadInitialItems = useCallback(async () => {
-		const r = await getChatInputOptions();
-		setSelectedModel(sanitizeUIChatOptionByCapabilities(r.default));
-		setAllOptions(r.allOptions);
-		// Seed system prompts with current default if available
-		const initialSP = r.default.systemPrompt.trim();
-		if (initialSP) {
-			setSystemPrompts(prev =>
-				prev.some(i => i.prompt === initialSP) ? prev : [...prev, createSystemPromptItem(initialSP, { locked: true })]
-			);
-		}
-	}, []);
-
-	useEffect(() => {
-		loadInitialItems();
-	}, [loadInitialItems]);
-
-	useEffect(() => {
-		setIsHybridReasoningEnabled(selectedModel.reasoning?.type === ReasoningType.HybridWithTokens);
-	}, [selectedModel.reasoning?.type]);
-
-	useEffect(() => {
-		const sp = selectedModel.systemPrompt.trim();
-		if (sp) {
-			setSystemPrompts(prev => (prev.some(i => i.prompt === sp) ? prev : [...prev, createSystemPromptItem(sp)]));
-		}
-	}, [selectedModel.systemPrompt]);
-
-	const buildFinalOptions = useCallback((): UIChatOption => {
-		const base = { ...selectedModel, disablePreviousMessages };
-
-		// remove reasoning when hybrid reasoning is toggled off
-		if (selectedModel.reasoning?.type === ReasoningType.HybridWithTokens && !isHybridReasoningEnabled) {
-			const modifiedOptions = { ...base };
-			delete modifiedOptions.reasoning;
-			if (modifiedOptions.temperature === undefined) {
-				modifiedOptions.temperature = DefaultUIChatOptions.temperature;
-			}
-			return sanitizeUIChatOptionByCapabilities(modifiedOptions);
-		}
-
-		return sanitizeUIChatOptionByCapabilities(base);
-	}, [selectedModel, disablePreviousMessages, isHybridReasoningEnabled]);
-
-	useEffect(() => {
-		onOptionsChange(buildFinalOptions());
-	}, [buildFinalOptions, onOptionsChange]);
-
 	const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
 	const [isSecondaryDropdownOpen, setIsSecondaryDropdownOpen] = useState(false);
 	const [isVerbosityDropdownOpen, setIsVerbosityDropdownOpen] = useState(false);
 	const [isSystemDropdownOpen, setIsSystemDropdownOpen] = useState(false);
-
 	const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);
 
-	const setTemperature = useCallback((temp: number) => {
-		const clampedTemp = Math.max(0, Math.min(1, temp));
-		setSelectedModel(prev => ({ ...prev, temperature: clampedTemp }));
+	const emitOptionsChange = useCallback(
+		(nextSelectedModel: UIChatOption, nextDisablePreviousMessages: boolean, nextIsHybridReasoningEnabled: boolean) => {
+			onOptionsChange(buildFinalOptions(nextSelectedModel, nextDisablePreviousMessages, nextIsHybridReasoningEnabled));
+		},
+		[onOptionsChange]
+	);
+
+	const addSystemPromptIfMissing = useCallback((prompt: string, options?: { locked?: boolean }) => {
+		setSystemPrompts(prev => upsertSystemPromptItem(prev, prompt, options));
 	}, []);
 
-	const setReasoningLevel = useCallback((newLevel: ReasoningLevel) => {
-		setSelectedModel(prev => ({
-			...prev,
-			reasoning: {
-				type: ReasoningType.SingleWithLevels,
-				level: newLevel,
-				tokens: 1024,
-				summaryStyle: prev.reasoning?.summaryStyle,
-			},
-		}));
-	}, []);
+	const applySelectedModel = useCallback(
+		(
+			action: SetStateAction<UIChatOption>,
+			options?: {
+				syncHybridFromModel?: boolean;
+				lockSystemPrompt?: boolean;
+			}
+		) => {
+			const nextSelectedModel =
+				typeof action === 'function' ? (action as (prevState: UIChatOption) => UIChatOption)(selectedModel) : action;
 
-	const setHybridTokens = useCallback((tokens: number) => {
-		setSelectedModel(prev => {
-			if (!prev.reasoning || prev.reasoning.type !== ReasoningType.HybridWithTokens) return prev;
-			return { ...prev, reasoning: { ...prev.reasoning, tokens } };
-		});
-	}, []);
+			const nextIsHybridReasoningEnabled = options?.syncHybridFromModel
+				? isHybridReasoningModel(nextSelectedModel)
+				: isHybridReasoningEnabled;
 
-	const setOutputVerbosity = useCallback((verbosity?: OutputVerbosity) => {
-		setSelectedModel(prev => {
-			const next = { ...(prev.outputParam ?? {}) };
+			setSelectedModel(nextSelectedModel);
 
-			if (verbosity === undefined) {
-				delete next.verbosity;
-			} else {
-				next.verbosity = verbosity;
+			if (nextIsHybridReasoningEnabled !== isHybridReasoningEnabled) {
+				setIsHybridReasoningEnabled(nextIsHybridReasoningEnabled);
 			}
 
-			const hasAny = !!next.verbosity || !!next.format;
-			return {
+			addSystemPromptIfMissing(nextSelectedModel.systemPrompt, {
+				locked: options?.lockSystemPrompt,
+			});
+
+			emitOptionsChange(nextSelectedModel, disablePreviousMessages, nextIsHybridReasoningEnabled);
+		},
+		[selectedModel, isHybridReasoningEnabled, disablePreviousMessages, addSystemPromptIfMissing, emitOptionsChange]
+	);
+
+	useEffect(() => {
+		let cancelled = false;
+
+		const initialHybridEnabled = isHybridReasoningModel(DefaultUIChatOptions);
+		emitOptionsChange(DefaultUIChatOptions, false, initialHybridEnabled);
+
+		void (async () => {
+			const r = await getChatInputOptions();
+			if (cancelled) return;
+
+			const nextSelectedModel = sanitizeUIChatOptionByCapabilities(r.default);
+			const nextIsHybridReasoningEnabled = isHybridReasoningModel(nextSelectedModel);
+
+			setSelectedModel(nextSelectedModel);
+			setAllOptions(r.allOptions);
+			setIsHybridReasoningEnabled(nextIsHybridReasoningEnabled);
+
+			addSystemPromptIfMissing(nextSelectedModel.systemPrompt, { locked: true });
+			emitOptionsChange(nextSelectedModel, false, nextIsHybridReasoningEnabled);
+		})();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [addSystemPromptIfMissing, emitOptionsChange]);
+
+	const handleSetSelectedModel = useCallback(
+		(action: SetStateAction<UIChatOption>) => {
+			applySelectedModel(action, { syncHybridFromModel: true });
+		},
+		[applySelectedModel]
+	);
+
+	const handleSetDisablePreviousMessages = useCallback(
+		(action: SetStateAction<boolean>) => {
+			const nextDisablePreviousMessages = typeof action === 'function' ? action(disablePreviousMessages) : action;
+
+			setDisablePreviousMessages(nextDisablePreviousMessages);
+			emitOptionsChange(selectedModel, nextDisablePreviousMessages, isHybridReasoningEnabled);
+		},
+		[disablePreviousMessages, emitOptionsChange, isHybridReasoningEnabled, selectedModel]
+	);
+
+	const handleSetIsHybridReasoningEnabled = useCallback(
+		(action: SetStateAction<boolean>) => {
+			const nextIsHybridReasoningEnabled = typeof action === 'function' ? action(isHybridReasoningEnabled) : action;
+
+			setIsHybridReasoningEnabled(nextIsHybridReasoningEnabled);
+			emitOptionsChange(selectedModel, disablePreviousMessages, nextIsHybridReasoningEnabled);
+		},
+		[disablePreviousMessages, emitOptionsChange, isHybridReasoningEnabled, selectedModel]
+	);
+
+	const setTemperature = useCallback(
+		(temp: number) => {
+			const clampedTemp = Math.max(0, Math.min(1, temp));
+			applySelectedModel(prev => ({ ...prev, temperature: clampedTemp }));
+		},
+		[applySelectedModel]
+	);
+
+	const setReasoningLevel = useCallback(
+		(newLevel: ReasoningLevel) => {
+			applySelectedModel(prev => ({
 				...prev,
-				outputParam: hasAny ? next : undefined,
-			};
-		});
-	}, []);
+				reasoning: {
+					type: ReasoningType.SingleWithLevels,
+					level: newLevel,
+					tokens: 1024,
+					summaryStyle: prev.reasoning?.summaryStyle,
+				},
+			}));
+		},
+		[applySelectedModel]
+	);
+
+	const setHybridTokens = useCallback(
+		(tokens: number) => {
+			applySelectedModel(prev => {
+				if (!prev.reasoning || prev.reasoning.type !== ReasoningType.HybridWithTokens) return prev;
+				return { ...prev, reasoning: { ...prev.reasoning, tokens } };
+			});
+		},
+		[applySelectedModel]
+	);
+
+	const setOutputVerbosity = useCallback(
+		(verbosity?: OutputVerbosity) => {
+			applySelectedModel(prev => {
+				const next = { ...(prev.outputParam ?? {}) };
+
+				if (verbosity === undefined) {
+					delete next.verbosity;
+				} else {
+					next.verbosity = verbosity;
+				}
+
+				const hasAny = !!next.verbosity || !!next.format;
+
+				return {
+					...prev,
+					outputParam: hasAny ? next : undefined,
+				};
+			});
+		},
+		[applySelectedModel]
+	);
 
 	const verbosityEnabled = supportsOutputVerbosity(selectedModel.capabilitiesOverride);
 
-	const selectSystemPrompt = useCallback((item: SystemPromptItem) => {
-		setSelectedModel(prev => ({ ...prev, systemPrompt: item.prompt }));
-	}, []);
+	const selectSystemPrompt = useCallback(
+		(item: SystemPromptItem) => {
+			applySelectedModel(prev => ({ ...prev, systemPrompt: item.prompt }));
+		},
+		[applySelectedModel]
+	);
 
 	const clearSystemPrompt = useCallback(() => {
-		setSelectedModel(prev => ({ ...prev, systemPrompt: '' }));
-	}, []);
+		applySelectedModel(prev => ({ ...prev, systemPrompt: '' }));
+	}, [applySelectedModel]);
 
 	const editSystemPrompt = useCallback(
 		(id: string, updatedPrompt: string) => {
 			const updatedText = updatedPrompt.trim();
 			if (!updatedText) return;
-			setSystemPrompts(prev => {
-				const oldItem = prev.find(i => i.id === id);
-				if (!oldItem) return prev;
-				const updated = prev.map(i =>
+
+			const oldItem = systemPrompts.find(i => i.id === id);
+			if (!oldItem) return;
+
+			setSystemPrompts(prev =>
+				prev.map(i =>
 					i.id === id
 						? {
 								...i,
@@ -160,46 +260,55 @@ export function AssistantContextBar({ onOptionsChange }: AssistantContextBarProp
 								title: updatedText.length > 24 ? `${updatedText.slice(0, 24)}…` : updatedText || '(empty)',
 							}
 						: i
-				);
-				if ((selectedModel.systemPrompt || '').trim() === (oldItem.prompt || '').trim()) {
-					setSelectedModel(sel => ({ ...sel, systemPrompt: updatedText }));
-				}
-				return updated;
-			});
+				)
+			);
+
+			if ((selectedModel.systemPrompt || '').trim() === (oldItem.prompt || '').trim()) {
+				applySelectedModel(prev => ({ ...prev, systemPrompt: updatedText }));
+			}
 		},
-		[selectedModel.systemPrompt]
+		[applySelectedModel, selectedModel.systemPrompt, systemPrompts]
 	);
 
 	const addSystemPrompt = useCallback(
 		(item: SystemPromptItem) => {
 			const p = item.prompt.trim();
 			if (!p) return;
+
 			setSystemPrompts(prev => (prev.some(i => i.prompt === p) ? prev : [...prev, item]));
-			setSelectedModel(prev => ({ ...prev, systemPrompt: p }));
+			applySelectedModel(prev => ({ ...prev, systemPrompt: p }));
 		},
-		[setSelectedModel]
+		[applySelectedModel]
 	);
 
 	const removeSystemPrompt = useCallback((id: string) => {
 		setSystemPrompts(prev => {
 			const target = prev.find(i => i.id === id);
-			if (target?.locked) return prev; // don't remove locked default
+			if (target?.locked) return prev;
 			return prev.filter(i => i.id !== id);
 		});
 	}, []);
 
-	useSetSystemPromptForChat(prompt => {
-		const p = (prompt || '').trim();
-		if (!p) return;
-		setSystemPrompts(prev => (prev.some(i => i.prompt === p) ? prev : [...prev, createSystemPromptItem(p)]));
-		setSelectedModel(prev => ({ ...prev, systemPrompt: p }));
-	});
+	const handleSetSystemPromptForChat = useCallback(
+		(prompt: string) => {
+			const p = (prompt || '').trim();
+			if (!p) return;
+
+			addSystemPromptIfMissing(p);
+			applySelectedModel(prev => ({ ...prev, systemPrompt: p }));
+		},
+		[addSystemPromptIfMissing, applySelectedModel]
+	);
+
+	useSetSystemPromptForChat(handleSetSystemPromptForChat);
+
+	const selectedPromptId = systemPrompts.find(i => i.prompt === (selectedModel.systemPrompt.trim() || ''))?.id;
 
 	return (
 		<div className="bg-base-200 mx-4 my-0 flex items-center justify-between space-x-1">
 			<ModelDropdown
 				selectedModel={selectedModel}
-				setSelectedModel={setSelectedModel}
+				setSelectedModel={handleSetSelectedModel}
 				allOptions={allOptions}
 				isOpen={isModelDropdownOpen}
 				setIsOpen={setIsModelDropdownOpen}
@@ -208,7 +317,7 @@ export function AssistantContextBar({ onOptionsChange }: AssistantContextBarProp
 			{selectedModel.reasoning?.type === ReasoningType.HybridWithTokens && (
 				<HybridReasoningCheckbox
 					isReasoningEnabled={isHybridReasoningEnabled}
-					setIsReasoningEnabled={setIsHybridReasoningEnabled}
+					setIsReasoningEnabled={handleSetIsHybridReasoningEnabled}
 				/>
 			)}
 
@@ -245,7 +354,6 @@ export function AssistantContextBar({ onOptionsChange }: AssistantContextBarProp
 				/>
 			)}
 
-			{/* Verbosity dropdown */}
 			{verbosityEnabled && (
 				<OutputVerbosityDropdown
 					verbosity={selectedModel.outputParam?.verbosity}
@@ -258,7 +366,7 @@ export function AssistantContextBar({ onOptionsChange }: AssistantContextBarProp
 
 			<SystemPromptDropdown
 				prompts={systemPrompts}
-				selectedPromptId={systemPrompts.find(i => i.prompt === (selectedModel.systemPrompt.trim() || ''))?.id}
+				selectedPromptId={selectedPromptId}
 				onSelect={selectSystemPrompt}
 				onAdd={addSystemPrompt}
 				onEdit={editSystemPrompt}
@@ -270,10 +378,9 @@ export function AssistantContextBar({ onOptionsChange }: AssistantContextBarProp
 
 			<DisablePreviousMessagesCheckbox
 				disablePreviousMessages={disablePreviousMessages}
-				setDisablePreviousMessages={setDisablePreviousMessages}
+				setDisablePreviousMessages={handleSetDisablePreviousMessages}
 			/>
 
-			{/* Advanced params button */}
 			<div className="flex items-center justify-center">
 				<div
 					className="tooltip tooltip-left"
@@ -291,7 +398,6 @@ export function AssistantContextBar({ onOptionsChange }: AssistantContextBarProp
 				</div>
 			</div>
 
-			{/* Advanced params modal */}
 			<AdvancedParamsModal
 				isOpen={isAdvancedModalOpen}
 				onClose={() => {
@@ -299,7 +405,7 @@ export function AssistantContextBar({ onOptionsChange }: AssistantContextBarProp
 				}}
 				currentModel={selectedModel}
 				onSave={(updatedModel: UIChatOption) => {
-					setSelectedModel(sanitizeUIChatOptionByCapabilities(updatedModel));
+					applySelectedModel(sanitizeUIChatOptionByCapabilities(updatedModel));
 				}}
 			/>
 		</div>

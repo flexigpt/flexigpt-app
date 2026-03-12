@@ -28,10 +28,12 @@ interface AddEditToolModalProps {
 	isOpen: boolean;
 	onClose: () => void;
 	onSubmit: (toolData: Partial<Tool>) => Promise<void>;
-	initialData?: ToolItem; // when editing/viewing
+	initialData?: ToolItem;
 	existingTools: ToolItem[];
 	mode?: ModalMode;
 }
+
+type AddEditToolModalContentProps = Omit<AddEditToolModalProps, 'isOpen'>;
 
 const TOOL_TYPE_LABEL_GO = 'Go';
 const TOOL_TYPE_LABEL_HTTP = 'HTTP';
@@ -65,140 +67,110 @@ const toolTypeDropdownItems: Record<ToolImplType, { isEnabled: boolean; displayN
 	[ToolImplType.SDK]: { isEnabled: false, displayName: TOOL_TYPE_LABEL_SDK },
 };
 
-export function AddEditToolModal({
-	isOpen,
+const EMPTY_FORM_DATA = {
+	displayName: '',
+	slug: '',
+	version: DEFAULT_SEMVER,
+	description: '',
+	tags: '',
+	isEnabled: true,
+
+	userCallable: true,
+	llmCallable: true,
+	autoExecReco: false,
+
+	type: ToolImplType.HTTP as ToolImplType,
+	argSchema: '{}',
+
+	goFunc: '',
+
+	httpUrl: '',
+	httpMethod: 'GET',
+	httpHeaders: '{}',
+	httpQuery: '{}',
+	httpBody: '',
+	httpAuthType: '',
+	httpAuthIn: '',
+	httpAuthName: '',
+	httpAuthValueTemplate: '',
+	httpResponseCodes: '',
+	httpResponseErrorMode: '',
+	httpResponseBodyOutputMode: HTTPBodyOutputMode.Auto as HTTPBodyOutputMode,
+	httpTimeoutMS: '',
+};
+
+type ToolFormData = typeof EMPTY_FORM_DATA;
+
+function buildInitialFormData(
+	initialData: ToolItem | undefined,
+	existingTools: ToolItem[],
+	isEditMode: boolean
+): ToolFormData {
+	if (!initialData) {
+		return { ...EMPTY_FORM_DATA };
+	}
+
+	const t = initialData.tool;
+	const existingVersionsForSlug = existingTools.filter(x => x.tool.slug === t.slug).map(x => x.tool.version);
+	const nextV = isEditMode ? suggestNextMinorVersion(t.version, existingVersionsForSlug).suggested : t.version;
+
+	return {
+		displayName: t.displayName,
+		slug: t.slug,
+		version: nextV,
+
+		description: t.description ?? '',
+		tags: (t.tags ?? []).join(', '),
+		isEnabled: t.isEnabled,
+
+		userCallable: t.userCallable,
+		llmCallable: t.llmCallable,
+		autoExecReco: t.autoExecReco,
+
+		type: t.type,
+		argSchema: JSON.stringify(t.argSchema ?? {}, null, 2),
+
+		goFunc: t.goImpl?.func ?? '',
+
+		httpUrl: t.httpImpl?.request.urlTemplate ?? '',
+		httpMethod: t.httpImpl?.request.method ?? 'GET',
+		httpHeaders: JSON.stringify(t.httpImpl?.request.headers ?? {}, null, 2),
+		httpQuery: JSON.stringify(t.httpImpl?.request.query ?? {}, null, 2),
+		httpBody: t.httpImpl?.request.body ?? '',
+		httpAuthType: t.httpImpl?.request.auth?.type ?? '',
+		httpAuthIn: t.httpImpl?.request.auth?.in ?? '',
+		httpAuthName: t.httpImpl?.request.auth?.name ?? '',
+		httpAuthValueTemplate: t.httpImpl?.request.auth?.valueTemplate ?? '',
+		httpResponseCodes: (t.httpImpl?.response.successCodes ?? []).join(','),
+		httpResponseErrorMode: t.httpImpl?.response.errorMode ?? '',
+		httpResponseBodyOutputMode: t.httpImpl?.response.bodyOutputMode ?? HTTPBodyOutputMode.Auto,
+		httpTimeoutMS: t.httpImpl?.request.timeoutMS !== undefined ? String(t.httpImpl.request.timeoutMS) : '',
+	};
+}
+
+function AddEditToolModalContent({
 	onClose,
 	onSubmit,
 	initialData,
 	existingTools,
 	mode,
-}: AddEditToolModalProps) {
+}: AddEditToolModalContentProps) {
 	const effectiveMode: ModalMode = mode ?? (initialData ? 'edit' : 'add');
 	const isViewMode = effectiveMode === 'view';
 	const isEditMode = effectiveMode === 'edit';
 
-	const [formData, setFormData] = useState({
-		displayName: '',
-		slug: '',
-		version: DEFAULT_SEMVER,
-		description: '',
-		tags: '',
-		isEnabled: true,
-
-		userCallable: true,
-		llmCallable: true,
-		autoExecReco: false,
-
-		type: ToolImplType.HTTP as ToolImplType,
-		argSchema: '{}',
-
-		goFunc: '',
-
-		httpUrl: '',
-		httpMethod: 'GET',
-		httpHeaders: '{}',
-		httpQuery: '{}',
-		httpBody: '',
-		httpAuthType: '',
-		httpAuthIn: '',
-		httpAuthName: '',
-		httpAuthValueTemplate: '',
-		httpResponseCodes: '',
-		httpResponseErrorMode: '',
-		httpResponseBodyOutputMode: HTTPBodyOutputMode.Auto,
-		httpTimeoutMS: '',
-	});
-
+	const [formData, setFormData] = useState<ToolFormData>(() =>
+		buildInitialFormData(initialData, existingTools, isEditMode)
+	);
 	const [errors, setErrors] = useState<ErrorState>({});
 	const [submitError, setSubmitError] = useState<string>('');
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const displayNameInputRef = useRef<HTMLInputElement | null>(null);
 	const httpUrlInputRef = useRef<HTMLInputElement | null>(null);
+	const ignoreCloseRef = useRef(false);
 
 	useEffect(() => {
-		if (!isOpen) return;
-
-		if (initialData) {
-			const t = initialData.tool;
-			const existingVersionsForSlug = existingTools.filter(x => x.tool.slug === t.slug).map(x => x.tool.version);
-
-			const nextV = isEditMode ? suggestNextMinorVersion(t.version, existingVersionsForSlug).suggested : t.version;
-
-			setFormData({
-				displayName: t.displayName,
-				slug: t.slug,
-				version: nextV,
-
-				description: t.description ?? '',
-				tags: (t.tags ?? []).join(', '),
-				isEnabled: t.isEnabled,
-
-				userCallable: t.userCallable,
-				llmCallable: t.llmCallable,
-				autoExecReco: t.autoExecReco,
-
-				type: t.type,
-				argSchema: JSON.stringify(t.argSchema ?? {}, null, 2),
-
-				goFunc: t.goImpl?.func ?? '',
-
-				httpUrl: t.httpImpl?.request.urlTemplate ?? '',
-				httpMethod: t.httpImpl?.request.method ?? 'GET',
-				httpHeaders: JSON.stringify(t.httpImpl?.request.headers ?? {}, null, 2),
-				httpQuery: JSON.stringify(t.httpImpl?.request.query ?? {}, null, 2),
-				httpBody: t.httpImpl?.request.body ?? '',
-				httpAuthType: t.httpImpl?.request.auth?.type ?? '',
-				httpAuthIn: t.httpImpl?.request.auth?.in ?? '',
-
-				httpAuthName: t.httpImpl?.request.auth?.name ?? '',
-				httpAuthValueTemplate: t.httpImpl?.request.auth?.valueTemplate ?? '',
-				httpResponseCodes: (t.httpImpl?.response.successCodes ?? []).join(','),
-				httpResponseErrorMode: t.httpImpl?.response.errorMode ?? '',
-				httpResponseBodyOutputMode: t.httpImpl?.response.bodyOutputMode ?? HTTPBodyOutputMode.Auto,
-				httpTimeoutMS: t.httpImpl?.request.timeoutMS !== undefined ? String(t.httpImpl.request.timeoutMS) : '',
-			});
-		} else {
-			setFormData({
-				displayName: '',
-				slug: '',
-				version: DEFAULT_SEMVER,
-
-				description: '',
-				tags: '',
-				isEnabled: true,
-
-				userCallable: true,
-				llmCallable: true,
-				autoExecReco: false,
-
-				type: ToolImplType.HTTP,
-				argSchema: '{}',
-
-				goFunc: '',
-
-				httpUrl: '',
-				httpMethod: 'GET',
-				httpHeaders: '{}',
-				httpQuery: '{}',
-				httpBody: '',
-				httpAuthType: '',
-				httpAuthIn: '',
-
-				httpAuthName: '',
-				httpAuthValueTemplate: '',
-				httpResponseCodes: '',
-				httpResponseErrorMode: '',
-				httpResponseBodyOutputMode: HTTPBodyOutputMode.Auto,
-				httpTimeoutMS: '',
-			});
-		}
-		setErrors({});
-		setSubmitError('');
-	}, [isOpen, initialData, isEditMode]);
-
-	useEffect(() => {
-		if (!isOpen) return;
 		const dialog = dialogRef.current;
 		if (!dialog) return;
 
@@ -206,16 +178,24 @@ export function AddEditToolModal({
 			dialog.showModal();
 		}
 
-		window.setTimeout(() => {
-			if (!isViewMode) displayNameInputRef.current?.focus();
+		const focusTimer = window.setTimeout(() => {
+			if (!isViewMode) {
+				displayNameInputRef.current?.focus();
+			}
 		}, 0);
 
 		return () => {
-			if (dialog.open) dialog.close();
+			window.clearTimeout(focusTimer);
+			ignoreCloseRef.current = true;
+
+			if (dialog.open) {
+				dialog.close();
+			}
 		};
-	}, [isOpen, isViewMode]);
+	}, [isViewMode]);
 
 	const handleDialogClose = () => {
+		if (ignoreCloseRef.current) return;
 		onClose();
 	};
 
@@ -238,10 +218,11 @@ export function AddEditToolModal({
 				else newErrs = omitManyKeys(newErrs, ['slug']);
 			}
 		} else if (field === 'version') {
-			if (!v) newErrs.version = 'Version is required.';
-			else if (isEditMode && initialData?.tool && v === initialData.tool.version)
+			if (!v) {
+				newErrs.version = 'Version is required.';
+			} else if (isEditMode && initialData?.tool && v === initialData.tool.version) {
 				newErrs.version = 'New version must be different from the current version.';
-			else {
+			} else {
 				const slugToCheck = initialData?.tool.slug ?? formData.slug.trim();
 				const versionClash = existingTools.some(t => t.tool.slug === slugToCheck && t.tool.version === v);
 				if (versionClash) newErrs.version = 'That version already exists for this slug.';
@@ -318,8 +299,9 @@ export function AddEditToolModal({
 				else newErrs = omitManyKeys(newErrs, ['httpResponseCodes']);
 			}
 		} else if (field === 'httpTimeoutMS') {
-			if (v === '') newErrs = omitManyKeys(newErrs, ['httpTimeoutMS']);
-			else {
+			if (v === '') {
+				newErrs = omitManyKeys(newErrs, ['httpTimeoutMS']);
+			} else {
 				const n = Number(v);
 				if (!Number.isFinite(n) || n < 1) newErrs.httpTimeoutMS = 'Timeout must be a positive number (ms).';
 				else newErrs = omitManyKeys(newErrs, ['httpTimeoutMS']);
@@ -331,7 +313,7 @@ export function AddEditToolModal({
 		return newErrs;
 	};
 
-	const validateForm = (state: typeof formData): ErrorState => {
+	const validateForm = (state: ToolFormData): ErrorState => {
 		let newErrs: ErrorState = {};
 		newErrs = validateField('displayName', state.displayName, newErrs);
 		newErrs = validateField('slug', state.slug, newErrs);
@@ -382,6 +364,7 @@ export function AddEditToolModal({
 
 	const isAllValid = useMemo(() => {
 		if (isViewMode) return true;
+
 		const hasErrs = Object.values(errors).some(Boolean);
 		const required =
 			formData.displayName.trim() &&
@@ -389,13 +372,16 @@ export function AddEditToolModal({
 			formData.version.trim() &&
 			formData.argSchema.trim() &&
 			(formData.type === ToolImplType.HTTP ? formData.httpUrl.trim() : true);
+
 		return Boolean(required) && !hasErrs;
 	}, [errors, formData, isViewMode]);
 
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
 		e.preventDefault();
 		e.stopPropagation();
+
 		if (isViewMode) return;
+
 		setSubmitError('');
 
 		const nextErrors = validateForm(formData);
@@ -415,7 +401,7 @@ export function AddEditToolModal({
 			return;
 		}
 
-		let httpImpl: Tool['httpImpl'] | undefined = undefined;
+		let httpImpl: Tool['httpImpl'] | undefined;
 
 		if (formData.type === ToolImplType.HTTP) {
 			const httpUrlInput = httpUrlInputRef.current;
@@ -509,23 +495,19 @@ export function AddEditToolModal({
 	};
 
 	const onToolTypeChange = (key: ToolImplType) => {
-		// UI restriction: only HTTP tools can be created/edited in current implementation
 		if (key !== ToolImplType.HTTP) return;
 		setFormData(prev => ({ ...prev, type: key }));
 		setErrors(prev => validateField('type', key, prev));
 	};
 
-	if (!isOpen) return null;
-
 	const headerTitle = effectiveMode === 'view' ? 'View Tool' : effectiveMode === 'edit' ? 'Edit Tool' : 'Add Tool';
 
-	return createPortal(
+	return (
 		<dialog
 			ref={dialogRef}
 			className="modal"
 			onClose={handleDialogClose}
 			onCancel={e => {
-				// Form mode (add/edit): block Esc close. View mode: allow.
 				if (!isViewMode) e.preventDefault();
 			}}
 		>
@@ -535,7 +517,7 @@ export function AddEditToolModal({
 						<h3 className="text-lg font-bold">{headerTitle}</h3>
 						<button
 							type="button"
-							className="btn btn-sm btn-circle bg-base-300"
+							className="btn btn-sm btn-circle bg-base-300 rounded-xl"
 							onClick={() => dialogRef.current?.close()}
 							aria-label="Close"
 						>
@@ -552,6 +534,7 @@ export function AddEditToolModal({
 								</div>
 							</div>
 						)}
+
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
 								<span className="label-text text-sm">Display Name*</span>
@@ -582,7 +565,7 @@ export function AddEditToolModal({
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
 								<span className="label-text text-sm">Slug*</span>
-								<span className="label-text-alt tooltip tooltip-right" data-tip="Lower-case, URL-friendly.">
+								<span className="tooltip tooltip-right label-text-alt" data-tip="Lower-case, URL-friendly.">
 									<FiHelpCircle size={12} />
 								</span>
 							</label>
@@ -607,12 +590,12 @@ export function AddEditToolModal({
 								)}
 							</div>
 						</div>
-						{/* Version */}
+
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
 								<span className="label-text text-sm">Version*</span>
 								<span
-									className="label-text-alt tooltip tooltip-right"
+									className="tooltip tooltip-right label-text-alt"
 									data-tip="Once created, existing versions are not edited. Edit creates a new version."
 								>
 									<FiHelpCircle size={12} />
@@ -632,7 +615,7 @@ export function AddEditToolModal({
 								/>
 								{isEditMode && initialData?.tool && (
 									<div className="label">
-										<span className="label-text-alt text-base-content/70 text-xs">
+										<span className="text-base-content/70 label-text-alt text-xs">
 											Current: {initialData.tool.version} · Suggested next:{' '}
 											{
 												suggestNextMinorVersion(
@@ -763,7 +746,7 @@ export function AddEditToolModal({
 						<div className="grid grid-cols-12 items-start gap-2">
 							<label className="label col-span-3">
 								<span className="label-text text-sm">Arg JSONSchema*</span>
-								<span className="label-text-alt tooltip tooltip-right" data-tip="JSON Schema for arguments">
+								<span className="tooltip tooltip-right label-text-alt" data-tip="JSON Schema for arguments">
 									<FiHelpCircle size={12} />
 								</span>
 							</label>
@@ -1049,7 +1032,7 @@ export function AddEditToolModal({
 												dropdownItems={bodyOutputModeItems}
 												selectedKey={formData.httpResponseBodyOutputMode}
 												onChange={m => {
-													setFormData(p => ({ ...p, httpResponseBodyOutputMode: m }));
+													setFormData(prev => ({ ...prev, httpResponseBodyOutputMode: m }));
 												}}
 												filterDisabled={false}
 												title="Select output mode"
@@ -1121,7 +1104,18 @@ export function AddEditToolModal({
 				</div>
 			</div>
 			<ModalBackdrop enabled={isViewMode} />
-		</dialog>,
+		</dialog>
+	);
+}
+
+export function AddEditToolModal({ isOpen, initialData, mode, ...rest }: AddEditToolModalProps) {
+	if (!isOpen || typeof document === 'undefined') return null;
+
+	const effectiveMode: ModalMode = mode ?? (initialData ? 'edit' : 'add');
+	const modalKey = `${effectiveMode}:${initialData?.tool.id ?? 'new'}:${initialData?.tool.version ?? DEFAULT_SEMVER}`;
+
+	return createPortal(
+		<AddEditToolModalContent key={modalKey} initialData={initialData} mode={mode} {...rest} />,
 		document.body
 	);
 }

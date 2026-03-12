@@ -1,4 +1,4 @@
-import { forwardRef, type RefObject, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, type RefObject, useImperativeHandle, useRef, useState } from 'react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { UIToolCall } from '@/spec/inference';
@@ -43,16 +43,16 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 	ref
 ) {
 	const [chatOptions, setUIChatOptions] = useState<UIChatOption>(DefaultUIChatOptions);
-
-	const [showAbortModal, setShowAbortModal] = useState(false);
-
-	useEffect(() => {
-		if (!isBusy) setShowAbortModal(false);
-	}, [isBusy]);
+	const [abortConfirmationRequested, setAbortConfirmationRequested] = useState(false);
 
 	const inputAreaRef = useRef<EditorAreaHandle>(null);
 
+	const showAbortModal = isBusy && abortConfirmationRequested;
+
 	const handleSubmitMessage = (payload: EditorSubmitPayload) => {
+		// Clear any stale abort confirmation request before starting a new send.
+		setAbortConfirmationRequested(false);
+
 		// Return the promise so <EditorArea /> can await it and surface
 		// any synchronous errors from sendMessage (e.g. validation).
 		return onSend(payload, chatOptions);
@@ -102,10 +102,10 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 			<DeleteConfirmationModal
 				isOpen={showAbortModal}
 				onClose={() => {
-					setShowAbortModal(false);
+					setAbortConfirmationRequested(false);
 				}}
 				onConfirm={() => {
-					setShowAbortModal(false);
+					setAbortConfirmationRequested(false);
 					abortRef.current?.abort();
 				}}
 				title="Abort generation?"
@@ -121,7 +121,9 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 					shortcutConfig={shortcutConfig}
 					onSubmit={handleSubmitMessage}
 					onRequestStop={() => {
-						setShowAbortModal(true);
+						if (isBusy) {
+							setAbortConfirmationRequested(true);
+						}
 					}}
 					editingMessageId={editingMessageId}
 					cancelEditing={onCancelEditing}

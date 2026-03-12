@@ -1,5 +1,4 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { useEffect, useState } from 'react';
 
 import { FiCheck, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
@@ -15,12 +14,6 @@ type ReasoningTokensDropdownProps = {
 };
 
 export function ReasoningTokensDropdown({ tokens, setTokens, isOpen, setIsOpen }: ReasoningTokensDropdownProps) {
-	const [customTokens, setCustomTokens] = useState<string>(String(tokens));
-
-	useEffect(() => {
-		setCustomTokens(String(tokens));
-	}, [tokens]);
-
 	const select = useSelectStore({
 		value: tokens.toString(),
 		setValue: value => {
@@ -38,8 +31,8 @@ export function ReasoningTokensDropdown({ tokens, setTokens, isOpen, setIsOpen }
 
 	const open = useStoreState(select, 'open');
 
-	function clampTokensOnBlur() {
-		let val = parseInt(customTokens, 10);
+	function clampTokens(rawValue: string) {
+		let val = parseInt(rawValue, 10);
 		if (isNaN(val)) {
 			val = 1024;
 		}
@@ -95,18 +88,18 @@ export function ReasoningTokensDropdown({ tokens, setTokens, isOpen, setIsOpen }
 								<div className="text-xs">Custom tokens (≥ 1024)</div>
 							</div>
 							<input
+								key={tokens}
 								type="text"
 								className="input input-xs w-full"
 								placeholder="Enter a custom integer ≥ 1024"
-								value={customTokens}
-								onChange={e => {
-									setCustomTokens(e.target.value);
+								defaultValue={tokens.toString()}
+								onBlur={e => {
+									clampTokens(e.currentTarget.value);
 								}}
-								onBlur={clampTokensOnBlur}
 								onKeyDown={e => {
 									if (e.key === 'Enter') {
 										e.preventDefault();
-										clampTokensOnBlur();
+										clampTokens(e.currentTarget.value);
 									}
 								}}
 							/>

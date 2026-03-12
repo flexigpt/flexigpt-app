@@ -49,8 +49,67 @@ type ErrorState = {
 	variables?: string;
 };
 
-export function AddEditPromptTemplateModal({
-	isOpen,
+type PromptTemplateFormData = {
+	displayName: string;
+	slug: string;
+	description: string;
+	tags: string;
+	isEnabled: boolean;
+	version: string;
+	blocks: MessageBlock[];
+	variables: PromptVariable[];
+};
+
+function cloneVariable(variable: PromptVariable): PromptVariable {
+	return {
+		...variable,
+		enumValues: variable.enumValues ? [...variable.enumValues] : variable.enumValues,
+	};
+}
+
+function getSuggestedNextVersion(initialData: TemplateItem, existingTemplates: TemplateItem[]): string {
+	return suggestNextMinorVersion(
+		initialData.template.version,
+		existingTemplates.filter(t => t.template.slug === initialData.template.slug).map(t => t.template.version)
+	).suggested;
+}
+
+function getInitialFormData(
+	initialData: TemplateItem | undefined,
+	existingTemplates: TemplateItem[],
+	isEditMode: boolean
+): PromptTemplateFormData {
+	if (initialData) {
+		const src = initialData.template;
+		const nextVersion = isEditMode ? getSuggestedNextVersion(initialData, existingTemplates) : src.version;
+
+		return {
+			displayName: src.displayName,
+			slug: src.slug,
+			description: src.description ?? '',
+			tags: (src.tags ?? []).join(', '),
+			isEnabled: src.isEnabled,
+			version: nextVersion,
+			blocks: src.blocks?.length
+				? src.blocks.map(block => ({ ...block }))
+				: [{ id: getUUIDv7(), role: PromptRoleEnum.User, content: '' }],
+			variables: src.variables?.length ? src.variables.map(cloneVariable) : [],
+		};
+	}
+
+	return {
+		displayName: '',
+		slug: '',
+		description: '',
+		tags: '',
+		isEnabled: true,
+		version: DEFAULT_SEMVER,
+		blocks: [{ id: getUUIDv7(), role: PromptRoleEnum.User, content: '' }],
+		variables: [],
+	};
+}
+
+function AddEditPromptTemplateModalContent({
 	onClose,
 	onSubmit,
 	initialData,
@@ -61,21 +120,19 @@ export function AddEditPromptTemplateModal({
 	const isViewMode = effectiveMode === 'view';
 	const isEditMode = effectiveMode === 'edit';
 
-	const [formData, setFormData] = useState({
-		displayName: '',
-		slug: '',
-		description: '',
-		tags: '',
-		isEnabled: true,
-		version: DEFAULT_SEMVER,
-		blocks: [] as MessageBlock[],
-		variables: [] as PromptVariable[],
-	});
-
+	const [formData, setFormData] = useState<PromptTemplateFormData>(() =>
+		getInitialFormData(initialData, existingTemplates, isEditMode)
+	);
 	const [errors, setErrors] = useState<ErrorState>({});
 	const [submitError, setSubmitError] = useState<string>('');
 
+	const initialTemplateId = initialData?.template?.id;
+	const initialTemplateSlug = initialData?.template?.slug;
+	const initialTemplateVersion = initialData?.template?.version;
+
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
+	const isUnmountingRef = useRef(false);
+
 	const roleDropdownItems = useMemo(() => {
 		const obj = {} as Record<PromptRoleEnum, DropdownItem>;
 		Object.values(PromptRoleEnum).forEach(r => {
@@ -100,66 +157,57 @@ export function AddEditPromptTemplateModal({
 		return obj;
 	}, []);
 
-	useEffect(() => {
-		if (!isOpen) return;
-
-		if (initialData) {
-			const src = initialData.template;
-			const existingVersionsForSlug = existingTemplates
-				.filter(t => t.template.slug === src.slug)
-				.map(t => t.template.version);
-
-			const nextV = isEditMode ? suggestNextMinorVersion(src.version, existingVersionsForSlug).suggested : src.version;
-
-			setFormData({
-				displayName: src.displayName,
-				slug: src.slug,
-				description: src.description ?? '',
-				tags: (src.tags ?? []).join(', '),
-				isEnabled: src.isEnabled,
-				version: nextV,
-				blocks: src.blocks?.length ? src.blocks : [{ id: getUUIDv7(), role: PromptRoleEnum.User, content: '' }],
-				variables: src.variables ?? [],
-			});
-		} else {
-			setFormData({
-				displayName: '',
-				slug: '',
-				description: '',
-				tags: '',
-				isEnabled: true,
-				version: DEFAULT_SEMVER,
-				blocks: [{ id: getUUIDv7(), role: PromptRoleEnum.User, content: '' }],
-				variables: [],
-			});
-		}
-		setErrors({});
-		setSubmitError('');
-	}, [isOpen, initialData, isEditMode]);
+	const suggestedNextVersion = useMemo(() => {
+		if (!initialData) return DEFAULT_SEMVER;
+		return getSuggestedNextVersion(initialData, existingTemplates);
+	}, [initialData, existingTemplates]);
 
 	useEffect(() => {
-		if (!isOpen) return;
-
 		const dialog = dialogRef.current;
 		if (!dialog) return;
 
 		if (!dialog.open) {
-			dialog.showModal();
+			try {
+				dialog.showModal();
+			} catch {
+				// Ignore showModal errors and keep rendering safely.
+			}
 		}
 
 		return () => {
+			isUnmountingRef.current = true;
+
 			if (dialog.open) {
 				dialog.close();
 			}
 		};
-	}, [isOpen]);
+	}, []);
 
-	const handleDialogClose = () => {
+	const requestClose = () => {
+		const dialog = dialogRef.current;
+
+		if (dialog?.open) {
+			dialog.close();
+			return;
+		}
+
 		onClose();
 	};
 
-	const validateField = (field: keyof ErrorState, val: string, currentErrors: ErrorState): ErrorState => {
+	const handleDialogClose = () => {
+		if (isUnmountingRef.current) return;
+		onClose();
+	};
+
+	const validateField = (
+		field: keyof ErrorState,
+		val: string,
+		state: PromptTemplateFormData,
+		currentErrors: ErrorState
+	): ErrorState => {
 		let newErrs: ErrorState = { ...currentErrors };
+		const variables = state.variables ?? [];
+		const blocks = state.blocks ?? [];
 		const v = val.trim();
 
 		if (field === 'slug') {
@@ -167,11 +215,13 @@ export function AddEditPromptTemplateModal({
 				newErrs.slug = 'This field is required.';
 				return newErrs;
 			}
+
 			const err = validateSlug(v);
 			if (err) {
 				newErrs.slug = err;
 			} else {
-				const clash = existingTemplates.some(t => t.template.slug === v && t.template.id !== initialData?.template.id);
+				const clash = existingTemplates.some(t => t.template.slug === v && t.template.id !== initialTemplateId);
+
 				if (clash) newErrs.slug = 'Slug already in use.';
 				else newErrs = omitManyKeys(newErrs, ['slug']);
 			}
@@ -181,34 +231,44 @@ export function AddEditPromptTemplateModal({
 		} else if (field === 'version') {
 			if (!v) {
 				newErrs.version = 'Version is required.';
-			} else if (isEditMode && initialData?.template && v === initialData.template.version) {
+			} else if (isEditMode && initialTemplateVersion && v === initialTemplateVersion) {
 				newErrs.version = 'New version must be different from the current version.';
 			} else {
-				const slugToCheck = initialData?.template.slug ?? formData.slug.trim();
-				const versionClash = existingTemplates.some(t => t.template.slug === slugToCheck && t.template.version === v);
+				const slugToCheck = isEditMode ? (initialTemplateSlug ?? state.slug.trim()) : state.slug.trim();
+				const versionClash =
+					Boolean(slugToCheck) &&
+					existingTemplates.some(t => t.template.slug === slugToCheck && t.template.version === v);
+
 				if (versionClash) newErrs.version = 'That version already exists for this slug.';
 				else newErrs = omitManyKeys(newErrs, ['version']);
 			}
 		} else if (field === 'tags') {
-			const err = validateTags(val);
-			if (err) newErrs.tags = err;
-			else newErrs = omitManyKeys(newErrs, ['tags']);
+			if (v === '') {
+				newErrs = omitManyKeys(newErrs, ['tags']);
+			} else {
+				const err = validateTags(val);
+				if (err) newErrs.tags = err;
+				else newErrs = omitManyKeys(newErrs, ['tags']);
+			}
 		} else if (field === 'blocks') {
-			if (!formData.blocks.length) {
+			if (!blocks.length) {
 				newErrs.blocks = 'At least one block is required.';
-			} else if (formData.blocks.some(b => !b.content.trim())) {
+			} else if (blocks.some(block => !block.content.trim())) {
 				newErrs.blocks = 'All blocks must have non-empty content.';
 			} else {
 				newErrs = omitManyKeys(newErrs, ['blocks']);
 			}
 		} else if (field === 'variables') {
-			const vars = formData.variables ?? [];
-			const names = vars.map(x => x.name.trim()).filter(Boolean);
+			const names = variables.map(variable => variable.name.trim()).filter(Boolean);
 			const unique = new Set(names);
 			const hasDupes = unique.size !== names.length;
-			const hasMissing = vars.some(vr => !vr.name.trim());
-			const badEnum = vars.some(vr => vr.type === VarType.Enum && (vr.enumValues ?? []).length === 0);
-			const badStatic = vars.some(vr => vr.source === VarSource.Static && !(vr.staticVal ?? '').trim());
+			const hasMissing = variables.some(variable => !variable.name.trim());
+			const badEnum = variables.some(
+				variable => variable.type === VarType.Enum && (variable.enumValues ?? []).length === 0
+			);
+			const badStatic = variables.some(
+				variable => variable.source === VarSource.Static && !(variable.staticVal ?? '').trim()
+			);
 
 			if (hasMissing) newErrs.variables = 'All variables must have a name.';
 			else if (hasDupes) newErrs.variables = 'Variable names must be unique.';
@@ -222,110 +282,130 @@ export function AddEditPromptTemplateModal({
 		return newErrs;
 	};
 
-	const validateForm = (state: typeof formData): ErrorState => {
+	const validateForm = (state: PromptTemplateFormData): ErrorState => {
 		let newErrs: ErrorState = {};
-		newErrs = validateField('displayName', state.displayName, newErrs);
-		if (!isEditMode) newErrs = validateField('slug', state.slug, newErrs);
-		newErrs = validateField('version', state.version, newErrs);
-		newErrs = validateField('blocks', 'x', newErrs);
-		newErrs = validateField('variables', 'x', newErrs);
+		newErrs = validateField('displayName', state.displayName, state, newErrs);
+		if (!isEditMode) newErrs = validateField('slug', state.slug, state, newErrs);
+		newErrs = validateField('version', state.version, state, newErrs);
+		newErrs = validateField('blocks', 'x', state, newErrs);
+		newErrs = validateField('variables', 'x', state, newErrs);
 
-		// Fix: validate tags ONLY when non-empty
 		if (state.tags.trim() !== '') {
-			newErrs = validateField('tags', state.tags, newErrs);
+			newErrs = validateField('tags', state.tags, state, newErrs);
 		}
 
 		return newErrs;
 	};
 
 	const handleInput = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-		const { name, value, type, checked } = e.target as HTMLInputElement;
+		const target = e.target as HTMLInputElement;
+		const { name, value, type, checked } = target;
 		const newVal = type === 'checkbox' ? checked : value;
+		const next = { ...formData, [name]: newVal } as PromptTemplateFormData;
 
-		setFormData(prev => {
-			const next = { ...prev, [name]: newVal };
-			if (!isViewMode) setErrors(validateForm(next));
-			return next;
-		});
+		setFormData(next);
 
-		if (name === 'displayName' || name === 'slug' || name === 'tags' || name === 'version') {
-			setErrors(prev => validateField(name as keyof ErrorState, String(newVal), prev));
+		if (!isViewMode) {
+			setErrors(validateForm(next));
 		}
 	};
 
 	const updateBlock = (idx: number, patch: Partial<MessageBlock>) => {
-		setFormData(prev => {
-			const blocks = prev.blocks.map((b, i) => (i === idx ? { ...b, ...patch } : b));
-			const next = { ...prev, blocks };
-			if (!isViewMode) setErrors(validateForm(next));
-			return next;
-		});
+		const next: PromptTemplateFormData = {
+			...formData,
+			blocks: formData.blocks.map((block, i) => (i === idx ? { ...block, ...patch } : block)),
+		};
+
+		setFormData(next);
+
+		if (!isViewMode) {
+			setErrors(validateForm(next));
+		}
 	};
 
 	const addBlock = () => {
-		setFormData(prev => {
-			const next = {
-				...prev,
-				blocks: [...prev.blocks, { id: getUUIDv7(), role: PromptRoleEnum.User, content: '' }],
-			};
-			if (!isViewMode) setErrors(validateForm(next));
-			return next;
-		});
+		const next: PromptTemplateFormData = {
+			...formData,
+			blocks: [...formData.blocks, { id: getUUIDv7(), role: PromptRoleEnum.User, content: '' }],
+		};
+
+		setFormData(next);
+
+		if (!isViewMode) {
+			setErrors(validateForm(next));
+		}
 	};
 
 	const removeBlock = (idx: number) => {
-		setFormData(prev => {
-			const next = { ...prev, blocks: prev.blocks.filter((_, i) => i !== idx) };
-			if (!isViewMode) setErrors(validateForm(next));
-			return next;
-		});
+		const next: PromptTemplateFormData = {
+			...formData,
+			blocks: formData.blocks.filter((_, i) => i !== idx),
+		};
+
+		setFormData(next);
+
+		if (!isViewMode) {
+			setErrors(validateForm(next));
+		}
 	};
 
 	const updateVariable = (idx: number, patch: Partial<PromptVariable>) => {
-		setFormData(prev => {
-			const variables = prev.variables.map((v, i) => (i === idx ? { ...v, ...patch } : v));
-			const next = { ...prev, variables };
-			if (!isViewMode) setErrors(validateForm(next));
-			return next;
-		});
+		const next: PromptTemplateFormData = {
+			...formData,
+			variables: formData.variables.map((variable, i) => (i === idx ? { ...variable, ...patch } : variable)),
+		};
+
+		setFormData(next);
+
+		if (!isViewMode) {
+			setErrors(validateForm(next));
+		}
 	};
 
 	const addVariable = () => {
-		setFormData(prev => {
-			const nextVar: PromptVariable = {
-				name: '',
-				type: VarType.String,
-				required: false,
-				source: VarSource.User,
-			};
-			const next = { ...prev, variables: [...prev.variables, nextVar] };
-			if (!isViewMode) setErrors(validateForm(next));
-			return next;
-		});
+		const nextVar: PromptVariable = {
+			name: '',
+			type: VarType.String,
+			required: false,
+			source: VarSource.User,
+		};
+
+		const next: PromptTemplateFormData = {
+			...formData,
+			variables: [...formData.variables, nextVar],
+		};
+
+		setFormData(next);
+
+		if (!isViewMode) {
+			setErrors(validateForm(next));
+		}
 	};
 
 	const removeVariable = (idx: number) => {
-		setFormData(prev => {
-			const next = { ...prev, variables: prev.variables.filter((_, i) => i !== idx) };
-			if (!isViewMode) setErrors(validateForm(next));
-			return next;
-		});
+		const next: PromptTemplateFormData = {
+			...formData,
+			variables: formData.variables.filter((_, i) => i !== idx),
+		};
+
+		setFormData(next);
+
+		if (!isViewMode) {
+			setErrors(validateForm(next));
+		}
 	};
 
-	const isAllValid = useMemo(() => {
-		if (isViewMode) return true;
-		const v = validateForm(formData);
-		return Object.keys(v).length === 0;
-	}, [formData, isViewMode, isEditMode]);
+	const isAllValid = isViewMode ? true : Object.keys(validateForm(formData)).length === 0;
 
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
 		e.preventDefault();
 		e.stopPropagation();
+
 		if (isViewMode) return;
+
 		setSubmitError('');
 
 		const newErrs = validateForm(formData);
-
 		setErrors(newErrs);
 
 		if (Object.keys(newErrs).length > 0) return;
@@ -335,26 +415,24 @@ export function AddEditPromptTemplateModal({
 			.map(t => t.trim())
 			.filter(Boolean);
 
-		onSubmit({
+		void onSubmit({
 			displayName: formData.displayName.trim(),
 			slug: formData.slug.trim(),
 			description: formData.description.trim() || undefined,
 			isEnabled: formData.isEnabled,
 			tags: tagsArr.length ? tagsArr : undefined,
 			version: formData.version.trim(),
-			blocks: formData.blocks.map(b => ({ ...b, content: b.content })),
+			blocks: formData.blocks.map(block => ({ ...block, content: block.content })),
 			variables: formData.variables.length ? formData.variables : undefined,
 		})
 			.then(() => {
-				dialogRef.current?.close();
+				requestClose();
 			})
 			.catch((err: unknown) => {
 				const msg = err instanceof Error ? err.message : 'Failed to save prompt template.';
 				setSubmitError(msg);
 			});
 	};
-
-	if (!isOpen) return null;
 
 	const headerTitle =
 		effectiveMode === 'view'
@@ -363,7 +441,7 @@ export function AddEditPromptTemplateModal({
 				? 'Create New Prompt Template Version'
 				: 'Add Prompt Template';
 
-	return createPortal(
+	return (
 		<dialog
 			ref={dialogRef}
 			className="modal"
@@ -380,7 +458,7 @@ export function AddEditPromptTemplateModal({
 						<button
 							type="button"
 							className="btn btn-sm btn-circle bg-base-300"
-							onClick={() => dialogRef.current?.close()}
+							onClick={requestClose}
 							aria-label="Close"
 						>
 							<FiX size={12} />
@@ -479,15 +557,7 @@ export function AddEditPromptTemplateModal({
 								{isEditMode && initialData?.template && (
 									<div className="label">
 										<span className="label-text-alt text-base-content/70 text-xs">
-											Current: {initialData.template.version} · Suggested next:{' '}
-											{
-												suggestNextMinorVersion(
-													initialData.template.version,
-													existingTemplates
-														.filter(t => t.template.slug === initialData.template.slug)
-														.map(t => t.template.version)
-												).suggested
-											}
+											Current: {initialData.template.version} · Suggested next: {suggestedNextVersion}
 											{!isSemverVersion(initialData.template.version) ? ' (current is not semver)' : ''}
 										</span>
 									</div>
@@ -533,6 +603,7 @@ export function AddEditPromptTemplateModal({
 								/>
 							</div>
 						</div>
+
 						{/* Blocks */}
 						<div className="divider">Blocks</div>
 						{errors.blocks && (
@@ -542,18 +613,18 @@ export function AddEditPromptTemplateModal({
 						)}
 
 						<div className="space-y-3">
-							{formData.blocks.map((b, idx) => (
-								<div key={b.id} className="border-base-content/10 rounded-2xl border p-3">
+							{formData.blocks.map((block, idx) => (
+								<div key={block.id} className="border-base-content/10 rounded-2xl border p-3">
 									<div className="mb-2 flex items-center justify-between gap-2">
 										<div className="flex items-center gap-2">
 											<span className="text-base-content/70 text-xs font-semibold uppercase">Role</span>
 											{isViewMode ? (
-												<ReadOnlyValue value={b.role} />
+												<ReadOnlyValue value={block.role} />
 											) : (
 												<div className="w-44">
 													<Dropdown<PromptRoleEnum>
 														dropdownItems={roleDropdownItems}
-														selectedKey={b.role}
+														selectedKey={block.role}
 														onChange={role => {
 															updateBlock(idx, { role });
 														}}
@@ -583,7 +654,7 @@ export function AddEditPromptTemplateModal({
 										className="textarea textarea-bordered bg-base-100 w-full rounded-xl"
 										readOnly={isViewMode}
 										spellCheck="false"
-										value={b.content}
+										value={block.content}
 										onChange={e => {
 											updateBlock(idx, { content: e.target.value });
 										}}
@@ -634,8 +705,8 @@ export function AddEditPromptTemplateModal({
 						)}
 
 						<div className="space-y-3">
-							{formData.variables.map((v, idx) => (
-								<div key={`${idx}-${v.name}`} className="border-base-content/10 rounded-2xl border p-3">
+							{formData.variables.map((variable, idx) => (
+								<div key={`${idx}-${variable.name}`} className="border-base-content/10 rounded-2xl border p-3">
 									<div className="mb-2 flex items-center justify-between">
 										<div className="text-base-content/70 text-xs font-semibold uppercase">Variable</div>
 										<div>
@@ -646,7 +717,7 @@ export function AddEditPromptTemplateModal({
 												<input
 													type="checkbox"
 													className="toggle toggle-accent disabled:opacity-80"
-													checked={v.required}
+													checked={variable.required}
 													disabled={isViewMode}
 													onChange={e => {
 														updateVariable(idx, { required: e.target.checked });
@@ -676,7 +747,7 @@ export function AddEditPromptTemplateModal({
 											<input
 												className="input input-bordered bg-base-100 w-full rounded-xl"
 												readOnly={isViewMode}
-												value={v.name}
+												value={variable.name}
 												onChange={e => {
 													updateVariable(idx, { name: e.target.value });
 												}}
@@ -688,11 +759,11 @@ export function AddEditPromptTemplateModal({
 												<span className="label-text text-sm">Type</span>
 											</label>
 											{isViewMode ? (
-												<ReadOnlyValue value={v.type} />
+												<ReadOnlyValue value={variable.type} />
 											) : (
 												<Dropdown<VarType>
 													dropdownItems={varTypeDropdownItems}
-													selectedKey={v.type}
+													selectedKey={variable.type}
 													onChange={type => {
 														updateVariable(idx, { type });
 													}}
@@ -707,11 +778,11 @@ export function AddEditPromptTemplateModal({
 												<span className="label-text text-sm">Source</span>
 											</label>
 											{isViewMode ? (
-												<ReadOnlyValue value={v.source} />
+												<ReadOnlyValue value={variable.source} />
 											) : (
 												<Dropdown<VarSource>
 													dropdownItems={varSourceDropdownItems}
-													selectedKey={v.source}
+													selectedKey={variable.source}
 													onChange={source => {
 														updateVariable(idx, { source });
 													}}
@@ -728,7 +799,7 @@ export function AddEditPromptTemplateModal({
 											<input
 												className="input input-bordered bg-base-100 w-full rounded-xl"
 												readOnly={isViewMode}
-												value={v.description ?? ''}
+												value={variable.description ?? ''}
 												onChange={e => {
 													updateVariable(idx, { description: e.target.value });
 												}}
@@ -742,14 +813,14 @@ export function AddEditPromptTemplateModal({
 											<input
 												className="input input-bordered bg-base-100 w-full rounded-xl"
 												readOnly={isViewMode}
-												value={v.default ?? ''}
+												value={variable.default ?? ''}
 												onChange={e => {
 													updateVariable(idx, { default: e.target.value });
 												}}
 											/>
 										</div>
 
-										{v.source === VarSource.Static && (
+										{variable.source === VarSource.Static && (
 											<div className="col-span-12 md:col-span-6">
 												<label className="label py-1">
 													<span className="label-text text-sm">Static Value</span>
@@ -757,7 +828,7 @@ export function AddEditPromptTemplateModal({
 												<input
 													className="input input-bordered bg-base-100 w-full rounded-xl"
 													readOnly={isViewMode}
-													value={v.staticVal ?? ''}
+													value={variable.staticVal ?? ''}
 													onChange={e => {
 														updateVariable(idx, { staticVal: e.target.value });
 													}}
@@ -765,7 +836,7 @@ export function AddEditPromptTemplateModal({
 											</div>
 										)}
 
-										{v.type === VarType.Enum && (
+										{variable.type === VarType.Enum && (
 											<div className="col-span-12 md:col-span-6">
 												<label className="label py-1">
 													<span className="label-text text-sm">Enum Values (comma)</span>
@@ -773,7 +844,7 @@ export function AddEditPromptTemplateModal({
 												<input
 													className="input input-bordered bg-base-100 w-full rounded-xl"
 													readOnly={isViewMode}
-													value={(v.enumValues ?? []).join(', ')}
+													value={(variable.enumValues ?? []).join(', ')}
 													onChange={e => {
 														updateVariable(idx, {
 															enumValues: e.target.value
@@ -818,7 +889,7 @@ export function AddEditPromptTemplateModal({
 						)}
 
 						<div className="modal-action">
-							<button type="button" className="btn bg-base-300 rounded-xl" onClick={() => dialogRef.current?.close()}>
+							<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
 								{isViewMode ? 'Close' : 'Cancel'}
 							</button>
 							{!isViewMode && (
@@ -831,7 +902,17 @@ export function AddEditPromptTemplateModal({
 				</div>
 			</div>
 			<ModalBackdrop enabled={isViewMode} />
-		</dialog>,
-		document.body
+		</dialog>
 	);
+}
+
+export function AddEditPromptTemplateModal(props: AddEditPromptTemplateModalProps) {
+	if (!props.isOpen) return null;
+	if (typeof document === 'undefined' || !document.body) return null;
+
+	const remountKey = props.initialData
+		? `${props.mode ?? 'auto'}:${props.initialData.bundleID}:${props.initialData.template.id}:${props.initialData.template.version}:${props.initialData.template.modifiedAt}`
+		: `${props.mode ?? 'auto'}:new`;
+
+	return createPortal(<AddEditPromptTemplateModalContent key={remountKey} {...props} />, document.body);
 }

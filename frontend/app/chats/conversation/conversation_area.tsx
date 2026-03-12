@@ -399,15 +399,17 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 	// Abort in-flight streams on unmount (matches original page behavior)
 	useEffect(() => {
+		const abortRefsCurrent = abortRefs.current;
+		const notifyTimersCurrent = notifyTimersRef.current;
 		return () => {
 			try {
-				for (const refObj of abortRefs.current.values()) {
+				for (const refObj of abortRefsCurrent.values()) {
 					refObj.current?.abort();
 				}
 			} catch {
 				// ignore
 			}
-			for (const timer of notifyTimersRef.current.values()) {
+			for (const timer of notifyTimersCurrent.values()) {
 				if (timer) window.clearTimeout(timer);
 			}
 		};

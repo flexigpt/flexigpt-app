@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
 import mermaid, { type MermaidConfig } from 'mermaid';
 
@@ -6,29 +6,49 @@ import { ALL_DARK_THEMES } from '@/spec/theme_consts';
 
 import { useTheme } from '@/hooks/use_theme_provider';
 
+const PREFERS_DARK_QUERY = '(prefers-color-scheme: dark)';
+
+function subscribePrefersDark(onStoreChange: () => void): () => void {
+	if (typeof window === 'undefined' || !window.matchMedia) {
+		return () => {};
+	}
+
+	const mediaQuery = window.matchMedia(PREFERS_DARK_QUERY);
+	const handler = () => {
+		onStoreChange();
+	};
+
+	mediaQuery.addEventListener('change', handler);
+	return () => {
+		mediaQuery.removeEventListener('change', handler);
+	};
+}
+
+function getPrefersDarkSnapshot(): boolean | undefined {
+	if (typeof window === 'undefined' || !window.matchMedia) {
+		return undefined;
+	}
+	return window.matchMedia(PREFERS_DARK_QUERY).matches;
+}
+
+function getPrefersDarkServerSnapshot(): boolean | undefined {
+	return undefined;
+}
+
+function usePrefersDark(): boolean | undefined {
+	return useSyncExternalStore(subscribePrefersDark, getPrefersDarkSnapshot, getPrefersDarkServerSnapshot);
+}
+
 export function useIsDarkMermaid(): boolean {
 	const { theme: providerTheme } = useTheme();
-	const [prefersDark, setPrefersDark] = useState(false);
-	useEffect(() => {
-		if (typeof window === 'undefined' || !window.matchMedia) return;
-		const mq = window.matchMedia('(prefers-color-scheme: dark)');
-		const update = () => {
-			setPrefersDark(mq.matches);
-		};
-		update();
-		mq.addEventListener?.('change', update);
-		return () => {
-			mq.removeEventListener?.('change', update);
-		};
-	}, []);
+	const prefersDark = usePrefersDark();
 
-	return useMemo(() => {
-		/* “system” → fall back to prefers-color-scheme */
-		if (providerTheme === 'system') {
-			return prefersDark;
-		}
-		return ALL_DARK_THEMES.includes(providerTheme as any);
-	}, [providerTheme, prefersDark]);
+	/* “system” → fall back to prefers-color-scheme */
+	if (providerTheme === 'system') {
+		return prefersDark ?? false;
+	}
+
+	return ALL_DARK_THEMES.includes(providerTheme as any);
 }
 
 type RenderResult = Awaited<ReturnType<typeof mermaid.render>>;

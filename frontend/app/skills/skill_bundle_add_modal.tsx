@@ -20,45 +20,65 @@ type ErrorState = {
 	displayName?: string;
 };
 
+type BundleFormData = {
+	slug: string;
+	displayName: string;
+	description: string;
+};
+
 function normalizeForUniq(s: string) {
 	return s.trim().toLowerCase();
 }
 
-export function AddSkillBundleModal({
-	isOpen,
-	onClose,
-	onSubmit,
-	existingSlugs,
-	existingNames,
-}: AddSkillBundleModalProps) {
-	const [form, setForm] = useState({
+function getInitialFormData(): BundleFormData {
+	return {
 		slug: '',
 		displayName: '',
 		description: '',
-	});
+	};
+}
+
+function AddSkillBundleModalContent({ onClose, onSubmit, existingSlugs, existingNames }: AddSkillBundleModalProps) {
+	const [formData, setFormData] = useState<BundleFormData>(() => getInitialFormData());
 	const [errors, setErrors] = useState<ErrorState>({});
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
+	const isUnmountingRef = useRef(false);
 
 	useEffect(() => {
-		if (!isOpen) return;
-		setForm({ slug: '', displayName: '', description: '' });
-		setErrors({});
-	}, [isOpen]);
-
-	useEffect(() => {
-		if (!isOpen) return;
 		const dialog = dialogRef.current;
 		if (!dialog) return;
 
-		if (!dialog.open) dialog.showModal();
+		if (!dialog.open) {
+			try {
+				dialog.showModal();
+			} catch {
+				// Ignore if the dialog cannot be shown; keep rendering safely.
+			}
+		}
 
 		return () => {
-			if (dialog.open) dialog.close();
+			isUnmountingRef.current = true;
+
+			if (dialog.open) {
+				dialog.close();
+			}
 		};
-	}, [isOpen]);
+	}, []);
+
+	const requestClose = () => {
+		const dialog = dialogRef.current;
+
+		if (dialog?.open) {
+			dialog.close();
+			return;
+		}
+
+		onClose();
+	};
 
 	const handleDialogClose = () => {
+		if (isUnmountingRef.current) return;
 		onClose();
 	};
 
@@ -94,7 +114,7 @@ export function AddSkillBundleModal({
 		return omitManyKeys(nextErrors, [field]);
 	};
 
-	const validateForm = (state: typeof form): ErrorState => {
+	const validateForm = (state: BundleFormData): ErrorState => {
 		let next: ErrorState = {};
 		next = validateField('slug', state.slug, next);
 		next = validateField('displayName', state.displayName, next);
@@ -102,15 +122,13 @@ export function AddSkillBundleModal({
 	};
 
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
-		if (e) {
-			e.preventDefault();
-			e.stopPropagation();
-		}
+		e.preventDefault();
+		e.stopPropagation();
 
-		const trimmed = {
-			slug: form.slug.trim(),
-			displayName: form.displayName.trim(),
-			description: form.description.trim(),
+		const trimmed: BundleFormData = {
+			slug: formData.slug.trim(),
+			displayName: formData.displayName.trim(),
+			description: formData.description.trim(),
 		};
 
 		const nextErrors = validateForm(trimmed);
@@ -118,17 +136,15 @@ export function AddSkillBundleModal({
 		if (Object.keys(nextErrors).length > 0) return;
 
 		onSubmit(trimmed.slug, trimmed.displayName, trimmed.description || undefined);
-		dialogRef.current?.close();
+		requestClose();
 	};
 
 	const isFormValid = useMemo(
-		() => Boolean(form.slug.trim()) && Boolean(form.displayName.trim()) && Object.keys(errors).length === 0,
-		[form.slug, form.displayName, errors]
+		() => Boolean(formData.slug.trim()) && Boolean(formData.displayName.trim()) && Object.keys(errors).length === 0,
+		[formData.slug, formData.displayName, errors]
 	);
 
-	if (!isOpen) return null;
-
-	return createPortal(
+	return (
 		<dialog
 			ref={dialogRef}
 			className="modal"
@@ -141,12 +157,7 @@ export function AddSkillBundleModal({
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-auto rounded-2xl">
 				<div className="mb-4 flex items-center justify-between">
 					<h3 className="text-lg font-bold">Add Skill Bundle</h3>
-					<button
-						type="button"
-						className="btn btn-sm btn-circle bg-base-300"
-						onClick={() => dialogRef.current?.close()}
-						aria-label="Close"
-					>
+					<button type="button" className="btn btn-sm btn-circle bg-base-300" onClick={requestClose} aria-label="Close">
 						<FiX size={12} />
 					</button>
 				</div>
@@ -163,10 +174,10 @@ export function AddSkillBundleModal({
 							<input
 								type="text"
 								className={`input input-bordered w-full rounded-xl ${errors.slug ? 'input-error' : ''}`}
-								value={form.slug}
+								value={formData.slug}
 								onChange={e => {
 									const value = e.target.value;
-									setForm(prev => ({ ...prev, slug: value }));
+									setFormData(prev => ({ ...prev, slug: value }));
 									setErrors(prevErrors => validateField('slug', value, prevErrors));
 								}}
 								spellCheck="false"
@@ -192,10 +203,10 @@ export function AddSkillBundleModal({
 							<input
 								type="text"
 								className={`input input-bordered w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
-								value={form.displayName}
+								value={formData.displayName}
 								onChange={e => {
 									const value = e.target.value;
-									setForm(prev => ({ ...prev, displayName: value }));
+									setFormData(prev => ({ ...prev, displayName: value }));
 									setErrors(prevErrors => validateField('displayName', value, prevErrors));
 								}}
 								spellCheck="false"
@@ -219,9 +230,9 @@ export function AddSkillBundleModal({
 						<div className="col-span-9">
 							<textarea
 								className="textarea textarea-bordered h-24 w-full rounded-xl"
-								value={form.description}
+								value={formData.description}
 								onChange={e => {
-									setForm(prev => ({ ...prev, description: e.target.value }));
+									setFormData(prev => ({ ...prev, description: e.target.value }));
 								}}
 								spellCheck="false"
 							/>
@@ -229,7 +240,7 @@ export function AddSkillBundleModal({
 					</div>
 
 					<div className="modal-action">
-						<button type="button" className="btn bg-base-300 rounded-xl" onClick={() => dialogRef.current?.close()}>
+						<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
 							Cancel
 						</button>
 						<button type="submit" className="btn btn-primary rounded-xl" disabled={!isFormValid}>
@@ -240,7 +251,13 @@ export function AddSkillBundleModal({
 			</div>
 
 			{/* No modal-backdrop: backdrop click should NOT close */}
-		</dialog>,
-		document.body
+		</dialog>
 	);
+}
+
+export function AddSkillBundleModal(props: AddSkillBundleModalProps) {
+	if (!props.isOpen) return null;
+	if (typeof document === 'undefined' || !document.body) return null;
+
+	return createPortal(<AddSkillBundleModalContent key="add-skill-bundle-modal" {...props} />, document.body);
 }

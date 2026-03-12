@@ -19,14 +19,12 @@ const extraDepsToOptimize = [
 	'@platejs/basic-styles/react',
 	'@platejs/basic-nodes/react',
 	'@platejs/indent/react',
-	'@platejs/emoji/react',
 	'@platejs/tabbable/react',
 	'@platejs/list/react',
-	'@platejs/combobox/react',
 	'@ariakit/react/tab',
 ];
 
-const excludedDepsToOptimize = new Set(['@emoji-mart/data', '@fontsource-variable/inter']);
+const excludedDepsToOptimize = new Set(['@fontsource-variable/inter']);
 
 const depsToOptimize = [...new Set([...baseDeps, ...extraDepsToOptimize])].filter(
 	dep => !excludedDepsToOptimize.has(dep)
@@ -134,7 +132,6 @@ export default defineConfig(({ mode }) => {
 
 						// PlateJS suite
 						if (/\/node_modules\/(@udecode|@platejs|platejs)\//.test(n)) return 'libplate';
-						if (/\/node_modules\/@emoji-mart\//.test(n)) return 'libemojimart';
 
 						// Let Rollup decide otherwise
 						return;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 
 import { type AppTheme, ThemeType } from '@/spec/setting';
 
@@ -8,6 +8,24 @@ const SYSTEM_THEME: AppTheme = { type: ThemeType.System, name: 'system' };
 
 let _startupTheme: Readonly<AppTheme> | null = null;
 let _themeInitPromise: Promise<Readonly<AppTheme>> | null = null;
+const _listeners = new Set<() => void>();
+
+function emitStartupThemeChange(): void {
+	for (const listener of _listeners) {
+		listener();
+	}
+}
+
+function subscribeStartupTheme(listener: () => void): () => void {
+	_listeners.add(listener);
+	return () => {
+		_listeners.delete(listener);
+	};
+}
+
+function getStartupThemeSnapshot(): Readonly<AppTheme> | null {
+	return _startupTheme;
+}
 
 // Call during bootstrap - **exactly once** per tab.
 export async function initStartupTheme(): Promise<Readonly<AppTheme>> {
@@ -23,6 +41,8 @@ export async function initStartupTheme(): Promise<Readonly<AppTheme>> {
 			console.error('Failed to fetch theme, falling back to system.', err);
 			_startupTheme = Object.freeze(SYSTEM_THEME);
 		}
+
+		emitStartupThemeChange();
 		return _startupTheme;
 	})();
 
@@ -35,23 +55,20 @@ export function getStartupThemeSync(): Readonly<AppTheme> {
 	return _startupTheme;
 }
 
-//  Call after the user changes the theme successfully.
+// Call after the user changes the theme successfully.
 export function updateStartupTheme(theme: AppTheme): void {
 	_startupTheme = Object.freeze(theme);
+	emitStartupThemeChange();
 }
 
 export function useStartupTheme(): [AppTheme | null, boolean] {
-	const [theme, setTheme] = useState<AppTheme | null>(_startupTheme);
-	const [ready, setReady] = useState<boolean>(!!_startupTheme);
+	const theme = useSyncExternalStore(subscribeStartupTheme, getStartupThemeSnapshot, getStartupThemeSnapshot);
 
 	useEffect(() => {
-		if (!ready) {
-			initStartupTheme().then(t => {
-				setTheme(t);
-				setReady(true);
-			});
+		if (!_startupTheme) {
+			void initStartupTheme();
 		}
-	}, [ready]);
+	}, []);
 
-	return [theme, ready];
+	return [theme as AppTheme | null, theme !== null];
 }

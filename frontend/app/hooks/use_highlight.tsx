@@ -8,7 +8,7 @@ const waiting = new Map<
 	number,
 	{
 		resolve: (html: string) => void;
-		reject: (err: any) => void;
+		reject: (err: unknown) => void;
 	}
 >();
 
@@ -21,7 +21,7 @@ export function ensureWorker(): Worker {
 		const { id, html, error } = evt.data as {
 			id: number;
 			html?: string;
-			error?: any;
+			error?: unknown;
 		};
 
 		const rec = waiting.get(id);
@@ -32,6 +32,7 @@ export function ensureWorker(): Worker {
 
 		waiting.delete(id);
 	};
+
 	console.log('highlight worker initialized');
 	return worker;
 }
@@ -46,26 +47,28 @@ function highlightAsync(code: string, lang: string): Promise<string> {
 
 export function useHighlight(code: string, lang: string) {
 	const [html, setHtml] = useState<string | null>(null);
-	const ticket = useRef(0); // <- local for this CodeBlock
+	const ticket = useRef(0);
 
 	useEffect(() => {
+		const myId = ++ticket.current;
+
 		if (!code.trim()) {
-			setHtml('');
 			return;
 		}
 
-		const myId = ++ticket.current; // bump local counter
-
 		highlightAsync(code, lang)
 			.then(h => {
-				// only update if still the newest
-				if (ticket.current === myId) setHtml(h);
+				if (ticket.current === myId) {
+					setHtml(h);
+				}
 			})
 			.catch((err: unknown) => {
 				console.error(err);
-				if (ticket.current === myId) setHtml('');
+				if (ticket.current === myId) {
+					setHtml('');
+				}
 			});
 	}, [code, lang]);
 
-	return html;
+	return code.trim() ? html : '';
 }

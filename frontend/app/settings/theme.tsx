@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { FiMonitor, FiMoon, FiSun } from 'react-icons/fi';
 
@@ -20,11 +20,25 @@ const toThemeType = (name: string): ThemeType => {
 	return ThemeType.Other;
 };
 
-/* ———————————————————————————————————————— main selector —————————————————————————————————— */
-export function ThemeSelector() {
-	const [startupTheme, startupReady] = useStartupTheme();
-	const { theme: providerTheme, setTheme } = useTheme();
+function getInitialOtherName(startupTheme?: AppTheme | null, providerTheme?: string): string {
+	if (startupTheme?.type === ThemeType.Other && isOtherThemeName(startupTheme.name)) {
+		return startupTheme.name;
+	}
 
+	if (providerTheme && toThemeType(providerTheme) === ThemeType.Other && isOtherThemeName(providerTheme)) {
+		return providerTheme;
+	}
+
+	return DAISYUI_BUILTIN_THEMES[0];
+}
+
+interface ThemeSelectorContentProps {
+	startupTheme?: AppTheme | null;
+	providerTheme: string;
+	setTheme: (themeName: string) => void;
+}
+
+function ThemeSelectorContent({ startupTheme, providerTheme, setTheme }: ThemeSelectorContentProps) {
 	/* derived state */
 	const current = useMemo(() => toThemeType(providerTheme), [providerTheme]);
 
@@ -34,31 +48,24 @@ export function ThemeSelector() {
 		[]
 	);
 
-	const [otherName, setOtherName] = useState<string>(DAISYUI_BUILTIN_THEMES[0]);
+	const [otherName, setOtherName] = useState<string>(() => getInitialOtherName(startupTheme, providerTheme));
 
-	/* initialise “other” theme name once start-up theme is loaded */
-	useEffect(() => {
-		if (!startupReady || !startupTheme) return;
-
-		if (startupTheme.type === ThemeType.Other && isOtherThemeName(startupTheme.name)) {
-			setOtherName(startupTheme.name);
-		}
-	}, [startupReady, startupTheme]);
+	const selectedOtherName = current === ThemeType.Other && isOtherThemeName(providerTheme) ? providerTheme : otherName;
 
 	/* ————————————————————————————— apply theme —————————————————————————————— */
 	const applyTheme = useCallback(
 		async (type: ThemeType, name: string) => {
-			if (!startupReady) return; // protect against very early calls
 			if (name === '') {
 				console.error('[Theme] empty name recieved');
 				return;
 			}
+
 			/* optimistic update */
 			setTheme(name);
 
 			const newTheme: AppTheme = {
-				type: type,
-				name: name,
+				type,
+				name,
 			};
 
 			try {
@@ -73,14 +80,10 @@ export function ThemeSelector() {
 				}
 			}
 		},
-		[otherName, setTheme, startupReady, startupTheme]
+		[setTheme, startupTheme]
 	);
 
 	/* ————————————————————————————— UI —————————————————————————————— */
-	if (!startupReady) {
-		return <span className="loading loading-dots loading-sm" />;
-	}
-
 	return (
 		<div className="flex items-center gap-6">
 			<label className="flex cursor-pointer items-center gap-2">
@@ -89,7 +92,7 @@ export function ThemeSelector() {
 					className="radio radio-accent"
 					checked={current === ThemeType.System}
 					onChange={() => {
-						applyTheme(ThemeType.System, CustomThemeSystem);
+						void applyTheme(ThemeType.System, CustomThemeSystem);
 					}}
 				/>
 				<FiMonitor />
@@ -101,7 +104,7 @@ export function ThemeSelector() {
 					className="radio radio-accent"
 					checked={current === ThemeType.Light}
 					onChange={() => {
-						applyTheme(ThemeType.Light, CustomThemeLight);
+						void applyTheme(ThemeType.Light, CustomThemeLight);
 					}}
 				/>
 				<FiSun />
@@ -114,7 +117,7 @@ export function ThemeSelector() {
 					className="radio radio-accent"
 					checked={current === ThemeType.Dark}
 					onChange={() => {
-						applyTheme(ThemeType.Dark, CustomThemeDark);
+						void applyTheme(ThemeType.Dark, CustomThemeDark);
 					}}
 				/>
 				<FiMoon />
@@ -126,12 +129,14 @@ export function ThemeSelector() {
 					type="radio"
 					className="radio radio-accent"
 					checked={current === ThemeType.Other}
-					onChange={() => applyTheme(ThemeType.Other, otherName)}
+					onChange={() => {
+						void applyTheme(ThemeType.Other, selectedOtherName);
+					}}
 				/>
 				<div className="w-50">
 					<Dropdown<string>
 						dropdownItems={dropdownItems}
-						selectedKey={otherName}
+						selectedKey={selectedOtherName}
 						onChange={async key => {
 							setOtherName(key);
 							await applyTheme(ThemeType.Other, key);
@@ -144,4 +149,15 @@ export function ThemeSelector() {
 			</label>
 		</div>
 	);
+}
+
+export function ThemeSelector() {
+	const [startupTheme, startupReady] = useStartupTheme();
+	const { theme: providerTheme, setTheme } = useTheme();
+
+	if (!startupReady) {
+		return <span className="loading loading-dots loading-sm" />;
+	}
+
+	return <ThemeSelectorContent startupTheme={startupTheme} providerTheme={providerTheme} setTheme={setTheme} />;
 }

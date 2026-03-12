@@ -1,5 +1,5 @@
 import type { ChangeEvent, SubmitEventHandler } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
@@ -40,8 +40,18 @@ interface FormData {
 	newType: string; // only when sentinelAddNew chosen
 }
 
-export function AddEditAuthKeyModal({
-	isOpen,
+type FormErrors = Partial<Record<keyof FormData, string>>;
+
+function getInitialFormData(initial: AuthKeyMeta | null, prefill: { type: string; keyName: string } | null): FormData {
+	return {
+		type: initial?.type ?? prefill?.type ?? AuthKeyTypeProvider,
+		keyName: initial?.keyName ?? prefill?.keyName ?? '',
+		secret: '',
+		newType: '',
+	};
+}
+
+function AddEditAuthKeyModalContent({
 	initial,
 	existing,
 	onClose,
@@ -52,18 +62,14 @@ export function AddEditAuthKeyModal({
 	const isPrefilled = !isEdit && !!prefill; // “add”, but (type,keyName) should be fixed
 	const isReadOnly = isEdit || isPrefilled; // helper for rendering
 
-	const [form, setForm] = useState<FormData>({
-		type: initial?.type ?? prefill?.type ?? AuthKeyTypeProvider,
-		keyName: initial?.keyName ?? prefill?.keyName ?? '',
-		secret: '',
-		newType: '',
-	});
-	const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
+	const [formData, setFormData] = useState<FormData>(() => getInitialFormData(initial, prefill));
+	const [errors, setErrors] = useState<FormErrors>({});
 
 	/* raw provider presets fetched from backend */
 	const [providerPresets, setProviderPresets] = useState<Record<ProviderName, ProviderPreset>>({});
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
+	const isUnmountingRef = useRef(false);
 
 	/* list of *types* that already exist (for dropdown) */
 	const existingTypes = useMemo(() => [...new Set(existing.map(k => k.type))], [existing]);
@@ -82,14 +88,15 @@ export function AddEditAuthKeyModal({
 		if (isEdit && initial?.type === AuthKeyTypeProvider) {
 			allowed.add(initial.keyName);
 		}
-		if (isPrefilled && prefill.type === AuthKeyTypeProvider) {
+		if (isPrefilled && prefill?.type === AuthKeyTypeProvider) {
 			allowed.add(prefill.keyName);
 		}
 
 		const out: Record<ProviderName, ProviderPreset> = {};
 		Object.entries(providerPresets).forEach(([name, preset]) => {
-			if (!usedProviderNames.has(name) || allowed.has(name)) {
-				out[name] = preset;
+			const providerName = name;
+			if (!usedProviderNames.has(name) || allowed.has(providerName)) {
+				out[providerName] = preset;
 			}
 		});
 		return out;
@@ -108,170 +115,209 @@ export function AddEditAuthKeyModal({
 
 	/* whether *no* provider is available to create a new key for */
 	const noProviderAvailable =
-		!isEdit && !isPrefilled && form.type === AuthKeyTypeProvider && Object.keys(providerDropdownItems).length === 0;
+		!isEdit && !isPrefilled && formData.type === AuthKeyTypeProvider && Object.keys(providerDropdownItems).length === 0;
 
 	/* type dropdown items (existing + sentinel) */
 	const typeDropdownItems = useMemo(() => {
 		const obj: Record<string, DropdownItem> = {};
-		existingTypes.forEach(t => (obj[t] = { isEnabled: true }));
+		existingTypes.forEach(t => {
+			obj[t] = { isEnabled: true };
+		});
 		obj[sentinelAddNew] = { isEnabled: true };
 		return obj;
 	}, [existingTypes]);
 
-	/* reset the form every time the modal is opened for a given target */
-	useEffect(() => {
-		if (!isOpen) return;
-
-		setForm({
-			type: initial?.type ?? prefill?.type ?? AuthKeyTypeProvider,
-			keyName: initial?.keyName ?? prefill?.keyName ?? '',
-			secret: '',
-			newType: '',
-		});
-		setErrors({});
-	}, [isOpen, initial, prefill]);
+	const hasProviderPresets = Object.keys(providerPresets).length > 0;
 
 	/* fetch provider presets once needed */
 	useEffect(() => {
-		if (isOpen && form.type === AuthKeyTypeProvider && Object.keys(providerPresets).length === 0) {
-			(async () => {
-				try {
-					const prov = await getAllProviderPresetsMap(true);
+		if (formData.type !== AuthKeyTypeProvider || hasProviderPresets) return;
+
+		let cancelled = false;
+
+		void (async () => {
+			try {
+				const prov = await getAllProviderPresetsMap(true);
+				if (!cancelled) {
 					setProviderPresets(prov);
-				} catch (err) {
-					console.error('Failed fetching provider presets', err);
 				}
-			})();
-		}
-	}, [isOpen, form.type, providerPresets]);
+			} catch (err) {
+				console.error('Failed fetching provider presets', err);
+			}
+		})();
 
-	// Open the dialog natively when isOpen becomes true
+		return () => {
+			cancelled = true;
+		};
+	}, [formData.type, hasProviderPresets]);
+
 	useEffect(() => {
-		if (!isOpen) return;
-
 		const dialog = dialogRef.current;
 		if (!dialog) return;
 
 		if (!dialog.open) {
-			dialog.showModal();
+			try {
+				dialog.showModal();
+			} catch {
+				// Ignore showModal errors and keep rendering safely.
+			}
 		}
 
 		return () => {
-			// If the component unmounts while the dialog is still open, close it.
+			isUnmountingRef.current = true;
+
 			if (dialog.open) {
 				dialog.close();
 			}
 		};
-	}, [isOpen]);
+	}, []);
 
-	// Sync parent state whenever the dialog is closed (Esc or dialog.close()).
-	const handleDialogClose = () => {
+	const requestClose = () => {
+		const dialog = dialogRef.current;
+
+		if (dialog?.open) {
+			dialog.close();
+			return;
+		}
+
 		onClose();
 	};
 
-	const checkDuplicate = (t: string, n: string) =>
-		existing.some(k => {
-			if (k.type !== t || k.keyName !== n) return false; // different pair
-			// allow the SAME pair that we're editing / pre-filling
-			if (isEdit && k === initial) return false;
-			if (isPrefilled && prefill.type === t && prefill.keyName === n) return false;
-			return true;
-		});
+	const handleDialogClose = () => {
+		if (isUnmountingRef.current) return;
+		onClose();
+	};
 
-	const validate = (field: keyof FormData, value: string) => {
-		const next = omitManyKeys(errors, [field]) as Partial<Record<keyof FormData, string>>;
+	const checkDuplicate = useCallback(
+		(t: string, n: string) =>
+			existing.some(k => {
+				if (k.type !== t || k.keyName !== n) return false; // different pair
+				// allow the SAME pair that we're editing / pre-filling
+				if (isEdit && k === initial) return false;
+				if (isPrefilled && prefill?.type === t && prefill.keyName === n) return false;
+				return true;
+			}),
+		[existing, initial, isEdit, isPrefilled, prefill]
+	);
 
-		switch (field) {
-			case 'type':
-				if (!value) next.type = 'Select a type';
-				break;
+	const validateField = useCallback(
+		(field: keyof FormData, value: string, state: FormData, currentErrors: FormErrors): FormErrors => {
+			const next = omitManyKeys(currentErrors, [field]) as FormErrors;
 
-			case 'newType':
-				if (form.type === sentinelAddNew && !value.trim()) next.newType = 'New type required';
-				break;
+			switch (field) {
+				case 'type':
+					if (!value) next.type = 'Select a type';
+					break;
 
-			case 'keyName': {
-				if (!value.trim()) next.keyName = 'Key name is required';
-				else {
-					const t = form.type === sentinelAddNew ? form.newType : form.type;
-					if (checkDuplicate(t, value.trim())) next.keyName = 'Duplicate (type, key) pair';
+				case 'newType':
+					if (state.type === sentinelAddNew && !value.trim()) next.newType = 'New type required';
+					break;
+
+				case 'keyName': {
+					if (!value.trim()) {
+						next.keyName = 'Key name is required';
+					} else {
+						const finalType = state.type === sentinelAddNew ? state.newType.trim() : state.type;
+						if (finalType && checkDuplicate(finalType, value.trim())) {
+							next.keyName = 'Duplicate (type, key) pair';
+						}
+					}
+					break;
 				}
-				break;
+
+				case 'secret':
+					if (!value.trim()) next.secret = 'Secret cannot be empty';
+					break;
 			}
 
-			case 'secret':
-				if (!value.trim()) next.secret = 'Secret cannot be empty';
-				break;
-		}
-		setErrors(next);
-	};
+			return next;
+		},
+		[checkDuplicate]
+	);
+
+	const validateForm = useCallback(
+		(state: FormData): FormErrors => {
+			let next: FormErrors = {};
+			next = validateField('type', state.type, state, next);
+			next = validateField('newType', state.newType, state, next);
+			next = validateField('keyName', state.keyName, state, next);
+			next = validateField('secret', state.secret, state, next);
+			return next;
+		},
+		[validateField]
+	);
 
 	const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
 		const { name, value } = e.target;
-		setForm(prev => ({ ...prev, [name]: value }));
-		validate(name as keyof FormData, value);
+		const field = name as keyof FormData;
+		const nextState = { ...formData, [field]: value };
+
+		setFormData(nextState);
+		setErrors(prev => {
+			let next = validateField(field, value, nextState, prev);
+
+			if (field === 'type' || field === 'newType') {
+				next = validateField('keyName', nextState.keyName, nextState, next);
+			}
+
+			return next;
+		});
 	};
 
 	const handleTypeSelect = (k: string) => {
-		setForm(prev => ({
-			...prev,
+		const nextState: FormData = {
+			...formData,
 			type: k,
 			newType: '',
 			/* reset key-name when switching away from provider */
-			keyName: k === AuthKeyTypeProvider ? prev.keyName : '',
-		}));
-		validate('type', k);
+			keyName: k === AuthKeyTypeProvider ? formData.keyName : '',
+		};
+
+		setFormData(nextState);
+		setErrors(prev => {
+			let next = validateField('type', k, nextState, prev);
+			next = validateField('newType', nextState.newType, nextState, next);
+			next = validateField('keyName', nextState.keyName, nextState, next);
+			return next;
+		});
 	};
 
 	const handleKeyNameSelect = (k: ProviderName) => {
-		setForm(prev => ({ ...prev, keyName: k }));
-		validate('keyName', k);
+		const nextState: FormData = { ...formData, keyName: k };
+		setFormData(nextState);
+		setErrors(prev => validateField('keyName', k, nextState, prev));
 	};
 
 	/* overall validity */
 	const isAllValid = useMemo(() => {
 		if (noProviderAvailable) return false;
-
-		if (!form.secret.trim()) return false;
-		if (form.type === sentinelAddNew && !form.newType.trim()) return false;
-		if (!form.keyName.trim()) return false;
-
-		return Object.values(errors).every(v => !v);
-	}, [form, errors, noProviderAvailable]);
+		const nextErrors = validateForm(formData);
+		return Object.values(nextErrors).every(v => !v);
+	}, [formData, noProviderAvailable, validateForm]);
 
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = async e => {
 		e.preventDefault();
 
-		// explicit validation trigger
-		(Object.entries(form) as [keyof FormData, string][]).forEach(([k, v]) => {
-			validate(k, v);
-		});
-		if (!isAllValid) return;
+		const nextErrors = validateForm(formData);
+		setErrors(nextErrors);
 
-		const finalType = form.type === sentinelAddNew ? form.newType.trim() : form.type;
+		if (noProviderAvailable || Object.values(nextErrors).some(Boolean)) return;
 
-		await aggregateAPI.setAuthKey(finalType, form.keyName.trim(), form.secret.trim());
+		const finalType = formData.type === sentinelAddNew ? formData.newType.trim() : formData.type;
+
+		await aggregateAPI.setAuthKey(finalType, formData.keyName.trim(), formData.secret.trim());
 
 		onChanged();
-		// Close via native dialog API; this will trigger handleDialogClose -> parent onClose()
-		dialogRef.current?.close();
+		requestClose();
 	};
 
-	/* closed → nothing to render */
-	if (!isOpen) return null;
-
-	return createPortal(
+	return (
 		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose}>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-auto rounded-2xl">
 				{/* header */}
 				<div className="mb-4 flex items-center justify-between">
 					<h3 className="text-lg font-bold">{isEdit ? 'Edit Auth Key' : 'Add Auth Key'}</h3>
-					<button
-						type="button"
-						className="btn btn-sm btn-circle bg-base-300"
-						onClick={() => dialogRef.current?.close()}
-						aria-label="Close"
-					>
+					<button type="button" className="btn btn-sm btn-circle bg-base-300" onClick={requestClose} aria-label="Close">
 						<FiX size={12} />
 					</button>
 				</div>
@@ -286,11 +332,11 @@ export function AddEditAuthKeyModal({
 						</label>
 						<div className="col-span-9">
 							{isReadOnly ? (
-								<input className="input input-bordered w-full rounded-2xl" value={form.type} disabled />
+								<input className="input input-bordered w-full rounded-2xl" value={formData.type} disabled />
 							) : (
 								<Dropdown<string>
 									dropdownItems={typeDropdownItems}
-									selectedKey={form.type}
+									selectedKey={formData.type}
 									onChange={handleTypeSelect}
 									filterDisabled={false}
 									title="Select type"
@@ -302,7 +348,7 @@ export function AddEditAuthKeyModal({
 					</div>
 
 					{/* NEW TYPE (only when sentinel)  */}
-					{!isReadOnly && form.type === sentinelAddNew && (
+					{!isReadOnly && formData.type === sentinelAddNew && (
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
 								<span className="label-text text-sm">New Type*</span>
@@ -311,7 +357,7 @@ export function AddEditAuthKeyModal({
 								<input
 									type="text"
 									name="newType"
-									value={form.newType}
+									value={formData.newType}
 									onChange={handleChange}
 									className={`input input-bordered w-full rounded-2xl ${errors.newType ? 'input-error' : ''}`}
 									spellCheck="false"
@@ -328,11 +374,11 @@ export function AddEditAuthKeyModal({
 						</label>
 						<div className="col-span-9">
 							{/* provider-type dropdown (create) */}
-							{!isReadOnly && form.type === AuthKeyTypeProvider ? (
+							{!isReadOnly && formData.type === AuthKeyTypeProvider ? (
 								Object.keys(providerDropdownItems).length > 0 ? (
 									<Dropdown<ProviderName>
 										dropdownItems={providerDropdownItems}
-										selectedKey={form.keyName}
+										selectedKey={formData.keyName}
 										onChange={handleKeyNameSelect}
 										filterDisabled={false}
 										title="Select provider"
@@ -351,7 +397,7 @@ export function AddEditAuthKeyModal({
 								<input
 									type="text"
 									name="keyName"
-									value={form.keyName}
+									value={formData.keyName}
 									onChange={handleChange}
 									className={`input input-bordered w-full rounded-2xl ${errors.keyName ? 'input-error' : ''}`}
 									disabled={isReadOnly}
@@ -371,7 +417,7 @@ export function AddEditAuthKeyModal({
 							<input
 								type="password"
 								name="secret"
-								value={form.secret}
+								value={formData.secret}
 								onChange={handleChange}
 								className={`input input-bordered w-full rounded-2xl ${errors.secret ? 'input-error' : ''}`}
 								spellCheck="false"
@@ -382,7 +428,7 @@ export function AddEditAuthKeyModal({
 
 					{/* ACTIONS - */}
 					<div className="modal-action mt-6">
-						<button type="button" className="btn bg-base-300 rounded-xl" onClick={() => dialogRef.current?.close()}>
+						<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
 							Cancel
 						</button>
 						<button type="submit" disabled={!isAllValid} className="btn btn-primary rounded-xl">
@@ -391,12 +437,10 @@ export function AddEditAuthKeyModal({
 					</div>
 				</form>
 			</div>
-		</dialog>,
-		document.body
+		</dialog>
 	);
 }
 
-/* ───────────────────────── field-error helper ───────────────────────── */
 function FieldError({ msg }: { msg?: string }) {
 	return msg ? (
 		<div className="label">
@@ -405,4 +449,17 @@ function FieldError({ msg }: { msg?: string }) {
 			</span>
 		</div>
 	) : null;
+}
+
+export function AddEditAuthKeyModal(props: AddEditAuthKeyModalProps) {
+	if (!props.isOpen) return null;
+	if (typeof document === 'undefined' || !document.body) return null;
+
+	const modalKey = props.initial
+		? `edit:${props.initial.type}:${props.initial.keyName}`
+		: props.prefill
+			? `prefill:${props.prefill.type}:${props.prefill.keyName}`
+			: 'add';
+
+	return createPortal(<AddEditAuthKeyModalContent key={modalKey} {...props} />, document.body);
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import {
 	FiCheck,
@@ -19,8 +19,6 @@ import { type ModelPreset, type ModelPresetID, type ProviderPreset } from '@/spe
 import type { AuthKeyMeta } from '@/spec/setting';
 import { AuthKeyTypeProvider } from '@/spec/setting';
 
-import { modelPresetStoreAPI, settingstoreAPI } from '@/apis/baseapi';
-
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 import { Dropdown } from '@/components/dropdown';
@@ -31,14 +29,25 @@ import { AddEditAuthKeyModal } from '@/settings/authkey_add_edit_modal';
 interface ProviderPresetCardProps {
 	provider: ProviderName;
 	preset: ProviderPreset;
-	defaultProvider: ProviderName;
+	defaultProvider?: ProviderName;
 	authKeySet: boolean;
+	authKeys: AuthKeyMeta[];
 	enabledProviders: ProviderName[];
 	allProviderPresets: Record<ProviderName, ProviderPreset>;
 
-	onProviderPresetChange: (provider: ProviderName, newPreset: ProviderPreset) => void;
-	onProviderDelete: (provider: ProviderName) => Promise<void>;
-	onRequestEdit: (provider: ProviderName) => void; // opens edit OR view modal in parent
+	onToggleProvider: (provider: ProviderName, nextEnabled: boolean) => Promise<void>;
+	onDeleteProvider: (provider: ProviderName) => Promise<void>;
+	onRequestEdit: (provider: ProviderName) => void;
+	onSetDefaultModel: (provider: ProviderName, modelPresetID: ModelPresetID) => Promise<void>;
+	onToggleModel: (provider: ProviderName, modelPresetID: ModelPresetID, nextEnabled: boolean) => Promise<void>;
+	onSaveModel: (provider: ProviderName, modelPresetID: ModelPresetID, modelData: ModelPreset) => Promise<void>;
+	onDeleteModel: (provider: ProviderName, modelPresetID: ModelPresetID) => Promise<void>;
+	onProviderAuthKeyChanged: (provider: ProviderName) => Promise<void>;
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+	if (error instanceof Error && error.message.trim()) return error.message;
+	return fallback;
 }
 
 export function ProviderPresetCard({
@@ -46,19 +55,19 @@ export function ProviderPresetCard({
 	preset,
 	defaultProvider,
 	authKeySet,
+	authKeys,
 	enabledProviders,
 	allProviderPresets,
-	onProviderPresetChange,
-	onProviderDelete,
+	onToggleProvider,
+	onDeleteProvider,
 	onRequestEdit,
+	onSetDefaultModel,
+	onToggleModel,
+	onSaveModel,
+	onDeleteModel,
+	onProviderAuthKeyChanged,
 }: ProviderPresetCardProps) {
 	const [expanded, setExpanded] = useState(false);
-
-	const [keySet, setKeySet] = useState(authKeySet);
-	useEffect(() => {
-		setKeySet(authKeySet);
-	}, [authKeySet]);
-
 	const [selectedID, setSelectedID] = useState<ModelPresetID | null>(null);
 	const [modelModalMode, setModelModalMode] = useState<'add' | 'edit' | 'view'>('add');
 
@@ -67,10 +76,7 @@ export function ProviderPresetCard({
 	const [showDelModel, setShowDelModel] = useState(false);
 	const [showDenied, setShowDenied] = useState(false);
 	const [deniedMsg, setDeniedMsg] = useState('');
-
 	const [showKeyModal, setShowKeyModal] = useState(false);
-	const [authKeys, setAuthKeys] = useState<AuthKeyMeta[]>([]);
-	const [keyModalInitial, setKeyModalInitial] = useState<AuthKeyMeta | null>(null);
 
 	const isLastEnabled = preset.isEnabled && enabledProviders.length === 1;
 	const providerIsBuiltIn = preset.isBuiltIn;
@@ -87,92 +93,103 @@ export function ProviderPresetCard({
 			: (Object.keys(modelPresets)[0] ?? '');
 
 	const allModelPresets = useMemo(() => {
-		const o: Record<ProviderName, Record<ModelPresetID, ModelPreset>> = {};
-		for (const [prov, pp] of Object.entries(allProviderPresets)) {
-			o[prov] = pp.modelPresets;
+		const out: Record<ProviderName, Record<ModelPresetID, ModelPreset>> = {};
+		for (const [prov, providerPreset] of Object.entries(allProviderPresets)) {
+			out[prov] = providerPreset.modelPresets;
 		}
-		return o;
+		return out;
 	}, [allProviderPresets]);
 
-	const toggleProviderEnable = async () => {
+	const keyModalInitial = useMemo(
+		() => authKeys.find(k => k.type === AuthKeyTypeProvider && k.keyName === provider) ?? null,
+		[authKeys, provider]
+	);
+
+	const showLocalDenied = (message: string) => {
+		setDeniedMsg(message);
+		setShowDenied(true);
+	};
+
+	const toggleProviderEnable = () => {
 		if (provider === defaultProvider && preset.isEnabled) {
-			setDeniedMsg('Cannot disable the default provider. Pick another default first.');
-			setShowDenied(true);
-			return;
-		}
-		if (isLastEnabled && preset.isEnabled) {
-			setDeniedMsg('Cannot disable the last enabled provider.');
-			setShowDenied(true);
+			showLocalDenied('Cannot disable the default provider. Pick another default first.');
 			return;
 		}
 
-		try {
-			await modelPresetStoreAPI.patchProviderPreset(provider, !preset.isEnabled);
-			onProviderPresetChange(provider, { ...preset, isEnabled: !preset.isEnabled });
-		} catch {
-			setDeniedMsg('Failed toggling provider.');
-			setShowDenied(true);
+		if (isLastEnabled && preset.isEnabled) {
+			showLocalDenied('Cannot disable the last enabled provider.');
+			return;
 		}
+
+		void (async () => {
+			try {
+				await onToggleProvider(provider, !preset.isEnabled);
+			} catch (error) {
+				showLocalDenied(getErrorMessage(error, 'Failed toggling provider.'));
+			}
+		})();
 	};
 
 	const toggleExpand = () => {
-		setExpanded(p => !p);
+		setExpanded(prev => !prev);
 	};
 
 	const requestDeleteProvider = () => {
 		if (providerIsBuiltIn) {
-			setDeniedMsg('Built-in providers cannot be deleted.');
-			setShowDenied(true);
+			showLocalDenied('Built-in providers cannot be deleted.');
 			return;
 		}
+
 		if (hasModels) {
-			setDeniedMsg('Only empty providers can be deleted. Remove all model presets first.');
-			setShowDenied(true);
+			showLocalDenied('Only empty providers can be deleted. Remove all model presets first.');
 			return;
 		}
+
 		setShowDelProv(true);
 	};
 
 	const confirmDeleteProvider = async () => {
-		await onProviderDelete(provider);
-		setShowDelProv(false);
-	};
-
-	const handleDefaultModelChange = async (id: ModelPresetID) => {
 		try {
-			await modelPresetStoreAPI.patchProviderPreset(provider, undefined, id);
-			onProviderPresetChange(provider, { ...preset, defaultModelPresetID: id });
-		} catch {
-			setDeniedMsg('Failed setting default model.');
-			setShowDenied(true);
+			await onDeleteProvider(provider);
+			setShowDelProv(false);
+		} catch (error) {
+			showLocalDenied(getErrorMessage(error, 'Failed deleting provider.'));
 		}
 	};
 
-	const toggleModelEnable = async (id: ModelPresetID) => {
-		const m = modelPresets[id];
-		if (id === defaultModelPresetID && m.isEnabled) {
-			setDeniedMsg('Cannot disable the default model preset. Choose another default first.');
-			setShowDenied(true);
+	const handleDefaultModelChange = (id: ModelPresetID) => {
+		void (async () => {
+			try {
+				await onSetDefaultModel(provider, id);
+			} catch (error) {
+				showLocalDenied(getErrorMessage(error, 'Failed setting default model.'));
+			}
+		})();
+	};
+
+	const toggleModelEnable = (id: ModelPresetID) => {
+		const modelPreset = modelPresets[id];
+
+		if (id === defaultModelPresetID && modelPreset.isEnabled) {
+			showLocalDenied('Cannot disable the default model preset. Choose another default first.');
 			return;
 		}
-		try {
-			await modelPresetStoreAPI.patchModelPreset(provider, id, !m.isEnabled);
-			onProviderPresetChange(provider, {
-				...preset,
-				modelPresets: { ...modelPresets, [id]: { ...m, isEnabled: !m.isEnabled } },
-			});
-		} catch {
-			setDeniedMsg('Failed toggling model.');
-			setShowDenied(true);
-		}
+
+		void (async () => {
+			try {
+				await onToggleModel(provider, id, !modelPreset.isEnabled);
+			} catch (error) {
+				showLocalDenied(getErrorMessage(error, 'Failed toggling model.'));
+			}
+		})();
 	};
 
 	const openAddModel = () => {
 		if (providerIsBuiltIn) {
-			setDeniedMsg('Cannot add model presets to a built-in provider.');
-			setShowDenied(true);
+			showLocalDenied('Cannot add model presets to a built-in provider.');
 			return;
 		}
+
 		setSelectedID(null);
 		setModelModalMode('add');
 		setShowModModal(true);
@@ -192,78 +209,33 @@ export function ProviderPresetCard({
 
 	const handleModifyModelSubmit = async (id: ModelPresetID, data: ModelPreset) => {
 		try {
-			const { id: _id, isBuiltIn: _isBuiltIn, ...payload } = data;
-			await modelPresetStoreAPI.putModelPreset(provider, id, payload);
-
-			let newDefault = defaultModelPresetID;
-			if (!defaultModelPresetID) {
-				await modelPresetStoreAPI.patchProviderPreset(provider, undefined, id);
-				newDefault = id;
-			}
-
-			onProviderPresetChange(provider, {
-				...preset,
-				modelPresets: { ...modelPresets, [id]: data },
-				defaultModelPresetID: newDefault,
-			});
-
+			await onSaveModel(provider, id, data);
 			setShowModModal(false);
-		} catch {
-			setDeniedMsg('Failed saving model preset.');
-			setShowDenied(true);
+		} catch (error) {
+			const message = getErrorMessage(error, 'Failed saving model preset.');
+			showLocalDenied(message);
+			throw error instanceof Error ? error : new Error(message);
 		}
 	};
 
 	const requestDeleteModel = (id: ModelPresetID) => {
 		if (modelPresets[id].isBuiltIn) {
-			setDeniedMsg('Built-in model presets cannot be deleted.');
-			setShowDenied(true);
+			showLocalDenied('Built-in model presets cannot be deleted.');
 			return;
 		}
+
 		setSelectedID(id);
 		setShowDelModel(true);
 	};
 
 	const confirmDeleteModel = async () => {
 		if (!selectedID) return;
+
 		try {
-			await modelPresetStoreAPI.deleteModelPreset(provider, selectedID);
-			const { [selectedID]: _removed, ...rest } = modelPresets;
-
-			let newDefault = defaultModelPresetID;
-			if (selectedID === defaultModelPresetID) {
-				newDefault = Object.keys(rest)[0] ?? '';
-				if (newDefault !== '') {
-					await modelPresetStoreAPI.patchProviderPreset(provider, undefined, newDefault);
-				}
-			}
-
-			onProviderPresetChange(provider, {
-				...preset,
-				modelPresets: rest,
-				defaultModelPresetID: newDefault,
-			});
-
+			await onDeleteModel(provider, selectedID);
 			setShowDelModel(false);
-		} catch {
-			setDeniedMsg('Failed deleting model preset.');
-			setShowDenied(true);
-		}
-	};
-
-	const openSetApiKey = async () => {
-		try {
-			const settings = await settingstoreAPI.getSettings();
-			setAuthKeys(settings.authKeys);
-
-			const meta = settings.authKeys.find(k => k.type === AuthKeyTypeProvider && k.keyName === provider) ?? null;
-
-			setKeyModalInitial(meta);
-			setShowKeyModal(true);
-		} catch (err) {
-			console.error(err);
-			setDeniedMsg('Failed loading auth keys.');
-			setShowDenied(true);
+		} catch (error) {
+			showLocalDenied(getErrorMessage(error, 'Failed deleting model preset.'));
 		}
 	};
 
@@ -292,7 +264,7 @@ export function ProviderPresetCard({
 					<div className="flex cursor-pointer items-end justify-end gap-4" onClick={toggleExpand}>
 						<div className="flex items-center">
 							<span className="text-sm">API-Key</span>
-							{keySet ? <FiCheckCircle className="text-success mx-1" /> : <FiXCircle className="text-error mx-1" />}
+							{authKeySet ? <FiCheckCircle className="text-success mx-1" /> : <FiXCircle className="text-error mx-1" />}
 						</div>
 
 						<div className="flex items-center">
@@ -303,7 +275,6 @@ export function ProviderPresetCard({
 				</div>
 			</div>
 
-			{/* body: allow even when provider disabled */}
 			{expanded && (
 				<div className="mt-4 space-y-6">
 					<div className="border-base-content/10 mb-4 overflow-x-auto rounded-2xl border">
@@ -327,7 +298,7 @@ export function ProviderPresetCard({
 														!canDeleteProvider ? 'btn-disabled cursor-not-allowed opacity-50' : ''
 													}`}
 													onClick={canDeleteProvider ? requestDeleteProvider : undefined}
-													title={'Delete Provider'}
+													title="Delete Provider"
 													disabled={!canDeleteProvider}
 												>
 													<FiTrash2 />
@@ -338,11 +309,13 @@ export function ProviderPresetCard({
 											<div className="flex gap-2">
 												<button
 													className="btn btn-ghost flex items-center rounded-2xl"
-													onClick={openSetApiKey}
-													title={keySet ? 'Update API Key' : 'Set API Key'}
+													onClick={() => {
+														setShowKeyModal(true);
+													}}
+													title={authKeySet ? 'Update API Key' : 'Set API Key'}
 												>
 													<FiKey />
-													<span className="ml-1 hidden md:inline">{keySet ? 'Update API Key' : 'Set API Key'}</span>
+													<span className="ml-1 hidden md:inline">{authKeySet ? 'Update API Key' : 'Set API Key'}</span>
 												</button>
 
 												<button
@@ -441,22 +414,24 @@ export function ProviderPresetCard({
 								</thead>
 
 								<tbody>
-									{modelEntries.map(([id, m]) => {
-										const canModify = !m.isBuiltIn;
+									{modelEntries.map(([id, modelPreset]) => {
+										const canModify = !modelPreset.isBuiltIn;
 										return (
 											<tr key={id} className="hover:bg-base-300">
-												<td>{m.displayName || id}</td>
-												<td>{m.name}</td>
+												<td>{modelPreset.displayName || id}</td>
+												<td>{modelPreset.name}</td>
 												<td className="text-center">
 													<input
 														type="checkbox"
 														className="toggle toggle-accent"
-														checked={m.isEnabled}
-														onChange={() => toggleModelEnable(id)}
+														checked={modelPreset.isEnabled}
+														onChange={() => {
+															toggleModelEnable(id);
+														}}
 													/>
 												</td>
 												<td className="text-center">
-													{'reasoning' in m && m.reasoning ? (
+													{'reasoning' in modelPreset && modelPreset.reasoning ? (
 														<FiCheck className="mx-auto" />
 													) : (
 														<FiX className="mx-auto" />
@@ -554,7 +529,13 @@ export function ProviderPresetCard({
 				}}
 				onChanged={() => {
 					setShowKeyModal(false);
-					setKeySet(true);
+					void (async () => {
+						try {
+							await onProviderAuthKeyChanged(provider);
+						} catch (error) {
+							showLocalDenied(getErrorMessage(error, 'Failed refreshing auth key state.'));
+						}
+					})();
 				}}
 			/>
 

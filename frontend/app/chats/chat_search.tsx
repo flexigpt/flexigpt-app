@@ -553,7 +553,7 @@ export const ChatSearch = forwardRef<ChatSearchHandle, ChatSearchProps>(function
 		const r = el.getBoundingClientRect();
 		const gap = compact ? 8 : 12;
 		setDropdownPos({ top: r.bottom + gap, left: r.left, width: r.width });
-	}, []);
+	}, [compact]);
 
 	useLayoutEffect(() => {
 		if (!show) return;
@@ -593,7 +593,7 @@ export const ChatSearch = forwardRef<ChatSearchHandle, ChatSearchProps>(function
 				results: conversationsToResults(recentConversations),
 			}));
 		}
-	}, [recentConversations, loadRecentConversations, searchState.query]);
+	}, [recentConversations, loadRecentConversations, searchState.query, updateDropdownPos]);
 
 	const handleBlur = useCallback(() => {
 		setTimeout(() => {
@@ -651,7 +651,7 @@ export const ChatSearch = forwardRef<ChatSearchHandle, ChatSearchProps>(function
 			setDeleteLoading(false);
 			setDeleteTarget(null);
 		}
-	}, [deleteTarget]);
+	}, [deleteTarget, loadRecentConversations, searchState.query]);
 
 	const showSearchAllHintShortQuery =
 		searchState.query.length > 0 &&

@@ -10,7 +10,7 @@ export function useTools() {
 
 	useEffect(() => {
 		let cancelled = false;
-		setLoading(true);
+
 		getAllTools()
 			.then(res => {
 				if (cancelled) {
@@ -24,6 +24,7 @@ export function useTools() {
 				}
 				setLoading(false);
 			});
+
 		return () => {
 			cancelled = true;
 		};

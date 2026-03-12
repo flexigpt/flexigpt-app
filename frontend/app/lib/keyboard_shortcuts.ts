@@ -35,7 +35,6 @@ export enum ShortcutAction {
 	editorBlockquote = 'editorBlockquote',
 
 	// Editor – other
-	editorEmoji = 'editorEmoji',
 	editorFloatingToolbar = 'editorFloatingToolbar',
 	editorUndo = 'editorUndo',
 	editorRedo = 'editorRedo',
@@ -241,15 +240,7 @@ const ACTION_META: Record<ShortcutAction, ShortcutMeta> = {
 		keys: `${MOD_LABEL} + Shift + '.'`,
 	},
 
-	// EDITOR – OTHER (Emoji, floating toolbar, undo/redo, etc.)
-	// EmojiKit – type ":" to open emoji suggestions
-	[ShortcutAction.editorEmoji]: {
-		label: 'Emoji picker',
-		group: 'Editor',
-		order: 320,
-		source: 'static',
-		keys: `Type ":" in the editor`,
-	},
+	// EDITOR – OTHER (floating toolbar, undo/redo, etc.)
 	// FloatingToolbarKit – appears when you select text
 	[ShortcutAction.editorFloatingToolbar]: {
 		label: 'Floating toolbar',
@@ -383,7 +374,7 @@ export function useChatShortcuts({ config, isBusy, handlers }: UseShortcutsOptio
  * Build a flat list of display items for all shortcuts.
  *
  * - Includes configurable app-level shortcuts (from `config`).
- * - Also includes static Plate editor shortcuts (marks, blocks, emoji, etc.).
+ * - Also includes static Plate editor shortcuts (marks, blocks,  etc.).
  *
  * This is what UI components should consume for a "Keyboard shortcuts" dialog.
  */

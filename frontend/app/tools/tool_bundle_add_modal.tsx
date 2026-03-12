@@ -14,32 +14,28 @@ interface AddToolBundleModalProps {
 	existingSlugs: string[];
 }
 
+type AddToolBundleModalContentProps = Omit<AddToolBundleModalProps, 'isOpen'>;
+
 type ErrorState = {
 	slug?: string;
 	displayName?: string;
 };
 
-export function AddToolBundleModal({ isOpen, onClose, onSubmit, existingSlugs }: AddToolBundleModalProps) {
-	const [form, setForm] = useState({
-		slug: '',
-		displayName: '',
-		description: '',
-	});
+const INITIAL_FORM = {
+	slug: '',
+	displayName: '',
+	description: '',
+};
+
+function AddToolBundleModalContent({ onClose, onSubmit, existingSlugs }: AddToolBundleModalContentProps) {
+	const [formData, setFormData] = useState(INITIAL_FORM);
 	const [errors, setErrors] = useState<ErrorState>({});
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
+	const ignoreCloseRef = useRef(false);
 
-	// Reset form state whenever the modal is opened
+	// Open the native <dialog> on mount, and close it on unmount.
 	useEffect(() => {
-		if (!isOpen) return;
-		setForm({ slug: '', displayName: '', description: '' });
-		setErrors({});
-	}, [isOpen]);
-
-	// Open/close the native <dialog> when isOpen changes
-	useEffect(() => {
-		if (!isOpen) return;
-
 		const dialog = dialogRef.current;
 		if (!dialog) return;
 
@@ -48,14 +44,18 @@ export function AddToolBundleModal({ isOpen, onClose, onSubmit, existingSlugs }:
 		}
 
 		return () => {
+			ignoreCloseRef.current = true;
+
 			if (dialog.open) {
 				dialog.close();
 			}
 		};
-	}, [isOpen]);
+	}, []);
 
-	// Sync parent state whenever the dialog is closed (Esc or programmatic close)
+	// Sync parent state whenever the dialog is closed by user interaction
+	// or by programmatic close from inside this component.
 	const handleDialogClose = () => {
+		if (ignoreCloseRef.current) return;
 		onClose();
 	};
 
@@ -81,7 +81,7 @@ export function AddToolBundleModal({ isOpen, onClose, onSubmit, existingSlugs }:
 		return nextErrors;
 	};
 
-	const validateForm = (state: typeof form): ErrorState => {
+	const validateForm = (state: typeof formData): ErrorState => {
 		let nextErrors: ErrorState = {};
 		nextErrors = validateField('slug', state.slug, nextErrors);
 		nextErrors = validateField('displayName', state.displayName, nextErrors);
@@ -89,15 +89,13 @@ export function AddToolBundleModal({ isOpen, onClose, onSubmit, existingSlugs }:
 	};
 
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
-		if (e) {
-			e.preventDefault();
-			e.stopPropagation();
-		}
+		e.preventDefault();
+		e.stopPropagation();
 
 		const trimmed = {
-			slug: form.slug.trim(),
-			displayName: form.displayName.trim(),
-			description: form.description.trim(),
+			slug: formData.slug.trim(),
+			displayName: formData.displayName.trim(),
+			description: formData.description.trim(),
 		};
 
 		const nextErrors = validateForm(trimmed);
@@ -112,13 +110,11 @@ export function AddToolBundleModal({ isOpen, onClose, onSubmit, existingSlugs }:
 	};
 
 	const isFormValid = useMemo(
-		() => Boolean(form.slug.trim()) && Boolean(form.displayName.trim()) && Object.keys(errors).length === 0,
-		[form.slug, form.displayName, errors]
+		() => Boolean(formData.slug.trim()) && Boolean(formData.displayName.trim()) && Object.keys(errors).length === 0,
+		[formData.slug, formData.displayName, errors]
 	);
 
-	if (!isOpen) return null;
-
-	return createPortal(
+	return (
 		<dialog
 			ref={dialogRef}
 			className="modal"
@@ -134,7 +130,7 @@ export function AddToolBundleModal({ isOpen, onClose, onSubmit, existingSlugs }:
 					<h3 className="text-lg font-bold">Add Tool Bundle</h3>
 					<button
 						type="button"
-						className="btn btn-sm btn-circle bg-base-300"
+						className="btn btn-sm btn-circle bg-base-300 rounded-xl"
 						onClick={() => dialogRef.current?.close()}
 						aria-label="Close"
 					>
@@ -147,7 +143,7 @@ export function AddToolBundleModal({ isOpen, onClose, onSubmit, existingSlugs }:
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-3">
 							<span className="label-text text-sm">Bundle Slug*</span>
-							<span className="label-text-alt tooltip tooltip-right" data-tip="Lower-case, URL-friendly.">
+							<span className="tooltip tooltip-right label-text-alt" data-tip="Lower-case, URL-friendly.">
 								<FiHelpCircle size={12} />
 							</span>
 						</label>
@@ -155,10 +151,10 @@ export function AddToolBundleModal({ isOpen, onClose, onSubmit, existingSlugs }:
 							<input
 								type="text"
 								className={`input input-bordered w-full rounded-xl ${errors.slug ? 'input-error' : ''}`}
-								value={form.slug}
+								value={formData.slug}
 								onChange={e => {
 									const value = e.target.value;
-									setForm(prev => ({ ...prev, slug: value }));
+									setFormData(prev => ({ ...prev, slug: value }));
 									setErrors(prevErrors => validateField('slug', value, prevErrors));
 								}}
 								spellCheck="false"
@@ -185,10 +181,10 @@ export function AddToolBundleModal({ isOpen, onClose, onSubmit, existingSlugs }:
 							<input
 								type="text"
 								className={`input input-bordered w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
-								value={form.displayName}
+								value={formData.displayName}
 								onChange={e => {
 									const value = e.target.value;
-									setForm(prev => ({ ...prev, displayName: value }));
+									setFormData(prev => ({ ...prev, displayName: value }));
 									setErrors(prevErrors => validateField('displayName', value, prevErrors));
 								}}
 								spellCheck="false"
@@ -213,10 +209,10 @@ export function AddToolBundleModal({ isOpen, onClose, onSubmit, existingSlugs }:
 						<div className="col-span-9">
 							<textarea
 								className="textarea textarea-bordered h-24 w-full rounded-xl"
-								value={form.description}
+								value={formData.description}
 								onChange={e => {
 									const value = e.target.value;
-									setForm(prev => ({ ...prev, description: value }));
+									setFormData(prev => ({ ...prev, description: value }));
 								}}
 								spellCheck="false"
 							/>
@@ -234,8 +230,14 @@ export function AddToolBundleModal({ isOpen, onClose, onSubmit, existingSlugs }:
 					</div>
 				</form>
 			</div>
+
 			{/* NOTE: no modal-backdrop here: backdrop click should NOT close this modal */}
-		</dialog>,
-		document.body
+		</dialog>
 	);
+}
+
+export function AddToolBundleModal({ isOpen, ...rest }: AddToolBundleModalProps) {
+	if (!isOpen || typeof document === 'undefined') return null;
+
+	return createPortal(<AddToolBundleModalContent {...rest} />, document.body);
 }

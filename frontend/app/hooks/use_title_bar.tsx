@@ -69,5 +69,6 @@ export function useTitleBarContent(slots: TitleBarSlots, deps: unknown[] = []) {
 		return () => {
 			clearTitleBarSlots(owner);
 		};
-	}, [owner, ...deps]);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [owner, slots, ...deps]);
 }

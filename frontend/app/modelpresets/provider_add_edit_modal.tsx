@@ -1,5 +1,5 @@
 import type { ChangeEvent, SubmitEventHandler } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
@@ -18,7 +18,7 @@ import { ReadOnlyValue } from '@/components/read_only_value';
 
 type ModalMode = 'add' | 'edit' | 'view';
 
-type FormData = {
+type ProviderFormData = {
 	providerName: string;
 	displayName: string;
 	sdkType: ProviderSDKType;
@@ -30,7 +30,7 @@ type FormData = {
 	apiKey: string;
 };
 
-const DEFAULT_FORM: FormData = {
+const DEFAULT_FORM: ProviderFormData = {
 	providerName: '',
 	displayName: '',
 	sdkType: ProviderSDKType.ProviderSDKTypeOpenAIChatCompletions,
@@ -50,19 +50,34 @@ interface AddEditProviderPresetModalProps {
 		providerName: ProviderName,
 		payload: Omit<ProviderPreset, 'isBuiltIn' | 'defaultModelPresetID' | 'modelPresets' | 'name'>,
 		apiKey: string | null
-	) => void;
+	) => Promise<void>;
 	existingProviderNames: ProviderName[];
 	allProviderPresets: Record<ProviderName, ProviderPreset>;
-
-	/* edit/view-mode helpers */
 	initialPreset?: ProviderPreset;
 	apiKeyAlreadySet?: boolean;
 }
 
-type ErrorState = Partial<Record<keyof FormData, string>>;
+type ErrorState = Partial<Record<keyof ProviderFormData, string>>;
 
-export function AddEditProviderPresetModal({
-	isOpen,
+function getInitialFormData(mode: ModalMode, initialPreset?: ProviderPreset): ProviderFormData {
+	if ((mode === 'edit' || mode === 'view') && initialPreset) {
+		return {
+			providerName: initialPreset.name,
+			displayName: initialPreset.displayName,
+			sdkType: initialPreset.sdkType,
+			isEnabled: initialPreset.isEnabled,
+			origin: initialPreset.origin,
+			chatCompletionPathPrefix: initialPreset.chatCompletionPathPrefix,
+			apiKeyHeaderKey: initialPreset.apiKeyHeaderKey,
+			defaultHeadersRawJSON: JSON.stringify(initialPreset.defaultHeaders, null, 2),
+			apiKey: '',
+		};
+	}
+
+	return { ...DEFAULT_FORM };
+}
+
+function AddEditProviderPresetModalContent({
 	mode,
 	onClose,
 	onSubmit,
@@ -73,20 +88,26 @@ export function AddEditProviderPresetModal({
 }: AddEditProviderPresetModalProps) {
 	const isReadOnly = mode === 'view';
 
-	const [formData, setFormData] = useState<FormData>(DEFAULT_FORM);
+	const [formData, setFormData] = useState<ProviderFormData>(() => getInitialFormData(mode, initialPreset));
 	const [errors, setErrors] = useState<ErrorState>({});
+	const [prefillMode, setPrefillMode] = useState(false);
+	const [selectedPrefillKey, setSelectedPrefillKey] = useState<ProviderName | null>(null);
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const providerNameInputRef = useRef<HTMLInputElement | null>(null);
 	const displayNameInputRef = useRef<HTMLInputElement | null>(null);
 	const originInputRef = useRef<HTMLInputElement | null>(null);
+	const isUnmountingRef = useRef(false);
 
 	const prefillDropdownItems: Record<ProviderName, { isEnabled: boolean; displayName: string }> = useMemo(() => {
-		const o: Record<ProviderName, { isEnabled: boolean; displayName: string }> = {} as any;
-		for (const [name, p] of Object.entries(allProviderPresets)) {
-			o[name] = { isEnabled: true, displayName: p.displayName || name };
+		const out = {} as Record<ProviderName, { isEnabled: boolean; displayName: string }>;
+
+		for (const [name, preset] of Object.entries(allProviderPresets)) {
+			out[name] = { isEnabled: true, displayName: preset.displayName || name };
 		}
-		return o;
+
+		return out;
 	}, [allProviderPresets]);
 
 	const sdkDropdownItems: Record<ProviderSDKType, { isEnabled: boolean; displayName: string }> = useMemo(
@@ -107,17 +128,143 @@ export function AddEditProviderPresetModal({
 		[]
 	);
 
-	const [prefillMode, setPrefillMode] = useState(false);
-	const [selectedPrefillKey, setSelectedPrefillKey] = useState<ProviderName | null>(null);
+	useEffect(() => {
+		const dialog = dialogRef.current;
+		if (!dialog) return;
+
+		if (!dialog.open) {
+			try {
+				dialog.showModal();
+			} catch {
+				// Ignore showModal errors and keep rendering safely.
+			}
+		}
+
+		const focusTimer = window.setTimeout(() => {
+			if (mode === 'add') {
+				providerNameInputRef.current?.focus();
+			} else if (!isReadOnly) {
+				displayNameInputRef.current?.focus();
+			}
+		}, 0);
+
+		return () => {
+			isUnmountingRef.current = true;
+			window.clearTimeout(focusTimer);
+
+			if (dialog.open) {
+				dialog.close();
+			}
+		};
+	}, [isReadOnly, mode]);
+
+	const requestClose = useCallback(() => {
+		if (isSubmitting) return;
+
+		const dialog = dialogRef.current;
+
+		if (dialog?.open) {
+			dialog.close();
+			return;
+		}
+
+		onClose();
+	}, [isSubmitting, onClose]);
+
+	const handleDialogClose = () => {
+		if (isUnmountingRef.current) return;
+		onClose();
+	};
+
+	const validateField = useCallback(
+		(
+			field: keyof ProviderFormData,
+			val: string | boolean | ProviderSDKType,
+			currentErrors: ErrorState,
+			originInput: HTMLInputElement | null = null
+		): ErrorState => {
+			if (isReadOnly) return currentErrors;
+
+			let newErrs: ErrorState = { ...currentErrors };
+			const v = typeof val === 'string' ? val.trim() : val;
+
+			if (field === 'providerName' && mode === 'add') {
+				if (!v) {
+					newErrs.providerName = 'Provider name required.';
+				} else if (typeof v === 'string' && !/^[\w-]+$/.test(v)) {
+					newErrs.providerName = 'Letters, numbers, dash & underscore only.';
+				} else if (typeof v === 'string' && existingProviderNames.includes(v)) {
+					newErrs.providerName = 'Provider already exists.';
+				} else {
+					newErrs = omitManyKeys(newErrs, ['providerName']);
+				}
+			}
+
+			if (field === 'displayName') {
+				if (!v) newErrs.displayName = 'Display name required.';
+				else newErrs = omitManyKeys(newErrs, ['displayName']);
+			}
+
+			if (field === 'origin') {
+				const { error } = validateUrlForInput(String(val), originInput, { required: true });
+				if (error) newErrs.origin = error;
+				else newErrs = omitManyKeys(newErrs, ['origin']);
+			}
+
+			if (field === 'defaultHeadersRawJSON') {
+				if (v) {
+					try {
+						JSON.parse(String(v));
+						newErrs = omitManyKeys(newErrs, ['defaultHeadersRawJSON']);
+					} catch {
+						newErrs.defaultHeadersRawJSON = 'Invalid JSON.';
+					}
+				} else {
+					newErrs = omitManyKeys(newErrs, ['defaultHeadersRawJSON']);
+				}
+			}
+
+			if (field === 'apiKey' && mode === 'add') {
+				if (!v) newErrs.apiKey = 'API key required.';
+				else newErrs = omitManyKeys(newErrs, ['apiKey']);
+			}
+
+			if (field === 'sdkType') {
+				if (!Object.values(ProviderSDKType).includes(val as ProviderSDKType)) {
+					newErrs.sdkType = 'Invalid SDK type.';
+				} else {
+					newErrs = omitManyKeys(newErrs, ['sdkType']);
+				}
+			}
+
+			return newErrs;
+		},
+		[existingProviderNames, isReadOnly, mode]
+	);
+
+	const validateForm = useCallback(
+		(state: ProviderFormData): ErrorState => {
+			if (isReadOnly) return {};
+
+			let next: ErrorState = {};
+			next = validateField('providerName', state.providerName, next);
+			next = validateField('displayName', state.displayName, next);
+			next = validateField('origin', state.origin, next);
+			next = validateField('defaultHeadersRawJSON', state.defaultHeadersRawJSON, next);
+			if (mode === 'add' || state.apiKey.trim()) next = validateField('apiKey', state.apiKey, next);
+			next = validateField('sdkType', state.sdkType, next);
+			return next;
+		},
+		[isReadOnly, mode, validateField]
+	);
 
 	const applyPrefill = (key: ProviderName) => {
 		const src = allProviderPresets[key];
+		if (!src) return;
 
-		setFormData(prev => ({
-			...prev,
-
-			/* IDs & secrets are intentionally NOT copied */
-			displayName: src.displayName + '-' + GenerateRandomNumberString(3),
+		const next: ProviderFormData = {
+			...formData,
+			displayName: `${src.displayName}-${GenerateRandomNumberString(3)}`,
 			sdkType: src.sdkType,
 			isEnabled: true,
 			origin: src.origin,
@@ -125,141 +272,45 @@ export function AddEditProviderPresetModal({
 			apiKeyHeaderKey: src.apiKeyHeaderKey,
 			defaultHeadersRawJSON: JSON.stringify(src.defaultHeaders, null, 2),
 			apiKey: '',
-		}));
-	};
-
-	useEffect(() => {
-		if (!isOpen) return;
-
-		if ((mode === 'edit' || mode === 'view') && initialPreset) {
-			setFormData({
-				providerName: initialPreset.name,
-				displayName: initialPreset.displayName,
-				sdkType: initialPreset.sdkType,
-				isEnabled: initialPreset.isEnabled,
-				origin: initialPreset.origin,
-				chatCompletionPathPrefix: initialPreset.chatCompletionPathPrefix,
-				apiKeyHeaderKey: initialPreset.apiKeyHeaderKey,
-				defaultHeadersRawJSON: JSON.stringify(initialPreset.defaultHeaders, null, 2),
-				apiKey: '',
-			});
-		} else {
-			setFormData(DEFAULT_FORM);
-			setPrefillMode(false);
-			setSelectedPrefillKey(null);
-		}
-		setErrors({});
-	}, [isOpen, mode, initialPreset]);
-
-	useEffect(() => {
-		if (!isOpen) return;
-		const dialog = dialogRef.current;
-		if (!dialog) return;
-
-		if (!dialog.open) dialog.showModal();
-
-		window.setTimeout(() => {
-			if (mode === 'add') providerNameInputRef.current?.focus();
-			else displayNameInputRef.current?.focus();
-		}, 0);
-
-		return () => {
-			if (dialog.open) dialog.close();
 		};
-	}, [isOpen, mode]);
 
-	const handleDialogClose = () => {
-		onClose();
-	};
-
-	const validateField = (field: keyof FormData, val: string, currentErrors: ErrorState): ErrorState => {
-		if (isReadOnly) return currentErrors;
-
-		let newErrs: ErrorState = { ...currentErrors };
-		const v = typeof val === 'string' ? val.trim() : val;
-
-		if (field === 'providerName' && mode === 'add') {
-			if (!v) newErrs.providerName = 'Provider name required.';
-			else if (typeof v === 'string' && !/^[\w-]+$/.test(v))
-				newErrs.providerName = 'Letters, numbers, dash & underscore only.';
-			else if (typeof v === 'string' && existingProviderNames.includes(v))
-				newErrs.providerName = 'Provider already exists.';
-			else newErrs = omitManyKeys(newErrs, ['providerName']);
-		}
-
-		if (field === 'displayName') {
-			if (!v) newErrs.displayName = 'Display name required.';
-			else newErrs = omitManyKeys(newErrs, ['displayName']);
-		}
-
-		if (field === 'origin') {
-			const { error } = validateUrlForInput(v, originInputRef.current, { required: true });
-			if (error) newErrs.origin = error;
-			else newErrs = omitManyKeys(newErrs, ['origin']);
-		}
-
-		if (field === 'defaultHeadersRawJSON') {
-			if (v) {
-				try {
-					JSON.parse(v);
-					newErrs = omitManyKeys(newErrs, ['defaultHeadersRawJSON']);
-				} catch {
-					newErrs.defaultHeadersRawJSON = 'Invalid JSON.';
-				}
-			} else newErrs = omitManyKeys(newErrs, ['defaultHeadersRawJSON']);
-		}
-
-		if (field === 'apiKey' && mode === 'add') {
-			if (!v) newErrs.apiKey = 'API key required.';
-			else newErrs = omitManyKeys(newErrs, ['apiKey']);
-		}
-
-		if (field === 'sdkType') {
-			if (!Object.values(ProviderSDKType).includes(v as ProviderSDKType)) newErrs.sdkType = 'Invalid SDK type.';
-			else newErrs = omitManyKeys(newErrs, ['sdkType']);
-		}
-
-		return newErrs;
-	};
-
-	const validateForm = (state: FormData): ErrorState => {
-		if (isReadOnly) return {};
-
-		let next: ErrorState = {};
-		next = validateField('providerName', state.providerName, next);
-		next = validateField('displayName', state.displayName, next);
-		next = validateField('origin', state.origin, next);
-		next = validateField('defaultHeadersRawJSON', state.defaultHeadersRawJSON, next);
-		if (mode === 'add' || state.apiKey.trim()) next = validateField('apiKey', state.apiKey, next);
-		next = validateField('sdkType', state.sdkType, next);
-		return next;
+		setFormData(next);
+		setErrors(validateForm(next));
 	};
 
 	const handleInput = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-		const { name, value, type, checked } = e.target as HTMLInputElement;
+		if (isSubmitting) return;
+
+		const target = e.target as HTMLInputElement;
+		const { name, value, type, checked } = target;
 		const newVal = type === 'checkbox' ? checked : value;
 
 		setFormData(prev => ({ ...prev, [name]: newVal }));
 
 		if (['providerName', 'displayName', 'origin', 'defaultHeadersRawJSON', 'apiKey'].includes(name)) {
-			setErrors(prev => validateField(name as keyof FormData, String(newVal), prev));
+			setErrors(prev =>
+				validateField(name as keyof ProviderFormData, newVal, prev, name === 'origin' ? originInputRef.current : null)
+			);
 		}
 	};
 
 	const onSdkTypeChange = (key: ProviderSDKType) => {
-		if (isReadOnly) return;
+		if (isReadOnly || isSubmitting) return;
 
-		setFormData(prev => {
-			const next = { ...prev, sdkType: key };
-			const defaults = SDK_DEFAULTS[key];
+		const defaults = SDK_DEFAULTS[key];
+		const next: ProviderFormData = {
+			...formData,
+			sdkType: key,
+			chatCompletionPathPrefix: formData.chatCompletionPathPrefix.trim()
+				? formData.chatCompletionPathPrefix
+				: defaults.chatPath,
+			apiKeyHeaderKey: formData.apiKeyHeaderKey.trim() ? formData.apiKeyHeaderKey : defaults.apiKeyHeaderKey,
+			defaultHeadersRawJSON: formData.defaultHeadersRawJSON.trim()
+				? formData.defaultHeadersRawJSON
+				: JSON.stringify(defaults.defaultHeaders, null, 2),
+		};
 
-			if (!prev.chatCompletionPathPrefix.trim()) next.chatCompletionPathPrefix = defaults.chatPath;
-			if (!prev.apiKeyHeaderKey.trim()) next.apiKeyHeaderKey = defaults.apiKeyHeaderKey;
-			if (!prev.defaultHeadersRawJSON.trim())
-				next.defaultHeadersRawJSON = JSON.stringify(defaults.defaultHeaders, null, 2);
-
-			return next;
-		});
+		setFormData(next);
 		setErrors(prev => validateField('sdkType', key, prev));
 	};
 
@@ -274,15 +325,12 @@ export function AddEditProviderPresetModal({
 			formData.origin.trim() &&
 			(mode === 'add' ? formData.apiKey.trim() : true);
 
-		return !hasErr && requiredFilled;
-	}, [formData, mode, isReadOnly]);
+		return !hasErr && Boolean(requiredFilled);
+	}, [formData, isReadOnly, mode, validateForm]);
 
-	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
-		e.preventDefault();
-		e.stopPropagation();
-
+	const submitForm = async () => {
 		if (isReadOnly) {
-			dialogRef.current?.close();
+			requestClose();
 			return;
 		}
 
@@ -304,7 +352,7 @@ export function AddEditProviderPresetModal({
 		let defaultHeaders: Record<string, string> = {};
 		if (formData.defaultHeadersRawJSON.trim()) {
 			try {
-				defaultHeaders = JSON.parse(formData.defaultHeadersRawJSON.trim());
+				defaultHeaders = JSON.parse(formData.defaultHeadersRawJSON.trim()) as Record<string, string>;
 			} catch {
 				return;
 			}
@@ -320,22 +368,32 @@ export function AddEditProviderPresetModal({
 			defaultHeaders,
 		};
 
-		onSubmit(formData.providerName.trim(), payload, formData.apiKey.trim() || null);
-		dialogRef.current?.close();
+		setIsSubmitting(true);
+		try {
+			await onSubmit(formData.providerName.trim(), payload, formData.apiKey.trim() || null);
+			requestClose();
+		} catch {
+			// Keep modal open so the user keeps their form on failed save.
+		} finally {
+			setIsSubmitting(false);
+		}
 	};
 
-	if (!isOpen) return null;
+	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
+		e.preventDefault();
+		e.stopPropagation();
+		void submitForm();
+	};
 
 	const title = mode === 'add' ? 'Add Provider' : mode === 'edit' ? 'Edit Provider' : 'View Provider';
 
-	return createPortal(
+	return (
 		<dialog
 			ref={dialogRef}
 			className="modal"
 			onClose={handleDialogClose}
 			onCancel={e => {
-				// Form mode (add/edit): block Esc close. View mode: allow.
-				if (!isReadOnly) e.preventDefault();
+				if (!isReadOnly || isSubmitting) e.preventDefault();
 			}}
 		>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-hidden rounded-2xl p-0">
@@ -345,15 +403,15 @@ export function AddEditProviderPresetModal({
 						<button
 							type="button"
 							className="btn btn-sm btn-circle bg-base-300"
-							onClick={() => dialogRef.current?.close()}
+							onClick={requestClose}
 							aria-label="Close"
+							disabled={isSubmitting}
 						>
 							<FiX size={12} />
 						</button>
 					</div>
 
 					<form noValidate onSubmit={handleSubmit} className="space-y-4">
-						{/* PREFILL (ADD mode only) */}
 						{mode === 'add' && (
 							<div className="grid grid-cols-12 items-center gap-2">
 								<label className="label col-span-3">
@@ -368,6 +426,7 @@ export function AddEditProviderPresetModal({
 											onClick={() => {
 												setPrefillMode(true);
 											}}
+											disabled={isSubmitting}
 										>
 											<FiUpload size={14} />
 											<span className="ml-1">Copy Existing Provider</span>
@@ -396,6 +455,7 @@ export function AddEditProviderPresetModal({
 													setSelectedPrefillKey(null);
 												}}
 												title="Cancel prefill"
+												disabled={isSubmitting}
 											>
 												<FiX size={12} />
 											</button>
@@ -405,7 +465,6 @@ export function AddEditProviderPresetModal({
 							</div>
 						)}
 
-						{/* SDK Type */}
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
 								<span className="label-text text-sm">SDK Type*</span>
@@ -439,7 +498,6 @@ export function AddEditProviderPresetModal({
 							</div>
 						</div>
 
-						{/* Provider ID */}
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
 								<span className="label-text text-sm">Provider ID*</span>
@@ -463,6 +521,7 @@ export function AddEditProviderPresetModal({
 									readOnly={mode !== 'add'}
 									spellCheck="false"
 									autoComplete="off"
+									disabled={isSubmitting}
 								/>
 								{errors.providerName && (
 									<div className="label">
@@ -474,7 +533,6 @@ export function AddEditProviderPresetModal({
 							</div>
 						</div>
 
-						{/* Display Name */}
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
 								<span className="label-text text-sm">Display Name*</span>
@@ -490,6 +548,7 @@ export function AddEditProviderPresetModal({
 									spellCheck="false"
 									autoComplete="off"
 									readOnly={isReadOnly}
+									disabled={isSubmitting}
 								/>
 								{errors.displayName && (
 									<div className="label">
@@ -501,7 +560,6 @@ export function AddEditProviderPresetModal({
 							</div>
 						</div>
 
-						{/* Origin */}
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
 								<span className="label-text text-sm">Origin*</span>
@@ -518,6 +576,7 @@ export function AddEditProviderPresetModal({
 									autoComplete="off"
 									placeholder="https://api.example.com OR api.example.com"
 									readOnly={isReadOnly}
+									disabled={isSubmitting}
 								/>
 								{errors.origin && (
 									<div className="label">
@@ -529,7 +588,6 @@ export function AddEditProviderPresetModal({
 							</div>
 						</div>
 
-						{/* Chat-completion Path */}
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
 								<span className="label-text text-sm">Chat Path*</span>
@@ -547,11 +605,11 @@ export function AddEditProviderPresetModal({
 									spellCheck="false"
 									autoComplete="off"
 									readOnly={isReadOnly}
+									disabled={isSubmitting}
 								/>
 							</div>
 						</div>
 
-						{/* API-key header key */}
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
 								<span className="label-text text-sm">API-Key Header Key</span>
@@ -566,11 +624,11 @@ export function AddEditProviderPresetModal({
 									spellCheck="false"
 									autoComplete="off"
 									readOnly={isReadOnly}
+									disabled={isSubmitting}
 								/>
 							</div>
 						</div>
 
-						{/* Default Headers */}
 						<div className="grid grid-cols-12 items-start gap-2">
 							<label className="label col-span-3">
 								<span className="label-text text-sm">Default Headers (JSON)</span>
@@ -585,6 +643,7 @@ export function AddEditProviderPresetModal({
 									}`}
 									spellCheck="false"
 									readOnly={isReadOnly}
+									disabled={isSubmitting}
 								/>
 								{errors.defaultHeadersRawJSON && (
 									<div className="label">
@@ -596,7 +655,6 @@ export function AddEditProviderPresetModal({
 							</div>
 						</div>
 
-						{/* API-Key (never reveal actual key) */}
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3 flex flex-col items-start gap-0.5">
 								<span className="label-text text-sm">API-Key*</span>
@@ -617,6 +675,7 @@ export function AddEditProviderPresetModal({
 									spellCheck="false"
 									autoComplete="off"
 									readOnly={isReadOnly}
+									disabled={isSubmitting}
 								/>
 								{errors.apiKey && (
 									<div className="label">
@@ -628,7 +687,6 @@ export function AddEditProviderPresetModal({
 							</div>
 						</div>
 
-						{/* Enabled toggle */}
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3 cursor-pointer">
 								<span className="label-text text-sm">Enabled</span>
@@ -640,20 +698,24 @@ export function AddEditProviderPresetModal({
 									checked={formData.isEnabled}
 									onChange={handleInput}
 									className="toggle toggle-accent"
-									readOnly={isReadOnly}
+									disabled={isReadOnly || isSubmitting}
 								/>
 							</div>
 						</div>
 
-						{/* Actions */}
 						<div className="modal-action">
-							<button type="button" className="btn bg-base-300 rounded-xl" onClick={() => dialogRef.current?.close()}>
+							<button
+								type="button"
+								className="btn bg-base-300 rounded-xl"
+								onClick={requestClose}
+								disabled={isSubmitting}
+							>
 								{isReadOnly ? 'Close' : 'Cancel'}
 							</button>
 
 							{!isReadOnly && (
-								<button type="submit" className="btn btn-primary rounded-xl" disabled={!allValid}>
-									{mode === 'add' ? 'Add Provider' : 'Save'}
+								<button type="submit" className="btn btn-primary rounded-xl" disabled={!allValid || isSubmitting}>
+									{isSubmitting ? 'Saving…' : mode === 'add' ? 'Add Provider' : 'Save'}
 								</button>
 							)}
 						</div>
@@ -661,7 +723,16 @@ export function AddEditProviderPresetModal({
 				</div>
 			</div>
 			<ModalBackdrop enabled={isReadOnly} />
-		</dialog>,
-		document.body
+		</dialog>
 	);
+}
+
+export function AddEditProviderPresetModal(props: AddEditProviderPresetModalProps) {
+	if (!props.isOpen) return null;
+	if (typeof document === 'undefined' || !document.body) return null;
+
+	const modalKey =
+		props.mode === 'add' ? 'add-provider' : `${props.mode}:${props.initialPreset?.name ?? 'provider-without-name'}`;
+
+	return createPortal(<AddEditProviderPresetModalContent key={modalKey} {...props} />, document.body);
 }

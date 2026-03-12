@@ -50,16 +50,26 @@ function asJsonMarkdownBlock(json: string): string {
 	return `\`\`\`json\n${json}\n\`\`\``;
 }
 
-export function ToolUserArgsModal({
-	isOpen,
-	onClose,
-	toolLabel,
-	schema,
-	existingInstance,
-	onSave,
-}: ToolUserArgsModalProps) {
+function getInitialRawJson(existingInstance?: string): string {
+	if (existingInstance && existingInstance.trim() !== '') {
+		try {
+			const parsed = JSON.parse(existingInstance);
+			return JSON.stringify(parsed, null, 2);
+		} catch {
+			return existingInstance;
+		}
+	}
+
+	return '{}';
+}
+
+function ToolUserArgsModalContent({ onClose, toolLabel, schema, existingInstance, onSave }: ToolUserArgsModalProps) {
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
-	const [form, setForm] = useState<FormState>({ rawJson: '' });
+	const isUnmountingRef = useRef(false);
+
+	const [formData, setFormData] = useState<FormState>(() => ({
+		rawJson: getInitialRawJson(existingInstance),
+	}));
 	const [error, setError] = useState<string | null>(null);
 
 	const schemaObj = useMemo(() => getJSONObject(schema), [schema]);
@@ -77,56 +87,54 @@ export function ToolUserArgsModal({
 	const schemaMarkdown = useMemo(() => (schemaPretty ? asJsonMarkdownBlock(schemaPretty) : null), [schemaPretty]);
 	const exampleMarkdown = useMemo(() => asJsonMarkdownBlock(examplePretty), [examplePretty]);
 
-	// Initialize editor content whenever modal opens
 	useEffect(() => {
-		if (!isOpen) return;
-
-		let initial = '';
-
-		if (existingInstance && existingInstance.trim() !== '') {
-			try {
-				const parsed = JSON.parse(existingInstance);
-				initial = JSON.stringify(parsed, null, 2);
-			} catch {
-				initial = existingInstance;
-			}
-		} else {
-			initial = '{}';
-		}
-
-		setForm({ rawJson: initial });
-		setError(null);
-	}, [isOpen, existingInstance, schemaObj, examplePretty]);
-
-	// Manage native <dialog> lifecycle
-	useEffect(() => {
-		if (!isOpen) return;
-
 		const dialog = dialogRef.current;
 		if (!dialog) return;
 
-		if (!dialog.open) dialog.showModal();
+		if (!dialog.open) {
+			try {
+				dialog.showModal();
+			} catch {
+				// Ignore if the dialog cannot be shown safely.
+			}
+		}
 
 		return () => {
-			if (dialog.open) dialog.close();
+			isUnmountingRef.current = true;
+
+			if (dialog.open) {
+				dialog.close();
+			}
 		};
-	}, [isOpen]);
+	}, []);
+
+	const requestClose = () => {
+		const dialog = dialogRef.current;
+
+		if (dialog?.open) {
+			dialog.close();
+			return;
+		}
+
+		onClose();
+	};
 
 	const handleDialogClose = () => {
+		if (isUnmountingRef.current) return;
 		onClose();
 	};
 
 	const handleFormat = () => {
-		const raw = form.rawJson.trim();
+		const raw = formData.rawJson.trim();
 		if (!raw) {
-			setForm({ rawJson: '{}' });
+			setFormData({ rawJson: '{}' });
 			setError(null);
 			return;
 		}
 
 		try {
 			const parsed = JSON.parse(raw);
-			setForm({ rawJson: JSON.stringify(parsed, null, 2) });
+			setFormData({ rawJson: JSON.stringify(parsed, null, 2) });
 			setError(null);
 		} catch (err) {
 			setError((err as Error).message || 'Invalid JSON. Please fix it and try again.');
@@ -134,7 +142,7 @@ export function ToolUserArgsModal({
 	};
 
 	const handleUseExample = () => {
-		setForm({ rawJson: examplePretty });
+		setFormData({ rawJson: examplePretty });
 		setError(null);
 	};
 
@@ -142,7 +150,7 @@ export function ToolUserArgsModal({
 		e.preventDefault();
 		e.stopPropagation();
 
-		let raw = form.rawJson.trim();
+		let raw = formData.rawJson.trim();
 		if (!raw) {
 			if (requiredKeys.length > 0) {
 				setError('This tool requires options. Provide a JSON object with the required keys.');
@@ -171,12 +179,10 @@ export function ToolUserArgsModal({
 		}
 
 		onSave(JSON.stringify(parsed, null, 2));
-		dialogRef.current?.close();
+		requestClose();
 	};
 
-	if (!isOpen) return null;
-
-	return createPortal(
+	return (
 		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose}>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-[80vw] min-w-0 overflow-hidden rounded-2xl p-0">
 				<div className="max-h-[80vh] overflow-y-auto p-6">
@@ -191,7 +197,7 @@ export function ToolUserArgsModal({
 						<button
 							type="button"
 							className="btn btn-sm btn-circle bg-base-300"
-							onClick={() => dialogRef.current?.close()}
+							onClick={requestClose}
 							aria-label="Close"
 						>
 							<FiX size={12} />
@@ -268,9 +274,9 @@ export function ToolUserArgsModal({
 									error ? 'textarea-error' : ''
 								}`}
 								rows={12}
-								value={form.rawJson}
+								value={formData.rawJson}
 								onChange={e => {
-									setForm({ rawJson: e.target.value });
+									setFormData({ rawJson: e.target.value });
 									if (error) setError(null);
 								}}
 								spellCheck={false}
@@ -323,7 +329,7 @@ export function ToolUserArgsModal({
 
 						{/* footer */}
 						<div className="modal-action">
-							<button type="button" className="btn bg-base-300 rounded-xl" onClick={() => dialogRef.current?.close()}>
+							<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
 								Cancel
 							</button>
 							<button type="submit" className="btn btn-primary rounded-xl">
@@ -335,7 +341,19 @@ export function ToolUserArgsModal({
 			</div>
 
 			<ModalBackdrop enabled={true} />
-		</dialog>,
-		document.body
+		</dialog>
 	);
+}
+
+export function ToolUserArgsModal(props: ToolUserArgsModalProps) {
+	if (!props.isOpen) return null;
+	if (typeof document === 'undefined' || !document.body) return null;
+
+	const remountKey = JSON.stringify({
+		toolLabel: props.toolLabel,
+		existingInstance: props.existingInstance ?? null,
+		schema: props.schema ?? null,
+	});
+
+	return createPortal(<ToolUserArgsModalContent key={remountKey} {...props} />, document.body);
 }

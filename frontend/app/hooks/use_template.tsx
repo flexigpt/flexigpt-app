@@ -11,7 +11,7 @@ export function usePromptTemplates() {
 
 	useEffect(() => {
 		let cancelled = false;
-		setLoading(true);
+
 		getAllPromptTemplates()
 			.then(res => {
 				if (cancelled) {
@@ -25,6 +25,7 @@ export function usePromptTemplates() {
 				}
 				setLoading(false);
 			});
+
 		return () => {
 			cancelled = true;
 		};
@@ -38,16 +39,19 @@ export function usePromptTemplates() {
  */
 export function usePromptTemplate(bundleID: string, slug: string, version: string) {
 	const [tmpl, setTmpl] = useState<PromptTemplate | undefined>();
+
 	useEffect(() => {
 		if (!bundleID || !slug || !version) return;
 
 		let cancelled = false;
+
 		promptStoreAPI.getPromptTemplate(bundleID, slug, version).then(res => {
 			if (cancelled) {
 				return;
 			}
 			setTmpl(res);
 		});
+
 		return () => {
 			cancelled = true;
 		};

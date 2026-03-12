@@ -12,6 +12,7 @@ import type {
 import { RoleEnum } from '@/spec/inference';
 
 import { defaultShortcutConfig, type ShortcutConfig, useChatShortcuts } from '@/lib/keyboard_shortcuts';
+import { omitManyKeys } from '@/lib/obj_utils';
 import { sanitizeConversationTitle } from '@/lib/text_utils';
 import { generateTitle } from '@/lib/title_utils';
 
@@ -35,76 +36,274 @@ import {
 import { ConversationArea, type ConversationAreaHandle } from '@/chats/conversation/conversation_area';
 import { hydrateConversation, initConversation } from '@/chats/conversation/hydration_helper';
 
+type NormalizedTabsResult = {
+	tabs: ChatTabState[];
+	removedTabIds: string[];
+	addedScratchTabId: string | null;
+};
+
+function toTimestampMap(source?: Record<string, number>): Map<string, number> {
+	const map = new Map<string, number>();
+	if (!source) return map;
+
+	for (const [tabId, ts] of Object.entries(source)) {
+		if (typeof ts === 'number') {
+			map.set(tabId, ts);
+		}
+	}
+
+	return map;
+}
+
+function pickLRUEvictionCandidateFromMap(
+	current: ChatTabState[],
+	activeId: string,
+	lastActivatedAt: Map<string, number>
+): ChatTabState | null {
+	if (current.length < MAX_TABS) return null;
+
+	// Never evict scratch; prefer not to evict busy, but allow if needed.
+	const base = current.filter(t => t.tabId !== activeId && !isScratchTab(t));
+	const nonBusy = base.filter(t => !t.isBusy);
+	const candidates = nonBusy.length > 0 ? nonBusy : base;
+
+	if (candidates.length === 0) return null;
+
+	const ts = (id: string) => lastActivatedAt.get(id) ?? 0;
+	return candidates.reduce((lru, tab) => (ts(tab.tabId) < ts(lru.tabId) ? tab : lru), candidates[0]);
+}
+
+function normalizeTabsForInvariants(
+	current: ChatTabState[],
+	activeId: string,
+	lastActivatedAt: Map<string, number>
+): NormalizedTabsResult {
+	let next = current.slice();
+	const removedTabIds = new Set<string>();
+	let addedScratchTabId: string | null = null;
+
+	const scratchTabs = next.filter(isScratchTab);
+	const selected = next.find(t => t.tabId === activeId) ?? null;
+	const keepScratch =
+		scratchTabs.length === 0
+			? null
+			: selected && isScratchTab(selected)
+				? selected
+				: scratchTabs[scratchTabs.length - 1];
+
+	if (keepScratch) {
+		for (const tab of scratchTabs) {
+			if (tab.tabId !== keepScratch.tabId) {
+				removedTabIds.add(tab.tabId);
+			}
+		}
+
+		if (removedTabIds.size > 0) {
+			next = next.filter(tab => !removedTabIds.has(tab.tabId));
+		}
+
+		const keepIdx = next.findIndex(tab => tab.tabId === keepScratch.tabId);
+		if (keepIdx !== -1 && keepIdx !== next.length - 1) {
+			next = [...next.slice(0, keepIdx), ...next.slice(keepIdx + 1), keepScratch];
+		}
+	} else {
+		while (next.length >= MAX_TABS) {
+			const victim = pickLRUEvictionCandidateFromMap(next, activeId, lastActivatedAt);
+			if (!victim) break;
+
+			removedTabIds.add(victim.tabId);
+			next = next.filter(tab => tab.tabId !== victim.tabId);
+		}
+
+		const scratch = createEmptyTab();
+		addedScratchTabId = scratch.tabId;
+		next = [...next, scratch];
+	}
+
+	while (next.length > MAX_TABS) {
+		const victim = pickLRUEvictionCandidateFromMap(next, activeId, lastActivatedAt);
+		if (!victim) break;
+
+		removedTabIds.add(victim.tabId);
+		next = next.filter(tab => tab.tabId !== victim.tabId);
+	}
+
+	if (next.length === 0) {
+		const scratch = createEmptyTab();
+		addedScratchTabId = scratch.tabId;
+		next = [scratch];
+	}
+
+	return {
+		tabs: next,
+		removedTabIds: [...removedTabIds],
+		addedScratchTabId,
+	};
+}
+
+function buildNormalizedInitialModel(): InitialChatsModel {
+	const built = buildInitialChatsModel();
+
+	const createdFallbackTab = built.tabs.length === 0 ? createEmptyTab() : null;
+	const baseTabs = built.tabs.length > 0 ? built.tabs : createdFallbackTab ? [createdFallbackTab] : [];
+	const baseSelectedTabId = baseTabs.some(tab => tab.tabId === built.selectedTabId)
+		? built.selectedTabId
+		: (baseTabs[0]?.tabId ?? '');
+
+	const lastActivatedAt = toTimestampMap(built.lastActivatedAtByTab);
+	const normalized = normalizeTabsForInvariants(baseTabs, baseSelectedTabId, lastActivatedAt);
+
+	for (const removedTabId of normalized.removedTabIds) {
+		lastActivatedAt.delete(removedTabId);
+	}
+	if (createdFallbackTab) {
+		lastActivatedAt.set(createdFallbackTab.tabId, Date.now());
+	}
+	if (normalized.addedScratchTabId) {
+		lastActivatedAt.set(normalized.addedScratchTabId, Date.now());
+	}
+
+	const existingTabIds = new Set(normalized.tabs.map(tab => tab.tabId));
+	const selectedTabId = normalized.tabs.some(tab => tab.tabId === baseSelectedTabId)
+		? baseSelectedTabId
+		: (normalized.tabs[0]?.tabId ?? '');
+
+	const scrollTopByTab: Record<string, number> = {};
+	for (const [tabId, scrollTop] of Object.entries(built.scrollTopByTab ?? {})) {
+		if (existingTabIds.has(tabId) && typeof scrollTop === 'number') {
+			scrollTopByTab[tabId] = scrollTop;
+		}
+	}
+	if (createdFallbackTab) {
+		scrollTopByTab[createdFallbackTab.tabId] = 0;
+	}
+	if (normalized.addedScratchTabId) {
+		scrollTopByTab[normalized.addedScratchTabId] = 0;
+	}
+
+	const lastActivatedAtByTab: Record<string, number> = {};
+	for (const [tabId, ts] of lastActivatedAt.entries()) {
+		if (existingTabIds.has(tabId)) {
+			lastActivatedAtByTab[tabId] = ts;
+		}
+	}
+
+	return {
+		...built,
+		tabs: normalized.tabs,
+		selectedTabId,
+		scrollTopByTab,
+		lastActivatedAtByTab,
+	};
+}
+
 // eslint-disable-next-line no-restricted-exports
 export default function ChatsPage() {
-	// Compute initial model once (important: stable IDs; no double-randomUUID)
-	const initialModelRef = useRef<InitialChatsModel | null>(null);
-	if (!initialModelRef.current) initialModelRef.current = buildInitialChatsModel();
-	const initialModel = initialModelRef.current;
+	const [initialModel] = useState<InitialChatsModel>(() => buildNormalizedInitialModel());
+	const initialSelectedTabId = initialModel.selectedTabId;
 
 	// ---------------- Tabs state ----------------
-	const lastActivatedAtRef = useRef(new Map<string, number>());
+	const lastActivatedAtRef = useRef<Map<string, number>>(toTimestampMap(initialModel.lastActivatedAtByTab));
 	const touchTab = useCallback((tabId: string) => {
 		lastActivatedAtRef.current.set(tabId, Date.now());
 	}, []);
-	const [tabs, setTabs] = useState<ChatTabState[]>(initialModel.tabs);
 
-	const tabsRef = useRef(tabs);
-	useEffect(() => {
-		tabsRef.current = tabs;
-	}, [tabs]);
+	const [tabs, setTabs] = useState<ChatTabState[]>(() => initialModel.tabs);
+	const tabsRef = useRef<ChatTabState[]>(initialModel.tabs);
 
-	const tabStore = useTabStore({ defaultSelectedId: initialModel.selectedTabId });
-	const selectedTabId = useStoreState(tabStore, 'selectedId') ?? initialModel.selectedTabId;
+	const tabStore = useTabStore({ defaultSelectedId: initialSelectedTabId });
+	const storeSelectedTabId = useStoreState(tabStore, 'selectedId') ?? initialSelectedTabId;
+
+	const selectedTabId = useMemo(() => {
+		if (tabs.some(t => t.tabId === storeSelectedTabId)) {
+			return storeSelectedTabId;
+		}
+		return tabs[0]?.tabId ?? initialSelectedTabId;
+	}, [initialSelectedTabId, storeSelectedTabId, tabs]);
 
 	const selectedTabIdRef = useRef(selectedTabId);
 	useEffect(() => {
 		selectedTabIdRef.current = selectedTabId;
 	}, [selectedTabId]);
 
-	const activeTab = useMemo(() => tabs.find(t => t.tabId === selectedTabId) ?? tabs[0], [tabs, selectedTabId]);
+	const selectTab = useCallback(
+		(nextTabId: string) => {
+			if (!nextTabId) return;
+			selectedTabIdRef.current = nextTabId;
+			tabStore.setSelectedId(nextTabId);
+		},
+		[tabStore]
+	);
+
+	const activeTab = useMemo(() => tabs.find(t => t.tabId === selectedTabId) ?? tabs[0] ?? null, [tabs, selectedTabId]);
 
 	// ---------------- Conversation area (conversation runtime + UI) ----------------
 	const conversationAreaRef = useRef<ConversationAreaHandle | null>(null);
 
-	// Seed runtime maps from persisted state (once) - LRU only (scroll is now in ConversationArea)
-	const seededRuntimeFromStorageRef = useRef(false);
-	if (!seededRuntimeFromStorageRef.current) {
-		seededRuntimeFromStorageRef.current = true;
-		for (const [id, ts] of Object.entries(initialModel.lastActivatedAtByTab)) {
-			if (typeof ts === 'number') lastActivatedAtRef.current.set(id, ts);
-		}
-	}
+	// ---------------- UI refs ----------------
+	const searchRef = useRef<ChatSearchHandle | null>(null);
 
+	// ---------------- Persistence scratch state ----------------
+	const scrollTopSnapshotRef = useRef<Record<string, number>>(initialModel.scrollTopByTab ?? {});
+
+	// ---------------- Helpers ----------------
 	const disposeTabRuntime = useCallback((tabId: string) => {
 		conversationAreaRef.current?.disposeTabRuntime(tabId);
 		lastActivatedAtRef.current.delete(tabId);
 	}, []);
 
-	// ---------------- UI refs ----------------
-	const searchRef = useRef<ChatSearchHandle | null>(null);
-
-	// ---------------- Helpers ----------------
-	const updateTab = useCallback((tabId: string, updater: (t: ChatTabState) => ChatTabState) => {
-		setTabs(prev => {
-			const idx = prev.findIndex(t => t.tabId === tabId);
-			if (idx === -1) return prev; // closed while async
-			const next = prev.slice();
-			next[idx] = updater(next[idx]);
-			return next;
-		});
+	const commitTabs = useCallback((nextTabs: ChatTabState[]) => {
+		tabsRef.current = nextTabs;
+		setTabs(nextTabs);
 	}, []);
+
+	const normalizeAndCommitTabs = useCallback(
+		(nextTabs: ChatTabState[]) => {
+			const {
+				tabs: normalizedTabs,
+				removedTabIds,
+				addedScratchTabId,
+			} = normalizeTabsForInvariants(nextTabs, selectedTabIdRef.current, lastActivatedAtRef.current);
+
+			if (removedTabIds.length > 0 || addedScratchTabId) {
+				let nextScrollSnapshot = { ...scrollTopSnapshotRef.current };
+
+				for (const removedTabId of removedTabIds) {
+					disposeTabRuntime(removedTabId);
+					nextScrollSnapshot = omitManyKeys(nextScrollSnapshot, [removedTabId]);
+				}
+
+				if (addedScratchTabId) {
+					touchTab(addedScratchTabId);
+					conversationAreaRef.current?.setScrollTopForTab(addedScratchTabId, 0);
+					nextScrollSnapshot[addedScratchTabId] = 0;
+				}
+
+				scrollTopSnapshotRef.current = nextScrollSnapshot;
+			}
+
+			commitTabs(normalizedTabs);
+			return normalizedTabs;
+		},
+		[commitTabs, disposeTabRuntime, touchTab]
+	);
+
+	const updateTab = useCallback(
+		(tabId: string, updater: (t: ChatTabState) => ChatTabState) => {
+			const current = tabsRef.current;
+			const idx = current.findIndex(t => t.tabId === tabId);
+			if (idx === -1) return;
+
+			const next = current.slice();
+			next[idx] = updater(next[idx]);
+			normalizeAndCommitTabs(next);
+		},
+		[normalizeAndCommitTabs]
+	);
 
 	useEffect(() => {
 		touchTab(selectedTabId);
 	}, [selectedTabId, touchTab]);
-
-	// If the selected tab id becomes invalid (e.g. restored state had stale ids), correct it.
-	useEffect(() => {
-		if (tabs.length === 0) return;
-		if (tabs.some(t => t.tabId === selectedTabId)) return;
-		tabStore.setSelectedId(tabs[0].tabId);
-	}, [selectedTabId, tabStore, tabs]);
 
 	// ---------------- Search refresh key ----------------
 	const [searchRefreshKey, setSearchRefreshKey] = useState(0);
@@ -114,6 +313,71 @@ export default function ChatsPage() {
 	}, []);
 
 	// ---------------- Persistence ----------------
+	const persistNow = useCallback(() => {
+		const tabsSnapshot = tabsRef.current.slice(0, MAX_TABS);
+
+		const scrollObj =
+			conversationAreaRef.current?.getScrollTopByTabSnapshot() ??
+			scrollTopSnapshotRef.current ??
+			({} as Record<string, number>);
+		scrollTopSnapshotRef.current = scrollObj;
+
+		const lruObj: Record<string, number> = {};
+		for (const [k, v] of lastActivatedAtRef.current.entries()) lruObj[k] = v;
+
+		writePersistedChatsPageState({
+			v: 1,
+			selectedTabId: selectedTabIdRef.current,
+			tabs: tabsSnapshot.map(t => ({
+				tabId: t.tabId,
+				conversationId: t.conversation.id,
+				title: t.conversation.title,
+				isPersisted: t.isPersisted,
+				manualTitleLocked: t.manualTitleLocked,
+			})),
+			scrollTopByTab: scrollObj,
+			lastActivatedAtByTab: lruObj,
+		});
+	}, []);
+
+	const persistTimerRef = useRef<number | null>(null);
+	const schedulePersist = useCallback(() => {
+		if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
+		persistTimerRef.current = window.setTimeout(() => {
+			persistTimerRef.current = null;
+			persistNow();
+		}, 250);
+	}, [persistNow]);
+
+	useEffect(() => {
+		schedulePersist();
+	}, [schedulePersist]);
+
+	useEffect(() => {
+		const onPageHide = () => {
+			persistNow();
+		};
+		const onVis = () => {
+			if (document.visibilityState === 'hidden') persistNow();
+		};
+
+		window.addEventListener('pagehide', onPageHide);
+		document.addEventListener('visibilitychange', onVis);
+
+		return () => {
+			window.removeEventListener('pagehide', onPageHide);
+			document.removeEventListener('visibilitychange', onVis);
+		};
+	}, [persistNow]);
+
+	// On unmount: flush persistence (route navigation safety)
+	useEffect(() => {
+		return () => {
+			persistNow();
+		};
+	}, [persistNow]);
+
+	// ---------------- Save conversation ----------------
 	const saveUpdatedConversation = useCallback(
 		(tabId: string, updatedConv: Conversation, titleWasExternallyChanged = false) => {
 			const tab = tabsRef.current.find(t => t.tabId === tabId);
@@ -163,191 +427,62 @@ export default function ChatsPage() {
 		[bumpSearchKey, updateTab]
 	);
 
-	// ---------------- LRU eviction ----------------
-	const pickLRUEvictionCandidate = useCallback((current: ChatTabState[], activeId: string) => {
-		if (current.length < MAX_TABS) return null;
-		// Never evict scratch; prefer not to evict busy, but allow if needed.
-		const base = current.filter(t => t.tabId !== activeId && !isScratchTab(t));
-		const nonBusy = base.filter(t => !t.isBusy);
-		const candidates = nonBusy.length > 0 ? nonBusy : base;
-
-		if (candidates.length === 0) return null;
-		const ts = (id: string) => lastActivatedAtRef.current.get(id) ?? 0;
-		return candidates.reduce((lru, t) => (ts(t.tabId) < ts(lru.tabId) ? t : lru), candidates[0]);
-	}, []);
-
-	const ensureScratchRightmost = useCallback(() => {
-		const current = tabsRef.current;
-		const scratchTabs = current.filter(isScratchTab);
-
-		// Pick which scratch to keep (prefer selected if it's scratch, else keep the rightmost)
-		const selected = current.find(t => t.tabId === selectedTabIdRef.current);
-		const keep = (selected && isScratchTab(selected) ? selected : scratchTabs[scratchTabs.length - 1]) ?? null;
-
-		const removeIds = new Set(scratchTabs.filter(t => !keep || t.tabId !== keep.tabId).map(t => t.tabId));
-		if (removeIds.size > 0) {
-			for (const id of removeIds) disposeTabRuntime(id);
-		}
-
-		let next = current.filter(t => !removeIds.has(t.tabId));
-
-		if (!keep) {
-			// Need to create a new scratch tab
-			if (next.length >= MAX_TABS) {
-				const victim = pickLRUEvictionCandidate(next, selectedTabIdRef.current);
-				if (victim) {
-					disposeTabRuntime(victim.tabId);
-					next = next.filter(t => t.tabId !== victim.tabId);
-				}
-			}
-			const scratch = createEmptyTab();
-			touchTab(scratch.tabId);
-
-			conversationAreaRef.current?.setScrollTopForTab(scratch.tabId, 0);
-			next = [...next, scratch];
-		} else {
-			// Ensure it's rightmost
-			const idx = next.findIndex(t => t.tabId === keep.tabId);
-			if (idx !== -1 && idx !== next.length - 1) {
-				next = [...next.slice(0, idx), ...next.slice(idx + 1), keep];
-			}
-		}
-
-		// Commit only if changed (cheap shallow check)
-		if (next.length !== current.length || next.some((t, i) => t.tabId !== current[i]?.tabId)) {
-			setTabs(next);
-		}
-	}, [disposeTabRuntime, pickLRUEvictionCandidate, touchTab]);
-
-	const scratchKey = useMemo(() => {
-		// changes when scratch tabs count/identity changes OR when tab count changes
-		const scratchIds = tabs
-			.filter(isScratchTab)
-			.map(t => t.tabId)
-			.join('|');
-		return `${tabs.length}:${scratchIds}`;
-	}, [tabs]);
-
-	// Enforce scratch invariants after any tabs mutation (search load, send, close, etc.)
-	useEffect(() => {
-		ensureScratchRightmost();
-	}, [scratchKey, ensureScratchRightmost]);
-
-	// ---------------- Persist open tabs + selected + scroll/LRU ----------------
-	const scrollTopSnapshotRef = useRef<Record<string, number>>(initialModel.scrollTopByTab ?? {});
-
-	const persistNow = useCallback(() => {
-		const tabsSnapshot = tabsRef.current.slice(0, MAX_TABS);
-
-		const scrollObj =
-			conversationAreaRef.current?.getScrollTopByTabSnapshot() ??
-			scrollTopSnapshotRef.current ??
-			({} as Record<string, number>);
-		scrollTopSnapshotRef.current = scrollObj;
-
-		const lruObj: Record<string, number> = {};
-		for (const [k, v] of lastActivatedAtRef.current.entries()) lruObj[k] = v;
-
-		writePersistedChatsPageState({
-			v: 1,
-			selectedTabId: selectedTabIdRef.current,
-			tabs: tabsSnapshot.map(t => ({
-				tabId: t.tabId,
-				conversationId: t.conversation.id,
-				title: t.conversation.title,
-				isPersisted: t.isPersisted,
-				manualTitleLocked: t.manualTitleLocked,
-			})),
-			scrollTopByTab: scrollObj,
-			lastActivatedAtByTab: lruObj,
-		});
-	}, []);
-
-	const persistTimerRef = useRef<number | null>(null);
-	const schedulePersist = useCallback(() => {
-		if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
-		persistTimerRef.current = window.setTimeout(() => {
-			persistTimerRef.current = null;
-			persistNow();
-		}, 250);
-	}, [persistNow]);
-
-	useEffect(() => {
-		schedulePersist();
-	}, [schedulePersist, tabs, selectedTabId]);
-
-	useEffect(() => {
-		const onPageHide = () => {
-			persistNow();
-		};
-		const onVis = () => {
-			if (document.visibilityState === 'hidden') persistNow();
-		};
-		window.addEventListener('pagehide', onPageHide);
-		document.addEventListener('visibilitychange', onVis);
-		return () => {
-			window.removeEventListener('pagehide', onPageHide);
-			document.removeEventListener('visibilitychange', onVis);
-		};
-	}, [persistNow]);
-
-	// On unmount: flush persistence (route navigation safety)
-	useEffect(() => {
-		return () => {
-			persistNow();
-		};
-	}, [persistNow]);
-
 	// ---------------- Tab actions ----------------
 	const openNewTab = useCallback(() => {
-		// Always go to the (single) scratch tab; invariant effect keeps it rightmost.
+		// Always go to the single scratch tab.
 		const scratch = tabsRef.current.find(isScratchTab) ?? null;
 		const targetId = scratch?.tabId ?? selectedTabIdRef.current;
-		tabStore.setSelectedId(targetId);
+		if (!targetId) return;
+
+		selectTab(targetId);
 		requestAnimationFrame(() => conversationAreaRef.current?.focusInput(targetId));
-	}, [tabStore]);
+	}, [selectTab]);
 
 	const closeTab = useCallback(
 		(tabId: string) => {
 			const current = tabsRef.current;
+			const idx = current.findIndex(t => t.tabId === tabId);
+			if (idx === -1) return;
+
 			const wasActive = tabId === selectedTabIdRef.current;
 
-			// 1) Stop any async work / cleanup runtime refs immediately
+			// Stop any async work / cleanup runtime refs immediately.
 			disposeTabRuntime(tabId);
 
-			// 2) Compute next tabs synchronously from a single snapshot (no mutation inside setState)
-			const idx = current.findIndex(t => t.tabId === tabId);
-			let nextTabs = current.filter(t => t.tabId !== tabId);
+			let nextScrollSnapshot = { ...scrollTopSnapshotRef.current };
+			nextScrollSnapshot = omitManyKeys(nextScrollSnapshot, [tabId]);
 
-			// 3) Ensure we never end up with 0 tabs
-			if (nextTabs.length === 0) {
-				const fresh = createEmptyTab();
-				conversationAreaRef.current?.setScrollTopForTab(fresh.tabId, 0);
-				nextTabs = [fresh];
-			}
+			scrollTopSnapshotRef.current = nextScrollSnapshot;
 
-			// 4) If the closed tab was active, select nearest neighbor (prefer left, else right)
-			let nextSelectedId = selectedTabIdRef.current;
-			if (wasActive) {
-				const right = idx >= 0 ? current[idx + 1] : undefined;
-				const left = idx > 0 ? current[idx - 1] : undefined;
-				nextSelectedId =
-					(left && left.tabId !== tabId ? left.tabId : right && right.tabId !== tabId ? right.tabId : '') ||
-					nextTabs[0].tabId;
-			}
+			const baseNextTabs = current.filter(t => t.tabId !== tabId);
+			const normalizedNextTabs = normalizeAndCommitTabs(baseNextTabs);
 
-			// 5) Commit state + selection (selection set after tabs update to avoid invalid ids)
-			setTabs(nextTabs);
-			if (wasActive) {
-				requestAnimationFrame(() => {
-					// still valid? (paranoid guard)
-					const ok =
-						tabsRef.current.some(t => t.tabId === nextSelectedId) || nextTabs.some(t => t.tabId === nextSelectedId);
-					tabStore.setSelectedId(ok ? nextSelectedId : nextTabs[0].tabId);
-				});
-			}
+			if (!wasActive) return;
+
+			const right = current[idx + 1];
+			const left = idx > 0 ? current[idx - 1] : undefined;
+			const preferredNextSelectedId =
+				(left && left.tabId !== tabId ? left.tabId : right && right.tabId !== tabId ? right.tabId : '') ||
+				normalizedNextTabs[0]?.tabId ||
+				'';
+
+			if (!preferredNextSelectedId) return;
+
+			// Keep refs immediately valid for persistence and callbacks.
+			selectedTabIdRef.current = preferredNextSelectedId;
+
+			requestAnimationFrame(() => {
+				const currentTabs = tabsRef.current;
+				const nextSelectedId = currentTabs.some(t => t.tabId === preferredNextSelectedId)
+					? preferredNextSelectedId
+					: currentTabs[0]?.tabId;
+
+				if (nextSelectedId) {
+					selectTab(nextSelectedId);
+				}
+			});
 		},
-		[disposeTabRuntime, tabStore]
+		[disposeTabRuntime, normalizeAndCommitTabs, selectTab]
 	);
 
 	const cycleTabBy = useCallback(
@@ -362,15 +497,16 @@ export default function ChatsPage() {
 			const nextId = current[nextIndex]?.tabId;
 			if (!nextId) return;
 
-			tabStore.setSelectedId(nextId);
+			selectTab(nextId);
 			requestAnimationFrame(() => conversationAreaRef.current?.focusInput(nextId));
 		},
-		[tabStore]
+		[selectTab]
 	);
 
 	const selectNextTab = useCallback(() => {
 		cycleTabBy(1);
 	}, [cycleTabBy]);
+
 	const selectPrevTab = useCallback(() => {
 		cycleTabBy(-1);
 	}, [cycleTabBy]);
@@ -427,31 +563,35 @@ export default function ChatsPage() {
 
 	const handleSelectConversation = useCallback(
 		async (item: ConversationSearchItem) => {
-			// If already open, just activate it
+			// If already open, just activate it.
 			const already = tabsRef.current.find(t => t.conversation.id === item.id);
 			if (already) {
-				tabStore.setSelectedId(already.tabId);
+				selectTab(already.tabId);
 				return;
 			}
+
 			// Always load into scratch tab; after load it becomes a normal tab and
-			// the invariant effect will create a new scratch on the right.
+			// mutation-time normalization creates the new scratch on the right.
 			const scratch = tabsRef.current.find(isScratchTab);
 			const targetId = scratch?.tabId ?? selectedTabIdRef.current;
-			tabStore.setSelectedId(targetId);
+			if (!targetId) return;
+
+			selectTab(targetId);
 			await loadConversationIntoTab(targetId, item);
 			requestAnimationFrame(() => conversationAreaRef.current?.focusInput(targetId));
 		},
-		[loadConversationIntoTab, tabStore]
+		[loadConversationIntoTab, selectTab]
 	);
 
 	// ---------------- Rehydrate tabs on mount (from Go-backed store) ----------------
 	useEffect(() => {
-		if (!initialModelRef.current?.restoredFromStorage) return;
+		if (!initialModel.restoredFromStorage) return;
 
 		let cancelled = false;
 
 		(async () => {
 			const snapshot = tabsRef.current.slice(0, MAX_TABS);
+
 			for (const t of snapshot) {
 				if (cancelled) return;
 				if (!t.isPersisted) continue;
@@ -462,7 +602,7 @@ export default function ChatsPage() {
 					if (cancelled) return;
 
 					if (!stored) {
-						// Conversation missing -> degrade to scratch; scratch invariant will clean up.
+						// Conversation missing -> degrade to scratch; mutation-time normalization will clean up.
 						updateTab(t.tabId, prev => ({
 							...prev,
 							isBusy: false,
@@ -499,7 +639,7 @@ export default function ChatsPage() {
 		return () => {
 			cancelled = true;
 		};
-	}, [updateTab]);
+	}, [initialModel.restoredFromStorage, updateTab]);
 
 	// ---------------- Shortcuts ----------------
 	const [shortcutConfig] = useState<ShortcutConfig>(defaultShortcutConfig);
@@ -571,7 +711,6 @@ export default function ChatsPage() {
 	return (
 		<PageFrame contentScrollable={false}>
 			<div className="grid h-full w-full grid-rows-[auto_1fr_auto] overflow-hidden">
-				{/* Row 1: TAB STRIP (where navbar used to be) + Download floater */}
 				<div className="relative row-start-1 row-end-2 min-h-0 min-w-0 p-0">
 					<ChatTabsBar
 						store={tabStore}
@@ -585,7 +724,6 @@ export default function ChatsPage() {
 					/>
 				</div>
 
-				{/* Rows 2 + 3: Conversation UI/runtime (messages + per-tab input panes) */}
 				<ConversationArea
 					ref={conversationAreaRef}
 					tabs={tabs}

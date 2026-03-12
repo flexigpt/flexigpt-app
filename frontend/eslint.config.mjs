@@ -1,9 +1,10 @@
 import js from '@eslint/js';
-import prettier from 'eslint-plugin-prettier';
 import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
 import react from 'eslint-plugin-react';
+import reactHooks from 'eslint-plugin-react-hooks';
+import reactYouMightNotNeedAnEffect from 'eslint-plugin-react-you-might-not-need-an-effect';
 import tailwindCanonicalClasses from 'eslint-plugin-tailwind-canonical-classes';
-import { defineConfig } from 'eslint/config';
+import { defineConfig, globalIgnores } from 'eslint/config';
 import globals from 'globals';
 import path from 'path';
 import { configs } from 'typescript-eslint';
@@ -14,17 +15,17 @@ const __dirname = path.dirname(__filename);
 
 // eslint-disable-next-line no-restricted-exports
 export default defineConfig(
-	{ ignores: ['**/dist/**', '**/app/apis/wailsjs/**', '**/.react-router/**'] },
+	globalIgnores(['dist/**', 'app/apis/wailsjs/**', '.react-router/**']),
+
 	js.configs.recommended,
 	configs.strictTypeChecked,
-	eslintPluginPrettierRecommended,
 
-	// ...tailwind.configs['flat/recommended'],
 	{
 		files: ['**/*.{js,jsx,mjs,ts,tsx}'],
 		plugins: {
-			prettier,
 			react,
+			'react-hooks': reactHooks,
+			'react-you-might-not-need-an-effect': reactYouMightNotNeedAnEffect,
 			'tailwind-canonical-classes': tailwindCanonicalClasses,
 		},
 		languageOptions: {
@@ -33,7 +34,7 @@ export default defineConfig(
 					jsx: true,
 				},
 				projectService: true,
-				tsconfigRootDir: import.meta.dirname,
+				tsconfigRootDir: __dirname,
 			},
 			globals: {
 				...globals.browser,
@@ -49,9 +50,6 @@ export default defineConfig(
 			react: {
 				version: 'detect',
 			},
-			// tailwindcss: {
-			// 	config: path.resolve(__dirname, './app/globals.css'),
-			// },
 		},
 		rules: {
 			'no-restricted-imports': [
@@ -71,7 +69,7 @@ export default defineConfig(
 					],
 					patterns: [
 						{
-							group: ['./', '../'],
+							group: ['./*', '../*'],
 							message: 'Relative imports are not allowed.',
 						},
 					],
@@ -89,6 +87,14 @@ export default defineConfig(
 					},
 				},
 			],
+
+			...reactHooks.configs.flat.recommended.rules,
+			'react-hooks/exhaustive-deps': 'error',
+			'react-hooks/unsupported-syntax': 'error',
+			'react-hooks/incompatible-library': 'error',
+
+			...reactYouMightNotNeedAnEffect.configs.strict.rules,
+
 			'@typescript-eslint/consistent-type-imports': 'error',
 			'@typescript-eslint/no-explicit-any': 'off',
 			'@typescript-eslint/no-unsafe-assignment': 'off',
@@ -108,6 +114,19 @@ export default defineConfig(
 					caughtErrorsIgnorePattern: '^_',
 				},
 			],
+
+			'tailwind-canonical-classes/tailwind-canonical-classes': [
+				'error',
+				{
+					cssPath: './app/globals.css',
+				},
+			],
+		},
+	},
+
+	eslintPluginPrettierRecommended,
+	{
+		rules: {
 			'prettier/prettier': [
 				'error',
 				{
@@ -116,21 +135,10 @@ export default defineConfig(
 				{
 					usePrettierrc: true,
 					fileInfoOptions: {
-						// Use path.resolve to get the absolute path to the .prettierignore file
 						ignorePath: path.resolve(__dirname, '../.prettierignore'),
 					},
 				},
 			],
-			'tailwind-canonical-classes/tailwind-canonical-classes': [
-				'error',
-				{
-					cssPath: './app/globals.css',
-				},
-			],
-			// // There is some issue with daisyui classname detection with eslint tailwind 4 beta
-			// 'tailwindcss/no-custom-classname': 'off',
-			// // We use prettier for classname order
-			// 'tailwindcss/classnames-order': 'off',
 		},
 	}
 );

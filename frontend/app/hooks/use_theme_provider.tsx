@@ -40,14 +40,15 @@ export function GenericThemeProvider({
 		localStorage.setItem(storageKey, defaultTheme);
 		return defaultTheme; // first run → persist + use
 	});
-	const getSystemTheme = () => (window.matchMedia('(prefers-color-scheme: dark)').matches ? darkTheme : lightTheme);
 
 	/* apply theme before paint */
 	useLayoutEffect(() => {
-		const effective = theme === 'system' ? getSystemTheme() : theme;
+		const effective =
+			theme === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? darkTheme : lightTheme) : theme;
+
 		noTransition();
 		document.documentElement.setAttribute('data-theme', effective);
-	}, [theme]);
+	}, [theme, darkTheme, lightTheme]);
 
 	/* follow OS preference while in “system” mode */
 	useEffect(() => {

@@ -1,12 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { FiCheck, FiChevronDown, FiChevronUp, FiEdit2, FiEye, FiPlus, FiTrash2, FiX } from 'react-icons/fi';
 
 import type { Skill, SkillBundle } from '@/spec/skill';
 import { SkillPresenceStatus } from '@/spec/skill';
-
-import { skillStoreAPI } from '@/apis/baseapi';
-import { getAllSkills } from '@/apis/list_helper';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
@@ -19,9 +16,11 @@ type SkillModalMode = 'add' | 'edit' | 'view';
 interface SkillBundleCardProps {
 	bundle: SkillBundle;
 	skills: Skill[];
-	onSkillsChange: (bundleID: string, newSkills: Skill[]) => void;
-	onBundleEnableChange: (bundleID: string, enabled: boolean) => void;
-	onBundleDeleted: (bundle: SkillBundle) => void;
+	onToggleBundleEnable: (bundleID: string, nextEnabled: boolean) => Promise<void>;
+	onToggleSkillEnable: (bundleID: string, skillID: string, skillSlug: string, nextEnabled: boolean) => Promise<void>;
+	onDeleteSkill: (bundleID: string, skillID: string, skillSlug: string) => Promise<void>;
+	onSubmitSkill: (bundleID: string, partial: Partial<Skill>, existingSkillSlug?: string) => Promise<void>;
+	onRequestBundleDelete: (bundle: SkillBundle) => void;
 }
 
 function PresenceBadge({ skill }: { skill: Skill }) {
@@ -61,28 +60,23 @@ function PresenceBadge({ skill }: { skill: Skill }) {
 export function SkillBundleCard({
 	bundle,
 	skills,
-	onSkillsChange,
-	onBundleEnableChange,
-	onBundleDeleted,
+	onToggleBundleEnable,
+	onToggleSkillEnable,
+	onDeleteSkill,
+	onSubmitSkill,
+	onRequestBundleDelete,
 }: SkillBundleCardProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
-	const [localSkills, setLocalSkills] = useState<Skill[]>(skills);
-	const [isBundleEnabled, setIsBundleEnabled] = useState(bundle.isEnabled);
 
 	const [busyBundleToggle, setBusyBundleToggle] = useState(false);
 	const [busySkillIDs, setBusySkillIDs] = useState<Set<string>>(new Set());
 
-	useEffect(() => {
-		setIsBundleEnabled(bundle.isEnabled);
-	}, [bundle.isEnabled]);
-	useEffect(() => {
-		setLocalSkills(skills);
-	}, [skills]);
-
 	const [isDeleteSkillModalOpen, setIsDeleteSkillModalOpen] = useState(false);
+	const [isDeleteSkillPending, setIsDeleteSkillPending] = useState(false);
 	const [skillToDelete, setSkillToDelete] = useState<Skill | null>(null);
 
 	const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
+	const [isSkillSubmitPending, setIsSkillSubmitPending] = useState(false);
 	const [skillModalMode, setSkillModalMode] = useState<SkillModalMode>('add');
 	const [skillToEdit, setSkillToEdit] = useState<Skill | undefined>(undefined);
 
@@ -91,60 +85,77 @@ export function SkillBundleCard({
 	const [showAlert, setShowAlert] = useState(false);
 	const [alertMsg, setAlertMsg] = useState('');
 
+	const isMountedRef = useRef(false);
+
+	useEffect(() => {
+		isMountedRef.current = true;
+
+		return () => {
+			isMountedRef.current = false;
+		};
+	}, []);
+
 	const existingSkillItems = useMemo(
 		() =>
-			localSkills.map(s => ({
-				skill: s,
+			skills.map(skill => ({
+				skill,
 				bundleID: bundle.id,
-				skillSlug: s.slug,
+				skillSlug: skill.slug,
 			})),
-		[localSkills, bundle.id]
+		[skills, bundle.id]
 	);
 
-	const refreshSkills = async () => {
-		const listItems = await getAllSkills([bundle.id], undefined, true, true);
-		const fresh = listItems.map(li => li.skillDefinition);
-		setLocalSkills(fresh);
-		onSkillsChange(bundle.id, fresh);
-	};
-
 	const toggleBundleEnable = async () => {
-		if (busyBundleToggle) return;
+		if (busyBundleToggle) {
+			return;
+		}
+
 		setBusyBundleToggle(true);
+
 		try {
-			const newVal = !isBundleEnabled;
-			await skillStoreAPI.patchSkillBundle(bundle.id, newVal);
-			setIsBundleEnabled(newVal);
-			onBundleEnableChange(bundle.id, newVal);
+			await onToggleBundleEnable(bundle.id, !bundle.isEnabled);
 		} catch (err) {
 			console.error('Toggle skill bundle enable failed:', err);
-			setAlertMsg('Failed to toggle bundle enable state.');
-			setShowAlert(true);
+
+			if (isMountedRef.current) {
+				setAlertMsg('Failed to toggle bundle enable state.');
+				setShowAlert(true);
+			}
 		} finally {
-			setBusyBundleToggle(false);
+			if (isMountedRef.current) {
+				setBusyBundleToggle(false);
+			}
 		}
 	};
 
 	const patchSkillEnable = async (skill: Skill) => {
-		if (busySkillIDs.has(skill.id)) return;
+		if (busySkillIDs.has(skill.id)) {
+			return;
+		}
 
-		setBusySkillIDs(prev => new Set(prev).add(skill.id));
+		setBusySkillIDs(prev => {
+			const next = new Set(prev);
+			next.add(skill.id);
+			return next;
+		});
+
 		try {
-			await skillStoreAPI.patchSkill(bundle.id, skill.slug, !skill.isEnabled);
-			const updated: Skill = { ...skill, isEnabled: !skill.isEnabled };
-			const newArr = localSkills.map(s => (s.id === skill.id ? updated : s));
-			setLocalSkills(newArr);
-			onSkillsChange(bundle.id, newArr);
+			await onToggleSkillEnable(bundle.id, skill.id, skill.slug, !skill.isEnabled);
 		} catch (err) {
 			console.error('Toggle skill failed:', err);
-			setAlertMsg('Failed to toggle skill.');
-			setShowAlert(true);
+
+			if (isMountedRef.current) {
+				setAlertMsg('Failed to toggle skill.');
+				setShowAlert(true);
+			}
 		} finally {
-			setBusySkillIDs(prev => {
-				const next = new Set(prev);
-				next.delete(skill.id);
-				return next;
-			});
+			if (isMountedRef.current) {
+				setBusySkillIDs(prev => {
+					const next = new Set(prev);
+					next.delete(skill.id);
+					return next;
+				});
+			}
 		}
 	};
 
@@ -154,24 +165,33 @@ export function SkillBundleCard({
 			setShowAlert(true);
 			return;
 		}
+
 		setSkillToDelete(skill);
 		setIsDeleteSkillModalOpen(true);
 	};
 
 	const confirmDeleteSkill = async () => {
-		if (!skillToDelete) return;
+		if (!skillToDelete || isDeleteSkillPending) {
+			return;
+		}
+
+		setIsDeleteSkillPending(true);
+
 		try {
-			await skillStoreAPI.deleteSkill(bundle.id, skillToDelete.slug);
-			const newArr = localSkills.filter(s => s.id !== skillToDelete.id);
-			setLocalSkills(newArr);
-			onSkillsChange(bundle.id, newArr);
+			await onDeleteSkill(bundle.id, skillToDelete.id, skillToDelete.slug);
 		} catch (err) {
 			console.error('Delete skill failed:', err);
-			setAlertMsg('Failed to delete skill.');
-			setShowAlert(true);
+
+			if (isMountedRef.current) {
+				setAlertMsg('Failed to delete skill.');
+				setShowAlert(true);
+			}
 		} finally {
-			setIsDeleteSkillModalOpen(false);
-			setSkillToDelete(null);
+			if (isMountedRef.current) {
+				setIsDeleteSkillPending(false);
+				setIsDeleteSkillModalOpen(false);
+				setSkillToDelete(null);
+			}
 		}
 	};
 
@@ -181,6 +201,7 @@ export function SkillBundleCard({
 			setShowAlert(true);
 			return;
 		}
+
 		if (mode === 'edit' && skill?.isBuiltIn) {
 			setAlertMsg('Built-in skills cannot be edited (only enabled/disabled).');
 			setShowAlert(true);
@@ -193,41 +214,19 @@ export function SkillBundleCard({
 	};
 
 	const handleSubmitSkill = async (partial: Partial<Skill>) => {
-		if (skillToEdit) {
-			// Edit existing skill (no versioning)
-			await skillStoreAPI.patchSkill(
-				bundle.id,
-				skillToEdit.slug,
-				partial.isEnabled,
-				partial.location,
-				partial.displayName,
-				partial.description,
-				partial.tags
-			);
-		} else {
-			// Add new skill
-			const slug = (partial.slug ?? '').trim();
-			const name = (partial.name ?? '').trim();
-			const location = (partial.location ?? '').trim();
-			if (!slug) throw new Error('Missing skill slug.');
-			if (!name) throw new Error('Missing skill name.');
-			if (!partial.type) throw new Error('Missing skill type.');
-			if (!location) throw new Error('Missing skill location.');
-
-			await skillStoreAPI.putSkill(
-				bundle.id,
-				slug,
-				partial.type,
-				location,
-				name,
-				partial.isEnabled ?? true,
-				partial.displayName,
-				partial.description,
-				partial.tags
-			);
+		if (isSkillSubmitPending) {
+			return;
 		}
 
-		await refreshSkills();
+		setIsSkillSubmitPending(true);
+
+		try {
+			await onSubmitSkill(bundle.id, partial, skillToEdit?.slug);
+		} finally {
+			if (isMountedRef.current) {
+				setIsSkillSubmitPending(false);
+			}
+		}
 	};
 
 	return (
@@ -261,7 +260,7 @@ export function SkillBundleCard({
 						<input
 							type="checkbox"
 							className="toggle toggle-accent"
-							checked={isBundleEnabled}
+							checked={bundle.isEnabled}
 							onChange={toggleBundleEnable}
 							disabled={busyBundleToggle}
 						/>
@@ -270,10 +269,10 @@ export function SkillBundleCard({
 					<div
 						className="flex cursor-pointer items-center gap-1"
 						onClick={() => {
-							setIsExpanded(p => !p);
+							setIsExpanded(prev => !prev);
 						}}
 					>
-						<label className="text-sm whitespace-nowrap">Skills:&nbsp;{localSkills.length}</label>
+						<label className="text-sm whitespace-nowrap">Skills:&nbsp;{skills.length}</label>
 						{isExpanded ? <FiChevronUp /> : <FiChevronDown />}
 					</div>
 				</div>
@@ -295,7 +294,7 @@ export function SkillBundleCard({
 							</thead>
 
 							<tbody>
-								{localSkills.map(skill => (
+								{skills.map(skill => (
 									<tr key={skill.id} className="hover:bg-base-300">
 										<td>{skill.displayName || '-'}</td>
 										<td className="text-center">{skill.slug}</td>
@@ -359,7 +358,7 @@ export function SkillBundleCard({
 									</tr>
 								))}
 
-								{localSkills.length === 0 && (
+								{skills.length === 0 && (
 									<tr>
 										<td colSpan={9} className="py-3 text-center text-sm">
 											No skills in this bundle.
@@ -375,7 +374,7 @@ export function SkillBundleCard({
 							<button
 								className="btn btn-md btn-ghost flex items-center rounded-2xl"
 								onClick={() => {
-									onBundleDeleted(bundle);
+									onRequestBundleDelete(bundle);
 								}}
 							>
 								<FiTrash2 /> <span className="ml-1">Delete Bundle</span>
@@ -398,6 +397,7 @@ export function SkillBundleCard({
 				isOpen={isDeleteSkillModalOpen}
 				onClose={() => {
 					setIsDeleteSkillModalOpen(false);
+					setSkillToDelete(null);
 				}}
 				onConfirm={confirmDeleteSkill}
 				title="Delete Skill"

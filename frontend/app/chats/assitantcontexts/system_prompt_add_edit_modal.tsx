@@ -1,4 +1,4 @@
-import { type SubmitEventHandler, useEffect, useMemo, useRef, useState } from 'react';
+import { type SubmitEventHandler, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
@@ -10,7 +10,7 @@ type SystemPromptItem = {
 	id: string;
 	title: string;
 	prompt: string;
-	locked?: boolean; // when true, cannot be deleted
+	locked?: boolean;
 };
 
 type SystemPromptAddEditModalProps = {
@@ -22,6 +22,19 @@ type SystemPromptAddEditModalProps = {
 	onSave: (value: string) => void;
 };
 
+type SystemPromptAddEditModalInnerProps = Omit<SystemPromptAddEditModalProps, 'isOpen'>;
+
+function closeDialogSafely(dialog: HTMLDialogElement | null): boolean {
+	if (!dialog?.open) return false;
+
+	try {
+		dialog.close();
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 export function SystemPromptAddEditModal({
 	isOpen,
 	mode,
@@ -30,61 +43,88 @@ export function SystemPromptAddEditModal({
 	onClose,
 	onSave,
 }: SystemPromptAddEditModalProps) {
-	const [value, setValue] = useState<string>(initialValue);
+	if (!isOpen || typeof document === 'undefined') return null;
+
+	return createPortal(
+		<SystemPromptAddEditModalInner
+			key={`${mode}::${initialValue}`}
+			mode={mode}
+			initialValue={initialValue}
+			promptsForCopy={promptsForCopy}
+			onClose={onClose}
+			onSave={onSave}
+		/>,
+		document.body
+	);
+}
+
+function SystemPromptAddEditModalInner({
+	mode,
+	initialValue = '',
+	promptsForCopy = [],
+	onClose,
+	onSave,
+}: SystemPromptAddEditModalInnerProps) {
+	const [value, setValue] = useState<string>(() => initialValue);
 	const [copyFromId, setCopyFromId] = useState<string>('');
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
+	const isUnmountingRef = useRef(false);
 
-	// Reset local state whenever the modal is opened
 	useEffect(() => {
-		if (isOpen) {
-			setValue(initialValue);
-			setCopyFromId('');
-		}
-	}, [isOpen, initialValue]);
-
-	// Open the dialog natively when isOpen becomes true
-	useEffect(() => {
-		if (!isOpen) return;
+		isUnmountingRef.current = false;
 
 		const dialog = dialogRef.current;
 		if (!dialog) return;
 
-		if (!dialog.open) {
-			dialog.showModal();
+		try {
+			if (!dialog.open) {
+				dialog.showModal();
+			}
+		} catch {
+			// Ignore showModal errors if the dialog is already open or not ready.
 		}
 
 		return () => {
-			// If the component unmounts while the dialog is still open, close it.
-			if (dialog.open) {
-				dialog.close();
-			}
+			isUnmountingRef.current = true;
+			closeDialogSafely(dialog);
 		};
-	}, [isOpen]);
+	}, []);
 
-	// Sync parent state whenever the dialog is closed (Esc or dialog.close()).
-	const handleDialogClose = () => {
-		onClose();
-	};
+	const handleDialogClose = useCallback(() => {
+		if (!isUnmountingRef.current) {
+			onClose();
+		}
+	}, [onClose]);
+
+	const requestClose = useCallback(() => {
+		if (!closeDialogSafely(dialogRef.current)) {
+			onClose();
+		}
+	}, [onClose]);
 
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
 		e.preventDefault();
+
 		const v = value.trim();
 		if (!v) return;
+
 		onSave(v);
-		// Close via native dialog API; this will trigger handleDialogClose -> parent onClose()
-		dialogRef.current?.close();
+		requestClose();
 	};
 
-	const handleCopyFrom = (id: string) => {
-		setCopyFromId(id);
-		const found = promptsForCopy.find(p => p.id === id);
-		if (found) {
-			setValue(found.prompt);
-		}
-	};
+	const handleCopyFrom = useCallback(
+		(id: string) => {
+			setCopyFromId(id);
 
-	// Build dropdown items for "Copy Existing"
+			const found = promptsForCopy.find(p => p.id === id);
+			if (found) {
+				setValue(found.prompt);
+			}
+		},
+		[promptsForCopy]
+	);
+
 	const copyDropdownItems = useMemo(() => {
 		const map: Record<string, { isEnabled: boolean }> = {};
 		for (const p of promptsForCopy) {
@@ -93,24 +133,20 @@ export function SystemPromptAddEditModal({
 		return map;
 	}, [promptsForCopy]);
 
-	const getCopyDisplayName = (id: string) => {
-		const found = promptsForCopy.find(p => p.id === id);
-		return found?.title ?? id;
-	};
+	const getCopyDisplayName = useCallback(
+		(id: string) => {
+			const found = promptsForCopy.find(p => p.id === id);
+			return found?.title ?? id;
+		},
+		[promptsForCopy]
+	);
 
-	if (!isOpen) return null;
-
-	return createPortal(
+	return (
 		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose}>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-auto rounded-2xl">
 				<div className="mb-4 flex items-center justify-between">
 					<h3 className="text-lg font-bold">{mode === 'add' ? 'Add System Prompt' : 'Edit System Prompt'}</h3>
-					<button
-						type="button"
-						className="btn btn-sm btn-circle bg-base-300"
-						onClick={() => dialogRef.current?.close()}
-						aria-label="Close"
-					>
+					<button type="button" className="btn btn-sm btn-circle bg-base-300" onClick={requestClose} aria-label="Close">
 						<FiX size={12} />
 					</button>
 				</div>
@@ -123,9 +159,7 @@ export function SystemPromptAddEditModal({
 								<Dropdown<string>
 									dropdownItems={copyDropdownItems}
 									selectedKey={copyFromId}
-									onChange={key => {
-										handleCopyFrom(key);
-									}}
+									onChange={handleCopyFrom}
 									filterDisabled={false}
 									title="Select a saved prompt to copy"
 									getDisplayName={getCopyDisplayName}
@@ -137,7 +171,9 @@ export function SystemPromptAddEditModal({
 								className="btn btn-ghost btn-xs col-span-1 p-4"
 								title="Copy again"
 								onClick={() => {
-									if (copyFromId) handleCopyFrom(copyFromId);
+									if (copyFromId) {
+										handleCopyFrom(copyFromId);
+									}
 								}}
 								disabled={!copyFromId}
 							>
@@ -159,7 +195,7 @@ export function SystemPromptAddEditModal({
 					</div>
 
 					<div className="modal-action">
-						<button type="button" className="btn bg-base-300 rounded-xl" onClick={() => dialogRef.current?.close()}>
+						<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
 							Cancel
 						</button>
 						<button type="submit" className="btn btn-primary rounded-xl" disabled={!value.trim()}>
@@ -168,7 +204,6 @@ export function SystemPromptAddEditModal({
 					</div>
 				</form>
 			</div>
-		</dialog>,
-		document.body
+		</dialog>
 	);
 }

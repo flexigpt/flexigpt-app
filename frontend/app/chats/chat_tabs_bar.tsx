@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 
 import { FiEdit2, FiPlus, FiX } from 'react-icons/fi';
 
@@ -30,7 +30,11 @@ interface ChatTabsBarProps {
 	getConversationForExport: () => Promise<string>;
 }
 
-export const ChatTabsBar = memo(function ChatTabsBar({
+interface ChatTabsBarContentProps extends ChatTabsBarProps {
+	setTabEl: (id: string) => (el: HTMLElement | null) => void;
+}
+
+function ChatTabsBarContent({
 	store,
 	selectedTabId,
 	tabs,
@@ -39,53 +43,30 @@ export const ChatTabsBar = memo(function ChatTabsBar({
 	onCloseTab,
 	onRenameTab,
 	getConversationForExport,
-}: ChatTabsBarProps) {
-	const active = useMemo(() => tabs.find(t => t.tabId === selectedTabId) ?? tabs[0], [tabs, selectedTabId]);
-
+	setTabEl,
+}: ChatTabsBarContentProps) {
 	const [editingTabId, setEditingTabId] = useState<string | null>(null);
 	const [draftTitle, setDraftTitle] = useState('');
-	const tabElById = useRef(new Map<string, HTMLElement | null>());
-	const setTabEl = useCallback(
-		(id: string) => (el: HTMLElement | null) => {
-			if (!el) tabElById.current.delete(id);
-			else tabElById.current.set(id, el);
-		},
-		[]
-	);
-
-	useEffect(() => {
-		tabElById.current.get(selectedTabId)?.scrollIntoView({
-			behavior: 'smooth',
-			block: 'nearest',
-			inline: 'nearest',
-		});
-	}, [selectedTabId]);
-
-	useEffect(() => {
-		if (editingTabId) return;
-		setDraftTitle(active?.title ?? '');
-	}, [active?.title, editingTabId]);
-
-	// Only active tab can be renamed; switching tabs cancels edit mode.
-	useEffect(() => {
-		if (editingTabId && editingTabId !== selectedTabId) setEditingTabId(null);
-	}, [editingTabId, selectedTabId]);
 
 	const finishRename = useCallback(() => {
 		if (!editingTabId) return;
 
+		const currentTitle = tabs.find(tab => tab.tabId === editingTabId)?.title ?? '';
 		const cleaned = sanitizeConversationTitle(draftTitle.trim());
-		if (cleaned && cleaned !== (active?.title ?? '')) {
+
+		if (cleaned && cleaned !== currentTitle) {
 			onRenameTab(editingTabId, cleaned);
 		}
-		setEditingTabId(null);
-	}, [active?.title, draftTitle, editingTabId, onRenameTab]);
 
-	const elements: React.ReactNode[] = [];
+		setEditingTabId(null);
+	}, [draftTitle, editingTabId, onRenameTab, tabs]);
+
+	const elements: ReactNode[] = [];
 
 	for (const t of tabs) {
 		const isActive = t.tabId === selectedTabId;
 		const canRename = isActive && t.renameEnabled && !t.isBusy;
+		const isEditing = isActive && editingTabId === t.tabId;
 
 		elements.push(
 			<Tab
@@ -108,7 +89,7 @@ export const ChatTabsBar = memo(function ChatTabsBar({
 			>
 				{/* Title / Rename */}
 				<div className="min-w-0 flex-1 px-2 text-sm">
-					{isActive && editingTabId === t.tabId ? (
+					{isEditing ? (
 						<input
 							data-disable-chat-shortcuts="true"
 							autoFocus
@@ -219,5 +200,49 @@ export const ChatTabsBar = memo(function ChatTabsBar({
 				/>
 			</div>
 		</div>
+	);
+}
+
+export const ChatTabsBar = memo(function ChatTabsBar({
+	store,
+	selectedTabId,
+	tabs,
+	maxTabs,
+	onNewTab,
+	onCloseTab,
+	onRenameTab,
+	getConversationForExport,
+}: ChatTabsBarProps) {
+	const tabElById = useRef(new Map<string, HTMLElement | null>());
+
+	const setTabEl = useCallback(
+		(id: string) => (el: HTMLElement | null) => {
+			if (!el) tabElById.current.delete(id);
+			else tabElById.current.set(id, el);
+		},
+		[]
+	);
+
+	useEffect(() => {
+		tabElById.current.get(selectedTabId)?.scrollIntoView({
+			behavior: 'smooth',
+			block: 'nearest',
+			inline: 'nearest',
+		});
+	}, [selectedTabId]);
+
+	return (
+		<ChatTabsBarContent
+			key={selectedTabId}
+			store={store}
+			selectedTabId={selectedTabId}
+			tabs={tabs}
+			maxTabs={maxTabs}
+			onNewTab={onNewTab}
+			onCloseTab={onCloseTab}
+			onRenameTab={onRenameTab}
+			getConversationForExport={getConversationForExport}
+			setTabEl={setTabEl}
+		/>
 	);
 });

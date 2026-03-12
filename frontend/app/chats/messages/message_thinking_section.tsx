@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import type { ReasoningContent } from '@/spec/inference';
 
@@ -29,24 +29,25 @@ export function MessageThinkingSection(props: {
 
 	// Prefer streamed thinking while busy; otherwise show final thinking.
 	const thinkingText = (isBusy ? streamedThinking : finalThinking).trimEnd();
+
 	// Thinking is optional: only show when we actually have something to display.
 	const hasSummary = finalSummary.trim().length > 0;
 	const hasThinking = thinkingText.trim().length > 0;
 	const shouldShow = hasSummary || hasThinking;
-	// Auto-open while busy; auto-collapse when done (unless user interacted).
-	const userToggledRef = useRef(false);
-	const [open, setOpen] = useState<boolean>(isBusy);
-	useEffect(() => {
-		if (userToggledRef.current) return;
-		setOpen(isBusy);
-	}, [isBusy]);
+
+	// null means "auto" mode and follows isBusy.
+	// Once the user toggles, their explicit choice wins from then on.
+	const [manualOpen, setManualOpen] = useState<boolean | null>(null);
+	const open = manualOpen ?? isBusy;
 
 	const summaryNode = (
 		<div className="flex items-center gap-2">
 			<span className="text-xs">Thinking Content</span>
 		</div>
 	);
+
 	if (!shouldShow) return null;
+
 	return (
 		<div className="m-0 p-0">
 			{finalSummary ? (
@@ -65,9 +66,8 @@ export function MessageThinkingSection(props: {
 					detailsSummary={summaryNode}
 					text={thinkingText}
 					open={open}
-					onOpenChange={v => {
-						userToggledRef.current = true;
-						setOpen(v);
+					onOpenChange={value => {
+						setManualOpen(value);
 					}}
 					streaming={isBusy}
 					maxRows={10}

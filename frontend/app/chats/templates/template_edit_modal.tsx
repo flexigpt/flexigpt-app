@@ -1,5 +1,5 @@
 import type { SubmitEventHandler } from 'react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
@@ -18,108 +18,103 @@ import {
 import { type TemplateSelectionElementNode } from '@/chats/templates/template_spec';
 import { EnumDropdownInline } from '@/chats/templates/template_variable_enum_dropdown';
 
-export function TemplateEditModal({
-	open,
-	onClose,
-	tsenode,
-	editor,
-	path,
-}: {
+type TemplateEditModalProps = {
 	open: boolean;
 	onClose: () => void;
 	tsenode: TemplateSelectionElementNode;
 	editor: PlateEditor;
 	path: any;
-}) {
-	// Compute current effective template for rendering
+};
+
+type TemplateEditFormState = {
+	displayName: string;
+	description: string;
+	tags: string;
+	blockEdits: ReturnType<typeof computeEffectiveTemplate>['blocks'];
+	varValues: Record<string, unknown>;
+};
+
+function getInitialFormState(tsenode: TemplateSelectionElementNode): TemplateEditFormState {
 	const { template, blocks, variablesSchema } = computeEffectiveTemplate(tsenode);
 
-	// Local form state
-	const [displayName, setDisplayName] = useState<string>(
-		tsenode.overrides?.displayName ?? template?.displayName ?? tsenode.templateSlug
-	);
-	const [description, setDescription] = useState<string>(tsenode.overrides?.description ?? template?.description ?? '');
-	const [tags, setTags] = useState<string>((tsenode.overrides?.tags ?? template?.tags ?? []).join(', '));
-
-	// Editable message blocks (content)
-	const [blockEdits, setBlockEdits] = useState(blocks);
-
-	// Variable values
-	const [varValues, setVarValues] = useState<Record<string, unknown>>(() => {
-		const vals: Record<string, unknown> = { ...tsenode.variables };
-		for (const v of variablesSchema) {
-			const val = effectiveVarValueLocal(v, tsenode.variables);
-			if (val !== undefined) vals[v.name] = val;
+	const varValues: Record<string, unknown> = { ...tsenode.variables };
+	for (const variable of variablesSchema) {
+		const val = effectiveVarValueLocal(variable, tsenode.variables);
+		if (val !== undefined) {
+			varValues[variable.name] = val;
 		}
-		return vals;
-	});
+	}
+
+	return {
+		displayName: tsenode.overrides?.displayName ?? template?.displayName ?? tsenode.templateSlug,
+		description: tsenode.overrides?.description ?? template?.description ?? '',
+		tags: (tsenode.overrides?.tags ?? template?.tags ?? []).join(', '),
+		blockEdits: blocks,
+		varValues,
+	};
+}
+
+function TemplateEditModalContent({ onClose, tsenode, editor, path }: Omit<TemplateEditModalProps, 'open'>) {
+	const { template, variablesSchema } = useMemo(() => computeEffectiveTemplate(tsenode), [tsenode]);
+
+	const [formState, setFormState] = useState<TemplateEditFormState>(() => getInitialFormState(tsenode));
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
+	const isUnmountingRef = useRef(false);
 
-	// Rehydrate form when opening or when the node reference changes
 	useEffect(() => {
-		if (!open) return;
-
-		// Recompute effective template inside the effect to avoid depending on changing references
-		const eff = computeEffectiveTemplate(tsenode);
-		const t = eff.template;
-		const blks = eff.blocks;
-		const varsSchema = eff.variablesSchema;
-
-		setDisplayName(tsenode.overrides?.displayName ?? t?.displayName ?? tsenode.templateSlug);
-		setDescription(tsenode.overrides?.description ?? t?.description ?? '');
-		setTags((tsenode.overrides?.tags ?? t?.tags ?? []).join(', '));
-		setBlockEdits(blks);
-
-		const vals: Record<string, unknown> = { ...tsenode.variables };
-		for (const v of varsSchema) {
-			const val = effectiveVarValueLocal(v, tsenode.variables);
-			if (val !== undefined) vals[v.name] = val;
-		}
-		setVarValues(vals);
-	}, [open, tsenode]);
-
-	// Sync React `open` prop with the native <dialog> lifecycle, like UrlAttachmentModal
-	useEffect(() => {
-		if (!open) return;
-
 		const dialog = dialogRef.current;
 		if (!dialog) return;
 
 		if (!dialog.open) {
-			dialog.showModal();
+			try {
+				dialog.showModal();
+			} catch {
+				// Ignore showModal errors and keep rendering safely.
+			}
 		}
 
 		return () => {
-			// If unmounted while still open, ensure we close the dialog
+			isUnmountingRef.current = true;
+
 			if (dialog.open) {
 				dialog.close();
 			}
 		};
-	}, [open]);
+	}, []);
 
-	// Keep parent `open` in sync with native dialog closing (ESC, programmatic close, etc.)
+	const requestClose = () => {
+		const dialog = dialogRef.current;
+
+		if (dialog?.open) {
+			dialog.close();
+			return;
+		}
+
+		onClose();
+	};
+
 	const handleDialogClose = () => {
+		if (isUnmountingRef.current) return;
 		onClose();
 	};
 
 	function saveAndClose() {
 		const nextOverrides = {
 			...tsenode.overrides,
-			displayName,
-			description,
-			tags: tags
+			displayName: formState.displayName,
+			description: formState.description,
+			tags: formState.tags
 				.split(',')
 				.map(s => s.trim())
 				.filter(Boolean),
-			blocks: blockEdits,
+			blocks: formState.blockEdits,
 		};
 
-		// Persist changes into the editor node
 		editor.tf.setNodes(
 			{
 				overrides: nextOverrides,
-				variables: varValues,
+				variables: formState.varValues,
 			},
 			{ at: path }
 		);
@@ -128,8 +123,7 @@ export function TemplateEditModal({
 			dispatchTemplateVarsUpdated(tsenode.selectionID);
 		}
 
-		// Close the dialog; this will trigger handleDialogClose -> parent onClose().
-		dialogRef.current?.close();
+		requestClose();
 	}
 
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
@@ -138,11 +132,9 @@ export function TemplateEditModal({
 		saveAndClose();
 	};
 
-	const req = computeRequirements(variablesSchema, varValues);
+	const req = computeRequirements(variablesSchema, formState.varValues);
 
-	if (!open) return null;
-
-	return createPortal(
+	return (
 		<dialog
 			ref={dialogRef}
 			className="modal"
@@ -158,12 +150,12 @@ export function TemplateEditModal({
 					<div className="mb-4 flex items-center justify-between gap-2">
 						<div className="flex items-center gap-2">
 							<h3 className="text-lg font-bold">Edit Template</h3>
-							<span className="badge badge-neutral">{displayName}</span>
+							<span className="badge badge-neutral">{formState.displayName}</span>
 						</div>
 						<button
 							type="button"
 							className="btn btn-sm btn-circle bg-base-300"
-							onClick={() => dialogRef.current?.close()}
+							onClick={requestClose}
 							aria-label="Close"
 						>
 							<FiX size={12} />
@@ -199,9 +191,9 @@ export function TemplateEditModal({
 									<div className="col-span-12 md:col-span-8">
 										<input
 											className="input input-bordered input-sm w-full rounded-xl"
-											value={displayName}
+											value={formState.displayName}
 											onChange={e => {
-												setDisplayName(e.target.value);
+												setFormState(prev => ({ ...prev, displayName: e.target.value }));
 											}}
 											placeholder={template?.displayName ?? tsenode.templateSlug}
 											spellCheck="false"
@@ -222,9 +214,9 @@ export function TemplateEditModal({
 									<div className="col-span-12 md:col-span-8">
 										<input
 											className="input input-bordered input-sm w-full rounded-xl"
-											value={tags}
+											value={formState.tags}
 											onChange={e => {
-												setTags(e.target.value);
+												setFormState(prev => ({ ...prev, tags: e.target.value }));
 											}}
 											placeholder="e.g. brainstorm, draft, review"
 											spellCheck="false"
@@ -245,9 +237,9 @@ export function TemplateEditModal({
 									<div className="col-span-12 md:col-span-8">
 										<textarea
 											className="textarea textarea-bordered w-full rounded-xl"
-											value={description}
+											value={formState.description}
 											onChange={e => {
-												setDescription(e.target.value);
+												setFormState(prev => ({ ...prev, description: e.target.value }));
 											}}
 											placeholder={template?.description ?? 'Describe how this template should be used...'}
 										/>
@@ -280,9 +272,12 @@ export function TemplateEditModal({
 									<VariableEditorRow
 										key={v.name}
 										varDef={v}
-										value={varValues[v.name]}
+										value={formState.varValues[v.name]}
 										onChange={val => {
-											setVarValues(s => ({ ...s, [v.name]: val }));
+											setFormState(prev => ({
+												...prev,
+												varValues: { ...prev.varValues, [v.name]: val },
+											}));
 										}}
 									/>
 								))}
@@ -297,7 +292,7 @@ export function TemplateEditModal({
 								Blocks (local override)
 							</h4>
 							<div className="space-y-3">
-								{blockEdits.map((b, idx) => (
+								{formState.blockEdits.map((b, idx) => (
 									<div key={b.id} className="rounded-xl border p-3">
 										<div className="mb-2 flex items-center gap-2 text-sm opacity-70">
 											<span className="badge badge-outline">{b.role}</span>
@@ -307,10 +302,10 @@ export function TemplateEditModal({
 											className="textarea textarea-bordered min-h-32 w-full rounded-xl"
 											value={b.content}
 											onChange={e => {
-												setBlockEdits(arr => {
-													const next = [...arr];
+												setFormState(prev => {
+													const next = [...prev.blockEdits];
 													next[idx] = { ...next[idx], content: e.target.value };
-													return next;
+													return { ...prev, blockEdits: next };
 												});
 											}}
 										/>
@@ -321,7 +316,7 @@ export function TemplateEditModal({
 
 						{/* Footer */}
 						<div className="modal-action">
-							<button type="button" className="btn bg-base-300 rounded-xl" onClick={() => dialogRef.current?.close()}>
+							<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
 								Cancel
 							</button>
 							<button type="submit" className="btn btn-primary rounded-xl">
@@ -333,7 +328,18 @@ export function TemplateEditModal({
 			</div>
 
 			{/* NOTE: no modal-backdrop here: backdrop click should NOT close this modal; ESC still works via native <dialog>. */}
-		</dialog>,
+		</dialog>
+	);
+}
+
+export function TemplateEditModal({ open, onClose, tsenode, editor, path }: TemplateEditModalProps) {
+	if (!open) return null;
+	if (typeof document === 'undefined' || !document.body) return null;
+
+	const modalKey = JSON.stringify({ tsenode, path });
+
+	return createPortal(
+		<TemplateEditModalContent key={modalKey} onClose={onClose} tsenode={tsenode} editor={editor} path={path} />,
 		document.body
 	);
 }
@@ -424,8 +430,7 @@ function VariableEditorRow({
 					<div className="col-span-12 md:col-span-8">
 						<EnumDropdownInline
 							options={varDef.enumValues ?? []}
-							// eslint-disable-next-line @typescript-eslint/no-base-to-string
-							value={value === undefined || value === null ? undefined : String(value)}
+							value={value === undefined || value === null ? undefined : (value as string)}
 							onChange={val => {
 								onChange(val);
 							}}

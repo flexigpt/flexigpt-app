@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { FiPlus } from 'react-icons/fi';
 
 import type { ProviderName } from '@/spec/inference';
-import { type ProviderPreset } from '@/spec/modelpreset';
+import { type ModelPreset, type ModelPresetID, type ProviderPreset } from '@/spec/modelpreset';
+import type { AuthKeyMeta } from '@/spec/setting';
 import { AuthKeyTypeProvider } from '@/spec/setting';
 
 import { aggregateAPI, modelPresetStoreAPI, settingstoreAPI } from '@/apis/baseapi';
@@ -21,204 +22,438 @@ import { ProviderPresetCard } from '@/modelpresets/provider_presets_card';
 const sortByDisplayName = ([, a]: [string, ProviderPreset], [, b]: [string, ProviderPreset]) =>
 	a.displayName.localeCompare(b.displayName);
 
+type CanonicalPageData = {
+	settings: Awaited<ReturnType<typeof settingstoreAPI.getSettings>>;
+	defaultProvider: ProviderName | undefined;
+	providerPresets: Record<ProviderName, ProviderPreset>;
+};
+
+const buildProviderKeySet = (authKeys: AuthKeyMeta[]): Record<ProviderName, boolean> =>
+	Object.fromEntries(
+		authKeys.filter(key => key.type === AuthKeyTypeProvider).map(key => [key.keyName, key.nonEmpty])
+	) as Record<ProviderName, boolean>;
+
+async function fetchCanonicalPageData(): Promise<CanonicalPageData> {
+	const [settings, defaultProvider, providerPresets] = await Promise.all([
+		settingstoreAPI.getSettings(),
+		modelPresetStoreAPI.getDefaultProvider(),
+		getAllProviderPresetsMap(true),
+	]);
+
+	return {
+		settings,
+		defaultProvider,
+		providerPresets,
+	};
+}
+
 // eslint-disable-next-line no-restricted-exports
 export default function ModelPresetsPage() {
 	const [defaultProvider, setDefaultProvider] = useState<ProviderName | undefined>(undefined);
 	const [providerPresets, setProviderPresets] = useState<Record<ProviderName, ProviderPreset>>({});
 	const [providerKeySet, setProviderKeySet] = useState<Record<ProviderName, boolean>>({});
+	const [authKeys, setAuthKeys] = useState<AuthKeyMeta[]>([]);
 
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [showDenied, setShowDenied] = useState(false);
 	const [deniedMsg, setDeniedMsg] = useState('');
+	const [isRepairingDefaultProvider, setIsRepairingDefaultProvider] = useState(false);
 
 	const [modalOpen, setModalOpen] = useState(false);
 	const [modalMode, setModalMode] = useState<'add' | 'edit' | 'view'>('add');
 	const [editProvider, setEditProvider] = useState<ProviderName | null>(null);
 
+	const showGlobalDenied = useCallback((message: string) => {
+		setDeniedMsg(message);
+		setShowDenied(true);
+	}, []);
+
+	const applyCanonicalPageData = useCallback((data: CanonicalPageData) => {
+		setDefaultProvider(data.defaultProvider);
+		setProviderPresets(data.providerPresets);
+		setAuthKeys(data.settings.authKeys);
+		setProviderKeySet(buildProviderKeySet(data.settings.authKeys));
+	}, []);
+
+	const refreshCanonicalData = useCallback(async () => {
+		const data = await fetchCanonicalPageData();
+		applyCanonicalPageData(data);
+	}, [applyCanonicalPageData]);
+
+	const refreshCanonicalDataSafely = useCallback(async () => {
+		try {
+			await refreshCanonicalData();
+		} catch (refreshError) {
+			console.error('refresh canonical data error', refreshError);
+		}
+	}, [refreshCanonicalData]);
+
+	const refreshAuthKeys = useCallback(async () => {
+		const settings = await settingstoreAPI.getSettings();
+		setAuthKeys(settings.authKeys);
+		setProviderKeySet(buildProviderKeySet(settings.authKeys));
+	}, []);
+
 	useEffect(() => {
-		(async () => {
+		let isActive = true;
+
+		const loadInitialData = async () => {
 			try {
 				setLoading(true);
-				const [settings, defProv, presets] = await Promise.all([
-					settingstoreAPI.getSettings(),
-					modelPresetStoreAPI.getDefaultProvider(),
-					getAllProviderPresetsMap(true),
-				]);
+				setError(null);
 
-				setDefaultProvider(defProv);
-				setProviderPresets(presets);
-				setProviderKeySet(
-					Object.fromEntries(
-						settings.authKeys.filter(k => k.type === AuthKeyTypeProvider).map(k => [k.keyName, k.nonEmpty])
-					)
-				);
-			} catch (err) {
-				console.error('init model presets error', err);
+				const data = await fetchCanonicalPageData();
+				if (!isActive) return;
+
+				applyCanonicalPageData(data);
+			} catch (loadError) {
+				console.error('init model presets error', loadError);
+				if (!isActive) return;
 				setError('Failed to load provider presets. Try again.');
 			} finally {
-				setLoading(false);
+				if (isActive) {
+					setLoading(false);
+				}
 			}
-		})();
-	}, []);
+		};
+
+		void loadInitialData();
+
+		return () => {
+			isActive = false;
+		};
+	}, [applyCanonicalPageData]);
 
 	const enabledProviderNames = useMemo(
 		() =>
 			Object.values(providerPresets)
-				.filter(p => p.isEnabled)
-				.map(p => p.name),
+				.filter(providerPreset => providerPreset.isEnabled)
+				.map(providerPreset => providerPreset.name),
 		[providerPresets]
 	);
 
 	const enabledProviderPresets = useMemo<Partial<Record<ProviderName, ProviderPreset>>>(() => {
-		const obj: Partial<Record<ProviderName, ProviderPreset>> = {};
+		const out: Partial<Record<ProviderName, ProviderPreset>> = {};
 		for (const [name, preset] of Object.entries(providerPresets)) {
-			if (preset.isEnabled) obj[name] = preset;
+			if (preset.isEnabled) {
+				out[name] = preset;
+			}
 		}
-		return obj;
+		return out;
 	}, [providerPresets]);
 
 	const safeDefaultKey: ProviderName | undefined =
-		defaultProvider && defaultProvider in enabledProviderPresets ? defaultProvider : undefined;
+		defaultProvider && enabledProviderPresets[defaultProvider] ? defaultProvider : undefined;
 
 	useEffect(() => {
+		if (loading || isRepairingDefaultProvider) return;
 		if (enabledProviderNames.length === 0) return;
 
-		if (!defaultProvider || !providerPresets[defaultProvider].isEnabled) {
-			const first = enabledProviderNames[0];
-			(async () => {
-				try {
-					await modelPresetStoreAPI.patchDefaultProvider(first);
-					setDefaultProvider(first);
-				} catch (err) {
-					console.error(err);
-					setDeniedMsg('Failed setting default provider.');
-					setShowDenied(true);
+		const defaultProviderIsEnabled = defaultProvider ? providerPresets[defaultProvider]?.isEnabled : false;
+		if (defaultProviderIsEnabled) return;
+
+		const fallbackProvider = enabledProviderNames[0];
+		if (!fallbackProvider) return;
+
+		let isActive = true;
+
+		const repairDefaultProvider = async () => {
+			try {
+				setIsRepairingDefaultProvider(true);
+				await modelPresetStoreAPI.patchDefaultProvider(fallbackProvider);
+				if (isActive) {
+					await refreshCanonicalData();
 				}
-			})();
-		}
-	}, [enabledProviderNames, defaultProvider, providerPresets]);
+			} catch (repairError) {
+				console.error(repairError);
+				if (isActive) {
+					showGlobalDenied('Failed setting default provider.');
+				}
+			} finally {
+				if (isActive) {
+					setIsRepairingDefaultProvider(false);
+				}
+			}
+		};
 
-	const handleDefaultProviderChange = async (prov: ProviderName) => {
-		try {
-			setDefaultProvider(prov);
-			await modelPresetStoreAPI.patchDefaultProvider(prov);
-		} catch (err) {
-			console.error(err);
-			setDeniedMsg('Failed changing default provider.');
-			setShowDenied(true);
-		}
-	};
+		void repairDefaultProvider();
 
-	const handleProviderPresetChange = (name: ProviderName, newPreset: ProviderPreset) => {
-		if (name === defaultProvider && !newPreset.isEnabled) {
-			setDeniedMsg('Cannot disable the current default provider. Pick another default first.');
-			setShowDenied(true);
-			return;
-		}
+		return () => {
+			isActive = false;
+		};
+	}, [
+		defaultProvider,
+		enabledProviderNames,
+		isRepairingDefaultProvider,
+		loading,
+		providerPresets,
+		refreshCanonicalData,
+		showGlobalDenied,
+	]);
 
-		setProviderPresets(prev => ({ ...prev, [name]: newPreset }));
+	const handleDefaultProviderChange = useCallback(
+		async (providerName: ProviderName) => {
+			setDefaultProvider(providerName);
 
-		if (!defaultProvider && newPreset.isEnabled) {
-			handleDefaultProviderChange(name);
-		}
-	};
+			try {
+				await modelPresetStoreAPI.patchDefaultProvider(providerName);
+				await refreshCanonicalData();
+			} catch (changeError) {
+				console.error(changeError);
+				await refreshCanonicalDataSafely();
+				showGlobalDenied('Failed changing default provider.');
+			}
+		},
+		[refreshCanonicalData, refreshCanonicalDataSafely, showGlobalDenied]
+	);
 
-	const handleProviderDelete = async (name: ProviderName) => {
-		if (providerPresets[name].isBuiltIn) {
-			setDeniedMsg('Built-in providers cannot be deleted.');
-			setShowDenied(true);
-			return;
-		}
-
-		if (name === defaultProvider) {
-			setDeniedMsg('Cannot delete the current default provider. Pick another default first.');
-			setShowDenied(true);
-			return;
-		}
-
-		try {
-			await aggregateAPI.deleteProviderPreset(name);
-			await aggregateAPI.deleteAuthKey(AuthKeyTypeProvider, name).catch(() => void 0);
-
-			setProviderPresets(prev => {
-				const { [name]: _removed, ...rest } = prev;
-				return rest;
-			});
-			setProviderKeySet(prev => {
-				const { [name]: _removed, ...rest } = prev;
-				return rest;
-			});
-		} catch (err) {
-			console.error(err);
-			setDeniedMsg('Failed deleting provider.');
-			setShowDenied(true);
-		}
-	};
-
-	const handleProviderModalSubmit = async (
-		name: ProviderName,
-		payload: Omit<ProviderPreset, 'isBuiltIn' | 'defaultModelPresetID' | 'modelPresets' | 'name'>,
-		apiKey: string | null,
-		isEdit: boolean
-	) => {
-		if (isEdit && name === defaultProvider && !payload.isEnabled) {
-			setDeniedMsg('Cannot disable the current default provider. Pick another default first.');
-			setShowDenied(true);
-			return;
-		}
-
-		try {
-			await aggregateAPI.putProviderPreset(name, payload);
-			if (apiKey && apiKey.trim()) {
-				await aggregateAPI.setAuthKey(AuthKeyTypeProvider, name, apiKey.trim());
+	const handleToggleProvider = useCallback(
+		async (providerName: ProviderName, nextEnabled: boolean) => {
+			const providerPreset = providerPresets[providerName];
+			if (!providerPreset) {
+				throw new Error('Provider not found.');
 			}
 
-			setProviderPresets(prev => {
-				const existing = prev[name];
-				return {
-					...prev,
-					[name]: {
-						...(existing ?? {}),
-						...payload,
+			if (!nextEnabled) {
+				if (providerName === defaultProvider) {
+					throw new Error('Cannot disable the current default provider. Pick another default first.');
+				}
 
-						// Editing should NEVER wipe these:
-						defaultModelPresetID: existing?.defaultModelPresetID ?? '',
-						modelPresets: existing?.modelPresets ?? {},
-
-						// Only custom providers go through this modal in edit/add
-						isBuiltIn: false,
-					} as ProviderPreset,
-				};
-			});
-
-			if (apiKey && apiKey.trim()) setProviderKeySet(prev => ({ ...prev, [name]: true }));
-
-			if (!defaultProvider && payload.isEnabled) {
-				await modelPresetStoreAPI.patchDefaultProvider(name);
-				setDefaultProvider(name);
+				const enabledCount = Object.values(providerPresets).filter(preset => preset.isEnabled).length;
+				if (providerPreset.isEnabled && enabledCount === 1) {
+					throw new Error('Cannot disable the last enabled provider.');
+				}
 			}
-		} catch (err) {
-			console.error(err);
-			setDeniedMsg(isEdit ? 'Failed updating provider.' : 'Failed adding provider.');
-			setShowDenied(true);
-		}
-	};
 
-	const fetchValue = async () => {
+			try {
+				await modelPresetStoreAPI.patchProviderPreset(providerName, nextEnabled);
+
+				if (nextEnabled && !defaultProvider) {
+					await modelPresetStoreAPI.patchDefaultProvider(providerName);
+				}
+
+				await refreshCanonicalData();
+			} catch (toggleError) {
+				console.error(toggleError);
+				await refreshCanonicalDataSafely();
+				throw new Error('Failed toggling provider.');
+			}
+		},
+		[defaultProvider, providerPresets, refreshCanonicalData, refreshCanonicalDataSafely]
+	);
+
+	const handleDeleteProvider = useCallback(
+		async (providerName: ProviderName) => {
+			const providerPreset = providerPresets[providerName];
+			if (!providerPreset) {
+				throw new Error('Provider not found.');
+			}
+
+			if (providerPreset.isBuiltIn) {
+				throw new Error('Built-in providers cannot be deleted.');
+			}
+
+			if (providerName === defaultProvider) {
+				throw new Error('Cannot delete the current default provider. Pick another default first.');
+			}
+
+			if (Object.keys(providerPreset.modelPresets).length > 0) {
+				throw new Error('Only empty providers can be deleted. Remove all model presets first.');
+			}
+
+			try {
+				await aggregateAPI.deleteProviderPreset(providerName);
+				await aggregateAPI.deleteAuthKey(AuthKeyTypeProvider, providerName).catch(() => void 0);
+				await refreshCanonicalData();
+			} catch (deleteError) {
+				console.error(deleteError);
+				await refreshCanonicalDataSafely();
+				throw new Error('Failed deleting provider.');
+			}
+		},
+		[defaultProvider, providerPresets, refreshCanonicalData, refreshCanonicalDataSafely]
+	);
+
+	const handleSetDefaultModel = useCallback(
+		async (providerName: ProviderName, modelPresetID: ModelPresetID) => {
+			const providerPreset = providerPresets[providerName];
+			if (!providerPreset) {
+				throw new Error('Provider not found.');
+			}
+
+			if (!providerPreset.modelPresets[modelPresetID]) {
+				throw new Error('Model preset not found.');
+			}
+
+			try {
+				await modelPresetStoreAPI.patchProviderPreset(providerName, undefined, modelPresetID);
+				await refreshCanonicalData();
+			} catch (changeError) {
+				console.error(changeError);
+				await refreshCanonicalDataSafely();
+				throw new Error('Failed setting default model.');
+			}
+		},
+		[providerPresets, refreshCanonicalData, refreshCanonicalDataSafely]
+	);
+
+	const handleToggleModel = useCallback(
+		async (providerName: ProviderName, modelPresetID: ModelPresetID, nextEnabled: boolean) => {
+			const providerPreset = providerPresets[providerName];
+			if (!providerPreset) {
+				throw new Error('Provider not found.');
+			}
+
+			const modelPreset = providerPreset.modelPresets[modelPresetID];
+			if (!modelPreset) {
+				throw new Error('Model preset not found.');
+			}
+
+			if (!nextEnabled && providerPreset.defaultModelPresetID === modelPresetID && modelPreset.isEnabled) {
+				throw new Error('Cannot disable the default model preset. Choose another default first.');
+			}
+
+			try {
+				await modelPresetStoreAPI.patchModelPreset(providerName, modelPresetID, nextEnabled);
+				await refreshCanonicalData();
+			} catch (toggleError) {
+				console.error(toggleError);
+				await refreshCanonicalDataSafely();
+				throw new Error('Failed toggling model.');
+			}
+		},
+		[providerPresets, refreshCanonicalData, refreshCanonicalDataSafely]
+	);
+
+	const handleSaveModel = useCallback(
+		async (providerName: ProviderName, modelPresetID: ModelPresetID, modelData: ModelPreset) => {
+			const providerPreset = providerPresets[providerName];
+			if (!providerPreset) {
+				throw new Error('Provider not found.');
+			}
+
+			try {
+				const { id: _id, isBuiltIn: _isBuiltIn, ...payload } = modelData;
+				await modelPresetStoreAPI.putModelPreset(providerName, modelPresetID, payload);
+
+				if (!providerPreset.defaultModelPresetID) {
+					await modelPresetStoreAPI.patchProviderPreset(providerName, undefined, modelPresetID);
+				}
+
+				await refreshCanonicalData();
+			} catch (saveError) {
+				console.error(saveError);
+				await refreshCanonicalDataSafely();
+				throw new Error('Failed saving model preset.');
+			}
+		},
+		[providerPresets, refreshCanonicalData, refreshCanonicalDataSafely]
+	);
+
+	const handleDeleteModel = useCallback(
+		async (providerName: ProviderName, modelPresetID: ModelPresetID) => {
+			const providerPreset = providerPresets[providerName];
+			if (!providerPreset) {
+				throw new Error('Provider not found.');
+			}
+
+			const modelPreset = providerPreset.modelPresets[modelPresetID];
+			if (!modelPreset) {
+				throw new Error('Model preset not found.');
+			}
+
+			if (modelPreset.isBuiltIn) {
+				throw new Error('Built-in model presets cannot be deleted.');
+			}
+
+			const remainingModelIDs = Object.keys(providerPreset.modelPresets).filter(id => id !== modelPresetID);
+
+			try {
+				await modelPresetStoreAPI.deleteModelPreset(providerName, modelPresetID);
+
+				if (providerPreset.defaultModelPresetID === modelPresetID && remainingModelIDs.length > 0) {
+					await modelPresetStoreAPI.patchProviderPreset(providerName, undefined, remainingModelIDs[0]);
+				}
+
+				await refreshCanonicalData();
+			} catch (deleteError) {
+				console.error(deleteError);
+				await refreshCanonicalDataSafely();
+				throw new Error('Failed deleting model preset.');
+			}
+		},
+		[providerPresets, refreshCanonicalData, refreshCanonicalDataSafely]
+	);
+
+	const handleProviderModalSubmit = useCallback(
+		async (
+			providerName: ProviderName,
+			payload: Omit<ProviderPreset, 'isBuiltIn' | 'defaultModelPresetID' | 'modelPresets' | 'name'>,
+			apiKey: string | null,
+			isEdit: boolean
+		) => {
+			if (isEdit && providerName === defaultProvider && !payload.isEnabled) {
+				const message = 'Cannot disable the current default provider. Pick another default first.';
+				showGlobalDenied(message);
+				throw new Error(message);
+			}
+
+			try {
+				await aggregateAPI.putProviderPreset(providerName, payload);
+
+				if (apiKey && apiKey.trim()) {
+					await aggregateAPI.setAuthKey(AuthKeyTypeProvider, providerName, apiKey.trim());
+				}
+
+				if (!defaultProvider && payload.isEnabled) {
+					await modelPresetStoreAPI.patchDefaultProvider(providerName);
+				}
+
+				await refreshCanonicalData();
+			} catch (submitError) {
+				console.error(submitError);
+				await refreshCanonicalDataSafely();
+
+				const message = isEdit ? 'Failed updating provider.' : 'Failed adding provider.';
+				showGlobalDenied(message);
+				throw new Error(message);
+			}
+		},
+		[defaultProvider, refreshCanonicalData, refreshCanonicalDataSafely, showGlobalDenied]
+	);
+
+	const handleProviderAuthKeyChanged = useCallback(
+		async (providerName: ProviderName) => {
+			setProviderKeySet(prev => ({ ...prev, [providerName]: true }));
+
+			try {
+				await refreshAuthKeys();
+			} catch (refreshError) {
+				console.error(refreshError);
+				throw new Error('Failed refreshing auth key state.');
+			}
+		},
+		[refreshAuthKeys]
+	);
+
+	const fetchValue = useCallback(async () => {
 		try {
-			const [providerPresetMap, defProv] = await Promise.all([
-				getAllProviderPresetsMap(true),
-				modelPresetStoreAPI.getDefaultProvider(),
-			]);
-			return JSON.stringify({ defaultProvider: defProv, providers: providerPresetMap }, null, 2);
-		} catch (err) {
-			console.log('fetch preset error', err);
-			setDeniedMsg('Failed fetching presets.');
-			setShowDenied(true);
+			const data = await fetchCanonicalPageData();
+			return JSON.stringify(
+				{
+					defaultProvider: data.defaultProvider,
+					providers: data.providerPresets,
+				},
+				null,
+				2
+			);
+		} catch (fetchError) {
+			console.log('fetch preset error', fetchError);
+			showGlobalDenied('Failed fetching presets.');
 			return '';
 		}
-	};
+	}, [showGlobalDenied]);
 
 	const openAddModal = () => {
 		setModalMode('add');
@@ -226,10 +461,15 @@ export default function ModelPresetsPage() {
 		setModalOpen(true);
 	};
 
-	const openEditModal = (name: ProviderName) => {
-		const isBuiltIn = providerPresets[name].isBuiltIn;
-		setModalMode(isBuiltIn ? 'view' : 'edit');
-		setEditProvider(name);
+	const openEditModal = (providerName: ProviderName) => {
+		const providerPreset = providerPresets[providerName];
+		if (!providerPreset) {
+			showGlobalDenied('Provider not found.');
+			return;
+		}
+
+		setModalMode(providerPreset.isBuiltIn ? 'view' : 'edit');
+		setEditProvider(providerName);
 		setModalOpen(true);
 	};
 
@@ -287,18 +527,24 @@ export default function ModelPresetsPage() {
 						{!error &&
 							Object.entries(providerPresets)
 								.sort(sortByDisplayName)
-								.map(([name, p]) => (
+								.map(([name, preset]) => (
 									<ProviderPresetCard
 										key={name}
 										provider={name}
-										preset={p}
-										defaultProvider={defaultProvider ?? ''}
+										preset={preset}
+										defaultProvider={defaultProvider}
 										authKeySet={providerKeySet[name]}
+										authKeys={authKeys}
 										enabledProviders={enabledProviderNames}
-										onProviderPresetChange={handleProviderPresetChange}
-										onProviderDelete={handleProviderDelete}
-										onRequestEdit={openEditModal}
 										allProviderPresets={providerPresets}
+										onToggleProvider={handleToggleProvider}
+										onDeleteProvider={handleDeleteProvider}
+										onRequestEdit={openEditModal}
+										onSetDefaultModel={handleSetDefaultModel}
+										onToggleModel={handleToggleModel}
+										onSaveModel={handleSaveModel}
+										onDeleteModel={handleDeleteModel}
+										onProviderAuthKeyChanged={handleProviderAuthKeyChanged}
 									/>
 								))}
 					</div>
@@ -310,9 +556,9 @@ export default function ModelPresetsPage() {
 					onClose={() => {
 						setModalOpen(false);
 					}}
-					onSubmit={(n, payload, key) => {
+					onSubmit={async (name, payload, apiKey) => {
 						if (modalMode === 'view') return;
-						return handleProviderModalSubmit(n, payload, key, modalMode === 'edit');
+						await handleProviderModalSubmit(name, payload, apiKey, modalMode === 'edit');
 					}}
 					existingProviderNames={Object.keys(providerPresets)}
 					allProviderPresets={providerPresets}
