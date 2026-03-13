@@ -1,18 +1,16 @@
 import { memo } from 'react';
 
-import type { Path } from 'platejs';
-
 import type { AttachmentContentBlockMode, UIAttachment } from '@/spec/attachment';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 
 import { DirectoryChip } from '@/chats/attachments/attachment_directory_chip';
 import { type DirectoryAttachmentGroup, uiAttachmentKey } from '@/chats/attachments/attachment_editor_utils';
 import { StandaloneAttachmentsChip } from '@/chats/attachments/attachment_standalone_chips';
+import type { AttachedToolEntry } from '@/chats/platedoc/tool_document_ops';
 import type { ConversationToolStateEntry } from '@/chats/tools/conversation_tool_utils';
 import { ConversationToolsChip } from '@/chats/tools/conversation_tools_chip';
 import { ToolChipsComposerRow } from '@/chats/tools/tool_chips_composer';
 import { ToolChoicesChip } from '@/chats/tools/tool_choices_chip';
-import type { ToolSelectionElementNode } from '@/chats/tools/tool_editor_utils';
 
 interface EditorChipsBarProps {
 	attachments: UIAttachment[];
@@ -22,7 +20,7 @@ interface EditorChipsBarProps {
 	// Tool calls & outputs (tool runners / results)
 	toolCalls?: UIToolCall[];
 	toolOutputs?: UIToolOutput[];
-	toolEntries: Array<[ToolSelectionElementNode, Path]>;
+	toolEntries: AttachedToolEntry[];
 	isBusy?: boolean;
 	onRunToolCall?: (id: string) => void | Promise<void>;
 	onDiscardToolCall?: (id: string) => void;
@@ -35,13 +33,14 @@ interface EditorChipsBarProps {
 	onRemoveDirectoryGroup: (groupId: string) => void;
 	onRemoveOverflowDir?: (groupId: string, dirPath: string) => void;
 	onConversationToolsChange?: (next: ConversationToolStateEntry[]) => void;
-	onToggleAttachedToolAutoExecute: (node: ToolSelectionElementNode, next: boolean) => void;
-	onRemoveAttachedTool: (node: ToolSelectionElementNode) => void;
-	onRemoveAllAttachedTools: (nodes: ToolSelectionElementNode[]) => void;
-	onEditAttachedToolOptions: (node: ToolSelectionElementNode) => void;
+	onToggleAttachedToolAutoExecute: (entry: AttachedToolEntry, next: boolean) => void;
+	onRemoveAttachedTool: (entry: AttachedToolEntry) => void;
+	onRemoveAllAttachedTools: (entries: AttachedToolEntry[]) => void;
+	onEditAttachedToolOptions: (entry: AttachedToolEntry) => void;
 	onOpenToolCallDetails?: (call: UIToolCall) => void;
 	onOpenConversationToolDetails?: (entry: ConversationToolStateEntry) => void;
-	onOpenAttachedToolDetails?: (node: ToolSelectionElementNode) => void;
+	onOpenAttachedToolDetails?: (entry: AttachedToolEntry) => void;
+	toolArgsEventTarget?: EventTarget | null;
 }
 
 /**
@@ -79,6 +78,7 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 	onOpenToolCallDetails,
 	onOpenConversationToolDetails,
 	onOpenAttachedToolDetails,
+	toolArgsEventTarget,
 }: EditorChipsBarProps) {
 	const hasVisibleToolCalls = toolCalls.some(
 		toolCall => toolCall.status !== 'discarded' && toolCall.status !== 'succeeded'
@@ -120,6 +120,7 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 				tools={conversationTools}
 				onChange={onConversationToolsChange}
 				onShowToolDetails={openConversationToolDetails}
+				toolArgsEventTarget={toolArgsEventTarget}
 			/>
 
 			{/* Aggregated chip for standalone attachments */}

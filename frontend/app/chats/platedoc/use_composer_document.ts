@@ -2,27 +2,17 @@ import {
 	type ClipboardEvent as ReactClipboardEvent,
 	type RefObject,
 	useCallback,
-	useDeferredValue,
 	useEffect,
 	useMemo,
 	useRef,
 	useState,
 } from 'react';
 
-import { SingleBlockPlugin, type Value } from 'platejs';
+import { type Value } from 'platejs';
 import { type PlateEditor, usePlateEditor } from 'platejs/react';
 
 import { compareEntryByPathDeepestFirst } from '@/lib/path_utils';
 import { cssEscape } from '@/lib/text_utils';
-
-import { AlignKit } from '@/components/editor/plugins/align_kit';
-import { BasicBlocksKit } from '@/components/editor/plugins/basic_blocks_kit';
-import { BasicMarksKit } from '@/components/editor/plugins/basic_marks_kit';
-import { FloatingToolbarKit } from '@/components/editor/plugins/floating_toolbar_kit';
-import { IndentKit } from '@/components/editor/plugins/indent_kit';
-import { LineHeightKit } from '@/components/editor/plugins/line_height_kit';
-import { ListKit } from '@/components/editor/plugins/list_kit';
-import { TabbableKit } from '@/components/editor/plugins/tabbable_kit';
 
 import {
 	buildSingleParagraphValue,
@@ -42,27 +32,11 @@ import {
 	type ComposerDocumentSelectionInfo,
 	isSelectionOnlyEditorChange,
 } from '@/chats/platedoc/document_analysis';
-import { getTemplateNodesWithPath } from '@/chats/templates/template_editor_utils';
-import { TemplateSlashKit } from '@/chats/templates/template_plugin';
+import { createComposerEditorPlugins } from '@/chats/platedoc/plugins';
+import { getTemplateNodesWithPath } from '@/chats/platedoc/template_document_ops';
+import { buildUserInlineChildrenFromText } from '@/chats/platedoc/template_variables_inline';
+import { type AttachedToolEntry, getAttachedToolEntries } from '@/chats/platedoc/tool_document_ops';
 import { getLastUserBlockContent } from '@/chats/templates/template_processing';
-import { buildUserInlineChildrenFromText } from '@/chats/templates/template_variables_inline';
-import { getToolNodesWithPath } from '@/chats/tools/tool_editor_utils';
-import { ToolPlusKit } from '@/chats/tools/tool_plugin';
-
-const createEditorPlugins = () => [
-	SingleBlockPlugin,
-	...BasicBlocksKit,
-	...BasicMarksKit,
-	...LineHeightKit,
-	...AlignKit,
-	...IndentKit,
-	...ListKit,
-	// ...AutoformatKit, // Don't want any formatting on typing
-	...TabbableKit,
-	...TemplateSlashKit,
-	...ToolPlusKit,
-	...FloatingToolbarKit,
-];
 
 type ReplaceEditorDocumentFocusMode = 'none' | 'preserve' | 'end';
 
@@ -76,10 +50,11 @@ interface UseComposerDocumentResult {
 	hasText: boolean;
 	hasTextRef: RefObject<boolean>;
 	selectionInfo: ComposerDocumentSelectionInfo;
-	attachedToolEntries: ReturnType<typeof getToolNodesWithPath>;
+	attachedToolEntries: AttachedToolEntry[];
+	getAttachedToolEntriesSnapshot: (uniqueByIdentity?: boolean) => AttachedToolEntry[];
 	onEditorChange: () => boolean;
 	onEditorPaste: (event: ReactClipboardEvent<HTMLDivElement>) => void;
-	replaceEditorDocument: (nextValue: Value, nextHasText: boolean, focus?: ReplaceEditorDocumentFocusMode) => void;
+	replaceEditorDocument: (nextValue: Value, focus?: ReplaceEditorDocumentFocusMode) => void;
 	resetEditorDocument: () => void;
 	focusEditorAtEnd: () => void;
 	focusEditorPreservingSelection: () => void;
@@ -87,7 +62,7 @@ interface UseComposerDocumentResult {
 
 export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseComposerDocumentResult {
 	const initialEditorValue = useMemo<Value>(() => createEmptyEditorValue(), []);
-	const editorPlugins = useMemo(() => createEditorPlugins(), []);
+	const editorPlugins = useMemo(() => createComposerEditorPlugins(), []);
 	const editor = usePlateEditor({
 		plugins: editorPlugins,
 		value: initialEditorValue,
@@ -99,7 +74,6 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 	// doc version tick to re-run selection computations on any editor change
 	const [docVersion, setDocVersion] = useState(0);
-	const deferredDocVersion = useDeferredValue(docVersion);
 
 	// Cache "has text" so we don't re-scan the editor tree multiple times per render.
 	const [hasText, setHasText] = useState(false);
@@ -107,18 +81,25 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 	const isAutoChunkingRef = useRef(false);
 	const lastPopulatedSelectionKeyRef = useRef<Set<string>>(new Set());
 
+	const syncDocumentDerivedState = useCallback((bumpDocVersion = true) => {
+		const nextHasText = hasNonEmptyUserText(editorRef.current);
+		hasTextRef.current = nextHasText;
+		setHasText(prev => (prev === nextHasText ? prev : nextHasText));
+
+		if (bumpDocVersion) {
+			setDocVersion(v => v + 1);
+		}
+	}, []);
+
 	// Throttle docVersion bumps to at most 1/frame to avoid re-render storms on big documents.
 	const docRafRef = useRef<number | null>(null);
 	const scheduleDocRecompute = useCallback(() => {
 		if (docRafRef.current != null) return;
 		docRafRef.current = window.requestAnimationFrame(() => {
 			docRafRef.current = null;
-			setDocVersion(v => v + 1);
-			const nextHasText = hasNonEmptyUserText(editorRef.current);
-			hasTextRef.current = nextHasText;
-			setHasText(nextHasText);
+			syncDocumentDerivedState(true);
 		});
-	}, []);
+	}, [syncDocumentDerivedState]);
 
 	useEffect(() => {
 		return () => {
@@ -254,13 +235,17 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 		});
 	}, [isBusy]);
 
+	// Recompute template selection info whenever doc changes.
+	// analyzeTemplateSelectionInfo has a fast-path exit when no template nodes exist.
 	// eslint-disable-next-line react-hooks/exhaustive-deps
-	const selectionInfo = useMemo(() => analyzeTemplateSelectionInfo(editor), [editor, deferredDocVersion]);
+	const selectionInfo = useMemo(() => analyzeTemplateSelectionInfo(editor), [editor, docVersion]);
 
-	// Intentionally not memoized only against docVersion: some editor mutations can
-	// cause unrelated parent rerenders before the throttled doc tick lands, and we
-	// still want attached tool chips to reflect the current editor tree on that render.
-	const attachedToolEntries = getToolNodesWithPath(editor);
+	// Intentionally derived on render so any parent rerender sees current doc state.
+	const attachedToolEntries = getAttachedToolEntries(editor);
+
+	const getAttachedToolEntriesSnapshot = useCallback((uniqueByIdentity?: boolean) => {
+		return getAttachedToolEntries(editorRef.current, uniqueByIdentity);
+	}, []);
 
 	// Populate editor with effective last-USER block for EACH template selection (once per selectionID)
 	useEffect(() => {
@@ -275,7 +260,7 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 		for (const [tsenode, originalPath] of nodesRev) {
 			if (!tsenode || !tsenode.selectionID) continue;
-			const selectionID: string = tsenode.selectionID;
+			const selectionID = tsenode.selectionID;
 			if (populated.has(selectionID)) continue;
 
 			// Build children: keep the selection chip, add parsed user text with variable pills
@@ -285,7 +270,7 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 			try {
 				editor.tf.withoutNormalizing(() => {
 					// Recompute a fresh path to guard against prior insertions shifting indices
-					const pathArr = Array.isArray(originalPath) ? (originalPath as number[]) : [];
+					const pathArr = Array.isArray(originalPath) ? originalPath : [];
 
 					if (pathArr.length >= 2) {
 						const blockPath = pathArr.slice(0, pathArr.length - 1); // parent paragraph path
@@ -324,10 +309,10 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 				}
 			});
 		}
-	}, [editor, focusEditorAtEnd, deferredDocVersion, selectionInfo.tplNodeWithPath]);
+	}, [editor, focusEditorAtEnd, docVersion, selectionInfo.tplNodeWithPath, syncDocumentDerivedState]);
 
 	const replaceEditorDocument = useCallback(
-		(nextValue: Value, nextHasText: boolean, focus: ReplaceEditorDocumentFocusMode = 'none') => {
+		(nextValue: Value, focus: ReplaceEditorDocumentFocusMode = 'none') => {
 			const currentEditor = editorRef.current;
 			if (!currentEditor) return;
 
@@ -342,9 +327,7 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 				currentEditor.tf.setValue(nextValue);
 			});
 
-			hasTextRef.current = nextHasText;
-			setHasText(nextHasText);
-			setDocVersion(v => v + 1);
+			syncDocumentDerivedState(true);
 
 			if (focus === 'end') {
 				focusEditorAtEnd();
@@ -352,40 +335,41 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 				focusEditorPreservingSelection();
 			}
 		},
-		[focusEditorAtEnd, focusEditorPreservingSelection]
+		[focusEditorAtEnd, focusEditorPreservingSelection, syncDocumentDerivedState]
 	);
 
 	const resetEditorDocument = useCallback(() => {
-		replaceEditorDocument(createEmptyEditorValue(), false, 'end');
+		replaceEditorDocument(createEmptyEditorValue(), 'end');
 	}, [replaceEditorDocument]);
 
-	const onEditorPaste = useCallback((e: ReactClipboardEvent<HTMLDivElement>) => {
-		e.preventDefault();
-		e.stopPropagation();
+	const onEditorPaste = useCallback(
+		(e: ReactClipboardEvent<HTMLDivElement>) => {
+			e.preventDefault();
+			e.stopPropagation();
 
-		const text = e.clipboardData.getData('text/plain');
-		if (!text) return;
+			const text = e.clipboardData.getData('text/plain');
+			if (!text) return;
 
-		const currentEditor = editorRef.current;
-		clearAllMarks(currentEditor);
+			const currentEditor = editorRef.current;
+			clearAllMarks(currentEditor);
 
-		// PERF: if paste is huge AND the doc is truly the default empty paragraph,
-		// set chunked value directly. Do not use "has text" as a proxy for
-		// emptiness, or we can blow away template/tool nodes.
-		if (isSimpleEmptyParagraphDocument(currentEditor) && text.length >= LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS) {
-			currentEditor.tf.withoutNormalizing(() => {
-				currentEditor.tf.setValue(buildSingleParagraphValueChunked(text, LARGE_TEXT_CHUNK_SIZE));
-				currentEditor.tf.collapse({ edge: 'end' });
-			});
+			// PERF: if paste is huge AND the doc is truly the default empty paragraph,
+			// set chunked value directly. Do not use "has text" as a proxy for
+			// emptiness, or we can blow away template/tool nodes.
+			if (isSimpleEmptyParagraphDocument(currentEditor) && text.length >= LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS) {
+				currentEditor.tf.withoutNormalizing(() => {
+					currentEditor.tf.setValue(buildSingleParagraphValueChunked(text, LARGE_TEXT_CHUNK_SIZE));
+					currentEditor.tf.collapse({ edge: 'end' });
+				});
 
-			hasTextRef.current = true;
-			setHasText(true);
-			setDocVersion(v => v + 1);
-			return;
-		}
+				syncDocumentDerivedState(true);
+				return;
+			}
 
-		insertPlainTextAsSingleBlock(currentEditor, text);
-	}, []);
+			insertPlainTextAsSingleBlock(currentEditor, text);
+		},
+		[syncDocumentDerivedState]
+	);
 
 	const onEditorChange = useCallback(() => {
 		const currentEditor = editorRef.current;
@@ -406,6 +390,7 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 		hasTextRef,
 		selectionInfo,
 		attachedToolEntries,
+		getAttachedToolEntriesSnapshot,
 		onEditorChange,
 		onEditorPaste,
 		replaceEditorDocument,

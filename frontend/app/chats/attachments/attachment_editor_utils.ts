@@ -73,7 +73,7 @@ export function getUIAttachmentPath(att: UIAttachment): string {
 
 function buildErrorAttachmentForLocalPath(att: Attachment, reason: AttachmentErrorReason): UIAttachment {
 	return {
-		kind: AttachmentKind.file,
+		kind: att.kind,
 		label: att.label,
 		mode: AttachmentContentBlockMode.notReadable,
 		availableContentBlockModes: [AttachmentContentBlockMode.notReadable],
@@ -105,7 +105,7 @@ export function buildUIAttachmentForLocalPath(att: Attachment): UIAttachment | u
 		return buildErrorAttachmentForLocalPath(att, AttachmentErrorReason.TooLargeSingle);
 	}
 
-	if (att.mode && att.mode == AttachmentContentBlockMode.notReadable) {
+	if (att.mode && att.mode === AttachmentContentBlockMode.notReadable) {
 		return buildErrorAttachmentForLocalPath(att, AttachmentErrorReason.Unreadable);
 	}
 	return {
@@ -148,12 +148,13 @@ export function getAttachmentErrorMessage(att: UIAttachment): string | null {
 	} else if (att.imageRef && att.imageRef.size && att.imageRef.size > 0) {
 		size = att.imageRef.size;
 	}
-	if (size <= 0) {
-		return null;
-	}
+
 	switch (att.errorReason) {
 		case AttachmentErrorReason.TooLargeSingle: {
-			return `Too large to attach (${formatBytes(size)}; limit is ${limit}).`;
+			if (size > 0) {
+				return `Too large to attach (${formatBytes(size)}; limit is ${limit}).`;
+			}
+			return `Too large to attach (limit is ${limit}).`;
 		}
 		case AttachmentErrorReason.TooLargeTotal:
 			return 'Too many or too large files in this folder were skipped; only a subset was attached.';

@@ -7,6 +7,7 @@ import type { PlateEditor, PlateElementProps } from 'platejs/react';
 
 import { VarType } from '@/spec/prompt';
 
+import { omitManyKeys } from '@/lib/obj_utils';
 import { cssEscape } from '@/lib/text_utils';
 
 import {
@@ -14,16 +15,16 @@ import {
 	useTemplateVarsUpdatedForSelection,
 } from '@/chats/events/template_toolbar_vars_updated';
 import {
-	computeEffectiveTemplate,
-	computeRequirements,
-	effectiveVarValueLocal,
-} from '@/chats/templates/template_processing';
-import {
 	KEY_TEMPLATE_SELECTION,
 	KEY_TEMPLATE_VARIABLE,
 	type TemplateSelectionElementNode,
 	type TemplateVariableElementNode,
-} from '@/chats/templates/template_spec';
+} from '@/chats/platedoc/nodes';
+import {
+	computeEffectiveTemplate,
+	computeRequirements,
+	effectiveVarValueLocal,
+} from '@/chats/templates/template_processing';
 import { EnumDropdownInline } from '@/chats/templates/template_variable_enum_dropdown';
 
 type TemplateVariableDef = ReturnType<typeof computeEffectiveTemplate>['variablesSchema'][number];
@@ -290,12 +291,11 @@ export function TemplateVariableElement(props: PlateElementProps<any>) {
 	function commitValue(next: unknown) {
 		if (!tsenode || !tsPath) return;
 
-		const nextVars = { ...(tsenode.variables ?? {}) };
+		let nextVars = { ...(tsenode.variables ?? {}) };
 
 		const shouldUnset = next === undefined || next === null;
 		if (shouldUnset) {
-			// eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-			delete nextVars[el.name];
+			nextVars = omitManyKeys(nextVars, [el.name]);
 		} else {
 			nextVars[el.name] = next;
 		}
@@ -423,7 +423,7 @@ export function buildUserInlineChildrenFromText(
 ): TemplateInlineChild[] {
 	const { variablesSchema } = computeEffectiveTemplate(tsenode);
 	const variablesByName = new Map(variablesSchema.map(v => [v.name, v] as const));
-	const selectionID: string | undefined = tsenode.selectionID;
+	const selectionID = tsenode.selectionID;
 
 	const result: TemplateInlineChild[] = [];
 	const re = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
@@ -456,7 +456,7 @@ export function buildUserInlineChildrenFromText(
 			result.push(node);
 		} else {
 			// unknown variable -> keep as literal
-			result.push({ text: m[0] });
+			result.push({ text: m[0], ownerSelectionID: selectionID });
 		}
 
 		idx = m.index + m[0].length;
@@ -468,7 +468,7 @@ export function buildUserInlineChildrenFromText(
 	}
 
 	if (result.length === 0) {
-		result.push({ text: '' });
+		result.push({ text: '', ownerSelectionID: selectionID });
 	}
 
 	return result;

@@ -39,6 +39,8 @@ interface UseComposerSkillsResult {
 	applyEnabledSkillRefsFromMessage: (refs: SkillRef[]) => void;
 	applyActiveSkillRefsFromMessage: (refs: SkillRef[]) => void;
 	flushPendingMessageSkillSelection: () => void;
+	getCurrentEnabledSkillRefs: () => SkillRef[];
+	getCurrentActiveSkillRefs: () => SkillRef[];
 	getCurrentSkillSessionID: () => string | null;
 }
 
@@ -82,6 +84,14 @@ export function useComposerSkills(): UseComposerSkillsResult {
 
 	const getCurrentSkillSessionID = useCallback(() => {
 		return skillSessionIDRef.current;
+	}, []);
+
+	const getCurrentEnabledSkillRefs = useCallback(() => {
+		return enabledSkillRefsRef.current;
+	}, []);
+
+	const getCurrentActiveSkillRefs = useCallback(() => {
+		return activeSkillRefsRef.current;
 	}, []);
 
 	const closeSkillSessionBestEffort = useCallback((sid: string | null | undefined) => {
@@ -339,6 +349,8 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		applyEnabledSkillRefsFromMessage,
 		applyActiveSkillRefsFromMessage,
 		flushPendingMessageSkillSelection,
+		getCurrentEnabledSkillRefs,
+		getCurrentActiveSkillRefs,
 		getCurrentSkillSessionID,
 	};
 }

@@ -1,20 +1,20 @@
 import { FiChevronUp, FiTool, FiX } from 'react-icons/fi';
 
 import { Menu, MenuButton, useMenuStore } from '@ariakit/react';
-import type { Path } from 'platejs';
 
 import { ToolStoreChoiceType } from '@/spec/tool';
 
-import { computeToolUserArgsStatus, type ToolSelectionElementNode } from '@/chats/tools/tool_editor_utils';
+import type { AttachedToolEntry } from '@/chats/platedoc/tool_document_ops';
+import { computeToolUserArgsStatus } from '@/chats/tools/tool_editor_utils';
 import { ToolMenuRow } from '@/chats/tools/tool_menu_row';
 
 interface ToolChoicesChipProps {
-	toolEntries: Array<[ToolSelectionElementNode, Path]>;
-	onToggleAutoExecute: (node: ToolSelectionElementNode, next: boolean) => void;
-	onRemoveTool: (node: ToolSelectionElementNode) => void;
-	onRemoveAllTools: (nodes: ToolSelectionElementNode[]) => void;
-	onEditToolOptions: (node: ToolSelectionElementNode) => void;
-	onShowToolDetails?: (node: ToolSelectionElementNode) => void;
+	toolEntries: AttachedToolEntry[];
+	onToggleAutoExecute: (entry: AttachedToolEntry, next: boolean) => void;
+	onRemoveTool: (entry: AttachedToolEntry) => void;
+	onRemoveAllTools: (entries: AttachedToolEntry[]) => void;
+	onEditToolOptions: (entry: AttachedToolEntry) => void;
+	onShowToolDetails?: (entry: AttachedToolEntry) => void;
 }
 
 /**
@@ -33,8 +33,8 @@ export function ToolChoicesChip({
 }: ToolChoicesChipProps) {
 	// Only show "attached tools" that behave like normal tools in this UI.
 	// Web search is controlled separately in the bottom bar.
-	const visibleEntries = toolEntries.filter(([node]) => node.toolType !== ToolStoreChoiceType.WebSearch);
-	const visibleNodes = visibleEntries.map(([node]) => node);
+	const visibleEntries = toolEntries.filter(node => node.toolType !== ToolStoreChoiceType.WebSearch);
+	const visibleNodes = visibleEntries;
 	const count = visibleEntries.length;
 
 	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
@@ -84,7 +84,7 @@ export function ToolChoicesChip({
 			>
 				<div className="text-base-content/70 mb-1 text-[11px] font-semibold">Tools</div>
 
-				{visibleEntries.map(([node]) => {
+				{visibleEntries.map(node => {
 					const rawDisplay: string | undefined = node.toolSnapshot?.displayName ?? node.toolSlug;
 					const display = rawDisplay && rawDisplay.length > 0 ? rawDisplay : 'Tool';
 					const slug = `${node.bundleSlug ?? node.bundleID}/${node.toolSlug}@${node.toolVersion}`;
@@ -112,7 +112,6 @@ export function ToolChoicesChip({
 								onToggleAutoExecute(node, next);
 							}}
 							argsStatus={status}
-							// Keep your existing "edit" icon if you prefer:
 							editIcon={<FiChevronUp size={12} />}
 							onEditOptions={
 								hasArgs

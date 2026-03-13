@@ -1,20 +1,20 @@
 import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from 'react';
 
-import type { PlateEditor } from 'platejs/react';
-
 import type { Tool } from '@/spec/tool';
 
 import type { JSONSchema } from '@/lib/jsonschema_utils';
 
 import { toolStoreAPI } from '@/apis/baseapi';
 
+import type { AttachedToolEntry } from '@/chats/platedoc/tool_document_ops';
 import type { ConversationToolStateEntry } from '@/chats/tools/conversation_tool_utils';
-import { computeToolUserArgsStatus, getToolNodesWithPath } from '@/chats/tools/tool_editor_utils';
+import { computeToolUserArgsStatus } from '@/chats/tools/tool_editor_utils';
 import { type ToolArgsTarget, ToolUserArgsModal } from '@/chats/tools/tool_user_args_modal';
 import { type WebSearchChoiceTemplate } from '@/chats/tools/websearch_utils';
 
 interface ToolArgsModalHostProps {
-	editor: PlateEditor;
+	attachedToolEntries: AttachedToolEntry[];
+	setAttachedToolUserArgSchemaInstance: (selectionID: string, newInstance: string) => void;
 	conversationToolsState: ConversationToolStateEntry[];
 	setConversationToolsState: Dispatch<SetStateAction<ConversationToolStateEntry[]>>;
 	toolArgsTarget: ToolArgsTarget | null;
@@ -26,7 +26,8 @@ interface ToolArgsModalHostProps {
 }
 
 export function ToolArgsModalHost({
-	editor,
+	attachedToolEntries,
+	setAttachedToolUserArgSchemaInstance,
 	conversationToolsState,
 	setConversationToolsState,
 	toolArgsTarget,
@@ -39,6 +40,7 @@ export function ToolArgsModalHost({
 	let toolLabel = '';
 	let schema: JSONSchema | undefined;
 	let existingInstance: string | undefined;
+	let modalIdentity: string | undefined;
 	let onSave: (newInstance: string) => void = () => {};
 
 	const activeWebSearch = useMemo(
@@ -46,51 +48,82 @@ export function ToolArgsModalHost({
 		[webSearchTemplates]
 	);
 
-	const [webSearchToolDef, setWebSearchToolDef] = useState<Tool | null>(null);
+	const [loadedWebSearchToolDef, setLoadedWebSearchToolDef] = useState<{
+		key: string;
+		def: Tool | null;
+	} | null>(null);
+	const activeWebSearchBundleID = activeWebSearch?.bundleID;
+	const activeWebSearchToolSlug = activeWebSearch?.toolSlug;
+	const activeWebSearchToolVersion = activeWebSearch?.toolVersion;
+	const activeWebSearchKey =
+		activeWebSearchBundleID && activeWebSearchToolSlug && activeWebSearchToolVersion
+			? `${activeWebSearchBundleID}:${activeWebSearchToolSlug}:${activeWebSearchToolVersion}`
+			: null;
+
+	const webSearchToolDef = loadedWebSearchToolDef?.key === activeWebSearchKey ? loadedWebSearchToolDef.def : null;
 
 	useEffect(() => {
 		let cancelled = false;
-		if (toolArgsTarget?.kind !== 'webSearch' || !activeWebSearch) return;
+
+		if (
+			toolArgsTarget?.kind !== 'webSearch' ||
+			!activeWebSearchBundleID ||
+			!activeWebSearchToolSlug ||
+			!activeWebSearchToolVersion ||
+			!activeWebSearchKey
+		) {
+			return;
+		}
 
 		(async () => {
 			try {
 				const def = await toolStoreAPI.getTool(
-					activeWebSearch.bundleID,
-					activeWebSearch.toolSlug,
-					activeWebSearch.toolVersion
+					activeWebSearchBundleID,
+					activeWebSearchToolSlug,
+					activeWebSearchToolVersion
 				);
-				if (!cancelled) setWebSearchToolDef(def ?? null);
+				if (!cancelled) {
+					setLoadedWebSearchToolDef({
+						key: activeWebSearchKey,
+						def: def ?? null,
+					});
+				}
 			} catch {
-				if (!cancelled) setWebSearchToolDef(null);
+				if (!cancelled) {
+					setLoadedWebSearchToolDef({
+						key: activeWebSearchKey,
+						def: null,
+					});
+				}
 			}
 		})();
 
 		return () => {
 			cancelled = true;
 		};
-	}, [toolArgsTarget?.kind, activeWebSearch]);
+	}, [
+		toolArgsTarget?.kind,
+		activeWebSearch,
+		activeWebSearchBundleID,
+		activeWebSearchToolSlug,
+		activeWebSearchToolVersion,
+		activeWebSearchKey,
+	]);
 
 	if (toolArgsTarget?.kind === 'attached') {
-		const all = getToolNodesWithPath(editor, false);
-		const hit = all.find(([n]) => n.selectionID === toolArgsTarget.selectionID);
+		const hit = attachedToolEntries.find(n => n.selectionID === toolArgsTarget.selectionID);
 		if (hit) {
 			isOpen = true;
-			const [node] = hit;
-			schema = node.toolSnapshot?.userArgSchema;
+			modalIdentity = `attached:${toolArgsTarget.selectionID}`;
+			schema = hit.toolSnapshot?.userArgSchema;
 			toolLabel =
-				node.toolSnapshot?.displayName && node.toolSnapshot.displayName.length > 0
-					? node.toolSnapshot.displayName
-					: node.toolSlug;
-			existingInstance = node.userArgSchemaInstance;
+				hit.toolSnapshot?.displayName && hit.toolSnapshot.displayName.length > 0
+					? hit.toolSnapshot.displayName
+					: hit.toolSlug;
+			existingInstance = hit.userArgSchemaInstance;
 
 			onSave = newInstance => {
-				// Re-locate the node by selectionID to avoid stale paths.
-				const allNow = getToolNodesWithPath(editor, false);
-				const again = allNow.find(([n]) => n.selectionID === toolArgsTarget.selectionID);
-				if (again) {
-					const [, path] = again;
-					editor.tf.setNodes({ userArgSchemaInstance: newInstance }, { at: path as any });
-				}
+				setAttachedToolUserArgSchemaInstance(toolArgsTarget.selectionID, newInstance);
 
 				// Do *not* close here; the modal will call dialog.close(),
 				// which triggers onClose -> setToolArgsTarget(null).
@@ -101,6 +134,7 @@ export function ToolArgsModalHost({
 		const entry = conversationToolsState.find(e => e.key === toolArgsTarget.key);
 		if (entry) {
 			isOpen = true;
+			modalIdentity = `conversation:${toolArgsTarget.key}`;
 			const def = entry.toolDefinition;
 			schema = def?.userArgSchema;
 			toolLabel =
@@ -142,6 +176,7 @@ export function ToolArgsModalHost({
 
 		if (active) {
 			isOpen = true;
+			modalIdentity = `web-search:${active.bundleID}:${active.toolSlug}:${active.toolVersion}`;
 			toolLabel =
 				(webSearchToolDef?.displayName && webSearchToolDef.displayName.length > 0
 					? webSearchToolDef.displayName
@@ -174,6 +209,7 @@ export function ToolArgsModalHost({
 			onClose={handleClose}
 			toolLabel={toolLabel}
 			schema={schema}
+			modalIdentity={modalIdentity}
 			existingInstance={existingInstance}
 			onSave={onSave}
 		/>

@@ -13,6 +13,7 @@ interface ConversationToolsChipProps {
 	tools: ConversationToolStateEntry[];
 	onChange?: (next: ConversationToolStateEntry[]) => void;
 	onShowToolDetails?: (entry: ConversationToolStateEntry) => void;
+	toolArgsEventTarget?: EventTarget | null;
 }
 
 /**
@@ -27,7 +28,12 @@ interface ConversationToolsChipProps {
  * All state here is UI-only; it controls what gets attached on the next send,
  * but does not rewrite existing messages.
  */
-export function ConversationToolsChip({ tools, onChange, onShowToolDetails }: ConversationToolsChipProps) {
+export function ConversationToolsChip({
+	tools,
+	onChange,
+	onShowToolDetails,
+	toolArgsEventTarget,
+}: ConversationToolsChipProps) {
 	const count = tools.length;
 	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
 
@@ -143,7 +149,7 @@ export function ConversationToolsChip({ tools, onChange, onShowToolDetails }: Co
 							onEditOptions={
 								hasArgs
 									? () => {
-											dispatchOpenToolArgs({ kind: 'conversation', key: entry.key });
+											dispatchOpenToolArgs({ kind: 'conversation', key: entry.key }, toolArgsEventTarget);
 										}
 									: undefined
 							}

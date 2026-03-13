@@ -1,6 +1,6 @@
 import type { PlateEditor } from 'platejs/react';
 
-import { getFirstTemplateNodeWithPath, getTemplateSelections } from '@/chats/templates/template_editor_utils';
+import { getFirstTemplateNodeWithPath, getTemplateSelections } from '@/chats/platedoc/template_document_ops';
 
 export interface ComposerDocumentSelectionInfo {
 	tplNodeWithPath: ReturnType<typeof getFirstTemplateNodeWithPath>;

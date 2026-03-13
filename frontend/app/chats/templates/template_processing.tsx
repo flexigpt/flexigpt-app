@@ -1,6 +1,32 @@
 import { type MessageBlock, type PromptTemplate, type PromptVariable, VarSource, VarType } from '@/spec/prompt';
 
-import { type SelectedTemplateForRun, type TemplateSelectionElementNode } from '@/chats/templates/template_spec';
+import { KEY_TEMPLATE_SELECTION, type TemplateSelectionElementNode } from '@/chats/platedoc/nodes';
+
+/**
+ * Execution-ready derived representation of a selected template.
+ */
+export interface SelectedTemplateForRun {
+	type: typeof KEY_TEMPLATE_SELECTION;
+	bundleID: string;
+	templateSlug: string;
+	templateVersion: string;
+	selectionID: string;
+
+	// Final structures after applying local overrides
+	template: PromptTemplate;
+	blocks: MessageBlock[];
+	variablesSchema: PromptVariable[];
+
+	// Effective variable values for execution
+	variableValues: Record<string, unknown>;
+
+	// Requirements state
+	requiredVariables: string[];
+	requiredCount: number;
+
+	// Convenience
+	isReady: boolean;
+}
 
 /**
  * Merge templateSnapshot with local overrides to produce effective template structures.
@@ -112,7 +138,7 @@ export function makeSelectedTemplateForRun(tsenode: TemplateSelectionElementNode
 	const req = computeRequirements(variablesSchema, tsenode.variables);
 
 	return {
-		type: 'templateSelection',
+		type: KEY_TEMPLATE_SELECTION,
 		bundleID: tsenode.bundleID,
 		templateSlug: tsenode.templateSlug,
 		templateVersion: tsenode.templateVersion,

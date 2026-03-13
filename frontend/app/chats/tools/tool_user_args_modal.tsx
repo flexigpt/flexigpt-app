@@ -25,6 +25,7 @@ interface ToolUserArgsModalProps {
 	toolLabel: string;
 	schema: JSONSchema | undefined;
 	existingInstance?: string;
+	modalIdentity?: string;
 	onSave: (newInstance: string) => void;
 }
 
@@ -350,9 +351,8 @@ export function ToolUserArgsModal(props: ToolUserArgsModalProps) {
 	if (typeof document === 'undefined' || !document.body) return null;
 
 	const remountKey = JSON.stringify({
-		toolLabel: props.toolLabel,
+		modalIdentity: props.modalIdentity ?? props.toolLabel,
 		existingInstance: props.existingInstance ?? null,
-		schema: props.schema ?? null,
 	});
 
 	return createPortal(<ToolUserArgsModalContent key={remountKey} {...props} />, document.body);

@@ -54,6 +54,10 @@ export function MessageThinkingSection(props: {
 				<ThinkingFence
 					detailsSummary={summaryNode}
 					text={finalSummary}
+					open={open}
+					onOpenChange={value => {
+						setManualOpen(value);
+					}}
 					streaming={isBusy}
 					maxRows={10}
 					autoScroll={isBusy}

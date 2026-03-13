@@ -16,6 +16,7 @@ import { Plate, PlateContent } from 'platejs/react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { ProviderSDKType, UIToolCall, UIToolOutput } from '@/spec/inference';
+import type { PromptTemplate } from '@/spec/prompt';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolListItem, ToolStoreChoice } from '@/spec/tool';
 
@@ -35,27 +36,29 @@ import {
 	type EditorSubmitPayload,
 	hasNonEmptyUserText,
 } from '@/chats/inputarea/input_editor_utils';
+import {
+	getTemplateSelections,
+	insertTemplateSelectionNode,
+	toPlainTextReplacingVariables,
+} from '@/chats/platedoc/template_document_ops';
+import { TemplateToolbars } from '@/chats/platedoc/template_toolbars';
+import {
+	type AttachedToolEntry,
+	getAttachedTools,
+	insertToolSelectionNode,
+	removeToolByKey,
+	setAttachedToolUserArgSchemaInstanceBySelectionID,
+	setToolAutoExecuteByKey,
+} from '@/chats/platedoc/tool_document_ops';
 import { useComposerDocument } from '@/chats/platedoc/use_composer_document';
 import { useComposerSkills } from '@/chats/skills/use_composer_skills';
-import { getTemplateSelections, toPlainTextReplacingVariables } from '@/chats/templates/template_editor_utils';
-import { TemplateToolbars } from '@/chats/templates/template_toolbars';
 import {
 	type ConversationToolStateEntry,
 	conversationToolsToChoices,
 	mergeConversationToolsWithNewChoices,
 } from '@/chats/tools/conversation_tool_utils';
 import { ToolDetailsModal } from '@/chats/tools/tool_details_modal';
-import {
-	dedupeToolChoices,
-	editorAttachedToolToToolChoice,
-	getAttachedTools,
-	getToolNodesWithPath,
-	insertToolSelectionNode,
-	removeToolByKey,
-	setToolAutoExecuteByKey,
-	toolIdentityKey,
-	type ToolSelectionElementNode,
-} from '@/chats/tools/tool_editor_utils';
+import { dedupeToolChoices, editorAttachedToolToToolChoice, toolIdentityKey } from '@/chats/tools/tool_editor_utils';
 import { ToolArgsModalHost } from '@/chats/tools/tool_user_args_host';
 import { useComposerTools } from '@/chats/tools/use_composer_tools';
 import { buildWebSearchChoicesForSubmit, type WebSearchChoiceTemplate } from '@/chats/tools/websearch_utils';
@@ -98,6 +101,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		hasTextRef,
 		selectionInfo,
 		attachedToolEntries,
+		getAttachedToolEntriesSnapshot,
 		onEditorChange,
 		onEditorPaste,
 		replaceEditorDocument,
@@ -114,6 +118,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const templateButtonRef = useRef<HTMLButtonElement | null>(null);
 	const toolButtonRef = useRef<HTMLButtonElement | null>(null);
 	const attachmentButtonRef = useRef<HTMLButtonElement | null>(null);
+
+	const toolArgsEventTarget = useMemo<EventTarget | null>(() => {
+		return typeof EventTarget !== 'undefined' ? new EventTarget() : null;
+	}, []);
+
 	// Track whether a menu was opened via shortcut so we can:
 	// - force focus into the menu (arrow-key nav)
 	// - optionally restore focus to editor on close (Esc)
@@ -138,6 +147,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	});
 
 	const [submitError, setSubmitError] = useState<string | null>(null);
+	// Guard: while true, handleEditorDocumentChange skips auto-cancel logic.
+	// This prevents a race where Plate fires onChange after clearComposerTransientState
+	// empties attachments/toolOutputs but before loadAttachmentsFromMessage restores them.
+	const isLoadingExternalMessageRef = useRef(false);
 
 	// ---- Skills (conversation-level) ----
 	const {
@@ -156,6 +169,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		applyEnabledSkillRefsFromMessage,
 		applyActiveSkillRefsFromMessage,
 		getCurrentSkillSessionID,
+		getCurrentEnabledSkillRefs,
+		getCurrentActiveSkillRefs,
+		flushPendingMessageSkillSelection,
 	} = useComposerSkills();
 
 	const templateBlocked = selectionInfo.hasTemplate && selectionInfo.requiredCount > 0;
@@ -195,7 +211,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		handleOpenAttachedToolDetails,
 		clearComposerToolsState,
 	} = useComposerTools({
-		editor,
 		isBusy,
 		isSubmittingRef,
 		templateBlocked,
@@ -205,20 +220,29 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		setActiveSkillRefs,
 		getCurrentSkillSessionID,
 		skillSessionID,
+		toolArgsEventTarget,
+		getAttachedToolEntries: getAttachedToolEntriesSnapshot,
 	});
 
-	const getAttachedToolIdentityKeys = useCallback(() => {
+	const attachedToolIdentityKeys = useMemo(() => {
 		return new Set(
-			getToolNodesWithPath(editor, false).map(([node]) =>
-				toolIdentityKey(node.bundleID, node.bundleSlug, node.toolSlug, node.toolVersion)
+			attachedToolEntries.map(entry =>
+				toolIdentityKey(entry.bundleID, entry.bundleSlug, entry.toolSlug, entry.toolVersion)
 			)
 		);
-	}, [editor]);
+	}, [attachedToolEntries]);
+
+	const handleInsertTemplate = useCallback(
+		(args: { bundleID: string; templateSlug: string; templateVersion: string; template?: PromptTemplate }) => {
+			insertTemplateSelectionNode(editor, args.bundleID, args.templateSlug, args.templateVersion, args.template);
+		},
+		[editor]
+	);
 
 	const handleAttachTool = useCallback(
 		(item: ToolListItem, autoExecute: boolean) => {
 			const identityKey = toolIdentityKey(item.bundleID, item.bundleSlug, item.toolSlug, item.toolVersion);
-			if (getAttachedToolIdentityKeys().has(identityKey)) return;
+			if (attachedToolIdentityKeys.has(identityKey)) return;
 
 			insertToolSelectionNode(
 				editor,
@@ -233,55 +257,54 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			);
 			handleAttachedToolsChanged();
 		},
-		[editor, getAttachedToolIdentityKeys, handleAttachedToolsChanged]
+		[attachedToolIdentityKeys, editor, handleAttachedToolsChanged]
 	);
 
 	const handleDetachAttachedToolByKey = useCallback(
 		(identityKey: string) => {
-			if (!getAttachedToolIdentityKeys().has(identityKey)) return;
+			if (!attachedToolIdentityKeys.has(identityKey)) return;
 
 			removeToolByKey(editor, identityKey);
 			handleAttachedToolsChanged();
 		},
-		[editor, getAttachedToolIdentityKeys, handleAttachedToolsChanged]
+		[attachedToolIdentityKeys, editor, handleAttachedToolsChanged]
 	);
 
 	const handleSetAttachedToolAutoExecuteByKey = useCallback(
 		(identityKey: string, autoExecute: boolean) => {
-			if (!getAttachedToolIdentityKeys().has(identityKey)) return;
+			if (!attachedToolIdentityKeys.has(identityKey)) return;
 
 			setToolAutoExecuteByKey(editor, identityKey, autoExecute);
 			handleAttachedToolsChanged();
 		},
-		[editor, getAttachedToolIdentityKeys, handleAttachedToolsChanged]
+		[attachedToolIdentityKeys, editor, handleAttachedToolsChanged]
 	);
 
 	const handleToggleAttachedToolAutoExecute = useCallback(
-		(node: ToolSelectionElementNode, autoExecute: boolean) => {
-			const identityKey = toolIdentityKey(node.bundleID, node.bundleSlug, node.toolSlug, node.toolVersion);
+		(entry: AttachedToolEntry, autoExecute: boolean) => {
+			const identityKey = toolIdentityKey(entry.bundleID, entry.bundleSlug, entry.toolSlug, entry.toolVersion);
 			handleSetAttachedToolAutoExecuteByKey(identityKey, autoExecute);
 		},
 		[handleSetAttachedToolAutoExecuteByKey]
 	);
 
 	const handleRemoveAttachedTool = useCallback(
-		(node: ToolSelectionElementNode) => {
-			const identityKey = toolIdentityKey(node.bundleID, node.bundleSlug, node.toolSlug, node.toolVersion);
+		(entry: AttachedToolEntry) => {
+			const identityKey = toolIdentityKey(entry.bundleID, entry.bundleSlug, entry.toolSlug, entry.toolVersion);
 			handleDetachAttachedToolByKey(identityKey);
 		},
 		[handleDetachAttachedToolByKey]
 	);
 
 	const handleRemoveAllAttachedTools = useCallback(
-		(nodes: ToolSelectionElementNode[]) => {
-			if (nodes.length === 0) return;
+		(entries: AttachedToolEntry[]) => {
+			if (entries.length === 0) return;
 
-			const attachedKeys = getAttachedToolIdentityKeys();
 			const uniqueKeys = new Set<string>();
 
-			for (const node of nodes) {
-				const identityKey = toolIdentityKey(node.bundleID, node.bundleSlug, node.toolSlug, node.toolVersion);
-				if (!attachedKeys.has(identityKey) || uniqueKeys.has(identityKey)) continue;
+			for (const entry of entries) {
+				const identityKey = toolIdentityKey(entry.bundleID, entry.bundleSlug, entry.toolSlug, entry.toolVersion);
+				if (!attachedToolIdentityKeys.has(identityKey) || uniqueKeys.has(identityKey)) continue;
 				uniqueKeys.add(identityKey);
 			}
 
@@ -293,12 +316,22 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 			handleAttachedToolsChanged();
 		},
-		[editor, getAttachedToolIdentityKeys, handleAttachedToolsChanged]
+		[attachedToolIdentityKeys, editor, handleAttachedToolsChanged]
 	);
 
-	const handleEditAttachedToolOptions = useCallback((node: ToolSelectionElementNode) => {
-		dispatchOpenToolArgs({ kind: 'attached', selectionID: node.selectionID });
-	}, []);
+	const handleEditAttachedToolOptions = useCallback(
+		(entry: AttachedToolEntry) => {
+			dispatchOpenToolArgs({ kind: 'attached', selectionID: entry.selectionID }, toolArgsEventTarget);
+		},
+		[toolArgsEventTarget]
+	);
+
+	const handleSetAttachedToolUserArgSchemaInstance = useCallback(
+		(selectionID: string, newInstance: string) => {
+			setAttachedToolUserArgSchemaInstanceBySelectionID(editor, selectionID, newInstance);
+		},
+		[editor]
+	);
 
 	// When editing an earlier message we temporarily override the current
 	// conversation-tool + web-search config. Keep a snapshot so Cancel restores it.
@@ -429,7 +462,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		if (isBusy) return false;
 		if (templateBlocked) return false;
 		if (toolArgsBlocked) return false;
-		if (toolsDefLoading) return false;
 
 		if (hasText) return true;
 
@@ -437,13 +469,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		const hasOutputs = toolOutputs.length > 0;
 
 		return hasAttachments || hasOutputs;
-	}, [isBusy, templateBlocked, attachments, toolOutputs, hasText, toolArgsBlocked, toolsDefLoading]);
+	}, [isBusy, templateBlocked, attachments, toolOutputs, hasText, toolArgsBlocked]);
 
 	const { formRef, onKeyDown } = useEnterSubmit({
 		isBusy,
 		canSubmit: () => {
 			if (toolArgsBlocked) return false;
-			if (toolsDefLoading) return false;
 
 			if (selectionInfo.hasTemplate) {
 				return selectionInfo.requiredCount === 0;
@@ -485,6 +516,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 			if (isSubmittingRef.current) return;
 			if (isBusy) return;
+			// If conversation sync queued enabled/active skill refs via timeout,
+			// flush them now so this submit uses the latest skill selection.
+			flushPendingMessageSkillSelection();
+			const effectiveEnabledSkillRefs = getCurrentEnabledSkillRefs();
+			let activeForMessage = getCurrentActiveSkillRefs();
 
 			// 1) Templates: never allow send when required vars are missing.
 			if (templateBlocked) {
@@ -529,7 +565,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			try {
 				// Ensure session exists BEFORE running any pending tools (skills.* needs it)
 				let effectiveSkillSessionID: string | null = null;
-				if (enabledSkillRefs.length > 0) {
+				if (effectiveEnabledSkillRefs.length > 0) {
 					try {
 						effectiveSkillSessionID = await ensureSkillSession();
 					} catch (err) {
@@ -568,8 +604,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				}
 
 				// Snapshot active skills right before send (authoritative persistence).
-				let activeForMessage: SkillRef[] = activeSkillRefs;
-				if (effectiveSkillSessionID && enabledSkillRefs.length > 0) {
+				if (effectiveSkillSessionID && effectiveEnabledSkillRefs.length > 0) {
 					try {
 						activeForMessage = await listActiveSkillRefs(effectiveSkillSessionID);
 						if (getCurrentSkillSessionID() === effectiveSkillSessionID) {
@@ -594,7 +629,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					attachments,
 					toolOutputs: finalToolOutputs,
 					finalToolChoices,
-					enabledSkillRefs,
+					enabledSkillRefs: effectiveEnabledSkillRefs,
 					activeSkillRefs: activeForMessage,
 					skillSessionID: effectiveSkillSessionID ?? undefined,
 				};
@@ -615,15 +650,16 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			}
 		},
 		[
-			activeSkillRefs,
 			attachments,
 			clearPreEditSnapshot,
 			contentRef,
 			conversationToolsState,
 			editor,
-			enabledSkillRefs,
 			ensureSkillSession,
+			flushPendingMessageSkillSelection,
 			focusEditorAtEnd,
+			getCurrentActiveSkillRefs,
+			getCurrentEnabledSkillRefs,
 			getCurrentSkillSessionID,
 			hasPendingToolCalls,
 			isBusy,
@@ -656,6 +692,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const loadExternalMessage = useCallback(
 		(incoming: EditorExternalMessage) => {
+			isLoadingExternalMessageRef.current = true;
 			// Snapshot current context so Cancel Editing can restore it.
 			if (!preEditConversationToolsRef.current) {
 				preEditConversationToolsRef.current = conversationToolsState;
@@ -674,7 +711,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			// 1) Reset document to plain text paragraphs.
 			const plain = incoming.text ?? '';
 			const value = buildEditorValueFromPlainText(plain);
-			replaceEditorDocument(value, plain.trim().length > 0, 'end');
+			replaceEditorDocument(value, 'end');
 
 			// 2) Rebuild flat attachment chips from incoming attachment state.
 			loadAttachmentsFromMessage(incoming.attachments);
@@ -689,6 +726,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 			// 5) Restore any tool outputs that were previously attached to this message.
 			setToolOutputs(incoming.toolOutputs ?? []);
+			isLoadingExternalMessageRef.current = true;
 		},
 		[
 			activeSkillRefs,
@@ -715,6 +753,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		if (submitError) {
 			setSubmitError(null);
 		}
+		// Skip auto-cancel while loadExternalMessage is in progress.
+		// The transient state (cleared attachments / tool outputs) is not yet restored.
+		if (isLoadingExternalMessageRef.current) return;
 
 		// Auto-cancel editing when the editor is completely empty
 		// (no text, no tools, no attachments, no tool outputs).
@@ -732,7 +773,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			cancelEditing();
 		}
 	}, [
-		attachments,
+		attachments.length,
 		cancelEditing,
 		editingMessageId,
 		editor,
@@ -741,32 +782,49 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		onEditorChange,
 		restorePreEditContext,
 		submitError,
-		toolCalls,
-		toolOutputs,
+		toolCalls.length,
+		toolOutputs.length,
 	]);
 
-	useImperativeHandle(ref, () => ({
-		focus: () => {
-			focusEditorAtEnd();
-		},
-		openTemplateMenu: () => {
-			openTemplatePicker();
-		},
-		openToolMenu: () => {
-			openToolPicker();
-		},
-		openAttachmentMenu: () => {
-			openAttachmentPicker();
-		},
-		loadExternalMessage,
-		resetEditor,
-		loadToolCalls,
-		setConversationToolsFromChoices: applyConversationToolsFromChoices,
-		setWebSearchFromChoices: applyWebSearchFromChoices,
-		applyAttachmentsDrop,
-		setEnabledSkillRefsFromMessage: applyEnabledSkillRefsFromMessage,
-		setActiveSkillRefsFromMessage: applyActiveSkillRefsFromMessage,
-	}));
+	useImperativeHandle(
+		ref,
+		() => ({
+			focus: () => {
+				focusEditorAtEnd();
+			},
+			openTemplateMenu: () => {
+				openTemplatePicker();
+			},
+			openToolMenu: () => {
+				openToolPicker();
+			},
+			openAttachmentMenu: () => {
+				openAttachmentPicker();
+			},
+			loadExternalMessage,
+			resetEditor,
+			loadToolCalls,
+			setConversationToolsFromChoices: applyConversationToolsFromChoices,
+			setWebSearchFromChoices: applyWebSearchFromChoices,
+			applyAttachmentsDrop,
+			setEnabledSkillRefsFromMessage: applyEnabledSkillRefsFromMessage,
+			setActiveSkillRefsFromMessage: applyActiveSkillRefsFromMessage,
+		}),
+		[
+			applyAttachmentsDrop,
+			applyConversationToolsFromChoices,
+			applyEnabledSkillRefsFromMessage,
+			applyActiveSkillRefsFromMessage,
+			applyWebSearchFromChoices,
+			focusEditorAtEnd,
+			loadExternalMessage,
+			loadToolCalls,
+			openAttachmentPicker,
+			openTemplatePicker,
+			openToolPicker,
+			resetEditor,
+		]
+	);
 
 	const handleCancelEditing = useCallback(() => {
 		resetEditor();
@@ -872,6 +930,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									onOpenToolCallDetails={handleOpenToolCallDetails}
 									onOpenConversationToolDetails={handleOpenConversationToolDetails}
 									onOpenAttachedToolDetails={handleOpenAttachedToolDetails}
+									toolArgsEventTarget={toolArgsEventTarget}
 								/>
 							</div>
 						</div>
@@ -957,12 +1016,14 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						onAttachFiles={handleAttachFiles}
 						onAttachDirectory={handleAttachDirectory}
 						onAttachURL={handleAttachURL}
+						onInsertTemplate={handleInsertTemplate}
 						templateMenuState={templateMenu}
 						toolMenuState={toolMenu}
 						attachmentMenuState={attachmentMenu}
 						templateButtonRef={templateButtonRef}
 						toolButtonRef={toolButtonRef}
 						attachmentButtonRef={attachmentButtonRef}
+						toolArgsEventTarget={toolArgsEventTarget}
 						shortcutConfig={shortcutConfig}
 						currentProviderSDKType={currentProviderSDKType}
 						attachedToolEntries={attachedToolEntries}
@@ -981,8 +1042,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				</Plate>
 			</form>
 
-			{/* Tool choice / call inspector modal */}
-
 			<ToolDetailsModal
 				state={toolDetailsState}
 				onClose={() => {
@@ -990,10 +1049,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				}}
 			/>
 
-			{/* Tool user-args editor modal host */}
-
 			<ToolArgsModalHost
-				editor={editor}
+				attachedToolEntries={getAttachedToolEntriesSnapshot(false)}
+				setAttachedToolUserArgSchemaInstance={handleSetAttachedToolUserArgSchemaInstance}
 				conversationToolsState={conversationToolsState}
 				setConversationToolsState={setConversationToolsStateAndMaybeAutoExecute}
 				toolArgsTarget={toolArgsTarget}

@@ -97,11 +97,9 @@ function getErrorStub(
 	rawResponse: CompletionResponseBody | undefined,
 	errorObj: any
 ) {
-	assistantPlaceholder.modelParam = modelParams;
-	assistantPlaceholder.status = Status.Failed;
-	// Optionally keep the raw error on the message
+	let error: InferenceError;
 	if (rawResponse?.inferenceResponse && rawResponse.inferenceResponse.error) {
-		assistantPlaceholder.error = rawResponse.inferenceResponse.error;
+		error = rawResponse.inferenceResponse.error;
 	} else {
 		let msg: string;
 		try {
@@ -109,15 +107,15 @@ function getErrorStub(
 		} catch {
 			msg = String(errorObj);
 		}
-		assistantPlaceholder.error = {
+		error = {
 			code: 'unknown',
 			message: msg,
 		} as InferenceError;
 	}
 
 	const outText = (assistantPlaceholder.uiContent || '') + '\n\n>Got error in API processing.';
-	assistantPlaceholder.uiContent = outText;
-	assistantPlaceholder.outputs = [
+
+	const outputs: OutputUnion[] = [
 		{
 			kind: OutputKind.OutputMessage,
 			outputMessage: {
@@ -138,19 +136,29 @@ function getErrorStub(
 
 	// Prefer backend debugDetails if present
 	let detailsMarkdown: string = '';
+	let debugDetails: any;
 	if (rawResponse?.inferenceResponse) {
 		detailsMarkdown =
 			getDebugDetailsMarkdown(rawResponse.inferenceResponse.debugDetails, rawResponse.inferenceResponse.error) ?? '';
-		assistantPlaceholder.debugDetails = rawResponse.inferenceResponse.debugDetails;
+		debugDetails = rawResponse.inferenceResponse.debugDetails;
 	}
 
 	if (errorObj !== undefined && errorObj !== null) {
 		detailsMarkdown = detailsMarkdown + '\n\n### Error\n\n' + getQuotedJSON(errorObj);
 	}
 
-	assistantPlaceholder.uiDebugDetails = detailsMarkdown;
+	const errorMessage: ConversationMessage = {
+		...assistantPlaceholder,
+		modelParam: modelParams,
+		status: Status.Failed,
+		error,
+		uiContent: outText,
+		outputs,
+		debugDetails,
+		uiDebugDetails: detailsMarkdown,
+	};
 
-	return { responseMessage: assistantPlaceholder, rawResponse };
+	return { responseMessage: errorMessage, rawResponse };
 }
 
 export function getDebugDetailsMarkdown(debugObj?: any, errorObj?: any): string | undefined {

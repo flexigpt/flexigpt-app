@@ -1,4 +1,30 @@
 import type { MessageBlock, PromptTemplate, PromptVariable } from '@/spec/prompt';
+import type { Tool, ToolStoreChoiceType } from '@/spec/tool';
+
+export const KEY_TOOL_SELECTION = 'toolSelection';
+
+export type ToolSelectionElementNode = {
+	type: typeof KEY_TOOL_SELECTION;
+	choiceID: string;
+	bundleID: string;
+	bundleSlug?: string;
+	toolSlug: string;
+	toolVersion: string;
+	selectionID: string;
+	toolType: ToolStoreChoiceType;
+	autoExecute: boolean;
+	userArgSchemaInstance?: string;
+
+	toolSnapshot?: Tool;
+	overrides?: {
+		displayName?: string;
+		description?: string;
+		tags?: string[];
+	};
+
+	// inline+void node needs a text child
+	children: [{ text: '' }];
+};
 
 export const KEY_TEMPLATE_SELECTION = 'templateSelection';
 export const KEY_TEMPLATE_VARIABLE = 'templateVariable';
@@ -40,26 +66,3 @@ export type TemplateSelectionElementNode = {
 	// Slate text children
 	children: [{ text: '' }];
 };
-
-export interface SelectedTemplateForRun {
-	type: typeof KEY_TEMPLATE_SELECTION;
-	bundleID: string;
-	templateSlug: string;
-	templateVersion: string;
-	selectionID: string;
-
-	// Final structures after applying local overrides
-	template: PromptTemplate;
-	blocks: MessageBlock[];
-	variablesSchema: PromptVariable[];
-
-	// Effective variable values for execution
-	variableValues: Record<string, unknown>;
-
-	// Requirements state
-	requiredVariables: string[];
-	requiredCount: number;
-
-	// Convenience
-	isReady: boolean;
-}

@@ -1,19 +1,22 @@
-import { ElementApi, KEYS, NodeApi } from 'platejs';
+import { ElementApi, KEYS, NodeApi, type Path } from 'platejs';
 import type { PlateEditor } from 'platejs/react';
 
 import type { PromptTemplate, PromptVariable } from '@/spec/prompt';
 
 import {
+	KEY_TEMPLATE_SELECTION,
+	KEY_TEMPLATE_VARIABLE,
+	type TemplateSelectionElementNode,
+	type TemplateVariableElementNode,
+} from '@/chats/platedoc/nodes';
+import {
 	computeEffectiveTemplate,
 	effectiveVarValueLocal,
 	makeSelectedTemplateForRun,
+	type SelectedTemplateForRun,
 } from '@/chats/templates/template_processing';
-import type { SelectedTemplateForRun, TemplateSelectionElementNode } from '@/chats/templates/template_spec';
-import {
-	KEY_TEMPLATE_SELECTION,
-	KEY_TEMPLATE_VARIABLE,
-	type TemplateVariableElementNode,
-} from '@/chats/templates/template_spec';
+
+type TemplateNodeWithPath = [TemplateSelectionElementNode, Path];
 
 export function insertTemplateSelectionNode(
 	editor: PlateEditor,
@@ -60,7 +63,7 @@ export function insertTemplateSelectionNode(
 export function getTemplateSelections(editor: PlateEditor): SelectedTemplateForRun[] {
 	const elList = NodeApi.elements(editor);
 	const selections: SelectedTemplateForRun[] = [];
-	for (const [el, _path] of elList) {
+	for (const [el] of elList) {
 		if (ElementApi.isElementType(el, KEY_TEMPLATE_SELECTION)) {
 			const node = el as unknown as TemplateSelectionElementNode;
 			selections.push(makeSelectedTemplateForRun(node));
@@ -71,7 +74,7 @@ export function getTemplateSelections(editor: PlateEditor): SelectedTemplateForR
 }
 
 // Utility to get the first template node with its path
-export function getFirstTemplateNodeWithPath(editor: PlateEditor): [TemplateSelectionElementNode, any] | undefined {
+export function getFirstTemplateNodeWithPath(editor: PlateEditor): TemplateNodeWithPath | undefined {
 	const elList = NodeApi.elements(editor);
 	for (const [el, path] of elList) {
 		if (ElementApi.isElementType(el, KEY_TEMPLATE_SELECTION)) {
@@ -82,8 +85,8 @@ export function getFirstTemplateNodeWithPath(editor: PlateEditor): [TemplateSele
 }
 
 // Utility to get all template selection nodes with their paths (document order)
-export function getTemplateNodesWithPath(editor: PlateEditor): Array<[TemplateSelectionElementNode, any]> {
-	const out: Array<[TemplateSelectionElementNode, any]> = [];
+export function getTemplateNodesWithPath(editor: PlateEditor): TemplateNodeWithPath[] {
+	const out: TemplateNodeWithPath[] = [];
 	const elList = NodeApi.elements(editor);
 	for (const [el, path] of elList) {
 		if (ElementApi.isElementType(el, KEY_TEMPLATE_SELECTION)) {

@@ -11,17 +11,20 @@ import { replaceDoubleBraces } from '@/lib/text_utils';
 import { dispatchSetSystemPromptForChat } from '@/chats/events/set_system_prompt';
 import { useTemplateFlashEvent } from '@/chats/events/template_flash';
 import { dispatchTemplateVarsUpdated } from '@/chats/events/template_toolbar_vars_updated';
-import { TemplateEditModal } from '@/chats/templates/template_edit_modal';
-import { getTemplateNodesWithPath, getTemplateSelections } from '@/chats/templates/template_editor_utils';
+import {
+	KEY_TEMPLATE_SELECTION,
+	KEY_TEMPLATE_VARIABLE,
+	type TemplateSelectionElementNode,
+} from '@/chats/platedoc/nodes';
+import { getTemplateNodesWithPath, getTemplateSelections } from '@/chats/platedoc/template_document_ops';
+import { TemplateEditModal } from '@/chats/platedoc/template_edit_modal';
 import { computeEffectiveTemplate, effectiveVarValueLocal } from '@/chats/templates/template_processing';
-import type { TemplateSelectionElementNode } from '@/chats/templates/template_spec';
-import { KEY_TEMPLATE_SELECTION, KEY_TEMPLATE_VARIABLE } from '@/chats/templates/template_spec';
 import { TemplateFixedToolbar } from '@/chats/templates/template_toolbar_fixed';
 
 type TplKey = string; // path-based unique key
 
-function pathKey(path: any): TplKey {
-	return Array.isArray(path) ? path.join('.') : String(path ?? '');
+function pathKey(path: Path | undefined): TplKey {
+	return Array.isArray(path) ? path.join('.') : (path ?? '');
 }
 
 function replaceVariablesForSelectionWithText(
@@ -116,7 +119,7 @@ function removeSelection(
 	bundleID: string,
 	templateSlug: string,
 	templateVersion: string,
-	pathOfSelection?: any
+	pathOfSelection?: Path
 ) {
 	editor.tf.withoutNormalizing(() => {
 		// Identify target selection (get selectionId for precise removal)
@@ -260,7 +263,7 @@ export function TemplateToolbars() {
 							}}
 						/>
 
-						{tsNode ? (
+						{tsNode && tsPath ? (
 							<TemplateEditModal
 								open={openId === id}
 								onClose={() => {

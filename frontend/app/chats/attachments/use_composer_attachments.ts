@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { type SetStateAction, useCallback, useRef, useState } from 'react';
 
 import type {
 	Attachment,
@@ -8,6 +8,8 @@ import type {
 	UIAttachment,
 } from '@/spec/attachment';
 import { AttachmentKind } from '@/spec/attachment';
+
+import { resolveStateUpdate } from '@/lib/hook_utils';
 
 import { backendAPI } from '@/apis/baseapi';
 
@@ -43,121 +45,144 @@ export function useComposerAttachments({
 	isBusy,
 	focusEditorAtEnd,
 }: UseComposerAttachmentsArgs): UseComposerAttachmentsResult {
-	const [attachments, setAttachments] = useState<UIAttachment[]>([]);
-	const [directoryGroups, setDirectoryGroups] = useState<DirectoryAttachmentGroup[]>([]);
+	const [attachments, setAttachmentsState] = useState<UIAttachment[]>([]);
+	const [directoryGroups, setDirectoryGroupsState] = useState<DirectoryAttachmentGroup[]>([]);
+	const attachmentsRef = useRef<UIAttachment[]>([]);
+	const directoryGroupsRef = useRef<DirectoryAttachmentGroup[]>([]);
+
+	const setAttachments = useCallback((update: SetStateAction<UIAttachment[]>) => {
+		const next = resolveStateUpdate(update, attachmentsRef.current);
+		attachmentsRef.current = next;
+		setAttachmentsState(prev => (prev === next ? prev : next));
+	}, []);
+
+	const setDirectoryGroups = useCallback((update: SetStateAction<DirectoryAttachmentGroup[]>) => {
+		const next = resolveStateUpdate(update, directoryGroupsRef.current);
+		directoryGroupsRef.current = next;
+		setDirectoryGroupsState(prev => (prev === next ? prev : next));
+	}, []);
 
 	const clearAttachments = useCallback(() => {
 		setAttachments([]);
 		setDirectoryGroups([]);
-	}, []);
+	}, [setAttachments, setDirectoryGroups]);
 
-	const loadAttachmentsFromMessage = useCallback((incomingAttachments: Attachment[] | null | undefined) => {
-		setAttachments(() => {
-			if (!incomingAttachments || incomingAttachments.length === 0) return [];
-			const next: UIAttachment[] = [];
-			const seen = new Set<string>();
+	const loadAttachmentsFromMessage = useCallback(
+		(incomingAttachments: Attachment[] | null | undefined) => {
+			setAttachments(() => {
+				if (!incomingAttachments || incomingAttachments.length === 0) return [];
+				const next: UIAttachment[] = [];
+				const seen = new Set<string>();
 
-			for (const att of incomingAttachments) {
-				let ui: UIAttachment | undefined = undefined;
+				for (const att of incomingAttachments) {
+					let ui: UIAttachment | undefined = undefined;
 
-				if (att.kind === AttachmentKind.url) {
-					if (att.urlRef) {
-						ui = buildUIAttachmentForURL(att);
-					} else {
-						continue;
+					if (att.kind === AttachmentKind.url) {
+						if (att.urlRef) {
+							ui = buildUIAttachmentForURL(att);
+						} else {
+							continue;
+						}
+					} else if (att.kind === AttachmentKind.file || att.kind === AttachmentKind.image) {
+						ui = buildUIAttachmentForLocalPath(att);
 					}
-				} else if (att.kind === AttachmentKind.file || att.kind === AttachmentKind.image) {
-					ui = buildUIAttachmentForLocalPath(att);
+
+					if (!ui) continue;
+
+					const key = uiAttachmentKey(ui);
+					if (seen.has(key)) continue;
+					seen.add(key);
+					next.push(ui);
+				}
+				return next;
+			});
+
+			// We don’t attempt to reconstruct directoryGroups; show flat chips instead.
+			setDirectoryGroups([]);
+		},
+		[setAttachments, setDirectoryGroups]
+	);
+
+	const applyFileAttachments = useCallback(
+		(results: Attachment[]) => {
+			if (!results || results.length === 0) return;
+
+			setAttachments(prev => {
+				const existing = new Set(prev.map(uiAttachmentKey));
+				const next: UIAttachment[] = [...prev];
+
+				for (const r of results) {
+					const att = buildUIAttachmentForLocalPath(r);
+					if (!att) continue;
+
+					const key = uiAttachmentKey(att);
+					if (existing.has(key)) continue;
+
+					existing.add(key);
+					next.push(att);
+				}
+				return next;
+			});
+		},
+		[setAttachments]
+	);
+
+	const applyDirectoryAttachments = useCallback(
+		(result: DirectoryAttachmentsResult) => {
+			if (!result || !result.dirPath) return;
+
+			const { dirPath, attachments: dirAttachments, overflowDirs } = result;
+			if ((!dirAttachments || dirAttachments.length === 0) && (!overflowDirs || overflowDirs.length === 0)) {
+				return;
+			}
+
+			const folderLabel = dirPath.trim().split(/[\\/]/).pop() || dirPath.trim();
+			const groupId = crypto.randomUUID?.() ?? `dir-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+			const attachmentKeysForGroup: string[] = [];
+			const ownedAttachmentKeysForGroup: string[] = [];
+			const seenKeysForGroup = new Set<string>();
+
+			setAttachments(prev => {
+				const existing = new Map<string, UIAttachment>();
+				for (const att of prev) existing.set(uiAttachmentKey(att), att);
+
+				const added: UIAttachment[] = [];
+
+				for (const r of dirAttachments ?? []) {
+					const att = buildUIAttachmentForLocalPath(r);
+					if (!att) continue;
+
+					const key = uiAttachmentKey(att);
+					if (seenKeysForGroup.has(key)) continue;
+					seenKeysForGroup.add(key);
+
+					attachmentKeysForGroup.push(key);
+
+					if (!existing.has(key)) {
+						existing.set(key, att);
+						added.push(att);
+						ownedAttachmentKeysForGroup.push(key);
+					}
 				}
 
-				if (!ui) continue;
+				return [...prev, ...added];
+			});
 
-				const key = uiAttachmentKey(ui);
-				if (seen.has(key)) continue;
-				seen.add(key);
-				next.push(ui);
-			}
-			return next;
-		});
-
-		// We don’t attempt to reconstruct directoryGroups; show flat chips instead.
-		setDirectoryGroups([]);
-	}, []);
-
-	const applyFileAttachments = useCallback((results: Attachment[]) => {
-		if (!results || results.length === 0) return;
-
-		setAttachments(prev => {
-			const existing = new Set(prev.map(uiAttachmentKey));
-			const next: UIAttachment[] = [...prev];
-
-			for (const r of results) {
-				const att = buildUIAttachmentForLocalPath(r);
-				if (!att) continue;
-
-				const key = uiAttachmentKey(att);
-				if (existing.has(key)) continue;
-
-				existing.add(key);
-				next.push(att);
-			}
-			return next;
-		});
-	}, []);
-
-	const applyDirectoryAttachments = useCallback((result: DirectoryAttachmentsResult) => {
-		if (!result || !result.dirPath) return;
-
-		const { dirPath, attachments: dirAttachments, overflowDirs } = result;
-		if ((!dirAttachments || dirAttachments.length === 0) && (!overflowDirs || overflowDirs.length === 0)) {
-			return;
-		}
-
-		const folderLabel = dirPath.trim().split(/[\\/]/).pop() || dirPath.trim();
-		const groupId = crypto.randomUUID?.() ?? `dir-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-		const attachmentKeysForGroup: string[] = [];
-		const ownedAttachmentKeysForGroup: string[] = [];
-		const seenKeysForGroup = new Set<string>();
-
-		setAttachments(prev => {
-			const existing = new Map<string, UIAttachment>();
-			for (const att of prev) existing.set(uiAttachmentKey(att), att);
-
-			const added: UIAttachment[] = [];
-
-			for (const r of dirAttachments ?? []) {
-				const att = buildUIAttachmentForLocalPath(r);
-				if (!att) continue;
-
-				const key = uiAttachmentKey(att);
-				if (seenKeysForGroup.has(key)) continue;
-				seenKeysForGroup.add(key);
-
-				attachmentKeysForGroup.push(key);
-
-				if (!existing.has(key)) {
-					existing.set(key, att);
-					added.push(att);
-					ownedAttachmentKeysForGroup.push(key);
-				}
-			}
-
-			return [...prev, ...added];
-		});
-
-		setDirectoryGroups(prev => [
-			...prev,
-			{
-				id: groupId,
-				dirPath,
-				label: folderLabel,
-				attachmentKeys: attachmentKeysForGroup,
-				ownedAttachmentKeys: ownedAttachmentKeysForGroup,
-				overflowDirs: overflowDirs ?? [],
-			},
-		]);
-	}, []);
+			setDirectoryGroups(prev => [
+				...prev,
+				{
+					id: groupId,
+					dirPath,
+					label: folderLabel,
+					attachmentKeys: attachmentKeysForGroup,
+					ownedAttachmentKeys: ownedAttachmentKeysForGroup,
+					overflowDirs: overflowDirs ?? [],
+				},
+			]);
+		},
+		[setAttachments, setDirectoryGroups]
+	);
 
 	const attachFiles = useCallback(async () => {
 		let results: Attachment[];
@@ -204,7 +229,7 @@ export function useComposerAttachments({
 				focusEditorAtEnd();
 			}
 		},
-		[focusEditorAtEnd, isBusy]
+		[focusEditorAtEnd, isBusy, setAttachments]
 	);
 
 	const changeAttachmentMode = useCallback(
@@ -213,70 +238,79 @@ export function useComposerAttachments({
 			setAttachments(prev => prev.map(a => (uiAttachmentKey(a) === targetKey ? { ...a, mode: newMode } : a)));
 			focusEditorAtEnd();
 		},
-		[focusEditorAtEnd]
+		[focusEditorAtEnd, setAttachments]
 	);
 
-	const removeAttachment = useCallback((att: UIAttachment) => {
-		const targetKey = uiAttachmentKey(att);
+	const removeAttachment = useCallback(
+		(att: UIAttachment) => {
+			const targetKey = uiAttachmentKey(att);
 
-		setAttachments(prev => prev.filter(a => uiAttachmentKey(a) !== targetKey));
+			setAttachments(prev => prev.filter(a => uiAttachmentKey(a) !== targetKey));
 
-		// Also detach from any directory groups (and drop empty groups)
-		setDirectoryGroups(prevGroups => {
-			const updated = prevGroups.map(g => ({
-				...g,
-				attachmentKeys: g.attachmentKeys.filter(k => k !== targetKey),
-				ownedAttachmentKeys: g.ownedAttachmentKeys.filter(k => k !== targetKey),
-			}));
-			return updated.filter(g => g.attachmentKeys.length > 0 || g.overflowDirs.length > 0);
-		});
-	}, []);
+			// Also detach from any directory groups (and drop empty groups)
+			setDirectoryGroups(prevGroups => {
+				const updated = prevGroups.map(g => ({
+					...g,
+					attachmentKeys: g.attachmentKeys.filter(k => k !== targetKey),
+					ownedAttachmentKeys: g.ownedAttachmentKeys.filter(k => k !== targetKey),
+				}));
+				return updated.filter(g => g.attachmentKeys.length > 0 || g.overflowDirs.length > 0);
+			});
+		},
+		[setAttachments, setDirectoryGroups]
+	);
 
-	const removeDirectoryGroup = useCallback((groupId: string) => {
-		setDirectoryGroups(prevGroups => {
-			const groupToRemove = prevGroups.find(g => g.id === groupId);
-			if (!groupToRemove) return prevGroups;
+	const removeDirectoryGroup = useCallback(
+		(groupId: string) => {
+			setDirectoryGroups(prevGroups => {
+				const groupToRemove = prevGroups.find(g => g.id === groupId);
+				if (!groupToRemove) return prevGroups;
 
-			const remainingGroups = prevGroups.filter(g => g.id !== groupId);
+				const remainingGroups = prevGroups.filter(g => g.id !== groupId);
 
-			// Keys owned by other groups (so we don't delete shared attachments).
-			const keysOwnedByOtherGroups = new Set<string>();
-			for (const g of remainingGroups) {
-				for (const key of g.ownedAttachmentKeys) {
-					keysOwnedByOtherGroups.add(key);
+				// Keys owned by other groups (so we don't delete shared attachments).
+				const keysOwnedByOtherGroups = new Set<string>();
+				for (const g of remainingGroups) {
+					for (const key of g.ownedAttachmentKeys) {
+						keysOwnedByOtherGroups.add(key);
+					}
 				}
-			}
 
-			if (groupToRemove.ownedAttachmentKeys.length > 0) {
-				setAttachments(prevAttachments =>
-					prevAttachments.filter(att => {
-						const key = uiAttachmentKey(att);
-						if (!groupToRemove.ownedAttachmentKeys.includes(key)) return true;
-						// If other groups still own this attachment, keep it.
-						if (keysOwnedByOtherGroups.has(key)) return true;
-						// Otherwise, drop it when this folder is removed.
-						return false;
-					})
+				if (groupToRemove.ownedAttachmentKeys.length > 0) {
+					setAttachments(prevAttachments =>
+						prevAttachments.filter(att => {
+							const key = uiAttachmentKey(att);
+							if (!groupToRemove.ownedAttachmentKeys.includes(key)) return true;
+							// If other groups still own this attachment, keep it.
+							if (keysOwnedByOtherGroups.has(key)) return true;
+							// Otherwise, drop it when this folder is removed.
+							return false;
+						})
+					);
+				}
+
+				return remainingGroups;
+			});
+		},
+		[setAttachments, setDirectoryGroups]
+	);
+
+	const removeOverflowDir = useCallback(
+		(groupId: string, dirPath: string) => {
+			setDirectoryGroups(prevGroups => {
+				const updated = prevGroups.map(g =>
+					g.id !== groupId
+						? g
+						: {
+								...g,
+								overflowDirs: g.overflowDirs.filter(od => od.dirPath !== dirPath),
+							}
 				);
-			}
-
-			return remainingGroups;
-		});
-	}, []);
-
-	const removeOverflowDir = useCallback((groupId: string, dirPath: string) => {
-		setDirectoryGroups(prevGroups => {
-			const updated = prevGroups.map(g =>
-				g.id !== groupId
-					? g
-					: {
-							...g,
-							overflowDirs: g.overflowDirs.filter(od => od.dirPath !== dirPath),
-						}
-			);
-			return updated.filter(g => g.attachmentKeys.length > 0 || g.overflowDirs.length > 0);
-		});
-	}, []);
+				return updated.filter(g => g.attachmentKeys.length > 0 || g.overflowDirs.length > 0);
+			});
+		},
+		[setDirectoryGroups]
+	);
 
 	const applyAttachmentsDrop = useCallback(
 		(payload: AttachmentsDroppedPayload) => {

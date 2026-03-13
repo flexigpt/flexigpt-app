@@ -3,7 +3,7 @@ import { memo, useState } from 'react';
 import { FiUser, FiZap } from 'react-icons/fi';
 
 import type { ConversationMessage } from '@/spec/conversation';
-import { RoleEnum } from '@/spec/inference';
+import { RoleEnum, Status } from '@/spec/inference';
 
 import { MessageAttachmentsBar } from '@/chats/messages/message_attachments_bar';
 import { MessageCitationsBar } from '@/chats/messages/message_citations_bar';
@@ -83,6 +83,7 @@ export const ChatMessage = memo(function ChatMessage({
 
 	const baseContent = message.uiContent ?? '';
 	const hasAnyContent = baseContent.trim().length > 0 || streamedText.trim().length > 0;
+	const hasError = message.status === Status.Failed || !!message.error;
 
 	const hasAnyReasoning =
 		streamedThinking.trim().length > 0 ||
@@ -104,7 +105,7 @@ export const ChatMessage = memo(function ChatMessage({
 	// Body wrapper should exist only if something inside can render:
 	// - content (final/streamed) OR
 	// - busy (content card will show loader while busy)
-	const showBody = isBusy || hasAnyContent;
+	const showBody = isBusy || hasAnyContent || hasError;
 	return (
 		<div className="mb-2 grid grid-cols-12" style={{ fontSize: 13 }}>
 			{/* Row 1 ── icon + message bubble (only when showCardRow) */}
@@ -138,6 +139,12 @@ export const ChatMessage = memo(function ChatMessage({
 								align={align}
 								renderAsMarkdown={renderMarkdown}
 							/>
+							{/* Fallback for error-only messages with no text content */}
+							{!hasAnyContent && hasError && !isBusy && (
+								<div className="text-error text-sm opacity-80">
+									{message.error?.message || 'An error occurred while processing this request.'}
+								</div>
+							)}
 						</div>
 						{hasCitations && (
 							<div className="border-base-300 border-t p-1">

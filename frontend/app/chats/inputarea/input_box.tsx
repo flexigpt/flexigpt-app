@@ -58,42 +58,46 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 		return onSend(payload, chatOptions);
 	};
 
-	useImperativeHandle(ref, () => ({
-		getUIChatOptions: () => chatOptions,
-		focus: () => {
-			inputAreaRef.current?.focus();
-		},
-		openTemplateMenu: () => {
-			inputAreaRef.current?.openTemplateMenu();
-		},
-		openToolMenu: () => {
-			inputAreaRef.current?.openToolMenu();
-		},
-		openAttachmentMenu: () => {
-			inputAreaRef.current?.openAttachmentMenu();
-		},
-		loadExternalMessage: msg => {
-			inputAreaRef.current?.loadExternalMessage(msg);
-		},
-		loadToolCalls: toolCalls => {
-			inputAreaRef.current?.loadToolCalls(toolCalls);
-		},
-		setConversationToolsFromChoices: tools => {
-			inputAreaRef.current?.setConversationToolsFromChoices(tools);
-		},
-		setWebSearchFromChoices: choices => {
-			inputAreaRef.current?.setWebSearchFromChoices(choices);
-		},
-		applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => {
-			inputAreaRef.current?.applyAttachmentsDrop(payload);
-		},
-		setEnabledSkillRefsFromMessage: (refs: SkillRef[]) => {
-			inputAreaRef.current?.setEnabledSkillRefsFromMessage(refs);
-		},
-		setActiveSkillRefsFromMessage: (refs: SkillRef[]) => {
-			inputAreaRef.current?.setActiveSkillRefsFromMessage(refs);
-		},
-	}));
+	useImperativeHandle(
+		ref,
+		() => ({
+			getUIChatOptions: () => chatOptions,
+			focus: () => {
+				inputAreaRef.current?.focus();
+			},
+			openTemplateMenu: () => {
+				inputAreaRef.current?.openTemplateMenu();
+			},
+			openToolMenu: () => {
+				inputAreaRef.current?.openToolMenu();
+			},
+			openAttachmentMenu: () => {
+				inputAreaRef.current?.openAttachmentMenu();
+			},
+			loadExternalMessage: msg => {
+				inputAreaRef.current?.loadExternalMessage(msg);
+			},
+			loadToolCalls: toolCalls => {
+				inputAreaRef.current?.loadToolCalls(toolCalls);
+			},
+			setConversationToolsFromChoices: tools => {
+				inputAreaRef.current?.setConversationToolsFromChoices(tools);
+			},
+			setWebSearchFromChoices: choices => {
+				inputAreaRef.current?.setWebSearchFromChoices(choices);
+			},
+			applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => {
+				inputAreaRef.current?.applyAttachmentsDrop(payload);
+			},
+			setEnabledSkillRefsFromMessage: (refs: SkillRef[]) => {
+				inputAreaRef.current?.setEnabledSkillRefsFromMessage(refs);
+			},
+			setActiveSkillRefsFromMessage: (refs: SkillRef[]) => {
+				inputAreaRef.current?.setActiveSkillRefsFromMessage(refs);
+			},
+		}),
+		[chatOptions]
+	);
 
 	return (
 		<div className="bg-base-200 w-full min-w-0">

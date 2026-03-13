@@ -5,17 +5,18 @@ import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiHelpCircle, FiX } from 'react-icons/fi';
 
+import type { Path } from 'platejs';
 import type { PlateEditor } from 'platejs/react';
 
 import { type PromptVariable, VarSource, VarType } from '@/spec/prompt';
 
 import { dispatchTemplateVarsUpdated } from '@/chats/events/template_toolbar_vars_updated';
+import { type TemplateSelectionElementNode } from '@/chats/platedoc/nodes';
 import {
 	computeEffectiveTemplate,
 	computeRequirements,
 	effectiveVarValueLocal,
 } from '@/chats/templates/template_processing';
-import { type TemplateSelectionElementNode } from '@/chats/templates/template_spec';
 import { EnumDropdownInline } from '@/chats/templates/template_variable_enum_dropdown';
 
 type TemplateEditModalProps = {
@@ -23,7 +24,7 @@ type TemplateEditModalProps = {
 	onClose: () => void;
 	tsenode: TemplateSelectionElementNode;
 	editor: PlateEditor;
-	path: any;
+	path: Path;
 };
 
 type TemplateEditFormState = {

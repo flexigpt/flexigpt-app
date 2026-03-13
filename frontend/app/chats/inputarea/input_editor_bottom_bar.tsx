@@ -3,11 +3,9 @@ import { type Dispatch, memo, type ReactNode, type RefObject, type SetStateActio
 import { FiFilePlus, FiFolder, FiLink, FiPaperclip, FiTool, FiUpload } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, type MenuStore, useStoreState } from '@ariakit/react';
-import type { Path } from 'platejs';
-import { type PlateEditor, useEditorRef } from 'platejs/react';
 
 import type { ProviderSDKType } from '@/spec/inference';
-import type { PromptTemplateListItem } from '@/spec/prompt';
+import type { PromptTemplate, PromptTemplateListItem } from '@/spec/prompt';
 import type { SkillListItem, SkillRef } from '@/spec/skill';
 import { ToolImplType, type ToolListItem, ToolStoreChoiceType } from '@/spec/tool';
 
@@ -21,13 +19,9 @@ import { promptStoreAPI } from '@/apis/baseapi';
 import { UrlAttachmentModal } from '@/chats/attachments/attachment_url_modal';
 import { dispatchOpenToolArgs } from '@/chats/events/open_attached_toolargs';
 import { CommandTipsMenu } from '@/chats/inputtips/command_tips_menu';
+import type { AttachedToolEntry } from '@/chats/platedoc/tool_document_ops';
 import { SkillsBottomBarChip } from '@/chats/skills/skill_bottom_bar_chip';
-import { insertTemplateSelectionNode } from '@/chats/templates/template_editor_utils';
-import {
-	computeToolUserArgsStatus,
-	toolIdentityKey,
-	type ToolSelectionElementNode,
-} from '@/chats/tools/tool_editor_utils';
+import { computeToolUserArgsStatus, toolIdentityKey } from '@/chats/tools/tool_editor_utils';
 import { ToolMenuRow } from '@/chats/tools/tool_menu_row';
 import { WebSearchBottomBarChip } from '@/chats/tools/web_search_bottom_bar_chip';
 import {
@@ -41,6 +35,12 @@ interface EditorBottomBarProps {
 	onAttachFiles: () => Promise<void> | void;
 	onAttachDirectory: () => Promise<void> | void;
 	onAttachURL: (url: string) => Promise<void> | void;
+	onInsertTemplate: (args: {
+		bundleID: string;
+		templateSlug: string;
+		templateVersion: string;
+		template?: PromptTemplate;
+	}) => Promise<void> | void;
 
 	templateMenuState: MenuStore;
 	toolMenuState: MenuStore;
@@ -49,11 +49,12 @@ interface EditorBottomBarProps {
 	templateButtonRef: RefObject<HTMLButtonElement | null>;
 	toolButtonRef: RefObject<HTMLButtonElement | null>;
 	attachmentButtonRef: RefObject<HTMLButtonElement | null>;
+	toolArgsEventTarget?: EventTarget | null;
 
 	shortcutConfig: ShortcutConfig;
 	currentProviderSDKType: ProviderSDKType;
 
-	attachedToolEntries: Array<[ToolSelectionElementNode, Path]>;
+	attachedToolEntries: AttachedToolEntry[];
 	onAttachTool: (item: ToolListItem, autoExecute: boolean) => void;
 	onDetachToolByKey: (key: string) => void;
 	onSetAttachedToolAutoExecute: (key: string, autoExecute: boolean) => void;
@@ -116,12 +117,14 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	onAttachFiles,
 	onAttachDirectory,
 	onAttachURL,
+	onInsertTemplate,
 	templateMenuState,
 	toolMenuState,
 	attachmentMenuState,
 	templateButtonRef,
 	toolButtonRef,
 	attachmentButtonRef,
+	toolArgsEventTarget,
 	shortcutConfig,
 	currentProviderSDKType,
 	attachedToolEntries,
@@ -137,7 +140,6 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	onEnableAllSkills,
 	onDisableAllSkills,
 }: EditorBottomBarProps) {
-	const editor = useEditorRef() as PlateEditor;
 	const [isUrlModalOpen, setIsUrlModalOpen] = useState(false);
 	const templateMenuOpen = useStoreState(templateMenuState, 'open');
 	const toolMenuOpen = useStoreState(toolMenuState, 'open');
@@ -156,7 +158,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 
 	const attachedAutoExecByKey = useMemo(() => {
 		const map: Record<string, boolean> = {};
-		for (const [node] of toolEntries) {
+		for (const node of toolEntries) {
 			const key = toolIdentityKey(node.bundleID, node.bundleSlug, node.toolSlug, node.toolVersion);
 			map[key] = node.autoExecute;
 		}
@@ -168,7 +170,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	 * Keyed by tool identity; defaults to toolDefinition.autoExecReco.
 	 *
 	 * This is UI-only until the tool is actually inserted (at which point it becomes
-	 * a ToolSelectionElementNode.autoExecute and eventually ToolStoreChoice.autoExecute).
+	 * an attached tool entry and eventually ToolStoreChoice.autoExecute).
 	 */
 	const [toolAutoExecOverrides, setToolAutoExecOverrides] = useState<Record<string, boolean>>({});
 	const getAutoExecForTool = useMemo(() => {
@@ -210,7 +212,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	}, [activeWebSearchDef, activeWebSearch]);
 
 	const attachedToolKeys = useMemo(() => {
-		return new Set(toolEntries.map(([n]) => toolIdentityKey(n.bundleID, n.bundleSlug, n.toolSlug, n.toolVersion)));
+		return new Set(toolEntries.map(n => toolIdentityKey(n.bundleID, n.bundleSlug, n.toolSlug, n.toolVersion)));
 	}, [toolEntries]);
 
 	const availableTools = useMemo<ToolListItem[]>(() => {
@@ -244,9 +246,18 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	const handleTemplatePick = async (item: PromptTemplateListItem) => {
 		try {
 			const tmpl = await promptStoreAPI.getPromptTemplate(item.bundleID, item.templateSlug, item.templateVersion);
-			insertTemplateSelectionNode(editor, item.bundleID, item.templateSlug, item.templateVersion, tmpl);
+			await onInsertTemplate({
+				bundleID: item.bundleID,
+				templateSlug: item.templateSlug,
+				templateVersion: item.templateVersion,
+				template: tmpl,
+			});
 		} catch {
-			insertTemplateSelectionNode(editor, item.bundleID, item.templateSlug, item.templateVersion);
+			await onInsertTemplate({
+				bundleID: item.bundleID,
+				templateSlug: item.templateSlug,
+				templateVersion: item.templateVersion,
+			});
 		} finally {
 			closeTemplateMenu();
 		}
@@ -472,7 +483,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 							// Open the unified tool-args modal targeting "web search".
 							// (ToolArgsModalHost should apply this to the active web-search tool.)
 							if (!activeWebSearch) return;
-							dispatchOpenToolArgs({ kind: 'webSearch' });
+							dispatchOpenToolArgs({ kind: 'webSearch' }, toolArgsEventTarget);
 						}}
 					/>
 

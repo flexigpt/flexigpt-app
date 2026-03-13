@@ -3,11 +3,13 @@ import {
 	useCallback,
 	useEffect,
 	useImperativeHandle,
-	useLayoutEffect,
 	useMemo,
 	useRef,
+	useState,
 	useSyncExternalStore,
 } from 'react';
+
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { Conversation, ConversationMessage } from '@/spec/conversation';
@@ -17,8 +19,6 @@ import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { ensureMakeID, getUUIDv7 } from '@/lib/uuid_utils';
-
-import { useAtTopBottom } from '@/hooks/use_at_top_bottom';
 
 import { attachmentsDropAPI } from '@/apis/baseapi';
 
@@ -71,6 +71,14 @@ function StreamingLastMessage(props: {
 	);
 }
 
+/**
+ * Custom Virtuoso List container.
+ * Defined outside the component for referential stability.
+ */
+const VirtuosoList = forwardRef<HTMLDivElement, any>(function VirtuosoList({ className, ...props }, ref) {
+	return <div ref={ref} {...props} className={`mx-auto w-11/12 xl:w-5/6 ${className ?? ''}`} />;
+});
+
 export type ConversationAreaHandle = {
 	disposeTabRuntime: (tabId: string) => void;
 	clearStreamForTab: (tabId: string) => void;
@@ -108,22 +116,17 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 ) {
 	// ---------------- Tabs ref (for async safety) ----------------
 	const tabsRef = useRef(tabs);
-	useEffect(() => {
-		tabsRef.current = tabs;
-	}, [tabs]);
+	tabsRef.current = tabs;
 
 	const selectedTabIdRef = useRef(selectedTabId);
-	useEffect(() => {
-		selectedTabIdRef.current = selectedTabId;
-	}, [selectedTabId]);
+	selectedTabIdRef.current = selectedTabId;
 
 	const activeTab = useMemo(() => tabs.find(t => t.tabId === selectedTabId) ?? tabs[0], [tabs, selectedTabId]);
 
 	// PERF: O(1) existence checks (used in async paths)
-	const tabIdSetRef = useRef<Set<string>>(new Set());
-	useEffect(() => {
-		tabIdSetRef.current = new Set(tabs.map(t => t.tabId));
-	}, [tabs]);
+	const tabIdSet = useMemo(() => new Set(tabs.map(t => t.tabId)), [tabs]);
+	const tabIdSetRef = useRef<Set<string>>(tabIdSet);
+	tabIdSetRef.current = tabIdSet;
 	const tabExists = useCallback((tabId: string) => tabIdSetRef.current.has(tabId), []);
 
 	// ---------------- Per-tab runtime refs ----------------
@@ -158,6 +161,13 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 	const clearStreamBuffer = useCallback(
 		(tabId: string) => {
+			// Cancel any throttled notification still in flight.
+			const pending = notifyTimersRef.current.get(tabId) ?? null;
+			if (pending !== null) {
+				window.clearTimeout(pending);
+				notifyTimersRef.current.set(tabId, null);
+			}
+
 			const buf = getStreamBuffer(tabId);
 			buf.text.chunks = [];
 			buf.text.flushedIdx = 0;
@@ -188,15 +198,26 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	const getFullStreamTextForTab = useCallback((tabId: string) => {
 		const buf = streamBuffersRef.current.get(tabId);
 		if (!buf) return '';
-		// We flush on notify; treat display as authoritative.
-		return buf.text.display;
+		// Ensure any pending chunks are included before reading.
+		const ch = buf.text;
+		if (ch.flushedIdx < ch.chunks.length) {
+			ch.display += ch.chunks.slice(ch.flushedIdx).join('');
+			ch.flushedIdx = ch.chunks.length;
+		}
+		return ch.display;
 	}, []);
 
 	const getFullStreamThinkingForTab = useCallback((tabId: string) => {
 		const buf = streamBuffersRef.current.get(tabId);
 		if (!buf) return '';
-		return buf.thinking.display;
+		const ch = buf.thinking;
+		if (ch.flushedIdx < ch.chunks.length) {
+			ch.display += ch.chunks.slice(ch.flushedIdx).join('');
+			ch.flushedIdx = ch.chunks.length;
+		}
+		return ch.display;
 	}, []);
+
 	const bumpStreamVersion = useCallback((tabId: string) => {
 		const v = (streamVersionRef.current.get(tabId) ?? 0) + 1;
 		streamVersionRef.current.set(tabId, v);
@@ -232,6 +253,16 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			const set = streamListenersRef.current.get(tabId);
 			if (!set) return;
 			for (const cb of set) cb();
+
+			// Auto-scroll during streaming: keep user at bottom if they were there.
+			// Virtuoso's followOutput handles new-item appends; this covers
+			// height growth of the *existing* last item during streaming.
+			if (selectedTabIdRef.current === tabId && isAtBottomRef.current) {
+				requestAnimationFrame(() => {
+					const el = scrollerElRef.current;
+					if (el) el.scrollTop = el.scrollHeight;
+				});
+			}
 		},
 		[flushStreamForTab, bumpStreamVersion]
 	);
@@ -415,16 +446,50 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		};
 	}, []);
 
-	// ---------------- UI refs ----------------
-	const chatContainerRef = useRef<HTMLDivElement>(null);
-	const { isAtBottom, isAtTop, isScrollable } = useAtTopBottom(chatContainerRef);
+	const virtuosoRef = useRef<VirtuosoHandle>(null);
+	const scrollerElRef = useRef<HTMLDivElement | null>(null);
+	const isAtBottomRef = useRef(true);
+	const [isAtBottom, setIsAtBottom] = useState(true);
+	const [isAtTop, setIsAtTop] = useState(true);
+
+	// Bridge Virtuoso's scroller element so we can:
+	//  1) track scrollTop per-tab (passive scroll listener)
+	//  2) pass it to ButtonScrollToTop / ButtonScrollToBottom
+	const scrollListenerCleanupRef = useRef<(() => void) | null>(null);
+
+	const handleScrollerRef = useCallback((el: HTMLElement | Window | null) => {
+		scrollListenerCleanupRef.current?.();
+		scrollListenerCleanupRef.current = null;
+
+		const htmlEl = el instanceof HTMLElement ? el : null;
+		scrollerElRef.current = htmlEl as HTMLDivElement | null;
+
+		if (htmlEl) {
+			const handler = () => {
+				scrollTopByTab.current.set(selectedTabIdRef.current, htmlEl.scrollTop);
+			};
+			htmlEl.addEventListener('scroll', handler, { passive: true });
+			scrollListenerCleanupRef.current = () => {
+				htmlEl.removeEventListener('scroll', handler);
+			};
+		}
+	}, []);
+
+	// Cleanup scroll listener on component unmount
+	useEffect(() => {
+		return () => {
+			scrollListenerCleanupRef.current?.();
+		};
+	}, []);
+
+	// Stable Virtuoso `components` object (never changes → no remount)
+	const virtuosoComponents = useMemo(() => ({ List: VirtuosoList }), []);
 
 	const scrollToBottom = useCallback((tabId: string) => {
 		// There is only one visible scroll container; it corresponds to the active tab.
 		if (selectedTabIdRef.current !== tabId) return;
-		const el = chatContainerRef.current;
-		if (!el) return;
-		el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+		const el = scrollerElRef.current;
+		if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
 	}, []);
 
 	const scrollToBottomSoon = useCallback(
@@ -436,39 +501,10 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		[scrollToBottom]
 	);
 
-	// Save scroll position for active tab on scroll
-	const onScrollActive = useCallback(() => {
-		const tabId = selectedTabIdRef.current;
-		const el = chatContainerRef.current;
-		if (!el) return;
-		scrollTopByTab.current.set(tabId, el.scrollTop);
-	}, []);
-
-	// Restore scroll position when changing tabs (scroll restore requirement)
-	useLayoutEffect(() => {
-		const el = chatContainerRef.current;
-		if (!el) return;
-
-		const top = scrollTopByTab.current.get(selectedTabId) ?? 0;
-
-		// Keep map consistent even if user never scrolls.
-		scrollTopByTab.current.set(selectedTabId, top);
-
-		// Use rAF to ensure DOM layout is committed for the new tab content
-		requestAnimationFrame(() => {
-			const el2 = chatContainerRef.current;
-			if (!el2) return;
-			el2.scrollTop = top;
-		});
-	}, [selectedTabId]);
-
 	const resetScrollToTop = useCallback((tabId: string) => {
 		scrollTopByTab.current.set(tabId, 0);
 		if (selectedTabIdRef.current !== tabId) return;
-		requestAnimationFrame(() => {
-			const el = chatContainerRef.current;
-			if (el) el.scrollTop = 0;
-		});
+		virtuosoRef.current?.scrollTo({ top: 0 });
 	}, []);
 
 	const getScrollTopByTabSnapshot = useCallback(() => {
@@ -635,6 +671,40 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 							inputRefs.current.get(tabId)?.loadToolCalls(runnableCalls);
 						}
 					}
+				} else {
+					// No usable response (e.g. nil inferenceResponse or null resp).
+					// Replace the placeholder with a visible error so it is not an
+					// invisible single-line stub.
+					const fallbackMsg: ConversationMessage = {
+						...assistantPlaceholder,
+						status: Status.Failed,
+						uiContent: '> Error: No response was returned by the backend.',
+						outputs: [
+							{
+								kind: OutputKind.OutputMessage,
+								outputMessage: {
+									id: assistantPlaceholder.id,
+									role: RoleEnum.Assistant,
+									status: Status.Failed,
+									contents: [
+										{
+											kind: ContentItemKind.Text,
+											textItem: {
+												text: '> Error: No response was returned by the backend.',
+											},
+										},
+									],
+								},
+							},
+						],
+					};
+
+					const finalChat: Conversation = {
+						...chatWithPlaceholder,
+						messages: [...chatWithPlaceholder.messages.slice(0, -1), fallbackMsg],
+						modifiedAt: new Date(),
+					};
+					saveUpdatedConversation(tabId, finalChat);
 				}
 			} catch (e) {
 				if (!tabExists(tabId)) return;
@@ -835,87 +905,115 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		]
 	);
 
-	// ---------------- Render helpers ----------------
-	const renderedMessagesExceptLast = useMemo(() => {
-		if (!activeTab) return null;
-		const msgs = activeTab.conversation.messages;
-		if (msgs.length <= 1) return null;
+	// ---------------- Virtuoso render helpers ----------------
 
-		// IMPORTANT: previous rows are not "busy" just because the tab is generating.
-		// This avoids re-mounting heavy Markdown for all prior messages.
-		return msgs.slice(0, -1).map(msg => (
-			<ChatMessage
-				key={msg.id}
-				message={msg}
-				streamedText={''}
-				streamedThinking={''}
-				isBusy={false}
-				isEditing={activeTab.editingMessageId === msg.id}
-				onEdit={() => {
-					beginEditMessageForTab(activeTab.tabId, msg.id);
-				}}
-			/>
-		));
-	}, [activeTab, beginEditMessageForTab]);
+	// Stable streaming subscription callbacks — only change when the active tab
+	// switches, NOT when isBusy/messages/editingMessageId change.  This prevents
+	// useSyncExternalStore in StreamingLastMessage from re-subscribing on every
+	// content tick.
+	const activeTabId = activeTab?.tabId ?? '';
 
-	const renderedLastMessage = useMemo(() => {
-		if (!activeTab) return null;
-		const msgs = activeTab.conversation.messages;
-		if (msgs.length === 0) return null;
+	const subscribeToActiveStream = useCallback(
+		(cb: () => void) => subscribeToStream(activeTabId, cb),
+		[activeTabId, subscribeToStream]
+	);
+	const getActiveStreamSnapshot = useCallback(
+		() => getStreamVersionSnapshot(activeTabId),
+		[activeTabId, getStreamVersionSnapshot]
+	);
+	const getActiveStreamText = useCallback(
+		() => getFullStreamTextForTab(activeTabId),
+		[activeTabId, getFullStreamTextForTab]
+	);
+	const getActiveStreamThinking = useCallback(
+		() => getFullStreamThinkingForTab(activeTabId),
+		[activeTabId, getFullStreamThinkingForTab]
+	);
 
-		const msg = msgs[msgs.length - 1];
-		const isAssistant = msg.role === RoleEnum.Assistant;
+	const computeItemKey = useCallback((_index: number, message: ConversationMessage) => message.id, []);
 
-		const rowIsBusy = activeTab.isBusy && isAssistant;
+	const messages = activeTab?.conversation?.messages ?? [];
 
-		return (
-			<StreamingLastMessage
-				key={msg.id}
-				message={msg}
-				rowIsBusy={rowIsBusy}
-				isEditing={activeTab.editingMessageId === msg.id}
-				onEdit={() => {
-					beginEditMessageForTab(activeTab.tabId, msg.id);
-				}}
-				subscribe={cb => subscribeToStream(activeTab.tabId, cb)}
-				getSnapshot={() => getStreamVersionSnapshot(activeTab.tabId)}
-				getStreamText={() => getFullStreamTextForTab(activeTab.tabId)}
-				getStreamThinking={() => getFullStreamThinkingForTab(activeTab.tabId)}
-			/>
-		);
-	}, [
-		activeTab,
-		beginEditMessageForTab,
-		getFullStreamTextForTab,
-		getFullStreamThinkingForTab,
-		getStreamVersionSnapshot,
-		subscribeToStream,
-	]);
+	const itemContent = useCallback(
+		(index: number, message: ConversationMessage) => {
+			const isLast = index === messages.length - 1;
+			const isAssistant = message.role === RoleEnum.Assistant;
+			const rowIsBusy = isLast && activeTab?.isBusy && isAssistant;
+
+			if (rowIsBusy) {
+				return (
+					<StreamingLastMessage
+						message={message}
+						rowIsBusy={true}
+						isEditing={activeTab.editingMessageId === message.id}
+						onEdit={() => {
+							beginEditMessageForTab(activeTabId, message.id);
+						}}
+						subscribe={subscribeToActiveStream}
+						getSnapshot={getActiveStreamSnapshot}
+						getStreamText={getActiveStreamText}
+						getStreamThinking={getActiveStreamThinking}
+					/>
+				);
+			}
+
+			return (
+				<ChatMessage
+					message={message}
+					streamedText=""
+					streamedThinking=""
+					isBusy={false}
+					isEditing={activeTab?.editingMessageId === message.id}
+					onEdit={() => {
+						beginEditMessageForTab(activeTabId, message.id);
+					}}
+				/>
+			);
+		},
+		[
+			messages.length,
+			activeTab,
+			subscribeToActiveStream,
+			getActiveStreamSnapshot,
+			getActiveStreamText,
+			getActiveStreamThinking,
+			beginEditMessageForTab,
+			activeTabId,
+		]
+	);
 
 	return (
 		<>
-			{/* Row 2: MESSAGES (single scroll container; scroll position restored per tab) */}
+			{/* MESSAGES (single scroll container; scroll position restored per tab) */}
 			<div className="relative row-start-2 row-end-3 mt-2 min-h-0">
-				<div
-					ref={chatContainerRef}
-					onScroll={onScrollActive}
-					className="relative h-full w-full overflow-y-auto overscroll-contain py-1"
+				<Virtuoso<ConversationMessage>
+					key={selectedTabId}
+					ref={virtuosoRef}
+					data={messages}
+					computeItemKey={computeItemKey}
+					initialScrollTop={scrollTopByTab.current.get(selectedTabId) ?? 0}
+					followOutput={atBottom => (atBottom ? 'smooth' : false)}
+					atBottomThreshold={100}
+					increaseViewportBy={200}
+					atBottomStateChange={atBottom => {
+						isAtBottomRef.current = atBottom;
+						setIsAtBottom(atBottom);
+					}}
+					atTopStateChange={setIsAtTop}
+					scrollerRef={handleScrollerRef}
+					itemContent={itemContent}
+					components={virtuosoComponents}
+					className="h-full w-full overscroll-contain py-1"
 					style={{ scrollbarGutter: 'stable both-edges' }}
-				>
-					<div className="mx-auto w-11/12 xl:w-5/6">
-						{renderedMessagesExceptLast}
-						{renderedLastMessage}
-					</div>
-				</div>
+				/>
 
-				{/* Overlay scroll buttons (active tab only, since container is shared) */}
 				<div className="pointer-events-none absolute right-4 bottom-16 z-10 xl:right-24">
 					<div className="pointer-events-auto">
-						{isScrollable && !isAtTop ? (
+						{!isAtTop ? (
 							<ButtonScrollToTop
-								scrollContainerRef={chatContainerRef}
+								scrollContainerRef={scrollerElRef}
 								iconSize={32}
-								show={isScrollable && !isAtTop}
+								show={!isAtTop}
 								className="btn btn-md border-none bg-transparent shadow-none"
 							/>
 						) : null}
@@ -923,11 +1021,11 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 				</div>
 				<div className="pointer-events-none absolute right-4 bottom-4 z-10 xl:right-24">
 					<div className="pointer-events-auto">
-						{isScrollable && !isAtBottom ? (
+						{!isAtBottom ? (
 							<ButtonScrollToBottom
-								scrollContainerRef={chatContainerRef}
+								scrollContainerRef={scrollerElRef}
 								iconSize={32}
-								show={isScrollable && !isAtBottom}
+								show={!isAtBottom}
 								className="btn btn-md border-none bg-transparent shadow-none"
 							/>
 						) : null}
