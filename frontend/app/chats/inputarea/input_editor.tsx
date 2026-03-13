@@ -1,7 +1,5 @@
 import {
-	type Dispatch,
 	forwardRef,
-	type SetStateAction,
 	type SubmitEventHandler,
 	useCallback,
 	useDeferredValue,
@@ -21,17 +19,13 @@ import { Plate, PlateContent, type PlateEditor, usePlateEditor } from 'platejs/r
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { ProviderSDKType, UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { SkillRef } from '@/spec/skill';
-import { type Tool, type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
+import type { ToolStoreChoice } from '@/spec/tool';
 
-import { resolveStateUpdate } from '@/lib/hook_utils';
 import { type ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { compareEntryByPathDeepestFirst } from '@/lib/path_utils';
 import { cssEscape } from '@/lib/text_utils';
-import { ensureMakeID, getUUIDv7 } from '@/lib/uuid_utils';
 
 import { useEnterSubmit } from '@/hooks/use_enter_submit';
-
-import { skillStoreAPI, toolRuntimeAPI, toolStoreAPI } from '@/apis/baseapi';
 
 import { AlignKit } from '@/components/editor/plugins/align_kit';
 import { BasicBlocksKit } from '@/components/editor/plugins/basic_blocks_kit';
@@ -43,7 +37,6 @@ import { ListKit } from '@/components/editor/plugins/list_kit';
 import { TabbableKit } from '@/components/editor/plugins/tabbable_kit';
 
 import { useComposerAttachments } from '@/chats/attachments/use_composer_attachments';
-import { useOpenToolArgs } from '@/chats/events/open_attached_toolargs';
 import { dispatchTemplateFlashEvent } from '@/chats/events/template_flash';
 import { EditorBottomBar } from '@/chats/inputarea/input_editor_bottom_bar';
 import { EditorChipsBar } from '@/chats/inputarea/input_editor_chips_bar';
@@ -77,27 +70,19 @@ import { buildUserInlineChildrenFromText } from '@/chats/templates/template_vari
 import {
 	type ConversationToolStateEntry,
 	conversationToolsToChoices,
-	initConversationToolsStateFromChoices,
 	mergeConversationToolsWithNewChoices,
 } from '@/chats/tools/conversation_tool_utils';
-import { ToolDetailsModal, type ToolDetailsState } from '@/chats/tools/tool_details_modal';
+import { ToolDetailsModal } from '@/chats/tools/tool_details_modal';
 import {
-	computeToolUserArgsStatus,
 	dedupeToolChoices,
 	editorAttachedToolToToolChoice,
-	formatToolOutputSummary,
 	getAttachedTools,
 	getToolNodesWithPath,
-	type ToolSelectionElementNode,
 } from '@/chats/tools/tool_editor_utils';
 import { ToolPlusKit } from '@/chats/tools/tool_plugin';
 import { ToolArgsModalHost } from '@/chats/tools/tool_user_args_host';
-import { type ToolArgsTarget } from '@/chats/tools/tool_user_args_modal';
-import {
-	buildWebSearchChoicesForSubmit,
-	type WebSearchChoiceTemplate,
-	webSearchTemplateFromChoice,
-} from '@/chats/tools/websearch_utils';
+import { useComposerTools } from '@/chats/tools/use_composer_tools';
+import { buildWebSearchChoicesForSubmit, type WebSearchChoiceTemplate } from '@/chats/tools/websearch_utils';
 
 export interface EditorAreaHandle {
 	focus: () => void;
@@ -113,10 +98,6 @@ export interface EditorAreaHandle {
 	setEnabledSkillRefsFromMessage: (refs: SkillRef[]) => void;
 	setActiveSkillRefsFromMessage: (refs: SkillRef[]) => void;
 }
-
-const conversationToolHydrationKey = (entry: ConversationToolStateEntry): string => {
-	return `${entry.toolStoreChoice.bundleID}::${entry.toolStoreChoice.toolSlug}::${entry.toolStoreChoice.toolVersion}`;
-};
 
 const isSelectionOnlyEditorChange = (editor: PlateEditor): boolean => {
 	const operations = editor.operations ?? [];
@@ -137,11 +118,6 @@ const createEditorPlugins = () => [
 	...ToolPlusKit,
 	...FloatingToolbarKit,
 ];
-
-interface ComposerToolRuntimeState {
-	toolCalls: UIToolCall[];
-	toolOutputs: UIToolOutput[];
-}
 
 interface EditorAreaProps {
 	isBusy: boolean;
@@ -189,7 +165,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	// doc version tick to re-run selection computations on any editor change
 	const [docVersion, setDocVersion] = useState(0);
 	const deferredDocVersion = useDeferredValue(docVersion);
-	const [toolEntriesVersion, setToolEntriesVersion] = useState(0);
 
 	// Cache "has text" so we don't re-scan the editor tree multiple times per render.
 	const [hasText, setHasText] = useState(false);
@@ -363,87 +338,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const [submitError, setSubmitError] = useState<string | null>(null);
 
-	// Tool-call chips (assistant-suggested) + tool outputs attached to the next user message.
-	const [toolRuntimeState, setToolRuntimeStateRaw] = useState<ComposerToolRuntimeState>({
-		toolCalls: [],
-		toolOutputs: [],
-	});
-	const toolRuntimeStateRef = useRef<ComposerToolRuntimeState>({
-		toolCalls: [],
-		toolOutputs: [],
-	});
-	const updateToolRuntimeState = useCallback((update: SetStateAction<ComposerToolRuntimeState>) => {
-		setToolRuntimeStateRaw(prev => {
-			const next = resolveStateUpdate(update, prev);
-			toolRuntimeStateRef.current = next;
-			return next === prev ? prev : next;
-		});
-	}, []);
-	toolRuntimeStateRef.current = toolRuntimeState;
-
-	const toolCalls = toolRuntimeState.toolCalls;
-	const toolOutputs = toolRuntimeState.toolOutputs;
-	const setToolCalls = useCallback(
-		(update: SetStateAction<UIToolCall[]>) => {
-			updateToolRuntimeState(prev => {
-				const nextToolCalls = resolveStateUpdate(update, prev.toolCalls);
-				if (nextToolCalls === prev.toolCalls) return prev;
-				return { ...prev, toolCalls: nextToolCalls };
-			});
-		},
-		[updateToolRuntimeState]
-	);
-	const setToolOutputs = useCallback(
-		(update: SetStateAction<UIToolOutput[]>) => {
-			updateToolRuntimeState(prev => {
-				const nextToolOutputs = resolveStateUpdate(update, prev.toolOutputs);
-				if (nextToolOutputs === prev.toolOutputs) return prev;
-				return { ...prev, toolOutputs: nextToolOutputs };
-			});
-		},
-		[updateToolRuntimeState]
-	);
-	const lastAutoExecuteAttemptKeyRef = useRef<string | null>(null);
-	// eslint-disable-next-line react-hooks/exhaustive-deps
-	const attachedToolEntries = useMemo(() => getToolNodesWithPath(editor), [editor, toolEntriesVersion]);
-
-	const [toolDetailsState, setToolDetailsState] = useState<ToolDetailsState>(null);
-
-	const [conversationToolsState, setConversationToolsStateRaw] = useState<ConversationToolStateEntry[]>([]);
-	const conversationToolsStateRef = useRef<ConversationToolStateEntry[]>([]);
-	conversationToolsStateRef.current = conversationToolsState;
-	const conversationToolDefsCacheRef = useRef<Map<string, Tool>>(new Map());
-	// When editing an earlier message we temporarily override the current
-	// conversation-tool + web-search config. Keep a snapshot so Cancel restores it.
-	const preEditConversationToolsRef = useRef<ConversationToolStateEntry[] | null>(null);
-	const preEditWebSearchTemplatesRef = useRef<WebSearchChoiceTemplate[] | null>(null);
-	const preEditEnabledSkillRefsRef = useRef<SkillRef[] | null>(null);
-	const preEditActiveSkillRefsRef = useRef<SkillRef[] | null>(null);
-
-	// Count of in-flight tool-definition hydration tasks (conversation-level + attached).
-	// Used to gate sending while schemas are still loading.
-	const [toolsHydratingCount, setToolsHydratingCount] = useState(0);
-	const hydratingConversationToolKeysRef = useRef<Set<string>>(new Set());
-
-	const toolsDefLoading = toolsHydratingCount > 0;
-	// Arg-blocking state, split by attached-vs-conversation tools.
-	const [attachedToolArgsBlocked, setAttachedToolArgsBlocked] = useState(false);
-	const conversationToolArgsBlocked = useMemo(() => {
-		for (const entry of conversationToolsState) {
-			if (!entry.enabled) continue;
-			const status = entry.argStatus;
-			if (status?.hasSchema && !status.isSatisfied) {
-				return true;
-			}
-		}
-		return false;
-	}, [conversationToolsState]);
-	const toolArgsBlocked = attachedToolArgsBlocked || conversationToolArgsBlocked;
-
-	// Single “active tool args editor” target (conversation-level or attached).
-	const [toolArgsTarget, setToolArgsTarget] = useState<ToolArgsTarget | null>(null);
-	const [webSearchTemplates, setWebSearchTemplates] = useState<WebSearchChoiceTemplate[]>([]);
-
 	// ---- Skills (conversation-level) ----
 	const {
 		allSkills,
@@ -463,6 +357,107 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		getCurrentSkillSessionID,
 	} = useComposerSkills();
 
+	const lastPopulatedSelectionKeyRef = useRef<Set<string>>(new Set());
+
+	const selectionInfo = useMemo(() => {
+		// Fast path: if the document contains no template-selection elements at all,
+		// short-circuit instead of running the heavier helpers.
+		const tplNodeWithPath = getFirstTemplateNodeWithPath(editor);
+		if (!tplNodeWithPath) {
+			return {
+				tplNodeWithPath: undefined,
+				hasTemplate: false,
+				requiredCount: 0,
+				firstPendingVar: undefined,
+			};
+		}
+
+		const selections = getTemplateSelections(editor);
+		const hasTemplate = selections.length > 0;
+
+		let requiredCount = 0;
+		let firstPendingVar: { name: string; selectionID?: string } | undefined = undefined;
+
+		for (const s of selections) {
+			requiredCount += s.requiredCount;
+
+			if (!firstPendingVar) {
+				if (s.requiredVariables.length > 0) {
+					firstPendingVar = { name: s.requiredVariables[0], selectionID: s.selectionID };
+				}
+			}
+		}
+
+		return {
+			tplNodeWithPath,
+			hasTemplate,
+			requiredCount,
+			firstPendingVar,
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [editor, deferredDocVersion]);
+
+	const templateBlocked = selectionInfo.hasTemplate && selectionInfo.requiredCount > 0;
+
+	const submitPendingToolsAndSendRef = useRef<(() => void | Promise<void>) | null>(null);
+
+	const {
+		toolCalls,
+		toolOutputs,
+		setToolOutputs,
+		conversationToolsState,
+		setConversationToolsState,
+		setConversationToolsStateAndMaybeAutoExecute,
+		webSearchTemplates,
+		setWebSearchTemplates,
+		setWebSearchTemplatesAndMaybeAutoExecute,
+		toolDetailsState,
+		setToolDetailsState,
+		toolArgsTarget,
+		setToolArgsTarget,
+		toolsDefLoading,
+		toolArgsBlocked,
+		hasPendingToolCalls,
+		hasRunningToolCalls,
+		toolEntriesVersion,
+		bumpToolEntriesVersion,
+		runAllPendingToolCalls,
+		handleRunSingleToolCall,
+		handleDiscardToolCall,
+		handleRemoveToolOutput,
+		handleRetryErroredOutput,
+		handleAttachedToolsChanged,
+		applyConversationToolsFromChoices,
+		applyWebSearchFromChoices,
+		loadToolCalls,
+		handleOpenToolOutput,
+		handleOpenToolCallDetails,
+		handleOpenConversationToolDetails,
+		handleOpenAttachedToolDetails,
+		clearComposerToolsState,
+	} = useComposerTools({
+		editor,
+		isBusy,
+		isSubmittingRef,
+		templateBlocked,
+		submitPendingToolsAndSendRef,
+		ensureSkillSession,
+		listActiveSkillRefs,
+		setActiveSkillRefs,
+		getCurrentSkillSessionID,
+		skillSessionID,
+	});
+
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	const attachedToolEntries = useMemo(() => getToolNodesWithPath(editor), [editor, toolEntriesVersion]);
+
+	// When editing an earlier message we temporarily override the current
+	// conversation-tool + web-search config. Keep a snapshot so Cancel restores it.
+	const preEditConversationToolsRef = useRef<ConversationToolStateEntry[] | null>(null);
+	const preEditWebSearchTemplatesRef = useRef<WebSearchChoiceTemplate[] | null>(null);
+	const preEditEnabledSkillRefsRef = useRef<SkillRef[] | null>(null);
+	const preEditActiveSkillRefsRef = useRef<SkillRef[] | null>(null);
+
 	// --- Fix: focus management for menus opened by shortcuts ---
 	const templateMenuOpen = useStoreState(templateMenu, 'open');
 	const toolMenuOpen = useStoreState(toolMenu, 'open');
@@ -477,10 +472,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		preEditEnabledSkillRefsRef.current = null;
 		preEditActiveSkillRefsRef.current = null;
 	}, []);
-
-	useOpenToolArgs(target => {
-		setToolArgsTarget(target);
-	});
 
 	const closeAllMenus = useCallback(() => {
 		templateMenu.hide();
@@ -564,129 +555,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		attachmentButtonRef.current?.focus({ preventScroll: true });
 	}, [closeAllMenus, attachmentMenu]);
 
-	const lastPopulatedSelectionKeyRef = useRef<Set<string>>(new Set());
-
-	const selectionInfo = useMemo(() => {
-		// Fast path: if the document contains no template-selection elements at all,
-		// short-circuit instead of running the heavier helpers.
-		const tplNodeWithPath = getFirstTemplateNodeWithPath(editor);
-		if (!tplNodeWithPath) {
-			return {
-				tplNodeWithPath: undefined,
-				hasTemplate: false,
-				requiredCount: 0,
-				firstPendingVar: undefined,
-			};
-		}
-
-		const selections = getTemplateSelections(editor);
-		const hasTemplate = selections.length > 0;
-
-		let requiredCount = 0;
-		let firstPendingVar: { name: string; selectionID?: string } | undefined = undefined;
-
-		for (const s of selections) {
-			requiredCount += s.requiredCount;
-
-			if (!firstPendingVar) {
-				if (s.requiredVariables.length > 0) {
-					firstPendingVar = { name: s.requiredVariables[0], selectionID: s.selectionID };
-				}
-			}
-		}
-
-		return {
-			tplNodeWithPath,
-			hasTemplate,
-			requiredCount,
-			firstPendingVar,
-		};
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [editor, deferredDocVersion]);
-
-	const hasPendingToolCalls = useMemo(() => toolCalls.some(c => c.status === 'pending'), [toolCalls]);
-	const hasRunningToolCalls = useMemo(() => toolCalls.some(c => c.status === 'running'), [toolCalls]);
-	const templateBlocked = selectionInfo.hasTemplate && selectionInfo.requiredCount > 0;
-
-	const isBusyRef = useRef(isBusy);
-	isBusyRef.current = isBusy;
-	const templateBlockedRef = useRef(templateBlocked);
-	templateBlockedRef.current = templateBlocked;
-	const toolArgsBlockedRef = useRef(toolArgsBlocked);
-	toolArgsBlockedRef.current = toolArgsBlocked;
-	const toolsDefLoadingRef = useRef(toolsDefLoading);
-	toolsDefLoadingRef.current = toolsDefLoading;
-	const autoExecuteCheckTimeoutRef = useRef<number | null>(null);
-	const autoExecuteRetryBudgetRef = useRef(0);
-
-	const runAutoExecutePendingToolCallsCheck = useCallback(() => {
-		const currentToolCalls = toolRuntimeStateRef.current.toolCalls;
-		const pendingRunnable = currentToolCalls.filter(
-			c => c.status === 'pending' && (c.type === ToolStoreChoiceType.Function || c.type === ToolStoreChoiceType.Custom)
-		);
-
-		if (pendingRunnable.length === 0) {
-			lastAutoExecuteAttemptKeyRef.current = null;
-			autoExecuteRetryBudgetRef.current = 0;
-			return;
-		}
-
-		const shouldAutoExecute = pendingRunnable.every(c => c.toolStoreChoice?.autoExecute);
-		if (!shouldAutoExecute) {
-			autoExecuteRetryBudgetRef.current = 0;
-			return;
-		}
-
-		const hasRunningCalls = currentToolCalls.some(c => c.status === 'running');
-		if (
-			isBusyRef.current ||
-			isSubmittingRef.current ||
-			hasRunningCalls ||
-			templateBlockedRef.current ||
-			toolArgsBlockedRef.current ||
-			toolsDefLoadingRef.current
-		) {
-			if (autoExecuteRetryBudgetRef.current > 0) {
-				autoExecuteRetryBudgetRef.current -= 1;
-				autoExecuteCheckTimeoutRef.current = window.setTimeout(() => {
-					autoExecuteCheckTimeoutRef.current = null;
-					runAutoExecutePendingToolCallsCheck();
-				}, 80);
-			}
-			return;
-		}
-
-		const nextKey = pendingRunnable.map(c => c.id).join('|');
-		if (nextKey && lastAutoExecuteAttemptKeyRef.current === nextKey) {
-			autoExecuteRetryBudgetRef.current = 0;
-			return;
-		}
-
-		lastAutoExecuteAttemptKeyRef.current = nextKey;
-		autoExecuteRetryBudgetRef.current = 0;
-		void doSubmitRef.current({ runPendingTools: true });
-	}, []);
-
-	const kickAutoExecutePendingToolCalls = useCallback(
-		(retryBudget = 0) => {
-			autoExecuteRetryBudgetRef.current = Math.max(autoExecuteRetryBudgetRef.current, retryBudget);
-			if (autoExecuteCheckTimeoutRef.current != null) return;
-			autoExecuteCheckTimeoutRef.current = window.setTimeout(() => {
-				autoExecuteCheckTimeoutRef.current = null;
-				runAutoExecutePendingToolCallsCheck();
-			}, 0);
-		},
-		[runAutoExecutePendingToolCallsCheck]
-	);
-
-	useEffect(() => {
-		return () => {
-			if (autoExecuteCheckTimeoutRef.current != null) {
-				window.clearTimeout(autoExecuteCheckTimeoutRef.current);
-			}
-		};
-	}, []);
-
 	// Populate editor with effective last-USER block for EACH template selection (once per selectionID)
 	useEffect(() => {
 		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
@@ -751,129 +619,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		}
 	}, [editor, focusEditorAtEnd, deferredDocVersion, selectionInfo.tplNodeWithPath]);
 
-	// Helper to recompute attached-tool arg blocking on demand.
-	const recomputeAttachedToolArgsBlocked = useCallback(() => {
-		const toolEntries = getToolNodesWithPath(editor, false);
-		let nextBlocked = false;
-
-		for (const [node] of toolEntries) {
-			const schema = node.toolSnapshot?.userArgSchema;
-			const status = computeToolUserArgsStatus(schema, node.userArgSchemaInstance);
-			if (status.hasSchema && !status.isSatisfied) {
-				nextBlocked = true;
-				break;
-			}
-		}
-
-		setAttachedToolArgsBlocked(prev => (prev === nextBlocked ? prev : nextBlocked));
-	}, [editor]);
-
-	// Single callback to call whenever attached tools change (add/remove/options).
-	const handleAttachedToolsChanged = useCallback(() => {
-		setToolEntriesVersion(v => v + 1);
-		recomputeAttachedToolArgsBlocked();
-		if (toolRuntimeStateRef.current.toolCalls.length > 0) {
-			kickAutoExecutePendingToolCalls(1);
-		}
-	}, [kickAutoExecutePendingToolCalls, recomputeAttachedToolArgsBlocked]);
-
-	const primeConversationToolsFromCache = useCallback((entries: ConversationToolStateEntry[]) => {
-		let changed = false;
-
-		const next = entries.map(entry => {
-			const cacheKey = conversationToolHydrationKey(entry);
-			const def = entry.toolDefinition ?? conversationToolDefsCacheRef.current.get(cacheKey);
-			if (!def) return entry;
-
-			const argStatus = computeToolUserArgsStatus(def.userArgSchema, entry.toolStoreChoice.userArgSchemaInstance);
-			if (entry.toolDefinition === def && entry.argStatus === argStatus) return entry;
-
-			changed = true;
-			return { ...entry, toolDefinition: def, argStatus };
-		});
-
-		return changed ? next : entries;
-	}, []);
-
-	const hydrateConversationToolsIfNeeded = useCallback(
-		(entries: ConversationToolStateEntry[]) => {
-			const inFlight = hydratingConversationToolKeysRef.current;
-			const cache = conversationToolDefsCacheRef.current;
-
-			const missing = entries.filter(entry => {
-				const cacheKey = conversationToolHydrationKey(entry);
-				return !entry.toolDefinition && !cache.has(cacheKey) && !inFlight.has(cacheKey);
-			});
-
-			if (!missing.length) return;
-
-			const requestedKeys = new Set<string>();
-			for (const entry of missing) {
-				const cacheKey = conversationToolHydrationKey(entry);
-				inFlight.add(cacheKey);
-				requestedKeys.add(cacheKey);
-			}
-
-			setToolsHydratingCount(c => c + 1);
-
-			void Promise.all(
-				missing.map(async entry => {
-					const cacheKey = conversationToolHydrationKey(entry);
-					try {
-						const def = await toolStoreAPI.getTool(
-							entry.toolStoreChoice.bundleID,
-							entry.toolStoreChoice.toolSlug,
-							entry.toolStoreChoice.toolVersion
-						);
-						return def ? { cacheKey, def } : null;
-					} catch {
-						return null;
-					}
-				})
-			)
-				.then(results => {
-					if (!isMountedRef.current) return;
-
-					let loadedAny = false;
-					for (const result of results) {
-						if (!result) continue;
-						cache.set(result.cacheKey, result.def);
-						loadedAny = true;
-					}
-
-					if (!loadedAny) return;
-
-					setConversationToolsStateRaw(prev => {
-						const next = primeConversationToolsFromCache(prev);
-						conversationToolsStateRef.current = next;
-						return next;
-					});
-				})
-				.finally(() => {
-					for (const key of requestedKeys) {
-						inFlight.delete(key);
-					}
-					if (isMountedRef.current) {
-						setToolsHydratingCount(c => Math.max(0, c - 1));
-					}
-				});
-		},
-		[primeConversationToolsFromCache]
-	);
-
-	const setConversationToolsState = useCallback<Dispatch<SetStateAction<ConversationToolStateEntry[]>>>(
-		update => {
-			const prev = conversationToolsStateRef.current;
-			const requested = resolveStateUpdate(update, prev);
-			const next = primeConversationToolsFromCache(requested);
-
-			conversationToolsStateRef.current = next;
-			setConversationToolsStateRaw(next);
-			hydrateConversationToolsIfNeeded(next);
-		},
-		[hydrateConversationToolsIfNeeded, primeConversationToolsFromCache]
-	);
-
 	const restorePreEditContext = useCallback(() => {
 		const prevConv = preEditConversationToolsRef.current;
 		const prevWs = preEditWebSearchTemplatesRef.current;
@@ -886,7 +631,14 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			applySkillSelectionState(prevSkills ?? enabledSkillRefs, prevActive ?? activeSkillRefs);
 		}
 		clearPreEditSnapshot();
-	}, [activeSkillRefs, applySkillSelectionState, clearPreEditSnapshot, enabledSkillRefs, setConversationToolsState]);
+	}, [
+		activeSkillRefs,
+		applySkillSelectionState,
+		clearPreEditSnapshot,
+		enabledSkillRefs,
+		setConversationToolsState,
+		setWebSearchTemplates,
+	]);
 
 	const isSendButtonEnabled = useMemo(() => {
 		if (isBusy) return false;
@@ -924,297 +676,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		},
 	});
 
-	const isSkillsToolName = useCallback((name: string | undefined): boolean => {
-		const n = (name ?? '').trim();
-		return n.startsWith('skills.');
-	}, []);
-
-	const runToolCallInternal = useCallback(
-		async (toolCall: UIToolCall): Promise<UIToolOutput | null> => {
-			if (toolCall.type !== ToolStoreChoiceType.Function && toolCall.type !== ToolStoreChoiceType.Custom) {
-				const errMsg = 'This tool call type cannot be executed from the composer.';
-				setToolCalls(prev =>
-					prev.map(c => (c.id === toolCall.id ? { ...c, status: 'failed', errorMessage: errMsg } : c))
-				);
-				return null;
-			}
-
-			const args = toolCall.arguments && toolCall.arguments.trim().length > 0 ? toolCall.arguments : undefined;
-
-			// ---- Skills tool path (runtime-injected tools: skills.*) ----
-			if (isSkillsToolName(toolCall.name)) {
-				let sid = getCurrentSkillSessionID();
-				if (!sid) {
-					try {
-						sid = await ensureSkillSession();
-					} catch {
-						sid = null;
-					}
-				}
-
-				if (!sid) {
-					const errMsg = 'No active skills session. Enable skills and resend, or run again after a session is created.';
-					setToolCalls(prev =>
-						prev.map(c => (c.id === toolCall.id ? { ...c, status: 'failed', errorMessage: errMsg } : c))
-					);
-					return null;
-				}
-
-				// Mark as running (allow retry after failure by overwriting previous status).
-				setToolCalls(prev =>
-					prev.map(c => (c.id === toolCall.id ? { ...c, status: 'running', errorMessage: undefined } : c))
-				);
-
-				try {
-					const resp = await skillStoreAPI.invokeSkillTool(sid, toolCall.name, args);
-
-					const isError = !!resp.isError;
-					const errorMessage =
-						resp.errorMessage ||
-						(isError ? 'Skill tool reported an error. Inspect the output for details.' : undefined);
-
-					const output: UIToolOutput = {
-						id: toolCall.id,
-						callID: toolCall.callID,
-						name: toolCall.name,
-						choiceID: toolCall.choiceID,
-						type: toolCall.type,
-						summary: isError
-							? `Error: ${formatToolOutputSummary(toolCall.name)}`
-							: formatToolOutputSummary(toolCall.name),
-						toolOutputs: resp.outputs,
-						isError,
-						errorMessage,
-						arguments: toolCall.arguments,
-						webSearchToolCallItems: toolCall.webSearchToolCallItems,
-						toolStoreChoice: toolCall.toolStoreChoice, // usually undefined for skills.*
-					};
-
-					updateToolRuntimeState(prev => ({
-						toolCalls: prev.toolCalls.filter(c => c.id !== toolCall.id),
-						toolOutputs: [...prev.toolOutputs, output],
-					}));
-
-					// Refresh active skills after load/unload.
-					void (async () => {
-						try {
-							const nextActive = await listActiveSkillRefs(sid);
-							if (getCurrentSkillSessionID() !== sid) return;
-							setActiveSkillRefs(nextActive);
-						} catch {
-							// ignore
-						}
-					})();
-
-					return output;
-				} catch (err) {
-					const msg = (err as Error)?.message || 'Skill tool invocation failed.';
-					setToolCalls(prev =>
-						prev.map(c => (c.id === toolCall.id ? { ...c, status: 'failed', errorMessage: msg } : c))
-					);
-					return null;
-				}
-			}
-
-			// Resolve identity using toolStoreChoice when available; fall back to name parsing.
-			let bundleID: string | undefined;
-			let toolSlug: string | undefined;
-			let version: string | undefined;
-
-			if (toolCall.toolStoreChoice) {
-				bundleID = toolCall.toolStoreChoice.bundleID;
-				toolSlug = toolCall.toolStoreChoice.toolSlug;
-				version = toolCall.toolStoreChoice.toolVersion;
-			}
-
-			if (!bundleID || !toolSlug || !version) {
-				const errMsg = 'Cannot resolve tool identity for this call.';
-				setToolCalls(prev =>
-					prev.map(c => (c.id === toolCall.id ? { ...c, status: 'failed', errorMessage: errMsg } : c))
-				);
-				return null;
-			}
-
-			// Mark as running (allow retry after failure by overwriting previous status).
-			setToolCalls(prev =>
-				prev.map(c => (c.id === toolCall.id ? { ...c, status: 'running', errorMessage: undefined } : c))
-			);
-
-			try {
-				const resp = await toolRuntimeAPI.invokeTool(bundleID, toolSlug, version, args);
-				const isError = !!resp.isError;
-				const errorMessage =
-					resp.errorMessage || (isError ? 'Tool reported an error. Inspect the output for details.' : undefined);
-
-				const output: UIToolOutput = {
-					id: toolCall.id,
-					callID: toolCall.callID,
-					name: toolCall.name,
-					choiceID: toolCall.choiceID,
-					type: toolCall.type,
-					summary: isError
-						? `Error: ${formatToolOutputSummary(toolCall.name)}`
-						: formatToolOutputSummary(toolCall.name),
-					toolOutputs: resp.outputs,
-					isError,
-					errorMessage,
-					arguments: toolCall.arguments,
-					webSearchToolCallItems: toolCall.webSearchToolCallItems,
-					toolStoreChoice: toolCall.toolStoreChoice,
-				};
-
-				// Remove the call chip & append the output.
-				updateToolRuntimeState(prev => ({
-					toolCalls: prev.toolCalls.filter(c => c.id !== toolCall.id),
-					toolOutputs: [...prev.toolOutputs, output],
-				}));
-
-				return output;
-			} catch (err) {
-				const msg = (err as Error)?.message || 'Tool invocation failed.';
-				setToolCalls(prev => prev.map(c => (c.id === toolCall.id ? { ...c, status: 'failed', errorMessage: msg } : c)));
-				return null;
-			}
-		},
-		[
-			ensureSkillSession,
-			getCurrentSkillSessionID,
-			isSkillsToolName,
-			listActiveSkillRefs,
-			setActiveSkillRefs,
-			setToolCalls,
-			updateToolRuntimeState,
-		]
-	);
-
-	/**
-	 * Run all currently pending tool calls (in sequence) and return the
-	 * UIToolOutput objects produced in this pass.
-	 */
-	const runAllPendingToolCalls = useCallback(async (): Promise<UIToolOutput[]> => {
-		const pending = toolCalls.filter(c => c.status === 'pending');
-		if (pending.length === 0) return [];
-
-		const produced: UIToolOutput[] = [];
-		for (const chip of pending) {
-			if (chip.type === ToolStoreChoiceType.Function || chip.type === ToolStoreChoiceType.Custom) {
-				const out = await runToolCallInternal(chip);
-				if (out) produced.push(out);
-			}
-		}
-		return produced;
-	}, [toolCalls, runToolCallInternal]);
-
-	const handleRunSingleToolCall = useCallback(
-		async (id: string) => {
-			const chip = toolCalls.find(c => c.id === id && (c.status === 'pending' || c.status === 'failed'));
-			if (!chip) return;
-			await runToolCallInternal(chip);
-		},
-		[toolCalls, runToolCallInternal]
-	);
-
-	const handleDiscardToolCall = useCallback(
-		(id: string) => {
-			setToolCalls(prev => {
-				const next = prev.filter(c => c.id !== id);
-				return next.length === prev.length ? prev : next;
-			});
-		},
-		[setToolCalls]
-	);
-
-	const handleRemoveToolOutput = useCallback(
-		(id: string) => {
-			setToolOutputs(prev => {
-				const next = prev.filter(o => o.id !== id);
-				return next.length === prev.length ? prev : next;
-			});
-			setToolDetailsState(current =>
-				current && current.kind === 'output' && current.output.id === id ? null : current
-			);
-		},
-		[setToolOutputs]
-	);
-
-	const handleRetryErroredOutput = useCallback(
-		(output: UIToolOutput) => {
-			// Only support retry when we still know arguments. For non-skills tools we
-			// also require toolStoreChoice; for skills.* we route via skill session.
-			if (!output.isError || !output.arguments) return;
-
-			const isSkills = isSkillsToolName(output.name);
-
-			if (!isSkills) {
-				if (!output.toolStoreChoice) return;
-				if (output.type !== ToolStoreChoiceType.Function && output.type !== ToolStoreChoiceType.Custom) return;
-
-				const { bundleID, toolSlug, toolVersion } = output.toolStoreChoice;
-				if (!bundleID || !toolSlug || !toolVersion) return;
-			} else {
-				// Skills retry requires an active session.
-				if (!skillSessionID) return;
-				// skills.* are expected to be Function or Custom in the inference schema;
-				// if something else slips through, don't retry.
-				if (output.type !== ToolStoreChoiceType.Function && output.type !== ToolStoreChoiceType.Custom) return;
-			}
-			let newId: string;
-			try {
-				newId = getUUIDv7();
-			} catch {
-				newId = ensureMakeID();
-			}
-
-			const chip: UIToolCall = {
-				id: newId,
-				callID: output.callID || newId,
-				name: output.name,
-				arguments: output.arguments,
-				webSearchToolCallItems: output.webSearchToolCallItems,
-				choiceID: output.choiceID,
-				type: output.type,
-				status: 'pending',
-				toolStoreChoice: output.toolStoreChoice, // may be undefined for skills.*
-			};
-
-			updateToolRuntimeState(prev => ({
-				toolCalls: [...prev.toolCalls, chip],
-				toolOutputs: prev.toolOutputs.filter(o => o.id !== output.id),
-			}));
-			kickAutoExecutePendingToolCalls(20);
-		},
-		[isSkillsToolName, kickAutoExecutePendingToolCalls, skillSessionID, updateToolRuntimeState]
-	);
-
-	const handleOpenToolOutput = useCallback((output: UIToolOutput) => {
-		setToolDetailsState({ kind: 'output', output });
-	}, []);
-
-	const handleOpenToolCallDetails = useCallback((call: UIToolCall) => {
-		setToolDetailsState({ kind: 'call', call });
-	}, []);
-
-	const handleOpenConversationToolDetails = useCallback((entry: ConversationToolStateEntry) => {
-		setToolDetailsState({ kind: 'choice', choice: entry.toolStoreChoice });
-	}, []);
-
-	const handleOpenAttachedToolDetails = useCallback((node: ToolSelectionElementNode) => {
-		const choice: ToolStoreChoice = {
-			choiceID: node.choiceID,
-			bundleID: node.bundleID,
-			bundleSlug: node.bundleSlug,
-			toolSlug: node.toolSlug,
-			toolVersion: node.toolVersion,
-			displayName: node.overrides?.displayName ?? node.toolSnapshot?.displayName ?? node.toolSlug,
-			description: node.overrides?.description ?? node.toolSnapshot?.description ?? node.toolSlug,
-			toolID: node.toolSnapshot?.id,
-			toolType: node.toolType,
-			autoExecute: node.autoExecute,
-			userArgSchemaInstance: node.userArgSchemaInstance,
-		};
-		setToolDetailsState({ kind: 'choice', choice });
-	}, []);
-
 	const clearComposerTransientState = useCallback(() => {
 		closeAllMenus();
 		setSubmitError(null);
@@ -1222,13 +683,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		isSubmittingRef.current = false;
 
 		clearAttachments();
-		updateToolRuntimeState(prev =>
-			prev.toolCalls.length === 0 && prev.toolOutputs.length === 0 ? prev : { toolCalls: [], toolOutputs: [] }
-		);
-		setToolDetailsState(null);
-		setToolArgsTarget(null);
-		setAttachedToolArgsBlocked(false);
-	}, [clearAttachments, closeAllMenus, updateToolRuntimeState]);
+		clearComposerToolsState();
+	}, [clearAttachments, clearComposerToolsState, closeAllMenus]);
 
 	const replaceEditorDocument = useCallback(
 		(nextValue: Value, nextHasText: boolean, focus: 'none' | 'preserve' | 'end' = 'none') => {
@@ -1247,14 +703,14 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			hasTextRef.current = nextHasText;
 			setHasText(nextHasText);
 			setDocVersion(v => v + 1);
-			setToolEntriesVersion(v => v + 1);
+			bumpToolEntriesVersion();
 			if (focus === 'end') {
 				focusEditorAtEnd();
 			} else if (focus === 'preserve') {
 				focusEditorPreservingSelection();
 			}
 		},
-		[focusEditorAtEnd, focusEditorPreservingSelection]
+		[bumpToolEntriesVersion, focusEditorAtEnd, focusEditorPreservingSelection]
 	);
 
 	const resetEditor = useCallback(() => {
@@ -1430,25 +886,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const doSubmitRef = useRef(doSubmit);
 	doSubmitRef.current = doSubmit;
-
-	const setConversationToolsStateAndMaybeAutoExecute = useCallback<
-		Dispatch<SetStateAction<ConversationToolStateEntry[]>>
-	>(
-		update => {
-			setConversationToolsState(update);
-			if (toolRuntimeStateRef.current.toolCalls.length > 0) {
-				kickAutoExecutePendingToolCalls(1);
-			}
-		},
-		[kickAutoExecutePendingToolCalls, setConversationToolsState]
-	);
-	const setWebSearchTemplatesAndMaybeAutoExecute = useCallback<Dispatch<SetStateAction<WebSearchChoiceTemplate[]>>>(
-		update => {
-			setWebSearchTemplates(update);
-			if (toolRuntimeStateRef.current.toolCalls.length > 0) kickAutoExecutePendingToolCalls(1);
-		},
-		[kickAutoExecutePendingToolCalls]
-	);
+	submitPendingToolsAndSendRef.current = () => doSubmitRef.current({ runPendingTools: true });
 
 	/**
 	 * Default form submit / Enter: "run pending tools, then send".
@@ -1457,21 +895,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		if (e) e.preventDefault();
 		void doSubmit({ runPendingTools: true });
 	};
-
-	const applyConversationToolsFromChoices = useCallback(
-		(tools: ToolStoreChoice[]) => {
-			setConversationToolsStateAndMaybeAutoExecute(initConversationToolsStateFromChoices(tools));
-		},
-		[setConversationToolsStateAndMaybeAutoExecute]
-	);
-
-	const applyWebSearchFromChoices = useCallback(
-		(tools: ToolStoreChoice[]) => {
-			const ws = (tools ?? []).filter(t => t.toolType === ToolStoreChoiceType.WebSearch);
-			setWebSearchTemplatesAndMaybeAutoExecute(ws.map(webSearchTemplateFromChoice));
-		},
-		[setWebSearchTemplatesAndMaybeAutoExecute]
-	);
 
 	const loadExternalMessage = useCallback(
 		(incoming: EditorExternalMessage) => {
@@ -1522,14 +945,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			setToolOutputs,
 			webSearchTemplates,
 		]
-	);
-
-	const loadToolCalls = useCallback(
-		(nextToolCalls: UIToolCall[]) => {
-			setToolCalls(nextToolCalls);
-			kickAutoExecutePendingToolCalls(20);
-		},
-		[kickAutoExecutePendingToolCalls, setToolCalls]
 	);
 
 	useImperativeHandle(ref, () => ({
@@ -1599,8 +1014,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						}
 						scheduleDocRecompute();
 						scheduleAutoChunk();
-						if (toolRuntimeStateRef.current.toolCalls.length > 0) {
-							kickAutoExecutePendingToolCalls(1);
+						if (toolCalls.length > 0) {
+							handleAttachedToolsChanged();
 						}
 						if (submitError) {
 							setSubmitError(null);

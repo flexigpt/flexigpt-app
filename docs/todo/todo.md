@@ -2,20 +2,27 @@
 
 ## Laundry list
 
-- [ ] if you start a web search, then change model whose sdk is different that before, there is arbitrary behaviour as of now wrt web search selection.
-- [ ] include some builtin skills and test on all platforms, full flow.
+- [ ] chats
+  - [ ] context deadline exceeded error or may be other errors dont show up as content box? it comes out as minimal single line item.
+  - [ ] perf: react virtuoso, throttle time tuning, offload some md parsing/rendering etc to worker, use sync external store for some stores and selectors for partial subscriptions.
+
+- [ ] context bar
+  - [ ] if you start a web search, then change model whose sdk is different that before, there is arbitrary behaviour as of now wrt web search selection.
+  - [ ] system prompts need to be non editor specific list i.e across tabs. also we shoudl not have edit, we should have a fork button and add button that has copy for existing anycase.
+  - [ ] multi selection possiblity. This needs to evolve as additional/multiple system prompts and a way to send a concatend thing of all these together.
+  - [ ] rather than ignore chat, we can have a combo option too, i.e ignore all messages, send last n messages i.e last 2/3/n etc including the user one that initiated it.
+
+- [ ] Skill
+  - [ ] include some builtin skills and test on all platforms, full flow.
+  - [ ] with the number of skills present, maybe we dont want to enable all on click for the enable sills button, may be have a button at bottom on open that says enable all separately. also show collapsed bundles at start and then expanding if needed.
+  - [ ] in skills world, especially with artifact driven dev, we can almost get away with without sending a lot of things again and again, latest context and last 1/2 chats. attachments may pose a problem here, but can be thought through properly so that these things are persisted properly.
+
 - [x] Drag and drop files as attachments.
   - [ ] while the code is there, on linux, webkitgtk has issue wrt firing drop events with wails currently.
   - [ ] win and mac testing is pending
+
 - [ ] Sys prompt:
   - [ ] We may want to have a explicit prompt saying that use explicit tools rather than shell wherever possible.
-  - [ ] this needs to evolve as additional/multiple system prompts and a way to send a concatend thing of all these together.
-
-- [ ] with the number of skills present, maybe we dont want to enable all on click for the enable sills button, may be have a button at bottom on open that says enable all separately. also show collapsed bundles at start and then expanding if needed.
-
-- [ ] context deadline exceeded error or may be other errors dont show up as content box? it comes out as minimal single line item.
-- [ ] rather than ignore chat, we can have a combo option too, i.e ignore all messages, send last n messages i.e last 2/3/n etc including the user one that initiated it.
-- [ ] in skills world, especially with artifact driven dev, we can almost get away with without sending a lot of things again and again, latest context and last 1/2 chats. attachments may pose a problem here, but can be thought through properly so that these things are persisted properly.
 
 ## Features
 
