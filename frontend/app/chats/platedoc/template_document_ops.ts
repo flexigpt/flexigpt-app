@@ -1,4 +1,4 @@
-import { ElementApi, KEYS, NodeApi, type Path } from 'platejs';
+import { ElementApi, NodeApi, type Path } from 'platejs';
 import type { PlateEditor } from 'platejs/react';
 
 import type { PromptTemplate, PromptVariable } from '@/spec/prompt';
@@ -51,11 +51,19 @@ export function insertTemplateSelectionNode(
 	};
 
 	editor.tf.withoutNormalizing(() => {
-		// Insert the chip (inline+void)
-		editor.tf.insertNodes([nnode, { type: KEYS.p, text: '\n' }], { select: true });
-		// Move caret after the chip and add a trailing space so the user can keep typing
-		editor.tf.collapse({ edge: 'end' });
-		editor.tf.select(undefined, { edge: 'end' }); // Select end of block above
+		// Insert ONLY inline content here. This composer is single-block; inserting
+		// a paragraph block from an inline helper creates unstable intermediate
+		// structure and forces unnecessary normalization.
+		//
+		// The trailing empty text leaf gives Slate a caret target immediately after
+		// the hidden selection node until the template-population effect inserts the
+		// user-visible inline content/variables.
+		editor.tf.insertNodes([nnode, { text: '' }], { select: true });
+		try {
+			editor.tf.collapse({ edge: 'end' });
+		} catch {
+			// Best-effort: keep inserted nodes even if selection collapse is unavailable.
+		}
 	});
 }
 
@@ -159,8 +167,8 @@ export function toPlainTextReplacingVariables(editor: PlateEditor): string {
 		return '';
 	}
 
-	const childnodes = (editor.children[0]?.children ?? []) as any[];
-	return childnodes.map(toStringDeepWithVars).join('');
+	const rootNodes = editor.children ?? [];
+	return rootNodes.map(toStringDeepWithVars).join('\n');
 }
 
 function isTemplateVarNode(n: unknown): n is TemplateVariableElementNode {

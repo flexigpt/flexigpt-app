@@ -68,9 +68,8 @@ export function initConversationMessage(role: RoleEnum): ConversationMessage {
 export function deriveConversationToolsFromMessages(messages: ConversationMessage[]): ToolStoreChoice[] {
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
 		const m = messages[i];
-		if (m.role === RoleEnum.User && m.toolStoreChoices && m.toolStoreChoices.length > 0) {
-			return m.toolStoreChoices.filter(c => c.toolType !== ToolStoreChoiceType.WebSearch);
-		}
+		if (m.role !== RoleEnum.User) continue;
+		return (m.toolStoreChoices ?? []).filter(c => c.toolType !== ToolStoreChoiceType.WebSearch);
 	}
 	return [];
 }
@@ -78,9 +77,29 @@ export function deriveConversationToolsFromMessages(messages: ConversationMessag
 export function deriveWebSearchChoiceFromMessages(messages: ConversationMessage[]): ToolStoreChoice[] {
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
 		const m = messages[i];
-		if (m.role === RoleEnum.User && m.toolStoreChoices && m.toolStoreChoices.length > 0) {
-			return m.toolStoreChoices.filter(c => c.toolType === ToolStoreChoiceType.WebSearch);
-		}
+		if (m.role !== RoleEnum.User) continue;
+		return (m.toolStoreChoices ?? []).filter(c => c.toolType === ToolStoreChoiceType.WebSearch);
+	}
+	return [];
+}
+
+export function deriveEnabledSkillRefsFromMessages(messages: ConversationMessage[]): SkillRef[] {
+	// We must treat "missing/undefined" the same as "empty": both mean "no skills selected" for the latest user turn.
+	// Scanning for "last non-empty" makes old skill selections sticky forever.
+	for (let i = messages.length - 1; i >= 0; i -= 1) {
+		const m = messages[i];
+		if (m.role !== RoleEnum.User) continue;
+		return m.enabledSkillRefs ?? [];
+	}
+	return [];
+}
+
+export function deriveActiveSkillRefsFromMessages(messages: ConversationMessage[]): SkillRef[] {
+	// We must treat "missing/undefined" the same as "empty": both mean "no active skills" for the latest user turn.
+	for (let i = messages.length - 1; i >= 0; i -= 1) {
+		const m = messages[i];
+		if (m.role !== RoleEnum.User) continue;
+		return m.activeSkillRefs ?? [];
 	}
 	return [];
 }
@@ -344,27 +363,6 @@ function deriveUIToolOutputsFromInputUnion(
 	}
 
 	return uiOutputs;
-}
-
-export function deriveEnabledSkillRefsFromMessages(messages: ConversationMessage[]): SkillRef[] {
-	// We must treat "missing/undefined" the same as "empty": both mean "no skills selected" for the latest user turn.
-	// Scanning for "last non-empty" makes old skill selections sticky forever.
-	for (let i = messages.length - 1; i >= 0; i -= 1) {
-		const m = messages[i];
-		if (m.role !== RoleEnum.User) continue;
-		return m.enabledSkillRefs ?? [];
-	}
-	return [];
-}
-
-export function deriveActiveSkillRefsFromMessages(messages: ConversationMessage[]): SkillRef[] {
-	// We must treat "missing/undefined" the same as "empty": both mean "no active skills" for the latest user turn.
-	for (let i = messages.length - 1; i >= 0; i -= 1) {
-		const m = messages[i];
-		if (m.role !== RoleEnum.User) continue;
-		return m.activeSkillRefs ?? [];
-	}
-	return [];
 }
 
 function attachmentRefKey(a: Attachment): string {

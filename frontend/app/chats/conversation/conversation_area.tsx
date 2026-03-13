@@ -13,7 +13,15 @@ import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { Conversation, ConversationMessage } from '@/spec/conversation';
-import { ContentItemKind, type ModelParam, OutputKind, type OutputUnion, RoleEnum, Status } from '@/spec/inference';
+import {
+	ContentItemKind,
+	type InferenceError,
+	type ModelParam,
+	OutputKind,
+	type OutputUnion,
+	RoleEnum,
+	Status,
+} from '@/spec/inference';
 import { type UIChatOption } from '@/spec/modelpreset';
 import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
@@ -756,6 +764,49 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 					}
 				} else {
 					console.error(e);
+
+					const errorMessage =
+						e instanceof Error && e.message.trim().length > 0
+							? e.message
+							: 'Unexpected error while processing this request.';
+					const partialText = getFullStreamTextForTab(tabId).trim();
+					const fallbackText = partialText ? `${partialText}\n\n> Error: ${errorMessage}` : `> Error: ${errorMessage}`;
+
+					const fallbackMsg: ConversationMessage = {
+						...assistantPlaceholder,
+						status: Status.Failed,
+						error: {
+							code: 'unknown',
+							message: errorMessage,
+						} as InferenceError,
+						uiContent: fallbackText,
+						outputs: [
+							{
+								kind: OutputKind.OutputMessage,
+								outputMessage: {
+									id: assistantPlaceholder.id,
+									role: RoleEnum.Assistant,
+									status: Status.Failed,
+									contents: [
+										{
+											kind: ContentItemKind.Text,
+											textItem: {
+												text: fallbackText,
+											},
+										},
+									],
+								},
+							},
+						],
+					};
+
+					const finalChat: Conversation = {
+						...chatWithPlaceholder,
+						messages: [...chatWithPlaceholder.messages.slice(0, -1), fallbackMsg],
+						modifiedAt: new Date(),
+					};
+
+					saveUpdatedConversation(tabId, finalChat);
 				}
 			} finally {
 				if (tabExists(tabId)) {

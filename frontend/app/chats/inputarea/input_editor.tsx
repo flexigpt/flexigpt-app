@@ -97,7 +97,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const {
 		editor,
 		contentRef,
-		hasText,
 		hasTextRef,
 		selectionInfo,
 		attachedToolEntries,
@@ -151,6 +150,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	// This prevents a race where Plate fires onChange after clearComposerTransientState
 	// empties attachments/toolOutputs but before loadAttachmentsFromMessage restores them.
 	const isLoadingExternalMessageRef = useRef(false);
+	const externalMessageLoadReleaseTimerRef = useRef<number | null>(null);
+	const [webSearchArgsBlocked, setWebSearchArgsBlocked] = useState(false);
 
 	// ---- Skills (conversation-level) ----
 	const {
@@ -175,6 +176,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	} = useComposerSkills();
 
 	const templateBlocked = selectionInfo.hasTemplate && selectionInfo.requiredCount > 0;
+	const effectiveSubmitText = useMemo(() => {
+		return selectionInfo.hasTemplate ? toPlainTextReplacingVariables(editor) : editor.api.string([]);
+	}, [editor, selectionInfo]);
+	const hasEffectiveTextForSubmit = effectiveSubmitText.trim().length > 0;
 
 	const submitPendingToolsAndSendRef = useRef<(() => void | Promise<void>) | null>(null);
 
@@ -223,6 +228,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		toolArgsEventTarget,
 		getAttachedToolEntries: getAttachedToolEntriesSnapshot,
 	});
+	const hasBlockingToolArgs = toolArgsBlocked || webSearchArgsBlocked;
 
 	const attachedToolIdentityKeys = useMemo(() => {
 		return new Set(
@@ -231,6 +237,15 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			)
 		);
 	}, [attachedToolEntries]);
+
+	useEffect(() => {
+		return () => {
+			if (externalMessageLoadReleaseTimerRef.current !== null) {
+				window.clearTimeout(externalMessageLoadReleaseTimerRef.current);
+				externalMessageLoadReleaseTimerRef.current = null;
+			}
+		};
+	}, []);
 
 	const handleInsertTemplate = useCallback(
 		(args: { bundleID: string; templateSlug: string; templateVersion: string; template?: PromptTemplate }) => {
@@ -461,26 +476,30 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const isSendButtonEnabled = useMemo(() => {
 		if (isBusy) return false;
 		if (templateBlocked) return false;
-		if (toolArgsBlocked) return false;
+		if (hasBlockingToolArgs) return false;
 
-		if (hasText) return true;
+		if (hasEffectiveTextForSubmit) return true;
 
 		const hasAttachments = attachments.length > 0;
 		const hasOutputs = toolOutputs.length > 0;
 
 		return hasAttachments || hasOutputs;
-	}, [isBusy, templateBlocked, attachments, toolOutputs, hasText, toolArgsBlocked]);
+	}, [isBusy, templateBlocked, hasBlockingToolArgs, hasEffectiveTextForSubmit, attachments.length, toolOutputs.length]);
 
 	const { formRef, onKeyDown } = useEnterSubmit({
 		isBusy,
 		canSubmit: () => {
-			if (toolArgsBlocked) return false;
+			if (hasBlockingToolArgs) return false;
+			if (templateBlocked) return false;
 
-			if (selectionInfo.hasTemplate) {
-				return selectionInfo.requiredCount === 0;
+			// Default Enter behavior is "run pending tools, then send", so allow
+			// submission when pending tools exist even if they are currently the
+			// only content source.
+			if (hasPendingToolCalls && !hasRunningToolCalls) {
+				return true;
 			}
 
-			if (hasTextRef.current) return true;
+			if (hasEffectiveTextForSubmit) return true;
 
 			const hasAttachments = attachments.length > 0;
 			const hasOutputs = toolOutputs.length > 0;
@@ -552,8 +571,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			}
 
 			// Guard explicitly here as well, so even programmatic calls respect it.
-			if (toolArgsBlocked) {
-				setSubmitError('Some attached tools require options. Fill the required tool options before sending.');
+			if (hasBlockingToolArgs) {
+				setSubmitError(
+					'Some attached tools or web-search options require configuration. Fill the required options before sending.'
+				);
 				return;
 			}
 
@@ -661,6 +682,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			getCurrentActiveSkillRefs,
 			getCurrentEnabledSkillRefs,
 			getCurrentSkillSessionID,
+			hasBlockingToolArgs,
 			hasPendingToolCalls,
 			isBusy,
 			isSendButtonEnabled,
@@ -672,7 +694,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			setActiveSkillRefs,
 			setConversationToolsState,
 			templateBlocked,
-			toolArgsBlocked,
 			toolOutputs,
 			webSearchTemplates,
 		]
@@ -692,41 +713,51 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const loadExternalMessage = useCallback(
 		(incoming: EditorExternalMessage) => {
+			if (externalMessageLoadReleaseTimerRef.current !== null) {
+				window.clearTimeout(externalMessageLoadReleaseTimerRef.current);
+				externalMessageLoadReleaseTimerRef.current = null;
+			}
 			isLoadingExternalMessageRef.current = true;
-			// Snapshot current context so Cancel Editing can restore it.
-			if (!preEditConversationToolsRef.current) {
-				preEditConversationToolsRef.current = conversationToolsState;
+			try {
+				// Snapshot current context so Cancel Editing can restore it.
+				if (!preEditConversationToolsRef.current) {
+					preEditConversationToolsRef.current = conversationToolsState;
+				}
+				if (!preEditWebSearchTemplatesRef.current) {
+					preEditWebSearchTemplatesRef.current = webSearchTemplates;
+				}
+				if (!preEditEnabledSkillRefsRef.current) {
+					preEditEnabledSkillRefsRef.current = enabledSkillRefs;
+				}
+				if (!preEditActiveSkillRefsRef.current) {
+					preEditActiveSkillRefsRef.current = activeSkillRefs;
+				}
+				clearComposerTransientState();
+
+				// 1) Reset document to plain text paragraphs.
+				const plain = incoming.text ?? '';
+				const value = buildEditorValueFromPlainText(plain);
+				replaceEditorDocument(value, 'end');
+
+				// 2) Rebuild flat attachment chips from incoming attachment state.
+				loadAttachmentsFromMessage(incoming.attachments);
+
+				// 3) Restore tool choices into conversation-level state.
+				const incomingToolChoices = incoming.toolChoices ?? [];
+				applyConversationToolsFromChoices(incomingToolChoices);
+				applyWebSearchFromChoices(incomingToolChoices);
+
+				// 4) Restore enabled/active skills together so invariants hold immediately.
+				applySkillSelectionState(incoming.enabledSkillRefs ?? [], incoming.activeSkillRefs ?? []);
+
+				// 5) Restore any tool outputs that were previously attached to this message.
+				setToolOutputs(incoming.toolOutputs ?? []);
+			} finally {
+				externalMessageLoadReleaseTimerRef.current = window.setTimeout(() => {
+					externalMessageLoadReleaseTimerRef.current = null;
+					isLoadingExternalMessageRef.current = false;
+				}, 0);
 			}
-			if (!preEditWebSearchTemplatesRef.current) {
-				preEditWebSearchTemplatesRef.current = webSearchTemplates;
-			}
-			if (!preEditEnabledSkillRefsRef.current) {
-				preEditEnabledSkillRefsRef.current = enabledSkillRefs;
-			}
-			if (!preEditActiveSkillRefsRef.current) {
-				preEditActiveSkillRefsRef.current = activeSkillRefs;
-			}
-			clearComposerTransientState();
-
-			// 1) Reset document to plain text paragraphs.
-			const plain = incoming.text ?? '';
-			const value = buildEditorValueFromPlainText(plain);
-			replaceEditorDocument(value, 'end');
-
-			// 2) Rebuild flat attachment chips from incoming attachment state.
-			loadAttachmentsFromMessage(incoming.attachments);
-
-			// 3) Restore tool choices into conversation-level state.
-			const incomingToolChoices = incoming.toolChoices ?? [];
-			applyConversationToolsFromChoices(incomingToolChoices);
-			applyWebSearchFromChoices(incomingToolChoices);
-
-			// 4) Restore enabled/active skills together so invariants hold immediately.
-			applySkillSelectionState(incoming.enabledSkillRefs ?? [], incoming.activeSkillRefs ?? []);
-
-			// 5) Restore any tool outputs that were previously attached to this message.
-			setToolOutputs(incoming.toolOutputs ?? []);
-			isLoadingExternalMessageRef.current = true;
 		},
 		[
 			activeSkillRefs,
@@ -845,7 +876,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const canSendOnly = !hasPendingToolCalls && isSendButtonEnabled && !hasRunningToolCalls;
 	const canRunToolsOnly = hasPendingToolCalls && !hasRunningToolCalls && !isBusy;
 	const canRunToolsAndSend =
-		hasPendingToolCalls && !hasRunningToolCalls && !isBusy && !templateBlocked && !toolArgsBlocked && !toolsDefLoading;
+		hasPendingToolCalls &&
+		!hasRunningToolCalls &&
+		!isBusy &&
+		!templateBlocked &&
+		!hasBlockingToolArgs &&
+		!toolsDefLoading;
 
 	return (
 		<>
@@ -888,7 +924,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									spellCheck={false}
 									readOnly={isBusy}
 									onKeyDown={e => {
-										onKeyDown(e); // from useEnterSubmit
+										onKeyDown(e);
 									}}
 									onPaste={onEditorPaste}
 									className="max-h-96 min-w-0 flex-1 resize-none overflow-auto bg-transparent p-1 wrap-break-word whitespace-break-spaces outline-none [tab-size:2] focus:outline-none"
@@ -1032,6 +1068,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						onSetAttachedToolAutoExecute={handleSetAttachedToolAutoExecuteByKey}
 						webSearchTemplates={webSearchTemplates}
 						setWebSearchTemplates={setWebSearchTemplatesAndMaybeAutoExecute}
+						onWebSearchArgsBlockedChange={setWebSearchArgsBlocked}
 						allSkills={allSkills}
 						skillsLoading={skillsLoading}
 						enabledSkillRefs={enabledSkillRefs}

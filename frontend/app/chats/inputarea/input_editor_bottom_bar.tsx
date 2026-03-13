@@ -1,4 +1,13 @@
-import { type Dispatch, memo, type ReactNode, type RefObject, type SetStateAction, useMemo, useState } from 'react';
+import {
+	type Dispatch,
+	memo,
+	type ReactNode,
+	type RefObject,
+	type SetStateAction,
+	useEffect,
+	useMemo,
+	useState,
+} from 'react';
 
 import { FiFilePlus, FiFolder, FiLink, FiPaperclip, FiTool, FiUpload } from 'react-icons/fi';
 
@@ -62,6 +71,7 @@ interface EditorBottomBarProps {
 	// Web-search state comes from EditorArea (separate UX/state)
 	webSearchTemplates: WebSearchChoiceTemplate[];
 	setWebSearchTemplates: Dispatch<SetStateAction<WebSearchChoiceTemplate[]>>;
+	onWebSearchArgsBlockedChange?: (blocked: boolean) => void;
 
 	// Skills state comes from EditorArea (conversation-level)
 	allSkills: SkillListItem[];
@@ -133,6 +143,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	onSetAttachedToolAutoExecute,
 	webSearchTemplates,
 	setWebSearchTemplates,
+	onWebSearchArgsBlockedChange,
 	allSkills,
 	skillsLoading = false,
 	enabledSkillRefs,
@@ -210,6 +221,14 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 		if (!schema || !activeWebSearch) return undefined;
 		return computeToolUserArgsStatus(schema, activeWebSearch.userArgSchemaInstance);
 	}, [activeWebSearchDef, activeWebSearch]);
+
+	const webSearchArgsBlocked = Boolean(
+		webSearchEnabled && activeWebSearchArgsStatus?.hasSchema && !activeWebSearchArgsStatus.isSatisfied
+	);
+
+	useEffect(() => {
+		onWebSearchArgsBlockedChange?.(webSearchArgsBlocked);
+	}, [onWebSearchArgsBlockedChange, webSearchArgsBlocked]);
 
 	const attachedToolKeys = useMemo(() => {
 		return new Set(toolEntries.map(n => toolIdentityKey(n.bundleID, n.bundleSlug, n.toolSlug, n.toolVersion)));

@@ -144,7 +144,7 @@ function TemplateVariableInlineEditor({
 				} else if (type === VarType.Date) {
 					commitValue(target.value || undefined);
 				} else {
-					commitValue(target.value ?? '');
+					commitValue(target.value === '' ? undefined : target.value);
 				}
 			}
 		},
@@ -217,7 +217,8 @@ function TemplateVariableInlineEditor({
 			maxLength={32}
 			placeholder={varDef?.default !== undefined ? formatTemplateVarValue(varDef.default) : ''}
 			onBlur={e => {
-				commitValue(e.currentTarget.value);
+				const next = e.currentTarget.value;
+				commitValue(next === '' ? undefined : next);
 			}}
 			{...commonProps}
 		/>
@@ -253,7 +254,10 @@ export function TemplateVariableElement(props: PlateElementProps<any>) {
 		return effectiveVarValueLocal(varDef, tsenode.variables ?? {});
 	}, [tsenode, varDef]);
 
-	const hasDisplayValue = currentValue !== undefined && currentValue !== null;
+	const hasDisplayValue =
+		currentValue !== undefined &&
+		currentValue !== null &&
+		!(typeof currentValue === 'string' && currentValue.length === 0);
 	const displayValue = formatTemplateVarValue(currentValue);
 
 	function focusNextVariablePill() {
@@ -269,15 +273,16 @@ export function TemplateVariableElement(props: PlateElementProps<any>) {
 				}
 
 				const missingInSelection = chips.filter(chip => chip.dataset.state === 'required');
+				const currentIndex = chips.findIndex(chip => chip.dataset.varName === el.name);
+				const currentChip = currentIndex >= 0 ? chips[currentIndex] : null;
 
 				if (missingInSelection.length === 0) {
+					currentChip?.focus();
 					return;
 				}
-
-				const currentIndex = chips.findIndex(chip => chip.dataset.varName === el.name);
 				const later = currentIndex >= 0 ? chips.slice(currentIndex + 1) : chips;
 
-				const next = later.find(chip => chip.dataset.state === 'required') ?? missingInSelection[0];
+				const next = later.find(chip => chip.dataset.state === 'required') ?? missingInSelection[0] ?? currentChip;
 
 				if (next) {
 					next.focus();
