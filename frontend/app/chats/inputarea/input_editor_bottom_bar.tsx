@@ -25,10 +25,6 @@ import { SkillsBottomBarChip } from '@/chats/skills/skill_bottom_bar_chip';
 import { insertTemplateSelectionNode } from '@/chats/templates/template_editor_utils';
 import {
 	computeToolUserArgsStatus,
-	getToolNodesWithPath,
-	insertToolSelectionNode,
-	removeToolByKey,
-	setToolAutoExecuteByKey,
 	toolIdentityKey,
 	type ToolSelectionElementNode,
 } from '@/chats/tools/tool_editor_utils';
@@ -57,8 +53,10 @@ interface EditorBottomBarProps {
 	shortcutConfig: ShortcutConfig;
 	currentProviderSDKType: ProviderSDKType;
 
-	onToolsChanged?: () => void;
-	attachedToolEntries?: Array<[ToolSelectionElementNode, Path]>;
+	attachedToolEntries: Array<[ToolSelectionElementNode, Path]>;
+	onAttachTool: (item: ToolListItem, autoExecute: boolean) => void;
+	onDetachToolByKey: (key: string) => void;
+	onSetAttachedToolAutoExecute: (key: string, autoExecute: boolean) => void;
 
 	// Web-search state comes from EditorArea (separate UX/state)
 	webSearchTemplates: WebSearchChoiceTemplate[];
@@ -126,8 +124,10 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	attachmentButtonRef,
 	shortcutConfig,
 	currentProviderSDKType,
-	onToolsChanged,
 	attachedToolEntries,
+	onAttachTool,
+	onDetachToolByKey,
+	onSetAttachedToolAutoExecute,
 	webSearchTemplates,
 	setWebSearchTemplates,
 	allSkills,
@@ -152,7 +152,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	);
 	const { data: templateData, loading: templatesLoading } = usePromptTemplates();
 	const { data: toolData, loading: toolsLoading } = useTools();
-	const toolEntries = attachedToolEntries ?? getToolNodesWithPath(editor);
+	const toolEntries = attachedToolEntries;
 
 	const attachedAutoExecByKey = useMemo(() => {
 		const map: Record<string, boolean> = {};
@@ -251,24 +251,13 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 			closeTemplateMenu();
 		}
 	};
-	const handleAttachTool = (item: ToolListItem) => {
-		const key = toolIdentityKey(item.bundleID, item.bundleSlug, item.toolSlug, item.toolVersion);
-		if (!key) return;
 
-		if (attachedToolKeys.has(key)) return;
-		insertToolSelectionNode(
-			editor,
-			{ bundleID: item.bundleID, bundleSlug: item.bundleSlug, toolSlug: item.toolSlug, toolVersion: item.toolVersion },
-			item.toolDefinition,
-			{ autoExecute: getAutoExecForTool(item) }
-		);
-		onToolsChanged?.();
+	const handleAttachToolPick = (item: ToolListItem) => {
+		onAttachTool(item, getAutoExecForTool(item));
 	};
 
-	const handleDetachToolByKey = (key: string) => {
-		if (!key) return;
-		removeToolByKey(editor, key);
-		onToolsChanged?.();
+	const handleDetachToolPick = (key: string) => {
+		onDetachToolByKey(key);
 	};
 
 	const handleAttachmentPickFiles = async () => {
@@ -425,8 +414,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 										autoExecute={getAutoExecForTool(item)}
 										onAutoExecuteChange={next => {
 											if (isAttached) {
-												setToolAutoExecuteByKey(editor, key, next);
-												onToolsChanged?.();
+												onSetAttachedToolAutoExecute(key, next);
 												return;
 											}
 											setToolAutoExecOverrides(prev => ({ ...prev, [key]: next }));
@@ -434,10 +422,10 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 										onRowClick={
 											!isAttached
 												? () => {
-														handleAttachTool(item);
+														handleAttachToolPick(item);
 													}
 												: () => {
-														handleDetachToolByKey(key);
+														handleDetachToolPick(key);
 													}
 										}
 										primaryAction={
@@ -445,14 +433,14 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 												? {
 														kind: 'detach',
 														onClick: () => {
-															handleDetachToolByKey(key);
+															handleDetachToolPick(key);
 														},
 														title: 'Detach tool',
 													}
 												: {
 														kind: 'attach',
 														onClick: () => {
-															handleAttachTool(item);
+															handleAttachToolPick(item);
 														},
 														title: 'Attach tool',
 														label: 'Attach',

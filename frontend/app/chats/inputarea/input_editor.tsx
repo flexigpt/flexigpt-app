@@ -19,7 +19,7 @@ import { Plate, PlateContent, type PlateEditor, usePlateEditor } from 'platejs/r
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { ProviderSDKType, UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { SkillRef } from '@/spec/skill';
-import type { ToolStoreChoice } from '@/spec/tool';
+import type { ToolListItem, ToolStoreChoice } from '@/spec/tool';
 
 import { type ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { compareEntryByPathDeepestFirst } from '@/lib/path_utils';
@@ -37,6 +37,7 @@ import { ListKit } from '@/components/editor/plugins/list_kit';
 import { TabbableKit } from '@/components/editor/plugins/tabbable_kit';
 
 import { useComposerAttachments } from '@/chats/attachments/use_composer_attachments';
+import { dispatchOpenToolArgs } from '@/chats/events/open_attached_toolargs';
 import { dispatchTemplateFlashEvent } from '@/chats/events/template_flash';
 import { EditorBottomBar } from '@/chats/inputarea/input_editor_bottom_bar';
 import { EditorChipsBar } from '@/chats/inputarea/input_editor_chips_bar';
@@ -78,6 +79,11 @@ import {
 	editorAttachedToolToToolChoice,
 	getAttachedTools,
 	getToolNodesWithPath,
+	insertToolSelectionNode,
+	removeToolByKey,
+	setToolAutoExecuteByKey,
+	toolIdentityKey,
+	type ToolSelectionElementNode,
 } from '@/chats/tools/tool_editor_utils';
 import { ToolPlusKit } from '@/chats/tools/tool_plugin';
 import { ToolArgsModalHost } from '@/chats/tools/tool_user_args_host';
@@ -450,6 +456,99 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	// eslint-disable-next-line react-hooks/exhaustive-deps
 	const attachedToolEntries = useMemo(() => getToolNodesWithPath(editor), [editor, toolEntriesVersion]);
+
+	const getAttachedToolIdentityKeys = useCallback(() => {
+		return new Set(
+			getToolNodesWithPath(editorRef.current, false).map(([node]) =>
+				toolIdentityKey(node.bundleID, node.bundleSlug, node.toolSlug, node.toolVersion)
+			)
+		);
+	}, []);
+
+	const handleAttachTool = useCallback(
+		(item: ToolListItem, autoExecute: boolean) => {
+			const identityKey = toolIdentityKey(item.bundleID, item.bundleSlug, item.toolSlug, item.toolVersion);
+			if (getAttachedToolIdentityKeys().has(identityKey)) return;
+
+			insertToolSelectionNode(
+				editorRef.current,
+				{
+					bundleID: item.bundleID,
+					bundleSlug: item.bundleSlug,
+					toolSlug: item.toolSlug,
+					toolVersion: item.toolVersion,
+				},
+				item.toolDefinition,
+				{ autoExecute }
+			);
+			handleAttachedToolsChanged();
+		},
+		[getAttachedToolIdentityKeys, handleAttachedToolsChanged]
+	);
+
+	const handleDetachAttachedToolByKey = useCallback(
+		(identityKey: string) => {
+			if (!getAttachedToolIdentityKeys().has(identityKey)) return;
+
+			removeToolByKey(editorRef.current, identityKey);
+			handleAttachedToolsChanged();
+		},
+		[getAttachedToolIdentityKeys, handleAttachedToolsChanged]
+	);
+
+	const handleSetAttachedToolAutoExecuteByKey = useCallback(
+		(identityKey: string, autoExecute: boolean) => {
+			if (!getAttachedToolIdentityKeys().has(identityKey)) return;
+
+			setToolAutoExecuteByKey(editorRef.current, identityKey, autoExecute);
+			handleAttachedToolsChanged();
+		},
+		[getAttachedToolIdentityKeys, handleAttachedToolsChanged]
+	);
+
+	const handleToggleAttachedToolAutoExecute = useCallback(
+		(node: ToolSelectionElementNode, autoExecute: boolean) => {
+			const identityKey = toolIdentityKey(node.bundleID, node.bundleSlug, node.toolSlug, node.toolVersion);
+			handleSetAttachedToolAutoExecuteByKey(identityKey, autoExecute);
+		},
+		[handleSetAttachedToolAutoExecuteByKey]
+	);
+
+	const handleRemoveAttachedTool = useCallback(
+		(node: ToolSelectionElementNode) => {
+			const identityKey = toolIdentityKey(node.bundleID, node.bundleSlug, node.toolSlug, node.toolVersion);
+			handleDetachAttachedToolByKey(identityKey);
+		},
+		[handleDetachAttachedToolByKey]
+	);
+
+	const handleRemoveAllAttachedTools = useCallback(
+		(nodes: ToolSelectionElementNode[]) => {
+			if (nodes.length === 0) return;
+
+			const attachedKeys = getAttachedToolIdentityKeys();
+			const uniqueKeys = new Set<string>();
+
+			for (const node of nodes) {
+				const identityKey = toolIdentityKey(node.bundleID, node.bundleSlug, node.toolSlug, node.toolVersion);
+				if (!attachedKeys.has(identityKey) || uniqueKeys.has(identityKey)) continue;
+				uniqueKeys.add(identityKey);
+			}
+
+			if (uniqueKeys.size === 0) return;
+
+			for (const identityKey of uniqueKeys) {
+				removeToolByKey(editorRef.current, identityKey);
+			}
+
+			handleAttachedToolsChanged();
+		},
+		[getAttachedToolIdentityKeys, handleAttachedToolsChanged]
+	);
+
+	const handleEditAttachedToolOptions = useCallback((node: ToolSelectionElementNode) => {
+		dispatchOpenToolArgs({ kind: 'attached', selectionID: node.selectionID });
+	}, []);
 
 	// When editing an earlier message we temporarily override the current
 	// conversation-tool + web-search config. Keep a snapshot so Cancel restores it.
@@ -1125,7 +1224,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									onRemoveDirectoryGroup={handleRemoveDirectoryGroup}
 									onRemoveOverflowDir={handleRemoveOverflowDir}
 									onConversationToolsChange={setConversationToolsStateAndMaybeAutoExecute}
-									onAttachedToolsChanged={handleAttachedToolsChanged}
+									onToggleAttachedToolAutoExecute={handleToggleAttachedToolAutoExecute}
+									onRemoveAttachedTool={handleRemoveAttachedTool}
+									onRemoveAllAttachedTools={handleRemoveAllAttachedTools}
+									onEditAttachedToolOptions={handleEditAttachedToolOptions}
 									onOpenToolCallDetails={handleOpenToolCallDetails}
 									onOpenConversationToolDetails={handleOpenConversationToolDetails}
 									onOpenAttachedToolDetails={handleOpenAttachedToolDetails}
@@ -1222,8 +1324,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						attachmentButtonRef={attachmentButtonRef}
 						shortcutConfig={shortcutConfig}
 						currentProviderSDKType={currentProviderSDKType}
-						onToolsChanged={handleAttachedToolsChanged}
 						attachedToolEntries={attachedToolEntries}
+						onAttachTool={handleAttachTool}
+						onDetachToolByKey={handleDetachAttachedToolByKey}
+						onSetAttachedToolAutoExecute={handleSetAttachedToolAutoExecuteByKey}
 						webSearchTemplates={webSearchTemplates}
 						setWebSearchTemplates={setWebSearchTemplatesAndMaybeAutoExecute}
 						allSkills={allSkills}

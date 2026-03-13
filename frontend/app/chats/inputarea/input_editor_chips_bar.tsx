@@ -1,8 +1,6 @@
 import { memo } from 'react';
 
 import type { Path } from 'platejs';
-import type { PlateEditor } from 'platejs/react';
-import { useEditorRef } from 'platejs/react';
 
 import type { AttachmentContentBlockMode, UIAttachment } from '@/spec/attachment';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
@@ -14,7 +12,7 @@ import type { ConversationToolStateEntry } from '@/chats/tools/conversation_tool
 import { ConversationToolsChip } from '@/chats/tools/conversation_tools_chip';
 import { ToolChipsComposerRow } from '@/chats/tools/tool_chips_composer';
 import { ToolChoicesChip } from '@/chats/tools/tool_choices_chip';
-import { getToolNodesWithPath, type ToolSelectionElementNode } from '@/chats/tools/tool_editor_utils';
+import type { ToolSelectionElementNode } from '@/chats/tools/tool_editor_utils';
 
 interface EditorChipsBarProps {
 	attachments: UIAttachment[];
@@ -24,8 +22,7 @@ interface EditorChipsBarProps {
 	// Tool calls & outputs (tool runners / results)
 	toolCalls?: UIToolCall[];
 	toolOutputs?: UIToolOutput[];
-	// PERF: allow parent to pass cached tool entries so we don't rescan the editor on each keystroke.
-	toolEntries?: Array<[ToolSelectionElementNode, Path]>;
+	toolEntries: Array<[ToolSelectionElementNode, Path]>;
 	isBusy?: boolean;
 	onRunToolCall?: (id: string) => void | Promise<void>;
 	onDiscardToolCall?: (id: string) => void;
@@ -38,7 +35,10 @@ interface EditorChipsBarProps {
 	onRemoveDirectoryGroup: (groupId: string) => void;
 	onRemoveOverflowDir?: (groupId: string, dirPath: string) => void;
 	onConversationToolsChange?: (next: ConversationToolStateEntry[]) => void;
-	onAttachedToolsChanged?: () => void;
+	onToggleAttachedToolAutoExecute: (node: ToolSelectionElementNode, next: boolean) => void;
+	onRemoveAttachedTool: (node: ToolSelectionElementNode) => void;
+	onRemoveAllAttachedTools: (nodes: ToolSelectionElementNode[]) => void;
+	onEditAttachedToolOptions: (node: ToolSelectionElementNode) => void;
 	onOpenToolCallDetails?: (call: UIToolCall) => void;
 	onOpenConversationToolDetails?: (entry: ConversationToolStateEntry) => void;
 	onOpenAttachedToolDetails?: (node: ToolSelectionElementNode) => void;
@@ -60,7 +60,7 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 	conversationTools = [],
 	toolCalls = [],
 	toolOutputs = [],
-	toolEntries: toolEntriesProp,
+	toolEntries,
 	isBusy = false,
 	onRunToolCall,
 	onDiscardToolCall,
@@ -72,14 +72,14 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 	onRemoveDirectoryGroup,
 	onRemoveOverflowDir,
 	onConversationToolsChange,
-	onAttachedToolsChanged,
+	onToggleAttachedToolAutoExecute,
+	onRemoveAttachedTool,
+	onRemoveAllAttachedTools,
+	onEditAttachedToolOptions,
 	onOpenToolCallDetails,
 	onOpenConversationToolDetails,
 	onOpenAttachedToolDetails,
 }: EditorChipsBarProps) {
-	const editor = useEditorRef() as PlateEditor;
-	const toolEntries = toolEntriesProp ?? getToolNodesWithPath(editor);
-
 	const hasVisibleToolCalls = toolCalls.some(
 		toolCall => toolCall.status !== 'discarded' && toolCall.status !== 'succeeded'
 	);
@@ -110,6 +110,7 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 	const openToolCallDetails = onOpenToolCallDetails ?? (() => {});
 	const openConversationToolDetails = onOpenConversationToolDetails ?? (() => {});
 	const openAttachedToolDetails = onOpenAttachedToolDetails ?? (() => {});
+
 	if (!hasAnyChips) return null;
 
 	return (
@@ -143,9 +144,11 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 
 			{/* Per-message tool choices (inline-attached tools for this draft) */}
 			<ToolChoicesChip
-				editor={editor}
 				toolEntries={toolEntries}
-				onToolsChanged={onAttachedToolsChanged}
+				onToggleAutoExecute={onToggleAttachedToolAutoExecute}
+				onRemoveTool={onRemoveAttachedTool}
+				onRemoveAllTools={onRemoveAllAttachedTools}
+				onEditToolOptions={onEditAttachedToolOptions}
 				onShowToolDetails={openAttachedToolDetails}
 			/>
 

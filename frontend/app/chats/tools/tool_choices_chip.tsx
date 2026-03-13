@@ -2,25 +2,18 @@ import { FiChevronUp, FiTool, FiX } from 'react-icons/fi';
 
 import { Menu, MenuButton, useMenuStore } from '@ariakit/react';
 import type { Path } from 'platejs';
-import type { PlateEditor } from 'platejs/react';
 
 import { ToolStoreChoiceType } from '@/spec/tool';
 
-import { dispatchOpenToolArgs } from '@/chats/events/open_attached_toolargs';
-import {
-	computeToolUserArgsStatus,
-	removeToolByKey,
-	setToolAutoExecuteByKey,
-	toolIdentityKey,
-	type ToolSelectionElementNode,
-} from '@/chats/tools/tool_editor_utils';
+import { computeToolUserArgsStatus, type ToolSelectionElementNode } from '@/chats/tools/tool_editor_utils';
 import { ToolMenuRow } from '@/chats/tools/tool_menu_row';
 
 interface ToolChoicesChipProps {
-	editor: PlateEditor;
-	// Entries from getToolNodesWithPath(editor); typed loosely here.
 	toolEntries: Array<[ToolSelectionElementNode, Path]>;
-	onToolsChanged?: () => void;
+	onToggleAutoExecute: (node: ToolSelectionElementNode, next: boolean) => void;
+	onRemoveTool: (node: ToolSelectionElementNode) => void;
+	onRemoveAllTools: (nodes: ToolSelectionElementNode[]) => void;
+	onEditToolOptions: (node: ToolSelectionElementNode) => void;
 	onShowToolDetails?: (node: ToolSelectionElementNode) => void;
 }
 
@@ -30,42 +23,23 @@ interface ToolChoicesChipProps {
  * - Opens a dropdown listing each tool with an individual remove button.
  * - Has a "remove all" cross that clears all attached tools.
  */
-export function ToolChoicesChip({ editor, toolEntries, onToolsChanged, onShowToolDetails }: ToolChoicesChipProps) {
+export function ToolChoicesChip({
+	toolEntries,
+	onToggleAutoExecute,
+	onRemoveTool,
+	onRemoveAllTools,
+	onEditToolOptions,
+	onShowToolDetails,
+}: ToolChoicesChipProps) {
 	// Only show "attached tools" that behave like normal tools in this UI.
 	// Web search is controlled separately in the bottom bar.
 	const visibleEntries = toolEntries.filter(([node]) => node.toolType !== ToolStoreChoiceType.WebSearch);
+	const visibleNodes = visibleEntries.map(([node]) => node);
 	const count = visibleEntries.length;
 
 	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
 
 	const title = `Tools\n${count} tool${count === 1 ? '' : 's'} attached`;
-	const handleToggleAutoExecute = (node: ToolSelectionElementNode) => {
-		const key = toolIdentityKey(node.bundleID, node.bundleSlug, node.toolSlug, node.toolVersion);
-		if (!key) return;
-		setToolAutoExecuteByKey(editor, key, !node.autoExecute);
-		onToolsChanged?.();
-	};
-
-	const handleRemoveSingle = (node: ToolSelectionElementNode) => {
-		const key = toolIdentityKey(node.bundleID, node.bundleSlug, node.toolSlug, node.toolVersion);
-		if (!key) return;
-		removeToolByKey(editor, key);
-		onToolsChanged?.();
-	};
-
-	const handleRemoveAll = () => {
-		const seen = new Set<string>();
-
-		for (const [node] of visibleEntries) {
-			const key = toolIdentityKey(node.bundleID, node.bundleSlug, node.toolSlug, node.toolVersion);
-			if (!key || seen.has(key)) continue;
-			seen.add(key);
-			removeToolByKey(editor, key);
-		}
-
-		menu.hide();
-		onToolsChanged?.();
-	};
 
 	if (count === 0) return null;
 
@@ -92,7 +66,10 @@ export function ToolChoicesChip({ editor, toolEntries, onToolsChanged, onShowToo
 			<button
 				type="button"
 				className="btn btn-ghost btn-xs text-error shrink-0 px-0 py-0 shadow-none"
-				onClick={handleRemoveAll}
+				onClick={() => {
+					onRemoveAllTools(visibleNodes);
+					menu.hide();
+				}}
 				title="Remove all tools"
 				aria-label="Remove all tools"
 			>
@@ -116,6 +93,7 @@ export function ToolChoicesChip({ editor, toolEntries, onToolsChanged, onShowToo
 					const supportsAutoExecute =
 						node.toolType === ToolStoreChoiceType.Function || node.toolType === ToolStoreChoiceType.Custom;
 					const hasArgs = status?.hasSchema ?? false;
+
 					return (
 						<ToolMenuRow
 							key={node.selectionID}
@@ -130,8 +108,8 @@ export function ToolChoicesChip({ editor, toolEntries, onToolsChanged, onShowToo
 							isSelected={true}
 							supportsAutoExecute={supportsAutoExecute}
 							autoExecute={node.autoExecute}
-							onAutoExecuteChange={() => {
-								handleToggleAutoExecute(node);
+							onAutoExecuteChange={next => {
+								onToggleAutoExecute(node, next);
 							}}
 							argsStatus={status}
 							// Keep your existing "edit" icon if you prefer:
@@ -139,7 +117,7 @@ export function ToolChoicesChip({ editor, toolEntries, onToolsChanged, onShowToo
 							onEditOptions={
 								hasArgs
 									? () => {
-											dispatchOpenToolArgs({ kind: 'attached', selectionID: node.selectionID });
+											onEditToolOptions(node);
 										}
 									: undefined
 							}
@@ -153,7 +131,7 @@ export function ToolChoicesChip({ editor, toolEntries, onToolsChanged, onShowToo
 							primaryAction={{
 								kind: 'remove',
 								onClick: () => {
-									handleRemoveSingle(node);
+									onRemoveTool(node);
 								},
 								title: 'Remove tool choice',
 							}}
