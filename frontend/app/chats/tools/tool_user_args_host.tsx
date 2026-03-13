@@ -8,7 +8,7 @@ import type { JSONSchema } from '@/lib/jsonschema_utils';
 
 import { toolStoreAPI } from '@/apis/baseapi';
 
-import type { ConversationToolStateEntry } from '@/chats/tools/conversation_tools_chip';
+import type { ConversationToolStateEntry } from '@/chats/tools/conversation_tool_utils';
 import { computeToolUserArgsStatus, getToolNodesWithPath } from '@/chats/tools/tool_editor_utils';
 import { type ToolArgsTarget, ToolUserArgsModal } from '@/chats/tools/tool_user_args_modal';
 import { type WebSearchChoiceTemplate } from '@/chats/tools/websearch_utils';

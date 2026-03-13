@@ -60,9 +60,11 @@ import { dispatchTemplateFlashEvent } from '@/chats/events/template_flash';
 import { EditorBottomBar } from '@/chats/inputarea/input_editor_bottom_bar';
 import { EditorChipsBar } from '@/chats/inputarea/input_editor_chips_bar';
 import {
+	buildEditorValueFromPlainText,
 	buildSingleParagraphValue,
 	buildSingleParagraphValueChunked,
 	clearAllMarks,
+	createEmptyEditorValue,
 	type EditorExternalMessage,
 	type EditorSubmitPayload,
 	hasNonEmptyUserText,
@@ -72,8 +74,15 @@ import {
 	LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS,
 	LARGE_TEXT_AUTODECHUNK_THRESHOLD_CHARS,
 	LARGE_TEXT_CHUNK_SIZE,
+	resolveStateUpdate,
 } from '@/chats/inputarea/input_editor_utils';
-import { dedupeSkillRefs, skillRefFromListItem, skillRefKey } from '@/chats/skills/skill_utils';
+import {
+	areSkillRefListsEqual,
+	buildSkillRefsFingerprint,
+	clampActiveSkillRefsToEnabled,
+	normalizeSkillRefs,
+	skillRefFromListItem,
+} from '@/chats/skills/skill_utils';
 import {
 	getFirstTemplateNodeWithPath,
 	getTemplateNodesWithPath,
@@ -89,7 +98,7 @@ import {
 	conversationToolsToChoices,
 	initConversationToolsStateFromChoices,
 	mergeConversationToolsWithNewChoices,
-} from '@/chats/tools/conversation_tools_chip';
+} from '@/chats/tools/conversation_tool_utils';
 import { ToolDetailsModal, type ToolDetailsState } from '@/chats/tools/tool_details_modal';
 import {
 	computeToolUserArgsStatus,
@@ -123,51 +132,6 @@ export interface EditorAreaHandle {
 	setEnabledSkillRefsFromMessage: (refs: SkillRef[]) => void;
 	setActiveSkillRefsFromMessage: (refs: SkillRef[]) => void;
 }
-
-const createEmptyEditorValue = (): Value => [{ type: 'p', children: [{ text: '' }] }];
-
-const buildEditorValueFromPlainText = (plain: string): Value => {
-	if (plain.length === 0) return createEmptyEditorValue();
-	return plain.length >= LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS
-		? buildSingleParagraphValueChunked(plain, LARGE_TEXT_CHUNK_SIZE)
-		: buildSingleParagraphValue(plain);
-};
-
-const resolveStateUpdate = <T,>(update: SetStateAction<T>, prev: T): T => {
-	return typeof update === 'function' ? (update as (prevState: T) => T)(prev) : update;
-};
-
-const normalizeSkillRefs = (refs: SkillRef[] | null | undefined): SkillRef[] => {
-	return dedupeSkillRefs(refs ?? []);
-};
-
-const buildSkillRefsFingerprint = (refs: SkillRef[] | null | undefined): string => {
-	const keys = normalizeSkillRefs(refs).map(skillRefKey);
-	keys.sort();
-	return keys.join('|');
-};
-
-const clampActiveSkillRefsToEnabled = (
-	enabledRefs: SkillRef[] | null | undefined,
-	activeRefs: SkillRef[] | null | undefined
-): SkillRef[] => {
-	const enabled = normalizeSkillRefs(enabledRefs);
-	if (enabled.length === 0) return [];
-
-	const allow = new Set(enabled.map(skillRefKey));
-	return dedupeSkillRefs((activeRefs ?? []).filter(ref => allow.has(skillRefKey(ref))));
-};
-
-const areSkillRefListsEqual = (a: SkillRef[] | null | undefined, b: SkillRef[] | null | undefined): boolean => {
-	const left = a ?? [];
-	const right = b ?? [];
-
-	if (left.length !== right.length) return false;
-	for (let i = 0; i < left.length; i += 1) {
-		if (skillRefKey(left[i]) !== skillRefKey(right[i])) return false;
-	}
-	return true;
-};
 
 const conversationToolHydrationKey = (entry: ConversationToolStateEntry): string => {
 	return `${entry.toolStoreChoice.bundleID}::${entry.toolStoreChoice.toolSlug}::${entry.toolStoreChoice.toolVersion}`;

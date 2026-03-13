@@ -1,6 +1,8 @@
 // ---- Large-text perf tuning ----
 // If you type huge prompts (10k+ words), a single giant text leaf becomes slow.
 // We keep ONE paragraph, but chunk its text into multiple text nodes ("leaves").
+import type { SetStateAction } from 'react';
+
 import { NodeApi, type Value } from 'platejs';
 import type { PlateEditor } from 'platejs/react';
 
@@ -144,3 +146,16 @@ export function hasNonEmptyUserText(ed: PlateEditor | null | undefined): boolean
 	}
 	return false;
 }
+
+export const createEmptyEditorValue = (): Value => [{ type: 'p', children: [{ text: '' }] }];
+
+export const buildEditorValueFromPlainText = (plain: string): Value => {
+	if (plain.length === 0) return createEmptyEditorValue();
+	return plain.length >= LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS
+		? buildSingleParagraphValueChunked(plain, LARGE_TEXT_CHUNK_SIZE)
+		: buildSingleParagraphValue(plain);
+};
+
+export const resolveStateUpdate = <T,>(update: SetStateAction<T>, prev: T): T => {
+	return typeof update === 'function' ? (update as (prevState: T) => T)(prev) : update;
+};
