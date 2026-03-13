@@ -1,6 +1,3 @@
-// ---- Large-text perf tuning ----
-// If you type huge prompts (10k+ words), a single giant text leaf becomes slow.
-// We keep ONE paragraph, but chunk its text into multiple text nodes ("leaves").
 import type { SetStateAction } from 'react';
 
 import { NodeApi, type Value } from 'platejs';
