@@ -20,9 +20,10 @@ import { Plate, PlateContent, type PlateEditor, usePlateEditor } from 'platejs/r
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { ProviderSDKType, UIToolCall, UIToolOutput } from '@/spec/inference';
-import type { SkillListItem, SkillRef } from '@/spec/skill';
+import type { SkillRef } from '@/spec/skill';
 import { type Tool, type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
+import { resolveStateUpdate } from '@/lib/hook_utils';
 import { type ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { compareEntryByPathDeepestFirst } from '@/lib/path_utils';
 import { cssEscape } from '@/lib/text_utils';
@@ -61,15 +62,8 @@ import {
 	LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS,
 	LARGE_TEXT_AUTODECHUNK_THRESHOLD_CHARS,
 	LARGE_TEXT_CHUNK_SIZE,
-	resolveStateUpdate,
 } from '@/chats/inputarea/input_editor_utils';
-import {
-	areSkillRefListsEqual,
-	buildSkillRefsFingerprint,
-	clampActiveSkillRefsToEnabled,
-	normalizeSkillRefs,
-	skillRefFromListItem,
-} from '@/chats/skills/skill_utils';
+import { useComposerSkills } from '@/chats/skills/use_composer_skills';
 import {
 	getFirstTemplateNodeWithPath,
 	getTemplateNodesWithPath,
@@ -423,6 +417,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	// conversation-tool + web-search config. Keep a snapshot so Cancel restores it.
 	const preEditConversationToolsRef = useRef<ConversationToolStateEntry[] | null>(null);
 	const preEditWebSearchTemplatesRef = useRef<WebSearchChoiceTemplate[] | null>(null);
+	const preEditEnabledSkillRefsRef = useRef<SkillRef[] | null>(null);
+	const preEditActiveSkillRefsRef = useRef<SkillRef[] | null>(null);
 
 	// Count of in-flight tool-definition hydration tasks (conversation-level + attached).
 	// Used to gate sending while schemas are still loading.
@@ -447,30 +443,25 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	// Single “active tool args editor” target (conversation-level or attached).
 	const [toolArgsTarget, setToolArgsTarget] = useState<ToolArgsTarget | null>(null);
 	const [webSearchTemplates, setWebSearchTemplates] = useState<WebSearchChoiceTemplate[]>([]);
+
 	// ---- Skills (conversation-level) ----
-	const [allSkills, setAllSkills] = useState<SkillListItem[]>([]);
-	const [enabledSkillRefs, setEnabledSkillRefsRaw] = useState<SkillRef[]>([]);
-	const [activeSkillRefs, setActiveSkillRefsRaw] = useState<SkillRef[]>([]);
-
-	// Track the allowlist fingerprint used to create the current session.
-	const sessionAllowlistKeyRef = useRef<string>('');
-
-	// Ensure we close the session on unmount (tab close / app navigation).
-	const skillSessionIDRef = useRef<string | null>(null);
-	const enabledSkillRefsRef = useRef<SkillRef[]>([]);
-	const activeSkillRefsRef = useRef<SkillRef[]>([]);
-	const [skillsLoading, setSkillsLoading] = useState(true);
-	const skillsCatalogLoadPromiseRef = useRef<Promise<SkillListItem[]> | null>(null);
-	const enableAllSkillsRequestVersionRef = useRef(0);
-	const preEditEnabledSkillRefsRef = useRef<SkillRef[] | null>(null);
-	const preEditActiveSkillRefsRef = useRef<SkillRef[] | null>(null);
-	const pendingMessageSkillSelectionRef = useRef<{
-		enabled?: SkillRef[];
-		active?: SkillRef[];
-		timeoutID: number | null;
-	}>({
-		timeoutID: null,
-	});
+	const {
+		allSkills,
+		skillsLoading,
+		enabledSkillRefs,
+		activeSkillRefs,
+		skillSessionID,
+		setEnabledSkillRefs,
+		setActiveSkillRefs,
+		enableAllSkills,
+		disableAllSkills,
+		applySkillSelectionState,
+		ensureSkillSession,
+		listActiveSkillRefs,
+		applyEnabledSkillRefsFromMessage,
+		applyActiveSkillRefsFromMessage,
+		getCurrentSkillSessionID,
+	} = useComposerSkills();
 
 	// --- Fix: focus management for menus opened by shortcuts ---
 	const templateMenuOpen = useStoreState(templateMenu, 'open');
@@ -496,237 +487,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		toolMenu.hide();
 		attachmentMenu.hide();
 	}, [templateMenu, toolMenu, attachmentMenu]);
-
-	const cancelPendingEnableAllSkills = useCallback(() => {
-		enableAllSkillsRequestVersionRef.current += 1;
-	}, []);
-
-	const updateEnabledSkillRefsState = useCallback((next: SkillRef[]) => {
-		enabledSkillRefsRef.current = next;
-		setEnabledSkillRefsRaw(prev => (areSkillRefListsEqual(prev, next) ? prev : next));
-	}, []);
-
-	const updateActiveSkillRefsState = useCallback((next: SkillRef[]) => {
-		activeSkillRefsRef.current = next;
-		setActiveSkillRefsRaw(prev => (areSkillRefListsEqual(prev, next) ? prev : next));
-	}, []);
-
-	const updateSkillSessionIDState = useCallback((next: string | null) => {
-		skillSessionIDRef.current = next;
-	}, []);
-
-	const closeSkillSessionBestEffort = useCallback((sid: string | null | undefined) => {
-		if (!sid) return;
-		void skillStoreAPI.closeSkillSession(sid).catch(() => {});
-	}, []);
-
-	const applySkillSelectionState = useCallback(
-		(nextEnabledInput: SkillRef[] | null | undefined, nextActiveInput: SkillRef[] | null | undefined) => {
-			const nextEnabled = normalizeSkillRefs(nextEnabledInput);
-			const nextActive = clampActiveSkillRefsToEnabled(nextEnabled, nextActiveInput);
-
-			const prevSessionID = skillSessionIDRef.current;
-			const prevSessionAllowlistKey = sessionAllowlistKeyRef.current;
-			const nextAllowlistKey = buildSkillRefsFingerprint(nextEnabled);
-
-			if (nextEnabled.length === 0) {
-				sessionAllowlistKeyRef.current = '';
-				if (prevSessionID) {
-					updateSkillSessionIDState(null);
-					closeSkillSessionBestEffort(prevSessionID);
-				}
-			} else if (!prevSessionID) {
-				sessionAllowlistKeyRef.current = '';
-			} else if (!prevSessionAllowlistKey) {
-				// Session existed before we had a tracked allowlist; initialize tracking.
-				sessionAllowlistKeyRef.current = nextAllowlistKey;
-			} else if (prevSessionAllowlistKey !== nextAllowlistKey) {
-				sessionAllowlistKeyRef.current = '';
-				updateSkillSessionIDState(null);
-				closeSkillSessionBestEffort(prevSessionID);
-			}
-
-			updateEnabledSkillRefsState(nextEnabled);
-			updateActiveSkillRefsState(nextActive);
-		},
-		[closeSkillSessionBestEffort, updateActiveSkillRefsState, updateEnabledSkillRefsState, updateSkillSessionIDState]
-	);
-
-	const setEnabledSkillRefs = useCallback<Dispatch<SetStateAction<SkillRef[]>>>(
-		update => {
-			cancelPendingEnableAllSkills();
-			const prevEnabled = enabledSkillRefsRef.current;
-			const nextEnabled = resolveStateUpdate(update, prevEnabled);
-			applySkillSelectionState(nextEnabled, activeSkillRefsRef.current);
-		},
-		[applySkillSelectionState, cancelPendingEnableAllSkills]
-	);
-
-	const setActiveSkillRefs = useCallback<Dispatch<SetStateAction<SkillRef[]>>>(
-		update => {
-			const prevActive = activeSkillRefsRef.current;
-			const nextActive = resolveStateUpdate(update, prevActive);
-			applySkillSelectionState(enabledSkillRefsRef.current, nextActive);
-		},
-		[applySkillSelectionState]
-	);
-
-	const flushPendingMessageSkillSelection = useCallback(() => {
-		const pending = pendingMessageSkillSelectionRef.current;
-		if (pending.timeoutID != null) {
-			window.clearTimeout(pending.timeoutID);
-			pending.timeoutID = null;
-		}
-
-		if (pending.enabled == null && pending.active == null) return;
-
-		const nextEnabled = pending.enabled ?? enabledSkillRefsRef.current;
-		const nextActive = pending.active ?? activeSkillRefsRef.current;
-
-		pending.enabled = undefined;
-		pending.active = undefined;
-
-		cancelPendingEnableAllSkills();
-		applySkillSelectionState(nextEnabled, nextActive);
-	}, [applySkillSelectionState, cancelPendingEnableAllSkills]);
-
-	const schedulePendingMessageSkillSelectionFlush = useCallback(() => {
-		const pending = pendingMessageSkillSelectionRef.current;
-		if (pending.timeoutID != null) return;
-
-		pending.timeoutID = window.setTimeout(() => {
-			pending.timeoutID = null;
-			flushPendingMessageSkillSelection();
-		}, 0);
-	}, [flushPendingMessageSkillSelection]);
-
-	useEffect(() => {
-		const pending = pendingMessageSkillSelectionRef.current;
-		return () => {
-			if (pending.timeoutID != null) {
-				window.clearTimeout(pending.timeoutID);
-				pending.timeoutID = null;
-			}
-		};
-	}, []);
-
-	useEffect(() => {
-		return () => {
-			const sid = skillSessionIDRef.current;
-			if (!sid) return;
-			void skillStoreAPI.closeSkillSession(sid).catch(() => {});
-		};
-	}, []);
-
-	const fetchAllSkills = useCallback(async (): Promise<SkillListItem[]> => {
-		const out: SkillListItem[] = [];
-		let token: string | undefined = undefined;
-
-		for (let guard = 0; guard < 50; guard += 1) {
-			const resp = await skillStoreAPI.listSkills(
-				undefined,
-				undefined,
-				false, // includeDisabled
-				false, // includeMissing
-				200, // recommendedPageSize
-				token
-			);
-
-			out.push(...(resp.skillListItems ?? []));
-			token = resp.nextPageToken;
-			if (!token) break;
-		}
-
-		return out;
-	}, []);
-
-	// Fetch skills catalog (store listSkills; NOT runtime listRuntimeSkills).
-	useEffect(() => {
-		let cancelled = false;
-		const loadPromise = fetchAllSkills();
-		skillsCatalogLoadPromiseRef.current = loadPromise;
-
-		loadPromise
-			.then(out => {
-				if (cancelled) return;
-				setAllSkills(out);
-			})
-			.catch(() => {
-				if (!cancelled) setAllSkills([]);
-			})
-			.finally(() => {
-				if (!cancelled) setSkillsLoading(false);
-				if (skillsCatalogLoadPromiseRef.current === loadPromise) {
-					skillsCatalogLoadPromiseRef.current = null;
-				}
-			});
-
-		return () => {
-			cancelled = true;
-			if (skillsCatalogLoadPromiseRef.current === loadPromise) {
-				skillsCatalogLoadPromiseRef.current = null;
-			}
-		};
-	}, [fetchAllSkills]);
-
-	const enableAllSkills = useCallback(() => {
-		const requestVersion = enableAllSkillsRequestVersionRef.current + 1;
-		enableAllSkillsRequestVersionRef.current = requestVersion;
-
-		void (async () => {
-			const pendingLoad = skillsCatalogLoadPromiseRef.current;
-			const loadedSkills =
-				allSkills.length > 0 ? allSkills : pendingLoad ? await pendingLoad.catch(() => []) : ([] as SkillListItem[]);
-
-			if (enableAllSkillsRequestVersionRef.current !== requestVersion) return;
-			if (loadedSkills.length === 0) return;
-
-			applySkillSelectionState(loadedSkills.map(skillRefFromListItem), activeSkillRefsRef.current);
-		})();
-	}, [allSkills, applySkillSelectionState]);
-
-	const disableAllSkills = useCallback(() => {
-		setEnabledSkillRefs([]);
-	}, [setEnabledSkillRefs]);
-
-	const listActiveSkillRefs = useCallback(async (sid: string): Promise<SkillRef[]> => {
-		const allowSkillRefs = enabledSkillRefsRef.current;
-		if (!sid || allowSkillRefs.length === 0) return [];
-
-		const items = await skillStoreAPI.listRuntimeSkills({
-			sessionID: sid,
-			activity: 'active',
-			allowSkillRefs,
-		});
-
-		return clampActiveSkillRefsToEnabled(
-			allowSkillRefs,
-			(items ?? []).map(it => it.skillRef)
-		);
-	}, []);
-
-	const ensureSkillSession = useCallback(async (): Promise<string | null> => {
-		const currentEnabled = enabledSkillRefsRef.current;
-		if (currentEnabled.length === 0) return null;
-
-		const currentActive = activeSkillRefsRef.current;
-		const currentEnabledKey = buildSkillRefsFingerprint(currentEnabled);
-		const existing = skillSessionIDRef.current;
-
-		if (existing && sessionAllowlistKeyRef.current === currentEnabledKey) return existing;
-
-		const sess = await skillStoreAPI.createSkillSession(
-			existing ?? undefined, // closeSessionID (best-effort)
-			undefined, // maxActivePerSession
-			currentEnabled, // allowSkillRefs (REQUIRED)
-			currentActive // initial active from conversation
-		);
-
-		sessionAllowlistKeyRef.current = currentEnabledKey;
-		updateSkillSessionIDState(sess.sessionID);
-		updateActiveSkillRefsState(clampActiveSkillRefsToEnabled(currentEnabled, sess.activeSkillRefs ?? []));
-		return sess.sessionID;
-	}, [updateActiveSkillRefsState, updateSkillSessionIDState]);
 
 	useEffect(() => {
 		if (!templateMenuOpen) {
@@ -1123,11 +883,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		if (prevConv) setConversationToolsState(prevConv);
 		if (prevWs) setWebSearchTemplates(prevWs);
 		if (prevSkills || prevActive) {
-			cancelPendingEnableAllSkills();
-			applySkillSelectionState(prevSkills ?? enabledSkillRefsRef.current, prevActive ?? activeSkillRefsRef.current);
+			applySkillSelectionState(prevSkills ?? enabledSkillRefs, prevActive ?? activeSkillRefs);
 		}
 		clearPreEditSnapshot();
-	}, [applySkillSelectionState, cancelPendingEnableAllSkills, clearPreEditSnapshot, setConversationToolsState]);
+	}, [activeSkillRefs, applySkillSelectionState, clearPreEditSnapshot, enabledSkillRefs, setConversationToolsState]);
 
 	const isSendButtonEnabled = useMemo(() => {
 		if (isBusy) return false;
@@ -1184,7 +943,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 			// ---- Skills tool path (runtime-injected tools: skills.*) ----
 			if (isSkillsToolName(toolCall.name)) {
-				let sid = skillSessionIDRef.current;
+				let sid = getCurrentSkillSessionID();
 				if (!sid) {
 					try {
 						sid = await ensureSkillSession();
@@ -1240,7 +999,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					void (async () => {
 						try {
 							const nextActive = await listActiveSkillRefs(sid);
-							if (skillSessionIDRef.current !== sid) return;
+							if (getCurrentSkillSessionID() !== sid) return;
 							setActiveSkillRefs(nextActive);
 						} catch {
 							// ignore
@@ -1319,6 +1078,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		},
 		[
 			ensureSkillSession,
+			getCurrentSkillSessionID,
 			isSkillsToolName,
 			listActiveSkillRefs,
 			setActiveSkillRefs,
@@ -1393,7 +1153,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				if (!bundleID || !toolSlug || !toolVersion) return;
 			} else {
 				// Skills retry requires an active session.
-				if (!skillSessionIDRef.current) return;
+				if (!skillSessionID) return;
 				// skills.* are expected to be Function or Custom in the inference schema;
 				// if something else slips through, don't retry.
 				if (output.type !== ToolStoreChoiceType.Function && output.type !== ToolStoreChoiceType.Custom) return;
@@ -1423,7 +1183,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			}));
 			kickAutoExecutePendingToolCalls(20);
 		},
-		[isSkillsToolName, kickAutoExecutePendingToolCalls, updateToolRuntimeState]
+		[isSkillsToolName, kickAutoExecutePendingToolCalls, skillSessionID, updateToolRuntimeState]
 	);
 
 	const handleOpenToolOutput = useCallback((output: UIToolOutput) => {
@@ -1599,7 +1359,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				if (effectiveSkillSessionID && enabledSkillRefs.length > 0) {
 					try {
 						activeForMessage = await listActiveSkillRefs(effectiveSkillSessionID);
-						if (skillSessionIDRef.current === effectiveSkillSessionID) {
+						if (getCurrentSkillSessionID() === effectiveSkillSessionID) {
 							setActiveSkillRefs(activeForMessage);
 						}
 					} catch {
@@ -1650,6 +1410,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			enabledSkillRefs,
 			ensureSkillSession,
 			focusEditorAtEnd,
+			getCurrentSkillSessionID,
 			hasPendingToolCalls,
 			isBusy,
 			isSendButtonEnabled,
@@ -1743,7 +1504,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			applyWebSearchFromChoices(incomingToolChoices);
 
 			// 4) Restore enabled/active skills together so invariants hold immediately.
-			cancelPendingEnableAllSkills();
 			applySkillSelectionState(incoming.enabledSkillRefs ?? [], incoming.activeSkillRefs ?? []);
 
 			// 5) Restore any tool outputs that were previously attached to this message.
@@ -1754,7 +1514,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			applyConversationToolsFromChoices,
 			applySkillSelectionState,
 			applyWebSearchFromChoices,
-			cancelPendingEnableAllSkills,
 			clearComposerTransientState,
 			conversationToolsState,
 			enabledSkillRefs,
@@ -1771,24 +1530,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			kickAutoExecutePendingToolCalls(20);
 		},
 		[kickAutoExecutePendingToolCalls, setToolCalls]
-	);
-
-	const applyEnabledSkillRefsFromMessage = useCallback(
-		(refs: SkillRef[]) => {
-			const pending = pendingMessageSkillSelectionRef.current;
-			pending.enabled = refs ?? [];
-			schedulePendingMessageSkillSelectionFlush();
-		},
-		[schedulePendingMessageSkillSelectionFlush]
-	);
-
-	const applyActiveSkillRefsFromMessage = useCallback(
-		(refs: SkillRef[]) => {
-			const pending = pendingMessageSkillSelectionRef.current;
-			pending.active = refs ?? [];
-			schedulePendingMessageSkillSelectionFlush();
-		},
-		[schedulePendingMessageSkillSelectionFlush]
 	);
 
 	useImperativeHandle(ref, () => ({

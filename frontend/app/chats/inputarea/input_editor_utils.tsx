@@ -1,5 +1,3 @@
-import type { SetStateAction } from 'react';
-
 import { NodeApi, type Value } from 'platejs';
 import type { PlateEditor } from 'platejs/react';
 
@@ -151,8 +149,4 @@ export const buildEditorValueFromPlainText = (plain: string): Value => {
 	return plain.length >= LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS
 		? buildSingleParagraphValueChunked(plain, LARGE_TEXT_CHUNK_SIZE)
 		: buildSingleParagraphValue(plain);
-};
-
-export const resolveStateUpdate = <T,>(update: SetStateAction<T>, prev: T): T => {
-	return typeof update === 'function' ? (update as (prevState: T) => T)(prev) : update;
 };
