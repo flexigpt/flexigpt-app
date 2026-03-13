@@ -72,8 +72,6 @@ interface UseComposerToolsResult {
 	toolArgsBlocked: boolean;
 	hasPendingToolCalls: boolean;
 	hasRunningToolCalls: boolean;
-	toolEntriesVersion: number;
-	bumpToolEntriesVersion: () => void;
 	recomputeAttachedToolArgsBlocked: () => void;
 	runAllPendingToolCalls: () => Promise<UIToolOutput[]>;
 	handleRunSingleToolCall: (id: string) => Promise<void>;
@@ -158,11 +156,6 @@ export function useComposerTools({
 		},
 		[updateToolRuntimeState]
 	);
-
-	const [toolEntriesVersion, setToolEntriesVersion] = useState(0);
-	const bumpToolEntriesVersion = useCallback(() => {
-		setToolEntriesVersion(v => v + 1);
-	}, []);
 
 	const [toolDetailsState, setToolDetailsState] = useState<ToolDetailsState>(null);
 	const [toolArgsTarget, setToolArgsTarget] = useState<ToolArgsTarget | null>(null);
@@ -441,7 +434,6 @@ export function useComposerTools({
 	}, [editor]);
 
 	const handleAttachedToolsChanged = useCallback(() => {
-		setToolEntriesVersion(v => v + 1);
 		recomputeAttachedToolArgsBlocked();
 		if (toolRuntimeStateRef.current.toolCalls.length > 0) {
 			kickAutoExecutePendingToolCalls(1);
@@ -791,8 +783,6 @@ export function useComposerTools({
 		toolArgsBlocked,
 		hasPendingToolCalls,
 		hasRunningToolCalls,
-		toolEntriesVersion,
-		bumpToolEntriesVersion,
 		recomputeAttachedToolArgsBlocked,
 		runAllPendingToolCalls,
 		handleRunSingleToolCall,

@@ -2,7 +2,6 @@ import {
 	forwardRef,
 	type SubmitEventHandler,
 	useCallback,
-	useDeferredValue,
 	useEffect,
 	useImperativeHandle,
 	useMemo,
@@ -13,8 +12,7 @@ import {
 import { FiAlertTriangle, FiEdit2, FiFastForward, FiPlay, FiSend, FiSquare, FiX } from 'react-icons/fi';
 
 import { useMenuStore, useStoreState } from '@ariakit/react';
-import { SingleBlockPlugin, type Value } from 'platejs';
-import { Plate, PlateContent, type PlateEditor, usePlateEditor } from 'platejs/react';
+import { Plate, PlateContent } from 'platejs/react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { ProviderSDKType, UIToolCall, UIToolOutput } from '@/spec/inference';
@@ -22,19 +20,9 @@ import type { SkillRef } from '@/spec/skill';
 import type { ToolListItem, ToolStoreChoice } from '@/spec/tool';
 
 import { type ShortcutConfig } from '@/lib/keyboard_shortcuts';
-import { compareEntryByPathDeepestFirst } from '@/lib/path_utils';
 import { cssEscape } from '@/lib/text_utils';
 
 import { useEnterSubmit } from '@/hooks/use_enter_submit';
-
-import { AlignKit } from '@/components/editor/plugins/align_kit';
-import { BasicBlocksKit } from '@/components/editor/plugins/basic_blocks_kit';
-import { BasicMarksKit } from '@/components/editor/plugins/basic_marks_kit';
-import { FloatingToolbarKit } from '@/components/editor/plugins/floating_toolbar_kit';
-import { IndentKit } from '@/components/editor/plugins/indent_kit';
-import { LineHeightKit } from '@/components/editor/plugins/line_height_kit';
-import { ListKit } from '@/components/editor/plugins/list_kit';
-import { TabbableKit } from '@/components/editor/plugins/tabbable_kit';
 
 import { useComposerAttachments } from '@/chats/attachments/use_composer_attachments';
 import { dispatchOpenToolArgs } from '@/chats/events/open_attached_toolargs';
@@ -43,31 +31,14 @@ import { EditorBottomBar } from '@/chats/inputarea/input_editor_bottom_bar';
 import { EditorChipsBar } from '@/chats/inputarea/input_editor_chips_bar';
 import {
 	buildEditorValueFromPlainText,
-	buildSingleParagraphValue,
-	buildSingleParagraphValueChunked,
-	clearAllMarks,
-	createEmptyEditorValue,
 	type EditorExternalMessage,
 	type EditorSubmitPayload,
 	hasNonEmptyUserText,
-	insertPlainTextAsSingleBlock,
-	isCursorAtDocumentEnd,
-	isSimpleEmptyParagraphDocument,
-	LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS,
-	LARGE_TEXT_AUTODECHUNK_THRESHOLD_CHARS,
-	LARGE_TEXT_CHUNK_SIZE,
 } from '@/chats/inputarea/input_editor_utils';
+import { useComposerDocument } from '@/chats/platedoc/use_composer_document';
 import { useComposerSkills } from '@/chats/skills/use_composer_skills';
-import {
-	getFirstTemplateNodeWithPath,
-	getTemplateNodesWithPath,
-	getTemplateSelections,
-	toPlainTextReplacingVariables,
-} from '@/chats/templates/template_editor_utils';
-import { TemplateSlashKit } from '@/chats/templates/template_plugin';
-import { getLastUserBlockContent } from '@/chats/templates/template_processing';
+import { getTemplateSelections, toPlainTextReplacingVariables } from '@/chats/templates/template_editor_utils';
 import { TemplateToolbars } from '@/chats/templates/template_toolbars';
-import { buildUserInlineChildrenFromText } from '@/chats/templates/template_variables_inline';
 import {
 	type ConversationToolStateEntry,
 	conversationToolsToChoices,
@@ -85,7 +56,6 @@ import {
 	toolIdentityKey,
 	type ToolSelectionElementNode,
 } from '@/chats/tools/tool_editor_utils';
-import { ToolPlusKit } from '@/chats/tools/tool_plugin';
 import { ToolArgsModalHost } from '@/chats/tools/tool_user_args_host';
 import { useComposerTools } from '@/chats/tools/use_composer_tools';
 import { buildWebSearchChoicesForSubmit, type WebSearchChoiceTemplate } from '@/chats/tools/websearch_utils';
@@ -105,26 +75,6 @@ export interface EditorAreaHandle {
 	setActiveSkillRefsFromMessage: (refs: SkillRef[]) => void;
 }
 
-const isSelectionOnlyEditorChange = (editor: PlateEditor): boolean => {
-	const operations = editor.operations ?? [];
-	return operations.length > 0 && operations.every(op => op.type === 'set_selection');
-};
-
-const createEditorPlugins = () => [
-	SingleBlockPlugin,
-	...BasicBlocksKit,
-	...BasicMarksKit,
-	...LineHeightKit,
-	...AlignKit,
-	...IndentKit,
-	...ListKit,
-	// ...AutoformatKit, // Don't want any formatting on typing
-	...TabbableKit,
-	...TemplateSlashKit,
-	...ToolPlusKit,
-	...FloatingToolbarKit,
-];
-
 interface EditorAreaProps {
 	isBusy: boolean;
 	currentProviderSDKType: ProviderSDKType;
@@ -139,23 +89,24 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	{ isBusy, currentProviderSDKType, shortcutConfig, onSubmit, onRequestStop, editingMessageId, cancelEditing },
 	ref
 ) {
-	const initialEditorValue = useMemo<Value>(() => createEmptyEditorValue(), []);
-	const editorPlugins = useMemo(() => createEditorPlugins(), []);
-	const editor = usePlateEditor({
-		plugins: editorPlugins,
-		value: initialEditorValue,
-	});
-
 	const isSubmittingRef = useRef<boolean>(false);
-	const contentRef = useRef<HTMLDivElement | null>(null);
-	const editorRef = useRef(editor);
-	editorRef.current = editor; // keep a live ref for key handlers
-	const isMountedRef = useRef(true);
-	useEffect(() => {
-		return () => {
-			isMountedRef.current = false;
-		};
-	}, []);
+
+	const {
+		editor,
+		contentRef,
+		hasText,
+		hasTextRef,
+		selectionInfo,
+		attachedToolEntries,
+		onEditorChange,
+		onEditorPaste,
+		replaceEditorDocument,
+		resetEditorDocument,
+		focusEditorAtEnd,
+		focusEditorPreservingSelection,
+	} = useComposerDocument({
+		isBusy,
+	});
 
 	const templateMenu = useMenuStore({ placement: 'top-start', focusLoop: true });
 	const toolMenu = useMenuStore({ placement: 'top-start', focusLoop: true });
@@ -167,162 +118,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	// - force focus into the menu (arrow-key nav)
 	// - optionally restore focus to editor on close (Esc)
 	const menuOpenedByShortcutRef = useRef({ templates: false, tools: false, attachments: false });
-
-	// doc version tick to re-run selection computations on any editor change
-	const [docVersion, setDocVersion] = useState(0);
-	const deferredDocVersion = useDeferredValue(docVersion);
-
-	// Cache "has text" so we don't re-scan the editor tree multiple times per render.
-	const [hasText, setHasText] = useState(false);
-	const hasTextRef = useRef(false);
-	const isAutoChunkingRef = useRef(false);
-
-	// Throttle docVersion bumps to at most 1/frame to avoid re-render storms on big documents.
-	const docRafRef = useRef<number | null>(null);
-	const scheduleDocRecompute = useCallback(() => {
-		if (docRafRef.current != null) return;
-		docRafRef.current = window.requestAnimationFrame(() => {
-			docRafRef.current = null;
-			setDocVersion(v => v + 1);
-			const nextHasText = hasNonEmptyUserText(editorRef.current);
-			hasTextRef.current = nextHasText;
-			setHasText(nextHasText);
-		});
-	}, []);
-
-	useEffect(() => {
-		return () => {
-			if (docRafRef.current != null) window.cancelAnimationFrame(docRafRef.current);
-		};
-	}, []);
-
-	// Auto-chunking job (runs outside the keystroke critical path).
-	const idleChunkJobRef = useRef<number | null>(null);
-
-	const autoChunkIfNeeded = useCallback(() => {
-		if (isAutoChunkingRef.current) return;
-		if (!contentRef.current) return;
-
-		const domLen = (contentRef.current.textContent ?? '').length;
-		const ed = editorRef.current;
-
-		// Only operate on the simplest safe shape:
-		// - single paragraph
-		// - only text children
-		const rootChildren = ed.children ?? [];
-		if (rootChildren.length !== 1) return;
-		const p = rootChildren[0];
-		if (!p || p.type !== 'p' || !Array.isArray(p.children)) return;
-		const pChildren = p.children;
-		if (pChildren.some(c => typeof c?.text !== 'string')) return; // any inline element => skip
-
-		// Avoid cursor jumps: only chunk/dechunk when user is typing at the end.
-		if (!isCursorAtDocumentEnd(ed)) return;
-
-		// Chunk: 1 huge leaf -> many leaves
-		if (domLen >= LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS && pChildren.length === 1) {
-			const text = ed.api.string([]);
-			if (text.length < LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS) return;
-
-			isAutoChunkingRef.current = true;
-			try {
-				ed.tf.withoutNormalizing(() => {
-					ed.tf.setValue(buildSingleParagraphValueChunked(text, LARGE_TEXT_CHUNK_SIZE));
-				});
-				ed.tf.select(undefined, { edge: 'end' });
-			} finally {
-				isAutoChunkingRef.current = false;
-			}
-			return;
-		}
-
-		// Dechunk: many leaves -> 1 leaf (when user deletes a lot)
-		if (domLen <= LARGE_TEXT_AUTODECHUNK_THRESHOLD_CHARS && pChildren.length > 1) {
-			const text = ed.api.string([]);
-			if (text.length > LARGE_TEXT_AUTODECHUNK_THRESHOLD_CHARS) return;
-
-			isAutoChunkingRef.current = true;
-			try {
-				ed.tf.withoutNormalizing(() => {
-					ed.tf.setValue(buildSingleParagraphValue(text));
-				});
-				ed.tf.select(undefined, { edge: 'end' });
-			} finally {
-				isAutoChunkingRef.current = false;
-			}
-		}
-	}, []);
-
-	const scheduleAutoChunk = useCallback(() => {
-		if (idleChunkJobRef.current != null) return;
-
-		// requestIdleCallback is ideal; fall back to a short timeout.
-		const w = window;
-		if (typeof w.requestIdleCallback === 'function') {
-			idleChunkJobRef.current = w.requestIdleCallback(
-				() => {
-					idleChunkJobRef.current = null;
-					autoChunkIfNeeded();
-				},
-				{ timeout: 250 }
-			);
-		} else {
-			idleChunkJobRef.current = window.setTimeout(() => {
-				idleChunkJobRef.current = null;
-				autoChunkIfNeeded();
-			}, 120);
-		}
-	}, [autoChunkIfNeeded]);
-
-	useEffect(() => {
-		return () => {
-			const w = window;
-			if (idleChunkJobRef.current != null && typeof w.cancelIdleCallback === 'function') {
-				w.cancelIdleCallback(idleChunkJobRef.current);
-			} else if (idleChunkJobRef.current != null) {
-				window.clearTimeout(idleChunkJobRef.current);
-			}
-		};
-	}, []);
-
-	const focusEditorPreservingSelection = useCallback(() => {
-		const editor = editorRef.current;
-		if (!editor || isBusy) return;
-
-		requestAnimationFrame(() => {
-			try {
-				editor.tf.focus();
-			} catch {
-				// noop
-			}
-		});
-	}, [isBusy]);
-
-	const focusEditorAtEnd = useCallback(() => {
-		const editor = editorRef.current;
-		if (!editor) return;
-
-		// No visible caret in readOnly mode.
-		if (isBusy) return;
-
-		requestAnimationFrame(() => {
-			try {
-				editor.tf.withoutNormalizing(() => {
-					editor.tf.select(undefined, { edge: 'end' });
-					editor.tf.collapse({ edge: 'end' });
-				});
-
-				editor.tf.focus();
-
-				// Keep end visible if content is long
-				if (contentRef.current) {
-					contentRef.current.scrollTop = contentRef.current.scrollHeight;
-				}
-			} catch {
-				editor.tf.focus();
-			}
-		});
-	}, [isBusy]);
 
 	const {
 		attachments,
@@ -363,46 +158,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		getCurrentSkillSessionID,
 	} = useComposerSkills();
 
-	const lastPopulatedSelectionKeyRef = useRef<Set<string>>(new Set());
-
-	const selectionInfo = useMemo(() => {
-		// Fast path: if the document contains no template-selection elements at all,
-		// short-circuit instead of running the heavier helpers.
-		const tplNodeWithPath = getFirstTemplateNodeWithPath(editor);
-		if (!tplNodeWithPath) {
-			return {
-				tplNodeWithPath: undefined,
-				hasTemplate: false,
-				requiredCount: 0,
-				firstPendingVar: undefined,
-			};
-		}
-
-		const selections = getTemplateSelections(editor);
-		const hasTemplate = selections.length > 0;
-
-		let requiredCount = 0;
-		let firstPendingVar: { name: string; selectionID?: string } | undefined = undefined;
-
-		for (const s of selections) {
-			requiredCount += s.requiredCount;
-
-			if (!firstPendingVar) {
-				if (s.requiredVariables.length > 0) {
-					firstPendingVar = { name: s.requiredVariables[0], selectionID: s.selectionID };
-				}
-			}
-		}
-
-		return {
-			tplNodeWithPath,
-			hasTemplate,
-			requiredCount,
-			firstPendingVar,
-		};
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [editor, deferredDocVersion]);
-
 	const templateBlocked = selectionInfo.hasTemplate && selectionInfo.requiredCount > 0;
 
 	const submitPendingToolsAndSendRef = useRef<(() => void | Promise<void>) | null>(null);
@@ -425,8 +180,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		toolArgsBlocked,
 		hasPendingToolCalls,
 		hasRunningToolCalls,
-		toolEntriesVersion,
-		bumpToolEntriesVersion,
 		runAllPendingToolCalls,
 		handleRunSingleToolCall,
 		handleDiscardToolCall,
@@ -454,16 +207,13 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		skillSessionID,
 	});
 
-	// eslint-disable-next-line react-hooks/exhaustive-deps
-	const attachedToolEntries = useMemo(() => getToolNodesWithPath(editor), [editor, toolEntriesVersion]);
-
 	const getAttachedToolIdentityKeys = useCallback(() => {
 		return new Set(
-			getToolNodesWithPath(editorRef.current, false).map(([node]) =>
+			getToolNodesWithPath(editor, false).map(([node]) =>
 				toolIdentityKey(node.bundleID, node.bundleSlug, node.toolSlug, node.toolVersion)
 			)
 		);
-	}, []);
+	}, [editor]);
 
 	const handleAttachTool = useCallback(
 		(item: ToolListItem, autoExecute: boolean) => {
@@ -471,7 +221,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			if (getAttachedToolIdentityKeys().has(identityKey)) return;
 
 			insertToolSelectionNode(
-				editorRef.current,
+				editor,
 				{
 					bundleID: item.bundleID,
 					bundleSlug: item.bundleSlug,
@@ -483,27 +233,27 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			);
 			handleAttachedToolsChanged();
 		},
-		[getAttachedToolIdentityKeys, handleAttachedToolsChanged]
+		[editor, getAttachedToolIdentityKeys, handleAttachedToolsChanged]
 	);
 
 	const handleDetachAttachedToolByKey = useCallback(
 		(identityKey: string) => {
 			if (!getAttachedToolIdentityKeys().has(identityKey)) return;
 
-			removeToolByKey(editorRef.current, identityKey);
+			removeToolByKey(editor, identityKey);
 			handleAttachedToolsChanged();
 		},
-		[getAttachedToolIdentityKeys, handleAttachedToolsChanged]
+		[editor, getAttachedToolIdentityKeys, handleAttachedToolsChanged]
 	);
 
 	const handleSetAttachedToolAutoExecuteByKey = useCallback(
 		(identityKey: string, autoExecute: boolean) => {
 			if (!getAttachedToolIdentityKeys().has(identityKey)) return;
 
-			setToolAutoExecuteByKey(editorRef.current, identityKey, autoExecute);
+			setToolAutoExecuteByKey(editor, identityKey, autoExecute);
 			handleAttachedToolsChanged();
 		},
-		[getAttachedToolIdentityKeys, handleAttachedToolsChanged]
+		[editor, getAttachedToolIdentityKeys, handleAttachedToolsChanged]
 	);
 
 	const handleToggleAttachedToolAutoExecute = useCallback(
@@ -538,12 +288,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			if (uniqueKeys.size === 0) return;
 
 			for (const identityKey of uniqueKeys) {
-				removeToolByKey(editorRef.current, identityKey);
+				removeToolByKey(editor, identityKey);
 			}
 
 			handleAttachedToolsChanged();
 		},
-		[getAttachedToolIdentityKeys, handleAttachedToolsChanged]
+		[editor, getAttachedToolIdentityKeys, handleAttachedToolsChanged]
 	);
 
 	const handleEditAttachedToolOptions = useCallback((node: ToolSelectionElementNode) => {
@@ -654,70 +404,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		attachmentButtonRef.current?.focus({ preventScroll: true });
 	}, [closeAllMenus, attachmentMenu]);
 
-	// Populate editor with effective last-USER block for EACH template selection (once per selectionID)
-	useEffect(() => {
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
-		if (!selectionInfo.tplNodeWithPath) return;
-		const populated = lastPopulatedSelectionKeyRef.current;
-		const nodes = getTemplateNodesWithPath(editor);
-		const insertedIds: string[] = [];
-
-		// Process in reverse document order to keep captured paths valid
-		const nodesRev = [...nodes].sort(compareEntryByPathDeepestFirst);
-
-		for (const [tsenode, originalPath] of nodesRev) {
-			if (!tsenode || !tsenode.selectionID) continue;
-			const selectionID: string = tsenode.selectionID;
-			if (populated.has(selectionID)) continue;
-
-			// Build children: keep the selection chip, add parsed user text with variable pills
-			const userText = getLastUserBlockContent(tsenode);
-			const inlineChildren = buildUserInlineChildrenFromText(tsenode, userText);
-
-			try {
-				editor.tf.withoutNormalizing(() => {
-					// Recompute a fresh path to guard against prior insertions shifting indices
-					const pathArr = Array.isArray(originalPath) ? (originalPath as number[]) : [];
-
-					if (pathArr.length >= 2) {
-						const blockPath = pathArr.slice(0, pathArr.length - 1); // parent paragraph path
-						const indexAfter = pathArr[pathArr.length - 1] + 1;
-						const atPath = [...blockPath, indexAfter] as any;
-						editor.tf.insertNodes(inlineChildren, { at: atPath });
-					} else {
-						// Fallback: insert at start of first paragraph
-						editor.tf.insertNodes(inlineChildren, { at: [0, 0] as any });
-					}
-				});
-			} catch {
-				// Last-resort fallback: insert at selection (or end)
-				editor.tf.insertNodes(inlineChildren);
-			}
-
-			populated.add(selectionID);
-			insertedIds.push(selectionID);
-		}
-
-		// Focus first variable pill of the last inserted selection (if any)
-		if (insertedIds.length > 0) {
-			const focusId = insertedIds[insertedIds.length - 1];
-			requestAnimationFrame(() => {
-				try {
-					const sel = contentRef.current?.querySelector(
-						`span[data-template-variable][data-selection-id="${cssEscape(focusId)}"]`
-					) as HTMLElement | null;
-					if (sel && 'focus' in sel && typeof sel.focus === 'function') {
-						sel.focus();
-					} else {
-						focusEditorAtEnd();
-					}
-				} catch {
-					focusEditorAtEnd();
-				}
-			});
-		}
-	}, [editor, focusEditorAtEnd, deferredDocVersion, selectionInfo.tplNodeWithPath]);
-
 	const restorePreEditContext = useCallback(() => {
 		const prevConv = preEditConversationToolsRef.current;
 		const prevWs = preEditWebSearchTemplatesRef.current;
@@ -778,44 +464,16 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const clearComposerTransientState = useCallback(() => {
 		closeAllMenus();
 		setSubmitError(null);
-		lastPopulatedSelectionKeyRef.current.clear();
 		isSubmittingRef.current = false;
 
 		clearAttachments();
 		clearComposerToolsState();
 	}, [clearAttachments, clearComposerToolsState, closeAllMenus]);
 
-	const replaceEditorDocument = useCallback(
-		(nextValue: Value, nextHasText: boolean, focus: 'none' | 'preserve' | 'end' = 'none') => {
-			const editor = editorRef.current;
-			if (!editor) return;
-
-			editor.tf.withoutNormalizing(() => {
-				try {
-					editor.tf.deselect();
-				} catch {
-					// noop
-				}
-				editor.tf.setValue(nextValue);
-			});
-
-			hasTextRef.current = nextHasText;
-			setHasText(nextHasText);
-			setDocVersion(v => v + 1);
-			bumpToolEntriesVersion();
-			if (focus === 'end') {
-				focusEditorAtEnd();
-			} else if (focus === 'preserve') {
-				focusEditorPreservingSelection();
-			}
-		},
-		[bumpToolEntriesVersion, focusEditorAtEnd, focusEditorPreservingSelection]
-	);
-
 	const resetEditor = useCallback(() => {
 		clearComposerTransientState();
-		replaceEditorDocument(createEmptyEditorValue(), false, 'end');
-	}, [clearComposerTransientState, replaceEditorDocument]);
+		resetEditorDocument();
+	}, [clearComposerTransientState, resetEditorDocument]);
 
 	/**
 	 * Main submit logic, parameterized by whether to run pending tool calls
@@ -960,6 +618,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			activeSkillRefs,
 			attachments,
 			clearPreEditSnapshot,
+			contentRef,
 			conversationToolsState,
 			editor,
 			enabledSkillRefs,
@@ -1046,6 +705,46 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		]
 	);
 
+	const handleEditorDocumentChange = useCallback(() => {
+		const didProcessChange = onEditorChange();
+		if (!didProcessChange) return;
+
+		if (toolCalls.length > 0) {
+			handleAttachedToolsChanged();
+		}
+		if (submitError) {
+			setSubmitError(null);
+		}
+
+		// Auto-cancel editing when the editor is completely empty
+		// (no text, no tools, no attachments, no tool outputs).
+		const hasTextNow = editingMessageId ? hasNonEmptyUserText(editor) : hasTextRef.current;
+
+		const hasAttachmentsLocal = attachments.length > 0;
+		const hasToolOutputsLocal = toolOutputs.length > 0;
+		// Tools alone are not considered enough to keep edit mode alive.
+		const isEffectivelyEmpty = !hasTextNow && !hasAttachmentsLocal && !hasToolOutputsLocal;
+
+		// Only do this while editing an older message.
+		if (editingMessageId && isEffectivelyEmpty) {
+			// IMPORTANT: do NOT call resetEditor here; we only exit edit mode.
+			restorePreEditContext();
+			cancelEditing();
+		}
+	}, [
+		attachments,
+		cancelEditing,
+		editingMessageId,
+		editor,
+		handleAttachedToolsChanged,
+		hasTextRef,
+		onEditorChange,
+		restorePreEditContext,
+		submitError,
+		toolCalls,
+		toolOutputs,
+	]);
+
 	useImperativeHandle(ref, () => ({
 		focus: () => {
 			focusEditorAtEnd();
@@ -1103,40 +802,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						<span>{submitError}</span>
 					</div>
 				) : null}
-				<Plate
-					editor={editor}
-					onChange={() => {
-						const currentEditor = editorRef.current;
-						if (isAutoChunkingRef.current || isSelectionOnlyEditorChange(currentEditor)) {
-							// Avoid feedback loops and skip selection-only updates.
-							return;
-						}
-						scheduleDocRecompute();
-						scheduleAutoChunk();
-						if (toolCalls.length > 0) {
-							handleAttachedToolsChanged();
-						}
-						if (submitError) {
-							setSubmitError(null);
-						}
-
-						// Auto-cancel editing when the editor is completely empty
-						// (no text, no tools, no attachments, no tool outputs).
-						const hasTextNow = editingMessageId ? hasNonEmptyUserText(currentEditor) : hasTextRef.current;
-
-						const hasAttachmentsLocal = attachments.length > 0;
-						const hasToolOutputsLocal = toolOutputs.length > 0;
-						// Tools alone are not considered enough to keep edit mode alive.
-						const isEffectivelyEmpty = !hasTextNow && !hasAttachmentsLocal && !hasToolOutputsLocal;
-
-						// Only do this while editing an older message.
-						if (editingMessageId && isEffectivelyEmpty) {
-							// IMPORTANT: do NOT call resetEditor here; we only exit edit mode.
-							restorePreEditContext();
-							cancelEditing();
-						}
-					}}
-				>
+				<Plate editor={editor} onChange={handleEditorDocumentChange}>
 					<div className="bg-base-100 border-base-200 flex w-full max-w-full min-w-0 overflow-hidden rounded-2xl border">
 						<div className="flex min-w-0 grow flex-col p-0">
 							<TemplateToolbars />
@@ -1166,32 +832,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									onKeyDown={e => {
 										onKeyDown(e); // from useEnterSubmit
 									}}
-									onPaste={e => {
-										e.preventDefault();
-										e.stopPropagation();
-										const text = e.clipboardData.getData('text/plain');
-										if (!text) return;
-										clearAllMarks(editor);
-
-										// PERF: if paste is huge AND the doc is truly the default empty paragraph,
-										// set chunked value directly. Do not use "has text" as a proxy for
-										// emptiness, or we can blow away template/tool nodes.
-										if (
-											isSimpleEmptyParagraphDocument(editorRef.current) &&
-											text.length >= LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS
-										) {
-											editor.tf.withoutNormalizing(() => {
-												editor.tf.setValue(buildSingleParagraphValueChunked(text, LARGE_TEXT_CHUNK_SIZE));
-												editor.tf.collapse({ edge: 'end' });
-											});
-
-											hasTextRef.current = true;
-											setHasText(true);
-											setDocVersion(v => v + 1);
-											return;
-										}
-										insertPlainTextAsSingleBlock(editor, text);
-									}}
+									onPaste={onEditorPaste}
 									className="max-h-96 min-w-0 flex-1 resize-none overflow-auto bg-transparent p-1 wrap-break-word whitespace-break-spaces outline-none [tab-size:2] focus:outline-none"
 									style={{
 										fontSize: '14px',
