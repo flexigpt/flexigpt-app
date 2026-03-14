@@ -3,8 +3,12 @@
 ## Laundry list
 
 - [ ] chats
-  - [ ] context deadline exceeded error or may be other errors dont show up as content box? it comes out as minimal single line item.
-  - [ ] perf: react virtuoso, throttle time tuning, offload some md parsing/rendering etc to worker, use sync external store for some stores and selectors for partial subscriptions.
+  - [x] context deadline exceeded error or may be other errors dont show up as content box? it comes out as minimal single line item.
+  - [ ] perf:
+    - [x] react virtuoso
+    - [x] throttle time tuning,
+    - [ ] offload some md parsing/rendering etc to worker
+    - [ ] use sync external store for some stores and selectors for partial subscriptions.
 
 - [ ] context bar
   - [ ] system prompts need to be non editor specific list i.e across tabs. also we should not have edit, we should have a fork button, figitbranch, and add button that has copy for existing anycase.
