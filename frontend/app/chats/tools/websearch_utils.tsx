@@ -8,6 +8,23 @@ export type WebSearchChoiceTemplate = Omit<ToolStoreChoice, 'choiceID'> & {
 	toolType: ToolStoreChoiceType.WebSearch;
 };
 
+export function normalizeWebSearchChoiceTemplates(
+	templates: WebSearchChoiceTemplate[] | null | undefined
+): WebSearchChoiceTemplate[] {
+	const out: WebSearchChoiceTemplate[] = [];
+	const seen = new Set<string>();
+
+	for (const template of templates ?? []) {
+		const key = `${template.bundleID}/${template.toolSlug}@${template.toolVersion}`;
+		if (seen.has(key)) continue;
+		seen.add(key);
+		out.push(template);
+		if (out.length === 1) break;
+	}
+
+	return out;
+}
+
 export function webSearchTemplateFromChoice(choice: ToolStoreChoice): WebSearchChoiceTemplate {
 	const { choiceID: _drop, ...rest } = choice;
 	return rest as WebSearchChoiceTemplate;
@@ -44,7 +61,7 @@ export function getEligibleWebSearchTools(tools: ToolListItem[], sdkType: Provid
 }
 
 export function buildWebSearchChoicesForSubmit(ts: WebSearchChoiceTemplate[]): ToolStoreChoice[] {
-	return ts.map(buildWebSearchChoiceForSubmit);
+	return normalizeWebSearchChoiceTemplates(ts).map(buildWebSearchChoiceForSubmit);
 }
 
 export function webSearchIdentityKey(t: { bundleID: string; toolSlug: string; toolVersion: string }): string {

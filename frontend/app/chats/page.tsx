@@ -245,6 +245,7 @@ export default function ChatsPage() {
 
 	// ---------------- Persistence scratch state ----------------
 	const scrollTopSnapshotRef = useRef<Record<string, number>>(initialModel.scrollTopByTab ?? {});
+	const persistNowRef = useRef<() => void>(() => {});
 
 	// ---------------- Helpers ----------------
 	const disposeTabRuntime = useCallback((tabId: string) => {
@@ -340,6 +341,10 @@ export default function ChatsPage() {
 		});
 	}, []);
 
+	useEffect(() => {
+		persistNowRef.current = persistNow;
+	}, [persistNow]);
+
 	const persistTimerRef = useRef<number | null>(null);
 	const schedulePersist = useCallback(() => {
 		if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
@@ -350,8 +355,11 @@ export default function ChatsPage() {
 	}, [persistNow]);
 
 	useEffect(() => {
+		// Persist actual tab/selection changes, not just pagehide/unmount.
+		// Without this, stale tab metadata (especially old conversation titles)
+		// can survive across restarts and break title-based conversation lookup.
 		schedulePersist();
-	}, [schedulePersist]);
+	}, [schedulePersist, selectedTabId, tabs]);
 
 	useEffect(() => {
 		const onPageHide = () => {
@@ -423,6 +431,13 @@ export default function ChatsPage() {
 				isPersisted: true,
 				manualTitleLocked: titleWasExternallyChanged ? true : t.manualTitleLocked,
 			}));
+
+			// Title + persistence identity are part of tab restore.
+			// Flush them synchronously so a quick app/window close cannot leave
+			// localStorage pointing at an old conversation filename.
+			if (titleChanged || !tab.isPersisted) {
+				persistNowRef.current();
+			}
 		},
 		[bumpSearchKey, updateTab]
 	);

@@ -17,6 +17,7 @@ import {
 interface PendingMessageSkillSelectionState {
 	enabled?: SkillRef[];
 	active?: SkillRef[];
+	resetSession: boolean;
 	timeoutID: number | null;
 }
 
@@ -61,6 +62,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 	const enableAllSkillsRequestVersionRef = useRef(0);
 	const pendingMessageSkillSelectionRef = useRef<PendingMessageSkillSelectionState>({
 		timeoutID: null,
+		resetSession: false,
 	});
 
 	const cancelPendingEnableAllSkills = useCallback(() => {
@@ -166,16 +168,33 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		}
 
 		if (pending.enabled == null && pending.active == null) return;
+		if (pending.enabled == null && pending.active == null && !pending.resetSession) return;
 
 		const nextEnabled = pending.enabled ?? enabledSkillRefsRef.current;
 		const nextActive = pending.active ?? activeSkillRefsRef.current;
+		const shouldResetSession = pending.resetSession;
 
 		pending.enabled = undefined;
 		pending.active = undefined;
+		pending.resetSession = false;
+
+		if (shouldResetSession) {
+			const prevSessionID = skillSessionIDRef.current;
+			sessionAllowlistKeyRef.current = '';
+			if (prevSessionID) {
+				updateSkillSessionIDState(null);
+				closeSkillSessionBestEffort(prevSessionID);
+			}
+		}
 
 		cancelPendingEnableAllSkills();
 		applySkillSelectionStateInternal(nextEnabled, nextActive);
-	}, [applySkillSelectionStateInternal, cancelPendingEnableAllSkills]);
+	}, [
+		applySkillSelectionStateInternal,
+		cancelPendingEnableAllSkills,
+		closeSkillSessionBestEffort,
+		updateSkillSessionIDState,
+	]);
 
 	const schedulePendingMessageSkillSelectionFlush = useCallback(() => {
 		const pending = pendingMessageSkillSelectionRef.current;
@@ -319,6 +338,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		(refs: SkillRef[]) => {
 			const pending = pendingMessageSkillSelectionRef.current;
 			pending.enabled = refs ?? [];
+			pending.resetSession = true;
 			schedulePendingMessageSkillSelectionFlush();
 		},
 		[schedulePendingMessageSkillSelectionFlush]
@@ -328,6 +348,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		(refs: SkillRef[]) => {
 			const pending = pendingMessageSkillSelectionRef.current;
 			pending.active = refs ?? [];
+			pending.resetSession = true;
 			schedulePendingMessageSkillSelectionFlush();
 		},
 		[schedulePendingMessageSkillSelectionFlush]

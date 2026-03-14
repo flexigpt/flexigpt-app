@@ -21,6 +21,7 @@ import {
 	type OutputUnion,
 	RoleEnum,
 	Status,
+	type UIToolCall,
 } from '@/spec/inference';
 import { type UIChatOption } from '@/spec/modelpreset';
 import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
@@ -415,6 +416,9 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	const syncComposerFromConversation = useCallback((tabId: string, conv: Conversation) => {
 		const input = inputRefs.current.get(tabId);
 		if (!input) return;
+		// Loading/restoring a conversation into an existing tab must clear any
+		// unsent draft state already living in that tab's composer.
+		input.resetEditor();
 
 		const tools = deriveConversationToolsFromMessages(conv.messages);
 		const web = deriveWebSearchChoiceFromMessages(conv.messages);
@@ -527,6 +531,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			if (!tabExists(tabId)) return;
 
 			const abortRef = getAbortRef(tabId);
+			let queuedRunnableToolCalls: UIToolCall[] = [];
 
 			abortRef.current?.abort();
 			tokensReceivedByTab.current.set(tabId, false);
@@ -670,14 +675,13 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 					saveUpdatedConversation(tabId, finalChat);
 
-					// Tool calls -> load into THIS tab's composer (even if hidden)
+					// Queue tool calls for THIS tab's composer (even if hidden),
+					// but do not load them until the assistant turn has cleared busy.
+					// Auto-exec is event-driven and should see isBusy=false.
 					if (responseMessage.uiToolCalls && responseMessage.uiToolCalls.length > 0) {
-						const runnableCalls = responseMessage.uiToolCalls.filter(
+						queuedRunnableToolCalls = responseMessage.uiToolCalls.filter(
 							c => c.type === ToolStoreChoiceType.Function || c.type === ToolStoreChoiceType.Custom
 						);
-						if (runnableCalls.length > 0) {
-							inputRefs.current.get(tabId)?.loadToolCalls(runnableCalls);
-						}
 					}
 				} else {
 					// No usable response (e.g. nil inferenceResponse or null resp).
@@ -818,6 +822,13 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 						clearStreamBuffer(tabId);
 
 						updateTab(tabId, t => ({ ...t, isBusy: false }));
+						if (queuedRunnableToolCalls.length > 0) {
+							requestAnimationFrame(() => {
+								if (!tabExists(tabId)) return;
+								if (requestIdByTab.current.get(tabId) !== reqId) return;
+								inputRefs.current.get(tabId)?.loadToolCalls(queuedRunnableToolCalls);
+							});
+						}
 
 						if (selectedTabIdRef.current === tabId) scrollToBottomSoon(tabId);
 					}

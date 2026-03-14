@@ -17,6 +17,7 @@ import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/inputar
 export interface InputBoxHandle {
 	getUIChatOptions: () => UIChatOption;
 	focus: () => void;
+	resetEditor: () => void;
 	openTemplateMenu: () => void;
 	openToolMenu: () => void;
 	openAttachmentMenu: () => void;
@@ -64,6 +65,9 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 			getUIChatOptions: () => chatOptions,
 			focus: () => {
 				inputAreaRef.current?.focus();
+			},
+			resetEditor: () => {
+				inputAreaRef.current?.resetEditor();
 			},
 			openTemplateMenu: () => {
 				inputAreaRef.current?.openTemplateMenu();
