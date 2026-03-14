@@ -40,6 +40,7 @@ export type ChatTabState = {
 
 	// streaming (state only for coarse UI like spinner)
 	isBusy: boolean;
+	isHydrating: boolean;
 
 	// persistence/title behavior
 	isPersisted: boolean;
@@ -67,6 +68,7 @@ export function createEmptyTab(tabId: string = crypto.randomUUID()): ChatTabStat
 		tabId,
 		conversation: initConversation(),
 		isBusy: false,
+		isHydrating: false,
 		isPersisted: false,
 		manualTitleLocked: false,
 		editingMessageId: null,
@@ -115,6 +117,7 @@ export function buildInitialChatsModel(): InitialChatsModel {
 			tabId: t.tabId,
 			conversation: conv,
 			isBusy: false,
+			isHydrating: t.isPersisted,
 			isPersisted: t.isPersisted,
 			manualTitleLocked: t.manualTitleLocked,
 			editingMessageId: null,

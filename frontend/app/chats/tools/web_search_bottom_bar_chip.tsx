@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 
 import { FiChevronUp, FiEdit2, FiGlobe, FiX } from 'react-icons/fi';
 
@@ -25,6 +25,7 @@ export function WebSearchBottomBarChip({
 	onEnabledChange,
 	onSelectTool,
 	onEditOptions,
+	isInputLocked = false,
 }: {
 	eligibleTools: ToolListItem[];
 	enabled: boolean;
@@ -34,11 +35,15 @@ export function WebSearchBottomBarChip({
 	onEnabledChange: (enabled: boolean) => void;
 	onSelectTool: (tool: ToolListItem) => void;
 	onEditOptions: () => void;
+	isInputLocked?: boolean;
 }) {
 	const hasDropdown = eligibleTools.length > 1;
 
 	// Hooks must not be conditional; safe to always create the store.
 	const menu = useMenuStore({ placement: 'top-end', focusLoop: true });
+	useEffect(() => {
+		if (isInputLocked) menu.hide();
+	}, [isInputLocked, menu]);
 
 	const selectedTool = useMemo(() => {
 		if (!selected) return undefined;
@@ -57,6 +62,7 @@ export function WebSearchBottomBarChip({
 		(enabled
 			? 'bg-info/10 text-neutral-custom border-info/50 hover:bg-info/15'
 			: 'bg-base-200 text-neutral-custom border-0 hover:bg-base-300/80') +
+		(isInputLocked ? ' opacity-60' : '') +
 		' flex items-center gap-1 rounded-2xl border px-2 py-0';
 
 	const title = useMemo(() => {
@@ -76,26 +82,29 @@ export function WebSearchBottomBarChip({
 	}, [onEnabledChange]);
 
 	const onClickEnableWhenDisabled = useCallback(() => {
+		if (isInputLocked) return;
 		// Requested behavior: clicking the chip enables only when currently disabled.
 		if (!enabled) enable();
-	}, [enabled, enable]);
+	}, [isInputLocked, enabled, enable]);
 
 	const onClickDisableButton = useCallback(
 		(e: React.MouseEvent) => {
+			if (isInputLocked) return;
 			e.preventDefault();
 			e.stopPropagation();
 			disable();
 		},
-		[disable]
+		[disable, isInputLocked]
 	);
 
 	const onClickEditButton = useCallback(
 		(e: React.MouseEvent) => {
+			if (isInputLocked) return;
 			e.preventDefault();
 			e.stopPropagation();
 			onEditOptions();
 		},
-		[onEditOptions]
+		[isInputLocked, onEditOptions]
 	);
 
 	if (eligibleTools.length === 0) return null;
@@ -118,6 +127,7 @@ export function WebSearchBottomBarChip({
 					className="flex items-center gap-2"
 					onClick={onClickEnableWhenDisabled}
 					aria-label="Enable web search"
+					disabled={isInputLocked}
 				>
 					<FiGlobe size={14} />
 					<span className="max-w-28 truncate">Enable web search</span>
@@ -136,6 +146,7 @@ export function WebSearchBottomBarChip({
 					onClick={onClickEditButton}
 					title="Edit web-search options"
 					aria-label="Edit web-search options"
+					disabled={isInputLocked}
 				>
 					<FiEdit2 size={12} />
 				</button>
@@ -149,6 +160,7 @@ export function WebSearchBottomBarChip({
 					onClick={onClickDisableButton}
 					title="Disable web search"
 					aria-label="Disable web search"
+					disabled={isInputLocked}
 				>
 					<FiX size={12} />
 				</button>
@@ -162,6 +174,7 @@ export function WebSearchBottomBarChip({
 						className="btn btn-ghost btn-xs p-0 shadow-none"
 						aria-label="Choose web-search tool"
 						title="Choose web-search tool"
+						disabled={isInputLocked}
 					>
 						<FiChevronUp size={14} />
 					</MenuButton>
@@ -183,6 +196,7 @@ export function WebSearchBottomBarChip({
 									key={toolKey(t)}
 									className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
 									onClick={() => {
+										if (isInputLocked) return;
 										onSelectTool(t);
 										menu.hide();
 									}}

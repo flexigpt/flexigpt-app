@@ -23,10 +23,12 @@ function BundleCheckbox({
 	checked,
 	indeterminate,
 	onChange,
+	isInputLocked,
 }: {
 	checked: boolean;
 	indeterminate: boolean;
 	onChange: (next: boolean) => void;
+	isInputLocked: boolean;
 }) {
 	const ref = useRef<HTMLInputElement | null>(null);
 	useEffect(() => {
@@ -39,8 +41,10 @@ function BundleCheckbox({
 			ref={ref}
 			type="checkbox"
 			className="checkbox checkbox-xs"
+			disabled={isInputLocked}
 			checked={checked}
 			onChange={e => {
+				if (isInputLocked) return;
 				onChange(e.currentTarget.checked);
 			}}
 			onPointerDown={stop}
@@ -57,6 +61,7 @@ export function SkillsBottomBarChip({
 	setEnabledSkillRefs,
 	onEnableAll,
 	onDisableAll,
+	isInputLocked = false,
 }: {
 	allSkills: SkillListItem[];
 	loading: boolean;
@@ -64,8 +69,12 @@ export function SkillsBottomBarChip({
 	setEnabledSkillRefs: React.Dispatch<React.SetStateAction<SkillRef[]>>;
 	onEnableAll: () => void;
 	onDisableAll: () => void;
+	isInputLocked?: boolean;
 }) {
 	const menu = useMenuStore({ placement: 'top-end', focusLoop: true });
+	useEffect(() => {
+		if (isInputLocked) menu.hide();
+	}, [isInputLocked, menu]);
 
 	const enabledKeySet = useMemo(() => new Set(enabledSkillRefs.map(skillRefKey)), [enabledSkillRefs]);
 	const enabledCount = enabledSkillRefs.length;
@@ -134,14 +143,16 @@ export function SkillsBottomBarChip({
 	);
 
 	const enableAndOpen = useCallback(() => {
+		if (isInputLocked) return;
 		onEnableAll();
 		menu.show();
-	}, [menu, onEnableAll]);
+	}, [isInputLocked, menu, onEnableAll]);
 
 	const containerClassName =
 		(isEnabled
 			? 'bg-warning/10 text-neutral-custom border-warning/50 hover:bg-warning/15'
 			: 'bg-base-200 text-neutral-custom border-0 hover:bg-base-300/80') +
+		(isInputLocked ? ' opacity-60' : '') +
 		' flex items-center gap-1 rounded-2xl border px-2 py-0';
 
 	const title = useMemo(() => {
@@ -166,7 +177,13 @@ export function SkillsBottomBarChip({
 					<span className="text-xs opacity-70">{enabledCount}</span>
 				</div>
 			) : (
-				<button type="button" className="flex items-center gap-2" onClick={enableAndOpen} aria-label="Enable skills">
+				<button
+					type="button"
+					className="flex items-center gap-2"
+					onClick={enableAndOpen}
+					aria-label="Enable skills"
+					disabled={isInputLocked}
+				>
 					<FiZap size={14} />
 					<span className="max-w-32 truncate">Enable skills</span>
 					{loading ? <span className="text-xs opacity-70">Loading…</span> : null}
@@ -185,6 +202,7 @@ export function SkillsBottomBarChip({
 					}}
 					title="Disable all skills"
 					aria-label="Disable all skills"
+					disabled={isInputLocked}
 				>
 					<FiX size={12} />
 				</button>
@@ -196,7 +214,9 @@ export function SkillsBottomBarChip({
 				className="btn btn-ghost btn-xs p-0 shadow-none"
 				aria-label="Choose skills"
 				title="Choose skills"
+				disabled={isInputLocked}
 				onClick={() => {
+					if (isInputLocked) return;
 					// If user opens the menu while disabled, match requested behavior:
 					// enable all skills, then open the menu for deselection.
 					if (!isEnabled) {
@@ -241,12 +261,14 @@ export function SkillsBottomBarChip({
 									hideOnClick={false}
 									className="data-active-item:bg-base-200 flex items-center gap-2 rounded-xl px-2 py-1 outline-none"
 									onClick={() => {
+										if (isInputLocked) return;
 										// clicking bundle row toggles between "all on" and "all off"
 										const next = !(bundleEnabled === bundleTotal);
 										setBundleEnabled(group, next);
 									}}
 								>
 									<BundleCheckbox
+										isInputLocked={isInputLocked}
 										checked={bundleChecked}
 										indeterminate={bundleIndeterminate}
 										onChange={next => {
@@ -278,6 +300,7 @@ export function SkillsBottomBarChip({
 												hideOnClick={false}
 												className="data-active-item:bg-base-200 flex items-center gap-2 rounded-xl px-2 py-1 pl-6 outline-none"
 												onClick={() => {
+													if (isInputLocked) return;
 													toggleSkillItem(item);
 												}}
 											>
@@ -285,8 +308,10 @@ export function SkillsBottomBarChip({
 													type="checkbox"
 													className="checkbox checkbox-xs"
 													checked={checked}
+													disabled={isInputLocked}
 													onChange={e => {
 														stop(e);
+														if (isInputLocked) return;
 														setSkillEnabled(ref, e.currentTarget.checked);
 													}}
 													onPointerDown={stop}

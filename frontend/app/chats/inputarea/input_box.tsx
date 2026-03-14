@@ -33,6 +33,7 @@ export interface InputBoxHandle {
 interface InputBoxProps {
 	onSend: (message: EditorSubmitPayload, options: UIChatOption) => Promise<void>;
 	isBusy: boolean;
+	isHydrating: boolean;
 	abortRef: RefObject<AbortController | null>;
 	shortcutConfig: ShortcutConfig;
 	editingMessageId: string | null;
@@ -40,11 +41,12 @@ interface InputBoxProps {
 }
 
 export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox(
-	{ onSend, isBusy, abortRef, shortcutConfig, editingMessageId, onCancelEditing },
+	{ onSend, isBusy, isHydrating, abortRef, shortcutConfig, editingMessageId, onCancelEditing },
 	ref
 ) {
 	const [chatOptions, setUIChatOptions] = useState<UIChatOption>(DefaultUIChatOptions);
 	const [abortConfirmationRequested, setAbortConfirmationRequested] = useState(false);
+	const isInputLocked = isBusy || isHydrating;
 
 	const inputAreaRef = useRef<EditorAreaHandle>(null);
 
@@ -124,7 +126,8 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 			<div className="overflow-x-hidden overflow-y-auto">
 				<EditorArea
 					ref={inputAreaRef}
-					isBusy={isBusy}
+					isBusy={isBusy || isInputLocked}
+					isInputLocked={isInputLocked}
 					currentProviderSDKType={chatOptions.providerSDKType}
 					shortcutConfig={shortcutConfig}
 					onSubmit={handleSubmitMessage}

@@ -80,6 +80,7 @@ interface EditorBottomBarProps {
 	setEnabledSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
 	onEnableAllSkills: () => void;
 	onDisableAllSkills: () => void;
+	isInputLocked?: boolean;
 }
 
 interface PickerButtonProps {
@@ -150,6 +151,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	setEnabledSkillRefs,
 	onEnableAllSkills,
 	onDisableAllSkills,
+	isInputLocked = false,
 }: EditorBottomBarProps) {
 	const [isUrlModalOpen, setIsUrlModalOpen] = useState(false);
 	const templateMenuOpen = useStoreState(templateMenuState, 'open');
@@ -201,6 +203,34 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 		if (toolsLoading) return [];
 		return getEligibleWebSearchTools(toolData, currentProviderSDKType);
 	}, [toolData, toolsLoading, currentProviderSDKType]);
+
+	const eligibleWebSearchKeys = useMemo(() => {
+		return new Set(
+			eligibleWebSearchTools.map(tool =>
+				webSearchIdentityKey({
+					bundleID: tool.bundleID,
+					toolSlug: tool.toolSlug,
+					toolVersion: tool.toolVersion,
+				})
+			)
+		);
+	}, [eligibleWebSearchTools]);
+	useEffect(() => {
+		if (isInputLocked) {
+			templateMenuState.hide();
+			toolMenuState.hide();
+			attachmentMenuState.hide();
+			setIsUrlModalOpen(false);
+		}
+	}, [attachmentMenuState, isInputLocked, templateMenuState, toolMenuState]);
+	useEffect(() => {
+		if (toolsLoading) return;
+		setWebSearchTemplates(prev => {
+			if (prev.length === 0) return prev;
+			const next = prev.filter(template => eligibleWebSearchKeys.has(webSearchIdentityKey(template)));
+			return next.length === prev.length ? prev : next;
+		});
+	}, [eligibleWebSearchKeys, setWebSearchTemplates, toolsLoading]);
 
 	// "Active" web-search tool for the bottom-bar UX (first one wins).
 	const activeWebSearch = webSearchTemplates.length > 0 ? webSearchTemplates[0] : undefined;
@@ -345,6 +375,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						buttonRef={attachmentButtonRef}
 						menuState={attachmentMenuState}
 						shortcut={shortcutLabels.attachments}
+						disabled={isInputLocked}
 					/>
 					<Menu
 						store={attachmentMenuState}
@@ -382,6 +413,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						buttonRef={templateButtonRef}
 						menuState={templateMenuState}
 						shortcut={shortcutLabels.templates}
+						disabled={isInputLocked}
 					/>
 					<Menu store={templateMenuState} gutter={8} className={menuClasses} data-menu-kind="templates" autoFocusOnShow>
 						{!templateMenuOpen ? null : templatesLoading ? (
@@ -416,6 +448,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						buttonRef={toolButtonRef}
 						menuState={toolMenuState}
 						shortcut={shortcutLabels.tools}
+						disabled={isInputLocked}
 					/>
 					<Menu store={toolMenuState} gutter={8} className={menuClasses} data-menu-kind="tools" autoFocusOnShow>
 						{!toolMenuOpen ? null : toolsLoading ? (
@@ -498,6 +531,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						argsStatus={activeWebSearchArgsStatus}
 						onEnabledChange={handleWebSearchEnabled}
 						onSelectTool={handleWebSearchToolSelected}
+						isInputLocked={isInputLocked}
 						onEditOptions={() => {
 							// Open the unified tool-args modal targeting "web search".
 							// (ToolArgsModalHost should apply this to the active web-search tool.)
@@ -514,6 +548,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						setEnabledSkillRefs={setEnabledSkillRefs}
 						onEnableAll={onEnableAllSkills}
 						onDisableAll={onDisableAllSkills}
+						isInputLocked={isInputLocked}
 					/>
 				</div>
 

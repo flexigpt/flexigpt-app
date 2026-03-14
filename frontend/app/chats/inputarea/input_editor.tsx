@@ -80,6 +80,7 @@ export interface EditorAreaHandle {
 
 interface EditorAreaProps {
 	isBusy: boolean;
+	isInputLocked: boolean;
 	currentProviderSDKType: ProviderSDKType;
 	shortcutConfig: ShortcutConfig;
 	onSubmit: (payload: EditorSubmitPayload) => Promise<void>;
@@ -89,7 +90,16 @@ interface EditorAreaProps {
 }
 
 export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function EditorArea(
-	{ isBusy, currentProviderSDKType, shortcutConfig, onSubmit, onRequestStop, editingMessageId, cancelEditing },
+	{
+		isBusy,
+		isInputLocked,
+		currentProviderSDKType,
+		shortcutConfig,
+		onSubmit,
+		onRequestStop,
+		editingMessageId,
+		cancelEditing,
+	},
 	ref
 ) {
 	const isSubmittingRef = useRef<boolean>(false);
@@ -108,7 +118,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		focusEditorAtEnd,
 		focusEditorPreservingSelection,
 	} = useComposerDocument({
-		isBusy,
+		isBusy: isInputLocked,
 	});
 
 	const templateMenu = useMenuStore({ placement: 'top-start', focusLoop: true });
@@ -197,7 +207,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		setToolDetailsState,
 		toolArgsTarget,
 		setToolArgsTarget,
-		toolsDefLoading,
+
 		toolArgsBlocked,
 		hasPendingToolCalls,
 		hasRunningToolCalls,
@@ -215,6 +225,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		handleOpenConversationToolDetails,
 		handleOpenAttachedToolDetails,
 		clearComposerToolsState,
+		getToolRuntimeSnapshot,
 	} = useComposerTools({
 		isBusy,
 		isSubmittingRef,
@@ -428,29 +439,32 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, [attachmentMenuOpen, attachmentMenuEl, focusEditorPreservingSelection]);
 
 	const openTemplatePicker = useCallback(() => {
+		if (isInputLocked) return;
 		menuOpenedByShortcutRef.current.templates = true;
 
 		closeAllMenus();
 		templateMenu.show();
 		// Make Ariakit's "return focus" behavior deterministic on close.
 		templateButtonRef.current?.focus({ preventScroll: true });
-	}, [closeAllMenus, templateMenu]);
+	}, [closeAllMenus, isInputLocked, templateMenu]);
 
 	const openToolPicker = useCallback(() => {
+		if (isInputLocked) return;
 		menuOpenedByShortcutRef.current.tools = true;
 
 		closeAllMenus();
 		toolMenu.show();
 		toolButtonRef.current?.focus({ preventScroll: true });
-	}, [closeAllMenus, toolMenu]);
+	}, [closeAllMenus, isInputLocked, toolMenu]);
 
 	const openAttachmentPicker = useCallback(() => {
+		if (isInputLocked) return;
 		menuOpenedByShortcutRef.current.attachments = true;
 
 		closeAllMenus();
 		attachmentMenu.show();
 		attachmentButtonRef.current?.focus({ preventScroll: true });
-	}, [closeAllMenus, attachmentMenu]);
+	}, [isInputLocked, closeAllMenus, attachmentMenu]);
 
 	const restorePreEditContext = useCallback(() => {
 		const prevConv = preEditConversationToolsRef.current;
@@ -474,7 +488,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	]);
 
 	const isSendButtonEnabled = useMemo(() => {
-		if (isBusy) return false;
+		// Cannot block on tools def loading here.
+		if (isInputLocked) return false;
 		if (templateBlocked) return false;
 		if (hasBlockingToolArgs) return false;
 
@@ -484,11 +499,19 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		const hasOutputs = toolOutputs.length > 0;
 
 		return hasAttachments || hasOutputs;
-	}, [isBusy, templateBlocked, hasBlockingToolArgs, hasEffectiveTextForSubmit, attachments.length, toolOutputs.length]);
+	}, [
+		isInputLocked,
+		templateBlocked,
+		hasBlockingToolArgs,
+		hasEffectiveTextForSubmit,
+		attachments.length,
+		toolOutputs.length,
+	]);
 
 	const { formRef, onKeyDown } = useEnterSubmit({
 		isBusy,
 		canSubmit: () => {
+			if (isInputLocked) return false;
 			if (hasBlockingToolArgs) return false;
 			if (templateBlocked) return false;
 
@@ -534,7 +557,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			const { runPendingTools } = options;
 
 			if (isSubmittingRef.current) return;
-			if (isBusy) return;
+			if (isInputLocked) return;
+
 			// If conversation sync queued enabled/active skill refs via timeout,
 			// flush them now so this submit uses the latest skill selection.
 			flushPendingMessageSkillSelection();
@@ -573,14 +597,15 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			// Guard explicitly here as well, so even programmatic calls respect it.
 			if (hasBlockingToolArgs) {
 				setSubmitError(
-					'Some attached tools or web-search options require configuration. Fill the required options before sending.'
+					'Some tools or web-search options require configuration. Fill the required options before sending.'
 				);
 				return;
 			}
 
 			setSubmitError(null);
 			isSubmittingRef.current = true;
-			const hadPendingTools = runPendingTools && hasPendingToolCalls;
+			const runtimeBeforeRun = getToolRuntimeSnapshot();
+			const hadPendingTools = runPendingTools && runtimeBeforeRun.toolCalls.some(c => c.status === 'pending');
 			let didSend = false;
 
 			try {
@@ -595,20 +620,20 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					}
 				}
 
-				const existingOutputs = toolOutputs;
-				let newlyProducedOutputs: UIToolOutput[] = [];
-
-				// 3) Optional tool run (fast-forward path).
-				if (runPendingTools && hasPendingToolCalls) {
-					newlyProducedOutputs = await runAllPendingToolCalls();
+				if (hadPendingTools) {
+					await runAllPendingToolCalls();
 				}
 
-				// 4) Build final message content after tools have run.
+				// Build final message content after tools have run.
+				// Always read from the live tool runtime snapshot here. Auto-execute
+				// can complete and trigger submit before React re-renders the latest
+				// toolOutputs / hasPendingToolCalls values into this component.
+				const runtimeAfterRun = getToolRuntimeSnapshot();
 				const selections = getTemplateSelections(editor);
 				const hasTpl = selections.length > 0;
 
 				const textToSend = hasTpl ? toPlainTextReplacingVariables(editor) : editor.api.string([]);
-				const finalToolOutputs = [...existingOutputs, ...newlyProducedOutputs];
+				const finalToolOutputs: UIToolOutput[] = runtimeAfterRun.toolOutputs;
 
 				const hasNonEmptyText = textToSend.trim().length > 0;
 				const hasAttachmentsToSend = attachments.length > 0;
@@ -682,9 +707,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			getCurrentActiveSkillRefs,
 			getCurrentEnabledSkillRefs,
 			getCurrentSkillSessionID,
+			getToolRuntimeSnapshot,
 			hasBlockingToolArgs,
-			hasPendingToolCalls,
-			isBusy,
+			isInputLocked,
 			isSendButtonEnabled,
 			listActiveSkillRefs,
 			onSubmit,
@@ -694,7 +719,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			setActiveSkillRefs,
 			setConversationToolsState,
 			templateBlocked,
-			toolOutputs,
 			webSearchTemplates,
 		]
 	);
@@ -864,9 +888,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, [cancelEditing, resetEditor, restorePreEditContext]);
 
 	const handleRunToolsOnlyClick = useCallback(async () => {
-		if (!hasPendingToolCalls || isBusy || hasRunningToolCalls) return;
+		if (!hasPendingToolCalls || isInputLocked || hasRunningToolCalls) return;
 		await runAllPendingToolCalls();
-	}, [hasPendingToolCalls, hasRunningToolCalls, isBusy, runAllPendingToolCalls]);
+	}, [hasPendingToolCalls, hasRunningToolCalls, isInputLocked, runAllPendingToolCalls]);
 
 	// Button-state helpers:
 	// - Play: run tools only (enabled when there are pending tools and none are running).
@@ -874,14 +898,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	//   templates are satisfied; "sendability" will be re-checked after tools run).
 	// - Send: send only (enabled when send is allowed and there are no pending tools).
 	const canSendOnly = !hasPendingToolCalls && isSendButtonEnabled && !hasRunningToolCalls;
-	const canRunToolsOnly = hasPendingToolCalls && !hasRunningToolCalls && !isBusy;
+	const canRunToolsOnly = hasPendingToolCalls && !hasRunningToolCalls && !isInputLocked;
 	const canRunToolsAndSend =
-		hasPendingToolCalls &&
-		!hasRunningToolCalls &&
-		!isBusy &&
-		!templateBlocked &&
-		!hasBlockingToolArgs &&
-		!toolsDefLoading;
+		hasPendingToolCalls && !hasRunningToolCalls && !isInputLocked && !templateBlocked && !hasBlockingToolArgs;
 
 	return (
 		<>
@@ -922,7 +941,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									ref={contentRef}
 									placeholder="Type message..."
 									spellCheck={false}
-									readOnly={isBusy}
+									readOnly={isInputLocked}
 									onKeyDown={e => {
 										onKeyDown(e);
 									}}
@@ -948,7 +967,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									toolCalls={toolCalls}
 									toolOutputs={toolOutputs}
 									toolEntries={attachedToolEntries}
-									isBusy={isBusy || isSubmittingRef.current}
+									isBusy={isBusy || isSubmittingRef.current || isInputLocked}
 									onRunToolCall={handleRunSingleToolCall}
 									onDiscardToolCall={handleDiscardToolCall}
 									onOpenOutput={handleOpenToolOutput}
@@ -1075,6 +1094,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						setEnabledSkillRefs={setEnabledSkillRefs}
 						onEnableAllSkills={enableAllSkills}
 						onDisableAllSkills={disableAllSkills}
+						isInputLocked={isInputLocked}
 					/>
 				</Plate>
 			</form>

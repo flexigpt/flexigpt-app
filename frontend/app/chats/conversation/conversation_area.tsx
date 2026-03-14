@@ -854,7 +854,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		async (tabId: string, payload: EditorSubmitPayload, options: UIChatOption) => {
 			const tab = tabsRef.current.find(t => t.tabId === tabId);
 			if (!tab) return;
-			if (tab.isBusy) return;
+			if (tab.isBusy || tab.isHydrating) return;
 
 			const trimmed = payload.text.trim();
 			const hasNonEmptyText = trimmed.length > 0;
@@ -909,7 +909,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		(tabId: string, id: string) => {
 			const tab = tabsRef.current.find(t => t.tabId === tabId);
 			if (!tab) return;
-			if (tab.isBusy) return;
+			if (tab.isBusy || tab.isHydrating) return;
 
 			const msg = tab.conversation.messages.find(m => m.id === id);
 			if (!msg) return;
@@ -1104,6 +1104,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 							tabId={t.tabId}
 							active={t.tabId === selectedTabId}
 							isBusy={t.isBusy}
+							isHydrating={t.isHydrating}
 							editingMessageId={t.editingMessageId}
 							setInputRef={setInputRef}
 							getAbortRef={getAbortRef}

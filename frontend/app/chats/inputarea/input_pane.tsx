@@ -11,6 +11,7 @@ export const InputPane = memo(function InputPane(props: {
 	tabId: string;
 	active: boolean;
 	isBusy: boolean;
+	isHydrating: boolean;
 	editingMessageId: string | null;
 	setInputRef: (tabId: string) => (inst: InputBoxHandle | null) => void;
 	getAbortRef: (tabId: string) => { current: AbortController | null };
@@ -22,6 +23,7 @@ export const InputPane = memo(function InputPane(props: {
 		tabId,
 		active,
 		isBusy,
+		isHydrating,
 		editingMessageId,
 		setInputRef,
 		getAbortRef,
@@ -44,6 +46,7 @@ export const InputPane = memo(function InputPane(props: {
 				ref={setInputRef(tabId)}
 				onSend={onSend}
 				isBusy={isBusy}
+				isHydrating={isHydrating}
 				abortRef={getAbortRef(tabId)}
 				shortcutConfig={shortcutConfig}
 				editingMessageId={editingMessageId}

@@ -430,6 +430,7 @@ export default function ChatsPage() {
 				conversation: { ...updatedConv, messages: [...updatedConv.messages] },
 				isPersisted: true,
 				manualTitleLocked: titleWasExternallyChanged ? true : t.manualTitleLocked,
+				isHydrating: false,
 			}));
 
 			// Title + persistence identity are part of tab restore.
@@ -549,29 +550,61 @@ export default function ChatsPage() {
 	// ---------------- Search select behavior ----------------
 	const loadConversationIntoTab = useCallback(
 		async (tabId: string, item: ConversationSearchItem) => {
-			const selectedChat = await conversationStoreAPI.getConversation(item.id, item.title, true);
-			if (!selectedChat) return;
-
-			const hydrated = hydrateConversation(selectedChat);
-
-			// Reset stream buffer for that tab
-			conversationAreaRef.current?.clearStreamForTab(tabId);
-
 			updateTab(tabId, t => ({
 				...t,
-				conversation: hydrated,
-				isPersisted: true,
-				manualTitleLocked: false,
-				editingMessageId: null,
+				isHydrating: true,
 				isBusy: false,
+				editingMessageId: null,
 			}));
 
-			// Reset scroll position for that tab
-			conversationAreaRef.current?.resetScrollToTop(tabId);
+			try {
+				const selectedChat = await conversationStoreAPI.getConversation(item.id, item.title, true);
+				if (!selectedChat) {
+					updateTab(tabId, t => ({
+						...t,
+						isHydrating: false,
+						isBusy: false,
+						editingMessageId: null,
+					}));
+					return;
+				}
 
-			requestAnimationFrame(() => {
-				conversationAreaRef.current?.syncComposerFromConversation(tabId, hydrated);
-			});
+				const hydrated = hydrateConversation(selectedChat);
+
+				// Reset stream buffer for that tab
+				conversationAreaRef.current?.clearStreamForTab(tabId);
+
+				updateTab(tabId, t => ({
+					...t,
+					conversation: hydrated,
+					isPersisted: true,
+					manualTitleLocked: false,
+					editingMessageId: null,
+					isBusy: false,
+					isHydrating: true,
+				}));
+
+				// Reset scroll position for that tab
+				conversationAreaRef.current?.resetScrollToTop(tabId);
+
+				requestAnimationFrame(() => {
+					conversationAreaRef.current?.syncComposerFromConversation(tabId, hydrated);
+					updateTab(tabId, t => ({
+						...t,
+						isHydrating: false,
+						isBusy: false,
+						editingMessageId: null,
+					}));
+				});
+			} catch (e) {
+				console.error(e);
+				updateTab(tabId, t => ({
+					...t,
+					isHydrating: false,
+					isBusy: false,
+					editingMessageId: null,
+				}));
+			}
 		},
 		[updateTab]
 	);
@@ -621,6 +654,7 @@ export default function ChatsPage() {
 						updateTab(t.tabId, prev => ({
 							...prev,
 							isBusy: false,
+							isHydrating: false,
 							isPersisted: false,
 							manualTitleLocked: false,
 							editingMessageId: null,
@@ -637,16 +671,33 @@ export default function ChatsPage() {
 					updateTab(t.tabId, prev => ({
 						...prev,
 						isBusy: false,
+						isHydrating: true,
 						editingMessageId: null,
 						isPersisted: true,
 						conversation: hydrated,
 					}));
 
 					requestAnimationFrame(() => {
+						if (cancelled) return;
 						conversationAreaRef.current?.syncComposerFromConversation(t.tabId, hydrated);
+						updateTab(t.tabId, prev => ({
+							...prev,
+							isBusy: false,
+							isHydrating: false,
+							editingMessageId: null,
+						}));
 					});
 				} catch (e) {
 					console.error(e);
+					updateTab(t.tabId, prev => ({
+						...prev,
+						isBusy: false,
+						isHydrating: false,
+						isPersisted: false,
+						manualTitleLocked: false,
+						editingMessageId: null,
+						conversation: initConversation(),
+					}));
 				}
 			}
 		})().catch(console.error);
@@ -716,7 +767,7 @@ export default function ChatsPage() {
 			tabs.map(t => ({
 				tabId: t.tabId,
 				title: t.conversation.title,
-				isBusy: t.isBusy,
+				isBusy: t.isBusy || t.isHydrating,
 				isEmpty: t.conversation.messages.length === 0,
 				renameEnabled: t.conversation.messages.length > 0,
 			})),

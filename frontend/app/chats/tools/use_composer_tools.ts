@@ -49,6 +49,8 @@ interface UseComposerToolsArgs {
 	getCurrentSkillSessionID: () => string | null;
 	skillSessionID: string | null;
 	toolArgsEventTarget?: EventTarget | null;
+	externalAutoExecuteBlocked?: boolean;
+	getExternalAutoExecuteBlocked?: () => boolean;
 	getAttachedToolEntries: (uniqueByIdentity?: boolean) => AttachedToolEntry[];
 }
 
@@ -67,7 +69,6 @@ interface UseComposerToolsResult {
 	setToolDetailsState: Dispatch<SetStateAction<ToolDetailsState>>;
 	toolArgsTarget: ToolArgsTarget | null;
 	setToolArgsTarget: Dispatch<SetStateAction<ToolArgsTarget | null>>;
-	toolsDefLoading: boolean;
 	toolArgsBlocked: boolean;
 	hasPendingToolCalls: boolean;
 	hasRunningToolCalls: boolean;
@@ -86,6 +87,7 @@ interface UseComposerToolsResult {
 	handleOpenConversationToolDetails: (entry: ConversationToolStateEntry) => void;
 	handleOpenAttachedToolDetails: (entry: AttachedToolEntry) => void;
 	clearComposerToolsState: () => void;
+	getToolRuntimeSnapshot: () => ComposerToolRuntimeState;
 }
 
 const conversationToolHydrationKey = (entry: ConversationToolStateEntry): string => {
@@ -106,6 +108,18 @@ function getPendingAutoExecuteToolCalls(toolCalls: UIToolCall[]): UIToolCall[] {
 
 function hasFailedRunnableToolCalls(toolCalls: UIToolCall[]): boolean {
 	return toolCalls.some(toolCall => toolCall.status === 'failed' && isRunnableComposerToolCall(toolCall));
+}
+
+function getConversationToolArgsBlocked(entries: ConversationToolStateEntry[]): boolean {
+	for (const entry of entries) {
+		if (!entry.enabled) continue;
+
+		const status = entry.argStatus;
+		if (status?.hasSchema && !status.isSatisfied) {
+			return true;
+		}
+	}
+	return false;
 }
 
 export function useComposerTools({
@@ -148,47 +162,72 @@ export function useComposerTools({
 
 	const conversationToolDefsCacheRef = useRef<Map<string, Tool>>(new Map());
 
-	// Count of in-flight conversation tool-definition hydration tasks.
-	// Used to gate sending while schemas are still loading.
-	const [toolsHydratingCount, setToolsHydratingCount] = useState(0);
-	const toolsHydratingCountRef = useRef(0);
 	const hydratingConversationToolKeysRef = useRef<Set<string>>(new Set());
-
-	const toolsDefLoading = toolsHydratingCount > 0;
 
 	// Arg-blocking state, split by attached-vs-conversation tools.
 	const [attachedToolArgsBlocked, setAttachedToolArgsBlocked] = useState(false);
+	const attachedToolArgsBlockedRef = useRef(false);
 	const isBusyRef = useRef(isBusy);
 	const templateBlockedRef = useRef(templateBlocked);
 	const [webSearchTemplates, setWebSearchTemplatesRaw] = useState<WebSearchChoiceTemplate[]>([]);
 
-	const conversationToolArgsBlocked = useMemo(() => {
-		for (const entry of conversationToolsState) {
-			if (!entry.enabled) continue;
-			const status = entry.argStatus;
-			if (status?.hasSchema && !status.isSatisfied) {
-				return true;
-			}
-		}
-		return false;
-	}, [conversationToolsState]);
+	const conversationToolArgsBlocked = useMemo(
+		() => getConversationToolArgsBlocked(conversationToolsState),
+		[conversationToolsState]
+	);
 	const toolArgsBlocked = attachedToolArgsBlocked || conversationToolArgsBlocked;
 	const toolArgsBlockedRef = useRef(toolArgsBlocked);
 
 	const lastAutoExecuteAttemptKeyRef = useRef<string | null>(null);
 	const autoExecuteCheckTimeoutRef = useRef<number | null>(null);
 	const autoExecuteInFlightRef = useRef(false);
+	const autoExecuteRequestedRef = useRef(false);
 	const runAutoExecutePendingToolCallsCheckRef = useRef<() => void>(() => {});
-
 	useEffect(() => {
 		toolRuntimeStateRef.current = toolRuntimeState;
 	}, [toolRuntimeState]);
+	const kickAutoExecutePendingToolCalls = useCallback(() => {
+		if (!autoExecuteRequestedRef.current) return;
+		if (isBusyRef.current || isSubmittingRef.current || templateBlockedRef.current || toolArgsBlockedRef.current) {
+			return;
+		}
+		if (autoExecuteCheckTimeoutRef.current != null) return;
+		autoExecuteCheckTimeoutRef.current = window.setTimeout(() => {
+			autoExecuteCheckTimeoutRef.current = null;
+			runAutoExecutePendingToolCallsCheckRef.current();
+		}, 0);
+	}, [isSubmittingRef]);
 
-	const updateToolRuntimeState = useCallback((update: SetStateAction<ComposerToolRuntimeState>) => {
-		const next = resolveStateUpdate(update, toolRuntimeStateRef.current);
-		toolRuntimeStateRef.current = next;
-		setToolRuntimeStateRaw(prev => (prev === next ? prev : next));
-	}, []);
+	const syncAutoExecutePendingToolCallsRequest = useCallback(
+		(nextToolCalls: UIToolCall[]) => {
+			const pendingAutoExecuteCalls = getPendingAutoExecuteToolCalls(nextToolCalls);
+
+			if (pendingAutoExecuteCalls.length === 0) {
+				autoExecuteRequestedRef.current = false;
+				lastAutoExecuteAttemptKeyRef.current = null;
+				return;
+			}
+
+			autoExecuteRequestedRef.current = true;
+			kickAutoExecutePendingToolCalls();
+		},
+		[kickAutoExecutePendingToolCalls]
+	);
+
+	const updateToolRuntimeState = useCallback(
+		(update: SetStateAction<ComposerToolRuntimeState>) => {
+			const prev = toolRuntimeStateRef.current;
+			const next = resolveStateUpdate(update, prev);
+			toolRuntimeStateRef.current = next;
+
+			if (next.toolCalls !== prev.toolCalls) {
+				syncAutoExecutePendingToolCallsRequest(next.toolCalls);
+			}
+
+			setToolRuntimeStateRaw(current => (current === next ? current : next));
+		},
+		[syncAutoExecutePendingToolCallsRequest]
+	);
 
 	const setToolCalls = useCallback<Dispatch<SetStateAction<UIToolCall[]>>>(
 		update => {
@@ -247,11 +286,17 @@ export function useComposerTools({
 
 	useEffect(() => {
 		isBusyRef.current = isBusy;
-	}, [isBusy]);
+		if (!isBusy) {
+			kickAutoExecutePendingToolCalls();
+		}
+	}, [isBusy, kickAutoExecutePendingToolCalls]);
 
 	useEffect(() => {
 		templateBlockedRef.current = templateBlocked;
-	}, [templateBlocked]);
+		if (!templateBlocked) {
+			kickAutoExecutePendingToolCalls();
+		}
+	}, [templateBlocked, kickAutoExecutePendingToolCalls]);
 
 	useEffect(() => {
 		toolArgsBlockedRef.current = toolArgsBlocked;
@@ -480,14 +525,6 @@ export function useComposerTools({
 		[setToolOutputs]
 	);
 
-	const kickAutoExecutePendingToolCalls = useCallback(() => {
-		if (autoExecuteCheckTimeoutRef.current != null) return;
-		autoExecuteCheckTimeoutRef.current = window.setTimeout(() => {
-			autoExecuteCheckTimeoutRef.current = null;
-			runAutoExecutePendingToolCallsCheckRef.current();
-		}, 0);
-	}, []);
-
 	const handleRetryErroredOutput = useCallback(
 		(output: UIToolOutput) => {
 			// Only support retry when we still know arguments. For non-skills tools we
@@ -533,9 +570,8 @@ export function useComposerTools({
 				toolCalls: [...prev.toolCalls, chip],
 				toolOutputs: prev.toolOutputs.filter(o => o.id !== output.id),
 			}));
-			kickAutoExecutePendingToolCalls();
 		},
-		[isSkillsToolName, kickAutoExecutePendingToolCalls, skillSessionID, updateToolRuntimeState]
+		[isSkillsToolName, skillSessionID, updateToolRuntimeState]
 	);
 
 	const runAutoExecutePendingToolCallsCheck = useCallback(() => {
@@ -545,6 +581,7 @@ export function useComposerTools({
 		const pendingAutoExecuteCalls = getPendingAutoExecuteToolCalls(currentToolCalls);
 
 		if (pendingAutoExecuteCalls.length === 0) {
+			autoExecuteRequestedRef.current = false;
 			lastAutoExecuteAttemptKeyRef.current = null;
 			return;
 		}
@@ -555,8 +592,7 @@ export function useComposerTools({
 			isSubmittingRef.current ||
 			hasRunningCalls ||
 			templateBlockedRef.current ||
-			toolArgsBlockedRef.current ||
-			toolsHydratingCountRef.current > 0
+			toolArgsBlockedRef.current
 		) {
 			return;
 		}
@@ -611,6 +647,7 @@ export function useComposerTools({
 						.map(toolCall => toolCall.id)
 						.join('|') || null;
 
+				autoExecuteRequestedRef.current = !!remainingAutoExecuteKey;
 				lastAutoExecuteAttemptKeyRef.current = remainingAutoExecuteKey;
 
 				if (remainingAutoExecuteKey) {
@@ -659,10 +696,6 @@ export function useComposerTools({
 				requestedKeys.add(cacheKey);
 			}
 
-			const nextToolsHydratingCount = toolsHydratingCountRef.current + 1;
-			toolsHydratingCountRef.current = nextToolsHydratingCount;
-			setToolsHydratingCount(prev => (prev === nextToolsHydratingCount ? prev : nextToolsHydratingCount));
-
 			void Promise.all(
 				missing.map(async entry => {
 					const cacheKey = conversationToolHydrationKey(entry);
@@ -695,12 +728,13 @@ export function useComposerTools({
 					setConversationToolsStateRaw(prev => {
 						const next = primeConversationToolsFromCache(prev);
 						conversationToolsStateRef.current = next;
+						toolArgsBlockedRef.current = attachedToolArgsBlockedRef.current || getConversationToolArgsBlocked(next);
 						return next;
 					});
 
 					// Re-check auto-execute now that definitions have loaded.
 					// This is critical: pending tool calls may have been blocked
-					// by toolsDefLoadingRef while definitions were in flight.
+					// by while definitions were in flight.
 					if (toolRuntimeStateRef.current.toolCalls.length > 0) {
 						kickAutoExecutePendingToolCalls();
 					}
@@ -710,19 +744,10 @@ export function useComposerTools({
 						inFlight.delete(key);
 					}
 					if (isMountedRef.current) {
-						const prevToolsHydratingCount = toolsHydratingCountRef.current;
-						const nextToolsHydratingCount = Math.max(0, prevToolsHydratingCount - 1);
-						toolsHydratingCountRef.current = nextToolsHydratingCount;
-						setToolsHydratingCount(prev => (prev === nextToolsHydratingCount ? prev : nextToolsHydratingCount));
-
 						// When the last hydration task finishes, re-check auto-execute.
 						// The earlier timeout-based check may have bailed because definitions
 						// were still loading.
-						if (
-							prevToolsHydratingCount > 0 &&
-							nextToolsHydratingCount === 0 &&
-							toolRuntimeStateRef.current.toolCalls.length > 0
-						) {
+						if (toolRuntimeStateRef.current.toolCalls.length > 0) {
 							kickAutoExecutePendingToolCalls();
 						}
 					}
@@ -736,12 +761,17 @@ export function useComposerTools({
 			const prev = conversationToolsStateRef.current;
 			const requested = resolveStateUpdate(update, prev);
 			const next = primeConversationToolsFromCache(requested);
+			const nextConversationToolArgsBlocked = getConversationToolArgsBlocked(next);
 
 			conversationToolsStateRef.current = next;
+			toolArgsBlockedRef.current = attachedToolArgsBlockedRef.current || nextConversationToolArgsBlocked;
 			setConversationToolsStateRaw(next);
 			hydrateConversationToolsIfNeeded(next);
+			if (toolRuntimeStateRef.current.toolCalls.length > 0) {
+				kickAutoExecutePendingToolCalls();
+			}
 		},
-		[hydrateConversationToolsIfNeeded, primeConversationToolsFromCache]
+		[hydrateConversationToolsIfNeeded, kickAutoExecutePendingToolCalls, primeConversationToolsFromCache]
 	);
 
 	const setConversationToolsStateAndMaybeAutoExecute = useCallback<
@@ -749,11 +779,8 @@ export function useComposerTools({
 	>(
 		update => {
 			setConversationToolsState(update);
-			if (toolRuntimeStateRef.current.toolCalls.length > 0) {
-				kickAutoExecutePendingToolCalls();
-			}
 		},
-		[kickAutoExecutePendingToolCalls, setConversationToolsState]
+		[setConversationToolsState]
 	);
 
 	const setWebSearchTemplatesAndMaybeAutoExecute = useCallback<Dispatch<SetStateAction<WebSearchChoiceTemplate[]>>>(
@@ -779,6 +806,8 @@ export function useComposerTools({
 			}
 		}
 
+		attachedToolArgsBlockedRef.current = nextBlocked;
+		toolArgsBlockedRef.current = nextBlocked || getConversationToolArgsBlocked(conversationToolsStateRef.current);
 		setAttachedToolArgsBlocked(prev => (prev === nextBlocked ? prev : nextBlocked));
 	}, [getAttachedToolEntries]);
 
@@ -838,9 +867,8 @@ export function useComposerTools({
 	const loadToolCalls = useCallback(
 		(nextToolCalls: UIToolCall[]) => {
 			setToolCalls(nextToolCalls);
-			kickAutoExecutePendingToolCalls();
 		},
-		[kickAutoExecutePendingToolCalls, setToolCalls]
+		[setToolCalls]
 	);
 
 	const clearComposerToolsState = useCallback(() => {
@@ -848,6 +876,7 @@ export function useComposerTools({
 			window.clearTimeout(autoExecuteCheckTimeoutRef.current);
 			autoExecuteCheckTimeoutRef.current = null;
 		}
+		autoExecuteRequestedRef.current = false;
 		lastAutoExecuteAttemptKeyRef.current = null;
 
 		updateToolRuntimeState(prev =>
@@ -855,8 +884,14 @@ export function useComposerTools({
 		);
 		setToolDetailsState(null);
 		setToolArgsTarget(null);
+		attachedToolArgsBlockedRef.current = false;
+		toolArgsBlockedRef.current = false;
 		setAttachedToolArgsBlocked(false);
 	}, [updateToolRuntimeState]);
+
+	const getToolRuntimeSnapshot = useCallback((): ComposerToolRuntimeState => {
+		return toolRuntimeStateRef.current;
+	}, []);
 
 	return {
 		toolCalls,
@@ -873,7 +908,6 @@ export function useComposerTools({
 		setToolDetailsState,
 		toolArgsTarget,
 		setToolArgsTarget,
-		toolsDefLoading,
 		toolArgsBlocked,
 		hasPendingToolCalls,
 		hasRunningToolCalls,
@@ -892,5 +926,6 @@ export function useComposerTools({
 		handleOpenConversationToolDetails,
 		handleOpenAttachedToolDetails,
 		clearComposerToolsState,
+		getToolRuntimeSnapshot,
 	};
 }
