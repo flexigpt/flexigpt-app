@@ -23,14 +23,21 @@ function keyToValue(key: string): IncludePreviousMessages {
 	return key === 'all' ? 'all' : Math.max(0, Number.parseInt(key, 10) || 0);
 }
 
-function displayValue(value: IncludePreviousMessages): string {
-	return value === 'all' ? 'All' : String(value);
+function displayCount(value: IncludePreviousMessages): string {
+	if (value === 'all') return 'All';
+	if (value === 0) return 'No';
+	return String(value);
 }
 
-function parseCustomValue(rawValue: string): IncludePreviousMessages {
-	const trimmed = rawValue.trim();
-	if (!trimmed) return 0;
+function displayLabel(value: IncludePreviousMessages): string {
+	return `${displayCount(value)} msgs`;
+}
 
+function maybeParseCustomValue(rawValue: string): IncludePreviousMessages | undefined {
+	const trimmed = rawValue.trim();
+	if (!trimmed) {
+		return undefined;
+	}
 	const parsed = Number.parseInt(trimmed, 10);
 	if (Number.isNaN(parsed) || parsed < 0) {
 		return 0;
@@ -54,7 +61,12 @@ export function PreviousMessagesDropdown({ value, setValue, isOpen, setIsOpen }:
 
 	const open = useStoreState(select, 'open');
 	const commitCustomValue = (rawValue: string) => {
-		const nextValue = parseCustomValue(rawValue);
+		const nextValue = maybeParseCustomValue(rawValue);
+		if (nextValue === undefined) {
+			setIsOpen(false);
+			return;
+		}
+
 		setValue(nextValue);
 		setIsOpen(false);
 	};
@@ -66,11 +78,11 @@ export function PreviousMessagesDropdown({ value, setValue, isOpen, setIsOpen }:
 					className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none text-center text-nowrap shadow-none"
 					title="How many previous messages to include in addition to the new user message"
 				>
-					<span className="min-w-0 truncate text-center text-xs font-normal">Prev Msgs: {displayValue(value)}</span>
+					<span className="min-w-0 truncate text-center text-xs font-normal">Include Prev: {displayLabel(value)}</span>
 					{open ? (
-						<FiChevronDown size={16} className="ml-1 shrink-0 md:ml-2" />
+						<FiChevronDown size={16} className="ml-2 shrink-0" />
 					) : (
-						<FiChevronUp size={16} className="ml-1 shrink-0 md:ml-2" />
+						<FiChevronUp size={16} className="ml-2 shrink-0" />
 					)}
 				</Select>
 
@@ -90,12 +102,12 @@ export function PreviousMessagesDropdown({ value, setValue, isOpen, setIsOpen }:
 								value={key}
 								className="hover:bg-base-200 data-active-item:bg-base-300 m-0 flex cursor-pointer items-center justify-between rounded-md px-2 py-1 text-xs transition-colors outline-none"
 							>
-								<span>{displayValue(option)}</span>
+								<span>{displayLabel(option)}</span>
 								{value === option && <FiCheck />}
 							</SelectItem>
 						);
 					})}
-					+{' '}
+
 					<div className="border-neutral/20 mt-2 border-t pt-2 text-xs">
 						<label className="tooltip tooltip-top w-full border-none outline-none">
 							<div className="tooltip-content">
@@ -105,9 +117,11 @@ export function PreviousMessagesDropdown({ value, setValue, isOpen, setIsOpen }:
 								key={valueToKey(value)}
 								data-disable-chat-shortcuts="true"
 								type="text"
+								name="include-previous-messages"
 								className="input input-xs w-full"
 								placeholder="Custom previous message count"
 								defaultValue={value === 'all' ? '' : String(value)}
+								spellCheck="false"
 								onBlur={e => {
 									commitCustomValue(e.currentTarget.value);
 								}}

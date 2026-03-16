@@ -50,7 +50,12 @@ function normalizeStoredPrompt(raw: unknown): SystemPromptItem | null {
 }
 
 function sortPrompts(prompts: SystemPromptItem[]): SystemPromptItem[] {
-	return [...prompts].sort((a, b) => a.createdAt - b.createdAt);
+	return [...prompts].sort((a, b) => {
+		if (a.createdAt !== b.createdAt) {
+			return a.createdAt - b.createdAt;
+		}
+		return a.id.localeCompare(b.id);
+	});
 }
 
 function readPromptsFromStorage(): SystemPromptItem[] {
@@ -94,6 +99,16 @@ function writePromptsToStorage(prompts: SystemPromptItem[]) {
 	}
 }
 
+function getFreshPromptsForMutation(): SystemPromptItem[] {
+	if (!canUseDOM()) {
+		return getSystemPromptsSnapshot();
+	}
+
+	const fresh = readPromptsFromStorage();
+	cachedPrompts = fresh;
+	return fresh;
+}
+
 function emitChange() {
 	for (const listener of listeners) {
 		listener();
@@ -116,7 +131,7 @@ function addSystemPrompt(prompt: string): SystemPromptItem | undefined {
 	const trimmed = prompt.trim();
 	if (!trimmed) return undefined;
 
-	const current = getSystemPromptsSnapshot();
+	const current = getFreshPromptsForMutation();
 	const nextItem = createSystemPromptItem(trimmed);
 	writePromptsToStorage([...current, nextItem]);
 	emitChange();
@@ -152,7 +167,7 @@ function ensureSystemPrompt(prompt: string): SystemPromptItem | undefined {
 	const trimmed = prompt.trim();
 	if (!trimmed) return undefined;
 
-	const current = getSystemPromptsSnapshot();
+	const current = getFreshPromptsForMutation();
 	const existing = current.find(item => item.prompt.trim() === trimmed);
 	if (existing) return existing;
 
@@ -160,7 +175,7 @@ function ensureSystemPrompt(prompt: string): SystemPromptItem | undefined {
 }
 
 function deleteSystemPrompt(id: string) {
-	const current = getSystemPromptsSnapshot();
+	const current = getFreshPromptsForMutation();
 	const next = current.filter(item => item.id !== id);
 
 	if (next.length === current.length) return;

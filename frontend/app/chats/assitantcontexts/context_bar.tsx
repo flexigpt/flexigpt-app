@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { type SetStateAction, useCallback, useState } from 'react';
 
 import { FiSliders } from 'react-icons/fi';
 
@@ -20,13 +20,58 @@ type AssistantContextBarProps = {
 	context: AssistantContextController;
 };
 
+type ContextBarMenuKey = 'model' | 'secondary' | 'verbosity' | 'system' | 'previous' | null;
+
 export function AssistantContextBar({ context }: AssistantContextBarProps) {
-	const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
-	const [isSecondaryDropdownOpen, setIsSecondaryDropdownOpen] = useState(false);
-	const [isVerbosityDropdownOpen, setIsVerbosityDropdownOpen] = useState(false);
-	const [isSystemDropdownOpen, setIsSystemDropdownOpen] = useState(false);
-	const [isPreviousMessagesDropdownOpen, setIsPreviousMessagesDropdownOpen] = useState(false);
+	const [openMenu, setOpenMenu] = useState<ContextBarMenuKey>(null);
 	const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);
+
+	const setMenuOpen = useCallback((menuKey: Exclude<ContextBarMenuKey, null>, action: SetStateAction<boolean>) => {
+		setOpenMenu(prevOpenMenu => {
+			const currentIsOpen = prevOpenMenu === menuKey;
+			const nextIsOpen = typeof action === 'function' ? action(currentIsOpen) : action;
+
+			if (nextIsOpen) return menuKey;
+			return currentIsOpen ? null : prevOpenMenu;
+		});
+	}, []);
+
+	const isModelDropdownOpen = openMenu === 'model';
+	const isSecondaryDropdownOpen = openMenu === 'secondary';
+	const isVerbosityDropdownOpen = openMenu === 'verbosity';
+	const isSystemDropdownOpen = openMenu === 'system';
+	const isPreviousMessagesDropdownOpen = openMenu === 'previous';
+
+	const setIsModelDropdownOpen = useCallback(
+		(action: SetStateAction<boolean>) => {
+			setMenuOpen('model', action);
+		},
+		[setMenuOpen]
+	);
+	const setIsSecondaryDropdownOpen = useCallback(
+		(action: SetStateAction<boolean>) => {
+			setMenuOpen('secondary', action);
+		},
+		[setMenuOpen]
+	);
+	const setIsVerbosityDropdownOpen = useCallback(
+		(action: SetStateAction<boolean>) => {
+			setMenuOpen('verbosity', action);
+		},
+		[setMenuOpen]
+	);
+	const setIsSystemDropdownOpen = useCallback(
+		(action: SetStateAction<boolean>) => {
+			setMenuOpen('system', action);
+		},
+		[setMenuOpen]
+	);
+	const setIsPreviousMessagesDropdownOpen = useCallback(
+		(action: SetStateAction<boolean>) => {
+			setMenuOpen('previous', action);
+		},
+		[setMenuOpen]
+	);
 
 	return (
 		<div className="bg-base-200 mx-4 my-0 flex items-center justify-between space-x-1">
@@ -120,6 +165,7 @@ export function AssistantContextBar({ context }: AssistantContextBarProps) {
 						type="button"
 						className="btn btn-xs btn-ghost text-neutral-custom m-1"
 						onClick={() => {
+							setOpenMenu(null);
 							setIsAdvancedModalOpen(true);
 						}}
 					>

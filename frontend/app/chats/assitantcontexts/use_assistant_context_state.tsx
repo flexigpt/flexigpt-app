@@ -1,4 +1,4 @@
-import { type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useState } from 'react';
+import { type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { type OutputVerbosity, type ReasoningLevel, ReasoningType } from '@/spec/inference';
 import { DefaultUIChatOptions, type IncludePreviousMessages, type UIChatOption } from '@/spec/modelpreset';
@@ -96,6 +96,17 @@ export function useAssistantContextState({ active }: { active: boolean }): Assis
 		Boolean(DefaultUIChatOptions.systemPrompt.trim())
 	);
 
+	const selectedModelRef = useRef(selectedModel);
+	const isHybridReasoningEnabledRef = useRef(isHybridReasoningEnabled);
+
+	useEffect(() => {
+		selectedModelRef.current = selectedModel;
+	}, [selectedModel]);
+
+	useEffect(() => {
+		isHybridReasoningEnabledRef.current = isHybridReasoningEnabled;
+	}, [isHybridReasoningEnabled]);
+
 	const { prompts, addPrompt, ensurePrompt, deletePrompt } = useSystemPrompts();
 
 	const promptsById = useMemo(() => new Map(prompts.map(item => [item.id, item])), [prompts]);
@@ -133,16 +144,21 @@ export function useAssistantContextState({ active }: { active: boolean }): Assis
 				syncModelDefaultSelectionFromModel?: boolean;
 			}
 		) => {
+			const currentSelectedModel = selectedModelRef.current;
+			const currentIsHybridReasoningEnabled = isHybridReasoningEnabledRef.current;
+
 			const nextSelectedModel =
-				typeof action === 'function' ? (action as (prevState: UIChatOption) => UIChatOption)(selectedModel) : action;
+				typeof action === 'function'
+					? (action as (prevState: UIChatOption) => UIChatOption)(currentSelectedModel)
+					: action;
 
 			const nextIsHybridReasoningEnabled = options?.syncHybridFromModel
 				? isHybridReasoningModel(nextSelectedModel)
-				: isHybridReasoningEnabled;
+				: currentIsHybridReasoningEnabled;
 
 			setSelectedModel(nextSelectedModel);
 
-			if (nextIsHybridReasoningEnabled !== isHybridReasoningEnabled) {
+			if (nextIsHybridReasoningEnabled !== currentIsHybridReasoningEnabled) {
 				setIsHybridReasoningEnabled(nextIsHybridReasoningEnabled);
 			}
 
@@ -150,7 +166,7 @@ export function useAssistantContextState({ active }: { active: boolean }): Assis
 				setIncludeModelDefault(Boolean(nextSelectedModel.systemPrompt.trim()));
 			}
 		},
-		[selectedModel, isHybridReasoningEnabled]
+		[]
 	);
 
 	useEffect(() => {
@@ -184,13 +200,12 @@ export function useAssistantContextState({ active }: { active: boolean }): Assis
 		[applySelectedModel]
 	);
 
-	const handleSetIsHybridReasoningEnabled = useCallback(
-		(action: SetStateAction<boolean>) => {
-			const nextIsHybridReasoningEnabled = typeof action === 'function' ? action(isHybridReasoningEnabled) : action;
-			setIsHybridReasoningEnabled(nextIsHybridReasoningEnabled);
-		},
-		[isHybridReasoningEnabled]
-	);
+	const handleSetIsHybridReasoningEnabled = useCallback((action: SetStateAction<boolean>) => {
+		const currentIsHybridReasoningEnabled = isHybridReasoningEnabledRef.current;
+		const nextIsHybridReasoningEnabled =
+			typeof action === 'function' ? action(currentIsHybridReasoningEnabled) : action;
+		setIsHybridReasoningEnabled(nextIsHybridReasoningEnabled);
+	}, []);
 
 	const setTemperature = useCallback(
 		(temp: number) => {

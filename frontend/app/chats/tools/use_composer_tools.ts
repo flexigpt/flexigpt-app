@@ -186,6 +186,7 @@ export function useComposerTools({
 	useEffect(() => {
 		toolRuntimeStateRef.current = toolRuntimeState;
 	}, [toolRuntimeState]);
+
 	const kickAutoExecutePendingToolCalls = useCallback(() => {
 		if (!autoExecuteRequestedRef.current) return;
 		if (isBusyRef.current || isSubmittingRef.current || templateBlockedRef.current || toolArgsBlockedRef.current) {

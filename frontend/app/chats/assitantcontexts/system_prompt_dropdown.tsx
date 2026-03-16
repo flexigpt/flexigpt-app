@@ -160,7 +160,7 @@ export function SystemPromptDropdown({
 									<span className="font-medium">Model default</span>
 									<span className="badge badge-ghost badge-xs">per selected model</span>
 								</div>
-								<div className="mt-1 text-[11px] whitespace-pre-wrap opacity-75" title={modelDefaultPrompt}>
+								<div className="mt-1 text-[11px] whitespace-pre-wrap opacity-75">
 									{hasModelDefaultPrompt
 										? buildPromptPreview(modelDefaultPrompt)
 										: 'This model has no default system prompt.'}
@@ -202,7 +202,6 @@ export function SystemPromptDropdown({
 										<button
 											type="button"
 											className="min-w-0 flex-1 text-left"
-											title={item.prompt}
 											onClick={() => {
 												onTogglePrompt(item.id);
 											}}
