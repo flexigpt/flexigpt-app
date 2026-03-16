@@ -787,3 +787,19 @@
 
     - user doesn't select skills,
       - nothing to do. remove any additional prompts if some state is present somewhere.
+
+- [x] chats
+  - [x] context deadline exceeded error or may be other errors dont show up as content box? it comes out as minimal single line item.
+  - [x] perf:
+    - [x] react virtuoso
+    - [x] throttle time tuning,
+    - [ ] ~~offload some md parsing/rendering etc to worker~~
+    - [ ] ~~use sync external store for some stores and selectors for partial subscriptions.~~
+
+- [x] context bar
+  - [x] system prompts need to be non editor specific list i.e across tabs. also we should not have edit, we should have a fork button, figitbranch, and add button that has copy for existing anycase.
+  - [x] multi selection possibility. This needs to evolve as additional/multiple system prompts and a way to send a concatenated thing of all these together.
+  - [x] rather than ignore chat, we can have a combo drop down option, i.e include messages: all, only last message, ignore all, send last n messages i.e last 2/3/n etc including the user one that initiated it. we can make option names based on behaviour.
+
+- [x] bottom bar
+  - [x] if you start a web search, then change model whose sdk is different that before, there is arbitrary behavior as of now wrt web search selection.

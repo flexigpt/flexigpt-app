@@ -36,6 +36,10 @@
     - [ ] specialized urls like github/gitlab pr's
     - [ ] local git diff/commit history/etc attachments
 
+- [x] Drag and drop files as attachments.
+  - [ ] while the code is there, on linux, webkitgtk has issue wrt firing drop events with wails currently.
+  - [ ] win and mac testing is pending
+
 ## Laundry list
 
 - [ ] Chat

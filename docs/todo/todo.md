@@ -2,30 +2,10 @@
 
 ## Laundry list
 
-- [x] chats
-  - [x] context deadline exceeded error or may be other errors dont show up as content box? it comes out as minimal single line item.
-  - [x] perf:
-    - [x] react virtuoso
-    - [x] throttle time tuning,
-    - [ ] ~~offload some md parsing/rendering etc to worker~~
-    - [ ] ~~use sync external store for some stores and selectors for partial subscriptions.~~
-
-- [x] context bar
-  - [x] system prompts need to be non editor specific list i.e across tabs. also we should not have edit, we should have a fork button, figitbranch, and add button that has copy for existing anycase.
-  - [x] multi selection possibility. This needs to evolve as additional/multiple system prompts and a way to send a concatenated thing of all these together.
-  - [x] rather than ignore chat, we can have a combo drop down option, i.e include messages: all, only last message, ignore all, send last n messages i.e last 2/3/n etc including the user one that initiated it. we can make option names based on behaviour.
-
 - [ ] Skill
   - [ ] include some builtin skills and test on all platforms, full flow.
   - [ ] with the number of skills present, maybe we dont want to enable all on click for the enable sills button, may be have a button at bottom on open that says enable all separately. also show collapsed bundles at start and then expanding if needed.
   - [ ] in skills world, especially with artifact driven dev, we can almost get away with without sending a lot of things again and again, latest context and last 1/2 chats. attachments may pose a problem here, but can be thought through properly so that these things are persisted properly.
-
-- [ ] bottom bar
-  - [ ] if you start a web search, then change model whose sdk is different that before, there is arbitrary behavior as of now wrt web search selection.
-
-- [x] Drag and drop files as attachments.
-  - [ ] while the code is there, on linux, webkitgtk has issue wrt firing drop events with wails currently.
-  - [ ] win and mac testing is pending
 
 - [ ] Sys prompt:
   - [ ] We may want to have a explicit prompt saying that use explicit tools rather than shell wherever possible.
