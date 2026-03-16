@@ -233,7 +233,6 @@ export const ChatTabsBar = memo(function ChatTabsBar({
 
 	return (
 		<ChatTabsBarContent
-			key={selectedTabId}
 			store={store}
 			selectedTabId={selectedTabId}
 			tabs={tabs}

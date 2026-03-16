@@ -80,7 +80,7 @@ export interface EditorAreaHandle {
 }
 
 interface EditorAreaProps {
-	isBusy: boolean;
+	isGenerating: boolean;
 	isInputLocked: boolean;
 	currentProviderSDKType: ProviderSDKType;
 	shortcutConfig: ShortcutConfig;
@@ -92,7 +92,7 @@ interface EditorAreaProps {
 
 export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function EditorArea(
 	{
-		isBusy,
+		isGenerating,
 		isInputLocked,
 		currentProviderSDKType,
 		shortcutConfig,
@@ -152,7 +152,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		clearAttachments,
 		loadAttachmentsFromMessage,
 	} = useComposerAttachments({
-		isBusy,
+		isBusy: isGenerating,
 		focusEditorAtEnd,
 	});
 
@@ -237,7 +237,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		clearComposerToolsState,
 		getToolRuntimeSnapshot,
 	} = useComposerTools({
-		isBusy,
+		isBusy: isGenerating,
 		isSubmittingRef,
 		templateBlocked,
 		submitPendingToolsAndSendRef,
@@ -535,7 +535,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	]);
 
 	const { formRef, onKeyDown } = useEnterSubmit({
-		isBusy,
+		isBusy: isGenerating,
 		canSubmit: () => {
 			if (isInputLocked) return false;
 			if (hasBlockingToolArgs) return false;
@@ -993,7 +993,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									toolCalls={toolCalls}
 									toolOutputs={toolOutputs}
 									toolEntries={attachedToolEntries}
-									isBusy={isBusy || isSubmittingRef.current || isInputLocked}
+									isBusy={isGenerating || isSubmittingRef.current || isInputLocked}
 									onRunToolCall={handleRunSingleToolCall}
 									onDiscardToolCall={handleDiscardToolCall}
 									onOpenOutput={handleOpenToolOutput}
@@ -1017,7 +1017,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						</div>
 						{/* Primary / secondary actions anchored at bottom-right */}
 						<div className="flex flex-col items-end justify-end gap-2 p-1">
-							{isBusy ? (
+							{isGenerating ? (
 								<button
 									type="button"
 									className="btn btn-circle btn-neutral btn-sm shrink-0"

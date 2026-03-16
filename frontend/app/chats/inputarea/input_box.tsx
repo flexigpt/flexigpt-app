@@ -47,13 +47,14 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 	ref
 ) {
 	const [abortConfirmationRequested, setAbortConfirmationRequested] = useState(false);
-	const isInputLocked = isBusy || isHydrating;
+	const isGenerating = isBusy;
+	const isInputLocked = isGenerating || isHydrating;
 
 	const inputAreaRef = useRef<EditorAreaHandle>(null);
 	const assistantContext = useAssistantContextState({ active });
 	const chatOptions = assistantContext.chatOptions;
 
-	const showAbortModal = isBusy && abortConfirmationRequested;
+	const showAbortModal = isGenerating && abortConfirmationRequested;
 
 	const handleSubmitMessage = (payload: EditorSubmitPayload) => {
 		// Clear any stale abort confirmation request before starting a new send.
@@ -129,13 +130,13 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 			<div className="overflow-x-hidden overflow-y-auto">
 				<EditorArea
 					ref={inputAreaRef}
-					isBusy={isBusy || isInputLocked}
+					isGenerating={isGenerating}
 					isInputLocked={isInputLocked}
 					currentProviderSDKType={chatOptions.providerSDKType}
 					shortcutConfig={shortcutConfig}
 					onSubmit={handleSubmitMessage}
 					onRequestStop={() => {
-						if (isBusy) {
+						if (isGenerating) {
 							setAbortConfirmationRequested(true);
 						}
 					}}

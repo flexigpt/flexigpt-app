@@ -109,12 +109,13 @@ interface SearchDropdownProps {
 	error?: string;
 	hasMore: boolean;
 	onLoadMore: () => void;
+	onRetry: () => void;
 	focusedIndex: number;
 	onPick: (item: ConversationSearchItem) => void;
 	onDelete: (item: ConversationSearchItem) => void;
 	query: string;
 	showSearchAllHintShortQuery: boolean;
-	currentConversationId: string;
+	openConversationIdSet: Set<string>;
 }
 
 function SearchDropdown({
@@ -123,12 +124,13 @@ function SearchDropdown({
 	error,
 	hasMore,
 	onLoadMore,
+	onRetry,
 	focusedIndex,
 	onPick,
 	onDelete,
 	query,
 	showSearchAllHintShortQuery,
-	currentConversationId,
+	openConversationIdSet,
 }: SearchDropdownProps) {
 	const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -150,12 +152,7 @@ function SearchDropdown({
 		return (
 			<div className="bg-base-200 absolute right-0 left-0 mt-1 rounded-2xl p-4 text-center shadow-lg">
 				<p className="text-error mb-2 text-sm">{error}</p>
-				<button
-					className="btn btn-sm btn-primary"
-					onClick={() => {
-						window.location.reload();
-					}}
-				>
+				<button className="btn btn-sm btn-primary" onClick={onRetry}>
 					Retry
 				</button>
 			</div>
@@ -235,7 +232,7 @@ function SearchDropdown({
 									{r.matchType === 'message' && <span className="max-w-48 truncate">{r.snippet}</span>}
 									<span className="whitespace-nowrap">{formatDateAsString(r.searchConversation.modifiedAt)}</span>
 									{/* delete (not for active conv) */}
-									{r.searchConversation.id !== currentConversationId && (
+									{!openConversationIdSet.has(r.searchConversation.id) && (
 										<FiTrash2
 											size={14}
 											className="text-neutral-custom hover:text-error shrink-0 cursor-pointer"
@@ -270,7 +267,7 @@ function SearchDropdown({
 												{r.matchType === 'message' && <span className="max-w-48 truncate">{r.snippet}</span>}
 												<span className="whitespace-nowrap">{formatDateAsString(r.searchConversation.modifiedAt)}</span>
 												{/* delete (not for active conv) */}
-												{r.searchConversation.id !== currentConversationId && (
+												{!openConversationIdSet.has(r.searchConversation.id) && (
 													<FiTrash2
 														size={14}
 														className="text-neutral-custom hover:text-error shrink-0 cursor-pointer"
@@ -310,12 +307,12 @@ export interface ChatSearchHandle {
 interface ChatSearchProps {
 	onSelectConversation: (item: ConversationSearchItem) => Promise<void>;
 	refreshKey: number;
-	currentConversationId: string;
+	openConversationIds: string[];
 	compact: boolean;
 }
 
 export const ChatSearch = forwardRef<ChatSearchHandle, ChatSearchProps>(function ChatSearch(
-	{ onSelectConversation, refreshKey, currentConversationId, compact }: ChatSearchProps,
+	{ onSelectConversation, refreshKey, openConversationIds, compact }: ChatSearchProps,
 	ref
 ) {
 	const [searchState, setSearchState] = useState<SearchState>({
@@ -333,12 +330,13 @@ export const ChatSearch = forwardRef<ChatSearchHandle, ChatSearchProps>(function
 	/** all conversations fetched so far (used for local filtering) */
 	const [recentConversations, setRecentConversations] = useState<ConversationSearchItem[]>([]);
 
-	const abortControllerRef = useRef<AbortController | null>(null);
-	const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const searchDivRef = useRef<HTMLDivElement>(null);
 	const recentsNextTokenRef = useRef<string | undefined>(undefined);
 	const recentsHasMoreRef = useRef<boolean>(false);
+	const recentConversationsRef = useRef<ConversationSearchItem[]>([]);
+	const searchRequestSeqRef = useRef(0);
 
 	const [dropdownPos, setDropdownPos] = useState<{
 		top: number;
@@ -346,22 +344,54 @@ export const ChatSearch = forwardRef<ChatSearchHandle, ChatSearchProps>(function
 		width: number;
 	} | null>(null);
 
+	const openConversationIdSet = useMemo(() => new Set(openConversationIds.filter(Boolean)), [openConversationIds]);
+
+	const invalidatePendingSearches = useCallback(() => {
+		searchRequestSeqRef.current += 1;
+	}, []);
+
+	useEffect(() => {
+		recentConversationsRef.current = recentConversations;
+	}, [recentConversations]);
+
 	const loadRecentConversations = useCallback(async (token?: string, append = false) => {
 		try {
 			if (!append) setSearchState(p => ({ ...p, loading: true, error: undefined }));
 
 			const { conversations, nextToken } = await conversationStoreAPI.listConversations(token, 20);
 			const trimmedNext = nextToken?.trim() || '';
+			const nextRecentConversations = append
+				? mergeUniqBy(recentConversationsRef.current, conversations, c => c.id)
+				: [...conversations];
 
 			// track recents pagination for local mode
 			recentsNextTokenRef.current = trimmedNext || undefined;
 			recentsHasMoreRef.current = !!trimmedNext;
 
 			// keep local cache of recents deduped
-			setRecentConversations(prev => (append ? mergeUniqBy(prev, conversations, c => c.id) : [...conversations]));
+			recentConversationsRef.current = nextRecentConversations;
+			setRecentConversations(nextRecentConversations);
 
 			setSearchState(prev => {
-				if (prev.query !== '' && !append) {
+				const activeQuery = prev.query;
+
+				if (activeQuery.length > 0 && activeQuery.length < 3) {
+					const filtered = nextRecentConversations.filter(c =>
+						c.title.toLowerCase().includes(activeQuery.toLowerCase())
+					);
+
+					return {
+						...prev,
+						results: conversationsToResults(filtered),
+						loading: false,
+						nextToken: trimmedNext,
+						hasMore: !!trimmedNext,
+						error: undefined,
+						searchedMessages: false,
+					};
+				}
+
+				if (activeQuery !== '' && !append) {
 					// if we’re in search mode and this was not an append, don’t clobber search results
 					return {
 						...prev,
@@ -372,7 +402,7 @@ export const ChatSearch = forwardRef<ChatSearchHandle, ChatSearchProps>(function
 				}
 
 				const prevConvs = append ? prev.results.map(r => r.searchConversation) : [];
-				const mergedConvs = append ? mergeUniqBy(prevConvs, conversations, c => c.id) : conversations;
+				const mergedConvs = append ? mergeUniqBy(prevConvs, conversations, c => c.id) : nextRecentConversations;
 
 				const newRes = conversationsToResults(mergedConvs);
 
@@ -392,76 +422,82 @@ export const ChatSearch = forwardRef<ChatSearchHandle, ChatSearchProps>(function
 		}
 	}, []);
 
-	const performSearch = useCallback(async (rawQuery: string, token?: string, append = false) => {
-		if (abortControllerRef.current && !append) abortControllerRef.current.abort();
-		abortControllerRef.current = new AbortController();
+	const performSearch = useCallback(
+		async (rawQuery: string, token?: string, append = false) => {
+			const query = cleanSearchQuery(rawQuery);
 
-		const query = cleanSearchQuery(rawQuery);
+			if (query === '') {
+				invalidatePendingSearches();
 
-		if (query === '') {
-			setSearchState(p => ({
-				...p,
-				results: [],
-				loading: false,
-				hasMore: false,
-				nextToken: undefined,
-				error: undefined,
-				searchedMessages: true,
-			}));
-			return;
-		}
-
-		if (!append) {
-			setSearchState(p => ({
-				...p,
-				loading: true,
-				error: undefined,
-				hasMore: false,
-				searchedMessages: false,
-			}));
-		}
-
-		try {
-			const res = await conversationStoreAPI.searchConversations(query, token, 20);
-			const nextToken = res.nextToken?.trim() || '';
-
-			const pageResults: SearchResult[] = res.conversations.map(searchConv => ({
-				searchConversation: searchConv,
-				matchType: searchConv.title.toLowerCase().includes(rawQuery.toLowerCase()) ? 'title' : 'message',
-				snippet: '',
-			}));
-
-			// dedupe the incoming page first (defensive)
-			const uniquePage = uniqBy(pageResults, r => r.searchConversation.id);
-
-			setSearchState(p => {
-				const results = append ? mergeUniqBy(p.results, uniquePage, r => r.searchConversation.id) : uniquePage;
-
-				return {
+				setSearchState(p => ({
 					...p,
-					results,
-					nextToken,
-					hasMore: !!nextToken,
+					results: [],
 					loading: false,
-					searchedMessages: true,
-				};
-			});
-
-			// cache first page only
-			if (!append) {
-				searchCache.set(query, {
-					results: uniquePage,
-					nextToken,
-					timestamp: Date.now(),
-				});
-				while (searchCache.size > 5) {
-					const oldest = [...searchCache.entries()].reduce((a, b) => (a[1].timestamp < b[1].timestamp ? a : b))[0];
-					searchCache.delete(oldest);
-				}
+					hasMore: false,
+					nextToken: undefined,
+					error: undefined,
+					searchedMessages: false,
+				}));
+				return;
 			}
-		} catch (err) {
-			if ((err as DOMException).name === 'AbortError') return;
-			if (!abortControllerRef.current.signal.aborted) {
+
+			const requestSeq = append ? searchRequestSeqRef.current : searchRequestSeqRef.current + 1;
+			if (!append) {
+				searchRequestSeqRef.current = requestSeq;
+			}
+
+			if (!append) {
+				setSearchState(p => ({
+					...p,
+					loading: true,
+					error: undefined,
+					hasMore: false,
+					searchedMessages: false,
+				}));
+			}
+
+			try {
+				const res = await conversationStoreAPI.searchConversations(query, token, 20);
+				if (requestSeq !== searchRequestSeqRef.current) return;
+				const nextToken = res.nextToken?.trim() || '';
+
+				const pageResults: SearchResult[] = res.conversations.map(searchConv => ({
+					searchConversation: searchConv,
+					matchType: searchConv.title.toLowerCase().includes(rawQuery.toLowerCase()) ? 'title' : 'message',
+					snippet: '',
+				}));
+
+				// dedupe the incoming page first (defensive)
+				const uniquePage = uniqBy(pageResults, r => r.searchConversation.id);
+
+				setSearchState(p => {
+					const results = append ? mergeUniqBy(p.results, uniquePage, r => r.searchConversation.id) : uniquePage;
+
+					return {
+						...p,
+						results,
+						nextToken,
+						hasMore: !!nextToken,
+						loading: false,
+						searchedMessages: true,
+					};
+				});
+
+				// cache first page only
+				if (!append) {
+					searchCache.set(query, {
+						results: uniquePage,
+						nextToken,
+						timestamp: Date.now(),
+					});
+					while (searchCache.size > 5) {
+						const oldest = [...searchCache.entries()].reduce((a, b) => (a[1].timestamp < b[1].timestamp ? a : b))[0];
+						searchCache.delete(oldest);
+					}
+				}
+			} catch (_err) {
+				if (requestSeq !== searchRequestSeqRef.current) return;
+
 				setSearchState(p => ({
 					...p,
 					loading: false,
@@ -470,8 +506,9 @@ export const ChatSearch = forwardRef<ChatSearchHandle, ChatSearchProps>(function
 					searchedMessages: true,
 				}));
 			}
-		}
-	}, []);
+		},
+		[invalidatePendingSearches]
+	);
 
 	/* Local filter for 1-2 char queries  */
 	const filterLocalResults = useCallback(
@@ -503,9 +540,10 @@ export const ChatSearch = forwardRef<ChatSearchHandle, ChatSearchProps>(function
 
 			/* empty query -> show recents                               */
 			if (!q.trim()) {
+				invalidatePendingSearches();
 				setSearchState(p => ({
 					...p,
-					results: conversationsToResults(recentConversations),
+					results: conversationsToResults(recentConversationsRef.current),
 					loading: false,
 					hasMore: recentsHasMoreRef.current,
 					nextToken: recentsNextTokenRef.current,
@@ -517,6 +555,7 @@ export const ChatSearch = forwardRef<ChatSearchHandle, ChatSearchProps>(function
 
 			/* short query (1–2 chars) -> local only                    */
 			if (q.length < 3) {
+				invalidatePendingSearches();
 				filterLocalResults(q);
 				return;
 			}
@@ -525,6 +564,7 @@ export const ChatSearch = forwardRef<ChatSearchHandle, ChatSearchProps>(function
 			const cleaned = cleanSearchQuery(q);
 			const cached = searchCache.get(cleaned);
 			if (cached && Date.now() - cached.timestamp < CACHE_EXPIRY_TIME) {
+				invalidatePendingSearches();
 				setSearchState(p => ({
 					...p,
 					results: cached.results,
@@ -540,7 +580,7 @@ export const ChatSearch = forwardRef<ChatSearchHandle, ChatSearchProps>(function
 			/* remote search (debounced) */
 			debounceTimeoutRef.current = setTimeout(() => performSearch(q), 300);
 		},
-		[show, recentConversations, filterLocalResults, performSearch]
+		[show, invalidatePendingSearches, filterLocalResults, performSearch]
 	);
 
 	// Compute and keep dropdown position in sync with the input
@@ -625,7 +665,10 @@ export const ChatSearch = forwardRef<ChatSearchHandle, ChatSearchProps>(function
 			await conversationStoreAPI.deleteConversation(deleteTarget.id, deleteTarget.title);
 
 			/* prune from local caches */
-			setRecentConversations(prev => prev.filter(c => c.id !== deleteTarget.id));
+			const nextRecentConversations = recentConversationsRef.current.filter(c => c.id !== deleteTarget.id);
+			recentConversationsRef.current = nextRecentConversations;
+			setRecentConversations(nextRecentConversations);
+
 			setSearchState(prev => ({
 				...prev,
 				results: prev.results.filter(r => r.searchConversation.id !== deleteTarget.id),
@@ -652,6 +695,15 @@ export const ChatSearch = forwardRef<ChatSearchHandle, ChatSearchProps>(function
 			setDeleteTarget(null);
 		}
 	}, [deleteTarget, loadRecentConversations, searchState.query]);
+
+	const handleRetryCurrentMode = useCallback(() => {
+		if (!searchState.query.trim() || (searchState.query.length < 3 && !searchState.searchedMessages)) {
+			void loadRecentConversations();
+			return;
+		}
+
+		void performSearch(searchState.query);
+	}, [loadRecentConversations, performSearch, searchState.query, searchState.searchedMessages]);
 
 	const showSearchAllHintShortQuery =
 		searchState.query.length > 0 &&
@@ -709,13 +761,13 @@ export const ChatSearch = forwardRef<ChatSearchHandle, ChatSearchProps>(function
 	);
 
 	useEffect(() => {
+		invalidatePendingSearches();
 		searchCache.clear();
-		loadRecentConversations(); // first page
-	}, [refreshKey, loadRecentConversations]);
+		void loadRecentConversations(); // first page
+	}, [refreshKey, loadRecentConversations, invalidatePendingSearches]);
 
 	useEffect(
 		() => () => {
-			abortControllerRef.current?.abort();
 			if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
 		},
 		[]
@@ -771,12 +823,13 @@ export const ChatSearch = forwardRef<ChatSearchHandle, ChatSearchProps>(function
 							error={searchState.error}
 							hasMore={searchState.hasMore}
 							onLoadMore={handleLoadMore}
+							onRetry={handleRetryCurrentMode}
 							focusedIndex={focusedIndex}
 							onPick={handlePick}
 							onDelete={handleAskDelete}
 							query={searchState.query}
 							showSearchAllHintShortQuery={showSearchAllHintShortQuery}
-							currentConversationId={currentConversationId}
+							openConversationIdSet={openConversationIdSet}
 						/>
 					</div>,
 					document.body

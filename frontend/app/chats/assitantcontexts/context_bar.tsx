@@ -180,6 +180,11 @@ export function AssistantContextBar({ context }: AssistantContextBarProps) {
 					setIsAdvancedModalOpen(false);
 				}}
 				currentModel={context.selectedModel}
+				effectiveReasoningEnabled={
+					context.selectedModel.reasoning?.type === ReasoningType.HybridWithTokens
+						? context.isHybridReasoningEnabled
+						: !!context.selectedModel.reasoning
+				}
 				onSave={(updatedModel: UIChatOption) => {
 					context.applyAdvancedModel(updatedModel);
 				}}

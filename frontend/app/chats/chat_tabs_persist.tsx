@@ -1,9 +1,15 @@
 import type { Conversation } from '@/spec/conversation';
 
+import { ensureMakeID } from '@/lib/uuid_utils';
+
 import { initConversation } from '@/chats/conversation/hydration_helper';
 
 // ---------------- Tabs persistence ----------------
 const CHAT_TABS_PERSIST_KEY = 'app.chats.tabs.v1';
+
+function canUseStorage(): boolean {
+	return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+}
 
 type PersistedChatsPageStateV1 = {
 	v: 1;
@@ -18,19 +24,6 @@ type PersistedChatsPageStateV1 = {
 	scrollTopByTab?: Record<string, number>;
 	lastActivatedAtByTab?: Record<string, number>;
 };
-
-function readPersistedChatsPageState(): PersistedChatsPageStateV1 | null {
-	try {
-		const raw = localStorage.getItem(CHAT_TABS_PERSIST_KEY);
-		if (!raw) return null;
-		const parsed = JSON.parse(raw) as PersistedChatsPageStateV1;
-		if (!parsed || parsed.v !== 1) return null;
-		if (!Array.isArray(parsed.tabs)) return null;
-		return parsed;
-	} catch {
-		return null;
-	}
-}
 
 export const MAX_TABS = 8;
 
@@ -55,15 +48,7 @@ export function isScratchTab(t: ChatTabState) {
 	return !t.isPersisted && t.conversation.messages.length === 0;
 }
 
-export function writePersistedChatsPageState(state: PersistedChatsPageStateV1) {
-	try {
-		localStorage.setItem(CHAT_TABS_PERSIST_KEY, JSON.stringify(state));
-	} catch {
-		// ignore quota / disabled storage; app still works without persistence
-	}
-}
-
-export function createEmptyTab(tabId: string = crypto.randomUUID()): ChatTabState {
+export function createEmptyTab(tabId: string = ensureMakeID()): ChatTabState {
 	return {
 		tabId,
 		conversation: initConversation(),
@@ -73,6 +58,29 @@ export function createEmptyTab(tabId: string = crypto.randomUUID()): ChatTabStat
 		manualTitleLocked: false,
 		editingMessageId: null,
 	};
+}
+
+function readPersistedChatsPageState(): PersistedChatsPageStateV1 | null {
+	if (!canUseStorage()) return null;
+	try {
+		const raw = localStorage.getItem(CHAT_TABS_PERSIST_KEY);
+		if (!raw) return null;
+		const parsed = JSON.parse(raw) as PersistedChatsPageStateV1;
+		if (!parsed || parsed.v !== 1) return null;
+		if (!Array.isArray(parsed.tabs)) return null;
+		return parsed;
+	} catch {
+		return null;
+	}
+}
+
+export function writePersistedChatsPageState(state: PersistedChatsPageStateV1) {
+	if (!canUseStorage()) return;
+	try {
+		localStorage.setItem(CHAT_TABS_PERSIST_KEY, JSON.stringify(state));
+	} catch {
+		// ignore quota / disabled storage; app still works without persistence
+	}
 }
 
 export type InitialChatsModel = {

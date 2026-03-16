@@ -28,6 +28,7 @@ type AdvancedParamsModalProps = {
 	isOpen: boolean;
 	onClose: () => void;
 	currentModel: UIChatOption;
+	effectiveReasoningEnabled?: boolean;
 	onSave: (updatedModel: UIChatOption) => void;
 };
 
@@ -116,7 +117,12 @@ function closeDialogSafely(dialog: HTMLDialogElement | null): boolean {
 	}
 }
 
-function AdvancedParamsModalInner({ onClose, currentModel, onSave }: AdvancedParamsModalInnerProps) {
+function AdvancedParamsModalInner({
+	onClose,
+	currentModel,
+	effectiveReasoningEnabled,
+	onSave,
+}: AdvancedParamsModalInnerProps) {
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 
 	const supportedOutputFormats = useMemo(
@@ -135,7 +141,8 @@ function AdvancedParamsModalInner({ onClose, currentModel, onSave }: AdvancedPar
 		};
 	}, [supportedOutputFormats]);
 
-	const reasoningEnabled = !!currentModel.reasoning;
+	const reasoningEnabled = effectiveReasoningEnabled ?? !!currentModel.reasoning;
+
 	const summaryStyleSupported = supportsReasoningSummaryStyle(currentModel.capabilitiesOverride);
 
 	const stopPolicy = useMemo(
@@ -793,13 +800,25 @@ function AdvancedParamsModalInner({ onClose, currentModel, onSave }: AdvancedPar
 	);
 }
 
-export function AdvancedParamsModal({ isOpen, onClose, currentModel, onSave }: AdvancedParamsModalProps) {
+export function AdvancedParamsModal({
+	isOpen,
+	onClose,
+	currentModel,
+	effectiveReasoningEnabled,
+	onSave,
+}: AdvancedParamsModalProps) {
 	if (!isOpen || typeof document === 'undefined') return null;
 
 	const modelIdentity = `${currentModel.providerName}::${currentModel.modelPresetID}`;
 
 	return createPortal(
-		<AdvancedParamsModalInner key={modelIdentity} onClose={onClose} currentModel={currentModel} onSave={onSave} />,
+		<AdvancedParamsModalInner
+			key={modelIdentity}
+			onClose={onClose}
+			currentModel={currentModel}
+			effectiveReasoningEnabled={effectiveReasoningEnabled}
+			onSave={onSave}
+		/>,
 		document.body
 	);
 }

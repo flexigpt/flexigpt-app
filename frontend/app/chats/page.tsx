@@ -235,7 +235,7 @@ export default function ChatsPage() {
 		[tabStore]
 	);
 
-	const activeTab = useMemo(() => tabs.find(t => t.tabId === selectedTabId) ?? tabs[0] ?? null, [tabs, selectedTabId]);
+	const openConversationIds = useMemo(() => tabs.map(t => t.conversation.id).filter(Boolean), [tabs]);
 
 	// ---------------- Conversation area (conversation runtime + UI) ----------------
 	const conversationAreaRef = useRef<ConversationAreaHandle | null>(null);
@@ -744,12 +744,12 @@ export default function ChatsPage() {
 						compact={true}
 						onSelectConversation={handleSelectConversation}
 						refreshKey={searchRefreshKey}
-						currentConversationId={activeTab?.conversation.id ?? ''}
+						openConversationIds={openConversationIds}
 					/>
 				</div>
 			),
 		},
-		[activeTab?.conversation.id, handleSelectConversation, searchRefreshKey]
+		[handleSelectConversation, openConversationIds, searchRefreshKey]
 	);
 
 	// ---------------- Export (active tab) ----------------
