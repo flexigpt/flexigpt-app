@@ -4,6 +4,7 @@ import {
 	type SetStateAction,
 	useCallback,
 	useEffect,
+	useLayoutEffect,
 	useMemo,
 	useRef,
 	useState,
@@ -42,15 +43,14 @@ interface UseComposerToolsArgs {
 	isBusy: boolean;
 	isSubmittingRef: RefObject<boolean>;
 	templateBlocked: boolean;
-	submitPendingToolsAndSendRef: RefObject<(() => void | Promise<void>) | null>;
 	ensureSkillSession: () => Promise<string | null>;
 	listActiveSkillRefs: (sid: string) => Promise<SkillRef[]>;
 	setActiveSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
 	getCurrentSkillSessionID: () => string | null;
 	skillSessionID: string | null;
 	toolArgsEventTarget?: EventTarget | null;
+	onAutoSubmitRequest?: () => void;
 	externalAutoExecuteBlocked?: boolean;
-	getExternalAutoExecuteBlocked?: () => boolean;
 	getAttachedToolEntries: (uniqueByIdentity?: boolean) => AttachedToolEntry[];
 }
 
@@ -61,10 +61,8 @@ interface UseComposerToolsResult {
 	setToolOutputs: Dispatch<SetStateAction<UIToolOutput[]>>;
 	conversationToolsState: ConversationToolStateEntry[];
 	setConversationToolsState: Dispatch<SetStateAction<ConversationToolStateEntry[]>>;
-	setConversationToolsStateAndMaybeAutoExecute: Dispatch<SetStateAction<ConversationToolStateEntry[]>>;
 	webSearchTemplates: WebSearchChoiceTemplate[];
 	setWebSearchTemplates: Dispatch<SetStateAction<WebSearchChoiceTemplate[]>>;
-	setWebSearchTemplatesAndMaybeAutoExecute: Dispatch<SetStateAction<WebSearchChoiceTemplate[]>>;
 	toolDetailsState: ToolDetailsState;
 	setToolDetailsState: Dispatch<SetStateAction<ToolDetailsState>>;
 	toolArgsTarget: ToolArgsTarget | null;
@@ -126,15 +124,14 @@ export function useComposerTools({
 	isBusy,
 	isSubmittingRef,
 	templateBlocked,
-	submitPendingToolsAndSendRef,
 	ensureSkillSession,
 	listActiveSkillRefs,
 	setActiveSkillRefs,
 	getCurrentSkillSessionID,
 	skillSessionID,
 	toolArgsEventTarget,
+	onAutoSubmitRequest,
 	externalAutoExecuteBlocked = false,
-	getExternalAutoExecuteBlocked,
 	getAttachedToolEntries,
 }: UseComposerToolsArgs): UseComposerToolsResult {
 	const isMountedRef = useRef(true);
@@ -170,8 +167,11 @@ export function useComposerTools({
 	const [attachedToolArgsBlocked, setAttachedToolArgsBlocked] = useState(false);
 	const attachedToolArgsBlockedRef = useRef(false);
 	const isBusyRef = useRef(isBusy);
+	const externalAutoExecuteBlockedRef = useRef(externalAutoExecuteBlocked);
+	const onAutoSubmitRequestRef = useRef<(() => void) | null>(onAutoSubmitRequest ?? null);
 	const templateBlockedRef = useRef(templateBlocked);
 	const [webSearchTemplates, setWebSearchTemplatesRaw] = useState<WebSearchChoiceTemplate[]>([]);
+	const webSearchTemplatesRef = useRef<WebSearchChoiceTemplate[]>([]);
 
 	const conversationToolArgsBlocked = useMemo(
 		() => getConversationToolArgsBlocked(conversationToolsState),
@@ -186,13 +186,13 @@ export function useComposerTools({
 	const autoExecuteRequestedRef = useRef(false);
 	const runAutoExecutePendingToolCallsCheckRef = useRef<() => void>(() => {});
 
-	const hasExternalAutoExecuteBlocked = useCallback(() => {
-		return getExternalAutoExecuteBlocked ? getExternalAutoExecuteBlocked() : externalAutoExecuteBlocked;
-	}, [externalAutoExecuteBlocked, getExternalAutoExecuteBlocked]);
-
 	useEffect(() => {
 		toolRuntimeStateRef.current = toolRuntimeState;
 	}, [toolRuntimeState]);
+
+	useLayoutEffect(() => {
+		onAutoSubmitRequestRef.current = onAutoSubmitRequest ?? null;
+	}, [onAutoSubmitRequest]);
 
 	const kickAutoExecutePendingToolCalls = useCallback(() => {
 		if (!autoExecuteRequestedRef.current) return;
@@ -201,7 +201,7 @@ export function useComposerTools({
 			isSubmittingRef.current ||
 			templateBlockedRef.current ||
 			toolArgsBlockedRef.current ||
-			hasExternalAutoExecuteBlocked()
+			externalAutoExecuteBlockedRef.current
 		) {
 			return;
 		}
@@ -210,7 +210,7 @@ export function useComposerTools({
 			autoExecuteCheckTimeoutRef.current = null;
 			runAutoExecutePendingToolCallsCheckRef.current();
 		}, 0);
-	}, [hasExternalAutoExecuteBlocked, isSubmittingRef]);
+	}, [isSubmittingRef]);
 
 	const syncAutoExecutePendingToolCallsRequest = useCallback(
 		(nextToolCalls: UIToolCall[]) => {
@@ -273,8 +273,9 @@ export function useComposerTools({
 		conversationToolsStateRef.current = conversationToolsState;
 	}, [conversationToolsState]);
 
-	const setWebSearchTemplates = useCallback<Dispatch<SetStateAction<WebSearchChoiceTemplate[]>>>(update => {
-		setWebSearchTemplatesRaw(prev => {
+	const setWebSearchTemplates = useCallback<Dispatch<SetStateAction<WebSearchChoiceTemplate[]>>>(
+		update => {
+			const prev = webSearchTemplatesRef.current;
 			const requested = resolveStateUpdate(update, prev);
 			const next = normalizeWebSearchChoiceTemplates(requested);
 
@@ -288,12 +289,17 @@ export function useComposerTools({
 						item.userArgSchemaInstance === next[idx]?.userArgSchemaInstance
 				)
 			) {
-				return prev;
+				return;
 			}
 
-			return next;
-		});
-	}, []);
+			webSearchTemplatesRef.current = next;
+			setWebSearchTemplatesRaw(next);
+			if (toolRuntimeStateRef.current.toolCalls.length > 0) {
+				kickAutoExecutePendingToolCalls();
+			}
+		},
+		[kickAutoExecutePendingToolCalls]
+	);
 
 	const hasPendingToolCalls = useMemo(() => toolCalls.some(c => c.status === 'pending'), [toolCalls]);
 	const hasRunningToolCalls = useMemo(() => toolCalls.some(c => c.status === 'running'), [toolCalls]);
@@ -301,7 +307,6 @@ export function useComposerTools({
 	useEffect(() => {
 		isBusyRef.current = isBusy;
 		if (!isBusy) {
-			// eslint-disable-next-line react-you-might-not-need-an-effect/no-pass-live-state-to-parent
 			kickAutoExecutePendingToolCalls();
 		}
 	}, [isBusy, kickAutoExecutePendingToolCalls]);
@@ -309,7 +314,6 @@ export function useComposerTools({
 	useEffect(() => {
 		templateBlockedRef.current = templateBlocked;
 		if (!templateBlocked) {
-			// eslint-disable-next-line react-you-might-not-need-an-effect/no-pass-live-state-to-parent
 			kickAutoExecutePendingToolCalls();
 		}
 	}, [templateBlocked, kickAutoExecutePendingToolCalls]);
@@ -319,19 +323,19 @@ export function useComposerTools({
 	}, [toolArgsBlocked]);
 
 	useEffect(() => {
+		externalAutoExecuteBlockedRef.current = externalAutoExecuteBlocked;
+		if (!externalAutoExecuteBlocked) {
+			kickAutoExecutePendingToolCalls();
+		}
+	}, [externalAutoExecuteBlocked, kickAutoExecutePendingToolCalls]);
+
+	useEffect(() => {
 		return () => {
 			if (autoExecuteCheckTimeoutRef.current != null) {
 				window.clearTimeout(autoExecuteCheckTimeoutRef.current);
 			}
 		};
 	}, []);
-
-	useEffect(() => {
-		if (!hasExternalAutoExecuteBlocked()) {
-			// eslint-disable-next-line react-you-might-not-need-an-effect/no-pass-live-state-to-parent
-			kickAutoExecutePendingToolCalls();
-		}
-	}, [hasExternalAutoExecuteBlocked, kickAutoExecutePendingToolCalls]);
 
 	const isSkillsToolName = useCallback((name: string | undefined): boolean => {
 		const n = (name ?? '').trim();
@@ -615,6 +619,7 @@ export function useComposerTools({
 			isSubmittingRef.current ||
 			hasRunningCalls ||
 			templateBlockedRef.current ||
+			externalAutoExecuteBlockedRef.current ||
 			toolArgsBlockedRef.current
 		) {
 			return;
@@ -656,12 +661,10 @@ export function useComposerTools({
 
 				// If any auto-exec invocation failed at runtime, keep the failed chip
 				// in the composer and do not auto-send.
-				if (!allAutoExecuteCallsCompleted || hasFailedRunnable || hasExternalAutoExecuteBlocked()) return;
+				if (!allAutoExecuteCallsCompleted || hasFailedRunnable || externalAutoExecuteBlockedRef.current) return;
 
-				// All remaining runnable calls were auto-exec and completed.
-				// Reuse the existing fast-forward submit path; with no pending calls
-				// left, this becomes a plain send.
-				await submitPendingToolsAndSendRef.current?.();
+				// Request the parent submit path; with no pending calls left, this becomes a plain send.
+				onAutoSubmitRequestRef.current?.();
 			} finally {
 				autoExecuteInFlightRef.current = false;
 
@@ -678,15 +681,11 @@ export function useComposerTools({
 				}
 			}
 		})();
-	}, [
-		hasExternalAutoExecuteBlocked,
-		isSubmittingRef,
-		kickAutoExecutePendingToolCalls,
-		runToolCallInternal,
-		submitPendingToolsAndSendRef,
-	]);
+	}, [isSubmittingRef, kickAutoExecutePendingToolCalls, runToolCallInternal]);
 
-	runAutoExecutePendingToolCallsCheckRef.current = runAutoExecutePendingToolCallsCheck;
+	useLayoutEffect(() => {
+		runAutoExecutePendingToolCallsCheckRef.current = runAutoExecutePendingToolCallsCheck;
+	}, [runAutoExecutePendingToolCallsCheck]);
 
 	const primeConversationToolsFromCache = useCallback((entries: ConversationToolStateEntry[]) => {
 		let changed = false;
@@ -803,25 +802,6 @@ export function useComposerTools({
 		[hydrateConversationToolsIfNeeded, kickAutoExecutePendingToolCalls, primeConversationToolsFromCache]
 	);
 
-	const setConversationToolsStateAndMaybeAutoExecute = useCallback<
-		Dispatch<SetStateAction<ConversationToolStateEntry[]>>
-	>(
-		update => {
-			setConversationToolsState(update);
-		},
-		[setConversationToolsState]
-	);
-
-	const setWebSearchTemplatesAndMaybeAutoExecute = useCallback<Dispatch<SetStateAction<WebSearchChoiceTemplate[]>>>(
-		update => {
-			setWebSearchTemplates(update);
-			if (toolRuntimeStateRef.current.toolCalls.length > 0) {
-				kickAutoExecutePendingToolCalls();
-			}
-		},
-		[kickAutoExecutePendingToolCalls, setWebSearchTemplates]
-	);
-
 	const recomputeAttachedToolArgsBlocked = useCallback(() => {
 		const toolEntries = getAttachedToolEntries(false);
 		let nextBlocked = false;
@@ -878,9 +858,9 @@ export function useComposerTools({
 
 	const applyConversationToolsFromChoices = useCallback(
 		(tools: ToolStoreChoice[]) => {
-			setConversationToolsStateAndMaybeAutoExecute(initConversationToolsStateFromChoices(tools));
+			setConversationToolsState(initConversationToolsStateFromChoices(tools));
 		},
-		[setConversationToolsStateAndMaybeAutoExecute]
+		[setConversationToolsState]
 	);
 
 	const applyWebSearchFromChoices = useCallback(
@@ -888,9 +868,9 @@ export function useComposerTools({
 			const ws = normalizeWebSearchChoiceTemplates(
 				(tools ?? []).filter(t => t.toolType === ToolStoreChoiceType.WebSearch).map(webSearchTemplateFromChoice)
 			);
-			setWebSearchTemplatesAndMaybeAutoExecute(ws);
+			setWebSearchTemplates(ws);
 		},
-		[setWebSearchTemplatesAndMaybeAutoExecute]
+		[setWebSearchTemplates]
 	);
 
 	const loadToolCalls = useCallback(
@@ -929,10 +909,8 @@ export function useComposerTools({
 		setToolOutputs,
 		conversationToolsState,
 		setConversationToolsState,
-		setConversationToolsStateAndMaybeAutoExecute,
 		webSearchTemplates,
 		setWebSearchTemplates,
-		setWebSearchTemplatesAndMaybeAutoExecute,
 		toolDetailsState,
 		setToolDetailsState,
 		toolArgsTarget,

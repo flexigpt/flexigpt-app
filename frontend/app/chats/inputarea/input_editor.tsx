@@ -90,6 +90,8 @@ interface EditorAreaProps {
 	cancelEditing: () => void;
 }
 
+type SubmitOptions = { runPendingTools: boolean };
+
 export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function EditorArea(
 	{
 		isGenerating,
@@ -157,21 +159,23 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	});
 
 	const [submitError, setSubmitError] = useState<string | null>(null);
+	const [isSubmitting, setIsSubmitting] = useState(false);
+	const setSubmitting = useCallback((next: boolean) => {
+		isSubmittingRef.current = next;
+		setIsSubmitting(current => (current === next ? current : next));
+	}, []);
+
+	const autoSubmitRequestHandlerRef = useRef<((options: SubmitOptions) => Promise<void>) | null>(null);
+	const handleAutoSubmitRequest = useCallback(() => {
+		void autoSubmitRequestHandlerRef.current?.({ runPendingTools: true });
+	}, []);
+
 	// Guard: while true, handleEditorDocumentChange skips auto-cancel logic.
 	// This prevents a race where Plate fires onChange after clearComposerTransientState
 	// empties attachments/toolOutputs but before loadAttachmentsFromMessage restores them.
 	const isLoadingExternalMessageRef = useRef(false);
 	const externalMessageLoadReleaseTimerRef = useRef<number | null>(null);
 	const [webSearchArgsBlocked, setWebSearchArgsBlocked] = useState(false);
-	const webSearchArgsBlockedRef = useRef(false);
-
-	useEffect(() => {
-		webSearchArgsBlockedRef.current = webSearchArgsBlocked;
-	}, [webSearchArgsBlocked]);
-
-	const getExternalAutoExecuteBlocked = useCallback(() => {
-		return webSearchArgsBlockedRef.current;
-	}, []);
 
 	// ---- Skills (conversation-level) ----
 	const {
@@ -201,23 +205,18 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, [editor, selectionInfo]);
 	const hasEffectiveTextForSubmit = effectiveSubmitText.trim().length > 0;
 
-	const submitPendingToolsAndSendRef = useRef<(() => void | Promise<void>) | null>(null);
-
 	const {
 		toolCalls,
 		toolOutputs,
 		setToolOutputs,
 		conversationToolsState,
 		setConversationToolsState,
-		setConversationToolsStateAndMaybeAutoExecute,
 		webSearchTemplates,
 		setWebSearchTemplates,
-		setWebSearchTemplatesAndMaybeAutoExecute,
 		toolDetailsState,
 		setToolDetailsState,
 		toolArgsTarget,
 		setToolArgsTarget,
-
 		toolArgsBlocked,
 		hasPendingToolCalls,
 		hasRunningToolCalls,
@@ -240,14 +239,14 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		isBusy: isGenerating,
 		isSubmittingRef,
 		templateBlocked,
-		submitPendingToolsAndSendRef,
 		ensureSkillSession,
 		listActiveSkillRefs,
 		setActiveSkillRefs,
 		getCurrentSkillSessionID,
 		skillSessionID,
 		toolArgsEventTarget,
-		getExternalAutoExecuteBlocked,
+		onAutoSubmitRequest: handleAutoSubmitRequest,
+		externalAutoExecuteBlocked: webSearchArgsBlocked,
 		getAttachedToolEntries: getAttachedToolEntriesSnapshot,
 	});
 
@@ -516,6 +515,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const isSendButtonEnabled = useMemo(() => {
 		// Cannot block on tools def loading here.
 		if (isInputLocked) return false;
+		if (isSubmitting) return false;
 		if (templateBlocked) return false;
 		if (hasBlockingToolArgs) return false;
 
@@ -527,6 +527,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		return hasAttachments || hasOutputs;
 	}, [
 		isInputLocked,
+		isSubmitting,
 		templateBlocked,
 		hasBlockingToolArgs,
 		hasEffectiveTextForSubmit,
@@ -535,9 +536,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	]);
 
 	const { formRef, onKeyDown } = useEnterSubmit({
-		isBusy: isGenerating,
+		isBusy: isGenerating || isSubmitting,
 		canSubmit: () => {
 			if (isInputLocked) return false;
+			if (isSubmitting) return false;
 			if (hasBlockingToolArgs) return false;
 			if (templateBlocked) return false;
 
@@ -563,11 +565,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const clearComposerTransientState = useCallback(() => {
 		closeAllMenus();
 		setSubmitError(null);
-		isSubmittingRef.current = false;
+		setSubmitting(false);
 
 		clearAttachments();
 		clearComposerToolsState();
-	}, [clearAttachments, clearComposerToolsState, closeAllMenus]);
+	}, [clearAttachments, clearComposerToolsState, closeAllMenus, setSubmitting]);
 
 	const resetEditor = useCallback(() => {
 		clearComposerTransientState();
@@ -579,7 +581,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	 * before sending.
 	 */
 	const doSubmit = useCallback(
-		async (options: { runPendingTools: boolean }) => {
+		async (options: SubmitOptions) => {
 			const { runPendingTools } = options;
 
 			if (isSubmittingRef.current) return;
@@ -629,7 +631,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			}
 
 			setSubmitError(null);
-			isSubmittingRef.current = true;
+			setSubmitting(true);
 			const runtimeBeforeRun = getToolRuntimeSnapshot();
 			const hadPendingTools = runPendingTools && runtimeBeforeRun.toolCalls.some(c => c.status === 'pending');
 			let didSend = false;
@@ -711,7 +713,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				setConversationToolsState(prev => mergeConversationToolsWithNewChoices(prev, finalToolChoices));
 				didSend = true;
 			} finally {
-				isSubmittingRef.current = false;
+				setSubmitting(false);
 
 				// Only clear the editor if we actually sent something.
 				if (didSend) {
@@ -744,15 +746,18 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			selectionInfo.firstPendingVar,
 			setActiveSkillRefs,
 			setConversationToolsState,
+			setSubmitting,
 			templateBlocked,
 			webSearchTemplates,
 		]
 	);
 
-	const doSubmitRef = useRef(doSubmit);
-	doSubmitRef.current = doSubmit;
-	submitPendingToolsAndSendRef.current = () => doSubmitRef.current({ runPendingTools: true });
-
+	useLayoutEffect(() => {
+		autoSubmitRequestHandlerRef.current = doSubmit;
+		return () => {
+			autoSubmitRequestHandlerRef.current = null;
+		};
+	}, [doSubmit]);
 	/**
 	 * Default form submit / Enter: "run pending tools, then send".
 	 */
@@ -914,9 +919,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, [cancelEditing, resetEditor, restorePreEditContext]);
 
 	const handleRunToolsOnlyClick = useCallback(async () => {
-		if (!hasPendingToolCalls || isInputLocked || hasRunningToolCalls) return;
+		if (!hasPendingToolCalls || isInputLocked || isSubmitting || hasRunningToolCalls) return;
 		await runAllPendingToolCalls();
-	}, [hasPendingToolCalls, hasRunningToolCalls, isInputLocked, runAllPendingToolCalls]);
+	}, [hasPendingToolCalls, hasRunningToolCalls, isInputLocked, isSubmitting, runAllPendingToolCalls]);
 
 	// Button-state helpers:
 	// - Play: run tools only (enabled when there are pending tools and none are running).
@@ -924,9 +929,14 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	//   templates are satisfied; "sendability" will be re-checked after tools run).
 	// - Send: send only (enabled when send is allowed and there are no pending tools).
 	const canSendOnly = !hasPendingToolCalls && isSendButtonEnabled && !hasRunningToolCalls;
-	const canRunToolsOnly = hasPendingToolCalls && !hasRunningToolCalls && !isInputLocked;
+	const canRunToolsOnly = hasPendingToolCalls && !hasRunningToolCalls && !isInputLocked && !isSubmitting;
 	const canRunToolsAndSend =
-		hasPendingToolCalls && !hasRunningToolCalls && !isInputLocked && !templateBlocked && !hasBlockingToolArgs;
+		hasPendingToolCalls &&
+		!hasRunningToolCalls &&
+		!isInputLocked &&
+		!isSubmitting &&
+		!templateBlocked &&
+		!hasBlockingToolArgs;
 
 	return (
 		<>
@@ -993,7 +1003,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									toolCalls={toolCalls}
 									toolOutputs={toolOutputs}
 									toolEntries={attachedToolEntries}
-									isBusy={isGenerating || isSubmittingRef.current || isInputLocked}
+									isBusy={isGenerating || isSubmitting || isInputLocked}
 									onRunToolCall={handleRunSingleToolCall}
 									onDiscardToolCall={handleDiscardToolCall}
 									onOpenOutput={handleOpenToolOutput}
@@ -1003,7 +1013,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									onChangeAttachmentContentBlockMode={handleChangeAttachmentContentBlockMode}
 									onRemoveDirectoryGroup={handleRemoveDirectoryGroup}
 									onRemoveOverflowDir={handleRemoveOverflowDir}
-									onConversationToolsChange={setConversationToolsStateAndMaybeAutoExecute}
+									onConversationToolsChange={setConversationToolsState}
 									onToggleAttachedToolAutoExecute={handleToggleAttachedToolAutoExecute}
 									onRemoveAttachedTool={handleRemoveAttachedTool}
 									onRemoveAllAttachedTools={handleRemoveAllAttachedTools}
@@ -1112,7 +1122,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						onDetachToolByKey={handleDetachAttachedToolByKey}
 						onSetAttachedToolAutoExecute={handleSetAttachedToolAutoExecuteByKey}
 						webSearchTemplates={webSearchTemplates}
-						setWebSearchTemplates={setWebSearchTemplatesAndMaybeAutoExecute}
+						setWebSearchTemplates={setWebSearchTemplates}
 						onWebSearchArgsBlockedChange={setWebSearchArgsBlocked}
 						allSkills={allSkills}
 						skillsLoading={skillsLoading}
@@ -1136,12 +1146,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				attachedToolEntries={getAttachedToolEntriesSnapshot(false)}
 				setAttachedToolUserArgSchemaInstance={handleSetAttachedToolUserArgSchemaInstance}
 				conversationToolsState={conversationToolsState}
-				setConversationToolsState={setConversationToolsStateAndMaybeAutoExecute}
+				setConversationToolsState={setConversationToolsState}
 				toolArgsTarget={toolArgsTarget}
 				setToolArgsTarget={setToolArgsTarget}
 				recomputeAttachedToolArgsBlocked={handleAttachedToolsChanged}
 				webSearchTemplates={webSearchTemplates}
-				setWebSearchTemplates={setWebSearchTemplatesAndMaybeAutoExecute}
+				setWebSearchTemplates={setWebSearchTemplates}
 			/>
 		</>
 	);
