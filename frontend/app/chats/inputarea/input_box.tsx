@@ -2,7 +2,7 @@ import { forwardRef, type RefObject, useImperativeHandle, useRef, useState } fro
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { UIToolCall } from '@/spec/inference';
-import { DefaultUIChatOptions, type UIChatOption } from '@/spec/modelpreset';
+import { type UIChatOption } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
 
@@ -11,6 +11,7 @@ import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 
 import { AssistantContextBar } from '@/chats/assitantcontexts/context_bar';
+import { useAssistantContextState } from '@/chats/assitantcontexts/use_assistant_context_state';
 import { EditorArea, type EditorAreaHandle } from '@/chats/inputarea/input_editor';
 import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/inputarea/input_editor_utils';
 
@@ -33,6 +34,7 @@ export interface InputBoxHandle {
 interface InputBoxProps {
 	onSend: (message: EditorSubmitPayload, options: UIChatOption) => Promise<void>;
 	isBusy: boolean;
+	active: boolean;
 	isHydrating: boolean;
 	abortRef: RefObject<AbortController | null>;
 	shortcutConfig: ShortcutConfig;
@@ -41,14 +43,15 @@ interface InputBoxProps {
 }
 
 export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox(
-	{ onSend, isBusy, isHydrating, abortRef, shortcutConfig, editingMessageId, onCancelEditing },
+	{ onSend, isBusy, active, isHydrating, abortRef, shortcutConfig, editingMessageId, onCancelEditing },
 	ref
 ) {
-	const [chatOptions, setUIChatOptions] = useState<UIChatOption>(DefaultUIChatOptions);
 	const [abortConfirmationRequested, setAbortConfirmationRequested] = useState(false);
 	const isInputLocked = isBusy || isHydrating;
 
 	const inputAreaRef = useRef<EditorAreaHandle>(null);
+	const assistantContext = useAssistantContextState({ active });
+	const chatOptions = assistantContext.chatOptions;
 
 	const showAbortModal = isBusy && abortConfirmationRequested;
 
@@ -107,7 +110,7 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 
 	return (
 		<div className="bg-base-200 w-full min-w-0">
-			<AssistantContextBar onOptionsChange={setUIChatOptions} /* hand the aggregated options up */ />
+			<AssistantContextBar context={assistantContext} />
 
 			<DeleteConfirmationModal
 				isOpen={showAbortModal}

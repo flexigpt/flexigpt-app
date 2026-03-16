@@ -46,6 +46,7 @@ export const InputPane = memo(function InputPane(props: {
 				ref={setInputRef(tabId)}
 				onSend={onSend}
 				isBusy={isBusy}
+				active={active}
 				isHydrating={isHydrating}
 				abortRef={getAbortRef(tabId)}
 				shortcutConfig={shortcutConfig}

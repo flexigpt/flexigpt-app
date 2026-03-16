@@ -52,6 +52,21 @@ import { ChatMessage } from '@/chats/messages/message';
 type StreamChannelBuffer = { chunks: string[]; flushedIdx: number; display: string };
 type StreamBuffer = { text: StreamChannelBuffer; thinking: StreamChannelBuffer };
 
+function sliceMessagesForSend(
+	messages: ConversationMessage[],
+	includePreviousMessages: UIChatOption['includePreviousMessages']
+) {
+	if (messages.length === 0) return [];
+	if (includePreviousMessages === 'all') return messages;
+
+	const safeCount = Math.max(0, includePreviousMessages);
+	const current = messages[messages.length - 1];
+	const previous = messages.slice(0, -1);
+	const selectedPrevious = safeCount > 0 ? previous.slice(-safeCount) : [];
+
+	return [...selectedPrevious, current];
+}
+
 function StreamingLastMessage(props: {
 	message: ConversationMessage;
 	rowIsBusy: boolean;
@@ -550,11 +565,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			const controller = new AbortController();
 			abortRef.current = controller;
 
-			let allMessages = updatedChatWithUserMessage.messages;
-			if (options.disablePreviousMessages) {
-				const last = updatedChatWithUserMessage.messages.at(-1);
-				allMessages = last ? [last] : [];
-			}
+			const allMessages = sliceMessagesForSend(updatedChatWithUserMessage.messages, options.includePreviousMessages);
 			if (allMessages.length === 0) {
 				updateTab(tabId, t => ({ ...t, isBusy: false }));
 				return;

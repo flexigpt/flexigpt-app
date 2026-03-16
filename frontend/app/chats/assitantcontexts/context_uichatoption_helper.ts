@@ -78,7 +78,7 @@ export async function getChatInputOptions(): Promise<{
 					modelPresetID: modelPresetID,
 					providerDisplayName: providerPreset.displayName,
 					modelDisplayName: modelPreset.displayName,
-					disablePreviousMessages: false,
+					includePreviousMessages: 'all',
 					capabilitiesOverride: mergedCaps,
 				};
 

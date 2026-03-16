@@ -1,257 +1,268 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
-import { FiCheck, FiChevronDown, FiChevronUp, FiEdit2, FiPlus, FiTrash, FiX } from 'react-icons/fi';
+import { FiCheck, FiChevronDown, FiChevronUp, FiGitBranch, FiPlus, FiTrash, FiX } from 'react-icons/fi';
 
-import {
-	Select,
-	SelectItem,
-	SelectPopover,
-	Tooltip,
-	useSelectStore,
-	useStoreState,
-	useTooltipStore,
-} from '@ariakit/react';
-
-import { getUUIDv7 } from '@/lib/uuid_utils';
+import { Popover, PopoverDisclosure, Tooltip, usePopoverStore, useStoreState, useTooltipStore } from '@ariakit/react';
 
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 
-import { SystemPromptAddEditModal } from '@/chats/assitantcontexts/system_prompt_add_edit_modal';
-
-export type SystemPromptItem = {
-	id: string;
-	title: string;
-	prompt: string;
-	locked?: boolean; // when true, cannot be deleted
-};
-
-function buildTitleFromPrompt(p: string): string {
-	const s = (p || '').trim();
-	if (!s) return '(empty)';
-	return s.length > 64 ? s.slice(0, 64) : s;
-}
-
-export function createSystemPromptItem(prompt: string, opts?: { locked?: boolean }): SystemPromptItem {
-	return {
-		id: getUUIDv7(),
-		title: buildTitleFromPrompt(prompt),
-		prompt,
-		locked: Boolean(opts?.locked),
-	};
-}
+import { SystemPromptAddModal } from '@/chats/assitantcontexts/system_prompt_add_modal';
+import { countEnabledSystemPromptSources } from '@/chats/assitantcontexts/system_prompt_utils';
+import type { SystemPromptItem } from '@/chats/assitantcontexts/use_system_prompts';
 
 type SystemPromptDropdownProps = {
 	prompts: SystemPromptItem[];
-	selectedPromptId?: string;
-	onSelect: (item: SystemPromptItem) => void;
-	onAdd: (item: SystemPromptItem) => void;
-	onEdit: (id: string, updatedPrompt: string) => void;
-	onRemove: (id: string) => void;
-	onClear: () => void;
+	selectedPromptIds: string[];
+	modelDefaultPrompt: string;
+	includeModelDefault: boolean;
+	onTogglePrompt: (id: string) => void;
+	onToggleModelDefault: (next: boolean) => void;
+	onAddPrompt: (prompt: string) => void;
+	onDeletePrompt: (id: string) => void;
+	onClearSelected: () => void;
 	isOpen: boolean;
 	setIsOpen: Dispatch<SetStateAction<boolean>>;
 };
 
+function buildPromptPreview(prompt: string): string {
+	const trimmed = prompt.trim();
+	if (!trimmed) return '(empty)';
+	return trimmed.length > 120 ? `${trimmed.slice(0, 120)}…` : trimmed;
+}
+
 export function SystemPromptDropdown({
 	prompts,
-	selectedPromptId,
-	onSelect,
-	onAdd,
-	onEdit,
-	onRemove,
-	onClear,
+	selectedPromptIds,
+	modelDefaultPrompt,
+	includeModelDefault,
+	onTogglePrompt,
+	onToggleModelDefault,
+	onAddPrompt,
+	onDeletePrompt,
+	onClearSelected,
 	isOpen,
 	setIsOpen,
 }: SystemPromptDropdownProps) {
-	const [isAddOpen, setIsAddOpen] = useState(false);
-	const [isEditOpen, setIsEditOpen] = useState(false);
-	const [editingItemId, setEditingItemId] = useState<string | null>(null);
-	const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+	const [isComposerOpen, setIsComposerOpen] = useState(false);
+	const [composerTitle, setComposerTitle] = useState('Add System Prompt');
+	const [composerInitialValue, setComposerInitialValue] = useState('');
 	const [itemPendingDelete, setItemPendingDelete] = useState<SystemPromptItem | null>(null);
 
-	const editingItem = useMemo(() => prompts.find(p => p.id === editingItemId) || null, [prompts, editingItemId]);
+	const hasModelDefaultPrompt = modelDefaultPrompt.trim().length > 0;
 
-	const select = useSelectStore({
-		value: selectedPromptId ?? '',
-		setValue: id => {
-			if (typeof id !== 'string') return;
+	const promptsById = useMemo(() => new Map(prompts.map(item => [item.id, item])), [prompts]);
 
-			if (!id) {
-				onClear();
-				return;
-			}
-			const item = prompts.find(p => p.id === id);
-			if (!item) return;
+	const activeSourceCount = useMemo(
+		() =>
+			countEnabledSystemPromptSources({
+				modelDefaultPrompt,
+				includeModelDefault,
+				selectedPromptIds,
+				promptsById,
+			}),
+		[includeModelDefault, modelDefaultPrompt, promptsById, selectedPromptIds]
+	);
 
-			// Clicking the same item again toggles off
-			if (selectedPromptId === id) {
-				onClear();
-			} else {
-				onSelect(item);
-			}
-		},
+	const popover = usePopoverStore({
 		open: isOpen,
 		setOpen: setIsOpen,
 		placement: 'top-start',
-		focusLoop: true,
 	});
 
-	const open = useStoreState(select, 'open');
+	const open = useStoreState(popover, 'open');
 
-	// Tooltip for full prompt text on each item.
-	// - placement: 'top-start' -> above the item, left-aligned.
-	// - portal: true on <Tooltip> so it escapes the popover box.
+	const selectedIdSet = useMemo(() => new Set(selectedPromptIds), [selectedPromptIds]);
 	const promptTooltip = useTooltipStore({ placement: 'left-end' });
 	const tooltipAnchorEl = useStoreState(promptTooltip, 'anchorElement');
 	const currentPromptText = tooltipAnchorEl?.dataset.prompt ?? '';
 
-	const handleEditItem = (item: SystemPromptItem) => {
-		setEditingItemId(item.id);
-		setIsEditOpen(true);
-		setIsOpen(false);
-	};
+	const showPromptTooltip = useCallback(
+		(element: HTMLElement) => {
+			const prompt = element.dataset.prompt ?? '';
+			if (!prompt.trim()) return;
 
-	const handleRemoveItem = (item: SystemPromptItem) => {
-		if (item.locked) return;
-		setItemPendingDelete(item);
-		setIsDeleteOpen(true);
-		setIsOpen(false);
-	};
+			promptTooltip.setAnchorElement(element);
+			promptTooltip.show();
+		},
+		[promptTooltip]
+	);
 
-	const handleConfirmDelete = () => {
-		if (!itemPendingDelete) return;
-
-		if (selectedPromptId === itemPendingDelete.id) {
-			onClear();
-		}
-		onRemove(itemPendingDelete.id);
-
-		setItemPendingDelete(null);
-		setIsDeleteOpen(false);
-	};
-
-	const handleCancelDelete = () => {
-		setItemPendingDelete(null);
-		setIsDeleteOpen(false);
-	};
-
-	const hasPrompts = prompts.length > 0;
+	const hidePromptTooltip = useCallback(() => {
+		promptTooltip.hide();
+		promptTooltip.setAnchorElement(null);
+	}, [promptTooltip]);
 
 	return (
 		<div className="flex w-full justify-center">
 			<div className="relative w-full">
-				<Select
-					store={select}
+				<PopoverDisclosure
+					store={popover}
 					className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none text-center text-nowrap shadow-none"
-					title={selectedPromptId ? 'System Prompt (enabled)' : 'System Prompt (disabled)'}
+					title={
+						activeSourceCount > 0 ? `System prompt sources enabled: ${activeSourceCount}` : 'System prompt disabled'
+					}
 				>
-					<span className="min-w-0 truncate text-center text-xs font-normal">System Prompt?</span>
-					{selectedPromptId ? (
-						<FiCheck size={16} className="m-0 shrink-0 p-0" />
+					<span className="min-w-0 truncate text-center text-xs font-normal">System Prompt</span>
+
+					{activeSourceCount > 0 ? (
+						<>
+							<span className="bg-success/15 text-success rounded-full px-1.5 py-0.5 text-[10px]">
+								{activeSourceCount}
+							</span>
+							<FiCheck size={16} className="m-0 shrink-0 p-0" />
+						</>
 					) : (
 						<FiX size={16} className="m-0 shrink-0 p-0" />
 					)}
+
 					{open ? (
 						<FiChevronDown size={16} className="ml-2 shrink-0" />
 					) : (
 						<FiChevronUp size={16} className="ml-2 shrink-0" />
 					)}
-				</Select>
+				</PopoverDisclosure>
 
-				<SelectPopover
-					store={select}
-					portal={false}
+				<Popover
+					store={popover}
 					gutter={4}
-					autoFocusOnShow
-					sameWidth
-					className="border-base-300 bg-base-100 z-50 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border p-1 text-xs shadow-lg outline-none"
+					portal={false}
+					className="border-base-300 bg-base-100 z-50 mt-1 max-h-80 w-[min(42rem,92vw)] overflow-y-auto rounded-xl border p-2 text-xs shadow-lg outline-none"
 				>
-					{hasPrompts ? (
-						prompts.map(item => (
-							<SelectItem
-								key={item.id}
-								value={item.id}
-								className="hover:bg-base-200 data-active-item:bg-base-300 m-0 flex cursor-pointer flex-col gap-1 rounded-md px-2 py-1 text-xs transition-colors outline-none"
-								// Used by the tooltip store to get the full prompt text
-								data-prompt={item.prompt}
-								onFocus={e => {
-									// Keyboard focus -> show tooltip above this item
-									promptTooltip.setAnchorElement(e.currentTarget as HTMLElement);
-									promptTooltip.show();
-								}}
-								onBlur={() => {
-									// Leaving item -> hide tooltip
-									promptTooltip.hide();
-									promptTooltip.setAnchorElement(null);
-								}}
-								onMouseEnter={e => {
-									// Mouse hover -> show tooltip above this item
-									promptTooltip.setAnchorElement(e.currentTarget as HTMLElement);
-									promptTooltip.show();
-								}}
-								onMouseLeave={() => {
-									// Mouse leave -> hide tooltip
-									promptTooltip.hide();
-								}}
-							>
-								{/* Title (truncated in list) */}
-								<div className="truncate text-start text-xs font-normal">{item.title}</div>
+					<div className="mb-2 px-1 text-[11px] font-medium opacity-70">
+						Active sources are concatenated in this order: model default, then selected saved prompts.
+					</div>
 
-								{/* Action row */}
-								<div className="flex items-center gap-1">
-									{selectedPromptId === item.id && (
-										<span className="bg-success/10 text-success inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium">
-											<FiCheck className="h-3 w-3" />
-											Current
-										</span>
-									)}
-
-									<div className="ml-auto flex gap-1">
-										<button
-											type="button"
-											className="btn btn-ghost btn-xs"
-											title="Edit"
-											onClick={e => {
-												e.stopPropagation();
-												e.preventDefault();
-												handleEditItem(item);
-											}}
-										>
-											<FiEdit2 size={12} />
-										</button>
-										<button
-											type="button"
-											className="btn btn-ghost btn-xs"
-											title={item.locked ? 'Cannot delete default prompt' : 'Delete'}
-											disabled={item.locked}
-											onClick={e => {
-												e.stopPropagation();
-												e.preventDefault();
-												handleRemoveItem(item);
-											}}
-										>
-											<FiTrash size={12} />
-										</button>
-									</div>
+					<div
+						className="border-base-300 mb-2 rounded-lg border p-2"
+						data-prompt={modelDefaultPrompt}
+						onFocus={e => {
+							showPromptTooltip(e.currentTarget);
+						}}
+						onBlur={hidePromptTooltip}
+						onMouseEnter={e => {
+							showPromptTooltip(e.currentTarget);
+						}}
+						onMouseLeave={hidePromptTooltip}
+					>
+						<div className="mb-1 flex items-start gap-2">
+							<input
+								type="checkbox"
+								className="checkbox checkbox-xs mt-0.5 rounded"
+								checked={hasModelDefaultPrompt && includeModelDefault}
+								disabled={!hasModelDefaultPrompt}
+								onChange={e => {
+									onToggleModelDefault(e.target.checked);
+								}}
+							/>
+							<div className="min-w-0 flex-1">
+								<div className="flex items-center gap-2">
+									<span className="font-medium">Model default</span>
+									<span className="badge badge-ghost badge-xs">per selected model</span>
 								</div>
-							</SelectItem>
-						))
+								<div className="mt-1 text-[11px] whitespace-pre-wrap opacity-75" title={modelDefaultPrompt}>
+									{hasModelDefaultPrompt
+										? buildPromptPreview(modelDefaultPrompt)
+										: 'This model has no default system prompt.'}
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<div className="mb-1 px-1 text-[11px] font-medium opacity-70">Saved prompts</div>
+
+					{prompts.length > 0 ? (
+						<div className="space-y-1">
+							{prompts.map(item => {
+								const isSelected = selectedIdSet.has(item.id);
+
+								return (
+									<div
+										key={item.id}
+										data-prompt={item.prompt}
+										className="hover:bg-base-200 border-base-300 flex items-start gap-2 rounded-lg border p-2 transition-colors"
+										onFocus={e => {
+											showPromptTooltip(e.currentTarget);
+										}}
+										onBlur={hidePromptTooltip}
+										onMouseEnter={e => {
+											showPromptTooltip(e.currentTarget);
+										}}
+										onMouseLeave={hidePromptTooltip}
+									>
+										<input
+											type="checkbox"
+											className="checkbox checkbox-xs mt-0.5 rounded"
+											checked={isSelected}
+											onChange={() => {
+												onTogglePrompt(item.id);
+											}}
+										/>
+
+										<button
+											type="button"
+											className="min-w-0 flex-1 text-left"
+											title={item.prompt}
+											onClick={() => {
+												onTogglePrompt(item.id);
+											}}
+										>
+											<div className="truncate text-xs font-medium">{item.title}</div>
+											<div className="mt-1 text-[11px] whitespace-pre-wrap opacity-75">
+												{buildPromptPreview(item.prompt)}
+											</div>
+										</button>
+
+										<div className="ml-2 flex shrink-0 gap-1">
+											<button
+												type="button"
+												className="btn btn-ghost btn-xs"
+												title="Fork"
+												onClick={() => {
+													hidePromptTooltip();
+
+													setComposerTitle('Fork System Prompt');
+													setComposerInitialValue(item.prompt);
+													setIsOpen(false);
+													setIsComposerOpen(true);
+												}}
+											>
+												<FiGitBranch size={12} />
+											</button>
+
+											<button
+												type="button"
+												className="btn btn-ghost btn-xs"
+												title="Delete"
+												onClick={() => {
+													hidePromptTooltip();
+													setItemPendingDelete(item);
+													setIsOpen(false);
+												}}
+											>
+												<FiTrash size={12} />
+											</button>
+										</div>
+									</div>
+								);
+							})}
+						</div>
 					) : (
-						<div className="m-0 flex cursor-default items-center justify-between rounded-md px-2 py-1 text-xs opacity-70">
+						<div className="m-0 flex cursor-default items-center justify-between rounded-md px-2 py-2 text-xs opacity-70">
 							<span>No saved prompts</span>
 						</div>
 					)}
 
-					{/* Add / Clear row */}
-					<div className="border-neutral/20 mt-1 border-t pt-1 text-xs">
-						<div className="flex items-center justify-between p-1">
+					<div className="border-neutral/20 mt-2 border-t pt-2 text-xs">
+						<div className="flex items-center justify-between gap-2 p-1">
 							<button
 								type="button"
 								className="btn btn-ghost btn-xs rounded-lg"
 								onClick={() => {
+									setComposerTitle('Add System Prompt');
+									setComposerInitialValue('');
 									setIsOpen(false);
-									setIsAddOpen(true);
+									setIsComposerOpen(true);
 								}}
 							>
 								<FiPlus size={14} className="mr-1" /> Add
@@ -261,19 +272,18 @@ export function SystemPromptDropdown({
 								type="button"
 								className="btn btn-ghost btn-xs rounded-lg"
 								onClick={() => {
-									onClear();
+									onClearSelected();
 									setIsOpen(false);
 								}}
-								title="Clear current system prompt"
-								disabled={!selectedPromptId}
+								title="Clear all selected prompt sources"
+								disabled={!includeModelDefault && selectedPromptIds.length === 0}
 							>
-								<FiX size={14} className="mr-1" /> Clear
+								<FiX size={14} className="mr-1" /> Clear selected
 							</button>
 						</div>
 					</div>
-				</SelectPopover>
+				</Popover>
 
-				{/* Tooltip showing full prompt text, above the currently hovered/focused item */}
 				<Tooltip
 					store={promptTooltip}
 					portal
@@ -282,49 +292,40 @@ export function SystemPromptDropdown({
 					{currentPromptText}
 				</Tooltip>
 
-				{/* Add Modal */}
-				<SystemPromptAddEditModal
-					isOpen={isAddOpen}
-					mode="add"
-					initialValue=""
+				<SystemPromptAddModal
+					isOpen={isComposerOpen}
+					title={composerTitle}
+					initialValue={composerInitialValue}
 					promptsForCopy={prompts}
 					onClose={() => {
-						setIsAddOpen(false);
+						setIsComposerOpen(false);
+						setComposerInitialValue('');
 					}}
 					onSave={value => {
-						const newItem = createSystemPromptItem(value);
-						onAdd(newItem);
+						onAddPrompt(value);
+						setIsComposerOpen(false);
+						setComposerInitialValue('');
 					}}
 				/>
 
-				{/* Edit Modal */}
-				<SystemPromptAddEditModal
-					isOpen={isEditOpen}
-					mode="edit"
-					initialValue={editingItem?.prompt ?? ''}
-					promptsForCopy={prompts}
-					onClose={() => {
-						setIsEditOpen(false);
-						setEditingItemId(null);
-					}}
-					onSave={value => {
-						if (!editingItem) return;
-						onEdit(editingItem.id, value);
-					}}
-				/>
-
-				{/* Delete confirmation */}
 				<DeleteConfirmationModal
-					isOpen={isDeleteOpen}
-					onClose={handleCancelDelete}
-					onConfirm={handleConfirmDelete}
-					title="Remove saved prompt?"
+					isOpen={!!itemPendingDelete}
+					onClose={() => {
+						setItemPendingDelete(null);
+					}}
+					onConfirm={() => {
+						if (itemPendingDelete) {
+							onDeletePrompt(itemPendingDelete.id);
+						}
+						setItemPendingDelete(null);
+					}}
+					title="Delete saved prompt?"
 					message={
 						itemPendingDelete
-							? `This will remove "${itemPendingDelete.title}" from your saved system prompts. This action cannot be undone.`
-							: 'This will remove the saved system prompt. This action cannot be undone.'
+							? `This will delete "${itemPendingDelete.title}" from the saved system prompt library.`
+							: 'This will delete the saved system prompt.'
 					}
-					confirmButtonText="Remove"
+					confirmButtonText="Delete"
 				/>
 			</div>
 		</div>

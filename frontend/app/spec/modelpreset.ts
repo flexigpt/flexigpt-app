@@ -105,13 +105,22 @@ export interface ProviderPreset extends PutProviderPresetPayload {
 	modelPresets: Record<ModelPresetID, ModelPreset>;
 }
 
+export type IncludePreviousMessages = number | 'all';
+
 export interface UIChatOption extends ModelParam {
 	providerName: ProviderName;
 	providerSDKType: ProviderSDKType;
 	modelPresetID: ModelPresetID;
 	providerDisplayName: ProviderDisplayName;
 	modelDisplayName: ModelDisplayName;
-	disablePreviousMessages: boolean;
+	/**
+	 * How many earlier conversation messages to include in addition to the
+	 * current submitted user message.
+	 * - 'all' => full history
+	 * - 0 => current message only
+	 * - n => last n previous messages + current message
+	 */
+	includePreviousMessages: IncludePreviousMessages;
 	/**
 	 * Effective (provider + model merged) capability overrides for this selectable option.
 	 * Model-level override wins over provider-level override.
@@ -126,6 +135,6 @@ export const DefaultUIChatOptions: UIChatOption = {
 	modelPresetID: 'no-model',
 	providerDisplayName: 'No Provider',
 	modelDisplayName: 'No Model configured',
-	disablePreviousMessages: false,
+	includePreviousMessages: 'all',
 	capabilitiesOverride: undefined,
 };
