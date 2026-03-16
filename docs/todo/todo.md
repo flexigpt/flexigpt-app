@@ -2,7 +2,7 @@
 
 ## Laundry list
 
-- [ ] chats
+- [x] chats
   - [x] context deadline exceeded error or may be other errors dont show up as content box? it comes out as minimal single line item.
   - [x] perf:
     - [x] react virtuoso

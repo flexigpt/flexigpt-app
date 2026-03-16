@@ -118,7 +118,6 @@ function closeDialogSafely(dialog: HTMLDialogElement | null): boolean {
 
 function AdvancedParamsModalInner({ onClose, currentModel, onSave }: AdvancedParamsModalInnerProps) {
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
-	const isUnmountingRef = useRef(false);
 
 	const supportedOutputFormats = useMemo(
 		() => getSupportedOutputFormats(currentModel.capabilitiesOverride),
@@ -192,8 +191,6 @@ function AdvancedParamsModalInner({ onClose, currentModel, onSave }: AdvancedPar
 	const [errors, setErrors] = useState<Partial<Record<ErrorKey, string>>>({});
 
 	useEffect(() => {
-		isUnmountingRef.current = false;
-
 		const dialog = dialogRef.current;
 		if (!dialog) return;
 
@@ -204,17 +201,10 @@ function AdvancedParamsModalInner({ onClose, currentModel, onSave }: AdvancedPar
 		} catch {
 			// Ignore showModal errors if the dialog is already open or not ready.
 		}
-
-		return () => {
-			isUnmountingRef.current = true;
-			closeDialogSafely(dialog);
-		};
 	}, []);
 
 	const handleDialogClose = useCallback(() => {
-		if (!isUnmountingRef.current) {
-			onClose();
-		}
+		onClose();
 	}, [onClose]);
 
 	const requestClose = useCallback(() => {
@@ -443,7 +433,15 @@ function AdvancedParamsModalInner({ onClose, currentModel, onSave }: AdvancedPar
 	};
 
 	return (
-		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose}>
+		<dialog
+			ref={dialogRef}
+			className="modal"
+			onClose={handleDialogClose}
+			onCancel={e => {
+				e.preventDefault();
+				requestClose();
+			}}
+		>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-auto rounded-2xl">
 				<div className="mb-4 flex items-center justify-between">
 					<h3 className="text-lg font-bold">Advanced Model Parameters</h3>

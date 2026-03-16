@@ -4,6 +4,7 @@ import {
 	useCallback,
 	useEffect,
 	useImperativeHandle,
+	useLayoutEffect,
 	useMemo,
 	useRef,
 	useState,
@@ -162,6 +163,15 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const isLoadingExternalMessageRef = useRef(false);
 	const externalMessageLoadReleaseTimerRef = useRef<number | null>(null);
 	const [webSearchArgsBlocked, setWebSearchArgsBlocked] = useState(false);
+	const webSearchArgsBlockedRef = useRef(false);
+
+	useEffect(() => {
+		webSearchArgsBlockedRef.current = webSearchArgsBlocked;
+	}, [webSearchArgsBlocked]);
+
+	const getExternalAutoExecuteBlocked = useCallback(() => {
+		return webSearchArgsBlockedRef.current;
+	}, []);
 
 	// ---- Skills (conversation-level) ----
 	const {
@@ -237,8 +247,24 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		getCurrentSkillSessionID,
 		skillSessionID,
 		toolArgsEventTarget,
+		getExternalAutoExecuteBlocked,
 		getAttachedToolEntries: getAttachedToolEntriesSnapshot,
 	});
+
+	const previousProviderSDKTypeRef = useRef(currentProviderSDKType);
+
+	useLayoutEffect(() => {
+		if (previousProviderSDKTypeRef.current === currentProviderSDKType) return;
+
+		previousProviderSDKTypeRef.current = currentProviderSDKType;
+
+		// Web-search tools are SDK-bound. Clear stale selections immediately
+		// when switching SDK families so incompatible choices cannot linger
+		// in UI state or slip into the next submit.
+		setWebSearchTemplates([]);
+		setToolArgsTarget(prev => (prev?.kind === 'webSearch' ? null : prev));
+	}, [currentProviderSDKType, setToolArgsTarget, setWebSearchTemplates]);
+
 	const hasBlockingToolArgs = toolArgsBlocked || webSearchArgsBlocked;
 
 	const attachedToolIdentityKeys = useMemo(() => {

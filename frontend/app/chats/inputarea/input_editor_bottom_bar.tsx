@@ -35,6 +35,7 @@ import { ToolMenuRow } from '@/chats/tools/tool_menu_row';
 import { WebSearchBottomBarChip } from '@/chats/tools/web_search_bottom_bar_chip';
 import {
 	getEligibleWebSearchTools,
+	normalizeWebSearchChoiceTemplates,
 	type WebSearchChoiceTemplate,
 	webSearchIdentityKey,
 	webSearchTemplateFromToolListItem,
@@ -197,8 +198,6 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 		};
 	}, [toolAutoExecOverrides, attachedAutoExecByKey]);
 
-	const webSearchEnabled = webSearchTemplates.length > 0;
-
 	const eligibleWebSearchTools = useMemo(() => {
 		if (toolsLoading) return [];
 		return getEligibleWebSearchTools(toolData, currentProviderSDKType);
@@ -215,6 +214,17 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 			)
 		);
 	}, [eligibleWebSearchTools]);
+
+	const compatibleWebSearchTemplates = useMemo(
+		() =>
+			normalizeWebSearchChoiceTemplates(
+				webSearchTemplates.filter(template => eligibleWebSearchKeys.has(webSearchIdentityKey(template)))
+			),
+		[eligibleWebSearchKeys, webSearchTemplates]
+	);
+
+	const webSearchEnabled = compatibleWebSearchTemplates.length > 0;
+
 	useEffect(() => {
 		if (isInputLocked) {
 			templateMenuState.hide();
@@ -223,6 +233,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 			setIsUrlModalOpen(false);
 		}
 	}, [attachmentMenuState, isInputLocked, templateMenuState, toolMenuState]);
+
 	useEffect(() => {
 		if (toolsLoading) return;
 		setWebSearchTemplates(prev => {
@@ -233,7 +244,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	}, [eligibleWebSearchKeys, setWebSearchTemplates, toolsLoading]);
 
 	// "Active" web-search tool for the bottom-bar UX (first one wins).
-	const activeWebSearch = webSearchTemplates.length > 0 ? webSearchTemplates[0] : undefined;
+	const activeWebSearch = compatibleWebSearchTemplates.length > 0 ? compatibleWebSearchTemplates[0] : undefined;
 
 	// Try to find the active tool definition from eligible tools (so we can show args status).
 	const activeWebSearchDef = useMemo(() => {
@@ -340,8 +351,8 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 			setWebSearchTemplates([]);
 			return;
 		}
-		// default enable: add the first eligible tool if none selected
-		if (webSearchTemplates.length > 0 || eligibleWebSearchTools.length === 0) return;
+
+		if (compatibleWebSearchTemplates.length > 0 || eligibleWebSearchTools.length === 0) return;
 
 		const first = eligibleWebSearchTools[0];
 		setWebSearchTemplates([webSearchTemplateFromToolListItem(first)]);

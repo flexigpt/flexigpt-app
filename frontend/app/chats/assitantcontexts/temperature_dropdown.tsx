@@ -87,6 +87,7 @@ export function TemperatureDropdown({ temperature, setTemperature, isOpen, setIs
 							</div>
 							<input
 								key={temperature}
+								data-disable-chat-shortcuts="true"
 								type="text"
 								name="temperature"
 								className="input input-xs w-full"

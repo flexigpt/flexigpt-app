@@ -133,6 +133,8 @@ export function useComposerTools({
 	getCurrentSkillSessionID,
 	skillSessionID,
 	toolArgsEventTarget,
+	externalAutoExecuteBlocked = false,
+	getExternalAutoExecuteBlocked,
 	getAttachedToolEntries,
 }: UseComposerToolsArgs): UseComposerToolsResult {
 	const isMountedRef = useRef(true);
@@ -183,13 +185,24 @@ export function useComposerTools({
 	const autoExecuteInFlightRef = useRef(false);
 	const autoExecuteRequestedRef = useRef(false);
 	const runAutoExecutePendingToolCallsCheckRef = useRef<() => void>(() => {});
+
+	const hasExternalAutoExecuteBlocked = useCallback(() => {
+		return getExternalAutoExecuteBlocked ? getExternalAutoExecuteBlocked() : externalAutoExecuteBlocked;
+	}, [externalAutoExecuteBlocked, getExternalAutoExecuteBlocked]);
+
 	useEffect(() => {
 		toolRuntimeStateRef.current = toolRuntimeState;
 	}, [toolRuntimeState]);
 
 	const kickAutoExecutePendingToolCalls = useCallback(() => {
 		if (!autoExecuteRequestedRef.current) return;
-		if (isBusyRef.current || isSubmittingRef.current || templateBlockedRef.current || toolArgsBlockedRef.current) {
+		if (
+			isBusyRef.current ||
+			isSubmittingRef.current ||
+			templateBlockedRef.current ||
+			toolArgsBlockedRef.current ||
+			hasExternalAutoExecuteBlocked()
+		) {
 			return;
 		}
 		if (autoExecuteCheckTimeoutRef.current != null) return;
@@ -197,7 +210,7 @@ export function useComposerTools({
 			autoExecuteCheckTimeoutRef.current = null;
 			runAutoExecutePendingToolCallsCheckRef.current();
 		}, 0);
-	}, [isSubmittingRef]);
+	}, [hasExternalAutoExecuteBlocked, isSubmittingRef]);
 
 	const syncAutoExecutePendingToolCallsRequest = useCallback(
 		(nextToolCalls: UIToolCall[]) => {
@@ -288,6 +301,7 @@ export function useComposerTools({
 	useEffect(() => {
 		isBusyRef.current = isBusy;
 		if (!isBusy) {
+			// eslint-disable-next-line react-you-might-not-need-an-effect/no-pass-live-state-to-parent
 			kickAutoExecutePendingToolCalls();
 		}
 	}, [isBusy, kickAutoExecutePendingToolCalls]);
@@ -295,6 +309,7 @@ export function useComposerTools({
 	useEffect(() => {
 		templateBlockedRef.current = templateBlocked;
 		if (!templateBlocked) {
+			// eslint-disable-next-line react-you-might-not-need-an-effect/no-pass-live-state-to-parent
 			kickAutoExecutePendingToolCalls();
 		}
 	}, [templateBlocked, kickAutoExecutePendingToolCalls]);
@@ -310,6 +325,13 @@ export function useComposerTools({
 			}
 		};
 	}, []);
+
+	useEffect(() => {
+		if (!hasExternalAutoExecuteBlocked()) {
+			// eslint-disable-next-line react-you-might-not-need-an-effect/no-pass-live-state-to-parent
+			kickAutoExecutePendingToolCalls();
+		}
+	}, [hasExternalAutoExecuteBlocked, kickAutoExecutePendingToolCalls]);
 
 	const isSkillsToolName = useCallback((name: string | undefined): boolean => {
 		const n = (name ?? '').trim();
@@ -634,7 +656,7 @@ export function useComposerTools({
 
 				// If any auto-exec invocation failed at runtime, keep the failed chip
 				// in the composer and do not auto-send.
-				if (!allAutoExecuteCallsCompleted || hasFailedRunnable) return;
+				if (!allAutoExecuteCallsCompleted || hasFailedRunnable || hasExternalAutoExecuteBlocked()) return;
 
 				// All remaining runnable calls were auto-exec and completed.
 				// Reuse the existing fast-forward submit path; with no pending calls
@@ -656,7 +678,13 @@ export function useComposerTools({
 				}
 			}
 		})();
-	}, [isSubmittingRef, kickAutoExecutePendingToolCalls, runToolCallInternal, submitPendingToolsAndSendRef]);
+	}, [
+		hasExternalAutoExecuteBlocked,
+		isSubmittingRef,
+		kickAutoExecutePendingToolCalls,
+		runToolCallInternal,
+		submitPendingToolsAndSendRef,
+	]);
 
 	runAutoExecutePendingToolCallsCheckRef.current = runAutoExecutePendingToolCallsCheck;
 

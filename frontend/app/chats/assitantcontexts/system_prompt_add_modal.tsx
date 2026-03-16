@@ -64,11 +64,8 @@ function SystemPromptAddModalInner({
 	const [copyFromId, setCopyFromId] = useState<string>('');
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
-	const isUnmountingRef = useRef(false);
 
 	useEffect(() => {
-		isUnmountingRef.current = false;
-
 		const dialog = dialogRef.current;
 		if (!dialog) return;
 
@@ -79,17 +76,10 @@ function SystemPromptAddModalInner({
 		} catch {
 			// ignore showModal errors
 		}
-
-		return () => {
-			isUnmountingRef.current = true;
-			closeDialogSafely(dialog);
-		};
 	}, []);
 
 	const handleDialogClose = useCallback(() => {
-		if (!isUnmountingRef.current) {
-			onClose();
-		}
+		onClose();
 	}, [onClose]);
 
 	const requestClose = useCallback(() => {
@@ -137,8 +127,16 @@ function SystemPromptAddModalInner({
 	);
 
 	return (
-		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose}>
-			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-auto rounded-2xl">
+		<dialog
+			ref={dialogRef}
+			className="modal"
+			onClose={handleDialogClose}
+			onCancel={e => {
+				e.preventDefault();
+				requestClose();
+			}}
+		>
+			<div className="modal-box bg-base-200 max-h-[80vh] max-w-xl overflow-auto rounded-2xl">
 				<div className="mb-4 flex items-center justify-between">
 					<h3 className="text-lg font-bold">{title}</h3>
 					<button type="button" className="btn btn-sm btn-circle bg-base-300" onClick={requestClose} aria-label="Close">

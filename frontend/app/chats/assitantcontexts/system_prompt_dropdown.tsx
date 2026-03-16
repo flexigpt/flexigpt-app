@@ -127,7 +127,7 @@ export function SystemPromptDropdown({
 					store={popover}
 					gutter={4}
 					portal={false}
-					className="border-base-300 bg-base-100 z-50 mt-1 max-h-80 w-[min(42rem,92vw)] overflow-y-auto rounded-xl border p-2 text-xs shadow-lg outline-none"
+					className="border-base-300 bg-base-100 z-50 mt-1 max-h-80 max-w-xl min-w-md overflow-y-auto rounded-xl border p-2 text-xs shadow-lg outline-none"
 				>
 					<div className="mb-2 px-1 text-[11px] font-medium opacity-70">
 						Active sources are concatenated in this order: model default, then selected saved prompts.
@@ -223,7 +223,9 @@ export function SystemPromptDropdown({
 													setComposerTitle('Fork System Prompt');
 													setComposerInitialValue(item.prompt);
 													setIsOpen(false);
-													setIsComposerOpen(true);
+													requestAnimationFrame(() => {
+														setIsComposerOpen(true);
+													});
 												}}
 											>
 												<FiGitBranch size={12} />
@@ -261,7 +263,9 @@ export function SystemPromptDropdown({
 									setComposerTitle('Add System Prompt');
 									setComposerInitialValue('');
 									setIsOpen(false);
-									setIsComposerOpen(true);
+									requestAnimationFrame(() => {
+										setIsComposerOpen(true);
+									});
 								}}
 							>
 								<FiPlus size={14} className="mr-1" /> Add

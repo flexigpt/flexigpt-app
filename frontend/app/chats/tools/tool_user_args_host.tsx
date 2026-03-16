@@ -63,6 +63,32 @@ export function ToolArgsModalHost({
 	const webSearchToolDef = loadedWebSearchToolDef?.key === activeWebSearchKey ? loadedWebSearchToolDef.def : null;
 
 	useEffect(() => {
+		if (!toolArgsTarget) return;
+
+		if (toolArgsTarget.kind === 'webSearch' && !activeWebSearch) {
+			setToolArgsTarget(null);
+			return;
+		}
+
+		if (toolArgsTarget.kind === 'attached') {
+			// eslint-disable-next-line react-you-might-not-need-an-effect/no-pass-data-to-parent
+			const stillExists = attachedToolEntries.some(entry => entry.selectionID === toolArgsTarget.selectionID);
+			if (!stillExists) {
+				setToolArgsTarget(null);
+			}
+			return;
+		}
+
+		if (toolArgsTarget.kind === 'conversation') {
+			// eslint-disable-next-line react-you-might-not-need-an-effect/no-pass-data-to-parent
+			const stillExists = conversationToolsState.some(entry => entry.key === toolArgsTarget.key);
+			if (!stillExists) {
+				setToolArgsTarget(null);
+			}
+		}
+	}, [activeWebSearch, attachedToolEntries, conversationToolsState, setToolArgsTarget, toolArgsTarget]);
+
+	useEffect(() => {
 		let cancelled = false;
 
 		if (

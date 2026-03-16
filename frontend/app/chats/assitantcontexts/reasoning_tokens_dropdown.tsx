@@ -89,6 +89,7 @@ export function ReasoningTokensDropdown({ tokens, setTokens, isOpen, setIsOpen }
 							</div>
 							<input
 								key={tokens}
+								data-disable-chat-shortcuts="true"
 								type="text"
 								className="input input-xs w-full"
 								placeholder="Enter a custom integer ≥ 1024"

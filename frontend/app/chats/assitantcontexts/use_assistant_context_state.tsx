@@ -141,7 +141,6 @@ export function useAssistantContextState({ active }: { active: boolean }): Assis
 			action: SetStateAction<UIChatOption>,
 			options?: {
 				syncHybridFromModel?: boolean;
-				syncModelDefaultSelectionFromModel?: boolean;
 			}
 		) => {
 			const currentSelectedModel = selectedModelRef.current;
@@ -160,10 +159,6 @@ export function useAssistantContextState({ active }: { active: boolean }): Assis
 
 			if (nextIsHybridReasoningEnabled !== currentIsHybridReasoningEnabled) {
 				setIsHybridReasoningEnabled(nextIsHybridReasoningEnabled);
-			}
-
-			if (options?.syncModelDefaultSelectionFromModel) {
-				setIncludeModelDefault(Boolean(nextSelectedModel.systemPrompt.trim()));
 			}
 		},
 		[]
@@ -194,7 +189,6 @@ export function useAssistantContextState({ active }: { active: boolean }): Assis
 		(action: SetStateAction<UIChatOption>) => {
 			applySelectedModel(action, {
 				syncHybridFromModel: true,
-				syncModelDefaultSelectionFromModel: true,
 			});
 		},
 		[applySelectedModel]

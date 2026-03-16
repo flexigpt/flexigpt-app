@@ -74,6 +74,7 @@ export function TemplateFixedToolbar(props: {
 					<FiEdit2 size={14} />
 				</button>
 				<button
+					type="button"
 					className="btn btn-ghost btn-sm shrink-0 px-2 py-0 shadow-none"
 					onClick={onSetAsSystemPrompt}
 					title="Set system prompt for chat"
