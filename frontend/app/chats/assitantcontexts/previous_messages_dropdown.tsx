@@ -109,30 +109,25 @@ export function PreviousMessagesDropdown({ value, setValue, isOpen, setIsOpen }:
 					})}
 
 					<div className="border-neutral/20 mt-2 border-t pt-2 text-xs">
-						<label className="tooltip tooltip-top w-full border-none outline-none">
-							<div className="tooltip-content">
-								<div className="text-xs">Custom number of previous messages to include (0 or greater)</div>
-							</div>
-							<input
-								key={valueToKey(value)}
-								data-disable-chat-shortcuts="true"
-								type="text"
-								name="include-previous-messages"
-								className="input input-xs w-full"
-								placeholder="Custom previous message count"
-								defaultValue={value === 'all' ? '' : String(value)}
-								spellCheck="false"
-								onBlur={e => {
+						<input
+							key={valueToKey(value)}
+							data-disable-chat-shortcuts="true"
+							type="text"
+							name="include-previous-messages"
+							className="input input-xs w-full"
+							placeholder="<n> previous messages"
+							defaultValue={value === 'all' ? '' : String(value)}
+							spellCheck="false"
+							onBlur={e => {
+								commitCustomValue(e.currentTarget.value);
+							}}
+							onKeyDown={e => {
+								if (e.key === 'Enter') {
+									e.preventDefault();
 									commitCustomValue(e.currentTarget.value);
-								}}
-								onKeyDown={e => {
-									if (e.key === 'Enter') {
-										e.preventDefault();
-										commitCustomValue(e.currentTarget.value);
-									}
-								}}
-							/>
-						</label>
+								}
+							}}
+						/>
 					</div>
 				</SelectPopover>
 			</div>

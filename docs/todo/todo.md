@@ -10,6 +10,9 @@
 - [ ] Sys prompt:
   - [ ] We may want to have a explicit prompt saying that use explicit tools rather than shell wherever possible.
 
+- [ ] context bar
+  - [ ] tooltips are needed. ariakit ones as daisyui ones can get cutoff
+
 ## Features
 
 - [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls loop is better.
