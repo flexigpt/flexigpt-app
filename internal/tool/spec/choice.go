@@ -10,6 +10,11 @@ const (
 	ToolStoreChoiceTypeWebSearch ToolStoreChoiceType = "webSearch"
 )
 
+type ToolChoicePatch struct {
+	AutoExecute           *bool         `json:"autoExecute,omitempty"`
+	UserArgSchemaInstance JSONRawString `json:"userArgSchemaInstance,omitempty"`
+}
+
 type ToolStoreChoice struct {
 	ChoiceID string `json:"choiceID"`
 

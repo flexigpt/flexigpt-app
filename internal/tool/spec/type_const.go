@@ -110,6 +110,12 @@ type HTTPToolImpl struct {
 	Response HTTPResponse `json:"response"`
 }
 
+type ToolRef struct {
+	BundleID    bundleitemutils.BundleID    `json:"bundleID"`
+	ToolSlug    bundleitemutils.ItemSlug    `json:"toolSlug"`
+	ToolVersion bundleitemutils.ItemVersion `json:"toolVersion"`
+}
+
 type Tool struct {
 	SchemaVersion string                      `json:"schemaVersion"`
 	ID            bundleitemutils.ItemID      `json:"id"` // UUID-v7

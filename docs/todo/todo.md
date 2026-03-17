@@ -5,9 +5,9 @@
 - AssistantPreset
   - [ ] core philosophy is that it is a starting point for user with recommended things. user can change post that as needed.
   - [ ] should have tool sets and autoexec config too so that the "agent" loop is kind of autonomous
-  - [ ] create refs and patch objects in current specs first. do associated cleanups.
+  - [x] create refs and patch objects in current specs first. do associated cleanups.
     - [x] modelpreset
-    - [ ] tool
+    - [x] tool
   - [ ] support storing sys prompts in prompt templates
   - [ ] assistant store
   - [ ] conversation to include additional things wrt assistant and current absent contexts. idea is to have "full vs increment" in message turn.
