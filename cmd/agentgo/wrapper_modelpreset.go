@@ -60,11 +60,11 @@ func (w *ModelPresetStoreWrapper) ListProviderPresets(
 	})
 }
 
-func (w *ModelPresetStoreWrapper) PutModelPreset(
-	req *spec.PutModelPresetRequest,
-) (*spec.PutModelPresetResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.PutModelPresetResponse, error) {
-		return w.store.PutModelPreset(context.Background(), req)
+func (w *ModelPresetStoreWrapper) PostModelPreset(
+	req *spec.PostModelPresetRequest,
+) (*spec.PostModelPresetResponse, error) {
+	return middleware.WithRecoveryResp(func() (*spec.PostModelPresetResponse, error) {
+		return w.store.PostModelPreset(context.Background(), req)
 	})
 }
 

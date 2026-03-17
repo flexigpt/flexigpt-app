@@ -89,10 +89,10 @@ func SetWrappedProviderAppContext(w *AggregrateWrapper, ctx context.Context) {
 	w.appContext = ctx
 }
 
-func (w *AggregrateWrapper) PutProviderPreset(
-	req *modelpresetSpec.PutProviderPresetRequest,
-) (*modelpresetSpec.PutProviderPresetResponse, error) {
-	return middleware.WithRecoveryResp(func() (*modelpresetSpec.PutProviderPresetResponse, error) {
+func (w *AggregrateWrapper) PostProviderPreset(
+	req *modelpresetSpec.PostProviderPresetRequest,
+) (*modelpresetSpec.PostProviderPresetResponse, error) {
+	return middleware.WithRecoveryResp(func() (*modelpresetSpec.PostProviderPresetResponse, error) {
 		// First try to delete from provider apis, it is ok if it is not present.
 		_, _ = w.providersetAPI.DeleteProvider(
 			context.Background(),
@@ -115,7 +115,7 @@ func (w *AggregrateWrapper) PutProviderPreset(
 			}); err != nil {
 			return nil, err
 		}
-		resp, err := w.modelPresetStore.PutProviderPreset(context.Background(), req)
+		resp, err := w.modelPresetStore.PostProviderPreset(context.Background(), req)
 		if err != nil {
 			return nil, err
 		}

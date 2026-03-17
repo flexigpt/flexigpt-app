@@ -65,10 +65,10 @@ func newStoreAtDir(t *testing.T, dir string) *ModelPresetStore {
 	return st
 }
 
-func putUserProvider(t *testing.T, st *ModelPresetStore, name inferenceSpec.ProviderName, enabled bool) {
+func postUserProvider(t *testing.T, st *ModelPresetStore, name inferenceSpec.ProviderName, enabled bool) {
 	t.Helper()
 
-	body := &spec.PutProviderPresetRequestBody{
+	body := &spec.PostProviderPresetRequestBody{
 		DisplayName:              spec.ProviderDisplayName(strings.ToUpper(string(name))),
 		SDKType:                  inferenceSpec.ProviderSDKTypeOpenAIChatCompletions,
 		IsEnabled:                enabled,
@@ -78,16 +78,16 @@ func putUserProvider(t *testing.T, st *ModelPresetStore, name inferenceSpec.Prov
 		DefaultHeaders:           spec.OpenAIChatCompletionsDefaultHeaders,
 	}
 
-	_, err := st.PutProviderPreset(t.Context(), &spec.PutProviderPresetRequest{
+	_, err := st.PostProviderPreset(t.Context(), &spec.PostProviderPresetRequest{
 		ProviderName: name,
 		Body:         body,
 	})
 	if err != nil {
-		t.Fatalf("PutProviderPreset(%q): %v", name, err)
+		t.Fatalf("PostProviderPreset(%q): %v", name, err)
 	}
 }
 
-func putUserModelPreset(
+func postUserModelPreset(
 	t *testing.T,
 	ctx context.Context,
 	st *ModelPresetStore,
@@ -98,19 +98,21 @@ func putUserModelPreset(
 	t.Helper()
 
 	temp := 0.1
-	_, err := st.PutModelPreset(ctx, &spec.PutModelPresetRequest{
+	_, err := st.PostModelPreset(ctx, &spec.PostModelPresetRequest{
 		ProviderName:  provider,
 		ModelPresetID: modelID,
-		Body: &spec.PutModelPresetRequestBody{
+		Body: &spec.PostModelPresetRequestBody{
 			Name:        spec.ModelName(modelID),
 			Slug:        spec.ModelSlug(modelID),
 			DisplayName: spec.ModelDisplayName(strings.ToUpper(string(modelID))),
 			IsEnabled:   enabled,
-			Temperature: &temp, // required (or reasoning)
+			ModelPresetPatch: spec.ModelPresetPatch{
+				Temperature: &temp, // required (or reasoning)
+			},
 		},
 	})
 	if err != nil {
-		t.Fatalf("PutModelPreset(%q/%q): %v", provider, modelID, err)
+		t.Fatalf("PostModelPreset(%q/%q): %v", provider, modelID, err)
 	}
 }
 
@@ -341,9 +343,11 @@ func makeModelPreset(id spec.ModelPresetID) spec.ModelPreset {
 		Slug:          spec.ModelSlug(id),
 		IsEnabled:     true,
 
-		Temperature: &temp, // validation requires reasoning or temp
-		CreatedAt:   now,
-		ModifiedAt:  now,
+		ModelPresetPatch: spec.ModelPresetPatch{
+			Temperature: &temp, // validation requires reasoning or temp
+		},
+		CreatedAt:  now,
+		ModifiedAt: now,
 	}
 }
 
@@ -365,10 +369,6 @@ func anotherModelID(
 	}
 	return ""
 }
-
-func boolPtr(v bool) *bool { return &v }
-
-func mpidPtr(v spec.ModelPresetID) *spec.ModelPresetID { return &v }
 
 func mustMkdirAll(t *testing.T, dir string) {
 	t.Helper()
@@ -410,3 +410,13 @@ func PrintJSON(v any) {
 		fmt.Print("request params", "json", string(p))
 	}
 }
+
+func boolPtr(v bool) *bool { return &v }
+
+func mpidPtr(v spec.ModelPresetID) *spec.ModelPresetID { return &v }
+
+func stringPtr(v string) *string { return &v }
+
+func floatPtr(v float64) *float64 { return &v }
+
+func providerDisplayNamePtr(v spec.ProviderDisplayName) *spec.ProviderDisplayName { return &v }

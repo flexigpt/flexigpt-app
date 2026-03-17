@@ -2,6 +2,18 @@
 
 ## Laundry list
 
+- AssistantPreset
+  - [ ] core philosophy is that it is a starting point for user with recommended things. user can change post that as needed.
+  - [ ] should have tool sets and autoexec config too so that the "agent" loop is kind of autonomous
+  - [ ] create refs and patch objects in current specs first. do associated cleanups. modelpreset and tool
+  - [ ] support storing sys prompts in prompt templates
+  - [ ] assistant store
+  - [ ] conversation to include additional things wrt assistant and current absent contexts. idea is to have "full vs increment" in message turn.
+  - [ ] clean fetch completion api. it should take current params and value as separate inputs and NOT take current message input. a hydrated current message should be sent back.
+  - [ ] have a default "empty" assistant i.e all allowed.
+  - [ ] UI to manage preset
+  - [ ] UI integration in chat. should have select and reset capability, with indication that default is overridden in xyz things.
+
 - [ ] Skill
   - [ ] include some builtin skills and test on all platforms, full flow.
   - [ ] with the number of skills present, maybe we dont want to enable all on click for the enable sills button, may be have a button at bottom on open that says enable all separately. also show collapsed bundles at start and then expanding if needed.
@@ -9,12 +21,15 @@
 
 - [ ] Sys prompt:
   - [ ] We may want to have a explicit prompt saying that use explicit tools rather than shell wherever possible.
+  - [ ] store it as prompt templates.
+  - [ ] look at prompt templates structure and see how to have sys prompts separate than body prompts
 
 - [ ] context bar
   - [ ] tooltips are needed. ariakit ones as daisyui ones can get cutoff
 
 - [ ] eslint 10: pending plugins support.
-- [ ] vite 8, jsdom next major
+- [ ] vite 8: react router dev support. react router has some cleanup planned with vite8. would be better to wait until react router stamps it as ok.
+- [ ] jsdom next major
 
 ## Features
 
@@ -26,7 +41,6 @@
   - [ ] docx, excel support
 
 - [ ] debug flag/s (maybe one for scrubbing, one for key activate etc etc) for provider in UI settings
-- [ ] we may want to have a "assistant" like we planned before that has tool sets and autoexec config so that the "agent" loop is kind of autonomous
 
 ## Milestone thoughts
 

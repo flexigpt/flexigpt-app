@@ -170,10 +170,10 @@ func (s *ModelPresetStore) PatchDefaultProvider(
 	return &spec.PatchDefaultProviderResponse{}, nil
 }
 
-// PutProviderPreset creates or replaces a provider preset.
-func (s *ModelPresetStore) PutProviderPreset(
-	ctx context.Context, req *spec.PutProviderPresetRequest,
-) (*spec.PutProviderPresetResponse, error) {
+// PostProviderPreset creates or replaces a provider preset.
+func (s *ModelPresetStore) PostProviderPreset(
+	ctx context.Context, req *spec.PostProviderPresetRequest,
+) (*spec.PostProviderPresetResponse, error) {
 	if req == nil || req.Body == nil || req.ProviderName == "" {
 		return nil, fmt.Errorf("%w: providerName & body required", spec.ErrInvalidDir)
 	}
@@ -209,7 +209,6 @@ func (s *ModelPresetStore) PutProviderPreset(
 		return nil, err
 	}
 
-	// Persist.
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -217,127 +216,16 @@ func (s *ModelPresetStore) PutProviderPreset(
 	if err != nil {
 		return nil, err
 	}
-	if existing, ok := all.ProviderPresets[req.ProviderName]; ok {
-		pp.CreatedAt = existing.CreatedAt
-		// Preserve existing models + default model when updating provider metadata.
-		pp.ModelPresets = existing.ModelPresets
-		pp.DefaultModelPresetID = existing.DefaultModelPresetID
-		// Preserve existing capabilities override if caller didn't provide a new one.
-		if req.Body.CapabilitiesOverride == nil {
-			pp.CapabilitiesOverride = existing.CapabilitiesOverride
-		}
+	if _, ok := all.ProviderPresets[req.ProviderName]; ok {
+		return nil, fmt.Errorf("%w: %s", spec.ErrProviderPresetAlreadyExists, req.ProviderName)
 	}
-	pp.ModifiedAt = now
+
 	all.ProviderPresets[req.ProviderName] = pp
 	if err := s.writeAllUserPresets(all); err != nil {
 		return nil, err
 	}
-	slog.Info("putProviderPreset", "provider", req.ProviderName)
-	return &spec.PutProviderPresetResponse{}, nil
-}
-
-// PatchProviderPreset updates a provider preset.
-// It can (independently or simultaneously)
-//   - enable / disable the provider (body.isEnabled)
-//   - change the provider-level default model-preset (body.defaultModelPresetID).
-//
-// At least one of the two fields must be supplied.
-func (s *ModelPresetStore) PatchProviderPreset(
-	ctx context.Context, req *spec.PatchProviderPresetRequest,
-) (*spec.PatchProviderPresetResponse, error) {
-	if req == nil || req.Body == nil || req.ProviderName == "" {
-		return nil, fmt.Errorf("%w: providerName required", spec.ErrInvalidDir)
-	}
-	if req.Body.IsEnabled == nil && req.Body.DefaultModelPresetID == nil {
-		return nil, fmt.Errorf("%w: either isEnabled or defaultModelPresetID must be supplied",
-			spec.ErrInvalidDir)
-	}
-	if req.Body.DefaultModelPresetID != nil {
-		if err := validateModelPresetID(*req.Body.DefaultModelPresetID); err != nil {
-			return nil, err
-		}
-	}
-
-	if _, err := s.builtinData.GetBuiltInProvider(ctx, req.ProviderName); err == nil {
-
-		// Enable / disable.
-		if req.Body.IsEnabled != nil {
-			if _, err := s.builtinData.SetProviderEnabled(ctx,
-				req.ProviderName, *req.Body.IsEnabled,
-			); err != nil {
-				return nil, err
-			}
-			slog.Info("patchProviderPreset.builtin",
-				"provider", req.ProviderName,
-				"isEnabled", *req.Body.IsEnabled)
-		}
-
-		// Change default model-preset (placeholder - to be implemented later).
-		if req.Body.DefaultModelPresetID != nil {
-			if _, err := s.builtinData.SetDefaultModelPreset(
-				ctx, req.ProviderName, *req.Body.DefaultModelPresetID,
-			); err != nil {
-				return nil, err
-			}
-			slog.Info("patchProviderPreset.builtin",
-				"provider", req.ProviderName,
-				"defaultModelPresetID", *req.Body.DefaultModelPresetID)
-		}
-
-		return &spec.PatchProviderPresetResponse{}, nil
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	all, err := s.readAllUserPresets(false)
-	if err != nil {
-		return nil, err
-	}
-
-	pp, ok := all.ProviderPresets[req.ProviderName]
-	if !ok {
-		return nil, fmt.Errorf("%w: %s", spec.ErrProviderNotFound, req.ProviderName)
-	}
-
-	changed := false
-
-	// Enable / disable.
-	if req.Body.IsEnabled != nil && pp.IsEnabled != *req.Body.IsEnabled {
-		pp.IsEnabled = *req.Body.IsEnabled
-		changed = true
-	}
-
-	// Default model-preset.
-	if req.Body.DefaultModelPresetID != nil &&
-		pp.DefaultModelPresetID != *req.Body.DefaultModelPresetID {
-
-		if _, ok := pp.ModelPresets[*req.Body.DefaultModelPresetID]; !ok {
-			return nil, fmt.Errorf("%w: %s",
-				spec.ErrModelPresetNotFound, *req.Body.DefaultModelPresetID)
-		}
-		pp.DefaultModelPresetID = *req.Body.DefaultModelPresetID
-		changed = true
-	}
-
-	if !changed {
-		// Nothing to do - silently succeed.
-		return &spec.PatchProviderPresetResponse{}, nil
-	}
-
-	pp.ModifiedAt = time.Now().UTC()
-	all.ProviderPresets[req.ProviderName] = pp
-
-	if err := s.writeAllUserPresets(all); err != nil {
-		return nil, err
-	}
-
-	slog.Info("patchProviderPreset",
-		"provider", req.ProviderName,
-		"isEnabled", pp.IsEnabled,
-		"defaultModelPresetID", pp.DefaultModelPresetID)
-
-	return &spec.PatchProviderPresetResponse{}, nil
+	slog.Info("postProviderPreset", "provider", req.ProviderName)
+	return &spec.PostProviderPresetResponse{}, nil
 }
 
 // DeleteProviderPreset removes a provider if it has no model presets.
@@ -489,10 +377,10 @@ func (s *ModelPresetStore) ListProviderPresets(
 	}, nil
 }
 
-// PutModelPreset creates or replaces a model preset on a user provider.
-func (s *ModelPresetStore) PutModelPreset(
-	ctx context.Context, req *spec.PutModelPresetRequest,
-) (*spec.PutModelPresetResponse, error) {
+// PostModelPreset creates a new model preset on a user provider.
+func (s *ModelPresetStore) PostModelPreset(
+	ctx context.Context, req *spec.PostModelPresetRequest,
+) (*spec.PostModelPresetResponse, error) {
 	if req == nil || req.Body == nil ||
 		req.ProviderName == "" || req.ModelPresetID == "" {
 		return nil, fmt.Errorf("%w: providerName & modelPresetID required", spec.ErrInvalidDir)
@@ -513,23 +401,14 @@ func (s *ModelPresetStore) PutModelPreset(
 
 	// Build model preset.
 	mp := spec.ModelPreset{
-		SchemaVersion:               spec.SchemaVersion,
-		ID:                          req.ModelPresetID,
-		Name:                        req.Body.Name,
-		DisplayName:                 req.Body.DisplayName,
-		Slug:                        req.Body.Slug,
-		IsEnabled:                   req.Body.IsEnabled,
-		Stream:                      req.Body.Stream,
-		MaxPromptLength:             req.Body.MaxPromptLength,
-		MaxOutputLength:             req.Body.MaxOutputLength,
-		Temperature:                 req.Body.Temperature,
-		Reasoning:                   req.Body.Reasoning,
-		SystemPrompt:                req.Body.SystemPrompt,
-		Timeout:                     req.Body.Timeout,
-		OutputParam:                 req.Body.OutputParam,
-		StopSequences:               req.Body.StopSequences,
-		AdditionalParametersRawJSON: req.Body.AdditionalParametersRawJSON,
-		CapabilitiesOverride:        cloneModelCapabilitiesOverride(req.Body.CapabilitiesOverride),
+		SchemaVersion:        spec.SchemaVersion,
+		ID:                   req.ModelPresetID,
+		Name:                 req.Body.Name,
+		DisplayName:          req.Body.DisplayName,
+		Slug:                 req.Body.Slug,
+		IsEnabled:            req.Body.IsEnabled,
+		ModelPresetPatch:     cloneModelPresetPatch(req.Body.ModelPresetPatch),
+		CapabilitiesOverride: cloneModelCapabilitiesOverride(req.Body.CapabilitiesOverride),
 
 		CreatedAt:  now,
 		ModifiedAt: now,
@@ -551,18 +430,14 @@ func (s *ModelPresetStore) PutModelPreset(
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", spec.ErrProviderNotFound, req.ProviderName)
 	}
-	// Keep if overwriting.
-	if old, ok := pp.ModelPresets[req.ModelPresetID]; ok {
-		mp.CreatedAt = old.CreatedAt
-		// Preserve existing capabilities override if caller didn't provide a new one.
-		if req.Body.CapabilitiesOverride == nil {
-			mp.CapabilitiesOverride = old.CapabilitiesOverride
-		}
-	}
+
 	if pp.ModelPresets == nil {
 		pp.ModelPresets = map[spec.ModelPresetID]spec.ModelPreset{}
 	}
-	mp.ModifiedAt = now
+	if _, ok := pp.ModelPresets[req.ModelPresetID]; ok {
+		return nil, fmt.Errorf("%w: %s", spec.ErrModelPresetAlreadyExists, req.ModelPresetID)
+	}
+
 	pp.ModelPresets[req.ModelPresetID] = mp
 	pp.ModifiedAt = now
 	all.ProviderPresets[req.ProviderName] = pp
@@ -570,76 +445,9 @@ func (s *ModelPresetStore) PutModelPreset(
 	if err := s.writeAllUserPresets(all); err != nil {
 		return nil, err
 	}
-	slog.Info("putModelPreset",
+	slog.Info("postModelPreset",
 		"provider", req.ProviderName, "modelPresetID", req.ModelPresetID)
-	return &spec.PutModelPresetResponse{}, nil
-}
-
-// PatchModelPreset enables or disables a model preset.
-func (s *ModelPresetStore) PatchModelPreset(
-	ctx context.Context, req *spec.PatchModelPresetRequest,
-) (*spec.PatchModelPresetResponse, error) {
-	if req == nil || req.Body == nil ||
-		req.ProviderName == "" || req.ModelPresetID == "" {
-		return nil, fmt.Errorf("%w: providerName & modelPresetID required", spec.ErrInvalidDir)
-	}
-
-	// Built-in branch.
-	if _, err := s.builtinData.GetBuiltInProvider(ctx, req.ProviderName); err == nil {
-		if req.Body.CapabilitiesOverride != nil || req.Body.ClearCapabilitiesOverride {
-			return nil, fmt.Errorf("%w: model capabilities are read-only for built-in presets",
-				spec.ErrBuiltInReadOnly)
-		}
-		if _, err := s.builtinData.SetModelPresetEnabled(
-			ctx,
-			req.ProviderName, req.ModelPresetID, req.Body.IsEnabled,
-		); err != nil {
-			return nil, err
-		}
-		slog.Info("patchModelPreset.builtin",
-			"provider", req.ProviderName, "modelPresetID", req.ModelPresetID,
-			"enabled", req.Body.IsEnabled)
-		return &spec.PatchModelPresetResponse{}, nil
-	}
-
-	// User branch.
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	all, err := s.readAllUserPresets(false)
-	if err != nil {
-		return nil, err
-	}
-	pp, ok := all.ProviderPresets[req.ProviderName]
-	if !ok {
-		return nil, fmt.Errorf("%w: %s", spec.ErrProviderNotFound, req.ProviderName)
-	}
-	mp, ok := pp.ModelPresets[req.ModelPresetID]
-	if !ok {
-		return nil, fmt.Errorf("%w: %s", spec.ErrModelPresetNotFound, req.ModelPresetID)
-	}
-	mp.IsEnabled = req.Body.IsEnabled
-	if req.Body.ClearCapabilitiesOverride {
-		mp.CapabilitiesOverride = nil
-	} else if req.Body.CapabilitiesOverride != nil {
-		mp.CapabilitiesOverride = cloneModelCapabilitiesOverride(req.Body.CapabilitiesOverride)
-	}
-
-	mp.ModifiedAt = time.Now().UTC()
-	pp.ModelPresets[req.ModelPresetID] = mp
-	pp.ModifiedAt = mp.ModifiedAt
-	all.ProviderPresets[req.ProviderName] = pp
-
-	if err := validateModelPreset(&mp); err != nil {
-		return nil, fmt.Errorf("invalid patched model preset: %w", err)
-	}
-	if err := s.writeAllUserPresets(all); err != nil {
-		return nil, err
-	}
-	slog.Info("patchModelPreset",
-		"provider", req.ProviderName, "modelPresetID", req.ModelPresetID,
-		"enabled", req.Body.IsEnabled)
-	return &spec.PatchModelPresetResponse{}, nil
+	return &spec.PostModelPresetResponse{}, nil
 }
 
 // DeleteModelPreset removes a model preset.

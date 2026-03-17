@@ -54,8 +54,8 @@ func validateProviderPreset(pp *spec.ProviderPreset) error {
 	// DefaultModelPresetID must exist if set.
 	if pp.DefaultModelPresetID != "" {
 		if _, ok := pp.ModelPresets[pp.DefaultModelPresetID]; !ok {
-			return fmt.Errorf("provider %q: defaultModelPresetID %q not present",
-				pp.Name, pp.DefaultModelPresetID)
+			return fmt.Errorf("provider %q: defaultModelPresetID %q not present: %w",
+				pp.Name, pp.DefaultModelPresetID, spec.ErrModelPresetNotFound)
 		}
 	}
 	return nil

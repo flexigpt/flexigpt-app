@@ -21,7 +21,7 @@ type GetDefaultProviderResponse struct {
 	Body *GetDefaultProviderResponseBody
 }
 
-type PutProviderPresetRequestBody struct {
+type PostProviderPresetRequestBody struct {
 	DisplayName              ProviderDisplayName           `json:"displayName"              required:"true"`
 	SDKType                  inferenceSpec.ProviderSDKType `json:"sdkType"                  required:"true"`
 	IsEnabled                bool                          `json:"isEnabled"                required:"true"`
@@ -32,16 +32,33 @@ type PutProviderPresetRequestBody struct {
 	DefaultHeaders       map[string]string          `json:"defaultHeaders,omitempty"`
 	CapabilitiesOverride *ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
 }
-type PutProviderPresetRequest struct {
+type PostProviderPresetRequest struct {
 	ProviderName inferenceSpec.ProviderName `path:"providerName" required:"true"`
-	Body         *PutProviderPresetRequestBody
+	Body         *PostProviderPresetRequestBody
 }
 
-type PutProviderPresetResponse struct{}
+type PostProviderPresetResponse struct{}
 
+// PatchProviderPresetRequestBody patches an existing provider preset.
+//
+// Semantics:
+//   - nil pointer fields => not provided
+//   - DefaultHeaders nil => not provided
+//   - DefaultHeaders {} => replace with empty map
+//   - only user providers can patch provider metadata/capabilities
+//   - built-ins only support isEnabled and defaultModelPresetID
 type PatchProviderPresetRequestBody struct {
-	IsEnabled            *bool          `json:"isEnabled,omitempty"`
-	DefaultModelPresetID *ModelPresetID `json:"defaultModelPresetID,omitempty"`
+	DisplayName              *ProviderDisplayName           `json:"displayName,omitempty"`
+	SDKType                  *inferenceSpec.ProviderSDKType `json:"sdkType,omitempty"`
+	IsEnabled                *bool                          `json:"isEnabled,omitempty"`
+	Origin                   *string                        `json:"origin,omitempty"`
+	ChatCompletionPathPrefix *string                        `json:"chatCompletionPathPrefix,omitempty"`
+	APIKeyHeaderKey          *string                        `json:"apiKeyHeaderKey,omitempty"`
+	DefaultHeaders           map[string]string              `json:"defaultHeaders,omitempty"`
+	DefaultModelPresetID     *ModelPresetID                 `json:"defaultModelPresetID,omitempty"`
+
+	CapabilitiesOverride      *ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
+	ClearCapabilitiesOverride bool                       `json:"clearCapabilitiesOverride,omitempty"`
 }
 
 type PatchProviderPresetRequest struct {
@@ -56,40 +73,44 @@ type DeleteProviderPresetRequest struct {
 }
 type DeleteProviderPresetResponse struct{}
 
-type PutModelPresetRequestBody struct {
+type PostModelPresetRequestBody struct {
+	ModelPresetPatch
+
 	Name        ModelName        `json:"name"        required:"true"`
 	Slug        ModelSlug        `json:"slug"        required:"true"`
 	DisplayName ModelDisplayName `json:"displayName" required:"true"`
 	IsEnabled   bool             `json:"isEnabled"   required:"true"`
 
-	Stream          *bool                         `json:"stream,omitempty"`
-	MaxPromptLength *int                          `json:"maxPromptLength,omitempty"`
-	MaxOutputLength *int                          `json:"maxOutputLength,omitempty"`
-	Temperature     *float64                      `json:"temperature,omitempty"`
-	Reasoning       *inferenceSpec.ReasoningParam `json:"reasoning,omitempty"`
-	SystemPrompt    *string                       `json:"systemPrompt,omitempty"`
-	Timeout         *int                          `json:"timeout,omitempty"`
-
-	OutputParam   *inferenceSpec.OutputParam `json:"outputParam,omitempty"`
-	StopSequences []string                   `json:"stopSequences,omitempty"`
-
-	AdditionalParametersRawJSON *string                    `json:"additionalParametersRawJSON,omitempty"`
-	CapabilitiesOverride        *ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
+	CapabilitiesOverride *ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
 }
 
-type PutModelPresetRequest struct {
+type PostModelPresetRequest struct {
 	ProviderName  inferenceSpec.ProviderName `path:"providerName"  required:"true"`
 	ModelPresetID ModelPresetID              `path:"modelPresetID" required:"true"`
-	Body          *PutModelPresetRequestBody
+	Body          *PostModelPresetRequestBody
 }
-type PutModelPresetResponse struct{}
+type PostModelPresetResponse struct{}
 
+// PatchModelPresetRequestBody patches a stored model preset.
+//
+// Semantics:
+//   - nil pointer/object fields => not provided
+//   - StopSequences nil/empty => not provided
+//   - use Clear* flags to explicitly remove stored optional values
+//   - at least one field/clear-flag/override field must be supplied
 type PatchModelPresetRequestBody struct {
-	IsEnabled bool `json:"isEnabled" required:"true"`
+	ModelPresetPatch
+
+	Name        *ModelName        `json:"name,omitempty"`
+	Slug        *ModelSlug        `json:"slug,omitempty"`
+	DisplayName *ModelDisplayName `json:"displayName,omitempty"`
+	IsEnabled   *bool             `json:"isEnabled,omitempty"`
+
 	// CapabilitiesOverride can only be patched for USER provider presets (not built-ins).
 	// To clear the override entirely, set ClearCapabilitiesOverride=true.
-	CapabilitiesOverride      *ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
-	ClearCapabilitiesOverride bool                       `json:"clearCapabilitiesOverride,omitempty"`
+	CapabilitiesOverride *ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
+
+	ClearStopSequences bool `json:"clearStopSequences,omitempty"`
 }
 
 type PatchModelPresetRequest struct {

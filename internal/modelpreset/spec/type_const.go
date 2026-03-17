@@ -37,13 +37,16 @@ var OpenAIChatCompletionsDefaultHeaders = map[string]string{"content-type": "app
 var (
 	ErrInvalidDir = errors.New("invalid directory")
 
-	ErrProviderNotFound      = errors.New("provider not found")
-	ErrModelPresetNotFound   = errors.New("model preset not found")
-	ErrBuiltInProviderAbsent = errors.New("provider not found in built-in data")
+	ErrProviderNotFound            = errors.New("provider not found")
+	ErrProviderPresetAlreadyExists = errors.New("provider preset already exists")
+	ErrBuiltInProviderAbsent       = errors.New("provider not found in built-in data")
+	ErrNilProvider                 = errors.New("provider preset is nil")
 
-	ErrNilProvider      = errors.New("provider preset is nil")
-	ErrNilModelPreset   = errors.New("model preset is nil")
-	ErrNoModelPresets   = errors.New("provider has no model presets")
+	ErrModelPresetNotFound      = errors.New("model preset not found")
+	ErrModelPresetAlreadyExists = errors.New("model preset already exists")
+	ErrNilModelPreset           = errors.New("model preset is nil")
+	ErrNoModelPresets           = errors.New("provider has no model presets")
+
 	ErrInvalidTimestamp = errors.New("zero timestamp")
 	ErrBuiltInReadOnly  = errors.New("built-in resource is read-only")
 )
@@ -57,16 +60,24 @@ type (
 	ProviderDisplayName string
 )
 
-// ModelPreset is the entire "model + default knobs" bundle the user can save.
-// Anything not present in the preset is considered to be taken as default from any global or inbuilt model defaults.
-type ModelPreset struct {
-	SchemaVersion string           `json:"schemaVersion" required:"true"`
-	ID            ModelPresetID    `json:"id"            required:"true"`
-	Name          ModelName        `json:"name"          required:"true"`
-	DisplayName   ModelDisplayName `json:"displayName"   required:"true"`
-	Slug          ModelSlug        `json:"slug"          required:"true"`
-	IsEnabled     bool             `json:"isEnabled"     required:"true"`
+// ModelPresetRef identifies a model preset inside a provider namespace.
+// It is intended for internal helpers and JSON payloads, not HTTP path binding.
+type ModelPresetRef struct {
+	ProviderName  inferenceSpec.ProviderName `json:"providerName"`
+	ModelPresetID ModelPresetID              `json:"modelPresetID"`
+}
 
+func (r ModelPresetRef) IsZero() bool {
+	return r.ProviderName == "" || r.ModelPresetID == ""
+}
+
+// ModelPresetPatch is the reusable set of persisted model-preset knobs.
+//
+// PATCH semantics:
+//   - nil pointer/object fields => not provided
+//   - StopSequences nil/empty => not provided
+//   - use clearStopSequences to remove stored stop sequences
+type ModelPresetPatch struct {
 	Stream          *bool                         `json:"stream,omitempty"`
 	MaxPromptLength *int                          `json:"maxPromptLength,omitempty"`
 	MaxOutputLength *int                          `json:"maxOutputLength,omitempty"`
@@ -79,6 +90,20 @@ type ModelPreset struct {
 	StopSequences []string                   `json:"stopSequences,omitempty"`
 
 	AdditionalParametersRawJSON *string `json:"additionalParametersRawJSON,omitempty"`
+}
+
+// ModelPreset is the entire "model + default knobs" bundle the user can save.
+// Anything not present in the preset is considered to be taken as default from any global or inbuilt model defaults.
+type ModelPreset struct {
+	ModelPresetPatch
+
+	SchemaVersion string           `json:"schemaVersion" required:"true"`
+	ID            ModelPresetID    `json:"id"            required:"true"`
+	Name          ModelName        `json:"name"          required:"true"`
+	DisplayName   ModelDisplayName `json:"displayName"   required:"true"`
+	Slug          ModelSlug        `json:"slug"          required:"true"`
+	IsEnabled     bool             `json:"isEnabled"     required:"true"`
+
 	// CapabilitiesOverride is a stored override for runtime capability resolution.
 	// This is NOT the derived/effective capability profile.
 	CapabilitiesOverride *ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`

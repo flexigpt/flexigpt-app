@@ -1233,9 +1233,11 @@ func TestBuiltInPresets_OverlayPersistsAcrossReopen(t *testing.T) {
 		DisplayName:   spec.ModelDisplayName("M1"),
 		Slug:          spec.ModelSlug(m1),
 		IsEnabled:     true,
-		Temperature:   &temp,
-		CreatedAt:     now,
-		ModifiedAt:    now,
+		ModelPresetPatch: spec.ModelPresetPatch{
+			Temperature: &temp,
+		},
+		CreatedAt:  now,
+		ModifiedAt: now,
 	}
 	mp2 := mp1
 	mp2.ID = m2

@@ -32,18 +32,18 @@ func InitModelPresetStoreHandlers(api huma.API, modelPresetStoreAPI *ModelPreset
 	}, modelPresetStoreAPI.GetDefaultProvider)
 
 	huma.Register(api, huma.Operation{
-		OperationID: "put-provider-preset",
-		Method:      http.MethodPut,
+		OperationID: "post-provider-preset",
+		Method:      http.MethodPost,
 		Path:        pathPrefix + "/{providerName}",
-		Summary:     "Put new provider preset",
+		Summary:     "Create a new provider preset",
 		Tags:        []string{tag},
-	}, modelPresetStoreAPI.PutProviderPreset)
+	}, modelPresetStoreAPI.PostProviderPreset)
 
 	huma.Register(api, huma.Operation{
 		OperationID: "patch-provider-preset",
 		Method:      http.MethodPatch,
 		Path:        pathPrefix + "/{providerName}",
-		Summary:     "Patch a provider preset. Only enable/disable and set default provider supported as of now.",
+		Summary:     "Patch an existing provider preset",
 		Tags:        []string{tag},
 	}, modelPresetStoreAPI.PatchProviderPreset)
 
@@ -56,18 +56,18 @@ func InitModelPresetStoreHandlers(api huma.API, modelPresetStoreAPI *ModelPreset
 	}, modelPresetStoreAPI.DeleteProviderPreset)
 
 	huma.Register(api, huma.Operation{
-		OperationID: "put-model-preset",
-		Method:      http.MethodPut,
+		OperationID: "post-model-preset",
+		Method:      http.MethodPost,
 		Path:        pathPrefix + "/{providerName}/models/{modelPresetID}",
-		Summary:     "Add or replace a single model preset for a given provider",
+		Summary:     "Create a new model preset for a given provider",
 		Tags:        []string{tag},
-	}, modelPresetStoreAPI.PutModelPreset)
+	}, modelPresetStoreAPI.PostModelPreset)
 
 	huma.Register(api, huma.Operation{
 		OperationID: "patch-model-preset",
 		Method:      http.MethodPatch,
 		Path:        pathPrefix + "/{providerName}/models/{modelPresetID}",
-		Summary:     "Configure properties of a single model preset. Only enable disable allowed as of now",
+		Summary:     "Patch properties of a single model preset",
 		Tags:        []string{tag},
 	}, modelPresetStoreAPI.PatchModelPreset)
 

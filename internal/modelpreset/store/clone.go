@@ -5,7 +5,81 @@ import (
 	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
+
+func cloneProviderPresetForInference(pp spec.ProviderPreset) spec.ProviderPreset {
+	out := cloneProviderPreset(pp)
+	// Never return the full model map for this endpoint (perf + safety).
+	out.ModelPresets = nil
+	return out
+}
+
+func cloneProviderPreset(pp spec.ProviderPreset) spec.ProviderPreset {
+	out := pp
+	out.DefaultHeaders = maps.Clone(pp.DefaultHeaders)
+	out.ModelPresets = maps.Clone(pp.ModelPresets)
+	out.CapabilitiesOverride = cloneModelCapabilitiesOverride(pp.CapabilitiesOverride)
+	return out
+}
+
+func cloneModelPresetForInference(mp spec.ModelPreset) spec.ModelPreset {
+	out := mp
+
+	out.ModelPresetPatch = cloneModelPresetPatch(mp.ModelPresetPatch)
+	out.CapabilitiesOverride = cloneModelCapabilitiesOverride(mp.CapabilitiesOverride)
+	return out
+}
+
+func cloneModelPresetPatch(in spec.ModelPresetPatch) spec.ModelPresetPatch {
+	return spec.ModelPresetPatch{
+		Stream:                      cloneBoolPtr(in.Stream),
+		MaxPromptLength:             cloneIntPtr(in.MaxPromptLength),
+		MaxOutputLength:             cloneIntPtr(in.MaxOutputLength),
+		Temperature:                 cloneFloat64Ptr(in.Temperature),
+		Reasoning:                   cloneReasoningParam(in.Reasoning),
+		SystemPrompt:                cloneStringPtr(in.SystemPrompt),
+		Timeout:                     cloneIntPtr(in.Timeout),
+		OutputParam:                 cloneOutputParam(in.OutputParam),
+		StopSequences:               slices.Clone(in.StopSequences),
+		AdditionalParametersRawJSON: cloneStringPtr(in.AdditionalParametersRawJSON),
+	}
+}
+
+func cloneReasoningParam(in *inferenceSpec.ReasoningParam) *inferenceSpec.ReasoningParam {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	if in.SummaryStyle != nil {
+		ss := *in.SummaryStyle
+		out.SummaryStyle = &ss
+	}
+	return &out
+}
+
+func cloneOutputParam(in *inferenceSpec.OutputParam) *inferenceSpec.OutputParam {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	if in.Verbosity != nil {
+		v := *in.Verbosity
+		out.Verbosity = &v
+	}
+	if in.Format != nil {
+		f := *in.Format
+		if f.JSONSchemaParam != nil {
+			j := *f.JSONSchemaParam
+			if j.Schema != nil {
+				j.Schema = maps.Clone(j.Schema)
+			}
+			f.JSONSchemaParam = &j
+		}
+		out.Format = &f
+	}
+	return &out
+}
 
 func cloneModelCapabilitiesOverride(in *spec.ModelCapabilitiesOverride) *spec.ModelCapabilitiesOverride {
 	if in == nil {
@@ -45,63 +119,6 @@ func cloneModelCapabilitiesOverride(in *spec.ModelCapabilitiesOverride) *spec.Mo
 			MaxForcedTools:            cloneIntPtr(in.ToolCapabilities.MaxForcedTools),
 		}
 	}
-	return out
-}
-
-func cloneProviderPresetForInference(pp spec.ProviderPreset) spec.ProviderPreset {
-	out := pp
-	// Never return the full model map for this endpoint (perf + safety).
-	out.ModelPresets = nil
-
-	out.DefaultHeaders = maps.Clone(pp.DefaultHeaders)
-	out.CapabilitiesOverride = cloneModelCapabilitiesOverride(pp.CapabilitiesOverride)
-	return out
-}
-
-func cloneModelPresetForInference(mp spec.ModelPreset) spec.ModelPreset {
-	out := mp
-
-	out.StopSequences = slices.Clone(mp.StopSequences)
-	out.Stream = cloneBoolPtr(mp.Stream)
-	out.MaxPromptLength = cloneIntPtr(mp.MaxPromptLength)
-	out.MaxOutputLength = cloneIntPtr(mp.MaxOutputLength)
-	out.Temperature = cloneFloat64Ptr(mp.Temperature)
-	out.SystemPrompt = cloneStringPtr(mp.SystemPrompt)
-	out.Timeout = cloneIntPtr(mp.Timeout)
-	out.AdditionalParametersRawJSON = cloneStringPtr(mp.AdditionalParametersRawJSON)
-
-	// Clone nested inference-go structs (shallow + deep where needed).
-	if mp.Reasoning != nil {
-		r := *mp.Reasoning
-		if mp.Reasoning.SummaryStyle != nil {
-			ss := *mp.Reasoning.SummaryStyle
-			r.SummaryStyle = &ss
-		}
-		out.Reasoning = &r
-	}
-
-	if mp.OutputParam != nil {
-		op := *mp.OutputParam
-		if mp.OutputParam.Verbosity != nil {
-			v := *mp.OutputParam.Verbosity
-			op.Verbosity = &v
-		}
-		if mp.OutputParam.Format != nil {
-			f := *mp.OutputParam.Format
-			if f.JSONSchemaParam != nil {
-				j := *f.JSONSchemaParam
-				// Schema is typically map[string]any; clone defensively if present.
-				if j.Schema != nil {
-					j.Schema = maps.Clone(j.Schema)
-				}
-				f.JSONSchemaParam = &j
-			}
-			op.Format = &f
-		}
-		out.OutputParam = &op
-	}
-
-	out.CapabilitiesOverride = cloneModelCapabilitiesOverride(mp.CapabilitiesOverride)
 	return out
 }
 
