@@ -19,6 +19,14 @@ import {
 } from '@/apis/wailsjs/go/main/ModelPresetStoreWrapper';
 import type { spec } from '@/apis/wailsjs/go/models';
 
+function normalizeProviderPreset(provider: ProviderPreset): ProviderPreset {
+	return {
+		...provider,
+		defaultHeaders: provider.defaultHeaders ?? {},
+		modelPresets: provider.modelPresets ?? {},
+	};
+}
+
 /**
  * @public
  */
@@ -99,8 +107,9 @@ export class WailsModelPresetStoreAPI implements IModelPresetStoreAPI {
 			PageToken: pageToken ?? '',
 		};
 		const resp = await ListProviderPresets(r);
+		const providers = ((resp.Body?.providers ?? []) as ProviderPreset[]).map(normalizeProviderPreset);
 		return {
-			providers: (resp.Body?.providers ?? []) as ProviderPreset[],
+			providers: providers,
 			nextPageToken: resp.Body?.nextPageToken ?? undefined,
 		};
 	}

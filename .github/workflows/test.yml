@@ -54,6 +54,7 @@ jobs:
       - name: test
         run: |
           if [[ "${{ matrix.coverage }}" == "true" ]]; then
+            rm -f coverage.out
             go test -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./...
             go tool cover -func=coverage.out
           else

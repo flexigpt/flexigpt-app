@@ -226,7 +226,7 @@ export function ProviderPresetCard({
 	const handleModifyModelSubmit = async (id: ModelPresetID, data: PostModelPresetPayload | PatchModelPresetPayload) => {
 		try {
 			if (modelModalMode === 'add') {
-				onCreateModel(provider, id, data as PostModelPresetPayload);
+				await onCreateModel(provider, id, data as PostModelPresetPayload);
 			} else if (modelModalMode === 'edit') {
 				await onPatchModel(provider, id, data as PatchModelPresetPayload);
 			}

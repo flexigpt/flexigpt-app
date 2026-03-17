@@ -167,6 +167,8 @@ export interface UIChatOption extends ModelParam {
 	includePreviousMessages: IncludePreviousMessages;
 	/**
 	 * Effective (provider + model merged) capability overrides for this selectable option.
+	 * Merged stored capability overrides for this selectable option.
+	 * This is still an override layer, not a fully-derived effective capability profile.
 	 * Model-level override wins over provider-level override.
 	 */
 	capabilitiesOverride?: ModelCapabilitiesOverride;
