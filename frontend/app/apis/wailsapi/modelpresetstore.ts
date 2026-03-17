@@ -1,9 +1,10 @@
 import type { ProviderName } from '@/spec/inference';
 import type {
-	ModelCapabilitiesOverride,
 	ModelPresetID,
+	PatchModelPresetPayload,
+	PatchProviderPresetPayload,
+	PostModelPresetPayload,
 	ProviderPreset,
-	PutModelPresetPayload,
 } from '@/spec/modelpreset';
 
 import type { IModelPresetStoreAPI } from '@/apis/interface';
@@ -14,7 +15,7 @@ import {
 	PatchDefaultProvider,
 	PatchModelPreset,
 	PatchProviderPreset,
-	PutModelPreset,
+	PostModelPreset,
 } from '@/apis/wailsjs/go/main/ModelPresetStoreWrapper';
 import type { spec } from '@/apis/wailsjs/go/models';
 
@@ -24,7 +25,7 @@ import type { spec } from '@/apis/wailsjs/go/models';
 export class WailsModelPresetStoreAPI implements IModelPresetStoreAPI {
 	async getDefaultProvider(): Promise<ProviderName> {
 		const resp = await GetDefaultProvider({});
-		return resp.Body?.DefaultProvider ?? '';
+		return resp.Body?.defaultProvider ?? '';
 	}
 
 	async patchDefaultProvider(providerName: ProviderName): Promise<void> {
@@ -35,26 +36,21 @@ export class WailsModelPresetStoreAPI implements IModelPresetStoreAPI {
 		await PatchDefaultProvider(r as spec.PatchDefaultProviderRequest);
 	}
 
-	async patchProviderPreset(
-		providerName: ProviderName,
-		isEnabled?: boolean,
-		defaultModelPresetID?: ModelPresetID
-	): Promise<void> {
+	async patchProviderPreset(providerName: ProviderName, payload: PatchProviderPresetPayload): Promise<void> {
 		if (!providerName) throw new Error('Missing providerName');
+		const body = Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined));
+		if (Object.keys(body).length === 0) throw new Error('Provider patch payload is empty');
 		const r = {
 			ProviderName: providerName,
-			Body: {
-				isEnabled: isEnabled ?? undefined,
-				defaultModelPresetID: defaultModelPresetID ?? undefined,
-			},
+			Body: body as spec.PatchProviderPresetRequestBody,
 		};
 		await PatchProviderPreset(r as spec.PatchProviderPresetRequest);
 	}
 
-	async putModelPreset(
+	async postModelPreset(
 		providerName: ProviderName,
 		modelPresetID: ModelPresetID,
-		payload: PutModelPresetPayload
+		payload: PostModelPresetPayload
 	): Promise<void> {
 		if (!providerName || !modelPresetID) throw new Error('Missing arguments');
 		const r = {
@@ -62,25 +58,21 @@ export class WailsModelPresetStoreAPI implements IModelPresetStoreAPI {
 			ModelPresetID: modelPresetID,
 			Body: payload,
 		};
-		await PutModelPreset(r as spec.PutModelPresetRequest);
+		await PostModelPreset(r as spec.PostModelPresetRequest);
 	}
 
 	async patchModelPreset(
 		providerName: ProviderName,
 		modelPresetID: ModelPresetID,
-		isEnabled: boolean,
-		capabilitiesOverride?: ModelCapabilitiesOverride,
-		clearCapabilitiesOverride?: boolean
+		payload: PatchModelPresetPayload
 	): Promise<void> {
 		if (!providerName || !modelPresetID) throw new Error('Missing arguments');
+		const body = Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined));
+		if (Object.keys(body).length === 0) throw new Error('Model patch payload is empty');
 		const r = {
 			ProviderName: providerName,
 			ModelPresetID: modelPresetID,
-			Body: {
-				isEnabled: isEnabled,
-				capabilitiesOverride: capabilitiesOverride,
-				clearCapabilitiesOverride: clearCapabilitiesOverride,
-			} as spec.PatchModelPresetRequestBody,
+			Body: body as spec.PatchModelPresetRequestBody,
 		} as spec.PatchModelPresetRequest;
 		await PatchModelPreset(r);
 	}

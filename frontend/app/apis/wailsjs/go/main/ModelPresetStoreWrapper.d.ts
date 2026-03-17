@@ -16,4 +16,4 @@ export function PatchModelPreset(arg1:spec.PatchModelPresetRequest):Promise<spec
 
 export function PatchProviderPreset(arg1:spec.PatchProviderPresetRequest):Promise<spec.PatchProviderPresetResponse>;
 
-export function PutModelPreset(arg1:spec.PutModelPresetRequest):Promise<spec.PutModelPresetResponse>;
+export function PostModelPreset(arg1:spec.PostModelPresetRequest):Promise<spec.PostModelPresetResponse>;

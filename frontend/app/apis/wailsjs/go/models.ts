@@ -2251,7 +2251,7 @@ export namespace spec {
 	    }
 	}
 	export class GetDefaultProviderResponseBody {
-	    DefaultProvider: string;
+	    defaultProvider: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new GetDefaultProviderResponseBody(source);
@@ -2259,7 +2259,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.DefaultProvider = source["DefaultProvider"];
+	        this.defaultProvider = source["defaultProvider"];
 	    }
 	}
 	export class GetDefaultProviderResponse {
@@ -2310,12 +2310,6 @@ export namespace spec {
 	    }
 	}
 	export class ModelPreset {
-	    schemaVersion: string;
-	    id: string;
-	    name: string;
-	    displayName: string;
-	    slug: string;
-	    isEnabled: boolean;
 	    stream?: boolean;
 	    maxPromptLength?: number;
 	    maxOutputLength?: number;
@@ -2327,6 +2321,12 @@ export namespace spec {
 	    stopSequences?: string[];
 	    additionalParametersRawJSON?: string;
 	    capabilitiesOverride?: ModelCapabilitiesOverride;
+	    schemaVersion: string;
+	    id: string;
+	    name: string;
+	    displayName: string;
+	    slug: string;
+	    isEnabled: boolean;
 	    // Go type: time
 	    createdAt: any;
 	    // Go type: time
@@ -2339,12 +2339,6 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.schemaVersion = source["schemaVersion"];
-	        this.id = source["id"];
-	        this.name = source["name"];
-	        this.displayName = source["displayName"];
-	        this.slug = source["slug"];
-	        this.isEnabled = source["isEnabled"];
 	        this.stream = source["stream"];
 	        this.maxPromptLength = source["maxPromptLength"];
 	        this.maxOutputLength = source["maxOutputLength"];
@@ -2356,6 +2350,12 @@ export namespace spec {
 	        this.stopSequences = source["stopSequences"];
 	        this.additionalParametersRawJSON = source["additionalParametersRawJSON"];
 	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], ModelCapabilitiesOverride);
+	        this.schemaVersion = source["schemaVersion"];
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.displayName = source["displayName"];
+	        this.slug = source["slug"];
+	        this.isEnabled = source["isEnabled"];
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
 	        this.isBuiltIn = source["isBuiltIn"];
@@ -4872,9 +4872,21 @@ export namespace spec {
 	    }
 	}
 	export class PatchModelPresetRequestBody {
-	    isEnabled: boolean;
+	    stream?: boolean;
+	    maxPromptLength?: number;
+	    maxOutputLength?: number;
+	    temperature?: number;
+	    reasoning?: ReasoningParam;
+	    systemPrompt?: string;
+	    timeout?: number;
+	    outputParam?: OutputParam;
+	    stopSequences?: string[];
+	    additionalParametersRawJSON?: string;
 	    capabilitiesOverride?: ModelCapabilitiesOverride;
-	    clearCapabilitiesOverride?: boolean;
+	    name?: string;
+	    slug?: string;
+	    displayName?: string;
+	    isEnabled?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new PatchModelPresetRequestBody(source);
@@ -4882,9 +4894,21 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.isEnabled = source["isEnabled"];
+	        this.stream = source["stream"];
+	        this.maxPromptLength = source["maxPromptLength"];
+	        this.maxOutputLength = source["maxOutputLength"];
+	        this.temperature = source["temperature"];
+	        this.reasoning = this.convertValues(source["reasoning"], ReasoningParam);
+	        this.systemPrompt = source["systemPrompt"];
+	        this.timeout = source["timeout"];
+	        this.outputParam = this.convertValues(source["outputParam"], OutputParam);
+	        this.stopSequences = source["stopSequences"];
+	        this.additionalParametersRawJSON = source["additionalParametersRawJSON"];
 	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], ModelCapabilitiesOverride);
-	        this.clearCapabilitiesOverride = source["clearCapabilitiesOverride"];
+	        this.name = source["name"];
+	        this.slug = source["slug"];
+	        this.displayName = source["displayName"];
+	        this.isEnabled = source["isEnabled"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -5071,8 +5095,15 @@ export namespace spec {
 	    }
 	}
 	export class PatchProviderPresetRequestBody {
+	    displayName?: string;
+	    sdkType?: string;
 	    isEnabled?: boolean;
+	    origin?: string;
+	    chatCompletionPathPrefix?: string;
+	    apiKeyHeaderKey?: string;
+	    defaultHeaders?: Record<string, string>;
 	    defaultModelPresetID?: string;
+	    capabilitiesOverride?: ModelCapabilitiesOverride;
 	
 	    static createFrom(source: any = {}) {
 	        return new PatchProviderPresetRequestBody(source);
@@ -5080,9 +5111,34 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.displayName = source["displayName"];
+	        this.sdkType = source["sdkType"];
 	        this.isEnabled = source["isEnabled"];
+	        this.origin = source["origin"];
+	        this.chatCompletionPathPrefix = source["chatCompletionPathPrefix"];
+	        this.apiKeyHeaderKey = source["apiKeyHeaderKey"];
+	        this.defaultHeaders = source["defaultHeaders"];
 	        this.defaultModelPresetID = source["defaultModelPresetID"];
+	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], ModelCapabilitiesOverride);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class PatchProviderPresetRequest {
 	    ProviderName: string;
@@ -5371,6 +5427,200 @@ export namespace spec {
 	
 	    }
 	}
+	export class PostModelPresetRequestBody {
+	    stream?: boolean;
+	    maxPromptLength?: number;
+	    maxOutputLength?: number;
+	    temperature?: number;
+	    reasoning?: ReasoningParam;
+	    systemPrompt?: string;
+	    timeout?: number;
+	    outputParam?: OutputParam;
+	    stopSequences?: string[];
+	    additionalParametersRawJSON?: string;
+	    capabilitiesOverride?: ModelCapabilitiesOverride;
+	    name: string;
+	    slug: string;
+	    displayName: string;
+	    isEnabled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new PostModelPresetRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.stream = source["stream"];
+	        this.maxPromptLength = source["maxPromptLength"];
+	        this.maxOutputLength = source["maxOutputLength"];
+	        this.temperature = source["temperature"];
+	        this.reasoning = this.convertValues(source["reasoning"], ReasoningParam);
+	        this.systemPrompt = source["systemPrompt"];
+	        this.timeout = source["timeout"];
+	        this.outputParam = this.convertValues(source["outputParam"], OutputParam);
+	        this.stopSequences = source["stopSequences"];
+	        this.additionalParametersRawJSON = source["additionalParametersRawJSON"];
+	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], ModelCapabilitiesOverride);
+	        this.name = source["name"];
+	        this.slug = source["slug"];
+	        this.displayName = source["displayName"];
+	        this.isEnabled = source["isEnabled"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PostModelPresetRequest {
+	    ProviderName: string;
+	    ModelPresetID: string;
+	    Body?: PostModelPresetRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new PostModelPresetRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ProviderName = source["ProviderName"];
+	        this.ModelPresetID = source["ModelPresetID"];
+	        this.Body = this.convertValues(source["Body"], PostModelPresetRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class PostModelPresetResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new PostModelPresetResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
+	export class PostProviderPresetRequestBody {
+	    displayName: string;
+	    sdkType: string;
+	    isEnabled: boolean;
+	    origin: string;
+	    chatCompletionPathPrefix: string;
+	    apiKeyHeaderKey?: string;
+	    defaultHeaders?: Record<string, string>;
+	    capabilitiesOverride?: ModelCapabilitiesOverride;
+	
+	    static createFrom(source: any = {}) {
+	        return new PostProviderPresetRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.displayName = source["displayName"];
+	        this.sdkType = source["sdkType"];
+	        this.isEnabled = source["isEnabled"];
+	        this.origin = source["origin"];
+	        this.chatCompletionPathPrefix = source["chatCompletionPathPrefix"];
+	        this.apiKeyHeaderKey = source["apiKeyHeaderKey"];
+	        this.defaultHeaders = source["defaultHeaders"];
+	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], ModelCapabilitiesOverride);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PostProviderPresetRequest {
+	    ProviderName: string;
+	    Body?: PostProviderPresetRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new PostProviderPresetRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ProviderName = source["ProviderName"];
+	        this.Body = this.convertValues(source["Body"], PostProviderPresetRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class PostProviderPresetResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new PostProviderPresetResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
 	
 	
 	
@@ -5538,111 +5788,6 @@ export namespace spec {
 	
 	    }
 	}
-	export class PutModelPresetRequestBody {
-	    name: string;
-	    slug: string;
-	    displayName: string;
-	    isEnabled: boolean;
-	    stream?: boolean;
-	    maxPromptLength?: number;
-	    maxOutputLength?: number;
-	    temperature?: number;
-	    reasoning?: ReasoningParam;
-	    systemPrompt?: string;
-	    timeout?: number;
-	    outputParam?: OutputParam;
-	    stopSequences?: string[];
-	    additionalParametersRawJSON?: string;
-	    capabilitiesOverride?: ModelCapabilitiesOverride;
-	
-	    static createFrom(source: any = {}) {
-	        return new PutModelPresetRequestBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.name = source["name"];
-	        this.slug = source["slug"];
-	        this.displayName = source["displayName"];
-	        this.isEnabled = source["isEnabled"];
-	        this.stream = source["stream"];
-	        this.maxPromptLength = source["maxPromptLength"];
-	        this.maxOutputLength = source["maxOutputLength"];
-	        this.temperature = source["temperature"];
-	        this.reasoning = this.convertValues(source["reasoning"], ReasoningParam);
-	        this.systemPrompt = source["systemPrompt"];
-	        this.timeout = source["timeout"];
-	        this.outputParam = this.convertValues(source["outputParam"], OutputParam);
-	        this.stopSequences = source["stopSequences"];
-	        this.additionalParametersRawJSON = source["additionalParametersRawJSON"];
-	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], ModelCapabilitiesOverride);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class PutModelPresetRequest {
-	    ProviderName: string;
-	    ModelPresetID: string;
-	    Body?: PutModelPresetRequestBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new PutModelPresetRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.ProviderName = source["ProviderName"];
-	        this.ModelPresetID = source["ModelPresetID"];
-	        this.Body = this.convertValues(source["Body"], PutModelPresetRequestBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class PutModelPresetResponse {
-	
-	
-	    static createFrom(source: any = {}) {
-	        return new PutModelPresetResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	
-	    }
-	}
 	export class PutPromptBundleRequestBody {
 	    slug: string;
 	    displayName: string;
@@ -5788,95 +5933,6 @@ export namespace spec {
 	
 	    static createFrom(source: any = {}) {
 	        return new PutPromptTemplateResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	
-	    }
-	}
-	export class PutProviderPresetRequestBody {
-	    displayName: string;
-	    sdkType: string;
-	    isEnabled: boolean;
-	    origin: string;
-	    chatCompletionPathPrefix: string;
-	    apiKeyHeaderKey?: string;
-	    defaultHeaders?: Record<string, string>;
-	    capabilitiesOverride?: ModelCapabilitiesOverride;
-	
-	    static createFrom(source: any = {}) {
-	        return new PutProviderPresetRequestBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.displayName = source["displayName"];
-	        this.sdkType = source["sdkType"];
-	        this.isEnabled = source["isEnabled"];
-	        this.origin = source["origin"];
-	        this.chatCompletionPathPrefix = source["chatCompletionPathPrefix"];
-	        this.apiKeyHeaderKey = source["apiKeyHeaderKey"];
-	        this.defaultHeaders = source["defaultHeaders"];
-	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], ModelCapabilitiesOverride);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class PutProviderPresetRequest {
-	    ProviderName: string;
-	    Body?: PutProviderPresetRequestBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new PutProviderPresetRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.ProviderName = source["ProviderName"];
-	        this.Body = this.convertValues(source["Body"], PutProviderPresetRequestBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class PutProviderPresetResponse {
-	
-	
-	    static createFrom(source: any = {}) {
-	        return new PutProviderPresetResponse(source);
 	    }
 	
 	    constructor(source: any = {}) {

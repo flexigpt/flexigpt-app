@@ -10,6 +10,6 @@ export function DeleteProviderPreset(arg1:spec.DeleteProviderPresetRequest):Prom
 
 export function FetchCompletion(arg1:string,arg2:string,arg3:spec.CompletionRequestBody,arg4:string,arg5:string,arg6:string):Promise<spec.CompletionResponse>;
 
-export function PutProviderPreset(arg1:spec.PutProviderPresetRequest):Promise<spec.PutProviderPresetResponse>;
+export function PostProviderPreset(arg1:spec.PostProviderPresetRequest):Promise<spec.PostProviderPresetResponse>;
 
 export function SetAuthKey(arg1:spec.SetAuthKeyRequest):Promise<spec.SetAuthKeyResponse>;

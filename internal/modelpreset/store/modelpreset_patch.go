@@ -93,7 +93,7 @@ func (s *ModelPresetStore) PatchModelPreset(
 	}
 	slog.Info("patchModelPreset",
 		"provider", req.ProviderName, "modelPresetID", req.ModelPresetID,
-		"enabled", req.Body.IsEnabled)
+		"enabled", mp.IsEnabled)
 	return &spec.PatchModelPresetResponse{}, nil
 }
 
@@ -106,8 +106,9 @@ func hasModelPresetPatchValue(p spec.ModelPresetPatch) bool {
 		p.SystemPrompt != nil ||
 		p.Timeout != nil ||
 		p.OutputParam != nil ||
-		len(p.StopSequences) > 0 ||
-		p.AdditionalParametersRawJSON != nil
+		p.StopSequences != nil ||
+		p.AdditionalParametersRawJSON != nil ||
+		p.CapabilitiesOverride != nil
 }
 
 func hasAnyModelPresetPatchMutation(body *spec.PatchModelPresetRequestBody) bool {
@@ -118,9 +119,7 @@ func hasAnyModelPresetPatchMutation(body *spec.PatchModelPresetRequestBody) bool
 		body.Slug != nil ||
 		body.DisplayName != nil ||
 		body.IsEnabled != nil ||
-		hasModelPresetPatchValue(body.ModelPresetPatch) ||
-		body.CapabilitiesOverride != nil ||
-		body.ClearStopSequences
+		hasModelPresetPatchValue(body.ModelPresetPatch)
 }
 
 func hasAnyReadOnlyBuiltInModelPatch(body *spec.PatchModelPresetRequestBody) bool {
@@ -130,9 +129,7 @@ func hasAnyReadOnlyBuiltInModelPatch(body *spec.PatchModelPresetRequestBody) boo
 	return body.Name != nil ||
 		body.Slug != nil ||
 		body.DisplayName != nil ||
-		hasModelPresetPatchValue(body.ModelPresetPatch) ||
-		body.CapabilitiesOverride != nil ||
-		body.ClearStopSequences
+		hasModelPresetPatchValue(body.ModelPresetPatch)
 }
 
 func validateModelPresetPatchRequestBody(body *spec.PatchModelPresetRequestBody) error {
@@ -143,15 +140,11 @@ func validateModelPresetPatchRequestBody(body *spec.PatchModelPresetRequestBody)
 		return errors.New("at least one model preset field must be supplied")
 	}
 
-	if len(body.StopSequences) > 0 && body.ClearStopSequences {
-		return errors.New("stopSequences and clearStopSequences cannot both be supplied")
-	}
-
 	return nil
 }
 
 func applyModelPresetPatch(dst *spec.ModelPreset, body *spec.PatchModelPresetRequestBody) bool {
-	before := cloneModelPresetForInference(*dst)
+	before := cloneModelPreset(*dst)
 
 	if body.Name != nil {
 		dst.Name = *body.Name
@@ -190,10 +183,9 @@ func applyModelPresetPatch(dst *spec.ModelPreset, body *spec.PatchModelPresetReq
 	if body.OutputParam != nil {
 		dst.OutputParam = cloneOutputParam(body.OutputParam)
 	}
-	if body.ClearStopSequences {
-		dst.StopSequences = nil
-	} else if len(body.StopSequences) > 0 {
-		dst.StopSequences = slices.Clone(body.StopSequences)
+	if body.StopSequences != nil {
+		s := slices.Clone(*body.StopSequences)
+		dst.StopSequences = &s
 	}
 	if body.AdditionalParametersRawJSON != nil {
 		dst.AdditionalParametersRawJSON = cloneStringPtr(body.AdditionalParametersRawJSON)
@@ -203,6 +195,6 @@ func applyModelPresetPatch(dst *spec.ModelPreset, body *spec.PatchModelPresetReq
 		dst.CapabilitiesOverride = cloneModelCapabilitiesOverride(body.CapabilitiesOverride)
 	}
 
-	after := cloneModelPresetForInference(*dst)
+	after := cloneModelPreset(*dst)
 	return !reflect.DeepEqual(before, after)
 }

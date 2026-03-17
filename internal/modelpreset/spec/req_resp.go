@@ -15,8 +15,9 @@ type PatchDefaultProviderResponse struct{}
 type GetDefaultProviderRequest struct{}
 
 type GetDefaultProviderResponseBody struct {
-	DefaultProvider inferenceSpec.ProviderName
+	DefaultProvider inferenceSpec.ProviderName `json:"defaultProvider"`
 }
+
 type GetDefaultProviderResponse struct {
 	Body *GetDefaultProviderResponseBody
 }
@@ -57,8 +58,7 @@ type PatchProviderPresetRequestBody struct {
 	DefaultHeaders           map[string]string              `json:"defaultHeaders,omitempty"`
 	DefaultModelPresetID     *ModelPresetID                 `json:"defaultModelPresetID,omitempty"`
 
-	CapabilitiesOverride      *ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
-	ClearCapabilitiesOverride bool                       `json:"clearCapabilitiesOverride,omitempty"`
+	CapabilitiesOverride *ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
 }
 
 type PatchProviderPresetRequest struct {
@@ -80,8 +80,6 @@ type PostModelPresetRequestBody struct {
 	Slug        ModelSlug        `json:"slug"        required:"true"`
 	DisplayName ModelDisplayName `json:"displayName" required:"true"`
 	IsEnabled   bool             `json:"isEnabled"   required:"true"`
-
-	CapabilitiesOverride *ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
 }
 
 type PostModelPresetRequest struct {
@@ -95,9 +93,9 @@ type PostModelPresetResponse struct{}
 //
 // Semantics:
 //   - nil pointer/object fields => not provided
-//   - StopSequences nil/empty => not provided
-//   - use Clear* flags to explicitly remove stored optional values
-//   - at least one field/clear-flag/override field must be supplied
+//   - StopSequences=nil => not provided
+//   - StopSequences=&[]{} => explicitly set to empty
+//   - at least one field/override field must be supplied
 type PatchModelPresetRequestBody struct {
 	ModelPresetPatch
 
@@ -105,12 +103,6 @@ type PatchModelPresetRequestBody struct {
 	Slug        *ModelSlug        `json:"slug,omitempty"`
 	DisplayName *ModelDisplayName `json:"displayName,omitempty"`
 	IsEnabled   *bool             `json:"isEnabled,omitempty"`
-
-	// CapabilitiesOverride can only be patched for USER provider presets (not built-ins).
-	// To clear the override entirely, set ClearCapabilitiesOverride=true.
-	CapabilitiesOverride *ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
-
-	ClearStopSequences bool `json:"clearStopSequences,omitempty"`
 }
 
 type PatchModelPresetRequest struct {

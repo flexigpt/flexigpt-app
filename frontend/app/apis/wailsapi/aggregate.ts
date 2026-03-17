@@ -1,6 +1,6 @@
 import type { StoreConversationMessage } from '@/spec/conversation';
 import type { CompletionResponseBody, ModelParam, ProviderName } from '@/spec/inference';
-import type { ModelPresetID, PutProviderPresetPayload } from '@/spec/modelpreset';
+import type { ModelPresetID, PostProviderPresetPayload } from '@/spec/modelpreset';
 import type { AuthKeyName, AuthKeyType } from '@/spec/setting';
 import type { ToolStoreChoice } from '@/spec/tool';
 
@@ -12,7 +12,7 @@ import {
 	DeleteAuthKey,
 	DeleteProviderPreset,
 	FetchCompletion,
-	PutProviderPreset,
+	PostProviderPreset,
 	SetAuthKey,
 } from '@/apis/wailsjs/go/main/AggregrateWrapper';
 import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
@@ -38,13 +38,13 @@ export class WailsAggregateAPI implements IAggregateAPI {
 		await SetAuthKey(r as wailsSpec.SetAuthKeyRequest);
 	}
 
-	async putProviderPreset(providerName: ProviderName, payload: PutProviderPresetPayload): Promise<void> {
+	async postProviderPreset(providerName: ProviderName, payload: PostProviderPresetPayload): Promise<void> {
 		if (!providerName) throw new Error('Missing providerName or payload');
 		const r = {
 			ProviderName: providerName,
-			Body: payload as wailsSpec.PutProviderPresetRequestBody,
+			Body: payload as wailsSpec.PostProviderPresetRequestBody,
 		};
-		await PutProviderPreset(r as wailsSpec.PutProviderPresetRequest);
+		await PostProviderPreset(r as wailsSpec.PostProviderPresetRequest);
 	}
 
 	async deleteProviderPreset(providerName: ProviderName): Promise<void> {

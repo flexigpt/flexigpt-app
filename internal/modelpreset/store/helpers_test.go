@@ -415,6 +415,8 @@ func boolPtr(v bool) *bool { return &v }
 
 func mpidPtr(v spec.ModelPresetID) *spec.ModelPresetID { return &v }
 
+func stringSlicePtr(v []string) *[]string { return &v }
+
 func stringPtr(v string) *string { return &v }
 
 func floatPtr(v float64) *float64 { return &v }

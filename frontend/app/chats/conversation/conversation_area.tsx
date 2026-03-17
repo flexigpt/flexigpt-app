@@ -1066,7 +1066,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 					computeItemKey={computeItemKey}
 					initialScrollTop={scrollTopByTab.current.get(selectedTabId) ?? 0}
 					followOutput={atBottom => (atBottom ? 'smooth' : false)}
-					atBottomThreshold={100}
+					atBottomThreshold={128}
 					increaseViewportBy={200}
 					atBottomStateChange={atBottom => {
 						isAtBottomRef.current = atBottom;

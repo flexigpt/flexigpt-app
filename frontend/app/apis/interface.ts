@@ -8,11 +8,12 @@ import type {
 import type { ConversationSearchItem, StoreConversation, StoreConversationMessage } from '@/spec/conversation';
 import type { CompletionResponseBody, ModelParam, ProviderName } from '@/spec/inference';
 import type {
-	ModelCapabilitiesOverride,
 	ModelPresetID,
+	PatchModelPresetPayload,
+	PatchProviderPresetPayload,
+	PostModelPresetPayload,
+	PostProviderPresetPayload,
 	ProviderPreset,
-	PutModelPresetPayload,
-	PutProviderPresetPayload,
 } from '@/spec/modelpreset';
 import type { MessageBlock, PromptBundle, PromptTemplate, PromptTemplateListItem, PromptVariable } from '@/spec/prompt';
 import type { AppTheme, AuthKey, AuthKeyName, AuthKeyType, SettingsSchema } from '@/spec/setting';
@@ -125,24 +126,18 @@ export interface IModelPresetStoreAPI {
 
 	patchDefaultProvider(providerName: ProviderName): Promise<void>;
 
-	patchProviderPreset(
-		providerName: ProviderName,
-		isEnabled?: boolean,
-		defaultModelPresetID?: ModelPresetID
-	): Promise<void>;
+	patchProviderPreset(providerName: ProviderName, payload: PatchProviderPresetPayload): Promise<void>;
 
-	putModelPreset(
+	postModelPreset(
 		providerName: ProviderName,
 		modelPresetID: ModelPresetID,
-		payload: PutModelPresetPayload
+		payload: PostModelPresetPayload
 	): Promise<void>;
 
 	patchModelPreset(
 		providerName: ProviderName,
 		modelPresetID: ModelPresetID,
-		isEnabled: boolean,
-		capabilitiesOverride?: ModelCapabilitiesOverride,
-		clearCapabilitiesOverride?: boolean
+		payload: PatchModelPresetPayload
 	): Promise<void>;
 
 	deleteModelPreset(providerName: ProviderName, modelPresetID: ModelPresetID): Promise<void>;
@@ -347,7 +342,8 @@ export interface IAttachmentsDropAPI {
 }
 
 export interface IAggregateAPI {
-	putProviderPreset(providerName: ProviderName, payload: PutProviderPresetPayload): Promise<void>;
+	postProviderPreset(providerName: ProviderName, payload: PostProviderPresetPayload): Promise<void>;
+
 	deleteProviderPreset(providerName: ProviderName): Promise<void>;
 	deleteAuthKey: (type: AuthKeyType, keyName: AuthKeyName) => Promise<void>;
 	setAuthKey: (type: AuthKeyType, keyName: AuthKeyName, secret: string) => Promise<void>;

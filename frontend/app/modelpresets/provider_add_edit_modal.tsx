@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom';
 import { FiAlertCircle, FiHelpCircle, FiUpload, FiX } from 'react-icons/fi';
 
 import { type ProviderName, ProviderSDKType, SDK_DEFAULTS, SDK_DISPLAY_NAME } from '@/spec/inference';
-import type { ProviderPreset } from '@/spec/modelpreset';
+import type { PatchProviderPresetPayload, PostProviderPresetPayload, ProviderPreset } from '@/spec/modelpreset';
 
 import { GenerateRandomNumberString } from '@/lib/encode_decode';
 import { omitManyKeys } from '@/lib/obj_utils';
@@ -17,6 +17,19 @@ import { ModalBackdrop } from '@/components/modal_backdrop';
 import { ReadOnlyValue } from '@/components/read_only_value';
 
 type ModalMode = 'add' | 'edit' | 'view';
+
+function parseDefaultHeadersRawJSON(raw: string): Record<string, string> {
+	if (!raw.trim()) return {};
+	return JSON.parse(raw.trim()) as Record<string, string>;
+}
+
+function normalizeHeadersRecord(headers: Record<string, string>): Record<string, string> {
+	return Object.fromEntries(Object.entries(headers).sort(([a], [b]) => a.localeCompare(b)));
+}
+
+function headersEqual(a: Record<string, string>, b: Record<string, string>): boolean {
+	return JSON.stringify(normalizeHeadersRecord(a)) === JSON.stringify(normalizeHeadersRecord(b));
+}
 
 type ProviderFormData = {
 	providerName: string;
@@ -42,21 +55,6 @@ const DEFAULT_FORM: ProviderFormData = {
 	apiKey: '',
 };
 
-interface AddEditProviderPresetModalProps {
-	isOpen: boolean;
-	mode: ModalMode;
-	onClose: () => void;
-	onSubmit: (
-		providerName: ProviderName,
-		payload: Omit<ProviderPreset, 'isBuiltIn' | 'defaultModelPresetID' | 'modelPresets' | 'name'>,
-		apiKey: string | null
-	) => Promise<void>;
-	existingProviderNames: ProviderName[];
-	allProviderPresets: Record<ProviderName, ProviderPreset>;
-	initialPreset?: ProviderPreset;
-	apiKeyAlreadySet?: boolean;
-}
-
 type ErrorState = Partial<Record<keyof ProviderFormData, string>>;
 
 function getInitialFormData(mode: ModalMode, initialPreset?: ProviderPreset): ProviderFormData {
@@ -69,12 +67,27 @@ function getInitialFormData(mode: ModalMode, initialPreset?: ProviderPreset): Pr
 			origin: initialPreset.origin,
 			chatCompletionPathPrefix: initialPreset.chatCompletionPathPrefix,
 			apiKeyHeaderKey: initialPreset.apiKeyHeaderKey,
-			defaultHeadersRawJSON: JSON.stringify(initialPreset.defaultHeaders, null, 2),
+			defaultHeadersRawJSON: JSON.stringify(initialPreset.defaultHeaders ?? {}, null, 2),
 			apiKey: '',
 		};
 	}
 
 	return { ...DEFAULT_FORM };
+}
+
+interface AddEditProviderPresetModalProps {
+	isOpen: boolean;
+	mode: ModalMode;
+	onClose: () => void;
+	onSubmit: (
+		providerName: ProviderName,
+		payload: PostProviderPresetPayload | PatchProviderPresetPayload,
+		apiKey: string | null
+	) => Promise<void>;
+	existingProviderNames: ProviderName[];
+	allProviderPresets: Record<ProviderName, ProviderPreset>;
+	initialPreset?: ProviderPreset;
+	apiKeyAlreadySet?: boolean;
 }
 
 function AddEditProviderPresetModalContent({
@@ -211,6 +224,11 @@ function AddEditProviderPresetModalContent({
 				else newErrs = omitManyKeys(newErrs, ['origin']);
 			}
 
+			if (field === 'chatCompletionPathPrefix') {
+				if (!String(v).trim()) newErrs.chatCompletionPathPrefix = 'Chat path required.';
+				else newErrs = omitManyKeys(newErrs, ['chatCompletionPathPrefix']);
+			}
+
 			if (field === 'defaultHeadersRawJSON') {
 				if (v) {
 					try {
@@ -250,12 +268,36 @@ function AddEditProviderPresetModalContent({
 			next = validateField('providerName', state.providerName, next);
 			next = validateField('displayName', state.displayName, next);
 			next = validateField('origin', state.origin, next);
+			next = validateField('chatCompletionPathPrefix', state.chatCompletionPathPrefix, next);
 			next = validateField('defaultHeadersRawJSON', state.defaultHeadersRawJSON, next);
 			if (mode === 'add' || state.apiKey.trim()) next = validateField('apiKey', state.apiKey, next);
 			next = validateField('sdkType', state.sdkType, next);
 			return next;
 		},
 		[isReadOnly, mode, validateField]
+	);
+
+	const buildPatchPayload = useCallback(
+		(
+			state: ProviderFormData,
+			normalizedOrigin: string,
+			defaultHeaders: Record<string, string>
+		): PatchProviderPresetPayload => {
+			if (!initialPreset) return {};
+
+			const patch: PatchProviderPresetPayload = {};
+			if (state.displayName.trim() !== initialPreset.displayName) patch.displayName = state.displayName.trim();
+			if (state.sdkType !== initialPreset.sdkType) patch.sdkType = state.sdkType;
+			if (state.isEnabled !== initialPreset.isEnabled) patch.isEnabled = state.isEnabled;
+			if (normalizedOrigin !== initialPreset.origin) patch.origin = normalizedOrigin;
+			if (state.chatCompletionPathPrefix.trim() !== initialPreset.chatCompletionPathPrefix)
+				patch.chatCompletionPathPrefix = state.chatCompletionPathPrefix.trim();
+			if (state.apiKeyHeaderKey.trim() !== initialPreset.apiKeyHeaderKey)
+				patch.apiKeyHeaderKey = state.apiKeyHeaderKey.trim();
+			if (!headersEqual(defaultHeaders, initialPreset.defaultHeaders ?? {})) patch.defaultHeaders = defaultHeaders;
+			return patch;
+		},
+		[initialPreset]
 	);
 
 	const applyPrefill = (key: ProviderName) => {
@@ -287,7 +329,11 @@ function AddEditProviderPresetModalContent({
 
 		setFormData(prev => ({ ...prev, [name]: newVal }));
 
-		if (['providerName', 'displayName', 'origin', 'defaultHeadersRawJSON', 'apiKey'].includes(name)) {
+		if (
+			['providerName', 'displayName', 'origin', 'chatCompletionPathPrefix', 'defaultHeadersRawJSON', 'apiKey'].includes(
+				name
+			)
+		) {
 			setErrors(prev =>
 				validateField(name as keyof ProviderFormData, newVal, prev, name === 'origin' ? originInputRef.current : null)
 			);
@@ -314,6 +360,24 @@ function AddEditProviderPresetModalContent({
 		setErrors(prev => validateField('sdkType', key, prev));
 	};
 
+	const hasEffectiveChanges = useMemo(() => {
+		if (mode !== 'edit') return true;
+		if (formData.apiKey.trim()) return true;
+		if (!initialPreset) return false;
+
+		let defaultHeaders: Record<string, string>;
+		try {
+			defaultHeaders = parseDefaultHeadersRawJSON(formData.defaultHeadersRawJSON);
+		} catch {
+			return true;
+		}
+
+		const { normalized } = validateUrlForInput(formData.origin, originInputRef.current, { required: true });
+		const normalizedOrigin = normalized ?? formData.origin.trim();
+
+		return Object.keys(buildPatchPayload(formData, normalizedOrigin, defaultHeaders)).length > 0;
+	}, [buildPatchPayload, formData, initialPreset, mode]);
+
 	const allValid = useMemo(() => {
 		if (isReadOnly) return true;
 
@@ -323,6 +387,7 @@ function AddEditProviderPresetModalContent({
 			formData.providerName.trim() &&
 			formData.displayName.trim() &&
 			formData.origin.trim() &&
+			formData.chatCompletionPathPrefix.trim() &&
 			(mode === 'add' ? formData.apiKey.trim() : true);
 
 		return !hasErr && Boolean(requiredFilled);
@@ -349,28 +414,39 @@ function AddEditProviderPresetModalContent({
 			return;
 		}
 
-		let defaultHeaders: Record<string, string> = {};
-		if (formData.defaultHeadersRawJSON.trim()) {
-			try {
-				defaultHeaders = JSON.parse(formData.defaultHeadersRawJSON.trim()) as Record<string, string>;
-			} catch {
-				return;
-			}
+		let defaultHeaders: Record<string, string>;
+		try {
+			defaultHeaders = parseDefaultHeadersRawJSON(formData.defaultHeadersRawJSON);
+		} catch {
+			return;
 		}
 
-		const payload = {
-			displayName: formData.displayName.trim(),
-			sdkType: formData.sdkType,
-			isEnabled: formData.isEnabled,
-			origin: normalizedOrigin,
-			chatCompletionPathPrefix: formData.chatCompletionPathPrefix.trim(),
-			apiKeyHeaderKey: formData.apiKeyHeaderKey.trim(),
-			defaultHeaders,
-		};
+		const providerName = formData.providerName.trim();
+		const apiKey = formData.apiKey.trim() || null;
+		const trimmedApiKeyHeaderKey = formData.apiKeyHeaderKey.trim();
+		const trimmedChatPath = formData.chatCompletionPathPrefix.trim();
+
+		const payload: PostProviderPresetPayload | PatchProviderPresetPayload =
+			mode === 'add'
+				? {
+						displayName: formData.displayName.trim(),
+						sdkType: formData.sdkType,
+						isEnabled: formData.isEnabled,
+						origin: normalizedOrigin,
+						chatCompletionPathPrefix: trimmedChatPath,
+						...(trimmedApiKeyHeaderKey && { apiKeyHeaderKey: trimmedApiKeyHeaderKey }),
+						...(Object.keys(defaultHeaders).length > 0 && { defaultHeaders }),
+					}
+				: buildPatchPayload(formData, normalizedOrigin, defaultHeaders);
+
+		if (mode === 'edit' && Object.keys(payload).length === 0 && !apiKey) {
+			requestClose();
+			return;
+		}
 
 		setIsSubmitting(true);
 		try {
-			await onSubmit(formData.providerName.trim(), payload, formData.apiKey.trim() || null);
+			await onSubmit(providerName, payload, apiKey);
 			requestClose();
 		} catch {
 			// Keep modal open so the user keeps their form on failed save.
@@ -412,6 +488,14 @@ function AddEditProviderPresetModalContent({
 					</div>
 
 					<form noValidate onSubmit={handleSubmit} className="space-y-4">
+						{mode === 'edit' && !isReadOnly && (
+							<div className="border-info/30 bg-info/10 rounded-xl border px-3 py-2 text-xs">
+								Only changed provider fields are sent while editing.
+								<br />
+								Leaving API-Key blank keeps the current stored secret.
+							</div>
+						)}
+
 						{mode === 'add' && (
 							<div className="grid grid-cols-12 items-center gap-2">
 								<label className="label col-span-3">
@@ -607,6 +691,13 @@ function AddEditProviderPresetModalContent({
 									readOnly={isReadOnly}
 									disabled={isSubmitting}
 								/>
+								{errors.chatCompletionPathPrefix && (
+									<div className="label">
+										<span className="label-text-alt text-error flex items-center gap-1">
+											<FiAlertCircle size={12} /> {errors.chatCompletionPathPrefix}
+										</span>
+									</div>
+								)}
 							</div>
 						</div>
 
@@ -714,7 +805,11 @@ function AddEditProviderPresetModalContent({
 							</button>
 
 							{!isReadOnly && (
-								<button type="submit" className="btn btn-primary rounded-xl" disabled={!allValid || isSubmitting}>
+								<button
+									type="submit"
+									className="btn btn-primary rounded-xl"
+									disabled={!allValid || (mode === 'edit' && !hasEffectiveChanges) || isSubmitting}
+								>
 									{isSubmitting ? 'Saving…' : mode === 'add' ? 'Add Provider' : 'Save'}
 								</button>
 							)}

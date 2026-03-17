@@ -18,8 +18,8 @@ export function FetchCompletion(arg1, arg2, arg3, arg4, arg5, arg6) {
   return window['go']['main']['AggregrateWrapper']['FetchCompletion'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
-export function PutProviderPreset(arg1) {
-  return window['go']['main']['AggregrateWrapper']['PutProviderPreset'](arg1);
+export function PostProviderPreset(arg1) {
+  return window['go']['main']['AggregrateWrapper']['PostProviderPreset'](arg1);
 }
 
 export function SetAuthKey(arg1) {

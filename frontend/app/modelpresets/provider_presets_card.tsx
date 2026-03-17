@@ -15,7 +15,13 @@ import {
 } from 'react-icons/fi';
 
 import { type ProviderName, SDK_DISPLAY_NAME } from '@/spec/inference';
-import { type ModelPreset, type ModelPresetID, type ProviderPreset } from '@/spec/modelpreset';
+import {
+	type ModelPreset,
+	type ModelPresetID,
+	type PatchModelPresetPayload,
+	type PostModelPresetPayload,
+	type ProviderPreset,
+} from '@/spec/modelpreset';
 import type { AuthKeyMeta } from '@/spec/setting';
 import { AuthKeyTypeProvider } from '@/spec/setting';
 
@@ -40,7 +46,16 @@ interface ProviderPresetCardProps {
 	onRequestEdit: (provider: ProviderName) => void;
 	onSetDefaultModel: (provider: ProviderName, modelPresetID: ModelPresetID) => Promise<void>;
 	onToggleModel: (provider: ProviderName, modelPresetID: ModelPresetID, nextEnabled: boolean) => Promise<void>;
-	onSaveModel: (provider: ProviderName, modelPresetID: ModelPresetID, modelData: ModelPreset) => Promise<void>;
+	onCreateModel: (
+		provider: ProviderName,
+		modelPresetID: ModelPresetID,
+		payload: PostModelPresetPayload
+	) => Promise<void>;
+	onPatchModel: (
+		provider: ProviderName,
+		modelPresetID: ModelPresetID,
+		payload: PatchModelPresetPayload
+	) => Promise<void>;
 	onDeleteModel: (provider: ProviderName, modelPresetID: ModelPresetID) => Promise<void>;
 	onProviderAuthKeyChanged: (provider: ProviderName) => Promise<void>;
 }
@@ -63,7 +78,8 @@ export function ProviderPresetCard({
 	onRequestEdit,
 	onSetDefaultModel,
 	onToggleModel,
-	onSaveModel,
+	onCreateModel,
+	onPatchModel,
 	onDeleteModel,
 	onProviderAuthKeyChanged,
 }: ProviderPresetCardProps) {
@@ -207,9 +223,13 @@ export function ProviderPresetCard({
 		setShowModModal(true);
 	};
 
-	const handleModifyModelSubmit = async (id: ModelPresetID, data: ModelPreset) => {
+	const handleModifyModelSubmit = async (id: ModelPresetID, data: PostModelPresetPayload | PatchModelPresetPayload) => {
 		try {
-			await onSaveModel(provider, id, data);
+			if (modelModalMode === 'add') {
+				onCreateModel(provider, id, data as PostModelPresetPayload);
+			} else if (modelModalMode === 'edit') {
+				await onPatchModel(provider, id, data as PatchModelPresetPayload);
+			}
 			setShowModModal(false);
 		} catch (error) {
 			const message = getErrorMessage(error, 'Failed saving model preset.');

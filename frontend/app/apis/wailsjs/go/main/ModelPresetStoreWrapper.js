@@ -30,6 +30,6 @@ export function PatchProviderPreset(arg1) {
   return window['go']['main']['ModelPresetStoreWrapper']['PatchProviderPreset'](arg1);
 }
 
-export function PutModelPreset(arg1) {
-  return window['go']['main']['ModelPresetStoreWrapper']['PutModelPreset'](arg1);
+export function PostModelPreset(arg1) {
+  return window['go']['main']['ModelPresetStoreWrapper']['PostModelPreset'](arg1);
 }

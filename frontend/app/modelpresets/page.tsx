@@ -3,7 +3,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FiPlus } from 'react-icons/fi';
 
 import type { ProviderName } from '@/spec/inference';
-import { type ModelPreset, type ModelPresetID, type ProviderPreset } from '@/spec/modelpreset';
+import {
+	type ModelPresetID,
+	type PatchModelPresetPayload,
+	type PatchProviderPresetPayload,
+	type PostModelPresetPayload,
+	type PostProviderPresetPayload,
+	type ProviderPreset,
+} from '@/spec/modelpreset';
 import type { AuthKeyMeta } from '@/spec/setting';
 import { AuthKeyTypeProvider } from '@/spec/setting';
 
@@ -227,8 +234,7 @@ export default function ModelPresetsPage() {
 			}
 
 			try {
-				await modelPresetStoreAPI.patchProviderPreset(providerName, nextEnabled);
-
+				await modelPresetStoreAPI.patchProviderPreset(providerName, { isEnabled: nextEnabled });
 				if (nextEnabled && !defaultProvider) {
 					await modelPresetStoreAPI.patchDefaultProvider(providerName);
 				}
@@ -287,7 +293,7 @@ export default function ModelPresetsPage() {
 			}
 
 			try {
-				await modelPresetStoreAPI.patchProviderPreset(providerName, undefined, modelPresetID);
+				await modelPresetStoreAPI.patchProviderPreset(providerName, { defaultModelPresetID: modelPresetID });
 				await refreshCanonicalData();
 			} catch (changeError) {
 				console.error(changeError);
@@ -315,7 +321,7 @@ export default function ModelPresetsPage() {
 			}
 
 			try {
-				await modelPresetStoreAPI.patchModelPreset(providerName, modelPresetID, nextEnabled);
+				await modelPresetStoreAPI.patchModelPreset(providerName, modelPresetID, { isEnabled: nextEnabled });
 				await refreshCanonicalData();
 			} catch (toggleError) {
 				console.error(toggleError);
@@ -326,19 +332,18 @@ export default function ModelPresetsPage() {
 		[providerPresets, refreshCanonicalData, refreshCanonicalDataSafely]
 	);
 
-	const handleSaveModel = useCallback(
-		async (providerName: ProviderName, modelPresetID: ModelPresetID, modelData: ModelPreset) => {
+	const handleCreateModel = useCallback(
+		async (providerName: ProviderName, modelPresetID: ModelPresetID, payload: PostModelPresetPayload) => {
 			const providerPreset = providerPresets[providerName];
 			if (!providerPreset) {
 				throw new Error('Provider not found.');
 			}
 
 			try {
-				const { id: _id, isBuiltIn: _isBuiltIn, ...payload } = modelData;
-				await modelPresetStoreAPI.putModelPreset(providerName, modelPresetID, payload);
+				await modelPresetStoreAPI.postModelPreset(providerName, modelPresetID, payload);
 
 				if (!providerPreset.defaultModelPresetID) {
-					await modelPresetStoreAPI.patchProviderPreset(providerName, undefined, modelPresetID);
+					await modelPresetStoreAPI.patchProviderPreset(providerName, { defaultModelPresetID: modelPresetID });
 				}
 
 				await refreshCanonicalData();
@@ -346,6 +351,27 @@ export default function ModelPresetsPage() {
 				console.error(saveError);
 				await refreshCanonicalDataSafely();
 				throw new Error('Failed saving model preset.');
+			}
+		},
+		[providerPresets, refreshCanonicalData, refreshCanonicalDataSafely]
+	);
+
+	const handlePatchModel = useCallback(
+		async (providerName: ProviderName, modelPresetID: ModelPresetID, payload: PatchModelPresetPayload) => {
+			const providerPreset = providerPresets[providerName];
+			if (!providerPreset) {
+				throw new Error('Provider not found.');
+			}
+
+			if (Object.keys(payload).length === 0) return;
+
+			try {
+				await modelPresetStoreAPI.patchModelPreset(providerName, modelPresetID, payload);
+				await refreshCanonicalData();
+			} catch (patchError) {
+				console.error(patchError);
+				await refreshCanonicalDataSafely();
+				throw new Error('Failed updating model preset.');
 			}
 		},
 		[providerPresets, refreshCanonicalData, refreshCanonicalDataSafely]
@@ -373,7 +399,7 @@ export default function ModelPresetsPage() {
 				await modelPresetStoreAPI.deleteModelPreset(providerName, modelPresetID);
 
 				if (providerPreset.defaultModelPresetID === modelPresetID && remainingModelIDs.length > 0) {
-					await modelPresetStoreAPI.patchProviderPreset(providerName, undefined, remainingModelIDs[0]);
+					await modelPresetStoreAPI.patchProviderPreset(providerName, { defaultModelPresetID: remainingModelIDs[0] });
 				}
 
 				await refreshCanonicalData();
@@ -386,21 +412,10 @@ export default function ModelPresetsPage() {
 		[providerPresets, refreshCanonicalData, refreshCanonicalDataSafely]
 	);
 
-	const handleProviderModalSubmit = useCallback(
-		async (
-			providerName: ProviderName,
-			payload: Omit<ProviderPreset, 'isBuiltIn' | 'defaultModelPresetID' | 'modelPresets' | 'name'>,
-			apiKey: string | null,
-			isEdit: boolean
-		) => {
-			if (isEdit && providerName === defaultProvider && !payload.isEnabled) {
-				const message = 'Cannot disable the current default provider. Pick another default first.';
-				showGlobalDenied(message);
-				throw new Error(message);
-			}
-
+	const handleCreateProvider = useCallback(
+		async (providerName: ProviderName, payload: PostProviderPresetPayload, apiKey: string | null) => {
 			try {
-				await aggregateAPI.putProviderPreset(providerName, payload);
+				await aggregateAPI.postProviderPreset(providerName, payload);
 
 				if (apiKey && apiKey.trim()) {
 					await aggregateAPI.setAuthKey(AuthKeyTypeProvider, providerName, apiKey.trim());
@@ -411,11 +426,47 @@ export default function ModelPresetsPage() {
 				}
 
 				await refreshCanonicalData();
-			} catch (submitError) {
-				console.error(submitError);
-				await refreshCanonicalDataSafely();
+			} catch (createError) {
+				console.error(createError);
+				const message = 'Failed adding provider.';
+				showGlobalDenied(message);
+				throw new Error(message);
+			}
+		},
+		[defaultProvider, refreshCanonicalData, showGlobalDenied]
+	);
 
-				const message = isEdit ? 'Failed updating provider.' : 'Failed adding provider.';
+	const handlePatchProvider = useCallback(
+		async (providerName: ProviderName, payload: PatchProviderPresetPayload, apiKey: string | null) => {
+			if (providerName === defaultProvider && payload.isEnabled === false) {
+				const message = 'Cannot disable the current default provider. Pick another default first.';
+				showGlobalDenied(message);
+				throw new Error(message);
+			}
+
+			const hasStorePatch = Object.keys(payload).length > 0;
+			const hasKeyPatch = Boolean(apiKey && apiKey.trim());
+			if (!hasStorePatch && !hasKeyPatch) return;
+
+			try {
+				if (hasStorePatch) {
+					await modelPresetStoreAPI.patchProviderPreset(providerName, payload);
+				}
+
+				if (apiKey && apiKey.trim()) {
+					await aggregateAPI.setAuthKey(AuthKeyTypeProvider, providerName, apiKey.trim());
+				}
+
+				if (!defaultProvider && payload.isEnabled === true) {
+					await modelPresetStoreAPI.patchDefaultProvider(providerName);
+				}
+
+				await refreshCanonicalData();
+			} catch (patchError) {
+				console.error(patchError);
+				await refreshCanonicalDataSafely();
+				const message = 'Failed updating provider.';
+
 				showGlobalDenied(message);
 				throw new Error(message);
 			}
@@ -542,7 +593,8 @@ export default function ModelPresetsPage() {
 										onRequestEdit={openEditModal}
 										onSetDefaultModel={handleSetDefaultModel}
 										onToggleModel={handleToggleModel}
-										onSaveModel={handleSaveModel}
+										onCreateModel={handleCreateModel}
+										onPatchModel={handlePatchModel}
 										onDeleteModel={handleDeleteModel}
 										onProviderAuthKeyChanged={handleProviderAuthKeyChanged}
 									/>
@@ -558,7 +610,12 @@ export default function ModelPresetsPage() {
 					}}
 					onSubmit={async (name, payload, apiKey) => {
 						if (modalMode === 'view') return;
-						await handleProviderModalSubmit(name, payload, apiKey, modalMode === 'edit');
+						if (modalMode === 'add') {
+							await handleCreateProvider(name, payload as PostProviderPresetPayload, apiKey);
+							return;
+						}
+
+						await handlePatchProvider(name, payload as PatchProviderPresetPayload, apiKey);
 					}}
 					existingProviderNames={Object.keys(providerPresets)}
 					allProviderPresets={providerPresets}

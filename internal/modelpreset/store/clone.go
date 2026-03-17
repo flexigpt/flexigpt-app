@@ -18,20 +18,53 @@ func cloneProviderPresetForInference(pp spec.ProviderPreset) spec.ProviderPreset
 func cloneProviderPreset(pp spec.ProviderPreset) spec.ProviderPreset {
 	out := pp
 	out.DefaultHeaders = maps.Clone(pp.DefaultHeaders)
-	out.ModelPresets = maps.Clone(pp.ModelPresets)
+	out.ModelPresets = cloneModelPresetMap(pp.ModelPresets)
 	out.CapabilitiesOverride = cloneModelCapabilitiesOverride(pp.CapabilitiesOverride)
 	return out
 }
 
-func cloneModelPresetForInference(mp spec.ModelPreset) spec.ModelPreset {
-	out := mp
+func cloneProviderPresetMap(
+	src map[inferenceSpec.ProviderName]spec.ProviderPreset,
+) map[inferenceSpec.ProviderName]spec.ProviderPreset {
+	dst := make(map[inferenceSpec.ProviderName]spec.ProviderPreset, len(src))
+	for k, v := range src {
+		dst[k] = cloneProviderPreset(v)
+	}
+	return dst
+}
 
+func cloneModelPresetMap(
+	src map[spec.ModelPresetID]spec.ModelPreset,
+) map[spec.ModelPresetID]spec.ModelPreset {
+	dst := make(map[spec.ModelPresetID]spec.ModelPreset, len(src))
+	for k, v := range src {
+		dst[k] = cloneModelPreset(v)
+	}
+	return dst
+}
+
+func cloneModelPresetNestedMap(
+	src map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset,
+) map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset {
+	dst := make(map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset, len(src))
+	for k, v := range src {
+		dst[k] = cloneModelPresetMap(v)
+	}
+	return dst
+}
+
+func cloneModelPreset(mp spec.ModelPreset) spec.ModelPreset {
+	out := mp
 	out.ModelPresetPatch = cloneModelPresetPatch(mp.ModelPresetPatch)
-	out.CapabilitiesOverride = cloneModelCapabilitiesOverride(mp.CapabilitiesOverride)
 	return out
 }
 
 func cloneModelPresetPatch(in spec.ModelPresetPatch) spec.ModelPresetPatch {
+	var stopSequences *[]string
+	if in.StopSequences != nil {
+		s := slices.Clone(*in.StopSequences)
+		stopSequences = &s
+	}
 	return spec.ModelPresetPatch{
 		Stream:                      cloneBoolPtr(in.Stream),
 		MaxPromptLength:             cloneIntPtr(in.MaxPromptLength),
@@ -41,8 +74,9 @@ func cloneModelPresetPatch(in spec.ModelPresetPatch) spec.ModelPresetPatch {
 		SystemPrompt:                cloneStringPtr(in.SystemPrompt),
 		Timeout:                     cloneIntPtr(in.Timeout),
 		OutputParam:                 cloneOutputParam(in.OutputParam),
-		StopSequences:               slices.Clone(in.StopSequences),
+		StopSequences:               stopSequences,
 		AdditionalParametersRawJSON: cloneStringPtr(in.AdditionalParametersRawJSON),
+		CapabilitiesOverride:        cloneModelCapabilitiesOverride(in.CapabilitiesOverride),
 	}
 }
 

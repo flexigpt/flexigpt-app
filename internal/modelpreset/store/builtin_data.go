@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"maps"
 	"os"            // POSIX for embed.FS
 	"path/filepath" // Native paths
 	"sync"
@@ -171,7 +170,7 @@ func (b *BuiltInPresets) ListBuiltInPresets(ctx context.Context) (
 ) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	return maps.Clone(b.viewProv), cloneModels(b.viewModels), nil
+	return cloneProviderPresetMap(b.viewProv), cloneModelPresetNestedMap(b.viewModels), nil
 }
 
 // GetBuiltInDefaultProviderName fetches the default provider name in builtin.
@@ -197,7 +196,7 @@ func (b *BuiltInPresets) GetBuiltInProvider(
 	if !ok {
 		return spec.ProviderPreset{}, spec.ErrProviderNotFound
 	}
-	return p, nil
+	return cloneProviderPreset(p), nil
 }
 
 // SetProviderEnabled toggles a provider.
@@ -222,7 +221,7 @@ func (b *BuiltInPresets) SetProviderEnabled(
 	b.mu.Unlock()
 
 	b.rebuilder.Trigger()
-	return pp, nil
+	return cloneProviderPreset(pp), nil
 }
 
 // SetModelPresetEnabled toggles a model preset.
@@ -256,7 +255,7 @@ func (b *BuiltInPresets) SetModelPresetEnabled(
 	b.mu.Unlock()
 
 	b.rebuilder.Trigger()
-	return mp, nil
+	return cloneModelPreset(mp), nil
 }
 
 // GetBuiltInModelPreset fetches a model preset.
@@ -275,7 +274,7 @@ func (b *BuiltInPresets) GetBuiltInModelPreset(
 	if !ok {
 		return spec.ModelPreset{}, spec.ErrModelPresetNotFound
 	}
-	return mp, nil
+	return cloneModelPreset(mp), nil
 }
 
 func (b *BuiltInPresets) SetDefaultModelPreset(
@@ -309,7 +308,7 @@ func (b *BuiltInPresets) SetDefaultModelPreset(
 	b.mu.Unlock()
 
 	b.rebuilder.Trigger()
-	return pp, nil
+	return cloneProviderPreset(pp), nil
 }
 
 func (b *BuiltInPresets) loadFromFS(ctx context.Context) error {
@@ -415,16 +414,6 @@ func (b *BuiltInPresets) rebuildSnapshot(ctx context.Context) error {
 	b.viewProv = newProv
 	b.viewModels = newModels
 	return nil
-}
-
-func cloneModels(
-	src map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset,
-) map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset {
-	dst := make(map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset, len(src))
-	for pname, inner := range src {
-		dst[pname] = maps.Clone(inner)
-	}
-	return dst
 }
 
 func resolvePresetsFS(fsys fs.FS, dir string) (fs.FS, error) {

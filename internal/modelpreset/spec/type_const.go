@@ -75,8 +75,11 @@ func (r ModelPresetRef) IsZero() bool {
 //
 // PATCH semantics:
 //   - nil pointer/object fields => not provided
-//   - StopSequences nil/empty => not provided
-//   - use clearStopSequences to remove stored stop sequences
+//   - StopSequences is a pointer-to-slice so PATCH can distinguish:
+//   - nil => not provided
+//   - non-nil empty slice => explicitly set to empty
+//
+// Note: PATCH does not support generic "clear to nil" semantics.
 type ModelPresetPatch struct {
 	Stream          *bool                         `json:"stream,omitempty"`
 	MaxPromptLength *int                          `json:"maxPromptLength,omitempty"`
@@ -87,9 +90,13 @@ type ModelPresetPatch struct {
 	Timeout         *int                          `json:"timeout,omitempty"`
 
 	OutputParam   *inferenceSpec.OutputParam `json:"outputParam,omitempty"`
-	StopSequences []string                   `json:"stopSequences,omitempty"`
+	StopSequences *[]string                  `json:"stopSequences,omitempty"`
 
 	AdditionalParametersRawJSON *string `json:"additionalParametersRawJSON,omitempty"`
+
+	// CapabilitiesOverride is a stored override for runtime capability resolution.
+	// This is NOT the derived/effective capability profile.
+	CapabilitiesOverride *ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
 }
 
 // ModelPreset is the entire "model + default knobs" bundle the user can save.
@@ -103,10 +110,6 @@ type ModelPreset struct {
 	DisplayName   ModelDisplayName `json:"displayName"   required:"true"`
 	Slug          ModelSlug        `json:"slug"          required:"true"`
 	IsEnabled     bool             `json:"isEnabled"     required:"true"`
-
-	// CapabilitiesOverride is a stored override for runtime capability resolution.
-	// This is NOT the derived/effective capability profile.
-	CapabilitiesOverride *ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
 
 	CreatedAt  time.Time `json:"createdAt"`
 	ModifiedAt time.Time `json:"modifiedAt"`

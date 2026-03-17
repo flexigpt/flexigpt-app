@@ -52,7 +52,7 @@ func (s *ModelPresetStore) PatchProviderPreset(
 			changed = true
 		}
 
-		// Change default model-preset (placeholder - to be implemented later).
+		// Change default model-preset.
 		if req.Body.DefaultModelPresetID != nil &&
 			currentPP.DefaultModelPresetID != *req.Body.DefaultModelPresetID {
 			if _, err := s.builtinData.SetDefaultModelPreset(
@@ -115,8 +115,7 @@ func hasAnyProviderPatchMutation(body *spec.PatchProviderPresetRequestBody) bool
 		body.APIKeyHeaderKey != nil ||
 		body.DefaultHeaders != nil ||
 		body.DefaultModelPresetID != nil ||
-		body.CapabilitiesOverride != nil ||
-		body.ClearCapabilitiesOverride
+		body.CapabilitiesOverride != nil
 }
 
 func hasAnyReadOnlyBuiltInProviderPatch(body *spec.PatchProviderPresetRequestBody) bool {
@@ -129,8 +128,7 @@ func hasAnyReadOnlyBuiltInProviderPatch(body *spec.PatchProviderPresetRequestBod
 		body.ChatCompletionPathPrefix != nil ||
 		body.APIKeyHeaderKey != nil ||
 		body.DefaultHeaders != nil ||
-		body.CapabilitiesOverride != nil ||
-		body.ClearCapabilitiesOverride
+		body.CapabilitiesOverride != nil
 }
 
 func validateProviderPresetPatchRequestBody(body *spec.PatchProviderPresetRequestBody) error {
@@ -140,9 +138,7 @@ func validateProviderPresetPatchRequestBody(body *spec.PatchProviderPresetReques
 	if !hasAnyProviderPatchMutation(body) {
 		return errors.New("at least one provider preset field must be supplied")
 	}
-	if body.CapabilitiesOverride != nil && body.ClearCapabilitiesOverride {
-		return errors.New("capabilitiesOverride and clearCapabilitiesOverride cannot both be supplied")
-	}
+
 	return nil
 }
 
@@ -173,9 +169,7 @@ func applyProviderPresetPatch(dst *spec.ProviderPreset, body *spec.PatchProvider
 	if body.DefaultModelPresetID != nil {
 		dst.DefaultModelPresetID = *body.DefaultModelPresetID
 	}
-	if body.ClearCapabilitiesOverride {
-		dst.CapabilitiesOverride = nil
-	} else if body.CapabilitiesOverride != nil {
+	if body.CapabilitiesOverride != nil {
 		dst.CapabilitiesOverride = cloneModelCapabilitiesOverride(body.CapabilitiesOverride)
 	}
 

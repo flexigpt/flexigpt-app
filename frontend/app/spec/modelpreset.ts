@@ -64,11 +64,7 @@ export interface ModelCapabilitiesOverride {
 	toolCapabilities?: ToolCapabilitiesOverride;
 }
 
-export interface PutModelPresetPayload {
-	name: ModelName;
-	slug: ModelSlug;
-	displayName: ModelDisplayName;
-	isEnabled: boolean;
+interface ModelPresetPatch {
 	stream?: boolean;
 	maxPromptLength?: number;
 	maxOutputLength?: number;
@@ -82,25 +78,73 @@ export interface PutModelPresetPayload {
 	capabilitiesOverride?: ModelCapabilitiesOverride;
 }
 
-export interface ModelPreset extends PutModelPresetPayload {
+export interface PostModelPresetPayload extends ModelPresetPatch {
+	name: ModelName;
+	slug: ModelSlug;
+	displayName: ModelDisplayName;
+	isEnabled: boolean;
+}
+
+export interface PatchModelPresetPayload extends ModelPresetPatch {
+	name?: ModelName;
+	slug?: ModelSlug;
+	displayName?: ModelDisplayName;
+	isEnabled?: boolean;
+}
+
+type ISODateString = string;
+
+export interface ModelPreset extends ModelPresetPatch {
+	schemaVersion: string;
 	id: ModelPresetID;
+	name: ModelName;
+	slug: ModelSlug;
+	displayName: ModelDisplayName;
+	isEnabled: boolean;
+	capabilitiesOverride?: ModelCapabilitiesOverride;
+	createdAt: ISODateString;
+	modifiedAt: ISODateString;
 	isBuiltIn: boolean;
 }
 
-export interface PutProviderPresetPayload {
+export interface PostProviderPresetPayload {
 	displayName: ProviderDisplayName;
 	sdkType: ProviderSDKType;
 	isEnabled: boolean;
 	origin: string;
 	chatCompletionPathPrefix: string;
-	apiKeyHeaderKey: string;
-	defaultHeaders: Record<string, string>;
+
+	apiKeyHeaderKey?: string;
+	defaultHeaders?: Record<string, string>;
 	capabilitiesOverride?: ModelCapabilitiesOverride;
 }
 
-export interface ProviderPreset extends PutProviderPresetPayload {
+export interface PatchProviderPresetPayload {
+	displayName?: ProviderDisplayName;
+	sdkType?: ProviderSDKType;
+	isEnabled?: boolean;
+	origin?: string;
+	chatCompletionPathPrefix?: string;
+	apiKeyHeaderKey?: string;
+	defaultHeaders?: Record<string, string>;
+	defaultModelPresetID?: ModelPresetID;
+	capabilitiesOverride?: ModelCapabilitiesOverride;
+}
+
+export interface ProviderPreset {
+	schemaVersion: string;
 	name: ProviderName;
+	displayName: ProviderDisplayName;
+	sdkType: ProviderSDKType;
+	isEnabled: boolean;
+	createdAt: ISODateString;
+	modifiedAt: ISODateString;
 	isBuiltIn: boolean;
+	origin: string;
+	chatCompletionPathPrefix: string;
+	apiKeyHeaderKey: string;
+	defaultHeaders: Record<string, string>;
+	capabilitiesOverride?: ModelCapabilitiesOverride;
 	defaultModelPresetID: ModelPresetID;
 	modelPresets: Record<ModelPresetID, ModelPreset>;
 }

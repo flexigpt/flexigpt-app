@@ -170,7 +170,7 @@ func (s *ModelPresetStore) PatchDefaultProvider(
 	return &spec.PatchDefaultProviderResponse{}, nil
 }
 
-// PostProviderPreset creates or replaces a provider preset.
+// PostProviderPreset creates a new provider preset.
 func (s *ModelPresetStore) PostProviderPreset(
 	ctx context.Context, req *spec.PostProviderPresetRequest,
 ) (*spec.PostProviderPresetResponse, error) {
@@ -186,7 +186,7 @@ func (s *ModelPresetStore) PostProviderPreset(
 
 	now := time.Now().UTC()
 
-	// Build object - keep CreatedAt if provider existed.
+	// Build object.
 	pp := spec.ProviderPreset{
 		SchemaVersion:            spec.SchemaVersion,
 		Name:                     req.ProviderName,
@@ -255,6 +255,11 @@ func (s *ModelPresetStore) DeleteProviderPreset(
 	if len(pp.ModelPresets) != 0 {
 		return nil, fmt.Errorf("provider %q is not empty", req.ProviderName)
 	}
+	// If the deleted provider was the selected user default, we dont allow to delete.
+	if all.DefaultProvider == req.ProviderName {
+		return nil, fmt.Errorf("provider %q is the default provider", req.ProviderName)
+	}
+
 	delete(all.ProviderPresets, req.ProviderName)
 
 	if err := s.writeAllUserPresets(all); err != nil {
@@ -302,6 +307,7 @@ func (s *ModelPresetStore) ListProviderPresets(
 	if s.builtinData != nil {
 		bi, _, _ := s.builtinData.ListBuiltInPresets(ctx)
 		for _, p := range bi {
+			// List already returns a deep cloned thing. No need to clone again.
 			all = append(all, p)
 		}
 	}
@@ -313,7 +319,7 @@ func (s *ModelPresetStore) ListProviderPresets(
 		return nil, err
 	}
 	for _, p := range user.ProviderPresets {
-		all = append(all, p)
+		all = append(all, cloneProviderPreset(p))
 	}
 
 	// Filtering.
@@ -401,14 +407,13 @@ func (s *ModelPresetStore) PostModelPreset(
 
 	// Build model preset.
 	mp := spec.ModelPreset{
-		SchemaVersion:        spec.SchemaVersion,
-		ID:                   req.ModelPresetID,
-		Name:                 req.Body.Name,
-		DisplayName:          req.Body.DisplayName,
-		Slug:                 req.Body.Slug,
-		IsEnabled:            req.Body.IsEnabled,
-		ModelPresetPatch:     cloneModelPresetPatch(req.Body.ModelPresetPatch),
-		CapabilitiesOverride: cloneModelCapabilitiesOverride(req.Body.CapabilitiesOverride),
+		SchemaVersion:    spec.SchemaVersion,
+		ID:               req.ModelPresetID,
+		Name:             req.Body.Name,
+		DisplayName:      req.Body.DisplayName,
+		Slug:             req.Body.Slug,
+		IsEnabled:        req.Body.IsEnabled,
+		ModelPresetPatch: cloneModelPresetPatch(req.Body.ModelPresetPatch),
 
 		CreatedAt:  now,
 		ModifiedAt: now,
@@ -526,7 +531,7 @@ func (s *ModelPresetStore) GetModelPreset(
 			}
 
 			ppOut := cloneProviderPresetForInference(pp)
-			mpOut := cloneModelPresetForInference(mp)
+			mpOut := cloneModelPreset(mp)
 
 			return &spec.GetModelPresetResponse{
 				Body: &spec.GetModelPresetResponseBody{
@@ -563,7 +568,7 @@ func (s *ModelPresetStore) GetModelPreset(
 	}
 
 	ppOut := cloneProviderPresetForInference(pp)
-	mpOut := cloneModelPresetForInference(mp)
+	mpOut := cloneModelPreset(mp)
 
 	return &spec.GetModelPresetResponse{
 		Body: &spec.GetModelPresetResponseBody{

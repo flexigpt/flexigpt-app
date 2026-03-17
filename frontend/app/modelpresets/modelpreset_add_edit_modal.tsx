@@ -6,13 +6,20 @@ import { FiAlertCircle, FiHelpCircle, FiUpload, FiX } from 'react-icons/fi';
 
 import {
 	OutputFormatKind,
+	type OutputParam,
 	OutputVerbosity,
 	type ProviderName,
 	ReasoningLevel,
+	type ReasoningParam,
 	ReasoningSummaryStyle,
 	ReasoningType,
 } from '@/spec/inference';
-import { type ModelPreset, type ModelPresetID } from '@/spec/modelpreset';
+import {
+	type ModelPreset,
+	type ModelPresetID,
+	type PatchModelPresetPayload,
+	type PostModelPresetPayload,
+} from '@/spec/modelpreset';
 
 import { Dropdown } from '@/components/dropdown';
 import { ModalBackdrop } from '@/components/modal_backdrop';
@@ -65,26 +72,67 @@ const reasoningSummaryStyleItems: Record<ReasoningSummaryStyle, { isEnabled: boo
 };
 
 /** Defaults we apply while in Add mode. */
-const AddModeDefaults: ModelPreset = {
-	id: '',
-	name: '',
-	slug: '',
-	displayName: '',
-	isEnabled: true,
-	isBuiltIn: false,
+const AddModeDefaults = {
 	stream: true,
 	maxPromptLength: 2048,
 	maxOutputLength: 1024,
-	temperature: undefined,
-	reasoning: undefined,
-	systemPrompt: '',
+	temperature: undefined as number | undefined,
 	timeout: 300,
-	outputParam: undefined,
-	stopSequences: undefined,
-	additionalParametersRawJSON: undefined,
 };
 
 const DEFAULT_REASONING_TOKENS = 1024;
+
+function arraysEqual(a: string[] = [], b: string[] = []): boolean {
+	if (a.length !== b.length) return false;
+	return a.every((value, index) => value === b[index]);
+}
+
+function parseOptionalNumber(val: string): number | undefined {
+	const trimmed = val.trim();
+	if (!trimmed) return undefined;
+	const parsed = Number(trimmed);
+	return Number.isNaN(parsed) ? undefined : parsed;
+}
+
+function buildOutputParamFromForm(
+	outputFormatKind: OutputFormatKindSelection,
+	outputVerbosity: OutputVerbositySelection,
+	initialOutputParam?: OutputParam
+): OutputParam | undefined {
+	const formatKind = outputFormatKind !== OUTPUT_FORMAT_NONE ? outputFormatKind : undefined;
+	const verbosity = outputVerbosity !== OUTPUT_VERBOSITY_NONE ? outputVerbosity : undefined;
+	if (!formatKind && !verbosity) return undefined;
+
+	const format =
+		formatKind !== undefined
+			? initialOutputParam?.format?.kind === formatKind
+				? initialOutputParam.format
+				: { kind: formatKind }
+			: undefined;
+
+	return {
+		...(format && { format }),
+		...(verbosity && { verbosity }),
+	};
+}
+
+function outputParamsEqual(a?: OutputParam, b?: OutputParam): boolean {
+	if (!a && !b) return true;
+	if (!a || !b) return false;
+
+	if (a.verbosity !== b.verbosity) return false;
+
+	const aFormat = a.format;
+	const bFormat = b.format;
+	if (!!aFormat !== !!bFormat) return false;
+	if (!aFormat && !bFormat) return true;
+	if (!aFormat || !bFormat) return false;
+
+	return (
+		aFormat.kind === bFormat.kind &&
+		JSON.stringify(aFormat.jsonSchemaParam ?? null) === JSON.stringify(bFormat.jsonSchemaParam ?? null)
+	);
+}
 
 interface ModelPresetFormData {
 	presetLabel: string;
@@ -114,13 +162,42 @@ type ModalMode = 'add' | 'edit' | 'view';
 interface AddEditModelPresetModalProps {
 	isOpen: boolean;
 	onClose: () => void;
-	onSubmit: (modelPresetID: ModelPresetID, modelData: ModelPreset) => Promise<void>;
+	onSubmit: (
+		modelPresetID: ModelPresetID,
+		modelData: PostModelPresetPayload | PatchModelPresetPayload
+	) => Promise<void>;
 	providerName: ProviderName;
 	mode?: ModalMode;
 	initialModelID?: ModelPresetID;
 	initialData?: ModelPreset;
 	existingModels: Record<ModelPresetID, ModelPreset>;
 	allModelPresets: Record<ProviderName, Record<ModelPresetID, ModelPreset>>;
+}
+
+function buildReasoningFromForm(
+	formData: ModelPresetFormData,
+	initialReasoning?: ReasoningParam
+): ReasoningParam | undefined {
+	if (!formData.reasoningSupport) return undefined;
+
+	const type = formData.reasoningType ?? ReasoningType.SingleWithLevels;
+	return {
+		type,
+		level: formData.reasoningLevel ?? ReasoningLevel.Medium,
+		tokens:
+			type === ReasoningType.HybridWithTokens
+				? parseOrDefault(formData.reasoningTokens ?? '', DEFAULT_REASONING_TOKENS)
+				: initialReasoning?.type === ReasoningType.SingleWithLevels
+					? initialReasoning.tokens
+					: DEFAULT_REASONING_TOKENS,
+		summaryStyle: formData.reasoningSummaryStyle,
+	};
+}
+
+function reasoningEqual(a?: ReasoningParam, b?: ReasoningParam): boolean {
+	if (!a && !b) return true;
+	if (!a || !b) return false;
+	return a.type === b.type && a.level === b.level && a.tokens === b.tokens && a.summaryStyle === b.summaryStyle;
 }
 
 interface AddEditModelPresetModalContentProps extends Omit<AddEditModelPresetModalProps, 'mode'> {
@@ -331,6 +408,55 @@ function AddEditModelPresetModalContent({
 		}));
 	};
 
+	const buildPatchPayload = useCallback((): PatchModelPresetPayload => {
+		if (!initialData) return {};
+
+		const patch: PatchModelPresetPayload = {};
+		const nextName = formData.name.trim();
+		const nextDisplayName = formData.presetLabel.trim();
+
+		if (nextName !== initialData.name) patch.name = nextName;
+		if (nextDisplayName !== initialData.displayName) patch.displayName = nextDisplayName;
+		if (formData.isEnabled !== initialData.isEnabled) patch.isEnabled = formData.isEnabled;
+		if (formData.stream !== (initialData.stream ?? false)) patch.stream = formData.stream;
+
+		const nextMaxPromptLength = parseOptionalNumber(formData.maxPromptLength);
+		if (nextMaxPromptLength !== undefined && nextMaxPromptLength !== initialData.maxPromptLength) {
+			patch.maxPromptLength = nextMaxPromptLength;
+		}
+
+		const nextMaxOutputLength = parseOptionalNumber(formData.maxOutputLength);
+		if (nextMaxOutputLength !== undefined && nextMaxOutputLength !== initialData.maxOutputLength) {
+			patch.maxOutputLength = nextMaxOutputLength;
+		}
+
+		const nextTemperature = parseOptionalNumber(formData.temperature);
+		if (nextTemperature !== undefined && nextTemperature !== initialData.temperature) {
+			patch.temperature = nextTemperature;
+		}
+
+		if (formData.systemPrompt !== (initialData.systemPrompt ?? '')) patch.systemPrompt = formData.systemPrompt;
+
+		const nextTimeout = parseOptionalNumber(formData.timeout);
+		if (nextTimeout !== undefined && nextTimeout !== initialData.timeout) patch.timeout = nextTimeout;
+
+		const nextOutputParam = buildOutputParamFromForm(
+			formData.outputFormatKind,
+			formData.outputVerbosity,
+			initialData.outputParam
+		);
+		if (!outputParamsEqual(nextOutputParam, initialData.outputParam) && nextOutputParam)
+			patch.outputParam = nextOutputParam;
+
+		const nextStopSequences = parseStopSequencesRaw(formData.stopSequencesRaw);
+		if (!arraysEqual(nextStopSequences, initialData.stopSequences ?? [])) patch.stopSequences = nextStopSequences;
+
+		const nextReasoning = buildReasoningFromForm(formData, initialData.reasoning);
+		if (!reasoningEqual(nextReasoning, initialData.reasoning) && nextReasoning) patch.reasoning = nextReasoning;
+
+		return patch;
+	}, [formData, initialData]);
+
 	const runValidation = useCallback((): ValidationErrors => {
 		if (isReadOnly) return {};
 
@@ -368,21 +494,37 @@ function AddEditModelPresetModalContent({
 		}
 
 		const hasTemperature = formData.temperature.trim() !== '';
-		if (!formData.reasoningSupport && !hasTemperature) {
-			nextErrors.temperature = 'Provide either Temperature or enable Reasoning.';
+		const effectiveHasTemperature = hasTemperature || (isEditMode && initialData?.temperature !== undefined);
+		const effectiveHasReasoning = formData.reasoningSupport || (isEditMode && !!initialData?.reasoning);
+
+		if (!effectiveHasReasoning && !effectiveHasTemperature) {
+			nextErrors.temperature = 'Provide either Temperature or enable Reasoning for new presets.';
 		}
 
 		return Object.fromEntries(
 			Object.entries(nextErrors).filter(([key]) => nextErrors[key as ValidationField] !== undefined)
 		) as ValidationErrors;
-	}, [existingModels, formData, isEditMode, isReadOnly, modelPresetID]);
+	}, [
+		existingModels,
+		formData,
+		initialData?.reasoning,
+		initialData?.temperature,
+		isEditMode,
+		isReadOnly,
+		modelPresetID,
+	]);
 
 	const isAllValid = useMemo(() => {
 		if (isReadOnly) return true;
 		return Object.keys(runValidation()).length === 0;
 	}, [isReadOnly, runValidation]);
 
-	const numPlaceholder = (field: keyof ModelPreset) => {
+	const hasPatchChanges = useMemo(() => {
+		if (!isEditMode) return true;
+		return Object.keys(buildPatchPayload()).length > 0;
+	}, [buildPatchPayload, isEditMode]);
+
+	const numPlaceholder = (field: keyof typeof AddModeDefaults) => {
 		const v = AddModeDefaults[field];
 		return v === undefined || typeof v === 'object' ? 'Default: N/A' : `Default: ${String(v)}`;
 	};
@@ -399,57 +541,47 @@ function AddEditModelPresetModalContent({
 
 		const finalModelPresetID = modelPresetID.trim();
 
-		const finalData: ModelPreset = {
-			id: finalModelPresetID,
-			slug: finalModelPresetID,
-			isBuiltIn: false,
-			name: formData.name.trim(),
-			displayName: formData.presetLabel.trim(),
-			isEnabled: formData.isEnabled,
-			stream: formData.stream,
-			maxPromptLength: parseOrDefault(formData.maxPromptLength, AddModeDefaults.maxPromptLength ?? 2048),
-			maxOutputLength: parseOrDefault(formData.maxOutputLength, AddModeDefaults.maxOutputLength ?? 1024),
-			timeout: parseOrDefault(formData.timeout, AddModeDefaults.timeout ?? 300),
-			systemPrompt: formData.systemPrompt,
-			...(formData.temperature.trim() !== '' && {
-				temperature: parseOrDefault(formData.temperature, 0.1),
-			}),
-		};
+		const payload: PostModelPresetPayload | PatchModelPresetPayload =
+			mode === 'add'
+				? {
+						name: formData.name.trim(),
+						slug: finalModelPresetID,
+						displayName: formData.presetLabel.trim(),
+						isEnabled: formData.isEnabled,
+						stream: formData.stream,
+						maxPromptLength: parseOrDefault(formData.maxPromptLength, AddModeDefaults.maxPromptLength),
+						maxOutputLength: parseOrDefault(formData.maxOutputLength, AddModeDefaults.maxOutputLength),
+						timeout: parseOrDefault(formData.timeout, AddModeDefaults.timeout),
+						systemPrompt: formData.systemPrompt,
+						...(formData.temperature.trim() !== '' && {
+							temperature: parseOrDefault(formData.temperature, 0.1),
+						}),
+						...(buildOutputParamFromForm(formData.outputFormatKind, formData.outputVerbosity) && {
+							outputParam: buildOutputParamFromForm(formData.outputFormatKind, formData.outputVerbosity),
+						}),
+						...(buildReasoningFromForm(formData) && {
+							reasoning: buildReasoningFromForm(formData),
+						}),
+						...(parseStopSequencesRaw(formData.stopSequencesRaw).length > 0 && {
+							stopSequences: parseStopSequencesRaw(formData.stopSequencesRaw),
+						}),
+					}
+				: buildPatchPayload();
 
-		const stopSequences = parseStopSequencesRaw(formData.stopSequencesRaw);
-		if (stopSequences.length > 0) {
-			finalData.stopSequences = stopSequences;
+		if (mode === 'edit' && Object.keys(payload).length === 0) {
+			return;
 		}
 
-		const formatKind: OutputFormatKind | undefined =
-			formData.outputFormatKind !== OUTPUT_FORMAT_NONE ? formData.outputFormatKind : undefined;
-		const verbosity: OutputVerbosity | undefined =
-			formData.outputVerbosity !== OUTPUT_VERBOSITY_NONE ? formData.outputVerbosity : undefined;
-
-		if (formatKind || verbosity) {
-			finalData.outputParam = {
-				...(formatKind && { format: { kind: formatKind } }),
-				...(verbosity && { verbosity }),
-			};
+		if ('outputParam' in payload && payload.outputParam === undefined) {
+			delete payload.outputParam;
 		}
-
-		if (formData.reasoningSupport) {
-			const type = formData.reasoningType ?? ReasoningType.SingleWithLevels;
-
-			finalData.reasoning = {
-				type,
-				level: formData.reasoningLevel ?? ReasoningLevel.Medium,
-				tokens:
-					type === ReasoningType.HybridWithTokens
-						? parseOrDefault(formData.reasoningTokens ?? '', DEFAULT_REASONING_TOKENS)
-						: DEFAULT_REASONING_TOKENS,
-				summaryStyle: formData.reasoningSummaryStyle,
-			};
+		if ('reasoning' in payload && payload.reasoning === undefined) {
+			delete payload.reasoning;
 		}
 
 		setIsSubmitting(true);
 		try {
-			await onSubmit(finalModelPresetID, finalData);
+			await onSubmit(finalModelPresetID, payload);
 			requestClose();
 		} catch {
 			// Keep the modal open so the user does not lose their form on failed save.
@@ -521,6 +653,11 @@ function AddEditModelPresetModalContent({
 					</div>
 
 					<form noValidate onSubmit={handleSubmit} className="space-y-4">
+						{isEditMode && !isReadOnly && (
+							<div className="border-info/30 bg-info/10 rounded-xl border px-3 py-2 text-xs">
+								Only changed fields are sent while editing.
+							</div>
+						)}
 						{mode === 'add' && (
 							<div className="grid grid-cols-12 items-center gap-2">
 								<label className="label col-span-3">
@@ -1038,7 +1175,11 @@ function AddEditModelPresetModalContent({
 							</button>
 
 							{!isReadOnly && (
-								<button type="submit" className="btn btn-primary rounded-xl" disabled={!isAllValid || isSubmitting}>
+								<button
+									type="submit"
+									className="btn btn-primary rounded-xl"
+									disabled={!isAllValid || (isEditMode && !hasPatchChanges) || isSubmitting}
+								>
 									{isSubmitting ? 'Saving…' : isEditMode ? 'Save Changes' : 'Add Preset'}
 								</button>
 							)}

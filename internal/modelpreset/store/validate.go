@@ -125,12 +125,15 @@ func validateModelPreset(mp *spec.ModelPreset) error {
 	return nil
 }
 
-func validateStopSequences(stops []string) error {
-	// Keep this conservative across providers (OpenAI chat-completions allows up to 4).
-	if len(stops) > 4 {
-		return fmt.Errorf("too many stop sequences: %d (max 4)", len(stops))
+func validateStopSequences(stops *[]string) error {
+	if stops == nil {
+		return nil
 	}
-	for i, s := range stops {
+	// Keep this conservative across providers (OpenAI chat-completions allows up to 4).
+	if len(*stops) > 4 {
+		return fmt.Errorf("too many stop sequences: %d (max 4)", len(*stops))
+	}
+	for i, s := range *stops {
 		if strings.TrimSpace(s) == "" {
 			return fmt.Errorf("stopSequences[%d] is empty", i)
 		}

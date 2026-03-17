@@ -668,9 +668,9 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 						IsEnabled:   true,
 						ModelPresetPatch: spec.ModelPresetPatch{
 							Temperature: &temp,
-							StopSequences: []string{
+							StopSequences: stringSlicePtr([]string{
 								"a", "b", "c", "d", "e",
-							},
+							}),
 						},
 					},
 				},
@@ -777,7 +777,7 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 				ModelPresetPatch: spec.ModelPresetPatch{
 					Temperature:                 &temp2,
 					SystemPrompt:                &sysPrompt,
-					StopSequences:               []string{"END"},
+					StopSequences:               stringSlicePtr([]string{"END"}),
 					AdditionalParametersRawJSON: &rawJSON,
 				},
 			},
@@ -799,8 +799,8 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 					Temperature:                 floatPtr(0),
 					SystemPrompt:                stringPtr(""),
 					AdditionalParametersRawJSON: stringPtr(""),
+					StopSequences:               stringSlicePtr([]string{}),
 				},
-				ClearStopSequences: true,
 			},
 		})
 		if err != nil {
@@ -817,8 +817,8 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 			t.Fatalf("optional field patch/clear did not apply correctly: sysPrompt")
 		}
 
-		if got.StopSequences != nil {
-			t.Fatalf("optional field patch/clear did not apply correctly: stopSequences")
+		if got.StopSequences != nil && len(*got.StopSequences) != 0 {
+			t.Fatalf("optional field patch/clear did not apply correctly: stopSequences, %v", got.StopSequences)
 		}
 
 		if got.AdditionalParametersRawJSON != nil && *got.AdditionalParametersRawJSON != "" {
@@ -889,6 +889,44 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 		pp := getProviderByName(t, st, ctx, userProv, true)
 		if pp.DefaultModelPresetID != "" {
 			t.Fatalf("expected default model reset to empty after delete, got %q", pp.DefaultModelPresetID)
+		}
+	})
+
+	t.Run("PatchModelPreset_explicit_empty_stop_sequences_is_applied", func(t *testing.T) {
+		_, err := st.PostModelPreset(ctx, &spec.PostModelPresetRequest{
+			ProviderName:  userProv,
+			ModelPresetID: "m5",
+			Body: &spec.PostModelPresetRequestBody{
+				Name:        "model-five",
+				Slug:        "m5",
+				DisplayName: "Model Five",
+				IsEnabled:   true,
+				ModelPresetPatch: spec.ModelPresetPatch{
+					Temperature:   &temp,
+					StopSequences: stringSlicePtr([]string{"END"}),
+				},
+			},
+		})
+		if err != nil {
+			t.Fatalf("PostModelPreset(seed m5): %v", err)
+		}
+
+		_, err = st.PatchModelPreset(ctx, &spec.PatchModelPresetRequest{
+			ProviderName:  userProv,
+			ModelPresetID: "m5",
+			Body: &spec.PatchModelPresetRequestBody{
+				ModelPresetPatch: spec.ModelPresetPatch{
+					StopSequences: stringSlicePtr([]string{}),
+				},
+			},
+		})
+		if err != nil {
+			t.Fatalf("PatchModelPreset(empty stopSequences): %v", err)
+		}
+
+		pp := getProviderByName(t, st, ctx, userProv, true)
+		if pp.ModelPresets["m5"].StopSequences == nil || len(*pp.ModelPresets["m5"].StopSequences) != 0 {
+			t.Fatalf("expected explicit empty stopSequences to be persisted")
 		}
 	})
 }
@@ -1560,7 +1598,7 @@ func TestModelPresetStore_PostModelPreset_AdditionalValidation(t *testing.T) {
 			name: "stop_sequence_empty_string",
 			req: func() *spec.PostModelPresetRequest {
 				r := baseReq()
-				r.Body.StopSequences = []string{""}
+				r.Body.StopSequences = stringSlicePtr([]string{""})
 				return r
 			},
 			wantErrText: "stopSequences[0] is empty",
