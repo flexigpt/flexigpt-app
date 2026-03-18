@@ -245,10 +245,10 @@ export default function PromptsPage() {
 				throw new Error('Built-in templates cannot be edited.');
 			}
 
-			const slug = (templateToEdit?.slug ?? partial.slug ?? '').trim();
-			const version = (partial.version ?? '').trim();
-			const nextBlocks = partial.blocks ?? templateToEdit?.blocks ?? [];
-			const nextVariables = partial.variables ?? templateToEdit?.variables;
+			const slug = (templateToEdit?.slug ?? partial.slug).trim();
+			const version = partial.version.trim();
+			const nextBlocks = partial.blocks;
+			const nextVariables = partial.variables;
 			const nextKind = derivePromptTemplateKind(nextBlocks);
 			const nextIsResolved = derivePromptTemplateResolved(nextBlocks, nextVariables);
 
@@ -271,8 +271,8 @@ export default function PromptsPage() {
 					nextKind,
 					bundleID,
 					templateToEdit.slug,
-					partial.displayName ?? templateToEdit.displayName,
-					partial.isEnabled ?? templateToEdit.isEnabled,
+					partial.displayName,
+					partial.isEnabled,
 					nextBlocks,
 					version,
 					nextIsResolved,
@@ -281,14 +281,14 @@ export default function PromptsPage() {
 					nextVariables
 				);
 			} else {
-				const displayName = partial.displayName?.trim() ?? '';
+				const displayName = partial.displayName?.trim();
 
 				await promptStoreAPI.putPromptTemplate(
 					nextKind,
 					bundleID,
 					slug,
 					displayName,
-					partial.isEnabled ?? true,
+					partial.isEnabled,
 					nextBlocks,
 					version,
 					nextIsResolved,
@@ -360,7 +360,7 @@ export default function PromptsPage() {
 					className="mt-24 flex w-full grow flex-col items-center overflow-y-auto"
 					style={{ maxHeight: `calc(100vh - 128px)` }}
 				>
-					<div className="flex w-5/6 flex-col space-y-4 xl:w-2/3">
+					<div className="flex w-11/12 flex-col space-y-4 xl:w-2/3">
 						{bundles.length === 0 && <p className="mt-8 text-center text-sm">No bundles configured yet.</p>}
 
 						{bundles.map(bundleData => (

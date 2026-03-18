@@ -222,7 +222,7 @@ export function PromptBundleCard({
 							<thead>
 								<tr className="bg-base-300 text-sm font-semibold">
 									<th className="w-full">Display Name</th>
-									<th className="min-w-32 text-center">Slug</th>
+									<th className="text-center">Slug</th>
 									<th className="text-center whitespace-nowrap">Enabled</th>
 									<th className="text-center whitespace-nowrap">Kind</th>
 									<th className="text-center whitespace-nowrap">Resolved</th>
@@ -249,10 +249,8 @@ export function PromptBundleCard({
 											/>
 										</td>
 										<td className="text-center">{getPromptTemplateKindLabel(template.kind)}</td>
-										<td className="text-center">
-											<span className={`badge badge-sm ${template.isResolved ? 'badge-success' : 'badge-warning'}`}>
-												{getPromptTemplateResolutionLabel(template.isResolved)}
-											</span>
+										<td className="text-center" title={getPromptTemplateResolutionLabel(template.isResolved)}>
+											{template.isResolved ? <FiCheck className="mx-auto" /> : <FiX className="mx-auto" />}
 										</td>
 										<td className="text-center">{template.version}</td>
 										<td className="text-center">

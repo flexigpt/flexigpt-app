@@ -621,6 +621,10 @@ func (s *PromptTemplateStore) PatchPromptTemplate(
 	if err != nil {
 		return nil, err
 	}
+	if !bundle.IsEnabled {
+		return nil, fmt.Errorf("%w: %s", spec.ErrBundleDisabled, req.BundleID)
+	}
+
 	if isBuiltIn {
 		_, err := s.builtinData.SetTemplateEnabled(
 			ctx,
@@ -647,9 +651,6 @@ func (s *PromptTemplateStore) PatchPromptTemplate(
 		return &spec.PatchPromptTemplateResponse{}, nil
 	}
 
-	if !bundle.IsEnabled {
-		return nil, fmt.Errorf("%w: %s", spec.ErrBundleDisabled, req.BundleID)
-	}
 	dirInfo, derr := bundleitemutils.BuildBundleDir(bundle.ID, bundle.Slug)
 	if derr != nil {
 		return nil, derr

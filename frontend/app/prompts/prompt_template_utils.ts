@@ -1,14 +1,17 @@
-import {
-	type MessageBlock,
-	PromptRoleEnum,
-	type PromptTemplate,
-	PromptTemplateKind,
-	type PromptVariable,
-	VarSource,
-} from '@/spec/prompt';
+import { type MessageBlock, PromptRoleEnum, PromptTemplateKind, type PromptVariable, VarSource } from '@/spec/prompt';
 
 const PROMPT_PLACEHOLDER_RE = /\{\{([a-zA-Z_][a-zA-Z0-9_-]*)\}\}/g;
 const PROMPT_VARIABLE_NAME_RE = /^[a-zA-Z_][a-zA-Z0-9_-]*$/;
+export interface PromptTemplateUpsertInput {
+	displayName: string;
+	slug: string;
+	description: string;
+	isEnabled: boolean;
+	tags: string[];
+	version: string;
+	blocks: MessageBlock[];
+	variables: PromptVariable[];
+}
 
 export function cloneVariable(variable: PromptVariable): PromptVariable {
 	return {
@@ -44,11 +47,6 @@ export function validatePromptVariableName(name: string): string | undefined {
 
 	return undefined;
 }
-
-export type PromptTemplateUpsertInput = Pick<
-	PromptTemplate,
-	'displayName' | 'slug' | 'description' | 'isEnabled' | 'tags' | 'version' | 'blocks' | 'variables'
->;
 
 export function derivePromptTemplateKind(blocks: MessageBlock[]): PromptTemplateKind {
 	if (

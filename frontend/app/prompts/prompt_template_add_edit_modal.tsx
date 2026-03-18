@@ -445,23 +445,23 @@ function AddEditPromptTemplateModalContent({
 			.split(',')
 			.map(t => t.trim())
 			.filter(Boolean);
+		const normalizedVariables = formData.variables.map(variable => ({
+			...variable,
+			name: variable.name.trim(),
+			required: variable.source === VarSource.Static ? false : variable.required,
+			description: variable.description?.trim() || undefined,
+			enumValues: variable.enumValues?.map(value => value.trim()).filter(Boolean),
+		}));
 
 		void onSubmit({
 			displayName: formData.displayName.trim(),
 			slug: formData.slug.trim(),
-			description: formData.description.trim() || undefined,
+			description: formData.description.trim(),
 			isEnabled: formData.isEnabled,
-			tags: tagsArr.length ? tagsArr : undefined,
+			tags: tagsArr,
 			version: formData.version.trim(),
 			blocks: formData.blocks.map(block => ({ ...block, content: block.content })),
-			variables: formData.variables.length
-				? formData.variables.map(variable => ({
-						...variable,
-						name: variable.name.trim(),
-						description: variable.description?.trim() || undefined,
-						enumValues: variable.enumValues?.map(value => value.trim()).filter(Boolean),
-					}))
-				: undefined,
+			variables: normalizedVariables,
 		})
 			.then(() => {
 				requestClose();
