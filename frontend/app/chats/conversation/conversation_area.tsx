@@ -33,6 +33,7 @@ import { attachmentsDropAPI } from '@/apis/baseapi';
 
 import { ButtonScrollToBottom, ButtonScrollToTop } from '@/components/button_scroll_top_bottom';
 
+import { sliceMessagesForSend } from '@/chats/assitantcontexts/previous_messages_helper';
 import type { ChatTabState } from '@/chats/chat_tabs_persist';
 import { HandleCompletion } from '@/chats/conversation/completion_helper';
 import {
@@ -51,21 +52,6 @@ import { ChatMessage } from '@/chats/messages/message';
 
 type StreamChannelBuffer = { chunks: string[]; flushedIdx: number; display: string };
 type StreamBuffer = { text: StreamChannelBuffer; thinking: StreamChannelBuffer };
-
-function sliceMessagesForSend(
-	messages: ConversationMessage[],
-	includePreviousMessages: UIChatOption['includePreviousMessages']
-) {
-	if (messages.length === 0) return [];
-	if (includePreviousMessages === 'all') return messages;
-
-	const safeCount = Math.max(0, includePreviousMessages);
-	const current = messages[messages.length - 1];
-	const previous = messages.slice(0, -1);
-	const selectedPrevious = safeCount > 0 ? previous.slice(-safeCount) : [];
-
-	return [...selectedPrevious, current];
-}
 
 function StreamingLastMessage(props: {
 	message: ConversationMessage;

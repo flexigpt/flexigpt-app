@@ -2,7 +2,16 @@ import type { Dispatch, SetStateAction } from 'react';
 
 import { FiCheck, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
-import { Select, SelectItem, SelectPopover, useSelectStore, useStoreState } from '@ariakit/react';
+import {
+	Select,
+	SelectItem,
+	SelectPopover,
+	Tooltip,
+	TooltipAnchor,
+	useSelectStore,
+	useStoreState,
+	useTooltipStore,
+} from '@ariakit/react';
 
 import type { IncludePreviousMessages } from '@/spec/modelpreset';
 
@@ -13,7 +22,7 @@ type PreviousMessagesDropdownProps = {
 	setIsOpen: Dispatch<SetStateAction<boolean>>;
 };
 
-const OPTIONS: IncludePreviousMessages[] = ['all', 0, 1, 2, 3, 5, 10];
+const OPTIONS: IncludePreviousMessages[] = [1, 2, 3, 0, 'all'];
 
 function valueToKey(value: IncludePreviousMessages): string {
 	return value === 'all' ? 'all' : String(value);
@@ -23,14 +32,15 @@ function keyToValue(key: string): IncludePreviousMessages {
 	return key === 'all' ? 'all' : Math.max(0, Number.parseInt(key, 10) || 0);
 }
 
-function displayCount(value: IncludePreviousMessages): string {
+function displayButtonValue(value: IncludePreviousMessages): string {
 	if (value === 'all') return 'All';
-	if (value === 0) return 'No';
 	return String(value);
 }
 
-function displayLabel(value: IncludePreviousMessages): string {
-	return `${displayCount(value)} msgs`;
+function displayOptionLabel(value: IncludePreviousMessages): string {
+	if (value === 'all') return 'All previous user turns';
+	if (value === 0) return 'Current user turn only';
+	return `${value} previous user turn${value === 1 ? '' : 's'}`;
 }
 
 function maybeParseCustomValue(rawValue: string): IncludePreviousMessages | undefined {
@@ -59,6 +69,10 @@ export function PreviousMessagesDropdown({ value, setValue, isOpen, setIsOpen }:
 		focusLoop: true,
 	});
 
+	const tooltip = useTooltipStore({
+		placement: 'top',
+	});
+
 	const open = useStoreState(select, 'open');
 	const commitCustomValue = (rawValue: string) => {
 		const nextValue = maybeParseCustomValue(rawValue);
@@ -76,15 +90,29 @@ export function PreviousMessagesDropdown({ value, setValue, isOpen, setIsOpen }:
 				<Select
 					store={select}
 					className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none text-center text-nowrap shadow-none"
-					title="How many previous messages to include in addition to the new user message"
 				>
-					<span className="min-w-0 truncate text-center text-xs font-normal">Include Prev: {displayLabel(value)}</span>
+					<TooltipAnchor store={tooltip} render={<span className="truncate text-center text-xs font-normal" />}>
+						Prev user turns: {displayButtonValue(value)}
+					</TooltipAnchor>
+
 					{open ? (
 						<FiChevronDown size={16} className="ml-2 shrink-0" />
 					) : (
 						<FiChevronUp size={16} className="ml-2 shrink-0" />
 					)}
 				</Select>
+
+				<Tooltip
+					store={tooltip}
+					className="bg-base-100 text-base-content z-50 max-w-sm rounded-md px-3 py-2 text-xs leading-4 shadow-lg"
+				>
+					<div className="space-y-1">
+						<p>
+							- Send "N" previous pure user turns excluding current message. <br />
+							- A pure user turn is one without any tool outputs. <br />
+						</p>
+					</div>
+				</Tooltip>
 
 				<SelectPopover
 					store={select}
@@ -102,7 +130,7 @@ export function PreviousMessagesDropdown({ value, setValue, isOpen, setIsOpen }:
 								value={key}
 								className="hover:bg-base-200 data-active-item:bg-base-300 m-0 flex cursor-pointer items-center justify-between rounded-md px-2 py-1 text-xs transition-colors outline-none"
 							>
-								<span>{displayLabel(option)}</span>
+								<span>{displayOptionLabel(option)}</span>
 								{value === option && <FiCheck />}
 							</SelectItem>
 						);
@@ -115,7 +143,7 @@ export function PreviousMessagesDropdown({ value, setValue, isOpen, setIsOpen }:
 							type="text"
 							name="include-previous-messages"
 							className="input input-xs w-full"
-							placeholder="<n> previous messages"
+							placeholder="<n> previous user turns"
 							defaultValue={value === 'all' ? '' : String(value)}
 							spellCheck="false"
 							onBlur={e => {

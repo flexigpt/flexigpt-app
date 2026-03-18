@@ -33,8 +33,6 @@ github.com/elliotchance/pie/v2 v2.9.0 h1:BkEhh8b/avGCSpXpABSjNuytxlI/S2snkjT3vtV
 github.com/elliotchance/pie/v2 v2.9.0/go.mod h1:18t0dgGFH006g4eVdDtWfgFZPQEgl10IoEO8YWEq3Og=
 github.com/flexigpt/agentskills-go v0.8.0 h1:EiM/io01SNSnAOU2gXJC+b7RgjegsuhnI3bh31reV+s=
 github.com/flexigpt/agentskills-go v0.8.0/go.mod h1:q2rR4WWTdrkMlmYlo655bybmHna2M3mSQuBiS5jkBno=
-github.com/flexigpt/inference-go v0.9.3 h1:4JMybwN+aItVigOS+3976QvARWCz7f8b0PUa0l0TxBw=
-github.com/flexigpt/inference-go v0.9.3/go.mod h1:FesaZNj8meCwpw3hLZd8+lnHMS7Nnnku+8VnXqA6Mqg=
 github.com/flexigpt/inference-go v0.9.4 h1:OkotqyxIoVroQxFwJap05nzZLcabAvHmmsEaq9hojLM=
 github.com/flexigpt/inference-go v0.9.4/go.mod h1:FesaZNj8meCwpw3hLZd8+lnHMS7Nnnku+8VnXqA6Mqg=
 github.com/flexigpt/llmtools-go v0.11.0 h1:b0SpE86k1k8ptfILVcrVIfVpiXBRarK7NukR7Axkn6w=

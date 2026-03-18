@@ -29,6 +29,17 @@
 - [ ] context bar
   - [ ] tooltips are needed. ariakit ones as daisyui ones can get cutoff
 
+- [ ] react virtoso examples refer and see if it improves some flickerings etc in the conversation area.
+  - [ ] also chat jumps to top if we move away for a while.
+  - [ ] autoscroll is erratic
+  - [ ] is react virtuoso cross tab safe?
+  - [ ] some message jumps at message boundary?
+
+- [x] prev user turns. send valid user turns and not pure slice.
+
+- [ ] modelpreset: only this is not version based as of now. should it be version based?
+  - [ ] better do it before assistant preset.
+
 - [ ] eslint 10: pending plugins support.
 - [ ] vite 8: react router dev support. react router has some cleanup planned with vite8. would be better to wait until react router stamps it as ok.
 - [ ] jsdom next major
