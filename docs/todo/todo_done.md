@@ -803,3 +803,11 @@
 
 - [x] bottom bar
   - [x] if you start a web search, then change model whose sdk is different that before, there is arbitrary behavior as of now wrt web search selection.
+
+- [x] react virtoso examples refer and see if it improves some flickerings etc in the conversation area.
+  - [x] also chat jumps to top if we move away for a while.
+  - [x] autoscroll is erratic
+  - [x] is react virtuoso cross tab safe?
+  - [x] some message jumps at message boundary?
+
+- [x] prev user turns. send valid user turns and not pure slice.
