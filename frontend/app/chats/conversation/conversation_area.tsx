@@ -52,6 +52,24 @@ import { InputPane } from '@/chats/inputarea/input_pane';
 import { ChatMessage } from '@/chats/messages/message';
 
 const VIRTUOSO_AT_BOTTOM_THRESHOLD = 128;
+const EMPTY_MESSAGES: ConversationMessage[] = [];
+
+const VIRTUOSO_SCROLL_SEEK = {
+	enter: (velocity: number) => Math.abs(velocity) > 1000,
+	exit: (velocity: number) => Math.abs(velocity) < 500,
+};
+
+function VirtuosoScrollSeekPlaceholder({ height }: { height: number }) {
+	return (
+		<div className="mx-auto w-11/12 overflow-hidden py-1 xl:w-5/6">
+			<div
+				className="bg-base-200/70 border-base-300/40 rounded-2xl border"
+				style={{ height: height }}
+				aria-hidden="true"
+			/>
+		</div>
+	);
+}
 
 type StreamChannelBuffer = { chunks: string[]; flushedIdx: number; display: string };
 type StreamBuffer = { text: StreamChannelBuffer; thinking: StreamChannelBuffer };
@@ -135,6 +153,12 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	selectedTabIdRef.current = selectedTabId;
 
 	const activeTab = useMemo(() => tabs.find(t => t.tabId === selectedTabId) ?? tabs[0], [tabs, selectedTabId]);
+	const activeTabId = activeTab?.tabId ?? '';
+	const activeTabIsBusy = activeTab?.isBusy ?? false;
+	const activeTabIsHydrating = activeTab?.isHydrating ?? false;
+	const activeEditingMessageId = activeTab?.editingMessageId ?? null;
+	const messages = activeTab?.conversation?.messages ?? EMPTY_MESSAGES;
+	const messageCount = messages.length;
 
 	// PERF: O(1) existence checks (used in async paths)
 	const tabIdSet = useMemo(() => new Set(tabs.map(t => t.tabId)), [tabs]);
@@ -512,8 +536,10 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	}, []);
 
 	// Stable Virtuoso `components` object (never changes → no remount)
-	const virtuosoComponents = useMemo(() => ({ List: VirtuosoList }), []);
-
+	const virtuosoComponents = useMemo(
+		() => ({ List: VirtuosoList, ScrollSeekPlaceholder: VirtuosoScrollSeekPlaceholder }),
+		[]
+	);
 	const scrollTabToBottomSoon = useCallback((tabId: string) => {
 		requestAnimationFrame(() => {
 			requestAnimationFrame(() => {
@@ -528,19 +554,18 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		});
 	}, []);
 
-	const scrollActiveToTop = useCallback(() => {
-		virtuosoRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-	}, []);
-
-	const messages = activeTab?.conversation?.messages ?? [];
 	const activeVirtuosoState = virtuosoStateByTabRef.current.get(selectedTabId);
 
+	const scrollActiveToTop = useCallback(() => {
+		virtuosoRef.current?.scrollToIndex({ index: 0, align: 'start', behavior: 'auto' });
+	}, []);
+
 	const scrollActiveToBottom = useCallback(() => {
-		const lastIndex = messages.length - 1;
+		const lastIndex = messageCount - 1;
 		if (lastIndex < 0) return;
 
-		virtuosoRef.current?.scrollToIndex({ index: lastIndex, align: 'end', behavior: 'smooth' });
-	}, [messages.length]);
+		virtuosoRef.current?.scrollToIndex({ index: lastIndex, align: 'end', behavior: 'auto' });
+	}, [messageCount]);
 
 	const resetScrollToTop = useCallback((tabId: string) => {
 		scrollTopByTab.current.set(tabId, 0);
@@ -993,7 +1018,6 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	// switches, NOT when isBusy/messages/editingMessageId change.  This prevents
 	// useSyncExternalStore in StreamingLastMessage from re-subscribing on every
 	// content tick.
-	const activeTabId = activeTab?.tabId ?? '';
 
 	const subscribeToActiveStream = useCallback(
 		(cb: () => void) => subscribeToStream(activeTabId, cb),
@@ -1019,8 +1043,8 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	// real messages have mounted.
 	useEffect(() => {
 		const tabId = selectedTabId;
-		if (!tabId || !activeTab || activeTab.isHydrating) return;
-		if (messages.length === 0) return;
+		if (!tabId || activeTabIsHydrating) return;
+		if (messageCount === 0) return;
 		if (activeVirtuosoState) return;
 		if (restoredInitialScrollByTabRef.current.has(tabId)) return;
 
@@ -1035,20 +1059,20 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			virtuosoRef.current?.scrollTo({ top: savedTop, behavior: 'smooth' });
 			restoredInitialScrollByTabRef.current.add(tabId);
 		});
-	}, [selectedTabId, activeTab, messages.length, activeVirtuosoState]);
+	}, [selectedTabId, activeVirtuosoState, activeTabIsHydrating, messageCount]);
 
 	const itemContent = useCallback(
 		(index: number, message: ConversationMessage) => {
-			const isLast = index === messages.length - 1;
+			const isLast = index === messageCount - 1;
 			const isAssistant = message.role === RoleEnum.Assistant;
-			const rowIsBusy = isLast && activeTab?.isBusy && isAssistant;
+			const rowIsBusy = isLast && activeTabIsBusy && isAssistant;
 
 			if (rowIsBusy) {
 				return (
 					<StreamingLastMessage
 						message={message}
 						rowIsBusy={true}
-						isEditing={activeTab.editingMessageId === message.id}
+						isEditing={activeEditingMessageId === message.id}
 						onEdit={() => {
 							beginEditMessageForTab(activeTabId, message.id);
 						}}
@@ -1066,7 +1090,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 					streamedText=""
 					streamedThinking=""
 					isBusy={false}
-					isEditing={activeTab?.editingMessageId === message.id}
+					isEditing={activeEditingMessageId === message.id}
 					onEdit={() => {
 						beginEditMessageForTab(activeTabId, message.id);
 					}}
@@ -1074,8 +1098,9 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			);
 		},
 		[
-			messages.length,
-			activeTab,
+			messageCount,
+			activeTabIsBusy,
+			activeEditingMessageId,
 			subscribeToActiveStream,
 			getActiveStreamSnapshot,
 			getActiveStreamText,
@@ -1097,7 +1122,8 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 					restoreStateFrom={activeVirtuosoState}
 					initialScrollTop={activeVirtuosoState ? undefined : (scrollTopByTab.current.get(selectedTabId) ?? 0)}
 					atBottomThreshold={VIRTUOSO_AT_BOTTOM_THRESHOLD}
-					increaseViewportBy={{ top: 300, bottom: 300 }}
+					scrollSeekConfiguration={VIRTUOSO_SCROLL_SEEK}
+					increaseViewportBy={{ top: 500, bottom: 800 }}
 					atBottomStateChange={atBottom => {
 						setIsAtBottom(atBottom);
 					}}
