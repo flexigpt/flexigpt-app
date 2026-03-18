@@ -22,6 +22,17 @@ import { Dropdown, type DropdownItem } from '@/components/dropdown';
 import { ModalBackdrop } from '@/components/modal_backdrop';
 import { ReadOnlyValue } from '@/components/read_only_value';
 
+import {
+	cloneVariable,
+	derivePromptTemplateKind,
+	derivePromptTemplateResolved,
+	extractPromptTemplatePlaceholders,
+	getPromptTemplateKindLabel,
+	getPromptTemplateResolutionLabel,
+	type PromptTemplateUpsertInput,
+	validatePromptVariableName,
+} from '@/prompts/prompt_template_utils';
+
 interface TemplateItem {
 	template: PromptTemplate;
 	bundleID: string;
@@ -33,7 +44,7 @@ type ModalMode = 'add' | 'edit' | 'view';
 interface AddEditPromptTemplateModalProps {
 	isOpen: boolean;
 	onClose: () => void;
-	onSubmit: (templateData: Partial<PromptTemplate>) => Promise<void>;
+	onSubmit: (templateData: PromptTemplateUpsertInput) => Promise<void>;
 	initialData?: TemplateItem; // when editing/viewing
 	existingTemplates: TemplateItem[];
 	mode?: ModalMode;
@@ -59,13 +70,6 @@ type PromptTemplateFormData = {
 	blocks: MessageBlock[];
 	variables: PromptVariable[];
 };
-
-function cloneVariable(variable: PromptVariable): PromptVariable {
-	return {
-		...variable,
-		enumValues: variable.enumValues ? [...variable.enumValues] : variable.enumValues,
-	};
-}
 
 function getSuggestedNextVersion(initialData: TemplateItem, existingTemplates: TemplateItem[]): string {
 	return suggestNextMinorVersion(
@@ -161,7 +165,11 @@ function AddEditPromptTemplateModalContent({
 		if (!initialData) return DEFAULT_SEMVER;
 		return getSuggestedNextVersion(initialData, existingTemplates);
 	}, [initialData, existingTemplates]);
-
+	const derivedKind = useMemo(() => derivePromptTemplateKind(formData.blocks), [formData.blocks]);
+	const derivedIsResolved = useMemo(
+		() => derivePromptTemplateResolved(formData.blocks, formData.variables),
+		[formData.blocks, formData.variables]
+	);
 	useEffect(() => {
 		const dialog = dialogRef.current;
 		if (!dialog) return;
@@ -263,18 +271,41 @@ function AddEditPromptTemplateModalContent({
 			const unique = new Set(names);
 			const hasDupes = unique.size !== names.length;
 			const hasMissing = variables.some(variable => !variable.name.trim());
+			const invalidName = variables.find(variable => validatePromptVariableName(variable.name) !== undefined);
 			const badEnum = variables.some(
 				variable => variable.type === VarType.Enum && (variable.enumValues ?? []).length === 0
 			);
-			const badStatic = variables.some(
-				variable => variable.source === VarSource.Static && !(variable.staticVal ?? '').trim()
+			const badEnumDefault = variables.some(
+				variable =>
+					variable.type === VarType.Enum &&
+					variable.default !== undefined &&
+					!(variable.enumValues ?? []).includes(variable.default)
 			);
+			const badStatic = variables.some(
+				variable => variable.source === VarSource.Static && (variable.staticVal ?? '').trim().length === 0
+			);
+			const badStaticRequired = variables.some(variable => variable.source === VarSource.Static && variable.required);
+			const placeholders = new Set(extractPromptTemplatePlaceholders(blocks));
+			const missingDeclaredPlaceholder = [...placeholders].some(name => !unique.has(name));
+			const unusedUserVariable = variables.some(variable => {
+				const name = variable.name.trim();
+				return Boolean(name) && variable.source === VarSource.User && !placeholders.has(name);
+			});
 
 			if (hasMissing) newErrs.variables = 'All variables must have a name.';
+			else if (invalidName) newErrs.variables = validatePromptVariableName(invalidName.name);
 			else if (hasDupes) newErrs.variables = 'Variable names must be unique.';
 			else if (badEnum) newErrs.variables = 'Enum variables must include at least one enum value.';
-			else if (badStatic) newErrs.variables = 'Static variables must include a static value.';
-			else newErrs = omitManyKeys(newErrs, ['variables']);
+			else if (badEnumDefault) newErrs.variables = 'Enum defaults must be one of the enum values.';
+			else if (badStatic) {
+				newErrs.variables = 'Static variables must include a non-empty static value.';
+			} else if (badStaticRequired) {
+				newErrs.variables = 'Static variables cannot be required.';
+			} else if (missingDeclaredPlaceholder) {
+				newErrs.variables = 'All placeholders used in blocks must be declared as variables.';
+			} else if (unusedUserVariable) {
+				newErrs.variables = 'User variables must be referenced by at least one block.';
+			} else newErrs = omitManyKeys(newErrs, ['variables']);
 		} else {
 			newErrs = omitManyKeys(newErrs, [field]);
 		}
@@ -423,7 +454,14 @@ function AddEditPromptTemplateModalContent({
 			tags: tagsArr.length ? tagsArr : undefined,
 			version: formData.version.trim(),
 			blocks: formData.blocks.map(block => ({ ...block, content: block.content })),
-			variables: formData.variables.length ? formData.variables : undefined,
+			variables: formData.variables.length
+				? formData.variables.map(variable => ({
+						...variable,
+						name: variable.name.trim(),
+						description: variable.description?.trim() || undefined,
+						enumValues: variable.enumValues?.map(value => value.trim()).filter(Boolean),
+					}))
+				: undefined,
 		})
 			.then(() => {
 				requestClose();
@@ -604,6 +642,30 @@ function AddEditPromptTemplateModalContent({
 							</div>
 						</div>
 
+						<div className="grid grid-cols-12 items-start gap-2">
+							<label className="label col-span-3">
+								<span className="label-text text-sm">Derived</span>
+								<span
+									className="label-text-alt tooltip tooltip-right"
+									data-tip="Kind is derived from block roles. Resolved is derived from whether every referenced placeholder already has a static value or default."
+								>
+									<FiHelpCircle size={12} />
+								</span>
+							</label>
+							<div className="col-span-9 space-y-2">
+								<div className="flex flex-wrap gap-2">
+									<span className="badge badge-outline rounded-xl">{getPromptTemplateKindLabel(derivedKind)}</span>
+									<span className={`badge rounded-xl ${derivedIsResolved ? 'badge-success' : 'badge-warning'}`}>
+										{getPromptTemplateResolutionLabel(derivedIsResolved)}
+									</span>
+								</div>
+								<p className="text-base-content/70 text-xs">
+									Instructions only = every block is System or Developer. Resolved = every referenced placeholder can be
+									satisfied locally by a static value or default.
+								</p>
+							</div>
+						</div>
+
 						{/* Blocks */}
 						<div className="divider">Blocks</div>
 						{errors.blocks && (
@@ -717,8 +779,11 @@ function AddEditPromptTemplateModalContent({
 												<input
 													type="checkbox"
 													className="toggle toggle-accent disabled:opacity-80"
-													checked={variable.required}
-													disabled={isViewMode}
+													checked={variable.source === VarSource.Static ? false : variable.required}
+													disabled={isViewMode || variable.source === VarSource.Static}
+													title={
+														variable.source === VarSource.Static ? 'Static variables cannot be required.' : undefined
+													}
 													onChange={e => {
 														updateVariable(idx, { required: e.target.checked });
 													}}
@@ -784,7 +849,10 @@ function AddEditPromptTemplateModalContent({
 													dropdownItems={varSourceDropdownItems}
 													selectedKey={variable.source}
 													onChange={source => {
-														updateVariable(idx, { source });
+														updateVariable(idx, {
+															source,
+															required: source === VarSource.Static ? false : variable.required,
+														});
 													}}
 													filterDisabled={false}
 													title="Select source"
@@ -878,6 +946,12 @@ function AddEditPromptTemplateModalContent({
 
 									<div className="col-span-3 font-semibold">Built-in</div>
 									<div className="col-span-9">{initialData.template.isBuiltIn ? 'Yes' : 'No'}</div>
+
+									<div className="col-span-3 font-semibold">Kind</div>
+									<div className="col-span-9">{getPromptTemplateKindLabel(initialData.template.kind)}</div>
+
+									<div className="col-span-3 font-semibold">Resolved</div>
+									<div className="col-span-9">{getPromptTemplateResolutionLabel(initialData.template.isResolved)}</div>
 
 									<div className="col-span-3 font-semibold">Created</div>
 									<div className="col-span-9">{initialData.template.createdAt}</div>

@@ -1,4 +1,11 @@
-import { type MessageBlock, type PromptTemplate, type PromptVariable, VarSource, VarType } from '@/spec/prompt';
+import {
+	type MessageBlock,
+	type PromptTemplate,
+	PromptTemplateKind,
+	type PromptVariable,
+	VarSource,
+	VarType,
+} from '@/spec/prompt';
 
 import { KEY_TEMPLATE_SELECTION, type TemplateSelectionElementNode } from '@/chats/platedoc/nodes';
 
@@ -120,6 +127,7 @@ export function makeSelectedTemplateForRun(tsenode: TemplateSelectionElementNode
 	const effTemplate: PromptTemplate =
 		template ??
 		({
+			kind: PromptTemplateKind.Generic,
 			id: '',
 			displayName: tsenode.templateSlug,
 			slug: tsenode.templateSlug,
@@ -128,7 +136,7 @@ export function makeSelectedTemplateForRun(tsenode: TemplateSelectionElementNode
 			tags: [],
 			blocks,
 			variables: variablesSchema,
-
+			isResolved: true,
 			version: tsenode.templateVersion,
 			createdAt: new Date().toISOString(),
 			modifiedAt: new Date().toISOString(),

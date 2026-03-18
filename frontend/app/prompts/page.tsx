@@ -16,6 +16,11 @@ import { PageFrame } from '@/components/page_frame';
 
 import { AddBundleModal } from '@/prompts/prompt_bundle_add_modal';
 import { PromptBundleCard } from '@/prompts/prompt_bundle_card';
+import {
+	derivePromptTemplateKind,
+	derivePromptTemplateResolved,
+	type PromptTemplateUpsertInput,
+} from '@/prompts/prompt_template_utils';
 
 interface BundleData {
 	bundle: PromptBundle;
@@ -140,6 +145,10 @@ export default function PromptsPage() {
 				throw new Error('Bundle not found.');
 			}
 
+			if (!bundleData.bundle.isEnabled) {
+				throw new Error('Enable the bundle before enabling or disabling templates.');
+			}
+
 			const template = bundleData.templates.find(item => item.id === templateID);
 
 			if (!template) {
@@ -210,7 +219,7 @@ export default function PromptsPage() {
 	);
 
 	const handleSubmitTemplate = useCallback(
-		async (bundleID: string, templateToEditID: string | undefined, partial: Partial<PromptTemplate>) => {
+		async (bundleID: string, templateToEditID: string | undefined, partial: PromptTemplateUpsertInput) => {
 			const bundleData = bundles.find(item => item.bundle.id === bundleID);
 
 			if (!bundleData) {
@@ -219,6 +228,10 @@ export default function PromptsPage() {
 
 			if (bundleData.bundle.isBuiltIn) {
 				throw new Error('Cannot add or edit templates in a built-in bundle.');
+			}
+
+			if (!bundleData.bundle.isEnabled) {
+				throw new Error('Enable the bundle before adding or editing templates.');
 			}
 
 			const templateToEdit =
@@ -234,6 +247,10 @@ export default function PromptsPage() {
 
 			const slug = (templateToEdit?.slug ?? partial.slug ?? '').trim();
 			const version = (partial.version ?? '').trim();
+			const nextBlocks = partial.blocks ?? templateToEdit?.blocks ?? [];
+			const nextVariables = partial.variables ?? templateToEdit?.variables;
+			const nextKind = derivePromptTemplateKind(nextBlocks);
+			const nextIsResolved = derivePromptTemplateResolved(nextBlocks, nextVariables);
 
 			if (!slug) {
 				throw new Error('Missing template slug.');
@@ -251,29 +268,33 @@ export default function PromptsPage() {
 
 			if (templateToEdit) {
 				await promptStoreAPI.putPromptTemplate(
+					nextKind,
 					bundleID,
 					templateToEdit.slug,
 					partial.displayName ?? templateToEdit.displayName,
 					partial.isEnabled ?? templateToEdit.isEnabled,
-					partial.blocks ?? templateToEdit.blocks,
+					nextBlocks,
 					version,
+					nextIsResolved,
 					partial.description ?? templateToEdit.description,
 					partial.tags ?? templateToEdit.tags,
-					partial.variables ?? templateToEdit.variables
+					nextVariables
 				);
 			} else {
 				const displayName = partial.displayName?.trim() ?? '';
 
 				await promptStoreAPI.putPromptTemplate(
+					nextKind,
 					bundleID,
 					slug,
 					displayName,
 					partial.isEnabled ?? true,
-					partial.blocks ?? [],
+					nextBlocks,
 					version,
+					nextIsResolved,
 					partial.description,
 					partial.tags,
-					partial.variables
+					nextVariables
 				);
 			}
 
@@ -366,7 +387,7 @@ export default function PromptsPage() {
 					}}
 					onConfirm={handleBundleDelete}
 					title="Delete Prompt Bundle"
-					message={`Delete bundle "${bundleToDelete?.displayName ?? ''}" and all its templates?`}
+					message={`Delete empty bundle "${bundleToDelete?.displayName ?? ''}"? Remove all templates first.`}
 					confirmButtonText="Delete"
 				/>
 

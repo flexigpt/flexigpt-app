@@ -487,10 +487,8 @@ func TestListPromptTemplates_FiltersByKindAndResolved(t *testing.T) {
 
 	mustPutBundle(t, s, "b1", "slug1", "Bundle", true)
 
-	// generic + resolved
 	mustPutTemplate(t, s, "b1", "generic-resolved", "v1", "GR", true)
 
-	// generic + unresolved
 	_, err := s.PutPromptTemplate(t.Context(), &spec.PutPromptTemplateRequest{
 		BundleID:     "b1",
 		TemplateSlug: "generic-unresolved",
@@ -517,7 +515,6 @@ func TestListPromptTemplates_FiltersByKindAndResolved(t *testing.T) {
 		t.Fatalf("PutPromptTemplate unresolved: %v", err)
 	}
 
-	// instructionsOnly + resolved
 	_, err = s.PutPromptTemplate(t.Context(), &spec.PutPromptTemplateRequest{
 		BundleID:     "b1",
 		TemplateSlug: "instructions-resolved",

@@ -8,6 +8,11 @@ export enum PromptRoleEnum {
 	Assistant = 'assistant',
 }
 
+export enum PromptTemplateKind {
+	InstructionsOnly = 'instructionsOnly',
+	Generic = 'generic',
+}
+
 /**
  * @public
  */
@@ -45,6 +50,7 @@ export interface PromptVariable {
 }
 
 export interface PromptTemplate {
+	kind: PromptTemplateKind;
 	id: string;
 	displayName: string;
 	slug: string;
@@ -53,6 +59,7 @@ export interface PromptTemplate {
 	tags?: string[];
 	blocks: MessageBlock[];
 	variables?: PromptVariable[];
+	isResolved: boolean;
 	version: string;
 	createdAt: string;
 	modifiedAt: string;
@@ -76,4 +83,6 @@ export interface PromptTemplateListItem {
 	templateSlug: string;
 	templateVersion: string;
 	isBuiltIn: boolean;
+	kind: PromptTemplateKind;
+	isResolved: boolean;
 }

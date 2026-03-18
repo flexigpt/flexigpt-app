@@ -62,7 +62,7 @@ on:
 
 jobs:
   build-macos:
-    runs-on: macos-15
+    runs-on: macos-15-large
     timeout-minutes: 30
     strategy:
       matrix:

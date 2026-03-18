@@ -1,4 +1,11 @@
-import type { MessageBlock, PromptBundle, PromptTemplate, PromptTemplateListItem, PromptVariable } from '@/spec/prompt';
+import type {
+	MessageBlock,
+	PromptBundle,
+	PromptTemplate,
+	PromptTemplateKind,
+	PromptTemplateListItem,
+	PromptVariable,
+} from '@/spec/prompt';
 
 import type { IPromptStoreAPI } from '@/apis/interface';
 import {
@@ -74,15 +81,19 @@ export class WailsPromptStoreAPI implements IPromptStoreAPI {
 		bundleIDs?: string[],
 		tags?: string[],
 		includeDisabled?: boolean,
+		kinds?: PromptTemplateKind[],
+		onlyResolved?: boolean,
 		pageSize?: number,
 		pageToken?: string
 	): Promise<{ promptTemplateListItems: PromptTemplateListItem[]; nextPageToken?: string }> {
 		const req = {
-			BundleIDs: bundleIDs,
-			Tags: tags,
-			IncludeDisabled: includeDisabled,
-			RecommendedPageSize: pageSize,
-			PageToken: pageToken,
+			BundleIDs: bundleIDs ?? [],
+			Tags: tags ?? [],
+			IncludeDisabled: includeDisabled ?? false,
+			RecommendedPageSize: pageSize ?? 25,
+			PageToken: pageToken ?? undefined,
+			Kinds: kinds ?? [],
+			OnlyResolved: onlyResolved ?? false,
 		};
 		const resp = await ListPromptTemplates(req as spec.ListPromptTemplatesRequest);
 		return {
@@ -92,12 +103,14 @@ export class WailsPromptStoreAPI implements IPromptStoreAPI {
 	}
 
 	async putPromptTemplate(
+		kind: PromptTemplateKind,
 		bundleID: string,
 		templateSlug: string,
 		displayName: string,
 		isEnabled: boolean,
 		blocks: MessageBlock[],
 		version: string,
+		isResolved: boolean,
 		description?: string,
 		tags?: string[],
 		variables?: PromptVariable[]
@@ -107,12 +120,14 @@ export class WailsPromptStoreAPI implements IPromptStoreAPI {
 			TemplateSlug: templateSlug,
 			Version: version,
 			Body: {
+				kind: kind,
 				displayName: displayName,
 				isEnabled: isEnabled,
 				description: description,
 				tags: tags,
 				blocks: blocks,
 				variables: variables,
+				isResolved: isResolved,
 			},
 		};
 		await PutPromptTemplate(req as spec.PutPromptTemplateRequest);

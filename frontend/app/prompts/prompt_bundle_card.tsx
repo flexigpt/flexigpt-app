@@ -9,6 +9,11 @@ import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal'
 
 import { PromptBundleDetailsModal } from '@/prompts/prompt_bundle_details_modal';
 import { AddEditPromptTemplateModal } from '@/prompts/prompt_template_add_edit_modal';
+import {
+	getPromptTemplateKindLabel,
+	getPromptTemplateResolutionLabel,
+	type PromptTemplateUpsertInput,
+} from '@/prompts/prompt_template_utils';
 
 type TemplateModalMode = 'add' | 'edit' | 'view';
 
@@ -22,7 +27,7 @@ interface PromptBundleCardProps {
 	onSubmitTemplate: (
 		bundleID: string,
 		templateToEditID: string | undefined,
-		partial: Partial<PromptTemplate>
+		partial: PromptTemplateUpsertInput
 	) => Promise<void>;
 	onDeleteBundleRequested: (bundleID: string) => void;
 }
@@ -140,6 +145,11 @@ export function PromptBundleCard({
 			return;
 		}
 
+		if ((mode === 'add' || mode === 'edit') && !bundle.isEnabled) {
+			openAlert('Enable the bundle before adding or editing templates.');
+			return;
+		}
+
 		if (mode === 'edit' && template?.isBuiltIn) {
 			openAlert('Built-in templates cannot be edited.');
 			return;
@@ -150,7 +160,7 @@ export function PromptBundleCard({
 		setIsTemplateModalOpen(true);
 	};
 
-	const handleModifySubmit = async (partial: Partial<PromptTemplate>) => {
+	const handleModifySubmit = async (partial: PromptTemplateUpsertInput) => {
 		await onSubmitTemplate(bundle.id, templateToEdit?.id, partial);
 	};
 
@@ -214,6 +224,8 @@ export function PromptBundleCard({
 									<th className="w-full">Display Name</th>
 									<th className="min-w-32 text-center">Slug</th>
 									<th className="text-center whitespace-nowrap">Enabled</th>
+									<th className="text-center whitespace-nowrap">Kind</th>
+									<th className="text-center whitespace-nowrap">Resolved</th>
 									<th className="text-center whitespace-nowrap">Version</th>
 									<th className="text-center whitespace-nowrap">Built-In</th>
 									<th className="text-center whitespace-nowrap">Actions</th>
@@ -229,11 +241,18 @@ export function PromptBundleCard({
 												type="checkbox"
 												className="toggle toggle-accent"
 												checked={template.isEnabled}
-												disabled={pendingTemplateToggleIDs.has(template.id)}
+												disabled={pendingTemplateToggleIDs.has(template.id) || !bundle.isEnabled}
+												title={!bundle.isEnabled ? 'Enable the bundle first.' : undefined}
 												onChange={() => {
 													void handleTemplateEnableToggle(template);
 												}}
 											/>
+										</td>
+										<td className="text-center">{getPromptTemplateKindLabel(template.kind)}</td>
+										<td className="text-center">
+											<span className={`badge badge-sm ${template.isResolved ? 'badge-success' : 'badge-warning'}`}>
+												{getPromptTemplateResolutionLabel(template.isResolved)}
+											</span>
 										</td>
 										<td className="text-center">{template.version}</td>
 										<td className="text-center">
@@ -257,11 +276,13 @@ export function PromptBundleCard({
 													onClick={() => {
 														openTemplateModal('edit', template);
 													}}
-													disabled={template.isBuiltIn || bundle.isBuiltIn}
+													disabled={template.isBuiltIn || bundle.isBuiltIn || !bundle.isEnabled}
 													title={
 														template.isBuiltIn || bundle.isBuiltIn
 															? 'Built-in items cannot create new versions'
-															: 'New Version'
+															: !bundle.isEnabled
+																? 'Enable the bundle first.'
+																: 'New Version'
 													}
 													aria-label="New Version"
 												>
@@ -288,7 +309,7 @@ export function PromptBundleCard({
 
 								{templates.length === 0 && (
 									<tr>
-										<td colSpan={6} className="py-3 text-center text-sm">
+										<td colSpan={8} className="py-3 text-center text-sm">
 											No templates in this bundle.
 										</td>
 									</tr>
@@ -301,6 +322,8 @@ export function PromptBundleCard({
 						<div className="flex items-center justify-between">
 							<button
 								className="btn btn-md btn-ghost flex items-center rounded-2xl"
+								disabled={templates.length > 0}
+								title={templates.length > 0 ? 'Delete all templates from this bundle first.' : 'Delete Bundle'}
 								onClick={() => {
 									onDeleteBundleRequested(bundle.id);
 								}}
@@ -310,6 +333,8 @@ export function PromptBundleCard({
 
 							<button
 								className="btn btn-md btn-ghost flex items-center rounded-2xl"
+								disabled={!bundle.isEnabled}
+								title={!bundle.isEnabled ? 'Enable the bundle first.' : 'Add Template'}
 								onClick={() => {
 									openTemplateModal('add');
 								}}

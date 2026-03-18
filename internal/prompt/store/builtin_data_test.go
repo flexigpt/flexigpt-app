@@ -850,11 +850,11 @@ func TestBuiltInData_ReturnedTemplatesAreDeepCopies(t *testing.T) {
 	}
 
 	// Mutate returned copy.
-	tpl1.Blocks[0].Content = "CORRUPTED"
+	tpl1.Blocks[0].Content = corrupted
 	for bid, tm := range tpls1 {
 		for tid := range tm {
 			tmp := tm[tid]
-			tmp.Blocks[0].Content = "CORRUPTED"
+			tmp.Blocks[0].Content = corrupted
 			tpls1[bid][tid] = tmp
 			break
 		}
@@ -863,7 +863,7 @@ func TestBuiltInData_ReturnedTemplatesAreDeepCopies(t *testing.T) {
 
 	_, tpls2, _ := bi.ListBuiltInData(t.Context())
 	_, _, tpl2 := anyTemplate(tpls2)
-	if got := tpl2.Blocks[0].Content; got == "CORRUPTED" {
+	if got := tpl2.Blocks[0].Content; got == corrupted {
 		t.Fatalf("built-in template blocks share backing memory")
 	}
 
@@ -931,7 +931,7 @@ func buildTemplate(t *testing.T, slug, ver string) (fileName string, raw []byte,
 		Slug:          bundleitemutils.ItemSlug(slug),
 		Version:       bundleitemutils.ItemVersion(ver),
 		DisplayName:   slug,
-		Kind:          spec.PromptTemplateKindGeneric,
+		Kind:          spec.PromptTemplateKindInstructionsOnly,
 		IsResolved:    true,
 		Blocks: []spec.MessageBlock{
 			{

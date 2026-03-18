@@ -82,6 +82,11 @@ func validateTemplate(tpl *spec.PromptTemplate) error {
 		}
 	}
 
+	expectedKind := derivePromptTemplateKindFromBlocks(tpl.Blocks)
+	if tpl.Kind != expectedKind {
+		return fmt.Errorf("kind mismatched. got: %q, computed: %q", tpl.Kind, expectedKind)
+	}
+
 	// Validate variables.
 	allowedVarTypes := map[spec.VarType]struct{}{
 		spec.VarString:  {},
@@ -188,6 +193,23 @@ func validateTemplate(tpl *spec.PromptTemplate) error {
 		return err
 	}
 	return nil
+}
+
+func derivePromptTemplateKindFromBlocks(blocks []spec.MessageBlock) spec.PromptTemplateKind {
+	if len(blocks) > 0 {
+		instructionsOnly := true
+		for _, block := range blocks {
+			if block.Role != spec.System && block.Role != spec.Developer {
+				instructionsOnly = false
+				break
+			}
+		}
+		if instructionsOnly {
+			return spec.PromptTemplateKindInstructionsOnly
+		}
+	}
+
+	return spec.PromptTemplateKindGeneric
 }
 
 func allowedRolesForKind(kind spec.PromptTemplateKind) map[spec.PromptRoleEnum]struct{} {

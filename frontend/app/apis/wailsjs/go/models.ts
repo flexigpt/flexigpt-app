@@ -2670,6 +2670,7 @@ export namespace spec {
 	}
 	export class PromptTemplate {
 	    schemaVersion: string;
+	    kind: string;
 	    id: string;
 	    slug: string;
 	    isEnabled: boolean;
@@ -2678,6 +2679,7 @@ export namespace spec {
 	    tags?: string[];
 	    blocks: MessageBlock[];
 	    variables?: PromptVariable[];
+	    isResolved: boolean;
 	    version: string;
 	    // Go type: time
 	    createdAt: any;
@@ -2692,6 +2694,7 @@ export namespace spec {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.schemaVersion = source["schemaVersion"];
+	        this.kind = source["kind"];
 	        this.id = source["id"];
 	        this.slug = source["slug"];
 	        this.isEnabled = source["isEnabled"];
@@ -2700,6 +2703,7 @@ export namespace spec {
 	        this.tags = source["tags"];
 	        this.blocks = this.convertValues(source["blocks"], MessageBlock);
 	        this.variables = this.convertValues(source["variables"], PromptVariable);
+	        this.isResolved = source["isResolved"];
 	        this.version = source["version"];
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
@@ -3953,6 +3957,8 @@ export namespace spec {
 	export class ListPromptTemplatesRequest {
 	    BundleIDs: string[];
 	    Tags: string[];
+	    Kinds: string[];
+	    OnlyResolved: boolean;
 	    IncludeDisabled: boolean;
 	    RecommendedPageSize: number;
 	    PageToken: string;
@@ -3965,6 +3971,8 @@ export namespace spec {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleIDs = source["BundleIDs"];
 	        this.Tags = source["Tags"];
+	        this.Kinds = source["Kinds"];
+	        this.OnlyResolved = source["OnlyResolved"];
 	        this.IncludeDisabled = source["IncludeDisabled"];
 	        this.RecommendedPageSize = source["RecommendedPageSize"];
 	        this.PageToken = source["PageToken"];
@@ -3975,6 +3983,8 @@ export namespace spec {
 	    bundleSlug: string;
 	    templateSlug: string;
 	    templateVersion: string;
+	    kind: string;
+	    isResolved: boolean;
 	    isBuiltIn: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -3987,6 +3997,8 @@ export namespace spec {
 	        this.bundleSlug = source["bundleSlug"];
 	        this.templateSlug = source["templateSlug"];
 	        this.templateVersion = source["templateVersion"];
+	        this.kind = source["kind"];
+	        this.isResolved = source["isResolved"];
 	        this.isBuiltIn = source["isBuiltIn"];
 	    }
 	}
@@ -5852,12 +5864,14 @@ export namespace spec {
 	    }
 	}
 	export class PutPromptTemplateRequestBody {
+	    kind: string;
 	    displayName: string;
 	    isEnabled: boolean;
 	    description?: string;
 	    blocks: MessageBlock[];
 	    tags?: string[];
 	    variables?: PromptVariable[];
+	    isResolved: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new PutPromptTemplateRequestBody(source);
@@ -5865,12 +5879,14 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
 	        this.displayName = source["displayName"];
 	        this.isEnabled = source["isEnabled"];
 	        this.description = source["description"];
 	        this.blocks = this.convertValues(source["blocks"], MessageBlock);
 	        this.tags = source["tags"];
 	        this.variables = this.convertValues(source["variables"], PromptVariable);
+	        this.isResolved = source["isResolved"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

@@ -15,7 +15,14 @@ import type {
 	PostProviderPresetPayload,
 	ProviderPreset,
 } from '@/spec/modelpreset';
-import type { MessageBlock, PromptBundle, PromptTemplate, PromptTemplateListItem, PromptVariable } from '@/spec/prompt';
+import type {
+	MessageBlock,
+	PromptBundle,
+	PromptTemplate,
+	PromptTemplateKind,
+	PromptTemplateListItem,
+	PromptVariable,
+} from '@/spec/prompt';
 import type { AppTheme, AuthKey, AuthKeyName, AuthKeyType, SettingsSchema } from '@/spec/setting';
 import type {
 	InvokeSkillToolResponse,
@@ -94,18 +101,22 @@ export interface IPromptStoreAPI {
 		bundleIDs?: string[],
 		tags?: string[],
 		includeDisabled?: boolean,
+		kinds?: PromptTemplateKind[],
+		onlyResolved?: boolean,
 		recommendedPageSize?: number,
 		pageToken?: string
 	): Promise<{ promptTemplateListItems: PromptTemplateListItem[]; nextPageToken?: string }>;
 
 	/** Create or update a template. */
 	putPromptTemplate(
+		kind: PromptTemplateKind,
 		bundleID: string,
 		templateSlug: string,
 		displayName: string,
 		isEnabled: boolean,
 		blocks: MessageBlock[],
 		version: string,
+		isResolved: boolean,
 		description?: string,
 		tags?: string[],
 		variables?: PromptVariable[]
@@ -117,7 +128,7 @@ export interface IPromptStoreAPI {
 	/** Delete a template version. */
 	deletePromptTemplate(bundleID: string, templateSlug: string, version: string): Promise<void>;
 
-	/** Get a template version (or latest if version omitted). */
+	/** Get a template version. */
 	getPromptTemplate(bundleID: string, templateSlug: string, version: string): Promise<PromptTemplate | undefined>;
 }
 

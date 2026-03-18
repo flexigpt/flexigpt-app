@@ -1,6 +1,6 @@
 import type { ProviderName } from '@/spec/inference';
 import type { ProviderPreset } from '@/spec/modelpreset';
-import type { PromptBundle, PromptTemplateListItem } from '@/spec/prompt';
+import type { PromptBundle, PromptTemplateKind, PromptTemplateListItem } from '@/spec/prompt';
 import type { SkillBundle, SkillListItem, SkillType } from '@/spec/skill';
 import type { ToolBundle, ToolListItem } from '@/spec/tool';
 
@@ -35,7 +35,9 @@ export async function getAllProviderPresetsMap(
 export async function getAllPromptTemplates(
 	bundleIDs?: string[],
 	tags?: string[],
-	includeDisabled?: boolean
+	includeDisabled?: boolean,
+	kinds?: PromptTemplateKind[],
+	onlyResolved?: boolean
 ): Promise<PromptTemplateListItem[]> {
 	const all: PromptTemplateListItem[] = [];
 	let pageToken: string | undefined;
@@ -45,6 +47,8 @@ export async function getAllPromptTemplates(
 			bundleIDs,
 			tags,
 			includeDisabled,
+			kinds,
+			onlyResolved,
 			recommendedPageSize,
 			pageToken
 		);
