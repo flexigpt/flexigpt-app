@@ -29,11 +29,11 @@
 - [ ] context bar
   - [ ] tooltips are needed. ariakit ones as daisyui ones can get cutoff
 
-- [ ] react virtoso examples refer and see if it improves some flickerings etc in the conversation area.
-  - [ ] also chat jumps to top if we move away for a while.
-  - [ ] autoscroll is erratic
-  - [ ] is react virtuoso cross tab safe?
-  - [ ] some message jumps at message boundary?
+- [x] react virtoso examples refer and see if it improves some flickerings etc in the conversation area.
+  - [x] also chat jumps to top if we move away for a while.
+  - [x] autoscroll is erratic
+  - [x] is react virtuoso cross tab safe?
+  - [x] some message jumps at message boundary?
 
 - [x] prev user turns. send valid user turns and not pure slice.
 

@@ -316,8 +316,9 @@ export function deriveUIFieldsFromOutputUnion(
 				for (const c of msg.contents) {
 					if (c.kind === ContentItemKind.Text && c.textItem) {
 						const raw = c.textItem?.text;
-						const t = typeof raw === 'string' ? raw.trim() : '';
-						if (t) textParts.push(t);
+						// Preserve provider text exactly as produced so the final
+						// message matches the streamed text and does not "jump" on completion.
+						if (typeof raw === 'string' && raw.length > 0) textParts.push(raw);
 
 						const itemCitations = c.textItem.citations;
 						if (itemCitations && itemCitations.length > 0) {
@@ -372,7 +373,7 @@ export function deriveUIFieldsFromOutputUnion(
 		}
 	}
 
-	const content = textParts.join('\n\n');
+	const content = textParts.join('');
 
 	return {
 		uiContent: content,

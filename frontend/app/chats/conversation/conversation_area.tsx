@@ -3,13 +3,14 @@ import {
 	useCallback,
 	useEffect,
 	useImperativeHandle,
+	useLayoutEffect,
 	useMemo,
 	useRef,
 	useState,
 	useSyncExternalStore,
 } from 'react';
 
-import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
+import { type StateSnapshot, Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { Conversation, ConversationMessage } from '@/spec/conversation';
@@ -49,6 +50,9 @@ import type { InputBoxHandle } from '@/chats/inputarea/input_box';
 import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/inputarea/input_editor_utils';
 import { InputPane } from '@/chats/inputarea/input_pane';
 import { ChatMessage } from '@/chats/messages/message';
+
+const VIRTUOSO_AT_BOTTOM_THRESHOLD = 128;
+type VirtuosoScrollBehavior = 'auto' | 'smooth';
 
 type StreamChannelBuffer = { chunks: string[]; flushedIdx: number; display: string };
 type StreamBuffer = { text: StreamChannelBuffer; thinking: StreamChannelBuffer };
@@ -143,6 +147,10 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	const abortRefs = useRef(new Map<string, { current: AbortController | null }>());
 	const requestIdByTab = useRef(new Map<string, string | null>());
 	const tokensReceivedByTab = useRef(new Map<string, boolean | null>());
+
+	const virtuosoRef = useRef<VirtuosoHandle>(null);
+	const virtuosoStateByTabRef = useRef(new Map<string, StateSnapshot>());
+	const restoredInitialScrollByTabRef = useRef(new Set<string>());
 
 	const getAbortRef = useCallback((tabId: string) => {
 		let refObj = abortRefs.current.get(tabId);
@@ -255,23 +263,23 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		};
 	}, []);
 
+	const saveVirtuosoStateForTab = useCallback((tabId: string, handle: VirtuosoHandle | null) => {
+		if (!handle) return;
+
+		const stateByTab = virtuosoStateByTabRef.current;
+		handle.getState(state => {
+			stateByTab.set(tabId, state);
+		});
+	}, []);
+
 	const notifyStreamNow = useCallback(
 		(tabId: string) => {
 			flushStreamForTab(tabId);
 			bumpStreamVersion(tabId);
 
 			const set = streamListenersRef.current.get(tabId);
-			if (!set) return;
-			for (const cb of set) cb();
-
-			// Auto-scroll during streaming: keep user at bottom if they were there.
-			// Virtuoso's followOutput handles new-item appends; this covers
-			// height growth of the *existing* last item during streaming.
-			if (selectedTabIdRef.current === tabId && isAtBottomRef.current) {
-				requestAnimationFrame(() => {
-					const el = scrollerElRef.current;
-					if (el) el.scrollTop = el.scrollHeight;
-				});
+			if (set) {
+				for (const cb of set) cb();
 			}
 		},
 		[flushStreamForTab, bumpStreamVersion]
@@ -395,6 +403,9 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			streamBuffersRef.current.delete(tabId);
 			streamVersionRef.current.delete(tabId);
 
+			virtuosoStateByTabRef.current.delete(tabId);
+			restoredInitialScrollByTabRef.current.delete(tabId);
+
 			inputRefs.current.delete(tabId);
 			scrollTopByTab.current.delete(tabId);
 
@@ -459,9 +470,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		};
 	}, []);
 
-	const virtuosoRef = useRef<VirtuosoHandle>(null);
 	const scrollerElRef = useRef<HTMLDivElement | null>(null);
-	const isAtBottomRef = useRef(true);
 	const [isAtBottom, setIsAtBottom] = useState(true);
 	const [isAtTop, setIsAtTop] = useState(true);
 
@@ -479,14 +488,26 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 		if (htmlEl) {
 			const handler = () => {
-				scrollTopByTab.current.set(selectedTabIdRef.current, htmlEl.scrollTop);
+				const tabId = selectedTabIdRef.current;
+				scrollTopByTab.current.set(tabId, htmlEl.scrollTop);
 			};
+			handler();
 			htmlEl.addEventListener('scroll', handler, { passive: true });
 			scrollListenerCleanupRef.current = () => {
 				htmlEl.removeEventListener('scroll', handler);
 			};
 		}
 	}, []);
+
+	// Save Virtuoso measurement + scroll state when switching away from a tab.
+	// This is much more reliable than restoring only a raw scrollTop.
+	useLayoutEffect(() => {
+		const tabId = selectedTabId;
+		const handle = virtuosoRef.current;
+		return () => {
+			saveVirtuosoStateForTab(tabId, handle);
+		};
+	}, [saveVirtuosoStateForTab, selectedTabId]);
 
 	// Cleanup scroll listener on component unmount
 	useEffect(() => {
@@ -498,24 +519,30 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	// Stable Virtuoso `components` object (never changes → no remount)
 	const virtuosoComponents = useMemo(() => ({ List: VirtuosoList }), []);
 
-	const scrollToBottom = useCallback((tabId: string) => {
+	const scrollToBottom = useCallback((tabId: string, behavior: VirtuosoScrollBehavior = 'smooth') => {
 		// There is only one visible scroll container; it corresponds to the active tab.
 		if (selectedTabIdRef.current !== tabId) return;
-		const el = scrollerElRef.current;
-		if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+		const tab = tabsRef.current.find(t => t.tabId === tabId);
+		const lastIndex = (tab?.conversation.messages.length ?? 0) - 1;
+		if (lastIndex < 0) return;
+		virtuosoRef.current?.scrollToIndex({ index: lastIndex, align: 'end', behavior });
 	}, []);
 
 	const scrollToBottomSoon = useCallback(
-		(tabId: string) => {
-			window.setTimeout(() => {
-				scrollToBottom(tabId);
-			}, 80);
+		(tabId: string, behavior: VirtuosoScrollBehavior = 'smooth') => {
+			requestAnimationFrame(() => {
+				requestAnimationFrame(() => {
+					scrollToBottom(tabId, behavior);
+				});
+			});
 		},
 		[scrollToBottom]
 	);
 
 	const resetScrollToTop = useCallback((tabId: string) => {
 		scrollTopByTab.current.set(tabId, 0);
+		virtuosoStateByTabRef.current.delete(tabId);
+		restoredInitialScrollByTabRef.current.add(tabId);
 		if (selectedTabIdRef.current !== tabId) return;
 		virtuosoRef.current?.scrollTo({ top: 0 });
 	}, []);
@@ -582,8 +609,6 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 				...t,
 				conversation: { ...chatWithPlaceholder, messages: [...chatWithPlaceholder.messages] },
 			}));
-
-			if (selectedTabIdRef.current === tabId) scrollToBottomSoon(tabId);
 
 			const onStreamTextData = (textData: string) => {
 				if (!textData) return;
@@ -826,8 +851,6 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 								inputRefs.current.get(tabId)?.loadToolCalls(queuedRunnableToolCalls);
 							});
 						}
-
-						if (selectedTabIdRef.current === tabId) scrollToBottomSoon(tabId);
 					}
 				}
 			}
@@ -840,7 +863,6 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			notifyStreamNow,
 			notifyStreamSoon,
 			saveUpdatedConversation,
-			scrollToBottomSoon,
 			tabExists,
 			updateTab,
 		]
@@ -878,8 +900,6 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 					updateTab(tabId, t => ({ ...t, editingMessageId: null }));
 					saveUpdatedConversation(tabId, updatedChat);
 
-					if (selectedTabIdRef.current === tabId) scrollToBottomSoon(tabId);
-
 					void updateStreamingMessage(tabId, updatedChat, options, payload.skillSessionID).catch(console.error);
 					return;
 				}
@@ -895,7 +915,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			};
 
 			saveUpdatedConversation(tabId, updated);
-			if (selectedTabIdRef.current === tabId) scrollToBottomSoon(tabId);
+			if (selectedTabIdRef.current === tabId) scrollToBottomSoon(tabId, 'smooth');
 
 			void updateStreamingMessage(tabId, updated, options, payload.skillSessionID).catch(console.error);
 		},
@@ -992,6 +1012,32 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	const computeItemKey = useCallback((_index: number, message: ConversationMessage) => message.id, []);
 
 	const messages = activeTab?.conversation?.messages ?? [];
+	const activeVirtuosoState = virtuosoStateByTabRef.current.get(selectedTabId);
+
+	// First restore after async hydration: if we do not yet have a Virtuoso
+	// state snapshot for this tab, apply the saved scrollTop once after the
+	// real messages have mounted.
+	useEffect(() => {
+		const tabId = selectedTabId;
+		if (!tabId || !activeTab || activeTab.isHydrating) return;
+		if (messages.length === 0) return;
+		if (activeVirtuosoState) return;
+		if (restoredInitialScrollByTabRef.current.has(tabId)) return;
+
+		const savedTop = scrollTopByTab.current.get(tabId) ?? 0;
+		if (savedTop <= 0) {
+			restoredInitialScrollByTabRef.current.add(tabId);
+			return;
+		}
+
+		requestAnimationFrame(() =>
+			requestAnimationFrame(() => {
+				if (selectedTabIdRef.current !== tabId) return;
+				virtuosoRef.current?.scrollTo({ top: savedTop, behavior: 'auto' });
+				restoredInitialScrollByTabRef.current.add(tabId);
+			})
+		);
+	}, [selectedTabId, activeTab, messages.length, activeVirtuosoState]);
 
 	const itemContent = useCallback(
 		(index: number, message: ConversationMessage) => {
@@ -1050,12 +1096,11 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 					ref={virtuosoRef}
 					data={messages}
 					computeItemKey={computeItemKey}
-					initialScrollTop={scrollTopByTab.current.get(selectedTabId) ?? 0}
-					followOutput={atBottom => (atBottom ? 'smooth' : false)}
-					atBottomThreshold={128}
-					increaseViewportBy={200}
+					restoreStateFrom={activeVirtuosoState}
+					initialScrollTop={activeVirtuosoState ? undefined : (scrollTopByTab.current.get(selectedTabId) ?? 0)}
+					atBottomThreshold={VIRTUOSO_AT_BOTTOM_THRESHOLD}
+					increaseViewportBy={{ top: 300, bottom: 300 }}
 					atBottomStateChange={atBottom => {
-						isAtBottomRef.current = atBottom;
 						setIsAtBottom(atBottom);
 					}}
 					atTopStateChange={setIsAtTop}
