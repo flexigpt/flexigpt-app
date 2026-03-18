@@ -52,7 +52,6 @@ import { InputPane } from '@/chats/inputarea/input_pane';
 import { ChatMessage } from '@/chats/messages/message';
 
 const VIRTUOSO_AT_BOTTOM_THRESHOLD = 128;
-type VirtuosoScrollBehavior = 'auto' | 'smooth';
 
 type StreamChannelBuffer = { chunks: string[]; flushedIdx: number; display: string };
 type StreamBuffer = { text: StreamChannelBuffer; thinking: StreamChannelBuffer };
@@ -470,13 +469,10 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		};
 	}, []);
 
-	const scrollerElRef = useRef<HTMLDivElement | null>(null);
 	const [isAtBottom, setIsAtBottom] = useState(true);
 	const [isAtTop, setIsAtTop] = useState(true);
 
-	// Bridge Virtuoso's scroller element so we can:
-	//  1) track scrollTop per-tab (passive scroll listener)
-	//  2) pass it to ButtonScrollToTop / ButtonScrollToBottom
+	// Bridge Virtuoso's scroller element so we can track scrollTop per-tab.
 	const scrollListenerCleanupRef = useRef<(() => void) | null>(null);
 
 	const handleScrollerRef = useCallback((el: HTMLElement | Window | null) => {
@@ -484,7 +480,6 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		scrollListenerCleanupRef.current = null;
 
 		const htmlEl = el instanceof HTMLElement ? el : null;
-		scrollerElRef.current = htmlEl as HTMLDivElement | null;
 
 		if (htmlEl) {
 			const handler = () => {
@@ -519,25 +514,33 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	// Stable Virtuoso `components` object (never changes → no remount)
 	const virtuosoComponents = useMemo(() => ({ List: VirtuosoList }), []);
 
-	const scrollToBottom = useCallback((tabId: string, behavior: VirtuosoScrollBehavior = 'smooth') => {
-		// There is only one visible scroll container; it corresponds to the active tab.
-		if (selectedTabIdRef.current !== tabId) return;
-		const tab = tabsRef.current.find(t => t.tabId === tabId);
-		const lastIndex = (tab?.conversation.messages.length ?? 0) - 1;
-		if (lastIndex < 0) return;
-		virtuosoRef.current?.scrollToIndex({ index: lastIndex, align: 'end', behavior });
+	const scrollTabToBottomSoon = useCallback((tabId: string) => {
+		requestAnimationFrame(() => {
+			requestAnimationFrame(() => {
+				if (selectedTabIdRef.current !== tabId) return;
+
+				const tab = tabsRef.current.find(t => t.tabId === tabId);
+				const lastIndex = (tab?.conversation.messages.length ?? 0) - 1;
+				if (lastIndex < 0) return;
+
+				virtuosoRef.current?.scrollToIndex({ index: lastIndex, align: 'end', behavior: 'smooth' });
+			});
+		});
 	}, []);
 
-	const scrollToBottomSoon = useCallback(
-		(tabId: string, behavior: VirtuosoScrollBehavior = 'smooth') => {
-			requestAnimationFrame(() => {
-				requestAnimationFrame(() => {
-					scrollToBottom(tabId, behavior);
-				});
-			});
-		},
-		[scrollToBottom]
-	);
+	const scrollActiveToTop = useCallback(() => {
+		virtuosoRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+	}, []);
+
+	const messages = activeTab?.conversation?.messages ?? [];
+	const activeVirtuosoState = virtuosoStateByTabRef.current.get(selectedTabId);
+
+	const scrollActiveToBottom = useCallback(() => {
+		const lastIndex = messages.length - 1;
+		if (lastIndex < 0) return;
+
+		virtuosoRef.current?.scrollToIndex({ index: lastIndex, align: 'end', behavior: 'smooth' });
+	}, [messages.length]);
 
 	const resetScrollToTop = useCallback((tabId: string) => {
 		scrollTopByTab.current.set(tabId, 0);
@@ -915,11 +918,11 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			};
 
 			saveUpdatedConversation(tabId, updated);
-			if (selectedTabIdRef.current === tabId) scrollToBottomSoon(tabId, 'smooth');
+			if (selectedTabIdRef.current === tabId) scrollTabToBottomSoon(tabId);
 
 			void updateStreamingMessage(tabId, updated, options, payload.skillSessionID).catch(console.error);
 		},
-		[saveUpdatedConversation, scrollToBottomSoon, updateStreamingMessage, updateTab]
+		[saveUpdatedConversation, scrollTabToBottomSoon, updateStreamingMessage, updateTab]
 	);
 
 	const beginEditMessageForTab = useCallback(
@@ -1011,9 +1014,6 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 	const computeItemKey = useCallback((_index: number, message: ConversationMessage) => message.id, []);
 
-	const messages = activeTab?.conversation?.messages ?? [];
-	const activeVirtuosoState = virtuosoStateByTabRef.current.get(selectedTabId);
-
 	// First restore after async hydration: if we do not yet have a Virtuoso
 	// state snapshot for this tab, apply the saved scrollTop once after the
 	// real messages have mounted.
@@ -1030,13 +1030,11 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			return;
 		}
 
-		requestAnimationFrame(() =>
-			requestAnimationFrame(() => {
-				if (selectedTabIdRef.current !== tabId) return;
-				virtuosoRef.current?.scrollTo({ top: savedTop, behavior: 'auto' });
-				restoredInitialScrollByTabRef.current.add(tabId);
-			})
-		);
+		requestAnimationFrame(() => {
+			if (selectedTabIdRef.current !== tabId) return;
+			virtuosoRef.current?.scrollTo({ top: savedTop, behavior: 'smooth' });
+			restoredInitialScrollByTabRef.current.add(tabId);
+		});
 	}, [selectedTabId, activeTab, messages.length, activeVirtuosoState]);
 
 	const itemContent = useCallback(
@@ -1115,7 +1113,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 					<div className="pointer-events-auto">
 						{!isAtTop ? (
 							<ButtonScrollToTop
-								scrollContainerRef={scrollerElRef}
+								onScrollToTop={scrollActiveToTop}
 								iconSize={32}
 								show={!isAtTop}
 								className="btn btn-md border-none bg-transparent shadow-none"
@@ -1127,7 +1125,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 					<div className="pointer-events-auto">
 						{!isAtBottom ? (
 							<ButtonScrollToBottom
-								scrollContainerRef={scrollerElRef}
+								onScrollToBottom={scrollActiveToBottom}
 								iconSize={32}
 								show={!isAtBottom}
 								className="btn btn-md border-none bg-transparent shadow-none"
