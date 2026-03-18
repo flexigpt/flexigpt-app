@@ -134,14 +134,14 @@ func TestAsyncRebuilder_Trigger(t *testing.T) {
 		{
 			name:           "fresh snapshot",
 			maxAge:         time.Hour,
-			initialLastRun: time.Now().Add(-30 * time.Minute),
+			initialLastRun: time.Now().UTC().Add(-30 * time.Minute),
 			expectRun:      false,
 			description:    "should not run when snapshot is fresh",
 		},
 		{
 			name:           "stale snapshot",
 			maxAge:         time.Hour,
-			initialLastRun: time.Now().Add(-2 * time.Hour),
+			initialLastRun: time.Now().UTC().Add(-2 * time.Hour),
 			expectRun:      true,
 			description:    "should run when snapshot is stale",
 		},
@@ -155,7 +155,7 @@ func TestAsyncRebuilder_Trigger(t *testing.T) {
 		{
 			name:           "always stale maxAge",
 			maxAge:         alwaysStale,
-			initialLastRun: time.Now(),
+			initialLastRun: time.Now().UTC(),
 			expectRun:      true,
 			description:    "should always run with alwaysStale maxAge",
 		},
@@ -183,7 +183,7 @@ func TestAsyncRebuilder_Trigger(t *testing.T) {
 
 			if tt.boundary {
 				// Set lastRun so that time.Since(lastRun) <= maxAge (small epsilon).
-				atomic.StoreInt64(&r.lastRun, time.Now().Add(-tt.maxAge+10*time.Millisecond).UnixNano())
+				atomic.StoreInt64(&r.lastRun, time.Now().UTC().Add(-tt.maxAge+10*time.Millisecond).UnixNano())
 			} else if !tt.initialLastRun.IsZero() {
 				atomic.StoreInt64(&r.lastRun, tt.initialLastRun.UnixNano())
 			}
@@ -449,7 +449,7 @@ func TestAsyncRebuilder_MaxAgeEdgeCases(t *testing.T) {
 			maxAge: time.Nanosecond,
 			setup: func(r *AsyncRebuilder) {
 				// Make the last run sufficiently in the past so it is stale.
-				atomic.StoreInt64(&r.lastRun, time.Now().Add(-2*time.Millisecond).UnixNano())
+				atomic.StoreInt64(&r.lastRun, time.Now().UTC().Add(-2*time.Millisecond).UnixNano())
 			},
 			expect: true,
 		},

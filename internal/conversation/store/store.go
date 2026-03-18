@@ -222,7 +222,7 @@ func (cc *ConversationCollection) PutMessagesToConversation(
 	}
 
 	currentConversation := convoResp.Body
-	currentConversation.ModifiedAt = time.Now()
+	currentConversation.ModifiedAt = time.Now().UTC()
 	currentConversation.Messages = req.Body.Messages
 
 	filename, err := cc.fileNameFromConversation(*currentConversation)

@@ -71,6 +71,8 @@ func TestScale_LotsOfBundles(t *testing.T) {
 						TemplateSlug: "t",
 						Version:      "v1",
 						Body: &spec.PutPromptTemplateRequestBody{
+							Kind:        spec.PromptTemplateKindGeneric,
+							IsResolved:  true,
 							DisplayName: "dummy",
 							IsEnabled:   true,
 							Blocks: []spec.MessageBlock{{
@@ -201,6 +203,8 @@ func TestScale_LotsOfTemplates(t *testing.T) {
 					TemplateSlug: bundleitemutils.ItemSlug(fmt.Sprintf("tpl-%d", j.s)),
 					Version:      bundleitemutils.ItemVersion(fmt.Sprintf("v%d", j.v)),
 					Body: &spec.PutPromptTemplateRequestBody{
+						Kind:        spec.PromptTemplateKindGeneric,
+						IsResolved:  true,
 						DisplayName: "T",
 						IsEnabled:   true,
 						Blocks: []spec.MessageBlock{{

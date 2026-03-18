@@ -822,6 +822,70 @@ func Test_NewBuiltInData_SyntheticFS_HappyAndCRUD(t *testing.T) {
 	}
 }
 
+func TestBuiltInData_ReturnedTemplatesAreDeepCopies(t *testing.T) {
+	if runtime.GOOS == windows {
+		t.Skip("same as other synthetic fs tests")
+	}
+
+	bid := bundleitemutils.BundleID(newUUID(t))
+	slug := "demo"
+	dir := fmt.Sprintf("%s_%s", bid, slug)
+	fn, rawTpl, _ := buildTemplate(t, slug, "v1")
+
+	mem := fstest.MapFS{
+		builtin.BuiltInPromptBundlesJSON: {Data: buildManifest(string(bid), slug)},
+		dir:                              &fstest.MapFile{Mode: fs.ModeDir},
+		dir + "/" + fn:                   {Data: rawTpl},
+	}
+
+	bi, err := newFromFS(t, mem)
+	if err != nil {
+		t.Fatalf("newFromFS: %v", err)
+	}
+
+	_, tpls1, _ := bi.ListBuiltInData(t.Context())
+	_, _, tpl1 := anyTemplate(tpls1)
+	if len(tpl1.Blocks) == 0 {
+		t.Fatal("expected blocks in built-in template")
+	}
+
+	// Mutate returned copy.
+	tpl1.Blocks[0].Content = "CORRUPTED"
+	for bid, tm := range tpls1 {
+		for tid := range tm {
+			tmp := tm[tid]
+			tmp.Blocks[0].Content = "CORRUPTED"
+			tpls1[bid][tid] = tmp
+			break
+		}
+		break
+	}
+
+	_, tpls2, _ := bi.ListBuiltInData(t.Context())
+	_, _, tpl2 := anyTemplate(tpls2)
+	if got := tpl2.Blocks[0].Content; got == "CORRUPTED" {
+		t.Fatalf("built-in template blocks share backing memory")
+	}
+
+	// Also verify exact getter returns a safe copy.
+	got, err := bi.GetBuiltInTemplate(t.Context(), bid, tpl2.Slug, tpl2.Version)
+	if err != nil {
+		t.Fatalf("GetBuiltInTemplate: %v", err)
+	}
+	if len(got.Blocks) == 0 {
+		t.Fatal("expected blocks in exact built-in get")
+	}
+	got.Blocks[0].Content = "MUTATED"
+
+	got2, err := bi.GetBuiltInTemplate(t.Context(), bid, tpl2.Slug, tpl2.Version)
+	if err != nil {
+		t.Fatalf("GetBuiltInTemplate second: %v", err)
+	}
+	if got2.Blocks[0].Content == "MUTATED" {
+		t.Fatalf("GetBuiltInTemplate returned aliased slice data")
+	}
+}
+
 func anyTemplate(
 	m map[bundleitemutils.BundleID]map[bundleitemutils.ItemID]spec.PromptTemplate,
 ) (bundleitemutils.BundleID, bundleitemutils.ItemID, spec.PromptTemplate) {
@@ -867,6 +931,8 @@ func buildTemplate(t *testing.T, slug, ver string) (fileName string, raw []byte,
 		Slug:          bundleitemutils.ItemSlug(slug),
 		Version:       bundleitemutils.ItemVersion(ver),
 		DisplayName:   slug,
+		Kind:          spec.PromptTemplateKindGeneric,
+		IsResolved:    true,
 		Blocks: []spec.MessageBlock{
 			{
 				ID:      spec.MessageBlockID("a"),
@@ -875,8 +941,8 @@ func buildTemplate(t *testing.T, slug, ver string) (fileName string, raw []byte,
 			},
 		},
 		IsEnabled:  true,
-		CreatedAt:  time.Now(),
-		ModifiedAt: time.Now(),
+		CreatedAt:  time.Now().UTC(),
+		ModifiedAt: time.Now().UTC(),
 	}
 	raw, _ = json.Marshal(tpl) // cannot fail
 	fileName = fmt.Sprintf("%s_%s.json", slug, ver)

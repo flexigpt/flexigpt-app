@@ -172,7 +172,7 @@ func (w *Writer) listen() {
 			}
 		}
 
-		if w.opts.MaximumLifetime != 0 && time.Now().After(w.ts.Add(w.opts.MaximumLifetime)) {
+		if w.opts.MaximumLifetime != 0 && time.Now().UTC().After(w.ts.Add(w.opts.MaximumLifetime)) {
 			if err := w.rotate(); err != nil {
 				w.logger.Error("failed to rotate log file", "error", err)
 			}

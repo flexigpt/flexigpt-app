@@ -1,5 +1,6 @@
 {
 	"schemaVersion": "2025-07-01",
+	"kind": "generic",
 	"id": "018faf50-b7b6-7c02-9e09-a22a6e0af105",
 	"displayName": "Architecture / Interaction Diagrams",
 	"slug": "diagrams-stage",
@@ -47,6 +48,7 @@
 			"default": "2"
 		}
 	],
+	"isResolved": false,
 	"version": "v1.1.0",
 	"createdAt": "2024-06-06T00:00:00Z",
 	"modifiedAt": "2024-06-06T00:00:00Z",

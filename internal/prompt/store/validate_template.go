@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
@@ -27,12 +28,21 @@ func validateTemplate(tpl *spec.PromptTemplate) error {
 			spec.SchemaVersion,
 		)
 	}
+
 	if err := bundleitemutils.ValidateItemSlug(tpl.Slug); err != nil {
 		return fmt.Errorf("invalid slug: %w", err)
 	}
 	if err := bundleitemutils.ValidateItemVersion(tpl.Version); err != nil {
 		return fmt.Errorf("invalid version: %w", err)
 	}
+
+	switch tpl.Kind {
+	case spec.PromptTemplateKindInstructionsOnly, spec.PromptTemplateKindGeneric:
+		// Ok.
+	default:
+		return fmt.Errorf("invalid kind %q", tpl.Kind)
+	}
+
 	if strings.TrimSpace(tpl.DisplayName) == "" {
 		return errors.New("displayName is empty")
 	}
@@ -46,19 +56,13 @@ func validateTemplate(tpl *spec.PromptTemplate) error {
 		return errors.New("at least one message block required")
 	}
 
-	// Validate message blocks and collect placeholders.
-	allowedRoles := map[spec.PromptRoleEnum]struct{}{
-		spec.System:    {},
-		spec.Developer: {},
-		spec.User:      {},
-		spec.Assistant: {},
-	}
+	allowedRoles := allowedRolesForKind(tpl.Kind)
 	blockIDs := map[spec.MessageBlockID]struct{}{}
 	placeholders := map[string]struct{}{}
 
 	for i, b := range tpl.Blocks {
 		if _, ok := allowedRoles[b.Role]; !ok {
-			return fmt.Errorf("blocks[%d]: invalid role %q", i, b.Role)
+			return fmt.Errorf("blocks[%d]: role %q not allowed for kind %q", i, b.Role, tpl.Kind)
 		}
 		if strings.TrimSpace(b.Content) == "" {
 			return fmt.Errorf("blocks[%d]: content is empty", i)
@@ -92,6 +96,7 @@ func validateTemplate(tpl *spec.PromptTemplate) error {
 	}
 
 	varNames := map[string]spec.VarSource{}
+	varDefs := map[string]spec.PromptVariable{}
 	for i, v := range tpl.Variables {
 		v.Name = strings.TrimSpace(v.Name)
 		if err := bundleitemutils.ValidateTag(v.Name); err != nil {
@@ -137,9 +142,16 @@ func validateTemplate(tpl *spec.PromptTemplate) error {
 				}
 				seenEnum[ev] = struct{}{}
 			}
+			if v.Default != nil {
+				found := slices.Contains(v.EnumValues, *v.Default)
+				if !found {
+					return fmt.Errorf("variables[%d]: default %q not in enumValues", i, *v.Default)
+				}
+			}
 		}
 
 		varNames[v.Name] = v.Source
+		varDefs[v.Name] = v
 	}
 
 	// All placeholders must be declared.
@@ -161,8 +173,51 @@ func validateTemplate(tpl *spec.PromptTemplate) error {
 		return fmt.Errorf("variable %q declared but never used", n)
 	}
 
+	isResolved := true
+	for ph := range placeholders {
+		if !isVariableResolvedLocally(varDefs[ph]) {
+			isResolved = false
+			break
+		}
+	}
+	if tpl.IsResolved != isResolved {
+		return fmt.Errorf("isResolved mismatched. got: %v, computed: %v", tpl.IsResolved, isResolved)
+	}
+
 	if err := bundleitemutils.ValidateTags(tpl.Tags); err != nil {
 		return err
 	}
 	return nil
+}
+
+func allowedRolesForKind(kind spec.PromptTemplateKind) map[spec.PromptRoleEnum]struct{} {
+	switch kind {
+	case spec.PromptTemplateKindInstructionsOnly:
+		return map[spec.PromptRoleEnum]struct{}{
+			spec.System:    {},
+			spec.Developer: {},
+		}
+
+	default:
+		return map[spec.PromptRoleEnum]struct{}{
+			spec.System:    {},
+			spec.Developer: {},
+			spec.User:      {},
+			spec.Assistant: {},
+		}
+	}
+}
+
+func isVariableResolvedLocally(v spec.PromptVariable) bool {
+	switch v.Source {
+	case spec.SourceStatic:
+		return strings.TrimSpace(v.StaticVal) != ""
+	case spec.SourceUser:
+		if v.Default != nil {
+			return true
+		}
+	default:
+		return false
+	}
+	return false
 }

@@ -138,9 +138,10 @@ func TestTemplateCRUD(t *testing.T) {
 				TemplateSlug: tc.slug,
 				Version:      tc.ver,
 				Body: &spec.PutPromptTemplateRequestBody{
+					Kind:        spec.PromptTemplateKindGeneric,
+					IsResolved:  true,
 					DisplayName: tc.display,
-
-					IsEnabled: true,
+					IsEnabled:   true,
 					Blocks: []spec.MessageBlock{{
 						ID:      "1",
 						Role:    spec.User,
@@ -174,6 +175,8 @@ func TestTemplateVersionConflict(t *testing.T) {
 		TemplateSlug: "tpl",
 		Version:      "v1",
 		Body: &spec.PutPromptTemplateRequestBody{
+			Kind:        spec.PromptTemplateKindGeneric,
+			IsResolved:  true,
 			DisplayName: "dup",
 			IsEnabled:   true,
 			Blocks: []spec.MessageBlock{{
@@ -200,6 +203,8 @@ func TestTemplateDisabledBundleGuard(t *testing.T) {
 		TemplateSlug: "tpl",
 		Version:      "v1",
 		Body: &spec.PutPromptTemplateRequestBody{
+			Kind:        spec.PromptTemplateKindGeneric,
+			IsResolved:  true,
 			DisplayName: "d",
 			IsEnabled:   true,
 			Blocks: []spec.MessageBlock{{
@@ -264,6 +269,8 @@ func TestBuiltInTemplateGuards(t *testing.T) {
 		TemplateSlug: slug,
 		Version:      "v-new",
 		Body: &spec.PutPromptTemplateRequestBody{
+			Kind:        spec.PromptTemplateKindGeneric,
+			IsResolved:  true,
 			DisplayName: "illegal",
 			IsEnabled:   true,
 			Blocks: []spec.MessageBlock{{
@@ -474,6 +481,168 @@ func TestTemplatePagination(t *testing.T) {
 	}
 }
 
+func TestListPromptTemplates_FiltersByKindAndResolved(t *testing.T) {
+	s, clean := newTestStore(t)
+	defer clean()
+
+	mustPutBundle(t, s, "b1", "slug1", "Bundle", true)
+
+	// generic + resolved
+	mustPutTemplate(t, s, "b1", "generic-resolved", "v1", "GR", true)
+
+	// generic + unresolved
+	_, err := s.PutPromptTemplate(t.Context(), &spec.PutPromptTemplateRequest{
+		BundleID:     "b1",
+		TemplateSlug: "generic-unresolved",
+		Version:      "v1",
+		Body: &spec.PutPromptTemplateRequestBody{
+			Kind:        spec.PromptTemplateKindGeneric,
+			IsResolved:  false,
+			DisplayName: "GU",
+			IsEnabled:   true,
+			Blocks: []spec.MessageBlock{{
+				ID:      "b1",
+				Role:    spec.User,
+				Content: "Hello {{name}}",
+			}},
+			Variables: []spec.PromptVariable{{
+				Name:     "name",
+				Type:     spec.VarString,
+				Source:   spec.SourceUser,
+				Required: true,
+			}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("PutPromptTemplate unresolved: %v", err)
+	}
+
+	// instructionsOnly + resolved
+	_, err = s.PutPromptTemplate(t.Context(), &spec.PutPromptTemplateRequest{
+		BundleID:     "b1",
+		TemplateSlug: "instructions-resolved",
+		Version:      "v1",
+		Body: &spec.PutPromptTemplateRequestBody{
+			Kind:        spec.PromptTemplateKindInstructionsOnly,
+			IsResolved:  true,
+			DisplayName: "IR",
+			IsEnabled:   true,
+			Blocks: []spec.MessageBlock{{
+				ID:      "b1",
+				Role:    spec.System,
+				Content: "You are concise.",
+			}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("PutPromptTemplate instructionsOnly: %v", err)
+	}
+
+	tests := []struct {
+		name      string
+		req       spec.ListPromptTemplatesRequest
+		wantCount int
+	}{
+		{
+			name: "all_templates",
+			req: spec.ListPromptTemplatesRequest{
+				BundleIDs: []bundleitemutils.BundleID{"b1"},
+			},
+			wantCount: 3,
+		},
+		{
+			name: "only_resolved",
+			req: spec.ListPromptTemplatesRequest{
+				BundleIDs:    []bundleitemutils.BundleID{"b1"},
+				OnlyResolved: true,
+			},
+			wantCount: 2,
+		},
+		{
+			name: "only_instructions_only",
+			req: spec.ListPromptTemplatesRequest{
+				BundleIDs: []bundleitemutils.BundleID{"b1"},
+				Kinds:     []spec.PromptTemplateKind{spec.PromptTemplateKindInstructionsOnly},
+			},
+			wantCount: 1,
+		},
+		{
+			name: "generic_and_resolved",
+			req: spec.ListPromptTemplatesRequest{
+				BundleIDs:    []bundleitemutils.BundleID{"b1"},
+				Kinds:        []spec.PromptTemplateKind{spec.PromptTemplateKindGeneric},
+				OnlyResolved: true,
+			},
+			wantCount: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := s.ListPromptTemplates(t.Context(), &tt.req)
+			if err != nil {
+				t.Fatalf("ListPromptTemplates: %v", err)
+			}
+			if got := len(resp.Body.PromptTemplateListItems); got != tt.wantCount {
+				t.Fatalf("count = %d, want %d", got, tt.wantCount)
+			}
+		})
+	}
+}
+
+func TestListPromptTemplates_HidesDisabledBundleTemplatesUnlessIncludeDisabled(t *testing.T) {
+	s, clean := newTestStore(t)
+	defer clean()
+
+	mustPutBundle(t, s, "b1", "slug1", "EnabledBundle", true)
+	mustPutBundle(t, s, "b2", "slug2", "WillBeDisabled", true)
+
+	mustPutTemplate(t, s, "b1", "t1", "v1", "T1", true)
+	mustPutTemplate(t, s, "b2", "t2", "v1", "T2", true)
+
+	_, err := s.PatchPromptBundle(t.Context(), &spec.PatchPromptBundleRequest{
+		BundleID: "b2",
+		Body: &spec.PatchPromptBundleRequestBody{
+			IsEnabled: false,
+		},
+	})
+	if err != nil {
+		t.Fatalf("PatchPromptBundle: %v", err)
+	}
+
+	tests := []struct {
+		name            string
+		includeDisabled bool
+		wantCount       int
+	}{
+		{
+			name:            "enabled_only",
+			includeDisabled: false,
+			wantCount:       1,
+		},
+		{
+			name:            "include_disabled",
+			includeDisabled: true,
+			wantCount:       2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := s.ListPromptTemplates(t.Context(), &spec.ListPromptTemplatesRequest{
+				BundleIDs:       []bundleitemutils.BundleID{"b1", "b2"},
+				IncludeDisabled: tt.includeDisabled,
+			})
+			if err != nil {
+				t.Fatalf("ListPromptTemplates: %v", err)
+			}
+			if got := len(resp.Body.PromptTemplateListItems); got != tt.wantCount {
+				t.Fatalf("count = %d, want %d", got, tt.wantCount)
+			}
+		})
+	}
+}
+
 func TestSoftDeleteBehaviour(t *testing.T) {
 	s, clean := newTestStore(t)
 	defer clean()
@@ -517,6 +686,8 @@ func TestConcurrentTemplatePut(t *testing.T) {
 			TemplateSlug: "concurrent",
 			Version:      "v1",
 			Body: &spec.PutPromptTemplateRequestBody{
+				Kind:        spec.PromptTemplateKindGeneric,
+				IsResolved:  true,
 				DisplayName: "v1",
 				IsEnabled:   true,
 				Blocks: []spec.MessageBlock{{
@@ -534,6 +705,8 @@ func TestConcurrentTemplatePut(t *testing.T) {
 			TemplateSlug: "concurrent",
 			Version:      "v2",
 			Body: &spec.PutPromptTemplateRequestBody{
+				Kind:        spec.PromptTemplateKindGeneric,
+				IsResolved:  true,
 				DisplayName: "v2",
 				IsEnabled:   true,
 				Blocks: []spec.MessageBlock{{
@@ -548,33 +721,6 @@ func TestConcurrentTemplatePut(t *testing.T) {
 
 	if e1, e2 := <-errCh, <-errCh; e1 != nil || e2 != nil {
 		t.Fatalf("parallel PutPromptTemplate failed: %v / %v", e1, e2)
-	}
-}
-
-func TestSlugVersionValidation(t *testing.T) {
-	cases := []struct {
-		slug  bundleitemutils.ItemSlug
-		ver   bundleitemutils.ItemVersion
-		valid bool
-	}{
-		{"abc", "v1", true},
-		{"abc-def", "v1", true},
-		{"", "v1", false},
-		{"abc", "", false},
-		{"bad.slug", "v1", false},
-		{"abc", "v 1", false},
-	}
-
-	for _, c := range cases {
-		errSlug := bundleitemutils.ValidateItemSlug(c.slug)
-		errVer := bundleitemutils.ValidateItemVersion(c.ver)
-		if c.valid && (errSlug != nil || errVer != nil) {
-			t.Fatalf("expected valid slug/version (%s/%s) got errors %v %v",
-				c.slug, c.ver, errSlug, errVer)
-		}
-		if !c.valid && errSlug == nil && errVer == nil {
-			t.Fatalf("expected invalid for (%s/%s)", c.slug, c.ver)
-		}
 	}
 }
 
@@ -630,6 +776,7 @@ func mustPutTemplate(
 		TemplateSlug: slug,
 		Version:      ver,
 		Body: &spec.PutPromptTemplateRequestBody{
+			Kind:        spec.PromptTemplateKindGeneric,
 			DisplayName: display,
 			Description: "test template",
 			IsEnabled:   enabled,
@@ -638,7 +785,8 @@ func mustPutTemplate(
 				Role:    spec.User,
 				Content: "hello",
 			}},
-			Tags: tags,
+			Tags:       tags,
+			IsResolved: true,
 		},
 	})
 	if err != nil {

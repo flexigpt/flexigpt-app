@@ -1,5 +1,6 @@
 {
 	"schemaVersion": "2025-07-01",
+	"kind": "generic",
 	"id": "018faf50-b7b6-7d01-9f0a-a22a6e0af106",
 	"displayName": "Go Table-Driven Tests (stdlib-only)",
 	"slug": "go-table-tests",
@@ -19,6 +20,7 @@
 			"content": "Code is below:\n"
 		}
 	],
+	"isResolved": true,
 	"version": "v1.0.0",
 	"createdAt": "2024-06-06T00:00:00Z",
 	"modifiedAt": "2024-06-06T00:00:00Z",

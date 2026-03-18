@@ -196,7 +196,7 @@ func (r *HTTPToolRunner) Run(
 	}
 	httpReq.Header = headers
 
-	start := time.Now()
+	start := time.Now().UTC()
 	httpResp, err := client.Do(httpReq)
 	dur := time.Since(start)
 	if err != nil {

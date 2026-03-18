@@ -1,5 +1,6 @@
 {
 	"schemaVersion": "2025-07-01",
+	"kind": "generic",
 	"id": "018faf50-b7b6-7c01-9d08-a22a6e0af104",
 	"displayName": "Requirements & High-Level Design",
 	"slug": "requirements-design-stage",
@@ -48,6 +49,7 @@
 			"source": "user"
 		}
 	],
+	"isResolved": false,
 	"version": "v1.0.0",
 	"createdAt": "2024-06-06T00:00:00Z",
 	"modifiedAt": "2024-06-06T00:00:00Z",

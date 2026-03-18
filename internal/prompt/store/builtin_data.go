@@ -141,7 +141,7 @@ func (d *BuiltInData) ListBuiltInData(ctx context.Context) (
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	bundles = maps.Clone(d.viewBundles)
-	templates = cloneTemplates(d.viewTemplates)
+	templates = cloneAllTemplates(d.viewTemplates)
 	return bundles, templates, nil
 }
 
@@ -215,7 +215,7 @@ func (d *BuiltInData) SetTemplateEnabled(
 	d.mu.Unlock()
 
 	d.rebuilder.Trigger()
-	return template, nil
+	return clonePromptTemplate(template), nil
 }
 
 func (d *BuiltInData) GetBuiltInTemplate(
@@ -232,7 +232,7 @@ func (d *BuiltInData) GetBuiltInTemplate(
 	}
 	for _, tpl := range templates {
 		if tpl.Slug == slug && tpl.Version == version {
-			return tpl, nil
+			return clonePromptTemplate(tpl), nil
 		}
 	}
 	return spec.PromptTemplate{}, fmt.Errorf(
@@ -430,19 +430,6 @@ func (d *BuiltInData) rebuildSnapshot(ctx context.Context) error {
 	d.viewBundles = newBundles
 	d.viewTemplates = newTemplates
 	return nil
-}
-
-func cloneTemplates(
-	src map[bundleitemutils.BundleID]map[bundleitemutils.ItemID]spec.PromptTemplate,
-) map[bundleitemutils.BundleID]map[bundleitemutils.ItemID]spec.PromptTemplate {
-	dst := make(
-		map[bundleitemutils.BundleID]map[bundleitemutils.ItemID]spec.PromptTemplate,
-		len(src),
-	)
-	for bid, inner := range src {
-		dst[bid] = maps.Clone(inner)
-	}
-	return dst
 }
 
 func resolveBundlesFS(fsys fs.FS, dir string) (fs.FS, error) {

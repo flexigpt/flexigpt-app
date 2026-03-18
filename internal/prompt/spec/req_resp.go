@@ -58,13 +58,16 @@ type ListPromptBundlesResponse struct {
 
 type PutPromptTemplateRequestBody struct {
 	// Auto populate template id internally.
-	DisplayName string `json:"displayName"           required:"true"`
-	IsEnabled   bool   `json:"isEnabled"             required:"true"`
-	Description string `json:"description,omitempty"`
+	Kind        PromptTemplateKind `json:"kind"                  required:"true"`
+	DisplayName string             `json:"displayName"           required:"true"`
+	IsEnabled   bool               `json:"isEnabled"             required:"true"`
+	Description string             `json:"description,omitempty"`
 
 	Blocks    []MessageBlock   `json:"blocks"              required:"true"`
 	Tags      []string         `json:"tags,omitempty"`
 	Variables []PromptVariable `json:"variables,omitempty"`
+
+	IsResolved bool `json:"isResolved" required:"true"`
 }
 
 type PutPromptTemplateRequest struct {
@@ -110,11 +113,15 @@ type TemplatePageToken struct {
 	Tags                []string                   `json:"tags,omitempty"` //nolint:tagliatelle // PageToken specific.
 	BuiltInDone         bool                       `json:"bd,omitempty"`   //nolint:tagliatelle // PageToken specific.
 	DirTok              string                     `json:"dt,omitempty"`   //nolint:tagliatelle // PageToken specific.
+	Kinds               []PromptTemplateKind       `json:"k,omitempty"`    //nolint:tagliatelle // PageToken specific.
+	OnlyResolved        bool                       `json:"r,omitempty"`    //nolint:tagliatelle // PageToken specific.
 }
 
 type ListPromptTemplatesRequest struct {
 	BundleIDs           []bundleitemutils.BundleID `query:"bundleIDs"`
 	Tags                []string                   `query:"tags"`
+	Kinds               []PromptTemplateKind       `query:"kinds"`
+	OnlyResolved        bool                       `query:"onlyResolved"`
 	IncludeDisabled     bool                       `query:"includeDisabled"`
 	RecommendedPageSize int                        `query:"recommendedPageSize"`
 	PageToken           string                     `query:"pageToken"`
@@ -125,6 +132,8 @@ type PromptTemplateListItem struct {
 	BundleSlug      bundleitemutils.BundleSlug  `json:"bundleSlug"`
 	TemplateSlug    bundleitemutils.ItemSlug    `json:"templateSlug"`
 	TemplateVersion bundleitemutils.ItemVersion `json:"templateVersion"`
+	Kind            PromptTemplateKind          `json:"kind"`
+	IsResolved      bool                        `json:"isResolved"`
 	IsBuiltIn       bool                        `json:"isBuiltIn"`
 }
 

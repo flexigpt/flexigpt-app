@@ -401,7 +401,7 @@ func TestConversationCollection(t *testing.T) {
 		convo1.ID = u
 		convo1.Title = "Jan"
 		convo1.CreatedAt = time.Date(2023, 1, 15, 10, 0, 0, 0, time.UTC)
-		convo1.ModifiedAt = time.Now()
+		convo1.ModifiedAt = time.Now().UTC()
 		convo1.Messages = []spec.ConversationMessage{}
 
 		// Feb.
@@ -414,7 +414,7 @@ func TestConversationCollection(t *testing.T) {
 		convo2.ID = u
 		convo2.Title = "Feb"
 		convo2.CreatedAt = time.Date(2023, 2, 15, 10, 0, 0, 0, time.UTC)
-		convo2.ModifiedAt = time.Now()
+		convo2.ModifiedAt = time.Now().UTC()
 		convo2.Messages = []spec.ConversationMessage{}
 
 		_, err = cc.PutConversation(ctx, getNewPutRequestFromConversation(convo1))
@@ -446,7 +446,7 @@ func TestConversationCollection(t *testing.T) {
 	// NEW: Corrupted/invalid file handling.
 	t.Run("CorruptedFileHandling", func(t *testing.T) {
 		// Place a file with invalid name in the directory.
-		partitionDir := filepath.Join(baseDir, time.Now().Format("200601"))
+		partitionDir := filepath.Join(baseDir, time.Now().UTC().Format("200601"))
 		_ = os.MkdirAll(partitionDir, 0o755)
 		badFile := filepath.Join(partitionDir, "not-a-valid-convo-file.txt")
 		_ = os.WriteFile(badFile, []byte("garbage"), 0o600)
@@ -601,8 +601,8 @@ func initConversation(title string) (*spec.Conversation, error) {
 	}
 	c.ID = u
 	c.Title = title
-	c.CreatedAt = time.Now()
-	c.ModifiedAt = time.Now()
+	c.CreatedAt = time.Now().UTC()
+	c.ModifiedAt = time.Now().UTC()
 
 	return &c, nil
 }

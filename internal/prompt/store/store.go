@@ -442,9 +442,9 @@ func (s *PromptTemplateStore) PutPromptTemplate(
 	if req == nil || req.Body == nil {
 		return nil, fmt.Errorf("%w: nil request/body", spec.ErrInvalidRequest)
 	}
-	if req.BundleID == "" || req.TemplateSlug == "" || req.Version == "" {
+	if req.BundleID == "" || req.TemplateSlug == "" || req.Version == "" || req.Body.Kind == "" {
 		return nil, fmt.Errorf(
-			"%w: bundleID, templateSlug, version required",
+			"%w: bundleID, templateSlug, version, kind required",
 			spec.ErrInvalidRequest,
 		)
 	}
@@ -504,6 +504,7 @@ func (s *PromptTemplateStore) PutPromptTemplate(
 
 	tpl := spec.PromptTemplate{
 		SchemaVersion: spec.SchemaVersion,
+		Kind:          req.Body.Kind,
 		ID:            bundleitemutils.ItemID(u),
 		DisplayName:   req.Body.DisplayName,
 		Slug:          req.TemplateSlug,
@@ -512,6 +513,7 @@ func (s *PromptTemplateStore) PutPromptTemplate(
 		Tags:          req.Body.Tags,
 		Blocks:        req.Body.Blocks,
 		Variables:     req.Body.Variables,
+		IsResolved:    req.Body.IsResolved,
 		Version:       req.Version,
 		CreatedAt:     now,
 		ModifiedAt:    now,
@@ -671,8 +673,11 @@ func (s *PromptTemplateStore) PatchPromptTemplate(
 	if err := jsonencdec.MapToStructWithJSONTags(raw, &tpl); err != nil {
 		return nil, err
 	}
+	if err := validateTemplate(&tpl); err != nil {
+		return nil, err
+	}
 	tpl.IsEnabled = req.Body.IsEnabled
-	tpl.ModifiedAt = time.Now()
+	tpl.ModifiedAt = time.Now().UTC()
 
 	mp, _ := jsonencdec.StructWithJSONTagsToMap(tpl)
 	if err := s.templateStore.SetFileData(key, mp); err != nil {
@@ -692,7 +697,7 @@ func (s *PromptTemplateStore) PatchPromptTemplate(
 	return &spec.PatchPromptTemplateResponse{}, nil
 }
 
-// GetPromptTemplate returns a template version or the active version if version is omitted.
+// GetPromptTemplate returns the exact requested template version.
 func (s *PromptTemplateStore) GetPromptTemplate(
 	ctx context.Context, req *spec.GetPromptTemplateRequest,
 ) (*spec.GetPromptTemplateResponse, error) {
@@ -750,6 +755,10 @@ func (s *PromptTemplateStore) GetPromptTemplate(
 	if err := jsonencdec.MapToStructWithJSONTags(raw, &tpl); err != nil {
 		return nil, err
 	}
+	if err := validateTemplate(&tpl); err != nil {
+		return nil, err
+	}
+
 	return &spec.GetPromptTemplateResponse{Body: &tpl}, nil
 }
 
@@ -780,11 +789,21 @@ func (s *PromptTemplateStore) ListPromptTemplates(
 		slices.Sort(tok.BundleIDs)
 		tok.Tags = slices.Clone(req.Tags)
 		sort.Strings(tok.Tags)
+		tok.Kinds = slices.Clone(req.Kinds)
+		slices.SortFunc(tok.Kinds, func(a, b spec.PromptTemplateKind) int {
+			return strings.Compare(string(a), string(b))
+		})
+		tok.OnlyResolved = req.OnlyResolved
 	}
 
 	pageHint := tok.RecommendedPageSize
 	if pageHint <= 0 || pageHint > maxPageSize {
 		pageHint = defaultPageSize
+	}
+
+	userBundles, err := s.readAllBundles(false)
+	if err != nil {
+		return nil, err
 	}
 
 	//  Prepare helpers / constant filters
@@ -796,16 +815,32 @@ func (s *PromptTemplateStore) ListPromptTemplates(
 	for _, tg := range tok.Tags {
 		tagFilter[tg] = struct{}{}
 	}
+	kindFilter := map[spec.PromptTemplateKind]struct{}{}
+	for _, k := range tok.Kinds {
+		kindFilter[k] = struct{}{}
+	}
 
-	addAllowed := func(bid bundleitemutils.BundleID, tpl *spec.PromptTemplate) bool {
+	addAllowed := func(bundleEnabled bool, bid bundleitemutils.BundleID, tpl *spec.PromptTemplate) bool {
 		if len(bundleFilter) != 0 {
 			if _, ok := bundleFilter[bid]; !ok {
 				return false
 			}
 		}
+		if !bundleEnabled && !tok.IncludeDisabled {
+			return false
+		}
 		if !tpl.IsEnabled && !tok.IncludeDisabled {
 			return false
 		}
+		if len(kindFilter) != 0 {
+			if _, ok := kindFilter[tpl.Kind]; !ok {
+				return false
+			}
+		}
+		if tok.OnlyResolved && !tpl.IsResolved {
+			return false
+		}
+
 		if len(tagFilter) != 0 {
 			hit := false
 			for _, t := range tpl.Tags {
@@ -849,13 +884,15 @@ func (s *PromptTemplateStore) ListPromptTemplates(
 
 			for _, templateID := range tidList {
 				pt := biTpls[bid][templateID]
-				if addAllowed(bid, &pt) {
+				if addAllowed(biBundles[bid].IsEnabled, bid, &pt) {
 					out = append(out, spec.PromptTemplateListItem{
 						BundleID:        bid,
 						BundleSlug:      bslug,
 						TemplateSlug:    pt.Slug,
 						TemplateVersion: pt.Version,
 						IsBuiltIn:       true,
+						Kind:            pt.Kind,
+						IsResolved:      pt.IsResolved,
 					})
 				}
 			}
@@ -897,7 +934,14 @@ func (s *PromptTemplateStore) ListPromptTemplates(
 			if err := jsonencdec.MapToStructWithJSONTags(raw, &pt); err != nil {
 				continue
 			}
-			if !addAllowed(bdi.ID, &pt) {
+			if err := validateTemplate(&pt); err != nil {
+				continue
+			}
+			bundle, ok := userBundles.Bundles[bdi.ID]
+			if !ok || isSoftDeleted(bundle) {
+				continue
+			}
+			if !addAllowed(bundle.IsEnabled, bdi.ID, &pt) {
 				continue
 			}
 
@@ -907,6 +951,8 @@ func (s *PromptTemplateStore) ListPromptTemplates(
 				TemplateSlug:    pt.Slug,
 				TemplateVersion: pt.Version,
 				IsBuiltIn:       false,
+				Kind:            pt.Kind,
+				IsResolved:      pt.IsResolved,
 			})
 		}
 

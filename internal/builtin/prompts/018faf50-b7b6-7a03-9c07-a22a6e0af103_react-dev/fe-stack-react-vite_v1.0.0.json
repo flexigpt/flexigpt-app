@@ -1,5 +1,6 @@
 {
 	"schemaVersion": "2025-07-01",
+	"kind": "generic",
 	"id": "018faf50-b7b6-7e01-a00b-a22a6e0af107",
 	"displayName": "React-Router v7 + Vite + Tailwind 4",
 	"slug": "fe-stack-react-vite",
@@ -35,6 +36,7 @@
 		},
 		{ "name": "Notes", "type": "string", "required": false, "source": "user" }
 	],
+	"isResolved": false,
 	"version": "v1.0.0",
 	"createdAt": "2024-06-06T00:00:00Z",
 	"modifiedAt": "2024-06-06T00:00:00Z",

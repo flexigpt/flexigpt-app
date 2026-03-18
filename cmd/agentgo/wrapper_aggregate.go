@@ -327,10 +327,10 @@ func (w *AggregrateWrapper) CancelCompletion(id string) error {
 	}
 
 	// Cancel arrived before FetchCompletion registered the cancel func.
-	w.preCanceled[id] = time.Now()
+	w.preCanceled[id] = time.Now().UTC()
 
 	// Best-effort pruning to avoid unbounded growth.
-	cutoff := time.Now().Add(-2 * time.Minute)
+	cutoff := time.Now().UTC().Add(-2 * time.Minute)
 	for k, t := range w.preCanceled {
 		if t.Before(cutoff) {
 			delete(w.preCanceled, k)

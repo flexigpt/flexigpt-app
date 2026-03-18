@@ -44,6 +44,13 @@ const (
 	Assistant PromptRoleEnum = "assistant"
 )
 
+type PromptTemplateKind string
+
+const (
+	PromptTemplateKindInstructionsOnly PromptTemplateKind = "instructionsOnly"
+	PromptTemplateKindGeneric          PromptTemplateKind = "generic"
+)
+
 type VarType string
 
 const (
@@ -83,14 +90,16 @@ type PromptVariable struct {
 	EnumValues []string `json:"enumValues,omitempty"`
 
 	// Optional default for the var.
-	Default string `json:"default,omitempty"`
+	Default *string `json:"default,omitempty"`
 }
 
 type PromptTemplate struct {
-	SchemaVersion string                   `json:"schemaVersion"`
-	ID            bundleitemutils.ItemID   `json:"id"`
-	Slug          bundleitemutils.ItemSlug `json:"slug"`
-	IsEnabled     bool                     `json:"isEnabled"`
+	SchemaVersion string             `json:"schemaVersion"`
+	Kind          PromptTemplateKind `json:"kind"`
+
+	ID        bundleitemutils.ItemID   `json:"id"`
+	Slug      bundleitemutils.ItemSlug `json:"slug"`
+	IsEnabled bool                     `json:"isEnabled"`
 
 	DisplayName string   `json:"displayName"`
 	Description string   `json:"description,omitempty"`
@@ -100,6 +109,18 @@ type PromptTemplate struct {
 	Blocks []MessageBlock `json:"blocks"`
 	// Declared placeholders.
 	Variables []PromptVariable `json:"variables,omitempty"`
+
+	// IsResolved is a backend-computed persisted property.
+	//
+	// True means all placeholders used by this template can be resolved using template-local variable information only,
+	// with no external caller/user input required.
+	//
+	// Current resolution rules:
+	//   - SourceStatic => resolved iff StaticVal is non-empty
+	//   - SourceUser   => resolved iff Default is non-nil
+	//
+	// This field is computed and enforced by backend validation on put/read flows.
+	IsResolved bool `json:"isResolved"`
 
 	Version    bundleitemutils.ItemVersion `json:"version"`
 	CreatedAt  time.Time                   `json:"createdAt"`

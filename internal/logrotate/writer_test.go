@@ -172,8 +172,8 @@ func TestRotateOnLifetime(t *testing.T) {
 	})
 
 	// Keep writing until lifetime + half of lifetime (middle of ticks) elapses.
-	end := time.Now().Add(lifetime + lifetime/2)
-	for time.Now().Before(end) {
+	end := time.Now().UTC().Add(lifetime + lifetime/2)
+	for time.Now().UTC().Before(end) {
 		if _, err := w.Write([]byte("message")); err != nil {
 			t.Fatalf("failed to write: %v", err)
 		}
