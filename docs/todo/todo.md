@@ -11,6 +11,7 @@
   - [x] support storing sys prompts in prompt templates
   - [ ] assistant store
   - [ ] conversation to include additional things wrt assistant and current absent contexts. idea is to have "full vs increment" in message turn.
+    - [ ] we store modelparams on assitant turn as of now. we need to verify what needs to happen for user turn, what shoudl be restored back, what should not etc. this needs a end to end look.
   - [ ] clean fetch completion api. it should take current params and value as separate inputs and NOT take current message input. a hydrated current message should be sent back.
   - [ ] have a default "empty" assistant i.e all allowed.
   - [ ] UI to manage preset
