@@ -45,31 +45,14 @@ import {
 	deriveWebSearchChoiceFromMessages,
 	initConversationMessage,
 } from '@/chats/conversation/hydration_helper';
+import { VIRTUOSO_AT_BOTTOM_THRESHOLD } from '@/chats/conversation/virtuoso_config';
 import { sliceMessagesForSend } from '@/chats/inputarea/assitantcontexts/previous_messages_helper';
 import type { InputBoxHandle } from '@/chats/inputarea/input_box';
 import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/inputarea/input_editor_utils';
 import { InputPane } from '@/chats/inputarea/input_pane';
 import { ChatMessage } from '@/chats/messages/message';
 
-const VIRTUOSO_AT_BOTTOM_THRESHOLD = 128;
 const EMPTY_MESSAGES: ConversationMessage[] = [];
-
-const VIRTUOSO_SCROLL_SEEK = {
-	enter: (velocity: number) => Math.abs(velocity) > 1000,
-	exit: (velocity: number) => Math.abs(velocity) < 500,
-};
-
-function VirtuosoScrollSeekPlaceholder({ height }: { height: number }) {
-	return (
-		<div className="mx-auto w-11/12 overflow-hidden py-1 xl:w-5/6">
-			<div
-				className="bg-base-200/70 border-base-300/40 rounded-2xl border"
-				style={{ height: height }}
-				aria-hidden="true"
-			/>
-		</div>
-	);
-}
 
 type StreamChannelBuffer = { chunks: string[]; flushedIdx: number; display: string };
 type StreamBuffer = { text: StreamChannelBuffer; thinking: StreamChannelBuffer };
@@ -537,9 +520,11 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 	// Stable Virtuoso `components` object (never changes → no remount)
 	const virtuosoComponents = useMemo(
-		() => ({ List: VirtuosoList, ScrollSeekPlaceholder: VirtuosoScrollSeekPlaceholder }),
+		// () => ({ List: VirtuosoList, ScrollSeekPlaceholder: VirtuosoScrollSeekPlaceholder }),
+		() => ({ List: VirtuosoList }),
 		[]
 	);
+
 	const scrollTabToBottomSoon = useCallback((tabId: string) => {
 		requestAnimationFrame(() => {
 			requestAnimationFrame(() => {
@@ -1122,7 +1107,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 					restoreStateFrom={activeVirtuosoState}
 					initialScrollTop={activeVirtuosoState ? undefined : (scrollTopByTab.current.get(selectedTabId) ?? 0)}
 					atBottomThreshold={VIRTUOSO_AT_BOTTOM_THRESHOLD}
-					scrollSeekConfiguration={VIRTUOSO_SCROLL_SEEK}
+					// scrollSeekConfiguration={VIRTUOSO_SCROLL_SEEK}
 					increaseViewportBy={{ top: 500, bottom: 800 }}
 					atBottomStateChange={atBottom => {
 						setIsAtBottom(atBottom);
