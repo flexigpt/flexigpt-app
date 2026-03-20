@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 
-import { type PromptBundle, PromptRoleEnum, type PromptTemplate, PromptTemplateKind } from '@/spec/prompt';
+import {
+	type PromptBundle,
+	PromptRoleEnum,
+	type PromptTemplate,
+	PromptTemplateKind,
+	type PromptVariable,
+	VarSource,
+} from '@/spec/prompt';
 
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
@@ -12,6 +19,9 @@ import {
 	buildPromptTemplateSeriesKey,
 	getPromptTemplateRef,
 } from '@/prompts/lib/prompt_template_ref';
+
+const TEMPLATE_PLACEHOLDER_RE = /\{\{([a-zA-Z_][a-zA-Z0-9_-]*)\}\}/g;
+const TEMPLATE_PLACEHOLDER_TEST_RE = /\{\{([a-zA-Z_][a-zA-Z0-9_-]*)\}\}/;
 
 export type SystemPromptRole = PromptRoleEnum.System | PromptRoleEnum.Developer;
 
@@ -98,10 +108,39 @@ function normalizeSystemPromptRole(role?: PromptRoleEnum): SystemPromptRole {
 	return role === PromptRoleEnum.Developer ? PromptRoleEnum.Developer : PromptRoleEnum.System;
 }
 
+function buildResolvedPromptVariableValues(variables?: PromptVariable[]): Record<string, string> {
+	const values: Record<string, string> = {};
+
+	for (const variable of variables ?? []) {
+		const name = variable.name?.trim();
+		if (!name) continue;
+
+		if (variable.source === VarSource.Static) {
+			if (variable.staticVal !== undefined) {
+				values[name] = variable.staticVal;
+				continue;
+			}
+		}
+
+		if (variable.default !== undefined) {
+			values[name] = variable.default;
+		}
+	}
+
+	return values;
+}
+
+function renderResolvedPromptText(text: string, values: Record<string, string>): string {
+	return text.replace(TEMPLATE_PLACEHOLDER_RE, (match, name: string) =>
+		Object.prototype.hasOwnProperty.call(values, name) ? values[name] : match
+	);
+}
+
 function flattenInstructionsPrompt(template: PromptTemplate): string {
+	const resolvedValues = buildResolvedPromptVariableValues(template.variables);
 	return template.blocks
 		.filter(block => block.role === PromptRoleEnum.System || block.role === PromptRoleEnum.Developer)
-		.map(block => block.content.trim())
+		.map(block => renderResolvedPromptText(block.content, resolvedValues).trim())
 		.filter(Boolean)
 		.join('\n\n');
 }
@@ -308,6 +347,12 @@ async function createSystemPrompt(draft: SystemPromptDraft): Promise<SystemPromp
 	}
 	if (!content) {
 		throw new Error('Prompt content is required.');
+	}
+
+	if (TEMPLATE_PLACEHOLDER_TEST_RE.test(content)) {
+		throw new Error(
+			'Add/Fork here only supports fully resolved system prompts. Remove {{...}} placeholders or create this prompt from Prompt Bundles.'
+		);
 	}
 
 	const seriesKey = buildPromptTemplateSeriesKey(bundle.id, slug);

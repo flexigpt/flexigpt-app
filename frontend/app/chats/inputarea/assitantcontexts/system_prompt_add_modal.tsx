@@ -33,6 +33,30 @@ type ErrorState = {
 	content?: string;
 };
 
+const SYSTEM_PROMPT_PLACEHOLDER_RE = /\{\{([a-zA-Z_][a-zA-Z0-9_-]*)\}\}/g;
+
+function getSystemPromptContentError(content: string): string | undefined {
+	if (!content.trim()) {
+		return 'Prompt content is required.';
+	}
+
+	const names = new Set<string>();
+	for (const match of content.matchAll(SYSTEM_PROMPT_PLACEHOLDER_RE)) {
+		if (match[1]) {
+			names.add(match[1]);
+		}
+	}
+
+	if (names.size === 0) {
+		return undefined;
+	}
+
+	const placeholders = [...names].map(name => `{{${name}}}`);
+	return placeholders.length === 1
+		? `Unresolved placeholder ${placeholders[0]} is not allowed here. Replace it with final text first.`
+		: `Unresolved placeholders are not allowed here: ${placeholders.join(', ')}. Replace them with final text first.`;
+}
+
 function buildBundleLabel(bundle: PromptBundle): string {
 	return `${bundle.displayName || bundle.slug} (${bundle.slug})`;
 }
@@ -179,10 +203,8 @@ function SystemPromptAddModalInner({
 			nextErrors.version = 'That version already exists for this slug in the selected bundle.';
 		}
 
-		if (!state.content.trim()) {
-			nextErrors.content = 'Prompt content is required.';
-		}
-
+		const contentError = getSystemPromptContentError(state.content);
+		if (contentError) nextErrors.content = contentError;
 		return nextErrors;
 	};
 
@@ -363,8 +385,12 @@ function SystemPromptAddModalInner({
 							className="textarea textarea-bordered h-40 w-full rounded-xl"
 							value={formData.content}
 							onChange={e => {
-								setFormData(prev => ({ ...prev, content: e.target.value }));
-								setErrors(prev => ({ ...prev, content: undefined }));
+								const nextContent = e.target.value;
+								setFormData(prev => ({ ...prev, content: nextContent }));
+								setErrors(prev => ({
+									...prev,
+									content: getSystemPromptContentError(nextContent),
+								}));
 							}}
 							placeholder="Enter system/developer instructions here..."
 							spellCheck="false"

@@ -15,6 +15,11 @@ type ToolChoicePatch struct {
 	UserArgSchemaInstance JSONRawString `json:"userArgSchemaInstance,omitempty"`
 }
 
+type ToolSelection struct {
+	ToolRef         ToolRef          `json:"toolRef"`
+	ToolChoicePatch *ToolChoicePatch `json:"toolChoicePatch,omitempty"`
+}
+
 type ToolStoreChoice struct {
 	ChoiceID string `json:"choiceID"`
 

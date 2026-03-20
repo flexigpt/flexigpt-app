@@ -92,6 +92,12 @@ type PromptVariable struct {
 	Default *string `json:"default,omitempty"`
 }
 
+type PromptTemplateRef struct {
+	BundleID        bundleitemutils.BundleID    `json:"bundleID"`
+	TemplateSlug    bundleitemutils.ItemSlug    `json:"templateSlug"`
+	TemplateVersion bundleitemutils.ItemVersion `json:"templateVersion"`
+}
+
 type PromptTemplate struct {
 	SchemaVersion string             `json:"schemaVersion"`
 	Kind          PromptTemplateKind `json:"kind"`

@@ -15,7 +15,6 @@ export const LARGE_TEXT_CHUNK_SIZE = 1600; // each leaf ~1.2k chars; adjust 800â
 
 export interface EditorExternalMessage {
 	text: string;
-	templateSystemPrompt?: string;
 	attachments?: Attachment[];
 	toolChoices?: ToolStoreChoice[];
 	toolOutputs?: UIToolOutput[];

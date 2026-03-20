@@ -78,7 +78,11 @@ export function TemplateFixedToolbar(props: {
 					type="button"
 					className="btn btn-ghost btn-sm shrink-0 px-2 py-0 shadow-none"
 					onClick={onFlatten}
-					title="Convert chips into plain text"
+					title={
+						hasSystemBlock
+							? 'This template has system blocks, those will be lost on flattening'
+							: 'Convert chips into plain text'
+					}
 					aria-label="Convert template chips into plain text"
 				>
 					<FiMaximize2 size={14} />
