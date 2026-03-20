@@ -26,9 +26,9 @@ import { cssEscape } from '@/lib/text_utils';
 
 import { useEnterSubmit } from '@/hooks/use_enter_submit';
 
-import { useComposerAttachments } from '@/chats/attachments/use_composer_attachments';
-import { dispatchOpenToolArgs } from '@/chats/events/open_attached_toolargs';
-import { dispatchTemplateFlashEvent } from '@/chats/events/template_flash';
+import { useComposerAttachments } from '@/chats/inputarea/attachments/use_composer_attachments';
+import { dispatchOpenToolArgs } from '@/chats/inputarea/events/open_attached_toolargs';
+import { dispatchTemplateFlashEvent } from '@/chats/inputarea/events/template_flash';
 import { EditorBottomBar } from '@/chats/inputarea/input_editor_bottom_bar';
 import { EditorChipsBar } from '@/chats/inputarea/input_editor_chips_bar';
 import {
@@ -41,8 +41,8 @@ import {
 	getTemplateSelections,
 	insertTemplateSelectionNode,
 	toPlainTextReplacingVariables,
-} from '@/chats/platedoc/template_document_ops';
-import { TemplateToolbars } from '@/chats/platedoc/template_toolbars';
+} from '@/chats/inputarea/platedoc/templates/template_document_ops';
+import { TemplateToolbars } from '@/chats/inputarea/platedoc/templates/template_toolbars';
 import {
 	type AttachedToolEntry,
 	getAttachedTools,
@@ -50,19 +50,20 @@ import {
 	removeToolByKey,
 	setAttachedToolUserArgSchemaInstanceBySelectionID,
 	setToolAutoExecuteByKey,
-} from '@/chats/platedoc/tool_document_ops';
-import { useComposerDocument } from '@/chats/platedoc/use_composer_document';
-import { useComposerSkills } from '@/chats/skills/use_composer_skills';
+} from '@/chats/inputarea/platedoc/tool_document_ops';
+import { useComposerDocument } from '@/chats/inputarea/platedoc/use_composer_document';
+import { useComposerSkills } from '@/chats/inputarea/skills/use_composer_skills';
 import {
 	type ConversationToolStateEntry,
 	conversationToolsToChoices,
 	mergeConversationToolsWithNewChoices,
-} from '@/chats/tools/conversation_tool_utils';
-import { ToolDetailsModal } from '@/chats/tools/tool_details_modal';
-import { dedupeToolChoices, editorAttachedToolToToolChoice, toolIdentityKey } from '@/chats/tools/tool_editor_utils';
-import { ToolArgsModalHost } from '@/chats/tools/tool_user_args_host';
-import { useComposerTools } from '@/chats/tools/use_composer_tools';
-import { buildWebSearchChoicesForSubmit, type WebSearchChoiceTemplate } from '@/chats/tools/websearch_utils';
+} from '@/chats/inputarea/tools/conversation_tool_utils';
+import { ToolDetailsModal } from '@/chats/inputarea/tools/tool_details_modal';
+import { ToolArgsModalHost } from '@/chats/inputarea/tools/tool_user_args_host';
+import { useComposerTools } from '@/chats/inputarea/tools/use_composer_tools';
+import { buildWebSearchChoicesForSubmit, type WebSearchChoiceTemplate } from '@/chats/inputarea/tools/websearch_utils';
+import { dedupeToolChoices, uiToolChoiceToToolStoreChoice } from '@/tools/lib/tool_choice_utils';
+import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 
 export interface EditorAreaHandle {
 	focus: () => void;
@@ -691,7 +692,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 				// 5) Tool choices (editor-attached + conversation-level).
 				const attachedTools = getAttachedTools(editor);
-				const explicitChoices = attachedTools.map(editorAttachedToolToToolChoice);
+				const explicitChoices = attachedTools.map(uiToolChoiceToToolStoreChoice);
 				const conversationChoices = conversationToolsToChoices(conversationToolsState);
 				const webSearchChoices = buildWebSearchChoicesForSubmit(webSearchTemplates);
 

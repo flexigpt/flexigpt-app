@@ -3,14 +3,14 @@ import { memo } from 'react';
 import type { AttachmentContentBlockMode, UIAttachment } from '@/spec/attachment';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 
-import { DirectoryChip } from '@/chats/attachments/attachment_directory_chip';
-import { type DirectoryAttachmentGroup, uiAttachmentKey } from '@/chats/attachments/attachment_editor_utils';
-import { StandaloneAttachmentsChip } from '@/chats/attachments/attachment_standalone_chips';
-import type { AttachedToolEntry } from '@/chats/platedoc/tool_document_ops';
-import type { ConversationToolStateEntry } from '@/chats/tools/conversation_tool_utils';
-import { ConversationToolsChip } from '@/chats/tools/conversation_tools_chip';
-import { ToolChipsComposerRow } from '@/chats/tools/tool_chips_composer';
-import { ToolChoicesChip } from '@/chats/tools/tool_choices_chip';
+import { DirectoryChip } from '@/chats/inputarea/attachments/attachment_directory_chip';
+import { type DirectoryAttachmentGroup, uiAttachmentKey } from '@/chats/inputarea/attachments/attachment_editor_utils';
+import { StandaloneAttachmentsChip } from '@/chats/inputarea/attachments/attachment_standalone_chips';
+import type { AttachedToolEntry } from '@/chats/inputarea/platedoc/tool_document_ops';
+import type { ConversationToolStateEntry } from '@/chats/inputarea/tools/conversation_tool_utils';
+import { ConversationToolsChip } from '@/chats/inputarea/tools/conversation_tools_chip';
+import { ToolChipsComposerRow } from '@/chats/inputarea/tools/tool_chips_composer';
+import { ToolChoicesChip } from '@/chats/inputarea/tools/tool_choices_chip';
 
 interface EditorChipsBarProps {
 	attachments: UIAttachment[];

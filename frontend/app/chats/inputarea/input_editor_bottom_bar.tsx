@@ -20,26 +20,27 @@ import { ToolImplType, type ToolListItem, ToolStoreChoiceType } from '@/spec/too
 
 import { formatShortcut, type ShortcutConfig } from '@/lib/keyboard_shortcuts';
 
-import { usePromptTemplates } from '@/hooks/use_template';
 import { useTools } from '@/hooks/use_tool';
 
 import { promptStoreAPI } from '@/apis/baseapi';
 
-import { UrlAttachmentModal } from '@/chats/attachments/attachment_url_modal';
-import { dispatchOpenToolArgs } from '@/chats/events/open_attached_toolargs';
-import { CommandTipsMenu } from '@/chats/inputtips/command_tips_menu';
-import type { AttachedToolEntry } from '@/chats/platedoc/tool_document_ops';
-import { SkillsBottomBarChip } from '@/chats/skills/skill_bottom_bar_chip';
-import { computeToolUserArgsStatus, toolIdentityKey } from '@/chats/tools/tool_editor_utils';
-import { ToolMenuRow } from '@/chats/tools/tool_menu_row';
-import { WebSearchBottomBarChip } from '@/chats/tools/web_search_bottom_bar_chip';
+import { UrlAttachmentModal } from '@/chats/inputarea/attachments/attachment_url_modal';
+import { dispatchOpenToolArgs } from '@/chats/inputarea/events/open_attached_toolargs';
+import { CommandTipsMenu } from '@/chats/inputarea/inputtips/command_tips_menu';
+import type { AttachedToolEntry } from '@/chats/inputarea/platedoc/tool_document_ops';
+import { SkillsBottomBarChip } from '@/chats/inputarea/skills/skill_bottom_bar_chip';
+import { ToolMenuRow } from '@/chats/inputarea/tools/tool_menu_row';
+import { WebSearchBottomBarChip } from '@/chats/inputarea/tools/web_search_bottom_bar_chip';
 import {
 	getEligibleWebSearchTools,
 	normalizeWebSearchChoiceTemplates,
 	type WebSearchChoiceTemplate,
 	webSearchIdentityKey,
 	webSearchTemplateFromToolListItem,
-} from '@/chats/tools/websearch_utils';
+} from '@/chats/inputarea/tools/websearch_utils';
+import { usePromptTemplates } from '@/prompts/lib/use_prompt_templates';
+import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
+import { computeToolUserArgsStatus } from '@/tools/lib/tool_userargs_utils';
 
 interface EditorBottomBarProps {
 	onAttachFiles: () => Promise<void> | void;

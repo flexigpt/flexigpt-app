@@ -24,12 +24,12 @@ import { getUUIDv7 } from '@/lib/uuid_utils';
 
 import { aggregateAPI } from '@/apis/baseapi';
 
+import { collectToolCallsFromOutputs } from '@/tools/lib/tool_call_utils';
 import {
-	collectToolCallsFromOutputs,
 	extractPrimaryTextFromToolOutputs,
 	formatToolOutputSummary,
 	mapToolOutputItemsToToolOutputs,
-} from '@/chats/tools/tool_editor_utils';
+} from '@/tools/lib/tool_output_utils';
 
 export async function HandleCompletion(
 	provider: ProviderName,

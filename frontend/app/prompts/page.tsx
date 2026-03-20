@@ -14,13 +14,13 @@ import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal'
 import { Loader } from '@/components/loader';
 import { PageFrame } from '@/components/page_frame';
 
-import { AddBundleModal } from '@/prompts/prompt_bundle_add_modal';
-import { PromptBundleCard } from '@/prompts/prompt_bundle_card';
 import {
 	derivePromptTemplateKind,
 	derivePromptTemplateResolved,
 	type PromptTemplateUpsertInput,
-} from '@/prompts/prompt_template_utils';
+} from '@/prompts/lib/prompt_template_utils';
+import { AddBundleModal } from '@/prompts/prompt_bundle_add_modal';
+import { PromptBundleCard } from '@/prompts/prompt_bundle_card';
 
 interface BundleData {
 	bundle: PromptBundle;

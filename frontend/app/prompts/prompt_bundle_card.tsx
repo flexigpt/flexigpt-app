@@ -7,13 +7,13 @@ import type { PromptBundle, PromptTemplate } from '@/spec/prompt';
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 
-import { PromptBundleDetailsModal } from '@/prompts/prompt_bundle_details_modal';
-import { AddEditPromptTemplateModal } from '@/prompts/prompt_template_add_edit_modal';
 import {
 	getPromptTemplateKindLabel,
 	getPromptTemplateResolutionLabel,
 	type PromptTemplateUpsertInput,
-} from '@/prompts/prompt_template_utils';
+} from '@/prompts/lib/prompt_template_utils';
+import { PromptBundleDetailsModal } from '@/prompts/prompt_bundle_details_modal';
+import { AddEditPromptTemplateModal } from '@/prompts/prompt_template_add_edit_modal';
 
 type TemplateModalMode = 'add' | 'edit' | 'view';
 

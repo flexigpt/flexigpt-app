@@ -31,7 +31,7 @@ import {
 	getPromptTemplateResolutionLabel,
 	type PromptTemplateUpsertInput,
 	validatePromptVariableName,
-} from '@/prompts/prompt_template_utils';
+} from '@/prompts/lib/prompt_template_utils';
 
 interface TemplateItem {
 	template: PromptTemplate;

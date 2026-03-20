@@ -14,26 +14,9 @@ import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal'
 import { Loader } from '@/components/loader';
 import { PageFrame } from '@/components/page_frame';
 
+import { type BundleData, sortBundleData } from '@/skills/lib/skill_bundle_utils';
 import { AddSkillBundleModal } from '@/skills/skill_bundle_add_modal';
 import { SkillBundleCard } from '@/skills/skill_bundle_card';
-
-interface BundleData {
-	bundle: SkillBundle;
-	skills: Skill[];
-}
-
-function sortBundleData(bundleData: BundleData[]): BundleData[] {
-	return [...bundleData].sort((a, b) => {
-		if (a.bundle.isBuiltIn !== b.bundle.isBuiltIn) {
-			return a.bundle.isBuiltIn ? -1 : 1;
-		}
-
-		const aName = (a.bundle.displayName ?? a.bundle.slug).toLowerCase();
-		const bName = (b.bundle.displayName ?? b.bundle.slug).toLowerCase();
-
-		return aName.localeCompare(bName);
-	});
-}
 
 // eslint-disable-next-line no-restricted-exports
 export default function SkillsPage() {

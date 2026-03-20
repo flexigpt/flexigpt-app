@@ -1,5 +1,11 @@
 import type { JSONRawString, JSONSchema } from '@/lib/jsonschema_utils';
 
+// Shared type for "what args editor is currently open?"
+export type ToolArgsTarget =
+	| { kind: 'attached'; selectionID: string }
+	| { kind: 'conversation'; key: string }
+	| { kind: 'webSearch' };
+
 export enum ToolStoreChoiceType {
 	Function = 'function',
 	Custom = 'custom',

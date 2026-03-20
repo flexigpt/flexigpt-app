@@ -10,8 +10,8 @@ import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 
-import { AssistantContextBar } from '@/chats/assitantcontexts/context_bar';
-import { useAssistantContextState } from '@/chats/assitantcontexts/use_assistant_context_state';
+import { AssistantContextBar } from '@/chats/inputarea/assitantcontexts/context_bar';
+import { useAssistantContextState } from '@/chats/inputarea/assitantcontexts/use_assistant_context_state';
 import { EditorArea, type EditorAreaHandle } from '@/chats/inputarea/input_editor';
 import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/inputarea/input_editor_utils';
 

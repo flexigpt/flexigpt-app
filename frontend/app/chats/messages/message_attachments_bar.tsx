@@ -20,8 +20,9 @@ import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 import {
 	getAttachmentContentBlockModeLabel,
 	getAttachmentContentBlockModeTooltip,
-} from '@/chats/attachments/attachment_mode_menu';
-import { formatToolCallLabel, getPrettyToolName } from '@/chats/tools/tool_editor_utils';
+} from '@/chats/inputarea/attachments/attachment_mode_menu';
+import { formatToolCallLabel } from '@/tools/lib/tool_call_utils';
+import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';
 
 /**
  * Get a path/URL for tooltip display, similar to getUIAttachmentPath

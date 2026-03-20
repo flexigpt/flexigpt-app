@@ -34,7 +34,6 @@ import { attachmentsDropAPI } from '@/apis/baseapi';
 
 import { ButtonScrollToBottom, ButtonScrollToTop } from '@/components/button_scroll_top_bottom';
 
-import { sliceMessagesForSend } from '@/chats/assitantcontexts/previous_messages_helper';
 import type { ChatTabState } from '@/chats/chat_tabs_persist';
 import { HandleCompletion } from '@/chats/conversation/completion_helper';
 import {
@@ -46,6 +45,7 @@ import {
 	deriveWebSearchChoiceFromMessages,
 	initConversationMessage,
 } from '@/chats/conversation/hydration_helper';
+import { sliceMessagesForSend } from '@/chats/inputarea/assitantcontexts/previous_messages_helper';
 import type { InputBoxHandle } from '@/chats/inputarea/input_box';
 import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/inputarea/input_editor_utils';
 import { InputPane } from '@/chats/inputarea/input_pane';
