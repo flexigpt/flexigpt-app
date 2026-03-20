@@ -106,7 +106,7 @@ function flattenInstructionsPrompt(template: PromptTemplate): string {
 		.join('\n\n');
 }
 
-export function deriveSystemPromptRole(template: PromptTemplate): SystemPromptRole {
+function deriveSystemPromptRole(template: PromptTemplate): SystemPromptRole {
 	const roles = template.blocks
 		.filter(block => block.role === PromptRoleEnum.System || block.role === PromptRoleEnum.Developer)
 		.map(block => block.role);

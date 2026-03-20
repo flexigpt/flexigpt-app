@@ -88,8 +88,11 @@ export function cssEscape(s: string) {
 	}
 }
 
-// simple {{var}} replacement using provided values (leave unknown tokens intact)
+/**
+ * @public
+ */
 export function replaceDoubleBraces(text: string, vars: Record<string, unknown>): string {
+	// simple {{var}} replacement using provided values (leave unknown tokens intact)
 	if (!text) return '';
 	return text.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_m, name: string) => {
 		const v = vars[name];

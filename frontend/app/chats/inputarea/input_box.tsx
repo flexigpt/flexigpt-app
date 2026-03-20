@@ -34,7 +34,6 @@ export interface InputBoxHandle {
 interface InputBoxProps {
 	onSend: (message: EditorSubmitPayload, options: UIChatOption) => Promise<void>;
 	isBusy: boolean;
-	active: boolean;
 	isHydrating: boolean;
 	abortRef: RefObject<AbortController | null>;
 	shortcutConfig: ShortcutConfig;
@@ -43,7 +42,7 @@ interface InputBoxProps {
 }
 
 export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox(
-	{ onSend, isBusy, active, isHydrating, abortRef, shortcutConfig, editingMessageId, onCancelEditing },
+	{ onSend, isBusy, isHydrating, abortRef, shortcutConfig, editingMessageId, onCancelEditing },
 	ref
 ) {
 	const [abortConfirmationRequested, setAbortConfirmationRequested] = useState(false);
@@ -51,7 +50,7 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 	const isInputLocked = isGenerating || isHydrating;
 
 	const inputAreaRef = useRef<EditorAreaHandle>(null);
-	const assistantContext = useAssistantContextState({ active });
+	const assistantContext = useAssistantContextState();
 	const chatOptions = assistantContext.chatOptions;
 
 	const showAbortModal = isGenerating && abortConfirmationRequested;

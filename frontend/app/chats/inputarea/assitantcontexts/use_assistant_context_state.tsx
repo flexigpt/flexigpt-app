@@ -2,9 +2,7 @@ import { type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, us
 
 import { type OutputVerbosity, type ReasoningLevel, ReasoningType } from '@/spec/inference';
 import { DefaultUIChatOptions, type IncludePreviousMessages, type UIChatOption } from '@/spec/modelpreset';
-import { type PromptBundle, PromptRoleEnum } from '@/spec/prompt';
-
-import { DEFAULT_SEMVER, suggestNextMinorVersion } from '@/lib/version_utils';
+import { type PromptBundle } from '@/spec/prompt';
 
 import {
 	getSupportedReasoningLevels,
@@ -12,64 +10,9 @@ import {
 	supportsOutputVerbosity,
 } from '@/chats/inputarea/assitantcontexts/capabilities_override_helper';
 import { getChatInputOptions } from '@/chats/inputarea/assitantcontexts/context_uichatoption_helper';
-import {
-	type SetSystemPromptForChatDetail,
-	useSetSystemPromptForChat,
-} from '@/chats/inputarea/events/set_system_prompt';
-import { buildPromptTemplateRefKey } from '@/prompts/lib/prompt_template_ref';
 import { buildEffectiveSystemPrompt } from '@/prompts/lib/system_prompt_utils';
 import type { SystemPromptDraft } from '@/prompts/lib/use_system_prompts';
 import { type SystemPromptItem, useSystemPrompts } from '@/prompts/lib/use_system_prompts';
-
-function normalizeSystemPromptRole(
-	role?: PromptRoleEnum.System | PromptRoleEnum.Developer
-): PromptRoleEnum.System | PromptRoleEnum.Developer {
-	return role === PromptRoleEnum.Developer ? PromptRoleEnum.Developer : PromptRoleEnum.System;
-}
-
-function buildSystemPromptDisplayName(prompt: string, role: PromptRoleEnum.System | PromptRoleEnum.Developer): string {
-	const firstLine = prompt
-		.split(/\r\n?|\n/g)
-		.map(line => line.trim())
-		.find(Boolean);
-
-	const fallback = role === PromptRoleEnum.Developer ? 'Developer Prompt' : 'System Prompt';
-	const label = firstLine || fallback;
-	return label.length > 64 ? `${label.slice(0, 64)}…` : label;
-}
-
-function slugifySystemPromptName(input: string): string {
-	const slug = input
-		.toLowerCase()
-		.trim()
-		.replace(/[^a-z0-9]+/g, '-')
-		.replace(/^-+|-+$/g, '')
-		.replace(/-{2,}/g, '-');
-
-	return slug || 'system-prompt';
-}
-
-function pickWritableSystemPromptBundleID(
-	bundles: PromptBundle[],
-	preferredBundleID: string | null,
-	sourceBundleID?: string
-): string | undefined {
-	const writableBundles = bundles.filter(bundle => !bundle.isBuiltIn && bundle.isEnabled);
-
-	if (sourceBundleID && writableBundles.some(bundle => bundle.id === sourceBundleID)) {
-		return sourceBundleID;
-	}
-
-	if (preferredBundleID && writableBundles.some(bundle => bundle.id === preferredBundleID)) {
-		return preferredBundleID;
-	}
-
-	return writableBundles[0]?.id;
-}
-
-function suggestSystemPromptVersion(baseVersion: string | undefined, existingVersions: string[]): string {
-	return suggestNextMinorVersion(baseVersion?.trim() || DEFAULT_SEMVER, existingVersions).suggested;
-}
 
 function isHybridReasoningModel(model: UIChatOption): boolean {
 	return model.reasoning?.type === ReasoningType.HybridWithTokens;
@@ -146,7 +89,7 @@ export type AssistantContextController = {
 	reasoningLevelOptions: ReasoningLevel[];
 };
 
-export function useAssistantContextState({ active }: { active: boolean }): AssistantContextController {
+export function useAssistantContextState(): AssistantContextController {
 	const [selectedModel, setSelectedModel] = useState<UIChatOption>(DefaultUIChatOptions);
 	const [allOptions, setAllOptions] = useState<UIChatOption[]>([DefaultUIChatOptions]);
 
@@ -346,63 +289,6 @@ export function useAssistantContextState({ active }: { active: boolean }): Assis
 		setIncludeModelDefault(false);
 		setRawSelectedPromptKeys([]);
 	}, []);
-
-	const handleSetSystemPromptForChat = useCallback(
-		(detail: SetSystemPromptForChatDetail) => {
-			if (!active) return;
-
-			const trimmed = detail.prompt.trim();
-			if (!trimmed) return;
-
-			const role = normalizeSystemPromptRole(detail.role);
-			const sourceIdentityKey = detail.sourceTemplate ? buildPromptTemplateRefKey(detail.sourceTemplate) : undefined;
-			const exactExisting = sourceIdentityKey ? promptsByKey.get(sourceIdentityKey) : undefined;
-
-			if (exactExisting && exactExisting.prompt === trimmed && exactExisting.role === role) {
-				setIncludeModelDefault(false);
-				setRawSelectedPromptKeys([exactExisting.identityKey]);
-				return;
-			}
-
-			const targetBundleID = pickWritableSystemPromptBundleID(
-				systemPromptBundles,
-				preferredSystemPromptBundleID,
-				detail.sourceTemplate?.bundleID
-			);
-
-			if (!targetBundleID) {
-				console.error('No writable custom prompt bundle is available for saving a system prompt.');
-				return;
-			}
-
-			const displayName =
-				detail.displayName?.trim() || exactExisting?.displayName || buildSystemPromptDisplayName(trimmed, role);
-			const slug = detail.sourceTemplate?.templateSlug || slugifySystemPromptName(displayName);
-			const version = suggestSystemPromptVersion(
-				detail.sourceTemplate?.templateVersion,
-				getExistingVersions(targetBundleID, slug)
-			);
-
-			void addPrompt({
-				bundleID: targetBundleID,
-				displayName,
-				slug,
-				version,
-				role,
-				content: trimmed,
-			})
-				.then(item => {
-					setIncludeModelDefault(false);
-					setRawSelectedPromptKeys([item.identityKey]);
-				})
-				.catch((error: unknown) => {
-					console.error('Failed to save system prompt from event:', error);
-				});
-		},
-		[active, addPrompt, getExistingVersions, preferredSystemPromptBundleID, promptsByKey, systemPromptBundles]
-	);
-
-	useSetSystemPromptForChat(handleSetSystemPromptForChat);
 
 	const applyAdvancedModel = useCallback(
 		(updatedModel: UIChatOption) => {

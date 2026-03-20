@@ -3,12 +3,10 @@ import { useState } from 'react';
 import { NodeApi, type Path, type TElement, type TNode } from 'platejs';
 import { type PlateEditor, useEditorRef } from 'platejs/react';
 
-import { PromptRoleEnum, type PromptVariable } from '@/spec/prompt';
+import { type PromptVariable } from '@/spec/prompt';
 
 import { comparePathDeepestFirst } from '@/lib/path_utils';
-import { replaceDoubleBraces } from '@/lib/text_utils';
 
-import { dispatchSetSystemPromptForChat } from '@/chats/inputarea/events/set_system_prompt';
 import { useTemplateFlashEvent } from '@/chats/inputarea/events/template_flash';
 import { dispatchTemplateVarsUpdated } from '@/chats/inputarea/events/template_toolbar_vars_updated';
 import {
@@ -26,7 +24,6 @@ import {
 	effectiveVarValueLocal,
 } from '@/chats/inputarea/platedoc/templates/template_processing';
 import { TemplateFixedToolbar } from '@/chats/inputarea/platedoc/templates/template_toolbar_fixed';
-import { deriveSystemPromptRole } from '@/prompts/lib/use_system_prompts';
 
 type TplKey = string; // path-based unique key
 
@@ -190,15 +187,6 @@ function removeSelection(
 	});
 }
 
-function buildSystemPromptFromSelection(sel: ReturnType<typeof getTemplateSelections>[number]): string {
-	// include both System and Developer blocks (order preserved)
-	const sysOrDev = sel.blocks.filter(b => [PromptRoleEnum.Developer, PromptRoleEnum.System].includes(b.role));
-	if (sysOrDev.length === 0) return '';
-	const vv = sel.variableValues;
-	const parts = sysOrDev.map(b => replaceDoubleBraces(b.content, vv));
-	return parts.join('\n\n');
-}
-
 export function TemplateToolbars() {
 	const editor = useEditorRef() as PlateEditor;
 	const flashAll = useTemplateFlashEvent();
@@ -245,21 +233,6 @@ export function TemplateToolbars() {
 							}}
 							onRemove={() => {
 								removeSelection(editor, sel.bundleID, sel.templateSlug, sel.templateVersion, tsPath);
-							}}
-							onSetAsSystemPrompt={() => {
-								const prompt = buildSystemPromptFromSelection(sel).trim();
-								if (prompt) {
-									dispatchSetSystemPromptForChat({
-										prompt,
-										role: deriveSystemPromptRole(sel.template),
-										displayName: sel.template.displayName || sel.templateSlug || 'System Prompt',
-										sourceTemplate: {
-											bundleID: sel.bundleID,
-											templateSlug: sel.templateSlug,
-											templateVersion: sel.templateVersion,
-										},
-									});
-								}
 							}}
 							onFlatten={() => {
 								editor.tf.withoutNormalizing(() => {

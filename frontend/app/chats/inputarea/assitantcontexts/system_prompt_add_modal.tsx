@@ -122,6 +122,8 @@ function SystemPromptAddModalInner({
 		return suggestNextMinorVersion(seedVersion, existingVersions).suggested;
 	}, [existingVersions, initialDraft?.version]);
 
+	const effectiveVersion = versionTouched ? formData.version : suggestedVersion;
+
 	useEffect(() => {
 		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
 		if (versionTouched) return;
@@ -194,7 +196,7 @@ function SystemPromptAddModalInner({
 			bundleID: formData.bundleID,
 			displayName: formData.displayName.trim(),
 			slug: formData.slug.trim(),
-			version: formData.version.trim(),
+			version: effectiveVersion.trim(),
 			role: formData.role,
 			content: formData.content.trim(),
 		};
@@ -326,7 +328,7 @@ function SystemPromptAddModalInner({
 							<input
 								type="text"
 								className={`input input-bordered w-full rounded-xl ${errors.version ? 'input-error' : ''}`}
-								value={formData.version}
+								value={effectiveVersion}
 								onChange={e => {
 									setVersionTouched(true);
 									setFormData(prev => ({ ...prev, version: e.target.value }));

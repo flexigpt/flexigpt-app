@@ -1,4 +1,4 @@
-import { FiCheck, FiEdit2, FiMaximize2, FiUpload, FiX } from 'react-icons/fi';
+import { FiCheck, FiEdit2, FiMaximize2, FiX } from 'react-icons/fi';
 
 import { PromptRoleEnum } from '@/spec/prompt';
 
@@ -10,9 +10,8 @@ export function TemplateFixedToolbar(props: {
 	onOpenModal: () => void;
 	onRemove: () => void;
 	onFlatten: () => void;
-	onSetAsSystemPrompt: () => void;
 }) {
-	const { selection, flashing, onOpenModal, onRemove, onFlatten, onSetAsSystemPrompt } = props;
+	const { selection, flashing, onOpenModal, onRemove, onFlatten } = props;
 
 	const templateName =
 		selection.template.displayName || selection.templateSlug || selection.template.slug || 'Template';
@@ -73,16 +72,7 @@ export function TemplateFixedToolbar(props: {
 				>
 					<FiEdit2 size={14} />
 				</button>
-				<button
-					type="button"
-					className="btn btn-ghost btn-sm shrink-0 px-2 py-0 shadow-none"
-					onClick={onSetAsSystemPrompt}
-					title="Set system prompt for chat"
-					aria-label="Set system prompt for chat"
-					disabled={!hasSystemBlock}
-				>
-					<FiUpload size={14} />
-				</button>
+
 				{/* Expand to plain text */}
 				<button
 					type="button"
