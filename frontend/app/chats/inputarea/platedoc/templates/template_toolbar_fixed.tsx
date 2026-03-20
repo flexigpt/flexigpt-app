@@ -22,7 +22,7 @@ export function TemplateFixedToolbar(props: {
 
 	return (
 		<div
-			className={`flex w-full items-center gap-3 border-b px-2 py-0 font-mono text-xs ${
+			className={`flex w-full items-center gap-3 px-2 py-0 font-mono text-xs ${
 				flashing ? 'ring-error rounded-t-2xl ring ring-offset-0' : ''
 			}`}
 			data-template-toolbar

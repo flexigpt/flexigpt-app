@@ -41,7 +41,6 @@ const (
 	System    PromptRoleEnum = "system"
 	Developer PromptRoleEnum = "developer"
 	User      PromptRoleEnum = "user"
-	Assistant PromptRoleEnum = "assistant"
 )
 
 type PromptTemplateKind string

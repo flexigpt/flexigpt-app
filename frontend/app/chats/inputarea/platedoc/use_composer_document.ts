@@ -36,7 +36,7 @@ import {
 	analyzeTemplateSelectionInfo,
 	getTemplateNodesWithPath,
 } from '@/chats/inputarea/platedoc/templates/template_document_ops';
-import { getLastUserBlockContent } from '@/chats/inputarea/platedoc/templates/template_processing';
+import { getUserBlocksContent } from '@/chats/inputarea/platedoc/templates/template_processing';
 import { buildUserInlineChildrenFromText } from '@/chats/inputarea/platedoc/templates/template_variables_inline';
 import { type AttachedToolEntry, getAttachedToolEntries } from '@/chats/inputarea/platedoc/tool_document_ops';
 
@@ -249,7 +249,7 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 		return getAttachedToolEntries(editorRef.current, uniqueByIdentity);
 	}, []);
 
-	// Populate editor with effective last-USER block for EACH template selection (once per selectionID)
+	// Populate editor with effective USER blocks for EACH template selection (once per selectionID)
 	useEffect(() => {
 		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
 		if (!selectionInfo.tplNodeWithPath) return;
@@ -266,7 +266,7 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 			if (populated.has(selectionID)) continue;
 
 			// Build children: keep the selection chip, add parsed user text with variable pills
-			const userText = getLastUserBlockContent(tsenode);
+			const userText = getUserBlocksContent(tsenode);
 			const inlineChildren = buildUserInlineChildrenFromText(tsenode, userText);
 
 			try {

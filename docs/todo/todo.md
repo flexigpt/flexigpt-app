@@ -8,7 +8,7 @@
   - [x] create refs and patch objects in current specs first. do associated cleanups.
     - [x] modelpreset
     - [x] tool
-  - [ ] support storing sys prompts in prompt templates
+  - [x] support storing sys prompts in prompt templates
   - [ ] assistant store
   - [ ] conversation to include additional things wrt assistant and current absent contexts. idea is to have "full vs increment" in message turn.
   - [ ] clean fetch completion api. it should take current params and value as separate inputs and NOT take current message input. a hydrated current message should be sent back.

@@ -51,6 +51,7 @@ import type { InputBoxHandle } from '@/chats/inputarea/input_box';
 import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/inputarea/input_editor_utils';
 import { InputPane } from '@/chats/inputarea/input_pane';
 import { ChatMessage } from '@/chats/messages/message';
+import { appendSystemPromptParts } from '@/prompts/lib/system_prompt_utils';
 
 const EMPTY_MESSAGES: ConversationMessage[] = [];
 
@@ -895,7 +896,15 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 			if (!hasNonEmptyText && !hasToolOutputs && !hasAttachments) return;
 
+			let sendOptions = options;
 			const editingId = tab.editingMessageId ?? undefined;
+			const templateSystemPrompt = payload.templateSystemPrompt?.trim() || undefined;
+			if (templateSystemPrompt) {
+				sendOptions = {
+					...sendOptions,
+					systemPrompt: appendSystemPromptParts(sendOptions.systemPrompt, [templateSystemPrompt]),
+				};
+			}
 			const userMsg = buildUserConversationMessageFromEditor(payload, editingId);
 
 			if (tab.editingMessageId) {
@@ -913,7 +922,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 					updateTab(tabId, t => ({ ...t, editingMessageId: null }));
 					saveUpdatedConversation(tabId, updatedChat);
 
-					void updateStreamingMessage(tabId, updatedChat, options, payload.skillSessionID).catch(console.error);
+					void updateStreamingMessage(tabId, updatedChat, sendOptions, payload.skillSessionID).catch(console.error);
 					return;
 				}
 
@@ -930,7 +939,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			saveUpdatedConversation(tabId, updated);
 			if (selectedTabIdRef.current === tabId) scrollTabToBottomSoon(tabId);
 
-			void updateStreamingMessage(tabId, updated, options, payload.skillSessionID).catch(console.error);
+			void updateStreamingMessage(tabId, updated, sendOptions, payload.skillSessionID).catch(console.error);
 		},
 		[saveUpdatedConversation, scrollTabToBottomSoon, updateStreamingMessage, updateTab]
 	);

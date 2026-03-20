@@ -1,5 +1,6 @@
 import {
 	type MessageBlock,
+	PromptRoleEnum,
 	type PromptTemplate,
 	PromptTemplateKind,
 	type PromptVariable,
@@ -8,6 +9,8 @@ import {
 } from '@/spec/prompt';
 
 import { KEY_TEMPLATE_SELECTION, type TemplateSelectionElementNode } from '@/chats/inputarea/platedoc/nodes';
+
+const TEMPLATE_PLACEHOLDER_RE = /\{\{([a-zA-Z_][a-zA-Z0-9_-]*)\}\}/g;
 
 /**
  * Execution-ready derived representation of a selected template.
@@ -33,6 +36,25 @@ export interface SelectedTemplateForRun {
 
 	// Convenience
 	isReady: boolean;
+}
+
+function renderTemplateTextWithVariableValues(text: string, variableValues: Record<string, unknown>): string {
+	return text.replace(TEMPLATE_PLACEHOLDER_RE, (_match, name: string) => {
+		const value = variableValues[name];
+		return value === undefined || value === null ? '' : (value as string);
+	});
+}
+
+function getInstructionPromptPartFromSelection(selection: SelectedTemplateForRun): string {
+	return selection.blocks
+		.filter(block => block.role === PromptRoleEnum.System || block.role === PromptRoleEnum.Developer)
+		.map(block => renderTemplateTextWithVariableValues(block.content, selection.variableValues).trim())
+		.filter(Boolean)
+		.join('\n\n');
+}
+
+export function getInstructionPromptPartsFromSelections(selections: SelectedTemplateForRun[]): string[] {
+	return selections.map(getInstructionPromptPartFromSelection).filter(Boolean);
 }
 
 /**
@@ -163,15 +185,14 @@ export function makeSelectedTemplateForRun(tsenode: TemplateSelectionElementNode
 	};
 }
 
-// Returns the content of the last block as plain text if it is from role user.
-// If not found, returns empty string.
-export function getLastUserBlockContent(el: TemplateSelectionElementNode): string {
+// Returns all user-facing blocks concatenated in template order.
+// System/developer blocks are sent via systemPrompt, so only user blocks belong
+// in the editor/message body.
+export function getUserBlocksContent(el: TemplateSelectionElementNode): string {
 	const { blocks } = computeEffectiveTemplate(el);
-	if (blocks.length > 0) {
-		const b = blocks[blocks.length - 1];
-		if (b.role.toLowerCase() === 'user') {
-			return b.content;
-		}
-	}
-	return '';
+	return blocks
+		.filter(block => block.role === PromptRoleEnum.User)
+		.map(block => block.content)
+		.filter(content => content.trim().length > 0)
+		.join('\n\n');
 }

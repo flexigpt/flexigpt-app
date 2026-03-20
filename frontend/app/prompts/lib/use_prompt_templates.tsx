@@ -12,12 +12,18 @@ export function usePromptTemplates() {
 	useEffect(() => {
 		let cancelled = false;
 
-		getAllPromptTemplates(undefined, undefined, false, [PromptTemplateKind.Generic])
+		getAllPromptTemplates(undefined, undefined, false)
 			.then(res => {
 				if (cancelled) {
 					return;
 				}
-				setData(res);
+				setData(
+					res.filter(
+						item =>
+							item.kind === PromptTemplateKind.Generic ||
+							(item.kind === PromptTemplateKind.InstructionsOnly && !item.isResolved)
+					)
+				);
 			})
 			.finally(() => {
 				if (cancelled) {

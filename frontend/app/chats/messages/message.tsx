@@ -107,7 +107,7 @@ export const ChatMessage = memo(function ChatMessage({
 	// - busy (content card will show loader while busy)
 	const showBody = isBusy || hasAnyContent || hasError;
 	return (
-		<div className="mb-2 grid grid-cols-12" style={{ fontSize: 13 }}>
+		<div className="grid grid-cols-12 p-1" style={{ fontSize: 13 }}>
 			{/* Row 1 ── icon + message bubble (only when showCardRow) */}
 			{showBody && (
 				<>

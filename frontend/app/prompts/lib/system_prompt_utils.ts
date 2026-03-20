@@ -10,6 +10,19 @@ function concatenateSystemPromptParts(parts: string[]): string {
 	return parts.map(normalizePromptPart).filter(Boolean).join(SYSTEM_PROMPT_SEPARATOR);
 }
 
+export function appendSystemPromptParts(basePrompt: string, extraParts: string[]): string {
+	const parts: string[] = [];
+
+	const normalizedBase = normalizePromptPart(basePrompt);
+	if (normalizedBase) {
+		parts.push(normalizedBase);
+	}
+
+	parts.push(...extraParts);
+
+	return concatenateSystemPromptParts(parts);
+}
+
 export function buildEffectiveSystemPrompt(params: {
 	modelDefaultPrompt: string;
 	includeModelDefault: boolean;

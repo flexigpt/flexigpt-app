@@ -225,7 +225,6 @@ func allowedRolesForKind(kind spec.PromptTemplateKind) map[spec.PromptRoleEnum]s
 			spec.System:    {},
 			spec.Developer: {},
 			spec.User:      {},
-			spec.Assistant: {},
 		}
 	}
 }

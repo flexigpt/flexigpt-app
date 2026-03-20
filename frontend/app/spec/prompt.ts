@@ -5,7 +5,6 @@ export enum PromptRoleEnum {
 	System = 'system',
 	Developer = 'developer',
 	User = 'user',
-	Assistant = 'assistant',
 }
 
 export enum PromptTemplateKind {

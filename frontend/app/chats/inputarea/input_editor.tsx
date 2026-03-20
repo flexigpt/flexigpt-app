@@ -42,6 +42,7 @@ import {
 	insertTemplateSelectionNode,
 	toPlainTextReplacingVariables,
 } from '@/chats/inputarea/platedoc/templates/template_document_ops';
+import { getInstructionPromptPartsFromSelections } from '@/chats/inputarea/platedoc/templates/template_processing';
 import { TemplateToolbars } from '@/chats/inputarea/platedoc/templates/template_toolbars';
 import {
 	type AttachedToolEntry,
@@ -62,6 +63,7 @@ import { ToolDetailsModal } from '@/chats/inputarea/tools/tool_details_modal';
 import { ToolArgsModalHost } from '@/chats/inputarea/tools/tool_user_args_host';
 import { useComposerTools } from '@/chats/inputarea/tools/use_composer_tools';
 import { buildWebSearchChoicesForSubmit, type WebSearchChoiceTemplate } from '@/chats/inputarea/tools/websearch_utils';
+import { appendSystemPromptParts } from '@/prompts/lib/system_prompt_utils';
 import { dedupeToolChoices, uiToolChoiceToToolStoreChoice } from '@/tools/lib/tool_choice_utils';
 import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 
@@ -201,6 +203,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	} = useComposerSkills();
 
 	const templateBlocked = selectionInfo.hasTemplate && selectionInfo.requiredCount > 0;
+
 	const effectiveSubmitText = useMemo(() => {
 		return selectionInfo.hasTemplate ? toPlainTextReplacingVariables(editor) : editor.api.string([]);
 	}, [editor, selectionInfo]);
@@ -660,6 +663,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				const runtimeAfterRun = getToolRuntimeSnapshot();
 				const selections = getTemplateSelections(editor);
 				const hasTpl = selections.length > 0;
+				const currentTemplateSystemPrompt = appendSystemPromptParts(
+					'',
+					getInstructionPromptPartsFromSelections(selections)
+				);
 
 				const textToSend = hasTpl ? toPlainTextReplacingVariables(editor) : editor.api.string([]);
 				const finalToolOutputs: UIToolOutput[] = runtimeAfterRun.toolOutputs;
@@ -700,6 +707,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 				const payload: EditorSubmitPayload = {
 					text: textToSend,
+					templateSystemPrompt: currentTemplateSystemPrompt.trim() || undefined,
 					attachedTools,
 					attachments,
 					toolOutputs: finalToolOutputs,
