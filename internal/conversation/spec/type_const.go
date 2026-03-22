@@ -32,7 +32,7 @@ type ConversationMessage struct {
 	// Default model configuration for this turn. This can be empty and would mean that model param have been carried
 	// over from previous messages. Same for model ref.
 	ModelParam     *inferenceSpec.ModelParam       `json:"modelParam,omitempty"`
-	ModelPresetRef *modelpresetSpec.ModelPresetRef `json:"modelPresetRef"`
+	ModelPresetRef *modelpresetSpec.ModelPresetRef `json:"modelPresetRef,omitempty"`
 
 	// Canonical, lossless events for this turn, in the order they occurred.
 	//
