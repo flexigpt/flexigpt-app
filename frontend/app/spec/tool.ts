@@ -12,6 +12,31 @@ export enum ToolStoreChoiceType {
 	WebSearch = 'webSearch',
 }
 
+/**
+ * @public
+ */
+export interface ToolChoicePatch {
+	autoExecute?: boolean;
+	userArgSchemaInstance?: string;
+}
+
+/**
+ * @public
+ */
+export interface ToolRef {
+	bundleID: string;
+	toolSlug: string;
+	toolVersion: string;
+}
+
+/**
+ * @public
+ */
+export interface ToolSelection {
+	toolRef: ToolRef;
+	toolChoicePatch?: ToolChoicePatch;
+}
+
 export interface ToolStoreChoice {
 	choiceID: string;
 	bundleID: string;

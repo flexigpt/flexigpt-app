@@ -72,7 +72,10 @@ export interface ModelCapabilitiesOverride {
 	toolCapabilities?: ToolCapabilitiesOverride;
 }
 
-interface ModelPresetPatch {
+/**
+ * @public
+ */
+export interface ModelPresetPatch {
 	stream?: boolean;
 	maxPromptLength?: number;
 	maxOutputLength?: number;
