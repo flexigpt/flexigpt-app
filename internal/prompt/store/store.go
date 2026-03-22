@@ -398,10 +398,11 @@ func (s *PromptTemplateStore) ListPromptBundles(
 	// Guard against stale, malicious index.
 	startIdx := 0
 	if !cursorMod.IsZero() || cursorID != "" {
+		startIdx = len(filtered)
 		for i, b := range filtered {
 			if b.ModifiedAt.Before(cursorMod) ||
-				(b.ModifiedAt.Equal(cursorMod) && b.ID == cursorID) {
-				startIdx = i + 1
+				(b.ModifiedAt.Equal(cursorMod) && b.ID > cursorID) {
+				startIdx = i
 				break
 			}
 		}

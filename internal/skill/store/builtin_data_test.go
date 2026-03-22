@@ -16,6 +16,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	"github.com/flexigpt/flexigpt-app/internal/fsutil"
 	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
 )
 
@@ -37,7 +38,7 @@ func TestNewBuiltInSkills_InvalidArgs(t *testing.T) {
 	}
 }
 
-func TestBuiltInSkills_LoadFromFS_HappyPathAndClones(t *testing.T) {
+func TestBuiltInSkills_PopulateDataFromFS_HappyPathAndClones(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -127,7 +128,7 @@ func TestBuiltInSkills_LoadFromFS_HappyPathAndClones(t *testing.T) {
 	}
 }
 
-func TestBuiltInSkills_LoadFromFS_Errors(t *testing.T) {
+func TestBuiltInSkills_PopulateDataFromFS_Errors(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("custom fs test has some overlay race in win")
 		return
@@ -479,7 +480,7 @@ func TestResolveSkillsFS(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := resolveSkillsFS(fsys, tc.dir)
+			_, err := fsutil.ResolveFS(fsys, tc.dir)
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("err=%v wantErr=%v", err, tc.wantErr)
 			}

@@ -58,8 +58,8 @@ func TestSkillStore_ListSkillBundles_BuiltInAndUser_SortPaging_AndTokenErrors(t 
 		builtin.BuiltInSkillBundlesJSON: &fstest.MapFile{Data: raw},
 	}
 	s.builtin.skillsDir = "."
-	if err := s.builtin.loadFromFS(t.Context()); err != nil {
-		t.Fatalf("builtin.loadFromFS: %v", err)
+	if err := s.builtin.populateDataFromFS(t.Context()); err != nil {
+		t.Fatalf("builtin.populateDataFromFS: %v", err)
 	}
 
 	// User snapshot with two bundles at same ModifiedAt => tie-break by ID asc.
@@ -167,8 +167,8 @@ func TestSkillStore_ListSkills_BuiltInPaging_PhaseSwitch_AndTokenErrors(t *testi
 	fsys := os.DirFS(filepath.Join(".", "testdata", "builtinspaging"))
 	s.builtin.skillsFS = fsys
 	s.builtin.skillsDir = "."
-	if err := s.builtin.loadFromFS(t.Context()); err != nil {
-		t.Fatalf("builtin.loadFromFS: %v", err)
+	if err := s.builtin.populateDataFromFS(t.Context()); err != nil {
+		t.Fatalf("builtin.populateDataFromFS: %v", err)
 	}
 
 	// Deterministic user snapshot (no runtime involved here; listing reads JSON).

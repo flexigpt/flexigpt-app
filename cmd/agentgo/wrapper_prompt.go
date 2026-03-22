@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	"github.com/flexigpt/flexigpt-app/internal/prompt/spec"
@@ -96,4 +97,14 @@ func (pbw *PromptTemplateStoreWrapper) ListPromptTemplates(
 	return middleware.WithRecoveryResp(func() (*spec.ListPromptTemplatesResponse, error) {
 		return pbw.store.ListPromptTemplates(context.Background(), req)
 	})
+}
+
+func (p *PromptTemplateStoreWrapper) close() {
+	if p == nil || p.store == nil {
+		return
+	}
+	if err := p.store.Close(); err != nil {
+		slog.Error("failed to close prompt template store", "error", err)
+	}
+	p.store = nil
 }

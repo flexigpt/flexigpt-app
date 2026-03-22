@@ -102,28 +102,6 @@
 		"vite-tsconfig-paths": "^6.1.1",
 		"vitest": "^4.1.0"
 	},
-	"knip": {
-		"entry": [
-			"vite.config.{js,cjs,mjs,ts}",
-			"react-router.config.{js,cjs,mjs,ts}",
-			"app/hooks/highlight_worker.ts"
-		],
-		"ignore": [
-			"app/apis/wailsjs/go/models.ts",
-			"app/apis/wailsjs/runtime/runtime.js",
-			"app/apis/wailsjs/go/main/SkillStoreWrapper.js",
-			"app/apis/wailsjs/go/main/ModelPresetStoreWrapper.js",
-			"app/spec/inference_capabilities.ts",
-			"app/hooks/use_at_top_bottom.tsx"
-		],
-		"ignoreBinaries": [],
-		"ignoreDependencies": [
-			"@testing-library/react",
-			"@testing-library/user-event",
-			"eslint-plugin-tailwindcss",
-			"@tailwindcss/node"
-		]
-	},
 	"prettier": {
 		"arrowParens": "avoid",
 		"bracketSpacing": true,
@@ -155,5 +133,27 @@
 		"importOrderSeparation": true,
 		"importOrderSortSpecifiers": true,
 		"importOrderCaseInsensitive": true
+	},
+	"knip": {
+		"entry": [
+			"vite.config.{js,cjs,mjs,ts}",
+			"react-router.config.{js,cjs,mjs,ts}",
+			"app/hooks/highlight_worker.ts"
+		],
+		"ignore": [
+			"app/apis/wailsjs/go/models.ts",
+			"app/apis/wailsjs/runtime/runtime.js",
+			"app/apis/wailsjs/go/main/ModelPresetStoreWrapper.js",
+			"app/apis/wailsjs/go/main/AssistantPresetStoreWrapper.js",
+			"app/spec/inference_capabilities.ts",
+			"app/hooks/use_at_top_bottom.tsx"
+		],
+		"ignoreBinaries": [],
+		"ignoreDependencies": [
+			"@testing-library/react",
+			"@testing-library/user-event",
+			"eslint-plugin-tailwindcss",
+			"@tailwindcss/node"
+		]
 	}
 }

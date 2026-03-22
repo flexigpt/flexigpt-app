@@ -108,6 +108,7 @@ func main() {
 			app.toolRuntimeAPI,
 			app.skillStoreAPI,
 			app.aggregateAPI,
+			app.assistantPresetStoreAPI,
 		},
 
 		Windows: &windows.Options{

@@ -97,3 +97,11 @@ func (tbw *ToolStoreWrapper) ListTools(
 		return tbw.store.ListTools(context.Background(), req)
 	})
 }
+
+func (t *ToolStoreWrapper) close() {
+	if t == nil || t.store == nil {
+		return
+	}
+	t.store.Close()
+	t.store = nil
+}

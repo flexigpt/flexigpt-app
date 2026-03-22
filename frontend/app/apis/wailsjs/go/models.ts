@@ -332,6 +332,536 @@ export namespace spec {
 	        this.name = source["name"];
 	    }
 	}
+	export class SkillRef {
+	    bundleID: string;
+	    skillSlug: string;
+	    skillID: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SkillRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
+	        this.skillSlug = source["skillSlug"];
+	        this.skillID = source["skillID"];
+	    }
+	}
+	export class ToolChoicePatch {
+	    autoExecute?: boolean;
+	    userArgSchemaInstance?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ToolChoicePatch(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.autoExecute = source["autoExecute"];
+	        this.userArgSchemaInstance = source["userArgSchemaInstance"];
+	    }
+	}
+	export class ToolRef {
+	    bundleID: string;
+	    toolSlug: string;
+	    toolVersion: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ToolRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
+	        this.toolSlug = source["toolSlug"];
+	        this.toolVersion = source["toolVersion"];
+	    }
+	}
+	export class ToolSelection {
+	    toolRef: ToolRef;
+	    toolChoicePatch?: ToolChoicePatch;
+	
+	    static createFrom(source: any = {}) {
+	        return new ToolSelection(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.toolRef = this.convertValues(source["toolRef"], ToolRef);
+	        this.toolChoicePatch = this.convertValues(source["toolChoicePatch"], ToolChoicePatch);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PromptTemplateRef {
+	    bundleID: string;
+	    templateSlug: string;
+	    templateVersion: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PromptTemplateRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
+	        this.templateSlug = source["templateSlug"];
+	        this.templateVersion = source["templateVersion"];
+	    }
+	}
+	export class ToolCapabilitiesOverride {
+	    supportedToolTypes?: string[];
+	    supportedToolPolicyModes?: string[];
+	    supportsParallelToolCalls?: boolean;
+	    maxForcedTools?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ToolCapabilitiesOverride(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supportedToolTypes = source["supportedToolTypes"];
+	        this.supportedToolPolicyModes = source["supportedToolPolicyModes"];
+	        this.supportsParallelToolCalls = source["supportsParallelToolCalls"];
+	        this.maxForcedTools = source["maxForcedTools"];
+	    }
+	}
+	export class OutputCapabilitiesOverride {
+	    supportedOutputFormats?: string[];
+	    supportsVerbosity?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new OutputCapabilitiesOverride(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supportedOutputFormats = source["supportedOutputFormats"];
+	        this.supportsVerbosity = source["supportsVerbosity"];
+	    }
+	}
+	export class StopSequenceCapabilitiesOverride {
+	    isSupported?: boolean;
+	    disallowedWithReasoning?: boolean;
+	    maxSequences?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new StopSequenceCapabilitiesOverride(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.isSupported = source["isSupported"];
+	        this.disallowedWithReasoning = source["disallowedWithReasoning"];
+	        this.maxSequences = source["maxSequences"];
+	    }
+	}
+	export class ReasoningCapabilitiesOverride {
+	    supportedReasoningTypes?: string[];
+	    supportedReasoningLevels?: string[];
+	    supportsSummaryStyle?: boolean;
+	    supportsEncryptedReasoningInput?: boolean;
+	    temperatureDisallowedWhenEnabled?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReasoningCapabilitiesOverride(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supportedReasoningTypes = source["supportedReasoningTypes"];
+	        this.supportedReasoningLevels = source["supportedReasoningLevels"];
+	        this.supportsSummaryStyle = source["supportsSummaryStyle"];
+	        this.supportsEncryptedReasoningInput = source["supportsEncryptedReasoningInput"];
+	        this.temperatureDisallowedWhenEnabled = source["temperatureDisallowedWhenEnabled"];
+	    }
+	}
+	export class ModelCapabilitiesOverride {
+	    modalitiesIn?: string[];
+	    modalitiesOut?: string[];
+	    reasoningCapabilities?: ReasoningCapabilitiesOverride;
+	    stopSequenceCapabilities?: StopSequenceCapabilitiesOverride;
+	    outputCapabilities?: OutputCapabilitiesOverride;
+	    toolCapabilities?: ToolCapabilitiesOverride;
+	
+	    static createFrom(source: any = {}) {
+	        return new ModelCapabilitiesOverride(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.modalitiesIn = source["modalitiesIn"];
+	        this.modalitiesOut = source["modalitiesOut"];
+	        this.reasoningCapabilities = this.convertValues(source["reasoningCapabilities"], ReasoningCapabilitiesOverride);
+	        this.stopSequenceCapabilities = this.convertValues(source["stopSequenceCapabilities"], StopSequenceCapabilitiesOverride);
+	        this.outputCapabilities = this.convertValues(source["outputCapabilities"], OutputCapabilitiesOverride);
+	        this.toolCapabilities = this.convertValues(source["toolCapabilities"], ToolCapabilitiesOverride);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class JSONSchemaParam {
+	    name: string;
+	    description?: string;
+	    schema?: Record<string, any>;
+	    strict?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new JSONSchemaParam(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.schema = source["schema"];
+	        this.strict = source["strict"];
+	    }
+	}
+	export class OutputFormat {
+	    kind: string;
+	    jsonSchemaParam?: JSONSchemaParam;
+	
+	    static createFrom(source: any = {}) {
+	        return new OutputFormat(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.jsonSchemaParam = this.convertValues(source["jsonSchemaParam"], JSONSchemaParam);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class OutputParam {
+	    format?: OutputFormat;
+	    verbosity?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new OutputParam(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.format = this.convertValues(source["format"], OutputFormat);
+	        this.verbosity = source["verbosity"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ReasoningParam {
+	    type: string;
+	    level: string;
+	    tokens: number;
+	    summaryStyle?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReasoningParam(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.level = source["level"];
+	        this.tokens = source["tokens"];
+	        this.summaryStyle = source["summaryStyle"];
+	    }
+	}
+	export class ModelPresetPatch {
+	    stream?: boolean;
+	    maxPromptLength?: number;
+	    maxOutputLength?: number;
+	    temperature?: number;
+	    reasoning?: ReasoningParam;
+	    systemPrompt?: string;
+	    timeout?: number;
+	    outputParam?: OutputParam;
+	    stopSequences?: string[];
+	    additionalParametersRawJSON?: string;
+	    capabilitiesOverride?: ModelCapabilitiesOverride;
+	
+	    static createFrom(source: any = {}) {
+	        return new ModelPresetPatch(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.stream = source["stream"];
+	        this.maxPromptLength = source["maxPromptLength"];
+	        this.maxOutputLength = source["maxOutputLength"];
+	        this.temperature = source["temperature"];
+	        this.reasoning = this.convertValues(source["reasoning"], ReasoningParam);
+	        this.systemPrompt = source["systemPrompt"];
+	        this.timeout = source["timeout"];
+	        this.outputParam = this.convertValues(source["outputParam"], OutputParam);
+	        this.stopSequences = source["stopSequences"];
+	        this.additionalParametersRawJSON = source["additionalParametersRawJSON"];
+	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], ModelCapabilitiesOverride);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ModelPresetRef {
+	    providerName: string;
+	    modelPresetID: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ModelPresetRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.providerName = source["providerName"];
+	        this.modelPresetID = source["modelPresetID"];
+	    }
+	}
+	export class AssistantPreset {
+	    schemaVersion: string;
+	    id: string;
+	    slug: string;
+	    version: string;
+	    displayName: string;
+	    description?: string;
+	    icon?: string;
+	    isEnabled: boolean;
+	    isBuiltIn: boolean;
+	    startingModelPresetRef?: ModelPresetRef;
+	    startingModelPresetPatch?: ModelPresetPatch;
+	    startingIncludeModelSystemPrompt?: boolean;
+	    startingInstructionTemplateRefs?: PromptTemplateRef[];
+	    startingToolSelections?: ToolSelection[];
+	    startingEnabledSkillRefs?: SkillRef[];
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    modifiedAt: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new AssistantPreset(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.schemaVersion = source["schemaVersion"];
+	        this.id = source["id"];
+	        this.slug = source["slug"];
+	        this.version = source["version"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.icon = source["icon"];
+	        this.isEnabled = source["isEnabled"];
+	        this.isBuiltIn = source["isBuiltIn"];
+	        this.startingModelPresetRef = this.convertValues(source["startingModelPresetRef"], ModelPresetRef);
+	        this.startingModelPresetPatch = this.convertValues(source["startingModelPresetPatch"], ModelPresetPatch);
+	        this.startingIncludeModelSystemPrompt = source["startingIncludeModelSystemPrompt"];
+	        this.startingInstructionTemplateRefs = this.convertValues(source["startingInstructionTemplateRefs"], PromptTemplateRef);
+	        this.startingToolSelections = this.convertValues(source["startingToolSelections"], ToolSelection);
+	        this.startingEnabledSkillRefs = this.convertValues(source["startingEnabledSkillRefs"], SkillRef);
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AssistantPresetBundle {
+	    schemaVersion: string;
+	    id: string;
+	    slug: string;
+	    displayName: string;
+	    description?: string;
+	    isEnabled: boolean;
+	    isBuiltIn: boolean;
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    modifiedAt: any;
+	    // Go type: time
+	    softDeletedAt?: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new AssistantPresetBundle(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.schemaVersion = source["schemaVersion"];
+	        this.id = source["id"];
+	        this.slug = source["slug"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.isEnabled = source["isEnabled"];
+	        this.isBuiltIn = source["isBuiltIn"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
+	        this.softDeletedAt = this.convertValues(source["softDeletedAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AssistantPresetListItem {
+	    bundleID: string;
+	    bundleSlug: string;
+	    assistantPresetSlug: string;
+	    assistantPresetVersion: string;
+	    displayName: string;
+	    description?: string;
+	    icon?: string;
+	    isEnabled: boolean;
+	    isBuiltIn: boolean;
+	    // Go type: time
+	    modifiedAt?: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new AssistantPresetListItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
+	        this.bundleSlug = source["bundleSlug"];
+	        this.assistantPresetSlug = source["assistantPresetSlug"];
+	        this.assistantPresetVersion = source["assistantPresetVersion"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.icon = source["icon"];
+	        this.isEnabled = source["isEnabled"];
+	        this.isBuiltIn = source["isBuiltIn"];
+	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class AuthKeyMeta {
 	    type: string;
 	    keyName: string;
@@ -517,22 +1047,6 @@ export namespace spec {
 	        this.inputTokensUncached = source["inputTokensUncached"];
 	        this.outputTokens = source["outputTokens"];
 	        this.reasoningTokens = source["reasoningTokens"];
-	    }
-	}
-	export class SkillRef {
-	    bundleID: string;
-	    skillSlug: string;
-	    skillID: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new SkillRef(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.bundleID = source["bundleID"];
-	        this.skillSlug = source["skillSlug"];
-	        this.skillID = source["skillID"];
 	    }
 	}
 	export class ToolStoreChoice {
@@ -1295,20 +1809,6 @@ export namespace spec {
 		    return a;
 		}
 	}
-	export class ModelPresetRef {
-	    providerName: string;
-	    modelPresetID: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ModelPresetRef(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.providerName = source["providerName"];
-	        this.modelPresetID = source["modelPresetID"];
-	    }
-	}
 	export class ConversationMessage {
 	    id: string;
 	    // Go type: time
@@ -1371,106 +1871,6 @@ export namespace spec {
 		    }
 		    return a;
 		}
-	}
-	export class JSONSchemaParam {
-	    name: string;
-	    description?: string;
-	    schema?: Record<string, any>;
-	    strict?: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new JSONSchemaParam(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.name = source["name"];
-	        this.description = source["description"];
-	        this.schema = source["schema"];
-	        this.strict = source["strict"];
-	    }
-	}
-	export class OutputFormat {
-	    kind: string;
-	    jsonSchemaParam?: JSONSchemaParam;
-	
-	    static createFrom(source: any = {}) {
-	        return new OutputFormat(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.kind = source["kind"];
-	        this.jsonSchemaParam = this.convertValues(source["jsonSchemaParam"], JSONSchemaParam);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class OutputParam {
-	    format?: OutputFormat;
-	    verbosity?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new OutputParam(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.format = this.convertValues(source["format"], OutputFormat);
-	        this.verbosity = source["verbosity"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ReasoningParam {
-	    type: string;
-	    level: string;
-	    tokens: number;
-	    summaryStyle?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ReasoningParam(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.type = source["type"];
-	        this.level = source["level"];
-	        this.tokens = source["tokens"];
-	        this.summaryStyle = source["summaryStyle"];
-	    }
 	}
 	export class ModelParam {
 	    name: string;
@@ -1889,6 +2289,58 @@ export namespace spec {
 		}
 	}
 	
+	export class DeleteAssistantPresetBundleRequest {
+	    BundleID: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeleteAssistantPresetBundleRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	    }
+	}
+	export class DeleteAssistantPresetBundleResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new DeleteAssistantPresetBundleResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
+	export class DeleteAssistantPresetRequest {
+	    BundleID: string;
+	    AssistantPresetSlug: string;
+	    Version: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeleteAssistantPresetRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	        this.AssistantPresetSlug = source["AssistantPresetSlug"];
+	        this.Version = source["Version"];
+	    }
+	}
+	export class DeleteAssistantPresetResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new DeleteAssistantPresetResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
 	export class DeleteAuthKeyRequest {
 	    Type: string;
 	    KeyName: string;
@@ -2147,6 +2599,52 @@ export namespace spec {
 	}
 	
 	
+	export class GetAssistantPresetRequest {
+	    BundleID: string;
+	    AssistantPresetSlug: string;
+	    Version: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new GetAssistantPresetRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	        this.AssistantPresetSlug = source["AssistantPresetSlug"];
+	        this.Version = source["Version"];
+	    }
+	}
+	export class GetAssistantPresetResponse {
+	    Body?: AssistantPreset;
+	
+	    static createFrom(source: any = {}) {
+	        return new GetAssistantPresetResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], AssistantPreset);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class GetAuthKeyRequest {
 	    Type: string;
 	    KeyName: string;
@@ -2375,114 +2873,6 @@ export namespace spec {
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
 	        this.isBuiltIn = source["isBuiltIn"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ToolCapabilitiesOverride {
-	    supportedToolTypes?: string[];
-	    supportedToolPolicyModes?: string[];
-	    supportsParallelToolCalls?: boolean;
-	    maxForcedTools?: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new ToolCapabilitiesOverride(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.supportedToolTypes = source["supportedToolTypes"];
-	        this.supportedToolPolicyModes = source["supportedToolPolicyModes"];
-	        this.supportsParallelToolCalls = source["supportsParallelToolCalls"];
-	        this.maxForcedTools = source["maxForcedTools"];
-	    }
-	}
-	export class OutputCapabilitiesOverride {
-	    supportedOutputFormats?: string[];
-	    supportsVerbosity?: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new OutputCapabilitiesOverride(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.supportedOutputFormats = source["supportedOutputFormats"];
-	        this.supportsVerbosity = source["supportsVerbosity"];
-	    }
-	}
-	export class StopSequenceCapabilitiesOverride {
-	    isSupported?: boolean;
-	    disallowedWithReasoning?: boolean;
-	    maxSequences?: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new StopSequenceCapabilitiesOverride(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.isSupported = source["isSupported"];
-	        this.disallowedWithReasoning = source["disallowedWithReasoning"];
-	        this.maxSequences = source["maxSequences"];
-	    }
-	}
-	export class ReasoningCapabilitiesOverride {
-	    supportedReasoningTypes?: string[];
-	    supportedReasoningLevels?: string[];
-	    supportsSummaryStyle?: boolean;
-	    supportsEncryptedReasoningInput?: boolean;
-	    temperatureDisallowedWhenEnabled?: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new ReasoningCapabilitiesOverride(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.supportedReasoningTypes = source["supportedReasoningTypes"];
-	        this.supportedReasoningLevels = source["supportedReasoningLevels"];
-	        this.supportsSummaryStyle = source["supportsSummaryStyle"];
-	        this.supportsEncryptedReasoningInput = source["supportsEncryptedReasoningInput"];
-	        this.temperatureDisallowedWhenEnabled = source["temperatureDisallowedWhenEnabled"];
-	    }
-	}
-	export class ModelCapabilitiesOverride {
-	    modalitiesIn?: string[];
-	    modalitiesOut?: string[];
-	    reasoningCapabilities?: ReasoningCapabilitiesOverride;
-	    stopSequenceCapabilities?: StopSequenceCapabilitiesOverride;
-	    outputCapabilities?: OutputCapabilitiesOverride;
-	    toolCapabilities?: ToolCapabilitiesOverride;
-	
-	    static createFrom(source: any = {}) {
-	        return new ModelCapabilitiesOverride(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.modalitiesIn = source["modalitiesIn"];
-	        this.modalitiesOut = source["modalitiesOut"];
-	        this.reasoningCapabilities = this.convertValues(source["reasoningCapabilities"], ReasoningCapabilitiesOverride);
-	        this.stopSequenceCapabilities = this.convertValues(source["stopSequenceCapabilities"], StopSequenceCapabilitiesOverride);
-	        this.outputCapabilities = this.convertValues(source["outputCapabilities"], OutputCapabilitiesOverride);
-	        this.toolCapabilities = this.convertValues(source["toolCapabilities"], ToolCapabilitiesOverride);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -3761,6 +4151,168 @@ export namespace spec {
 	}
 	
 	
+	export class ListAssistantPresetBundlesRequest {
+	    BundleIDs: string[];
+	    IncludeDisabled: boolean;
+	    PageSize: number;
+	    PageToken: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListAssistantPresetBundlesRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleIDs = source["BundleIDs"];
+	        this.IncludeDisabled = source["IncludeDisabled"];
+	        this.PageSize = source["PageSize"];
+	        this.PageToken = source["PageToken"];
+	    }
+	}
+	export class ListAssistantPresetBundlesResponseBody {
+	    assistantPresetBundles: AssistantPresetBundle[];
+	    nextPageToken?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListAssistantPresetBundlesResponseBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.assistantPresetBundles = this.convertValues(source["assistantPresetBundles"], AssistantPresetBundle);
+	        this.nextPageToken = source["nextPageToken"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ListAssistantPresetBundlesResponse {
+	    Body?: ListAssistantPresetBundlesResponseBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListAssistantPresetBundlesResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], ListAssistantPresetBundlesResponseBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class ListAssistantPresetsRequest {
+	    BundleIDs: string[];
+	    IncludeDisabled: boolean;
+	    RecommendedPageSize: number;
+	    PageToken: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListAssistantPresetsRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleIDs = source["BundleIDs"];
+	        this.IncludeDisabled = source["IncludeDisabled"];
+	        this.RecommendedPageSize = source["RecommendedPageSize"];
+	        this.PageToken = source["PageToken"];
+	    }
+	}
+	export class ListAssistantPresetsResponseBody {
+	    assistantPresetListItems: AssistantPresetListItem[];
+	    nextPageToken?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListAssistantPresetsResponseBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.assistantPresetListItems = this.convertValues(source["assistantPresetListItems"], AssistantPresetListItem);
+	        this.nextPageToken = source["nextPageToken"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ListAssistantPresetsResponse {
+	    Body?: ListAssistantPresetsResponseBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListAssistantPresetsResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], ListAssistantPresetsResponseBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class ListConversationsRequest {
 	    PageSize: number;
 	    PageToken: string;
@@ -4845,6 +5397,125 @@ export namespace spec {
 	
 	
 	
+	
+	export class PatchAssistantPresetBundleRequestBody {
+	    isEnabled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchAssistantPresetBundleRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.isEnabled = source["isEnabled"];
+	    }
+	}
+	export class PatchAssistantPresetBundleRequest {
+	    BundleID: string;
+	    Body?: PatchAssistantPresetBundleRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchAssistantPresetBundleRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	        this.Body = this.convertValues(source["Body"], PatchAssistantPresetBundleRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class PatchAssistantPresetBundleResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchAssistantPresetBundleResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
+	export class PatchAssistantPresetRequestBody {
+	    isEnabled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchAssistantPresetRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.isEnabled = source["isEnabled"];
+	    }
+	}
+	export class PatchAssistantPresetRequest {
+	    BundleID: string;
+	    AssistantPresetSlug: string;
+	    Version: string;
+	    Body?: PatchAssistantPresetRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchAssistantPresetRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	        this.AssistantPresetSlug = source["AssistantPresetSlug"];
+	        this.Version = source["Version"];
+	        this.Body = this.convertValues(source["Body"], PatchAssistantPresetRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class PatchAssistantPresetResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchAssistantPresetResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
 	export class PatchDefaultProviderRequestBody {
 	    defaultProvider: string;
 	
@@ -5655,6 +6326,167 @@ export namespace spec {
 	
 	
 	
+	
+	export class PutAssistantPresetBundleRequestBody {
+	    slug: string;
+	    displayName: string;
+	    description?: string;
+	    isEnabled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new PutAssistantPresetBundleRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.slug = source["slug"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.isEnabled = source["isEnabled"];
+	    }
+	}
+	export class PutAssistantPresetBundleRequest {
+	    BundleID: string;
+	    Body?: PutAssistantPresetBundleRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new PutAssistantPresetBundleRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	        this.Body = this.convertValues(source["Body"], PutAssistantPresetBundleRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class PutAssistantPresetBundleResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new PutAssistantPresetBundleResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
+	export class PutAssistantPresetRequestBody {
+	    displayName: string;
+	    description?: string;
+	    icon?: string;
+	    isEnabled: boolean;
+	    startingModelPresetRef?: ModelPresetRef;
+	    startingModelPresetPatch?: ModelPresetPatch;
+	    startingIncludeModelSystemPrompt?: boolean;
+	    startingInstructionTemplateRefs?: PromptTemplateRef[];
+	    startingToolSelections?: ToolSelection[];
+	    startingEnabledSkillRefs?: SkillRef[];
+	
+	    static createFrom(source: any = {}) {
+	        return new PutAssistantPresetRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.icon = source["icon"];
+	        this.isEnabled = source["isEnabled"];
+	        this.startingModelPresetRef = this.convertValues(source["startingModelPresetRef"], ModelPresetRef);
+	        this.startingModelPresetPatch = this.convertValues(source["startingModelPresetPatch"], ModelPresetPatch);
+	        this.startingIncludeModelSystemPrompt = source["startingIncludeModelSystemPrompt"];
+	        this.startingInstructionTemplateRefs = this.convertValues(source["startingInstructionTemplateRefs"], PromptTemplateRef);
+	        this.startingToolSelections = this.convertValues(source["startingToolSelections"], ToolSelection);
+	        this.startingEnabledSkillRefs = this.convertValues(source["startingEnabledSkillRefs"], SkillRef);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PutAssistantPresetRequest {
+	    BundleID: string;
+	    AssistantPresetSlug: string;
+	    Version: string;
+	    Body?: PutAssistantPresetRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new PutAssistantPresetRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	        this.AssistantPresetSlug = source["AssistantPresetSlug"];
+	        this.Version = source["Version"];
+	        this.Body = this.convertValues(source["Body"], PutAssistantPresetRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class PutAssistantPresetResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new PutAssistantPresetResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
 	export class PutConversationRequestBody {
 	    title: string;
 	    // Go type: time
@@ -6468,6 +7300,9 @@ export namespace spec {
 	
 	    }
 	}
+	
+	
+	
 	
 	
 	

@@ -17,23 +17,25 @@ const AppTitle = "FlexiGPT"
 type App struct {
 	ctx context.Context
 
-	settingStoreAPI        *SettingStoreWrapper
-	conversationStoreAPI   *ConversationCollectionWrapper
-	modelPresetStoreAPI    *ModelPresetStoreWrapper
-	promptTemplateStoreAPI *PromptTemplateStoreWrapper
-	toolStoreAPI           *ToolStoreWrapper
-	toolRuntimeAPI         *ToolRuntimeWrapper
-	skillStoreAPI          *SkillStoreWrapper
-	aggregateAPI           *AggregrateWrapper
+	settingStoreAPI         *SettingStoreWrapper
+	conversationStoreAPI    *ConversationCollectionWrapper
+	modelPresetStoreAPI     *ModelPresetStoreWrapper
+	promptTemplateStoreAPI  *PromptTemplateStoreWrapper
+	toolStoreAPI            *ToolStoreWrapper
+	toolRuntimeAPI          *ToolRuntimeWrapper
+	skillStoreAPI           *SkillStoreWrapper
+	aggregateAPI            *AggregrateWrapper
+	assistantPresetStoreAPI *AssistantPresetStoreWrapper
 
 	dataBasePath string
 
-	settingsDirPath      string
-	conversationsDirPath string
-	modelPresetsDirPath  string
-	promptsDirPath       string
-	toolsDirPath         string
-	skillsDirPath        string
+	settingsDirPath         string
+	conversationsDirPath    string
+	modelPresetsDirPath     string
+	promptsDirPath          string
+	toolsDirPath            string
+	skillsDirPath           string
+	assistantPresetsDirPath string
 }
 
 func NewApp() *App {
@@ -54,15 +56,18 @@ func NewApp() *App {
 	app.promptsDirPath = filepath.Join(app.dataBasePath, "prompttemplatesv1")
 	app.toolsDirPath = filepath.Join(app.dataBasePath, "toolsv1")
 	app.skillsDirPath = filepath.Join(app.dataBasePath, "skills")
+	app.assistantPresetsDirPath = filepath.Join(app.dataBasePath, "assistantpresetsv1")
 
 	if app.settingsDirPath == "" || app.conversationsDirPath == "" ||
-		app.modelPresetsDirPath == "" || app.promptsDirPath == "" || app.toolsDirPath == "" || app.skillsDirPath == "" {
+		app.modelPresetsDirPath == "" || app.promptsDirPath == "" ||
+		app.assistantPresetsDirPath == "" || app.toolsDirPath == "" || app.skillsDirPath == "" {
 		slog.Error(
 			"invalid app path configuration",
 			"settingsDirPath", app.settingsDirPath,
 			"conversationsDirPath", app.conversationsDirPath,
 			"modelPresetsDirPath", app.modelPresetsDirPath,
 			"promptsDirPath", app.promptsDirPath,
+			"assistantPresetsDirPath", app.assistantPresetsDirPath,
 			"toolsDirPath", app.toolsDirPath,
 			"skillsDirPath", app.skillsDirPath,
 		)
@@ -79,6 +84,7 @@ func NewApp() *App {
 	app.skillStoreAPI = &SkillStoreWrapper{}
 	app.toolRuntimeAPI = &ToolRuntimeWrapper{}
 	app.aggregateAPI = &AggregrateWrapper{}
+	app.assistantPresetStoreAPI = &AssistantPresetStoreWrapper{}
 
 	if err := os.MkdirAll(app.settingsDirPath, os.FileMode(0o770)); err != nil {
 		slog.Error(
@@ -128,6 +134,14 @@ func NewApp() *App {
 		)
 		panic("failed to initialize app: could not create skills directory")
 	}
+	if err := os.MkdirAll(app.assistantPresetsDirPath, os.FileMode(0o770)); err != nil {
+		slog.Error(
+			"failed to create assistant presets directory",
+			"assistant presets path", app.assistantPresetsDirPath,
+			"error", err,
+		)
+		panic("failed to initialize app: could not create assistant presets directory")
+	}
 
 	slog.Info(
 		"flexiGPT paths initialized",
@@ -138,6 +152,7 @@ func NewApp() *App {
 		"promptsDirPath", app.promptsDirPath,
 		"toolsDirPath", app.toolsDirPath,
 		"skillsDirPath", app.skillsDirPath,
+		"assistantPresetsDirPath", app.assistantPresetsDirPath,
 	)
 	return app
 }
@@ -217,6 +232,27 @@ func (a *App) initManagers() {
 	}
 	slog.Info("model presets store initialized", "dir", a.modelPresetsDirPath)
 
+	err = InitAssistantPresetStoreWrapper(
+		a.assistantPresetStoreAPI,
+		a.assistantPresetsDirPath,
+		a.modelPresetStoreAPI.store,
+		a.promptTemplateStoreAPI.store,
+		a.toolStoreAPI.store,
+		a.skillStoreAPI.store,
+	)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize assistant preset store",
+			"dir", a.assistantPresetsDirPath,
+			"error", err,
+		)
+		panic("failed to initialize managers: assistant preset store initialization failed")
+	}
+	slog.Info(
+		"assistant preset store initialized",
+		"dir", a.assistantPresetsDirPath,
+	)
+
 	err = InitSettingStoreWrapper(a.settingStoreAPI, a.settingsDirPath)
 	if err != nil {
 		slog.Error(
@@ -270,7 +306,17 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	// Perform any teardown here.
 
 	// Stop background goroutines + flushes for stores that need it.
+	if a.assistantPresetStoreAPI != nil {
+		a.assistantPresetStoreAPI.close()
+	}
+	if a.toolStoreAPI != nil {
+		a.toolStoreAPI.close()
+	}
+	if a.promptTemplateStoreAPI != nil {
+		a.promptTemplateStoreAPI.close()
+	}
+
 	if a.skillStoreAPI != nil {
-		a.skillStoreAPI.Close()
+		a.skillStoreAPI.close()
 	}
 }

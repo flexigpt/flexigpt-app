@@ -13,6 +13,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/flexigpt/flexigpt-app/internal/fsutil"
 )
 
 func (s *SkillStore) hydrateBuiltInEmbeddedFS(ctx context.Context) (err error) {
@@ -31,7 +33,7 @@ func (s *SkillStore) hydrateBuiltInEmbeddedFS(ctx context.Context) (err error) {
 		}
 	}()
 
-	sub, err := resolveSkillsFS(s.builtin.skillsFS, s.builtin.skillsDir)
+	sub, err := fsutil.ResolveFS(s.builtin.skillsFS, s.builtin.skillsDir)
 	if err != nil {
 		return err
 	}

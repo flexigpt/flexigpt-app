@@ -18,6 +18,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	"github.com/flexigpt/flexigpt-app/internal/fsutil"
 	"github.com/flexigpt/flexigpt-app/internal/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	"github.com/flexigpt/flexigpt-app/internal/tool/storehelper"
@@ -268,7 +269,7 @@ func (d *BuiltInToolData) GetBuiltInTool(
 }
 
 func (d *BuiltInToolData) populateDataFromFS(ctx context.Context) error {
-	toolsFS, err := resolveToolBundlesFS(d.toolsFS, d.toolsDir)
+	toolsFS, err := fsutil.ResolveFS(d.toolsFS, d.toolsDir)
 	if err != nil {
 		return err
 	}
@@ -452,13 +453,6 @@ func (d *BuiltInToolData) rebuildSnapshot(ctx context.Context) error {
 	d.viewBundles = newBundles
 	d.viewTools = newTools
 	return nil
-}
-
-func resolveToolBundlesFS(fsys fs.FS, dir string) (fs.FS, error) {
-	if dir == "" || dir == "." {
-		return fsys, nil
-	}
-	return fs.Sub(fsys, dir)
 }
 
 func cloneToolSpecs(

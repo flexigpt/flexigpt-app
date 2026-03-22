@@ -7,6 +7,8 @@ export SERVICE_CONVERSATIONS_DIR_PATH="./out/conversationsv1"
 export SERVICE_MODEL_PRESETS_DIR_PATH="./out/modelpresetsv1"
 export SERVICE_PROMPT_TEMPLATES_DIR_PATH="./out/prompttemplatesv1"
 export SERVICE_TOOLS_DIR_PATH="./out/toolsv1"
+export SERVICE_SKILLS_DIR_PATH="./out/skills"
+export SERVICE_ASSISTANTPRESETS_DIR_PATH="./out/assistantpresetsv1"
 export SERVICE_LOGS_DIR_PATH="./out/logs"
 export SERVICE_DEBUG="true"
 

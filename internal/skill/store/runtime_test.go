@@ -190,8 +190,8 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 	// Replace the built-in FS snapshot (embeddedfs) used by BuiltInSkills, then reload.
 	s.builtin.skillsFS = fsys
 	s.builtin.skillsDir = root
-	if err := s.builtin.loadFromFS(ctx); err != nil {
-		t.Fatalf("builtin.loadFromFS: %v", err)
+	if err := s.builtin.populateDataFromFS(ctx); err != nil {
+		t.Fatalf("builtin.populateDataFromFS: %v", err)
 	}
 
 	// Enable runtime and run the same two-step integration path:
@@ -577,8 +577,8 @@ func TestSkillStore_RuntimeIntegration_ReplacementSafety_UserSkillLocationChange
 	fsys := newBuiltInMapFS(t, root, now, bundle, []biSkill{biHello})
 	s.builtin.skillsFS = fsys
 	s.builtin.skillsDir = root
-	if err := s.builtin.loadFromFS(ctx); err != nil {
-		t.Fatalf("builtin.loadFromFS: %v", err)
+	if err := s.builtin.populateDataFromFS(ctx); err != nil {
+		t.Fatalf("builtin.populateDataFromFS: %v", err)
 	}
 
 	s.runtime = rt
@@ -723,8 +723,8 @@ func TestSkillStore_RuntimeIntegration_ReplacementSafety_BackgroundDrift_DoesNot
 	fsys := newBuiltInMapFS(t, root, now, bundle, []biSkill{biHello})
 	s.builtin.skillsFS = fsys
 	s.builtin.skillsDir = root
-	if err := s.builtin.loadFromFS(ctx); err != nil {
-		t.Fatalf("builtin.loadFromFS: %v", err)
+	if err := s.builtin.populateDataFromFS(ctx); err != nil {
+		t.Fatalf("builtin.populateDataFromFS: %v", err)
 	}
 
 	s.runtime = rt

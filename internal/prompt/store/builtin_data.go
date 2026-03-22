@@ -14,6 +14,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	"github.com/flexigpt/flexigpt-app/internal/fsutil"
 	"github.com/flexigpt/flexigpt-app/internal/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/prompt/spec"
 )
@@ -261,7 +262,7 @@ func (d *BuiltInData) Close() error {
 }
 
 func (d *BuiltInData) populateDataFromFS(ctx context.Context) error {
-	bundlesFS, err := resolveBundlesFS(d.bundlesFS, d.bundlesDir)
+	bundlesFS, err := fsutil.ResolveFS(d.bundlesFS, d.bundlesDir)
 	if err != nil {
 		return err
 	}
@@ -430,13 +431,6 @@ func (d *BuiltInData) rebuildSnapshot(ctx context.Context) error {
 	d.viewBundles = newBundles
 	d.viewTemplates = newTemplates
 	return nil
-}
-
-func resolveBundlesFS(fsys fs.FS, dir string) (fs.FS, error) {
-	if dir == "" || dir == "." {
-		return fsys, nil
-	}
-	return fs.Sub(fsys, dir)
 }
 
 func getTemplateKey(bid bundleitemutils.BundleID, tid bundleitemutils.ItemID) builtInTemplateID {

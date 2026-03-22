@@ -957,6 +957,78 @@
 					"modifiedAt": "2026-03-06T00:00:00Z",
 					"isBuiltIn": true
 				},
+				"gpt54mini": {
+					"schemaVersion": "2025-07-01",
+					"id": "gpt54mini",
+					"name": "gpt-5.4-mini",
+					"displayName": "OpenAI GPT 5.4 Mini",
+					"slug": "gpt54mini",
+					"isEnabled": true,
+					"stream": true,
+					"maxPromptLength": 400000,
+					"maxOutputLength": 128000,
+					"temperature": 1.0,
+					"reasoning": {
+						"type": "singleWithLevels",
+						"level": "high",
+						"tokens": 0
+					},
+					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
+					"timeout": 1200,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"temperatureDisallowedWhenEnabled": true,
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": [
+								"none",
+								"low",
+								"medium",
+								"high",
+								"xhigh"
+							],
+							"supportsSummaryStyle": true
+						}
+					},
+					"createdAt": "2026-03-22T00:00:00Z",
+					"modifiedAt": "2026-03-22T00:00:00Z",
+					"isBuiltIn": true
+				},
+				"gpt54nano": {
+					"schemaVersion": "2025-07-01",
+					"id": "gpt54nano",
+					"name": "gpt-5.4-nano",
+					"displayName": "OpenAI GPT 5.4 Nano",
+					"slug": "gpt54nano",
+					"isEnabled": true,
+					"stream": true,
+					"maxPromptLength": 400000,
+					"maxOutputLength": 128000,
+					"temperature": 1.0,
+					"reasoning": {
+						"type": "singleWithLevels",
+						"level": "high",
+						"tokens": 0
+					},
+					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
+					"timeout": 1200,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"temperatureDisallowedWhenEnabled": true,
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": [
+								"none",
+								"low",
+								"medium",
+								"high",
+								"xhigh"
+							],
+							"supportsSummaryStyle": true
+						}
+					},
+					"createdAt": "2026-03-22T00:00:00Z",
+					"modifiedAt": "2026-03-22T00:00:00Z",
+					"isBuiltIn": true
+				},
 				"gpt53Codex": {
 					"schemaVersion": "2025-07-01",
 					"id": "gpt53Codex",
@@ -993,7 +1065,7 @@
 					"name": "gpt-5.2",
 					"displayName": "OpenAI GPT 5.2",
 					"slug": "gpt52",
-					"isEnabled": true,
+					"isEnabled": false,
 					"stream": true,
 					"maxPromptLength": 400000,
 					"maxOutputLength": 128000,
@@ -1029,7 +1101,7 @@
 					"name": "gpt-5.2-codex",
 					"displayName": "OpenAI GPT 5.2 Codex",
 					"slug": "gpt52Codex",
-					"isEnabled": true,
+					"isEnabled": false,
 					"stream": true,
 					"maxPromptLength": 400000,
 					"maxOutputLength": 128000,
@@ -1149,7 +1221,7 @@
 					"name": "gpt-5-mini",
 					"displayName": "OpenAI GPT 5 Mini",
 					"slug": "gpt5Mini",
-					"isEnabled": true,
+					"isEnabled": false,
 					"stream": true,
 					"maxPromptLength": 400000,
 					"maxOutputLength": 128000,

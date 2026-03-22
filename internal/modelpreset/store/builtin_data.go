@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
+	"github.com/flexigpt/flexigpt-app/internal/fsutil"
 	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	"github.com/flexigpt/flexigpt-app/internal/overlay"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
@@ -129,7 +130,7 @@ func NewBuiltInPresets(
 	for _, o := range opts {
 		o(bi)
 	}
-	if err := bi.loadFromFS(ctx); err != nil {
+	if err := bi.populateDataFromFS(ctx); err != nil {
 		return nil, err
 	}
 
@@ -311,8 +312,8 @@ func (b *BuiltInPresets) SetDefaultModelPreset(
 	return cloneProviderPreset(pp), nil
 }
 
-func (b *BuiltInPresets) loadFromFS(ctx context.Context) error {
-	subFS, err := resolvePresetsFS(b.presetsFS, b.presetsDir)
+func (b *BuiltInPresets) populateDataFromFS(ctx context.Context) error {
+	subFS, err := fsutil.ResolveFS(b.presetsFS, b.presetsDir)
 	if err != nil {
 		return err
 	}
@@ -414,13 +415,6 @@ func (b *BuiltInPresets) rebuildSnapshot(ctx context.Context) error {
 	b.viewProv = newProv
 	b.viewModels = newModels
 	return nil
-}
-
-func resolvePresetsFS(fsys fs.FS, dir string) (fs.FS, error) {
-	if dir == "" || dir == "." {
-		return fsys, nil
-	}
-	return fs.Sub(fsys, dir)
 }
 
 func getModelKey(pName inferenceSpec.ProviderName, modelID spec.ModelPresetID) builtInModelKey {

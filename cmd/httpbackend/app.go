@@ -8,6 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/toolruntime"
 	"github.com/flexigpt/inference-go/debugclient"
 
+	assistantpresetStore "github.com/flexigpt/flexigpt-app/internal/assistantpreset/store"
 	conversationStore "github.com/flexigpt/flexigpt-app/internal/conversation/store"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
 	promptStore "github.com/flexigpt/flexigpt-app/internal/prompt/store"
@@ -25,20 +26,22 @@ type BackendApp struct {
 	toolStoreAPI           *toolStore.ToolStore
 	toolRuntimeAPI         *toolruntime.ToolRuntime
 	skillStoreAPI          *skillStore.SkillStore
+	assistantPresetAPI     *assistantpresetStore.AssistantPresetStore
 
-	settingsDirPath      string
-	conversationsDirPath string
-	modelPresetsDirPath  string
-	promptsDirPath       string
-	toolsDirPath         string
-	skillsDirPath        string
+	settingsDirPath         string
+	conversationsDirPath    string
+	modelPresetsDirPath     string
+	promptsDirPath          string
+	toolsDirPath            string
+	skillsDirPath           string
+	assistantPresetsDirPath string
 }
 
 func NewBackendApp(
-	settingsDirPath, conversationsDirPath, modelPresetsDirPath, promptsDirPath, toolsDirPath, skillsDirPath string,
+	settingsDirPath, conversationsDirPath, modelPresetsDirPath, promptsDirPath, toolsDirPath, skillsDirPath, assistantPresetsDirPath string,
 ) *BackendApp {
 	if settingsDirPath == "" || conversationsDirPath == "" ||
-		modelPresetsDirPath == "" || promptsDirPath == "" || toolsDirPath == "" || skillsDirPath == "" {
+		modelPresetsDirPath == "" || promptsDirPath == "" || toolsDirPath == "" || skillsDirPath == "" || assistantPresetsDirPath == "" {
 		slog.Error(
 			"invalid app path configuration",
 			"settingsDirPath", settingsDirPath,
@@ -47,17 +50,19 @@ func NewBackendApp(
 			"promptsDirPath", promptsDirPath,
 			"toolsDirPath", toolsDirPath,
 			"skillsDirPath", skillsDirPath,
+			"assistantPresetsDirPath", assistantPresetsDirPath,
 		)
 		panic("failed to initialize BackendApp: invalid path configuration")
 	}
 
 	app := &BackendApp{
-		settingsDirPath:      settingsDirPath,
-		conversationsDirPath: conversationsDirPath,
-		modelPresetsDirPath:  modelPresetsDirPath,
-		promptsDirPath:       promptsDirPath,
-		toolsDirPath:         toolsDirPath,
-		skillsDirPath:        skillsDirPath,
+		settingsDirPath:         settingsDirPath,
+		conversationsDirPath:    conversationsDirPath,
+		modelPresetsDirPath:     modelPresetsDirPath,
+		promptsDirPath:          promptsDirPath,
+		toolsDirPath:            toolsDirPath,
+		skillsDirPath:           skillsDirPath,
+		assistantPresetsDirPath: assistantPresetsDirPath,
 	}
 
 	app.initSettingsStore()
@@ -67,6 +72,7 @@ func NewBackendApp(
 	app.initProviderSet()
 	app.initModelPresetStore()
 	app.initPromptTemplateStore()
+	app.initAssistantPresetsStore()
 	return app
 }
 
@@ -242,4 +248,28 @@ func (a *BackendApp) initProviderSet() {
 		panic("failed to initialize BackendApp: invalid default provider")
 	}
 	a.providerSetAPI = p
+}
+
+func (a *BackendApp) initAssistantPresetsStore() {
+	if err := os.MkdirAll(a.assistantPresetsDirPath, os.FileMode(0o770)); err != nil {
+		slog.Error(
+			"failed to create skills directory",
+			"assistantPresetsDirPath", a.assistantPresetsDirPath,
+			"error", err,
+		)
+		panic("failed to initialize BackendApp: could not create assistantPresets directory")
+	}
+
+	st, err := assistantpresetStore.NewAssistantPresetStore(a.assistantPresetsDirPath)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize assistantPresets store",
+			"assistantPresetsDirPath", a.assistantPresetsDirPath,
+			"error", err,
+		)
+		panic("failed to initialize BackendApp: assistantPresets store initialization failed")
+	}
+
+	a.assistantPresetAPI = st
+	slog.Info("assistantPresets store initialized", "dir", a.assistantPresetsDirPath)
 }

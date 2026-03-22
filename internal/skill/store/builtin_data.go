@@ -12,6 +12,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	"github.com/flexigpt/flexigpt-app/internal/fsutil"
 	"github.com/flexigpt/flexigpt-app/internal/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
 )
@@ -114,7 +115,7 @@ func NewBuiltInSkills(
 		o(b)
 	}
 
-	if err := b.loadFromFS(ctx); err != nil {
+	if err := b.populateDataFromFS(ctx); err != nil {
 		return nil, err
 	}
 
@@ -263,8 +264,8 @@ func (b *BuiltInSkills) SetSkillEnabled(
 	return cloneSkill(sk), nil
 }
 
-func (b *BuiltInSkills) loadFromFS(ctx context.Context) error {
-	sub, err := resolveSkillsFS(b.skillsFS, b.skillsDir)
+func (b *BuiltInSkills) populateDataFromFS(ctx context.Context) error {
+	sub, err := fsutil.ResolveFS(b.skillsFS, b.skillsDir)
 	if err != nil {
 		return err
 	}
@@ -369,23 +370,6 @@ func (b *BuiltInSkills) rebuildSnapshot(ctx context.Context) error {
 	b.viewBundles = newBundles
 	b.viewSkills = newSkills
 	return nil
-}
-
-func resolveSkillsFS(fsys fs.FS, dir string) (fs.FS, error) {
-	if dir == "" || dir == "." {
-		return fsys, nil
-	}
-
-	// Validate dir exists and is a directory.
-	fi, err := fs.Stat(fsys, dir)
-	if err != nil {
-		return nil, err
-	}
-	if !fi.IsDir() {
-		return nil, fmt.Errorf("%q is not a directory", dir)
-	}
-
-	return fs.Sub(fsys, dir)
 }
 
 func getBuiltInSkillKey(bundleID bundleitemutils.BundleID, slug spec.SkillSlug) builtInSkillKey {

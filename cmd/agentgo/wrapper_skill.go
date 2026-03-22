@@ -22,13 +22,6 @@ func InitSkillStoreWrapper(s *SkillStoreWrapper, skillsDir string) error {
 	return nil
 }
 
-func (s *SkillStoreWrapper) Close() {
-	if s == nil || s.store == nil {
-		return
-	}
-	s.store.Close()
-}
-
 func (s *SkillStoreWrapper) PutSkillBundle(
 	req *spec.PutSkillBundleRequest,
 ) (*spec.PutSkillBundleResponse, error) {
@@ -129,4 +122,11 @@ func (s *SkillStoreWrapper) InvokeSkillTool(
 	return middleware.WithRecoveryResp(func() (*spec.InvokeSkillToolResponse, error) {
 		return s.store.InvokeSkillTool(context.Background(), req)
 	})
+}
+
+func (s *SkillStoreWrapper) close() {
+	if s == nil || s.store == nil {
+		return
+	}
+	s.store.Close()
 }

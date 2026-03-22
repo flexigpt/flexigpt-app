@@ -13,6 +13,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
 	"github.com/danielgtaylor/huma/v2/humacli"
+	assistantpresetStore "github.com/flexigpt/flexigpt-app/internal/assistantpreset/store"
 	conversationStore "github.com/flexigpt/flexigpt-app/internal/conversation/store"
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper"
 	"github.com/flexigpt/flexigpt-app/internal/logrotate"
@@ -29,16 +30,17 @@ import (
 
 // Options for the server cli.
 type Options struct {
-	Host                   string `doc:"Hostname to listen on."                  default:"127.0.0.1"`
-	Port                   int    `doc:"Port to listen on"                       default:"8888"`
-	SettingsDirPath        string `doc:"path to directory of settings file"`
-	ConversationsDirPath   string `doc:"path to conversations directory"`
-	ModelPresetsDirPath    string `doc:"path to modelPresets data directory"`
-	PromptTemplatesDirPath string `doc:"path to prompt templates data directory"`
-	ToolsDirPath           string `doc:"path to tools data directory"`
-	SkillsDirPath          string `doc:"path to skills data directory"`
-	LogsDirPath            string `doc:"path to logs directory"`
-	Debug                  bool   `doc:"Enable debug logs"`
+	Host                    string `doc:"Hostname to listen on."                  default:"127.0.0.1"`
+	Port                    int    `doc:"Port to listen on"                       default:"8888"`
+	SettingsDirPath         string `doc:"path to directory of settings file"`
+	ConversationsDirPath    string `doc:"path to conversations directory"`
+	ModelPresetsDirPath     string `doc:"path to modelPresets data directory"`
+	PromptTemplatesDirPath  string `doc:"path to prompt templates data directory"`
+	ToolsDirPath            string `doc:"path to tools data directory"`
+	SkillsDirPath           string `doc:"path to skills data directory"`
+	AssistantPresetsDirPath string `doc:"path to assistantpresets data directory"`
+	LogsDirPath             string `doc:"path to logs directory"`
+	Debug                   bool   `doc:"Enable debug logs"`
 }
 
 func main() {
@@ -54,6 +56,7 @@ func main() {
 			opts.PromptTemplatesDirPath,
 			opts.ToolsDirPath,
 			opts.SkillsDirPath,
+			opts.AssistantPresetsDirPath,
 		)
 		settingStore.InitSettingStoreHandlers(api, app.settingStoreAPI)
 		conversationStore.InitConversationStoreHandlers(api, app.conversationStoreAPI)
@@ -63,6 +66,8 @@ func main() {
 		toolStore.InitToolStoreHandlers(api, app.toolStoreAPI)
 		toolruntime.InitToolRuntimeHandlers(api, app.toolRuntimeAPI)
 		skillStore.InitSkillStoreHandlers(api, app.skillStoreAPI)
+		assistantpresetStore.InitAssistantPresetStoreHandlers(api, app.assistantPresetAPI)
+
 		// Create the HTTP server.
 		server := http.Server{
 			Addr:              fmt.Sprintf("%s:%d", opts.Host, opts.Port),
