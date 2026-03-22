@@ -13,6 +13,7 @@ import type {
 	UIToolOutput,
 	URLCitation,
 } from '@/spec/inference';
+import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
 
@@ -27,6 +28,7 @@ export interface StoreConversationMessage {
 	status: Status;
 
 	modelParam?: ModelParam;
+	modelPresetRef?: ModelPresetRef;
 	inputs?: InputUnion[];
 	outputs?: OutputUnion[];
 
@@ -75,3 +77,12 @@ export type ConversationSearchItem = {
 	idDate: Date;
 	modifiedAt: Date;
 };
+
+export interface RestorableConversationContext {
+	modelPresetRef?: ModelPresetRef;
+	modelParam?: ModelParam;
+	toolChoices: ToolStoreChoice[];
+	webSearchChoices: ToolStoreChoice[];
+	enabledSkillRefs: SkillRef[];
+	activeSkillRefs: SkillRef[];
+}

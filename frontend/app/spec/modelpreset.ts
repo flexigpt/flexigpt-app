@@ -7,10 +7,18 @@ import {
 	type ReasoningParam,
 } from '@/spec/inference';
 
+export const PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY = '__conversation__:previous-system-prompt';
+export const PREVIOUS_CONVO_SYSTEM_PROMPT_BUNDLEID = '__conversation__';
+
 type ModelName = string;
 export type ModelDisplayName = string;
 type ModelSlug = string;
 export type ModelPresetID = string;
+
+export interface ModelPresetRef {
+	providerName: ProviderName;
+	modelPresetID: ModelPresetID;
+}
 
 export type ProviderDisplayName = string;
 

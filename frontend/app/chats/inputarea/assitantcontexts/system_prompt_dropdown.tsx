@@ -5,6 +5,7 @@ import { FiCheck, FiChevronDown, FiChevronUp, FiGitBranch, FiPlus, FiX } from 'r
 
 import { Popover, PopoverDisclosure, Tooltip, usePopoverStore, useStoreState, useTooltipStore } from '@ariakit/react';
 
+import { PREVIOUS_CONVO_SYSTEM_PROMPT_BUNDLEID } from '@/spec/modelpreset';
 import { type PromptBundle, PromptRoleEnum } from '@/spec/prompt';
 
 import { DEFAULT_SEMVER } from '@/lib/version_utils';
@@ -52,7 +53,7 @@ function pickInitialBundleID(
 function buildPromptPreview(prompt: string): string {
 	const trimmed = prompt.trim();
 	if (!trimmed) return '(empty)';
-	return trimmed.length > 120 ? `${trimmed.slice(0, 120)}…` : trimmed;
+	return trimmed.length > 64 ? `${trimmed.slice(0, 64)}…` : trimmed;
 }
 
 export function SystemPromptDropdown({
@@ -149,12 +150,18 @@ export function SystemPromptDropdown({
 
 	const openForkModal = useCallback(
 		(item: SystemPromptItem) => {
-			setModalMode('fork');
+			const isSyntheticPreviousConversationPrompt = item.bundleID === PREVIOUS_CONVO_SYSTEM_PROMPT_BUNDLEID;
+			setModalMode(isSyntheticPreviousConversationPrompt ? 'add' : 'fork');
+
 			setComposerInitialDraft({
-				bundleID: pickInitialBundleID(bundles, preferredBundleID, item.bundleID),
+				bundleID: pickInitialBundleID(
+					bundles,
+					preferredBundleID,
+					isSyntheticPreviousConversationPrompt ? undefined : item.bundleID
+				),
 				displayName: item.displayName,
 				slug: item.templateSlug,
-				version: item.templateVersion,
+				version: isSyntheticPreviousConversationPrompt ? DEFAULT_SEMVER : item.templateVersion,
 				role: item.role,
 				content: item.prompt,
 			});

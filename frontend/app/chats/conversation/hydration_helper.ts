@@ -4,6 +4,7 @@ import {
 	type Conversation,
 	CONVERSATION_SCHEMA_VERSION,
 	type ConversationMessage,
+	type RestorableConversationContext,
 	type StoreConversation,
 	type StoreConversationMessage,
 } from '@/spec/conversation';
@@ -13,6 +14,7 @@ import {
 	type InputOutputContent,
 	type InputOutputContentItemUnion,
 	type InputUnion,
+	type ModelParam,
 	type OutputUnion,
 	type ReasoningContent,
 	RoleEnum,
@@ -24,9 +26,11 @@ import {
 	type UIToolOutput,
 	type URLCitation,
 } from '@/spec/inference';
+import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
 import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
+import { stripUndefinedDeep } from '@/lib/obj_utils';
 import { generateTitle } from '@/lib/title_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
@@ -62,7 +66,7 @@ export function initConversationMessage(role: RoleEnum): ConversationMessage {
 	};
 }
 
-export function deriveConversationToolsFromMessages(messages: ConversationMessage[]): ToolStoreChoice[] {
+function deriveConversationToolsFromMessages(messages: ConversationMessage[]): ToolStoreChoice[] {
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
 		const m = messages[i];
 		if (m.role !== RoleEnum.User) continue;
@@ -71,7 +75,7 @@ export function deriveConversationToolsFromMessages(messages: ConversationMessag
 	return [];
 }
 
-export function deriveWebSearchChoiceFromMessages(messages: ConversationMessage[]): ToolStoreChoice[] {
+function deriveWebSearchChoiceFromMessages(messages: ConversationMessage[]): ToolStoreChoice[] {
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
 		const m = messages[i];
 		if (m.role !== RoleEnum.User) continue;
@@ -80,7 +84,7 @@ export function deriveWebSearchChoiceFromMessages(messages: ConversationMessage[
 	return [];
 }
 
-export function deriveEnabledSkillRefsFromMessages(messages: ConversationMessage[]): SkillRef[] {
+function deriveEnabledSkillRefsFromMessages(messages: ConversationMessage[]): SkillRef[] {
 	// We must treat "missing/undefined" the same as "empty": both mean "no skills selected" for the latest user turn.
 	// Scanning for "last non-empty" makes old skill selections sticky forever.
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -91,7 +95,7 @@ export function deriveEnabledSkillRefsFromMessages(messages: ConversationMessage
 	return [];
 }
 
-export function deriveActiveSkillRefsFromMessages(messages: ConversationMessage[]): SkillRef[] {
+function deriveActiveSkillRefsFromMessages(messages: ConversationMessage[]): SkillRef[] {
 	// We must treat "missing/undefined" the same as "empty": both mean "no active skills" for the latest user turn.
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
 		const m = messages[i];
@@ -101,9 +105,74 @@ export function deriveActiveSkillRefsFromMessages(messages: ConversationMessage[
 	return [];
 }
 
+function findLastModelPresetRef(messages: ConversationMessage[]): ModelPresetRef | undefined {
+	for (let i = messages.length - 1; i >= 0; i -= 1) {
+		const ref = messages[i].modelPresetRef;
+		if (!ref) continue;
+		if (!ref.providerName || !ref.modelPresetID) continue;
+		return ref;
+	}
+	return undefined;
+}
+
+function findLastModelParam(messages: ConversationMessage[]): ModelParam | undefined {
+	for (let i = messages.length - 1; i >= 0; i -= 1) {
+		const modelParam = messages[i].modelParam;
+		if (modelParam) return modelParam;
+	}
+	return undefined;
+}
+
+function modelParamsEqual(a?: ModelParam, b?: ModelParam): boolean {
+	return JSON.stringify(stripUndefinedDeep(a)) === JSON.stringify(stripUndefinedDeep(b));
+}
+
+function findLastPersistedModelParam(messages: ConversationMessage[]): ModelParam | undefined {
+	for (let i = messages.length - 1; i >= 0; i -= 1) {
+		const modelParam = messages[i].modelParam;
+		if (modelParam) return modelParam;
+	}
+	return undefined;
+}
+
+export function shouldPersistAssistantModelParam(messages: ConversationMessage[], nextModelParam: ModelParam): boolean {
+	const previous = findLastPersistedModelParam(messages);
+	return !previous || !modelParamsEqual(previous, nextModelParam);
+}
+
+export function applyAssistantPersistenceContext(
+	message: ConversationMessage,
+	modelPresetRef: ModelPresetRef,
+	modelParam?: ModelParam
+): ConversationMessage {
+	const next = {
+		...message,
+		modelPresetRef,
+	} as ConversationMessage & { modelParam?: ModelParam };
+
+	if (modelParam) next.modelParam = modelParam;
+	else delete next.modelParam;
+
+	return next;
+}
+
+export function deriveRestorableConversationContextFromMessages(
+	messages: ConversationMessage[]
+): RestorableConversationContext {
+	return {
+		modelPresetRef: findLastModelPresetRef(messages),
+		modelParam: findLastModelParam(messages),
+		toolChoices: deriveConversationToolsFromMessages(messages),
+		webSearchChoices: deriveWebSearchChoiceFromMessages(messages),
+		enabledSkillRefs: deriveEnabledSkillRefsFromMessages(messages),
+		activeSkillRefs: deriveActiveSkillRefsFromMessages(messages),
+	};
+}
+
 export function buildUserConversationMessageFromEditor(
 	payload: EditorSubmitPayload,
-	existingId?: string
+	existingId?: string,
+	modelPresetRef?: ModelPresetRef
 ): ConversationMessage {
 	const now = new Date();
 	const id = existingId ?? getUUIDv7();
@@ -179,6 +248,7 @@ export function buildUserConversationMessageFromEditor(
 		createdAt: now,
 		role: RoleEnum.User,
 		status: Status.None,
+		modelPresetRef: modelPresetRef,
 		inputs,
 		attachments,
 		toolStoreChoices,

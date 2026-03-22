@@ -6,6 +6,7 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/attachment"
+	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
@@ -29,8 +30,9 @@ type ConversationMessage struct {
 	Status    inferenceSpec.Status   `json:"status,omitzero"`
 
 	// Default model configuration for this turn. This can be empty and would mean that model param have been carried
-	// over from previous messages.
-	ModelParam *inferenceSpec.ModelParam `json:"modelParam,omitempty"`
+	// over from previous messages. Same for model ref.
+	ModelParam     *inferenceSpec.ModelParam       `json:"modelParam,omitempty"`
+	ModelPresetRef *modelpresetSpec.ModelPresetRef `json:"modelPresetRef"`
 
 	// Canonical, lossless events for this turn, in the order they occurred.
 	//

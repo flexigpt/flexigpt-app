@@ -24,7 +24,7 @@ import {
 	Status,
 	type UIToolCall,
 } from '@/spec/inference';
-import { type UIChatOption } from '@/spec/modelpreset';
+import { type ModelPresetRef, type UIChatOption } from '@/spec/modelpreset';
 import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
@@ -37,13 +37,12 @@ import { ButtonScrollToBottom, ButtonScrollToTop } from '@/components/button_scr
 import type { ChatTabState } from '@/chats/chat_tabs_persist';
 import { HandleCompletion } from '@/chats/conversation/completion_helper';
 import {
+	applyAssistantPersistenceContext,
 	buildUserConversationMessageFromEditor,
 	dedupeAttachmentsByRef,
-	deriveActiveSkillRefsFromMessages,
-	deriveConversationToolsFromMessages,
-	deriveEnabledSkillRefsFromMessages,
-	deriveWebSearchChoiceFromMessages,
+	deriveRestorableConversationContextFromMessages,
 	initConversationMessage,
+	shouldPersistAssistantModelParam,
 } from '@/chats/conversation/hydration_helper';
 import { VIRTUOSO_AT_BOTTOM_THRESHOLD } from '@/chats/conversation/virtuoso_config';
 import { sliceMessagesForSend } from '@/chats/inputarea/assitantcontexts/previous_messages_helper';
@@ -438,16 +437,13 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		// Loading/restoring a conversation into an existing tab must clear any
 		// unsent draft state already living in that tab's composer.
 		input.resetEditor();
+		const restored = deriveRestorableConversationContextFromMessages(conv.messages);
 
-		const tools = deriveConversationToolsFromMessages(conv.messages);
-		const web = deriveWebSearchChoiceFromMessages(conv.messages);
-		const skills = deriveEnabledSkillRefsFromMessages(conv.messages);
-		const active = deriveActiveSkillRefsFromMessages(conv.messages);
-
-		input.setConversationToolsFromChoices(tools);
-		input.setWebSearchFromChoices(web);
-		input.setEnabledSkillRefsFromMessage(skills);
-		input.setActiveSkillRefsFromMessage(active);
+		input.restoreConversationContext(restored);
+		input.setConversationToolsFromChoices(restored.toolChoices);
+		input.setWebSearchFromChoices(restored.webSearchChoices);
+		input.setEnabledSkillRefsFromMessage(restored.enabledSkillRefs);
+		input.setActiveSkillRefsFromMessage(restored.activeSkillRefs);
 	}, []);
 
 	const focusInput = useCallback((tabId: string) => inputRefs.current.get(tabId)?.focus(), []);
@@ -644,22 +640,32 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 				getStreamBuffer(tabId).thinking.chunks.push(thinkingData);
 				notifyStreamSoon(tabId);
 			};
+			const inputParams: ModelParam = {
+				name: options.name,
+				temperature: options.temperature,
+				stream: options.stream,
+				maxPromptLength: options.maxPromptLength,
+				maxOutputLength: options.maxOutputLength,
+				reasoning: options.reasoning,
+				systemPrompt: options.systemPrompt,
+				timeout: options.timeout,
+				outputParam: options.outputParam,
+				stopSequences: options.stopSequences,
+				additionalParametersRawJSON: options.additionalParametersRawJSON,
+			};
+
+			const effectiveModelPresetRef: ModelPresetRef = {
+				providerName: options.providerName,
+				modelPresetID: options.modelPresetID,
+			};
+			const persistedAssistantModelParam = shouldPersistAssistantModelParam(
+				updatedChatWithUserMessage.messages,
+				inputParams
+			)
+				? inputParams
+				: undefined;
 
 			try {
-				const inputParams: ModelParam = {
-					name: options.name,
-					temperature: options.temperature,
-					stream: options.stream,
-					maxPromptLength: options.maxPromptLength,
-					maxOutputLength: options.maxOutputLength,
-					reasoning: options.reasoning,
-					systemPrompt: options.systemPrompt,
-					timeout: options.timeout,
-					outputParam: options.outputParam,
-					stopSequences: options.stopSequences,
-					additionalParametersRawJSON: options.additionalParametersRawJSON,
-				};
-
 				let toolStoreChoices: ToolStoreChoice[] | undefined;
 				const latestUser = updatedChatWithUserMessage.messages
 					.slice()
@@ -688,9 +694,15 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 				if (requestIdByTab.current.get(tabId) !== reqId) return; // stale completion
 
 				if (responseMessage) {
+					const persistedAssistantMessage = applyAssistantPersistenceContext(
+						responseMessage,
+						effectiveModelPresetRef,
+						persistedAssistantModelParam
+					);
+
 					let finalChat: Conversation = {
 						...chatWithPlaceholder,
-						messages: [...chatWithPlaceholder.messages.slice(0, -1), responseMessage],
+						messages: [...chatWithPlaceholder.messages.slice(0, -1), persistedAssistantMessage],
 						modifiedAt: new Date(),
 					};
 
@@ -714,8 +726,8 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 					// Queue tool calls for THIS tab's composer (even if hidden),
 					// but do not load them until the assistant turn has cleared busy.
 					// Auto-exec is event-driven and should see isBusy=false.
-					if (responseMessage.uiToolCalls && responseMessage.uiToolCalls.length > 0) {
-						queuedRunnableToolCalls = responseMessage.uiToolCalls.filter(
+					if (persistedAssistantMessage.uiToolCalls && persistedAssistantMessage.uiToolCalls.length > 0) {
+						queuedRunnableToolCalls = persistedAssistantMessage.uiToolCalls.filter(
 							c => c.type === ToolStoreChoiceType.Function || c.type === ToolStoreChoiceType.Custom
 						);
 					}
@@ -723,29 +735,33 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 					// No usable response (e.g. nil inferenceResponse or null resp).
 					// Replace the placeholder with a visible error so it is not an
 					// invisible single-line stub.
-					const fallbackMsg: ConversationMessage = {
-						...assistantPlaceholder,
-						status: Status.Failed,
-						uiContent: '> Error: No response was returned by the backend.',
-						outputs: [
-							{
-								kind: OutputKind.OutputMessage,
-								outputMessage: {
-									id: assistantPlaceholder.id,
-									role: RoleEnum.Assistant,
-									status: Status.Failed,
-									contents: [
-										{
-											kind: ContentItemKind.Text,
-											textItem: {
-												text: '> Error: No response was returned by the backend.',
+					const fallbackMsg = applyAssistantPersistenceContext(
+						{
+							...assistantPlaceholder,
+							status: Status.Failed,
+							uiContent: '> Error: No response was returned by the backend.',
+							outputs: [
+								{
+									kind: OutputKind.OutputMessage,
+									outputMessage: {
+										id: assistantPlaceholder.id,
+										role: RoleEnum.Assistant,
+										status: Status.Failed,
+										contents: [
+											{
+												kind: ContentItemKind.Text,
+												textItem: {
+													text: '> Error: No response was returned by the backend.',
+												},
 											},
-										},
-									],
+										],
+									},
 								},
-							},
-						],
-					};
+							],
+						},
+						effectiveModelPresetRef,
+						persistedAssistantModelParam
+					);
 
 					const finalChat: Conversation = {
 						...chatWithPlaceholder,
@@ -787,12 +803,11 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 							},
 						];
 
-						const partialMsg: ConversationMessage = {
-							...assistantPlaceholder,
-							status: Status.Completed,
-							outputs: partialOutputs,
-							uiContent: partialText,
-						};
+						const partialMsg = applyAssistantPersistenceContext(
+							{ ...assistantPlaceholder, status: Status.Completed, outputs: partialOutputs, uiContent: partialText },
+							effectiveModelPresetRef,
+							persistedAssistantModelParam
+						);
 
 						const finalChat: Conversation = {
 							...chatWithPlaceholder,
@@ -812,33 +827,37 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 					const partialText = getFullStreamTextForTab(tabId).trim();
 					const fallbackText = partialText ? `${partialText}\n\n> Error: ${errorMessage}` : `> Error: ${errorMessage}`;
 
-					const fallbackMsg: ConversationMessage = {
-						...assistantPlaceholder,
-						status: Status.Failed,
-						error: {
-							code: 'unknown',
-							message: errorMessage,
-						} as InferenceError,
-						uiContent: fallbackText,
-						outputs: [
-							{
-								kind: OutputKind.OutputMessage,
-								outputMessage: {
-									id: assistantPlaceholder.id,
-									role: RoleEnum.Assistant,
-									status: Status.Failed,
-									contents: [
-										{
-											kind: ContentItemKind.Text,
-											textItem: {
-												text: fallbackText,
+					const fallbackMsg = applyAssistantPersistenceContext(
+						{
+							...assistantPlaceholder,
+							status: Status.Failed,
+							error: {
+								code: 'unknown',
+								message: errorMessage,
+							} as InferenceError,
+							uiContent: fallbackText,
+							outputs: [
+								{
+									kind: OutputKind.OutputMessage,
+									outputMessage: {
+										id: assistantPlaceholder.id,
+										role: RoleEnum.Assistant,
+										status: Status.Failed,
+										contents: [
+											{
+												kind: ContentItemKind.Text,
+												textItem: {
+													text: fallbackText,
+												},
 											},
-										},
-									],
+										],
+									},
 								},
-							},
-						],
-					};
+							],
+						},
+						effectiveModelPresetRef,
+						persistedAssistantModelParam
+					);
 
 					const finalChat: Conversation = {
 						...chatWithPlaceholder,
@@ -905,7 +924,11 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 					systemPrompt: appendSystemPromptParts(sendOptions.systemPrompt, [templateSystemPrompt]),
 				};
 			}
-			const userMsg = buildUserConversationMessageFromEditor(payload, editingId);
+			const modelPresetRef: ModelPresetRef = {
+				providerName: sendOptions.providerName,
+				modelPresetID: sendOptions.modelPresetID,
+			};
+			const userMsg = buildUserConversationMessageFromEditor(payload, editingId, modelPresetRef);
 
 			if (tab.editingMessageId) {
 				const idx = tab.conversation.messages.findIndex(m => m.id === tab.editingMessageId);

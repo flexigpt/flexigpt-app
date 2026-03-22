@@ -1,8 +1,16 @@
 import { type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { type OutputVerbosity, type ReasoningLevel, ReasoningType } from '@/spec/inference';
-import { DefaultUIChatOptions, type IncludePreviousMessages, type UIChatOption } from '@/spec/modelpreset';
-import { type PromptBundle } from '@/spec/prompt';
+import type { RestorableConversationContext } from '@/spec/conversation';
+import { type ModelParam, type OutputVerbosity, type ReasoningLevel, ReasoningType } from '@/spec/inference';
+import {
+	DefaultUIChatOptions,
+	type IncludePreviousMessages,
+	type ModelPresetRef,
+	PREVIOUS_CONVO_SYSTEM_PROMPT_BUNDLEID,
+	PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY,
+	type UIChatOption,
+} from '@/spec/modelpreset';
+import { type PromptBundle, PromptRoleEnum } from '@/spec/prompt';
 
 import {
 	getSupportedReasoningLevels,
@@ -16,6 +24,183 @@ import { type SystemPromptItem, useSystemPrompts } from '@/prompts/lib/use_syste
 
 function isHybridReasoningModel(model: UIChatOption): boolean {
 	return model.reasoning?.type === ReasoningType.HybridWithTokens;
+}
+
+function hasOwn(obj: object, key: string): boolean {
+	return Object.prototype.hasOwnProperty.call(obj, key);
+}
+
+function applyPersistedModelParamToSelectedModel(base: UIChatOption, modelParam?: ModelParam): UIChatOption {
+	if (!modelParam) return sanitizeUIChatOptionByCapabilities(base);
+
+	const next: UIChatOption = {
+		...base,
+		name: modelParam.name,
+		stream: modelParam.stream,
+		maxPromptLength: modelParam.maxPromptLength,
+		maxOutputLength: modelParam.maxOutputLength,
+		timeout: modelParam.timeout,
+	};
+
+	if (hasOwn(modelParam, 'temperature')) next.temperature = modelParam.temperature;
+	else delete next.temperature;
+
+	if (hasOwn(modelParam, 'reasoning')) next.reasoning = modelParam.reasoning;
+	else delete next.reasoning;
+
+	if (hasOwn(modelParam, 'outputParam')) next.outputParam = modelParam.outputParam;
+	else delete next.outputParam;
+
+	if (hasOwn(modelParam, 'stopSequences')) next.stopSequences = modelParam.stopSequences;
+	else delete next.stopSequences;
+
+	if (hasOwn(modelParam, 'additionalParametersRawJSON')) {
+		next.additionalParametersRawJSON = modelParam.additionalParametersRawJSON;
+	} else {
+		delete next.additionalParametersRawJSON;
+	}
+
+	// IMPORTANT:
+	// selectedModel.systemPrompt in UI state represents the model-default prompt.
+	// The restored effective conversation prompt is handled separately as a
+	// synthetic selectable prompt source ("previous convo system prompt").
+	return sanitizeUIChatOptionByCapabilities(next);
+}
+
+function pickUniqueModelOption(options: UIChatOption[]): UIChatOption | undefined {
+	return options.length === 1 ? options[0] : undefined;
+}
+
+function findRestorableModelOption(
+	allOptions: UIChatOption[],
+	modelPresetRef?: ModelPresetRef,
+	modelParam?: ModelParam
+): UIChatOption | undefined {
+	const providerName = modelPresetRef?.providerName?.trim();
+	const modelPresetID = modelPresetRef?.modelPresetID?.trim();
+	const modelName = modelParam?.name?.trim();
+
+	const providerScopedOptions = providerName
+		? allOptions.filter(option => option.providerName === providerName)
+		: allOptions;
+
+	// 1) Strongest match: exact provider + preset id
+	if (providerName && modelPresetID) {
+		const exactRef = providerScopedOptions.find(option => option.modelPresetID === modelPresetID);
+		if (exactRef) return exactRef;
+	}
+
+	// 2) If provider is known but preset id is stale/missing, prefer matching by
+	//    underlying model name ONLY within that provider, and only if unique.
+	if (providerName && modelName) {
+		const byProviderAndName = providerScopedOptions.filter(option => option.name === modelName);
+		const uniqueByProviderAndName = pickUniqueModelOption(byProviderAndName);
+		if (uniqueByProviderAndName) return uniqueByProviderAndName;
+
+		// Secondary provider-scoped fallback in case very old persisted state used
+		// a display-ish name instead of the raw model name.
+		const byProviderAndDisplayName = providerScopedOptions.filter(option => option.modelDisplayName === modelName);
+		const uniqueByProviderAndDisplayName = pickUniqueModelOption(byProviderAndDisplayName);
+		if (uniqueByProviderAndDisplayName) return uniqueByProviderAndDisplayName;
+
+		// Ambiguous within provider -> do not guess.
+		return undefined;
+	}
+
+	// 3) No provider info: only accept globally unique matches.
+	if (modelName) {
+		const byGlobalName = allOptions.filter(option => option.name === modelName);
+		const uniqueByGlobalName = pickUniqueModelOption(byGlobalName);
+		if (uniqueByGlobalName) return uniqueByGlobalName;
+
+		const byGlobalDisplayName = allOptions.filter(option => option.modelDisplayName === modelName);
+		const uniqueByGlobalDisplayName = pickUniqueModelOption(byGlobalDisplayName);
+		if (uniqueByGlobalDisplayName) return uniqueByGlobalDisplayName;
+	}
+
+	return undefined;
+}
+
+function resolveRestoredSelectedModel(
+	allOptions: UIChatOption[],
+	fallbackSelectedModel: UIChatOption,
+	modelPresetRef?: ModelPresetRef,
+	modelParam?: ModelParam
+): UIChatOption {
+	const resolvedOption = findRestorableModelOption(allOptions, modelPresetRef, modelParam);
+	if (resolvedOption) {
+		return applyPersistedModelParamToSelectedModel(resolvedOption, modelParam);
+	}
+
+	const providerMatch = modelPresetRef
+		? allOptions.find(option => option.providerName === modelPresetRef.providerName)
+		: undefined;
+
+	const seed = providerMatch ?? fallbackSelectedModel ?? allOptions[0] ?? DefaultUIChatOptions;
+
+	const fallbackBase: UIChatOption = {
+		...seed,
+		providerName: modelPresetRef?.providerName ?? seed.providerName,
+		modelPresetID: modelPresetRef?.modelPresetID ?? seed.modelPresetID,
+		providerDisplayName: providerMatch?.providerDisplayName ?? modelPresetRef?.providerName ?? seed.providerDisplayName,
+		modelDisplayName: modelParam?.name?.trim() || modelPresetRef?.modelPresetID || seed.modelDisplayName,
+		name: modelParam?.name ?? seed.name,
+		systemPrompt: '',
+	};
+
+	return applyPersistedModelParamToSelectedModel(fallbackBase, modelParam);
+}
+
+function buildPreviousConversationSystemPromptItem(prompt: string): SystemPromptItem {
+	return {
+		identityKey: PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY,
+		bundleID: PREVIOUS_CONVO_SYSTEM_PROMPT_BUNDLEID,
+		bundleDisplayName: 'Conversation',
+		displayName: 'Previous convo system prompt',
+		templateSlug: 'previous-conversation-system-prompt',
+		templateVersion: 'persisted',
+		role: PromptRoleEnum.System,
+		prompt,
+		isBuiltIn: true,
+	} as SystemPromptItem;
+}
+
+function deriveRestoredPromptSelectionState(
+	nextSelectedModel: UIChatOption,
+	modelParam?: ModelParam
+): {
+	restoredConversationSystemPrompt: string | null;
+	includeModelDefault: boolean;
+	selectedPromptKeys: string[];
+} {
+	// No persisted model params at all:
+	// behave like a fresh conversation for prompt-selection UI.
+	if (!modelParam) {
+		return {
+			restoredConversationSystemPrompt: null,
+			includeModelDefault: Boolean(nextSelectedModel.systemPrompt.trim()),
+			selectedPromptKeys: [],
+		};
+	}
+
+	// Persisted effective system prompt exists:
+	// restore it as ONE synthetic selectable source and do not keep any old
+	// prompt selections from prior tab-local state.
+	const restoredSystemPrompt = modelParam.systemPrompt?.trim() ?? '';
+	if (restoredSystemPrompt) {
+		return {
+			restoredConversationSystemPrompt: restoredSystemPrompt,
+			includeModelDefault: false,
+			selectedPromptKeys: [PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY],
+		};
+	}
+
+	// Persisted model params explicitly had no effective system prompt.
+	return {
+		restoredConversationSystemPrompt: null,
+		includeModelDefault: false,
+		selectedPromptKeys: [],
+	};
 }
 
 function buildFinalOptions(
@@ -84,6 +269,7 @@ export type AssistantContextController = {
 	getExistingSystemPromptVersions: (bundleID: string, slug: string) => string[];
 
 	applyAdvancedModel: (updatedModel: UIChatOption) => void;
+	restoreConversationContext: (context: RestorableConversationContext) => void;
 
 	verbosityEnabled: boolean;
 	reasoningLevelOptions: ReasoningLevel[];
@@ -101,9 +287,14 @@ export function useAssistantContextState(): AssistantContextController {
 	const [includeModelDefault, setIncludeModelDefault] = useState<boolean>(
 		Boolean(DefaultUIChatOptions.systemPrompt.trim())
 	);
+	const [restoredConversationSystemPrompt, setRestoredConversationSystemPrompt] = useState<string | null>(null);
 
 	const selectedModelRef = useRef(selectedModel);
 	const isHybridReasoningEnabledRef = useRef(isHybridReasoningEnabled);
+	const allOptionsRef = useRef(allOptions);
+	const defaultLoadedOptionRef = useRef(DefaultUIChatOptions);
+	const optionsLoadedRef = useRef(false);
+	const pendingRestoreContextRef = useRef<RestorableConversationContext | null>(null);
 
 	useEffect(() => {
 		selectedModelRef.current = selectedModel;
@@ -113,8 +304,12 @@ export function useAssistantContextState(): AssistantContextController {
 		isHybridReasoningEnabledRef.current = isHybridReasoningEnabled;
 	}, [isHybridReasoningEnabled]);
 
+	useEffect(() => {
+		allOptionsRef.current = allOptions;
+	}, [allOptions]);
+
 	const {
-		prompts,
+		prompts: storedPrompts,
 		bundles: systemPromptBundles,
 		preferredBundleID: preferredSystemPromptBundleID,
 		loading: systemPromptsLoading,
@@ -123,6 +318,17 @@ export function useAssistantContextState(): AssistantContextController {
 		refreshPrompts,
 		getExistingVersions,
 	} = useSystemPrompts();
+
+	const syntheticPreviousConversationPrompt = useMemo(() => {
+		const prompt = restoredConversationSystemPrompt?.trim();
+		return prompt ? buildPreviousConversationSystemPromptItem(prompt) : null;
+	}, [restoredConversationSystemPrompt]);
+
+	const prompts = useMemo(
+		() =>
+			syntheticPreviousConversationPrompt ? [syntheticPreviousConversationPrompt, ...storedPrompts] : storedPrompts,
+		[storedPrompts, syntheticPreviousConversationPrompt]
+	);
 
 	const promptsByKey = useMemo(() => new Map(prompts.map(item => [item.identityKey, item])), [prompts]);
 
@@ -149,6 +355,45 @@ export function useAssistantContextState(): AssistantContextController {
 			selectedModel,
 			selectedPromptKeys,
 		]
+	);
+
+	const applyRestoredConversationContext = useCallback(
+		(context: RestorableConversationContext, availableOptions: UIChatOption[]) => {
+			const nextSelectedModel = resolveRestoredSelectedModel(
+				availableOptions,
+				defaultLoadedOptionRef.current,
+				context.modelPresetRef,
+				context.modelParam
+			);
+
+			selectedModelRef.current = nextSelectedModel;
+			setSelectedModel(nextSelectedModel);
+
+			const nextHybridEnabled = isHybridReasoningModel(nextSelectedModel);
+			isHybridReasoningEnabledRef.current = nextHybridEnabled;
+			setIsHybridReasoningEnabled(nextHybridEnabled);
+
+			const restoredPromptState = deriveRestoredPromptSelectionState(nextSelectedModel, context.modelParam);
+			setRestoredConversationSystemPrompt(restoredPromptState.restoredConversationSystemPrompt);
+			setIncludeModelDefault(restoredPromptState.includeModelDefault);
+			setRawSelectedPromptKeys(restoredPromptState.selectedPromptKeys);
+
+			// We intentionally do not restore includePreviousMessages yet.
+			// But hydration must still reset it so stale per-tab UI state cannot
+			// leak into restored conversations, especially old/stale ones.
+			setIncludePreviousMessages(nextSelectedModel.includePreviousMessages);
+		},
+		[]
+	);
+
+	const restoreConversationContext = useCallback(
+		(context: RestorableConversationContext) => {
+			pendingRestoreContextRef.current = context;
+			if (!optionsLoadedRef.current) return;
+			applyRestoredConversationContext(context, allOptionsRef.current);
+			pendingRestoreContextRef.current = null;
+		},
+		[applyRestoredConversationContext]
 	);
 
 	const applySelectedModel = useCallback(
@@ -189,8 +434,19 @@ export function useAssistantContextState(): AssistantContextController {
 			const nextSelectedModel = sanitizeUIChatOptionByCapabilities(r.default);
 			const nextIsHybridReasoningEnabled = isHybridReasoningModel(nextSelectedModel);
 
-			setSelectedModel(nextSelectedModel);
 			setAllOptions(r.allOptions);
+			allOptionsRef.current = r.allOptions;
+			defaultLoadedOptionRef.current = nextSelectedModel;
+			optionsLoadedRef.current = true;
+
+			const pendingRestore = pendingRestoreContextRef.current;
+			if (pendingRestore) {
+				pendingRestoreContextRef.current = null;
+				applyRestoredConversationContext(pendingRestore, r.allOptions);
+				return;
+			}
+
+			setSelectedModel(nextSelectedModel);
 			setIsHybridReasoningEnabled(nextIsHybridReasoningEnabled);
 			setIncludeModelDefault(Boolean(nextSelectedModel.systemPrompt.trim()));
 		})();
@@ -198,7 +454,7 @@ export function useAssistantContextState(): AssistantContextController {
 		return () => {
 			cancelled = true;
 		};
-	}, []);
+	}, [applyRestoredConversationContext]);
 
 	const handleSetSelectedModel = useCallback(
 		(action: SetStateAction<UIChatOption>) => {
@@ -333,6 +589,7 @@ export function useAssistantContextState(): AssistantContextController {
 		getExistingSystemPromptVersions: getExistingVersions,
 
 		applyAdvancedModel,
+		restoreConversationContext,
 		verbosityEnabled,
 		reasoningLevelOptions,
 	};

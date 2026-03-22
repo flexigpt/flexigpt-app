@@ -1295,6 +1295,20 @@ export namespace spec {
 		    return a;
 		}
 	}
+	export class ModelPresetRef {
+	    providerName: string;
+	    modelPresetID: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ModelPresetRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.providerName = source["providerName"];
+	        this.modelPresetID = source["modelPresetID"];
+	    }
+	}
 	export class ConversationMessage {
 	    id: string;
 	    // Go type: time
@@ -1302,6 +1316,7 @@ export namespace spec {
 	    role: string;
 	    status: string;
 	    modelParam?: ModelParam;
+	    modelPresetRef?: ModelPresetRef;
 	    inputs?: InputUnion[];
 	    outputs?: OutputUnion[];
 	    toolChoices?: ToolChoice[];
@@ -1325,6 +1340,7 @@ export namespace spec {
 	        this.role = source["role"];
 	        this.status = source["status"];
 	        this.modelParam = this.convertValues(source["modelParam"], ModelParam);
+	        this.modelPresetRef = this.convertValues(source["modelPresetRef"], ModelPresetRef);
 	        this.inputs = this.convertValues(source["inputs"], InputUnion);
 	        this.outputs = this.convertValues(source["outputs"], OutputUnion);
 	        this.toolChoices = this.convertValues(source["toolChoices"], ToolChoice);
@@ -4819,6 +4835,7 @@ export namespace spec {
 		    return a;
 		}
 	}
+	
 	
 	
 	

@@ -1,6 +1,7 @@
 import { forwardRef, type RefObject, useImperativeHandle, useRef, useState } from 'react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
+import type { RestorableConversationContext } from '@/spec/conversation';
 import type { UIToolCall } from '@/spec/inference';
 import { type UIChatOption } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
@@ -29,6 +30,7 @@ export interface InputBoxHandle {
 	applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => void;
 	setEnabledSkillRefsFromMessage: (refs: SkillRef[]) => void;
 	setActiveSkillRefsFromMessage: (refs: SkillRef[]) => void;
+	restoreConversationContext: (context: RestorableConversationContext) => void;
 }
 
 interface InputBoxProps {
@@ -104,8 +106,11 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 			setActiveSkillRefsFromMessage: (refs: SkillRef[]) => {
 				inputAreaRef.current?.setActiveSkillRefsFromMessage(refs);
 			},
+			restoreConversationContext: context => {
+				assistantContext.restoreConversationContext(context);
+			},
 		}),
-		[chatOptions]
+		[assistantContext, chatOptions]
 	);
 
 	return (
