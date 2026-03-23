@@ -11,6 +11,7 @@ import { OutputFormatKind, ReasoningLevel, ReasoningType } from '@/spec/inferenc
 import { validateSlug } from '@/lib/text_utils';
 import { DEFAULT_SEMVER, isSemverVersion, suggestNextMinorVersion } from '@/lib/version_utils';
 
+import { Dropdown } from '@/components/dropdown';
 import { ModalBackdrop } from '@/components/modal_backdrop';
 
 import { AssistantPresetModelPatchEditor } from '@/assistantpresets/components/model_patch_editor';
@@ -785,6 +786,32 @@ function AddEditAssistantPresetModalContent({
 
 	const hasMissingSelectedModel = Boolean(formData.startingModelPresetKey) && currentModelOption === undefined;
 
+	const modelPresetDropdownItems = useMemo<Record<string, { isEnabled: boolean }>>(() => {
+		const items: Record<string, { isEnabled: boolean }> = {
+			'': { isEnabled: true },
+		};
+
+		if (hasMissingSelectedModel && formData.startingModelPresetKey) {
+			items[formData.startingModelPresetKey] = { isEnabled: false };
+		}
+
+		for (const option of modelPresetOptions) {
+			items[option.key] = { isEnabled: option.isSelectable };
+		}
+
+		return items;
+	}, [formData.startingModelPresetKey, hasMissingSelectedModel, modelPresetOptions]);
+
+	const modelPresetOrderedKeys = useMemo(() => {
+		const keys = [''];
+
+		if (hasMissingSelectedModel && formData.startingModelPresetKey) {
+			keys.push(formData.startingModelPresetKey);
+		}
+
+		return [...keys, ...modelPresetOptions.map(option => option.key)];
+	}, [formData.startingModelPresetKey, hasMissingSelectedModel, modelPresetOptions]);
+
 	const instructionDisplayItems = useMemo<OrderedDisplayItem[]>(
 		() =>
 			formData.startingInstructionTemplateRefs.map(ref => {
@@ -1326,36 +1353,34 @@ function AddEditAssistantPresetModalContent({
 								</span>
 							</label>
 							<div className="col-span-9">
-								<select
-									className={`select select-bordered w-full rounded-xl ${errors.modelPreset ? 'select-error' : ''}`}
-									value={formData.startingModelPresetKey}
-									disabled={isViewMode}
-									onChange={e => {
-										const value = e.target.value;
-										updateFormData(prev => ({
-											...prev,
-											startingModelPresetKey: value,
-											startingIncludeModelSystemPrompt: value ? prev.startingIncludeModelSystemPrompt : false,
-										}));
-									}}
-								>
-									<option value="">None</option>
-									{hasMissingSelectedModel && (
-										<option value={formData.startingModelPresetKey}>
-											Unavailable ({formData.startingModelPresetKey})
-										</option>
-									)}
-									{modelPresetOptions.map(option => (
-										<option
-											key={option.key}
-											value={option.key}
-											disabled={!option.isSelectable && option.key !== formData.startingModelPresetKey}
-										>
-											{option.label}
-											{!option.isSelectable ? ` — ${option.availabilityReason}` : ''}
-										</option>
-									))}
-								</select>
+								<div className={errors.modelPreset ? 'ring-error/50 rounded-2xl ring-1' : ''}>
+									<Dropdown<string>
+										dropdownItems={modelPresetDropdownItems}
+										orderedKeys={modelPresetOrderedKeys}
+										selectedKey={formData.startingModelPresetKey}
+										onChange={value => {
+											updateFormData(prev => ({
+												...prev,
+												startingModelPresetKey: value,
+												startingIncludeModelSystemPrompt: value ? prev.startingIncludeModelSystemPrompt : false,
+											}));
+										}}
+										disabled={isViewMode}
+										filterDisabled={false}
+										placeholderLabel="None"
+										title="Select model preset"
+										getDisplayName={key => {
+											if (!key) return 'None';
+											const option = modelOptionByKey.get(key);
+											if (option) {
+												return option.isSelectable
+													? option.label
+													: `${option.label} — ${option.availabilityReason ?? 'Unavailable'}`;
+											}
+											return `Unavailable (${key})`;
+										}}
+									/>
+								</div>
 
 								{currentModelOption && (
 									<div className="label">

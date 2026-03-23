@@ -10,6 +10,8 @@ import {
 	ReasoningType,
 } from '@/spec/inference';
 
+import { Dropdown } from '@/components/dropdown';
+
 import type { ModelPatchFormData, TriStateBoolean } from '@/assistantpresets/lib/assistant_preset_editor_types';
 
 interface AssistantPresetModelPatchEditorProps {
@@ -19,11 +21,32 @@ interface AssistantPresetModelPatchEditorProps {
 	onPatchChange: (patch: Partial<ModelPatchFormData>) => void;
 }
 
-const REASONING_TYPES = Object.values(ReasoningType);
-const REASONING_LEVELS = Object.values(ReasoningLevel);
-const REASONING_SUMMARY_STYLES = Object.values(ReasoningSummaryStyle);
-const OUTPUT_VERBOSITIES = Object.values(OutputVerbosity);
-const OUTPUT_FORMAT_KINDS = Object.values(OutputFormatKind);
+const REASONING_TYPES = Object.values(ReasoningType) as ReasoningType[];
+const REASONING_LEVELS = Object.values(ReasoningLevel) as ReasoningLevel[];
+const REASONING_SUMMARY_STYLES = Object.values(ReasoningSummaryStyle) as ReasoningSummaryStyle[];
+const OUTPUT_VERBOSITIES = Object.values(OutputVerbosity) as OutputVerbosity[];
+const OUTPUT_FORMAT_KINDS = Object.values(OutputFormatKind) as OutputFormatKind[];
+
+const TRI_STATE_OPTIONS: TriStateBoolean[] = ['', 'true', 'false'];
+const REASONING_SUMMARY_STYLE_OPTIONS: Array<'' | ReasoningSummaryStyle> = ['', ...REASONING_SUMMARY_STYLES];
+const OUTPUT_VERBOSITY_OPTIONS: Array<'' | OutputVerbosity> = ['', ...OUTPUT_VERBOSITIES];
+
+function buildEnabledDropdownItems<K extends string>(keys: readonly K[]): Record<K, { isEnabled: boolean }> {
+	return Object.fromEntries(keys.map(key => [key, { isEnabled: true }])) as Record<K, { isEnabled: boolean }>;
+}
+
+function getTriStateDropdownLabel(value: TriStateBoolean, defaultLabel: string): string {
+	if (value === 'true') return 'Force On';
+	if (value === 'false') return 'Force Off';
+	return defaultLabel;
+}
+
+const TRI_STATE_DROPDOWN_ITEMS = buildEnabledDropdownItems(TRI_STATE_OPTIONS);
+const REASONING_TYPE_DROPDOWN_ITEMS = buildEnabledDropdownItems(REASONING_TYPES);
+const REASONING_LEVEL_DROPDOWN_ITEMS = buildEnabledDropdownItems(REASONING_LEVELS);
+const REASONING_SUMMARY_STYLE_DROPDOWN_ITEMS = buildEnabledDropdownItems(REASONING_SUMMARY_STYLE_OPTIONS);
+const OUTPUT_VERBOSITY_DROPDOWN_ITEMS = buildEnabledDropdownItems(OUTPUT_VERBOSITY_OPTIONS);
+const OUTPUT_FORMAT_KIND_DROPDOWN_ITEMS = buildEnabledDropdownItems(OUTPUT_FORMAT_KINDS);
 
 export const AssistantPresetModelPatchEditor = memo(function AssistantPresetModelPatchEditor({
 	isViewMode,
@@ -56,20 +79,18 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 							<label className="label py-1">
 								<span className="label-text text-sm">Stream Override</span>
 							</label>
-							<select
-								className="select select-bordered w-full rounded-xl"
-								disabled={isViewMode}
-								value={modelPatch.stream}
-								onChange={e => {
-									onPatchChange({
-										stream: e.target.value as TriStateBoolean,
-									});
+							<Dropdown<TriStateBoolean>
+								dropdownItems={TRI_STATE_DROPDOWN_ITEMS}
+								orderedKeys={TRI_STATE_OPTIONS}
+								selectedKey={modelPatch.stream}
+								onChange={stream => {
+									onPatchChange({ stream });
 								}}
-							>
-								<option value="">Leave Default</option>
-								<option value="true">Force On</option>
-								<option value="false">Force Off</option>
-							</select>
+								disabled={isViewMode}
+								placeholderLabel="Leave Default"
+								title="Stream override"
+								getDisplayName={value => getTriStateDropdownLabel(value, 'Leave Default')}
+							/>
 						</div>
 
 						<div className="col-span-12 md:col-span-4">
@@ -197,44 +218,36 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 								<label className="label py-1">
 									<span className="label-text text-sm">Reasoning Type</span>
 								</label>
-								<select
-									className="select select-bordered w-full rounded-xl"
-									disabled={isViewMode}
-									value={modelPatch.reasoningType}
-									onChange={e => {
-										onPatchChange({
-											reasoningType: e.target.value as ReasoningType,
-										});
+								<Dropdown<ReasoningType>
+									dropdownItems={REASONING_TYPE_DROPDOWN_ITEMS}
+									orderedKeys={REASONING_TYPES}
+									selectedKey={modelPatch.reasoningType}
+									onChange={reasoningType => {
+										onPatchChange({ reasoningType });
 									}}
-								>
-									{REASONING_TYPES.map(value => (
-										<option key={value} value={value}>
-											{value}
-										</option>
-									))}
-								</select>
+									disabled={isViewMode}
+									placeholderLabel="Select reasoning type"
+									title="Reasoning type"
+									getDisplayName={value => value}
+								/>
 							</div>
 
 							<div className="col-span-12 md:col-span-4">
 								<label className="label py-1">
 									<span className="label-text text-sm">Reasoning Level</span>
 								</label>
-								<select
-									className="select select-bordered w-full rounded-xl"
-									disabled={isViewMode}
-									value={modelPatch.reasoningLevel}
-									onChange={e => {
-										onPatchChange({
-											reasoningLevel: e.target.value as ReasoningLevel,
-										});
+								<Dropdown<ReasoningLevel>
+									dropdownItems={REASONING_LEVEL_DROPDOWN_ITEMS}
+									orderedKeys={REASONING_LEVELS}
+									selectedKey={modelPatch.reasoningLevel}
+									onChange={reasoningLevel => {
+										onPatchChange({ reasoningLevel });
 									}}
-								>
-									{REASONING_LEVELS.map(value => (
-										<option key={value} value={value}>
-											{value}
-										</option>
-									))}
-								</select>
+									disabled={isViewMode}
+									placeholderLabel="Select reasoning level"
+									title="Reasoning level"
+									getDisplayName={value => value}
+								/>
 							</div>
 
 							<div className="col-span-12 md:col-span-4">
@@ -257,23 +270,18 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 								<label className="label py-1">
 									<span className="label-text text-sm">Summary Style</span>
 								</label>
-								<select
-									className="select select-bordered w-full rounded-xl"
-									disabled={isViewMode}
-									value={modelPatch.reasoningSummaryStyle}
-									onChange={e => {
-										onPatchChange({
-											reasoningSummaryStyle: e.target.value as '' | ReasoningSummaryStyle,
-										});
+								<Dropdown<'' | ReasoningSummaryStyle>
+									dropdownItems={REASONING_SUMMARY_STYLE_DROPDOWN_ITEMS}
+									orderedKeys={REASONING_SUMMARY_STYLE_OPTIONS}
+									selectedKey={modelPatch.reasoningSummaryStyle}
+									onChange={reasoningSummaryStyle => {
+										onPatchChange({ reasoningSummaryStyle });
 									}}
-								>
-									<option value="">Leave Default</option>
-									{REASONING_SUMMARY_STYLES.map(value => (
-										<option key={value} value={value}>
-											{value}
-										</option>
-									))}
-								</select>
+									disabled={isViewMode}
+									placeholderLabel="Leave Default"
+									title="Reasoning summary style"
+									getDisplayName={value => value || 'Leave Default'}
+								/>
 							</div>
 						</div>
 					)}
@@ -305,23 +313,18 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 								<label className="label py-1">
 									<span className="label-text text-sm">Verbosity</span>
 								</label>
-								<select
-									className="select select-bordered w-full rounded-xl"
-									disabled={isViewMode}
-									value={modelPatch.outputVerbosity}
-									onChange={e => {
-										onPatchChange({
-											outputVerbosity: e.target.value as '' | OutputVerbosity,
-										});
+								<Dropdown<'' | OutputVerbosity>
+									dropdownItems={OUTPUT_VERBOSITY_DROPDOWN_ITEMS}
+									orderedKeys={OUTPUT_VERBOSITY_OPTIONS}
+									selectedKey={modelPatch.outputVerbosity}
+									onChange={outputVerbosity => {
+										onPatchChange({ outputVerbosity });
 									}}
-								>
-									<option value="">Leave Default</option>
-									{OUTPUT_VERBOSITIES.map(value => (
-										<option key={value} value={value}>
-											{value}
-										</option>
-									))}
-								</select>
+									disabled={isViewMode}
+									placeholderLabel="Leave Default"
+									title="Output verbosity"
+									getDisplayName={value => value || 'Leave Default'}
+								/>
 							</div>
 
 							<div className="col-span-12 md:col-span-4">
@@ -349,22 +352,18 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 										<label className="label py-1">
 											<span className="label-text text-sm">Format Kind</span>
 										</label>
-										<select
-											className="select select-bordered w-full rounded-xl"
-											disabled={isViewMode}
-											value={modelPatch.outputFormatKind}
-											onChange={e => {
-												onPatchChange({
-													outputFormatKind: e.target.value as OutputFormatKind,
-												});
+										<Dropdown<OutputFormatKind>
+											dropdownItems={OUTPUT_FORMAT_KIND_DROPDOWN_ITEMS}
+											orderedKeys={OUTPUT_FORMAT_KINDS}
+											selectedKey={modelPatch.outputFormatKind}
+											onChange={outputFormatKind => {
+												onPatchChange({ outputFormatKind });
 											}}
-										>
-											{OUTPUT_FORMAT_KINDS.map(value => (
-												<option key={value} value={value}>
-													{value}
-												</option>
-											))}
-										</select>
+											disabled={isViewMode}
+											placeholderLabel="Select format kind"
+											title="Output format kind"
+											getDisplayName={value => value}
+										/>
 									</div>
 
 									{modelPatch.outputFormatKind === OutputFormatKind.JSONSchema && (
@@ -391,20 +390,18 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 												<label className="label py-1">
 													<span className="label-text text-sm">Strict</span>
 												</label>
-												<select
-													className="select select-bordered w-full rounded-xl"
-													disabled={isViewMode}
-													value={modelPatch.outputJSONSchemaStrictMode}
-													onChange={e => {
-														onPatchChange({
-															outputJSONSchemaStrictMode: e.target.value as TriStateBoolean,
-														});
+												<Dropdown<TriStateBoolean>
+													dropdownItems={TRI_STATE_DROPDOWN_ITEMS}
+													orderedKeys={TRI_STATE_OPTIONS}
+													selectedKey={modelPatch.outputJSONSchemaStrictMode}
+													onChange={outputJSONSchemaStrictMode => {
+														onPatchChange({ outputJSONSchemaStrictMode });
 													}}
-												>
-													<option value="">Leave Default</option>
-													<option value="true">Force On</option>
-													<option value="false">Force Off</option>
-												</select>
+													disabled={isViewMode}
+													placeholderLabel="Leave Default"
+													title="JSON schema strict mode"
+													getDisplayName={value => getTriStateDropdownLabel(value, 'Leave Default')}
+												/>
 											</div>
 
 											<div className="col-span-12">

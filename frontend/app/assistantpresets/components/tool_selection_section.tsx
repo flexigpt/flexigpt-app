@@ -1,6 +1,8 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 
 import { FiPlus } from 'react-icons/fi';
+
+import { Dropdown } from '@/components/dropdown';
 
 import { OrderedItemControls } from '@/assistantpresets/components/ordered_item_controls';
 import type {
@@ -28,6 +30,19 @@ interface ToolSelectionSectionProps {
 	onUserArgsChange: (index: number, value: string) => void;
 }
 
+const AUTO_EXECUTE_OPTIONS: TriStateBoolean[] = ['', 'true', 'false'];
+const AUTO_EXECUTE_DROPDOWN_ITEMS: Record<TriStateBoolean, { isEnabled: boolean }> = {
+	'': { isEnabled: true },
+	true: { isEnabled: true },
+	false: { isEnabled: true },
+};
+
+function getAutoExecuteDropdownLabel(value: TriStateBoolean): string {
+	if (value === 'true') return 'Force On';
+	if (value === 'false') return 'Force Off';
+	return 'Tool Default';
+}
+
 export const ToolSelectionSection = memo(function ToolSelectionSection({
 	isViewMode,
 	availableOptions,
@@ -43,29 +58,32 @@ export const ToolSelectionSection = memo(function ToolSelectionSection({
 	onAutoExecuteChange,
 	onUserArgsChange,
 }: ToolSelectionSectionProps) {
+	const dropdownItems = useMemo<Record<string, { isEnabled: boolean }>>(
+		() =>
+			Object.fromEntries(availableOptions.map(option => [option.key, { isEnabled: true }])) as Record<
+				string,
+				{ isEnabled: boolean }
+			>,
+		[availableOptions]
+	);
+
+	const orderedKeys = useMemo(() => availableOptions.map(option => option.key), [availableOptions]);
+
 	return (
 		<>
 			{!isViewMode && (
 				<div className="grid grid-cols-12 items-center gap-2">
 					<div className="col-span-10">
-						<select
-							className="select select-bordered w-full rounded-xl"
-							value={selectedOptionKey}
-							onChange={e => {
-								onSelectedOptionKeyChange(e.target.value);
-							}}
+						<Dropdown<string>
+							dropdownItems={dropdownItems}
+							orderedKeys={orderedKeys}
+							selectedKey={selectedOptionKey}
+							onChange={onSelectedOptionKeyChange}
 							disabled={availableOptions.length === 0}
-						>
-							{availableOptions.length === 0 ? (
-								<option value="">{emptyOptionsLabel}</option>
-							) : (
-								availableOptions.map(option => (
-									<option key={option.key} value={option.key}>
-										{option.label}
-									</option>
-								))
-							)}
-						</select>
+							placeholderLabel={availableOptions.length === 0 ? emptyOptionsLabel : 'Select an option'}
+							title="Select a tool to add"
+							getDisplayName={key => availableOptions.find(option => option.key === key)?.label ?? emptyOptionsLabel}
+						/>
 					</div>
 					<div className="col-span-2">
 						<button
@@ -111,17 +129,17 @@ export const ToolSelectionSection = memo(function ToolSelectionSection({
 								{isViewMode ? (
 									<div className="bg-base-300 rounded-xl px-3 py-2 text-sm">{item.autoExecuteLabel}</div>
 								) : (
-									<select
-										className="select select-bordered w-full rounded-xl"
-										value={item.autoExecuteMode}
-										onChange={e => {
-											onAutoExecuteChange(idx, e.target.value as TriStateBoolean);
+									<Dropdown<TriStateBoolean>
+										dropdownItems={AUTO_EXECUTE_DROPDOWN_ITEMS}
+										orderedKeys={AUTO_EXECUTE_OPTIONS}
+										selectedKey={item.autoExecuteMode}
+										onChange={value => {
+											onAutoExecuteChange(idx, value);
 										}}
-									>
-										<option value="">Tool Default</option>
-										<option value="true">Force On</option>
-										<option value="false">Force Off</option>
-									</select>
+										placeholderLabel="Tool Default"
+										title="Auto execute override"
+										getDisplayName={getAutoExecuteDropdownLabel}
+									/>
 								)}
 							</div>
 

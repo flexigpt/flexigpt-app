@@ -1,6 +1,8 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 
 import { FiPlus } from 'react-icons/fi';
+
+import { Dropdown } from '@/components/dropdown';
 
 import { OrderedItemControls } from '@/assistantpresets/components/ordered_item_controls';
 import type { OrderedDisplayItem, SimpleSelectableOption } from '@/assistantpresets/lib/assistant_preset_editor_types';
@@ -38,29 +40,32 @@ export const OrderedRefSelectionSection = memo(function OrderedRefSelectionSecti
 	onRemove,
 	addButtonLabel = 'Add',
 }: OrderedRefSelectionSectionProps) {
+	const dropdownItems = useMemo<Record<string, { isEnabled: boolean }>>(
+		() =>
+			Object.fromEntries(availableOptions.map(option => [option.key, { isEnabled: true }])) as Record<
+				string,
+				{ isEnabled: boolean }
+			>,
+		[availableOptions]
+	);
+
+	const orderedKeys = useMemo(() => availableOptions.map(option => option.key), [availableOptions]);
+
 	return (
 		<>
 			{!isViewMode && (
 				<div className="grid grid-cols-12 items-center gap-2">
 					<div className="col-span-10">
-						<select
-							className="select select-bordered w-full rounded-xl"
-							value={selectedOptionKey}
-							onChange={e => {
-								onSelectedOptionKeyChange(e.target.value);
-							}}
+						<Dropdown<string>
+							dropdownItems={dropdownItems}
+							orderedKeys={orderedKeys}
+							selectedKey={selectedOptionKey}
+							onChange={onSelectedOptionKeyChange}
 							disabled={availableOptions.length === 0}
-						>
-							{availableOptions.length === 0 ? (
-								<option value="">{emptyOptionsLabel}</option>
-							) : (
-								availableOptions.map(option => (
-									<option key={option.key} value={option.key}>
-										{option.label}
-									</option>
-								))
-							)}
-						</select>
+							placeholderLabel={availableOptions.length === 0 ? emptyOptionsLabel : 'Select an option'}
+							title="Select an item to add"
+							getDisplayName={key => availableOptions.find(option => option.key === key)?.label ?? emptyOptionsLabel}
+						/>
 					</div>
 					<div className="col-span-2">
 						<button

@@ -33,6 +33,9 @@ export interface DropdownProps<K extends string> {
 	// Otherwise, this function (if present) will be used to determine the label.
 	getDisplayName?: (key: K) => string;
 	maxMenuHeight?: number | string; // Optional, default 300
+	orderedKeys?: readonly K[];
+	placeholderLabel?: string;
+	disabled?: boolean;
 }
 
 // A single reusable dropdown that can be used by passing the appropriate config.
@@ -45,6 +48,9 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 		title = 'Select an option',
 		getDisplayName,
 		maxMenuHeight = 300,
+		orderedKeys,
+		placeholderLabel = 'Select an option',
+		disabled = false,
 	} = props;
 
 	const [isOpen, setIsOpen] = useState(false);
@@ -60,6 +66,10 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 	});
 
 	const handleSelection = (key: K) => {
+		const item = dropdownItems[key];
+		if (!item?.isEnabled) {
+			return;
+		}
 		onChange(key);
 		if (detailsRef.current) {
 			// Force-close the details dropdown.
@@ -79,29 +89,44 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 	};
 
 	// We can optionally filter out disabled items, unless they are already selected.
-	const filteredKeys = Object.keys(dropdownItems).filter(k => {
-		const typedKey = k as K;
+	const sourceKeys = (orderedKeys ?? (Object.keys(dropdownItems) as K[])).filter(
+		key => dropdownItems[key] !== undefined
+	);
+
+	const filteredKeys = sourceKeys.filter(typedKey => {
 		const item = dropdownItems[typedKey];
+		if (!item) return false;
 		if (!filterDisabled) return true;
 		// If the item is enabled or it is the selected key, we keep it.
 		return item.isEnabled || typedKey === selectedKey;
-	}) as K[];
+	});
 
 	return (
 		<details
 			ref={detailsRef}
 			className="dropdown relative w-full"
 			onToggle={(event: SyntheticEvent<HTMLElement>) => {
-				setIsOpen((event.currentTarget as HTMLDetailsElement).open);
+				const details = event.currentTarget as HTMLDetailsElement;
+				if (disabled && details.open) {
+					details.open = false;
+					setIsOpen(false);
+					return;
+				}
+				setIsOpen(details.open);
 			}}
 		>
 			<summary
-				className="btn border-neutral/20 bg-base-200 flex w-full cursor-pointer items-center justify-between rounded-2xl px-4 py-2 text-left shadow-none"
+				className={`btn border-neutral/20 bg-base-200 flex w-full items-center justify-between rounded-2xl px-4 py-2 text-left shadow-none ${
+					disabled ? 'cursor-default opacity-70' : 'cursor-pointer'
+				}`}
 				title={title}
+				onClick={event => {
+					if (disabled) {
+						event.preventDefault();
+					}
+				}}
 			>
-				<span className="truncate font-normal">
-					{selectedKey ? getItemDisplayName(selectedKey) : 'Select an option'}
-				</span>
+				<span className="truncate font-normal">{selectedKey ? getItemDisplayName(selectedKey) : placeholderLabel}</span>
 				{isOpen ? <FiChevronUp size={16} /> : <FiChevronDown size={16} />}
 			</summary>
 
@@ -112,20 +137,33 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 					maxHeight: typeof maxMenuHeight === 'number' ? `${maxMenuHeight}px` : maxMenuHeight,
 				}}
 			>
-				{filteredKeys.sort().map(key => (
-					<li
-						key={key}
-						className="w-full cursor-pointer rounded-2xl"
-						onClick={() => {
-							handleSelection(key);
-						}}
-					>
-						<a className="m-1 flex items-center justify-between p-2">
-							<span className="truncate">{getItemDisplayName(key)}</span>
-							{key === selectedKey && <FiCheck />}
-						</a>
-					</li>
-				))}
+				{filteredKeys.map(key => {
+					const item = dropdownItems[key];
+					const isItemDisabled = disabled || !item?.isEnabled;
+
+					return (
+						<li
+							key={key}
+							className={`w-full rounded-2xl ${isItemDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+							onClick={() => {
+								if (!isItemDisabled) {
+									handleSelection(key);
+								}
+							}}
+						>
+							<a
+								className="m-1 flex items-center justify-between p-2"
+								aria-disabled={isItemDisabled}
+								onClick={event => {
+									event.preventDefault();
+								}}
+							>
+								<span className="truncate">{getItemDisplayName(key)}</span>
+								{key === selectedKey && <FiCheck />}
+							</a>
+						</li>
+					);
+				})}
 			</ul>
 		</details>
 	);
