@@ -15,7 +15,7 @@
   - [x] assistant store
   - [ ] have a default "empty" assistant i.e all allowed.
   - [ ] may also need a default bundle for editable instructions only sys prompts that people can add too directly from chat.
-  - [ ] UI to manage preset
+  - [x] UI to manage preset
   - [ ] UI integration in chat. should have select and reset capability, with indication that default is overridden in xyz things.
   - [ ] review for and handle stale refs in the preset, no fk present so need to validate properly.
 

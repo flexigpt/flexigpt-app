@@ -735,7 +735,6 @@ func TestAssistantPresetStore_PutAssistantPreset_HappyConflictCloneAndBuiltInRea
 			Body: &spec.PutAssistantPresetRequestBody{
 				DisplayName:                      "Preset Happy",
 				Description:                      "desc",
-				Icon:                             "icon",
 				IsEnabled:                        true,
 				StartingIncludeModelSystemPrompt: &include,
 			},

@@ -163,11 +163,6 @@ export function toPutAssistantPresetPayload(input: AssistantPresetUpsertInput): 
 		payload.description = description;
 	}
 
-	const icon = input.icon?.trim();
-	if (icon) {
-		payload.icon = icon;
-	}
-
 	if (input.startingModelPresetRef) {
 		payload.startingModelPresetRef = {
 			providerName: input.startingModelPresetRef.providerName,

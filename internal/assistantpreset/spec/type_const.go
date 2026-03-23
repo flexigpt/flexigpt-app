@@ -46,7 +46,6 @@ type AssistantPreset struct {
 	Version     bundleitemutils.ItemVersion `json:"version"`
 	DisplayName string                      `json:"displayName"`
 	Description string                      `json:"description,omitempty"`
-	Icon        string                      `json:"icon,omitempty"`
 
 	IsEnabled bool `json:"isEnabled"`
 	IsBuiltIn bool `json:"isBuiltIn"`

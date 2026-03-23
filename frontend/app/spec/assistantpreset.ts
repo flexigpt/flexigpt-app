@@ -28,7 +28,6 @@ export interface AssistantPreset {
 	version: string;
 	displayName: string;
 	description?: string;
-	icon?: string;
 	isEnabled: boolean;
 	isBuiltIn: boolean;
 	startingModelPresetRef?: ModelPresetRef;
@@ -61,7 +60,6 @@ export interface AssistantPresetListItem {
 	assistantPresetVersion: string;
 	displayName: string;
 	description?: string;
-	icon?: string;
 	isEnabled: boolean;
 	isBuiltIn: boolean;
 	modifiedAt?: Date; // Go type: time
@@ -74,7 +72,6 @@ export interface AssistantPresetListItem {
 export interface PutAssistantPresetPayload {
 	displayName: string;
 	description?: string;
-	icon?: string;
 	isEnabled: boolean;
 	startingModelPresetRef?: ModelPresetRef;
 	startingModelPresetPatch?: AssistantPresetStartingModelPresetPatch;

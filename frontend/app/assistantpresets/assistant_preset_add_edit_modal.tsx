@@ -241,7 +241,6 @@ function getInitialFormData(
 			displayName: src.displayName,
 			slug: src.slug,
 			description: src.description ?? '',
-			icon: src.icon ?? '',
 			isEnabled: src.isEnabled,
 			version: nextVersion,
 			startingModelPresetKey: src.startingModelPresetRef ? buildModelPresetRefKey(src.startingModelPresetRef) : '',
@@ -265,7 +264,6 @@ function getInitialFormData(
 		displayName: '',
 		slug: '',
 		description: '',
-		icon: '',
 		isEnabled: true,
 		version: DEFAULT_SEMVER,
 		startingModelPresetKey: '',
@@ -1098,7 +1096,6 @@ function AddEditAssistantPresetModalContent({
 				displayName: formData.displayName.trim(),
 				slug: (initialData?.preset.slug ?? formData.slug).trim(),
 				description: formData.description.trim(),
-				icon: formData.icon.trim(),
 				isEnabled: formData.isEnabled,
 				version: formData.version.trim(),
 				startingModelPresetRef,
@@ -1298,32 +1295,6 @@ function AddEditAssistantPresetModalContent({
 							</div>
 						</div>
 
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
-								<span className="label-text text-sm">Icon</span>
-								<span
-									className="label-text-alt tooltip tooltip-right"
-									data-tip="Optional emoji or short icon token for display."
-								>
-									<FiHelpCircle size={12} />
-								</span>
-							</label>
-							<div className="col-span-9">
-								<input
-									type="text"
-									value={formData.icon}
-									onChange={e => {
-										const value = e.target.value;
-										updateFormData(prev => ({ ...prev, icon: value }));
-									}}
-									readOnly={isViewMode}
-									className="input input-bordered w-full rounded-xl"
-									spellCheck="false"
-									autoComplete="off"
-								/>
-							</div>
-						</div>
-
 						<div className="grid grid-cols-12 items-start gap-2">
 							<label className="label col-span-3">
 								<span className="label-text text-sm">Description</span>
@@ -1452,8 +1423,7 @@ function AddEditAssistantPresetModalContent({
 						<div className="divider">Instruction Templates</div>
 
 						<p className="text-base-content/70 text-xs">
-							Only enabled, already-resolved <code>instructionsOnly</code> prompt templates may be selected. Assistant
-							presets store refs only and do not run variable resolution.
+							Only enabled, already-resolved system prompt templates may be selected.
 						</p>
 
 						{errors.startingInstructionTemplateRefs && (
@@ -1478,11 +1448,6 @@ function AddEditAssistantPresetModalContent({
 
 						<div className="divider">Tool Selections</div>
 
-						<p className="text-base-content/70 text-xs">
-							Assistant presets store tool refs plus optional selection patch only. They do not hydrate runtime tool
-							choices.
-						</p>
-
 						{errors.startingToolSelections && (
 							<div className="text-error flex items-center gap-1 text-sm">
 								<FiAlertCircle size={12} /> {errors.startingToolSelections}
@@ -1506,10 +1471,6 @@ function AddEditAssistantPresetModalContent({
 						/>
 
 						<div className="divider">Enabled Skills</div>
-
-						<p className="text-base-content/70 text-xs">
-							Assistant presets store skill refs only. They do not create runtime skill sessions.
-						</p>
 
 						{errors.startingEnabledSkillRefs && (
 							<div className="text-error flex items-center gap-1 text-sm">

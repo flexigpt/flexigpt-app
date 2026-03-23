@@ -68,7 +68,6 @@ type ListAssistantPresetBundlesResponse struct {
 type PutAssistantPresetRequestBody struct {
 	DisplayName string `json:"displayName"           required:"true"`
 	Description string `json:"description,omitempty"`
-	Icon        string `json:"icon,omitempty"`
 	IsEnabled   bool   `json:"isEnabled"             required:"true"`
 
 	StartingModelPresetRef *modelpresetSpec.ModelPresetRef `json:"startingModelPresetRef,omitempty"`
@@ -146,7 +145,6 @@ type AssistantPresetListItem struct {
 	AssistantPresetVersion bundleitemutils.ItemVersion `json:"assistantPresetVersion"`
 	DisplayName            string                      `json:"displayName"`
 	Description            string                      `json:"description,omitempty"`
-	Icon                   string                      `json:"icon,omitempty"`
 	IsEnabled              bool                        `json:"isEnabled"`
 	IsBuiltIn              bool                        `json:"isBuiltIn"`
 	ModifiedAt             *time.Time                  `json:"modifiedAt,omitempty"`

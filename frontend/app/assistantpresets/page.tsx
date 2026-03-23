@@ -318,7 +318,7 @@ export default function AssistantPresetsPage() {
 	return (
 		<PageFrame>
 			<div className="flex h-full w-full flex-col items-center">
-				<div className="fixed mt-8 flex w-10/12 items-center p-2 lg:w-2/3">
+				<div className="fixed mt-8 flex w-11/12 items-center px-12 py-2">
 					<h1 className="flex grow items-center justify-center text-xl font-semibold">Assistant Preset Bundles</h1>
 					<button
 						className="btn btn-ghost flex items-center rounded-2xl"

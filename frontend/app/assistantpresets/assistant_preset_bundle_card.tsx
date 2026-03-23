@@ -241,7 +241,6 @@ export function AssistantPresetBundleCard({
 										<tr key={preset.id} className="hover:bg-base-300">
 											<td>
 												<div className="flex items-center gap-2">
-													{preset.icon?.trim() ? <span className="text-lg leading-none">{preset.icon}</span> : null}
 													<span>{preset.displayName}</span>
 												</div>
 											</td>

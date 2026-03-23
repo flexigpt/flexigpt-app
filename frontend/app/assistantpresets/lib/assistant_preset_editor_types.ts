@@ -66,7 +66,6 @@ export type AssistantPresetFormData = {
 	displayName: string;
 	slug: string;
 	description: string;
-	icon: string;
 	isEnabled: boolean;
 	version: string;
 

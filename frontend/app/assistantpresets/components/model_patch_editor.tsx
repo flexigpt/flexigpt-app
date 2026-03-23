@@ -43,11 +43,6 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 				}}
 			/>
 
-			<p className="text-base-content/70 text-xs">
-				Assistant presets store refs and starter knobs only. This patch is limited to runtime model parameters and may
-				not include <code>systemPrompt</code> or <code>capabilitiesOverride</code>.
-			</p>
-
 			{error && (
 				<div className="text-error flex items-center gap-1 text-sm">
 					<FiAlertCircle size={12} /> {error}

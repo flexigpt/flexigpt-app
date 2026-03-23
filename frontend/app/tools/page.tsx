@@ -236,7 +236,7 @@ export default function ToolsPage() {
 	return (
 		<PageFrame>
 			<div className="flex h-full w-full flex-col items-center">
-				<div className="fixed mt-8 flex w-10/12 items-center p-2 lg:w-2/3">
+				<div className="fixed mt-8 flex w-11/12 items-center px-12 py-2">
 					<h1 className="flex grow items-center justify-center text-xl font-semibold">Tool Bundles</h1>
 					<button
 						className="btn btn-ghost flex items-center rounded-2xl"
@@ -252,7 +252,7 @@ export default function ToolsPage() {
 					className="mt-24 flex w-full grow flex-col items-center overflow-y-auto"
 					style={{ maxHeight: `calc(100vh - 128px)` }}
 				>
-					<div className="flex w-5/6 flex-col space-y-4 xl:w-2/3">
+					<div className="flex w-11/12 flex-col space-y-4 xl:w-2/3">
 						{bundles.length === 0 && <p className="mt-8 text-center text-sm">No tool bundles configured yet.</p>}
 
 						{bundles.map(bd => (

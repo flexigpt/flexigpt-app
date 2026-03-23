@@ -172,7 +172,6 @@ export class WailsAssistantPresetStoreAPI implements IAssistantPresetStoreAPI {
 		const body = omitUndefined({
 			displayName: payload.displayName,
 			description: payload.description,
-			icon: payload.icon,
 			isEnabled: payload.isEnabled,
 			startingModelPresetRef: payload.startingModelPresetRef,
 			startingModelPresetPatch: payload.startingModelPresetPatch,

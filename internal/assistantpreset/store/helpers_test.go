@@ -130,7 +130,6 @@ func newTestPreset(t *testing.T, suffix string, enabled bool) spec.AssistantPres
 		Version:       testItemVersion(t),
 		DisplayName:   "Preset " + suffix,
 		Description:   "Preset description " + suffix,
-		Icon:          "icon-" + suffix,
 		IsEnabled:     enabled,
 		IsBuiltIn:     false,
 		CreatedAt:     now,
@@ -320,7 +319,6 @@ func mustPutPreset(
 		Body: &spec.PutAssistantPresetRequestBody{
 			DisplayName: "preset " + string(slug),
 			Description: "desc " + string(slug),
-			Icon:        "icon-" + string(slug),
 			IsEnabled:   enabled,
 		},
 	})

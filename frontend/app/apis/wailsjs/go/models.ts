@@ -705,7 +705,6 @@ export namespace spec {
 	    version: string;
 	    displayName: string;
 	    description?: string;
-	    icon?: string;
 	    isEnabled: boolean;
 	    isBuiltIn: boolean;
 	    startingModelPresetRef?: ModelPresetRef;
@@ -731,7 +730,6 @@ export namespace spec {
 	        this.version = source["version"];
 	        this.displayName = source["displayName"];
 	        this.description = source["description"];
-	        this.icon = source["icon"];
 	        this.isEnabled = source["isEnabled"];
 	        this.isBuiltIn = source["isBuiltIn"];
 	        this.startingModelPresetRef = this.convertValues(source["startingModelPresetRef"], ModelPresetRef);
@@ -820,7 +818,6 @@ export namespace spec {
 	    assistantPresetVersion: string;
 	    displayName: string;
 	    description?: string;
-	    icon?: string;
 	    isEnabled: boolean;
 	    isBuiltIn: boolean;
 	    // Go type: time
@@ -838,7 +835,6 @@ export namespace spec {
 	        this.assistantPresetVersion = source["assistantPresetVersion"];
 	        this.displayName = source["displayName"];
 	        this.description = source["description"];
-	        this.icon = source["icon"];
 	        this.isEnabled = source["isEnabled"];
 	        this.isBuiltIn = source["isBuiltIn"];
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
@@ -6393,7 +6389,6 @@ export namespace spec {
 	export class PutAssistantPresetRequestBody {
 	    displayName: string;
 	    description?: string;
-	    icon?: string;
 	    isEnabled: boolean;
 	    startingModelPresetRef?: ModelPresetRef;
 	    startingModelPresetPatch?: ModelPresetPatch;
@@ -6410,7 +6405,6 @@ export namespace spec {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.displayName = source["displayName"];
 	        this.description = source["description"];
-	        this.icon = source["icon"];
 	        this.isEnabled = source["isEnabled"];
 	        this.startingModelPresetRef = this.convertValues(source["startingModelPresetRef"], ModelPresetRef);
 	        this.startingModelPresetPatch = this.convertValues(source["startingModelPresetPatch"], ModelPresetPatch);
