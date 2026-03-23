@@ -1426,24 +1426,12 @@ function AddEditAssistantPresetModalContent({
 							</div>
 						</div>
 
-						<div className="grid grid-cols-12 items-start gap-2">
-							<label className="label col-span-3 cursor-pointer">
-								<span className="label-text text-sm">Starting Model Patch</span>
-								<span
-									className="label-text-alt tooltip tooltip-right"
-									data-tip="Runtime knob patch only. systemPrompt and capabilitiesOverride are intentionally not allowed."
-								>
-									<FiHelpCircle size={12} />
-								</span>
-							</label>
-
-							<AssistantPresetModelPatchEditor
-								isViewMode={isViewMode}
-								modelPatch={formData.modelPatch}
-								error={errors.modelPatch}
-								onPatchChange={updateModelPatch}
-							/>
-						</div>
+						<AssistantPresetModelPatchEditor
+							isViewMode={isViewMode}
+							modelPatch={formData.modelPatch}
+							error={errors.modelPatch}
+							onPatchChange={updateModelPatch}
+						/>
 
 						<div className="divider">Instruction Templates</div>
 

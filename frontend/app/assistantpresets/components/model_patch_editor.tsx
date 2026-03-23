@@ -1,6 +1,6 @@
 import { memo } from 'react';
 
-import { FiAlertCircle } from 'react-icons/fi';
+import { FiAlertCircle, FiHelpCircle } from 'react-icons/fi';
 
 import {
 	OutputFormatKind,
@@ -55,22 +55,35 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 	onPatchChange,
 }: AssistantPresetModelPatchEditorProps) {
 	return (
-		<div className="col-span-9 space-y-3">
-			<input
-				type="checkbox"
-				className="toggle toggle-accent"
-				checked={modelPatch.enabled}
-				disabled={isViewMode}
-				onChange={e => {
-					onPatchChange({ enabled: e.target.checked });
-				}}
-			/>
+		<div className="flex flex-col space-y-3">
+			<div className="grid grid-cols-12 gap-2">
+				<label className="label col-span-3 cursor-pointer">
+					<span className="label-text text-sm">Starting Model Patch</span>
+					<span
+						className="label-text-alt tooltip tooltip-right"
+						data-tip="Runtime knob patch only. systemPrompt is intentionally not allowed."
+					>
+						<FiHelpCircle size={12} />
+					</span>
+				</label>
+				<div className="col-span-9 flex flex-row items-start gap-2">
+					<input
+						type="checkbox"
+						className="toggle toggle-accent"
+						checked={modelPatch.enabled}
+						disabled={isViewMode}
+						onChange={e => {
+							onPatchChange({ enabled: e.target.checked });
+						}}
+					/>
 
-			{error && (
-				<div className="text-error flex items-center gap-1 text-sm">
-					<FiAlertCircle size={12} /> {error}
+					{error && (
+						<div className="text-error flex items-center gap-1 text-sm">
+							<FiAlertCircle size={12} /> {error}
+						</div>
+					)}
 				</div>
-			)}
+			</div>
 
 			{modelPatch.enabled && (
 				<div className="border-base-content/10 space-y-4 rounded-2xl border p-4">

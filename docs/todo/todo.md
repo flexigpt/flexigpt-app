@@ -18,6 +18,9 @@
   - [x] UI to manage preset
   - [ ] UI integration in chat. should have select and reset capability, with indication that default is overridden in xyz things.
   - [ ] review for and handle stale refs in the preset, no fk present so need to validate properly.
+  - [ ] assistant add edit.
+    - [ ] tools should have args only if args schema is present
+    - [ ] model patch should start with model defaults
 
 - [ ] Skill
   - [ ] include some builtin skills and test on all platforms, full flow.
