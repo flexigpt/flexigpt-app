@@ -4,6 +4,21 @@ import type { SkillRef } from '@/spec/skill';
 import type { ToolSelection } from '@/spec/tool';
 
 /**
+ * Assistant preset write-time subset of ModelPresetPatch.
+ *
+ * Mirrors Go validation for assistant presets:
+ * - systemPrompt must be nil
+ * - capabilitiesOverride must be nil
+ */
+export type AssistantPresetStartingModelPresetPatch = Omit<
+	ModelPresetPatch,
+	'systemPrompt' | 'capabilitiesOverride'
+> & {
+	systemPrompt?: never;
+	capabilitiesOverride?: never;
+};
+
+/**
  * @public
  */
 export interface AssistantPreset {
@@ -26,9 +41,6 @@ export interface AssistantPreset {
 	modifiedAt: Date; // Go type: time
 }
 
-/**
- * @public
- */
 export interface AssistantPresetBundle {
 	schemaVersion: string;
 	id: string;
@@ -42,9 +54,6 @@ export interface AssistantPresetBundle {
 	softDeletedAt?: Date; // Go type: time
 }
 
-/**
- * @public
- */
 export interface AssistantPresetListItem {
 	bundleID: string;
 	bundleSlug: string;
@@ -56,4 +65,21 @@ export interface AssistantPresetListItem {
 	isEnabled: boolean;
 	isBuiltIn: boolean;
 	modifiedAt?: Date; // Go type: time
+}
+
+/**
+ * App-facing write payload for putAssistantPreset().
+ * No "Body" wrapper type on the frontend boundary.
+ */
+export interface PutAssistantPresetPayload {
+	displayName: string;
+	description?: string;
+	icon?: string;
+	isEnabled: boolean;
+	startingModelPresetRef?: ModelPresetRef;
+	startingModelPresetPatch?: AssistantPresetStartingModelPresetPatch;
+	startingIncludeModelSystemPrompt?: boolean;
+	startingInstructionTemplateRefs?: PromptTemplateRef[];
+	startingToolSelections?: ToolSelection[];
+	startingEnabledSkillRefs?: SkillRef[];
 }

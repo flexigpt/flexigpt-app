@@ -1,4 +1,10 @@
 import type {
+	AssistantPreset,
+	AssistantPresetBundle,
+	AssistantPresetListItem,
+	PutAssistantPresetPayload,
+} from '@/spec/assistantpreset';
+import type {
 	Attachment,
 	AttachmentsDroppedPayload,
 	DirectoryAttachmentsResult,
@@ -374,4 +380,63 @@ export interface IAggregateAPI {
 	): Promise<CompletionResponseBody | undefined>;
 
 	cancelCompletion(requestId: string): Promise<void>;
+}
+
+export interface IAssistantPresetStoreAPI {
+	/** List assistant preset bundles, optionally filtered by IDs, disabled, and paginated. */
+	listAssistantPresetBundles(
+		bundleIDs?: string[],
+		includeDisabled?: boolean,
+		pageSize?: number,
+		pageToken?: string
+	): Promise<{ assistantPresetBundles: AssistantPresetBundle[]; nextPageToken?: string }>;
+
+	/** Create or update an assistant preset bundle. */
+	putAssistantPresetBundle(
+		bundleID: string,
+		slug: string,
+		displayName: string,
+		isEnabled: boolean,
+		description?: string
+	): Promise<void>;
+
+	/** Patch (enable/disable) an assistant preset bundle. */
+	patchAssistantPresetBundle(bundleID: string, isEnabled: boolean): Promise<void>;
+
+	/** Delete an assistant preset bundle. */
+	deleteAssistantPresetBundle(bundleID: string): Promise<void>;
+
+	/** List assistant presets, optionally filtered by bundle IDs and paginated. */
+	listAssistantPresets(
+		bundleIDs?: string[],
+		includeDisabled?: boolean,
+		recommendedPageSize?: number,
+		pageToken?: string
+	): Promise<{ assistantPresetListItems: AssistantPresetListItem[]; nextPageToken?: string }>;
+
+	/** Create or update an assistant preset version. */
+	putAssistantPreset(
+		bundleID: string,
+		assistantPresetSlug: string,
+		version: string,
+		payload: PutAssistantPresetPayload
+	): Promise<void>;
+
+	/** Patch (enable/disable) an assistant preset version. */
+	patchAssistantPreset(
+		bundleID: string,
+		assistantPresetSlug: string,
+		version: string,
+		isEnabled: boolean
+	): Promise<void>;
+
+	/** Delete an assistant preset version. */
+	deleteAssistantPreset(bundleID: string, assistantPresetSlug: string, version: string): Promise<void>;
+
+	/** Get an assistant preset version. */
+	getAssistantPreset(
+		bundleID: string,
+		assistantPresetSlug: string,
+		version: string
+	): Promise<AssistantPreset | undefined>;
 }

@@ -144,10 +144,8 @@
 			"app/apis/wailsjs/go/models.ts",
 			"app/apis/wailsjs/runtime/runtime.js",
 			"app/apis/wailsjs/go/main/ModelPresetStoreWrapper.js",
-			"app/apis/wailsjs/go/main/AssistantPresetStoreWrapper.js",
 			"app/spec/inference_capabilities.ts",
-			"app/hooks/use_at_top_bottom.tsx",
-			"app/spec/assistantpreset.ts"
+			"app/hooks/use_at_top_bottom.tsx"
 		],
 		"ignoreBinaries": [],
 		"ignoreDependencies": [

@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-imports */
 export * from './aggregate';
+export * from './assistantpresetstore';
 export * from './attachmentsdrop';
 export * from './backend';
 export * from './conversationstore';

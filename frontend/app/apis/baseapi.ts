@@ -2,6 +2,7 @@ import { IS_WAILS_PLATFORM } from '@/lib/features';
 
 import type {
 	IAggregateAPI,
+	IAssistantPresetStoreAPI,
 	IAttachmentsDropAPI,
 	IBackendAPI,
 	IConversationStoreAPI,
@@ -27,6 +28,10 @@ export let promptStoreAPI: IPromptStoreAPI;
 export let toolStoreAPI: IToolStoreAPI;
 export let toolRuntimeAPI: IToolRuntimeAPI;
 export let skillStoreAPI: ISkillStoreAPI;
+/**
+ * @public
+ */
+export let assistantPresetStoreAPI: IAssistantPresetStoreAPI;
 
 // Conditional initialization
 if (IS_WAILS_PLATFORM) {
@@ -43,6 +48,7 @@ if (IS_WAILS_PLATFORM) {
 	toolStoreAPI = new wailsImpl.WailsToolStoreAPI();
 	toolRuntimeAPI = new wailsImpl.WailsToolRuntimeAPI();
 	skillStoreAPI = new wailsImpl.WailsSkillStoreAPI();
+	assistantPresetStoreAPI = new wailsImpl.WailsAssistantPresetStoreAPI();
 } else {
 	// Error for unsupported platforms
 	throw new Error('Unsupported platform');
