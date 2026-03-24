@@ -128,7 +128,7 @@ function AddEditPromptTemplateModalContent({
 		getInitialFormData(initialData, existingTemplates, isEditMode)
 	);
 	const [errors, setErrors] = useState<ErrorState>({});
-	const [submitError, setSubmitError] = useState<string>('');
+	const [submitError, setSubmitError] = useState('');
 
 	const initialTemplateId = initialData?.template?.id;
 	const initialTemplateSlug = initialData?.template?.slug;

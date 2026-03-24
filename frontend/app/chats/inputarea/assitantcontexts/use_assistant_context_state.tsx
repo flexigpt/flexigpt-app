@@ -302,17 +302,15 @@ export type AssistantContextController = {
 };
 
 export function useAssistantContextState(): AssistantContextController {
-	const [selectedModel, setSelectedModel] = useState<UIChatOption>(DefaultUIChatOptions);
-	const [allOptions, setAllOptions] = useState<UIChatOption[]>([DefaultUIChatOptions]);
+	const [selectedModel, setSelectedModel] = useState(DefaultUIChatOptions);
+	const [allOptions, setAllOptions] = useState([DefaultUIChatOptions]);
 
 	const [isHybridReasoningEnabled, setIsHybridReasoningEnabled] = useState(true);
 	const [includePreviousMessages, setIncludePreviousMessages] = useState<IncludePreviousMessages>(
 		DefaultUIChatOptions.includePreviousMessages
 	);
 	const [rawSelectedPromptKeys, setRawSelectedPromptKeys] = useState<string[]>([]);
-	const [includeModelDefault, setIncludeModelDefault] = useState<boolean>(
-		Boolean(DefaultUIChatOptions.systemPrompt.trim())
-	);
+	const [includeModelDefault, setIncludeModelDefault] = useState(Boolean(DefaultUIChatOptions.systemPrompt.trim()));
 	const [restoredConversationSystemPrompt, setRestoredConversationSystemPrompt] = useState<string | null>(null);
 
 	const selectedModelRef = useRef(selectedModel);

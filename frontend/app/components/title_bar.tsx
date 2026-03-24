@@ -15,7 +15,7 @@ type TitleBarProps = {
 export function TitleBar({ onToggleDrawer }: TitleBarProps) {
 	const slots = useTitleBarSlots();
 
-	const [version, setVersion] = useState<string>('');
+	const [version, setVersion] = useState('');
 	const [isMax, setIsMax] = useState(false);
 	const [isTogglingMax, setIsTogglingMax] = useState(false);
 

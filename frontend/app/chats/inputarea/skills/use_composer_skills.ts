@@ -53,7 +53,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 	const [skillsLoading, setSkillsLoading] = useState(true);
 
 	// Track the allowlist fingerprint used to create the current session.
-	const sessionAllowlistKeyRef = useRef<string>('');
+	const sessionAllowlistKeyRef = useRef('');
 
 	const skillSessionIDRef = useRef<string | null>(null);
 	const enabledSkillRefsRef = useRef<SkillRef[]>([]);

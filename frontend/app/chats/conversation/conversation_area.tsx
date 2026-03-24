@@ -145,7 +145,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 	// PERF: O(1) existence checks (used in async paths)
 	const tabIdSet = useMemo(() => new Set(tabs.map(t => t.tabId)), [tabs]);
-	const tabIdSetRef = useRef<Set<string>>(tabIdSet);
+	const tabIdSetRef = useRef(tabIdSet);
 	tabIdSetRef.current = tabIdSet;
 	const tabExists = useCallback((tabId: string) => tabIdSetRef.current.has(tabId), []);
 

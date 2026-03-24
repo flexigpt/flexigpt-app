@@ -130,7 +130,7 @@ export const ToolbarToggleItem = forwardRef<HTMLButtonElement, ToolbarToggleItem
 	ref
 ) {
 	const isControlled = typeof pressed === 'boolean';
-	const [internalPressed, setInternalPressed] = useState<boolean>(defaultPressed ?? false);
+	const [internalPressed, setInternalPressed] = useState(defaultPressed ?? false);
 
 	const isPressed = isControlled ? pressed : internalPressed;
 

@@ -811,3 +811,17 @@
   - [x] some message jumps at message boundary?
 
 - [x] prev user turns. send valid user turns and not pure slice.
+
+- AssistantPreset
+  - [x] core philosophy is that it is a starting point for user with recommended things. user can change post that as needed.
+  - [x] should have tool sets and autoexec config too so that the "agent" loop is kind of autonomous
+  - [x] create refs and patch objects in current specs first. do associated cleanups.
+    - [x] modelpreset
+    - [x] tool
+  - [x] support storing sys prompts in prompt templates
+  - [x] conversation to include additional things wrt assistant and current absent contexts. idea is to have "full vs increment" in message turn.
+    - [x] we store modelparams on assitant turn as of now. we need to verify what needs to happen for user turn, what shoudl be restored back, what should not etc. this needs a end to end look.
+  - [ ] ~~clean fetch completion api. it should take current params and value as separate inputs and NOT take current message input. a hydrated current message should be sent back.~~
+  - [x] assistant store
+  - [x] UI to manage preset
+  - [x] UI integration in chat. should have select and reset capability, with indication that default is overridden in xyz things.

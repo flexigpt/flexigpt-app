@@ -63,7 +63,7 @@ export function AssistantPresetBundleCard({
 	const [alertMsg, setAlertMsg] = useState('');
 
 	const [isBundleTogglePending, setIsBundleTogglePending] = useState(false);
-	const [pendingPresetToggleIDs, setPendingPresetToggleIDs] = useState<Set<string>>(new Set());
+	const [pendingPresetToggleIDs, setPendingPresetToggleIDs] = useState(new Set());
 
 	const openAlert = (message: string) => {
 		setAlertMsg(message);

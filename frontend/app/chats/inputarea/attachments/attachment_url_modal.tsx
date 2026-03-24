@@ -26,7 +26,7 @@ type UrlAttachmentModalContentProps = Omit<UrlAttachmentModalProps, 'isOpen'>;
 const INITIAL_FORM_STATE: FormState = { url: '' };
 
 function UrlAttachmentModalContent({ onClose, onAttachURL }: UrlAttachmentModalContentProps) {
-	const [formData, setFormData] = useState<FormState>(INITIAL_FORM_STATE);
+	const [formData, setFormData] = useState(INITIAL_FORM_STATE);
 	const [errors, setErrors] = useState<FieldErrorState<FormState>>({});
 	const [submitting, setSubmitting] = useState(false);
 

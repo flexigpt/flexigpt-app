@@ -100,7 +100,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 
 	const [formData, setFormData] = useState<SkillFormData>(() => getInitialFormData(initialData));
 	const [errors, setErrors] = useState<ErrorState>({});
-	const [submitError, setSubmitError] = useState<string>('');
+	const [submitError, setSubmitError] = useState('');
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const nameInputRef = useRef<HTMLInputElement | null>(null);

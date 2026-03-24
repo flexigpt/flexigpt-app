@@ -11,7 +11,7 @@ interface CopyButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export function CopyButton({ value, size, ...buttonProps }: CopyButtonProps) {
-	const [copied, setCopied] = useState<boolean>(false);
+	const [copied, setCopied] = useState(false);
 
 	const handleCopy = async () => {
 		if (!value) {

@@ -11,7 +11,7 @@ import type {
 } from '@/spec/conversation';
 import { RoleEnum } from '@/spec/inference';
 
-import { defaultShortcutConfig, type ShortcutConfig, useChatShortcuts } from '@/lib/keyboard_shortcuts';
+import { defaultShortcutConfig, useChatShortcuts } from '@/lib/keyboard_shortcuts';
 import { omitManyKeys } from '@/lib/obj_utils';
 import { sanitizeConversationTitle } from '@/lib/text_utils';
 import { generateTitle } from '@/lib/title_utils';
@@ -203,13 +203,13 @@ export default function ChatsPage() {
 	const initialSelectedTabId = initialModel.selectedTabId;
 
 	// ---------------- Tabs state ----------------
-	const lastActivatedAtRef = useRef<Map<string, number>>(toTimestampMap(initialModel.lastActivatedAtByTab));
+	const lastActivatedAtRef = useRef(toTimestampMap(initialModel.lastActivatedAtByTab));
 	const touchTab = useCallback((tabId: string) => {
 		lastActivatedAtRef.current.set(tabId, Date.now());
 	}, []);
 
 	const [tabs, setTabs] = useState<ChatTabState[]>(() => initialModel.tabs);
-	const tabsRef = useRef<ChatTabState[]>(initialModel.tabs);
+	const tabsRef = useRef(initialModel.tabs);
 
 	const tabStore = useTabStore({ defaultSelectedId: initialSelectedTabId });
 	const storeSelectedTabId = useStoreState(tabStore, 'selectedId') ?? initialSelectedTabId;
@@ -244,7 +244,7 @@ export default function ChatsPage() {
 	const searchRef = useRef<ChatSearchHandle | null>(null);
 
 	// ---------------- Persistence scratch state ----------------
-	const scrollTopSnapshotRef = useRef<Record<string, number>>(initialModel.scrollTopByTab ?? {});
+	const scrollTopSnapshotRef = useRef(initialModel.scrollTopByTab ?? {});
 	const persistNowRef = useRef<() => void>(() => {});
 
 	// ---------------- Helpers ----------------
@@ -708,7 +708,7 @@ export default function ChatsPage() {
 	}, [initialModel.restoredFromStorage, updateTab]);
 
 	// ---------------- Shortcuts ----------------
-	const [shortcutConfig] = useState<ShortcutConfig>(defaultShortcutConfig);
+	const [shortcutConfig] = useState(defaultShortcutConfig);
 
 	useChatShortcuts({
 		config: shortcutConfig,

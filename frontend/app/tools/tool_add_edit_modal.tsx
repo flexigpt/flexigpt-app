@@ -163,7 +163,7 @@ function AddEditToolModalContent({
 		buildInitialFormData(initialData, existingTools, isEditMode)
 	);
 	const [errors, setErrors] = useState<ErrorState>({});
-	const [submitError, setSubmitError] = useState<string>('');
+	const [submitError, setSubmitError] = useState('');
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const displayNameInputRef = useRef<HTMLInputElement | null>(null);

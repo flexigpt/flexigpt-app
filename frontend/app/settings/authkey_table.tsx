@@ -20,7 +20,7 @@ interface AuthKeyTableProps {
 export function AuthKeyTable({ authKeys, onEdit, onChanged }: AuthKeyTableProps) {
 	const builtInsReady = useBuiltInsReady();
 	const [deleteTarget, setDeleteTarget] = useState<AuthKeyMeta | null>(null);
-	const [alertMsg, setAlertMsg] = useState<string>('');
+	const [alertMsg, setAlertMsg] = useState('');
 
 	if (!builtInsReady) {
 		return <span className="loading loading-dots loading-sm" />;

@@ -6,7 +6,7 @@ const OPEN_TOOL_ARGS_EVENT = 'tool-args:open';
 type Detail = { target: ToolArgsTarget };
 
 export function dispatchOpenToolArgs(target: ToolArgsTarget, eventTarget?: EventTarget | null) {
-	emitCustomEvent<Detail>(OPEN_TOOL_ARGS_EVENT, { target }, eventTarget);
+	emitCustomEvent(OPEN_TOOL_ARGS_EVENT, { target }, eventTarget);
 }
 
 export function useOpenToolArgs(handler: (target: ToolArgsTarget) => void, eventTarget?: EventTarget | null) {

@@ -334,7 +334,7 @@ export const ChatSearch = forwardRef<ChatSearchHandle, ChatSearchProps>(function
 	const inputRef = useRef<HTMLInputElement>(null);
 	const searchDivRef = useRef<HTMLDivElement>(null);
 	const recentsNextTokenRef = useRef<string | undefined>(undefined);
-	const recentsHasMoreRef = useRef<boolean>(false);
+	const recentsHasMoreRef = useRef(false);
 	const recentConversationsRef = useRef<ConversationSearchItem[]>([]);
 	const searchRequestSeqRef = useRef(0);
 

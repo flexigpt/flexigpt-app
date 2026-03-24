@@ -63,7 +63,7 @@ export function PromptBundleCard({
 	const [alertMsg, setAlertMsg] = useState('');
 
 	const [isBundleTogglePending, setIsBundleTogglePending] = useState(false);
-	const [pendingTemplateToggleIDs, setPendingTemplateToggleIDs] = useState<Set<string>>(new Set());
+	const [pendingTemplateToggleIDs, setPendingTemplateToggleIDs] = useState(new Set());
 
 	const openAlert = (message: string) => {
 		setAlertMsg(message);

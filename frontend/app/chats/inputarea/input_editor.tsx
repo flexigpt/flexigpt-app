@@ -114,7 +114,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	},
 	ref
 ) {
-	const isSubmittingRef = useRef<boolean>(false);
+	const isSubmittingRef = useRef(false);
 
 	const {
 		editor,

@@ -13,7 +13,6 @@ import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal'
 
 import {
 	type AssistantPresetPreparedApplication,
-	type AssistantPresetRuntimeSnapshot,
 	EMPTY_ASSISTANT_PRESET_RUNTIME_SNAPSHOT,
 } from '@/chats/inputarea/assitantcontexts/assistant_preset_runtime';
 import { AssistantContextBar } from '@/chats/inputarea/assitantcontexts/context_bar';
@@ -62,9 +61,7 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 	const chatOptions = assistantContext.chatOptions;
 	const showAbortModal = isGenerating && abortConfirmationRequested;
 
-	const [assistantRuntimeSnapshot, setAssistantRuntimeSnapshot] = useState<AssistantPresetRuntimeSnapshot>(
-		EMPTY_ASSISTANT_PRESET_RUNTIME_SNAPSHOT
-	);
+	const [assistantRuntimeSnapshot, setAssistantRuntimeSnapshot] = useState(EMPTY_ASSISTANT_PRESET_RUNTIME_SNAPSHOT);
 
 	const applyAssistantPresetRuntimeSelections = useCallback((prepared: AssistantPresetPreparedApplication) => {
 		if (prepared.runtimeSelections.hasToolsSelection) {

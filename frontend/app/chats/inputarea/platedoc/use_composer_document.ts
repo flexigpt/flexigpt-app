@@ -81,7 +81,7 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 	const [hasText, setHasText] = useState(false);
 	const hasTextRef = useRef(false);
 	const isAutoChunkingRef = useRef(false);
-	const lastPopulatedSelectionKeyRef = useRef<Set<string>>(new Set());
+	const lastPopulatedSelectionKeyRef = useRef(new Set());
 
 	const syncDocumentDerivedState = useCallback((bumpDocVersion = true) => {
 		const nextHasText = hasNonEmptyUserText(editorRef.current);

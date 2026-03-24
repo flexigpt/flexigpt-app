@@ -159,16 +159,17 @@ export function useComposerTools({
 	const [conversationToolsState, setConversationToolsStateRaw] = useState<ConversationToolStateEntry[]>([]);
 	const conversationToolsStateRef = useRef<ConversationToolStateEntry[]>([]);
 
+	// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-arguments
 	const conversationToolDefsCacheRef = useRef<Map<string, Tool>>(new Map());
 
-	const hydratingConversationToolKeysRef = useRef<Set<string>>(new Set());
+	const hydratingConversationToolKeysRef = useRef(new Set());
 
 	// Arg-blocking state, split by attached-vs-conversation tools.
 	const [attachedToolArgsBlocked, setAttachedToolArgsBlocked] = useState(false);
 	const attachedToolArgsBlockedRef = useRef(false);
 	const isBusyRef = useRef(isBusy);
 	const externalAutoExecuteBlockedRef = useRef(externalAutoExecuteBlocked);
-	const onAutoSubmitRequestRef = useRef<(() => void) | null>(onAutoSubmitRequest ?? null);
+	const onAutoSubmitRequestRef = useRef(onAutoSubmitRequest ?? null);
 	const templateBlockedRef = useRef(templateBlocked);
 	const [webSearchTemplates, setWebSearchTemplatesRaw] = useState<WebSearchChoiceTemplate[]>([]);
 	const webSearchTemplatesRef = useRef<WebSearchChoiceTemplate[]>([]);

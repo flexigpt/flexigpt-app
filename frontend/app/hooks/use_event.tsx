@@ -58,11 +58,11 @@ export function useEvent<D = unknown, Ev extends Event = CustomEvent<D>>(
 export function useEvent(name: string, options: UseEventOptions<Event, any> = {}): UseEventResult<any> {
 	const { target, capture, passive, once, filter, handler, trackDetail = false, mapDetail, pulseMs } = options;
 
-	const handlerRef = useRef<typeof handler>(handler);
-	const filterRef = useRef<typeof filter>(filter);
-	const mapDetailRef = useRef<typeof mapDetail>(mapDetail);
-	const trackDetailRef = useRef<boolean>(trackDetail);
-	const pulseMsRef = useRef<number | undefined>(pulseMs);
+	const handlerRef = useRef(handler);
+	const filterRef = useRef(filter);
+	const mapDetailRef = useRef(mapDetail);
+	const trackDetailRef = useRef(trackDetail);
+	const pulseMsRef = useRef(pulseMs);
 
 	useEffect(() => {
 		handlerRef.current = handler;

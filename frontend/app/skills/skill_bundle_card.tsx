@@ -69,7 +69,7 @@ export function SkillBundleCard({
 	const [isExpanded, setIsExpanded] = useState(false);
 
 	const [busyBundleToggle, setBusyBundleToggle] = useState(false);
-	const [busySkillIDs, setBusySkillIDs] = useState<Set<string>>(new Set());
+	const [busySkillIDs, setBusySkillIDs] = useState(new Set());
 
 	const [isDeleteSkillModalOpen, setIsDeleteSkillModalOpen] = useState(false);
 	const [isDeleteSkillPending, setIsDeleteSkillPending] = useState(false);
