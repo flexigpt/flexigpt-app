@@ -27,10 +27,6 @@
 - [ ] modelpreset: only this is not version based as of now. should it be version based?
   - [ ] better do it before assistant preset.
 
-- [ ] eslint 10: pending plugins support.
-- [ ] vite 8: react router dev support. react router has some cleanup planned with vite8. would be better to wait until react router stamps it as ok.
-- [ ] jsdom next major
-
 ## Features
 
 - [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls loop is better.
@@ -45,23 +41,23 @@
 ## Milestone thoughts
 
 - [ ] M1 - API coverage - Pending items:
-  - [ ] Modalities coverage:
+  - [x] Modalities coverage:
     - [x] Text
       - [x] content in/out
       - [x] reasoning in/out
       - [x] extracted web pages input
       - [x] extracted pdf input
-      - [ ] extracted other docs input, sheets and docx mainly.
+
     - [x] Image input
     - [x] Document input
     - [x] Image url input
     - [x] Document url input
 
-  - [ ] Tools
+  - [x] Tools
     - [x] built-in tools from apis
       - [x] web search
 
-    - [ ] local replacements for some builtin tools that are very vendor specific
+    - [x] local replacements for some builtin tools that are very vendor specific
       - [x] bash: yes.
       - [x] apply patch: No. this is very error prone, cosnidering unidiff vs V4A diff formats and compatibility issues.
       - [x] text editor: yes
@@ -72,6 +68,8 @@
   - [ ] i18n
 
 - [ ] M2 - Better context
+  - [ ] Text support
+    - [ ] extracted other docs input, sheets and docx mainly.
   - [ ] MCP local connections and hooks
   - [ ] MCP options in apis connections and hooks
   - [ ] Doc stores/vector stores connections
@@ -83,7 +81,20 @@
   - [ ] Image output: See inference-go notes.
   - [ ] audio in/out
   - [ ] check the reference calculator tool in claude docs
+
   - [ ] tool search tool: we may need a tool search tool that does sqlite based bm25 search or regex search like from anthropic
     - [ ] Not needed as of now. May be a progressive disclosure runtime like skills will be better.
     - [ ] May need to check when there are actually a lot of tools.
     - [ ] May be like skills we can also inject a available tools prompt in the sys prompt
+
+## Chores
+
+- [ ] Upgrade sequence:
+  - [ ] task checkupgrade; go-mod-upgrade -v ; pnpm up -r
+
+- [ ] eslint 10: pending plugins support.
+  - [ ] monitor oxclint for a while. ecosystem seems weak as of now.
+
+- [ ] vite 8: react router dev support. react router has some cleanup planned with vite8. would be better to wait until react router stamps it as ok.
+
+- [ ] jsdom next major
