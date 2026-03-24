@@ -26,6 +26,10 @@ import { cssEscape } from '@/lib/text_utils';
 
 import { useEnterSubmit } from '@/hooks/use_enter_submit';
 
+import {
+	type AssistantPresetRuntimeSnapshot,
+	mapAssistantPresetWebSearchTemplatesToChoices,
+} from '@/chats/inputarea/assitantcontexts/assistant_preset_runtime';
 import { useComposerAttachments } from '@/chats/inputarea/attachments/use_composer_attachments';
 import { dispatchOpenToolArgs } from '@/chats/inputarea/events/open_attached_toolargs';
 import { dispatchTemplateFlashEvent } from '@/chats/inputarea/events/template_flash';
@@ -89,6 +93,7 @@ interface EditorAreaProps {
 	shortcutConfig: ShortcutConfig;
 	onSubmit: (payload: EditorSubmitPayload) => Promise<void>;
 	onRequestStop: () => void;
+	onAssistantPresetRuntimeStateChange?: (snapshot: AssistantPresetRuntimeSnapshot) => void;
 	editingMessageId: string | null;
 	cancelEditing: () => void;
 }
@@ -103,6 +108,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		shortcutConfig,
 		onSubmit,
 		onRequestStop,
+		onAssistantPresetRuntimeStateChange,
 		editingMessageId,
 		cancelEditing,
 	},
@@ -946,7 +952,13 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		!isSubmitting &&
 		!templateBlocked &&
 		!hasBlockingToolArgs;
-
+	useEffect(() => {
+		onAssistantPresetRuntimeStateChange?.({
+			conversationToolChoices: conversationToolsToChoices(conversationToolsState),
+			webSearchChoices: mapAssistantPresetWebSearchTemplatesToChoices(webSearchTemplates),
+			enabledSkillRefs,
+		});
+	}, [conversationToolsState, enabledSkillRefs, onAssistantPresetRuntimeStateChange, webSearchTemplates]);
 	return (
 		<>
 			<form

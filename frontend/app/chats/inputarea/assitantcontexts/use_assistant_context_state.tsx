@@ -11,16 +11,34 @@ import {
 	type UIChatOption,
 } from '@/spec/modelpreset';
 import { type PromptBundle, PromptRoleEnum } from '@/spec/prompt';
+import { type Tool, type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
+import { dedupeStringArray } from '@/lib/obj_utils';
+import { getUUIDv7 } from '@/lib/uuid_utils';
+
+import { toolStoreAPI } from '@/apis/baseapi';
+
+import { buildToolRefKey } from '@/assistantpresets/lib/assistant_preset_utils';
+import {
+	applyAssistantPresetModelPatch,
+	type AssistantPresetOptionItem,
+	type AssistantPresetPreparedApplication,
+	buildAssistantPresetModelComparisonState,
+	normalizeAssistantPresetSkillRefs,
+	normalizeAssistantPresetToolChoices,
+} from '@/chats/inputarea/assitantcontexts/assistant_preset_runtime';
 import {
 	getSupportedReasoningLevels,
 	sanitizeUIChatOptionByCapabilities,
 	supportsOutputVerbosity,
 } from '@/chats/inputarea/assitantcontexts/capabilities_override_helper';
 import { getChatInputOptions } from '@/chats/inputarea/assitantcontexts/context_uichatoption_helper';
+import { useAssistantPresets } from '@/chats/inputarea/assitantcontexts/use_assistant_presets';
+import { buildPromptTemplateRefKey } from '@/prompts/lib/prompt_template_ref';
 import { buildEffectiveSystemPrompt } from '@/prompts/lib/system_prompt_utils';
 import type { SystemPromptDraft } from '@/prompts/lib/use_system_prompts';
 import { type SystemPromptItem, useSystemPrompts } from '@/prompts/lib/use_system_prompts';
+import { normalizeSkillRefs } from '@/skills/lib/skill_identity_utils';
 
 function isHybridReasoningModel(model: UIChatOption): boolean {
 	return model.reasoning?.type === ReasoningType.HybridWithTokens;
@@ -268,7 +286,15 @@ export type AssistantContextController = {
 	refreshSystemPrompts: () => Promise<void>;
 	getExistingSystemPromptVersions: (bundleID: string, slug: string) => string[];
 
+	assistantPresetOptions: AssistantPresetOptionItem[];
+	assistantPresetsLoading: boolean;
+	assistantPresetError: string | null;
+	refreshAssistantPresets: () => Promise<void>;
+	prepareAssistantPresetApplication: (presetKey: string) => Promise<AssistantPresetPreparedApplication | null>;
+	applyPreparedAssistantPreset: (prepared: AssistantPresetPreparedApplication) => void;
+
 	applyAdvancedModel: (updatedModel: UIChatOption) => void;
+
 	restoreConversationContext: (context: RestorableConversationContext) => void;
 
 	verbosityEnabled: boolean;
@@ -295,6 +321,7 @@ export function useAssistantContextState(): AssistantContextController {
 	const defaultLoadedOptionRef = useRef(DefaultUIChatOptions);
 	const optionsLoadedRef = useRef(false);
 	const pendingRestoreContextRef = useRef<RestorableConversationContext | null>(null);
+	const assistantPresetToolCacheRef = useRef(new Map<string, Tool | null>());
 
 	useEffect(() => {
 		selectedModelRef.current = selectedModel;
@@ -319,6 +346,13 @@ export function useAssistantContextState(): AssistantContextController {
 		getExistingVersions,
 	} = useSystemPrompts();
 
+	const {
+		presetOptions: assistantPresetOptions,
+		loading: assistantPresetsLoading,
+		error: assistantPresetError,
+		refreshPresets: refreshAssistantPresets,
+	} = useAssistantPresets();
+
 	const syntheticPreviousConversationPrompt = useMemo(() => {
 		const prompt = restoredConversationSystemPrompt?.trim();
 		return prompt ? buildPreviousConversationSystemPromptItem(prompt) : null;
@@ -336,6 +370,16 @@ export function useAssistantContextState(): AssistantContextController {
 		() => rawSelectedPromptKeys.filter(key => promptsByKey.has(key)),
 		[promptsByKey, rawSelectedPromptKeys]
 	);
+
+	const includeModelDefaultRef = useRef(includeModelDefault);
+	useEffect(() => {
+		includeModelDefaultRef.current = includeModelDefault;
+	}, [includeModelDefault]);
+
+	const selectedPromptKeysRef = useRef(selectedPromptKeys);
+	useEffect(() => {
+		selectedPromptKeysRef.current = selectedPromptKeys;
+	}, [selectedPromptKeys]);
 
 	const chatOptions = useMemo(
 		() =>
@@ -546,6 +590,169 @@ export function useAssistantContextState(): AssistantContextController {
 		setRawSelectedPromptKeys([]);
 	}, []);
 
+	const getAssistantPresetToolDefinition = useCallback(
+		async (bundleID: string, toolSlug: string, toolVersion: string) => {
+			const cacheKey = buildToolRefKey({ bundleID, toolSlug, toolVersion });
+			const cache = assistantPresetToolCacheRef.current;
+
+			if (cache.has(cacheKey)) {
+				return cache.get(cacheKey) ?? undefined;
+			}
+
+			const toolDefinition = await toolStoreAPI.getTool(bundleID, toolSlug, toolVersion);
+			cache.set(cacheKey, toolDefinition ?? null);
+			return toolDefinition ?? undefined;
+		},
+		[]
+	);
+
+	const prepareAssistantPresetApplication = useCallback(
+		async (presetKey: string): Promise<AssistantPresetPreparedApplication | null> => {
+			const option = assistantPresetOptions.find(item => item.key === presetKey);
+			if (!option) {
+				return null;
+			}
+
+			const { preset } = option;
+			const currentSelectedModel = selectedModelRef.current;
+			let nextSelectedModel = currentSelectedModel;
+			let hasModelSelection = false;
+
+			if (preset.startingModelPresetRef) {
+				if (!optionsLoadedRef.current) {
+					throw new Error('Model presets are still loading. Try again in a moment.');
+				}
+
+				const matchedModel = allOptionsRef.current.find(
+					item =>
+						item.providerName === preset.startingModelPresetRef?.providerName &&
+						item.modelPresetID === preset.startingModelPresetRef?.modelPresetID
+				);
+
+				if (!matchedModel) {
+					throw new Error(
+						`Model preset "${preset.startingModelPresetRef.providerName}/${preset.startingModelPresetRef.modelPresetID}" is not currently selectable.`
+					);
+				}
+
+				nextSelectedModel = {
+					...matchedModel,
+				};
+				hasModelSelection = true;
+			}
+
+			if (preset.startingModelPresetPatch) {
+				nextSelectedModel = applyAssistantPresetModelPatch(nextSelectedModel, preset.startingModelPresetPatch);
+				hasModelSelection = true;
+			}
+
+			const hasIncludeModelSystemPromptSelection = preset.startingIncludeModelSystemPrompt !== undefined;
+			const nextIncludeModelSystemPrompt = hasIncludeModelSystemPromptSelection
+				? Boolean(preset.startingIncludeModelSystemPrompt)
+				: includeModelDefaultRef.current;
+
+			const hasInstructionTemplateSelection = (preset.startingInstructionTemplateRefs?.length ?? 0) > 0;
+			let nextSelectedPromptKeys = selectedPromptKeysRef.current;
+			if (hasInstructionTemplateSelection && preset.startingInstructionTemplateRefs) {
+				nextSelectedPromptKeys = dedupeStringArray(
+					preset.startingInstructionTemplateRefs.map(buildPromptTemplateRefKey)
+				);
+			}
+
+			const hasToolsSelection = Array.isArray(preset.startingToolSelections);
+			const conversationToolChoices: ToolStoreChoice[] = [];
+			const webSearchChoices: ToolStoreChoice[] = [];
+
+			if (hasToolsSelection) {
+				for (const selection of preset.startingToolSelections ?? []) {
+					const toolDefinition = await getAssistantPresetToolDefinition(
+						selection.toolRef.bundleID,
+						selection.toolRef.toolSlug,
+						selection.toolRef.toolVersion
+					);
+
+					if (!toolDefinition) {
+						throw new Error(
+							`Tool "${selection.toolRef.bundleID}/${selection.toolRef.toolSlug}@${selection.toolRef.toolVersion}" is not currently available.`
+						);
+					}
+
+					const toolChoice: ToolStoreChoice = {
+						choiceID: getUUIDv7(),
+						bundleID: selection.toolRef.bundleID,
+						toolID: toolDefinition.id,
+						toolSlug: toolDefinition.slug,
+						toolVersion: toolDefinition.version,
+						toolType: toolDefinition.llmToolType,
+						displayName: toolDefinition.displayName,
+						description: toolDefinition.description,
+						autoExecute: selection.toolChoicePatch?.autoExecute ?? toolDefinition.autoExecReco,
+						userArgSchemaInstance: selection.toolChoicePatch?.userArgSchemaInstance,
+					};
+
+					if (toolDefinition.llmToolType === ToolStoreChoiceType.WebSearch) {
+						webSearchChoices.push(toolChoice);
+					} else {
+						conversationToolChoices.push(toolChoice);
+					}
+				}
+			}
+
+			const hasSkillsSelection = Array.isArray(preset.startingEnabledSkillRefs);
+			const enabledSkillRefs = hasSkillsSelection ? normalizeSkillRefs(preset.startingEnabledSkillRefs) : [];
+
+			return {
+				presetKey,
+				option,
+				preset,
+				hasModelSelection,
+				nextSelectedModel,
+				hasIncludeModelSystemPromptSelection,
+				nextIncludeModelSystemPrompt,
+				hasInstructionTemplateSelection,
+				nextSelectedPromptKeys,
+				runtimeSelections: {
+					hasToolsSelection,
+					conversationToolChoices,
+					webSearchChoices,
+					hasSkillsSelection,
+					enabledSkillRefs,
+				},
+				comparisonState: {
+					model: buildAssistantPresetModelComparisonState(preset, nextSelectedModel, nextIncludeModelSystemPrompt),
+					instructions: hasInstructionTemplateSelection ? [...nextSelectedPromptKeys] : undefined,
+					tools: hasToolsSelection
+						? {
+								conversationToolChoices: normalizeAssistantPresetToolChoices(conversationToolChoices),
+								webSearchChoices: normalizeAssistantPresetToolChoices(webSearchChoices),
+							}
+						: undefined,
+					skills: hasSkillsSelection ? normalizeAssistantPresetSkillRefs(enabledSkillRefs) : undefined,
+				},
+			};
+		},
+		[assistantPresetOptions, getAssistantPresetToolDefinition]
+	);
+
+	const applyPreparedAssistantPreset = useCallback(
+		(prepared: AssistantPresetPreparedApplication) => {
+			if (prepared.hasModelSelection) {
+				applySelectedModel(prepared.nextSelectedModel, {
+					syncHybridFromModel: true,
+				});
+			}
+
+			if (prepared.hasIncludeModelSystemPromptSelection) {
+				setIncludeModelDefault(prepared.nextIncludeModelSystemPrompt);
+			}
+
+			if (prepared.hasInstructionTemplateSelection) {
+				setRawSelectedPromptKeys(prepared.nextSelectedPromptKeys);
+			}
+		},
+		[applySelectedModel]
+	);
+
 	const applyAdvancedModel = useCallback(
 		(updatedModel: UIChatOption) => {
 			applySelectedModel(sanitizeUIChatOptionByCapabilities(updatedModel));
@@ -588,7 +795,15 @@ export function useAssistantContextState(): AssistantContextController {
 		refreshSystemPrompts: refreshPrompts,
 		getExistingSystemPromptVersions: getExistingVersions,
 
+		assistantPresetOptions,
+		assistantPresetsLoading,
+		assistantPresetError,
+		refreshAssistantPresets,
+		prepareAssistantPresetApplication,
+		applyPreparedAssistantPreset,
+
 		applyAdvancedModel,
+
 		restoreConversationContext,
 		verbosityEnabled,
 		reasoningLevelOptions,

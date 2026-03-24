@@ -67,7 +67,7 @@ export function OutputVerbosityDropdown({
 					}
 				>
 					<span className="min-w-0 truncate text-center text-xs font-normal">
-						<span className="hidden lg:inline">Verbosity/</span>
+						<span className="hidden xl:inline">Verbosity/</span>
 						Effort{labelFor(verbosity)}
 					</span>
 					{open ? (

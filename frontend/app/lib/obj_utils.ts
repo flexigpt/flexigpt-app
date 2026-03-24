@@ -18,3 +18,16 @@ export function stripUndefinedDeep<T>(value: T): T {
 
 	return value;
 }
+
+export function dedupeStringArray(values: string[]): string[] {
+	const seen = new Set<string>();
+	const out: string[] = [];
+
+	for (const value of values) {
+		if (seen.has(value)) continue;
+		seen.add(value);
+		out.push(value);
+	}
+
+	return out;
+}

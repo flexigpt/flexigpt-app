@@ -64,7 +64,7 @@ export function SingleReasoningDropdown({
 					title="Set Reasoning Level"
 				>
 					<span className="min-w-0 truncate text-center text-xs font-normal">
-						Reasoning Level: {levelDisplayNames[reasoningLevel]}
+						Reasoning: {levelDisplayNames[reasoningLevel]}
 					</span>
 					{open ? (
 						<FiChevronDown size={16} className="ml-1 shrink-0 md:ml-2" />

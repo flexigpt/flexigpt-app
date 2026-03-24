@@ -1,4 +1,4 @@
-import { forwardRef, type RefObject, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, type RefObject, useCallback, useImperativeHandle, useRef, useState } from 'react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { RestorableConversationContext } from '@/spec/conversation';
@@ -11,8 +11,14 @@ import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 
+import {
+	type AssistantPresetPreparedApplication,
+	type AssistantPresetRuntimeSnapshot,
+	EMPTY_ASSISTANT_PRESET_RUNTIME_SNAPSHOT,
+} from '@/chats/inputarea/assitantcontexts/assistant_preset_runtime';
 import { AssistantContextBar } from '@/chats/inputarea/assitantcontexts/context_bar';
 import { useAssistantContextState } from '@/chats/inputarea/assitantcontexts/use_assistant_context_state';
+import { useAssistantPresetManager } from '@/chats/inputarea/assitantcontexts/use_assistant_preset_manager';
 import { EditorArea, type EditorAreaHandle } from '@/chats/inputarea/input_editor';
 import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/inputarea/input_editor_utils';
 
@@ -54,8 +60,41 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 	const inputAreaRef = useRef<EditorAreaHandle>(null);
 	const assistantContext = useAssistantContextState();
 	const chatOptions = assistantContext.chatOptions;
-
 	const showAbortModal = isGenerating && abortConfirmationRequested;
+
+	const [assistantRuntimeSnapshot, setAssistantRuntimeSnapshot] = useState<AssistantPresetRuntimeSnapshot>(
+		EMPTY_ASSISTANT_PRESET_RUNTIME_SNAPSHOT
+	);
+
+	const applyAssistantPresetRuntimeSelections = useCallback((prepared: AssistantPresetPreparedApplication) => {
+		if (prepared.runtimeSelections.hasToolsSelection) {
+			inputAreaRef.current?.setConversationToolsFromChoices(prepared.runtimeSelections.conversationToolChoices);
+			inputAreaRef.current?.setWebSearchFromChoices(prepared.runtimeSelections.webSearchChoices);
+		}
+
+		if (prepared.runtimeSelections.hasSkillsSelection) {
+			inputAreaRef.current?.setEnabledSkillRefsFromMessage(prepared.runtimeSelections.enabledSkillRefs);
+			inputAreaRef.current?.setActiveSkillRefsFromMessage([]);
+		}
+
+		setAssistantRuntimeSnapshot(prev => ({
+			conversationToolChoices: prepared.runtimeSelections.hasToolsSelection
+				? prepared.runtimeSelections.conversationToolChoices
+				: prev.conversationToolChoices,
+			webSearchChoices: prepared.runtimeSelections.hasToolsSelection
+				? prepared.runtimeSelections.webSearchChoices
+				: prev.webSearchChoices,
+			enabledSkillRefs: prepared.runtimeSelections.hasSkillsSelection
+				? prepared.runtimeSelections.enabledSkillRefs
+				: prev.enabledSkillRefs,
+		}));
+	}, []);
+
+	const assistantPreset = useAssistantPresetManager({
+		context: assistantContext,
+		runtimeSnapshot: assistantRuntimeSnapshot,
+		applyRuntimeSelections: applyAssistantPresetRuntimeSelections,
+	});
 
 	const handleSubmitMessage = (payload: EditorSubmitPayload) => {
 		// Clear any stale abort confirmation request before starting a new send.
@@ -107,15 +146,16 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 				inputAreaRef.current?.setActiveSkillRefsFromMessage(refs);
 			},
 			restoreConversationContext: context => {
+				assistantPreset.clearSelectedPreset();
 				assistantContext.restoreConversationContext(context);
 			},
 		}),
-		[assistantContext, chatOptions]
+		[assistantContext, assistantPreset, chatOptions]
 	);
 
 	return (
 		<div className="bg-base-200 w-full min-w-0">
-			<AssistantContextBar context={assistantContext} />
+			<AssistantContextBar context={assistantContext} assistantPreset={assistantPreset} />
 
 			<DeleteConfirmationModal
 				isOpen={showAbortModal}
@@ -144,6 +184,7 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 							setAbortConfirmationRequested(true);
 						}
 					}}
+					onAssistantPresetRuntimeStateChange={setAssistantRuntimeSnapshot}
 					editingMessageId={editingMessageId}
 					cancelEditing={onCancelEditing}
 				/>

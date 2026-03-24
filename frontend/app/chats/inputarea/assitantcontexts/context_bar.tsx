@@ -1,11 +1,13 @@
 import { type SetStateAction, useCallback, useState } from 'react';
 
-import { FiSliders } from 'react-icons/fi';
+import { FiRefreshCcw, FiSliders } from 'react-icons/fi';
 
 import { ReasoningType } from '@/spec/inference';
 import { type UIChatOption } from '@/spec/modelpreset';
 
 import { AdvancedParamsModal } from '@/chats/inputarea/assitantcontexts/advanced_params_modal';
+import { AssistantPresetDropdown } from '@/chats/inputarea/assitantcontexts/assistant_preset_dropdown';
+import { AssistantPresetViewModal } from '@/chats/inputarea/assitantcontexts/assistant_preset_view_modal';
 import { ModelDropdown } from '@/chats/inputarea/assitantcontexts/model_dropdown';
 import { OutputVerbosityDropdown } from '@/chats/inputarea/assitantcontexts/output_verbosity_dropdown';
 import { PreviousMessagesDropdown } from '@/chats/inputarea/assitantcontexts/previous_messages_dropdown';
@@ -15,16 +17,19 @@ import { ReasoningTokensDropdown } from '@/chats/inputarea/assitantcontexts/reas
 import { SystemPromptDropdown } from '@/chats/inputarea/assitantcontexts/system_prompt_dropdown';
 import { TemperatureDropdown } from '@/chats/inputarea/assitantcontexts/temperature_dropdown';
 import type { AssistantContextController } from '@/chats/inputarea/assitantcontexts/use_assistant_context_state';
+import type { AssistantPresetManagerState } from '@/chats/inputarea/assitantcontexts/use_assistant_preset_manager';
 
 type AssistantContextBarProps = {
 	context: AssistantContextController;
+	assistantPreset: AssistantPresetManagerState;
 };
 
-type ContextBarMenuKey = 'model' | 'secondary' | 'verbosity' | 'system' | 'previous' | null;
+type ContextBarMenuKey = 'assistant' | 'model' | 'secondary' | 'verbosity' | 'system' | 'previous' | null;
 
-export function AssistantContextBar({ context }: AssistantContextBarProps) {
+export function AssistantContextBar({ context, assistantPreset }: AssistantContextBarProps) {
 	const [openMenu, setOpenMenu] = useState<ContextBarMenuKey>(null);
 	const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);
+	const [isAssistantViewModalOpen, setIsAssistantViewModalOpen] = useState(false);
 
 	const setMenuOpen = useCallback((menuKey: Exclude<ContextBarMenuKey, null>, action: SetStateAction<boolean>) => {
 		setOpenMenu(prevOpenMenu => {
@@ -36,11 +41,19 @@ export function AssistantContextBar({ context }: AssistantContextBarProps) {
 		});
 	}, []);
 
+	const isAssistantDropdownOpen = openMenu === 'assistant';
 	const isModelDropdownOpen = openMenu === 'model';
 	const isSecondaryDropdownOpen = openMenu === 'secondary';
 	const isVerbosityDropdownOpen = openMenu === 'verbosity';
 	const isSystemDropdownOpen = openMenu === 'system';
 	const isPreviousMessagesDropdownOpen = openMenu === 'previous';
+
+	const setIsAssistantDropdownOpen = useCallback(
+		(action: SetStateAction<boolean>) => {
+			setMenuOpen('assistant', action);
+		},
+		[setMenuOpen]
+	);
 
 	const setIsModelDropdownOpen = useCallback(
 		(action: SetStateAction<boolean>) => {
@@ -75,6 +88,73 @@ export function AssistantContextBar({ context }: AssistantContextBarProps) {
 
 	return (
 		<div className="bg-base-200 mx-4 my-0 flex items-center justify-between space-x-1">
+			<AssistantPresetDropdown
+				presetOptions={assistantPreset.presetOptions}
+				selectedPresetKey={assistantPreset.selectedPresetKey}
+				selectedPreset={assistantPreset.selectedPreset}
+				loading={assistantPreset.loading}
+				error={assistantPreset.error}
+				actionError={assistantPreset.actionError}
+				isApplying={assistantPreset.isApplying}
+				isOpen={isAssistantDropdownOpen}
+				setIsOpen={setIsAssistantDropdownOpen}
+				onSelectPreset={assistantPreset.selectPreset}
+				onClearPreset={assistantPreset.clearSelectedPreset}
+			/>
+
+			{assistantPreset.selectedPreset ? (
+				<div className="flex items-center gap-1">
+					<button
+						type="button"
+						className="btn btn-xs btn-ghost text-neutral-custom"
+						onClick={() => {
+							setOpenMenu(null);
+							setIsAssistantViewModalOpen(true);
+						}}
+						title="View assistant preset details"
+					>
+						View
+					</button>
+
+					<div
+						className="tooltip tooltip-top"
+						data-tip={
+							assistantPreset.modificationSummary.any
+								? `Reapply preset-managed sections: ${assistantPreset.modificationSummary.modifiedLabels.join(', ')}`
+								: 'Preset-managed sections are already in sync'
+						}
+					>
+						<button
+							type="button"
+							className="btn btn-xs btn-ghost text-neutral-custom"
+							disabled={!assistantPreset.modificationSummary.any || assistantPreset.isApplying}
+							onClick={() => {
+								setOpenMenu(null);
+								void assistantPreset.reapplySelectedPreset();
+							}}
+							title="Reapply current assistant preset"
+						>
+							<FiRefreshCcw size={12} />
+						</button>
+					</div>
+
+					{assistantPreset.modificationSummary.any ? (
+						<span
+							className="badge badge-warning badge-xs"
+							title={`Modified sections: ${assistantPreset.modificationSummary.modifiedLabels.join(', ')}`}
+						>
+							Modified
+						</span>
+					) : null}
+
+					{assistantPreset.actionError ? (
+						<span className="badge badge-error badge-xs" title={assistantPreset.actionError}>
+							Error
+						</span>
+					) : null}
+				</div>
+			) : null}
+
 			<ModelDropdown
 				selectedModel={context.selectedModel}
 				setSelectedModel={context.handleSetSelectedModel}
@@ -193,6 +273,20 @@ export function AssistantContextBar({ context }: AssistantContextBarProps) {
 				onSave={(updatedModel: UIChatOption) => {
 					context.applyAdvancedModel(updatedModel);
 				}}
+			/>
+
+			<AssistantPresetViewModal
+				isOpen={isAssistantViewModalOpen && assistantPreset.appliedPresetApplication !== null}
+				onClose={() => {
+					setIsAssistantViewModalOpen(false);
+				}}
+				appliedPresetApplication={assistantPreset.appliedPresetApplication}
+				currentRuntimeSnapshot={assistantPreset.runtimeSnapshot}
+				currentModel={context.selectedModel}
+				currentIncludeModelSystemPrompt={context.includeModelDefault}
+				currentSelectedPromptKeys={context.selectedPromptKeys}
+				promptItems={context.prompts}
+				modificationSummary={assistantPreset.modificationSummary}
 			/>
 		</div>
 	);
