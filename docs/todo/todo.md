@@ -27,6 +27,9 @@
 - [ ] modelpreset: only this is not version based as of now. should it be version based?
   - [ ] better do it before assistant preset.
 
+- [ ] Tool calls customize
+  - [ ] Some calls like editor replace text, create files, etc can be visually represented better via custom elemets representing each.
+
 ## Features
 
 - [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls loop is better.
