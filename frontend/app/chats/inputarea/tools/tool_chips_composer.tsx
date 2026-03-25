@@ -139,7 +139,7 @@ function ToolCallComposerChipView({ toolCall, isBusy, onRun, onDiscard, onDetail
 							aria-label={isFailed ? 'Retry tool call' : 'Run tool call'}
 						>
 							<FiPlay size={12} />
-							<span className="ml-1 text-[11px]">Run</span>
+							<span className="ml-1 text-xs">Run</span>
 						</button>
 					))}
 
@@ -250,7 +250,7 @@ function ToolOutputComposerChipView({ output, onOpen, onRemove, onRetry }: ToolO
 						aria-label="Retry this tool"
 					>
 						<FiPlay size={12} />
-						<span className="ml-1 text-[11px]">Retry</span>
+						<span className="ml-1 text-xs">Retry</span>
 					</button>
 				)}
 

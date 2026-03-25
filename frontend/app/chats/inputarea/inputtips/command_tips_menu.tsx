@@ -111,13 +111,11 @@ export function CommandTipsMenu({ shortcutConfig }: CommandTipsMenuProps) {
 				{/* Chat group */}
 				{chatShortcuts.length > 0 && (
 					<>
-						<div className="text-neutral-custom/70 px-3 pt-2 pb-1 text-[11px] tracking-wide uppercase">
-							Chat shortcuts
-						</div>
+						<div className="text-neutral-custom/70 px-3 pt-2 pb-1 text-xs tracking-wide uppercase">Chat shortcuts</div>
 						{chatShortcuts.map(item => (
 							<MenuItem key={item.action} className={menuItemClasses}>
 								<span className="flex-1 text-left">{item.label}</span>
-								<span className="text-neutral-custom ml-auto w-22 text-left text-[11px] whitespace-nowrap">
+								<span className="text-neutral-custom ml-auto w-22 text-left text-xs whitespace-nowrap">
 									{item.keys}
 								</span>
 							</MenuItem>
@@ -129,13 +127,13 @@ export function CommandTipsMenu({ shortcutConfig }: CommandTipsMenuProps) {
 				{insertShortcuts.length > 0 && (
 					<>
 						{chatShortcuts.length > 0 && <div className="border-base-200 mx-2 mt-1 border-t" />}
-						<div className="text-neutral-custom/70 px-3 pt-2 pb-1 text-[11px] tracking-wide uppercase">
+						<div className="text-neutral-custom/70 px-3 pt-2 pb-1 text-xs tracking-wide uppercase">
 							Insert shortcuts
 						</div>
 						{insertShortcuts.map(item => (
 							<MenuItem key={item.action} className={menuItemClasses}>
 								<span className="flex-1 text-left">{item.label}</span>
-								<span className="text-neutral-custom ml-auto w-22 text-left text-[11px] whitespace-nowrap">
+								<span className="text-neutral-custom ml-auto w-22 text-left text-xs whitespace-nowrap">
 									{item.keys}
 								</span>
 							</MenuItem>

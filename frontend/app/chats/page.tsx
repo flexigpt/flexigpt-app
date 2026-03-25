@@ -5,6 +5,7 @@ import { useTabStore } from '@ariakit/react/tab';
 
 import type {
 	Conversation,
+	ConversationMessage,
 	ConversationSearchItem,
 	StoreConversation,
 	StoreConversationMessage,
@@ -197,6 +198,27 @@ function buildNormalizedInitialModel(): InitialChatsModel {
 	};
 }
 
+function toStoreConversationMessage(message: ConversationMessage): StoreConversationMessage {
+	const {
+		uiContent: _uiContent,
+		uiDebugDetails: _uiDebugDetails,
+		uiReasoningContents: _uiReasoningContents,
+		uiToolCalls: _uiToolCalls,
+		uiToolOutputs: _uiToolOutputs,
+		uiCitations: _uiCitations,
+		...storeMessage
+	} = message;
+
+	return storeMessage;
+}
+
+function toStoreConversation(conversation: Conversation): StoreConversation {
+	return {
+		...conversation,
+		messages: conversation.messages.map(toStoreConversationMessage),
+	};
+}
+
 // eslint-disable-next-line no-restricted-exports
 export default function ChatsPage() {
 	const [initialModel] = useState<InitialChatsModel>(() => buildNormalizedInitialModel());
@@ -246,11 +268,33 @@ export default function ChatsPage() {
 	// ---------------- Persistence scratch state ----------------
 	const scrollTopSnapshotRef = useRef(initialModel.scrollTopByTab ?? {});
 	const persistNowRef = useRef<() => void>(() => {});
+	const saveQueueByTabRef = useRef(new Map<string, Promise<void>>());
 
 	// ---------------- Helpers ----------------
 	const disposeTabRuntime = useCallback((tabId: string) => {
 		conversationAreaRef.current?.disposeTabRuntime(tabId);
 		lastActivatedAtRef.current.delete(tabId);
+	}, []);
+
+	const enqueueSaveForTab = useCallback((tabId: string, operation: () => Promise<void>) => {
+		const previous = saveQueueByTabRef.current.get(tabId) ?? Promise.resolve();
+
+		const next = previous
+			.catch(() => {
+				// Swallow previous errors so later saves still run.
+			})
+			.then(operation)
+			.catch((error: unknown) => {
+				console.error('Failed to persist conversation state:', error);
+			});
+
+		saveQueueByTabRef.current.set(tabId, next);
+
+		void next.finally(() => {
+			if (saveQueueByTabRef.current.get(tabId) === next) {
+				saveQueueByTabRef.current.delete(tabId);
+			}
+		});
 	}, []);
 
 	const commitTabs = useCallback((nextTabs: ChatTabState[]) => {
@@ -410,20 +454,26 @@ export default function ChatsPage() {
 			if (titleChangedByFunction) updatedConv.title = newTitle;
 
 			const titleChanged = titleWasExternallyChanged || titleChangedByFunction;
+			const storeConversation = toStoreConversation(updatedConv);
+			const needsFullSave = !tab.isPersisted || titleChanged;
 
-			if (!tab.isPersisted) {
-				conversationStoreAPI.putConversation(updatedConv as StoreConversation);
-				void bumpSearchKey();
-			} else if (titleChanged) {
-				conversationStoreAPI.putConversation(updatedConv as StoreConversation);
-				void bumpSearchKey();
-			} else {
-				conversationStoreAPI.putMessagesToConversation(
-					updatedConv.id,
-					updatedConv.title,
-					updatedConv.messages as StoreConversationMessage[]
+			enqueueSaveForTab(tabId, async () => {
+				if (needsFullSave) {
+					await conversationStoreAPI.putConversation(storeConversation);
+					await bumpSearchKey();
+
+					// Tab restore metadata (title / persisted identity) must be flushed
+					// only after the full conversation save has succeeded.
+					persistNowRef.current();
+					return;
+				}
+
+				await conversationStoreAPI.putMessagesToConversation(
+					storeConversation.id,
+					storeConversation.title,
+					storeConversation.messages
 				);
-			}
+			});
 
 			updateTab(tabId, t => ({
 				...t,
@@ -432,15 +482,8 @@ export default function ChatsPage() {
 				manualTitleLocked: titleWasExternallyChanged ? true : t.manualTitleLocked,
 				isHydrating: false,
 			}));
-
-			// Title + persistence identity are part of tab restore.
-			// Flush them synchronously so a quick app/window close cannot leave
-			// localStorage pointing at an old conversation filename.
-			if (titleChanged || !tab.isPersisted) {
-				persistNowRef.current();
-			}
 		},
-		[bumpSearchKey, updateTab]
+		[bumpSearchKey, enqueueSaveForTab, updateTab]
 	);
 
 	// ---------------- Tab actions ----------------

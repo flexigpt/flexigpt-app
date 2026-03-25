@@ -96,7 +96,7 @@ export function DirectoryChip({
 				className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
 				autoFocusOnShow
 			>
-				<div className="text-base-content/70 mb-1 text-[11px] font-semibold">Files in “{group.label}”</div>
+				<div className="text-base-content/70 mb-1 text-xs font-semibold">Files in “{group.label}”</div>
 
 				{group.attachmentKeys.map(key => {
 					const att = attachmentByKey.get(key);
@@ -138,7 +138,7 @@ export function DirectoryChip({
 										>
 											{rel}
 										</div>
-										<div className="text-base-content/70 truncate text-[11px]">
+										<div className="text-base-content/70 truncate text-xs">
 											{od.fileCount} item
 											{od.fileCount === 1 ? '' : 's'} not attached in this folder
 											{od.partial ? ' (folder only partially scanned)' : ''}
@@ -170,7 +170,7 @@ export function DirectoryChip({
 				)}
 
 				{group.attachmentKeys.length === 0 && group.overflowDirs.length === 0 && (
-					<div className="text-base-content/70 text-[11px]">No readable files could be attached from this folder.</div>
+					<div className="text-base-content/70 text-xs">No readable files could be attached from this folder.</div>
 				)}
 			</Menu>
 		</div>

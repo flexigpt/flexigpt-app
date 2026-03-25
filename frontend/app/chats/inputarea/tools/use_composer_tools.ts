@@ -47,7 +47,6 @@ interface UseComposerToolsArgs {
 	listActiveSkillRefs: (sid: string) => Promise<SkillRef[]>;
 	setActiveSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
 	getCurrentSkillSessionID: () => string | null;
-	skillSessionID: string | null;
 	toolArgsEventTarget?: EventTarget | null;
 	onAutoSubmitRequest?: () => void;
 	externalAutoExecuteBlocked?: boolean;
@@ -120,6 +119,21 @@ function getConversationToolArgsBlocked(entries: ConversationToolStateEntry[]): 
 	return false;
 }
 
+function hasPendingConversationToolDefinitions(
+	entries: ConversationToolStateEntry[],
+	cache: Map<string, Tool>
+): boolean {
+	for (const entry of entries) {
+		if (!entry.enabled) continue;
+		if (entry.toolDefinition) continue;
+		if (!cache.has(conversationToolHydrationKey(entry))) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 export function useComposerTools({
 	isBusy,
 	isSubmittingRef,
@@ -128,7 +142,6 @@ export function useComposerTools({
 	listActiveSkillRefs,
 	setActiveSkillRefs,
 	getCurrentSkillSessionID,
-	skillSessionID,
 	toolArgsEventTarget,
 	onAutoSubmitRequest,
 	externalAutoExecuteBlocked = false,
@@ -178,7 +191,11 @@ export function useComposerTools({
 		() => getConversationToolArgsBlocked(conversationToolsState),
 		[conversationToolsState]
 	);
-	const toolArgsBlocked = attachedToolArgsBlocked || conversationToolArgsBlocked;
+	const conversationToolDefsPending = useMemo(
+		() => hasPendingConversationToolDefinitions(conversationToolsState, conversationToolDefsCacheRef.current),
+		[conversationToolsState]
+	);
+	const toolArgsBlocked = attachedToolArgsBlocked || conversationToolArgsBlocked || conversationToolDefsPending;
 	const toolArgsBlockedRef = useRef(toolArgsBlocked);
 
 	const lastAutoExecuteAttemptKeyRef = useRef<string | null>(null);
@@ -568,8 +585,6 @@ export function useComposerTools({
 				const { bundleID, toolSlug, toolVersion } = output.toolStoreChoice;
 				if (!bundleID || !toolSlug || !toolVersion) return;
 			} else {
-				// Skills retry requires an active session.
-				if (!skillSessionID) return;
 				// skills.* are expected to be Function or Custom in the inference schema;
 				// if something else slips through, don't retry.
 				if (output.type !== ToolStoreChoiceType.Function && output.type !== ToolStoreChoiceType.Custom) return;
@@ -599,7 +614,7 @@ export function useComposerTools({
 				toolOutputs: prev.toolOutputs.filter(o => o.id !== output.id),
 			}));
 		},
-		[isSkillsToolName, skillSessionID, updateToolRuntimeState]
+		[isSkillsToolName, updateToolRuntimeState]
 	);
 
 	const runAutoExecutePendingToolCallsCheck = useCallback(() => {
@@ -756,8 +771,12 @@ export function useComposerTools({
 					// and any further missing definitions are queued for hydration.
 					setConversationToolsStateRaw(prev => {
 						const next = primeConversationToolsFromCache(prev);
+						const nextConversationToolArgsBlocked = getConversationToolArgsBlocked(next);
+						const nextConversationToolDefsPending = hasPendingConversationToolDefinitions(next, cache);
+
 						conversationToolsStateRef.current = next;
-						toolArgsBlockedRef.current = attachedToolArgsBlockedRef.current || getConversationToolArgsBlocked(next);
+						toolArgsBlockedRef.current =
+							attachedToolArgsBlockedRef.current || nextConversationToolArgsBlocked || nextConversationToolDefsPending;
 						return next;
 					});
 
@@ -791,9 +810,15 @@ export function useComposerTools({
 			const requested = resolveStateUpdate(update, prev);
 			const next = primeConversationToolsFromCache(requested);
 			const nextConversationToolArgsBlocked = getConversationToolArgsBlocked(next);
+			const nextConversationToolDefsPending = hasPendingConversationToolDefinitions(
+				next,
+				conversationToolDefsCacheRef.current
+			);
 
 			conversationToolsStateRef.current = next;
-			toolArgsBlockedRef.current = attachedToolArgsBlockedRef.current || nextConversationToolArgsBlocked;
+			toolArgsBlockedRef.current =
+				attachedToolArgsBlockedRef.current || nextConversationToolArgsBlocked || nextConversationToolDefsPending;
+
 			setConversationToolsStateRaw(next);
 			hydrateConversationToolsIfNeeded(next);
 			if (toolRuntimeStateRef.current.toolCalls.length > 0) {
@@ -817,7 +842,10 @@ export function useComposerTools({
 		}
 
 		attachedToolArgsBlockedRef.current = nextBlocked;
-		toolArgsBlockedRef.current = nextBlocked || getConversationToolArgsBlocked(conversationToolsStateRef.current);
+		toolArgsBlockedRef.current =
+			nextBlocked ||
+			getConversationToolArgsBlocked(conversationToolsStateRef.current) ||
+			hasPendingConversationToolDefinitions(conversationToolsStateRef.current, conversationToolDefsCacheRef.current);
 		setAttachedToolArgsBlocked(prev => (prev === nextBlocked ? prev : nextBlocked));
 	}, [getAttachedToolEntries]);
 

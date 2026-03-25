@@ -452,18 +452,7 @@ export function buildUIToolOutputFromToolOutput(
 		toolOutputs: toolOutputs,
 		webSearchToolOutputItems: webSearchOutputs,
 
-		toolStoreChoice:
-			toolStoreChoice ??
-			({
-				// Very defensive fallback; ideally you never hit this.
-				choiceID: out.choiceID,
-				bundleID: '',
-				toolSlug: out.name,
-				toolVersion: '',
-				toolType: out.type as unknown as ToolStoreChoiceType,
-				autoExecute: false,
-			} as ToolStoreChoice),
-
+		toolStoreChoice,
 		isError: isError,
 		errorMessage: isError ? primaryText : undefined,
 

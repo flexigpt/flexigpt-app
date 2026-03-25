@@ -298,9 +298,7 @@ function SystemPromptAddModalInner({
 								}}
 							/>
 							{errors.bundleID ? <div className="text-error mt-1 text-xs">{errors.bundleID}</div> : null}
-							<div className="mt-1 text-[11px] opacity-70">
-								Only enabled custom bundles can accept new prompt versions.
-							</div>
+							<div className="mt-1 text-xs opacity-70">Only enabled custom bundles can accept new prompt versions.</div>
 						</div>
 					</div>
 					<div className="grid grid-cols-12 items-center gap-2">
@@ -358,7 +356,7 @@ function SystemPromptAddModalInner({
 								}}
 								spellCheck="false"
 							/>
-							<div className="mt-1 text-[11px] opacity-70">
+							<div className="mt-1 text-xs opacity-70">
 								Suggested next version: {suggestedVersion}
 								{selectedBundle ? ` in ${buildBundleLabel(selectedBundle)}` : ''}
 							</div>

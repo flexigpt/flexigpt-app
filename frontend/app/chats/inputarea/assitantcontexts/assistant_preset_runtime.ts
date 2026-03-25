@@ -17,6 +17,9 @@ export interface AssistantPresetOptionItem {
 	description?: string;
 	preset: AssistantPreset;
 	label: string;
+
+	isSelectable: boolean;
+	availabilityReason?: string;
 }
 
 export interface AssistantPresetPreparedRuntimeSelections {

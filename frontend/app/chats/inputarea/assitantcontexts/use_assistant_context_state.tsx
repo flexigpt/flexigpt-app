@@ -11,7 +11,7 @@ import {
 	type UIChatOption,
 } from '@/spec/modelpreset';
 import { type PromptBundle, PromptRoleEnum } from '@/spec/prompt';
-import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
+import { type Tool, ToolImplType, type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
 import { dedupeStringArray } from '@/lib/obj_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
@@ -226,6 +226,25 @@ function deriveRestoredPromptSelectionState(
 		includeModelDefault: false,
 		selectedPromptKeys: [],
 	};
+}
+
+function getPresetToolModelCompatibilityError(toolDefinition: Tool, selectedModel: UIChatOption): string | undefined {
+	if (toolDefinition.type !== ToolImplType.SDK) {
+		return undefined;
+	}
+
+	const requiredSDKType = toolDefinition.sdkImpl?.sdkType?.trim();
+	const toolLabel = toolDefinition.displayName || toolDefinition.slug || toolDefinition.id;
+
+	if (!requiredSDKType) {
+		return `Tool "${toolLabel}" is missing SDK metadata and cannot be applied safely.`;
+	}
+
+	if (requiredSDKType !== (selectedModel.providerSDKType as string)) {
+		return `Tool "${toolLabel}" requires provider SDK "${requiredSDKType}", but the selected starting model uses "${selectedModel.providerSDKType}".`;
+	}
+
+	return undefined;
 }
 
 function buildFinalOptions(
@@ -714,6 +733,10 @@ export function useAssistantContextState(): AssistantContextController {
 					}
 
 					const toolDefinition = toolOption.toolDefinition;
+					const compatibilityError = getPresetToolModelCompatibilityError(toolDefinition, nextSelectedModel);
+					if (compatibilityError) {
+						throw new Error(compatibilityError);
+					}
 
 					const toolChoice: ToolStoreChoice = {
 						choiceID: getUUIDv7(),

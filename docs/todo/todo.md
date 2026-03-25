@@ -18,8 +18,8 @@
 
 - [ ] Sys prompt:
   - [ ] We may want to have a explicit prompt saying that use explicit tools rather than shell wherever possible.
-  - [ ] store it as prompt templates.
-  - [ ] look at prompt templates structure and see how to have sys prompts separate than body prompts
+  - [x] store it as prompt templates.
+  - [x] look at prompt templates structure and see how to have sys prompts separate than body prompts
 
 - [ ] context bar
   - [ ] tooltips are needed. ariakit ones as daisyui ones can get cutoff
@@ -28,7 +28,7 @@
   - [x] ~~better do it before assistant preset.~~
 
 - [ ] Tool calls customize
-  - [ ] Some calls like editor replace text, create files, etc can be visually represented better via custom elemets representing each.
+  - [ ] Some calls like editor replace text, create files, etc can be visually represented better via custom elements representing each.
 
 - [ ] ui jumps to top after tab switch.
 

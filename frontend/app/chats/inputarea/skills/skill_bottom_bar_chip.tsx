@@ -235,8 +235,8 @@ export function SkillsBottomBarChip({
 				portal
 			>
 				<div className="mb-2 flex items-center justify-between gap-2">
-					<div className="text-base-content/70 text-[11px] font-semibold">Skills</div>
-					<div className="text-base-content/60 text-[11px]">
+					<div className="text-base-content/70 text-xs font-semibold">Skills</div>
+					<div className="text-base-content/60 text-xs">
 						{enabledCount}/{totalCount} enabled
 					</div>
 				</div>
@@ -277,7 +277,7 @@ export function SkillsBottomBarChip({
 									/>
 									<div className="min-w-0 flex-1">
 										<div className="truncate text-xs font-semibold">{bundleLabel}</div>
-										<div className="text-base-content/60 text-[11px]">
+										<div className="text-base-content/60 text-xs">
 											{bundleEnabled}/{bundleTotal} enabled
 										</div>
 									</div>
@@ -320,7 +320,7 @@ export function SkillsBottomBarChip({
 												/>
 												<div className="min-w-0 flex-1">
 													<div className="truncate text-xs">{label}</div>
-													<div className="text-base-content/60 truncate text-[11px]">
+													<div className="text-base-content/60 truncate text-xs">
 														{item.skillDefinition.type} • {item.skillDefinition.location} • {item.skillDefinition.name}
 													</div>
 												</div>

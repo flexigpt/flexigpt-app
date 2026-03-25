@@ -141,7 +141,7 @@ export function ToolMenuRow({
 					{toolNode}
 					<div className="flex-1 justify-start truncate">
 						<div className="truncate text-xs font-medium">{truncatedDisplay}</div>
-						<div className="text-base-content/70 truncate text-[11px]">{slug}</div>
+						<div className="text-base-content/70 truncate text-xs">{slug}</div>
 					</div>
 					<div
 						className="justify-end"
@@ -156,7 +156,7 @@ export function ToolMenuRow({
 				<div className="col-span-2 shrink-0 justify-self-center whitespace-nowrap">
 					{supportsAutoExecute ? (
 						<label
-							className="flex items-center gap-1 text-[11px]"
+							className="flex items-center gap-1 text-xs"
 							title={autoExecuteTitle}
 							onPointerDown={e => {
 								// don’t activate MenuItem
@@ -181,7 +181,7 @@ export function ToolMenuRow({
 							/>
 						</label>
 					) : (
-						<span className="text-base-content/40 text-[11px]" title="Auto-exec not applicable">
+						<span className="text-base-content/40 text-xs" title="Auto-exec not applicable">
 							—
 						</span>
 					)}

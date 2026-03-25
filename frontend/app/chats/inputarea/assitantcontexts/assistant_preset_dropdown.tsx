@@ -93,15 +93,23 @@ export function AssistantPresetDropdown({
 						<div className="space-y-1">
 							{presetOptions.map(option => {
 								const isSelected = option.key === selectedPresetKey;
+								const isDisabled = isApplying || !option.isSelectable;
 								return (
 									<button
 										key={option.key}
 										type="button"
-										disabled={isApplying}
+										disabled={isDisabled}
 										className={`hover:bg-base-200 border-base-300 flex w-full items-start gap-2 rounded-lg border p-2 text-left transition-colors ${
 											isSelected ? 'bg-base-200' : ''
-										} ${isApplying ? 'cursor-wait opacity-70' : ''}`}
+										} ${
+											isDisabled
+												? option.isSelectable
+													? 'cursor-wait opacity-70'
+													: 'cursor-not-allowed opacity-60'
+												: ''
+										}`}
 										onClick={() => {
+											if (isDisabled) return;
 											void (async () => {
 												const ok = await onSelectPreset(option.key);
 												if (ok) {
@@ -109,7 +117,11 @@ export function AssistantPresetDropdown({
 												}
 											})();
 										}}
-										title={option.label}
+										title={
+											option.isSelectable
+												? option.label
+												: `${option.label} — ${option.availabilityReason ?? 'Unavailable'}`
+										}
 									>
 										<div className="pt-0.5">{isSelected ? <FiCheck size={14} /> : <span className="w-3" />}</div>
 
@@ -123,9 +135,18 @@ export function AssistantPresetDropdown({
 												</span>
 											</div>
 											{option.description ? (
-												<div className="mt-1 line-clamp-2 text-[11px] opacity-75">{option.description}</div>
+												<div className="mt-1 line-clamp-2 text-xs opacity-75">{option.description}</div>
+											) : null}
+											{!option.isSelectable ? (
+												<div className="text-warning mt-1 text-xs">
+													{option.availabilityReason ?? 'This preset is not currently available.'}
+												</div>
 											) : null}
 										</div>
+
+										{!option.isSelectable ? (
+											<span className="badge badge-warning badge-xs shrink-0">Unavailable</span>
+										) : null}
 									</button>
 								);
 							})}

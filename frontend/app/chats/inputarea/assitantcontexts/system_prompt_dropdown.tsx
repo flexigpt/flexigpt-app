@@ -242,7 +242,7 @@ export function SystemPromptDropdown({
 									<span className="font-medium">Model default</span>
 									<span className="badge badge-ghost badge-xs">per selected model</span>
 								</div>
-								<div className="mt-1 text-[11px] whitespace-pre-wrap opacity-75">
+								<div className="mt-1 text-xs whitespace-pre-wrap opacity-75">
 									{hasModelDefaultPrompt
 										? buildPromptPreview(modelDefaultPrompt)
 										: 'This model has no default system prompt.'}
@@ -251,7 +251,7 @@ export function SystemPromptDropdown({
 						</div>
 					</div>
 
-					<div className="mb-1 px-1 text-[11px] font-medium opacity-70">Saved prompts</div>
+					<div className="mb-1 px-1 text-xs font-medium opacity-70">Saved prompts</div>
 					{loading ? (
 						<div className="m-0 flex cursor-default items-center justify-between rounded-md px-2 py-2 text-xs opacity-70">
 							<span>Loading system prompts…</span>

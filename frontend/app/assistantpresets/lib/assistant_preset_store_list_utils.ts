@@ -1,5 +1,7 @@
 import type { AssistantPreset, AssistantPresetBundle, AssistantPresetListItem } from '@/spec/assistantpreset';
 
+import { compareVersionStrings } from '@/lib/version_utils';
+
 import { assistantPresetStoreAPI } from '@/apis/baseapi';
 
 async function collectAllPages<TResponse, TItem>(
@@ -62,7 +64,7 @@ export function sortAssistantPresets(presets: AssistantPreset[]): AssistantPrese
 			return bySlug;
 		}
 
-		return a.version.localeCompare(b.version);
+		return compareVersionStrings(a.version, b.version);
 	});
 }
 
@@ -104,6 +106,6 @@ export async function getAllAssistantPresetListItems(
 			return bySlug;
 		}
 
-		return a.assistantPresetVersion.localeCompare(b.assistantPresetVersion);
+		return compareVersionStrings(a.assistantPresetVersion, b.assistantPresetVersion);
 	});
 }

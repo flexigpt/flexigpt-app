@@ -186,7 +186,7 @@ export function WebSearchBottomBarChip({
 						autoFocusOnShow
 						portal
 					>
-						<div className="text-base-content/70 mb-2 text-[11px] font-semibold">Web search tools</div>
+						<div className="text-base-content/70 mb-2 text-xs font-semibold">Web search tools</div>
 
 						{eligibleTools.map(t => {
 							const isSelected = !!selected && isSameTool(selected, t);
@@ -208,7 +208,7 @@ export function WebSearchBottomBarChip({
 												{t.toolDefinition.displayName || t.toolSlug}
 												{isSelected ? ' (selected)' : ''}
 											</div>
-											<div className="text-base-content/70 truncate text-[11px]">
+											<div className="text-base-content/70 truncate text-xs">
 												{t.bundleSlug ?? t.bundleID}/{t.toolSlug}@{t.toolVersion}
 											</div>
 										</div>

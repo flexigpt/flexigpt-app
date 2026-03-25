@@ -82,7 +82,7 @@ export function ToolChoicesChip({
 				className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-72 min-w-80 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
 				autoFocusOnShow
 			>
-				<div className="text-base-content/70 mb-1 text-[11px] font-semibold">Tools</div>
+				<div className="text-base-content/70 mb-1 text-xs font-semibold">Tools</div>
 
 				{visibleEntries.map(node => {
 					const rawDisplay: string | undefined = node.toolSnapshot?.displayName ?? node.toolSlug;

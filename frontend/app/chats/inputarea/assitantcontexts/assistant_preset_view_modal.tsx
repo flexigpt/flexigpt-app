@@ -74,7 +74,7 @@ function renderSimpleList(items: Array<{ title: string; meta?: string }>, emptyT
 			{items.map((item, index) => (
 				<li key={`${item.title}-${item.meta ?? ''}-${index}`} className="rounded-xl border p-2">
 					<div className="text-sm font-medium">{item.title}</div>
-					{item.meta ? <div className="mt-1 text-[11px] opacity-70">{item.meta}</div> : null}
+					{item.meta ? <div className="mt-1 text-xs opacity-70">{item.meta}</div> : null}
 				</li>
 			))}
 		</ul>

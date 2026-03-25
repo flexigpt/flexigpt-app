@@ -407,7 +407,7 @@ function AttachmentsGroupChip({ attachments }: AttachmentsGroupChipProps) {
 		>
 			<FiPaperclip size={14} />
 			<span className="max-w-24 truncate">Attachments</span>
-			<span className="text-base-content/70 text-[11px] whitespace-nowrap">{count}</span>
+			<span className="text-base-content/70 text-xs whitespace-nowrap">{count}</span>
 
 			<MenuButton
 				store={menu}
@@ -424,7 +424,7 @@ function AttachmentsGroupChip({ attachments }: AttachmentsGroupChipProps) {
 				className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
 				autoFocusOnShow
 			>
-				<div className="text-base-content/70 mb-1 text-[11px] font-semibold">Attachments</div>
+				<div className="text-base-content/70 mb-1 text-xs font-semibold">Attachments</div>
 
 				{attachments.map((att, index) => (
 					<MenuItem
@@ -495,7 +495,7 @@ function ToolChoicesGroupChip({ tools, onToolChoiceDetails }: ToolChoicesGroupCh
 				className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
 				autoFocusOnShow
 			>
-				<div className="text-base-content/70 mb-1 text-[11px] font-semibold">Tools</div>
+				<div className="text-base-content/70 mb-1 text-xs font-semibold">Tools</div>
 
 				{tools.map(tool => (
 					<MenuItem
@@ -573,7 +573,7 @@ function ToolOutputsGroupChip({ outputs, onToolOutputDetails }: ToolOutputsGroup
 				className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
 				autoFocusOnShow
 			>
-				<div className="text-base-content/70 mb-1 text-[11px] font-semibold">Tool results</div>
+				<div className="text-base-content/70 mb-1 text-xs font-semibold">Tool results</div>
 
 				{outputs.map(out => (
 					<MenuItem
@@ -651,7 +651,7 @@ function ToolCallsGroupChip({ calls, onToolCallDetails }: ToolCallsGroupChipProp
 				className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
 				autoFocusOnShow
 			>
-				<div className="text-base-content/70 mb-1 text-[11px] font-semibold">Suggested tool calls</div>
+				<div className="text-base-content/70 mb-1 text-xs font-semibold">Suggested tool calls</div>
 
 				{calls.map(call => (
 					<MenuItem
@@ -728,7 +728,7 @@ function WebSearchOutputsGroupChip({ outputs, onOutputDetails }: WebSearchOutput
 				className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
 				autoFocusOnShow
 			>
-				<div className="text-base-content/70 mb-1 text-[11px] font-semibold">Web search results</div>
+				<div className="text-base-content/70 mb-1 text-xs font-semibold">Web search results</div>
 
 				{outputs.map(out => (
 					<MenuItem
@@ -805,7 +805,7 @@ function WebSearchCallsGroupChip({ calls, onCallDetails }: WebSearchCallsGroupCh
 				className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
 				autoFocusOnShow
 			>
-				<div className="text-base-content/70 mb-1 text-[11px] font-semibold">Web search queries</div>
+				<div className="text-base-content/70 mb-1 text-xs font-semibold">Web search queries</div>
 
 				{calls.map(call => (
 					<MenuItem
@@ -884,7 +884,7 @@ function WebSearchChoicesGroupChip({ choices, onChoiceDetails }: WebSearchChoice
 				className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
 				autoFocusOnShow
 			>
-				<div className="text-base-content/70 mb-1 text-[11px] font-semibold">Web search configuration</div>
+				<div className="text-base-content/70 mb-1 text-xs font-semibold">Web search configuration</div>
 
 				{choices.map(choice => (
 					<MenuItem

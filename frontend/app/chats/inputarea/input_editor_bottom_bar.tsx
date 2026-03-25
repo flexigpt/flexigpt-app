@@ -225,6 +225,9 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	);
 
 	const webSearchEnabled = compatibleWebSearchTemplates.length > 0;
+	const hasConfiguredWebSearch = webSearchTemplates.length > 0;
+	const webSearchSelectionPendingNormalization =
+		hasConfiguredWebSearch && compatibleWebSearchTemplates.length !== webSearchTemplates.length;
 
 	useEffect(() => {
 		if (isInputLocked) {
@@ -264,9 +267,14 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 		return computeToolUserArgsStatus(schema, activeWebSearch.userArgSchemaInstance);
 	}, [activeWebSearchDef, activeWebSearch]);
 
-	const webSearchArgsBlocked = Boolean(
-		webSearchEnabled && activeWebSearchArgsStatus?.hasSchema && !activeWebSearchArgsStatus.isSatisfied
+	const webSearchDefinitionPending = Boolean(
+		hasConfiguredWebSearch &&
+		(toolsLoading || webSearchSelectionPendingNormalization || (activeWebSearch && !activeWebSearchDef))
 	);
+
+	const webSearchArgsBlocked =
+		webSearchDefinitionPending ||
+		Boolean(webSearchEnabled && activeWebSearchArgsStatus?.hasSchema && !activeWebSearchArgsStatus.isSatisfied);
 
 	useEffect(() => {
 		onWebSearchArgsBlockedChange?.(webSearchArgsBlocked);
