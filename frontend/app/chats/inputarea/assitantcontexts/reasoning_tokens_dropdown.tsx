@@ -48,16 +48,16 @@ export function ReasoningTokensDropdown({ tokens, setTokens, isOpen, setIsOpen }
 			<div className="relative w-full">
 				<Select
 					store={select}
-					className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none text-center text-nowrap shadow-none"
+					className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-center text-nowrap shadow-none"
 					title="Set Tokens"
 				>
 					<span className="mr-2 text-xs font-normal sm:hidden">Tokens:</span>
 					<span className="mr-2 hidden text-xs font-normal sm:inline">Effort Tokens:</span>
 					<span className="text-xs font-normal">{tokens}</span>
 					{open ? (
-						<FiChevronDown size={16} className="ml-1 shrink-0 md:ml-2" />
+						<FiChevronDown size={16} className="ml-1 shrink-0 xl:ml-2" />
 					) : (
-						<FiChevronUp size={16} className="ml-1 shrink-0 md:ml-2" />
+						<FiChevronUp size={16} className="ml-1 shrink-0 xl:ml-2" />
 					)}
 				</Select>
 

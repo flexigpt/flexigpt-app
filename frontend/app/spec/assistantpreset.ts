@@ -4,6 +4,11 @@ import type { SkillRef } from '@/spec/skill';
 import type { ToolSelection } from '@/spec/tool';
 
 /**
+ * @public
+ */
+export const BASE_ASSISTANT_PRESET_SLUG = 'base';
+
+/**
  * Assistant preset write-time subset of ModelPresetPatch.
  *
  * Mirrors Go validation for assistant presets:

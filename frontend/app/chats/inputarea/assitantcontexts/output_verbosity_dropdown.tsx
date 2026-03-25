@@ -61,7 +61,7 @@ export function OutputVerbosityDropdown({
 				<Select
 					store={select}
 					disabled={disabled}
-					className={`btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none text-center text-nowrap shadow-none ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
+					className={`btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-center text-nowrap shadow-none ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
 					title={
 						disabled ? 'Effort/Verbosity not supported by this model/provider' : 'Set effort/verbosity for model output'
 					}
@@ -71,9 +71,9 @@ export function OutputVerbosityDropdown({
 						Effort{labelFor(verbosity)}
 					</span>
 					{open ? (
-						<FiChevronDown size={16} className="ml-1 shrink-0 md:ml-2" />
+						<FiChevronDown size={16} className="ml-1 shrink-0 xl:ml-2" />
 					) : (
-						<FiChevronUp size={16} className="ml-1 shrink-0 md:ml-2" />
+						<FiChevronUp size={16} className="ml-1 shrink-0 xl:ml-2" />
 					)}
 				</Select>
 

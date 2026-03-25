@@ -60,16 +60,16 @@ export function SingleReasoningDropdown({
 			<div className="relative w-full">
 				<Select
 					store={select}
-					className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none text-center text-nowrap shadow-none"
+					className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-center text-nowrap shadow-none"
 					title="Set Reasoning Level"
 				>
 					<span className="min-w-0 truncate text-center text-xs font-normal">
 						Reasoning: {levelDisplayNames[reasoningLevel]}
 					</span>
 					{open ? (
-						<FiChevronDown size={16} className="ml-1 shrink-0 md:ml-2" />
+						<FiChevronDown size={16} className="ml-1 shrink-0 xl:ml-2" />
 					) : (
-						<FiChevronUp size={16} className="ml-1 shrink-0 md:ml-2" />
+						<FiChevronUp size={16} className="ml-1 shrink-0 xl:ml-2" />
 					)}
 				</Select>
 

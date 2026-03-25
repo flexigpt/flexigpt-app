@@ -87,7 +87,7 @@ export function AssistantContextBar({ context, assistantPreset }: AssistantConte
 	);
 
 	return (
-		<div className="bg-base-200 mx-4 my-0 flex items-center justify-between space-x-1">
+		<div className="bg-base-200 mx-2 my-0 flex items-center justify-between gap-2 xl:mx-4">
 			<AssistantPresetDropdown
 				presetOptions={assistantPreset.presetOptions}
 				selectedPresetKey={assistantPreset.selectedPresetKey}

@@ -574,7 +574,7 @@
 						"level": "medium",
 						"tokens": 0
 					},
-					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
+					"systemPrompt": "",
 					"timeout": 1200,
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
@@ -596,7 +596,7 @@
 						"level": "medium",
 						"tokens": 0
 					},
-					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
+					"systemPrompt": "",
 					"timeout": 1200,
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
@@ -937,7 +937,7 @@
 						"level": "high",
 						"tokens": 0
 					},
-					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
+					"systemPrompt": "",
 					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
@@ -973,7 +973,7 @@
 						"level": "high",
 						"tokens": 0
 					},
-					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
+					"systemPrompt": "",
 					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
@@ -1009,7 +1009,7 @@
 						"level": "high",
 						"tokens": 0
 					},
-					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
+					"systemPrompt": "",
 					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
@@ -1045,7 +1045,7 @@
 						"level": "high",
 						"tokens": 0
 					},
-					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
+					"systemPrompt": "",
 					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
@@ -1075,7 +1075,7 @@
 						"level": "high",
 						"tokens": 0
 					},
-					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
+					"systemPrompt": "",
 					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
@@ -1111,7 +1111,7 @@
 						"level": "high",
 						"tokens": 0
 					},
-					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
+					"systemPrompt": "",
 					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
@@ -1141,7 +1141,7 @@
 						"level": "high",
 						"tokens": 0
 					},
-					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
+					"systemPrompt": "",
 					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
@@ -1171,7 +1171,7 @@
 						"level": "high",
 						"tokens": 0
 					},
-					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
+					"systemPrompt": "",
 					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
@@ -1201,7 +1201,7 @@
 						"level": "high",
 						"tokens": 0
 					},
-					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
+					"systemPrompt": "",
 					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
@@ -1231,7 +1231,7 @@
 						"level": "high",
 						"tokens": 0
 					},
-					"systemPrompt": "Formatting re-enabled.\nAlways output in Markdown format.",
+					"systemPrompt": "",
 					"timeout": 1200,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {

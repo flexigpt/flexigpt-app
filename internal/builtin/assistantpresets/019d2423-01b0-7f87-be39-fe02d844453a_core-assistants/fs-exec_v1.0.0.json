@@ -1,0 +1,127 @@
+{
+	"schemaVersion": "2026-03-22",
+	"id": "019d2426-58d7-73f7-9a74-0100ca63069a",
+	"slug": "fs-exec",
+	"version": "v1.0.0",
+	"displayName": "Files, Text and Shell Tools",
+	"description": "Built-in assistant preset with file-system, text, and shell/ scrip execution tools enabled.",
+	"isEnabled": true,
+	"isBuiltIn": true,
+	"startingIncludeModelSystemPrompt": true,
+	"startingInstructionTemplateRefs": [
+		{
+			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
+			"templateSlug": "markdown-output",
+			"templateVersion": "v1.0.0"
+		},
+		{
+			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
+			"templateSlug": "use-explicit-tools",
+			"templateVersion": "v1.0.0"
+		}
+	],
+	"startingToolSelections": [
+		{
+			"toolRef": {
+				"bundleID": "018fe0f4-b8cd-7e55-82d5-9df0bd70e400",
+				"toolSlug": "readfile",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": true
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "018fe0f4-b8cd-7e55-82d5-9df0bd70e400",
+				"toolSlug": "searchfiles",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": true
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "018fe0f4-b8cd-7e55-82d5-9df0bd70e400",
+				"toolSlug": "writefile",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": false
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "019c0da2-02d2-7e71-81d7-35f2e5a0bebf",
+				"toolSlug": "readtextrange",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": true
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "019c0da2-02d2-7e71-81d7-35f2e5a0bebf",
+				"toolSlug": "findtext",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": true
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "019c0da2-02d2-7e71-81d7-35f2e5a0bebf",
+				"toolSlug": "inserttextlines",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": false
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "019c0da2-02d2-7e71-81d7-35f2e5a0bebf",
+				"toolSlug": "replacetextlines",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": false
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "019c0da2-02d2-7e71-81d7-35f2e5a0bebf",
+				"toolSlug": "deletetextlines",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": false
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "019c0415-40f7-70cb-9200-d804c9388a57",
+				"toolSlug": "shellcommand",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": false
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "019c0415-40f7-70cb-9200-d804c9388a57",
+				"toolSlug": "runscript",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": false
+			}
+		}
+	],
+	"createdAt": "2026-03-25T00:00:00Z",
+	"modifiedAt": "2026-03-25T00:00:00Z"
+}

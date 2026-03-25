@@ -46,16 +46,16 @@ export function TemperatureDropdown({ temperature, setTemperature, isOpen, setIs
 			<div className="relative w-full">
 				<Select
 					store={select}
-					className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none text-left text-nowrap shadow-none"
+					className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-left text-nowrap shadow-none"
 					title="Set Temperature"
 				>
 					<span className="mr-2 text-xs font-normal sm:hidden">Temp:</span>
 					<span className="mr-2 hidden text-xs font-normal sm:inline">Temperature:</span>
 					<span className="text-xs font-normal">{temperature.toFixed(2)}</span>
 					{open ? (
-						<FiChevronDown size={16} className="ml-1 shrink-0 md:ml-2" />
+						<FiChevronDown size={16} className="ml-1 shrink-0 xl:ml-2" />
 					) : (
-						<FiChevronUp size={16} className="ml-1 shrink-0 md:ml-2" />
+						<FiChevronUp size={16} className="ml-1 shrink-0 xl:ml-2" />
 					)}
 				</Select>
 

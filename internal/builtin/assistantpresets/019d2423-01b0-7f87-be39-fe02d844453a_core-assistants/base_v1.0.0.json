@@ -1,0 +1,20 @@
+{
+	"schemaVersion": "2026-03-22",
+	"id": "019d2424-c48f-7017-a7cf-f9fb997f4a59",
+	"slug": "base",
+	"version": "v1.0.0",
+	"displayName": "Base Assistant",
+	"description": "Empty built-in default assistant preset. No pre-selections.",
+	"isEnabled": true,
+	"isBuiltIn": true,
+	"startingIncludeModelSystemPrompt": true,
+	"startingInstructionTemplateRefs": [
+		{
+			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
+			"templateSlug": "markdown-output",
+			"templateVersion": "v1.0.0"
+		}
+	],
+	"createdAt": "2026-03-25T00:00:00Z",
+	"modifiedAt": "2026-03-25T00:00:00Z"
+}

@@ -51,15 +51,15 @@ export function AssistantPresetDropdown({
 			<div className="relative w-full">
 				<PopoverDisclosure
 					store={popover}
-					className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none text-center text-nowrap shadow-none"
+					className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-center text-nowrap shadow-none"
 					title={triggerTitle}
 				>
 					<span className="min-w-0 truncate text-center text-xs font-normal">{triggerLabel}</span>
 					{selectedPreset ? <FiCheck size={14} className="ml-1 shrink-0" /> : null}
 					{open ? (
-						<FiChevronDown size={16} className="ml-2 shrink-0" />
+						<FiChevronDown size={16} className="ml-1 shrink-0 xl:ml-2" />
 					) : (
-						<FiChevronUp size={16} className="ml-2 shrink-0" />
+						<FiChevronUp size={16} className="ml-1 shrink-0 xl:ml-2" />
 					)}
 				</PopoverDisclosure>
 

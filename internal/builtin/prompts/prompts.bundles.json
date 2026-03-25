@@ -1,5 +1,16 @@
 {
 	"bundles": {
+		"019d2430-6c84-7596-b87b-90ed012bff86": {
+			"schemaVersion": "2025-07-01",
+			"id": "019d2430-6c84-7596-b87b-90ed012bff86",
+			"slug": "core-prompts",
+			"displayName": "Core prompts",
+			"description": "Built-in instruction templates to force policies.",
+			"isEnabled": true,
+			"createdAt": "2026-03-25T00:00:00Z",
+			"modifiedAt": "2026-03-25T00:00:00Z",
+			"isBuiltIn": true
+		},
 		"018faf50-b7b6-7a01-9a05-a22a6e0af101": {
 			"schemaVersion": "2025-07-01",
 			"id": "018faf50-b7b6-7a01-9a05-a22a6e0af101",

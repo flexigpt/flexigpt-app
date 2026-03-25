@@ -50,12 +50,6 @@ function pickInitialBundleID(
 	return writable[0]?.id ?? custom[0]?.id ?? '';
 }
 
-function buildPromptPreview(prompt: string): string {
-	const trimmed = prompt.trim();
-	if (!trimmed) return '(empty)';
-	return trimmed.length > 64 ? `${trimmed.slice(0, 64)}…` : trimmed;
-}
-
 export function SystemPromptDropdown({
 	prompts,
 	bundles,
@@ -178,7 +172,7 @@ export function SystemPromptDropdown({
 			<div className="relative w-full">
 				<PopoverDisclosure
 					store={popover}
-					className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none text-center text-nowrap shadow-none"
+					className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-center text-nowrap shadow-none"
 					title={
 						activeSourceCount > 0 ? `System prompt sources enabled: ${activeSourceCount}` : 'System prompt disabled'
 					}
@@ -197,9 +191,9 @@ export function SystemPromptDropdown({
 					)}
 
 					{open ? (
-						<FiChevronDown size={16} className="ml-2 shrink-0" />
+						<FiChevronDown size={16} className="ml-1 shrink-0 xl:ml-2" />
 					) : (
-						<FiChevronUp size={16} className="ml-2 shrink-0" />
+						<FiChevronUp size={16} className="ml-1 shrink-0 xl:ml-2" />
 					)}
 				</PopoverDisclosure>
 
@@ -207,49 +201,48 @@ export function SystemPromptDropdown({
 					store={popover}
 					gutter={4}
 					portal={false}
-					className="border-base-300 bg-base-100 z-50 mt-1 max-h-80 max-w-xl min-w-md overflow-y-auto rounded-xl border p-2 text-xs shadow-lg outline-none"
+					className="border-base-300 bg-base-100 z-50 mt-1 max-h-80 max-w-2xl min-w-lg overflow-y-auto rounded-xl border p-2 text-xs shadow-lg outline-none"
 				>
 					<div className="mb-2 px-1 text-xs opacity-70">
-						Active sources are concatenated in this order: model default, then selected saved prompts. <br />
 						Add/Fork creates a prompt template. <br />
-						Bundles cannot be created here; use the Prompt Bundles page.
+						{hasModelDefaultPrompt
+							? 'Active sources are concatenated in this order: model default, then selected saved prompts.'
+							: ''}
+						Bundles cannot be created here; use the Prompt Bundles page. <br />
+						<br />
 					</div>
 
-					<div
-						className="border-base-300 mb-2 rounded-lg border p-2"
-						data-prompt={modelDefaultPrompt}
-						onFocus={e => {
-							showPromptTooltip(e.currentTarget);
-						}}
-						onBlur={hidePromptTooltip}
-						onMouseEnter={e => {
-							showPromptTooltip(e.currentTarget);
-						}}
-						onMouseLeave={hidePromptTooltip}
-					>
-						<div className="mb-1 flex items-start gap-2">
-							<input
-								type="checkbox"
-								className="checkbox checkbox-xs mt-0.5 rounded"
-								checked={hasModelDefaultPrompt && includeModelDefault}
-								disabled={!hasModelDefaultPrompt}
-								onChange={e => {
-									onToggleModelDefault(e.target.checked);
-								}}
-							/>
-							<div className="min-w-0 flex-1">
-								<div className="flex items-center gap-2">
-									<span className="font-medium">Model default</span>
-									<span className="badge badge-ghost badge-xs">per selected model</span>
-								</div>
-								<div className="mt-1 text-xs whitespace-pre-wrap opacity-75">
-									{hasModelDefaultPrompt
-										? buildPromptPreview(modelDefaultPrompt)
-										: 'This model has no default system prompt.'}
+					{hasModelDefaultPrompt ? (
+						<div
+							className="border-base-300 mb-2 rounded-lg border p-2"
+							data-prompt={modelDefaultPrompt}
+							onFocus={e => {
+								showPromptTooltip(e.currentTarget);
+							}}
+							onBlur={hidePromptTooltip}
+							onMouseEnter={e => {
+								showPromptTooltip(e.currentTarget);
+							}}
+							onMouseLeave={hidePromptTooltip}
+						>
+							<div className="mb-1 flex items-start gap-2">
+								<input
+									type="checkbox"
+									className="checkbox checkbox-xs mt-0.5 rounded"
+									checked={includeModelDefault}
+									onChange={e => {
+										onToggleModelDefault(e.target.checked);
+									}}
+								/>
+								<div className="min-w-0 flex-1">
+									<div className="flex items-center gap-2">
+										<span className="font-medium">Model default</span>
+										<span className="badge badge-ghost badge-xs">per selected model</span>
+									</div>
 								</div>
 							</div>
 						</div>
-					</div>
+					) : null}
 
 					<div className="mb-1 px-1 text-xs font-medium opacity-70">Saved prompts</div>
 					{loading ? (
@@ -304,10 +297,6 @@ export function SystemPromptDropdown({
 												<span>{item.templateVersion}</span>
 												<span>•</span>
 												<span>{item.role === PromptRoleEnum.Developer ? 'developer' : 'system'}</span>
-											</div>
-
-											<div className="mt-1 text-xs whitespace-pre-wrap opacity-75">
-												{buildPromptPreview(item.prompt)}
 											</div>
 										</button>
 

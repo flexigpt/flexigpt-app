@@ -48,15 +48,15 @@ export function ModelDropdown({ selectedModel, setSelectedModel, allOptions, isO
 				{/* Trigger button */}
 				<Select
 					store={select}
-					className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none text-center text-nowrap shadow-none"
+					className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-center text-nowrap shadow-none"
 					title="Select Model"
 				>
 					<span className="min-w-0 truncate text-center text-xs font-normal">{selectedModel.modelDisplayName}</span>
 					{/* Chevron UP when closed, DOWN when open */}
 					{open ? (
-						<FiChevronDown size={16} className="ml-1 shrink-0 md:ml-2" />
+						<FiChevronDown size={16} className="ml-1 shrink-0 xl:ml-2" />
 					) : (
-						<FiChevronUp size={16} className="ml-1 shrink-0 md:ml-2" />
+						<FiChevronUp size={16} className="ml-1 shrink-0 xl:ml-2" />
 					)}
 				</Select>
 
