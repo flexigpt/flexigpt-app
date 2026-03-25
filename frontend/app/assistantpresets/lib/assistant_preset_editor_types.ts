@@ -70,7 +70,7 @@ export type AssistantPresetFormData = {
 	version: string;
 
 	startingModelPresetKey: string;
-	startingIncludeModelSystemPrompt: boolean;
+	startingIncludeModelSystemPrompt: TriStateBoolean;
 	modelPatch: ModelPatchFormData;
 
 	startingInstructionTemplateRefs: PromptTemplateRef[];

@@ -254,7 +254,8 @@ export function TemplateVariableElement(props: PlateElementProps<any>) {
 	const currentValue = useMemo(() => {
 		if (!tsenode || !varDef) return undefined;
 		return effectiveVarValueLocal(varDef, tsenode.variables ?? {});
-	}, [tsenode, varDef]);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [tsenode, varDef, refreshTick]);
 
 	const hasDisplayValue =
 		currentValue !== undefined &&

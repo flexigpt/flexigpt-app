@@ -51,17 +51,23 @@ function hasOwn(obj: object, key: string): boolean {
 	return Object.prototype.hasOwnProperty.call(obj, key);
 }
 
-function applyPersistedModelParamToSelectedModel(base: UIChatOption, modelParam?: ModelParam): UIChatOption {
+function applyPersistedModelParamToSelectedModel(
+	base: UIChatOption,
+	modelParam?: ModelParam,
+	options?: { preserveName?: boolean }
+): UIChatOption {
 	if (!modelParam) return sanitizeUIChatOptionByCapabilities(base);
 
 	const next: UIChatOption = {
 		...base,
-		name: modelParam.name,
 		stream: modelParam.stream,
 		maxPromptLength: modelParam.maxPromptLength,
 		maxOutputLength: modelParam.maxOutputLength,
 		timeout: modelParam.timeout,
 	};
+	if (options?.preserveName !== false) {
+		next.name = modelParam.name;
+	}
 
 	if (hasOwn(modelParam, 'temperature')) next.temperature = modelParam.temperature;
 	else delete next.temperature;
@@ -150,22 +156,24 @@ function resolveRestoredSelectedModel(
 ): UIChatOption {
 	const resolvedOption = findRestorableModelOption(allOptions, modelPresetRef, modelParam);
 	if (resolvedOption) {
-		return applyPersistedModelParamToSelectedModel(resolvedOption, modelParam);
+		return applyPersistedModelParamToSelectedModel(resolvedOption, modelParam, {
+			preserveName: true,
+		});
 	}
-
-	const providerMatch = modelPresetRef
-		? allOptions.find(option => option.providerName === modelPresetRef.providerName)
-		: undefined;
 
 	// IMPORTANT:
 	// If the exact conversation model preset is no longer selectable (disabled,
 	// deleted, no API key, etc.), do NOT project its stale provider/model IDs
 	// back into selectedModel. That re-selects a non-existent option in UI state.
 	//
-	// Instead, restore onto a real available option and only carry over the
-	// persisted model params as best-effort advanced settings.
-	const fallbackAvailable = providerMatch ?? fallbackSelectedModel ?? allOptions[0] ?? DefaultUIChatOptions;
-	return applyPersistedModelParamToSelectedModel(fallbackAvailable, modelParam);
+	// Also do not guess an arbitrary sibling model from the same provider and do
+	// not carry forward the stale `modelParam.name` onto a different live preset.
+	// Restore onto a real available option and only carry over non-identity
+	// advanced settings as best-effort state.
+	const fallbackAvailable = fallbackSelectedModel ?? allOptions[0] ?? DefaultUIChatOptions;
+	return applyPersistedModelParamToSelectedModel(fallbackAvailable, modelParam, {
+		preserveName: false,
+	});
 }
 
 function buildPreviousConversationSystemPromptItem(prompt: string): SystemPromptItem {
@@ -671,14 +679,15 @@ export function useAssistantContextState(): AssistantContextController {
 				nextSelectedPromptKeys = requestedPromptKeys;
 			}
 
-			const hasToolsSelection = Array.isArray(preset.startingToolSelections);
+			const requestedToolSelections = preset.startingToolSelections ?? [];
+			const hasToolsSelection = requestedToolSelections.length > 0;
 			const conversationToolChoices: ToolStoreChoice[] = [];
 			const webSearchChoices: ToolStoreChoice[] = [];
 
 			if (hasToolsSelection) {
 				const toolOptions = await loadToolOptions();
 				const toolOptionByKey = new Map(toolOptions.map(item => [item.key, item] as const));
-				for (const selection of preset.startingToolSelections ?? []) {
+				for (const selection of requestedToolSelections) {
 					const toolOption = toolOptionByKey.get(buildToolRefKey(selection.toolRef));
 					if (!toolOption || !toolOption.isSelectable) {
 						throw new Error(
@@ -727,13 +736,15 @@ export function useAssistantContextState(): AssistantContextController {
 				}
 			}
 
-			const hasSkillsSelection = Array.isArray(preset.startingEnabledSkillRefs);
-			const enabledSkillRefs = hasSkillsSelection ? normalizeSkillRefs(preset.startingEnabledSkillRefs) : [];
+			const requestedSkillRefs = preset.startingEnabledSkillRefs ?? [];
+			const hasSkillsSelection = requestedSkillRefs.length > 0;
+			const enabledSkillRefs = hasSkillsSelection ? normalizeSkillRefs(requestedSkillRefs) : [];
+
 			if (hasSkillsSelection) {
 				const skillOptions = await loadSkillOptions();
 				const skillOptionByKey = new Map(skillOptions.map(item => [item.key, item] as const));
 
-				const invalidSkillRef = (preset.startingEnabledSkillRefs ?? []).find(ref => {
+				const invalidSkillRef = requestedSkillRefs.find(ref => {
 					const skillOption = skillOptionByKey.get(buildSkillRefKey(ref));
 					return !skillOption || !skillOption.isSelectable;
 				});

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import {
 	type AssistantPresetModificationSummary,
@@ -54,6 +54,7 @@ export function useAssistantPresetManager(args: {
 		actionError: null,
 	});
 	const [isApplying, setIsApplying] = useState(false);
+	const applyRequestSeqRef = useRef(0);
 
 	const hasMissingSelectedPreset =
 		selectionState.selectedPresetKey !== null &&
@@ -96,6 +97,8 @@ export function useAssistantPresetManager(args: {
 
 	const applyPresetByKey = useCallback(
 		async (presetKey: string): Promise<boolean> => {
+			const requestSeq = applyRequestSeqRef.current + 1;
+			applyRequestSeqRef.current = requestSeq;
 			setIsApplying(true);
 			setSelectionState(current =>
 				current.actionError === null
@@ -107,6 +110,9 @@ export function useAssistantPresetManager(args: {
 			);
 			try {
 				const prepared = await context.prepareAssistantPresetApplication(presetKey);
+				if (applyRequestSeqRef.current !== requestSeq) {
+					return false;
+				}
 				if (!prepared) {
 					setSelectionState(current => ({
 						...current,
@@ -125,6 +131,9 @@ export function useAssistantPresetManager(args: {
 				});
 				return true;
 			} catch (error) {
+				if (applyRequestSeqRef.current !== requestSeq) {
+					return false;
+				}
 				console.error('Failed to apply assistant preset:', error);
 				setSelectionState(current => ({
 					...current,
@@ -132,7 +141,9 @@ export function useAssistantPresetManager(args: {
 				}));
 				return false;
 			} finally {
-				setIsApplying(false);
+				if (applyRequestSeqRef.current === requestSeq) {
+					setIsApplying(false);
+				}
 			}
 		},
 		[applyRuntimeSelections, context]

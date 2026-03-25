@@ -199,7 +199,10 @@ function ToolOutputComposerChipView({ output, onOpen, onRemove, onRetry }: ToolO
 	const truncatedLabel = label.length > 64 ? `${label.slice(0, 61)}…` : label;
 
 	const isError = !!output.isError;
-	const canRetry = isError && !!output.arguments && (isSkillsToolName(output.name) || !!output.toolStoreChoice);
+
+	const hasResolvableStoredTool =
+		!!output.toolStoreChoice?.bundleID && !!output.toolStoreChoice?.toolSlug && !!output.toolStoreChoice?.toolVersion;
+	const canRetry = isError && !!output.arguments && (isSkillsToolName(output.name) || hasResolvableStoredTool);
 
 	const titleLines = [
 		isError ? `Errored result from: ${label}` : label,

@@ -5,11 +5,11 @@
 - AssistantPreset
   - [ ] have a default "empty" assistant i.e all allowed.
   - [ ] may also need a default bundle for editable instructions only sys prompts that people can add to directly from chat.
-  - [ ] review for and handle stale refs in the preset, no fk present so need to validate properly.
-  - [ ] assistant add edit.
-    - [ ] tools should have args only if args schema is present
-    - [ ] model patch should start with model defaults
-  - [ ] modelpreset should not be selected if it is disabled even if it comes from conversation.
+  - [x] review for and handle stale refs in the preset, no fk present so need to validate properly.
+  - [x] assistant add edit.
+    - [x] tools should have args only if args schema is present
+    - [x] model patch should start with model defaults
+  - [x] modelpreset should not be selected if it is disabled even if it comes from conversation.
 
 - [ ] Skill
   - [ ] include some builtin skills and test on all platforms, full flow.

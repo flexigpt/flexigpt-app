@@ -66,6 +66,12 @@ const EMPTY_MODEL_OPTIONS: AssistantModelPresetOption[] = [];
 const EMPTY_INSTRUCTION_OPTIONS: AssistantInstructionTemplateOption[] = [];
 const EMPTY_TOOL_OPTIONS: AssistantToolOption[] = [];
 const EMPTY_SKILL_OPTIONS: AssistantSkillOption[] = [];
+const TRI_STATE_DROPDOWN_ITEMS: Record<TriStateBoolean, { isEnabled: boolean }> = {
+	'': { isEnabled: true },
+	true: { isEnabled: true },
+	false: { isEnabled: true },
+};
+const TRI_STATE_ORDERED_KEYS: TriStateBoolean[] = ['', 'true', 'false'];
 
 function getErrorMessage(error: unknown, fallback: string): string {
 	if (error instanceof Error && error.message.trim().length > 0) {
@@ -138,6 +144,12 @@ function getToolAutoExecuteLabel(value: TriStateBoolean): string {
 	if (value === 'true') return 'Force On';
 	if (value === 'false') return 'Force Off';
 	return 'Tool Default';
+}
+
+function getIncludeModelSystemPromptLabel(value: TriStateBoolean): string {
+	if (value === 'true') return 'Include';
+	if (value === 'false') return 'Do Not Include';
+	return 'Not Set';
 }
 
 function getSuggestedNextVersion(initialData: PresetItem, existingPresets: PresetItem[]): string {
@@ -266,7 +278,7 @@ function getInitialFormData(
 			isEnabled: src.isEnabled,
 			version: nextVersion,
 			startingModelPresetKey: src.startingModelPresetRef ? buildModelPresetRefKey(src.startingModelPresetRef) : '',
-			startingIncludeModelSystemPrompt: src.startingIncludeModelSystemPrompt ?? false,
+			startingIncludeModelSystemPrompt: booleanToTriState(src.startingIncludeModelSystemPrompt),
 			modelPatch: getInitialModelPatchFormData(src.startingModelPresetPatch),
 			startingInstructionTemplateRefs: (src.startingInstructionTemplateRefs ?? []).map(clonePromptTemplateRef),
 			startingToolSelections: (src.startingToolSelections ?? []).map(selection => ({
@@ -289,7 +301,7 @@ function getInitialFormData(
 		isEnabled: true,
 		version: DEFAULT_SEMVER,
 		startingModelPresetKey: '',
-		startingIncludeModelSystemPrompt: false,
+		startingIncludeModelSystemPrompt: '',
 		modelPatch: getDefaultModelPatchFormData(),
 		startingInstructionTemplateRefs: [],
 		startingToolSelections: [],
@@ -1181,7 +1193,7 @@ function AddEditAssistantPresetModalContent({
 				startingModelPresetRef,
 				startingModelPresetPatch: buildModelPatchFromFormData(formData.modelPatch),
 				startingIncludeModelSystemPrompt: startingModelPresetRef
-					? formData.startingIncludeModelSystemPrompt
+					? triStateToBoolean(formData.startingIncludeModelSystemPrompt)
 					: undefined,
 				startingInstructionTemplateRefs: formData.startingInstructionTemplateRefs.map(clonePromptTemplateRef),
 				startingToolSelections,
@@ -1415,7 +1427,7 @@ function AddEditAssistantPresetModalContent({
 											updateFormData(prev => ({
 												...prev,
 												startingModelPresetKey: value,
-												startingIncludeModelSystemPrompt: value ? prev.startingIncludeModelSystemPrompt : false,
+												startingIncludeModelSystemPrompt: value ? prev.startingIncludeModelSystemPrompt : '',
 											}));
 										}}
 										disabled={isViewMode}
@@ -1462,21 +1474,31 @@ function AddEditAssistantPresetModalContent({
 						</div>
 
 						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3 cursor-pointer">
+							<label className="label col-span-3">
 								<span className="label-text text-sm">Include Model System Prompt</span>
+								<span
+									className="label-text-alt tooltip tooltip-right"
+									data-tip="Optional. Not Set leaves the user's current choice unchanged."
+								>
+									<FiHelpCircle size={12} />
+								</span>
 							</label>
 							<div className="col-span-9">
-								<input
-									type="checkbox"
-									className="toggle toggle-accent"
-									checked={formData.startingIncludeModelSystemPrompt}
-									disabled={isViewMode || !formData.startingModelPresetKey}
-									onChange={e => {
+								<Dropdown<TriStateBoolean>
+									dropdownItems={TRI_STATE_DROPDOWN_ITEMS}
+									orderedKeys={TRI_STATE_ORDERED_KEYS}
+									selectedKey={formData.startingIncludeModelSystemPrompt}
+									onChange={value => {
 										updateFormData(prev => ({
 											...prev,
-											startingIncludeModelSystemPrompt: e.target.checked,
+											startingIncludeModelSystemPrompt: value,
 										}));
 									}}
+									disabled={isViewMode || !formData.startingModelPresetKey}
+									filterDisabled={false}
+									placeholderLabel="Not Set"
+									title="Model system prompt inclusion"
+									getDisplayName={getIncludeModelSystemPromptLabel}
 								/>
 							</div>
 						</div>
@@ -1584,7 +1606,9 @@ function AddEditAssistantPresetModalContent({
 
 									<div className="col-span-3 font-semibold">Include Model System Prompt</div>
 									<div className="col-span-9">
-										{formData.startingModelPresetKey ? (formData.startingIncludeModelSystemPrompt ? 'Yes' : 'No') : '—'}
+										{formData.startingModelPresetKey
+											? getIncludeModelSystemPromptLabel(formData.startingIncludeModelSystemPrompt)
+											: '—'}
 									</div>
 
 									<div className="col-span-3 font-semibold">Created</div>
