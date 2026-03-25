@@ -3,10 +3,9 @@ import type { PromptTemplateRef } from '@/spec/prompt';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolSelection } from '@/spec/tool';
 
-/**
- * @public
- */
 export const BASE_ASSISTANT_PRESET_SLUG = 'base';
+export const BASE_ASSISTANT_PRESET_BUNDLEID = '019d2423-01b0-7f87-be39-fe02d844453a';
+export const BASE_ASSISTANT_PRESET_VERSION = 'v1.0.0';
 
 /**
  * Assistant preset write-time subset of ModelPresetPatch.

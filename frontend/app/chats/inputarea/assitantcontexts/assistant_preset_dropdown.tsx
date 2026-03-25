@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-import { FiCheck, FiChevronDown, FiChevronUp, FiX } from 'react-icons/fi';
+import { FiCheck, FiChevronDown, FiChevronUp, FiEye, FiRefreshCcw, FiTrash2 } from 'react-icons/fi';
 
 import { Popover, PopoverDisclosure, usePopoverStore, useStoreState } from '@ariakit/react';
 
@@ -14,10 +14,15 @@ type AssistantPresetDropdownProps = {
 	error: string | null;
 	actionError: string | null;
 	isApplying: boolean;
+	basePresetKey: string | null;
+	selectedPresetModifiedLabels: string[];
+	canResetToBasePreset: boolean;
 	isOpen: boolean;
 	setIsOpen: Dispatch<SetStateAction<boolean>>;
+	onViewPreset: (preset: AssistantPresetOptionItem) => void;
+	onReapplySelectedPreset: () => Promise<boolean>;
+	onResetToBasePreset: () => Promise<boolean>;
 	onSelectPreset: (presetKey: string) => Promise<boolean>;
-	onClearPreset: () => void;
 };
 
 export function AssistantPresetDropdown({
@@ -28,10 +33,15 @@ export function AssistantPresetDropdown({
 	error,
 	actionError,
 	isApplying,
+	basePresetKey,
+	selectedPresetModifiedLabels,
+	canResetToBasePreset,
 	isOpen,
 	setIsOpen,
+	onViewPreset,
+	onReapplySelectedPreset,
+	onResetToBasePreset,
 	onSelectPreset,
-	onClearPreset,
 }: AssistantPresetDropdownProps) {
 	const popover = usePopoverStore({
 		open: isOpen,
@@ -92,84 +102,135 @@ export function AssistantPresetDropdown({
 					) : (
 						<div className="space-y-1">
 							{presetOptions.map(option => {
+								const isBasePreset = option.key === basePresetKey;
 								const isSelected = option.key === selectedPresetKey;
 								const isDisabled = isApplying || !option.isSelectable;
 								return (
-									<button
+									<div
 										key={option.key}
-										type="button"
-										disabled={isDisabled}
-										className={`hover:bg-base-200 border-base-300 flex w-full items-start gap-2 rounded-lg border p-2 text-left transition-colors ${
+										className={`hover:bg-base-200 border-base-300 flex w-full flex-col rounded-lg border p-2 text-left transition-colors ${
 											isSelected ? 'bg-base-200' : ''
-										} ${
-											isDisabled
-												? option.isSelectable
-													? 'cursor-wait opacity-70'
-													: 'cursor-not-allowed opacity-60'
-												: ''
 										}`}
-										onClick={() => {
-											if (isDisabled) return;
-											void (async () => {
-												const ok = await onSelectPreset(option.key);
-												if (ok) {
-													setIsOpen(false);
-												}
-											})();
-										}}
-										title={
-											option.isSelectable
-												? option.label
-												: `${option.label} — ${option.availabilityReason ?? 'Unavailable'}`
-										}
 									>
-										<div className="pt-0.5">{isSelected ? <FiCheck size={14} /> : <span className="w-3" />}</div>
+										<div className="flex w-full items-start gap-2">
+											<button
+												type="button"
+												disabled={isDisabled}
+												className={`flex min-w-0 flex-1 items-start gap-2 text-left ${
+													isDisabled
+														? option.isSelectable
+															? 'cursor-wait opacity-70'
+															: 'cursor-not-allowed opacity-60'
+														: ''
+												}`}
+												onClick={() => {
+													if (isDisabled) return;
+													void (async () => {
+														const ok = await onSelectPreset(option.key);
+														if (ok) {
+															setIsOpen(false);
+														}
+													})();
+												}}
+												title={
+													option.isSelectable
+														? option.label
+														: `${option.label} — ${option.availabilityReason ?? 'Unavailable'}`
+												}
+											>
+												<div className="pt-0.5">{isSelected ? <FiCheck size={14} /> : <span className="w-3" />}</div>
 
-										<div className="min-w-0 flex-1">
-											<div className="truncate text-xs font-medium">{option.displayName}</div>
-											<div className="mt-1 flex items-center gap-2 text-[10px] opacity-70">
-												<span>{option.bundleDisplayName}</span>
-												<span>•</span>
-												<span>
-													{option.preset.slug}@{option.preset.version}
-												</span>
-											</div>
-											{option.description ? (
-												<div className="mt-1 line-clamp-2 text-xs opacity-75">{option.description}</div>
-											) : null}
-											{!option.isSelectable ? (
-												<div className="text-warning mt-1 text-xs">
-													{option.availabilityReason ?? 'This preset is not currently available.'}
+												<div className="min-w-0 flex-1">
+													<div className="truncate text-xs font-medium">{option.displayName}</div>
+													<div className="mt-1 flex items-center gap-2 text-[10px] opacity-70">
+														<span>{option.bundleDisplayName}</span>
+														<span>•</span>
+														<span>
+															{option.preset.slug}@{option.preset.version}
+														</span>
+													</div>
+													{option.description ? (
+														<div className="mt-1 line-clamp-2 text-xs opacity-75">{option.description}</div>
+													) : null}
+													{!option.isSelectable ? (
+														<div className="text-warning mt-1 text-xs">
+															{option.availabilityReason ?? 'This preset is not currently available.'}
+														</div>
+													) : null}
 												</div>
-											) : null}
+											</button>
+
+											<div className="flex shrink-0 items-start gap-1">
+												<button
+													type="button"
+													className="btn btn-ghost btn-xs btn-square rounded-lg"
+													onClick={() => {
+														onViewPreset(option);
+													}}
+													title={isSelected ? 'View active assistant preset details' : 'View assistant preset details'}
+												>
+													<FiEye size={14} />
+												</button>
+
+												{!option.isSelectable ? (
+													<span className="badge badge-warning badge-xs shrink-0">Unavailable</span>
+												) : null}
+											</div>
 										</div>
 
-										{!option.isSelectable ? (
-											<span className="badge badge-warning badge-xs shrink-0">Unavailable</span>
+										{isSelected ? (
+											<div className="border-base-300 mt-2 ml-5 flex flex-wrap items-center gap-2 border-t pt-2">
+												<button
+													type="button"
+													className="btn btn-ghost btn-xs rounded-lg"
+													disabled={isApplying}
+													onClick={() => {
+														void onReapplySelectedPreset();
+													}}
+													title={
+														selectedPresetModifiedLabels.length > 0
+															? `Reset preset-managed sections: ${selectedPresetModifiedLabels.join(', ')}`
+															: 'Reapply current assistant preset'
+													}
+												>
+													<FiRefreshCcw size={14} className="mr-1" />
+													{selectedPresetModifiedLabels.length > 0 ? 'Reset to preset' : 'Reapply preset'}
+												</button>
+
+												<button
+													type="button"
+													className="btn btn-ghost btn-xs rounded-lg"
+													disabled={isApplying || isBasePreset || !canResetToBasePreset}
+													onClick={() => {
+														void onResetToBasePreset();
+													}}
+													title={
+														isBasePreset ? 'Base preset is already active' : 'Switch back to the base assistant preset'
+													}
+												>
+													<FiTrash2 size={14} className="mr-1" />
+													Clear to base
+												</button>
+
+												<span
+													className={`badge badge-xs ${selectedPresetModifiedLabels.length > 0 ? 'badge-warning' : 'badge-success'}`}
+													title={
+														selectedPresetModifiedLabels.length > 0
+															? `Modified sections: ${selectedPresetModifiedLabels.join(', ')}`
+															: 'Preset-managed sections are currently in sync'
+													}
+												>
+													{selectedPresetModifiedLabels.length > 0 ? 'Modified' : 'In sync'}
+												</span>
+
+												{isBasePreset ? <span className="badge badge-ghost badge-xs">Base</span> : null}
+											</div>
 										) : null}
-									</button>
+									</div>
 								);
 							})}
 						</div>
 					)}
-
-					{selectedPresetKey ? (
-						<div className="border-neutral/20 mt-2 border-t pt-2">
-							<button
-								type="button"
-								className="btn btn-ghost btn-xs rounded-lg"
-								disabled={isApplying}
-								onClick={() => {
-									onClearPreset();
-									setIsOpen(false);
-								}}
-								title="Clear assistant preset selection without changing current values"
-							>
-								<FiX size={14} className="mr-1" />
-								Clear selection
-							</button>
-						</div>
-					) : null}
 				</Popover>
 			</div>
 		</div>

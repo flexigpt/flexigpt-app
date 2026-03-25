@@ -4,16 +4,20 @@ import { createPortal } from 'react-dom';
 
 import { FiSliders, FiTool, FiX, FiZap } from 'react-icons/fi';
 
+import type { AssistantPreset } from '@/spec/assistantpreset';
+import type { UIChatOption } from '@/spec/modelpreset';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
 import { ModalBackdrop } from '@/components/modal_backdrop';
 
 import {
 	type AssistantPresetModificationSummary,
+	type AssistantPresetOptionItem,
 	type AssistantPresetPreparedApplication,
 	type AssistantPresetRuntimeSnapshot,
 	buildAssistantPresetModelComparisonState,
 } from '@/chats/inputarea/assitantcontexts/assistant_preset_runtime';
+import { buildPromptTemplateRefKey } from '@/prompts/lib/prompt_template_ref';
 import type { SystemPromptItem } from '@/prompts/lib/use_system_prompts';
 
 function closeDialogSafely(dialog: HTMLDialogElement | null): boolean {
@@ -81,14 +85,62 @@ function renderSimpleList(items: Array<{ title: string; meta?: string }>, emptyT
 	);
 }
 
-function SectionCard(props: { title: string; isModified: boolean; children: React.ReactNode; icon?: React.ReactNode }) {
+function buildPresetModelPreviewState(preset: AssistantPreset): Record<string, unknown> | undefined {
+	const state: Record<string, unknown> = {};
+
+	if (preset.startingModelPresetRef) {
+		state.modelRef = preset.startingModelPresetRef;
+	}
+
+	if (preset.startingModelPresetPatch) {
+		Object.assign(state, preset.startingModelPresetPatch);
+	}
+
+	if (preset.startingIncludeModelSystemPrompt !== undefined) {
+		state.includeModelSystemPrompt = preset.startingIncludeModelSystemPrompt;
+	}
+
+	return Object.keys(state).length > 0 ? state : undefined;
+}
+
+function formatPresetToolSelectionLabel(selection: {
+	toolRef: {
+		bundleID: string;
+		toolSlug: string;
+		toolVersion: string;
+	};
+	toolChoicePatch?: {
+		autoExecute?: boolean;
+		userArgSchemaInstance?: string;
+	};
+}) {
+	const metaParts = [`${selection.toolRef.bundleID}/${selection.toolRef.toolSlug}@${selection.toolRef.toolVersion}`];
+
+	if (selection.toolChoicePatch?.autoExecute) metaParts.push('auto');
+	if (selection.toolChoicePatch?.userArgSchemaInstance?.trim()) metaParts.push('args');
+
+	return {
+		title: selection.toolRef.toolSlug,
+		meta: metaParts.join(' • '),
+	};
+}
+
+function SectionCard(props: {
+	title: string;
+	isModified?: boolean;
+	showSyncState?: boolean;
+	children: React.ReactNode;
+	icon?: React.ReactNode;
+}) {
 	return (
 		<section className="border-base-300 rounded-2xl border p-4">
 			<div className="mb-3 flex items-center gap-2">
 				{props.icon}
 				<h4 className="text-sm font-semibold">{props.title}</h4>
-				<span className={`badge badge-sm ${props.isModified ? 'badge-warning' : 'badge-success'}`}>
-					{props.isModified ? 'Modified' : 'In sync'}
+				<span
+					className={`badge badge-sm ${props.showSyncState ? (props.isModified ? 'badge-warning' : 'badge-success') : 'badge-outline'}`}
+				>
+					{props.showSyncState ? (props.isModified ? 'Modified' : 'In sync') : 'Preset values'}
 				</span>
 			</div>
 			{props.children}
@@ -99,9 +151,12 @@ function SectionCard(props: { title: string; isModified: boolean; children: Reac
 type AssistantPresetViewModalProps = {
 	isOpen: boolean;
 	onClose: () => void;
-	appliedPresetApplication: AssistantPresetPreparedApplication | null;
+	viewedPreset: AssistantPresetOptionItem | null;
+	viewedPresetApplication: AssistantPresetPreparedApplication | null;
+	isActivePresetView: boolean;
+
 	currentRuntimeSnapshot: AssistantPresetRuntimeSnapshot;
-	currentModel: ReturnType<typeof buildAssistantPresetModelComparisonState> extends infer _X ? any : never;
+	currentModel: UIChatOption;
 	currentIncludeModelSystemPrompt: boolean;
 	currentSelectedPromptKeys: string[];
 	promptItems: SystemPromptItem[];
@@ -111,7 +166,9 @@ type AssistantPresetViewModalProps = {
 export function AssistantPresetViewModal({
 	isOpen,
 	onClose,
-	appliedPresetApplication,
+	viewedPreset,
+	viewedPresetApplication,
+	isActivePresetView,
 	currentRuntimeSnapshot,
 	currentModel,
 	currentIncludeModelSystemPrompt,
@@ -142,16 +199,23 @@ export function AssistantPresetViewModal({
 		return new Map(promptItems.map(item => [item.identityKey, item]));
 	}, [promptItems]);
 
-	if (!isOpen || !appliedPresetApplication || typeof document === 'undefined') {
+	if (!isOpen || !viewedPreset || typeof document === 'undefined') {
 		return null;
 	}
 
-	const appliedModelState = appliedPresetApplication.comparisonState.model;
-	const currentModelState = buildAssistantPresetModelComparisonState(
-		appliedPresetApplication.preset,
-		currentModel,
-		currentIncludeModelSystemPrompt
-	);
+	const preparedApplication = viewedPresetApplication;
+	const shouldShowActiveComparison = isActivePresetView && preparedApplication !== null;
+
+	const appliedModelState =
+		preparedApplication?.comparisonState.model ?? buildPresetModelPreviewState(viewedPreset.preset);
+	const currentModelState =
+		shouldShowActiveComparison && preparedApplication
+			? buildAssistantPresetModelComparisonState(
+					preparedApplication.preset,
+					currentModel,
+					currentIncludeModelSystemPrompt
+				)
+			: undefined;
 
 	const promptLabelItems = (keys: string[]) =>
 		keys.map(key => {
@@ -162,30 +226,42 @@ export function AssistantPresetViewModal({
 			};
 		});
 
-	const appliedToolItems = [
-		...appliedPresetApplication.runtimeSelections.conversationToolChoices,
-		...appliedPresetApplication.runtimeSelections.webSearchChoices,
-	].map(formatToolLabel);
+	const appliedInstructionKeys =
+		preparedApplication?.comparisonState.instructions ??
+		(viewedPreset.preset.startingInstructionTemplateRefs ?? []).map(buildPromptTemplateRefKey);
+	const appliedToolItems = preparedApplication
+		? [
+				...preparedApplication.runtimeSelections.conversationToolChoices,
+				...preparedApplication.runtimeSelections.webSearchChoices,
+			].map(formatToolLabel)
+		: (viewedPreset.preset.startingToolSelections ?? []).map(formatPresetToolSelectionLabel);
 
-	const currentToolItems = [
-		...currentRuntimeSnapshot.conversationToolChoices,
-		...currentRuntimeSnapshot.webSearchChoices,
-	].map(choice =>
-		formatToolLabel({
-			displayName: choice.displayName,
-			toolSlug: choice.toolSlug,
-			toolVersion: choice.toolVersion,
-			bundleID: choice.bundleID,
-			toolType: choice.toolType,
-			autoExecute: choice.autoExecute,
-			userArgSchemaInstance: choice.userArgSchemaInstance,
-		})
-	);
+	const currentToolItems = shouldShowActiveComparison
+		? [...currentRuntimeSnapshot.conversationToolChoices, ...currentRuntimeSnapshot.webSearchChoices].map(choice =>
+				formatToolLabel({
+					displayName: choice.displayName,
+					toolSlug: choice.toolSlug,
+					toolVersion: choice.toolVersion,
+					bundleID: choice.bundleID,
+					toolType: choice.toolType,
+					autoExecute: choice.autoExecute,
+					userArgSchemaInstance: choice.userArgSchemaInstance,
+				})
+			)
+		: [];
 
-	const appliedSkillItems = appliedPresetApplication.runtimeSelections.enabledSkillRefs.map(formatSkillLabel);
-	const currentSkillItems = currentRuntimeSnapshot.enabledSkillRefs.map(formatSkillLabel);
+	const appliedSkillItems = preparedApplication
+		? preparedApplication.runtimeSelections.enabledSkillRefs.map(formatSkillLabel)
+		: (viewedPreset.preset.startingEnabledSkillRefs ?? []).map(formatSkillLabel);
+	const currentSkillItems = shouldShowActiveComparison
+		? currentRuntimeSnapshot.enabledSkillRefs.map(formatSkillLabel)
+		: [];
 
-	const description = appliedPresetApplication.option.description || appliedPresetApplication.preset.description;
+	const description = viewedPreset.description || viewedPreset.preset.description;
+	const showCurrentModel = shouldShowActiveComparison && modificationSummary.model;
+	const showCurrentInstructions = shouldShowActiveComparison && modificationSummary.instructions;
+	const showCurrentTools = shouldShowActiveComparison && modificationSummary.tools;
+	const showCurrentSkills = shouldShowActiveComparison && modificationSummary.skills;
 
 	return createPortal(
 		<dialog
@@ -203,10 +279,9 @@ export function AssistantPresetViewModal({
 				<div className="max-h-[80vh] overflow-y-auto p-6">
 					<div className="mb-4 flex items-center justify-between gap-3">
 						<div>
-							<h3 className="text-lg font-bold">{appliedPresetApplication.option.displayName}</h3>
+							<h3 className="text-lg font-bold">{viewedPreset.displayName}</h3>
 							<div className="mt-1 text-xs opacity-70">
-								{appliedPresetApplication.option.bundleDisplayName} • {appliedPresetApplication.preset.slug}@
-								{appliedPresetApplication.preset.version}
+								{viewedPreset.bundleDisplayName} • {viewedPreset.preset.slug}@{viewedPreset.preset.version}
 							</div>
 						</div>
 
@@ -232,40 +307,55 @@ export function AssistantPresetViewModal({
 						)}
 
 						<div className="mt-3 flex flex-wrap items-center gap-2">
-							<span
-								className={`badge badge-sm ${modificationSummary.any ? 'badge-warning' : 'badge-success'}`}
-								title={
-									modificationSummary.any
-										? `Modified sections: ${modificationSummary.modifiedLabels.join(', ')}`
-										: 'Current values still match the applied preset.'
-								}
-							>
-								{modificationSummary.any ? 'Preset overridden' : 'Preset in sync'}
-							</span>
-							{modificationSummary.modifiedLabels.map(label => (
-								<span key={label} className="badge badge-outline badge-sm">
-									{label}
-								</span>
-							))}
+							{shouldShowActiveComparison ? (
+								<>
+									<span
+										className={`badge badge-sm ${modificationSummary.any ? 'badge-warning' : 'badge-success'}`}
+										title={
+											modificationSummary.any
+												? `Modified sections: ${modificationSummary.modifiedLabels.join(', ')}`
+												: 'Current values still match the applied preset.'
+										}
+									>
+										{modificationSummary.any ? 'Preset overridden' : 'Preset in sync'}
+									</span>
+									{modificationSummary.modifiedLabels.map(label => (
+										<span key={label} className="badge badge-outline badge-sm">
+											{label}
+										</span>
+									))}
+								</>
+							) : (
+								<span className="badge badge-outline badge-sm">Preset preview</span>
+							)}
+
+							{!viewedPreset.isSelectable ? <span className="badge badge-warning badge-sm">Unavailable</span> : null}
 						</div>
+
+						{!viewedPreset.isSelectable && viewedPreset.availabilityReason ? (
+							<div className="text-warning mt-3 text-xs">{viewedPreset.availabilityReason}</div>
+						) : null}
 					</div>
 
 					<div className="space-y-4">
 						{appliedModelState ? (
 							<SectionCard
 								title="Model and advanced params"
+								showSyncState={shouldShowActiveComparison}
 								isModified={modificationSummary.model}
 								icon={<FiSliders size={14} />}
 							>
-								<div className={`grid gap-4 ${modificationSummary.model ? 'lg:grid-cols-2' : 'grid-cols-1'}`}>
+								<div className={`grid gap-4 ${showCurrentModel ? 'lg:grid-cols-2' : 'grid-cols-1'}`}>
 									<div>
-										<div className="mb-2 text-xs font-semibold opacity-70">Preset-applied values</div>
+										<div className="mb-2 text-xs font-semibold opacity-70">
+											{shouldShowActiveComparison ? 'Preset-applied values' : 'Preset values'}
+										</div>
 										<pre className="bg-base-300 overflow-x-auto rounded-xl p-3 text-xs">
 											{JSON.stringify(appliedModelState, null, 2)}
 										</pre>
 									</div>
 
-									{modificationSummary.model ? (
+									{showCurrentModel ? (
 										<div>
 											<div className="mb-2 text-xs font-semibold opacity-70">Current values</div>
 											<pre className="bg-base-300 overflow-x-auto rounded-xl p-3 text-xs">
@@ -277,18 +367,21 @@ export function AssistantPresetViewModal({
 							</SectionCard>
 						) : null}
 
-						{appliedPresetApplication.comparisonState.instructions ? (
-							<SectionCard title="Instruction templates" isModified={modificationSummary.instructions}>
-								<div className={`grid gap-4 ${modificationSummary.instructions ? 'lg:grid-cols-2' : 'grid-cols-1'}`}>
+						{appliedInstructionKeys.length > 0 ? (
+							<SectionCard
+								title="Instruction templates"
+								showSyncState={shouldShowActiveComparison}
+								isModified={modificationSummary.instructions}
+							>
+								<div className={`grid gap-4 ${showCurrentInstructions ? 'lg:grid-cols-2' : 'grid-cols-1'}`}>
 									<div>
-										<div className="mb-2 text-xs font-semibold opacity-70">Preset-applied selection</div>
-										{renderSimpleList(
-											promptLabelItems(appliedPresetApplication.comparisonState.instructions),
-											'No instruction templates selected.'
-										)}
+										<div className="mb-2 text-xs font-semibold opacity-70">
+											{shouldShowActiveComparison ? 'Preset-applied selection' : 'Preset selection'}
+										</div>
+										{renderSimpleList(promptLabelItems(appliedInstructionKeys), 'No instruction templates selected.')}
 									</div>
 
-									{modificationSummary.instructions ? (
+									{showCurrentInstructions ? (
 										<div>
 											<div className="mb-2 text-xs font-semibold opacity-70">Current selection</div>
 											{renderSimpleList(
@@ -301,19 +394,22 @@ export function AssistantPresetViewModal({
 							</SectionCard>
 						) : null}
 
-						{appliedPresetApplication.comparisonState.tools ? (
+						{appliedToolItems.length > 0 ? (
 							<SectionCard
 								title="Tools and web search"
+								showSyncState={shouldShowActiveComparison}
 								isModified={modificationSummary.tools}
 								icon={<FiTool size={14} />}
 							>
-								<div className={`grid gap-4 ${modificationSummary.tools ? 'lg:grid-cols-2' : 'grid-cols-1'}`}>
+								<div className={`grid gap-4 ${showCurrentTools ? 'lg:grid-cols-2' : 'grid-cols-1'}`}>
 									<div>
-										<div className="mb-2 text-xs font-semibold opacity-70">Preset-applied selection</div>
+										<div className="mb-2 text-xs font-semibold opacity-70">
+											{shouldShowActiveComparison ? 'Preset-applied selection' : 'Preset selection'}
+										</div>
 										{renderSimpleList(appliedToolItems, 'No tool selections.')}
 									</div>
 
-									{modificationSummary.tools ? (
+									{showCurrentTools ? (
 										<div>
 											<div className="mb-2 text-xs font-semibold opacity-70">Current selection</div>
 											{renderSimpleList(currentToolItems, 'No tool selections.')}
@@ -323,15 +419,22 @@ export function AssistantPresetViewModal({
 							</SectionCard>
 						) : null}
 
-						{appliedPresetApplication.comparisonState.skills ? (
-							<SectionCard title="Enabled skills" isModified={modificationSummary.skills} icon={<FiZap size={14} />}>
-								<div className={`grid gap-4 ${modificationSummary.skills ? 'lg:grid-cols-2' : 'grid-cols-1'}`}>
+						{appliedSkillItems.length > 0 ? (
+							<SectionCard
+								title="Enabled skills"
+								showSyncState={shouldShowActiveComparison}
+								isModified={modificationSummary.skills}
+								icon={<FiZap size={14} />}
+							>
+								<div className={`grid gap-4 ${showCurrentSkills ? 'lg:grid-cols-2' : 'grid-cols-1'}`}>
 									<div>
-										<div className="mb-2 text-xs font-semibold opacity-70">Preset-applied selection</div>
+										<div className="mb-2 text-xs font-semibold opacity-70">
+											{shouldShowActiveComparison ? 'Preset-applied selection' : 'Preset selection'}
+										</div>
 										{renderSimpleList(appliedSkillItems, 'No enabled skills.')}
 									</div>
 
-									{modificationSummary.skills ? (
+									{showCurrentSkills ? (
 										<div>
 											<div className="mb-2 text-xs font-semibold opacity-70">Current selection</div>
 											{renderSimpleList(currentSkillItems, 'No enabled skills.')}
@@ -342,9 +445,9 @@ export function AssistantPresetViewModal({
 						) : null}
 
 						{!appliedModelState &&
-						!appliedPresetApplication.comparisonState.instructions &&
-						!appliedPresetApplication.comparisonState.tools &&
-						!appliedPresetApplication.comparisonState.skills ? (
+						appliedInstructionKeys.length === 0 &&
+						appliedToolItems.length === 0 &&
+						appliedSkillItems.length === 0 ? (
 							<div className="rounded-2xl border p-4 text-sm opacity-70">
 								This preset only carries display metadata right now; it does not manage any current authoring sections.
 							</div>

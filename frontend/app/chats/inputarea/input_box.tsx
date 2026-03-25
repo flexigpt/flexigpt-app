@@ -25,6 +25,7 @@ export interface InputBoxHandle {
 	getUIChatOptions: () => UIChatOption;
 	focus: () => void;
 	resetEditor: () => void;
+	resetForNewConversation: () => Promise<void>;
 	openTemplateMenu: () => void;
 	openToolMenu: () => void;
 	openAttachmentMenu: () => void;
@@ -112,6 +113,19 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 			resetEditor: () => {
 				inputAreaRef.current?.resetEditor();
 			},
+			resetForNewConversation: async () => {
+				setAbortConfirmationRequested(false);
+				inputAreaRef.current?.resetEditor();
+				inputAreaRef.current?.setConversationToolsFromChoices([]);
+				inputAreaRef.current?.setWebSearchFromChoices([]);
+				inputAreaRef.current?.setEnabledSkillRefsFromMessage([]);
+				inputAreaRef.current?.setActiveSkillRefsFromMessage([]);
+				setAssistantRuntimeSnapshot(EMPTY_ASSISTANT_PRESET_RUNTIME_SNAPSHOT);
+
+				assistantContext.resetForNewConversation();
+				await assistantPreset.resetToBasePreset();
+			},
+
 			openTemplateMenu: () => {
 				inputAreaRef.current?.openTemplateMenu();
 			},
@@ -127,24 +141,46 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 			loadToolCalls: toolCalls => {
 				inputAreaRef.current?.loadToolCalls(toolCalls);
 			},
-			setConversationToolsFromChoices: tools => {
-				inputAreaRef.current?.setConversationToolsFromChoices(tools);
-			},
-			setWebSearchFromChoices: choices => {
-				inputAreaRef.current?.setWebSearchFromChoices(choices);
-			},
 			applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => {
 				inputAreaRef.current?.applyAttachmentsDrop(payload);
 			},
+			setConversationToolsFromChoices: tools => {
+				inputAreaRef.current?.setConversationToolsFromChoices(tools);
+				setAssistantRuntimeSnapshot(prev => ({
+					...prev,
+					conversationToolChoices: [...tools],
+				}));
+			},
+			setWebSearchFromChoices: choices => {
+				inputAreaRef.current?.setWebSearchFromChoices(choices);
+				setAssistantRuntimeSnapshot(prev => ({
+					...prev,
+					webSearchChoices: [...choices],
+				}));
+			},
 			setEnabledSkillRefsFromMessage: (refs: SkillRef[]) => {
 				inputAreaRef.current?.setEnabledSkillRefsFromMessage(refs);
+				setAssistantRuntimeSnapshot(prev => ({
+					...prev,
+					enabledSkillRefs: [...refs],
+				}));
 			},
 			setActiveSkillRefsFromMessage: (refs: SkillRef[]) => {
 				inputAreaRef.current?.setActiveSkillRefsFromMessage(refs);
 			},
 			restoreConversationContext: context => {
-				assistantPreset.clearSelectedPreset();
+				setAbortConfirmationRequested(false);
 				assistantContext.restoreConversationContext(context);
+				inputAreaRef.current?.setConversationToolsFromChoices(context.toolChoices);
+				inputAreaRef.current?.setWebSearchFromChoices(context.webSearchChoices);
+				inputAreaRef.current?.setEnabledSkillRefsFromMessage(context.enabledSkillRefs);
+				inputAreaRef.current?.setActiveSkillRefsFromMessage(context.activeSkillRefs);
+				setAssistantRuntimeSnapshot({
+					conversationToolChoices: [...context.toolChoices],
+					webSearchChoices: [...context.webSearchChoices],
+					enabledSkillRefs: [...context.enabledSkillRefs],
+				});
+				void assistantPreset.trackDefaultPresetWithoutApplying();
 			},
 		}),
 		[assistantContext, assistantPreset, chatOptions]

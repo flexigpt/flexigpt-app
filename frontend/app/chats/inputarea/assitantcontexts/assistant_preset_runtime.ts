@@ -1,4 +1,9 @@
-import type { AssistantPreset } from '@/spec/assistantpreset';
+import {
+	type AssistantPreset,
+	BASE_ASSISTANT_PRESET_BUNDLEID,
+	BASE_ASSISTANT_PRESET_SLUG,
+	BASE_ASSISTANT_PRESET_VERSION,
+} from '@/spec/assistantpreset';
 import type { UIChatOption } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
 import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
@@ -395,4 +400,34 @@ export function getAssistantPresetModificationSummary(args: {
 		any: modifiedLabels.length > 0,
 		modifiedLabels,
 	};
+}
+
+export function findBaseAssistantPresetOption(
+	options: AssistantPresetOptionItem[],
+	baseBundleID: string,
+	baseSlug: string,
+	baseVersion: string
+): AssistantPresetOptionItem | null {
+	return (
+		options.find(
+			option =>
+				option.bundleID === baseBundleID && option.preset.slug === baseSlug && option.preset.version === baseVersion
+		) ?? null
+	);
+}
+
+export function findDefaultAssistantPresetOption(
+	options: AssistantPresetOptionItem[]
+): AssistantPresetOptionItem | null {
+	const o = findBaseAssistantPresetOption(
+		options,
+		BASE_ASSISTANT_PRESET_BUNDLEID,
+		BASE_ASSISTANT_PRESET_SLUG,
+		BASE_ASSISTANT_PRESET_VERSION
+	);
+	if (o && o.isSelectable) {
+		return o;
+	}
+
+	return options.find(option => option.isSelectable) ?? o;
 }

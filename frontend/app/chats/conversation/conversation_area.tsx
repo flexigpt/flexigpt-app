@@ -97,6 +97,7 @@ export type ConversationAreaHandle = {
 	disposeTabRuntime: (tabId: string) => void;
 	clearStreamForTab: (tabId: string) => void;
 	syncComposerFromConversation: (tabId: string, conv: Conversation) => void;
+	resetComposerForNewConversation: (tabId: string) => Promise<void>;
 
 	focusInput: (tabId: string) => void;
 	openTemplateMenu: (tabId: string) => void;
@@ -440,10 +441,12 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		const restored = deriveRestorableConversationContextFromMessages(conv.messages);
 
 		input.restoreConversationContext(restored);
-		input.setConversationToolsFromChoices(restored.toolChoices);
-		input.setWebSearchFromChoices(restored.webSearchChoices);
-		input.setEnabledSkillRefsFromMessage(restored.enabledSkillRefs);
-		input.setActiveSkillRefsFromMessage(restored.activeSkillRefs);
+	}, []);
+
+	const resetComposerForNewConversation = useCallback(async (tabId: string) => {
+		const input = inputRefs.current.get(tabId);
+		if (!input) return;
+		await input.resetForNewConversation();
 	}, []);
 
 	const focusInput = useCallback((tabId: string) => inputRefs.current.get(tabId)?.focus(), []);
@@ -1007,6 +1010,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			disposeTabRuntime,
 			clearStreamForTab,
 			syncComposerFromConversation,
+			resetComposerForNewConversation,
 			focusInput,
 			openTemplateMenu,
 			openToolMenu,
@@ -1019,6 +1023,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			clearStreamForTab,
 			disposeTabRuntime,
 			focusInput,
+			resetComposerForNewConversation,
 			getScrollTopByTabSnapshot,
 			openAttachmentMenu,
 			openTemplateMenu,

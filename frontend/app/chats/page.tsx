@@ -494,7 +494,13 @@ export default function ChatsPage() {
 		if (!targetId) return;
 
 		selectTab(targetId);
-		requestAnimationFrame(() => conversationAreaRef.current?.focusInput(targetId));
+		requestAnimationFrame(() => {
+			const area = conversationAreaRef.current;
+			if (!area) return;
+			void area.resetComposerForNewConversation(targetId).finally(() => {
+				area.focusInput(targetId);
+			});
+		});
 	}, [selectTab]);
 
 	const closeTab = useCallback(

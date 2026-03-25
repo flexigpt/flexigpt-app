@@ -289,6 +289,7 @@ export type AssistantContextController = {
 
 	selectedModel: UIChatOption;
 	allOptions: UIChatOption[];
+	modelOptionsLoaded: boolean;
 
 	isHybridReasoningEnabled: boolean;
 	includePreviousMessages: IncludePreviousMessages;
@@ -326,6 +327,7 @@ export type AssistantContextController = {
 	applyAdvancedModel: (updatedModel: UIChatOption) => void;
 
 	restoreConversationContext: (context: RestorableConversationContext) => void;
+	resetForNewConversation: () => void;
 
 	verbosityEnabled: boolean;
 	reasoningLevelOptions: ReasoningLevel[];
@@ -341,7 +343,9 @@ export function useAssistantContextState(): AssistantContextController {
 		DefaultUIChatOptions.includePreviousMessages
 	);
 	const [rawSelectedPromptKeys, setRawSelectedPromptKeys] = useState<string[]>([]);
-	const [includeModelDefault, setIncludeModelDefault] = useState(Boolean(DefaultUIChatOptions.systemPrompt.trim()));
+	const [includeModelDefault, setIncludeModelDefaultState] = useState(
+		Boolean(DefaultUIChatOptions.systemPrompt.trim())
+	);
 	const [restoredConversationSystemPrompt, setRestoredConversationSystemPrompt] = useState<string | null>(null);
 
 	const selectedModelRef = useRef(selectedModel);
@@ -440,10 +444,34 @@ export function useAssistantContextState(): AssistantContextController {
 		includeModelDefaultRef.current = includeModelDefault;
 	}, [includeModelDefault]);
 
+	const setIncludeModelDefault = useCallback((action: SetStateAction<boolean>) => {
+		const currentValue = includeModelDefaultRef.current;
+		const nextValue = typeof action === 'function' ? action(currentValue) : action;
+		includeModelDefaultRef.current = nextValue;
+		setIncludeModelDefaultState(nextValue);
+	}, []);
+
 	const selectedPromptKeysRef = useRef(selectedPromptKeys);
 	useEffect(() => {
 		selectedPromptKeysRef.current = selectedPromptKeys;
 	}, [selectedPromptKeys]);
+
+	const setPromptSelectionState = useCallback(
+		(
+			nextRestoredConversationSystemPrompt: string | null,
+			nextIncludeModelDefault: boolean,
+			nextSelectedPromptKeys: string[]
+		) => {
+			setRestoredConversationSystemPrompt(nextRestoredConversationSystemPrompt);
+			includeModelDefaultRef.current = nextIncludeModelDefault;
+			setIncludeModelDefaultState(nextIncludeModelDefault);
+
+			const nextKeys = [...nextSelectedPromptKeys];
+			selectedPromptKeysRef.current = nextKeys;
+			setRawSelectedPromptKeys(nextKeys);
+		},
+		[]
+	);
 
 	const chatOptions = useMemo(
 		() =>
@@ -482,16 +510,17 @@ export function useAssistantContextState(): AssistantContextController {
 			setIsHybridReasoningEnabled(nextHybridEnabled);
 
 			const restoredPromptState = deriveRestoredPromptSelectionState(nextSelectedModel, context.modelParam);
-			setRestoredConversationSystemPrompt(restoredPromptState.restoredConversationSystemPrompt);
-			setIncludeModelDefault(restoredPromptState.includeModelDefault);
-			setRawSelectedPromptKeys(restoredPromptState.selectedPromptKeys);
-
+			setPromptSelectionState(
+				restoredPromptState.restoredConversationSystemPrompt,
+				restoredPromptState.includeModelDefault,
+				restoredPromptState.selectedPromptKeys
+			);
 			// We intentionally do not restore includePreviousMessages yet.
 			// But hydration must still reset it so stale per-tab UI state cannot
 			// leak into restored conversations, especially old/stale ones.
 			setIncludePreviousMessages(nextSelectedModel.includePreviousMessages);
 		},
-		[]
+		[setPromptSelectionState]
 	);
 
 	const restoreConversationContext = useCallback(
@@ -503,6 +532,23 @@ export function useAssistantContextState(): AssistantContextController {
 		},
 		[applyRestoredConversationContext, optionsLoaded]
 	);
+
+	const resetForNewConversation = useCallback(() => {
+		pendingRestoreContextRef.current = null;
+
+		const nextSelectedModel = sanitizeUIChatOptionByCapabilities(
+			defaultLoadedOptionRef.current ?? allOptionsRef.current[0] ?? DefaultUIChatOptions
+		);
+		selectedModelRef.current = nextSelectedModel;
+		setSelectedModel(nextSelectedModel);
+
+		const nextHybridEnabled = isHybridReasoningModel(nextSelectedModel);
+		isHybridReasoningEnabledRef.current = nextHybridEnabled;
+		setIsHybridReasoningEnabled(nextHybridEnabled);
+
+		setPromptSelectionState(null, Boolean(nextSelectedModel.systemPrompt.trim()), []);
+		setIncludePreviousMessages(nextSelectedModel.includePreviousMessages);
+	}, [setPromptSelectionState]);
 
 	const applySelectedModel = useCallback(
 		(
@@ -561,13 +607,13 @@ export function useAssistantContextState(): AssistantContextController {
 
 			setSelectedModel(nextSelectedModel);
 			setIsHybridReasoningEnabled(nextIsHybridReasoningEnabled);
-			setIncludeModelDefault(Boolean(nextSelectedModel.systemPrompt.trim()));
+			setPromptSelectionState(null, Boolean(nextSelectedModel.systemPrompt.trim()), []);
 		})();
 
 		return () => {
 			cancelled = true;
 		};
-	}, [applyRestoredConversationContext]);
+	}, [applyRestoredConversationContext, setPromptSelectionState]);
 
 	const handleSetSelectedModel = useCallback(
 		(action: SetStateAction<UIChatOption>) => {
@@ -642,21 +688,29 @@ export function useAssistantContextState(): AssistantContextController {
 	);
 
 	const togglePromptSelection = useCallback((identityKey: string) => {
-		setRawSelectedPromptKeys(prev =>
-			prev.includes(identityKey) ? prev.filter(item => item !== identityKey) : [...prev, identityKey]
-		);
+		setRawSelectedPromptKeys(prev => {
+			const next = prev.includes(identityKey) ? prev.filter(item => item !== identityKey) : [...prev, identityKey];
+			selectedPromptKeysRef.current = next;
+			return next;
+		});
 	}, []);
 
 	const addAndSelectPrompt = useCallback(
 		async (draft: SystemPromptDraft) => {
 			const item = await addPrompt(draft);
-			setRawSelectedPromptKeys(prev => (prev.includes(item.identityKey) ? prev : [...prev, item.identityKey]));
+			setRawSelectedPromptKeys(prev => {
+				const next = prev.includes(item.identityKey) ? prev : [...prev, item.identityKey];
+				selectedPromptKeysRef.current = next;
+				return next;
+			});
 		},
 		[addPrompt]
 	);
 
 	const clearSelectedPromptSources = useCallback(() => {
-		setIncludeModelDefault(false);
+		includeModelDefaultRef.current = false;
+		setIncludeModelDefaultState(false);
+		selectedPromptKeysRef.current = [];
 		setRawSelectedPromptKeys([]);
 	}, []);
 
@@ -859,10 +913,12 @@ export function useAssistantContextState(): AssistantContextController {
 			}
 
 			if (prepared.hasIncludeModelSystemPromptSelection) {
-				setIncludeModelDefault(prepared.nextIncludeModelSystemPrompt);
+				includeModelDefaultRef.current = prepared.nextIncludeModelSystemPrompt;
+				setIncludeModelDefaultState(prepared.nextIncludeModelSystemPrompt);
 			}
 
 			if (prepared.hasInstructionTemplateSelection) {
+				selectedPromptKeysRef.current = [...prepared.nextSelectedPromptKeys];
 				setRawSelectedPromptKeys(prepared.nextSelectedPromptKeys);
 			}
 		},
@@ -884,6 +940,7 @@ export function useAssistantContextState(): AssistantContextController {
 
 		selectedModel,
 		allOptions,
+		modelOptionsLoaded: optionsLoaded,
 
 		isHybridReasoningEnabled,
 		includePreviousMessages,
@@ -921,6 +978,7 @@ export function useAssistantContextState(): AssistantContextController {
 		applyAdvancedModel,
 
 		restoreConversationContext,
+		resetForNewConversation,
 		verbosityEnabled,
 		reasoningLevelOptions,
 	};

@@ -1,12 +1,16 @@
-import { type SetStateAction, useCallback, useState } from 'react';
+import { type SetStateAction, useCallback, useRef, useState } from 'react';
 
-import { FiRefreshCcw, FiSliders } from 'react-icons/fi';
+import { FiSliders } from 'react-icons/fi';
 
 import { ReasoningType } from '@/spec/inference';
 import { type UIChatOption } from '@/spec/modelpreset';
 
 import { AdvancedParamsModal } from '@/chats/inputarea/assitantcontexts/advanced_params_modal';
 import { AssistantPresetDropdown } from '@/chats/inputarea/assitantcontexts/assistant_preset_dropdown';
+import type {
+	AssistantPresetOptionItem,
+	AssistantPresetPreparedApplication,
+} from '@/chats/inputarea/assitantcontexts/assistant_preset_runtime';
 import { AssistantPresetViewModal } from '@/chats/inputarea/assitantcontexts/assistant_preset_view_modal';
 import { ModelDropdown } from '@/chats/inputarea/assitantcontexts/model_dropdown';
 import { OutputVerbosityDropdown } from '@/chats/inputarea/assitantcontexts/output_verbosity_dropdown';
@@ -25,6 +29,12 @@ type AssistantContextBarProps = {
 };
 
 type ContextBarMenuKey = 'assistant' | 'model' | 'secondary' | 'verbosity' | 'system' | 'previous' | null;
+
+type AssistantPresetViewState = {
+	option: AssistantPresetOptionItem | null;
+	preparedApplication: AssistantPresetPreparedApplication | null;
+	isActivePreset: boolean;
+};
 
 export function AssistantContextBar({ context, assistantPreset }: AssistantContextBarProps) {
 	const [openMenu, setOpenMenu] = useState<ContextBarMenuKey>(null);
@@ -86,6 +96,55 @@ export function AssistantContextBar({ context, assistantPreset }: AssistantConte
 		[setMenuOpen]
 	);
 
+	const [assistantPresetViewState, setAssistantPresetViewState] = useState<AssistantPresetViewState>({
+		option: null,
+		preparedApplication: null,
+		isActivePreset: false,
+	});
+	const assistantPresetViewRequestSeqRef = useRef(0);
+
+	const openAssistantPresetView = useCallback(
+		(option: AssistantPresetOptionItem) => {
+			setOpenMenu(null);
+
+			const activePresetKey =
+				assistantPreset.selectedPresetKey ?? assistantPreset.appliedPresetApplication?.presetKey ?? null;
+			const isActivePreset = activePresetKey === option.key;
+			const initialPreparedApplication =
+				isActivePreset && assistantPreset.appliedPresetApplication?.presetKey === option.key
+					? assistantPreset.appliedPresetApplication
+					: null;
+
+			setAssistantPresetViewState({
+				option,
+				preparedApplication: initialPreparedApplication,
+				isActivePreset,
+			});
+			setIsAssistantViewModalOpen(true);
+
+			if (initialPreparedApplication || !option.isSelectable) {
+				assistantPresetViewRequestSeqRef.current += 1;
+				return;
+			}
+
+			const requestSeq = assistantPresetViewRequestSeqRef.current + 1;
+			assistantPresetViewRequestSeqRef.current = requestSeq;
+
+			void (async () => {
+				try {
+					const prepared = await context.prepareAssistantPresetApplication(option.key);
+					if (!prepared || assistantPresetViewRequestSeqRef.current !== requestSeq) return;
+					setAssistantPresetViewState(current =>
+						current.option?.key === option.key ? { ...current, preparedApplication: prepared } : current
+					);
+				} catch (error) {
+					console.error('Failed to prepare assistant preset preview:', error);
+				}
+			})();
+		},
+		[assistantPreset.appliedPresetApplication, assistantPreset.selectedPresetKey, context]
+	);
+
 	return (
 		<div className="bg-base-200 mx-2 my-0 flex items-center justify-between gap-2 xl:mx-4">
 			<AssistantPresetDropdown
@@ -96,64 +155,24 @@ export function AssistantContextBar({ context, assistantPreset }: AssistantConte
 				error={assistantPreset.error}
 				actionError={assistantPreset.actionError}
 				isApplying={assistantPreset.isApplying}
+				basePresetKey={assistantPreset.basePresetKey}
+				selectedPresetModifiedLabels={assistantPreset.modificationSummary.modifiedLabels}
+				canResetToBasePreset={
+					assistantPreset.presetOptions.some(option => option.isSelectable) && !assistantPreset.isBasePresetSelected
+				}
 				isOpen={isAssistantDropdownOpen}
 				setIsOpen={setIsAssistantDropdownOpen}
+				onViewPreset={openAssistantPresetView}
+				onReapplySelectedPreset={() => {
+					setOpenMenu(null);
+					return assistantPreset.reapplySelectedPreset();
+				}}
+				onResetToBasePreset={() => {
+					setOpenMenu(null);
+					return assistantPreset.resetToBasePreset();
+				}}
 				onSelectPreset={assistantPreset.selectPreset}
-				onClearPreset={assistantPreset.clearSelectedPreset}
 			/>
-
-			{assistantPreset.selectedPreset ? (
-				<div className="flex items-center gap-1">
-					<button
-						type="button"
-						className="btn btn-xs btn-ghost text-neutral-custom"
-						onClick={() => {
-							setOpenMenu(null);
-							setIsAssistantViewModalOpen(true);
-						}}
-						title="View assistant preset details"
-					>
-						View
-					</button>
-
-					<div
-						className="tooltip tooltip-top"
-						data-tip={
-							assistantPreset.modificationSummary.any
-								? `Reapply preset-managed sections: ${assistantPreset.modificationSummary.modifiedLabels.join(', ')}`
-								: 'Preset-managed sections are already in sync'
-						}
-					>
-						<button
-							type="button"
-							className="btn btn-xs btn-ghost text-neutral-custom"
-							disabled={!assistantPreset.modificationSummary.any || assistantPreset.isApplying}
-							onClick={() => {
-								setOpenMenu(null);
-								void assistantPreset.reapplySelectedPreset();
-							}}
-							title="Reapply current assistant preset"
-						>
-							<FiRefreshCcw size={12} />
-						</button>
-					</div>
-
-					{assistantPreset.modificationSummary.any ? (
-						<span
-							className="badge badge-warning badge-xs"
-							title={`Modified sections: ${assistantPreset.modificationSummary.modifiedLabels.join(', ')}`}
-						>
-							Modified
-						</span>
-					) : null}
-
-					{assistantPreset.actionError ? (
-						<span className="badge badge-error badge-xs" title={assistantPreset.actionError}>
-							Error
-						</span>
-					) : null}
-				</div>
-			) : null}
 
 			<ModelDropdown
 				selectedModel={context.selectedModel}
@@ -276,11 +295,19 @@ export function AssistantContextBar({ context, assistantPreset }: AssistantConte
 			/>
 
 			<AssistantPresetViewModal
-				isOpen={isAssistantViewModalOpen && assistantPreset.appliedPresetApplication !== null}
+				isOpen={isAssistantViewModalOpen && assistantPresetViewState.option !== null}
 				onClose={() => {
+					assistantPresetViewRequestSeqRef.current += 1;
 					setIsAssistantViewModalOpen(false);
+					setAssistantPresetViewState({
+						option: null,
+						preparedApplication: null,
+						isActivePreset: false,
+					});
 				}}
-				appliedPresetApplication={assistantPreset.appliedPresetApplication}
+				viewedPreset={assistantPresetViewState.option}
+				viewedPresetApplication={assistantPresetViewState.preparedApplication}
+				isActivePresetView={assistantPresetViewState.isActivePreset}
 				currentRuntimeSnapshot={assistantPreset.runtimeSnapshot}
 				currentModel={context.selectedModel}
 				currentIncludeModelSystemPrompt={context.includeModelDefault}
