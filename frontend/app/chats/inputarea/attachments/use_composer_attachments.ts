@@ -241,7 +241,6 @@ export function useComposerAttachments({
 				return [...prev, ...added];
 			});
 
-			setDirectoryGroups(prev => [...prev]);
 			setDirectoryGroups(prev => {
 				const existingIndex = prev.findIndex(group => group.dirPath === dirPath);
 

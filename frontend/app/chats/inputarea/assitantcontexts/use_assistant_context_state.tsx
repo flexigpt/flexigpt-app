@@ -21,7 +21,11 @@ import {
 	loadSkillOptions,
 	loadToolOptions,
 } from '@/assistantpresets/lib/assistant_preset_catalog';
-import { buildSkillRefKey, buildToolRefKey } from '@/assistantpresets/lib/assistant_preset_utils';
+import {
+	buildModelPresetRefKey,
+	buildSkillRefKey,
+	buildToolRefKey,
+} from '@/assistantpresets/lib/assistant_preset_utils';
 import {
 	applyAssistantPresetModelPatch,
 	type AssistantPresetOptionItem,
@@ -330,6 +334,7 @@ export type AssistantContextController = {
 export function useAssistantContextState(): AssistantContextController {
 	const [selectedModel, setSelectedModel] = useState(DefaultUIChatOptions);
 	const [allOptions, setAllOptions] = useState([DefaultUIChatOptions]);
+	const [optionsLoaded, setOptionsLoaded] = useState(false);
 
 	const [isHybridReasoningEnabled, setIsHybridReasoningEnabled] = useState(true);
 	const [includePreviousMessages, setIncludePreviousMessages] = useState<IncludePreviousMessages>(
@@ -343,7 +348,6 @@ export function useAssistantContextState(): AssistantContextController {
 	const isHybridReasoningEnabledRef = useRef(isHybridReasoningEnabled);
 	const allOptionsRef = useRef(allOptions);
 	const defaultLoadedOptionRef = useRef(DefaultUIChatOptions);
-	const optionsLoadedRef = useRef(false);
 	const pendingRestoreContextRef = useRef<RestorableConversationContext | null>(null);
 
 	useEffect(() => {
@@ -370,11 +374,43 @@ export function useAssistantContextState(): AssistantContextController {
 	} = useSystemPrompts();
 
 	const {
-		presetOptions: assistantPresetOptions,
+		presetOptions: rawAssistantPresetOptions,
 		loading: assistantPresetsLoading,
 		error: assistantPresetError,
 		refreshPresets: refreshAssistantPresets,
 	} = useAssistantPresets();
+
+	const assistantPresetOptions = useMemo(() => {
+		// Before model options finish loading, keep the raw preset catalog state.
+		if (!optionsLoaded) {
+			return rawAssistantPresetOptions;
+		}
+
+		const selectableModelPresetKeys = new Set(
+			allOptions.map(option =>
+				buildModelPresetRefKey({
+					providerName: option.providerName,
+					modelPresetID: option.modelPresetID,
+				})
+			)
+		);
+
+		return rawAssistantPresetOptions.map(option => {
+			if (!option.isSelectable) return option;
+
+			const startingModelPresetRef = option.preset.startingModelPresetRef;
+			if (!startingModelPresetRef) return option;
+
+			const modelKey = buildModelPresetRefKey(startingModelPresetRef);
+			if (selectableModelPresetKeys.has(modelKey)) return option;
+
+			return {
+				...option,
+				isSelectable: false,
+				availabilityReason: `Starting model preset "${modelKey}" is not currently selectable in chat (disabled, missing API key, or unavailable).`,
+			};
+		});
+	}, [allOptions, optionsLoaded, rawAssistantPresetOptions]);
 
 	const syntheticPreviousConversationPrompt = useMemo(() => {
 		const prompt = restoredConversationSystemPrompt?.trim();
@@ -461,11 +497,11 @@ export function useAssistantContextState(): AssistantContextController {
 	const restoreConversationContext = useCallback(
 		(context: RestorableConversationContext) => {
 			pendingRestoreContextRef.current = context;
-			if (!optionsLoadedRef.current) return;
+			if (!optionsLoaded) return;
 			applyRestoredConversationContext(context, allOptionsRef.current);
 			pendingRestoreContextRef.current = null;
 		},
-		[applyRestoredConversationContext]
+		[applyRestoredConversationContext, optionsLoaded]
 	);
 
 	const applySelectedModel = useCallback(
@@ -514,7 +550,7 @@ export function useAssistantContextState(): AssistantContextController {
 			setAllOptions(r.allOptions);
 			allOptionsRef.current = r.allOptions;
 			defaultLoadedOptionRef.current = nextSelectedModel;
-			optionsLoadedRef.current = true;
+			setOptionsLoaded(true);
 
 			const pendingRestore = pendingRestoreContextRef.current;
 			if (pendingRestore) {
@@ -637,7 +673,7 @@ export function useAssistantContextState(): AssistantContextController {
 			let hasModelSelection = false;
 
 			if (preset.startingModelPresetRef) {
-				if (!optionsLoadedRef.current) {
+				if (!optionsLoaded) {
 					throw new Error('Model presets are still loading. Try again in a moment.');
 				}
 
@@ -811,7 +847,7 @@ export function useAssistantContextState(): AssistantContextController {
 				},
 			};
 		},
-		[assistantPresetOptions, refreshPrompts]
+		[assistantPresetOptions, optionsLoaded, refreshPrompts]
 	);
 
 	const applyPreparedAssistantPreset = useCallback(

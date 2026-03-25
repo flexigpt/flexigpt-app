@@ -10,7 +10,7 @@ import { OutputFormatKind, ReasoningLevel, ReasoningType } from '@/spec/inferenc
 import type { AssistantModelPresetOption } from '@/spec/modelpreset';
 import type { AssistantInstructionTemplateOption } from '@/spec/prompt';
 import type { AssistantSkillOption } from '@/spec/skill';
-import type { AssistantToolOption } from '@/spec/tool';
+import { type AssistantToolOption, ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
 import { parseOptionalNumber, parsePositiveInteger } from '@/lib/obj_utils';
 import { validateSlug } from '@/lib/text_utils';
@@ -439,6 +439,33 @@ function getEffectiveOptionKey(availableOptions: readonly SimpleSelectableOption
 	return availableOptions.some(option => option.key === requestedKey) ? requestedKey : availableOptions[0].key;
 }
 
+function getAssistantPresetToolModelCompatibilityError(
+	toolOption: AssistantToolOption,
+	modelOption?: AssistantModelPresetOption
+): string | undefined {
+	if (!modelOption) {
+		return undefined;
+	}
+
+	if (toolOption.toolDefinition.type !== ToolImplType.SDK) {
+		return undefined;
+	}
+
+	const requiredSDKType = toolOption.toolDefinition.sdkImpl?.sdkType?.trim();
+	const toolLabel =
+		toolOption.toolDefinition.displayName || toolOption.toolDefinition.slug || toolOption.toolDefinition.id;
+
+	if (!requiredSDKType) {
+		return `Tool "${toolLabel}" is missing SDK metadata and cannot be applied safely.`;
+	}
+
+	if (requiredSDKType !== (modelOption.providerPreset.sdkType as string)) {
+		return `Tool "${toolLabel}" requires provider SDK "${requiredSDKType}", but the selected starting model uses "${modelOption.providerPreset.sdkType}".`;
+	}
+
+	return undefined;
+}
+
 function AddEditAssistantPresetModalContent({
 	onClose,
 	onSubmit,
@@ -535,6 +562,9 @@ function AddEditAssistantPresetModalContent({
 	const instructionOptionByKey = useMemo(() => createOptionMap(instructionOptions), [instructionOptions]);
 	const toolOptionByKey = useMemo(() => createOptionMap(toolOptions), [toolOptions]);
 	const skillOptionByKey = useMemo(() => createOptionMap(skillOptions), [skillOptions]);
+	const selectedStartingModelOption = formData.startingModelPresetKey
+		? modelOptionByKey.get(formData.startingModelPresetKey)
+		: undefined;
 
 	const availableInstructionOptions = useMemo<SimpleSelectableOption[]>(() => {
 		const selected = new Set(formData.startingInstructionTemplateRefs.map(ref => buildPromptTemplateRefKey(ref)));
@@ -549,14 +579,28 @@ function AddEditAssistantPresetModalContent({
 
 	const availableToolOptions = useMemo<SimpleSelectableOption[]>(() => {
 		const selected = new Set(formData.startingToolSelections.map(selection => buildToolRefKey(selection.toolRef)));
+		const hasSelectedWebSearchTool = formData.startingToolSelections.some(selection => {
+			const option = toolOptionByKey.get(buildToolRefKey(selection.toolRef));
+			return option?.toolDefinition.llmToolType === ToolStoreChoiceType.WebSearch;
+		});
 
 		return toolOptions
-			.filter(option => option.isSelectable && !selected.has(option.key))
+			.filter(option => {
+				if (!option.isSelectable || selected.has(option.key)) {
+					return false;
+				}
+
+				if (hasSelectedWebSearchTool && option.toolDefinition.llmToolType === ToolStoreChoiceType.WebSearch) {
+					return false;
+				}
+
+				return getAssistantPresetToolModelCompatibilityError(option, selectedStartingModelOption) === undefined;
+			})
 			.map(option => ({
 				key: option.key,
 				label: option.label,
 			}));
-	}, [toolOptions, formData.startingToolSelections]);
+	}, [formData.startingToolSelections, toolOptions, toolOptionByKey, selectedStartingModelOption]);
 
 	const availableSkillOptions = useMemo<SimpleSelectableOption[]>(() => {
 		const selected = new Set(formData.startingEnabledSkillRefs.map(ref => buildSkillRefKey(ref)));
@@ -732,6 +776,9 @@ function AddEditAssistantPresetModalContent({
 				if (new Set(keys).size !== keys.length) {
 					nextErrors.startingToolSelections = 'Tool selections must be unique.';
 				} else {
+					const selectedModelOption = state.startingModelPresetKey
+						? modelOptionByKey.get(state.startingModelPresetKey)
+						: undefined;
 					const invalidTool = state.startingToolSelections.find(selection => {
 						const option = toolOptionByKey.get(buildToolRefKey(selection.toolRef));
 						return !option || !option.isSelectable;
@@ -740,6 +787,34 @@ function AddEditAssistantPresetModalContent({
 					if (invalidTool) {
 						nextErrors.startingToolSelections = 'Every selected tool must still exist and be enabled.';
 					} else {
+						const webSearchToolCount = state.startingToolSelections.reduce((count, selection) => {
+							const option = toolOptionByKey.get(buildToolRefKey(selection.toolRef));
+							return count + (option?.toolDefinition.llmToolType === ToolStoreChoiceType.WebSearch ? 1 : 0);
+						}, 0);
+
+						if (webSearchToolCount > 1) {
+							nextErrors.startingToolSelections =
+								'Only one web-search tool may be selected in an assistant preset. The chat runtime currently restores a single active web-search configuration.';
+						}
+					}
+
+					if (!nextErrors.startingToolSelections && selectedModelOption) {
+						const incompatibleToolSelection = state.startingToolSelections.find(selection => {
+							const option = toolOptionByKey.get(buildToolRefKey(selection.toolRef));
+							return option
+								? getAssistantPresetToolModelCompatibilityError(option, selectedModelOption) !== undefined
+								: false;
+						});
+
+						if (incompatibleToolSelection) {
+							const option = toolOptionByKey.get(buildToolRefKey(incompatibleToolSelection.toolRef));
+							nextErrors.startingToolSelections =
+								(option && getAssistantPresetToolModelCompatibilityError(option, selectedModelOption)) ??
+								'Selected tool is not compatible with the chosen starting model.';
+						}
+					}
+
+					if (!nextErrors.startingToolSelections) {
 						const invalidArgsSelection = state.startingToolSelections.find(selection => {
 							const option = toolOptionByKey.get(buildToolRefKey(selection.toolRef));
 							const raw = selection.userArgSchemaInstance.trim();
@@ -805,9 +880,7 @@ function AddEditAssistantPresetModalContent({
 		return getSuggestedNextVersion(initialData, existingPresets);
 	}, [initialData, existingPresets]);
 
-	const currentModelOption = formData.startingModelPresetKey
-		? modelOptionByKey.get(formData.startingModelPresetKey)
-		: undefined;
+	const currentModelOption = selectedStartingModelOption;
 
 	const hasMissingSelectedModel = Boolean(formData.startingModelPresetKey) && currentModelOption === undefined;
 

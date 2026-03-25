@@ -55,6 +55,10 @@ export function useAssistantPresetManager(args: {
 	});
 	const [isApplying, setIsApplying] = useState(false);
 	const applyRequestSeqRef = useRef(0);
+	const invalidatePendingApply = useCallback(() => {
+		applyRequestSeqRef.current += 1;
+		setIsApplying(false);
+	}, []);
 
 	const hasMissingSelectedPreset =
 		selectionState.selectedPresetKey !== null &&
@@ -159,12 +163,13 @@ export function useAssistantPresetManager(args: {
 	}, [appliedPresetApplication?.presetKey, applyPresetByKey, selectedPresetKey]);
 
 	const clearSelectedPreset = useCallback(() => {
+		invalidatePendingApply();
 		setSelectionState({
 			selectedPresetKey: null,
 			appliedPresetApplication: null,
 			actionError: null,
 		});
-	}, []);
+	}, [invalidatePendingApply]);
 
 	return {
 		presetOptions: context.assistantPresetOptions,

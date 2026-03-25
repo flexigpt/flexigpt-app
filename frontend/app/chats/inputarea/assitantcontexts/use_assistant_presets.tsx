@@ -174,7 +174,7 @@ export function useAssistantPresets() {
 				false
 			);
 
-			const fullResults = await Promise.all(
+			const fullResults = await Promise.allSettled(
 				listItems.map(async item => {
 					const preset = await assistantPresetStoreAPI.getAssistantPreset(
 						item.bundleID,
@@ -189,7 +189,13 @@ export function useAssistantPresets() {
 				})
 			);
 
-			const nextOptions: AssistantPresetOptionItem[] = fullResults.flatMap(({ item, preset }) => {
+			const nextOptions: AssistantPresetOptionItem[] = fullResults.flatMap(result => {
+				if (result.status !== 'fulfilled') {
+					console.error('Failed to load assistant preset:', result.reason);
+					return [];
+				}
+
+				const { item, preset } = result.value;
 				if (!preset) {
 					return [];
 				}
