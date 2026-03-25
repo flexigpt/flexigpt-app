@@ -31,7 +31,7 @@ export interface AssistantPreset {
 	isEnabled: boolean;
 	isBuiltIn: boolean;
 	startingModelPresetRef?: ModelPresetRef;
-	startingModelPresetPatch?: ModelPresetPatch;
+	startingModelPresetPatch?: AssistantPresetStartingModelPresetPatch;
 	startingIncludeModelSystemPrompt?: boolean;
 	startingInstructionTemplateRefs?: PromptTemplateRef[];
 	startingToolSelections?: ToolSelection[];

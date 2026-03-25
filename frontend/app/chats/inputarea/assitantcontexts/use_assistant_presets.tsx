@@ -33,6 +33,10 @@ export function useAssistantPresets() {
 
 		try {
 			const bundles = await getAllAssistantPresetBundles(undefined, false);
+			if (bundles.length === 0) {
+				setPresetOptions([]);
+				return;
+			}
 			const bundleByID = new Map(bundles.map(bundle => [bundle.id, bundle]));
 
 			const listItems = await getAllAssistantPresetListItems(

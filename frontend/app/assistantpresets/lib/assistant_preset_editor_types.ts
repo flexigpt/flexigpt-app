@@ -95,4 +95,5 @@ export interface ToolSelectionDisplayItem extends OrderedDisplayItem {
 	autoExecuteLabel: string;
 	userArgSchemaInstance: string;
 	userArgsHint: string;
+	userArgsEditable: boolean;
 }

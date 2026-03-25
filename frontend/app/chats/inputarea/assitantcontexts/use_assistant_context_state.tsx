@@ -154,19 +154,15 @@ function resolveRestoredSelectedModel(
 		? allOptions.find(option => option.providerName === modelPresetRef.providerName)
 		: undefined;
 
-	const seed = providerMatch ?? fallbackSelectedModel ?? allOptions[0] ?? DefaultUIChatOptions;
-
-	const fallbackBase: UIChatOption = {
-		...seed,
-		providerName: modelPresetRef?.providerName ?? seed.providerName,
-		modelPresetID: modelPresetRef?.modelPresetID ?? seed.modelPresetID,
-		providerDisplayName: providerMatch?.providerDisplayName ?? modelPresetRef?.providerName ?? seed.providerDisplayName,
-		modelDisplayName: modelParam?.name?.trim() || modelPresetRef?.modelPresetID || seed.modelDisplayName,
-		name: modelParam?.name ?? seed.name,
-		systemPrompt: '',
-	};
-
-	return applyPersistedModelParamToSelectedModel(fallbackBase, modelParam);
+	// IMPORTANT:
+	// If the exact conversation model preset is no longer selectable (disabled,
+	// deleted, no API key, etc.), do NOT project its stale provider/model IDs
+	// back into selectedModel. That re-selects a non-existent option in UI state.
+	//
+	// Instead, restore onto a real available option and only carry over the
+	// persisted model params as best-effort advanced settings.
+	const fallbackAvailable = providerMatch ?? fallbackSelectedModel ?? allOptions[0] ?? DefaultUIChatOptions;
+	return applyPersistedModelParamToSelectedModel(fallbackAvailable, modelParam);
 }
 
 function buildPreviousConversationSystemPromptItem(prompt: string): SystemPromptItem {
@@ -363,6 +359,11 @@ export function useAssistantContextState(): AssistantContextController {
 	);
 
 	const promptsByKey = useMemo(() => new Map(prompts.map(item => [item.identityKey, item])), [prompts]);
+	const promptsByKeyRef = useRef(promptsByKey);
+
+	useEffect(() => {
+		promptsByKeyRef.current = promptsByKey;
+	}, [promptsByKey]);
 
 	const selectedPromptKeys = useMemo(
 		() => rawSelectedPromptKeys.filter(key => promptsByKey.has(key)),
@@ -457,6 +458,11 @@ export function useAssistantContextState(): AssistantContextController {
 				? isHybridReasoningModel(nextSelectedModel)
 				: currentIsHybridReasoningEnabled;
 
+			// Keep refs in sync immediately so same-tick follow-up logic
+			// cannot read stale selected model / reasoning mode.
+			selectedModelRef.current = nextSelectedModel;
+			isHybridReasoningEnabledRef.current = nextIsHybridReasoningEnabled;
+
 			setSelectedModel(nextSelectedModel);
 
 			if (nextIsHybridReasoningEnabled !== currentIsHybridReasoningEnabled) {
@@ -511,6 +517,7 @@ export function useAssistantContextState(): AssistantContextController {
 		const currentIsHybridReasoningEnabled = isHybridReasoningEnabledRef.current;
 		const nextIsHybridReasoningEnabled =
 			typeof action === 'function' ? action(currentIsHybridReasoningEnabled) : action;
+		isHybridReasoningEnabledRef.current = nextIsHybridReasoningEnabled;
 		setIsHybridReasoningEnabled(nextIsHybridReasoningEnabled);
 	}, []);
 

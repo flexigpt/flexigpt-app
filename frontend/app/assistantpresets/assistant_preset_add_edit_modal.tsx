@@ -708,15 +708,20 @@ function AddEditAssistantPresetModalContent({
 						nextErrors.startingToolSelections = 'Every selected tool must still exist and be enabled.';
 					} else {
 						const invalidArgsSelection = state.startingToolSelections.find(selection => {
+							const option = toolOptionByKey.get(buildToolRefKey(selection.toolRef));
 							const raw = selection.userArgSchemaInstance.trim();
 							if (!raw) return false;
+							if (!option?.hasUserArgSchema) return true;
 
 							const parsed = tryParseJSONRaw(raw);
 							return !parsed.ok;
 						});
 
 						if (invalidArgsSelection) {
-							nextErrors.startingToolSelections = 'Tool user-args instances must be valid JSON.';
+							const option = toolOptionByKey.get(buildToolRefKey(invalidArgsSelection.toolRef));
+							nextErrors.startingToolSelections = option?.hasUserArgSchema
+								? 'Tool user-args instances must be valid JSON.'
+								: 'Tool args may only be provided for tools that expose a user-args schema.';
 						}
 					}
 				}
@@ -839,6 +844,8 @@ function AddEditAssistantPresetModalContent({
 			formData.startingToolSelections.map(selection => {
 				const key = buildToolRefKey(selection.toolRef);
 				const option = toolOptionByKey.get(key);
+				const hasStaleArgsWithoutSchema =
+					selection.userArgSchemaInstance.trim().length > 0 && option !== undefined && !option.hasUserArgSchema;
 
 				return {
 					key,
@@ -849,16 +856,22 @@ function AddEditAssistantPresetModalContent({
 						? `${option.toolType} · ${option.bundleDisplayName}`
 						: 'Reference no longer exists in catalog.',
 					statusLabel: option
-						? option.isSelectable
-							? undefined
-							: (option.availabilityReason ?? 'Unavailable')
+						? hasStaleArgsWithoutSchema
+							? 'Args schema missing'
+							: option.isSelectable
+								? undefined
+								: (option.availabilityReason ?? 'Unavailable')
 						: 'Missing reference',
+
 					autoExecuteMode: selection.autoExecuteMode,
 					autoExecuteLabel: getToolAutoExecuteLabel(selection.autoExecuteMode),
 					userArgSchemaInstance: selection.userArgSchemaInstance,
 					userArgsHint: option?.hasUserArgSchema
 						? 'This tool exposes a user-args schema.'
-						: 'Optional raw JSON instance. Assistant presets save refs and patch only.',
+						: hasStaleArgsWithoutSchema
+							? 'This preset still contains saved args, but the tool no longer exposes a user-args schema.'
+							: 'This tool does not expose a user-args schema.',
+					userArgsEditable: option?.hasUserArgSchema ?? false,
 				};
 			}),
 		[formData.startingToolSelections, toolOptionByKey]
@@ -1098,8 +1111,9 @@ function AddEditAssistantPresetModalContent({
 			}
 
 			const startingToolSelections = formData.startingToolSelections.map(selection => {
+				const toolOption = toolOptionByKey.get(buildToolRefKey(selection.toolRef));
 				const autoExecute = triStateToBoolean(selection.autoExecuteMode);
-				const userArgSchemaInstance = selection.userArgSchemaInstance.trim();
+				const userArgSchemaInstance = toolOption?.hasUserArgSchema ? selection.userArgSchemaInstance.trim() : '';
 
 				const toolChoicePatch =
 					autoExecute === undefined && !userArgSchemaInstance
