@@ -1,8 +1,8 @@
-import type { ModelPresetRef, ProviderPreset } from '@/spec/modelpreset';
-import type { PromptTemplateRef } from '@/spec/prompt';
+import type { AssistantModelPresetOption, ModelPresetRef, ProviderPreset } from '@/spec/modelpreset';
+import type { AssistantInstructionTemplateOption, PromptTemplateRef } from '@/spec/prompt';
 import { PromptTemplateKind } from '@/spec/prompt';
-import type { SkillRef, SkillType } from '@/spec/skill';
-import type { ToolRef, ToolStoreChoiceType } from '@/spec/tool';
+import type { AssistantSkillOption, SkillRef } from '@/spec/skill';
+import type { AssistantToolOption, ToolRef } from '@/spec/tool';
 
 import { modelPresetStoreAPI, promptStoreAPI, skillStoreAPI, toolStoreAPI } from '@/apis/baseapi';
 
@@ -13,82 +13,11 @@ import {
 } from '@/assistantpresets/lib/assistant_preset_utils';
 import { buildPromptTemplateRefKey } from '@/prompts/lib/prompt_template_ref';
 
-export interface ModelPresetOption {
-	key: string;
-	label: string;
-	ref: ModelPresetRef;
-	providerName: string;
-	providerDisplayName: string;
-	modelPresetID: string;
-	modelDisplayName: string;
-	isBuiltIn: boolean;
-	isSelectable: boolean;
-	isProviderEnabled: boolean;
-	isModelEnabled: boolean;
-	availabilityReason?: string;
-}
-
-export interface InstructionTemplateOption {
-	key: string;
-	label: string;
-	ref: PromptTemplateRef;
-	bundleID: string;
-	bundleSlug: string;
-	bundleDisplayName: string;
-	displayName: string;
-	templateSlug: string;
-	version: string;
-	isBuiltIn: boolean;
-	isSelectable: boolean;
-	isBundleEnabled: boolean;
-	isTemplateEnabled: boolean;
-	isResolved: boolean;
-	availabilityReason?: string;
-}
-
-export interface ToolOption {
-	key: string;
-	label: string;
-	toolRef: ToolRef;
-	bundleID: string;
-	bundleSlug: string;
-	bundleDisplayName: string;
-	displayName: string;
-	toolSlug: string;
-	version: string;
-	toolType: ToolStoreChoiceType;
-	autoExecReco: boolean;
-	hasUserArgSchema: boolean;
-	isBuiltIn: boolean;
-	isSelectable: boolean;
-	isBundleEnabled: boolean;
-	isToolEnabled: boolean;
-	availabilityReason?: string;
-}
-
-export interface SkillOption {
-	key: string;
-	label: string;
-	ref: SkillRef;
-	bundleID: string;
-	bundleSlug: string;
-	bundleDisplayName: string;
-	displayName: string;
-	skillSlug: string;
-	skillID: string;
-	skillType: SkillType;
-	isBuiltIn: boolean;
-	isSelectable: boolean;
-	isBundleEnabled: boolean;
-	isSkillEnabled: boolean;
-	availabilityReason?: string;
-}
-
 export interface AssistantPresetEditorCatalog {
-	modelPresetOptions: ModelPresetOption[];
-	instructionTemplateOptions: InstructionTemplateOption[];
-	toolOptions: ToolOption[];
-	skillOptions: SkillOption[];
+	modelPresetOptions: AssistantModelPresetOption[];
+	instructionTemplateOptions: AssistantInstructionTemplateOption[];
+	toolOptions: AssistantToolOption[];
+	skillOptions: AssistantSkillOption[];
 }
 
 async function collectAllPages<TResponse, TItem>(
@@ -141,14 +70,14 @@ function getModelAvailabilityReason(provider: ProviderPreset, modelEnabled: bool
 	return undefined;
 }
 
-async function loadModelPresetOptions(): Promise<ModelPresetOption[]> {
+async function loadModelPresetOptions(): Promise<AssistantModelPresetOption[]> {
 	const providers = await collectAllPages(
 		pageToken => modelPresetStoreAPI.listProviderPresets(undefined, true, 200, pageToken),
 		response => response.providers,
 		response => response.nextPageToken
 	);
 
-	const options: ModelPresetOption[] = [];
+	const options: AssistantModelPresetOption[] = [];
 
 	for (const provider of providers) {
 		for (const model of Object.values(provider.modelPresets ?? {})) {
@@ -162,10 +91,9 @@ async function loadModelPresetOptions(): Promise<ModelPresetOption[]> {
 			options.push({
 				key: buildModelPresetRefKey(ref),
 				ref,
-				providerName: provider.name,
-				providerDisplayName: provider.displayName || provider.name,
-				modelPresetID: model.id,
-				modelDisplayName: model.displayName || model.name,
+				providerPreset: provider,
+				modelPreset: model,
+
 				isBuiltIn: model.isBuiltIn,
 				isProviderEnabled: provider.isEnabled,
 				isModelEnabled: model.isEnabled,
@@ -179,7 +107,7 @@ async function loadModelPresetOptions(): Promise<ModelPresetOption[]> {
 	return sortByBuiltInThenLabel(options);
 }
 
-async function loadInstructionTemplateOptions(): Promise<InstructionTemplateOption[]> {
+export async function loadInstructionTemplateOptions(): Promise<AssistantInstructionTemplateOption[]> {
 	const [promptBundles, listItems] = await Promise.all([
 		collectAllPages(
 			pageToken => promptStoreAPI.listPromptBundles(undefined, true, 200, pageToken),
@@ -208,7 +136,7 @@ async function loadInstructionTemplateOptions(): Promise<InstructionTemplateOpti
 		listItems.map(item => promptStoreAPI.getPromptTemplate(item.bundleID, item.templateSlug, item.templateVersion))
 	);
 
-	const options: InstructionTemplateOption[] = [];
+	const options: AssistantInstructionTemplateOption[] = [];
 
 	fullTemplates.forEach((template, index) => {
 		if (!template) {
@@ -245,12 +173,11 @@ async function loadInstructionTemplateOptions(): Promise<InstructionTemplateOpti
 		options.push({
 			key: buildPromptTemplateRefKey(ref),
 			ref,
-			bundleID: item.bundleID,
+			template,
+
 			bundleSlug: bundle?.slug || item.bundleSlug || item.bundleID,
 			bundleDisplayName,
-			displayName: template.displayName || template.slug,
-			templateSlug: template.slug,
-			version: template.version,
+
 			isBuiltIn: template.isBuiltIn,
 			isBundleEnabled,
 			isTemplateEnabled,
@@ -264,7 +191,7 @@ async function loadInstructionTemplateOptions(): Promise<InstructionTemplateOpti
 	return sortByBuiltInThenLabel(options);
 }
 
-async function loadToolOptions(): Promise<ToolOption[]> {
+export async function loadToolOptions(): Promise<AssistantToolOption[]> {
 	const [toolBundles, toolListItems] = await Promise.all([
 		collectAllPages(
 			pageToken => toolStoreAPI.listToolBundles(undefined, true, 200, pageToken),
@@ -280,7 +207,7 @@ async function loadToolOptions(): Promise<ToolOption[]> {
 
 	const bundleByID = new Map(toolBundles.map(bundle => [bundle.id, bundle]));
 
-	const options: ToolOption[] = toolListItems.map(item => {
+	const options: AssistantToolOption[] = toolListItems.map(item => {
 		const bundle = bundleByID.get(item.bundleID);
 		const tool = item.toolDefinition;
 
@@ -305,14 +232,11 @@ async function loadToolOptions(): Promise<ToolOption[]> {
 		return {
 			key: buildToolRefKey(toolRef),
 			toolRef,
-			bundleID: item.bundleID,
+			toolDefinition: tool,
+
 			bundleSlug: bundle?.slug || item.bundleSlug || item.bundleID,
 			bundleDisplayName,
-			displayName: tool.displayName || tool.slug,
-			toolSlug: tool.slug,
-			version: tool.version,
-			toolType: tool.llmToolType,
-			autoExecReco: tool.autoExecReco,
+
 			hasUserArgSchema: Boolean(tool.userArgSchema),
 			isBuiltIn: tool.isBuiltIn,
 			isBundleEnabled,
@@ -326,7 +250,7 @@ async function loadToolOptions(): Promise<ToolOption[]> {
 	return sortByBuiltInThenLabel(options);
 }
 
-async function loadSkillOptions(): Promise<SkillOption[]> {
+export async function loadSkillOptions(): Promise<AssistantSkillOption[]> {
 	const [skillBundles, skillListItems] = await Promise.all([
 		collectAllPages(
 			pageToken => skillStoreAPI.listSkillBundles(undefined, true, 200, pageToken),
@@ -342,7 +266,7 @@ async function loadSkillOptions(): Promise<SkillOption[]> {
 
 	const bundleByID = new Map(skillBundles.map(bundle => [bundle.id, bundle]));
 
-	const options: SkillOption[] = skillListItems.map(item => {
+	const options: AssistantSkillOption[] = skillListItems.map(item => {
 		const bundle = bundleByID.get(item.bundleID);
 		const skill = item.skillDefinition;
 
@@ -367,13 +291,11 @@ async function loadSkillOptions(): Promise<SkillOption[]> {
 		return {
 			key: buildSkillRefKey(ref),
 			ref,
-			bundleID: item.bundleID,
+			skillDefinition: skill,
+
 			bundleSlug: bundle?.slug || item.bundleSlug || item.bundleID,
 			bundleDisplayName,
-			displayName: skill.displayName || skill.name || skill.slug,
-			skillSlug: item.skillSlug,
-			skillID: skill.id,
-			skillType: skill.type,
+
 			isBuiltIn: skill.isBuiltIn,
 			isBundleEnabled,
 			isSkillEnabled,

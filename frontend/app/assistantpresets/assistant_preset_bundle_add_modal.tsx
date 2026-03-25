@@ -10,7 +10,7 @@ import { validateSlug } from '@/lib/text_utils';
 interface AddAssistantPresetBundleModalProps {
 	isOpen: boolean;
 	onClose: () => void;
-	onSubmit: (slug: string, display: string, description?: string) => void;
+	onSubmit: (slug: string, display: string, description?: string) => Promise<void>;
 	existingSlugs: string[];
 }
 
@@ -40,6 +40,8 @@ function AddAssistantPresetBundleModalContent({
 }: AddAssistantPresetBundleModalProps) {
 	const [formData, setFormData] = useState<BundleFormData>(() => getInitialFormData());
 	const [errors, setErrors] = useState<ErrorState>({});
+	const [submitError, setSubmitError] = useState('');
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const isUnmountingRef = useRef(false);
@@ -110,9 +112,10 @@ function AddAssistantPresetBundleModalContent({
 		return nextErrors;
 	};
 
-	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
+	const handleSubmit: SubmitEventHandler<HTMLFormElement> = async e => {
 		e.preventDefault();
 		e.stopPropagation();
+		if (isSubmitting) return;
 
 		const trimmed: BundleFormData = {
 			slug: formData.slug.trim(),
@@ -125,8 +128,16 @@ function AddAssistantPresetBundleModalContent({
 
 		if (Object.keys(nextErrors).length > 0) return;
 
-		onSubmit(trimmed.slug, trimmed.displayName, trimmed.description || undefined);
-		requestClose();
+		setSubmitError('');
+		setIsSubmitting(true);
+		try {
+			await onSubmit(trimmed.slug, trimmed.displayName, trimmed.description || undefined);
+			requestClose();
+		} catch (error) {
+			setSubmitError(error instanceof Error ? error.message : 'Failed to create assistant preset bundle.');
+		} finally {
+			setIsSubmitting(false);
+		}
 	};
 
 	const isFormValid = useMemo(
@@ -158,6 +169,14 @@ function AddAssistantPresetBundleModalContent({
 					</div>
 
 					<form noValidate onSubmit={handleSubmit} className="space-y-4">
+						{submitError && (
+							<div className="alert alert-error rounded-2xl text-sm">
+								<div className="flex items-center gap-2">
+									<FiAlertCircle size={14} />
+									<span>{submitError}</span>
+								</div>
+							</div>
+						)}
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
 								<span className="label-text text-sm">Bundle Slug*</span>
@@ -175,6 +194,7 @@ function AddAssistantPresetBundleModalContent({
 										const value = e.target.value;
 										setFormData(prev => ({ ...prev, slug: value }));
 										setErrors(prev => validateField('slug', value, prev));
+										if (submitError) setSubmitError('');
 									}}
 									spellCheck="false"
 									autoComplete="off"
@@ -205,6 +225,7 @@ function AddAssistantPresetBundleModalContent({
 										const value = e.target.value;
 										setFormData(prev => ({ ...prev, displayName: value }));
 										setErrors(prev => validateField('displayName', value, prev));
+										if (submitError) setSubmitError('');
 									}}
 									spellCheck="false"
 									autoComplete="off"
@@ -232,6 +253,7 @@ function AddAssistantPresetBundleModalContent({
 									onChange={e => {
 										const value = e.target.value;
 										setFormData(prev => ({ ...prev, description: value }));
+										if (submitError) setSubmitError('');
 									}}
 									spellCheck="false"
 								/>
@@ -242,8 +264,8 @@ function AddAssistantPresetBundleModalContent({
 							<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
 								Cancel
 							</button>
-							<button type="submit" className="btn btn-primary rounded-xl" disabled={!isFormValid}>
-								Create
+							<button type="submit" className="btn btn-primary rounded-xl" disabled={!isFormValid || isSubmitting}>
+								{isSubmitting ? 'Creating…' : 'Create'}
 							</button>
 						</div>
 					</form>

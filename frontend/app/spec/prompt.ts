@@ -91,3 +91,21 @@ export interface PromptTemplateListItem {
 	kind: PromptTemplateKind;
 	isResolved: boolean;
 }
+
+export interface AssistantInstructionTemplateOption {
+	key: string;
+	label: string;
+
+	ref: PromptTemplateRef;
+	template: PromptTemplate;
+
+	bundleSlug: string;
+	bundleDisplayName: string;
+
+	isBuiltIn: boolean;
+	isSelectable: boolean;
+	isBundleEnabled: boolean;
+	isTemplateEnabled: boolean;
+	isResolved: boolean;
+	availabilityReason?: string;
+}

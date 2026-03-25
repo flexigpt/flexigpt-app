@@ -31,3 +31,40 @@ export function dedupeStringArray(values: string[]): string[] {
 
 	return out;
 }
+
+export function arraysEqual(a: string[] = [], b: string[] = []): boolean {
+	if (a.length !== b.length) return false;
+	return a.every((value, index) => value === b[index]);
+}
+
+export function parsePositiveInteger(value: string): number | undefined {
+	const trimmed = value.trim();
+	if (!trimmed) return undefined;
+
+	const parsed = Number(trimmed);
+	if (!Number.isInteger(parsed) || parsed <= 0) {
+		return undefined;
+	}
+
+	return parsed;
+}
+
+export function parseOptionalNumber(val: string, defaultVal?: number): number | undefined {
+	const trimmed = val.trim();
+	if (trimmed === '' || !trimmed) {
+		if (defaultVal) {
+			return defaultVal;
+		}
+		return undefined;
+	}
+
+	const parsed = Number(trimmed);
+	if (Number.isNaN(parsed) || !Number.isFinite(parsed)) {
+		if (defaultVal) {
+			return defaultVal;
+		}
+		return undefined;
+	}
+
+	return parsed;
+}

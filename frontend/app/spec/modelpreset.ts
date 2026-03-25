@@ -9,6 +9,7 @@ import {
 
 export const PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY = '__conversation__:previous-system-prompt';
 export const PREVIOUS_CONVO_SYSTEM_PROMPT_BUNDLEID = '__conversation__';
+export const DEFAULT_REASONING_TOKENS = 1024;
 
 type ModelName = string;
 export type ModelDisplayName = string;
@@ -183,6 +184,21 @@ export interface UIChatOption extends ModelParam {
 	 * Model-level override wins over provider-level override.
 	 */
 	capabilitiesOverride?: ModelCapabilitiesOverride;
+}
+
+export interface AssistantModelPresetOption {
+	key: string;
+	label: string;
+
+	ref: ModelPresetRef;
+	providerPreset: ProviderPreset;
+	modelPreset: ModelPreset;
+
+	isBuiltIn: boolean;
+	isSelectable: boolean;
+	isProviderEnabled: boolean;
+	isModelEnabled: boolean;
+	availabilityReason?: string;
 }
 
 export const DefaultUIChatOptions: UIChatOption = {

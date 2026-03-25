@@ -1,5 +1,5 @@
-import { DefaultModelParams, type ModelParam, type ProviderName } from '@/spec/inference';
-import { DefaultUIChatOptions, type ModelPreset, type UIChatOption } from '@/spec/modelpreset';
+import { type ProviderName } from '@/spec/inference';
+import { DefaultUIChatOptions, type UIChatOption } from '@/spec/modelpreset';
 import { AuthKeyTypeProvider, type SettingsSchema } from '@/spec/setting';
 
 import { modelPresetStoreAPI, settingstoreAPI } from '@/apis/baseapi';
@@ -9,36 +9,10 @@ import {
 	mergeModelCapabilitiesOverride,
 	sanitizeUIChatOptionByCapabilities,
 } from '@/chats/inputarea/assitantcontexts/capabilities_override_helper';
+import { buildEffectiveModelParamFromModelPreset } from '@/modelpresets/lib/modelpreset_effective_defaults';
 
 function hasApiKey(settings: SettingsSchema, providerName: ProviderName): boolean {
 	return settings.authKeys.some(k => k.type === AuthKeyTypeProvider && k.keyName === providerName && k.nonEmpty);
-}
-
-// Ensure every optional field of `ModelParam` is filled.
-// Falls back to hard-coded defaults when the model preset does not specify a value.
-function buildModelParams(modelPreset: ModelPreset): ModelParam {
-	const o: ModelParam = {
-		name: modelPreset.name,
-		stream: modelPreset.stream ?? DefaultModelParams.stream,
-		maxPromptLength: modelPreset.maxPromptLength ?? DefaultModelParams.maxPromptLength,
-		maxOutputLength: modelPreset.maxOutputLength ?? DefaultModelParams.maxOutputLength,
-		systemPrompt: modelPreset.systemPrompt ?? DefaultModelParams.systemPrompt,
-		timeout: modelPreset.timeout ?? DefaultModelParams.timeout,
-
-		// Optional fields in modelparams
-		temperature: modelPreset.temperature,
-		reasoning: modelPreset.reasoning,
-
-		outputParam: modelPreset.outputParam ?? DefaultModelParams.outputParam,
-		stopSequences: modelPreset.stopSequences ?? DefaultModelParams.stopSequences,
-
-		additionalParametersRawJSON: modelPreset.additionalParametersRawJSON,
-	};
-
-	if (o.temperature === undefined && o.reasoning === undefined) {
-		o.temperature = DefaultModelParams.temperature;
-	}
-	return o;
 }
 
 export async function getChatInputOptions(): Promise<{
@@ -65,7 +39,7 @@ export async function getChatInputOptions(): Promise<{
 			for (const [modelPresetID, modelPreset] of Object.entries(providerPreset.modelPresets)) {
 				if (!modelPreset.isEnabled) continue;
 
-				const modelParams = buildModelParams(modelPreset);
+				const modelParams = buildEffectiveModelParamFromModelPreset(modelPreset);
 				const mergedCaps = mergeModelCapabilitiesOverride(
 					providerPreset.capabilitiesOverride,
 					modelPreset.capabilitiesOverride

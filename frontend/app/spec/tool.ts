@@ -250,3 +250,20 @@ export interface UIToolUserArgsStatus {
 	/** True when there is a schema and all required keys are satisfied */
 	isSatisfied: boolean;
 }
+
+export interface AssistantToolOption {
+	key: string;
+	label: string;
+	toolRef: ToolRef;
+	toolDefinition: Tool;
+
+	bundleSlug: string;
+	bundleDisplayName: string;
+
+	hasUserArgSchema: boolean;
+	isBuiltIn: boolean;
+	isSelectable: boolean;
+	isBundleEnabled: boolean;
+	isToolEnabled: boolean;
+	availabilityReason?: string;
+}

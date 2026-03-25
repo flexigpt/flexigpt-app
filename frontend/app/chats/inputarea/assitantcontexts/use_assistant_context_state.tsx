@@ -11,14 +11,17 @@ import {
 	type UIChatOption,
 } from '@/spec/modelpreset';
 import { type PromptBundle, PromptRoleEnum } from '@/spec/prompt';
-import { type Tool, type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
+import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
 import { dedupeStringArray } from '@/lib/obj_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
-import { toolStoreAPI } from '@/apis/baseapi';
-
-import { buildToolRefKey } from '@/assistantpresets/lib/assistant_preset_utils';
+import {
+	loadInstructionTemplateOptions,
+	loadSkillOptions,
+	loadToolOptions,
+} from '@/assistantpresets/lib/assistant_preset_catalog';
+import { buildSkillRefKey, buildToolRefKey } from '@/assistantpresets/lib/assistant_preset_utils';
 import {
 	applyAssistantPresetModelPatch,
 	type AssistantPresetOptionItem,
@@ -315,7 +318,6 @@ export function useAssistantContextState(): AssistantContextController {
 	const defaultLoadedOptionRef = useRef(DefaultUIChatOptions);
 	const optionsLoadedRef = useRef(false);
 	const pendingRestoreContextRef = useRef<RestorableConversationContext | null>(null);
-	const assistantPresetToolCacheRef = useRef(new Map<string, Tool | null>());
 
 	useEffect(() => {
 		selectedModelRef.current = selectedModel;
@@ -595,22 +597,6 @@ export function useAssistantContextState(): AssistantContextController {
 		setRawSelectedPromptKeys([]);
 	}, []);
 
-	const getAssistantPresetToolDefinition = useCallback(
-		async (bundleID: string, toolSlug: string, toolVersion: string) => {
-			const cacheKey = buildToolRefKey({ bundleID, toolSlug, toolVersion });
-			const cache = assistantPresetToolCacheRef.current;
-
-			if (cache.has(cacheKey)) {
-				return cache.get(cacheKey) ?? undefined;
-			}
-
-			const toolDefinition = await toolStoreAPI.getTool(bundleID, toolSlug, toolVersion);
-			cache.set(cacheKey, toolDefinition ?? null);
-			return toolDefinition ?? undefined;
-		},
-		[]
-	);
-
 	const prepareAssistantPresetApplication = useCallback(
 		async (presetKey: string): Promise<AssistantPresetPreparedApplication | null> => {
 			const option = assistantPresetOptions.find(item => item.key === presetKey);
@@ -658,10 +644,31 @@ export function useAssistantContextState(): AssistantContextController {
 
 			const hasInstructionTemplateSelection = (preset.startingInstructionTemplateRefs?.length ?? 0) > 0;
 			let nextSelectedPromptKeys = selectedPromptKeysRef.current;
-			if (hasInstructionTemplateSelection && preset.startingInstructionTemplateRefs) {
-				nextSelectedPromptKeys = dedupeStringArray(
-					preset.startingInstructionTemplateRefs.map(buildPromptTemplateRefKey)
+			if (hasInstructionTemplateSelection) {
+				const requestedPromptKeys = dedupeStringArray(
+					(preset.startingInstructionTemplateRefs ?? []).map(buildPromptTemplateRefKey)
 				);
+
+				const instructionOptions = await loadInstructionTemplateOptions();
+				const instructionOptionByKey = new Map(instructionOptions.map(item => [item.key, item] as const));
+
+				const invalidPromptKey = requestedPromptKeys.find(key => {
+					const promptOption = instructionOptionByKey.get(key);
+					return !promptOption || !promptOption.isSelectable;
+				});
+
+				if (invalidPromptKey) {
+					const invalidPromptOption = instructionOptionByKey.get(invalidPromptKey);
+					throw new Error(
+						invalidPromptOption?.availabilityReason ??
+							`Instruction template "${invalidPromptKey}" is not currently available.`
+					);
+				}
+
+				// Keep the prompt store in sync so selectedPromptKeys can immediately
+				// resolve to concrete prompt sources after apply.
+				await refreshPrompts();
+				nextSelectedPromptKeys = requestedPromptKeys;
 			}
 
 			const hasToolsSelection = Array.isArray(preset.startingToolSelections);
@@ -669,18 +676,35 @@ export function useAssistantContextState(): AssistantContextController {
 			const webSearchChoices: ToolStoreChoice[] = [];
 
 			if (hasToolsSelection) {
+				const toolOptions = await loadToolOptions();
+				const toolOptionByKey = new Map(toolOptions.map(item => [item.key, item] as const));
 				for (const selection of preset.startingToolSelections ?? []) {
-					const toolDefinition = await getAssistantPresetToolDefinition(
-						selection.toolRef.bundleID,
-						selection.toolRef.toolSlug,
-						selection.toolRef.toolVersion
-					);
-
-					if (!toolDefinition) {
+					const toolOption = toolOptionByKey.get(buildToolRefKey(selection.toolRef));
+					if (!toolOption || !toolOption.isSelectable) {
 						throw new Error(
-							`Tool "${selection.toolRef.bundleID}/${selection.toolRef.toolSlug}@${selection.toolRef.toolVersion}" is not currently available.`
+							toolOption?.availabilityReason ??
+								`Tool "${selection.toolRef.bundleID}/${selection.toolRef.toolSlug}@${selection.toolRef.toolVersion}" is not currently available.`
 						);
 					}
+
+					const rawUserArgs = selection.toolChoicePatch?.userArgSchemaInstance?.trim();
+					if (rawUserArgs && !toolOption.hasUserArgSchema) {
+						throw new Error(
+							`Tool "${selection.toolRef.bundleID}/${selection.toolRef.toolSlug}@${selection.toolRef.toolVersion}" no longer exposes user args, but this assistant preset still contains saved args for it.`
+						);
+					}
+
+					if (rawUserArgs) {
+						try {
+							JSON.parse(rawUserArgs);
+						} catch {
+							throw new Error(
+								`Tool "${selection.toolRef.bundleID}/${selection.toolRef.toolSlug}@${selection.toolRef.toolVersion}" contains invalid saved args JSON.`
+							);
+						}
+					}
+
+					const toolDefinition = toolOption.toolDefinition;
 
 					const toolChoice: ToolStoreChoice = {
 						choiceID: getUUIDv7(),
@@ -692,7 +716,7 @@ export function useAssistantContextState(): AssistantContextController {
 						displayName: toolDefinition.displayName,
 						description: toolDefinition.description,
 						autoExecute: selection.toolChoicePatch?.autoExecute ?? toolDefinition.autoExecReco,
-						userArgSchemaInstance: selection.toolChoicePatch?.userArgSchemaInstance,
+						userArgSchemaInstance: rawUserArgs || undefined,
 					};
 
 					if (toolDefinition.llmToolType === ToolStoreChoiceType.WebSearch) {
@@ -705,6 +729,23 @@ export function useAssistantContextState(): AssistantContextController {
 
 			const hasSkillsSelection = Array.isArray(preset.startingEnabledSkillRefs);
 			const enabledSkillRefs = hasSkillsSelection ? normalizeSkillRefs(preset.startingEnabledSkillRefs) : [];
+			if (hasSkillsSelection) {
+				const skillOptions = await loadSkillOptions();
+				const skillOptionByKey = new Map(skillOptions.map(item => [item.key, item] as const));
+
+				const invalidSkillRef = (preset.startingEnabledSkillRefs ?? []).find(ref => {
+					const skillOption = skillOptionByKey.get(buildSkillRefKey(ref));
+					return !skillOption || !skillOption.isSelectable;
+				});
+
+				if (invalidSkillRef) {
+					const invalidSkillOption = skillOptionByKey.get(buildSkillRefKey(invalidSkillRef));
+					throw new Error(
+						invalidSkillOption?.availabilityReason ??
+							`Skill "${invalidSkillRef.bundleID}/${invalidSkillRef.skillSlug}#${invalidSkillRef.skillID}" is not currently available.`
+					);
+				}
+			}
 
 			return {
 				presetKey,
@@ -736,7 +777,7 @@ export function useAssistantContextState(): AssistantContextController {
 				},
 			};
 		},
-		[assistantPresetOptions, getAssistantPresetToolDefinition]
+		[assistantPresetOptions, refreshPrompts]
 	);
 
 	const applyPreparedAssistantPreset = useCallback(

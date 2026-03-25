@@ -297,16 +297,9 @@ export default function AssistantPresetsPage() {
 
 	const handleAddBundle = useCallback(
 		async (slug: string, display: string, description?: string) => {
-			try {
-				const id = getUUIDv7();
-				await assistantPresetStoreAPI.putAssistantPresetBundle(id, slug, display, true, description);
-				setIsAddModalOpen(false);
-				await fetchAll();
-			} catch (error) {
-				console.error('Add bundle failed:', error);
-				setAlertMsg(getErrorMessage(error, 'Failed to add assistant preset bundle.'));
-				setShowAlert(true);
-			}
+			const id = getUUIDv7();
+			await assistantPresetStoreAPI.putAssistantPresetBundle(id, slug, display, true, description);
+			await fetchAll();
 		},
 		[fetchAll]
 	);

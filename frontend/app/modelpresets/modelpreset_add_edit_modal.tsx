@@ -15,15 +15,20 @@ import {
 	ReasoningType,
 } from '@/spec/inference';
 import {
+	DEFAULT_REASONING_TOKENS,
 	type ModelPreset,
 	type ModelPresetID,
 	type PatchModelPresetPayload,
 	type PostModelPresetPayload,
 } from '@/spec/modelpreset';
 
+import { arraysEqual, parseOptionalNumber } from '@/lib/obj_utils';
+
 import { Dropdown } from '@/components/dropdown';
 import { ModalBackdrop } from '@/components/modal_backdrop';
 import { ReadOnlyValue } from '@/components/read_only_value';
+
+import { outputParamsEqual, reasoningEqual } from '@/modelpresets/lib/type_utils';
 
 const OUTPUT_FORMAT_NONE = '__none__' as const;
 type OutputFormatKindSelection = OutputFormatKind | typeof OUTPUT_FORMAT_NONE;
@@ -80,20 +85,6 @@ const AddModeDefaults = {
 	timeout: 300,
 };
 
-const DEFAULT_REASONING_TOKENS = 1024;
-
-function arraysEqual(a: string[] = [], b: string[] = []): boolean {
-	if (a.length !== b.length) return false;
-	return a.every((value, index) => value === b[index]);
-}
-
-function parseOptionalNumber(val: string): number | undefined {
-	const trimmed = val.trim();
-	if (!trimmed) return undefined;
-	const parsed = Number(trimmed);
-	return Number.isNaN(parsed) ? undefined : parsed;
-}
-
 function buildOutputParamFromForm(
 	outputFormatKind: OutputFormatKindSelection,
 	outputVerbosity: OutputVerbositySelection,
@@ -114,24 +105,6 @@ function buildOutputParamFromForm(
 		...(format && { format }),
 		...(verbosity && { verbosity }),
 	};
-}
-
-function outputParamsEqual(a?: OutputParam, b?: OutputParam): boolean {
-	if (!a && !b) return true;
-	if (!a || !b) return false;
-
-	if (a.verbosity !== b.verbosity) return false;
-
-	const aFormat = a.format;
-	const bFormat = b.format;
-	if (!!aFormat !== !!bFormat) return false;
-	if (!aFormat && !bFormat) return true;
-	if (!aFormat || !bFormat) return false;
-
-	return (
-		aFormat.kind === bFormat.kind &&
-		JSON.stringify(aFormat.jsonSchemaParam ?? null) === JSON.stringify(bFormat.jsonSchemaParam ?? null)
-	);
 }
 
 interface ModelPresetFormData {
@@ -181,23 +154,21 @@ function buildReasoningFromForm(
 	if (!formData.reasoningSupport) return undefined;
 
 	const type = formData.reasoningType ?? ReasoningType.SingleWithLevels;
+	let tokens = DEFAULT_REASONING_TOKENS;
+	if (type === ReasoningType.HybridWithTokens) {
+		const n = parseOptionalNumber(formData.reasoningTokens ?? '', DEFAULT_REASONING_TOKENS);
+		if (n) {
+			tokens = n;
+		}
+	} else if (initialReasoning?.type === ReasoningType.SingleWithLevels) {
+		tokens = initialReasoning.tokens;
+	}
 	return {
 		type,
 		level: formData.reasoningLevel ?? ReasoningLevel.Medium,
-		tokens:
-			type === ReasoningType.HybridWithTokens
-				? parseOrDefault(formData.reasoningTokens ?? '', DEFAULT_REASONING_TOKENS)
-				: initialReasoning?.type === ReasoningType.SingleWithLevels
-					? initialReasoning.tokens
-					: DEFAULT_REASONING_TOKENS,
+		tokens: tokens,
 		summaryStyle: formData.reasoningSummaryStyle,
 	};
-}
-
-function reasoningEqual(a?: ReasoningParam, b?: ReasoningParam): boolean {
-	if (!a && !b) return true;
-	if (!a || !b) return false;
-	return a.type === b.type && a.level === b.level && a.tokens === b.tokens && a.summaryStyle === b.summaryStyle;
 }
 
 interface AddEditModelPresetModalContentProps extends Omit<AddEditModelPresetModalProps, 'mode'> {
@@ -238,11 +209,6 @@ const calcNumericError = (
 	if (minOrRange?.max !== undefined && num > minOrRange.max) return `${field} must be ≤ ${minOrRange.max}.`;
 	return;
 };
-
-function parseOrDefault(val: string, def: number): number {
-	const n = Number(val);
-	return val.trim() === '' || Number.isNaN(n) ? def : n;
-}
 
 function getInitialModelPresetFormData(mode: ModalMode, initialData?: ModelPreset): ModelPresetFormData {
 	if ((mode === 'edit' || mode === 'view') && initialData) {
@@ -549,12 +515,12 @@ function AddEditModelPresetModalContent({
 						displayName: formData.presetLabel.trim(),
 						isEnabled: formData.isEnabled,
 						stream: formData.stream,
-						maxPromptLength: parseOrDefault(formData.maxPromptLength, AddModeDefaults.maxPromptLength),
-						maxOutputLength: parseOrDefault(formData.maxOutputLength, AddModeDefaults.maxOutputLength),
-						timeout: parseOrDefault(formData.timeout, AddModeDefaults.timeout),
+						maxPromptLength: parseOptionalNumber(formData.maxPromptLength, AddModeDefaults.maxPromptLength),
+						maxOutputLength: parseOptionalNumber(formData.maxOutputLength, AddModeDefaults.maxOutputLength),
+						timeout: parseOptionalNumber(formData.timeout, AddModeDefaults.timeout),
 						systemPrompt: formData.systemPrompt,
 						...(formData.temperature.trim() !== '' && {
-							temperature: parseOrDefault(formData.temperature, 0.1),
+							temperature: parseOptionalNumber(formData.temperature, 0.1),
 						}),
 						...(buildOutputParamFromForm(formData.outputFormatKind, formData.outputVerbosity) && {
 							outputParam: buildOutputParamFromForm(formData.outputFormatKind, formData.outputVerbosity),

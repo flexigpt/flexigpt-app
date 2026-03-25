@@ -7,7 +7,12 @@ import { FiAlertCircle, FiHelpCircle, FiRefreshCw, FiX } from 'react-icons/fi';
 import type { AssistantPreset, AssistantPresetStartingModelPresetPatch } from '@/spec/assistantpreset';
 import type { JSONSchemaParam, OutputFormat, OutputParam } from '@/spec/inference';
 import { OutputFormatKind, ReasoningLevel, ReasoningType } from '@/spec/inference';
+import type { AssistantModelPresetOption } from '@/spec/modelpreset';
+import type { AssistantInstructionTemplateOption } from '@/spec/prompt';
+import type { AssistantSkillOption } from '@/spec/skill';
+import type { AssistantToolOption } from '@/spec/tool';
 
+import { parseOptionalNumber, parsePositiveInteger } from '@/lib/obj_utils';
 import { validateSlug } from '@/lib/text_utils';
 import { DEFAULT_SEMVER, isSemverVersion, suggestNextMinorVersion } from '@/lib/version_utils';
 
@@ -42,6 +47,7 @@ import {
 	formatDateish,
 	hasAssistantPresetModelPatch,
 } from '@/assistantpresets/lib/assistant_preset_utils';
+import { buildEffectiveModelParamFromModelPreset } from '@/modelpresets/lib/modelpreset_effective_defaults';
 import { buildPromptTemplateRefKey } from '@/prompts/lib/prompt_template_ref';
 
 interface AddEditAssistantPresetModalProps {
@@ -56,10 +62,10 @@ interface AddEditAssistantPresetModalProps {
 type JSONParseResult = { ok: true; value: unknown } | { ok: false; error: string };
 
 const EMPTY_ERROR_STATE: ErrorState = {};
-const EMPTY_MODEL_OPTIONS: AssistantPresetEditorCatalog['modelPresetOptions'] = [];
-const EMPTY_INSTRUCTION_OPTIONS: AssistantPresetEditorCatalog['instructionTemplateOptions'] = [];
-const EMPTY_TOOL_OPTIONS: AssistantPresetEditorCatalog['toolOptions'] = [];
-const EMPTY_SKILL_OPTIONS: AssistantPresetEditorCatalog['skillOptions'] = [];
+const EMPTY_MODEL_OPTIONS: AssistantModelPresetOption[] = [];
+const EMPTY_INSTRUCTION_OPTIONS: AssistantInstructionTemplateOption[] = [];
+const EMPTY_TOOL_OPTIONS: AssistantToolOption[] = [];
+const EMPTY_SKILL_OPTIONS: AssistantSkillOption[] = [];
 
 function getErrorMessage(error: unknown, fallback: string): string {
 	if (error instanceof Error && error.message.trim().length > 0) {
@@ -122,30 +128,6 @@ function tryParseJSONRaw(raw: string): JSONParseResult {
 	}
 }
 
-function parsePositiveInteger(value: string): number | undefined {
-	const trimmed = value.trim();
-	if (!trimmed) return undefined;
-
-	const parsed = Number(trimmed);
-	if (!Number.isInteger(parsed) || parsed <= 0) {
-		return undefined;
-	}
-
-	return parsed;
-}
-
-function parseNumberValue(value: string): number | undefined {
-	const trimmed = value.trim();
-	if (!trimmed) return undefined;
-
-	const parsed = Number(trimmed);
-	if (!Number.isFinite(parsed)) {
-		return undefined;
-	}
-
-	return parsed;
-}
-
 function getTriStateLabel(value: TriStateBoolean): string {
 	if (value === 'true') return 'Force On';
 	if (value === 'false') return 'Force Off';
@@ -163,6 +145,45 @@ function getSuggestedNextVersion(initialData: PresetItem, existingPresets: Prese
 		initialData.preset.version,
 		existingPresets.filter(item => item.preset.slug === initialData.preset.slug).map(item => item.preset.version)
 	).suggested;
+}
+
+function buildModelPatchSeedFormData(modelOption?: AssistantModelPresetOption): ModelPatchFormData {
+	const base = getDefaultModelPatchFormData();
+	if (!modelOption) {
+		return base;
+	}
+
+	const effective = buildEffectiveModelParamFromModelPreset(modelOption.modelPreset);
+
+	return {
+		...base,
+		enabled: true,
+		stream: booleanToTriState(effective.stream),
+		maxPromptLength: String(effective.maxPromptLength),
+		maxOutputLength: String(effective.maxOutputLength),
+		temperature: effective.temperature !== undefined ? String(effective.temperature) : '',
+		timeout: String(effective.timeout),
+		stopSequencesText: (effective.stopSequences ?? []).join('\n'),
+		additionalParametersRawJSON: effective.additionalParametersRawJSON ?? '',
+
+		reasoningEnabled: effective.reasoning !== undefined,
+		reasoningType: effective.reasoning?.type ?? base.reasoningType,
+		reasoningLevel: effective.reasoning?.level ?? base.reasoningLevel,
+		reasoningTokens:
+			effective.reasoning?.tokens !== undefined ? String(effective.reasoning.tokens) : base.reasoningTokens,
+		reasoningSummaryStyle: effective.reasoning?.summaryStyle ?? '',
+
+		outputEnabled: effective.outputParam !== undefined,
+		outputVerbosity: effective.outputParam?.verbosity ?? '',
+		outputFormatEnabled: effective.outputParam?.format !== undefined,
+		outputFormatKind: effective.outputParam?.format?.kind ?? base.outputFormatKind,
+		outputJSONSchemaName: effective.outputParam?.format?.jsonSchemaParam?.name ?? '',
+		outputJSONSchemaDescription: effective.outputParam?.format?.jsonSchemaParam?.description ?? '',
+		outputJSONSchemaRaw: effective.outputParam?.format?.jsonSchemaParam?.schema
+			? JSON.stringify(effective.outputParam.format.jsonSchemaParam.schema, null, 2)
+			: '',
+		outputJSONSchemaStrictMode: booleanToTriState(effective.outputParam?.format?.jsonSchemaParam?.strict),
+	};
 }
 
 function getDefaultModelPatchFormData(): ModelPatchFormData {
@@ -314,7 +335,7 @@ function buildModelPatchFromFormData(
 		patch.maxOutputLength = maxOutputLength;
 	}
 
-	const temperature = parseNumberValue(modelPatch.temperature);
+	const temperature = parseOptionalNumber(modelPatch.temperature);
 	if (temperature !== undefined) {
 		patch.temperature = temperature;
 	}
@@ -630,7 +651,7 @@ function AddEditAssistantPresetModalContent({
 				if (
 					!nextErrors.modelPatch &&
 					state.modelPatch.temperature.trim() &&
-					parseNumberValue(state.modelPatch.temperature) === undefined
+					parseOptionalNumber(state.modelPatch.temperature) === undefined
 				) {
 					nextErrors.modelPatch = 'Temperature must be a valid number.';
 				}
@@ -767,19 +788,6 @@ function AddEditAssistantPresetModalContent({
 		setFormData(prev => updater(prev));
 	}, []);
 
-	const updateModelPatch = useCallback(
-		(patch: Partial<ModelPatchFormData>) => {
-			updateFormData(prev => ({
-				...prev,
-				modelPatch: {
-					...prev.modelPatch,
-					...patch,
-				},
-			}));
-		},
-		[updateFormData]
-	);
-
 	const suggestedNextVersion = useMemo(() => {
 		if (!initialData) return DEFAULT_SEMVER;
 		return getSuggestedNextVersion(initialData, existingPresets);
@@ -790,6 +798,36 @@ function AddEditAssistantPresetModalContent({
 		: undefined;
 
 	const hasMissingSelectedModel = Boolean(formData.startingModelPresetKey) && currentModelOption === undefined;
+
+	const seedModelPatchFromSelectedModel = useCallback(() => {
+		if (!currentModelOption) {
+			return;
+		}
+
+		updateFormData(prev => ({
+			...prev,
+			modelPatch: buildModelPatchSeedFormData(currentModelOption),
+		}));
+	}, [currentModelOption, updateFormData]);
+
+	const updateModelPatch = useCallback(
+		(patch: Partial<ModelPatchFormData>) => {
+			updateFormData(prev => ({
+				...prev,
+				modelPatch:
+					patch.enabled === true &&
+					!prev.modelPatch.enabled &&
+					!hasModelPatchFormValues(prev.modelPatch) &&
+					currentModelOption
+						? buildModelPatchSeedFormData(currentModelOption)
+						: {
+								...prev.modelPatch,
+								...patch,
+							},
+			}));
+		},
+		[currentModelOption, updateFormData]
+	);
 
 	const modelPresetDropdownItems = useMemo<Record<string, { isEnabled: boolean }>>(() => {
 		const items: Record<string, { isEnabled: boolean }> = {
@@ -827,7 +865,7 @@ function AddEditAssistantPresetModalContent({
 					key,
 					title: option?.label ?? `${ref.templateSlug}@${ref.templateVersion} — ${ref.bundleID}`,
 					subtitle: option
-						? `${option.bundleDisplayName} · ${option.templateSlug}@${option.version}`
+						? `${option.bundleDisplayName} · ${option.template.slug}@${option.template.version}`
 						: 'Reference no longer exists in catalog.',
 					statusLabel: option
 						? option.isSelectable
@@ -844,8 +882,9 @@ function AddEditAssistantPresetModalContent({
 			formData.startingToolSelections.map(selection => {
 				const key = buildToolRefKey(selection.toolRef);
 				const option = toolOptionByKey.get(key);
-				const hasStaleArgsWithoutSchema =
-					selection.userArgSchemaInstance.trim().length > 0 && option !== undefined && !option.hasUserArgSchema;
+				const rawUserArgs = selection.userArgSchemaInstance.trim();
+				const hasStaleArgsWithoutSchema = rawUserArgs.length > 0 && option !== undefined && !option.hasUserArgSchema;
+				const canEditUserArgs = option?.hasUserArgSchema || rawUserArgs.length > 0;
 
 				return {
 					key,
@@ -853,7 +892,7 @@ function AddEditAssistantPresetModalContent({
 						option?.label ??
 						`${selection.toolRef.toolSlug}@${selection.toolRef.toolVersion} — ${selection.toolRef.bundleID}`,
 					subtitle: option
-						? `${option.toolType} · ${option.bundleDisplayName}`
+						? `${option.bundleDisplayName} · ${option.toolDefinition.type}`
 						: 'Reference no longer exists in catalog.',
 					statusLabel: option
 						? hasStaleArgsWithoutSchema
@@ -871,7 +910,7 @@ function AddEditAssistantPresetModalContent({
 						: hasStaleArgsWithoutSchema
 							? 'This preset still contains saved args, but the tool no longer exposes a user-args schema.'
 							: 'This tool does not expose a user-args schema.',
-					userArgsEditable: option?.hasUserArgSchema ?? false,
+					userArgsEditable: canEditUserArgs,
 				};
 			}),
 		[formData.startingToolSelections, toolOptionByKey]
@@ -887,7 +926,7 @@ function AddEditAssistantPresetModalContent({
 					key,
 					title: option?.label ?? `${ref.skillSlug} — ${ref.bundleID}`,
 					subtitle: option
-						? `${option.bundleDisplayName} · ${option.skillType}`
+						? `${option.bundleDisplayName} · ${option.skillDefinition.type}`
 						: 'Reference no longer exists in catalog.',
 					statusLabel: option
 						? option.isSelectable
@@ -1086,7 +1125,7 @@ function AddEditAssistantPresetModalContent({
 
 		setSubmitError('');
 
-		if (!catalogLoading && !catalog) {
+		if (catalogLoading || !catalog) {
 			setSubmitError('The editor catalog could not be loaded yet. Please retry.');
 			return;
 		}
@@ -1404,7 +1443,9 @@ function AddEditAssistantPresetModalContent({
 											}`}
 										>
 											{currentModelOption.isSelectable
-												? `${currentModelOption.providerDisplayName} / ${currentModelOption.modelDisplayName}`
+												? `${currentModelOption.providerPreset.displayName || currentModelOption.providerPreset.name} / ${
+														currentModelOption.modelPreset.displayName || currentModelOption.modelPreset.name
+													}`
 												: currentModelOption.availabilityReason}
 										</span>
 									</div>
@@ -1445,6 +1486,8 @@ function AddEditAssistantPresetModalContent({
 							modelPatch={formData.modelPatch}
 							error={errors.modelPatch}
 							onPatchChange={updateModelPatch}
+							canSeedFromSelectedModel={Boolean(currentModelOption)}
+							onSeedFromSelectedModel={seedModelPatchFromSelectedModel}
 						/>
 
 						<div className="divider">Instruction Templates</div>
@@ -1536,9 +1579,7 @@ function AddEditAssistantPresetModalContent({
 
 									<div className="col-span-3 font-semibold">Model Patch</div>
 									<div className="col-span-9">
-										{formData.modelPatch.enabled || hasModelPatchFormValues(formData.modelPatch)
-											? 'Configured'
-											: 'None'}
+										{hasAssistantPresetModelPatch(initialData.preset.startingModelPresetPatch) ? 'Configured' : 'None'}
 									</div>
 
 									<div className="col-span-3 font-semibold">Include Model System Prompt</div>

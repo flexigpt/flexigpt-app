@@ -119,3 +119,19 @@ export interface InvokeSkillToolResponse {
 	isError?: boolean;
 	errorMessage?: string;
 }
+
+export interface AssistantSkillOption {
+	key: string;
+	label: string;
+	ref: SkillRef;
+	skillDefinition: Skill;
+
+	bundleSlug: string;
+	bundleDisplayName: string;
+
+	isBuiltIn: boolean;
+	isSelectable: boolean;
+	isBundleEnabled: boolean;
+	isSkillEnabled: boolean;
+	availabilityReason?: string;
+}

@@ -142,23 +142,20 @@ export const ToolSelectionSection = memo(function ToolSelectionSection({
 									/>
 								)}
 							</div>
-							{item.userArgsEditable && (
+							{(item.userArgsEditable || item.userArgSchemaInstance.trim().length > 0) && (
 								<div className="col-span-12 md:col-span-8">
 									<label className="label py-1">
 										<span className="label-text text-sm">User Args JSON</span>
 									</label>
 									<textarea
 										className="textarea textarea-bordered h-24 w-full rounded-xl font-mono text-xs"
-										readOnly={isViewMode || !item.userArgsEditable}
+										readOnly={isViewMode}
 										value={item.userArgSchemaInstance}
 										onChange={e => {
-											if (!item.userArgsEditable) return;
 											onUserArgsChange(idx, e.target.value);
 										}}
 										spellCheck="false"
-										placeholder={
-											item.userArgsEditable ? 'e.g. {"location":"london"}' : 'This tool does not expose user args'
-										}
+										placeholder='e.g. {"location":"london"}'
 									/>
 									<div className="label">
 										<span className="label-text-alt text-base-content/70 text-xs">{item.userArgsHint}</span>

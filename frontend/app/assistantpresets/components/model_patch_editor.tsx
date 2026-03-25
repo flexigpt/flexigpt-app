@@ -1,6 +1,6 @@
 import { memo } from 'react';
 
-import { FiAlertCircle, FiHelpCircle } from 'react-icons/fi';
+import { FiAlertCircle, FiHelpCircle, FiRefreshCcw } from 'react-icons/fi';
 
 import {
 	OutputFormatKind,
@@ -19,6 +19,8 @@ interface AssistantPresetModelPatchEditorProps {
 	modelPatch: ModelPatchFormData;
 	error?: string;
 	onPatchChange: (patch: Partial<ModelPatchFormData>) => void;
+	canSeedFromSelectedModel: boolean;
+	onSeedFromSelectedModel: () => void;
 }
 
 const REASONING_TYPES = Object.values(ReasoningType) as ReasoningType[];
@@ -53,6 +55,8 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 	modelPatch,
 	error,
 	onPatchChange,
+	canSeedFromSelectedModel,
+	onSeedFromSelectedModel,
 }: AssistantPresetModelPatchEditorProps) {
 	return (
 		<div className="flex flex-col space-y-3">
@@ -76,6 +80,27 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 							onPatchChange({ enabled: e.target.checked });
 						}}
 					/>
+
+					{!isViewMode && (
+						<button
+							type="button"
+							className="btn btn-ghost btn-sm rounded-xl"
+							disabled={!canSeedFromSelectedModel}
+							onClick={onSeedFromSelectedModel}
+							title={
+								canSeedFromSelectedModel
+									? modelPatch.enabled
+										? 'Reset patch fields from the selected model preset defaults'
+										: 'Load patch fields from the selected model preset defaults'
+									: 'Select a starting model preset first'
+							}
+						>
+							<FiRefreshCcw size={14} />
+							<span className="ml-1">
+								{modelPatch.enabled ? 'Reset from selected model' : 'Load selected model defaults'}
+							</span>
+						</button>
+					)}
 
 					{error && (
 						<div className="text-error flex items-center gap-1 text-sm">

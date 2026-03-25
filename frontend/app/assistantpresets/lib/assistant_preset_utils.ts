@@ -179,6 +179,7 @@ export function toPutAssistantPresetPayload(input: AssistantPresetUpsertInput): 
 		payload.startingIncludeModelSystemPrompt = input.startingIncludeModelSystemPrompt;
 	}
 
+	// Assistant presets are starter recipes. An explicit empty list means - leave the user's current state alone, not set empty.
 	if ((input.startingInstructionTemplateRefs?.length ?? 0) > 0) {
 		payload.startingInstructionTemplateRefs = input.startingInstructionTemplateRefs?.map(clonePromptTemplateRef);
 	}
