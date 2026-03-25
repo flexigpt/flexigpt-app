@@ -73,7 +73,7 @@
     - [ ] May need to check when there are actually a lot of tools.
     - [ ] May be like skills we can also inject a available tools prompt in the sys prompt
 
-## Chores
+## Chores: Package upgrade
 
 - [ ] Upgrade sequence:
   - [ ] task checkupgrade; go-mod-upgrade -v ; pnpm up -r
