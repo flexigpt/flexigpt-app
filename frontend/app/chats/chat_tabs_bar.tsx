@@ -7,6 +7,7 @@ import { Tab, TabList } from '@ariakit/react/tab';
 
 import { sanitizeConversationTitle } from '@/lib/text_utils';
 
+import { HoverTip } from '@/components/ariakit_hover_tip';
 import { BusyDot } from '@/components/busy_dot';
 import { DownloadButton } from '@/components/download_button';
 
@@ -122,42 +123,48 @@ function ChatTabsBarContent({
 					{(t.isBusy || canRename) && (
 						<div className="flex w-6 shrink-0 items-center justify-center">
 							{t.isBusy ? (
-								<BusyDot />
+								<HoverTip content="Response in progress" placement="bottom">
+									<span className="inline-flex">
+										<BusyDot />
+									</span>
+								</HoverTip>
 							) : canRename ? (
-								<button
-									type="button"
-									className="btn btn-ghost btn-xs btn-circle p-0 opacity-70 hover:opacity-100"
-									aria-label="Rename tab"
-									title="Rename"
-									onMouseDown={e => {
-										e.stopPropagation();
-									}}
-									onClick={e => {
-										e.stopPropagation();
-										setEditingTabId(t.tabId);
-										setDraftTitle(t.title);
-									}}
-								>
-									<FiEdit2 size={14} />
-								</button>
+								<HoverTip content="Rename tab" placement="bottom">
+									<button
+										type="button"
+										className="btn btn-ghost btn-xs btn-circle p-0 opacity-70 hover:opacity-100"
+										aria-label="Rename tab"
+										onMouseDown={e => {
+											e.stopPropagation();
+										}}
+										onClick={e => {
+											e.stopPropagation();
+											setEditingTabId(t.tabId);
+											setDraftTitle(t.title);
+										}}
+									>
+										<FiEdit2 size={14} />
+									</button>
+								</HoverTip>
 							) : null}
 						</div>
 					)}
-					<button
-						type="button"
-						className="btn btn-ghost btn-xs btn-circle shrink-0 p-0 opacity-80 hover:opacity-100"
-						aria-label="Close tab"
-						title="Close tab"
-						onMouseDown={e => {
-							e.stopPropagation();
-						}}
-						onClick={e => {
-							e.stopPropagation();
-							onCloseTab(t.tabId);
-						}}
-					>
-						<FiX size={14} />
-					</button>
+					<HoverTip content="Close tab" placement="bottom">
+						<button
+							type="button"
+							className="btn btn-ghost btn-xs btn-circle shrink-0 p-0 opacity-80 hover:opacity-100"
+							aria-label="Close tab"
+							onMouseDown={e => {
+								e.stopPropagation();
+							}}
+							onClick={e => {
+								e.stopPropagation();
+								onCloseTab(t.tabId);
+							}}
+						>
+							<FiX size={14} />
+						</button>
+					</HoverTip>
 				</div>
 			</Tab>
 		);
@@ -176,22 +183,23 @@ function ChatTabsBarContent({
 						{elements}
 					</TabList>
 				</div>
-				<div
-					className="tooltip tooltip-left px-1 py-0"
-					data-tip={tabs.length >= maxTabs ? `New chat (max ${maxTabs} tabs)` : 'New chat'}
+				<HoverTip
+					content={
+						tabs.length >= maxTabs ? `New chat (reuses the scratch tab at the ${maxTabs}-tab limit)` : 'New chat'
+					}
+					placement="left"
 				>
 					<button
 						type="button"
 						className="btn btn-ghost btn-circle btn-xs shrink-0 p-0 opacity-80 hover:opacity-100"
 						onClick={onNewTab}
-						aria-label="New Chat"
-						title="New Chat"
+						aria-label="New chat"
 					>
 						<FiPlus size={18} />
 					</button>
-				</div>
+				</HoverTip>
 			</div>
-			<div className="tooltip tooltip-left mx-2 p-0" data-tip="Export Conversation As JSON">
+			<HoverTip content="Export current chat as JSON" placement="left">
 				<DownloadButton
 					language="json"
 					valueFetcher={getConversationForExport}
@@ -201,7 +209,7 @@ function ChatTabsBarContent({
 					aria-label="Export Chat"
 					title="Export Chat"
 				/>
-			</div>
+			</HoverTip>
 		</div>
 	);
 }

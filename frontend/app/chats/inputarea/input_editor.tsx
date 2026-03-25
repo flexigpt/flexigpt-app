@@ -26,6 +26,8 @@ import { cssEscape } from '@/lib/text_utils';
 
 import { useEnterSubmit } from '@/hooks/use_enter_submit';
 
+import { HoverTip } from '@/components/ariakit_hover_tip';
+
 import {
 	type AssistantPresetRuntimeSnapshot,
 	mapAssistantPresetWebSearchTemplatesToChoices,
@@ -1047,20 +1049,21 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						{/* Primary / secondary actions anchored at bottom-right */}
 						<div className="flex flex-col items-end justify-end gap-2 p-1">
 							{isGenerating ? (
-								<button
-									type="button"
-									className="btn btn-circle btn-neutral btn-sm shrink-0"
-									onClick={onRequestStop}
-									title="Stop response"
-									aria-label="Stop response"
-								>
-									<FiSquare size={20} />
-								</button>
+								<HoverTip content="Stop response" placement="left">
+									<button
+										type="button"
+										className="btn btn-circle btn-neutral btn-sm shrink-0"
+										onClick={onRequestStop}
+										aria-label="Stop response"
+									>
+										<FiSquare size={20} />
+									</button>
+								</HoverTip>
 							) : (
 								<>
 									{/* Run tools only (Play) */}
 									{hasPendingToolCalls && (
-										<div className="tooltip tooltip-left" data-tip="Run tools only">
+										<HoverTip content="Run tools only" placement="left">
 											<button
 												type="button"
 												className={`btn btn-circle btn-neutral btn-sm shrink-0 ${
@@ -1075,12 +1078,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 											>
 												<FiPlay size={18} />
 											</button>
-										</div>
+										</HoverTip>
 									)}
 
 									{/* Run tools and send (Fast-forward) */}
 									{hasPendingToolCalls && (
-										<div className="tooltip tooltip-left" data-tip="Run tools and send">
+										<HoverTip content="Run tools and send" placement="left">
 											<button
 												type="button"
 												className={`btn btn-circle btn-neutral btn-sm shrink-0 ${
@@ -1095,13 +1098,13 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 											>
 												<FiFastForward size={18} />
 											</button>
-										</div>
+										</HoverTip>
 									)}
 
-									{/* Send only (plane). Disabled while there are pending tools. */}
-									<div
-										className="tooltip tooltip-left"
-										data-tip={hasPendingToolCalls ? 'Send (enabled after tools finish)' : 'Send message'}
+									{/* Send only . Disabled while there are pending tools. */}
+									<HoverTip
+										content={hasPendingToolCalls ? 'Send (enabled after tools finish)' : 'Send message'}
+										placement="left"
 									>
 										<button
 											type="button"
@@ -1115,7 +1118,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 										>
 											<FiSend size={18} />
 										</button>
-									</div>
+									</HoverTip>
 								</>
 							)}
 						</div>

@@ -9,6 +9,7 @@ import { type PromptBundle, PromptRoleEnum } from '@/spec/prompt';
 import { validateSlug } from '@/lib/text_utils';
 import { DEFAULT_SEMVER, suggestNextMinorVersion } from '@/lib/version_utils';
 
+import { HoverTip } from '@/components/ariakit_hover_tip';
 import { Dropdown } from '@/components/dropdown';
 
 import type { SystemPromptDraft, SystemPromptRole } from '@/prompts/lib/use_system_prompts';
@@ -83,6 +84,16 @@ function closeDialogSafely(dialog: HTMLDialogElement | null): boolean {
 	} catch {
 		return false;
 	}
+}
+
+function HelpHint({ content }: { content: string }) {
+	return (
+		<HoverTip content={content} placement="right">
+			<span className="ml-1 inline-flex cursor-help">
+				<FiHelpCircle size={12} className="inline" />
+			</span>
+		</HoverTip>
+	);
 }
 
 function SystemPromptAddModalInner({
@@ -275,12 +286,7 @@ function SystemPromptAddModalInner({
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="col-span-3 text-sm opacity-70">
 							Bundle
-							<span
-								className="tooltip tooltip-right ml-1"
-								data-tip="Use an existing custom bundle. Bundles cannot be created here."
-							>
-								<FiHelpCircle size={12} className="inline" />
-							</span>
+							<HelpHint content="Use an existing custom bundle. Bundles cannot be created here." />
 						</label>
 						<div className="col-span-9">
 							<Dropdown<string>
@@ -337,12 +343,7 @@ function SystemPromptAddModalInner({
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="col-span-3 text-sm opacity-70">
 							Version
-							<span
-								className="tooltip tooltip-right ml-1"
-								data-tip="Fork usually keeps the same slug and creates a new version."
-							>
-								<FiHelpCircle size={12} className="inline" />
-							</span>
+							<HelpHint content="Fork usually keeps the same slug and creates a new version." />
 						</label>
 						<div className="col-span-9">
 							<input

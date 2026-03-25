@@ -83,28 +83,24 @@ export function ReasoningTokensDropdown({ tokens, setTokens, isOpen, setIsOpen }
 
 					{/* Custom token input */}
 					<div className="border-neutral/20 mt-2 border-t pt-2 text-xs">
-						<label className="tooltip tooltip-top w-full border-none outline-none">
-							<div className="tooltip-content">
-								<div className="text-xs">Custom tokens (≥ 1024)</div>
-							</div>
-							<input
-								key={tokens}
-								data-disable-chat-shortcuts="true"
-								type="text"
-								className="input input-xs w-full"
-								placeholder="Enter a custom integer ≥ 1024"
-								defaultValue={tokens.toString()}
-								onBlur={e => {
+						<div className="text-base-content/70 mb-1 text-xs">Custom (≥ 1024)</div>
+						<input
+							key={tokens}
+							data-disable-chat-shortcuts="true"
+							type="text"
+							className="input input-xs w-full"
+							placeholder="Enter a custom integer ≥ 1024"
+							defaultValue={tokens.toString()}
+							onBlur={e => {
+								clampTokens(e.currentTarget.value);
+							}}
+							onKeyDown={e => {
+								if (e.key === 'Enter') {
+									e.preventDefault();
 									clampTokens(e.currentTarget.value);
-								}}
-								onKeyDown={e => {
-									if (e.key === 'Enter') {
-										e.preventDefault();
-										clampTokens(e.currentTarget.value);
-									}
-								}}
-							/>
-						</label>
+								}
+							}}
+						/>
 					</div>
 				</SelectPopover>
 			</div>

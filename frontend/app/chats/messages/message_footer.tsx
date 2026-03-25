@@ -6,6 +6,7 @@ import type { InferenceUsage } from '@/spec/inference';
 
 import { stripCustomMDFences } from '@/lib/text_utils';
 
+import { HoverTip } from '@/components/ariakit_hover_tip';
 import { CopyButton } from '@/components/copy_button';
 
 import { MessageDetailsModal } from '@/chats/messages/message_details_modal';
@@ -46,48 +47,37 @@ export function MessageFooterArea({
 		setIsDetailsOpen(prev => !prev);
 	};
 
+	const usageTooltip = usage
+		? (() => {
+				const parts: string[] = [];
+
+				if (usage.inputTokensTotal > 0) parts.push(`Total input tokens: ${usage.inputTokensTotal}`);
+				if (usage.inputTokensCached > 0) {
+					parts.push(`Input cached tokens: ${usage.inputTokensCached}`);
+					if (usage.inputTokensUncached > 0) {
+						parts.push(`Input uncached tokens: ${usage.inputTokensUncached}`);
+					}
+				}
+				if (usage.outputTokens > 0) parts.push(`Total output tokens: ${usage.outputTokens}`);
+				if (usage.reasoningTokens > 0) parts.push(`Reasoning tokens: ${usage.reasoningTokens}`);
+
+				return parts.join('\n');
+			})()
+		: '';
+
 	return (
 		<div className={bodyPresent ? 'grow' : ''}>
 			<div className={`flex items-center space-x-6 ${bodyPresent ? 'justify-between' : ''}`}>
 				{usage && !isStreaming && (
-					<div className="flex items-center bg-transparent p-0 text-xs">
-						<div
-							className="tooltip tooltip-top flex items-center before:whitespace-pre-line"
-							data-tip={(() => {
-								const parts: string[] = [];
-
-								// Total input
-								if (usage.inputTokensTotal > 0) {
-									parts.push(`Total input tokens: ${usage.inputTokensTotal}`);
-								}
-
-								// Cached + Uncached: only show uncached if cached > 0
-								if (usage.inputTokensCached > 0) {
-									parts.push(`Input cached tokens: ${usage.inputTokensCached}`);
-
-									if (usage.inputTokensUncached > 0) {
-										parts.push(`Input uncached tokens: ${usage.inputTokensUncached}`);
-									}
-								}
-
-								// Output
-								if (usage.outputTokens > 0) {
-									parts.push(`Total output tokens: ${usage.outputTokens}`);
-								}
-
-								// Reasoning
-								if (usage.reasoningTokens > 0) {
-									parts.push(`Reasoning tokens: ${usage.reasoningTokens}`);
-								}
-
-								return parts.join('\n'); // each item on its own line
-							})()}
-						>
-							<FiArrowUp size={14} />
-							<span className="shrink-0">{usage.inputTokensTotal}&nbsp;&nbsp;-&nbsp;&nbsp;</span>
-							<FiArrowDown size={14} /> <span>{usage.outputTokens}</span>
+					<HoverTip content={usageTooltip} placement="top" wrapperElement="div">
+						<div className="flex items-center bg-transparent p-0 text-xs">
+							<div className="flex items-center">
+								<FiArrowUp size={14} />
+								<span className="shrink-0">{usage.inputTokensTotal}&nbsp;&nbsp;-&nbsp;&nbsp;</span>
+								<FiArrowDown size={14} /> <span>{usage.outputTokens}</span>
+							</div>
 						</div>
-					</div>
+					</HoverTip>
 				)}
 
 				<div className={`flex items-center justify-end space-x-6 ${!isStreaming && !usage ? 'w-full' : ''}`}>
@@ -107,34 +97,36 @@ export function MessageFooterArea({
 					)}
 
 					{hasDetails && !isBusy && (
-						<button
-							className={`btn btn-sm flex items-center border-none bg-transparent! p-0 shadow-none ${
-								isBusy || !hasDetails ? 'btn-disabled' : ''
-							}`}
-							onClick={toggleDetailsModal}
-							aria-label="Details"
-							title={hasDetails ? 'Show details' : 'No details'}
-						>
-							<FiCode size={16} />
-						</button>
+						<HoverTip content="Show message details" placement="top">
+							<button
+								className="btn btn-sm flex items-center border-none bg-transparent! p-0 shadow-none"
+								onClick={toggleDetailsModal}
+								aria-label="Show message details"
+							>
+								<FiCode size={16} />
+							</button>
+						</HoverTip>
 					)}
 					{isUser && !isBusy && (
-						<button
-							className={`btn btn-sm } flex items-center border-none bg-transparent! p-0 shadow-none`}
-							onClick={onEdit}
-							aria-label="Edit and Send Message"
-							title="Edit and Send Message"
-						>
-							<FiEdit2 size={16} />
-						</button>
+						<HoverTip content="Edit and resend from this message" placement="top">
+							<button
+								className="btn btn-sm flex items-center border-none bg-transparent! p-0 shadow-none"
+								onClick={onEdit}
+								aria-label="Edit and resend from this message"
+							>
+								<FiEdit2 size={16} />
+							</button>
+						</HoverTip>
 					)}
 
 					{cardCopyContent !== '' && !isBusy && (
-						<CopyButton
-							value={stripCustomMDFences(cardCopyContent)}
-							className={`btn btn-sm } flex items-center border-none bg-transparent! p-0 shadow-none`}
-							size={16}
-						/>
+						<HoverTip content="Copy message text" placement="top">
+							<CopyButton
+								value={stripCustomMDFences(cardCopyContent)}
+								className="btn btn-sm flex items-center border-none bg-transparent! p-0 shadow-none"
+								size={16}
+							/>
+						</HoverTip>
 					)}
 				</div>
 			</div>

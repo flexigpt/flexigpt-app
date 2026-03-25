@@ -10,9 +10,6 @@
 - [ ] Sys prompt:
   - [ ] may also need a default bundle for editable instructions only sys prompts that people can add to directly from chat.
 
-- [ ] context bar
-  - [ ] tooltips are needed. ariakit ones as daisyui ones can get cutoff
-
 - [ ] Tool calls customize
   - [ ] Some calls like editor replace text, create files, etc can be visually represented better via custom elements representing each.
 

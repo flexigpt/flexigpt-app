@@ -81,30 +81,26 @@ export function TemperatureDropdown({ temperature, setTemperature, isOpen, setIs
 
 					{/* Custom input */}
 					<div className="border-neutral/20 mt-2 border-t pt-2 text-xs">
-						<label className="tooltip tooltip-top w-full border-none outline-none">
-							<div className="tooltip-content">
-								<div className="text-xs">Custom value (0.0 - 1.0)</div>
-							</div>
-							<input
-								key={temperature}
-								data-disable-chat-shortcuts="true"
-								type="text"
-								name="temperature"
-								className="input input-xs w-full"
-								placeholder="Custom value (0.0 - 1.0)"
-								defaultValue={temperature.toString()}
-								onBlur={e => {
+						<div className="text-base-content/70 mb-1 text-xs">Custom (0.0 - 1.0)</div>
+						<input
+							key={temperature}
+							data-disable-chat-shortcuts="true"
+							type="text"
+							name="temperature"
+							className="input input-xs w-full"
+							placeholder="Custom value (0.0 - 1.0)"
+							defaultValue={temperature.toString()}
+							onBlur={e => {
+								clampTemperature(e.currentTarget.value);
+							}}
+							onKeyDown={e => {
+								if (e.key === 'Enter') {
+									e.preventDefault();
 									clampTemperature(e.currentTarget.value);
-								}}
-								onKeyDown={e => {
-									if (e.key === 'Enter') {
-										e.preventDefault();
-										clampTemperature(e.currentTarget.value);
-									}
-								}}
-								spellCheck="false"
-							/>
-						</label>
+								}
+							}}
+							spellCheck="false"
+						/>
 					</div>
 				</SelectPopover>
 			</div>

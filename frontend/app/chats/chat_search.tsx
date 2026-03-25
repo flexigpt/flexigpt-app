@@ -21,6 +21,7 @@ import { cleanSearchQuery } from '@/lib/title_utils';
 
 import { conversationStoreAPI } from '@/apis/baseapi';
 
+import { HoverTip } from '@/components/ariakit_hover_tip';
 import { GroupedDropdown } from '@/components/date_grouped_dropdown';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 
@@ -233,14 +234,19 @@ function SearchDropdown({
 									<span className="whitespace-nowrap">{formatDateAsString(r.searchConversation.modifiedAt)}</span>
 									{/* delete (not for active conv) */}
 									{!openConversationIdSet.has(r.searchConversation.id) && (
-										<FiTrash2
-											size={14}
-											className="text-neutral-custom hover:text-error shrink-0 cursor-pointer"
-											onClick={e => {
-												e.stopPropagation(); // don’t trigger onPick
-												onDelete(r.searchConversation);
-											}}
-										/>
+										<HoverTip content="Delete conversation" placement="right">
+											<button
+												type="button"
+												className="btn btn-ghost btn-xs btn-circle h-5 min-h-0 w-5 shrink-0 p-0 shadow-none"
+												aria-label="Delete conversation"
+												onClick={e => {
+													e.stopPropagation();
+													onDelete(r.searchConversation);
+												}}
+											>
+												<FiTrash2 size={14} className="text-neutral-custom hover:text-error shrink-0" />
+											</button>
+										</HoverTip>
 									)}
 								</span>
 							)}
@@ -268,14 +274,19 @@ function SearchDropdown({
 												<span className="whitespace-nowrap">{formatDateAsString(r.searchConversation.modifiedAt)}</span>
 												{/* delete (not for active conv) */}
 												{!openConversationIdSet.has(r.searchConversation.id) && (
-													<FiTrash2
-														size={14}
-														className="text-neutral-custom hover:text-error shrink-0 cursor-pointer"
-														onClick={e => {
-															e.stopPropagation();
-															onDelete(r.searchConversation);
-														}}
-													/>
+													<HoverTip content="Delete conversation" placement="right">
+														<button
+															type="button"
+															className="btn btn-ghost btn-xs btn-circle h-5 min-h-0 w-5 shrink-0 p-0 shadow-none"
+															aria-label="Delete conversation"
+															onClick={e => {
+																e.stopPropagation();
+																onDelete(r.searchConversation);
+															}}
+														>
+															<FiTrash2 size={14} className="text-neutral-custom hover:text-error shrink-0" />
+														</button>
+													</HoverTip>
 												)}
 											</span>
 										</span>
@@ -810,7 +821,7 @@ export const ChatSearch = forwardRef<ChatSearchHandle, ChatSearchProps>(function
 				dropdownPos &&
 				createPortal(
 					<div
-						className="app-no-drag fixed z-9999"
+						className="app-no-drag fixed z-999"
 						style={{
 							top: dropdownPos.top,
 							left: dropdownPos.left,

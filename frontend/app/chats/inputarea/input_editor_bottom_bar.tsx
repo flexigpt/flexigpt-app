@@ -24,6 +24,8 @@ import { useTools } from '@/hooks/use_tool';
 
 import { promptStoreAPI } from '@/apis/baseapi';
 
+import { HoverTip } from '@/components/ariakit_hover_tip';
+
 import { UrlAttachmentModal } from '@/chats/inputarea/attachments/attachment_url_modal';
 import { dispatchOpenToolArgs } from '@/chats/inputarea/events/open_attached_toolargs';
 import { CommandTipsMenu } from '@/chats/inputarea/inputtips/command_tips_menu';
@@ -97,7 +99,7 @@ interface PickerButtonProps {
 function PickerButton({ label, icon, buttonRef, menuState, shortcut, disabled }: PickerButtonProps) {
 	const tooltip = shortcut ? `${label} (${shortcut})` : label;
 	return (
-		<div className="tooltip tooltip-right" data-tip={tooltip}>
+		<HoverTip content={tooltip} placement="top">
 			<MenuButton
 				ref={buttonRef}
 				store={menuState}
@@ -107,7 +109,7 @@ function PickerButton({ label, icon, buttonRef, menuState, shortcut, disabled }:
 			>
 				{icon}
 			</MenuButton>
-		</div>
+		</HoverTip>
 	);
 }
 

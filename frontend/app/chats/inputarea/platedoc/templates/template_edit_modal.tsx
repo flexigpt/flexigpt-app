@@ -10,6 +10,8 @@ import type { PlateEditor } from 'platejs/react';
 
 import { type PromptVariable, VarSource, VarType } from '@/spec/prompt';
 
+import { HoverTip } from '@/components/ariakit_hover_tip';
+
 import { dispatchTemplateVarsUpdated } from '@/chats/inputarea/events/template_toolbar_vars_updated';
 import { type TemplateSelectionElementNode } from '@/chats/inputarea/platedoc/nodes';
 import {
@@ -53,6 +55,16 @@ function getInitialFormState(tsenode: TemplateSelectionElementNode): TemplateEdi
 		blockEdits: blocks,
 		varValues,
 	};
+}
+
+function HelpHint({ content }: { content: string }) {
+	return (
+		<HoverTip content={content} placement="right">
+			<span className="label-text-alt inline-flex cursor-help">
+				<FiHelpCircle size={12} />
+			</span>
+		</HoverTip>
+	);
 }
 
 function TemplateEditModalContent({ onClose, tsenode, editor, path }: Omit<TemplateEditModalProps, 'open'>) {
@@ -182,12 +194,7 @@ function TemplateEditModalContent({ onClose, tsenode, editor, path }: Omit<Templ
 								<div className="grid grid-cols-12 items-center gap-3">
 									<label className="label col-span-12 md:col-span-4">
 										<span className="label-text text-sm">Display Name (local)</span>
-										<span
-											className="label-text-alt tooltip tooltip-right"
-											data-tip="Local override; visible only here."
-										>
-											<FiHelpCircle size={12} />
-										</span>
+										<HelpHint content="Local override; visible only here." />
 									</label>
 									<div className="col-span-12 md:col-span-8">
 										<input
@@ -205,12 +212,7 @@ function TemplateEditModalContent({ onClose, tsenode, editor, path }: Omit<Templ
 								<div className="grid grid-cols-12 items-center gap-3">
 									<label className="label col-span-12 md:col-span-4">
 										<span className="label-text text-sm">Tags</span>
-										<span
-											className="label-text-alt tooltip tooltip-right"
-											data-tip="Comma-separated tags used for filtering."
-										>
-											<FiHelpCircle size={12} />
-										</span>
+										<HelpHint content="Comma-separated tags used for filtering." />
 									</label>
 									<div className="col-span-12 md:col-span-8">
 										<input
@@ -228,12 +230,7 @@ function TemplateEditModalContent({ onClose, tsenode, editor, path }: Omit<Templ
 								<div className="grid grid-cols-12 items-start gap-3">
 									<label className="label col-span-12 md:col-span-4">
 										<span className="label-text text-sm">Description (local)</span>
-										<span
-											className="label-text-alt tooltip tooltip-right"
-											data-tip="Local description for your reference."
-										>
-											<FiHelpCircle size={12} />
-										</span>
+										<HelpHint content="Local description for your reference." />
 									</label>
 									<div className="col-span-12 md:col-span-8">
 										<textarea

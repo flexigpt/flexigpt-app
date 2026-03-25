@@ -841,3 +841,6 @@
   - [x] look at prompt templates structure and see how to have sys prompts separate than body prompts
 
 - [x] ui jumps to top after tab switch.
+
+- [x] context bar
+  - [x] tooltips are needed. ariakit ones as daisyui ones can get cutoff

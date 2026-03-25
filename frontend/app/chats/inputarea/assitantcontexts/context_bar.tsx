@@ -5,6 +5,8 @@ import { FiSliders } from 'react-icons/fi';
 import { ReasoningType } from '@/spec/inference';
 import { type UIChatOption } from '@/spec/modelpreset';
 
+import { HoverTip } from '@/components/ariakit_hover_tip';
+
 import { AdvancedParamsModal } from '@/chats/inputarea/assitantcontexts/advanced_params_modal';
 import { AssistantPresetDropdown } from '@/chats/inputarea/assitantcontexts/assistant_preset_dropdown';
 import type {
@@ -261,9 +263,9 @@ export function AssistantContextBar({ context, assistantPreset }: AssistantConte
 			/>
 
 			<div className="flex items-center justify-center">
-				<div
-					className="tooltip tooltip-left"
-					data-tip="Advanced parameters (streaming, token limits, output format, stop sequences, raw JSON)"
+				<HoverTip
+					content="Advanced parameters: streaming, token limits, output format, stop sequences, raw JSON"
+					placement="left"
 				>
 					<button
 						type="button"
@@ -275,7 +277,7 @@ export function AssistantContextBar({ context, assistantPreset }: AssistantConte
 					>
 						<FiSliders size={14} />
 					</button>
-				</div>
+				</HoverTip>
 			</div>
 
 			<AdvancedParamsModal

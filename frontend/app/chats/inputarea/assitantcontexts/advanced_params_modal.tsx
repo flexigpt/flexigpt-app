@@ -16,6 +16,7 @@ import { FiAlertCircle, FiHelpCircle, FiX } from 'react-icons/fi';
 import { type JSONSchemaParam, OutputFormatKind, type OutputParam, ReasoningSummaryStyle } from '@/spec/inference';
 import type { UIChatOption } from '@/spec/modelpreset';
 
+import { HoverTip } from '@/components/ariakit_hover_tip';
 import { Dropdown } from '@/components/dropdown';
 
 import {
@@ -115,6 +116,16 @@ function closeDialogSafely(dialog: HTMLDialogElement | null): boolean {
 	} catch {
 		return false;
 	}
+}
+
+function HelpHint({ content }: { content: string }) {
+	return (
+		<HoverTip content={content} placement="right">
+			<span className="label-text-alt inline-flex cursor-help">
+				<FiHelpCircle size={12} />
+			</span>
+		</HoverTip>
+	);
 }
 
 function AdvancedParamsModalInner({
@@ -461,9 +472,7 @@ function AdvancedParamsModalInner({
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-4 cursor-pointer">
 							<span className="label-text text-sm">Streaming</span>
-							<span className="label-text-alt tooltip tooltip-right" data-tip="Stream data continuously.">
-								<FiHelpCircle size={12} />
-							</span>
+							<HelpHint content="Stream data continuously." />
 						</label>
 						<div className="col-span-8">
 							<input
@@ -480,9 +489,7 @@ function AdvancedParamsModalInner({
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-4">
 							<span className="label-text text-sm">Max Prompt Tokens</span>
-							<span className="label-text-alt tooltip tooltip-right" data-tip="Maximum tokens for input prompt">
-								<FiHelpCircle size={12} />
-							</span>
+							<HelpHint content="Maximum tokens for input prompt" />
 						</label>
 						<div className="col-span-8">
 							<input
@@ -508,9 +515,7 @@ function AdvancedParamsModalInner({
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-4">
 							<span className="label-text text-sm">Max Output Tokens</span>
-							<span className="label-text-alt tooltip tooltip-right" data-tip="Maximum tokens for model output">
-								<FiHelpCircle size={12} />
-							</span>
+							<HelpHint content="Maximum tokens for model output" />
 						</label>
 						<div className="col-span-8">
 							<input
@@ -536,12 +541,7 @@ function AdvancedParamsModalInner({
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-4">
 							<span className="label-text text-sm">Timeout (s)</span>
-							<span
-								className="label-text-alt tooltip tooltip-right"
-								data-tip="Maximum time a request can take (seconds)"
-							>
-								<FiHelpCircle size={12} />
-							</span>
+							<HelpHint content="Maximum time a request can take (seconds)" />
 						</label>
 						<div className="col-span-8">
 							<input
@@ -567,16 +567,13 @@ function AdvancedParamsModalInner({
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-4">
 							<span className="label-text text-sm">Reasoning Summary</span>
-							<span
-								className="label-text-alt tooltip tooltip-right"
-								data-tip={
+							<HelpHint
+								content={
 									reasoningEnabled
 										? 'Controls whether the model produces a reasoning summary (when supported).'
 										: 'This model is currently using temperature mode (no reasoning params active).'
 								}
-							>
-								<FiHelpCircle size={12} />
-							</span>
+							/>
 						</label>
 						<div className="col-span-8">
 							<Dropdown<SummaryStyleChoice>
@@ -595,12 +592,7 @@ function AdvancedParamsModalInner({
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-4">
 							<span className="label-text text-sm">Output Format</span>
-							<span
-								className="label-text-alt tooltip tooltip-right"
-								data-tip="Controls output formatting. Verbosity is set in the top bar."
-							>
-								<FiHelpCircle size={12} />
-							</span>
+							<HelpHint content="Controls output formatting. Verbosity is set in the top bar." />
 						</label>
 						<div className="col-span-8">
 							<Dropdown<OutputFormatChoice>
@@ -706,16 +698,13 @@ function AdvancedParamsModalInner({
 						<div className="grid grid-cols-12 items-start gap-2">
 							<label className="label col-span-4">
 								<span className="label-text text-sm">Stop Sequences</span>
-								<span
-									className="label-text-alt tooltip tooltip-right"
-									data-tip={
+								<HelpHint
+									content={
 										stopSequencesDisabledBecauseReasoning
 											? 'Stop sequences are disabled when reasoning is enabled for this model.'
 											: `One per line. Empty = none. Max ${stopPolicy.maxSequences}.`
 									}
-								>
-									<FiHelpCircle size={12} />
-								</span>
+								/>
 							</label>
 							<div className="col-span-8">
 								<textarea
@@ -754,12 +743,7 @@ function AdvancedParamsModalInner({
 					<div className="grid grid-cols-12 items-start gap-2">
 						<label className="label col-span-4">
 							<span className="label-text text-sm">Additional Params JSON</span>
-							<span
-								className="label-text-alt tooltip tooltip-right"
-								data-tip="Raw provider-specific JSON object. Must be valid JSON."
-							>
-								<FiHelpCircle size={12} />
-							</span>
+							<HelpHint content="Raw provider-specific JSON object. Must be valid JSON." />
 						</label>
 						<div className="col-span-8">
 							<textarea

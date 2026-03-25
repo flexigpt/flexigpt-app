@@ -1,3 +1,5 @@
+import { HoverTip } from '@/components/ariakit_hover_tip';
+
 export function HybridReasoningCheckbox({
 	isReasoningEnabled,
 	setIsReasoningEnabled,
@@ -7,9 +9,9 @@ export function HybridReasoningCheckbox({
 }) {
 	return (
 		<div className="mx-2 flex w-full justify-center">
-			<div
-				className="tooltip tooltip-top"
-				data-tip="Toggle the model's hybrid reasoning mode (uses effort tokens instead of temperature)."
+			<HoverTip
+				content="Toggle the model's hybrid reasoning mode (uses effort tokens instead of temperature)."
+				placement="top"
 			>
 				<label className="text-neutral-custom flex cursor-pointer">
 					<input
@@ -22,7 +24,7 @@ export function HybridReasoningCheckbox({
 					/>
 					<span className="text-neutral-custom ml-2 text-xs">Hybrid Reasoning</span>
 				</label>
-			</div>
+			</HoverTip>
 		</div>
 	);
 }
