@@ -182,6 +182,19 @@ function buildNormalizedInitialModel(): InitialChatsModel {
 		scrollTopByTab[normalized.addedScratchTabId] = 0;
 	}
 
+	const topItemIndexByTab: Record<string, number> = {};
+	for (const [tabId, topItemIndex] of Object.entries(built.topItemIndexByTab ?? {})) {
+		if (existingTabIds.has(tabId) && typeof topItemIndex === 'number') {
+			topItemIndexByTab[tabId] = topItemIndex;
+		}
+	}
+	if (createdFallbackTab) {
+		topItemIndexByTab[createdFallbackTab.tabId] = 0;
+	}
+	if (normalized.addedScratchTabId) {
+		topItemIndexByTab[normalized.addedScratchTabId] = 0;
+	}
+
 	const lastActivatedAtByTab: Record<string, number> = {};
 	for (const [tabId, ts] of lastActivatedAt.entries()) {
 		if (existingTabIds.has(tabId)) {
@@ -194,6 +207,7 @@ function buildNormalizedInitialModel(): InitialChatsModel {
 		tabs: normalized.tabs,
 		selectedTabId,
 		scrollTopByTab,
+		topItemIndexByTab,
 		lastActivatedAtByTab,
 	};
 }
@@ -267,6 +281,7 @@ export default function ChatsPage() {
 
 	// ---------------- Persistence scratch state ----------------
 	const scrollTopSnapshotRef = useRef(initialModel.scrollTopByTab ?? {});
+	const topItemIndexSnapshotRef = useRef(initialModel.topItemIndexByTab ?? {});
 	const persistNowRef = useRef<() => void>(() => {});
 	const saveQueueByTabRef = useRef(new Map<string, Promise<void>>());
 
@@ -312,19 +327,23 @@ export default function ChatsPage() {
 
 			if (removedTabIds.length > 0 || addedScratchTabId) {
 				let nextScrollSnapshot = { ...scrollTopSnapshotRef.current };
+				let nextTopItemIndexSnapshot = { ...topItemIndexSnapshotRef.current };
 
 				for (const removedTabId of removedTabIds) {
 					disposeTabRuntime(removedTabId);
 					nextScrollSnapshot = omitManyKeys(nextScrollSnapshot, [removedTabId]);
+					nextTopItemIndexSnapshot = omitManyKeys(nextTopItemIndexSnapshot, [removedTabId]);
 				}
 
 				if (addedScratchTabId) {
 					touchTab(addedScratchTabId);
 					conversationAreaRef.current?.setScrollTopForTab(addedScratchTabId, 0);
 					nextScrollSnapshot[addedScratchTabId] = 0;
+					nextTopItemIndexSnapshot[addedScratchTabId] = 0;
 				}
 
 				scrollTopSnapshotRef.current = nextScrollSnapshot;
+				topItemIndexSnapshotRef.current = nextTopItemIndexSnapshot;
 			}
 
 			commitTabs(normalizedTabs);
@@ -361,11 +380,17 @@ export default function ChatsPage() {
 	const persistNow = useCallback(() => {
 		const tabsSnapshot = tabsRef.current.slice(0, MAX_TABS);
 
-		const scrollObj =
-			conversationAreaRef.current?.getScrollTopByTabSnapshot() ??
-			scrollTopSnapshotRef.current ??
-			({} as Record<string, number>);
+		const scrollObj: Record<string, number> = {
+			...(scrollTopSnapshotRef.current ?? {}),
+			...(conversationAreaRef.current?.getScrollTopByTabSnapshot() ?? {}),
+		};
 		scrollTopSnapshotRef.current = scrollObj;
+
+		const topItemIndexObj: Record<string, number> = {
+			...(topItemIndexSnapshotRef.current ?? {}),
+			...(conversationAreaRef.current?.getTopItemIndexByTabSnapshot() ?? {}),
+		};
+		topItemIndexSnapshotRef.current = topItemIndexObj;
 
 		const lruObj: Record<string, number> = {};
 		for (const [k, v] of lastActivatedAtRef.current.entries()) lruObj[k] = v;
@@ -381,6 +406,7 @@ export default function ChatsPage() {
 				manualTitleLocked: t.manualTitleLocked,
 			})),
 			scrollTopByTab: scrollObj,
+			topItemIndexByTab: topItemIndexObj,
 			lastActivatedAtByTab: lruObj,
 		});
 	}, []);
@@ -516,36 +542,38 @@ export default function ChatsPage() {
 
 			let nextScrollSnapshot = { ...scrollTopSnapshotRef.current };
 			nextScrollSnapshot = omitManyKeys(nextScrollSnapshot, [tabId]);
+			let nextTopItemIndexSnapshot = { ...topItemIndexSnapshotRef.current };
+			nextTopItemIndexSnapshot = omitManyKeys(nextTopItemIndexSnapshot, [tabId]);
 
 			scrollTopSnapshotRef.current = nextScrollSnapshot;
+			topItemIndexSnapshotRef.current = nextTopItemIndexSnapshot;
 
 			const baseNextTabs = current.filter(t => t.tabId !== tabId);
+
+			if (wasActive) {
+				const right = current[idx + 1];
+				const left = idx > 0 ? current[idx - 1] : undefined;
+				const preferredNextSelectedId =
+					(left && left.tabId !== tabId ? left.tabId : right && right.tabId !== tabId ? right.tabId : '') ||
+					baseNextTabs[0]?.tabId ||
+					'';
+
+				if (preferredNextSelectedId) {
+					selectTab(preferredNextSelectedId);
+				}
+			}
+
 			const normalizedNextTabs = normalizeAndCommitTabs(baseNextTabs);
 
 			if (!wasActive) return;
 
-			const right = current[idx + 1];
-			const left = idx > 0 ? current[idx - 1] : undefined;
-			const preferredNextSelectedId =
-				(left && left.tabId !== tabId ? left.tabId : right && right.tabId !== tabId ? right.tabId : '') ||
-				normalizedNextTabs[0]?.tabId ||
-				'';
+			const finalNextSelectedId = normalizedNextTabs.some(t => t.tabId === selectedTabIdRef.current)
+				? selectedTabIdRef.current
+				: (normalizedNextTabs[0]?.tabId ?? '');
 
-			if (!preferredNextSelectedId) return;
-
-			// Keep refs immediately valid for persistence and callbacks.
-			selectedTabIdRef.current = preferredNextSelectedId;
-
-			requestAnimationFrame(() => {
-				const currentTabs = tabsRef.current;
-				const nextSelectedId = currentTabs.some(t => t.tabId === preferredNextSelectedId)
-					? preferredNextSelectedId
-					: currentTabs[0]?.tabId;
-
-				if (nextSelectedId) {
-					selectTab(nextSelectedId);
-				}
-			});
+			if (finalNextSelectedId && finalNextSelectedId !== selectedTabIdRef.current) {
+				selectTab(finalNextSelectedId);
+			}
 		},
 		[disposeTabRuntime, normalizeAndCommitTabs, selectTab]
 	);
@@ -845,6 +873,7 @@ export default function ChatsPage() {
 					selectedTabId={selectedTabId}
 					shortcutConfig={shortcutConfig}
 					initialScrollTopByTab={initialModel.scrollTopByTab}
+					initialTopItemIndexByTab={initialModel.topItemIndexByTab}
 					updateTab={updateTab}
 					saveUpdatedConversation={saveUpdatedConversation}
 				/>

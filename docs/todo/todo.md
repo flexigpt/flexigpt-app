@@ -2,14 +2,6 @@
 
 ## Laundry list
 
-- AssistantPreset
-  - [x] have a default "empty" assistant i.e all allowed.
-  - [x] review for and handle stale refs in the preset, no fk present so need to validate properly.
-  - [x] assistant add edit.
-    - [x] tools should have args only if args schema is present
-    - [x] model patch should start with model defaults
-  - [x] modelpreset should not be selected if it is disabled even if it comes from conversation.
-
 - [ ] Skill
   - [ ] include some builtin skills and test on all platforms, full flow.
   - [ ] with the number of skills present, maybe we dont want to enable all on click for the enable sills button, may be have a button at bottom on open that says enable all separately. also show collapsed bundles at start and then expanding if needed.
@@ -17,20 +9,12 @@
 
 - [ ] Sys prompt:
   - [ ] may also need a default bundle for editable instructions only sys prompts that people can add to directly from chat.
-  - [x] We may want to have a explicit prompt saying that use explicit tools rather than shell wherever possible.
-  - [x] store it as prompt templates.
-  - [x] look at prompt templates structure and see how to have sys prompts separate than body prompts
 
 - [ ] context bar
   - [ ] tooltips are needed. ariakit ones as daisyui ones can get cutoff
 
-- [x] ~~modelpreset only this is not version based as of now. should it be version based?~~
-  - [x] ~~better do it before assistant preset.~~
-
 - [ ] Tool calls customize
   - [ ] Some calls like editor replace text, create files, etc can be visually represented better via custom elements representing each.
-
-- [ ] ui jumps to top after tab switch.
 
 ## Features
 

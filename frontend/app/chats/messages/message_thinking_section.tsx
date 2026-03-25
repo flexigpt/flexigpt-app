@@ -35,8 +35,9 @@ export function MessageThinkingSection(props: {
 	const hasThinking = thinkingText.trim().length > 0;
 	const shouldShow = hasSummary || hasThinking;
 
-	// null means "auto" mode and follows isBusy.
-	// Once the user toggles, their explicit choice wins from then on.
+	// null means "auto" mode.
+	// Auto-open while streaming, but do not auto-collapse when streaming ends;
+	// collapsing at completion causes a visible height jump in the virtual list.
 	const [manualOpen, setManualOpen] = useState<boolean | null>(null);
 	const open = manualOpen ?? isBusy;
 

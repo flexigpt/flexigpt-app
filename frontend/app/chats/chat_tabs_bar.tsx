@@ -1,4 +1,4 @@
-import { memo, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from 'react';
 
 import { FiEdit2, FiPlus, FiX } from 'react-icons/fi';
 
@@ -32,6 +32,7 @@ interface ChatTabsBarProps {
 
 interface ChatTabsBarContentProps extends ChatTabsBarProps {
 	setTabEl: (id: string) => (el: HTMLElement | null) => void;
+	tabsViewportRef: RefObject<HTMLDivElement | null>;
 }
 
 function ChatTabsBarContent({
@@ -44,6 +45,7 @@ function ChatTabsBarContent({
 	onRenameTab,
 	getConversationForExport,
 	setTabEl,
+	tabsViewportRef,
 }: ChatTabsBarContentProps) {
 	const [editingTabId, setEditingTabId] = useState<string | null>(null);
 	const [draftTitle, setDraftTitle] = useState('');
@@ -166,6 +168,7 @@ function ChatTabsBarContent({
 			<div className="flex min-w-0 flex-1 flex-nowrap items-center overflow-hidden">
 				{/* Scroll ONLY the tabs. Reserve bottom space so scrollbar doesn't clip tab content. */}
 				<div
+					ref={tabsViewportRef}
 					className="scrollbar-custom-thin min-w-0 overflow-x-auto overflow-y-hidden overscroll-contain pb-1"
 					style={{ scrollbarGutter: 'stable' }}
 				>
@@ -214,6 +217,7 @@ export const ChatTabsBar = memo(function ChatTabsBar({
 	getConversationForExport,
 }: ChatTabsBarProps) {
 	const tabElById = useRef(new Map<string, HTMLElement | null>());
+	const tabsViewportRef = useRef<HTMLDivElement | null>(null);
 
 	const setTabEl = useCallback(
 		(id: string) => (el: HTMLElement | null) => {
@@ -224,8 +228,18 @@ export const ChatTabsBar = memo(function ChatTabsBar({
 	);
 
 	useEffect(() => {
-		tabElById.current.get(selectedTabId)?.scrollIntoView({
-			behavior: 'smooth',
+		const tabEl = tabElById.current.get(selectedTabId);
+		const viewportEl = tabsViewportRef.current;
+		if (!tabEl || !viewportEl) return;
+
+		const viewportRect = viewportEl.getBoundingClientRect();
+		const tabRect = tabEl.getBoundingClientRect();
+		const fullyVisible = tabRect.left >= viewportRect.left && tabRect.right <= viewportRect.right;
+
+		if (fullyVisible) return;
+
+		tabEl.scrollIntoView({
+			behavior: 'auto',
 			block: 'nearest',
 			inline: 'nearest',
 		});
@@ -242,6 +256,7 @@ export const ChatTabsBar = memo(function ChatTabsBar({
 			onRenameTab={onRenameTab}
 			getConversationForExport={getConversationForExport}
 			setTabEl={setTabEl}
+			tabsViewportRef={tabsViewportRef}
 		/>
 	);
 });

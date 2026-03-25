@@ -6,6 +6,7 @@ import { initConversation } from '@/chats/conversation/hydration_helper';
 
 // ---------------- Tabs persistence ----------------
 const CHAT_TABS_PERSIST_KEY = 'app.chats.tabs.v1';
+export const MAX_TABS = 8;
 
 function canUseStorage(): boolean {
 	return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
@@ -22,10 +23,18 @@ type PersistedChatsPageStateV1 = {
 		manualTitleLocked: boolean;
 	}>;
 	scrollTopByTab?: Record<string, number>;
+	topItemIndexByTab?: Record<string, number>;
 	lastActivatedAtByTab?: Record<string, number>;
 };
 
-export const MAX_TABS = 8;
+export type InitialChatsModel = {
+	restoredFromStorage: boolean;
+	selectedTabId: string;
+	tabs: ChatTabState[];
+	scrollTopByTab: Record<string, number>;
+	topItemIndexByTab: Record<string, number>;
+	lastActivatedAtByTab: Record<string, number>;
+};
 
 export type ChatTabState = {
 	tabId: string;
@@ -83,14 +92,6 @@ export function writePersistedChatsPageState(state: PersistedChatsPageStateV1) {
 	}
 }
 
-export type InitialChatsModel = {
-	restoredFromStorage: boolean;
-	selectedTabId: string;
-	tabs: ChatTabState[];
-	scrollTopByTab: Record<string, number>;
-	lastActivatedAtByTab: Record<string, number>;
-};
-
 export function buildInitialChatsModel(): InitialChatsModel {
 	const persisted = readPersistedChatsPageState();
 	if (!persisted) {
@@ -100,6 +101,7 @@ export function buildInitialChatsModel(): InitialChatsModel {
 			selectedTabId: t.tabId,
 			tabs: [t],
 			scrollTopByTab: {},
+			topItemIndexByTab: {},
 			lastActivatedAtByTab: {},
 		};
 	}
@@ -143,6 +145,7 @@ export function buildInitialChatsModel(): InitialChatsModel {
 		selectedTabId: selected,
 		tabs: nonEmptyTabs,
 		scrollTopByTab: persisted.scrollTopByTab ?? {},
+		topItemIndexByTab: persisted.topItemIndexByTab ?? {},
 		lastActivatedAtByTab: persisted.lastActivatedAtByTab ?? {},
 	};
 }

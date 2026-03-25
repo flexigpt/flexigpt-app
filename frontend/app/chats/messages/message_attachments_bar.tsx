@@ -969,7 +969,10 @@ export function MessageAttachmentsBar({
 	}
 
 	return (
-		<div className="flex min-h-8 max-w-full min-w-0 items-center gap-1 overflow-x-auto text-xs">
+		<div
+			className="flex min-h-8 max-w-full min-w-0 items-center gap-1 overflow-x-auto text-xs"
+			style={{ scrollbarGutter: 'stable' }}
+		>
 			{hasAttachments && <AttachmentsGroupChip attachments={attachments ?? []} />}
 
 			{/* Regular tools for this turn */}

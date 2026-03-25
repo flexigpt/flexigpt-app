@@ -10,7 +10,7 @@ import {
 	useSyncExternalStore,
 } from 'react';
 
-import { type StateSnapshot, Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { Conversation, ConversationMessage } from '@/spec/conversation';
@@ -44,7 +44,11 @@ import {
 	initConversationMessage,
 	shouldPersistAssistantModelParam,
 } from '@/chats/conversation/hydration_helper';
-import { VIRTUOSO_AT_BOTTOM_THRESHOLD } from '@/chats/conversation/virtuoso_config';
+import {
+	type SavedVirtuosoState,
+	VIRTUOSO_AT_BOTTOM_THRESHOLD,
+	VirtuosoList,
+} from '@/chats/conversation/virtuoso_utils';
 import { sliceMessagesForSend } from '@/chats/inputarea/assitantcontexts/previous_messages_helper';
 import type { InputBoxHandle } from '@/chats/inputarea/input_box';
 import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/inputarea/input_editor_utils';
@@ -56,6 +60,14 @@ const EMPTY_MESSAGES: ConversationMessage[] = [];
 
 type StreamChannelBuffer = { chunks: string[]; flushedIdx: number; display: string };
 type StreamBuffer = { text: StreamChannelBuffer; thinking: StreamChannelBuffer };
+
+function getConversationModifiedAtMs(conversation?: Conversation): number {
+	const raw = conversation?.modifiedAt;
+	if (!raw) return 0;
+
+	const ms = raw instanceof Date ? raw.getTime() : new Date(raw).getTime();
+	return Number.isFinite(ms) ? ms : 0;
+}
 
 function StreamingLastMessage(props: {
 	message: ConversationMessage;
@@ -85,14 +97,6 @@ function StreamingLastMessage(props: {
 	);
 }
 
-/**
- * Custom Virtuoso List container.
- * Defined outside the component for referential stability.
- */
-const VirtuosoList = forwardRef<HTMLDivElement, any>(function VirtuosoList({ className, ...props }, ref) {
-	return <div ref={ref} {...props} className={`mx-auto w-11/12 xl:w-5/6 ${className ?? ''}`} />;
-});
-
 export type ConversationAreaHandle = {
 	disposeTabRuntime: (tabId: string) => void;
 	clearStreamForTab: (tabId: string) => void;
@@ -107,6 +111,7 @@ export type ConversationAreaHandle = {
 	setScrollTopForTab: (tabId: string, top: number) => void;
 	resetScrollToTop: (tabId: string) => void;
 	getScrollTopByTabSnapshot: () => Record<string, number>;
+	getTopItemIndexByTabSnapshot: () => Record<string, number>;
 };
 
 type ConversationAreaProps = {
@@ -118,6 +123,7 @@ type ConversationAreaProps = {
 
 	// Persisted scroll restore seed (from storage)
 	initialScrollTopByTab?: Record<string, number>;
+	initialTopItemIndexByTab?: Record<string, number>;
 
 	// State mutations remain in the page; this component owns "conversation runtime":
 	// streaming buffers, abort controllers, input refs, scroll restoration, send/edit.
@@ -126,7 +132,15 @@ type ConversationAreaProps = {
 };
 
 export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationAreaProps>(function ConversationArea(
-	{ tabs, selectedTabId, shortcutConfig, initialScrollTopByTab, updateTab, saveUpdatedConversation },
+	{
+		tabs,
+		selectedTabId,
+		shortcutConfig,
+		initialScrollTopByTab,
+		initialTopItemIndexByTab,
+		updateTab,
+		saveUpdatedConversation,
+	},
 	ref
 ) {
 	// ---------------- Tabs ref (for async safety) ----------------
@@ -144,6 +158,9 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	const messages = activeTab?.conversation?.messages ?? EMPTY_MESSAGES;
 	const messageCount = messages.length;
 
+	const activeConversationModifiedAtMs = getConversationModifiedAtMs(activeTab?.conversation);
+	const activeLastMessageId = messageCount > 0 ? (messages[messageCount - 1]?.id ?? null) : null;
+
 	// PERF: O(1) existence checks (used in async paths)
 	const tabIdSet = useMemo(() => new Set(tabs.map(t => t.tabId)), [tabs]);
 	const tabIdSetRef = useRef(tabIdSet);
@@ -156,7 +173,8 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	const tokensReceivedByTab = useRef(new Map<string, boolean | null>());
 
 	const virtuosoRef = useRef<VirtuosoHandle>(null);
-	const virtuosoStateByTabRef = useRef(new Map<string, StateSnapshot>());
+	const virtuosoStateByTabRef = useRef(new Map<string, SavedVirtuosoState>());
+
 	const restoredInitialScrollByTabRef = useRef(new Set<string>());
 
 	const getAbortRef = useCallback((tabId: string) => {
@@ -274,8 +292,19 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		if (!handle) return;
 
 		const stateByTab = virtuosoStateByTabRef.current;
+		const tab = tabsRef.current.find(t => t.tabId === tabId);
+		const tabMessages = tab?.conversation.messages ?? EMPTY_MESSAGES;
+		const savedStateMeta = {
+			modifiedAtMs: getConversationModifiedAtMs(tab?.conversation),
+			messageCount: tabMessages.length,
+			lastMessageId: tabMessages[tabMessages.length - 1]?.id ?? null,
+		};
+
 		handle.getState(state => {
-			stateByTab.set(tabId, state);
+			stateByTab.set(tabId, {
+				snapshot: state,
+				...savedStateMeta,
+			});
 		});
 	}, []);
 
@@ -385,6 +414,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 	// Scroll position restore per tab
 	const scrollTopByTab = useRef(new Map<string, number>());
+	const topItemIndexByTabRef = useRef(new Map<string, number>());
 
 	// Seed scroll positions from persisted state (once)
 	const seededScrollFromStorageRef = useRef(false);
@@ -396,6 +426,28 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			}
 		}
 	}
+
+	const seededTopItemIndexFromStorageRef = useRef(false);
+	if (!seededTopItemIndexFromStorageRef.current) {
+		seededTopItemIndexFromStorageRef.current = true;
+		if (initialTopItemIndexByTab) {
+			for (const [id, topItemIndex] of Object.entries(initialTopItemIndexByTab)) {
+				if (typeof topItemIndex === 'number') topItemIndexByTabRef.current.set(id, topItemIndex);
+			}
+		}
+	}
+
+	const shouldPreserveRestoreSeed = useCallback((tabId: string) => {
+		if (restoredInitialScrollByTabRef.current.has(tabId)) return false;
+
+		const tab = tabsRef.current.find(t => t.tabId === tabId);
+		if (!tab) return false;
+
+		const savedScrollTop = scrollTopByTab.current.get(tabId) ?? 0;
+		const savedTopItemIndex = topItemIndexByTabRef.current.get(tabId) ?? 0;
+
+		return tab.isHydrating || savedScrollTop > 0 || savedTopItemIndex > 0;
+	}, []);
 
 	const disposeTabRuntime = useCallback(
 		(tabId: string) => {
@@ -415,6 +467,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 			inputRefs.current.delete(tabId);
 			scrollTopByTab.current.delete(tabId);
+			topItemIndexByTabRef.current.delete(tabId);
 
 			const timer = notifyTimersRef.current.get(tabId);
 			if (timer) window.clearTimeout(timer);
@@ -482,24 +535,29 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	// Bridge Virtuoso's scroller element so we can track scrollTop per-tab.
 	const scrollListenerCleanupRef = useRef<(() => void) | null>(null);
 
-	const handleScrollerRef = useCallback((el: HTMLElement | Window | null) => {
-		scrollListenerCleanupRef.current?.();
-		scrollListenerCleanupRef.current = null;
+	const handleScrollerRef = useCallback(
+		(el: HTMLElement | Window | null) => {
+			scrollListenerCleanupRef.current?.();
+			scrollListenerCleanupRef.current = null;
 
-		const htmlEl = el instanceof HTMLElement ? el : null;
+			const htmlEl = el instanceof HTMLElement ? el : null;
 
-		if (htmlEl) {
-			const handler = () => {
+			if (htmlEl) {
 				const tabId = selectedTabIdRef.current;
-				scrollTopByTab.current.set(tabId, htmlEl.scrollTop);
-			};
-			handler();
-			htmlEl.addEventListener('scroll', handler, { passive: true });
-			scrollListenerCleanupRef.current = () => {
-				htmlEl.removeEventListener('scroll', handler);
-			};
-		}
-	}, []);
+				const handler = () => {
+					if (!tabId) return;
+					if (shouldPreserveRestoreSeed(tabId)) return;
+					scrollTopByTab.current.set(tabId, htmlEl.scrollTop);
+				};
+
+				htmlEl.addEventListener('scroll', handler, { passive: true });
+				scrollListenerCleanupRef.current = () => {
+					htmlEl.removeEventListener('scroll', handler);
+				};
+			}
+		},
+		[shouldPreserveRestoreSeed]
+	);
 
 	// Save Virtuoso measurement + scroll state when switching away from a tab.
 	// This is much more reliable than restoring only a raw scrollTop.
@@ -534,13 +592,50 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 				const lastIndex = (tab?.conversation.messages.length ?? 0) - 1;
 				if (lastIndex < 0) return;
 
-				virtuosoRef.current?.scrollToIndex({ index: lastIndex, align: 'end', behavior: 'smooth' });
+				virtuosoRef.current?.scrollToIndex({ index: lastIndex, align: 'end', behavior: 'auto' });
 			});
 		});
 	}, []);
 
-	const activeVirtuosoState = virtuosoStateByTabRef.current.get(selectedTabId);
+	const activeVirtuosoStateRecord = virtuosoStateByTabRef.current.get(selectedTabId);
+	const activeVirtuosoState =
+		activeVirtuosoStateRecord &&
+		activeVirtuosoStateRecord.modifiedAtMs === activeConversationModifiedAtMs &&
+		activeVirtuosoStateRecord.messageCount === messageCount &&
+		activeVirtuosoStateRecord.lastMessageId === activeLastMessageId
+			? activeVirtuosoStateRecord.snapshot
+			: undefined;
 
+	useEffect(() => {
+		if (activeVirtuosoStateRecord && !activeVirtuosoState) {
+			virtuosoStateByTabRef.current.delete(selectedTabId);
+		}
+	}, [activeVirtuosoState, activeVirtuosoStateRecord, selectedTabId]);
+
+	const savedTopItemIndex = topItemIndexByTabRef.current.get(selectedTabId);
+	const hasInitialTopItemIndex =
+		!activeVirtuosoState &&
+		typeof savedTopItemIndex === 'number' &&
+		Number.isFinite(savedTopItemIndex) &&
+		savedTopItemIndex > 0 &&
+		savedTopItemIndex < messageCount;
+
+	const savedInitialScrollTop = scrollTopByTab.current.get(selectedTabId) ?? 0;
+
+	const initialPositionProps = activeVirtuosoState
+		? {}
+		: hasInitialTopItemIndex
+			? {
+					initialTopMostItemIndex: {
+						index: savedTopItemIndex,
+						align: 'start' as const,
+					},
+				}
+			: Number.isFinite(savedInitialScrollTop) && savedInitialScrollTop > 0
+				? {
+						initialScrollTop: savedInitialScrollTop,
+					}
+				: {};
 	const scrollActiveToTop = useCallback(() => {
 		virtuosoRef.current?.scrollToIndex({ index: 0, align: 'start', behavior: 'auto' });
 	}, []);
@@ -554,6 +649,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 	const resetScrollToTop = useCallback((tabId: string) => {
 		scrollTopByTab.current.set(tabId, 0);
+		topItemIndexByTabRef.current.set(tabId, 0);
 		virtuosoStateByTabRef.current.delete(tabId);
 		restoredInitialScrollByTabRef.current.add(tabId);
 		if (selectedTabIdRef.current !== tabId) return;
@@ -563,6 +659,12 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	const getScrollTopByTabSnapshot = useCallback(() => {
 		const obj: Record<string, number> = {};
 		for (const [k, v] of scrollTopByTab.current.entries()) obj[k] = v;
+		return obj;
+	}, []);
+
+	const getTopItemIndexByTabSnapshot = useCallback(() => {
+		const obj: Record<string, number> = {};
+		for (const [k, v] of topItemIndexByTabRef.current.entries()) obj[k] = v;
 		return obj;
 	}, []);
 
@@ -1018,16 +1120,18 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			setScrollTopForTab,
 			resetScrollToTop,
 			getScrollTopByTabSnapshot,
+			getTopItemIndexByTabSnapshot,
 		}),
 		[
 			clearStreamForTab,
 			disposeTabRuntime,
 			focusInput,
-			resetComposerForNewConversation,
 			getScrollTopByTabSnapshot,
+			getTopItemIndexByTabSnapshot,
 			openAttachmentMenu,
 			openTemplateMenu,
 			openToolMenu,
+			resetComposerForNewConversation,
 			resetScrollToTop,
 			setScrollTopForTab,
 			syncComposerFromConversation,
@@ -1060,28 +1164,84 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 	const computeItemKey = useCallback((_index: number, message: ConversationMessage) => message.id, []);
 
-	// First restore after async hydration: if we do not yet have a Virtuoso
-	// state snapshot for this tab, apply the saved scrollTop once after the
-	// real messages have mounted.
-	useEffect(() => {
-		const tabId = selectedTabId;
-		if (!tabId || activeTabIsHydrating) return;
-		if (messageCount === 0) return;
-		if (activeVirtuosoState) return;
-		if (restoredInitialScrollByTabRef.current.has(tabId)) return;
+	// When switching to a tab that already has data on mount, the initial
+	// position props are responsible for restoration. Mark that as handled so
+	// we don't do a second restore in an effect.
+	const previousSelectedTabIdRef = useRef<string | null>(null);
 
-		const savedTop = scrollTopByTab.current.get(tabId) ?? 0;
-		if (savedTop <= 0) {
-			restoredInitialScrollByTabRef.current.add(tabId);
-			return;
+	useEffect(() => {
+		const previousSelectedTabId = previousSelectedTabIdRef.current;
+		const switchedTabs = previousSelectedTabId !== selectedTabId;
+
+		if (switchedTabs && !activeVirtuosoState && messageCount > 0) {
+			restoredInitialScrollByTabRef.current.add(selectedTabId);
 		}
 
-		requestAnimationFrame(() => {
-			if (selectedTabIdRef.current !== tabId) return;
-			virtuosoRef.current?.scrollTo({ top: savedTop, behavior: 'smooth' });
-			restoredInitialScrollByTabRef.current.add(tabId);
-		});
-	}, [selectedTabId, activeVirtuosoState, activeTabIsHydrating, messageCount]);
+		previousSelectedTabIdRef.current = selectedTabId;
+	}, [selectedTabId, activeVirtuosoState, messageCount]);
+
+	// First restore after async hydration / delayed data arrival.
+	// Use auto restore, not smooth, and prefer top item index over raw scrollTop.
+	const previousSelectedRenderRef = useRef({
+		tabId: selectedTabId,
+		isHydrating: activeTabIsHydrating,
+		messageCount,
+	});
+	useEffect(() => {
+		const previous = previousSelectedRenderRef.current;
+		const sameTab = previous.tabId === selectedTabId;
+		const justBecameRenderable =
+			sameTab && ((previous.isHydrating && !activeTabIsHydrating) || (previous.messageCount === 0 && messageCount > 0));
+
+		if (
+			selectedTabId &&
+			justBecameRenderable &&
+			!activeTabIsHydrating &&
+			messageCount > 0 &&
+			!activeVirtuosoState &&
+			!restoredInitialScrollByTabRef.current.has(selectedTabId)
+		) {
+			const restoreTabId = selectedTabId;
+			const restoreTopItemIndex = topItemIndexByTabRef.current.get(restoreTabId);
+			const canRestoreByTopItemIndex =
+				typeof restoreTopItemIndex === 'number' && restoreTopItemIndex > 0 && restoreTopItemIndex < messageCount;
+			const restoreScrollTop = scrollTopByTab.current.get(restoreTabId) ?? 0;
+
+			requestAnimationFrame(() => {
+				if (selectedTabIdRef.current !== restoreTabId) return;
+
+				if (canRestoreByTopItemIndex) {
+					const currentTab = tabsRef.current.find(t => t.tabId === restoreTabId);
+					const currentMessageCount = currentTab?.conversation.messages.length ?? 0;
+					if (currentMessageCount > 0) {
+						virtuosoRef.current?.scrollToIndex({
+							index: Math.min(restoreTopItemIndex, currentMessageCount - 1),
+							align: 'start',
+							behavior: 'auto',
+						});
+					}
+				} else if (restoreScrollTop > 0) {
+					virtuosoRef.current?.scrollTo({ top: restoreScrollTop, behavior: 'auto' });
+				}
+
+				restoredInitialScrollByTabRef.current.add(restoreTabId);
+			});
+		}
+
+		previousSelectedRenderRef.current = {
+			tabId: selectedTabId,
+			isHydrating: activeTabIsHydrating,
+			messageCount,
+		};
+	}, [selectedTabId, activeTabIsHydrating, messageCount, activeVirtuosoState]);
+
+	const followActiveOutput = useCallback(
+		(atBottom: boolean) => {
+			if (activeTabIsHydrating) return false;
+			return atBottom;
+		},
+		[activeTabIsHydrating]
+	);
 
 	const itemContent = useCallback(
 		(index: number, message: ConversationMessage) => {
@@ -1142,10 +1302,16 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 					data={messages}
 					computeItemKey={computeItemKey}
 					restoreStateFrom={activeVirtuosoState}
-					initialScrollTop={activeVirtuosoState ? undefined : (scrollTopByTab.current.get(selectedTabId) ?? 0)}
+					{...initialPositionProps}
+					followOutput={followActiveOutput}
 					atBottomThreshold={VIRTUOSO_AT_BOTTOM_THRESHOLD}
 					// scrollSeekConfiguration={VIRTUOSO_SCROLL_SEEK}
-					increaseViewportBy={{ top: 500, bottom: 800 }}
+					increaseViewportBy={{ top: 300, bottom: 300 }}
+					rangeChanged={range => {
+						if (!selectedTabId) return;
+						if (shouldPreserveRestoreSeed(selectedTabId)) return;
+						topItemIndexByTabRef.current.set(selectedTabId, range.startIndex);
+					}}
 					atBottomStateChange={atBottom => {
 						setIsAtBottom(atBottom);
 					}}
@@ -1154,7 +1320,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 					itemContent={itemContent}
 					components={virtuosoComponents}
 					className="h-full w-full overscroll-contain py-1"
-					style={{ scrollbarGutter: 'stable both-edges' }}
+					style={{ scrollbarGutter: 'stable both-edges', overflowAnchor: 'none' }}
 				/>
 
 				<div className="pointer-events-none absolute right-4 bottom-16 z-10 xl:right-24">
