@@ -607,6 +607,7 @@ export function useAssistantContextState(): AssistantContextController {
 
 			setSelectedModel(nextSelectedModel);
 			setIsHybridReasoningEnabled(nextIsHybridReasoningEnabled);
+			setIncludePreviousMessages(nextSelectedModel.includePreviousMessages);
 			setPromptSelectionState(null, Boolean(nextSelectedModel.systemPrompt.trim()), []);
 		})();
 

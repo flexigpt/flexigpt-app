@@ -179,51 +179,56 @@ export function AssistantPresetDropdown({
 										</div>
 
 										{isSelected ? (
-											<div className="border-base-300 mt-2 ml-5 flex flex-wrap items-center gap-2 border-t pt-2">
-												<button
-													type="button"
-													className="btn btn-ghost btn-xs rounded-lg"
-													disabled={isApplying}
-													onClick={() => {
-														void onReapplySelectedPreset();
-													}}
-													title={
-														selectedPresetModifiedLabels.length > 0
-															? `Reset preset-managed sections: ${selectedPresetModifiedLabels.join(', ')}`
-															: 'Reapply current assistant preset'
-													}
-												>
-													<FiRefreshCcw size={14} className="mr-1" />
-													{selectedPresetModifiedLabels.length > 0 ? 'Reset to preset' : 'Reapply preset'}
-												</button>
+											<div className="border-base-300 mt-2 ml-5 flex flex-wrap items-center justify-between gap-1 border-t p-0 pt-1">
+												<div className="flex">
+													<span
+														className={`badge badge-xs ${selectedPresetModifiedLabels.length > 0 ? 'badge-warning' : 'badge-success'}`}
+														title={
+															selectedPresetModifiedLabels.length > 0
+																? `Modified sections: ${selectedPresetModifiedLabels.join(', ')}`
+																: 'Preset-managed sections are currently in sync'
+														}
+													>
+														{selectedPresetModifiedLabels.length > 0 ? 'Modified' : 'In sync'}
+													</span>
 
-												<button
-													type="button"
-													className="btn btn-ghost btn-xs rounded-lg"
-													disabled={isApplying || isBasePreset || !canResetToBasePreset}
-													onClick={() => {
-														void onResetToBasePreset();
-													}}
-													title={
-														isBasePreset ? 'Base preset is already active' : 'Switch back to the base assistant preset'
-													}
-												>
-													<FiTrash2 size={14} className="mr-1" />
-													Clear to base
-												</button>
+													{isBasePreset ? <span className="badge badge-ghost badge-xs">Base</span> : null}
+												</div>
+												<div className="flex">
+													<button
+														type="button"
+														className="btn btn-ghost btn-xs rounded-lg"
+														disabled={isApplying}
+														onClick={() => {
+															void onReapplySelectedPreset();
+														}}
+														title={
+															selectedPresetModifiedLabels.length > 0
+																? `Reset preset-managed sections: ${selectedPresetModifiedLabels.join(', ')}`
+																: 'Reapply current assistant preset'
+														}
+													>
+														<FiRefreshCcw size={14} className="mr-1" />
+														{selectedPresetModifiedLabels.length > 0 ? 'Reset' : 'Reapply'}
+													</button>
 
-												<span
-													className={`badge badge-xs ${selectedPresetModifiedLabels.length > 0 ? 'badge-warning' : 'badge-success'}`}
-													title={
-														selectedPresetModifiedLabels.length > 0
-															? `Modified sections: ${selectedPresetModifiedLabels.join(', ')}`
-															: 'Preset-managed sections are currently in sync'
-													}
-												>
-													{selectedPresetModifiedLabels.length > 0 ? 'Modified' : 'In sync'}
-												</span>
-
-												{isBasePreset ? <span className="badge badge-ghost badge-xs">Base</span> : null}
+													<button
+														type="button"
+														className="btn btn-ghost btn-xs rounded-lg"
+														disabled={isApplying || isBasePreset || !canResetToBasePreset}
+														onClick={() => {
+															void onResetToBasePreset();
+														}}
+														title={
+															isBasePreset
+																? 'Base preset is already active'
+																: 'Switch back to the base assistant preset'
+														}
+													>
+														<FiTrash2 size={14} className="mr-1" />
+														Clear to base
+													</button>
+												</div>
 											</div>
 										) : null}
 									</div>

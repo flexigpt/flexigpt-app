@@ -1,4 +1,4 @@
-import { forwardRef, type RefObject, useCallback, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, type RefObject, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { RestorableConversationContext } from '@/spec/conversation';
@@ -63,6 +63,7 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 	const showAbortModal = isGenerating && abortConfirmationRequested;
 
 	const [assistantRuntimeSnapshot, setAssistantRuntimeSnapshot] = useState(EMPTY_ASSISTANT_PRESET_RUNTIME_SNAPSHOT);
+	const pendingPresetResolutionModeRef = useRef<'none' | 'ensure-active' | 'track-default'>('ensure-active');
 
 	const applyAssistantPresetRuntimeSelections = useCallback((prepared: AssistantPresetPreparedApplication) => {
 		if (prepared.runtimeSelections.hasToolsSelection) {
@@ -94,6 +95,41 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 		applyRuntimeSelections: applyAssistantPresetRuntimeSelections,
 	});
 
+	const flushPendingPresetResolution = useCallback(async () => {
+		if (!assistantContext.modelOptionsLoaded || assistantPreset.loading || assistantPreset.isApplying) {
+			return false;
+		}
+
+		if (pendingPresetResolutionModeRef.current === 'track-default') {
+			const ok = await assistantPreset.trackDefaultPresetWithoutApplying();
+			if (ok) {
+				pendingPresetResolutionModeRef.current = 'none';
+			}
+			return ok;
+		}
+
+		if (pendingPresetResolutionModeRef.current === 'ensure-active') {
+			const ok = await assistantPreset.ensureActivePreset();
+			if (ok) {
+				pendingPresetResolutionModeRef.current = 'none';
+			}
+			return ok;
+		}
+
+		return true;
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [
+		assistantContext.modelOptionsLoaded,
+		assistantPreset.ensureActivePreset,
+		assistantPreset.isApplying,
+		assistantPreset.loading,
+		assistantPreset.trackDefaultPresetWithoutApplying,
+	]);
+
+	useEffect(() => {
+		void flushPendingPresetResolution();
+	}, [flushPendingPresetResolution]);
+
 	const handleSubmitMessage = (payload: EditorSubmitPayload) => {
 		// Clear any stale abort confirmation request before starting a new send.
 		setAbortConfirmationRequested(false);
@@ -115,6 +151,7 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 			},
 			resetForNewConversation: async () => {
 				setAbortConfirmationRequested(false);
+				pendingPresetResolutionModeRef.current = 'none';
 				inputAreaRef.current?.resetEditor();
 				inputAreaRef.current?.setConversationToolsFromChoices([]);
 				inputAreaRef.current?.setWebSearchFromChoices([]);
@@ -123,7 +160,11 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 				setAssistantRuntimeSnapshot(EMPTY_ASSISTANT_PRESET_RUNTIME_SNAPSHOT);
 
 				assistantContext.resetForNewConversation();
-				await assistantPreset.resetToBasePreset();
+				const ok = await assistantPreset.resetToBasePreset();
+				if (!ok) {
+					pendingPresetResolutionModeRef.current = 'ensure-active';
+					void flushPendingPresetResolution();
+				}
 			},
 
 			openTemplateMenu: () => {
@@ -180,10 +221,11 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 					webSearchChoices: [...context.webSearchChoices],
 					enabledSkillRefs: [...context.enabledSkillRefs],
 				});
-				void assistantPreset.trackDefaultPresetWithoutApplying();
+				pendingPresetResolutionModeRef.current = 'track-default';
+				void flushPendingPresetResolution();
 			},
 		}),
-		[assistantContext, assistantPreset, chatOptions]
+		[assistantContext, assistantPreset, chatOptions, flushPendingPresetResolution]
 	);
 
 	return (

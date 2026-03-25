@@ -4,7 +4,7 @@
 	"slug": "fs-exec",
 	"version": "v1.0.0",
 	"displayName": "Files, Text and Shell Tools",
-	"description": "Built-in assistant preset with file-system, text, and shell/ scrip execution tools enabled.",
+	"description": "Built-in assistant preset with file-system, text, and shell/script execution tools enabled.",
 	"isEnabled": true,
 	"isBuiltIn": true,
 	"startingIncludeModelSystemPrompt": true,

@@ -3,8 +3,7 @@
 ## Laundry list
 
 - AssistantPreset
-  - [ ] have a default "empty" assistant i.e all allowed.
-  - [ ] may also need a default bundle for editable instructions only sys prompts that people can add to directly from chat.
+  - [x] have a default "empty" assistant i.e all allowed.
   - [x] review for and handle stale refs in the preset, no fk present so need to validate properly.
   - [x] assistant add edit.
     - [x] tools should have args only if args schema is present
@@ -17,7 +16,8 @@
   - [ ] in skills world, especially with artifact driven dev, we can almost get away with without sending a lot of things again and again, latest context and last 1/2 chats. attachments may pose a problem here, but can be thought through properly so that these things are persisted properly.
 
 - [ ] Sys prompt:
-  - [ ] We may want to have a explicit prompt saying that use explicit tools rather than shell wherever possible.
+  - [ ] may also need a default bundle for editable instructions only sys prompts that people can add to directly from chat.
+  - [x] We may want to have a explicit prompt saying that use explicit tools rather than shell wherever possible.
   - [x] store it as prompt templates.
   - [x] look at prompt templates structure and see how to have sys prompts separate than body prompts
 

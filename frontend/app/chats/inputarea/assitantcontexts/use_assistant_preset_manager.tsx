@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import {
 	BASE_ASSISTANT_PRESET_BUNDLEID,
@@ -43,6 +43,7 @@ export interface AssistantPresetManagerState {
 	modificationSummary: AssistantPresetModificationSummary;
 
 	resetToBasePreset: () => Promise<boolean>;
+	ensureActivePreset: () => Promise<boolean>;
 	selectPreset: (presetKey: string) => Promise<boolean>;
 	reapplySelectedPreset: () => Promise<boolean>;
 	clearSelectedPreset: () => void;
@@ -98,13 +99,6 @@ export function useAssistantPresetManager(args: {
 		setSelectionActionError(null);
 	}, [setSelectionActionError]);
 
-	const suppressInvariantRef = useRef(false);
-	const pendingDefaultTrackingRef = useRef(false);
-	const autoAppliedInvariantPresetKeyRef = useRef<string | null>(null);
-	const cancelPendingDefaultTracking = useCallback(() => {
-		pendingDefaultTrackingRef.current = false;
-		suppressInvariantRef.current = false;
-	}, []);
 	const basePreset = useMemo(
 		() =>
 			findBaseAssistantPresetOption(
@@ -115,6 +109,8 @@ export function useAssistantPresetManager(args: {
 			),
 		[assistantPresetOptions]
 	);
+	const isPresetLayerReady = !assistantPresetsLoading && modelOptionsLoaded;
+
 	const invariantFallbackPreset = useMemo(
 		() => findDefaultAssistantPresetOption(assistantPresetOptions),
 		[assistantPresetOptions]
@@ -158,7 +154,6 @@ export function useAssistantPresetManager(args: {
 
 	const applyPresetByKey = useCallback(
 		async (presetKey: string): Promise<boolean> => {
-			cancelPendingDefaultTracking();
 			const requestSeq = applyRequestSeqRef.current + 1;
 			applyRequestSeqRef.current = requestSeq;
 			setIsApplying(true);
@@ -199,87 +194,69 @@ export function useAssistantPresetManager(args: {
 		[
 			applyPreparedAssistantPreset,
 			applyRuntimeSelections,
-			cancelPendingDefaultTracking,
 			clearSelectionActionError,
 			prepareAssistantPresetApplication,
 			setSelectionActionError,
 		]
 	);
 
-	const resolveDefaultPresetTrackingWithoutApplying = useCallback(async (): Promise<boolean> => {
-		if (assistantPresetsLoading || !modelOptionsLoaded) {
-			return false;
-		}
+	const trackPresetWithoutApplying = useCallback(
+		async (presetKey: string): Promise<boolean> => {
+			const requestSeq = applyRequestSeqRef.current + 1;
+			applyRequestSeqRef.current = requestSeq;
+			clearSelectionActionError();
+			try {
+				const prepared = await prepareAssistantPresetApplication(presetKey);
+				if (applyRequestSeqRef.current !== requestSeq) {
+					return false;
+				}
 
-		const defaultPresetKey = invariantFallbackPresetKey;
-		if (!defaultPresetKey) {
-			pendingDefaultTrackingRef.current = false;
-			suppressInvariantRef.current = false;
-			setSelectionActionError(noSelectablePresetError);
+				if (!prepared) {
+					setSelectionActionError('Assistant preset not found.');
+					return false;
+				}
 
-			return false;
-		}
-
-		const requestSeq = applyRequestSeqRef.current + 1;
-		applyRequestSeqRef.current = requestSeq;
-		clearSelectionActionError();
-
-		try {
-			const prepared = await prepareAssistantPresetApplication(defaultPresetKey);
-			if (applyRequestSeqRef.current !== requestSeq) {
+				setSelectionState({
+					selectedPresetKey: presetKey,
+					appliedPresetApplication: prepared,
+					actionError: null,
+				});
+				return true;
+			} catch (error) {
+				if (applyRequestSeqRef.current !== requestSeq) {
+					return false;
+				}
+				console.error('Failed to track assistant preset without applying:', error);
+				setSelectionActionError(getErrorMessage(error, 'Failed to prepare assistant preset.'));
 				return false;
 			}
-
-			if (!prepared) {
-				setSelectionActionError('Assistant preset not found.');
-				return false;
-			}
-
-			autoAppliedInvariantPresetKeyRef.current = null;
-			setSelectionState({
-				selectedPresetKey: defaultPresetKey,
-				appliedPresetApplication: prepared,
-				actionError: null,
-			});
-			return true;
-		} catch (error) {
-			if (applyRequestSeqRef.current !== requestSeq) {
-				return false;
-			}
-			console.error('Failed to track default assistant preset:', error);
-			setSelectionActionError(getErrorMessage(error, 'Failed to prepare default assistant preset.'));
-			return false;
-		} finally {
-			if (applyRequestSeqRef.current === requestSeq) {
-				pendingDefaultTrackingRef.current = false;
-				suppressInvariantRef.current = false;
-			}
-		}
-	}, [
-		assistantPresetsLoading,
-		clearSelectionActionError,
-		invariantFallbackPresetKey,
-		modelOptionsLoaded,
-		noSelectablePresetError,
-		prepareAssistantPresetApplication,
-		setSelectionActionError,
-	]);
+		},
+		[clearSelectionActionError, prepareAssistantPresetApplication, setSelectionActionError]
+	);
 
 	const trackDefaultPresetWithoutApplying = useCallback(async (): Promise<boolean> => {
-		pendingDefaultTrackingRef.current = true;
-		suppressInvariantRef.current = true;
-
-		if (assistantPresetsLoading || !modelOptionsLoaded) {
+		if (!isPresetLayerReady) {
 			clearSelectionActionError();
 			return false;
 		}
+		if (!invariantFallbackPresetKey) {
+			if (assistantPresetOptions.length > 0) {
+				setSelectionActionError(noSelectablePresetError);
+			} else {
+				clearSelectionActionError();
+			}
+			return false;
+		}
 
-		return resolveDefaultPresetTrackingWithoutApplying();
+		return trackPresetWithoutApplying(invariantFallbackPresetKey);
 	}, [
-		assistantPresetsLoading,
+		assistantPresetOptions.length,
 		clearSelectionActionError,
-		modelOptionsLoaded,
-		resolveDefaultPresetTrackingWithoutApplying,
+		invariantFallbackPresetKey,
+		isPresetLayerReady,
+		noSelectablePresetError,
+		setSelectionActionError,
+		trackPresetWithoutApplying,
 	]);
 
 	const reapplySelectedPreset = useCallback(async (): Promise<boolean> => {
@@ -291,10 +268,42 @@ export function useAssistantPresetManager(args: {
 		return applyPresetByKey(presetKey);
 	}, [appliedPresetApplication?.presetKey, applyPresetByKey, selectedPresetKey]);
 
+	const ensureActivePreset = useCallback(async (): Promise<boolean> => {
+		if (activePresetKey || isApplying) {
+			return true;
+		}
+
+		if (!isPresetLayerReady) {
+			clearSelectionActionError();
+			return false;
+		}
+
+		if (!invariantFallbackPresetKey) {
+			if (assistantPresetOptions.length > 0) {
+				setSelectionActionError(noSelectablePresetError);
+			} else {
+				clearSelectionActionError();
+			}
+			return false;
+		}
+
+		return applyPresetByKey(invariantFallbackPresetKey);
+	}, [
+		activePresetKey,
+		applyPresetByKey,
+		assistantPresetOptions.length,
+		clearSelectionActionError,
+		invariantFallbackPresetKey,
+		isApplying,
+		isPresetLayerReady,
+		noSelectablePresetError,
+		setSelectionActionError,
+	]);
+
 	const resetToBasePreset = useCallback(async (): Promise<boolean> => {
 		const targetPresetKey = (basePreset?.isSelectable ? basePreset.key : null) ?? invariantFallbackPresetKey;
 		if (!targetPresetKey) {
-			if (assistantPresetsLoading || !modelOptionsLoaded) {
+			if (!isPresetLayerReady) {
 				clearSelectionActionError();
 				return false;
 			}
@@ -307,76 +316,18 @@ export function useAssistantPresetManager(args: {
 		return applyPresetByKey(targetPresetKey);
 	}, [
 		applyPresetByKey,
-		assistantPresetsLoading,
 		basePreset?.isSelectable,
 		basePreset?.key,
 		clearSelectionActionError,
 		invariantFallbackPresetKey,
-		modelOptionsLoaded,
+		isPresetLayerReady,
 		noSelectablePresetError,
 		setSelectionActionError,
 	]);
-
-	useEffect(() => {
-		autoAppliedInvariantPresetKeyRef.current = null;
-	}, [assistantPresetOptions, modelOptionsLoaded]);
 
 	const clearSelectedPreset = useCallback(() => {
 		void resetToBasePreset();
 	}, [resetToBasePreset]);
-
-	useEffect(() => {
-		if (!pendingDefaultTrackingRef.current) {
-			return;
-		}
-
-		if (assistantPresetsLoading || !modelOptionsLoaded) {
-			return;
-		}
-
-		void resolveDefaultPresetTrackingWithoutApplying();
-	}, [assistantPresetsLoading, modelOptionsLoaded, resolveDefaultPresetTrackingWithoutApplying]);
-
-	useEffect(() => {
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
-		if (activePresetKey) {
-			autoAppliedInvariantPresetKeyRef.current = null;
-			return;
-		}
-
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
-		if (suppressInvariantRef.current || assistantPresetsLoading || !modelOptionsLoaded || isApplying) {
-			return;
-		}
-
-		if (!invariantFallbackPresetKey) {
-			if (assistantPresetOptions.length === 0) {
-				return;
-			}
-
-			// eslint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change, react-you-might-not-need-an-effect/no-chain-state-updates
-			setSelectionActionError(noSelectablePresetError);
-			return;
-		}
-
-		if (autoAppliedInvariantPresetKeyRef.current === invariantFallbackPresetKey) {
-			return;
-		}
-
-		autoAppliedInvariantPresetKeyRef.current = invariantFallbackPresetKey;
-		void applyPresetByKey(invariantFallbackPresetKey);
-	}, [
-		activePresetKey,
-		applyPresetByKey,
-		assistantPresetOptions.length,
-		assistantPresetsLoading,
-		assistantPresetOptions,
-		modelOptionsLoaded,
-		invariantFallbackPresetKey,
-		isApplying,
-		noSelectablePresetError,
-		setSelectionActionError,
-	]);
 
 	return {
 		presetOptions: assistantPresetOptions,
@@ -395,6 +346,7 @@ export function useAssistantPresetManager(args: {
 
 		selectPreset: applyPresetByKey,
 		resetToBasePreset,
+		ensureActivePreset,
 
 		reapplySelectedPreset,
 		clearSelectedPreset,
