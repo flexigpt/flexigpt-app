@@ -200,11 +200,8 @@ export function useComposerTools({
 		() => getConversationToolArgsBlocked(conversationToolsState),
 		[conversationToolsState]
 	);
-	const conversationToolDefsPending = useMemo(
-		() => hasPendingConversationToolDefinitions(conversationToolsState, conversationToolDefsCacheRef.current),
-		[conversationToolsState]
-	);
-	const toolArgsBlocked = attachedToolArgsBlocked || conversationToolArgsBlocked || conversationToolDefsPending;
+
+	const toolArgsBlocked = attachedToolArgsBlocked || conversationToolArgsBlocked;
 	const toolArgsBlockedRef = useRef(toolArgsBlocked);
 
 	const lastAutoExecuteAttemptKeyRef = useRef<string | null>(null);
