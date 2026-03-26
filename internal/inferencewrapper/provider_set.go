@@ -343,8 +343,8 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	if req.OnStreamText != nil || req.OnStreamThinking != nil {
 		opts.StreamHandler = makeStreamHandler(req.OnStreamText, req.OnStreamThinking)
 		opts.StreamConfig = &inferenceSpec.StreamConfig{
-			FlushIntervalMillis: 64,
-			FlushChunkSize:      1024,
+			FlushIntervalMillis: 16,
+			FlushChunkSize:      256,
 		}
 	}
 

@@ -35,7 +35,7 @@ export const MessageContentCard = memo(function MessageContentCard({
 	renderAsMarkdown = true,
 }: MessageContentCardProps) {
 	const liveText = isStreaming ? streamedText : content;
-	// Backend already throttles 64ms.
+	// Backend already throttles few ms.
 	const textToRender = liveText;
 	const renderBusy = isBusy;
 
