@@ -7,11 +7,9 @@
   - [ ] with the number of skills present, maybe we dont want to enable all on click for the enable sills button, may be have a button at bottom on open that says enable all separately. also show collapsed bundles at start and then expanding if needed.
   - [ ] in skills world, especially with artifact driven dev, we can almost get away with without sending a lot of things again and again, latest context and last 1/2 chats. attachments may pose a problem here, but can be thought through properly so that these things are persisted properly.
 
-- [x] Sys prompt:
-  - [x] may also need a default bundle for editable instructions only sys prompts that people can add to directly from chat.
-
-- [ ] Tool calls customize
+- [ ] Tool calls
   - [ ] Some calls like editor replace text, create files, etc can be visually represented better via custom elements representing each.
+  - [ ] autoexec engine has issues with multipel tool calls. also the state machine is fragine when it comes to some running some resolving etc. deep dive and rectify.
 
 ## Features
 

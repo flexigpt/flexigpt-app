@@ -844,3 +844,6 @@
 
 - [x] context bar
   - [x] tooltips are needed. ariakit ones as daisyui ones can get cutoff
+
+- [x] Sys prompt:
+  - [x] may also need a default bundle for editable instructions only sys prompts that people can add to directly from chat.
