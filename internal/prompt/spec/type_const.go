@@ -12,6 +12,12 @@ const (
 	PromptDBFileName               = "prompts.fts.sqlite"
 	PromptBuiltInOverlayDBFileName = "promptsbuiltin.overlay.sqlite"
 
+	// BasePromptBundleID Reserved writable bundle that acts as the default scratch-pad for user prompts.
+	BasePromptBundleID          bundleitemutils.BundleID   = "019d2a53-964e-7700-b8b7-24573c722142"
+	BasePromptBundleSlug        bundleitemutils.BundleSlug = "base"
+	BasePromptBundleDisplayName                            = "Base"
+	BasePromptBundleDescription                            = "Editable starter bundle for custom prompts."
+
 	// SchemaVersion is the current on-disk schema version.
 	SchemaVersion = "2025-07-01"
 )
@@ -28,7 +34,8 @@ var (
 	ErrBundleNotEmpty        = errors.New("bundle still contains templates")
 	ErrTemplateNotFound      = errors.New("template not found")
 
-	ErrBuiltInReadOnly = errors.New("built-in resource is read-only")
+	ErrReservedBundleReadOnly = errors.New("reserved bundle metadata is read-only")
+	ErrBuiltInReadOnly        = errors.New("built-in resource is read-only")
 
 	ErrFTSDisabled = errors.New("FTS is disabled")
 )

@@ -6,20 +6,21 @@ go 1.25.0
 require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.0
 	github.com/adrg/xdg v0.5.3
-	github.com/danielgtaylor/huma/v2 v2.37.2
+	github.com/danielgtaylor/huma/v2 v2.37.3
 	github.com/flexigpt/agentskills-go v0.8.0
 	github.com/flexigpt/inference-go v0.9.5
-	github.com/flexigpt/llmtools-go v0.11.0
+	github.com/flexigpt/llmtools-go v0.12.0
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/google/uuid v1.6.0
 	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
 	github.com/markusmobius/go-trafilatura v1.12.2
 	github.com/ppipada/mapstore-go v0.1.4
-	github.com/wailsapp/wails/v2 v2.11.0
+	github.com/wailsapp/wails/v2 v2.12.0
 	golang.org/x/net v0.52.0
 )
 
 require (
+	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
 	github.com/JohannesKaufmann/dom v0.2.0 // indirect
 	github.com/RadhiFadlillah/whatlanggo v0.0.0-20240916001553-aac1f0f737fc // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect

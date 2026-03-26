@@ -83,7 +83,7 @@ modules:
   - name: wails
     buildsystem: simple
     build-commands:
-      - $GOROOT/bin/go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
+      - $GOROOT/bin/go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
 
   - name: FlexiGPT
     buildsystem: simple

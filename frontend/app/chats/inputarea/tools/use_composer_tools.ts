@@ -95,12 +95,21 @@ function isRunnableComposerToolCall(toolCall: UIToolCall): boolean {
 	return toolCall.type === ToolStoreChoiceType.Function || toolCall.type === ToolStoreChoiceType.Custom;
 }
 
-function getPendingRunnableToolCalls(toolCalls: UIToolCall[]): UIToolCall[] {
-	return toolCalls.filter(toolCall => toolCall.status === 'pending' && isRunnableComposerToolCall(toolCall));
+function getPendingRunnableToolCalls(toolCalls: UIToolCall[], autoExecuteOnly = false): UIToolCall[] {
+	return toolCalls.filter(toolCall => {
+		if (toolCall.status !== 'pending') return false;
+		if (!isRunnableComposerToolCall(toolCall)) return false;
+		if (autoExecuteOnly && !toolCall.toolStoreChoice?.autoExecute) return false;
+		return true;
+	});
 }
 
 function getPendingAutoExecuteToolCalls(toolCalls: UIToolCall[]): UIToolCall[] {
-	return getPendingRunnableToolCalls(toolCalls).filter(toolCall => toolCall.toolStoreChoice?.autoExecute);
+	return getPendingRunnableToolCalls(toolCalls, true);
+}
+
+function hasRunningRunnableToolCalls(toolCalls: UIToolCall[]): boolean {
+	return toolCalls.some(toolCall => toolCall.status === 'running' && isRunnableComposerToolCall(toolCall));
 }
 
 function hasFailedRunnableToolCalls(toolCalls: UIToolCall[]): boolean {
@@ -518,23 +527,36 @@ export function useComposerTools({
 		]
 	);
 
+	const drainPendingToolCalls = useCallback(
+		async (autoExecuteOnly: boolean): Promise<UIToolOutput[]> => {
+			const produced: UIToolOutput[] = [];
+
+			while (true) {
+				const pending = getPendingRunnableToolCalls(toolRuntimeStateRef.current.toolCalls, autoExecuteOnly);
+				if (pending.length === 0) break;
+
+				for (const toolCall of pending) {
+					const latest = toolRuntimeStateRef.current.toolCalls.find(current => current.id === toolCall.id);
+					if (!latest || latest.status !== 'pending') continue;
+					if (autoExecuteOnly && !latest.toolStoreChoice?.autoExecute) continue;
+
+					const out = await runToolCallInternal(latest);
+					if (out) produced.push(out);
+				}
+			}
+
+			return produced;
+		},
+		[runToolCallInternal]
+	);
+
 	/**
 	 * Run all currently pending tool calls (in sequence) and return the
 	 * UIToolOutput objects produced in this pass.
 	 */
 	const runAllPendingToolCalls = useCallback(async (): Promise<UIToolOutput[]> => {
-		const pending = toolRuntimeStateRef.current.toolCalls.filter(c => c.status === 'pending');
-		if (pending.length === 0) return [];
-
-		const produced: UIToolOutput[] = [];
-		for (const chip of pending) {
-			if (chip.type === ToolStoreChoiceType.Function || chip.type === ToolStoreChoiceType.Custom) {
-				const out = await runToolCallInternal(chip);
-				if (out) produced.push(out);
-			}
-		}
-		return produced;
-	}, [runToolCallInternal]);
+		return drainPendingToolCalls(false);
+	}, [drainPendingToolCalls]);
 
 	const handleRunSingleToolCall = useCallback(
 		async (id: string) => {
@@ -650,24 +672,14 @@ export function useComposerTools({
 		autoExecuteInFlightRef.current = true;
 
 		void (async () => {
-			let allAutoExecuteCallsCompleted = true;
-
 			try {
-				for (const toolCall of pendingAutoExecuteCalls) {
-					const latest = toolRuntimeStateRef.current.toolCalls.find(current => current.id === toolCall.id);
-					if (!latest || latest.status !== 'pending') continue;
-					if (!isRunnableComposerToolCall(latest)) continue;
-					if (!latest.toolStoreChoice?.autoExecute) continue;
-
-					const out = await runToolCallInternal(latest);
-					if (!out) {
-						allAutoExecuteCallsCompleted = false;
-					}
-				}
+				await drainPendingToolCalls(true);
 
 				const postRunToolCalls = toolRuntimeStateRef.current.toolCalls;
 				const remainingPendingRunnable = getPendingRunnableToolCalls(postRunToolCalls);
+				const hasRunningRunnable = hasRunningRunnableToolCalls(postRunToolCalls);
 				const hasFailedRunnable = hasFailedRunnableToolCalls(postRunToolCalls);
+				if (remainingPendingRunnable.length > 0 || hasRunningRunnable) return;
 
 				// Mixed case:
 				// - auto-exec calls have already run
@@ -677,7 +689,7 @@ export function useComposerTools({
 
 				// If any auto-exec invocation failed at runtime, keep the failed chip
 				// in the composer and do not auto-send.
-				if (!allAutoExecuteCallsCompleted || hasFailedRunnable || externalAutoExecuteBlockedRef.current) return;
+				if (hasFailedRunnable || externalAutoExecuteBlockedRef.current) return;
 
 				// Request the parent submit path; with no pending calls left, this becomes a plain send.
 				onAutoSubmitRequestRef.current?.();
@@ -697,7 +709,7 @@ export function useComposerTools({
 				}
 			}
 		})();
-	}, [isSubmittingRef, kickAutoExecutePendingToolCalls, runToolCallInternal]);
+	}, [drainPendingToolCalls, isSubmittingRef, kickAutoExecutePendingToolCalls]);
 
 	useLayoutEffect(() => {
 		runAutoExecutePendingToolCallsCheckRef.current = runAutoExecutePendingToolCallsCheck;

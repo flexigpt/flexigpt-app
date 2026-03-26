@@ -106,6 +106,14 @@ func NewPromptTemplateStore(baseDir string, opts ...Option) (*PromptTemplateStor
 	}
 
 	s.slugLock = newSlugLocks()
+
+	if err := s.ensureBaseBundleHydrated(); err != nil {
+		_ = s.templateStore.CloseAll()
+		_ = s.bundleStore.Close()
+		_ = s.builtinData.Close()
+		return nil, err
+	}
+
 	s.startCleanupLoop()
 	slog.Info("prompt-store ready", "baseDir", s.baseDir)
 	return s, nil
@@ -159,6 +167,18 @@ func (s *PromptTemplateStore) PutPromptBundle(
 	if err := bundleitemutils.ValidateBundleSlug(req.Body.Slug); err != nil {
 		return nil, err
 	}
+
+	if isBasePromptBundleID(req.BundleID) {
+		return nil, fmt.Errorf("%w: bundleID %q", spec.ErrReservedBundleReadOnly, req.BundleID)
+	}
+	if isBasePromptBundleSlug(req.Body.Slug) {
+		return nil, fmt.Errorf(
+			"%w: bundle slug %q is reserved",
+			spec.ErrConflict,
+			req.Body.Slug,
+		)
+	}
+
 	if s.builtinData != nil {
 		_, err := s.builtinData.GetBuiltInBundle(ctx, req.BundleID)
 		if err == nil {
@@ -212,6 +232,9 @@ func (s *PromptTemplateStore) PatchPromptBundle(
 	if req == nil || req.Body == nil || req.BundleID == "" {
 		return nil, fmt.Errorf("%w: bundleID required", spec.ErrInvalidRequest)
 	}
+	if isBasePromptBundleID(req.BundleID) {
+		return nil, fmt.Errorf("%w: bundleID %q", spec.ErrReservedBundleReadOnly, req.BundleID)
+	}
 
 	if s.builtinData != nil {
 		if _, err := s.builtinData.GetBuiltInBundle(ctx, req.BundleID); err == nil {
@@ -252,6 +275,10 @@ func (s *PromptTemplateStore) DeletePromptBundle(
 ) (*spec.DeletePromptBundleResponse, error) {
 	if req == nil || req.BundleID == "" {
 		return nil, fmt.Errorf("%w: bundleID required", spec.ErrInvalidRequest)
+	}
+
+	if isBasePromptBundleID(req.BundleID) {
+		return nil, fmt.Errorf("%w: bundleID %q", spec.ErrReservedBundleReadOnly, req.BundleID)
 	}
 
 	if s.builtinData != nil {
@@ -1193,6 +1220,92 @@ func (s *PromptTemplateStore) readAllBundles(forceFetch bool) (spec.AllBundles, 
 func (s *PromptTemplateStore) writeAllBundles(ab spec.AllBundles) error {
 	mp, _ := jsonencdec.StructWithJSONTagsToMap(ab)
 	return s.bundleStore.SetAll(mp)
+}
+
+// ensureBaseBundleHydrated creates the reserved writable base bundle if missing.
+// If an older version left it disabled or soft-deleted, revive it.
+//
+// Important: do not forcibly rewrite an existing non-empty slug here because
+// template directory paths depend on bundle slug.
+func (s *PromptTemplateStore) ensureBaseBundleHydrated() error {
+	s.sweepMu.Lock()
+	defer s.sweepMu.Unlock()
+
+	all, err := s.readAllBundles(false)
+	if err != nil {
+		return err
+	}
+	if all.Bundles == nil {
+		all.Bundles = map[bundleitemutils.BundleID]spec.PromptBundle{}
+	}
+
+	now := time.Now().UTC()
+
+	if b, ok := all.Bundles[spec.BasePromptBundleID]; ok {
+		changed := false
+
+		if b.SchemaVersion == "" {
+			b.SchemaVersion = spec.SchemaVersion
+			changed = true
+		}
+		if strings.TrimSpace(string(b.Slug)) == "" {
+			b.Slug = spec.BasePromptBundleSlug
+			changed = true
+		}
+		if strings.TrimSpace(b.DisplayName) == "" {
+			b.DisplayName = spec.BasePromptBundleDisplayName
+			changed = true
+		}
+		if strings.TrimSpace(b.Description) == "" {
+			b.Description = spec.BasePromptBundleDescription
+			changed = true
+		}
+		if b.CreatedAt.IsZero() {
+			b.CreatedAt = now
+			changed = true
+		}
+		if !b.IsEnabled {
+			b.IsEnabled = true
+			changed = true
+		}
+		if b.SoftDeletedAt != nil {
+			b.SoftDeletedAt = nil
+			changed = true
+		}
+		if b.IsBuiltIn {
+			b.IsBuiltIn = false
+			changed = true
+		}
+
+		if !changed {
+			return nil
+		}
+		b.ModifiedAt = now
+		all.Bundles[spec.BasePromptBundleID] = b
+		return s.writeAllBundles(all)
+	}
+
+	all.Bundles[spec.BasePromptBundleID] = spec.PromptBundle{
+		SchemaVersion: spec.SchemaVersion,
+		ID:            spec.BasePromptBundleID,
+		Slug:          spec.BasePromptBundleSlug,
+		DisplayName:   spec.BasePromptBundleDisplayName,
+		Description:   spec.BasePromptBundleDescription,
+		IsEnabled:     true,
+		CreatedAt:     now,
+		ModifiedAt:    now,
+		IsBuiltIn:     false,
+		SoftDeletedAt: nil,
+	}
+	return s.writeAllBundles(all)
+}
+
+func isBasePromptBundleID(id bundleitemutils.BundleID) bool {
+	return id == spec.BasePromptBundleID
+}
+
+func isBasePromptBundleSlug(slug bundleitemutils.BundleSlug) bool {
+	return slug == spec.BasePromptBundleSlug
 }
 
 // isSoftDeleted returns true if the bundle is soft-deleted.

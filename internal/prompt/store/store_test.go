@@ -343,6 +343,7 @@ func TestBundleListFiltering(t *testing.T) {
 			want := tc.expectUser
 			if tc.filterIDs == nil { // built-ins included
 				want += builtInCnt
+				want += 1 // The default base bundle.
 			}
 			if got != want {
 				t.Fatalf("expected %d bundles, got %d", want, got)

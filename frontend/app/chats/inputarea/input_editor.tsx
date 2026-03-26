@@ -19,7 +19,7 @@ import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { ProviderSDKType, UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { PromptTemplate } from '@/spec/prompt';
 import type { SkillRef } from '@/spec/skill';
-import type { ToolListItem, ToolStoreChoice } from '@/spec/tool';
+import { type ToolListItem, type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
 import { type ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { cssEscape } from '@/lib/text_utils';
@@ -676,6 +676,25 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 				const textToSend = hasTpl ? toPlainTextReplacingVariables(editor) : editor.api.string([]);
 				const finalToolOutputs: UIToolOutput[] = runtimeAfterRun.toolOutputs;
+				const unfinishedRunnableToolCalls = runtimeAfterRun.toolCalls.filter(
+					toolCall =>
+						(toolCall.status === 'pending' || toolCall.status === 'running') &&
+						(toolCall.type === ToolStoreChoiceType.Function || toolCall.type === ToolStoreChoiceType.Custom)
+				);
+				const failedRunnableToolCalls = runtimeAfterRun.toolCalls.filter(
+					toolCall =>
+						toolCall.status === 'failed' &&
+						(toolCall.type === ToolStoreChoiceType.Function || toolCall.type === ToolStoreChoiceType.Custom)
+				);
+
+				if (unfinishedRunnableToolCalls.length > 0) {
+					setSubmitError('Waiting for all tool calls to finish before sending.');
+					return;
+				}
+				if (failedRunnableToolCalls.length > 0) {
+					setSubmitError('Some tool calls failed. Retry or discard them before sending.');
+					return;
+				}
 
 				const hasNonEmptyText = textToSend.trim().length > 0;
 				const hasAttachmentsToSend = attachments.length > 0;
