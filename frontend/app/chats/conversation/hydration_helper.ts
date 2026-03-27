@@ -1,12 +1,9 @@
-// Adjust this import path to wherever your Attachment type lives
 import type { Attachment } from '@/spec/attachment';
 import {
 	type Conversation,
 	CONVERSATION_SCHEMA_VERSION,
 	type ConversationMessage,
 	type RestorableConversationContext,
-	type StoreConversation,
-	type StoreConversationMessage,
 } from '@/spec/conversation';
 import {
 	ContentItemKind,
@@ -15,16 +12,11 @@ import {
 	type InputOutputContentItemUnion,
 	type InputUnion,
 	type ModelParam,
-	type OutputUnion,
-	type ReasoningContent,
 	RoleEnum,
 	Status,
-	type ToolCall,
 	type ToolOutput,
 	ToolType,
-	type UIToolCall,
 	type UIToolOutput,
-	type URLCitation,
 } from '@/spec/inference';
 import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
@@ -36,12 +28,6 @@ import { getUUIDv7 } from '@/lib/uuid_utils';
 
 import { uiAttachmentToConversation } from '@/chats/composer/attachments/attachment_editor_utils';
 import type { EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
-import {
-	buildUIToolOutputFromToolOutput,
-	deriveUIFieldsFromOutputUnion,
-	getDebugDetailsMarkdown,
-} from '@/chats/conversation/completion_helper';
-import { collectToolCallsFromInputs, collectToolCallsFromOutputs } from '@/tools/lib/tool_call_utils';
 import { mapToolOutputsToToolOutputItems } from '@/tools/lib/tool_output_utils';
 
 export function initConversation(title = 'New Conversation'): Conversation {
@@ -56,11 +42,11 @@ export function initConversation(title = 'New Conversation'): Conversation {
 }
 
 export function initConversationMessage(role: RoleEnum): ConversationMessage {
-	const d = new Date();
+	const now = new Date();
 	return {
 		id: getUUIDv7(),
-		createdAt: d,
-		role: role,
+		createdAt: now,
+		role,
 		status: Status.None,
 		uiContent: '',
 	};
@@ -68,39 +54,36 @@ export function initConversationMessage(role: RoleEnum): ConversationMessage {
 
 function deriveConversationToolsFromMessages(messages: ConversationMessage[]): ToolStoreChoice[] {
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
-		const m = messages[i];
-		if (m.role !== RoleEnum.User) continue;
-		return (m.toolStoreChoices ?? []).filter(c => c.toolType !== ToolStoreChoiceType.WebSearch);
+		const message = messages[i];
+		if (message.role !== RoleEnum.User) continue;
+		return (message.toolStoreChoices ?? []).filter(choice => choice.toolType !== ToolStoreChoiceType.WebSearch);
 	}
 	return [];
 }
 
 function deriveWebSearchChoiceFromMessages(messages: ConversationMessage[]): ToolStoreChoice[] {
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
-		const m = messages[i];
-		if (m.role !== RoleEnum.User) continue;
-		return (m.toolStoreChoices ?? []).filter(c => c.toolType === ToolStoreChoiceType.WebSearch);
+		const message = messages[i];
+		if (message.role !== RoleEnum.User) continue;
+		return (message.toolStoreChoices ?? []).filter(choice => choice.toolType === ToolStoreChoiceType.WebSearch);
 	}
 	return [];
 }
 
 function deriveEnabledSkillRefsFromMessages(messages: ConversationMessage[]): SkillRef[] {
-	// We must treat "missing/undefined" the same as "empty": both mean "no skills selected" for the latest user turn.
-	// Scanning for "last non-empty" makes old skill selections sticky forever.
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
-		const m = messages[i];
-		if (m.role !== RoleEnum.User) continue;
-		return m.enabledSkillRefs ?? [];
+		const message = messages[i];
+		if (message.role !== RoleEnum.User) continue;
+		return message.enabledSkillRefs ?? [];
 	}
 	return [];
 }
 
 function deriveActiveSkillRefsFromMessages(messages: ConversationMessage[]): SkillRef[] {
-	// We must treat "missing/undefined" the same as "empty": both mean "no active skills" for the latest user turn.
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
-		const m = messages[i];
-		if (m.role !== RoleEnum.User) continue;
-		return m.activeSkillRefs ?? [];
+		const message = messages[i];
+		if (message.role !== RoleEnum.User) continue;
+		return message.activeSkillRefs ?? [];
 	}
 	return [];
 }
@@ -201,27 +184,25 @@ export function buildUserConversationMessageFromEditor(
 			inputMessage,
 		},
 	];
-	// console.log('inputs from editor', JSON.stringify(inputs, null, 2));
 
-	// Attach tool outputs as FunctionToolOutput / CustomToolOutput events.
-	for (const ui of payload.toolOutputs) {
-		const infOut = buildToolOutputFromEditor(ui);
-		if (!infOut) continue;
+	for (const uiToolOutput of payload.toolOutputs) {
+		const inferenceToolOutput = buildToolOutputFromEditor(uiToolOutput);
+		if (!inferenceToolOutput) continue;
 
-		if (infOut.type === ToolType.Function) {
+		if (inferenceToolOutput.type === ToolType.Function) {
 			inputs.push({
 				kind: InputKind.FunctionToolOutput,
-				functionToolOutput: infOut,
+				functionToolOutput: inferenceToolOutput,
 			});
-		} else if (infOut.type === ToolType.Custom) {
+		} else if (inferenceToolOutput.type === ToolType.Custom) {
 			inputs.push({
 				kind: InputKind.CustomToolOutput,
-				customToolOutput: infOut,
+				customToolOutput: inferenceToolOutput,
 			});
-		} else if (infOut.type === ToolType.WebSearch) {
+		} else if (inferenceToolOutput.type === ToolType.WebSearch) {
 			inputs.push({
 				kind: InputKind.WebSearchToolOutput,
-				webSearchToolOutput: infOut,
+				webSearchToolOutput: inferenceToolOutput,
 			});
 		}
 	}
@@ -232,23 +213,21 @@ export function buildUserConversationMessageFromEditor(
 			: undefined;
 
 	const toolStoreChoices = payload.finalToolChoices.length > 0 ? payload.finalToolChoices : undefined;
-
 	const toolOutputs = payload.toolOutputs.length > 0 ? payload.toolOutputs : undefined;
+
 	const enabledSkillRefs = payload.enabledSkillRefs ?? [];
 	let activeSkillRefs = payload.activeSkillRefs ?? [];
 
-	// Invariant: if no skills are enabled/selected, no skills can be active.
-	// This prevents persisting inconsistent conversations (active without enabled).
 	if (enabledSkillRefs.length === 0) {
 		activeSkillRefs = [];
 	}
 
-	const msg: ConversationMessage = {
+	return {
 		id,
 		createdAt: now,
 		role: RoleEnum.User,
 		status: Status.None,
-		modelPresetRef: modelPresetRef,
+		modelPresetRef,
 		inputs,
 		attachments,
 		toolStoreChoices,
@@ -257,15 +236,9 @@ export function buildUserConversationMessageFromEditor(
 		uiContent: text,
 		uiToolOutputs: toolOutputs,
 	};
-	// console.log('msg from editor', JSON.stringify(msg, null, 2));
-
-	return msg;
 }
 
 function buildToolOutputFromEditor(ui: UIToolOutput): ToolOutput | undefined {
-	// Support function, custom and web-search tool outputs.
-	// For web-search outputs we only round‑trip the textual/toolOutputs
-	// representation and do not attempt to reconstruct provider‑specific metadata.
 	if (
 		ui.type !== ToolStoreChoiceType.Function &&
 		ui.type !== ToolStoreChoiceType.Custom &&
@@ -292,168 +265,27 @@ function buildToolOutputFromEditor(ui: UIToolOutput): ToolOutput | undefined {
 	};
 }
 
-/**
- * Hydrate a stored conversation (from Go) into the full UI Conversation shape.
- * - Derives message.content, reasoningContents, toolCalls, toolOutputs.
- */
-export function hydrateConversation(store: StoreConversation): Conversation {
-	// 1. Build global maps for this conversation
-	const choiceMap = buildToolStoreChoiceMap(store.messages);
-	const toolCallMap = buildToolCallMap(store.messages);
+function attachmentRefKey(attachment: Attachment): string {
+	const kind = attachment.kind ?? '';
 
-	const hydratedMessages: ConversationMessage[] = store.messages.map(
-		(m: StoreConversationMessage): ConversationMessage => {
-			const role = m.role;
-			let uiContent = '';
-			let uiReasoningContents: ReasoningContent[] | undefined = undefined;
-			let uiToolCalls: UIToolCall[] | undefined = undefined;
-			let uiToolOutputs: UIToolOutput[] | undefined = undefined;
-			let uiCitations: URLCitation[] | undefined = undefined;
-
-			const outputs: OutputUnion[] | undefined = m.outputs;
-			const inputs: InputUnion[] | undefined = m.inputs;
-
-			if (role === RoleEnum.Assistant) {
-				// Text + tool calls + tool outputs from model outputs.
-				const derived = deriveUIFieldsFromOutputUnion(outputs, choiceMap);
-
-				uiContent = derived.uiContent;
-				uiReasoningContents = derived.uiReasoningContents;
-				uiToolCalls = derived.uiToolCalls;
-				uiCitations = derived.uiCitations;
-
-				// Prefer outputs from model response; fall back to any tool outputs in inputs.
-				uiToolOutputs =
-					derived.uiToolOutputs && derived.uiToolOutputs.length > 0
-						? derived.uiToolOutputs
-						: deriveUIToolOutputsFromInputUnion(inputs, choiceMap, toolCallMap);
-			} else if (role === RoleEnum.User) {
-				// User content from inputs, tool outputs from inputs.
-				uiContent = deriveUIContentFromInputUnion(inputs);
-				uiToolOutputs = deriveUIToolOutputsFromInputUnion(inputs, choiceMap, toolCallMap);
-			} else {
-				// System / developer / other roles: We do not show them in UI text bubble.
-			}
-
-			const uiDebugDetails = getDebugDetailsMarkdown(m.debugDetails, m.error);
-
-			return {
-				...(m as any),
-				uiContent,
-				uiReasoningContents,
-				uiToolCalls,
-				uiToolOutputs,
-				uiCitations,
-				uiDebugDetails,
-			} as ConversationMessage;
-		}
-	);
-
-	const allMessages = {
-		...(store as any),
-		messages: hydratedMessages,
-	} as Conversation;
-
-	return allMessages;
-}
-
-function buildToolStoreChoiceMap(messages: StoreConversationMessage[]): Map<string, ToolStoreChoice> {
-	const map = new Map<string, ToolStoreChoice>();
-
-	for (const m of messages) {
-		if (!m.toolStoreChoices) continue;
-
-		for (const choice of m.toolStoreChoices) {
-			// choiceID is the key used by ToolCall / ToolOutput
-			map.set(choice.choiceID, choice);
-		}
+	if (attachment.fileRef) {
+		const path = attachment.fileRef.origPath || attachment.fileRef.path || attachment.fileRef.name || '';
+		return `${kind}|file|${path}`;
+	}
+	if (attachment.imageRef) {
+		const path = attachment.imageRef.origPath || attachment.imageRef.path || attachment.imageRef.name || '';
+		return `${kind}|image|${path}`;
+	}
+	if (attachment.urlRef) {
+		const url = attachment.urlRef.origNormalized || attachment.urlRef.normalized || attachment.urlRef.url || '';
+		return `${kind}|url|${url}`;
+	}
+	if (attachment.genericRef) {
+		const handle = attachment.genericRef.origHandle || attachment.genericRef.handle || '';
+		return `${kind}|handle|${handle}`;
 	}
 
-	return map;
-}
-
-function buildToolCallMap(messages: StoreConversationMessage[]): Map<string, ToolCall> {
-	let map = new Map<string, ToolCall>();
-	for (const m of messages) {
-		map = collectToolCallsFromInputs(m.inputs, map);
-		map = collectToolCallsFromOutputs(m.outputs, map);
-	}
-	return map;
-}
-/**
- * Rebuild user-visible content from InputUnion(s) for a message.
- * Used primarily for user turns, since `content` is not persisted.
- */
-function deriveUIContentFromInputUnion(inputs?: InputUnion[]): string {
-	if (!inputs || inputs.length === 0) return '';
-
-	for (const iu of inputs) {
-		// We want only the first user input content.
-		// Attachments that are processed as text etc are not shown in UI.
-		if (iu.kind !== InputKind.InputMessage || iu.inputMessage?.role != RoleEnum.User || !iu.inputMessage.contents)
-			continue;
-
-		for (const c of iu.inputMessage.contents) {
-			if (c.kind === ContentItemKind.Text && c.textItem?.text) {
-				const t = c.textItem.text.trim();
-				if (t) return t;
-			}
-		}
-	}
-
-	return '';
-}
-
-function deriveUIToolOutputsFromInputUnion(
-	inputs: InputUnion[] | undefined,
-	choiceMap: Map<string, ToolStoreChoice>,
-	toolCallMap: Map<string, ToolCall>
-): UIToolOutput[] {
-	if (!inputs || inputs.length === 0) return [];
-
-	const uiOutputs: UIToolOutput[] = [];
-
-	for (const iu of inputs) {
-		let out: ToolOutput | undefined;
-
-		if (iu.kind === InputKind.FunctionToolOutput && iu.functionToolOutput) {
-			out = iu.functionToolOutput;
-		} else if (iu.kind === InputKind.CustomToolOutput && iu.customToolOutput) {
-			out = iu.customToolOutput;
-		} else if (iu.kind === InputKind.WebSearchToolOutput && iu.webSearchToolOutput) {
-			out = iu.webSearchToolOutput;
-		} else {
-			continue;
-		}
-
-		uiOutputs.push(buildUIToolOutputFromToolOutput(out, choiceMap, toolCallMap));
-	}
-
-	return uiOutputs;
-}
-
-function attachmentRefKey(a: Attachment): string {
-	const kind = a.kind ?? '';
-
-	if (a.fileRef) {
-		const p = a.fileRef.origPath || a.fileRef.path || a.fileRef.name || '';
-		return `${kind}|file|${p}`;
-	}
-	if (a.imageRef) {
-		const p = a.imageRef.origPath || a.imageRef.path || a.imageRef.name || '';
-		return `${kind}|image|${p}`;
-	}
-	if (a.urlRef) {
-		const u = a.urlRef.origNormalized || a.urlRef.normalized || a.urlRef.url || '';
-		return `${kind}|url|${u}`;
-	}
-	if (a.genericRef) {
-		const h = a.genericRef.origHandle || a.genericRef.handle || '';
-		return `${kind}|handle|${h}`;
-	}
-
-	// fallback
-	return `${kind}|label|${a.label ?? ''}`;
+	return `${kind}|label|${attachment.label ?? ''}`;
 }
 
 export function dedupeAttachmentsByRef<T extends Attachment>(attachments?: T[]): T[] | undefined {
@@ -462,11 +294,12 @@ export function dedupeAttachmentsByRef<T extends Attachment>(attachments?: T[]):
 	const seen = new Set<string>();
 	const out: T[] = [];
 
-	for (const a of attachments) {
-		const key = attachmentRefKey(a);
+	for (const attachment of attachments) {
+		const key = attachmentRefKey(attachment);
 		if (seen.has(key)) continue;
 		seen.add(key);
-		out.push(a);
+		out.push(attachment);
 	}
+
 	return out.length > 0 ? out : undefined;
 }

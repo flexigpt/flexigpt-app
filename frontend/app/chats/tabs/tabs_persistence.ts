@@ -1,12 +1,7 @@
-import type { Conversation } from '@/spec/conversation';
-
-import { ensureMakeID } from '@/lib/uuid_utils';
-
 import { initConversation } from '@/chats/conversation/hydration_helper';
+import { type ChatTabState, createEmptyTab, MAX_TABS } from '@/chats/tabs/tabs_model';
 
-// ---------------- Tabs persistence ----------------
 const CHAT_TABS_PERSIST_KEY = 'app.chats.tabs.v1';
-export const MAX_TABS = 8;
 
 function canUseStorage(): boolean {
 	return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
@@ -36,70 +31,42 @@ export type InitialChatsModel = {
 	lastActivatedAtByTab: Record<string, number>;
 };
 
-export type ChatTabState = {
-	tabId: string;
-	conversation: Conversation;
-
-	// streaming (state only for coarse UI like spinner)
-	isBusy: boolean;
-	isHydrating: boolean;
-
-	// persistence/title behavior
-	isPersisted: boolean;
-	manualTitleLocked: boolean;
-
-	// edit state
-	editingMessageId: string | null;
-};
-
-export function isScratchTab(t: ChatTabState) {
-	// "New conversation" = local scratch, not a stored convo
-	return !t.isPersisted && t.conversation.messages.length === 0;
-}
-
-export function createEmptyTab(tabId: string = ensureMakeID()): ChatTabState {
-	return {
-		tabId,
-		conversation: initConversation(),
-		isBusy: false,
-		isHydrating: false,
-		isPersisted: false,
-		manualTitleLocked: false,
-		editingMessageId: null,
-	};
-}
-
 function readPersistedChatsPageState(): PersistedChatsPageStateV1 | null {
 	if (!canUseStorage()) return null;
+
 	try {
 		const raw = localStorage.getItem(CHAT_TABS_PERSIST_KEY);
 		if (!raw) return null;
+
 		const parsed = JSON.parse(raw) as PersistedChatsPageStateV1;
 		if (!parsed || parsed.v !== 1) return null;
 		if (!Array.isArray(parsed.tabs)) return null;
+
 		return parsed;
 	} catch {
 		return null;
 	}
 }
 
-export function writePersistedChatsPageState(state: PersistedChatsPageStateV1) {
+export function writePersistedChatsPageState(state: PersistedChatsPageStateV1): void {
 	if (!canUseStorage()) return;
+
 	try {
 		localStorage.setItem(CHAT_TABS_PERSIST_KEY, JSON.stringify(state));
 	} catch {
-		// ignore quota / disabled storage; app still works without persistence
+		// ignore
 	}
 }
 
 export function buildInitialChatsModel(): InitialChatsModel {
 	const persisted = readPersistedChatsPageState();
+
 	if (!persisted) {
-		const t = createEmptyTab();
+		const tab = createEmptyTab();
 		return {
 			restoredFromStorage: false,
-			selectedTabId: t.tabId,
-			tabs: [t],
+			selectedTabId: tab.tabId,
+			tabs: [tab],
 			scrollTopByTab: {},
 			topItemIndexByTab: {},
 			lastActivatedAtByTab: {},
@@ -108,41 +75,42 @@ export function buildInitialChatsModel(): InitialChatsModel {
 
 	const seen = new Set<string>();
 	const sanitizedTabs = persisted.tabs
-		.filter(t => {
-			if (!t?.tabId || typeof t.tabId !== 'string') return false;
-			if (seen.has(t.tabId)) return false;
-			seen.add(t.tabId);
+		.filter(tab => {
+			if (!tab?.tabId || typeof tab.tabId !== 'string') return false;
+			if (seen.has(tab.tabId)) return false;
+			seen.add(tab.tabId);
 			return true;
 		})
 		.slice(0, MAX_TABS);
 
-	const tabs: ChatTabState[] = sanitizedTabs.map(t => {
-		// Create a lightweight placeholder conversation; real content is rehydrated on mount.
-		const conv = initConversation();
-		if (t.isPersisted && t.conversationId) conv.id = t.conversationId;
-		conv.title = t.title || conv.title;
-		conv.messages = [];
+	const tabs: ChatTabState[] = sanitizedTabs.map(tab => {
+		const conversation = initConversation();
+		if (tab.isPersisted && tab.conversationId) {
+			conversation.id = tab.conversationId;
+		}
+		conversation.title = tab.title || conversation.title;
+		conversation.messages = [];
 
 		return {
-			tabId: t.tabId,
-			conversation: conv,
+			tabId: tab.tabId,
+			conversation,
 			isBusy: false,
-			isHydrating: t.isPersisted,
-			isPersisted: t.isPersisted,
-			manualTitleLocked: t.manualTitleLocked,
+			isHydrating: tab.isPersisted,
+			isPersisted: tab.isPersisted,
+			manualTitleLocked: tab.manualTitleLocked,
 			editingMessageId: null,
 		};
 	});
 
 	const nonEmptyTabs = tabs.length > 0 ? tabs : [createEmptyTab()];
-	const selected =
-		persisted.selectedTabId && nonEmptyTabs.some(t => t.tabId === persisted.selectedTabId)
+	const selectedTabId =
+		persisted.selectedTabId && nonEmptyTabs.some(tab => tab.tabId === persisted.selectedTabId)
 			? persisted.selectedTabId
 			: nonEmptyTabs[0].tabId;
 
 	return {
 		restoredFromStorage: true,
-		selectedTabId: selected,
+		selectedTabId,
 		tabs: nonEmptyTabs,
 		scrollTopByTab: persisted.scrollTopByTab ?? {},
 		topItemIndexByTab: persisted.topItemIndexByTab ?? {},

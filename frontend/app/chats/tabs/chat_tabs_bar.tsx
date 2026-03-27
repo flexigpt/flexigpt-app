@@ -15,15 +15,14 @@ interface ChatTabBarItem {
 	tabId: string;
 	title: string;
 	isBusy: boolean;
-	isEmpty: boolean; // messages.length === 0
-	renameEnabled: boolean; // messages.length > 0
+	isEmpty: boolean;
+	renameEnabled: boolean;
 }
 
 interface ChatTabsBarProps {
 	store: TabStore;
 	selectedTabId: string;
 	tabs: ChatTabBarItem[];
-
 	maxTabs: number;
 	onNewTab: () => void;
 	onCloseTab: (tabId: string) => void;
@@ -66,31 +65,28 @@ function ChatTabsBarContent({
 
 	const elements: ReactNode[] = [];
 
-	for (const t of tabs) {
-		const isActive = t.tabId === selectedTabId;
-		const canRename = isActive && t.renameEnabled && !t.isBusy;
-		const isEditing = isActive && editingTabId === t.tabId;
+	for (const tab of tabs) {
+		const isActive = tab.tabId === selectedTabId;
+		const canRename = isActive && tab.renameEnabled && !tab.isBusy;
+		const isEditing = isActive && editingTabId === tab.tabId;
 
 		elements.push(
 			<Tab
-				key={t.tabId}
-				ref={setTabEl(t.tabId)}
+				key={tab.tabId}
+				ref={setTabEl(tab.tabId)}
 				store={store}
-				id={t.tabId}
-				// render as <div> so we can safely place an <input> inside the tab (no <input> inside <button>)
+				id={tab.tabId}
 				render={<div />}
 				className={[
 					'relative flex h-8 w-44 items-center p-0',
 					'select-none',
 					'focus-visible:outline-primary focus-visible:outline focus-visible:outline-offset-2',
-					// Firefox-ish feel: rounded top + active lifted
 					isActive
 						? 'bg-base-100 text-base-content border-base-300 rounded-xl border shadow-xs'
 						: 'bg-base-200/80 text-base-content/80 hover:bg-base-200 border-0',
-					t.isBusy ? 'cursor-progress' : '',
+					tab.isBusy ? 'cursor-progress' : '',
 				].join(' ')}
 			>
-				{/* Title / Rename */}
 				<div className="min-w-0 flex-1 px-2 text-sm">
 					{isEditing ? (
 						<input
@@ -112,17 +108,16 @@ function ChatTabsBarContent({
 							className="input input-sm bg-base-100 w-full p-0"
 						/>
 					) : (
-						<div className="flex min-w-0" title={t.title}>
-							<span className="truncate">{t.title}</span>
+						<div className="flex min-w-0" title={tab.title}>
+							<span className="truncate">{tab.title}</span>
 						</div>
 					)}
 				</div>
 
-				{/* Right end: spinner OR rename icon in same slot, then close */}
 				<div className="flex items-center gap-1 pr-1">
-					{(t.isBusy || canRename) && (
+					{(tab.isBusy || canRename) && (
 						<div className="flex w-6 shrink-0 items-center justify-center">
-							{t.isBusy ? (
+							{tab.isBusy ? (
 								<HoverTip content="Response in progress" placement="bottom">
 									<span className="inline-flex">
 										<BusyDot />
@@ -139,8 +134,8 @@ function ChatTabsBarContent({
 										}}
 										onClick={e => {
 											e.stopPropagation();
-											setEditingTabId(t.tabId);
-											setDraftTitle(t.title);
+											setEditingTabId(tab.tabId);
+											setDraftTitle(tab.title);
 										}}
 									>
 										<FiEdit2 size={14} />
@@ -149,6 +144,7 @@ function ChatTabsBarContent({
 							) : null}
 						</div>
 					)}
+
 					<HoverTip content="Close tab" placement="bottom">
 						<button
 							type="button"
@@ -159,7 +155,7 @@ function ChatTabsBarContent({
 							}}
 							onClick={e => {
 								e.stopPropagation();
-								onCloseTab(t.tabId);
+								onCloseTab(tab.tabId);
 							}}
 						>
 							<FiX size={14} />
@@ -173,7 +169,6 @@ function ChatTabsBarContent({
 	return (
 		<div className="border-base-300 flex h-9 w-full items-center gap-2 border-b bg-inherit">
 			<div className="flex min-w-0 flex-1 flex-nowrap items-center overflow-hidden">
-				{/* Scroll ONLY the tabs. Reserve bottom space so scrollbar doesn't clip tab content. */}
 				<div
 					ref={tabsViewportRef}
 					className="scrollbar-custom-thin min-w-0 overflow-x-auto overflow-y-hidden overscroll-contain pb-1"
@@ -183,6 +178,7 @@ function ChatTabsBarContent({
 						{elements}
 					</TabList>
 				</div>
+
 				<HoverTip
 					content={
 						tabs.length >= maxTabs ? `New chat (reuses the scratch tab at the ${maxTabs}-tab limit)` : 'New chat'
@@ -199,6 +195,7 @@ function ChatTabsBarContent({
 					</button>
 				</HoverTip>
 			</div>
+
 			<HoverTip content="Export current chat as JSON" placement="left">
 				<DownloadButton
 					language="json"
@@ -214,16 +211,9 @@ function ChatTabsBarContent({
 	);
 }
 
-export const ChatTabsBar = memo(function ChatTabsBar({
-	store,
-	selectedTabId,
-	tabs,
-	maxTabs,
-	onNewTab,
-	onCloseTab,
-	onRenameTab,
-	getConversationForExport,
-}: ChatTabsBarProps) {
+export const ChatTabsBar = memo(function ChatTabsBar(props: ChatTabsBarProps) {
+	const { selectedTabId } = props;
+
 	const tabElById = useRef(new Map<string, HTMLElement | null>());
 	const tabsViewportRef = useRef<HTMLDivElement | null>(null);
 
@@ -253,18 +243,5 @@ export const ChatTabsBar = memo(function ChatTabsBar({
 		});
 	}, [selectedTabId]);
 
-	return (
-		<ChatTabsBarContent
-			store={store}
-			selectedTabId={selectedTabId}
-			tabs={tabs}
-			maxTabs={maxTabs}
-			onNewTab={onNewTab}
-			onCloseTab={onCloseTab}
-			onRenameTab={onRenameTab}
-			getConversationForExport={getConversationForExport}
-			setTabEl={setTabEl}
-			tabsViewportRef={tabsViewportRef}
-		/>
-	);
+	return <ChatTabsBarContent {...props} setTabEl={setTabEl} tabsViewportRef={tabsViewportRef} />;
 });
