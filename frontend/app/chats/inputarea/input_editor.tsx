@@ -176,10 +176,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		setIsSubmitting(current => (current === next ? current : next));
 	}, []);
 
-	const autoSubmitRequestHandlerRef = useRef<((options: SubmitOptions) => Promise<void>) | null>(null);
-	const handleAutoSubmitRequest = useCallback(() => {
-		void autoSubmitRequestHandlerRef.current?.({ runPendingTools: true });
-	}, []);
+	const autoSubmitReadyRef = useRef<(() => Promise<void>) | null>(null);
 
 	// Guard: while true, handleEditorDocumentChange skips auto-cancel logic.
 	// This prevents a race where Plate fires onChange after clearComposerTransientState
@@ -246,16 +243,19 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		handleOpenAttachedToolDetails,
 		clearComposerToolsState,
 		getToolRuntimeSnapshot,
+		resumeAutoExecBatch,
 	} = useComposerTools({
 		isBusy: isGenerating,
-		isSubmittingRef,
+		isSubmitting,
 		templateBlocked,
 		ensureSkillSession,
 		listActiveSkillRefs,
 		setActiveSkillRefs,
 		getCurrentSkillSessionID,
 		toolArgsEventTarget,
-		onAutoSubmitRequest: handleAutoSubmitRequest,
+		onAutoSubmitReady: async () => {
+			await autoSubmitReadyRef.current?.();
+		},
 		externalAutoExecuteBlocked: webSearchArgsBlocked,
 		getAttachedToolEntries: getAttachedToolEntriesSnapshot,
 	});
@@ -787,9 +787,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	);
 
 	useLayoutEffect(() => {
-		autoSubmitRequestHandlerRef.current = doSubmit;
+		autoSubmitReadyRef.current = async () => {
+			await doSubmit({ runPendingTools: true });
+		};
 		return () => {
-			autoSubmitRequestHandlerRef.current = null;
+			autoSubmitReadyRef.current = null;
 		};
 	}, [doSubmit]);
 	/**
@@ -892,6 +894,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			restorePreEditContext();
 			cancelEditing();
 		}
+
+		// If a queued auto-exec batch was waiting on template vars or similar
+		// editor-side blockers, give it a chance to resume.
+		resumeAutoExecBatch();
 	}, [
 		attachments.length,
 		cancelEditing,
@@ -901,6 +907,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		hasTextRef,
 		onEditorChange,
 		restorePreEditContext,
+		resumeAutoExecBatch,
 		submitError,
 		toolCalls.length,
 		toolOutputs.length,
@@ -1164,7 +1171,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						onSetAttachedToolAutoExecute={handleSetAttachedToolAutoExecuteByKey}
 						webSearchTemplates={webSearchTemplates}
 						setWebSearchTemplates={setWebSearchTemplates}
-						onWebSearchArgsBlockedChange={setWebSearchArgsBlocked}
+						onWebSearchArgsBlockedChange={nextBlocked => {
+							setWebSearchArgsBlocked(nextBlocked);
+							if (!nextBlocked) {
+								resumeAutoExecBatch();
+							}
+						}}
 						allSkills={allSkills}
 						skillsLoading={skillsLoading}
 						enabledSkillRefs={enabledSkillRefs}
