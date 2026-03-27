@@ -13,13 +13,10 @@ import { type PromptVariable, VarSource, VarType } from '@/spec/prompt';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 
 import { type TemplateSelectionElementNode } from '@/chats/composer/platedoc/nodes';
-import {
-	computeEffectiveTemplate,
-	computeRequirements,
-	effectiveVarValueLocal,
-} from '@/chats/composer/templates/template_processing';
+import { computeEffectiveTemplate } from '@/chats/composer/platedoc/template_document_ops';
 import { EnumDropdownInline } from '@/chats/composer/templates/template_variable_enum_dropdown';
 import { dispatchTemplateVarsUpdated } from '@/chats/composer/templates/use_template_toolbar_vars_updated_event';
+import { computeTemplateVarRequirements, effectiveVarValueLocal } from '@/prompts/lib/prompt_template_var_utils';
 
 type TemplateEditModalProps = {
 	open: boolean;
@@ -145,7 +142,7 @@ function TemplateEditModalContent({ onClose, tsenode, editor, path }: Omit<Templ
 		saveAndClose();
 	};
 
-	const req = computeRequirements(variablesSchema, formState.varValues);
+	const req = computeTemplateVarRequirements(variablesSchema, formState.varValues);
 
 	return (
 		<dialog

@@ -33,9 +33,9 @@ import { createComposerEditorPlugins } from '@/chats/composer/platedoc/plugins';
 import {
 	analyzeTemplateSelectionInfo,
 	getTemplateNodesWithPath,
+	getUserBlocksContent,
 } from '@/chats/composer/platedoc/template_document_ops';
 import { type AttachedToolEntry, getAttachedToolEntries } from '@/chats/composer/platedoc/tool_document_ops';
-import { getUserBlocksContent } from '@/chats/composer/templates/template_processing';
 import { buildUserInlineChildrenFromText } from '@/chats/composer/templates/template_variables_inline';
 
 type ReplaceEditorDocumentFocusMode = 'none' | 'preserve' | 'end';

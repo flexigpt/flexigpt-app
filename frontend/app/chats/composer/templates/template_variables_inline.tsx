@@ -16,16 +16,13 @@ import {
 	type TemplateSelectionElementNode,
 	type TemplateVariableElementNode,
 } from '@/chats/composer/platedoc/nodes';
-import {
-	computeEffectiveTemplate,
-	computeRequirements,
-	effectiveVarValueLocal,
-} from '@/chats/composer/templates/template_processing';
+import { computeEffectiveTemplate } from '@/chats/composer/platedoc/template_document_ops';
 import { EnumDropdownInline } from '@/chats/composer/templates/template_variable_enum_dropdown';
 import {
 	dispatchTemplateVarsUpdated,
 	useTemplateVarsUpdatedForSelection,
 } from '@/chats/composer/templates/use_template_toolbar_vars_updated_event';
+import { computeTemplateVarRequirements, effectiveVarValueLocal } from '@/prompts/lib/prompt_template_var_utils';
 
 const TEMPLATE_VARIABLE_TOKEN_RE = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_-]*)\s*\}\}/g;
 
@@ -241,7 +238,7 @@ export function TemplateVariableElement(props: PlateElementProps<any>) {
 	const varDef = variablesSchema.find(v => v.name === el.name);
 	const isRequired = Boolean(varDef?.required);
 
-	const req = tsenode ? computeRequirements(variablesSchema, tsenode.variables) : EMPTY_REQUIREMENTS;
+	const req = tsenode ? computeTemplateVarRequirements(variablesSchema, tsenode.variables) : EMPTY_REQUIREMENTS;
 	const isMissing = isRequired && req.requiredVariables.includes(el.name);
 
 	const [isEditing, setIsEditing] = useState(false);

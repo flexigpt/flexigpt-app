@@ -12,12 +12,16 @@ import {
 	KEY_TEMPLATE_VARIABLE,
 	type TemplateSelectionElementNode,
 } from '@/chats/composer/platedoc/nodes';
-import { getTemplateNodesWithPath, getTemplateSelections } from '@/chats/composer/platedoc/template_document_ops';
+import {
+	computeEffectiveTemplate,
+	getTemplateNodesWithPath,
+	getTemplateSelections,
+} from '@/chats/composer/platedoc/template_document_ops';
 import { TemplateEditModal } from '@/chats/composer/templates/template_edit_modal';
-import { computeEffectiveTemplate, effectiveVarValueLocal } from '@/chats/composer/templates/template_processing';
 import { TemplateFixedToolbar } from '@/chats/composer/templates/template_toolbar_fixed';
 import { useTemplateFlashEvent } from '@/chats/composer/templates/use_template_flash_event';
 import { dispatchTemplateVarsUpdated } from '@/chats/composer/templates/use_template_toolbar_vars_updated_event';
+import { effectiveVarValueLocal } from '@/prompts/lib/prompt_template_var_utils';
 
 type TplKey = string; // path-based unique key
 

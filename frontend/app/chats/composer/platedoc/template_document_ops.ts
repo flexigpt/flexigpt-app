@@ -1,7 +1,13 @@
 import { ElementApi, NodeApi, type Path } from 'platejs';
 import type { PlateEditor } from 'platejs/react';
 
-import type { PromptTemplate, PromptVariable } from '@/spec/prompt';
+import {
+	type MessageBlock,
+	PromptRoleEnum,
+	type PromptTemplate,
+	PromptTemplateKind,
+	type PromptVariable,
+} from '@/spec/prompt';
 
 import {
 	KEY_TEMPLATE_SELECTION,
@@ -9,14 +15,124 @@ import {
 	type TemplateSelectionElementNode,
 	type TemplateVariableElementNode,
 } from '@/chats/composer/platedoc/nodes';
-import {
-	computeEffectiveTemplate,
-	effectiveVarValueLocal,
-	makeSelectedTemplateForRun,
-	type SelectedTemplateForRun,
-} from '@/chats/composer/templates/template_processing';
+import { computeTemplateVarRequirements, effectiveVarValueLocal } from '@/prompts/lib/prompt_template_var_utils';
 
+const TEMPLATE_PLACEHOLDER_RE = /\{\{([a-zA-Z_][a-zA-Z0-9_-]*)\}\}/g;
 type TemplateNodeWithPath = [TemplateSelectionElementNode, Path];
+
+/**
+ * Execution-ready derived representation of a selected template.
+ */
+export interface SelectedTemplateForRun {
+	type: typeof KEY_TEMPLATE_SELECTION;
+	bundleID: string;
+	templateSlug: string;
+	templateVersion: string;
+	selectionID: string;
+
+	// Final structures after applying local overrides
+	template: PromptTemplate;
+	blocks: MessageBlock[];
+	variablesSchema: PromptVariable[];
+
+	// Effective variable values for execution
+	variableValues: Record<string, unknown>;
+
+	// Requirements state
+	requiredVariables: string[];
+	requiredCount: number;
+
+	// Convenience
+	isReady: boolean;
+}
+
+function renderTemplateTextWithVariableValues(text: string, variableValues: Record<string, unknown>): string {
+	return text.replace(TEMPLATE_PLACEHOLDER_RE, (_match, name: string) => {
+		const value = variableValues[name];
+		return value === undefined || value === null ? '' : (value as string);
+	});
+}
+
+function getInstructionPromptPartFromSelection(selection: SelectedTemplateForRun): string {
+	return selection.blocks
+		.filter(block => block.role === PromptRoleEnum.System || block.role === PromptRoleEnum.Developer)
+		.map(block => renderTemplateTextWithVariableValues(block.content, selection.variableValues).trim())
+		.filter(Boolean)
+		.join('\n\n');
+}
+
+export function getInstructionPromptPartsFromSelections(selections: SelectedTemplateForRun[]): string[] {
+	return selections.map(getInstructionPromptPartFromSelection).filter(Boolean);
+}
+
+/**
+ * Merge templateSnapshot with local overrides to produce effective template structures.
+ */
+export function computeEffectiveTemplate(el: TemplateSelectionElementNode): {
+	template: PromptTemplate | undefined;
+	blocks: MessageBlock[];
+	variablesSchema: PromptVariable[];
+} {
+	const base = el.templateSnapshot;
+	const blocks = el.overrides?.blocks ?? base?.blocks ?? [];
+	const variablesSchema = el.overrides?.variables ?? base?.variables ?? [];
+
+	return { template: base, blocks, variablesSchema };
+}
+
+function makeSelectedTemplateForRun(tsenode: TemplateSelectionElementNode): SelectedTemplateForRun {
+	const { template, blocks, variablesSchema } = computeEffectiveTemplate(tsenode);
+
+	const effTemplate: PromptTemplate =
+		template ??
+		({
+			kind: PromptTemplateKind.Generic,
+			id: '',
+			displayName: tsenode.templateSlug,
+			slug: tsenode.templateSlug,
+			isEnabled: true,
+			description: '',
+			tags: [],
+			blocks,
+			variables: variablesSchema,
+			isResolved: true,
+			version: tsenode.templateVersion,
+			createdAt: new Date().toISOString(),
+			modifiedAt: new Date().toISOString(),
+			isBuiltIn: false,
+		} as PromptTemplate);
+
+	const req = computeTemplateVarRequirements(variablesSchema, tsenode.variables);
+
+	return {
+		type: KEY_TEMPLATE_SELECTION,
+		bundleID: tsenode.bundleID,
+		templateSlug: tsenode.templateSlug,
+		templateVersion: tsenode.templateVersion,
+		selectionID: tsenode.selectionID,
+		template: effTemplate,
+		blocks,
+		variablesSchema,
+
+		variableValues: req.variableValues,
+		requiredVariables: req.requiredVariables,
+		requiredCount: req.requiredCount,
+
+		isReady: req.requiredCount === 0,
+	};
+}
+
+// Returns all user-facing blocks concatenated in template order.
+// System/developer blocks are sent via systemPrompt, so only user blocks belong
+// in the editor/message body.
+export function getUserBlocksContent(el: TemplateSelectionElementNode): string {
+	const { blocks } = computeEffectiveTemplate(el);
+	return blocks
+		.filter(block => block.role === PromptRoleEnum.User)
+		.map(block => block.content)
+		.filter(content => content.trim().length > 0)
+		.join('\n\n');
+}
 
 export function insertTemplateSelectionNode(
 	editor: PlateEditor,

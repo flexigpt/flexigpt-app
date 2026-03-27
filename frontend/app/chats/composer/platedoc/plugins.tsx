@@ -17,8 +17,9 @@ import {
 	type TemplateSelectionElementNode,
 	type ToolSelectionElementNode,
 } from '@/chats/composer/platedoc/nodes';
-import { computeEffectiveTemplate, computeRequirements } from '@/chats/composer/templates/template_processing';
+import { computeEffectiveTemplate } from '@/chats/composer/platedoc/template_document_ops';
 import { TemplateVariableElement } from '@/chats/composer/templates/template_variables_inline';
+import { computeTemplateVarRequirements } from '@/prompts/lib/prompt_template_var_utils';
 
 export const createComposerEditorPlugins = () => [
 	SingleBlockPlugin,
@@ -90,7 +91,7 @@ function TemplateSelectionElement(props: PlateElementProps<any>) {
 
 	// We still compute badges for accessibility/title, but hide it from visual flow.
 	const { template, variablesSchema } = computeEffectiveTemplate(el);
-	const req = computeRequirements(variablesSchema, el.variables);
+	const req = computeTemplateVarRequirements(variablesSchema, el.variables);
 
 	return (
 		<span

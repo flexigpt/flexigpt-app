@@ -38,6 +38,7 @@ import { EditorChipsBar } from '@/chats/composer/editor/editor_chips_bar';
 import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
 import { buildEditorValueFromPlainText, hasNonEmptyUserText } from '@/chats/composer/platedoc/platedoc_utils';
 import {
+	getInstructionPromptPartsFromSelections,
 	getTemplateSelections,
 	insertTemplateSelectionNode,
 	toPlainTextReplacingVariables,
@@ -52,7 +53,6 @@ import {
 } from '@/chats/composer/platedoc/tool_document_ops';
 import { useComposerDocument } from '@/chats/composer/platedoc/use_composer_document';
 import { useComposerSkills } from '@/chats/composer/skills/use_composer_skills';
-import { getInstructionPromptPartsFromSelections } from '@/chats/composer/templates/template_processing';
 import { TemplateToolbars } from '@/chats/composer/templates/template_toolbars';
 import { dispatchTemplateFlashEvent } from '@/chats/composer/templates/use_template_flash_event';
 import { useComposerTools } from '@/chats/composer/toolruntime/use_composer_tools';
