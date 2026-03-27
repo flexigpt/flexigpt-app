@@ -55,6 +55,11 @@ import { useComposerDocument } from '@/chats/composer/platedoc/use_composer_docu
 import { useComposerSkills } from '@/chats/composer/skills/use_composer_skills';
 import { TemplateToolbars } from '@/chats/composer/templates/template_toolbars';
 import { dispatchTemplateFlashEvent } from '@/chats/composer/templates/use_template_flash_event';
+import {
+	createAutoSubmitTracker,
+	getToolAutoSubmitKey,
+	isAutoSubmitEligibleToolCall,
+} from '@/chats/composer/toolruntime/tool_runtime_utils';
 import { useComposerTools } from '@/chats/composer/toolruntime/use_composer_tools';
 import { dispatchOpenToolArgs, useOpenToolArgs } from '@/chats/composer/toolruntime/use_open_toolargs_event';
 import { ToolDetailsModal, type ToolDetailsState } from '@/chats/composer/tools/tool_details_modal';
@@ -113,6 +118,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	ref
 ) {
 	const isSubmittingRef = useRef(false);
+	const autoSubmitTrackerRef = useRef(createAutoSubmitTracker());
+	const resetAutoSubmitTracker = useCallback(() => {
+		autoSubmitTrackerRef.current = createAutoSubmitTracker();
+	}, []);
 
 	const {
 		editor,
@@ -235,6 +244,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		loadToolCalls,
 		clearComposerToolsState,
 		getToolRuntimeSnapshot,
+		autoExecState,
 	} = useComposerTools({
 		isBusy: isGenerating,
 		isSubmitting,
@@ -602,10 +612,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		setSubmitting(false);
 		setToolDetailsState(null);
 		setToolArgsTarget(null);
-
+		resetAutoSubmitTracker();
 		clearAttachments();
 		clearComposerToolsState();
-	}, [clearAttachments, clearComposerToolsState, closeAllMenus, setSubmitting]);
+	}, [clearAttachments, clearComposerToolsState, closeAllMenus, resetAutoSubmitTracker, setSubmitting]);
 
 	const resetEditor = useCallback(() => {
 		clearComposerTransientState();
@@ -820,6 +830,68 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		void doSubmit({ runPendingTools: true });
 	};
 
+	useEffect(() => {
+		const tracker = autoSubmitTrackerRef.current;
+
+		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
+		if (toolCalls.length > 0) {
+			for (const toolCall of toolCalls) {
+				tracker.observedCallKeys.add(getToolAutoSubmitKey(toolCall));
+				if (!isAutoSubmitEligibleToolCall(toolCall)) {
+					tracker.allObservedCallsAreAutoExecute = false;
+				}
+			}
+			return;
+		}
+
+		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
+		if (autoExecState.phase !== 'idle') return;
+		if (tracker.observedCallKeys.size === 0) return;
+		if (!tracker.allObservedCallsAreAutoExecute) return;
+		if (isGenerating || isInputLocked || isSubmittingRef.current) return;
+		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
+		if (templateBlocked || hasBlockingToolArgs) return;
+
+		const runtime = getToolRuntimeSnapshot();
+
+		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
+		if (runtime.toolCalls.length === 0 && runtime.toolOutputs.length === 0) {
+			resetAutoSubmitTracker();
+			return;
+		}
+
+		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
+		if (runtime.toolCalls.length > 0) return;
+
+		const observedCallKeys = [...tracker.observedCallKeys].sort();
+		const batchSignature = observedCallKeys.join('::');
+		if (!batchSignature) return;
+		if (tracker.attemptedBatchSignature === batchSignature) return;
+
+		const outputByCallKey = new Map(runtime.toolOutputs.map(output => [getToolAutoSubmitKey(output), output] as const));
+
+		const allObservedCallsProducedSuccessfulOutputs = observedCallKeys.every(callKey => {
+			const output = outputByCallKey.get(callKey);
+			return output && !output.isError;
+		});
+
+		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
+		if (!allObservedCallsProducedSuccessfulOutputs) return;
+
+		tracker.attemptedBatchSignature = batchSignature;
+		void doSubmit({ runPendingTools: false });
+	}, [
+		autoExecState.phase,
+		doSubmit,
+		getToolRuntimeSnapshot,
+		hasBlockingToolArgs,
+		isGenerating,
+		isInputLocked,
+		resetAutoSubmitTracker,
+		templateBlocked,
+		toolCalls,
+	]);
+
 	const loadExternalMessage = useCallback(
 		(incoming: EditorExternalMessage) => {
 			if (externalMessageLoadReleaseTimerRef.current !== null) {
@@ -926,6 +998,14 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		toolOutputs.length,
 	]);
 
+	const handleLoadToolCalls = useCallback(
+		(toolCallsToLoad: UIToolCall[]) => {
+			resetAutoSubmitTracker();
+			loadToolCalls(toolCallsToLoad);
+		},
+		[loadToolCalls, resetAutoSubmitTracker]
+	);
+
 	useImperativeHandle(
 		ref,
 		() => ({
@@ -943,7 +1023,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			},
 			loadExternalMessage,
 			resetEditor,
-			loadToolCalls,
+			loadToolCalls: handleLoadToolCalls,
 			setConversationToolsFromChoices: applyConversationToolsFromChoices,
 			setWebSearchFromChoices: applyWebSearchFromChoices,
 			applyAttachmentsDrop,
@@ -958,7 +1038,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			applyWebSearchFromChoices,
 			focusEditorAtEnd,
 			loadExternalMessage,
-			loadToolCalls,
+			handleLoadToolCalls,
 			openAttachmentPicker,
 			openTemplatePicker,
 			openToolPicker,
