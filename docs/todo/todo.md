@@ -9,14 +9,38 @@
 
 - [ ] Tool calls
   - [ ] Some calls like editor replace text, create files, etc can be visually represented better via custom elements representing each.
+  - [ ] error result submit creates some api processing issue.
+    - [ ] also may be error or other results also, we may need some "editor" to edit and submit results ??
+  - [ ] fast forward has some alert in composer saying waiting for tool calls to complete before completing. need to seeif it is broken after refactor
+
+- [ ] debug flag/s (maybe one for scrubbing, one for key activate etc etc) for provider in UI settings
+  - [ ] backend is mostly there. the application of settings path is problematic as of now.
+    - [ ] inference go needs dynamic debug client setting support. then adapt to inference wrapper and then to settings api.
+  - [x] UI has some inbuilt selects etc. test and change.
+
+- [ ] need to add default assistant preset support e2e
+
+- [ ] llm tools
+  - [ ] search files (and may be others too), need to explicit setting to exclude hidden files/folders.
+  - [ ] read/replace text utils, may need to support approx line numbers so that llm can be more specific on where to read / write etc.
+    - [ ] replace has lots of ambigous mismatch errors. need a way to narrow down, and have errors better communicated back that are actionable.
+
+- [ ] Observations
+  - [ ] attachments need to include absolute path most probably. think through and see how to fit it. tool calls need some way to say that start from this.
+  - [ ] openai tool calls does a deep dive a lot, for flexigpt, it goes from backend to frontend to others. i think there needs to be a way to control its spread. most probably need to have a way to say that do step by step, and identify domains and then do things etc.
+  - [ ] in a tooling session, there are no parallell tool calls being made for some reason. better force the caller to say that do a bfs kind of tool calls.
+  - [ ] running linters tests etc is shell driven, the agents.md or similar file may help to say what are commands. for task file it may be simpler, but ned a way of discovery and exec.
+  - [ ] asking for things that are missing should be encouraged in some ways. most probably llms are now more in "agentic" mode so they dont really ask questions, but we can shine a lot with human in loops rather than direct.
+  - [ ] once nice thing i noticed that may or may not be available in others, in flexigpt, i can remove/add tools if there are errors etc. and llm may work with base tools anycase i.e read/write/delete files are unambigious anycase :)
+  - [ ] i think we should have a "files only" assistant as well.
+
+  - [ ] I am linking this loop of implementing this using tool tempalte loop (may be skills at some point), and then observing issues, then fixing these, then picking other feature and doing the same.
 
 ## Features
 
 - [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls loop is better.
   - [ ] this is a "feature" in anthropic and chargeable for cache write.
   - [ ] implement this after feature filters support and additional param support features in apis.
-
-- [ ] debug flag/s (maybe one for scrubbing, one for key activate etc etc) for provider in UI settings
 
 ## Milestone thoughts
 

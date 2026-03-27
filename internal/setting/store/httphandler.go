@@ -22,6 +22,15 @@ func InitSettingStoreHandlers(api huma.API, s *SettingStore) {
 	}, s.SetAppTheme)
 
 	huma.Register(api, huma.Operation{
+		OperationID: "settings-set-debug-settings",
+		Method:      http.MethodPut,
+		Path:        pathPrefix + "/debug",
+		Summary:     "Set debug settings",
+		Description: "Create or update global debug settings such as LLM request/response logging and log level.",
+		Tags:        []string{tag},
+	}, s.SetDebugSettings)
+
+	huma.Register(api, huma.Operation{
 		OperationID: "settings-set-auth-key",
 		Method:      http.MethodPut,
 		Path:        pathPrefix + "/authkeys/{type}/key/{keyName}",
@@ -53,7 +62,7 @@ func InitSettingStoreHandlers(api huma.API, s *SettingStore) {
 		Method:      http.MethodGet,
 		Path:        pathPrefix,
 		Summary:     "Get all settings (no secrets)",
-		Description: "Returns the application theme and metadata for every stored authentication key.",
+		Description: "Returns the application theme, debug settings and metadata for every stored authentication key.",
 		Tags:        []string{tag},
 	}, s.GetSettings)
 }

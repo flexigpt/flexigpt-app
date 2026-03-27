@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -42,7 +43,7 @@ func TestComputeSHA(t *testing.T) {
 	}
 }
 
-func TestValidateTheme_TableDriven(t *testing.T) {
+func TestValidateTheme(t *testing.T) {
 	cases := []struct {
 		name    string
 		theme   *spec.AppTheme
@@ -69,7 +70,31 @@ func TestValidateTheme_TableDriven(t *testing.T) {
 	}
 }
 
-func TestIsBuiltInKey_TableDriven(t *testing.T) {
+func TestValidateDebugSettings(t *testing.T) {
+	cases := []struct {
+		name    string
+		cfg     *spec.DebugSettings
+		wantErr bool
+	}{
+		{"nil", nil, true},
+		{"debug", &spec.DebugSettings{LogLevel: spec.DebugLogLevelDebug}, false},
+		{"info", &spec.DebugSettings{LogLevel: spec.DebugLogLevelInfo}, false},
+		{"warn", &spec.DebugSettings{LogLevel: spec.DebugLogLevelWarn}, false},
+		{"error", &spec.DebugSettings{LogLevel: spec.DebugLogLevelError}, false},
+		{"invalid", &spec.DebugSettings{LogLevel: spec.DebugLogLevel("trace")}, true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateDebugSettings(tc.cfg)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("validateDebugSettings(%v) returned err=%v, wantErr=%v", tc.cfg, err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestIsBuiltInKey(t *testing.T) {
 	// Preserve old BuiltInAuthKeys and restore at end.
 	old := BuiltInAuthKeys
 	defer func() { BuiltInAuthKeys = old }()
@@ -208,6 +233,15 @@ func TestSettingStore_AuthKeyLifecycleAndSettings(t *testing.T) {
 	if len(out.Body.AuthKeys) != 0 {
 		t.Fatalf("expected no auth keys initially, got %d", len(out.Body.AuthKeys))
 	}
+	if out.Body.Debug.LogLevel != spec.DebugLogLevelInfo {
+		t.Fatalf("expected default debug log level %q, got %q", spec.DebugLogLevelInfo, out.Body.Debug.LogLevel)
+	}
+	if out.Body.Debug.LogLLMReqResp {
+		t.Fatalf("expected logLLMReqResp false by default")
+	}
+	if out.Body.Debug.DisableContentStripping {
+		t.Fatalf("expected disableContentStripping false by default")
+	}
 
 	// Invalid SetAuthKey requests should return ErrInvalidArgument.
 	badReqs := []*spec.SetAuthKeyRequest{
@@ -222,6 +256,48 @@ func TestSettingStore_AuthKeyLifecycleAndSettings(t *testing.T) {
 		if !errors.Is(err, spec.ErrInvalidArgument) {
 			t.Fatalf("bad request %d: expected ErrInvalidArgument, got %v", i, err)
 		}
+	}
+
+	badDebugReqs := []*spec.SetDebugSettingsRequest{
+		nil,
+		{Body: nil},
+		{Body: &spec.SetDebugSettingsRequestBody{LogLevel: spec.DebugLogLevel("trace")}},
+	}
+	for i, br := range badDebugReqs {
+		_, err := store.SetDebugSettings(ctx, br)
+		if br != nil && br.Body != nil {
+			if !errors.Is(err, spec.ErrInvalidDebugSettings) {
+				t.Fatalf("bad debug request %d: expected ErrInvalidDebugSettings, got %v", i, err)
+			}
+			continue
+		}
+		if !errors.Is(err, spec.ErrInvalidArgument) {
+			t.Fatalf("bad debug request %d: expected ErrInvalidArgument, got %v", i, err)
+		}
+	}
+
+	debugReq := &spec.SetDebugSettingsRequest{
+		Body: &spec.SetDebugSettingsRequestBody{
+			LogLLMReqResp:           true,
+			DisableContentStripping: true,
+			LogLevel:                spec.DebugLogLevelDebug,
+		},
+	}
+	if _, err := store.SetDebugSettings(ctx, debugReq); err != nil {
+		t.Fatalf("SetDebugSettings failed: %v", err)
+	}
+
+	settingsAfterDebug, err := store.GetSettings(ctx, nil)
+	if err != nil {
+		t.Fatalf("GetSettings after SetDebugSettings failed: %v", err)
+	}
+	if settingsAfterDebug.Body == nil {
+		t.Fatalf("GetSettings after SetDebugSettings returned nil body")
+	}
+	if settingsAfterDebug.Body.Debug.LogLevel != spec.DebugLogLevelDebug ||
+		!settingsAfterDebug.Body.Debug.LogLLMReqResp ||
+		!settingsAfterDebug.Body.Debug.DisableContentStripping {
+		t.Fatalf("unexpected debug settings after save: %+v", settingsAfterDebug.Body.Debug)
 	}
 
 	// Create a key and verify GetAuthKey and GetSettings reflect it.
@@ -366,6 +442,23 @@ func TestSettingStore_AuthKeyLifecycleAndSettings(t *testing.T) {
 		if raw2["schemaVersion"] != spec.SchemaVersion {
 			t.Fatalf("schemaVersion not updated by Migrate: got %v want %v", raw2["schemaVersion"], spec.SchemaVersion)
 		}
+		debugRaw, ok := raw2["debug"].(map[string]any)
+		if !ok {
+			t.Fatalf("debug settings missing after Migrate")
+		}
+		if debugRaw["logLLMReqResp"] != false {
+			t.Fatalf("expected logLLMReqResp=false after Migrate, got %v", debugRaw["logLLMReqResp"])
+		}
+		if debugRaw["disableContentStripping"] != false {
+			t.Fatalf(
+				"expected disableContentStripping=false after Migrate, got %v",
+				debugRaw["disableContentStripping"],
+			)
+		}
+		if debugRaw["logLevel"] != string(spec.DebugLogLevelInfo) {
+			t.Fatalf("expected logLevel=%q after Migrate, got %v", spec.DebugLogLevelInfo, debugRaw["logLevel"])
+		}
+
 		akRaw, ok := raw2["authKeys"].(map[string]any)
 		if !ok {
 			t.Fatalf("authKeys missing after Migrate")
@@ -422,6 +515,37 @@ func TestSettingStore_AuthKeyLifecycleAndSettings(t *testing.T) {
 		}
 	} else {
 		t.Fatalf("appTheme missing after SetAppTheme")
+	}
+}
+
+func TestSettingStore_ApplyCurrentDebugSettings(t *testing.T) {
+	defaultMap := map[string]any{
+		"schemaVersion": spec.SchemaVersion,
+		"appTheme": map[string]any{
+			"type": string(spec.ThemeSystem),
+			"name": string(spec.ThemeNameSystem),
+		},
+		"debug": map[string]any{
+			"logLLMReqResp":           true,
+			"disableContentStripping": true,
+			"logLevel":                string(spec.DebugLogLevelError),
+		},
+		"authKeys": map[string]any{},
+	}
+	store, cleanup := integrationTestStore(t, defaultMap)
+	defer cleanup()
+
+	var got spec.DebugSettings
+	store.SetDebugSettingsApplier(func(_ context.Context, cfg spec.DebugSettings) error {
+		got = cfg
+		return nil
+	})
+
+	if err := store.ApplyCurrentDebugSettings(t.Context(), false); err != nil {
+		t.Fatalf("ApplyCurrentDebugSettings failed: %v", err)
+	}
+	if got.LogLevel != spec.DebugLogLevelError || !got.LogLLMReqResp || !got.DisableContentStripping {
+		t.Fatalf("unexpected debug settings applied: %+v", got)
 	}
 }
 

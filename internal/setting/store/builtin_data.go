@@ -21,6 +21,13 @@ var BuiltInAuthKeys = func() map[spec.AuthKeyType][]spec.AuthKeyName {
 	return m
 }()
 
+// DefaultDebugSettingsData is written to disk on first start and used for migrations.
+var DefaultDebugSettingsData = spec.DebugSettings{
+	LogLLMReqResp:           false,
+	DisableContentStripping: false,
+	LogLevel:                spec.DebugLogLevelInfo,
+}
+
 // DefaultSettingsData is written to disk on first start.
 var DefaultSettingsData = func() spec.SettingsSchema {
 	ak := spec.AuthKeysSchema{
@@ -36,6 +43,7 @@ var DefaultSettingsData = func() spec.SettingsSchema {
 	return spec.SettingsSchema{
 		SchemaVersion: spec.SchemaVersion,
 		AppTheme:      spec.AppTheme{Type: spec.ThemeSystem, Name: string(spec.ThemeSystem)},
+		Debug:         DefaultDebugSettingsData,
 		AuthKeys:      ak,
 	}
 }()

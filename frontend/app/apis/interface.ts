@@ -29,7 +29,7 @@ import type {
 	PromptTemplateListItem,
 	PromptVariable,
 } from '@/spec/prompt';
-import type { AppTheme, AuthKey, AuthKeyName, AuthKeyType, SettingsSchema } from '@/spec/setting';
+import type { AppTheme, AuthKey, AuthKeyName, AuthKeyType, DebugSettings, SettingsSchema } from '@/spec/setting';
 import type {
 	InvokeSkillToolResponse,
 	RuntimeSkillFilter,
@@ -74,6 +74,7 @@ export interface IBackendAPI {
 
 export interface ISettingStoreAPI {
 	setAppTheme: (theme: AppTheme) => Promise<void>;
+	setDebugSettings: (settings: DebugSettings) => Promise<void>;
 	getAuthKey: (type: AuthKeyType, keyName: AuthKeyName) => Promise<AuthKey>;
 	getSettings: (forceFetch?: boolean) => Promise<SettingsSchema>;
 }

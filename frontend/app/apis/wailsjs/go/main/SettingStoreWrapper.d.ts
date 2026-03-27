@@ -7,3 +7,5 @@ export function GetAuthKey(arg1:spec.GetAuthKeyRequest):Promise<spec.GetAuthKeyR
 export function GetSettings(arg1:spec.GetSettingsRequest):Promise<spec.GetSettingsResponse>;
 
 export function SetAppTheme(arg1:spec.SetAppThemeRequest):Promise<spec.SetAppThemeResponse>;
+
+export function SetDebugSettings(arg1:spec.SetDebugSettingsRequest):Promise<spec.SetDebugSettingsResponse>;

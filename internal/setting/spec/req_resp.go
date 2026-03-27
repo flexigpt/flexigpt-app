@@ -4,11 +4,24 @@ type SetAppThemeRequestBody struct {
 	Type ThemeType `json:"type" required:"true"`
 	Name string    `json:"name" required:"true"`
 }
+
 type SetAppThemeRequest struct {
 	Body *SetAppThemeRequestBody
 }
 
 type SetAppThemeResponse struct{}
+
+type SetDebugSettingsRequestBody struct {
+	LogLLMReqResp           bool          `json:"logLLMReqResp"           required:"true"`
+	DisableContentStripping bool          `json:"disableContentStripping" required:"true"`
+	LogLevel                DebugLogLevel `json:"logLevel"                required:"true"`
+}
+
+type SetDebugSettingsRequest struct {
+	Body *SetDebugSettingsRequestBody
+}
+
+type SetDebugSettingsResponse struct{}
 
 // AuthKeyMeta is the public view of one stored key (no secret, only SHA).
 type AuthKeyMeta struct {
@@ -29,6 +42,7 @@ type GetAuthKeyResponseBody struct {
 	SHA256   string `json:"sha256"`
 	NonEmpty bool   `json:"nonEmpty"`
 }
+
 type GetAuthKeyResponse struct {
 	Body *GetAuthKeyResponseBody
 }
@@ -54,13 +68,14 @@ type DeleteAuthKeyRequest struct {
 
 type DeleteAuthKeyResponse struct{}
 
-// GetSettingsRequest fetches everything (theme + keys).  Secrets are omitted.
+// GetSettingsRequest fetches everything (theme + debug + keys). Secrets are omitted.
 type GetSettingsRequest struct {
 	ForceFetch bool `query:"forceFetch" doc:"Refresh from disk before reading." required:"false"`
 }
 
 type GetSettingsResponseBody struct {
 	AppTheme AppTheme      `json:"appTheme"`
+	Debug    DebugSettings `json:"debug"`
 	AuthKeys []AuthKeyMeta `json:"authKeys"`
 }
 

@@ -29,6 +29,18 @@ import (
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 )
 
+var defaultDebugConfig = debugclient.DebugConfig{
+	Disable:                 false,
+	DisableRequestBody:      false,
+	DisableResponseBody:     false,
+	DisableContentStripping: false,
+	LogToSlog:               false,
+}
+
+func DefaultDebugConfig() debugclient.DebugConfig {
+	return defaultDebugConfig
+}
+
 type completionKeyCapabilityResolver struct {
 	key  string
 	caps *inferenceSpec.ModelCapabilities
@@ -128,6 +140,31 @@ func NewProviderSetAPI(
 	ps.inner = inner
 
 	return ps, nil
+}
+
+// SetDebugConfig updates the debug client configuration used for future completions.
+func (ps *ProviderSetAPI) SetDebugConfig(cfg *debugclient.DebugConfig) {
+	if ps == nil {
+		return
+	}
+	if cfg == nil {
+		if ps.debugConfig == nil {
+			c := defaultDebugConfig
+			ps.debugConfig = &c
+		}
+		return
+	}
+	cloned := *cfg
+	ps.debugConfig = &cloned
+}
+
+// GetDebugConfig returns a defensive copy of the current debug configuration.
+func (ps *ProviderSetAPI) GetDebugConfig() *debugclient.DebugConfig {
+	if ps == nil || ps.debugConfig == nil {
+		return nil
+	}
+	cloned := *ps.debugConfig
+	return &cloned
 }
 
 // AddProvider forwards to inference-go ProviderSetAPI.AddProvider.

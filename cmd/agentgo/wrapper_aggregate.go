@@ -11,7 +11,6 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"github.com/flexigpt/inference-go/debugclient"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper"
@@ -24,6 +23,12 @@ import (
 	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 )
+
+var appSlogLevelVar slog.LevelVar
+
+func init() {
+	appSlogLevelVar.Set(slog.LevelInfo)
+}
 
 type AggregrateWrapper struct {
 	modelPresetStore *modelpresetStore.ModelPresetStore
@@ -53,18 +58,13 @@ func InitAggregrateWrapper(
 	agg.modelPresetStore = mps
 	agg.settingStore = ss
 	agg.skillStore = skillSt
+	defaultDebugConfig := inferencewrapper.DefaultDebugConfig()
 	p, err := inferencewrapper.NewProviderSetAPI(
 		agg.toolStore,
 		agg.modelPresetStore,
 		agg.skillStore,
 		inferencewrapper.WithLogger(slog.Default()),
-		inferencewrapper.WithDebugConfig(&debugclient.DebugConfig{
-			Disable:                 false,
-			DisableRequestBody:      false,
-			DisableResponseBody:     false,
-			DisableContentStripping: false,
-			LogToSlog:               false,
-		}),
+		inferencewrapper.WithDebugConfig(&defaultDebugConfig),
 	)
 	if err != nil {
 		return errors.Join(err, errors.New("invalid default provider"))
@@ -80,6 +80,14 @@ func InitAggregrateWrapper(
 		agg.providersetAPI,
 	)
 	if err != nil {
+		return err
+	}
+
+	agg.settingStore.SetDebugSettingsApplier(func(_ context.Context, cfg settingSpec.DebugSettings) error {
+		return applyAppDebugSettings(agg.providersetAPI, cfg)
+	})
+	if err := agg.settingStore.ApplyCurrentDebugSettings(context.Background(), true); err != nil {
+		slog.Error("couldn't apply persisted debug settings", "error", err)
 		return err
 	}
 	return nil
@@ -488,4 +496,37 @@ func initProviders(
 	}
 
 	return nil
+}
+
+func applyAppDebugSettings(providerSet *inferencewrapper.ProviderSetAPI, cfg settingSpec.DebugSettings) error {
+	appSlogLevelVar.Set(toSlogLevel(cfg.LogLevel))
+	if providerSet != nil {
+		clone := providerSet.GetDebugConfig()
+		if clone != nil {
+			clone.LogToSlog = cfg.LogLLMReqResp
+			clone.DisableContentStripping = cfg.DisableContentStripping
+			providerSet.SetDebugConfig(clone)
+		}
+	}
+
+	slog.Info(
+		"applied debug settings",
+		"logLLMReqResp", cfg.LogLLMReqResp,
+		"disableContentStripping", cfg.DisableContentStripping,
+		"logLevel", cfg.LogLevel,
+	)
+	return nil
+}
+
+func toSlogLevel(level settingSpec.DebugLogLevel) slog.Level {
+	switch level {
+	case settingSpec.DebugLogLevelDebug:
+		return slog.LevelDebug
+	case settingSpec.DebugLogLevelWarn:
+		return slog.LevelWarn
+	case settingSpec.DebugLogLevelError:
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }

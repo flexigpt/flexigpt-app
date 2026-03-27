@@ -6,7 +6,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper"
 	"github.com/flexigpt/flexigpt-app/internal/toolruntime"
-	"github.com/flexigpt/inference-go/debugclient"
 
 	assistantpresetStore "github.com/flexigpt/flexigpt-app/internal/assistantpreset/store"
 	conversationStore "github.com/flexigpt/flexigpt-app/internal/conversation/store"
@@ -227,18 +226,13 @@ func (a *BackendApp) initSkillStore() {
 }
 
 func (a *BackendApp) initProviderSet() {
+	defaultDebugConfig := inferencewrapper.DefaultDebugConfig()
 	p, err := inferencewrapper.NewProviderSetAPI(
 		a.toolStoreAPI,
 		a.modelPresetStoreAPI,
 		a.skillStoreAPI,
 		inferencewrapper.WithLogger(slog.Default()),
-		inferencewrapper.WithDebugConfig(&debugclient.DebugConfig{
-			Disable:                 false,
-			DisableRequestBody:      false,
-			DisableResponseBody:     false,
-			DisableContentStripping: false,
-			LogToSlog:               false,
-		}),
+		inferencewrapper.WithDebugConfig(&defaultDebugConfig),
 	)
 	if err != nil {
 		slog.Error(

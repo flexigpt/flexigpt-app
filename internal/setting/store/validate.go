@@ -51,3 +51,37 @@ func validateTheme(th *spec.AppTheme) error {
 		return spec.ErrInvalidTheme
 	}
 }
+
+// validateDebugSettings checks whether debug settings are supported.
+func validateDebugSettings(cfg *spec.DebugSettings) error {
+	if cfg == nil {
+		return spec.ErrInvalidDebugSettings
+	}
+
+	switch cfg.LogLevel {
+	case spec.DebugLogLevelDebug,
+		spec.DebugLogLevelInfo,
+		spec.DebugLogLevelWarn,
+		spec.DebugLogLevelError:
+		return nil
+	default:
+		return fmt.Errorf("%w: unsupported logLevel %q", spec.ErrInvalidDebugSettings, cfg.LogLevel)
+	}
+}
+
+func normalizeDebugSettings(cfg spec.DebugSettings) (spec.DebugSettings, bool) {
+	normalized := cfg
+	changed := false
+
+	if normalized.LogLevel == "" {
+		normalized.LogLevel = DefaultDebugSettingsData.LogLevel
+		changed = true
+	}
+
+	if err := validateDebugSettings(&normalized); err != nil {
+		normalized = DefaultDebugSettingsData
+		changed = true
+	}
+
+	return normalized, changed
+}

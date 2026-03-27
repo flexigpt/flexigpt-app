@@ -1020,7 +1020,7 @@ func TestScopedModelIDs_AcrossProviders_OverlayIsolation(t *testing.T) {
 	}
 }
 
-func Test_NewBuiltInPresets_SyntheticFS_AdditionalValidationErrors_TableDriven(t *testing.T) {
+func Test_NewBuiltInPresets_SyntheticFS_AdditionalValidationErrors(t *testing.T) {
 	if isWindows() {
 		t.Skip("synthetic fs tests are skipped on windows (known overlay flake)")
 	}
@@ -1149,7 +1149,7 @@ func Test_NewBuiltInPresets_SyntheticFS_AdditionalValidationErrors_TableDriven(t
 	}
 }
 
-func Test_NewBuiltInPresets_SyntheticFS_SubDirResolution_TableDriven(t *testing.T) {
+func Test_NewBuiltInPresets_SyntheticFS_SubDirResolution(t *testing.T) {
 	if isWindows() {
 		t.Skip("synthetic fs tests are skipped on windows (known overlay flake)")
 	}

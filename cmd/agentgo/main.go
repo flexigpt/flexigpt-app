@@ -26,14 +26,13 @@ var Version string
 
 func main() {
 	appDisplayTitle := "FlexiGPT - " + Version
-	slogLevel := slog.LevelDebug
 	wailsLogLevel := logger.INFO
 	wailsProdLogLevel := logger.INFO
 
 	// Create an instance of the app structure.
 	app := NewApp()
 	slogOpts := &slog.HandlerOptions{
-		Level: slogLevel,
+		Level: &appSlogLevelVar,
 	}
 
 	var stdoutHandler slog.Handler = slog.NewTextHandler(os.Stdout, slogOpts)

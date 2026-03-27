@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"path/filepath"
@@ -15,9 +16,12 @@ import (
 	"github.com/ppipada/mapstore-go/keyringencdec"
 )
 
+type DebugSettingsApplier func(context.Context, spec.DebugSettings) error
+
 type SettingStore struct {
-	store      *mapstore.MapFileStore
-	encEncrypt mapstore.IOEncoderDecoder
+	store                *mapstore.MapFileStore
+	encEncrypt           mapstore.IOEncoderDecoder
+	debugSettingsApplier DebugSettingsApplier
 }
 
 const (
@@ -72,8 +76,31 @@ func (s *SettingStore) Close() error {
 	return nil
 }
 
+func (s *SettingStore) SetDebugSettingsApplier(applier DebugSettingsApplier) {
+	if s == nil {
+		return
+	}
+	s.debugSettingsApplier = applier
+}
+
+func (s *SettingStore) ApplyCurrentDebugSettings(ctx context.Context, forceFetch bool) error {
+	if s == nil {
+		return nil
+	}
+
+	resp, err := s.GetSettings(ctx, &spec.GetSettingsRequest{ForceFetch: forceFetch})
+	if err != nil {
+		return err
+	}
+	if resp == nil || resp.Body == nil {
+		return errors.New("get settings: empty response body")
+	}
+	return s.applyDebugSettings(ctx, resp.Body.Debug)
+}
+
 // Migrate ensures the store is up-to-date with built-in data.
 // - Adds missing built-in auth keys as empty entries.
+// - Adds new settings sections/fields with defaults.
 // - Updates schemaVersion if changed.
 func (s *SettingStore) Migrate(ctx context.Context) error {
 	// Force re-read from disk to be safe during startup.
@@ -87,7 +114,8 @@ func (s *SettingStore) Migrate(ctx context.Context) error {
 		return fmt.Errorf("migrate: decode: %w", err)
 	}
 
-	added := 0
+	addedBuiltInAuthKeys := 0
+	debugChanged := false
 
 	// Ensure the authKeys map and the required nested maps exist,
 	// by using SetKey to create them on demand, but check via the decoded schema.
@@ -127,8 +155,20 @@ func (s *SettingStore) Migrate(ctx context.Context) error {
 				return fmt.Errorf("settings migrate: set nonEmpty for %s/%s: %w", t, name, err)
 			}
 
-			added++
+			addedBuiltInAuthKeys++
 		}
+	}
+
+	normalizedDebug, changed := normalizeDebugSettings(schema.Debug)
+	if changed {
+		val, err := jsonencdec.StructWithJSONTagsToMap(normalizedDebug)
+		if err != nil {
+			return fmt.Errorf("migrate: encode debug settings: %w", err)
+		}
+		if err := s.store.SetKey([]string{"debug"}, val); err != nil {
+			return fmt.Errorf("migrate: update debug settings: %w", err)
+		}
+		debugChanged = true
 	}
 
 	// Optionally bump schemaVersion if changed or missing.
@@ -138,8 +178,12 @@ func (s *SettingStore) Migrate(ctx context.Context) error {
 		}
 	}
 
-	if added > 0 {
-		slog.Info("settings migration complete: added missing built-in auth keys", "added", added)
+	if addedBuiltInAuthKeys > 0 || debugChanged {
+		slog.Info(
+			"settings migration complete",
+			"addedBuiltInAuthKeys", addedBuiltInAuthKeys,
+			"debugChanged", debugChanged,
+		)
 	} else {
 		slog.Info("settings migration: no changes needed")
 	}
@@ -168,6 +212,44 @@ func (s *SettingStore) SetAppTheme(
 
 	slog.Info("appTheme updated", "type", theme.Type, "name", theme.Name)
 	return &spec.SetAppThemeResponse{}, nil
+}
+
+// SetDebugSettings validates and persists runtime debug settings.
+func (s *SettingStore) SetDebugSettings(
+	ctx context.Context,
+	req *spec.SetDebugSettingsRequest,
+) (*spec.SetDebugSettingsResponse, error) {
+	if req == nil || req.Body == nil {
+		return nil, spec.ErrInvalidArgument
+	}
+
+	cfg := spec.DebugSettings{
+		LogLLMReqResp:           req.Body.LogLLMReqResp,
+		DisableContentStripping: req.Body.DisableContentStripping,
+		LogLevel:                req.Body.LogLevel,
+	}
+	if err := validateDebugSettings(&cfg); err != nil {
+		return nil, err
+	}
+
+	val, err := jsonencdec.StructWithJSONTagsToMap(cfg)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.store.SetKey([]string{"debug"}, val); err != nil {
+		return nil, err
+	}
+	if err := s.applyDebugSettings(ctx, cfg); err != nil {
+		return nil, fmt.Errorf("debug settings saved but runtime apply failed: %w", err)
+	}
+
+	slog.Info(
+		"debug settings updated",
+		"logLLMReqResp", cfg.LogLLMReqResp,
+		"disableContentStripping", cfg.DisableContentStripping,
+		"logLevel", cfg.LogLevel,
+	)
+	return &spec.SetDebugSettingsResponse{}, nil
 }
 
 // SetAuthKey inserts or updates one auth-key.
@@ -303,11 +385,13 @@ func (s *SettingStore) GetSettings(
 	if err := jsonencdec.MapToStructWithJSONTags(raw, &schema); err != nil {
 		return nil, err
 	}
+	schema.Debug, _ = normalizeDebugSettings(schema.Debug)
 
 	// Convert to DTO (secrets stripped).
 	out := spec.GetSettingsResponse{
 		Body: &spec.GetSettingsResponseBody{
 			AppTheme: schema.AppTheme,
+			Debug:    schema.Debug,
 			AuthKeys: []spec.AuthKeyMeta{},
 		},
 	}
@@ -340,6 +424,13 @@ func (s *SettingStore) valueEncDecGetter(path []string) mapstore.IOEncoderDecode
 		return s.encEncrypt
 	}
 	return nil
+}
+
+func (s *SettingStore) applyDebugSettings(ctx context.Context, cfg spec.DebugSettings) error {
+	if s == nil || s.debugSettingsApplier == nil {
+		return nil
+	}
+	return s.debugSettingsApplier(ctx, cfg)
 }
 
 // computeSHA returns the hex SHA-256 of the given string.

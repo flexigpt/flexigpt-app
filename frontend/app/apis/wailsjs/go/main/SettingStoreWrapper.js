@@ -13,3 +13,7 @@ export function GetSettings(arg1) {
 export function SetAppTheme(arg1) {
   return window['go']['main']['SettingStoreWrapper']['SetAppTheme'](arg1);
 }
+
+export function SetDebugSettings(arg1) {
+  return window['go']['main']['SettingStoreWrapper']['SetDebugSettings'](arg1);
+}

@@ -9,6 +9,25 @@ export interface AppTheme {
 	name: string;
 }
 
+export enum DebugLogLevel {
+	Debug = 'debug',
+	Info = 'info',
+	Warn = 'warn',
+	Error = 'error',
+}
+
+export interface DebugSettings {
+	logLLMReqResp: boolean;
+	disableContentStripping: boolean;
+	logLevel: DebugLogLevel;
+}
+
+export const DEFAULT_DEBUG_SETTINGS: DebugSettings = {
+	logLLMReqResp: false,
+	disableContentStripping: false,
+	logLevel: DebugLogLevel.Info,
+};
+
 export type AuthKeyType = string;
 export const AuthKeyTypeProvider = 'provider';
 
@@ -29,5 +48,6 @@ export interface AuthKeyMeta {
 
 export interface SettingsSchema {
 	appTheme: AppTheme;
+	debug: DebugSettings;
 	authKeys: AuthKeyMeta[];
 }

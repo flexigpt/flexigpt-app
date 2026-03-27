@@ -38,6 +38,14 @@ func (w *SettingStoreWrapper) SetAppTheme(
 	})
 }
 
+func (w *SettingStoreWrapper) SetDebugSettings(
+	req *settingSpec.SetDebugSettingsRequest,
+) (*settingSpec.SetDebugSettingsResponse, error) {
+	return middleware.WithRecoveryResp(func() (*settingSpec.SetDebugSettingsResponse, error) {
+		return w.store.SetDebugSettings(context.Background(), req)
+	})
+}
+
 func (w *SettingStoreWrapper) GetSettings(
 	req *settingSpec.GetSettingsRequest,
 ) (*settingSpec.GetSettingsResponse, error) {

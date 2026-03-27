@@ -278,7 +278,8 @@ func (a *App) initManagers() {
 		)
 		panic("failed to initialize managers: aggregate initialization failed")
 	}
-	slog.Info("model presets store initialized", "dir", a.modelPresetsDirPath)
+
+	slog.Info("aggregate initialized", "dir", a.modelPresetsDirPath)
 }
 
 // startup is called at application startup.
