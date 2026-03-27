@@ -34,13 +34,13 @@ import { stripUndefinedDeep } from '@/lib/obj_utils';
 import { generateTitle } from '@/lib/title_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
+import { uiAttachmentToConversation } from '@/chats/composer/attachments/attachment_editor_utils';
+import type { EditorSubmitPayload } from '@/chats/composer/editor/editor_utils';
 import {
 	buildUIToolOutputFromToolOutput,
 	deriveUIFieldsFromOutputUnion,
 	getDebugDetailsMarkdown,
 } from '@/chats/conversation/completion_helper';
-import { uiAttachmentToConversation } from '@/chats/inputarea/attachments/attachment_editor_utils';
-import type { EditorSubmitPayload } from '@/chats/inputarea/editor/editor_utils';
 import { collectToolCallsFromInputs, collectToolCallsFromOutputs } from '@/tools/lib/tool_call_utils';
 import { mapToolOutputsToToolOutputItems } from '@/tools/lib/tool_output_utils';
 

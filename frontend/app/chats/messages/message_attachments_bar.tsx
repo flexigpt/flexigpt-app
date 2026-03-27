@@ -20,7 +20,7 @@ import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 import {
 	getAttachmentContentBlockModeLabel,
 	getAttachmentContentBlockModeTooltip,
-} from '@/chats/inputarea/attachments/attachment_mode_menu';
+} from '@/chats/composer/attachments/attachment_mode_menu';
 import { formatToolCallLabel } from '@/tools/lib/tool_call_utils';
 import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';
 

@@ -5,7 +5,7 @@ import { FiUser, FiZap } from 'react-icons/fi';
 import type { ConversationMessage } from '@/spec/conversation';
 import { RoleEnum, Status } from '@/spec/inference';
 
-import { ToolDetailsModal, type ToolDetailsState } from '@/chats/inputarea/tools/tool_details_modal';
+import { ToolDetailsModal, type ToolDetailsState } from '@/chats/composer/tools/tool_details_modal';
 import { MessageAttachmentsBar } from '@/chats/messages/message_attachments_bar';
 import { MessageCitationsBar } from '@/chats/messages/message_citations_bar';
 import { MessageContentCard } from '@/chats/messages/message_content_card';

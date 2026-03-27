@@ -35,6 +35,9 @@ import { attachmentsDropAPI } from '@/apis/baseapi';
 import { ButtonScrollToBottom, ButtonScrollToTop } from '@/components/button_scroll_top_bottom';
 
 import type { ChatTabState } from '@/chats/chat_tabs_persist';
+import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/composer/editor/editor_utils';
+import type { InputBoxHandle } from '@/chats/composer/input_box';
+import { sliceMessagesForSend } from '@/chats/composer/previousmessages/previous_messages_helper';
 import { HandleCompletion } from '@/chats/conversation/completion_helper';
 import { TabInputPane } from '@/chats/conversation/conversation_input_pane';
 import {
@@ -50,9 +53,6 @@ import {
 	VIRTUOSO_AT_BOTTOM_THRESHOLD,
 	VirtuosoList,
 } from '@/chats/conversation/virtuoso_utils';
-import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/inputarea/editor/editor_utils';
-import type { InputBoxHandle } from '@/chats/inputarea/input_box';
-import { sliceMessagesForSend } from '@/chats/inputarea/previousmessages/previous_messages_helper';
 import { ChatMessage } from '@/chats/messages/message';
 import { appendSystemPromptParts } from '@/prompts/lib/system_prompt_utils';
 
