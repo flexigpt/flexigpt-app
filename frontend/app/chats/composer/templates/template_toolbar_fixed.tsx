@@ -2,7 +2,7 @@ import { FiCheck, FiEdit2, FiMaximize2, FiX } from 'react-icons/fi';
 
 import { PromptRoleEnum } from '@/spec/prompt';
 
-import { type SelectedTemplateForRun } from '@/chats/composer/platedoc/templates/template_processing';
+import { type SelectedTemplateForRun } from '@/chats/composer/templates/template_processing';
 
 export function TemplateFixedToolbar(props: {
 	selection: SelectedTemplateForRun;

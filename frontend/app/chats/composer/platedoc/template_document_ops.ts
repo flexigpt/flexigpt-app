@@ -14,7 +14,7 @@ import {
 	effectiveVarValueLocal,
 	makeSelectedTemplateForRun,
 	type SelectedTemplateForRun,
-} from '@/chats/composer/platedoc/templates/template_processing';
+} from '@/chats/composer/templates/template_processing';
 
 type TemplateNodeWithPath = [TemplateSelectionElementNode, Path];
 

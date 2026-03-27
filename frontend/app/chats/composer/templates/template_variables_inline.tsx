@@ -20,12 +20,12 @@ import {
 	computeEffectiveTemplate,
 	computeRequirements,
 	effectiveVarValueLocal,
-} from '@/chats/composer/platedoc/templates/template_processing';
-import { EnumDropdownInline } from '@/chats/composer/platedoc/templates/template_variable_enum_dropdown';
+} from '@/chats/composer/templates/template_processing';
+import { EnumDropdownInline } from '@/chats/composer/templates/template_variable_enum_dropdown';
 import {
 	dispatchTemplateVarsUpdated,
 	useTemplateVarsUpdatedForSelection,
-} from '@/chats/composer/platedoc/templates/use_template_toolbar_vars_updated_event';
+} from '@/chats/composer/templates/use_template_toolbar_vars_updated_event';
 
 const TEMPLATE_VARIABLE_TOKEN_RE = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_-]*)\s*\}\}/g;
 

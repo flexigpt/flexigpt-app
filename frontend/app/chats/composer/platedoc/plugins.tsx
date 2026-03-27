@@ -17,8 +17,8 @@ import {
 	type TemplateSelectionElementNode,
 	type ToolSelectionElementNode,
 } from '@/chats/composer/platedoc/nodes';
-import { computeEffectiveTemplate, computeRequirements } from '@/chats/composer/platedoc/templates/template_processing';
-import { TemplateVariableElement } from '@/chats/composer/platedoc/templates/template_variables_inline';
+import { computeEffectiveTemplate, computeRequirements } from '@/chats/composer/templates/template_processing';
+import { TemplateVariableElement } from '@/chats/composer/templates/template_variables_inline';
 
 export const createComposerEditorPlugins = () => [
 	SingleBlockPlugin,

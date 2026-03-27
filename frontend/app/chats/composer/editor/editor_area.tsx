@@ -45,10 +45,7 @@ import {
 	getTemplateSelections,
 	insertTemplateSelectionNode,
 	toPlainTextReplacingVariables,
-} from '@/chats/composer/platedoc/templates/template_document_ops';
-import { getInstructionPromptPartsFromSelections } from '@/chats/composer/platedoc/templates/template_processing';
-import { TemplateToolbars } from '@/chats/composer/platedoc/templates/template_toolbars';
-import { dispatchTemplateFlashEvent } from '@/chats/composer/platedoc/templates/use_template_flash_event';
+} from '@/chats/composer/platedoc/template_document_ops';
 import {
 	type AttachedToolEntry,
 	getAttachedTools,
@@ -59,6 +56,9 @@ import {
 } from '@/chats/composer/platedoc/tool_document_ops';
 import { useComposerDocument } from '@/chats/composer/platedoc/use_composer_document';
 import { useComposerSkills } from '@/chats/composer/skills/use_composer_skills';
+import { getInstructionPromptPartsFromSelections } from '@/chats/composer/templates/template_processing';
+import { TemplateToolbars } from '@/chats/composer/templates/template_toolbars';
+import { dispatchTemplateFlashEvent } from '@/chats/composer/templates/use_template_flash_event';
 import { useComposerTools } from '@/chats/composer/toolruntime/use_composer_tools';
 import { dispatchOpenToolArgs, useOpenToolArgs } from '@/chats/composer/toolruntime/use_open_toolargs_event';
 import { ToolDetailsModal, type ToolDetailsState } from '@/chats/composer/tools/tool_details_modal';
