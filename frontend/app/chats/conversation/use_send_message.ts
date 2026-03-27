@@ -120,6 +120,10 @@ export function useSendMessage({
 				conversation: { ...chatWithPlaceholder, messages: [...chatWithPlaceholder.messages] },
 			}));
 
+			if (selectedTabIdRef.current === tabId) {
+				scrollTabToBottomSoon(tabId);
+			}
+
 			const onStreamTextData = (textData: string) => {
 				if (!textData) return;
 				if (requestIdByTabRef.current.get(tabId) !== reqId) return;
@@ -389,6 +393,8 @@ export function useSendMessage({
 			notifyStreamSoon,
 			requestIdByTabRef,
 			saveUpdatedConversation,
+			scrollTabToBottomSoon,
+			selectedTabIdRef,
 			tabExists,
 			tokensReceivedByTabRef,
 			updateTab,

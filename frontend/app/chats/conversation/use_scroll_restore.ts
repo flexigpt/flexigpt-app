@@ -1,60 +1,42 @@
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-import { type ListRange, type VirtuosoHandle } from 'react-virtuoso';
+const SCROLL_AT_TOP_THRESHOLD = 8;
+const SCROLL_AT_BOTTOM_THRESHOLD = 128;
 
-import type { Conversation } from '@/spec/conversation';
-
-import type { SavedVirtuosoState } from '@/chats/conversation/virtuoso_utils';
-import type { ChatTabState } from '@/chats/tabs/tabs_model';
-
-function getConversationModifiedAtMs(conversation?: Conversation): number {
-	const raw = conversation?.modifiedAt;
-	if (!raw) return 0;
-
-	const ms = raw instanceof Date ? raw.getTime() : new Date(raw).getTime();
-	return Number.isFinite(ms) ? ms : 0;
+function getDistanceFromBottom(el: HTMLElement): number {
+	return Math.max(0, el.scrollHeight - el.clientHeight - el.scrollTop);
 }
 
-function getSavedVirtuosoStateRecord(
-	stateByTabRef: RefObject<Map<string, SavedVirtuosoState>>,
-	tabId: string
-): SavedVirtuosoState | undefined {
-	return stateByTabRef.current?.get(tabId);
+function isElementAtBottom(el: HTMLElement): boolean {
+	return getDistanceFromBottom(el) <= SCROLL_AT_BOTTOM_THRESHOLD;
 }
 
-function getMapNumberValue(mapRef: RefObject<Map<string, number>>, key: string): number | undefined {
-	return mapRef.current?.get(key);
+function isElementAtTop(el: HTMLElement): boolean {
+	return el.scrollTop <= SCROLL_AT_TOP_THRESHOLD;
 }
 
 type UseScrollRestoreArgs = {
-	tabsRef: RefObject<ChatTabState[]>;
 	selectedTabId: string;
 	selectedTabIdRef: RefObject<string>;
 	activeTabIsHydrating: boolean;
 	messageCount: number;
-	activeConversationModifiedAtMs: number;
-	activeLastMessageId: string | null;
 	initialScrollTopByTab?: Record<string, number>;
-	initialTopItemIndexByTab?: Record<string, number>;
 };
 
 export function useScrollRestore({
-	tabsRef,
 	selectedTabId,
 	selectedTabIdRef,
 	activeTabIsHydrating,
 	messageCount,
-	activeConversationModifiedAtMs,
-	activeLastMessageId,
 	initialScrollTopByTab,
-	initialTopItemIndexByTab,
 }: UseScrollRestoreArgs) {
-	const virtuosoRef = useRef<VirtuosoHandle>(null);
-	const virtuosoStateByTabRef = useRef(new Map<string, SavedVirtuosoState>());
-	const restoredInitialScrollByTabRef = useRef(new Set<string>());
+	const [isAtBottom, setIsAtBottom] = useState(true);
+	const [isAtTop, setIsAtTop] = useState(true);
 
+	const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+	const scrollContentRef = useRef<HTMLDivElement | null>(null);
 	const scrollTopByTabRef = useRef(new Map<string, number>());
-	const topItemIndexByTabRef = useRef(new Map<string, number>());
+	const shouldAutoFollowRef = useRef(true);
 
 	const seededScrollFromStorageRef = useRef(false);
 	useEffect(() => {
@@ -70,99 +52,135 @@ export function useScrollRestore({
 		}
 	}, [initialScrollTopByTab]);
 
-	const seededTopItemIndexFromStorageRef = useRef(false);
-	useEffect(() => {
-		if (!seededTopItemIndexFromStorageRef.current) {
-			seededTopItemIndexFromStorageRef.current = true;
-			if (initialTopItemIndexByTab) {
-				for (const [tabId, topItemIndex] of Object.entries(initialTopItemIndexByTab)) {
-					if (typeof topItemIndex === 'number') {
-						topItemIndexByTabRef.current.set(tabId, topItemIndex);
-					}
-				}
-			}
+	const persistScrollPosition = useCallback((tabId: string, el: HTMLElement) => {
+		scrollTopByTabRef.current.set(tabId, el.scrollTop);
+	}, []);
+
+	const updateScrollState = useCallback((el: HTMLElement | null) => {
+		if (!el) {
+			shouldAutoFollowRef.current = true;
+			setIsAtTop(true);
+			setIsAtBottom(true);
+			return;
 		}
-	}, [initialTopItemIndexByTab]);
 
-	const shouldPreserveRestoreSeed = useCallback(
-		(tabId: string) => {
-			if (restoredInitialScrollByTabRef.current.has(tabId)) return false;
+		const nextAtTop = isElementAtTop(el);
+		const nextAtBottom = isElementAtBottom(el);
 
-			const tab = tabsRef.current.find(t => t.tabId === tabId);
-			if (!tab) return false;
+		shouldAutoFollowRef.current = nextAtBottom;
+		setIsAtTop(nextAtTop);
+		setIsAtBottom(nextAtBottom);
+	}, []);
 
-			const savedScrollTop = scrollTopByTabRef.current.get(tabId) ?? 0;
-			const savedTopItemIndex = topItemIndexByTabRef.current.get(tabId) ?? 0;
-
-			return tab.isHydrating || savedScrollTop > 0 || savedTopItemIndex > 0;
+	const setScrollContainerRef = useCallback(
+		(el: HTMLDivElement | null) => {
+			scrollContainerRef.current = el;
+			updateScrollState(el);
 		},
-		[tabsRef]
+		[updateScrollState]
 	);
 
-	const saveVirtuosoStateForTab = useCallback(
-		(tabId: string, handle: VirtuosoHandle | null) => {
-			if (!handle) return;
+	const setScrollContentRef = useCallback((el: HTMLDivElement | null) => {
+		scrollContentRef.current = el;
+	}, []);
 
-			const tab = tabsRef.current.find(t => t.tabId === tabId);
-			const tabMessages = tab?.conversation.messages ?? [];
-			const savedStateMeta = {
-				modifiedAtMs: getConversationModifiedAtMs(tab?.conversation),
-				messageCount: tabMessages.length,
-				lastMessageId: tabMessages[tabMessages.length - 1]?.id ?? null,
-			};
+	const handleScroll = useCallback(() => {
+		const el = scrollContainerRef.current;
+		const tabId = selectedTabIdRef.current;
+		if (!el || !tabId) return;
 
-			handle.getState(state => {
-				virtuosoStateByTabRef.current.set(tabId, {
-					snapshot: state,
-					...savedStateMeta,
-				});
-			});
-		},
-		[tabsRef]
-	);
+		persistScrollPosition(tabId, el);
+		updateScrollState(el);
+	}, [persistScrollPosition, selectedTabIdRef, updateScrollState]);
 
-	const [isAtBottom, setIsAtBottom] = useState(true);
-	const [isAtTop, setIsAtTop] = useState(true);
+	const scrollElementToBottom = useCallback((el: HTMLElement | null) => {
+		if (!el) return;
+		el.scrollTo({ top: el.scrollHeight, behavior: 'auto' });
+	}, []);
 
-	const scrollListenerCleanupRef = useRef<(() => void) | null>(null);
-
-	const handleScrollerRef = useCallback(
-		(el: HTMLElement | Window | null) => {
-			scrollListenerCleanupRef.current?.();
-			scrollListenerCleanupRef.current = null;
-
-			const htmlEl = el instanceof HTMLElement ? el : null;
-			if (!htmlEl) return;
-
-			const tabId = selectedTabIdRef.current;
-			const handler = () => {
-				if (!tabId) return;
-				if (shouldPreserveRestoreSeed(tabId)) return;
-				scrollTopByTabRef.current.set(tabId, htmlEl.scrollTop);
-			};
-
-			htmlEl.addEventListener('scroll', handler, { passive: true });
-			scrollListenerCleanupRef.current = () => {
-				htmlEl.removeEventListener('scroll', handler);
-			};
-		},
-		[selectedTabIdRef, shouldPreserveRestoreSeed]
-	);
+	const previousSelectedTabIdRef = useRef<string | null>(null);
+	const previousHydratingRef = useRef(activeTabIsHydrating);
 
 	useLayoutEffect(() => {
-		const tabId = selectedTabId;
-		const handle = virtuosoRef.current;
+		const el = scrollContainerRef.current;
+		const selectedChanged = previousSelectedTabIdRef.current !== selectedTabId;
+		const justFinishedHydrating =
+			previousSelectedTabIdRef.current === selectedTabId && previousHydratingRef.current && !activeTabIsHydrating;
 
-		return () => {
-			saveVirtuosoStateForTab(tabId, handle);
+		if (el && selectedTabId && !activeTabIsHydrating && (selectedChanged || justFinishedHydrating)) {
+			const nextTop = scrollTopByTabRef.current?.get(selectedTabId) ?? 0;
+			el.scrollTo({ top: nextTop, behavior: 'auto' });
+			persistScrollPosition(selectedTabId, el);
+			updateScrollState(el);
+		} else if (el) {
+			updateScrollState(el);
+		}
+
+		previousSelectedTabIdRef.current = selectedTabId;
+		previousHydratingRef.current = activeTabIsHydrating;
+	}, [activeTabIsHydrating, persistScrollPosition, selectedTabId, updateScrollState]);
+
+	const previousRenderRef = useRef({
+		tabId: selectedTabId,
+		messageCount,
+	});
+
+	useLayoutEffect(() => {
+		const el = scrollContainerRef.current;
+		const previous = previousRenderRef.current;
+		const sameTab = previous.tabId === selectedTabId;
+		const messageCountIncreased = sameTab && messageCount > previous.messageCount;
+
+		if (el && selectedTabId && !activeTabIsHydrating && messageCountIncreased && shouldAutoFollowRef.current) {
+			scrollElementToBottom(el);
+			persistScrollPosition(selectedTabId, el);
+			updateScrollState(el);
+		} else if (el) {
+			updateScrollState(el);
+		}
+
+		previousRenderRef.current = {
+			tabId: selectedTabId,
+			messageCount,
 		};
-	}, [saveVirtuosoStateForTab, selectedTabId]);
+	}, [
+		activeTabIsHydrating,
+		messageCount,
+		persistScrollPosition,
+		scrollElementToBottom,
+		selectedTabId,
+		updateScrollState,
+	]);
 
 	useEffect(() => {
+		const contentEl = scrollContentRef.current;
+		if (!contentEl) return;
+		if (typeof ResizeObserver === 'undefined') return;
+
+		const observer = new ResizeObserver(() => {
+			const scrollerEl = scrollContainerRef.current;
+			const tabId = selectedTabIdRef.current;
+			if (!scrollerEl || !tabId) return;
+
+			if (!activeTabIsHydrating && shouldAutoFollowRef.current) {
+				scrollElementToBottom(scrollerEl);
+				persistScrollPosition(tabId, scrollerEl);
+			}
+
+			updateScrollState(scrollerEl);
+		});
+		observer.observe(contentEl);
 		return () => {
-			scrollListenerCleanupRef.current?.();
+			observer.disconnect();
 		};
-	}, []);
+	}, [
+		activeTabIsHydrating,
+		persistScrollPosition,
+		scrollElementToBottom,
+		selectedTabId,
+		selectedTabIdRef,
+		updateScrollState,
+	]);
 
 	const scrollTabToBottomSoon = useCallback(
 		(tabId: string) => {
@@ -170,84 +188,54 @@ export function useScrollRestore({
 				requestAnimationFrame(() => {
 					if (selectedTabIdRef.current !== tabId) return;
 
-					const tab = tabsRef.current.find(t => t.tabId === tabId);
-					const lastIndex = (tab?.conversation.messages.length ?? 0) - 1;
-					if (lastIndex < 0) return;
+					const el = scrollContainerRef.current;
+					if (!el) return;
 
-					virtuosoRef.current?.scrollToIndex({ index: lastIndex, align: 'end', behavior: 'auto' });
+					scrollElementToBottom(el);
+					persistScrollPosition(tabId, el);
+					updateScrollState(el);
 				});
 			});
 		},
-		[selectedTabIdRef, tabsRef]
+		[persistScrollPosition, scrollElementToBottom, selectedTabIdRef, updateScrollState]
 	);
 
-	// eslint-disable-next-line react-hooks/refs
-	const activeVirtuosoStateRecord = getSavedVirtuosoStateRecord(virtuosoStateByTabRef, selectedTabId);
-
-	const activeVirtuosoState =
-		activeVirtuosoStateRecord &&
-		activeVirtuosoStateRecord.modifiedAtMs === activeConversationModifiedAtMs &&
-		activeVirtuosoStateRecord.messageCount === messageCount &&
-		activeVirtuosoStateRecord.lastMessageId === activeLastMessageId
-			? activeVirtuosoStateRecord.snapshot
-			: undefined;
-
-	useEffect(() => {
-		if (activeVirtuosoStateRecord && !activeVirtuosoState) {
-			virtuosoStateByTabRef.current.delete(selectedTabId);
-		}
-	}, [activeVirtuosoState, activeVirtuosoStateRecord, selectedTabId]);
-
-	// eslint-disable-next-line react-hooks/refs
-	const savedTopItemIndex = getMapNumberValue(topItemIndexByTabRef, selectedTabId);
-
-	const hasInitialTopItemIndex =
-		!activeVirtuosoState &&
-		typeof savedTopItemIndex === 'number' &&
-		Number.isFinite(savedTopItemIndex) &&
-		savedTopItemIndex > 0 &&
-		savedTopItemIndex < messageCount;
-
-	// eslint-disable-next-line react-hooks/refs
-	const savedInitialScrollTop = getMapNumberValue(scrollTopByTabRef, selectedTabId) ?? 0;
-
-	const initialPositionProps = activeVirtuosoState
-		? {}
-		: hasInitialTopItemIndex
-			? {
-					initialTopMostItemIndex: {
-						index: savedTopItemIndex,
-						align: 'start' as const,
-					},
-				}
-			: Number.isFinite(savedInitialScrollTop) && savedInitialScrollTop > 0
-				? {
-						initialScrollTop: savedInitialScrollTop,
-					}
-				: {};
-
 	const scrollActiveToTop = useCallback(() => {
-		virtuosoRef.current?.scrollToIndex({ index: 0, align: 'start', behavior: 'auto' });
-	}, []);
+		const el = scrollContainerRef.current;
+		const tabId = selectedTabIdRef.current;
+		if (!el || !tabId) return;
+
+		el.scrollTo({ top: 0, behavior: 'auto' });
+		persistScrollPosition(tabId, el);
+		updateScrollState(el);
+	}, [persistScrollPosition, selectedTabIdRef, updateScrollState]);
 
 	const scrollActiveToBottom = useCallback(() => {
 		const lastIndex = messageCount - 1;
 		if (lastIndex < 0) return;
 
-		virtuosoRef.current?.scrollToIndex({ index: lastIndex, align: 'end', behavior: 'auto' });
-	}, [messageCount]);
+		const el = scrollContainerRef.current;
+		const tabId = selectedTabIdRef.current;
+		if (!el || !tabId) return;
+
+		scrollElementToBottom(el);
+		persistScrollPosition(tabId, el);
+		updateScrollState(el);
+	}, [messageCount, persistScrollPosition, scrollElementToBottom, selectedTabIdRef, updateScrollState]);
 
 	const resetScrollToTop = useCallback(
 		(tabId: string) => {
 			scrollTopByTabRef.current.set(tabId, 0);
-			topItemIndexByTabRef.current.set(tabId, 0);
-			virtuosoStateByTabRef.current.delete(tabId);
-			restoredInitialScrollByTabRef.current.add(tabId);
 
 			if (selectedTabIdRef.current !== tabId) return;
-			virtuosoRef.current?.scrollTo({ top: 0 });
+			const el = scrollContainerRef.current;
+			if (!el) return;
+
+			el.scrollTo({ top: 0, behavior: 'auto' });
+			persistScrollPosition(tabId, el);
+			updateScrollState(el);
 		},
-		[selectedTabIdRef]
+		[persistScrollPosition, selectedTabIdRef, updateScrollState]
 	);
 
 	const setScrollTopForTab = useCallback((tabId: string, top: number) => {
@@ -262,131 +250,22 @@ export function useScrollRestore({
 		return obj;
 	}, []);
 
-	const getTopItemIndexByTabSnapshot = useCallback(() => {
-		const obj: Record<string, number> = {};
-		for (const [key, value] of topItemIndexByTabRef.current.entries()) {
-			obj[key] = value;
-		}
-		return obj;
-	}, []);
-
 	const disposeScrollRuntime = useCallback((tabId: string) => {
-		virtuosoStateByTabRef.current.delete(tabId);
-		restoredInitialScrollByTabRef.current.delete(tabId);
 		scrollTopByTabRef.current.delete(tabId);
-		topItemIndexByTabRef.current.delete(tabId);
-	}, []);
-
-	const previousSelectedTabIdRef = useRef<string | null>(null);
-
-	useEffect(() => {
-		const previousSelectedTabId = previousSelectedTabIdRef.current;
-		const switchedTabs = previousSelectedTabId !== selectedTabId;
-
-		if (switchedTabs && !activeVirtuosoState && messageCount > 0) {
-			restoredInitialScrollByTabRef.current.add(selectedTabId);
-		}
-
-		previousSelectedTabIdRef.current = selectedTabId;
-	}, [selectedTabId, activeVirtuosoState, messageCount]);
-
-	const previousSelectedRenderRef = useRef({
-		tabId: selectedTabId,
-		isHydrating: activeTabIsHydrating,
-		messageCount,
-	});
-
-	useEffect(() => {
-		const previous = previousSelectedRenderRef.current;
-		const sameTab = previous.tabId === selectedTabId;
-		const justBecameRenderable =
-			sameTab && ((previous.isHydrating && !activeTabIsHydrating) || (previous.messageCount === 0 && messageCount > 0));
-
-		if (
-			selectedTabId &&
-			justBecameRenderable &&
-			!activeTabIsHydrating &&
-			messageCount > 0 &&
-			!activeVirtuosoState &&
-			!restoredInitialScrollByTabRef.current.has(selectedTabId)
-		) {
-			const restoreTabId = selectedTabId;
-			const restoreTopItemIndex = topItemIndexByTabRef.current.get(restoreTabId);
-			const canRestoreByTopItemIndex =
-				typeof restoreTopItemIndex === 'number' && restoreTopItemIndex > 0 && restoreTopItemIndex < messageCount;
-			const restoreScrollTop = scrollTopByTabRef.current.get(restoreTabId) ?? 0;
-
-			requestAnimationFrame(() => {
-				if (selectedTabIdRef.current !== restoreTabId) return;
-
-				if (canRestoreByTopItemIndex) {
-					const currentTab = tabsRef.current.find(t => t.tabId === restoreTabId);
-					const currentMessageCount = currentTab?.conversation.messages.length ?? 0;
-					if (currentMessageCount > 0) {
-						virtuosoRef.current?.scrollToIndex({
-							index: Math.min(restoreTopItemIndex, currentMessageCount - 1),
-							align: 'start',
-							behavior: 'auto',
-						});
-					}
-				} else if (restoreScrollTop > 0) {
-					virtuosoRef.current?.scrollTo({ top: restoreScrollTop, behavior: 'auto' });
-				}
-
-				restoredInitialScrollByTabRef.current.add(restoreTabId);
-			});
-		}
-
-		previousSelectedRenderRef.current = {
-			tabId: selectedTabId,
-			isHydrating: activeTabIsHydrating,
-			messageCount,
-		};
-	}, [activeTabIsHydrating, activeVirtuosoState, messageCount, selectedTabId, selectedTabIdRef, tabsRef]);
-
-	const followActiveOutput = useCallback(
-		(atBottom: boolean) => {
-			if (activeTabIsHydrating) return false;
-			return atBottom;
-		},
-		[activeTabIsHydrating]
-	);
-
-	const handleRangeChanged = useCallback(
-		(range: ListRange) => {
-			if (!selectedTabId) return;
-			if (shouldPreserveRestoreSeed(selectedTabId)) return;
-			topItemIndexByTabRef.current.set(selectedTabId, range.startIndex);
-		},
-		[selectedTabId, shouldPreserveRestoreSeed]
-	);
-
-	const handleAtBottomStateChange = useCallback((atBottom: boolean) => {
-		setIsAtBottom(atBottom);
-	}, []);
-
-	const handleAtTopStateChange = useCallback((atTop: boolean) => {
-		setIsAtTop(atTop);
 	}, []);
 
 	return {
-		virtuosoRef,
-		activeVirtuosoState,
-		initialPositionProps,
-		followActiveOutput,
-		handleScrollerRef,
-		handleRangeChanged,
+		setScrollContainerRef,
+		setScrollContentRef,
+		handleScroll,
 		isAtBottom,
 		isAtTop,
-		handleAtBottomStateChange,
-		handleAtTopStateChange,
 		scrollActiveToTop,
 		scrollActiveToBottom,
 		scrollTabToBottomSoon,
 		setScrollTopForTab,
 		resetScrollToTop,
 		getScrollTopByTabSnapshot,
-		getTopItemIndexByTabSnapshot,
 		disposeScrollRuntime,
 	};
 }

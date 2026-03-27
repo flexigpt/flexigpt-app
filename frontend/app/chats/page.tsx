@@ -19,7 +19,6 @@ export default function ChatsPage() {
 		tabs,
 		selectedTabId,
 		initialScrollTopByTab,
-		initialTopItemIndexByTab,
 		shortcutConfig,
 		updateTab,
 		saveUpdatedConversation,
@@ -76,7 +75,6 @@ export default function ChatsPage() {
 					selectedTabId={selectedTabId}
 					shortcutConfig={shortcutConfig}
 					initialScrollTopByTab={initialScrollTopByTab}
-					initialTopItemIndexByTab={initialTopItemIndexByTab}
 					updateTab={updateTab}
 					saveUpdatedConversation={saveUpdatedConversation}
 				/>

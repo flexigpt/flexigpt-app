@@ -18,7 +18,6 @@ type PersistedChatsPageStateV1 = {
 		manualTitleLocked: boolean;
 	}>;
 	scrollTopByTab?: Record<string, number>;
-	topItemIndexByTab?: Record<string, number>;
 	lastActivatedAtByTab?: Record<string, number>;
 };
 
@@ -27,7 +26,6 @@ export type InitialChatsModel = {
 	selectedTabId: string;
 	tabs: ChatTabState[];
 	scrollTopByTab: Record<string, number>;
-	topItemIndexByTab: Record<string, number>;
 	lastActivatedAtByTab: Record<string, number>;
 };
 
@@ -68,7 +66,6 @@ export function buildInitialChatsModel(): InitialChatsModel {
 			selectedTabId: tab.tabId,
 			tabs: [tab],
 			scrollTopByTab: {},
-			topItemIndexByTab: {},
 			lastActivatedAtByTab: {},
 		};
 	}
@@ -113,7 +110,6 @@ export function buildInitialChatsModel(): InitialChatsModel {
 		selectedTabId,
 		tabs: nonEmptyTabs,
 		scrollTopByTab: persisted.scrollTopByTab ?? {},
-		topItemIndexByTab: persisted.topItemIndexByTab ?? {},
 		lastActivatedAtByTab: persisted.lastActivatedAtByTab ?? {},
 	};
 }

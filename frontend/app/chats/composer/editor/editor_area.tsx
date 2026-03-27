@@ -1052,10 +1052,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 								/>
 							</div>
 							{/* Unified chips bar: attachments, directories, tools, tool calls & outputs (scrollable) */}
-							<div
-								className="scrollbar-custom-thin w-full min-w-0 items-center overflow-x-auto overscroll-contain p-1 text-xs"
-								style={{ scrollbarGutter: 'stable' }}
-							>
+							<div className="w-full min-w-0 items-center overflow-x-auto overscroll-contain p-0 text-xs">
 								<EditorChipsBar
 									attachments={attachments}
 									directoryGroups={directoryGroups}

@@ -1,7 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useSyncExternalStore } from 'react';
 
-import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
-
 import type { Conversation, ConversationMessage } from '@/spec/conversation';
 import { RoleEnum } from '@/spec/inference';
 
@@ -15,19 +13,10 @@ import { useInputRegistry } from '@/chats/conversation/use_input_registry';
 import { useScrollRestore } from '@/chats/conversation/use_scroll_restore';
 import { useSendMessage } from '@/chats/conversation/use_send_message';
 import { useStreamingRuntime } from '@/chats/conversation/use_streaming_runtime';
-import { VIRTUOSO_AT_BOTTOM_THRESHOLD, VirtuosoList } from '@/chats/conversation/virtuoso_utils';
 import { ChatMessage } from '@/chats/messages/message';
 import type { ChatTabState } from '@/chats/tabs/tabs_model';
 
 const EMPTY_MESSAGES: ConversationMessage[] = [];
-
-function getConversationModifiedAtMs(conversation?: Conversation): number {
-	const raw = conversation?.modifiedAt;
-	if (!raw) return 0;
-
-	const ms = raw instanceof Date ? raw.getTime() : new Date(raw).getTime();
-	return Number.isFinite(ms) ? ms : 0;
-}
 
 function StreamingLastMessage(props: {
 	message: ConversationMessage;
@@ -70,7 +59,6 @@ export type ConversationAreaHandle = {
 	setScrollTopForTab: (tabId: string, top: number) => void;
 	resetScrollToTop: (tabId: string) => void;
 	getScrollTopByTabSnapshot: () => Record<string, number>;
-	getTopItemIndexByTabSnapshot: () => Record<string, number>;
 };
 
 type ConversationAreaProps = {
@@ -78,21 +66,12 @@ type ConversationAreaProps = {
 	selectedTabId: string;
 	shortcutConfig: ShortcutConfig;
 	initialScrollTopByTab?: Record<string, number>;
-	initialTopItemIndexByTab?: Record<string, number>;
 	updateTab: (tabId: string, updater: (tab: ChatTabState) => ChatTabState) => void;
 	saveUpdatedConversation: (tabId: string, updatedConv: Conversation, titleWasExternallyChanged?: boolean) => void;
 };
 
 export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationAreaProps>(function ConversationArea(
-	{
-		tabs,
-		selectedTabId,
-		shortcutConfig,
-		initialScrollTopByTab,
-		initialTopItemIndexByTab,
-		updateTab,
-		saveUpdatedConversation,
-	},
+	{ tabs, selectedTabId, shortcutConfig, initialScrollTopByTab, updateTab, saveUpdatedConversation },
 	ref
 ) {
 	const tabsRef = useRef(tabs);
@@ -106,8 +85,6 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	const activeEditingMessageId = activeTab?.editingMessageId ?? null;
 	const messages = activeTab?.conversation?.messages ?? EMPTY_MESSAGES;
 	const messageCount = messages.length;
-	const activeConversationModifiedAtMs = getConversationModifiedAtMs(activeTab?.conversation);
-	const activeLastMessageId = messageCount > 0 ? (messages[messageCount - 1]?.id ?? null) : null;
 
 	useEffect(() => {
 		tabsRef.current = tabs;
@@ -161,34 +138,24 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	});
 
 	const {
-		virtuosoRef,
-		activeVirtuosoState,
-		initialPositionProps,
-		followActiveOutput,
-		handleScrollerRef,
-		handleRangeChanged,
+		setScrollContainerRef,
+		setScrollContentRef,
+		handleScroll,
 		isAtBottom,
 		isAtTop,
-		handleAtBottomStateChange,
-		handleAtTopStateChange,
 		scrollActiveToTop,
 		scrollActiveToBottom,
 		scrollTabToBottomSoon,
 		setScrollTopForTab,
 		resetScrollToTop,
 		getScrollTopByTabSnapshot,
-		getTopItemIndexByTabSnapshot,
 		disposeScrollRuntime,
 	} = useScrollRestore({
-		tabsRef,
 		selectedTabId,
 		selectedTabIdRef,
 		activeTabIsHydrating,
 		messageCount,
-		activeConversationModifiedAtMs,
-		activeLastMessageId,
 		initialScrollTopByTab,
-		initialTopItemIndexByTab,
 	});
 
 	const { sendMessageForTab, beginEditMessageForTab, cancelEditingForTab } = useSendMessage({
@@ -232,14 +199,12 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			setScrollTopForTab,
 			resetScrollToTop,
 			getScrollTopByTabSnapshot,
-			getTopItemIndexByTabSnapshot,
 		}),
 		[
 			clearStreamForTab,
 			disposeTabRuntime,
 			focusInput,
 			getScrollTopByTabSnapshot,
-			getTopItemIndexByTabSnapshot,
 			openAttachmentMenu,
 			openTemplateMenu,
 			openToolMenu,
@@ -269,10 +234,6 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		() => getFullStreamThinkingForTab(activeTabId),
 		[activeTabId, getFullStreamThinkingForTab]
 	);
-
-	const computeItemKey = useCallback((_index: number, message: ConversationMessage) => message.id, []);
-
-	const virtuosoComponents = useMemo(() => ({ List: VirtuosoList }), []);
 
 	const itemContent = useCallback(
 		(index: number, message: ConversationMessage) => {
@@ -326,25 +287,18 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	return (
 		<>
 			<div className="relative row-start-2 row-end-3 mt-2 min-h-0">
-				<Virtuoso<ConversationMessage>
-					key={selectedTabId}
-					ref={virtuosoRef as React.RefObject<VirtuosoHandle>}
-					data={messages}
-					computeItemKey={computeItemKey}
-					restoreStateFrom={activeVirtuosoState}
-					{...initialPositionProps}
-					followOutput={followActiveOutput}
-					atBottomThreshold={VIRTUOSO_AT_BOTTOM_THRESHOLD}
-					increaseViewportBy={{ top: 300, bottom: 300 }}
-					rangeChanged={handleRangeChanged}
-					atBottomStateChange={handleAtBottomStateChange}
-					atTopStateChange={handleAtTopStateChange}
-					scrollerRef={handleScrollerRef}
-					itemContent={itemContent}
-					components={virtuosoComponents}
+				<div
+					ref={setScrollContainerRef}
+					onScroll={handleScroll}
 					className="h-full w-full overscroll-contain py-1"
-					style={{ scrollbarGutter: 'stable both-edges', overflowAnchor: 'none' }}
-				/>
+					style={{ scrollbarGutter: 'stable both-edges', overflowAnchor: 'none', overflowY: 'auto' }}
+				>
+					<div ref={setScrollContentRef} className="mx-auto w-11/12 xl:w-5/6">
+						{messages.map((message, index) => (
+							<div key={message.id}>{itemContent(index, message)}</div>
+						))}
+					</div>
+				</div>
 
 				<div className="pointer-events-none absolute right-4 bottom-16 z-10 xl:right-24">
 					<div className="pointer-events-auto">

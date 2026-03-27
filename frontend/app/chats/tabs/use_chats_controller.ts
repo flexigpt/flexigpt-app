@@ -78,19 +78,6 @@ function buildNormalizedInitialModel(): InitialChatsModel {
 		scrollTopByTab[normalized.addedScratchTabId] = 0;
 	}
 
-	const topItemIndexByTab: Record<string, number> = {};
-	for (const [tabId, topItemIndex] of Object.entries(built.topItemIndexByTab ?? {})) {
-		if (existingTabIds.has(tabId) && typeof topItemIndex === 'number') {
-			topItemIndexByTab[tabId] = topItemIndex;
-		}
-	}
-	if (createdFallbackTab) {
-		topItemIndexByTab[createdFallbackTab.tabId] = 0;
-	}
-	if (normalized.addedScratchTabId) {
-		topItemIndexByTab[normalized.addedScratchTabId] = 0;
-	}
-
 	const lastActivatedAtByTab: Record<string, number> = {};
 	for (const [tabId, ts] of lastActivatedAt.entries()) {
 		if (existingTabIds.has(tabId)) {
@@ -103,7 +90,6 @@ function buildNormalizedInitialModel(): InitialChatsModel {
 		tabs: normalized.tabs,
 		selectedTabId,
 		scrollTopByTab,
-		topItemIndexByTab,
 		lastActivatedAtByTab,
 	};
 }
@@ -147,7 +133,6 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 	const openConversationIds = useMemo(() => tabs.map(tab => tab.conversation.id).filter(Boolean), [tabs]);
 
 	const scrollTopSnapshotRef = useRef(initialModel.scrollTopByTab ?? {});
-	const topItemIndexSnapshotRef = useRef(initialModel.topItemIndexByTab ?? {});
 	const persistNowRef = useRef<() => void>(() => {});
 	const schedulePersistRef = useRef<() => void>(() => {});
 	const saveQueueByTabRef = useRef(new Map<string, Promise<void>>());
@@ -197,23 +182,19 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 
 			if (removedTabIds.length > 0 || addedScratchTabId) {
 				let nextScrollSnapshot = { ...scrollTopSnapshotRef.current };
-				let nextTopItemIndexSnapshot = { ...topItemIndexSnapshotRef.current };
 
 				for (const removedTabId of removedTabIds) {
 					disposeTabRuntime(removedTabId);
 					nextScrollSnapshot = omitManyKeys(nextScrollSnapshot, [removedTabId]);
-					nextTopItemIndexSnapshot = omitManyKeys(nextTopItemIndexSnapshot, [removedTabId]);
 				}
 
 				if (addedScratchTabId) {
 					touchTab(addedScratchTabId);
 					conversationAreaRef.current?.setScrollTopForTab(addedScratchTabId, 0);
 					nextScrollSnapshot[addedScratchTabId] = 0;
-					nextTopItemIndexSnapshot[addedScratchTabId] = 0;
 				}
 
 				scrollTopSnapshotRef.current = nextScrollSnapshot;
-				topItemIndexSnapshotRef.current = nextTopItemIndexSnapshot;
 			}
 
 			commitTabs(normalizedTabs);
@@ -254,12 +235,6 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		};
 		scrollTopSnapshotRef.current = scrollObj;
 
-		const topItemIndexObj: Record<string, number> = {
-			...(topItemIndexSnapshotRef.current ?? {}),
-			...(conversationAreaRef.current?.getTopItemIndexByTabSnapshot() ?? {}),
-		};
-		topItemIndexSnapshotRef.current = topItemIndexObj;
-
 		const lruObj: Record<string, number> = {};
 		for (const [key, value] of lastActivatedAtRef.current.entries()) {
 			lruObj[key] = value;
@@ -276,7 +251,6 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 				manualTitleLocked: tab.manualTitleLocked,
 			})),
 			scrollTopByTab: scrollObj,
-			topItemIndexByTab: topItemIndexObj,
 			lastActivatedAtByTab: lruObj,
 		});
 	}, [conversationAreaRef]);
@@ -426,7 +400,6 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			disposeTabRuntime(tabId);
 
 			scrollTopSnapshotRef.current = omitManyKeys({ ...scrollTopSnapshotRef.current }, [tabId]);
-			topItemIndexSnapshotRef.current = omitManyKeys({ ...topItemIndexSnapshotRef.current }, [tabId]);
 
 			const baseNextTabs = current.filter(tab => tab.tabId !== tabId);
 
@@ -724,7 +697,6 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		tabs,
 		selectedTabId,
 		initialScrollTopByTab: initialModel.scrollTopByTab,
-		initialTopItemIndexByTab: initialModel.topItemIndexByTab,
 		shortcutConfig,
 		updateTab,
 		saveUpdatedConversation,

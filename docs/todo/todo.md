@@ -9,7 +9,7 @@
 
 - [ ] Tool calls
   - [ ] Some calls like editor replace text, create files, etc can be visually represented better via custom elements representing each.
-  - [ ] autoexec engine has issues with multipel tool calls. also the state machine is fragine when it comes to some running some resolving etc. deep dive and rectify.
+  - [ ] autoexec engine has issues with multiple tool calls. also the state machine is fragile when it comes to some running some resolving etc. deep dive and rectify.
 
 ## Features
 

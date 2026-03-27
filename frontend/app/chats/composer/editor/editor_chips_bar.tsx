@@ -114,7 +114,10 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 	if (!hasAnyChips) return null;
 
 	return (
-		<div className="flex w-max shrink-0 flex-nowrap items-center gap-1">
+		<div
+			className="scrollbar-custom-thin mb-1 flex w-max shrink-0 flex-nowrap items-center gap-1"
+			style={{ scrollbarGutter: 'stable' }}
+		>
 			{/* Conversation tools (first, tinted) */}
 			<ConversationToolsChip
 				tools={conversationTools}
