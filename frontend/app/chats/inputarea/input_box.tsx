@@ -19,7 +19,7 @@ import { useAssistantPresetManager } from '@/chats/inputarea/assistantpresets/us
 import { EditorArea, type EditorAreaHandle } from '@/chats/inputarea/editor/editor_area';
 import { EditorContextBar } from '@/chats/inputarea/editor/editor_context_bar';
 import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/inputarea/editor/editor_utils';
-import { useAssistantContextState } from '@/chats/inputarea/editor/use_assistant_context_state';
+import { useAssistantContextState } from '@/chats/inputarea/editor/use_editor_context_state';
 
 export interface InputBoxHandle {
 	getUIChatOptions: () => UIChatOption;

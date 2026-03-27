@@ -36,6 +36,7 @@ import { ButtonScrollToBottom, ButtonScrollToTop } from '@/components/button_scr
 
 import type { ChatTabState } from '@/chats/chat_tabs_persist';
 import { HandleCompletion } from '@/chats/conversation/completion_helper';
+import { TabInputPane } from '@/chats/conversation/conversation_input_pane';
 import {
 	applyAssistantPersistenceContext,
 	buildUserConversationMessageFromEditor,
@@ -51,7 +52,6 @@ import {
 } from '@/chats/conversation/virtuoso_utils';
 import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/inputarea/editor/editor_utils';
 import type { InputBoxHandle } from '@/chats/inputarea/input_box';
-import { InputPane } from '@/chats/inputarea/input_pane';
 import { sliceMessagesForSend } from '@/chats/inputarea/previousmessages/previous_messages_helper';
 import { ChatMessage } from '@/chats/messages/message';
 import { appendSystemPromptParts } from '@/prompts/lib/system_prompt_utils';
@@ -118,7 +118,7 @@ type ConversationAreaProps = {
 	tabs: ChatTabState[];
 	selectedTabId: string;
 
-	// Used by InputPane (unchanged API)
+	// Used by TabInputPane (unchanged API)
 	shortcutConfig: ShortcutConfig;
 
 	// Persisted scroll restore seed (from storage)
@@ -1353,7 +1353,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			<div className="row-start-3 row-end-4 flex w-full min-w-0 justify-center">
 				<div className="w-11/12 min-w-0 xl:w-5/6">
 					{tabs.map(t => (
-						<InputPane
+						<TabInputPane
 							key={t.tabId}
 							tabId={t.tabId}
 							active={t.tabId === selectedTabId}

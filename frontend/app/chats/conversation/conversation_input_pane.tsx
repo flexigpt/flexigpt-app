@@ -7,7 +7,7 @@ import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import type { EditorSubmitPayload } from '@/chats/inputarea/editor/editor_utils';
 import { InputBox, type InputBoxHandle } from '@/chats/inputarea/input_box';
 
-export const InputPane = memo(function InputPane(props: {
+export const TabInputPane = memo(function TabInputPane(props: {
 	tabId: string;
 	active: boolean;
 	isBusy: boolean;

@@ -15,9 +15,9 @@ import type {
 } from '@/chats/inputarea/assistantpresets/assistant_preset_runtime';
 import { AssistantPresetViewModal } from '@/chats/inputarea/assistantpresets/assistant_preset_view_modal';
 import type { AssistantPresetManagerState } from '@/chats/inputarea/assistantpresets/use_assistant_preset_manager';
-import type { AssistantContextController } from '@/chats/inputarea/editor/use_assistant_context_state';
+import type { AssistantContextController } from '@/chats/inputarea/editor/use_editor_context_state';
 import { ModelDropdown } from '@/chats/inputarea/models/model_dropdown';
-import { OutputVerbosityDropdown } from '@/chats/inputarea/outputparams/output_verbosity_dropdown';
+import { OutputVerbosityDropdown } from '@/chats/inputarea/outputverbosities/output_verbosity_dropdown';
 import { PreviousMessagesDropdown } from '@/chats/inputarea/previousmessages/previous_messages_dropdown';
 import { HybridReasoningCheckbox } from '@/chats/inputarea/reasoningparams/reasoning_hybrid_checkbox';
 import { SingleReasoningDropdown } from '@/chats/inputarea/reasoningparams/reasoning_levels_dropdown';
