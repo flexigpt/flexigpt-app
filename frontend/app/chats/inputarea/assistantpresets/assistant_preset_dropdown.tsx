@@ -4,7 +4,7 @@ import { FiCheck, FiChevronDown, FiChevronUp, FiEye, FiRefreshCcw, FiTrash2 } fr
 
 import { Popover, PopoverDisclosure, usePopoverStore, useStoreState } from '@ariakit/react';
 
-import type { AssistantPresetOptionItem } from '@/chats/inputarea/assitantcontexts/assistant_preset_runtime';
+import type { AssistantPresetOptionItem } from '@/chats/inputarea/assistantpresets/assistant_preset_runtime';
 
 type AssistantPresetDropdownProps = {
 	presetOptions: AssistantPresetOptionItem[];

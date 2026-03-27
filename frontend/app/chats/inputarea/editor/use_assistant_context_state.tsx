@@ -33,14 +33,14 @@ import {
 	buildAssistantPresetModelComparisonState,
 	normalizeAssistantPresetSkillRefs,
 	normalizeAssistantPresetToolChoices,
-} from '@/chats/inputarea/assitantcontexts/assistant_preset_runtime';
+} from '@/chats/inputarea/assistantpresets/assistant_preset_runtime';
+import { useAssistantPresets } from '@/chats/inputarea/assistantpresets/use_assistant_presets';
 import {
 	getSupportedReasoningLevels,
 	sanitizeUIChatOptionByCapabilities,
 	supportsOutputVerbosity,
-} from '@/chats/inputarea/assitantcontexts/capabilities_override_helper';
-import { getChatInputOptions } from '@/chats/inputarea/assitantcontexts/context_uichatoption_helper';
-import { useAssistantPresets } from '@/chats/inputarea/assitantcontexts/use_assistant_presets';
+} from '@/modelpresets/lib/capabilities_override';
+import { getChatInputOptions } from '@/modelpresets/lib/uichatoption_helper';
 import { buildPromptTemplateRefKey } from '@/prompts/lib/prompt_template_ref';
 import { buildEffectiveSystemPrompt } from '@/prompts/lib/system_prompt_utils';
 import type { SystemPromptDraft } from '@/prompts/lib/use_system_prompts';

@@ -49,10 +49,10 @@ import {
 	VIRTUOSO_AT_BOTTOM_THRESHOLD,
 	VirtuosoList,
 } from '@/chats/conversation/virtuoso_utils';
-import { sliceMessagesForSend } from '@/chats/inputarea/assitantcontexts/previous_messages_helper';
-import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/inputarea/editor/input_editor_utils';
+import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/inputarea/editor/editor_utils';
 import type { InputBoxHandle } from '@/chats/inputarea/input_box';
 import { InputPane } from '@/chats/inputarea/input_pane';
+import { sliceMessagesForSend } from '@/chats/inputarea/previousmessages/previous_messages_helper';
 import { ChatMessage } from '@/chats/messages/message';
 import { appendSystemPromptParts } from '@/prompts/lib/system_prompt_utils';
 

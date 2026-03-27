@@ -14,12 +14,12 @@ import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal'
 import {
 	type AssistantPresetPreparedApplication,
 	EMPTY_ASSISTANT_PRESET_RUNTIME_SNAPSHOT,
-} from '@/chats/inputarea/assitantcontexts/assistant_preset_runtime';
-import { AssistantContextBar } from '@/chats/inputarea/assitantcontexts/context_bar';
-import { useAssistantContextState } from '@/chats/inputarea/assitantcontexts/use_assistant_context_state';
-import { useAssistantPresetManager } from '@/chats/inputarea/assitantcontexts/use_assistant_preset_manager';
-import { EditorArea, type EditorAreaHandle } from '@/chats/inputarea/editor/input_editor';
-import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/inputarea/editor/input_editor_utils';
+} from '@/chats/inputarea/assistantpresets/assistant_preset_runtime';
+import { useAssistantPresetManager } from '@/chats/inputarea/assistantpresets/use_assistant_preset_manager';
+import { EditorArea, type EditorAreaHandle } from '@/chats/inputarea/editor/editor_area';
+import { EditorContextBar } from '@/chats/inputarea/editor/editor_context_bar';
+import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/inputarea/editor/editor_utils';
+import { useAssistantContextState } from '@/chats/inputarea/editor/use_assistant_context_state';
 
 export interface InputBoxHandle {
 	getUIChatOptions: () => UIChatOption;
@@ -230,7 +230,7 @@ export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function Input
 
 	return (
 		<div className="bg-base-200 w-full min-w-0">
-			<AssistantContextBar context={assistantContext} assistantPreset={assistantPreset} />
+			<EditorContextBar context={assistantContext} assistantPreset={assistantPreset} />
 
 			<DeleteConfirmationModal
 				isOpen={showAbortModal}

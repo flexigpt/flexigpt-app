@@ -10,7 +10,7 @@ import { type PromptBundle, PromptRoleEnum } from '@/spec/prompt';
 
 import { DEFAULT_SEMVER } from '@/lib/version_utils';
 
-import { SystemPromptAddModal } from '@/chats/inputarea/assitantcontexts/system_prompt_add_modal';
+import { SystemPromptAddModal } from '@/chats/inputarea/systemprompts/system_prompt_add_modal';
 import { countEnabledSystemPromptSources } from '@/prompts/lib/system_prompt_utils';
 import type { SystemPromptDraft, SystemPromptItem } from '@/prompts/lib/use_system_prompts';
 

@@ -7,30 +7,30 @@ import { type UIChatOption } from '@/spec/modelpreset';
 
 import { HoverTip } from '@/components/ariakit_hover_tip';
 
-import { AdvancedParamsModal } from '@/chats/inputarea/assitantcontexts/advanced_params_modal';
-import { AssistantPresetDropdown } from '@/chats/inputarea/assitantcontexts/assistant_preset_dropdown';
+import { AdvancedParamsModal } from '@/chats/inputarea/advancedparams/advanced_params_modal';
+import { AssistantPresetDropdown } from '@/chats/inputarea/assistantpresets/assistant_preset_dropdown';
 import type {
 	AssistantPresetOptionItem,
 	AssistantPresetPreparedApplication,
-} from '@/chats/inputarea/assitantcontexts/assistant_preset_runtime';
-import { AssistantPresetViewModal } from '@/chats/inputarea/assitantcontexts/assistant_preset_view_modal';
-import { ModelDropdown } from '@/chats/inputarea/assitantcontexts/model_dropdown';
-import { OutputVerbosityDropdown } from '@/chats/inputarea/assitantcontexts/output_verbosity_dropdown';
-import { PreviousMessagesDropdown } from '@/chats/inputarea/assitantcontexts/previous_messages_dropdown';
-import { HybridReasoningCheckbox } from '@/chats/inputarea/assitantcontexts/reasoning_hybrid_checkbox';
-import { SingleReasoningDropdown } from '@/chats/inputarea/assitantcontexts/reasoning_levels_dropdown';
-import { ReasoningTokensDropdown } from '@/chats/inputarea/assitantcontexts/reasoning_tokens_dropdown';
-import { SystemPromptDropdown } from '@/chats/inputarea/assitantcontexts/system_prompt_dropdown';
-import { TemperatureDropdown } from '@/chats/inputarea/assitantcontexts/temperature_dropdown';
-import type { AssistantContextController } from '@/chats/inputarea/assitantcontexts/use_assistant_context_state';
-import type { AssistantPresetManagerState } from '@/chats/inputarea/assitantcontexts/use_assistant_preset_manager';
+} from '@/chats/inputarea/assistantpresets/assistant_preset_runtime';
+import { AssistantPresetViewModal } from '@/chats/inputarea/assistantpresets/assistant_preset_view_modal';
+import type { AssistantPresetManagerState } from '@/chats/inputarea/assistantpresets/use_assistant_preset_manager';
+import type { AssistantContextController } from '@/chats/inputarea/editor/use_assistant_context_state';
+import { ModelDropdown } from '@/chats/inputarea/models/model_dropdown';
+import { OutputVerbosityDropdown } from '@/chats/inputarea/outputparams/output_verbosity_dropdown';
+import { PreviousMessagesDropdown } from '@/chats/inputarea/previousmessages/previous_messages_dropdown';
+import { HybridReasoningCheckbox } from '@/chats/inputarea/reasoningparams/reasoning_hybrid_checkbox';
+import { SingleReasoningDropdown } from '@/chats/inputarea/reasoningparams/reasoning_levels_dropdown';
+import { ReasoningTokensDropdown } from '@/chats/inputarea/reasoningparams/reasoning_tokens_dropdown';
+import { SystemPromptDropdown } from '@/chats/inputarea/systemprompts/system_prompt_dropdown';
+import { TemperatureDropdown } from '@/chats/inputarea/temperatures/temperature_dropdown';
 
-type AssistantContextBarProps = {
+type EditorContextBarProps = {
 	context: AssistantContextController;
 	assistantPreset: AssistantPresetManagerState;
 };
 
-type ContextBarMenuKey = 'assistant' | 'model' | 'secondary' | 'verbosity' | 'system' | 'previous' | null;
+type EditorContextBarMenuKey = 'assistant' | 'model' | 'secondary' | 'verbosity' | 'system' | 'previous' | null;
 
 type AssistantPresetViewState = {
 	option: AssistantPresetOptionItem | null;
@@ -38,20 +38,23 @@ type AssistantPresetViewState = {
 	isActivePreset: boolean;
 };
 
-export function AssistantContextBar({ context, assistantPreset }: AssistantContextBarProps) {
-	const [openMenu, setOpenMenu] = useState<ContextBarMenuKey>(null);
+export function EditorContextBar({ context, assistantPreset }: EditorContextBarProps) {
+	const [openMenu, setOpenMenu] = useState<EditorContextBarMenuKey>(null);
 	const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);
 	const [isAssistantViewModalOpen, setIsAssistantViewModalOpen] = useState(false);
 
-	const setMenuOpen = useCallback((menuKey: Exclude<ContextBarMenuKey, null>, action: SetStateAction<boolean>) => {
-		setOpenMenu(prevOpenMenu => {
-			const currentIsOpen = prevOpenMenu === menuKey;
-			const nextIsOpen = typeof action === 'function' ? action(currentIsOpen) : action;
+	const setMenuOpen = useCallback(
+		(menuKey: Exclude<EditorContextBarMenuKey, null>, action: SetStateAction<boolean>) => {
+			setOpenMenu(prevOpenMenu => {
+				const currentIsOpen = prevOpenMenu === menuKey;
+				const nextIsOpen = typeof action === 'function' ? action(currentIsOpen) : action;
 
-			if (nextIsOpen) return menuKey;
-			return currentIsOpen ? null : prevOpenMenu;
-		});
-	}, []);
+				if (nextIsOpen) return menuKey;
+				return currentIsOpen ? null : prevOpenMenu;
+			});
+		},
+		[]
+	);
 
 	const isAssistantDropdownOpen = openMenu === 'assistant';
 	const isModelDropdownOpen = openMenu === 'model';

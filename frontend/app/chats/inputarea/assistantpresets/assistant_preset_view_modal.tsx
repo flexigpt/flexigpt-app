@@ -16,7 +16,7 @@ import {
 	type AssistantPresetPreparedApplication,
 	type AssistantPresetRuntimeSnapshot,
 	buildAssistantPresetModelComparisonState,
-} from '@/chats/inputarea/assitantcontexts/assistant_preset_runtime';
+} from '@/chats/inputarea/assistantpresets/assistant_preset_runtime';
 import { buildPromptTemplateRefKey } from '@/prompts/lib/prompt_template_ref';
 import type { SystemPromptItem } from '@/prompts/lib/use_system_prompts';
 

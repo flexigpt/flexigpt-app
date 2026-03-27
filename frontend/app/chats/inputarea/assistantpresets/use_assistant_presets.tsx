@@ -21,7 +21,7 @@ import {
 import {
 	type AssistantPresetOptionItem,
 	buildAssistantPresetIdentityKey,
-} from '@/chats/inputarea/assitantcontexts/assistant_preset_runtime';
+} from '@/chats/inputarea/assistantpresets/assistant_preset_runtime';
 import { buildPromptTemplateRefKey } from '@/prompts/lib/prompt_template_ref';
 
 function getErrorMessage(error: unknown, fallback: string): string {

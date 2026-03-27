@@ -8,7 +8,7 @@ import { getAllProviderPresetsMap } from '@/apis/list_helper';
 import {
 	mergeModelCapabilitiesOverride,
 	sanitizeUIChatOptionByCapabilities,
-} from '@/chats/inputarea/assitantcontexts/capabilities_override_helper';
+} from '@/modelpresets/lib/capabilities_override';
 import { buildEffectiveModelParamFromModelPreset } from '@/modelpresets/lib/modelpreset_effective_defaults';
 
 function hasApiKey(settings: SettingsSchema, providerName: ProviderName): boolean {

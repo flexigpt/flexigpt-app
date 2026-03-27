@@ -23,7 +23,7 @@ import {
 	getStopSequencesPolicy,
 	getSupportedOutputFormats,
 	supportsReasoningSummaryStyle,
-} from '@/chats/inputarea/assitantcontexts/capabilities_override_helper';
+} from '@/modelpresets/lib/capabilities_override';
 
 type AdvancedParamsModalProps = {
 	isOpen: boolean;

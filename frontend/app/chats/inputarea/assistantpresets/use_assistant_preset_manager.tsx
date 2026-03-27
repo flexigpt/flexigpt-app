@@ -15,8 +15,8 @@ import {
 	findBaseAssistantPresetOption,
 	findDefaultAssistantPresetOption,
 	getAssistantPresetModificationSummary,
-} from '@/chats/inputarea/assitantcontexts/assistant_preset_runtime';
-import type { AssistantContextController } from '@/chats/inputarea/assitantcontexts/use_assistant_context_state';
+} from '@/chats/inputarea/assistantpresets/assistant_preset_runtime';
+import type { AssistantContextController } from '@/chats/inputarea/editor/use_assistant_context_state';
 
 function getErrorMessage(error: unknown, fallback: string): string {
 	if (error instanceof Error && error.message.trim().length > 0) {

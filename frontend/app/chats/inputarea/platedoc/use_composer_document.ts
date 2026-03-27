@@ -26,7 +26,7 @@ import {
 	LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS,
 	LARGE_TEXT_AUTODECHUNK_THRESHOLD_CHARS,
 	LARGE_TEXT_CHUNK_SIZE,
-} from '@/chats/inputarea/editor/input_editor_utils';
+} from '@/chats/inputarea/editor/editor_utils';
 import {
 	type ComposerDocumentSelectionInfo,
 	isSelectionOnlyEditorChange,

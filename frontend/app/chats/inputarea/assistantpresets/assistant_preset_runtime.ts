@@ -10,8 +10,8 @@ import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
 import { stripUndefinedDeep } from '@/lib/obj_utils';
 
-import { sanitizeUIChatOptionByCapabilities } from '@/chats/inputarea/assitantcontexts/capabilities_override_helper';
 import type { WebSearchChoiceTemplate } from '@/chats/inputarea/tools/websearch_utils';
+import { sanitizeUIChatOptionByCapabilities } from '@/modelpresets/lib/capabilities_override';
 
 export interface AssistantPresetOptionItem {
 	key: string;
