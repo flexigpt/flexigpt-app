@@ -1,9 +1,34 @@
+import { useEffect, useMemo, useRef } from 'react';
+
 import { FiAlertTriangle, FiCode, FiPlay, FiTerminal, FiTool, FiX } from 'react-icons/fi';
 
 import { type UIToolCall, type UIToolOutput } from '@/spec/inference';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
 import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';
+
+type OrderedToolChipItem =
+	| { key: string; kind: 'call'; call: UIToolCall }
+	| { key: string; kind: 'output'; output: UIToolOutput };
+
+function buildCurrentChipIds(toolCalls: UIToolCall[], toolOutputs: UIToolOutput[]): string[] {
+	const ids: string[] = [];
+	const seen = new Set<string>();
+
+	for (const toolCall of toolCalls) {
+		if (seen.has(toolCall.id)) continue;
+		seen.add(toolCall.id);
+		ids.push(toolCall.id);
+	}
+
+	for (const output of toolOutputs) {
+		if (seen.has(output.id)) continue;
+		seen.add(output.id);
+		ids.push(output.id);
+	}
+
+	return ids;
+}
 
 interface ToolChipsComposerRowProps {
 	toolCalls: UIToolCall[];
@@ -38,43 +63,93 @@ export function ToolChipsComposerRow({
 	const visibleCalls = toolCalls.filter(toolCall => toolCall.status !== 'discarded' && toolCall.status !== 'succeeded');
 	const hasAny = visibleCalls.length > 0 || toolOutputs.length > 0;
 	const openCallDetails = onOpenCallDetails ?? (() => {});
+	// Keep a stable visual ordering so a succeeded tool call can "turn into"
+	// its output in-place instead of disappearing from the left and reappearing
+	// at the far right. This dramatically reduces horizontal layout churn.
+	const orderedChipIdsRef = useRef<string[]>([]);
+
+	const displayOrder = useMemo(() => {
+		const currentIds = buildCurrentChipIds(visibleCalls, toolOutputs);
+		const currentIdSet = new Set(currentIds);
+
+		// eslint-disable-next-line react-hooks/refs
+		const nextOrder = orderedChipIdsRef.current.filter(id => currentIdSet.has(id));
+		const seen = new Set(nextOrder);
+
+		for (const id of currentIds) {
+			if (seen.has(id)) continue;
+			seen.add(id);
+			nextOrder.push(id);
+		}
+
+		return nextOrder;
+	}, [toolOutputs, visibleCalls]);
+
+	useEffect(() => {
+		orderedChipIdsRef.current = displayOrder;
+	}, [displayOrder]);
+
+	const callById = useMemo(
+		() => new Map(visibleCalls.map(toolCall => [toolCall.id, toolCall] as const)),
+		[visibleCalls]
+	);
+	const outputById = useMemo(() => new Map(toolOutputs.map(output => [output.id, output] as const)), [toolOutputs]);
+
+	const orderedItems = useMemo<OrderedToolChipItem[]>(() => {
+		const items: OrderedToolChipItem[] = [];
+
+		for (const id of displayOrder) {
+			const toolCall = callById.get(id);
+			if (toolCall) {
+				items.push({ key: id, kind: 'call', call: toolCall });
+				continue;
+			}
+
+			const output = outputById.get(id);
+			if (output) {
+				items.push({ key: id, kind: 'output', output });
+			}
+		}
+
+		return items;
+	}, [callById, displayOrder, outputById]);
 
 	if (!hasAny) return null;
 
 	return (
 		<div className="flex shrink-0 items-center gap-1">
-			{visibleCalls.map(toolCall => (
-				<ToolCallComposerChipView
-					key={toolCall.id}
-					toolCall={toolCall}
-					isBusy={isBusy}
-					onRun={() => {
-						void onRunToolCall(toolCall.id);
-					}}
-					onDiscard={() => {
-						onDiscardToolCall(toolCall.id);
-					}}
-					onDetails={() => {
-						openCallDetails(toolCall);
-					}}
-				/>
-			))}
-
-			{toolOutputs.map(output => (
-				<ToolOutputComposerChipView
-					key={output.id}
-					output={output}
-					onOpen={() => {
-						onOpenOutput(output);
-					}}
-					onRemove={() => {
-						onRemoveOutput(output.id);
-					}}
-					onRetry={() => {
-						onRetryErroredOutput(output);
-					}}
-				/>
-			))}
+			{orderedItems.map(item =>
+				item.kind === 'call' ? (
+					<ToolCallComposerChipView
+						key={item.key}
+						toolCall={item.call}
+						isBusy={isBusy}
+						onRun={() => {
+							void onRunToolCall(item.call.id);
+						}}
+						onDiscard={() => {
+							onDiscardToolCall(item.call.id);
+						}}
+						onDetails={() => {
+							openCallDetails(item.call);
+						}}
+					/>
+				) : (
+					<ToolOutputComposerChipView
+						key={item.key}
+						output={item.output}
+						onOpen={() => {
+							onOpenOutput(item.output);
+						}}
+						onRemove={() => {
+							onRemoveOutput(item.output.id);
+						}}
+						onRetry={() => {
+							onRetryErroredOutput(item.output);
+						}}
+					/>
+				)
+			)}
 		</div>
 	);
 }
@@ -104,10 +179,6 @@ function ToolCallComposerChipView({ toolCall, isBusy, onRun, onDiscard, onDetail
 
 	const canRun = isRunnableType && (isPending || isFailed) && !isBusy;
 
-	const baseClasses =
-		'bg-base-200 text-base-content flex shrink-0 items-center gap-2 rounded-2xl px-2 py-0 border ' +
-		'border-transparent hover:bg-base-300/80';
-
 	const errorClasses = isFailed ? 'border-error/70 bg-error/5 text-error' : '';
 
 	const titleLines: string[] = [`Suggested: ${label}`];
@@ -120,7 +191,11 @@ function ToolCallComposerChipView({ toolCall, isBusy, onRun, onDiscard, onDetail
 	const title = titleLines.join('\n');
 
 	return (
-		<div className={`${baseClasses} ${errorClasses}`} title={title} data-attachment-chip="tool-call">
+		<div
+			className={`bg-base-200 text-base-content hover:bg-base-300/80 flex min-w-48 shrink-0 items-center gap-2 rounded-2xl border border-transparent px-2 py-0 ${errorClasses}`}
+			title={title}
+			data-attachment-chip="tool-call"
+		>
 			<FiTerminal size={14} className={isFailed ? 'text-error' : ''} />
 			{toolCall.toolStoreChoice?.autoExecute ? <span className="badge badge-primary badge-xs">Auto</span> : null}
 			<span className="max-w-64 truncate">{truncatedLabel}</span>
@@ -216,7 +291,7 @@ function ToolOutputComposerChipView({ output, onOpen, onRemove, onRetry }: ToolO
 
 	return (
 		<div
-			className={`flex shrink-0 cursor-pointer items-center gap-2 rounded-2xl px-2 py-0 transition-colors ${isError ? 'border-error/70 bg-error/5 text-error border' : 'bg-base-200 text-base-content hover:bg-base-300/80'}`}
+			className={`flex min-w-48 shrink-0 cursor-pointer items-center gap-2 rounded-2xl px-2 py-0 transition-colors ${isError ? 'border-error/70 bg-error/5 text-error border' : 'bg-base-200 text-base-content hover:bg-base-300/80'}`}
 			title={title}
 			role="button"
 			tabIndex={0}

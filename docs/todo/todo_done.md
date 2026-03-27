@@ -847,3 +847,5 @@
 
 - [x] Sys prompt:
   - [x] may also need a default bundle for editable instructions only sys prompts that people can add to directly from chat.
+
+- [x] autoexec engine has issues with multiple tool calls. also the state machine is fragile when it comes to some running some resolving etc. deep dive and rectify.
