@@ -19,9 +19,9 @@ import { useAssistantPresetManager } from '@/chats/composer/assistantpresets/use
 import { EditorContextBar } from '@/chats/composer/contextarea/context_bar';
 import { useAssistantContextState } from '@/chats/composer/contextarea/use_context_state';
 import { EditorArea, type EditorAreaHandle } from '@/chats/composer/editor/editor_area';
-import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/composer/editor/editor_utils';
+import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
 
-export interface InputBoxHandle {
+export interface ComposerBoxHandle {
 	getUIChatOptions: () => UIChatOption;
 	focus: () => void;
 	resetEditor: () => void;
@@ -39,7 +39,7 @@ export interface InputBoxHandle {
 	restoreConversationContext: (context: RestorableConversationContext) => void;
 }
 
-interface InputBoxProps {
+interface ComposerBoxProps {
 	onSend: (message: EditorSubmitPayload, options: UIChatOption) => Promise<void>;
 	isBusy: boolean;
 	isHydrating: boolean;
@@ -49,7 +49,7 @@ interface InputBoxProps {
 	onCancelEditing: () => void;
 }
 
-export const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox(
+export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(function ComposerBox(
 	{ onSend, isBusy, isHydrating, abortRef, shortcutConfig, editingMessageId, onCancelEditing },
 	ref
 ) {

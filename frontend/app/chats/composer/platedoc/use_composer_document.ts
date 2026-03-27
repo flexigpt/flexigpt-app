@@ -18,19 +18,17 @@ import {
 	buildSingleParagraphValue,
 	buildSingleParagraphValueChunked,
 	clearAllMarks,
+	type ComposerDocumentSelectionInfo,
 	createEmptyEditorValue,
 	hasNonEmptyUserText,
 	insertPlainTextAsSingleBlock,
 	isCursorAtDocumentEnd,
+	isSelectionOnlyEditorChange,
 	isSimpleEmptyParagraphDocument,
 	LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS,
 	LARGE_TEXT_AUTODECHUNK_THRESHOLD_CHARS,
 	LARGE_TEXT_CHUNK_SIZE,
-} from '@/chats/composer/editor/editor_utils';
-import {
-	type ComposerDocumentSelectionInfo,
-	isSelectionOnlyEditorChange,
-} from '@/chats/composer/platedoc/document_analysis';
+} from '@/chats/composer/platedoc/platedoc_utils';
 import { createComposerEditorPlugins } from '@/chats/composer/platedoc/plugins';
 import {
 	analyzeTemplateSelectionInfo,

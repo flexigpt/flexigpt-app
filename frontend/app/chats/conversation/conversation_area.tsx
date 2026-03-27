@@ -35,8 +35,8 @@ import { attachmentsDropAPI } from '@/apis/baseapi';
 import { ButtonScrollToBottom, ButtonScrollToTop } from '@/components/button_scroll_top_bottom';
 
 import type { ChatTabState } from '@/chats/chat_tabs_persist';
-import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/composer/editor/editor_utils';
-import type { InputBoxHandle } from '@/chats/composer/input_box';
+import type { ComposerBoxHandle } from '@/chats/composer/composer_box';
+import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
 import { sliceMessagesForSend } from '@/chats/composer/previousmessages/previous_messages_helper';
 import { HandleCompletion } from '@/chats/conversation/completion_helper';
 import { TabInputPane } from '@/chats/conversation/conversation_input_pane';
@@ -340,7 +340,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	);
 
 	// Input refs per tab (per-tab composer instance)
-	const inputRefs = useRef(new Map<string, InputBoxHandle | null>());
+	const inputRefs = useRef(new Map<string, ComposerBoxHandle | null>());
 	// If a drop arrives before the input handle is available (rare on first mount),
 	// keep it and retry shortly.
 	type PendingDrop = { tabId: string; payload: AttachmentsDroppedPayload };
@@ -350,7 +350,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		const input = inputRefs.current.get(tabId);
 		if (!input) return false;
 
-		// Requires InputBoxHandle.applyAttachmentsDrop to exist (see section 4 below).
+		// Requires ComposerBoxHandle.applyAttachmentsDrop to exist (see section 4 below).
 		input.applyAttachmentsDrop(payload);
 		return true;
 	}, []);
@@ -372,7 +372,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 	const setInputRef = useCallback(
 		(tabId: string) => {
-			return (inst: InputBoxHandle | null) => {
+			return (inst: ComposerBoxHandle | null) => {
 				inputRefs.current.set(tabId, inst);
 				// If this tab just became available, retry any pending drops.
 				if (inst) {

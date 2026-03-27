@@ -35,12 +35,8 @@ import {
 import { useComposerAttachments } from '@/chats/composer/attachments/use_composer_attachments';
 import { EditorBottomBar } from '@/chats/composer/editor/editor_bottom_bar';
 import { EditorChipsBar } from '@/chats/composer/editor/editor_chips_bar';
-import {
-	buildEditorValueFromPlainText,
-	type EditorExternalMessage,
-	type EditorSubmitPayload,
-	hasNonEmptyUserText,
-} from '@/chats/composer/editor/editor_utils';
+import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
+import { buildEditorValueFromPlainText, hasNonEmptyUserText } from '@/chats/composer/platedoc/platedoc_utils';
 import {
 	getTemplateSelections,
 	insertTemplateSelectionNode,

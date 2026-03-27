@@ -4,8 +4,8 @@ import type { UIChatOption } from '@/spec/modelpreset';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 
-import type { EditorSubmitPayload } from '@/chats/composer/editor/editor_utils';
-import { InputBox, type InputBoxHandle } from '@/chats/composer/input_box';
+import { ComposerBox, type ComposerBoxHandle } from '@/chats/composer/composer_box';
+import type { EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
 
 export const TabInputPane = memo(function TabInputPane(props: {
 	tabId: string;
@@ -13,7 +13,7 @@ export const TabInputPane = memo(function TabInputPane(props: {
 	isBusy: boolean;
 	isHydrating: boolean;
 	editingMessageId: string | null;
-	setInputRef: (tabId: string) => (inst: InputBoxHandle | null) => void;
+	setInputRef: (tabId: string) => (inst: ComposerBoxHandle | null) => void;
 	getAbortRef: (tabId: string) => { current: AbortController | null };
 	shortcutConfig: ShortcutConfig;
 	sendMessage: (tabId: string, payload: EditorSubmitPayload, options: UIChatOption) => Promise<void>;
@@ -42,7 +42,7 @@ export const TabInputPane = memo(function TabInputPane(props: {
 
 	return (
 		<div className={active ? 'block' : 'hidden'}>
-			<InputBox
+			<ComposerBox
 				ref={setInputRef(tabId)}
 				onSend={onSend}
 				isBusy={isBusy}
