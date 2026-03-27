@@ -50,8 +50,8 @@ import {
 	VirtuosoList,
 } from '@/chats/conversation/virtuoso_utils';
 import { sliceMessagesForSend } from '@/chats/inputarea/assitantcontexts/previous_messages_helper';
+import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/inputarea/editor/input_editor_utils';
 import type { InputBoxHandle } from '@/chats/inputarea/input_box';
-import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/inputarea/input_editor_utils';
 import { InputPane } from '@/chats/inputarea/input_pane';
 import { ChatMessage } from '@/chats/messages/message';
 import { appendSystemPromptParts } from '@/prompts/lib/system_prompt_utils';

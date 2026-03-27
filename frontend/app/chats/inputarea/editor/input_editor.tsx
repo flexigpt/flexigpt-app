@@ -33,16 +33,16 @@ import {
 	mapAssistantPresetWebSearchTemplatesToChoices,
 } from '@/chats/inputarea/assitantcontexts/assistant_preset_runtime';
 import { useComposerAttachments } from '@/chats/inputarea/attachments/use_composer_attachments';
-import { dispatchOpenToolArgs, useOpenToolArgs } from '@/chats/inputarea/events/open_attached_toolargs';
-import { dispatchTemplateFlashEvent } from '@/chats/inputarea/events/template_flash';
-import { EditorBottomBar } from '@/chats/inputarea/input_editor_bottom_bar';
-import { EditorChipsBar } from '@/chats/inputarea/input_editor_chips_bar';
+import { EditorBottomBar } from '@/chats/inputarea/editor/input_editor_bottom_bar';
+import { EditorChipsBar } from '@/chats/inputarea/editor/input_editor_chips_bar';
 import {
 	buildEditorValueFromPlainText,
 	type EditorExternalMessage,
 	type EditorSubmitPayload,
 	hasNonEmptyUserText,
-} from '@/chats/inputarea/input_editor_utils';
+} from '@/chats/inputarea/editor/input_editor_utils';
+import { dispatchOpenToolArgs, useOpenToolArgs } from '@/chats/inputarea/events/open_attached_toolargs';
+import { dispatchTemplateFlashEvent } from '@/chats/inputarea/events/template_flash';
 import {
 	getTemplateSelections,
 	insertTemplateSelectionNode,

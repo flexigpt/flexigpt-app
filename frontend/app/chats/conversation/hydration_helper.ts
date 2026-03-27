@@ -40,7 +40,7 @@ import {
 	getDebugDetailsMarkdown,
 } from '@/chats/conversation/completion_helper';
 import { uiAttachmentToConversation } from '@/chats/inputarea/attachments/attachment_editor_utils';
-import type { EditorSubmitPayload } from '@/chats/inputarea/input_editor_utils';
+import type { EditorSubmitPayload } from '@/chats/inputarea/editor/input_editor_utils';
 import { collectToolCallsFromInputs, collectToolCallsFromOutputs } from '@/tools/lib/tool_call_utils';
 import { mapToolOutputsToToolOutputItems } from '@/tools/lib/tool_output_utils';
 

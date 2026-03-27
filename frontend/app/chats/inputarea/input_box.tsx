@@ -18,8 +18,8 @@ import {
 import { AssistantContextBar } from '@/chats/inputarea/assitantcontexts/context_bar';
 import { useAssistantContextState } from '@/chats/inputarea/assitantcontexts/use_assistant_context_state';
 import { useAssistantPresetManager } from '@/chats/inputarea/assitantcontexts/use_assistant_preset_manager';
-import { EditorArea, type EditorAreaHandle } from '@/chats/inputarea/input_editor';
-import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/inputarea/input_editor_utils';
+import { EditorArea, type EditorAreaHandle } from '@/chats/inputarea/editor/input_editor';
+import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/inputarea/editor/input_editor_utils';
 
 export interface InputBoxHandle {
 	getUIChatOptions: () => UIChatOption;
