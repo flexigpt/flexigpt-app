@@ -16,7 +16,7 @@ export interface ConversationToolStateEntry {
  * Initialize UI state from an array of ToolStoreChoice coming from history
  * (e.g. last user message's toolChoices).
  */
-export function initConversationToolsStateFromChoices(choices: ToolStoreChoice[]): ConversationToolStateEntry[] {
+export function toolStoreChoicesToConversationTools(choices: ToolStoreChoice[]): ConversationToolStateEntry[] {
 	const out: ConversationToolStateEntry[] = [];
 	const seen = new Set<string>();
 

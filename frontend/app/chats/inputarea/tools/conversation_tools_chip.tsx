@@ -5,8 +5,8 @@ import { Menu, MenuButton, useMenuStore } from '@ariakit/react';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
 import { dispatchOpenToolArgs } from '@/chats/inputarea/events/open_attached_toolargs';
-import type { ConversationToolStateEntry } from '@/chats/inputarea/tools/conversation_tool_utils';
 import { ToolMenuRow } from '@/chats/inputarea/tools/tool_menu_row';
+import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
 import { computeToolUserArgsStatus } from '@/tools/lib/tool_userargs_utils';
 
 interface ConversationToolsChipProps {

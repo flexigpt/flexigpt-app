@@ -17,7 +17,7 @@ import (
 var defaultGoRegistry *llmtools.Registry
 
 func init() {
-	defaultGoRegistry = mustNewGoRegistry(llmtools.WithDefaultCallTimeout(5 * time.Second))
+	defaultGoRegistry = mustNewGoRegistry(llmtools.WithDefaultCallTimeout(300 * time.Second))
 }
 
 type LLMToolMeta struct {

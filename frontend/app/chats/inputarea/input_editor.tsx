@@ -19,7 +19,7 @@ import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { ProviderSDKType, UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { PromptTemplate } from '@/spec/prompt';
 import type { SkillRef } from '@/spec/skill';
-import { type ToolListItem, type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
+import { type ToolArgsTarget, type ToolListItem, type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
 import { type ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { cssEscape } from '@/lib/text_utils';
@@ -33,7 +33,7 @@ import {
 	mapAssistantPresetWebSearchTemplatesToChoices,
 } from '@/chats/inputarea/assitantcontexts/assistant_preset_runtime';
 import { useComposerAttachments } from '@/chats/inputarea/attachments/use_composer_attachments';
-import { dispatchOpenToolArgs } from '@/chats/inputarea/events/open_attached_toolargs';
+import { dispatchOpenToolArgs, useOpenToolArgs } from '@/chats/inputarea/events/open_attached_toolargs';
 import { dispatchTemplateFlashEvent } from '@/chats/inputarea/events/template_flash';
 import { EditorBottomBar } from '@/chats/inputarea/input_editor_bottom_bar';
 import { EditorChipsBar } from '@/chats/inputarea/input_editor_chips_bar';
@@ -60,16 +60,16 @@ import {
 } from '@/chats/inputarea/platedoc/tool_document_ops';
 import { useComposerDocument } from '@/chats/inputarea/platedoc/use_composer_document';
 import { useComposerSkills } from '@/chats/inputarea/skills/use_composer_skills';
+import { useComposerTools } from '@/chats/inputarea/toolruntime/use_composer_tools';
+import { ToolDetailsModal, type ToolDetailsState } from '@/chats/inputarea/tools/tool_details_modal';
+import { ToolArgsModalHost } from '@/chats/inputarea/tools/tool_user_args_host';
+import { buildWebSearchChoicesForSubmit, type WebSearchChoiceTemplate } from '@/chats/inputarea/tools/websearch_utils';
+import { appendSystemPromptParts } from '@/prompts/lib/system_prompt_utils';
 import {
 	type ConversationToolStateEntry,
 	conversationToolsToChoices,
 	mergeConversationToolsWithNewChoices,
-} from '@/chats/inputarea/tools/conversation_tool_utils';
-import { ToolDetailsModal } from '@/chats/inputarea/tools/tool_details_modal';
-import { ToolArgsModalHost } from '@/chats/inputarea/tools/tool_user_args_host';
-import { useComposerTools } from '@/chats/inputarea/tools/use_composer_tools';
-import { buildWebSearchChoicesForSubmit, type WebSearchChoiceTemplate } from '@/chats/inputarea/tools/websearch_utils';
-import { appendSystemPromptParts } from '@/prompts/lib/system_prompt_utils';
+} from '@/tools/lib/conversation_tool_utils';
 import { dedupeToolChoices, uiToolChoiceToToolStoreChoice } from '@/tools/lib/tool_choice_utils';
 import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 
@@ -176,14 +176,18 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		setIsSubmitting(current => (current === next ? current : next));
 	}, []);
 
-	const autoSubmitReadyRef = useRef<(() => Promise<void>) | null>(null);
-
 	// Guard: while true, handleEditorDocumentChange skips auto-cancel logic.
 	// This prevents a race where Plate fires onChange after clearComposerTransientState
 	// empties attachments/toolOutputs but before loadAttachmentsFromMessage restores them.
 	const isLoadingExternalMessageRef = useRef(false);
 	const externalMessageLoadReleaseTimerRef = useRef<number | null>(null);
 	const [webSearchArgsBlocked, setWebSearchArgsBlocked] = useState(false);
+	const [toolDetailsState, setToolDetailsState] = useState<ToolDetailsState>(null);
+	const [toolArgsTarget, setToolArgsTarget] = useState<ToolArgsTarget | null>(null);
+
+	useOpenToolArgs(target => {
+		setToolArgsTarget(target);
+	}, toolArgsEventTarget);
 
 	// ---- Skills (conversation-level) ----
 	const {
@@ -221,42 +225,27 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		setConversationToolsState,
 		webSearchTemplates,
 		setWebSearchTemplates,
-		toolDetailsState,
-		setToolDetailsState,
-		toolArgsTarget,
-		setToolArgsTarget,
 		toolArgsBlocked,
 		hasPendingToolCalls,
 		hasRunningToolCalls,
 		runAllPendingToolCalls,
 		handleRunSingleToolCall,
 		handleDiscardToolCall,
-		handleRemoveToolOutput,
+		handleRemoveToolOutput: removeToolOutput,
 		handleRetryErroredOutput,
 		handleAttachedToolsChanged,
 		applyConversationToolsFromChoices,
 		applyWebSearchFromChoices,
 		loadToolCalls,
-		handleOpenToolOutput,
-		handleOpenToolCallDetails,
-		handleOpenConversationToolDetails,
-		handleOpenAttachedToolDetails,
 		clearComposerToolsState,
 		getToolRuntimeSnapshot,
-		resumeAutoExecBatch,
 	} = useComposerTools({
 		isBusy: isGenerating,
 		isSubmitting,
-		templateBlocked,
 		ensureSkillSession,
 		listActiveSkillRefs,
 		setActiveSkillRefs,
 		getCurrentSkillSessionID,
-		toolArgsEventTarget,
-		onAutoSubmitReady: async () => {
-			await autoSubmitReadyRef.current?.();
-		},
-		externalAutoExecuteBlocked: webSearchArgsBlocked,
 		getAttachedToolEntries: getAttachedToolEntriesSnapshot,
 	});
 
@@ -275,6 +264,45 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, [currentProviderSDKType, setToolArgsTarget, setWebSearchTemplates]);
 
 	const hasBlockingToolArgs = toolArgsBlocked || webSearchArgsBlocked;
+	const handleOpenToolOutput = useCallback((output: UIToolOutput) => {
+		setToolDetailsState({ kind: 'output', output });
+	}, []);
+
+	const handleOpenToolCallDetails = useCallback((call: UIToolCall) => {
+		setToolDetailsState({ kind: 'call', call });
+	}, []);
+
+	const handleOpenConversationToolDetails = useCallback((entry: ConversationToolStateEntry) => {
+		setToolDetailsState({ kind: 'choice', choice: entry.toolStoreChoice });
+	}, []);
+
+	const handleOpenAttachedToolDetails = useCallback((entry: AttachedToolEntry) => {
+		const choice: ToolStoreChoice = {
+			choiceID: entry.choiceID,
+			bundleID: entry.bundleID,
+			bundleSlug: entry.bundleSlug,
+			toolSlug: entry.toolSlug,
+			toolVersion: entry.toolVersion,
+			displayName: entry.overrides?.displayName ?? entry.toolSnapshot?.displayName ?? entry.toolSlug,
+			description: entry.overrides?.description ?? entry.toolSnapshot?.description ?? entry.toolSlug,
+			toolID: entry.toolSnapshot?.id,
+			toolType: entry.toolType,
+			autoExecute: entry.autoExecute,
+			userArgSchemaInstance: entry.userArgSchemaInstance,
+		};
+
+		setToolDetailsState({ kind: 'choice', choice });
+	}, []);
+
+	const handleRemoveToolOutput = useCallback(
+		(id: string) => {
+			removeToolOutput(id);
+			setToolDetailsState(current =>
+				current && current.kind === 'output' && current.output.id === id ? null : current
+			);
+		},
+		[removeToolOutput]
+	);
 
 	const attachedToolIdentityKeys = useMemo(() => {
 		return new Set(
@@ -576,6 +604,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		closeAllMenus();
 		setSubmitError(null);
 		setSubmitting(false);
+		setToolDetailsState(null);
+		setToolArgsTarget(null);
 
 		clearAttachments();
 		clearComposerToolsState();
@@ -786,14 +816,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		]
 	);
 
-	useLayoutEffect(() => {
-		autoSubmitReadyRef.current = async () => {
-			await doSubmit({ runPendingTools: true });
-		};
-		return () => {
-			autoSubmitReadyRef.current = null;
-		};
-	}, [doSubmit]);
 	/**
 	 * Default form submit / Enter: "run pending tools, then send".
 	 */
@@ -894,10 +916,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			restorePreEditContext();
 			cancelEditing();
 		}
-
-		// If a queued auto-exec batch was waiting on template vars or similar
-		// editor-side blockers, give it a chance to resume.
-		resumeAutoExecBatch();
 	}, [
 		attachments.length,
 		cancelEditing,
@@ -907,7 +925,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		hasTextRef,
 		onEditorChange,
 		restorePreEditContext,
-		resumeAutoExecBatch,
 		submitError,
 		toolCalls.length,
 		toolOutputs.length,
@@ -1173,9 +1190,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						setWebSearchTemplates={setWebSearchTemplates}
 						onWebSearchArgsBlockedChange={nextBlocked => {
 							setWebSearchArgsBlocked(nextBlocked);
-							if (!nextBlocked) {
-								resumeAutoExecBatch();
-							}
 						}}
 						allSkills={allSkills}
 						skillsLoading={skillsLoading}
