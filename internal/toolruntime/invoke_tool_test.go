@@ -1281,7 +1281,7 @@ func TestInvokeTool_Go_BuiltIns(t *testing.T) {
 		{
 			name:     "ListDirectory_glob",
 			funcName: string(ft.ListDirectoryTool().GoImpl.FuncID),
-			args:     fmt.Sprintf(`{"path":%q,"pattern":"*.txt"}`, tmp),
+			args:     fmt.Sprintf(`{"path":%q,"nameGlob":"*.txt"}`, tmp),
 			verify: func(t *testing.T, body *spec.InvokeToolResponseBody) {
 				t.Helper()
 				text := getOneTextOutput(t, body)
@@ -1289,18 +1289,22 @@ func TestInvokeTool_Go_BuiltIns(t *testing.T) {
 				if err := json.Unmarshal([]byte(text), &o); err != nil {
 					t.Fatalf("unmarshal: %v", err)
 				}
+				entries := make([]string, 0, len(o.Items))
+				for _, item := range o.Items {
+					entries = append(entries, item.Name)
+				}
 				has := func(name string) bool {
-					return slices.Contains(o.Entries, name)
+					return slices.Contains(entries, name)
 				}
 				if !has("a.txt") || has("b.md") {
-					t.Fatalf("entries=%v, expected only a.txt with pattern", o.Entries)
+					t.Fatalf("entries=%v, expected only a.txt with pattern", entries)
 				}
 			},
 		},
 		{
 			name:     "SearchFiles_regex",
 			funcName: string(ft.SearchFilesTool().GoImpl.FuncID),
-			args:     fmt.Sprintf(`{"root":%q,"pattern":"hello"}`, tmp),
+			args:     fmt.Sprintf(`{"root":%q,"query":"hello"}`, tmp),
 			verify: func(t *testing.T, body *spec.InvokeToolResponseBody) {
 				t.Helper()
 				text := getOneTextOutput(t, body)
@@ -1308,9 +1312,14 @@ func TestInvokeTool_Go_BuiltIns(t *testing.T) {
 				if err := json.Unmarshal([]byte(text), &o); err != nil {
 					t.Fatalf("unmarshal: %v", err)
 				}
-				found := slices.Contains(o.Matches, fileA)
+				entries := make([]string, 0, len(o.Items))
+				for _, item := range o.Items {
+					entries = append(entries, item.Path)
+				}
+
+				found := slices.Contains(entries, fileA)
 				if !found {
-					t.Fatalf("expected to find %q in matches; got %v", fileA, o.Matches)
+					t.Fatalf("expected to find %q in matches; got %v", fileA, entries)
 				}
 			},
 		},

@@ -11,21 +11,17 @@
   - [ ] Some calls like editor replace text, create files, etc can be visually represented better via custom elements representing each.
   - [ ] error result submit creates some api processing issue.
     - [ ] also may be error or other results also, we may need some "editor" to edit and submit results ??
-  - [ ] fast forward has some alert in composer saying waiting for tool calls to complete before completing. need to seeif it is broken after refactor
-
-- [ ] llm tools
-  - [ ] search files (and may be others too), need to explicit setting to exclude hidden files/folders.
-  - [ ] read/replace text utils, may need to support approx line numbers so that llm can be more specific on where to read / write etc.
-    - [ ] replace has lots of ambigous mismatch errors. need a way to narrow down, and have errors better communicated back that are actionable.
+  - [ ] fast forward has some alert in composer saying waiting for tool calls to complete before completing. need to see if it is broken after refactor
 
 - [ ] Observations
   - [ ] attachments need to include absolute path most probably. think through and see how to fit it. tool calls need some way to say that start from this.
   - [ ] openai tool calls does a deep dive a lot, for flexigpt, it goes from backend to frontend to others. i think there needs to be a way to control its spread. most probably need to have a way to say that do step by step, and identify domains and then do things etc.
-  - [ ] in a tooling session, there are no parallell tool calls being made for some reason. better force the caller to say that do a bfs kind of tool calls.
+  - [ ] in a tooling session, there are no parallel tool calls being made for some reason. better force the caller to say that do a bfs kind of tool calls.
   - [ ] running linters tests etc is shell driven, the agents.md or similar file may help to say what are commands. for task file it may be simpler, but ned a way of discovery and exec.
   - [ ] asking for things that are missing should be encouraged in some ways. most probably llms are now more in "agentic" mode so they dont really ask questions, but we can shine a lot with human in loops rather than direct.
-  - [ ] once nice thing i noticed that may or may not be available in others, in flexigpt, i can remove/add tools if there are errors etc. and llm may work with base tools anycase i.e read/write/delete files are unambigious anycase
+  - [ ] once nice thing i noticed that may or may not be available in others, in flexigpt, i can remove/add tools if there are errors etc. and llm may work with base tools i.e read/write/delete files are unambiguous
   - [ ] i think we should have a "files only" assistant as well.
+  - [ ] conversation level tokens would be nice to have.
 
   - [ ] I am linking this loop of implementing this using tool tempalte loop (may be skills at some point), and then observing issues, then fixing these, then picking other feature and doing the same.
 
@@ -95,3 +91,11 @@
 - [ ] vite 8: react router dev support. react router has some cleanup planned with vite8. would be better to wait until react router stamps it as ok.
 
 - [ ] jsdom next major
+
+## Chores: Other repos thoughts
+
+- [ ] llm tools
+  - [x] search files (and may be others too), need to explicit setting to exclude hidden files/folders. (may be list dir too.)
+  - [x] read/replace text utils, may need to support approx line numbers so that llm can be more specific on where to read / write etc.
+    - [x] replace has lots of ambiguous mismatch errors. need a way to narrow down, and have errors better communicated back that are actionable.
+  - [ ] may be pdf parsing and any other parsing should be builder hooks that people can input at build time so that adding support etc is easy.
