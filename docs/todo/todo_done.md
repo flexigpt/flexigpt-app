@@ -856,3 +856,9 @@
   - [x] UI has some inbuilt selects etc. test and change.
 
 - [x] need to add default assistant preset support e2e
+
+- [x] Tool calls
+  - [x] error result submit creates some api processing issue.
+    - [ ] ~~also may be error or other results also, we may need some "editor" to edit and submit results ??~~
+  - [x] fast forward has some alert in composer saying waiting for tool calls to complete before completing. need to see if it is broken after refactor
+  - [x] do autosubmit on fast forward.

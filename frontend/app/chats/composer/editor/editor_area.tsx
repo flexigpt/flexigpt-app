@@ -176,6 +176,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const [submitError, setSubmitError] = useState<string | null>(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [fastForwardPending, setFastForwardPending] = useState(false);
 	const setSubmitting = useCallback((next: boolean) => {
 		isSubmittingRef.current = next;
 		setIsSubmitting(current => (current === next ? current : next));
@@ -253,6 +254,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		setActiveSkillRefs,
 		getCurrentSkillSessionID,
 		getAttachedToolEntries: getAttachedToolEntriesSnapshot,
+		externalExecutionBlocked: fastForwardPending,
 	});
 
 	const previousProviderSDKTypeRef = useRef(currentProviderSDKType);
@@ -580,7 +582,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	]);
 
 	const { formRef, onKeyDown } = useEnterSubmit({
-		isBusy: isGenerating || isSubmitting,
+		isBusy: isGenerating || isSubmitting || fastForwardPending,
 		canSubmit: () => {
 			if (isInputLocked) return false;
 			if (isSubmitting) return false;
@@ -610,12 +612,34 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		closeAllMenus();
 		setSubmitError(null);
 		setSubmitting(false);
+		setFastForwardPending(false);
 		setToolDetailsState(null);
 		setToolArgsTarget(null);
 		resetAutoSubmitTracker();
 		clearAttachments();
 		clearComposerToolsState();
 	}, [clearAttachments, clearComposerToolsState, closeAllMenus, resetAutoSubmitTracker, setSubmitting]);
+
+	const startFastForwardRun = useCallback(
+		(pendingRunnableToolCallIDs: string[]) => {
+			if (pendingRunnableToolCallIDs.length === 0) return;
+
+			setSubmitError(null);
+			setFastForwardPending(true);
+
+			void (async () => {
+				try {
+					for (const id of pendingRunnableToolCallIDs) {
+						await handleRunSingleToolCall(id);
+					}
+				} catch (err) {
+					setFastForwardPending(false);
+					setSubmitError((err as Error)?.message || 'Failed to run pending tool calls.');
+				}
+			})();
+		},
+		[handleRunSingleToolCall]
+	);
 
 	const resetEditor = useCallback(() => {
 		clearComposerTransientState();
@@ -677,13 +701,27 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			}
 
 			setSubmitError(null);
+			const pendingRunnableToolCallIDs = runPendingTools
+				? toolCalls
+						.filter(
+							toolCall =>
+								toolCall.status === 'pending' &&
+								(toolCall.type === ToolStoreChoiceType.Function || toolCall.type === ToolStoreChoiceType.Custom)
+						)
+						.map(toolCall => toolCall.id)
+				: [];
+			const hadPendingTools = pendingRunnableToolCallIDs.length > 0;
+
+			if (hadPendingTools) {
+				startFastForwardRun(pendingRunnableToolCallIDs);
+				return;
+			}
+
 			setSubmitting(true);
-			const runtimeBeforeRun = getToolRuntimeSnapshot();
-			const hadPendingTools = runPendingTools && runtimeBeforeRun.toolCalls.some(c => c.status === 'pending');
+
 			let didSend = false;
 
 			try {
-				// Ensure session exists BEFORE running any pending tools (skills.* needs it)
 				let effectiveSkillSessionID: string | null = null;
 				if (effectiveEnabledSkillRefs.length > 0) {
 					try {
@@ -692,10 +730,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						setSubmitError((err as Error)?.message || 'Failed to create skills session.');
 						return;
 					}
-				}
-
-				if (hadPendingTools) {
-					await runAllPendingToolCalls();
 				}
 
 				// Build final message content after tools have run.
@@ -817,12 +851,13 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			listActiveSkillRefs,
 			onSubmit,
 			resetEditor,
-			runAllPendingToolCalls,
 			selectionInfo.firstPendingVar,
 			setActiveSkillRefs,
 			setConversationToolsState,
 			setSubmitting,
+			startFastForwardRun,
 			templateBlocked,
+			toolCalls,
 			webSearchTemplates,
 		]
 	);
@@ -834,6 +869,60 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		if (e) e.preventDefault();
 		void doSubmit({ runPendingTools: true });
 	};
+
+	useEffect(() => {
+		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
+		if (!fastForwardPending) return;
+		if (isGenerating || isInputLocked || isSubmittingRef.current) return;
+		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
+		if (templateBlocked || hasBlockingToolArgs) return;
+
+		const unfinishedRunnableToolCalls = toolCalls.filter(
+			toolCall =>
+				(toolCall.status === 'pending' || toolCall.status === 'running') &&
+				(toolCall.type === ToolStoreChoiceType.Function || toolCall.type === ToolStoreChoiceType.Custom)
+		);
+		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
+		if (unfinishedRunnableToolCalls.length > 0) return;
+
+		const failedRunnableToolCalls = toolCalls.filter(
+			toolCall =>
+				toolCall.status === 'failed' &&
+				(toolCall.type === ToolStoreChoiceType.Function || toolCall.type === ToolStoreChoiceType.Custom)
+		);
+		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
+		if (failedRunnableToolCalls.length > 0) {
+			// eslint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
+			setFastForwardPending(false);
+			// eslint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
+			setSubmitError('Some tool calls failed. Retry or discard them before sending.');
+			return;
+		}
+
+		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
+		if (!hasEffectiveTextForSubmit && attachments.length === 0 && toolOutputs.length === 0) {
+			// eslint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
+			setFastForwardPending(false);
+			// eslint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
+			setSubmitError('Tool calls did not produce any outputs, so there is nothing to send yet.');
+			return;
+		}
+
+		// eslint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
+		setFastForwardPending(false);
+		void doSubmit({ runPendingTools: false });
+	}, [
+		attachments.length,
+		doSubmit,
+		fastForwardPending,
+		hasBlockingToolArgs,
+		hasEffectiveTextForSubmit,
+		isGenerating,
+		isInputLocked,
+		templateBlocked,
+		toolCalls,
+		toolOutputs.length,
+	]);
 
 	useEffect(() => {
 		const tracker = autoSubmitTrackerRef.current;
@@ -1058,22 +1147,31 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, [cancelEditing, resetEditor, restorePreEditContext]);
 
 	const handleRunToolsOnlyClick = useCallback(async () => {
-		if (!hasPendingToolCalls || isInputLocked || isSubmitting || hasRunningToolCalls) return;
+		if (!hasPendingToolCalls || isInputLocked || isSubmitting || fastForwardPending || hasRunningToolCalls) return;
 		await runAllPendingToolCalls();
-	}, [hasPendingToolCalls, hasRunningToolCalls, isInputLocked, isSubmitting, runAllPendingToolCalls]);
+	}, [
+		fastForwardPending,
+		hasPendingToolCalls,
+		hasRunningToolCalls,
+		isInputLocked,
+		isSubmitting,
+		runAllPendingToolCalls,
+	]);
 
 	// Button-state helpers:
 	// - Play: run tools only (enabled when there are pending tools and none are running).
 	// - Fast-forward: run tools then send (enabled when there are pending tools and
 	//   templates are satisfied; "sendability" will be re-checked after tools run).
 	// - Send: send only (enabled when send is allowed and there are no pending tools).
-	const canSendOnly = !hasPendingToolCalls && isSendButtonEnabled && !hasRunningToolCalls;
-	const canRunToolsOnly = hasPendingToolCalls && !hasRunningToolCalls && !isInputLocked && !isSubmitting;
+	const canSendOnly = !hasPendingToolCalls && isSendButtonEnabled && !hasRunningToolCalls && !fastForwardPending;
+	const canRunToolsOnly =
+		hasPendingToolCalls && !hasRunningToolCalls && !isInputLocked && !isSubmitting && !fastForwardPending;
 	const canRunToolsAndSend =
 		hasPendingToolCalls &&
 		!hasRunningToolCalls &&
 		!isInputLocked &&
 		!isSubmitting &&
+		!fastForwardPending &&
 		!templateBlocked &&
 		!hasBlockingToolArgs;
 	useEffect(() => {
@@ -1145,7 +1243,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									toolCalls={toolCalls}
 									toolOutputs={toolOutputs}
 									toolEntries={attachedToolEntries}
-									isBusy={isGenerating || isSubmitting || isInputLocked}
+									isBusy={isGenerating || isSubmitting || isInputLocked || fastForwardPending}
 									onRunToolCall={handleRunSingleToolCall}
 									onDiscardToolCall={handleDiscardToolCall}
 									onOpenOutput={handleOpenToolOutput}
@@ -1275,7 +1373,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						setEnabledSkillRefs={setEnabledSkillRefs}
 						onEnableAllSkills={enableAllSkills}
 						onDisableAllSkills={disableAllSkills}
-						isInputLocked={isInputLocked}
+						isInputLocked={isInputLocked || fastForwardPending}
 					/>
 				</Plate>
 			</form>

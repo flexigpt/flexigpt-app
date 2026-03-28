@@ -7,13 +7,6 @@
   - [ ] with the number of skills present, maybe we dont want to enable all on click for the enable sills button, may be have a button at bottom on open that says enable all separately. also show collapsed bundles at start and then expanding if needed.
   - [ ] in skills world, especially with artifact driven dev, we can almost get away with without sending a lot of things again and again, latest context and last 1/2 chats. attachments may pose a problem here, but can be thought through properly so that these things are persisted properly.
 
-- [ ] Tool calls
-  - [ ] Some calls like editor replace text, create files, etc can be visually represented better via custom elements representing each.
-  - [x] error result submit creates some api processing issue.
-    - [ ] ~~also may be error or other results also, we may need some "editor" to edit and submit results ??~~
-  - [x] fast forward has some alert in composer saying waiting for tool calls to complete before completing. need to see if it is broken after refactor
-  - [ ] do autosubmit on fast forward.
-
 - [ ] Observations
   - [ ] attachments need to include absolute path most probably. think through and see how to fit it. tool calls need some way to say that start from this.
   - [ ] openai tool calls does a deep dive a lot, for flexigpt, it goes from backend to frontend to others. i think there needs to be a way to control its spread. most probably need to have a way to say that do step by step, and identify domains and then do things etc.
@@ -31,6 +24,9 @@
 - [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls loop is better.
   - [ ] this is a "feature" in anthropic and chargeable for cache write.
   - [ ] implement this after feature filters support and additional param support features in apis.
+
+- [ ] Tool calls
+  - [ ] Some calls like editor replace text, create files, etc can be visually represented better via custom elements representing each.
 
 ## Milestone thoughts
 
