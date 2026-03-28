@@ -13,13 +13,6 @@
     - [ ] also may be error or other results also, we may need some "editor" to edit and submit results ??
   - [ ] fast forward has some alert in composer saying waiting for tool calls to complete before completing. need to seeif it is broken after refactor
 
-- [ ] debug flag/s (maybe one for scrubbing, one for key activate etc etc) for provider in UI settings
-  - [ ] backend is mostly there. the application of settings path is problematic as of now.
-    - [ ] inference go needs dynamic debug client setting support. then adapt to inference wrapper and then to settings api.
-  - [x] UI has some inbuilt selects etc. test and change.
-
-- [x] need to add default assistant preset support e2e
-
 - [ ] llm tools
   - [ ] search files (and may be others too), need to explicit setting to exclude hidden files/folders.
   - [ ] read/replace text utils, may need to support approx line numbers so that llm can be more specific on where to read / write etc.
