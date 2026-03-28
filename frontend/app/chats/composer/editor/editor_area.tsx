@@ -724,7 +724,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				);
 
 				if (unfinishedRunnableToolCalls.length > 0) {
-					setSubmitError('Waiting for all tool calls to finish before sending.');
+					// Fast-forward should be silent while tools are still progressing.
+					// The chips already show running state, so avoid flashing an inline
+					// composer alert for this transient condition.
+					if (!hadPendingTools) {
+						setSubmitError('Waiting for all tool calls to finish before sending.');
+					}
 					return;
 				}
 				if (failedRunnableToolCalls.length > 0) {

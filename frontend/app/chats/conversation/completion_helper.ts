@@ -433,7 +433,7 @@ export function buildUIToolOutputFromToolOutput(
 	const toolOutputs = mapToolOutputItemsToToolOutputs(out.contents);
 
 	const primaryText = extractPrimaryTextFromToolOutputs(toolOutputs);
-	const summary = isError && primaryText ? `Error: ${primaryText.split('\n')[0].slice(0, 80)}` : summaryBase;
+	const summary = isError && primaryText ? `Tool Error: ${primaryText.split('\n')[0].slice(0, 80)}` : summaryBase;
 
 	let webSearchOutputs: WebSearchToolOutputItemUnion[] | undefined;
 	if (out.webSearchToolOutputItems && out.webSearchToolOutputItems.length > 0) {

@@ -9,9 +9,10 @@
 
 - [ ] Tool calls
   - [ ] Some calls like editor replace text, create files, etc can be visually represented better via custom elements representing each.
-  - [ ] error result submit creates some api processing issue.
-    - [ ] also may be error or other results also, we may need some "editor" to edit and submit results ??
-  - [ ] fast forward has some alert in composer saying waiting for tool calls to complete before completing. need to see if it is broken after refactor
+  - [x] error result submit creates some api processing issue.
+    - [ ] ~~also may be error or other results also, we may need some "editor" to edit and submit results ??~~
+  - [x] fast forward has some alert in composer saying waiting for tool calls to complete before completing. need to see if it is broken after refactor
+  - [ ] do autosubmit on fast forward.
 
 - [ ] Observations
   - [ ] attachments need to include absolute path most probably. think through and see how to fit it. tool calls need some way to say that start from this.
@@ -92,7 +93,7 @@
 
 - [ ] jsdom next major
 
-## Chores: Other repos thoughts
+## Other repos thoughts
 
 - [ ] llm tools
   - [x] search files (and may be others too), need to explicit setting to exclude hidden files/folders. (may be list dir too.)

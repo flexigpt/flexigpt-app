@@ -287,6 +287,9 @@ function ToolOutputComposerChipView({ output, onOpen, onRemove, onRetry }: ToolO
 	if (isError && output.errorMessage) {
 		titleLines.push(`Error: ${output.errorMessage}`);
 	}
+	if (isError) {
+		titleLines.push('This is a tool error result. It can still be sent to the model as tool output.');
+	}
 	const title = titleLines.join('\n');
 
 	return (
@@ -305,7 +308,9 @@ function ToolOutputComposerChipView({ output, onOpen, onRemove, onRetry }: ToolO
 			data-attachment-chip="tool-output"
 		>
 			<FiTool size={14} className={isError ? 'text-error' : ''} />
-			<span className="text-base-content/60 text-[10px] uppercase">{isError ? 'Error' : 'Result'}</span>
+			<span className={`text-[10px] uppercase ${isError ? 'text-error' : 'text-base-content/60'}`}>
+				{isError ? 'Tool error' : 'Result'}
+			</span>
 			<span className="max-w-64 truncate">{truncatedLabel}</span>
 
 			<div className="ml-auto flex items-center gap-1">

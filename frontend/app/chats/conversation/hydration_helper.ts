@@ -15,6 +15,7 @@ import {
 	RoleEnum,
 	Status,
 	type ToolOutput,
+	type ToolOutputItemUnion,
 	ToolType,
 	type UIToolOutput,
 } from '@/spec/inference';
@@ -247,7 +248,22 @@ function buildToolOutputFromEditor(ui: UIToolOutput): ToolOutput | undefined {
 		return undefined;
 	}
 
-	const contents = mapToolOutputsToToolOutputItems(ui.toolOutputs);
+	let contents = mapToolOutputsToToolOutputItems(ui.toolOutputs);
+	const hasContents = (contents?.length ?? 0) > 0;
+	const hasWebSearchToolOutputItems = (ui.webSearchToolOutputItems?.length ?? 0) > 0;
+
+	// Preserve tool errors as real tool output payloads.
+	// Without this, an errored output that only has `errorMessage` becomes
+	// an empty tool-output union on the wire.
+	if (ui.isError && !hasContents && !hasWebSearchToolOutputItems) {
+		const msg = 'Tool call returned a error, rectify the call.';
+		contents = [
+			{
+				kind: ContentItemKind.Text,
+				textItem: { text: ui.errorMessage ? 'ErrorMessage: ' + ui.errorMessage : msg },
+			},
+		] as ToolOutputItemUnion[];
+	}
 
 	return {
 		type: ui.type as unknown as ToolType,

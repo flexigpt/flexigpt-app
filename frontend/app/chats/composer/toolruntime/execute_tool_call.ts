@@ -96,7 +96,7 @@ export async function executeComposerToolCall({
 					choiceID: toolCall.choiceID,
 					type: toolCall.type,
 					summary: isError
-						? `Error: ${formatToolOutputSummary(toolCall.name)}`
+						? `Tool error: ${formatToolOutputSummary(toolCall.name)}`
 						: formatToolOutputSummary(toolCall.name),
 					toolOutputs: resp.outputs,
 					isError,
@@ -144,7 +144,9 @@ export async function executeComposerToolCall({
 				name: toolCall.name,
 				choiceID: toolCall.choiceID,
 				type: toolCall.type,
-				summary: isError ? `Error: ${formatToolOutputSummary(toolCall.name)}` : formatToolOutputSummary(toolCall.name),
+				summary: isError
+					? `Tool error: ${formatToolOutputSummary(toolCall.name)}`
+					: formatToolOutputSummary(toolCall.name),
 				toolOutputs: resp.outputs,
 				isError,
 				errorMessage,
