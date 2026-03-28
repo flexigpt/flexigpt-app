@@ -84,7 +84,7 @@ func InitAggregrateWrapper(
 	}
 
 	agg.settingStore.SetDebugSettingsApplier(func(_ context.Context, cfg settingSpec.DebugSettings) error {
-		return applyAppDebugSettings(agg.providersetAPI, cfg)
+		return applyDebugSettings(agg.providersetAPI, cfg)
 	})
 	if err := agg.settingStore.ApplyCurrentDebugSettings(context.Background(), true); err != nil {
 		slog.Error("couldn't apply persisted debug settings", "error", err)
@@ -498,7 +498,7 @@ func initProviders(
 	return nil
 }
 
-func applyAppDebugSettings(providerSet *inferencewrapper.ProviderSetAPI, cfg settingSpec.DebugSettings) error {
+func applyDebugSettings(providerSet *inferencewrapper.ProviderSetAPI, cfg settingSpec.DebugSettings) error {
 	appSlogLevelVar.Set(toSlogLevel(cfg.LogLevel))
 	if providerSet != nil {
 		clone := providerSet.GetDebugConfig()

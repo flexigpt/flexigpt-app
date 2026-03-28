@@ -41,6 +41,12 @@ func DefaultDebugConfig() debugclient.DebugConfig {
 	return defaultDebugConfig
 }
 
+func disabledDebugConfig() debugclient.DebugConfig {
+	cfg := defaultDebugConfig
+	cfg.Disable = true
+	return cfg
+}
+
 type completionKeyCapabilityResolver struct {
 	key  string
 	caps *inferenceSpec.ModelCapabilities
@@ -71,8 +77,10 @@ type ProviderSetAPI struct {
 	mpStore    *modelpresetStore.ModelPresetStore
 	skillStore *skillStore.SkillStore
 
-	logger                 *slog.Logger
-	debugConfig            *debugclient.DebugConfig
+	logger             *slog.Logger
+	debugger           *debugclient.HTTPCompletionDebugger
+	initialDebugConfig *debugclient.DebugConfig
+
 	skillsRunScriptEnabled bool
 }
 
@@ -86,7 +94,12 @@ func WithLogger(logger *slog.Logger) ProviderSetOption {
 
 func WithDebugConfig(debugConfig *debugclient.DebugConfig) ProviderSetOption {
 	return func(ps *ProviderSetAPI) {
-		ps.debugConfig = debugConfig
+		if debugConfig == nil {
+			ps.initialDebugConfig = nil
+			return
+		}
+		cloned := *debugConfig
+		ps.initialDebugConfig = &cloned
 	}
 }
 
@@ -119,19 +132,26 @@ func NewProviderSetAPI(
 			opt(ps)
 		}
 	}
-	allOpts := make([]inference.ProviderSetOption, 0)
+	allOpts := make([]inference.ProviderSetOption, 0, 2)
 	if ps.logger == nil {
 		ps.logger = slog.Default()
 	}
 	allOpts = append(allOpts, inference.WithLogger(ps.logger))
-	if ps.debugConfig != nil {
-		allOpts = append(allOpts,
-			inference.WithDebugClientBuilder(func(p inferenceSpec.ProviderParam) inferenceSpec.CompletionDebugger {
-				// Here we enable for all providers. Possible to give provider specific options later.
-				return debugclient.NewHTTPCompletionDebugger(ps.debugConfig)
-			}),
-		)
+	// Always install a debugger so runtime debug config changes work even if debugging starts out disabled.
+	// If no config was provided, we begin in a disabled state and can enable later via SetDebugConfig without
+	// rebuilding
+	// providers or HTTP clients.
+	debugCfg := disabledDebugConfig()
+	if ps.initialDebugConfig != nil {
+		debugCfg = *ps.initialDebugConfig
 	}
+	dbg := debugclient.NewHTTPCompletionDebugger(&debugCfg)
+	ps.debugger = dbg
+	allOpts = append(allOpts,
+		inference.WithDebugClientBuilder(func(p inferenceSpec.ProviderParam) inferenceSpec.CompletionDebugger {
+			return dbg
+		}),
+	)
 
 	inner, err := inference.NewProviderSetAPI(allOpts...)
 	if err != nil {
@@ -142,29 +162,30 @@ func NewProviderSetAPI(
 	return ps, nil
 }
 
-// SetDebugConfig updates the debug client configuration used for future completions.
+// SetDebugConfig updates the live debug client configuration used for future
+// completions. Passing nil disables debugging while keeping the transport
+// wrapper installed, so debugging can be enabled again later without
+// reinitializing providers.
 func (ps *ProviderSetAPI) SetDebugConfig(cfg *debugclient.DebugConfig) {
-	if ps == nil {
+	if ps == nil || ps.debugger == nil {
 		return
 	}
-	if cfg == nil {
-		if ps.debugConfig == nil {
-			c := defaultDebugConfig
-			ps.debugConfig = &c
-		}
-		return
+
+	next := disabledDebugConfig()
+	if cfg != nil {
+		next = *cfg
 	}
-	cloned := *cfg
-	ps.debugConfig = &cloned
+
+	ps.debugger.SetConfig(next)
 }
 
-// GetDebugConfig returns a defensive copy of the current debug configuration.
+// GetDebugConfig returns a defensive copy of the live debug configuration.
 func (ps *ProviderSetAPI) GetDebugConfig() *debugclient.DebugConfig {
-	if ps == nil || ps.debugConfig == nil {
+	if ps == nil || ps.debugger == nil {
 		return nil
 	}
-	cloned := *ps.debugConfig
-	return &cloned
+	cfg := ps.debugger.GetConfig()
+	return &cfg
 }
 
 // AddProvider forwards to inference-go ProviderSetAPI.AddProvider.

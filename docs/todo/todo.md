@@ -18,7 +18,7 @@
     - [ ] inference go needs dynamic debug client setting support. then adapt to inference wrapper and then to settings api.
   - [x] UI has some inbuilt selects etc. test and change.
 
-- [ ] need to add default assistant preset support e2e
+- [x] need to add default assistant preset support e2e
 
 - [ ] llm tools
   - [ ] search files (and may be others too), need to explicit setting to exclude hidden files/folders.
@@ -31,7 +31,7 @@
   - [ ] in a tooling session, there are no parallell tool calls being made for some reason. better force the caller to say that do a bfs kind of tool calls.
   - [ ] running linters tests etc is shell driven, the agents.md or similar file may help to say what are commands. for task file it may be simpler, but ned a way of discovery and exec.
   - [ ] asking for things that are missing should be encouraged in some ways. most probably llms are now more in "agentic" mode so they dont really ask questions, but we can shine a lot with human in loops rather than direct.
-  - [ ] once nice thing i noticed that may or may not be available in others, in flexigpt, i can remove/add tools if there are errors etc. and llm may work with base tools anycase i.e read/write/delete files are unambigious anycase :)
+  - [ ] once nice thing i noticed that may or may not be available in others, in flexigpt, i can remove/add tools if there are errors etc. and llm may work with base tools anycase i.e read/write/delete files are unambigious anycase
   - [ ] i think we should have a "files only" assistant as well.
 
   - [ ] I am linking this loop of implementing this using tool tempalte loop (may be skills at some point), and then observing issues, then fixing these, then picking other feature and doing the same.
