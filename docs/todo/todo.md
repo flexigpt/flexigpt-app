@@ -7,18 +7,6 @@
   - [ ] with the number of skills present, maybe we dont want to enable all on click for the enable sills button, may be have a button at bottom on open that says enable all separately. also show collapsed bundles at start and then expanding if needed.
   - [ ] in skills world, especially with artifact driven dev, we can almost get away with without sending a lot of things again and again, latest context and last 1/2 chats. attachments may pose a problem here, but can be thought through properly so that these things are persisted properly.
 
-- [ ] Observations
-  - [ ] attachments need to include absolute path most probably. think through and see how to fit it. tool calls need some way to say that start from this.
-  - [ ] openai tool calls does a deep dive a lot, for flexigpt, it goes from backend to frontend to others. i think there needs to be a way to control its spread. most probably need to have a way to say that do step by step, and identify domains and then do things etc.
-  - [ ] in a tooling session, there are no parallel tool calls being made for some reason. better force the caller to say that do a bfs kind of tool calls.
-  - [ ] running linters tests etc is shell driven, the agents.md or similar file may help to say what are commands. for task file it may be simpler, but ned a way of discovery and exec.
-  - [ ] asking for things that are missing should be encouraged in some ways. most probably llms are now more in "agentic" mode so they dont really ask questions, but we can shine a lot with human in loops rather than direct.
-  - [ ] once nice thing i noticed that may or may not be available in others, in flexigpt, i can remove/add tools if there are errors etc. and llm may work with base tools i.e read/write/delete files are unambiguous
-  - [ ] i think we should have a "files only" assistant as well.
-  - [ ] conversation level tokens would be nice to have.
-
-  - [ ] I am linking this loop of implementing this using tool tempalte loop (may be skills at some point), and then observing issues, then fixing these, then picking other feature and doing the same.
-
 ## Features
 
 - [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls loop is better.
@@ -55,7 +43,7 @@
     - [x] Dont: New stateful APIs and its hooks from vendors
       - [x] stored responses, stored conversations, on server memory context, on server prompt templates etc.
 
-  - [ ] i18n
+  - [x] Agent Skills but via local "skills" flow
 
 - [ ] M2 - Better context
   - [ ] Text support
@@ -64,8 +52,7 @@
   - [ ] MCP options in apis connections and hooks
   - [ ] Doc stores/vector stores connections
     - [ ] Only if MCP cannot serve this.
-
-- [x] Agent Skills but via local "skills" flow???
+  - [ ] i18n
 
 - [ ] Deferred.
   - [ ] Image output: See inference-go notes.
@@ -88,6 +75,23 @@
 - [ ] vite 8: react router dev support. react router has some cleanup planned with vite8. would be better to wait until react router stamps it as ok.
 
 - [ ] jsdom next major
+
+## Observations
+
+- take some action
+  - [ ] attachments need to include absolute path most probably. think through and see how to fit it. tool calls need some way to say that start from this.
+
+- openai tool loop
+  - [ ] openai tool calls does a deep dive a lot, for flexigpt, it goes from backend to frontend to others. i think there needs to be a way to control its spread. most probably need to have a way to say that do step by step, and identify domains and then do things etc.
+  - [ ] in a tooling session, there are no parallel tool calls being made for some reason. better force the caller to say that do a bfs kind of tool calls.
+  - [ ] running linters tests etc is shell driven, the agents.md or similar file may help to say what are commands. for task file it may be simpler, but ned a way of discovery and exec.
+  - [ ] asking for things that are missing should be encouraged in some ways. most probably llms are now more in "agentic" mode so they dont really ask questions, but we can shine a lot with human in loops rather than direct.
+
+- [ ] once nice thing i noticed that may or may not be available in others, in flexigpt, i can remove/add tools if there are errors etc. and llm may work with base tools i.e read/write/delete files are unambiguous
+- [ ] i think we should have a "files only" assistant as well.
+- [ ] conversation level tokens would be nice to have.
+
+- [ ] I am linking this loop of implementing this using tool template loop (may be skills at some point), and then observing issues, then fixing these, then picking other feature and doing the same.
 
 ## Other repos thoughts
 
