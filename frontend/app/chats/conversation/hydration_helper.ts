@@ -17,6 +17,7 @@ import {
 	type ToolOutput,
 	type ToolOutputItemUnion,
 	ToolType,
+	type UIToolCall,
 	type UIToolOutput,
 } from '@/spec/inference';
 import type { ModelPresetRef } from '@/spec/modelpreset';
@@ -237,6 +238,15 @@ export function buildUserConversationMessageFromEditor(
 		uiContent: text,
 		uiToolOutputs: toolOutputs,
 	};
+}
+
+export function deriveHydratedLastAssistantToolCalls(conversation: Conversation): UIToolCall[] {
+	const lastMessage = conversation.messages[conversation.messages.length - 1];
+	if (!lastMessage || lastMessage.role !== RoleEnum.Assistant) return [];
+
+	return (lastMessage.uiToolCalls ?? [])
+		.filter(call => call.type === ToolStoreChoiceType.Function || call.type === ToolStoreChoiceType.Custom)
+		.map(call => ({ ...call, suppressAutoExecute: true }));
 }
 
 function buildToolOutputFromEditor(ui: UIToolOutput): ToolOutput | undefined {

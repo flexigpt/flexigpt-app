@@ -501,6 +501,14 @@ export interface UIToolCall {
 	 */
 	toolStoreChoice?: ToolStoreChoice;
 
+	/**
+	 * UI-only hydration flag.
+	 * Restored tool calls from persisted history should be shown and remain
+	 * manually runnable, but must not enter the auto-exec / auto-submit flow
+	 * just because the underlying tool choice has autoExecute=true.
+	 */
+	suppressAutoExecute?: boolean;
+
 	errorMessage?: string;
 }
 

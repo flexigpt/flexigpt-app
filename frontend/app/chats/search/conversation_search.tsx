@@ -86,10 +86,10 @@ export const ConversationSearch = forwardRef<ConversationSearchHandle, Conversat
 
 		const handlePick = useCallback(
 			async (conversation: ConversationSearchItem) => {
-				await pickConversation(conversation);
 				popover.setOpen(false);
 				setFocusedIndex(-1);
 				inputRef.current?.blur();
+				void pickConversation(conversation);
 			},
 			[pickConversation, popover]
 		);
@@ -163,7 +163,15 @@ export const ConversationSearch = forwardRef<ConversationSearchHandle, Conversat
 					{loading && <span className="loading loading-dots loading-sm" />}
 				</div>
 
-				<Popover store={popover} portal sameWidth className="app-no-drag z-999" gutter={compact ? 8 : 12}>
+				<Popover
+					store={popover}
+					portal
+					sameWidth
+					className="app-no-drag z-999"
+					gutter={compact ? 8 : 12}
+					autoFocusOnShow={false}
+					autoFocusOnHide={false}
+				>
 					<ConversationSearchDropdown
 						results={results}
 						loading={loading}

@@ -21,6 +21,7 @@ export function getToolAutoSubmitKey(value: { id: string; callID: string }): str
 
 export function isAutoSubmitEligibleToolCall(toolCall: UIToolCall): boolean {
 	return (
+		!toolCall.suppressAutoExecute &&
 		(toolCall.type === ToolStoreChoiceType.Function || toolCall.type === ToolStoreChoiceType.Custom) &&
 		Boolean(toolCall.toolStoreChoice?.autoExecute)
 	);
@@ -30,20 +31,16 @@ export function isRunnableComposerToolCall(toolCall: UIToolCall): boolean {
 	return toolCall.type === ToolStoreChoiceType.Function || toolCall.type === ToolStoreChoiceType.Custom;
 }
 
-function isAutoExecutableComposerToolCall(toolCall: UIToolCall): boolean {
-	return (
-		toolCall.status === 'pending' &&
-		isRunnableComposerToolCall(toolCall) &&
-		Boolean(toolCall.toolStoreChoice?.autoExecute)
-	);
-}
-
 export function getPendingRunnableToolCalls(toolCalls: UIToolCall[]): UIToolCall[] {
 	return toolCalls.filter(toolCall => toolCall.status === 'pending' && isRunnableComposerToolCall(toolCall));
 }
 
 export function getNextPendingAutoExecutableToolCall(toolCalls: UIToolCall[]): UIToolCall | null {
-	const tc = toolCalls.filter(isAutoExecutableComposerToolCall);
+	const tc = toolCalls.filter(toolCall => {
+		return (
+			toolCall.status === 'pending' && isRunnableComposerToolCall(toolCall) && isAutoSubmitEligibleToolCall(toolCall)
+		);
+	});
 	return tc[0] ?? null;
 }
 

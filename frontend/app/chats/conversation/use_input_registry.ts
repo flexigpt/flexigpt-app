@@ -4,7 +4,10 @@ import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { Conversation } from '@/spec/conversation';
 
 import type { ComposerBoxHandle } from '@/chats/composer/composer_box';
-import { deriveRestorableConversationContextFromMessages } from '@/chats/conversation/hydration_helper';
+import {
+	deriveHydratedLastAssistantToolCalls,
+	deriveRestorableConversationContextFromMessages,
+} from '@/chats/conversation/hydration_helper';
 
 type PendingDrop = {
 	tabId: string;
@@ -68,6 +71,13 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 
 		input.resetEditor();
 		input.restoreConversationContext(deriveRestorableConversationContextFromMessages(conversation.messages));
+		// Match the normal live-chat behavior: if the last hydrated message is an
+		// assistant tool-call turn, restore runnable tool calls into the composer.
+		// Do not auto-execute restored calls; they remain manual until the user acts.
+		const hydratedToolCalls = deriveHydratedLastAssistantToolCalls(conversation);
+		if (hydratedToolCalls.length > 0) {
+			input.loadToolCalls(hydratedToolCalls);
+		}
 	}, []);
 
 	const resetComposerForNewConversation = useCallback(async (tabId: string) => {

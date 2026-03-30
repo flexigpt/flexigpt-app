@@ -862,3 +862,7 @@
     - [ ] ~~also may be error or other results also, we may need some "editor" to edit and submit results ??~~
   - [x] fast forward has some alert in composer saying waiting for tool calls to complete before completing. need to see if it is broken after refactor
   - [x] do autosubmit on fast forward.
+
+- [x] remove virtuoso, no really benifit seen, too many scroll issues faced.
+- [x] Assistant hydration should result in tool calls loaded again. No need to auto exec them.
+- [x] chat search on load doesnt close. on click outside doesnt close.
