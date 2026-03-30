@@ -45,14 +45,15 @@
 
   - [x] Agent Skills but via local "skills" flow
 
-- [ ] M2 - Better context
-  - [ ] Text support
-    - [ ] extracted other docs input, sheets and docx mainly.
-  - [ ] MCP local connections and hooks
-  - [ ] MCP options in apis connections and hooks
-  - [ ] Doc stores/vector stores connections
-    - [ ] Only if MCP cannot serve this.
+- [ ] M-Future
+  - [ ] App SDK, etc
   - [ ] i18n
+  - [ ] Better context
+    - [ ] Text support
+      - [ ] extracted other docs input, sheets and docx mainly.
+    - [ ] MCP local connections and hooks
+    - [ ] MCP options in apis connections and hooks
+    - [ ] Doc stores/vector stores connections: Only if MCP cannot serve this.
 
 - [ ] Deferred.
   - [ ] Image output: See inference-go notes.
@@ -92,6 +93,7 @@
 - [ ] conversation level tokens would be nice to have.
 
 - [ ] I am linking this loop of implementing this using tool template loop (may be skills at some point), and then observing issues, then fixing these, then picking other feature and doing the same.
+- [ ] An inbuilt docs pages and then some ai intro tutorial builtin will be good.
 
 ## Other repos thoughts
 
