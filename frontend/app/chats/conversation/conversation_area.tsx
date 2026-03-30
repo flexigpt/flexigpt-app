@@ -173,6 +173,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		notifyStreamSoon,
 		getStreamBuffer,
 		getFullStreamTextForTab,
+		getFullStreamThinkingForTab,
 		inputRefs,
 	});
 

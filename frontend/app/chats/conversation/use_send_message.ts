@@ -1,6 +1,6 @@
 import { type RefObject, useCallback } from 'react';
 
-import type { Conversation } from '@/spec/conversation';
+import type { Conversation, ConversationMessage } from '@/spec/conversation';
 import {
 	ContentItemKind,
 	type InferenceError,
@@ -47,9 +47,54 @@ type UseSendMessageArgs = {
 	notifyStreamSoon: (tabId: string) => void;
 	getStreamBuffer: (tabId: string) => StreamBuffer;
 	getFullStreamTextForTab: (tabId: string) => string;
+	getFullStreamThinkingForTab: (tabId: string) => string;
 
 	inputRefs: RefObject<Map<string, ComposerBoxHandle | null>>;
 };
+
+function buildTerminalAssistantOutputs(assistantMessageId: string, status: Status, uiContent: string): OutputUnion[] {
+	return [
+		{
+			kind: OutputKind.OutputMessage,
+			outputMessage: {
+				id: assistantMessageId,
+				role: RoleEnum.Assistant,
+				status,
+				contents: [
+					{
+						kind: ContentItemKind.Text,
+						textItem: {
+							text: uiContent,
+						},
+					},
+				],
+			},
+		},
+	];
+}
+
+function buildTerminalAssistantMessage(args: {
+	assistantPlaceholder: ConversationMessage;
+	status: Status;
+	partialText: string;
+	terminalLine: string;
+	error?: InferenceError;
+	debugDetails?: unknown;
+	uiDebugDetails?: string;
+}): ConversationMessage {
+	const baseText = args.partialText.trimEnd();
+	const uiContent = baseText ? `${baseText}\n\n${args.terminalLine}` : args.terminalLine;
+
+	return {
+		...args.assistantPlaceholder,
+		status: args.status,
+		error: args.error,
+		debugDetails: args.debugDetails,
+		uiDebugDetails: args.uiDebugDetails,
+		uiContent,
+		outputs: buildTerminalAssistantOutputs(args.assistantPlaceholder.id, args.status, uiContent),
+	};
+}
 
 export function useSendMessage({
 	tabsRef,
@@ -66,6 +111,7 @@ export function useSendMessage({
 	notifyStreamSoon,
 	getStreamBuffer,
 	getFullStreamTextForTab,
+	getFullStreamThinkingForTab,
 	inputRefs,
 }: UseSendMessageArgs) {
 	const updateStreamingMessage = useCallback(
@@ -197,10 +243,41 @@ export function useSendMessage({
 
 				if (!tabExists(tabId)) return;
 				if (requestIdByTabRef.current.get(tabId) !== reqId) return;
+				const partialText = getFullStreamTextForTab(tabId);
+				const partialThinking = getFullStreamThinkingForTab(tabId);
+				const hasPartialStream = partialText.trim().length > 0 || partialThinking.trim().length > 0;
 
 				if (responseMessage) {
+					let finalResponseMessage = responseMessage;
+
+					const isErrorResponseWithoutOutputs =
+						finalResponseMessage.status === Status.Failed &&
+						!!rawResponse?.inferenceResponse?.error &&
+						(rawResponse?.inferenceResponse?.outputs?.length ?? 0) === 0;
+
+					// If backend streamed something but finalized as an error without
+					// outputs, keep the streamed text and only show thinking as a
+					// transient UI overlay.
+					if (hasPartialStream && isErrorResponseWithoutOutputs) {
+						const backendErrorMessage =
+							typeof finalResponseMessage.error?.message === 'string' &&
+							finalResponseMessage.error.message.trim().length > 0
+								? finalResponseMessage.error.message.trim()
+								: 'Got error in API processing.';
+
+						finalResponseMessage = buildTerminalAssistantMessage({
+							assistantPlaceholder,
+							status: Status.Failed,
+							partialText,
+							terminalLine: `> Error: ${backendErrorMessage}`,
+							error: finalResponseMessage.error,
+							debugDetails: finalResponseMessage.debugDetails,
+							uiDebugDetails: finalResponseMessage.uiDebugDetails,
+						});
+					}
+
 					const persistedAssistantMessage = applyAssistantPersistenceContext(
-						responseMessage,
+						finalResponseMessage,
 						effectiveModelPresetRef,
 						persistedAssistantModelParam
 					);
@@ -234,30 +311,38 @@ export function useSendMessage({
 						);
 					}
 				} else {
+					const partialText = getFullStreamTextForTab(tabId);
+					const partialThinking = getFullStreamThinkingForTab(tabId);
+					const hasPartialStream = partialText.trim().length > 0 || partialThinking.trim().length > 0;
+
+					const fallbackBase = hasPartialStream
+						? buildTerminalAssistantMessage({
+								assistantPlaceholder,
+								status: Status.Failed,
+								partialText,
+								terminalLine: '> Error: No response was returned by the backend.',
+								error: {
+									code: 'unknown',
+									message: 'No response was returned by the backend.',
+								} as InferenceError,
+							})
+						: {
+								...assistantPlaceholder,
+								status: Status.Failed,
+								error: {
+									code: 'unknown',
+									message: 'No response was returned by the backend.',
+								} as InferenceError,
+								uiContent: '> Error: No response was returned by the backend.',
+								outputs: buildTerminalAssistantOutputs(
+									assistantPlaceholder.id,
+									Status.Failed,
+									'> Error: No response was returned by the backend.'
+								),
+							};
+
 					const fallbackMsg = applyAssistantPersistenceContext(
-						{
-							...assistantPlaceholder,
-							status: Status.Failed,
-							uiContent: '> Error: No response was returned by the backend.',
-							outputs: [
-								{
-									kind: OutputKind.OutputMessage,
-									outputMessage: {
-										id: assistantPlaceholder.id,
-										role: RoleEnum.Assistant,
-										status: Status.Failed,
-										contents: [
-											{
-												kind: ContentItemKind.Text,
-												textItem: {
-													text: '> Error: No response was returned by the backend.',
-												},
-											},
-										],
-									},
-								},
-							],
-						},
+						fallbackBase,
 						effectiveModelPresetRef,
 						persistedAssistantModelParam
 					);
@@ -289,22 +374,16 @@ export function useSendMessage({
 							};
 						});
 					} else {
-						const partialText = getFullStreamTextForTab(tabId) + '\n\n>API Aborted after partial response...';
-
-						const partialOutputs: OutputUnion[] = [
-							{
-								kind: OutputKind.OutputMessage,
-								outputMessage: {
-									id: assistantPlaceholder.id,
-									role: RoleEnum.Assistant,
-									status: Status.Completed,
-									contents: [{ kind: ContentItemKind.Text, textItem: { text: partialText } }],
-								},
-							},
-						];
+						const partialText = getFullStreamTextForTab(tabId);
 
 						const partialMsg = applyAssistantPersistenceContext(
-							{ ...assistantPlaceholder, status: Status.Completed, outputs: partialOutputs, uiContent: partialText },
+							buildTerminalAssistantMessage({
+								assistantPlaceholder,
+								status: Status.Completed,
+								partialText,
+								terminalLine: '> API aborted after partial response...',
+							}),
+
 							effectiveModelPresetRef,
 							persistedAssistantModelParam
 						);
@@ -325,37 +404,19 @@ export function useSendMessage({
 							? error.message
 							: 'Unexpected error while processing this request.';
 
-					const partialText = getFullStreamTextForTab(tabId).trim();
-					const fallbackText = partialText ? `${partialText}\n\n> Error: ${errorMessage}` : `> Error: ${errorMessage}`;
+					const partialText = getFullStreamTextForTab(tabId);
 
 					const fallbackMsg = applyAssistantPersistenceContext(
-						{
-							...assistantPlaceholder,
+						buildTerminalAssistantMessage({
+							assistantPlaceholder,
 							status: Status.Failed,
+							partialText,
+							terminalLine: `> Error: ${errorMessage}`,
 							error: {
 								code: 'unknown',
 								message: errorMessage,
 							} as InferenceError,
-							uiContent: fallbackText,
-							outputs: [
-								{
-									kind: OutputKind.OutputMessage,
-									outputMessage: {
-										id: assistantPlaceholder.id,
-										role: RoleEnum.Assistant,
-										status: Status.Failed,
-										contents: [
-											{
-												kind: ContentItemKind.Text,
-												textItem: {
-													text: fallbackText,
-												},
-											},
-										],
-									},
-								},
-							],
-						},
+						}),
 						effectiveModelPresetRef,
 						persistedAssistantModelParam
 					);
@@ -387,6 +448,7 @@ export function useSendMessage({
 			clearStreamBuffer,
 			getAbortRef,
 			getFullStreamTextForTab,
+			getFullStreamThinkingForTab,
 			getStreamBuffer,
 			inputRefs,
 			notifyStreamNow,

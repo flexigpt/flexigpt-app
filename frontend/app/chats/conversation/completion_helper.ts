@@ -48,47 +48,42 @@ export async function HandleCompletion(
 	responseMessage: ConversationMessage | undefined;
 	rawResponse?: CompletionResponseBody;
 }> {
-	try {
-		// console.log('history to completion', JSON.stringify(history, null, 2));
-		const choiceMap = new Map<string, ToolStoreChoice>(
-			(toolStoreChoices ?? []).map(choice => [choice.choiceID, choice])
-		);
+	// console.log('history to completion', JSON.stringify(history, null, 2));
+	const choiceMap = new Map<string, ToolStoreChoice>((toolStoreChoices ?? []).map(choice => [choice.choiceID, choice]));
 
-		const resp = await aggregateAPI.fetchCompletion(
-			provider,
-			modelPresetID,
-			modelParams,
-			currentUserMsg,
-			history,
-			toolStoreChoices,
-			skillSessionID,
-			requestId,
-			signal,
-			onStreamTextData,
-			onStreamThinkingData
-		);
+	const resp = await aggregateAPI.fetchCompletion(
+		provider,
+		modelPresetID,
+		modelParams,
+		currentUserMsg,
+		history,
+		toolStoreChoices,
+		skillSessionID,
+		requestId,
+		signal,
+		onStreamTextData,
+		onStreamThinkingData
+	);
 
-		if (!resp) {
-			return { responseMessage: undefined, rawResponse: undefined };
-		}
-
-		const inf = resp.inferenceResponse;
-		const hasModelError = !!inf?.error;
-		const hasOutputs = !!inf?.outputs && inf.outputs.length > 0;
-
-		if (!hasModelError || hasOutputs) {
-			const assistantMsg = buildAssistantMessageFromResponse(assistantPlaceholder.id, modelParams, resp, choiceMap);
-			return { responseMessage: assistantMsg, rawResponse: resp };
-		}
-
-		// Error with no outputs at all -> fall back to existing "error stub".
-		return getErrorStub(modelParams, assistantPlaceholder, resp, undefined);
-	} catch (error) {
-		if ((error as DOMException).name === 'AbortError') {
-			throw error;
-		}
-		return getErrorStub(modelParams, assistantPlaceholder, undefined, error);
+	if (!resp) {
+		return { responseMessage: undefined, rawResponse: undefined };
 	}
+
+	const inf = resp.inferenceResponse;
+	const hasModelError = !!inf?.error;
+	const hasOutputs = !!inf?.outputs && inf.outputs.length > 0;
+
+	if (!hasModelError || hasOutputs) {
+		const assistantMsg = buildAssistantMessageFromResponse(assistantPlaceholder.id, modelParams, resp, choiceMap);
+		return { responseMessage: assistantMsg, rawResponse: resp };
+	}
+
+	// Error with no outputs at all -> fall back to existing "error stub".
+	return getErrorStub(modelParams, assistantPlaceholder, resp, undefined);
+	// Important:
+	// Transport/runtime failures must be finalized by the caller because only
+	// the caller has access to the live stream buffers. If we swallow the
+	// error here, already-streamed text/thinking gets lost. So throw error always.
 }
 
 function getErrorStub(
@@ -113,8 +108,8 @@ function getErrorStub(
 		} as InferenceError;
 	}
 
-	const outText = (assistantPlaceholder.uiContent || '') + '\n\n>Got error in API processing.';
-
+	const errMsg = typeof error?.message === 'string' ? error.message.trim() : '';
+	const outText = errMsg ? `> Error: ${errMsg}` : '> Error: Got error in API processing.';
 	const outputs: OutputUnion[] = [
 		{
 			kind: OutputKind.OutputMessage,
