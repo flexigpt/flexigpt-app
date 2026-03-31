@@ -866,3 +866,6 @@
 - [x] remove virtuoso, no really benifit seen, too many scroll issues faced.
 - [x] Assistant hydration should result in tool calls loaded again. No need to auto exec them.
 - [x] chat search on load doesnt close. on click outside doesnt close.
+
+- [x] shell env resolution to user login shell
+- [x] api processing error not getting uicontent if present.
