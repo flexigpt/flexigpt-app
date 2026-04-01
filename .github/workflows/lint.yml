@@ -42,6 +42,7 @@ jobs:
           args: --verbose
           version-file: .tool-versions
           install-mode: "binary"
+          skip-cache: true
 
       - name: Remove embed placeholder
         if: ${{ always() }}
