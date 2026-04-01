@@ -5,6 +5,7 @@ import { FiAlertTriangle, FiCode, FiPlay, FiTerminal, FiTool, FiX } from 'react-
 import { type UIToolCall, type UIToolOutput } from '@/spec/inference';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
+import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
 import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';
 
 type OrderedToolChipItem =
@@ -256,11 +257,6 @@ interface ToolOutputComposerChipViewProps {
 	onOpen: () => void;
 	onRemove: () => void;
 	onRetry: () => void;
-}
-
-function isSkillsToolName(name: string | undefined): boolean {
-	const n = (name ?? '').trim();
-	return n.startsWith('skills.');
 }
 
 /**

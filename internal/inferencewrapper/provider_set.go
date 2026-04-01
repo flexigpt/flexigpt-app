@@ -103,7 +103,7 @@ func WithDebugConfig(debugConfig *debugclient.DebugConfig) ProviderSetOption {
 	}
 }
 
-// WithSkillsRunScriptEnabled controls whether skills.runscript is advertised to the model.
+// WithSkillsRunScriptEnabled controls whether skills-runscript is advertised to the model.
 // Default: false (safer; matches the default fsskillprovider which disables scripts).
 func WithSkillsRunScriptEnabled(enabled bool) ProviderSetOption {
 	return func(ps *ProviderSetAPI) { ps.skillsRunScriptEnabled = enabled }
@@ -365,7 +365,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 				xmlResp,
 			)
 			// Tool choices:
-			// - if none active => only skills.load
+			// - if none active => only skills-load
 			// - else => load/unload/readresource/runscript.
 			skillToolChoices, err := buildSkillToolChoices(activeCount > 0, ps.skillsRunScriptEnabled)
 			if err != nil {
@@ -432,20 +432,20 @@ func buildSkillToolChoices(includeAll, includeRunScript bool) ([]inferenceSpec.T
 	}
 
 	var out []inferenceSpec.ToolChoice
-	tc, err := mk("builtin.skills.load", "skills.load", agentskillsSpec.SkillsLoadTool())
+	tc, err := mk("builtin.skills-load", "skills-load", agentskillsSpec.SkillsLoadTool())
 	if err != nil {
 		return nil, err
 	}
 	out = append(out, tc)
 
 	if includeAll {
-		if tc, err = mk("builtin.skills.unload", "skills.unload", agentskillsSpec.SkillsUnloadTool()); err != nil {
+		if tc, err = mk("builtin.skills-unload", "skills-unload", agentskillsSpec.SkillsUnloadTool()); err != nil {
 			return nil, err
 		}
 		out = append(out, tc)
 		if tc, err = mk(
-			"builtin.skills.readresource",
-			"skills.readresource",
+			"builtin.skills-readresource",
+			"skills-readresource",
 			agentskillsSpec.SkillsReadResourceTool(),
 		); err != nil {
 			return nil, err
@@ -453,8 +453,8 @@ func buildSkillToolChoices(includeAll, includeRunScript bool) ([]inferenceSpec.T
 		out = append(out, tc)
 		if includeRunScript {
 			if tc, err = mk(
-				"builtin.skills.runscript",
-				"skills.runscript",
+				"builtin.skills-runscript",
+				"skills-runscript",
 				agentskillsSpec.SkillsRunScriptTool(),
 			); err != nil {
 				return nil, err
@@ -962,17 +962,17 @@ func decodeToolArgSchema(raw toolSpec.JSONRawString) (map[string]any, error) {
 
 func skillsRulesPrompt(includeAll, includeRunScript bool) string {
 	var tools []string
-	tools = append(tools, "- skills.load")
+	tools = append(tools, "- skills-load")
 	if includeAll {
-		tools = append(tools, "- skills.unload", "- skills.readresource")
+		tools = append(tools, "- skills-unload", "- skills-readresource")
 		if includeRunScript {
-			tools = append(tools, "- skills.runscript")
+			tools = append(tools, "- skills-runscript")
 		}
 	}
 
 	extra := ""
 	if !includeAll {
-		extra = "\nThis turn only exposes skills.load. After you load at least one skill, more skills tools may be available.\n"
+		extra = "\nThis turn only exposes skills-load. After you load at least one skill, more skills tools may be available.\n"
 	}
 
 	return strings.TrimSpace(fmt.Sprintf(`
@@ -981,8 +981,8 @@ You have access to "skills" tools:
 %s
 Rules:
 1) Only use skills that are listed in the provided skills XML prompt.
-2) Prefer reading skill resources (skills.readresource) before running scripts.
-3) After calling skills.load or skills.unload, rely on the updated skills context in subsequent turns.
+2) Prefer reading skill resources (skills-readresource) before running scripts.
+3) After calling skills-load or skills-unload, rely on the updated skills context in subsequent turns.
 `, strings.Join(tools, "\n"), strings.TrimSpace(extra)))
 }
 

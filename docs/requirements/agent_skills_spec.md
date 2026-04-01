@@ -63,7 +63,7 @@ SkillRecord (functional fields):
 
 A Session is a lightweight conversation-scoped state container used to link:
 
-- tool calls (e.g., `skills.load`, `skills.unload`) and their effects
+- tool calls (e.g., `skills-load`, `skills-unload`) and their effects
 - per-turn prompt injection (active skill instructions)
 - authorization checks for skill-scoped reads and script execution
 
@@ -125,7 +125,7 @@ Tools are _functionally stateless by signature_ but operate against a session co
   - Recommended policy: include `<available_skills>` in the top-level instructions of EVERY LLM call to keep selection consistent across turns.
 
 - Loading-Required Rule:
-  - The orchestrator MUST include a base instruction rule that specifies that the LLM MUST call `skills.load` before using any skill’s full instructions/resources/scripts.
+  - The orchestrator MUST include a base instruction rule that specifies that the LLM MUST call `skills-load` before using any skill’s full instructions/resources/scripts.
 
 - Active Skills Instruction Injection:
   - When a session has `active_skills`, the orchestrator SHOULD include each loaded skill’s `SKILL.md` body in the top-level instructions of each LLM call:
@@ -142,7 +142,7 @@ Tools are _functionally stateless by signature_ but operate against a session co
 
 ### Skill Load Tool
 
-- `skills.load`:
+- `skills-load`:
   - Purpose: Load one or more skills (progressive disclosure) and set/update the session’s loaded skill set.
 
 Recommended Input (structured):
@@ -188,7 +188,7 @@ Output (recommended minimal receipt):
 
 ### Skill Unload Tool
 
-- `skills.unload`:
+- `skills-unload`:
   - Purpose: Remove one or more loaded skills from the session, or clear all loaded skills.
 
 Recommended Input:
@@ -211,7 +211,7 @@ Behavior:
 
 ### Skill Resource/Assets Read Tool
 
-- `skills.read`
+- `skills-read`
   - Purpose: Read skill-scoped files on demand (progressive disclosure).
 
 Behavior:
@@ -223,7 +223,7 @@ Behavior:
 
 ### Skill Script Execution Tool
 
-- `skills.run_script`
+- `skills-run_script`
   - Purpose: Execute a script from the active skill’s `scripts/` directory.
 
 Behavior:
@@ -264,9 +264,9 @@ Output:
   - optional: per-skill cached `location`, `root_dir`, `properties`, `digest`
 
 - State Transitions
-  - `skills.load` updates `active_skills` (replace/add)
-  - `skills.unload` removes skills or clears all
-  - `skills.read` and `skills.run_script` require `active_skills.length > 0`
+  - `skills-load` updates `active_skills` (replace/add)
+  - `skills-unload` removes skills or clears all
+  - `skills-read` and `skills-run_script` require `active_skills.length > 0`
 
 ## Linear Turn-by-Turn Runtime Behavior
 
@@ -286,13 +286,13 @@ For each LLM call, orchestrator constructs:
 ### Typical Flow: Choose, Activate, Use
 
 1. LLM sees available skills (prompt or tool) and decides a skill is needed.
-2. LLM calls `skills.load(...)`.
+2. LLM calls `skills-load(...)`.
 3. Orchestrator appends tool result and updates session state.
 4. Next LLM call includes active `SKILL.md` instructions in top-level instructions.
-5. LLM uses `skills.read` and `skills.run_script` as needed.
+5. LLM uses `skills-read` and `skills-run_script` as needed.
 
 ### Skill Switching
 
-1. LLM calls `skills.load(names=["skill-b"], mode="replace")`.
+1. LLM calls `skills-load(names=["skill-b"], mode="replace")`.
 2. Orchestrator updates state (`active_skills=["skill-b"]`).
 3. Next LLM call injects skill-b’s `SKILL.md` instructions (not skill-a).

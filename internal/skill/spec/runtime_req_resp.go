@@ -98,7 +98,7 @@ type ListRuntimeSkillsResponse struct {
 
 type InvokeSkillToolRequestBody struct {
 	SessionID agentskillsSpec.SessionID `json:"sessionID"      required:"true"`
-	ToolName  string                    `json:"toolName"       required:"true"` // "skills.load" | "skills.unload" | "skills.readresource" | "skills.runscript"
+	ToolName  string                    `json:"toolName"       required:"true"` // "skills-load" | "skills-unload" | "skills-readresource" | "skills-runscript"
 	Args      JSONRawString             `json:"args,omitempty"`                 // JSON object string
 }
 

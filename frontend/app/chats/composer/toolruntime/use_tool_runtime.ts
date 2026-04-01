@@ -11,8 +11,8 @@ import { executeComposerToolCall } from '@/chats/composer/toolruntime/execute_to
 import {
 	getPendingRunnableToolCalls,
 	isRunnableComposerToolCall,
-	isSkillsToolName,
 } from '@/chats/composer/toolruntime/tool_runtime_utils';
+import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
 
 export interface ComposerToolRuntimeState {
 	toolCalls: UIToolCall[];

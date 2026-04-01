@@ -2,7 +2,8 @@ import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 
 import { skillStoreAPI, toolRuntimeAPI } from '@/apis/baseapi';
 
-import { isRunnableComposerToolCall, isSkillsToolName } from '@/chats/composer/toolruntime/tool_runtime_utils';
+import { isRunnableComposerToolCall } from '@/chats/composer/toolruntime/tool_runtime_utils';
+import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
 import { formatToolOutputSummary } from '@/tools/lib/tool_output_utils';
 
 const TOOL_CALL_TIMEOUT_MS = 90_000;

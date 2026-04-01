@@ -388,7 +388,7 @@ function deriveUIToolCallFromToolCall(
 	const choiceID = toolCall.choiceID;
 	if (!choiceID) return undefined;
 
-	// NOTE: runtime-injected tools (e.g. skills.*) are not in toolStoreChoices,
+	// NOTE: runtime-injected tools (e.g. skills-*) are not in toolStoreChoices,
 	// so they will not be present in this map. Do NOT drop the tool call.
 	const toolStoreChoice = choiceMap.get(choiceID); // ToolStoreChoice | undefined
 

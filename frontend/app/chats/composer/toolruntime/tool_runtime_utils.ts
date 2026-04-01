@@ -43,8 +43,3 @@ export function getNextPendingAutoExecutableToolCall(toolCalls: UIToolCall[]): U
 	});
 	return tc[0] ?? null;
 }
-
-export function isSkillsToolName(name: string | undefined): boolean {
-	const n = (name ?? '').trim();
-	return n.startsWith('skills.');
-}

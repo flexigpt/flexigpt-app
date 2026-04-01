@@ -4,7 +4,9 @@
 
 - [ ] Skill
   - [ ] include some builtin skills and test on all platforms, full flow.
-  - [ ] with the number of skills present, maybe we dont want to enable all on click for the enable sills button, may be have a button at bottom on open that says enable all separately. also show collapsed bundles at start and then expanding if needed.
+    - [x] include spec driven dev
+    - [ ] test with some skill that has scripts too
+  - [ ] with the number of skills present, maybe we dont want to enable all on click for the enable skills button, may be have a button at bottom on open that says enable all separately. also show collapsed bundles at start and then expanding if needed.
   - [ ] in skills world, especially with artifact driven dev, we can almost get away with without sending a lot of things again and again, latest context and last 1/2 chats. attachments may pose a problem here, but can be thought through properly so that these things are persisted properly.
 
 ## Features

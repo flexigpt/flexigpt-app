@@ -496,7 +496,7 @@ export interface UIToolCall {
 	choiceID: string;
 	status: UIToolCallStatus;
 	/**
-	 * Optional. Some tool calls are injected at runtime (e.g. skills.*) and do not
+	 * Optional. Some tool calls are injected at runtime (e.g. skills-*) and do not
 	 * correspond to a ToolStoreChoice in message.toolStoreChoices.
 	 */
 	toolStoreChoice?: ToolStoreChoice;

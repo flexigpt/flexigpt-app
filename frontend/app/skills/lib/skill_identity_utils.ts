@@ -55,3 +55,8 @@ export const areSkillRefListsEqual = (a: SkillRef[] | null | undefined, b: Skill
 	}
 	return true;
 };
+
+export function isSkillsToolName(name: string | undefined): boolean {
+	const n = (name ?? '').trim();
+	return n.startsWith('skills-');
+}

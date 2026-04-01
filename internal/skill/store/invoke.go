@@ -58,13 +58,13 @@ func (s *SkillStore) InvokeSkillTool(
 
 	var funcID string
 	switch toolName {
-	case "skills.load":
+	case "skills-load":
 		funcID = string(agentskillsSpec.FuncIDSkillsLoad)
-	case "skills.unload":
+	case "skills-unload":
 		funcID = string(agentskillsSpec.FuncIDSkillsUnload)
-	case "skills.readresource":
+	case "skills-readresource":
 		funcID = string(agentskillsSpec.FuncIDSkillsReadResource)
-	case "skills.runscript":
+	case "skills-runscript":
 		funcID = string(agentskillsSpec.FuncIDSkillsRunScript)
 	default:
 		return nil, fmt.Errorf("%w: unknown toolName %q", spec.ErrSkillInvalidRequest, toolName)

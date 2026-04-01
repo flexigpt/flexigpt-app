@@ -1,5 +1,40 @@
 {
 	"schemaVersion": "2026-02-10",
-	"bundles": {},
-	"skills": {}
+	"bundles": {
+		"spec-driven-dev": {
+			"schemaVersion": "2026-02-10",
+			"id": "spec-driven-dev",
+			"slug": "spec-driven-dev",
+			"displayName": "Spec Driven Development",
+			"description": "Skills to do spec driven development",
+			"isEnabled": true,
+			"isBuiltIn": true,
+			"createdAt": "2026-02-10T00:00:00Z",
+			"modifiedAt": "2026-02-10T00:00:00Z"
+		}
+	},
+	"skills": {
+		"spec-driven-dev": {
+			"spec-driven-dev": {
+				"schemaVersion": "2026-02-10",
+				"id": "spec-driven-dev",
+				"slug": "spec-driven-dev",
+				"type": "embeddedfs",
+				"location": "spec-driven-dev/spec-driven-dev",
+				"name": "spec-driven-dev",
+				"displayName": "Spec Driven Development",
+				"description": "Spec-first development workflow. Use when a request should be clarified into a concrete spec, implemented from that spec, and verified against explicit requirements with persistent artifacts.",
+				"tags": ["sdd", "builtin"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-02-10T00:00:02Z",
+					"lastSeenAt": "2026-02-10T00:00:02Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-02-10T00:00:02Z",
+				"modifiedAt": "2026-02-10T00:00:02Z"
+			}
+		}
+	}
 }

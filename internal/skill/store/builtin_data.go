@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -128,6 +129,7 @@ func NewBuiltInSkills(
 		},
 	)
 	b.rebuilder.MarkFresh()
+	slog.Info("skills builtin loaded", "bundles", len(b.bundles), "skillsBundles", len(b.skills))
 
 	return b, nil
 }
