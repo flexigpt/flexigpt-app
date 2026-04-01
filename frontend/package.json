@@ -37,7 +37,7 @@
 		"@udecode/cn": "^52.3.4",
 		"class-variance-authority": "^0.7.1",
 		"compromise": "^14.15.0",
-		"isbot": "^5.1.36",
+		"isbot": "^5.1.37",
 		"katex": "^0.16.44",
 		"mermaid": "^11.13.0",
 		"platejs": "^52.3.16",
