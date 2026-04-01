@@ -40,7 +40,7 @@ function BundleCheckbox({
 		<input
 			ref={ref}
 			type="checkbox"
-			className="checkbox checkbox-xs"
+			className="checkbox checkbox-xs rounded-sm"
 			disabled={isInputLocked}
 			checked={checked}
 			onChange={e => {
@@ -89,7 +89,11 @@ export function SkillsBottomBarChip({
 			if (existing) {
 				existing.skills.push(item);
 			} else {
-				map.set(id, { bundleID: id, bundleSlug: item.bundleSlug, skills: [item] });
+				map.set(id, {
+					bundleID: id,
+					bundleSlug: item.bundleSlug,
+					skills: [item],
+				});
 			}
 		}
 		return Array.from(map.values()).sort((a, b) =>
@@ -142,12 +146,6 @@ export function SkillsBottomBarChip({
 		[setEnabledSkillRefs]
 	);
 
-	const enableAndOpen = useCallback(() => {
-		if (isInputLocked) return;
-		onEnableAll();
-		menu.show();
-	}, [isInputLocked, menu, onEnableAll]);
-
 	const containerClassName =
 		(isEnabled
 			? 'bg-warning/10 text-neutral-custom border-warning/50 hover:bg-warning/15'
@@ -163,34 +161,18 @@ export function SkillsBottomBarChip({
 		return lines.join('\n');
 	}, [enabledCount, isEnabled, totalCount]);
 
-	if (loading && totalCount === 0) {
-		// Still show the chip as "Enable skills" so UX is stable.
-	}
-
 	return (
 		<div className={containerClassName} title={title} data-bottom-bar-skills>
-			{/* When disabled: clicking enables all skills and opens menu */}
-			{isEnabled ? (
-				<div className="flex items-center gap-2">
-					<FiZap size={14} />
-					<span className="max-w-24 truncate">Skills</span>
+			<div className="flex items-center gap-2">
+				<FiZap size={14} />
+				<span className="max-w-24 truncate">Skills</span>
+				{loading && totalCount === 0 ? (
+					<span className="text-xs opacity-70">Loading…</span>
+				) : (
 					<span className="text-xs opacity-70">{enabledCount}</span>
-				</div>
-			) : (
-				<button
-					type="button"
-					className="flex items-center gap-2"
-					onClick={enableAndOpen}
-					aria-label="Enable skills"
-					disabled={isInputLocked}
-				>
-					<FiZap size={14} />
-					<span className="max-w-32 truncate">Enable skills</span>
-					{loading ? <span className="text-xs opacity-70">Loading…</span> : null}
-				</button>
-			)}
+				)}
+			</div>
 
-			{/* Disable all (only when enabled) */}
 			{isEnabled ? (
 				<button
 					type="button"
@@ -198,31 +180,21 @@ export function SkillsBottomBarChip({
 					onClick={e => {
 						stop(e);
 						onDisableAll();
-						menu.hide();
 					}}
-					title="Disable all skills"
-					aria-label="Disable all skills"
+					title="Remove all selected skills"
+					aria-label="Remove all selected skills"
 					disabled={isInputLocked}
 				>
 					<FiX size={12} />
 				</button>
 			) : null}
 
-			{/* Dropdown / editor */}
 			<MenuButton
 				store={menu}
 				className="btn btn-ghost btn-xs p-0 shadow-none"
 				aria-label="Choose skills"
 				title="Choose skills"
 				disabled={isInputLocked}
-				onClick={() => {
-					if (isInputLocked) return;
-					// If user opens the menu while disabled, match requested behavior:
-					// enable all skills, then open the menu for deselection.
-					if (!isEnabled) {
-						enableAndOpen();
-					}
-				}}
 			>
 				<FiChevronUp size={14} />
 			</MenuButton>
@@ -246,91 +218,121 @@ export function SkillsBottomBarChip({
 				) : totalCount === 0 ? (
 					<div className="text-base-content/60 cursor-default rounded-xl px-2 py-1 text-sm">No skills available</div>
 				) : (
-					groups.map(group => {
-						const bundleLabel = group.bundleSlug ?? group.bundleID;
-						const bundleRefs = group.skills.map(skillRefFromListItem);
-						const bundleTotal = bundleRefs.length;
-						const bundleEnabled = bundleRefs.filter(r => enabledKeySet.has(skillRefKey(r))).length;
+					<>
+						{groups.map(group => {
+							const bundleLabel = group.bundleSlug ?? group.bundleID;
+							const bundleRefs = group.skills.map(skillRefFromListItem);
+							const bundleTotal = bundleRefs.length;
+							const bundleEnabled = bundleRefs.filter(r => enabledKeySet.has(skillRefKey(r))).length;
 
-						const bundleChecked = bundleEnabled > 0 && bundleEnabled === bundleTotal;
-						const bundleIndeterminate = bundleEnabled > 0 && bundleEnabled < bundleTotal;
+							const bundleChecked = bundleEnabled > 0 && bundleEnabled === bundleTotal;
+							const bundleIndeterminate = bundleEnabled > 0 && bundleEnabled < bundleTotal;
 
-						return (
-							<div key={group.bundleID} className="mb-2 last:mb-0">
-								<MenuItem
-									hideOnClick={false}
-									className="data-active-item:bg-base-200 flex items-center gap-2 rounded-xl px-2 py-1 outline-none"
-									onClick={() => {
-										if (isInputLocked) return;
-										// clicking bundle row toggles between "all on" and "all off"
-										const next = !(bundleEnabled === bundleTotal);
-										setBundleEnabled(group, next);
-									}}
-								>
-									<BundleCheckbox
-										isInputLocked={isInputLocked}
-										checked={bundleChecked}
-										indeterminate={bundleIndeterminate}
-										onChange={next => {
+							return (
+								<div key={group.bundleID} className="mb-2 last:mb-0">
+									<MenuItem
+										hideOnClick={false}
+										className="data-active-item:bg-base-200 flex items-center gap-2 rounded-xl px-2 py-1 outline-none"
+										onClick={() => {
+											if (isInputLocked) return;
+											const next = !(bundleEnabled === bundleTotal);
 											setBundleEnabled(group, next);
 										}}
-									/>
-									<div className="min-w-0 flex-1">
-										<div className="truncate text-xs font-semibold">{bundleLabel}</div>
-										<div className="text-base-content/60 text-xs">
-											{bundleEnabled}/{bundleTotal} enabled
+									>
+										<BundleCheckbox
+											isInputLocked={isInputLocked}
+											checked={bundleChecked}
+											indeterminate={bundleIndeterminate}
+											onChange={next => {
+												setBundleEnabled(group, next);
+											}}
+										/>
+										<div className="min-w-0 flex-1">
+											<div className="truncate text-xs font-semibold">{bundleLabel}</div>
+											<div className="text-base-content/60 text-xs">
+												{bundleEnabled}/{bundleTotal} enabled
+											</div>
 										</div>
-									</div>
-								</MenuItem>
+									</MenuItem>
 
-								<div className="mt-1">
-									{group.skills.map(item => {
-										const ref = skillRefFromListItem(item);
-										const k = skillRefKey(ref);
-										const checked = enabledKeySet.has(k);
+									<div className="mt-1">
+										{group.skills.map(item => {
+											const ref = skillRefFromListItem(item);
+											const k = skillRefKey(ref);
+											const checked = enabledKeySet.has(k);
 
-										const label =
-											item.skillDefinition.displayName && item.skillDefinition.displayName.length > 0
-												? item.skillDefinition.displayName
-												: item.skillSlug;
+											const label =
+												item.skillDefinition.displayName && item.skillDefinition.displayName.length > 0
+													? item.skillDefinition.displayName
+													: item.skillSlug;
 
-										return (
-											<MenuItem
-												key={`${item.bundleID}:${item.skillSlug}`}
-												hideOnClick={false}
-												className="data-active-item:bg-base-200 flex items-center gap-2 rounded-xl px-2 py-1 pl-6 outline-none"
-												onClick={() => {
-													if (isInputLocked) return;
-													toggleSkillItem(item);
-												}}
-											>
-												<input
-													type="checkbox"
-													className="checkbox checkbox-xs"
-													checked={checked}
-													disabled={isInputLocked}
-													onChange={e => {
-														stop(e);
+											return (
+												<MenuItem
+													key={`${item.bundleID}:${item.skillSlug}`}
+													hideOnClick={false}
+													className="data-active-item:bg-base-200 flex items-center gap-2 rounded-xl px-2 py-1 pl-6 outline-none"
+													onClick={() => {
 														if (isInputLocked) return;
-														setSkillEnabled(ref, e.currentTarget.checked);
+														toggleSkillItem(item);
 													}}
-													onPointerDown={stop}
-													onClick={stop}
-													aria-label={`Toggle skill ${label}`}
-												/>
-												<div className="min-w-0 flex-1">
-													<div className="truncate text-xs">{label}</div>
-													<div className="text-base-content/60 truncate text-xs">
-														{item.skillDefinition.type} • {item.skillDefinition.location} • {item.skillDefinition.name}
+												>
+													<input
+														type="checkbox"
+														className="checkbox checkbox-xs rounded-sm"
+														checked={checked}
+														disabled={isInputLocked}
+														onChange={e => {
+															stop(e);
+															if (isInputLocked) return;
+															setSkillEnabled(ref, e.currentTarget.checked);
+														}}
+														onPointerDown={stop}
+														onClick={stop}
+														aria-label={`Toggle skill ${label}`}
+													/>
+													<div className="min-w-0 flex-1">
+														<div className="truncate text-xs">{label}</div>
+														<div className="text-base-content/60 truncate text-xs">
+															{item.skillDefinition.type} • {item.skillDefinition.location} •{' '}
+															{item.skillDefinition.name}
+														</div>
 													</div>
-												</div>
-											</MenuItem>
-										);
-									})}
+												</MenuItem>
+											);
+										})}
+									</div>
 								</div>
-							</div>
-						);
-					})
+							);
+						})}
+
+						<div className="border-base-300 mt-2 flex items-center justify-end gap-2 border-t pt-2">
+							<button
+								type="button"
+								className="btn btn-ghost btn-xs rounded-lg"
+								disabled={isInputLocked || totalCount === 0 || enabledCount === totalCount}
+								onClick={e => {
+									stop(e);
+									onEnableAll();
+								}}
+								title="Select all skills"
+							>
+								Select all
+							</button>
+
+							<button
+								type="button"
+								className="btn btn-ghost btn-xs rounded-lg"
+								disabled={isInputLocked || enabledCount === 0}
+								onClick={e => {
+									stop(e);
+									onDisableAll();
+								}}
+								title="Remove all selected skills"
+							>
+								Remove all
+							</button>
+						</div>
+					</>
 				)}
 			</Menu>
 		</div>

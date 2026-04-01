@@ -1,5 +1,11 @@
 import type { ToolOutputUnion } from '@/spec/tool';
 
+export const SKILLS_AUTOEXEC_TOOL_CHOICES = new Set([
+	'builtin.skills-load',
+	'builtin.skills-unload',
+	'builtin.skills-readresource',
+]);
+
 // Store identity for selection/persistence (NOT runtime identity).
 export interface SkillRef {
 	bundleID: string;

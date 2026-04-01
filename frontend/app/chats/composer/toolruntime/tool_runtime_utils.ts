@@ -1,4 +1,5 @@
 import type { UIToolCall } from '@/spec/inference';
+import { SKILLS_AUTOEXEC_TOOL_CHOICES } from '@/spec/skill';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
 type AutoSubmitTracker = {
@@ -23,7 +24,7 @@ export function isAutoSubmitEligibleToolCall(toolCall: UIToolCall): boolean {
 	return (
 		!toolCall.suppressAutoExecute &&
 		(toolCall.type === ToolStoreChoiceType.Function || toolCall.type === ToolStoreChoiceType.Custom) &&
-		Boolean(toolCall.toolStoreChoice?.autoExecute)
+		(Boolean(toolCall.toolStoreChoice?.autoExecute) || SKILLS_AUTOEXEC_TOOL_CHOICES.has(toolCall.choiceID))
 	);
 }
 
