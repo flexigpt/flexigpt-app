@@ -4,7 +4,7 @@ import { ensureMakeID } from '@/lib/uuid_utils';
 
 import { initConversation } from '@/chats/conversation/hydration_helper';
 
-export const MAX_TABS = 8;
+export const MAX_TABS = 16;
 
 export type ChatTabState = {
 	tabId: string;

@@ -1,12 +1,12 @@
 {
 	"schemaVersion": "2026-02-10",
 	"bundles": {
-		"spec-driven-dev": {
+		"software-dev": {
 			"schemaVersion": "2026-02-10",
-			"id": "spec-driven-dev",
-			"slug": "spec-driven-dev",
-			"displayName": "Spec Driven Development",
-			"description": "Skills to do spec driven development",
+			"id": "software-dev",
+			"slug": "software-dev",
+			"displayName": "Software Development",
+			"description": "Software Development Lifecycle Skills",
 			"isEnabled": true,
 			"isBuiltIn": true,
 			"createdAt": "2026-02-10T00:00:00Z",
@@ -14,17 +14,77 @@
 		}
 	},
 	"skills": {
-		"spec-driven-dev": {
+		"software-dev": {
+			"designing-system-architecture": {
+				"schemaVersion": "2026-02-10",
+				"id": "designing-system-architecture",
+				"slug": "designing-system-architecture",
+				"type": "embeddedfs",
+				"location": "software-dev/designing-system-architecture",
+				"name": "designing-system-architecture",
+				"displayName": "Designing System Architecture",
+				"description": "Guides system architecture decisions, domain boundary mapping, and event-driven pattern evaluation for new systems or major changes. Use when the user needs to choose or evaluate structure, clarify bounded contexts and integration ownership, or assess whether CQRS, event sourcing, or sagas are justified. Compares options from simplest to most complex and outputs ADR-ready decisions.",
+				"tags": ["software-dev", "builtin", "architecture"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-02-10T00:00:02Z",
+					"lastSeenAt": "2026-02-10T00:00:02Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-02-10T00:00:02Z",
+				"modifiedAt": "2026-02-10T00:00:02Z"
+			},
+			"refactoring-code": {
+				"schemaVersion": "2026-02-10",
+				"id": "refactoring-code",
+				"slug": "refactoring-code",
+				"type": "embeddedfs",
+				"location": "software-dev/refactoring-code",
+				"name": "refactoring-code",
+				"displayName": "Refactoring Code",
+				"description": "Selects and performs bounded, behavior-preserving refactors or legacy-containment slices that reduce complexity, duplication, coupling, and change risk without turning into a rewrite. Use when the user asks to refactor code, clean up a risky module, modernize a legacy area safely, or decide what technical debt slice to tackle next.",
+				"tags": ["software-dev", "builtin", "refactor"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-02-10T00:00:02Z",
+					"lastSeenAt": "2026-02-10T00:00:02Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-02-10T00:00:02Z",
+				"modifiedAt": "2026-02-10T00:00:02Z"
+			},
+			"reviewing-code": {
+				"schemaVersion": "2026-02-10",
+				"id": "reviewing-code",
+				"slug": "reviewing-code",
+				"type": "embeddedfs",
+				"location": "software-dev/reviewing-code",
+				"name": "reviewing-code",
+				"displayName": "Reviewing Code",
+				"description": "Reviews code, diffs, pull requests, modules, and API/config surfaces for bugs, security flaws, reliability issues, performance/scalability risks, maintainability hazards, and misuse-enabling designs. Use when the user asks to review code, find bugs, audit merge safety, verify a fix, or assess whether an interface is safe to use.",
+				"tags": ["software-dev", "builtin", "review"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-02-10T00:00:02Z",
+					"lastSeenAt": "2026-02-10T00:00:02Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-02-10T00:00:02Z",
+				"modifiedAt": "2026-02-10T00:00:02Z"
+			},
 			"spec-driven-dev": {
 				"schemaVersion": "2026-02-10",
 				"id": "spec-driven-dev",
 				"slug": "spec-driven-dev",
 				"type": "embeddedfs",
-				"location": "spec-driven-dev/spec-driven-dev",
+				"location": "software-dev/spec-driven-dev",
 				"name": "spec-driven-dev",
 				"displayName": "Spec Driven Development",
 				"description": "Spec-first development workflow. Use when a request should be clarified into a concrete spec, implemented from that spec, and verified against explicit requirements with persistent artifacts.",
-				"tags": ["sdd", "builtin"],
+				"tags": ["software-dev", "builtin", "spec-driven-dev"],
 				"presence": {
 					"status": "present",
 					"lastCheckedAt": "2026-02-10T00:00:02Z",

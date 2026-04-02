@@ -2,6 +2,8 @@
 
 ## Laundry list
 
+- [ ] lots of persona like templates can be added for sys prompt templates.
+
 - [ ] Skill
   - [ ] include some builtin skills and test on all platforms, full flow.
     - [x] include spec driven dev
