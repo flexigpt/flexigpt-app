@@ -187,13 +187,75 @@ func (att *Attachment) PopulateRef(ctx context.Context, replaceOrig bool) error 
 
 func (att *Attachment) GetTextBlockWithDisplayNameOnly(suffix string) (*ContentBlock, error) {
 	if txt := att.formatAsDisplayName(); txt != "" {
-		txt += " " + strings.TrimSpace(suffix)
-		return &ContentBlock{
+		if suffix = strings.TrimSpace(suffix); suffix != "" {
+			txt += " " + suffix
+		}
+
+		cb := &ContentBlock{
 			Kind: ContentBlockText,
 			Text: &txt,
-		}, nil
+		}
+		att.populateContentBlockSource(cb)
+
+		return cb, nil
 	}
 	return nil, errors.New("invalid attachment mode")
+}
+
+func (att *Attachment) populateContentBlockSource(cb *ContentBlock) {
+	if att == nil || cb == nil {
+		return
+	}
+
+	switch att.Kind {
+	case AttachmentFile:
+		if att.FileRef == nil {
+			return
+		}
+
+		path := strings.TrimSpace(att.FileRef.Path)
+		name := strings.TrimSpace(att.FileRef.Name)
+		if name == "" && path != "" {
+			name = filepath.Base(path)
+		}
+
+		if path != "" {
+			cb.FilePath = &path
+		}
+		if name != "" {
+			cb.FileName = &name
+		}
+
+	case AttachmentImage:
+		if att.ImageRef == nil {
+			return
+		}
+
+		path := strings.TrimSpace(att.ImageRef.Path)
+		name := strings.TrimSpace(att.ImageRef.Name)
+		if name == "" && path != "" {
+			name = filepath.Base(path)
+		}
+
+		if path != "" {
+			cb.FilePath = &path
+		}
+		if name != "" {
+			cb.FileName = &name
+		}
+
+	case AttachmentURL:
+		if att.URLRef == nil {
+			return
+		}
+
+		rawURL := strings.TrimSpace(att.URLRef.URL)
+		if rawURL != "" {
+			cb.URL = &rawURL
+		}
+	default:
+		return
+	}
 }
 
 // formatAsDisplayName normalizes an attachment into a short, human-readable

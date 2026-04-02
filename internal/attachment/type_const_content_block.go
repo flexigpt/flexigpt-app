@@ -35,13 +35,15 @@ const (
 type ContentBlock struct {
 	Kind AttachmentContentBlockKind `json:"kind"`
 
-	// For Kind == text: Text, MIMEType and FileName are populated when read from local file.
-	// For URL based text attachments, Filename will not be present, MIMEType _may_ be present.
+	// For Kind == text: Text, MIMEType, FileName and FilePath are populated when read from local file.
+	// For URL based text attachments, URL will be present and MIMEType _may_ be present.
 	Text     *string `json:"text,omitempty"`
 	MIMEType *string `json:"mimeType,omitempty"`
 	FileName *string `json:"fileName,omitempty"`
+	FilePath *string `json:"filePath,omitempty"`
 
-	// For Kind == image or file: Base64Data will be populated for local file.
+	// For Kind == image or file: Base64Data is populated for local attachments.
+	// FileName and FilePath are populated for local attachments when available.
 	// For URL based attachments, Base64Data may or may not be present depending on AttachmentMode.
 	Base64Data *string `json:"base64Data,omitempty"`
 

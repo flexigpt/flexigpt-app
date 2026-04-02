@@ -218,11 +218,13 @@ func (ref *FileRef) getTextFileContent(
 
 	mStr := string(mimeType)
 	fname := filepath.Base(path)
+	filePath := path
 	return &ContentBlock{
 		Kind:     ContentBlockText,
 		Text:     &tItem.Text,
 		MIMEType: &mStr,
 		FileName: &fname,
+		FilePath: &filePath,
 	}, nil
 }
 
@@ -245,11 +247,13 @@ func (ref *FileRef) getBinaryFileContent(
 	fItem := toolOut[0].FileItem
 
 	mStr := string(mimeType)
+	filePath := path
 
 	return &ContentBlock{
 		Kind:       ContentBlockFile,
 		Base64Data: &fItem.FileData,
 		MIMEType:   &mStr,
 		FileName:   &fItem.FileName,
+		FilePath:   &filePath,
 	}, nil
 }

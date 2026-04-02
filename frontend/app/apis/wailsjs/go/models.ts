@@ -5,6 +5,7 @@ export namespace attachment {
 	    text?: string;
 	    mimeType?: string;
 	    fileName?: string;
+	    filePath?: string;
 	    base64Data?: string;
 	    url?: string;
 	
@@ -18,6 +19,7 @@ export namespace attachment {
 	        this.text = source["text"];
 	        this.mimeType = source["mimeType"];
 	        this.fileName = source["fileName"];
+	        this.filePath = source["filePath"];
 	        this.base64Data = source["base64Data"];
 	        this.url = source["url"];
 	    }

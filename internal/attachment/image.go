@@ -102,10 +102,17 @@ func buildImageBlockFromLocal(ctx context.Context, path string) (*ContentBlock, 
 		return nil, errors.Join(ErrUnreadableFile, err)
 	}
 
-	return &ContentBlock{
+	cb := &ContentBlock{
 		Kind:       ContentBlockImage,
 		Base64Data: &toolOut.Base64Data,
 		MIMEType:   &toolOut.MIMEType,
 		FileName:   &toolOut.Name,
-	}, nil
+	}
+
+	filePath := strings.TrimSpace(path)
+	if filePath != "" {
+		cb.FilePath = &filePath
+	}
+
+	return cb, nil
 }

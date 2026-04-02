@@ -118,6 +118,7 @@ interface ContentBlock {
 
 	mimeType?: string;
 	fileName?: string;
+	filePath?: string;
 	base64Data?: string;
 	url?: string;
 }

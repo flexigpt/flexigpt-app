@@ -3,6 +3,8 @@
 ## Laundry list
 
 - [ ] lots of persona like templates can be added for sys prompt templates.
+- [ ] better software assistant using new skills.
+- [ ] file level only software dev flow, guidance in tool that if replace text doesnt work fall to file based things. also parallell work doing is not follwoed. need to be explicit.
 
 - [ ] Skill
   - [ ] include some builtin skills and test on all platforms, full flow.
@@ -86,7 +88,7 @@
 ## Observations
 
 - take some action
-  - [ ] attachments need to include absolute path most probably. think through and see how to fit it. tool calls need some way to say that start from this.
+  - [x] attachments need to include absolute path most probably. think through and see how to fit it. tool calls need some way to say that start from this.
 
 - openai tool loop
   - [ ] openai tool calls does a deep dive a lot, for flexigpt, it goes from backend to frontend to others. i think there needs to be a way to control its spread. most probably need to have a way to say that do step by step, and identify domains and then do things etc.

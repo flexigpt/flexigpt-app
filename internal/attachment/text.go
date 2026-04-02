@@ -5,21 +5,41 @@ import (
 )
 
 func FormatTextBlockForLLM(b ContentBlock) (string, error) {
-	if b.FileName == nil && b.URL == nil && b.Text == nil {
+	filePath := ""
+	if b.FilePath != nil {
+		filePath = strings.TrimSpace(*b.FilePath)
+	}
+
+	fileName := ""
+	if b.FileName != nil {
+		fileName = strings.TrimSpace(*b.FileName)
+	}
+
+	blockURL := ""
+	if b.URL != nil {
+		blockURL = strings.TrimSpace(*b.URL)
+	}
+
+	if filePath == "" && fileName == "" && blockURL == "" && b.Text == nil {
 		return "", nil
 	}
 
 	var sb strings.Builder
 
 	sb.WriteString("<<<FILE")
-	if b.FileName != nil {
+	switch {
+	case filePath != "":
+		sb.WriteString(` path="`)
+		sb.WriteString(filePath) // no escaping
+		sb.WriteString(`"`)
+	case fileName != "":
 		sb.WriteString(` name="`)
-		sb.WriteString(*b.FileName) // no escaping
+		sb.WriteString(fileName) // no escaping
 		sb.WriteString(`"`)
 	}
-	if b.URL != nil {
+	if blockURL != "" {
 		sb.WriteString(` url="`)
-		sb.WriteString(*b.URL) // no escaping
+		sb.WriteString(blockURL) // no escaping
 		sb.WriteString(`"`)
 	}
 	sb.WriteString(">>>\n")
