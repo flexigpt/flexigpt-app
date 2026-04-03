@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
-import { FiChevronUp, FiX, FiZap } from 'react-icons/fi';
+import { FiCheck, FiChevronDown, FiChevronUp, FiX, FiZap } from 'react-icons/fi';
 
-import { Menu, MenuButton, MenuItem, useMenuStore } from '@ariakit/react';
+import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import type { SkillListItem, SkillRef } from '@/spec/skill';
 
@@ -72,6 +72,8 @@ export function SkillsBottomBarChip({
 	isInputLocked?: boolean;
 }) {
 	const menu = useMenuStore({ placement: 'top-end', focusLoop: true });
+	const open = useStoreState(menu, 'open');
+
 	useEffect(() => {
 		if (isInputLocked) menu.hide();
 	}, [isInputLocked, menu]);
@@ -146,13 +148,6 @@ export function SkillsBottomBarChip({
 		[setEnabledSkillRefs]
 	);
 
-	const containerClassName =
-		(isEnabled
-			? 'bg-warning/10 text-neutral-custom border-warning/50 hover:bg-warning/15'
-			: 'bg-base-200 text-neutral-custom border-0 hover:bg-base-300/80') +
-		(isInputLocked ? ' opacity-60' : '') +
-		' flex items-center gap-1 rounded-2xl border px-2 py-0';
-
 	const title = useMemo(() => {
 		const lines: string[] = [];
 		lines.push('Skills');
@@ -162,51 +157,39 @@ export function SkillsBottomBarChip({
 	}, [enabledCount, isEnabled, totalCount]);
 
 	return (
-		<div className={containerClassName} title={title} data-bottom-bar-skills>
-			<div className="flex items-center gap-2">
-				<FiZap size={14} />
-				<span className="max-w-24 truncate">Skills</span>
-				{loading && totalCount === 0 ? (
-					<span className="text-xs opacity-70">Loading…</span>
-				) : (
-					<span className="text-xs opacity-70">{enabledCount}</span>
-				)}
-			</div>
-
-			{isEnabled ? (
-				<button
-					type="button"
-					className="btn btn-ghost btn-xs p-0 shadow-none"
-					onClick={e => {
-						stop(e);
-						onDisableAll();
-					}}
-					title="Remove all selected skills"
-					aria-label="Remove all selected skills"
-					disabled={isInputLocked}
-				>
-					<FiX size={12} />
-				</button>
-			) : null}
-
+		<div className="relative" title={title} data-bottom-bar-skills>
 			<MenuButton
 				store={menu}
-				className="btn btn-ghost btn-xs p-0 shadow-none"
+				className={
+					`btn btn-xs text-neutral-custom bg-base-200/70 hover:bg-base-300/80 h-7 min-h-0 items-center gap-1 overflow-hidden rounded-full border-none px-2 text-center text-nowrap shadow-none` +
+					(open ? ' bg-base-300/80' : '') +
+					(isInputLocked ? ' opacity-60' : '')
+				}
 				aria-label="Choose skills"
-				title="Choose skills"
+				title={title}
 				disabled={isInputLocked}
 			>
-				<FiChevronUp size={14} />
+				<FiZap size={14} className="shrink-0" />
+				<span className="max-w-24 truncate text-xs font-normal">Skills</span>
+
+				{loading && totalCount === 0 && !isEnabled ? <span className="text-[10px] opacity-70">Loading…</span> : null}
+
+				{isEnabled ? (
+					<span className="bg-success/15 text-success rounded-full px-1.5 py-0.5 text-[10px]">{enabledCount}</span>
+				) : null}
+
+				{isEnabled ? <FiCheck size={14} className="shrink-0" /> : <FiX size={14} className="shrink-0" />}
+				{open ? <FiChevronDown size={14} className="shrink-0" /> : <FiChevronUp size={14} className="shrink-0" />}
 			</MenuButton>
 
 			<Menu
 				store={menu}
 				gutter={6}
-				className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-72 min-w-96 overflow-y-auto border p-2 shadow-xl"
+				className="border-base-300 bg-base-100 text-base-content z-50 max-h-80 min-w-96 overflow-y-auto rounded-xl border p-2 text-xs shadow-lg outline-none"
 				autoFocusOnShow
 				portal
 			>
-				<div className="mb-2 flex items-center justify-between gap-2">
+				<div className="mb-2 flex items-center justify-between gap-2 px-1">
 					<div className="text-base-content/70 text-xs font-semibold">Skills</div>
 					<div className="text-base-content/60 text-xs">
 						{enabledCount}/{totalCount} enabled
