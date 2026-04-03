@@ -351,18 +351,18 @@ func (ps *ProviderSetAPI) FetchCompletion(
 			ps.logger.Warn("getSkillsPrompt failed; disabling skills for this turn", "err", perr)
 		}
 
-		xmlResp := ""
+		skillsPrompt := ""
 		if promptResp != nil && promptResp.Body != nil {
-			xmlResp = strings.TrimSpace(promptResp.Body.XML)
+			skillsPrompt = strings.TrimSpace(promptResp.Body.Prompt)
 		}
 
-		// Only expose skills tools if we also have the XML prompt.
-		if xmlResp != "" {
+		// Only expose skills tools if we also have the prompt.
+		if skillsPrompt != "" {
 			includeAllTools := activeCount > 0
 			modelParam.SystemPrompt = appendToSystemPrompt(
 				modelParam.SystemPrompt,
 				skillsRulesPrompt(includeAllTools, ps.skillsRunScriptEnabled),
-				xmlResp,
+				skillsPrompt,
 			)
 			// Tool choices:
 			// - if none active => only skills-load

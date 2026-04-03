@@ -384,7 +384,7 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 		mustNotHaveRuntimeItemBySlug(t, inactive, spec.SkillSlug("user-hello"))
 	}
 
-	// Prompt XML: must contain active bodies and inactive metadata.
+	// Prompt: must contain active bodies and inactive metadata.
 	promptResp, err := s.GetSkillsPrompt(ctx, &spec.GetSkillsPromptRequest{
 		Body: &spec.GetSkillsPromptRequestBody{
 			Filter: &spec.RuntimeSkillFilter{
@@ -396,11 +396,11 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 	if err != nil {
 		t.Fatalf("GetSkillsPrompt: %v", err)
 	}
-	xml := promptResp.Body.XML
-	mustContain(t, xml, "BI_HELLO_BODY_MARKER")
-	mustContain(t, xml, "USER_HELLO_BODY_MARKER")
-	mustContain(t, xml, "USER other frontmatter description")
-	mustContain(t, xml, userOtherDir)
+	prompt := promptResp.Body.Prompt
+	mustContain(t, prompt, "BI_HELLO_BODY_MARKER")
+	mustContain(t, prompt, "USER_HELLO_BODY_MARKER")
+	mustContain(t, prompt, "USER other frontmatter description")
+	mustContain(t, prompt, userOtherDir)
 
 	// Disable user bundle -> runtime should remove its skills and prune them from the session.
 	if _, err := s.PatchSkillBundle(ctx, &spec.PatchSkillBundleRequest{

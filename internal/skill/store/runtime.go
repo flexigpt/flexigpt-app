@@ -214,7 +214,7 @@ func (s *SkillStore) GetSkillsPrompt(
 			// treat it as "no skills allowed" (not "all skills").
 			if len(res.AllowDefs) == 0 {
 				return &spec.GetSkillsPromptResponse{
-					Body: &spec.GetSkillsPromptResponseBody{XML: ""},
+					Body: &spec.GetSkillsPromptResponseBody{Prompt: ""},
 				}, nil
 			}
 			allow = res.AllowDefs
@@ -228,12 +228,12 @@ func (s *SkillStore) GetSkillsPrompt(
 			Activity:       f.Activity,
 		}
 	}
-	xml, err := s.runtime.SkillsPrompt(ctx, filter)
+	prompt, err := s.runtime.SkillsPrompt(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
 	return &spec.GetSkillsPromptResponse{
-		Body: &spec.GetSkillsPromptResponseBody{XML: xml},
+		Body: &spec.GetSkillsPromptResponseBody{Prompt: prompt},
 	}, nil
 }
 

@@ -177,7 +177,7 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 			Body: { filter: filter as spec.RuntimeSkillFilter } as spec.GetSkillsPromptRequestBody,
 		} as spec.GetSkillsPromptRequest;
 		const resp = await GetSkillsPrompt(req);
-		return resp?.Body?.xml || '';
+		return resp?.Body?.prompt || '';
 	}
 
 	async createSkillSession(

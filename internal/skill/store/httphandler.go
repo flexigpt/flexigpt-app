@@ -107,10 +107,10 @@ func InitSkillStoreHandlers(api huma.API, store *SkillStore) {
 	}, store.CloseSkillSession)
 
 	huma.Register(api, huma.Operation{
-		OperationID: "get-skills-prompt-xml",
+		OperationID: "get-skills-prompt",
 		Method:      http.MethodPost,
-		Path:        skillPathPrefix + "/runtime/promptxml",
-		Summary:     "Get skills prompt XML (runtime)",
+		Path:        skillPathPrefix + "/runtime/prompt",
+		Summary:     "Get skills prompt (runtime)",
 		Tags:        []string{skillRuntimeTag},
 	}, store.GetSkillsPrompt)
 

@@ -17,7 +17,7 @@ type GetSkillsPromptRequest struct {
 }
 
 type GetSkillsPromptResponseBody struct {
-	XML string `json:"xml"`
+	Prompt string `json:"prompt"`
 }
 
 type GetSkillsPromptResponse struct {

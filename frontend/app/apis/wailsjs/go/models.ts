@@ -3500,7 +3500,7 @@ export namespace spec {
 	}
 	
 	export class GetSkillsPromptResponseBody {
-	    xml: string;
+	    prompt: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new GetSkillsPromptResponseBody(source);
@@ -3508,7 +3508,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.xml = source["xml"];
+	        this.prompt = source["prompt"];
 	    }
 	}
 	export class GetSkillsPromptResponse {
