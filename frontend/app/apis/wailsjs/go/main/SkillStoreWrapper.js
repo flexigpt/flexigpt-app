@@ -22,8 +22,8 @@ export function GetSkill(arg1) {
   return window['go']['main']['SkillStoreWrapper']['GetSkill'](arg1);
 }
 
-export function GetSkillsPromptXML(arg1) {
-  return window['go']['main']['SkillStoreWrapper']['GetSkillsPromptXML'](arg1);
+export function GetSkillsPrompt(arg1) {
+  return window['go']['main']['SkillStoreWrapper']['GetSkillsPrompt'](arg1);
 }
 
 export function InvokeSkillTool(arg1) {

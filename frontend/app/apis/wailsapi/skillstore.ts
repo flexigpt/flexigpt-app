@@ -19,7 +19,7 @@ import {
 	DeleteSkill,
 	DeleteSkillBundle,
 	GetSkill,
-	GetSkillsPromptXML,
+	GetSkillsPrompt,
 	InvokeSkillTool,
 	ListRuntimeSkills,
 	ListSkillBundles,
@@ -172,11 +172,11 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 		return resp?.Body as Skill;
 	}
 
-	async getSkillsPromptXML(filter?: RuntimeSkillFilter): Promise<string> {
+	async getSkillsPrompt(filter?: RuntimeSkillFilter): Promise<string> {
 		const req = {
-			Body: { filter: filter as spec.RuntimeSkillFilter } as spec.GetSkillsPromptXMLRequestBody,
-		} as spec.GetSkillsPromptXMLRequest;
-		const resp = await GetSkillsPromptXML(req);
+			Body: { filter: filter as spec.RuntimeSkillFilter } as spec.GetSkillsPromptRequestBody,
+		} as spec.GetSkillsPromptRequest;
+		const resp = await GetSkillsPrompt(req);
 		return resp?.Body?.xml || '';
 	}
 

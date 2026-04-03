@@ -8,20 +8,20 @@ import (
 // JSONRawString mirrors the ToolRuntime API style; it's a raw JSON string.
 type JSONRawString = string
 
-type GetSkillsPromptXMLRequestBody struct {
+type GetSkillsPromptRequestBody struct {
 	Filter *RuntimeSkillFilter `json:"filter,omitempty"`
 }
 
-type GetSkillsPromptXMLRequest struct {
-	Body *GetSkillsPromptXMLRequestBody
+type GetSkillsPromptRequest struct {
+	Body *GetSkillsPromptRequestBody
 }
 
-type GetSkillsPromptXMLResponseBody struct {
+type GetSkillsPromptResponseBody struct {
 	XML string `json:"xml"`
 }
 
-type GetSkillsPromptXMLResponse struct {
-	Body *GetSkillsPromptXMLResponseBody
+type GetSkillsPromptResponse struct {
+	Body *GetSkillsPromptResponseBody
 }
 
 type CreateSkillSessionRequestBody struct {

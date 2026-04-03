@@ -335,8 +335,8 @@ func (ps *ProviderSetAPI) FetchCompletion(
 			promptActivity = agentskillsSpec.SkillActivityAny
 		}
 
-		promptResp, perr := ps.skillStore.GetSkillsPromptXML(ctx, &skillSpec.GetSkillsPromptXMLRequest{
-			Body: &skillSpec.GetSkillsPromptXMLRequestBody{
+		promptResp, perr := ps.skillStore.GetSkillsPrompt(ctx, &skillSpec.GetSkillsPromptRequest{
+			Body: &skillSpec.GetSkillsPromptRequestBody{
 				Filter: &skillSpec.RuntimeSkillFilter{
 					SessionID:      agentskillsSpec.SessionID(skillSessionID),
 					Activity:       promptActivity,
@@ -348,7 +348,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 			if errors.Is(perr, agentskillsSpec.ErrSessionNotFound) {
 				return nil, fmt.Errorf("skill session %q not found", skillSessionID)
 			}
-			ps.logger.Warn("getSkillsPromptXML failed; disabling skills for this turn", "err", perr)
+			ps.logger.Warn("getSkillsPrompt failed; disabling skills for this turn", "err", perr)
 		}
 
 		xmlResp := ""
@@ -961,29 +961,15 @@ func decodeToolArgSchema(raw toolSpec.JSONRawString) (map[string]any, error) {
 }
 
 func skillsRulesPrompt(includeAll, includeRunScript bool) string {
-	var tools []string
-	tools = append(tools, "- skills-load")
-	if includeAll {
-		tools = append(tools, "- skills-unload", "- skills-readresource")
-		if includeRunScript {
-			tools = append(tools, "- skills-runscript")
-		}
-	}
-
-	extra := ""
 	if !includeAll {
-		extra = "\nThis turn only exposes skills-load. After you load at least one skill, more skills tools may be available.\n"
+		return agentskillsSpec.SkillsRulesPromptLoadOnly
 	}
 
-	return strings.TrimSpace(fmt.Sprintf(`
-You have access to "skills" tools:
-%s
-%s
-Rules:
-1) Only use skills that are listed in the provided skills XML prompt.
-2) Prefer reading skill resources (skills-readresource) before running scripts.
-3) After calling skills-load or skills-unload, rely on the updated skills context in subsequent turns.
-`, strings.Join(tools, "\n"), strings.TrimSpace(extra)))
+	if !includeRunScript {
+		return agentskillsSpec.SkillsRulesPromptWithoutRunScript
+	}
+
+	return agentskillsSpec.SkillsRulesPromptAll
 }
 
 func appendToSystemPrompt(base string, parts ...string) string {

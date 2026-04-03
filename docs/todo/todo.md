@@ -2,9 +2,8 @@
 
 ## Laundry list
 
-- [ ] lots of persona like templates can be added for sys prompt templates.
 - [ ] better software assistant using new skills.
-- [ ] file level only software dev flow, guidance in tool that if replace text doesnt work fall to file based things. also parallell work doing is not follwoed. need to be explicit.
+- [ ] file level only software dev flow, guidance in tool that if replace text doesnt work fall to file based things. also parallell work doing is not followed. need to be explicit.
 
 - [ ] Skill
   - [ ] include some builtin skills and test on all platforms, full flow.
@@ -12,8 +11,6 @@
     - [ ] test with some skill that has scripts too
   - [x] with the number of skills present, maybe we dont want to enable all on click for the enable skills button, may be have a button at bottom on open that says enable all separately. also show collapsed bundles at start and then expanding if needed.
   - [x] enable autoexec for load/unload/readresource
-
-  - [ ] in skills world, especially with artifact driven dev, we can almost get away with without sending a lot of things again and again, latest context and last 1/2 chats. attachments may pose a problem here, but can be thought through properly so that these things are persisted properly.
 
 ## Features
 
@@ -87,9 +84,6 @@
 
 ## Observations
 
-- take some action
-  - [x] attachments need to include absolute path most probably. think through and see how to fit it. tool calls need some way to say that start from this.
-
 - openai tool loop
   - [ ] openai tool calls does a deep dive a lot, for flexigpt, it goes from backend to frontend to others. i think there needs to be a way to control its spread. most probably need to have a way to say that do step by step, and identify domains and then do things etc.
   - [ ] in a tooling session, there are no parallel tool calls being made for some reason. better force the caller to say that do a bfs kind of tool calls.
@@ -102,6 +96,10 @@
 
 - [ ] I am linking this loop of implementing this using tool template loop (may be skills at some point), and then observing issues, then fixing these, then picking other feature and doing the same.
 - [ ] An inbuilt docs pages and then some ai intro tutorial builtin will be good.
+
+- [ ] in skills world, especially with artifact driven dev, we can almost get away with without sending a lot of things again and again, latest context and last 1/2 chats. attachments may pose a problem here, but can be thought through properly so that these things are persisted properly.
+
+- [ ] lots of persona like templates can be added for sys prompt templates.
 
 ## Other repos thoughts
 

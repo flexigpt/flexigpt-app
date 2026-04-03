@@ -12,7 +12,7 @@ export function DeleteSkillBundle(arg1:spec.DeleteSkillBundleRequest):Promise<sp
 
 export function GetSkill(arg1:spec.GetSkillRequest):Promise<spec.GetSkillResponse>;
 
-export function GetSkillsPromptXML(arg1:spec.GetSkillsPromptXMLRequest):Promise<spec.GetSkillsPromptXMLResponse>;
+export function GetSkillsPrompt(arg1:spec.GetSkillsPromptRequest):Promise<spec.GetSkillsPromptResponse>;
 
 export function InvokeSkillTool(arg1:spec.InvokeSkillToolRequest):Promise<spec.InvokeSkillToolResponse>;
 

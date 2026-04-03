@@ -3438,11 +3438,11 @@ export namespace spec {
 		    return a;
 		}
 	}
-	export class GetSkillsPromptXMLRequestBody {
+	export class GetSkillsPromptRequestBody {
 	    filter?: RuntimeSkillFilter;
 	
 	    static createFrom(source: any = {}) {
-	        return new GetSkillsPromptXMLRequestBody(source);
+	        return new GetSkillsPromptRequestBody(source);
 	    }
 	
 	    constructor(source: any = {}) {
@@ -3468,16 +3468,16 @@ export namespace spec {
 		    return a;
 		}
 	}
-	export class GetSkillsPromptXMLRequest {
-	    Body?: GetSkillsPromptXMLRequestBody;
+	export class GetSkillsPromptRequest {
+	    Body?: GetSkillsPromptRequestBody;
 	
 	    static createFrom(source: any = {}) {
-	        return new GetSkillsPromptXMLRequest(source);
+	        return new GetSkillsPromptRequest(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Body = this.convertValues(source["Body"], GetSkillsPromptXMLRequestBody);
+	        this.Body = this.convertValues(source["Body"], GetSkillsPromptRequestBody);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -3499,11 +3499,11 @@ export namespace spec {
 		}
 	}
 	
-	export class GetSkillsPromptXMLResponseBody {
+	export class GetSkillsPromptResponseBody {
 	    xml: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new GetSkillsPromptXMLResponseBody(source);
+	        return new GetSkillsPromptResponseBody(source);
 	    }
 	
 	    constructor(source: any = {}) {
@@ -3511,16 +3511,16 @@ export namespace spec {
 	        this.xml = source["xml"];
 	    }
 	}
-	export class GetSkillsPromptXMLResponse {
-	    Body?: GetSkillsPromptXMLResponseBody;
+	export class GetSkillsPromptResponse {
+	    Body?: GetSkillsPromptResponseBody;
 	
 	    static createFrom(source: any = {}) {
-	        return new GetSkillsPromptXMLResponse(source);
+	        return new GetSkillsPromptResponse(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Body = this.convertValues(source["Body"], GetSkillsPromptXMLResponseBody);
+	        this.Body = this.convertValues(source["Body"], GetSkillsPromptResponseBody);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

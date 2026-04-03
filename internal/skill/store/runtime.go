@@ -190,10 +190,10 @@ func (s *SkillStore) CloseSkillSession(
 	return &spec.CloseSkillSessionResponse{}, nil
 }
 
-func (s *SkillStore) GetSkillsPromptXML(
+func (s *SkillStore) GetSkillsPrompt(
 	ctx context.Context,
-	req *spec.GetSkillsPromptXMLRequest,
-) (resp *spec.GetSkillsPromptXMLResponse, err error) {
+	req *spec.GetSkillsPromptRequest,
+) (resp *spec.GetSkillsPromptResponse, err error) {
 	if s.runtime == nil {
 		return nil, fmt.Errorf("%w: runtime not configured", spec.ErrSkillInvalidRequest)
 	}
@@ -213,8 +213,8 @@ func (s *SkillStore) GetSkillsPromptXML(
 			// IMPORTANT: if caller provided allowSkillRefs but none resolve,
 			// treat it as "no skills allowed" (not "all skills").
 			if len(res.AllowDefs) == 0 {
-				return &spec.GetSkillsPromptXMLResponse{
-					Body: &spec.GetSkillsPromptXMLResponseBody{XML: ""},
+				return &spec.GetSkillsPromptResponse{
+					Body: &spec.GetSkillsPromptResponseBody{XML: ""},
 				}, nil
 			}
 			allow = res.AllowDefs
@@ -228,12 +228,12 @@ func (s *SkillStore) GetSkillsPromptXML(
 			Activity:       f.Activity,
 		}
 	}
-	xml, err := s.runtime.SkillsPromptXML(ctx, filter)
+	xml, err := s.runtime.SkillsPrompt(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
-	return &spec.GetSkillsPromptXMLResponse{
-		Body: &spec.GetSkillsPromptXMLResponseBody{XML: xml},
+	return &spec.GetSkillsPromptResponse{
+		Body: &spec.GetSkillsPromptResponseBody{XML: xml},
 	}, nil
 }
 

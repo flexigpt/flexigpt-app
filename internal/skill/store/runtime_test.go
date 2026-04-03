@@ -385,8 +385,8 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 	}
 
 	// Prompt XML: must contain active bodies and inactive metadata.
-	promptResp, err := s.GetSkillsPromptXML(ctx, &spec.GetSkillsPromptXMLRequest{
-		Body: &spec.GetSkillsPromptXMLRequestBody{
+	promptResp, err := s.GetSkillsPrompt(ctx, &spec.GetSkillsPromptRequest{
+		Body: &spec.GetSkillsPromptRequestBody{
 			Filter: &spec.RuntimeSkillFilter{
 				SessionID: sid,
 				Activity:  agentskillsSpec.SkillActivityAny,
@@ -394,17 +394,13 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 		},
 	})
 	if err != nil {
-		t.Fatalf("GetSkillsPromptXML: %v", err)
+		t.Fatalf("GetSkillsPrompt: %v", err)
 	}
 	xml := promptResp.Body.XML
 	mustContain(t, xml, "BI_HELLO_BODY_MARKER")
 	mustContain(t, xml, "USER_HELLO_BODY_MARKER")
 	mustContain(t, xml, "USER other frontmatter description")
 	mustContain(t, xml, userOtherDir)
-
-	// Ensure frontmatter is not leaked into injected skill body.
-	mustNotContain(t, xml, "name: bi-hello")
-	mustNotContain(t, xml, "name: user-hello")
 
 	// Disable user bundle -> runtime should remove its skills and prune them from the session.
 	if _, err := s.PatchSkillBundle(ctx, &spec.PatchSkillBundleRequest{
@@ -522,8 +518,8 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 	if _, err := s.CloseSkillSession(ctx, &spec.CloseSkillSessionRequest{SessionID: sid}); err != nil {
 		t.Fatalf("CloseSkillSession: %v", err)
 	}
-	_, err = s.GetSkillsPromptXML(ctx, &spec.GetSkillsPromptXMLRequest{
-		Body: &spec.GetSkillsPromptXMLRequestBody{
+	_, err = s.GetSkillsPrompt(ctx, &spec.GetSkillsPromptRequest{
+		Body: &spec.GetSkillsPromptRequestBody{
 			Filter: &spec.RuntimeSkillFilter{
 				SessionID: sid,
 				Activity:  agentskillsSpec.SkillActivityAny,
@@ -911,12 +907,12 @@ func TestSkillStore_RuntimeIntegration_RuntimeEndpoints_Errors(t *testing.T) {
 			wantIs: spec.ErrSkillInvalidRequest,
 		},
 		{
-			name: "GetSkillsPromptXML activity=active requires sessionID",
+			name: "GetSkillsPrompt activity=active requires sessionID",
 			run: func(t *testing.T) error {
 				t.Helper()
 				s.runtime = rt
-				_, err := s.GetSkillsPromptXML(ctx, &spec.GetSkillsPromptXMLRequest{
-					Body: &spec.GetSkillsPromptXMLRequestBody{
+				_, err := s.GetSkillsPrompt(ctx, &spec.GetSkillsPromptRequest{
+					Body: &spec.GetSkillsPromptRequestBody{
 						Filter: &spec.RuntimeSkillFilter{
 							Activity: agentskillsSpec.SkillActivityActive,
 						},

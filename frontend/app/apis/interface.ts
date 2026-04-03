@@ -293,7 +293,7 @@ export interface ISkillStoreAPI {
 	getSkill(bundleID: string, skillSlug: string, includeDisabled: boolean): Promise<Skill | undefined>;
 
 	/** Runtime: get a skills prompt. */
-	getSkillsPromptXML(filter?: RuntimeSkillFilter): Promise<string>;
+	getSkillsPrompt(filter?: RuntimeSkillFilter): Promise<string>;
 
 	/** Runtime: create a skill session. */
 	createSkillSession(

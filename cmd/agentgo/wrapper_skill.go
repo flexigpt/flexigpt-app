@@ -100,11 +100,11 @@ func (s *SkillStoreWrapper) CloseSkillSession(
 	})
 }
 
-func (s *SkillStoreWrapper) GetSkillsPromptXML(
-	req *spec.GetSkillsPromptXMLRequest,
-) (*spec.GetSkillsPromptXMLResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.GetSkillsPromptXMLResponse, error) {
-		return s.store.GetSkillsPromptXML(context.Background(), req)
+func (s *SkillStoreWrapper) GetSkillsPrompt(
+	req *spec.GetSkillsPromptRequest,
+) (*spec.GetSkillsPromptResponse, error) {
+	return middleware.WithRecoveryResp(func() (*spec.GetSkillsPromptResponse, error) {
+		return s.store.GetSkillsPrompt(context.Background(), req)
 	})
 }
 

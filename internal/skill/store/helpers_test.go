@@ -256,13 +256,6 @@ func mustContain(t *testing.T, s, sub string) {
 	}
 }
 
-func mustNotContain(t *testing.T, s, sub string) {
-	t.Helper()
-	if strings.Contains(s, sub) {
-		t.Fatalf("expected output to NOT contain %q; got:\n%s", sub, s)
-	}
-}
-
 func boolPtr(v bool) *bool { return &v }
 func strPtr(v string) *string {
 	return &v
