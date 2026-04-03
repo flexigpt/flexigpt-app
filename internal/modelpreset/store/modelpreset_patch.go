@@ -105,6 +105,7 @@ func hasModelPresetPatchValue(p spec.ModelPresetPatch) bool {
 		p.Reasoning != nil ||
 		p.SystemPrompt != nil ||
 		p.Timeout != nil ||
+		p.CacheControl != nil ||
 		p.OutputParam != nil ||
 		p.StopSequences != nil ||
 		p.AdditionalParametersRawJSON != nil ||
@@ -179,6 +180,9 @@ func applyModelPresetPatch(dst *spec.ModelPreset, body *spec.PatchModelPresetReq
 	}
 	if body.Timeout != nil {
 		dst.Timeout = cloneIntPtr(body.Timeout)
+	}
+	if body.CacheControl != nil {
+		dst.CacheControl = cloneCacheControl(body.CacheControl)
 	}
 	if body.OutputParam != nil {
 		dst.OutputParam = cloneOutputParam(body.OutputParam)

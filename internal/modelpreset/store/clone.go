@@ -73,11 +73,20 @@ func cloneModelPresetPatch(in spec.ModelPresetPatch) spec.ModelPresetPatch {
 		Reasoning:                   cloneReasoningParam(in.Reasoning),
 		SystemPrompt:                cloneStringPtr(in.SystemPrompt),
 		Timeout:                     cloneIntPtr(in.Timeout),
+		CacheControl:                cloneCacheControl(in.CacheControl),
 		OutputParam:                 cloneOutputParam(in.OutputParam),
 		StopSequences:               stopSequences,
 		AdditionalParametersRawJSON: cloneStringPtr(in.AdditionalParametersRawJSON),
 		CapabilitiesOverride:        cloneModelCapabilitiesOverride(in.CapabilitiesOverride),
 	}
+}
+
+func cloneCacheControl(in *inferenceSpec.CacheControl) *inferenceSpec.CacheControl {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	return &out
 }
 
 func cloneReasoningParam(in *inferenceSpec.ReasoningParam) *inferenceSpec.ReasoningParam {
@@ -153,7 +162,37 @@ func cloneModelCapabilitiesOverride(in *spec.ModelCapabilitiesOverride) *spec.Mo
 			MaxForcedTools:            cloneIntPtr(in.ToolCapabilities.MaxForcedTools),
 		}
 	}
+	out.CacheCapabilities = cloneCacheCapabilitiesOverride(in.CacheCapabilities)
 	return out
+}
+
+func cloneCacheCapabilitiesOverride(in *spec.CacheCapabilitiesOverride) *spec.CacheCapabilitiesOverride {
+	if in == nil {
+		return nil
+	}
+	out := &spec.CacheCapabilitiesOverride{
+		SupportsAutomaticCaching: cloneBoolPtr(in.SupportsAutomaticCaching),
+		TopLevel:                 cloneCacheControlCapabilitiesOverride(in.TopLevel),
+		InputOutputContent:       cloneCacheControlCapabilitiesOverride(in.InputOutputContent),
+		ReasoningContent:         cloneCacheControlCapabilitiesOverride(in.ReasoningContent),
+		ToolChoice:               cloneCacheControlCapabilitiesOverride(in.ToolChoice),
+		ToolCall:                 cloneCacheControlCapabilitiesOverride(in.ToolCall),
+		ToolOutput:               cloneCacheControlCapabilitiesOverride(in.ToolOutput),
+	}
+	return out
+}
+
+func cloneCacheControlCapabilitiesOverride(
+	in *spec.CacheControlCapabilitiesOverride,
+) *spec.CacheControlCapabilitiesOverride {
+	if in == nil {
+		return nil
+	}
+	return &spec.CacheControlCapabilitiesOverride{
+		SupportedKinds: slices.Clone(in.SupportedKinds),
+		SupportedTTLs:  slices.Clone(in.SupportedTTLs),
+		SupportsKey:    cloneBoolPtr(in.SupportsKey),
+	}
 }
 
 func cloneStringPtr(p *string) *string {

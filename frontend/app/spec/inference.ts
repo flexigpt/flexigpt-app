@@ -124,6 +124,7 @@ export interface ModelParam {
 	reasoning?: ReasoningParam;
 	systemPrompt: string;
 	timeout: number;
+	cacheControl?: CacheControl;
 	outputParam?: OutputParam;
 	stopSequences?: string[];
 	additionalParametersRawJSON?: string;
@@ -135,8 +136,6 @@ export const DefaultModelParams: ModelParam = {
 	maxPromptLength: 2048,
 	maxOutputLength: 1024,
 	temperature: 0.1,
-	outputParam: undefined,
-	stopSequences: undefined,
 	reasoning: {
 		type: ReasoningType.SingleWithLevels,
 		level: ReasoningLevel.Medium,
@@ -144,6 +143,9 @@ export const DefaultModelParams: ModelParam = {
 	},
 	systemPrompt: '',
 	timeout: 300,
+	cacheControl: undefined,
+	outputParam: undefined,
+	stopSequences: undefined,
 	additionalParametersRawJSON: undefined,
 };
 
@@ -170,13 +172,17 @@ export enum CacheControlKind {
 /**
  * @public
  */
-export interface CacheControlEphemeral {
-	ttl?: string;
+export enum CacheControlTTL {
+	TTL5m = '5m',
+	TTL1h = '1h',
+	TTL24h = '24h',
+	TTLInMemory = 'in-memory',
 }
 
 export interface CacheControl {
 	kind: CacheControlKind;
-	cacheControlEphemeral?: CacheControlEphemeral;
+	ttl?: CacheControlTTL;
+	key?: string;
 }
 
 export enum CitationKind {

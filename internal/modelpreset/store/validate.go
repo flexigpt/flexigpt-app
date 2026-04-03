@@ -101,6 +101,10 @@ func validateModelPreset(mp *spec.ModelPreset) error {
 		return errors.New("timeout must be >= 0")
 	}
 
+	if err := validateCacheControl(mp.CacheControl); err != nil {
+		return fmt.Errorf("invalid cacheControl: %w", err)
+	}
+
 	// Reasoning checks (optional).
 	if mp.Reasoning != nil {
 		if err := validateReasoning(mp.Reasoning); err != nil {
@@ -309,6 +313,100 @@ func validateModelCapabilitiesOverride(o *spec.ModelCapabilitiesOverride) error 
 	if o.ToolCapabilities != nil {
 		if err := validateToolCapabilitiesOverride(o.ToolCapabilities); err != nil {
 			return fmt.Errorf("toolCapabilities: %w", err)
+		}
+	}
+	if o.CacheCapabilities != nil {
+		if err := validateCacheCapabilitiesOverride(o.CacheCapabilities); err != nil {
+			return fmt.Errorf("cacheCapabilities: %w", err)
+		}
+	}
+	return nil
+}
+
+func validateCacheControl(cc *inferenceSpec.CacheControl) error {
+	if cc == nil {
+		return nil
+	}
+	if cc.Kind != "" {
+		switch cc.Kind {
+		case inferenceSpec.CacheControlKindEphemeral:
+		default:
+			return fmt.Errorf("unknown kind %q", cc.Kind)
+		}
+	}
+	if cc.TTL != "" {
+		switch cc.TTL {
+		case inferenceSpec.CacheControlTTL5m,
+			inferenceSpec.CacheControlTTL1h,
+			inferenceSpec.CacheControlTTL24h,
+			inferenceSpec.CacheControlTTLInMemory:
+		default:
+			return fmt.Errorf("unknown ttl %q", cc.TTL)
+		}
+	}
+	return nil
+}
+
+func validateCacheCapabilitiesOverride(o *spec.CacheCapabilitiesOverride) error {
+	if o == nil {
+		return nil
+	}
+	scopes := []struct {
+		name string
+		val  *spec.CacheControlCapabilitiesOverride
+	}{
+		{"topLevel", o.TopLevel},
+		{"inputOutputContent", o.InputOutputContent},
+		{"reasoningContent", o.ReasoningContent},
+		{"toolChoice", o.ToolChoice},
+		{"toolCall", o.ToolCall},
+		{"toolOutput", o.ToolOutput},
+	}
+	for _, s := range scopes {
+		if s.val != nil {
+			if err := validateCacheControlCapabilitiesOverride(s.val); err != nil {
+				return fmt.Errorf("%s: %w", s.name, err)
+			}
+		}
+	}
+	return nil
+}
+
+func validateCacheControlCapabilitiesOverride(o *spec.CacheControlCapabilitiesOverride) error {
+	if o == nil {
+		return nil
+	}
+	if o.SupportedKinds != nil {
+		seen := map[inferenceSpec.CacheControlKind]struct{}{}
+		for i, k := range o.SupportedKinds {
+			switch k {
+			case inferenceSpec.CacheControlKindEphemeral:
+				// OK.
+			default:
+				return fmt.Errorf("supportedKinds[%d] unknown kind %q", i, k)
+			}
+			if _, ok := seen[k]; ok {
+				return fmt.Errorf("supportedKinds[%d] duplicate %q", i, k)
+			}
+			seen[k] = struct{}{}
+		}
+	}
+	if o.SupportedTTLs != nil {
+		seen := map[inferenceSpec.CacheControlTTL]struct{}{}
+		for i, t := range o.SupportedTTLs {
+			switch t {
+			case inferenceSpec.CacheControlTTL5m,
+				inferenceSpec.CacheControlTTL1h,
+				inferenceSpec.CacheControlTTL24h,
+				inferenceSpec.CacheControlTTLInMemory:
+				// OK.
+			default:
+				return fmt.Errorf("supportedTTLs[%d] unknown TTL %q", i, t)
+			}
+			if _, ok := seen[t]; ok {
+				return fmt.Errorf("supportedTTLs[%d] duplicate %q", i, t)
+			}
+			seen[t] = struct{}{}
 		}
 	}
 	return nil

@@ -89,8 +89,9 @@ type ModelPresetPatch struct {
 	SystemPrompt    *string                       `json:"systemPrompt,omitempty"`
 	Timeout         *int                          `json:"timeout,omitempty"`
 
-	OutputParam   *inferenceSpec.OutputParam `json:"outputParam,omitempty"`
-	StopSequences *[]string                  `json:"stopSequences,omitempty"`
+	CacheControl  *inferenceSpec.CacheControl `json:"cacheControl,omitempty"`
+	OutputParam   *inferenceSpec.OutputParam  `json:"outputParam,omitempty"`
+	StopSequences *[]string                   `json:"stopSequences,omitempty"`
 
 	AdditionalParametersRawJSON *string `json:"additionalParametersRawJSON,omitempty"`
 

@@ -1,4 +1,7 @@
 import {
+	type CacheControl,
+	type CacheControlKind,
+	type CacheControlTTL,
 	DefaultModelParams,
 	type ModelParam,
 	type OutputParam,
@@ -64,6 +67,28 @@ export interface ReasoningCapabilitiesOverride {
 /**
  * @public
  */
+export class CacheControlCapabilitiesOverride {
+	supportedKinds?: CacheControlKind[];
+	supportedTTLs?: CacheControlTTL[];
+	supportsKey?: boolean;
+}
+
+/**
+ * @public
+ */
+export class CacheCapabilitiesOverride {
+	supportsAutomaticCaching?: boolean;
+	topLevel?: CacheControlCapabilitiesOverride;
+	inputOutputContent?: CacheControlCapabilitiesOverride;
+	reasoningContent?: CacheControlCapabilitiesOverride;
+	toolChoice?: CacheControlCapabilitiesOverride;
+	toolCall?: CacheControlCapabilitiesOverride;
+	toolOutput?: CacheControlCapabilitiesOverride;
+}
+
+/**
+ * @public
+ */
 export interface ModelCapabilitiesOverride {
 	modalitiesIn?: string[];
 	modalitiesOut?: string[];
@@ -71,6 +96,7 @@ export interface ModelCapabilitiesOverride {
 	stopSequenceCapabilities?: StopSequenceCapabilitiesOverride;
 	outputCapabilities?: OutputCapabilitiesOverride;
 	toolCapabilities?: ToolCapabilitiesOverride;
+	cacheCapabilities?: CacheCapabilitiesOverride;
 }
 
 /**
@@ -86,6 +112,7 @@ export interface ModelPresetPatch {
 	reasoning?: ReasoningParam;
 	systemPrompt?: string;
 	timeout?: number;
+	cacheControl?: CacheControl;
 	additionalParametersRawJSON?: string;
 	capabilitiesOverride?: ModelCapabilitiesOverride;
 }

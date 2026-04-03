@@ -72,6 +72,10 @@
 					},
 					"systemPrompt": "",
 					"timeout": 1800,
+					"cacheControl": {
+						"kind": "ephemeral",
+						"ttl": "5m"
+					},
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"supportedReasoningTypes": ["singleWithLevels"],
@@ -100,6 +104,10 @@
 					},
 					"systemPrompt": "",
 					"timeout": 1800,
+					"cacheControl": {
+						"kind": "ephemeral",
+						"ttl": "5m"
+					},
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"supportedReasoningTypes": ["hybridWithTokens"]
@@ -127,6 +135,10 @@
 					},
 					"systemPrompt": "",
 					"timeout": 1800,
+					"cacheControl": {
+						"kind": "ephemeral",
+						"ttl": "5m"
+					},
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"supportedReasoningTypes": ["hybridWithTokens"]
@@ -154,6 +166,10 @@
 					},
 					"systemPrompt": "",
 					"timeout": 1800,
+					"cacheControl": {
+						"kind": "ephemeral",
+						"ttl": "5m"
+					},
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"supportedReasoningTypes": ["singleWithLevels"],
@@ -182,6 +198,10 @@
 					},
 					"systemPrompt": "",
 					"timeout": 1800,
+					"cacheControl": {
+						"kind": "ephemeral",
+						"ttl": "5m"
+					},
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"supportedReasoningTypes": ["hybridWithTokens"]
@@ -209,6 +229,10 @@
 					},
 					"systemPrompt": "",
 					"timeout": 1800,
+					"cacheControl": {
+						"kind": "ephemeral",
+						"ttl": "5m"
+					},
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -231,6 +255,10 @@
 					},
 					"systemPrompt": "",
 					"timeout": 1800,
+					"cacheControl": {
+						"kind": "ephemeral",
+						"ttl": "5m"
+					},
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"supportedReasoningTypes": ["hybridWithTokens"]

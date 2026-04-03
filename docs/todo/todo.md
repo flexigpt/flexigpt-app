@@ -3,7 +3,10 @@
 ## Laundry list
 
 - [ ] better software assistant using new skills.
-- [ ] file level only software dev flow, guidance in tool that if replace text doesnt work fall to file based things. also parallell work doing is not followed. need to be explicit.
+  - [ ] file level only software dev flow, guidance in tool that if replace text doesnt work fall to file based things. also parallell work doing is not followed. need to be explicit.
+  - [ ] one single shot assistant that asks for changes in one shot and write to files.
+  - [ ] one discovery and edit assistant that first discovers things, then confirms and then single shot edit. A slight separation of spec driven dev.
+  - [ ] one discovery only assistant that first discovers things via searches, questions etc. may see if this is jsut a phase of above via some skill or different assistant.
 
 - [ ] Skill
   - [ ] include some builtin skills and test on all platforms, full flow.
@@ -12,14 +15,16 @@
   - [x] with the number of skills present, maybe we dont want to enable all on click for the enable skills button, may be have a button at bottom on open that says enable all separately. also show collapsed bundles at start and then expanding if needed.
   - [x] enable autoexec for load/unload/readresource
 
-## Features
-
 - [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls loop is better.
-  - [ ] this is a "feature" in anthropic and chargeable for cache write.
-  - [ ] implement this after feature filters support and additional param support features in apis.
+  - [x] this is a "feature" in anthropic and chargeable for cache write.
+  - [x] implement this after feature filters support and additional param support features in apis.
+  - [x] hook in inference
+  - [x] adopt as a preset param
+  - [ ] adopt in ui with defaults
 
-- [ ] Tool calls
-  - [ ] Some calls like editor replace text, create files, etc can be visually represented better via custom elements representing each.
+- [ ] tools issues
+  - [x] flatpak shell path issue. need hostspawn support in llm tools.
+  - [ ] test on flatpak, mac pkg and win
 
 ## Milestone thoughts
 
@@ -100,6 +105,9 @@
 - [ ] in skills world, especially with artifact driven dev, we can almost get away with without sending a lot of things again and again, latest context and last 1/2 chats. attachments may pose a problem here, but can be thought through properly so that these things are persisted properly.
 
 - [ ] lots of persona like templates can be added for sys prompt templates.
+
+- [ ] Tool calls
+  - [ ] Some calls like editor replace text, create files, etc can be visually represented better via custom elements representing each.
 
 ## Other repos thoughts
 

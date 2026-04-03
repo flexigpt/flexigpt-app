@@ -33,7 +33,50 @@ func cloneModelCapabilities(in inferenceSpec.ModelCapabilities) inferenceSpec.Mo
 		c.SupportedToolPolicyModes = slices.Clone(c.SupportedToolPolicyModes)
 		out.ToolCapabilities = &c
 	}
+	if in.CacheCapabilities != nil {
+		c := *in.CacheCapabilities
+		c.TopLevel = cloneCacheControlCapabilities(in.CacheCapabilities.TopLevel)
+		c.InputOutputContent = cloneCacheControlCapabilities(in.CacheCapabilities.InputOutputContent)
+		c.ReasoningContent = cloneCacheControlCapabilities(in.CacheCapabilities.ReasoningContent)
+		c.ToolChoice = cloneCacheControlCapabilities(in.CacheCapabilities.ToolChoice)
+		c.ToolCall = cloneCacheControlCapabilities(in.CacheCapabilities.ToolCall)
+		c.ToolOutput = cloneCacheControlCapabilities(in.CacheCapabilities.ToolOutput)
+		out.CacheCapabilities = &c
+	}
 	return out
+}
+
+func cloneCacheControlCapabilities(
+	in *inferenceSpec.CacheControlCapabilities,
+) *inferenceSpec.CacheControlCapabilities {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	out.SupportedKinds = slices.Clone(in.SupportedKinds)
+	out.SupportedTTLs = slices.Clone(in.SupportedTTLs)
+	return &out
+}
+
+func applyCacheControlCapabilitiesOverride(
+	dst **inferenceSpec.CacheControlCapabilities,
+	ov *spec.CacheControlCapabilitiesOverride,
+) {
+	if ov == nil {
+		return
+	}
+	if *dst == nil {
+		*dst = &inferenceSpec.CacheControlCapabilities{}
+	}
+	if ov.SupportedKinds != nil {
+		(*dst).SupportedKinds = slices.Clone(ov.SupportedKinds)
+	}
+	if ov.SupportedTTLs != nil {
+		(*dst).SupportedTTLs = slices.Clone(ov.SupportedTTLs)
+	}
+	if ov.SupportsKey != nil {
+		(*dst).SupportsKey = *ov.SupportsKey
+	}
 }
 
 func applyModelCapabilitiesOverride(
@@ -119,5 +162,39 @@ func applyModelCapabilitiesOverride(
 		if ov.ToolCapabilities.MaxForcedTools != nil {
 			dst.ToolCapabilities.MaxForcedTools = *ov.ToolCapabilities.MaxForcedTools
 		}
+	}
+
+	if ov.CacheCapabilities != nil {
+		if dst.CacheCapabilities == nil {
+			dst.CacheCapabilities = &inferenceSpec.CacheCapabilities{}
+		}
+		if ov.CacheCapabilities.SupportsAutomaticCaching != nil {
+			dst.CacheCapabilities.SupportsAutomaticCaching = *ov.CacheCapabilities.SupportsAutomaticCaching
+		}
+
+		applyCacheControlCapabilitiesOverride(
+			&dst.CacheCapabilities.TopLevel,
+			ov.CacheCapabilities.TopLevel,
+		)
+		applyCacheControlCapabilitiesOverride(
+			&dst.CacheCapabilities.InputOutputContent,
+			ov.CacheCapabilities.InputOutputContent,
+		)
+		applyCacheControlCapabilitiesOverride(
+			&dst.CacheCapabilities.ReasoningContent,
+			ov.CacheCapabilities.ReasoningContent,
+		)
+		applyCacheControlCapabilitiesOverride(
+			&dst.CacheCapabilities.ToolChoice,
+			ov.CacheCapabilities.ToolChoice,
+		)
+		applyCacheControlCapabilitiesOverride(
+			&dst.CacheCapabilities.ToolCall,
+			ov.CacheCapabilities.ToolCall,
+		)
+		applyCacheControlCapabilitiesOverride(
+			&dst.CacheCapabilities.ToolOutput,
+			ov.CacheCapabilities.ToolOutput,
+		)
 	}
 }

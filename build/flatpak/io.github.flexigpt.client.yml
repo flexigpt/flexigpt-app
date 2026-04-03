@@ -11,14 +11,14 @@ finish-args:
   - --socket=fallback-x11
   - --device=dri
   - --share=network
-  - --talk-name=org.freedesktop.secrets
-  - --talk-name=com.canonical.AppMenu.Registrar
   - --filesystem=host
   # keep client-side decorations. Ubuntu mate has csd stripping and injects some gtk libs like appmenu,canberra etc
   - --env=GTK_CSD=1
   # block the host’s nocsd shim
   - --unset-env=LD_PRELOAD
-
+  - --talk-name=org.freedesktop.secrets
+  - --talk-name=com.canonical.AppMenu.Registrar
+  - --talk-name=org.freedesktop.Flatpak
   # disable WebKit accelerated compositing for nvidia drivers.
   # - --env=WEBKIT_DISABLE_COMPOSITING_MODE=1
   # This should not be enabled here as this is a issue in nvidia + x11 + legacy window manager combination

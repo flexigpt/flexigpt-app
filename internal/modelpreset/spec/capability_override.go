@@ -29,6 +29,22 @@ type ToolCapabilitiesOverride struct {
 	MaxForcedTools            *int                           `json:"maxForcedTools,omitempty"`
 }
 
+type CacheControlCapabilitiesOverride struct {
+	SupportedKinds []inferenceSpec.CacheControlKind `json:"supportedKinds,omitempty"`
+	SupportedTTLs  []inferenceSpec.CacheControlTTL  `json:"supportedTTLs,omitempty"`
+	SupportsKey    *bool                            `json:"supportsKey,omitempty"`
+}
+
+type CacheCapabilitiesOverride struct {
+	SupportsAutomaticCaching *bool                             `json:"supportsAutomaticCaching,omitempty"`
+	TopLevel                 *CacheControlCapabilitiesOverride `json:"topLevel,omitempty"`
+	InputOutputContent       *CacheControlCapabilitiesOverride `json:"inputOutputContent,omitempty"`
+	ReasoningContent         *CacheControlCapabilitiesOverride `json:"reasoningContent,omitempty"`
+	ToolChoice               *CacheControlCapabilitiesOverride `json:"toolChoice,omitempty"`
+	ToolCall                 *CacheControlCapabilitiesOverride `json:"toolCall,omitempty"`
+	ToolOutput               *CacheControlCapabilitiesOverride `json:"toolOutput,omitempty"`
+}
+
 // ModelCapabilitiesOverride is a "patch-like" version of inference-go's ModelCapabilities.
 //
 // Semantics:
@@ -46,4 +62,6 @@ type ModelCapabilitiesOverride struct {
 	StopSequenceCapabilities *StopSequenceCapabilitiesOverride `json:"stopSequenceCapabilities,omitempty"`
 	OutputCapabilities       *OutputCapabilitiesOverride       `json:"outputCapabilities,omitempty"`
 	ToolCapabilities         *ToolCapabilitiesOverride         `json:"toolCapabilities,omitempty"`
+
+	CacheCapabilities *CacheCapabilitiesOverride `json:"cacheCapabilities,omitempty"`
 }
