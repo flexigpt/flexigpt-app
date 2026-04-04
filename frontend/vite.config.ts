@@ -5,7 +5,6 @@ import path from 'node:path';
 import license from 'rollup-plugin-license';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig } from 'vite';
-import checker from 'vite-plugin-checker';
 
 // eslint-disable-next-line no-restricted-imports
 import pkg from './package.json';
@@ -66,17 +65,7 @@ export default defineConfig(({ mode }) => {
 		);
 	}
 	return {
-		plugins: [
-			reactRouter(),
-			tailwindcss(),
-			checker({
-				typescript: true,
-				eslint: {
-					lintCommand: 'eslint . -c ./eslint.config.mjs',
-					useFlatConfig: true,
-				},
-			}),
-		],
+		plugins: [reactRouter(), tailwindcss()],
 
 		base: isProd ? '/frontend/dist/' : '/',
 

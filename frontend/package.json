@@ -5,7 +5,9 @@
 	"type": "module",
 	"private": true,
 	"scripts": {
-		"typecheck": "react-router typegen && tsc",
+		"typegen": "react-router typegen",
+		"tsc": "tsc --noEmit --diagnostics",
+		"typecheck": "pnpm run typegen && pnpm run tsc",
 		"lint:knip": "knip --tags=-lintignore",
 		"lint:eslint": "eslint . -c ./eslint.config.mjs",
 		"lint:specific": "eslint . -c ./eslint.specific.config.mjs --no-config-lookup",
@@ -97,7 +99,6 @@
 		"typescript": "^5.9.3",
 		"typescript-eslint": "^8.58.0",
 		"vite": "^8.0.3",
-		"vite-plugin-checker": "^0.12.0",
 		"vitest": "^4.1.2"
 	},
 	"prettier": {
