@@ -872,3 +872,5 @@
 
 - [x] attachments need to include absolute path most probably. think through and see how to fit it. tool calls need some way to say that start from this.
 - [x] available skills prompts etc should not contain xml. move skill prompt to internal agentskills.
+
+- [x] jsdom next major
