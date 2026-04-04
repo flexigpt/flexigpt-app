@@ -17,7 +17,7 @@
 		"clean": "rimraf ./dist",
 		"run:wailsdev": "cp .env.dev .env && cross-env VITE_PLATFORM=wails react-router dev",
 		"build:pre": "node -e \"const fs=require('fs'); if(fs.existsSync('.env.prod')) fs.copyFileSync('.env.prod','.env');\" && pnpm run typecheck",
-		"build:wails": "rimraf ./dist && pnpm run build:pre && pnpm run typecheck && cross-env VITE_PLATFORM=wails react-router build",
+		"build:wails": "rimraf ./dist && pnpm run build:pre && cross-env VITE_PLATFORM=wails react-router build",
 		"test": "vitest run",
 		"coverage": "vitest run --coverage",
 		"licenses:gen": "pnpm run build:pre && cross-env GEN_LICENSES=true VITE_PLATFORM=wails vite build --mode production"
