@@ -10,9 +10,9 @@
 		"esModuleInterop": true,
 		"module": "ESNext",
 		"moduleResolution": "bundler",
+		"allowImportingTsExtensions": true,
 		"resolveJsonModule": true,
-		"isolatedModules": true,
-		"jsx": "preserve",
+		"jsx": "react-jsx",
 		"incremental": true,
 		"paths": {
 			"@/*": ["./app/*"]

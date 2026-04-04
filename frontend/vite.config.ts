@@ -6,7 +6,6 @@ import license from 'rollup-plugin-license';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig } from 'vite';
 import checker from 'vite-plugin-checker';
-import tsconfigPaths from 'vite-tsconfig-paths';
 
 // eslint-disable-next-line no-restricted-imports
 import pkg from './package.json';
@@ -25,6 +24,8 @@ const extraDepsToOptimize = [
 ];
 
 const excludedDepsToOptimize = new Set(['@fontsource-variable/inter']);
+
+const normalize = (id: string) => id.replace(/\\/g, '/');
 
 const depsToOptimize = [...new Set([...baseDeps, ...extraDepsToOptimize])].filter(
 	dep => !excludedDepsToOptimize.has(dep)
@@ -66,10 +67,8 @@ export default defineConfig(({ mode }) => {
 	}
 	return {
 		plugins: [
-			tailwindcss(),
 			reactRouter(),
-			tsconfigPaths(),
-
+			tailwindcss(),
 			checker({
 				typescript: true,
 				eslint: {
@@ -81,18 +80,18 @@ export default defineConfig(({ mode }) => {
 
 		base: isProd ? '/frontend/dist/' : '/',
 
+		resolve: {
+			// This replaces the need for the vite-tsconfig-paths plugin
+			tsconfigPaths: true,
+		},
+
 		// Add these configurations for better ESM support
 		optimizeDeps: {
 			// set optimizeDeps.noDiscovery to true and optimizeDeps.include as undefined or empty to disable.
 			// noDiscovery: true,
 			// include: undefined,
 			include: depsToOptimize,
-			esbuildOptions: {
-				target: 'esnext',
-				supported: {
-					bigint: true,
-				},
-			},
+			target: 'esnext',
 		},
 
 		build: {
@@ -105,36 +104,34 @@ export default defineConfig(({ mode }) => {
 			 */
 			write: !(genLicenses && !genLicensesForceWrite),
 			emptyOutDir: !(genLicenses && !genLicensesForceWrite),
-
-			rollupOptions: {
+			rolldownOptions: {
 				plugins: rollupPlugins,
 				output: {
 					format: 'es',
-
-					manualChunks(id) {
-						// Only vendor modules
-						if (!id.includes('node_modules')) return;
-
-						// Cross-platform path normalization
-						const n = id.replace(/\\/g, '/');
-
-						// KaTeX (JS). Fonts are emitted separately as assets automatically.
-						if (n.includes('/node_modules/katex/')) return 'libkatex';
-
-						if (n.includes('/node_modules/compromise/')) return 'libcompromise';
-
-						// Mermaid and common companions
-						if (n.includes('/node_modules/mermaid/')) return 'libmermaid';
-
-						if (/\/node_modules\/(unified|remark(?:-[^/]+)?|rehype(?:-[^/]+)?)\//.test(n)) {
-							return 'libunified';
-						}
-
-						// PlateJS suite
-						if (/\/node_modules\/(@udecode|@platejs|platejs)\//.test(n)) return 'libplate';
-
-						// Let Rollup decide otherwise
-						return;
+					codeSplitting: {
+						groups: [
+							{
+								name: 'libkatex',
+								test: (id: string) => normalize(id).includes('/node_modules/katex/'),
+							},
+							{
+								name: 'libcompromise',
+								test: (id: string) => normalize(id).includes('/node_modules/compromise/'),
+							},
+							{
+								name: 'libmermaid',
+								test: (id: string) => normalize(id).includes('/node_modules/mermaid/'),
+							},
+							{
+								name: 'libunified',
+								test: (id: string) =>
+									/\/node_modules\/(unified|remark(?:-[^/]+)?|rehype(?:-[^/]+)?)\//.test(normalize(id)),
+							},
+							{
+								name: 'libplate',
+								test: (id: string) => /\/node_modules\/(@udecode|@platejs|platejs)\//.test(normalize(id)),
+							},
+						],
 					},
 				},
 			},

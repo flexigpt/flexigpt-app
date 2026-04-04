@@ -874,3 +874,4 @@
 - [x] available skills prompts etc should not contain xml. move skill prompt to internal agentskills.
 
 - [x] jsdom next major
+- [x] vite 8: react router dev support. react router has some cleanup planned with vite8. would be better to wait until react router stamps it as ok.

@@ -83,8 +83,6 @@
 - [ ] eslint 10: pending plugins support.
   - [ ] monitor oxclint for a while. ecosystem seems weak as of now.
 
-- [ ] vite 8: react router dev support. react router has some cleanup planned with vite8. would be better to wait until react router stamps it as ok.
-
 ## Observations
 
 - openai tool loop
