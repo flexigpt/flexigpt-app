@@ -10,11 +10,11 @@ require (
 	github.com/flexigpt/agentskills-go v0.12.0
 	github.com/flexigpt/inference-go v0.11.1
 	github.com/flexigpt/llmtools-go v0.15.0
+	github.com/flexigpt/mapstore-go v0.2.0
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/google/uuid v1.6.0
 	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
 	github.com/markusmobius/go-trafilatura v1.12.2
-	github.com/ppipada/mapstore-go v0.1.4
 	github.com/wailsapp/wails/v2 v2.12.0
 	golang.org/x/net v0.52.0
 )

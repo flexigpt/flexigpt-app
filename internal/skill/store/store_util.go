@@ -9,7 +9,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
-	"github.com/ppipada/mapstore-go/jsonencdec"
+	"github.com/flexigpt/mapstore-go/jsonencdec"
 )
 
 func (s *SkillStore) startCleanupLoop() {

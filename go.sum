@@ -37,6 +37,8 @@ github.com/flexigpt/inference-go v0.11.1 h1:9cmuh7boxLpsOB5ECvk4swdusLyFdxE8XCYn
 github.com/flexigpt/inference-go v0.11.1/go.mod h1:O7ThVuyKBWfaWzYcXwfAp9OOec7HKt+mYa0Z1BGZPr0=
 github.com/flexigpt/llmtools-go v0.15.0 h1:O1Q5MfeiePAAUx+7G05hY6rIquvTlyr2EA4OFZhnIco=
 github.com/flexigpt/llmtools-go v0.15.0/go.mod h1:K/Gdq+WJxkBIr9ykLodM6RL9QUsqCg5mcxEozbZlvDQ=
+github.com/flexigpt/mapstore-go v0.2.0 h1:kjSeyL0D9YhEYvcV43HqsLkntCOrYFoQPqgho1ka0Qg=
+github.com/flexigpt/mapstore-go v0.2.0/go.mod h1:An1R83lzFlsEVdvZn0HgnI1R0bEUdqxQOxY5/16wnuY=
 github.com/forPelevin/gomoji v1.2.0 h1:9k4WVSSkE1ARO/BWywxgEUBvR/jMnao6EZzrql5nxJ8=
 github.com/forPelevin/gomoji v1.2.0/go.mod h1:8+Z3KNGkdslmeGZBC3tCrwMrcPy5GRzAD+gL9NAwMXg=
 github.com/fxamacker/cbor/v2 v2.9.0 h1:NpKPmjDBgUfBms6tr6JZkTHtfFGcMKsw3eGcmD/sapM=
@@ -122,8 +124,6 @@ github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/ppipada/mapstore-go v0.1.4 h1:7GG4ZVYbQpkHecf6eh0OAYOz6ZTBmHZW5fVAKVxdTk0=
-github.com/ppipada/mapstore-go v0.1.4/go.mod h1:UEysfatliFvGoots6Gwevh/fKmX1LP4JRqFfKeP5uwI=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec h1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
 github.com/rivo/uniseg v0.1.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=

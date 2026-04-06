@@ -26,7 +26,7 @@ import (
 	"github.com/flexigpt/llmtools-go/fstool"
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 
-	"github.com/ppipada/mapstore-go/jsonencdec"
+	"github.com/flexigpt/mapstore-go/jsonencdec"
 )
 
 func TestInvokeTool(t *testing.T) {

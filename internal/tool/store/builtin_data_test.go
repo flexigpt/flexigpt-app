@@ -17,7 +17,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/tool/spec"
-	"github.com/ppipada/mapstore-go/uuidv7filename"
+	"github.com/flexigpt/mapstore-go/uuidv7filename"
 )
 
 const (

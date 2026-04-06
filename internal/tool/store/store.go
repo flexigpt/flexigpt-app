@@ -14,9 +14,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ppipada/mapstore-go"
-	"github.com/ppipada/mapstore-go/jsonencdec"
-	"github.com/ppipada/mapstore-go/uuidv7filename"
+	"github.com/flexigpt/mapstore-go"
+	"github.com/flexigpt/mapstore-go/jsonencdec"
+	"github.com/flexigpt/mapstore-go/uuidv7filename"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"

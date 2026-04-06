@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ppipada/mapstore-go"
+	"github.com/flexigpt/mapstore-go"
 )
 
 // bundlePartitionAttr is a type for bundle partition attributes.

@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/conversation/spec"
-	"github.com/ppipada/mapstore-go"
-	"github.com/ppipada/mapstore-go/dirpartition"
-	"github.com/ppipada/mapstore-go/ftsengine"
-	"github.com/ppipada/mapstore-go/jsonencdec"
-	"github.com/ppipada/mapstore-go/uuidv7filename"
+	"github.com/flexigpt/mapstore-go"
+	"github.com/flexigpt/mapstore-go/dirpartition"
+	"github.com/flexigpt/mapstore-go/ftsengine"
+	"github.com/flexigpt/mapstore-go/jsonencdec"
+	"github.com/flexigpt/mapstore-go/uuidv7filename"
 )
 
 type ConversationCollection struct {

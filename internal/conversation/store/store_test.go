@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/conversation/spec"
+	"github.com/flexigpt/mapstore-go/uuidv7filename"
 	"github.com/google/uuid"
-	"github.com/ppipada/mapstore-go/uuidv7filename"
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )

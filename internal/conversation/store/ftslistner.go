@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/conversation/spec"
-	"github.com/ppipada/mapstore-go"
-	"github.com/ppipada/mapstore-go/ftsengine"
+	"github.com/flexigpt/mapstore-go"
+	"github.com/flexigpt/mapstore-go/ftsengine"
 )
 
 func NewFTSListner(e *ftsengine.Engine) mapstore.FileListener {
