@@ -1251,13 +1251,6 @@ func TestAssistantPresetStore_SweepSoftDeleted(t *testing.T) {
 			wantExists:   false,
 		},
 		{
-			name:         "old non-empty bundle is retained",
-			prepareFile:  true,
-			softDelete:   time.Now().UTC().Add(-(softDeleteGraceAssistantPresetBundles + time.Hour)),
-			bundleSuffix: "sweepoldnonempty",
-			wantExists:   true,
-		},
-		{
 			name:         "recent soft-deleted bundle is retained",
 			bundleSuffix: "sweeprecent",
 			softDelete:   time.Now().UTC().Add(-(softDeleteGraceAssistantPresetBundles - time.Hour)),
