@@ -1,0 +1,155 @@
+# CLOC Summary
+
+ ## Aggregate overview
+
+ | Metric          | Value                    |
+ | :-------------- | -----------------------: |
+ | Generated at    | 2026-04-06T12:04:51.992Z |
+ | Repos requested |                        5 |
+ | Repos scanned   |                        5 |
+ | Repos failed    |                        0 |
+ | Total files     |                      803 |
+ | Total code      |                  157,218 |
+ | Total comment   |                    7,571 |
+ | Total blank     |                   28,021 |
+
+ ## By language
+
+ | Language     | Repos | Files | Code   | Comment | Blank  |
+ | :----------- | ----: | ----: | -----: | ------: | -----: |
+ | Go           |     5 |   379 | 84,167 |   4,454 | 10,560 |
+ | TypeScript   |     1 |   262 | 48,809 |   1,843 |  7,455 |
+ | Markdown     |     5 |    27 | 15,797 |       1 |  8,540 |
+ | JSON         |     5 |    39 |  3,326 |       0 |     31 |
+ | YAML         |     5 |    42 |  2,501 |     936 |    904 |
+ | Bourne Shell |     5 |    21 |  1,056 |     244 |    256 |
+ | JavaScript   |     1 |    13 |    579 |      82 |    156 |
+ | Text         |     5 |     5 |    346 |       0 |     44 |
+ | CSS          |     1 |     1 |    275 |       8 |     32 |
+ | INI          |     5 |     6 |    138 |       0 |     22 |
+ | Mustache     |     1 |     6 |    115 |       0 |      9 |
+ | XML          |     1 |     1 |     68 |       0 |      0 |
+ | PowerShell   |     1 |     1 |     41 |       3 |     12 |
+
+ ## By repo
+
+ | Repo                      | Status | Files | Code   | Comment | Blank  | Ref / SHA    |
+ | :------------------------ | :----- | ----: | -----: | ------: | -----: | :----------- |
+ | `flexigpt/flexigpt-app`   | ok     |   511 | 97,326 |   4,329 | 14,257 | e907f95ee412 |
+ | `flexigpt/inference-go`   | ok     |    72 | 21,523 |     912 |  8,800 | dc85071af5ca |
+ | `flexigpt/llmtools-go`    | ok     |   127 | 21,426 |   1,056 |  2,602 | cedb853959bd |
+ | `flexigpt/mapstore-go`    | ok     |    44 |  9,666 |     744 |  1,099 | 89a257433d05 |
+ | `flexigpt/agentskills-go` | ok     |    49 |  7,277 |     530 |  1,263 | ccd94ad296ea |
+
+ ## Repo language breakdown
+
+ ### `flexigpt/flexigpt-app`
+
+ | Metric    | Value        |
+ | :-------- | -----------: |
+ | Status    |           ok |
+ | Files     |          511 |
+ | Code      |       97,326 |
+ | Comment   |        4,329 |
+ | Blank     |       14,257 |
+ | Ref / SHA | e907f95ee412 |
+
+ | Language     | Files | Code   | Comment | Blank |
+ | :----------- | ----: | -----: | ------: | ----: |
+ | TypeScript   |   262 | 48,809 |   1,843 | 7,455 |
+ | Go           |   153 | 39,346 |   2,046 | 5,137 |
+ | Markdown     |    17 |  3,058 |       0 |   986 |
+ | JSON         |    27 |  2,940 |       0 |    15 |
+ | YAML         |    14 |  1,089 |     223 |   259 |
+ | Bourne Shell |    13 |    724 |     124 |   160 |
+ | JavaScript   |    13 |    579 |      82 |   156 |
+ | CSS          |     1 |    275 |       8 |    32 |
+ | Text         |     1 |    192 |       0 |    22 |
+ | Mustache     |     6 |    115 |       0 |     9 |
+ | INI          |     2 |     90 |       0 |    14 |
+ | XML          |     1 |     68 |       0 |     0 |
+ | PowerShell   |     1 |     41 |       3 |    12 |
+
+ ### `flexigpt/inference-go`
+
+ | Metric    | Value        |
+ | :-------- | -----------: |
+ | Status    |           ok |
+ | Files     |           72 |
+ | Code      |       21,523 |
+ | Comment   |          912 |
+ | Blank     |        8,800 |
+ | Ref / SHA | dc85071af5ca |
+
+ | Language     | Files | Code   | Comment | Blank |
+ | :----------- | ----: | -----: | ------: | ----: |
+ | Markdown     |     5 | 12,227 |       0 | 7,357 |
+ | Go           |    53 |  8,699 |     704 | 1,244 |
+ | YAML         |     7 |    357 |     178 |   162 |
+ | JSON         |     3 |     96 |       0 |     4 |
+ | Bourne Shell |     2 |     83 |      30 |    24 |
+ | Text         |     1 |     49 |       0 |     7 |
+ | INI          |     1 |     12 |       0 |     2 |
+
+ ### `flexigpt/llmtools-go`
+
+ | Metric    | Value        |
+ | :-------- | -----------: |
+ | Status    |           ok |
+ | Files     |          127 |
+ | Code      |       21,426 |
+ | Comment   |        1,056 |
+ | Blank     |        2,602 |
+ | Ref / SHA | cedb853959bd |
+
+ | Language     | Files | Code   | Comment | Blank |
+ | :----------- | ----: | -----: | ------: | ----: |
+ | Go           |   111 | 20,568 |     848 | 2,295 |
+ | YAML         |     7 |    350 |     178 |   161 |
+ | Markdown     |     2 |    267 |       0 |   109 |
+ | JSON         |     3 |     97 |       0 |     4 |
+ | Bourne Shell |     2 |     83 |      30 |    24 |
+ | Text         |     1 |     49 |       0 |     7 |
+ | INI          |     1 |     12 |       0 |     2 |
+
+ ### `flexigpt/mapstore-go`
+
+ | Metric    | Value        |
+ | :-------- | -----------: |
+ | Status    |           ok |
+ | Files     |           44 |
+ | Code      |        9,666 |
+ | Comment   |          744 |
+ | Blank     |        1,099 |
+ | Ref / SHA | 89a257433d05 |
+
+ | Language     | Files | Code  | Comment | Blank |
+ | :----------- | ----: | ----: | ------: | ----: |
+ | Go           |    29 | 9,020 |     536 |   875 |
+ | YAML         |     7 |   352 |     178 |   161 |
+ | JSON         |     3 |    97 |       0 |     4 |
+ | Bourne Shell |     2 |    83 |      30 |    24 |
+ | Markdown     |     1 |    74 |       0 |    29 |
+ | Text         |     1 |    28 |       0 |     4 |
+ | INI          |     1 |    12 |       0 |     2 |
+
+ ### `flexigpt/agentskills-go`
+
+ | Metric    | Value        |
+ | :-------- | -----------: |
+ | Status    |           ok |
+ | Files     |           49 |
+ | Code      |        7,277 |
+ | Comment   |          530 |
+ | Blank     |        1,263 |
+ | Ref / SHA | ccd94ad296ea |
+
+ | Language     | Files | Code  | Comment | Blank |
+ | :----------- | ----: | ----: | ------: | ----: |
+ | Go           |    33 | 6,534 |     320 | 1,009 |
+ | YAML         |     7 |   353 |     179 |   161 |
+ | Markdown     |     2 |   171 |       1 |    59 |
+ | JSON         |     3 |    96 |       0 |     4 |
+ | Bourne Shell |     2 |    83 |      30 |    24 |
+ | Text         |     1 |    28 |       0 |     4 |
+ | INI          |     1 |    12 |       0 |     2 |

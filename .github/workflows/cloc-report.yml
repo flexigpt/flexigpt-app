@@ -1,0 +1,90 @@
+name: Multi-repo cloc report
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload_artifact:
+        description: Upload the generated .cloc-report directory as an artifact
+        type: boolean
+        required: false
+        default: false
+
+      fail_on_repo_error:
+        description: Fail the job if one or more repos fail to clone or scan
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  cloc:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout current repo
+        uses: actions/checkout@v4
+
+      - name: Run multi-repo cloc
+        id: cloc
+        uses: ./.github/actions/multi-repo-cloc
+        with:
+          fail-on-repo-error: ${{ inputs.fail_on_repo_error }}
+          output-dir: .cloc-report
+          write-job-summary: "false"
+          print-summary: "true"
+          install-cloc: "true"
+          use-current-workspace: "true"
+          default-exclude-dir-json: "[]"
+          default-cloc-args-json: >
+            ["--vcs=git",
+            "--exclude_ext=yaml,sum,mod,md5",
+            "--force-lang=Mustache,tmpl",
+            "--force-lang=INI,env",
+            "--force-lang=INI,dev",
+            "--force-lang=INI,prod",
+            "--not-match-f=LICENSE$|\\.npmrc$|\\.prettierignore$|\\.gitignore$|\\.gitattributes$|\\.gitmodules$"]
+          repos-json: >
+            [
+              {
+                "repo": "self",
+                "useWorkspace": true,
+                "ignoredFile": "ignored.txt"
+              },
+              {
+                "repo": "github.com/flexigpt/agentskills-go"
+              },
+              {
+                "repo": "github.com/flexigpt/inference-go"
+              },
+              {
+                "repo": "github.com/flexigpt/llmtools-go"
+              },
+              {
+                "repo": "github.com/flexigpt/mapstore-go"
+              }
+            ]
+
+      - name: Upload cloc artifact
+        if: ${{ inputs.upload_artifact }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: multi-repo-cloc-${{ github.run_number }}
+          path: ${{ steps.cloc.outputs.output_dir }}
+          if-no-files-found: error
+
+      - name: Show output paths
+        run: |
+          echo "output_dir=${{ steps.cloc.outputs.output_dir }}"
+          echo "aggregate_json=${{ steps.cloc.outputs.aggregate_json }}"
+          echo "summary_markdown=${{ steps.cloc.outputs.summary_markdown }}"
+          echo "manifest_json=${{ steps.cloc.outputs.manifest_json }}"
+          echo "repo_count=${{ steps.cloc.outputs.repo_count }}"
+          echo "scanned_repo_count=${{ steps.cloc.outputs.scanned_repo_count }}"
+          echo "failed_repo_count=${{ steps.cloc.outputs.failed_repo_count }}"
+          echo "total_files=${{ steps.cloc.outputs.total_files }}"
+          echo "total_blank=${{ steps.cloc.outputs.total_blank }}"
+          echo "total_comment=${{ steps.cloc.outputs.total_comment }}"
+          echo "total_code=${{ steps.cloc.outputs.total_code }}"
+          echo "has_errors=${{ steps.cloc.outputs.has_errors }}"

@@ -45,6 +45,10 @@ tasks:
           --not-match-f='LICENSE$|\.npmrc$|\.prettierignore$|\.gitignore$|\.gitattributes$|\.gitmodules$' \
           .
 
+  cloc-multi:
+    cmds:
+      - gh act workflow_dispatch -W "./.github/workflows/cloc-report.yml" --artifact-server-path "{{.ROOT_DIR}}/{{.COMMON_APP_DEV_ARTIFACT_DIR}}"
+
   checkupgrade:
     cmds:
       - gomajor list
