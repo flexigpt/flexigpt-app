@@ -1,6 +1,6 @@
 {
 	"schemaVersion": "2025-07-01",
-	"kind": "generic",
+	"kind": "instructionsOnly",
 	"id": "018faf50-b7b6-7d01-9f0a-a22a6e0af106",
 	"displayName": "Go Table-Driven Tests (stdlib-only)",
 	"slug": "go-table-tests",
@@ -8,16 +8,10 @@
 	"description": "Scaffold idiomatic table-driven tests for a given function.",
 	"tags": ["golang", "testing", "table-driven"],
 	"blocks": [
-		{ "id": "sys", "role": "system", "content": "<sys/>" },
 		{
 			"id": "dev",
 			"role": "developer",
 			"content": "## Task\nWrite a *_test.go* file that covers normal, edge, error and (if relevant) concurrency cases.\n\n## Checklist\n- Use stdlib only, no external libraries.\n- Cover as many paths as possible."
-		},
-		{
-			"id": "usr",
-			"role": "user",
-			"content": "Code is below:\n"
 		}
 	],
 	"isResolved": true,

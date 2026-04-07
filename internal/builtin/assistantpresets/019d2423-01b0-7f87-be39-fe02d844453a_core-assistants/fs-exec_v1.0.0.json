@@ -4,7 +4,7 @@
 	"slug": "fs-exec",
 	"version": "v1.0.0",
 	"displayName": "Files, Text and Shell Tools",
-	"description": "Built-in assistant preset with file-system, text, and shell/script execution tools enabled.",
+	"description": "preset with file-system, text, and shell/script execution tools enabled",
 	"isEnabled": true,
 	"isBuiltIn": true,
 	"startingIncludeModelSystemPrompt": true,
@@ -16,7 +16,7 @@
 		},
 		{
 			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
-			"templateSlug": "use-explicit-tools",
+			"templateSlug": "use-explicit-tools-batched",
 			"templateVersion": "v1.0.0"
 		}
 	],
@@ -45,6 +45,26 @@
 			"toolRef": {
 				"bundleID": "018fe0f4-b8cd-7e55-82d5-9df0bd70e400",
 				"toolSlug": "writefile",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": false
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "018fe0f4-b8cd-7e55-82d5-9df0bd70e400",
+				"toolSlug": "listdirectory",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": false
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "018fe0f4-b8cd-7e55-82d5-9df0bd70e400",
+				"toolSlug": "statpath",
 				"toolVersion": "v1.0.0"
 			},
 			"toolChoicePatch": {

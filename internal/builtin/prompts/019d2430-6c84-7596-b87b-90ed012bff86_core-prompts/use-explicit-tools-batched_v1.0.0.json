@@ -1,0 +1,22 @@
+{
+	"schemaVersion": "2025-07-01",
+	"kind": "instructionsOnly",
+	"id": "019d2431-fa71-7a68-82ba-69f5fa01c27c",
+	"displayName": "Use explicit tools over shell and batched",
+	"slug": "use-explicit-tools-batched",
+	"isEnabled": true,
+	"description": "Prefer purpose-built fs/text tools in batches with shell/script tools as last resort.",
+	"tags": ["tools", "shell"],
+	"blocks": [
+		{
+			"id": "dev",
+			"role": "developer",
+			"content": "- always think through everything needed first, then make as many necessary tool calls as possible in parallel, in a single batch, rather than sequentially; do not make sequential calls when independent calls can be grouped together, this includes both read and write calls\n- prefer explicit, purpose-built tools over generic shell or script execution whenever an explicit tool can accomplish the task\n- shell/script tools are an absolute last resort. use them only when no explicit tool can complete the task, or when the user explicitly requires shell/script execution\n- if you must use shell/script tools, first state briefly why the explicit tools are insufficient, then use the narrowest command or script necessary.\n"
+		}
+	],
+	"isResolved": true,
+	"version": "v1.0.0",
+	"createdAt": "2026-03-25T00:00:00Z",
+	"modifiedAt": "2026-03-25T00:00:00Z",
+	"isBuiltIn": true
+}

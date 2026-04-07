@@ -11,6 +11,17 @@
 			"isBuiltIn": true,
 			"createdAt": "2026-03-25T00:00:00Z",
 			"modifiedAt": "2026-03-25T00:00:00Z"
+		},
+		"019d676e-2533-7fdf-a0af-d3a571ab4f4f": {
+			"schemaVersion": "2026-03-22",
+			"id": "019d676e-2533-7fdf-a0af-d3a571ab4f4f",
+			"slug": "software-assistants",
+			"displayName": "Software Assistants",
+			"description": "Built-in Software Dev assistant presets.",
+			"isEnabled": true,
+			"isBuiltIn": true,
+			"createdAt": "2026-04-07T00:00:00Z",
+			"modifiedAt": "2026-04-07T00:00:00Z"
 		}
 	}
 }
