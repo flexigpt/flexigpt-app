@@ -28,7 +28,8 @@ jobs:
 
       - name: Run multi-repo cloc
         id: cloc
-        uses: ./.github/actions/multi-repo-cloc
+        uses: ppipada/multi-repo-cloc@v1
+
         with:
           fail-on-repo-error: ${{ inputs.fail_on_repo_error }}
           output-dir: .cloc-report
