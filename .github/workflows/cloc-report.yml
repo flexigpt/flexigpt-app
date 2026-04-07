@@ -13,7 +13,7 @@ on:
         description: Fail the job if one or more repos fail to clone or scan
         type: boolean
         required: false
-        default: false
+        default: true
 
 permissions:
   contents: read
