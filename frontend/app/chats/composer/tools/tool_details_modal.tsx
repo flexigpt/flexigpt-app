@@ -5,13 +5,125 @@ import { createPortal } from 'react-dom';
 import { FiTool, FiX } from 'react-icons/fi';
 
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
-import type { ToolStoreChoice } from '@/spec/tool';
+import { ToolOutputKind, type ToolOutputUnion, type ToolStoreChoice } from '@/spec/tool';
 
 import { ModalBackdrop } from '@/components/modal_backdrop';
 
 import { MessageContentCard } from '@/chats/messages/message_content_card';
 import { formatToolCallLabel } from '@/tools/lib/tool_call_utils';
-import { extractPrimaryTextFromToolOutputs, formatToolOutputSummary } from '@/tools/lib/tool_output_utils';
+import { formatToolOutputSummary } from '@/tools/lib/tool_output_utils';
+
+function buildTextCodeBlock(text: string): string {
+	return ['```text', text, '```'].join('\n');
+}
+
+function buildJSONCodeBlock(value: unknown): string {
+	try {
+		return ['```json', JSON.stringify(value, null, 2), '```'].join('\n');
+	} catch {
+		return buildTextCodeBlock(String(value));
+	}
+}
+
+function parseStructuredJSONString(raw?: string): unknown {
+	if (typeof raw !== 'string') return undefined;
+
+	const trimmed = raw.trim();
+	if (!trimmed) return undefined;
+
+	try {
+		const parsed = JSON.parse(trimmed);
+		if (parsed !== null && typeof parsed === 'object') {
+			return parsed;
+		}
+	} catch {
+		// ignore
+	}
+
+	return undefined;
+}
+
+function buildJSONOrTextCodeBlock(raw?: string): string | null {
+	if (typeof raw !== 'string' || raw.trim().length === 0) {
+		return null;
+	}
+
+	return buildJSONCodeBlock(parseStructuredJSONString(raw) ?? raw);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function normalizeStructuredJSONStringDeep(value: unknown): unknown {
+	const parsed = typeof value === 'string' ? parseStructuredJSONString(value) : undefined;
+	if (parsed !== undefined) {
+		return normalizeStructuredJSONStringDeep(parsed);
+	}
+
+	if (Array.isArray(value)) {
+		return value.map(item => normalizeStructuredJSONStringDeep(item));
+	}
+	if (isRecord(value)) {
+		return Object.fromEntries(
+			Object.entries(value).map(([key, item]) => [key, normalizeStructuredJSONStringDeep(item)])
+		);
+	}
+	return value;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
+function normalizeStructuredDisplayObject<T extends object>(value: T): Record<string, unknown> {
+	const normalized = normalizeStructuredJSONStringDeep(value);
+	return isRecord(normalized) ? normalized : (value as Record<string, unknown>);
+}
+
+function buildToolOutputItemLabel(item: ToolOutputUnion, index: number): string {
+	switch (item.kind) {
+		case ToolOutputKind.Text:
+			return `Text item ${index + 1}`;
+		case ToolOutputKind.Image:
+			return `Image item ${index + 1}`;
+		case ToolOutputKind.File:
+			return `File item ${index + 1}`;
+		case ToolOutputKind.None:
+		default:
+			return `Output item ${index + 1}`;
+	}
+}
+
+function buildToolOutputItemsMarkdown(items?: ToolOutputUnion[]): string | null {
+	if (!items || items.length === 0) return null;
+
+	const nonEmptyItems = items.filter(item => {
+		if (item.kind === ToolOutputKind.Text) {
+			return (item.textItem?.text?.trim().length ?? 0) > 0;
+		}
+		return true;
+	});
+
+	if (nonEmptyItems.length === 0) return null;
+
+	if (nonEmptyItems.length === 1 && nonEmptyItems[0].kind === ToolOutputKind.Text) {
+		return buildJSONOrTextCodeBlock(nonEmptyItems[0].textItem?.text) ?? null;
+	}
+	const parts: string[] = [];
+
+	for (const [index, item] of nonEmptyItems.entries()) {
+		parts.push(`#### ${buildToolOutputItemLabel(item, index)}`, '');
+
+		if (item.kind === ToolOutputKind.Text) {
+			parts.push(buildJSONOrTextCodeBlock(item.textItem?.text) ?? '_Empty text item._');
+		} else {
+			parts.push(buildJSONCodeBlock(normalizeStructuredJSONStringDeep(item)));
+		}
+
+		if (index < nonEmptyItems.length - 1) {
+			parts.push('');
+		}
+	}
+	return parts.join('\n');
+}
 
 export type ToolDetailsState =
 	| { kind: 'choice'; choice: ToolStoreChoice }
@@ -35,10 +147,11 @@ function buildPayload(state: Exclude<ToolDetailsState, null>): { title: string; 
 		case 'choice': {
 			const c = state.choice;
 			const { display, slug } = getChoiceDisplayInfo(c);
+
 			return {
 				title: `Tool choice • ${display}`,
 				payload: {
-					...c,
+					...normalizeStructuredDisplayObject(c),
 					__meta: {
 						identity: slug,
 					},
@@ -47,29 +160,19 @@ function buildPayload(state: Exclude<ToolDetailsState, null>): { title: string; 
 		}
 		case 'call': {
 			const call = state.call;
-			let args: unknown = call.arguments;
-			if (call.arguments) {
-				try {
-					args = JSON.parse(call.arguments);
-				} catch {
-					args = call.arguments;
-				}
-			}
 			return {
 				title: `Tool call • ${formatToolCallLabel(call)}`,
-				payload: {
-					...call,
-					arguments: args,
-				},
+				payload: normalizeStructuredJSONStringDeep(call),
 			};
 		}
 		case 'output': {
 			const out = state.output;
+
 			return {
 				title: `Tool output • ${
 					out.summary && out.summary.length > 0 ? out.summary : formatToolOutputSummary(out.name)
 				}`,
-				payload: out,
+				payload: normalizeStructuredJSONStringDeep(out),
 			};
 		}
 	}
@@ -90,6 +193,14 @@ function buildChoicePrimaryContent(choice: ToolStoreChoice): string {
 		lines.push(`### Description: ${choice.description}`);
 	}
 
+	const userArgsBlock = buildJSONOrTextCodeBlock(choice.userArgSchemaInstance);
+	if (userArgsBlock) {
+		lines.push('');
+		lines.push('### Tool options');
+		lines.push('');
+		lines.push(userArgsBlock);
+	}
+
 	return lines.join('\n');
 }
 
@@ -100,27 +211,21 @@ function buildCallPrimaryContent(call: UIToolCall): string {
 	lines.push(`### Tool: ${call.name}`);
 	lines.push(`### Call ID: \`${call.callID}\``);
 	lines.push(`### Status: \`${call.status}\``);
-	if (call.errorMessage) {
-		lines.push(`Error: ${call.errorMessage}`);
+	const errorBlock = buildJSONOrTextCodeBlock(call.errorMessage);
+	if (errorBlock) {
+		lines.push('');
+		lines.push('### Error details');
+		lines.push('');
+		lines.push(errorBlock);
 	}
 
 	lines.push('');
 
-	if (call.arguments && call.arguments.trim().length > 0) {
+	const argumentsBlock = buildJSONOrTextCodeBlock(call.arguments);
+	if (argumentsBlock) {
 		lines.push('### Arguments');
 		lines.push('');
-
-		const raw = call.arguments.trim();
-		try {
-			const parsed = JSON.parse(raw);
-			lines.push('```json');
-			lines.push(JSON.stringify(parsed, null, 2));
-			lines.push('```');
-		} catch {
-			lines.push('```text');
-			lines.push(raw);
-			lines.push('```');
-		}
+		lines.push(argumentsBlock);
 	} else {
 		lines.push('### Arguments: no arguments provided for this call');
 	}
@@ -129,9 +234,7 @@ function buildCallPrimaryContent(call: UIToolCall): string {
 		lines.push('');
 		lines.push('### Web-search call items');
 		lines.push('');
-		lines.push('```json');
-		lines.push(JSON.stringify(call.webSearchToolCallItems, null, 2));
-		lines.push('```');
+		lines.push(buildJSONCodeBlock(call.webSearchToolCallItems));
 	}
 
 	return lines.join('\n');
@@ -147,47 +250,40 @@ function buildOutputPrimaryContent(output: UIToolOutput): string {
 	lines.push(`### Tool: ${output.name}`);
 	lines.push(`### Call ID: \`${output.callID}\``);
 	if (typeof output.isError === 'boolean') {
-		lines.push(`## Status: \`${output.isError ? 'error' : 'ok'}\``);
+		lines.push(`### Status: \`${output.isError ? 'error' : 'ok'}\``);
 	}
-	if (output.errorMessage) {
-		lines.push(`### Error message: ${output.errorMessage}`);
+	const argumentsBlock = buildJSONOrTextCodeBlock(output.arguments);
+	if (argumentsBlock) {
+		lines.push('');
+		lines.push('### Arguments');
+		lines.push('');
+		lines.push(argumentsBlock);
 	}
-
+	const errorBlock = buildJSONOrTextCodeBlock(output.errorMessage);
+	if (errorBlock) {
+		lines.push('');
+		lines.push('### Error details');
+		lines.push('');
+		lines.push(errorBlock);
+	}
 	lines.push('');
 
-	let bodyBlock: string | null = null;
+	let resultBlock: string | null = null;
 
-	const outputs = output.toolOutputs;
-
-	if (outputs && outputs.length > 0) {
-		const primaryText = extractPrimaryTextFromToolOutputs(outputs);
-
-		if (primaryText) {
-			const raw = primaryText.trim();
-			bodyBlock = ['```text', raw, '```'].join('\n');
-		} else {
-			try {
-				const formatted = JSON.stringify(outputs, null, 2);
-				bodyBlock = ['```json', formatted, '```'].join('\n');
-			} catch {
-				bodyBlock = 'Unable to render tool output.';
-			}
-		}
+	if (output.toolOutputs && output.toolOutputs.length > 0) {
+		resultBlock = buildToolOutputItemsMarkdown(output.toolOutputs);
 	} else if (output.webSearchToolOutputItems && output.webSearchToolOutputItems.length > 0) {
-		try {
-			const formatted = JSON.stringify(output.webSearchToolOutputItems, null, 2);
-			bodyBlock = ['```json', formatted, '```'].join('\n');
-		} catch {
-			bodyBlock = 'Unable to render web-search tool output.';
-		}
+		resultBlock = buildJSONCodeBlock(normalizeStructuredJSONStringDeep(output.webSearchToolOutputItems));
 	}
 
-	if (!bodyBlock) {
-		bodyBlock = '### Body block: _Tool returned no output._';
-		lines.push(bodyBlock);
+	if (!resultBlock) {
+		lines.push('### Tool result');
+		lines.push('');
+		lines.push('_Tool returned no output._');
 	} else {
-		lines.push('### Body block');
-		lines.push(bodyBlock);
+		lines.push('### Tool result');
+		lines.push('');
+		lines.push(resultBlock);
 	}
 
 	return lines.join('\n');

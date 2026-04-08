@@ -6,6 +6,7 @@ import { FiSliders, FiTool, FiX, FiZap } from 'react-icons/fi';
 
 import type { AssistantPreset } from '@/spec/assistantpreset';
 import type { UIChatOption } from '@/spec/modelpreset';
+import type { SkillSelection } from '@/spec/skill';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
 import { ModalBackdrop } from '@/components/modal_backdrop';
@@ -65,6 +66,13 @@ function formatSkillLabel(ref: { bundleID: string; skillSlug: string; skillID: s
 	return {
 		title: ref.skillSlug,
 		meta: `${ref.bundleID} • ${ref.skillID}`,
+	};
+}
+
+function formatSkillSelectionLabel(sel: SkillSelection) {
+	return {
+		title: sel.skillRef.skillSlug,
+		meta: `${sel.skillRef.bundleID} • ${sel.skillRef.skillID}`,
 	};
 }
 
@@ -252,7 +260,7 @@ export function AssistantPresetViewModal({
 
 	const appliedSkillItems = preparedApplication
 		? preparedApplication.runtimeSelections.enabledSkillRefs.map(formatSkillLabel)
-		: (viewedPreset.preset.startingEnabledSkillRefs ?? []).map(formatSkillLabel);
+		: (viewedPreset.preset.startingSkillSelections ?? []).map(formatSkillSelectionLabel);
 	const currentSkillItems = shouldShowActiveComparison
 		? currentRuntimeSnapshot.enabledSkillRefs.map(formatSkillLabel)
 		: [];

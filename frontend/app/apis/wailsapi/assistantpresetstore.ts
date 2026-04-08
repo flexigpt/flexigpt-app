@@ -178,7 +178,7 @@ export class WailsAssistantPresetStoreAPI implements IAssistantPresetStoreAPI {
 			startingIncludeModelSystemPrompt: payload.startingIncludeModelSystemPrompt,
 			startingInstructionTemplateRefs: payload.startingInstructionTemplateRefs,
 			startingToolSelections: payload.startingToolSelections,
-			startingEnabledSkillRefs: payload.startingEnabledSkillRefs,
+			startingSkillSelections: payload.startingSkillSelections,
 		}) as wailsSpec.PutAssistantPresetRequestBody;
 
 		const req = {

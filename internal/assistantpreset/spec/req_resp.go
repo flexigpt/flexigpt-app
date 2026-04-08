@@ -80,7 +80,7 @@ type PutAssistantPresetRequestBody struct {
 	StartingIncludeModelSystemPrompt *bool                          `json:"startingIncludeModelSystemPrompt,omitempty"`
 	StartingInstructionTemplateRefs  []promptSpec.PromptTemplateRef `json:"startingInstructionTemplateRefs,omitempty"`
 	StartingToolSelections           []toolSpec.ToolSelection       `json:"startingToolSelections,omitempty"`
-	StartingEnabledSkillRefs         []skillSpec.SkillRef           `json:"startingEnabledSkillRefs,omitempty"`
+	StartingSkillSelections          []skillSpec.SkillSelection     `json:"startingSkillSelections,omitempty"`
 }
 
 type PutAssistantPresetRequest struct {

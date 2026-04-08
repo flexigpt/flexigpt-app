@@ -158,25 +158,25 @@ type skillLookupAdapter struct {
 	store *skillStore.SkillStore
 }
 
-func (a *skillLookupAdapter) GetSkillSummary(
+func (a *skillLookupAdapter) GetSkillSummaryForSelection(
 	ctx context.Context,
-	ref skillSpec.SkillRef,
+	selection skillSpec.SkillSelection,
 ) (assistantpresetStore.SkillSummary, error) {
 	if a == nil || a.store == nil {
 		return assistantpresetStore.SkillSummary{}, errors.New("skill lookup adapter is not configured")
 	}
 
-	if ref.BundleID == "" || ref.SkillSlug == "" {
-		return assistantpresetStore.SkillSummary{}, errors.New("skill ref is incomplete")
+	if selection.SkillRef.BundleID == "" || selection.SkillRef.SkillSlug == "" {
+		return assistantpresetStore.SkillSummary{}, errors.New("skill selection skillRef is incomplete")
 	}
 
-	bundleEnabled, err := getSkillBundleEnabled(ctx, a.store, ref.BundleID)
+	bundleEnabled, err := getSkillBundleEnabled(ctx, a.store, selection.SkillRef.BundleID)
 	if err != nil {
 		return assistantpresetStore.SkillSummary{}, err
 	}
 	resp, err := a.store.GetSkill(ctx, &skillSpec.GetSkillRequest{
-		BundleID:        ref.BundleID,
-		SkillSlug:       ref.SkillSlug,
+		BundleID:        selection.SkillRef.BundleID,
+		SkillSlug:       selection.SkillRef.SkillSlug,
 		IncludeDisabled: true,
 	})
 	if err != nil {
@@ -188,11 +188,11 @@ func (a *skillLookupAdapter) GetSkillSummary(
 	if resp == nil || resp.Body == nil {
 		return assistantpresetStore.SkillSummary{}, errors.New("empty skill response")
 	}
-	if ref.SkillID != "" && resp.Body.ID != ref.SkillID {
+	if selection.SkillRef.SkillID != "" && resp.Body.ID != selection.SkillRef.SkillID {
 		return assistantpresetStore.SkillSummary{}, fmt.Errorf(
 			"skill ref id mismatch: got %q, expected %q",
 			resp.Body.ID,
-			ref.SkillID,
+			selection.SkillRef.SkillID,
 		)
 	}
 

@@ -12,6 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	promptSpec "github.com/flexigpt/flexigpt-app/internal/prompt/spec"
+	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
@@ -112,14 +113,14 @@ func validateAssistantPresetStructure(preset *spec.AssistantPreset) error {
 		seenToolRefs[key] = struct{}{}
 	}
 
-	seenSkillRefs := make(map[string]struct{}, len(preset.StartingEnabledSkillRefs))
-	for i, ref := range preset.StartingEnabledSkillRefs {
-		key, err := normalizedJSONKey(ref)
+	seenSkillRefs := make(map[string]struct{}, len(preset.StartingSkillSelections))
+	for i, selection := range preset.StartingSkillSelections {
+		key, err := skillSelectionRefKey(selection)
 		if err != nil {
-			return fmt.Errorf("startingEnabledSkillRefs[%d]: %w", i, err)
+			return fmt.Errorf("startingSkillSelections[%d]: %w", i, err)
 		}
 		if _, exists := seenSkillRefs[key]; exists {
-			return fmt.Errorf("startingEnabledSkillRefs[%d]: duplicate ref", i)
+			return fmt.Errorf("startingSkillSelections[%d]: duplicate skillRef", i)
 		}
 		seenSkillRefs[key] = struct{}{}
 	}
@@ -194,16 +195,16 @@ func validateAssistantPresetReferences(
 		}
 	}
 
-	for i, ref := range preset.StartingEnabledSkillRefs {
+	for i, selection := range preset.StartingSkillSelections {
 		if lookups.Skills == nil {
 			return errors.New("skill lookup not configured")
 		}
-		summary, err := lookups.Skills.GetSkillSummary(ctx, ref)
+		summary, err := lookups.Skills.GetSkillSummaryForSelection(ctx, selection)
 		if err != nil {
-			return fmt.Errorf("startingEnabledSkillRefs[%d]: %w", i, err)
+			return fmt.Errorf("startingSkillSelections[%d]: %w", i, err)
 		}
 		if !summary.IsEnabled {
-			return fmt.Errorf("startingEnabledSkillRefs[%d]: referenced skill is disabled", i)
+			return fmt.Errorf("startingSkillSelections[%d]: referenced skill is disabled", i)
 		}
 	}
 
@@ -278,5 +279,24 @@ func toolSelectionRefKey(selection toolSpec.ToolSelection) (string, error) {
 	}
 
 	// Fallback to the whole serialized selection if toolRef is not present.
+	return string(raw), nil
+}
+
+func skillSelectionRefKey(selection skillSpec.SkillSelection) (string, error) {
+	raw, err := json.Marshal(selection)
+	if err != nil {
+		return "", err
+	}
+
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &obj); err != nil {
+		return "", errors.New("json unmarshal error")
+	}
+
+	if refRaw, ok := obj["skillRef"]; ok && len(bytes.TrimSpace(refRaw)) > 0 {
+		return string(refRaw), nil
+	}
+
+	// Fallback to the whole serialized selection if skillRef is not present.
 	return string(raw), nil
 }

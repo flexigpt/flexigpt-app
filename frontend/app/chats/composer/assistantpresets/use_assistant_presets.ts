@@ -122,8 +122,8 @@ function getAssistantPresetAvailability(
 		}
 	}
 
-	for (const ref of preset.startingEnabledSkillRefs ?? []) {
-		const key = buildSkillRefKey(ref);
+	for (const sel of preset.startingSkillSelections ?? []) {
+		const key = buildSkillRefKey(sel.skillRef);
 		const option = lookups.skillOptionsByKey.get(key);
 
 		if (!option) {

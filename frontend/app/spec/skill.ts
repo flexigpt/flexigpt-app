@@ -13,6 +13,11 @@ export interface SkillRef {
 	skillID: string;
 }
 
+export interface SkillSelection {
+	skillRef: SkillRef;
+	preLoadAsActive: boolean;
+}
+
 export interface RuntimeSkillFilter {
 	types?: string[];
 	locationPrefix?: string;
@@ -129,7 +134,7 @@ export interface InvokeSkillToolResponse {
 export interface AssistantSkillOption {
 	key: string;
 	label: string;
-	ref: SkillRef;
+	sel: SkillSelection;
 	skillDefinition: Skill;
 
 	bundleSlug: string;

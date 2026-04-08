@@ -1,4 +1,4 @@
-import type { SkillListItem, SkillRef } from '@/spec/skill';
+import type { SkillListItem, SkillRef, SkillSelection } from '@/spec/skill';
 
 export function skillRefKey(ref: SkillRef): string {
 	return `${ref.bundleID}:${ref.skillSlug}:${ref.skillID}`;
@@ -23,6 +23,13 @@ export function dedupeSkillRefs(refs: SkillRef[]): SkillRef[] {
 	}
 	return out;
 }
+
+export const normalizeSkillSelectionsToRefs = (sels: SkillSelection[] | null | undefined): SkillRef[] => {
+	const r = sels?.map(item => {
+		return item.skillRef;
+	});
+	return normalizeSkillRefs(r ?? []);
+};
 
 export const normalizeSkillRefs = (refs: SkillRef[] | null | undefined): SkillRef[] => {
 	return dedupeSkillRefs(refs ?? []);

@@ -215,44 +215,48 @@ func TestToolSelectionLookupAdapter_GetToolSummaryForSelection_Errors(t *testing
 	}
 }
 
-func TestSkillLookupAdapter_GetSkillSummary_Errors(t *testing.T) {
+func TestSkillLookupAdapter_GetSkillSummaryForSelection_Errors(t *testing.T) {
 	ctx := t.Context()
 
 	tests := []struct {
 		name            string
 		adapter         *skillLookupAdapter
-		ref             skillSpec.SkillRef
+		selection       skillSpec.SkillSelection
 		wantErrContains string
 	}{
 		{
-			name:            "nil receiver",
-			adapter:         nil,
-			ref:             skillSpec.SkillRef{BundleID: "bundle-a", SkillSlug: "skill-a"},
+			name:    "nil receiver",
+			adapter: nil,
+			selection: skillSpec.SkillSelection{
+				SkillRef: skillSpec.SkillRef{BundleID: "bundle-a", SkillSlug: "skill-a"},
+			},
 			wantErrContains: "not configured",
 		},
 		{
-			name:            "nil store",
-			adapter:         &skillLookupAdapter{},
-			ref:             skillSpec.SkillRef{BundleID: "bundle-a", SkillSlug: "skill-a"},
+			name:    "nil store",
+			adapter: &skillLookupAdapter{},
+			selection: skillSpec.SkillSelection{
+				SkillRef: skillSpec.SkillRef{BundleID: "bundle-a", SkillSlug: "skill-a"},
+			},
 			wantErrContains: "not configured",
 		},
 		{
 			name:            "missing bundle id",
 			adapter:         &skillLookupAdapter{store: &skillStore.SkillStore{}},
-			ref:             skillSpec.SkillRef{SkillSlug: "skill-a"},
+			selection:       skillSpec.SkillSelection{SkillRef: skillSpec.SkillRef{SkillSlug: "skill-a"}},
 			wantErrContains: "incomplete",
 		},
 		{
 			name:            "missing skill slug",
 			adapter:         &skillLookupAdapter{store: &skillStore.SkillStore{}},
-			ref:             skillSpec.SkillRef{BundleID: "bundle-a"},
+			selection:       skillSpec.SkillSelection{SkillRef: skillSpec.SkillRef{BundleID: "bundle-a"}},
 			wantErrContains: "incomplete",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := tt.adapter.GetSkillSummary(ctx, tt.ref)
+			_, err := tt.adapter.GetSkillSummaryForSelection(ctx, tt.selection)
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}

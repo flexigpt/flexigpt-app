@@ -45,7 +45,7 @@ import { buildPromptTemplateRefKey } from '@/prompts/lib/prompt_template_ref';
 import { buildEffectiveSystemPrompt } from '@/prompts/lib/system_prompt_utils';
 import type { SystemPromptDraft } from '@/prompts/lib/use_system_prompts';
 import { type SystemPromptItem, useSystemPrompts } from '@/prompts/lib/use_system_prompts';
-import { normalizeSkillRefs } from '@/skills/lib/skill_identity_utils';
+import { normalizeSkillSelectionsToRefs } from '@/skills/lib/skill_identity_utils';
 
 function isHybridReasoningModel(model: UIChatOption): boolean {
 	return model.reasoning?.type === ReasoningType.HybridWithTokens;
@@ -850,24 +850,24 @@ export function useAssistantContextState(): AssistantContextController {
 				}
 			}
 
-			const requestedSkillRefs = preset.startingEnabledSkillRefs ?? [];
-			const hasSkillsSelection = requestedSkillRefs.length > 0;
-			const enabledSkillRefs = hasSkillsSelection ? normalizeSkillRefs(requestedSkillRefs) : [];
+			const requestedSkillSels = preset.startingSkillSelections ?? [];
+			const hasSkillsSelection = requestedSkillSels.length > 0;
+			const enabledSkillRefs = hasSkillsSelection ? normalizeSkillSelectionsToRefs(requestedSkillSels) : [];
 
 			if (hasSkillsSelection) {
 				const skillOptions = await loadSkillOptions();
 				const skillOptionByKey = new Map(skillOptions.map(item => [item.key, item] as const));
 
-				const invalidSkillRef = requestedSkillRefs.find(ref => {
-					const skillOption = skillOptionByKey.get(buildSkillRefKey(ref));
+				const invalidSkillSel = requestedSkillSels.find(sel => {
+					const skillOption = skillOptionByKey.get(buildSkillRefKey(sel.skillRef));
 					return !skillOption || !skillOption.isSelectable;
 				});
 
-				if (invalidSkillRef) {
-					const invalidSkillOption = skillOptionByKey.get(buildSkillRefKey(invalidSkillRef));
+				if (invalidSkillSel) {
+					const invalidSkillOption = skillOptionByKey.get(buildSkillRefKey(invalidSkillSel.skillRef));
 					throw new Error(
 						invalidSkillOption?.availabilityReason ??
-							`Skill "${invalidSkillRef.bundleID}/${invalidSkillRef.skillSlug}#${invalidSkillRef.skillID}" is not currently available.`
+							`Skill "${invalidSkillSel.skillRef.bundleID}/${invalidSkillSel.skillRef.skillSlug}#${invalidSkillSel.skillRef.skillID}" is not currently available.`
 					);
 				}
 			}

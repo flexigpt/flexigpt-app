@@ -70,8 +70,8 @@ type AssistantPreset struct {
 	// Ordered tool selections.
 	StartingToolSelections []toolSpec.ToolSelection `json:"startingToolSelections,omitempty"`
 
-	// Ordered enabled skills.
-	StartingEnabledSkillRefs []skillSpec.SkillRef `json:"startingEnabledSkillRefs,omitempty"`
+	// Ordered skill selections.
+	StartingSkillSelections []skillSpec.SkillSelection `json:"startingSkillSelections,omitempty"`
 
 	CreatedAt  time.Time `json:"createdAt"`
 	ModifiedAt time.Time `json:"modifiedAt"`

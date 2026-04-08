@@ -43,7 +43,7 @@ import {
 	buildSkillRefKey,
 	buildToolRefKey,
 	clonePromptTemplateRef,
-	cloneSkillRef,
+	cloneSkillSelection,
 	formatDateish,
 	hasAssistantPresetModelPatch,
 } from '@/assistantpresets/lib/assistant_preset_utils';
@@ -290,7 +290,7 @@ function getInitialFormData(
 				autoExecuteMode: booleanToTriState(selection.toolChoicePatch?.autoExecute),
 				userArgSchemaInstance: selection.toolChoicePatch?.userArgSchemaInstance ?? '',
 			})),
-			startingEnabledSkillRefs: (src.startingEnabledSkillRefs ?? []).map(cloneSkillRef),
+			startingSkillSelections: (src.startingSkillSelections ?? []).map(cloneSkillSelection),
 		};
 	}
 
@@ -305,7 +305,7 @@ function getInitialFormData(
 		modelPatch: getDefaultModelPatchFormData(),
 		startingInstructionTemplateRefs: [],
 		startingToolSelections: [],
-		startingEnabledSkillRefs: [],
+		startingSkillSelections: [],
 	};
 }
 
@@ -603,7 +603,7 @@ function AddEditAssistantPresetModalContent({
 	}, [formData.startingToolSelections, toolOptions, toolOptionByKey, selectedStartingModelOption]);
 
 	const availableSkillOptions = useMemo<SimpleSelectableOption[]>(() => {
-		const selected = new Set(formData.startingEnabledSkillRefs.map(ref => buildSkillRefKey(ref)));
+		const selected = new Set(formData.startingSkillSelections.map(sel => buildSkillRefKey(sel.skillRef)));
 
 		return skillOptions
 			.filter(option => option.isSelectable && !selected.has(option.key))
@@ -611,7 +611,7 @@ function AddEditAssistantPresetModalContent({
 				key: option.key,
 				label: option.label,
 			}));
-	}, [skillOptions, formData.startingEnabledSkillRefs]);
+	}, [skillOptions, formData.startingSkillSelections]);
 
 	const effectiveNextInstructionKey = useMemo(
 		() => getEffectiveOptionKey(availableInstructionOptions, nextInstructionKey),
@@ -835,18 +835,18 @@ function AddEditAssistantPresetModalContent({
 				}
 			}
 
-			if (state.startingEnabledSkillRefs.length > 0) {
-				const keys = state.startingEnabledSkillRefs.map(ref => buildSkillRefKey(ref));
+			if (state.startingSkillSelections.length > 0) {
+				const keys = state.startingSkillSelections.map(sel => buildSkillRefKey(sel.skillRef));
 				if (new Set(keys).size !== keys.length) {
-					nextErrors.startingEnabledSkillRefs = 'Skill selections must be unique.';
+					nextErrors.startingSkillSelections = 'Skill selections must be unique.';
 				} else {
-					const invalid = state.startingEnabledSkillRefs.find(ref => {
-						const option = skillOptionByKey.get(buildSkillRefKey(ref));
+					const invalid = state.startingSkillSelections.find(sel => {
+						const option = skillOptionByKey.get(buildSkillRefKey(sel.skillRef));
 						return !option || !option.isSelectable;
 					});
 
 					if (invalid) {
-						nextErrors.startingEnabledSkillRefs = 'Every selected skill must still exist and be enabled.';
+						nextErrors.startingSkillSelections = 'Every selected skill must still exist and be enabled.';
 					}
 				}
 			}
@@ -1003,7 +1003,8 @@ function AddEditAssistantPresetModalContent({
 
 	const skillDisplayItems = useMemo<OrderedDisplayItem[]>(
 		() =>
-			formData.startingEnabledSkillRefs.map(ref => {
+			formData.startingSkillSelections.map(sel => {
+				const ref = sel.skillRef;
 				const key = buildSkillRefKey(ref);
 				const option = skillOptionByKey.get(key);
 
@@ -1020,7 +1021,7 @@ function AddEditAssistantPresetModalContent({
 						: 'Missing reference',
 				};
 			}),
-		[formData.startingEnabledSkillRefs, skillOptionByKey]
+		[formData.startingSkillSelections, skillOptionByKey]
 	);
 
 	const isAllValid =
@@ -1167,7 +1168,7 @@ function AddEditAssistantPresetModalContent({
 
 		updateFormData(prev => ({
 			...prev,
-			startingEnabledSkillRefs: [...prev.startingEnabledSkillRefs, cloneSkillRef(option.ref)],
+			startingSkillSelections: [...prev.startingSkillSelections, cloneSkillSelection(option.sel)],
 		}));
 		setNextSkillKey('');
 	}, [effectiveNextSkillKey, skillOptions, updateFormData]);
@@ -1176,7 +1177,7 @@ function AddEditAssistantPresetModalContent({
 		(index: number) => {
 			updateFormData(prev => ({
 				...prev,
-				startingEnabledSkillRefs: moveItem(prev.startingEnabledSkillRefs, index, index - 1),
+				startingSkillSelections: moveItem(prev.startingSkillSelections, index, index - 1),
 			}));
 		},
 		[updateFormData]
@@ -1186,7 +1187,7 @@ function AddEditAssistantPresetModalContent({
 		(index: number) => {
 			updateFormData(prev => ({
 				...prev,
-				startingEnabledSkillRefs: moveItem(prev.startingEnabledSkillRefs, index, index + 1),
+				startingSkillSelections: moveItem(prev.startingSkillSelections, index, index + 1),
 			}));
 		},
 		[updateFormData]
@@ -1196,7 +1197,7 @@ function AddEditAssistantPresetModalContent({
 		(index: number) => {
 			updateFormData(prev => ({
 				...prev,
-				startingEnabledSkillRefs: removeItemAtIndex(prev.startingEnabledSkillRefs, index),
+				startingSkillSelections: removeItemAtIndex(prev.startingSkillSelections, index),
 			}));
 		},
 		[updateFormData]
@@ -1270,7 +1271,7 @@ function AddEditAssistantPresetModalContent({
 					: undefined,
 				startingInstructionTemplateRefs: formData.startingInstructionTemplateRefs.map(clonePromptTemplateRef),
 				startingToolSelections,
-				startingEnabledSkillRefs: formData.startingEnabledSkillRefs.map(cloneSkillRef),
+				startingSkillSelections: formData.startingSkillSelections.map(cloneSkillSelection),
 			};
 
 			await onSubmit(payload);
@@ -1637,9 +1638,9 @@ function AddEditAssistantPresetModalContent({
 
 						<div className="divider">Enabled Skills</div>
 
-						{errors.startingEnabledSkillRefs && (
+						{errors.startingSkillSelections && (
 							<div className="text-error flex items-center gap-1 text-sm">
-								<FiAlertCircle size={12} /> {errors.startingEnabledSkillRefs}
+								<FiAlertCircle size={12} /> {errors.startingSkillSelections}
 							</div>
 						)}
 

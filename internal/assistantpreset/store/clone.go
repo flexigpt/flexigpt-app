@@ -35,7 +35,7 @@ func cloneAssistantPreset(in spec.AssistantPreset) spec.AssistantPreset {
 	}
 	out.StartingInstructionTemplateRefs = cloneJSONValue(in.StartingInstructionTemplateRefs)
 	out.StartingToolSelections = cloneJSONValue(in.StartingToolSelections)
-	out.StartingEnabledSkillRefs = cloneJSONValue(in.StartingEnabledSkillRefs)
+	out.StartingSkillSelections = cloneJSONValue(in.StartingSkillSelections)
 
 	return out
 }

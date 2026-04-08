@@ -20,26 +20,38 @@
 			"templateVersion": "v1.0.0"
 		}
 	],
-	"startingEnabledSkillRefs": [
+	"startingSkillSelections": [
 		{
-			"bundleID": "software-dev",
-			"skillSlug": "designing-system-architecture",
-			"skillID": "designing-system-architecture"
+			"skillRef": {
+				"bundleID": "software-dev",
+				"skillSlug": "designing-system-architecture",
+				"skillID": "designing-system-architecture"
+			},
+			"preLoadAsActive": false
 		},
 		{
-			"bundleID": "software-dev",
-			"skillSlug": "refactoring-code",
-			"skillID": "refactoring-code"
+			"skillRef": {
+				"bundleID": "software-dev",
+				"skillSlug": "refactoring-code",
+				"skillID": "refactoring-code"
+			},
+			"preLoadAsActive": false
 		},
 		{
-			"bundleID": "software-dev",
-			"skillSlug": "reviewing-code",
-			"skillID": "reviewing-code"
+			"skillRef": {
+				"bundleID": "software-dev",
+				"skillSlug": "reviewing-code",
+				"skillID": "reviewing-code"
+			},
+			"preLoadAsActive": false
 		},
 		{
-			"bundleID": "software-dev",
-			"skillSlug": "spec-driven-dev",
-			"skillID": "spec-driven-dev"
+			"skillRef": {
+				"bundleID": "software-dev",
+				"skillSlug": "spec-driven-dev",
+				"skillID": "spec-driven-dev"
+			},
+			"preLoadAsActive": false
 		}
 	],
 	"startingToolSelections": [
@@ -80,7 +92,7 @@
 				"toolVersion": "v1.0.0"
 			},
 			"toolChoicePatch": {
-				"autoExecute": false
+				"autoExecute": true
 			}
 		},
 		{
@@ -90,7 +102,7 @@
 				"toolVersion": "v1.0.0"
 			},
 			"toolChoicePatch": {
-				"autoExecute": false
+				"autoExecute": true
 			}
 		},
 		{

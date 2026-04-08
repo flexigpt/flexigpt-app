@@ -54,12 +54,12 @@ type ToolSelectionLookup interface {
 	) (ToolSummary, error)
 }
 
-// SkillLookup validates/loads skill refs without coupling this package
+// SkillLookup validates/loads skill selections without coupling this package
 // to a concrete skill store implementation.
 type SkillLookup interface {
-	GetSkillSummary(
+	GetSkillSummaryForSelection(
 		ctx context.Context,
-		ref skillSpec.SkillRef,
+		selection skillSpec.SkillSelection,
 	) (SkillSummary, error)
 }
 

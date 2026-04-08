@@ -1,7 +1,7 @@
 import type { AssistantModelPresetOption, ModelPresetRef, ProviderPreset } from '@/spec/modelpreset';
 import type { AssistantInstructionTemplateOption, PromptTemplateRef } from '@/spec/prompt';
 import { PromptTemplateKind } from '@/spec/prompt';
-import type { AssistantSkillOption, SkillRef } from '@/spec/skill';
+import type { AssistantSkillOption, SkillSelection } from '@/spec/skill';
 import type { AssistantToolOption, ToolRef } from '@/spec/tool';
 
 import { modelPresetStoreAPI, promptStoreAPI, skillStoreAPI, toolStoreAPI } from '@/apis/baseapi';
@@ -280,17 +280,20 @@ export async function loadSkillOptions(): Promise<AssistantSkillOption[]> {
 			availabilityReason = 'Skill is disabled.';
 		}
 
-		const ref: SkillRef = {
-			bundleID: item.bundleID,
-			skillSlug: item.skillSlug,
-			skillID: skill.id,
+		const sel: SkillSelection = {
+			skillRef: {
+				bundleID: item.bundleID,
+				skillSlug: item.skillSlug,
+				skillID: skill.id,
+			},
+			preLoadAsActive: false,
 		};
 
 		const bundleDisplayName = bundle ? getBundleDisplayName(bundle, item.bundleID) : item.bundleSlug || item.bundleID;
 
 		return {
-			key: buildSkillRefKey(ref),
-			ref,
+			key: buildSkillRefKey(sel.skillRef),
+			sel,
 			skillDefinition: skill,
 
 			bundleSlug: bundle?.slug || item.bundleSlug || item.bundleID,

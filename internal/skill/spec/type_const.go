@@ -85,6 +85,11 @@ type SkillRef struct {
 	SkillID   SkillID       `json:"skillID"`
 }
 
+type SkillSelection struct {
+	SkillRef        SkillRef `json:"skillRef"`
+	PreLoadAsActive bool     `json:"preLoadAsActive"`
+}
+
 // Skill is the storage + management record.
 // It intentionally includes fields that are useful for JSON persistence, indexing, and listing/paging.
 type Skill struct {

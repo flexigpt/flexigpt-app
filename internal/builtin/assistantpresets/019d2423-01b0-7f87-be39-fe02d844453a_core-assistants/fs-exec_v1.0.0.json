@@ -58,7 +58,7 @@
 				"toolVersion": "v1.0.0"
 			},
 			"toolChoicePatch": {
-				"autoExecute": false
+				"autoExecute": true
 			}
 		},
 		{
@@ -68,7 +68,7 @@
 				"toolVersion": "v1.0.0"
 			},
 			"toolChoicePatch": {
-				"autoExecute": false
+				"autoExecute": true
 			}
 		},
 		{

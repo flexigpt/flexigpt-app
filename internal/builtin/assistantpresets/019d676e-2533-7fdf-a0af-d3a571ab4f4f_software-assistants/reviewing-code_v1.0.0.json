@@ -20,11 +20,14 @@
 			"templateVersion": "v1.0.0"
 		}
 	],
-	"startingEnabledSkillRefs": [
+	"startingSkillSelections": [
 		{
-			"bundleID": "software-dev",
-			"skillSlug": "reviewing-code",
-			"skillID": "reviewing-code"
+			"skillRef": {
+				"bundleID": "software-dev",
+				"skillSlug": "reviewing-code",
+				"skillID": "reviewing-code"
+			},
+			"preLoadAsActive": true
 		}
 	],
 	"startingToolSelections": [
@@ -55,7 +58,7 @@
 				"toolVersion": "v1.0.0"
 			},
 			"toolChoicePatch": {
-				"autoExecute": false
+				"autoExecute": true
 			}
 		},
 		{
@@ -65,7 +68,7 @@
 				"toolVersion": "v1.0.0"
 			},
 			"toolChoicePatch": {
-				"autoExecute": false
+				"autoExecute": true
 			}
 		},
 		{

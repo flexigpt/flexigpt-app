@@ -20,11 +20,14 @@
 			"templateVersion": "v1.0.0"
 		}
 	],
-	"startingEnabledSkillRefs": [
+	"startingSkillSelections": [
 		{
-			"bundleID": "software-dev",
-			"skillSlug": "refactoring-code",
-			"skillID": "refactoring-code"
+			"skillRef": {
+				"bundleID": "software-dev",
+				"skillSlug": "refactoring-code",
+				"skillID": "refactoring-code"
+			},
+			"preLoadAsActive": true
 		}
 	],
 	"startingToolSelections": [
@@ -65,7 +68,7 @@
 				"toolVersion": "v1.0.0"
 			},
 			"toolChoicePatch": {
-				"autoExecute": false
+				"autoExecute": true
 			}
 		},
 		{
@@ -75,7 +78,7 @@
 				"toolVersion": "v1.0.0"
 			},
 			"toolChoicePatch": {
-				"autoExecute": false
+				"autoExecute": true
 			}
 		},
 		{

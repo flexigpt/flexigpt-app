@@ -7,7 +7,7 @@ import {
 	type ReasoningType,
 } from '@/spec/inference';
 import type { PromptTemplateRef } from '@/spec/prompt';
-import type { SkillRef } from '@/spec/skill';
+import type { SkillSelection } from '@/spec/skill';
 import type { ToolRef } from '@/spec/tool';
 
 export interface PresetItem {
@@ -27,7 +27,7 @@ export type ErrorState = {
 	modelPatch?: string;
 	startingInstructionTemplateRefs?: string;
 	startingToolSelections?: string;
-	startingEnabledSkillRefs?: string;
+	startingSkillSelections?: string;
 };
 
 export type ModelPatchFormData = {
@@ -75,7 +75,7 @@ export type AssistantPresetFormData = {
 
 	startingInstructionTemplateRefs: PromptTemplateRef[];
 	startingToolSelections: ToolSelectionFormItem[];
-	startingEnabledSkillRefs: SkillRef[];
+	startingSkillSelections: SkillSelection[];
 };
 
 export interface SimpleSelectableOption {

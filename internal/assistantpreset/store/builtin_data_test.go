@@ -79,11 +79,13 @@ func TestBuiltInData_ListBuiltInData_DeepCopyAndGetters(t *testing.T) {
 			},
 		},
 	}
-	preset.StartingEnabledSkillRefs = []skillSpec.SkillRef{
+	preset.StartingSkillSelections = []skillSpec.SkillSelection{
 		{
-			BundleID:  bundleitemutils.BundleID("bundle-a"),
-			SkillSlug: "skill-a",
-			SkillID:   "skill-id-a",
+			SkillRef: skillSpec.SkillRef{
+				BundleID:  bundleitemutils.BundleID("bundle-a"),
+				SkillSlug: "skill-a",
+				SkillID:   "skill-id-a",
+			},
 		},
 	}
 
@@ -105,7 +107,7 @@ func TestBuiltInData_ListBuiltInData_DeepCopyAndGetters(t *testing.T) {
 		ToolSelections: fakeToolSelectionLookup(func(context.Context, toolSpec.ToolSelection) (ToolSummary, error) {
 			return ToolSummary{IsEnabled: true}, nil
 		}),
-		Skills: fakeSkillLookup(func(context.Context, skillSpec.SkillRef) (SkillSummary, error) {
+		Skills: fakeSkillLookup(func(context.Context, skillSpec.SkillSelection) (SkillSummary, error) {
 			return SkillSummary{IsEnabled: true}, nil
 		}),
 	}
@@ -146,7 +148,7 @@ func TestBuiltInData_ListBuiltInData_DeepCopyAndGetters(t *testing.T) {
 	*p.StartingIncludeModelSystemPrompt = false
 	p.StartingInstructionTemplateRefs[0].TemplateSlug = "mutated-template"
 	p.StartingToolSelections[0].ToolRef.ToolSlug = "mutated-tool"
-	p.StartingEnabledSkillRefs[0].SkillSlug = "mutated-skill"
+	p.StartingSkillSelections[0].SkillRef.SkillSlug = "mutated-skill"
 	presets[bundle.ID][preset.ID] = p
 	delete(presets[bundle.ID], preset.ID)
 
@@ -182,8 +184,8 @@ func TestBuiltInData_ListBuiltInData_DeepCopyAndGetters(t *testing.T) {
 	if gotPreset.StartingToolSelections[0].ToolRef.ToolSlug != "tool-a" {
 		t.Fatalf("tool slug = %q, want %q", gotPreset.StartingToolSelections[0].ToolRef.ToolSlug, "tool-a")
 	}
-	if gotPreset.StartingEnabledSkillRefs[0].SkillSlug != "skill-a" {
-		t.Fatalf("skill slug = %q, want %q", gotPreset.StartingEnabledSkillRefs[0].SkillSlug, "skill-a")
+	if gotPreset.StartingSkillSelections[0].SkillRef.SkillSlug != "skill-a" {
+		t.Fatalf("skill slug = %q, want %q", gotPreset.StartingSkillSelections[0].SkillRef.SkillSlug, "skill-a")
 	}
 }
 

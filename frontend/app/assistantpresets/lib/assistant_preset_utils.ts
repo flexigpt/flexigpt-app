@@ -5,7 +5,7 @@ import type {
 } from '@/spec/assistantpreset';
 import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { PromptTemplateRef } from '@/spec/prompt';
-import type { SkillRef } from '@/spec/skill';
+import type { SkillRef, SkillSelection } from '@/spec/skill';
 import type { ToolRef, ToolSelection } from '@/spec/tool';
 
 export interface AssistantPresetUpsertInput extends PutAssistantPresetPayload {
@@ -60,11 +60,18 @@ function cloneToolSelection(selection: ToolSelection): ToolSelection {
 	};
 }
 
-export function cloneSkillRef(ref: SkillRef): SkillRef {
+function cloneSkillRef(ref: SkillRef): SkillRef {
 	return {
 		bundleID: ref.bundleID,
 		skillSlug: ref.skillSlug,
 		skillID: ref.skillID,
+	};
+}
+
+export function cloneSkillSelection(sel: SkillSelection): SkillSelection {
+	return {
+		skillRef: cloneSkillRef(sel.skillRef),
+		preLoadAsActive: sel.preLoadAsActive,
 	};
 }
 
@@ -78,13 +85,13 @@ export function formatAssistantPresetModelRef(ref?: ModelPresetRef): string {
 export function getAssistantPresetCounts(
 	preset: Pick<
 		AssistantPreset,
-		'startingInstructionTemplateRefs' | 'startingToolSelections' | 'startingEnabledSkillRefs'
+		'startingInstructionTemplateRefs' | 'startingToolSelections' | 'startingSkillSelections'
 	>
 ) {
 	return {
 		instructions: preset.startingInstructionTemplateRefs?.length ?? 0,
 		tools: preset.startingToolSelections?.length ?? 0,
-		skills: preset.startingEnabledSkillRefs?.length ?? 0,
+		skills: preset.startingSkillSelections?.length ?? 0,
 	};
 }
 
@@ -188,8 +195,8 @@ export function toPutAssistantPresetPayload(input: AssistantPresetUpsertInput): 
 		payload.startingToolSelections = input.startingToolSelections?.map(cloneToolSelection);
 	}
 
-	if ((input.startingEnabledSkillRefs?.length ?? 0) > 0) {
-		payload.startingEnabledSkillRefs = input.startingEnabledSkillRefs?.map(cloneSkillRef);
+	if ((input.startingSkillSelections?.length ?? 0) > 0) {
+		payload.startingSkillSelections = input.startingSkillSelections?.map(cloneSkillSelection);
 	}
 
 	return payload;

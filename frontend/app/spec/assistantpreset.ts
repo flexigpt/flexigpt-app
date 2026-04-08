@@ -1,6 +1,6 @@
 import type { ModelPresetPatch, ModelPresetRef } from '@/spec/modelpreset';
 import type { PromptTemplateRef } from '@/spec/prompt';
-import type { SkillRef } from '@/spec/skill';
+import type { SkillSelection } from '@/spec/skill';
 import type { ToolSelection } from '@/spec/tool';
 
 export const BASE_ASSISTANT_PRESET_SLUG = 'base';
@@ -22,9 +22,6 @@ export type AssistantPresetStartingModelPresetPatch = Omit<
 	capabilitiesOverride?: never;
 };
 
-/**
- * @public
- */
 export interface AssistantPreset {
 	schemaVersion: string;
 	id: string;
@@ -39,7 +36,7 @@ export interface AssistantPreset {
 	startingIncludeModelSystemPrompt?: boolean;
 	startingInstructionTemplateRefs?: PromptTemplateRef[];
 	startingToolSelections?: ToolSelection[];
-	startingEnabledSkillRefs?: SkillRef[];
+	startingSkillSelections?: SkillSelection[];
 	createdAt: Date; // Go type: time
 	modifiedAt: Date; // Go type: time
 }
@@ -82,5 +79,5 @@ export interface PutAssistantPresetPayload {
 	startingIncludeModelSystemPrompt?: boolean;
 	startingInstructionTemplateRefs?: PromptTemplateRef[];
 	startingToolSelections?: ToolSelection[];
-	startingEnabledSkillRefs?: SkillRef[];
+	startingSkillSelections?: SkillSelection[];
 }

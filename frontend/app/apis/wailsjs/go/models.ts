@@ -350,6 +350,38 @@ export namespace spec {
 	        this.skillID = source["skillID"];
 	    }
 	}
+	export class SkillSelection {
+	    skillRef: SkillRef;
+	    preLoadAsActive: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SkillSelection(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.skillRef = this.convertValues(source["skillRef"], SkillRef);
+	        this.preLoadAsActive = source["preLoadAsActive"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class ToolChoicePatch {
 	    autoExecute?: boolean;
 	    userArgSchemaInstance?: string;
@@ -792,7 +824,7 @@ export namespace spec {
 	    startingIncludeModelSystemPrompt?: boolean;
 	    startingInstructionTemplateRefs?: PromptTemplateRef[];
 	    startingToolSelections?: ToolSelection[];
-	    startingEnabledSkillRefs?: SkillRef[];
+	    startingSkillSelections?: SkillSelection[];
 	    // Go type: time
 	    createdAt: any;
 	    // Go type: time
@@ -817,7 +849,7 @@ export namespace spec {
 	        this.startingIncludeModelSystemPrompt = source["startingIncludeModelSystemPrompt"];
 	        this.startingInstructionTemplateRefs = this.convertValues(source["startingInstructionTemplateRefs"], PromptTemplateRef);
 	        this.startingToolSelections = this.convertValues(source["startingToolSelections"], ToolSelection);
-	        this.startingEnabledSkillRefs = this.convertValues(source["startingEnabledSkillRefs"], SkillRef);
+	        this.startingSkillSelections = this.convertValues(source["startingSkillSelections"], SkillSelection);
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
 	    }
@@ -6459,7 +6491,7 @@ export namespace spec {
 	    startingIncludeModelSystemPrompt?: boolean;
 	    startingInstructionTemplateRefs?: PromptTemplateRef[];
 	    startingToolSelections?: ToolSelection[];
-	    startingEnabledSkillRefs?: SkillRef[];
+	    startingSkillSelections?: SkillSelection[];
 	
 	    static createFrom(source: any = {}) {
 	        return new PutAssistantPresetRequestBody(source);
@@ -6475,7 +6507,7 @@ export namespace spec {
 	        this.startingIncludeModelSystemPrompt = source["startingIncludeModelSystemPrompt"];
 	        this.startingInstructionTemplateRefs = this.convertValues(source["startingInstructionTemplateRefs"], PromptTemplateRef);
 	        this.startingToolSelections = this.convertValues(source["startingToolSelections"], ToolSelection);
-	        this.startingEnabledSkillRefs = this.convertValues(source["startingEnabledSkillRefs"], SkillRef);
+	        this.startingSkillSelections = this.convertValues(source["startingSkillSelections"], SkillSelection);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -7417,6 +7449,7 @@ export namespace spec {
 	
 	    }
 	}
+	
 	
 	
 	

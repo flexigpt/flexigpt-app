@@ -402,11 +402,11 @@ func (f fakeToolSelectionLookup) GetToolSummaryForSelection(
 	return f(ctx, selection)
 }
 
-type fakeSkillLookup func(context.Context, skillSpec.SkillRef) (SkillSummary, error)
+type fakeSkillLookup func(context.Context, skillSpec.SkillSelection) (SkillSummary, error)
 
-func (f fakeSkillLookup) GetSkillSummary(
+func (f fakeSkillLookup) GetSkillSummaryForSelection(
 	ctx context.Context,
-	ref skillSpec.SkillRef,
+	selection skillSpec.SkillSelection,
 ) (SkillSummary, error) {
-	return f(ctx, ref)
+	return f(ctx, selection)
 }

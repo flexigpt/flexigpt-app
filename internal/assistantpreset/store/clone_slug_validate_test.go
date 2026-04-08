@@ -96,11 +96,13 @@ func TestCloneAssistantPreset(t *testing.T) {
 			},
 		},
 	}
-	orig.StartingEnabledSkillRefs = []skillSpec.SkillRef{
+	orig.StartingSkillSelections = []skillSpec.SkillSelection{
 		{
-			BundleID:  bundleitemutils.BundleID("bundle-a"),
-			SkillSlug: "skill-a",
-			SkillID:   "skill-id-a",
+			SkillRef: skillSpec.SkillRef{
+				BundleID:  bundleitemutils.BundleID("bundle-a"),
+				SkillSlug: "skill-a",
+				SkillID:   "skill-id-a",
+			},
 		},
 	}
 
@@ -110,7 +112,7 @@ func TestCloneAssistantPreset(t *testing.T) {
 	*orig.StartingIncludeModelSystemPrompt = false
 	orig.StartingInstructionTemplateRefs[0].TemplateSlug = "changed-template"
 	orig.StartingToolSelections[0].ToolRef.ToolSlug = "changed-tool"
-	orig.StartingEnabledSkillRefs[0].SkillSlug = "changed-skill"
+	orig.StartingSkillSelections[0].SkillRef.SkillSlug = "changed-skill"
 
 	if got.StartingModelPresetRef == nil || got.StartingModelPresetRef.ProviderName != "provider-1" {
 		t.Fatalf("cloned StartingModelPresetRef = %#v", got.StartingModelPresetRef)
@@ -124,8 +126,8 @@ func TestCloneAssistantPreset(t *testing.T) {
 	if got.StartingToolSelections[0].ToolRef.ToolSlug != "tool-a" {
 		t.Fatalf("cloned tool slug = %q, want %q", got.StartingToolSelections[0].ToolRef.ToolSlug, "tool-a")
 	}
-	if got.StartingEnabledSkillRefs[0].SkillSlug != "skill-a" {
-		t.Fatalf("cloned skill slug = %q, want %q", got.StartingEnabledSkillRefs[0].SkillSlug, "skill-a")
+	if got.StartingSkillSelections[0].SkillRef.SkillSlug != "skill-a" {
+		t.Fatalf("cloned skill slug = %q, want %q", got.StartingSkillSelections[0].SkillRef.SkillSlug, "skill-a")
 	}
 }
 
@@ -346,10 +348,12 @@ func TestValidateAssistantPresetStructure(t *testing.T) {
 			ToolVersion: testItemVersion(t),
 		},
 	}
-	dupSkillRef := skillSpec.SkillRef{
-		BundleID:  bundleitemutils.BundleID("bundle-a"),
-		SkillSlug: "skill-a",
-		SkillID:   "skill-id-a",
+	dupSkillSelection := skillSpec.SkillSelection{
+		SkillRef: skillSpec.SkillRef{
+			BundleID:  bundleitemutils.BundleID("bundle-a"),
+			SkillSlug: "skill-a",
+			SkillID:   "skill-id-a",
+		},
 	}
 
 	tests := []struct {
@@ -448,10 +452,10 @@ func TestValidateAssistantPresetStructure(t *testing.T) {
 			name: "duplicate skill refs",
 			preset: func() *spec.AssistantPreset {
 				p := valid
-				p.StartingEnabledSkillRefs = []skillSpec.SkillRef{dupSkillRef, dupSkillRef}
+				p.StartingSkillSelections = []skillSpec.SkillSelection{dupSkillSelection, dupSkillSelection}
 				return &p
 			}(),
-			wantErrContains: "startingEnabledSkillRefs[1]: duplicate ref",
+			wantErrContains: "startingSkillSelections[1]: duplicate skillRef",
 		},
 		{
 			name:   "valid",
@@ -508,10 +512,12 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 			ToolVersion: version,
 		},
 	}
-	skillRef := skillSpec.SkillRef{
-		BundleID:  bundleitemutils.BundleID("bundle-a"),
-		SkillSlug: "skill-a",
-		SkillID:   "skill-id-a",
+	skillSelection := skillSpec.SkillSelection{
+		SkillRef: skillSpec.SkillRef{
+			BundleID:  bundleitemutils.BundleID("bundle-a"),
+			SkillSlug: "skill-a",
+			SkillID:   "skill-id-a",
+		},
 	}
 
 	makeBase := func() *spec.AssistantPreset {
@@ -733,7 +739,7 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 			name: "skill lookup missing",
 			preset: func() *spec.AssistantPreset {
 				p := makeBase()
-				p.StartingEnabledSkillRefs = []skillSpec.SkillRef{skillRef}
+				p.StartingSkillSelections = []skillSpec.SkillSelection{skillSelection}
 				return p
 			}(),
 			wantErrContains: "skill lookup not configured",
@@ -742,29 +748,29 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 			name: "skill lookup error",
 			preset: func() *spec.AssistantPreset {
 				p := makeBase()
-				p.StartingEnabledSkillRefs = []skillSpec.SkillRef{skillRef}
+				p.StartingSkillSelections = []skillSpec.SkillSelection{skillSelection}
 				return p
 			}(),
 			lookups: ReferenceLookups{
-				Skills: fakeSkillLookup(func(context.Context, skillSpec.SkillRef) (SkillSummary, error) {
+				Skills: fakeSkillLookup(func(context.Context, skillSpec.SkillSelection) (SkillSummary, error) {
 					return SkillSummary{}, errors.New("skill boom")
 				}),
 			},
-			wantErrContains: "startingEnabledSkillRefs[0]: skill boom",
+			wantErrContains: "startingSkillSelections[0]: skill boom",
 		},
 		{
 			name: "skill disabled",
 			preset: func() *spec.AssistantPreset {
 				p := makeBase()
-				p.StartingEnabledSkillRefs = []skillSpec.SkillRef{skillRef}
+				p.StartingSkillSelections = []skillSpec.SkillSelection{skillSelection}
 				return p
 			}(),
 			lookups: ReferenceLookups{
-				Skills: fakeSkillLookup(func(context.Context, skillSpec.SkillRef) (SkillSummary, error) {
+				Skills: fakeSkillLookup(func(context.Context, skillSpec.SkillSelection) (SkillSummary, error) {
 					return SkillSummary{IsEnabled: false}, nil
 				}),
 			},
-			wantErrContains: "startingEnabledSkillRefs[0]: referenced skill is disabled",
+			wantErrContains: "startingSkillSelections[0]: referenced skill is disabled",
 		},
 		{
 			name: "all references valid",
@@ -773,7 +779,7 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 				p.StartingModelPresetRef = &modelRef
 				p.StartingInstructionTemplateRefs = []promptSpec.PromptTemplateRef{promptRef1}
 				p.StartingToolSelections = []toolSpec.ToolSelection{toolSel}
-				p.StartingEnabledSkillRefs = []skillSpec.SkillRef{skillRef}
+				p.StartingSkillSelections = []skillSpec.SkillSelection{skillSelection}
 				return p
 			}(),
 			lookups: ReferenceLookups{
@@ -796,7 +802,7 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 						return ToolSummary{IsEnabled: true}, nil
 					},
 				),
-				Skills: fakeSkillLookup(func(context.Context, skillSpec.SkillRef) (SkillSummary, error) {
+				Skills: fakeSkillLookup(func(context.Context, skillSpec.SkillSelection) (SkillSummary, error) {
 					return SkillSummary{IsEnabled: true}, nil
 				}),
 			},
@@ -922,6 +928,41 @@ func TestJSONHelpers(t *testing.T) {
 		k2, err := toolSelectionRefKey(s2)
 		if err != nil {
 			t.Fatalf("toolSelectionRefKey(s2) error: %v", err)
+		}
+
+		if k1 == "" {
+			t.Fatal("empty key")
+		}
+		if k1 != k2 {
+			t.Fatalf("keys differ: %q != %q", k1, k2)
+		}
+	})
+
+	t.Run("skillSelectionRefKey stable for same skillRef", func(t *testing.T) {
+		s1 := skillSpec.SkillSelection{
+			SkillRef: skillSpec.SkillRef{
+				BundleID:  bundleitemutils.BundleID("bundle-a"),
+				SkillSlug: "skill-a",
+				SkillID:   "skill-id-a",
+			},
+			PreLoadAsActive: false,
+		}
+		s2 := skillSpec.SkillSelection{
+			SkillRef: skillSpec.SkillRef{
+				BundleID:  bundleitemutils.BundleID("bundle-a"),
+				SkillSlug: "skill-a",
+				SkillID:   "skill-id-a",
+			},
+			PreLoadAsActive: true,
+		}
+
+		k1, err := skillSelectionRefKey(s1)
+		if err != nil {
+			t.Fatalf("skillSelectionRefKey(s1) error: %v", err)
+		}
+		k2, err := skillSelectionRefKey(s2)
+		if err != nil {
+			t.Fatalf("skillSelectionRefKey(s2) error: %v", err)
 		}
 
 		if k1 == "" {
