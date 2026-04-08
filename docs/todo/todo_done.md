@@ -875,3 +875,10 @@
 
 - [x] jsdom next major
 - [x] vite 8: react router dev support. react router has some cleanup planned with vite8. would be better to wait until react router stamps it as ok.
+
+- [x] better software assistant using new skills.
+  - [x] file level only software dev flow, guidance in tool that if replace text doesnt work fall to file based things.
+  - [x] also parallel work doing is not followed. need to be explicit.
+  - [x] one single shot assistant that asks for changes in one shot and write to files.
+  - [x] one discovery and edit assistant that first discovers things, then confirms and then single shot edit. A slight separation of spec driven dev.
+  - [x] one discovery only assistant that first discovers things via searches, questions etc. may see if this is jsut a phase of above via some skill or different assistant.

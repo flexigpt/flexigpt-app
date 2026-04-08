@@ -2,13 +2,6 @@
 
 ## Laundry list
 
-- [ ] better software assistant using new skills.
-  - [ ] file level only software dev flow, guidance in tool that if replace text doesnt work fall to file based things.
-  - [x] also parallel work doing is not followed. need to be explicit.
-  - [ ] one single shot assistant that asks for changes in one shot and write to files.
-  - [ ] one discovery and edit assistant that first discovers things, then confirms and then single shot edit. A slight separation of spec driven dev.
-  - [ ] one discovery only assistant that first discovers things via searches, questions etc. may see if this is jsut a phase of above via some skill or different assistant.
-
 - [ ] Skill
   - [ ] include some builtin skills and test on all platforms, full flow.
     - [x] include spec driven dev
@@ -25,7 +18,8 @@
 
 - [ ] tools issues
   - [x] flatpak shell path issue. need hostspawn support in llm tools.
-  - [ ] test on flatpak, mac pkg and win
+  - [ ] test on flatpak
+  - [ ] test on mac pkg and win
 
 ## Milestone thoughts
 

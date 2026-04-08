@@ -8,7 +8,6 @@
 	"description": "Elicit requirements and sketch a candidate architecture.",
 	"tags": ["requirements", "architecture", "analysis"],
 	"blocks": [
-		{ "id": "sys", "role": "system", "content": "<sys/>" },
 		{
 			"id": "dev",
 			"role": "developer",

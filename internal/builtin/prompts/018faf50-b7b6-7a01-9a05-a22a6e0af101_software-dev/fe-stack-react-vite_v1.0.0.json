@@ -8,7 +8,6 @@
 	"description": "Implementation plan & snippets for the specified React stack.",
 	"tags": ["frontend", "react", "vite", "tailwind", "typescript"],
 	"blocks": [
-		{ "id": "sys", "role": "system", "content": "<sys/>" },
 		{
 			"id": "dev",
 			"role": "developer",

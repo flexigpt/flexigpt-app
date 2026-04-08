@@ -8,7 +8,6 @@
 	"description": "Generate one Mermaid diagram plus concise commentary.",
 	"tags": ["diagram", "mermaid", "visualisation"],
 	"blocks": [
-		{ "id": "sys", "role": "system", "content": "<sys/>" },
 		{
 			"id": "dev",
 			"role": "developer",

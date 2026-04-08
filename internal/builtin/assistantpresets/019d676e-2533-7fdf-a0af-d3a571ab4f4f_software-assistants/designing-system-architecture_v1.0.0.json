@@ -1,0 +1,94 @@
+{
+	"schemaVersion": "2026-03-22",
+	"id": "019d6ce9-7cfe-753a-b6d6-df719510c9e3",
+	"slug": "designing-system-architecture",
+	"version": "v1.0.0",
+	"displayName": "Designing System Architecture",
+	"description": "Software-dev preset for architecture decisions, boundary mapping, and event-pattern evaluation with read-oriented workspace tools.",
+	"isEnabled": true,
+	"isBuiltIn": true,
+	"startingIncludeModelSystemPrompt": true,
+	"startingInstructionTemplateRefs": [
+		{
+			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
+			"templateSlug": "markdown-output",
+			"templateVersion": "v1.0.0"
+		},
+		{
+			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
+			"templateSlug": "use-explicit-tools-batched",
+			"templateVersion": "v1.0.0"
+		}
+	],
+	"startingEnabledSkillRefs": [
+		{
+			"bundleID": "software-dev",
+			"skillSlug": "designing-system-architecture",
+			"skillID": "designing-system-architecture"
+		}
+	],
+	"startingToolSelections": [
+		{
+			"toolRef": {
+				"bundleID": "018fe0f4-b8cd-7e55-82d5-9df0bd70e400",
+				"toolSlug": "readfile",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": true
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "018fe0f4-b8cd-7e55-82d5-9df0bd70e400",
+				"toolSlug": "searchfiles",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": true
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "018fe0f4-b8cd-7e55-82d5-9df0bd70e400",
+				"toolSlug": "listdirectory",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": false
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "018fe0f4-b8cd-7e55-82d5-9df0bd70e400",
+				"toolSlug": "statpath",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": false
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "019c0da2-02d2-7e71-81d7-35f2e5a0bebf",
+				"toolSlug": "readtextrange",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": true
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "019c0da2-02d2-7e71-81d7-35f2e5a0bebf",
+				"toolSlug": "findtext",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": true
+			}
+		}
+	],
+	"createdAt": "2026-04-08T00:00:00Z",
+	"modifiedAt": "2026-04-08T00:00:00Z"
+}

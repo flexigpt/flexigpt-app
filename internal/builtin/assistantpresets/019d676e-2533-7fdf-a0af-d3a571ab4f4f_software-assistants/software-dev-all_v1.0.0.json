@@ -1,0 +1,169 @@
+{
+	"schemaVersion": "2026-03-22",
+	"id": "019d6cea-28ba-74ca-85fb-05ee26f2e8e2",
+	"slug": "software-dev-all",
+	"version": "v1.0.0",
+	"displayName": "Software Development Workspace",
+	"description": "Aggregate preset with all current software-dev skills and full file, text, and shell tooling enabled.",
+	"isEnabled": true,
+	"isBuiltIn": true,
+	"startingIncludeModelSystemPrompt": true,
+	"startingInstructionTemplateRefs": [
+		{
+			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
+			"templateSlug": "markdown-output",
+			"templateVersion": "v1.0.0"
+		},
+		{
+			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
+			"templateSlug": "use-explicit-tools-batched",
+			"templateVersion": "v1.0.0"
+		}
+	],
+	"startingEnabledSkillRefs": [
+		{
+			"bundleID": "software-dev",
+			"skillSlug": "designing-system-architecture",
+			"skillID": "designing-system-architecture"
+		},
+		{
+			"bundleID": "software-dev",
+			"skillSlug": "refactoring-code",
+			"skillID": "refactoring-code"
+		},
+		{
+			"bundleID": "software-dev",
+			"skillSlug": "reviewing-code",
+			"skillID": "reviewing-code"
+		},
+		{
+			"bundleID": "software-dev",
+			"skillSlug": "spec-driven-dev",
+			"skillID": "spec-driven-dev"
+		}
+	],
+	"startingToolSelections": [
+		{
+			"toolRef": {
+				"bundleID": "018fe0f4-b8cd-7e55-82d5-9df0bd70e400",
+				"toolSlug": "readfile",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": true
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "018fe0f4-b8cd-7e55-82d5-9df0bd70e400",
+				"toolSlug": "searchfiles",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": true
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "018fe0f4-b8cd-7e55-82d5-9df0bd70e400",
+				"toolSlug": "writefile",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": false
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "018fe0f4-b8cd-7e55-82d5-9df0bd70e400",
+				"toolSlug": "listdirectory",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": false
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "018fe0f4-b8cd-7e55-82d5-9df0bd70e400",
+				"toolSlug": "statpath",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": false
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "019c0da2-02d2-7e71-81d7-35f2e5a0bebf",
+				"toolSlug": "readtextrange",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": true
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "019c0da2-02d2-7e71-81d7-35f2e5a0bebf",
+				"toolSlug": "findtext",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": true
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "019c0da2-02d2-7e71-81d7-35f2e5a0bebf",
+				"toolSlug": "inserttextlines",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": false
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "019c0da2-02d2-7e71-81d7-35f2e5a0bebf",
+				"toolSlug": "replacetextlines",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": false
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "019c0da2-02d2-7e71-81d7-35f2e5a0bebf",
+				"toolSlug": "deletetextlines",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": false
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "019c0415-40f7-70cb-9200-d804c9388a57",
+				"toolSlug": "shellcommand",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": false
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "019c0415-40f7-70cb-9200-d804c9388a57",
+				"toolSlug": "runscript",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": false
+			}
+		}
+	],
+	"createdAt": "2026-04-08T00:00:00Z",
+	"modifiedAt": "2026-04-08T00:00:00Z"
+}
