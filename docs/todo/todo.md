@@ -12,7 +12,7 @@
 - [ ] ariakit tooltips on enable web search and all others
 - [ ] skills active and enabled are set properly on convo reload, but the ticks inside the menu are not visible.
 - [ ] set skill as active immediately button is also needed manually
-- [x] have a preloadactive as a bool in assistant preset
+- [x] have a preload active as a bool in assistant preset
   - [x] backend changes
   - [x] ui type adoption
   - [x] ui adoption and runtime injection

@@ -177,12 +177,9 @@ export function SkillsBottomBarChip({
 			>
 				<FiZap size={14} className="shrink-0" />
 				<span className="max-w-24 truncate text-xs font-normal">Skills</span>
-
 				{loading && totalCount === 0 && !isEnabled ? <span className="text-xs opacity-70">Loading…</span> : null}
-
 				{isEnabled ? <span className="badge badge-success badge-xs bg-success/30">{enabledCount} enabled</span> : null}
 				{activeCount > 0 ? <span className="badge badge-success badge-xs">{activeCount} active</span> : null}
-
 				{isEnabled ? <FiCheck size={14} className="shrink-0" /> : <FiX size={14} className="shrink-0" />}
 				{open ? <FiChevronDown size={14} className="shrink-0" /> : <FiChevronUp size={14} className="shrink-0" />}
 			</MenuButton>

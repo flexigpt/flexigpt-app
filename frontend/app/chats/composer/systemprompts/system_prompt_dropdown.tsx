@@ -181,9 +181,7 @@ export function SystemPromptDropdown({
 
 					{activeSourceCount > 0 ? (
 						<>
-							<span className="bg-success/15 text-success rounded-full px-1.5 py-0.5 text-[10px]">
-								{activeSourceCount}
-							</span>
+							<span className="badge badge-success badge-xs bg-success/30">{activeSourceCount}</span>
 							<FiCheck size={16} className="m-0 shrink-0 p-0" />
 						</>
 					) : (
