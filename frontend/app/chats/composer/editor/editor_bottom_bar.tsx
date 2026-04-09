@@ -133,18 +133,9 @@ const menuItemClasses =
  */
 const SystemPromptSection = memo(function SystemPromptSection({
 	systemPrompt,
-	isInputLocked,
 }: {
 	systemPrompt: ComposerSystemPromptController;
-	isInputLocked: boolean;
 }) {
-	const [isOpen, setIsOpen] = useState(false);
-
-	// Render-time state adjustment: close the dropdown when input becomes locked.
-	if (isInputLocked && isOpen) {
-		setIsOpen(false);
-	}
-
 	return (
 		<SystemPromptDropdown
 			prompts={systemPrompt.prompts}
@@ -161,8 +152,6 @@ const SystemPromptSection = memo(function SystemPromptSection({
 			onClearSelected={systemPrompt.clearSelectedPromptSources}
 			onRefreshPrompts={systemPrompt.refreshSystemPrompts}
 			getExistingVersions={systemPrompt.getExistingSystemPromptVersions}
-			isOpen={isOpen}
-			setIsOpen={setIsOpen}
 		/>
 	);
 });
@@ -464,7 +453,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						</MenuItem>
 					</Menu>
 
-					<SystemPromptSection systemPrompt={systemPrompt} isInputLocked={isInputLocked} />
+					<SystemPromptSection systemPrompt={systemPrompt} />
 
 					<PickerButton
 						label="Prompts"

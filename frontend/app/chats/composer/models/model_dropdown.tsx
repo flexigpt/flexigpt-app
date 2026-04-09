@@ -2,11 +2,16 @@ import type { Dispatch, SetStateAction } from 'react';
 
 import { FiCheck } from 'react-icons/fi';
 
-import { Select, SelectItem, SelectPopover, useSelectStore, useStoreState } from '@ariakit/react';
+import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import type { UIChatOption } from '@/spec/modelpreset';
 
-import { ActionTriggerChipContent } from '@/components/action_trigger_chip';
+import {
+	actionTriggerChipButtonClasses,
+	ActionTriggerChipContent,
+	actionTriggerMenuItemClasses,
+	actionTriggerMenuWideClasses,
+} from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 
 const modelKey = (m: UIChatOption) => `${m.providerName}::${m.modelPresetID}`;
@@ -15,74 +20,50 @@ type ModelDropdownProps = {
 	selectedModel: UIChatOption;
 	setSelectedModel: Dispatch<SetStateAction<UIChatOption>>;
 	allOptions: UIChatOption[];
-	isOpen: boolean;
-	setIsOpen: Dispatch<SetStateAction<boolean>>;
 };
 
-export function ModelDropdown({ selectedModel, setSelectedModel, allOptions, isOpen, setIsOpen }: ModelDropdownProps) {
+export function ModelDropdown({ selectedModel, setSelectedModel, allOptions }: ModelDropdownProps) {
 	const currentKey = modelKey(selectedModel);
+	const menu = useMenuStore({ placement: 'top', focusLoop: true });
 
-	const select = useSelectStore({
-		// value is a string key, not the full UIChatOption
-		value: currentKey,
-		setValue: key => {
-			if (typeof key !== 'string') return;
-			const model = allOptions.find(m => modelKey(m) === key);
-			if (model) setSelectedModel(model);
-		},
-
-		// external open state, so parent can still control it
-		open: isOpen,
-		setOpen: setIsOpen,
-
-		placement: 'top-start', // open above the trigger
-
-		focusLoop: true, // circular keyboard navigation
-	});
-
-	const open = useStoreState(select, 'open');
-
+	const open = useStoreState(menu, 'open');
 	const isCurrent = (m: UIChatOption) => modelKey(m) === currentKey;
 
 	return (
 		<div className="flex w-full justify-center">
-			{/* This wrapper is just for layout; no Daisy dropdown widget here */}
 			<div className="relative w-full">
 				<HoverTip content="Select model" placement="top" wrapperElement="div" wrapperClassName="w-full">
-					{/* Trigger button */}
-					<Select
-						store={select}
-						className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-center text-nowrap shadow-none"
-					>
+					<MenuButton store={menu} className={`${actionTriggerChipButtonClasses} w-full flex-1 justify-center`}>
 						<ActionTriggerChipContent
 							label={selectedModel.modelDisplayName}
 							open={open}
 							labelClassName="min-w-0 truncate text-center text-xs font-normal"
 							className="w-full justify-center"
 						/>
-					</Select>
+					</MenuButton>
 				</HoverTip>
 
-				{/* Popover with DaisyUI-like styling, managed by Ariakit */}
-				<SelectPopover
-					store={select}
-					portal={false}
-					gutter={4}
+				<Menu
+					store={menu}
+					portal
+					gutter={8}
+					overflowPadding={8}
 					autoFocusOnShow
-					sameWidth
-					className="border-base-300 bg-base-100 z-50 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border p-1 text-xs shadow-lg outline-none"
+					className={`${actionTriggerMenuWideClasses} text-xs`}
 				>
 					{allOptions.map(model => (
-						<SelectItem
+						<MenuItem
 							key={modelKey(model)}
-							value={modelKey(model)}
-							className="hover:bg-base-200 data-active-item:bg-base-300 m-0 flex cursor-pointer items-center justify-between rounded-md px-2 py-1 transition-colors outline-none"
+							className={`${actionTriggerMenuItemClasses} justify-between`}
+							onClick={() => {
+								setSelectedModel(model);
+							}}
 						>
-							<span>{model.modelDisplayName}</span>
-							{isCurrent(model) && <FiCheck />}
-						</SelectItem>
+							<span className="truncate">{model.modelDisplayName}</span>
+							{isCurrent(model) ? <FiCheck /> : null}
+						</MenuItem>
 					))}
-				</SelectPopover>
+				</Menu>
 			</div>
 		</div>
 	);

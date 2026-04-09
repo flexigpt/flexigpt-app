@@ -76,7 +76,7 @@ export function SkillsBottomBarChip({
 	onDisableAll: () => void;
 	isInputLocked?: boolean;
 }) {
-	const menu = useMenuStore({ placement: 'top-end', focusLoop: true });
+	const menu = useMenuStore({ placement: 'top', focusLoop: true });
 	const open = useStoreState(menu, 'open');
 
 	useEffect(() => {

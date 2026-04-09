@@ -6,7 +6,7 @@
 - [ ] composer: see if grammar rectification or atleast spell check and highlight can be added cleanly
 - [ ] set skill as active immediately button is also needed manually
 
-- [ ] context bar: ariakit menu styling and tooltips proper.
+- [ ] for anthropic tool results should be before tool use and then other messages it seems.
 
 - [ ] Skill
   - [ ] include some builtin skills and test on all platforms, full flow.

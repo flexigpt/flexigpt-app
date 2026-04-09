@@ -78,13 +78,8 @@ export function AttachmentContentBlockModeMenu({
 	attachment,
 	onChangeAttachmentContentBlockMode,
 }: AttachmentContentBlockModeMenuProps) {
-	const menu = useMenuStore({
-		placement: 'top-start',
-		focusLoop: true,
-	});
-
+	const menu = useMenuStore({ placement: 'top-start', focusLoop: true });
 	const open = useStoreState(menu, 'open');
-
 	const currentLabel = getAttachmentContentBlockModeLabel(attachment.mode);
 	const tooltip = getAttachmentContentBlockModeTooltip(attachment.mode);
 

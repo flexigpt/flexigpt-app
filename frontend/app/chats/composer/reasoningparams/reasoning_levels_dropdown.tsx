@@ -1,20 +1,21 @@
-import type { Dispatch, SetStateAction } from 'react';
-
 import { FiCheck } from 'react-icons/fi';
 
-import { Select, SelectItem, SelectPopover, useSelectStore, useStoreState } from '@ariakit/react';
+import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import { ReasoningLevel } from '@/spec/inference';
 
-import { ActionTriggerChipContent } from '@/components/action_trigger_chip';
+import {
+	actionTriggerChipButtonClasses,
+	ActionTriggerChipContent,
+	actionTriggerMenuCompactClasses,
+	actionTriggerMenuItemClasses,
+} from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 
 type SingleReasoningDropdownProps = {
 	reasoningLevel: ReasoningLevel;
 	levelOptions?: ReasoningLevel[];
 	setReasoningLevel: (level: ReasoningLevel) => void;
-	isOpen: boolean;
-	setIsOpen: Dispatch<SetStateAction<boolean>>;
 };
 
 const levelDisplayNames: Record<ReasoningLevel, string> = {
@@ -38,62 +39,47 @@ export function SingleReasoningDropdown({
 	reasoningLevel,
 	levelOptions,
 	setReasoningLevel,
-	isOpen,
-	setIsOpen,
 }: SingleReasoningDropdownProps) {
 	const options = (levelOptions && levelOptions.length > 0 ? levelOptions : DEFAULT_LEVEL_OPTIONS).filter(Boolean);
+	const menu = useMenuStore({ placement: 'top', focusLoop: true });
 
-	const select = useSelectStore({
-		value: reasoningLevel,
-		setValue: value => {
-			if (typeof value === 'string' || typeof value === 'number') {
-				setReasoningLevel(value as ReasoningLevel);
-			}
-		},
-		open: isOpen,
-		setOpen: setIsOpen,
-		placement: 'top-start',
-		focusLoop: true,
-	});
-
-	const open = useStoreState(select, 'open');
+	const open = useStoreState(menu, 'open');
 
 	return (
 		<div className="flex w-full justify-center">
 			<div className="relative w-full">
 				<HoverTip content="Set reasoning level" placement="top" wrapperElement="div" wrapperClassName="w-full">
-					<Select
-						store={select}
-						className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-center text-nowrap shadow-none"
-					>
+					<MenuButton store={menu} className={`${actionTriggerChipButtonClasses} w-full flex-1 justify-center`}>
 						<ActionTriggerChipContent
 							label={`Reasoning: ${levelDisplayNames[reasoningLevel]}`}
 							open={open}
 							labelClassName="min-w-0 truncate text-center text-xs font-normal"
 							className="w-full justify-center"
 						/>
-					</Select>
+					</MenuButton>
 				</HoverTip>
 
-				<SelectPopover
-					store={select}
-					portal={false}
-					gutter={4}
+				<Menu
+					store={menu}
+					portal
+					gutter={8}
+					overflowPadding={8}
 					autoFocusOnShow
-					sameWidth
-					className="border-base-300 bg-base-100 z-50 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border p-1 text-xs shadow-lg outline-none"
+					className={`${actionTriggerMenuCompactClasses} text-xs`}
 				>
 					{options.map(level => (
-						<SelectItem
+						<MenuItem
 							key={level}
-							value={level}
-							className="hover:bg-base-200 data-active-item:bg-base-300 m-0 flex cursor-pointer items-center justify-between rounded-md px-2 py-1 text-xs transition-colors outline-none"
+							className={`${actionTriggerMenuItemClasses} justify-between`}
+							onClick={() => {
+								setReasoningLevel(level);
+							}}
 						>
 							<span>{levelDisplayNames[level]}</span>
-							{reasoningLevel === level && <FiCheck />}
-						</SelectItem>
+							{reasoningLevel === level ? <FiCheck /> : null}
+						</MenuItem>
 					))}
-				</SelectPopover>
+				</Menu>
 			</div>
 		</div>
 	);

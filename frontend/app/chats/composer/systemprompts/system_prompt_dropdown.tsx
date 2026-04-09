@@ -1,4 +1,4 @@
-import { type Dispatch, type SetStateAction, type SyntheticEvent, useCallback, useMemo, useRef, useState } from 'react';
+import { type SyntheticEvent, useCallback, useMemo, useRef, useState } from 'react';
 
 import { FiCheck, FiGitBranch, FiPlus, FiX } from 'react-icons/fi';
 
@@ -34,8 +34,6 @@ type SystemPromptDropdownProps = {
 	onClearSelected: () => void;
 	onRefreshPrompts: () => Promise<void>;
 	getExistingVersions: (bundleID: string, slug: string) => string[];
-	isOpen: boolean;
-	setIsOpen: Dispatch<SetStateAction<boolean>>;
 };
 
 function pickInitialBundleID(
@@ -79,8 +77,6 @@ export function SystemPromptDropdown({
 	onClearSelected,
 	onRefreshPrompts,
 	getExistingVersions,
-	isOpen,
-	setIsOpen,
 }: SystemPromptDropdownProps) {
 	const [modalMode, setModalMode] = useState<'add' | 'fork'>('add');
 	const [isComposerOpen, setIsComposerOpen] = useState(false);
@@ -104,12 +100,7 @@ export function SystemPromptDropdown({
 		[includeModelDefault, modelDefaultPrompt, promptsByKey, selectedPromptKeys]
 	);
 
-	const menu = useMenuStore({
-		open: isOpen,
-		setOpen: setIsOpen,
-		placement: 'top-start',
-		focusLoop: true,
-	});
+	const menu = useMenuStore({ placement: 'top', focusLoop: true });
 
 	const lastRefreshTsRef = useRef(0);
 	const open = useStoreState(menu, 'open');
@@ -161,11 +152,11 @@ export function SystemPromptDropdown({
 			role: PromptRoleEnum.System,
 			content: '',
 		});
-		setIsOpen(false);
+
 		requestAnimationFrame(() => {
 			setIsComposerOpen(true);
 		});
-	}, [bundles, preferredBundleID, setIsOpen]);
+	}, [bundles, preferredBundleID]);
 
 	const openForkModal = useCallback(
 		(item: SystemPromptItem) => {
@@ -184,12 +175,12 @@ export function SystemPromptDropdown({
 				role: item.role,
 				content: item.prompt,
 			});
-			setIsOpen(false);
+
 			requestAnimationFrame(() => {
 				setIsComposerOpen(true);
 			});
 		},
-		[bundles, preferredBundleID, setIsOpen]
+		[bundles, preferredBundleID]
 	);
 
 	return (

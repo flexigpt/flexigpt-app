@@ -1,10 +1,13 @@
-import type { Dispatch, SetStateAction } from 'react';
-
 import { FiCheck } from 'react-icons/fi';
 
-import { Select, SelectItem, SelectPopover, useSelectStore, useStoreState } from '@ariakit/react';
+import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
-import { ActionTriggerChipContent } from '@/components/action_trigger_chip';
+import {
+	actionTriggerChipButtonClasses,
+	ActionTriggerChipContent,
+	actionTriggerMenuCompactClasses,
+	actionTriggerMenuItemClasses,
+} from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 
 const defaultTokenOptions = [1024, 8192, 32000];
@@ -12,27 +15,12 @@ const defaultTokenOptions = [1024, 8192, 32000];
 type ReasoningTokensDropdownProps = {
 	tokens: number;
 	setTokens: (tokens: number) => void;
-	isOpen: boolean;
-	setIsOpen: Dispatch<SetStateAction<boolean>>;
 };
 
-export function ReasoningTokensDropdown({ tokens, setTokens, isOpen, setIsOpen }: ReasoningTokensDropdownProps) {
-	const select = useSelectStore({
-		value: tokens.toString(),
-		setValue: value => {
-			if (typeof value !== 'string') return;
-			let v = parseInt(value, 10);
-			if (isNaN(v)) return;
-			if (v < 1024) v = 1024;
-			setTokens(v);
-		},
-		open: isOpen,
-		setOpen: setIsOpen,
-		placement: 'top-start',
-		focusLoop: true,
-	});
+export function ReasoningTokensDropdown({ tokens, setTokens }: ReasoningTokensDropdownProps) {
+	const menu = useMenuStore({ placement: 'top', focusLoop: true });
 
-	const open = useStoreState(select, 'open');
+	const open = useStoreState(menu, 'open');
 
 	function clampTokens(rawValue: string) {
 		let val = parseInt(rawValue, 10);
@@ -43,47 +31,43 @@ export function ReasoningTokensDropdown({ tokens, setTokens, isOpen, setIsOpen }
 			val = 1024;
 		}
 		setTokens(val);
-		setIsOpen(false);
 	}
 
 	return (
 		<div className="flex w-full justify-center">
 			<div className="relative w-full">
 				<HoverTip content="Set effort tokens" placement="top" wrapperElement="div" wrapperClassName="w-full">
-					<Select
-						store={select}
-						className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-center text-nowrap shadow-none"
-					>
+					<MenuButton store={menu} className={`${actionTriggerChipButtonClasses} w-full flex-1 justify-center`}>
 						<ActionTriggerChipContent
 							label={`Effort tokens: ${tokens}`}
 							open={open}
 							labelClassName="min-w-0 truncate text-center text-xs font-normal"
 							className="w-full justify-center"
 						/>
-					</Select>
+					</MenuButton>
 				</HoverTip>
 
-				<SelectPopover
-					store={select}
-					portal={false}
-					gutter={4}
+				<Menu
+					store={menu}
+					portal
+					gutter={8}
+					overflowPadding={8}
 					autoFocusOnShow
-					sameWidth
-					className="border-base-300 bg-base-100 z-50 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border p-4 text-xs shadow-lg outline-none"
+					className={`${actionTriggerMenuCompactClasses} p-4 text-xs`}
 				>
-					{/* Preset token options */}
 					{defaultTokenOptions.map(tk => (
-						<SelectItem
+						<MenuItem
 							key={tk}
-							value={tk.toString()}
-							className="hover:bg-base-200 data-active-item:bg-base-300 m-0 flex cursor-pointer items-center justify-between rounded-md px-2 py-1 text-xs transition-colors outline-none"
+							className={`${actionTriggerMenuItemClasses} justify-between`}
+							onClick={() => {
+								setTokens(tk);
+							}}
 						>
 							<span>{tk}</span>
-							{tokens === tk && <FiCheck />}
-						</SelectItem>
+							{tokens === tk ? <FiCheck /> : null}
+						</MenuItem>
 					))}
 
-					{/* Custom token input */}
 					<div className="border-neutral/20 mt-2 border-t pt-2 text-xs">
 						<div className="text-base-content/70 mb-1 text-xs">Custom (≥ 1024)</div>
 						<input
@@ -104,7 +88,7 @@ export function ReasoningTokensDropdown({ tokens, setTokens, isOpen, setIsOpen }
 							}}
 						/>
 					</div>
-				</SelectPopover>
+				</Menu>
 			</div>
 		</div>
 	);

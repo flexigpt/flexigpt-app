@@ -1,10 +1,11 @@
-import { type SetStateAction, useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { FiSliders } from 'react-icons/fi';
 
 import { ReasoningType } from '@/spec/inference';
 import { type UIChatOption } from '@/spec/modelpreset';
 
+import { actionTriggerChipButtonClasses, ActionTriggerChipContent } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 
 import { AdvancedParamsModal } from '@/chats/composer/advancedparams/advanced_params_modal';
@@ -35,8 +36,6 @@ type EditorContextBarProps = {
 	>;
 };
 
-type EditorContextBarMenuKey = 'assistant' | 'model' | 'secondary' | 'verbosity' | 'previous' | null;
-
 type AssistantPresetViewState = {
 	option: AssistantPresetOptionItem | null;
 	preparedApplication: AssistantPresetPreparedApplication | null;
@@ -44,60 +43,8 @@ type AssistantPresetViewState = {
 };
 
 export function EditorContextBar({ context, assistantPreset, systemPrompt }: EditorContextBarProps) {
-	const [openMenu, setOpenMenu] = useState<EditorContextBarMenuKey>(null);
 	const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);
 	const [isAssistantViewModalOpen, setIsAssistantViewModalOpen] = useState(false);
-
-	const setMenuOpen = useCallback(
-		(menuKey: Exclude<EditorContextBarMenuKey, null>, action: SetStateAction<boolean>) => {
-			setOpenMenu(prevOpenMenu => {
-				const currentIsOpen = prevOpenMenu === menuKey;
-				const nextIsOpen = typeof action === 'function' ? action(currentIsOpen) : action;
-
-				if (nextIsOpen) return menuKey;
-				return currentIsOpen ? null : prevOpenMenu;
-			});
-		},
-		[]
-	);
-
-	const isAssistantDropdownOpen = openMenu === 'assistant';
-	const isModelDropdownOpen = openMenu === 'model';
-	const isSecondaryDropdownOpen = openMenu === 'secondary';
-	const isVerbosityDropdownOpen = openMenu === 'verbosity';
-	const isPreviousMessagesDropdownOpen = openMenu === 'previous';
-
-	const setIsAssistantDropdownOpen = useCallback(
-		(action: SetStateAction<boolean>) => {
-			setMenuOpen('assistant', action);
-		},
-		[setMenuOpen]
-	);
-
-	const setIsModelDropdownOpen = useCallback(
-		(action: SetStateAction<boolean>) => {
-			setMenuOpen('model', action);
-		},
-		[setMenuOpen]
-	);
-	const setIsSecondaryDropdownOpen = useCallback(
-		(action: SetStateAction<boolean>) => {
-			setMenuOpen('secondary', action);
-		},
-		[setMenuOpen]
-	);
-	const setIsVerbosityDropdownOpen = useCallback(
-		(action: SetStateAction<boolean>) => {
-			setMenuOpen('verbosity', action);
-		},
-		[setMenuOpen]
-	);
-	const setIsPreviousMessagesDropdownOpen = useCallback(
-		(action: SetStateAction<boolean>) => {
-			setMenuOpen('previous', action);
-		},
-		[setMenuOpen]
-	);
 
 	const [assistantPresetViewState, setAssistantPresetViewState] = useState<AssistantPresetViewState>({
 		option: null,
@@ -108,8 +55,6 @@ export function EditorContextBar({ context, assistantPreset, systemPrompt }: Edi
 
 	const openAssistantPresetView = useCallback(
 		(option: AssistantPresetOptionItem) => {
-			setOpenMenu(null);
-
 			const activePresetKey =
 				assistantPreset.selectedPresetKey ?? assistantPreset.appliedPresetApplication?.presetKey ?? null;
 			const isActivePreset = activePresetKey === option.key;
@@ -186,15 +131,11 @@ export function EditorContextBar({ context, assistantPreset, systemPrompt }: Edi
 				canResetToBasePreset={
 					assistantPreset.presetOptions.some(option => option.isSelectable) && !assistantPreset.isBasePresetSelected
 				}
-				isOpen={isAssistantDropdownOpen}
-				setIsOpen={setIsAssistantDropdownOpen}
 				onViewPreset={openAssistantPresetView}
 				onReapplySelectedPreset={() => {
-					setOpenMenu(null);
 					return assistantPreset.reapplySelectedPreset();
 				}}
 				onResetToBasePreset={() => {
-					setOpenMenu(null);
 					return assistantPreset.resetToBasePreset();
 				}}
 				onSelectPreset={assistantPreset.selectPreset}
@@ -204,8 +145,6 @@ export function EditorContextBar({ context, assistantPreset, systemPrompt }: Edi
 				selectedModel={context.selectedModel}
 				setSelectedModel={context.handleSetSelectedModel}
 				allOptions={context.allOptions}
-				isOpen={isModelDropdownOpen}
-				setIsOpen={setIsModelDropdownOpen}
 			/>
 
 			{context.selectedModel.reasoning?.type === ReasoningType.HybridWithTokens && (
@@ -220,15 +159,11 @@ export function EditorContextBar({ context, assistantPreset, systemPrompt }: Edi
 					<ReasoningTokensDropdown
 						tokens={context.selectedModel.reasoning.tokens}
 						setTokens={context.setHybridTokens}
-						isOpen={isSecondaryDropdownOpen}
-						setIsOpen={setIsSecondaryDropdownOpen}
 					/>
 				) : (
 					<TemperatureDropdown
 						temperature={context.selectedModel.temperature ?? 0.1}
 						setTemperature={context.setTemperature}
-						isOpen={isSecondaryDropdownOpen}
-						setIsOpen={setIsSecondaryDropdownOpen}
 					/>
 				)
 			) : context.selectedModel.reasoning?.type === ReasoningType.SingleWithLevels ? (
@@ -236,15 +171,11 @@ export function EditorContextBar({ context, assistantPreset, systemPrompt }: Edi
 					reasoningLevel={context.selectedModel.reasoning.level}
 					setReasoningLevel={context.setReasoningLevel}
 					levelOptions={context.reasoningLevelOptions}
-					isOpen={isSecondaryDropdownOpen}
-					setIsOpen={setIsSecondaryDropdownOpen}
 				/>
 			) : (
 				<TemperatureDropdown
 					temperature={context.selectedModel.temperature ?? 0.1}
 					setTemperature={context.setTemperature}
-					isOpen={isSecondaryDropdownOpen}
-					setIsOpen={setIsSecondaryDropdownOpen}
 				/>
 			)}
 
@@ -253,17 +184,10 @@ export function EditorContextBar({ context, assistantPreset, systemPrompt }: Edi
 					verbosity={context.selectedModel.outputParam?.verbosity}
 					setVerbosity={context.setOutputVerbosity}
 					disabled={!context.verbosityEnabled}
-					isOpen={isVerbosityDropdownOpen}
-					setIsOpen={setIsVerbosityDropdownOpen}
 				/>
 			)}
 
-			<PreviousMessagesDropdown
-				value={context.includePreviousMessages}
-				setValue={context.setIncludePreviousMessages}
-				isOpen={isPreviousMessagesDropdownOpen}
-				setIsOpen={setIsPreviousMessagesDropdownOpen}
-			/>
+			<PreviousMessagesDropdown value={context.includePreviousMessages} setValue={context.setIncludePreviousMessages} />
 
 			<div className="flex items-center justify-center">
 				<HoverTip
@@ -272,13 +196,18 @@ export function EditorContextBar({ context, assistantPreset, systemPrompt }: Edi
 				>
 					<button
 						type="button"
-						className="btn btn-xs btn-ghost text-neutral-custom m-1"
+						className={`${actionTriggerChipButtonClasses} justify-center`}
 						onClick={() => {
-							setOpenMenu(null);
 							setIsAdvancedModalOpen(true);
 						}}
 					>
-						<FiSliders size={14} />
+						<ActionTriggerChipContent
+							icon={<FiSliders size={14} />}
+							label=""
+							showChevron={false}
+							className="justify-center"
+							labelClassName="truncate text-xs font-normal"
+						/>
 					</button>
 				</HoverTip>
 			</div>

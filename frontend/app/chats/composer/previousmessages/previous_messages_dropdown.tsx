@@ -2,28 +2,27 @@ import type { Dispatch, SetStateAction } from 'react';
 
 import { FiCheck } from 'react-icons/fi';
 
-import { Select, SelectItem, SelectPopover, useSelectStore, useStoreState } from '@ariakit/react';
+import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import type { IncludePreviousMessages } from '@/spec/modelpreset';
 
-import { ActionTriggerChipContent } from '@/components/action_trigger_chip';
+import {
+	actionTriggerChipButtonClasses,
+	ActionTriggerChipContent,
+	actionTriggerMenuCompactClasses,
+	actionTriggerMenuItemClasses,
+} from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 
 type PreviousMessagesDropdownProps = {
 	value: IncludePreviousMessages;
 	setValue: Dispatch<SetStateAction<IncludePreviousMessages>>;
-	isOpen: boolean;
-	setIsOpen: Dispatch<SetStateAction<boolean>>;
 };
 
 const OPTIONS: IncludePreviousMessages[] = [1, 2, 3, 0, 'all'];
 
 function valueToKey(value: IncludePreviousMessages): string {
 	return value === 'all' ? 'all' : String(value);
-}
-
-function keyToValue(key: string): IncludePreviousMessages {
-	return key === 'all' ? 'all' : Math.max(0, Number.parseInt(key, 10) || 0);
 }
 
 function displayButtonValue(value: IncludePreviousMessages): string {
@@ -50,29 +49,17 @@ function maybeParseCustomValue(rawValue: string): IncludePreviousMessages | unde
 	return parsed;
 }
 
-export function PreviousMessagesDropdown({ value, setValue, isOpen, setIsOpen }: PreviousMessagesDropdownProps) {
-	const select = useSelectStore({
-		value: valueToKey(value),
-		setValue: nextValue => {
-			if (typeof nextValue !== 'string') return;
-			setValue(keyToValue(nextValue));
-		},
-		open: isOpen,
-		setOpen: setIsOpen,
-		placement: 'top-start',
-		focusLoop: true,
-	});
+export function PreviousMessagesDropdown({ value, setValue }: PreviousMessagesDropdownProps) {
+	const menu = useMenuStore({ placement: 'top', focusLoop: true });
 
-	const open = useStoreState(select, 'open');
+	const open = useStoreState(menu, 'open');
 	const commitCustomValue = (rawValue: string) => {
 		const nextValue = maybeParseCustomValue(rawValue);
 		if (nextValue === undefined) {
-			setIsOpen(false);
 			return;
 		}
 
 		setValue(nextValue);
-		setIsOpen(false);
 	};
 
 	return (
@@ -91,38 +78,37 @@ export function PreviousMessagesDropdown({ value, setValue, isOpen, setIsOpen }:
 						</div>
 					}
 				>
-					<Select
-						store={select}
-						className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none text-center text-nowrap shadow-none"
-					>
+					<MenuButton store={menu} className={`${actionTriggerChipButtonClasses} w-full flex-1 justify-center`}>
 						<ActionTriggerChipContent
 							label={`Prev user turns: ${displayButtonValue(value)}`}
 							open={open}
 							labelClassName="min-w-0 truncate text-center text-xs font-normal"
 							className="w-full justify-center"
 						/>
-					</Select>
+					</MenuButton>
 				</HoverTip>
 
-				<SelectPopover
-					store={select}
-					portal={false}
-					gutter={4}
+				<Menu
+					store={menu}
+					portal
+					gutter={8}
+					overflowPadding={8}
 					autoFocusOnShow
-					sameWidth
-					className="border-base-300 bg-base-100 z-50 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border p-1 text-xs shadow-lg outline-none"
+					className={`${actionTriggerMenuCompactClasses} text-xs`}
 				>
 					{OPTIONS.map(option => {
 						const key = valueToKey(option);
 						return (
-							<SelectItem
+							<MenuItem
 								key={key}
-								value={key}
-								className="hover:bg-base-200 data-active-item:bg-base-300 m-0 flex cursor-pointer items-center justify-between rounded-md px-2 py-1 text-xs transition-colors outline-none"
+								className={`${actionTriggerMenuItemClasses} justify-between`}
+								onClick={() => {
+									setValue(option);
+								}}
 							>
 								<span>{displayOptionLabel(option)}</span>
-								{value === option && <FiCheck />}
-							</SelectItem>
+								{value === option ? <FiCheck /> : null}
+							</MenuItem>
 						);
 					})}
 
@@ -147,7 +133,7 @@ export function PreviousMessagesDropdown({ value, setValue, isOpen, setIsOpen }:
 							}}
 						/>
 					</div>
-				</SelectPopover>
+				</Menu>
 			</div>
 		</div>
 	);

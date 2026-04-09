@@ -46,7 +46,7 @@ export function WebSearchBottomBarChip({
 	const hasDropdown = eligibleTools.length > 1;
 
 	// Hooks must not be conditional; safe to always create the store.
-	const menu = useMenuStore({ placement: 'top-end', focusLoop: true });
+	const menu = useMenuStore({ placement: 'top', focusLoop: true });
 	const open = useStoreState(menu, 'open');
 
 	useEffect(() => {

@@ -147,9 +147,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		isBusy: isInputLocked,
 	});
 
-	const templateMenu = useMenuStore({ placement: 'top-start', focusLoop: true });
-	const toolMenu = useMenuStore({ placement: 'top-start', focusLoop: true });
-	const attachmentMenu = useMenuStore({ placement: 'top-start', focusLoop: true });
+	const templateMenu = useMenuStore({ placement: 'top', focusLoop: true });
+	const toolMenu = useMenuStore({ placement: 'top', focusLoop: true });
+	const attachmentMenu = useMenuStore({ placement: 'top', focusLoop: true });
 	const templateButtonRef = useRef<HTMLButtonElement | null>(null);
 	const toolButtonRef = useRef<HTMLButtonElement | null>(null);
 	const attachmentButtonRef = useRef<HTMLButtonElement | null>(null);
