@@ -1,19 +1,13 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-import { FiCheck, FiChevronDown, FiChevronUp } from 'react-icons/fi';
+import { FiCheck } from 'react-icons/fi';
 
-import {
-	Select,
-	SelectItem,
-	SelectPopover,
-	Tooltip,
-	TooltipAnchor,
-	useSelectStore,
-	useStoreState,
-	useTooltipStore,
-} from '@ariakit/react';
+import { Select, SelectItem, SelectPopover, useSelectStore, useStoreState } from '@ariakit/react';
 
 import type { IncludePreviousMessages } from '@/spec/modelpreset';
+
+import { ActionTriggerChipContent } from '@/components/action_trigger_chip';
+import { HoverTip } from '@/components/ariakit_hover_tip';
 
 type PreviousMessagesDropdownProps = {
 	value: IncludePreviousMessages;
@@ -69,10 +63,6 @@ export function PreviousMessagesDropdown({ value, setValue, isOpen, setIsOpen }:
 		focusLoop: true,
 	});
 
-	const tooltip = useTooltipStore({
-		placement: 'top',
-	});
-
 	const open = useStoreState(select, 'open');
 	const commitCustomValue = (rawValue: string) => {
 		const nextValue = maybeParseCustomValue(rawValue);
@@ -84,35 +74,35 @@ export function PreviousMessagesDropdown({ value, setValue, isOpen, setIsOpen }:
 		setValue(nextValue);
 		setIsOpen(false);
 	};
+
 	return (
 		<div className="flex w-full justify-center">
 			<div className="relative w-full">
-				<Select
-					store={select}
-					className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none text-center text-nowrap shadow-none"
+				<HoverTip
+					placement="top"
+					wrapperElement="div"
+					wrapperClassName="w-full"
+					content={
+						<div className="space-y-1">
+							<p>
+								- Send "N" previous pure user turns excluding current message. <br />
+								- A pure user turn is one without any tool outputs. <br />
+							</p>
+						</div>
+					}
 				>
-					<TooltipAnchor store={tooltip} render={<span className="truncate text-center text-xs font-normal" />}>
-						Prev user turns: {displayButtonValue(value)}
-					</TooltipAnchor>
-
-					{open ? (
-						<FiChevronDown size={16} className="ml-2 shrink-0" />
-					) : (
-						<FiChevronUp size={16} className="ml-2 shrink-0" />
-					)}
-				</Select>
-
-				<Tooltip
-					store={tooltip}
-					className="bg-base-100 text-base-content z-50 max-w-sm rounded-md px-3 py-2 text-xs leading-4 shadow-lg"
-				>
-					<div className="space-y-1">
-						<p>
-							- Send "N" previous pure user turns excluding current message. <br />
-							- A pure user turn is one without any tool outputs. <br />
-						</p>
-					</div>
-				</Tooltip>
+					<Select
+						store={select}
+						className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none text-center text-nowrap shadow-none"
+					>
+						<ActionTriggerChipContent
+							label={`Prev user turns: ${displayButtonValue(value)}`}
+							open={open}
+							labelClassName="min-w-0 truncate text-center text-xs font-normal"
+							className="w-full justify-center"
+						/>
+					</Select>
+				</HoverTip>
 
 				<SelectPopover
 					store={select}

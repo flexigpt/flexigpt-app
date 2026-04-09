@@ -1,10 +1,13 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-import { FiCheck, FiChevronDown, FiChevronUp } from 'react-icons/fi';
+import { FiCheck } from 'react-icons/fi';
 
 import { Select, SelectItem, SelectPopover, useSelectStore, useStoreState } from '@ariakit/react';
 
 import type { UIChatOption } from '@/spec/modelpreset';
+
+import { ActionTriggerChipContent } from '@/components/action_trigger_chip';
+import { HoverTip } from '@/components/ariakit_hover_tip';
 
 const modelKey = (m: UIChatOption) => `${m.providerName}::${m.modelPresetID}`;
 
@@ -45,20 +48,20 @@ export function ModelDropdown({ selectedModel, setSelectedModel, allOptions, isO
 		<div className="flex w-full justify-center">
 			{/* This wrapper is just for layout; no Daisy dropdown widget here */}
 			<div className="relative w-full">
-				{/* Trigger button */}
-				<Select
-					store={select}
-					className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-center text-nowrap shadow-none"
-					title="Select Model"
-				>
-					<span className="min-w-0 truncate text-center text-xs font-normal">{selectedModel.modelDisplayName}</span>
-					{/* Chevron UP when closed, DOWN when open */}
-					{open ? (
-						<FiChevronDown size={16} className="ml-1 shrink-0 xl:ml-2" />
-					) : (
-						<FiChevronUp size={16} className="ml-1 shrink-0 xl:ml-2" />
-					)}
-				</Select>
+				<HoverTip content="Select model" placement="top" wrapperElement="div" wrapperClassName="w-full">
+					{/* Trigger button */}
+					<Select
+						store={select}
+						className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-center text-nowrap shadow-none"
+					>
+						<ActionTriggerChipContent
+							label={selectedModel.modelDisplayName}
+							open={open}
+							labelClassName="min-w-0 truncate text-center text-xs font-normal"
+							className="w-full justify-center"
+						/>
+					</Select>
+				</HoverTip>
 
 				{/* Popover with DaisyUI-like styling, managed by Ariakit */}
 				<SelectPopover

@@ -24,6 +24,7 @@ import { useTools } from '@/hooks/use_tool';
 
 import { promptStoreAPI } from '@/apis/baseapi';
 
+import { actionTriggerChipButtonClasses, ActionTriggerChipContent } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 
 import { UrlAttachmentModal } from '@/chats/composer/attachments/attachment_url_modal';
@@ -98,17 +99,19 @@ interface PickerButtonProps {
 }
 
 function PickerButton({ label, icon, buttonRef, menuState, shortcut, disabled }: PickerButtonProps) {
+	const open = useStoreState(menuState, 'open');
 	const tooltip = shortcut ? `${label} (${shortcut})` : label;
+
 	return (
 		<HoverTip content={tooltip} placement="top">
 			<MenuButton
 				ref={buttonRef}
 				store={menuState}
 				disabled={disabled}
-				className="btn btn-ghost btn-circle btn-sm text-neutral-custom hover:text-base-content"
+				className={`${actionTriggerChipButtonClasses} hover:text-base-content ${disabled ? 'opacity-60' : ''}`}
 				aria-label={tooltip}
 			>
-				{icon}
+				<ActionTriggerChipContent icon={icon} label={label} open={open} />
 			</MenuButton>
 		</HoverTip>
 	);
@@ -390,7 +393,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 				{/* Left: template / tool / attachment pickers */}
 				<div className="flex items-center gap-1">
 					<PickerButton
-						label="Attach files or links"
+						label="Attachments"
 						icon={<FiPaperclip size={16} />}
 						buttonRef={attachmentButtonRef}
 						menuState={attachmentMenuState}
@@ -427,8 +430,9 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 							<span>Link or URL...</span>
 						</MenuItem>
 					</Menu>
+
 					<PickerButton
-						label="Insert template"
+						label="Prompts"
 						icon={<FiFilePlus size={16} />}
 						buttonRef={templateButtonRef}
 						menuState={templateMenuState}
@@ -463,7 +467,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 					</Menu>
 
 					<PickerButton
-						label="Add tool"
+						label="Tools"
 						icon={<FiTool size={16} />}
 						buttonRef={toolButtonRef}
 						menuState={toolMenuState}

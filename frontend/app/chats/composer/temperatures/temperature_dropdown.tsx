@@ -1,8 +1,11 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-import { FiCheck, FiChevronDown, FiChevronUp } from 'react-icons/fi';
+import { FiCheck } from 'react-icons/fi';
 
 import { Select, SelectItem, SelectPopover, useSelectStore, useStoreState } from '@ariakit/react';
+
+import { ActionTriggerChipContent } from '@/components/action_trigger_chip';
+import { HoverTip } from '@/components/ariakit_hover_tip';
 
 const defaultTemperatureOptions = [0.0, 0.1, 0.5, 1.0];
 
@@ -44,20 +47,19 @@ export function TemperatureDropdown({ temperature, setTemperature, isOpen, setIs
 	return (
 		<div className="flex w-full justify-center">
 			<div className="relative w-full">
-				<Select
-					store={select}
-					className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-left text-nowrap shadow-none"
-					title="Set Temperature"
-				>
-					<span className="mr-2 text-xs font-normal sm:hidden">Temp:</span>
-					<span className="mr-2 hidden text-xs font-normal sm:inline">Temperature:</span>
-					<span className="text-xs font-normal">{temperature.toFixed(2)}</span>
-					{open ? (
-						<FiChevronDown size={16} className="ml-1 shrink-0 xl:ml-2" />
-					) : (
-						<FiChevronUp size={16} className="ml-1 shrink-0 xl:ml-2" />
-					)}
-				</Select>
+				<HoverTip content="Set temperature" placement="top" wrapperElement="div" wrapperClassName="w-full">
+					<Select
+						store={select}
+						className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-center text-nowrap shadow-none"
+					>
+						<ActionTriggerChipContent
+							label={`Temperature: ${temperature.toFixed(2)}`}
+							open={open}
+							labelClassName="min-w-0 truncate text-center text-xs font-normal"
+							className="w-full justify-center"
+						/>
+					</Select>
+				</HoverTip>
 
 				<SelectPopover
 					store={select}

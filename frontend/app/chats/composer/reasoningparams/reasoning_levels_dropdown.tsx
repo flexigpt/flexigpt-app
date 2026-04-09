@@ -1,10 +1,13 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-import { FiCheck, FiChevronDown, FiChevronUp } from 'react-icons/fi';
+import { FiCheck } from 'react-icons/fi';
 
 import { Select, SelectItem, SelectPopover, useSelectStore, useStoreState } from '@ariakit/react';
 
 import { ReasoningLevel } from '@/spec/inference';
+
+import { ActionTriggerChipContent } from '@/components/action_trigger_chip';
+import { HoverTip } from '@/components/ariakit_hover_tip';
 
 type SingleReasoningDropdownProps = {
 	reasoningLevel: ReasoningLevel;
@@ -58,20 +61,19 @@ export function SingleReasoningDropdown({
 	return (
 		<div className="flex w-full justify-center">
 			<div className="relative w-full">
-				<Select
-					store={select}
-					className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-center text-nowrap shadow-none"
-					title="Set Reasoning Level"
-				>
-					<span className="min-w-0 truncate text-center text-xs font-normal">
-						Reasoning: {levelDisplayNames[reasoningLevel]}
-					</span>
-					{open ? (
-						<FiChevronDown size={16} className="ml-1 shrink-0 xl:ml-2" />
-					) : (
-						<FiChevronUp size={16} className="ml-1 shrink-0 xl:ml-2" />
-					)}
-				</Select>
+				<HoverTip content="Set reasoning level" placement="top" wrapperElement="div" wrapperClassName="w-full">
+					<Select
+						store={select}
+						className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-center text-nowrap shadow-none"
+					>
+						<ActionTriggerChipContent
+							label={`Reasoning: ${levelDisplayNames[reasoningLevel]}`}
+							open={open}
+							labelClassName="min-w-0 truncate text-center text-xs font-normal"
+							className="w-full justify-center"
+						/>
+					</Select>
+				</HoverTip>
 
 				<SelectPopover
 					store={select}

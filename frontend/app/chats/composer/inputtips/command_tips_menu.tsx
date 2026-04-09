@@ -99,7 +99,7 @@ export function CommandTipsMenu({ shortcutConfig }: CommandTipsMenuProps) {
 				title="Keyboard shortcuts"
 				aria-label="Keyboard shortcuts"
 			>
-				<span className="text-xs font-normal whitespace-nowrap">Keyboard shortcuts</span>
+				<span className="text-xs font-normal whitespace-nowrap">Shortcuts</span>
 				{shortcutsOpen ? (
 					<FiChevronDown size={14} className="shrink-0" aria-hidden="true" />
 				) : (
@@ -149,7 +149,7 @@ export function CommandTipsMenu({ shortcutConfig }: CommandTipsMenuProps) {
 				title="Additional input tips"
 				aria-label="Additional input tips"
 			>
-				<span className="text-xs font-normal whitespace-nowrap">Additional input tips</span>
+				<span className="text-xs font-normal whitespace-nowrap">Input tips</span>
 				{tipsOpen ? (
 					<FiChevronDown size={14} className="shrink-0" aria-hidden="true" />
 				) : (

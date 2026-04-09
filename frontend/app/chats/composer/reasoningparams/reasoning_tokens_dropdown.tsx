@@ -1,8 +1,11 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-import { FiCheck, FiChevronDown, FiChevronUp } from 'react-icons/fi';
+import { FiCheck } from 'react-icons/fi';
 
 import { Select, SelectItem, SelectPopover, useSelectStore, useStoreState } from '@ariakit/react';
+
+import { ActionTriggerChipContent } from '@/components/action_trigger_chip';
+import { HoverTip } from '@/components/ariakit_hover_tip';
 
 const defaultTokenOptions = [1024, 8192, 32000];
 
@@ -46,20 +49,19 @@ export function ReasoningTokensDropdown({ tokens, setTokens, isOpen, setIsOpen }
 	return (
 		<div className="flex w-full justify-center">
 			<div className="relative w-full">
-				<Select
-					store={select}
-					className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-center text-nowrap shadow-none"
-					title="Set Tokens"
-				>
-					<span className="mr-1 text-xs font-normal sm:hidden">Tokens:</span>
-					<span className="hidden text-xs font-normal sm:inline">Effort Tokens:</span>
-					<span className="text-xs font-normal">{tokens}</span>
-					{open ? (
-						<FiChevronDown size={16} className="ml-1 shrink-0 xl:ml-2" />
-					) : (
-						<FiChevronUp size={16} className="ml-1 shrink-0 xl:ml-2" />
-					)}
-				</Select>
+				<HoverTip content="Set effort tokens" placement="top" wrapperElement="div" wrapperClassName="w-full">
+					<Select
+						store={select}
+						className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-center text-nowrap shadow-none"
+					>
+						<ActionTriggerChipContent
+							label={`Effort tokens: ${tokens}`}
+							open={open}
+							labelClassName="min-w-0 truncate text-center text-xs font-normal"
+							className="w-full justify-center"
+						/>
+					</Select>
+				</HoverTip>
 
 				<SelectPopover
 					store={select}

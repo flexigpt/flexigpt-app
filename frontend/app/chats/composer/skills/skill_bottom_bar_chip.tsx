@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
-import { FiCheck, FiChevronDown, FiChevronUp, FiX, FiZap } from 'react-icons/fi';
+import { FiZap } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import type { SkillListItem, SkillRef } from '@/spec/skill';
+
+import { actionTriggerChipButtonClasses, ActionTriggerChipContent } from '@/components/action_trigger_chip';
+import { HoverTip } from '@/components/ariakit_hover_tip';
 
 import { dedupeSkillRefs, skillRefFromListItem, skillRefKey } from '@/skills/lib/skill_identity_utils';
 
@@ -159,30 +162,29 @@ export function SkillsBottomBarChip({
 		lines.push(isEnabled ? `Status: Enabled (${enabledCount})` : 'Status: Disabled');
 		lines.push(`Active: ${activeCount}`);
 		if (totalCount > 0) lines.push(`Available: ${totalCount}`);
+		if (loading && totalCount === 0) lines.push('Loading available skills…');
 		return lines.join('\n');
-	}, [activeCount, enabledCount, isEnabled, totalCount]);
+	}, [activeCount, enabledCount, isEnabled, loading, totalCount]);
 
 	return (
-		<div className="relative" title={title} data-bottom-bar-skills>
-			<MenuButton
-				store={menu}
-				className={
-					`btn btn-xs text-neutral-custom bg-base-200/70 hover:bg-base-300/80 h-7 min-h-0 items-center gap-1 overflow-hidden rounded-full border-none px-2 text-center text-nowrap shadow-none` +
-					(open ? ' bg-base-300/80' : '') +
-					(isInputLocked ? ' opacity-60' : '')
-				}
-				aria-label="Choose skills"
-				title={title}
-				disabled={isInputLocked}
-			>
-				<FiZap size={14} className="shrink-0" />
-				<span className="max-w-24 truncate text-xs font-normal">Skills</span>
-				{loading && totalCount === 0 && !isEnabled ? <span className="text-xs opacity-70">Loading…</span> : null}
-				{isEnabled ? <span className="badge badge-success badge-xs bg-success/30">{enabledCount} enabled</span> : null}
-				{activeCount > 0 ? <span className="badge badge-success badge-xs">{activeCount} active</span> : null}
-				{isEnabled ? <FiCheck size={14} className="shrink-0" /> : <FiX size={14} className="shrink-0" />}
-				{open ? <FiChevronDown size={14} className="shrink-0" /> : <FiChevronUp size={14} className="shrink-0" />}
-			</MenuButton>
+		<div className="relative" data-bottom-bar-skills>
+			<HoverTip content={title} placement="top">
+				<MenuButton
+					store={menu}
+					className={`${actionTriggerChipButtonClasses} ${open ? 'bg-base-300/80' : ''} ${isInputLocked ? 'opacity-60' : ''}`}
+					aria-label="Choose skills"
+					disabled={isInputLocked}
+				>
+					<ActionTriggerChipContent
+						icon={<FiZap size={14} />}
+						label="Skills"
+						count={
+							isEnabled ? <span className="badge badge-success badge-xs bg-success/30">{enabledCount}</span> : undefined
+						}
+						open={open}
+					/>
+				</MenuButton>
+			</HoverTip>
 
 			<Menu
 				store={menu}

@@ -1,11 +1,14 @@
 // FILE: output_verbosity_dropdown.tsx
 import type { Dispatch, SetStateAction } from 'react';
 
-import { FiCheck, FiChevronDown, FiChevronUp } from 'react-icons/fi';
+import { FiCheck } from 'react-icons/fi';
 
 import { Select, SelectItem, SelectPopover, useSelectStore, useStoreState } from '@ariakit/react';
 
 import { OutputVerbosity } from '@/spec/inference';
+
+import { ActionTriggerChipContent } from '@/components/action_trigger_chip';
+import { HoverTip } from '@/components/ariakit_hover_tip';
 
 type OutputVerbosityDropdownProps = {
 	verbosity?: OutputVerbosity;
@@ -54,28 +57,27 @@ export function OutputVerbosityDropdown({
 	});
 
 	const open = useStoreState(select, 'open');
+	const tooltipText = disabled
+		? 'Effort/Verbosity not supported by this model/provider'
+		: 'Set effort/verbosity for model output';
 
 	return (
 		<div className="flex w-full justify-center">
 			<div className="relative w-full">
-				<Select
-					store={select}
-					disabled={disabled}
-					className={`btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-center text-nowrap shadow-none ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
-					title={
-						disabled ? 'Effort/Verbosity not supported by this model/provider' : 'Set effort/verbosity for model output'
-					}
-				>
-					<span className="min-w-0 truncate text-center text-xs font-normal">
-						<span className="hidden xl:inline">Verbosity/</span>
-						Effort{labelFor(verbosity)}
-					</span>
-					{open ? (
-						<FiChevronDown size={16} className="ml-1 shrink-0 xl:ml-2" />
-					) : (
-						<FiChevronUp size={16} className="ml-1 shrink-0 xl:ml-2" />
-					)}
-				</Select>
+				<HoverTip content={tooltipText} placement="top" wrapperElement="div" wrapperClassName="w-full">
+					<Select
+						store={select}
+						disabled={disabled}
+						className={`btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-center text-nowrap shadow-none ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
+					>
+						<ActionTriggerChipContent
+							label={`Effort${labelFor(verbosity)}`}
+							open={open}
+							labelClassName="min-w-0 truncate text-center text-xs font-normal"
+							className="w-full justify-center"
+						/>
+					</Select>
+				</HoverTip>
 
 				<SelectPopover
 					store={select}

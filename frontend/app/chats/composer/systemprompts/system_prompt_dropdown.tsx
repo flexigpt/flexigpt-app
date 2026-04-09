@@ -1,7 +1,6 @@
-import type { Dispatch, SetStateAction } from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useState } from 'react';
 
-import { FiCheck, FiChevronDown, FiChevronUp, FiGitBranch, FiPlus, FiX } from 'react-icons/fi';
+import { FiCheck, FiGitBranch, FiPlus, FiX } from 'react-icons/fi';
 
 import { Popover, PopoverDisclosure, Tooltip, usePopoverStore, useStoreState, useTooltipStore } from '@ariakit/react';
 
@@ -9,6 +8,9 @@ import { PREVIOUS_CONVO_SYSTEM_PROMPT_BUNDLEID } from '@/spec/modelpreset';
 import { type PromptBundle, PromptRoleEnum } from '@/spec/prompt';
 
 import { DEFAULT_SEMVER } from '@/lib/version_utils';
+
+import { ActionTriggerChipContent } from '@/components/action_trigger_chip';
+import { HoverTip } from '@/components/ariakit_hover_tip';
 
 import { SystemPromptAddModal } from '@/chats/composer/systemprompts/system_prompt_add_modal';
 import { countEnabledSystemPromptSources } from '@/prompts/lib/system_prompt_utils';
@@ -102,6 +104,8 @@ export function SystemPromptDropdown({
 	const promptTooltip = useTooltipStore({ placement: 'left-end' });
 	const tooltipAnchorEl = useStoreState(promptTooltip, 'anchorElement');
 	const currentPromptText = tooltipAnchorEl?.dataset.prompt ?? '';
+	const triggerTooltip =
+		activeSourceCount > 0 ? `System prompt sources enabled: ${activeSourceCount}` : 'System prompt disabled';
 
 	const showPromptTooltip = useCallback(
 		(element: HTMLElement) => {
@@ -170,30 +174,31 @@ export function SystemPromptDropdown({
 	return (
 		<div className="flex w-full justify-center">
 			<div className="relative w-full">
-				<PopoverDisclosure
-					store={popover}
-					className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-center text-nowrap shadow-none"
-					title={
-						activeSourceCount > 0 ? `System prompt sources enabled: ${activeSourceCount}` : 'System prompt disabled'
-					}
-				>
-					<span className="min-w-0 truncate text-center text-xs font-normal">System Prompt</span>
-
-					{activeSourceCount > 0 ? (
-						<>
-							<span className="badge badge-success badge-xs bg-success/30">{activeSourceCount}</span>
-							<FiCheck size={16} className="m-0 shrink-0 p-0" />
-						</>
-					) : (
-						<FiX size={16} className="m-0 shrink-0 p-0" />
-					)}
-
-					{open ? (
-						<FiChevronDown size={16} className="ml-1 shrink-0 xl:ml-2" />
-					) : (
-						<FiChevronUp size={16} className="ml-1 shrink-0 xl:ml-2" />
-					)}
-				</PopoverDisclosure>
+				<HoverTip content={triggerTooltip} placement="top" wrapperElement="div" wrapperClassName="w-full">
+					<PopoverDisclosure
+						store={popover}
+						className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-center text-nowrap shadow-none"
+					>
+						<ActionTriggerChipContent
+							label="System Prompt"
+							count={
+								activeSourceCount > 0 ? (
+									<span className="badge badge-success badge-xs bg-success/30">{activeSourceCount}</span>
+								) : undefined
+							}
+							suffix={
+								activeSourceCount > 0 ? (
+									<FiCheck size={16} className="shrink-0" />
+								) : (
+									<FiX size={16} className="shrink-0" />
+								)
+							}
+							open={open}
+							labelClassName="min-w-0 truncate text-center text-xs font-normal"
+							className="w-full justify-center"
+						/>
+					</PopoverDisclosure>
+				</HoverTip>
 
 				<Popover
 					store={popover}

@@ -1,8 +1,11 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-import { FiCheck, FiChevronDown, FiChevronUp, FiEye, FiRefreshCcw, FiTrash2 } from 'react-icons/fi';
+import { FiCheck, FiEye, FiRefreshCcw, FiTrash2 } from 'react-icons/fi';
 
 import { Popover, PopoverDisclosure, usePopoverStore, useStoreState } from '@ariakit/react';
+
+import { ActionTriggerChipContent } from '@/components/action_trigger_chip';
+import { HoverTip } from '@/components/ariakit_hover_tip';
 
 import type { AssistantPresetOptionItem } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 
@@ -59,19 +62,20 @@ export function AssistantPresetDropdown({
 	return (
 		<div className="flex w-full justify-center">
 			<div className="relative w-full">
-				<PopoverDisclosure
-					store={popover}
-					className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-center text-nowrap shadow-none"
-					title={triggerTitle}
-				>
-					<span className="min-w-0 truncate text-center text-xs font-normal">{triggerLabel}</span>
-					{selectedPreset ? <FiCheck size={14} className="ml-1 shrink-0" /> : null}
-					{open ? (
-						<FiChevronDown size={16} className="ml-1 shrink-0 xl:ml-2" />
-					) : (
-						<FiChevronUp size={16} className="ml-1 shrink-0 xl:ml-2" />
-					)}
-				</PopoverDisclosure>
+				<HoverTip content={triggerTitle} placement="top" wrapperElement="div" wrapperClassName="w-full">
+					<PopoverDisclosure
+						store={popover}
+						className="btn btn-xs text-neutral-custom w-full flex-1 items-center overflow-hidden border-none p-0 text-center text-nowrap shadow-none"
+					>
+						<ActionTriggerChipContent
+							label={triggerLabel}
+							open={open}
+							suffix={selectedPreset ? <FiCheck size={14} className="shrink-0" /> : undefined}
+							labelClassName="min-w-0 truncate text-center text-xs font-normal"
+							className="w-full justify-center"
+						/>
+					</PopoverDisclosure>
+				</HoverTip>
 
 				<Popover
 					store={popover}
