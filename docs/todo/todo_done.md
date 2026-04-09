@@ -896,3 +896,7 @@
   - [x] hook in inference
   - [x] adopt as a preset param
   - [x] adopt in ui with defaults
+
+- [x] sys prompt to move to bottom bar rather than context bar.
+- [x] ariakit tooltips on enable web search and all others
+- [x] spec driven dev and others: enforcing bfs

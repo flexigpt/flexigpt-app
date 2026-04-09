@@ -67,7 +67,7 @@
 					"temperature": 0.1,
 					"reasoning": {
 						"type": "singleWithLevels",
-						"level": "medium",
+						"level": "high",
 						"tokens": 0
 					},
 					"systemPrompt": "",
@@ -161,7 +161,7 @@
 					"temperature": 0.1,
 					"reasoning": {
 						"type": "singleWithLevels",
-						"level": "medium",
+						"level": "high",
 						"tokens": 0
 					},
 					"systemPrompt": "",

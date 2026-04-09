@@ -1226,6 +1226,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									ref={contentRef}
 									placeholder="Type message..."
 									spellCheck={false}
+									autoCorrect={'off'}
+									autoCapitalize={'off'}
 									readOnly={isInputLocked}
 									onKeyDown={e => {
 										onKeyDown(e);

@@ -396,6 +396,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 					<Menu
 						store={attachmentMenuState}
 						gutter={8}
+						portal
 						className={menuClasses}
 						data-menu-kind="attachments"
 						autoFocusOnShow
@@ -451,7 +452,14 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						shortcut={shortcutLabels.templates}
 						disabled={isInputLocked}
 					/>
-					<Menu store={templateMenuState} gutter={8} className={menuClasses} data-menu-kind="templates" autoFocusOnShow>
+					<Menu
+						store={templateMenuState}
+						gutter={8}
+						portal
+						className={menuClasses}
+						data-menu-kind="templates"
+						autoFocusOnShow
+					>
 						{!templateMenuOpen ? null : templatesLoading ? (
 							<div className={`${menuItemClasses} text-base-content/60 cursor-default`}>Loading templates…</div>
 						) : templateData.length === 0 ? (
@@ -486,7 +494,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						shortcut={shortcutLabels.tools}
 						disabled={isInputLocked}
 					/>
-					<Menu store={toolMenuState} gutter={8} className={menuClasses} data-menu-kind="tools" autoFocusOnShow>
+					<Menu store={toolMenuState} gutter={8} portal className={menuClasses} data-menu-kind="tools" autoFocusOnShow>
 						{!toolMenuOpen ? null : toolsLoading ? (
 							<div className={`${menuItemClasses} text-base-content/60 cursor-default`}>Loading tools…</div>
 						) : availableTools.length === 0 ? (
@@ -565,6 +573,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 					<WebSearchBottomBarChip
 						eligibleTools={eligibleWebSearchTools}
 						enabled={webSearchEnabled}
+						selectedCount={compatibleWebSearchTemplates.length}
 						selected={
 							activeWebSearch
 								? {

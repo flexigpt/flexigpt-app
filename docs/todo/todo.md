@@ -3,15 +3,14 @@
 ## Laundry list
 
 - [ ] an apply diff to code preset will be good. simple template and tool
-
-- [ ] sys prompt to move to bottom bar rather than context bar.
-- [ ] ariakit tooltips on enable web search and all others
-
-- [ ] skills active and enabled are set properly on convo reload, but the ticks inside the menu are not visible.
+- [ ] composer: see if grammar rectification or atleast spell check and highlight can be added cleanly
 - [ ] set skill as active immediately button is also needed manually
 
-- [ ] spec driven dev and others: enforcing bfs
-- [ ] composer: see if grammar rectification or atleast spell check and highlight can be added cleanly
+- [ ] invalid id set for tool output once in error case for replacetext line. verify id an call id are preserved end to end.
+
+- [ ] context bar: ariakit menu styling and tooltips proper.
+
+- [x] skills active and enabled are set properly on convo reload, but the ticks inside the menu are not visible.
 
 - [ ] Skill
   - [ ] include some builtin skills and test on all platforms, full flow.

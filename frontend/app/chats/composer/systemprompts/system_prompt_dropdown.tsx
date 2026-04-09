@@ -1,8 +1,16 @@
-import { type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+	type Dispatch,
+	type SetStateAction,
+	type SyntheticEvent,
+	useCallback,
+	useEffect,
+	useMemo,
+	useState,
+} from 'react';
 
 import { FiCheck, FiGitBranch, FiPlus, FiX } from 'react-icons/fi';
 
-import { Popover, PopoverDisclosure, Tooltip, usePopoverStore, useStoreState, useTooltipStore } from '@ariakit/react';
+import { Menu, MenuButton, MenuItem, Tooltip, useMenuStore, useStoreState, useTooltipStore } from '@ariakit/react';
 
 import { PREVIOUS_CONVO_SYSTEM_PROMPT_BUNDLEID } from '@/spec/modelpreset';
 import { type PromptBundle, PromptRoleEnum } from '@/spec/prompt';
@@ -52,6 +60,15 @@ function pickInitialBundleID(
 	return writable[0]?.id ?? custom[0]?.id ?? '';
 }
 
+function stopMenuToggleEvent(event: SyntheticEvent) {
+	event.preventDefault();
+	event.stopPropagation();
+}
+
+function stopMenuBubbleEvent(event: SyntheticEvent) {
+	event.stopPropagation();
+}
+
 export function SystemPromptDropdown({
 	prompts,
 	bundles,
@@ -92,14 +109,14 @@ export function SystemPromptDropdown({
 		[includeModelDefault, modelDefaultPrompt, promptsByKey, selectedPromptKeys]
 	);
 
-	const popover = usePopoverStore({
+	const menu = useMenuStore({
 		open: isOpen,
 		setOpen: setIsOpen,
 		placement: 'top-start',
+		focusLoop: true,
 	});
 
-	const open = useStoreState(popover, 'open');
-
+	const open = useStoreState(menu, 'open');
 	const selectedKeySet = useMemo(() => new Set(selectedPromptKeys), [selectedPromptKeys]);
 	const promptTooltip = useTooltipStore({ placement: 'left-end' });
 	const tooltipAnchorEl = useStoreState(promptTooltip, 'anchorElement');
@@ -110,7 +127,11 @@ export function SystemPromptDropdown({
 	const showPromptTooltip = useCallback(
 		(element: HTMLElement) => {
 			const prompt = element.dataset.prompt ?? '';
-			if (!prompt.trim()) return;
+			if (!prompt.trim()) {
+				promptTooltip.hide();
+				promptTooltip.setAnchorElement(null);
+				return;
+			}
 
 			promptTooltip.setAnchorElement(element);
 			promptTooltip.show();
@@ -125,8 +146,8 @@ export function SystemPromptDropdown({
 
 	useEffect(() => {
 		if (!isOpen) return;
-		void onRefreshPrompts().catch((error: unknown) => {
-			console.error('Failed to refresh system prompts:', error);
+		void onRefreshPrompts().catch((refreshError: unknown) => {
+			console.error('Failed to refresh system prompts:', refreshError);
 		});
 	}, [isOpen, onRefreshPrompts]);
 
@@ -174,7 +195,7 @@ export function SystemPromptDropdown({
 	return (
 		<div className="relative shrink-0">
 			<HoverTip content={triggerTooltip} placement="top">
-				<PopoverDisclosure store={popover} className={`${actionTriggerChipButtonClasses} hover:text-base-content`}>
+				<MenuButton store={menu} className={`${actionTriggerChipButtonClasses} ${open ? 'bg-base-300/80' : ''}`}>
 					<ActionTriggerChipContent
 						label="System prompt"
 						count={
@@ -182,24 +203,25 @@ export function SystemPromptDropdown({
 								<span className="badge badge-success badge-xs bg-success/30">{activeSourceCount}</span>
 							) : undefined
 						}
-						suffix={
-							activeSourceCount > 0 ? (
-								<FiCheck size={14} className="shrink-0" />
-							) : (
-								<FiX size={14} className="shrink-0" />
-							)
-						}
+						suffix={activeSourceCount > 0 ? <FiCheck size={14} className="shrink-0" /> : undefined}
 						open={open}
 						labelClassName="max-w-28 truncate text-xs font-normal"
 					/>
-				</PopoverDisclosure>
+				</MenuButton>
 			</HoverTip>
 
-			<Popover
-				store={popover}
-				gutter={4}
-				portal={false}
-				className="border-base-300 bg-base-100 z-50 mt-1 max-h-80 max-w-2xl min-w-lg overflow-y-auto rounded-xl border p-2 text-xs shadow-lg outline-none"
+			<Menu
+				store={menu}
+				gutter={8}
+				portal
+				autoFocusOnShow
+				className="border-base-300 bg-base-100 z-50 max-h-80 max-w-2xl min-w-md overflow-y-auto rounded-xl border p-2 text-xs shadow-lg outline-none"
+				onKeyDownCapture={event => {
+					if (event.key === 'Escape') {
+						hidePromptTooltip();
+						menu.hide();
+					}
+				}}
 			>
 				<div className="mb-2 px-1 text-xs opacity-70">
 					Add/Fork creates a prompt template. <br />
@@ -211,26 +233,33 @@ export function SystemPromptDropdown({
 				</div>
 
 				{hasModelDefaultPrompt ? (
-					<div
-						className="border-base-300 mb-2 rounded-lg border p-2"
+					<MenuItem
+						hideOnClick={false}
+						className="data-active-item:bg-base-200 border-base-300 mb-2 rounded-lg border p-2 outline-none"
 						data-prompt={modelDefaultPrompt}
-						onFocus={e => {
-							showPromptTooltip(e.currentTarget);
+						onFocus={event => {
+							showPromptTooltip(event.currentTarget);
 						}}
 						onBlur={hidePromptTooltip}
-						onMouseEnter={e => {
-							showPromptTooltip(e.currentTarget);
+						onMouseEnter={event => {
+							showPromptTooltip(event.currentTarget);
 						}}
 						onMouseLeave={hidePromptTooltip}
+						onClick={() => {
+							onToggleModelDefault(!includeModelDefault);
+						}}
 					>
-						<div className="mb-1 flex items-start gap-2">
+						<div className="flex w-full items-start gap-2">
 							<input
 								type="checkbox"
 								className="checkbox checkbox-xs mt-0.5 rounded"
 								checked={includeModelDefault}
-								onChange={e => {
-									onToggleModelDefault(e.target.checked);
+								onChange={event => {
+									stopMenuBubbleEvent(event);
+									onToggleModelDefault(event.currentTarget.checked);
 								}}
+								onPointerDown={stopMenuToggleEvent}
+								onClick={stopMenuToggleEvent}
 							/>
 							<div className="min-w-0 flex-1">
 								<div className="flex items-center gap-2">
@@ -238,8 +267,9 @@ export function SystemPromptDropdown({
 									<span className="badge badge-ghost badge-xs">per selected model</span>
 								</div>
 							</div>
+							{includeModelDefault ? <FiCheck size={14} className="text-success mt-0.5 shrink-0" /> : null}
 						</div>
-					</div>
+					</MenuItem>
 				) : null}
 
 				<div className="mb-1 px-1 text-xs font-medium opacity-70">Saved prompts</div>
@@ -257,35 +287,36 @@ export function SystemPromptDropdown({
 							const isSelected = selectedKeySet.has(item.identityKey);
 
 							return (
-								<div
+								<MenuItem
 									key={item.identityKey}
+									hideOnClick={false}
 									data-prompt={item.prompt}
-									className="hover:bg-base-200 border-base-300 flex items-start gap-2 rounded-lg border p-2 transition-colors"
-									onFocus={e => {
-										showPromptTooltip(e.currentTarget);
+									className="data-active-item:bg-base-200 border-base-300 flex items-start gap-2 rounded-lg border p-2 outline-none"
+									onFocus={event => {
+										showPromptTooltip(event.currentTarget);
 									}}
 									onBlur={hidePromptTooltip}
-									onMouseEnter={e => {
-										showPromptTooltip(e.currentTarget);
+									onMouseEnter={event => {
+										showPromptTooltip(event.currentTarget);
 									}}
 									onMouseLeave={hidePromptTooltip}
+									onClick={() => {
+										onTogglePrompt(item.identityKey);
+									}}
 								>
 									<input
 										type="checkbox"
 										className="checkbox checkbox-xs mt-0.5 rounded"
 										checked={isSelected}
-										onChange={() => {
+										onChange={event => {
+											stopMenuBubbleEvent(event);
 											onTogglePrompt(item.identityKey);
 										}}
+										onPointerDown={stopMenuToggleEvent}
+										onClick={stopMenuToggleEvent}
 									/>
 
-									<button
-										type="button"
-										className="min-w-0 flex-1 text-left"
-										onClick={() => {
-											onTogglePrompt(item.identityKey);
-										}}
-									>
+									<div className="min-w-0 flex-1">
 										<div className="truncate text-xs font-medium">{item.displayName}</div>
 										<div className="mt-1 flex items-center gap-2 text-[10px] opacity-70">
 											<span>{item.bundleDisplayName}</span>
@@ -296,15 +327,17 @@ export function SystemPromptDropdown({
 											<span>•</span>
 											<span>{item.role === PromptRoleEnum.Developer ? 'developer' : 'system'}</span>
 										</div>
-									</button>
+									</div>
 
-									<div className="ml-2 flex shrink-0 gap-1">
+									<div className="ml-2 flex shrink-0 items-start gap-1">
+										{isSelected ? <FiCheck size={14} className="text-success mt-0.5 shrink-0" /> : null}
 										<button
 											type="button"
-											className="btn btn-ghost btn-xs"
+											className="btn btn-ghost btn-xs btn-square rounded-lg"
 											title="Fork"
 											disabled={!hasWritableCustomBundle}
-											onClick={() => {
+											onClick={event => {
+												stopMenuToggleEvent(event);
 												hidePromptTooltip();
 												openForkModal(item);
 											}}
@@ -312,7 +345,7 @@ export function SystemPromptDropdown({
 											<FiGitBranch size={12} />
 										</button>
 									</div>
-								</div>
+								</MenuItem>
 							);
 						})}
 					</div>
@@ -329,6 +362,7 @@ export function SystemPromptDropdown({
 							className="btn btn-ghost btn-xs rounded-lg"
 							disabled={!hasWritableCustomBundle}
 							onClick={() => {
+								hidePromptTooltip();
 								openAddModal();
 							}}
 						>
@@ -339,13 +373,14 @@ export function SystemPromptDropdown({
 							type="button"
 							className="btn btn-ghost btn-xs rounded-lg"
 							onClick={() => {
+								hidePromptTooltip();
 								onClearSelected();
-								setIsOpen(false);
+								menu.hide();
 							}}
 							title="Clear all selected prompt sources"
 							disabled={!includeModelDefault && selectedPromptKeys.length === 0}
 						>
-							<FiX size={14} className="mr-1" /> Clear selected
+							<FiX size={14} className="mr-1" /> Clear all
 						</button>
 					</div>
 					{!hasWritableCustomBundle ? (
@@ -354,7 +389,7 @@ export function SystemPromptDropdown({
 						</div>
 					) : null}
 				</div>
-			</Popover>
+			</Menu>
 
 			<Tooltip
 				store={promptTooltip}

@@ -1,10 +1,13 @@
 import { useMemo } from 'react';
 
-import { FiChevronDown, FiChevronUp, FiMoreHorizontal } from 'react-icons/fi';
+import { FiMoreHorizontal } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, Tooltip, useMenuStore, useStoreState, useTooltipStore } from '@ariakit/react';
 
 import { buildShortcutDisplay, type ShortcutConfig } from '@/lib/keyboard_shortcuts';
+
+import { actionTriggerChipButtonClasses, ActionTriggerChipContent } from '@/components/action_trigger_chip';
+import { HoverTip } from '@/components/ariakit_hover_tip';
 
 type TipKey = 'lastWins' | 'remove' | 'collapse' | 'attachmentsScope' | 'toolsPersist' | 'toolErrors';
 const tipsText: Record<TipKey, string> = {
@@ -87,33 +90,28 @@ export function CommandTipsMenu({ shortcutConfig }: CommandTipsMenuProps) {
 	// All shortcuts (global + insert) from central config
 	const shortcutItems = useMemo(() => buildShortcutDisplay(shortcutConfig), [shortcutConfig]);
 
-	const chatShortcuts = shortcutItems.filter(i => i.group === 'Chat');
-	const insertShortcuts = shortcutItems.filter(i => i.group === 'Insert');
+	const chatShortcuts = shortcutItems.filter(item => item.group === 'Chat');
+	const insertShortcuts = shortcutItems.filter(item => item.group === 'Insert');
 
 	return (
 		<div className="flex items-center gap-1">
-			{/* Keyboard shortcuts menu */}
-			<MenuButton
-				store={shortcutsMenu}
-				className="btn btn-xs text-neutral-custom flex items-center gap-2 overflow-hidden border-none bg-transparent px-2 py-0 text-left shadow-none"
-				title="Keyboard shortcuts"
-				aria-label="Keyboard shortcuts"
-			>
-				<span className="text-xs font-normal whitespace-nowrap">Shortcuts</span>
-				{shortcutsOpen ? (
-					<FiChevronDown size={14} className="shrink-0" aria-hidden="true" />
-				) : (
-					<FiChevronUp size={14} className="shrink-0" aria-hidden="true" />
-				)}
-			</MenuButton>
+			<HoverTip content="Keyboard shortcuts" placement="top">
+				<MenuButton
+					store={shortcutsMenu}
+					className={`${actionTriggerChipButtonClasses} ${shortcutsOpen ? 'bg-base-300/80' : ''}`}
+					aria-label="Keyboard shortcuts"
+				>
+					<ActionTriggerChipContent label="Shortcuts" open={shortcutsOpen} labelClassName="text-xs font-normal" />
+				</MenuButton>
+			</HoverTip>
 
-			<Menu store={shortcutsMenu} gutter={8} className={menuClasses} autoFocusOnShow>
+			<Menu store={shortcutsMenu} gutter={8} portal className={menuClasses} autoFocusOnShow>
 				{/* Chat group */}
 				{chatShortcuts.length > 0 && (
 					<>
 						<div className="text-neutral-custom/70 px-3 pt-2 pb-1 text-xs tracking-wide uppercase">Chat shortcuts</div>
 						{chatShortcuts.map(item => (
-							<MenuItem key={item.action} className={menuItemClasses}>
+							<MenuItem key={item.action} hideOnClick={false} className={menuItemClasses}>
 								<span className="flex-1 text-left">{item.label}</span>
 								<span className="text-neutral-custom ml-auto w-22 text-left text-xs whitespace-nowrap">
 									{item.keys}
@@ -131,7 +129,7 @@ export function CommandTipsMenu({ shortcutConfig }: CommandTipsMenuProps) {
 							Insert shortcuts
 						</div>
 						{insertShortcuts.map(item => (
-							<MenuItem key={item.action} className={menuItemClasses}>
+							<MenuItem key={item.action} hideOnClick={false} className={menuItemClasses}>
 								<span className="flex-1 text-left">{item.label}</span>
 								<span className="text-neutral-custom ml-auto w-22 text-left text-xs whitespace-nowrap">
 									{item.keys}
@@ -142,30 +140,26 @@ export function CommandTipsMenu({ shortcutConfig }: CommandTipsMenuProps) {
 				)}
 			</Menu>
 
-			{/* Additional input tips menu */}
-			<MenuButton
-				store={tipsMenu}
-				className="btn btn-xs text-neutral-custom flex items-center gap-2 overflow-hidden border-none bg-transparent px-2 py-0 text-left shadow-none"
-				title="Additional input tips"
-				aria-label="Additional input tips"
-			>
-				<span className="text-xs font-normal whitespace-nowrap">Input tips</span>
-				{tipsOpen ? (
-					<FiChevronDown size={14} className="shrink-0" aria-hidden="true" />
-				) : (
-					<FiChevronUp size={14} className="shrink-0" aria-hidden="true" />
-				)}
-			</MenuButton>
+			<HoverTip content="Additional input tips" placement="top">
+				<MenuButton
+					store={tipsMenu}
+					className={`${actionTriggerChipButtonClasses} ${tipsOpen ? 'bg-base-300/80' : ''}`}
+					aria-label="Additional input tips"
+				>
+					<ActionTriggerChipContent label="Input tips" open={tipsOpen} labelClassName="text-xs font-normal" />
+				</MenuButton>
+			</HoverTip>
 
 			<Menu
 				store={tipsMenu}
 				gutter={8}
+				portal
 				className={menuClasses}
 				autoFocusOnShow
 				// Explicitly handle Escape at the menu level (capture phase),
 				// so it always closes the menu & tooltip and returns focus to the button.
-				onKeyDownCapture={e => {
-					if (e.key === 'Escape') {
+				onKeyDownCapture={event => {
+					if (event.key === 'Escape') {
 						tipsTooltip.hide();
 						tipsMenu.hide();
 					}
@@ -174,11 +168,12 @@ export function CommandTipsMenu({ shortcutConfig }: CommandTipsMenuProps) {
 				{tips.map(tip => (
 					<MenuItem
 						key={tip.key}
+						hideOnClick={false}
 						className={menuItemClasses}
 						data-tip-description={tip.description}
-						onFocus={e => {
+						onFocus={event => {
 							// Focus via keyboard (arrow keys / Tab) -> show tooltip
-							tipsTooltip.setAnchorElement(e.currentTarget);
+							tipsTooltip.setAnchorElement(event.currentTarget);
 							tipsTooltip.show();
 						}}
 						onBlur={() => {
@@ -186,9 +181,9 @@ export function CommandTipsMenu({ shortcutConfig }: CommandTipsMenuProps) {
 							tipsTooltip.hide();
 							tipsTooltip.setAnchorElement(null);
 						}}
-						onMouseEnter={e => {
+						onMouseEnter={event => {
 							// Hover with mouse -> show tooltip
-							tipsTooltip.setAnchorElement(e.currentTarget);
+							tipsTooltip.setAnchorElement(event.currentTarget);
 							tipsTooltip.show();
 						}}
 						onMouseLeave={() => {

@@ -1,6 +1,7 @@
+import type { KeyboardEvent, MouseEvent } from 'react';
 import { useCallback, useEffect, useMemo } from 'react';
 
-import { FiEdit2, FiGlobe, FiX } from 'react-icons/fi';
+import { FiCheck, FiEdit2, FiGlobe, FiX } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
@@ -23,6 +24,7 @@ export function WebSearchBottomBarChip({
 	eligibleTools,
 	enabled,
 	selected,
+	selectedCount,
 	canEdit,
 	argsStatus,
 	onEnabledChange,
@@ -33,6 +35,7 @@ export function WebSearchBottomBarChip({
 	eligibleTools: ToolListItem[];
 	enabled: boolean;
 	selected?: SelectedIdentity;
+	selectedCount: number;
 	canEdit: boolean;
 	argsStatus?: UIToolUserArgsStatus;
 	onEnabledChange: (enabled: boolean) => void;
@@ -45,6 +48,7 @@ export function WebSearchBottomBarChip({
 	// Hooks must not be conditional; safe to always create the store.
 	const menu = useMenuStore({ placement: 'top-end', focusLoop: true });
 	const open = useStoreState(menu, 'open');
+
 	useEffect(() => {
 		if (isInputLocked) menu.hide();
 	}, [isInputLocked, menu]);
@@ -56,94 +60,110 @@ export function WebSearchBottomBarChip({
 
 	const selectedLabel = useMemo(() => {
 		if (!selectedTool) return '';
-
 		return selectedTool.toolDefinition.displayName ?? selectedTool.toolSlug ?? '';
 	}, [selectedTool]);
 
-	const isArgsBad = Boolean(enabled && argsStatus?.hasSchema && !argsStatus.isSatisfied);
-	const summarySecondaryLabel = useMemo(() => {
-		if (enabled) return 'On';
-		if (hasDropdown && selectedLabel) return 'On';
-		if (hasDropdown) return 'Choose tool';
-		if (selectedLabel) return 'On';
-		return 'Off';
-	}, [enabled, hasDropdown, selectedLabel]);
+	const enabledCount = selectedCount > 0 ? selectedCount : enabled ? 1 : 0;
+	const isConfigured = enabledCount > 0 || enabled;
+	const isArgsBad = Boolean(isConfigured && argsStatus?.hasSchema && !argsStatus.isSatisfied);
 
 	const title = useMemo(() => {
 		const lines: string[] = [];
 		lines.push('Web search');
 		if (selectedLabel) lines.push(`Tool: ${selectedLabel}`);
-		lines.push(enabled ? 'Status: Enabled' : 'Status: Disabled');
+		lines.push(isConfigured ? 'Status: Enabled' : 'Status: Disabled');
 		if (hasDropdown) lines.push(`Available tools: ${eligibleTools.length}`);
 		if (isArgsBad) lines.push('Options: Missing required fields');
 		return lines.join('\n');
-	}, [eligibleTools.length, enabled, hasDropdown, isArgsBad, selectedLabel]);
+	}, [eligibleTools.length, hasDropdown, isArgsBad, isConfigured, selectedLabel]);
 
 	const enable = useCallback(() => {
 		onEnabledChange(true);
 	}, [onEnabledChange]);
+
 	const disable = useCallback(() => {
 		onEnabledChange(false);
 	}, [onEnabledChange]);
 
-	const onClickEnableWhenDisabled = useCallback(() => {
-		if (isInputLocked) return;
-		// Requested behavior: clicking the chip enables only when currently disabled.
-		if (!enabled) enable();
-	}, [isInputLocked, enabled, enable]);
+	if (eligibleTools.length === 0) return null;
 
-	const summaryContent = (
+	const triggerContent = (
 		<ActionTriggerChipContent
 			icon={<FiGlobe size={14} />}
 			label="Web search"
-			secondaryLabel={summarySecondaryLabel}
+			count={
+				enabledCount > 0 ? (
+					<span className="badge badge-success badge-xs bg-success/30">{enabledCount}</span>
+				) : undefined
+			}
+			suffix={isConfigured ? <FiCheck size={14} className="shrink-0" /> : undefined}
 			open={open}
 			showChevron={hasDropdown}
 			labelClassName="max-w-24 truncate text-xs font-normal"
-			secondaryLabelClassName="max-w-28 truncate text-xs opacity-70"
 		/>
 	);
-
-	if (eligibleTools.length === 0) return null;
 
 	return (
 		<HoverTip content={title} placement="top" wrapperElement="div" wrapperClassName="inline-flex max-w-full">
 			<div
-				className={`${actionTriggerChipSurfaceClasses} ${enabled ? 'border-info/50 bg-info/10 hover:bg-info/15 border' : 'border-none'} ${isInputLocked ? 'opacity-60' : ''}`}
+				className={`${actionTriggerChipSurfaceClasses} border ${isConfigured ? 'border-info/50 bg-info/10 hover:bg-info/15' : 'border-transparent'} ${isInputLocked ? 'opacity-60' : ''}`}
 				data-bottom-bar-websearch
 			>
 				{hasDropdown ? (
 					<MenuButton
 						store={menu}
 						className="btn btn-ghost btn-xs h-auto min-h-0 flex-1 gap-0 px-0 py-0 text-left font-normal shadow-none hover:bg-transparent disabled:bg-transparent"
-						aria-label="Choose web search tool"
+						aria-label={isConfigured ? 'Choose web search tool' : 'Enable web search'}
 						disabled={isInputLocked}
+						onClick={(event: MouseEvent) => {
+							if (isInputLocked) {
+								event.preventDefault();
+								return;
+							}
+							if (!isConfigured) {
+								event.preventDefault();
+								event.stopPropagation();
+								enable();
+							}
+						}}
+						onKeyDown={(event: KeyboardEvent) => {
+							if (isInputLocked) {
+								event.preventDefault();
+								return;
+							}
+							if (!isConfigured && (event.key === 'Enter' || event.key === ' ')) {
+								event.preventDefault();
+								event.stopPropagation();
+								enable();
+							}
+						}}
 					>
-						{summaryContent}
+						{triggerContent}
 					</MenuButton>
-				) : enabled ? (
-					<div className="flex min-w-0 flex-1 items-center">{summaryContent}</div>
 				) : (
 					<button
 						type="button"
 						className="btn btn-ghost btn-xs h-auto min-h-0 flex-1 gap-0 px-0 py-0 text-left font-normal shadow-none hover:bg-transparent disabled:bg-transparent"
-						onClick={onClickEnableWhenDisabled}
-						aria-label="Enable web search"
+						onClick={() => {
+							if (isInputLocked || isConfigured) return;
+							enable();
+						}}
+						aria-label={isConfigured ? 'Web search enabled' : 'Enable web search'}
 						disabled={isInputLocked}
 					>
-						{summaryContent}
+						{triggerContent}
 					</button>
 				)}
 
 				{isArgsBad ? <span className="badge badge-warning badge-xs ml-1">Options</span> : null}
 
-				{enabled && canEdit ? (
+				{isConfigured && canEdit ? (
 					<button
 						type="button"
 						className="btn btn-ghost btn-xs h-auto min-h-0 shrink-0 px-1 py-0 shadow-none hover:bg-transparent"
-						onClick={e => {
-							e.preventDefault();
-							e.stopPropagation();
+						onClick={event => {
+							event.preventDefault();
+							event.stopPropagation();
 							onEditOptions();
 						}}
 						aria-label="Edit web search options"
@@ -153,16 +173,17 @@ export function WebSearchBottomBarChip({
 					</button>
 				) : null}
 
-				{enabled ? (
+				{isConfigured ? (
 					<button
 						type="button"
 						className="btn btn-ghost btn-xs h-auto min-h-0 shrink-0 px-1 py-0 shadow-none hover:bg-transparent"
-						onClick={e => {
-							e.preventDefault();
-							e.stopPropagation();
+						onClick={event => {
+							event.preventDefault();
+							event.stopPropagation();
 							disable();
+							menu.hide();
 						}}
-						aria-label="Disable web search"
+						aria-label="Clear web search"
 						disabled={isInputLocked}
 					>
 						<FiX size={12} />
@@ -172,22 +193,22 @@ export function WebSearchBottomBarChip({
 				<Menu
 					store={menu}
 					gutter={6}
+					portal
 					className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-72 min-w-72 overflow-y-auto border p-2 shadow-xl"
 					autoFocusOnShow
-					portal
 				>
 					<div className="text-base-content/70 mb-2 text-xs font-semibold">Web search tools</div>
 
-					{eligibleTools.map(t => {
-						const isSelected = !!selected && isSameTool(selected, t);
+					{eligibleTools.map(tool => {
+						const isSelected = !!selected && isSameTool(selected, tool);
 
 						return (
 							<MenuItem
-								key={toolKey(t)}
+								key={toolKey(tool)}
 								className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
 								onClick={() => {
 									if (isInputLocked) return;
-									onSelectTool(t);
+									onSelectTool(tool);
 									menu.hide();
 								}}
 							>
@@ -195,13 +216,13 @@ export function WebSearchBottomBarChip({
 									<FiGlobe size={14} />
 									<div className="min-w-0 flex-1">
 										<div className="truncate text-xs font-medium">
-											{t.toolDefinition.displayName || t.toolSlug}
-											{isSelected ? ' (selected)' : ''}
+											{tool.toolDefinition.displayName || tool.toolSlug}
 										</div>
 										<div className="text-base-content/70 truncate text-xs">
-											{t.bundleSlug ?? t.bundleID}/{t.toolSlug}@{t.toolVersion}
+											{tool.bundleSlug ?? tool.bundleID}/{tool.toolSlug}@{tool.toolVersion}
 										</div>
 									</div>
+									{isSelected ? <FiCheck size={14} className="text-success shrink-0" /> : null}
 								</div>
 							</MenuItem>
 						);

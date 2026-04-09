@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
-import { FiZap } from 'react-icons/fi';
+import { FiCheck, FiZap } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
@@ -181,6 +181,7 @@ export function SkillsBottomBarChip({
 						count={
 							isEnabled ? <span className="badge badge-success badge-xs bg-success/30">{enabledCount}</span> : undefined
 						}
+						suffix={isEnabled ? <FiCheck size={14} className="shrink-0" /> : undefined}
 						open={open}
 					/>
 				</MenuButton>
@@ -319,9 +320,9 @@ export function SkillsBottomBarChip({
 									stop(e);
 									onDisableAll();
 								}}
-								title="Remove all selected skills"
+								title="Clear all selected skills"
 							>
-								Remove all
+								Clear all
 							</button>
 						</div>
 					</>
