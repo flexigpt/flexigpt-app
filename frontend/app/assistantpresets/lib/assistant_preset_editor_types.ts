@@ -97,3 +97,7 @@ export interface ToolSelectionDisplayItem extends OrderedDisplayItem {
 	userArgsHint: string;
 	userArgsEditable: boolean;
 }
+
+export interface SkillSelectionDisplayItem extends OrderedDisplayItem {
+	preLoadAsActive: boolean;
+}

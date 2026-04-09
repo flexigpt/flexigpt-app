@@ -74,6 +74,11 @@ import {
 import { dedupeToolChoices, uiToolChoiceToToolStoreChoice } from '@/tools/lib/tool_choice_utils';
 import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 
+type SkillStateApplyOptions = {
+	syncSession?: 'none' | 'if-session-exists' | 'ensure-if-enabled';
+	forceResetSession?: boolean;
+};
+
 export interface EditorAreaHandle {
 	focus: () => void;
 	openTemplateMenu: () => void;
@@ -85,8 +90,7 @@ export interface EditorAreaHandle {
 	setConversationToolsFromChoices: (tools: ToolStoreChoice[]) => void;
 	setWebSearchFromChoices: (tools: ToolStoreChoice[]) => void;
 	applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => void;
-	setEnabledSkillRefsFromMessage: (refs: SkillRef[]) => void;
-	setActiveSkillRefsFromMessage: (refs: SkillRef[]) => void;
+	setSkillStateFromMessage: (enabledRefs: SkillRef[], activeRefs: SkillRef[], options?: SkillStateApplyOptions) => void;
 }
 
 interface EditorAreaProps {
@@ -208,12 +212,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		applySkillSelectionState,
 		ensureSkillSession,
 		listActiveSkillRefs,
-		applyEnabledSkillRefsFromMessage,
-		applyActiveSkillRefsFromMessage,
 		getCurrentSkillSessionID,
 		getCurrentEnabledSkillRefs,
 		getCurrentActiveSkillRefs,
-		flushPendingMessageSkillSelection,
 	} = useComposerSkills();
 
 	const templateBlocked = selectionInfo.hasTemplate && selectionInfo.requiredCount > 0;
@@ -659,7 +660,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 			// If conversation sync queued enabled/active skill refs via timeout,
 			// flush them now so this submit uses the latest skill selection.
-			flushPendingMessageSkillSelection();
 			const effectiveEnabledSkillRefs = getCurrentEnabledSkillRefs();
 			let activeForMessage = getCurrentActiveSkillRefs();
 
@@ -722,8 +722,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			let didSend = false;
 
 			try {
-				let effectiveSkillSessionID: string | null = null;
-				if (effectiveEnabledSkillRefs.length > 0) {
+				let effectiveSkillSessionID = getCurrentSkillSessionID();
+				if (!effectiveSkillSessionID && effectiveEnabledSkillRefs.length > 0) {
 					try {
 						effectiveSkillSessionID = await ensureSkillSession();
 					} catch (err) {
@@ -839,7 +839,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			conversationToolsState,
 			editor,
 			ensureSkillSession,
-			flushPendingMessageSkillSelection,
 			focusEditorAtEnd,
 			getCurrentActiveSkillRefs,
 			getCurrentEnabledSkillRefs,
@@ -1023,8 +1022,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				applyWebSearchFromChoices(incomingToolChoices);
 
 				// 4) Restore enabled/active skills together so invariants hold immediately.
-				applySkillSelectionState(incoming.enabledSkillRefs ?? [], incoming.activeSkillRefs ?? []);
-
+				void applySkillSelectionState(incoming.enabledSkillRefs ?? [], incoming.activeSkillRefs ?? [], {
+					syncSession: 'none',
+					forceResetSession: true,
+				});
 				// 5) Restore any tool outputs that were previously attached to this message.
 				setToolOutputs(incoming.toolOutputs ?? []);
 			} finally {
@@ -1121,14 +1122,14 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			setConversationToolsFromChoices: applyConversationToolsFromChoices,
 			setWebSearchFromChoices: applyWebSearchFromChoices,
 			applyAttachmentsDrop,
-			setEnabledSkillRefsFromMessage: applyEnabledSkillRefsFromMessage,
-			setActiveSkillRefsFromMessage: applyActiveSkillRefsFromMessage,
+			setSkillStateFromMessage: (enabledRefs, activeRefs, options) => {
+				void applySkillSelectionState(enabledRefs, activeRefs, options);
+			},
 		}),
 		[
 			applyAttachmentsDrop,
 			applyConversationToolsFromChoices,
-			applyEnabledSkillRefsFromMessage,
-			applyActiveSkillRefsFromMessage,
+			applySkillSelectionState,
 			applyWebSearchFromChoices,
 			focusEditorAtEnd,
 			loadExternalMessage,
@@ -1370,6 +1371,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						allSkills={allSkills}
 						skillsLoading={skillsLoading}
 						enabledSkillRefs={enabledSkillRefs}
+						activeSkillRefs={activeSkillRefs}
 						setEnabledSkillRefs={setEnabledSkillRefs}
 						onEnableAllSkills={enableAllSkills}
 						onDisableAllSkills={disableAllSkills}

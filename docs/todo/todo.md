@@ -10,10 +10,12 @@
   - [x] enable autoexec for load/unload/readresource
 
 - [ ] ariakit tooltips on enable web search and all others
-- [ ] have a preloadactive as a bool in assistant preset
+- [ ] skills active and enabled are set properly on convo reload, but the ticks inside the menu are not visible.
+- [ ] set skill as active immediately button is also needed manually
+- [x] have a preloadactive as a bool in assistant preset
   - [x] backend changes
   - [x] ui type adoption
-  - [ ] ui adoption and runtime injection
+  - [x] ui adoption and runtime injection
 
 - [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls loop is better.
   - [x] this is a "feature" in anthropic and chargeable for cache write.

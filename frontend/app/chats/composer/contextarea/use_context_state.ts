@@ -851,8 +851,12 @@ export function useAssistantContextState(): AssistantContextController {
 			}
 
 			const requestedSkillSels = preset.startingSkillSelections ?? [];
+			// Preset semantics: empty or missing means "no opinion", not "clear current skills".
 			const hasSkillsSelection = requestedSkillSels.length > 0;
 			const enabledSkillRefs = hasSkillsSelection ? normalizeSkillSelectionsToRefs(requestedSkillSels) : [];
+			const activeSkillRefs = hasSkillsSelection
+				? normalizeSkillSelectionsToRefs(requestedSkillSels.filter(sel => sel.preLoadAsActive))
+				: [];
 
 			if (hasSkillsSelection) {
 				const skillOptions = await loadSkillOptions();
@@ -888,6 +892,7 @@ export function useAssistantContextState(): AssistantContextController {
 					webSearchChoices,
 					hasSkillsSelection,
 					enabledSkillRefs,
+					activeSkillRefs,
 				},
 				comparisonState: {
 					model: buildAssistantPresetModelComparisonState(preset, nextSelectedModel, nextIncludeModelSystemPrompt),

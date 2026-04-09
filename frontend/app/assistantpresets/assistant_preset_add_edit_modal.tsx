@@ -21,6 +21,7 @@ import { ModalBackdrop } from '@/components/modal_backdrop';
 
 import { AssistantPresetModelPatchEditor } from '@/assistantpresets/components/model_patch_editor';
 import { OrderedRefSelectionSection } from '@/assistantpresets/components/ordered_ref_selection_section';
+import { SkillSelectionSection } from '@/assistantpresets/components/skill_selection_section';
 import { ToolSelectionSection } from '@/assistantpresets/components/tool_selection_section';
 import {
 	type AssistantPresetEditorCatalog,
@@ -34,6 +35,7 @@ import type {
 	OrderedDisplayItem,
 	PresetItem,
 	SimpleSelectableOption,
+	SkillSelectionDisplayItem,
 	ToolSelectionDisplayItem,
 	TriStateBoolean,
 } from '@/assistantpresets/lib/assistant_preset_editor_types';
@@ -1001,7 +1003,7 @@ function AddEditAssistantPresetModalContent({
 		[formData.startingToolSelections, toolOptionByKey]
 	);
 
-	const skillDisplayItems = useMemo<OrderedDisplayItem[]>(
+	const skillDisplayItems = useMemo<SkillSelectionDisplayItem[]>(
 		() =>
 			formData.startingSkillSelections.map(sel => {
 				const ref = sel.skillRef;
@@ -1019,6 +1021,7 @@ function AddEditAssistantPresetModalContent({
 							? undefined
 							: (option.availabilityReason ?? 'Unavailable')
 						: 'Missing reference',
+					preLoadAsActive: sel.preLoadAsActive,
 				};
 			}),
 		[formData.startingSkillSelections, skillOptionByKey]
@@ -1026,6 +1029,19 @@ function AddEditAssistantPresetModalContent({
 
 	const isAllValid =
 		isViewMode || (Boolean(catalog) && !catalogLoading && !catalogError && Object.keys(errors).length === 0);
+
+	const handleSkillPreLoadChange = useCallback(
+		(index: number, next: boolean) => {
+			updateFormData(prev => ({
+				...prev,
+				startingSkillSelections: updateItemAtIndex(prev.startingSkillSelections, index, item => ({
+					...item,
+					preLoadAsActive: next,
+				})),
+			}));
+		},
+		[updateFormData]
+	);
 
 	const handleCatalogRetry = useCallback(() => {
 		void loadCatalog();
@@ -1644,7 +1660,7 @@ function AddEditAssistantPresetModalContent({
 							</div>
 						)}
 
-						<OrderedRefSelectionSection
+						<SkillSelectionSection
 							isViewMode={isViewMode}
 							availableOptions={availableSkillOptions}
 							selectedOptionKey={effectiveNextSkillKey}
@@ -1656,6 +1672,7 @@ function AddEditAssistantPresetModalContent({
 							onMoveUp={handleMoveSkillUp}
 							onMoveDown={handleMoveSkillDown}
 							onRemove={handleRemoveSkill}
+							onPreLoadAsActiveChange={handleSkillPreLoadChange}
 						/>
 
 						{isViewMode && initialData?.preset && (

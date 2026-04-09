@@ -70,9 +70,13 @@ function formatSkillLabel(ref: { bundleID: string; skillSlug: string; skillID: s
 }
 
 function formatSkillSelectionLabel(sel: SkillSelection) {
+	const metaParts = [`${sel.skillRef.bundleID} • ${sel.skillRef.skillID}`];
+	if (sel.preLoadAsActive) {
+		metaParts.push('Preload as active');
+	}
 	return {
 		title: sel.skillRef.skillSlug,
-		meta: `${sel.skillRef.bundleID} • ${sel.skillRef.skillID}`,
+		meta: metaParts.join(' • '),
 	};
 }
 
@@ -258,9 +262,7 @@ export function AssistantPresetViewModal({
 			)
 		: [];
 
-	const appliedSkillItems = preparedApplication
-		? preparedApplication.runtimeSelections.enabledSkillRefs.map(formatSkillLabel)
-		: (viewedPreset.preset.startingSkillSelections ?? []).map(formatSkillSelectionLabel);
+	const appliedSkillItems = (viewedPreset.preset.startingSkillSelections ?? []).map(formatSkillSelectionLabel);
 	const currentSkillItems = shouldShowActiveComparison
 		? currentRuntimeSnapshot.enabledSkillRefs.map(formatSkillLabel)
 		: [];

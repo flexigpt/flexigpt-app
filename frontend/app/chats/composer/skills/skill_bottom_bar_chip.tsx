@@ -58,6 +58,7 @@ export function SkillsBottomBarChip({
 	allSkills,
 	loading,
 	enabledSkillRefs,
+	activeSkillRefs,
 	setEnabledSkillRefs,
 	onEnableAll,
 	onDisableAll,
@@ -66,6 +67,7 @@ export function SkillsBottomBarChip({
 	allSkills: SkillListItem[];
 	loading: boolean;
 	enabledSkillRefs: SkillRef[];
+	activeSkillRefs: SkillRef[];
 	setEnabledSkillRefs: React.Dispatch<React.SetStateAction<SkillRef[]>>;
 	onEnableAll: () => void;
 	onDisableAll: () => void;
@@ -79,7 +81,10 @@ export function SkillsBottomBarChip({
 	}, [isInputLocked, menu]);
 
 	const enabledKeySet = useMemo(() => new Set(enabledSkillRefs.map(skillRefKey)), [enabledSkillRefs]);
+	const activeKeySet = useMemo(() => new Set(activeSkillRefs.map(skillRefKey)), [activeSkillRefs]);
+
 	const enabledCount = enabledSkillRefs.length;
+	const activeCount = activeSkillRefs.length;
 	const totalCount = allSkills.length;
 	const isEnabled = enabledCount > 0;
 
@@ -152,9 +157,10 @@ export function SkillsBottomBarChip({
 		const lines: string[] = [];
 		lines.push('Skills');
 		lines.push(isEnabled ? `Status: Enabled (${enabledCount})` : 'Status: Disabled');
+		lines.push(`Active: ${activeCount}`);
 		if (totalCount > 0) lines.push(`Available: ${totalCount}`);
 		return lines.join('\n');
-	}, [enabledCount, isEnabled, totalCount]);
+	}, [activeCount, enabledCount, isEnabled, totalCount]);
 
 	return (
 		<div className="relative" title={title} data-bottom-bar-skills>
@@ -172,11 +178,10 @@ export function SkillsBottomBarChip({
 				<FiZap size={14} className="shrink-0" />
 				<span className="max-w-24 truncate text-xs font-normal">Skills</span>
 
-				{loading && totalCount === 0 && !isEnabled ? <span className="text-[10px] opacity-70">Loading…</span> : null}
+				{loading && totalCount === 0 && !isEnabled ? <span className="text-xs opacity-70">Loading…</span> : null}
 
-				{isEnabled ? (
-					<span className="bg-success/15 text-success rounded-full px-1.5 py-0.5 text-[10px]">{enabledCount}</span>
-				) : null}
+				{isEnabled ? <span className="badge badge-success badge-xs bg-success/30">{enabledCount} enabled</span> : null}
+				{activeCount > 0 ? <span className="badge badge-success badge-xs">{activeCount} active</span> : null}
 
 				{isEnabled ? <FiCheck size={14} className="shrink-0" /> : <FiX size={14} className="shrink-0" />}
 				{open ? <FiChevronDown size={14} className="shrink-0" /> : <FiChevronUp size={14} className="shrink-0" />}
@@ -191,8 +196,12 @@ export function SkillsBottomBarChip({
 			>
 				<div className="mb-2 flex items-center justify-between gap-2 px-1">
 					<div className="text-base-content/70 text-xs font-semibold">Skills</div>
-					<div className="text-base-content/60 text-xs">
-						{enabledCount}/{totalCount} enabled
+					<div className="text-base-content/60 flex items-center gap-2 text-xs">
+						<span>Selected: {enabledCount}</span>
+						<span>•</span>
+						<span>Active: {activeCount}</span>
+						<span>•</span>
+						<span>{totalCount} available</span>
 					</div>
 				</div>
 
@@ -243,7 +252,7 @@ export function SkillsBottomBarChip({
 											const ref = skillRefFromListItem(item);
 											const k = skillRefKey(ref);
 											const checked = enabledKeySet.has(k);
-
+											const isActive = activeKeySet.has(k);
 											const label =
 												item.skillDefinition.displayName && item.skillDefinition.displayName.length > 0
 													? item.skillDefinition.displayName
@@ -279,6 +288,7 @@ export function SkillsBottomBarChip({
 															{item.skillDefinition.type} • {item.skillDefinition.location} •{' '}
 															{item.skillDefinition.name}
 														</div>
+														{isActive ? <div className="badge badge-success badge-xs mt-1">Active</div> : null}
 													</div>
 												</MenuItem>
 											);

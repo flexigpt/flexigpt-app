@@ -34,8 +34,14 @@ export interface ComposerBoxHandle {
 	setConversationToolsFromChoices: (tools: ToolStoreChoice[]) => void;
 	setWebSearchFromChoices: (tools: ToolStoreChoice[]) => void;
 	applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => void;
-	setEnabledSkillRefsFromMessage: (refs: SkillRef[]) => void;
-	setActiveSkillRefsFromMessage: (refs: SkillRef[]) => void;
+	setSkillStateFromMessage: (
+		enabledRefs: SkillRef[],
+		activeRefs: SkillRef[],
+		options?: {
+			syncSession?: 'none' | 'if-session-exists' | 'ensure-if-enabled';
+			forceResetSession?: boolean;
+		}
+	) => void;
 	restoreConversationContext: (context: RestorableConversationContext) => void;
 }
 
@@ -72,8 +78,11 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 		}
 
 		if (prepared.runtimeSelections.hasSkillsSelection) {
-			editorAreaRef.current?.setEnabledSkillRefsFromMessage(prepared.runtimeSelections.enabledSkillRefs);
-			editorAreaRef.current?.setActiveSkillRefsFromMessage([]);
+			editorAreaRef.current?.setSkillStateFromMessage(
+				prepared.runtimeSelections.enabledSkillRefs,
+				prepared.runtimeSelections.activeSkillRefs,
+				{ syncSession: 'ensure-if-enabled' }
+			);
 		}
 
 		setAssistantRuntimeSnapshot(prev => ({
@@ -155,8 +164,7 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 				editorAreaRef.current?.resetEditor();
 				editorAreaRef.current?.setConversationToolsFromChoices([]);
 				editorAreaRef.current?.setWebSearchFromChoices([]);
-				editorAreaRef.current?.setEnabledSkillRefsFromMessage([]);
-				editorAreaRef.current?.setActiveSkillRefsFromMessage([]);
+				editorAreaRef.current?.setSkillStateFromMessage([], [], { syncSession: 'none', forceResetSession: true });
 				setAssistantRuntimeSnapshot(EMPTY_ASSISTANT_PRESET_RUNTIME_SNAPSHOT);
 
 				assistantContext.resetForNewConversation();
@@ -199,23 +207,22 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 					webSearchChoices: [...choices],
 				}));
 			},
-			setEnabledSkillRefsFromMessage: (refs: SkillRef[]) => {
-				editorAreaRef.current?.setEnabledSkillRefsFromMessage(refs);
+			setSkillStateFromMessage: (enabledRefs, activeRefs, options) => {
+				editorAreaRef.current?.setSkillStateFromMessage(enabledRefs, activeRefs, options);
 				setAssistantRuntimeSnapshot(prev => ({
 					...prev,
-					enabledSkillRefs: [...refs],
+					enabledSkillRefs: [...enabledRefs],
 				}));
-			},
-			setActiveSkillRefsFromMessage: (refs: SkillRef[]) => {
-				editorAreaRef.current?.setActiveSkillRefsFromMessage(refs);
 			},
 			restoreConversationContext: context => {
 				setAbortConfirmationRequested(false);
 				assistantContext.restoreConversationContext(context);
 				editorAreaRef.current?.setConversationToolsFromChoices(context.toolChoices);
 				editorAreaRef.current?.setWebSearchFromChoices(context.webSearchChoices);
-				editorAreaRef.current?.setEnabledSkillRefsFromMessage(context.enabledSkillRefs);
-				editorAreaRef.current?.setActiveSkillRefsFromMessage(context.activeSkillRefs);
+				editorAreaRef.current?.setSkillStateFromMessage(context.enabledSkillRefs, context.activeSkillRefs, {
+					syncSession: 'none',
+					forceResetSession: true,
+				});
 				setAssistantRuntimeSnapshot({
 					conversationToolChoices: [...context.toolChoices],
 					webSearchChoices: [...context.webSearchChoices],

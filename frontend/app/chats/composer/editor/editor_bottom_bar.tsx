@@ -81,6 +81,7 @@ interface EditorBottomBarProps {
 	allSkills: SkillListItem[];
 	skillsLoading?: boolean;
 	enabledSkillRefs: SkillRef[];
+	activeSkillRefs: SkillRef[];
 	setEnabledSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
 	onEnableAllSkills: () => void;
 	onDisableAllSkills: () => void;
@@ -120,10 +121,6 @@ const menuItemClasses =
 	'flex items-center gap-2 rounded-xl px-2 py-1 text-sm outline-none transition-colors ' +
 	'hover:bg-base-200 data-[active-item]:bg-base-300';
 
-const toolPickerMenuItemClasses =
-	'rounded-xl px-0 py-0 text-sm outline-none transition-colors ' +
-	'hover:bg-base-200 data-[active-item]:bg-base-300 overflow-hidden';
-
 /**
   Bottom bar for template/tool/attachment buttons and tips menus.
   The chips scroller now lives in a separate bar inside the editor.
@@ -152,6 +149,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	allSkills,
 	skillsLoading = false,
 	enabledSkillRefs,
+	activeSkillRefs,
 	setEnabledSkillRefs,
 	onEnableAllSkills,
 	onDisableAllSkills,
@@ -490,7 +488,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 								return (
 									<ToolMenuRow
 										key={`${item.bundleID}-${item.toolSlug}-${item.toolVersion}`}
-										menuItemClassName={`${toolPickerMenuItemClasses} ${isAttached ? 'bg-base-200' : ''}`}
+										menuItemClassName={`rounded-xl px-0 py-0 text-sm outline-none transition-colors hover:bg-base-200 data-[active-item]:bg-base-300 overflow-hidden ${isAttached ? 'bg-base-200' : ''}`}
 										title={`Tool: ${display} (${slug})`}
 										display={display}
 										slug={slug}
@@ -567,6 +565,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						allSkills={allSkills}
 						loading={skillsLoading}
 						enabledSkillRefs={enabledSkillRefs}
+						activeSkillRefs={activeSkillRefs}
 						setEnabledSkillRefs={setEnabledSkillRefs}
 						onEnableAll={onEnableAllSkills}
 						onDisableAll={onDisableAllSkills}

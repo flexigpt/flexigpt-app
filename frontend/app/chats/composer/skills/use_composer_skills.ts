@@ -14,12 +14,11 @@ import {
 	skillRefFromListItem,
 } from '@/skills/lib/skill_identity_utils';
 
-interface PendingMessageSkillSelectionState {
-	enabled?: SkillRef[];
-	active?: SkillRef[];
-	resetSession: boolean;
-	timeoutID: number | null;
-}
+type SkillSessionSyncMode = 'none' | 'if-session-exists' | 'ensure-if-enabled';
+type ApplySkillSelectionStateOptions = {
+	syncSession?: SkillSessionSyncMode;
+	forceResetSession?: boolean;
+};
 
 interface UseComposerSkillsResult {
 	allSkills: SkillListItem[];
@@ -33,16 +32,18 @@ interface UseComposerSkillsResult {
 	disableAllSkills: () => void;
 	applySkillSelectionState: (
 		nextEnabledInput: SkillRef[] | null | undefined,
-		nextActiveInput: SkillRef[] | null | undefined
-	) => void;
+		nextActiveInput: SkillRef[] | null | undefined,
+		options?: ApplySkillSelectionStateOptions
+	) => Promise<void>;
 	ensureSkillSession: () => Promise<string | null>;
 	listActiveSkillRefs: (sid: string) => Promise<SkillRef[]>;
-	applyEnabledSkillRefsFromMessage: (refs: SkillRef[]) => void;
-	applyActiveSkillRefsFromMessage: (refs: SkillRef[]) => void;
-	flushPendingMessageSkillSelection: () => void;
 	getCurrentEnabledSkillRefs: () => SkillRef[];
 	getCurrentActiveSkillRefs: () => SkillRef[];
 	getCurrentSkillSessionID: () => string | null;
+}
+
+function buildSkillSessionStateKey(enabled: SkillRef[], active: SkillRef[]): string {
+	return `${buildSkillRefsFingerprint(enabled)}::${buildSkillRefsFingerprint(active)}`;
 }
 
 export function useComposerSkills(): UseComposerSkillsResult {
@@ -52,18 +53,14 @@ export function useComposerSkills(): UseComposerSkillsResult {
 	const [skillSessionID, setSkillSessionID] = useState<string | null>(null);
 	const [skillsLoading, setSkillsLoading] = useState(true);
 
-	// Track the allowlist fingerprint used to create the current session.
-	const sessionAllowlistKeyRef = useRef('');
+	const sessionStateKeyRef = useRef('');
+	const skillSessionSyncVersionRef = useRef(0);
 
 	const skillSessionIDRef = useRef<string | null>(null);
 	const enabledSkillRefsRef = useRef<SkillRef[]>([]);
 	const activeSkillRefsRef = useRef<SkillRef[]>([]);
 	const skillsCatalogLoadPromiseRef = useRef<Promise<SkillListItem[]> | null>(null);
 	const enableAllSkillsRequestVersionRef = useRef(0);
-	const pendingMessageSkillSelectionRef = useRef<PendingMessageSkillSelectionState>({
-		timeoutID: null,
-		resetSession: false,
-	});
 
 	const cancelPendingEnableAllSkills = useCallback(() => {
 		enableAllSkillsRequestVersionRef.current += 1;
@@ -101,44 +98,88 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		void skillStoreAPI.closeSkillSession(sid).catch(() => {});
 	}, []);
 
-	const applySkillSelectionStateInternal = useCallback(
-		(nextEnabledInput: SkillRef[] | null | undefined, nextActiveInput: SkillRef[] | null | undefined) => {
+	const applySkillSelectionState = useCallback(
+		async (
+			nextEnabledInput: SkillRef[] | null | undefined,
+			nextActiveInput: SkillRef[] | null | undefined,
+			options?: ApplySkillSelectionStateOptions
+		) => {
+			const syncSession = options?.syncSession ?? 'if-session-exists';
+			const forceResetSession = options?.forceResetSession ?? false;
+
 			const nextEnabled = normalizeSkillRefs(nextEnabledInput);
 			const nextActive = clampActiveSkillRefsToEnabled(nextEnabled, nextActiveInput);
 
 			const prevSessionID = skillSessionIDRef.current;
-			const prevSessionAllowlistKey = sessionAllowlistKeyRef.current;
-			const nextAllowlistKey = buildSkillRefsFingerprint(nextEnabled);
-
-			if (nextEnabled.length === 0) {
-				sessionAllowlistKeyRef.current = '';
-				if (prevSessionID) {
-					updateSkillSessionIDState(null);
-					closeSkillSessionBestEffort(prevSessionID);
-				}
-			} else if (!prevSessionID) {
-				sessionAllowlistKeyRef.current = '';
-			} else if (!prevSessionAllowlistKey) {
-				// Session existed before we had a tracked allowlist; initialize tracking.
-				sessionAllowlistKeyRef.current = nextAllowlistKey;
-			} else if (prevSessionAllowlistKey !== nextAllowlistKey) {
-				sessionAllowlistKeyRef.current = '';
-				updateSkillSessionIDState(null);
-				closeSkillSessionBestEffort(prevSessionID);
-			}
+			const prevSessionStateKey = sessionStateKeyRef.current;
+			const nextSessionStateKey = buildSkillSessionStateKey(nextEnabled, nextActive);
+			const hadSession = Boolean(prevSessionID);
+			const stateChanged = hadSession ? prevSessionStateKey !== nextSessionStateKey || !prevSessionStateKey : false;
 
 			updateEnabledSkillRefsState(nextEnabled);
 			updateActiveSkillRefsState(nextActive);
+
+			const shouldEnsureSession =
+				nextEnabled.length > 0 &&
+				((syncSession === 'if-session-exists' && hadSession && (stateChanged || forceResetSession)) ||
+					(syncSession === 'ensure-if-enabled' && (!hadSession || stateChanged || forceResetSession)));
+
+			const shouldCloseExistingSession =
+				hadSession &&
+				(nextEnabled.length === 0 ||
+					forceResetSession ||
+					(syncSession !== 'none' && stateChanged && !shouldEnsureSession));
+
+			const shouldKeepExistingSession =
+				hadSession && nextEnabled.length > 0 && !forceResetSession && (syncSession === 'none' || !stateChanged);
+
+			if (shouldKeepExistingSession) {
+				sessionStateKeyRef.current = nextSessionStateKey;
+				return;
+			}
+
+			if (!hadSession && !shouldEnsureSession) {
+				sessionStateKeyRef.current = '';
+				return;
+			}
+
+			const syncVersion = skillSessionSyncVersionRef.current + 1;
+			skillSessionSyncVersionRef.current = syncVersion;
+			updateSkillSessionIDState(null);
+			sessionStateKeyRef.current = '';
+
+			if (!shouldEnsureSession) {
+				if (prevSessionID && shouldCloseExistingSession) {
+					closeSkillSessionBestEffort(prevSessionID);
+				}
+				return;
+			}
+
+			try {
+				const sess = await skillStoreAPI.createSkillSession(
+					prevSessionID ?? undefined,
+					undefined,
+					nextEnabled,
+					nextActive
+				);
+
+				if (skillSessionSyncVersionRef.current !== syncVersion) {
+					closeSkillSessionBestEffort(sess.sessionID);
+					return;
+				}
+
+				const resolvedActive = clampActiveSkillRefsToEnabled(nextEnabled, sess.activeSkillRefs ?? nextActive);
+				updateSkillSessionIDState(sess.sessionID);
+				updateActiveSkillRefsState(resolvedActive);
+				sessionStateKeyRef.current = buildSkillSessionStateKey(nextEnabled, resolvedActive);
+			} catch {
+				if (skillSessionSyncVersionRef.current !== syncVersion) return;
+				if (prevSessionID) {
+					closeSkillSessionBestEffort(prevSessionID);
+				}
+			}
 		},
 		[closeSkillSessionBestEffort, updateActiveSkillRefsState, updateEnabledSkillRefsState, updateSkillSessionIDState]
-	);
-
-	const applySkillSelectionState = useCallback(
-		(nextEnabledInput: SkillRef[] | null | undefined, nextActiveInput: SkillRef[] | null | undefined) => {
-			cancelPendingEnableAllSkills();
-			applySkillSelectionStateInternal(nextEnabledInput, nextActiveInput);
-		},
-		[applySkillSelectionStateInternal, cancelPendingEnableAllSkills]
 	);
 
 	const setEnabledSkillRefs = useCallback<Dispatch<SetStateAction<SkillRef[]>>>(
@@ -146,75 +187,23 @@ export function useComposerSkills(): UseComposerSkillsResult {
 			cancelPendingEnableAllSkills();
 			const prevEnabled = enabledSkillRefsRef.current;
 			const nextEnabled = resolveStateUpdate(update, prevEnabled);
-			applySkillSelectionStateInternal(nextEnabled, activeSkillRefsRef.current);
+			void applySkillSelectionState(nextEnabled, activeSkillRefsRef.current, {
+				syncSession: 'if-session-exists',
+			});
 		},
-		[applySkillSelectionStateInternal, cancelPendingEnableAllSkills]
+		[applySkillSelectionState, cancelPendingEnableAllSkills]
 	);
 
 	const setActiveSkillRefs = useCallback<Dispatch<SetStateAction<SkillRef[]>>>(
 		update => {
 			const prevActive = activeSkillRefsRef.current;
 			const nextActive = resolveStateUpdate(update, prevActive);
-			applySkillSelectionStateInternal(enabledSkillRefsRef.current, nextActive);
+			void applySkillSelectionState(enabledSkillRefsRef.current, nextActive, {
+				syncSession: 'none',
+			});
 		},
-		[applySkillSelectionStateInternal]
+		[applySkillSelectionState]
 	);
-
-	const flushPendingMessageSkillSelection = useCallback(() => {
-		const pending = pendingMessageSkillSelectionRef.current;
-		if (pending.timeoutID != null) {
-			window.clearTimeout(pending.timeoutID);
-			pending.timeoutID = null;
-		}
-
-		if (pending.enabled == null && pending.active == null) return;
-		if (pending.enabled == null && pending.active == null && !pending.resetSession) return;
-
-		const nextEnabled = pending.enabled ?? enabledSkillRefsRef.current;
-		const nextActive = pending.active ?? activeSkillRefsRef.current;
-		const shouldResetSession = pending.resetSession;
-
-		pending.enabled = undefined;
-		pending.active = undefined;
-		pending.resetSession = false;
-
-		if (shouldResetSession) {
-			const prevSessionID = skillSessionIDRef.current;
-			sessionAllowlistKeyRef.current = '';
-			if (prevSessionID) {
-				updateSkillSessionIDState(null);
-				closeSkillSessionBestEffort(prevSessionID);
-			}
-		}
-
-		cancelPendingEnableAllSkills();
-		applySkillSelectionStateInternal(nextEnabled, nextActive);
-	}, [
-		applySkillSelectionStateInternal,
-		cancelPendingEnableAllSkills,
-		closeSkillSessionBestEffort,
-		updateSkillSessionIDState,
-	]);
-
-	const schedulePendingMessageSkillSelectionFlush = useCallback(() => {
-		const pending = pendingMessageSkillSelectionRef.current;
-		if (pending.timeoutID != null) return;
-
-		pending.timeoutID = window.setTimeout(() => {
-			pending.timeoutID = null;
-			flushPendingMessageSkillSelection();
-		}, 0);
-	}, [flushPendingMessageSkillSelection]);
-
-	useEffect(() => {
-		const pending = pendingMessageSkillSelectionRef.current;
-		return () => {
-			if (pending.timeoutID != null) {
-				window.clearTimeout(pending.timeoutID);
-				pending.timeoutID = null;
-			}
-		};
-	}, []);
 
 	useEffect(() => {
 		return () => {
@@ -287,9 +276,11 @@ export function useComposerSkills(): UseComposerSkillsResult {
 			if (enableAllSkillsRequestVersionRef.current !== requestVersion) return;
 			if (loadedSkills.length === 0) return;
 
-			applySkillSelectionStateInternal(loadedSkills.map(skillRefFromListItem), activeSkillRefsRef.current);
+			void applySkillSelectionState(loadedSkills.map(skillRefFromListItem), activeSkillRefsRef.current, {
+				syncSession: 'if-session-exists',
+			});
 		})();
-	}, [allSkills, applySkillSelectionStateInternal]);
+	}, [allSkills, applySkillSelectionState]);
 
 	const disableAllSkills = useCallback(() => {
 		setEnabledSkillRefs([]);
@@ -316,10 +307,10 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		if (currentEnabled.length === 0) return null;
 
 		const currentActive = activeSkillRefsRef.current;
-		const currentEnabledKey = buildSkillRefsFingerprint(currentEnabled);
+		const currentStateKey = buildSkillSessionStateKey(currentEnabled, currentActive);
 		const existing = skillSessionIDRef.current;
 
-		if (existing && sessionAllowlistKeyRef.current === currentEnabledKey) return existing;
+		if (existing && sessionStateKeyRef.current === currentStateKey) return existing;
 
 		const sess = await skillStoreAPI.createSkillSession(
 			existing ?? undefined, // closeSessionID (best-effort)
@@ -328,31 +319,11 @@ export function useComposerSkills(): UseComposerSkillsResult {
 			currentActive // initial active from conversation
 		);
 
-		sessionAllowlistKeyRef.current = currentEnabledKey;
+		sessionStateKeyRef.current = buildSkillSessionStateKey(currentEnabled, sess.activeSkillRefs ?? currentActive);
 		updateSkillSessionIDState(sess.sessionID);
 		updateActiveSkillRefsState(clampActiveSkillRefsToEnabled(currentEnabled, sess.activeSkillRefs ?? []));
 		return sess.sessionID;
 	}, [updateActiveSkillRefsState, updateSkillSessionIDState]);
-
-	const applyEnabledSkillRefsFromMessage = useCallback(
-		(refs: SkillRef[]) => {
-			const pending = pendingMessageSkillSelectionRef.current;
-			pending.enabled = refs ?? [];
-			pending.resetSession = true;
-			schedulePendingMessageSkillSelectionFlush();
-		},
-		[schedulePendingMessageSkillSelectionFlush]
-	);
-
-	const applyActiveSkillRefsFromMessage = useCallback(
-		(refs: SkillRef[]) => {
-			const pending = pendingMessageSkillSelectionRef.current;
-			pending.active = refs ?? [];
-			pending.resetSession = true;
-			schedulePendingMessageSkillSelectionFlush();
-		},
-		[schedulePendingMessageSkillSelectionFlush]
-	);
 
 	return {
 		allSkills,
@@ -367,9 +338,6 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		applySkillSelectionState,
 		ensureSkillSession,
 		listActiveSkillRefs,
-		applyEnabledSkillRefsFromMessage,
-		applyActiveSkillRefsFromMessage,
-		flushPendingMessageSkillSelection,
 		getCurrentEnabledSkillRefs,
 		getCurrentActiveSkillRefs,
 		getCurrentSkillSessionID,

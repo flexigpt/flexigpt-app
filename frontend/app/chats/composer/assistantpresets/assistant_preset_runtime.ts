@@ -33,6 +33,7 @@ export interface AssistantPresetPreparedRuntimeSelections {
 	webSearchChoices: ToolStoreChoice[];
 	hasSkillsSelection: boolean;
 	enabledSkillRefs: SkillRef[];
+	activeSkillRefs: SkillRef[];
 }
 
 export interface AssistantPresetComparisonState {
