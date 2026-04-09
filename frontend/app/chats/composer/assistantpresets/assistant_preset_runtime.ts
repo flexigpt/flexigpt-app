@@ -241,6 +241,10 @@ export function applyAssistantPresetModelPatch(
 		next.timeout = patch.timeout;
 	}
 
+	if (hasOwn(patch, 'cacheControl')) {
+		next.cacheControl = patch.cacheControl ? cloneJSONLike(patch.cacheControl) : undefined;
+	}
+
 	if (hasOwn(patch, 'additionalParametersRawJSON')) {
 		next.additionalParametersRawJSON = patch.additionalParametersRawJSON?.trim() || undefined;
 	}
@@ -294,6 +298,10 @@ export function buildAssistantPresetModelComparisonState(
 
 		if (hasOwn(patch, 'timeout')) {
 			modelState.timeout = selectedModel.timeout;
+		}
+
+		if (hasOwn(patch, 'cacheControl')) {
+			modelState.cacheControl = selectedModel.cacheControl;
 		}
 
 		if (hasOwn(patch, 'additionalParametersRawJSON')) {

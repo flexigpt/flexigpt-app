@@ -20,6 +20,7 @@ import {
 import type { ModelPresetID } from '@/spec/modelpreset';
 import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
+import { buildJSONOrTextCodeBlock } from '@/lib/jsonschema_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
 import { aggregateAPI } from '@/apis/baseapi';
@@ -139,7 +140,12 @@ function getErrorStub(
 	}
 
 	if (errorObj !== undefined && errorObj !== null) {
-		detailsMarkdown = detailsMarkdown + '\n\n### Error\n\n' + getQuotedJSON(errorObj);
+		const errorBlock = buildJSONOrTextCodeBlock(errorObj) ?? undefined;
+		if (errorBlock) {
+			detailsMarkdown = detailsMarkdown
+				? `${detailsMarkdown}\n\n### Error\n\n${errorBlock}`
+				: `### Error\n\n${errorBlock}`;
+		}
 	}
 
 	const errorMessage: ConversationMessage = {
@@ -159,20 +165,15 @@ function getErrorStub(
 export function getDebugDetailsMarkdown(debugObj?: any, errorObj?: any): string | undefined {
 	const parts: string[] = [];
 
-	const pushJSONBlock = (title: string, value: unknown) => {
-		if (value === undefined) return;
-
-		try {
-			parts.push(title, getQuotedJSON(value));
-		} catch (err) {
-			const msg = err instanceof Error ? err.message : String(err);
-			parts.push(title, `\`[Failed to serialize ${title.replace(/^#+\s*/, '').toLowerCase()}: ${msg}]\``);
-		}
+	const pushDetailsBlock = (title: string, value: unknown) => {
+		const block = buildJSONOrTextCodeBlock(value) ?? undefined;
+		if (!block) return;
+		parts.push(title, block);
 	};
 
 	// 1. Error object should always be first, if present
-	if (errorObj !== undefined) {
-		pushJSONBlock('### Error', errorObj);
+	if (errorObj !== undefined && errorObj !== null) {
+		pushDetailsBlock('### Error', errorObj);
 	}
 
 	// 2. Handle debug details
@@ -206,23 +207,23 @@ export function getDebugDetailsMarkdown(debugObj?: any, errorObj?: any): string 
 		if (hasStructuredKeys) {
 			// Order: error details (from debug) → request → response → provider
 			if (hasErrorDetails) {
-				pushJSONBlock('### Error details', getValue('errorDetails'));
+				pushDetailsBlock('### Error details', getValue('errorDetails'));
 			}
 
 			if (hasRequest) {
-				pushJSONBlock('### Request debug details', getValue('requestDetails'));
+				pushDetailsBlock('### Request debug details', getValue('requestDetails'));
 			}
 
 			if (hasResponse) {
-				pushJSONBlock('### Response debug details', getValue('responseDetails'));
+				pushDetailsBlock('### Response debug details', getValue('responseDetails'));
 			}
 
 			if (hasProvider) {
-				pushJSONBlock('### Provider response debug details', getValue('providerResponse'));
+				pushDetailsBlock('### Provider response debug details', getValue('providerResponse'));
 			}
 		} else {
 			// No special keys: fallback to original behavior (one block)
-			pushJSONBlock('### Debug details', debugObj);
+			pushDetailsBlock('### Debug details', debugObj);
 		}
 	}
 
@@ -455,8 +456,4 @@ export function buildUIToolOutputFromToolOutput(
 		arguments: call?.arguments,
 		webSearchToolCallItems: call?.webSearchToolCallItems,
 	};
-}
-
-function getQuotedJSON(obj: any): string {
-	return '```json\n' + JSON.stringify(obj, null, 2) + '\n```';
 }

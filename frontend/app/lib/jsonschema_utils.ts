@@ -446,3 +446,107 @@ export function buildExampleFromDraft7Schema(
 		path.delete(schemaObj);
 	}
 }
+
+function buildTextCodeBlock(text: string): string {
+	return ['```text', text, '```'].join('\n');
+}
+
+export function buildJSONCodeBlock(value: unknown): string {
+	try {
+		return ['```json', JSON.stringify(value, null, 2), '```'].join('\n');
+	} catch {
+		return buildTextCodeBlock(String(value));
+	}
+}
+
+function parseStructuredJSONString(raw?: string): unknown {
+	if (typeof raw !== 'string') return undefined;
+
+	const trimmed = raw.trim();
+	if (!trimmed) return undefined;
+
+	try {
+		const parsed = JSON.parse(trimmed);
+		if (parsed !== null && typeof parsed === 'object') {
+			return parsed;
+		}
+	} catch {
+		// ignore
+	}
+
+	return undefined;
+}
+
+export function buildJSONOrTextCodeBlock(raw?: unknown): string | null {
+	if (raw === undefined || raw === null) {
+		return null;
+	}
+
+	if (typeof raw === 'string') {
+		if (raw.trim().length === 0) {
+			return null;
+		}
+
+		const parsed = parseStructuredJSONString(raw);
+		if (parsed !== undefined) {
+			return buildJSONCodeBlock(parsed);
+		}
+
+		return buildTextCodeBlock(raw);
+	}
+
+	return buildJSONCodeBlock(normalizeStructuredJSONStringDeep(raw));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+export function normalizeStructuredJSONStringDeep(value: unknown): unknown {
+	const parsed = typeof value === 'string' ? parseStructuredJSONString(value) : undefined;
+	if (parsed !== undefined) {
+		return normalizeStructuredJSONStringDeep(parsed);
+	}
+
+	if (value instanceof Date) {
+		return value.toISOString();
+	}
+
+	if (value instanceof Error) {
+		const ownProps = Object.fromEntries(
+			Object.entries(value).map(([key, item]) => [key, normalizeStructuredJSONStringDeep(item)])
+		);
+		return {
+			name: value.name,
+			message: value.message,
+			...(value.stack ? { stack: value.stack } : {}),
+			...ownProps,
+		};
+	}
+
+	if (value instanceof Map) {
+		return Object.fromEntries(
+			Array.from(value.entries()).map(([key, item]) => [String(key), normalizeStructuredJSONStringDeep(item)])
+		);
+	}
+
+	if (value instanceof Set) {
+		return Array.from(value.values()).map(item => normalizeStructuredJSONStringDeep(item));
+	}
+
+	if (Array.isArray(value)) {
+		return value.map(item => normalizeStructuredJSONStringDeep(item));
+	}
+	if (isRecord(value)) {
+		return Object.fromEntries(
+			Object.entries(value).map(([key, item]) => [key, normalizeStructuredJSONStringDeep(item)])
+		);
+	}
+	return value;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
+export function normalizeStructuredDisplayObject<T extends object>(value: T): Record<string, unknown> {
+	const normalized = normalizeStructuredJSONStringDeep(value);
+	return isRecord(normalized) ? normalized : (value as Record<string, unknown>);
+}

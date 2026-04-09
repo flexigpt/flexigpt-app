@@ -884,3 +884,15 @@
   - [x] one discovery only assistant that first discovers things via searches, questions etc. may see if this is jsut a phase of above via some skill or different assistant.
 
 - [x] if tool call and tool results are "json" try to pretty print in details. there can be fall back to plain text if it is so.
+- [x] have a preload active as a bool in assistant preset
+  - [x] backend changes
+  - [x] ui type adoption
+  - [x] ui adoption and runtime injection
+- [x] request details modal needs to have that json display thing.
+
+- [x] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls loop is better.
+  - [x] this is a "feature" in anthropic and chargeable for cache write.
+  - [x] implement this after feature filters support and additional param support features in apis.
+  - [x] hook in inference
+  - [x] adopt as a preset param
+  - [x] adopt in ui with defaults

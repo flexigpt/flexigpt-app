@@ -13,7 +13,7 @@ export function HybridReasoningCheckbox({
 				content="Toggle the model's hybrid reasoning mode (uses effort tokens instead of temperature)."
 				placement="top"
 			>
-				<label className="text-neutral-custom flex cursor-pointer">
+				<label className="text-neutral-custom flex cursor-pointer items-center">
 					<input
 						type="checkbox"
 						className="checkbox checkbox-xs rounded-full"

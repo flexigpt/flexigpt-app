@@ -193,6 +193,7 @@ export function useSendMessage({
 				temperature: options.temperature,
 				stream: options.stream,
 				maxPromptLength: options.maxPromptLength,
+				cacheControl: options.cacheControl,
 				maxOutputLength: options.maxOutputLength,
 				reasoning: options.reasoning,
 				systemPrompt: options.systemPrompt,

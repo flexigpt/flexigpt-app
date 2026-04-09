@@ -2,27 +2,20 @@
 
 ## Laundry list
 
+- [ ] ariakit tooltips on enable web search and all others
+- [ ] skills active and enabled are set properly on convo reload, but the ticks inside the menu are not visible.
+- [ ] set skill as active immediately button is also needed manually
+
+- [ ] an apply diff to code preset will be good. simple template and tool
+
+- [ ] sys prompt to move to bottom bar rather than context bar.
+
 - [ ] Skill
   - [ ] include some builtin skills and test on all platforms, full flow.
     - [x] include spec driven dev
     - [ ] test with some skill that has scripts too
   - [x] with the number of skills present, maybe we dont want to enable all on click for the enable skills button, may be have a button at bottom on open that says enable all separately. also show collapsed bundles at start and then expanding if needed.
   - [x] enable autoexec for load/unload/readresource
-
-- [ ] ariakit tooltips on enable web search and all others
-- [ ] skills active and enabled are set properly on convo reload, but the ticks inside the menu are not visible.
-- [ ] set skill as active immediately button is also needed manually
-- [x] have a preload active as a bool in assistant preset
-  - [x] backend changes
-  - [x] ui type adoption
-  - [x] ui adoption and runtime injection
-
-- [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls loop is better.
-  - [x] this is a "feature" in anthropic and chargeable for cache write.
-  - [x] implement this after feature filters support and additional param support features in apis.
-  - [x] hook in inference
-  - [x] adopt as a preset param
-  - [ ] adopt in ui with defaults
 
 - [ ] tools issues
   - [x] flatpak shell path issue. need hostspawn support in llm tools.

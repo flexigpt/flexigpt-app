@@ -5,10 +5,14 @@ import { createPortal } from 'react-dom';
 import { FiAlertCircle, FiHelpCircle, FiUpload, FiX } from 'react-icons/fi';
 
 import {
+	type CacheControl,
+	type CacheControlKind,
+	type CacheControlTTL,
 	OutputFormatKind,
 	type OutputParam,
 	OutputVerbosity,
 	type ProviderName,
+	type ProviderSDKType,
 	ReasoningLevel,
 	type ReasoningParam,
 	ReasoningSummaryStyle,
@@ -16,6 +20,7 @@ import {
 } from '@/spec/inference';
 import {
 	DEFAULT_REASONING_TOKENS,
+	type ModelCapabilitiesOverride,
 	type ModelPreset,
 	type ModelPresetID,
 	type PatchModelPresetPayload,
@@ -28,7 +33,22 @@ import { Dropdown } from '@/components/dropdown';
 import { ModalBackdrop } from '@/components/modal_backdrop';
 import { ReadOnlyValue } from '@/components/read_only_value';
 
-import { outputParamsEqual, reasoningEqual } from '@/modelpresets/lib/type_utils';
+import {
+	buildCacheControlFromForm,
+	buildCacheControlKindDropdownItems,
+	buildCacheControlTTLDropdownItems,
+	CACHE_CONTROL_TTL_PROVIDER_DEFAULT,
+	type CacheControlTTLSelection,
+	getInitialCacheControlKind,
+	getInitialCacheControlTTLSelection,
+	resolveSupportedCacheControlKinds,
+	resolveSupportedCacheControlTTLs,
+} from '@/modelpresets/lib/cache_control_utils';
+import {
+	getTopLevelCacheControlCapabilities,
+	mergeModelCapabilitiesOverride,
+} from '@/modelpresets/lib/capabilities_override';
+import { cacheControlEqual, outputParamsEqual, reasoningEqual } from '@/modelpresets/lib/type_utils';
 
 const OUTPUT_FORMAT_NONE = '__none__' as const;
 type OutputFormatKindSelection = OutputFormatKind | typeof OUTPUT_FORMAT_NONE;
@@ -107,6 +127,21 @@ function buildOutputParamFromForm(
 	};
 }
 
+function buildCacheControlFromModelPresetForm(
+	formData: ModelPresetFormData,
+	supportedKinds: CacheControlKind[],
+	supportsKey: boolean
+): CacheControl | undefined {
+	return buildCacheControlFromForm({
+		enabled: formData.cacheControlEnabled,
+		kind: formData.cacheControlKind,
+		supportedKinds,
+		ttlSelection: formData.cacheControlTTL,
+		key: formData.cacheControlKey,
+		supportsKey,
+	});
+}
+
 interface ModelPresetFormData {
 	presetLabel: string;
 	name: string;
@@ -127,6 +162,11 @@ interface ModelPresetFormData {
 
 	outputFormatKind: OutputFormatKindSelection;
 	outputVerbosity: OutputVerbositySelection;
+
+	cacheControlEnabled: boolean;
+	cacheControlKind: CacheControlKind | '';
+	cacheControlTTL: CacheControlTTLSelection;
+	cacheControlKey: string;
 	stopSequencesRaw: string;
 }
 
@@ -139,6 +179,8 @@ interface AddEditModelPresetModalProps {
 		modelPresetID: ModelPresetID,
 		modelData: PostModelPresetPayload | PatchModelPresetPayload
 	) => Promise<void>;
+	providerSDKType: ProviderSDKType;
+	providerCapabilitiesOverride?: ModelCapabilitiesOverride;
 	providerName: ProviderName;
 	mode?: ModalMode;
 	initialModelID?: ModelPresetID;
@@ -210,7 +252,12 @@ const calcNumericError = (
 	return;
 };
 
-function getInitialModelPresetFormData(mode: ModalMode, initialData?: ModelPreset): ModelPresetFormData {
+function getInitialModelPresetFormData(
+	mode: ModalMode,
+	initialData: ModelPreset | undefined,
+	supportedCacheKinds: CacheControlKind[],
+	supportedCacheTTLs: CacheControlTTL[]
+): ModelPresetFormData {
 	if ((mode === 'edit' || mode === 'view') && initialData) {
 		return {
 			presetLabel: initialData.displayName,
@@ -229,6 +276,10 @@ function getInitialModelPresetFormData(mode: ModalMode, initialData?: ModelPrese
 			timeout: initialData.timeout !== undefined ? String(initialData.timeout) : '',
 			outputFormatKind: initialData.outputParam?.format?.kind ?? OUTPUT_FORMAT_NONE,
 			outputVerbosity: initialData.outputParam?.verbosity ?? OUTPUT_VERBOSITY_NONE,
+			cacheControlEnabled: !!initialData.cacheControl,
+			cacheControlKind: getInitialCacheControlKind(initialData.cacheControl, supportedCacheKinds),
+			cacheControlTTL: getInitialCacheControlTTLSelection(initialData.cacheControl, supportedCacheTTLs),
+			cacheControlKey: initialData.cacheControl?.key ?? '',
 			stopSequencesRaw: initialData.stopSequences?.join('\n') ?? '',
 		};
 	}
@@ -250,6 +301,10 @@ function getInitialModelPresetFormData(mode: ModalMode, initialData?: ModelPrese
 		timeout: String(AddModeDefaults.timeout ?? ''),
 		outputFormatKind: OUTPUT_FORMAT_NONE,
 		outputVerbosity: OUTPUT_VERBOSITY_NONE,
+		cacheControlEnabled: false,
+		cacheControlKind: supportedCacheKinds[0] ?? '',
+		cacheControlTTL: CACHE_CONTROL_TTL_PROVIDER_DEFAULT,
+		cacheControlKey: '',
 		stopSequencesRaw: '',
 	};
 }
@@ -258,6 +313,8 @@ function AddEditModelPresetModalContent({
 	onClose,
 	onSubmit,
 	providerName,
+	providerSDKType,
+	providerCapabilitiesOverride,
 	mode,
 	initialModelID,
 	initialData,
@@ -268,8 +325,39 @@ function AddEditModelPresetModalContent({
 	const isViewMode = mode === 'view';
 	const isReadOnly = isViewMode;
 
+	const effectiveCapabilities = useMemo(
+		() => mergeModelCapabilitiesOverride(providerCapabilitiesOverride, initialData?.capabilitiesOverride),
+		[providerCapabilitiesOverride, initialData?.capabilitiesOverride]
+	);
+	const topLevelCacheCapabilities = useMemo(
+		() => getTopLevelCacheControlCapabilities(providerSDKType, effectiveCapabilities),
+		[effectiveCapabilities, providerSDKType]
+	);
+	const supportedCacheKinds = useMemo(
+		() => resolveSupportedCacheControlKinds(topLevelCacheCapabilities?.supportedKinds, initialData?.cacheControl),
+		[topLevelCacheCapabilities?.supportedKinds, initialData?.cacheControl]
+	);
+	const supportedCacheTTLs = useMemo(
+		() => resolveSupportedCacheControlTTLs(topLevelCacheCapabilities?.supportedTTLs, initialData?.cacheControl),
+		[topLevelCacheCapabilities?.supportedTTLs, initialData?.cacheControl]
+	);
+	const supportsManualCacheControl = supportedCacheKinds.length > 0;
+	const supportsCacheKey =
+		topLevelCacheCapabilities?.supportsKey === true || Boolean(initialData?.cacheControl?.key?.trim());
+	const canDisableCacheControl = mode === 'add' || !initialData?.cacheControl;
+	const cacheControlKindItems = useMemo(
+		() => buildCacheControlKindDropdownItems(supportedCacheKinds),
+		[supportedCacheKinds]
+	);
+	const cacheControlTTLItems = useMemo(
+		() => buildCacheControlTTLDropdownItems(supportedCacheTTLs),
+		[supportedCacheTTLs]
+	);
+
 	const [modelPresetID, setModelPresetID] = useState<ModelPresetID>(() => initialModelID ?? '');
-	const [formData, setFormData] = useState<ModelPresetFormData>(() => getInitialModelPresetFormData(mode, initialData));
+	const [formData, setFormData] = useState<ModelPresetFormData>(() =>
+		getInitialModelPresetFormData(mode, initialData, supportedCacheKinds, supportedCacheTTLs)
+	);
 	const [prefillMode, setPrefillMode] = useState(false);
 	const [selectedPrefillKey, setSelectedPrefillKey] = useState<string | null>(null);
 	const [errors, setErrors] = useState<ValidationErrors>({});
@@ -370,6 +458,15 @@ function AddEditModelPresetModalContent({
 			timeout: src.timeout !== undefined ? String(src.timeout) : prev.timeout,
 			outputFormatKind: src.outputParam?.format?.kind ?? prev.outputFormatKind ?? OUTPUT_FORMAT_NONE,
 			outputVerbosity: src.outputParam?.verbosity ?? prev.outputVerbosity ?? OUTPUT_VERBOSITY_NONE,
+			cacheControlEnabled: supportsManualCacheControl && !!src.cacheControl,
+			cacheControlKind: getInitialCacheControlKind(src.cacheControl, supportedCacheKinds),
+			cacheControlTTL: getInitialCacheControlTTLSelection(src.cacheControl, supportedCacheTTLs),
+			cacheControlKey:
+				supportsCacheKey && src.cacheControl?.key
+					? src.cacheControl.key
+					: prev.cacheControlEnabled && !supportsCacheKey
+						? ''
+						: prev.cacheControlKey,
 			stopSequencesRaw: src.stopSequences?.join('\n') ?? prev.stopSequencesRaw,
 		}));
 	};
@@ -406,6 +503,11 @@ function AddEditModelPresetModalContent({
 		const nextTimeout = parseOptionalNumber(formData.timeout);
 		if (nextTimeout !== undefined && nextTimeout !== initialData.timeout) patch.timeout = nextTimeout;
 
+		const nextCacheControl = buildCacheControlFromModelPresetForm(formData, supportedCacheKinds, supportsCacheKey);
+		if (nextCacheControl && !cacheControlEqual(nextCacheControl, initialData.cacheControl)) {
+			patch.cacheControl = nextCacheControl;
+		}
+
 		const nextOutputParam = buildOutputParamFromForm(
 			formData.outputFormatKind,
 			formData.outputVerbosity,
@@ -421,7 +523,7 @@ function AddEditModelPresetModalContent({
 		if (!reasoningEqual(nextReasoning, initialData.reasoning) && nextReasoning) patch.reasoning = nextReasoning;
 
 		return patch;
-	}, [formData, initialData]);
+	}, [formData, initialData, supportedCacheKinds, supportsCacheKey]);
 
 	const runValidation = useCallback((): ValidationErrors => {
 		if (isReadOnly) return {};
@@ -501,6 +603,10 @@ function AddEditModelPresetModalContent({
 			return;
 		}
 
+		const nextCacheControl = buildCacheControlFromModelPresetForm(formData, supportedCacheKinds, supportsCacheKey);
+		const nextOutputParam = buildOutputParamFromForm(formData.outputFormatKind, formData.outputVerbosity);
+		const nextReasoning = buildReasoningFromForm(formData);
+
 		const validationErrors = runValidation();
 		setErrors(validationErrors);
 		if (Object.keys(validationErrors).length !== 0) return;
@@ -519,14 +625,15 @@ function AddEditModelPresetModalContent({
 						maxOutputLength: parseOptionalNumber(formData.maxOutputLength, AddModeDefaults.maxOutputLength),
 						timeout: parseOptionalNumber(formData.timeout, AddModeDefaults.timeout),
 						systemPrompt: formData.systemPrompt,
+						...(nextCacheControl && { cacheControl: nextCacheControl }),
 						...(formData.temperature.trim() !== '' && {
 							temperature: parseOptionalNumber(formData.temperature, 0.1),
 						}),
-						...(buildOutputParamFromForm(formData.outputFormatKind, formData.outputVerbosity) && {
-							outputParam: buildOutputParamFromForm(formData.outputFormatKind, formData.outputVerbosity),
+						...(nextOutputParam && {
+							outputParam: nextOutputParam,
 						}),
-						...(buildReasoningFromForm(formData) && {
-							reasoning: buildReasoningFromForm(formData),
+						...(nextReasoning && {
+							reasoning: nextReasoning,
 						}),
 						...(parseStopSequencesRaw(formData.stopSequencesRaw).length > 0 && {
 							stopSequences: parseStopSequencesRaw(formData.stopSequencesRaw),
@@ -1026,6 +1133,117 @@ function AddEditModelPresetModalContent({
 								</div>
 							</div>
 						))}
+
+						{supportsManualCacheControl && (
+							<>
+								<div className="grid grid-cols-12 items-center gap-2">
+									<label className="label col-span-3 cursor-pointer">
+										<span className="label-text text-sm">Cache Control</span>
+										<span
+											className="label-text-alt tooltip tooltip-right"
+											data-tip="Request-level manual cache control for this preset."
+										>
+											<FiHelpCircle size={12} />
+										</span>
+									</label>
+									<div className="col-span-9 flex items-center gap-2">
+										<input
+											type="checkbox"
+											name="cacheControlEnabled"
+											className="toggle toggle-accent disabled:opacity-80"
+											checked={formData.cacheControlEnabled}
+											onChange={() => {
+												setFormData(prev => ({
+													...prev,
+													cacheControlEnabled: !prev.cacheControlEnabled,
+													cacheControlKind: prev.cacheControlKind || supportedCacheKinds[0] || '',
+												}));
+											}}
+											disabled={isReadOnly || isSubmitting || !canDisableCacheControl}
+										/>
+										{!canDisableCacheControl && (
+											<span className="text-xs opacity-70">
+												Existing cache control can be changed, but clearing it is not supported.
+											</span>
+										)}
+									</div>
+								</div>
+
+								{formData.cacheControlEnabled && (
+									<>
+										<div className="grid grid-cols-12 items-center gap-2">
+											<label className="label col-span-3">
+												<span className="label-text text-sm">Cache Kind</span>
+											</label>
+											<div className="col-span-9">
+												{isReadOnly ? (
+													<ReadOnlyValue
+														value={
+															cacheControlKindItems[formData.cacheControlKind as CacheControlKind]?.displayName ?? '—'
+														}
+													/>
+												) : (
+													<Dropdown<CacheControlKind>
+														dropdownItems={cacheControlKindItems}
+														selectedKey={(formData.cacheControlKind || supportedCacheKinds[0]) as CacheControlKind}
+														onChange={kind => {
+															setFormData(prev => ({ ...prev, cacheControlKind: kind }));
+														}}
+														filterDisabled={false}
+														title="Select Cache Kind"
+														getDisplayName={k => cacheControlKindItems[k].displayName}
+													/>
+												)}
+											</div>
+										</div>
+
+										<div className="grid grid-cols-12 items-center gap-2">
+											<label className="label col-span-3">
+												<span className="label-text text-sm">Cache TTL</span>
+											</label>
+											<div className="col-span-9">
+												{isReadOnly ? (
+													<ReadOnlyValue value={cacheControlTTLItems[formData.cacheControlTTL].displayName} />
+												) : (
+													<Dropdown<CacheControlTTLSelection>
+														dropdownItems={cacheControlTTLItems}
+														selectedKey={formData.cacheControlTTL}
+														onChange={ttl => {
+															setFormData(prev => ({ ...prev, cacheControlTTL: ttl }));
+														}}
+														filterDisabled={false}
+														title="Select Cache TTL"
+														getDisplayName={k => cacheControlTTLItems[k].displayName}
+													/>
+												)}
+											</div>
+										</div>
+
+										{supportsCacheKey && (
+											<div className="grid grid-cols-12 items-center gap-2">
+												<label className="label col-span-3">
+													<span className="label-text text-sm">Cache Key</span>
+												</label>
+												<div className="col-span-9">
+													<input
+														name="cacheControlKey"
+														type="text"
+														className="input input-bordered w-full rounded-xl"
+														value={formData.cacheControlKey}
+														onChange={handleChange}
+														placeholder="Optional request cache key"
+														autoComplete="off"
+														spellCheck="false"
+														readOnly={isReadOnly}
+														disabled={isSubmitting}
+													/>
+												</div>
+											</div>
+										)}
+									</>
+								)}
+							</>
+						)}
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">

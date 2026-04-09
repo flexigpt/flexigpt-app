@@ -13,15 +13,33 @@ import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiHelpCircle, FiX } from 'react-icons/fi';
 
-import { type JSONSchemaParam, OutputFormatKind, type OutputParam, ReasoningSummaryStyle } from '@/spec/inference';
+import {
+	type CacheControlKind,
+	type JSONSchemaParam,
+	OutputFormatKind,
+	type OutputParam,
+	ReasoningSummaryStyle,
+} from '@/spec/inference';
 import type { UIChatOption } from '@/spec/modelpreset';
 
 import { HoverTip } from '@/components/ariakit_hover_tip';
 import { Dropdown } from '@/components/dropdown';
 
 import {
+	buildCacheControlFromForm,
+	buildCacheControlKindDropdownItems,
+	buildCacheControlTTLDropdownItems,
+	type CacheControlTTLSelection,
+	getInitialCacheControlKind,
+	getInitialCacheControlTTLSelection,
+	resolveSupportedCacheControlKinds,
+	resolveSupportedCacheControlTTLs,
+} from '@/modelpresets/lib/cache_control_utils';
+import {
+	getEffectiveCacheCapabilities,
 	getStopSequencesPolicy,
 	getSupportedOutputFormats,
+	getTopLevelCacheControlCapabilities,
 	supportsReasoningSummaryStyle,
 } from '@/modelpresets/lib/capabilities_override';
 
@@ -154,6 +172,27 @@ function AdvancedParamsModalInner({
 
 	const reasoningEnabled = effectiveReasoningEnabled ?? !!currentModel.reasoning;
 
+	const effectiveCacheCapabilities = useMemo(
+		() => getEffectiveCacheCapabilities(currentModel.providerSDKType, currentModel.capabilitiesOverride),
+		[currentModel.capabilitiesOverride, currentModel.providerSDKType]
+	);
+	const topLevelCacheCapabilities = useMemo(
+		() => getTopLevelCacheControlCapabilities(currentModel.providerSDKType, currentModel.capabilitiesOverride),
+		[currentModel.capabilitiesOverride, currentModel.providerSDKType]
+	);
+	const supportedCacheKinds = useMemo(
+		() => resolveSupportedCacheControlKinds(topLevelCacheCapabilities?.supportedKinds, currentModel.cacheControl),
+		[currentModel.cacheControl, topLevelCacheCapabilities?.supportedKinds]
+	);
+	const supportedCacheTTLs = useMemo(
+		() => resolveSupportedCacheControlTTLs(topLevelCacheCapabilities?.supportedTTLs, currentModel.cacheControl),
+		[currentModel.cacheControl, topLevelCacheCapabilities?.supportedTTLs]
+	);
+	const supportsManualCacheControl = supportedCacheKinds.length > 0;
+	const supportsCacheKey =
+		topLevelCacheCapabilities?.supportsKey === true || Boolean(currentModel.cacheControl?.key?.trim());
+	const supportsAutomaticProviderCaching = effectiveCacheCapabilities?.supportsAutomaticCaching === true;
+
 	const summaryStyleSupported = supportsReasoningSummaryStyle(currentModel.capabilitiesOverride);
 
 	const stopPolicy = useMemo(
@@ -176,12 +215,29 @@ function AdvancedParamsModalInner({
 		[reasoningEnabled, summaryStyleSupported]
 	);
 
+	const cacheControlKindItems = useMemo(
+		() => buildCacheControlKindDropdownItems(supportedCacheKinds),
+		[supportedCacheKinds]
+	);
+	const cacheControlTTLItems = useMemo(
+		() => buildCacheControlTTLDropdownItems(supportedCacheTTLs),
+		[supportedCacheTTLs]
+	);
+
 	const initialJSONSchema = currentModel.outputParam?.format?.jsonSchemaParam;
 
 	const [stream, setStream] = useState(() => currentModel.stream);
 	const [maxPromptLength, setMaxPromptLength] = useState(() => String(currentModel.maxPromptLength));
 	const [maxOutputLength, setMaxOutputLength] = useState(() => String(currentModel.maxOutputLength));
 	const [timeoutSec, setTimeoutSec] = useState(() => String(currentModel.timeout));
+	const [cacheControlEnabled, setCacheControlEnabled] = useState(() => Boolean(currentModel.cacheControl));
+	const [cacheControlKind, setCacheControlKind] = useState<CacheControlKind | ''>(() =>
+		getInitialCacheControlKind(currentModel.cacheControl, supportedCacheKinds)
+	);
+	const [cacheControlTTL, setCacheControlTTL] = useState<CacheControlTTLSelection>(() =>
+		getInitialCacheControlTTLSelection(currentModel.cacheControl, supportedCacheTTLs)
+	);
+	const [cacheControlKey, setCacheControlKey] = useState(() => currentModel.cacheControl?.key ?? '');
 
 	const [reasoningSummaryStyle, setReasoningSummaryStyle] = useState<SummaryStyleChoice>(() =>
 		getInitialReasoningSummaryStyle(currentModel, summaryStyleSupported)
@@ -358,6 +414,15 @@ function AdvancedParamsModalInner({
 
 		const { nameErr, schemaErr } = validateJSONSchema(outputFormatChoice);
 
+		const nextCacheControl = buildCacheControlFromForm({
+			enabled: cacheControlEnabled,
+			kind: cacheControlKind,
+			supportedKinds: supportedCacheKinds,
+			ttlSelection: cacheControlTTL,
+			key: cacheControlKey,
+			supportsKey: supportsCacheKey,
+		});
+
 		const nextErrors: Partial<Record<ErrorKey, string>> = {
 			maxPromptLength: maxPromptErr,
 			maxOutputLength: maxOutputErr,
@@ -440,6 +505,7 @@ function AdvancedParamsModalInner({
 			maxPromptLength: parsePositiveIntAllowBlank(maxPromptLength) ?? currentModel.maxPromptLength,
 			maxOutputLength: parsePositiveIntAllowBlank(maxOutputLength) ?? currentModel.maxOutputLength,
 			timeout: parsePositiveIntAllowBlank(timeoutSec) ?? currentModel.timeout,
+			cacheControl: nextCacheControl,
 			reasoning: mergedReasoning,
 			outputParam: mergedOutputParam,
 			stopSequences: nextStopSequences,
@@ -691,6 +757,102 @@ function AdvancedParamsModalInner({
 									)}
 								</div>
 							</div>
+						</>
+					)}
+
+					{(supportsManualCacheControl || supportsAutomaticProviderCaching) && (
+						<>
+							<div className="grid grid-cols-12 items-center gap-2">
+								<label className="label col-span-4 cursor-pointer">
+									<span className="label-text text-sm">Cache Control</span>
+									<HelpHint content="Top-level request cache control, when supported by the selected provider SDK." />
+								</label>
+								<div className="col-span-8">
+									{supportsManualCacheControl ? (
+										<input
+											type="checkbox"
+											checked={cacheControlEnabled}
+											onChange={e => {
+												const nextEnabled = e.target.checked;
+												setCacheControlEnabled(nextEnabled);
+												if (nextEnabled && !cacheControlKind) {
+													setCacheControlKind(supportedCacheKinds[0] ?? '');
+												}
+											}}
+											className="toggle toggle-accent"
+										/>
+									) : (
+										<span className="text-sm opacity-70">Manual top-level cache control is not available.</span>
+									)}
+									{supportsAutomaticProviderCaching && (
+										<div className="label">
+											<span className="label-text-alt opacity-70">
+												This provider SDK also supports automatic caching behavior.
+											</span>
+										</div>
+									)}
+								</div>
+							</div>
+
+							{supportsManualCacheControl && cacheControlEnabled && (
+								<>
+									<div className="grid grid-cols-12 items-center gap-2">
+										<label className="label col-span-4">
+											<span className="label-text text-sm">Cache Kind</span>
+										</label>
+										<div className="col-span-8">
+											<Dropdown<CacheControlKind>
+												dropdownItems={cacheControlKindItems}
+												selectedKey={(cacheControlKind || supportedCacheKinds[0]) as CacheControlKind}
+												onChange={kind => {
+													setCacheControlKind(kind);
+												}}
+												filterDisabled={false}
+												title="Select Cache Kind"
+												getDisplayName={k => cacheControlKindItems[k].displayName}
+											/>
+										</div>
+									</div>
+
+									<div className="grid grid-cols-12 items-center gap-2">
+										<label className="label col-span-4">
+											<span className="label-text text-sm">Cache TTL</span>
+										</label>
+										<div className="col-span-8">
+											<Dropdown<CacheControlTTLSelection>
+												dropdownItems={cacheControlTTLItems}
+												selectedKey={cacheControlTTL}
+												onChange={ttl => {
+													setCacheControlTTL(ttl);
+												}}
+												filterDisabled={false}
+												title="Select Cache TTL"
+												getDisplayName={k => cacheControlTTLItems[k].displayName}
+											/>
+										</div>
+									</div>
+
+									{supportsCacheKey && (
+										<div className="grid grid-cols-12 items-center gap-2">
+											<label className="label col-span-4">
+												<span className="label-text text-sm">Cache Key</span>
+											</label>
+											<div className="col-span-8">
+												<input
+													type="text"
+													value={cacheControlKey}
+													onChange={e => {
+														setCacheControlKey(e.target.value);
+													}}
+													className="input input-bordered w-full rounded-xl"
+													placeholder="Optional request cache key"
+													spellCheck="false"
+												/>
+											</div>
+										</div>
+									)}
+								</>
+							)}
 						</>
 					)}
 

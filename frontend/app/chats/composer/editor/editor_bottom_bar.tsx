@@ -535,6 +535,17 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						)}
 					</Menu>
 
+					<SkillsBottomBarChip
+						allSkills={allSkills}
+						loading={skillsLoading}
+						enabledSkillRefs={enabledSkillRefs}
+						activeSkillRefs={activeSkillRefs}
+						setEnabledSkillRefs={setEnabledSkillRefs}
+						onEnableAll={onEnableAllSkills}
+						onDisableAll={onDisableAllSkills}
+						isInputLocked={isInputLocked}
+					/>
+
 					<WebSearchBottomBarChip
 						eligibleTools={eligibleWebSearchTools}
 						enabled={webSearchEnabled}
@@ -558,18 +569,6 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 							if (!activeWebSearch) return;
 							dispatchOpenToolArgs({ kind: 'webSearch' }, toolArgsEventTarget);
 						}}
-					/>
-
-					{/* Skills: sits to the right of Web Search */}
-					<SkillsBottomBarChip
-						allSkills={allSkills}
-						loading={skillsLoading}
-						enabledSkillRefs={enabledSkillRefs}
-						activeSkillRefs={activeSkillRefs}
-						setEnabledSkillRefs={setEnabledSkillRefs}
-						onEnableAll={onEnableAllSkills}
-						onDisableAll={onDisableAllSkills}
-						isInputLocked={isInputLocked}
 					/>
 				</div>
 

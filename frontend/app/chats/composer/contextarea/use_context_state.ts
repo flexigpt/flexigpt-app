@@ -85,6 +85,9 @@ function applyPersistedModelParamToSelectedModel(
 	if (hasOwn(modelParam, 'stopSequences')) next.stopSequences = modelParam.stopSequences;
 	else delete next.stopSequences;
 
+	if (hasOwn(modelParam, 'cacheControl')) next.cacheControl = modelParam.cacheControl;
+	else delete next.cacheControl;
+
 	if (hasOwn(modelParam, 'additionalParametersRawJSON')) {
 		next.additionalParametersRawJSON = modelParam.additionalParametersRawJSON;
 	} else {

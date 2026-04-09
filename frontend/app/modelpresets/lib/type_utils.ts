@@ -1,4 +1,4 @@
-import type { OutputParam, ReasoningParam } from '@/spec/inference';
+import type { CacheControl, OutputParam, ReasoningParam } from '@/spec/inference';
 
 export function outputParamsEqual(a?: OutputParam, b?: OutputParam): boolean {
 	if (!a && !b) return true;
@@ -22,4 +22,11 @@ export function reasoningEqual(a?: ReasoningParam, b?: ReasoningParam): boolean 
 	if (!a && !b) return true;
 	if (!a || !b) return false;
 	return a.type === b.type && a.level === b.level && a.tokens === b.tokens && a.summaryStyle === b.summaryStyle;
+}
+
+export function cacheControlEqual(a?: CacheControl, b?: CacheControl): boolean {
+	if (!a && !b) return true;
+	if (!a || !b) return false;
+
+	return a.kind === b.kind && a.ttl === b.ttl && (a.key?.trim() ?? '') === (b.key?.trim() ?? '');
 }

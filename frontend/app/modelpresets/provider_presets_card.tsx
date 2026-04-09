@@ -533,6 +533,8 @@ export function ProviderPresetCard({
 				}}
 				onSubmit={handleModifyModelSubmit}
 				providerName={provider}
+				providerSDKType={preset.sdkType}
+				providerCapabilitiesOverride={preset.capabilitiesOverride}
 				initialModelID={selectedID ?? undefined}
 				initialData={selectedID ? modelPresets[selectedID] : undefined}
 				existingModels={modelPresets}

@@ -15,6 +15,7 @@ export function buildEffectiveModelParamFromModelPreset(modelPreset: ModelPreset
 		maxOutputLength: modelPreset.maxOutputLength ?? DefaultModelParams.maxOutputLength,
 		systemPrompt: modelPreset.systemPrompt ?? DefaultModelParams.systemPrompt,
 		timeout: modelPreset.timeout ?? DefaultModelParams.timeout,
+		cacheControl: modelPreset.cacheControl ?? DefaultModelParams.cacheControl,
 
 		temperature: modelPreset.temperature,
 		reasoning: modelPreset.reasoning,

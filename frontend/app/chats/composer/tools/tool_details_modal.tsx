@@ -7,76 +7,18 @@ import { FiTool, FiX } from 'react-icons/fi';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import { ToolOutputKind, type ToolOutputUnion, type ToolStoreChoice } from '@/spec/tool';
 
+import {
+	buildJSONCodeBlock,
+	buildJSONOrTextCodeBlock,
+	normalizeStructuredDisplayObject,
+	normalizeStructuredJSONStringDeep,
+} from '@/lib/jsonschema_utils';
+
 import { ModalBackdrop } from '@/components/modal_backdrop';
 
 import { MessageContentCard } from '@/chats/messages/message_content_card';
 import { formatToolCallLabel } from '@/tools/lib/tool_call_utils';
 import { formatToolOutputSummary } from '@/tools/lib/tool_output_utils';
-
-function buildTextCodeBlock(text: string): string {
-	return ['```text', text, '```'].join('\n');
-}
-
-function buildJSONCodeBlock(value: unknown): string {
-	try {
-		return ['```json', JSON.stringify(value, null, 2), '```'].join('\n');
-	} catch {
-		return buildTextCodeBlock(String(value));
-	}
-}
-
-function parseStructuredJSONString(raw?: string): unknown {
-	if (typeof raw !== 'string') return undefined;
-
-	const trimmed = raw.trim();
-	if (!trimmed) return undefined;
-
-	try {
-		const parsed = JSON.parse(trimmed);
-		if (parsed !== null && typeof parsed === 'object') {
-			return parsed;
-		}
-	} catch {
-		// ignore
-	}
-
-	return undefined;
-}
-
-function buildJSONOrTextCodeBlock(raw?: string): string | null {
-	if (typeof raw !== 'string' || raw.trim().length === 0) {
-		return null;
-	}
-
-	return buildJSONCodeBlock(parseStructuredJSONString(raw) ?? raw);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function normalizeStructuredJSONStringDeep(value: unknown): unknown {
-	const parsed = typeof value === 'string' ? parseStructuredJSONString(value) : undefined;
-	if (parsed !== undefined) {
-		return normalizeStructuredJSONStringDeep(parsed);
-	}
-
-	if (Array.isArray(value)) {
-		return value.map(item => normalizeStructuredJSONStringDeep(item));
-	}
-	if (isRecord(value)) {
-		return Object.fromEntries(
-			Object.entries(value).map(([key, item]) => [key, normalizeStructuredJSONStringDeep(item)])
-		);
-	}
-	return value;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
-function normalizeStructuredDisplayObject<T extends object>(value: T): Record<string, unknown> {
-	const normalized = normalizeStructuredJSONStringDeep(value);
-	return isRecord(normalized) ? normalized : (value as Record<string, unknown>);
-}
 
 function buildToolOutputItemLabel(item: ToolOutputUnion, index: number): string {
 	switch (item.kind) {
@@ -310,16 +252,8 @@ export function ToolDetailsModal({ state, onClose }: ToolDetailsModalProps) {
 	if (!state) return null;
 	const { title, payload } = buildPayload(state);
 
-	// Raw JSON payload, rendered as a fenced code block for syntax highlighting.
-	let rawPayloadMarkdown = '### Raw Payload\n\n';
-	try {
-		const json = JSON.stringify(payload, null, 2);
-		rawPayloadMarkdown += ['```json', json, '```'].join('\n');
-	} catch (err) {
-		rawPayloadMarkdown +=
-			'Error serializing payload:\n\n' +
-			((err as Error).message ?? 'Unknown serialization error ' + JSON.stringify(err));
-	}
+	// Raw payload, preferring JSON display with a safe text fallback.
+	const rawPayloadMarkdown = `### Raw Payload\n\n${buildJSONOrTextCodeBlock(payload) ?? '_No raw payload available._'}`;
 
 	// Human-oriented primary content (semantics-first).
 	let primaryContent = '';
