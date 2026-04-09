@@ -196,7 +196,7 @@ export function SkillsBottomBarChip({
 				<div className="mb-2 flex items-center justify-between gap-2 px-1">
 					<div className="text-base-content/70 text-xs font-semibold">Skills</div>
 					<div className="text-base-content/60 flex items-center gap-2 text-xs">
-						<span>Selected: {enabledCount}</span>
+						<span>Enabled: {enabledCount}</span>
 						<span>•</span>
 						<span>Active: {activeCount}</span>
 						<span>•</span>

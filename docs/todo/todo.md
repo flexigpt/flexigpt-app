@@ -10,6 +10,9 @@
 - [ ] skills active and enabled are set properly on convo reload, but the ticks inside the menu are not visible.
 - [ ] set skill as active immediately button is also needed manually
 
+- [ ] spec driven dev and others: enforcing bfs
+- [ ] composer: see if grammar rectification or atleast spell check and highlight can be added cleanly
+
 - [ ] Skill
   - [ ] include some builtin skills and test on all platforms, full flow.
     - [x] include spec driven dev

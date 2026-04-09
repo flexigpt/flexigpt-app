@@ -6,21 +6,13 @@ import {
 	DefaultUIChatOptions,
 	type IncludePreviousMessages,
 	type ModelPresetRef,
-	PREVIOUS_CONVO_SYSTEM_PROMPT_BUNDLEID,
-	PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY,
 	type UIChatOption,
 } from '@/spec/modelpreset';
-import { type PromptBundle, PromptRoleEnum } from '@/spec/prompt';
 import { type Tool, ToolImplType, type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
-import { dedupeStringArray } from '@/lib/obj_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
-import {
-	loadInstructionTemplateOptions,
-	loadSkillOptions,
-	loadToolOptions,
-} from '@/assistantpresets/lib/assistant_preset_catalog';
+import { loadSkillOptions, loadToolOptions } from '@/assistantpresets/lib/assistant_preset_catalog';
 import {
 	buildModelPresetRefKey,
 	buildSkillRefKey,
@@ -30,7 +22,6 @@ import {
 	applyAssistantPresetModelPatch,
 	type AssistantPresetOptionItem,
 	type AssistantPresetPreparedApplication,
-	buildAssistantPresetModelComparisonState,
 	normalizeAssistantPresetSkillRefs,
 	normalizeAssistantPresetToolChoices,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
@@ -41,10 +32,6 @@ import {
 	supportsOutputVerbosity,
 } from '@/modelpresets/lib/capabilities_override';
 import { getChatInputOptions } from '@/modelpresets/lib/uichatoption_helper';
-import { buildPromptTemplateRefKey } from '@/prompts/lib/prompt_template_ref';
-import { buildEffectiveSystemPrompt } from '@/prompts/lib/system_prompt_utils';
-import type { SystemPromptDraft } from '@/prompts/lib/use_system_prompts';
-import { type SystemPromptItem, useSystemPrompts } from '@/prompts/lib/use_system_prompts';
 import { normalizeSkillSelectionsToRefs } from '@/skills/lib/skill_identity_utils';
 
 function isHybridReasoningModel(model: UIChatOption): boolean {
@@ -183,58 +170,6 @@ function resolveRestoredSelectedModel(
 	});
 }
 
-function buildPreviousConversationSystemPromptItem(prompt: string): SystemPromptItem {
-	return {
-		identityKey: PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY,
-		bundleID: PREVIOUS_CONVO_SYSTEM_PROMPT_BUNDLEID,
-		bundleDisplayName: 'Conversation',
-		displayName: 'Previous conversation prompt',
-		templateSlug: 'previous-conversation-prompt',
-		templateVersion: 'persisted',
-		role: PromptRoleEnum.System,
-		prompt,
-		isBuiltIn: true,
-	} as SystemPromptItem;
-}
-
-function deriveRestoredPromptSelectionState(
-	nextSelectedModel: UIChatOption,
-	modelParam?: ModelParam
-): {
-	restoredConversationSystemPrompt: string | null;
-	includeModelDefault: boolean;
-	selectedPromptKeys: string[];
-} {
-	// No persisted model params at all:
-	// behave like a fresh conversation for prompt-selection UI.
-	if (!modelParam) {
-		return {
-			restoredConversationSystemPrompt: null,
-			includeModelDefault: Boolean(nextSelectedModel.systemPrompt.trim()),
-			selectedPromptKeys: [],
-		};
-	}
-
-	// Persisted effective system prompt exists:
-	// restore it as ONE synthetic selectable source and do not keep any old
-	// prompt selections from prior tab-local state.
-	const restoredSystemPrompt = modelParam.systemPrompt?.trim() ?? '';
-	if (restoredSystemPrompt) {
-		return {
-			restoredConversationSystemPrompt: restoredSystemPrompt,
-			includeModelDefault: false,
-			selectedPromptKeys: [PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY],
-		};
-	}
-
-	// Persisted model params explicitly had no effective system prompt.
-	return {
-		restoredConversationSystemPrompt: null,
-		includeModelDefault: false,
-		selectedPromptKeys: [],
-	};
-}
-
 function getPresetToolModelCompatibilityError(toolDefinition: Tool, selectedModel: UIChatOption): string | undefined {
 	if (toolDefinition.type !== ToolImplType.SDK) {
 		return undefined;
@@ -257,20 +192,11 @@ function getPresetToolModelCompatibilityError(toolDefinition: Tool, selectedMode
 function buildFinalOptions(
 	selectedModel: UIChatOption,
 	includePreviousMessages: IncludePreviousMessages,
-	isHybridReasoningEnabled: boolean,
-	includeModelDefault: boolean,
-	selectedPromptKeys: string[],
-	promptsByKey: Map<string, SystemPromptItem>
+	isHybridReasoningEnabled: boolean
 ): UIChatOption {
 	const base: UIChatOption = {
 		...selectedModel,
 		includePreviousMessages,
-		systemPrompt: buildEffectiveSystemPrompt({
-			modelDefaultPrompt: selectedModel.systemPrompt,
-			includeModelDefault,
-			selectedPromptKeys,
-			promptsByKey,
-		}),
 	};
 
 	if (selectedModel.reasoning?.type === ReasoningType.HybridWithTokens && !isHybridReasoningEnabled) {
@@ -296,29 +222,15 @@ export type AssistantContextController = {
 
 	isHybridReasoningEnabled: boolean;
 	includePreviousMessages: IncludePreviousMessages;
-	prompts: SystemPromptItem[];
-	selectedPromptKeys: string[];
-	systemPromptBundles: PromptBundle[];
-	preferredSystemPromptBundleID: string | null;
-	systemPromptsLoading: boolean;
-	systemPromptError: string | null;
-	includeModelDefault: boolean;
 
 	handleSetSelectedModel: Dispatch<SetStateAction<UIChatOption>>;
 	handleSetIsHybridReasoningEnabled: Dispatch<SetStateAction<boolean>>;
 	setIncludePreviousMessages: Dispatch<SetStateAction<IncludePreviousMessages>>;
-	setIncludeModelDefault: Dispatch<SetStateAction<boolean>>;
 
 	setTemperature: (temp: number) => void;
 	setReasoningLevel: (level: ReasoningLevel) => void;
 	setHybridTokens: (tokens: number) => void;
 	setOutputVerbosity: (verbosity?: OutputVerbosity) => void;
-
-	togglePromptSelection: (identityKey: string) => void;
-	addAndSelectPrompt: (draft: SystemPromptDraft) => Promise<void>;
-	clearSelectedPromptSources: () => void;
-	refreshSystemPrompts: () => Promise<void>;
-	getExistingSystemPromptVersions: (bundleID: string, slug: string) => string[];
 
 	assistantPresetOptions: AssistantPresetOptionItem[];
 	assistantPresetsLoading: boolean;
@@ -329,8 +241,8 @@ export type AssistantContextController = {
 
 	applyAdvancedModel: (updatedModel: UIChatOption) => void;
 
-	restoreConversationContext: (context: RestorableConversationContext) => void;
-	resetForNewConversation: () => void;
+	restoreConversationContext: (context: RestorableConversationContext) => UIChatOption | null;
+	resetForNewConversation: () => UIChatOption;
 
 	verbosityEnabled: boolean;
 	reasoningLevelOptions: ReasoningLevel[];
@@ -345,11 +257,6 @@ export function useAssistantContextState(): AssistantContextController {
 	const [includePreviousMessages, setIncludePreviousMessages] = useState<IncludePreviousMessages>(
 		DefaultUIChatOptions.includePreviousMessages
 	);
-	const [rawSelectedPromptKeys, setRawSelectedPromptKeys] = useState<string[]>([]);
-	const [includeModelDefault, setIncludeModelDefaultState] = useState(
-		Boolean(DefaultUIChatOptions.systemPrompt.trim())
-	);
-	const [restoredConversationSystemPrompt, setRestoredConversationSystemPrompt] = useState<string | null>(null);
 
 	const selectedModelRef = useRef(selectedModel);
 	const isHybridReasoningEnabledRef = useRef(isHybridReasoningEnabled);
@@ -368,17 +275,6 @@ export function useAssistantContextState(): AssistantContextController {
 	useEffect(() => {
 		allOptionsRef.current = allOptions;
 	}, [allOptions]);
-
-	const {
-		prompts: storedPrompts,
-		bundles: systemPromptBundles,
-		preferredBundleID: preferredSystemPromptBundleID,
-		loading: systemPromptsLoading,
-		error: systemPromptError,
-		addPrompt,
-		refreshPrompts,
-		getExistingVersions,
-	} = useSystemPrompts();
 
 	const {
 		presetOptions: rawAssistantPresetOptions,
@@ -419,81 +315,9 @@ export function useAssistantContextState(): AssistantContextController {
 		});
 	}, [allOptions, optionsLoaded, rawAssistantPresetOptions]);
 
-	const syntheticPreviousConversationPrompt = useMemo(() => {
-		const prompt = restoredConversationSystemPrompt?.trim();
-		return prompt ? buildPreviousConversationSystemPromptItem(prompt) : null;
-	}, [restoredConversationSystemPrompt]);
-
-	const prompts = useMemo(
-		() =>
-			syntheticPreviousConversationPrompt ? [syntheticPreviousConversationPrompt, ...storedPrompts] : storedPrompts,
-		[storedPrompts, syntheticPreviousConversationPrompt]
-	);
-
-	const promptsByKey = useMemo(() => new Map(prompts.map(item => [item.identityKey, item])), [prompts]);
-	const promptsByKeyRef = useRef(promptsByKey);
-
-	useEffect(() => {
-		promptsByKeyRef.current = promptsByKey;
-	}, [promptsByKey]);
-
-	const selectedPromptKeys = useMemo(
-		() => rawSelectedPromptKeys.filter(key => promptsByKey.has(key)),
-		[promptsByKey, rawSelectedPromptKeys]
-	);
-
-	const includeModelDefaultRef = useRef(includeModelDefault);
-	useEffect(() => {
-		includeModelDefaultRef.current = includeModelDefault;
-	}, [includeModelDefault]);
-
-	const setIncludeModelDefault = useCallback((action: SetStateAction<boolean>) => {
-		const currentValue = includeModelDefaultRef.current;
-		const nextValue = typeof action === 'function' ? action(currentValue) : action;
-		includeModelDefaultRef.current = nextValue;
-		setIncludeModelDefaultState(nextValue);
-	}, []);
-
-	const selectedPromptKeysRef = useRef(selectedPromptKeys);
-	useEffect(() => {
-		selectedPromptKeysRef.current = selectedPromptKeys;
-	}, [selectedPromptKeys]);
-
-	const setPromptSelectionState = useCallback(
-		(
-			nextRestoredConversationSystemPrompt: string | null,
-			nextIncludeModelDefault: boolean,
-			nextSelectedPromptKeys: string[]
-		) => {
-			setRestoredConversationSystemPrompt(nextRestoredConversationSystemPrompt);
-			includeModelDefaultRef.current = nextIncludeModelDefault;
-			setIncludeModelDefaultState(nextIncludeModelDefault);
-
-			const nextKeys = [...nextSelectedPromptKeys];
-			selectedPromptKeysRef.current = nextKeys;
-			setRawSelectedPromptKeys(nextKeys);
-		},
-		[]
-	);
-
 	const chatOptions = useMemo(
-		() =>
-			buildFinalOptions(
-				selectedModel,
-				includePreviousMessages,
-				isHybridReasoningEnabled,
-				includeModelDefault,
-				selectedPromptKeys,
-				promptsByKey
-			),
-		[
-			includeModelDefault,
-			includePreviousMessages,
-			isHybridReasoningEnabled,
-			promptsByKey,
-			selectedModel,
-			selectedPromptKeys,
-		]
+		() => buildFinalOptions(selectedModel, includePreviousMessages, isHybridReasoningEnabled),
+		[includePreviousMessages, isHybridReasoningEnabled, selectedModel]
 	);
 
 	const applyRestoredConversationContext = useCallback(
@@ -512,26 +336,19 @@ export function useAssistantContextState(): AssistantContextController {
 			isHybridReasoningEnabledRef.current = nextHybridEnabled;
 			setIsHybridReasoningEnabled(nextHybridEnabled);
 
-			const restoredPromptState = deriveRestoredPromptSelectionState(nextSelectedModel, context.modelParam);
-			setPromptSelectionState(
-				restoredPromptState.restoredConversationSystemPrompt,
-				restoredPromptState.includeModelDefault,
-				restoredPromptState.selectedPromptKeys
-			);
-			// We intentionally do not restore includePreviousMessages yet.
-			// But hydration must still reset it so stale per-tab UI state cannot
-			// leak into restored conversations, especially old/stale ones.
 			setIncludePreviousMessages(nextSelectedModel.includePreviousMessages);
+			return nextSelectedModel;
 		},
-		[setPromptSelectionState]
+		[]
 	);
 
 	const restoreConversationContext = useCallback(
 		(context: RestorableConversationContext) => {
 			pendingRestoreContextRef.current = context;
-			if (!optionsLoaded) return;
-			applyRestoredConversationContext(context, allOptionsRef.current);
+			if (!optionsLoaded) return null;
+			const nextSelectedModel = applyRestoredConversationContext(context, allOptionsRef.current);
 			pendingRestoreContextRef.current = null;
+			return nextSelectedModel;
 		},
 		[applyRestoredConversationContext, optionsLoaded]
 	);
@@ -549,9 +366,9 @@ export function useAssistantContextState(): AssistantContextController {
 		isHybridReasoningEnabledRef.current = nextHybridEnabled;
 		setIsHybridReasoningEnabled(nextHybridEnabled);
 
-		setPromptSelectionState(null, Boolean(nextSelectedModel.systemPrompt.trim()), []);
 		setIncludePreviousMessages(nextSelectedModel.includePreviousMessages);
-	}, [setPromptSelectionState]);
+		return nextSelectedModel;
+	}, []);
 
 	const applySelectedModel = useCallback(
 		(
@@ -611,13 +428,12 @@ export function useAssistantContextState(): AssistantContextController {
 			setSelectedModel(nextSelectedModel);
 			setIsHybridReasoningEnabled(nextIsHybridReasoningEnabled);
 			setIncludePreviousMessages(nextSelectedModel.includePreviousMessages);
-			setPromptSelectionState(null, Boolean(nextSelectedModel.systemPrompt.trim()), []);
 		})();
 
 		return () => {
 			cancelled = true;
 		};
-	}, [applyRestoredConversationContext, setPromptSelectionState]);
+	}, [applyRestoredConversationContext]);
 
 	const handleSetSelectedModel = useCallback(
 		(action: SetStateAction<UIChatOption>) => {
@@ -691,33 +507,6 @@ export function useAssistantContextState(): AssistantContextController {
 		[applySelectedModel]
 	);
 
-	const togglePromptSelection = useCallback((identityKey: string) => {
-		setRawSelectedPromptKeys(prev => {
-			const next = prev.includes(identityKey) ? prev.filter(item => item !== identityKey) : [...prev, identityKey];
-			selectedPromptKeysRef.current = next;
-			return next;
-		});
-	}, []);
-
-	const addAndSelectPrompt = useCallback(
-		async (draft: SystemPromptDraft) => {
-			const item = await addPrompt(draft);
-			setRawSelectedPromptKeys(prev => {
-				const next = prev.includes(item.identityKey) ? prev : [...prev, item.identityKey];
-				selectedPromptKeysRef.current = next;
-				return next;
-			});
-		},
-		[addPrompt]
-	);
-
-	const clearSelectedPromptSources = useCallback(() => {
-		includeModelDefaultRef.current = false;
-		setIncludeModelDefaultState(false);
-		selectedPromptKeysRef.current = [];
-		setRawSelectedPromptKeys([]);
-	}, []);
-
 	const prepareAssistantPresetApplication = useCallback(
 		async (presetKey: string): Promise<AssistantPresetPreparedApplication | null> => {
 			const option = assistantPresetOptions.find(item => item.key === presetKey);
@@ -756,40 +545,6 @@ export function useAssistantContextState(): AssistantContextController {
 			if (preset.startingModelPresetPatch) {
 				nextSelectedModel = applyAssistantPresetModelPatch(nextSelectedModel, preset.startingModelPresetPatch);
 				hasModelSelection = true;
-			}
-
-			const hasIncludeModelSystemPromptSelection = preset.startingIncludeModelSystemPrompt !== undefined;
-			const nextIncludeModelSystemPrompt = hasIncludeModelSystemPromptSelection
-				? Boolean(preset.startingIncludeModelSystemPrompt)
-				: includeModelDefaultRef.current;
-
-			const hasInstructionTemplateSelection = (preset.startingInstructionTemplateRefs?.length ?? 0) > 0;
-			let nextSelectedPromptKeys = selectedPromptKeysRef.current;
-			if (hasInstructionTemplateSelection) {
-				const requestedPromptKeys = dedupeStringArray(
-					(preset.startingInstructionTemplateRefs ?? []).map(buildPromptTemplateRefKey)
-				);
-
-				const instructionOptions = await loadInstructionTemplateOptions();
-				const instructionOptionByKey = new Map(instructionOptions.map(item => [item.key, item] as const));
-
-				const invalidPromptKey = requestedPromptKeys.find(key => {
-					const promptOption = instructionOptionByKey.get(key);
-					return !promptOption || !promptOption.isSelectable;
-				});
-
-				if (invalidPromptKey) {
-					const invalidPromptOption = instructionOptionByKey.get(invalidPromptKey);
-					throw new Error(
-						invalidPromptOption?.availabilityReason ??
-							`Instruction template "${invalidPromptKey}" is not currently available.`
-					);
-				}
-
-				// Keep the prompt store in sync so selectedPromptKeys can immediately
-				// resolve to concrete prompt sources after apply.
-				await refreshPrompts();
-				nextSelectedPromptKeys = requestedPromptKeys;
 			}
 
 			const requestedToolSelections = preset.startingToolSelections ?? [];
@@ -885,10 +640,10 @@ export function useAssistantContextState(): AssistantContextController {
 				preset,
 				hasModelSelection,
 				nextSelectedModel,
-				hasIncludeModelSystemPromptSelection,
-				nextIncludeModelSystemPrompt,
-				hasInstructionTemplateSelection,
-				nextSelectedPromptKeys,
+				hasIncludeModelSystemPromptSelection: false,
+				nextIncludeModelSystemPrompt: false,
+				hasInstructionTemplateSelection: false,
+				nextSelectedPromptKeys: [],
 				runtimeSelections: {
 					hasToolsSelection,
 					conversationToolChoices,
@@ -898,8 +653,8 @@ export function useAssistantContextState(): AssistantContextController {
 					activeSkillRefs,
 				},
 				comparisonState: {
-					model: buildAssistantPresetModelComparisonState(preset, nextSelectedModel, nextIncludeModelSystemPrompt),
-					instructions: hasInstructionTemplateSelection ? [...nextSelectedPromptKeys] : undefined,
+					model: undefined,
+					instructions: undefined,
 					tools: hasToolsSelection
 						? {
 								conversationToolChoices: normalizeAssistantPresetToolChoices(conversationToolChoices),
@@ -910,7 +665,7 @@ export function useAssistantContextState(): AssistantContextController {
 				},
 			};
 		},
-		[assistantPresetOptions, optionsLoaded, refreshPrompts]
+		[assistantPresetOptions, optionsLoaded]
 	);
 
 	const applyPreparedAssistantPreset = useCallback(
@@ -919,16 +674,6 @@ export function useAssistantContextState(): AssistantContextController {
 				applySelectedModel(prepared.nextSelectedModel, {
 					syncHybridFromModel: true,
 				});
-			}
-
-			if (prepared.hasIncludeModelSystemPromptSelection) {
-				includeModelDefaultRef.current = prepared.nextIncludeModelSystemPrompt;
-				setIncludeModelDefaultState(prepared.nextIncludeModelSystemPrompt);
-			}
-
-			if (prepared.hasInstructionTemplateSelection) {
-				selectedPromptKeysRef.current = [...prepared.nextSelectedPromptKeys];
-				setRawSelectedPromptKeys(prepared.nextSelectedPromptKeys);
 			}
 		},
 		[applySelectedModel]
@@ -953,29 +698,15 @@ export function useAssistantContextState(): AssistantContextController {
 
 		isHybridReasoningEnabled,
 		includePreviousMessages,
-		prompts,
-		selectedPromptKeys,
-		systemPromptBundles,
-		preferredSystemPromptBundleID,
-		systemPromptsLoading,
-		systemPromptError,
-		includeModelDefault,
 
 		handleSetSelectedModel,
 		handleSetIsHybridReasoningEnabled,
 		setIncludePreviousMessages,
-		setIncludeModelDefault,
 
 		setTemperature,
 		setReasoningLevel,
 		setHybridTokens,
 		setOutputVerbosity,
-
-		togglePromptSelection,
-		addAndSelectPrompt,
-		clearSelectedPromptSources,
-		refreshSystemPrompts: refreshPrompts,
-		getExistingSystemPromptVersions: getExistingVersions,
 
 		assistantPresetOptions,
 		assistantPresetsLoading,

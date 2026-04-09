@@ -20,6 +20,7 @@ import { EditorContextBar } from '@/chats/composer/contextarea/context_bar';
 import { useAssistantContextState } from '@/chats/composer/contextarea/use_context_state';
 import { EditorArea, type EditorAreaHandle } from '@/chats/composer/editor/editor_area';
 import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
+import { useComposerSystemPrompt } from '@/chats/composer/systemprompts/use_composer_system_prompt';
 
 export interface ComposerBoxHandle {
 	getUIChatOptions: () => UIChatOption;
@@ -65,6 +66,10 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 
 	const editorAreaRef = useRef<EditorAreaHandle>(null);
 	const assistantContext = useAssistantContextState();
+	const systemPrompt = useComposerSystemPrompt({
+		modelDefaultPrompt: assistantContext.selectedModel.systemPrompt,
+		modelOptionsLoaded: assistantContext.modelOptionsLoaded,
+	});
 	const chatOptions = assistantContext.chatOptions;
 	const showAbortModal = isGenerating && abortConfirmationRequested;
 
@@ -100,6 +105,7 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 
 	const assistantPreset = useAssistantPresetManager({
 		context: assistantContext,
+		systemPrompt,
 		runtimeSnapshot: assistantRuntimeSnapshot,
 		applyRuntimeSelections: applyAssistantPresetRuntimeSelections,
 	});
@@ -167,7 +173,8 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 				editorAreaRef.current?.setSkillStateFromMessage([], [], { syncSession: 'none', forceResetSession: true });
 				setAssistantRuntimeSnapshot(EMPTY_ASSISTANT_PRESET_RUNTIME_SNAPSHOT);
 
-				assistantContext.resetForNewConversation();
+				const nextSelectedModel = assistantContext.resetForNewConversation();
+				systemPrompt.resetForNewConversation(nextSelectedModel.systemPrompt);
 				const ok = await assistantPreset.resetToBasePreset();
 				if (!ok) {
 					pendingPresetResolutionModeRef.current = 'ensure-active';
@@ -216,7 +223,8 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 			},
 			restoreConversationContext: context => {
 				setAbortConfirmationRequested(false);
-				assistantContext.restoreConversationContext(context);
+				const nextSelectedModel = assistantContext.restoreConversationContext(context);
+				systemPrompt.restoreConversationContext(nextSelectedModel?.systemPrompt ?? '', context.modelParam);
 				editorAreaRef.current?.setConversationToolsFromChoices(context.toolChoices);
 				editorAreaRef.current?.setWebSearchFromChoices(context.webSearchChoices);
 				editorAreaRef.current?.setSkillStateFromMessage(context.enabledSkillRefs, context.activeSkillRefs, {
@@ -232,12 +240,12 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 				void flushPendingPresetResolution();
 			},
 		}),
-		[assistantContext, assistantPreset, chatOptions, flushPendingPresetResolution]
+		[assistantContext, assistantPreset, chatOptions, flushPendingPresetResolution, systemPrompt]
 	);
 
 	return (
 		<div className="bg-base-200 w-full min-w-0">
-			<EditorContextBar context={assistantContext} assistantPreset={assistantPreset} />
+			<EditorContextBar context={assistantContext} assistantPreset={assistantPreset} systemPrompt={systemPrompt} />
 
 			<DeleteConfirmationModal
 				isOpen={showAbortModal}
@@ -269,6 +277,7 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 					onAssistantPresetRuntimeStateChange={setAssistantRuntimeSnapshot}
 					editingMessageId={editingMessageId}
 					cancelEditing={onCancelEditing}
+					systemPrompt={systemPrompt}
 				/>
 			</div>
 		</div>

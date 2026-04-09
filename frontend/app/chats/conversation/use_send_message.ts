@@ -477,14 +477,17 @@ export function useSendMessage({
 
 			if (!hasNonEmptyText && !hasToolOutputs && !hasAttachments) return;
 
-			let sendOptions = options;
+			let sendOptions: UIChatOption = {
+				...options,
+				systemPrompt: payload.resolvedSystemPrompt?.trim() || '',
+			};
 			const editingId = tab.editingMessageId ?? undefined;
 			const templateSystemPrompt = payload.templateSystemPrompt?.trim() || undefined;
 
 			if (templateSystemPrompt) {
 				sendOptions = {
 					...sendOptions,
-					systemPrompt: appendSystemPromptParts(sendOptions.systemPrompt, [templateSystemPrompt]),
+					systemPrompt: appendSystemPromptParts(sendOptions.systemPrompt ?? '', [templateSystemPrompt]),
 				};
 			}
 

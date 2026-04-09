@@ -11,12 +11,14 @@ import {
 	type AssistantPresetOptionItem,
 	type AssistantPresetPreparedApplication,
 	type AssistantPresetRuntimeSnapshot,
+	buildAssistantPresetModelComparisonState,
 	EMPTY_ASSISTANT_PRESET_MODIFICATION_SUMMARY,
 	findBaseAssistantPresetOption,
 	findDefaultAssistantPresetOption,
 	getAssistantPresetModificationSummary,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import type { AssistantContextController } from '@/chats/composer/contextarea/use_context_state';
+import type { ComposerSystemPromptController } from '@/chats/composer/systemprompts/use_composer_system_prompt';
 
 function getErrorMessage(error: unknown, fallback: string): string {
 	if (error instanceof Error && error.message.trim().length > 0) {
@@ -58,21 +60,26 @@ interface AssistantPresetSelectionState {
 
 export function useAssistantPresetManager(args: {
 	context: AssistantContextController;
+	systemPrompt: ComposerSystemPromptController;
 	runtimeSnapshot: AssistantPresetRuntimeSnapshot;
 	applyRuntimeSelections: (prepared: AssistantPresetPreparedApplication) => void;
 }): AssistantPresetManagerState {
-	const { context, runtimeSnapshot, applyRuntimeSelections } = args;
+	const { context, systemPrompt, runtimeSnapshot, applyRuntimeSelections } = args;
 	const {
 		assistantPresetOptions,
 		assistantPresetsLoading,
 		assistantPresetError,
 		modelOptionsLoaded,
 		selectedModel,
-		includeModelDefault,
-		selectedPromptKeys,
 		prepareAssistantPresetApplication,
 		applyPreparedAssistantPreset,
 	} = context;
+	const {
+		includeModelDefault,
+		selectedPromptKeys,
+		prepareAssistantPresetSelections,
+		applyPreparedAssistantPresetSelections,
+	} = systemPrompt;
 
 	const [selectionState, setSelectionState] = useState<AssistantPresetSelectionState>({
 		selectedPresetKey: null,
@@ -150,7 +157,36 @@ export function useAssistantPresetManager(args: {
 			currentSelectedPromptKeys: selectedPromptKeys,
 			currentRuntimeSnapshot: runtimeSnapshot,
 		});
-	}, [appliedPresetApplication, includeModelDefault, selectedModel, selectedPromptKeys, runtimeSnapshot]);
+	}, [appliedPresetApplication, includeModelDefault, runtimeSnapshot, selectedModel, selectedPromptKeys]);
+
+	const buildPreparedApplication = useCallback(
+		async (presetKey: string): Promise<AssistantPresetPreparedApplication | null> => {
+			const basePrepared = await prepareAssistantPresetApplication(presetKey);
+			if (!basePrepared) return null;
+
+			const preparedSystemPromptSelections = await prepareAssistantPresetSelections(basePrepared.preset);
+
+			return {
+				...basePrepared,
+				hasIncludeModelSystemPromptSelection: preparedSystemPromptSelections.hasIncludeModelSystemPromptSelection,
+				nextIncludeModelSystemPrompt: preparedSystemPromptSelections.nextIncludeModelSystemPrompt,
+				hasInstructionTemplateSelection: preparedSystemPromptSelections.hasInstructionTemplateSelection,
+				nextSelectedPromptKeys: preparedSystemPromptSelections.nextSelectedPromptKeys,
+				comparisonState: {
+					...basePrepared.comparisonState,
+					model: buildAssistantPresetModelComparisonState(
+						basePrepared.preset,
+						basePrepared.nextSelectedModel,
+						preparedSystemPromptSelections.nextIncludeModelSystemPrompt
+					),
+					instructions: preparedSystemPromptSelections.hasInstructionTemplateSelection
+						? [...preparedSystemPromptSelections.nextSelectedPromptKeys]
+						: undefined,
+				},
+			};
+		},
+		[prepareAssistantPresetApplication, prepareAssistantPresetSelections]
+	);
 
 	const applyPresetByKey = useCallback(
 		async (presetKey: string): Promise<boolean> => {
@@ -159,7 +195,7 @@ export function useAssistantPresetManager(args: {
 			setIsApplying(true);
 			clearSelectionActionError();
 			try {
-				const prepared = await prepareAssistantPresetApplication(presetKey);
+				const prepared = await buildPreparedApplication(presetKey);
 				if (applyRequestSeqRef.current !== requestSeq) {
 					return false;
 				}
@@ -169,6 +205,7 @@ export function useAssistantPresetManager(args: {
 				}
 
 				applyPreparedAssistantPreset(prepared);
+				applyPreparedAssistantPresetSelections(prepared);
 				applyRuntimeSelections(prepared);
 
 				setSelectionState({
@@ -193,9 +230,10 @@ export function useAssistantPresetManager(args: {
 		},
 		[
 			applyPreparedAssistantPreset,
+			applyPreparedAssistantPresetSelections,
 			applyRuntimeSelections,
+			buildPreparedApplication,
 			clearSelectionActionError,
-			prepareAssistantPresetApplication,
 			setSelectionActionError,
 		]
 	);
@@ -206,7 +244,7 @@ export function useAssistantPresetManager(args: {
 			applyRequestSeqRef.current = requestSeq;
 			clearSelectionActionError();
 			try {
-				const prepared = await prepareAssistantPresetApplication(presetKey);
+				const prepared = await buildPreparedApplication(presetKey);
 				if (applyRequestSeqRef.current !== requestSeq) {
 					return false;
 				}
@@ -231,7 +269,7 @@ export function useAssistantPresetManager(args: {
 				return false;
 			}
 		},
-		[clearSelectionActionError, prepareAssistantPresetApplication, setSelectionActionError]
+		[buildPreparedApplication, clearSelectionActionError, setSelectionActionError]
 	);
 
 	const trackDefaultPresetWithoutApplying = useCallback(async (): Promise<boolean> => {

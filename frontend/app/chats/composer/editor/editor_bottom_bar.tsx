@@ -31,6 +31,8 @@ import { UrlAttachmentModal } from '@/chats/composer/attachments/attachment_url_
 import { CommandTipsMenu } from '@/chats/composer/inputtips/command_tips_menu';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import { SkillsBottomBarChip } from '@/chats/composer/skills/skill_bottom_bar_chip';
+import { SystemPromptDropdown } from '@/chats/composer/systemprompts/system_prompt_dropdown';
+import type { ComposerSystemPromptController } from '@/chats/composer/systemprompts/use_composer_system_prompt';
 import { dispatchOpenToolArgs } from '@/chats/composer/toolruntime/use_open_toolargs_event';
 import { ToolMenuRow } from '@/chats/composer/tools/tool_menu_row';
 import { WebSearchBottomBarChip } from '@/chats/composer/tools/web_search_bottom_bar_chip';
@@ -87,6 +89,7 @@ interface EditorBottomBarProps {
 	onEnableAllSkills: () => void;
 	onDisableAllSkills: () => void;
 	isInputLocked?: boolean;
+	systemPrompt: ComposerSystemPromptController;
 }
 
 interface PickerButtonProps {
@@ -124,10 +127,6 @@ const menuItemClasses =
 	'flex items-center gap-2 rounded-xl px-2 py-1 text-sm outline-none transition-colors ' +
 	'hover:bg-base-200 data-[active-item]:bg-base-300';
 
-/**
-  Bottom bar for template/tool/attachment buttons and tips menus.
-  The chips scroller now lives in a separate bar inside the editor.
-*/
 export const EditorBottomBar = memo(function EditorBottomBar({
 	onAttachFiles,
 	onAttachDirectory,
@@ -157,8 +156,10 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	onEnableAllSkills,
 	onDisableAllSkills,
 	isInputLocked = false,
+	systemPrompt,
 }: EditorBottomBarProps) {
 	const [isUrlModalOpen, setIsUrlModalOpen] = useState(false);
+	const [isSystemPromptOpen, setIsSystemPromptOpen] = useState(false);
 	const templateMenuOpen = useStoreState(templateMenuState, 'open');
 	const toolMenuOpen = useStoreState(toolMenuState, 'open');
 
@@ -183,18 +184,10 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 		return map;
 	}, [toolEntries]);
 
-	/**
-	 * Per-tool UI preference for auto-execute in the picker list.
-	 * Keyed by tool identity; defaults to toolDefinition.autoExecReco.
-	 *
-	 * This is UI-only until the tool is actually inserted (at which point it becomes
-	 * an attached tool entry and eventually ToolStoreChoice.autoExecute).
-	 */
 	const [toolAutoExecOverrides, setToolAutoExecOverrides] = useState<Record<string, boolean>>({});
 	const getAutoExecForTool = useMemo(() => {
 		return (item: ToolListItem): boolean => {
 			const key = toolIdentityKey(item.bundleID, item.bundleSlug, item.toolSlug, item.toolVersion);
-			// If already attached, reflect the attached value (not the insertion override).
 			if (typeof attachedAutoExecByKey[key] === 'boolean') return attachedAutoExecByKey[key];
 			const override = toolAutoExecOverrides[key];
 			if (typeof override === 'boolean') return override;
@@ -237,6 +230,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 			templateMenuState.hide();
 			toolMenuState.hide();
 			attachmentMenuState.hide();
+			setIsSystemPromptOpen(false);
 			setIsUrlModalOpen(false);
 		}
 	}, [attachmentMenuState, isInputLocked, templateMenuState, toolMenuState]);
@@ -387,10 +381,9 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 		<div
 			className="bg-base-200 w-full overflow-hidden"
 			data-attachments-bottom-bar
-			aria-label="Templates, tools, and attachments"
+			aria-label="Templates, tools, attachments, skills, and system prompt"
 		>
-			<div className="flex items-center gap-2 px-1 py-1 text-xs shadow-none">
-				{/* Left: template / tool / attachment pickers */}
+			<div className="flex items-center gap-1 p-1 text-xs shadow-none">
 				<div className="flex items-center gap-1">
 					<PickerButton
 						label="Attachments"
@@ -430,6 +423,25 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 							<span>Link or URL...</span>
 						</MenuItem>
 					</Menu>
+
+					<SystemPromptDropdown
+						prompts={systemPrompt.prompts}
+						bundles={systemPrompt.systemPromptBundles}
+						selectedPromptKeys={systemPrompt.selectedPromptKeys}
+						preferredBundleID={systemPrompt.preferredSystemPromptBundleID}
+						loading={systemPrompt.systemPromptsLoading}
+						error={systemPrompt.systemPromptError}
+						modelDefaultPrompt={systemPrompt.modelDefaultPrompt}
+						includeModelDefault={systemPrompt.includeModelDefault}
+						onTogglePrompt={systemPrompt.togglePromptSelection}
+						onToggleModelDefault={systemPrompt.setIncludeModelDefault}
+						onAddPrompt={systemPrompt.addAndSelectPrompt}
+						onClearSelected={systemPrompt.clearSelectedPromptSources}
+						onRefreshPrompts={systemPrompt.refreshSystemPrompts}
+						getExistingVersions={systemPrompt.getExistingSystemPromptVersions}
+						isOpen={isSystemPromptOpen}
+						setIsOpen={setIsSystemPromptOpen}
+					/>
 
 					<PickerButton
 						label="Prompts"
@@ -576,12 +588,10 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 					/>
 				</div>
 
-				{/* Right: keyboard shortcuts & tips menus */}
 				<div className="ml-auto flex items-center gap-1">
 					<CommandTipsMenu shortcutConfig={shortcutConfig} />
 				</div>
 			</div>
-			{/* URL attachment dialog */}
 			<UrlAttachmentModal
 				isOpen={isUrlModalOpen}
 				onClose={() => {

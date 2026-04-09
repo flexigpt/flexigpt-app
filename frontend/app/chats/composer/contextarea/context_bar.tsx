@@ -9,9 +9,10 @@ import { HoverTip } from '@/components/ariakit_hover_tip';
 
 import { AdvancedParamsModal } from '@/chats/composer/advancedparams/advanced_params_modal';
 import { AssistantPresetDropdown } from '@/chats/composer/assistantpresets/assistant_preset_dropdown';
-import type {
-	AssistantPresetOptionItem,
-	AssistantPresetPreparedApplication,
+import {
+	type AssistantPresetOptionItem,
+	type AssistantPresetPreparedApplication,
+	buildAssistantPresetModelComparisonState,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import { AssistantPresetViewModal } from '@/chats/composer/assistantpresets/assistant_preset_view_modal';
 import type { AssistantPresetManagerState } from '@/chats/composer/assistantpresets/use_assistant_preset_manager';
@@ -22,15 +23,19 @@ import { PreviousMessagesDropdown } from '@/chats/composer/previousmessages/prev
 import { HybridReasoningCheckbox } from '@/chats/composer/reasoningparams/reasoning_hybrid_checkbox';
 import { SingleReasoningDropdown } from '@/chats/composer/reasoningparams/reasoning_levels_dropdown';
 import { ReasoningTokensDropdown } from '@/chats/composer/reasoningparams/reasoning_tokens_dropdown';
-import { SystemPromptDropdown } from '@/chats/composer/systemprompts/system_prompt_dropdown';
+import type { ComposerSystemPromptController } from '@/chats/composer/systemprompts/use_composer_system_prompt';
 import { TemperatureDropdown } from '@/chats/composer/temperatures/temperature_dropdown';
 
 type EditorContextBarProps = {
 	context: AssistantContextController;
 	assistantPreset: AssistantPresetManagerState;
+	systemPrompt: Pick<
+		ComposerSystemPromptController,
+		'includeModelDefault' | 'selectedPromptKeys' | 'prompts' | 'prepareAssistantPresetSelections'
+	>;
 };
 
-type EditorContextBarMenuKey = 'assistant' | 'model' | 'secondary' | 'verbosity' | 'system' | 'previous' | null;
+type EditorContextBarMenuKey = 'assistant' | 'model' | 'secondary' | 'verbosity' | 'previous' | null;
 
 type AssistantPresetViewState = {
 	option: AssistantPresetOptionItem | null;
@@ -38,7 +43,7 @@ type AssistantPresetViewState = {
 	isActivePreset: boolean;
 };
 
-export function EditorContextBar({ context, assistantPreset }: EditorContextBarProps) {
+export function EditorContextBar({ context, assistantPreset, systemPrompt }: EditorContextBarProps) {
 	const [openMenu, setOpenMenu] = useState<EditorContextBarMenuKey>(null);
 	const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);
 	const [isAssistantViewModalOpen, setIsAssistantViewModalOpen] = useState(false);
@@ -60,7 +65,6 @@ export function EditorContextBar({ context, assistantPreset }: EditorContextBarP
 	const isModelDropdownOpen = openMenu === 'model';
 	const isSecondaryDropdownOpen = openMenu === 'secondary';
 	const isVerbosityDropdownOpen = openMenu === 'verbosity';
-	const isSystemDropdownOpen = openMenu === 'system';
 	const isPreviousMessagesDropdownOpen = openMenu === 'previous';
 
 	const setIsAssistantDropdownOpen = useCallback(
@@ -85,12 +89,6 @@ export function EditorContextBar({ context, assistantPreset }: EditorContextBarP
 	const setIsVerbosityDropdownOpen = useCallback(
 		(action: SetStateAction<boolean>) => {
 			setMenuOpen('verbosity', action);
-		},
-		[setMenuOpen]
-	);
-	const setIsSystemDropdownOpen = useCallback(
-		(action: SetStateAction<boolean>) => {
-			setMenuOpen('system', action);
 		},
 		[setMenuOpen]
 	);
@@ -137,8 +135,31 @@ export function EditorContextBar({ context, assistantPreset }: EditorContextBarP
 
 			void (async () => {
 				try {
-					const prepared = await context.prepareAssistantPresetApplication(option.key);
-					if (!prepared || assistantPresetViewRequestSeqRef.current !== requestSeq) return;
+					const basePrepared = await context.prepareAssistantPresetApplication(option.key);
+					if (!basePrepared || assistantPresetViewRequestSeqRef.current !== requestSeq) return;
+
+					const preparedSystemPromptSelections = await systemPrompt.prepareAssistantPresetSelections(
+						basePrepared.preset
+					);
+					const prepared: AssistantPresetPreparedApplication = {
+						...basePrepared,
+						hasIncludeModelSystemPromptSelection: preparedSystemPromptSelections.hasIncludeModelSystemPromptSelection,
+						nextIncludeModelSystemPrompt: preparedSystemPromptSelections.nextIncludeModelSystemPrompt,
+						hasInstructionTemplateSelection: preparedSystemPromptSelections.hasInstructionTemplateSelection,
+						nextSelectedPromptKeys: preparedSystemPromptSelections.nextSelectedPromptKeys,
+						comparisonState: {
+							...basePrepared.comparisonState,
+							model: buildAssistantPresetModelComparisonState(
+								basePrepared.preset,
+								basePrepared.nextSelectedModel,
+								preparedSystemPromptSelections.nextIncludeModelSystemPrompt
+							),
+							instructions: preparedSystemPromptSelections.hasInstructionTemplateSelection
+								? [...preparedSystemPromptSelections.nextSelectedPromptKeys]
+								: undefined,
+						},
+					};
+
 					setAssistantPresetViewState(current =>
 						current.option?.key === option.key ? { ...current, preparedApplication: prepared } : current
 					);
@@ -147,7 +168,7 @@ export function EditorContextBar({ context, assistantPreset }: EditorContextBarP
 				}
 			})();
 		},
-		[assistantPreset.appliedPresetApplication, assistantPreset.selectedPresetKey, context]
+		[assistantPreset.appliedPresetApplication, assistantPreset.selectedPresetKey, context, systemPrompt]
 	);
 
 	return (
@@ -237,27 +258,6 @@ export function EditorContextBar({ context, assistantPreset }: EditorContextBarP
 				/>
 			)}
 
-			<SystemPromptDropdown
-				prompts={context.prompts}
-				bundles={context.systemPromptBundles}
-				selectedPromptKeys={context.selectedPromptKeys}
-				preferredBundleID={context.preferredSystemPromptBundleID}
-				loading={context.systemPromptsLoading}
-				error={context.systemPromptError}
-				modelDefaultPrompt={context.selectedModel.systemPrompt}
-				includeModelDefault={context.includeModelDefault}
-				onTogglePrompt={context.togglePromptSelection}
-				onToggleModelDefault={next => {
-					context.setIncludeModelDefault(next);
-				}}
-				onAddPrompt={context.addAndSelectPrompt}
-				onClearSelected={context.clearSelectedPromptSources}
-				onRefreshPrompts={context.refreshSystemPrompts}
-				getExistingVersions={context.getExistingSystemPromptVersions}
-				isOpen={isSystemDropdownOpen}
-				setIsOpen={setIsSystemDropdownOpen}
-			/>
-
 			<PreviousMessagesDropdown
 				value={context.includePreviousMessages}
 				setValue={context.setIncludePreviousMessages}
@@ -315,9 +315,9 @@ export function EditorContextBar({ context, assistantPreset }: EditorContextBarP
 				isActivePresetView={assistantPresetViewState.isActivePreset}
 				currentRuntimeSnapshot={assistantPreset.runtimeSnapshot}
 				currentModel={context.selectedModel}
-				currentIncludeModelSystemPrompt={context.includeModelDefault}
-				currentSelectedPromptKeys={context.selectedPromptKeys}
-				promptItems={context.prompts}
+				currentIncludeModelSystemPrompt={systemPrompt.includeModelDefault}
+				currentSelectedPromptKeys={systemPrompt.selectedPromptKeys}
+				promptItems={systemPrompt.prompts}
 				modificationSummary={assistantPreset.modificationSummary}
 			/>
 		</div>

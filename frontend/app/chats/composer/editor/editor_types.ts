@@ -14,6 +14,7 @@ export interface EditorExternalMessage {
 
 export interface EditorSubmitPayload {
 	text: string;
+	resolvedSystemPrompt?: string;
 	templateSystemPrompt?: string;
 	attachedTools: UIToolStoreChoice[];
 	attachments: UIAttachment[];

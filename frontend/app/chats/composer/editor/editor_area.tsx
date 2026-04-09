@@ -53,6 +53,7 @@ import {
 } from '@/chats/composer/platedoc/tool_document_ops';
 import { useComposerDocument } from '@/chats/composer/platedoc/use_composer_document';
 import { useComposerSkills } from '@/chats/composer/skills/use_composer_skills';
+import type { ComposerSystemPromptController } from '@/chats/composer/systemprompts/use_composer_system_prompt';
 import { TemplateToolbars } from '@/chats/composer/templates/template_toolbars';
 import { dispatchTemplateFlashEvent } from '@/chats/composer/templates/use_template_flash_event';
 import {
@@ -103,6 +104,7 @@ interface EditorAreaProps {
 	onAssistantPresetRuntimeStateChange?: (snapshot: AssistantPresetRuntimeSnapshot) => void;
 	editingMessageId: string | null;
 	cancelEditing: () => void;
+	systemPrompt: ComposerSystemPromptController;
 }
 
 type SubmitOptions = { runPendingTools: boolean };
@@ -118,6 +120,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		onAssistantPresetRuntimeStateChange,
 		editingMessageId,
 		cancelEditing,
+		systemPrompt,
 	},
 	ref
 ) {
@@ -199,7 +202,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		setToolArgsTarget(target);
 	}, toolArgsEventTarget);
 
-	// ---- Skills (conversation-level) ----
 	const {
 		allSkills,
 		skillsLoading,
@@ -743,6 +745,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					'',
 					getInstructionPromptPartsFromSelections(selections)
 				);
+				const resolvedSystemPrompt = systemPrompt.resolvedSystemPrompt.trim() || undefined;
 
 				const textToSend = hasTpl ? toPlainTextReplacingVariables(editor) : editor.api.string([]);
 				const finalToolOutputs: UIToolOutput[] = runtimeAfterRun.toolOutputs;
@@ -807,6 +810,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 				const payload: EditorSubmitPayload = {
 					text: textToSend,
+					resolvedSystemPrompt,
 					templateSystemPrompt: currentTemplateSystemPrompt.trim() || undefined,
 					attachedTools,
 					attachments,
@@ -855,6 +859,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			setConversationToolsState,
 			setSubmitting,
 			startFastForwardRun,
+			systemPrompt.resolvedSystemPrompt,
 			templateBlocked,
 			toolCalls,
 			webSearchTemplates,
@@ -1376,6 +1381,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						onEnableAllSkills={enableAllSkills}
 						onDisableAllSkills={disableAllSkills}
 						isInputLocked={isInputLocked || fastForwardPending}
+						systemPrompt={systemPrompt}
 					/>
 				</Plate>
 			</form>
