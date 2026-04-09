@@ -2,13 +2,13 @@
 
 ## Laundry list
 
-- [ ] ariakit tooltips on enable web search and all others
-- [ ] skills active and enabled are set properly on convo reload, but the ticks inside the menu are not visible.
-- [ ] set skill as active immediately button is also needed manually
-
 - [ ] an apply diff to code preset will be good. simple template and tool
 
 - [ ] sys prompt to move to bottom bar rather than context bar.
+- [ ] ariakit tooltips on enable web search and all others
+
+- [ ] skills active and enabled are set properly on convo reload, but the ticks inside the menu are not visible.
+- [ ] set skill as active immediately button is also needed manually
 
 - [ ] Skill
   - [ ] include some builtin skills and test on all platforms, full flow.
