@@ -31,7 +31,7 @@ interface CommandTipsMenuProps {
 }
 
 const menuClasses =
-	'rounded-box bg-base-100 text-base-content z-50 min-w-[240px] overflow-visible border border-base-300 p-1 shadow-xl';
+	'rounded-box bg-base-100 text-base-content z-50 max-w-lg min-w-60 overflow-visible border border-base-300 p-1 shadow-xl';
 
 const menuItemClasses =
 	'flex items-center gap-2 rounded-xl px-2 py-1 text-xs outline-none transition-colors ' +
@@ -105,7 +105,7 @@ export function CommandTipsMenu({ shortcutConfig }: CommandTipsMenuProps) {
 				</MenuButton>
 			</HoverTip>
 
-			<Menu store={shortcutsMenu} gutter={8} portal className={menuClasses} autoFocusOnShow>
+			<Menu store={shortcutsMenu} gutter={8} overflowPadding={8} portal className={menuClasses} autoFocusOnShow>
 				{/* Chat group */}
 				{chatShortcuts.length > 0 && (
 					<>
@@ -153,6 +153,7 @@ export function CommandTipsMenu({ shortcutConfig }: CommandTipsMenuProps) {
 			<Menu
 				store={tipsMenu}
 				gutter={8}
+				overflowPadding={8}
 				portal
 				className={menuClasses}
 				autoFocusOnShow

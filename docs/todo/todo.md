@@ -6,11 +6,7 @@
 - [ ] composer: see if grammar rectification or atleast spell check and highlight can be added cleanly
 - [ ] set skill as active immediately button is also needed manually
 
-- [ ] invalid id set for tool output once in error case for replacetext line. verify id an call id are preserved end to end.
-
 - [ ] context bar: ariakit menu styling and tooltips proper.
-
-- [x] skills active and enabled are set properly on convo reload, but the ticks inside the menu are not visible.
 
 - [ ] Skill
   - [ ] include some builtin skills and test on all platforms, full flow.

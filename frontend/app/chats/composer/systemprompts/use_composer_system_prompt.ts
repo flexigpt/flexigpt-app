@@ -106,7 +106,8 @@ export function useComposerSystemPrompt(args: {
 	const [rawSelectedPromptKeys, setRawSelectedPromptKeys] = useState<string[]>([]);
 	const [includeModelDefault, setIncludeModelDefaultState] = useState(false);
 	const [restoredConversationSystemPrompt, setRestoredConversationSystemPrompt] = useState<string | null>(null);
-	const initializedFromModelRef = useRef(false);
+	const [initializedFromModel, setInitializedFromModelState] = useState(false);
+	const initializedFromModelRef = useRef(initializedFromModel);
 
 	const {
 		prompts: storedPrompts,
@@ -120,13 +121,15 @@ export function useComposerSystemPrompt(args: {
 	} = useSystemPrompts();
 
 	useEffect(() => {
-		if (initializedFromModelRef.current) return;
-		if (!modelOptionsLoaded) return;
+		initializedFromModelRef.current = initializedFromModel;
+	}, [initializedFromModel]);
 
-		initializedFromModelRef.current = true;
-		// eslint-disable-next-line react-hooks/set-state-in-effect, react-you-might-not-need-an-effect/no-derived-state
+	// Initialize includeModelDefault once when model options finish loading,
+	// unless a restore/reset has already set the flag.
+	if (modelOptionsLoaded && !initializedFromModel) {
+		setInitializedFromModelState(true);
 		setIncludeModelDefaultState(Boolean(modelDefaultPrompt.trim()));
-	}, [modelDefaultPrompt, modelOptionsLoaded]);
+	}
 
 	const syntheticPreviousConversationPrompt = useMemo(() => {
 		const prompt = restoredConversationSystemPrompt?.trim();

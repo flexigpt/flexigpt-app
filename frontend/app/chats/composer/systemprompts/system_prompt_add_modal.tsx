@@ -157,17 +157,8 @@ function SystemPromptAddModalInner({
 		return suggestNextMinorVersion(seedVersion, existingVersions).suggested;
 	}, [existingVersions, initialDraft?.version]);
 
+	// effectiveVersion is used in the form and submit — no need for an effect to sync it.
 	const effectiveVersion = versionTouched ? formData.version : suggestedVersion;
-
-	useEffect(() => {
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
-		if (versionTouched) return;
-		// eslint-disable-next-line react-hooks/set-state-in-effect, react-you-might-not-need-an-effect/no-derived-state
-		setFormData(prev => ({
-			...prev,
-			version: suggestedVersion,
-		}));
-	}, [suggestedVersion, versionTouched]);
 
 	const handleDialogClose = useCallback(() => {
 		onClose();

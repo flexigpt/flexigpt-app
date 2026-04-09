@@ -81,7 +81,7 @@ export function AssistantPresetDropdown({
 					store={popover}
 					gutter={4}
 					portal={false}
-					className="border-base-300 bg-base-100 z-50 mt-1 max-h-80 max-w-xl min-w-96 overflow-y-auto rounded-xl border p-2 text-xs shadow-lg outline-none"
+					className="border-base-300 bg-base-100 z-50 mt-1 max-h-80 max-w-lg min-w-60 overflow-y-auto rounded-xl border p-2 text-xs shadow-lg outline-none"
 				>
 					<div className="mb-2 px-1 text-xs opacity-70">
 						Assistant presets seeds model, instructions, tools, and skills.

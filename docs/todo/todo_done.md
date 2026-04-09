@@ -900,3 +900,5 @@
 - [x] sys prompt to move to bottom bar rather than context bar.
 - [x] ariakit tooltips on enable web search and all others
 - [x] spec driven dev and others: enforcing bfs
+- [x] invalid id set for tool output once in error case for replacetext line. verify id an call id are preserved end to end.
+- [x] skills active and enabled are set properly on convo reload, but the ticks inside the menu are not visible.

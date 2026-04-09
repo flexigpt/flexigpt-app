@@ -121,11 +121,51 @@ function PickerButton({ label, icon, buttonRef, menuState, shortcut, disabled }:
 }
 
 const menuClasses =
-	'rounded-box bg-base-100 text-base-content z-50 max-h-72 min-w-80 overflow-y-auto border border-base-300 p-1 shadow-xl';
+	'rounded-box bg-base-100 text-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border border-base-300 p-1 shadow-xl';
 
 const menuItemClasses =
 	'flex items-center gap-2 rounded-xl px-2 py-1 text-sm outline-none transition-colors ' +
 	'hover:bg-base-200 data-[active-item]:bg-base-300';
+
+/**
+ * Isolated wrapper for SystemPromptDropdown so its open/close state changes
+ * don't re-render the entire EditorBottomBar.
+ */
+const SystemPromptSection = memo(function SystemPromptSection({
+	systemPrompt,
+	isInputLocked,
+}: {
+	systemPrompt: ComposerSystemPromptController;
+	isInputLocked: boolean;
+}) {
+	const [isOpen, setIsOpen] = useState(false);
+
+	// Render-time state adjustment: close the dropdown when input becomes locked.
+	if (isInputLocked && isOpen) {
+		setIsOpen(false);
+	}
+
+	return (
+		<SystemPromptDropdown
+			prompts={systemPrompt.prompts}
+			bundles={systemPrompt.systemPromptBundles}
+			selectedPromptKeys={systemPrompt.selectedPromptKeys}
+			preferredBundleID={systemPrompt.preferredSystemPromptBundleID}
+			loading={systemPrompt.systemPromptsLoading}
+			error={systemPrompt.systemPromptError}
+			modelDefaultPrompt={systemPrompt.modelDefaultPrompt}
+			includeModelDefault={systemPrompt.includeModelDefault}
+			onTogglePrompt={systemPrompt.togglePromptSelection}
+			onToggleModelDefault={systemPrompt.setIncludeModelDefault}
+			onAddPrompt={systemPrompt.addAndSelectPrompt}
+			onClearSelected={systemPrompt.clearSelectedPromptSources}
+			onRefreshPrompts={systemPrompt.refreshSystemPrompts}
+			getExistingVersions={systemPrompt.getExistingSystemPromptVersions}
+			isOpen={isOpen}
+			setIsOpen={setIsOpen}
+		/>
+	);
+});
 
 export const EditorBottomBar = memo(function EditorBottomBar({
 	onAttachFiles,
@@ -159,7 +199,6 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	systemPrompt,
 }: EditorBottomBarProps) {
 	const [isUrlModalOpen, setIsUrlModalOpen] = useState(false);
-	const [isSystemPromptOpen, setIsSystemPromptOpen] = useState(false);
 	const templateMenuOpen = useStoreState(templateMenuState, 'open');
 	const toolMenuOpen = useStoreState(toolMenuState, 'open');
 
@@ -230,7 +269,6 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 			templateMenuState.hide();
 			toolMenuState.hide();
 			attachmentMenuState.hide();
-			setIsSystemPromptOpen(false);
 			setIsUrlModalOpen(false);
 		}
 	}, [attachmentMenuState, isInputLocked, templateMenuState, toolMenuState]);
@@ -396,6 +434,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 					<Menu
 						store={attachmentMenuState}
 						gutter={8}
+						overflowPadding={8}
 						portal
 						className={menuClasses}
 						data-menu-kind="attachments"
@@ -425,24 +464,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						</MenuItem>
 					</Menu>
 
-					<SystemPromptDropdown
-						prompts={systemPrompt.prompts}
-						bundles={systemPrompt.systemPromptBundles}
-						selectedPromptKeys={systemPrompt.selectedPromptKeys}
-						preferredBundleID={systemPrompt.preferredSystemPromptBundleID}
-						loading={systemPrompt.systemPromptsLoading}
-						error={systemPrompt.systemPromptError}
-						modelDefaultPrompt={systemPrompt.modelDefaultPrompt}
-						includeModelDefault={systemPrompt.includeModelDefault}
-						onTogglePrompt={systemPrompt.togglePromptSelection}
-						onToggleModelDefault={systemPrompt.setIncludeModelDefault}
-						onAddPrompt={systemPrompt.addAndSelectPrompt}
-						onClearSelected={systemPrompt.clearSelectedPromptSources}
-						onRefreshPrompts={systemPrompt.refreshSystemPrompts}
-						getExistingVersions={systemPrompt.getExistingSystemPromptVersions}
-						isOpen={isSystemPromptOpen}
-						setIsOpen={setIsSystemPromptOpen}
-					/>
+					<SystemPromptSection systemPrompt={systemPrompt} isInputLocked={isInputLocked} />
 
 					<PickerButton
 						label="Prompts"
@@ -455,6 +477,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 					<Menu
 						store={templateMenuState}
 						gutter={8}
+						overflowPadding={8}
 						portal
 						className={menuClasses}
 						data-menu-kind="templates"
@@ -494,7 +517,15 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						shortcut={shortcutLabels.tools}
 						disabled={isInputLocked}
 					/>
-					<Menu store={toolMenuState} gutter={8} portal className={menuClasses} data-menu-kind="tools" autoFocusOnShow>
+					<Menu
+						store={toolMenuState}
+						gutter={8}
+						overflowPadding={8}
+						portal
+						className={menuClasses}
+						data-menu-kind="tools"
+						autoFocusOnShow
+					>
 						{!toolMenuOpen ? null : toolsLoading ? (
 							<div className={`${menuItemClasses} text-base-content/60 cursor-default`}>Loading tools…</div>
 						) : availableTools.length === 0 ? (

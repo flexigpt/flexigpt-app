@@ -92,8 +92,9 @@ export function DirectoryChip({
 
 			<Menu
 				store={directoryMenu}
-				gutter={6}
-				className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-72 min-w-65 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
+				gutter={8}
+				overflowPadding={8}
+				className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
 				autoFocusOnShow
 			>
 				<div className="text-base-content/70 mb-1 text-xs font-semibold">Files in “{group.label}”</div>

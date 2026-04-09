@@ -317,16 +317,9 @@ export function useComposerToolRuntime({
 			if (output.type !== ToolStoreChoiceType.Function && output.type !== ToolStoreChoiceType.Custom) return;
 		}
 
-		let newId: string;
-		try {
-			newId = getUUIDv7();
-		} catch {
-			newId = ensureMakeID();
-		}
-
 		const call: UIToolCall = {
-			id: newId,
-			callID: output.callID || newId,
+			id: output.id,
+			callID: output.callID || output.id,
 			name: output.name,
 			arguments: output.arguments,
 			webSearchToolCallItems: output.webSearchToolCallItems,

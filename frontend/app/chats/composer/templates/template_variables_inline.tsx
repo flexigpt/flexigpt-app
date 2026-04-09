@@ -178,7 +178,7 @@ function TemplateVariableInlineEditor({
 			<input
 				autoFocus
 				type="number"
-				className="input input-ghost input-xs w-28 min-w-20 rounded-md bg-transparent"
+				className="input input-ghost input-xs w-28 min-w-24 rounded-md bg-transparent"
 				aria-label={`Set number for ${el.name}`}
 				defaultValue={currentValue === undefined || currentValue === null ? '' : String(currentValue as number)}
 				placeholder={varDef?.default !== undefined ? formatTemplateVarValue(varDef.default) : ''}
@@ -196,7 +196,7 @@ function TemplateVariableInlineEditor({
 			<input
 				autoFocus
 				type="date"
-				className="input input-ghost input-xs w-36 min-w-28 bg-transparent"
+				className="input input-ghost input-xs w-36 min-w-24 bg-transparent"
 				aria-label={`Pick date for ${el.name}`}
 				defaultValue={currentValue ? (currentValue as string) : ''}
 				onBlur={e => {

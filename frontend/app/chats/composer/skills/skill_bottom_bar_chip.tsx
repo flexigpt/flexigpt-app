@@ -189,8 +189,9 @@ export function SkillsBottomBarChip({
 
 			<Menu
 				store={menu}
-				gutter={6}
-				className="border-base-300 bg-base-100 text-base-content z-50 max-h-80 min-w-96 overflow-y-auto rounded-xl border p-2 text-xs shadow-lg outline-none"
+				gutter={8}
+				overflowPadding={8}
+				className="border-base-300 bg-base-100 text-base-content z-50 max-h-80 max-w-lg min-w-60 overflow-y-auto rounded-xl border p-2 text-xs shadow-lg outline-none"
 				autoFocusOnShow
 				portal
 			>

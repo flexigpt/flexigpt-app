@@ -1,12 +1,4 @@
-import {
-	type Dispatch,
-	type SetStateAction,
-	type SyntheticEvent,
-	useCallback,
-	useEffect,
-	useMemo,
-	useState,
-} from 'react';
+import { type Dispatch, type SetStateAction, type SyntheticEvent, useCallback, useMemo, useRef, useState } from 'react';
 
 import { FiCheck, FiGitBranch, FiPlus, FiX } from 'react-icons/fi';
 
@@ -23,6 +15,9 @@ import { HoverTip } from '@/components/ariakit_hover_tip';
 import { SystemPromptAddModal } from '@/chats/composer/systemprompts/system_prompt_add_modal';
 import { countEnabledSystemPromptSources } from '@/prompts/lib/system_prompt_utils';
 import type { SystemPromptDraft, SystemPromptItem } from '@/prompts/lib/use_system_prompts';
+
+/** Minimum interval between automatic refresh calls (ms). */
+const REFRESH_STALE_MS = 60_000;
 
 type SystemPromptDropdownProps = {
 	prompts: SystemPromptItem[];
@@ -116,9 +111,10 @@ export function SystemPromptDropdown({
 		focusLoop: true,
 	});
 
+	const lastRefreshTsRef = useRef(0);
 	const open = useStoreState(menu, 'open');
 	const selectedKeySet = useMemo(() => new Set(selectedPromptKeys), [selectedPromptKeys]);
-	const promptTooltip = useTooltipStore({ placement: 'left-end' });
+	const promptTooltip = useTooltipStore({ placement: 'right-end' });
 	const tooltipAnchorEl = useStoreState(promptTooltip, 'anchorElement');
 	const currentPromptText = tooltipAnchorEl?.dataset.prompt ?? '';
 	const triggerTooltip =
@@ -144,12 +140,16 @@ export function SystemPromptDropdown({
 		promptTooltip.setAnchorElement(null);
 	}, [promptTooltip]);
 
-	useEffect(() => {
-		if (!isOpen) return;
+	// Refresh prompts on open, but at most once per REFRESH_STALE_MS to avoid
+	// repeated backend fetches that make the menu feel sluggish.
+	const handleMenuOpen = useCallback(() => {
+		const now = Date.now();
+		if (now - lastRefreshTsRef.current < REFRESH_STALE_MS) return;
+		lastRefreshTsRef.current = now;
 		void onRefreshPrompts().catch((refreshError: unknown) => {
 			console.error('Failed to refresh system prompts:', refreshError);
 		});
-	}, [isOpen, onRefreshPrompts]);
+	}, [onRefreshPrompts]);
 
 	const openAddModal = useCallback(() => {
 		setModalMode('add');
@@ -195,7 +195,11 @@ export function SystemPromptDropdown({
 	return (
 		<div className="relative shrink-0">
 			<HoverTip content={triggerTooltip} placement="top">
-				<MenuButton store={menu} className={`${actionTriggerChipButtonClasses} ${open ? 'bg-base-300/80' : ''}`}>
+				<MenuButton
+					store={menu}
+					className={`${actionTriggerChipButtonClasses} ${open ? 'bg-base-300/80' : ''}`}
+					onClick={handleMenuOpen}
+				>
 					<ActionTriggerChipContent
 						label="System prompt"
 						count={
@@ -212,10 +216,11 @@ export function SystemPromptDropdown({
 
 			<Menu
 				store={menu}
-				gutter={8}
 				portal
+				gutter={8}
+				overflowPadding={8}
 				autoFocusOnShow
-				className="border-base-300 bg-base-100 z-50 max-h-80 max-w-2xl min-w-md overflow-y-auto rounded-xl border p-2 text-xs shadow-lg outline-none"
+				className="border-base-300 bg-base-100 z-50 max-h-80 max-w-lg min-w-60 overflow-y-auto rounded-xl border p-2 text-xs shadow-lg outline-none"
 				onKeyDownCapture={event => {
 					if (event.key === 'Escape') {
 						hidePromptTooltip();
@@ -394,7 +399,9 @@ export function SystemPromptDropdown({
 			<Tooltip
 				store={promptTooltip}
 				portal
-				className="rounded-box bg-base-100 text-base-content border-base-300 max-w-xl border p-2 text-xs whitespace-pre-wrap shadow-xl"
+				gutter={8}
+				overflowPadding={8}
+				className="rounded-box bg-base-100 text-base-content border-base-300 z-1000 max-w-sm border p-2 text-xs whitespace-pre-wrap shadow-xl"
 			>
 				{currentPromptText}
 			</Tooltip>

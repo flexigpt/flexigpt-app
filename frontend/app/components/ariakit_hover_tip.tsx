@@ -21,6 +21,7 @@ interface HoverTipProps {
 	children: ReactNode;
 	placement?: HoverTipPlacement;
 	gutter?: number;
+	overflowPadding?: number;
 	disabled?: boolean;
 	wrapperClassName?: string;
 	wrapperElement?: 'span' | 'div';
@@ -32,6 +33,7 @@ export function HoverTip({
 	children,
 	placement = 'top',
 	gutter = 8,
+	overflowPadding = 8,
 	disabled = false,
 	wrapperClassName = 'inline-flex max-w-full',
 	wrapperElement = 'span',
@@ -55,6 +57,7 @@ export function HoverTip({
 			<Tooltip
 				store={tooltip}
 				gutter={gutter}
+				overflowPadding={overflowPadding}
 				portal
 				className={`rounded-box bg-base-100 text-base-content border-base-300 z-1000 max-w-xs border px-3 py-2 text-xs leading-4 whitespace-pre-line shadow-xl ${tooltipClassName}`}
 			>
