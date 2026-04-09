@@ -58,13 +58,6 @@ export function WebSearchBottomBarChip({
 
 	const isArgsBad = Boolean(enabled && argsStatus?.hasSchema && !argsStatus.isSatisfied);
 
-	const containerClassName =
-		(enabled
-			? 'bg-info/10 text-neutral-custom border-info/50 hover:bg-info/15'
-			: 'bg-base-200 text-neutral-custom border-0 hover:bg-base-300/80') +
-		(isInputLocked ? ' opacity-60' : '') +
-		' flex items-center gap-1 rounded-2xl border px-2 py-0';
-
 	const title = useMemo(() => {
 		const lines: string[] = [];
 		lines.push('Web search');
@@ -110,7 +103,15 @@ export function WebSearchBottomBarChip({
 	if (eligibleTools.length === 0) return null;
 
 	return (
-		<div className={containerClassName} title={title} data-bottom-bar-websearch>
+		<div
+			className={
+				'text-neutral-custom flex items-center gap-1 rounded-2xl border px-2 py-0 text-xs font-normal' +
+				(enabled ? 'bg-info/10 border-info/50 hover:bg-info/15' : 'bg-base-200 hover:bg-base-300/80 border-0') +
+				(isInputLocked ? ' opacity-60' : '')
+			}
+			title={title}
+			data-bottom-bar-websearch
+		>
 			{/* Main chip/label area
           - When disabled: it's a button that enables
           - When enabled: it's non-clickable (disabling only via the X button)
@@ -119,7 +120,7 @@ export function WebSearchBottomBarChip({
 				<div className="flex items-center gap-2">
 					<FiGlobe size={14} />
 					<span className="max-w-28 truncate">Web search</span>
-					{selectedLabel ? <span className="max-w-36 truncate text-xs opacity-70">{selectedLabel}</span> : null}
+					{selectedLabel ? <span className="max-w-36 truncate">{selectedLabel}</span> : null}
 				</div>
 			) : (
 				<button
@@ -131,7 +132,7 @@ export function WebSearchBottomBarChip({
 				>
 					<FiGlobe size={14} />
 					<span className="max-w-28 truncate">Enable web search</span>
-					{selectedLabel ? <span className="max-w-36 truncate text-xs opacity-70">{selectedLabel}</span> : null}
+					{selectedLabel ? <span className="max-w-36 truncate">{selectedLabel}</span> : null}
 				</button>
 			)}
 

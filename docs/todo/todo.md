@@ -9,11 +9,12 @@
   - [x] with the number of skills present, maybe we dont want to enable all on click for the enable skills button, may be have a button at bottom on open that says enable all separately. also show collapsed bundles at start and then expanding if needed.
   - [x] enable autoexec for load/unload/readresource
 
-- [x] if tool call and tool results are "json" try to pretty print in details. there can be fall back to plain text if it is so.
+- [ ] ariakit tooltips on enable web search and all others
 - [ ] have a preloadactive as a bool in assistant preset
   - [x] backend changes
   - [x] ui type adoption
   - [ ] ui adoption and runtime injection
+
 - [ ] need to check if anthropic needs explicit caching setting (openai has implicit for 5 mins) so that tool calls loop is better.
   - [x] this is a "feature" in anthropic and chargeable for cache write.
   - [x] implement this after feature filters support and additional param support features in apis.
@@ -23,7 +24,7 @@
 
 - [ ] tools issues
   - [x] flatpak shell path issue. need hostspawn support in llm tools.
-  - [ ] test on flatpak
+  - [x] test on flatpak
   - [ ] test on mac pkg and win
 
 ## Milestone thoughts
