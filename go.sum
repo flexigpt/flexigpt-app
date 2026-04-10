@@ -33,8 +33,8 @@ github.com/elliotchance/pie/v2 v2.9.0 h1:BkEhh8b/avGCSpXpABSjNuytxlI/S2snkjT3vtV
 github.com/elliotchance/pie/v2 v2.9.0/go.mod h1:18t0dgGFH006g4eVdDtWfgFZPQEgl10IoEO8YWEq3Og=
 github.com/flexigpt/agentskills-go v0.12.0 h1:IgMJlbunZmkVYDdAioZwJGcBbAUG4e68vcipm4/qo4I=
 github.com/flexigpt/agentskills-go v0.12.0/go.mod h1:G3O94VNJq3msVQzt5fKTnbKOAxIPbu7kGM8B7i0hAJI=
-github.com/flexigpt/inference-go v0.11.1 h1:9cmuh7boxLpsOB5ECvk4swdusLyFdxE8XCYnaTIZo+Q=
-github.com/flexigpt/inference-go v0.11.1/go.mod h1:O7ThVuyKBWfaWzYcXwfAp9OOec7HKt+mYa0Z1BGZPr0=
+github.com/flexigpt/inference-go v0.12.0 h1:fF+HPtiz9+E5ZpRcEjia0oRr996UDnkSJxSVBnbsRLo=
+github.com/flexigpt/inference-go v0.12.0/go.mod h1:O7ThVuyKBWfaWzYcXwfAp9OOec7HKt+mYa0Z1BGZPr0=
 github.com/flexigpt/llmtools-go v0.16.1 h1:HhTex5u0pdaRNBmgv3i+48FFDe75rKscQgXEn/6jvVI=
 github.com/flexigpt/llmtools-go v0.16.1/go.mod h1:K/Gdq+WJxkBIr9ykLodM6RL9QUsqCg5mcxEozbZlvDQ=
 github.com/flexigpt/mapstore-go v0.2.0 h1:kjSeyL0D9YhEYvcV43HqsLkntCOrYFoQPqgho1ka0Qg=

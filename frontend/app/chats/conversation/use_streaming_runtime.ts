@@ -173,7 +173,7 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 			const timer = window.setTimeout(() => {
 				notifyTimersRef.current.set(tabId, null);
 				notifyStreamNow(tabId);
-			}, 140);
+			}, 16);
 
 			notifyTimersRef.current.set(tabId, timer);
 		},
