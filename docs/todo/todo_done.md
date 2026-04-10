@@ -903,3 +903,5 @@
 - [x] invalid id set for tool output once in error case for replacetext line. verify id an call id are preserved end to end.
 - [x] skills active and enabled are set properly on convo reload, but the ticks inside the menu are not visible.
 - [x] context bar: ariakit menu styling and tooltips proper.
+- [x] tab lazy load
+- [x] sys prompt locked on input locked

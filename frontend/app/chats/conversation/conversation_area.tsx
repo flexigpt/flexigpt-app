@@ -64,6 +64,7 @@ export type ConversationAreaHandle = {
 type ConversationAreaProps = {
 	tabs: ChatTabState[];
 	selectedTabId: string;
+	mountedInputTabIds: ReadonlySet<string>;
 	shortcutConfig: ShortcutConfig;
 	initialScrollTopByTab?: Record<string, number>;
 	updateTab: (tabId: string, updater: (tab: ChatTabState) => ChatTabState) => void;
@@ -71,17 +72,24 @@ type ConversationAreaProps = {
 };
 
 export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationAreaProps>(function ConversationArea(
-	{ tabs, selectedTabId, shortcutConfig, initialScrollTopByTab, updateTab, saveUpdatedConversation },
+	{
+		tabs,
+		selectedTabId,
+		mountedInputTabIds,
+		shortcutConfig,
+		initialScrollTopByTab,
+		updateTab,
+		saveUpdatedConversation,
+	},
 	ref
 ) {
 	const tabsRef = useRef(tabs);
-
 	const selectedTabIdRef = useRef(selectedTabId);
 
 	const activeTab = useMemo(() => tabs.find(tab => tab.tabId === selectedTabId) ?? tabs[0], [tabs, selectedTabId]);
 	const activeTabId = activeTab?.tabId ?? '';
 	const activeTabIsBusy = activeTab?.isBusy ?? false;
-	const activeTabIsHydrating = activeTab?.isHydrating ?? false;
+	const activeTabIsHydrating = (activeTab?.isHydrating ?? false) || !(activeTab?.isLoaded ?? true);
 	const activeEditingMessageId = activeTab?.editingMessageId ?? null;
 	const messages = activeTab?.conversation?.messages ?? EMPTY_MESSAGES;
 	const messageCount = messages.length;
@@ -285,6 +293,11 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		]
 	);
 
+	const mountedInputTabs = useMemo(
+		() => tabs.filter(tab => tab.tabId === selectedTabId || mountedInputTabIds.has(tab.tabId)),
+		[mountedInputTabIds, selectedTabId, tabs]
+	);
+
 	return (
 		<>
 			<div className="relative row-start-2 row-end-3 mt-2 min-h-0">
@@ -295,9 +308,13 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 					style={{ scrollbarGutter: 'stable both-edges', overflowAnchor: 'none', overflowY: 'auto' }}
 				>
 					<div ref={setScrollContentRef} className="mx-auto w-11/12 xl:w-5/6">
-						{messages.map((message, index) => (
-							<div key={message.id}>{itemContent(index, message)}</div>
-						))}
+						{activeTabIsHydrating && messageCount === 0 ? (
+							<div className="flex min-h-128 items-center justify-center py-8">
+								<span className="loading loading-dots loading-md" aria-label="Loading conversation" />
+							</div>
+						) : (
+							messages.map((message, index) => <div key={message.id}>{itemContent(index, message)}</div>)
+						)}
 					</div>
 				</div>
 
@@ -330,13 +347,13 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 			<div className="row-start-3 row-end-4 flex w-full min-w-0 justify-center">
 				<div className="w-11/12 min-w-0 xl:w-5/6">
-					{tabs.map(tab => (
+					{mountedInputTabs.map(tab => (
 						<TabInputPane
 							key={tab.tabId}
 							tabId={tab.tabId}
 							active={tab.tabId === selectedTabId}
 							isBusy={tab.isBusy}
-							isHydrating={tab.isHydrating}
+							isHydrating={tab.isHydrating || !tab.isLoaded}
 							editingMessageId={tab.editingMessageId}
 							setInputRef={setInputRef}
 							getAbortRef={getAbortRef}

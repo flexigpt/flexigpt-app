@@ -1,4 +1,4 @@
-import { type SyntheticEvent, useCallback, useMemo, useRef, useState } from 'react';
+import { type SyntheticEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { FiCheck, FiGitBranch, FiPlus, FiX } from 'react-icons/fi';
 
@@ -34,6 +34,7 @@ type SystemPromptDropdownProps = {
 	onClearSelected: () => void;
 	onRefreshPrompts: () => Promise<void>;
 	getExistingVersions: (bundleID: string, slug: string) => string[];
+	isInputLocked?: boolean;
 };
 
 function pickInitialBundleID(
@@ -77,6 +78,7 @@ export function SystemPromptDropdown({
 	onClearSelected,
 	onRefreshPrompts,
 	getExistingVersions,
+	isInputLocked = false,
 }: SystemPromptDropdownProps) {
 	const [modalMode, setModalMode] = useState<'add' | 'fork'>('add');
 	const [isComposerOpen, setIsComposerOpen] = useState(false);
@@ -131,18 +133,28 @@ export function SystemPromptDropdown({
 		promptTooltip.setAnchorElement(null);
 	}, [promptTooltip]);
 
+	useEffect(() => {
+		if (!isInputLocked) return;
+		hidePromptTooltip();
+		menu.hide();
+	}, [hidePromptTooltip, isInputLocked, menu]);
+
 	// Refresh prompts on open, but at most once per REFRESH_STALE_MS to avoid
 	// repeated backend fetches that make the menu feel sluggish.
 	const handleMenuOpen = useCallback(() => {
+		if (isInputLocked) return;
+
 		const now = Date.now();
 		if (now - lastRefreshTsRef.current < REFRESH_STALE_MS) return;
 		lastRefreshTsRef.current = now;
 		void onRefreshPrompts().catch((refreshError: unknown) => {
 			console.error('Failed to refresh system prompts:', refreshError);
 		});
-	}, [onRefreshPrompts]);
+	}, [isInputLocked, onRefreshPrompts]);
 
 	const openAddModal = useCallback(() => {
+		if (isInputLocked) return;
+
 		setModalMode('add');
 		setComposerInitialDraft({
 			bundleID: pickInitialBundleID(bundles, preferredBundleID),
@@ -156,10 +168,12 @@ export function SystemPromptDropdown({
 		requestAnimationFrame(() => {
 			setIsComposerOpen(true);
 		});
-	}, [bundles, preferredBundleID]);
+	}, [bundles, isInputLocked, preferredBundleID]);
 
 	const openForkModal = useCallback(
 		(item: SystemPromptItem) => {
+			if (isInputLocked) return;
+
 			const isSyntheticPreviousConversationPrompt = item.bundleID === PREVIOUS_CONVO_SYSTEM_PROMPT_BUNDLEID;
 			setModalMode(isSyntheticPreviousConversationPrompt ? 'add' : 'fork');
 
@@ -180,7 +194,7 @@ export function SystemPromptDropdown({
 				setIsComposerOpen(true);
 			});
 		},
-		[bundles, preferredBundleID]
+		[bundles, isInputLocked, preferredBundleID]
 	);
 
 	return (
@@ -188,8 +202,11 @@ export function SystemPromptDropdown({
 			<HoverTip content={triggerTooltip} placement="top">
 				<MenuButton
 					store={menu}
-					className={`${actionTriggerChipButtonClasses} ${open ? 'bg-base-300/80' : ''}`}
+					className={`${actionTriggerChipButtonClasses} ${open ? 'bg-base-300/80' : ''} ${
+						isInputLocked ? 'opacity-60' : ''
+					}`}
 					onClick={handleMenuOpen}
+					disabled={isInputLocked}
 				>
 					<ActionTriggerChipContent
 						label="System prompt"
@@ -231,7 +248,9 @@ export function SystemPromptDropdown({
 				{hasModelDefaultPrompt ? (
 					<MenuItem
 						hideOnClick={false}
-						className="data-active-item:bg-base-200 border-base-300 mb-2 rounded-lg border p-2 outline-none"
+						className={`data-active-item:bg-base-200 border-base-300 mb-2 rounded-lg border p-2 outline-none ${
+							isInputLocked ? 'opacity-60' : ''
+						}`}
 						data-prompt={modelDefaultPrompt}
 						onFocus={event => {
 							showPromptTooltip(event.currentTarget);
@@ -242,6 +261,7 @@ export function SystemPromptDropdown({
 						}}
 						onMouseLeave={hidePromptTooltip}
 						onClick={() => {
+							if (isInputLocked) return;
 							onToggleModelDefault(!includeModelDefault);
 						}}
 					>
@@ -250,8 +270,10 @@ export function SystemPromptDropdown({
 								type="checkbox"
 								className="checkbox checkbox-xs mt-0.5 rounded"
 								checked={includeModelDefault}
+								disabled={isInputLocked}
 								onChange={event => {
 									stopMenuBubbleEvent(event);
+									if (isInputLocked) return;
 									onToggleModelDefault(event.currentTarget.checked);
 								}}
 								onPointerDown={stopMenuToggleEvent}
@@ -287,7 +309,9 @@ export function SystemPromptDropdown({
 									key={item.identityKey}
 									hideOnClick={false}
 									data-prompt={item.prompt}
-									className="data-active-item:bg-base-200 border-base-300 flex items-start gap-2 rounded-lg border p-2 outline-none"
+									className={`data-active-item:bg-base-200 border-base-300 flex items-start gap-2 rounded-lg border p-2 outline-none ${
+										isInputLocked ? 'opacity-60' : ''
+									}`}
 									onFocus={event => {
 										showPromptTooltip(event.currentTarget);
 									}}
@@ -297,6 +321,7 @@ export function SystemPromptDropdown({
 									}}
 									onMouseLeave={hidePromptTooltip}
 									onClick={() => {
+										if (isInputLocked) return;
 										onTogglePrompt(item.identityKey);
 									}}
 								>
@@ -304,8 +329,10 @@ export function SystemPromptDropdown({
 										type="checkbox"
 										className="checkbox checkbox-xs mt-0.5 rounded"
 										checked={isSelected}
+										disabled={isInputLocked}
 										onChange={event => {
 											stopMenuBubbleEvent(event);
+											if (isInputLocked) return;
 											onTogglePrompt(item.identityKey);
 										}}
 										onPointerDown={stopMenuToggleEvent}
@@ -331,9 +358,10 @@ export function SystemPromptDropdown({
 											type="button"
 											className="btn btn-ghost btn-xs btn-square rounded-lg"
 											title="Fork"
-											disabled={!hasWritableCustomBundle}
+											disabled={isInputLocked || !hasWritableCustomBundle}
 											onClick={event => {
 												stopMenuToggleEvent(event);
+												if (isInputLocked) return;
 												hidePromptTooltip();
 												openForkModal(item);
 											}}
@@ -356,8 +384,9 @@ export function SystemPromptDropdown({
 						<button
 							type="button"
 							className="btn btn-ghost btn-xs rounded-lg"
-							disabled={!hasWritableCustomBundle}
+							disabled={isInputLocked || !hasWritableCustomBundle}
 							onClick={() => {
+								if (isInputLocked) return;
 								hidePromptTooltip();
 								openAddModal();
 							}}
@@ -369,12 +398,13 @@ export function SystemPromptDropdown({
 							type="button"
 							className="btn btn-ghost btn-xs rounded-lg"
 							onClick={() => {
+								if (isInputLocked) return;
 								hidePromptTooltip();
 								onClearSelected();
 								menu.hide();
 							}}
 							title="Clear all selected prompt sources"
-							disabled={!includeModelDefault && selectedPromptKeys.length === 0}
+							disabled={isInputLocked || (!includeModelDefault && selectedPromptKeys.length === 0)}
 						>
 							<FiX size={14} className="mr-1" /> Clear all
 						</button>

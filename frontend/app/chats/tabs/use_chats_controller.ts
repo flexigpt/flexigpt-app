@@ -98,6 +98,14 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 	const [initialModel] = useState<InitialChatsModel>(() => buildNormalizedInitialModel());
 	const initialSelectedTabId = initialModel.selectedTabId;
 
+	const controllerAliveRef = useRef(true);
+	useEffect(() => {
+		controllerAliveRef.current = true;
+		return () => {
+			controllerAliveRef.current = false;
+		};
+	}, []);
+
 	const lastActivatedAtRef = useRef(toTimestampMap(initialModel.lastActivatedAtByTab));
 	const touchTab = useCallback((tabId: string) => {
 		lastActivatedAtRef.current.set(tabId, Date.now());
@@ -106,9 +114,30 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 	const [tabs, setTabs] = useState<ChatTabState[]>(() => initialModel.tabs);
 	const tabsRef = useRef(initialModel.tabs);
 
-	const tabStore = useTabStore({ defaultSelectedId: initialSelectedTabId });
-	const storeSelectedTabId = useStoreState(tabStore, 'selectedId') ?? initialSelectedTabId;
+	const [mountedInputTabIds, setMountedInputTabIds] = useState<Set<string>>(
+		() => new Set(initialSelectedTabId ? [initialSelectedTabId] : [])
+	);
 
+	const markInputMounted = useCallback((tabId: string) => {
+		if (!tabId) return;
+
+		setMountedInputTabIds(prev => {
+			if (prev.has(tabId)) return prev;
+			const next = new Set(prev);
+			next.add(tabId);
+			return next;
+		});
+	}, []);
+
+	const tabStore = useTabStore({
+		defaultSelectedId: initialSelectedTabId,
+		setSelectedId: nextSelectedId => {
+			if (typeof nextSelectedId === 'string' && nextSelectedId) {
+				markInputMounted(nextSelectedId);
+			}
+		},
+	});
+	const storeSelectedTabId = useStoreState(tabStore, 'selectedId') ?? initialSelectedTabId;
 	const selectedTabId = useMemo(() => {
 		if (tabs.some(tab => tab.tabId === storeSelectedTabId)) {
 			return storeSelectedTabId;
@@ -121,13 +150,22 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		selectedTabIdRef.current = selectedTabId;
 	}, [selectedTabId]);
 
+	const pruneMountedInputTabIds = useCallback((existingTabIds: Set<string>) => {
+		setMountedInputTabIds(prev => {
+			const next = new Set([...prev].filter(tabId => existingTabIds.has(tabId)));
+			return next.size === prev.size ? prev : next;
+		});
+	}, []);
+
 	const selectTab = useCallback(
 		(nextTabId: string) => {
 			if (!nextTabId) return;
+
 			selectedTabIdRef.current = nextTabId;
+			markInputMounted(nextTabId);
 			tabStore.setSelectedId(nextTabId);
 		},
-		[tabStore]
+		[markInputMounted, tabStore]
 	);
 
 	const openConversationIds = useMemo(() => tabs.map(tab => tab.conversation.id).filter(Boolean), [tabs]);
@@ -136,11 +174,14 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 	const persistNowRef = useRef<() => void>(() => {});
 	const schedulePersistRef = useRef<() => void>(() => {});
 	const saveQueueByTabRef = useRef(new Map<string, Promise<void>>());
+	const hydratePromiseByTabRef = useRef(new Map<string, Promise<void>>());
 
 	const disposeTabRuntime = useCallback(
 		(tabId: string) => {
 			conversationAreaRef.current?.disposeTabRuntime(tabId);
 			lastActivatedAtRef.current.delete(tabId);
+			hydratePromiseByTabRef.current.delete(tabId);
+			saveQueueByTabRef.current.delete(tabId);
 		},
 		[conversationAreaRef]
 	);
@@ -173,7 +214,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 	}, []);
 
 	const normalizeAndCommitTabs = useCallback(
-		(nextTabs: ChatTabState[]) => {
+		(nextTabs: ChatTabState[], preferredSelectedTabId?: string) => {
 			const {
 				tabs: normalizedTabs,
 				removedTabIds,
@@ -197,10 +238,24 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 				scrollTopSnapshotRef.current = nextScrollSnapshot;
 			}
 
+			const existingTabIds = new Set(normalizedTabs.map(tab => tab.tabId));
+			pruneMountedInputTabIds(existingTabIds);
+
 			commitTabs(normalizedTabs);
+
+			const finalSelectedTabId =
+				(preferredSelectedTabId && existingTabIds.has(preferredSelectedTabId) ? preferredSelectedTabId : '') ||
+				(existingTabIds.has(selectedTabIdRef.current) ? selectedTabIdRef.current : '') ||
+				normalizedTabs[0]?.tabId ||
+				'';
+
+			if (finalSelectedTabId && finalSelectedTabId !== selectedTabIdRef.current) {
+				selectTab(finalSelectedTabId);
+			}
+
 			return normalizedTabs;
 		},
-		[commitTabs, conversationAreaRef, disposeTabRuntime, touchTab]
+		[commitTabs, conversationAreaRef, disposeTabRuntime, pruneMountedInputTabIds, selectTab, touchTab]
 	);
 
 	const updateTab = useCallback(
@@ -214,6 +269,102 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			normalizeAndCommitTabs(next);
 		},
 		[normalizeAndCommitTabs]
+	);
+
+	const ensureTabLoaded = useCallback(
+		(tabId: string): Promise<void> => {
+			const existing = hydratePromiseByTabRef.current.get(tabId);
+			if (existing) return existing;
+
+			const tab = tabsRef.current.find(current => current.tabId === tabId);
+			if (!tab || tab.isLoaded || tab.isHydrating || !tab.isPersisted || !tab.conversation.id) {
+				return Promise.resolve();
+			}
+
+			updateTab(tabId, prev =>
+				prev.isLoaded || prev.isHydrating || !prev.isPersisted || !prev.conversation.id
+					? prev
+					: {
+							...prev,
+							isBusy: false,
+							isHydrating: true,
+							editingMessageId: null,
+						}
+			);
+
+			const promise = (async () => {
+				try {
+					const stored = await conversationStoreAPI.getConversation(tab.conversation.id, tab.conversation.title, true);
+					if (!controllerAliveRef.current) return;
+
+					if (!stored) {
+						updateTab(tabId, prev => ({
+							...prev,
+							isLoaded: true,
+							isBusy: false,
+							isHydrating: false,
+							isPersisted: false,
+							manualTitleLocked: false,
+							editingMessageId: null,
+							conversation: initConversation(),
+						}));
+						return;
+					}
+
+					const hydrated = hydrateConversation(stored);
+
+					conversationAreaRef.current?.clearStreamForTab(tabId);
+
+					updateTab(tabId, prev => ({
+						...prev,
+						isLoaded: true,
+						isBusy: false,
+						isHydrating: true,
+						editingMessageId: null,
+						isPersisted: true,
+						conversation: hydrated,
+					}));
+
+					requestAnimationFrame(() => {
+						if (!controllerAliveRef.current) return;
+						if (!tabsRef.current.some(current => current.tabId === tabId)) return;
+
+						conversationAreaRef.current?.syncComposerFromConversation(tabId, hydrated);
+						updateTab(tabId, prev => ({
+							...prev,
+							isLoaded: true,
+							isBusy: false,
+							isHydrating: false,
+							editingMessageId: null,
+						}));
+					});
+				} catch (error) {
+					if (!controllerAliveRef.current) return;
+
+					console.error(error);
+					updateTab(tabId, prev => ({
+						...prev,
+						isLoaded: true,
+						isBusy: false,
+						isHydrating: false,
+						isPersisted: false,
+						manualTitleLocked: false,
+						editingMessageId: null,
+						conversation: initConversation(),
+					}));
+				}
+			})();
+
+			hydratePromiseByTabRef.current.set(tabId, promise);
+			void promise.finally(() => {
+				if (hydratePromiseByTabRef.current.get(tabId) === promise) {
+					hydratePromiseByTabRef.current.delete(tabId);
+				}
+			});
+
+			return promise;
+		},
+		[conversationAreaRef, updateTab]
 	);
 
 	useEffect(() => {
@@ -364,6 +515,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			updateTab(tabId, current => ({
 				...current,
 				conversation: { ...updatedConv, messages: [...updatedConv.messages] },
+				isLoaded: true,
 				isPersisted: true,
 				manualTitleLocked: titleWasExternallyChanged ? true : current.manualTitleLocked,
 				isHydrating: false,
@@ -398,38 +550,21 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			const wasActive = tabId === selectedTabIdRef.current;
 
 			disposeTabRuntime(tabId);
-
 			scrollTopSnapshotRef.current = omitManyKeys({ ...scrollTopSnapshotRef.current }, [tabId]);
 
 			const baseNextTabs = current.filter(tab => tab.tabId !== tabId);
 
-			if (wasActive) {
-				const right = current[idx + 1];
-				const left = idx > 0 ? current[idx - 1] : undefined;
-
-				const preferredNextSelectedId =
-					(left && left.tabId !== tabId ? left.tabId : right && right.tabId !== tabId ? right.tabId : '') ||
+			const right = current[idx + 1];
+			const left = idx > 0 ? current[idx - 1] : undefined;
+			const preferredNextSelectedId = wasActive
+				? (left && left.tabId !== tabId ? left.tabId : right && right.tabId !== tabId ? right.tabId : '') ||
 					baseNextTabs[0]?.tabId ||
-					'';
+					''
+				: undefined;
 
-				if (preferredNextSelectedId) {
-					selectTab(preferredNextSelectedId);
-				}
-			}
-
-			const normalizedNextTabs = normalizeAndCommitTabs(baseNextTabs);
-
-			if (!wasActive) return;
-
-			const finalNextSelectedId = normalizedNextTabs.some(tab => tab.tabId === selectedTabIdRef.current)
-				? selectedTabIdRef.current
-				: (normalizedNextTabs[0]?.tabId ?? '');
-
-			if (finalNextSelectedId && finalNextSelectedId !== selectedTabIdRef.current) {
-				selectTab(finalNextSelectedId);
-			}
+			normalizeAndCommitTabs(baseNextTabs, preferredNextSelectedId);
 		},
-		[disposeTabRuntime, normalizeAndCommitTabs, selectTab]
+		[disposeTabRuntime, normalizeAndCommitTabs]
 	);
 
 	const cycleTabBy = useCallback(
@@ -490,9 +625,12 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 
 			try {
 				const selectedChat = await conversationStoreAPI.getConversation(item.id, item.title, true);
+				if (!controllerAliveRef.current) return;
+
 				if (!selectedChat) {
 					updateTab(tabId, tab => ({
 						...tab,
+						isLoaded: true,
 						isHydrating: false,
 						isBusy: false,
 						editingMessageId: null,
@@ -511,25 +649,33 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 					manualTitleLocked: false,
 					editingMessageId: null,
 					isBusy: false,
+					isLoaded: true,
 					isHydrating: true,
 				}));
 
 				conversationAreaRef.current?.resetScrollToTop(tabId);
 
 				requestAnimationFrame(() => {
+					if (!controllerAliveRef.current) return;
+					if (!tabsRef.current.some(current => current.tabId === tabId)) return;
+
 					conversationAreaRef.current?.syncComposerFromConversation(tabId, hydrated);
 
 					updateTab(tabId, tab => ({
 						...tab,
+						isLoaded: true,
 						isHydrating: false,
 						isBusy: false,
 						editingMessageId: null,
 					}));
 				});
 			} catch (error) {
+				if (!controllerAliveRef.current) return;
+
 				console.error(error);
 				updateTab(tabId, tab => ({
 					...tab,
+					isLoaded: true,
 					isHydrating: false,
 					isBusy: false,
 					editingMessageId: null,
@@ -544,6 +690,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			const alreadyOpen = tabsRef.current.find(tab => tab.conversation.id === item.id);
 			if (alreadyOpen) {
 				selectTab(alreadyOpen.tabId);
+				void ensureTabLoaded(alreadyOpen.tabId);
 				return;
 			}
 
@@ -558,82 +705,12 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 				conversationAreaRef.current?.focusInput(targetId);
 			});
 		},
-		[conversationAreaRef, loadConversationIntoTab, selectTab]
+		[conversationAreaRef, ensureTabLoaded, loadConversationIntoTab, selectTab]
 	);
 
 	useEffect(() => {
-		if (!initialModel.restoredFromStorage) return;
-
-		let cancelled = false;
-
-		(async () => {
-			const snapshot = tabsRef.current.slice(0, MAX_TABS);
-
-			for (const tab of snapshot) {
-				if (cancelled) return;
-				if (!tab.isPersisted) continue;
-				if (!tab.conversation.id) continue;
-
-				try {
-					const stored = await conversationStoreAPI.getConversation(tab.conversation.id, tab.conversation.title, true);
-					if (cancelled) return;
-
-					if (!stored) {
-						updateTab(tab.tabId, prev => ({
-							...prev,
-							isBusy: false,
-							isHydrating: false,
-							isPersisted: false,
-							manualTitleLocked: false,
-							editingMessageId: null,
-							conversation: initConversation(),
-						}));
-						continue;
-					}
-
-					const hydrated = hydrateConversation(stored);
-
-					conversationAreaRef.current?.clearStreamForTab(tab.tabId);
-
-					updateTab(tab.tabId, prev => ({
-						...prev,
-						isBusy: false,
-						isHydrating: true,
-						editingMessageId: null,
-						isPersisted: true,
-						conversation: hydrated,
-					}));
-
-					requestAnimationFrame(() => {
-						if (cancelled) return;
-
-						conversationAreaRef.current?.syncComposerFromConversation(tab.tabId, hydrated);
-						updateTab(tab.tabId, prev => ({
-							...prev,
-							isBusy: false,
-							isHydrating: false,
-							editingMessageId: null,
-						}));
-					});
-				} catch (error) {
-					console.error(error);
-					updateTab(tab.tabId, prev => ({
-						...prev,
-						isBusy: false,
-						isHydrating: false,
-						isPersisted: false,
-						manualTitleLocked: false,
-						editingMessageId: null,
-						conversation: initConversation(),
-					}));
-				}
-			}
-		})().catch(console.error);
-
-		return () => {
-			cancelled = true;
-		};
-	}, [conversationAreaRef, initialModel.restoredFromStorage, updateTab]);
+		void ensureTabLoaded(selectedTabId);
+	}, [ensureTabLoaded, selectedTabId]);
 
 	// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-arguments
 	const [shortcutConfig] = useState<ShortcutConfig>(defaultShortcutConfig);
@@ -696,6 +773,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		tabStore,
 		tabs,
 		selectedTabId,
+		mountedInputTabIds,
 		initialScrollTopByTab: initialModel.scrollTopByTab,
 		shortcutConfig,
 		updateTab,

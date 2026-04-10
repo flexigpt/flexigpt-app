@@ -10,6 +10,7 @@ export type ChatTabState = {
 	tabId: string;
 	conversation: Conversation;
 
+	isLoaded: boolean;
 	isBusy: boolean;
 	isHydrating: boolean;
 
@@ -33,6 +34,7 @@ export function createEmptyTab(tabId: string = ensureMakeID()): ChatTabState {
 	return {
 		tabId,
 		conversation: initConversation(),
+		isLoaded: true,
 		isBusy: false,
 		isHydrating: false,
 		isPersisted: false,

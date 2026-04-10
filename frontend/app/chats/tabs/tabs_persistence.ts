@@ -91,8 +91,9 @@ export function buildInitialChatsModel(): InitialChatsModel {
 		return {
 			tabId: tab.tabId,
 			conversation,
+			isLoaded: !tab.isPersisted,
 			isBusy: false,
-			isHydrating: tab.isPersisted,
+			isHydrating: false,
 			isPersisted: tab.isPersisted,
 			manualTitleLocked: tab.manualTitleLocked,
 			editingMessageId: null,

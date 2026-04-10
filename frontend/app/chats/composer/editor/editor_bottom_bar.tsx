@@ -133,8 +133,10 @@ const menuItemClasses =
  */
 const SystemPromptSection = memo(function SystemPromptSection({
 	systemPrompt,
+	isInputLocked,
 }: {
 	systemPrompt: ComposerSystemPromptController;
+	isInputLocked: boolean;
 }) {
 	return (
 		<SystemPromptDropdown
@@ -152,6 +154,7 @@ const SystemPromptSection = memo(function SystemPromptSection({
 			onClearSelected={systemPrompt.clearSelectedPromptSources}
 			onRefreshPrompts={systemPrompt.refreshSystemPrompts}
 			getExistingVersions={systemPrompt.getExistingSystemPromptVersions}
+			isInputLocked={isInputLocked}
 		/>
 	);
 });
@@ -453,7 +456,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						</MenuItem>
 					</Menu>
 
-					<SystemPromptSection systemPrompt={systemPrompt} />
+					<SystemPromptSection systemPrompt={systemPrompt} isInputLocked={isInputLocked} />
 
 					<PickerButton
 						label="Prompts"

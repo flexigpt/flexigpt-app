@@ -18,6 +18,7 @@ export default function ChatsPage() {
 		tabStore,
 		tabs,
 		selectedTabId,
+		mountedInputTabIds,
 		initialScrollTopByTab,
 		shortcutConfig,
 		updateTab,
@@ -73,6 +74,7 @@ export default function ChatsPage() {
 					ref={conversationAreaRef}
 					tabs={tabs}
 					selectedTabId={selectedTabId}
+					mountedInputTabIds={mountedInputTabIds}
 					shortcutConfig={shortcutConfig}
 					initialScrollTopByTab={initialScrollTopByTab}
 					updateTab={updateTab}
