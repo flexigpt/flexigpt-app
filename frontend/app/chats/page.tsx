@@ -23,6 +23,7 @@ export default function ChatsPage() {
 		shortcutConfig,
 		updateTab,
 		saveUpdatedConversation,
+		selectTab,
 		openNewTab,
 		closeTab,
 		renameTabTitle,
@@ -63,6 +64,7 @@ export default function ChatsPage() {
 						selectedTabId={selectedTabId}
 						tabs={tabBarItems}
 						maxTabs={maxTabs}
+						onSelectTab={selectTab}
 						onNewTab={openNewTab}
 						onCloseTab={closeTab}
 						onRenameTab={renameTabTitle}

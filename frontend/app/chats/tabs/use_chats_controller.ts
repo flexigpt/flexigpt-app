@@ -131,11 +131,6 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 
 	const tabStore = useTabStore({
 		defaultSelectedId: initialSelectedTabId,
-		setSelectedId: nextSelectedId => {
-			if (typeof nextSelectedId === 'string' && nextSelectedId) {
-				markInputMounted(nextSelectedId);
-			}
-		},
 	});
 	const storeSelectedTabId = useStoreState(tabStore, 'selectedId') ?? initialSelectedTabId;
 	const selectedTabId = useMemo(() => {
@@ -778,6 +773,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		shortcutConfig,
 		updateTab,
 		saveUpdatedConversation,
+		selectTab,
 		openNewTab,
 		closeTab,
 		renameTabTitle,

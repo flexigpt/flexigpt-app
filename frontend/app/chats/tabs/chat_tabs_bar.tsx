@@ -24,6 +24,7 @@ interface ChatTabsBarProps {
 	selectedTabId: string;
 	tabs: ChatTabBarItem[];
 	maxTabs: number;
+	onSelectTab: (tabId: string) => void;
 	onNewTab: () => void;
 	onCloseTab: (tabId: string) => void;
 	onRenameTab: (tabId: string, newTitle: string) => void;
@@ -40,6 +41,7 @@ function ChatTabsBarContent({
 	selectedTabId,
 	tabs,
 	maxTabs,
+	onSelectTab,
 	onNewTab,
 	onCloseTab,
 	onRenameTab,
@@ -78,14 +80,17 @@ function ChatTabsBarContent({
 				id={tab.tabId}
 				render={<div />}
 				className={[
-					'relative flex h-8 w-44 items-center p-0',
-					'select-none',
-					'focus-visible:outline-primary focus-visible:outline focus-visible:outline-offset-2',
+					'focus-visible:outline-primary relative flex h-8 w-44 items-center p-0 select-none focus-visible:outline focus-visible:outline-offset-2',
 					isActive
 						? 'bg-base-100 text-base-content border-base-300 rounded-xl border shadow-xs'
 						: 'bg-base-200/80 text-base-content/80 hover:bg-base-200 border-0',
 					tab.isBusy ? 'cursor-progress' : '',
 				].join(' ')}
+				onClick={() => {
+					if (!isEditing) {
+						onSelectTab(tab.tabId);
+					}
+				}}
 			>
 				<div className="min-w-0 flex-1 px-2 text-sm">
 					{isEditing ? (
