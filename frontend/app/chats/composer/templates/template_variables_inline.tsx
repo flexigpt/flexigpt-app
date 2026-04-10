@@ -251,6 +251,8 @@ export function TemplateVariableElement(props: PlateElementProps<any>) {
 	const currentValue = useMemo(() => {
 		if (!tsenode || !varDef) return undefined;
 		return effectiveVarValueLocal(varDef, tsenode.variables ?? {});
+
+		// we need refreshTick, it is not unnecessary dep.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [tsenode, varDef, refreshTick]);
 

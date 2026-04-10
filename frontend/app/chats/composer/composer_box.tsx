@@ -12,7 +12,9 @@ import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 
 import {
+	areAssistantRuntimeSnapshotsEqual,
 	type AssistantPresetPreparedApplication,
+	type AssistantPresetRuntimeSnapshot,
 	EMPTY_ASSISTANT_PRESET_RUNTIME_SNAPSHOT,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import { useAssistantPresetManager } from '@/chats/composer/assistantpresets/use_assistant_preset_manager';
@@ -76,32 +78,51 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 	const [assistantRuntimeSnapshot, setAssistantRuntimeSnapshot] = useState(EMPTY_ASSISTANT_PRESET_RUNTIME_SNAPSHOT);
 	const pendingPresetResolutionModeRef = useRef<'none' | 'ensure-active' | 'track-default'>('ensure-active');
 
-	const applyAssistantPresetRuntimeSelections = useCallback((prepared: AssistantPresetPreparedApplication) => {
-		if (prepared.runtimeSelections.hasToolsSelection) {
-			editorAreaRef.current?.setConversationToolsFromChoices(prepared.runtimeSelections.conversationToolChoices);
-			editorAreaRef.current?.setWebSearchFromChoices(prepared.runtimeSelections.webSearchChoices);
-		}
-
-		if (prepared.runtimeSelections.hasSkillsSelection) {
-			editorAreaRef.current?.setSkillStateFromMessage(
-				prepared.runtimeSelections.enabledSkillRefs,
-				prepared.runtimeSelections.activeSkillRefs,
-				{ syncSession: 'ensure-if-enabled' }
-			);
-		}
-
-		setAssistantRuntimeSnapshot(prev => ({
-			conversationToolChoices: prepared.runtimeSelections.hasToolsSelection
-				? prepared.runtimeSelections.conversationToolChoices
-				: prev.conversationToolChoices,
-			webSearchChoices: prepared.runtimeSelections.hasToolsSelection
-				? prepared.runtimeSelections.webSearchChoices
-				: prev.webSearchChoices,
-			enabledSkillRefs: prepared.runtimeSelections.hasSkillsSelection
-				? prepared.runtimeSelections.enabledSkillRefs
-				: prev.enabledSkillRefs,
-		}));
+	const replaceAssistantRuntimeSnapshot = useCallback((next: AssistantPresetRuntimeSnapshot) => {
+		setAssistantRuntimeSnapshot(prev => {
+			return areAssistantRuntimeSnapshotsEqual(prev, next) ? prev : next;
+		});
 	}, []);
+
+	const updateAssistantRuntimeSnapshot = useCallback(
+		(updater: (prev: AssistantPresetRuntimeSnapshot) => AssistantPresetRuntimeSnapshot) => {
+			setAssistantRuntimeSnapshot(prev => {
+				const next = updater(prev);
+				return areAssistantRuntimeSnapshotsEqual(prev, next) ? prev : next;
+			});
+		},
+		[]
+	);
+
+	const applyAssistantPresetRuntimeSelections = useCallback(
+		(prepared: AssistantPresetPreparedApplication) => {
+			if (prepared.runtimeSelections.hasToolsSelection) {
+				editorAreaRef.current?.setConversationToolsFromChoices(prepared.runtimeSelections.conversationToolChoices);
+				editorAreaRef.current?.setWebSearchFromChoices(prepared.runtimeSelections.webSearchChoices);
+			}
+
+			if (prepared.runtimeSelections.hasSkillsSelection) {
+				editorAreaRef.current?.setSkillStateFromMessage(
+					prepared.runtimeSelections.enabledSkillRefs,
+					prepared.runtimeSelections.activeSkillRefs,
+					{ syncSession: 'ensure-if-enabled' }
+				);
+			}
+
+			updateAssistantRuntimeSnapshot(prev => ({
+				conversationToolChoices: prepared.runtimeSelections.hasToolsSelection
+					? [...prepared.runtimeSelections.conversationToolChoices]
+					: prev.conversationToolChoices,
+				webSearchChoices: prepared.runtimeSelections.hasToolsSelection
+					? [...prepared.runtimeSelections.webSearchChoices]
+					: prev.webSearchChoices,
+				enabledSkillRefs: prepared.runtimeSelections.hasSkillsSelection
+					? [...prepared.runtimeSelections.enabledSkillRefs]
+					: prev.enabledSkillRefs,
+			}));
+		},
+		[updateAssistantRuntimeSnapshot]
+	);
 
 	const assistantPreset = useAssistantPresetManager({
 		context: assistantContext,
@@ -132,6 +153,7 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 		}
 
 		return true;
+		// we dont need assistantPreset as a dep as we check for individual vals.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [
 		assistantContext.modelOptionsLoaded,
@@ -171,7 +193,7 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 				editorAreaRef.current?.setConversationToolsFromChoices([]);
 				editorAreaRef.current?.setWebSearchFromChoices([]);
 				editorAreaRef.current?.setSkillStateFromMessage([], [], { syncSession: 'none', forceResetSession: true });
-				setAssistantRuntimeSnapshot(EMPTY_ASSISTANT_PRESET_RUNTIME_SNAPSHOT);
+				replaceAssistantRuntimeSnapshot(EMPTY_ASSISTANT_PRESET_RUNTIME_SNAPSHOT);
 
 				const nextSelectedModel = assistantContext.resetForNewConversation();
 				systemPrompt.resetForNewConversation(nextSelectedModel.systemPrompt);
@@ -202,21 +224,21 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 			},
 			setConversationToolsFromChoices: tools => {
 				editorAreaRef.current?.setConversationToolsFromChoices(tools);
-				setAssistantRuntimeSnapshot(prev => ({
+				updateAssistantRuntimeSnapshot(prev => ({
 					...prev,
 					conversationToolChoices: [...tools],
 				}));
 			},
 			setWebSearchFromChoices: choices => {
 				editorAreaRef.current?.setWebSearchFromChoices(choices);
-				setAssistantRuntimeSnapshot(prev => ({
+				updateAssistantRuntimeSnapshot(prev => ({
 					...prev,
 					webSearchChoices: [...choices],
 				}));
 			},
 			setSkillStateFromMessage: (enabledRefs, activeRefs, options) => {
 				editorAreaRef.current?.setSkillStateFromMessage(enabledRefs, activeRefs, options);
-				setAssistantRuntimeSnapshot(prev => ({
+				updateAssistantRuntimeSnapshot(prev => ({
 					...prev,
 					enabledSkillRefs: [...enabledRefs],
 				}));
@@ -231,7 +253,7 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 					syncSession: 'none',
 					forceResetSession: true,
 				});
-				setAssistantRuntimeSnapshot({
+				replaceAssistantRuntimeSnapshot({
 					conversationToolChoices: [...context.toolChoices],
 					webSearchChoices: [...context.webSearchChoices],
 					enabledSkillRefs: [...context.enabledSkillRefs],
@@ -240,7 +262,15 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 				void flushPendingPresetResolution();
 			},
 		}),
-		[assistantContext, assistantPreset, chatOptions, flushPendingPresetResolution, systemPrompt]
+		[
+			assistantContext,
+			assistantPreset,
+			chatOptions,
+			flushPendingPresetResolution,
+			replaceAssistantRuntimeSnapshot,
+			systemPrompt,
+			updateAssistantRuntimeSnapshot,
+		]
 	);
 
 	return (
@@ -274,7 +304,7 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 							setAbortConfirmationRequested(true);
 						}
 					}}
-					onAssistantPresetRuntimeStateChange={setAssistantRuntimeSnapshot}
+					onAssistantPresetRuntimeStateChange={replaceAssistantRuntimeSnapshot}
 					editingMessageId={editingMessageId}
 					cancelEditing={onCancelEditing}
 					systemPrompt={systemPrompt}

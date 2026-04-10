@@ -31,3 +31,26 @@ export function dedupeToolChoices(choices: ToolStoreChoice[]): ToolStoreChoice[]
 
 	return out;
 }
+
+export function areToolChoiceListsEqual(a: ToolStoreChoice[], b: ToolStoreChoice[]): boolean {
+	if (a === b) return true;
+	if (a.length !== b.length) return false;
+
+	for (let i = 0; i < a.length; i += 1) {
+		const left = a[i];
+		const right = b[i];
+
+		if (
+			left.toolType !== right.toolType ||
+			left.bundleID !== right.bundleID ||
+			left.toolSlug !== right.toolSlug ||
+			left.toolVersion !== right.toolVersion ||
+			left.autoExecute !== right.autoExecute ||
+			(left.userArgSchemaInstance ?? '') !== (right.userArgSchemaInstance ?? '')
+		) {
+			return false;
+		}
+	}
+
+	return true;
+}

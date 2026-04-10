@@ -69,6 +69,7 @@ export function useTitleBarContent(slots: TitleBarSlots, deps: unknown[] = []) {
 		return () => {
 			clearTitleBarSlots(owner);
 		};
+		// Deps is unknown at this stage so a spread deps array.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [owner, slots, ...deps]);
 }

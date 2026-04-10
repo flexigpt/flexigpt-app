@@ -19,6 +19,10 @@ export function stripUndefinedDeep<T>(value: T): T {
 	return value;
 }
 
+export function areComparableValuesEqual(left: unknown, right: unknown): boolean {
+	return JSON.stringify(stripUndefinedDeep(left)) === JSON.stringify(stripUndefinedDeep(right));
+}
+
 export function dedupeStringArray(values: string[]): string[] {
 	const seen = new Set<string>();
 	const out: string[] = [];

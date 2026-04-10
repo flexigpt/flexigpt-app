@@ -237,6 +237,7 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 	// Recompute template selection info whenever doc changes.
 	// analyzeTemplateSelectionInfo has a fast-path exit when no template nodes exist.
+	// we need docVersion, it is not unnecessary dep.
 	// eslint-disable-next-line react-hooks/exhaustive-deps
 	const selectionInfo = useMemo(() => analyzeTemplateSelectionInfo(editor), [editor, docVersion]);
 

@@ -8,10 +8,13 @@ import type { UIChatOption } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
 import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
-import { stripUndefinedDeep } from '@/lib/obj_utils';
+import { cloneJSONLike } from '@/lib/jsonschema_utils';
+import { areComparableValuesEqual } from '@/lib/obj_utils';
 
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
 import { sanitizeUIChatOptionByCapabilities } from '@/modelpresets/lib/capabilities_override';
+import { areSkillRefListsEqual } from '@/skills/lib/skill_identity_utils';
+import { areToolChoiceListsEqual } from '@/tools/lib/tool_choice_utils';
 
 export interface AssistantPresetOptionItem {
 	key: string;
@@ -103,15 +106,19 @@ export const EMPTY_ASSISTANT_PRESET_MODIFICATION_SUMMARY: AssistantPresetModific
 	modifiedLabels: [],
 };
 
-function hasOwn(value: object, key: string): boolean {
-	return Object.prototype.hasOwnProperty.call(value, key);
+export function areAssistantRuntimeSnapshotsEqual(
+	a: AssistantPresetRuntimeSnapshot,
+	b: AssistantPresetRuntimeSnapshot
+): boolean {
+	return (
+		areToolChoiceListsEqual(a.conversationToolChoices, b.conversationToolChoices) &&
+		areToolChoiceListsEqual(a.webSearchChoices, b.webSearchChoices) &&
+		areSkillRefListsEqual(a.enabledSkillRefs, b.enabledSkillRefs)
+	);
 }
 
-function cloneJSONLike<T>(value: T): T {
-	if (value === undefined) {
-		return value;
-	}
-	return JSON.parse(JSON.stringify(value)) as T;
+function hasOwn(value: object, key: string): boolean {
+	return Object.prototype.hasOwnProperty.call(value, key);
 }
 
 function mergePatchObject<T>(baseValue: T | undefined, patchValue: unknown): T {
@@ -160,10 +167,6 @@ function pickManagedPatchShape(patchValue: unknown, currentValue: unknown): unkn
 	}
 
 	return next;
-}
-
-function areComparableValuesEqual(left: unknown, right: unknown): boolean {
-	return JSON.stringify(stripUndefinedDeep(left)) === JSON.stringify(stripUndefinedDeep(right));
 }
 
 export function buildAssistantPresetIdentityKey(

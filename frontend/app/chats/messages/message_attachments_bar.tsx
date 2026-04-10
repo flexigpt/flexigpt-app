@@ -10,7 +10,7 @@ import {
 	FiTool,
 } from 'react-icons/fi';
 
-import { Menu, MenuButton, MenuItem, useMenuStore } from '@ariakit/react';
+import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import type { Attachment } from '@/spec/attachment';
 import { AttachmentContentBlockMode, AttachmentKind } from '@/spec/attachment';
@@ -391,6 +391,7 @@ function AttachmentsGroupChip({ attachments }: AttachmentsGroupChipProps) {
 	const count = attachments.length;
 
 	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
+	const open = useStoreState(menu, 'open');
 
 	const titleLines = ['Attachments', `${count} item${count === 1 ? '' : 's'} attached`];
 	const title = titleLines.join('\n');
@@ -418,26 +419,28 @@ function AttachmentsGroupChip({ attachments }: AttachmentsGroupChipProps) {
 				<FiChevronRight size={14} />
 			</MenuButton>
 
-			<Menu
-				store={menu}
-				gutter={8}
-				overflowPadding={8}
-				className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
-				autoFocusOnShow
-			>
-				<div className="text-base-content/70 mb-1 text-xs font-semibold">Attachments</div>
+			{open ? (
+				<Menu
+					store={menu}
+					gutter={8}
+					overflowPadding={8}
+					className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
+					autoFocusOnShow
+				>
+					<div className="text-base-content/70 mb-1 text-xs font-semibold">Attachments</div>
 
-				{attachments.map((att, index) => (
-					<MenuItem
-						key={`${att.kind}:${att.label}:${index}`}
-						store={menu}
-						hideOnClick={false}
-						className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
-					>
-						<MessageAttachmentInfoChip attachment={att} fullWidth />
-					</MenuItem>
-				))}
-			</Menu>
+					{attachments.map((att, index) => (
+						<MenuItem
+							key={`${att.kind}:${att.label}:${index}`}
+							store={menu}
+							hideOnClick={false}
+							className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
+						>
+							<MessageAttachmentInfoChip attachment={att} fullWidth />
+						</MenuItem>
+					))}
+				</Menu>
+			) : null}
 		</div>
 	);
 }
@@ -451,7 +454,7 @@ function ToolChoicesGroupChip({ tools, onToolChoiceDetails }: ToolChoicesGroupCh
 	const count = tools.length;
 
 	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
-
+	const open = useStoreState(menu, 'open');
 	const titleLines = ['Tools', `${count} tool${count === 1 ? '' : 's'} used for this turn`];
 	const title = titleLines.join('\n');
 	if (count === 0) return null;
@@ -489,34 +492,35 @@ function ToolChoicesGroupChip({ tools, onToolChoiceDetails }: ToolChoicesGroupCh
 			>
 				<FiChevronRight size={14} />
 			</MenuButton>
+			{open ? (
+				<Menu
+					store={menu}
+					gutter={8}
+					overflowPadding={8}
+					className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
+					autoFocusOnShow
+				>
+					<div className="text-base-content/70 mb-1 text-xs font-semibold">Tools</div>
 
-			<Menu
-				store={menu}
-				gutter={8}
-				overflowPadding={8}
-				className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
-				autoFocusOnShow
-			>
-				<div className="text-base-content/70 mb-1 text-xs font-semibold">Tools</div>
-
-				{tools.map(tool => (
-					<MenuItem
-						key={tool.toolID ?? `${tool.bundleID}-${tool.toolSlug}-${tool.toolVersion}`}
-						store={menu}
-						hideOnClick={false}
-						className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
-						onClick={
-							onToolChoiceDetails
-								? () => {
-										onToolChoiceDetails(tool);
-									}
-								: undefined
-						}
-					>
-						<MessageToolChoiceChip tool={tool} fullWidth />
-					</MenuItem>
-				))}
-			</Menu>
+					{tools.map(tool => (
+						<MenuItem
+							key={tool.toolID ?? `${tool.bundleID}-${tool.toolSlug}-${tool.toolVersion}`}
+							store={menu}
+							hideOnClick={false}
+							className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
+							onClick={
+								onToolChoiceDetails
+									? () => {
+											onToolChoiceDetails(tool);
+										}
+									: undefined
+							}
+						>
+							<MessageToolChoiceChip tool={tool} fullWidth />
+						</MenuItem>
+					))}
+				</Menu>
+			) : null}
 		</div>
 	);
 }
@@ -530,7 +534,7 @@ function ToolOutputsGroupChip({ outputs, onToolOutputDetails }: ToolOutputsGroup
 	const count = outputs.length;
 
 	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
-
+	const open = useStoreState(menu, 'open');
 	const titleLines = ['Tool outputs', `${count} result${count === 1 ? '' : 's'} used for this turn`];
 	const title = titleLines.join('\n');
 	if (count === 0) return null;
@@ -568,34 +572,35 @@ function ToolOutputsGroupChip({ outputs, onToolOutputDetails }: ToolOutputsGroup
 			>
 				<FiChevronRight size={14} />
 			</MenuButton>
+			{open ? (
+				<Menu
+					store={menu}
+					gutter={8}
+					overflowPadding={8}
+					className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
+					autoFocusOnShow
+				>
+					<div className="text-base-content/70 mb-1 text-xs font-semibold">Tool results</div>
 
-			<Menu
-				store={menu}
-				gutter={8}
-				overflowPadding={8}
-				className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
-				autoFocusOnShow
-			>
-				<div className="text-base-content/70 mb-1 text-xs font-semibold">Tool results</div>
-
-				{outputs.map(out => (
-					<MenuItem
-						key={out.id}
-						store={menu}
-						hideOnClick={false}
-						className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
-						onClick={
-							onToolOutputDetails
-								? () => {
-										onToolOutputDetails(out);
-									}
-								: undefined
-						}
-					>
-						<MessageToolOutputChip output={out} fullWidth />
-					</MenuItem>
-				))}
-			</Menu>
+					{outputs.map(out => (
+						<MenuItem
+							key={out.id}
+							store={menu}
+							hideOnClick={false}
+							className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
+							onClick={
+								onToolOutputDetails
+									? () => {
+											onToolOutputDetails(out);
+										}
+									: undefined
+							}
+						>
+							<MessageToolOutputChip output={out} fullWidth />
+						</MenuItem>
+					))}
+				</Menu>
+			) : null}
 		</div>
 	);
 }
@@ -609,7 +614,7 @@ function ToolCallsGroupChip({ calls, onToolCallDetails }: ToolCallsGroupChipProp
 	const count = calls.length;
 
 	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
-
+	const open = useStoreState(menu, 'open');
 	const titleLines = ['Suggested tool calls', `${count} suggestion${count === 1 ? '' : 's'} from assistant`];
 	const title = titleLines.join('\n');
 	if (count === 0) return null;
@@ -647,34 +652,35 @@ function ToolCallsGroupChip({ calls, onToolCallDetails }: ToolCallsGroupChipProp
 			>
 				<FiChevronRight size={14} />
 			</MenuButton>
+			{open ? (
+				<Menu
+					store={menu}
+					gutter={8}
+					overflowPadding={8}
+					className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
+					autoFocusOnShow
+				>
+					<div className="text-base-content/70 mb-1 text-xs font-semibold">Suggested tool calls</div>
 
-			<Menu
-				store={menu}
-				gutter={8}
-				overflowPadding={8}
-				className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
-				autoFocusOnShow
-			>
-				<div className="text-base-content/70 mb-1 text-xs font-semibold">Suggested tool calls</div>
-
-				{calls.map(call => (
-					<MenuItem
-						key={call.id || call.callID}
-						store={menu}
-						hideOnClick={false}
-						className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
-						onClick={
-							onToolCallDetails
-								? () => {
-										onToolCallDetails(call);
-									}
-								: undefined
-						}
-					>
-						<MessageToolCallChip call={call} fullWidth />
-					</MenuItem>
-				))}
-			</Menu>
+					{calls.map(call => (
+						<MenuItem
+							key={call.id || call.callID}
+							store={menu}
+							hideOnClick={false}
+							className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
+							onClick={
+								onToolCallDetails
+									? () => {
+											onToolCallDetails(call);
+										}
+									: undefined
+							}
+						>
+							<MessageToolCallChip call={call} fullWidth />
+						</MenuItem>
+					))}
+				</Menu>
+			) : null}
 		</div>
 	);
 }
@@ -688,7 +694,7 @@ function WebSearchOutputsGroupChip({ outputs, onOutputDetails }: WebSearchOutput
 	const count = outputs.length;
 
 	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
-
+	const open = useStoreState(menu, 'open');
 	const title = ['Web search results', `${count} result set${count === 1 ? '' : 's'} for this turn`].join('\n');
 	if (count === 0) return null;
 	// If there's only one item, show the single chip (no dropdown/group chip)
@@ -725,34 +731,35 @@ function WebSearchOutputsGroupChip({ outputs, onOutputDetails }: WebSearchOutput
 			>
 				<FiChevronRight size={14} />
 			</MenuButton>
+			{open ? (
+				<Menu
+					store={menu}
+					gutter={8}
+					overflowPadding={8}
+					className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
+					autoFocusOnShow
+				>
+					<div className="text-base-content/70 mb-1 text-xs font-semibold">Web search results</div>
 
-			<Menu
-				store={menu}
-				gutter={8}
-				overflowPadding={8}
-				className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
-				autoFocusOnShow
-			>
-				<div className="text-base-content/70 mb-1 text-xs font-semibold">Web search results</div>
-
-				{outputs.map(out => (
-					<MenuItem
-						key={out.id}
-						store={menu}
-						hideOnClick={false}
-						className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
-						onClick={
-							onOutputDetails
-								? () => {
-										onOutputDetails(out);
-									}
-								: undefined
-						}
-					>
-						<MessageWebSearchOutputChip output={out} fullWidth />
-					</MenuItem>
-				))}
-			</Menu>
+					{outputs.map(out => (
+						<MenuItem
+							key={out.id}
+							store={menu}
+							hideOnClick={false}
+							className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
+							onClick={
+								onOutputDetails
+									? () => {
+											onOutputDetails(out);
+										}
+									: undefined
+							}
+						>
+							<MessageWebSearchOutputChip output={out} fullWidth />
+						</MenuItem>
+					))}
+				</Menu>
+			) : null}
 		</div>
 	);
 }
@@ -766,7 +773,7 @@ function WebSearchCallsGroupChip({ calls, onCallDetails }: WebSearchCallsGroupCh
 	const count = calls.length;
 
 	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
-
+	const open = useStoreState(menu, 'open');
 	const title = ['Web search activity', `${count} web‑search quer${count === 1 ? 'y' : 'ies'} this turn`].join('\n');
 	if (count === 0) return null;
 	// If there's only one item, show the single chip (no dropdown/group chip)
@@ -803,34 +810,35 @@ function WebSearchCallsGroupChip({ calls, onCallDetails }: WebSearchCallsGroupCh
 			>
 				<FiChevronRight size={14} />
 			</MenuButton>
+			{open ? (
+				<Menu
+					store={menu}
+					gutter={8}
+					overflowPadding={8}
+					className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
+					autoFocusOnShow
+				>
+					<div className="text-base-content/70 mb-1 text-xs font-semibold">Web search queries</div>
 
-			<Menu
-				store={menu}
-				gutter={8}
-				overflowPadding={8}
-				className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
-				autoFocusOnShow
-			>
-				<div className="text-base-content/70 mb-1 text-xs font-semibold">Web search queries</div>
-
-				{calls.map(call => (
-					<MenuItem
-						key={call.id || call.callID}
-						store={menu}
-						hideOnClick={false}
-						className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
-						onClick={
-							onCallDetails
-								? () => {
-										onCallDetails(call);
-									}
-								: undefined
-						}
-					>
-						<MessageWebSearchCallChip call={call} fullWidth />
-					</MenuItem>
-				))}
-			</Menu>
+					{calls.map(call => (
+						<MenuItem
+							key={call.id || call.callID}
+							store={menu}
+							hideOnClick={false}
+							className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
+							onClick={
+								onCallDetails
+									? () => {
+											onCallDetails(call);
+										}
+									: undefined
+							}
+						>
+							<MessageWebSearchCallChip call={call} fullWidth />
+						</MenuItem>
+					))}
+				</Menu>
+			) : null}
 		</div>
 	);
 }
@@ -844,7 +852,7 @@ function WebSearchChoicesGroupChip({ choices, onChoiceDetails }: WebSearchChoice
 	const count = choices.length;
 
 	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
-
+	const open = useStoreState(menu, 'open');
 	const title = ['Web search configuration', `${count} web‑search tool${count === 1 ? '' : 's'} in this turn`].join(
 		'\n'
 	);
@@ -883,34 +891,35 @@ function WebSearchChoicesGroupChip({ choices, onChoiceDetails }: WebSearchChoice
 			>
 				<FiChevronRight size={14} />
 			</MenuButton>
+			{open ? (
+				<Menu
+					store={menu}
+					gutter={8}
+					overflowPadding={8}
+					className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
+					autoFocusOnShow
+				>
+					<div className="text-base-content/70 mb-1 text-xs font-semibold">Web search configuration</div>
 
-			<Menu
-				store={menu}
-				gutter={8}
-				overflowPadding={8}
-				className="rounded-box bg-base-200 text-base-content border-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
-				autoFocusOnShow
-			>
-				<div className="text-base-content/70 mb-1 text-xs font-semibold">Web search configuration</div>
-
-				{choices.map(choice => (
-					<MenuItem
-						key={choice.toolID ?? `${choice.bundleID}-${choice.toolSlug}-${choice.toolVersion}`}
-						store={menu}
-						hideOnClick={false}
-						className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
-						onClick={
-							onChoiceDetails
-								? () => {
-										onChoiceDetails(choice);
-									}
-								: undefined
-						}
-					>
-						<MessageWebSearchToolChoiceChip tool={choice} fullWidth />
-					</MenuItem>
-				))}
-			</Menu>
+					{choices.map(choice => (
+						<MenuItem
+							key={choice.toolID ?? `${choice.bundleID}-${choice.toolSlug}-${choice.toolVersion}`}
+							store={menu}
+							hideOnClick={false}
+							className="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
+							onClick={
+								onChoiceDetails
+									? () => {
+											onChoiceDetails(choice);
+										}
+									: undefined
+							}
+						>
+							<MessageWebSearchToolChoiceChip tool={choice} fullWidth />
+						</MenuItem>
+					))}
+				</Menu>
+			) : null}
 		</div>
 	);
 }

@@ -8,6 +8,8 @@ import type { PromptTemplateRef } from '@/spec/prompt';
 import type { SkillRef, SkillSelection } from '@/spec/skill';
 import type { ToolRef, ToolSelection } from '@/spec/tool';
 
+import { cloneJSONLike } from '@/lib/jsonschema_utils';
+
 export interface AssistantPresetUpsertInput extends PutAssistantPresetPayload {
 	slug: string;
 	version: string;
@@ -17,13 +19,6 @@ type AssistantPresetModelPatchLike =
 	| AssistantPreset['startingModelPresetPatch']
 	| AssistantPresetStartingModelPresetPatch
 	| undefined;
-
-function cloneJSONLike<T>(value: T): T {
-	if (value === undefined) {
-		return value;
-	}
-	return JSON.parse(JSON.stringify(value)) as T;
-}
 
 export function buildModelPresetRefKey(ref: ModelPresetRef): string {
 	return `${ref.providerName}/${ref.modelPresetID}`;

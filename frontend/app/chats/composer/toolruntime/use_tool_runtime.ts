@@ -139,8 +139,6 @@ export function useComposerToolRuntime({
 	useEffect(() => {
 		return () => {
 			isMountedRef.current = false;
-			// eslint-disable-next-line react-hooks/exhaustive-deps
-			toolCallAttemptKeyByIdRef.current.clear();
 		};
 	}, []);
 

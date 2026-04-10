@@ -1,5 +1,3 @@
-import { useEffect, useMemo, useRef } from 'react';
-
 import { FiAlertTriangle, FiCode, FiPlay, FiTerminal, FiTool, FiX } from 'react-icons/fi';
 
 import { type UIToolCall, type UIToolOutput } from '@/spec/inference';
@@ -12,23 +10,62 @@ type OrderedToolChipItem =
 	| { key: string; kind: 'call'; call: UIToolCall }
 	| { key: string; kind: 'output'; output: UIToolOutput };
 
-function buildCurrentChipIds(toolCalls: UIToolCall[], toolOutputs: UIToolOutput[]): string[] {
-	const ids: string[] = [];
-	const seen = new Set<string>();
+const noopOpenCallDetails = (_call: UIToolCall) => {};
+
+function buildOrderedToolChipItems(toolCalls: UIToolCall[], toolOutputs: UIToolOutput[]): OrderedToolChipItem[] {
+	const items: OrderedToolChipItem[] = [];
+
+	// Match outputs to calls by callID.
+	const outputByCallID = new Map<string, UIToolOutput>();
+	for (const output of toolOutputs) {
+		if (!outputByCallID.has(output.callID)) {
+			outputByCallID.set(output.callID, output);
+		}
+	}
+
+	const usedOutputIds = new Set<string>();
+	const seenNonDiscardedCallIDs = new Set<string>();
 
 	for (const toolCall of toolCalls) {
-		if (seen.has(toolCall.id)) continue;
-		seen.add(toolCall.id);
-		ids.push(toolCall.id);
+		if (toolCall.status === 'discarded') continue;
+
+		seenNonDiscardedCallIDs.add(toolCall.callID);
+
+		if (toolCall.status === 'succeeded') {
+			const output = outputByCallID.get(toolCall.callID);
+
+			if (output) {
+				items.push({
+					key: toolCall.id,
+					kind: 'output',
+					output,
+				});
+				usedOutputIds.add(output.id);
+			}
+
+			continue;
+		}
+
+		items.push({
+			key: toolCall.id,
+			kind: 'call',
+			call: toolCall,
+		});
 	}
 
+	// Append outputs that do not correspond to any still-present call.
 	for (const output of toolOutputs) {
-		if (seen.has(output.id)) continue;
-		seen.add(output.id);
-		ids.push(output.id);
+		if (usedOutputIds.has(output.id)) continue;
+		if (seenNonDiscardedCallIDs.has(output.callID)) continue;
+
+		items.push({
+			key: output.id,
+			kind: 'output',
+			output,
+		});
 	}
 
-	return ids;
+	return items;
 }
 
 interface ToolChipsComposerRowProps {
@@ -48,7 +85,8 @@ interface ToolChipsComposerRowProps {
  *
  * Order (left → right):
  *   - Pending / running / failed tool calls
- *   - Tool output chips
+ *   - Succeeded calls replaced in-place by their output
+ *   - Orphan outputs appended at the end
  */
 export function ToolChipsComposerRow({
 	toolCalls,
@@ -61,61 +99,10 @@ export function ToolChipsComposerRow({
 	onRetryErroredOutput,
 	onOpenCallDetails,
 }: ToolChipsComposerRowProps) {
-	const visibleCalls = toolCalls.filter(toolCall => toolCall.status !== 'discarded' && toolCall.status !== 'succeeded');
-	const hasAny = visibleCalls.length > 0 || toolOutputs.length > 0;
-	const openCallDetails = onOpenCallDetails ?? (() => {});
-	// Keep a stable visual ordering so a succeeded tool call can "turn into"
-	// its output in-place instead of disappearing from the left and reappearing
-	// at the far right. This dramatically reduces horizontal layout churn.
-	const orderedChipIdsRef = useRef<string[]>([]);
+	const openCallDetails = onOpenCallDetails ?? noopOpenCallDetails;
+	const orderedItems = buildOrderedToolChipItems(toolCalls, toolOutputs);
 
-	const displayOrder = useMemo(() => {
-		const currentIds = buildCurrentChipIds(visibleCalls, toolOutputs);
-		const currentIdSet = new Set(currentIds);
-
-		// eslint-disable-next-line react-hooks/refs
-		const nextOrder = orderedChipIdsRef.current.filter(id => currentIdSet.has(id));
-		const seen = new Set(nextOrder);
-
-		for (const id of currentIds) {
-			if (seen.has(id)) continue;
-			seen.add(id);
-			nextOrder.push(id);
-		}
-
-		return nextOrder;
-	}, [toolOutputs, visibleCalls]);
-
-	useEffect(() => {
-		orderedChipIdsRef.current = displayOrder;
-	}, [displayOrder]);
-
-	const callById = useMemo(
-		() => new Map(visibleCalls.map(toolCall => [toolCall.id, toolCall] as const)),
-		[visibleCalls]
-	);
-	const outputById = useMemo(() => new Map(toolOutputs.map(output => [output.id, output] as const)), [toolOutputs]);
-
-	const orderedItems = useMemo<OrderedToolChipItem[]>(() => {
-		const items: OrderedToolChipItem[] = [];
-
-		for (const id of displayOrder) {
-			const toolCall = callById.get(id);
-			if (toolCall) {
-				items.push({ key: id, kind: 'call', call: toolCall });
-				continue;
-			}
-
-			const output = outputById.get(id);
-			if (output) {
-				items.push({ key: id, kind: 'output', output });
-			}
-		}
-
-		return items;
-	}, [callById, displayOrder, outputById]);
-
-	if (!hasAny) return null;
+	if (orderedItems.length === 0) return null;
 
 	return (
 		<div className="flex shrink-0 items-center gap-1">
@@ -154,7 +141,6 @@ export function ToolChipsComposerRow({
 		</div>
 	);
 }
-
 interface ToolCallComposerChipViewProps {
 	toolCall: UIToolCall;
 	isBusy: boolean;
