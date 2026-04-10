@@ -142,7 +142,7 @@ jobs:
       # Import certs only if signing is enabled
       - name: Import Code-Signing Certificates for macOS
         if: ${{ env.SIGNING_ENABLED == 'true' }}
-        uses: Apple-Actions/import-codesign-certs@v3
+        uses: Apple-Actions/import-codesign-certs@v6
         with:
           keychain-password: ${{ env.MACOS_SIGN_APPLE_APP_PASSWORD }}
           p12-file-base64: ${{ env.MACOS_SIGN_APP_CERT }}
@@ -150,7 +150,7 @@ jobs:
 
       - name: Import Code-Signing Certificates for macOS installer
         if: ${{ env.SIGNING_ENABLED == 'true' }}
-        uses: Apple-Actions/import-codesign-certs@v3
+        uses: Apple-Actions/import-codesign-certs@v6
         with:
           keychain-password: ${{ env.MACOS_SIGN_APPLE_APP_PASSWORD }}
           p12-file-base64: ${{ env.MACOS_SIGN_INSTALLER_CERT }}
