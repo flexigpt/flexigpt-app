@@ -112,7 +112,7 @@ export function WebSearchBottomBarChip({
 				{hasDropdown ? (
 					<MenuButton
 						store={menu}
-						className="btn btn-ghost btn-xs h-auto min-h-0 flex-1 gap-0 px-0 py-0 text-left font-normal shadow-none hover:bg-transparent disabled:bg-transparent"
+						className="btn btn-xs text-neutral-custom bg-base-200/70 hover:bg-base-300/80 h-auto min-h-0 flex-1 gap-0 px-0 py-0 text-left font-normal shadow-none"
 						aria-label={isConfigured ? 'Choose web search tool' : 'Enable web search'}
 						disabled={isInputLocked}
 						onClick={(event: MouseEvent) => {
@@ -143,7 +143,7 @@ export function WebSearchBottomBarChip({
 				) : (
 					<button
 						type="button"
-						className="btn btn-ghost btn-xs h-auto min-h-0 flex-1 gap-0 px-0 py-0 text-left font-normal shadow-none hover:bg-transparent disabled:bg-transparent"
+						className="btn btn-xs text-neutral-custom bg-base-200/70 hover:bg-base-300/80 h-auto min-h-0 flex-1 gap-0 px-0 py-0 text-left font-normal shadow-none"
 						onClick={() => {
 							if (isInputLocked || isConfigured) return;
 							enable();
@@ -160,7 +160,7 @@ export function WebSearchBottomBarChip({
 				{isConfigured && canEdit ? (
 					<button
 						type="button"
-						className="btn btn-ghost btn-xs h-auto min-h-0 shrink-0 px-1 py-0 shadow-none hover:bg-transparent"
+						className="btn btn-xs text-neutral-custom bg-base-200/70 hover:bg-base-300/80 h-auto min-h-0 shrink-0 px-1 py-0 shadow-none"
 						onClick={event => {
 							event.preventDefault();
 							event.stopPropagation();
@@ -176,7 +176,7 @@ export function WebSearchBottomBarChip({
 				{isConfigured ? (
 					<button
 						type="button"
-						className="btn btn-ghost btn-xs h-auto min-h-0 shrink-0 px-1 py-0 shadow-none hover:bg-transparent"
+						className="btn btn-xs text-neutral-custom bg-base-200/70 hover:bg-base-300/80 h-auto min-h-0 shrink-0 px-1 py-0 shadow-none"
 						onClick={event => {
 							event.preventDefault();
 							event.stopPropagation();

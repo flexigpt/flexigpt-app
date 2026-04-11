@@ -5,22 +5,23 @@
 [![lint](https://github.com/flexigpt/flexigpt-app/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/flexigpt/flexigpt-app/actions/workflows/lint.yml)
 [![test](https://github.com/flexigpt/flexigpt-app/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/flexigpt/flexigpt-app/actions/workflows/test.yml)
 
-FlexiGPT is a _cross-platform desktop client_ that lets you chat with multiple Large Language Models (LLMs) from a single, streamlined interface.
+FlexiGPT is a local-first desktop app for working with multiple LLM providers from one workspace.
 
-> ⚠ Early Access Notice:
+Use your own provider keys, switch between models and providers, keep conversations and search local, and build repeatable agentic/human-in-loop workflows with assistant presets, prompt templates, tools, skills, and bundled offline docs.
+
+> Early access
 >
-> The project is under active development; expect breaking changes and incomplete features between releases.
-> This repository is intended as a standalone application, not a reusable library.
-> Public Go package APIs are not stable and may change between releases.
+> FlexiGPT is under active development. Expect breaking changes, evolving built-ins, and incomplete areas between releases.
 
-- [Quick Start](#quick-start)
+- [Why FlexiGPT](#why-flexigpt)
+- [Quick start](#quick-start)
 - [Key Features](#key-features)
-  - [Multi-provider Connectivity with Model Presets](#multi-provider-connectivity-with-model-presets)
-  - [Unified Chat Workspace](#unified-chat-workspace)
-  - [Persistent Conversation History](#persistent-conversation-history)
-  - [Attachments](#attachments)
-  - [Prompt Templates](#prompt-templates)
-  - [Themes (Light / Dark / Custom)](#themes-light--dark--custom)
+  - [Multi-provider connectivity with built-in presets](#multi-provider-connectivity-with-built-in-presets)
+  - [Unified chat workspace](#unified-chat-workspace)
+  - [Human-in-loop and agentic workflows](#human-in-loop-and-agentic-workflows)
+  - [Rich response rendering and inspection](#rich-response-rendering-and-inspection)
+  - [Local-first context and history](#local-first-context-and-history)
+- [Documentation](#documentation)
 - [Install](#install)
   - [MacOS](#macos)
   - [Windows](#windows)
@@ -29,166 +30,80 @@ FlexiGPT is a _cross-platform desktop client_ that lets you chat with multiple L
 - [Contributing](#contributing)
 - [License](#license)
 
-## Quick Start
+## Why FlexiGPT
 
-- Install FlexiGPT [for your OS](#install).
+- One desktop workspace for multiple provider families and compatible APIs
+- Reusable assistant presets, model presets, prompts, tools, and skills. Rich builtins to get you started and fully customizable to suit your specific needs.
+- In chat, agentic flows through tunable tool auto-executes.
+- File, folder, image, PDF, and URL context support
+- Built for iterative, real-world usage: compare models, attach context, reuse setups, inspect responses, and keep your workspace local by default.
 
-- Launch FlexiGPT, then open _Settings_.
+## Quick start
 
-- In _Auth Keys_ -> Paste the API key for your provider. Example links to provider pages for getting API keys:
-  - [OpenAI](https://platform.openai.com/api-keys), [Anthropic](https://platform.claude.com/settings/keys), [Google Gemini](https://aistudio.google.com/api-keys).
-  - Atleast one provider needs to be configured with an API key before chatting.
-  - FlexiGPT doesn’t bill you; all usage is metered by each provider on your own account.
+1. Download the latest release from [GitHub Releases](https://github.com/flexigpt/flexigpt-app/releases).
+2. Install the package for your platform:
+   - macOS: `.pkg`
+   - Windows: `.exe`
+   - Linux: `.flatpak`
+3. Launch FlexiGPT and open **Settings**.
+4. In **Auth Keys**, add at least one provider API key.
+5. Open **Chats**.
+6. Pick an **Assistant Preset** and **Model Preset**, or keep the defaults.
+7. Type a message, optionally add attachments, prompts, tools, or skills, then send.
 
-- Start chatting!
+FlexiGPT does not bill you directly. Usage costs and rate limits come from the provider account behind the API key you add.
 
 ## Key Features
 
-### Multi-provider Connectivity with Model Presets
+### Multi-provider connectivity with built-in presets
 
-- First-class connectors for OpenAI, Anthropic, Google, DeepSeek, xAI, Hugging Face, OpenRouter, Local LLama.cpp.
-- _Plus any local/remote OpenAI chat completions or OpenAI responses or Anthropic messages compatible endpoint_.
-- API keys are stored securely in your OS keyring - never in plain text.
+- First-class support for OpenAI, Anthropic, Google Gemini API, DeepSeek, xAI, Hugging Face, OpenRouter, and local `llama.cpp`
+- Support for compatible custom endpoints across OpenAI Chat Completions, OpenAI Responses, and Anthropic Messages style APIs
+- Built-in providers and curated model presets for leading models so you can get started quickly without manually defining endpoints or defaults first
+- API keys are stored securely through the OS keyring, not in plain-text exported settings
 
-- _Model Presets_ bundle a model selection (e.g. `gpt-5.1`) together with recommended defaults such as temperature, token limits, system prompt and reasoning parameters. Built-in presets for all supported LLM providers, with one-click loading during chat. Tweak values per conversation without altering the saved preset.
+### Unified chat workspace
 
-- <details>
-  <summary>Feature details</summary>
-  - Key Concepts
+- One interface for chats, tabs, attachments, prompts, tools, skills, presets, search, and exports
+- Switch providers or models as you iterate
+- Multi-tab conversations with local history search and resume flows
+- Export the current conversation as JSON
 
-    | Term                 | Description                                                                                                    |
-    | -------------------- | -------------------------------------------------------------------------------------------------------------- |
-    | Model Preset         | Named set of defaults for a single model (temperature, max tokens, reasoning, etc.).                           |
-    | Provider Preset      | Collection of model presets that belong to one provider and defines that provider’s default preset.            |
-    | Default Model Preset | The preset automatically applied when the provider is selected and the user has not chosen a different preset. |
+### Human-in-loop and agentic workflows
 
-  - Presets are organized per provider. A provider may expose many presets and may declare one of them as its default.
-  - A preset can be enabled or disabled at any time; existing chat history is not modified.
-  - Per-conversation overrides are possible: after selecting a preset the user may fine-tune individual parameters (temperature, reasoning, etc.) without changing the stored preset.
-  - Supports models with multiple behaviors: non-reasoning, reasoning with levels (high/medium/low), hybrid reasoning (with reasoning tokens).
+- Assistant presets bundle model choice, instructions, tools, and skills into reusable starting setups
+- Tools can be attached per conversation and configured for manual review or auto-execution
+- When an auto-execute tool is called, FlexiGPT can run it and automatically submit the result back to the model, enabling agentic workflows inside a normal chat flow
+- Keep tools manual when you want tighter control over execution
 
-  - Selecting a Preset in Chat
-    - In the chat input bar, open the dropdown and choose any preset listed.
-    - The preset’s parameters appear next to the dropdown; use the slider or number fields to make conversation-specific adjustments if desired.
-    - The adjusted parameters affect only the current conversation and are discarded when the session ends.
+### Rich response rendering and inspection
 
-  - Managing Presets
-    - Click the _Model Presets_ icon in the sidebar.
-    - Select a provider or create a new one.
-    - The app provides built-in presets. These will be listed.
-    - Create, edit, delete, enable/disable presets as required.
-    - Mark one preset as _Default_ for the provider; it loads automatically when a model from that provider is first chosen.
+- Markdown rendering with syntax-highlighted code blocks
+- Mermaid diagram rendering with zoom and source or image export workflows
+- KaTeX math rendering
+- Citations, token usage, and per-message request/response details for inspection and debugging
+- Message-level controls for copying, inspection, and follow-up iteration
 
-  - Notes
-    - Deleting a preset does not alter existing conversations; those sessions keep a snapshot of the parameters that were active when the message was sent.
-    - Global defaults are applied for any parameter left blank in the preset.
+### Local-first context and history
 
-  </details>
+- Local conversation storage and full-text search
+- File, folder, image, PDF, and URL attachments
+- Bundled offline docs shipped inside the app
+- Use your own provider accounts; FlexiGPT does not proxy or bill model usage
 
-### Unified Chat Workspace
+## Documentation
 
-- Switch models mid-conversation, chain results from one model into the next, and fine-tune generation parameters on the fly.
-  - Previous messages and context is preserved as a full thread in the new models API calls too.
-- Attach files, images, and PDFs, use prompt templates, load and resume previous conversations, export full conversation or a full message or code/mermaid diagram or its image inside a single message seamlessly in the same interface.
+Detailed usage docs live in [`frontend/app/docs/content/`](./frontend/app/docs/content/) and are also bundled into the app.
 
-- Productivity tooling inside the chat
-  - Streaming responses.
-  - Code snippets with copy/export
-  - Mermaid diagrams with copy/export/zoom
-  - Full Math/LaTeX rendering
-  - Readily available chat API requests and response details
+Recommended reading order:
 
-### Persistent Conversation History
-
-- Auto-saved sessions which are resumable at any time, with full-text local-only search and storage in local files.
-
-- <details>
-  <summary>Feature details</summary>
-  - Every chat session is persisted as a _Conversation_ containing its title, timestamps and full message sequence.
-  - Conversations are stored locally; you can reload a conversation and continue from last point at any time.
-  - A full-text search bar provides instant retrieval across titles and message contents. The search is fully local.
-
-  - Key Concepts
-
-    | Term              | Description                                                                      |
-    | ----------------- | -------------------------------------------------------------------------------- |
-    | Conversation      | A saved chat session composed of messages and metadata.                          |
-    | Conversation Item | Lightweight record (ID, title, creation time) shown in lists and search results. |
-    | Message Roles     | `system`, `user`, `assistant`; each recorded with timestamp and details.         |
-
-  - Using Conversation History
-    - Click the _Search Bar_ to open the history dropdown.
-    - Recent conversations are listed chronologically; type in the search bar to filter by keywords appearing in either titles or message text.
-    - Select a row to reload the full conversation and continue chatting.
-
-  - Automatic Saving
-    - A new conversation record is started automatically when you open a fresh chat window.
-    - The title is generated heuristically from the first user message but can be renamed at any time.
-    - Messages are appended in real-time; timestamps are stored for precise ordering.
-
-  </details>
-
-### Attachments
-
-- Attach Local or web-based files (text/code/images/PDFs) to a conversation.
-- Attach a directory (auto crawl and attach of files within)
-
-- <details>
-  <summary>Feature details</summary>
-  - Multiple local files or a single directory can be selected at a time to attach to the message.
-    - Code and text files become in-context text.
-    - Images are sent as binary blobs.
-    - Local extraction and attachment as text is supported for PDFs by default. Users can toggle the mode to send PDFs as blobs if supported by the API.
-
-  - Web pages/URLs can be attached to the conversation.
-    - By default readable content will be extracted and attached as in-context text for any web page.
-    - Image URLs and PDF URLs are sent as binary blobs, with user switch available to convert them as links of extract PDF as text and send.
-
-  - Attachments you add to a conversation are available to all subsequent turns in that conversation.
-  - You can edit and send any message at any point in time. Attachments can be modified in edit mode too.
-  - On each send, the currently attached blob files (images, PDFs in file mode) are re-read for the messages in this turn.
-  - Anything attached as text is stored with the conversation and not reread again.
-  - Max 16MB attachments are supported as of now.
-
-  </details>
-
-### Prompt Templates
-
-- Turn complex prompts into reusable `templates` with variables.
-- If required, group into toggle-able bundles.
-
-- <details>
-  <summary>Feature details</summary>
-  - Prompt Templates allow you to store complex prompts (with variables) and reuse them.
-  - Templates can be organized into Bundles, which act as configurable packs that can be enabled or disabled.
-  - Templates and Bundles can be disabled or removed at any time without affecting existing chat history.
-
-  - Key Concepts
-
-    | Term            | Description                                                                                    |
-    | --------------- | ---------------------------------------------------------------------------------------------- |
-    | Prompt Template | A reusable prompt that can contain variables.                                                  |
-    | Prompt Bundle   | A collection of templates that can be toggled on or off as a unit and shared with other users. |
-
-  - Invoking a Template
-    - Invoke the template menu using mouse click or keyboard shortcut.
-    - An auto-complete list appears, ranked by relevance.
-    - Use `↑/↓` to navigate if necessary, then press **Enter**.
-    - If two bundles provide the same slug, both options are listed.
-    - The most relevant match is selected for processing.
-
-  - Managing Prompt Templates
-    - Click the _Prompts_ icon in the sidebar.
-    - Select a current prompt bundle or create a new one.
-    - The app provides built-in bundles and templates. These will be listed.
-    - Create, edit, delete, enable/disable bundles/templates as required.
-
-  </details>
-
-### Themes (Light / Dark / Custom)
-
-- **System/Light/Dark Themes** supported with auto-detect & manual toggle.
-- An option to use any of the custom [**DaisyUI themes**](https://daisyui.com/docs/themes/?lang=en#list-of-themes).
+| Doc                                                                                        | What it covers                                                                                                                             |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| [Getting started](./frontend/app/docs/content/01-getting-started.md)                       | First-run setup and your first successful chat                                                                                             |
+| [Core concepts](./frontend/app/docs/content/02-core-concepts.md)                           | The main FlexiGPT concepts: providers, assistant presets, model presets, prompts, tools (+ auto-execute), skills, attachments, and context |
+| [App tour and chat workflow](./frontend/app/docs/content/03-app-tour-and-chat-workflow.md) | Where things live in the UI and the normal day-to-day workflow                                                                             |
+| [Getting better results](./frontend/app/docs/content/04-getting-better-results.md)         | Best practices for improving output quality and troubleshooting weak results                                                               |
+| [Privacy, storage, usage`](./frontend/app/docs/content/05-privacy-storage-and-usage.md)    | What stays local, what can be sent to providers, and debug/privacy caveats                                                                 |
 
 ## Install
 
@@ -251,5 +166,4 @@ FlexiGPT is a _cross-platform desktop client_ that lets you chat with multiple L
 
 Copyright (c) 2024 - Present - Pankaj Pipada
 
-All source code in this repository, unless otherwise noted, is licensed under the Mozilla Public License, v. 2.0.
-See [LICENSE](./LICENSE) for details.
+All source code in this repository, unless otherwise noted, is licensed under the Mozilla Public License, v. 2.0. See [`LICENSE`](./LICENSE) for details.

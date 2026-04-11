@@ -20,6 +20,11 @@
   - [x] test on flatpak
   - [ ] test on mac pkg and win
 
+- [ ] docs inside the app
+  - [x] docs in md
+  - [x] bundle with app
+  - [ ] better ux
+
 ## Milestone thoughts
 
 - [ ] M1 - API coverage - Pending items:

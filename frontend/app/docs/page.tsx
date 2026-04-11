@@ -48,17 +48,14 @@ export default function DocsPage() {
 
 	return (
 		<PageFrame>
-			<div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 lg:flex-row lg:px-6">
-				<aside className="lg:sticky lg:top-4 lg:h-fit lg:w-72 lg:self-start">
-					<div className="bg-base-100 rounded-2xl p-4 shadow-lg">
-						<div className="mb-3 flex items-center gap-2 text-lg font-semibold">
+			<div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-2 py-6 lg:flex-row">
+				<aside className="lg:sticky lg:top-4 lg:h-fit lg:w-60 lg:self-start">
+					<div className="bg-base-100 rounded-2xl p-2 shadow-lg">
+						<div className="flex items-center gap-2 text-lg font-semibold">
 							<FiBookOpen size={18} />
 							<span>In-app Docs</span>
 						</div>
-						<p className="mb-4 text-sm opacity-80">
-							Markdown-backed docs bundled into the app at build time for offline-friendly help and easier editing.
-						</p>
-						<div className="flex flex-col gap-2">
+						<div className="mt-4 flex flex-col gap-2">
 							{docsSections.map(section => (
 								<button
 									key={section.id}
@@ -69,7 +66,6 @@ export default function DocsPage() {
 									}}
 								>
 									<div className="text-sm font-semibold">{section.title}</div>
-									<div className="mt-1 text-xs opacity-70">{section.summary}</div>
 								</button>
 							))}
 						</div>

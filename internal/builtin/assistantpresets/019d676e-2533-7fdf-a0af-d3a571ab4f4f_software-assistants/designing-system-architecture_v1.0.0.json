@@ -63,16 +63,6 @@
 		},
 		{
 			"toolRef": {
-				"bundleID": "018fe0f4-b8cd-7e55-82d5-9df0bd70e400",
-				"toolSlug": "statpath",
-				"toolVersion": "v1.0.0"
-			},
-			"toolChoicePatch": {
-				"autoExecute": true
-			}
-		},
-		{
-			"toolRef": {
 				"bundleID": "019c0da2-02d2-7e71-81d7-35f2e5a0bebf",
 				"toolSlug": "readtextrange",
 				"toolVersion": "v1.0.0"
@@ -89,6 +79,16 @@
 			},
 			"toolChoicePatch": {
 				"autoExecute": true
+			}
+		},
+		{
+			"toolRef": {
+				"bundleID": "019c0415-40f7-70cb-9200-d804c9388a57",
+				"toolSlug": "shellcommand",
+				"toolVersion": "v1.0.0"
+			},
+			"toolChoicePatch": {
+				"autoExecute": false
 			}
 		}
 	],
