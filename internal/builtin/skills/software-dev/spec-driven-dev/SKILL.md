@@ -9,19 +9,21 @@ Deliver bounded software changes through strict phases, batched work, and eviden
 
 ## Execution model
 
-- Phases flow in strict order. Start at the earliest incomplete phase. Complete every consecutive unblocked phase in the same response.
+- Phases flow in strict order. Start at the earliest incomplete phase.
 
-  Discover → Write → Implement → Verify
+  Discover → Write → user confirms spec → Implement → Verify
 
 **Context priority.** Attached files are current state. Then pasted code, diffs, logs, stated requirements. Then named workspace paths. Then adjacent workspace files. Then targeted search for a specific unknown. Then questions. Do not skip earlier layers while they have unused evidence.
 
 **Batch everything.** Before any tool call, identify the full read-batch, write-batch, and verify-batch. Execute each batch together. Do not interleave single reads with single questions or edit one file at a time when multiple targets are clear.
 
-**Maximize progress per turn.** If some work is unblocked and some is blocked, do the unblocked work now and ask only the remaining blockers. If the next phase is already unblocked, enter it immediately. If the full change is clear from provided context, run all four phases in one response.
-
-**When blocked.** Exhaust all available context first. Then ask 1-3 true blocker questions in one batch. Include any partial progress before asking. When the user wants speed, proceed provisionally on non-blocking uncertainty.
+**When blocked.** Exhaust all available context first. Then ask 1-3 true blocker questions in one batch. Include any partial progress before asking. When the user wants speed, proceed provisionally on non-blocking uncertainty, but do not bypass spec confirmation.
 
 **Re-read the active artifact** after external edits or after 5+ tool actions since the last read.
+
+**Maximize progress per turn.** If some work is unblocked and some is blocked, do the unblocked work now and ask only the remaining blockers. If the next phase is already unblocked, enter it immediately unless that would cross the spec confirmation gate. Discover and Write may be completed in the same response. So can Implement and Verify.
+
+**Human in loop artifact confirmation** applies only to the written spec artifact. Present the spec artifact and ask the user to confirm or modify it. If the user requests changes, update the spec and ask again. Proceed to Implement and Verify only after the user confirms. If new evidence later changes scope, interfaces, or public behavior, update the spec and ask for confirmation again before continuing.
 
 ## Hard rules
 
@@ -74,18 +76,16 @@ Entry: goal understood, affected area known.
 3. Requirements must be concrete and testable. Use IDs: `R1`, `R2`, `E1`, `E2`.
 4. Use real paths from inspection. Mark unconfirmed paths `(unverified)` under `Assumptions`.
 5. If multiple materially different approaches exist, recommend one and ask before implementing.
-6. If implementation is unblocked, continue immediately.
+6. If implementation is unblocked, do not start it yet. Present the spec artifact and ask the user to confirm or modify it before starting the next phases.
 
-`Status` stays `provisional` until the user confirms. If the user says to proceed, implementation may continue provisionally.
-
-Produce `spec` artifact.
+Produce `spec` artifact. `Status` stays `provisional` until the user confirms. Once the user confirms, start the next phases.
 
 ### Implement
 
-Entry: bounded change, identified targets, no blocker that would change scope, interfaces, or public behavior.
+Entry: bounded change, identified targets, spec confirmed, no blocker that would change scope, interfaces, or public behavior.
 
 1. If no spec exists but the change is clear, create a minimal spec first.
-2. If the spec is `provisional`, ask for confirmation unless the user authorized proceeding or remaining uncertainty is non-blocking.
+2. If the spec is `provisional`, ask for confirmation or modification and stop.
 3. Create `progress` plan mapped to R# before editing.
 4. Read all write-batch targets plus required adjacent context together.
 5. Edit in dependency order: contracts → utilities → implementations → callers → tests/docs.
@@ -125,4 +125,4 @@ Artifacts live in the conversation. Keep them minimal. Update instead of rewriti
 
 ## Response format
 
-End each response with: `completed-phases`, `current-phase`, `delivery-mode` (direct edit|ready-to-apply output|analysis only), `status`, key assumptions or blockers, `next-step` (only if the user must act).
+End each response with: `completed-phases`, `current-phase`, `delivery-mode` (direct edit|ready-to-apply output|analysis only), `status`, key assumptions or blockers, `next-step`.

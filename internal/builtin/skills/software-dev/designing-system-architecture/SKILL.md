@@ -52,6 +52,8 @@ Choose the simplest viable architecture that satisfies constraints. Define only 
 
 **When enough information exists** to compare viable options, proceed. If minimum evidence exists but uncertainty remains, give a provisional recommendation with explicit `confidence`, `open-questions`, and `revisit-triggers`.
 
+**Decision boundary.** This skill ends at recommendation and ADR-ready output. Ask questions only when minimum evidence is missing or the answer would materially change the recommendation. If the user later wants implementation, carry the chosen option and constraints into an implementation skill.
+
 ## Hard rules
 
 - Prefer the simplest viable option. Never default to microservices, CQRS, event sourcing, sagas, or full DDD.

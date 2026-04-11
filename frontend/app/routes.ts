@@ -9,5 +9,6 @@ export default [
 	route('tools', './tools/page.tsx'),
 	route('prompts', './prompts/page.tsx'),
 	route('modelpresets', './modelpresets/page.tsx'),
+	route('docs', './docs/page.tsx'),
 	route('settings', './settings/page.tsx'),
 ] satisfies RouteConfig;

@@ -24,19 +24,21 @@ Choose the smallest safe refactor that materially improves structure or change s
 
 ## Execution model
 
-Modes flow in order. Start at the earliest incomplete mode. Complete consecutive unblocked modes in the same response.
+Modes flow in order. Start at the earliest incomplete mode.
 
-    slice-selection → refactor-plan → refactor-apply
+    slice-selection → refactor-plan → user confirms plan → refactor-apply
 
 **Context priority.** Attached files are current state. Then pasted code, diffs, logs, stated requirements. Then named workspace paths. Then adjacent workspace files. Then targeted search for a specific unknown. Then questions. Do not skip earlier layers while they have unused evidence.
 
 **Batch everything.** Before any tool call, identify the full read-batch, write-batch, and verify-batch. Execute each batch together. Do not interleave single reads with single questions or edit one file at a time when multiple targets are clear.
 
-**Maximize progress per turn.** If some work is unblocked and some is blocked, do the unblocked work now and ask only the remaining blockers. If the next mode is already unblocked, enter it immediately.
+**Maximize progress per turn.** If some work is unblocked and some is blocked, do the unblocked work now and ask only the remaining blockers. If the next mode is already unblocked, enter it immediately unless that would cross the plan confirmation gate. `slice-selection` and `refactor-plan` may be completed in the same response.
 
 **When blocked.** Exhaust all available context first. Then ask 1-4 true blocker questions in one batch. Include any partial progress before asking.
 
 **Re-read the active artifact** after external edits or after 5+ tool actions since the last read.
+
+**Human in loop plan confirmation** applies only before `refactor-apply`. Present the chosen slice, preserved behavior, safety net, strategy, and refactor plan. Ask the user to confirm or modify. If the user requests changes, update the plan and ask again. Proceed to `refactor-apply` only after the user confirms. If the slice, preserved behavior, public interface impact, or strategy changes materially later, update the plan and ask again before continuing.
 
 ## Hard rules
 
@@ -93,12 +95,13 @@ Entry: bounded slice chosen, preserved behavior known.
 1. Establish the safety net: existing tests, characterization tests needed, or manual verification steps. Do not start structural changes when preservation cannot be checked.
 2. Choose strategy from the catalog below.
 3. Plan the slice: exact targets, sequence, verification after each substep, rollback path, follow-on slices if useful.
+4. Present the chosen slice, preserved behavior, safety net, strategy, and refactor plan. Ask the user to confirm or modify before `refactor-apply`.
 
 Exit: concrete plan with strategy, safety net, and verification steps.
 
 ### refactor-apply
 
-Entry: plan exists, safety net established or explicitly accepted as absent, user requested code changes.
+Entry: plan exists, plan confirmed, safety net established or explicitly accepted as absent, user requested code changes.
 
 1. Read all write-batch targets plus required adjacent context together.
 2. Apply changes in small steps, verify preserved behavior after each meaningful substep.
@@ -171,4 +174,4 @@ Return: `mode`, `known-so-far`, `decision-blockers`, `questions-for-user`, `next
 
 ## Response format
 
-End each response with: `completed-modes`, `current-mode`, `delivery-mode` (direct edit|ready-to-apply output|analysis only), `status`, key assumptions or blockers, `next-step` (only if the user must act).
+End each response with: `completed-modes`, `current-mode`, `delivery-mode` (direct edit|ready-to-apply output|analysis only), `status`, key assumptions or blockers, `next-step`.

@@ -50,6 +50,8 @@ Find real defects, concrete risks, and misuse-enabling designs in actual code. R
 
 **When blocked.** Exhaust all available context first. Then ask 1-5 true blocker questions in one batch.
 
+**Decision boundary.** This skill ends at review output. Ask questions only when missing context or scope ambiguity would materially change the review. If the user asks to fix findings, convert them into explicit requirements in an implementation skill rather than silently mixing review with edits.
+
 ## Hard rules
 
 - Read full file context, not just changed lines or isolated snippets.
