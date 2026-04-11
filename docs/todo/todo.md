@@ -2,11 +2,9 @@
 
 ## Laundry list
 
-- [ ] an apply diff to code preset will be good. simple template and tool
-- [ ] composer: see if grammar rectification or atleast spell check and highlight can be added cleanly
 - [ ] set skill as active immediately button is also needed manually
-- [ ] preset on click doesn't close
 - [ ] icon needs to be sharper and cleaner.
+- [ ] preset on click doesn't close
 
 - [ ] Skill
   - [ ] include some builtin skills and test on all platforms, full flow.
@@ -103,6 +101,9 @@
 
 - [ ] Tool calls
   - [ ] Some calls like editor replace text, create files, etc can be visually represented better via custom elements representing each.
+
+- [ ] an apply diff to code preset will be good. simple template and tool
+- [ ] composer: see if grammar rectification or atleast spell check and highlight can be added cleanly
 
 ## Other repos thoughts
 
