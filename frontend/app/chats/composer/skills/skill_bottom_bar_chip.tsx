@@ -86,8 +86,28 @@ export function SkillsBottomBarChip({
 	const enabledKeySet = useMemo(() => new Set(enabledSkillRefs.map(skillRefKey)), [enabledSkillRefs]);
 	const activeKeySet = useMemo(() => new Set(activeSkillRefs.map(skillRefKey)), [activeSkillRefs]);
 
-	const enabledCount = enabledSkillRefs.length;
-	const activeCount = activeSkillRefs.length;
+	const availableSkillKeySet = useMemo(
+		() => new Set((allSkills ?? []).map(item => skillRefKey(skillRefFromListItem(item)))),
+		[allSkills]
+	);
+
+	const enabledCount = useMemo(() => {
+		if (loading) return enabledKeySet.size;
+		let count = 0;
+		for (const key of enabledKeySet) {
+			if (availableSkillKeySet.has(key)) count += 1;
+		}
+		return count;
+	}, [availableSkillKeySet, enabledKeySet, loading]);
+
+	const activeCount = useMemo(() => {
+		if (loading) return activeKeySet.size;
+		let count = 0;
+		for (const key of activeKeySet) {
+			if (availableSkillKeySet.has(key)) count += 1;
+		}
+		return count;
+	}, [activeKeySet, availableSkillKeySet, loading]);
 	const totalCount = allSkills.length;
 	const isEnabled = enabledCount > 0;
 

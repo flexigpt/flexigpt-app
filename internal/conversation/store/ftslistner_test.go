@@ -117,6 +117,7 @@ func TestFTSDeletePurgesIndex(t *testing.T) {
 	_, _ = cc.DeleteConversation(t.Context(),
 		&spec.DeleteConversationRequest{ID: c.ID, Title: c.Title})
 
+	time.Sleep(10 * time.Millisecond)
 	// Expect zero hits.
 	res, _ := cc.SearchConversations(t.Context(),
 		&spec.SearchConversationsRequest{Query: "cherry"})

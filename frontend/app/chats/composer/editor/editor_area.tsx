@@ -549,14 +549,14 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		if (prevConv) setConversationToolsState(prevConv);
 		if (prevWs) setWebSearchTemplates(prevWs);
 		if (prevSkills || prevActive) {
-			applySkillSelectionState(prevSkills ?? enabledSkillRefs, prevActive ?? activeSkillRefs);
+			applySkillSelectionState(prevSkills ?? getCurrentEnabledSkillRefs(), prevActive ?? getCurrentActiveSkillRefs());
 		}
 		clearPreEditSnapshot();
 	}, [
-		activeSkillRefs,
 		applySkillSelectionState,
 		clearPreEditSnapshot,
-		enabledSkillRefs,
+		getCurrentActiveSkillRefs,
+		getCurrentEnabledSkillRefs,
 		setConversationToolsState,
 		setWebSearchTemplates,
 	]);
@@ -1006,10 +1006,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					preEditWebSearchTemplatesRef.current = webSearchTemplates;
 				}
 				if (!preEditEnabledSkillRefsRef.current) {
-					preEditEnabledSkillRefsRef.current = enabledSkillRefs;
+					preEditEnabledSkillRefsRef.current = getCurrentEnabledSkillRefs();
 				}
 				if (!preEditActiveSkillRefsRef.current) {
-					preEditActiveSkillRefsRef.current = activeSkillRefs;
+					preEditActiveSkillRefsRef.current = getCurrentActiveSkillRefs();
 				}
 				clearComposerTransientState();
 
@@ -1041,13 +1041,13 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			}
 		},
 		[
-			activeSkillRefs,
 			applyConversationToolsFromChoices,
 			applySkillSelectionState,
 			applyWebSearchFromChoices,
 			clearComposerTransientState,
 			conversationToolsState,
-			enabledSkillRefs,
+			getCurrentActiveSkillRefs,
+			getCurrentEnabledSkillRefs,
 			loadAttachmentsFromMessage,
 			replaceEditorDocument,
 			setToolOutputs,

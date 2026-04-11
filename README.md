@@ -7,7 +7,7 @@
 
 FlexiGPT is a local-first desktop app for working with multiple LLM providers from one workspace.
 
-Use your own provider keys, switch between models and providers, keep conversations and search local, and build repeatable agentic/human-in-loop workflows with assistant presets, prompt templates, tools, skills, and bundled offline docs.
+Use your own provider keys, switch between models and providers, keep conversations and search local, and build repeatable agentic/human-in-loop workflows with assistant presets, prompt templates, tools and skills.
 
 > Early access
 >

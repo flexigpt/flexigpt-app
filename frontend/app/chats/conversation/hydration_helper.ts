@@ -30,6 +30,7 @@ import { getUUIDv7 } from '@/lib/uuid_utils';
 
 import { uiAttachmentToConversation } from '@/chats/composer/attachments/attachment_editor_utils';
 import type { EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
+import { clampActiveSkillRefsToEnabled, normalizeSkillRefs } from '@/skills/lib/skill_identity_utils';
 import { mapToolOutputsToToolOutputItems } from '@/tools/lib/tool_output_utils';
 
 export function initConversation(title = 'New Conversation'): Conversation {
@@ -144,13 +145,15 @@ export function applyAssistantPersistenceContext(
 export function deriveRestorableConversationContextFromMessages(
 	messages: ConversationMessage[]
 ): RestorableConversationContext {
+	const enabledSkillRefs = normalizeSkillRefs(deriveEnabledSkillRefsFromMessages(messages));
+	const activeSkillRefs = clampActiveSkillRefsToEnabled(enabledSkillRefs, deriveActiveSkillRefsFromMessages(messages));
 	return {
 		modelPresetRef: findLastModelPresetRef(messages),
 		modelParam: findLastModelParam(messages),
 		toolChoices: deriveConversationToolsFromMessages(messages),
 		webSearchChoices: deriveWebSearchChoiceFromMessages(messages),
-		enabledSkillRefs: deriveEnabledSkillRefsFromMessages(messages),
-		activeSkillRefs: deriveActiveSkillRefsFromMessages(messages),
+		enabledSkillRefs,
+		activeSkillRefs,
 	};
 }
 
@@ -217,12 +220,8 @@ export function buildUserConversationMessageFromEditor(
 	const toolStoreChoices = payload.finalToolChoices.length > 0 ? payload.finalToolChoices : undefined;
 	const toolOutputs = payload.toolOutputs.length > 0 ? payload.toolOutputs : undefined;
 
-	const enabledSkillRefs = payload.enabledSkillRefs ?? [];
-	let activeSkillRefs = payload.activeSkillRefs ?? [];
-
-	if (enabledSkillRefs.length === 0) {
-		activeSkillRefs = [];
-	}
+	const enabledSkillRefs = normalizeSkillRefs(payload.enabledSkillRefs);
+	const activeSkillRefs = clampActiveSkillRefsToEnabled(enabledSkillRefs, payload.activeSkillRefs);
 
 	return {
 		id,

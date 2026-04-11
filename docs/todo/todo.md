@@ -5,7 +5,7 @@
 - [ ] an apply diff to code preset will be good. simple template and tool
 - [ ] composer: see if grammar rectification or atleast spell check and highlight can be added cleanly
 - [ ] set skill as active immediately button is also needed manually
-- [ ] preset on click doesnt close
+- [ ] preset on click doesn't close
 - [ ] icon needs to be sharper and cleaner.
 
 - [ ] Skill
