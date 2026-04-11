@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
+import type { FocusEventHandler, MouseEventHandler, ReactNode } from 'react';
 
-import { Tooltip, TooltipAnchor, useTooltipStore } from '@ariakit/react';
+import { Tooltip, useTooltipStore } from '@ariakit/react';
 
 type HoverTipPlacement =
 	| 'top'
@@ -40,20 +40,47 @@ export function HoverTip({
 	tooltipClassName = '',
 }: HoverTipProps) {
 	const tooltip = useTooltipStore({ placement });
+	const Wrapper = wrapperElement ?? 'span';
 	const hasContent = !(content == null || (typeof content === 'string' && content.trim() === ''));
+
+	const hideTip = () => {
+		tooltip.hide();
+		tooltip.setAnchorElement(null);
+	};
+
+	const showForCurrentTarget: MouseEventHandler<HTMLElement> = event => {
+		tooltip.setAnchorElement(event.currentTarget);
+		tooltip.show();
+	};
+
+	const showForFocusedTarget: FocusEventHandler<HTMLElement> = event => {
+		tooltip.setAnchorElement(event.target as HTMLElement);
+		tooltip.show();
+	};
+
+	const hideOnBlurCapture: FocusEventHandler<HTMLElement> = event => {
+		const nextTarget = event.relatedTarget as Node | null;
+		if (nextTarget && event.currentTarget.contains(nextTarget)) {
+			return;
+		}
+		hideTip();
+	};
 
 	if (!hasContent || disabled) {
 		return <>{children}</>;
 	}
 
-	const anchor =
-		wrapperElement === 'div' ? <div className={wrapperClassName} /> : <span className={wrapperClassName} />;
-
 	return (
 		<>
-			<TooltipAnchor store={tooltip} render={anchor}>
+			<Wrapper
+				className={wrapperClassName}
+				onMouseEnter={showForCurrentTarget}
+				onMouseLeave={hideTip}
+				onFocusCapture={showForFocusedTarget}
+				onBlurCapture={hideOnBlurCapture}
+			>
 				{children}
-			</TooltipAnchor>
+			</Wrapper>
 			<Tooltip
 				store={tooltip}
 				gutter={gutter}

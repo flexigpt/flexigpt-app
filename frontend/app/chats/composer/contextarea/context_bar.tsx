@@ -196,7 +196,7 @@ export function EditorContextBar({ context, assistantPreset, systemPrompt }: Edi
 				>
 					<button
 						type="button"
-						className={`${actionTriggerChipButtonClasses} justify-center`}
+						className={`${actionTriggerChipButtonClasses} justify-center p-0`}
 						onClick={() => {
 							setIsAdvancedModalOpen(true);
 						}}

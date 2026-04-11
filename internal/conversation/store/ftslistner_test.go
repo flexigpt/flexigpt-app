@@ -117,13 +117,34 @@ func TestFTSDeletePurgesIndex(t *testing.T) {
 	_, _ = cc.DeleteConversation(t.Context(),
 		&spec.DeleteConversationRequest{ID: c.ID, Title: c.Title})
 
-	time.Sleep(10 * time.Millisecond)
-	// Expect zero hits.
-	res, _ := cc.SearchConversations(t.Context(),
-		&spec.SearchConversationsRequest{Query: "cherry"})
-	if len(res.Body.ConversationListItems) != 0 {
-		t.Fatalf("expected 0 hits after delete, got %d", len(res.Body.ConversationListItems))
+	const retries = 3
+
+	var got int
+	var lastErr error
+
+	for i := range retries {
+		res, err := cc.SearchConversations(
+			t.Context(),
+			&spec.SearchConversationsRequest{Query: "cherry"},
+		)
+		if err == nil {
+			got = len(res.Body.ConversationListItems)
+			if got == 0 {
+				return
+			}
+		} else {
+			lastErr = err
+		}
+
+		if i < retries-1 {
+			time.Sleep(10 * time.Millisecond)
+		}
 	}
+
+	if lastErr != nil {
+		t.Fatalf("search failed after %d retries: %v", retries, lastErr)
+	}
+	t.Fatalf("expected 0 hits after delete, got %d", got)
 }
 
 func TestFTSAddMessageUpdatesIndex(t *testing.T) {

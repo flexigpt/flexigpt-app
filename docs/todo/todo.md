@@ -4,24 +4,9 @@
 
 - [ ] set skill as active immediately button is also needed manually
 - [ ] icon needs to be sharper and cleaner.
-- [ ] preset on click doesn't close
-
-- [ ] Skill
-  - [ ] include some builtin skills and test on all platforms, full flow.
-    - [x] include spec driven dev
-    - [ ] test with some skill that has scripts too
-  - [x] with the number of skills present, maybe we dont want to enable all on click for the enable skills button, may be have a button at bottom on open that says enable all separately. also show collapsed bundles at start and then expanding if needed.
-  - [x] enable autoexec for load/unload/readresource
-
-- [ ] tools issues
-  - [x] flatpak shell path issue. need hostspawn support in llm tools.
-  - [x] test on flatpak
-  - [ ] test on mac pkg and win
-
-- [ ] docs inside the app
-  - [x] docs in md
-  - [x] bundle with app
-  - [ ] better ux
+- [ ] test with some skill that has scripts too
+- [ ] test shell and hostspawn exec on mac pkg and win
+- [ ] better docs and better ux inside app.
 
 ## Milestone thoughts
 

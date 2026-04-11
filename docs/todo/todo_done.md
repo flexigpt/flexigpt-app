@@ -906,3 +906,19 @@
 - [x] tab lazy load
 - [x] sys prompt locked on input locked
 - [x] for anthropic tool results should be before tool use and then other messages it seems.
+
+- [x] preset on click doesn't close
+- [x] skill count drift
+- [x] Skill
+  - [x] include some builtin skills and test on all platforms, full flow.
+    - [x] include spec driven dev
+  - [x] with the number of skills present, maybe we dont want to enable all on click for the enable skills button, may be have a button at bottom on open that says enable all separately. also show collapsed bundles at start and then expanding if needed.
+  - [x] enable autoexec for load/unload/readresource
+
+- [x] tools issues
+  - [x] flatpak shell path issue. need hostspawn support in llm tools.
+  - [x] test on flatpak
+
+- [x] docs inside the app
+  - [x] docs in md
+  - [x] bundle with app

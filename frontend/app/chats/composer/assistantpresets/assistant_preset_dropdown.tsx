@@ -129,7 +129,6 @@ export function AssistantPresetDropdown({
 											<div className="flex w-full items-start gap-2">
 												<MenuItem
 													store={menu}
-													hideOnClick={false}
 													disabled={isDisabled}
 													className={`data-active-item:bg-base-200 flex min-w-0 flex-1 items-start gap-2 rounded-lg p-1 text-left outline-none ${
 														isDisabled
@@ -141,7 +140,10 @@ export function AssistantPresetDropdown({
 													onClick={() => {
 														if (isDisabled) return;
 														void (async () => {
-															await onSelectPreset(option.key);
+															const ok = await onSelectPreset(option.key);
+															if (ok) {
+																menu.hide();
+															}
 														})();
 													}}
 												>
@@ -223,7 +225,12 @@ export function AssistantPresetDropdown({
 																className="btn btn-ghost btn-xs rounded-lg"
 																disabled={isApplying}
 																onClick={() => {
-																	void onReapplySelectedPreset();
+																	void (async () => {
+																		const ok = await onReapplySelectedPreset();
+																		if (ok) {
+																			menu.hide();
+																		}
+																	})();
 																}}
 															>
 																<FiRefreshCcw size={14} className="mr-1" />
@@ -243,6 +250,12 @@ export function AssistantPresetDropdown({
 																disabled={isApplying || isBasePreset || !canResetToBasePreset}
 																onClick={() => {
 																	void onResetToBasePreset();
+																	void (async () => {
+																		const ok = await onResetToBasePreset();
+																		if (ok) {
+																			menu.hide();
+																		}
+																	})();
 																}}
 															>
 																<FiTrash2 size={14} className="mr-1" />

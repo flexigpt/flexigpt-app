@@ -45,7 +45,7 @@ export function ActionTriggerChipContent({
 	return (
 		<span className={`flex min-w-0 items-center gap-1 ${className}`}>
 			{icon ? <span className="shrink-0">{icon}</span> : null}
-			<span className={labelClassName}>{label}</span>
+			{label ? <span className={labelClassName}>{label}</span> : null}
 			{secondaryLabel ? <span className={secondaryLabelClassName}>{secondaryLabel}</span> : null}
 			{count ? <span className="shrink-0">{count}</span> : null}
 			{suffix ? <span className="shrink-0">{suffix}</span> : null}
