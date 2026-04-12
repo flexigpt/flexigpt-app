@@ -99,19 +99,19 @@ export default function HomePage() {
 	return (
 		<PageFrame>
 			<div className="mx-auto flex h-full w-full max-w-6xl flex-col items-center px-4 py-8">
-				<div className="mt-2 flex max-w-xl flex-col items-center text-center">
+				<div className="flex max-w-xl flex-col items-center text-center">
 					<div className="flex items-center gap-4">
 						<img src="/icon.png" alt="FlexiGPT Icon" width={48} height={48} />
 						<h1 className="text-xl font-bold md:text-2xl">FlexiGPT</h1>
 					</div>
 
-					<p className="text-base-content/70 mt-2 max-w-2xl text-sm leading-relaxed">
+					<p className="text-base-content/70 max-w-2xl text-sm leading-relaxed">
 						Local-first desktop workspace for multi-provider LLM chats, with assistants, model presets, templates,
 						attachments, tools and skills.
 					</p>
 				</div>
 
-				<div className="mt-10 flex w-full flex-1 flex-col items-center gap-10">
+				<div className="mt-16 flex w-full flex-1 flex-col items-center justify-between xl:mt-24">
 					<PrimaryActionCard
 						title="Open Chats"
 						description="Start a new conversation or continue a saved local thread."
@@ -119,7 +119,7 @@ export default function HomePage() {
 						icon={<FiMessageSquare size={24} />}
 					/>
 
-					<section className="mt-8 w-full pb-12 xl:mt-24 xl:pb-24">
+					<section className="w-full xl:pb-16">
 						<div className="mx-auto max-w-3xl text-center">
 							<Link
 								to="/docs/"
