@@ -65,8 +65,7 @@ const docsCards: NavCardProps[] = [
 	},
 	{
 		title: 'Chats and Composer',
-		description:
-			'Learn how the Chats workspace is structured and how a normal conversation moves from setup to response.',
+		description: 'Learn how the Chats workspace is structured and how a conversation moves from setup to response.',
 		to: '/docs/#chats-composer-and-everyday-workflow',
 		icon: <FiMessageSquare size={18} />,
 	},
