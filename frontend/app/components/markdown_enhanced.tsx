@@ -34,6 +34,7 @@ interface EnhancedMarkdownProps {
 	text: string;
 	align?: string;
 	isBusy?: boolean;
+	hideMermaidCode?: boolean;
 }
 
 interface CodeComponentProps {
@@ -57,6 +58,7 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 	text,
 	align = 'left',
 	isBusy = false,
+	hideMermaidCode = false,
 }: EnhancedMarkdownProps) {
 	const processedText = useMemo(() => {
 		// During a stream skip LaTeX sanitisation for speed.
@@ -198,11 +200,11 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 				} else if (language === (CustomMDLanguage.Thinking as string)) {
 					return <ThinkingFence detailsSummary={<span>Thinking</span>} text={value} />;
 				} else {
-					return <CodeBlock language={language} value={value} isBusy={isBusy} />;
+					return <CodeBlock language={language} value={value} isBusy={isBusy} hideMermaidCode={hideMermaidCode} />;
 				}
 			},
 		}),
-		[align, isBusy]
+		[align, hideMermaidCode, isBusy]
 	);
 
 	return (

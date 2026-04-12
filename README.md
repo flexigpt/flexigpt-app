@@ -5,38 +5,13 @@
 [![lint](https://github.com/flexigpt/flexigpt-app/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/flexigpt/flexigpt-app/actions/workflows/lint.yml)
 [![test](https://github.com/flexigpt/flexigpt-app/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/flexigpt/flexigpt-app/actions/workflows/test.yml)
 
-FlexiGPT is a local-first desktop app for working with multiple LLM providers from one workspace.
+FlexiGPT is a local-first desktop workspace for multi-provider LLM chats.
 
-Use your own provider keys, switch between models and providers, keep conversations and search local, and build repeatable agentic/human-in-loop workflows with assistant presets, prompt templates, tools and skills.
+It combines reusable assistant presets, model presets, prompt templates, attachments, tools, and skills in one app, while keeping conversations and configuration local.
 
 > Early access
 >
-> FlexiGPT is under active development. Expect breaking changes, evolving built-ins, and incomplete areas between releases.
-
-- [Why FlexiGPT](#why-flexigpt)
-- [Quick start](#quick-start)
-- [Key Features](#key-features)
-  - [Multi-provider connectivity with built-in presets](#multi-provider-connectivity-with-built-in-presets)
-  - [Unified chat workspace](#unified-chat-workspace)
-  - [Human-in-loop and agentic workflows](#human-in-loop-and-agentic-workflows)
-  - [Rich response rendering and inspection](#rich-response-rendering-and-inspection)
-  - [Local-first context and history](#local-first-context-and-history)
-- [Documentation](#documentation)
-- [Install](#install)
-  - [MacOS](#macos)
-  - [Windows](#windows)
-  - [Linux](#linux)
-- [Built With](#built-with)
-- [Contributing](#contributing)
-- [License](#license)
-
-## Why FlexiGPT
-
-- One desktop workspace for multiple provider families and compatible APIs
-- Reusable assistant presets, model presets, prompts, tools, and skills. Rich builtins to get you started and fully customizable to suit your specific needs.
-- In chat, agentic flows through tunable tool auto-executes.
-- File, folder, image, PDF, and URL context support
-- Built for iterative, real-world usage: compare models, attach context, reuse setups, inspect responses, and keep your workspace local by default.
+> FlexiGPT is under active development. Expect some rough edges, evolving built-ins, and ongoing UX and docs refinement between releases.
 
 ## Quick start
 
@@ -45,13 +20,13 @@ Use your own provider keys, switch between models and providers, keep conversati
    - macOS: `.pkg`
    - Windows: `.exe`
    - Linux: `.flatpak`
-3. Launch FlexiGPT and open **Settings**.
-4. In **Auth Keys**, add at least one provider API key.
+3. Launch FlexiGPT.
+4. Open **Settings** and add a provider API key.
 5. Open **Chats**.
-6. Pick an **Assistant Preset** and **Model Preset**, or keep the defaults.
-7. Type a message, optionally add attachments, prompts, tools, or skills, then send.
+6. Pick an assistant preset and model preset, or keep the defaults.
+7. Send your first message.
 
-FlexiGPT does not bill you directly. Usage costs and rate limits come from the provider account behind the API key you add.
+FlexiGPT does not bill you directly. Usage costs and limits come from the provider account behind the key you configure.
 
 ## Key Features
 
@@ -93,17 +68,22 @@ FlexiGPT does not bill you directly. Usage costs and rate limits come from the p
 
 ## Documentation
 
-Detailed usage docs live in [`frontend/app/docs/content/`](./frontend/app/docs/content/) and are also bundled into the app.
+The main docs are bundled inside the app and mirrored in this repository under `frontend/app/docs/content/`.
 
-Recommended reading order:
+### User guide
 
-| Doc                                                                                        | What it covers                                                                                                                             |
-| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| [Getting started](./frontend/app/docs/content/01-getting-started.md)                       | First-run setup and your first successful chat                                                                                             |
-| [Core concepts](./frontend/app/docs/content/02-core-concepts.md)                           | The main FlexiGPT concepts: providers, assistant presets, model presets, prompts, tools (+ auto-execute), skills, attachments, and context |
-| [App tour and chat workflow](./frontend/app/docs/content/03-app-tour-and-chat-workflow.md) | Where things live in the UI and the normal day-to-day workflow                                                                             |
-| [Getting better results](./frontend/app/docs/content/04-getting-better-results.md)         | Best practices for improving output quality and troubleshooting weak results                                                               |
-| [Privacy, storage, usage`](./frontend/app/docs/content/05-privacy-storage-and-usage.md)    | What stays local, what can be sent to providers, and debug/privacy caveats                                                                 |
+- [Getting Started](./frontend/app/docs/content/01-getting-started.md)
+- [Core Concepts](./frontend/app/docs/content/02-core-concepts.md)
+- [Chats, Composer, and Everyday Workflow](./frontend/app/docs/content/03-chats-composer-and-everyday-workflow.md)
+- [Attachments, Tools, Skills, and Prompts](./frontend/app/docs/content/04-attachments-tools-skills-prompts.md)
+- [Presets, Providers, and Settings](./frontend/app/docs/content/05-presets-providers-settings.md)
+- [Privacy, Storage, and Troubleshooting](./frontend/app/docs/content/06-privacy-storage-and-troubleshooting.md)
+
+### Architecture
+
+- [Architecture Overview](./frontend/app/docs/content/11-architecture-overview.md)
+- [Frontend Roles and Responsibilities](./frontend/app/docs/content/12-frontend-roles-and-responsibilities.md)
+- [Backend Roles and Data Flow](./frontend/app/docs/content/13-backend-roles-and-data-flow.md)
 
 ## Install
 
@@ -160,7 +140,7 @@ Recommended reading order:
 
 ## Contributing
 
-- The dev setup docs are located at [devsetup.md](./docs/contributing/devsetup.md)
+Developer setup is documented in: [devsetup.md](./docs/contributing/devsetup.md)
 
 ## License
 

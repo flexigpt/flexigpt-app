@@ -1,70 +1,115 @@
-# Core concepts
+# Core Concepts
 
-FlexiGPT is much easier to use once a few core terms are clear.
+The app becomes much easier to use once a few core terms and concepts are clear.
 
 ## The main terms
 
-| Term                    | Meaning                                                                                                                                                   |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Provider**            | The API family or endpoint you are talking to, such as OpenAI, Anthropic, Gemini, OpenRouter, `llama.cpp`, or a compatible custom endpoint.               |
-| **Assistant Preset**    | A higher-level starting setup that can select a model preset and also preload instructions, tools, and skills.                                            |
-| **Model Preset**        | A saved model choice plus defaults such as streaming, token limits, temperature or reasoning, timeout, output settings, and provider-specific parameters. |
-| **Prompt Template**     | Reusable prompt content, sometimes with variables that must be filled before send.                                                                        |
-| **System Prompts**      | The combined instructions that shape model behavior for the request.                                                                                      |
-| **Previous user turns** | The number of earlier user messages (and attached context) that should be resent with the next request.                                                   |
-| **Tool**                | A callable capability that can be attached to a LLM request, either with autoexecute and submit, or manual review, execute and submit.                    |
-| **Skill**               | A reusable workflow or behavior package for a conversation.                                                                                               |
-| **Attachment**          | A file, image, PDF, folder-derived file set, or URL attached to a message.                                                                                |
+| Term                    | Role in FlexiGPT                                                                                                                                                                                                                                                                |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Provider**            | The API family or endpoint the app talks to, such as OpenAI, Anthropic, Google Gemini, OpenRouter, `llama.cpp`, or a compatible custom endpoint.                                                                                                                                |
+| **Model Preset**        | A saved provider-plus-model choice with request defaults such as streaming, timeout, token limits, temperature, reasoning, output settings, and advanced parameters.                                                                                                            |
+| **Assistant Preset**    | A higher-level starting setup that can preload a model preset, instruction templates, tools, and skills.                                                                                                                                                                        |
+| **System Prompts**      | The instructions that shape how the model should behave for the request.                                                                                                                                                                                                        |
+| **Prompt Template**     | Reusable prompt content that can be inserted into the current message flow.                                                                                                                                                                                                     |
+| **Previous user turns** | The number of earlier user turns that should be resent with the next request.                                                                                                                                                                                                   |
+| **Attachment**          | Extra context attached to a message, such as a file, folder-derived files, image, PDF, or URL.                                                                                                                                                                                  |
+| **Tool**                | A callable capability that can be offered to the model. Some run through local tool runtime, while some provider-side capabilities, such as web search, depend on the current provider family. They can be set to autoexecute and submit, or manual review, execute and submit. |
+| **Skill**               | A reusable workflow frame managed through the skills runtime and attached to a conversation.                                                                                                                                                                                    |
 
-## Assistant presets and Model presets and are different on purpose
+## Think in layers
 
-These two layers solve different problems.
+A useful mental model is to separate FlexiGPT into four stable layers.
+
+1. **Provider and transport**
+   - Which provider family or compatible endpoint is being used.
+2. **Model and inference settings**
+   - Which model preset is active and what request defaults it applies.
+3. **Behavior setup**
+   - Which assistant preset, system prompt sources, prompt templates, tools, and skills shape the request.
+4. **Turn context**
+   - The current message, selected earlier turns, attachments, and any tool outputs that are being resent.
+
+If the result changes, it is usually because one of these layers changed.
+
+## Assistant Presets and Model Presets solve different problems
 
 ### Assistant Presets answer
 
-"What complete starting workspace do I want for this kind of task?"
+"What workspace should I start from for this kind of job?"
 
-An assistant preset can capture:
+An assistant preset is best for repeated workflows. It can decide:
 
-- a starting model preset
-- instruction-style prompts
-- tool selections
-- skill selections
-
-That makes assistant presets useful when you repeat the same kind of work and want the same starting setup each time.
+- which model preset to start from
+- whether the model's system prompt should be included
+- which instruction templates should be selected
+- which tools should already be available
+- which skills should already be enabled
 
 ### Model Presets answer
 
-"What model and inference defaults should I use?"
+"What model and request defaults should actually run this turn?"
 
-A model preset is about execution details such as:
+A model preset is closer to execution details. It controls things like:
 
-- provider and model identity
-- streaming behavior
-- token limits
-- temperature or reasoning defaults
+- provider identity
+- model name
+- streaming
 - timeout
-- output format or verbosity controls
-- provider-specific advanced parameters
+- token limits
+- temperature or reasoning behavior
+- output settings
+- raw provider-specific parameters
 
-## What happens when you click Send
+## Persistent chat setup versus per-message inputs
 
-When you send a message, FlexiGPT builds a request from the current chat state.
+### Usually persistent for the current conversation
 
-That request can include:
+These controls are part of the chat setup until you change them again:
+
+- assistant preset selection
+- model selection and model defaults
+- history window through **Previous user turns**
+- system prompt source selection
+- conversation-level tool choices
+- conversation skill state
+- compatible web-search selection
+
+### Usually specific to the current message
+
+These belong to the turn you are currently preparing:
+
+- the text you type now
+- attachments you add now
+- prompt template output inserted for this send
+- tool outputs you choose to attach back into the conversation
+
+## What happens on send
+
+At send time, the frontend collects the active chat state and the current message, then the backend normalizes that into a provider request.
+
+The request can include:
 
 - the current user message
-- selected model preset values
-- resolved system prompt content
+- selected model parameters
+- combined system prompt content
 - selected prompt template output
-- earlier user context allowed by **Previous user turns**
-- attachments that belong to included messages
-- tool choices and tool outputs
-- skill session state, when relevant
+- earlier user turns allowed by the history control
+- attachments belonging to included messages
+- selected tool choices and tool outputs
+- skill session context and skill-provided prompt/tool behavior when enabled
 
-The exact payload depends on the selected provider family because different providers expose different capabilities.
+The exact final payload depends on the selected provider family and model capabilities.
 
-## Human-in-loop and agentic tool use
+## Tools, tool outputs and human-in-loop/agentic flows
+
+There are several stages when it comes to tool use:
+
+1. a tool is made available to the conversation as a "choice"
+2. the model may decide to "call" it
+3. the tool runtime may execute it locally or through HTTP, depending on the tool definition
+4. the resulting "output" can become part of the next request context
+
+This distinction matters because tool choice, tool call review, tool execution, and tool output reuse are related but not identical steps.
 
 FlexiGPT supports both manual and more agentic tool workflows.
 
@@ -79,26 +124,37 @@ When an auto-execute tool is called, FlexiGPT can:
 
 This lets you build more automated tool-driven flows inside the normal chat workspace, while still keeping manual control available when execution should be reviewed first.
 
-## How memory and context work
+## Skills are workflow frames, not just saved text
 
-FlexiGPT does not blindly resend the entire conversation every time.
+Skills are managed separately from prompts and tools.
 
-The **Previous user turns** control is one of the most important context settings in the app:
+The skill runtime can:
 
-- use a small value when the thread has drifted
-- use a larger value when the current task depends on earlier decisions
-- use `0` when you want an isolated turn in the same conversation
-- use `All` only when the whole thread is still relevant
+- create skill sessions
+- expose a skills prompt to the model
+- list runtime skills
+- allow skill tools such as load, unload, and read-resource behavior
 
-A key rule is that attachments belong to the message they were sent with. They are not stored in a hidden global bucket. If an older user turn is not included next time, its attachments are not automatically resent either.
+From a user perspective, that means skills are better thought of as reusable working modes for a conversation than as simple snippets.
 
-## A useful mental model
+## Attachments belong to messages
 
-You can think of FlexiGPT as four layers:
+Attachments are attached to messages, not to a hidden global chat bucket.
 
-1. **Transport layer**: provider and endpoint compatibility
-2. **Inference layer**: model preset and advanced request settings
-3. **Behavior layer**: assistant preset, system instructions, prompt templates, and skills
-4. **Context layer**: current message, previous user turns, attachments, and tool outputs
+This matters when you change **Previous user turns**:
 
-When results change, it is usually because one of those layers changed.
+- if an earlier user turn is included again, its attachments can be included again
+- if that earlier user turn is left out, its attachments are left out too
+
+That makes the history control one of the most important context-management knobs in the app.
+
+## Built-in content versus user-defined content
+
+Several admin surfaces use the same pattern:
+
+- built-in bundles and versions are shipped with the app
+- user-created entries are stored locally
+- built-in content can generally be enabled or disabled
+- built-in content is not meant to be freely edited in place
+
+You will see this pattern across model presets, prompts, tools, skills, and assistant presets.

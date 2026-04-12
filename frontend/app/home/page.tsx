@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { FiArrowRight, FiBookOpen, FiCompass, FiHome, FiLayers, FiMessageSquare, FiTarget } from 'react-icons/fi';
+import { FiArrowRight, FiBookOpen, FiCompass, FiHome, FiLayers, FiMessageSquare } from 'react-icons/fi';
 
 import { Link } from 'react-router';
 
@@ -59,27 +59,21 @@ function DocsCard({ title, description, to }: NavCardProps) {
 const docsCards: NavCardProps[] = [
 	{
 		title: 'Getting Started',
-		description: 'Add a provider key, choose a built-in preset, and send your first message.',
+		description: 'Connect a provider key, open Chats, and send the first useful request.',
 		to: '/docs/#getting-started',
 		icon: <FiCompass size={18} />,
 	},
 	{
-		title: 'Core Concepts',
-		description: 'Understand providers, presets, tools, skills, attachments, and context.',
-		to: '/docs/#core-concepts',
+		title: 'Chats and Composer',
+		description: 'Understand how the main workspace is structured and how the next request is assembled.',
+		to: '/docs/#chats-composer-and-everyday-workflow',
+		icon: <FiMessageSquare size={18} />,
+	},
+	{
+		title: 'Context and Automation',
+		description: 'Use attachments, prompts, tools, web search, and skills with intention.',
+		to: '/docs/#attachments-tools-skills-and-prompts',
 		icon: <FiLayers size={18} />,
-	},
-	{
-		title: 'App Tour',
-		description: 'See where everything lives and how the chat workflow fits together.',
-		to: '/docs/#app-tour-and-chat-workflow',
-		icon: <FiBookOpen size={18} />,
-	},
-	{
-		title: 'Better Results',
-		description: 'Improve output quality with better prompts, context, tools, and presets.',
-		to: '/docs/#getting-better-results',
-		icon: <FiTarget size={18} />,
 	},
 ];
 
@@ -106,8 +100,8 @@ export default function HomePage() {
 					</div>
 
 					<p className="text-base-content/70 max-w-2xl text-sm leading-relaxed">
-						Local-first desktop workspace for multi-provider LLM chats, with assistants, model presets, templates,
-						attachments, tools and skills.
+						Local-first desktop workspace for multi-provider LLM chats, with assistants, model presets, prompts,
+						attachments, tools, skills.
 					</p>
 				</div>
 
@@ -131,9 +125,12 @@ export default function HomePage() {
 									<FiArrowRight size={24} className="transition-transform group-hover:translate-x-1" />
 								</div>
 							</Link>
+							<p className="text-base-content/70 mt-1 text-sm">
+								Bundled reference material for setup, workflow, reusable building blocks, and high-level system roles.
+							</p>
 						</div>
 
-						<div className="mx-auto mt-6 grid w-full max-w-5xl grid-cols-2 gap-6 lg:grid-cols-4">
+						<div className="mx-auto mt-4 grid w-full max-w-5xl grid-cols-1 gap-6 md:grid-cols-3">
 							{docsCards.map(card => (
 								<DocsCard key={card.to} title={card.title} description={card.description} to={card.to} />
 							))}
