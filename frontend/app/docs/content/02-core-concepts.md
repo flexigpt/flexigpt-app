@@ -13,7 +13,7 @@ FlexiGPT becomes much easier to use once a few core terms are clear.
 | **Prompt Template**     | Reusable prompt structure that helps you format a request consistently.                                                                                             |
 | **Previous user turns** | The amount of earlier user context that should be resent with the next request.                                                                                     |
 | **Attachment**          | Extra source material attached to a message, such as a file, folder-derived files, image, PDF, or URL.                                                              |
-| **Tool**                | A callable capability that can be offered to the model during a conversation.                                                                                       |
+| **Tool**                | A callable capability the model can ask the app to run during a conversation.                                                                                       |
 | **Skill**               | A reusable workflow mode that helps the model approach a task in a more structured way. [Specification](https://agentskills.io/specification)                       |
 
 ## Think in four layers
@@ -109,22 +109,20 @@ Tool use has a few separate stages:
 3. the call may be reviewed or executed
 4. the tool output may be sent back as part of the continuing conversation
 
-FlexiGPT supports both manual review and more automated tool loops.
+FlexiGPT supports both manual review and more automated or agentic tool loops.
 
 ### Human-in-loop
 
-In a human-in-loop flow:
+Use this when execution should stay under closer control:
 
 - the model proposes a tool call
 - you review it
 - you decide whether to run it
 - the resulting output can then be submitted back into the conversation
 
-Use this when execution should stay under closer control.
-
 ### Auto-execute and agentic flow
 
-In a more agentic flow, you can mark a tool for **auto-execute**.
+In a more automated or agentic flow, you can mark a tool for **auto-execute**.
 
 When a matching tool call is produced and it has the required arguments, FlexiGPT can:
 
@@ -132,7 +130,7 @@ When a matching tool call is produced and it has the required arguments, FlexiGP
 2. capture the result
 3. submit that result back to the model so the conversation can continue
 
-This makes tool-assisted workflows feel more automatic while still staying within the configured tools and the current chat flow.
+This keeps tool-assisted workflows more automatic while still staying within the configured tools and the current chat flow.
 
 ## Skills are workflow modes, not just saved text
 
@@ -160,4 +158,4 @@ Across model presets, prompts, tools, skills, and assistant presets, the same br
 - built-in content can usually be enabled or disabled
 - built-in content is generally treated as read-only
 
-That gives you a ready-to-use starting point without taking away local customization.
+The fuller user-facing explanation is in **Presets, Providers, and Settings**, but the short version is that FlexiGPT gives you ready-to-use defaults without taking away local customization.

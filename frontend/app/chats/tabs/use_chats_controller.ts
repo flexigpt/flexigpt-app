@@ -707,7 +707,6 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		void ensureTabLoaded(selectedTabId);
 	}, [ensureTabLoaded, selectedTabId]);
 
-	// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-arguments
 	const [shortcutConfig] = useState<ShortcutConfig>(defaultShortcutConfig);
 
 	useChatShortcuts({

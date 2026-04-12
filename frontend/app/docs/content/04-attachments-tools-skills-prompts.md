@@ -54,7 +54,7 @@ A simple way to remember the difference:
 
 Tools are managed on the **Tools** page and attached in the composer.
 
-A tool makes a capability available to the model for a conversation. Depending on the tool, execution may happen through local runtime behavior, HTTP-backed behavior, or provider-coupled capability.
+A tool makes a capability available to the model for a conversation. In practice, it gives the model something the app can run. Depending on the tool, execution may happen through local runtime behavior, HTTP-backed behavior, or provider-coupled capability.
 
 ## Tool choice, tool call, and tool output are different things
 
@@ -89,7 +89,7 @@ When an eligible tool call appears and the required arguments are present, Flexi
 2. capture the result
 3. submit that result back to the model so the conversation continues
 
-This is the app's more agentic mode. It is still bounded by the tools you enabled and the execution mode you chose.
+This is the app's more automated or agentic mode. It is still bounded by the tools you enabled and the execution mode you chose.
 
 ## Web search: provider-dependent capability
 

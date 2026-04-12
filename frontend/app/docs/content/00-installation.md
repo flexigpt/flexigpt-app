@@ -7,10 +7,6 @@ Download the latest release from [GitHub Releases](https://github.com/flexigpt/f
 - Download the `.pkg` release package.
 - Open the installer and follow the setup steps.
 
-Local app data is stored under:
-
-- `~/Library/Containers/io.github.flexigpt.client/Data/Library/Application Support/flexigpt/`
-
 ## Windows
 
 - Download the `.exe` release package.
@@ -37,7 +33,7 @@ flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.f
 You can then install and inspect the package with:
 
 ```shell
-flatpak install --user FlexiGPT-xyz.flatpak
+flatpak install --user FlexiGPT-vX.Y.Z.flatpak
 flatpak info io.github.flexigpt.client
 ```
 
@@ -47,8 +43,6 @@ Run the app with:
 flatpak run io.github.flexigpt.client
 ```
 
-Local app data is stored under: `~/.var/app/io.github.flexigpt.client/data/flexigpt`
-
 - Known first-launch issue on Linux with Nvidia drivers
   - If you use Nvidia proprietary drivers, the app may open a blank window and close. Try launching it with:
 
@@ -57,3 +51,5 @@ Local app data is stored under: `~/.var/app/io.github.flexigpt.client/data/flexi
     ```
 
 If that works, the issue is likely the known WebKit rendering problem on some Linux setups.
+
+For platform-specific storage locations, what is stored locally, and where app data is kept, see **Privacy, Storage, and Troubleshooting**.

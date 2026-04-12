@@ -84,7 +84,6 @@ export function useComposerToolConfig({ getAttachedToolEntries }: UseComposerToo
 
 	const [attachedToolArgsBlocked, setAttachedToolArgsBlocked] = useState(false);
 
-	// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-arguments
 	const conversationToolDefsCacheRef = useRef<Map<string, Tool>>(new Map());
 	const hydratingConversationToolKeysRef = useRef(new Set<string>());
 

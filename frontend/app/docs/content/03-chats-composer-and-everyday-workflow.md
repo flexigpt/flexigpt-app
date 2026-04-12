@@ -2,20 +2,6 @@
 
 This page focuses on the day-to-day workspace inside FlexiGPT.
 
-## App surfaces at a glance
-
-| Page                  | What it is for                                                              |
-| --------------------- | --------------------------------------------------------------------------- |
-| **Home**              | Lightweight entry point into chats and bundled docs.                        |
-| **Chats**             | Main workspace for conversations, tabs, search, messages, and the composer. |
-| **Assistant Presets** | Manage reusable starting setups.                                            |
-| **Prompts**           | Manage prompt bundles and templates.                                        |
-| **Tools**             | Manage tool bundles and tool definitions.                                   |
-| **Skills**            | Manage skill bundles and skills.                                            |
-| **Model Presets**     | Manage providers, model presets, and the default provider.                  |
-| **Settings**          | Manage theme, provider keys, and debug settings.                            |
-| **Docs**              | Read the bundled setup, user, and architecture docs.                        |
-
 ## What the Chats page brings together
 
 The **Chats** page combines four responsibilities in one place:
@@ -51,13 +37,13 @@ Examples:
 
 - switch to a stronger model
 - reduce temperature for a stricter answer
-- shrink the history window because the thread drifted
+- reduce **Previous user turns** because the thread drifted
 - open advanced parameters for more control
 
 | Control                      | What it influences                                                                                           |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | **Assistant Preset**         | Reusable starting workspace for model, instructions, tools, and skills.                                      |
-| **Model**                    | Active provider and model choice for the request.                                                            |
+| **Model**                    | Active provider and model choice for the request, usually through the selected model preset.                 |
 | **Temperature or Reasoning** | Quality and style controls exposed by the selected model.                                                    |
 | **Output Verbosity**         | Output verbosity when the current model supports it.                                                         |
 | **Previous user turns**      | How much earlier user context is resent.                                                                     |
@@ -89,7 +75,7 @@ Common examples:
 - **Attachments** for files, folders, images, PDFs, and URLs
 - **System Prompt** sources for durable instructions
 - **Prompts** for reusable request structure
-- **Tools** for callable capability
+- **Tools** when the task may need execution capability
 - **Skills** for reusable workflow modes
 - **Web Search** when the current provider supports it and fresh information matters
 
@@ -128,7 +114,7 @@ In an auto-execute flow:
 - FlexiGPT runs it automatically when the tool is configured for auto-execution and the call has the required arguments
 - the result is submitted back into the conversation so the model can continue
 
-That is the app's more agentic mode: faster tool loops, but still bounded by the tools you selected and how you configured them.
+That is the app's more automated or agentic mode: faster tool loops, but still bounded by the tools you selected and how you configured them.
 
 ## Reading results in the message timeline
 

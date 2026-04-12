@@ -43,7 +43,7 @@ The **Chats** page is the main place where you work.
 From there you can:
 
 - start a new conversation
-- work parallelly across multiple chat tabs
+- work across multiple chat tabs in parallel
 - search local conversation history
 - reopen earlier conversations and continue them
 - export the current conversation as JSON
@@ -51,6 +51,8 @@ From there you can:
 ## 3. Pick a starting setup
 
 Before you send, decide what kind of workspace you want for this conversation.
+
+If you just want the quick version: an assistant preset shapes the workspace, while a model preset chooses the provider, model, and request defaults.
 
 ### Assistant Preset
 
@@ -102,7 +104,7 @@ You can add:
 - **System prompts** for durable instructions
 - **Prompt templates** for reusable request structure
 - **Attachments** such as files, folders, images, PDFs, and URLs
-- **Tools** when the task needs callable capability
+- **Tools** when the task needs execution capability
 - **Skills** when you want a reusable workflow style
 - **Web search** when recent information matters and the current provider supports it
 
@@ -136,5 +138,5 @@ Check these first:
 - the provider key was added in **Settings**
 - the selected provider is enabled in **Model Presets**
 - the selected model preset is enabled
-- the history window is not larger than needed
+- the history window through **Previous user turns** is not larger than needed
 - the current tool or web-search choice is configured correctly

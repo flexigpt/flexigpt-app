@@ -56,7 +56,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 
 	const sessionStateKeyRef = useRef('');
 	const skillSessionSyncVersionRef = useRef(0);
-	// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-arguments
+
 	const availableSkillKeySetRef = useRef<Set<string>>(new Set());
 	const skillsLoadingRef = useRef(true);
 

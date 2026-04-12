@@ -34,6 +34,17 @@ The app also stores local data for areas such as:
 
 Most of this is local configuration and catalog data.
 
+### Storage locations
+
+FlexiGPT stores its local data under the app's XDG data-home location, using a `flexigpt` app-data folder.
+
+For current packaged builds, that typically means:
+
+- macOS: `~/Library/Containers/io.github.flexigpt.client/Data/Library/Application Support/flexigpt/`
+- Linux Flatpak: `~/.var/app/io.github.flexigpt.client/data/flexigpt/`
+
+Provider secrets are still protected through the OS keyring rather than stored there in plain text.
+
 ## What can be sent to a provider
 
 When you send a request, the selected provider may receive some or all of the following:

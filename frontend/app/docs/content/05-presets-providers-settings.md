@@ -8,9 +8,9 @@ An assistant preset is a reusable starting setup.
 
 It can define a starting combination of:
 
-- model preset with patch overrides
+- model preset plus any preset-specific overrides
 - whether the model's own system prompt should be included
-- instruction template references
+- instruction template references from the prompts catalog
 - tool selections
 - skill selections
 
@@ -90,6 +90,8 @@ Across assistant presets, prompts, tools, skills, and model presets, the same br
 - your own items are stored locally
 - built-in items can usually be enabled or disabled
 - built-in items are generally treated as read-only definitions
+
+That gives you built-in starting points without taking away local customization.
 
 ## How to decide which page to use
 
