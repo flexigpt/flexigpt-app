@@ -93,7 +93,7 @@ jobs:
             ${{ env.COMMON_BUILD_NAME }}-linux-amd64-${{ env.VERSION_TAG }}.flatpak
 
       - name: Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         if: ${{ env.RELEASE_MODE == 'true' }}
         with:
           tag_name: ${{ env.VERSION_TAG }}

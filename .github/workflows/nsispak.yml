@@ -141,7 +141,7 @@ jobs:
             ${{ env.FINAL_LICENSES_ZIP_PATH }}
 
       - name: Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         if: ${{ env.RELEASE_MODE == 'true' }}
         with:
           tag_name: ${{ env.VERSION_TAG }}
