@@ -1,13 +1,13 @@
 # Architecture Overview
 
-This architecture section describe the roles and relationships inside the app.
+This page is an advanced reference for how FlexiGPT is organized at a high level.
 
 The goal is to explain:
 
-- what each major frontend and backend area is responsible for
-- how user-facing pages relate to backend services
+- which major parts of the app are responsible for what
+- how user-facing pages relate to local services and model providers
 - how a request moves through the app
-- where reusable building blocks such as presets, prompts, tools, and skills fit
+- where presets, prompts, tools, and skills fit
 
 ## FlexiGPT at a glance
 
@@ -18,17 +18,17 @@ flowchart LR
     subgraph Frontend[Frontend app]
         Home[Home and Docs]
         Chats[Chats workspace]
-        Admin[Management pages\nAssistant Presets, Prompts, Tools, Skills, Model Presets, Settings]
+        Admin[Management pages]
         API[Typed frontend API boundary]
     end
 
-    subgraph Bridge[Wails bridge]
-        Bindings[cmd/agentgo wrappers and app lifecycle]
+    subgraph Bridge[Desktop bridge]
+        Bindings[App bindings and lifecycle]
     end
 
     subgraph Backend[Backend services]
         Stores[Local stores and built-in catalogs]
-        Runtime[Inference wrapper, tool runtime, skill runtime]
+        Runtime[Request, tool, and skill runtimes]
         Logs[Logging and debug behavior]
     end
 
@@ -54,39 +54,39 @@ flowchart LR
 
 ## Stable responsibility split
 
-| Area                                      | Stable role                                                                                                     | User-visible outcome                                                     |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| **Home and Docs**                         | Give lightweight entry points into the real working areas and bundled reference material.                       | Fast onboarding and built-in documentation.                              |
-| **Chats workspace**                       | Assemble search, tabs, conversation display, composer state, sending, streaming, and tool-assisted follow-up.   | Day-to-day work happens here.                                            |
-| **Management pages**                      | Manage the reusable building blocks behind chat: presets, prompts, tools, skills, provider setup, and settings. | Reusable workflows instead of manual reconfiguration every turn.         |
-| **Frontend API boundary**                 | Keep the UI working against typed app APIs instead of raw ad hoc calls.                                         | Clear separation between React surfaces and backend behavior.            |
-| **Wails bridge**                          | Bind the frontend to Go services, own app startup and lifecycle, and serve bundled assets.                      | Desktop app behavior rather than a browser-only client.                  |
-| **Backend stores and runtimes**           | Persist local data, expose built-ins, prepare requests, execute tools, manage skills, and stream completions.   | Local-first behavior with reusable catalogs and tool-assisted workflows. |
-| **Providers and local execution targets** | Actually answer model requests or execute tool work.                                                            | Responses, citations, tool results, and execution side effects.          |
+| Area                                      | Stable role                                                                                                         | User-visible outcome                                                     |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **Home and Docs**                         | Provide entry points into the main workspace and bundled reference material.                                        | Faster onboarding and in-app reference.                                  |
+| **Chats workspace**                       | Bring together search, tabs, conversation display, composer state, sending, streaming, and tool-assisted follow-up. | Day-to-day work happens here.                                            |
+| **Management pages**                      | Manage the reusable building blocks behind chat: presets, prompts, tools, skills, provider setup, and settings.     | Reusable workflows instead of reconfiguring each turn by hand.           |
+| **Frontend API boundary**                 | Keep the UI working against typed app APIs rather than ad hoc calls.                                                | Clear separation between interface and app behavior.                     |
+| **Desktop bridge**                        | Connect the frontend to local services, app lifecycle, and bundled assets.                                          | Desktop app behavior instead of a browser-only client.                   |
+| **Backend stores and runtimes**           | Persist local data, expose built-ins, prepare requests, execute tools, manage skills, and stream completions.       | Local-first behavior with reusable catalogs and tool-assisted workflows. |
+| **Providers and local execution targets** | Answer model requests or execute tool work.                                                                         | Responses, citations, tool results, and execution side effects.          |
 
-## How the main experience is organized
+## Two user-facing planes
 
-The architecture is intentionally split into two big user-facing planes.
+The app is easiest to understand as two main planes.
 
 ### 1. Working plane: Chats
 
-This is where the app turns configuration into action.
+This is where configuration becomes action.
 
 It combines:
 
 - conversation state
-- current request setup
-- current turn context
-- result rendering
+- request setup
+- turn context
+- response rendering
 - tool-assisted loops
 
 ### 2. Catalog and setup plane: management pages
 
-These pages prepare the reusable pieces that Chats consumes later.
+These pages prepare the reusable pieces that the chat workflow uses later.
 
 They answer questions such as:
 
-- Which provider and models are available?
+- Which providers and models are available?
 - Which prompts, tools, and skills exist?
 - Which assistant presets bundle them into a starting workspace?
 - Which keys and debug settings are active?
@@ -98,48 +98,48 @@ sequenceDiagram
     participant User
     participant Chats as Chats and Composer
     participant Frontend as Frontend state and typed APIs
-    participant Bridge as Wails wrappers
-    participant Backend as Aggregate and inference services
+    participant Bridge as Desktop bridge
+    participant Backend as Backend services
     participant Provider as Model provider
 
     User->>Chats: choose preset, model, context, and message
     Chats->>Frontend: collect active conversation setup and current turn
-    Frontend->>Bridge: call bound backend APIs
-    Bridge->>Backend: build request from chat state
-    Backend->>Backend: resolve model preset, system prompt, tools, skills, attachments
+    Frontend->>Bridge: call app APIs
+    Bridge->>Backend: build request from conversation state
+    Backend->>Backend: resolve model settings, prompts, attachments, tools, and skills
     Backend->>Provider: send completion request
     Provider-->>Backend: stream tokens and final response
     Backend-->>Bridge: completion result and stream events
     Bridge-->>Frontend: push stream updates and final payload
-    Frontend-->>Chats: render assistant message, details, citations, and tool state
+    Frontend-->>Chats: render the response, details, citations, and tool state
 ```
 
 ## Where reusable content enters the architecture
 
-FlexiGPT's reusable building blocks exist so the chat workflow does not need to start from scratch every turn.
+FlexiGPT's reusable building blocks exist so the chat workflow does not start from scratch every turn.
 
 - **Model presets** define execution defaults.
 - **Assistant presets** define starting workspace shape.
-- **Prompts** define reusable instruction or message structure.
+- **Prompts** define reusable request structure.
 - **Tools** define callable capability.
 - **Skills** define reusable workflow behavior.
 
-The chat workflow is the place where these pieces are selected, combined, and turned into a live request.
+The chat workflow is where these pieces are selected, combined, and turned into a live request.
 
 ## Built-ins and local customization
 
-Several backend stores follow the same broad architectural pattern:
+Several parts of the app follow the same broad pattern:
 
-- the app ships with built-in catalogs embedded into the binary
-- the user also has local writable data
-- the runtime presents both together as the working catalog
+- built-in catalogs ship with the app
+- user-created content is stored locally
+- the runtime presents both together as the working view
 
-That pattern is why the app can feel ready to use on first launch while still staying local-first and customizable.
+That is why FlexiGPT can feel ready to use on first launch while still staying local-first and customizable.
 
-## What not to overfocus on
+## Why this split matters
 
 For architecture discussions, the most stable questions are:
 
 - which surface owns which role
-- where the reusable building blocks are managed
+- where reusable building blocks are managed
 - how a request gets from user intent to provider execution and back

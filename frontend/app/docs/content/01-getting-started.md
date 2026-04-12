@@ -26,58 +26,60 @@ FlexiGPT ships with built-in providers, model presets, tools, skills, prompts, a
 
 ## 1. Add a provider key
 
-The app can only send a live request after you configure credentials for at least one provider.
+FlexiGPT can only send a live request after you configure credentials for at least one provider.
 
 In **Settings**:
 
-- use **Auth Keys** to add a provider key
+- open **Auth Keys**
+- add a key for the provider you want to use
 - return to **Chats** after saving it
 
-From the backend code, provider secrets are stored through the OS keyring-backed settings and not in plain text.
+Provider secrets are stored through the OS keyring rather than kept in plain-text settings.
 
 ## 2. Open the Chats workspace
 
-The **Chats** page is the main working surface.
+The **Chats** page is the main place where you work.
 
-From here you can::
+From there you can:
 
 - start a new conversation
 - work parallelly across multiple chat tabs
+- search local conversation history
+- reopen earlier conversations and continue them
 - export the current conversation as JSON
-- search conversation history; if you already have older conversations, you can reopen them into tabs and continue from there.
 
 ## 3. Pick a starting setup
 
-Before you send, decide what kind of workspace you want for the next request.
+Before you send, decide what kind of workspace you want for this conversation.
 
 ### Assistant Preset
 
-Use an assistant preset when you want a reusable starting setup.
+Use an assistant preset when you want a reusable starting setup for a type of work.
 
 An assistant preset can preload:
 
-- a starting model preset
+- a model preset
 - instruction templates
 - tool selections
 - skill selections
 
 ### Model Preset
 
-Use a model preset to choose the provider, model, and inference defaults.
+Use a model preset to choose the provider, model, and request defaults.
 
-That includes things like:
+That can include:
 
 - provider family
 - model name
 - temperature or reasoning controls
-- streaming and timeout behavior
-- output options and advanced parameters
+- timeout and streaming behavior
+- output or advanced request parameters
 
 ### Previous user turns
 
 Use this control to decide how much earlier user context should be resent with the next request.
 
-If you are unsure, start small. You can always increase the history window later.
+If you are unsure, start small. You can always include more history later.
 
 ## 4. Write the first message
 
@@ -100,23 +102,23 @@ You can add:
 - **System prompts** for durable instructions
 - **Prompt templates** for reusable request structure
 - **Attachments** such as files, folders, images, PDFs, and URLs
-- **Tools** when the task needs callable capabilities (file/text read/writes etc)
-- **Skills** when you want a reusable workflow frame (structured reviews, spec driven development, etc)
-- **Web search** for working with recent information from the interne (needs LLM provider support)
+- **Tools** when the task needs callable capability
+- **Skills** when you want a reusable workflow style
+- **Web search** when recent information matters and the current provider supports it
+
+Only add the context that helps the current request. More context is not always better.
 
 ## 6. Send and inspect the result
 
-When you send a message, FlexiGPT builds a request from the current chat state and forwards it through the selected provider.
+After you send, you can usually:
 
-After the response completes, you can usually:
-
-- read the answer as rendered markdown
+- read the answer as rendered Markdown
 - inspect token usage and message details
 - review citations when the provider returns them
 - copy the content
 - edit and resend earlier user messages to branch the conversation
 
-If the assistant emits tool calls, the chat workflow can continue through the composer and tool runtime instead of forcing you into a separate interface.
+If the assistant proposes a tool call, the workflow stays inside the chat. You can review and run the call yourself, or allow configured tools to auto-execute when that fits the task.
 
 ## Good first workflows
 
@@ -124,15 +126,15 @@ Once the first send works, try one of these:
 
 - attach a local file and ask for an explanation
 - compare two model presets on the same question
-- use a prompt template to standardize a repeated task
+- use a prompt template for a repeated task
 - enable a tool-assisted assistant preset for a workflow that needs execution help
 
-## If the first send fails
+## If the first send feels off
 
 Check these first:
 
-- Did you add a provider key in **Settings**?
-- Is the selected provider enabled on **Model Presets**?
-- Is the chosen model preset enabled?
-- Is the request being sent with too much stale history?
-- Did you attach a tool or web-search option that still needs configuration?
+- the provider key was added in **Settings**
+- the selected provider is enabled in **Model Presets**
+- the selected model preset is enabled
+- the history window is not larger than needed
+- the current tool or web-search choice is configured correctly

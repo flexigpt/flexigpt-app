@@ -1,28 +1,28 @@
 # Privacy, Storage, and Troubleshooting
 
-FlexiGPT is local-first, but it still sends requests to the provider you choose. This page explains what stays local, what can leave the device, and what to check when something feels wrong.
+FlexiGPT is local-first, but requests still go to the provider you choose. This page explains what stays on your device, what can leave it, and what to check when something feels wrong.
 
 ## What stays local
 
 ### Provider secret handling
 
-Provider secrets are managed through the backend settings store using keyring-backed encryption.
+Provider secrets are protected through the OS keyring.
 
-The normal settings response sent to the frontend returns metadata such as key type, key name, and whether a key is non-empty, but not the secret itself. The secret remains strictly backend only.
+The app can show credential metadata such as key name or whether a value exists, but not the secret itself.
 
 ### Conversation history and search
 
-Conversations are stored locally. A local full-text index for conversation search is also provided.
+Conversations are stored locally, and local search is available for conversation history.
 
 That means these capabilities stay on-device:
 
 - stored conversation history
 - local history search
-- reopening a saved conversation into a tab
+- reopening saved conversations into tabs
 
 ### Catalog and app configuration data
 
-The app also stores local configuration for areas such as:
+The app also stores local data for areas such as:
 
 - settings metadata
 - provider and model presets
@@ -32,7 +32,7 @@ The app also stores local configuration for areas such as:
 - skill bundles and skills
 - bundled docs shipped inside the app
 
-Most of these stores are JSON-backed local data, with SQLite used where a local index or overrides for builtins are needed.
+Most of this is local configuration and catalog data.
 
 ## What can be sent to a provider
 
@@ -46,39 +46,45 @@ When you send a request, the selected provider may receive some or all of the fo
 - model preset and advanced parameter values
 - selected tool choices and tool outputs
 - web-search configuration when supported by the provider
-- skill session context and skill-derived prompt/tool behavior when enabled
+- skill session context and skill-related behavior when enabled
 
-FlexiGPT does not proxy billing through its own service. The provider behind the configured key handles billing and limits.
+FlexiGPT does not proxy billing through its own service. Billing and limits come from the provider account behind the configured key.
 
 ## Attachments need deliberate handling
 
-Attachments are often the largest privacy multiplier in a request.
+Attachments are often the biggest privacy multiplier in a request.
 
 ### Local files and folders
 
-Depending on attachment type, the backend may turn them into:
+Depending on the attachment type, the app may turn them into:
 
 - text content
 - image content
 - file content
 
-Folder attachments can expand into multiple files, so treat them as a batch of context rather than as a single symbolic pointer.
+Folder attachments can expand into multiple files, so treat them as a batch of source material rather than as a single symbolic pointer.
 
 ### URLs
 
-A URL attachment is not the same as leaving a plain link in your typed message. The attachment flow can fetch and transform URL content before it becomes request context.
+A URL attachment is not the same as leaving a plain link in your message.
 
-The user can choose to fetch the page and send it as text. Or an image URL or PDF url can be fetched and sent as base64 files when supported by the provider. Or the base URL can be sent as explicit URL link, when the provider supports URL fetch and process.
+Depending on the attachment type and provider support, the app may fetch and transform URL content before it becomes request context.
 
-## Debug settings can expose more than normal usage
+## Tool outputs can be resent too
 
-The debug settings can affect:
+Tool-assisted workflows can add more context to later requests.
+
+Before sending sensitive work, remember that tool outputs can also become part of the continuing conversation, whether they were added after manual review or after an auto-executed step.
+
+## Debug settings can expose more than normal use
+
+Debug settings can affect:
 
 - backend log verbosity
 - whether raw LLM request and response payloads are logged
 - whether content stripping is disabled for debug details
 
-If you enable raw request and response logging, treat your local logs as sensitive because they may contain prompt text, attachment-derived content, and provider responses.
+If you enable raw request and response logging, treat your local logs as sensitive.
 
 ## Troubleshooting checklist
 
@@ -86,11 +92,11 @@ If you enable raw request and response logging, treat your local logs as sensiti
 
 Check these first:
 
-- you added a provider key in **Settings**
-- the selected provider is enabled on **Model Presets**
+- a provider key was added in **Settings**
+- the selected provider is enabled in **Model Presets**
 - the selected model preset is enabled
-- the current tool or web-search choice is not blocked by missing arguments
-- the request still has real content after you removed stale attachments or tool outputs
+- the current tool or web-search choice is not blocked by missing arguments or missing configuration
+- the current request still has real content after removing stale attachments or tool outputs
 
 ### If the answer is weak
 
@@ -108,7 +114,7 @@ Adjust one layer at a time:
 Look for these causes:
 
 - the tool call is waiting for manual execution
-- auto-execution is off
+- auto-execute is off
 - required user arguments are missing
 - the selected tool is not the right one for the current provider or task
 
@@ -134,4 +140,4 @@ Before sending sensitive work, confirm:
 
 ## Final reminder
 
-Local-first does not mean provider requests are local. The safest habit is to think about the full request payload, not only the text currently visible in the editor.
+Local-first does not mean provider requests stay local. The safest habit is to think about the full request payload, not only the text currently visible in the editor.

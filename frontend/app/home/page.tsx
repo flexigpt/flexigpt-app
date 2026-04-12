@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { FiArrowRight, FiBookOpen, FiCompass, FiHome, FiLayers, FiMessageSquare } from 'react-icons/fi';
+import { FiArrowRight, FiBookOpen, FiHome, FiLayers, FiMessageSquare } from 'react-icons/fi';
 
 import { Link } from 'react-router';
 
@@ -59,19 +59,20 @@ function DocsCard({ title, description, to }: NavCardProps) {
 const docsCards: NavCardProps[] = [
 	{
 		title: 'Getting Started',
-		description: 'Connect a provider key, open Chats, and send the first useful request.',
+		description: 'Connect a provider key, choose a starting setup, and send the first useful message.',
 		to: '/docs/#getting-started',
-		icon: <FiCompass size={18} />,
+		icon: <FiMessageSquare size={18} />,
 	},
 	{
 		title: 'Chats and Composer',
-		description: 'Understand how the main workspace is structured and how the next request is assembled.',
+		description:
+			'Learn how the Chats workspace is structured and how a normal conversation moves from setup to response.',
 		to: '/docs/#chats-composer-and-everyday-workflow',
 		icon: <FiMessageSquare size={18} />,
 	},
 	{
 		title: 'Context and Automation',
-		description: 'Use attachments, prompts, tools, web search, and skills with intention.',
+		description: 'Use attachments, prompts, tools, skills, and auto-execute workflows.',
 		to: '/docs/#attachments-tools-skills-and-prompts',
 		icon: <FiLayers size={18} />,
 	},
@@ -101,7 +102,7 @@ export default function HomePage() {
 
 					<p className="text-base-content/70 max-w-2xl text-sm leading-relaxed">
 						Local-first desktop workspace for multi-provider LLM chats, with assistants, model presets, prompts,
-						attachments, tools, skills.
+						attachments, tools, and skills.
 					</p>
 				</div>
 
@@ -126,7 +127,7 @@ export default function HomePage() {
 								</div>
 							</Link>
 							<p className="text-base-content/70 mt-1 text-sm">
-								Bundled reference material for setup, workflow, reusable building blocks, and high-level system roles.
+								Bundled workflow, context, automation, and architecture reference for FlexiGPT.
 							</p>
 						</div>
 

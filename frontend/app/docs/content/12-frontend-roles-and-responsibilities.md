@@ -1,56 +1,54 @@
 # Frontend Roles and Responsibilities
 
-This page explains the frontend in terms of stable responsibilities.
+This page is an advanced reference for the frontend's stable responsibilities.
 
 The emphasis is on what each surface coordinates and what the user gets from it.
 
 ## The frontend's overall job
 
-At a high level, the frontend has four responsibilities:
+At a high level, the frontend does four things:
 
-1. present the app's working surfaces
-2. maintain conversation and composer state
-3. translate user actions into typed backend API calls
-4. render results, details, and reusable content clearly
+1. presents the app's working surfaces
+2. maintains conversation and composer state
+3. turns user actions into typed app API calls
+4. renders responses, details, and reusable content clearly
 
 ## Route-level pages are the stitching layer
 
-The route `page.tsx` files are the broad coordination points of the frontend.
+The main route-level pages are the frontend's coordination points.
 
-They are the place where the app decides which major controllers, views, and supporting components should work together for that surface.
+They decide which major controllers, views, and supporting components should work together for each surface.
 
-| Surface                     | Broad responsibility                | What it stitches together                                         |
-| --------------------------- | ----------------------------------- | ----------------------------------------------------------------- |
-| `home/page.tsx`             | Lightweight landing page            | Primary navigation into chats and docs                            |
-| `docs/page.tsx`             | Bundled documentation reader        | docs manifest plus markdown rendering                             |
-| `chats/page.tsx`            | Main working surface                | search, tabs, conversation area, and composer                     |
-| `assistantpresets/page.tsx` | Assistant preset catalog management | bundles, versions, enable/disable, add/edit flows                 |
-| `prompts/page.tsx`          | Prompt catalog management           | bundles, templates, enable/disable, add/edit flows                |
-| `tools/page.tsx`            | Tool catalog management             | bundles, tool definitions, enable/disable, add/edit flows         |
-| `skills/page.tsx`           | Skill catalog management            | bundles, skill records, runtime-aware enable/disable flows        |
-| `modelpresets/page.tsx`     | Provider and model setup management | default provider, provider presets, model presets, auth-key state |
-| `settings/page.tsx`         | App-wide configuration              | theme, auth keys, debug settings                                  |
+| Surface               | Broad responsibility         | What it brings together                             |
+| --------------------- | ---------------------------- | --------------------------------------------------- |
+| **Home**              | Lightweight landing page     | Entry points into chats and docs                    |
+| **Docs**              | Bundled documentation reader | Setup guide, user guide, and architecture reference |
+| **Chats**             | Main working surface         | Search, tabs, conversation timeline, and composer   |
+| **Assistant Presets** | Assistant preset management  | Reusable starting setups                            |
+| **Prompts**           | Prompt management            | Bundles, templates, and reusable request structure  |
+| **Tools**             | Tool management              | Tool definitions and availability                   |
+| **Skills**            | Skill management             | Reusable workflow modes                             |
+| **Model Presets**     | Provider and model setup     | Default provider, providers, and model presets      |
+| **Settings**          | App-wide configuration       | Theme, auth keys, and debug settings                |
 
 ## Chats is the coordinating heart of the frontend
 
-Among all routes, `chats/page.tsx` is the most important coordinating surface.
+Among all surfaces, **Chats** is the main working workspace.
 
-It assembles three user-visible concerns into one working workspace:
+It brings together three user-visible concerns:
 
 - local search and tab selection
 - conversation display and streaming updates
 - composer state for the next request
 
-## Conversation area: the thread and runtime coordinator
+## Conversation area: the active thread coordinator
 
-Inside Chats, `conversation_area.tsx` plays the role of page-level coordinator for the active conversation.
-
-Its responsibility is not to define one tiny UI element. Its job is to keep the whole thread experience coherent.
+Inside the chat workspace, the conversation area keeps the active thread coherent.
 
 That includes:
 
 - the current message list
-- the active tab's input pane
+- the active input pane
 - streaming state updates
 - scroll restoration
 - attachment drops into the active tab
@@ -60,11 +58,11 @@ From the user perspective, this is what makes one tab feel like a stable workspa
 
 ## Composer: the next-request coordinator
 
-The composer is split into a few stable roles.
+The composer can be understood in two stable parts.
 
 ### Context bar
 
-The context bar is responsible for the reusable setup for the next request.
+The context bar controls reusable setup for the next request.
 
 It brings together controls for:
 
@@ -75,11 +73,11 @@ It brings together controls for:
 - history window
 - advanced parameters
 
-This is the place where the user changes how the next request should behave.
+This is where the user changes how the next request should behave.
 
 ### Editor area
 
-The editor area is responsible for turn-specific preparation.
+The editor area handles turn-specific preparation.
 
 It brings together:
 
@@ -92,58 +90,56 @@ It brings together:
 - skill state
 - pending tool calls and tool outputs
 
-This is the place where the user decides what the next request should contain and what extra capabilities it may use.
+This is where the user decides what the next request should contain and what capabilities may be used.
 
-## Message rendering: make complex responses inspectable
+## Message rendering: make responses inspectable
 
-The message components exist so the chat timeline is not just raw text.
+The message components exist so the timeline is not just raw text.
 
-Their stable responsibility is to render and expose:
+They render and expose:
 
-- markdown content
+- Markdown content
 - code blocks
 - Mermaid diagrams
 - math
 - citations
-- attachments and tool state under each message
+- attachments and tool state under messages
 - message details and usage
 - edit controls for user messages
 
-This is what lets the conversation area double as both a reading surface and an inspection surface.
+That is what lets the conversation area work as both a reading surface and an inspection surface.
 
 ## Search and tabs: preserve working context
 
-The tabs and search modules support continuity.
+Tabs and search support continuity.
 
-Their broad job is to let the user:
+They let the user:
 
 - keep multiple threads open
 - return to older threads quickly
 - move between active and stored work without losing place
 
-This is an important architectural role because FlexiGPT is designed as a workspace, not as a one-shot prompt window.
+This matters because FlexiGPT is designed as a workspace, not as a one-shot prompt window.
 
 ## Typed frontend APIs: the UI boundary
 
-The `apis/interface.ts` and `apis/baseapi.ts` layer acts as the frontend's typed contract with the backend.
+The frontend talks to the rest of the app through typed APIs.
 
-Its role is to:
+That boundary helps:
 
 - keep UI components working against stable app-level methods
-- hide Wails-specific implementation detail behind typed interfaces
-- make store, aggregate, tool runtime, and skill runtime access feel consistent from the React side
-
-That boundary is part of why the route pages and conversation modules can focus on user behavior instead of backend transport detail.
+- hide bridge-specific details behind clear interfaces
+- make store, runtime, and orchestration access feel consistent from the React side
 
 ## Frontend relationship map
 
 ```mermaid
 flowchart TD
-    Routes[Route page.tsx surfaces]
+    Routes[Route-level surfaces]
 
     Routes --> Home[Home and Docs]
     Routes --> Chats[Chats workspace]
-    Routes --> Admin[Assistant Presets, Prompts, Tools, Skills, Model Presets, Settings]
+    Routes --> Admin[Management pages]
 
     Chats --> SearchTabs[Search and Tabs]
     Chats --> ConversationArea[Conversation area]
@@ -160,14 +156,12 @@ flowchart TD
     Admin --> FrontendAPI
 ```
 
-## What the user gets from the frontend split
+## What the user gets from this split
 
-The frontend module split is worthwhile only if it produces a better user experience.
-
-That split gives the user:
+This frontend split matters because it gives the user:
 
 - a chat workspace that can stay open across multiple threads
 - reusable setup instead of repetitive manual re-entry
-- clear separation between chat work and catalog management
+- a clear separation between chat work and catalog management
 - inspectable responses rather than opaque model output
-- a bundled docs surface inside the app itself
+- bundled docs inside the app itself

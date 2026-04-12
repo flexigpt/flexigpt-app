@@ -7,24 +7,28 @@
 
 FlexiGPT is a local-first desktop workspace for multi-provider LLM chats.
 
-It combines reusable assistant presets, model presets, prompt templates, attachments, tools, and skills in one app, while keeping conversations and configuration local.
+It brings together reusable assistant presets, model presets, prompt templates, attachments, tools, and skills in one app while keeping conversations and configuration local.
 
 > Early access
 >
 > FlexiGPT is under active development. Expect some rough edges, evolving built-ins, and ongoing UX and docs refinement between releases.
 
-## Quick start
+## Install
 
 1. Download the latest release from [GitHub Releases](https://github.com/flexigpt/flexigpt-app/releases).
 2. Install the package for your platform:
    - macOS: `.pkg`
    - Windows: `.exe`
    - Linux: `.flatpak`
+   - [Detailed installation steps are here](./frontend/app/docs/content/00-installation.md)
 3. Launch FlexiGPT.
-4. Open **Settings** and add a provider API key.
-5. Open **Chats**.
-6. Pick an assistant preset and model preset, or keep the defaults.
-7. Send your first message.
+
+## Quick start
+
+1. Open **Settings** and add a provider API key.
+2. Open **Chats**.
+3. Pick an assistant preset and model preset, or keep the defaults.
+4. Send your first message.
 
 FlexiGPT does not bill you directly. Usage costs and limits come from the provider account behind the key you configure.
 
@@ -72,6 +76,7 @@ The main docs are bundled inside the app and mirrored in this repository under `
 
 ### User guide
 
+- [Installation](./frontend/app/docs/content/00-installation.md)
 - [Getting Started](./frontend/app/docs/content/01-getting-started.md)
 - [Core Concepts](./frontend/app/docs/content/02-core-concepts.md)
 - [Chats, Composer, and Everyday Workflow](./frontend/app/docs/content/03-chats-composer-and-everyday-workflow.md)
@@ -84,50 +89,6 @@ The main docs are bundled inside the app and mirrored in this repository under `
 - [Architecture Overview](./frontend/app/docs/content/11-architecture-overview.md)
 - [Frontend Roles and Responsibilities](./frontend/app/docs/content/12-frontend-roles-and-responsibilities.md)
 - [Backend Roles and Data Flow](./frontend/app/docs/content/13-backend-roles-and-data-flow.md)
-
-## Install
-
-### MacOS
-
-- Download the `.pkg` release package.
-- Click to install the `.pkg`. It will walk you through the installation process.
-- Local data (settings, conversations, logs) is stored at:
-  - `~/Library/Containers/io.github.flexigpt.client/Data/Library/Application\ Support/flexigpt/`
-
-### Windows
-
-- Download the `.exe` release package.
-- Click to install the `.exe`. It will walk you through the installation process.
-- Note: Windows builds have undergone very limited testing.
-
-### Linux
-
-- Download the `.flatpak` release package.
-- If Flatpak is not installed, enable it for your distribution
-  - Ubuntu/Debian/etc (APT based systems):
-
-    ```shell
-    sudo apt update # update packages
-    sudo apt install -y flatpak # install flatpak
-    sudo apt install -y gnome-software-plugin-flatpak # optional, enables flathub packages in gnome sofware center
-    flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-    ```
-
-  - Some additional helper commands can be found in this [script](./scripts/initialize_flatpak.sh)
-
-- Install the package
-  - `flatpak install --user FlexiGPT-xyz.flatpak`
-  - `flatpak info io.github.flexigpt.client`
-
-- Running the app
-  - Using launcher GUI: You can launch the app from your distributions's launcher. E.g: In Ubuntu: Press the window key, type flexigpt and click on icon.
-  - Using terminal: `flatpak run io.github.flexigpt.client`
-  - Known issue with Nvidia drivers:
-    - If you use Nvidia and its proprietary drivers, you _may_ see that the run command open a blank screen and close, the workaround for it is to run the app as: `flatpak run --env=WEBKIT_DISABLE_COMPOSITING_MODE=1 io.github.flexigpt.client`
-    - Open bugs in upstream projects that cause this: [Webkit issue 180739](https://bugs.webkit.org/show_bug.cgi?id=180739), [Webkit issue 262607](https://bugs.webkit.org/show_bug.cgi?id=262607), [Debian issue 1082139](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1082139), [Wails issue 2977](https://github.com/wailsapp/wails/issues/2977)
-
-- Your local data (settings, conversations, logs) will be at:
-  - `~/.var/app/io.github.flexigpt.client/data/flexigpt`
 
 ## Built With
 

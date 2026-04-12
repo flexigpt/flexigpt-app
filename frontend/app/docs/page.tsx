@@ -55,7 +55,7 @@ export default function DocsPage() {
 							<FiBookOpen size={18} />
 							<span>In-app Docs</span>
 						</div>
-						<p className="mt-2 text-sm opacity-70">Bundled user guide and architecture reference for FlexiGPT.</p>
+						<p className="mt-2 text-sm opacity-70">Bundled user guide, and architecture reference for FlexiGPT.</p>
 
 						<div className="mt-4 flex flex-col gap-4">
 							{docsCategories.map(category => (

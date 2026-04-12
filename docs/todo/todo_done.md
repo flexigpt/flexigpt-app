@@ -922,3 +922,6 @@
 - [x] docs inside the app
   - [x] docs in md
   - [x] bundle with app
+- [x] better docs and better ux inside app.
+- [ ] ~~icon needs to be sharper and cleaner.~~
+- [ ] ~~set skill as active immediately button is also needed manually~~

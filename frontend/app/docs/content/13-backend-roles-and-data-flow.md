@@ -1,6 +1,6 @@
 # Backend Roles and Data Flow
 
-This page explains the backend in terms of service roles and request flow.
+This page is an advanced reference for the backend's service roles and request flow.
 
 The emphasis is on what each backend area is for and what the user gets from it.
 
@@ -8,32 +8,30 @@ The emphasis is on what each backend area is for and what the user gets from it.
 
 At a high level, the backend does five things:
 
-1. start and bind the desktop app through Wails
-2. persist local catalogs and conversation data
-3. expose built-in content alongside user-defined content
-4. build and execute model requests
-5. run tool and skill related runtime behavior
+1. starts and binds the desktop app
+2. persists local catalogs and conversation data
+3. exposes built-in content alongside user-defined content
+4. builds and executes model requests
+5. runs tool- and skill-related runtime behavior
 
-## Wails app layer: startup, binding, and lifecycle
+## Desktop app layer: startup, binding, and lifecycle
 
-The `cmd/agentgo/` layer is the backend's desktop-app shell.
+The desktop app layer is responsible for:
 
-From the current code, it is responsible for:
-
-- starting the Wails application
-- serving the embedded frontend assets
+- starting the application
+- serving the bundled frontend
 - creating app data directories
-- initializing store wrappers and the aggregate wrapper
-- binding backend wrappers into the frontend
-- configuring app logging and shutdown behavior
+- initializing local stores and orchestration services
+- exposing backend capabilities to the frontend
+- configuring logging and shutdown behavior
 
-This layer is what turns the Go backend plus frontend assets into a real desktop application.
+This layer is what turns the frontend and backend into a real desktop application.
 
-## Wails wrappers: domain-specific backend entry points
+## Backend API boundaries
 
-The `wrapper_*.go` files expose backend capabilities to the frontend in domain-shaped boundaries.
+The frontend talks to the backend through focused app APIs rather than one giant surface.
 
-Examples include wrappers for:
+Those APIs cover areas such as:
 
 - settings
 - conversations
@@ -43,87 +41,78 @@ Examples include wrappers for:
 - tool runtime
 - skills
 - assistant presets
-- the aggregate orchestration layer
+- overall request orchestration
 
-The user benefit is indirect but important: the frontend can call focused app APIs instead of one giant unstructured backend surface.
+The user benefit is indirect but important: the app stays more structured and predictable.
 
-## Aggregate and inference layers: request orchestration
+## Request orchestration
 
-The broad orchestration role is centered on two layers.
+A central orchestration layer coordinates things such as:
 
-### `wrapper_aggregate.go`
-
-This layer coordinates things such as:
-
-- provider preset lifecycle
-- auth key propagation into provider runtime
+- provider setup and lifecycle
+- auth key propagation into provider access
 - debug setting application
 - streamed completion requests and cancellation
 
-### `internal/inferencewrapper`
+A request-building layer then turns conversation state into provider-ready input.
 
-This layer translates app-level conversation state into provider-ready requests.
+That includes:
 
-From the current code, it is responsible for:
-
-- provider registry and provider lifecycle
+- provider selection
 - capability derivation from model presets
-- request construction from history plus current turn
-- attachment hydration into provider content items
-- tool choice hydration from the tool store
-- skill prompt and skill tool exposure for enabled skills
-- forwarding the final request to the underlying provider set
-
-This is the backend layer that most directly turns user intent into a real completion call.
+- request construction from history plus the current turn
+- attachment preparation
+- tool availability and tool choice preparation
+- skill context and skill-related behavior when enabled
+- forwarding the final request to the selected provider
 
 ## Local storage and catalog services
 
-Most user-visible reusable content is managed by store packages under `internal/`.
+Most reusable content in FlexiGPT is backed by local stores.
 
-| Package                    | Broad role                                                                        | What the user gets from it                      |
-| -------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------- |
-| `internal/setting`         | Theme, debug settings, and auth-key storage with keyring-backed secret handling.  | Keys, theme, and debug control.                 |
-| `internal/conversation`    | Local conversation persistence plus local full-text search support.               | Saved chats, search, reopen, export continuity. |
-| `internal/modelpreset`     | Provider and model preset catalogs, including built-ins and user-defined entries. | Multi-provider model setup and defaults.        |
-| `internal/prompt`          | Prompt bundle and template storage.                                               | Reusable prompt structure.                      |
-| `internal/tool`            | Tool bundle and tool definition storage.                                          | Callable capability catalog.                    |
-| `internal/skill`           | Skill bundle and skill storage plus runtime-aware session behavior.               | Reusable workflow frames.                       |
-| `internal/assistantpreset` | Assistant preset storage referencing model, prompt, tool, and skill selections.   | Reusable starting workspaces.                   |
+| Area                  | Broad role                                                                 | What the user gets                                  |
+| --------------------- | -------------------------------------------------------------------------- | --------------------------------------------------- |
+| **Settings**          | Theme, debug settings, and auth-key handling with OS keyring protection.   | Keys, theme, and debug control.                     |
+| **Conversations**     | Local conversation persistence and local search support.                   | Saved chats, search, reopen, and export continuity. |
+| **Model presets**     | Provider and model preset catalogs, including built-ins and local entries. | Multi-provider model setup and defaults.            |
+| **Prompts**           | Prompt bundle and template storage.                                        | Reusable request structure.                         |
+| **Tools**             | Tool bundle and tool definition storage.                                   | Callable capability catalog.                        |
+| **Skills**            | Skill bundle and skill storage plus session-aware behavior.                | Reusable workflow modes.                            |
+| **Assistant presets** | Preset storage that references model, prompt, tool, and skill selections.  | Reusable starting workspaces.                       |
 
 ## Runtime execution services
 
-A second group of backend modules exists to execute or transform work rather than simply store it.
+A second group of backend services executes or transforms work rather than simply storing it.
 
-| Package                 | Broad role                                                                       | What the user gets from it                                                        |
-| ----------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `internal/toolruntime`  | Execute supported tools from stored tool definitions.                            | Local or HTTP-backed tool actions inside chat workflows.                          |
-| `internal/attachment`   | Turn files, images, PDFs, and URLs into normalized content blocks for inference. | Attachments that actually become usable request context.                          |
-| `internal/llmtoolsutil` | Register and call local Go tool functions.                                       | Built-in callable runtime functions.                                              |
-| `internal/builtin`      | Expose built-in catalogs embedded into the app binary.                           | Ready-to-use starting content on first launch.                                    |
-| `internal/overlay`      | Support local overlay state where built-in data needs mutable runtime flags.     | Built-ins that can still be enabled or disabled without editing embedded content. |
+| Area                        | Broad role                                                            | What the user gets                                                       |
+| --------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **Tool runtime**            | Executes supported tools from stored definitions.                     | Local or HTTP-backed tool actions inside chat workflows.                 |
+| **Attachment handling**     | Turns files, images, PDFs, and URLs into request-ready content.       | Attachments that become usable context.                                  |
+| **Built-in catalogs**       | Exposes built-in content shipped with the app.                        | Ready-to-use defaults on first launch.                                   |
+| **Overlay and local state** | Lets built-in content participate in local enabled or disabled state. | Built-ins that can still be managed without editing shipped definitions. |
 
 ## Built-ins plus local customization
 
-Several store layers use the same architectural pattern:
+Several store layers use the same pattern:
 
-- built-in data is embedded with the app
+- built-in data ships with the app
 - user-defined data is stored locally
 - the runtime presents a merged working view
-- built-ins remain conceptually read-only definitions while still allowing some mutable flags such as enable or disable behavior
+- built-in entries remain conceptually read-only while still allowing local enable or disable behavior
 
-That pattern matters because it explains how FlexiGPT can ship usable defaults without giving up local customization.
+That is why FlexiGPT can ship usable defaults without giving up local customization.
 
 ## Completion request flow
 
 ```mermaid
 flowchart LR
-    Composer[Composer state and current turn]
-    Aggregate[Aggregate wrapper]
-    Presets[Model preset and settings stores]
-    Inference[ProviderSetAPI in inferencewrapper]
-    Attachments[Attachment normalization]
-    Tools[Tool store and tool choices]
-    Skills[Skill store and skill prompt runtime]
+    Composer[Conversation setup and current turn]
+    Aggregate[Orchestration layer]
+    Presets[Settings and model preset stores]
+    Inference[Request-building layer]
+    Attachments[Attachment preparation]
+    Tools[Tool catalog and tool choices]
+    Skills[Skill catalog and skill context]
     Provider[Selected provider]
     Stream[Streamed events and final response]
 
@@ -147,28 +136,28 @@ One important backend distinction is that not all execution behaves the same way
 This is the normal model request path:
 
 - gather model and conversation state
-- build provider request
-- stream response
+- build the provider request
+- stream the response
 - persist assistant output
 
 ### Tool runtime flow
 
 This is the local or HTTP execution path for user-managed tools:
 
-- load the tool definition from the tool store
-- validate the requested tool version and enabled state
+- load the tool definition
+- validate the requested tool and its enabled state
 - execute the appropriate runner
-- return structured tool outputs back into the conversation workflow
+- return structured output into the conversation workflow
 
-This separation is why tool-assisted conversations can stay inside the same chat UI while still having a different execution path behind the scenes.
+This separation is why tool-assisted conversations can stay inside the same chat UI while still following a different execution path behind the scenes.
 
 ## What the user gets from the backend architecture
 
-The user does not see package names, but they do feel the results:
+The user does not need to see the internal service layout, but they do feel the results:
 
 - conversations remain local
 - reusable catalogs survive across app launches
 - built-in starting content is available immediately
-- provider keys and model setup can be managed separately from chat behavior
+- provider keys and model setup stay separate from chat behavior
 - tool and skill workflows can exist inside a normal chat loop
 - debugging and inspection can go deeper when needed

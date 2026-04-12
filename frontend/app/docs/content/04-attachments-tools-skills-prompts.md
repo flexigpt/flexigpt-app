@@ -1,10 +1,10 @@
 # Attachments, Tools, Skills, and Prompts
 
-These features are where FlexiGPT moves beyond plain chat text.
+These features help FlexiGPT go beyond plain chat text.
 
-## Attachments: bring the right source material into the turn
+## Attachments: bring source material into the request
 
-The composer can attach more than one kind of context. Attachments can include:
+Attachments can include:
 
 - local files
 - folders that expand into file attachments
@@ -14,127 +14,117 @@ The composer can attach more than one kind of context. Attachments can include:
 
 ### Why attachments matter
 
-Attachments reduce ambiguity. Good uses include:
+Attachments reduce ambiguity. Good examples include:
 
 - attaching the exact file you want explained
 - attaching a focused folder instead of describing it vaguely
 - attaching a PDF you want summarized
 - attaching a URL when the page content matters more than the bare link
 
-### What the app does with attachments
-
-The attachment pipeline normalizes attachments into content blocks that can become:
-
-- text content
-- image content
-- file content
-
-That means the practical effect of an attachment depends on its type and on provider support.
-
 ### Best practices for attachments
 
 - prefer a few relevant files over a broad dump
 - remove stale attachments before sending again
 - remember that older attachments only return when the older user turn is included again
-- treat URL attachments as fetched content, not just a hyperlink reference
+- treat URL attachments as content you may be sending, not just as a hyperlink
 
-## Tools: explicit callable capability
+## Prompt templates and system prompts solve different problems
+
+### Prompt templates
+
+Use a prompt template when the current request should follow a reusable structure.
+
+Examples:
+
+- implementation briefs
+- review formats
+- rewrite requests
+- recurring team conventions
+
+### System prompts
+
+Use system prompts when behavior rules should remain active across turns.
+
+A simple way to remember the difference:
+
+- **Prompt template**: shapes the request you are sending now
+- **System prompt**: shapes how the assistant should behave across the conversation
+
+## Tools: callable capability inside the conversation
 
 Tools are managed on the **Tools** page and attached in the composer.
 
-### What a tool does in the workflow
+A tool makes a capability available to the model for a conversation. Depending on the tool, execution may happen through local runtime behavior, HTTP-backed behavior, or provider-coupled capability.
 
-A tool is a capability that can be made available to the model for a conversation.
+## Tool choice, tool call, and tool output are different things
 
-Depending on the tool definition, execution can happen through:
-
-- local Go-backed runtime
-- HTTP-backed runtime
-- provider-side SDK behavior for specific tool categories
-
-### Conversation tools versus tool calls
-
-There are two different ideas to keep separate:
+Keep these three steps separate:
 
 - **Tool choice**: you make a tool available to the conversation
-- **Tool call**: the model decides to call that tool with specific arguments
+- **Tool call**: the model proposes using that tool with specific arguments
+- **Tool output**: the result produced after the tool runs
 
-The runtime then decides whether the tool is:
+That distinction matters because availability, execution, and continued conversation are related but not identical steps.
 
-- waiting for manual action
-- auto-executable
-- blocked because required arguments are still missing
+## Human-in-loop and auto-execute tool flows
 
-### Auto-execute and manual review
+### Human-in-loop
 
-The composer tool runtime supports both styles.
+Use manual review when you want tighter control.
 
-- Use **manual** when you want to inspect a tool call before it runs.
-- Use **auto-execute** when the workflow is trusted enough to let the tool loop continue automatically.
+The flow is:
 
-When an auto-executable call is produced and the required arguments are satisfied, FlexiGPT can execute it and continue the tool-assisted flow without requiring a separate manual send for each step i.e auto-submit.
+1. the model proposes a tool call
+2. you review it
+3. you choose whether to run it
+4. the output can then be submitted back into the conversation
 
-### Tool outputs become context
+### Auto-execute and auto-submit
 
-After execution, tool outputs can become part of what the next request sees.
+Use **auto-execute** when a trusted workflow should continue with less manual interruption.
 
-This is why tool-assisted conversations feel different from plain chat: the model is no longer working only from your typed text.
+When an eligible tool call appears and the required arguments are present, FlexiGPT can:
 
-## Web search: provider-dependent, not a generic local tool
+1. run the tool automatically
+2. capture the result
+3. submit that result back to the model so the conversation continues
+
+This is the app's more agentic mode. It is still bounded by the tools you enabled and the execution mode you chose.
+
+## Web search: provider-dependent capability
 
 Web search is exposed separately from normal local tool runtime.
 
 In practice:
 
-- it only appears when compatible with the current provider setup
+- it appears only when compatible with the current provider setup
 - changing providers can remove incompatible web-search options
-- it is useful when freshness matters, not as a default for every task
+- it is most useful when freshness matters, not as a default for every task
 
-Because it is provider-coupled, web search should be treated as a request capability of the current model setup rather than as a universal local feature.
+Treat web search as a capability of the current model setup rather than as a universal local feature.
 
-## Skills: reusable workflow frames
+## Skills: reusable workflow modes
 
-Skills are managed on the **Skills** page and enabled inside a conversation. The apps skill runtime supports:
+Skills are managed on the **Skills** page and enabled inside a conversation.
 
-- skill sessions
-- runtime skill discovery through available/active skills prompt instructions
-- skill tools such as load, unload, and read-resource behavior
+From a user perspective, a skill is best used when you want the model to approach a task in a more consistent way across turns.
 
-From a user perspective, skills are best used when you want the model to approach a task in a consistent way across turns.
-
-Examples of when skills make sense:
+Examples:
 
 - review-oriented work
 - implementation planning
 - refactoring workflows
 - structured multi-step task framing
 
-## Prompts: reusable request structure
-
-Prompt templates are managed on the **Prompts** page and inserted from the composer.
-
-They are useful when you want repeatable request structure, such as:
-
-- implementation briefs
-- review formats
-- rewrite requests
-- architecture writeups
-- team-specific output conventions
-
-Prompt templates are different from system prompts:
-
-- **Prompt templates** shape the current request content
-- **System prompts** shape the assistant's persistent instruction context for the chat setup
-
 ## A simple way to choose the right feature
 
-Use this quick rule of thumb:
+Use this rule of thumb:
 
 - **Attachment**: when the model needs source material
 - **Prompt template**: when the request should follow reusable structure
 - **System prompt**: when behavior rules should stay active across turns
 - **Tool**: when the model may need execution capability
-- **Skill**: when the conversation should follow a reusable working mode
+- **Skill**: when the conversation should follow a reusable workflow mode
 - **Web search**: when current external information matters
 
 ## Recommended working pattern

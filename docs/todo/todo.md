@@ -2,11 +2,9 @@
 
 ## Laundry list
 
-- [ ] set skill as active immediately button is also needed manually
-- [ ] icon needs to be sharper and cleaner.
 - [ ] test with some skill that has scripts too
 - [ ] test shell and hostspawn exec on mac pkg and win
-- [ ] better docs and better ux inside app.
+- [ ] test all providers again for normal, attach, tool, autoexec, shell , skill flows.
 
 ## Milestone thoughts
 

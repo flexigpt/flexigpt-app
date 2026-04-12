@@ -1,31 +1,31 @@
 # Chats, Composer, and Everyday Workflow
 
-This page focuses on the day-to-day working surface inside FlexiGPT.
+This page focuses on the day-to-day workspace inside FlexiGPT.
 
-## The app surfaces at a glance
+## App surfaces at a glance
 
-| Page                  | What it does                                                                                |
-| --------------------- | ------------------------------------------------------------------------------------------- |
-| **Home**              | Lightweight landing page with entry points into chats and bundled docs.                     |
-| **Chats**             | The primary working area for conversations, tabs, local search, messages, and the composer. |
-| **Assistant Presets** | Manage reusable starting setups.                                                            |
-| **Prompts**           | Manage prompt bundles and templates.                                                        |
-| **Tools**             | Manage tool bundles and tool definitions.                                                   |
-| **Skills**            | Manage skill bundles and skills.                                                            |
-| **Model Presets**     | Manage providers, model presets, and the default provider.                                  |
-| **Settings**          | Manage theme, provider keys, and debug settings.                                            |
-| **Docs**              | Read the bundled user and architecture docs.                                                |
+| Page                  | What it is for                                                              |
+| --------------------- | --------------------------------------------------------------------------- |
+| **Home**              | Lightweight entry point into chats and bundled docs.                        |
+| **Chats**             | Main workspace for conversations, tabs, search, messages, and the composer. |
+| **Assistant Presets** | Manage reusable starting setups.                                            |
+| **Prompts**           | Manage prompt bundles and templates.                                        |
+| **Tools**             | Manage tool bundles and tool definitions.                                   |
+| **Skills**            | Manage skill bundles and skills.                                            |
+| **Model Presets**     | Manage providers, model presets, and the default provider.                  |
+| **Settings**          | Manage theme, provider keys, and debug settings.                            |
+| **Docs**              | Read the bundled setup, user, and architecture docs.                        |
 
-## What the Chats page is made of
+## What the Chats page brings together
 
-The `Chats` route stitches together four major responsibilities:
+The **Chats** page combines four responsibilities in one place:
 
-- **conversation search** in the title bar
-- **chat tabs** across open conversations
-- **conversation area** for the selected thread
-- **composer** for the next request
+- conversation search
+- chat tabs
+- the active conversation timeline
+- the composer for the next request
 
-That structure matters because most of the app's actual day-to-day work happens here.
+That is why most everyday work happens there.
 
 ## A normal workflow
 
@@ -33,90 +33,115 @@ That structure matters because most of the app's actual day-to-day work happens 
 
 On **Chats**, you can:
 
-- start from a fresh tab
-- switch between existing tabs
+- start a fresh conversation
+- switch between open tabs
 - search local history
-- reopen a stored conversation into the current workspace
+- reopen a saved conversation
 - export the current conversation as JSON
 
-The conversation store keeps these threads locally, and the search surface uses the local conversation index. Also, FlexiGPT keeps multiple chat tabs open so you can compare or continue different threads without losing your place.
+Multiple tabs make it easier to compare or continue different threads without losing your place.
 
 ### 2. Configure the next request in the context bar
 
-At the top of the composer, the context bar controls the setup for the next request. This bar is where you decide the shape of the next request before you add turn-specific context. Use this bar when you are changing how the chat should behave.
+At the top of the composer, the context bar controls the setup for the next request.
+
+Use it when you want to change how the next request should run.
 
 Examples:
 
 - switch to a stronger model
 - reduce temperature for a stricter answer
 - shrink the history window because the thread drifted
-- open advanced parameters for output constraints
+- open advanced parameters for more control
 
-| Control                      | What it influences                                                              |
-| ---------------------------- | ------------------------------------------------------------------------------- |
-| **Assistant Preset**         | Reusable starting workspace for model, instructions, tools, and skills.         |
-| **Model**                    | Active provider and model choice for the request.                               |
-| **Temperature or Reasoning** | The quality and style controls exposed by the selected model capabilities.      |
-| **Output Verbosity**         | Output verbosity when the current model supports it.                            |
-| **Previous user turns**      | How much earlier user context is resent.                                        |
-| **Advanced parameters**      | Streaming, token limits, timeout, output format, stop sequences, cache control. |
+| Control                      | What it influences                                                                                           |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| **Assistant Preset**         | Reusable starting workspace for model, instructions, tools, and skills.                                      |
+| **Model**                    | Active provider and model choice for the request.                                                            |
+| **Temperature or Reasoning** | Quality and style controls exposed by the selected model.                                                    |
+| **Output Verbosity**         | Output verbosity when the current model supports it.                                                         |
+| **Previous user turns**      | How much earlier user context is resent.                                                                     |
+| **Advanced parameters**      | Streaming, token limits, timeout, output format, stop sequences, cache control, and similar request options. |
 
-### 3. Prepare the message in the editor area
+### 3. Prepare the current turn in the editor area
 
-Below the context bar, the editor area is where you build the current turn.
+Below the context bar, the editor area is where you build the current request.
 
-That includes:
+That can include:
 
-- the message text itself
-- current attachments
+- the message text
+- attachments
 - prompt template insertion
 - system prompt selection
 - conversation tool choices
 - web-search selection when supported
 - skill selection
-- pending tool calls and tool outputs when the conversation is in a tool-assisted flow
+- pending tool calls and tool outputs in tool-assisted flows
 
-In practice, this is the place where human input, reusable configuration, and execution helpers come together.
+This is where human input, reusable configuration, and execution helpers come together.
 
-### 4. Add context and helpers using the composer bottom bar
+### 4. Add only the context that helps
 
-The composer bottom bar lets you add the supporting pieces for the next request. Use it when you are changing what the model should see or what it may use.
+The composer lets you add supporting context for the current request.
 
-Examples:
+Common examples:
 
 - **Attachments** for files, folders, images, PDFs, and URLs
 - **System Prompt** sources for durable instructions
-- **Prompts** for reusable templates
-- **Tools** for callable capabilities, including tools you may keep manual or mark for auto-execution
-- **Skills** for reusable workflow frames
-- **Web Search** when compatible with the current provider family
+- **Prompts** for reusable request structure
+- **Tools** for callable capability
+- **Skills** for reusable workflow modes
+- **Web Search** when the current provider supports it and fresh information matters
 
-Use only the pieces that help the current request. More context is not always better context.
+A focused request usually works better than an overloaded one.
 
 ## What happens after send
 
 After you send:
 
 - assistant text can stream into the message view
-- responses can render as Markdown, syntax-highlighted code, Mermaid diagrams, and KaTeX math
-- token usage is available after completion
+- responses can render as Markdown, syntax-highlighted code, Mermaid diagrams, and math
+- token usage becomes available after completion
 - citations may appear when the provider returns them
 - tool calls can appear in the thread
-- tool outputs will be visible once executed manually or automatically.
-- message details can help with debugging
+- tool outputs appear once you run them manually or they auto-execute
+- message details help with inspection and debugging
 
-## Reading results inside the message timeline
+## Tool-assisted conversations inside the chat flow
+
+When tools are available to a conversation, the workflow still stays in the chat.
+
+### Manual review
+
+In a manual flow:
+
+- the model proposes a tool call
+- you inspect the call
+- you decide whether to run it
+- the output is then available for the next step in the conversation
+
+### Auto-execute
+
+In an auto-execute flow:
+
+- the model proposes a tool call
+- FlexiGPT runs it automatically when the tool is configured for auto-execution and the call has the required arguments
+- the result is submitted back into the conversation so the model can continue
+
+That is the app's more agentic mode: faster tool loops, but still bounded by the tools you selected and how you configured them.
+
+## Reading results in the message timeline
 
 The message area is more than a plain transcript.
 
-From the current message components, the UI can show:
+It can show:
 
-- markdown-rendered content
-- syntax-highlighted code blocks
+- rendered Markdown
+- code blocks
 - Mermaid diagrams with zoom and export
-- KaTeX math rendering
+- math rendering
 - citations when present
-- attachments, tool choices, tool calls, and tool outputs under the message
+- attachments, tool calls, and tool outputs under messages
 - token usage and message details
 
 Per-message actions can include:
@@ -124,27 +149,25 @@ Per-message actions can include:
 - copy
 - message details
 - token usage
-- markdown toggle
-- Mermaid zoom and export actions where applicable
+- Markdown toggle
+- Mermaid actions where applicable
 - edit and resend for user messages
-
-The assistant and user messages are also treated differently in the UI, which makes it easier to inspect the structure of the conversation.
 
 ## Editing and branching
 
 User messages can be edited and resent.
 
-The current send flow is important here:
+When you resend an earlier user message:
 
-- the selected user message is loaded back into the composer
-- when you resend it, later messages in that branch are dropped
+- that message is loaded back into the composer
+- later messages in that branch are dropped
 - the updated message becomes the new continuation point
 
-This is a deliberate branching model, not a hidden patch on the old transcript.
+That makes resend a branching workflow rather than a hidden patch on the old transcript.
 
-## Search, tabs, and scroll state
+## Search, tabs, and continuity
 
-The chat workspace also handles a lot of local working-state responsibilities for you.
+The chat workspace also preserves local working context for you.
 
 That includes:
 
@@ -152,16 +175,16 @@ That includes:
 - reopening saved conversations
 - restoring scroll position
 - handling attachment drops into the active tab
-- keeping the selected tab's composer and runtime state aligned with the selected conversation
+- keeping the active tab's composer and runtime state aligned with the selected conversation
 
 ## When to leave the Chats page
 
-You stay on **Chats** for most work.
+Stay on **Chats** for most work.
 
-You usually leave it only when you need to change the reusable building blocks behind the chat, such as:
+Leave it when you need to change the reusable building blocks behind the chat, such as:
 
 - creating or editing an assistant preset
 - updating a tool definition
-- adding a new prompt template
+- adding a prompt template
 - changing provider or model setup
 - changing auth keys or debug settings

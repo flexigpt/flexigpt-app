@@ -31,8 +31,7 @@ export const docsCategories: DocsCategory[] = [
 			{
 				id: 'getting-started',
 				title: 'Getting Started',
-				summary:
-					'Set up a provider key, open the chat workspace, choose a starting setup, and send your first message.',
+				summary: 'Connect a provider key, open Chats, choose a starting setup, and send the first useful request.',
 				body: gettingStartedBody,
 			},
 			{
@@ -46,28 +45,27 @@ export const docsCategories: DocsCategory[] = [
 				id: 'chats-composer-and-everyday-workflow',
 				title: 'Chats, Composer, and Everyday Workflow',
 				summary:
-					'Learn how the Chats page is put together, how the composer works, and how a normal conversation flows from setup to response.',
+					'Learn how the Chats workspace is structured and how a normal conversation moves from setup to response.',
 				body: chatsWorkflowBody,
 			},
 			{
 				id: 'attachments-tools-skills-and-prompts',
 				title: 'Attachments, Tools, Skills, and Prompts',
 				summary:
-					'Use context and automation intentionally: attachments, prompt templates, tools, web search, and skills all solve different problems.',
+					'Choose the right helper for the job: source material, reusable prompts, tools, web search, and workflow modes.',
 				body: contextAndToolsBody,
 			},
 			{
 				id: 'presets-providers-and-settings',
 				title: 'Presets, Providers, and Settings',
 				summary:
-					'See which admin page owns which reusable building block: assistant presets, prompts, tools, skills, model presets, and app settings.',
+					'See which page manages which reusable building block, from assistant presets to providers, keys, and debug settings.',
 				body: presetsProvidersSettingsBody,
 			},
 			{
 				id: 'privacy-storage-and-troubleshooting',
 				title: 'Privacy, Storage, and Troubleshooting',
-				summary:
-					'Understand what stays local, what can be sent to providers, how debug settings affect visibility, and what to check when a workflow fails.',
+				summary: 'Understand what stays local, what can be sent to providers, and what to check when a workflow fails.',
 				body: privacyAndTroubleshootingBody,
 			},
 		],
@@ -75,27 +73,27 @@ export const docsCategories: DocsCategory[] = [
 	{
 		id: 'architecture',
 		title: 'Architecture',
-		summary: '',
+		summary: 'Advanced reference for how the app is organized and how requests move through it.',
 		sections: [
 			{
 				id: 'architecture-overview',
 				title: 'Architecture Overview',
 				summary:
-					'See the app as a set of stable roles: frontend surfaces, Wails bridge, backend stores and runtimes, providers, and local execution.',
+					'See the app as a set of stable roles: frontend surfaces, desktop bridge, backend stores and runtimes, providers, and local execution.',
 				body: architectureOverviewBody,
 			},
 			{
 				id: 'frontend-roles-and-responsibilities',
 				title: 'Frontend Roles and Responsibilities',
 				summary:
-					'Understand which frontend surfaces act as stitching layers, how the Chats workspace is composed, and what each major module group contributes.',
+					'Understand how the frontend coordinates the Chats workspace, docs, management pages, and typed app APIs.',
 				body: frontendRolesBody,
 			},
 			{
 				id: 'backend-roles-and-data-flow',
 				title: 'Backend Roles and Data Flow',
 				summary:
-					'Understand the Wails app shell, wrapper boundaries, store packages, runtimes, built-ins, and the end-to-end request path.',
+					'Understand local stores, request orchestration, tool and skill runtimes, and the end-to-end request path.',
 				body: backendRolesBody,
 			},
 		],
