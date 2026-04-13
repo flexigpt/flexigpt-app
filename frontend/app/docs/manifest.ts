@@ -74,12 +74,14 @@ export const docsCategories: DocsCategory[] = [
 	{
 		id: 'architecture',
 		title: 'Architecture',
-		summary: 'Reference pages for how the app is organized and how the major domains fit together.',
+		summary:
+			'Reference pages for the system-level view, frontend and backend ownership, and the detailed chats workspace design.',
 		sections: [
 			{
 				id: 'architecture-overview',
 				title: 'Architecture Overview',
-				summary: 'See the frontend as a set of systems and the backend boundary.',
+				summary:
+					'See FlexiGPT as a local-first desktop system: frontend surfaces, Wails boundary, backend domains, local storage, and external provider/runtime edges.',
 				body: architectureOverviewBody,
 			},
 			{
