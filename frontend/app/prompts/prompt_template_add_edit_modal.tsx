@@ -426,7 +426,15 @@ function AddEditPromptTemplateModalContent({
 		}
 	};
 
-	const isAllValid = isViewMode ? true : Object.keys(validateForm(formData)).length === 0;
+	// Memoize so validateForm only re-runs when formData actually changes,
+	// not on every parent-triggered re-render.
+	const isAllValid = useMemo(
+		() => (isViewMode ? true : Object.keys(validateForm(formData)).length === 0),
+		// validateForm captures existingTemplates / initialTemplate* which are
+		// stable for the lifetime of a single modal mount — safe to omit.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[isViewMode, formData]
+	);
 
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
 		e.preventDefault();

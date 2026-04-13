@@ -686,7 +686,7 @@ function AddEditToolModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3 cursor-pointer">
-								<span className="label-text text-sm">AutoExecute Recommendation</span>
+								<span className="label-text text-sm">AutoExecute</span>
 							</label>
 							<div className="col-span-9">
 								<input

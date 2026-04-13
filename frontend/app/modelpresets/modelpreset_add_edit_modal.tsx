@@ -525,62 +525,69 @@ function AddEditModelPresetModalContent({
 		return patch;
 	}, [formData, initialData, supportedCacheKinds, supportsCacheKey]);
 
-	const runValidation = useCallback((): ValidationErrors => {
-		if (isReadOnly) return {};
+	/**
+	 * Validates the form with optional overrides for the next-state values.
+	 * Pass overrides when calling from handleChange so errors reflect the
+	 * new value immediately (before React batches the state update).
+	 */
+	const computeValidation = useCallback(
+		(overrides?: {
+			formDataOverride?: ModelPresetFormData;
+			modelPresetIDOverride?: ModelPresetID;
+		}): ValidationErrors => {
+			const fd = overrides?.formDataOverride ?? formData;
+			const mpid = overrides?.modelPresetIDOverride ?? modelPresetID;
 
-		const nextErrors: ValidationErrors = {};
+			if (isReadOnly) return {};
 
-		if (!isEditMode) {
-			const idTrim = modelPresetID.trim();
-			if (!idTrim) nextErrors.modelPresetID = 'Model Preset ID is required.';
-			else if (!/^[a-zA-Z0-9-]+$/.test(idTrim))
-				nextErrors.modelPresetID = 'Only letters, numbers, and hyphens allowed.';
-			else if (Object.prototype.hasOwnProperty.call(existingModels, idTrim))
-				nextErrors.modelPresetID = 'Model Preset ID must be unique.';
-		}
+			const nextErrors: ValidationErrors = {};
 
-		if (!formData.name.trim()) nextErrors.name = 'Model Name is required.';
-		if (!formData.presetLabel.trim()) nextErrors.presetLabel = 'Preset Label is required.';
-
-		const maybeValidateNumeric = (field: ValidationField, range?: { min?: number; max?: number }) => {
-			const value =
-				field === 'modelPresetID' ? modelPresetID : (formData[field as keyof ModelPresetFormData] as string);
-			nextErrors[field] = calcNumericError(field, value, range);
-		};
-
-		maybeValidateNumeric('temperature', { min: 0, max: 1 });
-		maybeValidateNumeric('maxPromptLength', { min: 1 });
-		maybeValidateNumeric('maxOutputLength', { min: 1 });
-		maybeValidateNumeric('timeout', { min: 1 });
-
-		if (formData.reasoningSupport && formData.reasoningType === ReasoningType.HybridWithTokens) {
-			if ((formData.reasoningTokens ?? '').trim() === '') {
-				nextErrors.reasoningTokens = 'Reasoning Tokens is required for Hybrid mode.';
-			} else {
-				maybeValidateNumeric('reasoningTokens', { min: 1024 });
+			if (!isEditMode) {
+				const idTrim = mpid.trim();
+				if (!idTrim) nextErrors.modelPresetID = 'Model Preset ID is required.';
+				else if (!/^[a-zA-Z0-9-]+$/.test(idTrim))
+					nextErrors.modelPresetID = 'Only letters, numbers, and hyphens allowed.';
+				else if (Object.prototype.hasOwnProperty.call(existingModels, idTrim))
+					nextErrors.modelPresetID = 'Model Preset ID must be unique.';
 			}
-		}
 
-		const hasTemperature = formData.temperature.trim() !== '';
-		const effectiveHasTemperature = hasTemperature || (isEditMode && initialData?.temperature !== undefined);
-		const effectiveHasReasoning = formData.reasoningSupport || (isEditMode && !!initialData?.reasoning);
+			if (!fd.name.trim()) nextErrors.name = 'Model Name is required.';
+			if (!fd.presetLabel.trim()) nextErrors.presetLabel = 'Preset Label is required.';
 
-		if (!effectiveHasReasoning && !effectiveHasTemperature) {
-			nextErrors.temperature = 'Provide either Temperature or enable Reasoning for new presets.';
-		}
+			const maybeValidateNumeric = (field: ValidationField, range?: { min?: number; max?: number }) => {
+				const value = field === 'modelPresetID' ? mpid : (fd[field as keyof ModelPresetFormData] as string);
+				nextErrors[field] = calcNumericError(field, value, range);
+			};
 
-		return Object.fromEntries(
-			Object.entries(nextErrors).filter(([key]) => nextErrors[key as ValidationField] !== undefined)
-		) as ValidationErrors;
-	}, [
-		existingModels,
-		formData,
-		initialData?.reasoning,
-		initialData?.temperature,
-		isEditMode,
-		isReadOnly,
-		modelPresetID,
-	]);
+			maybeValidateNumeric('temperature', { min: 0, max: 1 });
+			maybeValidateNumeric('maxPromptLength', { min: 1 });
+			maybeValidateNumeric('maxOutputLength', { min: 1 });
+			maybeValidateNumeric('timeout', { min: 1 });
+
+			if (fd.reasoningSupport && fd.reasoningType === ReasoningType.HybridWithTokens) {
+				if ((fd.reasoningTokens ?? '').trim() === '') {
+					nextErrors.reasoningTokens = 'Reasoning Tokens is required for Hybrid mode.';
+				} else {
+					maybeValidateNumeric('reasoningTokens', { min: 1024 });
+				}
+			}
+
+			const hasTemperature = fd.temperature.trim() !== '';
+			const effectiveHasTemperature = hasTemperature || (isEditMode && initialData?.temperature !== undefined);
+			const effectiveHasReasoning = fd.reasoningSupport || (isEditMode && !!initialData?.reasoning);
+
+			if (!effectiveHasReasoning && !effectiveHasTemperature) {
+				nextErrors.temperature = 'Provide either Temperature or enable Reasoning for new presets.';
+			}
+
+			return Object.fromEntries(
+				Object.entries(nextErrors).filter(([key]) => nextErrors[key as ValidationField] !== undefined)
+			) as ValidationErrors;
+		},
+		[existingModels, formData, initialData?.reasoning, initialData?.temperature, isEditMode, isReadOnly, modelPresetID]
+	);
+
+	const runValidation = useCallback(() => computeValidation(), [computeValidation]);
 
 	const isAllValid = useMemo(() => {
 		if (isReadOnly) return true;
@@ -677,16 +684,19 @@ function AddEditModelPresetModalContent({
 
 		if (name === 'modelPresetID') {
 			setModelPresetID(value);
+			// Show ID field errors immediately without waiting for submit.
+			setErrors(computeValidation({ modelPresetIDOverride: value }));
 			return;
 		}
 
 		const nextValue: string | boolean = type === 'checkbox' ? checked : value;
 		const fieldName = name as keyof ModelPresetFormData;
+		// Compute next state synchronously so errors reflect the new value
+		// before React processes the batched setFormData update.
+		const nextFormData = { ...formData, [fieldName]: nextValue } as ModelPresetFormData;
 
-		setFormData(prev => ({
-			...prev,
-			[fieldName]: nextValue,
-		}));
+		setFormData(prev => ({ ...prev, [fieldName]: nextValue }));
+		setErrors(computeValidation({ formDataOverride: nextFormData }));
 	};
 
 	const title = mode === 'add' ? 'Add Model Preset' : mode === 'edit' ? 'Edit Model Preset' : 'View Model Preset';

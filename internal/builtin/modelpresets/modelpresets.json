@@ -411,7 +411,7 @@
 					"maxForcedTools": 1
 				}
 			},
-			"defaultModelPresetID": "gemini31Pro",
+			"defaultModelPresetID": "gemini25Flash",
 			"modelPresets": {
 				"gemini31Pro": {
 					"schemaVersion": "2025-07-01",
@@ -419,26 +419,13 @@
 					"name": "gemini-3.1-pro-preview",
 					"displayName": "GoogleAI Gemini 3.1 Pro",
 					"slug": "gemini31Pro",
-					"isEnabled": true,
+					"isEnabled": false,
 					"stream": true,
 					"maxPromptLength": 200000,
 					"maxOutputLength": 65536,
-					"temperature": 1.0,
-					"reasoning": {
-						"type": "singleWithLevels",
-						"level": "high",
-						"tokens": 0
-					},
+					"temperature": 0.1,
 					"systemPrompt": "",
 					"timeout": 1800,
-					"capabilitiesOverride": {
-						"reasoningCapabilities": {
-							"temperatureDisallowedWhenEnabled": true,
-							"supportedReasoningTypes": ["singleWithLevels"],
-							"supportedReasoningLevels": ["low", "medium", "high"],
-							"supportsSummaryStyle": true
-						}
-					},
 					"createdAt": "2025-11-19T00:00:00Z",
 					"modifiedAt": "2025-11-19T00:00:00Z",
 					"isBuiltIn": true
@@ -449,7 +436,7 @@
 					"name": "gemini-3-flash-preview",
 					"displayName": "GoogleAI Gemini 3 Flash",
 					"slug": "gemini3Flash",
-					"isEnabled": true,
+					"isEnabled": false,
 					"stream": true,
 					"maxPromptLength": 200000,
 					"maxOutputLength": 65536,
@@ -484,21 +471,8 @@
 					"maxPromptLength": 200000,
 					"maxOutputLength": 65536,
 					"temperature": 0.1,
-					"reasoning": {
-						"type": "singleWithLevels",
-						"level": "medium",
-						"tokens": 0
-					},
 					"systemPrompt": "",
 					"timeout": 1800,
-					"capabilitiesOverride": {
-						"reasoningCapabilities": {
-							"temperatureDisallowedWhenEnabled": true,
-							"supportedReasoningTypes": ["singleWithLevels"],
-							"supportedReasoningLevels": ["low", "medium", "high"],
-							"supportsSummaryStyle": true
-						}
-					},
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -509,26 +483,13 @@
 					"name": "gemini-2.5-flash-lite-preview-06-17",
 					"displayName": "GoogleAI Gemini 2.5 Flash Lite",
 					"slug": "gemini25FlashLite",
-					"isEnabled": false,
+					"isEnabled": true,
 					"stream": true,
 					"maxPromptLength": 200000,
 					"maxOutputLength": 65536,
 					"temperature": 0.1,
-					"reasoning": {
-						"type": "singleWithLevels",
-						"level": "medium",
-						"tokens": 0
-					},
 					"systemPrompt": "",
 					"timeout": 1800,
-					"capabilitiesOverride": {
-						"reasoningCapabilities": {
-							"temperatureDisallowedWhenEnabled": true,
-							"supportedReasoningTypes": ["singleWithLevels"],
-							"supportedReasoningLevels": ["low", "medium", "high"],
-							"supportsSummaryStyle": true
-						}
-					},
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -1325,14 +1286,14 @@
 					"maxForcedTools": 1
 				}
 			},
-			"defaultModelPresetID": "qwen3CoderFree",
+			"defaultModelPresetID": "nvidiaNemotron3SuperFree",
 			"modelPresets": {
-				"qwen3CoderFree": {
+				"nvidiaNemotron3SuperFree": {
 					"schemaVersion": "2025-07-01",
-					"id": "qwen3CoderFree",
-					"name": "qwen/qwen3-coder:free",
-					"displayName": "OR Qwen 3 Coder Free",
-					"slug": "qwen3CoderFree",
+					"id": "nvidiaNemotron3SuperFree",
+					"name": "nvidia/nemotron-3-super-120b-a12b:free",
+					"displayName": "NVIDIA Nemotron 3 Super 120B A12B",
+					"slug": "nvidiaNemotron3SuperFree",
 					"isEnabled": true,
 					"stream": true,
 					"maxPromptLength": 32768,
