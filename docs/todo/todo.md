@@ -8,7 +8,7 @@
 
 ## Milestone thoughts
 
-- [ ] M1 - API coverage - Pending items:
+- [x] M1 - API coverage - Pending items:
   - [x] Modalities coverage:
     - [x] Text
       - [x] content in/out

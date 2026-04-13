@@ -1,145 +1,89 @@
 # Architecture Overview
 
-This page is an advanced reference for how FlexiGPT is organized at a high level.
+This page describes FlexiGPT as a system of domains and responsibilities.
+The goal is to show which parts own which concerns, how the parts fit together,
+and where the major architectural decisions live.
 
-The goal is to explain:
-
-- which major parts of the app are responsible for what
-- how user-facing pages relate to local services and model providers
-- how a request moves through the app
-- where presets, prompts, tools, and skills fit
-
-## FlexiGPT at a glance
+## System view
 
 ```mermaid
 flowchart LR
     User[User]
 
-    subgraph Frontend[Frontend app]
-        Home[Home and Docs]
-        Chats[Chats workspace]
-        Admin[Management pages]
-        API[Typed frontend API boundary]
+    subgraph Frontend["Frontend surfaces"]
+        FrontendBox["Chats\nManagement pages\nDocs"]
     end
 
-    subgraph Bridge[Desktop bridge]
-        Bindings[App bindings and lifecycle]
+    subgraph Shell["App shell"]
+        ShellBox["Typed API bindings\nLifecycle/window management"]
     end
 
-    subgraph Backend[Backend services]
-        Stores[Local stores and built-in catalogs]
-        Runtime[Request, tool, and skill runtimes]
-        Logs[Logging and debug behavior]
+    subgraph Backend["Backend core"]
+        BackendBox["Catalogs\nConversations\nAttachments\nOrchestration"]
+        BuiltinsBox["Built-in catalogs"]
     end
 
-    subgraph External[External and local execution targets]
-        Providers[LLM providers and compatible endpoints]
-        LocalExec[Local tool execution and filesystem access]
+    subgraph Local["Local persistence"]
+        LocalBox["Mapstore-backed file stores\nSQLite overlay stores\nFTS engine"]
     end
 
-    User --> Home
-    User --> Chats
-    User --> Admin
-    Home --> API
-    Chats --> API
-    Admin --> API
-    API --> Bindings
-    Bindings --> Stores
-    Bindings --> Runtime
-    Bindings --> Logs
-    Runtime --> Providers
-    Runtime --> LocalExec
-    Stores --> Runtime
+    subgraph Capabilities["External capability libraries"]
+        CapBox["inference-go\nllmtools-go\nagentskills-go"]
+    end
+
+    User --> FrontendBox
+    FrontendBox --> ShellBox
+    ShellBox --> BackendBox
+    ShellBox --> BuiltinsBox
+    BackendBox --> LocalBox
+    BackendBox --> CapBox
+    BuiltinsBox --> LocalBox
 ```
 
-## Stable responsibility split
+## Domain responsibilities
 
-| Area                                      | Stable role                                                                                                         | User-visible outcome                                                     |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| **Home and Docs**                         | Provide entry points into the main workspace and bundled reference material.                                        | Faster onboarding and in-app reference.                                  |
-| **Chats workspace**                       | Bring together search, tabs, conversation display, composer state, sending, streaming, and tool-assisted follow-up. | Day-to-day work happens here.                                            |
-| **Management pages**                      | Manage the reusable building blocks behind chat: presets, prompts, tools, skills, provider setup, and settings.     | Reusable workflows instead of reconfiguring each turn by hand.           |
-| **Frontend API boundary**                 | Keep the UI working against typed app APIs rather than ad hoc calls.                                                | Clear separation between interface and app behavior.                     |
-| **Desktop bridge**                        | Connect the frontend to local services, app lifecycle, and bundled assets.                                          | Desktop app behavior instead of a browser-only client.                   |
-| **Backend stores and runtimes**           | Persist local data, expose built-ins, prepare requests, execute tools, manage skills, and stream completions.       | Local-first behavior with reusable catalogs and tool-assisted workflows. |
-| **Providers and local execution targets** | Answer model requests or execute tool work.                                                                         | Responses, citations, tool results, and execution side effects.          |
+| Domain                            | Responsibility                                                                        | Architectural reason                                                       |
+| --------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| **Frontend surfaces**             | Present the docs, chat workspace, and management pages.                               | These are the user entry points and the main coordination surfaces.        |
+| **App shell**                     | Own desktop lifecycle, app startup, bindings, and window behavior.                    | The desktop shell is the boundary between the UI and local Go services.    |
+| **Conversation domain**           | Persist conversation history and support search.                                      | Chat history needs local persistence and queryable recall.                 |
+| **Catalog domains**               | Manage settings, presets, prompts, tools, skills, and assistant presets.              | These are the reusable building blocks for conversations.                  |
+| **Request orchestration**         | Build provider requests from the active conversation state and stream responses back. | This is where user intent becomes model execution.                         |
+| **Attachment preparation**        | Convert files, images, PDFs, and URLs into request-ready content.                     | Attachments need normalization before they can enter a model request.      |
+| **Built-in catalogs**             | Ship ready-to-use defaults and merge them with local content.                         | The app can start useful and still remain local-first.                     |
+| **Local persistence**             | Store local state with file-backed data and small overlay stores.                     | Local data should survive app restarts without a server.                   |
+| **External capability libraries** | Provide provider execution, tool shapes, and skill runtime support.                   | These libraries supply the execution and catalog mechanics behind the app. |
 
-## Two user-facing planes
+## How the app holds together
 
-The app is easiest to understand as two main planes.
+The system works as a chain of responsibilities rather than as a single large service.
+A user works in the frontend, the frontend hands intent to the app shell through typed bindings,
+the backend composes the relevant catalogs and runtime inputs, and the external capability
+libraries carry out provider, tool, and skill work.
 
-### 1. Working plane: Chats
+The important architectural idea is that each major domain owns one responsibility:
 
-This is where configuration becomes action.
+- the frontend owns user interaction and surface composition
+- the shell owns desktop integration and the API boundary
+- the backend owns local state, orchestration, and catalog management
+- the capability libraries own specialized execution and storage primitives
 
-It combines:
+## Where the major external libraries fit
 
-- conversation state
-- request setup
-- turn context
-- response rendering
-- tool-assisted loops
+- `mapstore-go` provides the file-backed store primitives used by the catalog and conversation domains.
+- `inference-go` provides provider lifecycle, capability resolution, and streamed completions.
+- `llmtools-go` provides the common tool definitions and concrete tool implementations used by the app.
+- `agentskills-go` provides the skill runtime and the built-in skill tool shapes used in skill-aware requests.
 
-### 2. Catalog and setup plane: management pages
+## Request path at a glance
 
-These pages prepare the reusable pieces that the chat workflow uses later.
+A typical chat turn follows this broad path:
 
-They answer questions such as:
+1. the user prepares a message in the frontend
+2. the frontend packages the turn through typed app APIs
+3. the app shell routes the call into backend services
+4. the backend resolves the active preset, attachments, tools, and skills
+5. the request is sent through the provider layer
+6. the response streams back to the frontend for display and inspection
 
-- Which providers and models are available?
-- Which prompts, tools, and skills exist?
-- Which assistant presets bundle them into a starting workspace?
-- Which keys and debug settings are active?
-
-## End-to-end request flow
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Chats as Chats and Composer
-    participant Frontend as Frontend state and typed APIs
-    participant Bridge as Desktop bridge
-    participant Backend as Backend services
-    participant Provider as Model provider
-
-    User->>Chats: choose preset, model, context, and message
-    Chats->>Frontend: collect active conversation setup and current turn
-    Frontend->>Bridge: call app APIs
-    Bridge->>Backend: build request from conversation state
-    Backend->>Backend: resolve model settings, prompts, attachments, tools, and skills
-    Backend->>Provider: send completion request
-    Provider-->>Backend: stream tokens and final response
-    Backend-->>Bridge: completion result and stream events
-    Bridge-->>Frontend: push stream updates and final payload
-    Frontend-->>Chats: render the response, details, citations, and tool state
-```
-
-## Where reusable content enters the architecture
-
-FlexiGPT's reusable building blocks exist so the chat workflow does not start from scratch every turn.
-
-- **Model presets** define execution defaults.
-- **Assistant presets** define starting workspace shape.
-- **Prompts** define reusable request structure.
-- **Tools** define callable capability.
-- **Skills** define reusable workflow behavior.
-
-The chat workflow is where these pieces are selected, combined, and turned into a live request.
-
-## Built-ins and local customization
-
-Several parts of the app follow the same broad pattern:
-
-- built-in catalogs ship with the app
-- user-created content is stored locally
-- the runtime presents both together as the working view
-
-That is why FlexiGPT can feel ready to use on first launch while still staying local-first and customizable.
-
-## Why this split matters
-
-For architecture discussions, the most stable questions are:
-
-- which surface owns which role
-- where reusable building blocks are managed
-- how a request gets from user intent to provider execution and back
+The docs in this architecture section explain those responsibilities in more detail.

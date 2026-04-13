@@ -5,8 +5,10 @@ import contextAndToolsBody from '@/docs/content/04-attachments-tools-skills-prom
 import presetsProvidersSettingsBody from '@/docs/content/05-presets-providers-settings.md?raw';
 import privacyAndTroubleshootingBody from '@/docs/content/06-privacy-storage-and-troubleshooting.md?raw';
 import architectureOverviewBody from '@/docs/content/11-architecture-overview.md?raw';
-import frontendRolesBody from '@/docs/content/12-frontend-roles-and-responsibilities.md?raw';
-import backendRolesBody from '@/docs/content/13-backend-roles-and-data-flow.md?raw';
+import backendRolesBody from '@/docs/content/12-backend-roles-and-responsibilities.md?raw';
+import backendHldBody from '@/docs/content/13-backend-hld.md?raw';
+import frontendRolesBody from '@/docs/content/14-frontend-roles-and-responsibilities.md?raw';
+import frontendHldBody from '@/docs/content/15-frontend-hld.md?raw';
 
 type DocsSection = {
 	id: string;
@@ -73,28 +75,37 @@ export const docsCategories: DocsCategory[] = [
 	{
 		id: 'architecture',
 		title: 'Architecture',
-		summary: 'Advanced reference for how the app is organized and how requests move through it.',
+		summary: 'Reference pages for how the app is organized and how the major domains fit together.',
 		sections: [
 			{
 				id: 'architecture-overview',
 				title: 'Architecture Overview',
-				summary:
-					'See the app as a set of stable roles: frontend surfaces, desktop bridge, backend stores and runtimes, providers, and local execution.',
+				summary: 'Understand the app as a set of domains, and the external libraries that supply key capabilities.',
 				body: architectureOverviewBody,
+			},
+			{
+				id: 'backend-roles-and-responsibilities',
+				title: 'Backend Roles and Responsibilities',
+				summary: 'See which backend domains own what.',
+				body: backendRolesBody,
+			},
+			{
+				id: 'backend-hld',
+				title: 'Backend HLD',
+				summary: 'Look at the backend storage choices, module boundaries, and external dependencies.',
+				body: backendHldBody,
 			},
 			{
 				id: 'frontend-roles-and-responsibilities',
 				title: 'Frontend Roles and Responsibilities',
-				summary:
-					'Understand how the frontend coordinates the Chats workspace, docs, management pages, and typed app APIs.',
+				summary: 'See how the frontend owns surfaces, state coordination, and the typed boundary to the backend.',
 				body: frontendRolesBody,
 			},
 			{
-				id: 'backend-roles-and-data-flow',
-				title: 'Backend Roles and Data Flow',
-				summary:
-					'Understand local stores, request orchestration, tool and skill runtimes, and the end-to-end request path.',
-				body: backendRolesBody,
+				id: 'frontend-hld',
+				title: 'Frontend HLD',
+				summary: 'Look at the frontend route model, docs packaging, rendering approach, and backend boundary.',
+				body: frontendHldBody,
 			},
 		],
 	},

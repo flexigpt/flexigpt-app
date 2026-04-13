@@ -87,8 +87,10 @@ The main docs are bundled inside the app and mirrored in this repository under `
 ### Architecture
 
 - [Architecture Overview](./frontend/app/docs/content/11-architecture-overview.md)
-- [Frontend Roles and Responsibilities](./frontend/app/docs/content/12-frontend-roles-and-responsibilities.md)
-- [Backend Roles and Data Flow](./frontend/app/docs/content/13-backend-roles-and-data-flow.md)
+- [Backend Roles and Responsibilities](./frontend/app/docs/content/12-backend-roles-and-responsibilities.md)
+- [Backend HLD](./frontend/app/docs/content/13-backend-hld.md)
+- [Frontend Roles and Responsibilities](./frontend/app/docs/content/14-frontend-roles-and-responsibilities.md)
+- [Frontend HLD](./frontend/app/docs/content/15-frontend-hld.md)
 
 ## Built With
 
