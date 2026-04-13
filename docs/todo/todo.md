@@ -5,6 +5,10 @@
 - [ ] test with some skill that has scripts too
 - [ ] test shell and hostspawn exec on mac pkg and win
 - [ ] test all providers again for normal, attach, tool, autoexec, shell , skill flows.
+- [ ] mkdir in writefile.
+- [ ] xai to responses api migration. 4.x doesnt support thinking as such.
+- [ ] providers: mistral, qwen, minimax, z ai, deepseek, stepfun, meta, nvidia, xiaomi
+- [ ] google genai sdk integration from inference.
 
 ## Milestone thoughts
 
