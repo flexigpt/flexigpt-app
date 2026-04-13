@@ -1,15 +1,15 @@
 # Chats, Composer, and Everyday Workflow
 
-This page focuses on the day-to-day workspace inside FlexiGPT.
+This page focuses on the day-to-day workspace inside FlexiGPT. The **Chats** page is the main surface, combining chat tabs, conversation search, the active conversation timeline, and the composer for the next request.
 
 ## Table of contents <!-- omit from toc -->
 
 - [What the Chats page brings together](#what-the-chats-page-brings-together)
 - [A normal workflow](#a-normal-workflow)
-  - [1. Open or create a conversation](#1-open-or-create-a-conversation)
-  - [2. Configure the next request in the context bar](#2-configure-the-next-request-in-the-context-bar)
-  - [3. Prepare the current turn in the editor area](#3-prepare-the-current-turn-in-the-editor-area)
-  - [4. Add only the context that helps](#4-add-only-the-context-that-helps)
+  - [Open or create a conversation](#open-or-create-a-conversation)
+  - [Configure the next request in the context bar](#configure-the-next-request-in-the-context-bar)
+  - [Prepare the current turn in the editor area](#prepare-the-current-turn-in-the-editor-area)
+  - [Add only the context that helps](#add-only-the-context-that-helps)
 - [What happens after send](#what-happens-after-send)
 - [Tool-assisted conversations inside the chat flow](#tool-assisted-conversations-inside-the-chat-flow)
   - [Manual review](#manual-review)
@@ -32,7 +32,7 @@ That is why most everyday work happens there.
 
 ## A normal workflow
 
-### 1. Open or create a conversation
+### Open or create a conversation
 
 On **Chats**, you can:
 
@@ -44,11 +44,11 @@ On **Chats**, you can:
 
 Multiple tabs make it easier to compare or continue different threads without losing your place.
 
-### 2. Configure the next request in the context bar
+### Configure the next request in the context bar
 
-At the top of the composer, the context bar controls the setup for the next request.
+At the top of the composer, the context controls shape the next request.
 
-Use it when you want to change how the next request should run.
+Use them when you want to change how the next request should run.
 
 Examples:
 
@@ -66,9 +66,9 @@ Examples:
 | **Previous user turns**      | How much earlier user context is resent.                                                                     |
 | **Advanced parameters**      | Streaming, token limits, timeout, output format, stop sequences, cache control, and similar request options. |
 
-### 3. Prepare the current turn in the editor area
+### Prepare the current turn in the editor area
 
-Below the context bar, the editor area is where you build the current request.
+Below the context controls, the editor area is where you build the current request.
 
 That can include:
 
@@ -83,7 +83,7 @@ That can include:
 
 This is where human input, reusable configuration, and execution helpers come together.
 
-### 4. Add only the context that helps
+### Add only the context that helps
 
 The composer lets you add supporting context for the current request.
 

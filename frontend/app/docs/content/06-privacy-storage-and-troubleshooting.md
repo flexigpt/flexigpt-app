@@ -5,6 +5,7 @@ FlexiGPT is local-first, but requests still go to the provider you choose. This 
 ## Table of contents <!-- omit from toc -->
 
 - [What stays local](#what-stays-local)
+  - [Browser-local workspace state](#browser-local-workspace-state)
   - [Provider secret handling](#provider-secret-handling)
   - [Conversation history and search](#conversation-history-and-search)
   - [Catalog and app configuration data](#catalog-and-app-configuration-data)
@@ -24,6 +25,17 @@ FlexiGPT is local-first, but requests still go to the provider you choose. This 
 - [Final reminder](#final-reminder)
 
 ## What stays local
+
+### Browser-local workspace state
+
+The frontend may remember UI-only state in your browser profile, such as:
+
+- chat tab state
+- selected tab
+- scroll position
+- startup theme choice
+
+This is separate from durable app data.
 
 ### Provider secret handling
 

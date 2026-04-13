@@ -50,7 +50,7 @@ Use it to maintain reusable request structure instead of rewriting the same fram
 
 The **Tools** page manages the tool catalog.
 
-This is where you maintain the tool definitions that conversations can later use. Actual execution still happens from the chat workflow.
+This is where you maintain the tool definitions that conversations can later use. Actual execution still happens from the chat workflow, where tools may be run manually or through auto-execute behavior.
 
 ## Skills
 

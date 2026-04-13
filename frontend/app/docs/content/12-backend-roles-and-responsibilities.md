@@ -32,60 +32,70 @@ Supporting storage and capability libraries provide persistence, provider integr
 ## Backend responsibility map
 
 ```mermaid
-flowchart TD
-    Shell[App shell]
+flowchart LR
+    Shell["App shell"]
 
-    subgraph Domains[Backend domains]
-        direction TB
+    classDef ghost fill:transparent,stroke:transparent,color:transparent;
 
-        ModelPresets[Model presets]
-        Prompts[Prompts]
-        Tools[Tools]
-        Skills[Skills]
-        AssistantPresets[Assistant presets]
+    subgraph Domains["Backend domains"]
+        direction LR
 
-        Settings[Settings]
-        Conversations[Conversations]
+        DomainEntry[" "]:::ghost
 
-        Attachments[Attachment preparation]
-        Orchestration[Request orchestration]
+        subgraph Catalogs["Catalog domains"]
+            direction TB
+            ModelPresets["Model presets"]
+            Prompts["Prompts"]
+            Tools["Tools"]
+            Skills["Skills"]
+            AssistantPresets["Assistant presets"]
+        end
 
-        ModelPresets ~~~ Settings ~~~ Conversations
-        Prompts ~~~ Conversations
-        Tools ~~~ Conversations
-        Skills ~~~ Conversations
-        AssistantPresets ~~~ Conversations
+        subgraph State["State domains"]
+            direction TB
+            Settings["Settings"]
+            Conversations["Conversations"]
+        end
+
+        subgraph Runtime["Execution domains"]
+            direction TB
+            Attachments["Attachment preparation"]
+            Orchestration["Request orchestration"]
+        end
+
+        DomainEntry ~~~ ModelPresets
+        ModelPresets ~~~ Settings
         Settings ~~~ Attachments
-        Settings ~~~ Orchestration
     end
 
-    subgraph Builtins[Built-in catalogs]
+    subgraph Builtins["Built-in catalogs"]
         direction TB
-
-        GoEmbed[Go embedded files]
+        GoEmbed["Go embedded files"]
     end
 
-    subgraph Storage[Local storage and FTS]
+    subgraph Overlay["Overlay"]
         direction TB
-        Mapstore[mapstore-go stores]
-        FTS[FTS engine]
-
-        Mapstore ~~~ FTS
+        SQLite["SQLite overlay"]
     end
 
-    subgraph Overlay[Overlay]
+    subgraph Storage["Local storage and FTS"]
         direction TB
-        SQLite[SQLite overlay]
+        Mapstore["mapstore-go stores"]
+        FTS["FTS engine"]
     end
 
-    subgraph Libraries[External capability libraries]
+    subgraph Libraries["External capability libraries"]
         direction TB
-        Inference[inference-go]
-        LLMTools[llmtools-go]
-        AgentSkills[agentskills-go]
+        Inference["inference-go"]
+        LLMTools["llmtools-go"]
+        AgentSkills["agentskills-go"]
     end
 
-    Shell --> Domains
+    GoEmbed ~~~ SQLite
+    SQLite ~~~ Mapstore
+    Mapstore ~~~ Inference
+
+    Shell --> DomainEntry
 
     Settings --> Mapstore
 
@@ -94,23 +104,23 @@ flowchart TD
 
     ModelPresets --> Mapstore
     ModelPresets --> SQLite
-    ModelPresets --> Builtins
+    ModelPresets --> GoEmbed
 
     Prompts --> Mapstore
     Prompts --> SQLite
-    Prompts --> Builtins
+    Prompts --> GoEmbed
 
     Tools --> Mapstore
     Tools --> SQLite
-    Tools --> Builtins
+    Tools --> GoEmbed
 
     Skills --> Mapstore
     Skills --> SQLite
-    Skills --> Builtins
+    Skills --> GoEmbed
 
     AssistantPresets --> Mapstore
     AssistantPresets --> SQLite
-    AssistantPresets --> Builtins
+    AssistantPresets --> GoEmbed
 
     Attachments --> Orchestration
     Attachments --> LLMTools
@@ -118,11 +128,6 @@ flowchart TD
     Orchestration --> Inference
     Orchestration --> LLMTools
     Orchestration --> AgentSkills
-
-    ModelPresets ~~~ Builtins
-    Builtins ~~~ Overlay
-    Overlay ~~~ Storage
-    Storage ~~~ Libraries
 ```
 
 <!-- Only --\> arrows in the diagram represent architectural relationships or direct usage. The `~~~` connectors are present only to stabilize Mermaid layout and should not be interpreted as backend dependencies.-->

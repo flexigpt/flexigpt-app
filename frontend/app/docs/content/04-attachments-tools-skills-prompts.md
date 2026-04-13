@@ -59,6 +59,8 @@ Examples:
 - rewrite requests
 - recurring team conventions
 
+Prompt templates are request-shaped: they help you structure what you are sending now.
+
 ### System prompts
 
 Use system prompts when behavior rules should remain active across turns.
@@ -70,7 +72,7 @@ A simple way to remember the difference:
 
 ## Tools: callable capability inside the conversation
 
-Tools are managed on the **Tools** page and attached in the composer.
+Tools are managed on the **Tools** page and selected or attached in the composer.
 
 A tool makes a capability available to the model for a conversation. In practice, it gives the model something the app can run. Depending on the tool, execution may happen through local runtime behavior, HTTP-backed behavior, or provider-coupled capability.
 
