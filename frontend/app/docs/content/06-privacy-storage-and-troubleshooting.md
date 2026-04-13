@@ -2,6 +2,27 @@
 
 FlexiGPT is local-first, but requests still go to the provider you choose. This page explains what stays on your device, what can leave it, and what to check when something feels wrong.
 
+## Table of contents <!-- omit from toc -->
+
+- [What stays local](#what-stays-local)
+  - [Provider secret handling](#provider-secret-handling)
+  - [Conversation history and search](#conversation-history-and-search)
+  - [Catalog and app configuration data](#catalog-and-app-configuration-data)
+  - [Storage locations](#storage-locations)
+- [What can be sent to a provider](#what-can-be-sent-to-a-provider)
+- [Attachments need deliberate handling](#attachments-need-deliberate-handling)
+  - [Local files and folders](#local-files-and-folders)
+  - [URLs](#urls)
+- [Tool outputs can be resent too](#tool-outputs-can-be-resent-too)
+- [Debug settings can expose more than normal use](#debug-settings-can-expose-more-than-normal-use)
+- [Troubleshooting checklist](#troubleshooting-checklist)
+  - [If you cannot send a request](#if-you-cannot-send-a-request)
+  - [If the answer is weak](#if-the-answer-is-weak)
+  - [If a tool flow seems stuck](#if-a-tool-flow-seems-stuck)
+  - [If you need more visibility](#if-you-need-more-visibility)
+- [Practical privacy checklist](#practical-privacy-checklist)
+- [Final reminder](#final-reminder)
+
 ## What stays local
 
 ### Provider secret handling

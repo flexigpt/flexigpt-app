@@ -2,6 +2,24 @@
 
 FlexiGPT becomes much easier to use once a few core terms are clear.
 
+## Table of contents <!-- omit from toc -->
+
+- [The main terms](#the-main-terms)
+- [Think in four layers](#think-in-four-layers)
+- [Assistant Presets and Model Presets solve different problems](#assistant-presets-and-model-presets-solve-different-problems)
+  - [Assistant Presets answer](#assistant-presets-answer)
+  - [Model Presets answer](#model-presets-answer)
+- [Persistent conversation setup versus current-message input](#persistent-conversation-setup-versus-current-message-input)
+  - [Usually persistent for the conversation](#usually-persistent-for-the-conversation)
+  - [Usually specific to the current message](#usually-specific-to-the-current-message)
+- [What happens on send](#what-happens-on-send)
+- [Tool flows: human-in-loop and more agentic modes](#tool-flows-human-in-loop-and-more-agentic-modes)
+  - [Human-in-loop](#human-in-loop)
+  - [Auto-execute and agentic flow](#auto-execute-and-agentic-flow)
+- [Skills are workflow modes, not just saved text](#skills-are-workflow-modes-not-just-saved-text)
+- [Attachments belong to messages](#attachments-belong-to-messages)
+- [Built-in content versus your local content](#built-in-content-versus-your-local-content)
+
 ## The main terms
 
 | Term                    | What it means                                                                                                                                                       |

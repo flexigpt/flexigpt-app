@@ -1,11 +1,14 @@
-import type { ReactNode } from 'react';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import type { AnchorHTMLAttributes, HTMLAttributes, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import { memo, useMemo } from 'react';
 
 import 'katex/dist/katex.min.css';
+import type { ExtraProps } from 'react-markdown';
 import Markdown from 'react-markdown';
 import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
+import rehypeSlug from 'rehype-slug';
 import remarkGemoji from 'remark-gemoji';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -21,37 +24,39 @@ import { MdErrorBoundary } from '@/components/markdown_error_boundary';
 import { ThinkingFence } from '@/components/thinking_fence';
 
 const strictSchema = {
-	...defaultSchema, // keep ancestors / clobber / prefix logic
+	...defaultSchema,
 	attributes: {
 		...defaultSchema.attributes,
-		// The `language-*` regex is allowed by default.
 		code: [['className', /^language-./, /^math-./]],
 		input: defaultSchema.attributes?.input.filter(a => a !== 'value' && a !== 'checked'),
 	},
 };
+
+interface CodeComponentProps extends HTMLAttributes<HTMLElement>, ExtraProps {
+	inline?: boolean;
+	className?: string;
+	children?: ReactNode;
+}
+
+interface CustomComponentProps extends HTMLAttributes<HTMLElement>, ExtraProps {
+	className?: string;
+	children?: ReactNode;
+	id?: string;
+}
+
+interface RefComponentProps extends AnchorHTMLAttributes<HTMLAnchorElement>, ExtraProps {
+	href?: string;
+	className?: string;
+	children?: ReactNode;
+}
 
 interface EnhancedMarkdownProps {
 	text: string;
 	align?: string;
 	isBusy?: boolean;
 	hideMermaidCode?: boolean;
-}
-
-interface CodeComponentProps {
-	inline?: boolean;
-	className?: string;
-	children?: ReactNode;
-}
-
-interface CustomComponentProps {
-	className?: string;
-	children?: ReactNode;
-}
-
-interface RefComponentProps {
-	href?: string;
-	className?: string;
-	children?: ReactNode;
+	hideH1Title?: boolean;
+	onLinkClick?: (href: string, event: ReactMouseEvent<HTMLAnchorElement>) => boolean;
 }
 
 export const EnhancedMarkdown = memo(function EnhancedMarkdown({
@@ -59,82 +64,95 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 	align = 'left',
 	isBusy = false,
 	hideMermaidCode = false,
+	hideH1Title = false,
+	onLinkClick,
 }: EnhancedMarkdownProps) {
 	const processedText = useMemo(() => {
-		// During a stream skip LaTeX sanitisation for speed.
 		return isBusy ? text : SanitizeLaTeXOutsideFences(text);
 	}, [text, isBusy]);
 
-	const components = useMemo(
-		() => ({
-			h1: ({ children, className, ...rest }: CustomComponentProps) => (
-				<h1 {...rest} className={`my-2 text-xl font-bold ${className ?? ''}`}>
-					{children}
-				</h1>
-			),
-			h2: ({ children, className, ...rest }: CustomComponentProps) => (
-				<h2 {...rest} className={`my-2 text-lg font-bold ${className ?? ''}`}>
-					{children}
-				</h2>
-			),
-			h3: ({ children, className, ...rest }: CustomComponentProps) => (
-				<h3 {...rest} className={`my-2 text-base font-bold ${className ?? ''}`}>
-					{children}
-				</h3>
-			),
+	const components = useMemo(() => {
+		const renderHeading =
+			(tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6', baseClassName: string, options?: { hide?: boolean }) =>
+			({ node, children, className, id, ...rest }: CustomComponentProps) => {
+				if (options?.hide) {
+					return id ? <div id={id} className="scroll-mt-4" aria-hidden="true" /> : null;
+				}
 
-			ul: ({ children, className, ...rest }: CustomComponentProps) => (
-				<ul {...rest} className={`list-disc py-1 pl-4 ${className ?? ''}`}>
+				const HeadingTag = tag;
+
+				return (
+					<HeadingTag {...rest} id={id} className={`${baseClassName} scroll-mt-4 ${className ?? ''}`.trim()}>
+						{children}
+					</HeadingTag>
+				);
+			};
+
+		return {
+			h1: renderHeading('h1', 'my-2 pt-2 text-xl font-bold', { hide: hideH1Title }),
+			h2: renderHeading('h2', 'my-2 pt-2 text-lg font-bold'),
+			h3: renderHeading('h3', 'my-2 pt-2 text-base font-bold'),
+			h4: renderHeading('h4', 'my-2 pt-2 text-sm font-bold'),
+			h5: renderHeading('h5', 'my-2 pt-2 text-sm font-semibold'),
+			h6: renderHeading('h6', 'my-2 pt-2 text-xs font-semibold uppercase tracking-wide'),
+
+			ul: ({ node, children, className, ...rest }: CustomComponentProps) => (
+				<ul {...rest} className={`list-disc py-2 pl-4 ${className ?? ''}`}>
 					{children}
 				</ul>
 			),
-			ol: ({ children, className, ...rest }: CustomComponentProps) => (
-				// Important: keep {...rest} so `start`, `reversed`, `type` are preserved
+
+			ol: ({ node, children, className, ...rest }: CustomComponentProps) => (
 				<ol {...rest} className={`list-decimal py-1 pl-4 ${className ?? ''}`}>
 					{children}
 				</ol>
 			),
-			li: ({ children, className, ...rest }: CustomComponentProps) => (
+
+			li: ({ node, children, className, ...rest }: CustomComponentProps) => (
 				<li {...rest} className={`py-1 ${className ?? ''}`}>
 					{children}
 				</li>
 			),
 
-			table: ({ children, className, ...rest }: CustomComponentProps) => (
-				<div className="my-2 max-w-full overflow-x-auto" style={{ contain: 'layout paint' }}>
+			table: ({ node, children, className, ...rest }: CustomComponentProps) => (
+				<div className="my-2 max-w-full overflow-x-auto p-2" style={{ contain: 'layout paint' }}>
 					<table {...rest} className={`min-w-max table-fixed ${className ?? ''}`}>
 						{children}
 					</table>
 				</div>
 			),
-			thead: ({ children, className, ...rest }: CustomComponentProps) => (
+
+			thead: ({ node, children, className, ...rest }: CustomComponentProps) => (
 				<thead {...rest} className={`bg-base-300 ${className ?? ''}`}>
 					{children}
 				</thead>
 			),
-			tbody: ({ children, className, ...rest }: CustomComponentProps) => (
+
+			tbody: ({ node, children, className, ...rest }: CustomComponentProps) => (
 				<tbody {...rest} className={className ?? ''}>
 					{children}
 				</tbody>
 			),
 
-			tr: ({ children, className, ...rest }: CustomComponentProps) => (
+			tr: ({ node, children, className, ...rest }: CustomComponentProps) => (
 				<tr {...rest} className={`border-t ${className ?? ''}`}>
 					{children}
 				</tr>
 			),
-			th: ({ children, className, ...rest }: CustomComponentProps) => (
+
+			th: ({ node, children, className, ...rest }: CustomComponentProps) => (
 				<th {...rest} className={`px-4 py-2 text-left ${className ?? ''}`}>
 					{children}
 				</th>
 			),
-			td: ({ children, className, ...rest }: CustomComponentProps) => (
+
+			td: ({ node, children, className, ...rest }: CustomComponentProps) => (
 				<td {...rest} className={`px-4 py-2 ${className ?? ''}`}>
 					{children}
 				</td>
 			),
 
-			p: ({ className, children, ...rest }: CustomComponentProps) => (
+			p: ({ node, className, children, ...rest }: CustomComponentProps) => (
 				<p
 					{...rest}
 					className={`${className ?? ''} my-2 ${align} wrap-break-word`}
@@ -144,13 +162,13 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 				</p>
 			),
 
-			blockquote: ({ children, className, ...rest }: CustomComponentProps) => (
+			blockquote: ({ node, children, className, ...rest }: CustomComponentProps) => (
 				<blockquote {...rest} className={`border-neutral/20 border-l-4 pl-4 italic ${className ?? ''}`}>
 					{children}
 				</blockquote>
 			),
 
-			a: ({ href, children, className, ...rest }: RefComponentProps) => (
+			a: ({ node, href, children, className, ...rest }: RefComponentProps) => (
 				<a
 					{...rest}
 					href={href}
@@ -158,15 +176,26 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 					rel={href?.startsWith('http') ? 'noopener noreferrer' : undefined}
 					className={`cursor-pointer text-blue-600 underline hover:text-blue-800 ${className ?? ''}`}
 					onClick={e => {
+						if (!href) {
+							e.preventDefault();
+							return;
+						}
+
+						const handled = onLinkClick?.(href, e);
+						if (handled) {
+							e.preventDefault();
+							return;
+						}
+
 						e.preventDefault();
-						if (href) backendAPI.openURL(href);
+						backendAPI.openURL(href);
 					}}
 				>
 					{children}
 				</a>
 			),
 
-			code: ({ inline, className, children, ...props }: CodeComponentProps) => {
+			code: ({ node, inline, className, children, ...props }: CodeComponentProps) => {
 				if (inline || !className) {
 					return (
 						<code
@@ -181,7 +210,6 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 				const match = /lang-(\w+)/.exec(className || '') || /language-(\w+)/.exec(className || '');
 				const language = match && match[1] ? match[1] : 'text';
 
-				// react-markdown may pass children as string[]; String(array) inserts commas -> breaks Mermaid.
 				const raw =
 					typeof children === 'string'
 						? children
@@ -192,26 +220,26 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 								: // eslint-disable-next-line @typescript-eslint/no-base-to-string
 									String(children);
 
-				// Normalize newlines and trim ONE trailing newline from fenced blocks
 				const value = raw.replace(/\r\n/g, '\n').replace(/\n$/, '');
 
 				if (language === (CustomMDLanguage.ThinkingSummary as string)) {
 					return <ThinkingFence detailsSummary={<span>Thinking Summary</span>} text={value} />;
-				} else if (language === (CustomMDLanguage.Thinking as string)) {
-					return <ThinkingFence detailsSummary={<span>Thinking</span>} text={value} />;
-				} else {
-					return <CodeBlock language={language} value={value} isBusy={isBusy} hideMermaidCode={hideMermaidCode} />;
 				}
+
+				if (language === (CustomMDLanguage.Thinking as string)) {
+					return <ThinkingFence detailsSummary={<span>Thinking</span>} text={value} />;
+				}
+
+				return <CodeBlock language={language} value={value} isBusy={isBusy} hideMermaidCode={hideMermaidCode} />;
 			},
-		}),
-		[align, hideMermaidCode, isBusy]
-	);
+		};
+	}, [align, hideH1Title, hideMermaidCode, isBusy, onLinkClick]);
 
 	return (
 		<MdErrorBoundary source={processedText}>
 			<Markdown
 				remarkPlugins={[remarkGfm, remarkMath, supersub, remarkGemoji]}
-				rehypePlugins={[rehypeRaw, [rehypeSanitize, { ...strictSchema }], rehypeKatex]}
+				rehypePlugins={[rehypeRaw, [rehypeSanitize, { ...strictSchema }], rehypeSlug, rehypeKatex]}
 				components={components}
 				skipHtml={false}
 			>

@@ -3,6 +3,15 @@
 This page describes the frontend as the coordination layer for user surfaces.
 It owns the routes, the page composition, the view state, and the typed boundary to the Go backend.
 
+## Table of contents <!-- omit from toc -->
+
+- [Frontend responsibility map](#frontend-responsibility-map)
+- [What the frontend owns](#what-the-frontend-owns)
+- [Surface responsibilities](#surface-responsibilities)
+- [Route-level composition](#route-level-composition)
+- [The typed API boundary](#the-typed-api-boundary)
+- [Why this split matters](#why-this-split-matters)
+
 ## Frontend responsibility map
 
 ```mermaid

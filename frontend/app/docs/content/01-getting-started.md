@@ -2,7 +2,23 @@
 
 This guide is the fastest path from install to a useful first conversation in FlexiGPT.
 
-## What FlexiGPT expects from you
+## Table of contents <!-- omit from toc -->
+
+- [Base expectations](#base-expectations)
+- [First-run checklist](#first-run-checklist)
+- [Add a provider key](#add-a-provider-key)
+- [Chats workspace](#chats-workspace)
+- [Pick a starting setup](#pick-a-starting-setup)
+  - [Assistant Preset](#assistant-preset)
+  - [Model Preset](#model-preset)
+  - [Previous user turns](#previous-user-turns)
+- [Writing the first message](#writing-the-first-message)
+- [Adding optional context](#adding-optional-context)
+- [Send and inspect the result](#send-and-inspect-the-result)
+- [Good first workflows](#good-first-workflows)
+- [If the first send feels off](#if-the-first-send-feels-off)
+
+## Base expectations
 
 FlexiGPT is a desktop client for working with remote or local model providers from one workspace.
 
@@ -24,7 +40,7 @@ FlexiGPT ships with built-in providers, model presets, tools, skills, prompts, a
 6. Optionally attach files, prompts, tools, or skills.
 7. Send the request and inspect the result.
 
-## 1. Add a provider key
+## Add a provider key
 
 FlexiGPT can only send a live request after you configure credentials for at least one provider.
 
@@ -36,7 +52,7 @@ In **Settings**:
 
 Provider secrets are stored through the OS keyring rather than kept in plain-text settings.
 
-## 2. Open the Chats workspace
+## Chats workspace
 
 The **Chats** page is the main place where you work.
 
@@ -48,7 +64,7 @@ From there you can:
 - reopen earlier conversations and continue them
 - export the current conversation as JSON
 
-## 3. Pick a starting setup
+## Pick a starting setup
 
 Before you send, decide what kind of workspace you want for this conversation.
 
@@ -83,7 +99,7 @@ Use this control to decide how much earlier user context should be resent with t
 
 If you are unsure, start small. You can always include more history later.
 
-## 4. Write the first message
+## Writing the first message
 
 Good first requests are simple and concrete.
 
@@ -95,7 +111,7 @@ Examples:
 - review this code snippet
 - rewrite this paragraph more clearly
 
-## 5. Add optional context
+## Adding optional context
 
 The composer can send much more than plain text.
 
@@ -110,7 +126,7 @@ You can add:
 
 Only add the context that helps the current request. More context is not always better.
 
-## 6. Send and inspect the result
+## Send and inspect the result
 
 After you send, you can usually:
 

@@ -11,7 +11,7 @@
 		{
 			"id": "dev",
 			"role": "developer",
-			"content": "Formatting re-enabled.\nFormat responses in plain Markdown. Use headings when helpful, use `-` for bullets, use backticks for inline code and identifiers, and use fenced code blocks with a language tag when known.\n- Keep formatting clean and minimal; avoid decorative symbols, emojis, em dashes, excessive emphasis, and raw HTML unless explicitly asked for."
+			"content": "Formatting re-enabled.\nFormat responses in plain Markdown. Use headings when helpful, use `-` for bullets, use backticks for inline code and identifiers, and use fenced code blocks with a language tag when known.\n- Keep formatting clean and minimal; avoid decorative symbols, emojis, em dashes, excessive emphasis, and raw HTML unless explicitly asked for.\n- Never use nested triple backticks for anything."
 		}
 	],
 	"isResolved": true,

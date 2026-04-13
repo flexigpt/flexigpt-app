@@ -2,6 +2,23 @@
 
 This page focuses on the day-to-day workspace inside FlexiGPT.
 
+## Table of contents <!-- omit from toc -->
+
+- [What the Chats page brings together](#what-the-chats-page-brings-together)
+- [A normal workflow](#a-normal-workflow)
+  - [1. Open or create a conversation](#1-open-or-create-a-conversation)
+  - [2. Configure the next request in the context bar](#2-configure-the-next-request-in-the-context-bar)
+  - [3. Prepare the current turn in the editor area](#3-prepare-the-current-turn-in-the-editor-area)
+  - [4. Add only the context that helps](#4-add-only-the-context-that-helps)
+- [What happens after send](#what-happens-after-send)
+- [Tool-assisted conversations inside the chat flow](#tool-assisted-conversations-inside-the-chat-flow)
+  - [Manual review](#manual-review)
+  - [Auto-execute](#auto-execute)
+- [Reading results in the message timeline](#reading-results-in-the-message-timeline)
+- [Editing and branching](#editing-and-branching)
+- [Search, tabs, and continuity](#search-tabs-and-continuity)
+- [When to leave the Chats page](#when-to-leave-the-chats-page)
+
 ## What the Chats page brings together
 
 The **Chats** page combines four responsibilities in one place:

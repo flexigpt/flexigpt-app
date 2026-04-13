@@ -6,8 +6,7 @@ import presetsProvidersSettingsBody from '@/docs/content/05-presets-providers-se
 import privacyAndTroubleshootingBody from '@/docs/content/06-privacy-storage-and-troubleshooting.md?raw';
 import architectureOverviewBody from '@/docs/content/11-architecture-overview.md?raw';
 import backendRolesBody from '@/docs/content/12-backend-roles-and-responsibilities.md?raw';
-import backendHldBody from '@/docs/content/13-backend-hld.md?raw';
-import frontendRolesBody from '@/docs/content/14-frontend-roles-and-responsibilities.md?raw';
+import frontendRolesBody from '@/docs/content/13-frontend-roles-and-responsibilities.md?raw';
 import frontendHldBody from '@/docs/content/15-frontend-hld.md?raw';
 
 type DocsSection = {
@@ -90,12 +89,6 @@ export const docsCategories: DocsCategory[] = [
 				body: backendRolesBody,
 			},
 			{
-				id: 'backend-hld',
-				title: 'Backend HLD',
-				summary: 'Look at the backend storage choices, module boundaries, and external dependencies.',
-				body: backendHldBody,
-			},
-			{
 				id: 'frontend-roles-and-responsibilities',
 				title: 'Frontend Roles and Responsibilities',
 				summary: 'See how the frontend owns surfaces, state coordination, and the typed boundary to the backend.',
@@ -104,7 +97,7 @@ export const docsCategories: DocsCategory[] = [
 			{
 				id: 'frontend-hld',
 				title: 'Frontend HLD',
-				summary: 'Look at the frontend route model, docs packaging, rendering approach, and backend boundary.',
+				summary: 'Look at the frontend route model, rendering approach, and backend boundary.',
 				body: frontendHldBody,
 			},
 		],

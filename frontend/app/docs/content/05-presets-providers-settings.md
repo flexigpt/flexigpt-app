@@ -2,6 +2,21 @@
 
 The pages outside **Chats** manage the reusable building blocks behind your day-to-day workflow.
 
+## Table of contents <!-- omit from toc -->
+
+- [Assistant Presets](#assistant-presets)
+  - [When to use an assistant preset](#when-to-use-an-assistant-preset)
+- [Prompts](#prompts)
+- [Tools](#tools)
+- [Skills](#skills)
+- [Model Presets](#model-presets)
+  - [A useful mental split](#a-useful-mental-split)
+- [Settings](#settings)
+  - [Auth Keys](#auth-keys)
+  - [Debug](#debug)
+- [Built-in content and your own content](#built-in-content-and-your-own-content)
+- [How to decide which page to use](#how-to-decide-which-page-to-use)
+
 ## Assistant Presets
 
 An assistant preset is a reusable starting setup.

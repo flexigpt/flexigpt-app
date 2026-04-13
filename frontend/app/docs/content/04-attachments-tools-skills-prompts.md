@@ -2,6 +2,24 @@
 
 These features help FlexiGPT go beyond plain chat text.
 
+## Table of contents <!-- omit from toc -->
+
+- [Attachments: bring source material into the request](#attachments-bring-source-material-into-the-request)
+  - [Why attachments matter](#why-attachments-matter)
+  - [Best practices for attachments](#best-practices-for-attachments)
+- [Prompt templates and system prompts solve different problems](#prompt-templates-and-system-prompts-solve-different-problems)
+  - [Prompt templates](#prompt-templates)
+  - [System prompts](#system-prompts)
+- [Tools: callable capability inside the conversation](#tools-callable-capability-inside-the-conversation)
+- [Tool choice, tool call, and tool output are different things](#tool-choice-tool-call-and-tool-output-are-different-things)
+- [Human-in-loop and auto-execute tool flows](#human-in-loop-and-auto-execute-tool-flows)
+  - [Human-in-loop](#human-in-loop)
+  - [Auto-execute and auto-submit](#auto-execute-and-auto-submit)
+- [Web search: provider-dependent capability](#web-search-provider-dependent-capability)
+- [Skills: reusable workflow modes](#skills-reusable-workflow-modes)
+- [A simple way to choose the right feature](#a-simple-way-to-choose-the-right-feature)
+- [Recommended working pattern](#recommended-working-pattern)
+
 ## Attachments: bring source material into the request
 
 Attachments can include:

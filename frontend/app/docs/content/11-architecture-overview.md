@@ -4,6 +4,14 @@ This page describes FlexiGPT as a system of domains and responsibilities.
 The goal is to show which parts own which concerns, how the parts fit together,
 and where the major architectural decisions live.
 
+## Table of contents <!-- omit from toc -->
+
+- [System view](#system-view)
+- [Domain responsibilities](#domain-responsibilities)
+- [How the app holds together](#how-the-app-holds-together)
+- [Where the major external libraries fit](#where-the-major-external-libraries-fit)
+- [Request path at a glance](#request-path-at-a-glance)
+
 ## System view
 
 ```mermaid
