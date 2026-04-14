@@ -252,7 +252,9 @@ func anyModel(m map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.Model
 ) (inferenceSpec.ProviderName, spec.ModelPresetID, spec.ModelPreset) {
 	for pn, mm := range m {
 		for mid, mp := range mm {
-			return pn, mid, mp
+			if mp.IsEnabled {
+				return pn, mid, mp
+			}
 		}
 	}
 	return "", "", spec.ModelPreset{}

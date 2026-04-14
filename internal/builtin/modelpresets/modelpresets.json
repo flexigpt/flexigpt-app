@@ -380,7 +380,7 @@
 				"modalitiesIn": ["textIn", "imageIn", "fileIn"],
 				"modalitiesOut": ["textOut"],
 				"reasoningCapabilities": {
-					"supportedReasoningTypes": ["singleWithLevels"],
+					"supportedReasoningTypes": ["singleWithLevels", "hybridWithTokens"],
 					"supportedReasoningLevels": [
 						"none",
 						"minimal",
@@ -389,6 +389,12 @@
 						"high",
 						"xhigh"
 					],
+					"hybridTokenBudgetCapabilities": {
+						"minAllowed": 1,
+						"maxAllowed": 32768,
+						"zeroAllowed": true,
+						"minusOneAllowed": true
+					},
 					"supportsSummaryStyle": false,
 					"supportsEncryptedReasoningInput": false,
 					"temperatureDisallowedWhenEnabled": false
@@ -522,7 +528,13 @@
 					"timeout": 1800,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
-							"supportedReasoningTypes": ["hybridWithTokens"]
+							"supportedReasoningTypes": ["hybridWithTokens"],
+							"hybridTokenBudgetCapabilities": {
+								"minAllowed": 1,
+								"maxAllowed": 24576,
+								"zeroAllowed": true,
+								"minusOneAllowed": true
+							}
 						}
 					},
 					"createdAt": "2025-07-30T00:00:00Z",
@@ -549,7 +561,13 @@
 					"timeout": 1800,
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
-							"supportedReasoningTypes": ["hybridWithTokens"]
+							"supportedReasoningTypes": ["hybridWithTokens"],
+							"hybridTokenBudgetCapabilities": {
+								"minAllowed": 512,
+								"maxAllowed": 24576,
+								"zeroAllowed": true,
+								"minusOneAllowed": true
+							}
 						}
 					},
 					"createdAt": "2025-07-30T00:00:00Z",
