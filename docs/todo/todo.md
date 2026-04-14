@@ -8,12 +8,6 @@
 - [ ] mkdir in writefile.
 - [ ] xai to responses api migration. 4.x doesnt support thinking as such.
 - [ ] providers: mistral, qwen, minimax, z ai, deepseek, stepfun, meta, nvidia, xiaomi
-- [x] google genai sdk integration from inference.
-  - [x] google doesnt have "assistant role. it has role "model". mapping verify. thoughts are not visible in ui as of now.
-  - [x] may be if there is just thought response but no tool calls, we may want to show thoughts or may be even if there are tool calls showing thoughts is not a bad idea ?? need to analyze carefully. may be thought with calls can have a thoughts button in single row to show thoughts separately rather than details or details can extract thoughts and show even today.
-  - [x] some issue with tool calls and parts streaming i think i am seeing some streams etc but no tool calls in ui neither response.
-  - [x] tool call was visible in non streaming mode but again thought signature seems missing in submit.
-  - [x] signature seems to be not wired correctly.
 - [ ] findtext should allow matchlines if those are empty or empty string as such.
 
 ## Milestone thoughts

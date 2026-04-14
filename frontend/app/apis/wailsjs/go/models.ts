@@ -1559,6 +1559,7 @@ export namespace spec {
 	    callID: string;
 	    name: string;
 	    arguments?: string;
+	    signature: string;
 	    webSearchToolCallItems?: WebSearchToolCallItemUnion[];
 	
 	    static createFrom(source: any = {}) {
@@ -1576,6 +1577,7 @@ export namespace spec {
 	        this.callID = source["callID"];
 	        this.name = source["name"];
 	        this.arguments = source["arguments"];
+	        this.signature = source["signature"];
 	        this.webSearchToolCallItems = this.convertValues(source["webSearchToolCallItems"], WebSearchToolCallItemUnion);
 	    }
 	
@@ -1722,6 +1724,7 @@ export namespace spec {
 	export class ContentItemText {
 	    text: string;
 	    citations?: Citation[];
+	    signature: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ContentItemText(source);
@@ -1731,6 +1734,7 @@ export namespace spec {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.text = source["text"];
 	        this.citations = this.convertValues(source["citations"], Citation);
+	        this.signature = source["signature"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

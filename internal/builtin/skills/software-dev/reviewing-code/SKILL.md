@@ -40,7 +40,8 @@ Find real defects, concrete risks, and misuse-enabling designs in actual code. R
 3. Review every in-scope file/surface against the checklist. Mark each attribute `clean|finding|unverified|n/a`.
 4. Verify each candidate finding: check if handled elsewhere, check if tests cover it, classify `confirmed|suspected`, or move to `unverified-areas`.
 5. Score and rank findings. Full write-ups for prioritized findings.
-6. Output the artifact.
+6. For each retained finding, propose the narrowest safe fix. Include a minimal response-local unified diff format patch when enough context exists to do so; otherwise explain the fix without fabricating a patch.
+7. Output the artifact.
 
 **Context priority.** Attached files are current state. Then pasted code, diffs, logs, stated requirements. Then named workspace paths. Then adjacent workspace files. Then targeted search for a specific unknown. Then questions. Do not skip earlier layers while they have unused evidence.
 
@@ -52,7 +53,7 @@ Find real defects, concrete risks, and misuse-enabling designs in actual code. R
 
 **When blocked.** Exhaust all available context first. Then ask 1-5 true blocker questions in one batch.
 
-**Decision boundary.** This skill ends at review output. Ask questions only when missing context or scope ambiguity would materially change the review. If the user asks to fix findings, convert them into explicit requirements in an implementation skill rather than silently mixing review with edits.
+**Decision boundary.** This skill ends at review output. Ask questions only when missing context or scope ambiguity would materially change the review. For concrete findings, suggest the safest narrow fix and include a response-local unified diff patch when possible from available context. If a trustworthy patch cannot be produced, say so and provide the most concrete fix guidance you can. Do not silently apply edits or mix review with workspace changes unless the user also asks for implementation.
 
 ## Hard rules
 
@@ -157,9 +158,9 @@ Artifacts live in the conversation. Keep them minimal. Use only sections that ma
 
 **quality-attribute-coverage**: one row per in-scope file/surface. Columns: file/surface | correctness | security | reliability | availability | performance | scalability | maintainability | testability | operability | compatibility | ergonomics | notes.
 
-**priority-findings** (full write-up each): `Title`, `Location`, `Certainty` (confirmed|suspected), `Severity`, `Finding score`, `Category`, `Problem`, `Evidence`, `Why it matters`, `Suggested fix`.
+**priority-findings** (full write-up each): `Title`, `Location`, `Certainty` (confirmed|suspected), `Severity`, `Finding score`, `Category`, `Problem`, `Evidence`, `Why it matters`, `Suggested fix`, `Proposed patch` (optional unified diff patch).
 
-**secondary-findings** (brief bullets): title, location, certainty, severity, score, one-line reason, one-line fix.
+**secondary-findings** (brief bullets): title, location, certainty, severity, score, one-line reason, one-line fix, optional unified diff.
 
 **fix-verification** (fix-verification mode only): per-finding status.
 
