@@ -8,7 +8,7 @@ require (
 	github.com/adrg/xdg v0.5.3
 	github.com/danielgtaylor/huma/v2 v2.37.3
 	github.com/flexigpt/agentskills-go v0.12.0
-	github.com/flexigpt/inference-go v0.14.1
+	github.com/flexigpt/inference-go v0.15.0
 	github.com/flexigpt/llmtools-go v0.16.2
 	github.com/flexigpt/mapstore-go v0.2.0
 	github.com/glebarez/go-sqlite v1.22.0
@@ -27,7 +27,7 @@ require (
 	github.com/JohannesKaufmann/dom v0.2.0 // indirect
 	github.com/RadhiFadlillah/whatlanggo v0.0.0-20240916001553-aac1f0f737fc // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
-	github.com/anthropics/anthropic-sdk-go v1.29.0 // indirect
+	github.com/anthropics/anthropic-sdk-go v1.35.1 // indirect
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de // indirect
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/danieljoos/wincred v1.2.3 // indirect
@@ -61,7 +61,7 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
-	github.com/openai/openai-go/v3 v3.30.0 // indirect
+	github.com/openai/openai-go/v3 v3.31.0 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
@@ -90,7 +90,7 @@ require (
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.43.0 // indirect
 	golang.org/x/text v0.36.0 // indirect
-	google.golang.org/genai v1.53.0 // indirect
+	google.golang.org/genai v1.54.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240903143218-8af14fe29dc1 // indirect
 	google.golang.org/grpc v1.66.2 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
