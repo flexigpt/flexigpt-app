@@ -9,7 +9,6 @@ import { type PromptBundle, PromptRoleEnum } from '@/spec/prompt';
 import { validateSlug } from '@/lib/text_utils';
 import { DEFAULT_SEMVER, suggestNextMinorVersion } from '@/lib/version_utils';
 
-import { HoverTip } from '@/components/ariakit_hover_tip';
 import { Dropdown } from '@/components/dropdown';
 
 import type { SystemPromptDraft, SystemPromptRole } from '@/prompts/lib/use_system_prompts';
@@ -88,11 +87,9 @@ function closeDialogSafely(dialog: HTMLDialogElement | null): boolean {
 
 function HelpHint({ content }: { content: string }) {
 	return (
-		<HoverTip content={content} placement="right">
-			<span className="ml-1 inline-flex cursor-help">
-				<FiHelpCircle size={12} className="inline" />
-			</span>
-		</HoverTip>
+		<span className="label-text-alt tooltip tooltip-right ml-1 inline-flex cursor-help" data-tip={content}>
+			<FiHelpCircle size={12} />
+		</span>
 	);
 }
 

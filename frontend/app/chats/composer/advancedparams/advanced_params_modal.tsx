@@ -137,7 +137,7 @@ function closeDialogSafely(dialog: HTMLDialogElement | null): boolean {
 
 function HelpHint({ content }: { content: string }) {
 	return (
-		<span className="label-text-alt tooltip tooltip-right inline-flex cursor-help" data-tip={content}>
+		<span className="label-text-alt tooltip tooltip-right ml-1 inline-flex cursor-help" data-tip={content}>
 			<FiHelpCircle size={12} />
 		</span>
 	);

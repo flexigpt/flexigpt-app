@@ -10,8 +10,6 @@ import type { PlateEditor } from 'platejs/react';
 
 import { type PromptVariable, VarSource, VarType } from '@/spec/prompt';
 
-import { HoverTip } from '@/components/ariakit_hover_tip';
-
 import { type TemplateSelectionElementNode } from '@/chats/composer/platedoc/nodes';
 import { computeEffectiveTemplate } from '@/chats/composer/platedoc/template_document_ops';
 import { EnumDropdownInline } from '@/chats/composer/templates/template_variable_enum_dropdown';
@@ -56,11 +54,9 @@ function getInitialFormState(tsenode: TemplateSelectionElementNode): TemplateEdi
 
 function HelpHint({ content }: { content: string }) {
 	return (
-		<HoverTip content={content} placement="right">
-			<span className="label-text-alt inline-flex cursor-help">
-				<FiHelpCircle size={12} />
-			</span>
-		</HoverTip>
+		<span className="label-text-alt tooltip tooltip-right ml-1 inline-flex cursor-help" data-tip={content}>
+			<FiHelpCircle size={12} />
+		</span>
 	);
 }
 
