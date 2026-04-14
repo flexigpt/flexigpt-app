@@ -4,6 +4,8 @@ import { createPortal } from 'react-dom';
 
 import { FiCode, FiX } from 'react-icons/fi';
 
+import type { ReasoningContent } from '@/spec/inference';
+
 import { ModalBackdrop } from '@/components/modal_backdrop';
 
 import { MessageContentCard } from '@/chats/messages/message_content_card';
@@ -15,10 +17,46 @@ type MessageDetailsModalProps = {
 	title: string;
 	content: string;
 	isBusy: boolean;
+	reasoningContents?: ReasoningContent[];
+	streamedThinking?: string;
+	showReasoningAtTop?: boolean;
 };
 
-export function MessageDetailsModal({ isOpen, onClose, messageID, title, content, isBusy }: MessageDetailsModalProps) {
+function joinReasoningParts(reasoning: ReasoningContent[] | undefined, key: 'summary' | 'thinking'): string {
+	const items = reasoning ?? [];
+	const parts: string[] = [];
+
+	for (const rc of items) {
+		const arr = rc?.[key];
+		if (Array.isArray(arr) && arr.length > 0) {
+			parts.push(arr.join('\n'));
+		}
+	}
+
+	return parts.join('\n\n').trim();
+}
+
+export function MessageDetailsModal({
+	isOpen,
+	onClose,
+	messageID,
+	title,
+	content,
+	isBusy,
+	reasoningContents,
+	streamedThinking = '',
+	showReasoningAtTop = false,
+}: MessageDetailsModalProps) {
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
+
+	const summaryText = joinReasoningParts(reasoningContents, 'summary');
+	const finalThinkingText = joinReasoningParts(reasoningContents, 'thinking');
+	const thinkingText = (isBusy ? streamedThinking : finalThinkingText).trimEnd();
+
+	const hasSummary = summaryText.trim().length > 0;
+	const hasThinking = thinkingText.trim().length > 0;
+	const hasReasoningSection = showReasoningAtTop && (hasSummary || hasThinking);
+	const hasDebugContent = content.trim().length > 0;
 
 	// Open the dialog natively when isOpen becomes true
 	useEffect(() => {
@@ -65,17 +103,54 @@ export function MessageDetailsModal({ isOpen, onClose, messageID, title, content
 							<FiX size={12} />
 						</button>
 					</div>
-
 					<div className="mt-2">
-						<MessageContentCard
-							messageID={messageID}
-							content={content}
-							streamedText=""
-							isStreaming={false}
-							isBusy={isBusy}
-							align="items-start text-left"
-							renderAsMarkdown={true}
-						/>
+						{hasReasoningSection && (
+							<div className="border-base-300 bg-base-100 mb-4 rounded-2xl border p-4">
+								<div className="mb-3 text-sm font-semibold">Thinking content</div>
+
+								{hasSummary && (
+									<div className={hasThinking ? 'mb-4' : ''}>
+										<MessageContentCard
+											messageID={`${messageID}:details:reasoning-summary`}
+											content={summaryText}
+											streamedText=""
+											isStreaming={false}
+											isBusy={false}
+											align="items-start text-left"
+											renderAsMarkdown={false}
+										/>
+									</div>
+								)}
+
+								{hasThinking && (
+									<div>
+										<MessageContentCard
+											messageID={`${messageID}:details:reasoning-thinking`}
+											content={thinkingText}
+											streamedText=""
+											isStreaming={false}
+											isBusy={false}
+											align="items-start text-left"
+											renderAsMarkdown={false}
+										/>
+									</div>
+								)}
+							</div>
+						)}
+
+						{hasDebugContent ? (
+							<MessageContentCard
+								messageID={messageID}
+								content={content}
+								streamedText=""
+								isStreaming={false}
+								isBusy={isBusy}
+								align="items-start text-left"
+								renderAsMarkdown={true}
+							/>
+						) : !hasReasoningSection && !isBusy ? (
+							<div className="text-base-content/70 text-sm">No additional debug details available.</div>
+						) : null}
 					</div>
 				</div>
 			</div>

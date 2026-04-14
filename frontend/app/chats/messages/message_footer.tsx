@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { FiArrowDown, FiArrowUp, FiCode, FiEdit2 } from 'react-icons/fi';
 
-import type { InferenceUsage } from '@/spec/inference';
+import type { InferenceUsage, ReasoningContent } from '@/spec/inference';
 
 import { stripCustomMDFences } from '@/lib/text_utils';
 
@@ -17,6 +17,8 @@ interface MessageFooterAreaProps {
 	cardCopyContent: string;
 	onEdit: () => void;
 	messageDetails: string;
+	reasoningContents?: ReasoningContent[];
+	streamedThinking?: string;
 	isStreaming: boolean;
 	isBusy: boolean;
 	bodyPresent: boolean;
@@ -25,12 +27,26 @@ interface MessageFooterAreaProps {
 	usage?: InferenceUsage;
 }
 
+function hasReasoningContent(reasoningContents?: ReasoningContent[], streamedThinking = ''): boolean {
+	if (streamedThinking.trim().length > 0) return true;
+
+	return (
+		reasoningContents?.some(rc => {
+			const hasSummary = (rc?.summary ?? []).some(s => (s ?? '').trim().length > 0);
+			const hasThinking = (rc?.thinking ?? []).some(s => (s ?? '').trim().length > 0);
+			return hasSummary || hasThinking;
+		}) ?? false
+	);
+}
+
 export function MessageFooterArea({
 	messageID,
 	isUser,
 	cardCopyContent,
 	onEdit,
 	messageDetails,
+	reasoningContents,
+	streamedThinking,
 	isStreaming,
 	isBusy,
 	bodyPresent,
@@ -40,7 +56,9 @@ export function MessageFooterArea({
 }: MessageFooterAreaProps) {
 	const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
-	const hasDetails = !!messageDetails;
+	const hasDebugDetails = messageDetails.trim().length > 0;
+	const hasInlineHiddenReasoning = !bodyPresent && hasReasoningContent(reasoningContents, streamedThinking);
+	const hasDetails = hasDebugDetails || hasInlineHiddenReasoning;
 	const hasContent = !!cardCopyContent;
 	const toggleDetailsModal = () => {
 		if (!hasDetails || isBusy) return;
@@ -67,7 +85,9 @@ export function MessageFooterArea({
 
 	return (
 		<div className={bodyPresent ? 'grow' : ''}>
-			<div className={`flex items-center space-x-6 ${bodyPresent ? 'justify-between' : ''}`}>
+			<div
+				className={`flex items-center space-x-6 ${bodyPresent ? 'justify-between' : isUser ? 'justify-start' : 'justify-end'}`}
+			>
 				{usage && !isStreaming && (
 					<HoverTip content={usageTooltip} placement="top" wrapperElement="div">
 						<div className="flex items-center bg-transparent p-0 text-xs">
@@ -141,6 +161,9 @@ export function MessageFooterArea({
 				title={isUser ? 'User message details' : 'Assistant message details'}
 				content={messageDetails}
 				isBusy={isBusy}
+				reasoningContents={reasoningContents}
+				streamedThinking={streamedThinking}
+				showReasoningAtTop={!bodyPresent}
 			/>
 		</div>
 	);

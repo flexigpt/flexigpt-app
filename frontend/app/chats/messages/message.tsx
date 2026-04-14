@@ -174,7 +174,7 @@ export const ChatMessage = memo(function ChatMessage({
 			</div>
 			<div className="col-span-10 min-w-0 lg:col-span-9">
 				<div
-					className={`min-w-0 items-center gap-2 px-2 ${hasAttachmentsBar ? 'flex' : ''} ${showBody ? 'pt-1' : isUser ? 'justify-start' : 'justify-end'}`}
+					className={`min-w-0 items-center gap-2 px-2 ${hasAttachmentsBar || !showBody ? 'flex' : ''} ${showBody ? 'pt-1' : isUser ? 'justify-start' : 'justify-end'}`}
 				>
 					{hasAttachmentsBar && (
 						<div className={`flex min-w-0 items-center justify-start overflow-x-hidden px-1 py-0`}>
@@ -197,7 +197,9 @@ export const ChatMessage = memo(function ChatMessage({
 					)}
 
 					<div
-						className={`min-w-0 items-center px-1 py-0 ${hasAttachmentsBar ? (showBody ? 'flex flex-1' : 'flex') : ''}`}
+						className={`min-w-0 items-center px-1 py-0 ${
+							+hasAttachmentsBar ? (showBody ? 'flex flex-1' : 'flex') : !showBody ? 'flex' : ''
+						} ${!showBody ? (isUser ? 'justify-start' : 'justify-end') : ''}`}
 					>
 						<MessageFooterArea
 							messageID={message.id}
@@ -205,6 +207,8 @@ export const ChatMessage = memo(function ChatMessage({
 							cardCopyContent={message.uiContent}
 							onEdit={onEdit}
 							messageDetails={message.uiDebugDetails ?? ''}
+							reasoningContents={message.uiReasoningContents}
+							streamedThinking={streamedThinking}
 							isStreaming={!!streamedText || !!streamedThinking}
 							isBusy={isBusy}
 							bodyPresent={showBody}
