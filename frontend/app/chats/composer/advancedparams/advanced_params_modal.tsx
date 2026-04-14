@@ -22,7 +22,6 @@ import {
 } from '@/spec/inference';
 import type { UIChatOption } from '@/spec/modelpreset';
 
-import { HoverTip } from '@/components/ariakit_hover_tip';
 import { Dropdown } from '@/components/dropdown';
 
 import {
@@ -138,11 +137,9 @@ function closeDialogSafely(dialog: HTMLDialogElement | null): boolean {
 
 function HelpHint({ content }: { content: string }) {
 	return (
-		<HoverTip content={content} placement="right">
-			<span className="label-text-alt inline-flex cursor-help">
-				<FiHelpCircle size={12} />
-			</span>
-		</HoverTip>
+		<span className="label-text-alt tooltip tooltip-right inline-flex cursor-help" data-tip={content}>
+			<FiHelpCircle size={12} />
+		</span>
 	);
 }
 
@@ -258,10 +255,6 @@ function AdvancedParamsModalInner({
 		(currentModel.stopSequences ?? []).slice(0, stopPolicy.maxSequences).join('\n')
 	);
 
-	const [additionalParametersRawJSON, setAdditionalParametersRawJSON] = useState(
-		() => currentModel.additionalParametersRawJSON ?? ''
-	);
-
 	const [errors, setErrors] = useState<Partial<Record<ErrorKey, string>>>({});
 
 	useEffect(() => {
@@ -316,21 +309,6 @@ function AdvancedParamsModalInner({
 
 		const tooLong = parsed.find(s => s.length > 256);
 		if (tooLong) return 'A stop sequence is too long (max 256 chars per line).';
-
-		return undefined;
-	};
-
-	const validateAdditionalRawJSON = (raw: string): string | undefined => {
-		const s = raw.trim();
-		if (!s) return undefined;
-		if (s.length > MAX_JSON_CHARS) return `JSON too large (max ${MAX_JSON_CHARS} chars).`;
-
-		const parsed = safeJSONParse(s);
-		if (!parsed.ok) return `Invalid JSON: ${parsed.value}`;
-
-		if (!isPlainObject(parsed.value)) {
-			return 'Additional params must be a JSON object (e.g. { "top_p": 0.9 }).';
-		}
 
 		return undefined;
 	};
@@ -410,7 +388,6 @@ function AdvancedParamsModalInner({
 		const timeoutErr = validateNumberField('timeout', timeoutSec);
 
 		const stopErr = validateStopSequences(stopSequencesText);
-		const addJsonErr = validateAdditionalRawJSON(additionalParametersRawJSON);
 
 		const { nameErr, schemaErr } = validateJSONSchema(outputFormatChoice);
 
@@ -428,7 +405,6 @@ function AdvancedParamsModalInner({
 			maxOutputLength: maxOutputErr,
 			timeout: timeoutErr,
 			stopSequences: stopErr,
-			additionalParametersRawJSON: addJsonErr,
 			jsonSchemaName: nameErr,
 			jsonSchema: schemaErr,
 		};
@@ -509,7 +485,6 @@ function AdvancedParamsModalInner({
 			reasoning: mergedReasoning,
 			outputParam: mergedOutputParam,
 			stopSequences: nextStopSequences,
-			additionalParametersRawJSON: additionalParametersRawJSON.trim() ? additionalParametersRawJSON.trim() : undefined,
 		};
 
 		onSave(updatedModel);
@@ -901,36 +876,6 @@ function AdvancedParamsModalInner({
 							</div>
 						</div>
 					)}
-
-					<div className="grid grid-cols-12 items-start gap-2">
-						<label className="label col-span-4">
-							<span className="label-text text-sm">Additional Params JSON</span>
-							<HelpHint content="Raw provider-specific JSON object. Must be valid JSON." />
-						</label>
-						<div className="col-span-8">
-							<textarea
-								className={`textarea textarea-bordered w-full rounded-xl ${
-									errors.additionalParametersRawJSON ? 'textarea-error' : ''
-								}`}
-								rows={6}
-								value={additionalParametersRawJSON}
-								onChange={e => {
-									const v = e.target.value;
-									setAdditionalParametersRawJSON(v);
-									setErrors(prev => ({ ...prev, additionalParametersRawJSON: validateAdditionalRawJSON(v) }));
-								}}
-								placeholder={'{\n  "top_p": 0.9,\n  "presence_penalty": 0.2\n}'}
-								spellCheck="false"
-							/>
-							{errors.additionalParametersRawJSON && (
-								<div className="label">
-									<span className="label-text-alt text-error flex items-center gap-1">
-										<FiAlertCircle size={12} /> {errors.additionalParametersRawJSON}
-									</span>
-								</div>
-							)}
-						</div>
-					</div>
 
 					<div className="modal-action">
 						<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
