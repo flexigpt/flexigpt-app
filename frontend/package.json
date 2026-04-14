@@ -97,7 +97,7 @@
 		"rollup-plugin-license": "^3.7.1",
 		"rollup-plugin-visualizer": "^7.0.1",
 		"tailwindcss": "^4.2.2",
-		"typescript": "^5.9.3",
+		"typescript": "^6.0.2",
 		"typescript-eslint": "^8.58.2",
 		"vite": "^8.0.8",
 		"vitest": "^4.1.4"
