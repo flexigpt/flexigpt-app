@@ -30,7 +30,9 @@ Modes flow in order. Start at the earliest incomplete mode.
 
 **Context priority.** Attached files are current state. Then pasted code, diffs, logs, stated requirements. Then named workspace paths. Then adjacent workspace files. Then targeted search for a specific unknown. Then questions. Do not skip earlier layers while they have unused evidence.
 
-**Batch everything.** Before any tool call, identify the full read-batch, write-batch, and verify-batch. Execute each batch together. Do not interleave single reads with single questions or edit one file at a time when multiple targets are clear.
+**Discovery before reads.** Before reading workspace files, first do a breadth-first discovery pass. Use provided context plus listings, filename matches, symbol/reference lookup, and targeted content search to identify likely hotspots, callers, tests, seams, related configs, and specific regions worth reading. Let discovery build the read-batch. Prefer discovery outputs that return paths, symbols, matches, or small snippets over opening files one by one. Do not infer preserved behavior from discovery alone.
+
+**Batch everything.** Before any tool call, identify the full discovery-batch, read-batch, write-batch, and verify-batch. Execute each batch together. Do not interleave single reads with single questions or edit one file at a time when multiple targets are clear.
 
 **Maximize progress per turn.** If some work is unblocked and some is blocked, do the unblocked work now and ask only the remaining blockers. If the next mode is already unblocked, enter it immediately unless that would cross the plan confirmation gate. `slice-selection` and `refactor-plan` may be completed in the same response.
 
@@ -46,7 +48,8 @@ Modes flow in order. Start at the earliest incomplete mode.
 - Never invent paths, symbols, commands, or test results.
 - Keep claims proportional to what was actually seen. Mark unseen callers, dependencies, or tests as assumptions.
 - Do not re-read files already provided as attachments unless comparing versions or checking drift.
-- Do not search while direct evidence remains unused.
+- Do not skip direct evidence from attachments, pasted context, or named paths. Use it first to drive discovery.
+- Before opening workspace files, prefer discovery commands over full reads when they can identify more likely hotspots, callers, tests, or seams for the same batch.
 - Preserve external behavior unless the user explicitly approves a change.
 - For security-sensitive code (auth, authz, sessions, validation, multi-tenant), preserve control behavior and negative-path outcomes, not just happy-path outputs.
 - If tests are missing for behavior that must be preserved, the first slice is the safety net.
@@ -93,9 +96,10 @@ Exit: bounded slice chosen with clear scope and preserved behavior stated.
 Entry: bounded slice chosen, preserved behavior known.
 
 1. Establish the safety net: existing tests, characterization tests needed, or manual verification steps. Do not start structural changes when preservation cannot be checked.
-2. Choose strategy from the catalog below.
-3. Plan the slice: exact targets, sequence, verification after each substep, rollback path, follow-on slices if useful.
-4. Present the chosen slice, preserved behavior, safety net, strategy, and refactor plan. Ask the user to confirm or modify before `refactor-apply`.
+2. If target or safety-net coverage is still incomplete, do one more discovery pass before reading more files or asking questions.
+3. Choose strategy from the catalog below.
+4. Plan the slice: exact targets, sequence, verification after each substep, rollback path, follow-on slices if useful.
+5. Present the chosen slice, preserved behavior, safety net, strategy, and refactor plan. Ask the user to confirm or modify before `refactor-apply`.
 
 Exit: concrete plan with strategy, safety net, and verification steps.
 
@@ -103,7 +107,7 @@ Exit: concrete plan with strategy, safety net, and verification steps.
 
 Entry: plan exists, plan confirmed, safety net established or explicitly accepted as absent, user requested code changes.
 
-1. Read all write-batch targets plus required adjacent context together.
+1. If new target paths or neighbors emerge, do one discovery batch first. Then read all write-batch targets plus required adjacent context together.
 2. Apply changes in small steps, verify preserved behavior after each meaningful substep.
 3. One bounded pass. Prefer whole-file rewriting when changes span multiple nearby regions.
 4. If writable workspace is available, apply there. Otherwise return ready-to-apply output for all targets together.

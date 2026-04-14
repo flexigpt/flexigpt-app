@@ -76,6 +76,17 @@
 			"isBuiltIn": true,
 			"createdAt": "2026-01-06T12:00:00Z",
 			"modifiedAt": "2026-01-06T12:00:00Z"
+		},
+		"019b9293-fd72-7d43-b17f-6d2a55d8c9aa": {
+			"schemaVersion": "2025-07-01",
+			"id": "019b9293-fd72-7d43-b17f-6d2a55d8c9aa",
+			"slug": "googlegeneratecontent",
+			"displayName": "Google GenAI Tools",
+			"description": "Server tools from Google GenAI SDK.",
+			"isEnabled": true,
+			"isBuiltIn": true,
+			"createdAt": "2026-01-06T12:00:00Z",
+			"modifiedAt": "2026-01-06T12:00:00Z"
 		}
 	}
 }

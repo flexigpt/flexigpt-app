@@ -32,13 +32,14 @@ Choose the simplest viable architecture that satisfies constraints. Define only 
 **Workflow:**
 
 1. Summarize context: `[observed]`, `[inferred]`, `[assumed]`, `missing-inputs`, `scope`, `complexity` (low|medium|high).
-2. If minimum evidence for the scope is missing, use clarification mode.
-3. Build concrete option set, simplest first. Apply architecture baseline before considering distribution or evented complexity.
-4. If boundaries are part of the decision, define only the minimum needed.
-5. Evaluate async or evented patterns only after simpler options remain insufficient.
-6. Reject unnecessary complexity explicitly.
-7. Choose simplest option satisfying hard constraints. Record now vs later, rejected options, risks, revisit triggers.
-8. Produce ADR-ready recommendation.
+2. Use provided context plus a breadth-first discovery pass to identify likely modules, boundaries, contracts, integrations, configs, and specific regions worth reading before opening additional workspace files.
+3. If minimum evidence for the scope is missing, use clarification mode.
+4. Build concrete option set, simplest first. Apply architecture baseline before considering distribution or evented complexity.
+5. If boundaries are part of the decision, define only the minimum needed.
+6. Evaluate async or evented patterns only after simpler options remain insufficient.
+7. Reject unnecessary complexity explicitly.
+8. Choose simplest option satisfying hard constraints. Record now vs later, rejected options, risks, revisit triggers.
+9. Produce ADR-ready recommendation.
 
 **Complexity:**
 
@@ -48,7 +49,9 @@ Choose the simplest viable architecture that satisfies constraints. Define only 
 
 **Context priority.** Attached files are current state. Then pasted context and stated requirements. Then named workspace paths. Then adjacent files. Then targeted search. Then questions. Do not skip earlier layers while they have unused evidence.
 
-**Batch everything.** Identify all reads before calling tools. Read together. Ask 3-7 blocker questions in one batch when needed.
+**Discovery before reads.** Before reading workspace files, first do a breadth-first discovery pass. Use provided context plus listings, filename matches, symbol/reference lookup, and targeted content search to identify likely modules, boundaries, contracts, integrations, configs, tests, and specific regions worth reading. Let discovery build the read-batch. Prefer discovery outputs that return paths, symbols, matches, or small snippets over opening files one by one. Do not make architecture claims from discovery alone.
+
+**Batch everything.** Identify the full discovery-batch and read-batch before calling tools. Execute together. Ask 3-7 blocker questions in one batch when needed.
 
 **When enough information exists** to compare viable options, proceed. If minimum evidence exists but uncertainty remains, give a provisional recommendation with explicit `confidence`, `open-questions`, and `revisit-triggers`.
 
@@ -64,6 +67,8 @@ Choose the simplest viable architecture that satisfies constraints. Define only 
 - Make ownership explicit for modules, data, and contracts where integrations exist.
 - Compare 2-3 viable options when genuinely viable. If constraints leave one option, name what eliminated the others.
 - Separate `[observed]` from `[inferred]` from `[assumed]`.
+- Do not skip direct evidence from attachments, pasted context, or named paths. Use it first to drive discovery.
+- Before opening workspace files, prefer discovery commands over full reads when they can identify more relevant modules, contracts, or boundaries for the same batch.
 - Do not ask questions already answered or that would not change the decision.
 - If a section does not apply, say `not needed` rather than forcing it.
 - User instructions override this skill.

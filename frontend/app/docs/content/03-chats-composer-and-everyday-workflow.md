@@ -77,7 +77,7 @@ That can include:
 - prompt template insertion
 - system prompt selection
 - conversation tool choices
-- web-search selection when supported
+- web-search selection when supported and filtered to the active provider SDK
 - skill selection
 - pending tool calls and tool outputs in tool-assisted flows
 

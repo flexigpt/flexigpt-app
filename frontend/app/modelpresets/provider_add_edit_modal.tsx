@@ -137,6 +137,10 @@ function AddEditProviderPresetModalContent({
 				isEnabled: true,
 				displayName: SDK_DISPLAY_NAME[ProviderSDKType.ProviderSDKTypeOpenAIResponses],
 			},
+			[ProviderSDKType.ProviderSDKTypeGoogleGenerateContent]: {
+				isEnabled: true,
+				displayName: SDK_DISPLAY_NAME[ProviderSDKType.ProviderSDKTypeGoogleGenerateContent],
+			},
 		}),
 		[]
 	);
@@ -472,7 +476,7 @@ function AddEditProviderPresetModalContent({
 				if (!isReadOnly || isSubmitting) e.preventDefault();
 			}}
 		>
-			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-hidden rounded-2xl p-0">
+			<div className="modal-box bg-base-200 max-h-[80vh] max-w-4/5 overflow-hidden rounded-2xl p-0 xl:max-w-3/5">
 				<div className="max-h-[80vh] overflow-y-auto p-6">
 					<div className="mb-4 flex items-center justify-between">
 						<h3 className="text-lg font-bold">{title}</h3>

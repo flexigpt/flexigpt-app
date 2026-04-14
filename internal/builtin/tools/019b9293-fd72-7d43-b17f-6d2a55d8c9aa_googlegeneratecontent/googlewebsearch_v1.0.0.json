@@ -1,0 +1,70 @@
+{
+	"schemaVersion": "2025-07-01",
+	"id": "019b92a7-fd72-7d43-b17f-6d2a55d8c9ab",
+	"slug": "googlewebsearch",
+	"version": "v1.0.0",
+	"displayName": "Google GenAI SDK Websearch",
+	"description": "Search the web for relevant content and use in llm output.",
+	"tags": ["sdk", "search"],
+	"userCallable": false,
+	"llmCallable": true,
+	"llmToolType": "webSearch",
+	"argSchema": {
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object",
+		"additionalProperties": false,
+		"properties": {}
+	},
+	"userArgSchema": {
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object",
+		"additionalProperties": false,
+		"properties": {
+			"maxUses": {
+				"type": "integer",
+				"format": "int64"
+			},
+			"searchContextSize": {
+				"type": "string"
+			},
+			"allowedDomains": {
+				"type": "array",
+				"items": {
+					"type": "string"
+				}
+			},
+			"blockedDomains": {
+				"type": "array",
+				"items": {
+					"type": "string"
+				}
+			},
+			"userLocation": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"city": {
+						"type": "string"
+					},
+					"country": {
+						"type": "string"
+					},
+					"region": {
+						"type": "string"
+					},
+					"timezone": {
+						"type": "string"
+					}
+				}
+			}
+		}
+	},
+	"type": "sdk",
+	"sdkImpl": {
+		"sdkType": "providerSDKTypeGoogleGenerateContent"
+	},
+	"isEnabled": true,
+	"isBuiltIn": true,
+	"createdAt": "2026-01-06T12:00:00Z",
+	"modifiedAt": "2026-01-06T12:00:00Z"
+}

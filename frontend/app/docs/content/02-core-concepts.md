@@ -116,7 +116,7 @@ That request can include:
 - selected tool choices and tool outputs
 - skill session context and skill-related behavior when enabled
 
-The exact final payload depends on the selected provider family and model capabilities.
+The exact final payload depends on the selected provider SDK and model capabilities.
 
 ## Tool flows: human-in-loop and more agentic modes
 

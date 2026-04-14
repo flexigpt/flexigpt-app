@@ -15,7 +15,9 @@ Deliver bounded software changes through strict phases, batched work, and eviden
 
 **Context priority.** Attached files are current state. Then pasted code, diffs, logs, stated requirements. Then named workspace paths. Then adjacent workspace files. Then targeted search for a specific unknown. Then questions. Do not skip earlier layers while they have unused evidence.
 
-**Batch everything.** Before any tool call, identify the full read-batch, write-batch, and verify-batch. Execute each batch together. Do not interleave single reads with single questions or edit one file at a time when multiple targets are clear.
+**Discovery before reads.** Before reading workspace files, first do a breadth-first discovery pass. Use provided context plus cheap discovery tools such as listings, filename matches, symbol/reference lookup, and targeted content search to identify likely files, neighbors, tests, interfaces, and specific regions worth reading. Let discovery build the read-batch. Prefer discovery outputs that return paths, symbols, matches, or small snippets over opening files one by one. Do not make behavioral claims from discovery alone.
+
+**Batch everything.** Before any tool call, identify the full discovery-batch, read-batch, write-batch, and verify-batch. Execute together. Do not interleave single reads with single questions or edit one file at a time when multiple targets are clear.
 
 **When blocked.** Exhaust all available context first. Then ask 1-3 true blocker questions in one batch. Include any partial progress before asking. When the user wants speed, proceed provisionally on non-blocking uncertainty, but do not bypass spec confirmation.
 
@@ -59,9 +61,10 @@ After 3 failed approaches, mark the task `blocked`, record what was tried, and a
 Entry: the user goal exists and at least one anchor (file, symbol, path, error, behavior area).
 
 1. Start from provided context.
-2. Read direct neighbors (callers, callees, tests, interfaces) in one batch.
-3. Go one hop deeper only if a specific blocker remains.
-4. Stop when the edit surface is clear or the question is answered.
+2. Before reading additional workspace files, do a breadth-first discovery pass to collect likely targets, direct neighbors, tests, interfaces, and specific regions worth reading.
+3. Read as much as possible (including direct neighbors like callers, callees, tests, interfaces) in one batch.
+4. Prefer another discovery pass before another serial file-read pass. Go deeper only if specific blockers remains.
+5. Stop when the edit surface is clear or the question is answered.
 
 Do not turn discovery into a repo tour. Do not overclaim about unseen callers or coverage. When the user wants discovery only, do not drift into implementation.
 
@@ -74,7 +77,7 @@ Entry: goal understood, affected area known.
 1. Convert facts and intent into the smallest implementable spec.
 2. Fill known sections. Put unknowns in `Assumptions` or `Open Questions`, not in `Requirements`.
 3. Requirements must be concrete and testable. Use IDs: `R1`, `R2`, `E1`, `E2`.
-4. Use real paths from inspection. Mark unconfirmed paths `(unverified)` under `Assumptions`.
+4. Use real paths from inspection. If target coverage is still incomplete, do one more discovery pass before reading more files or asking questions. Mark unconfirmed paths `(unverified)` under `Assumptions`.
 5. If multiple materially different approaches exist, recommend one and ask before implementing.
 6. If implementation is unblocked, do not start it yet. Present the spec artifact and ask the user to confirm or modify it before starting the next phases.
 

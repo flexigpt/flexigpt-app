@@ -117,8 +117,8 @@ Web search is exposed separately from normal local tool runtime.
 
 In practice:
 
-- it appears only when compatible with the current provider setup
-- changing providers can remove incompatible web-search options
+- it is SDK-bound and only appears when the current provider SDK matches a compatible web-search bundle
+- changing providers can remove incompatible web-search options, and the composer filters mismatched selections out
 - it is most useful when freshness matters, not as a default for every task
 
 Treat web search as a capability of the current model setup rather than as a universal local feature.

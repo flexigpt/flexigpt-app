@@ -254,7 +254,7 @@ function getSDKBaseCacheCapabilities(providerSDKType: ProviderSDKType): CacheCap
 					supportsKey: true,
 				},
 			};
-		case ProviderSDKType.ProviderSDKTypeOpenAIChatCompletions:
+		case (ProviderSDKType.ProviderSDKTypeOpenAIChatCompletions, ProviderSDKType.ProviderSDKTypeGoogleGenerateContent):
 		default:
 			return {
 				supportsAutomaticCaching: false,

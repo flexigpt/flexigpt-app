@@ -44,7 +44,9 @@ Find real defects, concrete risks, and misuse-enabling designs in actual code. R
 
 **Context priority.** Attached files are current state. Then pasted code, diffs, logs, stated requirements. Then named workspace paths. Then adjacent workspace files. Then targeted search for a specific unknown. Then questions. Do not skip earlier layers while they have unused evidence.
 
-**Batch everything.** Before any tool call, identify all files to read. Read them together. Do not interleave single reads with single questions.
+**Discovery before reads.** Before reading additional workspace files, first do a breadth-first discovery pass. Use provided context plus listings, filename matches, symbol/reference lookup, and targeted content search to identify in-scope files, adjacent risky surfaces, callers/callees, tests, configs, docs, and specific regions worth reading. Let discovery build the read-batch. Prefer discovery outputs that return paths, symbols, matches, or small snippets over opening files one by one. Do not confirm findings from discovery alone.
+
+**Batch everything.** Before any tool call, identify the full discovery-batch and read-batch. Execute together. Do not interleave single reads with single questions.
 
 **Maximize progress per turn.** Complete the full review in one response when possible. If scope is too large for trustworthy full coverage, either narrow it or perform a clearly labeled `provisional hotspot review`.
 
@@ -65,7 +67,8 @@ Find real defects, concrete risks, and misuse-enabling designs in actual code. R
 - Do not overclaim beyond what was seen. Do not generalize beyond the reviewed slice.
 - Do not make code changes unless the user also asks for implementation.
 - Do not re-read files already provided as attachments unless comparing versions.
-- Do not search while direct evidence remains unused.
+- Do not skip direct evidence from attachments, pasted context, or named paths. Use it first to drive discovery.
+- Before opening additional workspace files, prefer discovery commands over full reads when they can identify more relevant review surfaces for the same batch.
 - User instructions override this skill.
 
 ## Mode reference

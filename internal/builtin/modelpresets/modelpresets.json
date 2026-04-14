@@ -270,7 +270,6 @@
 				}
 			}
 		},
-
 		"deepseek": {
 			"schemaVersion": "2025-07-01",
 			"name": "deepseek",
@@ -362,19 +361,18 @@
 				}
 			}
 		},
-
 		"googlegemini": {
 			"schemaVersion": "2025-07-01",
 			"name": "googlegemini",
 			"displayName": "Google Gemini API",
-			"sdkType": "providerSDKTypeOpenAIChatCompletions",
+			"sdkType": "providerSDKTypeGoogleGenerateContent",
 			"isEnabled": true,
 			"createdAt": "2025-07-30T00:00:00Z",
 			"modifiedAt": "2025-07-30T00:00:00Z",
 			"isBuiltIn": true,
 			"origin": "https://generativelanguage.googleapis.com",
-			"chatCompletionPathPrefix": "/v1beta/openai/chat/completions",
-			"apiKeyHeaderKey": "Authorization",
+			"chatCompletionPathPrefix": "/",
+			"apiKeyHeaderKey": "x-goog-api-key",
 			"defaultHeaders": {
 				"content-type": "application/json"
 			},
@@ -421,11 +419,24 @@
 					"slug": "gemini31Pro",
 					"isEnabled": false,
 					"stream": true,
-					"maxPromptLength": 200000,
+					"maxPromptLength": 1000000,
 					"maxOutputLength": 65536,
-					"temperature": 0.1,
+					"temperature": 1.0,
+					"reasoning": {
+						"type": "singleWithLevels",
+						"level": "high",
+						"tokens": 0
+					},
 					"systemPrompt": "",
 					"timeout": 1800,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"temperatureDisallowedWhenEnabled": true,
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": ["low", "medium", "high"],
+							"supportsSummaryStyle": true
+						}
+					},
 					"createdAt": "2025-11-19T00:00:00Z",
 					"modifiedAt": "2025-11-19T00:00:00Z",
 					"isBuiltIn": true
@@ -438,12 +449,12 @@
 					"slug": "gemini3Flash",
 					"isEnabled": false,
 					"stream": true,
-					"maxPromptLength": 200000,
+					"maxPromptLength": 1000000,
 					"maxOutputLength": 65536,
-					"temperature": 0.1,
+					"temperature": 1.0,
 					"reasoning": {
 						"type": "singleWithLevels",
-						"level": "medium",
+						"level": "high",
 						"tokens": 0
 					},
 					"systemPrompt": "",
@@ -460,6 +471,37 @@
 					"modifiedAt": "2025-02-13T00:00:00Z",
 					"isBuiltIn": true
 				},
+				"gemini31FlashLite": {
+					"schemaVersion": "2025-07-01",
+					"id": "gemini31FlashLite",
+					"name": "gemini-3.1-flash-lite-preview",
+					"displayName": "GoogleAI Gemini 3.1 Flash Lite",
+					"slug": "gemini31FlashLite",
+					"isEnabled": false,
+					"stream": true,
+					"maxPromptLength": 1000000,
+					"maxOutputLength": 65536,
+					"temperature": 1.0,
+					"reasoning": {
+						"type": "singleWithLevels",
+						"level": "high",
+						"tokens": 0
+					},
+					"systemPrompt": "",
+					"timeout": 1800,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"temperatureDisallowedWhenEnabled": true,
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": ["minimal", "low", "medium", "high"],
+							"supportsSummaryStyle": true
+						}
+					},
+					"createdAt": "2026-02-13T00:00:00Z",
+					"modifiedAt": "2025-02-13T00:00:00Z",
+					"isBuiltIn": true
+				},
+
 				"gemini25Flash": {
 					"schemaVersion": "2025-07-01",
 					"id": "gemini25Flash",
@@ -468,11 +510,21 @@
 					"slug": "gemini25Flash",
 					"isEnabled": true,
 					"stream": true,
-					"maxPromptLength": 200000,
+					"maxPromptLength": 1000000,
 					"maxOutputLength": 65536,
-					"temperature": 0.1,
+					"temperature": 1.0,
+					"reasoning": {
+						"type": "hybridWithTokens",
+						"level": "",
+						"tokens": 1024
+					},
 					"systemPrompt": "",
 					"timeout": 1800,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"supportedReasoningTypes": ["hybridWithTokens"]
+						}
+					},
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
@@ -487,16 +539,25 @@
 					"stream": true,
 					"maxPromptLength": 200000,
 					"maxOutputLength": 65536,
-					"temperature": 0.1,
+					"temperature": 1.0,
+					"reasoning": {
+						"type": "hybridWithTokens",
+						"level": "",
+						"tokens": 1024
+					},
 					"systemPrompt": "",
 					"timeout": 1800,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"supportedReasoningTypes": ["hybridWithTokens"]
+						}
+					},
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
 					"isBuiltIn": true
 				}
 			}
 		},
-
 		"huggingface": {
 			"schemaVersion": "2025-07-01",
 			"name": "huggingface",
@@ -610,7 +671,6 @@
 				}
 			}
 		},
-
 		"llamacpp": {
 			"schemaVersion": "2025-07-01",
 			"name": "llamacpp",
@@ -714,7 +774,6 @@
 				}
 			}
 		},
-
 		"openai": {
 			"schemaVersion": "2025-07-01",
 			"name": "openai",
@@ -859,7 +918,6 @@
 				}
 			}
 		},
-
 		"openairesponses": {
 			"schemaVersion": "2025-07-01",
 			"name": "openairesponses",
@@ -1307,7 +1365,6 @@
 				}
 			}
 		},
-
 		"xai": {
 			"schemaVersion": "2025-07-01",
 			"name": "xai",

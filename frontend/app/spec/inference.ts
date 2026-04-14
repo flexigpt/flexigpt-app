@@ -5,12 +5,14 @@ export enum ProviderSDKType {
 	ProviderSDKTypeAnthropic = 'providerSDKTypeAnthropicMessages',
 	ProviderSDKTypeOpenAIChatCompletions = 'providerSDKTypeOpenAIChatCompletions',
 	ProviderSDKTypeOpenAIResponses = 'providerSDKTypeOpenAIResponses',
+	ProviderSDKTypeGoogleGenerateContent = 'providerSDKTypeGoogleGenerateContent',
 }
 
 export const SDK_DISPLAY_NAME: Record<ProviderSDKType, string> = {
 	[ProviderSDKType.ProviderSDKTypeAnthropic]: 'Anthropic Messages API',
 	[ProviderSDKType.ProviderSDKTypeOpenAIChatCompletions]: 'OpenAI ChatCompletions API',
 	[ProviderSDKType.ProviderSDKTypeOpenAIResponses]: 'OpenAI Responses API',
+	[ProviderSDKType.ProviderSDKTypeGoogleGenerateContent]: 'Google GenAI API',
 };
 
 export const SDK_DEFAULTS: Record<
@@ -35,6 +37,13 @@ export const SDK_DEFAULTS: Record<
 	[ProviderSDKType.ProviderSDKTypeOpenAIResponses]: {
 		chatPath: '/v1/responses',
 		apiKeyHeaderKey: 'Authorization',
+		defaultHeaders: {
+			'Content-Type': 'application/json',
+		},
+	},
+	[ProviderSDKType.ProviderSDKTypeGoogleGenerateContent]: {
+		chatPath: '/',
+		apiKeyHeaderKey: 'x-goog-api-key',
 		defaultHeaders: {
 			'Content-Type': 'application/json',
 		},
