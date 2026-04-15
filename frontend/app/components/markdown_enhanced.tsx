@@ -2,6 +2,8 @@
 import type { AnchorHTMLAttributes, HTMLAttributes, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import { memo, useMemo } from 'react';
 
+import { FiExternalLink } from 'react-icons/fi';
+
 import 'katex/dist/katex.min.css';
 import type { ExtraProps } from 'react-markdown';
 import Markdown from 'react-markdown';
@@ -59,6 +61,8 @@ interface EnhancedMarkdownProps {
 	onLinkClick?: (href: string, event: ReactMouseEvent<HTMLAnchorElement>) => boolean;
 }
 
+const isExternalHref = (href?: string) => !!href && /^(https?:)?\/\/|^mailto:|^tel:/i.test(href);
+
 export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 	text,
 	align = 'left',
@@ -91,25 +95,25 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 		return {
 			h1: renderHeading('h1', 'my-2 pt-2 text-xl font-bold', { hide: hideH1Title }),
 			h2: renderHeading('h2', 'my-2 pt-2 text-lg font-bold'),
-			h3: renderHeading('h3', 'my-2 pt-2 text-base font-bold'),
-			h4: renderHeading('h4', 'my-2 pt-2 text-sm font-bold'),
-			h5: renderHeading('h5', 'my-2 pt-2 text-sm font-semibold'),
-			h6: renderHeading('h6', 'my-2 pt-2 text-xs font-semibold uppercase tracking-wide'),
+			h3: renderHeading('h3', 'my-1 pt-1 text-base font-semibold'),
+			h4: renderHeading('h4', 'my-1 pt-1 text-sm font-semibold'),
+			h5: renderHeading('h5', 'my-1 pt-1 text-sm font-semibold'),
+			h6: renderHeading('h6', 'my-1 pt-1 text-xs font-semibold uppercase tracking-wide'),
 
 			ul: ({ node, children, className, ...rest }: CustomComponentProps) => (
-				<ul {...rest} className={`list-disc py-2 pl-4 ${className ?? ''}`}>
+				<ul {...rest} className={`ml-4 list-disc py-1 pl-2 ${className ?? ''}`}>
 					{children}
 				</ul>
 			),
 
 			ol: ({ node, children, className, ...rest }: CustomComponentProps) => (
-				<ol {...rest} className={`list-decimal py-1 pl-4 ${className ?? ''}`}>
+				<ol {...rest} className={`ml-4 list-decimal py-1 pl-2 ${className ?? ''}`}>
 					{children}
 				</ol>
 			),
 
 			li: ({ node, children, className, ...rest }: CustomComponentProps) => (
-				<li {...rest} className={`py-1 ${className ?? ''}`}>
+				<li {...rest} className={`p-0 ${className ?? ''}`}>
 					{children}
 				</li>
 			),
@@ -168,32 +172,37 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 				</blockquote>
 			),
 
-			a: ({ node, href, children, className, ...rest }: RefComponentProps) => (
-				<a
-					{...rest}
-					href={href}
-					target={href?.startsWith('http') ? '_blank' : undefined}
-					rel={href?.startsWith('http') ? 'noopener noreferrer' : undefined}
-					className={`cursor-pointer text-blue-600 underline hover:text-blue-800 ${className ?? ''}`}
-					onClick={e => {
-						if (!href) {
-							e.preventDefault();
-							return;
-						}
+			a: ({ node, href, children, className, ...rest }: RefComponentProps) => {
+				const isExternal = isExternalHref(href);
 
-						const handled = onLinkClick?.(href, e);
-						if (handled) {
-							e.preventDefault();
-							return;
-						}
+				return (
+					<a
+						{...rest}
+						href={href}
+						target={isExternal ? '_blank' : undefined}
+						rel={isExternal ? 'noopener noreferrer' : undefined}
+						className={`cursor-pointer text-blue-600 hover:text-blue-800 ${className ?? ''}`}
+						onClick={e => {
+							if (!href) {
+								e.preventDefault();
+								return;
+							}
 
-						e.preventDefault();
-						backendAPI.openURL(href);
-					}}
-				>
-					{children}
-				</a>
-			),
+							const handled = onLinkClick?.(href, e);
+							if (handled) {
+								e.preventDefault();
+								return;
+							}
+
+							e.preventDefault();
+							backendAPI.openURL(href);
+						}}
+					>
+						{children}
+						{isExternal && <FiExternalLink aria-hidden="true" size="0.9em" className="ml-1 inline align-[-0.1em]" />}
+					</a>
+				);
+			},
 
 			code: ({ node, inline, className, children, ...props }: CodeComponentProps) => {
 				if (inline || !className) {

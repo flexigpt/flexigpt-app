@@ -25,10 +25,9 @@ It brings together reusable assistant presets, model presets, prompt templates, 
 
 ## Quick start
 
-1. Open **Settings** and add a provider API key.
-2. Open **Chats**.
-3. Pick an assistant preset and model preset, or keep the defaults.
-4. Send your first message.
+- Get an API key for your provider.
+- Add the key in Settings -> Auth Keys.
+- Chat.
 
 FlexiGPT does not bill you directly. Usage costs and limits come from the provider account behind the key you configure.
 

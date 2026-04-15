@@ -6,9 +6,39 @@
 - [ ] test shell and hostspawn exec on mac pkg and win
 - [ ] test all providers again for normal, attach, tool, autoexec, shell , skill flows.
 - [ ] mkdir in writefile.
-- [ ] xai to responses api migration. 4.x doesnt support thinking as such.
-- [ ] providers: mistral, qwen, minimax, z ai, deepseek, stepfun, meta, nvidia, xiaomi
 - [ ] findtext should allow matchlines if those are empty or empty string as such.
+
+- [ ] model providers with dedicated platforms:
+  - [ ] openai -> best use responses api -> done.
+  - [ ] anthropic -> use messages api -> done.
+  - [ ] google gemini -> use generate content api -> done.
+  - [ ] xai -> responses api, 4.x doesnt support thinking as such, "inbuilt" thinking is what they say, so no control
+  - [ ] mistral -> chat completions compatible but looks a bit different. check cleanly again.
+
+  - [ ] cohere -> non sota inference
+  - [ ] meta api -> chat completions, but getting api keys is in closed beta as of now.
+
+- [ ] Aggregate API endpoint providers:
+  - [ ] HF -> responses beta, completions stable
+  - [ ] Openrouter -> responses beta, completions stable
+
+- [ ] Aggregate Cloud services with AI deployments
+  - [ ] Amazon -> (non-sota models exist)
+  - [ ] Azure -> (non-sota models exist)
+  - [ ] nvidia nim/dgx cloud -> (non-sota models exist)
+  - [ ] Oracle ??
+
+- [ ] Chinese model providers with dedicated platforms: GLM (z ai), minimax, qwen (alibaba), kimi (moonshot ai), deepseek, yi models (01.ai), StepFun
+  - [ ] some specialize dedicated platforms for these have very slow access/login.
+  - [ ] data mostly sent to chinese infra and can be accessed by chinese govt.
+  - [ ] most privacy policy dictates that data will be used for training.
+  - [ ] better access models via openrouter/hf/other aggregators as needed
+
+- [ ] Local providers:
+  - [ ] llama.cpp -> chat completions
+  - [ ] LMStudio, Ollama -> anthropic messages, responses, chat completions, all are supported.
+  - [ ] vLLM -> responses, chat completions
+  - [ ] GPT4All -> chat completions
 
 ## Milestone thoughts
 

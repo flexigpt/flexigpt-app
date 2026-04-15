@@ -1,12 +1,11 @@
 # Getting Started
 
+FlexiGPT is a desktop client for working with remote or local model providers from one workspace.
 This guide is the fastest path from install to a useful first conversation in FlexiGPT.
 
 ## Table of contents <!-- omit from toc -->
 
 - [Base expectations](#base-expectations)
-- [First-run checklist](#first-run-checklist)
-- [Add a provider key](#add-a-provider-key)
 - [Chats workspace](#chats-workspace)
 - [Pick a starting setup](#pick-a-starting-setup)
   - [Assistant Preset](#assistant-preset)
@@ -20,37 +19,15 @@ This guide is the fastest path from install to a useful first conversation in Fl
 
 ## Base expectations
 
-FlexiGPT is a desktop client for working with remote or local model providers from one workspace.
-
 Before your first successful send, you usually need:
 
-- the installed desktop app
-- at least one enabled provider with an API key in **Settings**
-- a normal question, task, or file to work with
+- Get an API key for your provider.
+  - [OpenAI](https://platform.openai.com/settings/organization/api-keys), [Anthropic Claude](https://platform.claude.com/settings/keys), [Google Gemini](https://aistudio.google.com/api-keys), [OpenRouter](https://openrouter.ai/workspaces/default/keys), [xAI](https://console.x.ai/team/default/api-keys), [Hugging Face](https://huggingface.co/settings/tokens)
+- Add the key in [Settings -> Auth Keys](/settings).
+- [Chat](/chats).
 
-FlexiGPT ships with built-in providers, model presets, tools, skills, prompts, and assistant presets, so the first run is mostly about connecting your key and picking a starting setup.
-
-## First-run checklist
-
-1. Open **Settings**.
-2. Add a provider key in **Auth Keys**.
-3. Open **Chats**.
-4. Choose an **Assistant Preset** and **Model Preset**, or keep the defaults.
-5. Write a message.
-6. Optionally attach files, prompts, tools, or skills.
-7. Send the request and inspect the result.
-
-## Add a provider key
-
-FlexiGPT can only send a live request after you configure credentials for at least one provider.
-
-In **Settings**:
-
-- open **Auth Keys**
-- add a key for the provider you want to use
-- return to **Chats** after saving it
-
-Provider secrets are stored through the OS keyring rather than kept in plain-text settings.
+FlexiGPT ships with built-in providers, model presets, tools, skills, prompts, and assistant presets.
+Try out different things like: different assistants for spec driven dev or reviewing code, attaching files, creating your own prompt template or skill and using them!
 
 ## Chats workspace
 
