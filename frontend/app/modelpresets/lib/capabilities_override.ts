@@ -113,6 +113,17 @@ export function mergeModelCapabilitiesOverride(
 		modalitiesIn: pick(m?.modalitiesIn, p?.modalitiesIn),
 		modalitiesOut: pick(m?.modalitiesOut, p?.modalitiesOut),
 
+		paramDialect:
+			m?.paramDialect || p?.paramDialect
+				? {
+						maxOutputTokensParamName: pick(
+							m?.paramDialect?.maxOutputTokensParamName,
+							p?.paramDialect?.maxOutputTokensParamName
+						),
+						toolChoiceParamStyle: pick(m?.paramDialect?.toolChoiceParamStyle, p?.paramDialect?.toolChoiceParamStyle),
+					}
+				: undefined,
+
 		reasoningCapabilities:
 			m?.reasoningCapabilities || p?.reasoningCapabilities
 				? {

@@ -132,8 +132,17 @@ func cloneModelCapabilitiesOverride(in *spec.ModelCapabilitiesOverride) *spec.Mo
 		ModalitiesIn:  slices.Clone(in.ModalitiesIn),
 		ModalitiesOut: slices.Clone(in.ModalitiesOut),
 	}
+	if in.ParamDialect != nil {
+		mt := *in.ParamDialect.MaxOutputTokensParamName
+		tp := *in.ParamDialect.ToolChoiceParamStyle
+		out.ParamDialect = &spec.ParamDialectOverride{
+			MaxOutputTokensParamName: &mt,
+			ToolChoiceParamStyle:     &tp,
+		}
+	}
 	if in.ReasoningCapabilities != nil {
 		out.ReasoningCapabilities = &spec.ReasoningCapabilitiesOverride{
+			SupportsReasoningConfig:          cloneBoolPtr(in.ReasoningCapabilities.SupportsReasoningConfig),
 			SupportedReasoningTypes:          slices.Clone(in.ReasoningCapabilities.SupportedReasoningTypes),
 			SupportedReasoningLevels:         slices.Clone(in.ReasoningCapabilities.SupportedReasoningLevels),
 			SupportsSummaryStyle:             cloneBoolPtr(in.ReasoningCapabilities.SupportsSummaryStyle),
@@ -156,10 +165,11 @@ func cloneModelCapabilitiesOverride(in *spec.ModelCapabilitiesOverride) *spec.Mo
 	}
 	if in.ToolCapabilities != nil {
 		out.ToolCapabilities = &spec.ToolCapabilitiesOverride{
-			SupportedToolTypes:        slices.Clone(in.ToolCapabilities.SupportedToolTypes),
-			SupportedToolPolicyModes:  slices.Clone(in.ToolCapabilities.SupportedToolPolicyModes),
-			SupportsParallelToolCalls: cloneBoolPtr(in.ToolCapabilities.SupportsParallelToolCalls),
-			MaxForcedTools:            cloneIntPtr(in.ToolCapabilities.MaxForcedTools),
+			SupportedToolTypes:               slices.Clone(in.ToolCapabilities.SupportedToolTypes),
+			SupportedToolPolicyModes:         slices.Clone(in.ToolCapabilities.SupportedToolPolicyModes),
+			SupportsParallelToolCalls:        cloneBoolPtr(in.ToolCapabilities.SupportsParallelToolCalls),
+			MaxForcedTools:                   cloneIntPtr(in.ToolCapabilities.MaxForcedTools),
+			SupportedClientToolOutputFormats: slices.Clone(in.ToolCapabilities.SupportedClientToolOutputFormats),
 		}
 	}
 	out.CacheCapabilities = cloneCacheCapabilitiesOverride(in.CacheCapabilities)
@@ -192,6 +202,7 @@ func cloneCacheControlCapabilitiesOverride(
 		SupportedKinds: slices.Clone(in.SupportedKinds),
 		SupportedTTLs:  slices.Clone(in.SupportedTTLs),
 		SupportsKey:    cloneBoolPtr(in.SupportsKey),
+		SupportsTTL:    cloneBoolPtr(in.SupportsTTL),
 	}
 }
 

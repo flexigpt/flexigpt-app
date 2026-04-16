@@ -44,6 +44,10 @@ func cloneModelCapabilities(in inferenceSpec.ModelCapabilities) inferenceSpec.Mo
 		c.ToolOutput = cloneCacheControlCapabilities(in.CacheCapabilities.ToolOutput)
 		out.CacheCapabilities = &c
 	}
+	if in.ParamDialect != nil {
+		c := *in.ParamDialect
+		out.ParamDialect = &c
+	}
 	return out
 }
 
@@ -72,6 +76,12 @@ func applyModelCapabilitiesOverride(
 	}
 	if ov.ModalitiesOut != nil {
 		dst.ModalitiesOut = slices.Clone(ov.ModalitiesOut)
+	}
+	if ov.ParamDialect != nil {
+		dst.ParamDialect = &inferenceSpec.ParamDialect{
+			MaxOutputTokensParamName: *ov.ParamDialect.MaxOutputTokensParamName,
+			ToolChoiceParamStyle:     *ov.ParamDialect.ToolChoiceParamStyle,
+		}
 	}
 
 	if ov.ReasoningCapabilities != nil {

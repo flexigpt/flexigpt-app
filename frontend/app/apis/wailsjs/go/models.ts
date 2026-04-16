@@ -460,6 +460,20 @@ export namespace spec {
 	        this.templateVersion = source["templateVersion"];
 	    }
 	}
+	export class ParamDialectOverride {
+	    maxOutputTokensParamName?: string;
+	    toolChoiceParamStyle?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ParamDialectOverride(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.maxOutputTokensParamName = source["maxOutputTokensParamName"];
+	        this.toolChoiceParamStyle = source["toolChoiceParamStyle"];
+	    }
+	}
 	export class CacheControlCapabilitiesOverride {
 	    supportsTTL?: boolean;
 	    supportedKinds?: string[];
@@ -600,6 +614,7 @@ export namespace spec {
 	    outputCapabilities?: OutputCapabilitiesOverride;
 	    toolCapabilities?: ToolCapabilitiesOverride;
 	    cacheCapabilities?: CacheCapabilitiesOverride;
+	    paramDialect?: ParamDialectOverride;
 	
 	    static createFrom(source: any = {}) {
 	        return new ModelCapabilitiesOverride(source);
@@ -614,6 +629,7 @@ export namespace spec {
 	        this.outputCapabilities = this.convertValues(source["outputCapabilities"], OutputCapabilitiesOverride);
 	        this.toolCapabilities = this.convertValues(source["toolCapabilities"], ToolCapabilitiesOverride);
 	        this.cacheCapabilities = this.convertValues(source["cacheCapabilities"], CacheCapabilitiesOverride);
+	        this.paramDialect = this.convertValues(source["paramDialect"], ParamDialectOverride);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -5485,6 +5501,7 @@ export namespace spec {
 		    return a;
 		}
 	}
+	
 	
 	
 	

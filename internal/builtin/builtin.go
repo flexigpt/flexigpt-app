@@ -49,6 +49,7 @@ const (
 	ProviderNameGoogleGemini          = "googlegemini"
 	ProviderNameHuggingFace           = "huggingface"
 	ProviderNameLlamaCPP              = "llamacpp"
+	ProviderNameMistral               = "mistral"
 	ProviderNameOpenAIChatCompletions = "openai"
 	ProviderNameOpenAIResponses       = "openairesponses"
 	ProviderNameOpenRouter            = "openrouter"
@@ -60,6 +61,7 @@ var BuiltInProviderNames = []string{
 	ProviderNameGoogleGemini,
 	ProviderNameHuggingFace,
 	ProviderNameLlamaCPP,
+	ProviderNameMistral,
 	ProviderNameOpenAIChatCompletions,
 	ProviderNameOpenAIResponses,
 	ProviderNameOpenRouter,

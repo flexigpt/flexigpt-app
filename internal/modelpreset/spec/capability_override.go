@@ -49,6 +49,11 @@ type CacheCapabilitiesOverride struct {
 	ToolOutput               *CacheControlCapabilitiesOverride `json:"toolOutput,omitempty"`
 }
 
+type ParamDialectOverride struct {
+	MaxOutputTokensParamName *inferenceSpec.MaxOutputTokensParamName `json:"maxOutputTokensParamName,omitempty"`
+	ToolChoiceParamStyle     *inferenceSpec.ToolChoiceParamStyle     `json:"toolChoiceParamStyle,omitempty"`
+}
+
 // ModelCapabilitiesOverride is a "patch-like" version of inference-go's ModelCapabilities.
 //
 // Semantics:
@@ -66,6 +71,6 @@ type ModelCapabilitiesOverride struct {
 	StopSequenceCapabilities *StopSequenceCapabilitiesOverride `json:"stopSequenceCapabilities,omitempty"`
 	OutputCapabilities       *OutputCapabilitiesOverride       `json:"outputCapabilities,omitempty"`
 	ToolCapabilities         *ToolCapabilitiesOverride         `json:"toolCapabilities,omitempty"`
-
-	CacheCapabilities *CacheCapabilitiesOverride `json:"cacheCapabilities,omitempty"`
+	CacheCapabilities        *CacheCapabilitiesOverride        `json:"cacheCapabilities,omitempty"`
+	ParamDialect             *ParamDialectOverride             `json:"paramDialect,omitempty"`
 }

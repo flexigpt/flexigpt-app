@@ -705,6 +705,128 @@
 				}
 			}
 		},
+		"mistral": {
+			"schemaVersion": "2025-07-01",
+			"name": "mistral",
+			"displayName": "Mistral AI",
+			"sdkType": "providerSDKTypeOpenAIChatCompletions",
+			"isEnabled": true,
+			"createdAt": "2026-04-16T00:00:00Z",
+			"modifiedAt": "2026-04-16T00:00:00Z",
+			"isBuiltIn": true,
+			"origin": "https://api.mistral.ai",
+			"chatCompletionPathPrefix": "/v1/chat/completions",
+			"apiKeyHeaderKey": "Authorization",
+			"defaultHeaders": {
+				"content-type": "application/json"
+			},
+			"capabilitiesOverride": {
+				"modalitiesIn": ["textIn", "imageIn"],
+				"modalitiesOut": ["textOut"],
+				"reasoningCapabilities": {
+					"supportsReasoningConfig": true,
+					"supportedReasoningTypes": [],
+					"supportedReasoningLevels": ["none", "high"],
+					"supportsSummaryStyle": false,
+					"supportsEncryptedReasoningInput": false,
+					"temperatureDisallowedWhenEnabled": false
+				},
+				"stopSequenceCapabilities": {
+					"isSupported": true,
+					"disallowedWithReasoning": false,
+					"maxSequences": 0
+				},
+				"outputCapabilities": {
+					"supportedOutputFormats": ["text", "jsonSchema"],
+					"supportsVerbosity": false
+				},
+				"toolCapabilities": {
+					"supportedToolTypes": ["function"],
+					"supportedToolPolicyModes": ["auto", "any", "tool", "none"],
+					"supportsParallelToolCalls": true,
+					"maxForcedTools": 1,
+					"supportedClientToolOutputFormats": ["string"]
+				},
+				"cacheCapabilities": {
+					"supportsAutomaticCaching": false,
+					"topLevel": {
+						"supportsTTL": false,
+						"supportedKinds": [],
+						"supportedTTLs": [],
+						"supportsKey": false
+					}
+				},
+				"paramDialect": {
+					"maxOutputTokensParamName": "maxTokens",
+					"toolChoiceParamStyle": "requiredNamed"
+				}
+			},
+			"defaultModelPresetID": "mistralSmall4",
+			"modelPresets": {
+				"mistralSmall4": {
+					"schemaVersion": "2025-07-01",
+					"id": "mistralSmall4",
+					"name": "mistral-small-2603",
+					"displayName": "Mistral Small 4",
+					"slug": "mistralSmall4",
+					"isEnabled": true,
+					"stream": true,
+					"maxPromptLength": 256000,
+					"maxOutputLength": 32768,
+					"temperature": 0.1,
+					"systemPrompt": "",
+					"timeout": 1800,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"supportsReasoningConfig": true,
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": ["none", "high"],
+							"supportsSummaryStyle": false,
+							"supportsEncryptedReasoningInput": false,
+							"temperatureDisallowedWhenEnabled": false
+						}
+					},
+					"createdAt": "2026-04-16T00:00:00Z",
+					"modifiedAt": "2026-04-16T00:00:00Z",
+					"isBuiltIn": true
+				},
+				"mistralLarge3": {
+					"schemaVersion": "2025-07-01",
+					"id": "mistralLarge3",
+					"name": "mistral-large-2512",
+					"displayName": "Mistral Large 3",
+					"slug": "mistralLarge3",
+					"isEnabled": true,
+					"stream": true,
+					"maxPromptLength": 256000,
+					"maxOutputLength": 32768,
+					"temperature": 0.1,
+					"systemPrompt": "",
+					"timeout": 1800,
+					"createdAt": "2026-04-16T00:00:00Z",
+					"modifiedAt": "2026-04-16T00:00:00Z",
+					"isBuiltIn": true
+				},
+				"devstral2": {
+					"schemaVersion": "2025-07-01",
+					"id": "devstral2",
+					"name": "devstral-2512",
+					"displayName": "Devstral 2",
+					"slug": "devstral2",
+					"isEnabled": true,
+					"stream": true,
+					"maxPromptLength": 256000,
+					"maxOutputLength": 32768,
+					"temperature": 0.1,
+					"systemPrompt": "",
+					"timeout": 1800,
+					"createdAt": "2026-04-16T00:00:00Z",
+					"modifiedAt": "2026-04-16T00:00:00Z",
+					"isBuiltIn": true
+				}
+			}
+		},
+
 		"openai": {
 			"schemaVersion": "2025-07-01",
 			"name": "openai",

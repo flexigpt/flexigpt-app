@@ -26,6 +26,9 @@ It brings together reusable assistant presets, model presets, prompt templates, 
 ## Quick start
 
 - Get an API key for your provider.
+  - [OpenAI](https://platform.openai.com/settings/organization/api-keys), [Anthropic Claude](https://platform.claude.com/settings/keys), [Google Gemini](https://aistudio.google.com/api-keys), [xAI](https://console.x.ai/team/default/api-keys), [MistralAI](https://console.mistral.ai/home?profile_dialog=api-keys)
+  - [OpenRouter](https://openrouter.ai/workspaces/default/keys), [Hugging Face](https://huggingface.co/settings/tokens)
+  - llama.cpp, LMStudio, Ollama, vLLM, GPT4All
 - Add the key in Settings -> Auth Keys.
 - Chat.
 
@@ -35,7 +38,7 @@ FlexiGPT does not bill you directly. Usage costs and limits come from the provid
 
 ### Multi-provider connectivity with built-in presets
 
-- First-class support for OpenAI, Anthropic, Google Gemini API, xAI, Hugging Face, OpenRouter, and local `llama.cpp`
+- First-class support for OpenAI, Anthropic, Google Gemini API, xAI, Mistral, Hugging Face, OpenRouter, and local `llama.cpp`
 - Support for compatible custom endpoints across OpenAI Chat Completions, OpenAI Responses, and Anthropic Messages style APIs
 - Built-in providers and curated model presets for leading models so you can get started quickly without manually defining endpoints or defaults first
 - API keys are stored securely through the OS keyring, not in plain-text exported settings

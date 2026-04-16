@@ -69,7 +69,7 @@ export interface ReasoningCapabilitiesOverride {
 /**
  * @public
  */
-export class CacheControlCapabilitiesOverride {
+export interface CacheControlCapabilitiesOverride {
 	supportedKinds?: CacheControlKind[];
 	supportedTTLs?: CacheControlTTL[];
 	supportsKey?: boolean;
@@ -79,7 +79,7 @@ export class CacheControlCapabilitiesOverride {
 /**
  * @public
  */
-export class CacheCapabilitiesOverride {
+export interface CacheCapabilitiesOverride {
 	supportsAutomaticCaching?: boolean;
 	topLevel?: CacheControlCapabilitiesOverride;
 	inputOutputContent?: CacheControlCapabilitiesOverride;
@@ -87,6 +87,14 @@ export class CacheCapabilitiesOverride {
 	toolChoice?: CacheControlCapabilitiesOverride;
 	toolCall?: CacheControlCapabilitiesOverride;
 	toolOutput?: CacheControlCapabilitiesOverride;
+}
+
+/**
+ * @public
+ */
+export interface ParamDialectOverride {
+	maxOutputTokensParamName?: string;
+	toolChoiceParamStyle?: string;
 }
 
 /**
@@ -100,6 +108,7 @@ export interface ModelCapabilitiesOverride {
 	outputCapabilities?: OutputCapabilitiesOverride;
 	toolCapabilities?: ToolCapabilitiesOverride;
 	cacheCapabilities?: CacheCapabilitiesOverride;
+	paramDialect?: ParamDialectOverride;
 }
 
 /**
