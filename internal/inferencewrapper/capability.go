@@ -31,6 +31,7 @@ func cloneModelCapabilities(in inferenceSpec.ModelCapabilities) inferenceSpec.Mo
 		c := *in.ToolCapabilities
 		c.SupportedToolTypes = slices.Clone(c.SupportedToolTypes)
 		c.SupportedToolPolicyModes = slices.Clone(c.SupportedToolPolicyModes)
+		c.SupportedClientToolOutputFormats = slices.Clone(c.SupportedClientToolOutputFormats)
 		out.ToolCapabilities = &c
 	}
 	if in.CacheCapabilities != nil {
@@ -56,27 +57,6 @@ func cloneCacheControlCapabilities(
 	out.SupportedKinds = slices.Clone(in.SupportedKinds)
 	out.SupportedTTLs = slices.Clone(in.SupportedTTLs)
 	return &out
-}
-
-func applyCacheControlCapabilitiesOverride(
-	dst **inferenceSpec.CacheControlCapabilities,
-	ov *spec.CacheControlCapabilitiesOverride,
-) {
-	if ov == nil {
-		return
-	}
-	if *dst == nil {
-		*dst = &inferenceSpec.CacheControlCapabilities{}
-	}
-	if ov.SupportedKinds != nil {
-		(*dst).SupportedKinds = slices.Clone(ov.SupportedKinds)
-	}
-	if ov.SupportedTTLs != nil {
-		(*dst).SupportedTTLs = slices.Clone(ov.SupportedTTLs)
-	}
-	if ov.SupportsKey != nil {
-		(*dst).SupportsKey = *ov.SupportsKey
-	}
 }
 
 func applyModelCapabilitiesOverride(
@@ -107,6 +87,9 @@ func applyModelCapabilitiesOverride(
 			dst.ReasoningCapabilities.SupportedReasoningLevels = slices.Clone(
 				ov.ReasoningCapabilities.SupportedReasoningLevels,
 			)
+		}
+		if ov.ReasoningCapabilities.SupportsReasoningConfig != nil {
+			dst.ReasoningCapabilities.SupportsReasoningConfig = *ov.ReasoningCapabilities.SupportsReasoningConfig
 		}
 		if ov.ReasoningCapabilities.SupportsSummaryStyle != nil {
 			dst.ReasoningCapabilities.SupportsSummaryStyle = *ov.ReasoningCapabilities.SupportsSummaryStyle
@@ -156,6 +139,11 @@ func applyModelCapabilitiesOverride(
 		if ov.ToolCapabilities.SupportedToolPolicyModes != nil {
 			dst.ToolCapabilities.SupportedToolPolicyModes = slices.Clone(ov.ToolCapabilities.SupportedToolPolicyModes)
 		}
+		if ov.ToolCapabilities.SupportedClientToolOutputFormats != nil {
+			dst.ToolCapabilities.SupportedClientToolOutputFormats = slices.Clone(
+				ov.ToolCapabilities.SupportedClientToolOutputFormats,
+			)
+		}
 		if ov.ToolCapabilities.SupportsParallelToolCalls != nil {
 			dst.ToolCapabilities.SupportsParallelToolCalls = *ov.ToolCapabilities.SupportsParallelToolCalls
 		}
@@ -196,5 +184,29 @@ func applyModelCapabilitiesOverride(
 			&dst.CacheCapabilities.ToolOutput,
 			ov.CacheCapabilities.ToolOutput,
 		)
+	}
+}
+
+func applyCacheControlCapabilitiesOverride(
+	dst **inferenceSpec.CacheControlCapabilities,
+	ov *spec.CacheControlCapabilitiesOverride,
+) {
+	if ov == nil {
+		return
+	}
+	if *dst == nil {
+		*dst = &inferenceSpec.CacheControlCapabilities{}
+	}
+	if ov.SupportedKinds != nil {
+		(*dst).SupportedKinds = slices.Clone(ov.SupportedKinds)
+	}
+	if ov.SupportedTTLs != nil {
+		(*dst).SupportedTTLs = slices.Clone(ov.SupportedTTLs)
+	}
+	if ov.SupportsKey != nil {
+		(*dst).SupportsKey = *ov.SupportsKey
+	}
+	if ov.SupportsTTL != nil {
+		(*dst).SupportsTTL = *ov.SupportsTTL
 	}
 }

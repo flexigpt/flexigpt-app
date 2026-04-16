@@ -8,38 +8,6 @@
 - [ ] mkdir in writefile.
 - [ ] findtext should allow matchlines if those are empty or empty string as such.
 
-- [ ] model providers with dedicated platforms:
-  - [ ] openai -> best use responses api -> done.
-  - [ ] anthropic -> use messages api -> done.
-  - [ ] google gemini -> use generate content api -> done.
-  - [ ] xai -> responses api, 4.x doesnt support thinking as such, "inbuilt" thinking is what they say, so no control
-  - [ ] mistral -> chat completions compatible but looks a bit different. check cleanly again.
-
-  - [ ] cohere -> non sota inference
-  - [ ] meta api -> chat completions, but getting api keys is in closed beta as of now.
-
-- [ ] Aggregate API endpoint providers:
-  - [ ] HF -> responses beta, completions stable
-  - [ ] Openrouter -> responses beta, completions stable
-
-- [ ] Aggregate Cloud services with AI deployments
-  - [ ] Amazon -> (non-sota models exist)
-  - [ ] Azure -> (non-sota models exist)
-  - [ ] nvidia nim/dgx cloud -> (non-sota models exist)
-  - [ ] Oracle ??
-
-- [ ] Chinese model providers with dedicated platforms: GLM (z ai), minimax, qwen (alibaba), kimi (moonshot ai), deepseek, yi models (01.ai), StepFun
-  - [ ] some specialize dedicated platforms for these have very slow access/login.
-  - [ ] data mostly sent to chinese infra and can be accessed by chinese govt.
-  - [ ] most privacy policy dictates that data will be used for training.
-  - [ ] better access models via openrouter/hf/other aggregators as needed
-
-- [ ] Local providers:
-  - [ ] llama.cpp -> chat completions
-  - [ ] LMStudio, Ollama -> anthropic messages, responses, chat completions, all are supported.
-  - [ ] vLLM -> responses, chat completions
-  - [ ] GPT4All -> chat completions
-
 ## Milestone thoughts
 
 - [x] M1 - API coverage - Pending items:
@@ -129,3 +97,37 @@
   - [x] read/replace text utils, may need to support approx line numbers so that llm can be more specific on where to read / write etc.
     - [x] replace has lots of ambiguous mismatch errors. need a way to narrow down, and have errors better communicated back that are actionable.
   - [ ] may be pdf parsing and any other parsing should be builder hooks that people can input at build time so that adding support etc is easy.
+
+## Model analysis
+
+- [ ] model providers with dedicated platforms:
+  - [ ] openai -> best use responses api -> done.
+  - [ ] anthropic -> use messages api -> done.
+  - [ ] google gemini -> use generate content api -> done.
+  - [ ] xai -> responses api, 4.x doesnt support thinking as such, "inbuilt" thinking is what they say, so no control
+  - [ ] mistral -> chat completions compatible but looks a bit different. check cleanly again.
+
+  - [ ] cohere -> non sota inference
+  - [ ] meta api -> chat completions, but getting api keys is in closed beta as of now.
+
+- [ ] Aggregate API endpoint providers:
+  - [ ] HF -> responses beta, completions stable
+  - [ ] Openrouter -> responses beta, completions stable
+
+- [ ] Aggregate Cloud services with AI deployments
+  - [ ] Amazon -> (non-sota models exist) -> needs aws specific converse/conversestream sdk intergation.
+  - [ ] Azure -> (non-sota models exist) -> more chat completions like. needs a adapter.
+  - [ ] nvidia nim/dgx cloud -> (non-sota models exist) - ??
+  - [ ] Oracle -> ??
+
+- [ ] Chinese model providers with dedicated platforms: GLM (z ai), minimax, qwen (alibaba), kimi (moonshot ai), deepseek, yi models (01.ai), StepFun
+  - [ ] some specialize dedicated platforms for these have very slow access/login.
+  - [ ] data mostly sent to chinese infra and can be accessed by chinese govt.
+  - [ ] most privacy policy dictates that data will be used for training.
+  - [ ] better access models via openrouter/hf/other aggregators as needed
+
+- [ ] Local providers:
+  - [ ] llama.cpp -> chat completions
+  - [ ] LMStudio, Ollama -> anthropic messages, responses, chat completions, all are supported.
+  - [ ] vLLM -> responses, chat completions
+  - [ ] GPT4All -> chat completions

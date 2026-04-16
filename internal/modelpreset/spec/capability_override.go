@@ -3,6 +3,8 @@ package spec
 import inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 type ReasoningCapabilitiesOverride struct {
+	SupportsReasoningConfig *bool `json:"supportsReasoningConfig,omitempty"`
+
 	SupportedReasoningTypes  []inferenceSpec.ReasoningType  `json:"supportedReasoningTypes,omitempty"`
 	SupportedReasoningLevels []inferenceSpec.ReasoningLevel `json:"supportedReasoningLevels,omitempty"`
 
@@ -23,13 +25,15 @@ type OutputCapabilitiesOverride struct {
 }
 
 type ToolCapabilitiesOverride struct {
-	SupportedToolTypes        []inferenceSpec.ToolType       `json:"supportedToolTypes,omitempty"`
-	SupportedToolPolicyModes  []inferenceSpec.ToolPolicyMode `json:"supportedToolPolicyModes,omitempty"`
-	SupportsParallelToolCalls *bool                          `json:"supportsParallelToolCalls,omitempty"`
-	MaxForcedTools            *int                           `json:"maxForcedTools,omitempty"`
+	SupportedToolTypes               []inferenceSpec.ToolType             `json:"supportedToolTypes,omitempty"`
+	SupportedToolPolicyModes         []inferenceSpec.ToolPolicyMode       `json:"supportedToolPolicyModes,omitempty"`
+	SupportsParallelToolCalls        *bool                                `json:"supportsParallelToolCalls,omitempty"`
+	MaxForcedTools                   *int                                 `json:"maxForcedTools,omitempty"`
+	SupportedClientToolOutputFormats []inferenceSpec.ToolOutputFormatKind `json:"supportedClientToolOutputFormats,omitempty"`
 }
 
 type CacheControlCapabilitiesOverride struct {
+	SupportsTTL    *bool                            `json:"supportsTTL,omitempty"`
 	SupportedKinds []inferenceSpec.CacheControlKind `json:"supportedKinds,omitempty"`
 	SupportedTTLs  []inferenceSpec.CacheControlTTL  `json:"supportedTTLs,omitempty"`
 	SupportsKey    *bool                            `json:"supportsKey,omitempty"`

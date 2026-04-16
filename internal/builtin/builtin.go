@@ -46,7 +46,6 @@ const (
 
 const (
 	ProviderNameAnthropic             = "anthropic"
-	ProviderNameDeepseek              = "deepseek"
 	ProviderNameGoogleGemini          = "googlegemini"
 	ProviderNameHuggingFace           = "huggingface"
 	ProviderNameLlamaCPP              = "llamacpp"
@@ -58,7 +57,6 @@ const (
 
 var BuiltInProviderNames = []string{
 	ProviderNameAnthropic,
-	ProviderNameDeepseek,
 	ProviderNameGoogleGemini,
 	ProviderNameHuggingFace,
 	ProviderNameLlamaCPP,

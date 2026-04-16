@@ -461,6 +461,7 @@ export namespace spec {
 	    }
 	}
 	export class CacheControlCapabilitiesOverride {
+	    supportsTTL?: boolean;
 	    supportedKinds?: string[];
 	    supportedTTLs?: string[];
 	    supportsKey?: boolean;
@@ -471,6 +472,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supportsTTL = source["supportsTTL"];
 	        this.supportedKinds = source["supportedKinds"];
 	        this.supportedTTLs = source["supportedTTLs"];
 	        this.supportsKey = source["supportsKey"];
@@ -523,6 +525,7 @@ export namespace spec {
 	    supportedToolPolicyModes?: string[];
 	    supportsParallelToolCalls?: boolean;
 	    maxForcedTools?: number;
+	    supportedClientToolOutputFormats?: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new ToolCapabilitiesOverride(source);
@@ -534,6 +537,7 @@ export namespace spec {
 	        this.supportedToolPolicyModes = source["supportedToolPolicyModes"];
 	        this.supportsParallelToolCalls = source["supportsParallelToolCalls"];
 	        this.maxForcedTools = source["maxForcedTools"];
+	        this.supportedClientToolOutputFormats = source["supportedClientToolOutputFormats"];
 	    }
 	}
 	export class OutputCapabilitiesOverride {
@@ -567,6 +571,7 @@ export namespace spec {
 	    }
 	}
 	export class ReasoningCapabilitiesOverride {
+	    supportsReasoningConfig?: boolean;
 	    supportedReasoningTypes?: string[];
 	    supportedReasoningLevels?: string[];
 	    supportsSummaryStyle?: boolean;
@@ -579,6 +584,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supportsReasoningConfig = source["supportsReasoningConfig"];
 	        this.supportedReasoningTypes = source["supportedReasoningTypes"];
 	        this.supportedReasoningLevels = source["supportedReasoningLevels"];
 	        this.supportsSummaryStyle = source["supportsSummaryStyle"];

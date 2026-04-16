@@ -51,10 +51,14 @@ function mergeCacheControlCapabilities(
 		supportedKinds: pick(modelVal?.supportedKinds, providerVal?.supportedKinds),
 		supportedTTLs: pick(modelVal?.supportedTTLs, providerVal?.supportedTTLs),
 		supportsKey: pick(modelVal?.supportsKey, providerVal?.supportsKey),
+		supportsTTL: pick(modelVal?.supportsTTL, providerVal?.supportsTTL),
 	};
 
 	const hasAny =
-		merged.supportedKinds !== undefined || merged.supportedTTLs !== undefined || merged.supportsKey !== undefined;
+		merged.supportedKinds !== undefined ||
+		merged.supportedTTLs !== undefined ||
+		merged.supportsKey !== undefined ||
+		merged.supportsTTL !== undefined;
 
 	return hasAny ? merged : undefined;
 }
@@ -112,6 +116,10 @@ export function mergeModelCapabilitiesOverride(
 		reasoningCapabilities:
 			m?.reasoningCapabilities || p?.reasoningCapabilities
 				? {
+						supportsReasoningConfig: pick(
+							m?.reasoningCapabilities?.supportsReasoningConfig,
+							p?.reasoningCapabilities?.supportsReasoningConfig
+						),
 						supportedReasoningTypes: pick(
 							m?.reasoningCapabilities?.supportedReasoningTypes,
 							p?.reasoningCapabilities?.supportedReasoningTypes
@@ -165,6 +173,10 @@ export function mergeModelCapabilitiesOverride(
 						supportedToolPolicyModes: pick(
 							m?.toolCapabilities?.supportedToolPolicyModes,
 							p?.toolCapabilities?.supportedToolPolicyModes
+						),
+						supportedClientToolOutputFormats: pick(
+							m?.toolCapabilities?.supportedClientToolOutputFormats,
+							p?.toolCapabilities?.supportedClientToolOutputFormats
 						),
 						supportsParallelToolCalls: pick(
 							m?.toolCapabilities?.supportsParallelToolCalls,

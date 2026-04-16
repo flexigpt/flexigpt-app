@@ -156,9 +156,7 @@ export default function ModelPresetsPage() {
 	useEffect(() => {
 		if (loading || isRepairingDefaultProvider) return;
 		if (enabledProviderNames.length === 0) return;
-
-		const defaultProviderIsEnabled = defaultProvider ? providerPresets[defaultProvider]?.isEnabled : false;
-		if (defaultProviderIsEnabled) return;
+		if (defaultProvider && providerPresets[defaultProvider]?.isEnabled) return;
 
 		const fallbackProvider = enabledProviderNames[0];
 		if (!fallbackProvider) return;

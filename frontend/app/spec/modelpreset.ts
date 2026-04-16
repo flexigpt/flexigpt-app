@@ -34,6 +34,7 @@ export interface ToolCapabilitiesOverride {
 	supportedToolPolicyModes?: string[];
 	supportsParallelToolCalls?: boolean;
 	maxForcedTools?: number;
+	supportedClientToolOutputFormats?: string[];
 }
 
 /**
@@ -57,6 +58,7 @@ export interface StopSequenceCapabilitiesOverride {
  * @public
  */
 export interface ReasoningCapabilitiesOverride {
+	supportsReasoningConfig?: boolean;
 	supportedReasoningTypes?: string[];
 	supportedReasoningLevels?: string[];
 	supportsSummaryStyle?: boolean;
@@ -71,6 +73,7 @@ export class CacheControlCapabilitiesOverride {
 	supportedKinds?: CacheControlKind[];
 	supportedTTLs?: CacheControlTTL[];
 	supportsKey?: boolean;
+	supportsTTL?: boolean;
 }
 
 /**

@@ -35,7 +35,7 @@ FlexiGPT does not bill you directly. Usage costs and limits come from the provid
 
 ### Multi-provider connectivity with built-in presets
 
-- First-class support for OpenAI, Anthropic, Google Gemini API, DeepSeek, xAI, Hugging Face, OpenRouter, and local `llama.cpp`
+- First-class support for OpenAI, Anthropic, Google Gemini API, xAI, Hugging Face, OpenRouter, and local `llama.cpp`
 - Support for compatible custom endpoints across OpenAI Chat Completions, OpenAI Responses, and Anthropic Messages style APIs
 - Built-in providers and curated model presets for leading models so you can get started quickly without manually defining endpoints or defaults first
 - API keys are stored securely through the OS keyring, not in plain-text exported settings

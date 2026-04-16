@@ -5,7 +5,7 @@ This guide is the fastest path from install to a useful first conversation in Fl
 
 ## Table of contents <!-- omit from toc -->
 
-- [Base expectations](#base-expectations)
+- [First steps](#first-steps)
 - [Chats workspace](#chats-workspace)
 - [Pick a starting setup](#pick-a-starting-setup)
   - [Assistant Preset](#assistant-preset)
@@ -17,17 +17,21 @@ This guide is the fastest path from install to a useful first conversation in Fl
 - [Good first workflows](#good-first-workflows)
 - [If the first send feels off](#if-the-first-send-feels-off)
 
-## Base expectations
+## First steps
 
 Before your first successful send, you usually need:
 
-- Get an API key for your provider.
-  - [OpenAI](https://platform.openai.com/settings/organization/api-keys), [Anthropic Claude](https://platform.claude.com/settings/keys), [Google Gemini](https://aistudio.google.com/api-keys), [OpenRouter](https://openrouter.ai/workspaces/default/keys), [xAI](https://console.x.ai/team/default/api-keys), [Hugging Face](https://huggingface.co/settings/tokens)
+- Get an API key for your favorite provider.
+  - [OpenAI](https://platform.openai.com/settings/organization/api-keys), [Anthropic Claude](https://platform.claude.com/settings/keys), [Google Gemini](https://aistudio.google.com/api-keys), [xAI](https://console.x.ai/team/default/api-keys), [MistralAI](https://console.mistral.ai/home?profile_dialog=api-keys)
+  - [OpenRouter](https://openrouter.ai/workspaces/default/keys), [Hugging Face](https://huggingface.co/settings/tokens)
+  - llama.cpp, LMStudio, Ollama, vLLM, GPT4All
 - Add the key in [Settings -> Auth Keys](/settings).
-- [Chat](/chats).
+- Head to [Chats](/chats) page. Try out different things like: different assistants for spec driven dev or reviewing code, attaching files, creating your own prompt template or skill and using them!
 
 FlexiGPT ships with built-in providers, model presets, tools, skills, prompts, and assistant presets.
-Try out different things like: different assistants for spec driven dev or reviewing code, attaching files, creating your own prompt template or skill and using them!
+
+- Provider not listed above? -> You can create custom providers that are compatible with any of: OpenAI Responses or ChatCompletions API, Anthropic Messages API, Google GenerateContent API.
+- Don't like the builtin's? -> Customize your own thing for anything!
 
 ## Chats workspace
 
