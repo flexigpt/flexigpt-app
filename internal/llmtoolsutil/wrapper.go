@@ -115,26 +115,26 @@ func FindText(ctx context.Context, args texttool.FindTextArgs) (*texttool.FindTe
 	return t.FindText(ctx, args)
 }
 
-func InsertTextLines(ctx context.Context, args texttool.InsertTextLinesArgs) (*texttool.InsertTextLinesOut, error) {
+func InsertText(ctx context.Context, args texttool.InsertTextArgs) (*texttool.InsertTextOut, error) {
 	t, err := texttool.NewTextTool()
 	if err != nil || t == nil {
 		return nil, err
 	}
-	return t.InsertTextLines(ctx, args)
+	return t.InsertText(ctx, args)
 }
 
-func ReplaceTextLines(ctx context.Context, args texttool.ReplaceTextLinesArgs) (*texttool.ReplaceTextLinesOut, error) {
+func ReplaceText(ctx context.Context, args texttool.ReplaceTextArgs) (*texttool.ReplaceTextOut, error) {
 	t, err := texttool.NewTextTool()
 	if err != nil || t == nil {
 		return nil, err
 	}
-	return t.ReplaceTextLines(ctx, args)
+	return t.ReplaceText(ctx, args)
 }
 
-func DeleteTextLines(ctx context.Context, args texttool.DeleteTextLinesArgs) (*texttool.DeleteTextLinesOut, error) {
+func DeleteText(ctx context.Context, args texttool.DeleteTextArgs) (*texttool.DeleteTextOut, error) {
 	t, err := texttool.NewTextTool()
 	if err != nil || t == nil {
 		return nil, err
 	}
-	return t.DeleteTextLines(ctx, args)
+	return t.DeleteText(ctx, args)
 }

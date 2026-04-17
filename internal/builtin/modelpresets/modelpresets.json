@@ -55,6 +55,38 @@
 			},
 			"defaultModelPresetID": "sonnet46",
 			"modelPresets": {
+				"opus47": {
+					"schemaVersion": "2025-07-01",
+					"id": "opus47",
+					"name": "claude-opus-4-7",
+					"displayName": "Claude 4.7 Opus",
+					"slug": "opus47",
+					"isEnabled": true,
+					"stream": true,
+					"maxPromptLength": 200000,
+					"maxOutputLength": 128000,
+					"temperature": 0.1,
+					"reasoning": {
+						"type": "singleWithLevels",
+						"level": "high",
+						"tokens": 0
+					},
+					"systemPrompt": "",
+					"timeout": 1800,
+					"cacheControl": {
+						"kind": "ephemeral",
+						"ttl": "5m"
+					},
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": ["low", "medium", "high", "xhigh"]
+						}
+					},
+					"createdAt": "2026-04-17T00:00:00Z",
+					"modifiedAt": "2025-02-17T00:00:00Z",
+					"isBuiltIn": true
+				},
 				"opus46": {
 					"schemaVersion": "2025-07-01",
 					"id": "opus46",

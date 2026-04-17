@@ -70,6 +70,7 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 	const contentRef = useRef<HTMLDivElement | null>(null);
 	const editorRef = useRef(editor);
+	// eslint-disable-next-line react-hooks/refs
 	editorRef.current = editor;
 
 	// doc version tick to re-run selection computations on any editor change

@@ -93,15 +93,15 @@ var LLMToolsGoBuiltinCatalog = map[string]LLMToolMeta{
 		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsText),
 		AutoExecReco: true,
 	},
-	"github.com/flexigpt/llmtools-go/texttool/inserttextlines.InsertTextLines": {
+	"github.com/flexigpt/llmtools-go/texttool/inserttext.InsertText": {
 		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsText),
 		AutoExecReco: false,
 	},
-	"github.com/flexigpt/llmtools-go/texttool/replacetextlines.ReplaceTextLines": {
+	"github.com/flexigpt/llmtools-go/texttool/replacetext.ReplaceText": {
 		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsText),
 		AutoExecReco: false,
 	},
-	"github.com/flexigpt/llmtools-go/texttool/deletetextlines.DeleteTextLines": {
+	"github.com/flexigpt/llmtools-go/texttool/deletetext.DeleteText": {
 		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsText),
 		AutoExecReco: false,
 	},

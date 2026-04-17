@@ -107,6 +107,7 @@ export default function PromptsPage() {
 	}, [loadTemplatesForBundle]);
 
 	useEffect(() => {
+		// eslint-disable-next-line react-hooks/set-state-in-effect
 		void fetchAll();
 	}, [fetchAll]);
 

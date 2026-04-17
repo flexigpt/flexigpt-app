@@ -5,7 +5,6 @@ import { MarkToolbarButton } from '@/components/editor/nodes/mark_toolbar_button
 import { ToolbarGroup } from '@/components/editor/nodes/toolbar';
 
 function useModAndShiftSymbols() {
-	// eslint-disable-next-line @typescript-eslint/no-deprecated
 	const isMac = typeof navigator !== 'undefined' && /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform || '');
 
 	return {

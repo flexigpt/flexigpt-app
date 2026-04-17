@@ -265,6 +265,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 			templateMenuState.hide();
 			toolMenuState.hide();
 			attachmentMenuState.hide();
+			// eslint-disable-next-line react-hooks/set-state-in-effect
 			setIsUrlModalOpen(false);
 		}
 	}, [attachmentMenuState, isInputLocked, templateMenuState, toolMenuState]);

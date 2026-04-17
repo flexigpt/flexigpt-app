@@ -376,6 +376,7 @@ function AddEditProviderPresetModalContent({
 			return true;
 		}
 
+		// eslint-disable-next-line react-hooks/refs
 		const { normalized } = validateUrlForInput(formData.origin, originInputRef.current, { required: true });
 		const normalizedOrigin = normalized ?? formData.origin.trim();
 
