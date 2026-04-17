@@ -4,6 +4,7 @@
 
 - [ ] test with some skill that has scripts too
 - [ ] test shell and hostspawn exec on mac pkg and win
+- [ ] reasoning xhigh is not set on opus 4.7. dig.
 
 ## Milestone thoughts
 
