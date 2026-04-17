@@ -4,9 +4,6 @@
 
 - [ ] test with some skill that has scripts too
 - [ ] test shell and hostspawn exec on mac pkg and win
-- [x] test all providers again for normal, attach, tool, autoexec, shell , skill flows.
-- [ ] mkdir in writefile.
-- [ ] findtext should allow matchlines if those are empty or empty string as such.
 
 ## Milestone thoughts
 

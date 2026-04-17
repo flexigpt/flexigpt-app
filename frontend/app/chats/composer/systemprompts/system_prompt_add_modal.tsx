@@ -6,6 +6,7 @@ import { FiAlertCircle, FiHelpCircle, FiX } from 'react-icons/fi';
 
 import { type PromptBundle, PromptRoleEnum } from '@/spec/prompt';
 
+import { focusTextInputAtEnd } from '@/lib/focus_input';
 import { validateSlug } from '@/lib/text_utils';
 import { DEFAULT_SEMVER, suggestNextMinorVersion } from '@/lib/version_utils';
 
@@ -107,11 +108,12 @@ function SystemPromptAddModalInner({
 	const [isSaving, setIsSaving] = useState(false);
 	const [versionTouched, setVersionTouched] = useState(false);
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
-
+	const displayNameInputRef = useRef<HTMLInputElement | null>(null);
 	useEffect(() => {
 		const dialog = dialogRef.current;
 		if (!dialog) return;
-
+		let raf1 = 0;
+		let raf2 = 0;
 		try {
 			if (!dialog.open) {
 				dialog.showModal();
@@ -119,6 +121,16 @@ function SystemPromptAddModalInner({
 		} catch {
 			// ignore showModal errors
 		}
+		raf1 = window.requestAnimationFrame(() => {
+			raf2 = window.requestAnimationFrame(() => {
+				focusTextInputAtEnd(displayNameInputRef.current);
+			});
+		});
+
+		return () => {
+			window.cancelAnimationFrame(raf1);
+			window.cancelAnimationFrame(raf2);
+		};
 	}, []);
 
 	const bundleDropdownItems = useMemo(() => {
@@ -299,6 +311,7 @@ function SystemPromptAddModalInner({
 						<label className="col-span-3 text-sm opacity-70">Display Name</label>
 						<div className="col-span-9">
 							<input
+								ref={displayNameInputRef}
 								type="text"
 								className={`input input-bordered w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
 								value={formData.displayName}
@@ -307,7 +320,6 @@ function SystemPromptAddModalInner({
 									setErrors(prev => ({ ...prev, displayName: undefined }));
 								}}
 								spellCheck="false"
-								autoFocus
 							/>
 							{errors.displayName ? <div className="text-error mt-1 text-xs">{errors.displayName}</div> : null}
 						</div>

@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiRefreshCcw, FiTool, FiX } from 'react-icons/fi';
 
+import { focusTextInputAtEnd } from '@/lib/focus_input';
 import {
 	buildExampleFromDraft7Schema,
 	getJSONObject,
@@ -61,6 +62,7 @@ function getInitialRawJson(existingInstance?: string): string {
 function ToolUserArgsModalContent({ onClose, toolLabel, schema, existingInstance, onSave }: ToolUserArgsModalProps) {
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const isUnmountingRef = useRef(false);
+	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
 	const [formData, setFormData] = useState<FormState>(() => ({
 		rawJson: getInitialRawJson(existingInstance),
@@ -85,7 +87,8 @@ function ToolUserArgsModalContent({ onClose, toolLabel, schema, existingInstance
 	useEffect(() => {
 		const dialog = dialogRef.current;
 		if (!dialog) return;
-
+		let raf1 = 0;
+		let raf2 = 0;
 		if (!dialog.open) {
 			try {
 				dialog.showModal();
@@ -93,8 +96,14 @@ function ToolUserArgsModalContent({ onClose, toolLabel, schema, existingInstance
 				// Ignore if the dialog cannot be shown safely.
 			}
 		}
-
+		raf1 = window.requestAnimationFrame(() => {
+			raf2 = window.requestAnimationFrame(() => {
+				focusTextInputAtEnd(textareaRef.current);
+			});
+		});
 		return () => {
+			window.cancelAnimationFrame(raf1);
+			window.cancelAnimationFrame(raf2);
 			isUnmountingRef.current = true;
 
 			if (dialog.open) {
@@ -265,6 +274,7 @@ function ToolUserArgsModalContent({ onClose, toolLabel, schema, existingInstance
 							</div>
 
 							<textarea
+								ref={textareaRef}
 								className={`textarea textarea-bordered w-full rounded-xl font-mono text-xs ${
 									error ? 'textarea-error' : ''
 								}`}

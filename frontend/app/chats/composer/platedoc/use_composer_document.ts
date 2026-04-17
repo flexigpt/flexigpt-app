@@ -70,7 +70,7 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 	const contentRef = useRef<HTMLDivElement | null>(null);
 	const editorRef = useRef(editor);
-	editorRef.current = editor; // keep a live ref for callbacks / async work
+	editorRef.current = editor;
 
 	// doc version tick to re-run selection computations on any editor change
 	const [docVersion, setDocVersion] = useState(0);
@@ -80,6 +80,7 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 	const hasTextRef = useRef(false);
 	const isAutoChunkingRef = useRef(false);
 	const lastPopulatedSelectionKeyRef = useRef(new Set());
+	const idleChunkJobKindRef = useRef<'idle' | 'timeout' | null>(null);
 
 	const syncDocumentDerivedState = useCallback((bumpDocVersion = true) => {
 		const nextHasText = hasNonEmptyUserText(editorRef.current);
@@ -110,12 +111,130 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 	// Auto-chunking job (runs outside the keystroke critical path).
 	const idleChunkJobRef = useRef<number | null>(null);
 
+	const cancelScheduledAutoChunk = useCallback(() => {
+		const jobId = idleChunkJobRef.current;
+		if (jobId === null) return;
+
+		const w = window;
+		if (idleChunkJobKindRef.current === 'idle' && typeof w.cancelIdleCallback === 'function') {
+			w.cancelIdleCallback(jobId);
+		} else {
+			window.clearTimeout(jobId);
+		}
+
+		idleChunkJobRef.current = null;
+		idleChunkJobKindRef.current = null;
+	}, []);
+
+	const runAfterNextPaint = useCallback((fn: () => void) => {
+		window.requestAnimationFrame(() => {
+			window.requestAnimationFrame(() => {
+				fn();
+			});
+		});
+	}, []);
+
+	const selectEditorEnd = useCallback(() => {
+		const currentEditor = editorRef.current;
+		if (!currentEditor) return false;
+
+		const end = currentEditor.api.end([]);
+		if (!end) return false;
+
+		try {
+			currentEditor.tf.withoutNormalizing(() => {
+				currentEditor.tf.select(end);
+				currentEditor.tf.collapse({ edge: 'end' });
+			});
+			return true;
+		} catch {
+			return false;
+		}
+	}, []);
+
+	const scrollEditorSelectionIntoView = useCallback(() => {
+		const container = contentRef.current;
+		if (!container) return;
+
+		const sel = window.getSelection();
+		if (sel && sel.rangeCount > 0) {
+			try {
+				const range = sel.getRangeAt(0).cloneRange();
+				range.collapse(false);
+
+				const rects = range.getClientRects();
+				const rect = (rects.length > 0 ? rects[rects.length - 1] : null) ?? range.getBoundingClientRect();
+
+				if (rect && (rect.height > 0 || rect.width > 0)) {
+					const containerRect = container.getBoundingClientRect();
+					const padding = 12;
+
+					if (rect.bottom > containerRect.bottom - padding) {
+						container.scrollTop += rect.bottom - containerRect.bottom + padding;
+						return;
+					}
+
+					if (rect.top < containerRect.top + padding) {
+						container.scrollTop -= containerRect.top - rect.top + padding;
+						return;
+					}
+				}
+			} catch {
+				// noop
+			}
+		}
+
+		container.scrollTop = container.scrollHeight;
+	}, []);
+
+	const focusEditorPreservingSelection = useCallback(() => {
+		const currentEditor = editorRef.current;
+		if (!currentEditor || isBusy) return;
+
+		runAfterNextPaint(() => {
+			try {
+				currentEditor.tf.focus();
+			} catch {
+				return;
+			}
+
+			runAfterNextPaint(() => {
+				scrollEditorSelectionIntoView();
+			});
+		});
+	}, [isBusy, runAfterNextPaint, scrollEditorSelectionIntoView]);
+
+	const focusEditorAtEnd = useCallback(() => {
+		const currentEditor = editorRef.current;
+		if (!currentEditor || isBusy) return;
+
+		runAfterNextPaint(() => {
+			try {
+				currentEditor.tf.focus();
+			} catch {
+				return;
+			}
+
+			selectEditorEnd();
+
+			runAfterNextPaint(() => {
+				selectEditorEnd();
+				scrollEditorSelectionIntoView();
+			});
+		});
+	}, [isBusy, runAfterNextPaint, scrollEditorSelectionIntoView, selectEditorEnd]);
+
 	const autoChunkIfNeeded = useCallback(() => {
 		if (isAutoChunkingRef.current) return;
 		if (!contentRef.current) return;
 
 		const domLen = (contentRef.current.textContent ?? '').length;
 		const ed = editorRef.current;
+		const activeEl = document.activeElement;
+
+		if (activeEl && !contentRef.current.contains(activeEl)) {
+			return;
+		}
 
 		// Only operate on the simplest safe shape:
 		// - single paragraph
@@ -125,7 +244,7 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 		const p = rootChildren[0];
 		if (!p || p.type !== 'p' || !Array.isArray(p.children)) return;
 		const pChildren = p.children;
-		if (pChildren.some(c => typeof c?.text !== 'string')) return; // any inline element => skip
+		if (pChildren.some(c => typeof c?.text !== 'string')) return;
 
 		// Avoid cursor jumps: only chunk/dechunk when user is typing at the end.
 		if (!isCursorAtDocumentEnd(ed)) return;
@@ -140,7 +259,7 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 				ed.tf.withoutNormalizing(() => {
 					ed.tf.setValue(buildSingleParagraphValueChunked(text, LARGE_TEXT_CHUNK_SIZE));
 				});
-				ed.tf.select(undefined, { edge: 'end' });
+				focusEditorAtEnd();
 			} finally {
 				isAutoChunkingRef.current = false;
 			}
@@ -157,83 +276,40 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 				ed.tf.withoutNormalizing(() => {
 					ed.tf.setValue(buildSingleParagraphValue(text));
 				});
-				ed.tf.select(undefined, { edge: 'end' });
+				focusEditorAtEnd();
 			} finally {
 				isAutoChunkingRef.current = false;
 			}
 		}
-	}, []);
+	}, [focusEditorAtEnd]);
 
 	const scheduleAutoChunk = useCallback(() => {
-		if (idleChunkJobRef.current != null) return;
+		cancelScheduledAutoChunk();
 
-		// requestIdleCallback is ideal; fall back to a short timeout.
 		const w = window;
 		if (typeof w.requestIdleCallback === 'function') {
+			idleChunkJobKindRef.current = 'idle';
 			idleChunkJobRef.current = w.requestIdleCallback(
 				() => {
 					idleChunkJobRef.current = null;
+					idleChunkJobKindRef.current = null;
 					autoChunkIfNeeded();
 				},
 				{ timeout: 250 }
 			);
 		} else {
+			idleChunkJobKindRef.current = 'timeout';
 			idleChunkJobRef.current = window.setTimeout(() => {
 				idleChunkJobRef.current = null;
+				idleChunkJobKindRef.current = null;
 				autoChunkIfNeeded();
 			}, 120);
 		}
-	}, [autoChunkIfNeeded]);
+	}, [autoChunkIfNeeded, cancelScheduledAutoChunk]);
 
 	useEffect(() => {
-		return () => {
-			const w = window;
-			if (idleChunkJobRef.current != null && typeof w.cancelIdleCallback === 'function') {
-				w.cancelIdleCallback(idleChunkJobRef.current);
-			} else if (idleChunkJobRef.current != null) {
-				window.clearTimeout(idleChunkJobRef.current);
-			}
-		};
-	}, []);
-
-	const focusEditorPreservingSelection = useCallback(() => {
-		const currentEditor = editorRef.current;
-		if (!currentEditor || isBusy) return;
-
-		requestAnimationFrame(() => {
-			try {
-				currentEditor.tf.focus();
-			} catch {
-				// noop
-			}
-		});
-	}, [isBusy]);
-
-	const focusEditorAtEnd = useCallback(() => {
-		const currentEditor = editorRef.current;
-		if (!currentEditor) return;
-
-		// No visible caret in readOnly mode.
-		if (isBusy) return;
-
-		requestAnimationFrame(() => {
-			try {
-				currentEditor.tf.withoutNormalizing(() => {
-					currentEditor.tf.select(undefined, { edge: 'end' });
-					currentEditor.tf.collapse({ edge: 'end' });
-				});
-
-				currentEditor.tf.focus();
-
-				// Keep end visible if content is long
-				if (contentRef.current) {
-					contentRef.current.scrollTop = contentRef.current.scrollHeight;
-				}
-			} catch {
-				currentEditor.tf.focus();
-			}
-		});
-	}, [isBusy]);
+		return cancelScheduledAutoChunk;
+	}, [cancelScheduledAutoChunk]);
 
 	// Recompute template selection info whenever doc changes.
 	// analyzeTemplateSelectionInfo has a fast-path exit when no template nodes exist.
@@ -270,21 +346,18 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 			try {
 				editor.tf.withoutNormalizing(() => {
-					// Recompute a fresh path to guard against prior insertions shifting indices
 					const pathArr = Array.isArray(originalPath) ? originalPath : [];
 
 					if (pathArr.length >= 2) {
-						const blockPath = pathArr.slice(0, pathArr.length - 1); // parent paragraph path
+						const blockPath = pathArr.slice(0, pathArr.length - 1);
 						const indexAfter = pathArr[pathArr.length - 1] + 1;
 						const atPath = [...blockPath, indexAfter] as any;
 						editor.tf.insertNodes(inlineChildren, { at: atPath });
 					} else {
-						// Fallback: insert at start of first paragraph
 						editor.tf.insertNodes(inlineChildren, { at: [0, 0] as any });
 					}
 				});
 			} catch {
-				// Last-resort fallback: insert at selection (or end)
 				editor.tf.insertNodes(inlineChildren);
 			}
 
@@ -360,16 +433,18 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 			if (isSimpleEmptyParagraphDocument(currentEditor) && text.length >= LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS) {
 				currentEditor.tf.withoutNormalizing(() => {
 					currentEditor.tf.setValue(buildSingleParagraphValueChunked(text, LARGE_TEXT_CHUNK_SIZE));
-					currentEditor.tf.collapse({ edge: 'end' });
 				});
 
 				syncDocumentDerivedState(true);
+				focusEditorAtEnd();
+				cancelScheduledAutoChunk();
 				return;
 			}
 
 			insertPlainTextAsSingleBlock(currentEditor, text);
+			focusEditorPreservingSelection();
 		},
-		[syncDocumentDerivedState]
+		[cancelScheduledAutoChunk, focusEditorAtEnd, focusEditorPreservingSelection, syncDocumentDerivedState]
 	);
 
 	const onEditorChange = useCallback(() => {

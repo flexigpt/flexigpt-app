@@ -22,6 +22,8 @@ import {
 } from '@/spec/inference';
 import type { UIChatOption } from '@/spec/modelpreset';
 
+import { focusTextInputAtEnd } from '@/lib/focus_input';
+
 import { Dropdown } from '@/components/dropdown';
 
 import {
@@ -150,7 +152,7 @@ function AdvancedParamsModalInner({
 	onSave,
 }: AdvancedParamsModalInnerProps) {
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
-
+	const maxPromptLengthInputRef = useRef<HTMLInputElement | null>(null);
 	const supportedOutputFormats = useMemo(
 		() => getSupportedOutputFormats(currentModel.capabilitiesOverride),
 		[currentModel.capabilitiesOverride]
@@ -260,7 +262,8 @@ function AdvancedParamsModalInner({
 	useEffect(() => {
 		const dialog = dialogRef.current;
 		if (!dialog) return;
-
+		let raf1 = 0;
+		let raf2 = 0;
 		try {
 			if (!dialog.open) {
 				dialog.showModal();
@@ -268,6 +271,16 @@ function AdvancedParamsModalInner({
 		} catch {
 			// Ignore showModal errors if the dialog is already open or not ready.
 		}
+		raf1 = window.requestAnimationFrame(() => {
+			raf2 = window.requestAnimationFrame(() => {
+				focusTextInputAtEnd(maxPromptLengthInputRef.current);
+			});
+		});
+
+		return () => {
+			window.cancelAnimationFrame(raf1);
+			window.cancelAnimationFrame(raf2);
+		};
 	}, []);
 
 	const handleDialogClose = useCallback(() => {
@@ -534,6 +547,7 @@ function AdvancedParamsModalInner({
 						</label>
 						<div className="col-span-8">
 							<input
+								ref={maxPromptLengthInputRef}
 								type="text"
 								value={maxPromptLength}
 								onChange={e => {

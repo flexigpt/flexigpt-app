@@ -931,3 +931,9 @@
   - [x] some issue with tool calls and parts streaming i think i am seeing some streams etc but no tool calls in ui neither response.
   - [x] tool call was visible in non streaming mode but again thought signature seems missing in submit.
   - [x] signature seems to be not wired correctly.
+
+- [x] test all providers again for normal, attach, tool, autoexec, shell , skill flows.
+- [x] mkdir in writefile.
+- [x] findtext should allow match lines if those are empty or empty string as such.
+- [x] input focus issues after paste and may be other edit time focus issues.
+- [x] url text and other modals focus to start typing mods.

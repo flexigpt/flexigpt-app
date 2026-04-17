@@ -1,4 +1,4 @@
-import { type SubmitEventHandler, useEffect, useRef, useState } from 'react';
+import { type SubmitEventHandler, useCallback, useEffect, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
@@ -33,6 +33,19 @@ function UrlAttachmentModalContent({ onClose, onAttachURL }: UrlAttachmentModalC
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const inputRef = useRef<HTMLInputElement | null>(null);
 	const isUnmountingRef = useRef(false);
+
+	const focusInputAtEnd = useCallback(() => {
+		const input = inputRef.current;
+		if (!input) return;
+		input.focus({ preventScroll: true });
+		const end = input.value.length;
+		try {
+			input.setSelectionRange(end, end);
+		} catch {
+			// ok.
+		}
+	}, []);
+
 	useEffect(() => {
 		const dialog = dialogRef.current;
 		if (!dialog) return;
@@ -41,19 +54,22 @@ function UrlAttachmentModalContent({ onClose, onAttachURL }: UrlAttachmentModalC
 			dialog.showModal();
 		}
 
-		const focusTimer = window.setTimeout(() => {
-			inputRef.current?.focus();
-		}, 0);
-
+		let raf1 = 0;
+		let raf2 = 0;
+		raf1 = window.requestAnimationFrame(() => {
+			raf2 = window.requestAnimationFrame(() => {
+				focusInputAtEnd();
+			});
+		});
 		return () => {
 			isUnmountingRef.current = true;
-			window.clearTimeout(focusTimer);
-
+			window.cancelAnimationFrame(raf1);
+			window.cancelAnimationFrame(raf2);
 			if (dialog.open) {
 				dialog.close();
 			}
 		};
-	}, []);
+	}, [focusInputAtEnd]);
 
 	const handleDialogClose = () => {
 		if (isUnmountingRef.current) return;
@@ -79,7 +95,8 @@ function UrlAttachmentModalContent({ onClose, onAttachURL }: UrlAttachmentModalC
 				...prev,
 				url: error ?? MessageEnterValidURL,
 			}));
-			input?.focus();
+			focusInputAtEnd();
+
 			return;
 		}
 
@@ -92,6 +109,7 @@ function UrlAttachmentModalContent({ onClose, onAttachURL }: UrlAttachmentModalC
 				...prev,
 				url: (err as Error).message || 'Something went wrong while attaching the URL.',
 			}));
+			focusInputAtEnd();
 		} finally {
 			setSubmitting(false);
 		}

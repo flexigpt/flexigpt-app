@@ -162,6 +162,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	// - force focus into the menu (arrow-key nav)
 	// - optionally restore focus to editor on close (Esc)
 	const menuOpenedByShortcutRef = useRef({ templates: false, tools: false, attachments: false });
+	const suppressNextAttachmentMenuFocusRestoreRef = useRef(false);
 
 	const {
 		attachments,
@@ -497,6 +498,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	useEffect(() => {
 		if (!attachmentMenuOpen) {
+			if (suppressNextAttachmentMenuFocusRestoreRef.current) {
+				suppressNextAttachmentMenuFocusRestoreRef.current = false;
+				menuOpenedByShortcutRef.current.attachments = false;
+				return;
+			}
 			if (menuOpenedByShortcutRef.current.attachments) {
 				menuOpenedByShortcutRef.current.attachments = false;
 				requestAnimationFrame(() => {
@@ -1356,6 +1362,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						onAttachFiles={handleAttachFiles}
 						onAttachDirectory={handleAttachDirectory}
 						onAttachURL={handleAttachURL}
+						onOpenAttachmentUrlModal={() => {
+							suppressNextAttachmentMenuFocusRestoreRef.current = true;
+						}}
+						onUrlAttachmentModalClose={() => {
+							focusEditorAtEnd();
+						}}
 						onInsertTemplate={handleInsertTemplate}
 						templateMenuState={templateMenu}
 						toolMenuState={toolMenu}

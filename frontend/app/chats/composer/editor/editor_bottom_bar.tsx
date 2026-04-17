@@ -51,6 +51,8 @@ interface EditorBottomBarProps {
 	onAttachFiles: () => Promise<void> | void;
 	onAttachDirectory: () => Promise<void> | void;
 	onAttachURL: (url: string) => Promise<void> | void;
+	onOpenAttachmentUrlModal?: () => void;
+	onUrlAttachmentModalClose?: () => void;
 	onInsertTemplate: (args: {
 		bundleID: string;
 		templateSlug: string;
@@ -163,6 +165,8 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	onAttachFiles,
 	onAttachDirectory,
 	onAttachURL,
+	onOpenAttachmentUrlModal,
+	onUrlAttachmentModalClose,
 	onInsertTemplate,
 	templateMenuState,
 	toolMenuState,
@@ -378,6 +382,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	};
 
 	const handleAttachmentPickURL = () => {
+		onOpenAttachmentUrlModal?.();
 		closeAttachmentMenu();
 		setIsUrlModalOpen(true);
 	};
@@ -628,6 +633,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 				isOpen={isUrlModalOpen}
 				onClose={() => {
 					setIsUrlModalOpen(false);
+					onUrlAttachmentModalClose?.();
 				}}
 				onAttachURL={onAttachURL}
 			/>

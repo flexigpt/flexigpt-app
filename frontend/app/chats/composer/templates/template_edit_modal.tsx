@@ -10,6 +10,8 @@ import type { PlateEditor } from 'platejs/react';
 
 import { type PromptVariable, VarSource, VarType } from '@/spec/prompt';
 
+import { focusTextInputAtEnd } from '@/lib/focus_input';
+
 import { type TemplateSelectionElementNode } from '@/chats/composer/platedoc/nodes';
 import { computeEffectiveTemplate } from '@/chats/composer/platedoc/template_document_ops';
 import { EnumDropdownInline } from '@/chats/composer/templates/template_variable_enum_dropdown';
@@ -67,11 +69,13 @@ function TemplateEditModalContent({ onClose, tsenode, editor, path }: Omit<Templ
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const isUnmountingRef = useRef(false);
+	const displayNameInputRef = useRef<HTMLInputElement | null>(null);
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
 		if (!dialog) return;
-
+		let raf1 = 0;
+		let raf2 = 0;
 		if (!dialog.open) {
 			try {
 				dialog.showModal();
@@ -80,7 +84,15 @@ function TemplateEditModalContent({ onClose, tsenode, editor, path }: Omit<Templ
 			}
 		}
 
+		raf1 = window.requestAnimationFrame(() => {
+			raf2 = window.requestAnimationFrame(() => {
+				focusTextInputAtEnd(displayNameInputRef.current);
+			});
+		});
+
 		return () => {
+			window.cancelAnimationFrame(raf1);
+			window.cancelAnimationFrame(raf2);
 			isUnmountingRef.current = true;
 
 			if (dialog.open) {
@@ -191,6 +203,7 @@ function TemplateEditModalContent({ onClose, tsenode, editor, path }: Omit<Templ
 									</label>
 									<div className="col-span-12 md:col-span-8">
 										<input
+											ref={displayNameInputRef}
 											className="input input-bordered input-sm w-full rounded-xl"
 											value={formState.displayName}
 											onChange={e => {
