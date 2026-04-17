@@ -23,6 +23,7 @@ const VERBOSITY_OPTIONS: Array<{ label: string; value?: OutputVerbosity }> = [
 	{ label: 'Low', value: OutputVerbosity.Low },
 	{ label: 'Medium', value: OutputVerbosity.Medium },
 	{ label: 'High', value: OutputVerbosity.High },
+	{ label: 'XHigh', value: OutputVerbosity.XHigh },
 	{ label: 'Max', value: OutputVerbosity.Max },
 ];
 

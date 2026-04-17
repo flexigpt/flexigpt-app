@@ -98,6 +98,7 @@ const ORDERED_REASONING_LEVELS: ReasoningLevel[] = [
 	ReasoningLevel.Medium,
 	ReasoningLevel.High,
 	ReasoningLevel.XHigh,
+	ReasoningLevel.Max,
 ];
 
 export function mergeModelCapabilitiesOverride(

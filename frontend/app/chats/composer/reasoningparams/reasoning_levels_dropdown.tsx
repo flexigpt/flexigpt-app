@@ -25,6 +25,7 @@ const levelDisplayNames: Record<ReasoningLevel, string> = {
 	[ReasoningLevel.Medium]: 'Medium',
 	[ReasoningLevel.High]: 'High',
 	[ReasoningLevel.XHigh]: 'XHigh',
+	[ReasoningLevel.Max]: 'Max',
 };
 
 const DEFAULT_LEVEL_OPTIONS: ReasoningLevel[] = [

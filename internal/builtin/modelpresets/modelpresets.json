@@ -30,7 +30,8 @@
 						"low",
 						"medium",
 						"high",
-						"xhigh"
+						"xhigh",
+						"max"
 					],
 					"supportsSummaryStyle": false,
 					"supportsEncryptedReasoningInput": false,
@@ -65,10 +66,10 @@
 					"stream": true,
 					"maxPromptLength": 200000,
 					"maxOutputLength": 128000,
-					"temperature": 0.1,
+					"temperature": 1.0,
 					"reasoning": {
 						"type": "singleWithLevels",
-						"level": "high",
+						"level": "xhigh",
 						"tokens": 0
 					},
 					"systemPrompt": "",
@@ -80,7 +81,13 @@
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"supportedReasoningTypes": ["singleWithLevels"],
-							"supportedReasoningLevels": ["low", "medium", "high", "xhigh"]
+							"supportedReasoningLevels": [
+								"low",
+								"medium",
+								"high",
+								"xhigh",
+								"max"
+							]
 						}
 					},
 					"createdAt": "2026-04-17T00:00:00Z",
@@ -97,7 +104,7 @@
 					"stream": true,
 					"maxPromptLength": 200000,
 					"maxOutputLength": 128000,
-					"temperature": 0.1,
+					"temperature": 1.0,
 					"reasoning": {
 						"type": "singleWithLevels",
 						"level": "high",
@@ -112,7 +119,7 @@
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"supportedReasoningTypes": ["singleWithLevels"],
-							"supportedReasoningLevels": ["low", "medium", "high", "xhigh"]
+							"supportedReasoningLevels": ["low", "medium", "high", "max"]
 						}
 					},
 					"createdAt": "2026-02-13T00:00:00Z",
@@ -129,7 +136,7 @@
 					"stream": true,
 					"maxPromptLength": 200000,
 					"maxOutputLength": 64000,
-					"temperature": 0.1,
+					"temperature": 1.0,
 					"reasoning": {
 						"type": "hybridWithTokens",
 						"level": "",
@@ -206,7 +213,7 @@
 					"capabilitiesOverride": {
 						"reasoningCapabilities": {
 							"supportedReasoningTypes": ["singleWithLevels"],
-							"supportedReasoningLevels": ["low", "medium", "high", "xhigh"]
+							"supportedReasoningLevels": ["low", "medium", "high", "max"]
 						}
 					},
 					"createdAt": "2025-07-30T00:00:00Z",
@@ -329,7 +336,8 @@
 						"low",
 						"medium",
 						"high",
-						"xhigh"
+						"xhigh",
+						"max"
 					],
 					"hybridTokenBudgetCapabilities": {
 						"minAllowed": 1,
@@ -545,7 +553,8 @@
 						"low",
 						"medium",
 						"high",
-						"xhigh"
+						"xhigh",
+						"max"
 					],
 					"supportsSummaryStyle": false,
 					"supportsEncryptedReasoningInput": false,
@@ -586,6 +595,14 @@
 						"level": "medium",
 						"tokens": 0
 					},
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"temperatureDisallowedWhenEnabled": true,
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": ["low", "medium", "high"],
+							"supportsSummaryStyle": false
+						}
+					},
 					"systemPrompt": "",
 					"timeout": 1800,
 					"createdAt": "2025-07-30T00:00:00Z",
@@ -607,6 +624,14 @@
 						"type": "singleWithLevels",
 						"level": "medium",
 						"tokens": 0
+					},
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"temperatureDisallowedWhenEnabled": true,
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": ["low", "medium", "high"],
+							"supportsSummaryStyle": false
+						}
 					},
 					"systemPrompt": "",
 					"timeout": 1800,
@@ -659,7 +684,8 @@
 						"low",
 						"medium",
 						"high",
-						"xhigh"
+						"xhigh",
+						"max"
 					],
 					"supportsSummaryStyle": false,
 					"supportsEncryptedReasoningInput": false,
@@ -884,7 +910,8 @@
 						"low",
 						"medium",
 						"high",
-						"xhigh"
+						"xhigh",
+						"max"
 					],
 					"supportsSummaryStyle": false,
 					"supportsEncryptedReasoningInput": false,
@@ -1029,7 +1056,8 @@
 						"low",
 						"medium",
 						"high",
-						"xhigh"
+						"xhigh",
+						"max"
 					],
 					"supportsSummaryStyle": true,
 					"supportsEncryptedReasoningInput": true,
@@ -1408,7 +1436,8 @@
 						"low",
 						"medium",
 						"high",
-						"xhigh"
+						"xhigh",
+						"max"
 					],
 					"supportsSummaryStyle": true,
 					"supportsEncryptedReasoningInput": true,

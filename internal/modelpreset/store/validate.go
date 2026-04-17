@@ -154,6 +154,7 @@ func validateOutputParam(op *inferenceSpec.OutputParam) error {
 		case inferenceSpec.OutputVerbosityLow,
 			inferenceSpec.OutputVerbosityMedium,
 			inferenceSpec.OutputVerbosityHigh,
+			inferenceSpec.OutputVerbosityXHigh,
 			inferenceSpec.OutputVerbosityMax:
 			// OK.
 		default:
@@ -262,7 +263,8 @@ func validateReasoning(r *inferenceSpec.ReasoningParam) error {
 			inferenceSpec.ReasoningLevelLow,
 			inferenceSpec.ReasoningLevelMedium,
 			inferenceSpec.ReasoningLevelHigh,
-			inferenceSpec.ReasoningLevelXHigh:
+			inferenceSpec.ReasoningLevelXHigh,
+			inferenceSpec.ReasoningLevelMax:
 			// Valid.
 		default:
 			return fmt.Errorf("invalid level %q for singleWithLevels", r.Level)
@@ -472,7 +474,8 @@ func validateReasoningCapabilitiesOverride(o *spec.ReasoningCapabilitiesOverride
 				inferenceSpec.ReasoningLevelLow,
 				inferenceSpec.ReasoningLevelMedium,
 				inferenceSpec.ReasoningLevelHigh,
-				inferenceSpec.ReasoningLevelXHigh:
+				inferenceSpec.ReasoningLevelXHigh,
+				inferenceSpec.ReasoningLevelMax:
 			default:
 				return fmt.Errorf("supportedReasoningLevels[%d] unknown level %q", i, l)
 			}

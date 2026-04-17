@@ -33,7 +33,7 @@ It brings together reusable assistant presets, model presets, prompt templates, 
 
 FlexiGPT does not bill you directly. Usage costs and limits come from the provider account behind the key you configure.
 
-## Key Features
+## Key features
 
 ### Multi-provider connectivity with built-in presets
 
@@ -92,7 +92,7 @@ The main docs are bundled inside the app and mirrored in this repository under `
 - [Frontend Roles and Responsibilities](./frontend/app/docs/content/13-frontend-roles-and-responsibilities.md)
 - [Chats Workspace and Composer HLD](./frontend/app/docs/content/14-chats-workspace-and-composer-hld.md)
 
-## Built With
+## Built with
 
 - Data storage: `JSON` and `SQLite` files in local filesystem.
 - [Go](https://go.dev/) backend.

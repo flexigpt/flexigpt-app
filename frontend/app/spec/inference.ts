@@ -71,6 +71,7 @@ export enum ReasoningLevel {
 	Medium = 'medium',
 	High = 'high',
 	XHigh = 'xhigh',
+	Max = 'max',
 }
 
 export enum Status {
@@ -101,6 +102,7 @@ export enum OutputVerbosity {
 	Low = 'low',
 	Medium = 'medium',
 	High = 'high',
+	XHigh = 'xhigh',
 	Max = 'max',
 }
 

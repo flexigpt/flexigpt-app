@@ -67,6 +67,7 @@ const outputVerbosityItems: Record<OutputVerbositySelection, { isEnabled: boolea
 	[OutputVerbosity.Low]: { isEnabled: true, displayName: 'Low' },
 	[OutputVerbosity.Medium]: { isEnabled: true, displayName: 'Medium' },
 	[OutputVerbosity.High]: { isEnabled: true, displayName: 'High' },
+	[OutputVerbosity.XHigh]: { isEnabled: true, displayName: 'XHigh' },
 	[OutputVerbosity.Max]: { isEnabled: true, displayName: 'Max' },
 };
 
@@ -88,6 +89,7 @@ const reasoningLevelItems: Record<ReasoningLevel, { isEnabled: boolean; displayN
 	[ReasoningLevel.Medium]: { isEnabled: true, displayName: 'Medium' },
 	[ReasoningLevel.High]: { isEnabled: true, displayName: 'High' },
 	[ReasoningLevel.XHigh]: { isEnabled: true, displayName: 'XHigh' },
+	[ReasoningLevel.Max]: { isEnabled: true, displayName: 'Max' },
 };
 
 const reasoningSummaryStyleItems: Record<ReasoningSummaryStyle, { isEnabled: boolean; displayName: string }> = {
