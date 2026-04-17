@@ -24,7 +24,7 @@ Before your first successful send, you usually need:
 - Get an API key for your favorite provider.
   - [OpenAI](https://platform.openai.com/settings/organization/api-keys), [Anthropic Claude](https://platform.claude.com/settings/keys), [Google Gemini](https://aistudio.google.com/api-keys), [xAI](https://console.x.ai/team/default/api-keys), [MistralAI](https://console.mistral.ai/home?profile_dialog=api-keys)
   - [OpenRouter](https://openrouter.ai/workspaces/default/keys), [Hugging Face](https://huggingface.co/settings/tokens)
-  - llama.cpp, LMStudio, Ollama, vLLM, GPT4All
+
 - Add the key in [Settings -> Auth Keys](/settings).
 - Head to [Chats](/chats) page. Try out different things like: different assistants for spec driven dev or reviewing code, attaching files, creating your own prompt template or skill and using them!
 

@@ -22,17 +22,17 @@ FlexiGPT becomes much easier to use once a few core terms are clear.
 
 ## The main terms
 
-| Term                    | What it means                                                                                                                                                       |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Provider**            | The API family or endpoint the app talks to, such as OpenAI, Anthropic, Google Gemini API, OpenRouter, `llama.cpp`, or a compatible custom endpoint.                |
-| **Model Preset**        | A saved provider-and-model choice with request defaults such as streaming, timeout, token limits, temperature, reasoning, output settings, and advanced parameters. |
-| **Assistant Preset**    | A reusable starting workspace that can preload a model preset, instruction templates, tools, and skills.                                                            |
-| **System Prompt**       | Instructional context that shapes how the model should behave.                                                                                                      |
-| **Prompt Template**     | Reusable prompt structure that helps you format a request consistently.                                                                                             |
-| **Previous user turns** | The amount of earlier user context that should be resent with the next request.                                                                                     |
-| **Attachment**          | Extra source material attached to a message, such as a file, folder-derived files, image, PDF, or URL.                                                              |
-| **Tool**                | A callable capability the model can ask the app to run during a conversation.                                                                                       |
-| **Skill**               | A reusable workflow mode that helps the model approach a task in a more structured way. [Specification](https://agentskills.io/specification)                       |
+| Term                    | What it means                                                                                                                                                                   |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Provider**            | The API family or endpoint the app talks to, such as OpenAI, Anthropic, Google Gemini API, xAI, Mistral, HuggingFace, OpenRouter, `llama.cpp`, or a compatible custom endpoint. |
+| **Model Preset**        | A saved provider-and-model choice with request defaults such as streaming, timeout, token limits, temperature, reasoning, output settings, and advanced parameters.             |
+| **Assistant Preset**    | A reusable starting workspace that can preload a model preset, instruction templates, tools, and skills.                                                                        |
+| **System Prompt**       | Instructional context that shapes how the model should behave.                                                                                                                  |
+| **Prompt Template**     | Reusable prompt structure that helps you format a request consistently.                                                                                                         |
+| **Previous user turns** | The amount of earlier user context that should be resent with the next request.                                                                                                 |
+| **Attachment**          | Extra source material attached to a message, such as a file, folder-derived files, image, PDF, or URL.                                                                          |
+| **Tool**                | A callable capability the model can ask the app to run during a conversation.                                                                                                   |
+| **Skill**               | A reusable workflow mode that helps the model approach a task in a more structured way. [Specification](https://agentskills.io/specification)                                   |
 
 ## Think in four layers
 

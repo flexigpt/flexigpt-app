@@ -811,7 +811,7 @@
 					"schemaVersion": "2025-07-01",
 					"id": "devstral2",
 					"name": "devstral-2512",
-					"displayName": "Devstral 2",
+					"displayName": "Mistral Devstral 2",
 					"slug": "devstral2",
 					"isEnabled": true,
 					"stream": true,
@@ -826,7 +826,6 @@
 				}
 			}
 		},
-
 		"openai": {
 			"schemaVersion": "2025-07-01",
 			"name": "openai",
@@ -1353,13 +1352,13 @@
 			"schemaVersion": "2025-07-01",
 			"name": "openrouter",
 			"displayName": "OpenRouter",
-			"sdkType": "providerSDKTypeOpenAIChatCompletions",
+			"sdkType": "providerSDKTypeOpenAIResponses",
 			"isEnabled": true,
-			"createdAt": "2025-07-30T00:00:00Z",
-			"modifiedAt": "2025-07-30T00:00:00Z",
+			"createdAt": "2025-09-25T00:00:00Z",
+			"modifiedAt": "2025-09-25T00:00:00Z",
 			"isBuiltIn": true,
 			"origin": "https://openrouter.ai",
-			"chatCompletionPathPrefix": "/api/v1/chat/completions",
+			"chatCompletionPathPrefix": "/api/v1/responses",
 			"apiKeyHeaderKey": "Authorization",
 			"defaultHeaders": {
 				"content-type": "application/json",
@@ -1379,14 +1378,14 @@
 						"high",
 						"xhigh"
 					],
-					"supportsSummaryStyle": false,
-					"supportsEncryptedReasoningInput": false,
+					"supportsSummaryStyle": true,
+					"supportsEncryptedReasoningInput": true,
 					"temperatureDisallowedWhenEnabled": false
 				},
 				"stopSequenceCapabilities": {
-					"isSupported": true,
+					"isSupported": false,
 					"disallowedWithReasoning": false,
-					"maxSequences": 4
+					"maxSequences": 0
 				},
 				"outputCapabilities": {
 					"supportedOutputFormats": ["text", "jsonSchema"],
@@ -1397,7 +1396,7 @@
 					"supportedToolPolicyModes": ["auto", "any", "tool", "none"],
 					"supportsParallelToolCalls": true,
 					"maxForcedTools": 1,
-					"supportedClientToolOutputFormats": ["string"]
+					"supportedClientToolOutputFormats": ["string", "contentItemList"]
 				}
 			},
 			"defaultModelPresetID": "nvidiaNemotron3SuperFree",
@@ -1406,7 +1405,7 @@
 					"schemaVersion": "2025-07-01",
 					"id": "nvidiaNemotron3SuperFree",
 					"name": "nvidia/nemotron-3-super-120b-a12b:free",
-					"displayName": "NVIDIA Nemotron 3 Super 120B A12B",
+					"displayName": "OpenRouter NVIDIA Nemotron 3 Super Free",
 					"slug": "nvidiaNemotron3SuperFree",
 					"isEnabled": true,
 					"stream": true,
@@ -1417,6 +1416,96 @@
 					"timeout": 1800,
 					"createdAt": "2025-07-30T00:00:00Z",
 					"modifiedAt": "2025-07-30T00:00:00Z",
+					"isBuiltIn": true
+				},
+				"minimaxm27": {
+					"schemaVersion": "2025-07-01",
+					"id": "minimaxm27",
+					"name": "minimax/minimax-m2.7",
+					"displayName": "OpenRouter MiniMax M2.7",
+					"slug": "minimaxm27",
+					"isEnabled": true,
+					"stream": true,
+					"maxPromptLength": 180000,
+					"maxOutputLength": 125000,
+					"temperature": 1.0,
+					"reasoning": {
+						"type": "singleWithLevels",
+						"level": "high",
+						"tokens": 0
+					},
+					"systemPrompt": "",
+					"timeout": 1800,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"temperatureDisallowedWhenEnabled": true,
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": ["low", "medium", "high"],
+							"supportsSummaryStyle": true
+						}
+					},
+					"createdAt": "2026-04-16T00:00:00Z",
+					"modifiedAt": "2026-04-16T00:00:00Z",
+					"isBuiltIn": true
+				},
+				"minimaxm25free": {
+					"schemaVersion": "2025-07-01",
+					"id": "minimaxm25free",
+					"name": "minimax/minimax-m2.5:free",
+					"displayName": "OpenRouter MiniMax M2.5 free",
+					"slug": "minimaxm25free",
+					"isEnabled": true,
+					"stream": true,
+					"maxPromptLength": 100000,
+					"maxOutputLength": 8000,
+					"temperature": 1.0,
+					"reasoning": {
+						"type": "singleWithLevels",
+						"level": "high",
+						"tokens": 0
+					},
+					"systemPrompt": "",
+					"timeout": 1800,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"temperatureDisallowedWhenEnabled": true,
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": ["low", "medium", "high"],
+							"supportsSummaryStyle": true
+						}
+					},
+					"createdAt": "2026-04-16T00:00:00Z",
+					"modifiedAt": "2026-04-16T00:00:00Z",
+					"isBuiltIn": true
+				},
+				"zaiglm51": {
+					"schemaVersion": "2025-07-01",
+					"id": "zaiglm51",
+					"name": "z-ai/glm-5.1",
+					"displayName": "OpenRouter Z.AI GLM5.1",
+					"slug": "zaiglm51",
+					"isEnabled": true,
+					"stream": true,
+					"maxPromptLength": 180000,
+					"maxOutputLength": 125000,
+					"temperature": 1.0,
+					"reasoning": {
+						"type": "singleWithLevels",
+						"level": "high",
+						"tokens": 0
+					},
+					"systemPrompt": "",
+					"timeout": 1800,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"temperatureDisallowedWhenEnabled": true,
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": ["low", "medium", "high"],
+							"supportsSummaryStyle": true
+						}
+					},
+					"createdAt": "2026-04-16T00:00:00Z",
+					"modifiedAt": "2026-04-16T00:00:00Z",
 					"isBuiltIn": true
 				}
 			}
