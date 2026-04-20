@@ -8,9 +8,9 @@ require (
 	github.com/adrg/xdg v0.5.3
 	github.com/danielgtaylor/huma/v2 v2.37.3
 	github.com/flexigpt/agentskills-go v0.13.0
-	github.com/flexigpt/inference-go v0.17.5
-	github.com/flexigpt/llmtools-go v0.17.0
-	github.com/flexigpt/mapstore-go v0.2.0
+	github.com/flexigpt/inference-go v0.18.0
+	github.com/flexigpt/llmtools-go v0.18.0
+	github.com/flexigpt/mapstore-go v0.2.1
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/google/uuid v1.6.0
 	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728

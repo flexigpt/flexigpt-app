@@ -383,14 +383,14 @@ func TestAsyncRebuilder_RaceConditionStressTest(t *testing.T) {
 		t.Skip("skipping stress test in short mode")
 	}
 
-	var callCount int32
-	var completedCount int32
+	var callCount atomic.Int32
+	var completedCount atomic.Int32
 
 	fn := func() error {
-		atomic.AddInt32(&callCount, 1)
+		callCount.Add(1)
 		// Simulate some work.
 		time.Sleep(time.Millisecond)
-		atomic.AddInt32(&completedCount, 1)
+		completedCount.Add(1)
 		return nil
 	}
 
@@ -416,8 +416,8 @@ func TestAsyncRebuilder_RaceConditionStressTest(t *testing.T) {
 	// Wait for any remaining goroutines to complete.
 	time.Sleep(200 * time.Millisecond)
 
-	started := atomic.LoadInt32(&callCount)
-	completed := atomic.LoadInt32(&completedCount)
+	started := callCount.Load()
+	completed := completedCount.Load()
 
 	if started != completed {
 		t.Errorf("mismatch between started (%d) and completed (%d) calls", started, completed)
@@ -466,11 +466,11 @@ func TestAsyncRebuilder_MaxAgeEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var called int32
+			var called atomic.Int32
 			done := make(chan struct{})
 
 			fn := func() error {
-				atomic.StoreInt32(&called, 1)
+				called.Store(1)
 				close(done)
 				return nil
 			}
@@ -498,8 +498,8 @@ func TestAsyncRebuilder_MaxAgeEdgeCases(t *testing.T) {
 				}
 			}
 
-			if (atomic.LoadInt32(&called) == 1) != tt.expect {
-				t.Errorf("expected called=%v, got %v", tt.expect, atomic.LoadInt32(&called) == 1)
+			if (called.Load() == 1) != tt.expect {
+				t.Errorf("expected called=%v, got %v", tt.expect, called.Load() == 1)
 			}
 		})
 	}
