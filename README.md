@@ -9,10 +9,6 @@ FlexiGPT is a local-first desktop workspace for multi-provider LLM chats.
 
 It brings together reusable assistant presets, model presets, prompt templates, attachments, tools, and skills in one app while keeping conversations and configuration local.
 
-> Early access
->
-> FlexiGPT is under active development. Expect some rough edges, evolving built-ins, and ongoing UX and docs refinement between releases.
-
 ## Install
 
 1. Download the latest release from [GitHub Releases](https://github.com/flexigpt/flexigpt-app/releases).

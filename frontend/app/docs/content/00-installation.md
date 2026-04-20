@@ -12,10 +12,6 @@ Download the latest release from [GitHub Releases](https://github.com/flexigpt/f
 - Download the `.exe` release package.
 - Run the installer and follow the setup steps.
 
-Notes:
-
-- Windows builds have seen more limited testing so far.
-
 ## Linux
 
 - Download the `.flatpak` release package.
