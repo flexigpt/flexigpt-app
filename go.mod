@@ -7,7 +7,7 @@ require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.0
 	github.com/adrg/xdg v0.5.3
 	github.com/danielgtaylor/huma/v2 v2.37.3
-	github.com/flexigpt/agentskills-go v0.13.0
+	github.com/flexigpt/agentskills-go v0.13.1
 	github.com/flexigpt/inference-go v0.18.0
 	github.com/flexigpt/llmtools-go v0.18.0
 	github.com/flexigpt/mapstore-go v0.2.1
