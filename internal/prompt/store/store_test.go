@@ -1,12 +1,3 @@
-// The test-suite exercises the public behaviour of PromptTemplateStore after
-// the recent refactor that
-//   * removed the "latest/active" template convenience (version is now
-//     mandatory),
-//   * introduced "fluid" pagination (bundles first, then user objects),
-//   * added an immutable built-in catalogue that can only be enabled / disabled.
-//
-// The tests are still table driven and only use Go’s std-lib.
-
 package store
 
 import (
@@ -21,6 +12,16 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/prompt/spec"
 )
 
+const (
+	requiredText         = "required"
+	invalidText          = "invalid"
+	tplSlug              = "tpl"
+	helloContent         = "hello"
+	userBundleID         = "ub1"
+	helloTemplateContent = "Hello {{name}}"
+	variableName         = "name"
+)
+
 func TestBundleCRUD(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -33,11 +34,11 @@ func TestBundleCRUD(t *testing.T) {
 	}{
 		{"valid", "b1", "slug", "Bundle", true, false, ""},
 		{"disabled", "b2", "disabled", "Bundle", false, false, ""},
-		{"missing id", "", "s", "d", true, true, "required"},
-		{"missing slug", "b3", "", "d", true, true, "required"},
-		{"missing display", "b4", "s", "", true, true, "required"},
-		{"bad slug dot", "b5", "bad.slug", "d", true, true, "invalid"},
-		{"bad slug space", "b6", "bad slug", "d", true, true, "invalid"},
+		{"missing id", "", "s", "d", true, true, requiredText},
+		{"missing slug", "b3", "", "d", true, true, requiredText},
+		{"missing display", "b4", "s", "", true, true, requiredText},
+		{"bad slug dot", "b5", "bad.slug", "d", true, true, invalidText},
+		{"bad slug space", "b6", "bad slug", "d", true, true, invalidText},
 	}
 
 	for _, tc := range cases {
@@ -122,12 +123,12 @@ func TestTemplateCRUD(t *testing.T) {
 		wantError bool
 		msg       string
 	}{
-		{"valid", "b1", "tpl", "v1", "display", false, ""},
-		{"missing id", "", "s", "v1", "d", true, "required"},
-		{"missing slug", "b1", "", "v1", "d", true, "required"},
-		{"missing ver", "b1", "s", "", "d", true, "required"},
-		{"bad slug", "b1", "a.b", "v1", "d", true, "invalid"},
-		{"bad ver", "b1", "s", "v&1", "d", true, "invalid"},
+		{"valid", "b1", tplSlug, "v1", "display", false, ""},
+		{"missing id", "", "s", "v1", "d", true, requiredText},
+		{"missing slug", "b1", "", "v1", "d", true, requiredText},
+		{"missing ver", "b1", "s", "", "d", true, requiredText},
+		{"bad slug", "b1", "a.b", "v1", "d", true, invalidText},
+		{"bad ver", "b1", "s", "v&1", "d", true, invalidText},
 		{"unknown bundle", "x", "s", "v1", "d", true, "not found"},
 	}
 
@@ -145,7 +146,7 @@ func TestTemplateCRUD(t *testing.T) {
 					Blocks: []spec.MessageBlock{{
 						ID:      "1",
 						Role:    spec.User,
-						Content: "hello",
+						Content: helloContent,
 					}},
 				},
 			})
@@ -168,11 +169,11 @@ func TestTemplateVersionConflict(t *testing.T) {
 	defer clean()
 
 	mustPutBundle(t, s, "b1", "slug", "Bundle", true)
-	mustPutTemplate(t, s, "b1", "tpl", "v1", "d", true)
+	mustPutTemplate(t, s, "b1", tplSlug, "v1", "d", true)
 
 	_, err := s.PutPromptTemplate(t.Context(), &spec.PutPromptTemplateRequest{
 		BundleID:     "b1",
-		TemplateSlug: "tpl",
+		TemplateSlug: tplSlug,
 		Version:      "v1",
 		Body: &spec.PutPromptTemplateRequestBody{
 			Kind:        spec.PromptTemplateKindGeneric,
@@ -182,7 +183,7 @@ func TestTemplateVersionConflict(t *testing.T) {
 			Blocks: []spec.MessageBlock{{
 				ID:      "1",
 				Role:    spec.User,
-				Content: "hello",
+				Content: helloContent,
 			}},
 		},
 	})
@@ -200,7 +201,7 @@ func TestTemplateDisabledBundleGuard(t *testing.T) {
 
 	_, err := s.PutPromptTemplate(t.Context(), &spec.PutPromptTemplateRequest{
 		BundleID:     "b1",
-		TemplateSlug: "tpl",
+		TemplateSlug: tplSlug,
 		Version:      "v1",
 		Body: &spec.PutPromptTemplateRequestBody{
 			Kind:        spec.PromptTemplateKindGeneric,
@@ -210,7 +211,7 @@ func TestTemplateDisabledBundleGuard(t *testing.T) {
 			Blocks: []spec.MessageBlock{{
 				ID:      "1",
 				Role:    spec.User,
-				Content: "hello",
+				Content: helloContent,
 			}},
 		},
 	})
@@ -227,14 +228,14 @@ func TestTemplateMultiVersionExact(t *testing.T) {
 
 	vers := []string{"v1", "v2", "v3"}
 	for _, v := range vers {
-		mustPutTemplate(t, s, "b1", "tpl", bundleitemutils.ItemVersion(v), "disp "+v, true)
+		mustPutTemplate(t, s, "b1", tplSlug, bundleitemutils.ItemVersion(v), "disp "+v, true)
 		time.Sleep(5 * time.Millisecond)
 	}
 
 	for _, v := range vers {
 		resp, err := s.GetPromptTemplate(t.Context(), &spec.GetPromptTemplateRequest{
 			BundleID:     "b1",
-			TemplateSlug: "tpl",
+			TemplateSlug: tplSlug,
 			Version:      bundleitemutils.ItemVersion(v),
 		})
 		if err != nil {
@@ -248,7 +249,7 @@ func TestTemplateMultiVersionExact(t *testing.T) {
 	// Omitted version must now fail.
 	if _, err := s.GetPromptTemplate(t.Context(), &spec.GetPromptTemplateRequest{
 		BundleID:     "b1",
-		TemplateSlug: "tpl",
+		TemplateSlug: tplSlug,
 	}); !errors.Is(err, spec.ErrInvalidRequest) {
 		t.Fatalf("expected ErrInvalidRequest for missing version, got %v", err)
 	}
@@ -276,7 +277,7 @@ func TestBuiltInTemplateGuards(t *testing.T) {
 			Blocks: []spec.MessageBlock{{
 				ID:      "1",
 				Role:    spec.User,
-				Content: "hello",
+				Content: helloContent,
 			}},
 		},
 	})
@@ -315,7 +316,7 @@ func TestBundleListFiltering(t *testing.T) {
 	builtInCnt, _ := builtinStatistics(t, s)
 
 	// User data.
-	mustPutBundle(t, s, "ub1", "slug1", "Bundle1", true)
+	mustPutBundle(t, s, userBundleID, "slug1", "Bundle1", true)
 	mustPutBundle(t, s, "ub2", "slug2", "Bundle2", false)
 
 	tests := []struct {
@@ -326,7 +327,7 @@ func TestBundleListFiltering(t *testing.T) {
 	}{
 		{"enabledOnly", false, nil, 1},
 		{"allUsers", true, nil, 2},
-		{"filterUser", true, []bundleitemutils.BundleID{"ub1"}, 1},
+		{"filterUser", true, []bundleitemutils.BundleID{userBundleID}, 1},
 	}
 
 	for _, tc := range tests {
@@ -373,10 +374,10 @@ func TestTemplateListFiltering(t *testing.T) {
 	s, clean := newTestStore(t)
 	defer clean()
 
-	mustPutBundle(t, s, "ub1", "slug1", "UserBundle", true)
+	mustPutBundle(t, s, userBundleID, "slug1", "UserBundle", true)
 
-	mustPutTemplate(t, s, "ub1", "t1", "v1", "t1", true, "tag1")
-	mustPutTemplate(t, s, "ub1", "t2", "v1", "t2", false, "tag1", "tag2")
+	mustPutTemplate(t, s, userBundleID, "t1", "v1", "t1", true, "tag1")
+	mustPutTemplate(t, s, userBundleID, "t2", "v1", "t2", false, "tag1", "tag2")
 
 	tests := []struct {
 		name            string
@@ -393,7 +394,7 @@ func TestTemplateListFiltering(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			resp, err := s.ListPromptTemplates(t.Context(), &spec.ListPromptTemplatesRequest{
 				BundleIDs: []bundleitemutils.BundleID{
-					"ub1",
+					userBundleID,
 				}, // exclude built-ins for determinism
 				Tags:            tc.tags,
 				IncludeDisabled: tc.includeDisabled,
@@ -451,10 +452,10 @@ func TestTemplatePagination(t *testing.T) {
 	s, clean := newTestStore(t)
 	defer clean()
 
-	mustPutBundle(t, s, "ub1", "slug1", "bundle", true)
+	mustPutBundle(t, s, userBundleID, "slug1", "bundle", true)
 
 	for i := range 23 {
-		mustPutTemplate(t, s, "ub1",
+		mustPutTemplate(t, s, userBundleID,
 			bundleitemutils.ItemSlug(fmt.Sprintf("t%02d", i)),
 			"v1", "d", true)
 	}
@@ -466,7 +467,7 @@ func TestTemplatePagination(t *testing.T) {
 		resp, err := s.ListPromptTemplates(t.Context(), &spec.ListPromptTemplatesRequest{
 			RecommendedPageSize: page,
 			PageToken:           token,
-			BundleIDs:           []bundleitemutils.BundleID{"ub1"},
+			BundleIDs:           []bundleitemutils.BundleID{userBundleID},
 		})
 		if err != nil {
 			t.Fatalf("ListPromptTemplates() failed: %v", err)
@@ -502,10 +503,10 @@ func TestListPromptTemplates_FiltersByKindAndResolved(t *testing.T) {
 			Blocks: []spec.MessageBlock{{
 				ID:      "b1",
 				Role:    spec.User,
-				Content: "Hello {{name}}",
+				Content: helloTemplateContent,
 			}},
 			Variables: []spec.PromptVariable{{
-				Name:     "name",
+				Name:     variableName,
 				Type:     spec.VarString,
 				Source:   spec.SourceUser,
 				Required: true,
@@ -656,17 +657,18 @@ func TestSoftDeleteBehaviour(t *testing.T) {
 	if _, err := s.getUserBundle("b1"); !errors.Is(err, spec.ErrBundleDeleting) {
 		t.Fatalf("expected ErrBundleDeleting, got %v", err)
 	}
+	builtInBundleGroupID := "bundles"
 
 	// Fake grace-period expiration.
-	raw, _ := s.bundleStore.GetKey([]string{"bundles", "b1"})
+	raw, _ := s.bundleStore.GetKey([]string{builtInBundleGroupID, "b1"})
 	if mp, ok := raw.(map[string]any); ok {
 		mp["softDeletedAt"] = time.Now().Add(-2 * softDeleteGrace).UTC().Format(time.RFC3339Nano)
-		_ = s.bundleStore.SetKey([]string{"bundles", "b1"}, mp)
+		_ = s.bundleStore.SetKey([]string{builtInBundleGroupID, "b1"}, mp)
 	}
 
 	s.sweepSoftDeleted()
 
-	if _, err := s.bundleStore.GetKey([]string{"bundles", "b1"}); err == nil {
+	if _, err := s.bundleStore.GetKey([]string{builtInBundleGroupID, "b1"}); err == nil {
 		t.Fatalf("bundle should have been purged")
 	}
 }
@@ -691,7 +693,7 @@ func TestConcurrentTemplatePut(t *testing.T) {
 				Blocks: []spec.MessageBlock{{
 					ID:      "1",
 					Role:    spec.User,
-					Content: "hello",
+					Content: helloContent,
 				}},
 			},
 		})
@@ -710,7 +712,7 @@ func TestConcurrentTemplatePut(t *testing.T) {
 				Blocks: []spec.MessageBlock{{
 					ID:      "1",
 					Role:    spec.User,
-					Content: "hello",
+					Content: helloContent,
 				}},
 			},
 		})
@@ -781,7 +783,7 @@ func mustPutTemplate(
 			Blocks: []spec.MessageBlock{{
 				ID:      "b1",
 				Role:    spec.User,
-				Content: "hello",
+				Content: helloContent,
 			}},
 			Tags:       tags,
 			IsResolved: true,

@@ -27,6 +27,19 @@ type SettingStore struct {
 const (
 	keyringServiceName = "FlexiGPTKeyRingEncDec"
 	keyringUserName    = "user"
+
+	settingKeyAuthKeys                = "authKeys"
+	settingKeySecret                  = "secret"
+	settingKeySHA256                  = "sha256"
+	settingKeyNonEmpty                = "nonEmpty"
+	settingKeyDebug                   = "debug"
+	settingKeySchemaVersion           = "schemaVersion"
+	settingKeyAppTheme                = "appTheme"
+	settingKeyLogLLMReqResp           = "logLLMReqResp"
+	settingKeyDisableContentStripping = "disableContentStripping"
+	settingKeyLogLevel                = "logLevel"
+	settingJSONKeyType                = "type"
+	settingJSONKeyName                = "name"
 )
 
 func NewSettingStore(baseDir string) (*SettingStore, error) {
@@ -138,19 +151,19 @@ func (s *SettingStore) Migrate(ctx context.Context) error {
 			sha := computeSHA(secret)
 
 			if err := s.store.SetKey([]string{
-				"authKeys", string(t), string(name), "secret",
+				settingKeyAuthKeys, string(t), string(name), settingKeySecret,
 			}, secret); err != nil {
 				return fmt.Errorf("settings migrate: set secret for %s/%s: %w", t, name, err)
 			}
 
 			if err := s.store.SetKey([]string{
-				"authKeys", string(t), string(name), "sha256",
+				settingKeyAuthKeys, string(t), string(name), settingKeySHA256,
 			}, sha); err != nil {
 				return fmt.Errorf("settings migrate: set sha256 for %s/%s: %w", t, name, err)
 			}
 
 			if err := s.store.SetKey([]string{
-				"authKeys", string(t), string(name), "nonEmpty",
+				settingKeyAuthKeys, string(t), string(name), settingKeyNonEmpty,
 			}, false); err != nil {
 				return fmt.Errorf("settings migrate: set nonEmpty for %s/%s: %w", t, name, err)
 			}
@@ -165,7 +178,7 @@ func (s *SettingStore) Migrate(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("migrate: encode debug settings: %w", err)
 		}
-		if err := s.store.SetKey([]string{"debug"}, val); err != nil {
+		if err := s.store.SetKey([]string{settingKeyDebug}, val); err != nil {
 			return fmt.Errorf("migrate: update debug settings: %w", err)
 		}
 		debugChanged = true
@@ -173,7 +186,7 @@ func (s *SettingStore) Migrate(ctx context.Context) error {
 
 	// Optionally bump schemaVersion if changed or missing.
 	if schema.SchemaVersion != spec.SchemaVersion {
-		if err := s.store.SetKey([]string{"schemaVersion"}, spec.SchemaVersion); err != nil {
+		if err := s.store.SetKey([]string{settingKeySchemaVersion}, spec.SchemaVersion); err != nil {
 			return fmt.Errorf("migrate: update schemaVersion: %w", err)
 		}
 	}
@@ -206,7 +219,7 @@ func (s *SettingStore) SetAppTheme(
 	}
 
 	val, _ := jsonencdec.StructWithJSONTagsToMap(theme)
-	if err := s.store.SetKey([]string{"appTheme"}, val); err != nil {
+	if err := s.store.SetKey([]string{settingKeyAppTheme}, val); err != nil {
 		return nil, err
 	}
 
@@ -236,7 +249,7 @@ func (s *SettingStore) SetDebugSettings(
 	if err != nil {
 		return nil, err
 	}
-	if err := s.store.SetKey([]string{"debug"}, val); err != nil {
+	if err := s.store.SetKey([]string{settingKeyDebug}, val); err != nil {
 		return nil, err
 	}
 	if err := s.applyDebugSettings(ctx, cfg); err != nil {
@@ -271,19 +284,19 @@ func (s *SettingStore) SetAuthKey(
 	}
 
 	// Persist secret (encrypted) then sha (plain).
-	secretPath := []string{"authKeys", string(req.Type), string(req.KeyName), "secret"}
+	secretPath := []string{settingKeyAuthKeys, string(req.Type), string(req.KeyName), settingKeySecret}
 	if err := s.store.SetKey(secretPath, newAk.Secret); err != nil {
 		return nil, err
 	}
-	shaPath := []string{"authKeys", string(req.Type), string(req.KeyName), "sha256"}
+	shaPath := []string{settingKeyAuthKeys, string(req.Type), string(req.KeyName), settingKeySHA256}
 	if err := s.store.SetKey(shaPath, newAk.SHA256); err != nil {
 		return nil, err
 	}
 	nonEmptyPath := []string{
-		"authKeys",
+		settingKeyAuthKeys,
 		string(req.Type),
 		string(req.KeyName),
-		"nonEmpty",
+		settingKeyNonEmpty,
 	}
 	if err := s.store.SetKey(nonEmptyPath, newAk.NonEmpty); err != nil {
 		return nil, err
@@ -308,7 +321,7 @@ func (s *SettingStore) DeleteAuthKey(
 	}
 
 	// Delete the key map entirely (secret + sha).
-	keyPath := []string{"authKeys", string(req.Type), string(req.KeyName)}
+	keyPath := []string{settingKeyAuthKeys, string(req.Type), string(req.KeyName)}
 	if err := s.store.DeleteKey(keyPath); err != nil {
 		return nil, err
 	}
@@ -319,9 +332,9 @@ func (s *SettingStore) DeleteAuthKey(
 		return nil, err
 	}
 
-	if akRaw, ok := raw["authKeys"].(map[string]any); ok {
+	if akRaw, ok := raw[settingKeyAuthKeys].(map[string]any); ok {
 		if typRaw, ok := akRaw[string(req.Type)].(map[string]any); ok && len(typRaw) == 0 {
-			_ = s.store.DeleteKey([]string{"authKeys", string(req.Type)})
+			_ = s.store.DeleteKey([]string{settingKeyAuthKeys, string(req.Type)})
 		}
 	}
 
@@ -420,7 +433,7 @@ func (s *SettingStore) GetSettings(
 // valueEncDecGetter returns the encoder/decoder to encrypt secrets.
 func (s *SettingStore) valueEncDecGetter(path []string) mapstore.IOEncoderDecoder {
 	// AuthKeys / <type> / <keyName> / secret.
-	if len(path) == 4 && path[0] == "authKeys" && path[3] == "secret" {
+	if len(path) == 4 && path[0] == settingKeyAuthKeys && path[3] == settingKeySecret {
 		return s.encEncrypt
 	}
 	return nil

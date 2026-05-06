@@ -17,6 +17,33 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/setting/spec"
 )
 
+const (
+	testAuthTypeProvider = "provider"
+	testAuthTypeOther    = "other"
+	testAuthTypeMissing  = "missing"
+	testAuthTypeUnknown  = "unknown"
+
+	testAuthNameAlpha   = "alpha"
+	testAuthNameBeta    = "beta"
+	testAuthNameGamma   = "gamma"
+	testAuthNameOne     = "one"
+	testAuthNameBuiltIn = "built-in"
+	testAuthNameOnly    = "only"
+	testAuthTypeCustom  = "customType"
+	testAuthNameA       = "a"
+	testAuthNameB       = "b"
+	testAuthNameZ       = "z"
+	testAuthNameK       = "k"
+	testSecretX         = "x"
+	testAuthNameKey1    = "key1"
+	testAuthNameP1      = "p1"
+	testAuthNameP2      = "p2"
+
+	testInvalidThemeNameApplight = "applight"
+	testInvalidThemeNameWrong    = "wrong"
+	testInvalidLogLevelTrace     = "trace"
+)
+
 func TestComputeSHA(t *testing.T) {
 	cases := []struct {
 		in string
@@ -45,13 +72,13 @@ func TestValidateTheme(t *testing.T) {
 	}{
 		{"nil", nil, true},
 		{"system-valid", &spec.AppTheme{Type: spec.ThemeSystem, Name: spec.ThemeNameSystem}, false},
-		{"system-invalid-name", &spec.AppTheme{Type: spec.ThemeSystem, Name: "applight"}, true},
+		{"system-invalid-name", &spec.AppTheme{Type: spec.ThemeSystem, Name: testInvalidThemeNameApplight}, true},
 		{"light-valid", &spec.AppTheme{Type: spec.ThemeLight, Name: spec.ThemeNameLight}, false},
-		{"light-invalid-name", &spec.AppTheme{Type: spec.ThemeLight, Name: "wrong"}, true},
+		{"light-invalid-name", &spec.AppTheme{Type: spec.ThemeLight, Name: testInvalidThemeNameWrong}, true},
 		{"dark-valid", &spec.AppTheme{Type: spec.ThemeDark, Name: spec.ThemeNameDark}, false},
 		{"other-valid", &spec.AppTheme{Type: spec.ThemeOther, Name: "custom-theme"}, false},
 		{"other-invalid-empty", &spec.AppTheme{Type: spec.ThemeOther, Name: ""}, true},
-		{"unknown-type", &spec.AppTheme{Type: spec.ThemeType("unknown"), Name: "x"}, true},
+		{"unknown-type", &spec.AppTheme{Type: spec.ThemeType(testAuthTypeUnknown), Name: testSecretX}, true},
 	}
 
 	for _, tc := range cases {
@@ -70,12 +97,11 @@ func TestValidateDebugSettings(t *testing.T) {
 		cfg     *spec.DebugSettings
 		wantErr bool
 	}{
-		{"nil", nil, true},
-		{"debug", &spec.DebugSettings{LogLevel: spec.DebugLogLevelDebug}, false},
+		{settingKeyDebug, &spec.DebugSettings{LogLevel: spec.DebugLogLevelDebug}, false},
 		{"info", &spec.DebugSettings{LogLevel: spec.DebugLogLevelInfo}, false},
 		{"warn", &spec.DebugSettings{LogLevel: spec.DebugLogLevelWarn}, false},
 		{"error", &spec.DebugSettings{LogLevel: spec.DebugLogLevelError}, false},
-		{"invalid", &spec.DebugSettings{LogLevel: spec.DebugLogLevel("trace")}, true},
+		{"invalid", &spec.DebugSettings{LogLevel: spec.DebugLogLevel(testInvalidLogLevelTrace)}, true},
 	}
 
 	for _, tc := range cases {
@@ -94,8 +120,11 @@ func TestIsBuiltInKey(t *testing.T) {
 	defer func() { BuiltInAuthKeys = old }()
 
 	BuiltInAuthKeys = map[spec.AuthKeyType][]spec.AuthKeyName{
-		"provider": {"alpha", "beta"},
-		"other":    {"one"},
+		spec.AuthKeyType(testAuthTypeProvider): {
+			spec.AuthKeyName(testAuthNameAlpha),
+			spec.AuthKeyName(testAuthNameBeta),
+		},
+		spec.AuthKeyType(testAuthTypeOther): {spec.AuthKeyName(testAuthNameOne)},
 	}
 
 	cases := []struct {
@@ -103,10 +132,10 @@ func TestIsBuiltInKey(t *testing.T) {
 		name spec.AuthKeyName
 		want bool
 	}{
-		{typ: "provider", name: "alpha", want: true},
-		{typ: "provider", name: "gamma", want: false},
-		{typ: "other", name: "one", want: true},
-		{typ: "missing", name: "one", want: false},
+		{typ: spec.AuthKeyType(testAuthTypeProvider), name: spec.AuthKeyName(testAuthNameAlpha), want: true},
+		{typ: spec.AuthKeyType(testAuthTypeProvider), name: spec.AuthKeyName(testAuthNameGamma), want: false},
+		{typ: spec.AuthKeyType(testAuthTypeOther), name: spec.AuthKeyName(testAuthNameOne), want: true},
+		{typ: spec.AuthKeyType(testAuthTypeMissing), name: spec.AuthKeyName(testAuthNameOne), want: false},
 	}
 
 	for _, tc := range cases {
@@ -128,10 +157,10 @@ func TestValueEncDecGetter(t *testing.T) {
 		path    []string
 		wantNil bool
 	}{
-		{"secret-path", []string{"authKeys", "provider", "k", "secret"}, false},
-		{"wrong-last", []string{"authKeys", "provider", "k", "sha256"}, true},
-		{"short-path", []string{"authKeys", "provider"}, true},
-		{"other-root", []string{"appTheme"}, true},
+		{"secret-path", []string{settingKeyAuthKeys, testAuthTypeProvider, testAuthNameK, settingKeySecret}, false},
+		{"wrong-last", []string{settingKeyAuthKeys, testAuthTypeProvider, testAuthNameK, settingKeySHA256}, true},
+		{"short-path", []string{settingKeyAuthKeys, testAuthTypeProvider}, true},
+		{"other-root", []string{settingKeyAppTheme}, true},
 	}
 
 	for _, tc := range cases {
@@ -154,12 +183,12 @@ func TestSettingStore_AuthKeyLifecycleAndSettings(t *testing.T) {
 	// Start with a minimal default map having an "old" schema version to
 	// exercise migration bump as well.
 	defaultMap := map[string]any{
-		"schemaVersion": "v-old",
-		"appTheme": map[string]any{
-			"type": string(spec.ThemeSystem),
-			"name": string(spec.ThemeNameSystem),
+		settingKeySchemaVersion: "v-old",
+		settingKeyAppTheme: map[string]any{
+			settingJSONKeyType: spec.ThemeSystem,
+			settingJSONKeyName: spec.ThemeNameSystem,
 		},
-		"authKeys": map[string]any{},
+		settingKeyAuthKeys: map[string]any{},
 	}
 
 	store, cleanup := integrationTestStore(t, defaultMap)
@@ -200,9 +229,9 @@ func TestSettingStore_AuthKeyLifecycleAndSettings(t *testing.T) {
 	badReqs := []*spec.SetAuthKeyRequest{
 		nil,
 		{Type: "", KeyName: "", Body: nil},
-		{Type: spec.AuthKeyTypeProvider, KeyName: "", Body: &spec.SetAuthKeyRequestBody{Secret: "x"}},
-		{Type: "", KeyName: "k", Body: &spec.SetAuthKeyRequestBody{Secret: "x"}},
-		{Type: spec.AuthKeyTypeProvider, KeyName: "k", Body: nil},
+		{Type: spec.AuthKeyTypeProvider, KeyName: "", Body: &spec.SetAuthKeyRequestBody{Secret: testSecretX}},
+		{Type: "", KeyName: testAuthNameK, Body: &spec.SetAuthKeyRequestBody{Secret: testSecretX}},
+		{Type: spec.AuthKeyTypeProvider, KeyName: testAuthNameK, Body: nil},
 	}
 	for i, br := range badReqs {
 		_, err := store.SetAuthKey(ctx, br)
@@ -214,7 +243,7 @@ func TestSettingStore_AuthKeyLifecycleAndSettings(t *testing.T) {
 	badDebugReqs := []*spec.SetDebugSettingsRequest{
 		nil,
 		{Body: nil},
-		{Body: &spec.SetDebugSettingsRequestBody{LogLevel: spec.DebugLogLevel("trace")}},
+		{Body: &spec.SetDebugSettingsRequestBody{LogLevel: spec.DebugLogLevel(testInvalidLogLevelTrace)}},
 	}
 	for i, br := range badDebugReqs {
 		_, err := store.SetDebugSettings(ctx, br)
@@ -256,7 +285,7 @@ func TestSettingStore_AuthKeyLifecycleAndSettings(t *testing.T) {
 	// Create a key and verify GetAuthKey and GetSettings reflect it.
 	setReq := &spec.SetAuthKeyRequest{
 		Type:    spec.AuthKeyTypeProvider,
-		KeyName: "key1",
+		KeyName: testAuthNameKey1,
 		Body:    &spec.SetAuthKeyRequestBody{Secret: "secret123"},
 	}
 	if _, err := store.SetAuthKey(ctx, setReq); err != nil {
@@ -303,27 +332,30 @@ func TestSettingStore_AuthKeyLifecycleAndSettings(t *testing.T) {
 
 	// Test built-in key: when BuiltInAuthKeys contains a key, DeleteAuthKey must be read-only.
 	BuiltInAuthKeys = map[spec.AuthKeyType][]spec.AuthKeyName{
-		spec.AuthKeyTypeProvider: {"built-in"},
+		spec.AuthKeyTypeProvider: {spec.AuthKeyName(testAuthNameBuiltIn)},
 	}
 
 	if _, err := store.SetAuthKey(
 		ctx,
 		&spec.SetAuthKeyRequest{
 			Type:    spec.AuthKeyTypeProvider,
-			KeyName: "built-in",
+			KeyName: testAuthNameBuiltIn,
 			Body:    &spec.SetAuthKeyRequestBody{Secret: "s"},
 		},
 	); err != nil {
 		t.Fatalf("SetAuthKey for built-in failed: %v", err)
 	}
-	_, err = store.DeleteAuthKey(ctx, &spec.DeleteAuthKeyRequest{Type: spec.AuthKeyTypeProvider, KeyName: "built-in"})
+	_, err = store.DeleteAuthKey(
+		ctx,
+		&spec.DeleteAuthKeyRequest{Type: spec.AuthKeyTypeProvider, KeyName: testAuthNameBuiltIn},
+	)
 	if !errors.Is(err, spec.ErrBuiltInAuthKeyReadOnly) {
 		t.Fatalf("expected ErrBuiltInAuthKeyReadOnly when deleting built-in, got %v", err)
 	}
 
 	if _, err := store.GetAuthKey(
 		ctx,
-		&spec.GetAuthKeyRequest{Type: spec.AuthKeyTypeProvider, KeyName: "built-in"},
+		&spec.GetAuthKeyRequest{Type: spec.AuthKeyTypeProvider, KeyName: testAuthNameBuiltIn},
 	); err != nil {
 		t.Fatalf("expected built-in key to remain after failed delete, GetAuthKey error: %v", err)
 	}
@@ -332,8 +364,8 @@ func TestSettingStore_AuthKeyLifecycleAndSettings(t *testing.T) {
 	if _, err := store.SetAuthKey(
 		ctx,
 		&spec.SetAuthKeyRequest{
-			Type:    spec.AuthKeyType("customType"),
-			KeyName: "only",
+			Type:    spec.AuthKeyType(testAuthTypeCustom),
+			KeyName: testAuthNameOnly,
 			Body:    &spec.SetAuthKeyRequestBody{Secret: "v"},
 		},
 	); err != nil {
@@ -341,14 +373,14 @@ func TestSettingStore_AuthKeyLifecycleAndSettings(t *testing.T) {
 	}
 	if _, err := store.DeleteAuthKey(
 		ctx,
-		&spec.DeleteAuthKeyRequest{Type: spec.AuthKeyType("customType"), KeyName: "only"},
+		&spec.DeleteAuthKeyRequest{Type: spec.AuthKeyType(testAuthTypeCustom), KeyName: testAuthNameOnly},
 	); err != nil {
 		t.Fatalf("DeleteAuthKey failed: %v", err)
 	}
 	// After deletion, GetAuthKey should return not found.
 	if _, err := store.GetAuthKey(
 		ctx,
-		&spec.GetAuthKeyRequest{Type: spec.AuthKeyType("customType"), KeyName: "only"},
+		&spec.GetAuthKeyRequest{Type: spec.AuthKeyType(testAuthTypeCustom), KeyName: testAuthNameOnly},
 	); !errors.Is(err, spec.ErrAuthKeyNotFound) {
 		t.Fatalf("expected ErrAuthKeyNotFound after delete, got %v", err)
 	}
@@ -357,8 +389,8 @@ func TestSettingStore_AuthKeyLifecycleAndSettings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("store.GetAll failed: %v", err)
 	}
-	if akRaw, ok := raw["authKeys"].(map[string]any); ok {
-		if _, ok2 := akRaw["customType"]; ok2 {
+	if akRaw, ok := raw[settingKeyAuthKeys].(map[string]any); ok {
+		if _, ok2 := akRaw[testAuthTypeCustom]; ok2 {
 			t.Fatalf("expected 'customType' removed from authKeys map after deleting its only key")
 		}
 	}
@@ -366,12 +398,12 @@ func TestSettingStore_AuthKeyLifecycleAndSettings(t *testing.T) {
 	// Test migration: create a fresh store with missing built-in keys and different schemaVersion.
 	{
 		defaultMap2 := map[string]any{
-			"schemaVersion": "old-schema",
-			"appTheme": map[string]any{
-				"type": string(spec.ThemeSystem),
-				"name": string(spec.ThemeNameSystem),
+			settingKeySchemaVersion: "old-schema",
+			settingKeyAppTheme: map[string]any{
+				settingJSONKeyType: spec.ThemeSystem,
+				settingJSONKeyName: spec.ThemeNameSystem,
 			},
-			"authKeys": map[string]any{},
+			settingKeyAuthKeys: map[string]any{},
 		}
 		store2, cleanup2 := integrationTestStore(t, defaultMap2)
 		defer cleanup2()
@@ -379,7 +411,7 @@ func TestSettingStore_AuthKeyLifecycleAndSettings(t *testing.T) {
 		// Force BuiltInAuthKeys to include two entries to be added by Migrate.
 		old2 := BuiltInAuthKeys
 		BuiltInAuthKeys = map[spec.AuthKeyType][]spec.AuthKeyName{
-			spec.AuthKeyTypeProvider: {"p1", "p2"},
+			spec.AuthKeyTypeProvider: {spec.AuthKeyName(testAuthNameP1), spec.AuthKeyName(testAuthNameP2)},
 		}
 		defer func() { BuiltInAuthKeys = old2 }()
 
@@ -392,27 +424,31 @@ func TestSettingStore_AuthKeyLifecycleAndSettings(t *testing.T) {
 			t.Fatalf("store2.GetAll failed: %v", err)
 		}
 		// SchemaVersion should be updated to current.
-		if raw2["schemaVersion"] != spec.SchemaVersion {
-			t.Fatalf("schemaVersion not updated by Migrate: got %v want %v", raw2["schemaVersion"], spec.SchemaVersion)
+		if raw2[settingKeySchemaVersion] != spec.SchemaVersion {
+			t.Fatalf(
+				"schemaVersion not updated by Migrate: got %v want %v",
+				raw2[settingKeySchemaVersion],
+				spec.SchemaVersion,
+			)
 		}
-		debugRaw, ok := raw2["debug"].(map[string]any)
+		debugRaw, ok := raw2[settingKeyDebug].(map[string]any)
 		if !ok {
 			t.Fatalf("debug settings missing after Migrate")
 		}
-		if debugRaw["logLLMReqResp"] != false {
-			t.Fatalf("expected logLLMReqResp=false after Migrate, got %v", debugRaw["logLLMReqResp"])
+		if debugRaw[settingKeyLogLLMReqResp] != false {
+			t.Fatalf("expected logLLMReqResp=false after Migrate, got %v", debugRaw[settingKeyLogLLMReqResp])
 		}
-		if debugRaw["disableContentStripping"] != false {
+		if debugRaw[settingKeyDisableContentStripping] != false {
 			t.Fatalf(
 				"expected disableContentStripping=false after Migrate, got %v",
-				debugRaw["disableContentStripping"],
+				debugRaw[settingKeyDisableContentStripping],
 			)
 		}
-		if debugRaw["logLevel"] != string(spec.DebugLogLevelInfo) {
-			t.Fatalf("expected logLevel=%q after Migrate, got %v", spec.DebugLogLevelInfo, debugRaw["logLevel"])
+		if debugRaw[settingKeyLogLevel] != string(spec.DebugLogLevelInfo) {
+			t.Fatalf("expected logLevel=%q after Migrate, got %v", spec.DebugLogLevelInfo, debugRaw[settingKeyLogLevel])
 		}
 
-		akRaw, ok := raw2["authKeys"].(map[string]any)
+		akRaw, ok := raw2[settingKeyAuthKeys].(map[string]any)
 		if !ok {
 			t.Fatalf("authKeys missing after Migrate")
 		}
@@ -420,20 +456,20 @@ func TestSettingStore_AuthKeyLifecycleAndSettings(t *testing.T) {
 		if !ok {
 			t.Fatalf("provider map missing after Migrate")
 		}
-		for _, name := range []string{"p1", "p2"} {
+		for _, name := range []string{testAuthNameP1, testAuthNameP2} {
 			entry, ok := provRaw[name].(map[string]any)
 			if !ok {
 				t.Fatalf("built-in key %s missing in provider map", name)
 			}
 			// Check expected fields exist: secret, sha256, nonEmpty.
-			if entry["secret"] != "" {
-				t.Fatalf("expected empty secret for %s, got %v", name, entry["secret"])
+			if entry[settingKeySecret] != "" {
+				t.Fatalf("expected empty secret for %s, got %v", name, entry[settingKeySecret])
 			}
-			if entry["sha256"] != computeSHA("") {
-				t.Fatalf("expected sha256 of empty string for %s, got %v", name, entry["sha256"])
+			if entry[settingKeySHA256] != computeSHA("") {
+				t.Fatalf("expected sha256 of empty string for %s, got %v", name, entry[settingKeySHA256])
 			}
-			if entry["nonEmpty"] != false {
-				t.Fatalf("expected nonEmpty=false for %s, got %v", name, entry["nonEmpty"])
+			if entry[settingKeyNonEmpty] != false {
+				t.Fatalf("expected nonEmpty=false for %s, got %v", name, entry[settingKeyNonEmpty])
 			}
 		}
 	}
@@ -446,7 +482,9 @@ func TestSettingStore_AuthKeyLifecycleAndSettings(t *testing.T) {
 	// Invalid: wrong name for system.
 	if _, err := store.SetAppTheme(
 		ctx,
-		&spec.SetAppThemeRequest{Body: &spec.SetAppThemeRequestBody{Type: spec.ThemeSystem, Name: "applight"}},
+		&spec.SetAppThemeRequest{
+			Body: &spec.SetAppThemeRequestBody{Type: spec.ThemeSystem, Name: testInvalidThemeNameApplight},
+		},
 	); err == nil {
 		t.Fatalf("SetAppTheme with invalid theme expected error, got nil")
 	}
@@ -462,8 +500,9 @@ func TestSettingStore_AuthKeyLifecycleAndSettings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("store.GetAll failed: %v", err)
 	}
-	if atRaw, ok := rawFinal["appTheme"].(map[string]any); ok {
-		if atRaw["type"] != string(spec.ThemeLight) || atRaw["name"] != string(spec.ThemeNameLight) {
+	if atRaw, ok := rawFinal[settingKeyAppTheme].(map[string]any); ok {
+		if atRaw[settingJSONKeyType] != string(spec.ThemeLight) ||
+			atRaw[settingJSONKeyName] != string(spec.ThemeNameLight) {
 			t.Fatalf("appTheme not updated as expected: %v", atRaw)
 		}
 	} else {
@@ -473,17 +512,17 @@ func TestSettingStore_AuthKeyLifecycleAndSettings(t *testing.T) {
 
 func TestSettingStore_ApplyCurrentDebugSettings(t *testing.T) {
 	defaultMap := map[string]any{
-		"schemaVersion": spec.SchemaVersion,
-		"appTheme": map[string]any{
-			"type": string(spec.ThemeSystem),
-			"name": string(spec.ThemeNameSystem),
+		settingKeySchemaVersion: spec.SchemaVersion,
+		settingKeyAppTheme: map[string]any{
+			settingJSONKeyType: spec.ThemeSystem,
+			settingJSONKeyName: spec.ThemeNameSystem,
 		},
-		"debug": map[string]any{
-			"logLLMReqResp":           true,
-			"disableContentStripping": true,
-			"logLevel":                string(spec.DebugLogLevelError),
+		settingKeyDebug: map[string]any{
+			settingKeyLogLLMReqResp:           true,
+			settingKeyDisableContentStripping: true,
+			settingKeyLogLevel:                string(spec.DebugLogLevelError),
 		},
-		"authKeys": map[string]any{},
+		settingKeyAuthKeys: map[string]any{},
 	}
 	store, cleanup := integrationTestStore(t, defaultMap)
 	defer cleanup()
@@ -504,12 +543,12 @@ func TestSettingStore_ApplyCurrentDebugSettings(t *testing.T) {
 
 func TestGetSettings_Sorting(t *testing.T) {
 	defaultMap := map[string]any{
-		"schemaVersion": spec.SchemaVersion,
-		"appTheme": map[string]any{
-			"type": string(spec.ThemeSystem),
-			"name": string(spec.ThemeNameSystem),
+		settingKeySchemaVersion: spec.SchemaVersion,
+		settingKeyAppTheme: map[string]any{
+			settingJSONKeyType: spec.ThemeSystem,
+			settingJSONKeyName: spec.ThemeNameSystem,
 		},
-		"authKeys": map[string]any{},
+		settingKeyAuthKeys: map[string]any{},
 	}
 	store, cleanup := integrationTestStore(t, defaultMap)
 	defer cleanup()
@@ -518,9 +557,21 @@ func TestGetSettings_Sorting(t *testing.T) {
 
 	// Create keys out-of-order across types and names.
 	cases := []spec.SetAuthKeyRequest{
-		{Type: spec.AuthKeyType("b"), KeyName: "z", Body: &spec.SetAuthKeyRequestBody{Secret: "s1"}},
-		{Type: spec.AuthKeyType("a"), KeyName: "b", Body: &spec.SetAuthKeyRequestBody{Secret: "s2"}},
-		{Type: spec.AuthKeyType("a"), KeyName: "a", Body: &spec.SetAuthKeyRequestBody{Secret: "s3"}},
+		{
+			Type:    spec.AuthKeyType(testAuthNameB),
+			KeyName: testAuthNameZ,
+			Body:    &spec.SetAuthKeyRequestBody{Secret: "s1"},
+		},
+		{
+			Type:    spec.AuthKeyType(testAuthNameA),
+			KeyName: testAuthNameB,
+			Body:    &spec.SetAuthKeyRequestBody{Secret: "s2"},
+		},
+		{
+			Type:    spec.AuthKeyType(testAuthNameA),
+			KeyName: testAuthNameA,
+			Body:    &spec.SetAuthKeyRequestBody{Secret: "s3"},
+		},
 	}
 	for _, c := range cases {
 		// Create local copy to take address.
@@ -542,9 +593,9 @@ func TestGetSettings_Sorting(t *testing.T) {
 		typ  spec.AuthKeyType
 		name spec.AuthKeyName
 	}{
-		{typ: spec.AuthKeyType("a"), name: "a"},
-		{typ: spec.AuthKeyType("a"), name: "b"},
-		{typ: spec.AuthKeyType("b"), name: "z"},
+		{typ: spec.AuthKeyType(testAuthNameA), name: testAuthNameA},
+		{typ: spec.AuthKeyType(testAuthNameA), name: testAuthNameB},
+		{typ: spec.AuthKeyType(testAuthNameB), name: testAuthNameZ},
 	}
 	if len(out.Body.AuthKeys) != len(wantOrder) {
 		t.Fatalf("unexpected number of auth keys: got %d want %d", len(out.Body.AuthKeys), len(wantOrder))
@@ -584,7 +635,7 @@ func integrationTestStore(t *testing.T, defaultMap map[string]any) (store *Setti
 
 	// Value encoder/decoder getter: use JSON encoding for secret values only.
 	valueEncDecGetter := func(path []string) mapstore.IOEncoderDecoder {
-		if len(path) == 4 && path[0] == "authKeys" && path[3] == "secret" {
+		if len(path) == 4 && path[0] == settingKeyAuthKeys && path[3] == settingKeySecret {
 			return jsonencdec.JSONEncoderDecoder{}
 		}
 		return nil

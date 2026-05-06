@@ -12,7 +12,16 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
-const renamed = "RENAMED"
+const (
+	testNilRequest        = "nil_request"
+	testNilBody           = "nil_body"
+	testUnknownProvider   = "unknown_provider"
+	testGhostID           = "ghost"
+	testEmptyProviderName = "empty_providerName"
+	testBuiltInReadOnly   = "built_in_readonly"
+	testInvalidTagText    = "invalid tag"
+	testInvalidTagInput   = "white space"
+)
 
 func TestModelPresetStore_New_CreatesFiles_AndDefaultProviderFallback(t *testing.T) {
 	t.Parallel()
@@ -63,12 +72,12 @@ func TestModelPresetStore_DefaultProvider_CRUD_AndPersistence(t *testing.T) {
 		wantErrText string
 	}{
 		{
-			name:      "nil_request",
+			name:      testNilRequest,
 			req:       nil,
 			wantErrIs: spec.ErrProviderNotFound,
 		},
 		{
-			name: "nil_body",
+			name: testNilBody,
 			req: &spec.PatchDefaultProviderRequest{
 				Body: nil,
 			},
@@ -82,9 +91,9 @@ func TestModelPresetStore_DefaultProvider_CRUD_AndPersistence(t *testing.T) {
 			wantErrIs: spec.ErrProviderNotFound,
 		},
 		{
-			name: "unknown_provider",
+			name: testUnknownProvider,
 			req: &spec.PatchDefaultProviderRequest{
-				Body: &spec.PatchDefaultProviderRequestBody{DefaultProvider: "ghost"},
+				Body: &spec.PatchDefaultProviderRequestBody{DefaultProvider: testGhostID},
 			},
 			wantErrIs: spec.ErrProviderNotFound,
 		},
@@ -156,12 +165,12 @@ func TestModelPresetStore_PostProviderPreset(t *testing.T) {
 		verify      func(t *testing.T)
 	}{
 		{
-			name:      "nil_request",
+			name:      testNilRequest,
 			req:       nil,
 			wantErrIs: spec.ErrInvalidDir,
 		},
 		{
-			name: "nil_body",
+			name: testNilBody,
 			req: &spec.PostProviderPresetRequest{
 				ProviderName: "user-prov-x",
 				Body:         nil,
@@ -169,7 +178,7 @@ func TestModelPresetStore_PostProviderPreset(t *testing.T) {
 			wantErrIs: spec.ErrInvalidDir,
 		},
 		{
-			name: "empty_providerName",
+			name: testEmptyProviderName,
 			req: &spec.PostProviderPresetRequest{
 				ProviderName: "",
 				Body:         okBody,
@@ -177,7 +186,7 @@ func TestModelPresetStore_PostProviderPreset(t *testing.T) {
 			wantErrIs: spec.ErrInvalidDir,
 		},
 		{
-			name: "built_in_readonly",
+			name: testBuiltInReadOnly,
 			req: &spec.PostProviderPresetRequest{
 				ProviderName: builtinName,
 				Body:         okBody,
@@ -339,7 +348,7 @@ func TestModelPresetStore_PatchProviderPreset_UserProvider(t *testing.T) {
 		verify      func(t *testing.T)
 	}{
 		{
-			name:      "nil_request",
+			name:      testNilRequest,
 			req:       nil,
 			wantErrIs: spec.ErrInvalidDir,
 		},
@@ -352,9 +361,9 @@ func TestModelPresetStore_PatchProviderPreset_UserProvider(t *testing.T) {
 			wantErrIs: spec.ErrInvalidDir,
 		},
 		{
-			name: "unknown_provider",
+			name: testUnknownProvider,
 			req: &spec.PatchProviderPresetRequest{
-				ProviderName: "ghost",
+				ProviderName: testGhostID,
 				Body:         &spec.PatchProviderPresetRequestBody{IsEnabled: new(false)},
 			},
 			wantErrIs: spec.ErrProviderNotFound,
@@ -364,10 +373,10 @@ func TestModelPresetStore_PatchProviderPreset_UserProvider(t *testing.T) {
 			req: &spec.PatchProviderPresetRequest{
 				ProviderName: prov,
 				Body: &spec.PatchProviderPresetRequestBody{
-					DefaultModelPresetID: mpidPtr("white space"),
+					DefaultModelPresetID: mpidPtr(testInvalidTagInput),
 				},
 			},
-			wantErrText: "invalid tag",
+			wantErrText: testInvalidTagText,
 		},
 		{
 			name: "change_metadata",
@@ -516,12 +525,12 @@ func TestModelPresetStore_DeleteProviderPreset(t *testing.T) {
 		before      func()
 	}{
 		{
-			name:      "nil_request",
+			name:      testNilRequest,
 			req:       nil,
 			wantErrIs: spec.ErrInvalidDir,
 		},
 		{
-			name: "built_in_readonly",
+			name: testBuiltInReadOnly,
 			req: &spec.DeleteProviderPresetRequest{
 				ProviderName: builtinName,
 			},
@@ -594,12 +603,12 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 			wantErrText string
 		}{
 			{
-				name:      "nil_request",
+				name:      testNilRequest,
 				req:       nil,
 				wantErrIs: spec.ErrInvalidDir,
 			},
 			{
-				name: "nil_body",
+				name: testNilBody,
 				req: &spec.PostModelPresetRequest{
 					ProviderName:  userProv,
 					ModelPresetID: "m1",
@@ -611,7 +620,7 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 				name: "invalid_modelPresetID_tag",
 				req: &spec.PostModelPresetRequest{
 					ProviderName:  userProv,
-					ModelPresetID: "white space",
+					ModelPresetID: testInvalidTagInput,
 					Body: &spec.PostModelPresetRequestBody{
 						Name:        "n",
 						Slug:        "m1",
@@ -622,7 +631,7 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 						},
 					},
 				},
-				wantErrText: "invalid tag",
+				wantErrText: testInvalidTagText,
 			},
 			{
 				name: "invalid_slug_tag",
@@ -631,7 +640,7 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 					ModelPresetID: "m1",
 					Body: &spec.PostModelPresetRequestBody{
 						Name:        "n",
-						Slug:        "white space",
+						Slug:        testInvalidTagInput,
 						DisplayName: "x",
 						IsEnabled:   true,
 						ModelPresetPatch: spec.ModelPresetPatch{
@@ -639,7 +648,7 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 						},
 					},
 				},
-				wantErrText: "invalid tag",
+				wantErrText: testInvalidTagText,
 			},
 			{
 				name: "missing_temp_and_reasoning",
@@ -677,9 +686,9 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 				wantErrText: "too many stop sequences",
 			},
 			{
-				name: "unknown_provider",
+				name: testUnknownProvider,
 				req: &spec.PostModelPresetRequest{
-					ProviderName:  "ghost",
+					ProviderName:  testGhostID,
 					ModelPresetID: "m1",
 					Body: &spec.PostModelPresetRequestBody{
 						Name:        "n",
@@ -694,7 +703,7 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 				wantErrIs: spec.ErrProviderNotFound,
 			},
 			{
-				name: "built_in_readonly",
+				name: testBuiltInReadOnly,
 				req: &spec.PostModelPresetRequest{
 					ProviderName:  builtinName,
 					ModelPresetID: "m1",
@@ -835,7 +844,7 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 
 		// Unknown provider.
 		_, err := st.PatchModelPreset(ctx, &spec.PatchModelPresetRequest{
-			ProviderName:  "ghost",
+			ProviderName:  testGhostID,
 			ModelPresetID: "m3",
 			Body:          &spec.PatchModelPresetRequestBody{IsEnabled: new(false)},
 		})
@@ -844,7 +853,7 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 		// Unknown model.
 		_, err = st.PatchModelPreset(ctx, &spec.PatchModelPresetRequest{
 			ProviderName:  userProv,
-			ModelPresetID: "ghost",
+			ModelPresetID: testGhostID,
 			Body:          &spec.PatchModelPresetRequestBody{IsEnabled: new(false)},
 		})
 		wantErrIs(t, err, spec.ErrModelPresetNotFound)
@@ -1287,17 +1296,17 @@ func TestModelPresetStore_PatchProviderPreset_BuiltIn_BothFieldsAndErrors(t *tes
 			req: &spec.PatchProviderPresetRequest{
 				ProviderName: pn2,
 				Body: &spec.PatchProviderPresetRequestBody{
-					DefaultModelPresetID: mpidPtr("white space"),
+					DefaultModelPresetID: mpidPtr(testInvalidTagInput),
 				},
 			},
-			wantErrText: "invalid tag",
+			wantErrText: testInvalidTagText,
 		},
 		{
 			name: "unknown_default_model_returns_not_found",
 			req: &spec.PatchProviderPresetRequest{
 				ProviderName: pn2,
 				Body: &spec.PatchProviderPresetRequestBody{
-					DefaultModelPresetID: mpidPtr("ghost"),
+					DefaultModelPresetID: mpidPtr(testGhostID),
 				},
 			},
 			wantErrIs: spec.ErrModelPresetNotFound,
@@ -1357,12 +1366,12 @@ func TestModelPresetStore_PatchModelPreset_AdditionalErrors(t *testing.T) {
 		wantErrIs error
 	}{
 		{
-			name:      "nil_request",
+			name:      testNilRequest,
 			req:       nil,
 			wantErrIs: spec.ErrInvalidDir,
 		},
 		{
-			name: "nil_body",
+			name: testNilBody,
 			req: &spec.PatchModelPresetRequest{
 				ProviderName:  "p",
 				ModelPresetID: "m",
@@ -1371,7 +1380,7 @@ func TestModelPresetStore_PatchModelPreset_AdditionalErrors(t *testing.T) {
 			wantErrIs: spec.ErrInvalidDir,
 		},
 		{
-			name: "empty_providerName",
+			name: testEmptyProviderName,
 			req: &spec.PatchModelPresetRequest{
 				ProviderName:  "",
 				ModelPresetID: "m",
@@ -1392,7 +1401,7 @@ func TestModelPresetStore_PatchModelPreset_AdditionalErrors(t *testing.T) {
 			name: "builtin_provider_unknown_model",
 			req: &spec.PatchModelPresetRequest{
 				ProviderName:  bpn,
-				ModelPresetID: "ghost",
+				ModelPresetID: testGhostID,
 				Body:          &spec.PatchModelPresetRequestBody{IsEnabled: new(false)},
 			},
 			wantErrIs: spec.ErrModelPresetNotFound,
@@ -1437,12 +1446,12 @@ func TestModelPresetStore_DeleteModelPreset_AdditionalCases(t *testing.T) {
 		verify      func(t *testing.T)
 	}{
 		{
-			name:      "nil_request",
+			name:      testNilRequest,
 			req:       nil,
 			wantErrIs: spec.ErrInvalidDir,
 		},
 		{
-			name: "empty_providerName",
+			name: testEmptyProviderName,
 			req: &spec.DeleteModelPresetRequest{
 				ProviderName:  "",
 				ModelPresetID: "m",
@@ -1466,9 +1475,9 @@ func TestModelPresetStore_DeleteModelPreset_AdditionalCases(t *testing.T) {
 			wantErrIs: spec.ErrBuiltInReadOnly,
 		},
 		{
-			name: "unknown_provider",
+			name: testUnknownProvider,
 			req: &spec.DeleteModelPresetRequest{
-				ProviderName:  "ghost",
+				ProviderName:  testGhostID,
 				ModelPresetID: "m1",
 			},
 			wantErrIs: spec.ErrProviderNotFound,
@@ -1477,7 +1486,7 @@ func TestModelPresetStore_DeleteModelPreset_AdditionalCases(t *testing.T) {
 			name: "unknown_model",
 			req: &spec.DeleteModelPresetRequest{
 				ProviderName:  userProv,
-				ModelPresetID: "ghost",
+				ModelPresetID: testGhostID,
 			},
 			wantErrIs: spec.ErrModelPresetNotFound,
 		},
@@ -1866,7 +1875,7 @@ func TestModelPresetStore_PostModelPreset_InvalidOutputParamAndReasoningErrors(t
 				r := base()
 				r.Body.Temperature = nil
 				r.Body.Reasoning = &inferenceSpec.ReasoningParam{
-					Type: inferenceSpec.ReasoningType("ghost"),
+					Type: inferenceSpec.ReasoningType(testGhostID),
 				}
 				return r
 			},

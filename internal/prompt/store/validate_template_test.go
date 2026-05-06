@@ -9,18 +9,49 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/prompt/spec"
 )
 
+const (
+	validateTemplateStoreTestSlug               = "abc"
+	validateTemplateStoreTestVersion            = "v1"
+	validateTemplateStoreTestItemID             = "item-1"
+	validateTemplateStoreTestTemplateSlug       = "tpl"
+	validateTemplateStoreTestBundleSlug         = "slug1"
+	validateTemplateStoreTestB1                 = "b1"
+	validateTemplateStoreTestB2                 = "b2"
+	validateTemplateStoreTestTemplateName       = "Template"
+	validateTemplateStoreTestBundleName         = "Bundle"
+	validateTemplateStoreTestDisplayName        = "Display"
+	validateTemplateStoreTestSystemContent      = "sys"
+	validateTemplateStoreTestDeveloperContent   = "dev"
+	validateTemplateStoreTestUserContent        = "user"
+	validateTemplateStoreTestUserRoleContent    = "usr"
+	validateTemplateStoreTestInvalidKindErr     = "invalid kind"
+	validateTemplateStoreTestIsResolvedMismatch = "isResolved mismatched"
+	validateTemplateStoreTestModeContent        = "Mode {{mode}}"
+	validateTemplateStoreTestEnumFast           = "fast"
+	validateTemplateStoreTestEnumSafe           = "safe"
+	validateTemplateStoreTestEnumBad            = "bad"
+)
+
 func TestSlugVersionValidation(t *testing.T) {
 	cases := []struct {
 		slug  bundleitemutils.ItemSlug
 		ver   bundleitemutils.ItemVersion
 		valid bool
 	}{
-		{"abc", "v1", true},
-		{"abc-def", "v1", true},
-		{"", "v1", false},
-		{"abc", "", false},
-		{"bad.slug", "v1", false},
-		{"abc", "v 1", false},
+		{
+			bundleitemutils.ItemSlug(validateTemplateStoreTestSlug),
+			bundleitemutils.ItemVersion(validateTemplateStoreTestVersion),
+			true,
+		},
+		{
+			bundleitemutils.ItemSlug(validateTemplateStoreTestSlug),
+			bundleitemutils.ItemVersion(validateTemplateStoreTestVersion),
+			true,
+		},
+		{"", bundleitemutils.ItemVersion(validateTemplateStoreTestVersion), false},
+		{bundleitemutils.ItemSlug(validateTemplateStoreTestSlug), "", false},
+		{"bad.slug", bundleitemutils.ItemVersion(validateTemplateStoreTestVersion), false},
+		{bundleitemutils.ItemSlug(validateTemplateStoreTestSlug), "v 1", false},
 	}
 
 	for _, c := range cases {
@@ -42,10 +73,10 @@ func TestValidateTemplate_KindAndResolvedRules(t *testing.T) {
 	base := func() spec.PromptTemplate {
 		return spec.PromptTemplate{
 			SchemaVersion: spec.SchemaVersion,
-			ID:            bundleitemutils.ItemID("item-1"),
-			Slug:          bundleitemutils.ItemSlug("tpl"),
-			Version:       bundleitemutils.ItemVersion("v1"),
-			DisplayName:   "Template",
+			ID:            bundleitemutils.ItemID(validateTemplateStoreTestItemID),
+			Slug:          bundleitemutils.ItemSlug(validateTemplateStoreTestTemplateSlug),
+			Version:       bundleitemutils.ItemVersion(validateTemplateStoreTestVersion),
+			DisplayName:   validateTemplateStoreTestTemplateName,
 			IsEnabled:     true,
 			CreatedAt:     time.Now().UTC(),
 			ModifiedAt:    time.Now().UTC(),
@@ -65,8 +96,16 @@ func TestValidateTemplate_KindAndResolvedRules(t *testing.T) {
 				tpl.Kind = spec.PromptTemplateKindInstructionsOnly
 				tpl.IsResolved = true
 				tpl.Blocks = []spec.MessageBlock{
-					{ID: "b1", Role: spec.System, Content: "sys"},
-					{ID: "b2", Role: spec.Developer, Content: "dev"},
+					{
+						ID:      validateTemplateStoreTestB1,
+						Role:    spec.System,
+						Content: validateTemplateStoreTestSystemContent,
+					},
+					{
+						ID:      validateTemplateStoreTestB2,
+						Role:    spec.Developer,
+						Content: validateTemplateStoreTestDeveloperContent,
+					},
 				}
 				return tpl
 			}(),
@@ -78,7 +117,7 @@ func TestValidateTemplate_KindAndResolvedRules(t *testing.T) {
 				tpl.Kind = spec.PromptTemplateKindInstructionsOnly
 				tpl.IsResolved = true
 				tpl.Blocks = []spec.MessageBlock{
-					{ID: "b1", Role: spec.User, Content: "user"},
+					{ID: validateTemplateStoreTestB1, Role: spec.User, Content: validateTemplateStoreTestUserContent},
 				}
 				return tpl
 			}(),
@@ -91,8 +130,16 @@ func TestValidateTemplate_KindAndResolvedRules(t *testing.T) {
 				tpl.Kind = spec.PromptTemplateKindGeneric
 				tpl.IsResolved = true
 				tpl.Blocks = []spec.MessageBlock{
-					{ID: "b1", Role: spec.System, Content: "sys"},
-					{ID: "b2", Role: spec.User, Content: "usr"},
+					{
+						ID:      validateTemplateStoreTestB1,
+						Role:    spec.System,
+						Content: validateTemplateStoreTestSystemContent,
+					},
+					{
+						ID:      validateTemplateStoreTestB2,
+						Role:    spec.User,
+						Content: validateTemplateStoreTestUserRoleContent,
+					},
 				}
 				return tpl
 			}(),
@@ -104,11 +151,15 @@ func TestValidateTemplate_KindAndResolvedRules(t *testing.T) {
 				tpl.Kind = ""
 				tpl.IsResolved = true
 				tpl.Blocks = []spec.MessageBlock{
-					{ID: "b1", Role: spec.System, Content: "sys"},
+					{
+						ID:      validateTemplateStoreTestB1,
+						Role:    spec.System,
+						Content: validateTemplateStoreTestSystemContent,
+					},
 				}
 				return tpl
 			}(),
-			wantErrSub: "invalid kind",
+			wantErrSub: validateTemplateStoreTestInvalidKindErr,
 		},
 		{
 			name: "resolved_true_when_user_var_has_default",
@@ -117,11 +168,11 @@ func TestValidateTemplate_KindAndResolvedRules(t *testing.T) {
 				tpl.Kind = spec.PromptTemplateKindGeneric
 				tpl.IsResolved = true
 				tpl.Blocks = []spec.MessageBlock{
-					{ID: "b1", Role: spec.User, Content: "Hello {{name}}"},
+					{ID: validateTemplateStoreTestB1, Role: spec.User, Content: helloTemplateContent},
 				}
 				tpl.Variables = []spec.PromptVariable{
 					{
-						Name:     "name",
+						Name:     variableName,
 						Type:     spec.VarString,
 						Source:   spec.SourceUser,
 						Required: true,
@@ -138,11 +189,11 @@ func TestValidateTemplate_KindAndResolvedRules(t *testing.T) {
 				tpl.Kind = spec.PromptTemplateKindGeneric
 				tpl.IsResolved = true
 				tpl.Blocks = []spec.MessageBlock{
-					{ID: "b1", Role: spec.User, Content: "Hello {{name}}"},
+					{ID: validateTemplateStoreTestB1, Role: spec.User, Content: helloTemplateContent},
 				}
 				tpl.Variables = []spec.PromptVariable{
 					{
-						Name:     "name",
+						Name:     variableName,
 						Type:     spec.VarString,
 						Source:   spec.SourceUser,
 						Required: true,
@@ -150,7 +201,7 @@ func TestValidateTemplate_KindAndResolvedRules(t *testing.T) {
 				}
 				return tpl
 			}(),
-			wantErrSub: "isResolved mismatched",
+			wantErrSub: validateTemplateStoreTestIsResolvedMismatch,
 		},
 		{
 			name: "resolved_false_allowed_for_unresolved_user_var",
@@ -159,11 +210,11 @@ func TestValidateTemplate_KindAndResolvedRules(t *testing.T) {
 				tpl.Kind = spec.PromptTemplateKindGeneric
 				tpl.IsResolved = false
 				tpl.Blocks = []spec.MessageBlock{
-					{ID: "b1", Role: spec.User, Content: "Hello {{name}}"},
+					{ID: validateTemplateStoreTestB1, Role: spec.User, Content: helloTemplateContent},
 				}
 				tpl.Variables = []spec.PromptVariable{
 					{
-						Name:     "name",
+						Name:     variableName,
 						Type:     spec.VarString,
 						Source:   spec.SourceUser,
 						Required: true,
@@ -179,7 +230,7 @@ func TestValidateTemplate_KindAndResolvedRules(t *testing.T) {
 				tpl.Kind = spec.PromptTemplateKindGeneric
 				tpl.IsResolved = true
 				tpl.Blocks = []spec.MessageBlock{
-					{ID: "b1", Role: spec.User, Content: "Mode {{mode}}"},
+					{ID: validateTemplateStoreTestB1, Role: spec.User, Content: validateTemplateStoreTestModeContent},
 				}
 				tpl.Variables = []spec.PromptVariable{
 					{
@@ -187,8 +238,8 @@ func TestValidateTemplate_KindAndResolvedRules(t *testing.T) {
 						Type:       spec.VarEnum,
 						Source:     spec.SourceUser,
 						Required:   true,
-						EnumValues: []string{"fast", "safe"},
-						Default:    strptr("bad"),
+						EnumValues: []string{validateTemplateStoreTestEnumFast, validateTemplateStoreTestEnumSafe},
+						Default:    strptr(validateTemplateStoreTestEnumBad),
 					},
 				}
 				return tpl
@@ -228,16 +279,16 @@ func TestGetAndPatchPromptTemplate_ValidateStoredTemplate(t *testing.T) {
 			corrupt: func(raw map[string]any) {
 				raw["kind"] = ""
 			},
-			getErrSub:   "invalid kind",
-			patchErrSub: "invalid kind",
+			getErrSub:   validateTemplateStoreTestInvalidKindErr,
+			patchErrSub: validateTemplateStoreTestInvalidKindErr,
 		},
 		{
 			name: "corrupt_isResolved_rejected",
 			corrupt: func(raw map[string]any) {
 				raw["isResolved"] = false
 			},
-			getErrSub:   "isResolved mismatched",
-			patchErrSub: "isResolved mismatched",
+			getErrSub:   validateTemplateStoreTestIsResolvedMismatch,
+			patchErrSub: validateTemplateStoreTestIsResolvedMismatch,
 		},
 	}
 
@@ -247,14 +298,14 @@ func TestGetAndPatchPromptTemplate_ValidateStoredTemplate(t *testing.T) {
 			defer clean()
 
 			const (
-				bid   = bundleitemutils.BundleID("b1")
-				bslug = bundleitemutils.BundleSlug("slug1")
-				tslug = bundleitemutils.ItemSlug("tpl")
-				tver  = bundleitemutils.ItemVersion("v1")
+				bid   = bundleitemutils.BundleID(validateTemplateStoreTestB1)
+				bslug = bundleitemutils.BundleSlug(validateTemplateStoreTestBundleSlug)
+				tslug = bundleitemutils.ItemSlug(validateTemplateStoreTestTemplateSlug)
+				tver  = bundleitemutils.ItemVersion(validateTemplateStoreTestVersion)
 			)
 
-			mustPutBundle(t, s, bid, bslug, "Bundle", true)
-			mustPutTemplate(t, s, bid, tslug, tver, "Display", true)
+			mustPutBundle(t, s, bid, bslug, validateTemplateStoreTestBundleName, true)
+			mustPutTemplate(t, s, bid, tslug, tver, validateTemplateStoreTestDisplayName, true)
 
 			dirInfo, err := bundleitemutils.BuildBundleDir(bid, bslug)
 			if err != nil {

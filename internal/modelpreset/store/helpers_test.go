@@ -17,6 +17,13 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
+const (
+	renamed                 = "RENAMED"
+	ghostID                 = "ghost"
+	nonexistentProviderName = "nonexistent_provider"
+	invalidTagText          = "invalid tag"
+)
+
 const windowsGOOS = "windows"
 
 func decodeProviderPageToken(t *testing.T, token string) spec.ProviderPageToken {
@@ -296,7 +303,7 @@ func buildSchemaDefaultMissing(pn inferenceSpec.ProviderName, mpid spec.ModelPre
 		ModifiedAt:               time.Now().UTC(),
 		Origin:                   "https://x",
 		ChatCompletionPathPrefix: spec.DefaultOpenAIChatCompletionsPrefix,
-		DefaultModelPresetID:     "ghost",
+		DefaultModelPresetID:     ghostID,
 		ModelPresets:             map[spec.ModelPresetID]spec.ModelPreset{mpid: model},
 	}
 	s := spec.PresetsSchema{

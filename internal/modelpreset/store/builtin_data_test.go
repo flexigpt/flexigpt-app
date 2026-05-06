@@ -148,10 +148,10 @@ func TestSetProviderEnabled(t *testing.T) {
 			},
 		},
 		{
-			name: "nonexistent_provider",
+			name: nonexistentProviderName,
 			setup: func(t *testing.T, _ *BuiltInPresets) (inferenceSpec.ProviderName, bool) {
 				t.Helper()
-				return inferenceSpec.ProviderName("ghost"), true
+				return inferenceSpec.ProviderName(ghostID), true
 			},
 			wantErr: true,
 		},
@@ -214,9 +214,9 @@ func TestSetModelPresetEnabled(t *testing.T) {
 			},
 		},
 		{
-			name: "nonexistent_provider",
+			name: nonexistentProviderName,
 			setup: func(*testing.T, *BuiltInPresets) (inferenceSpec.ProviderName, spec.ModelPreset, bool) {
-				return inferenceSpec.ProviderName("ghost"), spec.ModelPreset{ID: "m"}, true
+				return inferenceSpec.ProviderName(ghostID), spec.ModelPreset{ID: "m"}, true
 			},
 			wantErr: true,
 		},
@@ -226,7 +226,7 @@ func TestSetModelPresetEnabled(t *testing.T) {
 				t.Helper()
 				prov, _, _ := bi.ListBuiltInPresets(t.Context())
 				pn, _ := anyProvider(prov)
-				return pn, spec.ModelPreset{ID: "ghost"}, true
+				return pn, spec.ModelPreset{ID: ghostID}, true
 			},
 			wantErr: true,
 		},
@@ -548,9 +548,9 @@ func TestSetDefaultModelPreset(t *testing.T) {
 			},
 		},
 		{
-			name: "nonexistent_provider",
+			name: nonexistentProviderName,
 			setup: func(*testing.T, *BuiltInPresets) (inferenceSpec.ProviderName, spec.ModelPresetID) {
-				return inferenceSpec.ProviderName("ghost"), spec.ModelPresetID("m1")
+				return inferenceSpec.ProviderName(ghostID), spec.ModelPresetID("m1")
 			},
 			wantErr: true,
 		},
@@ -560,7 +560,7 @@ func TestSetDefaultModelPreset(t *testing.T) {
 				t.Helper()
 				prov, _, _ := bi.ListBuiltInPresets(t.Context())
 				pn, _ := anyProvider(prov)
-				return pn, spec.ModelPresetID("ghost")
+				return pn, spec.ModelPresetID(ghostID)
 			},
 			wantErr: true,
 		},
@@ -1082,7 +1082,7 @@ func Test_NewBuiltInPresets_SyntheticFS_AdditionalValidationErrors(t *testing.T)
 			fsys: func(t *testing.T) fs.FS {
 				t.Helper()
 				return makeFS(t, func(s *spec.PresetsSchema) {
-					s.DefaultProvider = inferenceSpec.ProviderName("ghost")
+					s.DefaultProvider = inferenceSpec.ProviderName(ghostID)
 				})
 			},
 			wantErrText: "default provider not present in presets",
