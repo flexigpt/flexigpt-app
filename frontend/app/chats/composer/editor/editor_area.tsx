@@ -124,7 +124,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	},
 	ref
 ) {
-	const isSubmittingRef = useRef(false);
 	const autoSubmitTrackerRef = useRef(createAutoSubmitTracker());
 	const resetAutoSubmitTracker = useCallback(() => {
 		autoSubmitTrackerRef.current = createAutoSubmitTracker();
@@ -184,11 +183,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const [submitError, setSubmitError] = useState<string | null>(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const isSubmittingRef = useRef(false);
+	const submitVisualFrameRef = useRef<number | null>(null);
+
 	const [fastForwardPending, setFastForwardPending] = useState(false);
-	const setSubmitting = useCallback((next: boolean) => {
-		isSubmittingRef.current = next;
-		setIsSubmitting(current => (current === next ? current : next));
-	}, []);
 
 	// Guard: while true, handleEditorDocumentChange skips auto-cancel logic.
 	// This prevents a race where Plate fires onChange after clearComposerTransientState
@@ -262,7 +260,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	});
 
 	const previousProviderSDKTypeRef = useRef(currentProviderSDKType);
-
+	const hasBlockingToolArgs = toolArgsBlocked || webSearchArgsBlocked;
 	useLayoutEffect(() => {
 		if (previousProviderSDKTypeRef.current === currentProviderSDKType) return;
 
@@ -275,7 +273,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		setToolArgsTarget(prev => (prev?.kind === 'webSearch' ? null : prev));
 	}, [currentProviderSDKType, setToolArgsTarget, setWebSearchTemplates]);
 
-	const hasBlockingToolArgs = toolArgsBlocked || webSearchArgsBlocked;
 	const handleOpenToolOutput = useCallback((output: UIToolOutput) => {
 		setToolDetailsState({ kind: 'output', output });
 	}, []);
@@ -329,6 +326,15 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			if (externalMessageLoadReleaseTimerRef.current !== null) {
 				window.clearTimeout(externalMessageLoadReleaseTimerRef.current);
 				externalMessageLoadReleaseTimerRef.current = null;
+			}
+		};
+	}, []);
+
+	useEffect(() => {
+		return () => {
+			if (submitVisualFrameRef.current !== null) {
+				window.cancelAnimationFrame(submitVisualFrameRef.current);
+				submitVisualFrameRef.current = null;
 			}
 		};
 	}, []);
@@ -617,6 +623,28 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		},
 	});
 
+	const setSubmitting = useCallback((next: boolean, options?: { deferVisual?: boolean }) => {
+		isSubmittingRef.current = next;
+		if (submitVisualFrameRef.current !== null) {
+			window.cancelAnimationFrame(submitVisualFrameRef.current);
+			submitVisualFrameRef.current = null;
+		}
+
+		// Important: submitting=true is only a visual/UI state. Triggering that
+		// rerender synchronously right after an imperative Plate mutation is the
+		// fragile part in this repro. Keep the ref in sync immediately for logic,
+		// but defer the React render by one frame.
+		if (next && options?.deferVisual) {
+			submitVisualFrameRef.current = window.requestAnimationFrame(() => {
+				submitVisualFrameRef.current = null;
+				setIsSubmitting(current => (current === next ? current : next));
+			});
+			return;
+		}
+
+		setIsSubmitting(current => (current === next ? current : next));
+	}, []);
+
 	const clearComposerTransientState = useCallback(() => {
 		closeAllMenus();
 		setSubmitError(null);
@@ -708,6 +736,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				return;
 			}
 
+			// The tool picker can remain mounted after attaching a tool.
+			// Close all menus before submit-driven state changes so no Ariakit menu
+			// subtree spans the attached-tool -> conversation-tool transition.
+			closeAllMenus();
+
 			setSubmitError(null);
 			const pendingRunnableToolCallIDs = runPendingTools
 				? toolCalls
@@ -728,6 +761,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			setSubmitting(true);
 
 			let didSend = false;
+			let submittedToolChoices: ToolStoreChoice[] | null = null;
 
 			try {
 				let effectiveSkillSessionID = getCurrentSkillSessionID();
@@ -829,7 +863,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 				await onSubmit(payload);
 				setSubmitError(null);
-				setConversationToolsState(prev => mergeConversationToolsWithNewChoices(prev, finalToolChoices));
+				submittedToolChoices = finalToolChoices;
+
 				didSend = true;
 			} finally {
 				setSubmitting(false);
@@ -839,12 +874,19 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					resetEditor();
 					// If we were editing, the old snapshot is no longer relevant.
 					clearPreEditSnapshot();
+
+					if (submittedToolChoices && submittedToolChoices.length > 0) {
+						setConversationToolsState(prev =>
+							mergeConversationToolsWithNewChoices(prev, submittedToolChoices as ToolStoreChoice[])
+						);
+					}
 				}
 			}
 		},
 		[
 			attachments,
 			clearPreEditSnapshot,
+			closeAllMenus,
 			contentRef,
 			conversationToolsState,
 			editor,
@@ -1401,7 +1443,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			/>
 
 			<ToolArgsModalHost
-				attachedToolEntries={getAttachedToolEntriesSnapshot(false)}
+				attachedToolEntries={attachedToolEntries}
 				setAttachedToolUserArgSchemaInstance={handleSetAttachedToolUserArgSchemaInstance}
 				conversationToolsState={conversationToolsState}
 				setConversationToolsState={setConversationToolsState}

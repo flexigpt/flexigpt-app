@@ -17,13 +17,20 @@ updates:
       - dependency-name: "@types/node"
       - dependency-name: "eslint"
       - dependency-name: "@eslint/js"
+      - dependency-name: "platejs"
+      - dependency-name: "@platejs/basic-nodes"
+      - dependency-name: "@platejs/basic-styles"
+      - dependency-name: "@platejs/floating"
+      - dependency-name: "@platejs/indent"
+      - dependency-name: "@platejs/list"
+      - dependency-name: "@platejs/tabbable"
     groups:
       production-dependencies:
         dependency-type: "production"
-        update-types: ["minor", "patch"]
+        update-types: [ "minor", "patch" ]
       development-dependencies:
         dependency-type: "development"
-        update-types: ["minor", "patch"]
+        update-types: [ "minor", "patch" ]
   - package-ecosystem: "gomod"
     directory: "/"
     open-pull-requests-limit: 10

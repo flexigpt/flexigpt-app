@@ -495,11 +495,6 @@ func (ps *ProviderSetAPI) deriveCapabilitiesFromPreset(
 
 	presetModelName := inferenceSpec.ModelName(presp.Body.Model.Name)
 
-	// Hardening: ensure model name consistency.
-	if requestModelName != "" && presetModelName != "" && requestModelName != presetModelName {
-		return nil, fmt.Errorf("model name mismatch: request=%q preset=%q", requestModelName, presetModelName)
-	}
-
 	modelName := requestModelName
 	if modelName == "" {
 		modelName = presetModelName

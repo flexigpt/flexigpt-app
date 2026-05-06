@@ -26,13 +26,14 @@ export function useEnterSubmit({ isBusy, canSubmit, insertSoftBreak, onSubmitReq
 
 			// Shift+Enter => soft break
 			if (e.key === 'Enter' && e.shiftKey && !isComposing) {
-				insertSoftBreak?.();
 				e.preventDefault();
+				insertSoftBreak?.();
 				return;
 			}
 
 			// Enter => submit
 			if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
+				e.preventDefault();
 				const busy = resolveBool(isBusy);
 				if (!busy && canSubmit()) {
 					if (onSubmitRequest) {
@@ -41,7 +42,6 @@ export function useEnterSubmit({ isBusy, canSubmit, insertSoftBreak, onSubmitReq
 						formRef.current?.requestSubmit();
 					}
 				}
-				e.preventDefault();
 			}
 		},
 		[isBusy, canSubmit, insertSoftBreak, onSubmitRequest]
