@@ -52,23 +52,6 @@ func validateTheme(th *spec.AppTheme) error {
 	}
 }
 
-// validateDebugSettings checks whether debug settings are supported.
-func validateDebugSettings(cfg *spec.DebugSettings) error {
-	if cfg == nil {
-		return spec.ErrInvalidDebugSettings
-	}
-
-	switch cfg.LogLevel {
-	case spec.DebugLogLevelDebug,
-		spec.DebugLogLevelInfo,
-		spec.DebugLogLevelWarn,
-		spec.DebugLogLevelError:
-		return nil
-	default:
-		return fmt.Errorf("%w: unsupported logLevel %q", spec.ErrInvalidDebugSettings, cfg.LogLevel)
-	}
-}
-
 func normalizeDebugSettings(cfg spec.DebugSettings) (spec.DebugSettings, bool) {
 	normalized := cfg
 	changed := false
@@ -84,4 +67,21 @@ func normalizeDebugSettings(cfg spec.DebugSettings) (spec.DebugSettings, bool) {
 	}
 
 	return normalized, changed
+}
+
+// validateDebugSettings checks whether debug settings are supported.
+func validateDebugSettings(cfg *spec.DebugSettings) error {
+	if cfg == nil {
+		return spec.ErrInvalidDebugSettings
+	}
+
+	switch cfg.LogLevel {
+	case spec.DebugLogLevelDebug,
+		spec.DebugLogLevelInfo,
+		spec.DebugLogLevelWarn,
+		spec.DebugLogLevelError:
+		return nil
+	default:
+		return fmt.Errorf("%w: unsupported logLevel %q", spec.ErrInvalidDebugSettings, cfg.LogLevel)
+	}
 }

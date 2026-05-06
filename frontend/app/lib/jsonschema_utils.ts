@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
-
 /**
  * @public
  */
@@ -9,7 +7,7 @@ export interface JSONObject {
 	[key: string]: JSONValue | undefined;
 }
 
-export type JSONValue = JSONPrimitive | JSONObject | JSONValue[];
+type JSONValue = JSONPrimitive | JSONObject | JSONValue[];
 
 export type JSONSchema = JSONValue;
 export type JSONRawString = string;

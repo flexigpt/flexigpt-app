@@ -18,47 +18,79 @@ import (
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
-func fixedTestTime() time.Time {
-	return time.Date(2026, 3, 22, 10, 11, 12, 0, time.UTC)
+type builtInFixture struct {
+	fsys   fstest.MapFS
+	bundle spec.AssistantPresetBundle
+	preset spec.AssistantPreset
 }
 
-func testBundleSlug(t *testing.T, suffix string) bundleitemutils.BundleSlug {
+func newSingleBuiltInFixture(t *testing.T, bundleEnabled, presetEnabled bool) builtInFixture {
 	t.Helper()
 
-	candidates := []bundleitemutils.BundleSlug{
-		bundleitemutils.BundleSlug("bundle-" + suffix),
-		bundleitemutils.BundleSlug("bundle" + suffix),
-		bundleitemutils.BundleSlug("b" + suffix),
-	}
+	bundle := newTestBundle(t, "builtin", bundleEnabled)
+	bundle.DisplayName = "Built-in bundle"
 
-	for _, c := range candidates {
-		if err := bundleitemutils.ValidateBundleSlug(c); err == nil {
-			return c
-		}
-	}
+	preset := newTestPreset(t, "builtin", presetEnabled)
+	preset.DisplayName = "Built-in preset"
 
-	t.Fatalf("no valid bundle slug candidate for suffix %q", suffix)
-	return ""
+	return builtInFixture{
+		fsys: newBuiltInFS(
+			t,
+			map[bundleitemutils.BundleID]spec.AssistantPresetBundle{
+				bundle.ID: bundle,
+			},
+			map[bundleitemutils.BundleID][]spec.AssistantPreset{
+				bundle.ID: {preset},
+			},
+		),
+		bundle: bundle,
+		preset: preset,
+	}
 }
 
-func testBundleID(t *testing.T, suffix string) bundleitemutils.BundleID {
+func newTestStore(t *testing.T, builtins fs.FS, opts ...Option) *AssistantPresetStore {
 	t.Helper()
 
-	slug := testBundleSlug(t, suffix)
-	candidates := []bundleitemutils.BundleID{
-		bundleitemutils.BundleID("bundle-id-" + suffix),
-		bundleitemutils.BundleID("bundle-" + suffix),
-		bundleitemutils.BundleID("b-" + suffix),
+	if builtins == nil {
+		builtins = newEmptyBuiltInFS(t)
 	}
 
-	for _, c := range candidates {
-		if _, err := bundleitemutils.BuildBundleDir(c, slug); err == nil {
-			return c
-		}
+	allOpts := append(
+		[]Option{
+			WithBuiltInDataOptions(WithBundlesFS(builtins, ".")),
+		},
+		opts...,
+	)
+
+	s, err := NewAssistantPresetStore(t.TempDir(), allOpts...)
+	if err != nil {
+		t.Fatalf("NewAssistantPresetStore() error: %v", err)
 	}
 
-	t.Fatalf("no buildable bundle ID candidate for suffix %q", suffix)
-	return ""
+	t.Cleanup(func() {
+		_ = s.Close()
+	})
+
+	return s
+}
+
+func newTestPreset(t *testing.T, suffix string, enabled bool) spec.AssistantPreset {
+	t.Helper()
+
+	now := fixedTestTime()
+
+	return spec.AssistantPreset{
+		SchemaVersion: spec.SchemaVersion,
+		ID:            bundleitemutils.ItemID("preset-id-" + suffix),
+		Slug:          testItemSlug(t, suffix),
+		Version:       testItemVersion(t),
+		DisplayName:   "Preset " + suffix,
+		Description:   "Preset description " + suffix,
+		IsEnabled:     enabled,
+		IsBuiltIn:     false,
+		CreatedAt:     now,
+		ModifiedAt:    now,
+	}
 }
 
 func testItemSlug(t *testing.T, suffix string) bundleitemutils.ItemSlug {
@@ -118,51 +150,52 @@ func newTestBundle(t *testing.T, suffix string, enabled bool) spec.AssistantPres
 	}
 }
 
-func newTestPreset(t *testing.T, suffix string, enabled bool) spec.AssistantPreset {
+func testBundleID(t *testing.T, suffix string) bundleitemutils.BundleID {
 	t.Helper()
 
-	now := fixedTestTime()
-
-	return spec.AssistantPreset{
-		SchemaVersion: spec.SchemaVersion,
-		ID:            bundleitemutils.ItemID("preset-id-" + suffix),
-		Slug:          testItemSlug(t, suffix),
-		Version:       testItemVersion(t),
-		DisplayName:   "Preset " + suffix,
-		Description:   "Preset description " + suffix,
-		IsEnabled:     enabled,
-		IsBuiltIn:     false,
-		CreatedAt:     now,
-		ModifiedAt:    now,
+	slug := testBundleSlug(t, suffix)
+	candidates := []bundleitemutils.BundleID{
+		bundleitemutils.BundleID("bundle-id-" + suffix),
+		bundleitemutils.BundleID("bundle-" + suffix),
+		bundleitemutils.BundleID("b-" + suffix),
 	}
+
+	for _, c := range candidates {
+		if _, err := bundleitemutils.BuildBundleDir(c, slug); err == nil {
+			return c
+		}
+	}
+
+	t.Fatalf("no buildable bundle ID candidate for suffix %q", suffix)
+	return ""
 }
 
-func mustBuildBundleDir(
-	t *testing.T,
-	id bundleitemutils.BundleID,
-	slug bundleitemutils.BundleSlug,
-) bundleitemutils.BundleDirInfo {
+func testBundleSlug(t *testing.T, suffix string) bundleitemutils.BundleSlug {
 	t.Helper()
 
-	dirInfo, err := bundleitemutils.BuildBundleDir(id, slug)
-	if err != nil {
-		t.Fatalf("BuildBundleDir(%q, %q) error: %v", id, slug, err)
+	candidates := []bundleitemutils.BundleSlug{
+		bundleitemutils.BundleSlug("bundle-" + suffix),
+		bundleitemutils.BundleSlug("bundle" + suffix),
+		bundleitemutils.BundleSlug("b" + suffix),
 	}
-	return dirInfo
+
+	for _, c := range candidates {
+		if err := bundleitemutils.ValidateBundleSlug(c); err == nil {
+			return c
+		}
+	}
+
+	t.Fatalf("no valid bundle slug candidate for suffix %q", suffix)
+	return ""
 }
 
-func mustBuildItemFile(
-	t *testing.T,
-	slug bundleitemutils.ItemSlug,
-	version bundleitemutils.ItemVersion,
-) bundleitemutils.FileInfo {
-	t.Helper()
+func fixedTestTime() time.Time {
+	return time.Date(2026, 3, 22, 10, 11, 12, 0, time.UTC)
+}
 
-	info, err := bundleitemutils.BuildItemFileInfo(slug, version)
-	if err != nil {
-		t.Fatalf("BuildItemFileInfo(%q, %q) error: %v", slug, version, err)
-	}
-	return info
+func newEmptyBuiltInFS(t *testing.T) fstest.MapFS {
+	t.Helper()
+	return newBuiltInFS(t, nil, nil)
 }
 
 func newBuiltInFS(
@@ -218,65 +251,32 @@ func newBuiltInFS(
 	return fsys
 }
 
-func newEmptyBuiltInFS(t *testing.T) fstest.MapFS {
-	t.Helper()
-	return newBuiltInFS(t, nil, nil)
-}
-
-type builtInFixture struct {
-	fsys   fstest.MapFS
-	bundle spec.AssistantPresetBundle
-	preset spec.AssistantPreset
-}
-
-func newSingleBuiltInFixture(t *testing.T, bundleEnabled, presetEnabled bool) builtInFixture {
+func mustBuildBundleDir(
+	t *testing.T,
+	id bundleitemutils.BundleID,
+	slug bundleitemutils.BundleSlug,
+) bundleitemutils.BundleDirInfo {
 	t.Helper()
 
-	bundle := newTestBundle(t, "builtin", bundleEnabled)
-	bundle.DisplayName = "Built-in bundle"
-
-	preset := newTestPreset(t, "builtin", presetEnabled)
-	preset.DisplayName = "Built-in preset"
-
-	return builtInFixture{
-		fsys: newBuiltInFS(
-			t,
-			map[bundleitemutils.BundleID]spec.AssistantPresetBundle{
-				bundle.ID: bundle,
-			},
-			map[bundleitemutils.BundleID][]spec.AssistantPreset{
-				bundle.ID: {preset},
-			},
-		),
-		bundle: bundle,
-		preset: preset,
-	}
-}
-
-func newTestStore(t *testing.T, builtins fs.FS, opts ...Option) *AssistantPresetStore {
-	t.Helper()
-
-	if builtins == nil {
-		builtins = newEmptyBuiltInFS(t)
-	}
-
-	allOpts := append(
-		[]Option{
-			WithBuiltInDataOptions(WithBundlesFS(builtins, ".")),
-		},
-		opts...,
-	)
-
-	s, err := NewAssistantPresetStore(t.TempDir(), allOpts...)
+	dirInfo, err := bundleitemutils.BuildBundleDir(id, slug)
 	if err != nil {
-		t.Fatalf("NewAssistantPresetStore() error: %v", err)
+		t.Fatalf("BuildBundleDir(%q, %q) error: %v", id, slug, err)
 	}
+	return dirInfo
+}
 
-	t.Cleanup(func() {
-		_ = s.Close()
-	})
+func mustBuildItemFile(
+	t *testing.T,
+	slug bundleitemutils.ItemSlug,
+	version bundleitemutils.ItemVersion,
+) bundleitemutils.FileInfo {
+	t.Helper()
 
-	return s
+	info, err := bundleitemutils.BuildItemFileInfo(slug, version)
+	if err != nil {
+		t.Fatalf("BuildItemFileInfo(%q, %q) error: %v", slug, version, err)
+	}
+	return info
 }
 
 func mustPutBundle(
@@ -351,10 +351,6 @@ func mustGetAssistantPreset(
 	return *resp.Body
 }
 
-func boolPtr(v bool) *bool {
-	return &v
-}
-
 func collectBundleIDs(items []spec.AssistantPresetBundle) map[bundleitemutils.BundleID]struct{} {
 	out := make(map[bundleitemutils.BundleID]struct{}, len(items))
 	for _, item := range items {
@@ -363,16 +359,16 @@ func collectBundleIDs(items []spec.AssistantPresetBundle) map[bundleitemutils.Bu
 	return out
 }
 
-func presetListKey(item spec.AssistantPresetListItem) string {
-	return string(item.BundleID) + "|" + string(item.AssistantPresetSlug) + "|" + string(item.AssistantPresetVersion)
-}
-
 func collectPresetKeys(items []spec.AssistantPresetListItem) map[string]struct{} {
 	out := make(map[string]struct{}, len(items))
 	for _, item := range items {
 		out[presetListKey(item)] = struct{}{}
 	}
 	return out
+}
+
+func presetListKey(item spec.AssistantPresetListItem) string {
+	return string(item.BundleID) + "|" + string(item.AssistantPresetSlug) + "|" + string(item.AssistantPresetVersion)
 }
 
 type fakeModelPresetLookup func(context.Context, modelpresetSpec.ModelPresetRef) (ModelPresetSummary, error)

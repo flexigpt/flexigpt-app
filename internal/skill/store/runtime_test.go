@@ -40,98 +40,6 @@ type biBundle struct {
 	IsEnabled   bool
 }
 
-func mustGetSkillRef(t *testing.T, s *SkillStore, bid bundleitemutils.BundleID, slug spec.SkillSlug) spec.SkillRef {
-	t.Helper()
-
-	gs, err := s.GetSkill(t.Context(), &spec.GetSkillRequest{
-		BundleID:  bid,
-		SkillSlug: slug,
-	})
-	if err != nil {
-		t.Fatalf("GetSkill(%s/%s): %v", bid, slug, err)
-	}
-	if gs == nil || gs.Body == nil {
-		t.Fatalf("GetSkill(%s/%s): nil response", bid, slug)
-	}
-	return spec.SkillRef{
-		BundleID:  bid,
-		SkillSlug: slug,
-		SkillID:   gs.Body.ID,
-	}
-}
-
-func mustHaveRuntimeItemBySlug(
-	t *testing.T,
-	items []spec.RuntimeSkillListItem,
-	slug spec.SkillSlug,
-) spec.RuntimeSkillListItem {
-	t.Helper()
-	for _, it := range items {
-		if it.SkillRef.SkillSlug == slug {
-			return it
-		}
-	}
-	t.Fatalf("expected runtime list to contain slug=%q; got=%v", slug, runtimeSlugs(items))
-	return spec.RuntimeSkillListItem{}
-}
-
-func mustNotHaveRuntimeItemBySlug(t *testing.T, items []spec.RuntimeSkillListItem, slug spec.SkillSlug) {
-	t.Helper()
-	for _, it := range items {
-		if it.SkillRef.SkillSlug == slug {
-			t.Fatalf("expected runtime list to NOT contain slug=%q; got=%v", slug, runtimeSlugs(items))
-		}
-	}
-}
-
-func runtimeSlugs(items []spec.RuntimeSkillListItem) []spec.SkillSlug {
-	out := make([]spec.SkillSlug, 0, len(items))
-	for _, it := range items {
-		out = append(out, it.SkillRef.SkillSlug)
-	}
-	slices.Sort(out)
-	return out
-}
-
-func listRuntimeSkillsAllow(t *testing.T, s *SkillStore, allow []spec.SkillRef) *spec.ListRuntimeSkillsResponse {
-	t.Helper()
-
-	resp, err := s.ListRuntimeSkills(t.Context(), &spec.ListRuntimeSkillsRequest{
-		Body: &spec.ListRuntimeSkillsRequestBody{
-			Filter: &spec.RuntimeSkillFilter{
-				AllowSkillRefs: allow,
-				Activity:       agentskillsSpec.SkillActivityAny,
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("ListRuntimeSkills: %v", err)
-	}
-	if resp == nil || resp.Body == nil {
-		t.Fatalf("ListRuntimeSkills: nil response")
-	}
-	return resp
-}
-
-func listRuntimeSkillsAllowFiltered(
-	t *testing.T,
-	s *SkillStore,
-	f *spec.RuntimeSkillFilter,
-) *spec.ListRuntimeSkillsResponse {
-	t.Helper()
-
-	resp, err := s.ListRuntimeSkills(t.Context(), &spec.ListRuntimeSkillsRequest{
-		Body: &spec.ListRuntimeSkillsRequestBody{Filter: f},
-	})
-	if err != nil {
-		t.Fatalf("ListRuntimeSkills(filtered): %v", err)
-	}
-	if resp == nil || resp.Body == nil {
-		t.Fatalf("ListRuntimeSkills(filtered): nil response")
-	}
-	return resp
-}
-
 func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testing.T) {
 	ctx := t.Context()
 
@@ -449,7 +357,7 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 		BundleID:  userBundleID,
 		SkillSlug: spec.SkillSlug("user-hello"),
 		Body: &spec.PatchSkillRequestBody{
-			IsEnabled: boolPtr(false),
+			IsEnabled: new(false),
 		},
 	}); err != nil {
 		t.Fatalf("PatchSkill(user-hello disable): %v", err)
@@ -473,7 +381,7 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 		BundleID:  bundle.ID,
 		SkillSlug: biDisabled.Slug,
 		Body: &spec.PatchSkillRequestBody{
-			IsEnabled: boolPtr(true),
+			IsEnabled: new(true),
 		},
 	}); err != nil {
 		t.Fatalf("PatchSkill(builtin enable disabled skill): %v", err)
@@ -628,7 +536,7 @@ func TestSkillStore_RuntimeIntegration_ReplacementSafety_UserSkillLocationChange
 		BundleID:  userBundleID,
 		SkillSlug: spec.SkillSlug("replace-skill"),
 		Body: &spec.PatchSkillRequestBody{
-			Location: strPtr(locBad),
+			Location: new(locBad),
 		},
 	})
 	if err == nil {
@@ -663,7 +571,7 @@ func TestSkillStore_RuntimeIntegration_ReplacementSafety_UserSkillLocationChange
 		BundleID:  userBundleID,
 		SkillSlug: spec.SkillSlug("replace-skill"),
 		Body: &spec.PatchSkillRequestBody{
-			Location: strPtr(loc2),
+			Location: new(loc2),
 		},
 	}); err != nil {
 		t.Fatalf("PatchSkill(valid replacement location): %v", err)
@@ -1062,4 +970,96 @@ func TestSkillStore_HydrateBuiltInEmbeddedFS_DigestMismatchWipes(t *testing.T) {
 	if _, err := os.Stat(sentinel); err == nil {
 		t.Fatalf("expected sentinel to be removed on digest mismatch wipe")
 	}
+}
+
+func mustGetSkillRef(t *testing.T, s *SkillStore, bid bundleitemutils.BundleID, slug spec.SkillSlug) spec.SkillRef {
+	t.Helper()
+
+	gs, err := s.GetSkill(t.Context(), &spec.GetSkillRequest{
+		BundleID:  bid,
+		SkillSlug: slug,
+	})
+	if err != nil {
+		t.Fatalf("GetSkill(%s/%s): %v", bid, slug, err)
+	}
+	if gs == nil || gs.Body == nil {
+		t.Fatalf("GetSkill(%s/%s): nil response", bid, slug)
+	}
+	return spec.SkillRef{
+		BundleID:  bid,
+		SkillSlug: slug,
+		SkillID:   gs.Body.ID,
+	}
+}
+
+func mustHaveRuntimeItemBySlug(
+	t *testing.T,
+	items []spec.RuntimeSkillListItem,
+	slug spec.SkillSlug,
+) spec.RuntimeSkillListItem {
+	t.Helper()
+	for _, it := range items {
+		if it.SkillRef.SkillSlug == slug {
+			return it
+		}
+	}
+	t.Fatalf("expected runtime list to contain slug=%q; got=%v", slug, runtimeSlugs(items))
+	return spec.RuntimeSkillListItem{}
+}
+
+func mustNotHaveRuntimeItemBySlug(t *testing.T, items []spec.RuntimeSkillListItem, slug spec.SkillSlug) {
+	t.Helper()
+	for _, it := range items {
+		if it.SkillRef.SkillSlug == slug {
+			t.Fatalf("expected runtime list to NOT contain slug=%q; got=%v", slug, runtimeSlugs(items))
+		}
+	}
+}
+
+func runtimeSlugs(items []spec.RuntimeSkillListItem) []spec.SkillSlug {
+	out := make([]spec.SkillSlug, 0, len(items))
+	for _, it := range items {
+		out = append(out, it.SkillRef.SkillSlug)
+	}
+	slices.Sort(out)
+	return out
+}
+
+func listRuntimeSkillsAllow(t *testing.T, s *SkillStore, allow []spec.SkillRef) *spec.ListRuntimeSkillsResponse {
+	t.Helper()
+
+	resp, err := s.ListRuntimeSkills(t.Context(), &spec.ListRuntimeSkillsRequest{
+		Body: &spec.ListRuntimeSkillsRequestBody{
+			Filter: &spec.RuntimeSkillFilter{
+				AllowSkillRefs: allow,
+				Activity:       agentskillsSpec.SkillActivityAny,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ListRuntimeSkills: %v", err)
+	}
+	if resp == nil || resp.Body == nil {
+		t.Fatalf("ListRuntimeSkills: nil response")
+	}
+	return resp
+}
+
+func listRuntimeSkillsAllowFiltered(
+	t *testing.T,
+	s *SkillStore,
+	f *spec.RuntimeSkillFilter,
+) *spec.ListRuntimeSkillsResponse {
+	t.Helper()
+
+	resp, err := s.ListRuntimeSkills(t.Context(), &spec.ListRuntimeSkillsRequest{
+		Body: &spec.ListRuntimeSkillsRequestBody{Filter: f},
+	})
+	if err != nil {
+		t.Fatalf("ListRuntimeSkills(filtered): %v", err)
+	}
+	if resp == nil || resp.Body == nil {
+		t.Fatalf("ListRuntimeSkills(filtered): nil response")
+	}
+	return resp
 }

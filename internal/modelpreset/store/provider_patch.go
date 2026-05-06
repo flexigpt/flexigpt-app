@@ -103,21 +103,6 @@ func (s *ModelPresetStore) PatchProviderPreset(
 	return &spec.PatchProviderPresetResponse{}, nil
 }
 
-func hasAnyProviderPatchMutation(body *spec.PatchProviderPresetRequestBody) bool {
-	if body == nil {
-		return false
-	}
-	return body.DisplayName != nil ||
-		body.SDKType != nil ||
-		body.IsEnabled != nil ||
-		body.Origin != nil ||
-		body.ChatCompletionPathPrefix != nil ||
-		body.APIKeyHeaderKey != nil ||
-		body.DefaultHeaders != nil ||
-		body.DefaultModelPresetID != nil ||
-		body.CapabilitiesOverride != nil
-}
-
 func hasAnyReadOnlyBuiltInProviderPatch(body *spec.PatchProviderPresetRequestBody) bool {
 	if body == nil {
 		return false
@@ -140,6 +125,21 @@ func validateProviderPresetPatchRequestBody(body *spec.PatchProviderPresetReques
 	}
 
 	return nil
+}
+
+func hasAnyProviderPatchMutation(body *spec.PatchProviderPresetRequestBody) bool {
+	if body == nil {
+		return false
+	}
+	return body.DisplayName != nil ||
+		body.SDKType != nil ||
+		body.IsEnabled != nil ||
+		body.Origin != nil ||
+		body.ChatCompletionPathPrefix != nil ||
+		body.APIKeyHeaderKey != nil ||
+		body.DefaultHeaders != nil ||
+		body.DefaultModelPresetID != nil ||
+		body.CapabilitiesOverride != nil
 }
 
 func applyProviderPresetPatch(dst *spec.ProviderPreset, body *spec.PatchProviderPresetRequestBody) bool {

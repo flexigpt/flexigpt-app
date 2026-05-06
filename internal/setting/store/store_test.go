@@ -17,12 +17,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/setting/spec"
 )
 
-// Helper to compute SHA256 hex (same as computeSHA in production code).
-func expectedSHA(in string) string {
-	sum := sha256.Sum256([]byte(in))
-	return hex.EncodeToString(sum[:])
-}
-
 func TestComputeSHA(t *testing.T) {
 	cases := []struct {
 		in string
@@ -154,47 +148,6 @@ func TestValueEncDecGetter(t *testing.T) {
 			}
 		})
 	}
-}
-
-// integrationTestStore sets up a real mapstore.MapFileStore backed by a temp file.
-// Returns the SettingStore (with store and encEncrypt populated) and a cleanup func.
-func integrationTestStore(t *testing.T, defaultMap map[string]any) (store *SettingStore, cleanup func()) {
-	t.Helper()
-	tmpDir := t.TempDir()
-
-	file := filepath.Join(tmpDir, "settings.json")
-	encoder := jsonencdec.JSONEncoderDecoder{}
-
-	// Value encoder/decoder getter: use JSON encoding for secret values only.
-	valueEncDecGetter := func(path []string) mapstore.IOEncoderDecoder {
-		if len(path) == 4 && path[0] == "authKeys" && path[3] == "secret" {
-			return jsonencdec.JSONEncoderDecoder{}
-		}
-		return nil
-	}
-
-	fs, err := mapstore.NewMapFileStore(file, defaultMap, encoder,
-		mapstore.WithCreateIfNotExists(true),
-		mapstore.WithFileAutoFlush(true),
-		mapstore.WithValueEncDecGetter(valueEncDecGetter),
-	)
-	if err != nil {
-		// Clean up tmpDir before failing.
-		_ = os.RemoveAll(tmpDir)
-		t.Fatalf("NewMapFileStore: %v", err)
-	}
-
-	store = &SettingStore{
-		store:      fs,
-		encEncrypt: encoder,
-	}
-
-	cleanup = func() {
-		_ = fs.Close()
-		_ = os.RemoveAll(tmpDir)
-	}
-
-	return store, cleanup
 }
 
 func TestSettingStore_AuthKeyLifecycleAndSettings(t *testing.T) {
@@ -618,4 +571,51 @@ func TestGetSettings_Sorting(t *testing.T) {
 			t.Fatalf("GetSettings did not return sorted auth keys")
 		}
 	}
+}
+
+// integrationTestStore sets up a real mapstore.MapFileStore backed by a temp file.
+// Returns the SettingStore (with store and encEncrypt populated) and a cleanup func.
+func integrationTestStore(t *testing.T, defaultMap map[string]any) (store *SettingStore, cleanup func()) {
+	t.Helper()
+	tmpDir := t.TempDir()
+
+	file := filepath.Join(tmpDir, "settings.json")
+	encoder := jsonencdec.JSONEncoderDecoder{}
+
+	// Value encoder/decoder getter: use JSON encoding for secret values only.
+	valueEncDecGetter := func(path []string) mapstore.IOEncoderDecoder {
+		if len(path) == 4 && path[0] == "authKeys" && path[3] == "secret" {
+			return jsonencdec.JSONEncoderDecoder{}
+		}
+		return nil
+	}
+
+	fs, err := mapstore.NewMapFileStore(file, defaultMap, encoder,
+		mapstore.WithCreateIfNotExists(true),
+		mapstore.WithFileAutoFlush(true),
+		mapstore.WithValueEncDecGetter(valueEncDecGetter),
+	)
+	if err != nil {
+		// Clean up tmpDir before failing.
+		_ = os.RemoveAll(tmpDir)
+		t.Fatalf("NewMapFileStore: %v", err)
+	}
+
+	store = &SettingStore{
+		store:      fs,
+		encEncrypt: encoder,
+	}
+
+	cleanup = func() {
+		_ = fs.Close()
+		_ = os.RemoveAll(tmpDir)
+	}
+
+	return store, cleanup
+}
+
+// Helper to compute SHA256 hex (same as computeSHA in production code).
+func expectedSHA(in string) string {
+	sum := sha256.Sum256([]byte(in))
+	return hex.EncodeToString(sum[:])
 }

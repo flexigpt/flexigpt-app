@@ -98,6 +98,7 @@ export default defineConfig(
 			'@typescript-eslint/consistent-type-imports': 'error',
 			'@typescript-eslint/no-explicit-any': 'off',
 			'@typescript-eslint/no-unsafe-assignment': 'off',
+			'@typescript-eslint/no-unnecessary-type-assertion': 'off',
 			'@typescript-eslint/no-unsafe-call': 'off',
 			'@typescript-eslint/no-unsafe-argument': 'off',
 			'@typescript-eslint/restrict-template-expressions': 'off',

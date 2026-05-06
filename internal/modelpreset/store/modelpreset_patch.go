@@ -97,19 +97,15 @@ func (s *ModelPresetStore) PatchModelPreset(
 	return &spec.PatchModelPresetResponse{}, nil
 }
 
-func hasModelPresetPatchValue(p spec.ModelPresetPatch) bool {
-	return p.Stream != nil ||
-		p.MaxPromptLength != nil ||
-		p.MaxOutputLength != nil ||
-		p.Temperature != nil ||
-		p.Reasoning != nil ||
-		p.SystemPrompt != nil ||
-		p.Timeout != nil ||
-		p.CacheControl != nil ||
-		p.OutputParam != nil ||
-		p.StopSequences != nil ||
-		p.AdditionalParametersRawJSON != nil ||
-		p.CapabilitiesOverride != nil
+func validateModelPresetPatchRequestBody(body *spec.PatchModelPresetRequestBody) error {
+	if body == nil {
+		return errors.New("body is required")
+	}
+	if !hasAnyModelPresetPatchMutation(body) {
+		return errors.New("at least one model preset field must be supplied")
+	}
+
+	return nil
 }
 
 func hasAnyModelPresetPatchMutation(body *spec.PatchModelPresetRequestBody) bool {
@@ -133,15 +129,19 @@ func hasAnyReadOnlyBuiltInModelPatch(body *spec.PatchModelPresetRequestBody) boo
 		hasModelPresetPatchValue(body.ModelPresetPatch)
 }
 
-func validateModelPresetPatchRequestBody(body *spec.PatchModelPresetRequestBody) error {
-	if body == nil {
-		return errors.New("body is required")
-	}
-	if !hasAnyModelPresetPatchMutation(body) {
-		return errors.New("at least one model preset field must be supplied")
-	}
-
-	return nil
+func hasModelPresetPatchValue(p spec.ModelPresetPatch) bool {
+	return p.Stream != nil ||
+		p.MaxPromptLength != nil ||
+		p.MaxOutputLength != nil ||
+		p.Temperature != nil ||
+		p.Reasoning != nil ||
+		p.SystemPrompt != nil ||
+		p.Timeout != nil ||
+		p.CacheControl != nil ||
+		p.OutputParam != nil ||
+		p.StopSequences != nil ||
+		p.AdditionalParametersRawJSON != nil ||
+		p.CapabilitiesOverride != nil
 }
 
 func applyModelPresetPatch(dst *spec.ModelPreset, body *spec.PatchModelPresetRequestBody) bool {

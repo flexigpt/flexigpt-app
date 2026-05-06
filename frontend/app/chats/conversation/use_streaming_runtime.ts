@@ -2,7 +2,7 @@ import { type RefObject, useCallback, useEffect, useMemo, useRef } from 'react';
 
 import type { ChatTabState } from '@/chats/tabs/tabs_model';
 
-export type StreamChannelBuffer = {
+type StreamChannelBuffer = {
 	chunks: string[];
 	flushedIdx: number;
 	display: string;

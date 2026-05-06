@@ -14,7 +14,7 @@ import { buildEffectiveSystemPrompt } from '@/prompts/lib/system_prompt_utils';
 import type { SystemPromptDraft, SystemPromptItem } from '@/prompts/lib/use_system_prompts';
 import { useSystemPrompts } from '@/prompts/lib/use_system_prompts';
 
-export interface ComposerSystemPromptPreparedSelection {
+interface ComposerSystemPromptPreparedSelection {
 	hasIncludeModelSystemPromptSelection: boolean;
 	nextIncludeModelSystemPrompt: boolean;
 	hasInstructionTemplateSelection: boolean;

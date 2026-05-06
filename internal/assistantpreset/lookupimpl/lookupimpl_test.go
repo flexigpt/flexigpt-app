@@ -15,6 +15,20 @@ import (
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 )
 
+const (
+	testMissingBundleID = "missing bundle id"
+	testNilReceiver     = "nil receiver"
+	testNilStore        = "nil store"
+
+	testErrNotConfigured = "not configured"
+	testErrIncomplete    = "incomplete"
+
+	testBundleIDA     = "bundle-a"
+	testTemplateSlugA = "tmpl-a"
+	testToolA         = "tool-a"
+	testSkillA        = "skill-a"
+)
+
 func TestNewAssistantPresetReferenceLookups(t *testing.T) {
 	got := NewAssistantPresetReferenceLookups(nil, nil, nil, nil)
 
@@ -55,16 +69,16 @@ func TestModelPresetLookupAdapter_GetModelPresetSummary_Errors(t *testing.T) {
 		wantErrContains string
 	}{
 		{
-			name:            "nil receiver",
+			name:            testNilReceiver,
 			adapter:         nil,
 			ref:             modelpresetSpec.ModelPresetRef{ProviderName: "p", ModelPresetID: "id"},
-			wantErrContains: "not configured",
+			wantErrContains: testErrNotConfigured,
 		},
 		{
-			name:            "nil store",
+			name:            testNilStore,
 			adapter:         &modelPresetLookupAdapter{},
 			ref:             modelpresetSpec.ModelPresetRef{ProviderName: "p", ModelPresetID: "id"},
-			wantErrContains: "not configured",
+			wantErrContains: testErrNotConfigured,
 		},
 		{
 			name:            "zero ref",
@@ -98,42 +112,45 @@ func TestPromptTemplateLookupAdapter_GetPromptTemplateSummary_Errors(t *testing.
 		wantErrContains string
 	}{
 		{
-			name:    "nil receiver",
+			name:    testNilReceiver,
 			adapter: nil,
 			ref: promptSpec.PromptTemplateRef{
-				BundleID:        "bundle-a",
-				TemplateSlug:    "tmpl-a",
+				BundleID:        testBundleIDA,
+				TemplateSlug:    testTemplateSlugA,
 				TemplateVersion: validVersion,
 			},
-			wantErrContains: "not configured",
+			wantErrContains: testErrNotConfigured,
 		},
 		{
-			name:    "nil store",
+			name:    testNilStore,
 			adapter: &promptTemplateLookupAdapter{},
 			ref: promptSpec.PromptTemplateRef{
-				BundleID:        "bundle-a",
-				TemplateSlug:    "tmpl-a",
+				BundleID:        testBundleIDA,
+				TemplateSlug:    testTemplateSlugA,
 				TemplateVersion: validVersion,
 			},
-			wantErrContains: "not configured",
+			wantErrContains: testErrNotConfigured,
 		},
 		{
-			name:            "missing bundle id",
-			adapter:         &promptTemplateLookupAdapter{store: &promptStore.PromptTemplateStore{}},
-			ref:             promptSpec.PromptTemplateRef{TemplateSlug: "tmpl-a", TemplateVersion: validVersion},
-			wantErrContains: "incomplete",
+			name:    testMissingBundleID,
+			adapter: &promptTemplateLookupAdapter{store: &promptStore.PromptTemplateStore{}},
+			ref: promptSpec.PromptTemplateRef{
+				TemplateSlug:    testTemplateSlugA,
+				TemplateVersion: validVersion,
+			},
+			wantErrContains: testErrIncomplete,
 		},
 		{
 			name:            "missing template slug",
 			adapter:         &promptTemplateLookupAdapter{store: &promptStore.PromptTemplateStore{}},
-			ref:             promptSpec.PromptTemplateRef{BundleID: "bundle-a", TemplateVersion: validVersion},
-			wantErrContains: "incomplete",
+			ref:             promptSpec.PromptTemplateRef{BundleID: testBundleIDA, TemplateVersion: validVersion},
+			wantErrContains: testErrIncomplete,
 		},
 		{
 			name:            "missing template version",
 			adapter:         &promptTemplateLookupAdapter{store: &promptStore.PromptTemplateStore{}},
-			ref:             promptSpec.PromptTemplateRef{BundleID: "bundle-a", TemplateSlug: "tmpl-a"},
-			wantErrContains: "incomplete",
+			ref:             promptSpec.PromptTemplateRef{BundleID: testBundleIDA, TemplateSlug: testTemplateSlugA},
+			wantErrContains: testErrIncomplete,
 		},
 	}
 
@@ -161,44 +178,44 @@ func TestToolSelectionLookupAdapter_GetToolSummaryForSelection_Errors(t *testing
 		wantErrContains string
 	}{
 		{
-			name:    "nil receiver",
+			name:    testNilReceiver,
 			adapter: nil,
 			selection: toolSpec.ToolSelection{
-				ToolRef: toolSpec.ToolRef{BundleID: "bundle-a", ToolSlug: "tool-a", ToolVersion: validVersion},
+				ToolRef: toolSpec.ToolRef{BundleID: testBundleIDA, ToolSlug: testToolA, ToolVersion: validVersion},
 			},
-			wantErrContains: "not configured",
+			wantErrContains: testErrNotConfigured,
 		},
 		{
-			name:    "nil store",
+			name:    testNilStore,
 			adapter: &toolSelectionLookupAdapter{},
 			selection: toolSpec.ToolSelection{
-				ToolRef: toolSpec.ToolRef{BundleID: "bundle-a", ToolSlug: "tool-a", ToolVersion: validVersion},
+				ToolRef: toolSpec.ToolRef{BundleID: testBundleIDA, ToolSlug: testToolA, ToolVersion: validVersion},
 			},
-			wantErrContains: "not configured",
+			wantErrContains: testErrNotConfigured,
 		},
 		{
-			name:    "missing bundle id",
+			name:    testMissingBundleID,
 			adapter: &toolSelectionLookupAdapter{store: &toolStore.ToolStore{}},
 			selection: toolSpec.ToolSelection{
-				ToolRef: toolSpec.ToolRef{ToolSlug: "tool-a", ToolVersion: validVersion},
+				ToolRef: toolSpec.ToolRef{ToolSlug: testToolA, ToolVersion: validVersion},
 			},
-			wantErrContains: "incomplete",
+			wantErrContains: testErrIncomplete,
 		},
 		{
 			name:    "missing tool slug",
 			adapter: &toolSelectionLookupAdapter{store: &toolStore.ToolStore{}},
 			selection: toolSpec.ToolSelection{
-				ToolRef: toolSpec.ToolRef{BundleID: "bundle-a", ToolVersion: validVersion},
+				ToolRef: toolSpec.ToolRef{BundleID: testBundleIDA, ToolVersion: validVersion},
 			},
-			wantErrContains: "incomplete",
+			wantErrContains: testErrIncomplete,
 		},
 		{
 			name:    "missing tool version",
 			adapter: &toolSelectionLookupAdapter{store: &toolStore.ToolStore{}},
 			selection: toolSpec.ToolSelection{
-				ToolRef: toolSpec.ToolRef{BundleID: "bundle-a", ToolSlug: "tool-a"},
+				ToolRef: toolSpec.ToolRef{BundleID: testBundleIDA, ToolSlug: testToolA},
 			},
-			wantErrContains: "incomplete",
+			wantErrContains: testErrIncomplete,
 		},
 	}
 
@@ -225,32 +242,32 @@ func TestSkillLookupAdapter_GetSkillSummaryForSelection_Errors(t *testing.T) {
 		wantErrContains string
 	}{
 		{
-			name:    "nil receiver",
+			name:    testNilReceiver,
 			adapter: nil,
 			selection: skillSpec.SkillSelection{
-				SkillRef: skillSpec.SkillRef{BundleID: "bundle-a", SkillSlug: "skill-a"},
+				SkillRef: skillSpec.SkillRef{BundleID: testBundleIDA, SkillSlug: "skill-a"},
 			},
-			wantErrContains: "not configured",
+			wantErrContains: testErrNotConfigured,
 		},
 		{
-			name:    "nil store",
+			name:    testNilStore,
 			adapter: &skillLookupAdapter{},
 			selection: skillSpec.SkillSelection{
-				SkillRef: skillSpec.SkillRef{BundleID: "bundle-a", SkillSlug: "skill-a"},
+				SkillRef: skillSpec.SkillRef{BundleID: testBundleIDA, SkillSlug: "skill-a"},
 			},
-			wantErrContains: "not configured",
+			wantErrContains: testErrNotConfigured,
 		},
 		{
-			name:            "missing bundle id",
+			name:            testMissingBundleID,
 			adapter:         &skillLookupAdapter{store: &skillStore.SkillStore{}},
 			selection:       skillSpec.SkillSelection{SkillRef: skillSpec.SkillRef{SkillSlug: "skill-a"}},
-			wantErrContains: "incomplete",
+			wantErrContains: testErrIncomplete,
 		},
 		{
 			name:            "missing skill slug",
 			adapter:         &skillLookupAdapter{store: &skillStore.SkillStore{}},
-			selection:       skillSpec.SkillSelection{SkillRef: skillSpec.SkillRef{BundleID: "bundle-a"}},
-			wantErrContains: "incomplete",
+			selection:       skillSpec.SkillSelection{SkillRef: skillSpec.SkillRef{BundleID: testBundleIDA}},
+			wantErrContains: testErrIncomplete,
 		},
 	}
 

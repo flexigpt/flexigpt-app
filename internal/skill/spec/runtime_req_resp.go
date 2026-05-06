@@ -8,6 +8,14 @@ import (
 // JSONRawString mirrors the ToolRuntime API style; it's a raw JSON string.
 type JSONRawString = string
 
+type RuntimeSkillFilter struct {
+	Types          []string   `json:"types,omitempty"`
+	LocationPrefix string     `json:"locationPrefix,omitempty"`
+	AllowSkillRefs []SkillRef `json:"allowSkillRefs,omitempty"`
+
+	SessionID agentskillsSpec.SessionID     `json:"sessionID,omitempty"`
+	Activity  agentskillsSpec.SkillActivity `json:"activity,omitempty"`
+}
 type GetSkillsPromptRequestBody struct {
 	Filter *RuntimeSkillFilter `json:"filter,omitempty"`
 }
@@ -46,15 +54,6 @@ type CreateSkillSessionResponseBody struct {
 
 type CreateSkillSessionResponse struct {
 	Body *CreateSkillSessionResponseBody
-}
-
-type RuntimeSkillFilter struct {
-	Types          []string   `json:"types,omitempty"`
-	LocationPrefix string     `json:"locationPrefix,omitempty"`
-	AllowSkillRefs []SkillRef `json:"allowSkillRefs,omitempty"`
-
-	SessionID agentskillsSpec.SessionID     `json:"sessionID,omitempty"`
-	Activity  agentskillsSpec.SkillActivity `json:"activity,omitempty"`
 }
 
 type CloseSkillSessionRequest struct {

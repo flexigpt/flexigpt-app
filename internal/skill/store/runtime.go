@@ -369,39 +369,6 @@ func (s *SkillStore) ListRuntimeSkills(
 	}, nil
 }
 
-// resolveRuntimeDefForSkillRef resolves a store identity (SkillRef) to a runtime SkillDef.
-// If SkillID is provided, it must match the current store value (stale-ref hardening).
-func (s *SkillStore) resolveRuntimeDefForSkillRef(
-	ctx context.Context,
-	r spec.SkillRef,
-) (agentskillsSpec.SkillDef, bool) {
-	bid := strings.TrimSpace(string(r.BundleID))
-	slug := strings.TrimSpace(string(r.SkillSlug))
-	if bid == "" || slug == "" {
-		return agentskillsSpec.SkillDef{}, false
-	}
-
-	gs, err := s.GetSkill(ctx, &spec.GetSkillRequest{
-		BundleID:  bundleitemutils.BundleID(bid),
-		SkillSlug: spec.SkillSlug(slug),
-	})
-	if err != nil || gs == nil || gs.Body == nil {
-		return agentskillsSpec.SkillDef{}, false
-	}
-	sk := *gs.Body
-
-	// Stale ref hardening (optional).
-	if strings.TrimSpace(string(r.SkillID)) != "" && sk.ID != r.SkillID {
-		return agentskillsSpec.SkillDef{}, false
-	}
-
-	def, err := s.runtimeDefForStoreSkill(sk)
-	if err != nil {
-		return agentskillsSpec.SkillDef{}, false
-	}
-	return def, true
-}
-
 type resolvedAllowSkillRefs struct {
 	DefToRefs map[agentskillsSpec.SkillDef][]spec.SkillRef
 	RefToDef  map[string]agentskillsSpec.SkillDef
@@ -452,6 +419,39 @@ func (s *SkillStore) resolveAllowSkillRefs(
 
 	sortSkillDefs(out.AllowDefs)
 	return out
+}
+
+// resolveRuntimeDefForSkillRef resolves a store identity (SkillRef) to a runtime SkillDef.
+// If SkillID is provided, it must match the current store value (stale-ref hardening).
+func (s *SkillStore) resolveRuntimeDefForSkillRef(
+	ctx context.Context,
+	r spec.SkillRef,
+) (agentskillsSpec.SkillDef, bool) {
+	bid := strings.TrimSpace(string(r.BundleID))
+	slug := strings.TrimSpace(string(r.SkillSlug))
+	if bid == "" || slug == "" {
+		return agentskillsSpec.SkillDef{}, false
+	}
+
+	gs, err := s.GetSkill(ctx, &spec.GetSkillRequest{
+		BundleID:  bundleitemutils.BundleID(bid),
+		SkillSlug: spec.SkillSlug(slug),
+	})
+	if err != nil || gs == nil || gs.Body == nil {
+		return agentskillsSpec.SkillDef{}, false
+	}
+	sk := *gs.Body
+
+	// Stale ref hardening (optional).
+	if strings.TrimSpace(string(r.SkillID)) != "" && sk.ID != r.SkillID {
+		return agentskillsSpec.SkillDef{}, false
+	}
+
+	def, err := s.runtimeDefForStoreSkill(sk)
+	if err != nil {
+		return agentskillsSpec.SkillDef{}, false
+	}
+	return def, true
 }
 
 func (s *SkillStore) runtimeDefForBuiltInSkill(sk spec.Skill) (agentskillsSpec.SkillDef, error) {

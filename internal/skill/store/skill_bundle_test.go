@@ -264,7 +264,7 @@ func TestSkillStore_PatchSkill_EnableAndLocationChange_PresenceResetAndRuntimeDe
 	_, err = s.PatchSkill(t.Context(), &spec.PatchSkillRequest{
 		BundleID:  "b1",
 		SkillSlug: "patch-skill",
-		Body:      &spec.PatchSkillRequestBody{IsEnabled: boolPtr(true)},
+		Body:      &spec.PatchSkillRequestBody{IsEnabled: new(true)},
 	})
 	if err != nil {
 		t.Fatalf("PatchSkill(enable): %v", err)
@@ -276,7 +276,7 @@ func TestSkillStore_PatchSkill_EnableAndLocationChange_PresenceResetAndRuntimeDe
 	_, err = s.PatchSkill(t.Context(), &spec.PatchSkillRequest{
 		BundleID:  "b1",
 		SkillSlug: "patch-skill",
-		Body:      &spec.PatchSkillRequestBody{Location: strPtr(loc2)},
+		Body:      &spec.PatchSkillRequestBody{Location: new(loc2)},
 	})
 	if err != nil {
 		t.Fatalf("PatchSkill(location): %v", err)
@@ -342,7 +342,7 @@ func TestSkillStore_RuntimeDuplicateSafeRemoval_PatchAndDelete(t *testing.T) {
 	_, err = s.PatchSkill(t.Context(), &spec.PatchSkillRequest{
 		BundleID:  "b1",
 		SkillSlug: "dupe-1",
-		Body:      &spec.PatchSkillRequestBody{Location: strPtr(loc2)},
+		Body:      &spec.PatchSkillRequestBody{Location: new(loc2)},
 	})
 	if err != nil {
 		t.Fatalf("PatchSkill(dupe-1 location): %v", err)

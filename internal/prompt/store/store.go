@@ -1203,25 +1203,6 @@ func (s *PromptTemplateStore) kickCleanupLoop() {
 	}
 }
 
-// readAllBundles loads and decodes the meta-file.
-func (s *PromptTemplateStore) readAllBundles(forceFetch bool) (spec.AllBundles, error) {
-	raw, err := s.bundleStore.GetAll(forceFetch)
-	if err != nil {
-		return spec.AllBundles{}, err
-	}
-	var ab spec.AllBundles
-	if err := jsonencdec.MapToStructWithJSONTags(raw, &ab); err != nil {
-		return ab, err
-	}
-	return ab, nil
-}
-
-// writeAllBundles encodes and writes the strongly-typed value.
-func (s *PromptTemplateStore) writeAllBundles(ab spec.AllBundles) error {
-	mp, _ := jsonencdec.StructWithJSONTagsToMap(ab)
-	return s.bundleStore.SetAll(mp)
-}
-
 // ensureBaseBundleHydrated creates the reserved writable base bundle if missing.
 // If an older version left it disabled or soft-deleted, revive it.
 //
@@ -1298,6 +1279,25 @@ func (s *PromptTemplateStore) ensureBaseBundleHydrated() error {
 		SoftDeletedAt: nil,
 	}
 	return s.writeAllBundles(all)
+}
+
+// readAllBundles loads and decodes the meta-file.
+func (s *PromptTemplateStore) readAllBundles(forceFetch bool) (spec.AllBundles, error) {
+	raw, err := s.bundleStore.GetAll(forceFetch)
+	if err != nil {
+		return spec.AllBundles{}, err
+	}
+	var ab spec.AllBundles
+	if err := jsonencdec.MapToStructWithJSONTags(raw, &ab); err != nil {
+		return ab, err
+	}
+	return ab, nil
+}
+
+// writeAllBundles encodes and writes the strongly-typed value.
+func (s *PromptTemplateStore) writeAllBundles(ab spec.AllBundles) error {
+	mp, _ := jsonencdec.StructWithJSONTagsToMap(ab)
+	return s.bundleStore.SetAll(mp)
 }
 
 func isBasePromptBundleID(id bundleitemutils.BundleID) bool {

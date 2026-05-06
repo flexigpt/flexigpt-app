@@ -15,7 +15,7 @@ export const PREVIOUS_CONVO_SYSTEM_PROMPT_BUNDLEID = '__conversation__';
 export const DEFAULT_REASONING_TOKENS = 1024;
 
 type ModelName = string;
-export type ModelDisplayName = string;
+type ModelDisplayName = string;
 type ModelSlug = string;
 export type ModelPresetID = string;
 
@@ -24,7 +24,7 @@ export interface ModelPresetRef {
 	modelPresetID: ModelPresetID;
 }
 
-export type ProviderDisplayName = string;
+type ProviderDisplayName = string;
 
 /**
  * @public

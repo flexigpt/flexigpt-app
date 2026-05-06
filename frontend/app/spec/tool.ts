@@ -12,26 +12,17 @@ export enum ToolStoreChoiceType {
 	WebSearch = 'webSearch',
 }
 
-/**
- * @public
- */
-export interface ToolChoicePatch {
+interface ToolChoicePatch {
 	autoExecute?: boolean;
 	userArgSchemaInstance?: string;
 }
 
-/**
- * @public
- */
 export interface ToolRef {
 	bundleID: string;
 	toolSlug: string;
 	toolVersion: string;
 }
 
-/**
- * @public
- */
 export interface ToolSelection {
 	toolRef: ToolRef;
 	toolChoicePatch?: ToolChoicePatch;
@@ -59,33 +50,24 @@ export enum ToolImplType {
 	SDK = 'sdk',
 }
 
-/**
- * @public
- */
-export interface GoToolImpl {
+interface GoToolImpl {
 	/** Fully-qualified registration key, e.g. "github.com/acme/flexigpt/tools.Weather" */
 	func: string;
 }
 
-export interface SDKToolImpl {
+interface SDKToolImpl {
 	// SDKType can be ProviderSDKType.
 	sdkType: string;
 }
 
-/**
- * @public
- */
-export interface HTTPAuth {
+interface HTTPAuth {
 	type: string;
 	in?: string; // "header" | "query" (apiKey only)
 	name?: string;
 	valueTemplate: string; // may contain ${SECRET}
 }
 
-/**
- * @public
- */
-export interface HTTPRequest {
+interface HTTPRequest {
 	method?: string; // default "GET"
 	urlTemplate: string; // http(s)://… may contain ${var}
 	query?: Record<string, string>; // k:${var}
@@ -95,9 +77,6 @@ export interface HTTPRequest {
 	timeoutMS?: number; // default 10_000
 }
 
-/**
- * @public
- */
 export enum HTTPBodyOutputMode {
 	Auto = 'auto',
 	Text = 'text',
@@ -105,26 +84,17 @@ export enum HTTPBodyOutputMode {
 	Image = 'image',
 }
 
-/**
- * @public
- */
-export interface HTTPResponse {
+interface HTTPResponse {
 	successCodes?: number[]; // default: 2xx
 	errorMode?: string; // "fail"(dflt) | "empty"
 	bodyOutputMode?: HTTPBodyOutputMode;
 }
 
-/**
- * @public
- */
 export interface HTTPToolImpl {
 	request: HTTPRequest;
 	response: HTTPResponse;
 }
 
-/**
- * @public
- */
 export enum ToolOutputKind {
 	None = 'none',
 	Text = 'text',
@@ -132,35 +102,23 @@ export enum ToolOutputKind {
 	File = 'file',
 }
 
-/**
- * @public
- */
-export interface ToolOutputFile {
+interface ToolOutputFile {
 	fileName: string;
 	fileMIME: string;
 	fileData: string;
 }
 
-/**
- * @public
- */
-export interface ToolOutputImage {
+interface ToolOutputImage {
 	detail: string;
 	imageName: string;
 	imageMIME: string;
 	imageData: string;
 }
 
-/**
- * @public
- */
-export interface ToolOutputText {
+interface ToolOutputText {
 	text: string;
 }
 
-/**
- * @public
- */
 export interface ToolOutputUnion {
 	kind: ToolOutputKind;
 	textItem?: ToolOutputText;

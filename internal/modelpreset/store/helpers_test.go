@@ -19,20 +19,6 @@ import (
 
 const windowsGOOS = "windows"
 
-func isWindows() bool { return runtime.GOOS == windowsGOOS }
-
-func closeAndSleepOnWindows(t *testing.T, c interface{ Close() error }) {
-	t.Helper()
-	if c == nil {
-		return
-	}
-	_ = c.Close()
-	if isWindows() {
-		// SQLite + filesystem handle release can be slightly delayed on Windows.
-		time.Sleep(75 * time.Millisecond)
-	}
-}
-
 func decodeProviderPageToken(t *testing.T, token string) spec.ProviderPageToken {
 	t.Helper()
 
@@ -63,6 +49,18 @@ func newStoreAtDir(t *testing.T, dir string) *ModelPresetStore {
 	}
 	t.Cleanup(func() { closeAndSleepOnWindows(t, st) })
 	return st
+}
+
+func closeAndSleepOnWindows(t *testing.T, c interface{ Close() error }) {
+	t.Helper()
+	if c == nil {
+		return
+	}
+	_ = c.Close()
+	if isWindows() {
+		// SQLite + filesystem handle release can be slightly delayed on Windows.
+		time.Sleep(75 * time.Millisecond)
+	}
 }
 
 func postUserProvider(t *testing.T, st *ModelPresetStore, name inferenceSpec.ProviderName, enabled bool) {
@@ -116,6 +114,21 @@ func postUserModelPreset(
 	}
 }
 
+func getProviderByName(
+	t *testing.T,
+	st *ModelPresetStore,
+	ctx context.Context,
+	name inferenceSpec.ProviderName,
+	includeDisabled bool,
+) spec.ProviderPreset {
+	t.Helper()
+	ps := listProvidersByNames(t, st, ctx, []inferenceSpec.ProviderName{name}, includeDisabled)
+	if len(ps) != 1 {
+		t.Fatalf("expected exactly 1 provider %q, got %d", name, len(ps))
+	}
+	return ps[0]
+}
+
 func listProvidersByNames(
 	t *testing.T,
 	st *ModelPresetStore,
@@ -132,21 +145,6 @@ func listProvidersByNames(
 		t.Fatalf("ListProviderPresets(names=%v): %v", names, err)
 	}
 	return resp.Body.Providers
-}
-
-func getProviderByName(
-	t *testing.T,
-	st *ModelPresetStore,
-	ctx context.Context,
-	name inferenceSpec.ProviderName,
-	includeDisabled bool,
-) spec.ProviderPreset {
-	t.Helper()
-	ps := listProvidersByNames(t, st, ctx, []inferenceSpec.ProviderName{name}, includeDisabled)
-	if len(ps) != 1 {
-		t.Fatalf("expected exactly 1 provider %q, got %d", name, len(ps))
-	}
-	return ps[0]
 }
 
 func anyBuiltInProviderFromStore(
@@ -413,14 +411,8 @@ func PrintJSON(v any) {
 	}
 }
 
-func boolPtr(v bool) *bool { return &v }
+func providerDisplayNamePtr(v spec.ProviderDisplayName) *spec.ProviderDisplayName { return new(v) }
 
-func mpidPtr(v spec.ModelPresetID) *spec.ModelPresetID { return &v }
+func mpidPtr(v spec.ModelPresetID) *spec.ModelPresetID { return new(v) }
 
-func stringSlicePtr(v []string) *[]string { return &v }
-
-func stringPtr(v string) *string { return &v }
-
-func floatPtr(v float64) *float64 { return &v }
-
-func providerDisplayNamePtr(v spec.ProviderDisplayName) *spec.ProviderDisplayName { return &v }
+func isWindows() bool { return runtime.GOOS == windowsGOOS }

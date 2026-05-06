@@ -79,7 +79,7 @@ func TestCloneAssistantPreset(t *testing.T) {
 		ProviderName:  "provider-1",
 		ModelPresetID: "mp-1",
 	}
-	orig.StartingIncludeModelSystemPrompt = boolPtr(true)
+	orig.StartingIncludeModelSystemPrompt = new(true)
 	orig.StartingInstructionTemplateRefs = []promptSpec.PromptTemplateRef{
 		{
 			BundleID:        bundleitemutils.BundleID("bundle-a"),
@@ -144,7 +144,7 @@ func TestCloneAllAssistantPresets(t *testing.T) {
 
 	t.Run("deep copies nested maps and preset contents", func(t *testing.T) {
 		preset := newTestPreset(t, "all", true)
-		preset.StartingIncludeModelSystemPrompt = boolPtr(true)
+		preset.StartingIncludeModelSystemPrompt = new(true)
 
 		src := map[bundleitemutils.BundleID]map[bundleitemutils.ItemID]spec.AssistantPreset{
 			bundleitemutils.BundleID("bundle-a"): {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 
 	"github.com/flexigpt/inference-go"
@@ -39,12 +40,6 @@ var defaultDebugConfig = debugclient.DebugConfig{
 
 func DefaultDebugConfig() debugclient.DebugConfig {
 	return defaultDebugConfig
-}
-
-func disabledDebugConfig() debugclient.DebugConfig {
-	cfg := defaultDebugConfig
-	cfg.Disable = true
-	return cfg
 }
 
 type completionKeyCapabilityResolver struct {
@@ -541,9 +536,9 @@ func (ps *ProviderSetAPI) resolveModelParam(
 	if body.ModelParam != nil {
 		mp = body.ModelParam
 	} else {
-		for i := len(body.History) - 1; i >= 0; i-- {
-			if body.History[i].ModelParam != nil {
-				mp = body.History[i].ModelParam
+		for _, v := range slices.Backward(body.History) {
+			if v.ModelParam != nil {
+				mp = v.ModelParam
 				break
 			}
 		}
@@ -604,8 +599,8 @@ func (ps *ProviderSetAPI) buildInputs(
 	if len(msgContentItems) > 0 {
 		// Try to merge into the last user InputMessage if present.
 		merged := false
-		for i := len(currentOut) - 1; i >= 0; i-- {
-			iu := &currentOut[i]
+		for _, v := range slices.Backward(currentOut) {
+			iu := &v
 			if iu.Kind == inferenceSpec.InputKindInputMessage &&
 				iu.InputMessage != nil &&
 				iu.InputMessage.Role == inferenceSpec.RoleUser {
@@ -1010,4 +1005,10 @@ func makeStreamHandler(
 		}
 		return nil
 	}
+}
+
+func disabledDebugConfig() debugclient.DebugConfig {
+	cfg := defaultDebugConfig
+	cfg.Disable = true
+	return cfg
 }

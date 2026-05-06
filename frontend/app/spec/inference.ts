@@ -173,16 +173,10 @@ export interface InferenceUsage {
 	reasoningTokens: number;
 }
 
-/**
- * @public
- */
 export enum CacheControlKind {
 	Ephemeral = 'ephemeral',
 }
 
-/**
- * @public
- */
 export enum CacheControlTTL {
 	TTL5m = '5m',
 	TTL1h = '1h',
@@ -200,10 +194,7 @@ export enum CitationKind {
 	URL = 'urlCitation',
 }
 
-/**
- * @public
- */
-export interface CitationConfig {
+interface CitationConfig {
 	enabled: boolean;
 }
 
@@ -216,17 +207,11 @@ export interface URLCitation {
 	encryptedIndex?: string;
 }
 
-/**
- * @public
- */
-export interface Citation {
+interface Citation {
 	kind: CitationKind;
 	urlCitation?: URLCitation;
 }
 
-/**
- * @public
- */
 export enum ContentItemKind {
 	Text = 'text',
 	Image = 'image',
@@ -234,11 +219,11 @@ export enum ContentItemKind {
 	Refusal = 'refusal',
 }
 
-export interface ContentItemRefusal {
+interface ContentItemRefusal {
 	refusal: string;
 }
 
-export interface ContentItemFile {
+interface ContentItemFile {
 	id?: string;
 	fileName?: string;
 	fileMIME?: string;
@@ -254,7 +239,7 @@ export enum ImageDetail {
 	Auto = 'auto',
 }
 
-export interface ContentItemImage {
+interface ContentItemImage {
 	id?: string;
 	detail?: ImageDetail;
 	imageName?: string;
@@ -263,7 +248,7 @@ export interface ContentItemImage {
 	imageData?: string;
 }
 
-export interface ContentItemText {
+interface ContentItemText {
 	text: string;
 	citations?: Citation[];
 }
@@ -303,58 +288,44 @@ export interface ToolOutputItemUnion {
 	fileItem?: ContentItemFile;
 }
 
-/**
- * @public
- */
-export enum WebSearchToolCallKind {
+enum WebSearchToolCallKind {
 	Search = 'search',
 	OpenPage = 'openPage',
 	Find = 'find',
 }
 
-/**
- * @public
- */
-export interface WebSearchToolCallFind {
+interface WebSearchToolCallFind {
 	url: string;
 	pattern: string;
 }
-/**
- * @public
- */
-export interface WebSearchToolCallOpenPage {
+
+interface WebSearchToolCallOpenPage {
 	url: string;
 }
-/**
- * @public
- */
-export interface WebSearchToolCallSearchSource {
+
+interface WebSearchToolCallSearchSource {
 	url: string;
 }
-/**
- * @public
- */
-export interface WebSearchToolCallSearch {
+
+interface WebSearchToolCallSearch {
 	query: string;
 	sources?: WebSearchToolCallSearchSource[];
 	input?: Record<string, any>;
 }
-export interface WebSearchToolCallItemUnion {
+interface WebSearchToolCallItemUnion {
 	kind: WebSearchToolCallKind;
 	searchItem?: WebSearchToolCallSearch;
 	openPageItem?: WebSearchToolCallOpenPage;
 	findItem?: WebSearchToolCallFind;
 }
-/**
- * @public
- */
-export interface WebSearchToolChoiceItemUserLocation {
+
+interface WebSearchToolChoiceItemUserLocation {
 	city?: string;
 	country?: string;
 	region?: string;
 	timezone?: string;
 }
-export interface WebSearchToolChoiceItem {
+interface WebSearchToolChoiceItem {
 	maxUses?: number;
 	searchContextSize?: string;
 	allowedDomains?: string[];
@@ -362,15 +333,15 @@ export interface WebSearchToolChoiceItem {
 	userLocation?: WebSearchToolChoiceItemUserLocation;
 }
 
-export enum WebSearchToolOutputKind {
+enum WebSearchToolOutputKind {
 	Search = 'search',
 	Error = 'error',
 }
 
-export interface WebSearchToolOutputError {
+interface WebSearchToolOutputError {
 	code: string;
 }
-export interface WebSearchToolOutputSearch {
+interface WebSearchToolOutputSearch {
 	url: string;
 	title?: string;
 	encryptedContent?: string;
@@ -426,9 +397,6 @@ export interface ToolChoice {
 	webSearchArguments?: WebSearchToolChoiceItem;
 }
 
-/**
- * @public
- */
 export enum InputKind {
 	InputMessage = 'inputMessage',
 	OutputMessage = 'outputMessage',
@@ -472,14 +440,11 @@ export interface OutputUnion {
 	webSearchToolOutput?: ToolOutput;
 }
 
-/**
- * @public
- */
-export interface Warning {
+interface Warning {
 	code: string;
 	message: string;
 }
-export interface FetchCompletionResponse {
+interface FetchCompletionResponse {
 	outputs?: OutputUnion[];
 	usage?: InferenceUsage;
 	error?: InferenceError;
@@ -492,11 +457,7 @@ export interface CompletionResponseBody {
 	hydratedCurrentInputs?: InputUnion[];
 }
 
-/**
- * @public
- * Status for a tool-call chip in the composer/history.
- */
-export type UIToolCallStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'discarded';
+type UIToolCallStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'discarded';
 
 /**
  * UI representation of a tool call (for chips).

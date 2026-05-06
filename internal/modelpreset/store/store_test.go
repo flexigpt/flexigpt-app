@@ -355,7 +355,7 @@ func TestModelPresetStore_PatchProviderPreset_UserProvider(t *testing.T) {
 			name: "unknown_provider",
 			req: &spec.PatchProviderPresetRequest{
 				ProviderName: "ghost",
-				Body:         &spec.PatchProviderPresetRequestBody{IsEnabled: boolPtr(false)},
+				Body:         &spec.PatchProviderPresetRequestBody{IsEnabled: new(false)},
 			},
 			wantErrIs: spec.ErrProviderNotFound,
 		},
@@ -375,7 +375,7 @@ func TestModelPresetStore_PatchProviderPreset_UserProvider(t *testing.T) {
 				ProviderName: prov,
 				Body: &spec.PatchProviderPresetRequestBody{
 					DisplayName: providerDisplayNamePtr("Patched Name"),
-					Origin:      stringPtr("https://patched.example.test"),
+					Origin:      new("https://patched.example.test"),
 				},
 			},
 			verify: func(t *testing.T) {
@@ -390,7 +390,7 @@ func TestModelPresetStore_PatchProviderPreset_UserProvider(t *testing.T) {
 			name: "disable_provider",
 			req: &spec.PatchProviderPresetRequest{
 				ProviderName: prov,
-				Body:         &spec.PatchProviderPresetRequestBody{IsEnabled: boolPtr(false)},
+				Body:         &spec.PatchProviderPresetRequestBody{IsEnabled: new(false)},
 			},
 			verify: func(t *testing.T) {
 				t.Helper()
@@ -459,7 +459,7 @@ func TestModelPresetStore_PatchProviderPreset_BuiltInProvider_ToggleAndDefaultMo
 		newEnabled := !pp.IsEnabled
 		_, err := st.PatchProviderPreset(ctx, &spec.PatchProviderPresetRequest{
 			ProviderName: pn,
-			Body:         &spec.PatchProviderPresetRequestBody{IsEnabled: boolPtr(newEnabled)},
+			Body:         &spec.PatchProviderPresetRequestBody{IsEnabled: new(newEnabled)},
 		})
 		if err != nil {
 			t.Fatalf("PatchProviderPreset(builtin isEnabled): %v", err)
@@ -484,7 +484,7 @@ func TestModelPresetStore_PatchProviderPreset_BuiltInProvider_ToggleAndDefaultMo
 		_, err := st.PatchProviderPreset(ctx, &spec.PatchProviderPresetRequest{
 			ProviderName: pn2,
 			Body: &spec.PatchProviderPresetRequestBody{
-				DefaultModelPresetID: mpidPtr(newID),
+				DefaultModelPresetID: new(newID),
 			},
 		})
 		if err != nil {
@@ -668,7 +668,7 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 						IsEnabled:   true,
 						ModelPresetPatch: spec.ModelPresetPatch{
 							Temperature: &temp,
-							StopSequences: stringSlicePtr([]string{
+							StopSequences: new([]string{
 								"a", "b", "c", "d", "e",
 							}),
 						},
@@ -777,7 +777,7 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 				ModelPresetPatch: spec.ModelPresetPatch{
 					Temperature:                 &temp2,
 					SystemPrompt:                &sysPrompt,
-					StopSequences:               stringSlicePtr([]string{"END"}),
+					StopSequences:               new([]string{"END"}),
 					AdditionalParametersRawJSON: &rawJSON,
 				},
 			},
@@ -796,10 +796,10 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 			Body: &spec.PatchModelPresetRequestBody{
 				ModelPresetPatch: spec.ModelPresetPatch{
 					Reasoning:                   &reasoning,
-					Temperature:                 floatPtr(0),
-					SystemPrompt:                stringPtr(""),
-					AdditionalParametersRawJSON: stringPtr(""),
-					StopSequences:               stringSlicePtr([]string{}),
+					Temperature:                 new(0.0),
+					SystemPrompt:                new(""),
+					AdditionalParametersRawJSON: new(""),
+					StopSequences:               new([]string{}),
 				},
 			},
 		})
@@ -837,7 +837,7 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 		_, err := st.PatchModelPreset(ctx, &spec.PatchModelPresetRequest{
 			ProviderName:  "ghost",
 			ModelPresetID: "m3",
-			Body:          &spec.PatchModelPresetRequestBody{IsEnabled: boolPtr(false)},
+			Body:          &spec.PatchModelPresetRequestBody{IsEnabled: new(false)},
 		})
 		wantErrIs(t, err, spec.ErrProviderNotFound)
 
@@ -845,7 +845,7 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 		_, err = st.PatchModelPreset(ctx, &spec.PatchModelPresetRequest{
 			ProviderName:  userProv,
 			ModelPresetID: "ghost",
-			Body:          &spec.PatchModelPresetRequestBody{IsEnabled: boolPtr(false)},
+			Body:          &spec.PatchModelPresetRequestBody{IsEnabled: new(false)},
 		})
 		wantErrIs(t, err, spec.ErrModelPresetNotFound)
 
@@ -853,7 +853,7 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 		_, err = st.PatchModelPreset(ctx, &spec.PatchModelPresetRequest{
 			ProviderName:  userProv,
 			ModelPresetID: "m3",
-			Body:          &spec.PatchModelPresetRequestBody{IsEnabled: boolPtr(false)},
+			Body:          &spec.PatchModelPresetRequestBody{IsEnabled: new(false)},
 		})
 		if err != nil {
 			t.Fatalf("PatchModelPreset: %v", err)
@@ -903,7 +903,7 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 				IsEnabled:   true,
 				ModelPresetPatch: spec.ModelPresetPatch{
 					Temperature:   &temp,
-					StopSequences: stringSlicePtr([]string{"END"}),
+					StopSequences: new([]string{"END"}),
 				},
 			},
 		})
@@ -916,7 +916,7 @@ func TestModelPresetStore_ModelPreset_UserCRUD(t *testing.T) {
 			ModelPresetID: "m5",
 			Body: &spec.PatchModelPresetRequestBody{
 				ModelPresetPatch: spec.ModelPresetPatch{
-					StopSequences: stringSlicePtr([]string{}),
+					StopSequences: new([]string{}),
 				},
 			},
 		})
@@ -946,7 +946,7 @@ func TestModelPresetStore_ModelPreset_BuiltInToggle_ViaPatchModelPreset(t *testi
 	_, err := st.PatchModelPreset(ctx, &spec.PatchModelPresetRequest{
 		ProviderName:  pn,
 		ModelPresetID: mid,
-		Body:          &spec.PatchModelPresetRequestBody{IsEnabled: boolPtr(!(mp.IsEnabled))},
+		Body:          &spec.PatchModelPresetRequestBody{IsEnabled: new(!(mp.IsEnabled))},
 	})
 	if err != nil {
 		t.Fatalf("PatchModelPreset(builtin): %v", err)
@@ -1176,7 +1176,7 @@ func TestModelPresetStore_PatchProviderPreset_User_BothFields_NoOp_AtomicOnError
 				return &spec.PatchProviderPresetRequest{
 					ProviderName: out.prov,
 					Body: &spec.PatchProviderPresetRequestBody{
-						IsEnabled:            boolPtr(false),
+						IsEnabled:            new(false),
 						DefaultModelPresetID: mpidPtr("m2"),
 					},
 				}
@@ -1198,7 +1198,7 @@ func TestModelPresetStore_PatchProviderPreset_User_BothFields_NoOp_AtomicOnError
 				return &spec.PatchProviderPresetRequest{
 					ProviderName: out.prov,
 					Body: &spec.PatchProviderPresetRequestBody{
-						IsEnabled:            boolPtr(true),
+						IsEnabled:            new(true),
 						DefaultModelPresetID: mpidPtr("m1"),
 					},
 				}
@@ -1220,7 +1220,7 @@ func TestModelPresetStore_PatchProviderPreset_User_BothFields_NoOp_AtomicOnError
 				return &spec.PatchProviderPresetRequest{
 					ProviderName: out.prov,
 					Body: &spec.PatchProviderPresetRequestBody{
-						IsEnabled:            boolPtr(false),
+						IsEnabled:            new(false),
 						DefaultModelPresetID: mpidPtr("missing"),
 					},
 				}
@@ -1307,8 +1307,8 @@ func TestModelPresetStore_PatchProviderPreset_BuiltIn_BothFieldsAndErrors(t *tes
 			req: &spec.PatchProviderPresetRequest{
 				ProviderName: pn2,
 				Body: &spec.PatchProviderPresetRequestBody{
-					IsEnabled:            boolPtr(!pp2.IsEnabled),
-					DefaultModelPresetID: mpidPtr(alt),
+					IsEnabled:            new(!pp2.IsEnabled),
+					DefaultModelPresetID: new(alt),
 				},
 			},
 			verify: func(t *testing.T) {
@@ -1375,7 +1375,7 @@ func TestModelPresetStore_PatchModelPreset_AdditionalErrors(t *testing.T) {
 			req: &spec.PatchModelPresetRequest{
 				ProviderName:  "",
 				ModelPresetID: "m",
-				Body:          &spec.PatchModelPresetRequestBody{IsEnabled: boolPtr(false)},
+				Body:          &spec.PatchModelPresetRequestBody{IsEnabled: new(false)},
 			},
 			wantErrIs: spec.ErrInvalidDir,
 		},
@@ -1384,7 +1384,7 @@ func TestModelPresetStore_PatchModelPreset_AdditionalErrors(t *testing.T) {
 			req: &spec.PatchModelPresetRequest{
 				ProviderName:  "p",
 				ModelPresetID: "",
-				Body:          &spec.PatchModelPresetRequestBody{IsEnabled: boolPtr(false)},
+				Body:          &spec.PatchModelPresetRequestBody{IsEnabled: new(false)},
 			},
 			wantErrIs: spec.ErrInvalidDir,
 		},
@@ -1393,7 +1393,7 @@ func TestModelPresetStore_PatchModelPreset_AdditionalErrors(t *testing.T) {
 			req: &spec.PatchModelPresetRequest{
 				ProviderName:  bpn,
 				ModelPresetID: "ghost",
-				Body:          &spec.PatchModelPresetRequestBody{IsEnabled: boolPtr(false)},
+				Body:          &spec.PatchModelPresetRequestBody{IsEnabled: new(false)},
 			},
 			wantErrIs: spec.ErrModelPresetNotFound,
 		},
@@ -1598,7 +1598,7 @@ func TestModelPresetStore_PostModelPreset_AdditionalValidation(t *testing.T) {
 			name: "stop_sequence_empty_string",
 			req: func() *spec.PostModelPresetRequest {
 				r := baseReq()
-				r.Body.StopSequences = stringSlicePtr([]string{""})
+				r.Body.StopSequences = new([]string{""})
 				return r
 			},
 			wantErrText: "stopSequences[0] is empty",
@@ -1705,7 +1705,7 @@ func TestModelPresetStore_UserData_PersistsAcrossReopen(t *testing.T) {
 	_, err := st.PatchModelPreset(ctx, &spec.PatchModelPresetRequest{
 		ProviderName:  prov,
 		ModelPresetID: "m1",
-		Body:          &spec.PatchModelPresetRequestBody{IsEnabled: boolPtr(false)},
+		Body:          &spec.PatchModelPresetRequestBody{IsEnabled: new(false)},
 	})
 	if err != nil {
 		t.Fatalf("PatchModelPreset: %v", err)
@@ -1752,7 +1752,7 @@ func TestModelPresetStore_BuiltinOverlay_PersistsAcrossReopen(t *testing.T) {
 	_, err := st.PatchModelPreset(ctx, &spec.PatchModelPresetRequest{
 		ProviderName:  pn,
 		ModelPresetID: mid,
-		Body:          &spec.PatchModelPresetRequestBody{IsEnabled: boolPtr(!mp.IsEnabled)},
+		Body:          &spec.PatchModelPresetRequestBody{IsEnabled: new(!mp.IsEnabled)},
 	})
 	if err != nil {
 		t.Fatalf("PatchModelPreset(builtin): %v", err)

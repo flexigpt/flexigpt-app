@@ -20,6 +20,23 @@ const (
 	runtimeRollbackBackoff  = 150 * time.Millisecond
 )
 
+type runtimeDesiredViewOpts struct {
+	WantByTypeName bool
+	LogInvalid     bool
+}
+
+type runtimeDesiredView struct {
+	// Set is the desired unique SkillDefs (deduped).
+	Set map[agentskillsSpec.SkillDef]struct{}
+
+	// ByTypeName groups desired SkillDefs by (type,name) for replacement-safety rules.
+	// Optional (only built when requested).
+	ByTypeName map[string][]agentskillsSpec.SkillDef
+
+	// Counts tracks how many enabled skills resolve to the same SkillDef (duplicate-safe removals).
+	Counts map[agentskillsSpec.SkillDef]int
+}
+
 type userWriteSagaOutcome struct {
 	// RollbackReason/RollbackErr trigger a strict rollback *when returning an error*,
 	// for cases where runtime may have been mutated before the error.
@@ -361,23 +378,6 @@ func (s *SkillStore) runtimeResyncFromStore(ctx context.Context) error {
 	s.rtResyncMu.Lock()
 	defer s.rtResyncMu.Unlock()
 	return s.runtimeApplyDesired(ctx, view.Set, view.ByTypeName, runtimeApplyBestEffort)
-}
-
-type runtimeDesiredView struct {
-	// Set is the desired unique SkillDefs (deduped).
-	Set map[agentskillsSpec.SkillDef]struct{}
-
-	// ByTypeName groups desired SkillDefs by (type,name) for replacement-safety rules.
-	// Optional (only built when requested).
-	ByTypeName map[string][]agentskillsSpec.SkillDef
-
-	// Counts tracks how many enabled skills resolve to the same SkillDef (duplicate-safe removals).
-	Counts map[agentskillsSpec.SkillDef]int
-}
-
-type runtimeDesiredViewOpts struct {
-	WantByTypeName bool
-	LogInvalid     bool
 }
 
 func (s *SkillStore) runtimeDesiredViewFromStore(

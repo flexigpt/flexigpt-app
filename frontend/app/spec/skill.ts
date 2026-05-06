@@ -27,7 +27,7 @@ export interface RuntimeSkillFilter {
 	activity?: string;
 }
 
-export type SkillSessionID = string;
+type SkillSessionID = string;
 
 export interface SkillSession {
 	sessionID: SkillSessionID;

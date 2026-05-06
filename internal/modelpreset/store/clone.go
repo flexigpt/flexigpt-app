@@ -15,12 +15,14 @@ func cloneProviderPresetForInference(pp spec.ProviderPreset) spec.ProviderPreset
 	return out
 }
 
-func cloneProviderPreset(pp spec.ProviderPreset) spec.ProviderPreset {
-	out := pp
-	out.DefaultHeaders = maps.Clone(pp.DefaultHeaders)
-	out.ModelPresets = cloneModelPresetMap(pp.ModelPresets)
-	out.CapabilitiesOverride = cloneModelCapabilitiesOverride(pp.CapabilitiesOverride)
-	return out
+func cloneModelPresetNestedMap(
+	src map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset,
+) map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset {
+	dst := make(map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset, len(src))
+	for k, v := range src {
+		dst[k] = cloneModelPresetMap(v)
+	}
+	return dst
 }
 
 func cloneProviderPresetMap(
@@ -33,22 +35,20 @@ func cloneProviderPresetMap(
 	return dst
 }
 
+func cloneProviderPreset(pp spec.ProviderPreset) spec.ProviderPreset {
+	out := pp
+	out.DefaultHeaders = maps.Clone(pp.DefaultHeaders)
+	out.ModelPresets = cloneModelPresetMap(pp.ModelPresets)
+	out.CapabilitiesOverride = cloneModelCapabilitiesOverride(pp.CapabilitiesOverride)
+	return out
+}
+
 func cloneModelPresetMap(
 	src map[spec.ModelPresetID]spec.ModelPreset,
 ) map[spec.ModelPresetID]spec.ModelPreset {
 	dst := make(map[spec.ModelPresetID]spec.ModelPreset, len(src))
 	for k, v := range src {
 		dst[k] = cloneModelPreset(v)
-	}
-	return dst
-}
-
-func cloneModelPresetNestedMap(
-	src map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset,
-) map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset {
-	dst := make(map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset, len(src))
-	for k, v := range src {
-		dst[k] = cloneModelPresetMap(v)
 	}
 	return dst
 }

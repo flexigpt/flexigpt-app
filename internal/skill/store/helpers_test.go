@@ -255,8 +255,3 @@ func mustContain(t *testing.T, s, sub string) {
 		t.Fatalf("expected output to contain %q; got:\n%s", sub, s)
 	}
 }
-
-func boolPtr(v bool) *bool { return &v }
-func strPtr(v string) *string {
-	return &v
-}

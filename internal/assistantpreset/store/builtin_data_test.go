@@ -62,7 +62,7 @@ func TestBuiltInData_ListBuiltInData_DeepCopyAndGetters(t *testing.T) {
 		ProviderName:  "provider-a",
 		ModelPresetID: "mp-a",
 	}
-	preset.StartingIncludeModelSystemPrompt = boolPtr(true)
+	preset.StartingIncludeModelSystemPrompt = new(true)
 	preset.StartingInstructionTemplateRefs = []promptSpec.PromptTemplateRef{
 		{
 			BundleID:        bundleitemutils.BundleID("bundle-a"),

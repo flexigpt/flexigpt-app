@@ -9,7 +9,7 @@ interface ShortcutChord {
 	shift?: boolean;
 }
 
-export enum ShortcutAction {
+enum ShortcutAction {
 	// App / chat-level
 	newChat = 'newChat',
 	closeChat = 'closeChat',

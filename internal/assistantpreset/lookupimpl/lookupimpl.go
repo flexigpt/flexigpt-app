@@ -17,28 +17,6 @@ import (
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 )
 
-func NewAssistantPresetReferenceLookups(
-	modelPresetSt *modelpresetStore.ModelPresetStore,
-	promptTemplateSt *promptStore.PromptTemplateStore,
-	toolSt *toolStore.ToolStore,
-	skillSt *skillStore.SkillStore,
-) assistantpresetStore.ReferenceLookups {
-	return assistantpresetStore.ReferenceLookups{
-		ModelPresets: &modelPresetLookupAdapter{
-			store: modelPresetSt,
-		},
-		PromptTemplates: &promptTemplateLookupAdapter{
-			store: promptTemplateSt,
-		},
-		ToolSelections: &toolSelectionLookupAdapter{
-			store: toolSt,
-		},
-		Skills: &skillLookupAdapter{
-			store: skillSt,
-		},
-	}
-}
-
 type modelPresetLookupAdapter struct {
 	store *modelpresetStore.ModelPresetStore
 }
@@ -256,4 +234,26 @@ func getSkillBundleEnabled(
 		return false, skillSpec.ErrSkillBundleNotFound
 	}
 	return resp.Body.SkillBundles[0].IsEnabled, nil
+}
+
+func NewAssistantPresetReferenceLookups(
+	modelPresetSt *modelpresetStore.ModelPresetStore,
+	promptTemplateSt *promptStore.PromptTemplateStore,
+	toolSt *toolStore.ToolStore,
+	skillSt *skillStore.SkillStore,
+) assistantpresetStore.ReferenceLookups {
+	return assistantpresetStore.ReferenceLookups{
+		ModelPresets: &modelPresetLookupAdapter{
+			store: modelPresetSt,
+		},
+		PromptTemplates: &promptTemplateLookupAdapter{
+			store: promptTemplateSt,
+		},
+		ToolSelections: &toolSelectionLookupAdapter{
+			store: toolSt,
+		},
+		Skills: &skillLookupAdapter{
+			store: skillSt,
+		},
+	}
 }

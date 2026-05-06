@@ -56,7 +56,7 @@ export type ModelPatchFormData = {
 	outputJSONSchemaStrictMode: TriStateBoolean;
 };
 
-export type ToolSelectionFormItem = {
+type ToolSelectionFormItem = {
 	toolRef: ToolRef;
 	autoExecuteMode: TriStateBoolean;
 	userArgSchemaInstance: string;

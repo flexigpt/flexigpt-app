@@ -30,7 +30,7 @@ export interface AssistantPresetOptionItem {
 	availabilityReason?: string;
 }
 
-export interface AssistantPresetPreparedRuntimeSelections {
+interface AssistantPresetPreparedRuntimeSelections {
 	hasToolsSelection: boolean;
 	conversationToolChoices: ToolStoreChoice[];
 	webSearchChoices: ToolStoreChoice[];
@@ -39,7 +39,7 @@ export interface AssistantPresetPreparedRuntimeSelections {
 	activeSkillRefs: SkillRef[];
 }
 
-export interface AssistantPresetComparisonState {
+interface AssistantPresetComparisonState {
 	model?: Record<string, unknown>;
 	instructions?: string[];
 	tools?: {

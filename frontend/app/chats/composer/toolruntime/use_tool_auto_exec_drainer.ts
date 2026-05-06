@@ -4,7 +4,7 @@ import type { UIToolCall } from '@/spec/inference';
 
 import { getNextPendingAutoExecutableToolCall } from '@/chats/composer/toolruntime/tool_runtime_utils';
 
-export type AutoExecPhase = 'idle' | 'blocked' | 'running';
+type AutoExecPhase = 'idle' | 'blocked' | 'running';
 
 export interface AutoExecState {
 	phase: AutoExecPhase;
