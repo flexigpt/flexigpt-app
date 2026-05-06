@@ -34,7 +34,7 @@
 		"@platejs/floating": "^52.3.10",
 		"@platejs/indent": "^52.3.10",
 		"@platejs/list": "^52.3.10",
-		"@platejs/tabbable": "^52.3.10",
+		"@platejs/tabbable": "^53.0.0",
 		"@react-router/node": "^7.15.0",
 		"@udecode/cn": "^52.3.4",
 		"class-variance-authority": "^0.7.1",
