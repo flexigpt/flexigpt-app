@@ -33,7 +33,7 @@
 		"@platejs/basic-styles": "^52.3.10",
 		"@platejs/floating": "^52.3.10",
 		"@platejs/indent": "^52.3.10",
-		"@platejs/list": "^52.3.10",
+		"@platejs/list": "^53.0.2",
 		"@platejs/tabbable": "^52.3.10",
 		"@react-router/node": "^7.15.0",
 		"@udecode/cn": "^52.3.4",
