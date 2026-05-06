@@ -24,14 +24,19 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/tool/storehelper"
 )
 
+const (
+	builtInToolBundleGroupID = "bundles"
+	builtInToolGroupID       = "tools"
+)
+
 type builtInToolBundleID bundleitemutils.BundleID
 
-func (builtInToolBundleID) Group() overlay.GroupID { return "bundles" }
+func (builtInToolBundleID) Group() overlay.GroupID { return builtInToolBundleGroupID }
 func (b builtInToolBundleID) ID() overlay.KeyID    { return overlay.KeyID(b) }
 
 type builtInToolID bundleitemutils.ItemID
 
-func (builtInToolID) Group() overlay.GroupID { return "tools" }
+func (builtInToolID) Group() overlay.GroupID { return builtInToolGroupID }
 func (t builtInToolID) ID() overlay.KeyID    { return overlay.KeyID(t) }
 
 type BuiltInToolData struct {

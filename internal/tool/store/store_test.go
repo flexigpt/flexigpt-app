@@ -13,6 +13,65 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
+const (
+	testBundleGroup = "bundles"
+
+	testRequiredMsg = "required"
+	testInvalidMsg  = "invalid"
+
+	testBundleID1 = "b1"
+	testBundleID2 = "b2"
+	testBundleID3 = "b3"
+	testBundleID4 = "b4"
+	testBundleID5 = "b5"
+	testBundleID6 = "b6"
+	testBundleIDX = "x"
+
+	testUserBundleID1 = "ub1"
+	testUserBundleID2 = "ub2"
+
+	testShortSlug = "s"
+
+	testBundleSlug         = "slug"
+	testBundleSlug1        = "slug1"
+	testBundleSlugDisabled = "disabled"
+
+	testBundleDisplay        = "Bundle"
+	testBundleDisplay1       = "Bundle1"
+	testBundleDisplay2       = "Bundle2"
+	testUserBundleDisplay    = "UserBundle"
+	testIllegalUpdateDisplay = "illegal update"
+
+	testToolSlug           = "tool"
+	testToolSlugConcurrent = "concurrent"
+	testToolSlugT1         = "t1"
+	testToolSlugT2         = "t2"
+
+	testVersion1   = "v1"
+	testVersion2   = "v2"
+	testVersion3   = "v3"
+	testVersionNew = "v-new"
+
+	testDisplay      = "display"
+	testDisplayShort = "d"
+	testDisplayDup   = "dup"
+
+	testTag1 = "tag1"
+	testTag2 = "tag2"
+
+	testABC               = "abc"
+	testABCDef            = "abc-def"
+	testBadSlugDot        = "bad.slug"
+	testBadSlugSpace      = "bad slug"
+	testBadVersionSpace   = "v 1"
+	testArgSchema         = `{}`
+	testBundleDescription = "test bundle"
+	testToolDescription   = "test tool"
+	testHTTPMethod        = "GET"
+	testURLTemplate       = "https://example.com"
+	testErrorModeFail     = "fail"
+)
+
 func TestToolBundleCRUD(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -23,13 +82,13 @@ func TestToolBundleCRUD(t *testing.T) {
 		wantError bool
 		expectMsg string
 	}{
-		{"Valid", "b1", "slug", "Bundle", true, false, ""},
-		{"Disabled", "b2", "disabled", "Bundle", false, false, ""},
-		{"MissingID", "", "s", "d", true, true, "required"},
-		{"MissingSlug", "b3", "", "d", true, true, "required"},
-		{"MissingDisplay", "b4", "s", "", true, true, "required"},
-		{"BadSlugDot", "b5", "bad.slug", "d", true, true, "invalid"},
-		{"BadSlugSpace", "b6", "bad slug", "d", true, true, "invalid"},
+		{"Valid", testBundleID1, testBundleSlug, testBundleDisplay, true, false, ""},
+		{"Disabled", testBundleID2, testBundleSlugDisabled, testBundleDisplay, false, false, ""},
+		{"MissingID", "", testShortSlug, testDisplayShort, true, true, testRequiredMsg},
+		{"MissingSlug", testBundleID3, "", testDisplayShort, true, true, testRequiredMsg},
+		{"MissingDisplay", testBundleID4, testShortSlug, "", true, true, testRequiredMsg},
+		{"BadSlugDot", testBundleID5, testBadSlugDot, testDisplayShort, true, true, testInvalidMsg},
+		{"BadSlugSpace", testBundleID6, testBadSlugSpace, testDisplayShort, true, true, testInvalidMsg},
 	}
 
 	for _, tc := range cases {
@@ -72,8 +131,8 @@ func TestToolBuiltInBundleGuards(t *testing.T) {
 	_, err := s.PutToolBundle(t.Context(), &spec.PutToolBundleRequest{
 		BundleID: bid,
 		Body: &spec.PutToolBundleRequestBody{
-			Slug:        bundleitemutils.BundleSlug((string(slug))),
-			DisplayName: "illegal update",
+			Slug:        bundleitemutils.BundleSlug(string(slug)),
+			DisplayName: testIllegalUpdateDisplay,
 			IsEnabled:   true,
 		},
 	})
@@ -103,7 +162,7 @@ func TestToolCRUD(t *testing.T) {
 	s, clean := newTestToolStore(t)
 	defer clean()
 
-	mustPutToolBundle(t, s, "b1", "slug1", "Bundle", true)
+	mustPutToolBundle(t, s, testBundleID1, testBundleSlug1, testBundleDisplay, true)
 
 	cases := []struct {
 		name      string
@@ -114,13 +173,13 @@ func TestToolCRUD(t *testing.T) {
 		wantError bool
 		msg       string
 	}{
-		{"Valid", "b1", "tool", "v1", "display", false, ""},
-		{"MissingID", "", "s", "v1", "d", true, "required"},
-		{"MissingSlug", "b1", "", "v1", "d", true, "required"},
-		{"MissingVer", "b1", "s", "", "d", true, "required"},
-		{"BadSlug", "b1", "a.b", "v1", "d", true, "invalid"},
-		{"BadVer", "b1", "s", "v&1", "d", true, "invalid"},
-		{"UnknownBundle", "x", "s", "v1", "d", true, "not found"},
+		{"Valid", testBundleID1, testToolSlug, testVersion1, testDisplay, false, ""},
+		{"MissingID", "", testShortSlug, testVersion1, testDisplayShort, true, testRequiredMsg},
+		{"MissingSlug", testBundleID1, "", testVersion1, testDisplayShort, true, testRequiredMsg},
+		{"MissingVer", testBundleID1, testShortSlug, "", testDisplayShort, true, testRequiredMsg},
+		{"BadSlug", testBundleID1, testBadSlugDot, testVersion1, testDisplayShort, true, testInvalidMsg},
+		{"BadVer", testBundleID1, testShortSlug, testBadVersionSpace, testDisplayShort, true, testInvalidMsg},
+		{"UnknownBundle", testBundleIDX, testShortSlug, testVersion1, testDisplayShort, true, "not found"},
 	}
 
 	for _, tc := range cases {
@@ -135,7 +194,7 @@ func TestToolCRUD(t *testing.T) {
 					UserCallable: true,
 					LLMCallable:  true,
 
-					ArgSchema: `{}`,
+					ArgSchema: testArgSchema,
 
 					Type:     spec.ToolTypeHTTP,
 					HTTPImpl: dummyHTTPTool(),
@@ -159,18 +218,18 @@ func TestToolVersionConflict(t *testing.T) {
 	s, clean := newTestToolStore(t)
 	defer clean()
 
-	mustPutToolBundle(t, s, "b1", "slug", "Bundle", true)
-	mustPutTool(t, s, "b1", "tool", "v1", "d", true)
+	mustPutToolBundle(t, s, testBundleID1, testBundleSlug, testBundleDisplay, true)
+	mustPutTool(t, s, testBundleID1, testToolSlug, testVersion1, testDisplayShort, true)
 
 	_, err := s.PutTool(t.Context(), &spec.PutToolRequest{
-		BundleID: "b1", ToolSlug: "tool", Version: "v1",
+		BundleID: testBundleID1, ToolSlug: testToolSlug, Version: testVersion1,
 		Body: &spec.PutToolRequestBody{
-			DisplayName:  "dup",
+			DisplayName:  testDisplayDup,
 			IsEnabled:    true,
 			UserCallable: true,
 			LLMCallable:  true,
 
-			ArgSchema: `{}`,
+			ArgSchema: testArgSchema,
 
 			Type:     spec.ToolTypeHTTP,
 			HTTPImpl: dummyHTTPTool(),
@@ -185,17 +244,17 @@ func TestToolDisabledBundleGuard(t *testing.T) {
 	s, clean := newTestToolStore(t)
 	defer clean()
 
-	mustPutToolBundle(t, s, "b1", "slug", "Bundle", false)
+	mustPutToolBundle(t, s, testBundleID1, testBundleSlug, testBundleDisplay, false)
 
 	_, err := s.PutTool(t.Context(), &spec.PutToolRequest{
-		BundleID: "b1", ToolSlug: "tool", Version: "v1",
+		BundleID: testBundleID1, ToolSlug: testToolSlug, Version: testVersion1,
 		Body: &spec.PutToolRequestBody{
-			DisplayName:  "d",
+			DisplayName:  testDisplayShort,
 			IsEnabled:    true,
 			UserCallable: true,
 			LLMCallable:  true,
 
-			ArgSchema: `{}`,
+			ArgSchema: testArgSchema,
 
 			Type:     spec.ToolTypeHTTP,
 			HTTPImpl: dummyHTTPTool(),
@@ -210,17 +269,17 @@ func TestToolMultiVersionExact(t *testing.T) {
 	s, clean := newTestToolStore(t)
 	defer clean()
 
-	mustPutToolBundle(t, s, "b1", "slug", "Bundle", true)
+	mustPutToolBundle(t, s, testBundleID1, testBundleSlug, testBundleDisplay, true)
 
-	vers := []string{"v1", "v2", "v3"}
+	vers := []string{testVersion1, testVersion2, testVersion3}
 	for _, v := range vers {
-		mustPutTool(t, s, "b1", "tool", bundleitemutils.ItemVersion(v), "disp "+v, true)
+		mustPutTool(t, s, testBundleID1, testToolSlug, bundleitemutils.ItemVersion(v), "disp "+v, true)
 		time.Sleep(5 * time.Millisecond)
 	}
 
 	for _, v := range vers {
 		resp, err := s.GetTool(t.Context(), &spec.GetToolRequest{
-			BundleID: "b1", ToolSlug: "tool", Version: bundleitemutils.ItemVersion(v),
+			BundleID: testBundleID1, ToolSlug: testToolSlug, Version: bundleitemutils.ItemVersion(v),
 		})
 		if err != nil {
 			t.Fatalf("GetTool(%s) failed: %v", v, err)
@@ -232,7 +291,7 @@ func TestToolMultiVersionExact(t *testing.T) {
 
 	// Omitted version must fail.
 	_, err := s.GetTool(t.Context(), &spec.GetToolRequest{
-		BundleID: "b1", ToolSlug: "tool", Version: "",
+		BundleID: testBundleID1, ToolSlug: testToolSlug, Version: "",
 	})
 	if !errors.Is(err, spec.ErrInvalidRequest) {
 		t.Fatalf("expected ErrInvalidRequest for missing version, got %v", err)
@@ -250,14 +309,14 @@ func TestToolBuiltInGuards(t *testing.T) {
 
 	// Creating a tool in a built-in bundle is forbidden.
 	_, err := s.PutTool(t.Context(), &spec.PutToolRequest{
-		BundleID: bid, ToolSlug: slug, Version: "v-new",
+		BundleID: bid, ToolSlug: slug, Version: testVersionNew,
 		Body: &spec.PutToolRequestBody{
 			DisplayName:  "illegal",
 			IsEnabled:    true,
 			UserCallable: true,
 			LLMCallable:  true,
 
-			ArgSchema: `{}`,
+			ArgSchema: testArgSchema,
 
 			Type:     spec.ToolTypeHTTP,
 			HTTPImpl: dummyHTTPTool(),
@@ -291,8 +350,8 @@ func TestToolBundleListFiltering(t *testing.T) {
 
 	builtInCnt, _ := builtinToolStatistics(t, s)
 
-	mustPutToolBundle(t, s, "ub1", "slug1", "Bundle1", true)
-	mustPutToolBundle(t, s, "ub2", "slug2", "Bundle2", false)
+	mustPutToolBundle(t, s, testUserBundleID1, testBundleSlug1, testBundleDisplay1, true)
+	mustPutToolBundle(t, s, testUserBundleID2, testBundleSlug, testBundleDisplay2, false)
 
 	tests := []struct {
 		name            string
@@ -302,7 +361,7 @@ func TestToolBundleListFiltering(t *testing.T) {
 	}{
 		{"EnabledOnly", false, nil, 1},
 		{"AllUsers", true, nil, 2},
-		{"FilterUser", true, []bundleitemutils.BundleID{"ub1"}, 1},
+		{"FilterUser", true, []bundleitemutils.BundleID{testUserBundleID1}, 1},
 	}
 
 	for _, tc := range tests {
@@ -347,9 +406,9 @@ func TestToolListFiltering(t *testing.T) {
 	s, clean := newTestToolStore(t)
 	defer clean()
 
-	mustPutToolBundle(t, s, "ub1", "slug1", "UserBundle", true)
-	mustPutTool(t, s, "ub1", "t1", "v1", "t1", true, "tag1")
-	mustPutTool(t, s, "ub1", "t2", "v1", "t2", false, "tag1", "tag2")
+	mustPutToolBundle(t, s, testUserBundleID1, testBundleSlug1, testUserBundleDisplay, true)
+	mustPutTool(t, s, testUserBundleID1, testToolSlugT1, testVersion1, testToolSlugT1, true, testTag1)
+	mustPutTool(t, s, testUserBundleID1, testToolSlugT2, testVersion1, testToolSlugT2, false, testTag1, testTag2)
 
 	tests := []struct {
 		name            string
@@ -359,13 +418,13 @@ func TestToolListFiltering(t *testing.T) {
 	}{
 		{"EnabledOnly", false, nil, 1},
 		{"WithDisabled", true, nil, 2},
-		{"TagFilter", true, []string{"tag2"}, 1},
+		{"TagFilter", true, []string{testTag2}, 1},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			resp, err := s.ListTools(t.Context(), &spec.ListToolsRequest{
-				BundleIDs:       []bundleitemutils.BundleID{"ub1"},
+				BundleIDs:       []bundleitemutils.BundleID{testUserBundleID1},
 				Tags:            tc.tags,
 				IncludeDisabled: tc.includeDisabled,
 			})
@@ -387,7 +446,7 @@ func TestToolBundlePagination(t *testing.T) {
 	for i := range 30 {
 		id := bundleitemutils.BundleID(fmt.Sprintf("u%02d", i))
 		ids = append(ids, id)
-		mustPutToolBundle(t, s, id, bundleitemutils.BundleSlug("slug"+strconv.Itoa(i)), "b", true)
+		mustPutToolBundle(t, s, id, bundleitemutils.BundleSlug(testBundleSlug+strconv.Itoa(i)), "b", true)
 	}
 
 	pageSize := 7
@@ -420,12 +479,12 @@ func TestToolPagination(t *testing.T) {
 	s, clean := newTestToolStore(t)
 	defer clean()
 
-	mustPutToolBundle(t, s, "ub1", "slug1", "bundle", true)
+	mustPutToolBundle(t, s, testUserBundleID1, testBundleSlug1, "bundle", true)
 
 	for i := range 23 {
-		mustPutTool(t, s, "ub1",
+		mustPutTool(t, s, testUserBundleID1,
 			bundleitemutils.ItemSlug(fmt.Sprintf("t%02d", i)),
-			"v1", "d", true)
+			testVersion1, testDisplayShort, true)
 	}
 
 	const page = 6
@@ -435,7 +494,7 @@ func TestToolPagination(t *testing.T) {
 		resp, err := s.ListTools(t.Context(), &spec.ListToolsRequest{
 			RecommendedPageSize: page,
 			PageToken:           token,
-			BundleIDs:           []bundleitemutils.BundleID{"ub1"},
+			BundleIDs:           []bundleitemutils.BundleID{testUserBundleID1},
 		})
 		if err != nil {
 			t.Fatalf("ListTools() failed: %v", err)
@@ -455,29 +514,29 @@ func TestToolSoftDeleteBehaviour(t *testing.T) {
 	s, clean := newTestToolStore(t)
 	defer clean()
 
-	mustPutToolBundle(t, s, "b1", "slug", "Bundle", true)
+	mustPutToolBundle(t, s, testBundleID1, testBundleSlug, testBundleDisplay, true)
 
-	_, err := s.DeleteToolBundle(t.Context(), &spec.DeleteToolBundleRequest{BundleID: "b1"})
+	_, err := s.DeleteToolBundle(t.Context(), &spec.DeleteToolBundleRequest{BundleID: testBundleID1})
 	if err != nil {
 		t.Fatalf("DeleteToolBundle() failed: %v", err)
 	}
 
-	if _, err := s.getUserBundle("b1"); !errors.Is(err, spec.ErrBundleDeleting) {
+	if _, err := s.getUserBundle(testBundleID1); !errors.Is(err, spec.ErrBundleDeleting) {
 		t.Fatalf("expected ErrBundleDeleting, got %v", err)
 	}
 
-	raw, _ := s.bundleStore.GetKey([]string{"bundles", "b1"})
+	raw, _ := s.bundleStore.GetKey([]string{testBundleGroup, testBundleID1})
 	if mp, ok := raw.(map[string]any); ok {
 		mp["softDeletedAt"] = time.Now().
 			Add(-2 * softDeleteGraceTools).
 			UTC().
 			Format(time.RFC3339Nano)
-		_ = s.bundleStore.SetKey([]string{"bundles", "b1"}, mp)
+		_ = s.bundleStore.SetKey([]string{testBundleGroup, testBundleID1}, mp)
 	}
 
 	s.sweepSoftDeleted()
 
-	if _, err := s.bundleStore.GetKey([]string{"bundles", "b1"}); err == nil {
+	if _, err := s.bundleStore.GetKey([]string{testBundleGroup, testBundleID1}); err == nil {
 		t.Fatalf("bundle should have been purged")
 	}
 }
@@ -486,19 +545,19 @@ func TestConcurrentToolPut(t *testing.T) {
 	s, clean := newTestToolStore(t)
 	defer clean()
 
-	mustPutToolBundle(t, s, "b1", "slug", "Bundle", true)
+	mustPutToolBundle(t, s, testBundleID1, testBundleSlug, testBundleDisplay, true)
 
 	errCh := make(chan error, 2)
 	go func() {
 		_, err := s.PutTool(t.Context(), &spec.PutToolRequest{
-			BundleID: "b1", ToolSlug: "concurrent", Version: "v1",
+			BundleID: testBundleID1, ToolSlug: testToolSlugConcurrent, Version: testVersion1,
 			Body: &spec.PutToolRequestBody{
-				DisplayName:  "v1",
+				DisplayName:  testVersion1,
 				IsEnabled:    true,
 				UserCallable: true,
 				LLMCallable:  true,
 
-				ArgSchema: `{}`,
+				ArgSchema: testArgSchema,
 
 				Type:     spec.ToolTypeHTTP,
 				HTTPImpl: dummyHTTPTool(),
@@ -508,14 +567,14 @@ func TestConcurrentToolPut(t *testing.T) {
 	}()
 	go func() {
 		_, err := s.PutTool(t.Context(), &spec.PutToolRequest{
-			BundleID: "b1", ToolSlug: "concurrent", Version: "v2",
+			BundleID: testBundleID1, ToolSlug: testToolSlugConcurrent, Version: testVersion2,
 			Body: &spec.PutToolRequestBody{
-				DisplayName:  "v2",
+				DisplayName:  testVersion2,
 				IsEnabled:    true,
 				UserCallable: true,
 				LLMCallable:  true,
 
-				ArgSchema: `{}`,
+				ArgSchema: testArgSchema,
 
 				Type:     spec.ToolTypeHTTP,
 				HTTPImpl: dummyHTTPTool(),
@@ -535,12 +594,12 @@ func TestToolSlugVersionValidation(t *testing.T) {
 		ver   bundleitemutils.ItemVersion
 		valid bool
 	}{
-		{"abc", "v1", true},
-		{"abc-def", "v1", true},
-		{"", "v1", false},
-		{"abc", "", false},
-		{"bad.slug", "v1", false},
-		{"abc", "v 1", false},
+		{testABC, testVersion1, true},
+		{testABC + "-" + "def", testVersion1, true},
+		{"", testVersion1, false},
+		{testABC, "", false},
+		{testBadSlugDot, testVersion1, false},
+		{testABC, testBadVersionSpace, false},
 	}
 
 	for _, c := range cases {
@@ -603,13 +662,13 @@ func mustPutTool(
 		Version:  ver,
 		Body: &spec.PutToolRequestBody{
 			DisplayName:  display,
-			Description:  "test tool",
+			Description:  testToolDescription,
 			IsEnabled:    enabled,
 			Tags:         tags,
 			UserCallable: true,
 			LLMCallable:  true,
 
-			ArgSchema: `{}`,
+			ArgSchema: testArgSchema,
 
 			Type:     spec.ToolTypeHTTP,
 			HTTPImpl: dummyHTTPTool(),
@@ -634,7 +693,7 @@ func mustPutToolBundle(
 		Body: &spec.PutToolBundleRequestBody{
 			Slug:        slug,
 			DisplayName: display,
-			Description: "test bundle",
+			Description: testBundleDescription,
 			IsEnabled:   enabled,
 		},
 	})
@@ -656,13 +715,13 @@ func newTestToolStore(t *testing.T) (s *ToolStore, cleanup func()) {
 func dummyHTTPTool() *spec.HTTPToolImpl {
 	return &spec.HTTPToolImpl{
 		Request: spec.HTTPRequest{
-			Method:      "GET",
-			URLTemplate: "https://example.com",
+			Method:      testHTTPMethod,
+			URLTemplate: testURLTemplate,
 			TimeoutMS:   1000,
 		},
 		Response: spec.HTTPResponse{
 			SuccessCodes: []int{200},
-			ErrorMode:    "fail",
+			ErrorMode:    testErrorModeFail,
 		},
 	}
 }
