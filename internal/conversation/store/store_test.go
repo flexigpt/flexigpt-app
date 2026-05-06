@@ -13,6 +13,8 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
+const nonexistentStr = "nonexistent"
+
 func TestInitConversation(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -312,7 +314,7 @@ func TestConversationCollection(t *testing.T) {
 		// Non-existent conversation.
 		_, err = cc.DeleteConversation(
 			ctx,
-			&spec.DeleteConversationRequest{ID: "nonexistent", Title: "nonexistent"},
+			&spec.DeleteConversationRequest{ID: nonexistentStr, Title: nonexistentStr},
 		)
 		if err == nil {
 			t.Error("Expected error for deleting non-existent conversation")
@@ -328,7 +330,7 @@ func TestConversationCollection(t *testing.T) {
 		}
 		_, err = cc.GetConversation(
 			ctx,
-			&spec.GetConversationRequest{ID: "nonexistent", Title: "nonexistent"},
+			&spec.GetConversationRequest{ID: nonexistentStr, Title: nonexistentStr},
 		)
 		if err == nil {
 			t.Error("Expected error for getting non-existent conversation")
@@ -339,9 +341,9 @@ func TestConversationCollection(t *testing.T) {
 	t.Run("PutMessagesToNonExistentConversation", func(t *testing.T) {
 		ctx := t.Context()
 		_, err := cc.PutMessagesToConversation(ctx, &spec.PutMessagesToConversationRequest{
-			ID: "nonexistent",
+			ID: nonexistentStr,
 			Body: &spec.PutMessagesToConversationRequestBody{
-				Title: "nonexistent",
+				Title: nonexistentStr,
 				Messages: []spec.ConversationMessage{
 					newTextTurn("msg", inferenceSpec.RoleUser, "hi"),
 				},

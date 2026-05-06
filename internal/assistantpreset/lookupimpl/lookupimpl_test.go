@@ -245,7 +245,7 @@ func TestSkillLookupAdapter_GetSkillSummaryForSelection_Errors(t *testing.T) {
 			name:    testNilReceiver,
 			adapter: nil,
 			selection: skillSpec.SkillSelection{
-				SkillRef: skillSpec.SkillRef{BundleID: testBundleIDA, SkillSlug: "skill-a"},
+				SkillRef: skillSpec.SkillRef{BundleID: testBundleIDA, SkillSlug: testSkillA},
 			},
 			wantErrContains: testErrNotConfigured,
 		},
@@ -253,14 +253,14 @@ func TestSkillLookupAdapter_GetSkillSummaryForSelection_Errors(t *testing.T) {
 			name:    testNilStore,
 			adapter: &skillLookupAdapter{},
 			selection: skillSpec.SkillSelection{
-				SkillRef: skillSpec.SkillRef{BundleID: testBundleIDA, SkillSlug: "skill-a"},
+				SkillRef: skillSpec.SkillRef{BundleID: testBundleIDA, SkillSlug: testSkillA},
 			},
 			wantErrContains: testErrNotConfigured,
 		},
 		{
 			name:            testMissingBundleID,
 			adapter:         &skillLookupAdapter{store: &skillStore.SkillStore{}},
-			selection:       skillSpec.SkillSelection{SkillRef: skillSpec.SkillRef{SkillSlug: "skill-a"}},
+			selection:       skillSpec.SkillSelection{SkillRef: skillSpec.SkillRef{SkillSlug: testSkillA}},
 			wantErrContains: testErrIncomplete,
 		},
 		{

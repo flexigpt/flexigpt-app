@@ -66,7 +66,7 @@ func TestBuiltInData_ListBuiltInData_DeepCopyAndGetters(t *testing.T) {
 	preset.StartingInstructionTemplateRefs = []promptSpec.PromptTemplateRef{
 		{
 			BundleID:        bundleitemutils.BundleID("bundle-a"),
-			TemplateSlug:    "tmpl-a",
+			TemplateSlug:    testTemplateSlugA,
 			TemplateVersion: testItemVersion(t),
 		},
 	}
@@ -74,7 +74,7 @@ func TestBuiltInData_ListBuiltInData_DeepCopyAndGetters(t *testing.T) {
 		{
 			ToolRef: toolSpec.ToolRef{
 				BundleID:    bundleitemutils.BundleID("bundle-a"),
-				ToolSlug:    "tool-a",
+				ToolSlug:    testToolA,
 				ToolVersion: testItemVersion(t),
 			},
 		},
@@ -83,8 +83,8 @@ func TestBuiltInData_ListBuiltInData_DeepCopyAndGetters(t *testing.T) {
 		{
 			SkillRef: skillSpec.SkillRef{
 				BundleID:  bundleitemutils.BundleID("bundle-a"),
-				SkillSlug: "skill-a",
-				SkillID:   "skill-id-a",
+				SkillSlug: testSkillA,
+				SkillID:   testSkillIDA,
 			},
 		},
 	}
@@ -178,14 +178,18 @@ func TestBuiltInData_ListBuiltInData_DeepCopyAndGetters(t *testing.T) {
 			gotPreset.StartingIncludeModelSystemPrompt,
 		)
 	}
-	if gotPreset.StartingInstructionTemplateRefs[0].TemplateSlug != "tmpl-a" {
-		t.Fatalf("template slug = %q, want %q", gotPreset.StartingInstructionTemplateRefs[0].TemplateSlug, "tmpl-a")
+	if gotPreset.StartingInstructionTemplateRefs[0].TemplateSlug != testTemplateSlugA {
+		t.Fatalf(
+			"template slug = %q, want %q",
+			gotPreset.StartingInstructionTemplateRefs[0].TemplateSlug,
+			testTemplateSlugA,
+		)
 	}
-	if gotPreset.StartingToolSelections[0].ToolRef.ToolSlug != "tool-a" {
-		t.Fatalf("tool slug = %q, want %q", gotPreset.StartingToolSelections[0].ToolRef.ToolSlug, "tool-a")
+	if gotPreset.StartingToolSelections[0].ToolRef.ToolSlug != testToolA {
+		t.Fatalf("tool slug = %q, want %q", gotPreset.StartingToolSelections[0].ToolRef.ToolSlug, testToolA)
 	}
-	if gotPreset.StartingSkillSelections[0].SkillRef.SkillSlug != "skill-a" {
-		t.Fatalf("skill slug = %q, want %q", gotPreset.StartingSkillSelections[0].SkillRef.SkillSlug, "skill-a")
+	if gotPreset.StartingSkillSelections[0].SkillRef.SkillSlug != testSkillA {
+		t.Fatalf("skill slug = %q, want %q", gotPreset.StartingSkillSelections[0].SkillRef.SkillSlug, testSkillA)
 	}
 }
 
@@ -289,7 +293,7 @@ func TestBuiltInData_SettersAndErrors(t *testing.T) {
 func TestResolveBundlesFS(t *testing.T) {
 	baseFS := fstest.MapFS{
 		"root/file.txt": &fstest.MapFile{Data: []byte("x")},
-		"plain.txt":     &fstest.MapFile{Data: []byte("y")},
+		testPlainTxt:    &fstest.MapFile{Data: []byte("y")},
 	}
 
 	tests := []struct {
@@ -302,13 +306,13 @@ func TestResolveBundlesFS(t *testing.T) {
 		{
 			name:      "empty dir returns original fs",
 			dir:       "",
-			readPath:  "plain.txt",
+			readPath:  testPlainTxt,
 			wantBytes: []byte("y"),
 		},
 		{
 			name:      "dot dir returns original fs",
 			dir:       ".",
-			readPath:  "plain.txt",
+			readPath:  testPlainTxt,
 			wantBytes: []byte("y"),
 		},
 		{

@@ -327,7 +327,6 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 	// Populate editor with effective USER blocks for EACH template selection (once per selectionID)
 	useEffect(() => {
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
 		if (!selectionInfo.tplNodeWithPath) return;
 		const populated = lastPopulatedSelectionKeyRef.current;
 		const nodes = getTemplateNodesWithPath(editor);

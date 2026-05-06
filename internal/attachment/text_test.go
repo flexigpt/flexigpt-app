@@ -2,10 +2,16 @@ package attachment
 
 import "testing"
 
+const (
+	testMainGoFileName = "main.go"
+	testMainGoFilePath = "/repo/app/main.go"
+	testNoteFileName   = "note.txt"
+)
+
 func TestFormatTextBlockForLLM_PrefersFilePathOverFileName(t *testing.T) {
 	text := "package main\n"
-	fileName := "main.go"
-	filePath := "/repo/app/main.go"
+	fileName := testMainGoFileName
+	filePath := testMainGoFilePath
 
 	got, err := FormatTextBlockForLLM(ContentBlock{
 		Kind:     ContentBlockText,
@@ -25,7 +31,7 @@ func TestFormatTextBlockForLLM_PrefersFilePathOverFileName(t *testing.T) {
 
 func TestFormatTextBlockForLLM_FallsBackToFileName(t *testing.T) {
 	text := "hello"
-	fileName := "note.txt"
+	fileName := testNoteFileName
 
 	got, err := FormatTextBlockForLLM(ContentBlock{
 		Kind:     ContentBlockText,
@@ -48,8 +54,8 @@ func TestGetTextBlockWithDisplayNameOnly_LocalFileCarriesFileMetadata(t *testing
 		Label: "main.go",
 		FileRef: &FileRef{
 			PathInfo: PathInfo{
-				Path: "/repo/app/main.go",
-				Name: "main.go",
+				Path: testMainGoFilePath,
+				Name: testMainGoFileName,
 			},
 		},
 	}
@@ -61,10 +67,10 @@ func TestGetTextBlockWithDisplayNameOnly_LocalFileCarriesFileMetadata(t *testing
 	if cb == nil {
 		t.Fatal("expected non-nil content block")
 	}
-	if cb.FilePath == nil || *cb.FilePath != "/repo/app/main.go" {
+	if cb.FilePath == nil || *cb.FilePath != testMainGoFilePath {
 		t.Fatalf("expected file path metadata to be carried, got %#v", cb.FilePath)
 	}
-	if cb.FileName == nil || *cb.FileName != "main.go" {
+	if cb.FileName == nil || *cb.FileName != testMainGoFileName {
 		t.Fatalf("expected file name metadata to be carried, got %#v", cb.FileName)
 	}
 }

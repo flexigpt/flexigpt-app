@@ -94,7 +94,7 @@ export default defineConfig(
 			'react-hooks/incompatible-library': 'error',
 
 			...reactYouMightNotNeedAnEffect.configs.strict.rules,
-
+			'react-you-might-not-need-an-effect/no-event-handler': 'off',
 			'@typescript-eslint/consistent-type-imports': 'error',
 			'@typescript-eslint/no-explicit-any': 'off',
 			'@typescript-eslint/no-unsafe-assignment': 'off',

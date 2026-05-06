@@ -173,6 +173,7 @@ linters:
     - wastedassign
 
   disable:
+
     # Finds repeated strings that could be replaced by a constant.
     - goconst
 

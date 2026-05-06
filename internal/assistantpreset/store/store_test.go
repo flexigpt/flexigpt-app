@@ -21,30 +21,30 @@ func TestAssistantPresetStore_PutAssistantPresetBundle_Invalid(t *testing.T) {
 		wantErrContains string
 	}{
 		{
-			name:      "nil request",
+			name:      testNilRequestName,
 			req:       nil,
 			wantErrIs: spec.ErrInvalidRequest,
 		},
 		{
-			name: "nil body",
+			name: testNilBodyName,
 			req: &spec.PutAssistantPresetBundleRequest{
 				BundleID: testBundleID(t, "put-invalid-1"),
 			},
 			wantErrIs: spec.ErrInvalidRequest,
 		},
 		{
-			name: "empty bundle id",
+			name: testEmptyBundleIDName,
 			req: &spec.PutAssistantPresetBundleRequest{
 				Body: &spec.PutAssistantPresetBundleRequestBody{
 					Slug:        validSlug,
-					DisplayName: "bundle",
+					DisplayName: testBundleDisplayName,
 					IsEnabled:   true,
 				},
 			},
 			wantErrIs: spec.ErrInvalidRequest,
 		},
 		{
-			name: "empty display name",
+			name: testEmptyDisplayNameName,
 			req: &spec.PutAssistantPresetBundleRequest{
 				BundleID: testBundleID(t, "put-invalid-2"),
 				Body: &spec.PutAssistantPresetBundleRequestBody{
@@ -60,23 +60,23 @@ func TestAssistantPresetStore_PutAssistantPresetBundle_Invalid(t *testing.T) {
 			req: &spec.PutAssistantPresetBundleRequest{
 				BundleID: testBundleID(t, "put-invalid-3"),
 				Body: &spec.PutAssistantPresetBundleRequestBody{
-					DisplayName: "bundle",
+					DisplayName: testBundleDisplayName,
 					IsEnabled:   true,
 				},
 			},
 			wantErrIs: spec.ErrInvalidRequest,
 		},
 		{
-			name: "invalid slug",
+			name: testInvalidSlugName,
 			req: &spec.PutAssistantPresetBundleRequest{
 				BundleID: testBundleID(t, "put-invalid-4"),
 				Body: &spec.PutAssistantPresetBundleRequestBody{
 					Slug:        "Bad Slug!",
-					DisplayName: "bundle",
+					DisplayName: testBundleDisplayName,
 					IsEnabled:   true,
 				},
 			},
-			wantErrContains: "slug",
+			wantErrContains: testSlugErrContains,
 		},
 	}
 
@@ -204,13 +204,13 @@ func TestAssistantPresetStore_PatchAssistantPresetBundle(t *testing.T) {
 			name string
 			req  *spec.PatchAssistantPresetBundleRequest
 		}{
-			{name: "nil request", req: nil},
+			{name: testNilRequestName, req: nil},
 			{
-				name: "nil body",
+				name: testNilBodyName,
 				req:  &spec.PatchAssistantPresetBundleRequest{BundleID: testBundleID(t, "patch-bundle-1")},
 			},
 			{
-				name: "empty bundle id",
+				name: testEmptyBundleIDName,
 				req: &spec.PatchAssistantPresetBundleRequest{
 					Body: &spec.PatchAssistantPresetBundleRequestBody{IsEnabled: true},
 				},
@@ -324,8 +324,8 @@ func TestAssistantPresetStore_DeleteAssistantPresetBundle(t *testing.T) {
 			name string
 			req  *spec.DeleteAssistantPresetBundleRequest
 		}{
-			{name: "nil request", req: nil},
-			{name: "empty bundle id", req: &spec.DeleteAssistantPresetBundleRequest{}},
+			{name: testNilRequestName, req: nil},
+			{name: testEmptyBundleIDName, req: &spec.DeleteAssistantPresetBundleRequest{}},
 		}
 
 		for _, tt := range tests {
@@ -593,12 +593,12 @@ func TestAssistantPresetStore_PutAssistantPreset_Invalid(t *testing.T) {
 		wantErrContains string
 	}{
 		{
-			name:      "nil request",
+			name:      testNilRequestName,
 			req:       nil,
 			wantErrIs: spec.ErrInvalidRequest,
 		},
 		{
-			name: "nil body",
+			name: testNilBodyName,
 			req: &spec.PutAssistantPresetRequest{
 				BundleID:            enabledBundleID,
 				AssistantPresetSlug: testItemSlug(t, "put-preset-a"),
@@ -610,14 +610,14 @@ func TestAssistantPresetStore_PutAssistantPreset_Invalid(t *testing.T) {
 			name: "missing fields",
 			req: &spec.PutAssistantPresetRequest{
 				Body: &spec.PutAssistantPresetRequestBody{
-					DisplayName: "preset",
+					DisplayName: testPresetDisplayName,
 					IsEnabled:   true,
 				},
 			},
 			wantErrIs: spec.ErrInvalidRequest,
 		},
 		{
-			name: "empty display name",
+			name: testEmptyDisplayNameName,
 			req: &spec.PutAssistantPresetRequest{
 				BundleID:            enabledBundleID,
 				AssistantPresetSlug: testItemSlug(t, "put-preset-b"),
@@ -630,17 +630,17 @@ func TestAssistantPresetStore_PutAssistantPreset_Invalid(t *testing.T) {
 			wantErrIs: spec.ErrInvalidRequest,
 		},
 		{
-			name: "invalid slug",
+			name: testInvalidSlugName,
 			req: &spec.PutAssistantPresetRequest{
 				BundleID:            enabledBundleID,
 				AssistantPresetSlug: "Bad Slug!",
 				Version:             version,
 				Body: &spec.PutAssistantPresetRequestBody{
-					DisplayName: "preset",
+					DisplayName: testPresetDisplayName,
 					IsEnabled:   true,
 				},
 			},
-			wantErrContains: "slug",
+			wantErrContains: testSlugErrContains,
 		},
 		{
 			name: "invalid version",
@@ -649,11 +649,11 @@ func TestAssistantPresetStore_PutAssistantPreset_Invalid(t *testing.T) {
 				AssistantPresetSlug: testItemSlug(t, "put-preset-c"),
 				Version:             "bad version!",
 				Body: &spec.PutAssistantPresetRequestBody{
-					DisplayName: "preset",
+					DisplayName: testPresetDisplayName,
 					IsEnabled:   true,
 				},
 			},
-			wantErrContains: "version",
+			wantErrContains: testVersionErrContains,
 		},
 		{
 			name: "bundle not found",
@@ -662,7 +662,7 @@ func TestAssistantPresetStore_PutAssistantPreset_Invalid(t *testing.T) {
 				AssistantPresetSlug: testItemSlug(t, "put-preset-d"),
 				Version:             version,
 				Body: &spec.PutAssistantPresetRequestBody{
-					DisplayName: "preset",
+					DisplayName: testPresetDisplayName,
 					IsEnabled:   true,
 				},
 			},
@@ -675,7 +675,7 @@ func TestAssistantPresetStore_PutAssistantPreset_Invalid(t *testing.T) {
 				AssistantPresetSlug: testItemSlug(t, "put-preset-e"),
 				Version:             version,
 				Body: &spec.PutAssistantPresetRequestBody{
-					DisplayName: "preset",
+					DisplayName: testPresetDisplayName,
 					IsEnabled:   true,
 				},
 			},
@@ -709,7 +709,7 @@ func TestAssistantPresetStore_PutAssistantPreset_HappyConflictCloneAndBuiltInRea
 			AssistantPresetSlug: testItemSlug(t, "builtin-put"),
 			Version:             testItemVersion(t),
 			Body: &spec.PutAssistantPresetRequestBody{
-				DisplayName: "preset",
+				DisplayName: testPresetDisplayName,
 				IsEnabled:   true,
 			},
 		})
@@ -1168,8 +1168,8 @@ func TestAssistantPresetStore_FindAssistantPreset(t *testing.T) {
 			setup: func(t *testing.T) {
 				t.Helper()
 				if err := SetPreparedData(s, fileInfo.FileName, dirInfo.DirName, map[string]any{
-					"slug":    "other-slug",
-					"version": string(version),
+					testSlugErrContains:    "other-slug",
+					testVersionErrContains: string(version),
 				}); err != nil {
 					t.Fatalf("SetPreparedData() error: %v", err)
 				}
@@ -1183,8 +1183,8 @@ func TestAssistantPresetStore_FindAssistantPreset(t *testing.T) {
 			setup: func(t *testing.T) {
 				t.Helper()
 				if err := SetPreparedData(s, fileInfo.FileName, dirInfo.DirName, map[string]any{
-					"slug":    string(slug),
-					"version": "other-version",
+					testSlugErrContains:    string(slug),
+					testVersionErrContains: "other-version",
 				}); err != nil {
 					t.Fatalf("SetPreparedData() error: %v", err)
 				}
@@ -1198,8 +1198,8 @@ func TestAssistantPresetStore_FindAssistantPreset(t *testing.T) {
 			setup: func(t *testing.T) {
 				t.Helper()
 				if err := SetPreparedData(s, fileInfo.FileName, dirInfo.DirName, map[string]any{
-					"slug":    string(slug),
-					"version": string(version),
+					testSlugErrContains:    string(slug),
+					testVersionErrContains: string(version),
 				}); err != nil {
 					t.Fatalf("SetPreparedData() error: %v", err)
 				}
@@ -1279,8 +1279,8 @@ func TestAssistantPresetStore_SweepSoftDeleted(t *testing.T) {
 				dirInfo := mustBuildBundleDir(t, bundle.ID, bundle.Slug)
 				fileInfo := mustBuildItemFile(t, testItemSlug(t, "sweep"), testItemVersion(t))
 				if err := SetPreparedData(s, fileInfo.FileName, dirInfo.DirName, map[string]any{
-					"slug":    string(testItemSlug(t, "sweep")),
-					"version": string(testItemVersion(t)),
+					testSlugErrContains:    string(testItemSlug(t, "sweep")),
+					testVersionErrContains: string(testItemVersion(t)),
 				}); err != nil {
 					t.Fatalf("SetPreparedData() error: %v", err)
 				}

@@ -83,7 +83,7 @@ func TestCloneAssistantPreset(t *testing.T) {
 	orig.StartingInstructionTemplateRefs = []promptSpec.PromptTemplateRef{
 		{
 			BundleID:        bundleitemutils.BundleID("bundle-a"),
-			TemplateSlug:    "tmpl-a",
+			TemplateSlug:    testTemplateSlugA,
 			TemplateVersion: testItemVersion(t),
 		},
 	}
@@ -91,7 +91,7 @@ func TestCloneAssistantPreset(t *testing.T) {
 		{
 			ToolRef: toolSpec.ToolRef{
 				BundleID:    bundleitemutils.BundleID("bundle-a"),
-				ToolSlug:    "tool-a",
+				ToolSlug:    testToolA,
 				ToolVersion: testItemVersion(t),
 			},
 		},
@@ -100,8 +100,8 @@ func TestCloneAssistantPreset(t *testing.T) {
 		{
 			SkillRef: skillSpec.SkillRef{
 				BundleID:  bundleitemutils.BundleID("bundle-a"),
-				SkillSlug: "skill-a",
-				SkillID:   "skill-id-a",
+				SkillSlug: testSkillA,
+				SkillID:   testSkillIDA,
 			},
 		},
 	}
@@ -120,14 +120,18 @@ func TestCloneAssistantPreset(t *testing.T) {
 	if got.StartingIncludeModelSystemPrompt == nil || *got.StartingIncludeModelSystemPrompt != true {
 		t.Fatalf("cloned StartingIncludeModelSystemPrompt = %v", got.StartingIncludeModelSystemPrompt)
 	}
-	if got.StartingInstructionTemplateRefs[0].TemplateSlug != "tmpl-a" {
-		t.Fatalf("cloned template slug = %q, want %q", got.StartingInstructionTemplateRefs[0].TemplateSlug, "tmpl-a")
+	if got.StartingInstructionTemplateRefs[0].TemplateSlug != testTemplateSlugA {
+		t.Fatalf(
+			"cloned template slug = %q, want %q",
+			got.StartingInstructionTemplateRefs[0].TemplateSlug,
+			testTemplateSlugA,
+		)
 	}
-	if got.StartingToolSelections[0].ToolRef.ToolSlug != "tool-a" {
-		t.Fatalf("cloned tool slug = %q, want %q", got.StartingToolSelections[0].ToolRef.ToolSlug, "tool-a")
+	if got.StartingToolSelections[0].ToolRef.ToolSlug != testToolA {
+		t.Fatalf("cloned tool slug = %q, want %q", got.StartingToolSelections[0].ToolRef.ToolSlug, testToolA)
 	}
-	if got.StartingSkillSelections[0].SkillRef.SkillSlug != "skill-a" {
-		t.Fatalf("cloned skill slug = %q, want %q", got.StartingSkillSelections[0].SkillRef.SkillSlug, "skill-a")
+	if got.StartingSkillSelections[0].SkillRef.SkillSlug != testSkillA {
+		t.Fatalf("cloned skill slug = %q, want %q", got.StartingSkillSelections[0].SkillRef.SkillSlug, testSkillA)
 	}
 }
 
@@ -271,19 +275,19 @@ func TestValidateAssistantPresetBundle(t *testing.T) {
 			wantErrContains: "bundle id is empty",
 		},
 		{
-			name: "invalid slug",
+			name: testInvalidSlugName,
 			bundle: func() *spec.AssistantPresetBundle {
 				b := valid
-				b.Slug = "Bad Slug!"
+				b.Slug = testBadSlug
 				return &b
 			}(),
 			wantErrContains: "invalid bundle slug",
 		},
 		{
-			name: "empty display name",
+			name: testEmptyDisplayNameName,
 			bundle: func() *spec.AssistantPresetBundle {
 				b := valid
-				b.DisplayName = "   "
+				b.DisplayName = testWhitespaceString
 				return &b
 			}(),
 			wantErrContains: "bundle displayName is empty",
@@ -338,21 +342,21 @@ func TestValidateAssistantPresetStructure(t *testing.T) {
 
 	dupPromptRef := promptSpec.PromptTemplateRef{
 		BundleID:        bundleitemutils.BundleID("bundle-a"),
-		TemplateSlug:    "tmpl-a",
+		TemplateSlug:    testTemplateSlugA,
 		TemplateVersion: testItemVersion(t),
 	}
 	dupToolSelection := toolSpec.ToolSelection{
 		ToolRef: toolSpec.ToolRef{
 			BundleID:    bundleitemutils.BundleID("bundle-a"),
-			ToolSlug:    "tool-a",
+			ToolSlug:    testToolA,
 			ToolVersion: testItemVersion(t),
 		},
 	}
 	dupSkillSelection := skillSpec.SkillSelection{
 		SkillRef: skillSpec.SkillRef{
 			BundleID:  bundleitemutils.BundleID("bundle-a"),
-			SkillSlug: "skill-a",
-			SkillID:   "skill-id-a",
+			SkillSlug: testSkillA,
+			SkillID:   testSkillIDA,
 		},
 	}
 
@@ -386,10 +390,10 @@ func TestValidateAssistantPresetStructure(t *testing.T) {
 			wantErrContains: "assistant preset id is empty",
 		},
 		{
-			name: "invalid slug",
+			name: testInvalidSlugName,
 			preset: func() *spec.AssistantPreset {
 				p := valid
-				p.Slug = "Bad Slug!"
+				p.Slug = testBadSlug
 				return &p
 			}(),
 			wantErrContains: "invalid assistant preset slug",
@@ -404,10 +408,10 @@ func TestValidateAssistantPresetStructure(t *testing.T) {
 			wantErrContains: "invalid assistant preset version",
 		},
 		{
-			name: "empty display name",
+			name: testEmptyDisplayNameName,
 			preset: func() *spec.AssistantPreset {
 				p := valid
-				p.DisplayName = "   "
+				p.DisplayName = testWhitespaceString
 				return &p
 			}(),
 			wantErrContains: "displayName is empty",
@@ -497,7 +501,7 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 	}
 	promptRef1 := promptSpec.PromptTemplateRef{
 		BundleID:        bundleitemutils.BundleID("bundle-a"),
-		TemplateSlug:    "tmpl-a",
+		TemplateSlug:    testTemplateSlugA,
 		TemplateVersion: version,
 	}
 	promptRef2 := promptSpec.PromptTemplateRef{
@@ -508,15 +512,15 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 	toolSel := toolSpec.ToolSelection{
 		ToolRef: toolSpec.ToolRef{
 			BundleID:    bundleitemutils.BundleID("bundle-a"),
-			ToolSlug:    "tool-a",
+			ToolSlug:    testToolA,
 			ToolVersion: version,
 		},
 	}
 	skillSelection := skillSpec.SkillSelection{
 		SkillRef: skillSpec.SkillRef{
 			BundleID:  bundleitemutils.BundleID("bundle-a"),
-			SkillSlug: "skill-a",
-			SkillID:   "skill-id-a",
+			SkillSlug: testSkillA,
+			SkillID:   testSkillIDA,
 		},
 	}
 
@@ -851,19 +855,19 @@ func TestJSONHelpers(t *testing.T) {
 			{
 				name:  "field absent",
 				value: map[string]any{"other": "x"},
-				field: "field",
+				field: testFieldName,
 				want:  false,
 			},
 			{
 				name:  "field present null",
-				value: map[string]any{"field": nil},
-				field: "field",
+				value: map[string]any{testFieldName: nil},
+				field: testFieldName,
 				want:  false,
 			},
 			{
 				name:  "field present non-null",
-				value: map[string]any{"field": "x"},
-				field: "field",
+				value: map[string]any{testFieldName: "x"},
+				field: testFieldName,
 				want:  true,
 			},
 		}
@@ -909,14 +913,14 @@ func TestJSONHelpers(t *testing.T) {
 		s1 := toolSpec.ToolSelection{
 			ToolRef: toolSpec.ToolRef{
 				BundleID:    bundleitemutils.BundleID("bundle-a"),
-				ToolSlug:    "tool-a",
+				ToolSlug:    testToolA,
 				ToolVersion: testItemVersion(t),
 			},
 		}
 		s2 := toolSpec.ToolSelection{
 			ToolRef: toolSpec.ToolRef{
 				BundleID:    bundleitemutils.BundleID("bundle-a"),
-				ToolSlug:    "tool-a",
+				ToolSlug:    testToolA,
 				ToolVersion: testItemVersion(t),
 			},
 		}
@@ -942,16 +946,16 @@ func TestJSONHelpers(t *testing.T) {
 		s1 := skillSpec.SkillSelection{
 			SkillRef: skillSpec.SkillRef{
 				BundleID:  bundleitemutils.BundleID("bundle-a"),
-				SkillSlug: "skill-a",
-				SkillID:   "skill-id-a",
+				SkillSlug: testSkillA,
+				SkillID:   testSkillIDA,
 			},
 			PreLoadAsActive: false,
 		}
 		s2 := skillSpec.SkillSelection{
 			SkillRef: skillSpec.SkillRef{
 				BundleID:  bundleitemutils.BundleID("bundle-a"),
-				SkillSlug: "skill-a",
-				SkillID:   "skill-id-a",
+				SkillSlug: testSkillA,
+				SkillID:   testSkillIDA,
 			},
 			PreLoadAsActive: true,
 		}

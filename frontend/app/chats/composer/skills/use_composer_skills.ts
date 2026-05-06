@@ -261,7 +261,6 @@ export function useComposerSkills(): UseComposerSkillsResult {
 	);
 
 	useEffect(() => {
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
 		if (skillsLoading) return;
 
 		const nextEnabled = filterSkillRefsToLoadedCatalog(enabledSkillRefsRef.current);

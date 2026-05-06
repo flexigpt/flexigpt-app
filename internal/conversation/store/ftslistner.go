@@ -15,6 +15,12 @@ import (
 	"github.com/flexigpt/mapstore-go/ftsengine"
 )
 
+const (
+	conversationRoleSystem    = "system"
+	conversationRoleUser      = "user"
+	conversationRoleAssistant = "assistant"
+)
+
 func NewFTSListner(e *ftsengine.Engine) mapstore.FileListener {
 	return func(ev mapstore.FileEvent) {
 		defer func() {
@@ -133,11 +139,11 @@ func extractFTS(fullPath string, m map[string]any) map[string]string {
 			return
 		}
 		switch role {
-		case "system":
+		case conversationRoleSystem:
 			system.WriteString(txt + "\n")
-		case "user":
+		case conversationRoleUser:
 			user.WriteString(txt + "\n")
-		case "assistant":
+		case conversationRoleAssistant:
 			assist.WriteString(txt + "\n")
 		default:
 		}

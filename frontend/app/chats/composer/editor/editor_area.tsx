@@ -881,10 +881,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	};
 
 	useEffect(() => {
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
 		if (!fastForwardPending) return;
 		if (isGenerating || isInputLocked || isSubmittingRef.current) return;
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
+
 		if (templateBlocked || hasBlockingToolArgs) return;
 
 		const unfinishedRunnableToolCalls = toolCalls.filter(
@@ -892,7 +891,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				(toolCall.status === 'pending' || toolCall.status === 'running') &&
 				(toolCall.type === ToolStoreChoiceType.Function || toolCall.type === ToolStoreChoiceType.Custom)
 		);
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
+
 		if (unfinishedRunnableToolCalls.length > 0) return;
 
 		const failedRunnableToolCalls = toolCalls.filter(
@@ -900,7 +899,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				toolCall.status === 'failed' &&
 				(toolCall.type === ToolStoreChoiceType.Function || toolCall.type === ToolStoreChoiceType.Custom)
 		);
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
+
 		if (failedRunnableToolCalls.length > 0) {
 			// eslint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
 			setFastForwardPending(false);
@@ -909,7 +908,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			return;
 		}
 
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
 		if (!hasEffectiveTextForSubmit && attachments.length === 0 && toolOutputs.length === 0) {
 			// eslint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
 			setFastForwardPending(false);
@@ -937,7 +935,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	useEffect(() => {
 		const tracker = autoSubmitTrackerRef.current;
 
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
 		if (toolCalls.length > 0) {
 			for (const toolCall of toolCalls) {
 				tracker.observedCallKeys.add(getToolAutoSubmitKey(toolCall));
@@ -948,23 +945,20 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			return;
 		}
 
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
 		if (autoExecState.phase !== 'idle') return;
 		if (tracker.observedCallKeys.size === 0) return;
 		if (!tracker.allObservedCallsAreAutoExecute) return;
 		if (isGenerating || isInputLocked || isSubmittingRef.current) return;
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
+
 		if (templateBlocked || hasBlockingToolArgs) return;
 
 		const runtime = getToolRuntimeSnapshot();
 
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
 		if (runtime.toolCalls.length === 0 && runtime.toolOutputs.length === 0) {
 			resetAutoSubmitTracker();
 			return;
 		}
 
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
 		if (runtime.toolCalls.length > 0) return;
 
 		const observedCallKeys = [...tracker.observedCallKeys].sort();
@@ -979,7 +973,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			return output && !output.isError;
 		});
 
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-event-handler
 		if (!allObservedCallsProducedSuccessfulOutputs) return;
 
 		tracker.attemptedBatchSignature = batchSignature;
