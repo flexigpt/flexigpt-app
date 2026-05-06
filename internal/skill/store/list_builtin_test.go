@@ -15,6 +15,18 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
 )
 
+const (
+	listBi1ID                 = "bi-1"
+	listBi2ID                 = "bi-2"
+	listU1ID                  = "u-1"
+	listU2ID                  = "u-2"
+	listUB1ID                 = "ub1"
+	listUserOldSlug           = "user-old"
+	listUserNewSlug           = "user-new"
+	listUserBundleSlug        = "user-bundle-1"
+	listUserBundleDisplayName = "User Bundle 1"
+)
+
 func TestSkillStore_ListSkillBundles_BuiltInAndUser_SortPaging_AndTokenErrors(t *testing.T) {
 	t.Parallel()
 	s := newTestSkillStore(t)
@@ -24,20 +36,20 @@ func TestSkillStore_ListSkillBundles_BuiltInAndUser_SortPaging_AndTokenErrors(t 
 	biSchema := skillStoreSchema{
 		SchemaVersion: spec.SkillSchemaVersion,
 		Bundles: map[bundleitemutils.BundleID]spec.SkillBundle{
-			"bi-1": {
+			listBi1ID: {
 				SchemaVersion: spec.SkillSchemaVersion,
-				ID:            "bi-1",
-				Slug:          "bi-1",
+				ID:            listBi1ID,
+				Slug:          listBi1ID,
 				DisplayName:   "BuiltIn 1",
 				IsEnabled:     true,
 				IsBuiltIn:     true,
 				CreatedAt:     now,
 				ModifiedAt:    now.Add(20 * time.Second),
 			},
-			"bi-2": {
+			listBi2ID: {
 				SchemaVersion: spec.SkillSchemaVersion,
-				ID:            "bi-2",
-				Slug:          "bi-2",
+				ID:            listBi2ID,
+				Slug:          listBi2ID,
 				DisplayName:   "BuiltIn 2 (disabled)",
 				IsEnabled:     false,
 				IsBuiltIn:     true,
@@ -46,8 +58,8 @@ func TestSkillStore_ListSkillBundles_BuiltInAndUser_SortPaging_AndTokenErrors(t 
 			},
 		},
 		Skills: map[bundleitemutils.BundleID]map[spec.SkillSlug]spec.Skill{
-			"bi-1": {},
-			"bi-2": {},
+			listBi1ID: {},
+			listBi2ID: {},
 		},
 	}
 	raw, err := json.Marshal(biSchema)
@@ -67,20 +79,20 @@ func TestSkillStore_ListSkillBundles_BuiltInAndUser_SortPaging_AndTokenErrors(t 
 	user := skillStoreSchema{
 		SchemaVersion: spec.SkillSchemaVersion,
 		Bundles: map[bundleitemutils.BundleID]spec.SkillBundle{
-			"u-1": {
+			listU1ID: {
 				SchemaVersion: spec.SkillSchemaVersion,
-				ID:            "u-1",
-				Slug:          "u-1",
+				ID:            listU1ID,
+				Slug:          listU1ID,
 				DisplayName:   "User 1",
 				IsEnabled:     true,
 				IsBuiltIn:     false,
 				CreatedAt:     userMod,
 				ModifiedAt:    userMod,
 			},
-			"u-2": {
+			listU2ID: {
 				SchemaVersion: spec.SkillSchemaVersion,
-				ID:            "u-2",
-				Slug:          "u-2",
+				ID:            listU2ID,
+				Slug:          listU2ID,
 				DisplayName:   "User 2",
 				IsEnabled:     true,
 				IsBuiltIn:     false,
@@ -89,8 +101,8 @@ func TestSkillStore_ListSkillBundles_BuiltInAndUser_SortPaging_AndTokenErrors(t 
 			},
 		},
 		Skills: map[bundleitemutils.BundleID]map[spec.SkillSlug]spec.Skill{
-			"u-1": {},
-			"u-2": {},
+			listU1ID: {},
+			listU2ID: {},
 		},
 	}
 	writeAllUserLocked(t, s, user)
@@ -105,7 +117,7 @@ func TestSkillStore_ListSkillBundles_BuiltInAndUser_SortPaging_AndTokenErrors(t 
 	if len(resp1.Body.SkillBundles) != 1 {
 		t.Fatalf("expected 1 bundle on page1, got %d", len(resp1.Body.SkillBundles))
 	}
-	if resp1.Body.SkillBundles[0].ID != "u-1" {
+	if resp1.Body.SkillBundles[0].ID != listU1ID {
 		t.Fatalf("expected u-1 first (newest; tie by ID), got %q", resp1.Body.SkillBundles[0].ID)
 	}
 	if resp1.Body.NextPageToken == nil {
@@ -121,7 +133,7 @@ func TestSkillStore_ListSkillBundles_BuiltInAndUser_SortPaging_AndTokenErrors(t 
 	if len(resp2.Body.SkillBundles) != 1 {
 		t.Fatalf("expected 1 bundle on page2, got %d", len(resp2.Body.SkillBundles))
 	}
-	if resp2.Body.SkillBundles[0].ID != "u-2" {
+	if resp2.Body.SkillBundles[0].ID != listU2ID {
 		t.Fatalf("expected u-2 second, got %q", resp2.Body.SkillBundles[0].ID)
 	}
 	if resp2.Body.NextPageToken == nil {
@@ -137,7 +149,7 @@ func TestSkillStore_ListSkillBundles_BuiltInAndUser_SortPaging_AndTokenErrors(t 
 	if len(resp3.Body.SkillBundles) != 1 {
 		t.Fatalf("expected 1 bundle on page3, got %d", len(resp3.Body.SkillBundles))
 	}
-	if resp3.Body.SkillBundles[0].ID != "bi-1" {
+	if resp3.Body.SkillBundles[0].ID != listBi1ID {
 		t.Fatalf("expected bi-1 third, got %q", resp3.Body.SkillBundles[0].ID)
 	}
 	if resp3.Body.NextPageToken != nil {
@@ -176,11 +188,11 @@ func TestSkillStore_ListSkills_BuiltInPaging_PhaseSwitch_AndTokenErrors(t *testi
 	user := skillStoreSchema{
 		SchemaVersion: spec.SkillSchemaVersion,
 		Bundles: map[bundleitemutils.BundleID]spec.SkillBundle{
-			"ub1": {
+			listUB1ID: {
 				SchemaVersion: spec.SkillSchemaVersion,
-				ID:            "ub1",
-				Slug:          "user-bundle-1",
-				DisplayName:   "User Bundle 1",
+				ID:            listUB1ID,
+				Slug:          listUserBundleSlug,
+				DisplayName:   listUserBundleDisplayName,
 				IsEnabled:     true,
 				IsBuiltIn:     false,
 				CreatedAt:     now,
@@ -188,14 +200,14 @@ func TestSkillStore_ListSkills_BuiltInPaging_PhaseSwitch_AndTokenErrors(t *testi
 			},
 		},
 		Skills: map[bundleitemutils.BundleID]map[spec.SkillSlug]spec.Skill{
-			"ub1": {
-				"user-old": {
+			listUB1ID: {
+				listUserOldSlug: {
 					SchemaVersion: spec.SkillSchemaVersion,
 					ID:            "u-old",
-					Slug:          "user-old",
+					Slug:          listUserOldSlug,
 					Type:          spec.SkillTypeFS,
 					Location:      "/tmp/user-old",
-					Name:          "user-old",
+					Name:          listUserOldSlug,
 					Tags:          []string{"t1"},
 					Presence:      &spec.SkillPresence{Status: spec.SkillPresenceUnknown},
 					IsEnabled:     true,
@@ -203,13 +215,13 @@ func TestSkillStore_ListSkills_BuiltInPaging_PhaseSwitch_AndTokenErrors(t *testi
 					CreatedAt:     now,
 					ModifiedAt:    now.Add(1 * time.Second),
 				},
-				"user-new": {
+				listUserNewSlug: {
 					SchemaVersion: spec.SkillSchemaVersion,
 					ID:            "u-new",
-					Slug:          "user-new",
+					Slug:          listUserNewSlug,
 					Type:          spec.SkillTypeFS,
 					Location:      "/tmp/user-new",
-					Name:          "user-new",
+					Name:          listUserNewSlug,
 					Tags:          []string{"t1"},
 					Presence:      &spec.SkillPresence{Status: spec.SkillPresenceUnknown},
 					IsEnabled:     true,
@@ -254,7 +266,7 @@ func TestSkillStore_ListSkills_BuiltInPaging_PhaseSwitch_AndTokenErrors(t *testi
 	if !resp2.Body.SkillListItems[0].IsBuiltIn {
 		t.Fatalf("expected first item of page2 to be built-in, got %+v", resp2.Body.SkillListItems[0])
 	}
-	if resp2.Body.SkillListItems[1].IsBuiltIn || resp2.Body.SkillListItems[1].SkillSlug != "user-new" {
+	if resp2.Body.SkillListItems[1].IsBuiltIn || resp2.Body.SkillListItems[1].SkillSlug != listUserNewSlug {
 		t.Fatalf("expected second item of page2 to be user-new, got %+v", resp2.Body.SkillListItems[1])
 	}
 	if resp2.Body.NextPageToken == nil {
@@ -269,7 +281,7 @@ func TestSkillStore_ListSkills_BuiltInPaging_PhaseSwitch_AndTokenErrors(t *testi
 	if len(resp3.Body.SkillListItems) != 1 {
 		t.Fatalf("expected 1 item on page3, got %d", len(resp3.Body.SkillListItems))
 	}
-	if resp3.Body.SkillListItems[0].SkillSlug != "user-old" {
+	if resp3.Body.SkillListItems[0].SkillSlug != listUserOldSlug {
 		t.Fatalf("expected user-old on page3, got %+v", resp3.Body.SkillListItems[0])
 	}
 	if resp3.Body.NextPageToken != nil {
@@ -279,7 +291,7 @@ func TestSkillStore_ListSkills_BuiltInPaging_PhaseSwitch_AndTokenErrors(t *testi
 	// Token error cases.
 	t.Run("token-invalid-phase", func(t *testing.T) {
 		t.Parallel()
-		bad := jsonutil.Base64JSONEncode(spec.SkillPageToken{Phase: "nope"})
+		bad := jsonutil.Base64JSONEncode(spec.SkillPageToken{Phase: testNope})
 		_, err := s.ListSkills(t.Context(), &spec.ListSkillsRequest{PageToken: bad})
 		if err == nil || !errors.Is(err, spec.ErrSkillInvalidRequest) {
 			t.Fatalf("expected ErrSkillInvalidRequest, got %v", err)

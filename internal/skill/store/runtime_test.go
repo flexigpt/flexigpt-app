@@ -22,6 +22,21 @@ import (
 
 const testBuiltins = "test-builtins"
 
+const (
+	runtimeBiBundleID               = "bi-bundle-id"
+	runtimeBiBundleSlug             = "bi-bundle"
+	runtimeBuiltInBundleDisplayName = "Built-in Bundle"
+	runtimeBiHelloID                = "bi-hello-id"
+	runtimeBiHelloSlug              = "bi-hello"
+	runtimeBiDisabledID             = "bi-disabled-id"
+	runtimeBiDisabledSlug           = "bi-disabled"
+	runtimeBiHelloRelDir            = builtInSkillBundlesGroupID + "/" + runtimeBiBundleSlug + "/" + builtInSkillSkillsGroupID + "/" + runtimeBiHelloSlug
+	runtimeUserBundleID             = "user-bundle-id"
+	runtimeUserHelloSlug            = "user-hello"
+	runtimeUserOtherSlug            = "user-other"
+	runtimeReplaceSkillSlug         = "replace-skill"
+)
+
 type biSkill struct {
 	Slug      spec.SkillSlug
 	ID        spec.SkillID
@@ -67,26 +82,26 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 	// Inject a temp embeddedfs (MapFS) for built-ins and reload built-in snapshot from it.
 	now := time.Date(2026, 2, 10, 12, 0, 0, 0, time.UTC)
 	bundle := biBundle{
-		ID:          bundleitemutils.BundleID("bi-bundle-id"),
-		Slug:        bundleitemutils.BundleSlug("bi-bundle"),
-		DisplayName: "Built-in Bundle",
+		ID:          bundleitemutils.BundleID(runtimeBiBundleID),
+		Slug:        bundleitemutils.BundleSlug(runtimeBiBundleSlug),
+		DisplayName: runtimeBuiltInBundleDisplayName,
 		Description: "Bundle used for runtime integration tests",
 		IsEnabled:   true,
 	}
 	biHello := biSkill{
-		Slug:      spec.SkillSlug("bi-hello"),
-		ID:        spec.SkillID("bi-hello-id"),
-		Name:      "bi-hello",
-		RelDir:    "bundles/bi-bundle/skills/bi-hello",
+		Slug:      spec.SkillSlug(runtimeBiHelloSlug),
+		ID:        spec.SkillID(runtimeBiHelloID),
+		Name:      runtimeBiHelloSlug,
+		RelDir:    runtimeBiHelloRelDir,
 		FMDesc:    "BI hello frontmatter description",
 		Body:      "BI_HELLO_BODY_MARKER",
 		IsEnabled: true,
 	}
 	biDisabled := biSkill{
-		Slug:      spec.SkillSlug("bi-disabled"),
-		ID:        spec.SkillID("bi-disabled-id"),
-		Name:      "bi-disabled",
-		RelDir:    "bundles/bi-bundle/skills/bi-disabled",
+		Slug:      spec.SkillSlug(runtimeBiDisabledSlug),
+		ID:        spec.SkillID(runtimeBiDisabledID),
+		Name:      runtimeBiDisabledSlug,
+		RelDir:    builtInSkillBundlesGroupID + "/" + runtimeBiBundleSlug + "/" + builtInSkillSkillsGroupID + "/" + runtimeBiDisabledSlug,
 		FMDesc:    "BI disabled frontmatter description",
 		Body:      "BI_DISABLED_BODY_MARKER",
 		IsEnabled: false,
@@ -166,24 +181,23 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 	userHelloDir := writeSkillPackage(
 		t,
 		userSkillsRoot,
-		"user-hello",
+		runtimeUserHelloSlug,
 		"USER hello frontmatter description",
 		"USER_HELLO_BODY_MARKER",
 	)
 	userOtherDir := writeSkillPackage(
 		t,
 		userSkillsRoot,
-		"user-other",
+		runtimeUserOtherSlug,
 		"USER other frontmatter description",
 		"USER_OTHER_BODY_MARKER",
 	)
 
-	const userBundleID = bundleitemutils.BundleID("user-bundle-id")
 	if _, err := s.PutSkillBundle(ctx, &spec.PutSkillBundleRequest{
-		BundleID: userBundleID,
+		BundleID: bundleitemutils.BundleID(runtimeUserBundleID),
 		Body: &spec.PutSkillBundleRequestBody{
-			Slug:        bundleitemutils.BundleSlug("user-bundle"),
-			DisplayName: "User Bundle",
+			Slug:        bundleitemutils.BundleSlug(testUserBundleSlug),
+			DisplayName: testUserBundleDisplayName,
 			IsEnabled:   true,
 			Description: "user bundle desc",
 		},
@@ -193,12 +207,12 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 
 	// Store description != SKILL.md frontmatter description (runtime must use SKILL.md).
 	if _, err := s.PutSkill(ctx, &spec.PutSkillRequest{
-		BundleID:  userBundleID,
-		SkillSlug: spec.SkillSlug("user-hello"),
+		BundleID:  bundleitemutils.BundleID(runtimeUserBundleID),
+		SkillSlug: spec.SkillSlug(runtimeUserHelloSlug),
 		Body: &spec.PutSkillRequestBody{
 			SkillType:   spec.SkillTypeFS,
 			Location:    userHelloDir,
-			Name:        "user-hello",
+			Name:        runtimeUserHelloSlug,
 			IsEnabled:   true,
 			DisplayName: "User Hello",
 			Description: "STORE description (should not show in runtime)",
@@ -208,12 +222,12 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 		t.Fatalf("PutSkill(user-hello): %v", err)
 	}
 	if _, err := s.PutSkill(ctx, &spec.PutSkillRequest{
-		BundleID:  userBundleID,
-		SkillSlug: spec.SkillSlug("user-other"),
+		BundleID:  bundleitemutils.BundleID(runtimeUserBundleID),
+		SkillSlug: spec.SkillSlug(runtimeUserOtherSlug),
 		Body: &spec.PutSkillRequestBody{
 			SkillType:   spec.SkillTypeFS,
 			Location:    userOtherDir,
-			Name:        "user-other",
+			Name:        runtimeUserOtherSlug,
 			IsEnabled:   true,
 			DisplayName: "User Other",
 		},
@@ -221,8 +235,18 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 		t.Fatalf("PutSkill(user-other): %v", err)
 	}
 
-	userHelloRef := mustGetSkillRef(t, s, userBundleID, spec.SkillSlug("user-hello"))
-	userOtherRef := mustGetSkillRef(t, s, userBundleID, spec.SkillSlug("user-other"))
+	userHelloRef := mustGetSkillRef(
+		t,
+		s,
+		bundleitemutils.BundleID(runtimeUserBundleID),
+		spec.SkillSlug(runtimeUserHelloSlug),
+	)
+	userOtherRef := mustGetSkillRef(
+		t,
+		s,
+		bundleitemutils.BundleID(runtimeUserBundleID),
+		spec.SkillSlug(runtimeUserOtherSlug),
+	)
 
 	allow := []spec.SkillRef{biHelloRef, userHelloRef, userOtherRef}
 
@@ -231,10 +255,10 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 		items := resp.Body.Skills
 
 		mustHaveRuntimeItemBySlug(t, items, biHello.Slug)
-		mustHaveRuntimeItemBySlug(t, items, spec.SkillSlug("user-hello"))
-		mustHaveRuntimeItemBySlug(t, items, spec.SkillSlug("user-other"))
+		mustHaveRuntimeItemBySlug(t, items, spec.SkillSlug(runtimeUserHelloSlug))
+		mustHaveRuntimeItemBySlug(t, items, spec.SkillSlug(runtimeUserOtherSlug))
 
-		it := mustHaveRuntimeItemBySlug(t, items, spec.SkillSlug("user-hello"))
+		it := mustHaveRuntimeItemBySlug(t, items, spec.SkillSlug(runtimeUserHelloSlug))
 		if got, want := it.Description, "USER hello frontmatter description"; got != want {
 			t.Fatalf("user-hello description mismatch: got=%q want=%q", got, want)
 		}
@@ -267,8 +291,8 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 		})
 		active := activeResp.Body.Skills
 		mustHaveRuntimeItemBySlug(t, active, biHello.Slug)
-		mustHaveRuntimeItemBySlug(t, active, spec.SkillSlug("user-hello"))
-		mustNotHaveRuntimeItemBySlug(t, active, spec.SkillSlug("user-other"))
+		mustHaveRuntimeItemBySlug(t, active, spec.SkillSlug(runtimeUserHelloSlug))
+		mustNotHaveRuntimeItemBySlug(t, active, spec.SkillSlug(runtimeUserOtherSlug))
 
 		activeCount := 0
 		for _, s := range activeResp.Body.Skills {
@@ -287,9 +311,9 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 			Activity:       agentskillsSpec.SkillActivityInactive,
 		})
 		inactive := inactiveResp.Body.Skills
-		mustHaveRuntimeItemBySlug(t, inactive, spec.SkillSlug("user-other"))
+		mustHaveRuntimeItemBySlug(t, inactive, spec.SkillSlug(runtimeUserOtherSlug))
 		mustNotHaveRuntimeItemBySlug(t, inactive, biHello.Slug)
-		mustNotHaveRuntimeItemBySlug(t, inactive, spec.SkillSlug("user-hello"))
+		mustNotHaveRuntimeItemBySlug(t, inactive, spec.SkillSlug(runtimeUserHelloSlug))
 	}
 
 	// Prompt: must contain active bodies and inactive metadata.
@@ -312,7 +336,7 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 
 	// Disable user bundle -> runtime should remove its skills and prune them from the session.
 	if _, err := s.PatchSkillBundle(ctx, &spec.PatchSkillBundleRequest{
-		BundleID: userBundleID,
+		BundleID: bundleitemutils.BundleID(runtimeUserBundleID),
 		Body: &spec.PatchSkillBundleRequestBody{
 			IsEnabled: false,
 		},
@@ -324,8 +348,8 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 		resp := listRuntimeSkillsAllow(t, s, allow)
 		items := resp.Body.Skills
 		mustHaveRuntimeItemBySlug(t, items, biHello.Slug)
-		mustNotHaveRuntimeItemBySlug(t, items, spec.SkillSlug("user-hello"))
-		mustNotHaveRuntimeItemBySlug(t, items, spec.SkillSlug("user-other"))
+		mustNotHaveRuntimeItemBySlug(t, items, spec.SkillSlug(runtimeUserHelloSlug))
+		mustNotHaveRuntimeItemBySlug(t, items, spec.SkillSlug(runtimeUserOtherSlug))
 	}
 
 	activeAfterBundleDisable := listRuntimeSkillsAllowFiltered(t, s, &spec.RuntimeSkillFilter{
@@ -334,11 +358,11 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 		Activity:       agentskillsSpec.SkillActivityActive,
 	}).Body.Skills
 	mustHaveRuntimeItemBySlug(t, activeAfterBundleDisable, biHello.Slug)
-	mustNotHaveRuntimeItemBySlug(t, activeAfterBundleDisable, spec.SkillSlug("user-hello"))
+	mustNotHaveRuntimeItemBySlug(t, activeAfterBundleDisable, spec.SkillSlug(runtimeUserHelloSlug))
 
 	// Re-enable user bundle -> runtime should add them back.
 	if _, err := s.PatchSkillBundle(ctx, &spec.PatchSkillBundleRequest{
-		BundleID: userBundleID,
+		BundleID: bundleitemutils.BundleID(runtimeUserBundleID),
 		Body: &spec.PatchSkillBundleRequestBody{
 			IsEnabled: true,
 		},
@@ -348,14 +372,14 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 	{
 		resp := listRuntimeSkillsAllow(t, s, allow)
 		items := resp.Body.Skills
-		mustHaveRuntimeItemBySlug(t, items, spec.SkillSlug("user-hello"))
-		mustHaveRuntimeItemBySlug(t, items, spec.SkillSlug("user-other"))
+		mustHaveRuntimeItemBySlug(t, items, spec.SkillSlug(runtimeUserHelloSlug))
+		mustHaveRuntimeItemBySlug(t, items, spec.SkillSlug(runtimeUserOtherSlug))
 	}
 
 	// Disable an enabled user skill -> runtime must remove it and prune from session.
 	if _, err := s.PatchSkill(ctx, &spec.PatchSkillRequest{
-		BundleID:  userBundleID,
-		SkillSlug: spec.SkillSlug("user-hello"),
+		BundleID:  bundleitemutils.BundleID(runtimeUserBundleID),
+		SkillSlug: spec.SkillSlug(runtimeUserHelloSlug),
 		Body: &spec.PatchSkillRequestBody{
 			IsEnabled: new(false),
 		},
@@ -365,7 +389,7 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 	{
 		resp := listRuntimeSkillsAllow(t, s, allow)
 		items := resp.Body.Skills
-		mustNotHaveRuntimeItemBySlug(t, items, spec.SkillSlug("user-hello"))
+		mustNotHaveRuntimeItemBySlug(t, items, spec.SkillSlug(runtimeUserHelloSlug))
 	}
 
 	activeAfterUserDisable := listRuntimeSkillsAllowFiltered(t, s, &spec.RuntimeSkillFilter{
@@ -374,7 +398,7 @@ func TestSkillStore_RuntimeIntegration_HydrateResync_SessionsAndFilters(t *testi
 		Activity:       agentskillsSpec.SkillActivityActive,
 	}).Body.Skills
 	mustHaveRuntimeItemBySlug(t, activeAfterUserDisable, biHello.Slug)
-	mustNotHaveRuntimeItemBySlug(t, activeAfterUserDisable, spec.SkillSlug("user-hello"))
+	mustNotHaveRuntimeItemBySlug(t, activeAfterUserDisable, spec.SkillSlug(runtimeUserHelloSlug))
 
 	// Enable the built-in disabled skill via built-in PatchSkill path (overlay flag + resync).
 	if _, err := s.PatchSkill(ctx, &spec.PatchSkillRequest{
@@ -462,17 +486,17 @@ func TestSkillStore_RuntimeIntegration_ReplacementSafety_UserSkillLocationChange
 	// Keep built-ins minimal but valid for this test: reuse a tiny embeddedfs view.
 	now := time.Date(2026, 2, 10, 12, 0, 0, 0, time.UTC)
 	bundle := biBundle{
-		ID:          bundleitemutils.BundleID("bi-bundle-id"),
-		Slug:        bundleitemutils.BundleSlug("bi-bundle"),
-		DisplayName: "Built-in Bundle",
+		ID:          bundleitemutils.BundleID(runtimeBiBundleID),
+		Slug:        bundleitemutils.BundleSlug(runtimeBiBundleSlug),
+		DisplayName: runtimeBuiltInBundleDisplayName,
 		Description: "Bundle used for replacement test",
 		IsEnabled:   true,
 	}
 	biHello := biSkill{
-		Slug:      spec.SkillSlug("bi-hello"),
-		ID:        spec.SkillID("bi-hello-id"),
-		Name:      "bi-hello",
-		RelDir:    "bundles/bi-bundle/skills/bi-hello",
+		Slug:      spec.SkillSlug(runtimeBiHelloSlug),
+		ID:        spec.SkillID(runtimeBiHelloID),
+		Name:      runtimeBiHelloSlug,
+		RelDir:    runtimeBiHelloRelDir,
 		FMDesc:    "BI hello",
 		Body:      "BI_HELLO",
 		IsEnabled: true,
@@ -494,12 +518,11 @@ func TestSkillStore_RuntimeIntegration_ReplacementSafety_UserSkillLocationChange
 	}
 
 	// Create a user bundle + skill with an initial valid location.
-	const userBundleID = bundleitemutils.BundleID("user-bundle-id")
 	if _, err := s.PutSkillBundle(ctx, &spec.PutSkillBundleRequest{
-		BundleID: userBundleID,
+		BundleID: bundleitemutils.BundleID(runtimeUserBundleID),
 		Body: &spec.PutSkillBundleRequestBody{
-			Slug:        bundleitemutils.BundleSlug("user-bundle"),
-			DisplayName: "User Bundle",
+			Slug:        bundleitemutils.BundleSlug(testUserBundleSlug),
+			DisplayName: testUserBundleDisplayName,
 			IsEnabled:   true,
 		},
 	}); err != nil {
@@ -507,14 +530,14 @@ func TestSkillStore_RuntimeIntegration_ReplacementSafety_UserSkillLocationChange
 	}
 
 	userSkillsRoot := filepath.Join(baseDir, "user-skills")
-	loc1 := writeSkillPackage(t, userSkillsRoot, "replace-skill", "Replace skill v1", "REPLACE_V1_BODY")
+	loc1 := writeSkillPackage(t, userSkillsRoot, runtimeReplaceSkillSlug, "Replace skill v1", "REPLACE_V1_BODY")
 	_, err = s.PutSkill(ctx, &spec.PutSkillRequest{
-		BundleID:  userBundleID,
-		SkillSlug: spec.SkillSlug("replace-skill"),
+		BundleID:  bundleitemutils.BundleID(runtimeUserBundleID),
+		SkillSlug: spec.SkillSlug(runtimeReplaceSkillSlug),
 		Body: &spec.PutSkillRequestBody{
 			SkillType: spec.SkillTypeFS,
 			Location:  loc1,
-			Name:      "replace-skill",
+			Name:      runtimeReplaceSkillSlug,
 			IsEnabled: true,
 		},
 	})
@@ -527,14 +550,14 @@ func TestSkillStore_RuntimeIntegration_ReplacementSafety_UserSkillLocationChange
 	if err != nil {
 		t.Fatalf("runtime.ListSkills: %v", err)
 	}
-	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "replace-skill", Location: loc1})
+	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: runtimeReplaceSkillSlug, Location: loc1})
 
 	// Foreground strict behavior: patch to an invalid replacement location must FAIL
 	// and must NOT persist to store.
-	locBad := filepath.Join(baseDir, "does-not-exist", "replace-skill")
+	locBad := filepath.Join(baseDir, "does-not-exist", runtimeReplaceSkillSlug)
 	_, err = s.PatchSkill(ctx, &spec.PatchSkillRequest{
-		BundleID:  userBundleID,
-		SkillSlug: spec.SkillSlug("replace-skill"),
+		BundleID:  bundleitemutils.BundleID(runtimeUserBundleID),
+		SkillSlug: spec.SkillSlug(runtimeReplaceSkillSlug),
 		Body: &spec.PatchSkillRequestBody{
 			Location: new(locBad),
 		},
@@ -548,14 +571,17 @@ func TestSkillStore_RuntimeIntegration_ReplacementSafety_UserSkillLocationChange
 		t.Fatalf("runtime.ListSkills: %v", err)
 	}
 	// Old still present (not removed).
-	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "replace-skill", Location: loc1})
+	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: runtimeReplaceSkillSlug, Location: loc1})
 	// Bad replacement not present.
-	mustNotHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "replace-skill", Location: locBad})
+	mustNotHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: runtimeReplaceSkillSlug, Location: locBad})
 
 	// Store should also still be loc1.
 	gs, err := s.GetSkill(
 		ctx,
-		&spec.GetSkillRequest{BundleID: userBundleID, SkillSlug: spec.SkillSlug("replace-skill")},
+		&spec.GetSkillRequest{
+			BundleID:  bundleitemutils.BundleID(runtimeUserBundleID),
+			SkillSlug: spec.SkillSlug(runtimeReplaceSkillSlug),
+		},
 	)
 	if err != nil {
 		t.Fatalf("GetSkill(after failed patch): %v", err)
@@ -566,10 +592,10 @@ func TestSkillStore_RuntimeIntegration_ReplacementSafety_UserSkillLocationChange
 
 	// Patch to a new valid replacement location -> runtime should add new and remove old.
 	loc2Parent := filepath.Join(baseDir, "user-skills-v2")
-	loc2 := writeSkillPackage(t, loc2Parent, "replace-skill", "Replace skill v2", "REPLACE_V2_BODY")
+	loc2 := writeSkillPackage(t, loc2Parent, runtimeReplaceSkillSlug, "Replace skill v2", "REPLACE_V2_BODY")
 	if _, err := s.PatchSkill(ctx, &spec.PatchSkillRequest{
-		BundleID:  userBundleID,
-		SkillSlug: spec.SkillSlug("replace-skill"),
+		BundleID:  bundleitemutils.BundleID(runtimeUserBundleID),
+		SkillSlug: spec.SkillSlug(runtimeReplaceSkillSlug),
 		Body: &spec.PatchSkillRequestBody{
 			Location: new(loc2),
 		},
@@ -581,8 +607,8 @@ func TestSkillStore_RuntimeIntegration_ReplacementSafety_UserSkillLocationChange
 	if err != nil {
 		t.Fatalf("runtime.ListSkills: %v", err)
 	}
-	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "replace-skill", Location: loc2})
-	mustNotHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "replace-skill", Location: loc1})
+	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: runtimeReplaceSkillSlug, Location: loc2})
+	mustNotHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: runtimeReplaceSkillSlug, Location: loc1})
 }
 
 func TestSkillStore_RuntimeIntegration_ReplacementSafety_BackgroundDrift_DoesNotRemoveLastGood(t *testing.T) {
@@ -608,17 +634,17 @@ func TestSkillStore_RuntimeIntegration_ReplacementSafety_BackgroundDrift_DoesNot
 	// Minimal built-ins to keep things deterministic.
 	now := time.Date(2026, 2, 10, 12, 0, 0, 0, time.UTC)
 	bundle := biBundle{
-		ID:          bundleitemutils.BundleID("bi-bundle-id"),
-		Slug:        bundleitemutils.BundleSlug("bi-bundle"),
-		DisplayName: "Built-in Bundle",
+		ID:          bundleitemutils.BundleID(runtimeBiBundleID),
+		Slug:        bundleitemutils.BundleSlug(runtimeBiBundleSlug),
+		DisplayName: runtimeBuiltInBundleDisplayName,
 		Description: "Bundle used for drift test",
 		IsEnabled:   true,
 	}
 	biHello := biSkill{
-		Slug:      spec.SkillSlug("bi-hello"),
-		ID:        spec.SkillID("bi-hello-id"),
-		Name:      "bi-hello",
-		RelDir:    "bundles/bi-bundle/skills/bi-hello",
+		Slug:      spec.SkillSlug(runtimeBiHelloSlug),
+		ID:        spec.SkillID(runtimeBiHelloID),
+		Name:      runtimeBiHelloSlug,
+		RelDir:    runtimeBiHelloRelDir,
 		FMDesc:    "BI hello",
 		Body:      "BI_HELLO",
 		IsEnabled: true,
@@ -640,12 +666,11 @@ func TestSkillStore_RuntimeIntegration_ReplacementSafety_BackgroundDrift_DoesNot
 	}
 
 	// Create a user bundle + enabled skill at loc1 (valid).
-	const userBundleID = bundleitemutils.BundleID("user-bundle-id")
 	if _, err := s.PutSkillBundle(ctx, &spec.PutSkillBundleRequest{
-		BundleID: userBundleID,
+		BundleID: bundleitemutils.BundleID(runtimeUserBundleID),
 		Body: &spec.PutSkillBundleRequestBody{
-			Slug:        bundleitemutils.BundleSlug("user-bundle"),
-			DisplayName: "User Bundle",
+			Slug:        bundleitemutils.BundleSlug(testUserBundleSlug),
+			DisplayName: testUserBundleDisplayName,
 			IsEnabled:   true,
 		},
 	}); err != nil {
@@ -653,14 +678,14 @@ func TestSkillStore_RuntimeIntegration_ReplacementSafety_BackgroundDrift_DoesNot
 	}
 
 	userSkillsRoot := filepath.Join(baseDir, "user-skills")
-	loc1 := writeSkillPackage(t, userSkillsRoot, "replace-skill", "Replace skill v1", "REPLACE_V1_BODY")
+	loc1 := writeSkillPackage(t, userSkillsRoot, runtimeReplaceSkillSlug, "Replace skill v1", "REPLACE_V1_BODY")
 	if _, err := s.PutSkill(ctx, &spec.PutSkillRequest{
-		BundleID:  userBundleID,
-		SkillSlug: spec.SkillSlug("replace-skill"),
+		BundleID:  bundleitemutils.BundleID(runtimeUserBundleID),
+		SkillSlug: spec.SkillSlug(runtimeReplaceSkillSlug),
 		Body: &spec.PutSkillRequestBody{
 			SkillType: spec.SkillTypeFS,
 			Location:  loc1,
-			Name:      "replace-skill",
+			Name:      runtimeReplaceSkillSlug,
 			IsEnabled: true,
 		},
 	}); err != nil {
@@ -671,10 +696,10 @@ func TestSkillStore_RuntimeIntegration_ReplacementSafety_BackgroundDrift_DoesNot
 	if err != nil {
 		t.Fatalf("runtime.ListSkills: %v", err)
 	}
-	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "replace-skill", Location: loc1})
+	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: runtimeReplaceSkillSlug, Location: loc1})
 
 	// Simulate "background drift": user manually edits the store JSON to point to a bad location.
-	locBad := filepath.Join(baseDir, "does-not-exist", "replace-skill")
+	locBad := filepath.Join(baseDir, "does-not-exist", runtimeReplaceSkillSlug)
 	metaPath := filepath.Join(baseDir, spec.SkillBundlesMetaFileName)
 	raw, err := os.ReadFile(metaPath)
 	if err != nil {
@@ -684,9 +709,9 @@ func TestSkillStore_RuntimeIntegration_ReplacementSafety_BackgroundDrift_DoesNot
 	if err := json.Unmarshal(raw, &sc); err != nil {
 		t.Fatalf("json.Unmarshal(meta): %v", err)
 	}
-	sk := sc.Skills[userBundleID][spec.SkillSlug("replace-skill")]
+	sk := sc.Skills[bundleitemutils.BundleID(runtimeUserBundleID)][spec.SkillSlug(runtimeReplaceSkillSlug)]
 	sk.Location = locBad
-	sc.Skills[userBundleID][spec.SkillSlug("replace-skill")] = sk
+	sc.Skills[bundleitemutils.BundleID(runtimeUserBundleID)][spec.SkillSlug(runtimeReplaceSkillSlug)] = sk
 	raw2, err := json.Marshal(sc)
 	if err != nil {
 		t.Fatalf("json.Marshal(meta): %v", err)
@@ -704,8 +729,8 @@ func TestSkillStore_RuntimeIntegration_ReplacementSafety_BackgroundDrift_DoesNot
 	if err != nil {
 		t.Fatalf("runtime.ListSkills: %v", err)
 	}
-	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "replace-skill", Location: loc1})
-	mustNotHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "replace-skill", Location: locBad})
+	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: runtimeReplaceSkillSlug, Location: loc1})
+	mustNotHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: runtimeReplaceSkillSlug, Location: locBad})
 }
 
 func TestSkillStore_RuntimeIntegration_RuntimeEndpoints_Errors(t *testing.T) {
@@ -732,19 +757,18 @@ func TestSkillStore_RuntimeIntegration_RuntimeEndpoints_Errors(t *testing.T) {
 	userSkillsRoot := filepath.Join(baseDir, "user-skills")
 	loc := writeSkillPackage(t, userSkillsRoot, "err-skill", "Err skill", "ERR_SKILL_BODY")
 
-	const userBundleID = bundleitemutils.BundleID("user-bundle-id")
 	if _, err := s.PutSkillBundle(ctx, &spec.PutSkillBundleRequest{
-		BundleID: userBundleID,
+		BundleID: bundleitemutils.BundleID(runtimeUserBundleID),
 		Body: &spec.PutSkillBundleRequestBody{
-			Slug:        bundleitemutils.BundleSlug("user-bundle"),
-			DisplayName: "User Bundle",
+			Slug:        bundleitemutils.BundleSlug(testUserBundleSlug),
+			DisplayName: testUserBundleDisplayName,
 			IsEnabled:   true,
 		},
 	}); err != nil {
 		t.Fatalf("PutSkillBundle: %v", err)
 	}
 	if _, err := s.PutSkill(ctx, &spec.PutSkillRequest{
-		BundleID:  userBundleID,
+		BundleID:  bundleitemutils.BundleID(runtimeUserBundleID),
 		SkillSlug: spec.SkillSlug("err-skill"),
 		Body: &spec.PutSkillRequestBody{
 			SkillType: spec.SkillTypeFS,
@@ -755,7 +779,9 @@ func TestSkillStore_RuntimeIntegration_RuntimeEndpoints_Errors(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("PutSkill: %v", err)
 	}
-	allow := []spec.SkillRef{mustGetSkillRef(t, s, userBundleID, spec.SkillSlug("err-skill"))}
+	allow := []spec.SkillRef{
+		mustGetSkillRef(t, s, bundleitemutils.BundleID(runtimeUserBundleID), spec.SkillSlug("err-skill")),
+	}
 
 	type tc struct {
 		name    string
@@ -934,10 +960,23 @@ func TestSkillStore_HydrateBuiltInEmbeddedFS_DigestMismatchWipes(t *testing.T) {
 	}
 	t.Cleanup(s.Close)
 
+	schemaJSON := func(value string) []byte {
+		t.Helper()
+		b, err := json.Marshal(map[string]any{
+			testSchemaVersionKey:       spec.SkillSchemaVersion,
+			builtInSkillBundlesGroupID: map[string]any{},
+			builtInSkillSkillsGroupID:  map[string]any{},
+		})
+		if err != nil {
+			t.Fatalf("json.Marshal: %v", err)
+		}
+		return b
+	}
+
 	// Minimal FS: hydration only cares about digest + copying.
 	fsys1 := fstest.MapFS{
 		builtin.BuiltInSkillBundlesJSON: &fstest.MapFile{
-			Data: []byte(`{"schemaVersion":"` + spec.SkillSchemaVersion + `","bundles":{},"skills":{}}`),
+			Data: schemaJSON("v1"),
 		},
 		"x.txt": &fstest.MapFile{Data: []byte("v1")},
 	}
@@ -956,7 +995,7 @@ func TestSkillStore_HydrateBuiltInEmbeddedFS_DigestMismatchWipes(t *testing.T) {
 	// Change FS => digest mismatch => hydrate wipes dir => sentinel should disappear.
 	fsys2 := fstest.MapFS{
 		builtin.BuiltInSkillBundlesJSON: &fstest.MapFile{
-			Data: []byte(`{"schemaVersion":"` + spec.SkillSchemaVersion + `","bundles":{},"skills":{}}`),
+			Data: schemaJSON("v2"),
 		},
 		"x.txt": &fstest.MapFile{Data: []byte("v2")},
 	}

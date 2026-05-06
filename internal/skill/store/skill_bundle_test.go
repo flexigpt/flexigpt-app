@@ -12,12 +12,28 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
 )
 
+const (
+	skillBundleBen              = "ben"
+	skillBundleBdis             = "bdis"
+	skillBundleB1               = "b1"
+	skillBundleS1               = "s1"
+	skillBundleUserPutEnabled   = "user-put-enabled"
+	skillBundleUserPutDisabled  = "user-put-disabled"
+	skillBundleDupSkillSlug     = "dup-skill"
+	skillBundlePatchSkillSlug   = patchSkillOperationID
+	skillBundleDupeSkillName    = "dupe-skill"
+	skillBundleDupe1Slug        = "dupe-1"
+	skillBundleDupe2Slug        = "dupe-2"
+	skillBundleMissingSkillSlug = "missing-skill"
+	skillBundleBadSkillSlug     = "bad-skill"
+)
+
 func TestSkillStore_PutSkill_Errors(t *testing.T) {
 	t.Parallel()
 	s := newTestSkillStore(t)
 
-	putBundle(t, s, "ben", "bundle-enabled", "Enabled Bundle", true)
-	putBundle(t, s, "bdis", "bundle-disabled", "Disabled Bundle", false)
+	putBundle(t, s, skillBundleBen, "bundle-enabled", "Enabled Bundle", true)
+	putBundle(t, s, skillBundleBdis, "bundle-disabled", "Disabled Bundle", false)
 
 	skillRoot := t.TempDir()
 	loc := writeSkillPackage(t, skillRoot, "putskill-ok", "desc", "BODY")
@@ -28,27 +44,31 @@ func TestSkillStore_PutSkill_Errors(t *testing.T) {
 		wantIs error
 	}{
 		{"nil-req", nil, spec.ErrSkillInvalidRequest},
-		{"nil-body", &spec.PutSkillRequest{BundleID: "ben", SkillSlug: "s1", Body: nil}, spec.ErrSkillInvalidRequest},
+		{
+			"nil-body",
+			&spec.PutSkillRequest{BundleID: skillBundleBen, SkillSlug: skillBundleS1, Body: nil},
+			spec.ErrSkillInvalidRequest,
+		},
 		{
 			"empty-bundleid",
-			&spec.PutSkillRequest{BundleID: "", SkillSlug: "s1", Body: &spec.PutSkillRequestBody{}},
+			&spec.PutSkillRequest{BundleID: "", SkillSlug: skillBundleS1, Body: &spec.PutSkillRequestBody{}},
 			spec.ErrSkillInvalidRequest,
 		},
 		{
 			"empty-skillSlug",
-			&spec.PutSkillRequest{BundleID: "ben", SkillSlug: "", Body: &spec.PutSkillRequestBody{}},
+			&spec.PutSkillRequest{BundleID: skillBundleBen, SkillSlug: "", Body: &spec.PutSkillRequestBody{}},
 			spec.ErrSkillInvalidRequest,
 		},
 		{
 			"invalid-skillSlug",
-			&spec.PutSkillRequest{BundleID: "ben", SkillSlug: "BAD SLUG", Body: &spec.PutSkillRequestBody{}},
+			&spec.PutSkillRequest{BundleID: skillBundleBen, SkillSlug: badSlug, Body: &spec.PutSkillRequestBody{}},
 			spec.ErrSkillInvalidRequest,
 		},
 		{
 			"skillType-not-fs",
 			&spec.PutSkillRequest{
-				BundleID:  "ben",
-				SkillSlug: "s1",
+				BundleID:  skillBundleBen,
+				SkillSlug: skillBundleS1,
 				Body: &spec.PutSkillRequestBody{
 					SkillType: spec.SkillTypeEmbeddedFS,
 					Location:  loc,
@@ -61,8 +81,8 @@ func TestSkillStore_PutSkill_Errors(t *testing.T) {
 		{
 			"bundle-not-found",
 			&spec.PutSkillRequest{
-				BundleID:  "nope",
-				SkillSlug: "s1",
+				BundleID:  testNope,
+				SkillSlug: skillBundleS1,
 				Body: &spec.PutSkillRequestBody{
 					SkillType: spec.SkillTypeFS,
 					Location:  loc,
@@ -91,18 +111,18 @@ func TestSkillStore_PutSkill_Errors(t *testing.T) {
 func TestSkillStore_PutSkill_HappyPath_EnabledAndDisabled_RuntimeConverges(t *testing.T) {
 	t.Parallel()
 	s := newTestSkillStore(t)
-	putBundle(t, s, "b1", "bundle-1", "Bundle 1", true)
+	putBundle(t, s, skillBundleB1, testBundleSlug, testBundleDisplayName, true)
 
 	root := t.TempDir()
 
-	locEnabled := writeSkillPackage(t, root, "user-put-enabled", "desc enabled", "BODY_ENABLED")
+	locEnabled := writeSkillPackage(t, root, skillBundleUserPutEnabled, "desc enabled", "BODY_ENABLED")
 	_, err := s.PutSkill(t.Context(), &spec.PutSkillRequest{
-		BundleID:  "b1",
-		SkillSlug: "user-put-enabled",
+		BundleID:  skillBundleB1,
+		SkillSlug: skillBundleUserPutEnabled,
 		Body: &spec.PutSkillRequestBody{
 			SkillType: spec.SkillTypeFS,
 			Location:  locEnabled,
-			Name:      "user-put-enabled",
+			Name:      skillBundleUserPutEnabled,
 			IsEnabled: true,
 			Tags:      []string{"t1"},
 		},
@@ -112,17 +132,21 @@ func TestSkillStore_PutSkill_HappyPath_EnabledAndDisabled_RuntimeConverges(t *te
 	}
 
 	recs := runtimeRecs(t, s)
-	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "user-put-enabled", Location: locEnabled})
+	mustHaveSkillDef(
+		t,
+		recs,
+		agentskillsSpec.SkillDef{Type: "fs", Name: skillBundleUserPutEnabled, Location: locEnabled},
+	)
 
 	// Disabled-at-create: store persists it, but runtime must not keep it after resync.
-	locDisabled := writeSkillPackage(t, root, "user-put-disabled", "desc disabled", "BODY_DISABLED")
+	locDisabled := writeSkillPackage(t, root, skillBundleUserPutDisabled, "desc disabled", "BODY_DISABLED")
 	_, err = s.PutSkill(t.Context(), &spec.PutSkillRequest{
-		BundleID:  "b1",
-		SkillSlug: "user-put-disabled",
+		BundleID:  skillBundleB1,
+		SkillSlug: skillBundleUserPutDisabled,
 		Body: &spec.PutSkillRequestBody{
 			SkillType: spec.SkillTypeFS,
 			Location:  locDisabled,
-			Name:      "user-put-disabled",
+			Name:      skillBundleUserPutDisabled,
 			IsEnabled: false,
 			Tags:      []string{"t1"},
 		},
@@ -132,10 +156,17 @@ func TestSkillStore_PutSkill_HappyPath_EnabledAndDisabled_RuntimeConverges(t *te
 	}
 
 	recs = runtimeRecs(t, s)
-	mustNotHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "user-put-disabled", Location: locDisabled})
+	mustNotHaveSkillDef(
+		t,
+		recs,
+		agentskillsSpec.SkillDef{Type: "fs", Name: skillBundleUserPutDisabled, Location: locDisabled},
+	)
 
 	// Store has it (GetSkill should fail because disabled).
-	_, err = s.GetSkill(t.Context(), &spec.GetSkillRequest{BundleID: "b1", SkillSlug: "user-put-disabled"})
+	_, err = s.GetSkill(
+		t.Context(),
+		&spec.GetSkillRequest{BundleID: skillBundleB1, SkillSlug: skillBundleUserPutDisabled},
+	)
 	if err == nil || !errors.Is(err, spec.ErrSkillDisabled) {
 		t.Fatalf("expected ErrSkillDisabled, got %v", err)
 	}
@@ -144,21 +175,21 @@ func TestSkillStore_PutSkill_HappyPath_EnabledAndDisabled_RuntimeConverges(t *te
 func TestSkillStore_PutSkill_RuntimeRejected_DoesNotPersist(t *testing.T) {
 	t.Parallel()
 	s := newTestSkillStore(t)
-	putBundle(t, s, "b1", "bundle-1", "Bundle 1", true)
+	putBundle(t, s, skillBundleB1, testBundleSlug, testBundleDisplayName, true)
 
 	// Create an empty directory that does NOT contain SKILL.md. Runtime indexing should reject it.
-	locBad := filepath.Join(t.TempDir(), "bad-skill")
+	locBad := filepath.Join(t.TempDir(), skillBundleBadSkillSlug)
 	if err := os.MkdirAll(locBad, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
 
 	_, err := s.PutSkill(t.Context(), &spec.PutSkillRequest{
-		BundleID:  "b1",
-		SkillSlug: "bad-skill",
+		BundleID:  skillBundleB1,
+		SkillSlug: skillBundleBadSkillSlug,
 		Body: &spec.PutSkillRequestBody{
 			SkillType: spec.SkillTypeFS,
 			Location:  locBad,
-			Name:      "bad-skill",
+			Name:      skillBundleBadSkillSlug,
 			IsEnabled: true,
 		},
 	})
@@ -171,7 +202,7 @@ func TestSkillStore_PutSkill_RuntimeRejected_DoesNotPersist(t *testing.T) {
 
 	// Must not be persisted.
 	resp, err := s.ListSkills(t.Context(), &spec.ListSkillsRequest{
-		BundleIDs:           []bundleitemutils.BundleID{"b1"},
+		BundleIDs:           []bundleitemutils.BundleID{skillBundleB1},
 		Types:               []spec.SkillType{spec.SkillTypeFS},
 		IncludeDisabled:     true,
 		IncludeMissing:      true,
@@ -188,18 +219,18 @@ func TestSkillStore_PutSkill_RuntimeRejected_DoesNotPersist(t *testing.T) {
 func TestSkillStore_PutSkill_DuplicateSlug_Conflict(t *testing.T) {
 	t.Parallel()
 	s := newTestSkillStore(t)
-	putBundle(t, s, "b1", "bundle-1", "Bundle 1", true)
+	putBundle(t, s, skillBundleB1, testBundleSlug, testBundleDisplayName, true)
 
 	root := t.TempDir()
-	loc := writeSkillPackage(t, root, "dup-skill", "desc", "BODY")
+	loc := writeSkillPackage(t, root, skillBundleDupSkillSlug, "desc", "BODY")
 
 	_, err := s.PutSkill(t.Context(), &spec.PutSkillRequest{
-		BundleID:  "b1",
-		SkillSlug: "dup-skill",
+		BundleID:  skillBundleB1,
+		SkillSlug: skillBundleDupSkillSlug,
 		Body: &spec.PutSkillRequestBody{
 			SkillType: spec.SkillTypeFS,
 			Location:  loc,
-			Name:      "dup-skill",
+			Name:      skillBundleDupSkillSlug,
 			IsEnabled: true,
 		},
 	})
@@ -208,12 +239,12 @@ func TestSkillStore_PutSkill_DuplicateSlug_Conflict(t *testing.T) {
 	}
 
 	_, err = s.PutSkill(t.Context(), &spec.PutSkillRequest{
-		BundleID:  "b1",
-		SkillSlug: "dup-skill",
+		BundleID:  skillBundleB1,
+		SkillSlug: skillBundleDupSkillSlug,
 		Body: &spec.PutSkillRequestBody{
 			SkillType: spec.SkillTypeFS,
 			Location:  loc,
-			Name:      "dup-skill",
+			Name:      skillBundleDupSkillSlug,
 			IsEnabled: true,
 		},
 	})
@@ -227,8 +258,8 @@ func TestSkillStore_PatchSkill_EmptyPatchRejected(t *testing.T) {
 	s := newTestSkillStore(t)
 
 	_, err := s.PatchSkill(t.Context(), &spec.PatchSkillRequest{
-		BundleID:  "b1",
-		SkillSlug: "s1",
+		BundleID:  skillBundleB1,
+		SkillSlug: skillBundleS1,
 		Body:      &spec.PatchSkillRequestBody{},
 	})
 	if err == nil || !errors.Is(err, spec.ErrSkillInvalidRequest) {
@@ -239,20 +270,20 @@ func TestSkillStore_PatchSkill_EmptyPatchRejected(t *testing.T) {
 func TestSkillStore_PatchSkill_EnableAndLocationChange_PresenceResetAndRuntimeDelta(t *testing.T) {
 	t.Parallel()
 	s := newTestSkillStore(t)
-	putBundle(t, s, "b1", "bundle-1", "Bundle 1", true)
+	putBundle(t, s, skillBundleB1, testBundleSlug, testBundleDisplayName, true)
 
 	root1 := filepath.Join(t.TempDir(), "v1")
 	root2 := filepath.Join(t.TempDir(), "v2")
-	loc1 := writeSkillPackage(t, root1, "patch-skill", "desc v1", "BODY_V1")
-	loc2 := writeSkillPackage(t, root2, "patch-skill", "desc v2", "BODY_V2")
+	loc1 := writeSkillPackage(t, root1, skillBundlePatchSkillSlug, "desc v1", "BODY_V1")
+	loc2 := writeSkillPackage(t, root2, skillBundlePatchSkillSlug, "desc v2", "BODY_V2")
 
 	_, err := s.PutSkill(t.Context(), &spec.PutSkillRequest{
-		BundleID:  "b1",
-		SkillSlug: "patch-skill",
+		BundleID:  skillBundleB1,
+		SkillSlug: skillBundlePatchSkillSlug,
 		Body: &spec.PutSkillRequestBody{
 			SkillType: spec.SkillTypeFS,
 			Location:  loc1,
-			Name:      "patch-skill",
+			Name:      skillBundlePatchSkillSlug,
 			IsEnabled: false,
 		},
 	})
@@ -262,30 +293,33 @@ func TestSkillStore_PatchSkill_EnableAndLocationChange_PresenceResetAndRuntimeDe
 
 	// Enable -> should appear in runtime.
 	_, err = s.PatchSkill(t.Context(), &spec.PatchSkillRequest{
-		BundleID:  "b1",
-		SkillSlug: "patch-skill",
+		BundleID:  skillBundleB1,
+		SkillSlug: skillBundlePatchSkillSlug,
 		Body:      &spec.PatchSkillRequestBody{IsEnabled: new(true)},
 	})
 	if err != nil {
 		t.Fatalf("PatchSkill(enable): %v", err)
 	}
 	recs := runtimeRecs(t, s)
-	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "patch-skill", Location: loc1})
+	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: skillBundlePatchSkillSlug, Location: loc1})
 
 	// Location change -> must validate new, remove old, reset presence.
 	_, err = s.PatchSkill(t.Context(), &spec.PatchSkillRequest{
-		BundleID:  "b1",
-		SkillSlug: "patch-skill",
+		BundleID:  skillBundleB1,
+		SkillSlug: skillBundlePatchSkillSlug,
 		Body:      &spec.PatchSkillRequestBody{Location: new(loc2)},
 	})
 	if err != nil {
 		t.Fatalf("PatchSkill(location): %v", err)
 	}
 	recs = runtimeRecs(t, s)
-	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "patch-skill", Location: loc2})
-	mustNotHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "patch-skill", Location: loc1})
+	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: skillBundlePatchSkillSlug, Location: loc2})
+	mustNotHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: skillBundlePatchSkillSlug, Location: loc1})
 
-	gs, err := s.GetSkill(t.Context(), &spec.GetSkillRequest{BundleID: "b1", SkillSlug: "patch-skill"})
+	gs, err := s.GetSkill(
+		t.Context(),
+		&spec.GetSkillRequest{BundleID: skillBundleB1, SkillSlug: skillBundlePatchSkillSlug},
+	)
 	if err != nil {
 		t.Fatalf("GetSkill: %v", err)
 	}
@@ -300,21 +334,21 @@ func TestSkillStore_PatchSkill_EnableAndLocationChange_PresenceResetAndRuntimeDe
 func TestSkillStore_RuntimeDuplicateSafeRemoval_PatchAndDelete(t *testing.T) {
 	t.Parallel()
 	s := newTestSkillStore(t)
-	putBundle(t, s, "b1", "bundle-1", "Bundle 1", true)
+	putBundle(t, s, skillBundleB1, testBundleSlug, testBundleDisplayName, true)
 
 	// Two store skills pointing to the same underlying runtime def.
 	root1 := filepath.Join(t.TempDir(), "v1")
 	root2 := filepath.Join(t.TempDir(), "v2")
-	loc1 := writeSkillPackage(t, root1, "dupe-skill", "desc v1", "BODY_V1")
-	loc2 := writeSkillPackage(t, root2, "dupe-skill", "desc v2", "BODY_V2")
+	loc1 := writeSkillPackage(t, root1, skillBundleDupeSkillName, "desc v1", "BODY_V1")
+	loc2 := writeSkillPackage(t, root2, skillBundleDupeSkillName, "desc v2", "BODY_V2")
 
 	_, err := s.PutSkill(t.Context(), &spec.PutSkillRequest{
-		BundleID:  "b1",
-		SkillSlug: "dupe-1",
+		BundleID:  skillBundleB1,
+		SkillSlug: skillBundleDupe1Slug,
 		Body: &spec.PutSkillRequestBody{
 			SkillType: spec.SkillTypeFS,
 			Location:  loc1,
-			Name:      "dupe-skill",
+			Name:      skillBundleDupeSkillName,
 			IsEnabled: true,
 		},
 	})
@@ -322,12 +356,12 @@ func TestSkillStore_RuntimeDuplicateSafeRemoval_PatchAndDelete(t *testing.T) {
 		t.Fatalf("PutSkill(dupe-1): %v", err)
 	}
 	_, err = s.PutSkill(t.Context(), &spec.PutSkillRequest{
-		BundleID:  "b1",
-		SkillSlug: "dupe-2",
+		BundleID:  skillBundleB1,
+		SkillSlug: skillBundleDupe2Slug,
 		Body: &spec.PutSkillRequestBody{
 			SkillType: spec.SkillTypeFS,
 			Location:  loc1,
-			Name:      "dupe-skill",
+			Name:      skillBundleDupeSkillName,
 			IsEnabled: true,
 		},
 	})
@@ -336,12 +370,12 @@ func TestSkillStore_RuntimeDuplicateSafeRemoval_PatchAndDelete(t *testing.T) {
 	}
 
 	recs := runtimeRecs(t, s)
-	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "dupe-skill", Location: loc1})
+	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: skillBundleDupeSkillName, Location: loc1})
 
 	// Patch only one location: old def must stay because dupe-2 still wants it.
 	_, err = s.PatchSkill(t.Context(), &spec.PatchSkillRequest{
-		BundleID:  "b1",
-		SkillSlug: "dupe-1",
+		BundleID:  skillBundleB1,
+		SkillSlug: skillBundleDupe1Slug,
 		Body:      &spec.PatchSkillRequestBody{Location: new(loc2)},
 	})
 	if err != nil {
@@ -349,34 +383,37 @@ func TestSkillStore_RuntimeDuplicateSafeRemoval_PatchAndDelete(t *testing.T) {
 	}
 
 	recs = runtimeRecs(t, s)
-	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "dupe-skill", Location: loc1})
-	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "dupe-skill", Location: loc2})
+	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: skillBundleDupeSkillName, Location: loc1})
+	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: skillBundleDupeSkillName, Location: loc2})
 
 	// Delete the remaining reference to loc1 -> runtime must remove loc1 now.
-	_, err = s.DeleteSkill(t.Context(), &spec.DeleteSkillRequest{BundleID: "b1", SkillSlug: "dupe-2"})
+	_, err = s.DeleteSkill(
+		t.Context(),
+		&spec.DeleteSkillRequest{BundleID: skillBundleB1, SkillSlug: skillBundleDupe2Slug},
+	)
 	if err != nil {
 		t.Fatalf("DeleteSkill(dupe-2): %v", err)
 	}
 	recs = runtimeRecs(t, s)
-	mustNotHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "dupe-skill", Location: loc1})
-	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: "dupe-skill", Location: loc2})
+	mustNotHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: skillBundleDupeSkillName, Location: loc1})
+	mustHaveSkillDef(t, recs, agentskillsSpec.SkillDef{Type: "fs", Name: skillBundleDupeSkillName, Location: loc2})
 }
 
 func TestSkillStore_DeleteSkill_MissingPresenceBlocked(t *testing.T) {
 	t.Parallel()
 	s := newTestSkillStore(t)
-	putBundle(t, s, "b1", "bundle-1", "Bundle 1", true)
+	putBundle(t, s, skillBundleB1, testBundleSlug, testBundleDisplayName, true)
 
 	root := t.TempDir()
-	loc := writeSkillPackage(t, root, "missing-skill", "desc", "BODY")
+	loc := writeSkillPackage(t, root, skillBundleMissingSkillSlug, "desc", "BODY")
 
 	_, err := s.PutSkill(t.Context(), &spec.PutSkillRequest{
-		BundleID:  "b1",
-		SkillSlug: "missing-skill",
+		BundleID:  skillBundleB1,
+		SkillSlug: skillBundleMissingSkillSlug,
 		Body: &spec.PutSkillRequestBody{
 			SkillType: spec.SkillTypeFS,
 			Location:  loc,
-			Name:      "missing-skill",
+			Name:      skillBundleMissingSkillSlug,
 			IsEnabled: true,
 		},
 	})
@@ -389,12 +426,15 @@ func TestSkillStore_DeleteSkill_MissingPresenceBlocked(t *testing.T) {
 	if err != nil {
 		t.Fatalf("readAllUser: %v", err)
 	}
-	sk := all.Skills["b1"]["missing-skill"]
+	sk := all.Skills[skillBundleB1][skillBundleMissingSkillSlug]
 	sk.Presence = &spec.SkillPresence{Status: spec.SkillPresenceMissing}
-	all.Skills["b1"]["missing-skill"] = sk
+	all.Skills[skillBundleB1][skillBundleMissingSkillSlug] = sk
 	writeAllUserLocked(t, s, all)
 
-	_, err = s.DeleteSkill(t.Context(), &spec.DeleteSkillRequest{BundleID: "b1", SkillSlug: "missing-skill"})
+	_, err = s.DeleteSkill(
+		t.Context(),
+		&spec.DeleteSkillRequest{BundleID: skillBundleB1, SkillSlug: skillBundleMissingSkillSlug},
+	)
 	if err == nil || !errors.Is(err, spec.ErrSkillIsMissing) {
 		t.Fatalf("expected ErrSkillIsMissing, got %v", err)
 	}
@@ -403,12 +443,12 @@ func TestSkillStore_DeleteSkill_MissingPresenceBlocked(t *testing.T) {
 func TestSkillStore_DeleteSkillBundle_NotEmpty(t *testing.T) {
 	t.Parallel()
 	s := newTestSkillStore(t)
-	putBundle(t, s, "b1", "bundle-1", "Bundle 1", true)
+	putBundle(t, s, skillBundleB1, testBundleSlug, testBundleDisplayName, true)
 
 	root := t.TempDir()
 	loc := writeSkillPackage(t, root, "some-skill", "desc", "BODY")
 	_, err := s.PutSkill(t.Context(), &spec.PutSkillRequest{
-		BundleID:  "b1",
+		BundleID:  skillBundleB1,
 		SkillSlug: "some-skill",
 		Body: &spec.PutSkillRequestBody{
 			SkillType: spec.SkillTypeFS,
@@ -421,7 +461,7 @@ func TestSkillStore_DeleteSkillBundle_NotEmpty(t *testing.T) {
 		t.Fatalf("PutSkill: %v", err)
 	}
 
-	_, err = s.DeleteSkillBundle(t.Context(), &spec.DeleteSkillBundleRequest{BundleID: "b1"})
+	_, err = s.DeleteSkillBundle(t.Context(), &spec.DeleteSkillBundleRequest{BundleID: skillBundleB1})
 	if err == nil || !errors.Is(err, spec.ErrSkillBundleNotEmpty) {
 		t.Fatalf("expected ErrSkillBundleNotEmpty, got %v", err)
 	}
@@ -431,17 +471,17 @@ func TestSkillStore_PutSkillBundle_SoftDeletedCannotBeRecreated(t *testing.T) {
 	t.Parallel()
 	s := newTestSkillStore(t)
 
-	putBundle(t, s, "b1", "bundle-1", "Bundle 1", true)
+	putBundle(t, s, skillBundleB1, testBundleSlug, testBundleDisplayName, true)
 
-	_, err := s.DeleteSkillBundle(t.Context(), &spec.DeleteSkillBundleRequest{BundleID: "b1"})
+	_, err := s.DeleteSkillBundle(t.Context(), &spec.DeleteSkillBundleRequest{BundleID: skillBundleB1})
 	if err != nil {
 		t.Fatalf("DeleteSkillBundle: %v", err)
 	}
 
 	_, err = s.PutSkillBundle(t.Context(), &spec.PutSkillBundleRequest{
-		BundleID: "b1",
+		BundleID: skillBundleB1,
 		Body: &spec.PutSkillBundleRequestBody{
-			Slug:        "bundle-1",
+			Slug:        testBundleSlug,
 			DisplayName: "Bundle 1 (recreate)",
 			IsEnabled:   true,
 		},
@@ -475,7 +515,7 @@ func TestSkillStore_enabledDefCountsInUserBundle_NilAndEmpty(t *testing.T) {
 	t.Parallel()
 	s := newTestSkillStore(t)
 
-	got, err := s.enabledDefCountsInUserBundle(nil, "b1")
+	got, err := s.enabledDefCountsInUserBundle(nil, skillBundleB1)
 	if err != nil {
 		t.Fatalf("enabledDefCountsInUserBundle: %v", err)
 	}
@@ -488,7 +528,7 @@ func TestSkillStore_enabledDefCountsInUserBundle_NilAndEmpty(t *testing.T) {
 		Bundles:       map[bundleitemutils.BundleID]spec.SkillBundle{},
 		Skills:        map[bundleitemutils.BundleID]map[spec.SkillSlug]spec.Skill{},
 	}
-	got, err = s.enabledDefCountsInUserBundle(sc, "b1")
+	got, err = s.enabledDefCountsInUserBundle(sc, skillBundleB1)
 	if err != nil {
 		t.Fatalf("enabledDefCountsInUserBundle: %v", err)
 	}
@@ -505,18 +545,18 @@ func TestSkillStore_enabledDefCountsInUserBundle_InvalidSkillDefFails(t *testing
 	sc := &skillStoreSchema{
 		SchemaVersion: spec.SkillSchemaVersion,
 		Bundles: map[bundleitemutils.BundleID]spec.SkillBundle{
-			"b1": {
+			skillBundleB1: {
 				SchemaVersion: spec.SkillSchemaVersion,
-				ID:            "b1",
-				Slug:          "bundle-1",
-				DisplayName:   "Bundle 1",
+				ID:            skillBundleB1,
+				Slug:          testBundleSlug,
+				DisplayName:   testBundleDisplayName,
 				IsEnabled:     true,
 				CreatedAt:     now,
 				ModifiedAt:    now,
 			},
 		},
 		Skills: map[bundleitemutils.BundleID]map[spec.SkillSlug]spec.Skill{
-			"b1": {
+			skillBundleB1: {
 				"s1": {
 					SchemaVersion: spec.SkillSchemaVersion,
 					ID:            "id-1",
@@ -533,7 +573,7 @@ func TestSkillStore_enabledDefCountsInUserBundle_InvalidSkillDefFails(t *testing
 		},
 	}
 
-	_, err := s.enabledDefCountsInUserBundle(sc, "b1")
+	_, err := s.enabledDefCountsInUserBundle(sc, skillBundleB1)
 	if err == nil || !errors.Is(err, spec.ErrSkillInvalidRequest) {
 		t.Fatalf("expected ErrSkillInvalidRequest, got %v", err)
 	}

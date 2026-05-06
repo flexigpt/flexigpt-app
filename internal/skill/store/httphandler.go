@@ -7,9 +7,10 @@ import (
 )
 
 const (
-	skillTag        = "SkillStore"
-	skillRuntimeTag = "SkillRuntime"
-	skillPathPrefix = "/skills"
+	skillTag              = "SkillStore"
+	skillRuntimeTag       = "SkillRuntime"
+	skillPathPrefix       = "/skills"
+	patchSkillOperationID = "patch-skill"
 )
 
 // InitSkillStoreHandlers registers all endpoints for skill bundles and skills.
@@ -57,7 +58,7 @@ func InitSkillStoreHandlers(api huma.API, store *SkillStore) {
 	}, store.PutSkill)
 
 	huma.Register(api, huma.Operation{
-		OperationID: "patch-skill",
+		OperationID: patchSkillOperationID,
 		Method:      http.MethodPatch,
 		Path:        skillPathPrefix + "/bundles/{bundleID}/skills/{skillSlug}",
 		Summary:     "Patch a skill (enable/disable, location)",

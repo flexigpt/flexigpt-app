@@ -12,6 +12,30 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
 )
 
+const (
+	testSchemaVersionKey      = "schemaVersion"
+	testInvalidSlug           = "invalid slug"
+	testBundleSlug            = "bundle-1"
+	testBundleDisplayName     = "Bundle 1"
+	testNope                  = "nope"
+	testUserBundleSlug        = "user-bundle"
+	testUserBundleDisplayName = "User Bundle"
+	testTempLocation          = "/tmp/x"
+	testSlugValue             = "slug"
+	testNameValue             = "name"
+	testDisplayNameKey        = "displayName"
+	testDescriptionKey        = "description"
+	testLocationKey           = "location"
+	testTypeKey               = "type"
+	testTagsKey               = "tags"
+	testPresenceKey           = "presence"
+	testStatusKey             = "status"
+	testIsEnabledKey          = "isEnabled"
+	testIsBuiltInKey          = "isBuiltIn"
+	testCreatedAtKey          = "createdAt"
+	testModifiedAtKey         = "modifiedAt"
+)
+
 func TestCloneHelpers_DeepCopy(t *testing.T) {
 	t.Parallel()
 
@@ -26,10 +50,10 @@ func TestCloneHelpers_DeepCopy(t *testing.T) {
 	orig := spec.Skill{
 		SchemaVersion: spec.SkillSchemaVersion,
 		ID:            "id",
-		Slug:          "slug",
+		Slug:          testSlugValue,
 		Type:          spec.SkillTypeFS,
 		Location:      "loc",
-		Name:          "name",
+		Name:          testNameValue,
 		Tags:          []string{"a", "b"},
 		Presence:      p,
 		IsEnabled:     true,
@@ -138,8 +162,8 @@ func TestSkillStore_PutSkillBundle_Table(t *testing.T) {
 			&spec.PutSkillBundleRequest{
 				BundleID: "user-b1",
 				Body: &spec.PutSkillBundleRequestBody{
-					Slug:        "user-bundle",
-					DisplayName: "User Bundle",
+					Slug:        testUserBundleSlug,
+					DisplayName: testUserBundleDisplayName,
 					IsEnabled:   true,
 				},
 			},
@@ -203,7 +227,7 @@ func TestSkillStore_PatchAndDeleteSkillBundle_UserPaths(t *testing.T) {
 	t.Parallel()
 	s := newTestSkillStore(t)
 
-	putBundle(t, s, "b1", "bundle-1", "Bundle 1", true)
+	putBundle(t, s, "b1", testBundleSlug, testBundleDisplayName, true)
 
 	// Patch: disable.
 	_, err := s.PatchSkillBundle(t.Context(), &spec.PatchSkillBundleRequest{
@@ -238,7 +262,7 @@ func TestSkillStore_SweepSoftDeleted_HardDeletesAfterGrace(t *testing.T) {
 	t.Parallel()
 	s := newTestSkillStore(t)
 
-	putBundle(t, s, "b1", "bundle-1", "Bundle 1", true)
+	putBundle(t, s, "b1", testBundleSlug, testBundleDisplayName, true)
 
 	_, err := s.DeleteSkillBundle(t.Context(), &spec.DeleteSkillBundleRequest{BundleID: "b1"})
 	if err != nil {
@@ -284,7 +308,7 @@ func TestSkillStore_GetSkill_DisabledChecks(t *testing.T) {
 	t.Parallel()
 	s := newTestSkillStore(t)
 
-	putBundle(t, s, "b1", "bundle-1", "Bundle 1", true)
+	putBundle(t, s, "b1", testBundleSlug, testBundleDisplayName, true)
 	skillBaseDir := t.TempDir()
 	err := putSkill(t, s, "b1", "s1", skillBaseDir, "s1", "mySkill1", "My Skill 1", false)
 	if err != nil {
@@ -315,7 +339,7 @@ func TestSkillStore_ListSkillBundles_FiltersAndPaging(t *testing.T) {
 	t.Parallel()
 	s := newTestSkillStore(t)
 
-	putBundle(t, s, "b1", "bundle-1", "Bundle 1", true)
+	putBundle(t, s, "b1", testBundleSlug, testBundleDisplayName, true)
 	time.Sleep(2 * time.Millisecond)
 	putBundle(t, s, "b2", "bundle-2", "Bundle 2", false)
 	time.Sleep(2 * time.Millisecond)
@@ -378,7 +402,7 @@ func TestSkillStore_ListSkills_UserOnlyFiltersAndPaging(t *testing.T) {
 	t.Parallel()
 	s := newTestSkillStore(t)
 
-	putBundle(t, s, "b1", "bundle-1", "Bundle 1", true)
+	putBundle(t, s, "b1", testBundleSlug, testBundleDisplayName, true)
 	skillBaseDir := t.TempDir()
 
 	err := putSkill(t, s, "b1", "s1", skillBaseDir, "s1", "mySkill1", "My Skill 1", true)
@@ -486,7 +510,7 @@ func TestSkillStore_ConcurrentPutAndList(t *testing.T) {
 	t.Parallel()
 	s := newTestSkillStore(t)
 
-	putBundle(t, s, "b1", "bundle-1", "Bundle 1", true)
+	putBundle(t, s, "b1", testBundleSlug, testBundleDisplayName, true)
 
 	ctx := t.Context()
 	const n = 30
@@ -591,7 +615,7 @@ func TestSkillStore_BuiltInReadOnly_Guards(t *testing.T) {
 		SkillSlug: "user-skill",
 		Body: &spec.PutSkillRequestBody{
 			SkillType: spec.SkillTypeFS,
-			Location:  "/tmp/x",
+			Location:  testTempLocation,
 			Name:      "X",
 			IsEnabled: true,
 		},
@@ -645,36 +669,36 @@ func TestSkillStore_readAllUser_HardeningAndCorruptionDetection(t *testing.T) {
 
 	t.Run("missing-schemaVersion-defaults-and-normalizes-isBuiltIn", func(t *testing.T) {
 		setUserStoreAllLocked(t, s, map[string]any{
-			"bundles": map[string]any{
+			builtInSkillBundlesGroupID: map[string]any{
 				"b1": map[string]any{
-					"schemaVersion": spec.SkillSchemaVersion,
-					"id":            "b1",
-					"slug":          "bundle-1",
-					"displayName":   "Bundle 1",
-					"description":   "",
-					"isEnabled":     true,
-					"isBuiltIn":     true, // should be normalized to false on read
-					"createdAt":     now,
-					"modifiedAt":    now,
+					testSchemaVersionKey: spec.SkillSchemaVersion,
+					"id":                 "b1",
+					testSlugValue:        testBundleSlug,
+					testDisplayNameKey:   testBundleDisplayName,
+					testDescriptionKey:   "",
+					testIsEnabledKey:     true,
+					testIsBuiltInKey:     true, // should be normalized to false on read
+					testCreatedAtKey:     now,
+					testModifiedAtKey:    now,
 				},
 			},
-			"skills": map[string]any{
+			builtInSkillSkillsGroupID: map[string]any{
 				"b1": map[string]any{
 					"s1": map[string]any{
-						"schemaVersion": spec.SkillSchemaVersion,
-						"id":            "s1",
-						"slug":          "s1",
-						"type":          "fs",
-						"location":      "/tmp/x",
-						"name":          "n",
-						"displayName":   "",
-						"description":   "",
-						"tags":          []any{},
-						"presence":      map[string]any{"status": "unknown"},
-						"isEnabled":     true,
-						"isBuiltIn":     true, // should be normalized to false on read
-						"createdAt":     now,
-						"modifiedAt":    now,
+						testSchemaVersionKey: spec.SkillSchemaVersion,
+						"id":                 "s1",
+						testSlugValue:        "s1",
+						testTypeKey:          "fs",
+						testLocationKey:      testTempLocation,
+						testNameValue:        testNameValue,
+						testDisplayNameKey:   "",
+						testDescriptionKey:   "",
+						testTagsKey:          []any{},
+						testPresenceKey:      map[string]any{testStatusKey: "unknown"},
+						testIsEnabledKey:     true,
+						testIsBuiltInKey:     true, // should be normalized to false on read
+						testCreatedAtKey:     now,
+						testModifiedAtKey:    now,
 					},
 				},
 			},
@@ -697,31 +721,31 @@ func TestSkillStore_readAllUser_HardeningAndCorruptionDetection(t *testing.T) {
 
 	t.Run("schemaVersion-mismatch-errors", func(t *testing.T) {
 		setUserStoreAllLocked(t, s, map[string]any{
-			"schemaVersion": "1900-01-01",
-			"bundles":       map[string]any{},
-			"skills":        map[string]any{},
+			testSchemaVersionKey:       "1900-01-01",
+			builtInSkillBundlesGroupID: map[string]any{},
+			builtInSkillSkillsGroupID:  map[string]any{},
 		})
 		_, err := readAllUserLocked(t, s, true)
-		if err == nil || !strings.Contains(err.Error(), "schemaVersion") {
+		if err == nil || !strings.Contains(err.Error(), testSchemaVersionKey) {
 			t.Fatalf("expected schemaVersion error, got %v", err)
 		}
 	})
 
 	t.Run("bundle-key-mismatch-errors", func(t *testing.T) {
 		setUserStoreAllLocked(t, s, map[string]any{
-			"schemaVersion": spec.SkillSchemaVersion,
-			"bundles": map[string]any{
+			testSchemaVersionKey: spec.SkillSchemaVersion,
+			builtInSkillBundlesGroupID: map[string]any{
 				"b1": map[string]any{
-					"schemaVersion": spec.SkillSchemaVersion,
-					"id":            "DIFF",
-					"slug":          "bundle-1",
-					"displayName":   "Bundle 1",
-					"isEnabled":     true,
-					"createdAt":     now,
-					"modifiedAt":    now,
+					testSchemaVersionKey: spec.SkillSchemaVersion,
+					"id":                 "DIFF",
+					testSlugValue:        testBundleSlug,
+					testDisplayNameKey:   testBundleDisplayName,
+					testIsEnabledKey:     true,
+					testCreatedAtKey:     now,
+					testModifiedAtKey:    now,
 				},
 			},
-			"skills": map[string]any{"b1": map[string]any{}},
+			builtInSkillSkillsGroupID: map[string]any{"b1": map[string]any{}},
 		})
 
 		_, err := readAllUserLocked(t, s, true)
@@ -732,9 +756,9 @@ func TestSkillStore_readAllUser_HardeningAndCorruptionDetection(t *testing.T) {
 
 	t.Run("skills-reference-missing-bundle-errors", func(t *testing.T) {
 		setUserStoreAllLocked(t, s, map[string]any{
-			"schemaVersion": spec.SkillSchemaVersion,
-			"bundles":       map[string]any{},
-			"skills": map[string]any{
+			testSchemaVersionKey:       spec.SkillSchemaVersion,
+			builtInSkillBundlesGroupID: map[string]any{},
+			builtInSkillSkillsGroupID: map[string]any{
 				"missing": map[string]any{},
 			},
 		})
@@ -747,30 +771,30 @@ func TestSkillStore_readAllUser_HardeningAndCorruptionDetection(t *testing.T) {
 
 	t.Run("skill-key-mismatch-errors", func(t *testing.T) {
 		setUserStoreAllLocked(t, s, map[string]any{
-			"schemaVersion": spec.SkillSchemaVersion,
-			"bundles": map[string]any{
+			testSchemaVersionKey: spec.SkillSchemaVersion,
+			builtInSkillBundlesGroupID: map[string]any{
 				"b1": map[string]any{
-					"schemaVersion": spec.SkillSchemaVersion,
-					"id":            "b1",
-					"slug":          "bundle-1",
-					"displayName":   "Bundle 1",
-					"isEnabled":     true,
-					"createdAt":     now,
-					"modifiedAt":    now,
+					testSchemaVersionKey: spec.SkillSchemaVersion,
+					"id":                 "b1",
+					testSlugValue:        testBundleSlug,
+					testDisplayNameKey:   testBundleDisplayName,
+					testIsEnabledKey:     true,
+					testCreatedAtKey:     now,
+					testModifiedAtKey:    now,
 				},
 			},
-			"skills": map[string]any{
+			builtInSkillSkillsGroupID: map[string]any{
 				"b1": map[string]any{
 					"s1": map[string]any{
-						"schemaVersion": spec.SkillSchemaVersion,
-						"id":            "s1",
-						"slug":          "s2", // mismatch
-						"type":          "fs",
-						"location":      "/tmp/x",
-						"name":          "n",
-						"isEnabled":     true,
-						"createdAt":     now,
-						"modifiedAt":    now,
+						testSchemaVersionKey: spec.SkillSchemaVersion,
+						"id":                 "s1",
+						testSlugValue:        "s2", // mismatch
+						testTypeKey:          "fs",
+						testLocationKey:      testTempLocation,
+						testNameValue:        "n",
+						testIsEnabledKey:     true,
+						testCreatedAtKey:     now,
+						testModifiedAtKey:    now,
 					},
 				},
 			},
@@ -784,7 +808,7 @@ func TestSkillStore_readAllUser_HardeningAndCorruptionDetection(t *testing.T) {
 
 	t.Run("missing-bundles-and-skills-maps-normalize", func(t *testing.T) {
 		setUserStoreAllLocked(t, s, map[string]any{
-			"schemaVersion": spec.SkillSchemaVersion,
+			testSchemaVersionKey: spec.SkillSchemaVersion,
 		})
 
 		sc, err := readAllUserLocked(t, s, true)

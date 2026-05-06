@@ -18,14 +18,19 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/skill/spec"
 )
 
+const (
+	builtInSkillBundlesGroupID = "bundles"
+	builtInSkillSkillsGroupID  = "skills"
+)
+
 type builtInSkillBundleID bundleitemutils.BundleID
 
-func (builtInSkillBundleID) Group() overlay.GroupID { return "bundles" }
+func (builtInSkillBundleID) Group() overlay.GroupID { return builtInSkillBundlesGroupID }
 func (k builtInSkillBundleID) ID() overlay.KeyID    { return overlay.KeyID(k) }
 
 type builtInSkillKey string
 
-func (builtInSkillKey) Group() overlay.GroupID { return "skills" }
+func (builtInSkillKey) Group() overlay.GroupID { return builtInSkillSkillsGroupID }
 func (k builtInSkillKey) ID() overlay.KeyID    { return overlay.KeyID(k) }
 
 type BuiltInSkills struct {

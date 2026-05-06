@@ -61,6 +61,9 @@ linters:
     # Run exhaustiveness checks on Go "sum types".
     - gochecksumtype
 
+    # Finds repeated strings that could be replaced by a constant.
+    - goconst
+
     # Meta linter with lots of great checks
     - gocritic
 
@@ -173,9 +176,6 @@ linters:
     - wastedassign
 
   disable:
-
-    # Finds repeated strings that could be replaced by a constant.
-    - goconst
 
     #  Linter for ArangoDB go driver
     - arangolint

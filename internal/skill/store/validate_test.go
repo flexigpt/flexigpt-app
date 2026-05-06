@@ -36,9 +36,9 @@ func TestValidateSkillBundle_Table(t *testing.T) {
 			func(b *spec.SkillBundle) { *b = spec.SkillBundle{} /* handled by nil case separately */ },
 			"bundle is nil",
 		},
-		{"bad-schema", func(b *spec.SkillBundle) { b.SchemaVersion = "x" }, "schemaVersion"},
+		{"bad-schema", func(b *spec.SkillBundle) { b.SchemaVersion = "x" }, testSchemaVersionKey},
 		{"empty-id", func(b *spec.SkillBundle) { b.ID = "" }, "id is empty"},
-		{"bad-slug", func(b *spec.SkillBundle) { b.Slug = badSlug }, "invalid slug"},
+		{"bad-slug", func(b *spec.SkillBundle) { b.Slug = badSlug }, testInvalidSlug},
 		{"zero-times", func(b *spec.SkillBundle) { b.CreatedAt = time.Time{} }, "createdAt/modifiedAt is zero"},
 		{
 			"modified-before-created",
@@ -69,7 +69,6 @@ func TestValidateSkillBundle_Table(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-
 		if tc.name == "nil" {
 			continue
 		}
@@ -99,7 +98,7 @@ func TestValidateSkill_Table(t *testing.T) {
 			ID:            "s1",
 			Slug:          "ok-skill",
 			Type:          spec.SkillTypeFS,
-			Location:      "/tmp/x",
+			Location:      testTempLocation,
 			Name:          "Name",
 			Tags:          []string{"tag1"},
 			Presence:      &spec.SkillPresence{Status: spec.SkillPresenceUnknown},
@@ -115,9 +114,9 @@ func TestValidateSkill_Table(t *testing.T) {
 		mut     func(*spec.Skill)
 		wantSub string
 	}{
-		{"bad-schema", func(s *spec.Skill) { s.SchemaVersion = "x" }, "schemaVersion"},
+		{"bad-schema", func(s *spec.Skill) { s.SchemaVersion = "x" }, testSchemaVersionKey},
 		{"empty-id", func(s *spec.Skill) { s.ID = "" }, "id is empty"},
-		{"bad-slug", func(s *spec.Skill) { s.Slug = badSlug }, "invalid slug"},
+		{"bad-slug", func(s *spec.Skill) { s.Slug = badSlug }, testInvalidSlug},
 		{"empty-location", func(s *spec.Skill) { s.Location = "   " }, "location is empty"},
 		{
 			"location-too-long",
@@ -132,7 +131,7 @@ func TestValidateSkill_Table(t *testing.T) {
 			func(s *spec.Skill) { s.ModifiedAt = now.Add(-time.Second) },
 			"modifiedAt is before createdAt",
 		},
-		{"invalid-type", func(s *spec.Skill) { s.Type = "nope" }, "invalid type"},
+		{"invalid-type", func(s *spec.Skill) { s.Type = testNope }, "invalid type"},
 		{
 			"builtin-cannot-be-fs",
 			func(s *spec.Skill) { s.IsBuiltIn = true; s.Type = spec.SkillTypeFS },

@@ -21,8 +21,10 @@ import (
 )
 
 const (
-	mutated = "MUTATED"
-	badSlug = "BAD SLUG"
+	mutated          = "MUTATED"
+	badSlug          = "BAD SLUG"
+	builtinBundleID  = "builtin-bundle-1"
+	builtinSkillSlug = "hello"
 )
 
 func TestNewBuiltInSkills_InvalidArgs(t *testing.T) {
@@ -72,7 +74,7 @@ func TestBuiltInSkills_PopulateDataFromFS_HappyPathAndClones(t *testing.T) {
 	}
 
 	// Verify built-in normalization is applied.
-	sb1, ok := bundles[bundleitemutils.BundleID("builtin-bundle-1")]
+	sb1, ok := bundles[bundleitemutils.BundleID(builtinBundleID)]
 	if !ok {
 		t.Fatalf("missing builtin-bundle-1")
 	}
@@ -85,9 +87,9 @@ func TestBuiltInSkills_PopulateDataFromFS_HappyPathAndClones(t *testing.T) {
 
 	// Clone safety: mutate returned maps and ensure store data doesn't change.
 	sb1.DisplayName = mutated
-	bundles[bundleitemutils.BundleID("builtin-bundle-1")] = sb1
+	bundles[bundleitemutils.BundleID(builtinBundleID)] = sb1
 
-	orig, err := b.GetBuiltInSkillBundle(ctx, bundleitemutils.BundleID("builtin-bundle-1"))
+	orig, err := b.GetBuiltInSkillBundle(ctx, bundleitemutils.BundleID(builtinBundleID))
 	if err != nil {
 		t.Fatalf("GetBuiltInSkillBundle: %v", err)
 	}
@@ -96,7 +98,7 @@ func TestBuiltInSkills_PopulateDataFromFS_HappyPathAndClones(t *testing.T) {
 	}
 
 	// Clone safety for skills: mutate slices and nested pointers.
-	sk, err := b.GetBuiltInSkill(ctx, bundleitemutils.BundleID("builtin-bundle-1"), spec.SkillSlug("hello"))
+	sk, err := b.GetBuiltInSkill(ctx, bundleitemutils.BundleID(builtinBundleID), spec.SkillSlug(builtinSkillSlug))
 	if err != nil {
 		t.Fatalf("GetBuiltInSkill: %v", err)
 	}
@@ -105,7 +107,7 @@ func TestBuiltInSkills_PopulateDataFromFS_HappyPathAndClones(t *testing.T) {
 	}
 
 	// List returns cloneSkill; mutate list output then ensure Get returns unchanged.
-	lsk := skills[bundleitemutils.BundleID("builtin-bundle-1")][spec.SkillSlug("hello")]
+	lsk := skills[bundleitemutils.BundleID(builtinBundleID)][spec.SkillSlug(builtinSkillSlug)]
 	if len(lsk.Tags) == 0 {
 		t.Fatalf("expected tags")
 	}
@@ -114,9 +116,9 @@ func TestBuiltInSkills_PopulateDataFromFS_HappyPathAndClones(t *testing.T) {
 		t.Fatalf("expected presence")
 	}
 	lsk.Presence.Status = spec.SkillPresenceError
-	skills[bundleitemutils.BundleID("builtin-bundle-1")][spec.SkillSlug("hello")] = lsk
+	skills[bundleitemutils.BundleID(builtinBundleID)][spec.SkillSlug(builtinSkillSlug)] = lsk
 
-	sk2, err := b.GetBuiltInSkill(ctx, bundleitemutils.BundleID("builtin-bundle-1"), spec.SkillSlug("hello"))
+	sk2, err := b.GetBuiltInSkill(ctx, bundleitemutils.BundleID(builtinBundleID), spec.SkillSlug(builtinSkillSlug))
 	if err != nil {
 		t.Fatalf("GetBuiltInSkill: %v", err)
 	}
@@ -203,7 +205,7 @@ func TestBuiltInSkills_PopulateDataFromFS_Errors(t *testing.T) {
 				sc.SchemaVersion = "1900-01-01"
 				return mk(t, marshal(t, sc))
 			}(),
-			wantSub: "schemaVersion",
+			wantSub: testSchemaVersionKey,
 		},
 		{
 			name: "no-bundles",
@@ -256,7 +258,7 @@ func TestBuiltInSkills_PopulateDataFromFS_Errors(t *testing.T) {
 				sc.Bundles["b1"] = b
 				return mk(t, marshal(t, sc))
 			}(),
-			wantSub: "invalid slug",
+			wantSub: testInvalidSlug,
 		},
 		{
 			name: "invalid-skill-empty-location",
@@ -326,11 +328,15 @@ func TestBuiltInSkills_SetFlags_AndPersistence(t *testing.T) {
 	})
 
 	// Toggle bundle.
-	beforeBundle, err := b1.GetBuiltInSkillBundle(ctx, "builtin-bundle-1")
+	beforeBundle, err := b1.GetBuiltInSkillBundle(ctx, bundleitemutils.BundleID(builtinBundleID))
 	if err != nil {
 		t.Fatalf("GetBuiltInSkillBundle: %v", err)
 	}
-	afterBundle, err := b1.SetSkillBundleEnabled(ctx, "builtin-bundle-1", !beforeBundle.IsEnabled)
+	afterBundle, err := b1.SetSkillBundleEnabled(
+		ctx,
+		bundleitemutils.BundleID(builtinBundleID),
+		!beforeBundle.IsEnabled,
+	)
 	if err != nil {
 		t.Fatalf("SetSkillBundleEnabled: %v", err)
 	}
@@ -339,11 +345,20 @@ func TestBuiltInSkills_SetFlags_AndPersistence(t *testing.T) {
 	}
 
 	// Toggle skill.
-	beforeSkill, err := b1.GetBuiltInSkill(ctx, "builtin-bundle-1", "hello")
+	beforeSkill, err := b1.GetBuiltInSkill(
+		ctx,
+		bundleitemutils.BundleID(builtinBundleID),
+		spec.SkillSlug(builtinSkillSlug),
+	)
 	if err != nil {
 		t.Fatalf("GetBuiltInSkill: %v", err)
 	}
-	afterSkill, err := b1.SetSkillEnabled(ctx, "builtin-bundle-1", "hello", !beforeSkill.IsEnabled)
+	afterSkill, err := b1.SetSkillEnabled(
+		ctx,
+		bundleitemutils.BundleID(builtinBundleID),
+		spec.SkillSlug(builtinSkillSlug),
+		!beforeSkill.IsEnabled,
+	)
 	if err != nil {
 		t.Fatalf("SetSkillEnabled: %v", err)
 	}
@@ -359,14 +374,18 @@ func TestBuiltInSkills_SetFlags_AndPersistence(t *testing.T) {
 	t.Cleanup(func() {
 		_ = b2.Close()
 	})
-	gotBundle, err := b2.GetBuiltInSkillBundle(ctx, "builtin-bundle-1")
+	gotBundle, err := b2.GetBuiltInSkillBundle(ctx, bundleitemutils.BundleID(builtinBundleID))
 	if err != nil {
 		t.Fatalf("GetBuiltInSkillBundle(reopen): %v", err)
 	}
 	if gotBundle.IsEnabled != afterBundle.IsEnabled {
 		t.Fatalf("bundle flag did not persist: got=%v want=%v", gotBundle.IsEnabled, afterBundle.IsEnabled)
 	}
-	gotSkill, err := b2.GetBuiltInSkill(ctx, "builtin-bundle-1", "hello")
+	gotSkill, err := b2.GetBuiltInSkill(
+		ctx,
+		bundleitemutils.BundleID(builtinBundleID),
+		spec.SkillSlug(builtinSkillSlug),
+	)
 	if err != nil {
 		t.Fatalf("GetBuiltInSkill(reopen): %v", err)
 	}
@@ -389,8 +408,8 @@ func TestBuiltInSkills_ConcurrentFlagUpdates(t *testing.T) {
 			"b1": {
 				SchemaVersion: spec.SkillSchemaVersion,
 				ID:            "b1",
-				Slug:          "bundle-1",
-				DisplayName:   "Bundle 1",
+				Slug:          testBundleSlug,
+				DisplayName:   testBundleDisplayName,
 				IsEnabled:     true,
 				CreatedAt:     now,
 				ModifiedAt:    now,
@@ -475,7 +494,7 @@ func TestResolveSkillsFS(t *testing.T) {
 		{"empty-dir", "", false},
 		{"dot-dir", ".", false},
 		{"subdir-ok", "a", false},
-		{"subdir-missing", "nope", true},
+		{"subdir-missing", testNope, true},
 	}
 
 	for _, tc := range tests {
