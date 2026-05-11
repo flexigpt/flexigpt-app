@@ -101,19 +101,19 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 			h6: renderHeading('h6', 'my-1 pt-1 text-xs font-semibold uppercase tracking-wide'),
 
 			ul: ({ node, children, className, ...rest }: CustomComponentProps) => (
-				<ul {...rest} className={`ml-4 list-disc py-1.5 pl-2 ${className ?? ''}`}>
+				<ul {...rest} className={`ml-4 list-disc py-1.5 pl-2 ${className ?? ''}`} style={{ fontSize: 14 }}>
 					{children}
 				</ul>
 			),
 
 			ol: ({ node, children, className, ...rest }: CustomComponentProps) => (
-				<ol {...rest} className={`ml-4 list-decimal py-1.5 pl-2 ${className ?? ''}`}>
+				<ol {...rest} className={`ml-4 list-decimal py-1.5 pl-2 ${className ?? ''}`} style={{ fontSize: 14 }}>
 					{children}
 				</ol>
 			),
 
 			li: ({ node, children, className, ...rest }: CustomComponentProps) => (
-				<li {...rest} className={`p-0.5 ${className ?? ''}`}>
+				<li {...rest} className={`p-0.5 ${className ?? ''}`} style={{ fontSize: 14 }}>
 					{children}
 				</li>
 			),
@@ -159,8 +159,8 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 			p: ({ node, className, children, ...rest }: CustomComponentProps) => (
 				<p
 					{...rest}
-					className={`${className ?? ''} my-1 ${align} wrap-break-word`}
-					style={{ lineHeight: '2', fontSize: '14px' }}
+					className={`${className ?? ''} p-1 ${align} wrap-break-word`}
+					style={{ lineHeight: 1.5, fontSize: 14 }}
 				>
 					{children}
 				</p>

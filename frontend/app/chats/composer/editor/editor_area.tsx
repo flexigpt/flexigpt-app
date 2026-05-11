@@ -1276,7 +1276,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									onPaste={onEditorPaste}
 									className="max-h-96 min-w-0 flex-1 resize-none overflow-auto bg-transparent p-1 wrap-break-word whitespace-break-spaces outline-none [tab-size:2] focus:outline-none"
 									style={{
-										fontSize: '14px',
+										fontSize: 14,
 										whiteSpace: 'break-spaces',
 										tabSize: 2,
 										minHeight: '4rem',

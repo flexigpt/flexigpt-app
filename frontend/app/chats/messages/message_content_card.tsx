@@ -47,7 +47,7 @@ export const MessageContentCard = memo(function MessageContentCard({
 			<p
 				key={idx}
 				className={`${align} wrap-break-word`}
-				style={{ whiteSpace: 'pre-wrap', lineHeight: '1.5', fontSize: '14px' }}
+				style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5, fontSize: 14 }}
 			>
 				{line === '' ? <br /> : line}
 			</p>
