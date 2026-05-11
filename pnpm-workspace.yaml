@@ -1,6 +1,7 @@
 packages:
   - frontend
-onlyBuiltDependencies:
-  - "@tailwindcss/oxide"
-  - "esbuild"
-  - "oxc-resolver"
+ignoreWorkspaceRootCheck: true
+allowBuilds:
+  '@tailwindcss/oxide': true
+  esbuild: true
+  oxc-resolver: true

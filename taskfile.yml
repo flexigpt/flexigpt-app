@@ -25,6 +25,21 @@ tasks:
       - "{{.INSTALL_TOOL_GODEPGRAPH}}"
       - "{{.INSTALL_TOOL_GOMAJOR}}"
 
+  uppnpm:
+    cmds:
+      - corepack enable
+      - asdf reshim nodejs
+      - corepack prepare pnpm@11.0.9 --activate
+      - corepack use pnpm@11.0.9
+      - asdf reshim nodejs
+
+  upnodejs:
+    cmds:
+      - asdf install nodejs v24.14.0
+      - asdf set nodejs v24.14.0
+      - task: uppnpm
+      - echo '***Search and update builds***'
+
   gomod:
     cmds:
       - go mod download
