@@ -4,7 +4,7 @@ go 1.26
 
 // Tools: These are installed via the taskfile. check the associated task.
 require (
-	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.0
+	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.1
 	github.com/adrg/xdg v0.5.3
 	github.com/danielgtaylor/huma/v2 v2.37.3
 	github.com/flexigpt/agentskills-go v0.14.0
@@ -16,7 +16,7 @@ require (
 	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
 	github.com/markusmobius/go-trafilatura v1.12.2
 	github.com/wailsapp/wails/v2 v2.12.0
-	golang.org/x/net v0.53.0
+	golang.org/x/net v0.54.0
 )
 
 require (
@@ -63,7 +63,7 @@ require (
 	github.com/markusmobius/go-domdistiller v0.0.0-20240926050704-25b8d046ffb4 // indirect
 	github.com/markusmobius/go-htmldate v1.9.1 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/openai/openai-go/v3 v3.34.0 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
@@ -90,11 +90,11 @@ require (
 	github.com/yosssi/gohtml v0.0.0-20201013000340-ee4748c638f4 // indirect
 	github.com/zalando/go-keyring v0.2.8 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	golang.org/x/crypto v0.50.0 // indirect
+	golang.org/x/crypto v0.51.0 // indirect
 	golang.org/x/exp v0.0.0-20250819193227-8b4c13bb791b // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.43.0 // indirect
-	golang.org/x/text v0.36.0 // indirect
+	golang.org/x/sys v0.44.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 	google.golang.org/genai v1.56.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240903143218-8af14fe29dc1 // indirect
 	google.golang.org/grpc v1.66.2 // indirect

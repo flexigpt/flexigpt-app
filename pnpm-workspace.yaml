@@ -1,4 +1,6 @@
 packages:
   - frontend
 onlyBuiltDependencies:
-  - esbuild
+  - "@tailwindcss/oxide"
+  - "esbuild"
+  - "oxc-resolver"
