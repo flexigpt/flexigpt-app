@@ -96,7 +96,7 @@ tasks:
   build-withbindings:
     cmds:
       - pnpm run touch:tmp
-      - cd "{{.GO_BACKEND_DIR}}" && wails build -devtools -m -clean -v 2 -ldflags="-X main.Version={{.COMMON_APP_DEV_VERSION}}" > "{{.ROOT_DIR}}/{{.COMMON_APP_DEV_ARTIFACT_DIR}}/log.txt" 2>&1
+      - cd "{{.GO_BACKEND_DIR}}" && wails build -devtools -m -tags webkit2_41 -clean -v 2 -ldflags="-X main.Version={{.COMMON_APP_DEV_VERSION}}" > "{{.ROOT_DIR}}/{{.COMMON_APP_DEV_ARTIFACT_DIR}}/log.txt" 2>&1
 
   pack-flatpak:
     cmds:

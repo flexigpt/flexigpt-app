@@ -18,7 +18,7 @@
 		"check:version": "node -e \"const t=process.env.VERSION_TAG;if(!t){console.error('VERSION_TAG not set');process.exit(1);}if(!/^v\\d+\\.\\d+\\.\\d+$/.test(t)){console.error('VERSION_TAG must match vX.Y.Z');process.exit(1);}\"",
 		"build:linux": "cd ./cmd/agentgo && pnpm -F frontend run build:wails  && pnpm run check:version && wails build -m -v 2 -clean -s -skipbindings -tags webkit2_41 -platform linux/amd64 -ldflags=\"-X main.Version=$VERSION_TAG\"",
 		"build:mac": "cd ./cmd/agentgo && pnpm -F frontend run build:wails && pnpm run check:version && wails build -m -v 2 -clean -s -skipbindings -platform darwin/universal -ldflags=\"-X main.Version=$VERSION_TAG\"",
-		"build:win": "cd ./cmd/agentgo && pnpm -F frontend run build:wails && pnpm run check:version && wails build -m -v 2 -clean -s -skipbindings -nsis -platform windows/amd64 -ldflags=\"-X main.Version=$VERSION_TAG\"",
+		"build:win": "cd ./cmd/agentgo && pnpm -F frontend run build:wails && pnpm run check:version && wails build -m -v 2 -clean -s -skipbindings -nsis -platform windows/amd64 -ldflags=\"-X main.Version=%VERSION_TAG%\"",
 		"licenses:gen": "bash ./build/licenses/gen_licenses.sh"
 	},
 	"packageManager": "pnpm@11.0.9+sha512.34ce82e6780233cf9cad8685029a8f81d2e06196c5a9bad98879f7424940c6817c4e4524fb7d38b8553ceed48b9758b8ebaf1abd3600c232c4c8cf7366086f38",

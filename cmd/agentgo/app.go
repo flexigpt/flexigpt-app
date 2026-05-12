@@ -173,7 +173,7 @@ func (a *App) initManagers() {
 			"directory", a.conversationsDirPath,
 			"error", err,
 		)
-		panic("failed to initialize managers: conversation store initialization failed")
+		panic("failed to initialize managers: conversation store initialization failed\n" + err.Error())
 	}
 	slog.Info("conversation store initialized", "directory", a.conversationsDirPath)
 
@@ -184,7 +184,7 @@ func (a *App) initManagers() {
 			"directory", a.promptsDirPath,
 			"error", err,
 		)
-		panic("failed to initialize managers: prompt template store initialization failed")
+		panic("failed to initialize managers: prompt template store initialization failed\n" + err.Error())
 	}
 	slog.Info("prompt store initialized", "directory", a.promptsDirPath)
 
@@ -195,7 +195,7 @@ func (a *App) initManagers() {
 			"directory", a.toolsDirPath,
 			"error", err,
 		)
-		panic("failed to initialize managers: tool store initialization failed")
+		panic("failed to initialize managers: tool store initialization failed\n" + err.Error())
 	}
 
 	err = InitToolRuntimeWrapper(a.toolRuntimeAPI, a.toolStoreAPI.store)
@@ -204,7 +204,7 @@ func (a *App) initManagers() {
 			"couldn't initialize tool runtime",
 			"error", err,
 		)
-		panic("failed to initialize managers: tool runtime initialization failed")
+		panic("failed to initialize managers: tool runtime initialization failed\n" + err.Error())
 	}
 
 	err = InitSkillStoreWrapper(a.skillStoreAPI, a.skillsDirPath)
@@ -214,7 +214,7 @@ func (a *App) initManagers() {
 			"directory", a.skillsDirPath,
 			"error", err,
 		)
-		panic("failed to initialize managers: skill store initialization failed")
+		panic("failed to initialize managers: skill store initialization failed\n" + err.Error())
 	}
 	slog.Info("skill store initialized", "directory", a.skillsDirPath)
 
@@ -228,7 +228,7 @@ func (a *App) initManagers() {
 			"dir", a.modelPresetsDirPath,
 			"error", err,
 		)
-		panic("failed to initialize managers: model presets store initialization failed")
+		panic("failed to initialize managers: model presets store initialization failed\n" + err.Error())
 	}
 	slog.Info("model presets store initialized", "dir", a.modelPresetsDirPath)
 
@@ -246,7 +246,7 @@ func (a *App) initManagers() {
 			"dir", a.assistantPresetsDirPath,
 			"error", err,
 		)
-		panic("failed to initialize managers: assistant preset store initialization failed")
+		panic("failed to initialize managers: assistant preset store initialization failed\n" + err.Error())
 	}
 	slog.Info(
 		"assistant preset store initialized",
@@ -260,7 +260,7 @@ func (a *App) initManagers() {
 			"directory", a.settingsDirPath,
 			"error", err,
 		)
-		panic("failed to initialize managers: settings store initialization failed")
+		panic("failed to initialize managers: settings store initialization failed\n" + err.Error())
 	}
 	slog.Info("settings store initialized", "directory", a.settingsDirPath)
 
@@ -276,7 +276,7 @@ func (a *App) initManagers() {
 			"couldn't initialize aggregate",
 			"error", err,
 		)
-		panic("failed to initialize managers: aggregate initialization failed")
+		panic("failed to initialize managers: aggregate initialization failed\n" + err.Error())
 	}
 
 	slog.Info("aggregate initialized", "dir", a.modelPresetsDirPath)
