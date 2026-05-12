@@ -3,8 +3,8 @@
 ## Laundry list
 
 - [ ] test with some skill that has scripts too
-- [ ] test shell and hostspawn exec on mac pkg and win
-- [x] reasoning xhigh is not set on opus 4.7. dig.
+- [ ] test shell and hostspawn exec on win
+  - [ ] powershell is most probably not getting the default path as go mod verify did not work
 
 ## Milestone thoughts
 

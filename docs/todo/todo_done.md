@@ -937,3 +937,5 @@
 - [x] findtext should allow match lines if those are empty or empty string as such.
 - [x] input focus issues after paste and may be other edit time focus issues.
 - [x] url text and other modals focus to start typing mods.
+- [x] reasoning xhigh is not set on opus 4.7. dig.
+- [x] test shell and hostspawn exec on mac

@@ -11,13 +11,10 @@ It brings together reusable assistant presets, model presets, prompt templates, 
 
 ## Install
 
-1. Download the latest release from [GitHub Releases](https://github.com/flexigpt/flexigpt-app/releases).
-2. Install the package for your platform:
-   - macOS: `.pkg`
-   - Windows: `.exe`
-   - Linux: `.flatpak`
-   - [Detailed installation steps are here](./frontend/app/docs/content/00-installation.md)
-3. Launch FlexiGPT.
+1. Download the latest release from [GitHub Releases](https://github.com/flexigpt/flexigpt-app/releases)
+   - macOS: `.pkg`, Linux: `.flatpak`, Windows: `.exe`
+2. Install the package. [Detailed installation steps are here](./frontend/app/docs/content/00-installation.md)
+3. Launch FlexiGPT
 
 ## Quick start
 

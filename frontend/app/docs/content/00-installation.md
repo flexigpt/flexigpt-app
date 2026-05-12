@@ -9,8 +9,14 @@ Download the latest release from [GitHub Releases](https://github.com/flexigpt/f
 
 ## Windows
 
-- Download the `.exe` release package.
-- Run the installer and follow the setup steps.
+- Download the `.exe` release package from [GitHub Releases](https://github.com/flexigpt/flexigpt-app/releases).
+- Run the installer.
+- If Microsoft Defender SmartScreen shows a **Windows protected your PC** warning:
+  - This can happen because current Windows builds are not signed with a Windows code-signing certificate. Windows may therefore show the publisher as unknown.
+  - Select **More info**.
+  - Select **Run anyway**.
+    - If **Run anyway** is not available, your device or organization policy may block unsigned apps. In that case, use a device where you are allowed to install unsigned applications or contact your administrator.
+  - Continue through the installer setup steps.
 
 ## Linux
 

@@ -70,11 +70,15 @@ Most of this is local configuration and catalog data.
 ### Storage locations
 
 FlexiGPT stores its local data under the app's XDG data-home location, using a `flexigpt` app-data folder.
+These get created at first launch of FlexiGPT.
 
 For current packaged builds, that typically means:
 
 - macOS: `~/Library/Containers/io.github.flexigpt.client/Data/Library/Application Support/flexigpt/`
 - Linux Flatpak: `~/.var/app/io.github.flexigpt.client/data/flexigpt/`
+- Windows: `%LOCALAPPDATA%\flexigpt\`, usually `C:\Users\<username>\AppData\Local\flexigpt\`. Manually finding the folder:
+  - Open **File Explorer** -> Go to `C:\Users\<username>\` -> Enable hidden folders as **View** -> **Show** -> **Hidden items** -> Open `AppData\Local\flexigpt`.
+  - OR if `AppData` is not visible or you are unsure which local profile path Windows is using, open PowerShell and run `$env:LOCALAPPDATA`.
 
 ## What can be sent to a provider
 
