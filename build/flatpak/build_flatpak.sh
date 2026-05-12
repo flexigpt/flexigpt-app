@@ -16,7 +16,7 @@ chmod +x build/flatpak/render_templates.sh
 mkdir -p "$XDG_CONFIG_HOME"
 mkdir -p "$XDG_DATA_HOME"
 
-PATH="$PATH:$GOROOT/bin:$GOBIN:$NODEROOT/bin" pnpm install
+PATH="$PATH:$GOROOT/bin:$GOBIN:$NODEROOT/bin" pnpm install --frozen-lockfile
 
 PATH="$PATH:$GOROOT/bin:$GOBIN:$NODEROOT/bin" "$GOROOT/bin/go" mod download
 
