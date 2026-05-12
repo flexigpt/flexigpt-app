@@ -1628,7 +1628,13 @@
 				"reasoningCapabilities": {
 					"supportsReasoningConfig": true,
 					"supportedReasoningTypes": ["singleWithLevels"],
-					"supportedReasoningLevels": ["low", "medium", "high", "xhigh"],
+					"supportedReasoningLevels": [
+						"none",
+						"low",
+						"medium",
+						"high",
+						"xhigh"
+					],
 					"supportsSummaryStyle": false,
 					"supportsEncryptedReasoningInput": true,
 					"temperatureDisallowedWhenEnabled": false
@@ -1658,8 +1664,38 @@
 					}
 				}
 			},
-			"defaultModelPresetID": "grok42Reasoning",
+			"defaultModelPresetID": "grok43",
 			"modelPresets": {
+				"grok43": {
+					"schemaVersion": "2025-07-01",
+					"id": "grok43",
+					"name": "grok-4.3",
+					"displayName": "xAI Grok 4.3",
+					"slug": "grok43",
+					"isEnabled": true,
+					"stream": true,
+					"maxPromptLength": 1000000,
+					"maxOutputLength": 65536,
+					"temperature": 1.0,
+					"reasoning": {
+						"type": "singleWithLevels",
+						"level": "high",
+						"tokens": 0
+					},
+					"systemPrompt": "",
+					"timeout": 3600,
+					"capabilitiesOverride": {
+						"reasoningCapabilities": {
+							"temperatureDisallowedWhenEnabled": true,
+							"supportedReasoningTypes": ["singleWithLevels"],
+							"supportedReasoningLevels": ["none", "low", "medium", "high"],
+							"supportsSummaryStyle": true
+						}
+					},
+					"createdAt": "2026-05-12T00:00:00Z",
+					"modifiedAt": "2026-05-12T00:00:00Z",
+					"isBuiltIn": true
+				},
 				"grok42Reasoning": {
 					"schemaVersion": "2025-07-01",
 					"id": "grok42Reasoning",
@@ -1687,54 +1723,8 @@
 					"schemaVersion": "2025-07-01",
 					"id": "grok42NonReasoning",
 					"name": "grok-4.20-0309-non-reasoning",
-					"displayName": "xAI Grok 4.20 Non-Reasoning",
+					"displayName": "xAI Grok 4.2 Non-Reasoning",
 					"slug": "grok42NonReasoning",
-					"isEnabled": true,
-					"stream": true,
-					"maxPromptLength": 2000000,
-					"maxOutputLength": 65536,
-					"temperature": 1.0,
-					"systemPrompt": "",
-					"timeout": 1800,
-					"capabilitiesOverride": {
-						"reasoningCapabilities": {
-							"supportsReasoningConfig": false,
-							"supportsEncryptedReasoningInput": false
-						}
-					},
-					"createdAt": "2026-04-15T00:00:00Z",
-					"modifiedAt": "2026-04-15T00:00:00Z",
-					"isBuiltIn": true
-				},
-				"grok41FastReasoning": {
-					"schemaVersion": "2025-07-01",
-					"id": "grok41FastReasoning",
-					"name": "grok-4-1-fast-reasoning",
-					"displayName": "xAI Grok 4.1 Fast Reasoning",
-					"slug": "grok41FastReasoning",
-					"isEnabled": true,
-					"stream": true,
-					"maxPromptLength": 2000000,
-					"maxOutputLength": 65536,
-					"temperature": 1.0,
-					"systemPrompt": "",
-					"timeout": 3600,
-					"capabilitiesOverride": {
-						"reasoningCapabilities": {
-							"supportsReasoningConfig": false,
-							"supportsEncryptedReasoningInput": true
-						}
-					},
-					"createdAt": "2026-04-15T00:00:00Z",
-					"modifiedAt": "2026-04-15T00:00:00Z",
-					"isBuiltIn": true
-				},
-				"grok41FastNonReasoning": {
-					"schemaVersion": "2025-07-01",
-					"id": "grok41FastNonReasoning",
-					"name": "grok-4-1-fast-non-reasoning",
-					"displayName": "xAI Grok 4.1 Fast Non-Reasoning",
-					"slug": "grok41FastNonReasoning",
 					"isEnabled": true,
 					"stream": true,
 					"maxPromptLength": 2000000,
