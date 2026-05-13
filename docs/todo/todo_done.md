@@ -939,3 +939,32 @@
 - [x] url text and other modals focus to start typing mods.
 - [x] reasoning xhigh is not set on opus 4.7. dig.
 - [x] test shell and hostspawn exec on mac
+- [x] test shell and hostspawn exec on win
+  - [x] powershell is most probably not getting the default path as go mod verify did not work
+
+- [x] M1 - API coverage:
+  - [x] Modalities coverage:
+    - [x] Text
+      - [x] content in/out
+      - [x] reasoning in/out
+      - [x] extracted web pages input
+      - [x] extracted pdf input
+
+    - [x] Image input
+    - [x] Document input
+    - [x] Image url input
+    - [x] Document url input
+
+  - [x] Tools
+    - [x] built-in tools from apis
+      - [x] web search
+
+    - [x] local replacements for some builtin tools that are very vendor specific
+      - [x] bash: yes.
+      - [x] apply patch: No. this is very error prone, cosnidering unidiff vs V4A diff formats and compatibility issues.
+      - [x] text editor: yes
+
+    - [x] Dont: New stateful APIs and its hooks from vendors
+      - [x] stored responses, stored conversations, on server memory context, on server prompt templates etc.
+
+  - [x] Agent Skills but via local "skills" flow

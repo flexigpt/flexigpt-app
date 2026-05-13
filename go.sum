@@ -50,12 +50,12 @@ github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymF
 github.com/envoyproxy/go-control-plane v0.9.1-0.20191026205805-5f8ba28d4473/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/go-control-plane v0.9.4/go.mod h1:6rpuAdCZL397s3pYoYcLgu1mIlRU8Am5FuJP05cCM98=
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
-github.com/flexigpt/agentskills-go v0.14.0 h1:NoRy0jJvC9+gB5XqGOPDs9cQ0WW1cehQEzJkExSSrtQ=
-github.com/flexigpt/agentskills-go v0.14.0/go.mod h1:WIuWpVRHRynrog+7XwUeBUnnHb5gs4vPz+bMGFn51s8=
+github.com/flexigpt/agentskills-go v0.14.1 h1:lp+fFVvXm7lGF0CAGjWs1Slhp44hYllqUhndgYIyN0A=
+github.com/flexigpt/agentskills-go v0.14.1/go.mod h1:u4zetBhnCmhJTo99FgDl4EdSLs9yxCvUmp5ycj/tZ6c=
 github.com/flexigpt/inference-go v0.18.2 h1:je03HBy96rp69DFVgg+IlIv+sCd4NPibsWA8Hsb3GzY=
 github.com/flexigpt/inference-go v0.18.2/go.mod h1:zahFOMPHd+3zsLBFlxzMlzL992TocNCna0PUWGVfi0k=
-github.com/flexigpt/llmtools-go v0.19.0 h1:Kpuuzi4eJ33gJ05po2bIRoQmH5aVjX051ZDvaR4LSgs=
-github.com/flexigpt/llmtools-go v0.19.0/go.mod h1:RfZsi40yGrnl1rZR1aeV+iANgfLd7+dTpI90XKgaqKo=
+github.com/flexigpt/llmtools-go v0.20.0 h1:UZXLibPdndT4WWO/p1sy5YfN6AeA/uzKY/DbS3AZMOI=
+github.com/flexigpt/llmtools-go v0.20.0/go.mod h1:uGlgERkW45Eb56pF9eEpzFGP1Y29abMlFyXK92XEH9s=
 github.com/flexigpt/mapstore-go v0.3.1 h1:ldouFR5J22jH7FOmvTBuBShrCvRZEuLSXmEJbqKngfU=
 github.com/flexigpt/mapstore-go v0.3.1/go.mod h1:nJ2XpMixGqNqxzq+ulgx7ynpJPTashgkZCSRlbiIuY4=
 github.com/forPelevin/gomoji v1.2.0 h1:9k4WVSSkE1ARO/BWywxgEUBvR/jMnao6EZzrql5nxJ8=
