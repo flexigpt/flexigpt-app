@@ -6,7 +6,7 @@ import { isRunnableComposerToolCall } from '@/chats/composer/toolruntime/tool_ru
 import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
 import { formatToolOutputSummary } from '@/tools/lib/tool_output_utils';
 
-const TOOL_CALL_TIMEOUT_MS = 90_000;
+const TOOL_CALL_TIMEOUT_MS = 600_000;
 
 function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: string): Promise<T> {
 	return new Promise<T>((resolve, reject) => {
