@@ -26,6 +26,13 @@ It brings together reusable assistant presets, model presets, prompt templates, 
 
 FlexiGPT does not bill you directly. Usage costs and limits come from the provider account behind the key you configure.
 
+## Screenshots
+
+<p float="left">
+  <img src="images/home.png" alt="Home screenshot" width="220" />
+  <img src="images/latex_code.png" alt="Latex+Code screenshot" width="220" />
+</p>
+
 ## Key features
 
 ### Multi-provider connectivity with built-in presets
