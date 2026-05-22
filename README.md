@@ -29,8 +29,13 @@ FlexiGPT does not bill you directly. Usage costs and limits come from the provid
 ## Screenshots
 
 <p float="left">
-  <img src="images/home.png" alt="Home screenshot" width="220" />
-  <img src="images/latex_code.png" alt="Latex+Code screenshot" width="220" />
+  <img src="images/home.png" alt="Home" width="512" />
+  <img src="images/latex_code.png" alt="Latex+Code" width="512" />
+</p>
+
+<p float="left">
+  <img src="images/assistants.png" alt="Assistants" width="512" />
+  <img src="images/settings.png" alt="Settings" width="512" />
 </p>
 
 ## Key features
