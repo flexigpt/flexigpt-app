@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/inference-go"
+	"github.com/flexigpt/inference-go/capabilityoverride"
 	"github.com/flexigpt/inference-go/debugclient"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
@@ -40,25 +41,6 @@ var defaultDebugConfig = debugclient.DebugConfig{
 
 func DefaultDebugConfig() debugclient.DebugConfig {
 	return defaultDebugConfig
-}
-
-type completionKeyCapabilityResolver struct {
-	key  string
-	caps *inferenceSpec.ModelCapabilities
-}
-
-func (r completionKeyCapabilityResolver) ResolveModelCapabilities(
-	ctx context.Context,
-	req inferenceSpec.ResolveModelCapabilitiesRequest,
-) (*inferenceSpec.ModelCapabilities, error) {
-	if r.caps == nil {
-		return nil, errors.New("no model capabilities configured")
-	}
-	// Enforce mapping by completionKey to avoid any model-name uniqueness assumptions.
-	if r.key != "" && req.CompletionKey != r.key {
-		return nil, fmt.Errorf("capabilities not found for completionKey %q", req.CompletionKey)
-	}
-	return r.caps, nil
 }
 
 // ProviderSetAPI is a thin aggregator on top of inference-go's ProviderSetAPI.
@@ -386,18 +368,15 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	}
 
 	opts := &inferenceSpec.FetchCompletionOptions{
-		CompletionKey: ck,
-		CapabilityResolver: completionKeyCapabilityResolver{
-			key:  ck,
-			caps: derivedModelCapabilities,
-		},
+		CompletionKey:      ck,
+		CapabilityResolver: capabilityoverride.NewCompletionKeyResolver(ck, derivedModelCapabilities),
 	}
 
 	if req.OnStreamText != nil || req.OnStreamThinking != nil {
 		opts.StreamHandler = makeStreamHandler(req.OnStreamText, req.OnStreamThinking)
 		opts.StreamConfig = &inferenceSpec.StreamConfig{
-			FlushIntervalMillis: 16,
-			FlushChunkSize:      256,
+			FlushIntervalMillis: 32,
+			FlushChunkSize:      512,
 		}
 	}
 
@@ -509,10 +488,11 @@ func (ps *ProviderSetAPI) deriveCapabilitiesFromPreset(
 		return nil, err
 	}
 
-	derived := cloneModelCapabilities(base)
-	applyModelCapabilitiesOverride(&derived, presp.Body.Provider.CapabilitiesOverride)
-	applyModelCapabilitiesOverride(&derived, presp.Body.Model.CapabilitiesOverride)
-
+	derived := capabilityoverride.DeriveModelCapabilities(
+		base,
+		presp.Body.Provider.CapabilitiesOverride,
+		presp.Body.Model.CapabilitiesOverride,
+	)
 	return &derived, nil
 }
 

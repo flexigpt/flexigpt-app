@@ -17,6 +17,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
+	"github.com/flexigpt/inference-go/capabilityoverride"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 	"github.com/flexigpt/mapstore-go"
 	"github.com/flexigpt/mapstore-go/jsonencdec"
@@ -201,7 +202,7 @@ func (s *ModelPresetStore) PostProviderPreset(
 		APIKeyHeaderKey:          req.Body.APIKeyHeaderKey,
 		DefaultHeaders:           maps.Clone(req.Body.DefaultHeaders),
 		ModelPresets:             map[spec.ModelPresetID]spec.ModelPreset{},
-		CapabilitiesOverride:     cloneModelCapabilitiesOverride(req.Body.CapabilitiesOverride),
+		CapabilitiesOverride:     capabilityoverride.CloneModelCapabilitiesOverride(req.Body.CapabilitiesOverride),
 	}
 
 	// Validate.

@@ -1,6 +1,9 @@
 package spec
 
-import inferenceSpec "github.com/flexigpt/inference-go/spec"
+import (
+	"github.com/flexigpt/inference-go/capabilityoverride"
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
+)
 
 type PatchDefaultProviderRequestBody struct {
 	DefaultProvider inferenceSpec.ProviderName `json:"defaultProvider" required:"true"`
@@ -29,9 +32,9 @@ type PostProviderPresetRequestBody struct {
 	Origin                   string                        `json:"origin"                   required:"true"`
 	ChatCompletionPathPrefix string                        `json:"chatCompletionPathPrefix" required:"true"`
 
-	APIKeyHeaderKey      string                     `json:"apiKeyHeaderKey,omitempty"`
-	DefaultHeaders       map[string]string          `json:"defaultHeaders,omitempty"`
-	CapabilitiesOverride *ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
+	APIKeyHeaderKey      string                                        `json:"apiKeyHeaderKey,omitempty"`
+	DefaultHeaders       map[string]string                             `json:"defaultHeaders,omitempty"`
+	CapabilitiesOverride *capabilityoverride.ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
 }
 type PostProviderPresetRequest struct {
 	ProviderName inferenceSpec.ProviderName `path:"providerName" required:"true"`
@@ -58,7 +61,7 @@ type PatchProviderPresetRequestBody struct {
 	DefaultHeaders           map[string]string              `json:"defaultHeaders,omitempty"`
 	DefaultModelPresetID     *ModelPresetID                 `json:"defaultModelPresetID,omitempty"`
 
-	CapabilitiesOverride *ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
+	CapabilitiesOverride *capabilityoverride.ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
 }
 
 type PatchProviderPresetRequest struct {

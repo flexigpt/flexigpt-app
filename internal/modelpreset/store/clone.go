@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
+	"github.com/flexigpt/inference-go/capabilityoverride"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
@@ -39,7 +40,7 @@ func cloneProviderPreset(pp spec.ProviderPreset) spec.ProviderPreset {
 	out := pp
 	out.DefaultHeaders = maps.Clone(pp.DefaultHeaders)
 	out.ModelPresets = cloneModelPresetMap(pp.ModelPresets)
-	out.CapabilitiesOverride = cloneModelCapabilitiesOverride(pp.CapabilitiesOverride)
+	out.CapabilitiesOverride = capabilityoverride.CloneModelCapabilitiesOverride(pp.CapabilitiesOverride)
 	return out
 }
 
@@ -77,7 +78,7 @@ func cloneModelPresetPatch(in spec.ModelPresetPatch) spec.ModelPresetPatch {
 		OutputParam:                 cloneOutputParam(in.OutputParam),
 		StopSequences:               stopSequences,
 		AdditionalParametersRawJSON: cloneStringPtr(in.AdditionalParametersRawJSON),
-		CapabilitiesOverride:        cloneModelCapabilitiesOverride(in.CapabilitiesOverride),
+		CapabilitiesOverride:        capabilityoverride.CloneModelCapabilitiesOverride(in.CapabilitiesOverride),
 	}
 }
 
@@ -122,88 +123,6 @@ func cloneOutputParam(in *inferenceSpec.OutputParam) *inferenceSpec.OutputParam 
 		out.Format = &f
 	}
 	return &out
-}
-
-func cloneModelCapabilitiesOverride(in *spec.ModelCapabilitiesOverride) *spec.ModelCapabilitiesOverride {
-	if in == nil {
-		return nil
-	}
-	out := &spec.ModelCapabilitiesOverride{
-		ModalitiesIn:  slices.Clone(in.ModalitiesIn),
-		ModalitiesOut: slices.Clone(in.ModalitiesOut),
-	}
-	if in.ParamDialect != nil {
-		mt := *in.ParamDialect.MaxOutputTokensParamName
-		tp := *in.ParamDialect.ToolChoiceParamStyle
-		out.ParamDialect = &spec.ParamDialectOverride{
-			MaxOutputTokensParamName: &mt,
-			ToolChoiceParamStyle:     &tp,
-		}
-	}
-	if in.ReasoningCapabilities != nil {
-		out.ReasoningCapabilities = &spec.ReasoningCapabilitiesOverride{
-			SupportsReasoningConfig:          cloneBoolPtr(in.ReasoningCapabilities.SupportsReasoningConfig),
-			SupportedReasoningTypes:          slices.Clone(in.ReasoningCapabilities.SupportedReasoningTypes),
-			SupportedReasoningLevels:         slices.Clone(in.ReasoningCapabilities.SupportedReasoningLevels),
-			SupportsSummaryStyle:             cloneBoolPtr(in.ReasoningCapabilities.SupportsSummaryStyle),
-			SupportsEncryptedReasoningInput:  cloneBoolPtr(in.ReasoningCapabilities.SupportsEncryptedReasoningInput),
-			TemperatureDisallowedWhenEnabled: cloneBoolPtr(in.ReasoningCapabilities.TemperatureDisallowedWhenEnabled),
-		}
-	}
-	if in.StopSequenceCapabilities != nil {
-		out.StopSequenceCapabilities = &spec.StopSequenceCapabilitiesOverride{
-			IsSupported:             cloneBoolPtr(in.StopSequenceCapabilities.IsSupported),
-			DisallowedWithReasoning: cloneBoolPtr(in.StopSequenceCapabilities.DisallowedWithReasoning),
-			MaxSequences:            cloneIntPtr(in.StopSequenceCapabilities.MaxSequences),
-		}
-	}
-	if in.OutputCapabilities != nil {
-		out.OutputCapabilities = &spec.OutputCapabilitiesOverride{
-			SupportedOutputFormats: slices.Clone(in.OutputCapabilities.SupportedOutputFormats),
-			SupportsVerbosity:      cloneBoolPtr(in.OutputCapabilities.SupportsVerbosity),
-		}
-	}
-	if in.ToolCapabilities != nil {
-		out.ToolCapabilities = &spec.ToolCapabilitiesOverride{
-			SupportedToolTypes:               slices.Clone(in.ToolCapabilities.SupportedToolTypes),
-			SupportedToolPolicyModes:         slices.Clone(in.ToolCapabilities.SupportedToolPolicyModes),
-			SupportsParallelToolCalls:        cloneBoolPtr(in.ToolCapabilities.SupportsParallelToolCalls),
-			MaxForcedTools:                   cloneIntPtr(in.ToolCapabilities.MaxForcedTools),
-			SupportedClientToolOutputFormats: slices.Clone(in.ToolCapabilities.SupportedClientToolOutputFormats),
-		}
-	}
-	out.CacheCapabilities = cloneCacheCapabilitiesOverride(in.CacheCapabilities)
-	return out
-}
-
-func cloneCacheCapabilitiesOverride(in *spec.CacheCapabilitiesOverride) *spec.CacheCapabilitiesOverride {
-	if in == nil {
-		return nil
-	}
-	out := &spec.CacheCapabilitiesOverride{
-		SupportsAutomaticCaching: cloneBoolPtr(in.SupportsAutomaticCaching),
-		TopLevel:                 cloneCacheControlCapabilitiesOverride(in.TopLevel),
-		InputOutputContent:       cloneCacheControlCapabilitiesOverride(in.InputOutputContent),
-		ReasoningContent:         cloneCacheControlCapabilitiesOverride(in.ReasoningContent),
-		ToolChoice:               cloneCacheControlCapabilitiesOverride(in.ToolChoice),
-		ToolCall:                 cloneCacheControlCapabilitiesOverride(in.ToolCall),
-		ToolOutput:               cloneCacheControlCapabilitiesOverride(in.ToolOutput),
-	}
-	return out
-}
-
-func cloneCacheControlCapabilitiesOverride(
-	in *spec.CacheControlCapabilitiesOverride,
-) *spec.CacheControlCapabilitiesOverride {
-	if in == nil {
-		return nil
-	}
-	return &spec.CacheControlCapabilitiesOverride{
-		SupportedKinds: slices.Clone(in.SupportedKinds),
-		SupportedTTLs:  slices.Clone(in.SupportedTTLs),
-		SupportsKey:    cloneBoolPtr(in.SupportsKey),
-		SupportsTTL:    cloneBoolPtr(in.SupportsTTL),
-	}
 }
 
 func cloneStringPtr(p *string) *string {

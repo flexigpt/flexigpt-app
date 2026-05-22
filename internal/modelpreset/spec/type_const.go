@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/flexigpt/inference-go/capabilityoverride"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
@@ -97,7 +98,7 @@ type ModelPresetPatch struct {
 
 	// CapabilitiesOverride is a stored override for runtime capability resolution.
 	// This is NOT the derived/effective capability profile.
-	CapabilitiesOverride *ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
+	CapabilitiesOverride *capabilityoverride.ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
 }
 
 // ModelPreset is the entire "model + default knobs" bundle the user can save.
@@ -134,7 +135,7 @@ type ProviderPreset struct {
 	DefaultHeaders           map[string]string `json:"defaultHeaders"`
 	// CapabilitiesOverride is a provider-wide stored override. Model overrides take precedence.
 	// This is NOT the derived/effective capability profile.
-	CapabilitiesOverride *ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
+	CapabilitiesOverride *capabilityoverride.ModelCapabilitiesOverride `json:"capabilitiesOverride,omitempty"`
 
 	DefaultModelPresetID ModelPresetID                 `json:"defaultModelPresetID"`
 	ModelPresets         map[ModelPresetID]ModelPreset `json:"modelPresets"`

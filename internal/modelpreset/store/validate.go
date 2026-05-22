@@ -7,6 +7,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
+	"github.com/flexigpt/inference-go/capabilityoverride"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
@@ -35,7 +36,7 @@ func validateProviderPreset(pp *spec.ProviderPreset) error {
 	if strings.TrimSpace(pp.ChatCompletionPathPrefix) == "" {
 		return fmt.Errorf("provider %q: chatCompletionPathPrefix is empty", pp.Name)
 	}
-	if err := validateModelCapabilitiesOverride(pp.CapabilitiesOverride); err != nil {
+	if err := capabilityoverride.ValidateModelCapabilitiesOverride(pp.CapabilitiesOverride); err != nil {
 		return fmt.Errorf("provider %q: capabilitiesOverride: %w", pp.Name, err)
 	}
 	// Per-model validation and duplicate ID detection.
@@ -122,7 +123,7 @@ func validateModelPreset(mp *spec.ModelPreset) error {
 		return fmt.Errorf("invalid stopSequences: %w", err)
 	}
 
-	if err := validateModelCapabilitiesOverride(mp.CapabilitiesOverride); err != nil {
+	if err := capabilityoverride.ValidateModelCapabilitiesOverride(mp.CapabilitiesOverride); err != nil {
 		return fmt.Errorf("capabilitiesOverride: %w", err)
 	}
 
@@ -287,44 +288,6 @@ func validateReasoning(r *inferenceSpec.ReasoningParam) error {
 	return nil
 }
 
-func validateModelCapabilitiesOverride(o *spec.ModelCapabilitiesOverride) error {
-	if o == nil {
-		return nil
-	}
-	if err := validateModalities(o.ModalitiesIn); err != nil {
-		return fmt.Errorf("modalitiesIn: %w", err)
-	}
-	if err := validateModalities(o.ModalitiesOut); err != nil {
-		return fmt.Errorf("modalitiesOut: %w", err)
-	}
-	if o.ReasoningCapabilities != nil {
-		if err := validateReasoningCapabilitiesOverride(o.ReasoningCapabilities); err != nil {
-			return fmt.Errorf("reasoningCapabilities: %w", err)
-		}
-	}
-	if o.StopSequenceCapabilities != nil {
-		if err := validateStopSequenceCapabilitiesOverride(o.StopSequenceCapabilities); err != nil {
-			return fmt.Errorf("stopSequenceCapabilities: %w", err)
-		}
-	}
-	if o.OutputCapabilities != nil {
-		if err := validateOutputCapabilitiesOverride(o.OutputCapabilities); err != nil {
-			return fmt.Errorf("outputCapabilities: %w", err)
-		}
-	}
-	if o.ToolCapabilities != nil {
-		if err := validateToolCapabilitiesOverride(o.ToolCapabilities); err != nil {
-			return fmt.Errorf("toolCapabilities: %w", err)
-		}
-	}
-	if o.CacheCapabilities != nil {
-		if err := validateCacheCapabilitiesOverride(o.CacheCapabilities); err != nil {
-			return fmt.Errorf("cacheCapabilities: %w", err)
-		}
-	}
-	return nil
-}
-
 func validateCacheControl(cc *inferenceSpec.CacheControl) error {
 	if cc == nil {
 		return nil
@@ -344,220 +307,6 @@ func validateCacheControl(cc *inferenceSpec.CacheControl) error {
 			inferenceSpec.CacheControlTTLInMemory:
 		default:
 			return fmt.Errorf("unknown ttl %q", cc.TTL)
-		}
-	}
-	return nil
-}
-
-func validateCacheCapabilitiesOverride(o *spec.CacheCapabilitiesOverride) error {
-	if o == nil {
-		return nil
-	}
-	scopes := []struct {
-		name string
-		val  *spec.CacheControlCapabilitiesOverride
-	}{
-		{"topLevel", o.TopLevel},
-		{"inputOutputContent", o.InputOutputContent},
-		{"reasoningContent", o.ReasoningContent},
-		{"toolChoice", o.ToolChoice},
-		{"toolCall", o.ToolCall},
-		{"toolOutput", o.ToolOutput},
-	}
-	for _, s := range scopes {
-		if s.val != nil {
-			if err := validateCacheControlCapabilitiesOverride(s.val); err != nil {
-				return fmt.Errorf("%s: %w", s.name, err)
-			}
-		}
-	}
-	return nil
-}
-
-func validateCacheControlCapabilitiesOverride(o *spec.CacheControlCapabilitiesOverride) error {
-	if o == nil {
-		return nil
-	}
-	if o.SupportedKinds != nil {
-		seen := map[inferenceSpec.CacheControlKind]struct{}{}
-		for i, k := range o.SupportedKinds {
-			switch k {
-			case inferenceSpec.CacheControlKindEphemeral:
-				// OK.
-			default:
-				return fmt.Errorf("supportedKinds[%d] unknown kind %q", i, k)
-			}
-			if _, ok := seen[k]; ok {
-				return fmt.Errorf("supportedKinds[%d] duplicate %q", i, k)
-			}
-			seen[k] = struct{}{}
-		}
-	}
-	if o.SupportedTTLs != nil {
-		seen := map[inferenceSpec.CacheControlTTL]struct{}{}
-		for i, t := range o.SupportedTTLs {
-			switch t {
-			case inferenceSpec.CacheControlTTL5m,
-				inferenceSpec.CacheControlTTL1h,
-				inferenceSpec.CacheControlTTL24h,
-				inferenceSpec.CacheControlTTLInMemory:
-				// OK.
-			default:
-				return fmt.Errorf("supportedTTLs[%d] unknown TTL %q", i, t)
-			}
-			if _, ok := seen[t]; ok {
-				return fmt.Errorf("supportedTTLs[%d] duplicate %q", i, t)
-			}
-			seen[t] = struct{}{}
-		}
-	}
-	return nil
-}
-
-func validateModalities(mm []inferenceSpec.Modality) error {
-	if mm == nil {
-		return nil
-	}
-	seen := map[inferenceSpec.Modality]struct{}{}
-	for i, m := range mm {
-		if strings.TrimSpace(string(m)) == "" {
-			return fmt.Errorf("[%d] empty modality", i)
-		}
-		switch m {
-		case inferenceSpec.ModalityTextIn,
-			inferenceSpec.ModalityTextOut,
-			inferenceSpec.ModalityImageIn,
-			inferenceSpec.ModalityImageOut,
-			inferenceSpec.ModalityFileIn,
-			inferenceSpec.ModalityFileOut,
-			inferenceSpec.ModalityAudioIn,
-			inferenceSpec.ModalityAudioOut,
-			inferenceSpec.ModalityVideoIn,
-			inferenceSpec.ModalityVideoOut:
-			// OK.
-		default:
-			return fmt.Errorf("[%d] unknown modality %q", i, m)
-		}
-		if _, ok := seen[m]; ok {
-			return fmt.Errorf("[%d] duplicate modality %q", i, m)
-		}
-		seen[m] = struct{}{}
-	}
-	return nil
-}
-
-func validateReasoningCapabilitiesOverride(o *spec.ReasoningCapabilitiesOverride) error {
-	if o == nil {
-		return nil
-	}
-	if o.SupportedReasoningTypes != nil {
-		seen := map[inferenceSpec.ReasoningType]struct{}{}
-		for i, t := range o.SupportedReasoningTypes {
-			switch t {
-			case inferenceSpec.ReasoningTypeHybridWithTokens,
-				inferenceSpec.ReasoningTypeSingleWithLevels:
-			default:
-				return fmt.Errorf("supportedReasoningTypes[%d] unknown type %q", i, t)
-			}
-			if _, ok := seen[t]; ok {
-				return fmt.Errorf("supportedReasoningTypes[%d] duplicate %q", i, t)
-			}
-			seen[t] = struct{}{}
-		}
-	}
-	if o.SupportedReasoningLevels != nil {
-		seen := map[inferenceSpec.ReasoningLevel]struct{}{}
-		for i, l := range o.SupportedReasoningLevels {
-			switch l {
-			case inferenceSpec.ReasoningLevelNone,
-				inferenceSpec.ReasoningLevelMinimal,
-				inferenceSpec.ReasoningLevelLow,
-				inferenceSpec.ReasoningLevelMedium,
-				inferenceSpec.ReasoningLevelHigh,
-				inferenceSpec.ReasoningLevelXHigh,
-				inferenceSpec.ReasoningLevelMax:
-			default:
-				return fmt.Errorf("supportedReasoningLevels[%d] unknown level %q", i, l)
-			}
-			if _, ok := seen[l]; ok {
-				return fmt.Errorf("supportedReasoningLevels[%d] duplicate %q", i, l)
-			}
-			seen[l] = struct{}{}
-		}
-	}
-	return nil
-}
-
-func validateStopSequenceCapabilitiesOverride(o *spec.StopSequenceCapabilitiesOverride) error {
-	if o == nil {
-		return nil
-	}
-	if o.MaxSequences != nil && *o.MaxSequences < 0 {
-		return errors.New("maxSequences must be >= 0")
-	}
-	return nil
-}
-
-func validateOutputCapabilitiesOverride(o *spec.OutputCapabilitiesOverride) error {
-	if o == nil {
-		return nil
-	}
-	if o.SupportedOutputFormats != nil {
-		seen := map[inferenceSpec.OutputFormatKind]struct{}{}
-		for i, k := range o.SupportedOutputFormats {
-			switch k {
-			case inferenceSpec.OutputFormatKindText,
-				inferenceSpec.OutputFormatKindJSONSchema:
-			default:
-				return fmt.Errorf("supportedOutputFormats[%d] unknown kind %q", i, k)
-			}
-			if _, ok := seen[k]; ok {
-				return fmt.Errorf("supportedOutputFormats[%d] duplicate %q", i, k)
-			}
-			seen[k] = struct{}{}
-		}
-	}
-	return nil
-}
-
-func validateToolCapabilitiesOverride(o *spec.ToolCapabilitiesOverride) error {
-	if o == nil {
-		return nil
-	}
-	if o.MaxForcedTools != nil && *o.MaxForcedTools < 0 {
-		return errors.New("maxForcedTools must be >= 0")
-	}
-	if o.SupportedToolTypes != nil {
-		seen := map[inferenceSpec.ToolType]struct{}{}
-		for i, t := range o.SupportedToolTypes {
-			switch t {
-			case inferenceSpec.ToolTypeFunction,
-				inferenceSpec.ToolTypeCustom,
-				inferenceSpec.ToolTypeWebSearch:
-			default:
-				return fmt.Errorf("supportedToolTypes[%d] unknown type %q", i, t)
-			}
-			if _, ok := seen[t]; ok {
-				return fmt.Errorf("supportedToolTypes[%d] duplicate %q", i, t)
-			}
-			seen[t] = struct{}{}
-		}
-	}
-	if o.SupportedToolPolicyModes != nil {
-		seen := map[inferenceSpec.ToolPolicyMode]struct{}{}
-		for i, m := range o.SupportedToolPolicyModes {
-			switch m {
-			case inferenceSpec.ToolPolicyModeAuto,
-				inferenceSpec.ToolPolicyModeAny,
-				inferenceSpec.ToolPolicyModeTool,
-				inferenceSpec.ToolPolicyModeNone:
-			default:
-				return fmt.Errorf("supportedToolPolicyModes[%d] unknown mode %q", i, m)
-			}
-			if _, ok := seen[m]; ok {
-				return fmt.Errorf("supportedToolPolicyModes[%d] duplicate %q", i, m)
-			}
-			seen[m] = struct{}{}
 		}
 	}
 	return nil

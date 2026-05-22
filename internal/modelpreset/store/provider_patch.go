@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
+	"github.com/flexigpt/inference-go/capabilityoverride"
 )
 
 // PatchProviderPreset updates a provider preset.
@@ -170,7 +171,7 @@ func applyProviderPresetPatch(dst *spec.ProviderPreset, body *spec.PatchProvider
 		dst.DefaultModelPresetID = *body.DefaultModelPresetID
 	}
 	if body.CapabilitiesOverride != nil {
-		dst.CapabilitiesOverride = cloneModelCapabilitiesOverride(body.CapabilitiesOverride)
+		dst.CapabilitiesOverride = capabilityoverride.CloneModelCapabilitiesOverride(body.CapabilitiesOverride)
 	}
 
 	after := cloneProviderPreset(*dst)

@@ -57,10 +57,20 @@ export interface StopSequenceCapabilitiesOverride {
 /**
  * @public
  */
+export interface ReasoningTokenBudgetCapabilitiesOverride {
+	minAllowed?: number;
+	maxAllowed?: number;
+	zeroAllowed?: boolean;
+	minusOneAllowed?: boolean;
+}
+/**
+ * @public
+ */
 export interface ReasoningCapabilitiesOverride {
 	supportsReasoningConfig?: boolean;
 	supportedReasoningTypes?: string[];
 	supportedReasoningLevels?: string[];
+	hybridTokenBudgetCapabilities?: ReasoningTokenBudgetCapabilitiesOverride;
 	supportsSummaryStyle?: boolean;
 	supportsEncryptedReasoningInput?: boolean;
 	temperatureDisallowedWhenEnabled?: boolean;
@@ -111,9 +121,6 @@ export interface ModelCapabilitiesOverride {
 	paramDialect?: ParamDialectOverride;
 }
 
-/**
- * @public
- */
 export interface ModelPresetPatch {
 	stream?: boolean;
 	maxPromptLength?: number;

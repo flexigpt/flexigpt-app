@@ -318,6 +318,245 @@ export namespace attachment {
 
 }
 
+export namespace capabilityoverride {
+	
+	export class CacheControlCapabilitiesOverride {
+	    supportsTTL?: boolean;
+	    supportedKinds?: string[];
+	    supportedTTLs?: string[];
+	    supportsKey?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new CacheControlCapabilitiesOverride(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supportsTTL = source["supportsTTL"];
+	        this.supportedKinds = source["supportedKinds"];
+	        this.supportedTTLs = source["supportedTTLs"];
+	        this.supportsKey = source["supportsKey"];
+	    }
+	}
+	export class CacheCapabilitiesOverride {
+	    supportsAutomaticCaching?: boolean;
+	    topLevel?: CacheControlCapabilitiesOverride;
+	    inputOutputContent?: CacheControlCapabilitiesOverride;
+	    reasoningContent?: CacheControlCapabilitiesOverride;
+	    toolChoice?: CacheControlCapabilitiesOverride;
+	    toolCall?: CacheControlCapabilitiesOverride;
+	    toolOutput?: CacheControlCapabilitiesOverride;
+	
+	    static createFrom(source: any = {}) {
+	        return new CacheCapabilitiesOverride(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supportsAutomaticCaching = source["supportsAutomaticCaching"];
+	        this.topLevel = this.convertValues(source["topLevel"], CacheControlCapabilitiesOverride);
+	        this.inputOutputContent = this.convertValues(source["inputOutputContent"], CacheControlCapabilitiesOverride);
+	        this.reasoningContent = this.convertValues(source["reasoningContent"], CacheControlCapabilitiesOverride);
+	        this.toolChoice = this.convertValues(source["toolChoice"], CacheControlCapabilitiesOverride);
+	        this.toolCall = this.convertValues(source["toolCall"], CacheControlCapabilitiesOverride);
+	        this.toolOutput = this.convertValues(source["toolOutput"], CacheControlCapabilitiesOverride);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class ParamDialectOverride {
+	    maxOutputTokensParamName?: string;
+	    toolChoiceParamStyle?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ParamDialectOverride(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.maxOutputTokensParamName = source["maxOutputTokensParamName"];
+	        this.toolChoiceParamStyle = source["toolChoiceParamStyle"];
+	    }
+	}
+	export class ToolCapabilitiesOverride {
+	    supportedToolTypes?: string[];
+	    supportedToolPolicyModes?: string[];
+	    supportsParallelToolCalls?: boolean;
+	    maxForcedTools?: number;
+	    supportedClientToolOutputFormats?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ToolCapabilitiesOverride(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supportedToolTypes = source["supportedToolTypes"];
+	        this.supportedToolPolicyModes = source["supportedToolPolicyModes"];
+	        this.supportsParallelToolCalls = source["supportsParallelToolCalls"];
+	        this.maxForcedTools = source["maxForcedTools"];
+	        this.supportedClientToolOutputFormats = source["supportedClientToolOutputFormats"];
+	    }
+	}
+	export class OutputCapabilitiesOverride {
+	    supportedOutputFormats?: string[];
+	    supportsVerbosity?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new OutputCapabilitiesOverride(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supportedOutputFormats = source["supportedOutputFormats"];
+	        this.supportsVerbosity = source["supportsVerbosity"];
+	    }
+	}
+	export class StopSequenceCapabilitiesOverride {
+	    isSupported?: boolean;
+	    disallowedWithReasoning?: boolean;
+	    maxSequences?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new StopSequenceCapabilitiesOverride(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.isSupported = source["isSupported"];
+	        this.disallowedWithReasoning = source["disallowedWithReasoning"];
+	        this.maxSequences = source["maxSequences"];
+	    }
+	}
+	export class ReasoningTokenBudgetCapabilitiesOverride {
+	    minAllowed?: number;
+	    maxAllowed?: number;
+	    zeroAllowed?: boolean;
+	    minusOneAllowed?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReasoningTokenBudgetCapabilitiesOverride(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.minAllowed = source["minAllowed"];
+	        this.maxAllowed = source["maxAllowed"];
+	        this.zeroAllowed = source["zeroAllowed"];
+	        this.minusOneAllowed = source["minusOneAllowed"];
+	    }
+	}
+	export class ReasoningCapabilitiesOverride {
+	    supportsReasoningConfig?: boolean;
+	    supportedReasoningTypes?: string[];
+	    supportedReasoningLevels?: string[];
+	    hybridTokenBudgetCapabilities?: ReasoningTokenBudgetCapabilitiesOverride;
+	    supportsSummaryStyle?: boolean;
+	    supportsEncryptedReasoningInput?: boolean;
+	    temperatureDisallowedWhenEnabled?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReasoningCapabilitiesOverride(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supportsReasoningConfig = source["supportsReasoningConfig"];
+	        this.supportedReasoningTypes = source["supportedReasoningTypes"];
+	        this.supportedReasoningLevels = source["supportedReasoningLevels"];
+	        this.hybridTokenBudgetCapabilities = this.convertValues(source["hybridTokenBudgetCapabilities"], ReasoningTokenBudgetCapabilitiesOverride);
+	        this.supportsSummaryStyle = source["supportsSummaryStyle"];
+	        this.supportsEncryptedReasoningInput = source["supportsEncryptedReasoningInput"];
+	        this.temperatureDisallowedWhenEnabled = source["temperatureDisallowedWhenEnabled"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ModelCapabilitiesOverride {
+	    modalitiesIn?: string[];
+	    modalitiesOut?: string[];
+	    reasoningCapabilities?: ReasoningCapabilitiesOverride;
+	    stopSequenceCapabilities?: StopSequenceCapabilitiesOverride;
+	    outputCapabilities?: OutputCapabilitiesOverride;
+	    toolCapabilities?: ToolCapabilitiesOverride;
+	    cacheCapabilities?: CacheCapabilitiesOverride;
+	    paramDialect?: ParamDialectOverride;
+	
+	    static createFrom(source: any = {}) {
+	        return new ModelCapabilitiesOverride(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.modalitiesIn = source["modalitiesIn"];
+	        this.modalitiesOut = source["modalitiesOut"];
+	        this.reasoningCapabilities = this.convertValues(source["reasoningCapabilities"], ReasoningCapabilitiesOverride);
+	        this.stopSequenceCapabilities = this.convertValues(source["stopSequenceCapabilities"], StopSequenceCapabilitiesOverride);
+	        this.outputCapabilities = this.convertValues(source["outputCapabilities"], OutputCapabilitiesOverride);
+	        this.toolCapabilities = this.convertValues(source["toolCapabilities"], ToolCapabilitiesOverride);
+	        this.cacheCapabilities = this.convertValues(source["cacheCapabilities"], CacheCapabilitiesOverride);
+	        this.paramDialect = this.convertValues(source["paramDialect"], ParamDialectOverride);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	
+	
+	
+
+}
+
 export namespace spec {
 	
 	export class AppTheme {
@@ -460,196 +699,6 @@ export namespace spec {
 	        this.templateVersion = source["templateVersion"];
 	    }
 	}
-	export class ParamDialectOverride {
-	    maxOutputTokensParamName?: string;
-	    toolChoiceParamStyle?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ParamDialectOverride(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.maxOutputTokensParamName = source["maxOutputTokensParamName"];
-	        this.toolChoiceParamStyle = source["toolChoiceParamStyle"];
-	    }
-	}
-	export class CacheControlCapabilitiesOverride {
-	    supportsTTL?: boolean;
-	    supportedKinds?: string[];
-	    supportedTTLs?: string[];
-	    supportsKey?: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new CacheControlCapabilitiesOverride(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.supportsTTL = source["supportsTTL"];
-	        this.supportedKinds = source["supportedKinds"];
-	        this.supportedTTLs = source["supportedTTLs"];
-	        this.supportsKey = source["supportsKey"];
-	    }
-	}
-	export class CacheCapabilitiesOverride {
-	    supportsAutomaticCaching?: boolean;
-	    topLevel?: CacheControlCapabilitiesOverride;
-	    inputOutputContent?: CacheControlCapabilitiesOverride;
-	    reasoningContent?: CacheControlCapabilitiesOverride;
-	    toolChoice?: CacheControlCapabilitiesOverride;
-	    toolCall?: CacheControlCapabilitiesOverride;
-	    toolOutput?: CacheControlCapabilitiesOverride;
-	
-	    static createFrom(source: any = {}) {
-	        return new CacheCapabilitiesOverride(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.supportsAutomaticCaching = source["supportsAutomaticCaching"];
-	        this.topLevel = this.convertValues(source["topLevel"], CacheControlCapabilitiesOverride);
-	        this.inputOutputContent = this.convertValues(source["inputOutputContent"], CacheControlCapabilitiesOverride);
-	        this.reasoningContent = this.convertValues(source["reasoningContent"], CacheControlCapabilitiesOverride);
-	        this.toolChoice = this.convertValues(source["toolChoice"], CacheControlCapabilitiesOverride);
-	        this.toolCall = this.convertValues(source["toolCall"], CacheControlCapabilitiesOverride);
-	        this.toolOutput = this.convertValues(source["toolOutput"], CacheControlCapabilitiesOverride);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ToolCapabilitiesOverride {
-	    supportedToolTypes?: string[];
-	    supportedToolPolicyModes?: string[];
-	    supportsParallelToolCalls?: boolean;
-	    maxForcedTools?: number;
-	    supportedClientToolOutputFormats?: string[];
-	
-	    static createFrom(source: any = {}) {
-	        return new ToolCapabilitiesOverride(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.supportedToolTypes = source["supportedToolTypes"];
-	        this.supportedToolPolicyModes = source["supportedToolPolicyModes"];
-	        this.supportsParallelToolCalls = source["supportsParallelToolCalls"];
-	        this.maxForcedTools = source["maxForcedTools"];
-	        this.supportedClientToolOutputFormats = source["supportedClientToolOutputFormats"];
-	    }
-	}
-	export class OutputCapabilitiesOverride {
-	    supportedOutputFormats?: string[];
-	    supportsVerbosity?: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new OutputCapabilitiesOverride(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.supportedOutputFormats = source["supportedOutputFormats"];
-	        this.supportsVerbosity = source["supportsVerbosity"];
-	    }
-	}
-	export class StopSequenceCapabilitiesOverride {
-	    isSupported?: boolean;
-	    disallowedWithReasoning?: boolean;
-	    maxSequences?: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new StopSequenceCapabilitiesOverride(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.isSupported = source["isSupported"];
-	        this.disallowedWithReasoning = source["disallowedWithReasoning"];
-	        this.maxSequences = source["maxSequences"];
-	    }
-	}
-	export class ReasoningCapabilitiesOverride {
-	    supportsReasoningConfig?: boolean;
-	    supportedReasoningTypes?: string[];
-	    supportedReasoningLevels?: string[];
-	    supportsSummaryStyle?: boolean;
-	    supportsEncryptedReasoningInput?: boolean;
-	    temperatureDisallowedWhenEnabled?: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new ReasoningCapabilitiesOverride(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.supportsReasoningConfig = source["supportsReasoningConfig"];
-	        this.supportedReasoningTypes = source["supportedReasoningTypes"];
-	        this.supportedReasoningLevels = source["supportedReasoningLevels"];
-	        this.supportsSummaryStyle = source["supportsSummaryStyle"];
-	        this.supportsEncryptedReasoningInput = source["supportsEncryptedReasoningInput"];
-	        this.temperatureDisallowedWhenEnabled = source["temperatureDisallowedWhenEnabled"];
-	    }
-	}
-	export class ModelCapabilitiesOverride {
-	    modalitiesIn?: string[];
-	    modalitiesOut?: string[];
-	    reasoningCapabilities?: ReasoningCapabilitiesOverride;
-	    stopSequenceCapabilities?: StopSequenceCapabilitiesOverride;
-	    outputCapabilities?: OutputCapabilitiesOverride;
-	    toolCapabilities?: ToolCapabilitiesOverride;
-	    cacheCapabilities?: CacheCapabilitiesOverride;
-	    paramDialect?: ParamDialectOverride;
-	
-	    static createFrom(source: any = {}) {
-	        return new ModelCapabilitiesOverride(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.modalitiesIn = source["modalitiesIn"];
-	        this.modalitiesOut = source["modalitiesOut"];
-	        this.reasoningCapabilities = this.convertValues(source["reasoningCapabilities"], ReasoningCapabilitiesOverride);
-	        this.stopSequenceCapabilities = this.convertValues(source["stopSequenceCapabilities"], StopSequenceCapabilitiesOverride);
-	        this.outputCapabilities = this.convertValues(source["outputCapabilities"], OutputCapabilitiesOverride);
-	        this.toolCapabilities = this.convertValues(source["toolCapabilities"], ToolCapabilitiesOverride);
-	        this.cacheCapabilities = this.convertValues(source["cacheCapabilities"], CacheCapabilitiesOverride);
-	        this.paramDialect = this.convertValues(source["paramDialect"], ParamDialectOverride);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class JSONSchemaParam {
 	    name: string;
 	    description?: string;
@@ -778,7 +827,7 @@ export namespace spec {
 	    outputParam?: OutputParam;
 	    stopSequences?: string[];
 	    additionalParametersRawJSON?: string;
-	    capabilitiesOverride?: ModelCapabilitiesOverride;
+	    capabilitiesOverride?: capabilityoverride.ModelCapabilitiesOverride;
 	
 	    static createFrom(source: any = {}) {
 	        return new ModelPresetPatch(source);
@@ -797,7 +846,7 @@ export namespace spec {
 	        this.outputParam = this.convertValues(source["outputParam"], OutputParam);
 	        this.stopSequences = source["stopSequences"];
 	        this.additionalParametersRawJSON = source["additionalParametersRawJSON"];
-	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], ModelCapabilitiesOverride);
+	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], capabilityoverride.ModelCapabilitiesOverride);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1010,8 +1059,6 @@ export namespace spec {
 	        this.nonEmpty = source["nonEmpty"];
 	    }
 	}
-	
-	
 	
 	export class URLCitation {
 	    url: string;
@@ -2945,7 +2992,7 @@ export namespace spec {
 	    outputParam?: OutputParam;
 	    stopSequences?: string[];
 	    additionalParametersRawJSON?: string;
-	    capabilitiesOverride?: ModelCapabilitiesOverride;
+	    capabilitiesOverride?: capabilityoverride.ModelCapabilitiesOverride;
 	    schemaVersion: string;
 	    id: string;
 	    name: string;
@@ -2975,7 +3022,7 @@ export namespace spec {
 	        this.outputParam = this.convertValues(source["outputParam"], OutputParam);
 	        this.stopSequences = source["stopSequences"];
 	        this.additionalParametersRawJSON = source["additionalParametersRawJSON"];
-	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], ModelCapabilitiesOverride);
+	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], capabilityoverride.ModelCapabilitiesOverride);
 	        this.schemaVersion = source["schemaVersion"];
 	        this.id = source["id"];
 	        this.name = source["name"];
@@ -3020,7 +3067,7 @@ export namespace spec {
 	    chatCompletionPathPrefix: string;
 	    apiKeyHeaderKey: string;
 	    defaultHeaders: Record<string, string>;
-	    capabilitiesOverride?: ModelCapabilitiesOverride;
+	    capabilitiesOverride?: capabilityoverride.ModelCapabilitiesOverride;
 	    defaultModelPresetID: string;
 	    modelPresets: Record<string, ModelPreset>;
 	
@@ -3042,7 +3089,7 @@ export namespace spec {
 	        this.chatCompletionPathPrefix = source["chatCompletionPathPrefix"];
 	        this.apiKeyHeaderKey = source["apiKeyHeaderKey"];
 	        this.defaultHeaders = source["defaultHeaders"];
-	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], ModelCapabilitiesOverride);
+	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], capabilityoverride.ModelCapabilitiesOverride);
 	        this.defaultModelPresetID = source["defaultModelPresetID"];
 	        this.modelPresets = this.convertValues(source["modelPresets"], ModelPreset, true);
 	    }
@@ -5510,9 +5557,6 @@ export namespace spec {
 	
 	
 	
-	
-	
-	
 	export class PatchAssistantPresetBundleRequestBody {
 	    isEnabled: boolean;
 	
@@ -5698,7 +5742,7 @@ export namespace spec {
 	    outputParam?: OutputParam;
 	    stopSequences?: string[];
 	    additionalParametersRawJSON?: string;
-	    capabilitiesOverride?: ModelCapabilitiesOverride;
+	    capabilitiesOverride?: capabilityoverride.ModelCapabilitiesOverride;
 	    name?: string;
 	    slug?: string;
 	    displayName?: string;
@@ -5721,7 +5765,7 @@ export namespace spec {
 	        this.outputParam = this.convertValues(source["outputParam"], OutputParam);
 	        this.stopSequences = source["stopSequences"];
 	        this.additionalParametersRawJSON = source["additionalParametersRawJSON"];
-	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], ModelCapabilitiesOverride);
+	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], capabilityoverride.ModelCapabilitiesOverride);
 	        this.name = source["name"];
 	        this.slug = source["slug"];
 	        this.displayName = source["displayName"];
@@ -5920,7 +5964,7 @@ export namespace spec {
 	    apiKeyHeaderKey?: string;
 	    defaultHeaders?: Record<string, string>;
 	    defaultModelPresetID?: string;
-	    capabilitiesOverride?: ModelCapabilitiesOverride;
+	    capabilitiesOverride?: capabilityoverride.ModelCapabilitiesOverride;
 	
 	    static createFrom(source: any = {}) {
 	        return new PatchProviderPresetRequestBody(source);
@@ -5936,7 +5980,7 @@ export namespace spec {
 	        this.apiKeyHeaderKey = source["apiKeyHeaderKey"];
 	        this.defaultHeaders = source["defaultHeaders"];
 	        this.defaultModelPresetID = source["defaultModelPresetID"];
-	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], ModelCapabilitiesOverride);
+	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], capabilityoverride.ModelCapabilitiesOverride);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -6256,7 +6300,7 @@ export namespace spec {
 	    outputParam?: OutputParam;
 	    stopSequences?: string[];
 	    additionalParametersRawJSON?: string;
-	    capabilitiesOverride?: ModelCapabilitiesOverride;
+	    capabilitiesOverride?: capabilityoverride.ModelCapabilitiesOverride;
 	    name: string;
 	    slug: string;
 	    displayName: string;
@@ -6279,7 +6323,7 @@ export namespace spec {
 	        this.outputParam = this.convertValues(source["outputParam"], OutputParam);
 	        this.stopSequences = source["stopSequences"];
 	        this.additionalParametersRawJSON = source["additionalParametersRawJSON"];
-	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], ModelCapabilitiesOverride);
+	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], capabilityoverride.ModelCapabilitiesOverride);
 	        this.name = source["name"];
 	        this.slug = source["slug"];
 	        this.displayName = source["displayName"];
@@ -6359,7 +6403,7 @@ export namespace spec {
 	    chatCompletionPathPrefix: string;
 	    apiKeyHeaderKey?: string;
 	    defaultHeaders?: Record<string, string>;
-	    capabilitiesOverride?: ModelCapabilitiesOverride;
+	    capabilitiesOverride?: capabilityoverride.ModelCapabilitiesOverride;
 	
 	    static createFrom(source: any = {}) {
 	        return new PostProviderPresetRequestBody(source);
@@ -6374,7 +6418,7 @@ export namespace spec {
 	        this.chatCompletionPathPrefix = source["chatCompletionPathPrefix"];
 	        this.apiKeyHeaderKey = source["apiKeyHeaderKey"];
 	        this.defaultHeaders = source["defaultHeaders"];
-	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], ModelCapabilitiesOverride);
+	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], capabilityoverride.ModelCapabilitiesOverride);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -7221,7 +7265,6 @@ export namespace spec {
 	
 	
 	
-	
 	export class SearchConversationsRequest {
 	    Query: string;
 	    PageToken: string;
@@ -7476,8 +7519,6 @@ export namespace spec {
 	
 	    }
 	}
-	
-	
 	
 	
 	

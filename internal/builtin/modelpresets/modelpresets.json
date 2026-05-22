@@ -783,7 +783,7 @@
 				"modalitiesOut": ["textOut"],
 				"reasoningCapabilities": {
 					"supportsReasoningConfig": true,
-					"supportedReasoningTypes": [],
+					"supportedReasoningTypes": ["singleWithLevels"],
 					"supportedReasoningLevels": ["none", "high"],
 					"supportsSummaryStyle": false,
 					"supportsEncryptedReasoningInput": false,
@@ -1354,10 +1354,10 @@
 				},
 				"gpt51Codex": {
 					"schemaVersion": "2025-07-01",
-					"id": "gpt51codex",
+					"id": "gpt51Codex",
 					"name": "gpt-5.1-codex",
 					"displayName": "OpenAI GPT 5.1 Codex",
-					"slug": "gpt51codex",
+					"slug": "gpt51Codex",
 					"isEnabled": false,
 					"stream": true,
 					"maxPromptLength": 400000,
