@@ -38,6 +38,8 @@ FlexiGPT does not bill you directly. Usage costs and limits come from the provid
   <img src="images/settings.png" alt="Settings" width="512" />
 </p>
 
+[All images are here](./images/)
+
 ## Key features
 
 ### Multi-provider connectivity with built-in presets
