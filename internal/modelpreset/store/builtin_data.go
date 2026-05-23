@@ -2,20 +2,18 @@ package store
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io/fs"
-	"os"            // POSIX for embed.FS
-	"path/filepath" // Native paths
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
+	"github.com/flexigpt/inference-go/modelpreset"
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
+
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
-	"github.com/flexigpt/flexigpt-app/internal/fsutil"
 	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	"github.com/flexigpt/flexigpt-app/internal/overlay"
-	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
 type builtInProviderKey inferenceSpec.ProviderName
@@ -46,8 +44,6 @@ type BuiltInPresets struct {
 	viewModels map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset
 
 	// IO.
-	presetsFS      fs.FS
-	presetsDir     string
 	overlayBaseDir string
 
 	store                              *overlay.Store
@@ -59,14 +55,6 @@ type BuiltInPresets struct {
 }
 
 type PresetStoreOption func(*BuiltInPresets)
-
-// WithModelPresetsFS sets a custom FS + root for tests.
-func WithModelPresetsFS(fsys fs.FS, root string) PresetStoreOption {
-	return func(b *BuiltInPresets) {
-		b.presetsFS = fsys
-		b.presetsDir = root
-	}
-}
 
 // NewBuiltInPresets prepares the presets store and loads a first snapshot.
 func NewBuiltInPresets(
@@ -96,8 +84,6 @@ func NewBuiltInPresets(
 	}
 
 	bi = &BuiltInPresets{
-		presetsFS:      builtin.BuiltInModelPresetsFS,
-		presetsDir:     builtin.BuiltInModelPresetsRootDir,
 		overlayBaseDir: overlayBaseDir,
 		store:          store,
 	}
@@ -130,7 +116,7 @@ func NewBuiltInPresets(
 	for _, o := range opts {
 		o(bi)
 	}
-	if err := bi.populateDataFromFS(ctx); err != nil {
+	if err := bi.populateDataFromInferenceCatalog(ctx); err != nil {
 		return nil, err
 	}
 
@@ -181,7 +167,7 @@ func (b *BuiltInPresets) GetBuiltInDefaultProviderName(
 	defaultProvider := b.defaultProvider
 
 	if defaultProvider == "" {
-		defaultProvider = builtin.ProviderNameOpenAIChatCompletions
+		defaultProvider = modelpreset.ProviderOpenAIResponses
 	}
 	return defaultProvider, nil
 }
@@ -310,63 +296,6 @@ func (b *BuiltInPresets) SetDefaultModelPreset(
 
 	b.rebuilder.Trigger()
 	return cloneProviderPreset(pp), nil
-}
-
-func (b *BuiltInPresets) populateDataFromFS(ctx context.Context) error {
-	subFS, err := fsutil.ResolveFS(b.presetsFS, b.presetsDir)
-	if err != nil {
-		return err
-	}
-	raw, err := fs.ReadFile(subFS, builtin.BuiltInModelPresetsJSON)
-	if err != nil {
-		return err
-	}
-
-	var schema spec.PresetsSchema
-	if err := json.Unmarshal(raw, &schema); err != nil {
-		return err
-	}
-	if schema.SchemaVersion != spec.SchemaVersion {
-		return fmt.Errorf("schemaVersion %q not equal to %q",
-			schema.SchemaVersion, spec.SchemaVersion)
-	}
-	if schema.DefaultProvider == "" {
-		return errors.New("no default provider in builtin")
-	}
-	if len(schema.ProviderPresets) == 0 {
-		return fmt.Errorf("%s contains no providers", builtin.BuiltInModelPresetsJSON)
-	}
-
-	// Parse + validate.
-	prov := make(map[inferenceSpec.ProviderName]spec.ProviderPreset, len(schema.ProviderPresets))
-	models := make(map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset)
-
-	for name, pp := range schema.ProviderPresets {
-		if err := validateProviderPreset(&pp); err != nil {
-			return err
-		}
-		pp.IsBuiltIn = true
-		prov[name] = pp
-
-		sub := make(map[spec.ModelPresetID]spec.ModelPreset, len(pp.ModelPresets))
-		for mid, mp := range pp.ModelPresets {
-			mp.IsBuiltIn = true
-			sub[mid] = mp
-		}
-		models[name] = sub
-	}
-
-	if _, ok := prov[schema.DefaultProvider]; !ok {
-		return errors.New("default provider not present in presets")
-	}
-
-	b.defaultProvider = schema.DefaultProvider
-	b.providers = prov
-	b.models = models
-
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.rebuildSnapshot(ctx)
 }
 
 // rebuildSnapshot applies overlay flags onto the immutable base sets.

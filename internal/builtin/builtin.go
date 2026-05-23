@@ -2,10 +2,9 @@ package builtin
 
 import (
 	"embed"
-)
 
-//go:embed modelpresets
-var BuiltInModelPresetsFS embed.FS
+	"github.com/flexigpt/inference-go/modelpreset"
+)
 
 //go:embed tools
 var BuiltInToolBundlesFS embed.FS
@@ -20,9 +19,6 @@ var BuiltInSkillBundlesFS embed.FS
 var BuiltInAssistantPresetBundlesFS embed.FS
 
 const (
-	BuiltInModelPresetsRootDir = "modelpresets"
-	BuiltInModelPresetsJSON    = "modelpresets.json"
-
 	BuiltInToolBundlesRootDir = "tools"
 	BuiltInToolBundlesJSON    = "tools.bundles.json"
 
@@ -45,15 +41,15 @@ const (
 )
 
 const (
-	ProviderNameAnthropic             = "anthropic"
-	ProviderNameGoogleGemini          = "googlegemini"
-	ProviderNameHuggingFace           = "huggingface"
-	ProviderNameLlamaCPP              = "llamacpp"
-	ProviderNameMistral               = "mistral"
-	ProviderNameOpenAIChatCompletions = "openai"
-	ProviderNameOpenAIResponses       = "openairesponses"
-	ProviderNameOpenRouter            = "openrouter"
-	ProviderNameXAI                   = "xai"
+	ProviderNameAnthropic             = string(modelpreset.ProviderAnthropic)
+	ProviderNameGoogleGemini          = string(modelpreset.ProviderGoogleGemini)
+	ProviderNameHuggingFace           = string(modelpreset.ProviderHuggingFace)
+	ProviderNameLlamaCPP              = string(modelpreset.ProviderLlamaCPP)
+	ProviderNameMistral               = string(modelpreset.ProviderMistral)
+	ProviderNameOpenAIChatCompletions = string(modelpreset.ProviderOpenAIChat)
+	ProviderNameOpenAIResponses       = string(modelpreset.ProviderOpenAIResponses)
+	ProviderNameOpenRouter            = string(modelpreset.ProviderOpenRouter)
+	ProviderNameXAI                   = string(modelpreset.ProviderXAI)
 )
 
 var BuiltInProviderNames = []string{

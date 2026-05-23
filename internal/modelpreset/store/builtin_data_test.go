@@ -1,26 +1,24 @@
 package store
 
 import (
-	"encoding/json"
-	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
-	"strings"
+	"slices"
 	"sync"
 	"testing"
-	"testing/fstest"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/builtin"
-	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
+	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
+
+	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 )
 
 const (
-	corrupted = "corrupted"
-	windows   = "windows"
+	corruptedBuiltInTestValue = "corrupted"
+	windows                   = "windows"
 )
 
 func TestNewBuiltInPresets(t *testing.T) {
@@ -29,7 +27,6 @@ func TestNewBuiltInPresets(t *testing.T) {
 		setupDir       func(*testing.T) string
 		snapshotMaxAge time.Duration
 		wantErr        bool
-		errContains    string
 	}{
 		{
 			name: "happy_path",
@@ -55,29 +52,25 @@ func TestNewBuiltInPresets(t *testing.T) {
 			snapshotMaxAge: -1,
 		},
 		{
+			name: "empty_base_dir",
+			setupDir: func(t *testing.T) string {
+				t.Helper()
+				return ""
+			},
+			wantErr: true,
+		},
+		{
 			name: "base_dir_is_file",
 			setupDir: func(t *testing.T) string {
 				t.Helper()
 				tmp := t.TempDir()
 				f := filepath.Join(tmp, "file")
-				_ = os.WriteFile(f, []byte("dummy"), 0o600)
+				if err := os.WriteFile(f, []byte("dummy"), 0o600); err != nil {
+					t.Fatalf("write temp file: %v", err)
+				}
 				return f
 			},
 			wantErr: true,
-		},
-		{
-			name: "readonly_directory",
-			setupDir: func(t *testing.T) string {
-				t.Helper()
-				tmp := t.TempDir()
-				ro := filepath.Join(tmp, "ro")
-				_ = os.MkdirAll(ro, 0o444)
-				return ro
-			},
-			// Unix-like systems will typically fail to create files in a 0444
-			// directory; Windows does not honor these POSIX permission bits the
-			// same way, so don't require an error there.
-			wantErr: runtime.GOOS != windows,
 		},
 	}
 
@@ -85,23 +78,15 @@ func TestNewBuiltInPresets(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := t.Context()
 			dir := tc.setupDir(t)
+
 			bi, err := NewBuiltInPresets(ctx, dir, tc.snapshotMaxAge)
-			// Always ensure any created instance is closed at test cleanup.
-			// This guards against the case where NewBuiltInPresets unexpectedly
-			// succeeds for a case that planned to fail (which would otherwise
-			// leave resources open and cause TempDir removal to fail on Windows).
 			t.Cleanup(func() {
-				if bi != nil {
-					_ = bi.Close()
-				}
+				closeBuiltInPresetsForTest(t, bi)
 			})
 
 			if tc.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
-				}
-				if tc.errContains != "" && !strings.Contains(err.Error(), tc.errContains) {
-					t.Fatalf("error %q does not contain %q", err, tc.errContains)
 				}
 				return
 			}
@@ -109,26 +94,250 @@ func TestNewBuiltInPresets(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			prov, models, _ := bi.ListBuiltInPresets(ctx)
-			if len(prov) == 0 || len(models) == 0 {
-				t.Fatal("expected non-empty data")
+			providers, models, err := bi.ListBuiltInPresets(ctx)
+			if err != nil {
+				t.Fatalf("ListBuiltInPresets: %v", err)
 			}
+			if len(providers) == 0 {
+				t.Fatal("expected non-empty provider data")
+			}
+			if len(models) == 0 {
+				t.Fatal("expected non-empty model data")
+			}
+
 			if _, err := os.Stat(filepath.Join(dir, spec.ModelPresetsBuiltInOverlayDBFileName)); err != nil {
 				t.Fatalf("overlay file missing: %v", err)
 			}
-			for n, p := range prov {
-				if !p.IsBuiltIn {
-					t.Errorf("provider %s not flagged built-in", n)
+
+			for providerName, provider := range providers {
+				if !provider.IsBuiltIn {
+					t.Errorf("provider %s not flagged built-in", providerName)
+				}
+				if provider.SchemaVersion != spec.SchemaVersion {
+					t.Errorf("provider %s schemaVersion got %q want %q",
+						providerName, provider.SchemaVersion, spec.SchemaVersion)
+				}
+				if provider.DefaultModelPresetID == "" {
+					t.Errorf("provider %s has empty defaultModelPresetID", providerName)
+				}
+				if _, ok := provider.ModelPresets[provider.DefaultModelPresetID]; !ok {
+					t.Errorf("provider %s default model %s missing from provider.ModelPresets",
+						providerName, provider.DefaultModelPresetID)
+				}
+				if _, ok := models[providerName][provider.DefaultModelPresetID]; !ok {
+					t.Errorf("provider %s default model %s missing from model view",
+						providerName, provider.DefaultModelPresetID)
 				}
 			}
-			for pn, mm := range models {
-				for mid, mp := range mm {
-					if !mp.IsBuiltIn {
-						t.Errorf("model %s/%s not flagged built-in", pn, mid)
+
+			for providerName, modelMap := range models {
+				for modelID, model := range modelMap {
+					if !model.IsBuiltIn {
+						t.Errorf("model %s/%s not flagged built-in", providerName, modelID)
+					}
+					if model.SchemaVersion != spec.SchemaVersion {
+						t.Errorf("model %s/%s schemaVersion got %q want %q",
+							providerName, modelID, model.SchemaVersion, spec.SchemaVersion)
+					}
+					if model.ID != modelID {
+						t.Errorf("model map key mismatch for %s/%s: model.ID=%s",
+							providerName, modelID, model.ID)
+					}
+					if model.Slug != spec.ModelSlug(modelID) {
+						t.Errorf("model %s/%s slug got %q want %q",
+							providerName, modelID, model.Slug, modelID)
 					}
 				}
 			}
 		})
+	}
+}
+
+func TestBuiltInPresetsInitializedFromInferenceCatalog(t *testing.T) {
+	ctx := t.Context()
+	bi, _ := mustNewBuiltInPresets(t, time.Hour)
+	defer closeBuiltInPresetsForTest(t, bi)
+
+	catalog := modelpreset.DefaultCatalog()
+	providers, models, err := bi.ListBuiltInPresets(ctx)
+	if err != nil {
+		t.Fatalf("ListBuiltInPresets: %v", err)
+	}
+
+	if len(providers) != len(catalog.Providers) {
+		t.Fatalf("provider count got %d want %d", len(providers), len(catalog.Providers))
+	}
+
+	defaultProvider, err := bi.GetBuiltInDefaultProviderName(ctx)
+	if err != nil {
+		t.Fatalf("GetBuiltInDefaultProviderName: %v", err)
+	}
+	if defaultProvider != modelpreset.ProviderOpenAIResponses {
+		t.Fatalf("default provider got %q want %q",
+			defaultProvider, modelpreset.ProviderOpenAIResponses)
+	}
+
+	for providerName, inferenceProvider := range catalog.Providers {
+		appProvider, ok := providers[providerName]
+		if !ok {
+			t.Fatalf("provider %q missing from app built-ins", providerName)
+		}
+
+		if appProvider.Name != inferenceProvider.Name {
+			t.Errorf("provider %s name got %q want %q",
+				providerName, appProvider.Name, inferenceProvider.Name)
+		}
+		if string(appProvider.DisplayName) != inferenceProvider.DisplayName {
+			t.Errorf("provider %s displayName got %q want %q",
+				providerName, appProvider.DisplayName, inferenceProvider.DisplayName)
+		}
+		if appProvider.SDKType != inferenceProvider.SDKType {
+			t.Errorf("provider %s sdkType got %q want %q",
+				providerName, appProvider.SDKType, inferenceProvider.SDKType)
+		}
+		if appProvider.Origin != inferenceProvider.Origin {
+			t.Errorf("provider %s origin got %q want %q",
+				providerName, appProvider.Origin, inferenceProvider.Origin)
+		}
+		if appProvider.ChatCompletionPathPrefix != inferenceProvider.ChatCompletionPathPrefix {
+			t.Errorf("provider %s path got %q want %q",
+				providerName,
+				appProvider.ChatCompletionPathPrefix,
+				inferenceProvider.ChatCompletionPathPrefix,
+			)
+		}
+		if appProvider.APIKeyHeaderKey != inferenceProvider.APIKeyHeaderKey {
+			t.Errorf("provider %s apiKeyHeaderKey got %q want %q",
+				providerName, appProvider.APIKeyHeaderKey, inferenceProvider.APIKeyHeaderKey)
+		}
+
+		for k, v := range inferenceProvider.DefaultHeaders {
+			if appProvider.DefaultHeaders[k] != v {
+				t.Errorf("provider %s default header %q got %q want %q",
+					providerName, k, appProvider.DefaultHeaders[k], v)
+			}
+		}
+
+		if !reflect.DeepEqual(appProvider.CapabilitiesOverride, inferenceProvider.CapabilitiesOverride) {
+			t.Errorf("provider %s capabilities override differs from inference catalog", providerName)
+		}
+
+		appModels, ok := models[providerName]
+		if !ok {
+			t.Fatalf("provider %q missing from model view", providerName)
+		}
+		if len(appModels) != len(inferenceProvider.ModelPresets) {
+			t.Fatalf("provider %s model count got %d want %d",
+				providerName, len(appModels), len(inferenceProvider.ModelPresets))
+		}
+
+		for inferenceModelID, inferenceModel := range inferenceProvider.ModelPresets {
+			appModelID := spec.ModelPresetID(inferenceModelID)
+			appModel, ok := appModels[appModelID]
+			if !ok {
+				t.Fatalf("model %s/%s missing from app built-ins", providerName, inferenceModelID)
+			}
+
+			if appModel.ID != appModelID {
+				t.Errorf("model %s/%s id got %q want %q",
+					providerName, inferenceModelID, appModel.ID, appModelID)
+			}
+			if inferenceSpec.ModelName(appModel.Name) != inferenceModel.ModelParam.Name {
+				t.Errorf("model %s/%s name got %q want %q",
+					providerName, inferenceModelID, appModel.Name, inferenceModel.ModelParam.Name)
+			}
+			if string(appModel.DisplayName) != inferenceModel.DisplayName {
+				t.Errorf("model %s/%s displayName got %q want %q",
+					providerName, inferenceModelID, appModel.DisplayName, inferenceModel.DisplayName)
+			}
+			if appModel.Stream == nil || *appModel.Stream != inferenceModel.ModelParam.Stream {
+				t.Errorf("model %s/%s stream not copied from inference catalog", providerName, inferenceModelID)
+			}
+			if appModel.MaxPromptLength == nil ||
+				*appModel.MaxPromptLength != inferenceModel.ModelParam.MaxPromptLength {
+				t.Errorf("model %s/%s maxPromptLength not copied from inference catalog",
+					providerName, inferenceModelID)
+			}
+			if appModel.MaxOutputLength == nil ||
+				*appModel.MaxOutputLength != inferenceModel.ModelParam.MaxOutputLength {
+				t.Errorf("model %s/%s maxOutputLength not copied from inference catalog",
+					providerName, inferenceModelID)
+			}
+			if appModel.Timeout == nil || *appModel.Timeout != inferenceModel.ModelParam.Timeout {
+				t.Errorf("model %s/%s timeout not copied from inference catalog", providerName, inferenceModelID)
+			}
+			if !reflect.DeepEqual(appModel.CapabilitiesOverride, inferenceModel.CapabilitiesOverride) {
+				t.Errorf("model %s/%s capabilities override differs from inference catalog",
+					providerName, inferenceModelID)
+			}
+		}
+	}
+}
+
+func TestBuiltInPresetAppOverlays(t *testing.T) {
+	ctx := t.Context()
+	bi, _ := mustNewBuiltInPresets(t, time.Hour)
+	defer closeBuiltInPresetsForTest(t, bi)
+
+	providers, models, err := bi.ListBuiltInPresets(ctx)
+	if err != nil {
+		t.Fatalf("ListBuiltInPresets: %v", err)
+	}
+
+	openAIResponses := providers[modelpreset.ProviderOpenAIResponses]
+	if openAIResponses.DefaultModelPresetID != spec.ModelPresetID(modelpreset.PresetOpenAIResponsesGPT54Mini) {
+		t.Fatalf("openairesponses default model got %q want %q",
+			openAIResponses.DefaultModelPresetID,
+			modelpreset.PresetOpenAIResponsesGPT54Mini,
+		)
+	}
+
+	anthropic := providers[modelpreset.ProviderAnthropic]
+	if anthropic.DefaultModelPresetID != spec.ModelPresetID(modelpreset.PresetAnthropicSonnet46) {
+		t.Fatalf("anthropic default model got %q want %q",
+			anthropic.DefaultModelPresetID,
+			modelpreset.PresetAnthropicSonnet46,
+		)
+	}
+
+	openRouter := providers[modelpreset.ProviderOpenRouter]
+	if openRouter.DefaultHeaders["HTTP-Referer"] == "" {
+		t.Fatal("openrouter missing app-specific HTTP-Referer header overlay")
+	}
+	if openRouter.DefaultHeaders["X-Title"] == "" {
+		t.Fatal("openrouter missing app-specific X-Title header overlay")
+	}
+
+	disabledChecks := []struct {
+		provider inferenceSpec.ProviderName
+		modelID  spec.ModelPresetID
+	}{
+		{
+			provider: modelpreset.ProviderAnthropic,
+			modelID:  spec.ModelPresetID(modelpreset.PresetAnthropicSonnet45),
+		},
+		{
+			provider: modelpreset.ProviderGoogleGemini,
+			modelID:  spec.ModelPresetID(modelpreset.PresetGoogleGemini31Pro),
+		},
+		{
+			provider: modelpreset.ProviderOpenAIChat,
+			modelID:  spec.ModelPresetID(modelpreset.PresetOpenAIChatGPT4o),
+		},
+		{
+			provider: modelpreset.ProviderOpenAIResponses,
+			modelID:  spec.ModelPresetID(modelpreset.PresetOpenAIResponsesGPT52),
+		},
+	}
+
+	for _, tc := range disabledChecks {
+		model, ok := models[tc.provider][tc.modelID]
+		if !ok {
+			t.Fatalf("expected model %s/%s to exist", tc.provider, tc.modelID)
+		}
+		if model.IsEnabled {
+			t.Fatalf("model %s/%s should be disabled by app overlay", tc.provider, tc.modelID)
+		}
 	}
 }
 
@@ -142,16 +351,19 @@ func TestSetProviderEnabled(t *testing.T) {
 			name: "toggle_existing_provider",
 			setup: func(t *testing.T, bi *BuiltInPresets) (inferenceSpec.ProviderName, bool) {
 				t.Helper()
-				prov, _, _ := bi.ListBuiltInPresets(t.Context())
-				id, p := anyProvider(prov)
-				return id, !p.IsEnabled
+				providers, _, err := bi.ListBuiltInPresets(t.Context())
+				if err != nil {
+					t.Fatalf("ListBuiltInPresets: %v", err)
+				}
+				providerName, provider := anyBuiltInProvider(t, providers)
+				return providerName, !provider.IsEnabled
 			},
 		},
 		{
 			name: nonexistentProviderName,
 			setup: func(t *testing.T, _ *BuiltInPresets) (inferenceSpec.ProviderName, bool) {
 				t.Helper()
-				return inferenceSpec.ProviderName(ghostID), true
+				return inferenceSpec.ProviderName("ghost-provider"), true
 			},
 			wantErr: true,
 		},
@@ -160,13 +372,11 @@ func TestSetProviderEnabled(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := t.Context()
-			dir := t.TempDir()
-			bi, _ := NewBuiltInPresets(ctx, dir, 0)
-			t.Cleanup(func() {
-				_ = bi.Close()
-			})
-			pname, enabled := tc.setup(t, bi)
-			_, err := bi.SetProviderEnabled(ctx, pname, enabled)
+			bi, _ := mustNewBuiltInPresets(t, 0)
+			defer closeBuiltInPresetsForTest(t, bi)
+
+			providerName, enabled := tc.setup(t, bi)
+			got, err := bi.SetProviderEnabled(ctx, providerName, enabled)
 
 			if tc.wantErr {
 				if err == nil {
@@ -175,24 +385,27 @@ func TestSetProviderEnabled(t *testing.T) {
 				return
 			}
 			if err != nil {
-				t.Fatalf("unexpected: %v", err)
+				t.Fatalf("unexpected error: %v", err)
 			}
-			prov, _, _ := bi.ListBuiltInPresets(ctx)
-			if prov[pname].IsEnabled != enabled {
-				t.Errorf("flag mismatch want %v", enabled)
+			if got.IsEnabled != enabled {
+				t.Fatalf("returned provider enabled got %v want %v", got.IsEnabled, enabled)
 			}
-			// Check overlay state via providerOverlayFlags API.
-			flag, ok, err := bi.providerOverlayFlags.GetFlag(ctx, builtInProviderKey(pname))
+
+			providers, _, err := bi.ListBuiltInPresets(ctx)
+			if err != nil {
+				t.Fatalf("ListBuiltInPresets: %v", err)
+			}
+			if providers[providerName].IsEnabled != enabled {
+				t.Errorf("snapshot enabled got %v want %v", providers[providerName].IsEnabled, enabled)
+			}
+
+			flag, ok, err := bi.providerOverlayFlags.GetFlag(ctx, builtInProviderKey(providerName))
 			if err != nil {
 				t.Fatalf("providerOverlayFlags.GetFlag: %v", err)
 			}
 			if !ok || flag.Value != enabled {
-				t.Errorf(
-					"overlay mismatch: present=%v, value=%v, want present=true, value=%v",
-					ok,
-					flag.Value,
-					enabled,
-				)
+				t.Errorf("overlay mismatch: present=%v value=%v want present=true value=%v",
+					ok, flag.Value, enabled)
 			}
 		})
 	}
@@ -201,32 +414,39 @@ func TestSetProviderEnabled(t *testing.T) {
 func TestSetModelPresetEnabled(t *testing.T) {
 	tests := []struct {
 		name    string
-		setup   func(*testing.T, *BuiltInPresets) (inferenceSpec.ProviderName, spec.ModelPreset, bool)
+		setup   func(*testing.T, *BuiltInPresets) (inferenceSpec.ProviderName, spec.ModelPresetID, bool)
 		wantErr bool
 	}{
 		{
 			name: "toggle_existing_model",
-			setup: func(t *testing.T, bi *BuiltInPresets) (inferenceSpec.ProviderName, spec.ModelPreset, bool) {
+			setup: func(t *testing.T, bi *BuiltInPresets) (inferenceSpec.ProviderName, spec.ModelPresetID, bool) {
 				t.Helper()
-				_, models, _ := bi.ListBuiltInPresets(t.Context())
-				pn, _, mp := anyModel(models)
-				return pn, mp, !mp.IsEnabled
+				_, models, err := bi.ListBuiltInPresets(t.Context())
+				if err != nil {
+					t.Fatalf("ListBuiltInPresets: %v", err)
+				}
+				providerName, modelID, model := anyBuiltInModel(t, models)
+				return providerName, modelID, !model.IsEnabled
 			},
 		},
 		{
 			name: nonexistentProviderName,
-			setup: func(*testing.T, *BuiltInPresets) (inferenceSpec.ProviderName, spec.ModelPreset, bool) {
-				return inferenceSpec.ProviderName(ghostID), spec.ModelPreset{ID: "m"}, true
+			setup: func(t *testing.T, _ *BuiltInPresets) (inferenceSpec.ProviderName, spec.ModelPresetID, bool) {
+				t.Helper()
+				return inferenceSpec.ProviderName("ghost-provider"), spec.ModelPresetID("m"), true
 			},
 			wantErr: true,
 		},
 		{
 			name: "nonexistent_model",
-			setup: func(t *testing.T, bi *BuiltInPresets) (inferenceSpec.ProviderName, spec.ModelPreset, bool) {
+			setup: func(t *testing.T, bi *BuiltInPresets) (inferenceSpec.ProviderName, spec.ModelPresetID, bool) {
 				t.Helper()
-				prov, _, _ := bi.ListBuiltInPresets(t.Context())
-				pn, _ := anyProvider(prov)
-				return pn, spec.ModelPreset{ID: ghostID}, true
+				providers, _, err := bi.ListBuiltInPresets(t.Context())
+				if err != nil {
+					t.Fatalf("ListBuiltInPresets: %v", err)
+				}
+				providerName, _ := anyBuiltInProvider(t, providers)
+				return providerName, spec.ModelPresetID("ghost-model"), true
 			},
 			wantErr: true,
 		},
@@ -235,290 +455,47 @@ func TestSetModelPresetEnabled(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := t.Context()
-			dir := t.TempDir()
-			bi, _ := NewBuiltInPresets(ctx, dir, 0)
-			t.Cleanup(func() {
-				_ = bi.Close()
-			})
-			pn, mp, enabled := tc.setup(t, bi)
-			_, err := bi.SetModelPresetEnabled(ctx, pn, mp.ID, enabled)
+			bi, _ := mustNewBuiltInPresets(t, 0)
+			defer closeBuiltInPresetsForTest(t, bi)
+
+			providerName, modelID, enabled := tc.setup(t, bi)
+			got, err := bi.SetModelPresetEnabled(ctx, providerName, modelID, enabled)
 
 			if tc.wantErr {
 				if err == nil {
-					t.Fatalf("expected error, %v, %v", pn, mp.Slug)
+					t.Fatal("expected error")
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("unexpected: %v, %v, %v", err, pn, mp.Slug)
+				t.Fatalf("unexpected error: %v", err)
 			}
-			_, models, _ := bi.ListBuiltInPresets(ctx)
-			if models[pn][mp.ID].IsEnabled != enabled {
-				t.Errorf("flag mismatch want %v", enabled)
+			if got.IsEnabled != enabled {
+				t.Fatalf("returned model enabled got %v want %v", got.IsEnabled, enabled)
 			}
-			// Check overlay state via modelOverlayFlags API.
-			flag, ok, err := bi.modelOverlayFlags.GetFlag(ctx, getModelKey(pn, mp.ID))
+
+			providers, models, err := bi.ListBuiltInPresets(ctx)
+			if err != nil {
+				t.Fatalf("ListBuiltInPresets: %v", err)
+			}
+			if models[providerName][modelID].IsEnabled != enabled {
+				t.Errorf("models snapshot enabled got %v want %v",
+					models[providerName][modelID].IsEnabled, enabled)
+			}
+			if providers[providerName].ModelPresets[modelID].IsEnabled != enabled {
+				t.Errorf("provider snapshot enabled got %v want %v",
+					providers[providerName].ModelPresets[modelID].IsEnabled, enabled)
+			}
+
+			flag, ok, err := bi.modelOverlayFlags.GetFlag(ctx, getModelKey(providerName, modelID))
 			if err != nil {
 				t.Fatalf("modelOverlayFlags.GetFlag: %v", err)
 			}
 			if !ok || flag.Value != enabled {
-				t.Errorf(
-					"overlay mismatch: present=%v, value=%v, want present=true, value=%v",
-					ok,
-					flag.Value,
-					enabled,
-				)
+				t.Errorf("overlay mismatch: present=%v value=%v want present=true value=%v",
+					ok, flag.Value, enabled)
 			}
 		})
-	}
-}
-
-func TestListBuiltInPresets(t *testing.T) {
-	ctx := t.Context()
-	dir := t.TempDir()
-	bi, _ := NewBuiltInPresets(ctx, dir, 0)
-	t.Cleanup(func() {
-		_ = bi.Close()
-	})
-
-	t.Run("independent_copies", func(t *testing.T) {
-		p1, m1, _ := bi.ListBuiltInPresets(ctx)
-		p2, m2, _ := bi.ListBuiltInPresets(ctx)
-
-		for n := range p1 {
-			p1[n] = spec.ProviderPreset{DisplayName: corrupted}
-			break
-		}
-		for pn := range m1 {
-			for mid := range m1[pn] {
-				mp := m1[pn][mid]
-				mp.DisplayName = corrupted
-				m1[pn][mid] = mp
-				break
-			}
-			break
-		}
-		for n, p := range p2 {
-			if p.DisplayName == corrupted {
-				t.Errorf("provider %s shares memory", n)
-			}
-		}
-		for pn, mm := range m2 {
-			for mid, mp := range mm {
-				if mp.DisplayName == corrupted {
-					t.Errorf("model %s/%s shares memory", pn, mid)
-				}
-			}
-		}
-	})
-
-	t.Run("consistent_maps", func(t *testing.T) {
-		prov, models, _ := bi.ListBuiltInPresets(ctx)
-		for pn := range prov {
-			if _, ok := models[pn]; !ok {
-				t.Errorf("provider %s has no model map", pn)
-			}
-		}
-		for pn := range models {
-			if _, ok := prov[pn]; !ok {
-				t.Errorf("model map %s has no provider", pn)
-			}
-		}
-	})
-}
-
-func TestConcurrencyPresets(t *testing.T) {
-	ctx := t.Context()
-	dir := t.TempDir()
-	bi, _ := NewBuiltInPresets(ctx, dir, 10*time.Millisecond)
-	t.Cleanup(func() {
-		_ = bi.Close()
-	})
-
-	// Fetch sample keys.
-	prov, models, _ := bi.ListBuiltInPresets(ctx)
-	pname, _ := anyProvider(prov)
-	pn, mid, _ := anyModel(models)
-
-	// Concurrent reads.
-	t.Run("reads", func(t *testing.T) {
-		var wg sync.WaitGroup
-		const loops = 10
-		for range loops {
-			wg.Go(func() {
-				for range 100 {
-					_, _, _ = bi.ListBuiltInPresets(ctx)
-				}
-			})
-		}
-		wg.Wait()
-	})
-
-	// Concurrent writes.
-	t.Run("writes", func(t *testing.T) {
-		var wg sync.WaitGroup
-		const writers = 5
-		for i := range writers {
-			wg.Add(2)
-			go func(i int) {
-				defer wg.Done()
-				_, _ = bi.SetProviderEnabled(ctx, pname, i%2 == 0)
-			}(i)
-			go func(i int) {
-				defer wg.Done()
-				_, _ = bi.SetModelPresetEnabled(ctx, pn, mid, i%2 == 0)
-			}(i)
-		}
-		wg.Wait()
-	})
-}
-
-func TestRebuildSnapshotPresets(t *testing.T) {
-	ctx := t.Context()
-	dir := t.TempDir()
-	bi, _ := NewBuiltInPresets(ctx, dir, time.Hour)
-	t.Cleanup(func() {
-		_ = bi.Close()
-	})
-
-	prov, _, _ := bi.ListBuiltInPresets(ctx)
-	pn, p := anyProvider(prov)
-	_, err := bi.providerOverlayFlags.SetFlag(ctx, builtInProviderKey(pn), !p.IsEnabled)
-	if err != nil {
-		t.Fatalf("providerOverlayFlags.SetFlag: %v", err)
-	}
-
-	bi.mu.Lock()
-	_ = bi.rebuildSnapshot(ctx)
-	bi.mu.Unlock()
-
-	prov2, _, _ := bi.ListBuiltInPresets(ctx)
-	if prov2[pn].IsEnabled == p.IsEnabled {
-		t.Error("rebuild did not apply overlay")
-	}
-}
-
-func TestAsyncRebuildPresets(t *testing.T) {
-	ctx := t.Context()
-	dir := t.TempDir()
-	bi, _ := NewBuiltInPresets(ctx, dir, time.Millisecond)
-	t.Cleanup(func() {
-		_ = bi.Close()
-	})
-
-	prov, _, _ := bi.ListBuiltInPresets(ctx)
-	pn, p := anyProvider(prov)
-	time.Sleep(2 * time.Millisecond)
-	_, _ = bi.SetProviderEnabled(ctx, pn, !p.IsEnabled)
-	time.Sleep(10 * time.Millisecond)
-
-	prov2, _, _ := bi.ListBuiltInPresets(ctx)
-	if prov2[pn].IsEnabled == p.IsEnabled {
-		t.Error("async rebuild missed change")
-	}
-}
-
-func Test_NewBuiltInPresets_SyntheticFS_MissingJSON(t *testing.T) {
-	if runtime.GOOS == windows {
-		t.Skip("custom fs test has some overlay race in win")
-		return
-	}
-	_, err := newPresetsFromFS(t, fstest.MapFS{})
-	if !errors.Is(err, fs.ErrNotExist) {
-		t.Fatalf("want fs.ErrNotExist, got %v", err)
-	}
-}
-
-// Test when the json file is present but contains invalid JSON.
-func Test_NewBuiltInPresets_SyntheticFS_InvalidJSON(t *testing.T) {
-	if runtime.GOOS == windows {
-		t.Skip("custom fs test has some overlay race in win")
-		return
-	}
-	fsys := fstest.MapFS{builtin.BuiltInModelPresetsJSON: {Data: []byte("{ nope ]")}}
-	_, err := newPresetsFromFS(t, fsys)
-	if err == nil {
-		t.Fatal("want error")
-	}
-}
-
-// Test when the schema has no providers defined.
-func Test_NewBuiltInPresets_SyntheticFS_NoProviders(t *testing.T) {
-	if runtime.GOOS == windows {
-		t.Skip("custom fs test has some overlay race in win")
-		return
-	}
-	empty, _ := json.Marshal(spec.PresetsSchema{
-		SchemaVersion:   spec.SchemaVersion,
-		ProviderPresets: map[inferenceSpec.ProviderName]spec.ProviderPreset{},
-	})
-	fsys := fstest.MapFS{builtin.BuiltInModelPresetsJSON: {Data: empty}}
-	_, err := newPresetsFromFS(t, fsys)
-	if err == nil || (!strings.Contains(err.Error(), "no providers") &&
-		!strings.Contains(err.Error(), "no default provider in builtin")) {
-		t.Fatalf("unexpected: %v", err)
-	}
-}
-
-// Test when a provider exists but its default model preset id is missing.
-func Test_NewBuiltInPresets_SyntheticFS_DefaultModelMissing(t *testing.T) {
-	if runtime.GOOS == windows {
-		t.Skip("custom fs test has some overlay race in win")
-		return
-	}
-	provName := inferenceSpec.ProviderName("demoProv")
-	modelID := spec.ModelPresetID("model1")
-
-	s := buildSchemaDefaultMissing(provName, modelID)
-	fsys := fstest.MapFS{builtin.BuiltInModelPresetsJSON: {Data: s}}
-	_, err := newPresetsFromFS(t, fsys)
-	if err == nil || !strings.Contains(err.Error(), "defaultModelPresetID") {
-		t.Fatalf("unexpected: %v", err)
-	}
-}
-
-func Test_NewBuiltInPresets_SyntheticFS_HappyAndCRUD(t *testing.T) {
-	ctx := t.Context()
-	pn := inferenceSpec.ProviderName("demo")
-	mpid := spec.ModelPresetID("m1")
-
-	schema := buildHappySchema(pn, mpid)
-	fsys := fstest.MapFS{builtin.BuiltInModelPresetsJSON: {Data: schema}}
-
-	dir := t.TempDir()
-	bi, err := NewBuiltInPresets(ctx, dir, 0, WithModelPresetsFS(fsys, "."))
-	if err != nil {
-		t.Fatalf("unexpected: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = bi.Close()
-	})
-
-	prov, models, _ := bi.ListBuiltInPresets(ctx)
-	if len(prov) != 1 || len(models) != 1 {
-		t.Fatalf("want 1/1 objects, got %d/%d", len(prov), len(models))
-	}
-
-	// Toggle provider.
-	p := prov[pn]
-	_, _ = bi.SetProviderEnabled(ctx, pn, !p.IsEnabled)
-	flag, ok, err := bi.providerOverlayFlags.GetFlag(ctx, builtInProviderKey(pn))
-	if err != nil {
-		t.Fatalf("providerOverlayFlags.GetFlag: %v", err)
-	}
-	if !ok || flag.Value == p.IsEnabled {
-		t.Fatal("provider overlay not updated")
-	}
-
-	// Toggle model preset.
-	mp := models[pn][mpid]
-	_, _ = bi.SetModelPresetEnabled(ctx, pn, mpid, !mp.IsEnabled)
-	mflag, ok, err := bi.modelOverlayFlags.GetFlag(ctx, getModelKey(pn, mpid))
-	if err != nil {
-		t.Fatalf("modelOverlayFlags.GetFlag: %v", err)
-	}
-	if !ok || mflag.Value == mp.IsEnabled {
-		t.Fatal("model overlay not updated")
 	}
 }
 
@@ -532,25 +509,18 @@ func TestSetDefaultModelPreset(t *testing.T) {
 			name: "change_existing_provider",
 			setup: func(t *testing.T, bi *BuiltInPresets) (inferenceSpec.ProviderName, spec.ModelPresetID) {
 				t.Helper()
-				_, models, _ := bi.ListBuiltInPresets(t.Context())
-				for pn, mm := range models {
-					if len(mm) < 2 {
-						continue // need at least 2 models to change default
-					}
-					ids := make([]spec.ModelPresetID, 0, len(mm))
-					for mid := range mm {
-						ids = append(ids, mid)
-					}
-					return pn, ids[1] // pick a non-default one
+				providers, models, err := bi.ListBuiltInPresets(t.Context())
+				if err != nil {
+					t.Fatalf("ListBuiltInPresets: %v", err)
 				}
-				t.Skip("test data has no provider with ≥2 models")
-				return "", ""
+				return anyProviderWithNonDefaultModel(t, providers, models)
 			},
 		},
 		{
 			name: nonexistentProviderName,
-			setup: func(*testing.T, *BuiltInPresets) (inferenceSpec.ProviderName, spec.ModelPresetID) {
-				return inferenceSpec.ProviderName(ghostID), spec.ModelPresetID("m1")
+			setup: func(t *testing.T, _ *BuiltInPresets) (inferenceSpec.ProviderName, spec.ModelPresetID) {
+				t.Helper()
+				return inferenceSpec.ProviderName("ghost-provider"), spec.ModelPresetID("m1")
 			},
 			wantErr: true,
 		},
@@ -558,9 +528,12 @@ func TestSetDefaultModelPreset(t *testing.T) {
 			name: "nonexistent_model",
 			setup: func(t *testing.T, bi *BuiltInPresets) (inferenceSpec.ProviderName, spec.ModelPresetID) {
 				t.Helper()
-				prov, _, _ := bi.ListBuiltInPresets(t.Context())
-				pn, _ := anyProvider(prov)
-				return pn, spec.ModelPresetID(ghostID)
+				providers, _, err := bi.ListBuiltInPresets(t.Context())
+				if err != nil {
+					t.Fatalf("ListBuiltInPresets: %v", err)
+				}
+				providerName, _ := anyBuiltInProvider(t, providers)
+				return providerName, spec.ModelPresetID("ghost-model")
 			},
 			wantErr: true,
 		},
@@ -569,18 +542,11 @@ func TestSetDefaultModelPreset(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := t.Context()
-			dir := t.TempDir()
-			bi, _ := NewBuiltInPresets(ctx, dir, 0)
-			t.Cleanup(func() {
-				_ = bi.Close()
-			})
+			bi, _ := mustNewBuiltInPresets(t, 0)
+			defer closeBuiltInPresetsForTest(t, bi)
 
-			pn, mid := tc.setup(t, bi)
-			if pn == "" {
-				return // skipped inside setup
-			}
-
-			_, err := bi.SetDefaultModelPreset(ctx, pn, mid)
+			providerName, modelID := tc.setup(t, bi)
+			got, err := bi.SetDefaultModelPreset(ctx, providerName, modelID)
 
 			if tc.wantErr {
 				if err == nil {
@@ -589,731 +555,493 @@ func TestSetDefaultModelPreset(t *testing.T) {
 				return
 			}
 			if err != nil {
-				t.Fatalf("unexpected: %v", err)
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got.DefaultModelPresetID != modelID {
+				t.Fatalf("returned provider default got %s want %s", got.DefaultModelPresetID, modelID)
 			}
 
-			// Snapshot must reflect the change.
-			prov, _, _ := bi.ListBuiltInPresets(ctx)
-			if prov[pn].DefaultModelPresetID != mid {
-				t.Errorf("defaultModelPresetID not updated, want %s", mid)
+			providers, _, err := bi.ListBuiltInPresets(ctx)
+			if err != nil {
+				t.Fatalf("ListBuiltInPresets: %v", err)
+			}
+			if providers[providerName].DefaultModelPresetID != modelID {
+				t.Errorf("snapshot default got %s want %s",
+					providers[providerName].DefaultModelPresetID, modelID)
 			}
 
-			// Overlay flag must be present and consistent.
 			flag, ok, err := bi.providerDefaultModelIDOverlayFlags.GetFlag(
-				ctx, builtInProviderDefaultModelIDKey(pn))
+				ctx,
+				builtInProviderDefaultModelIDKey(providerName),
+			)
 			if err != nil {
 				t.Fatalf("providerDefaultModelIDOverlayFlags.GetFlag: %v", err)
 			}
-			if !ok || flag.Value != mid {
-				t.Errorf("overlay mismatch: present=%v, value=%s, want present=true, value=%s",
-					ok, flag.Value, mid)
+			if !ok || flag.Value != modelID {
+				t.Errorf("overlay mismatch: present=%v value=%s want present=true value=%s",
+					ok, flag.Value, modelID)
 			}
 		})
 	}
 }
 
-func TestRebuildSnapshot_DefaultModelPreset(t *testing.T) {
+func TestListBuiltInPresetsReturnsIndependentCopies(t *testing.T) {
 	ctx := t.Context()
-	dir := t.TempDir()
-	bi, _ := NewBuiltInPresets(ctx, dir, time.Hour)
-	t.Cleanup(func() {
-		_ = bi.Close()
-	})
+	bi, _ := mustNewBuiltInPresets(t, time.Hour)
+	defer closeBuiltInPresetsForTest(t, bi)
 
-	_, models, _ := bi.ListBuiltInPresets(ctx)
-	pn, _, mp := anyModel(models)
-
-	// Need another model ID to switch to – if there is none, skip.
-	var newID spec.ModelPresetID
-	for id := range models[pn] {
-		if id != mp.ID {
-			newID = id
-			break
-		}
-	}
-	if newID == "" {
-		t.Skip("dataset has only one model – cannot test rebuild for default overlay")
-	}
-
-	// Directly set flag (bypassing helper) then call rebuild.
-	_, _ = bi.providerDefaultModelIDOverlayFlags.SetFlag(
-		ctx, builtInProviderDefaultModelIDKey(pn), newID)
-
-	bi.mu.Lock()
-	_ = bi.rebuildSnapshot(ctx)
-	bi.mu.Unlock()
-
-	prov, _, _ := bi.ListBuiltInPresets(ctx)
-	if prov[pn].DefaultModelPresetID != newID {
-		t.Error("rebuild did not apply default-model overlay")
-	}
-}
-
-func TestAsyncRebuild_DefaultModelPreset(t *testing.T) {
-	ctx := t.Context()
-	dir := t.TempDir()
-	bi, _ := NewBuiltInPresets(ctx, dir, 5*time.Millisecond)
-	t.Cleanup(func() {
-		_ = bi.Close()
-	})
-
-	_, models, _ := bi.ListBuiltInPresets(ctx)
-	pn, _, mp := anyModel(models)
-
-	// Need another model ID to switch to.
-	var newID spec.ModelPresetID
-	for id := range models[pn] {
-		if id != mp.ID {
-			newID = id
-			break
-		}
-	}
-	if newID == "" {
-		t.Skip("dataset has only one model – cannot test async rebuild")
-	}
-
-	time.Sleep(10 * time.Millisecond) // ensure snapshot considered stale
-
-	_, _ = bi.SetDefaultModelPreset(ctx, pn, newID)
-	time.Sleep(20 * time.Millisecond) // allow async worker to run
-
-	prov, _, _ := bi.ListBuiltInPresets(ctx)
-	if prov[pn].DefaultModelPresetID != newID {
-		t.Error("async rebuild missed default-model change")
-	}
-}
-
-func TestProviderModelSync_Scenarios(t *testing.T) {
-	ctx := t.Context()
-	dir := t.TempDir()
-	bi, err := NewBuiltInPresets(ctx, dir, time.Hour)
-	if err != nil {
-		t.Fatalf("unexpected: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = bi.Close()
-	})
-
-	prov, models, _ := bi.ListBuiltInPresets(ctx)
-	pn, mid, mp := anyModel(models)
-	pname, p := anyProvider(prov)
-
-	// Try to find a provider with ≥2 models to test default-model flip.
-	var pn2 inferenceSpec.ProviderName
-	var secondModelID spec.ModelPresetID
-	for provName, mm := range models {
-		if len(mm) >= 2 {
-			pn2 = provName
-			for id := range mm {
-				if id != prov[provName].DefaultModelPresetID {
-					secondModelID = id
-					break
-				}
-			}
-			break
-		}
-	}
-	if pn2 == "" {
-		t.Log(
-			"dataset has no provider with ≥2 models; the default-model change subtest will be skipped",
-		)
-	}
-
-	tests := []struct {
-		name string
-		run  func(t *testing.T)
-	}{
-		{
-			name: "model_toggle_is_reflected_in_provider_snapshot",
-			run: func(t *testing.T) {
-				t.Helper()
-				newEnabled := !mp.IsEnabled
-
-				// Toggle model flag (provider-model sync target).
-				if _, err := bi.SetModelPresetEnabled(ctx, pn, mid, newEnabled); err != nil {
-					t.Fatalf("SetModelPresetEnabled: %v", err)
-				}
-
-				// Force a snapshot rebuild to ensure provider snapshot gets the model overlay applied.
-				bi.mu.Lock()
-				_ = bi.rebuildSnapshot(ctx)
-				bi.mu.Unlock()
-
-				prov2, models2, _ := bi.ListBuiltInPresets(ctx)
-
-				// Model map reflects the new flag.
-				if models2[pn][mid].IsEnabled != newEnabled {
-					t.Fatalf(
-						"models view mismatch: got %v, want %v",
-						models2[pn][mid].IsEnabled,
-						newEnabled,
-					)
-				}
-				// Provider snapshot reflects the same flag for the same model.
-				if prov2[pn].ModelPresets[mid].IsEnabled != newEnabled {
-					t.Fatalf("provider snapshot not in sync: got %v, want %v",
-						prov2[pn].ModelPresets[mid].IsEnabled, newEnabled)
-				}
-
-				// Check some other properties remain built-in and consistent across both views.
-				if !prov2[pn].ModelPresets[mid].IsBuiltIn || !models2[pn][mid].IsBuiltIn {
-					t.Fatal("model lost IsBuiltIn flag after overlay")
-				}
-
-				// ModifiedAt of the model should match the overlay flag's ModifiedAt as applied in snapshot.
-				flag, ok, err := bi.modelOverlayFlags.GetFlag(ctx, getModelKey(pn, mid))
-				if err != nil {
-					t.Fatalf("modelOverlayFlags.GetFlag: %v", err)
-				}
-				if !ok {
-					t.Fatal("expected model overlay flag to be present")
-				}
-				gotProvMod := prov2[pn].ModelPresets[mid].ModifiedAt
-				gotModelsMod := models2[pn][mid].ModifiedAt
-				if !gotProvMod.Equal(flag.ModifiedAt) || !gotModelsMod.Equal(flag.ModifiedAt) {
-					t.Fatalf("ModifiedAt mismatch: provider=%v models=%v overlay=%v",
-						gotProvMod, gotModelsMod, flag.ModifiedAt)
-				}
-			},
-		},
-		{
-			name: "provider_toggle_does_not_change_models",
-			run: func(t *testing.T) {
-				t.Helper()
-				// Take a stable snapshot of models for this provider.
-				_, beforeModels, _ := bi.ListBuiltInPresets(ctx)
-				before := beforeModels[pname]
-
-				// Toggle the provider flag.
-				newEnabled := !p.IsEnabled
-				if _, err := bi.SetProviderEnabled(ctx, pname, newEnabled); err != nil {
-					t.Fatalf("SetProviderEnabled: %v", err)
-				}
-
-				// Rebuild to ensure provider snapshot reflects the change.
-				bi.mu.Lock()
-				_ = bi.rebuildSnapshot(ctx)
-				bi.mu.Unlock()
-
-				_, afterModels, _ := bi.ListBuiltInPresets(ctx)
-				after := afterModels[pname]
-
-				// Models map should remain unchanged for this provider (no side effects of provider toggle).
-				if len(before) != len(after) {
-					t.Fatalf(
-						"model count changed after provider toggle: before=%d after=%d",
-						len(before),
-						len(after),
-					)
-				}
-				for id, bm := range before {
-					am, ok := after[id]
-					if !ok {
-						t.Fatalf("model %q disappeared after provider toggle", id)
-					}
-					if bm.IsEnabled != am.IsEnabled {
-						t.Fatalf(
-							"model %q IsEnabled changed after provider toggle: %v -> %v",
-							id,
-							bm.IsEnabled,
-							am.IsEnabled,
-						)
-					}
-				}
-			},
-		},
-		{
-			name: "default_model_change_reflected_and_model_map_consistent",
-			run: func(t *testing.T) {
-				t.Helper()
-				if pn2 == "" || secondModelID == "" {
-					t.Skip("no provider with ≥2 models; skipping default model change scenario")
-				}
-
-				// Change provider default model.
-				if _, err := bi.SetDefaultModelPreset(ctx, pn2, secondModelID); err != nil {
-					t.Fatalf("SetDefaultModelPreset: %v", err)
-				}
-
-				// Force rebuild to apply overlay onto view.
-				bi.mu.Lock()
-				_ = bi.rebuildSnapshot(ctx)
-				bi.mu.Unlock()
-
-				prov2, models2, _ := bi.ListBuiltInPresets(ctx)
-				if prov2[pn2].DefaultModelPresetID != secondModelID {
-					t.Fatalf("defaultModelPresetID not updated: got=%s want=%s",
-						prov2[pn2].DefaultModelPresetID, secondModelID)
-				}
-
-				// Consistency: provider.ModelPresets must have the exact same keys as models map.
-				mpMap := prov2[pn2].ModelPresets
-				if len(mpMap) != len(models2[pn2]) {
-					t.Fatalf(
-						"provider.ModelPresets key-count mismatch: %d vs %d",
-						len(mpMap),
-						len(models2[pn2]),
-					)
-				}
-				for id := range models2[pn2] {
-					if _, ok := mpMap[id]; !ok {
-						t.Fatalf("provider.ModelPresets missing model %q present in models map", id)
-					}
-				}
-
-				// Overlay flag must be present and consistent for default-model.
-				flag, ok, err := bi.providerDefaultModelIDOverlayFlags.GetFlag(
-					ctx,
-					builtInProviderDefaultModelIDKey(pn2),
-				)
-				if err != nil {
-					t.Fatalf("providerDefaultModelIDOverlayFlags.GetFlag: %v", err)
-				}
-				if !ok || flag.Value != secondModelID {
-					t.Fatalf(
-						"default-model overlay mismatch: present=%v value=%s want present=true value=%s",
-						ok,
-						flag.Value,
-						secondModelID,
-					)
-				}
-			},
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, tc.run)
-	}
-}
-
-func TestScopedModelIDs_AcrossProviders_OverlayIsolation(t *testing.T) {
-	ctx := t.Context()
-
-	p1 := inferenceSpec.ProviderName("provA")
-	p2 := inferenceSpec.ProviderName("provB")
-	commonID := spec.ModelPresetID("m1")
-	otherID := spec.ModelPresetID("m2")
-
-	// Build a schema where both providers have the same model ID "m1".
-	s := buildSchemaScopedDuplicateIDs(p1, p2, commonID, otherID)
-	fsys := fstest.MapFS{builtin.BuiltInModelPresetsJSON: {Data: s}}
-
-	dir := t.TempDir()
-	bi, err := NewBuiltInPresets(ctx, dir, time.Hour, WithModelPresetsFS(fsys, "."))
-	if err != nil {
-		t.Fatalf("unexpected: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = bi.Close()
-	})
-
-	// Sanity checks: both providers and the common model exist in their own namespaces.
-	prov, models, _ := bi.ListBuiltInPresets(ctx)
-	if len(prov) != 2 {
-		t.Fatalf("want 2 providers, got %d", len(prov))
-	}
-	if _, ok := models[p1][commonID]; !ok {
-		t.Fatalf("provider %s missing model %s", p1, commonID)
-	}
-	if _, ok := models[p2][commonID]; !ok {
-		t.Fatalf("provider %s missing model %s", p2, commonID)
-	}
-
-	// Table-driven: toggle in p1, verify no effect on p2; then toggle in p2 and verify independence again.
-	tests := []struct {
-		name       string
-		targetProv inferenceSpec.ProviderName
-		targetID   spec.ModelPresetID
-		newEnabled bool
-		otherProv  inferenceSpec.ProviderName
-	}{
-		{
-			name:       "toggle_common_model_in_first_provider_only",
-			targetProv: p1,
-			targetID:   commonID,
-			newEnabled: false,
-			otherProv:  p2,
-		},
-		{
-			name:       "toggle_common_model_in_second_provider_only",
-			targetProv: p2,
-			targetID:   commonID,
-			newEnabled: true,
-			otherProv:  p1,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			// Snapshot current state.
-			_, before, _ := bi.ListBuiltInPresets(ctx)
-
-			beforeOther := before[tc.otherProv][tc.targetID].IsEnabled
-
-			// Apply overlay to target provider's common model ID.
-			if _, err := bi.SetModelPresetEnabled(ctx, tc.targetProv, tc.targetID, tc.newEnabled); err != nil {
-				t.Fatalf("SetModelPresetEnabled: %v", err)
-			}
-
-			// Force rebuild to propagate provider snapshot update.
-			bi.mu.Lock()
-			_ = bi.rebuildSnapshot(ctx)
-			bi.mu.Unlock()
-
-			prov2, after, _ := bi.ListBuiltInPresets(ctx)
-
-			// Target provider changed as requested (both in models view and provider snapshot).
-			if after[tc.targetProv][tc.targetID].IsEnabled != tc.newEnabled {
-				t.Fatalf("target models view mismatch: got %v, want %v",
-					after[tc.targetProv][tc.targetID].IsEnabled, tc.newEnabled)
-			}
-			if prov2[tc.targetProv].ModelPresets[tc.targetID].IsEnabled != tc.newEnabled {
-				t.Fatalf("target provider snapshot mismatch: got %v, want %v",
-					prov2[tc.targetProv].ModelPresets[tc.targetID].IsEnabled, tc.newEnabled)
-			}
-
-			// Other provider remains unaffected.
-			if after[tc.otherProv][tc.targetID].IsEnabled != beforeOther {
-				t.Fatalf("other provider's model was affected: before=%v after=%v",
-					beforeOther, after[tc.otherProv][tc.targetID].IsEnabled)
-			}
-			if prov2[tc.otherProv].ModelPresets[tc.targetID].IsEnabled != beforeOther {
-				t.Fatalf("other provider snapshot was affected: before=%v after=%v",
-					beforeOther, prov2[tc.otherProv].ModelPresets[tc.targetID].IsEnabled)
-			}
-
-			// Overlay rows should be isolated by provider.
-			flag1, ok1, err := bi.modelOverlayFlags.GetFlag(
-				ctx,
-				getModelKey(tc.targetProv, tc.targetID),
-			)
-			if err != nil {
-				t.Fatalf("modelOverlayFlags.GetFlag(target): %v", err)
-			}
-			if !ok1 || flag1.Value != tc.newEnabled {
-				t.Fatalf(
-					"target overlay row missing or incorrect; present=%v value=%v want=%v",
-					ok1,
-					flag1.Value,
-					tc.newEnabled,
-				)
-			}
-
-			// Other provider should not have a flag unless it was changed earlier in the suite.
-			flag2, ok2, err := bi.modelOverlayFlags.GetFlag(
-				ctx,
-				getModelKey(tc.otherProv, tc.targetID),
-			)
-			if err != nil {
-				t.Fatalf("modelOverlayFlags.GetFlag(other): %v", err)
-			}
-			// We tolerate "ok2 == true but value == beforeOther" if previous subtest toggled it.
-			if ok2 && flag2.Value != beforeOther {
-				t.Fatalf(
-					"unexpected overlay for other provider: present=%v value=%v want(before)=%v",
-					ok2,
-					flag2.Value,
-					beforeOther,
-				)
-			}
-		})
-	}
-}
-
-func Test_NewBuiltInPresets_SyntheticFS_AdditionalValidationErrors(t *testing.T) {
-	if isWindows() {
-		t.Skip("synthetic fs tests are skipped on windows (known overlay flake)")
-	}
-
-	pn := inferenceSpec.ProviderName("demoProv")
-	mid := spec.ModelPresetID("m1")
-
-	baseSchemaBytes := func(t *testing.T) []byte {
-		t.Helper()
-		return buildHappySchema(pn, mid)
-	}
-
-	makeFS := func(t *testing.T, mutate func(s *spec.PresetsSchema)) fs.FS {
-		t.Helper()
-		var s spec.PresetsSchema
-		if err := json.Unmarshal(baseSchemaBytes(t), &s); err != nil {
-			t.Fatalf("unmarshal base schema: %v", err)
-		}
-		if mutate != nil {
-			mutate(&s)
-		}
-		b, err := json.Marshal(s)
-		if err != nil {
-			t.Fatalf("marshal mutated schema: %v", err)
-		}
-		return fstest.MapFS{builtin.BuiltInModelPresetsJSON: {Data: b}}
-	}
-
-	intPtr := func(v int) *int { return &v }
-
-	tests := []struct {
-		name        string
-		fsys        func(t *testing.T) fs.FS
-		wantErrIs   error
-		wantErrText string
-	}{
-		{
-			name: "schema_version_mismatch",
-			fsys: func(t *testing.T) fs.FS {
-				t.Helper()
-				return makeFS(t, func(s *spec.PresetsSchema) {
-					s.SchemaVersion = "1999-01-01"
-				})
-			},
-			wantErrText: "schemaVersion",
-		},
-		{
-			name: "default_provider_empty",
-			fsys: func(t *testing.T) fs.FS {
-				t.Helper()
-				return makeFS(t, func(s *spec.PresetsSchema) {
-					s.DefaultProvider = ""
-				})
-			},
-			wantErrText: "no default provider in builtin",
-		},
-		{
-			name: "default_provider_not_present_in_presets",
-			fsys: func(t *testing.T) fs.FS {
-				t.Helper()
-				return makeFS(t, func(s *spec.PresetsSchema) {
-					s.DefaultProvider = inferenceSpec.ProviderName(ghostID)
-				})
-			},
-			wantErrText: "default provider not present in presets",
-		},
-		{
-			name: "provider_zero_timestamps",
-			fsys: func(t *testing.T) fs.FS {
-				t.Helper()
-				return makeFS(t, func(s *spec.PresetsSchema) {
-					pp := s.ProviderPresets[pn]
-					pp.CreatedAt = time.Time{}
-					pp.ModifiedAt = time.Time{}
-					s.ProviderPresets[pn] = pp
-				})
-			},
-			wantErrIs: spec.ErrInvalidTimestamp,
-		},
-		{
-			name: "model_missing_temp_and_reasoning",
-			fsys: func(t *testing.T) fs.FS {
-				t.Helper()
-				return makeFS(t, func(s *spec.PresetsSchema) {
-					pp := s.ProviderPresets[pn]
-					mp := pp.ModelPresets[mid]
-					mp.Temperature = nil
-					mp.Reasoning = nil
-					pp.ModelPresets[mid] = mp
-					s.ProviderPresets[pn] = pp
-				})
-			},
-			wantErrText: "either reasoning or temperature must be set",
-		},
-		{
-			name: "model_negative_max_prompt_length",
-			fsys: func(t *testing.T) fs.FS {
-				t.Helper()
-				return makeFS(t, func(s *spec.PresetsSchema) {
-					pp := s.ProviderPresets[pn]
-					mp := pp.ModelPresets[mid]
-					mp.MaxPromptLength = intPtr(-1)
-					pp.ModelPresets[mid] = mp
-					s.ProviderPresets[pn] = pp
-				})
-			},
-			wantErrText: "maxPromptLength must be >= 0",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := newPresetsFromFS(t, tt.fsys(t))
-			if tt.wantErrIs != nil {
-				wantErrIs(t, err, tt.wantErrIs)
-				return
-			}
-			if tt.wantErrText != "" {
-				wantErrContains(t, err, tt.wantErrText)
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-		})
-	}
-}
-
-func Test_NewBuiltInPresets_SyntheticFS_SubDirResolution(t *testing.T) {
-	if isWindows() {
-		t.Skip("synthetic fs tests are skipped on windows (known overlay flake)")
-	}
-
-	ctx := t.Context()
-
-	pn := inferenceSpec.ProviderName("demo")
-	mid := spec.ModelPresetID("m1")
-	schema := buildHappySchema(pn, mid)
-
-	tests := []struct {
-		name        string
-		root        string
-		fsys        fs.FS
-		wantErrIs   error
-		wantErrText string
-	}{
-		{
-			name: "happy_subdir",
-			root: "root",
-			fsys: fstest.MapFS{
-				"root/" + builtin.BuiltInModelPresetsJSON: {Data: schema},
-			},
-		},
-		{
-			name:      "missing_subdir",
-			root:      "does-not-exist",
-			fsys:      fstest.MapFS{builtin.BuiltInModelPresetsJSON: {Data: schema}},
-			wantErrIs: fs.ErrNotExist,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			dir := t.TempDir()
-			bi, err := NewBuiltInPresets(ctx, dir, time.Hour, WithModelPresetsFS(tt.fsys, tt.root))
-			if bi != nil {
-				t.Cleanup(func() { closeAndSleepOnWindows(t, bi) })
-			}
-
-			if tt.wantErrIs != nil {
-				if err == nil {
-					t.Fatalf("expected error %v, got nil", tt.wantErrIs)
-				}
-				if !errors.Is(err, tt.wantErrIs) {
-					t.Fatalf("expected errors.Is(%v), got %v", tt.wantErrIs, err)
-				}
-				return
-			}
-			if tt.wantErrText != "" {
-				if err == nil || !strings.Contains(err.Error(), tt.wantErrText) {
-					t.Fatalf("expected error containing %q, got %v", tt.wantErrText, err)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-		})
-	}
-}
-
-func TestBuiltInPresets_OverlayPersistsAcrossReopen(t *testing.T) {
-	if isWindows() {
-		t.Skip("synthetic fs tests are skipped on windows (known overlay flake)")
-	}
-
-	ctx := t.Context()
-
-	pn := inferenceSpec.ProviderName("prov")
-	m1 := spec.ModelPresetID("m1")
-	m2 := spec.ModelPresetID("m2")
-
-	// Build schema with two models so default can change.
-	now := time.Now().UTC()
-	temp := 0.2
-	mp1 := spec.ModelPreset{
-		SchemaVersion: spec.SchemaVersion,
-		ID:            m1,
-		Name:          spec.ModelName(m1),
-		DisplayName:   spec.ModelDisplayName("M1"),
-		Slug:          spec.ModelSlug(m1),
-		IsEnabled:     true,
-		ModelPresetPatch: spec.ModelPresetPatch{
-			Temperature: &temp,
-		},
-		CreatedAt:  now,
-		ModifiedAt: now,
-	}
-	mp2 := mp1
-	mp2.ID = m2
-	mp2.Name = spec.ModelName(m2)
-	mp2.DisplayName = spec.ModelDisplayName("M2")
-	mp2.Slug = spec.ModelSlug(m2)
-
-	pp := spec.ProviderPreset{
-		SchemaVersion:            spec.SchemaVersion,
-		Name:                     pn,
-		DisplayName:              "Prov",
-		SDKType:                  inferenceSpec.ProviderSDKTypeOpenAIChatCompletions,
-		IsEnabled:                true,
-		CreatedAt:                now,
-		ModifiedAt:               now,
-		Origin:                   "https://example.test",
-		ChatCompletionPathPrefix: spec.DefaultOpenAIChatCompletionsPrefix,
-		DefaultModelPresetID:     m1,
-		ModelPresets: map[spec.ModelPresetID]spec.ModelPreset{
-			m1: mp1,
-			m2: mp2,
-		},
-	}
-
-	s := spec.PresetsSchema{
-		SchemaVersion:   spec.SchemaVersion,
-		DefaultProvider: pn,
-		ProviderPresets: map[inferenceSpec.ProviderName]spec.ProviderPreset{pn: pp},
-	}
-	raw, err := json.Marshal(s)
-	if err != nil {
-		t.Fatalf("marshal schema: %v", err)
-	}
-	fsys := fstest.MapFS{builtin.BuiltInModelPresetsJSON: {Data: raw}}
-
-	dir := t.TempDir()
-
-	// First instance: set overlay flags.
-	bi1, err := NewBuiltInPresets(ctx, dir, time.Hour, WithModelPresetsFS(fsys, "."))
-	if err != nil {
-		t.Fatalf("NewBuiltInPresets(1): %v", err)
-	}
-	_, err = bi1.SetProviderEnabled(ctx, pn, false)
-	if err != nil {
-		t.Fatalf("SetProviderEnabled: %v", err)
-	}
-	_, err = bi1.SetModelPresetEnabled(ctx, pn, m1, false)
-	if err != nil {
-		t.Fatalf("SetModelPresetEnabled: %v", err)
-	}
-	_, err = bi1.SetDefaultModelPreset(ctx, pn, m2)
-	if err != nil {
-		t.Fatalf("SetDefaultModelPreset: %v", err)
-	}
-
-	closeAndSleepOnWindows(t, bi1)
-
-	// Second instance: must re-apply persisted overlay.
-	bi2, err := NewBuiltInPresets(ctx, dir, time.Hour, WithModelPresetsFS(fsys, "."))
-	if err != nil {
-		t.Fatalf("NewBuiltInPresets(2): %v", err)
-	}
-	t.Cleanup(func() { closeAndSleepOnWindows(t, bi2) })
-
-	prov, models, err := bi2.ListBuiltInPresets(ctx)
+	providers1, models1, err := bi.ListBuiltInPresets(ctx)
 	if err != nil {
 		t.Fatalf("ListBuiltInPresets: %v", err)
 	}
 
-	if prov[pn].IsEnabled != false {
-		t.Fatalf("provider enabled not persisted: got=%v want=false", prov[pn].IsEnabled)
+	for providerName, provider := range providers1 {
+		provider.DisplayName = corruptedBuiltInTestValue
+		if provider.DefaultHeaders == nil {
+			provider.DefaultHeaders = map[string]string{}
+		}
+		provider.DefaultHeaders["x-corrupted"] = corruptedBuiltInTestValue
+
+		for modelID, model := range provider.ModelPresets {
+			model.DisplayName = corruptedBuiltInTestValue
+			provider.ModelPresets[modelID] = model
+			break
+		}
+
+		providers1[providerName] = provider
+		break
 	}
-	if models[pn][m1].IsEnabled != false {
-		t.Fatalf("model enabled not persisted: got=%v want=false", models[pn][m1].IsEnabled)
+
+	for providerName, modelMap := range models1 {
+		for modelID, model := range modelMap {
+			model.DisplayName = corruptedBuiltInTestValue
+			if model.Temperature != nil {
+				*model.Temperature = 99
+			}
+			modelMap[modelID] = model
+			models1[providerName] = modelMap
+			break
+		}
+		break
 	}
-	if prov[pn].DefaultModelPresetID != m2 {
-		t.Fatalf("default model not persisted: got=%q want=%q", prov[pn].DefaultModelPresetID, m2)
+
+	providers2, models2, err := bi.ListBuiltInPresets(ctx)
+	if err != nil {
+		t.Fatalf("ListBuiltInPresets second call: %v", err)
 	}
+
+	for providerName, provider := range providers2 {
+		if provider.DisplayName == corruptedBuiltInTestValue {
+			t.Errorf("provider %s shares displayName memory", providerName)
+		}
+		if provider.DefaultHeaders["x-corrupted"] == corruptedBuiltInTestValue {
+			t.Errorf("provider %s shares defaultHeaders memory", providerName)
+		}
+		for modelID, model := range provider.ModelPresets {
+			if model.DisplayName == corruptedBuiltInTestValue {
+				t.Errorf("provider model %s/%s shares memory", providerName, modelID)
+			}
+		}
+	}
+
+	for providerName, modelMap := range models2 {
+		for modelID, model := range modelMap {
+			if model.DisplayName == corruptedBuiltInTestValue {
+				t.Errorf("model %s/%s shares displayName memory", providerName, modelID)
+			}
+			if model.Temperature != nil && *model.Temperature == 99 {
+				t.Errorf("model %s/%s shares temperature pointer", providerName, modelID)
+			}
+		}
+	}
+}
+
+func TestProviderModelSnapshotConsistency(t *testing.T) {
+	ctx := t.Context()
+	bi, _ := mustNewBuiltInPresets(t, time.Hour)
+	defer closeBuiltInPresetsForTest(t, bi)
+
+	providers, models, err := bi.ListBuiltInPresets(ctx)
+	if err != nil {
+		t.Fatalf("ListBuiltInPresets: %v", err)
+	}
+
+	for providerName, provider := range providers {
+		modelMap, ok := models[providerName]
+		if !ok {
+			t.Fatalf("provider %s missing from model view", providerName)
+		}
+		if len(provider.ModelPresets) != len(modelMap) {
+			t.Fatalf("provider %s model count mismatch: provider=%d models=%d",
+				providerName, len(provider.ModelPresets), len(modelMap))
+		}
+		for modelID, modelFromModelsView := range modelMap {
+			modelFromProvider, ok := provider.ModelPresets[modelID]
+			if !ok {
+				t.Fatalf("provider %s missing model %s from embedded model map", providerName, modelID)
+			}
+			if !reflect.DeepEqual(modelFromProvider, modelFromModelsView) {
+				t.Fatalf("provider %s model %s differs between provider and model views",
+					providerName, modelID)
+			}
+		}
+	}
+
+	for providerName := range models {
+		if _, ok := providers[providerName]; !ok {
+			t.Fatalf("model view provider %s missing from provider view", providerName)
+		}
+	}
+}
+
+func TestRebuildSnapshotAppliesPersistedOverlays(t *testing.T) {
+	ctx := t.Context()
+	bi, _ := mustNewBuiltInPresets(t, time.Hour)
+	defer closeBuiltInPresetsForTest(t, bi)
+
+	providers, models, err := bi.ListBuiltInPresets(ctx)
+	if err != nil {
+		t.Fatalf("ListBuiltInPresets: %v", err)
+	}
+
+	providerName, provider := anyBuiltInProvider(t, providers)
+	modelProviderName, modelID, model := anyBuiltInModel(t, models)
+	defaultProviderName, newDefaultModelID := anyProviderWithNonDefaultModel(t, providers, models)
+
+	if _, err := bi.providerOverlayFlags.SetFlag(
+		ctx,
+		builtInProviderKey(providerName),
+		!provider.IsEnabled,
+	); err != nil {
+		t.Fatalf("providerOverlayFlags.SetFlag: %v", err)
+	}
+
+	if _, err := bi.modelOverlayFlags.SetFlag(
+		ctx,
+		getModelKey(modelProviderName, modelID),
+		!model.IsEnabled,
+	); err != nil {
+		t.Fatalf("modelOverlayFlags.SetFlag: %v", err)
+	}
+
+	if _, err := bi.providerDefaultModelIDOverlayFlags.SetFlag(
+		ctx,
+		builtInProviderDefaultModelIDKey(defaultProviderName),
+		newDefaultModelID,
+	); err != nil {
+		t.Fatalf("providerDefaultModelIDOverlayFlags.SetFlag: %v", err)
+	}
+
+	bi.mu.Lock()
+	err = bi.rebuildSnapshot(ctx)
+	bi.mu.Unlock()
+	if err != nil {
+		t.Fatalf("rebuildSnapshot: %v", err)
+	}
+
+	providers2, models2, err := bi.ListBuiltInPresets(ctx)
+	if err != nil {
+		t.Fatalf("ListBuiltInPresets: %v", err)
+	}
+
+	if providers2[providerName].IsEnabled == provider.IsEnabled {
+		t.Fatal("provider overlay was not applied")
+	}
+	if models2[modelProviderName][modelID].IsEnabled == model.IsEnabled {
+		t.Fatal("model overlay was not applied")
+	}
+	if providers2[modelProviderName].ModelPresets[modelID].IsEnabled == model.IsEnabled {
+		t.Fatal("model overlay was not applied to provider embedded model map")
+	}
+	if providers2[defaultProviderName].DefaultModelPresetID != newDefaultModelID {
+		t.Fatalf("default model overlay got %s want %s",
+			providers2[defaultProviderName].DefaultModelPresetID, newDefaultModelID)
+	}
+}
+
+func TestBuiltInPresetsOverlayPersistsAcrossReopen(t *testing.T) {
+	ctx := t.Context()
+	dir := t.TempDir()
+
+	bi1, err := NewBuiltInPresets(ctx, dir, time.Hour)
+	if err != nil {
+		t.Fatalf("NewBuiltInPresets first open: %v", err)
+	}
+
+	providerName := modelpreset.ProviderOpenAIResponses
+	modelID := spec.ModelPresetID(modelpreset.PresetOpenAIResponsesGPT54Mini)
+
+	providers, models, err := bi1.ListBuiltInPresets(ctx)
+	if err != nil {
+		t.Fatalf("ListBuiltInPresets: %v", err)
+	}
+	if _, ok := providers[providerName]; !ok {
+		t.Fatalf("provider %s missing", providerName)
+	}
+	if _, ok := models[providerName][modelID]; !ok {
+		t.Fatalf("model %s/%s missing", providerName, modelID)
+	}
+
+	var newDefaultModelID spec.ModelPresetID
+	for id := range models[providerName] {
+		if id != providers[providerName].DefaultModelPresetID {
+			newDefaultModelID = id
+			break
+		}
+	}
+	if newDefaultModelID == "" {
+		t.Skip("openairesponses has only one model; cannot test default model persistence")
+	}
+
+	if _, err := bi1.SetProviderEnabled(ctx, providerName, false); err != nil {
+		t.Fatalf("SetProviderEnabled: %v", err)
+	}
+	if _, err := bi1.SetModelPresetEnabled(ctx, providerName, modelID, false); err != nil {
+		t.Fatalf("SetModelPresetEnabled: %v", err)
+	}
+	if _, err := bi1.SetDefaultModelPreset(ctx, providerName, newDefaultModelID); err != nil {
+		t.Fatalf("SetDefaultModelPreset: %v", err)
+	}
+
+	closeBuiltInPresetsForTest(t, bi1)
+
+	bi2, err := NewBuiltInPresets(ctx, dir, time.Hour)
+	if err != nil {
+		t.Fatalf("NewBuiltInPresets second open: %v", err)
+	}
+	defer closeBuiltInPresetsForTest(t, bi2)
+
+	providers2, models2, err := bi2.ListBuiltInPresets(ctx)
+	if err != nil {
+		t.Fatalf("ListBuiltInPresets second open: %v", err)
+	}
+
+	if providers2[providerName].IsEnabled {
+		t.Fatal("provider enabled overlay did not persist")
+	}
+	if models2[providerName][modelID].IsEnabled {
+		t.Fatal("model enabled overlay did not persist")
+	}
+	if providers2[providerName].ModelPresets[modelID].IsEnabled {
+		t.Fatal("model enabled overlay did not persist into provider embedded model map")
+	}
+	if providers2[providerName].DefaultModelPresetID != newDefaultModelID {
+		t.Fatalf("default model overlay got %s want %s",
+			providers2[providerName].DefaultModelPresetID, newDefaultModelID)
+	}
+}
+
+func TestConcurrentBuiltInPresetAccess(t *testing.T) {
+	ctx := t.Context()
+	bi, _ := mustNewBuiltInPresets(t, 10*time.Millisecond)
+	defer closeBuiltInPresetsForTest(t, bi)
+
+	providers, models, err := bi.ListBuiltInPresets(ctx)
+	if err != nil {
+		t.Fatalf("ListBuiltInPresets: %v", err)
+	}
+
+	providerName, provider := anyBuiltInProvider(t, providers)
+	modelProviderName, modelID, model := anyBuiltInModel(t, models)
+
+	t.Run("concurrent_reads", func(t *testing.T) {
+		var wg sync.WaitGroup
+
+		for range 10 {
+			wg.Go(func() {
+				for range 100 {
+					if _, _, err := bi.ListBuiltInPresets(ctx); err != nil {
+						t.Errorf("ListBuiltInPresets: %v", err)
+					}
+				}
+			})
+		}
+
+		wg.Wait()
+	})
+
+	t.Run("concurrent_writes", func(t *testing.T) {
+		var wg sync.WaitGroup
+
+		for i := range 5 {
+			wg.Add(2)
+
+			go func(i int) {
+				defer wg.Done()
+				_, _ = bi.SetProviderEnabled(ctx, providerName, i%2 == 0)
+			}(i)
+
+			go func(i int) {
+				defer wg.Done()
+				_, _ = bi.SetModelPresetEnabled(ctx, modelProviderName, modelID, i%2 == 0)
+			}(i)
+		}
+
+		wg.Wait()
+
+		_, _, err := bi.ListBuiltInPresets(ctx)
+		if err != nil {
+			t.Fatalf("ListBuiltInPresets after concurrent writes: %v", err)
+		}
+
+		// Restore deterministic final values for easier debugging if subsequent
+		// assertions are added later.
+		_, _ = bi.SetProviderEnabled(ctx, providerName, provider.IsEnabled)
+		_, _ = bi.SetModelPresetEnabled(ctx, modelProviderName, modelID, model.IsEnabled)
+	})
+}
+
+func TestGetBuiltInProviderAndModelPreset(t *testing.T) {
+	ctx := t.Context()
+	bi, _ := mustNewBuiltInPresets(t, time.Hour)
+	defer closeBuiltInPresetsForTest(t, bi)
+
+	provider, err := bi.GetBuiltInProvider(ctx, modelpreset.ProviderAnthropic)
+	if err != nil {
+		t.Fatalf("GetBuiltInProvider: %v", err)
+	}
+	if provider.Name != modelpreset.ProviderAnthropic {
+		t.Fatalf("provider name got %q want %q", provider.Name, modelpreset.ProviderAnthropic)
+	}
+
+	modelID := spec.ModelPresetID(modelpreset.PresetAnthropicSonnet46)
+	model, err := bi.GetBuiltInModelPreset(ctx, modelpreset.ProviderAnthropic, modelID)
+	if err != nil {
+		t.Fatalf("GetBuiltInModelPreset: %v", err)
+	}
+	if model.ID != modelID {
+		t.Fatalf("model id got %q want %q", model.ID, modelID)
+	}
+
+	provider.DisplayName = corruptedBuiltInTestValue
+	model.DisplayName = corruptedBuiltInTestValue
+
+	provider2, err := bi.GetBuiltInProvider(ctx, modelpreset.ProviderAnthropic)
+	if err != nil {
+		t.Fatalf("GetBuiltInProvider second call: %v", err)
+	}
+	if provider2.DisplayName == corruptedBuiltInTestValue {
+		t.Fatal("GetBuiltInProvider returned shared provider memory")
+	}
+
+	model2, err := bi.GetBuiltInModelPreset(ctx, modelpreset.ProviderAnthropic, modelID)
+	if err != nil {
+		t.Fatalf("GetBuiltInModelPreset second call: %v", err)
+	}
+	if model2.DisplayName == corruptedBuiltInTestValue {
+		t.Fatal("GetBuiltInModelPreset returned shared model memory")
+	}
+}
+
+func mustNewBuiltInPresets(t *testing.T, maxSnapshotAge time.Duration) (bi *BuiltInPresets, dir string) {
+	t.Helper()
+
+	dir = t.TempDir()
+	bi, err := NewBuiltInPresets(t.Context(), dir, maxSnapshotAge)
+	if err != nil {
+		t.Fatalf("NewBuiltInPresets: %v", err)
+	}
+
+	return bi, dir
+}
+
+func closeBuiltInPresetsForTest(t *testing.T, bi *BuiltInPresets) {
+	t.Helper()
+
+	if bi == nil {
+		return
+	}
+
+	if err := bi.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	if runtime.GOOS == "windows" {
+		// SQLite/file-lock cleanup on Windows can lag very slightly after Close.
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+func anyBuiltInProvider(
+	t *testing.T,
+	providers map[inferenceSpec.ProviderName]spec.ProviderPreset,
+) (inferenceSpec.ProviderName, spec.ProviderPreset) {
+	t.Helper()
+
+	names := make([]inferenceSpec.ProviderName, 0, len(providers))
+	for name := range providers {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+
+	for _, name := range names {
+		return name, providers[name]
+	}
+
+	t.Fatal("no providers available")
+	return "", spec.ProviderPreset{}
+}
+
+func anyBuiltInModel(
+	t *testing.T,
+	models map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset,
+) (inferenceSpec.ProviderName, spec.ModelPresetID, spec.ModelPreset) {
+	t.Helper()
+
+	providerNames := make([]inferenceSpec.ProviderName, 0, len(models))
+	for providerName := range models {
+		providerNames = append(providerNames, providerName)
+	}
+	slices.Sort(providerNames)
+
+	for _, providerName := range providerNames {
+		modelIDs := make([]spec.ModelPresetID, 0, len(models[providerName]))
+		for modelID := range models[providerName] {
+			modelIDs = append(modelIDs, modelID)
+		}
+		slices.Sort(modelIDs)
+
+		for _, modelID := range modelIDs {
+			return providerName, modelID, models[providerName][modelID]
+		}
+	}
+
+	t.Fatal("no models available")
+	return "", "", spec.ModelPreset{}
+}
+
+func anyProviderWithNonDefaultModel(
+	t *testing.T,
+	providers map[inferenceSpec.ProviderName]spec.ProviderPreset,
+	models map[inferenceSpec.ProviderName]map[spec.ModelPresetID]spec.ModelPreset,
+) (inferenceSpec.ProviderName, spec.ModelPresetID) {
+	t.Helper()
+
+	providerNames := make([]inferenceSpec.ProviderName, 0, len(providers))
+	for providerName := range providers {
+		providerNames = append(providerNames, providerName)
+	}
+	slices.Sort(providerNames)
+
+	for _, providerName := range providerNames {
+		modelMap := models[providerName]
+		if len(modelMap) < 2 {
+			continue
+		}
+
+		modelIDs := make([]spec.ModelPresetID, 0, len(modelMap))
+		for modelID := range modelMap {
+			modelIDs = append(modelIDs, modelID)
+		}
+		slices.Sort(modelIDs)
+
+		for _, modelID := range modelIDs {
+			if modelID != providers[providerName].DefaultModelPresetID {
+				return providerName, modelID
+			}
+		}
+	}
+
+	t.Fatal("no provider with a non-default alternate model available")
+	return "", ""
 }

@@ -6,12 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"slices"
 	"strings"
 
 	"github.com/flexigpt/inference-go"
 	"github.com/flexigpt/inference-go/capabilityoverride"
 	"github.com/flexigpt/inference-go/debugclient"
+	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
@@ -250,11 +252,21 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		return nil, errors.New("prepopulated tool choices are not allowed in fetch completion, need tool store choices")
 	}
 
-	derivedModelCapabilities, err := ps.deriveCapabilitiesFromPreset(
+	var ck string
+	uid, err := uuid.NewV7()
+	if err != nil {
+		// Fallback only.
+		ck = string(req.Provider) + "_" + string(req.ModelPresetID)
+	} else {
+		ck = uid.String()
+	}
+
+	capabilityResolver, err := ps.newPresetCapabilityResolver(
 		ctx,
 		req.Provider,
 		req.ModelPresetID,
 		modelParam.Name,
+		ck,
 	)
 	if err != nil {
 		return nil, err
@@ -358,18 +370,9 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		ToolChoices: toolChoices,
 	}
 
-	var ck string
-	uid, err := uuid.NewV7()
-	if err != nil {
-		// Fallback only.
-		ck = string(req.Provider) + "_" + string(req.ModelPresetID)
-	} else {
-		ck = uid.String()
-	}
-
 	opts := &inferenceSpec.FetchCompletionOptions{
 		CompletionKey:      ck,
-		CapabilityResolver: capabilityoverride.NewCompletionKeyResolver(ck, derivedModelCapabilities),
+		CapabilityResolver: capabilityResolver,
 	}
 
 	if req.OnStreamText != nil || req.OnStreamThinking != nil {
@@ -388,6 +391,87 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	}}
 
 	return resp, err
+}
+
+func (ps *ProviderSetAPI) newPresetCapabilityResolver(
+	ctx context.Context,
+	provider inferenceSpec.ProviderName,
+	modelPresetID modelpresetSpec.ModelPresetID,
+	requestModelName inferenceSpec.ModelName,
+	completionKey string,
+) (inferenceSpec.ModelCapabilityResolver, error) {
+	if ps == nil || ps.inner == nil {
+		return nil, errors.New("provider set is not initialized")
+	}
+	if provider == "" {
+		return nil, errors.New("provider is required for capability derivation")
+	}
+	if strings.TrimSpace(string(modelPresetID)) == "" {
+		return nil, errors.New("modelPresetID is required for capability derivation")
+	}
+	if ps.mpStore == nil {
+		return nil, errors.New("model preset store not configured on inference wrapper")
+	}
+
+	presp, err := ps.mpStore.GetModelPreset(ctx, &modelpresetSpec.GetModelPresetRequest{
+		ProviderName:    provider,
+		ModelPresetID:   modelPresetID,
+		IncludeDisabled: false,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if presp == nil || presp.Body == nil {
+		return nil, errors.New("GetModelPreset: empty response")
+	}
+
+	modelName := requestModelName
+	if modelName == "" {
+		modelName = inferenceSpec.ModelName(presp.Body.Model.Name)
+	}
+	if modelName == "" {
+		return nil, errors.New("cannot derive capabilities: model name is empty")
+	}
+
+	return ps.inner.NewPresetCapabilityResolver(
+		ctx,
+		provider,
+		inferenceProviderPresetFromApp(presp.Body.Provider),
+		inferenceModelPresetFromApp(presp.Body.Model, modelName),
+		completionKey,
+	)
+}
+
+func inferenceProviderPresetFromApp(pp modelpresetSpec.ProviderPreset) modelpreset.ProviderPreset {
+	return modelpreset.ProviderPreset{
+		Name:                     pp.Name,
+		DisplayName:              string(pp.DisplayName),
+		SDKType:                  pp.SDKType,
+		Origin:                   pp.Origin,
+		ChatCompletionPathPrefix: pp.ChatCompletionPathPrefix,
+		APIKeyHeaderKey:          pp.APIKeyHeaderKey,
+		DefaultHeaders:           maps.Clone(pp.DefaultHeaders),
+		CapabilitiesOverride:     capabilityoverride.CloneModelCapabilitiesOverride(pp.CapabilitiesOverride),
+	}
+}
+
+func inferenceModelPresetFromApp(
+	mp modelpresetSpec.ModelPreset,
+	modelName inferenceSpec.ModelName,
+) modelpreset.ModelPreset {
+	if modelName == "" {
+		modelName = inferenceSpec.ModelName(mp.Name)
+	}
+
+	return modelpreset.ModelPreset{
+		ID:          modelpreset.ModelPresetID(mp.ID),
+		Name:        modelName,
+		DisplayName: string(mp.DisplayName),
+		ModelParam: inferenceSpec.ModelParam{
+			Name: modelName,
+		},
+		CapabilitiesOverride: capabilityoverride.CloneModelCapabilitiesOverride(mp.CapabilitiesOverride),
+	}
 }
 
 func buildSkillToolChoices(includeAll, includeRunScript bool) ([]inferenceSpec.ToolChoice, error) {
@@ -437,63 +521,6 @@ func buildSkillToolChoices(includeAll, includeRunScript bool) ([]inferenceSpec.T
 		}
 	}
 	return out, nil
-}
-
-func (ps *ProviderSetAPI) deriveCapabilitiesFromPreset(
-	ctx context.Context,
-	provider inferenceSpec.ProviderName,
-	modelPresetID modelpresetSpec.ModelPresetID,
-	requestModelName inferenceSpec.ModelName,
-) (*inferenceSpec.ModelCapabilities, error) {
-	if ps == nil || ps.inner == nil {
-		return nil, errors.New("providerset is not initialized")
-	}
-
-	if provider == "" {
-		return nil, errors.New("provider is required for capability derivation")
-	}
-	if strings.TrimSpace(string(modelPresetID)) == "" {
-		return nil, errors.New("modelPresetID is required for capability derivation")
-	}
-	if ps.mpStore == nil {
-		return nil, errors.New("model preset store not configured on inference wrapper")
-	}
-
-	// Load preset spec (contains provider+model overrides).
-	presp, err := ps.mpStore.GetModelPreset(ctx, &modelpresetSpec.GetModelPresetRequest{
-		ProviderName:    provider,
-		ModelPresetID:   modelPresetID,
-		IncludeDisabled: false,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if presp == nil || presp.Body == nil {
-		return nil, errors.New("GetModelPresetSpec: empty response")
-	}
-
-	presetModelName := inferenceSpec.ModelName(presp.Body.Model.Name)
-
-	modelName := requestModelName
-	if modelName == "" {
-		modelName = presetModelName
-	}
-	if modelName == "" {
-		return nil, errors.New("cannot derive capabilities: model name is empty")
-	}
-
-	// Base capabilities from inference-go/provider SDK.
-	base, err := ps.inner.GetProviderCapability(ctx, provider)
-	if err != nil {
-		return nil, err
-	}
-
-	derived := capabilityoverride.DeriveModelCapabilities(
-		base,
-		presp.Body.Provider.CapabilitiesOverride,
-		presp.Body.Model.CapabilitiesOverride,
-	)
-	return &derived, nil
 }
 
 // resolveModelParam chooses the effective ModelParam for this call.

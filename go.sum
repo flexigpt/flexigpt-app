@@ -52,8 +52,8 @@ github.com/envoyproxy/go-control-plane v0.9.4/go.mod h1:6rpuAdCZL397s3pYoYcLgu1m
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
 github.com/flexigpt/agentskills-go v0.14.2 h1:80OCYrFgIWcWOvydugd7Ko5YWuI67e9Z/cAVOkybWyY=
 github.com/flexigpt/agentskills-go v0.14.2/go.mod h1:qmqcQqiYf99y2y5LZmzgSowTp39O0rr2G/bDzPGoKWY=
-github.com/flexigpt/inference-go v0.19.0 h1:jscuGld3I38MSTzO+WiQRAJMSvJg2EeXcRO8E/sjgCE=
-github.com/flexigpt/inference-go v0.19.0/go.mod h1:4CI3aTZaOOv5C4KP6tvqZfWh4fZcg0LamIdNEDiRdr0=
+github.com/flexigpt/inference-go v0.20.0 h1:JikzAqH5c+rtYWn3MvYvOx4nw3ugz+uV70p0dJQDFfQ=
+github.com/flexigpt/inference-go v0.20.0/go.mod h1:4CI3aTZaOOv5C4KP6tvqZfWh4fZcg0LamIdNEDiRdr0=
 github.com/flexigpt/llmtools-go v0.20.1 h1:5f8XCVm3OuCz6pLNMUc2HP87VVWol/3CQVkRogZCCr0=
 github.com/flexigpt/llmtools-go v0.20.1/go.mod h1:uGlgERkW45Eb56pF9eEpzFGP1Y29abMlFyXK92XEH9s=
 github.com/flexigpt/mapstore-go v0.3.2 h1:rjh6ZE+cl5gu9sbKlK9vYxvxaoHSlurhAL1I/yOn5tI=
