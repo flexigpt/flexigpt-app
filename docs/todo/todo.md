@@ -3,6 +3,7 @@
 ## Laundry list
 
 - [ ] test with some skill that has scripts too
+- [ ] block autoexec should be a high level button for just in case things i.e the llm is spiralling and you want the next turn to not autoexec as you want to give some direction to llm.
 
 ## Milestone thoughts
 

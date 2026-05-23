@@ -69,6 +69,7 @@
 	"markdown.extension.toc.levels": "2..4",
 	"markdownlint.config": {
 		"MD030": false,
+		"MD024": false,
 		"MD033": {
 			"allowed_elements": ["table", "td", "tr", "strong", "details", "summary"]
 		}
