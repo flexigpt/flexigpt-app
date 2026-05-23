@@ -968,3 +968,12 @@
       - [x] stored responses, stored conversations, on server memory context, on server prompt templates etc.
 
   - [x] Agent Skills but via local "skills" flow
+
+- [x] inference go
+  - [x] move capability override functionality here.
+  - [x] add defaults for standard vendors and models there and use it inside builtin data.
+
+- [x] llm tools
+  - [x] search files (and may be others too), need to explicit setting to exclude hidden files/folders. (may be list dir too.)
+  - [x] read/replace text utils, may need to support approx line numbers so that llm can be more specific on where to read / write etc.
+    - [x] replace has lots of ambiguous mismatch errors. need a way to narrow down, and have errors better communicated back that are actionable.

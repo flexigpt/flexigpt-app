@@ -62,9 +62,6 @@
 ## Other repos thoughts
 
 - [ ] llm tools
-  - [x] search files (and may be others too), need to explicit setting to exclude hidden files/folders. (may be list dir too.)
-  - [x] read/replace text utils, may need to support approx line numbers so that llm can be more specific on where to read / write etc.
-    - [x] replace has lots of ambiguous mismatch errors. need a way to narrow down, and have errors better communicated back that are actionable.
   - [ ] may be pdf parsing and any other parsing should be builder hooks that people can input at build time so that adding support etc is easy.
 
 ## Model analysis
