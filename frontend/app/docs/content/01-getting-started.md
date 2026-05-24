@@ -1,6 +1,7 @@
 # Getting Started
 
-FlexiGPT is a desktop client for working with remote or local model providers from one workspace.
+FlexiGPT is a local-first AI workflow workspace for power users and teams who need repeatable prompts, tools, skills, model choices, assistants/agents and private local history across multiple LLM providers.
+
 This guide is the fastest path from install to a useful first conversation in FlexiGPT.
 
 ## Table of contents <!-- omit from toc -->

@@ -5,9 +5,7 @@
 [![lint](https://github.com/flexigpt/flexigpt-app/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/flexigpt/flexigpt-app/actions/workflows/lint.yml)
 [![test](https://github.com/flexigpt/flexigpt-app/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/flexigpt/flexigpt-app/actions/workflows/test.yml)
 
-FlexiGPT is a local-first desktop workspace for multi-provider LLM chats.
-
-It brings together reusable assistant presets, model presets, prompt templates, attachments, tools, and skills in one app while keeping conversations and configuration local.
+FlexiGPT is a local-first AI workflow workspace for power users and teams who need repeatable prompts, tools, skills, model choices, assistants/agents and private local history across multiple LLM providers.
 
 ## Install
 
