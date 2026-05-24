@@ -280,7 +280,7 @@ export default function ToolsPage() {
 					}}
 					onConfirm={handleBundleDelete}
 					title="Delete Tool Bundle"
-					message={`Delete bundle "${bundleToDelete?.displayName ?? ''}" and all its tools?`}
+					message={`Delete empty bundle "${bundleToDelete?.displayName ?? ''}"? Remove all tools first.`}
 					confirmButtonText="Delete"
 				/>
 

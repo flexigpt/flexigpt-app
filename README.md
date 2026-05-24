@@ -5,7 +5,7 @@
 [![lint](https://github.com/flexigpt/flexigpt-app/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/flexigpt/flexigpt-app/actions/workflows/lint.yml)
 [![test](https://github.com/flexigpt/flexigpt-app/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/flexigpt/flexigpt-app/actions/workflows/test.yml)
 
-FlexiGPT is a local-first AI workflow workspace for power users and teams who need repeatable prompts, tools, skills, model choices, assistants/agents and private local history across multiple LLM providers.
+FlexiGPT is a local-first AI workflow workspace for power users and teams who need repeatable prompts, tools, skills, model choices, assistants/agents, and private local history across multiple LLM providers.
 
 ## Who FlexiGPT is for
 
@@ -30,7 +30,15 @@ FlexiGPT is built for people who use LLMs as part of repeatable work, not just o
 - Add the key in Settings -> Auth Keys.
 - Chat. Start from a built-in assistant preset or build your own reusable workflow with prompts, attachments, tools, and skills.
 
+Good first workflows:
+
+- Open the app home screen and choose a starter workflow card such as Code Review, Explain This File, Generate Docs, Research Summary, Architecture Review, or Bug Investigation.
+- Attach the relevant file, folder, notes, PDF, URL, or code snippet.
+- Send the prefilled prompt as-is or adjust it for your task.
+- Reuse or customize the assistant preset once the workflow fits your style.
+
 FlexiGPT does not bill you directly. Usage costs and limits come from the provider account behind the key you configure.
+FlexiGPT also does not proxy LLM calls through a FlexiGPT-hosted or any third party services.
 
 ## Screenshots
 
@@ -50,9 +58,9 @@ FlexiGPT does not bill you directly. Usage costs and limits come from the provid
 
 ### Provider-independent model choices with built-in presets
 
-- First-class builtin support for OpenAI, Anthropic, Google Gemini API, xAI, Mistral, Hugging Face, OpenRouter, and local `llama.cpp`
+- First-class built-in support for OpenAI, Anthropic, Google Gemini API, xAI, Mistral, Hugging Face, OpenRouter, and local `llama.cpp`
 - Support for compatible custom endpoints across OpenAI Chat Completions, OpenAI Responses, and Anthropic Messages style APIs
-- Built-in providers and curated model presets for leading models so you can get started quickly without manually defining endpoints or defaults first
+- Built-in providers and curated model presets for leading models so you can start quickly without manually defining endpoints or defaults first
 - API keys are stored securely through the OS keyring, not in plain-text exported settings
 
 ### Repeatable AI workflow workspace
@@ -99,6 +107,9 @@ The main docs are bundled inside the app and mirrored in this repository under `
 - [Attachments, Tools, Skills, and Prompts](./frontend/app/docs/content/04-attachments-tools-skills-prompts.md)
 - [Presets, Providers, and Settings](./frontend/app/docs/content/05-presets-providers-settings.md)
 - [Privacy, Storage, and Troubleshooting](./frontend/app/docs/content/06-privacy-storage-and-troubleshooting.md)
+- [Security and Privacy Model](./frontend/app/docs/content/07-security-and-privacy-model.md)
+- [Recipes and Starter Workflows](./frontend/app/docs/content/08-recipes-and-starter-workflows.md)
+- [Provider and Local Model Setup](./frontend/app/docs/content/09-provider-and-local-model-setup.md)
 
 ### Architecture
 

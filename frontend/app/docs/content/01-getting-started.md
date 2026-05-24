@@ -1,6 +1,6 @@
 # Getting Started
 
-FlexiGPT is a local-first AI workflow workspace for power users and teams who need repeatable prompts, tools, skills, model choices, assistants/agents and private local history across multiple LLM providers.
+FlexiGPT is a local-first AI workflow workspace for power users and teams who need repeatable prompts, tools, skills, model choices, assistants/agents, and private local history across multiple LLM providers.
 
 This guide is the fastest path from install to your first useful workflow: connect a provider, choose a starting assistant/model setup, add context, and send a useful first message.
 
@@ -27,9 +27,9 @@ Before your first successful send, you usually need:
   - [OpenRouter](https://openrouter.ai/workspaces/default/keys), [Hugging Face](https://huggingface.co/settings/tokens)
 
 - Add the key in [Settings -> Auth Keys](/settings).
-- Head to the [Chats](/chats) page.
-- Head to [Chats](/chats) page. Start from a built-in assistant preset, or build your own repeatable workflow with prompts, attachments, tools, and skills.
-- Try out different things like: different assistants for spec driven dev or reviewing code, attaching files, creating your own prompt template or skill and using them!
+- Open the home screen and pick a starter workflow, or go directly to the [Chats](/chats) page.
+- Try different assistants for spec-driven development, code review, architecture review, or refactoring.
+- Attach files, folders, URLs, PDFs, or notes when the model needs source material.
 
 FlexiGPT ships with built-in providers, model presets, tools, skills, prompts, and assistant presets. These building blocks are meant to be combined into reusable workflows, not configured from scratch every time.
 
@@ -95,6 +95,8 @@ Examples:
 - review this code snippet
 - rewrite this paragraph more clearly
 
+The home screen starter workflow cards provide useful entry points for common workflows like spec driven dev, reviews, etc.
+
 ## Adding optional context
 
 The composer can send much more than plain text.
@@ -130,6 +132,7 @@ Once the first send works, try one of these:
 - compare two model presets on the same question
 - use a prompt template for a repeated task
 - enable a tool-assisted assistant preset for a workflow that needs execution help
+- start from a built-in software assistant such as Reviewing Code, Spec Driven Development, Refactoring Code, or Designing System Architecture
 
 ## If the first send feels off
 

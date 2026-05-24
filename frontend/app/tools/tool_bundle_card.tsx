@@ -286,6 +286,8 @@ export function ToolBundleCard({
 								onClick={() => {
 									onRequestDeleteBundle(bundle);
 								}}
+								disabled={tools.length > 0}
+								title={tools.length > 0 ? 'Delete all tools from this bundle first.' : 'Delete Bundle'}
 							>
 								<FiTrash2 /> <span className="ml-1">Delete Bundle</span>
 							</button>

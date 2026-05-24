@@ -4,6 +4,7 @@
 
 - [ ] test with some skill that has scripts too
 - [ ] block autoexec should be a high level button for just in case things i.e the llm is spiralling and you want the next turn to not autoexec as you want to give some direction to llm.
+- [ ] once you open a tool in edit mode nad then close without editing, next edit modal doesn't open
 
 ## Milestone thoughts
 

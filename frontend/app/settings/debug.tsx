@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 
+import { FiAlertTriangle } from 'react-icons/fi';
+
 import { DebugLogLevel, type DebugSettings, DEFAULT_DEBUG_SETTINGS } from '@/spec/setting';
 
 import { settingstoreAPI } from '@/apis/baseapi';
@@ -44,6 +46,20 @@ export function DebugSettingsSection({ value, onChanged }: DebugSettingsSectionP
 
 	return (
 		<div className="flex w-full flex-col gap-4 p-4">
+			{(current.logLLMReqResp || current.disableContentStripping) && (
+				<div className="border-warning/40 bg-warning/10 text-warning-content rounded-2xl border p-2 text-sm">
+					<div className="flex items-start gap-2">
+						<FiAlertTriangle className="mt-0.5 shrink-0" size={16} />
+						<div>
+							<div className="font-semibold">Debug content may include sensitive data.</div>
+							<p className="mt-1 text-xs">
+								Raw request/response logging and unstripped message details can expose prompts, attachments, outputs,
+								tool results, and provider payloads in local logs or message details.
+							</p>
+						</div>
+					</div>
+				</div>
+			)}
 			<div className="flex items-center justify-between gap-4">
 				<div>
 					<h3 className="text-sm font-semibold">Log level</h3>

@@ -340,8 +340,6 @@ export default function DocsPage() {
 									<span>In-app Docs</span>
 								</div>
 
-								<p className="mt-2 text-sm opacity-70">Bundled user guide and architecture reference for FlexiGPT.</p>
-
 								<p className="mt-3 text-xs opacity-60">
 									{activeDocIndex + 1} of {docSections.length}
 								</p>

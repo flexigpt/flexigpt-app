@@ -2,7 +2,7 @@ import { type ChangeEvent, type SubmitEventHandler, useEffect, useMemo, useRef, 
 
 import { createPortal } from 'react-dom';
 
-import { FiAlertCircle, FiHelpCircle, FiX } from 'react-icons/fi';
+import { FiAlertCircle, FiAlertTriangle, FiHelpCircle, FiX } from 'react-icons/fi';
 
 import { HTTPBodyOutputMode, type Tool, ToolImplType } from '@/spec/tool';
 
@@ -535,6 +535,19 @@ function AddEditToolModalContent({
 							</div>
 						)}
 
+						{formData.autoExecReco && !isViewMode && (
+							<div className="border-warning/40 bg-warning/10 rounded-2xl border p-2 text-sm">
+								<div className="flex items-start gap-2">
+									<FiAlertTriangle className="mt-0.5 shrink-0" size={16} />
+									<p>
+										Only recommend auto-execute for trusted, low-risk tools. Avoid it for tools that write files, call
+										network endpoints, run shell/script commands, or handle sensitive data unless the workflow is
+										explicitly designed for that risk.
+									</p>
+								</div>
+							</div>
+						)}
+
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
 								<span className="label-text text-sm">Display Name*</span>
@@ -772,6 +785,15 @@ function AddEditToolModalContent({
 
 						{formData.type === ToolImplType.HTTP && (
 							<>
+								<div className="border-info/30 bg-info/10 rounded-2xl border p-3 text-sm">
+									<div className="flex items-start gap-2">
+										<FiAlertTriangle className="mt-0.5 shrink-0" size={16} />
+										<p>
+											HTTP tools can call network endpoints and may include model-provided arguments. Review the URL,
+											headers, authentication template, and auto-execute setting before using the tool in a workflow.
+										</p>
+									</div>
+								</div>
 								<div className="grid grid-cols-12 items-center gap-2">
 									<label className="label col-span-3">
 										<span className="label-text text-sm">HTTP URL*</span>

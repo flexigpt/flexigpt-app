@@ -4,6 +4,9 @@ import chatsWorkflowBody from '@/docs/content/03-chats-composer-and-everyday-wor
 import contextAndToolsBody from '@/docs/content/04-attachments-tools-skills-prompts.md?raw';
 import presetsProvidersSettingsBody from '@/docs/content/05-presets-providers-settings.md?raw';
 import privacyAndTroubleshootingBody from '@/docs/content/06-privacy-storage-and-troubleshooting.md?raw';
+import securityPrivacyModelBody from '@/docs/content/07-security-and-privacy-model.md?raw';
+import recipesAndStarterWorkflowsBody from '@/docs/content/08-recipes-and-starter-workflows.md?raw';
+import providerAndLocalModelSetupBody from '@/docs/content/09-provider-and-local-model-setup.md?raw';
 import architectureOverviewBody from '@/docs/content/11-architecture-overview.md?raw';
 import backendRolesBody from '@/docs/content/12-backend-roles-and-responsibilities.md?raw';
 import frontendRolesBody from '@/docs/content/13-frontend-roles-and-responsibilities.md?raw';
@@ -27,7 +30,8 @@ export const docsCategories: DocsCategory[] = [
 	{
 		id: 'user-guide',
 		title: 'User Guide',
-		summary: '',
+		summary:
+			'Get started with FlexiGPT, connect providers, start useful workflows, and understand local-first data handling.',
 		sections: [
 			{
 				id: 'getting-started',
@@ -68,6 +72,26 @@ export const docsCategories: DocsCategory[] = [
 				summary:
 					'Understand what stays local, what can leave the device, and how to diagnose common workflow failures.',
 				body: privacyAndTroubleshootingBody,
+			},
+			{
+				id: 'security-and-privacy-model',
+				title: 'Security and Privacy Model',
+				summary:
+					'Trust-focused explanation of local storage, provider requests, keys, attachments, URL fetching, tools, logs, and data control.',
+				body: securityPrivacyModelBody,
+			},
+			{
+				id: 'recipes-and-starter-workflows',
+				title: 'Recipes and Starter Workflows',
+				summary:
+					'Outcome-based recipes for code review, docs, research, local files, model comparison, and safe tool use.',
+				body: recipesAndStarterWorkflowsBody,
+			},
+			{
+				id: 'provider-and-local-model-setup',
+				title: 'Provider and Local Model Setup',
+				summary: 'Setup notes for OpenRouter, compatible endpoints, Ollama-style local servers, and llama.cpp.',
+				body: providerAndLocalModelSetupBody,
 			},
 		],
 	},

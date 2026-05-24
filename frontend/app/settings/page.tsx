@@ -99,7 +99,7 @@ export default function SettingsPage() {
 						</div>
 
 						<div className="bg-base-100 rounded-2xl p-4 shadow-lg">
-							<h2 className="mr-8 mb-4 ml-4 font-semibold">Debug</h2>
+							<h2 className="mr-8 mb-0 ml-4 font-semibold">Debug</h2>
 							<DebugSettingsSection value={debugSettings} onChanged={setDebugSettings} />
 						</div>
 					</div>

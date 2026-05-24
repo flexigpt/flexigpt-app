@@ -116,6 +116,8 @@ web_modules/
 # vercel
 .vercel
 
+__todo.md
+
 asarex
 .flatpak-builder
 flatpak_app

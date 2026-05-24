@@ -46,8 +46,17 @@ export function AuthKeyTable({ authKeys, onEdit, onChanged }: AuthKeyTableProps)
 		onChanged();
 	};
 
-	if (!authKeys.length) return <p className="text-neutral-custom my-6 text-center text-sm">No keys defined.</p>;
-
+	if (!authKeys.length) {
+		return (
+			<div className="border-base-300 bg-base-200/60 my-6 rounded-2xl border p-4 text-sm">
+				<div className="font-semibold">No provider keys configured yet.</div>
+				<p className="text-base-content/70 mt-1">
+					Add a provider key before sending requests. Secrets are stored through the OS keyring, while FlexiGPT only
+					shows local key metadata here.
+				</p>
+			</div>
+		);
+	}
 	return (
 		<>
 			<div className="border-base-content/10 overflow-x-auto rounded-2xl border">

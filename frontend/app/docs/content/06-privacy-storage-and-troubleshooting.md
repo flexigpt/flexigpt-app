@@ -4,6 +4,8 @@ FlexiGPT is local-first: conversations, workflow catalogs, provider configuratio
 Requests still go to the provider you choose.
 This page explains what stays on your device, what can leave it, and what to check when something feels wrong.
 
+For a trust-focused checklist of local data, provider requests, keys, attachments, tools, logs, deletion, and export, see **Security and Privacy Model**.
+
 ## Table of contents <!-- omit from toc -->
 
 - [What stays local](#what-stays-local)
@@ -81,6 +83,8 @@ For current packaged builds, that typically means:
 - Windows: `%LOCALAPPDATA%\flexigpt\`, usually `C:\Users\<username>\AppData\Local\flexigpt\`. Manually finding the folder:
   - Open **File Explorer** -> Go to `C:\Users\<username>\` -> Enable hidden folders as **View** -> **Show** -> **Hidden items** -> Open `AppData\Local\flexigpt`.
   - OR if `AppData` is not visible or you are unsure which local profile path Windows is using, open PowerShell and run `$env:LOCALAPPDATA`.
+
+You can back up FlexiGPT local data by copying the `flexigpt` app-data folder while the app is closed. API key secret values are protected through the OS keyring and should be re-added or restored through the OS credential mechanism if needed.
 
 ## What can be sent to a provider
 
