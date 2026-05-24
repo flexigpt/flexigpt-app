@@ -4,11 +4,11 @@ This page gives the high-level system view of FlexiGPT.
 
 It explains the major parts of the app, the boundaries between them, and the main runtime flows. Deeper details are covered by the companion architecture pages.
 
-FlexiGPT is best understood as a **local-first desktop application**:
+FlexiGPT is best understood as a **local-first desktop application for repeatable LLM workflows**:
 
 - the user works in a React frontend
 - the frontend talks to a local Go backend through a typed Wails boundary
-- the backend owns durable state, search, attachment preparation, and request orchestration
+- the backend owns durable state, workflow catalogs, search, attachment preparation, and request orchestration
 - local files, local indexes, and the OS keyring hold app data and secrets
 - external model providers and runtime libraries are used only when the current workflow needs them
 
@@ -73,7 +73,8 @@ flowchart LR
     Core --> Runtime
 ```
 
-The important point is that FlexiGPT is not organized as a thin UI over a FlexiGPT-hosted cloud backend. The core application state and orchestration stay on the user's machine, with external provider calls happening only when the active workflow requires them.
+The important point is that FlexiGPT is not organized as a thin UI over a FlexiGPT-hosted cloud chat backend.
+The core application state, workflow catalogs, and orchestration stay on the user's machine, with external provider calls happening only when the active workflow requires them.
 
 ## Architectural boundaries
 

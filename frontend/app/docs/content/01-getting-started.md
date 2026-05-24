@@ -2,7 +2,7 @@
 
 FlexiGPT is a local-first AI workflow workspace for power users and teams who need repeatable prompts, tools, skills, model choices, assistants/agents and private local history across multiple LLM providers.
 
-This guide is the fastest path from install to a useful first conversation in FlexiGPT.
+This guide is the fastest path from install to your first useful workflow: connect a provider, choose a starting assistant/model setup, add context, and send a useful first message.
 
 ## Table of contents <!-- omit from toc -->
 
@@ -27,9 +27,11 @@ Before your first successful send, you usually need:
   - [OpenRouter](https://openrouter.ai/workspaces/default/keys), [Hugging Face](https://huggingface.co/settings/tokens)
 
 - Add the key in [Settings -> Auth Keys](/settings).
-- Head to [Chats](/chats) page. Try out different things like: different assistants for spec driven dev or reviewing code, attaching files, creating your own prompt template or skill and using them!
+- Head to the [Chats](/chats) page.
+- Head to [Chats](/chats) page. Start from a built-in assistant preset, or build your own repeatable workflow with prompts, attachments, tools, and skills.
+- Try out different things like: different assistants for spec driven dev or reviewing code, attaching files, creating your own prompt template or skill and using them!
 
-FlexiGPT ships with built-in providers, model presets, tools, skills, prompts, and assistant presets.
+FlexiGPT ships with built-in providers, model presets, tools, skills, prompts, and assistant presets. These building blocks are meant to be combined into reusable workflows, not configured from scratch every time.
 
 - Provider not listed above? -> You can create custom providers that are compatible with any of: OpenAI Responses or ChatCompletions API, Anthropic Messages API, Google GenerateContent API.
 - Don't like the builtin's? -> Customize your own thing for anything!
@@ -48,9 +50,9 @@ From there you can:
 
 ## Pick a starting setup
 
-Before you send, decide what kind of workspace you want for this conversation.
+Before you send, decide what kind of workflow you want for this conversation.
 
-If you just want the quick version: an assistant preset shapes the workspace, while a model preset chooses the provider, model, and request defaults.
+If you just want the quick version: an assistant preset shapes the workflow, while a model preset chooses the provider, model, and request defaults.
 
 ### Assistant Preset
 

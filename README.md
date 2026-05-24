@@ -7,6 +7,14 @@
 
 FlexiGPT is a local-first AI workflow workspace for power users and teams who need repeatable prompts, tools, skills, model choices, assistants/agents and private local history across multiple LLM providers.
 
+## Who FlexiGPT is for
+
+FlexiGPT is built for people who use LLMs as part of repeatable work, not just one-off chat.
+
+- Power/Local-first users who want provider choice, private local history, and full control over configuration and orchestration.
+- Developers and technical writers who reuse assistants/agents, prompts, attachments, tools, and model setups.
+- Consultants and small teams who want consistent assistant workflows without sending chat history through another hosted app.
+
 ## Install
 
 1. Download the latest release from [GitHub Releases](https://github.com/flexigpt/flexigpt-app/releases)
@@ -20,45 +28,46 @@ FlexiGPT is a local-first AI workflow workspace for power users and teams who ne
   - [OpenAI](https://platform.openai.com/settings/organization/api-keys), [Anthropic Claude](https://platform.claude.com/settings/keys), [Google Gemini](https://aistudio.google.com/api-keys), [xAI](https://console.x.ai/team/default/api-keys), [MistralAI](https://console.mistral.ai/home?profile_dialog=api-keys)
   - [OpenRouter](https://openrouter.ai/workspaces/default/keys), [Hugging Face](https://huggingface.co/settings/tokens)
 - Add the key in Settings -> Auth Keys.
-- Chat.
+- Chat. Start from a built-in assistant preset or build your own reusable workflow with prompts, attachments, tools, and skills.
 
 FlexiGPT does not bill you directly. Usage costs and limits come from the provider account behind the key you configure.
 
 ## Screenshots
 
 <p float="left">
-  <img src="images/home.png" alt="Home" width="512" />
-  <img src="images/latex_code.png" alt="Latex+Code" width="512" />
+  <img src="images/home.png" alt="FlexiGPT local-first workflow workspace home" width="512" />
+  <img src="images/latex_code.png" alt="Rich chat rendering with Markdown, LaTeX, and code" width="512" />
 </p>
 
 <p float="left">
-  <img src="images/assistants.png" alt="Assistants" width="512" />
-  <img src="images/settings.png" alt="Settings" width="512" />
+  <img src="images/assistants.png" alt="Reusable assistant presets and workflow setup" width="512" />
+  <img src="images/settings.png" alt="Local settings and provider auth keys" width="512" />
 </p>
 
 [All images are here](./images/)
 
 ## Key features
 
-### Multi-provider connectivity with built-in presets
+### Provider-independent model choices with built-in presets
 
 - First-class builtin support for OpenAI, Anthropic, Google Gemini API, xAI, Mistral, Hugging Face, OpenRouter, and local `llama.cpp`
 - Support for compatible custom endpoints across OpenAI Chat Completions, OpenAI Responses, and Anthropic Messages style APIs
 - Built-in providers and curated model presets for leading models so you can get started quickly without manually defining endpoints or defaults first
 - API keys are stored securely through the OS keyring, not in plain-text exported settings
 
-### Unified chat workspace
+### Repeatable AI workflow workspace
 
-- One interface for chats, tabs, attachments, prompts, tools, skills, presets, search, and exports
+- One interface for chats, tabs, reusable assistant presets, model presets, prompt templates, attachments, tools, skills, search, and exports
+- Build repeatable workflows by combining model choices, instructions, attachments, tools, and skills
 - Switch providers or models as you iterate
 - Multi-tab conversations with local history search and resume flows
 - Export the current conversation as JSON
 
-### Human-in-loop and agentic workflows
+### Assistants, tools, and agentic workflows with human-in-loop controls
 
 - Assistant presets bundle model choice, instructions, tools, and skills into reusable starting setups
 - Tools can be attached per conversation and configured for manual review or auto-execution
-- When an auto-execute tool is called, FlexiGPT can run it and automatically submit the result back to the model, enabling agentic workflows inside a normal chat flow
+- When an auto-execute tool is called, FlexiGPT can run it and automatically submit the result back to the model, enabling assistant/agent-style workflows inside a normal chat flow
 - Keep tools manual when you want tighter control over execution
 
 ### Rich response rendering and inspection
@@ -69,11 +78,12 @@ FlexiGPT does not bill you directly. Usage costs and limits come from the provid
 - Citations, token usage, and per-message request/response details for inspection and debugging
 - Message-level controls for copying, inspection, and follow-up iteration
 
-### Local-first context and history
+### Private local context and history
 
 - Local conversation storage and full-text search
 - File, folder, image, PDF, and URL attachments
 - Bundled offline docs shipped inside the app
+- Conversations, workflow catalogs, and configuration are stored locally only.
 - Use your own provider accounts; FlexiGPT does not proxy or bill model usage
 
 ## Documentation

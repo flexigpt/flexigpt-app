@@ -1,7 +1,7 @@
 # Chats Workspace and Composer HLD
 
 This page is the detailed high-level design for the `chats` workspace and the composer subsystem.
-It exists because the workspace is the main frontend system and the composer is a deep subsystem with its own architecture, state, and runtime boundaries.
+It exists because the workspace is the main frontend system where repeatable workflow setup turns into chat execution, and the composer is a deep subsystem with its own architecture, state, and runtime boundaries.
 
 ## Table of contents <!-- omit from toc -->
 
@@ -36,7 +36,7 @@ It exists because the workspace is the main frontend system and the composer is 
 ## Scope
 
 This document covers the architecture of the active conversation workspace, not the backend implementation.
-It explains how the frontend keeps a chat session alive across tabs, how it restores a saved conversation, how it streams new answers, and how the composer assembles and submits a turn.
+It explains how the frontend keeps a chat session alive across tabs, how it restores a saved conversation, how it streams new answers, and how the composer assembles reusable workflow context into a turn.
 
 ## Workspace view
 
@@ -182,7 +182,7 @@ When editing is active, the composer can load the old message state, replace it,
 ## Composer architecture
 
 The composer is the most internally layered frontend subsystem in the workspace.
-Its job is to turn the current draft into a valid request context.
+Its job is to turn the current draft, selected workflow setup, and active context into a valid request.
 
 ### Top-level responsibilities
 

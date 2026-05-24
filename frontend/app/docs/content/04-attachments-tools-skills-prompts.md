@@ -1,6 +1,7 @@
 # Attachments, Tools, Skills, and Prompts
 
-These features help FlexiGPT go beyond plain chat text.
+Attachments, tools, skills, and prompts are the building blocks that turn FlexiGPT from plain chat into a repeatable AI workflow workspace.
+They let you bring source material into a request, reuse structure, expose controlled execution capabilities, and keep workflow behavior consistent across turns.
 
 ## Table of contents <!-- omit from toc -->
 
@@ -146,6 +147,8 @@ Use this rule of thumb:
 - **Tool**: when the model may need execution capability
 - **Skill**: when the conversation should follow a reusable workflow mode
 - **Web search**: when current external information matters
+
+For repeatable work, combine these deliberately instead of rebuilding the same context by hand in every conversation.
 
 ## Recommended working pattern
 

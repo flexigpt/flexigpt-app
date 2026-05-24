@@ -1,6 +1,8 @@
 # Core Concepts
 
-FlexiGPT becomes much easier to use once a few core terms are clear.
+FlexiGPT is designed as a local-first AI workflow workspace, not only a chat box.
+It becomes much easier to use once a few core terms are clear.
+Most work in FlexiGPT is built by combining a model choice, an assistant preset, reusable prompts, tools or skills, and the current turn context.
 
 ## Table of contents <!-- omit from toc -->
 
@@ -36,7 +38,7 @@ FlexiGPT becomes much easier to use once a few core terms are clear.
 
 ## Think in four layers
 
-A useful mental model is to separate FlexiGPT into four layers.
+A useful mental model is to separate a FlexiGPT workflow into four layers.
 
 1. **Provider and transport**
    - Which provider family or compatible endpoint is being used.
@@ -176,4 +178,4 @@ Across model presets, prompts, tools, skills, and assistant presets, the same br
 - built-in content can usually be enabled or disabled
 - built-in content is generally treated as read-only
 
-The fuller user-facing explanation is in **Presets, Providers, and Settings**, but the short version is that FlexiGPT gives you ready-to-use defaults without taking away local customization.
+The fuller user-facing explanation is in **Presets, Providers, and Settings**, but the short version is that FlexiGPT gives you ready-to-use workflow building blocks without taking away local customization.

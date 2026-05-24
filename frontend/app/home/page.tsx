@@ -59,19 +59,19 @@ function DocsCard({ title, description, to }: NavCardProps) {
 const docsCards: NavCardProps[] = [
 	{
 		title: 'Getting Started',
-		description: 'Connect a provider key, choose a starting setup, and send the first useful message.',
+		description: 'Connect a provider key, choose a workflow setup, and send your first useful message.',
 		to: '/docs/#getting-started',
 		icon: <FiMessageSquare size={18} />,
 	},
 	{
 		title: 'Chats and Composer',
-		description: 'Learn how the Chats workspace is structured and how a conversation moves from setup to response.',
+		description: 'Run repeatable workflows from chat tabs with attachments, prompts, tools, and model choices.',
 		to: '/docs/#chats-composer-and-everyday-workflow',
 		icon: <FiMessageSquare size={18} />,
 	},
 	{
 		title: 'Context and Automation',
-		description: 'Use attachments, prompts, tools, skills, and auto-execute workflows.',
+		description: 'Combine attachments, prompts, tools, skills, web search, and auto-execute flows.',
 		to: '/docs/#attachments-tools-skills-and-prompts',
 		icon: <FiLayers size={18} />,
 	},
@@ -100,15 +100,15 @@ export default function HomePage() {
 					</div>
 
 					<p className="text-base-content/70 max-w-2xl text-sm leading-relaxed">
-						Local-first desktop workspace for multi-provider LLM chats, with assistants, model presets, prompts,
-						attachments, tools, and skills.
+						Local-first AI workflow workspace for reusable assistants/agents, prompts, tools, skills, model choices,
+						attachments, and private local history across multiple LLM providers.
 					</p>
 				</div>
 
 				<div className="mt-16 flex w-full flex-1 flex-col items-center justify-between xl:mt-24">
 					<PrimaryActionCard
-						title="Open Chats"
-						description="Start a new conversation or continue a saved local thread."
+						title="Open Chats Workspace"
+						description="Start a new chat/workflow or continue a saved local thread."
 						to="/chats/"
 						icon={<FiMessageSquare size={24} />}
 					/>
@@ -126,7 +126,7 @@ export default function HomePage() {
 								</div>
 							</Link>
 							<p className="text-base-content/70 mt-1 text-sm">
-								Bundled workflow, context, automation, and architecture reference for FlexiGPT.
+								Bundled guide for workflows, local context, automation, tools, skills, and architecture.
 							</p>
 						</div>
 

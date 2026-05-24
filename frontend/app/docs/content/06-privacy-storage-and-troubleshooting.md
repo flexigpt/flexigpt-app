@@ -1,6 +1,8 @@
 # Privacy, Storage, and Troubleshooting
 
-FlexiGPT is local-first, but requests still go to the provider you choose. This page explains what stays on your device, what can leave it, and what to check when something feels wrong.
+FlexiGPT is local-first: conversations, workflow catalogs, provider configuration, and most app state live on your machine.
+Requests still go to the provider you choose.
+This page explains what stays on your device, what can leave it, and what to check when something feels wrong.
 
 ## Table of contents <!-- omit from toc -->
 
@@ -65,7 +67,7 @@ The app also stores local data for areas such as:
 - skill bundles and skills
 - bundled docs shipped inside the app
 
-Most of this is local configuration and catalog data.
+Most of this is local configuration and workflow catalog data.
 
 ### Storage locations
 
@@ -95,6 +97,7 @@ When you send a request, the selected provider may receive some or all of the fo
 - skill session context and skill-related behavior when enabled
 
 FlexiGPT does not proxy billing through its own service. Billing and limits come from the provider account behind the configured key.
+Local-first does not mean provider-isolated: the safest habit is to review the full request context before sending sensitive work.
 
 ## Attachments need deliberate handling
 

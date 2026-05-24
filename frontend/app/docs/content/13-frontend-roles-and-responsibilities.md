@@ -4,7 +4,7 @@ This page is the frontend responsibility reference for FlexiGPT.
 It explains what the frontend owns, how the major surfaces fit together, and where the important architectural boundaries are.
 
 The most important frontend concern is the `chats` workspace.
-It is the primary surface, and it coordinates tab state, conversation restoration, message rendering, search, and the composer subsystem.
+It is the primary surface where reusable workflow setup becomes day-to-day conversation work, and it coordinates tab state, conversation restoration, message rendering, search, and the composer subsystem.
 
 ## Table of contents <!-- omit from toc -->
 
@@ -100,7 +100,7 @@ The frontend owns the parts of the app that the user directly sees and manipulat
 - route selection and route-level composition
 - the app shell, title bar, drawer, and page framing
 - the `chats` workspace and its internal coordination
-- message presentation, composer state, and streaming UI updates
+- message presentation, workflow composition state, composer state, and streaming UI updates
 - management pages for reusable catalogs and settings
 - docs navigation and in-app documentation rendering
 - the typed boundary to Go through Wails APIs

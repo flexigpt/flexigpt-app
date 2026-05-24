@@ -1,6 +1,8 @@
 # Chats, Composer, and Everyday Workflow
 
-This page focuses on the day-to-day workspace inside FlexiGPT. The **Chats** page is the main surface, combining chat tabs, conversation search, the active conversation timeline, and the composer for the next request.
+This page focuses on the day-to-day workflow workspace inside FlexiGPT.
+The **Chats** page is the main surface where reusable assistant setup, local history, current context, and provider/model choices come together.
+It combines chat tabs, conversation search, the active conversation timeline, and the composer for the next request.
 
 ## Table of contents <!-- omit from toc -->
 
@@ -28,7 +30,7 @@ The **Chats** page combines four responsibilities in one place:
 - the active conversation timeline
 - the composer for the next request
 
-That is why most everyday work happens there.
+That is why most everyday work happens there: it is where repeatable setup turns into a concrete message, response, tool run, or continuation.
 
 ## A normal workflow
 
@@ -52,6 +54,7 @@ Use them when you want to change how the next request should run.
 
 Examples:
 
+- apply a reusable assistant preset for a repeated workflow
 - switch to a stronger model
 - reduce temperature for a stricter answer
 - reduce **Previous user turns** because the thread drifted

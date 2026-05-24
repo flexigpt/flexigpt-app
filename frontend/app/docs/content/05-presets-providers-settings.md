@@ -1,6 +1,7 @@
 # Presets, Providers, and Settings
 
-The pages outside **Chats** manage the reusable building blocks behind your day-to-day workflow.
+The pages outside **Chats** manage the reusable building blocks behind your repeatable AI workflows.
+They are where you maintain assistant presets, prompt templates, tools, skills, model choices, provider settings, and local configuration.
 
 ## Table of contents <!-- omit from toc -->
 
@@ -20,6 +21,7 @@ The pages outside **Chats** manage the reusable building blocks behind your day-
 ## Assistant Presets
 
 An assistant preset is a reusable starting setup.
+It is the main way to turn a repeated way of working into something you can start from again.
 
 It can define a starting combination of:
 
@@ -106,7 +108,7 @@ Across assistant presets, prompts, tools, skills, and model presets, the same br
 - built-in items can usually be enabled or disabled
 - built-in items are generally treated as read-only definitions
 
-That gives you built-in starting points without taking away local customization.
+That gives you built-in workflow starting points without taking away local customization.
 
 ## How to decide which page to use
 
