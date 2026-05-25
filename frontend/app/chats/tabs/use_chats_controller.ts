@@ -16,6 +16,7 @@ import { conversationStoreAPI } from '@/apis/baseapi';
 import type { ConversationAreaHandle } from '@/chats/conversation/conversation_area';
 import { hydrateConversation, toStoreConversation } from '@/chats/conversation/conversation_persistence_mapper';
 import { initConversation } from '@/chats/conversation/hydration_helper';
+import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';
 import type { ConversationSearchHandle } from '@/chats/search/conversation_search';
 import {
 	type ChatTabState,
@@ -519,6 +520,42 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		[bumpSearchKey, enqueueSaveForTab, updateTab]
 	);
 
+	const getOrCreateScratchTabForStarter = useCallback((): string => {
+		const scratch = tabsRef.current.find(isScratchTab);
+		if (scratch) return scratch.tabId;
+
+		const nextScratch = createEmptyTab();
+		touchTab(nextScratch.tabId);
+		const normalizedTabs = normalizeAndCommitTabs([...tabsRef.current, nextScratch], nextScratch.tabId);
+
+		return normalizedTabs.some(tab => tab.tabId === nextScratch.tabId)
+			? nextScratch.tabId
+			: (normalizedTabs.find(isScratchTab)?.tabId ?? '');
+	}, [normalizeAndCommitTabs, touchTab]);
+
+	const preloadWorkflowStarter = useCallback(
+		async (starter: ChatWorkflowStarter): Promise<boolean> => {
+			const targetId = getOrCreateScratchTabForStarter();
+			if (!targetId) return false;
+
+			selectTab(targetId);
+
+			await new Promise<void>(resolve =>
+				requestAnimationFrame(() => {
+					resolve();
+				})
+			);
+			if (!controllerAliveRef.current) return false;
+
+			const applied = await conversationAreaRef.current?.applyWorkflowStarter(targetId, starter);
+			if (applied) {
+				conversationAreaRef.current?.focusInput(targetId);
+			}
+			return Boolean(applied);
+		},
+		[conversationAreaRef, getOrCreateScratchTabForStarter, selectTab]
+	);
+
 	const openNewTab = useCallback(() => {
 		const scratch = tabsRef.current.find(isScratchTab) ?? null;
 		const targetId = scratch?.tabId ?? selectedTabIdRef.current;
@@ -782,5 +819,6 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		openConversationIds,
 		searchRefreshKey,
 		maxTabs: MAX_TABS,
+		preloadWorkflowStarter,
 	};
 }

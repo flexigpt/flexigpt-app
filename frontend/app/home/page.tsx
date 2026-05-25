@@ -82,48 +82,62 @@ const CORE_ASSISTANTS_BUNDLE_ID = '019d2423-01b0-7f87-be39-fe02d844453a';
 
 const workflowStarters: WorkflowStarter[] = [
 	{
-		title: 'Explain This File',
-		description: 'Attach a file and get a guided explanation of purpose, flow, important APIs, and risky details.',
-		workflowID: 'explain-file',
+		title: 'Analyze File',
+		description: 'Attach a file and get a guided explanation of purpose, or any other query.',
+		workflowID: 'analyze-file',
 		assistantPresetBundleID: CORE_ASSISTANTS_BUNDLE_ID,
-		assistantPresetSlug: 'base',
+		assistantPresetSlug: 'fs-exec',
 		assistantPresetVersion: 'v1.0.0',
-		prompt:
-			'Explain the attached file. Cover purpose, main flows, important types/functions, dependencies, and surprising or risky behavior. End with what to inspect next.',
+		prompt: [
+			'<Attach the file or paste/replace this line with file contents, or replace this line with the full local path to inspect: `/absolute/path/to/file`>',
+			'',
+			'Analyze and explain this file. Cover purpose, main flows, important analysis and dependencies/references.',
+		].join('\n'),
 		icon: <FiFileText size={18} />,
 	},
 	{
 		title: 'Code Review',
-		description: 'Review code, diffs, or PR notes for correctness, security, reliability, maintainability, and tests.',
+		description:
+			'Review the code or diff for correctness, security, reliability, maintainability, and test gaps. Focus on concrete findings and narrow fixes.',
 		workflowID: 'code-review',
 		assistantPresetBundleID: SOFTWARE_ASSISTANTS_BUNDLE_ID,
 		assistantPresetSlug: 'reviewing-code',
 		assistantPresetVersion: 'v1.0.0',
-		prompt:
-			'Review the attached code or diff for correctness, security, reliability, maintainability, and test gaps. Focus on concrete findings and narrow fixes.',
+		prompt: [
+			'<Attach changed files, paste a diff, or replace this line with the repo path plus commit/branch/PR context: `/absolute/path/to/repo`>',
+			'',
+			'Review the code or diff for correctness, security, reliability, maintainability, and test gaps. Focus on concrete findings and narrow fixes.',
+		].join('\n'),
 		icon: <FiCode size={18} />,
 	},
 	{
 		title: 'Bug Investigation',
 		description:
-			'Analyze logs, stack traces, failing tests, or suspicious code and propose a narrow verification path.',
+			'Investigate a bug. Identify likely root cause, evidence, missing evidence, the smallest safe fix direction, and verification steps.',
 		workflowID: 'bug-investigation',
 		assistantPresetBundleID: CORE_ASSISTANTS_BUNDLE_ID,
 		assistantPresetSlug: 'fs-exec',
 		assistantPresetVersion: 'v1.0.0',
-		prompt:
-			'Investigate this bug from the attached logs, stack trace, failing test, or code. Identify likely root cause, evidence, missing evidence, narrow fix, and verification steps.',
+		prompt: [
+			'<Paste the error, stack trace, failing test output, or replace this line with the relevant repo/file path: `/absolute/path/to/repo-or-file`>',
+			'',
+			'Investigate this bug. Identify likely root cause, evidence, missing evidence, the smallest safe fix direction, and verification steps.',
+		].join('\n'),
 		icon: <FiAlertTriangle size={18} />,
 	},
 	{
 		title: 'Architecture Review',
-		description: 'Review structure, boundaries, risks, coupling, and the simplest viable improvements.',
+		description:
+			'Review the architecture. Identify boundaries, risks, coupling, unclear ownership, and the simplest viable improvements.',
 		workflowID: 'architecture-review',
 		assistantPresetBundleID: SOFTWARE_ASSISTANTS_BUNDLE_ID,
 		assistantPresetSlug: 'designing-system-architecture',
 		assistantPresetVersion: 'v1.0.0',
-		prompt:
-			'Review the attached architecture, README, docs, or code structure. Identify boundaries, risks, coupling, unclear ownership, and the simplest viable improvements.',
+		prompt: [
+			'<Attach the README/design docs, paste architecture notes, or replace this line with the repo/docs path to inspect: `/absolute/path/to/repo-or-docs`>',
+			'',
+			'Review the architecture. Identify boundaries, risks, coupling, unclear ownership, and the simplest viable improvements.',
+		].join('\n'),
 		icon: <FiLayers size={18} />,
 	},
 ];
@@ -153,12 +167,15 @@ function WorkflowStarterCard({ workflow }: { workflow: WorkflowStarter }) {
 	return (
 		<Link to={buildWorkflowStarterHref(workflow)} className="group block h-full">
 			<div className="bg-base-100 border-base-300/70 hover:border-primary/40 flex h-full flex-col rounded-2xl border shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
-				<div className="flex items-center justify-between p-2">
-					<div className="flex items-center justify-start gap-3 p-0">
-						<div className="bg-primary/10 text-primary rounded-xl p-2">{workflow.icon}</div>
-						<h3 className="text-sm font-semibold">{workflow.title}</h3>
+				<div className="flex flex-col p-4">
+					<div className="flex items-center justify-between p-0">
+						<div className="flex items-center gap-2">
+							<div className="bg-primary/10 text-primary rounded-xl p-2">{workflow.icon}</div>
+							<h3 className="text-sm font-semibold">{workflow.title}</h3>
+						</div>
+						<FiArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
 					</div>
-					<FiArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
+					<div className="text-base-content/70 mt-1 text-xs leading-relaxed">{workflow.description}</div>
 				</div>
 			</div>
 		</Link>
@@ -225,7 +242,7 @@ export default function HomePage() {
 							</p>
 						</div>
 
-						<div className="mx-auto mt-4 grid w-full max-w-5xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+						<div className="mx-auto mt-4 grid w-full max-w-5xl grid-cols-1 gap-4 sm:grid-cols-2">
 							{workflowStarters.map(workflow => (
 								<WorkflowStarterCard key={workflow.workflowID} workflow={workflow} />
 							))}

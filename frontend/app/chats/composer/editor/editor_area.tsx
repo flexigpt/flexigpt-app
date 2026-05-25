@@ -86,6 +86,7 @@ export interface EditorAreaHandle {
 	openToolMenu: () => void;
 	openAttachmentMenu: () => void;
 	loadExternalMessage: (msg: EditorExternalMessage) => void;
+	setDraftText: (text: string) => void;
 	resetEditor: () => void;
 	loadToolCalls: (toolCalls: UIToolCall[]) => void;
 	setConversationToolsFromChoices: (tools: ToolStoreChoice[]) => void;
@@ -1096,6 +1097,19 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		]
 	);
 
+	const setDraftText = useCallback(
+		(text: string) => {
+			closeAllMenus();
+			setSubmitError(null);
+			resetAutoSubmitTracker();
+			replaceEditorDocument(buildEditorValueFromPlainText(text), 'end');
+			window.requestAnimationFrame(() => {
+				focusEditorAtEnd();
+			});
+		},
+		[closeAllMenus, focusEditorAtEnd, replaceEditorDocument, resetAutoSubmitTracker]
+	);
+
 	const handleEditorDocumentChange = useCallback(() => {
 		const didProcessChange = onEditorChange();
 		if (!didProcessChange) return;
@@ -1163,6 +1177,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				openAttachmentPicker();
 			},
 			loadExternalMessage,
+			setDraftText,
 			resetEditor,
 			loadToolCalls: handleLoadToolCalls,
 			setConversationToolsFromChoices: applyConversationToolsFromChoices,
@@ -1173,17 +1188,18 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			},
 		}),
 		[
-			applyAttachmentsDrop,
-			applyConversationToolsFromChoices,
-			applySkillSelectionState,
-			applyWebSearchFromChoices,
-			focusEditorAtEnd,
 			loadExternalMessage,
+			setDraftText,
+			resetEditor,
 			handleLoadToolCalls,
-			openAttachmentPicker,
+			applyConversationToolsFromChoices,
+			applyWebSearchFromChoices,
+			applyAttachmentsDrop,
+			focusEditorAtEnd,
 			openTemplatePicker,
 			openToolPicker,
-			resetEditor,
+			openAttachmentPicker,
+			applySkillSelectionState,
 		]
 	);
 

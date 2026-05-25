@@ -15,6 +15,7 @@ import {
 	areAssistantRuntimeSnapshotsEqual,
 	type AssistantPresetPreparedApplication,
 	type AssistantPresetRuntimeSnapshot,
+	buildAssistantPresetIdentityKey,
 	EMPTY_ASSISTANT_PRESET_RUNTIME_SNAPSHOT,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import { useAssistantPresetManager } from '@/chats/composer/assistantpresets/use_assistant_preset_manager';
@@ -23,6 +24,7 @@ import { useAssistantContextState } from '@/chats/composer/contextarea/use_conte
 import { EditorArea, type EditorAreaHandle } from '@/chats/composer/editor/editor_area';
 import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
 import { useComposerSystemPrompt } from '@/chats/composer/systemprompts/use_composer_system_prompt';
+import type { ChatWorkflowStarter, ChatWorkflowStarterAssistantPresetRef } from '@/chats/conversation/starter_intent';
 
 export interface ComposerBoxHandle {
 	getUIChatOptions: () => UIChatOption;
@@ -32,6 +34,7 @@ export interface ComposerBoxHandle {
 	openTemplateMenu: () => void;
 	openToolMenu: () => void;
 	openAttachmentMenu: () => void;
+	loadWorkflowStarter: (starter: ChatWorkflowStarter) => Promise<boolean>;
 	loadExternalMessage: (msg: EditorExternalMessage) => void;
 	loadToolCalls: (toolCalls: UIToolCall[]) => void;
 	setConversationToolsFromChoices: (tools: ToolStoreChoice[]) => void;
@@ -77,6 +80,7 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 
 	const [assistantRuntimeSnapshot, setAssistantRuntimeSnapshot] = useState(EMPTY_ASSISTANT_PRESET_RUNTIME_SNAPSHOT);
 	const pendingPresetResolutionModeRef = useRef<'none' | 'ensure-active' | 'track-default'>('ensure-active');
+	const pendingStarterAssistantPresetRef = useRef<ChatWorkflowStarterAssistantPresetRef | null>(null);
 
 	const replaceAssistantRuntimeSnapshot = useCallback((next: AssistantPresetRuntimeSnapshot) => {
 		setAssistantRuntimeSnapshot(prev => {
@@ -131,9 +135,38 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 		applyRuntimeSelections: applyAssistantPresetRuntimeSelections,
 	});
 
+	const assistantPresetLayerReady =
+		assistantContext.modelOptionsLoaded && !assistantPreset.loading && !assistantPreset.isApplying;
+
+	const queueOrApplyAssistantPresetRef = useCallback(
+		async (presetRef: ChatWorkflowStarterAssistantPresetRef): Promise<boolean> => {
+			if (!assistantPresetLayerReady) {
+				pendingStarterAssistantPresetRef.current = presetRef;
+				pendingPresetResolutionModeRef.current = 'none';
+				return true;
+			}
+
+			const presetKey = buildAssistantPresetIdentityKey(
+				presetRef.bundleID,
+				presetRef.assistantPresetSlug,
+				presetRef.assistantPresetVersion
+			);
+			return assistantPreset.selectPreset(presetKey);
+		},
+		[assistantPreset, assistantPresetLayerReady]
+	);
+
 	const flushPendingPresetResolution = useCallback(async () => {
-		if (!assistantContext.modelOptionsLoaded || assistantPreset.loading || assistantPreset.isApplying) {
+		if (!assistantPresetLayerReady) {
 			return false;
+		}
+		const pendingStarterAssistantPreset = pendingStarterAssistantPresetRef.current;
+		if (pendingStarterAssistantPreset) {
+			const ok = await queueOrApplyAssistantPresetRef(pendingStarterAssistantPreset);
+			if (pendingStarterAssistantPresetRef.current === pendingStarterAssistantPreset) {
+				pendingStarterAssistantPresetRef.current = null;
+			}
+			return ok;
 		}
 
 		if (pendingPresetResolutionModeRef.current === 'track-default') {
@@ -153,15 +186,7 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 		}
 
 		return true;
-		// we dont need assistantPreset as a dep as we check for individual vals.
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [
-		assistantContext.modelOptionsLoaded,
-		assistantPreset.ensureActivePreset,
-		assistantPreset.isApplying,
-		assistantPreset.loading,
-		assistantPreset.trackDefaultPresetWithoutApplying,
-	]);
+	}, [assistantPreset, assistantPresetLayerReady, queueOrApplyAssistantPresetRef]);
 
 	useEffect(() => {
 		void flushPendingPresetResolution();
@@ -176,6 +201,21 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 		return onSend(payload, chatOptions);
 	};
 
+	const resetComposerStateForNewConversation = useCallback(() => {
+		setAbortConfirmationRequested(false);
+		pendingPresetResolutionModeRef.current = 'none';
+		pendingStarterAssistantPresetRef.current = null;
+		editorAreaRef.current?.resetEditor();
+		editorAreaRef.current?.setConversationToolsFromChoices([]);
+		editorAreaRef.current?.setWebSearchFromChoices([]);
+		editorAreaRef.current?.setSkillStateFromMessage([], [], { syncSession: 'none', forceResetSession: true });
+		replaceAssistantRuntimeSnapshot(EMPTY_ASSISTANT_PRESET_RUNTIME_SNAPSHOT);
+
+		const nextSelectedModel = assistantContext.resetForNewConversation();
+		systemPrompt.resetForNewConversation(nextSelectedModel.systemPrompt);
+		return nextSelectedModel;
+	}, [assistantContext, replaceAssistantRuntimeSnapshot, systemPrompt]);
+
 	useImperativeHandle(
 		ref,
 		() => ({
@@ -187,16 +227,7 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 				editorAreaRef.current?.resetEditor();
 			},
 			resetForNewConversation: async () => {
-				setAbortConfirmationRequested(false);
-				pendingPresetResolutionModeRef.current = 'none';
-				editorAreaRef.current?.resetEditor();
-				editorAreaRef.current?.setConversationToolsFromChoices([]);
-				editorAreaRef.current?.setWebSearchFromChoices([]);
-				editorAreaRef.current?.setSkillStateFromMessage([], [], { syncSession: 'none', forceResetSession: true });
-				replaceAssistantRuntimeSnapshot(EMPTY_ASSISTANT_PRESET_RUNTIME_SNAPSHOT);
-
-				const nextSelectedModel = assistantContext.resetForNewConversation();
-				systemPrompt.resetForNewConversation(nextSelectedModel.systemPrompt);
+				resetComposerStateForNewConversation();
 				const ok = await assistantPreset.resetToBasePreset();
 				if (!ok) {
 					pendingPresetResolutionModeRef.current = 'ensure-active';
@@ -212,6 +243,23 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 			},
 			openAttachmentMenu: () => {
 				editorAreaRef.current?.openAttachmentMenu();
+			},
+			loadWorkflowStarter: async starter => {
+				resetComposerStateForNewConversation();
+				editorAreaRef.current?.setDraftText(starter.draft ?? '');
+
+				if (starter.assistantPreset) {
+					const ok = await queueOrApplyAssistantPresetRef(starter.assistantPreset);
+					void flushPendingPresetResolution();
+					editorAreaRef.current?.focus();
+					return ok;
+				}
+
+				const ok = await assistantPreset.resetToBasePreset();
+				if (!ok) pendingPresetResolutionModeRef.current = 'ensure-active';
+				void flushPendingPresetResolution();
+				editorAreaRef.current?.focus();
+				return true;
 			},
 			loadExternalMessage: msg => {
 				editorAreaRef.current?.loadExternalMessage(msg);
@@ -267,7 +315,9 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 			assistantPreset,
 			chatOptions,
 			flushPendingPresetResolution,
+			queueOrApplyAssistantPresetRef,
 			replaceAssistantRuntimeSnapshot,
+			resetComposerStateForNewConversation,
 			systemPrompt,
 			updateAssistantRuntimeSnapshot,
 		]

@@ -8,6 +8,7 @@ import {
 	deriveHydratedLastAssistantToolCalls,
 	deriveRestorableConversationContextFromMessages,
 } from '@/chats/conversation/hydration_helper';
+import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';
 
 type PendingDrop = {
 	tabId: string;
@@ -21,6 +22,7 @@ type UseInputRegistryArgs = {
 export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 	const inputRefs = useRef(new Map<string, ComposerBoxHandle | null>());
 	const pendingDropsRef = useRef<PendingDrop[]>([]);
+	const pendingWorkflowStartersRef = useRef(new Map<string, ChatWorkflowStarter>());
 
 	const tryApplyDropToTab = useCallback((tabId: string, payload: AttachmentsDroppedPayload): boolean => {
 		const input = inputRefs.current.get(tabId);
@@ -50,6 +52,50 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 		pendingDropsRef.current = remaining;
 	}, [tabExists, tryApplyDropToTab]);
 
+	const tryApplyWorkflowStarterToTab = useCallback(
+		async (tabId: string, starter: ChatWorkflowStarter): Promise<boolean> => {
+			const input = inputRefs.current.get(tabId);
+			if (!input) return false;
+
+			await input.loadWorkflowStarter(starter);
+			return true;
+		},
+		[]
+	);
+
+	const flushPendingWorkflowStarters = useCallback(() => {
+		const pending = pendingWorkflowStartersRef.current;
+		if (pending.size === 0) return;
+
+		for (const [tabId, starter] of pending.entries()) {
+			if (!tabExists(tabId)) {
+				pending.delete(tabId);
+				continue;
+			}
+
+			void tryApplyWorkflowStarterToTab(tabId, starter)
+				.then(applied => {
+					if (applied && pendingWorkflowStartersRef.current.get(tabId) === starter) {
+						pendingWorkflowStartersRef.current.delete(tabId);
+					}
+				})
+				.catch((error: unknown) => {
+					console.error('Failed to apply pending workflow starter:', error);
+				});
+		}
+	}, [tabExists, tryApplyWorkflowStarterToTab]);
+
+	const applyWorkflowStarterToComposer = useCallback(
+		async (tabId: string, starter: ChatWorkflowStarter): Promise<boolean> => {
+			if (!tabExists(tabId)) return false;
+			if (await tryApplyWorkflowStarterToTab(tabId, starter)) return true;
+
+			pendingWorkflowStartersRef.current.set(tabId, starter);
+			return true;
+		},
+		[tabExists, tryApplyWorkflowStarterToTab]
+	);
+
 	const setInputRef = useCallback(
 		(tabId: string) => {
 			return (inst: ComposerBoxHandle | null) => {
@@ -58,11 +104,12 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 				if (inst) {
 					window.setTimeout(() => {
 						flushPendingDrops();
+						flushPendingWorkflowStarters();
 					}, 0);
 				}
 			};
 		},
-		[flushPendingDrops]
+		[flushPendingDrops, flushPendingWorkflowStarters]
 	);
 
 	const syncComposerFromConversation = useCallback((tabId: string, conversation: Conversation) => {
@@ -93,6 +140,7 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 
 	const disposeInputRuntime = useCallback((tabId: string) => {
 		inputRefs.current.delete(tabId);
+		pendingWorkflowStartersRef.current.delete(tabId);
 	}, []);
 
 	return {
@@ -108,5 +156,6 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 		openToolMenu,
 		openAttachmentMenu,
 		disposeInputRuntime,
+		applyWorkflowStarterToComposer,
 	};
 }

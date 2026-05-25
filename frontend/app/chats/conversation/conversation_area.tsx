@@ -8,6 +8,7 @@ import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { ButtonScrollToBottom, ButtonScrollToTop } from '@/components/button_scroll_top_bottom';
 
 import { TabInputPane } from '@/chats/conversation/conversation_input_pane';
+import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';
 import { useAttachmentsDropTarget } from '@/chats/conversation/use_attachments_drop_target';
 import { useInputRegistry } from '@/chats/conversation/use_input_registry';
 import { useScrollRestore } from '@/chats/conversation/use_scroll_restore';
@@ -59,6 +60,7 @@ export type ConversationAreaHandle = {
 	setScrollTopForTab: (tabId: string, top: number) => void;
 	resetScrollToTop: (tabId: string) => void;
 	getScrollTopByTabSnapshot: () => Record<string, number>;
+	applyWorkflowStarter: (tabId: string, starter: ChatWorkflowStarter) => Promise<boolean>;
 };
 
 type ConversationAreaProps = {
@@ -135,6 +137,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		openToolMenu,
 		openAttachmentMenu,
 		disposeInputRuntime,
+		applyWorkflowStarterToComposer,
 	} = useInputRegistry({ tabExists });
 
 	useAttachmentsDropTarget({
@@ -201,6 +204,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			clearStreamForTab,
 			syncComposerFromConversation,
 			resetComposerForNewConversation,
+			applyWorkflowStarter: applyWorkflowStarterToComposer,
 			focusInput,
 			openTemplateMenu,
 			openToolMenu,
@@ -210,6 +214,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			getScrollTopByTabSnapshot,
 		}),
 		[
+			applyWorkflowStarterToComposer,
 			clearStreamForTab,
 			disposeTabRuntime,
 			focusInput,
