@@ -96,9 +96,6 @@ FlexiGPT does not proxy normal LLM calls through a FlexiGPT-hosted service; requ
 
 ## Documentation
 
-Installation notes are repository/release documentation and are not bundled in the in-app docs.
-The bundled in-app docs are mirrored in this repository under `frontend/app/docs/content/`.
-
 ### Repository-only install notes
 
 - [Installation](./frontend/app/docs/content/00-installation.md)
@@ -115,7 +112,7 @@ The bundled in-app docs are mirrored in this repository under `frontend/app/docs
 - [Recipes and Starter Workflows](./frontend/app/docs/content/08-recipes-and-starter-workflows.md)
 - [Provider and Local Model Setup](./frontend/app/docs/content/09-provider-and-local-model-setup.md)
 
-### Architecture
+### Bundled in-app architecture reference
 
 - [Architecture Overview](./frontend/app/docs/content/11-architecture-overview.md)
 - [Backend Roles and Responsibilities](./frontend/app/docs/content/12-backend-roles-and-responsibilities.md)

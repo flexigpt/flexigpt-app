@@ -2,6 +2,8 @@
 
 Download the latest release from [GitHub Releases](https://github.com/flexigpt/flexigpt-app/releases), then install the package for your platform.
 
+## Table of contents <!-- omit from toc -->
+
 - [macOS](#macos)
 - [Windows](#windows)
 - [Linux](#linux)

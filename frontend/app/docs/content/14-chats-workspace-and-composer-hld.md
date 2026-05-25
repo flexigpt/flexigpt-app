@@ -83,10 +83,6 @@ flowchart LR
     WorkspaceState --> Persistence
     ConversationArea --> Backend
     Composer --> Backend
-    Composer --> Backend
-    Composer --> Backend
-    Composer --> Backend
-    Composer --> Backend
 ```
 
 ## Tabs and persistence

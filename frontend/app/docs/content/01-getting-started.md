@@ -2,7 +2,7 @@
 
 FlexiGPT is a local-first AI workflow workspace for power users and teams who need repeatable prompts, tools, skills, model choices, assistants/agents, and private local history across multiple LLM providers.
 
-This guide is the fastest path from install to your first useful workflow: connect a provider, choose a starting assistant/model setup, add context, and send a useful first message.
+This guide is the fastest path after installation: connect a provider, choose a starting assistant/model setup, add context, and send a useful first message.
 
 ## Table of contents <!-- omit from toc -->
 
@@ -33,8 +33,8 @@ Before your first successful send, you usually need:
 
 FlexiGPT ships with built-in providers, model presets, tools, skills, prompts, and assistant presets. These building blocks are meant to be combined into reusable workflows, not configured from scratch every time.
 
-- Provider not listed above? -> You can create custom providers that are compatible with any of: OpenAI Responses or ChatCompletions API, Anthropic Messages API, Google GenerateContent API.
-- Don't like the builtin's? -> Customize your own thing for anything!
+- Using another provider or endpoint? You can create a custom provider compatible with OpenAI Responses, OpenAI Chat Completions, Anthropic Messages, or Google GenerateContent APIs.
+- Want different defaults? Customize or create your own providers, model presets, prompts, tools, skills, and assistant presets.
 
 ## Chats workspace
 

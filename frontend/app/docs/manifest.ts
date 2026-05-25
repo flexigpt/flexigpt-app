@@ -67,14 +67,14 @@ export const docsCategories: DocsCategory[] = [
 				body: presetsProvidersSettingsBody,
 			},
 			{
-				id: 'privacy-storage-and-troubleshooting',
+				id: 'storage-data-control-and-troubleshooting',
 				title: 'Storage, Data Control, and Troubleshooting',
 				summary:
 					'Find local data categories, storage locations, backup/reset/export options, and troubleshooting checks.',
 				body: storageDataControlTroubleshootingBody,
 			},
 			{
-				id: 'security-and-privacy-model',
+				id: 'security-privacy-and-trust-model',
 				title: 'Security, Privacy, and Trust Model',
 				summary:
 					'Review trust boundaries for provider requests, keys, attachments, URL fetching, tools, logs, deletion, and safe sends.',

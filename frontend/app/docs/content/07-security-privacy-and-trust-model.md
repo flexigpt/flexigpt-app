@@ -8,6 +8,8 @@ It explains the boundaries between local app data, provider requests, provider a
 
 For exact storage paths, backup/restore/reset steps, and operational troubleshooting, see **Storage, Data Control, and Troubleshooting**.
 
+## Table of contents <!-- omit from toc -->
+
 - [Trust boundaries](#trust-boundaries)
 - [What stays local by default](#what-stays-local-by-default)
 - [What can leave the machine](#what-can-leave-the-machine)
@@ -40,7 +42,6 @@ Stored locally by default:
 - browser-local workspace state such as tabs and scroll position
 
 Provider API key secrets are protected through the OS keyring rather than normal exported settings.
-
 The app can display key metadata, but it does not display the secret value.
 
 ## What can leave the machine

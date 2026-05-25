@@ -3,10 +3,13 @@
 These recipes are outcome-based starting points.
 Use the home screen workflow cards or apply the matching assistant preset in Chats.
 
+## Table of contents <!-- omit from toc -->
+
 - [Code review](#code-review)
 - [Explain this file](#explain-this-file)
 - [Generate docs](#generate-docs)
 - [Research summary](#research-summary)
+- [Model comparison](#model-comparison)
 - [Architecture review](#architecture-review)
 - [Bug investigation](#bug-investigation)
 - [Prompt template creation](#prompt-template-creation)
@@ -76,6 +79,24 @@ Starter prompt:
 ```text
 Summarize the attached research material into: key takeaways, evidence, disagreements or uncertainty, risks, and action items.
 Separate observed facts from interpretation.
+```
+
+## Model comparison
+
+Use when you want to compare answer quality, cost trade-offs, reasoning style, or provider behavior on the same task.
+
+Suggested setup:
+
+- Use the same conversation prompt, attachments, and **Previous user turns** setting.
+- Send once with one model preset.
+- Switch only the model preset.
+- Send the same request again in another tab or branch.
+
+Starter prompt:
+
+```text
+Answer this task using the attached context.
+Then list assumptions, uncertainty, and the strongest reason your answer might be wrong.
 ```
 
 ## Architecture review

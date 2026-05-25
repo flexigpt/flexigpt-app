@@ -2,13 +2,10 @@
 
 FlexiGPT is BYOK: bring your own provider key or compatible local endpoint.
 
-The usual setup path is:
+## Table of contents <!-- omit from toc -->
 
-1. Create or choose a provider/model preset in **Model Presets**.
-2. Add the matching key in **Settings -> Auth Keys** or from the provider card.
-3. Set a default provider and default model.
-4. Open **Chats** and send a small test prompt.
-
+- [Usual setup path](#usual-setup-path)
+- [Built-in hosted providers](#built-in-hosted-providers)
 - [OpenRouter](#openrouter)
 - [Custom compatible endpoints](#custom-compatible-endpoints)
 - [Local OpenAI-compatible servers](#local-openai-compatible-servers)
@@ -16,6 +13,35 @@ The usual setup path is:
 - [Ollama-style local setup](#ollama-style-local-setup)
 - [Troubleshooting provider setup](#troubleshooting-provider-setup)
 - [Local-first reminder](#local-first-reminder)
+
+## Usual setup path
+
+The usual setup path is:
+
+1. Create or choose a provider/model preset in **Model Presets**.
+2. Add the matching key in **Settings -> Auth Keys** or from the provider card.
+3. Set a default provider and default model.
+4. Open **Chats** and send a small test prompt.
+
+## Built-in hosted providers
+
+Use this path for built-in hosted providers such as OpenAI, Anthropic Claude, Google Gemini API, xAI, Mistral, Hugging Face, or other enabled built-in provider presets.
+
+Steps:
+
+1. Create an API key in the provider's own console.
+2. In FlexiGPT, open **Settings -> Auth Keys**.
+3. Add or update the key for the matching provider.
+4. Open **Model Presets**.
+5. Confirm the provider is enabled.
+6. Confirm at least one model preset under that provider is enabled.
+7. Set the provider or model as default if you want it selected first in Chats.
+
+Test prompt:
+
+```text
+Reply with one sentence confirming that this provider key and model preset work.
+```
 
 ## OpenRouter
 

@@ -23,8 +23,8 @@ FlexiGPT is best understood as a **local-first desktop application for repeatabl
   - [External execution boundary](#external-execution-boundary)
 - [Major layers and responsibilities](#major-layers-and-responsibilities)
 - [Main system flows](#main-system-flows)
-- [Load and manage local app data](#load-and-manage-local-app-data)
-- [Send a chat turn](#send-a-chat-turn)
+  - [Load and manage local app data](#load-and-manage-local-app-data)
+  - [Send a chat turn](#send-a-chat-turn)
 - [Data and persistence model](#data-and-persistence-model)
   - [Durable app data](#durable-app-data)
   - [UI-local state](#ui-local-state)
@@ -146,7 +146,7 @@ FlexiGPT integrates these capabilities, but does not collapse them into frontend
 
 ## Main system flows
 
-## Load and manage local app data
+### Load and manage local app data
 
 A large part of FlexiGPT is local catalog and conversation management rather than live provider execution.
 
@@ -161,7 +161,7 @@ At a high level, that flow looks like this:
 
 This keeps the frontend focused on user interaction while the backend remains the source of truth for application data.
 
-## Send a chat turn
+### Send a chat turn
 
 The main execution path of the app is the chat send flow.
 
