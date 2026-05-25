@@ -9,6 +9,14 @@ The usual setup path is:
 3. Set a default provider and default model.
 4. Open **Chats** and send a small test prompt.
 
+- [OpenRouter](#openrouter)
+- [Custom compatible endpoints](#custom-compatible-endpoints)
+- [Local OpenAI-compatible servers](#local-openai-compatible-servers)
+- [llama.cpp server](#llamacpp-server)
+- [Ollama-style local setup](#ollama-style-local-setup)
+- [Troubleshooting provider setup](#troubleshooting-provider-setup)
+- [Local-first reminder](#local-first-reminder)
+
 ## OpenRouter
 
 OpenRouter is useful when you want one endpoint that can reach many hosted models.

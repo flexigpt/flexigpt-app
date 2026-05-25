@@ -3,6 +3,15 @@
 These recipes are outcome-based starting points.
 Use the home screen workflow cards or apply the matching assistant preset in Chats.
 
+- [Code review](#code-review)
+- [Explain this file](#explain-this-file)
+- [Generate docs](#generate-docs)
+- [Research summary](#research-summary)
+- [Architecture review](#architecture-review)
+- [Bug investigation](#bug-investigation)
+- [Prompt template creation](#prompt-template-creation)
+- [Safe tool execution](#safe-tool-execution)
+
 ## Code review
 
 Use when you want correctness, maintainability, security, reliability, and test-risk feedback.
