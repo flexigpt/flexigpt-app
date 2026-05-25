@@ -9,7 +9,7 @@ export const actionTriggerChipSurfaceClasses =
 	'text-neutral-custom bg-base-200/70 hover:bg-base-300/80 flex h-7 min-h-0 items-center overflow-hidden rounded-full px-2 shadow-none';
 
 export const actionTriggerMenuWideClasses =
-	'rounded-box bg-base-100 text-base-content z-50 max-h-72 min-w-60 max-w-lg overflow-y-auto border border-base-300 p-1 shadow-xl outline-none';
+	'rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-120 max-w-lg min-w-60 overflow-y-auto border p-2 text-xs shadow-xl outline-none';
 
 export const actionTriggerMenuCompactClasses =
 	'rounded-box bg-base-100 text-base-content z-50 max-h-72 min-w-48 max-w-sm overflow-y-auto border border-base-300 p-1 shadow-xl outline-none';

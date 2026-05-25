@@ -6,7 +6,12 @@ import { Menu, MenuButton, MenuItem, Tooltip, useMenuStore, useStoreState, useTo
 
 import { buildShortcutDisplay, type ShortcutConfig } from '@/lib/keyboard_shortcuts';
 
-import { actionTriggerChipButtonClasses, ActionTriggerChipContent } from '@/components/action_trigger_chip';
+import {
+	actionTriggerChipButtonClasses,
+	ActionTriggerChipContent,
+	actionTriggerMenuItemClasses,
+	actionTriggerMenuWideClasses,
+} from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 
 type TipKey = 'lastWins' | 'remove' | 'collapse' | 'attachmentsScope' | 'toolsPersist' | 'toolErrors';
@@ -29,13 +34,6 @@ const tipsText: Record<TipKey, string> = {
 interface CommandTipsMenuProps {
 	shortcutConfig: ShortcutConfig;
 }
-
-const menuClasses =
-	'rounded-box bg-base-100 text-base-content z-50 max-w-lg min-w-60 overflow-visible border border-base-300 p-1 shadow-xl';
-
-const menuItemClasses =
-	'flex items-center gap-2 rounded-xl px-2 py-1 text-xs outline-none transition-colors ' +
-	'hover:bg-base-200 data-[active-item]:bg-base-300';
 
 export function CommandTipsMenu({ shortcutConfig }: CommandTipsMenuProps) {
 	const shortcutsMenu = useMenuStore({ placement: 'top-end', focusLoop: true });
@@ -105,15 +103,22 @@ export function CommandTipsMenu({ shortcutConfig }: CommandTipsMenuProps) {
 				</MenuButton>
 			</HoverTip>
 
-			<Menu store={shortcutsMenu} gutter={8} overflowPadding={8} portal className={menuClasses} autoFocusOnShow>
+			<Menu
+				store={shortcutsMenu}
+				gutter={8}
+				overflowPadding={8}
+				portal
+				className={actionTriggerMenuWideClasses}
+				autoFocusOnShow
+			>
 				{/* Chat group */}
 				{chatShortcuts.length > 0 && (
 					<>
 						<div className="text-neutral-custom/70 px-3 pt-2 pb-1 text-xs tracking-wide uppercase">Chat shortcuts</div>
 						{chatShortcuts.map(item => (
-							<MenuItem key={item.action} hideOnClick={false} className={menuItemClasses}>
+							<MenuItem key={item.action} hideOnClick={false} className={actionTriggerMenuItemClasses}>
 								<span className="flex-1 text-left">{item.label}</span>
-								<span className="text-neutral-custom ml-auto w-22 text-left text-xs whitespace-nowrap">
+								<span className="text-neutral-custom ml-auto w-30 text-left text-xs whitespace-nowrap">
 									{item.keys}
 								</span>
 							</MenuItem>
@@ -129,9 +134,9 @@ export function CommandTipsMenu({ shortcutConfig }: CommandTipsMenuProps) {
 							Insert shortcuts
 						</div>
 						{insertShortcuts.map(item => (
-							<MenuItem key={item.action} hideOnClick={false} className={menuItemClasses}>
+							<MenuItem key={item.action} hideOnClick={false} className={actionTriggerMenuItemClasses}>
 								<span className="flex-1 text-left">{item.label}</span>
-								<span className="text-neutral-custom ml-auto w-22 text-left text-xs whitespace-nowrap">
+								<span className="text-neutral-custom ml-auto w-30 text-left text-xs whitespace-nowrap">
 									{item.keys}
 								</span>
 							</MenuItem>
@@ -155,7 +160,7 @@ export function CommandTipsMenu({ shortcutConfig }: CommandTipsMenuProps) {
 				gutter={8}
 				overflowPadding={8}
 				portal
-				className={menuClasses}
+				className={actionTriggerMenuWideClasses}
 				autoFocusOnShow
 				// Explicitly handle Escape at the menu level (capture phase),
 				// so it always closes the menu & tooltip and returns focus to the button.
@@ -170,7 +175,7 @@ export function CommandTipsMenu({ shortcutConfig }: CommandTipsMenuProps) {
 					<MenuItem
 						key={tip.key}
 						hideOnClick={false}
-						className={menuItemClasses}
+						className={actionTriggerMenuItemClasses}
 						data-tip-description={tip.description}
 						onFocus={event => {
 							// Focus via keyboard (arrow keys / Tab) -> show tooltip

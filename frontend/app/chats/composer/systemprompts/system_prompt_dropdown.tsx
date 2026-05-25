@@ -9,7 +9,11 @@ import { type PromptBundle, PromptRoleEnum } from '@/spec/prompt';
 
 import { DEFAULT_SEMVER } from '@/lib/version_utils';
 
-import { actionTriggerChipButtonClasses, ActionTriggerChipContent } from '@/components/action_trigger_chip';
+import {
+	actionTriggerChipButtonClasses,
+	ActionTriggerChipContent,
+	actionTriggerMenuWideClasses,
+} from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 
 import { SystemPromptAddModal } from '@/chats/composer/systemprompts/system_prompt_add_modal';
@@ -228,7 +232,7 @@ export function SystemPromptDropdown({
 				gutter={8}
 				overflowPadding={8}
 				autoFocusOnShow
-				className="border-base-300 bg-base-100 z-50 max-h-80 max-w-lg min-w-60 overflow-y-auto rounded-xl border p-2 text-xs shadow-lg outline-none"
+				className={actionTriggerMenuWideClasses}
 				onKeyDownCapture={event => {
 					if (event.key === 'Escape') {
 						hidePromptTooltip();

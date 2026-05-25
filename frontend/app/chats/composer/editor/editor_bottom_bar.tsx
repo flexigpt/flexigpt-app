@@ -24,13 +24,18 @@ import { useTools } from '@/hooks/use_tool';
 
 import { promptStoreAPI } from '@/apis/baseapi';
 
-import { actionTriggerChipButtonClasses, ActionTriggerChipContent } from '@/components/action_trigger_chip';
+import {
+	actionTriggerChipButtonClasses,
+	ActionTriggerChipContent,
+	actionTriggerMenuItemClasses,
+	actionTriggerMenuWideClasses,
+} from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 
 import { UrlAttachmentModal } from '@/chats/composer/attachments/attachment_url_modal';
 import { CommandTipsMenu } from '@/chats/composer/inputtips/command_tips_menu';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
-import { SkillsBottomBarChip } from '@/chats/composer/skills/skill_bottom_bar_chip';
+import { SkillDropDown } from '@/chats/composer/skills/skill_dropdown';
 import { SystemPromptDropdown } from '@/chats/composer/systemprompts/system_prompt_dropdown';
 import type { ComposerSystemPromptController } from '@/chats/composer/systemprompts/use_composer_system_prompt';
 import { dispatchOpenToolArgs } from '@/chats/composer/toolruntime/use_open_toolargs_event';
@@ -121,13 +126,6 @@ function PickerButton({ label, icon, buttonRef, menuState, shortcut, disabled }:
 		</HoverTip>
 	);
 }
-
-const menuClasses =
-	'rounded-box bg-base-100 text-base-content z-50 max-h-72 max-w-lg min-w-60 overflow-y-auto border border-base-300 p-1 shadow-xl';
-
-const menuItemClasses =
-	'flex items-center gap-2 rounded-xl px-2 py-1 text-sm outline-none transition-colors ' +
-	'hover:bg-base-200 data-[active-item]:bg-base-300';
 
 /**
  * Isolated wrapper for SystemPromptDropdown so its open/close state changes
@@ -434,7 +432,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						gutter={8}
 						overflowPadding={8}
 						portal
-						className={menuClasses}
+						className={actionTriggerMenuWideClasses}
 						data-menu-kind="attachments"
 						autoFocusOnShow
 					>
@@ -442,7 +440,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 							onClick={() => {
 								void handleAttachmentPickFiles();
 							}}
-							className={menuItemClasses}
+							className={actionTriggerMenuItemClasses}
 						>
 							<FiUpload size={14} />
 							<span>Multiple Files...</span>
@@ -451,12 +449,12 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 							onClick={() => {
 								void handleAttachmentPickDirectory();
 							}}
-							className={menuItemClasses}
+							className={actionTriggerMenuItemClasses}
 						>
 							<FiFolder size={14} />
 							<span>Folder...</span>
 						</MenuItem>
-						<MenuItem onClick={handleAttachmentPickURL} className={menuItemClasses}>
+						<MenuItem onClick={handleAttachmentPickURL} className={actionTriggerMenuItemClasses}>
 							<FiLink size={14} />
 							<span>Link or URL...</span>
 						</MenuItem>
@@ -477,14 +475,18 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						gutter={8}
 						overflowPadding={8}
 						portal
-						className={menuClasses}
+						className={actionTriggerMenuWideClasses}
 						data-menu-kind="templates"
 						autoFocusOnShow
 					>
 						{!templateMenuOpen ? null : templatesLoading ? (
-							<div className={`${menuItemClasses} text-base-content/60 cursor-default`}>Loading templates…</div>
+							<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
+								Loading templates…
+							</div>
 						) : templateData.length === 0 ? (
-							<div className={`${menuItemClasses} text-base-content/60 cursor-default`}>No templates available</div>
+							<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
+								No templates available
+							</div>
 						) : (
 							templateData.map(item => (
 								// For tooltip and display name we use a humanized slug.
@@ -494,7 +496,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 									onClick={() => {
 										void handleTemplatePick(item);
 									}}
-									className={menuItemClasses}
+									className={actionTriggerMenuItemClasses}
 									title={`${item.templateSlug.replace(/[-_]/g, ' ')} • v${item.templateVersion}`}
 								>
 									<FiFilePlus size={14} className="text-warning" />
@@ -520,14 +522,18 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						gutter={8}
 						overflowPadding={8}
 						portal
-						className={menuClasses}
+						className={actionTriggerMenuWideClasses}
 						data-menu-kind="tools"
 						autoFocusOnShow
 					>
 						{!toolMenuOpen ? null : toolsLoading ? (
-							<div className={`${menuItemClasses} text-base-content/60 cursor-default`}>Loading tools…</div>
+							<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
+								Loading tools…
+							</div>
 						) : availableTools.length === 0 ? (
-							<div className={`${menuItemClasses} text-base-content/60 cursor-default`}>No tools available</div>
+							<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
+								No tools available
+							</div>
 						) : (
 							availableTools.map(item => {
 								const display = item.toolDefinition.displayName || item.toolSlug || 'Tool';
@@ -588,7 +594,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						)}
 					</Menu>
 
-					<SkillsBottomBarChip
+					<SkillDropDown
 						allSkills={allSkills}
 						loading={skillsLoading}
 						enabledSkillRefs={enabledSkillRefs}

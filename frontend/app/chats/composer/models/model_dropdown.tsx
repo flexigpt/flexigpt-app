@@ -49,7 +49,7 @@ export function ModelDropdown({ selectedModel, setSelectedModel, allOptions }: M
 					gutter={8}
 					overflowPadding={8}
 					autoFocusOnShow
-					className={`${actionTriggerMenuWideClasses} text-xs`}
+					className={actionTriggerMenuWideClasses}
 				>
 					{allOptions.map(model => (
 						<MenuItem

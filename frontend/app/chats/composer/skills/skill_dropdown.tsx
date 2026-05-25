@@ -6,7 +6,11 @@ import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariaki
 
 import type { SkillListItem, SkillRef } from '@/spec/skill';
 
-import { actionTriggerChipButtonClasses, ActionTriggerChipContent } from '@/components/action_trigger_chip';
+import {
+	actionTriggerChipButtonClasses,
+	ActionTriggerChipContent,
+	actionTriggerMenuWideClasses,
+} from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 
 import { dedupeSkillRefs, skillRefFromListItem, skillRefKey } from '@/skills/lib/skill_identity_utils';
@@ -57,7 +61,7 @@ function BundleCheckbox({
 	);
 }
 
-export function SkillsBottomBarChip({
+export function SkillDropDown({
 	allSkills,
 	loading,
 	enabledSkillRefs,
@@ -207,14 +211,7 @@ export function SkillsBottomBarChip({
 				</MenuButton>
 			</HoverTip>
 
-			<Menu
-				store={menu}
-				gutter={8}
-				overflowPadding={8}
-				className="border-base-300 bg-base-100 text-base-content z-50 max-h-80 max-w-lg min-w-60 overflow-y-auto rounded-xl border p-2 text-xs shadow-lg outline-none"
-				autoFocusOnShow
-				portal
-			>
+			<Menu store={menu} gutter={8} overflowPadding={8} className={actionTriggerMenuWideClasses} autoFocusOnShow portal>
 				<div className="mb-2 flex items-center justify-between gap-2 px-1">
 					<div className="text-base-content/70 text-xs font-semibold">Skills</div>
 					<div className="text-base-content/60 flex items-center gap-2 text-xs">

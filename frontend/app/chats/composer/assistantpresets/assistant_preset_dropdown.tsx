@@ -75,7 +75,7 @@ export function AssistantPresetDropdown({
 						gutter={8}
 						overflowPadding={8}
 						autoFocusOnShow
-						className={`${actionTriggerMenuWideClasses} max-h-80 p-2 text-xs`}
+						className={actionTriggerMenuWideClasses}
 					>
 						<div className="mb-2 px-1 text-xs opacity-70">
 							Assistant presets seeds model, instructions, tools, and skills.
@@ -94,11 +94,11 @@ export function AssistantPresetDropdown({
 						) : null}
 
 						{loading ? (
-							<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default px-2 py-2`}>
+							<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default p-2`}>
 								Loading assistant presets…
 							</div>
 						) : presetOptions.length === 0 ? (
-							<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default px-2 py-2`}>
+							<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default p-2`}>
 								No enabled assistant presets available.
 							</div>
 						) : (
