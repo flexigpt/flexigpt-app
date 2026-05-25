@@ -4,7 +4,16 @@
 
 - [ ] test with some skill that has scripts too
 - [ ] block autoexec should be a high level button for just in case things i.e the llm is spiralling and you want the next turn to not autoexec as you want to give some direction to llm.
-- [ ] once you open a tool in edit mode nad then close without editing, next edit modal doesn't open
+- [ ] once you open a tool in edit mode and then close without editing, next edit modal doesn't open
+- [x] menu classes cleanup in dropdowns
+- [x] docs update to place product as repeatable workflows rather than just chat
+- [x] starter workflows in homepage and load it in chats
+- [x] better security privacy and workflow recipe guides
+- [ ] better assistant presets: definitely need one which is just fs read and explore setup rather than whole fs exec thing. may have read only, read write read write exec presets
+- [ ] better assistants that are more of a good starter recipes for full development
+- [ ] should tell that what to check to know the prompts supplied for presets, how to modify prompts etc.
+- [ ] easier preset import bundles and flows. e.g: just import a preset bundle that has assistant, models, prompts, tools etc.
+  - [ ] may be as a json import bundle or jsonc format
 
 ## Milestone thoughts
 

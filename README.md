@@ -45,6 +45,7 @@ FlexiGPT does not proxy normal LLM calls through a FlexiGPT-hosted service; requ
 <p float="left">
   <img src="images/home.png" alt="FlexiGPT local-first workflow workspace home" width="512" />
   <img src="images/latex_code.png" alt="Rich chat rendering with Markdown, LaTeX, and code" width="512" />
+  <img src="images/mermaid.png" alt="Rich chat rendering with Mermaid" width="512" />
 </p>
 
 <p float="left">
