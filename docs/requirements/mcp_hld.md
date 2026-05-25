@@ -2340,7 +2340,7 @@ frontend/app/docs/content/09-provider-and-local-model-setup.md
 frontend/app/docs/content/11-architecture-overview.md
 frontend/app/docs/content/12-backend-roles-and-responsibilities.md
 frontend/app/docs/content/13-frontend-roles-and-responsibilities.md
-frontend/app/docs/content/14-chats-workspace-and-composer-hld.md
+frontend/app/docs/content/14-chats-workspace-and-composer-design.md
 ```
 
 Add an MCP architecture doc if desired:

@@ -1,6 +1,7 @@
-# Chats Workspace and Composer HLD
+# Chats Workspace and Composer Design
 
-This page is the detailed high-level design for the `chats` workspace and the composer subsystem.
+This page is the detailed design for the `chats` workspace and the composer subsystem.
+
 It exists because the workspace is the main frontend system where repeatable workflow setup turns into chat execution, and the composer is a deep subsystem with its own architecture, state, and runtime boundaries.
 
 ## Table of contents <!-- omit from toc -->

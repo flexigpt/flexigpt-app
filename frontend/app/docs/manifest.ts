@@ -10,7 +10,7 @@ import providerAndLocalModelSetupBody from '@/docs/content/09-provider-and-local
 import architectureOverviewBody from '@/docs/content/11-architecture-overview.md?raw';
 import backendRolesBody from '@/docs/content/12-backend-roles-and-responsibilities.md?raw';
 import frontendRolesBody from '@/docs/content/13-frontend-roles-and-responsibilities.md?raw';
-import chatsWorkspaceHldBody from '@/docs/content/14-chats-workspace-and-composer-hld.md?raw';
+import chatsWorkspaceComposerDesignBody from '@/docs/content/14-chats-workspace-and-composer-design.md?raw';
 
 type DocsSection = {
 	id: string;
@@ -121,10 +121,10 @@ export const docsCategories: DocsCategory[] = [
 				body: frontendRolesBody,
 			},
 			{
-				id: 'chats-workspace-and-composer-hld',
-				title: 'Chats Workspace and Composer HLD',
-				summary: 'Look at the detailed design of the main workspace, its tab model, and the composer internals.',
-				body: chatsWorkspaceHldBody,
+				id: 'chats-workspace-and-composer-design',
+				title: 'Chats Workspace and Composer Design',
+				summary: 'See the detailed design of the main workspace, its tab model, and the composer internals.',
+				body: chatsWorkspaceComposerDesignBody,
 			},
 		],
 	},

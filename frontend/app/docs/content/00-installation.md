@@ -60,4 +60,4 @@ flatpak run io.github.flexigpt.client
 
 If that works, the issue is likely the known WebKit rendering problem on some Linux setups.
 
-For platform-specific storage locations, what is stored locally, and where app data is kept, see **Storage, Data Control, and Troubleshooting**.
+For platform-specific storage locations, what is stored locally, and where app data is kept, see [Storage, Data Control, and Troubleshooting](./06-storage-data-control-and-troubleshooting.md).

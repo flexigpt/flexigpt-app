@@ -112,6 +112,8 @@ When an eligible tool call appears and the required arguments are present, Flexi
 
 This is the app's more automated or agentic mode. It is still bounded by the tools you enabled and the execution mode you chose.
 
+For new, imported, or user-created tools, start with manual review before enabling auto-execute. For the full safety checklist, see **Security, Privacy, and Trust Model**.
+
 ## Web search: provider-dependent capability
 
 Web search is exposed separately from normal local tool runtime.
@@ -136,6 +138,8 @@ Examples:
 - implementation planning
 - refactoring workflows
 - structured multi-step task framing
+
+Some skill-aware workflows can add skill-session context or skill tool choices to the request, so treat enabled skills as part of the request context.
 
 ## A simple way to choose the right feature
 

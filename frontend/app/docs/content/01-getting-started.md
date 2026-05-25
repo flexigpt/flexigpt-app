@@ -7,6 +7,7 @@ This guide is the fastest path after installation: connect a provider, choose a 
 ## Table of contents <!-- omit from toc -->
 
 - [First steps](#first-steps)
+- [Choose a setup path](#choose-a-setup-path)
 - [Chats workspace](#chats-workspace)
 - [Pick a starting setup](#pick-a-starting-setup)
   - [Assistant Preset](#assistant-preset)
@@ -23,7 +24,7 @@ This guide is the fastest path after installation: connect a provider, choose a 
 Before your first successful send, you usually need:
 
 - Get an API key for your favorite provider.
-  - [OpenAI](https://platform.openai.com/settings/organization/api-keys), [Anthropic Claude](https://platform.claude.com/settings/keys), [Google Gemini](https://aistudio.google.com/api-keys), [xAI](https://console.x.ai/team/default/api-keys), [MistralAI](https://console.mistral.ai/home?profile_dialog=api-keys)
+  - [OpenAI](https://platform.openai.com/settings/organization/api-keys), [Anthropic Claude](https://platform.claude.com/settings/keys), [Google Gemini](https://aistudio.google.com/api-keys), [xAI](https://console.x.ai/team/default/api-keys), [Mistral AI](https://console.mistral.ai/home?profile_dialog=api-keys)
   - [OpenRouter](https://openrouter.ai/workspaces/default/keys), [Hugging Face](https://huggingface.co/settings/tokens)
 
 - Add the key in [Settings -> Auth Keys](/settings).
@@ -35,6 +36,15 @@ FlexiGPT ships with built-in providers, model presets, tools, skills, prompts, a
 
 - Using another provider or endpoint? You can create a custom provider compatible with OpenAI Responses, OpenAI Chat Completions, Anthropic Messages, or Google GenerateContent APIs.
 - Want different defaults? Customize or create your own providers, model presets, prompts, tools, skills, and assistant presets.
+
+## Choose a setup path
+
+- **Hosted provider**: add the provider key in **Settings -> Auth Keys**, then choose an enabled model preset in **Chats**.
+- **OpenRouter**: add the OpenRouter key, enable the OpenRouter provider/model preset, then test a small prompt.
+- **Custom or local endpoint**: use [Provider and Local Model Setup](/docs?doc=provider-and-local-model-setup) before sending sensitive work.
+- **Sensitive work**: review [Security, Privacy, and Trust Model](/docs?doc=security-privacy-and-trust-model) so you know what can leave the machine.
+
+If you are unsure, start with a hosted provider or OpenRouter and send a tiny test prompt first.
 
 ## Chats workspace
 

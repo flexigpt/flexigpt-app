@@ -59,7 +59,7 @@ FlexiGPT does not proxy normal LLM calls through a FlexiGPT-hosted service; requ
 ### Provider-independent model choices with built-in presets
 
 - First-class built-in support for OpenAI, Anthropic, Google Gemini API, xAI, Mistral, Hugging Face, OpenRouter, and local `llama.cpp`
-- Support for compatible custom endpoints across OpenAI Chat Completions, OpenAI Responses, and Anthropic Messages style APIs
+- Support for compatible custom endpoints across OpenAI Chat Completions, OpenAI Responses, Anthropic Messages, and Google GenerateContent style APIs
 - Built-in providers and curated model presets for leading models so you can start quickly without manually defining endpoints or defaults first
 - API keys are stored securely through the OS keyring, not in plain-text exported settings
 
@@ -117,7 +117,7 @@ FlexiGPT does not proxy normal LLM calls through a FlexiGPT-hosted service; requ
 - [Architecture Overview](./frontend/app/docs/content/11-architecture-overview.md)
 - [Backend Roles and Responsibilities](./frontend/app/docs/content/12-backend-roles-and-responsibilities.md)
 - [Frontend Roles and Responsibilities](./frontend/app/docs/content/13-frontend-roles-and-responsibilities.md)
-- [Chats Workspace and Composer HLD](./frontend/app/docs/content/14-chats-workspace-and-composer-hld.md)
+- [Chats Workspace and Composer Design](./frontend/app/docs/content/14-chats-workspace-and-composer-design.md)
 
 ## Built with
 
