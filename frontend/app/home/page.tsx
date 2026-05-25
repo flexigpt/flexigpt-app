@@ -9,7 +9,6 @@ import {
 	FiHome,
 	FiLayers,
 	FiMessageSquare,
-	FiSearch,
 } from 'react-icons/fi';
 
 import { Link } from 'react-router';
@@ -83,17 +82,6 @@ const CORE_ASSISTANTS_BUNDLE_ID = '019d2423-01b0-7f87-be39-fe02d844453a';
 
 const workflowStarters: WorkflowStarter[] = [
 	{
-		title: 'Code Review',
-		description: 'Review code, diffs, or PR notes for correctness, security, reliability, maintainability, and tests.',
-		workflowID: 'code-review',
-		assistantPresetBundleID: SOFTWARE_ASSISTANTS_BUNDLE_ID,
-		assistantPresetSlug: 'reviewing-code',
-		assistantPresetVersion: 'v1.0.0',
-		prompt:
-			'Review the attached code or diff for correctness, security, reliability, maintainability, and test gaps. Focus on concrete findings and narrow fixes.',
-		icon: <FiCode size={18} />,
-	},
-	{
 		title: 'Explain This File',
 		description: 'Attach a file and get a guided explanation of purpose, flow, important APIs, and risky details.',
 		workflowID: 'explain-file',
@@ -105,37 +93,15 @@ const workflowStarters: WorkflowStarter[] = [
 		icon: <FiFileText size={18} />,
 	},
 	{
-		title: 'Generate Docs',
-		description: 'Turn source files, notes, or an existing README into clear user-facing documentation.',
-		workflowID: 'generate-docs',
-		assistantPresetBundleID: CORE_ASSISTANTS_BUNDLE_ID,
-		assistantPresetSlug: 'fs-exec',
-		assistantPresetVersion: 'v1.0.0',
-		prompt:
-			'Generate clear documentation from the attached context. Include overview, setup, common workflow, examples, troubleshooting, and limitations. Keep claims grounded in the provided files.',
-		icon: <FiBookOpen size={18} />,
-	},
-	{
-		title: 'Research Summary',
-		description: 'Summarize notes, URLs, PDFs, or copied research into takeaways, evidence, risks, and actions.',
-		workflowID: 'research-summary',
-		assistantPresetBundleID: CORE_ASSISTANTS_BUNDLE_ID,
-		assistantPresetSlug: 'base',
-		assistantPresetVersion: 'v1.0.0',
-		prompt:
-			'Summarize the attached research material into key takeaways, evidence, disagreements or uncertainty, risks, and action items. Separate observed facts from interpretation.',
-		icon: <FiSearch size={18} />,
-	},
-	{
-		title: 'Architecture Review',
-		description: 'Review structure, boundaries, risks, coupling, and the simplest viable improvements.',
-		workflowID: 'architecture-review',
+		title: 'Code Review',
+		description: 'Review code, diffs, or PR notes for correctness, security, reliability, maintainability, and tests.',
+		workflowID: 'code-review',
 		assistantPresetBundleID: SOFTWARE_ASSISTANTS_BUNDLE_ID,
-		assistantPresetSlug: 'designing-system-architecture',
+		assistantPresetSlug: 'reviewing-code',
 		assistantPresetVersion: 'v1.0.0',
 		prompt:
-			'Review the attached architecture, README, docs, or code structure. Identify boundaries, risks, coupling, unclear ownership, and the simplest viable improvements.',
-		icon: <FiLayers size={18} />,
+			'Review the attached code or diff for correctness, security, reliability, maintainability, and test gaps. Focus on concrete findings and narrow fixes.',
+		icon: <FiCode size={18} />,
 	},
 	{
 		title: 'Bug Investigation',
@@ -148,6 +114,17 @@ const workflowStarters: WorkflowStarter[] = [
 		prompt:
 			'Investigate this bug from the attached logs, stack trace, failing test, or code. Identify likely root cause, evidence, missing evidence, narrow fix, and verification steps.',
 		icon: <FiAlertTriangle size={18} />,
+	},
+	{
+		title: 'Architecture Review',
+		description: 'Review structure, boundaries, risks, coupling, and the simplest viable improvements.',
+		workflowID: 'architecture-review',
+		assistantPresetBundleID: SOFTWARE_ASSISTANTS_BUNDLE_ID,
+		assistantPresetSlug: 'designing-system-architecture',
+		assistantPresetVersion: 'v1.0.0',
+		prompt:
+			'Review the attached architecture, README, docs, or code structure. Identify boundaries, risks, coupling, unclear ownership, and the simplest viable improvements.',
+		icon: <FiLayers size={18} />,
 	},
 ];
 
@@ -175,18 +152,11 @@ function PrimaryActionCard({ title, description, to, icon }: NavCardProps) {
 function WorkflowStarterCard({ workflow }: { workflow: WorkflowStarter }) {
 	return (
 		<Link to={buildWorkflowStarterHref(workflow)} className="group block h-full">
-			<div className="bg-base-100 border-base-300/70 hover:border-primary/40 flex h-full flex-col justify-between rounded-2xl border p-4 text-left shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
-				<div className="flex items-center justify-start gap-3">
-					<div className="bg-primary/10 text-primary rounded-xl p-2">{workflow.icon}</div>
-					<h3 className="text-sm font-semibold">{workflow.title}</h3>
-				</div>
-
-				<p className="text-base-content/70 mt-1 text-xs leading-relaxed">{workflow.description}</p>
-				<div className="mt-1 flex items-center justify-between">
-					<div className="text-base-content/60 text-xs">
-						{workflow.assistantPresetSlug
-							? `Preset: ${workflow.assistantPresetSlug}`
-							: 'Preset can be selected in chat'}
+			<div className="bg-base-100 border-base-300/70 hover:border-primary/40 flex h-full flex-col rounded-2xl border shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
+				<div className="flex items-center justify-between p-2">
+					<div className="flex items-center justify-start gap-3 p-0">
+						<div className="bg-primary/10 text-primary rounded-xl p-2">{workflow.icon}</div>
+						<h3 className="text-sm font-semibold">{workflow.title}</h3>
 					</div>
 					<FiArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
 				</div>
@@ -198,11 +168,13 @@ function WorkflowStarterCard({ workflow }: { workflow: WorkflowStarter }) {
 function DocsCard({ title, description, to }: NavCardProps) {
 	return (
 		<Link to={to} className="group block w-full">
-			<div className="bg-base-100 border-base-300/70 hover:border-primary/40 flex h-full flex-col justify-between rounded-2xl border p-4 text-left shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
-				<h3 className="text-sm font-semibold">{title}</h3>
-				<p className="text-base-content/70 mt-1 text-xs leading-relaxed">{description}</p>
-				<div className="text-base-content/80 flex justify-end">
-					<FiArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
+			<div className="bg-base-100 border-base-300/70 hover:border-primary/40 flex h-full flex-col rounded-2xl border shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
+				<div className="flex flex-col p-4">
+					<div className="flex items-center justify-between p-0">
+						<h3 className="text-sm font-semibold">{title}</h3>
+						<FiArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
+					</div>
+					<div className="text-base-content/70 mt-1 text-xs leading-relaxed">{description}</div>
 				</div>
 			</div>
 		</Link>
@@ -253,7 +225,7 @@ export default function HomePage() {
 							</p>
 						</div>
 
-						<div className="mx-auto mt-4 grid w-full max-w-5xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+						<div className="mx-auto mt-4 grid w-full max-w-5xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 							{workflowStarters.map(workflow => (
 								<WorkflowStarterCard key={workflow.workflowID} workflow={workflow} />
 							))}
