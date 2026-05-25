@@ -2332,7 +2332,11 @@ frontend/app/docs/content/02-core-concepts.md
 frontend/app/docs/content/03-chats-composer-and-everyday-workflow.md
 frontend/app/docs/content/04-attachments-tools-skills-prompts.md
 frontend/app/docs/content/05-presets-providers-settings.md
-frontend/app/docs/content/06-privacy-storage-and-troubleshooting.md
+frontend/app/docs/content/06-storage-data-control-and-troubleshooting.md
+frontend/app/docs/content/07-security-privacy-and-trust-model.md
+frontend/app/docs/content/08-recipes-and-starter-workflows.md
+frontend/app/docs/content/09-provider-and-local-model-setup.md
+
 frontend/app/docs/content/11-architecture-overview.md
 frontend/app/docs/content/12-backend-roles-and-responsibilities.md
 frontend/app/docs/content/13-frontend-roles-and-responsibilities.md

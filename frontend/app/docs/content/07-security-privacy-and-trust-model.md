@@ -1,13 +1,33 @@
-# Security and Privacy Model
+# Security, Privacy, and Trust Model
 
 FlexiGPT is local-first: conversations, workflow catalogs, settings metadata, and app data are stored on your machine.
 Requests still go to whichever provider or compatible endpoint you choose for a chat turn.
 
-This page is the trust checklist for what stays local, what can leave the device, and which features need deliberate handling.
+This page is the trust model for FlexiGPT.
+It explains the boundaries between local app data, provider requests, provider accounts, attachments, tools, skills, logs, and data-control actions.
 
-## What stays local
+For exact storage paths, backup/restore/reset steps, and operational troubleshooting, see **Storage, Data Control, and Troubleshooting**.
 
-Stored locally:
+- [Trust boundaries](#trust-boundaries)
+- [What stays local by default](#what-stays-local-by-default)
+- [What can leave the machine](#what-can-leave-the-machine)
+- [Provider proxying and billing](#provider-proxying-and-billing)
+- [Storage and backup details](#storage-and-backup-details)
+- [Attachments](#attachments)
+- [URL fetching](#url-fetching)
+- [Tools, skills, and auto-execute](#tools-skills-and-auto-execute)
+- [Debug logs](#debug-logs)
+- [Deleting and exporting data](#deleting-and-exporting-data)
+- [Practical trust checklist before sending sensitive work](#practical-trust-checklist-before-sending-sensitive-work)
+
+## Trust boundaries
+
+FlexiGPT is not a hosted chat service. The app runs locally, stores its main data locally, and uses the provider keys and endpoints you configure.
+The main trust decision happens when you choose a provider, model, compatible endpoint, tool, skill, attachment, or debug setting for a workflow.
+
+## What stays local by default
+
+Stored locally by default:
 
 - conversations and local history search data
 - model presets and provider metadata
@@ -19,7 +39,8 @@ Stored locally:
 - debug logs
 - browser-local workspace state such as tabs and scroll position
 
-Provider API key secrets are protected through the OS keyring.
+Provider API key secrets are protected through the OS keyring rather than normal exported settings.
+
 The app can display key metadata, but it does not display the secret value.
 
 ## What can leave the machine
@@ -38,6 +59,7 @@ When you send a chat request to a remote provider, the provider may receive:
 
 Local-first does not mean every inference request is local.
 If you choose a remote model provider, the assembled request is sent to that provider.
+If you choose a local endpoint, review the endpoint origin and confirm it is actually local before treating the request as local-only.
 
 ## Provider proxying and billing
 
@@ -46,18 +68,13 @@ It uses the provider keys and endpoints you configure locally.
 
 Billing, quotas, rate limits, retention behavior, and provider-side logging are controlled by the provider account and endpoint you use.
 
-## Storage locations
+## Storage and backup details
 
 FlexiGPT stores app data under the app's XDG data-home location in a `flexigpt` folder.
+The exact platform paths and backup/reset steps are covered in **Storage, Data Control, and Troubleshooting**.
 
-Typical packaged-build locations:
-
-- macOS: `~/Library/Containers/io.github.flexigpt.client/Data/Library/Application Support/flexigpt/`
-- Linux Flatpak: `~/.var/app/io.github.flexigpt.client/data/flexigpt/`
-- Windows: `%LOCALAPPDATA%\flexigpt\`
-
-Close the app before copying the folder for backup.
-OS-keyring secrets may need separate OS-level backup or re-entry after restore.
+The security point is that local app files and OS-keyring secrets are separate control surfaces.
+Backing up or deleting one does not necessarily back up or delete the other.
 
 ## Attachments
 
@@ -79,9 +96,10 @@ URL attachments can cause content to be fetched and included in the model reques
 Treat URL attachments as potentially sending page-derived content to the provider.
 If a URL points to private or authenticated content, make sure you understand what the backend can access and what will be included in the request.
 
-## Tools and auto-execute
+## Tools, skills, and auto-execute
 
 Tools can add execution capability to a chat.
+Skills can also add workflow/runtime context and may expose skill-related tool behavior depending on the active skill session.
 
 Important safety points:
 
@@ -89,6 +107,7 @@ Important safety points:
 - HTTP tools can call network endpoints
 - file-system tools can read or write local paths when exposed and selected
 - shell or script execution tools should be treated as high risk
+- skill-aware workflows can add skill session context and skill tool choices to the request
 - auto-execute should only be used for trusted tools and low-risk workflows
 - tool outputs can be sent back to the model in later turns
 
@@ -108,7 +127,7 @@ When raw request/response logging is enabled, logs can contain prompts, attachme
 
 ## Deleting and exporting data
 
-Current local data control surfaces include:
+Current local data-control surfaces include:
 
 - conversation export from the chat workspace
 - settings export from Settings
@@ -119,7 +138,7 @@ For a full reset, close FlexiGPT and remove the local `flexigpt` app-data folder
 This removes local conversations, catalogs, settings metadata, indexes, overlays, and logs.
 Provider secrets stored in the OS keyring may need to be removed separately through OS credential management.
 
-## Practical checklist before sending sensitive work
+## Practical trust checklist before sending sensitive work
 
 - Confirm the selected provider and model are intended.
 - Keep **Previous user turns** no larger than necessary.
@@ -127,4 +146,4 @@ Provider secrets stored in the OS keyring may need to be removed separately thro
 - Review tool outputs before resending them.
 - Avoid auto-execute for untrusted tools.
 - Keep raw debug logging off unless actively diagnosing a problem.
-- Back up local data by copying the app-data folder while FlexiGPT is closed.
+- For local-only work, confirm the provider origin points to a local endpoint you control.

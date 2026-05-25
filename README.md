@@ -38,7 +38,7 @@ Good first workflows:
 - Reuse or customize the assistant preset once the workflow fits your style.
 
 FlexiGPT does not bill you directly. Usage costs and limits come from the provider account behind the key you configure.
-FlexiGPT also does not proxy LLM calls through a FlexiGPT-hosted or any third party services.
+FlexiGPT does not proxy normal LLM calls through a FlexiGPT-hosted service; requests go directly to the provider or compatible endpoint you configure.
 
 ## Screenshots
 
@@ -91,23 +91,27 @@ FlexiGPT also does not proxy LLM calls through a FlexiGPT-hosted or any third pa
 - Local conversation storage and full-text search
 - File, folder, image, PDF, and URL attachments
 - Bundled offline docs shipped inside the app
-- Conversations, workflow catalogs, and configuration are stored locally only.
-- Use your own provider accounts; FlexiGPT does not proxy or bill model usage
+- Conversations, workflow catalogs, and configuration are stored locally; selected request context is sent to the provider or endpoint you choose when you send.
+- Use your own provider accounts; FlexiGPT does not proxy or bill model usage.
 
 ## Documentation
 
-The main docs are bundled inside the app and mirrored in this repository under `frontend/app/docs/content/`.
+Installation notes are repository/release documentation and are not bundled in the in-app docs.
+The bundled in-app docs are mirrored in this repository under `frontend/app/docs/content/`.
 
-### User guide
+### Repository-only install notes
 
 - [Installation](./frontend/app/docs/content/00-installation.md)
+
+### Bundled in-app user guide
+
 - [Getting Started](./frontend/app/docs/content/01-getting-started.md)
 - [Core Concepts](./frontend/app/docs/content/02-core-concepts.md)
 - [Chats, Composer, and Everyday Workflow](./frontend/app/docs/content/03-chats-composer-and-everyday-workflow.md)
 - [Attachments, Tools, Skills, and Prompts](./frontend/app/docs/content/04-attachments-tools-skills-prompts.md)
 - [Presets, Providers, and Settings](./frontend/app/docs/content/05-presets-providers-settings.md)
-- [Privacy, Storage, and Troubleshooting](./frontend/app/docs/content/06-privacy-storage-and-troubleshooting.md)
-- [Security and Privacy Model](./frontend/app/docs/content/07-security-and-privacy-model.md)
+- [Storage, Data Control, and Troubleshooting](./frontend/app/docs/content/06-storage-data-control-and-troubleshooting.md)
+- [Security, Privacy, and Trust Model](./frontend/app/docs/content/07-security-privacy-and-trust-model.md)
 - [Recipes and Starter Workflows](./frontend/app/docs/content/08-recipes-and-starter-workflows.md)
 - [Provider and Local Model Setup](./frontend/app/docs/content/09-provider-and-local-model-setup.md)
 

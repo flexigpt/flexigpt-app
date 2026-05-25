@@ -3,8 +3,8 @@ import coreConceptsBody from '@/docs/content/02-core-concepts.md?raw';
 import chatsWorkflowBody from '@/docs/content/03-chats-composer-and-everyday-workflow.md?raw';
 import contextAndToolsBody from '@/docs/content/04-attachments-tools-skills-prompts.md?raw';
 import presetsProvidersSettingsBody from '@/docs/content/05-presets-providers-settings.md?raw';
-import privacyAndTroubleshootingBody from '@/docs/content/06-privacy-storage-and-troubleshooting.md?raw';
-import securityPrivacyModelBody from '@/docs/content/07-security-and-privacy-model.md?raw';
+import storageDataControlTroubleshootingBody from '@/docs/content/06-storage-data-control-and-troubleshooting.md?raw';
+import securityPrivacyTrustModelBody from '@/docs/content/07-security-privacy-and-trust-model.md?raw';
 import recipesAndStarterWorkflowsBody from '@/docs/content/08-recipes-and-starter-workflows.md?raw';
 import providerAndLocalModelSetupBody from '@/docs/content/09-provider-and-local-model-setup.md?raw';
 import architectureOverviewBody from '@/docs/content/11-architecture-overview.md?raw';
@@ -68,17 +68,17 @@ export const docsCategories: DocsCategory[] = [
 			},
 			{
 				id: 'privacy-storage-and-troubleshooting',
-				title: 'Privacy, Storage, and Troubleshooting',
+				title: 'Storage, Data Control, and Troubleshooting',
 				summary:
-					'Understand what stays local, what can leave the device, and how to diagnose common workflow failures.',
-				body: privacyAndTroubleshootingBody,
+					'Find local data categories, storage locations, backup/reset/export options, and troubleshooting checks.',
+				body: storageDataControlTroubleshootingBody,
 			},
 			{
 				id: 'security-and-privacy-model',
-				title: 'Security and Privacy Model',
+				title: 'Security, Privacy, and Trust Model',
 				summary:
-					'Trust-focused explanation of local storage, provider requests, keys, attachments, URL fetching, tools, logs, and data control.',
-				body: securityPrivacyModelBody,
+					'Review trust boundaries for provider requests, keys, attachments, URL fetching, tools, logs, deletion, and safe sends.',
+				body: securityPrivacyTrustModelBody,
 			},
 			{
 				id: 'recipes-and-starter-workflows',
