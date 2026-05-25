@@ -10,7 +10,40 @@
 			"isEnabled": true,
 			"isBuiltIn": true,
 			"createdAt": "2026-02-10T00:00:00Z",
-			"modifiedAt": "2026-02-10T00:00:00Z"
+			"modifiedAt": "2026-05-25T00:00:00Z"
+		},
+		"product-leadership": {
+			"schemaVersion": "2026-02-10",
+			"id": "product-leadership",
+			"slug": "product-leadership",
+			"displayName": "Product and Leadership",
+			"description": "Skills for product specs, decision records, feedback analysis, roadmap prioritization, delivery risk review, and status updates.",
+			"isEnabled": true,
+			"isBuiltIn": true,
+			"createdAt": "2026-05-25T00:00:00Z",
+			"modifiedAt": "2026-05-25T00:00:00Z"
+		},
+		"technical-content-writing": {
+			"schemaVersion": "2026-02-10",
+			"id": "technical-content-writing",
+			"slug": "technical-content-writing",
+			"displayName": "Technical Content Writing",
+			"description": "Skills for software and product documentation, API references, release notes, and troubleshooting guides.",
+			"isEnabled": true,
+			"isBuiltIn": true,
+			"createdAt": "2026-05-25T00:00:00Z",
+			"modifiedAt": "2026-05-25T00:00:00Z"
+		},
+		"research-analysis": {
+			"schemaVersion": "2026-02-10",
+			"id": "research-analysis",
+			"slug": "research-analysis",
+			"displayName": "Research and Analysis",
+			"description": "Skills for research briefs based on local or attached source material.",
+			"isEnabled": true,
+			"isBuiltIn": true,
+			"createdAt": "2026-05-25T00:00:00Z",
+			"modifiedAt": "2026-05-25T00:00:00Z"
 		}
 	},
 	"skills": {
@@ -94,6 +127,347 @@
 				"isBuiltIn": true,
 				"createdAt": "2026-02-10T00:00:02Z",
 				"modifiedAt": "2026-02-10T00:00:02Z"
+			},
+			"codebase-exploration": {
+				"schemaVersion": "2026-02-10",
+				"id": "codebase-exploration",
+				"slug": "codebase-exploration",
+				"type": "embeddedfs",
+				"location": "software-dev/codebase-exploration",
+				"name": "codebase-exploration",
+				"displayName": "Codebase Exploration",
+				"description": "Map an unfamiliar repo or module by identifying entry points, modules, flows, configs, tests, dependencies, and risks. Use when the user wants a map of code before deciding what to do next. Discovery-first; no architecture decisions, edits, or reviews.",
+				"tags": ["software-dev", "builtin", "exploration"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-05-25T00:00:00Z",
+					"lastSeenAt": "2026-05-25T00:00:00Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-05-25T00:00:00Z",
+				"modifiedAt": "2026-05-25T00:00:00Z"
+			},
+			"test-case-design": {
+				"schemaVersion": "2026-02-10",
+				"id": "test-case-design",
+				"slug": "test-case-design",
+				"type": "embeddedfs",
+				"location": "software-dev/test-case-design",
+				"name": "test-case-design",
+				"displayName": "Test Case Design",
+				"description": "Design test scenarios from specs, requirements, bug reports, or code paths. Produces a traceable test plan and case list, not test code. Use when the user wants to plan tests before implementation, map coverage gaps, or design regression cases for a confirmed bug.",
+				"tags": ["software-dev", "builtin", "testing"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-05-25T00:00:00Z",
+					"lastSeenAt": "2026-05-25T00:00:00Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-05-25T00:00:00Z",
+				"modifiedAt": "2026-05-25T00:00:00Z"
+			},
+			"bug-investigation": {
+				"schemaVersion": "2026-02-10",
+				"id": "bug-investigation",
+				"slug": "bug-investigation",
+				"type": "embeddedfs",
+				"location": "software-dev/bug-investigation",
+				"name": "bug-investigation",
+				"displayName": "Bug Investigation",
+				"description": "Diagnose root cause from logs, errors, stack traces, failing outputs, code, and config. Diagnosis only; no fixing by default. Use when the user wants a root cause hypothesis, an evidence assessment of a proposed fix, or a verification plan.",
+				"tags": ["software-dev", "builtin", "bug-investigation"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-05-25T00:00:00Z",
+					"lastSeenAt": "2026-05-25T00:00:00Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-05-25T00:00:00Z",
+				"modifiedAt": "2026-05-25T00:00:00Z"
+			},
+			"test-implementation": {
+				"schemaVersion": "2026-02-10",
+				"id": "test-implementation",
+				"slug": "test-implementation",
+				"type": "embeddedfs",
+				"location": "software-dev/test-implementation",
+				"name": "test-implementation",
+				"displayName": "Test Implementation",
+				"description": "Write or update unit, integration, or regression tests, then verify with focused shell commands. Use when the user wants new tests written, a bug fix confirmed by tests, or backfilled coverage. Matches the existing test style.",
+				"tags": ["software-dev", "builtin", "testing"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-05-25T00:00:00Z",
+					"lastSeenAt": "2026-05-25T00:00:00Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-05-25T00:00:00Z",
+				"modifiedAt": "2026-05-25T00:00:00Z"
+			}
+		},
+		"product-leadership": {
+			"product-spec-authoring": {
+				"schemaVersion": "2026-02-10",
+				"id": "product-spec-authoring",
+				"slug": "product-spec-authoring",
+				"type": "embeddedfs",
+				"location": "product-leadership/product-spec-authoring",
+				"name": "product-spec-authoring",
+				"displayName": "Product Spec Authoring",
+				"description": "Turn goals, research notes, constraints, and stakeholder input into a product spec with testable requirements and acceptance criteria. Source-grounded; flags assumptions and missing inputs explicitly.",
+				"tags": ["product-leadership", "builtin", "spec", "requirements"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-05-25T00:00:00Z",
+					"lastSeenAt": "2026-05-25T00:00:00Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-05-25T00:00:00Z",
+				"modifiedAt": "2026-05-25T00:00:00Z"
+			},
+			"decision-record-authoring": {
+				"schemaVersion": "2026-02-10",
+				"id": "decision-record-authoring",
+				"slug": "decision-record-authoring",
+				"type": "embeddedfs",
+				"location": "product-leadership/decision-record-authoring",
+				"name": "decision-record-authoring",
+				"displayName": "Decision Record Authoring",
+				"description": "Write a decision record from context, options, evidence, and trade-offs. Produces a clear recommendation with explicit revisit triggers, not a generic pros-and-cons list.",
+				"tags": ["product-leadership", "builtin", "decisions", "adr"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-05-25T00:00:00Z",
+					"lastSeenAt": "2026-05-25T00:00:00Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-05-25T00:00:00Z",
+				"modifiedAt": "2026-05-25T00:00:00Z"
+			},
+			"user-feedback-analysis": {
+				"schemaVersion": "2026-02-10",
+				"id": "user-feedback-analysis",
+				"slug": "user-feedback-analysis",
+				"type": "embeddedfs",
+				"location": "product-leadership/user-feedback-analysis",
+				"name": "user-feedback-analysis",
+				"displayName": "User Feedback Analysis",
+				"description": "Analyze interviews, support notes, surveys, NPS comments, and customer notes into themes, needs, pain points, and product opportunities. Maintains traceability from theme to source.",
+				"tags": ["product-leadership", "builtin", "feedback", "research"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-05-25T00:00:00Z",
+					"lastSeenAt": "2026-05-25T00:00:00Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-05-25T00:00:00Z",
+				"modifiedAt": "2026-05-25T00:00:00Z"
+			},
+			"roadmap-prioritization": {
+				"schemaVersion": "2026-02-10",
+				"id": "roadmap-prioritization",
+				"slug": "roadmap-prioritization",
+				"type": "embeddedfs",
+				"location": "product-leadership/roadmap-prioritization",
+				"name": "roadmap-prioritization",
+				"displayName": "Roadmap Prioritization",
+				"description": "Prioritize ideas, requests, bugs, and opportunities against goals using impact, effort, risk, and dependencies. Honest about missing inputs and uses relative ranking when evidence is qualitative.",
+				"tags": ["product-leadership", "builtin", "prioritization", "roadmap"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-05-25T00:00:00Z",
+					"lastSeenAt": "2026-05-25T00:00:00Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-05-25T00:00:00Z",
+				"modifiedAt": "2026-05-25T00:00:00Z"
+			},
+			"delivery-risk-review": {
+				"schemaVersion": "2026-02-10",
+				"id": "delivery-risk-review",
+				"slug": "delivery-risk-review",
+				"type": "embeddedfs",
+				"location": "product-leadership/delivery-risk-review",
+				"name": "delivery-risk-review",
+				"displayName": "Delivery Risk Review",
+				"description": "Review plans, specs, milestones, issue lists, or status notes for delivery risks, dependency risks, blockers, unclear owners, and mitigations. Actionable, not theoretical.",
+				"tags": ["product-leadership", "builtin", "risk", "delivery"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-05-25T00:00:00Z",
+					"lastSeenAt": "2026-05-25T00:00:00Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-05-25T00:00:00Z",
+				"modifiedAt": "2026-05-25T00:00:00Z"
+			},
+			"status-update-authoring": {
+				"schemaVersion": "2026-02-10",
+				"id": "status-update-authoring",
+				"slug": "status-update-authoring",
+				"type": "embeddedfs",
+				"location": "product-leadership/status-update-authoring",
+				"name": "status-update-authoring",
+				"displayName": "Status Update Authoring",
+				"description": "Convert project notes, changelogs, meeting notes, or issue summaries into stakeholder-ready status updates. Avoids internal detail unless it affects status, risk, or decisions.",
+				"tags": ["product-leadership", "builtin", "status-update"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-05-25T00:00:00Z",
+					"lastSeenAt": "2026-05-25T00:00:00Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-05-25T00:00:00Z",
+				"modifiedAt": "2026-05-25T00:00:00Z"
+			}
+		},
+		"technical-content-writing": {
+			"docs-audit": {
+				"schemaVersion": "2026-02-10",
+				"id": "docs-audit",
+				"slug": "docs-audit",
+				"type": "embeddedfs",
+				"location": "technical-content-writing/docs-audit",
+				"name": "docs-audit",
+				"displayName": "Docs Audit",
+				"description": "Audit docs or README files for structural gaps, stale claims, duplication, missing content, and navigation issues. Produces an audit and rewrite plan; does not rewrite docs.",
+				"tags": ["technical-content-writing", "builtin", "docs", "audit"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-05-25T00:00:00Z",
+					"lastSeenAt": "2026-05-25T00:00:00Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-05-25T00:00:00Z",
+				"modifiedAt": "2026-05-25T00:00:00Z"
+			},
+			"docs-authoring": {
+				"schemaVersion": "2026-02-10",
+				"id": "docs-authoring",
+				"slug": "docs-authoring",
+				"type": "embeddedfs",
+				"location": "technical-content-writing/docs-authoring",
+				"name": "docs-authoring",
+				"displayName": "Docs Authoring",
+				"description": "Create or update READMEs, guides, how-tos, tutorials, conceptual docs, and internal docs from source context. Audience-aware and source-grounded. Includes diagrams only when they clarify the content.",
+				"tags": ["technical-content-writing", "builtin", "docs", "authoring"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-05-25T00:00:00Z",
+					"lastSeenAt": "2026-05-25T00:00:00Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-05-25T00:00:00Z",
+				"modifiedAt": "2026-05-25T00:00:00Z"
+			},
+			"api-reference-authoring": {
+				"schemaVersion": "2026-02-10",
+				"id": "api-reference-authoring",
+				"slug": "api-reference-authoring",
+				"type": "embeddedfs",
+				"location": "technical-content-writing/api-reference-authoring",
+				"name": "api-reference-authoring",
+				"displayName": "API Reference Authoring",
+				"description": "Generate or update API and SDK reference docs and examples from code, schemas, OpenAPI, proto files, or existing docs. Prefers accurate reference over marketing language.",
+				"tags": [
+					"technical-content-writing",
+					"builtin",
+					"api-docs",
+					"reference"
+				],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-05-25T00:00:00Z",
+					"lastSeenAt": "2026-05-25T00:00:00Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-05-25T00:00:00Z",
+				"modifiedAt": "2026-05-25T00:00:00Z"
+			},
+			"release-notes-authoring": {
+				"schemaVersion": "2026-02-10",
+				"id": "release-notes-authoring",
+				"slug": "release-notes-authoring",
+				"type": "embeddedfs",
+				"location": "technical-content-writing/release-notes-authoring",
+				"name": "release-notes-authoring",
+				"displayName": "Release Notes Authoring",
+				"description": "Create release notes and changelogs from diffs, commit notes, PR descriptions, issue summaries, or version notes. Distinguishes user-facing changes from internal changes; never invents changes.",
+				"tags": [
+					"technical-content-writing",
+					"builtin",
+					"release-notes",
+					"changelog"
+				],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-05-25T00:00:00Z",
+					"lastSeenAt": "2026-05-25T00:00:00Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-05-25T00:00:00Z",
+				"modifiedAt": "2026-05-25T00:00:00Z"
+			},
+			"troubleshooting-guide-authoring": {
+				"schemaVersion": "2026-02-10",
+				"id": "troubleshooting-guide-authoring",
+				"slug": "troubleshooting-guide-authoring",
+				"type": "embeddedfs",
+				"location": "technical-content-writing/troubleshooting-guide-authoring",
+				"name": "troubleshooting-guide-authoring",
+				"displayName": "Troubleshooting Guide Authoring",
+				"description": "Turn errors, logs, bug reports, support notes, and fixes into troubleshooting or knowledge-base articles. Distinguishes confirmed causes from possible causes and prefers safe diagnostic steps.",
+				"tags": [
+					"technical-content-writing",
+					"builtin",
+					"troubleshooting",
+					"kb"
+				],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-05-25T00:00:00Z",
+					"lastSeenAt": "2026-05-25T00:00:00Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-05-25T00:00:00Z",
+				"modifiedAt": "2026-05-25T00:00:00Z"
+			}
+		},
+		"research-analysis": {
+			"research-brief-authoring": {
+				"schemaVersion": "2026-02-10",
+				"id": "research-brief-authoring",
+				"slug": "research-brief-authoring",
+				"type": "embeddedfs",
+				"location": "research-analysis/research-brief-authoring",
+				"name": "research-brief-authoring",
+				"displayName": "Research Brief Authoring",
+				"description": "Turn attached or local source material into a research brief with findings, evidence, uncertainty, recommendations, and next questions. Uses local or attached sources only; does not assume live web search.",
+				"tags": ["research-analysis", "builtin", "research", "brief"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-05-25T00:00:00Z",
+					"lastSeenAt": "2026-05-25T00:00:00Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-05-25T00:00:00Z",
+				"modifiedAt": "2026-05-25T00:00:00Z"
 			}
 		}
 	}

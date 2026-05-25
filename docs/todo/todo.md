@@ -4,6 +4,8 @@
 
 - [ ] test with some skill that has scripts too
 - [ ] block autoexec should be a high level button for just in case things i.e the llm is spiralling and you want the next turn to not autoexec as you want to give some direction to llm.
+- [ ] that msg to msg jump button seems more and more useful for large prompts
+- [ ] may be in chats page even if there is no message card focus and someone does a page up when no modals are open, we can still scroll up.
 - [ ] once you open a tool in edit mode and then close without editing, next edit modal doesn't open
 - [x] menu classes cleanup in dropdowns
 - [x] docs update to place product as repeatable workflows rather than just chat

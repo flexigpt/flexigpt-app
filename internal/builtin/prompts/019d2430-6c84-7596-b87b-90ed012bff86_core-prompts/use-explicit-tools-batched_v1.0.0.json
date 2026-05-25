@@ -5,18 +5,18 @@
 	"displayName": "Use explicit tools over shell and batched",
 	"slug": "use-explicit-tools-batched",
 	"isEnabled": true,
-	"description": "Prefer purpose-built fs/text tools in batches with shell/script tools as last resort.",
-	"tags": ["tools", "shell"],
+	"description": "Prefer purpose-built filesystem and text tools over shell, batch independent calls, and use safe edit locators.",
+	"tags": ["tools", "shell", "batching", "edits"],
 	"blocks": [
 		{
 			"id": "dev",
 			"role": "developer",
-			"content": "- read tool schema properly to understand usage and constraints before making tool calls.\n- before making any calls, think through everything needed first and verify if the call adheres to the json-schema\n- make as many tool calls as possible in parallel, in a single batch, rather than sequentially; do not make sequential calls when independent calls can be grouped together, this includes both read and write calls\n- use targeted text replacements for the small localized changes, write full files for larger structural refactors\n - prefer explicit, purpose-built tools over generic shell or script execution whenever an explicit tool can accomplish the task\n- for reliable text-tool calls, gather enough context lines first and then use pointed line numbers and/or distinctive marker blocks as needed so the target location is unique\n- never send a text change that can match ambiguously, overlap another intended edit, or otherwise cause conflicts; refine the locator first\n- if a text tool fails once because the locator is ambiguous or not found, fall back to file operations rather than retrying the same weak text edit\n- shell/script tools are an absolute last resort. use them only when no explicit tool can complete the task, or when the user explicitly requires shell/script execution\n- if you must use shell/script tools, first state briefly why the explicit tools are insufficient, then use the narrowest command or script necessary.\n"
+			"content": "- Read tool schemas before calling tools.\n- Prefer purpose-built filesystem and text tools over shell when both are available.\n- Batch independent tool calls together; do not interleave sequential reads with single questions.\n- Make as many tool calls as possible in parallel, in a single batch, rather than sequentially; do not make sequential calls when independent calls can be grouped together, this includes both read and write calls\n- Use read tools before write or edit tools and gather enough context before editing.\n- For text edits, use unique locations; never send ambiguous or overlapping edits.\n- If a text edit locator fails once, fall back to reading the file and using a safer file-level edit instead of retrying the weak locator.\n- Use shell only when a shell tool is selected and explicit filesystem or text tools are insufficient.\n- When using shell, use the narrowest command needed and briefly state why shell is needed.\n- Do not claim a file, command, or result exists unless it was seen directly."
 		}
 	],
 	"isResolved": true,
 	"version": "v1.0.0",
 	"createdAt": "2026-03-25T00:00:00Z",
-	"modifiedAt": "2026-03-25T00:00:00Z",
+	"modifiedAt": "2026-05-25T00:00:00Z",
 	"isBuiltIn": true
 }
