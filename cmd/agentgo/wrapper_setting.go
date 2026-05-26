@@ -61,3 +61,10 @@ func (w *SettingStoreWrapper) GetAuthKey(
 		return w.store.GetAuthKey(context.Background(), req)
 	})
 }
+
+func (s *SettingStoreWrapper) close() {
+	if s == nil || s.store == nil {
+		return
+	}
+	s.store.Close()
+}

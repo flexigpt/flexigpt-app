@@ -74,3 +74,10 @@ func (ccw *ConversationCollectionWrapper) PutMessagesToConversation(
 		return ccw.store.PutMessagesToConversation(context.Background(), req)
 	})
 }
+
+func (ccw *ConversationCollectionWrapper) close() {
+	if ccw == nil || ccw.store == nil {
+		return
+	}
+	ccw.store.Close()
+}

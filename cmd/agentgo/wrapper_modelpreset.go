@@ -91,3 +91,10 @@ func (w *ModelPresetStoreWrapper) GetModelPreset(
 		return w.store.GetModelPreset(context.Background(), req)
 	})
 }
+
+func (s *ModelPresetStoreWrapper) close() {
+	if s == nil || s.store == nil {
+		return
+	}
+	s.store.Close()
+}

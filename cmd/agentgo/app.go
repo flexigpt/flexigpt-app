@@ -307,8 +307,17 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	// Perform any teardown here.
 
 	// Stop background goroutines + flushes for stores that need it.
+	if a.settingStoreAPI != nil {
+		a.settingStoreAPI.close()
+	}
 	if a.assistantPresetStoreAPI != nil {
 		a.assistantPresetStoreAPI.close()
+	}
+	if a.modelPresetStoreAPI != nil {
+		a.modelPresetStoreAPI.close()
+	}
+	if a.skillStoreAPI != nil {
+		a.skillStoreAPI.close()
 	}
 	if a.toolStoreAPI != nil {
 		a.toolStoreAPI.close()
@@ -316,8 +325,7 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	if a.promptTemplateStoreAPI != nil {
 		a.promptTemplateStoreAPI.close()
 	}
-
-	if a.skillStoreAPI != nil {
-		a.skillStoreAPI.close()
+	if a.conversationStoreAPI != nil {
+		a.conversationStoreAPI.close()
 	}
 }
