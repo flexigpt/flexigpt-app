@@ -22,6 +22,21 @@ import type { SystemPromptDraft, SystemPromptItem } from '@/prompts/lib/use_syst
 
 /** Minimum interval between automatic refresh calls (ms). */
 const REFRESH_STALE_MS = 60_000;
+const PROMPT_SORT_COLLATOR = new Intl.Collator(undefined, {
+	numeric: true,
+	sensitivity: 'base',
+});
+
+type SystemPromptBundleGroup = {
+	bundleID: string;
+	bundleSlug: string;
+	bundleDisplayName: string;
+	isKnownBundle: boolean;
+	isBundleEnabled: boolean;
+	isBuiltIn: boolean;
+	sortKey: string;
+	prompts: SystemPromptItem[];
+};
 
 type SystemPromptDropdownProps = {
 	prompts: SystemPromptItem[];
@@ -112,6 +127,57 @@ export function SystemPromptDropdown({
 	const open = useStoreState(menu, 'open');
 	const selectedKeySet = useMemo(() => new Set(selectedPromptKeys), [selectedPromptKeys]);
 	const promptTooltip = useTooltipStore({ placement: 'right-end' });
+
+	const groupedPrompts = useMemo(() => {
+		const bundlesByID = new Map(bundles.map(bundle => [bundle.id, bundle]));
+		const groupsByBundleID = new Map<string, SystemPromptBundleGroup>();
+
+		for (const item of prompts) {
+			const bundle = bundlesByID.get(item.bundleID);
+			const bundleSlug = bundle?.slug?.trim() || item.bundleID;
+			const bundleDisplayName = bundle?.displayName?.trim() || item.bundleDisplayName?.trim() || bundleSlug;
+
+			let group = groupsByBundleID.get(item.bundleID);
+			if (!group) {
+				group = {
+					bundleID: item.bundleID,
+					bundleSlug,
+					bundleDisplayName,
+					isKnownBundle: Boolean(bundle),
+					isBundleEnabled: bundle?.isEnabled ?? true,
+					isBuiltIn: bundle?.isBuiltIn ?? item.isBuiltIn,
+					sortKey: bundleSlug,
+					prompts: [],
+				};
+				groupsByBundleID.set(item.bundleID, group);
+			}
+
+			group.prompts.push(item);
+		}
+
+		return Array.from(groupsByBundleID.values())
+			.map(group => ({
+				...group,
+				prompts: [...group.prompts].sort((left, right) => {
+					const slugCompare = PROMPT_SORT_COLLATOR.compare(left.templateSlug, right.templateSlug);
+					if (slugCompare !== 0) return slugCompare;
+
+					const versionCompare = PROMPT_SORT_COLLATOR.compare(left.templateVersion, right.templateVersion);
+					if (versionCompare !== 0) return versionCompare;
+
+					const nameCompare = PROMPT_SORT_COLLATOR.compare(left.displayName, right.displayName);
+					if (nameCompare !== 0) return nameCompare;
+
+					return PROMPT_SORT_COLLATOR.compare(left.identityKey, right.identityKey);
+				}),
+			}))
+			.sort((left, right) => {
+				const bundleCompare = PROMPT_SORT_COLLATOR.compare(left.sortKey, right.sortKey);
+				if (bundleCompare !== 0) return bundleCompare;
+				return PROMPT_SORT_COLLATOR.compare(left.bundleID, right.bundleID);
+			});
+	}, [bundles, prompts]);
+
 	const tooltipAnchorEl = useStoreState(promptTooltip, 'anchorElement');
 	const currentPromptText = tooltipAnchorEl?.dataset.prompt ?? '';
 	const triggerTooltip =
@@ -304,78 +370,101 @@ export function SystemPromptDropdown({
 						<span>{error}</span>
 					</div>
 				) : prompts.length > 0 ? (
-					<div className="space-y-1">
-						{prompts.map(item => {
-							const isSelected = selectedKeySet.has(item.identityKey);
-
-							return (
-								<MenuItem
-									key={item.identityKey}
-									hideOnClick={false}
-									data-prompt={item.prompt}
-									className={`data-active-item:bg-base-200 border-base-300 flex items-start gap-2 rounded-lg border p-2 outline-none ${
-										isInputLocked ? 'opacity-60' : ''
-									}`}
-									onFocus={event => {
-										showPromptTooltip(event.currentTarget);
-									}}
-									onBlur={hidePromptTooltip}
-									onMouseEnter={event => {
-										showPromptTooltip(event.currentTarget);
-									}}
-									onMouseLeave={hidePromptTooltip}
-									onClick={() => {
-										if (isInputLocked) return;
-										onTogglePrompt(item.identityKey);
-									}}
-								>
-									<input
-										type="checkbox"
-										className="checkbox checkbox-xs mt-0.5 rounded"
-										checked={isSelected}
-										disabled={isInputLocked}
-										onChange={event => {
-											stopMenuBubbleEvent(event);
-											if (isInputLocked) return;
-											onTogglePrompt(item.identityKey);
-										}}
-										onPointerDown={stopMenuToggleEvent}
-										onClick={stopMenuToggleEvent}
-									/>
-
-									<div className="min-w-0 flex-1">
-										<div className="truncate text-xs font-medium">{item.displayName}</div>
-										<div className="mt-1 flex items-center gap-2 text-[10px] opacity-70">
-											<span>{item.bundleDisplayName}</span>
-											<span>•</span>
-											<span>{item.templateSlug}</span>
-											<span>•</span>
-											<span>{item.templateVersion}</span>
-											<span>•</span>
-											<span>{item.role === PromptRoleEnum.Developer ? 'developer' : 'system'}</span>
+					<div className="space-y-2">
+						{groupedPrompts.map((group, groupIndex) => (
+							<div key={group.bundleID} className={groupIndex > 0 ? 'border-neutral/20 border-t pt-2' : ''}>
+								<div className="mb-1 flex items-center justify-between gap-2 px-1">
+									<div className="min-w-0">
+										<div className="truncate text-[10px] font-semibold tracking-wide uppercase opacity-70">
+											{group.bundleDisplayName}
 										</div>
+										<div className="truncate font-mono text-[10px] opacity-50">{group.bundleSlug}</div>
 									</div>
 
-									<div className="ml-2 flex shrink-0 items-start gap-1">
-										{isSelected ? <FiCheck size={14} className="text-success mt-0.5 shrink-0" /> : null}
-										<button
-											type="button"
-											className="btn btn-ghost btn-xs btn-square rounded-lg"
-											title="Fork"
-											disabled={isInputLocked || !hasWritableCustomBundle}
-											onClick={event => {
-												stopMenuToggleEvent(event);
-												if (isInputLocked) return;
-												hidePromptTooltip();
-												openForkModal(item);
-											}}
-										>
-											<FiGitBranch size={12} />
-										</button>
+									<div className="flex shrink-0 items-center gap-1">
+										<span className="badge badge-ghost badge-xs">{group.prompts.length}</span>
+										<span className="badge badge-ghost badge-xs">{group.isBuiltIn ? 'built-in' : 'custom'}</span>
+										{!group.isKnownBundle ? (
+											<span className="badge badge-warning badge-xs">missing</span>
+										) : !group.isBundleEnabled ? (
+											<span className="badge badge-warning badge-xs">disabled</span>
+										) : null}
 									</div>
-								</MenuItem>
-							);
-						})}
+								</div>
+
+								<div className="space-y-1">
+									{group.prompts.map(item => {
+										const isSelected = selectedKeySet.has(item.identityKey);
+
+										return (
+											<MenuItem
+												key={item.identityKey}
+												hideOnClick={false}
+												data-prompt={item.prompt}
+												className={`data-active-item:bg-base-200 border-base-300 flex items-start gap-2 rounded-lg border p-2 outline-none ${
+													isInputLocked ? 'opacity-60' : ''
+												}`}
+												onFocus={event => {
+													showPromptTooltip(event.currentTarget);
+												}}
+												onBlur={hidePromptTooltip}
+												onMouseEnter={event => {
+													showPromptTooltip(event.currentTarget);
+												}}
+												onMouseLeave={hidePromptTooltip}
+												onClick={() => {
+													if (isInputLocked) return;
+													onTogglePrompt(item.identityKey);
+												}}
+											>
+												<input
+													type="checkbox"
+													className="checkbox checkbox-xs mt-0.5 rounded"
+													checked={isSelected}
+													disabled={isInputLocked}
+													onChange={event => {
+														stopMenuBubbleEvent(event);
+														if (isInputLocked) return;
+														onTogglePrompt(item.identityKey);
+													}}
+													onPointerDown={stopMenuToggleEvent}
+													onClick={stopMenuToggleEvent}
+												/>
+
+												<div className="min-w-0 flex-1">
+													<div className="truncate text-xs font-medium">{item.displayName}</div>
+													<div className="mt-1 flex items-center gap-2 text-[10px] opacity-70">
+														<span>{item.templateSlug}</span>
+														<span>•</span>
+														<span>{item.templateVersion}</span>
+														<span>•</span>
+														<span>{item.role === PromptRoleEnum.Developer ? 'developer' : 'system'}</span>
+													</div>
+												</div>
+
+												<div className="ml-2 flex shrink-0 items-start gap-1">
+													{isSelected ? <FiCheck size={14} className="text-success mt-0.5 shrink-0" /> : null}
+													<button
+														type="button"
+														className="btn btn-ghost btn-xs btn-square rounded-lg"
+														title="Fork"
+														disabled={isInputLocked || !hasWritableCustomBundle}
+														onClick={event => {
+															stopMenuToggleEvent(event);
+															if (isInputLocked) return;
+															hidePromptTooltip();
+															openForkModal(item);
+														}}
+													>
+														<FiGitBranch size={12} />
+													</button>
+												</div>
+											</MenuItem>
+										);
+									})}
+								</div>
+							</div>
+						))}
 					</div>
 				) : (
 					<div className="m-0 flex cursor-default items-center justify-between rounded-md px-2 py-2 text-xs opacity-70">

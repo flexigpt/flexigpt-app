@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from 'react';
+import { type Dispatch, Fragment, type SetStateAction, useMemo } from 'react';
 
 import { FiCheck } from 'react-icons/fi';
 
@@ -14,7 +14,49 @@ import {
 } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 
+type ProviderModelGroup = {
+	providerName: string;
+	providerDisplayName: string;
+	options: UIChatOption[];
+};
+
 const modelKey = (m: UIChatOption) => `${m.providerName}::${m.modelPresetID}`;
+
+const modelDropdownCollator = new Intl.Collator(undefined, {
+	numeric: true,
+	sensitivity: 'base',
+});
+
+const compareProviderGroups = (a: ProviderModelGroup, b: ProviderModelGroup) =>
+	modelDropdownCollator.compare(a.providerDisplayName, b.providerDisplayName) ||
+	modelDropdownCollator.compare(a.providerName, b.providerName);
+
+const compareModelOptions = (a: UIChatOption, b: UIChatOption) =>
+	modelDropdownCollator.compare(a.modelDisplayName, b.modelDisplayName) ||
+	modelDropdownCollator.compare(a.name, b.name) ||
+	modelDropdownCollator.compare(a.modelPresetID, b.modelPresetID);
+
+const groupModelOptionsByProvider = (options: UIChatOption[]): ProviderModelGroup[] => {
+	const groupsByProvider = new Map<string, ProviderModelGroup>();
+
+	for (const option of options) {
+		const group = groupsByProvider.get(option.providerName);
+		if (group) {
+			group.options.push(option);
+			continue;
+		}
+
+		groupsByProvider.set(option.providerName, {
+			providerName: option.providerName,
+			providerDisplayName: option.providerDisplayName || option.providerName,
+			options: [option],
+		});
+	}
+
+	return [...groupsByProvider.values()]
+		.map(group => ({ ...group, options: [...group.options].sort(compareModelOptions) }))
+		.sort(compareProviderGroups);
+};
 
 type ModelDropdownProps = {
 	selectedModel: UIChatOption;
@@ -25,6 +67,7 @@ type ModelDropdownProps = {
 export function ModelDropdown({ selectedModel, setSelectedModel, allOptions }: ModelDropdownProps) {
 	const currentKey = modelKey(selectedModel);
 	const menu = useMenuStore({ placement: 'top', focusLoop: true });
+	const providerGroups = useMemo(() => groupModelOptionsByProvider(allOptions), [allOptions]);
 
 	const open = useStoreState(menu, 'open');
 	const isCurrent = (m: UIChatOption) => modelKey(m) === currentKey;
@@ -51,17 +94,31 @@ export function ModelDropdown({ selectedModel, setSelectedModel, allOptions }: M
 					autoFocusOnShow
 					className={actionTriggerMenuWideClasses}
 				>
-					{allOptions.map(model => (
-						<MenuItem
-							key={modelKey(model)}
-							className={`${actionTriggerMenuItemClasses} justify-between`}
-							onClick={() => {
-								setSelectedModel(model);
-							}}
-						>
-							<span className="truncate">{model.modelDisplayName}</span>
-							{isCurrent(model) ? <FiCheck /> : null}
-						</MenuItem>
+					{providerGroups.map((group, groupIndex) => (
+						<Fragment key={group.providerName}>
+							{groupIndex > 0 ? (
+								<div role="separator" className="my-1 border-t border-zinc-200 dark:border-zinc-700" />
+							) : null}
+
+							<div role="group" aria-label={group.providerDisplayName}>
+								<div className="px-3 pt-2 pb-1 text-[10px] font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-400">
+									{group.providerDisplayName}
+								</div>
+
+								{group.options.map(model => (
+									<MenuItem
+										key={modelKey(model)}
+										className={`${actionTriggerMenuItemClasses} justify-between`}
+										onClick={() => {
+											setSelectedModel(model);
+										}}
+									>
+										<span className="min-w-0 truncate">{model.modelDisplayName}</span>
+										{isCurrent(model) ? <FiCheck className="ml-2 shrink-0" /> : null}
+									</MenuItem>
+								))}
+							</div>
+						</Fragment>
 					))}
 				</Menu>
 			</div>
