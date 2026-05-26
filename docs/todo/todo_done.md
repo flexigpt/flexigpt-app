@@ -992,3 +992,4 @@
   - [x] this is the react double rendering problem in dev with no solution as of now.
 - [x] product spec writer needs better name to identify with common prd mrd type things
 - [x] may be docs auditor can be a read only thing?
+- [x] group assistant presets with bundles. same for models, prompts, skills, tools, system prompts.

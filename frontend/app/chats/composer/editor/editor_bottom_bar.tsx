@@ -38,8 +38,9 @@ import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_
 import { SkillDropDown } from '@/chats/composer/skills/skill_dropdown';
 import { SystemPromptDropdown } from '@/chats/composer/systemprompts/system_prompt_dropdown';
 import type { ComposerSystemPromptController } from '@/chats/composer/systemprompts/use_composer_system_prompt';
+import { PromptTemplateDropdown } from '@/chats/composer/templates/prompt_template_dropdown';
 import { dispatchOpenToolArgs } from '@/chats/composer/toolruntime/use_open_toolargs_event';
-import { ToolMenuRow } from '@/chats/composer/tools/tool_menu_row';
+import { ToolDropdown } from '@/chats/composer/tools/tool_dropdown';
 import { WebSearchBottomBarChip } from '@/chats/composer/tools/web_search_bottom_bar_chip';
 import {
 	getEligibleWebSearchTools,
@@ -470,44 +471,15 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						shortcut={shortcutLabels.templates}
 						disabled={isInputLocked}
 					/>
-					<Menu
+					<PromptTemplateDropdown
 						store={templateMenuState}
-						gutter={8}
-						overflowPadding={8}
-						portal
-						className={actionTriggerMenuWideClasses}
-						data-menu-kind="templates"
-						autoFocusOnShow
-					>
-						{!templateMenuOpen ? null : templatesLoading ? (
-							<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
-								Loading templates…
-							</div>
-						) : templateData.length === 0 ? (
-							<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
-								No templates available
-							</div>
-						) : (
-							templateData.map(item => (
-								// For tooltip and display name we use a humanized slug.
-								// Note: we use title on the item so long names are fully visible when truncated.
-								<MenuItem
-									key={`${item.bundleID}-${item.templateSlug}-${item.templateVersion}`}
-									onClick={() => {
-										void handleTemplatePick(item);
-									}}
-									className={actionTriggerMenuItemClasses}
-									title={`${item.templateSlug.replace(/[-_]/g, ' ')} • v${item.templateVersion}`}
-								>
-									<FiFilePlus size={14} className="text-warning" />
-									<span className="truncate">{item.templateSlug.replace(/[-_]/g, ' ')}</span>
-									<span className="text-base-content/50 ml-auto text-[10px] uppercase" aria-hidden="true">
-										{item.templateVersion}
-									</span>
-								</MenuItem>
-							))
-						)}
-					</Menu>
+						open={templateMenuOpen}
+						loading={templatesLoading}
+						items={templateData}
+						onPick={item => {
+							void handleTemplatePick(item);
+						}}
+					/>
 
 					<PickerButton
 						label="Tools"
@@ -517,82 +489,24 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						shortcut={shortcutLabels.tools}
 						disabled={isInputLocked}
 					/>
-					<Menu
-						store={toolMenuState}
-						gutter={8}
-						overflowPadding={8}
-						portal
-						className={actionTriggerMenuWideClasses}
-						data-menu-kind="tools"
-						autoFocusOnShow
-					>
-						{!toolMenuOpen ? null : toolsLoading ? (
-							<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
-								Loading tools…
-							</div>
-						) : availableTools.length === 0 ? (
-							<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
-								No tools available
-							</div>
-						) : (
-							availableTools.map(item => {
-								const display = item.toolDefinition.displayName || item.toolSlug || 'Tool';
-								const slug = `${item.bundleSlug ?? item.bundleID}/${item.toolSlug}@${item.toolVersion}`;
-								const key = toolIdentityKey(item.bundleID, item.bundleSlug, item.toolSlug, item.toolVersion);
-								const isAttached = attachedToolKeys.has(key);
-								const supportsAutoExecute =
-									item.toolDefinition.llmToolType === ToolStoreChoiceType.Function ||
-									item.toolDefinition.llmToolType === ToolStoreChoiceType.Custom;
 
-								return (
-									<ToolMenuRow
-										key={`${item.bundleID}-${item.toolSlug}-${item.toolVersion}`}
-										menuItemClassName={`rounded-xl px-0 py-0 text-sm outline-none transition-colors hover:bg-base-200 data-[active-item]:bg-base-300 overflow-hidden ${isAttached ? 'bg-base-200' : ''}`}
-										title={`Tool: ${display} (${slug})`}
-										display={display}
-										slug={slug}
-										isSelected={isAttached}
-										supportsAutoExecute={supportsAutoExecute}
-										autoExecute={getAutoExecForTool(item)}
-										onAutoExecuteChange={next => {
-											if (isAttached) {
-												onSetAttachedToolAutoExecute(key, next);
-												return;
-											}
-											setToolAutoExecOverrides(prev => ({ ...prev, [key]: next }));
-										}}
-										onRowClick={
-											!isAttached
-												? () => {
-														handleAttachToolPick(item);
-													}
-												: () => {
-														handleDetachToolPick(key);
-													}
-										}
-										primaryAction={
-											isAttached
-												? {
-														kind: 'detach',
-														onClick: () => {
-															handleDetachToolPick(key);
-														},
-														title: 'Detach tool',
-													}
-												: {
-														kind: 'attach',
-														onClick: () => {
-															handleAttachToolPick(item);
-														},
-														title: 'Attach tool',
-														label: 'Attach',
-													}
-										}
-									/>
-								);
-							})
-						)}
-					</Menu>
+					<ToolDropdown
+						store={toolMenuState}
+						open={toolMenuOpen}
+						loading={toolsLoading}
+						tools={availableTools}
+						attachedToolKeys={attachedToolKeys}
+						getAutoExecForTool={getAutoExecForTool}
+						onAutoExecuteChange={(item, key, isAttached, next) => {
+							if (isAttached) {
+								onSetAttachedToolAutoExecute(key, next);
+								return;
+							}
+							setToolAutoExecOverrides(prev => ({ ...prev, [key]: next }));
+						}}
+						onAttachTool={handleAttachToolPick}
+						onDetachTool={handleDetachToolPick}
+					/>
 
 					<SkillDropDown
 						allSkills={allSkills}

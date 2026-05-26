@@ -1,4 +1,4 @@
-import { type Dispatch, Fragment, type SetStateAction, useMemo } from 'react';
+import { type Dispatch, type SetStateAction, useMemo } from 'react';
 
 import { FiCheck } from 'react-icons/fi';
 
@@ -13,6 +13,7 @@ import {
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
+import { GroupedMenuSection } from '@/components/grouped_menu_sections';
 
 type ProviderModelGroup = {
 	providerName: string;
@@ -95,30 +96,25 @@ export function ModelDropdown({ selectedModel, setSelectedModel, allOptions }: M
 					className={actionTriggerMenuWideClasses}
 				>
 					{providerGroups.map((group, groupIndex) => (
-						<Fragment key={group.providerName}>
-							{groupIndex > 0 ? (
-								<div role="separator" className="my-1 border-t border-zinc-200 dark:border-zinc-700" />
-							) : null}
-
-							<div role="group" aria-label={group.providerDisplayName}>
-								<div className="px-3 pt-2 pb-1 text-[10px] font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-400">
-									{group.providerDisplayName}
-								</div>
-
-								{group.options.map(model => (
-									<MenuItem
-										key={modelKey(model)}
-										className={`${actionTriggerMenuItemClasses} justify-between`}
-										onClick={() => {
-											setSelectedModel(model);
-										}}
-									>
-										<span className="min-w-0 truncate">{model.modelDisplayName}</span>
-										{isCurrent(model) ? <FiCheck className="ml-2 shrink-0" /> : null}
-									</MenuItem>
-								))}
-							</div>
-						</Fragment>
+						<GroupedMenuSection
+							key={group.providerName}
+							title={group.providerDisplayName}
+							ariaLabel={`${group.providerDisplayName} models`}
+							separatorBefore={groupIndex > 0}
+						>
+							{group.options.map(model => (
+								<MenuItem
+									key={modelKey(model)}
+									className={`${actionTriggerMenuItemClasses} justify-between`}
+									onClick={() => {
+										setSelectedModel(model);
+									}}
+								>
+									<span className="min-w-0 truncate">{model.modelDisplayName}</span>
+									{isCurrent(model) ? <FiCheck className="ml-2 shrink-0" /> : null}
+								</MenuItem>
+							))}
+						</GroupedMenuSection>
 					))}
 				</Menu>
 			</div>

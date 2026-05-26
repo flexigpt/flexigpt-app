@@ -2,19 +2,19 @@
 
 ## Laundry list
 
-- [ ] test with some skill that has scripts too
 - [ ] block autoexec should be a high level button for just in case things i.e the llm is spiralling and you want the next turn to not autoexec as you want to give some direction to llm.
 - [ ] add msg to msg jump button: seems more and more useful for large prompts
 - [ ] may be in chats page even if there is no message card focus and someone does a page up when no modals are open, we can still scroll up.
+- [ ] error but ready to submit needs better visual thing so that people know it can be submitted.
+- [ ] cursor up and down has some jerk in composer, this is post a paste of some code.
+- [ ] check if attachments becoming stale and getting new or files deleted causes panic anywhere.
+
 - [ ] would be a good idea to have a "starting text" in assistant preset. this can be inserted in the box if there is no text already there in composer.
 
-- [ ] error but ready to submit needs better visual thing so that people know it can be submitted.
 - [ ] easier preset import bundles and flows. e.g: just import a preset bundle that has assistant, models, prompts, tools etc.
   - [ ] may be as a json import bundle or jsonc format
-- [ ] check if attachments becoming stale and getting new or files deleted causes panic anywhere.
-- [ ] cursor up and down has some jerk in composer.
 
-- [ ] group assistant presets with bundles. same for models
+- [ ] test with some skill that has scripts too
 
 ## Milestone thoughts
 

@@ -15,6 +15,7 @@ import {
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
+import { GroupedMenuSection } from '@/components/grouped_menu_sections';
 
 import { SystemPromptAddModal } from '@/chats/composer/systemprompts/system_prompt_add_modal';
 import { countEnabledSystemPromptSources } from '@/prompts/lib/system_prompt_utils';
@@ -372,16 +373,13 @@ export function SystemPromptDropdown({
 				) : prompts.length > 0 ? (
 					<div className="space-y-2">
 						{groupedPrompts.map((group, groupIndex) => (
-							<div key={group.bundleID} className={groupIndex > 0 ? 'border-neutral/20 border-t pt-2' : ''}>
-								<div className="mb-1 flex items-center justify-between gap-2 px-1">
-									<div className="min-w-0">
-										<div className="truncate text-[10px] font-semibold tracking-wide uppercase opacity-70">
-											{group.bundleDisplayName}
-										</div>
-										<div className="truncate font-mono text-[10px] opacity-50">{group.bundleSlug}</div>
-									</div>
-
-									<div className="flex shrink-0 items-center gap-1">
+							<GroupedMenuSection
+								key={group.bundleID}
+								title={group.bundleDisplayName}
+								ariaLabel={`${group.bundleDisplayName} saved prompts`}
+								separatorBefore={groupIndex > 0}
+								meta={
+									<>
 										<span className="badge badge-ghost badge-xs">{group.prompts.length}</span>
 										<span className="badge badge-ghost badge-xs">{group.isBuiltIn ? 'built-in' : 'custom'}</span>
 										{!group.isKnownBundle ? (
@@ -389,9 +387,9 @@ export function SystemPromptDropdown({
 										) : !group.isBundleEnabled ? (
 											<span className="badge badge-warning badge-xs">disabled</span>
 										) : null}
-									</div>
-								</div>
-
+									</>
+								}
+							>
 								<div className="space-y-1">
 									{group.prompts.map(item => {
 										const isSelected = selectedKeySet.has(item.identityKey);
@@ -463,7 +461,7 @@ export function SystemPromptDropdown({
 										);
 									})}
 								</div>
-							</div>
+							</GroupedMenuSection>
 						))}
 					</div>
 				) : (

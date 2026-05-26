@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import {
+	type Dispatch,
+	type SetStateAction,
+	type SyntheticEvent,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+} from 'react';
 
 import { FiCheck, FiZap } from 'react-icons/fi';
 
@@ -9,21 +17,66 @@ import type { SkillListItem, SkillRef } from '@/spec/skill';
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
+	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
+import { GroupedMenuSection, GroupedMenuSubheading } from '@/components/grouped_menu_sections';
 
 import { dedupeSkillRefs, skillRefFromListItem, skillRefKey } from '@/skills/lib/skill_identity_utils';
 
 type BundleGroup = {
 	bundleID: string;
-	bundleSlug?: string;
+	bundleSlug: string;
 	skills: SkillListItem[];
 };
 
-function stop(e: React.SyntheticEvent) {
+const skillDropdownCollator = new Intl.Collator(undefined, {
+	numeric: true,
+	sensitivity: 'base',
+});
+
+function stop(e: SyntheticEvent) {
 	e.preventDefault();
 	e.stopPropagation();
+}
+
+function skillListItemKey(item: SkillListItem): string {
+	const ref = skillRefFromListItem(item);
+	return skillRefKey(ref);
+}
+
+function getSkillDisplayLabel(item: SkillListItem): string {
+	return item.skillDefinition.displayName?.trim() || item.skillDefinition.name?.trim() || item.skillSlug;
+}
+
+function compareSkillListItems(a: SkillListItem, b: SkillListItem): number {
+	const bundleSlugCompare = skillDropdownCollator.compare(a.bundleSlug, b.bundleSlug);
+	if (bundleSlugCompare !== 0) return bundleSlugCompare;
+
+	const bundleIDCompare = skillDropdownCollator.compare(a.bundleID, b.bundleID);
+	if (bundleIDCompare !== 0) return bundleIDCompare;
+
+	const skillSlugCompare = skillDropdownCollator.compare(a.skillSlug, b.skillSlug);
+	if (skillSlugCompare !== 0) return skillSlugCompare;
+
+	const skillNameCompare = skillDropdownCollator.compare(a.skillDefinition.name, b.skillDefinition.name);
+	if (skillNameCompare !== 0) return skillNameCompare;
+
+	return skillDropdownCollator.compare(skillListItemKey(a), skillListItemKey(b));
+}
+
+function compareBundleGroups(a: BundleGroup, b: BundleGroup): number {
+	return (
+		skillDropdownCollator.compare(a.bundleSlug, b.bundleSlug) || skillDropdownCollator.compare(a.bundleID, b.bundleID)
+	);
+}
+
+function getBundleKindLabel(group: BundleGroup): string {
+	const builtInCount = group.skills.filter(item => item.isBuiltIn).length;
+	if (builtInCount === 0) return 'custom';
+	if (builtInCount === group.skills.length) return 'built-in';
+	return 'mixed';
 }
 
 function BundleCheckbox({
@@ -75,7 +128,7 @@ export function SkillDropDown({
 	loading: boolean;
 	enabledSkillRefs: SkillRef[];
 	activeSkillRefs: SkillRef[];
-	setEnabledSkillRefs: React.Dispatch<React.SetStateAction<SkillRef[]>>;
+	setEnabledSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
 	onEnableAll: () => void;
 	onDisableAll: () => void;
 	isInputLocked?: boolean;
@@ -117,22 +170,26 @@ export function SkillDropDown({
 
 	const groups: BundleGroup[] = useMemo(() => {
 		const map = new Map<string, BundleGroup>();
-		for (const item of allSkills ?? []) {
-			const id = item.bundleID ?? 'unknown-bundle';
+		for (const item of [...(allSkills ?? [])].sort(compareSkillListItems)) {
+			const id = item.bundleID || 'unknown-bundle';
+			const slug = item.bundleSlug || id;
 			const existing = map.get(id);
 			if (existing) {
 				existing.skills.push(item);
 			} else {
 				map.set(id, {
 					bundleID: id,
-					bundleSlug: item.bundleSlug,
+					bundleSlug: slug,
 					skills: [item],
 				});
 			}
 		}
-		return Array.from(map.values()).sort((a, b) =>
-			(a.bundleSlug ?? a.bundleID).localeCompare(b.bundleSlug ?? b.bundleID)
-		);
+		return Array.from(map.values())
+			.map(group => ({
+				...group,
+				skills: [...group.skills].sort(compareSkillListItems),
+			}))
+			.sort(compareBundleGroups);
 	}, [allSkills]);
 
 	const setSkillEnabled = useCallback(
@@ -140,9 +197,14 @@ export function SkillDropDown({
 			const k = skillRefKey(ref);
 			setEnabledSkillRefs(prev => {
 				const byKey = new Map<string, SkillRef>();
-				for (const r of prev ?? []) byKey.set(skillRefKey(r), r);
-				if (enabled) byKey.set(k, ref);
-				else byKey.delete(k);
+				for (const r of prev ?? []) {
+					byKey.set(skillRefKey(r), r);
+				}
+				if (enabled) {
+					byKey.set(k, ref);
+				} else {
+					byKey.delete(k);
+				}
 				return Array.from(byKey.values());
 			});
 		},
@@ -166,12 +228,17 @@ export function SkillDropDown({
 
 			setEnabledSkillRefs(prev => {
 				const byKey = new Map<string, SkillRef>();
-				for (const r of prev ?? []) byKey.set(skillRefKey(r), r);
-
+				for (const r of prev ?? []) {
+					byKey.set(skillRefKey(r), r);
+				}
 				if (enabled) {
-					for (const r of refs) byKey.set(skillRefKey(r), r);
+					for (const r of refs) {
+						byKey.set(skillRefKey(r), r);
+					}
 				} else {
-					for (const k of refKeys) byKey.delete(k);
+					for (const k of refKeys) {
+						byKey.delete(k);
+					}
 				}
 
 				return dedupeSkillRefs(Array.from(byKey.values()));
@@ -189,6 +256,56 @@ export function SkillDropDown({
 		if (loading && totalCount === 0) lines.push('Loading available skills…');
 		return lines.join('\n');
 	}, [activeCount, enabledCount, isEnabled, loading, totalCount]);
+
+	const renderSkillItem = (item: SkillListItem) => {
+		const ref = skillRefFromListItem(item);
+		const k = skillRefKey(ref);
+		const checked = enabledKeySet.has(k);
+		const isActive = activeKeySet.has(k);
+		const label = getSkillDisplayLabel(item);
+
+		return (
+			<MenuItem
+				key={k}
+				hideOnClick={false}
+				className="data-active-item:bg-base-200 flex items-center gap-2 rounded-xl px-2 py-1 pl-6 outline-none"
+				title={`${item.bundleSlug}/${item.skillSlug} • ${item.skillDefinition.type} • ${item.skillDefinition.location}`}
+				onClick={() => {
+					if (isInputLocked) return;
+					toggleSkillItem(item);
+				}}
+			>
+				<input
+					type="checkbox"
+					className="checkbox checkbox-xs rounded-sm"
+					checked={checked}
+					disabled={isInputLocked}
+					onChange={e => {
+						stop(e);
+						if (isInputLocked) return;
+						setSkillEnabled(ref, e.currentTarget.checked);
+					}}
+					onPointerDown={stop}
+					onClick={stop}
+					aria-label={`Toggle skill ${label}`}
+				/>
+
+				<div className="min-w-0 flex-1">
+					<div className="truncate text-xs font-medium">{label}</div>
+					<div className="text-base-content/60 truncate text-xs">
+						{item.skillDefinition.type} • {item.skillDefinition.location} • {item.skillDefinition.name}
+					</div>
+
+					{isActive || !item.skillDefinition.isEnabled ? (
+						<div className="mt-1 flex items-center gap-1">
+							{isActive ? <span className="badge badge-success badge-xs">Active</span> : null}
+							{!item.skillDefinition.isEnabled ? <span className="badge badge-warning badge-xs">Disabled</span> : null}
+						</div>
+					) : null}
+				</div>
+			</MenuItem>
+		);
+	};
 
 	return (
 		<div className="relative" data-bottom-bar-skills>
@@ -224,97 +341,85 @@ export function SkillDropDown({
 				</div>
 
 				{loading ? (
-					<div className="text-base-content/60 cursor-default rounded-xl px-2 py-1 text-sm">Loading skills…</div>
+					<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>Loading skills…</div>
 				) : totalCount === 0 ? (
-					<div className="text-base-content/60 cursor-default rounded-xl px-2 py-1 text-sm">No skills available</div>
+					<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
+						No skills available
+					</div>
 				) : (
 					<>
-						{groups.map(group => {
-							const bundleLabel = group.bundleSlug ?? group.bundleID;
-							const bundleRefs = group.skills.map(skillRefFromListItem);
-							const bundleTotal = bundleRefs.length;
-							const bundleEnabled = bundleRefs.filter(r => enabledKeySet.has(skillRefKey(r))).length;
+						<div className="space-y-2">
+							{groups.map((group, groupIndex) => {
+								const bundleRefs = group.skills.map(skillRefFromListItem);
+								const bundleTotal = bundleRefs.length;
+								const bundleEnabled = bundleRefs.filter(r => enabledKeySet.has(skillRefKey(r))).length;
 
-							const bundleChecked = bundleEnabled > 0 && bundleEnabled === bundleTotal;
-							const bundleIndeterminate = bundleEnabled > 0 && bundleEnabled < bundleTotal;
+								const bundleChecked = bundleEnabled > 0 && bundleEnabled === bundleTotal;
+								const bundleIndeterminate = bundleEnabled > 0 && bundleEnabled < bundleTotal;
 
-							return (
-								<div key={group.bundleID} className="mb-2 last:mb-0">
-									<MenuItem
-										hideOnClick={false}
-										className="data-active-item:bg-base-200 flex items-center gap-2 rounded-xl px-2 py-1 outline-none"
-										onClick={() => {
-											if (isInputLocked) return;
-											const next = !(bundleEnabled === bundleTotal);
-											setBundleEnabled(group, next);
-										}}
+								const enabledSkills = group.skills.filter(item => enabledKeySet.has(skillListItemKey(item)));
+								const availableSkills = group.skills.filter(item => !enabledKeySet.has(skillListItemKey(item)));
+								const showSubheadings = enabledSkills.length > 0 && availableSkills.length > 0;
+
+								return (
+									<GroupedMenuSection
+										key={group.bundleID}
+										title={group.bundleSlug}
+										ariaLabel={`${group.bundleSlug} skills`}
+										separatorBefore={groupIndex > 0}
+										meta={
+											<>
+												<span className="badge badge-ghost badge-xs">
+													{bundleEnabled}/{bundleTotal}
+												</span>
+												<span className="badge badge-ghost badge-xs">{getBundleKindLabel(group)}</span>
+											</>
+										}
 									>
-										<BundleCheckbox
-											isInputLocked={isInputLocked}
-											checked={bundleChecked}
-											indeterminate={bundleIndeterminate}
-											onChange={next => {
+										<MenuItem
+											hideOnClick={false}
+											className="data-active-item:bg-base-200 flex items-center gap-2 rounded-xl px-2 py-1 outline-none"
+											onClick={() => {
+												if (isInputLocked) return;
+												const next = !(bundleEnabled === bundleTotal);
 												setBundleEnabled(group, next);
 											}}
-										/>
-										<div className="min-w-0 flex-1">
-											<div className="truncate text-xs font-semibold">{bundleLabel}</div>
-											<div className="text-base-content/60 text-xs">
-												{bundleEnabled}/{bundleTotal} enabled
+										>
+											<BundleCheckbox
+												isInputLocked={isInputLocked}
+												checked={bundleChecked}
+												indeterminate={bundleIndeterminate}
+												onChange={next => {
+													setBundleEnabled(group, next);
+												}}
+											/>
+											<div className="min-w-0 flex-1">
+												<div className="truncate text-xs font-semibold">All skills in bundle</div>
+												<div className="text-base-content/60 text-xs">
+													{bundleEnabled}/{bundleTotal} enabled
+												</div>
 											</div>
-										</div>
-									</MenuItem>
+										</MenuItem>
 
-									<div className="mt-1">
-										{group.skills.map(item => {
-											const ref = skillRefFromListItem(item);
-											const k = skillRefKey(ref);
-											const checked = enabledKeySet.has(k);
-											const isActive = activeKeySet.has(k);
-											const label =
-												item.skillDefinition.displayName && item.skillDefinition.displayName.length > 0
-													? item.skillDefinition.displayName
-													: item.skillSlug;
+										{enabledSkills.length > 0 ? (
+											<>
+												{showSubheadings ? <GroupedMenuSubheading>Enabled</GroupedMenuSubheading> : null}
+												<div className="space-y-1">{enabledSkills.map(renderSkillItem)}</div>
+											</>
+										) : null}
 
-											return (
-												<MenuItem
-													key={`${item.bundleID}:${item.skillSlug}`}
-													hideOnClick={false}
-													className="data-active-item:bg-base-200 flex items-center gap-2 rounded-xl px-2 py-1 pl-6 outline-none"
-													onClick={() => {
-														if (isInputLocked) return;
-														toggleSkillItem(item);
-													}}
-												>
-													<input
-														type="checkbox"
-														className="checkbox checkbox-xs rounded-sm"
-														checked={checked}
-														disabled={isInputLocked}
-														onChange={e => {
-															stop(e);
-															if (isInputLocked) return;
-															setSkillEnabled(ref, e.currentTarget.checked);
-														}}
-														onPointerDown={stop}
-														onClick={stop}
-														aria-label={`Toggle skill ${label}`}
-													/>
-													<div className="min-w-0 flex-1">
-														<div className="truncate text-xs">{label}</div>
-														<div className="text-base-content/60 truncate text-xs">
-															{item.skillDefinition.type} • {item.skillDefinition.location} •{' '}
-															{item.skillDefinition.name}
-														</div>
-														{isActive ? <div className="badge badge-success badge-xs mt-1">Active</div> : null}
-													</div>
-												</MenuItem>
-											);
-										})}
-									</div>
-								</div>
-							);
-						})}
+										{availableSkills.length > 0 ? (
+											<>
+												{showSubheadings ? (
+													<GroupedMenuSubheading separated={enabledSkills.length > 0}>Available</GroupedMenuSubheading>
+												) : null}
+												<div className="space-y-1">{availableSkills.map(renderSkillItem)}</div>
+											</>
+										) : null}
+									</GroupedMenuSection>
+								);
+							})}
+						</div>
 
 						<div className="border-base-300 mt-2 flex items-center justify-end gap-2 border-t pt-2">
 							<button

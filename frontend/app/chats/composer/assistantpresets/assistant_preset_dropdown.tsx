@@ -11,6 +11,7 @@ import {
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
+import { GroupedMenuSection, GroupedMenuSubheading } from '@/components/grouped_menu_sections';
 
 import type { AssistantPresetOptionItem } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 
@@ -327,46 +328,28 @@ export function AssistantPresetDropdown({
 							</div>
 						) : (
 							<div className="space-y-2">
-								{groupedPresetOptions.map((group, groupIndex) => {
-									return (
-										<div
-											key={group.bundleSlug}
-											role="group"
-											aria-label={`${group.bundleDisplayName} assistant presets`}
-											className="space-y-1"
-										>
-											{groupIndex > 0 ? <div role="separator" className="border-base-300 my-2 border-t" /> : null}
+								{groupedPresetOptions.map((group, groupIndex) => (
+									<GroupedMenuSection
+										key={group.bundleSlug}
+										title={group.bundleDisplayName}
+										ariaLabel={`${group.bundleDisplayName} assistant presets`}
+										separatorBefore={groupIndex > 0}
+									>
+										{group.selectableOptions.length > 0 && group.unavailableOptions.length > 0 ? (
+											<GroupedMenuSubheading>Available</GroupedMenuSubheading>
+										) : null}
 
-											<div className="px-1 pt-1">
-												<div className="flex min-w-0 items-center justify-between gap-2">
-													<div className="min-w-0 truncate text-[11px] font-semibold tracking-wide uppercase opacity-70">
-														{group.bundleDisplayName}
-													</div>
-													{group.bundleSlug !== group.bundleDisplayName ? (
-														<div className="shrink-0 truncate font-mono text-[10px] opacity-45">{group.bundleSlug}</div>
-													) : null}
-												</div>
-											</div>
+										{group.selectableOptions.map(renderPresetOption)}
 
-											{group.selectableOptions.length > 0 && group.unavailableOptions.length > 0 ? (
-												<div className="px-1 text-[10px] font-medium tracking-wide uppercase opacity-50">Available</div>
-											) : null}
-											{group.selectableOptions.map(renderPresetOption)}
+										{group.unavailableOptions.length > 0 ? (
+											<GroupedMenuSubheading tone="warning" separated={group.selectableOptions.length > 0}>
+												Unavailable
+											</GroupedMenuSubheading>
+										) : null}
 
-											{group.unavailableOptions.length > 0 ? (
-												<div
-													className={`text-warning px-1 text-[10px] font-medium tracking-wide uppercase opacity-80 ${
-														group.selectableOptions.length > 0 ? 'border-base-300 mt-1 border-t pt-2' : ''
-													}`}
-												>
-													Unavailable
-												</div>
-											) : null}
-
-											{group.unavailableOptions.map(renderPresetOption)}
-										</div>
-									);
-								})}
+										{group.unavailableOptions.map(renderPresetOption)}
+									</GroupedMenuSection>
+								))}
 							</div>
 						)}
 					</Menu>
