@@ -36,6 +36,11 @@ export interface DropdownProps<K extends string> {
 	orderedKeys?: readonly K[];
 	placeholderLabel?: string;
 	disabled?: boolean;
+	/**
+	 * Render the menu in normal document flow instead of as an absolute DaisyUI dropdown.
+	 * Useful inside scrollable modals so opening the menu expands the modal naturally.
+	 */
+	inlineMenu?: boolean;
 }
 
 // A single reusable dropdown that can be used by passing the appropriate config.
@@ -51,6 +56,7 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 		orderedKeys,
 		placeholderLabel = 'Select an option',
 		disabled = false,
+		inlineMenu = false,
 	} = props;
 
 	const [isOpen, setIsOpen] = useState(false);
@@ -104,7 +110,7 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 	return (
 		<details
 			ref={detailsRef}
-			className="dropdown relative w-full"
+			className={`${inlineMenu ? 'relative' : 'dropdown relative'} w-full`}
 			onToggle={(event: SyntheticEvent<HTMLElement>) => {
 				const details = event.currentTarget as HTMLDetailsElement;
 				if (disabled && details.open) {
@@ -130,41 +136,45 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 				{isOpen ? <FiChevronUp size={16} /> : <FiChevronDown size={16} />}
 			</summary>
 
-			<ul
-				tabIndex={0}
-				className="dropdown-content menu border-neutral/20 bg-base-300 flex w-full flex-col flex-nowrap overflow-x-hidden overflow-y-auto rounded-2xl shadow-sm"
-				style={{
-					maxHeight: typeof maxMenuHeight === 'number' ? `${maxMenuHeight}px` : maxMenuHeight,
-				}}
-			>
-				{filteredKeys.map(key => {
-					const item = dropdownItems[key];
-					const isItemDisabled = disabled || !item?.isEnabled;
+			{(!inlineMenu || isOpen) && (
+				<ul
+					tabIndex={0}
+					className={`menu border-neutral/20 bg-base-300 flex w-full flex-col flex-nowrap overflow-x-hidden overflow-y-auto rounded-2xl shadow-sm ${
+						inlineMenu ? 'mt-2 border' : 'dropdown-content z-50'
+					}`}
+					style={{
+						maxHeight: typeof maxMenuHeight === 'number' ? `${maxMenuHeight}px` : maxMenuHeight,
+					}}
+				>
+					{filteredKeys.map(key => {
+						const item = dropdownItems[key];
+						const isItemDisabled = disabled || !item?.isEnabled;
 
-					return (
-						<li
-							key={key}
-							className={`w-full rounded-2xl ${isItemDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
-							onClick={() => {
-								if (!isItemDisabled) {
-									handleSelection(key);
-								}
-							}}
-						>
-							<a
-								className="m-1 flex items-center justify-between p-2"
-								aria-disabled={isItemDisabled}
-								onClick={event => {
-									event.preventDefault();
+						return (
+							<li
+								key={key}
+								className={`w-full rounded-2xl ${isItemDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+								onClick={() => {
+									if (!isItemDisabled) {
+										handleSelection(key);
+									}
 								}}
 							>
-								<span className="truncate">{getItemDisplayName(key)}</span>
-								{key === selectedKey && <FiCheck />}
-							</a>
-						</li>
-					);
-				})}
-			</ul>
+								<a
+									className="m-1 flex items-center justify-between p-2"
+									aria-disabled={isItemDisabled}
+									onClick={event => {
+										event.preventDefault();
+									}}
+								>
+									<span className="truncate">{getItemDisplayName(key)}</span>
+									{key === selectedKey && <FiCheck />}
+								</a>
+							</li>
+						);
+					})}
+				</ul>
+			)}
 		</details>
 	);
 };

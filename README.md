@@ -42,7 +42,7 @@ FlexiGPT is built for people who use LLMs as part of repeatable work, not just o
 
 Good first workflows:
 
-- Use a home screen workflow card such as Analyze File, Code Review, Bug Investigation, or Architecture Review.
+- Use a home screen workflow card such as Analyze File, Code Review or Bug Investigation.
 - Attach only the relevant source material.
 - Send the prefilled prompt as-is or adjust it for your task.
 - Reuse or customize the assistant preset once the workflow fits your style.
