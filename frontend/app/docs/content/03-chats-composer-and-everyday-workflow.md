@@ -1,196 +1,315 @@
 # Chats, Composer, and Everyday Workflow
 
-This page focuses on the day-to-day workspace inside FlexiGPT.
-The **Chats** page is the main surface where reusable assistant setup, local history, current context, and provider/model choices come together.
-It combines chat tabs, conversation search, the active conversation timeline, and the composer for the next request.
+The **Chats** page is the main place where FlexiGPT turns reusable setup into actual work.
+It combines tabs, local conversation search, the active conversation timeline, model controls, assistant presets, prompt sources, attachments, tools, skills, and the editor for the next message.
 
 ## Table of contents <!-- omit from toc -->
 
 - [What the Chats page brings together](#what-the-chats-page-brings-together)
 - [A normal workflow](#a-normal-workflow)
-  - [Open or create a conversation](#open-or-create-a-conversation)
-  - [Configure the next request in the context bar](#configure-the-next-request-in-the-context-bar)
-  - [Prepare the current turn in the editor area](#prepare-the-current-turn-in-the-editor-area)
-  - [Add only the context that helps](#add-only-the-context-that-helps)
-- [What happens after send](#what-happens-after-send)
-- [Tool-assisted conversations inside the chat flow](#tool-assisted-conversations-inside-the-chat-flow)
-  - [Manual review](#manual-review)
-  - [Auto-execute](#auto-execute)
-- [Reading results in the message timeline](#reading-results-in-the-message-timeline)
+- [Composer control bar](#composer-control-bar)
+  - [Assistant preset dropdown](#assistant-preset-dropdown)
+- [Composer context bar](#composer-context-bar)
+- [Composer active chips bar](#composer-active-chips-bar)
+  - [Attachments in the composer](#attachments-in-the-composer)
+  - [Tools in the composer](#tools-in-the-composer)
+  - [Skills in the composer](#skills-in-the-composer)
+  - [Sending, running tools, and stopping](#sending-running-tools-and-stopping)
+- [Prompt templates in the composer](#prompt-templates-in-the-composer)
+- [Reading results](#reading-results)
 - [Editing and branching](#editing-and-branching)
 - [Search, tabs, and continuity](#search-tabs-and-continuity)
-- [When to leave the Chats page](#when-to-leave-the-chats-page)
+- [When to leave Chats](#when-to-leave-chats)
 
 ## What the Chats page brings together
 
-The **Chats** page combines four responsibilities in one place:
+The Chats page coordinates:
 
-- conversation search
 - chat tabs
-- the active conversation timeline
-- the composer for the next request
+- local conversation search
+- conversation restoration
+- the message timeline
+- streaming responses
+- the composer
+- assistant preset application
+- model and runtime parameter controls
+- attachments
+- prompt templates
+- system prompt sources
+- tools and tool outputs
+- skills and skill sessions
 
-That is why most everyday work happens there: it is where repeatable setup turns into a concrete message, response, tool run, or continuation.
+Most everyday work should start here.
 
 ## A normal workflow
 
-### Open or create a conversation
+A typical workflow is:
 
-On **Chats**, you can:
+1. Open **Chats** or choose a starter card from the home screen.
+2. Pick an assistant preset if you want a known workflow shape.
+3. Confirm the model preset and provider.
+4. Set **Previous user turns** intentionally.
+5. Add source context such as files, folders, URLs, or notes.
+6. Add prompt templates, tools, web search, or skills only if they help.
+7. Send.
+8. Inspect the answer, tool calls, citations, token usage, and message details.
+9. Adjust one layer at a time.
 
-- start a fresh conversation
-- switch between open tabs
-- search local history
-- reopen a saved conversation
-- export the current conversation as JSON
+## Composer control bar
 
-Multiple tabs make it easier to compare or continue different threads without losing your place.
+The request control bar sits above the editor and controls how the next turn runs.
 
-### Configure the next request in the context bar
+It includes:
 
-At the top of the composer, the context controls shape the next request.
+| Control                      | What it affects                                                                                             |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| **Assistant**                | Applies a starter recipe for model, instructions, tools, and skills.                                        |
+| **Model**                    | Chooses the provider/model preset.                                                                          |
+| **Temperature or reasoning** | Controls model style or reasoning behavior where supported.                                                 |
+| **Effort/verbosity**         | Controls output verbosity when supported by the model/provider.                                             |
+| **Previous user turns**      | Controls how much earlier user context is resent.                                                           |
+| **Advanced parameters**      | Streaming, token limits, timeout, cache control, output format, stop sequences, and other model parameters. |
 
-Use them when you want to change how the next request should run.
+Use the bar when you want to change the workflow or request params, not just the text of the current message.
 
-Examples:
+### Assistant preset dropdown
 
-- apply a reusable assistant preset for a repeated workflow
-- switch to a stronger model
-- reduce temperature for a stricter answer
-- reduce **Previous user turns** because the thread drifted
-- open advanced parameters for more control
+Assistant presets are starter recipes.
+They seed the composer, but they do not lock the conversation.
 
-| Control                      | What it influences                                                                                           |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| **Assistant Preset**         | Reusable starting workspace for model, instructions, tools, and skills.                                      |
-| **Model**                    | Active provider and model choice for the request, usually through the selected model preset.                 |
-| **Temperature or Reasoning** | Quality and style controls exposed by the selected model.                                                    |
-| **Output Verbosity**         | Output verbosity when the current model supports it.                                                         |
-| **Previous user turns**      | How much earlier user context is resent.                                                                     |
-| **Advanced parameters**      | Streaming, token limits, timeout, output format, stop sequences, cache control, and similar request options. |
+The assistant preset dropdown can show:
 
-### Prepare the current turn in the editor area
+- the selected preset
+- whether it is **In sync** or **Modified**
+- which sections changed after applying it
+- actions to view, reset, reapply, or clear to base
 
-Below the context controls, the editor area is where you build the current request.
+Use **View** to inspect what a preset contributes.
 
-That can include:
+Depending on the preset, the view can show:
 
-- the message text
-- attachments
-- prompt template insertion
-- system prompt selection
-- conversation tool choices
-- web-search selection when supported and filtered to the active provider SDK
-- skill selection
-- pending tool calls and tool outputs in tool-assisted flows
+- model and advanced parameter values
+- instruction template selections
+- tool and web-search selections
+- enabled skills
+- current values when the active preset has been modified
 
-This is where human input, reusable configuration, and execution helpers come together.
+Use **Reapply** or **Reset** when you want preset-managed sections to return to the preset values.
 
-### Add only the context that helps
+Use **Clear to base** when you want to return to the base assistant preset or fallback selectable preset.
 
-The composer lets you add supporting context for the current request.
+Important expectation:
 
-Common examples:
+- if a preset does not define a section, applying it usually leaves that section alone
+- if a preset defines instruction templates, those selected prompt sources are replaced by the preset selection
+- if a preset defines tools, conversation tools and web-search choices are set from the preset
+- if a preset defines skills, enabled/active skill state is set from the preset
 
-- **Attachments** for files, folders, images, PDFs, and URLs
-- **System Prompt** sources for durable instructions
-- **Prompts** for reusable request structure
-- **Tools** when the task may need execution capability
-- **Skills** for reusable workflow modes
-- **Web Search** when the current provider supports it and fresh information matters
+## Composer context bar
 
-A focused request usually works better than an overloaded one.
+The composer context bar is the picker area under the editor.
 
-## What happens after send
+It provides:
 
-After you send:
+- **Attachments**
+  - files
+  - folders
+  - URLs
+- **System prompt**
+  - model default prompt toggle
+  - saved system/developer prompt sources
+  - add/fork system prompt
+- **Prompts**
+  - reusable prompt templates for the current message
+- **Tools**
+  - attach tools to the draft
+- **Skills**
+  - enable or clear workflow skills
+- **Web search**
+  - provider-compatible web search tool selection when available
+- **Shortcuts**
+  - keyboard shortcut reference
+- **Input tips**
+  - common behavior notes for prompts, tools, and attachments
 
-- assistant text can stream into the message view
-- responses can render as Markdown, syntax-highlighted code, Mermaid diagrams, and math
-- token usage becomes available after completion
-- citations may appear when the provider returns them
-- tool calls can appear in the thread
-- tool outputs appear once you run them manually or they auto-execute
-- message details help with inspection and debugging
+## Composer active chips bar
 
-## Tool-assisted conversations inside the chat flow
-
-When tools are available to a conversation, the workflow still stays in the chat.
-
-### Manual review
-
-In a manual flow:
-
-- the model proposes a tool call
-- you inspect the call
-- you decide whether to run it
-- the output is then available for the next step in the conversation
-
-### Auto-execute
-
-In an auto-execute flow:
-
-- the model proposes a tool call
-- FlexiGPT runs it automatically when the tool is configured for auto-execution and the call has the required arguments
-- the result is submitted back into the conversation so the model can continue
-
-That is the app's more automated or agentic mode: faster tool loops, but still bounded by the tools you selected and how you configured them.
-
-## Reading results in the message timeline
-
-The message area is more than a plain transcript.
+The chips bar appears when the current draft has active context.
 
 It can show:
 
-- rendered Markdown
-- code blocks
-- Mermaid diagrams with zoom and export
-- math rendering
-- citations when present
-- attachments, tool calls, and tool outputs under messages
-- token usage and message details
+- conversation tools
+- standalone attachments
+- folder attachment groups
+- attached tools
+- pending tool calls
+- running tool calls
+- failed tool calls
+- tool outputs
 
-Per-message actions can include:
+The chips bar is where you inspect and remove draft context before sending.
 
-- copy
-- message details
+### Attachments in the composer
+
+Attachments can be added through the attachment picker or by dropping files.
+
+Supported user-facing inputs include:
+
+- multiple files
+- folders
+- URLs
+
+Attachment behavior to remember:
+
+- files and URLs are deduplicated by identity
+- a single local attachment over `16 MiB` becomes a not-readable/error attachment
+- folder selection is limited to `128` files per directory selection in the composer
+- overflow folders are shown as skipped notices
+- folder chips are UI grouping; restored messages may show flat attachment chips
+- each attachment has a mode, such as text, file, image, page content, link as text, or not readable
+
+Review attachment modes before sending sensitive work.
+
+### Tools in the composer
+
+Tools can be made available in several ways:
+
+- selected by an assistant preset
+- added as conversation-level tools
+- attached to the current draft
+- exposed through skills
+- selected as provider-compatible web search
+
+Tool states are separate:
+
+| State           | Meaning                                    |
+| --------------- | ------------------------------------------ |
+| **Tool choice** | Tool is available to the model.            |
+| **Tool call**   | Model requested a concrete call.           |
+| **Tool output** | FlexiGPT ran the call and captured output. |
+
+When tool calls appear, you can usually:
+
+- run a call
+- discard a call
+- inspect call details
+- retry failed output when possible
+- remove tool output before sending it back
+
+If a tool requires user options, the composer blocks sending until required options are valid.
+
+### Skills in the composer
+
+Skills are selected from the Skills menu.
+
+The menu shows:
+
+- enabled count
+- active count
+- available skills
+- bundle-level selection
+- individual skill selection
+- select all
+- clear all
+
+Enabled skills define what the skill session may use.
+Active skills are the skills currently active in that session.
+
+When you send with enabled skills, FlexiGPT may create or refresh a skill session and include skill-related context or tool choices in the request.
+
+### Sending, running tools, and stopping
+
+The composer supports these action paths:
+
+| Action                 | Meaning                                                                           |
+| ---------------------- | --------------------------------------------------------------------------------- |
+| **Send**               | Send the current message and selected context.                                    |
+| **Run tools only**     | Execute pending runnable tool calls without sending a new model request.          |
+| **Run tools and send** | Execute pending calls, then send the outputs back to the model.                   |
+| **Stop**               | Abort an in-flight generation. Partial output already received stays in the chat. |
+
+Guardrails:
+
+- required template variables block send
+- missing tool/web-search options block send
+- pending runnable tool calls must be run or discarded before normal send
+- failed runnable calls must be retried or discarded before send
+- if auto-execute is enabled for eligible tool calls, FlexiGPT can run them automatically
+- if all observed calls in an auto-execute batch succeed, the outputs may be submitted back automatically
+
+## Prompt templates in the composer
+
+Prompt templates are inserted into the editor.
+
+When you insert a template:
+
+- user blocks become visible draft text
+- variables become inline editable pills
+- required variables block sending until filled
+- system/developer blocks contribute instruction context for the send
+- a template toolbar appears so you can edit, flatten, or remove the template
+
+Use **Edit Template** in the toolbar when you want local changes for this inserted instance.
+Those local changes do not edit the saved template in the prompt catalog.
+
+Use **Flatten** when you want to convert the template’s visible user content into plain text.
+After flattening, the template’s variable behavior and template-derived instruction blocks no longer participate as a template.
+
+## Reading results
+
+The message timeline can show:
+
+- Markdown
+- syntax-highlighted code
+- Mermaid diagrams
+- math
+- reasoning content when available
+- citations when returned by the provider
 - token usage
-- Markdown toggle
-- Mermaid actions where applicable
-- edit and resend for user messages
+- debug/message details
+- tool calls and outputs
+- attachments
+
+Use message details when debugging why a response changed.
 
 ## Editing and branching
 
-User messages can be edited and resent.
+You can edit an earlier user message.
 
-When you resend an earlier user message:
+When editing:
 
-- that message is loaded back into the composer
-- later messages in that branch are dropped
-- the updated message becomes the new continuation point
+- the selected message is loaded into the composer
+- later messages are dropped when you resend
+- current conversation tools, web search, and skill state are snapshotted
+- canceling the edit restores the previous context
 
-That makes resend a branching workflow rather than a hidden patch on the old transcript.
+This is a branch-and-replay workflow, not a hidden edit of the old response.
 
 ## Search, tabs, and continuity
 
-The chat workspace also preserves local working context for you.
+The Chats workspace supports:
 
-That includes:
-
-- multi-tab navigation
+- multiple tabs
+- scratch tabs
+- local conversation search
 - reopening saved conversations
-- restoring scroll position
-- handling attachment drops into the active tab
-- keeping the active tab's composer and runtime state aligned with the selected conversation
+- scroll restoration
+- local tab restoration
 
-## When to leave the Chats page
+Tabs are UI workspace state.
+Conversation content is stored by the backend.
 
-Stay on **Chats** for most work.
+## When to leave Chats
 
-Leave it when you need to change the reusable building blocks behind the chat, such as:
+Stay in Chats for active work.
 
-- creating or editing an assistant preset
-- updating a tool definition
-- adding a prompt template
-- changing provider or model setup
-- changing auth keys or debug settings
+Leave Chats when you need to maintain reusable building blocks:
+
+| Goal                                  | Page              |
+| ------------------------------------- | ----------------- |
+| Create or version an assistant preset | Assistant Presets |
+| Create or version a prompt template   | Prompts           |
+| Add or maintain tools                 | Tools             |
+| Add or maintain skills                | Skills            |
+| Change providers/models               | Model Presets     |
+| Add provider keys or debug settings   | Settings          |

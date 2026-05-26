@@ -11,11 +11,10 @@
 - [ ] product spec writer needs better name to identify with common prd mrd type things
 - [ ] may be docs auditor can be a read only thing?
 - [ ] error but ready to submit needs better visual thing so that people know it can be submitted.
-- [ ] assistant preset behavior notes to document: all things are starter including prompts, tools, skills etc. all things can change as required.
-- [ ] should document what to check to know the prompts supplied for presets, how to modify prompts etc.
 - [ ] easier preset import bundles and flows. e.g: just import a preset bundle that has assistant, models, prompts, tools etc.
   - [ ] may be as a json import bundle or jsonc format
 - [ ] check if attachments becoming stale and getting new or files deleted causes panic anywhere.
+- [ ] cursor up and down has some jerk in composer.
 
 ## Milestone thoughts
 

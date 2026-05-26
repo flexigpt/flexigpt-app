@@ -984,3 +984,5 @@
 - [x] better security privacy and workflow recipe guides
 - [x] better assistant presets: definitely need one which is just fs read and explore setup rather than whole fs exec thing. may have read only, read write read write exec presets
 - [x] better assistants that are more of a good starter recipes for full development
+- [x] assistant preset behavior notes to document: all things are starter including prompts, tools, skills etc. all things can change as required.
+- [x] should document what to check to know the prompts supplied for presets, how to modify prompts etc.
