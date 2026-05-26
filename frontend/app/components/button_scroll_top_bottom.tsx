@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes } from 'react';
 
-import { FiArrowDownCircle, FiArrowUpCircle } from 'react-icons/fi';
+import { FiChevronsDown, FiChevronsUp } from 'react-icons/fi';
 
 interface ButtonScrollToBottomProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 	onScrollToBottom: () => void;
@@ -30,7 +30,7 @@ export function ButtonScrollToBottom({
 			className={`${className} transition-opacity duration-150 ${show ? 'visible opacity-100' : 'pointer-events-none invisible opacity-0'}`}
 			{...props}
 		>
-			<FiArrowDownCircle size={iconSize} />
+			<FiChevronsDown size={iconSize} />
 		</button>
 	);
 }
@@ -63,7 +63,7 @@ export function ButtonScrollToTop({
 			className={`${className} transition-opacity duration-150 ${show ? 'visible opacity-100' : 'pointer-events-none invisible opacity-0'}`}
 			{...props}
 		>
-			<FiArrowUpCircle size={iconSize} />
+			<FiChevronsUp size={iconSize} />
 		</button>
 	);
 }

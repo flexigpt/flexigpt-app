@@ -993,3 +993,9 @@
 - [x] product spec writer needs better name to identify with common prd mrd type things
 - [x] may be docs auditor can be a read only thing?
 - [x] group assistant presets with bundles. same for models, prompts, skills, tools, system prompts.
+
+- [x] error but ready to submit needs better visual thing so that people know it can be submitted. as of now it shows red and it feels like send is blocked, but we sho9udl properly say that tool errored, but this can be submitted, cannot submit can be red, but error but can submit needs better representation.
+
+- [x] add msg to msg jump button: seems more and more useful for large prompts. these should be along with other up and down current scroll buttons. like forward fast forward, back fast back but jump scroll counterparts. icons should indicate accordingly. their trigger shoudl be presense or absense of last/next messages rather than busy states.
+
+- [x] high cpu due to system prompt rerenders

@@ -4,11 +4,7 @@
 
 - [ ] block autoexec should be a high level button for just in case things i.e the llm is spiralling and you want the next turn to not autoexec as you want to give some direction to llm. this should be visible when there is atleast 2 ato exec tool during send. but it should be active during streaming and busy periods too, and value should be used during next autoexec run after assistant message. in enxt turn again if there are no autoexec tools, the button shuld not be visible. it should be present just above the stop streaming button, and should be indicative enough to tell that it is autoexec stop.
 
-- [ ] add msg to msg jump button: seems more and more useful for large prompts. these should be along with other up and down current scroll buttons. like forward fast forward, back fast back but jump scroll counterparts. icons should indicate accordingly. their trigger shoudl be presense or absense of last/next messages rather than busy states.
-
 - [ ] may be in chats page even if there is no message card focus and someone does a page up/down when no modals are open, we can still scroll up/down. as of now lack of focus creates a issue.
-
-- [ ] error but ready to submit needs better visual thing so that people know it can be submitted. as of now it shows red and it feels like send is blocked, but we sho9udl properly say that tool errored, but this can be submitted, cannot submit can be red, but error but can submit needs better representation.
 
 - [ ] cursor up and down has some jerk in composer, this is post a paste of some code. check any rerenders anyplace that can cause this.
 

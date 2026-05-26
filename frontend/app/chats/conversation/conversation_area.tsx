@@ -1,5 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useSyncExternalStore } from 'react';
 
+import { FiChevronDown, FiChevronUp } from 'react-icons/fi';
+
 import type { Conversation, ConversationMessage } from '@/spec/conversation';
 import { RoleEnum } from '@/spec/inference';
 
@@ -154,8 +156,13 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		handleScroll,
 		isAtBottom,
 		isAtTop,
+		canJumpToPreviousMessage,
+		canJumpToNextMessage,
 		scrollActiveToTop,
 		scrollActiveToBottom,
+		scrollActiveToPreviousMessage,
+		scrollActiveToNextMessage,
+		scrollActivePageBy,
 		scrollTabToBottomSoon,
 		setScrollTopForTab,
 		resetScrollToTop,
@@ -303,6 +310,34 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		[mountedInputTabIds, selectedTabId, tabs]
 	);
 
+	useEffect(() => {
+		const isEditableTarget = (target: EventTarget | null): boolean => {
+			if (!(target instanceof HTMLElement)) return false;
+			if (target.closest('[data-disable-chat-shortcuts="true"]')) return true;
+			if (target.isContentEditable) return true;
+			const tag = target.tagName.toLowerCase();
+			return tag === 'input' || tag === 'textarea' || tag === 'select';
+		};
+
+		const hasOpenModal = () => Boolean(document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]'));
+
+		const onKeyDown = (event: KeyboardEvent) => {
+			if (event.defaultPrevented) return;
+			if (event.altKey || event.ctrlKey || event.metaKey) return;
+			if (event.key !== 'PageUp' && event.key !== 'PageDown') return;
+			if (hasOpenModal()) return;
+			if (isEditableTarget(event.target)) return;
+
+			event.preventDefault();
+			scrollActivePageBy(event.key === 'PageDown' ? 1 : -1);
+		};
+
+		window.addEventListener('keydown', onKeyDown);
+		return () => {
+			window.removeEventListener('keydown', onKeyDown);
+		};
+	}, [scrollActivePageBy]);
+
 	return (
 		<>
 			<div className="relative row-start-2 row-end-3 mt-2 min-h-0">
@@ -318,13 +353,17 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 								<span className="loading loading-dots loading-md" aria-label="Loading conversation" />
 							</div>
 						) : (
-							messages.map((message, index) => <div key={message.id}>{itemContent(index, message)}</div>)
+							messages.map((message, index) => (
+								<div key={message.id} data-chat-message-index={index}>
+									{itemContent(index, message)}
+								</div>
+							))
 						)}
 					</div>
 				</div>
 
-				<div className="pointer-events-none absolute right-4 bottom-16 z-10 xl:right-24">
-					<div className="pointer-events-auto">
+				<div className="pointer-events-none absolute right-4 bottom-4 z-10 xl:right-24">
+					<div className="pointer-events-auto flex flex-col items-center gap-2">
 						{!isAtTop ? (
 							<ButtonScrollToTop
 								onScrollToTop={scrollActiveToTop}
@@ -333,11 +372,29 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 								className="btn btn-md border-none bg-transparent shadow-none"
 							/>
 						) : null}
-					</div>
-				</div>
+						{canJumpToPreviousMessage ? (
+							<button
+								type="button"
+								className="btn btn-md border-none bg-transparent shadow-none"
+								onClick={scrollActiveToPreviousMessage}
+								aria-label="Jump to previous message"
+								title="Jump to previous message"
+							>
+								<FiChevronUp size={32} />
+							</button>
+						) : null}
 
-				<div className="pointer-events-none absolute right-4 bottom-4 z-10 xl:right-24">
-					<div className="pointer-events-auto">
+						{canJumpToNextMessage ? (
+							<button
+								type="button"
+								className="btn btn-md border-none bg-transparent shadow-none"
+								onClick={scrollActiveToNextMessage}
+								aria-label="Jump to next message"
+								title="Jump to next message"
+							>
+								<FiChevronDown size={32} />
+							</button>
+						) : null}
 						{!isAtBottom ? (
 							<ButtonScrollToBottom
 								onScrollToBottom={scrollActiveToBottom}

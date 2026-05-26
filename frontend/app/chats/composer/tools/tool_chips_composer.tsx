@@ -276,7 +276,7 @@ function ToolOutputComposerChipView({ output, onOpen, onRemove, onRetry }: ToolO
 
 	return (
 		<div
-			className={`flex min-w-48 shrink-0 cursor-pointer items-center gap-2 rounded-2xl px-2 py-0 transition-colors ${isError ? 'border-error/70 bg-error/5 text-error border' : 'bg-base-200 text-base-content hover:bg-base-300/80'}`}
+			className={`flex min-w-48 shrink-0 cursor-pointer items-center gap-2 rounded-2xl px-2 py-0 transition-colors ${isError ? 'border-warning/70 bg-warning/10 text-warning-content border' : 'bg-base-200 text-base-content hover:bg-base-300/80'}`}
 			title={title}
 			role="button"
 			tabIndex={0}
@@ -289,9 +289,9 @@ function ToolOutputComposerChipView({ output, onOpen, onRemove, onRetry }: ToolO
 			}}
 			data-attachment-chip="tool-output"
 		>
-			<FiTool size={14} className={isError ? 'text-error' : ''} />
-			<span className={`text-[10px] uppercase ${isError ? 'text-error' : 'text-base-content/60'}`}>
-				{isError ? 'Tool error' : 'Result'}
+			<FiTool size={14} />
+			<span className={`text-[10px] uppercase ${isError ? 'font-semibold' : 'text-base-content/60'}`}>
+				{isError ? 'Error result' : 'Result'}
 			</span>
 			<span className="max-w-64 truncate">{truncatedLabel}</span>
 

@@ -125,11 +125,16 @@ export function useComposerSystemPrompt(args: {
 	}, [initializedFromModel]);
 
 	// Initialize includeModelDefault once when model options finish loading,
-	// unless a restore/reset has already set the flag.
-	if (modelOptionsLoaded && !initializedFromModel) {
+	// unless a restore/reset has already set the flag. Done in an effect so
+	// we don't trigger an extra render-during-render cycle on every mount.
+	useEffect(() => {
+		if (!modelOptionsLoaded || initializedFromModelRef.current) return;
+		initializedFromModelRef.current = true;
+		// eslint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setInitializedFromModelState(true);
+		// eslint-disable-next-line react-you-might-not-need-an-effect/no-derived-state
 		setIncludeModelDefaultState(Boolean(modelDefaultPrompt.trim()));
-	}
+	}, [modelOptionsLoaded, modelDefaultPrompt]);
 
 	const syntheticPreviousConversationPrompt = useMemo(() => {
 		const prompt = restoredConversationSystemPrompt?.trim();
@@ -237,6 +242,11 @@ export function useComposerSystemPrompt(args: {
 		[setPromptSelectionState]
 	);
 
+	const promptsByKeyRef = useRef(promptsByKey);
+	useEffect(() => {
+		promptsByKeyRef.current = promptsByKey;
+	}, [promptsByKey]);
+
 	const prepareAssistantPresetSelections = useCallback(
 		async (preset: AssistantPreset): Promise<ComposerSystemPromptPreparedSelection> => {
 			const hasIncludeModelSystemPromptSelection = preset.startingIncludeModelSystemPrompt !== undefined;
@@ -268,7 +278,14 @@ export function useComposerSystemPrompt(args: {
 					);
 				}
 
-				await refreshPrompts();
+				// Only refresh if at least one requested key isn't already
+				// known locally. Avoids a backend round-trip every time a
+				// preset is (re)applied.
+				const knownKeys = new Set(promptsByKeyRef.current.keys());
+				const needsRefresh = requestedPromptKeys.some(key => !knownKeys.has(key));
+				if (needsRefresh) {
+					await refreshPrompts();
+				}
 				nextSelectedPromptKeys = requestedPromptKeys;
 			}
 

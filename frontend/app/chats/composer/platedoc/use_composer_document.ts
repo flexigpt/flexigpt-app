@@ -442,9 +442,17 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 			}
 
 			insertPlainTextAsSingleBlock(currentEditor, text);
-			focusEditorPreservingSelection();
+			syncDocumentDerivedState(true);
+			scheduleAutoChunk();
+			scrollEditorSelectionIntoView();
 		},
-		[cancelScheduledAutoChunk, focusEditorAtEnd, focusEditorPreservingSelection, syncDocumentDerivedState]
+		[
+			cancelScheduledAutoChunk,
+			focusEditorAtEnd,
+			scheduleAutoChunk,
+			scrollEditorSelectionIntoView,
+			syncDocumentDerivedState,
+		]
 	);
 
 	const onEditorChange = useCallback(() => {

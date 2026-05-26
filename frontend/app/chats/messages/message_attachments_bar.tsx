@@ -17,6 +17,7 @@ import { AttachmentContentBlockMode, AttachmentKind } from '@/spec/attachment';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
+import { getAttachmentDisplayLabel } from '@/chats/composer/attachments/attachment_editor_utils';
 import {
 	getAttachmentContentBlockModeLabel,
 	getAttachmentContentBlockModeTooltip,
@@ -30,13 +31,13 @@ import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';
  */
 function getAttachmentPath(att: Attachment): string {
 	if (att.kind === AttachmentKind.file && att.fileRef) {
-		return att.fileRef.path;
+		return att.fileRef.origPath || att.fileRef.path || att.fileRef.name || '';
 	}
 	if (att.kind === AttachmentKind.image && att.imageRef) {
-		return att.imageRef.path;
+		return att.imageRef.origPath || att.imageRef.path || att.imageRef.name || '';
 	}
 	if (att.kind === AttachmentKind.url && att.urlRef) {
-		return att.urlRef.url;
+		return att.urlRef.origNormalized || att.urlRef.normalized || att.urlRef.url || '';
 	}
 	return '';
 }
@@ -51,8 +52,8 @@ interface MessageAttachmentInfoChipProps {
  * No remove, no mode menu — just info.
  */
 function MessageAttachmentInfoChip({ attachment, fullWidth = false }: MessageAttachmentInfoChipProps) {
-	const { kind, label } = attachment;
-
+	const { kind } = attachment;
+	const label = getAttachmentDisplayLabel(attachment);
 	const icon =
 		kind === AttachmentKind.image ? (
 			<FiImage size={14} />

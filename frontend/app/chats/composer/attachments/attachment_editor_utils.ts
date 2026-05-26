@@ -28,13 +28,44 @@ export interface DirectoryAttachmentGroup {
 	overflowDirs: DirectoryOverflowInfo[];
 }
 
+function pathBasename(path: string | undefined): string {
+	const trimmed = path?.trim() ?? '';
+	if (!trimmed) return '';
+	return trimmed.split(/[\\/]/).filter(Boolean).pop() ?? trimmed;
+}
+
+export function getAttachmentDisplayLabel(att: Partial<Attachment>): string {
+	const explicit = typeof att.label === 'string' ? att.label.trim() : '';
+	if (explicit) return explicit;
+
+	const fileName = att.fileRef?.name?.trim() || pathBasename(att.fileRef?.origPath || att.fileRef?.path);
+	if (fileName) return fileName;
+
+	const imageName = att.imageRef?.name?.trim() || pathBasename(att.imageRef?.origPath || att.imageRef?.path);
+	if (imageName) return imageName;
+
+	const url = att.urlRef?.url?.trim() || att.urlRef?.normalized?.trim() || att.urlRef?.origNormalized?.trim();
+	if (url) return url;
+
+	const handle = att.genericRef?.origHandle?.trim() || att.genericRef?.handle?.trim();
+	if (handle) return handle;
+
+	return 'Attachment';
+}
+
+function getSafeAvailableModes(att: Partial<Attachment>): AttachmentContentBlockMode[] {
+	return att.availableContentBlockModes?.length
+		? att.availableContentBlockModes
+		: [att.mode ?? AttachmentContentBlockMode.notReadable];
+}
+
 // Convert editor attachment to API attachment payload.
 export function uiAttachmentToConversation(att: UIAttachment): Attachment {
 	return {
 		kind: att.kind,
-		label: att.label,
-		mode: att.mode,
-		availableContentBlockModes: att.availableContentBlockModes,
+		label: getAttachmentDisplayLabel(att),
+		mode: att.mode ?? AttachmentContentBlockMode.notReadable,
+		availableContentBlockModes: getSafeAvailableModes(att),
 		fileRef: att.fileRef,
 		imageRef: att.imageRef,
 		urlRef: att.urlRef,
@@ -44,15 +75,15 @@ export function uiAttachmentToConversation(att: UIAttachment): Attachment {
 
 // Identity key used for de-duplication in the composer.
 export function uiAttachmentKey(att: UIAttachment): string {
-	let label = att.label;
+	let label = getAttachmentDisplayLabel(att);
 	if (att.kind === AttachmentKind.file && att.fileRef) {
-		label = att.fileRef.path;
+		label = att.fileRef.origPath || att.fileRef.path || att.fileRef.name || label;
 	}
 	if (att.kind === AttachmentKind.image && att.imageRef) {
-		label = att.imageRef.path;
+		label = att.imageRef.origPath || att.imageRef.path || att.imageRef.name || label;
 	}
 	if (att.kind === AttachmentKind.url && att.urlRef) {
-		label = att.urlRef.url;
+		label = att.urlRef.origNormalized || att.urlRef.normalized || att.urlRef.url || label;
 	}
 	return `${att.kind}:${label}`;
 }
@@ -60,13 +91,13 @@ export function uiAttachmentKey(att: UIAttachment): string {
 // Used only for tooltip/debug display in the chips bar.
 export function getUIAttachmentPath(att: UIAttachment): string {
 	if (att.kind === AttachmentKind.file && att.fileRef) {
-		return att.fileRef.path;
+		return att.fileRef.origPath || att.fileRef.path || att.fileRef.name || '';
 	}
 	if (att.kind === AttachmentKind.image && att.imageRef) {
-		return att.imageRef.path;
+		return att.imageRef.origPath || att.imageRef.path || att.imageRef.name || '';
 	}
 	if (att.kind === AttachmentKind.url && att.urlRef) {
-		return att.urlRef.url;
+		return att.urlRef.origNormalized || att.urlRef.normalized || att.urlRef.url || '';
 	}
 	return '';
 }
@@ -74,7 +105,7 @@ export function getUIAttachmentPath(att: UIAttachment): string {
 function buildErrorAttachmentForLocalPath(att: Attachment, reason: AttachmentErrorReason): UIAttachment {
 	return {
 		kind: att.kind,
-		label: att.label,
+		label: getAttachmentDisplayLabel(att),
 		mode: AttachmentContentBlockMode.notReadable,
 		availableContentBlockModes: [AttachmentContentBlockMode.notReadable],
 		fileRef: att.fileRef,
@@ -110,9 +141,9 @@ export function buildUIAttachmentForLocalPath(att: Attachment): UIAttachment | u
 	}
 	return {
 		kind: att.kind,
-		label: att.label,
+		label: getAttachmentDisplayLabel(att),
 		mode: att.mode ?? AttachmentContentBlockMode.notReadable,
-		availableContentBlockModes: att.availableContentBlockModes ?? [AttachmentContentBlockMode.notReadable],
+		availableContentBlockModes: getSafeAvailableModes(att),
 		fileRef: att.fileRef,
 		imageRef: att.imageRef,
 		urlRef: att.urlRef,
@@ -127,9 +158,9 @@ export function buildUIAttachmentForLocalPath(att: Attachment): UIAttachment | u
 export function buildUIAttachmentForURL(att: Attachment): UIAttachment {
 	return {
 		kind: att.kind,
-		label: att.label,
+		label: getAttachmentDisplayLabel(att),
 		mode: att.mode ?? AttachmentContentBlockMode.notReadable,
-		availableContentBlockModes: att.availableContentBlockModes ?? [AttachmentContentBlockMode.notReadable],
+		availableContentBlockModes: getSafeAvailableModes(att),
 		fileRef: att.fileRef,
 		imageRef: att.imageRef,
 		urlRef: att.urlRef,

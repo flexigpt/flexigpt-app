@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { Conversation } from '@/spec/conversation';
@@ -23,6 +23,10 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 	const inputRefs = useRef(new Map<string, ComposerBoxHandle | null>());
 	const pendingDropsRef = useRef<PendingDrop[]>([]);
 	const pendingWorkflowStartersRef = useRef(new Map<string, ChatWorkflowStarter>());
+	const inputRefCallbacksRef = useRef(new Map<string, (inst: ComposerBoxHandle | null) => void>());
+	const pendingInputFlushTimerRef = useRef<number | null>(null);
+	const flushPendingDropsRef = useRef<() => void>(() => {});
+	const flushPendingWorkflowStartersRef = useRef<() => void>(() => {});
 
 	const tryApplyDropToTab = useCallback((tabId: string, payload: AttachmentsDroppedPayload): boolean => {
 		const input = inputRefs.current.get(tabId);
@@ -85,6 +89,30 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 		}
 	}, [tabExists, tryApplyWorkflowStarterToTab]);
 
+	// eslint-disable-next-line react-hooks/refs
+	flushPendingDropsRef.current = flushPendingDrops;
+	// eslint-disable-next-line react-hooks/refs
+	flushPendingWorkflowStartersRef.current = flushPendingWorkflowStarters;
+
+	const schedulePendingInputFlush = useCallback(() => {
+		if (pendingInputFlushTimerRef.current !== null) return;
+
+		pendingInputFlushTimerRef.current = window.setTimeout(() => {
+			pendingInputFlushTimerRef.current = null;
+			flushPendingDropsRef.current();
+			flushPendingWorkflowStartersRef.current();
+		}, 0);
+	}, []);
+
+	useEffect(() => {
+		return () => {
+			if (pendingInputFlushTimerRef.current !== null) {
+				window.clearTimeout(pendingInputFlushTimerRef.current);
+				pendingInputFlushTimerRef.current = null;
+			}
+		};
+	}, []);
+
 	const applyWorkflowStarterToComposer = useCallback(
 		async (tabId: string, starter: ChatWorkflowStarter): Promise<boolean> => {
 			if (!tabExists(tabId)) return false;
@@ -98,18 +126,22 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 
 	const setInputRef = useCallback(
 		(tabId: string) => {
-			return (inst: ComposerBoxHandle | null) => {
+			let callback = inputRefCallbacksRef.current.get(tabId);
+			if (callback) return callback;
+
+			callback = (inst: ComposerBoxHandle | null) => {
+				const previous = inputRefs.current.get(tabId) ?? null;
+				if (previous === inst) return;
 				inputRefs.current.set(tabId, inst);
 
 				if (inst) {
-					window.setTimeout(() => {
-						flushPendingDrops();
-						flushPendingWorkflowStarters();
-					}, 0);
+					schedulePendingInputFlush();
 				}
 			};
+			inputRefCallbacksRef.current.set(tabId, callback);
+			return callback;
 		},
-		[flushPendingDrops, flushPendingWorkflowStarters]
+		[schedulePendingInputFlush]
 	);
 
 	const syncComposerFromConversation = useCallback((tabId: string, conversation: Conversation) => {
@@ -141,6 +173,7 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 	const disposeInputRuntime = useCallback((tabId: string) => {
 		inputRefs.current.delete(tabId);
 		pendingWorkflowStartersRef.current.delete(tabId);
+		inputRefCallbacksRef.current.delete(tabId);
 	}, []);
 
 	return {

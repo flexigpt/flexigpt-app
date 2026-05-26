@@ -3,7 +3,11 @@ import { FiFileText, FiImage, FiLink, FiX } from 'react-icons/fi';
 import type { AttachmentContentBlockMode, UIAttachment } from '@/spec/attachment';
 import { AttachmentKind } from '@/spec/attachment';
 
-import { getAttachmentErrorMessage, getUIAttachmentPath } from '@/chats/composer/attachments/attachment_editor_utils';
+import {
+	getAttachmentDisplayLabel,
+	getAttachmentErrorMessage,
+	getUIAttachmentPath,
+} from '@/chats/composer/attachments/attachment_editor_utils';
 import {
 	AttachmentContentBlockModeMenu,
 	getAttachmentContentBlockModeLabel,
@@ -34,8 +38,9 @@ export function AttachmentChip({
 	fullWidth = false,
 }: AttachmentChipProps) {
 	const att = attachment;
-	const isLabelTruncated = att.label.length > 40;
-	const label = isLabelTruncated ? att.label.slice(0, 37) + '...' : att.label;
+	const displayLabel = getAttachmentDisplayLabel(att);
+	const isLabelTruncated = displayLabel.length > 40;
+	const label = isLabelTruncated ? displayLabel.slice(0, 37) + '...' : displayLabel;
 
 	const path = getUIAttachmentPath(att);
 
@@ -56,9 +61,9 @@ export function AttachmentChip({
 	// - error message (if this is an error attachment)
 	const tooltipLines: string[] = [];
 	if (isLabelTruncated) {
-		tooltipLines.push(att.label);
+		tooltipLines.push(displayLabel);
 	}
-	if (path && path !== att.label) {
+	if (path && path !== displayLabel) {
 		tooltipLines.push(path);
 	}
 	if (errorMessage) {
@@ -80,12 +85,12 @@ export function AttachmentChip({
 
 			{/* Right: mode pill / menu + remove button, right-justified within the chip */}
 			<div className="ml-auto flex shrink-0 items-center gap-1">
-				{att.availableContentBlockModes.length > 1 ? (
+				{(att.availableContentBlockModes ?? []).length > 1 ? (
 					<AttachmentContentBlockModeMenu
 						attachment={att}
 						onChangeAttachmentContentBlockMode={onChangeAttachmentContentBlockMode}
 					/>
-				) : att.availableContentBlockModes.length === 1 ? (
+				) : (att.availableContentBlockModes ?? []).length === 1 ? (
 					<span
 						className={getAttachmentContentBlockModePillClasses(att.mode, false)}
 						title={getAttachmentContentBlockModeTooltip(att.mode)}

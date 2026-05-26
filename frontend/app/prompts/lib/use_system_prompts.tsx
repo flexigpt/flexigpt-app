@@ -81,7 +81,71 @@ function emitChange() {
 	}
 }
 
+function arePromptsEqual(a: SystemPromptItem[], b: SystemPromptItem[]): boolean {
+	if (a === b) return true;
+	if (a.length !== b.length) return false;
+	for (let i = 0; i < a.length; i++) {
+		const ai = a[i];
+		const bi = b[i];
+		if (
+			ai.identityKey !== bi.identityKey ||
+			ai.modifiedAt !== bi.modifiedAt ||
+			ai.prompt !== bi.prompt ||
+			ai.role !== bi.role
+		) {
+			return false;
+		}
+	}
+	return true;
+}
+
+function areBundlesEqual(a: PromptBundle[], b: PromptBundle[]): boolean {
+	if (a === b) return true;
+	if (a.length !== b.length) return false;
+	for (let i = 0; i < a.length; i++) {
+		const ai = a[i];
+		const bi = b[i];
+		if (
+			ai.id !== bi.id ||
+			ai.isEnabled !== bi.isEnabled ||
+			ai.isBuiltIn !== bi.isBuiltIn ||
+			(ai.displayName ?? '') !== (bi.displayName ?? '') ||
+			(ai.slug ?? '') !== (bi.slug ?? '')
+		) {
+			return false;
+		}
+	}
+	return true;
+}
+
+function areVersionsEqual(a: Record<string, string[]>, b: Record<string, string[]>): boolean {
+	if (a === b) return true;
+	const ak = Object.keys(a);
+	const bk = Object.keys(b);
+	if (ak.length !== bk.length) return false;
+	for (const k of ak) {
+		const av = a[k];
+		const bv = b[k];
+		if (!bv || av.length !== bv.length) return false;
+		for (let i = 0; i < av.length; i++) if (av[i] !== bv[i]) return false;
+	}
+	return true;
+}
+
+function isSameState(a: SystemPromptStoreState, b: SystemPromptStoreState): boolean {
+	return (
+		a.loading === b.loading &&
+		a.error === b.error &&
+		a.initialized === b.initialized &&
+		a.preferredBundleID === b.preferredBundleID &&
+		arePromptsEqual(a.prompts, b.prompts) &&
+		areBundlesEqual(a.bundles, b.bundles) &&
+		areVersionsEqual(a.templateVersionsBySeriesKey, b.templateVersionsBySeriesKey)
+	);
+}
+
 function setState(next: SystemPromptStoreState) {
+	if (isSameState(state, next)) return;
 	state = next;
 	emitChange();
 }
@@ -232,15 +296,19 @@ async function loadSystemPromptState(): Promise<void> {
 	const nextBundles = sortBundles(bundles);
 	const bundleByID = new Map(nextBundles.map(bundle => [bundle.id, bundle]));
 
-	const templateVersionsBySeriesKey: Record<string, string[]> = {};
+	const versionSetBySeriesKey = new Map<string, Set<string>>();
 	for (const item of allTemplateListItems) {
 		const seriesKey = buildPromptTemplateSeriesKey(item.bundleID, item.templateSlug);
-		const nextVersions = templateVersionsBySeriesKey[seriesKey] ?? [];
-		if (!nextVersions.includes(item.templateVersion)) {
-			nextVersions.push(item.templateVersion);
-			nextVersions.sort((a, b) => a.localeCompare(b));
-			templateVersionsBySeriesKey[seriesKey] = nextVersions;
+		let bucket = versionSetBySeriesKey.get(seriesKey);
+		if (!bucket) {
+			bucket = new Set<string>();
+			versionSetBySeriesKey.set(seriesKey, bucket);
 		}
+		bucket.add(item.templateVersion);
+	}
+	const templateVersionsBySeriesKey: Record<string, string[]> = {};
+	for (const [seriesKey, bucket] of versionSetBySeriesKey) {
+		templateVersionsBySeriesKey[seriesKey] = Array.from(bucket).sort((a, b) => a.localeCompare(b));
 	}
 
 	const visibleTemplates = await Promise.all(
@@ -274,11 +342,16 @@ async function refreshSystemPromptStore(): Promise<void> {
 		return refreshPromise;
 	}
 
-	setState({
-		...state,
-		loading: !state.initialized,
-		error: null,
-	});
+	// Only emit a "loading"/"error cleared" tick when it actually changes
+	// something. Avoids re-rendering every subscriber on a no-op refresh.
+	const nextLoading = !state.initialized;
+	if (state.loading !== nextLoading || state.error !== null) {
+		setState({
+			...state,
+			loading: nextLoading,
+			error: null,
+		});
+	}
 
 	refreshPromise = loadSystemPromptState()
 		.catch((error: unknown) => {

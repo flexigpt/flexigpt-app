@@ -1,4 +1,4 @@
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 
 import type { UIChatOption } from '@/spec/modelpreset';
 
@@ -32,6 +32,8 @@ export const TabInputPane = memo(function TabInputPane(props: {
 		cancelEditing,
 	} = props;
 
+	const composerRef = useMemo(() => setInputRef(tabId), [setInputRef, tabId]);
+
 	const onSend = useCallback(
 		(payload: EditorSubmitPayload, options: UIChatOption) => sendMessage(tabId, payload, options),
 		[sendMessage, tabId]
@@ -43,7 +45,7 @@ export const TabInputPane = memo(function TabInputPane(props: {
 	return (
 		<div className={active ? 'block' : 'hidden'}>
 			<ComposerBox
-				ref={setInputRef(tabId)}
+				ref={composerRef}
 				onSend={onSend}
 				isBusy={isBusy}
 				isHydrating={isHydrating}

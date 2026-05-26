@@ -138,6 +138,13 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 	const assistantPresetLayerReady =
 		assistantContext.modelOptionsLoaded && !assistantPreset.loading && !assistantPreset.isApplying;
 
+	// Keep a ref to the latest assistantPreset so we don't churn callback
+	// identities and re-fire the flush effect on every render.
+	const assistantPresetRef = useRef(assistantPreset);
+	useEffect(() => {
+		assistantPresetRef.current = assistantPreset;
+	}, [assistantPreset]);
+
 	const queueOrApplyAssistantPresetRef = useCallback(
 		async (presetRef: ChatWorkflowStarterAssistantPresetRef): Promise<boolean> => {
 			if (!assistantPresetLayerReady) {
@@ -151,9 +158,9 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 				presetRef.assistantPresetSlug,
 				presetRef.assistantPresetVersion
 			);
-			return assistantPreset.selectPreset(presetKey);
+			return assistantPresetRef.current.selectPreset(presetKey);
 		},
-		[assistantPreset, assistantPresetLayerReady]
+		[assistantPresetLayerReady]
 	);
 
 	const flushPendingPresetResolution = useCallback(async () => {
@@ -170,7 +177,8 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 		}
 
 		if (pendingPresetResolutionModeRef.current === 'track-default') {
-			const ok = await assistantPreset.trackDefaultPresetWithoutApplying();
+			const ok = await assistantPresetRef.current.trackDefaultPresetWithoutApplying();
+
 			if (ok) {
 				pendingPresetResolutionModeRef.current = 'none';
 			}
@@ -178,7 +186,8 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 		}
 
 		if (pendingPresetResolutionModeRef.current === 'ensure-active') {
-			const ok = await assistantPreset.ensureActivePreset();
+			const ok = await assistantPresetRef.current.ensureActivePreset();
+
 			if (ok) {
 				pendingPresetResolutionModeRef.current = 'none';
 			}
@@ -186,11 +195,14 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 		}
 
 		return true;
-	}, [assistantPreset, assistantPresetLayerReady, queueOrApplyAssistantPresetRef]);
+	}, [assistantPresetLayerReady, queueOrApplyAssistantPresetRef]);
 
+	// Only re-run when readiness flips. All other triggers (workflow load,
+	// restore, reset, etc.) call flushPendingPresetResolution() explicitly.
 	useEffect(() => {
+		if (!assistantPresetLayerReady) return;
 		void flushPendingPresetResolution();
-	}, [flushPendingPresetResolution]);
+	}, [assistantPresetLayerReady, flushPendingPresetResolution]);
 
 	const handleSubmitMessage = (payload: EditorSubmitPayload) => {
 		// Clear any stale abort confirmation request before starting a new send.
