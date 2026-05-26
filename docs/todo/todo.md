@@ -15,6 +15,7 @@
 - [ ] should document what to check to know the prompts supplied for presets, how to modify prompts etc.
 - [ ] easier preset import bundles and flows. e.g: just import a preset bundle that has assistant, models, prompts, tools etc.
   - [ ] may be as a json import bundle or jsonc format
+- [ ] check if attachments becoming stale and getting new or files deleted causes panic anywhere.
 
 ## Milestone thoughts
 

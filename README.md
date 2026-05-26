@@ -32,9 +32,10 @@ FlexiGPT is built for people who use LLMs as part of repeatable work, not just o
 
 Good first workflows:
 
-- Open the app home screen and choose a starter workflow card such as Code Review, Explain This File, Generate Docs, Research Summary, Architecture Review, or Bug Investigation.
+- Open the home screen and choose one of the built-in workflow cards: Analyze File, Code Review, Bug Investigation, or Architecture Review.
 - Attach the relevant file, folder, notes, PDF, URL, or code snippet.
 - Send the prefilled prompt as-is or adjust it for your task.
+- If you need editing or shell access, switch to Local Editor or Local Developer Assistant Preset.
 - Reuse or customize the assistant preset once the workflow fits your style.
 
 FlexiGPT does not bill you directly. Usage costs and limits come from the provider account behind the key you configure.

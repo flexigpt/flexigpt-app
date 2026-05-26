@@ -142,7 +142,7 @@ Once the first send works, try one of these:
 - compare two model presets on the same question
 - use a prompt template for a repeated task
 - enable a tool-assisted assistant preset for a workflow that needs execution help
-- start from a built-in software assistant such as Reviewing Code, Spec Driven Development, Refactoring Code, or Designing System Architecture
+- start from a built-in starter workflow such as Analyze File, Code Review, Bug Investigation, or Architecture Review
 
 ## If the first send feels off
 

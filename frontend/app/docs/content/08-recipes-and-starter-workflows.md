@@ -8,7 +8,7 @@ Use the home screen workflow cards or apply the matching assistant preset in Cha
 - [Code review](#code-review)
 - [Explain this file](#explain-this-file)
 - [Generate docs](#generate-docs)
-- [Research summary](#research-summary)
+- [Research brief](#research-brief)
 - [Model comparison](#model-comparison)
 - [Architecture review](#architecture-review)
 - [Bug investigation](#bug-investigation)
@@ -38,7 +38,7 @@ Use when you want to understand an unfamiliar file or module.
 
 Suggested setup:
 
-- Assistant preset: **Base Assistant** or **Files, Text and Shell Tools**
+- Assistant preset: **Local Reader** or **Local Developer**
 - Context: one file first; add nearby files only when needed
 
 Starter prompt:
@@ -54,7 +54,7 @@ Use when you want README text, usage docs, API docs, or internal implementation 
 
 Suggested setup:
 
-- Assistant preset: **Base Assistant** or **Files, Text and Shell Tools**
+- Assistant preset: **Docs Writer** or **Local Reader**
 - Context: source files, existing README/docs, examples, screenshots, or command output
 
 Starter prompt:
@@ -65,19 +65,19 @@ Include overview, setup, common workflow, examples, troubleshooting, and limitat
 Keep claims grounded in the provided files.
 ```
 
-## Research summary
+## Research brief
 
 Use when you want a digest of notes, URLs, PDFs, or copied source material.
 
 Suggested setup:
 
-- Assistant preset: **Base Assistant**
+- Assistant preset: **Research Brief Writer**
 - Optional: provider-supported web search if current information matters
 
 Starter prompt:
 
 ```text
-Summarize the attached research material into: key takeaways, evidence, disagreements or uncertainty, risks, and action items.
+Turn the attached research material into a brief with: key findings, evidence, disagreements or uncertainty, recommendations, and next questions.
 Separate observed facts from interpretation.
 ```
 
@@ -122,7 +122,7 @@ Use when you have logs, stack traces, failing tests, or a confusing behavior rep
 
 Suggested setup:
 
-- Assistant preset: **Files, Text and Shell Tools** or **Spec Driven Development**
+- Assistant preset: **Bug Investigator** or **Spec Driven Development**
 - Context: stack trace, logs, failing command, relevant code, recent diff
 
 Starter prompt:
