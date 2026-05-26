@@ -1,155 +1,112 @@
 # Getting Started
 
-FlexiGPT is a local-first BYOK AI workspace for power users and teams who need repeatable prompts, tools, skills, model choices, assistants/agents, and private local history across multiple LLM providers.
+FlexiGPT is a local-first BYOK AI workspace for repeatable LLM work. You bring provider keys or local endpoints, then combine models, assistant presets, prompts, attachments, tools, and skills inside a local desktop app.
 
-This guide is the fastest path after installation: connect a provider, choose a starting assistant/model setup, add context, and send a useful first message.
+This page is the shortest path to a useful first request.
 
 ## Table of contents <!-- omit from toc -->
 
-- [First steps](#first-steps)
-- [Choose a setup path](#choose-a-setup-path)
-- [Chats workspace](#chats-workspace)
-- [Pick a starting setup](#pick-a-starting-setup)
-  - [Assistant Preset](#assistant-preset)
-  - [Model Preset](#model-preset)
-  - [Previous user turns](#previous-user-turns)
-- [Writing the first message](#writing-the-first-message)
-- [Adding optional context](#adding-optional-context)
-- [Send and inspect the result](#send-and-inspect-the-result)
-- [Good first workflows](#good-first-workflows)
-- [If the first send feels off](#if-the-first-send-feels-off)
+- [First successful send](#first-successful-send)
+- [Choose your first path](#choose-your-first-path)
+- [What to look at before sending](#what-to-look-at-before-sending)
+- [A good first request](#a-good-first-request)
+- [After the response](#after-the-response)
+- [Where to go next](#where-to-go-next)
+- [If the first send fails](#if-the-first-send-fails)
 
-## First steps
+## First successful send
 
-Before your first successful send, you usually need:
+1. Get an API key for a provider you want to use.
+   - OpenAI
+   - Anthropic Claude
+   - Google Gemini API
+   - xAI
+   - Mistral AI
+   - Hugging Face
+   - OpenRouter
+   - Any compatible local LLM server
+2. Open **Settings -> Auth Keys**. Add the provider key.
+3. Open **Model Presets**. Confirm the provider and at least one model preset are enabled.
+4. Open **Chats**. Select a model preset. Type a small test request. Send.
 
-- Get an API key for your favorite provider.
-  - [OpenAI](https://platform.openai.com/settings/organization/api-keys), [Anthropic Claude](https://platform.claude.com/settings/keys), [Google Gemini](https://aistudio.google.com/api-keys), [xAI](https://console.x.ai/team/default/api-keys), [Mistral AI](https://console.mistral.ai/home?profile_dialog=api-keys)
-  - [OpenRouter](https://openrouter.ai/workspaces/default/keys), [Hugging Face](https://huggingface.co/settings/tokens)
+Good first test: `Reply with one sentence confirming the model is working.`
 
-- Add the key in [Settings -> Auth Keys](/settings).
-- Open the home screen and pick a starter workflow, or go directly to the [Chats](/chats) page.
-- Try different assistants for spec-driven development, code review, architecture review, or refactoring.
-- Attach files, folders, URLs, PDFs, or notes when the model needs source material.
+Once that works, attach source material or use a starter assistant preset.
 
-FlexiGPT ships with built-in providers, model presets, tools, skills, prompts, and assistant presets. These building blocks are meant to be combined into reusable workflows, not configured from scratch every time.
+## Choose your first path
 
-- Using another provider or endpoint? You can create a custom provider compatible with OpenAI Responses, OpenAI Chat Completions, Anthropic Messages, or Google GenerateContent APIs.
-- Want different defaults? Customize or create your own providers, model presets, prompts, tools, skills, and assistant presets.
+| If you want to...                       | Start here                                                                                                                          |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Use a normal hosted model               | Add the key in **Settings**, enable the model in **Model Presets**, then use **Chats**.                                             |
+| Try many hosted models through one key  | Use OpenRouter. See [Providers and Models](/docs?doc=providers-and-models#openrouter).                                              |
+| Use a local model server                | Configure a custom compatible provider. See [Providers and Models](/docs?doc=providers-and-models#local-openai-compatible-servers). |
+| Start from a known workflow             | Choose a home screen workflow card or an assistant preset in **Chats**.                                                             |
+| Work with private or sensitive material | Read [Privacy, Data, and Troubleshooting](/docs?doc=privacy-data-and-troubleshooting) before sending.                               |
 
-## Choose a setup path
+## What to look at before sending
 
-- **Hosted provider**: add the provider key in **Settings -> Auth Keys**, then choose an enabled model preset in **Chats**.
-- **OpenRouter**: add the OpenRouter key, enable the OpenRouter provider/model preset, then test a small prompt.
-- **Custom or local endpoint**: use [Provider and Local Model Setup](/docs?doc=provider-and-local-model-setup) before sending sensitive work.
-- **Sensitive work**: review [Security, Privacy, and Trust Model](/docs?doc=security-privacy-and-trust-model) so you know what can leave the machine.
+Before each important request, check these layers:
 
-If you are unsure, start with a hosted provider or OpenRouter and send a tiny test prompt first.
+1. **Provider/model**
+   - Which endpoint receives the request?
+2. **Assistant preset**
+   - Did you apply a starter workflow?
+3. **Instructions**
+   - Are model default prompts or saved system prompts active?
+4. **Current message**
+   - Is the request clear and specific?
+5. **Context**
+   - Are the right attachments, prompt templates, tools, skills, and web search selections active?
+6. **History**
+   - Is **Previous user turns** small enough to avoid stale context?
 
-## Chats workspace
+If the output changes unexpectedly, usually one of these layers changed.
 
-The **Chats** page is the main place where you work.
+## A good first request
 
-From there you can:
-
-- start a new conversation
-- work across multiple chat tabs in parallel
-- search local conversation history
-- reopen earlier conversations and continue them
-- export the current conversation as JSON
-
-## Pick a starting setup
-
-Before you send, decide what kind of workflow you want for this conversation.
-
-If you just want the quick version: an assistant preset shapes the workflow, while a model preset chooses the provider, model, and request defaults.
-
-### Assistant Preset
-
-Use an assistant preset when you want a reusable starting setup for a type of work.
-
-An assistant preset can preload:
-
-- a model preset
-- instruction templates
-- tool selections
-- skill selections
-
-### Model Preset
-
-Use a model preset to choose the provider, model, and request defaults.
-
-That can include:
-
-- provider family
-- model name
-- temperature or reasoning controls
-- timeout and streaming behavior
-- output or advanced request parameters
-
-### Previous user turns
-
-Use this control to decide how much earlier user context should be resent with the next request.
-
-If you are unsure, start small. You can always include more history later.
-
-## Writing the first message
-
-Good first requests are simple and concrete.
+Start with one focused task and one focused piece of context.
 
 Examples:
 
-- explain this file
-- summarize these notes
-- compare these two approaches
-- review this code snippet
-- rewrite this paragraph more clearly
+- Explain this attached file.
+- Summarize these notes.
+- Compare these two approaches.
+- Review this code snippet for correctness and test gaps.
+- Rewrite this paragraph for a technical README.
+- Turn this stack trace and log excerpt into likely causes and next checks.
 
-The home screen starter workflow cards provide useful entry points for common workflows like spec driven dev, reviews, etc.
+Avoid beginning with a huge folder, many tools, and long chat history. Add complexity after the basic path works.
 
-## Adding optional context
+## After the response
 
-The composer can send much more than plain text.
+In the message timeline you can usually:
 
-You can add:
-
-- **System prompts** for durable instructions
-- **Prompt templates** for reusable request structure
-- **Attachments** such as files, folders, images, PDFs, and URLs
-- **Tools** when the task needs execution capability
-- **Skills** when you want a reusable workflow style
-- **Web search** when recent information matters and the current provider supports it
-
-Only add the context that helps the current request. More context is not always better.
-
-## Send and inspect the result
-
-After you send, you can usually:
-
-- read the answer as rendered Markdown
+- read rendered Markdown, code, diagrams, and math
 - inspect token usage and message details
 - review citations when the provider returns them
-- copy the content
-- edit and resend earlier user messages to branch the conversation
+- copy output
+- inspect tool calls and tool outputs
+- edit an earlier user message and resend to branch the conversation
+- export the current conversation as JSON
 
-If the assistant proposes a tool call, the workflow stays inside the chat. You can review and run the call yourself, or allow configured tools to auto-execute when that fits the task.
+## Where to go next
 
-## Good first workflows
+- Learn the vocabulary and page ownership: [Concepts and Ownership](/docs?doc=concepts-and-ownership)
+- Learn the main work surface: [Chat Workspace](/docs?doc=chat-workspace)
+- Learn how to add files, prompts, tools, skills, and web search: [Composer Context](/docs?doc=composer-context)
+- Learn how to maintain reusable assistant presets and catalogs: [Reusable Catalogs](/docs?doc=reusable-catalogs)
+- Configure providers and local models: [Providers and Models](/docs?doc=providers-and-models)
+- Try outcome-based tasks: [Everyday Recipes](/docs?doc=everyday-recipes)
 
-Once the first send works, try one of these:
+## If the first send fails
 
-- attach a local file and ask for an explanation
-- compare two model presets on the same question
-- use a prompt template for a repeated task
-- enable a tool-assisted assistant preset for a workflow that needs execution help
-- start from a built-in starter workflow such as Analyze File, Code Review, Bug Investigation, or Architecture Review
+Check:
 
-## If the first send feels off
-
-Check these first:
-
-- the provider key was added in **Settings**
-- the selected provider is enabled in **Model Presets**
-- the selected model preset is enabled
-- the history window through **Previous user turns** is not larger than needed
-- the current tool or web-search choice is configured correctly
+- provider key exists in **Settings -> Auth Keys**
+- provider is enabled in **Model Presets**
+- model preset is enabled
+- model preset uses the correct provider/API type
+- custom endpoint origin includes `http://` or `https://`
+- local server is running, if using a local endpoint
+- current tool or web-search option is not blocked by missing required arguments
+- request still has real user content after removing stale attachments or failed tool outputs

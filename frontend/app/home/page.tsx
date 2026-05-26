@@ -27,20 +27,21 @@ type NavCardProps = {
 const docsCards: NavCardProps[] = [
 	{
 		title: 'Getting Started',
-		description: 'Connect a provider key, choose a workflow setup, and send your first useful message.',
-		to: '/docs/#getting-started',
+		description:
+			'Connect a provider key, choose a model or assistant preset, add context, and send your first request.',
+		to: '/docs/?doc=getting-started',
 		icon: <FiMessageSquare size={18} />,
 	},
 	{
-		title: 'Chats and Composer',
-		description: 'Run repeatable workflows from chat tabs with attachments, prompts, tools, and model choices.',
-		to: '/docs/#chats-composer-and-everyday-workflow',
+		title: 'Chat Workspace',
+		description: 'Use tabs, search, the timeline, model controls, assistant presets, and send/edit flows.',
+		to: '/docs/?doc=chat-workspace',
 		icon: <FiMessageSquare size={18} />,
 	},
 	{
-		title: 'Context and Automation',
-		description: 'Combine attachments, prompts, tools, skills, web search, and auto-execute flows.',
-		to: '/docs/#attachments-tools-skills-and-prompts',
+		title: 'Composer Context',
+		description: 'Attach files, folders, URLs, prompt templates, tools, skills, and web search to the current message.',
+		to: '/docs/?doc=composer-context',
 		icon: <FiLayers size={18} />,
 	},
 ];
@@ -262,7 +263,8 @@ export default function HomePage() {
 								</div>
 							</Link>
 							<p className="text-base-content/70 text-xs">
-								Bundled guide for workflows, local context, automation, tools, skills, and architecture.
+								Bundled guide for getting started, chat workflows, reusable context, providers, privacy, recipes, and
+								architecture.
 							</p>
 						</div>
 

@@ -1,12 +1,12 @@
 import gettingStartedBody from '@/docs/content/01-getting-started.md?raw';
-import coreConceptsBody from '@/docs/content/02-core-concepts.md?raw';
-import chatsWorkflowBody from '@/docs/content/03-chats-composer-and-everyday-workflow.md?raw';
-import contextAndToolsBody from '@/docs/content/04-attachments-tools-skills-prompts.md?raw';
-import presetsProvidersSettingsBody from '@/docs/content/05-presets-providers-settings.md?raw';
-import storageDataControlTroubleshootingBody from '@/docs/content/06-storage-data-control-and-troubleshooting.md?raw';
-import securityPrivacyTrustModelBody from '@/docs/content/07-security-privacy-and-trust-model.md?raw';
-import recipesAndStarterWorkflowsBody from '@/docs/content/08-recipes-and-starter-workflows.md?raw';
-import providerAndLocalModelSetupBody from '@/docs/content/09-provider-and-local-model-setup.md?raw';
+import conceptsAndOwnershipBody from '@/docs/content/02-concepts-and-ownership.md?raw';
+import chatWorkspaceBody from '@/docs/content/03-chat-workspace.md?raw';
+import composerContextBody from '@/docs/content/04-composer-context.md?raw';
+import reusableCatalogsBody from '@/docs/content/05-reusable-catalogs.md?raw';
+import providersAndModelsBody from '@/docs/content/06-providers-and-models.md?raw';
+import privacyDataTroubleshootingBody from '@/docs/content/07-privacy-data-and-troubleshooting.md?raw';
+import everydayRecipesBody from '@/docs/content/08-everyday-recipes.md?raw';
+import setupRecipesBody from '@/docs/content/09-setup-recipes.md?raw';
 import architectureOverviewBody from '@/docs/content/11-architecture-overview.md?raw';
 import backendRolesBody from '@/docs/content/12-backend-roles-and-responsibilities.md?raw';
 import frontendRolesBody from '@/docs/content/13-frontend-roles-and-responsibilities.md?raw';
@@ -28,70 +28,93 @@ type DocsCategory = {
 
 export const docsCategories: DocsCategory[] = [
 	{
-		id: 'user-guide',
-		title: 'User Guide',
-		summary:
-			'Get started with FlexiGPT, connect providers, start useful workflows, and understand local-first data handling.',
+		id: 'start-here',
+		title: 'Start Here',
+		summary: 'Learn the basic workflow, vocabulary, and Chats workspace before configuring advanced features.',
 		sections: [
 			{
 				id: 'getting-started',
 				title: 'Getting Started',
 				summary:
-					'Connect a provider key, learn the Chats workspace layout, pick a starting setup, and send the first useful request.',
+					'Connect a provider key, choose a model or assistant preset, add useful context, and send a first request.',
 				body: gettingStartedBody,
 			},
 			{
-				id: 'core-concepts',
-				title: 'Core Concepts',
+				id: 'concepts-and-ownership',
+				title: 'Concepts and Ownership',
+				summary: 'Understand the main FlexiGPT terms and which page owns each reusable building block.',
+				body: conceptsAndOwnershipBody,
+			},
+			{
+				id: 'chat-workspace',
+				title: 'Chat Workspace',
+				summary: 'Use tabs, search, the conversation timeline, model controls, assistant presets, and send/edit flows.',
+				body: chatWorkspaceBody,
+			},
+		],
+	},
+	{
+		id: 'context-and-catalogs',
+		title: 'Context and Catalogs',
+		summary:
+			'Use context inside Chats, then maintain reusable prompts, tools, skills, models, and assistant presets on their own pages.',
+		sections: [
+			{
+				id: 'composer-context',
+				title: 'Composer Context',
 				summary:
-					'Understand providers, model presets, assistant presets, prompts, tools, skills, attachments, and how request context is assembled.',
-				body: coreConceptsBody,
+					'Attach files, folders, URLs, prompt templates, tools, skills, and web search to the message you are composing.',
+				body: composerContextBody,
 			},
 			{
-				id: 'chats-composer-and-everyday-workflow',
-				title: 'Chats, Composer, and Everyday Workflow',
-				summary: 'Learn how the Chats workspace combines tabs, search, the conversation timeline, and the composer.',
-				body: chatsWorkflowBody,
-			},
-			{
-				id: 'attachments-tools-skills-and-prompts',
-				title: 'Attachments, Tools, Skills, and Prompts',
+				id: 'reusable-catalogs',
+				title: 'Reusable Catalogs',
 				summary:
-					'Choose when to use source material, reusable prompts, callable tools, workflow modes, and provider-dependent web search.',
-				body: contextAndToolsBody,
+					'Manage assistant presets, prompt templates, tools, skills, model presets, and settings outside the chat flow.',
+				body: reusableCatalogsBody,
 			},
+		],
+	},
+	{
+		id: 'setup-safety-help',
+		title: 'Setup, Safety, and Help',
+		summary:
+			'Configure providers and local endpoints, understand the trust boundary, manage local data, and troubleshoot common issues.',
+		sections: [
 			{
-				id: 'presets-providers-and-settings',
-				title: 'Presets, Providers, and Settings',
-				summary: 'See which page owns assistant presets, provider and model setup, keys, and debug settings.',
-				body: presetsProvidersSettingsBody,
-			},
-			{
-				id: 'storage-data-control-and-troubleshooting',
-				title: 'Storage, Data Control, and Troubleshooting',
+				id: 'providers-and-models',
+				title: 'Providers and Models',
 				summary:
-					'Find local data categories, storage locations, backup/reset/export options, and troubleshooting checks.',
-				body: storageDataControlTroubleshootingBody,
+					'Set up hosted providers, OpenRouter, custom compatible endpoints, Ollama-style servers, and llama.cpp.',
+				body: providersAndModelsBody,
 			},
 			{
-				id: 'security-privacy-and-trust-model',
-				title: 'Security, Privacy, and Trust Model',
+				id: 'privacy-data-and-troubleshooting',
+				title: 'Privacy, Data, and Troubleshooting',
 				summary:
-					'Review trust boundaries for provider requests, keys, attachments, URL fetching, tools, logs, deletion, and safe sends.',
-				body: securityPrivacyTrustModelBody,
+					'Review local storage, provider request boundaries, logs, backup/reset behavior, and troubleshooting checks.',
+				body: privacyDataTroubleshootingBody,
 			},
+		],
+	},
+	{
+		id: 'recipes',
+		title: 'Recipes',
+		summary: 'Use outcome-based recipes for work, and setup recipes for configuring reusable workflows.',
+		sections: [
 			{
-				id: 'recipes-and-starter-workflows',
-				title: 'Recipes and Starter Workflows',
+				id: 'everyday-recipes',
+				title: 'Everyday Recipes',
 				summary:
-					'Outcome-based recipes for code review, docs, research, local files, model comparison, and safe tool use.',
-				body: recipesAndStarterWorkflowsBody,
+					'Run common LLM workflows such as file analysis, code review, bug investigation, documentation, research, and model comparison.',
+				body: everydayRecipesBody,
 			},
 			{
-				id: 'provider-and-local-model-setup',
-				title: 'Provider and Local Model Setup',
-				summary: 'Setup notes for OpenRouter, compatible endpoints, Ollama-style local servers, and llama.cpp.',
-				body: providerAndLocalModelSetupBody,
+				id: 'setup-recipes',
+				title: 'Setup Recipes',
+				summary:
+					'Set up OpenRouter, local models, assistant presets, prompt templates, tool-assisted workflows, and skill-backed workflows.',
+				body: setupRecipesBody,
 			},
 		],
 	},

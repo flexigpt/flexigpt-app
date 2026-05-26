@@ -1,40 +1,23 @@
-# Provider and Local Model Setup
+# Providers and Models
 
 FlexiGPT is BYOK: bring your own provider key, custom compatible endpoint, or local model server.
 
-This page gives practical setup flows and expectations for hosted providers, custom endpoints, and local models.
+This page covers hosted providers, custom endpoints, and local model setup.
 
 ## Table of contents <!-- omit from toc -->
 
 - [Usual setup path](#usual-setup-path)
 - [Built-in hosted providers](#built-in-hosted-providers)
-  - [Steps](#steps)
-  - [What to check](#what-to-check)
 - [OpenRouter](#openrouter)
-  - [Steps](#steps-1)
-  - [Test prompt](#test-prompt)
-  - [What to expect](#what-to-expect)
-  - [Model comparison tip](#model-comparison-tip)
 - [Custom compatible endpoints](#custom-compatible-endpoints)
 - [Local OpenAI-compatible servers](#local-openai-compatible-servers)
-  - [Steps](#steps-2)
-  - [Test prompt](#test-prompt-1)
-  - [What to expect](#what-to-expect-1)
 - [llama.cpp server](#llamacpp-server)
-  - [Common limitations](#common-limitations)
 - [Ollama-style local setup](#ollama-style-local-setup)
-- [Comparing hosted, OpenRouter, and local providers](#comparing-hosted-openrouter-and-local-providers)
-- [Provider capability expectations](#provider-capability-expectations)
+- [Capability expectations](#capability-expectations)
 - [Troubleshooting provider setup](#troubleshooting-provider-setup)
-  - [If the first request fails](#if-the-first-request-fails)
-  - [If the request works but quality is weak](#if-the-request-works-but-quality-is-weak)
-  - [If tools or web search do not appear](#if-tools-or-web-search-do-not-appear)
-  - [If local model output is strange](#if-local-model-output-is-strange)
 - [Local-first reminder](#local-first-reminder)
 
 ## Usual setup path
-
-The usual provider setup path is:
 
 1. Open **Model Presets**.
 2. Enable or create a provider preset.
@@ -47,23 +30,21 @@ The usual provider setup path is:
 
 Test prompt:
 
-```text
-Reply with one sentence confirming this provider and model are working.
-```
+    Reply with one sentence confirming this provider and model are working.
 
 ## Built-in hosted providers
 
-Use this path for built-in hosted providers such as:
+Built-in hosted providers can include:
 
 - OpenAI
 - Anthropic Claude
 - Google Gemini API
 - xAI
-- Mistral
+- Mistral AI
 - Hugging Face
 - OpenRouter
 
-### Steps
+Steps:
 
 1. Create an API key in the provider console.
 2. Open **Settings -> Auth Keys**.
@@ -74,9 +55,7 @@ Use this path for built-in hosted providers such as:
 7. Optionally set the provider/model as default.
 8. Open **Chats** and send a tiny prompt.
 
-### What to check
-
-If the model does not appear in Chats:
+If the model does not appear in Chats, check:
 
 - provider is enabled
 - model preset is enabled
@@ -89,7 +68,7 @@ If the model does not appear in Chats:
 
 OpenRouter is useful when you want one endpoint that can route to many hosted models.
 
-### Steps
+Steps:
 
 1. Create an OpenRouter API key.
 2. Open **Settings -> Auth Keys**.
@@ -102,16 +81,11 @@ OpenRouter is useful when you want one endpoint that can route to many hosted mo
 9. Select an OpenRouter model preset.
 10. Send a tiny test prompt.
 
-### Test prompt
+Test prompt:
 
-```text
-Reply with one sentence confirming the provider and model you are using.
-```
+    Reply with one sentence confirming the provider and model you are using.
 
-### What to expect
-
-OpenRouter is not a local model path.
-Your request content is sent to OpenRouter and handled according to the selected OpenRouter model/provider behavior.
+OpenRouter is not a local model path. Request content goes to OpenRouter and is handled according to the selected OpenRouter model/provider behavior.
 
 Capabilities can vary by model:
 
@@ -123,20 +97,11 @@ Capabilities can vary by model:
 - JSON schema output
 - multimodal input
 
-If a feature disappears after switching to OpenRouter, the selected model/provider combination may not support it.
-
-### Model comparison tip
-
-OpenRouter is good for quick model comparison.
-When comparing, keep everything constant except the model preset.
-
-See [Compare models](/docs?doc=recipes-and-starter-workflows#compare-models).
+When comparing OpenRouter models, keep everything constant except the model preset.
 
 ## Custom compatible endpoints
 
-Use a custom provider when your endpoint implements one of the supported API styles.
-
-Supported setup styles include:
+Use a custom provider when your endpoint implements one of the supported API styles:
 
 - OpenAI Chat Completions-compatible
 - OpenAI Responses-compatible
@@ -161,13 +126,15 @@ Many local servers expose an OpenAI-compatible API.
 
 Typical values:
 
-- Origin: `http://127.0.0.1:8080` or `http://localhost:11434`
-- Chat path: `/v1/chat/completions`
-- API-key header: often `Authorization`
-- API key: placeholder if the server requires a non-empty value
-- Model name: whatever your local server expects
+| Field          | Example                                              |
+| -------------- | ---------------------------------------------------- |
+| Origin         | `http://127.0.0.1:8080` or `http://localhost:11434`  |
+| Chat path      | `/v1/chat/completions`                               |
+| API-key header | often `Authorization`                                |
+| API key        | placeholder if the server requires a non-empty value |
+| Model name     | whatever your local server expects                   |
 
-### Steps
+Steps:
 
 1. Start the local server.
 2. Open **Model Presets**.
@@ -179,17 +146,11 @@ Typical values:
 8. Add a placeholder key in **Settings -> Auth Keys** if required.
 9. Open **Chats** and test.
 
-### Test prompt
+Test prompt:
 
-```text
-Reply with "local endpoint works" and no extra text.
-```
+    Reply with "local endpoint works" and no extra text.
 
-### What to expect
-
-Local endpoints may not support every hosted-model feature.
-Start without tools, web search, files, or images.
-Add capabilities one at a time after basic chat works.
+Local endpoints may not support every hosted-model feature. Start without tools, web search, files, or images. Add capabilities one at a time after basic chat works.
 
 ## llama.cpp server
 
@@ -197,9 +158,7 @@ If you run a `llama.cpp` server with OpenAI-compatible routes, configure it as a
 
 Example server command shape:
 
-```shell
-llama-server -m /path/to/model.gguf --host 127.0.0.1 --port 8080
-```
+    llama-server -m /path/to/model.gguf --host 127.0.0.1 --port 8080
 
 Then configure:
 
@@ -208,9 +167,7 @@ Then configure:
 - SDK type: OpenAI Chat Completions-compatible
 - Model name: the model name expected by your server
 
-### Common limitations
-
-Depending on model and build:
+Common limitations:
 
 - lower context length
 - limited tool support
@@ -232,16 +189,7 @@ Typical values:
 
 If your endpoint differs, use the path and model name from your local Ollama setup.
 
-## Comparing hosted, OpenRouter, and local providers
-
-| Provider path          | Best for                                                        | Watch out for                                  |
-| ---------------------- | --------------------------------------------------------------- | ---------------------------------------------- |
-| Direct hosted provider | Stable first-party behavior and provider-specific capabilities. | Cost, quota, retention, provider policy.       |
-| OpenRouter             | Trying many hosted models through one key.                      | Capability differences by routed model.        |
-| Local endpoint         | Local inference when endpoint is truly local.                   | Smaller models, feature gaps, hardware limits. |
-| Custom hosted endpoint | Enterprise/self-hosted compatible APIs.                         | Confirm endpoint origin and trust boundary.    |
-
-## Provider capability expectations
+## Capability expectations
 
 Changing the selected provider/model can change available features.
 
@@ -267,9 +215,7 @@ If a workflow breaks after switching models, inspect:
 
 ## Troubleshooting provider setup
 
-### If the first request fails
-
-Check:
+If the first request fails, check:
 
 - provider enabled
 - model preset enabled
@@ -279,11 +225,9 @@ Check:
 - local server is running
 - local server accepts the configured model name
 - firewall or proxy is not blocking the request
-- try a tiny prompt before attachments or tools
+- tiny prompt works before attachments or tools
 
-### If the request works but quality is weak
-
-Try:
+If the request works but quality is weak, try:
 
 - stronger model preset
 - higher prompt/output limits
@@ -293,9 +237,7 @@ Try:
 - lower temperature for stricter work
 - stronger reasoning level if supported
 
-### If tools or web search do not appear
-
-Check:
+If tools or web search do not appear, check:
 
 - selected provider SDK type
 - tool/provider compatibility
@@ -305,9 +247,7 @@ Check:
 - assistant preset availability reason
 - model capability support
 
-### If local model output is strange
-
-Try:
+If local model output is strange, try:
 
 - smaller prompt
 - no attachments
@@ -320,8 +260,7 @@ Try:
 
 ## Local-first reminder
 
-FlexiGPT stores conversations and workflow catalogs locally.
-But inference requests go to the selected provider or endpoint.
+FlexiGPT stores conversations and workflow catalogs locally. Inference requests go to the selected provider or endpoint.
 
 For local-only inference:
 
