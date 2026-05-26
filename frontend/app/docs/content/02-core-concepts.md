@@ -1,6 +1,6 @@
 # Core Concepts
 
-FlexiGPT is designed as a local-first AI workflow workspace, not only a chat box.
+FlexiGPT is designed as a local-first AI workspace, not only a chat box.
 It becomes much easier to use once a few core terms are clear.
 Most work in FlexiGPT is built by combining a model choice, an assistant preset, reusable prompts, tools or skills, and the current turn context.
 

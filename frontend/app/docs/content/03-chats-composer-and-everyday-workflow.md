@@ -1,6 +1,6 @@
 # Chats, Composer, and Everyday Workflow
 
-This page focuses on the day-to-day workflow workspace inside FlexiGPT.
+This page focuses on the day-to-day workspace inside FlexiGPT.
 The **Chats** page is the main surface where reusable assistant setup, local history, current context, and provider/model choices come together.
 It combines chat tabs, conversation search, the active conversation timeline, and the composer for the next request.
 

@@ -221,8 +221,8 @@ export default function HomePage() {
 					</div>
 
 					<p className="text-base-content/70 max-w-5xl text-sm leading-relaxed">
-						Local-first AI workflow workspace for reusable assistants/agents, prompts, tools, skills, model choices,
-						attachments, and private local history across multiple LLM providers.
+						Local-first AI workspace for reusable assistants/agents, prompts, tools, skills, model choices, attachments,
+						and private local history across multiple LLM providers.
 					</p>
 				</div>
 

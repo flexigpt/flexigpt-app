@@ -5,7 +5,7 @@
 [![lint](https://github.com/flexigpt/flexigpt-app/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/flexigpt/flexigpt-app/actions/workflows/lint.yml)
 [![test](https://github.com/flexigpt/flexigpt-app/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/flexigpt/flexigpt-app/actions/workflows/test.yml)
 
-FlexiGPT is a local-first AI workflow workspace for power users and teams who need repeatable prompts, tools, skills, model choices, assistants/agents, and private local history across multiple LLM providers.
+FlexiGPT is a local-first AI workspace for power users and teams who need repeatable prompts, tools, skills, model choices, assistants/agents, and private local history across multiple LLM providers.
 
 ## Who FlexiGPT is for
 
@@ -43,7 +43,7 @@ FlexiGPT does not proxy normal LLM calls through a FlexiGPT-hosted service; requ
 ## Screenshots
 
 <p float="left">
-  <img src="images/home.png" alt="FlexiGPT local-first workflow workspace home" width="512" />
+  <img src="images/home.png" alt="FlexiGPT local-first workspace home" width="512" />
   <img src="images/latex_code.png" alt="Rich chat rendering with Markdown, LaTeX, and code" width="512" />
   <img src="images/mermaid.png" alt="Rich chat rendering with Mermaid" width="512" />
 </p>
@@ -64,7 +64,7 @@ FlexiGPT does not proxy normal LLM calls through a FlexiGPT-hosted service; requ
 - Built-in providers and curated model presets for leading models so you can start quickly without manually defining endpoints or defaults first
 - API keys are stored securely through the OS keyring, not in plain-text exported settings
 
-### Repeatable AI workflow workspace
+### Repeatable AI workspace
 
 - One interface for chats, tabs, reusable assistant presets, model presets, prompt templates, attachments, tools, skills, search, and exports
 - Build repeatable workflows by combining model choices, instructions, attachments, tools, and skills

@@ -1,6 +1,6 @@
 # FlexiGPT frontend map
 
-> FlexiGPT is a local-first AI workflow workspace built as a Wails desktop app with a React frontend.
+> FlexiGPT is a local-first AI workspace built as a Wails desktop app with a React frontend.
 >
 > This document is organized around functional layout, runtime flow, and architectural ownership so an LLM can understand the frontend quickly.
 > It focuses on what the frontend actually does, how the major surfaces fit together, and which files own which behavior.

@@ -1,6 +1,6 @@
 # Getting Started
 
-FlexiGPT is a local-first AI workflow workspace for power users and teams who need repeatable prompts, tools, skills, model choices, assistants/agents, and private local history across multiple LLM providers.
+FlexiGPT is a local-first AI workspace for power users and teams who need repeatable prompts, tools, skills, model choices, assistants/agents, and private local history across multiple LLM providers.
 
 This guide is the fastest path after installation: connect a provider, choose a starting assistant/model setup, add context, and send a useful first message.
 

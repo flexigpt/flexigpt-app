@@ -1,6 +1,6 @@
 # Attachments, Tools, Skills, and Prompts
 
-Attachments, tools, skills, and prompts are the building blocks that turn FlexiGPT from plain chat into a repeatable AI workflow workspace.
+Attachments, tools, skills, and prompts are the building blocks that turn FlexiGPT from plain chat into a repeatable AI workspace.
 They let you bring source material into a request, reuse structure, expose controlled execution capabilities, and keep workflow behavior consistent across turns.
 
 ## Table of contents <!-- omit from toc -->
