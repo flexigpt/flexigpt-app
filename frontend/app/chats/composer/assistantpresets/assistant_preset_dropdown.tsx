@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+
 import { FiCheck, FiEye, FiRefreshCcw, FiTrash2 } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
@@ -11,6 +13,88 @@ import {
 import { HoverTip } from '@/components/ariakit_hover_tip';
 
 import type { AssistantPresetOptionItem } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
+
+type AssistantPresetOptionItemWithBundleSortFields = AssistantPresetOptionItem & {
+	bundleSlug?: string;
+	bundleID?: string;
+	bundleId?: string;
+	bundle?: {
+		slug?: string;
+		id?: string;
+	};
+};
+
+type AssistantPresetOptionGroup = {
+	bundleSlug: string;
+	bundleDisplayName: string;
+	selectableOptions: AssistantPresetOptionItem[];
+	unavailableOptions: AssistantPresetOptionItem[];
+};
+
+const assistantPresetSlugCollator = new Intl.Collator(undefined, {
+	numeric: true,
+	sensitivity: 'base',
+});
+
+function getAssistantPresetBundleSlug(option: AssistantPresetOptionItem): string {
+	const optionWithBundle = option as AssistantPresetOptionItemWithBundleSortFields;
+
+	return (
+		optionWithBundle.bundleSlug ||
+		optionWithBundle.bundle?.slug ||
+		optionWithBundle.bundleID ||
+		optionWithBundle.bundleId ||
+		optionWithBundle.bundle?.id ||
+		option.bundleDisplayName ||
+		option.key
+	);
+}
+
+function compareAssistantPresetOptions(a: AssistantPresetOptionItem, b: AssistantPresetOptionItem): number {
+	const bundleSlugCompare = assistantPresetSlugCollator.compare(
+		getAssistantPresetBundleSlug(a),
+		getAssistantPresetBundleSlug(b)
+	);
+	if (bundleSlugCompare !== 0) return bundleSlugCompare;
+
+	const presetSlugCompare = assistantPresetSlugCollator.compare(a.preset.slug, b.preset.slug);
+	if (presetSlugCompare !== 0) return presetSlugCompare;
+
+	const presetVersionCompare = assistantPresetSlugCollator.compare(a.preset.version, b.preset.version);
+	if (presetVersionCompare !== 0) return presetVersionCompare;
+
+	return assistantPresetSlugCollator.compare(a.key, b.key);
+}
+
+function groupAssistantPresetOptions(presetOptions: AssistantPresetOptionItem[]): AssistantPresetOptionGroup[] {
+	const groupsByBundleSlug = new Map<
+		string,
+		{ bundleSlug: string; bundleDisplayName: string; options: AssistantPresetOptionItem[] }
+	>();
+
+	for (const option of [...presetOptions].sort(compareAssistantPresetOptions)) {
+		const bundleSlug = getAssistantPresetBundleSlug(option);
+		let group = groupsByBundleSlug.get(bundleSlug);
+
+		if (!group) {
+			group = {
+				bundleSlug,
+				bundleDisplayName: option.bundleDisplayName,
+				options: [],
+			};
+			groupsByBundleSlug.set(bundleSlug, group);
+		}
+
+		group.options.push(option);
+	}
+
+	return Array.from(groupsByBundleSlug.values()).map(group => ({
+		bundleSlug: group.bundleSlug,
+		bundleDisplayName: group.bundleDisplayName,
+		selectableOptions: group.options.filter(option => option.isSelectable),
+		unavailableOptions: group.options.filter(option => !option.isSelectable),
+	}));
+}
 
 type AssistantPresetDropdownProps = {
 	presetOptions: AssistantPresetOptionItem[];
@@ -52,6 +136,146 @@ export function AssistantPresetDropdown({
 	const triggerTitle = selectedPreset
 		? `${selectedPreset.displayName} — ${selectedPreset.bundleDisplayName}`
 		: 'Apply assistant preset';
+
+	const groupedPresetOptions = useMemo(() => groupAssistantPresetOptions(presetOptions), [presetOptions]);
+
+	const renderPresetOption = (option: AssistantPresetOptionItem) => {
+		const isBasePreset = option.key === basePresetKey;
+		const isSelected = option.key === selectedPresetKey;
+		const isDisabled = isApplying || !option.isSelectable;
+		const modifiedTip =
+			selectedPresetModifiedLabels.length > 0
+				? `Modified sections: ${selectedPresetModifiedLabels.join(', ')}`
+				: 'Preset-managed sections are currently in sync';
+		const resetTip =
+			selectedPresetModifiedLabels.length > 0
+				? `Reset preset-managed sections: ${selectedPresetModifiedLabels.join(', ')}`
+				: 'Reapply current assistant preset';
+		const clearTip = isBasePreset ? 'Base preset is already active' : 'Switch back to the base assistant preset';
+
+		return (
+			<div
+				key={option.key}
+				className={`border-base-300 flex w-full flex-col rounded-lg border p-2 text-left transition-colors ${
+					isSelected ? 'bg-base-200' : 'hover:bg-base-200'
+				}`}
+			>
+				<div className="flex w-full items-start gap-2">
+					<MenuItem
+						store={menu}
+						disabled={isDisabled}
+						className={`data-active-item:bg-base-200 flex min-w-0 flex-1 items-start gap-2 rounded-lg p-1 text-left outline-none ${
+							isDisabled ? (option.isSelectable ? 'cursor-wait opacity-70' : 'cursor-not-allowed opacity-60') : ''
+						}`}
+						onClick={() => {
+							if (isDisabled) return;
+							void (async () => {
+								const ok = await onSelectPreset(option.key);
+								if (ok) {
+									menu.hide();
+								}
+							})();
+						}}
+					>
+						<div className="pt-0.5">{isSelected ? <FiCheck size={14} /> : <span className="w-3" />}</div>
+
+						<div className="min-w-0 flex-1">
+							<div className="truncate text-xs font-medium">{option.displayName}</div>
+							<div className="mt-1 flex items-center gap-2 text-[10px] opacity-70">
+								<span>
+									{option.preset.slug}@{option.preset.version}
+								</span>
+							</div>
+							{option.description ? (
+								<div className="mt-1 line-clamp-2 text-xs opacity-75">{option.description}</div>
+							) : null}
+							{!option.isSelectable ? (
+								<div className="text-warning mt-1 text-xs">
+									{option.availabilityReason ?? 'This preset is not currently available.'}
+								</div>
+							) : null}
+						</div>
+					</MenuItem>
+
+					<div className="flex shrink-0 items-start gap-1">
+						<HoverTip
+							content={isSelected ? 'View active assistant preset details' : 'View assistant preset details'}
+							placement="top"
+							wrapperElement="div"
+							wrapperClassName="inline-flex"
+						>
+							<button
+								type="button"
+								className="btn btn-ghost btn-xs btn-square rounded-lg"
+								onClick={() => {
+									onViewPreset(option);
+								}}
+							>
+								<FiEye size={14} />
+							</button>
+						</HoverTip>
+
+						{!option.isSelectable ? <span className="badge badge-warning badge-xs shrink-0">Unavailable</span> : null}
+					</div>
+				</div>
+
+				{isSelected ? (
+					<div className="border-base-300 mt-2 ml-5 flex flex-wrap items-center justify-between gap-1 border-t p-0 pt-1">
+						<div className="flex items-center gap-1">
+							<HoverTip content={modifiedTip} placement="top" wrapperElement="div" wrapperClassName="inline-flex">
+								<span
+									className={`badge badge-xs ${selectedPresetModifiedLabels.length > 0 ? 'badge-warning' : 'badge-success'}`}
+								>
+									{selectedPresetModifiedLabels.length > 0 ? 'Modified' : 'In sync'}
+								</span>
+							</HoverTip>
+
+							{isBasePreset ? <span className="badge badge-ghost badge-xs">Base</span> : null}
+						</div>
+						<div className="flex items-center gap-1">
+							<HoverTip content={resetTip} placement="top" wrapperElement="div" wrapperClassName="inline-flex">
+								<button
+									type="button"
+									className="btn btn-ghost btn-xs rounded-lg"
+									disabled={isApplying}
+									onClick={() => {
+										void (async () => {
+											const ok = await onReapplySelectedPreset();
+											if (ok) {
+												menu.hide();
+											}
+										})();
+									}}
+								>
+									<FiRefreshCcw size={14} className="mr-1" />
+									{selectedPresetModifiedLabels.length > 0 ? 'Reset' : 'Reapply'}
+								</button>
+							</HoverTip>
+
+							<HoverTip content={clearTip} placement="top" wrapperElement="div" wrapperClassName="inline-flex">
+								<button
+									type="button"
+									className="btn btn-ghost btn-xs rounded-lg"
+									disabled={isApplying || isBasePreset || !canResetToBasePreset}
+									onClick={() => {
+										void (async () => {
+											const ok = await onResetToBasePreset();
+											if (ok) {
+												menu.hide();
+											}
+										})();
+									}}
+								>
+									<FiTrash2 size={14} className="mr-1" />
+									Clear to base
+								</button>
+							</HoverTip>
+						</div>
+					</div>
+				) : null}
+			</div>
+		);
+	};
 
 	return (
 		<div className="flex w-full justify-center">
@@ -102,169 +326,44 @@ export function AssistantPresetDropdown({
 								No enabled assistant presets available.
 							</div>
 						) : (
-							<div className="space-y-1">
-								{presetOptions.map(option => {
-									const isBasePreset = option.key === basePresetKey;
-									const isSelected = option.key === selectedPresetKey;
-									const isDisabled = isApplying || !option.isSelectable;
-									const modifiedTip =
-										selectedPresetModifiedLabels.length > 0
-											? `Modified sections: ${selectedPresetModifiedLabels.join(', ')}`
-											: 'Preset-managed sections are currently in sync';
-									const resetTip =
-										selectedPresetModifiedLabels.length > 0
-											? `Reset preset-managed sections: ${selectedPresetModifiedLabels.join(', ')}`
-											: 'Reapply current assistant preset';
-									const clearTip = isBasePreset
-										? 'Base preset is already active'
-										: 'Switch back to the base assistant preset';
-
+							<div className="space-y-2">
+								{groupedPresetOptions.map((group, groupIndex) => {
 									return (
 										<div
-											key={option.key}
-											className={`border-base-300 flex w-full flex-col rounded-lg border p-2 text-left transition-colors ${
-												isSelected ? 'bg-base-200' : 'hover:bg-base-200'
-											}`}
+											key={group.bundleSlug}
+											role="group"
+											aria-label={`${group.bundleDisplayName} assistant presets`}
+											className="space-y-1"
 										>
-											<div className="flex w-full items-start gap-2">
-												<MenuItem
-													store={menu}
-													disabled={isDisabled}
-													className={`data-active-item:bg-base-200 flex min-w-0 flex-1 items-start gap-2 rounded-lg p-1 text-left outline-none ${
-														isDisabled
-															? option.isSelectable
-																? 'cursor-wait opacity-70'
-																: 'cursor-not-allowed opacity-60'
-															: ''
-													}`}
-													onClick={() => {
-														if (isDisabled) return;
-														void (async () => {
-															const ok = await onSelectPreset(option.key);
-															if (ok) {
-																menu.hide();
-															}
-														})();
-													}}
-												>
-													<div className="pt-0.5">{isSelected ? <FiCheck size={14} /> : <span className="w-3" />}</div>
+											{groupIndex > 0 ? <div role="separator" className="border-base-300 my-2 border-t" /> : null}
 
-													<div className="min-w-0 flex-1">
-														<div className="truncate text-xs font-medium">{option.displayName}</div>
-														<div className="mt-1 flex items-center gap-2 text-[10px] opacity-70">
-															<span>{option.bundleDisplayName}</span>
-															<span>•</span>
-															<span>
-																{option.preset.slug}@{option.preset.version}
-															</span>
-														</div>
-														{option.description ? (
-															<div className="mt-1 line-clamp-2 text-xs opacity-75">{option.description}</div>
-														) : null}
-														{!option.isSelectable ? (
-															<div className="text-warning mt-1 text-xs">
-																{option.availabilityReason ?? 'This preset is not currently available.'}
-															</div>
-														) : null}
+											<div className="px-1 pt-1">
+												<div className="flex min-w-0 items-center justify-between gap-2">
+													<div className="min-w-0 truncate text-[11px] font-semibold tracking-wide uppercase opacity-70">
+														{group.bundleDisplayName}
 													</div>
-												</MenuItem>
-
-												<div className="flex shrink-0 items-start gap-1">
-													<HoverTip
-														content={
-															isSelected ? 'View active assistant preset details' : 'View assistant preset details'
-														}
-														placement="top"
-														wrapperElement="div"
-														wrapperClassName="inline-flex"
-													>
-														<button
-															type="button"
-															className="btn btn-ghost btn-xs btn-square rounded-lg"
-															onClick={() => {
-																onViewPreset(option);
-															}}
-														>
-															<FiEye size={14} />
-														</button>
-													</HoverTip>
-
-													{!option.isSelectable ? (
-														<span className="badge badge-warning badge-xs shrink-0">Unavailable</span>
+													{group.bundleSlug !== group.bundleDisplayName ? (
+														<div className="shrink-0 truncate font-mono text-[10px] opacity-45">{group.bundleSlug}</div>
 													) : null}
 												</div>
 											</div>
 
-											{isSelected ? (
-												<div className="border-base-300 mt-2 ml-5 flex flex-wrap items-center justify-between gap-1 border-t p-0 pt-1">
-													<div className="flex items-center gap-1">
-														<HoverTip
-															content={modifiedTip}
-															placement="top"
-															wrapperElement="div"
-															wrapperClassName="inline-flex"
-														>
-															<span
-																className={`badge badge-xs ${selectedPresetModifiedLabels.length > 0 ? 'badge-warning' : 'badge-success'}`}
-															>
-																{selectedPresetModifiedLabels.length > 0 ? 'Modified' : 'In sync'}
-															</span>
-														</HoverTip>
+											{group.selectableOptions.length > 0 && group.unavailableOptions.length > 0 ? (
+												<div className="px-1 text-[10px] font-medium tracking-wide uppercase opacity-50">Available</div>
+											) : null}
+											{group.selectableOptions.map(renderPresetOption)}
 
-														{isBasePreset ? <span className="badge badge-ghost badge-xs">Base</span> : null}
-													</div>
-													<div className="flex items-center gap-1">
-														<HoverTip
-															content={resetTip}
-															placement="top"
-															wrapperElement="div"
-															wrapperClassName="inline-flex"
-														>
-															<button
-																type="button"
-																className="btn btn-ghost btn-xs rounded-lg"
-																disabled={isApplying}
-																onClick={() => {
-																	void (async () => {
-																		const ok = await onReapplySelectedPreset();
-																		if (ok) {
-																			menu.hide();
-																		}
-																	})();
-																}}
-															>
-																<FiRefreshCcw size={14} className="mr-1" />
-																{selectedPresetModifiedLabels.length > 0 ? 'Reset' : 'Reapply'}
-															</button>
-														</HoverTip>
-
-														<HoverTip
-															content={clearTip}
-															placement="top"
-															wrapperElement="div"
-															wrapperClassName="inline-flex"
-														>
-															<button
-																type="button"
-																className="btn btn-ghost btn-xs rounded-lg"
-																disabled={isApplying || isBasePreset || !canResetToBasePreset}
-																onClick={() => {
-																	void onResetToBasePreset();
-																	void (async () => {
-																		const ok = await onResetToBasePreset();
-																		if (ok) {
-																			menu.hide();
-																		}
-																	})();
-																}}
-															>
-																<FiTrash2 size={14} className="mr-1" />
-																Clear to base
-															</button>
-														</HoverTip>
-													</div>
+											{group.unavailableOptions.length > 0 ? (
+												<div
+													className={`text-warning px-1 text-[10px] font-medium tracking-wide uppercase opacity-80 ${
+														group.selectableOptions.length > 0 ? 'border-base-300 mt-1 border-t pt-2' : ''
+													}`}
+												>
+													Unavailable
 												</div>
 											) : null}
+
+											{group.unavailableOptions.map(renderPresetOption)}
 										</div>
 									);
 								})}

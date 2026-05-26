@@ -14,6 +14,8 @@
 - [ ] check if attachments becoming stale and getting new or files deleted causes panic anywhere.
 - [ ] cursor up and down has some jerk in composer.
 
+- [ ] group assistant presets with bundles. same for models
+
 ## Milestone thoughts
 
 - [ ] M-Future
