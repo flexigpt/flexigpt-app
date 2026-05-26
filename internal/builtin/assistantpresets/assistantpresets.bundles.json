@@ -28,7 +28,7 @@
 			"id": "019e6265-4a12-7c8d-8a1f-1b273eb58eb5",
 			"slug": "product-leadership-assistants",
 			"displayName": "Product and Leadership",
-			"description": "Product spec, decision record, feedback analysis, prioritization, delivery risk, and status update assistant presets",
+			"description": "PRD/MRD, decision record, feedback analysis, prioritization, delivery risk, and status update assistant presets",
 			"isEnabled": true,
 			"isBuiltIn": true,
 			"createdAt": "2026-05-26T00:00:00Z",

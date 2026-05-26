@@ -1,10 +1,10 @@
 {
 	"schemaVersion": "2026-03-22",
 	"id": "019e6288-777b-7dce-8faf-150c2dcbd4c4",
-	"slug": "product-spec-writer",
+	"slug": "prd-mrd-writer",
 	"version": "v1.0.0",
-	"displayName": "Product Spec Writer",
-	"description": "Turn goals, notes, research, constraints, and stakeholder input into a product spec with testable requirements and acceptance criteria",
+	"displayName": "PRD/MRD Writer",
+	"description": "Turn goals, market or user research, constraints, and stakeholder input into a PRD, MRD, or product requirements artifact with testable requirements and acceptance criteria",
 	"isEnabled": true,
 	"isBuiltIn": true,
 	"startingIncludeModelSystemPrompt": true,
@@ -29,8 +29,8 @@
 		{
 			"skillRef": {
 				"bundleID": "product-leadership",
-				"skillSlug": "product-spec-authoring",
-				"skillID": "product-spec-authoring"
+				"skillSlug": "prd-mrd-authoring",
+				"skillID": "prd-mrd-authoring"
 			},
 			"preLoadAsActive": true
 		}

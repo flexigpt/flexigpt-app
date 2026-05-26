@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { FiAlertTriangle, FiArrowRight, FiCode, FiFileText } from 'react-icons/fi';
+import { FiAlertTriangle, FiArrowRight, FiCheckCircle, FiCode } from 'react-icons/fi';
 
 import { Link } from 'react-router';
 
@@ -16,25 +16,24 @@ type WorkflowStarter = {
 };
 
 const SOFTWARE_ASSISTANTS_BUNDLE_ID = '019d676e-2533-7fdf-a0af-d3a571ab4f4f';
-const CORE_ASSISTANTS_BUNDLE_ID = '019d2423-01b0-7f87-be39-fe02d844453a';
 
 export const workflowStarters: WorkflowStarter[] = [
 	{
-		title: 'Analyze File',
-		description: 'Attach a file and get a guided explanation of purpose, or any other query',
-		workflowID: 'analyze-file',
-		assistantPresetBundleID: CORE_ASSISTANTS_BUNDLE_ID,
-		assistantPresetSlug: 'local-reader',
+		title: 'Develop a Feature',
+		description: 'Implement a bounded code change from a repo path or attached files, using spec driven development',
+		workflowID: 'develop-feature',
+		assistantPresetBundleID: SOFTWARE_ASSISTANTS_BUNDLE_ID,
+		assistantPresetSlug: 'spec-driven-dev',
 		assistantPresetVersion: 'v1.0.0',
 		prompt: [
-			'<Attach the file or paste/replace this line with file contents, or replace this line with the full local path to inspect: `/absolute/path/to/file`>',
+			'<Replace this line with the repo path and feature request. Example: `/absolute/path/to/repo` Add export filters to the conversation search results.>',
 			'',
-			'Analyze and explain this file. Cover purpose, main flows, important analysis and dependencies/references.',
+			'Develop this feature end to end. Follow the workflow in attached skill',
 		].join('\n'),
-		icon: <FiFileText size={18} />,
+		icon: <FiCode size={24} />,
 	},
 	{
-		title: 'Code Review',
+		title: 'Review Code',
 		description: 'Review the code or diff for correctness, security, reliability, maintainability, and test gaps',
 		workflowID: 'code-review',
 		assistantPresetBundleID: SOFTWARE_ASSISTANTS_BUNDLE_ID,
@@ -45,12 +44,12 @@ export const workflowStarters: WorkflowStarter[] = [
 			'',
 			'Review the code or diff for correctness, security, reliability, maintainability, and test gaps. Focus on concrete findings and narrow fixes.',
 		].join('\n'),
-		icon: <FiCode size={18} />,
+		icon: <FiCheckCircle size={24} />,
 	},
 	{
-		title: 'Bug Investigation',
+		title: 'Investigate a Bug',
 		description:
-			'Diagnose root cause, identify missing evidence, the smallest safe fix direction, and verification steps from logs, errors, stack traces, failing outputs, code, and config',
+			'Diagnose root cause and the smallest safe fix direction, from logs, errors, stack traces, failing outputs, code, and config',
 		workflowID: 'bug-investigation',
 		assistantPresetBundleID: SOFTWARE_ASSISTANTS_BUNDLE_ID,
 		assistantPresetSlug: 'bug-investigator',
@@ -60,7 +59,7 @@ export const workflowStarters: WorkflowStarter[] = [
 			'',
 			'Investigate this bug. Identify likely root cause, evidence, missing evidence, the smallest safe fix direction, and verification steps.',
 		].join('\n'),
-		icon: <FiAlertTriangle size={18} />,
+		icon: <FiAlertTriangle size={24} />,
 	},
 ];
 

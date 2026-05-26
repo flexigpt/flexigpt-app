@@ -1,11 +1,11 @@
 ---
 name: docs-audit
-description: Audit docs or README files for structural gaps, stale claims, duplication, missing content, and navigation issues. Produces an audit and rewrite plan; does not rewrite docs.
+description: Read-only audit of docs or README files for structural gaps, stale claims, duplication, missing content, and navigation issues. Produces an audit and rewrite plan; does not rewrite docs.
 ---
 
 # Docs Audit
 
-Audit existing docs against their audience and purpose. Produce findings and a rewrite plan. Do not rewrite the docs in this skill.
+Audit existing docs against their audience and purpose. Produce findings and a rewrite plan. Do not rewrite docs or edit files in this skill.
 
 ## Use when
 
@@ -34,6 +34,7 @@ Severity, not adjectives. Use severity (`critical`, `major`, `minor`) tied to us
 
 ## Hard rules
 
+- Read-only: do not edit, create, delete, or rewrite files.
 - Cite files or sections for every finding.
 - Do not rewrite docs; produce an audit and a rewrite plan only.
 - Tie findings to audience and purpose, not to personal style preference.

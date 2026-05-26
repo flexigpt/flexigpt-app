@@ -106,7 +106,7 @@ export const docsCategories: DocsCategory[] = [
 				id: 'everyday-recipes',
 				title: 'Everyday Recipes',
 				summary:
-					'Run common LLM workflows such as file analysis, code review, bug investigation, documentation, research, and model comparison.',
+					'Run common workflows such as feature development, code review, bug investigation, documentation, research, and model comparison.',
 				body: everydayRecipesBody,
 			},
 			{

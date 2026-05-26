@@ -105,7 +105,7 @@ export default function HomePage() {
 				<div className="mt-4 flex w-full flex-1 flex-col items-center justify-between pb-4 xl:mt-16">
 					<div className="flex w-full flex-col items-center">
 						<PrimaryActionCard
-							title="Open Chats Workspace"
+							title="Open FlexiGPT Chat Workspace"
 							description="Start a new chat/workflow or continue a saved local thread."
 							to="/chats/"
 							icon={<img src="/icon.png" alt="FlexiGPT" width={64} height={64} />}
@@ -124,7 +124,7 @@ export default function HomePage() {
 						<div className="mx-auto max-w-3xl text-center">
 							<h2 className="text-lg font-semibold">Start from workflow</h2>
 							<p className="text-base-content/70 text-xs">
-								Pick a starter to open Chats with a workflow assistant/agent loaded and a prefilled draft prompt.
+								Pick a high-impact starter to open Chats with the right assistant preset and a focused draft prompt.
 							</p>
 						</div>
 

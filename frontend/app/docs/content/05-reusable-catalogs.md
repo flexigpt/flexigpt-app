@@ -38,6 +38,7 @@ An assistant preset is a reusable starter setup for a type of work.
 
 Examples:
 
+- feature developer using spec driven development
 - code reviewer
 - local reader
 - documentation writer

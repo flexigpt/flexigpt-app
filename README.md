@@ -12,7 +12,7 @@ FlexiGPT is a local-first BYOK AI workspace for power users and teams who need r
 FlexiGPT is built for people who use LLMs as part of repeatable work, not just one-off chat.
 
 - Power and local-first users who want provider choice, private local history, and control over configuration and orchestration.
-- Developers and technical writers who reuse assistants/agents, prompts, attachments, tools, and model setups.
+- Developers and technical writers who develop features, review diffs, debug failures, write tests/docs, and reuse assistants/agents, prompts, attachments, tools, and model setups.
 - Consultants and small teams who want consistent assistant workflows without sending chat history through another hosted app.
 
 ## Install
@@ -42,8 +42,9 @@ FlexiGPT is built for people who use LLMs as part of repeatable work, not just o
 
 Good first workflows:
 
-- Use a home screen workflow card such as Analyze File, Code Review or Bug Investigation.
+- Use a home screen workflow card such as Develop a Feature, Review Code, or Investigate a Bug.
 - Attach only the relevant source material.
+- For code changes, start with a repo path or changed files and let the Feature Developer workflow inspect, scope, implement, and verify the change.
 - Send the prefilled prompt as-is or adjust it for your task.
 - Reuse or customize the assistant preset once the workflow fits your style.
 
@@ -105,6 +106,19 @@ FlexiGPT does not proxy normal LLM calls through a FlexiGPT-hosted service. Requ
 - Conversations, workflow catalogs, and configuration are stored locally.
 - Selected request context is sent to the provider or endpoint you choose when you send.
 - Use your own provider accounts. FlexiGPT does not proxy or bill model usage.
+
+### Built-in software development workflows
+
+- Develop bounded features and enhancements from local repo context with a spec, implementation steps, edits, and focused verification.
+- Review code, diffs, and PRs for correctness, security, reliability, maintainability, and test gaps.
+- Investigate bugs from logs, stack traces, failing outputs, source files, and config.
+- Refactor code, design tests, implement tests, explore codebases, and review architecture with built-in software assistant presets.
+- Use read-only presets for review/investigation and write/shell-capable presets for implementation, with manual review for write and shell tools.
+
+### Built-in product, research, and technical-writing workflows
+
+- Built-in assistants cover PRD/MRD writing, decision records, user feedback analysis, roadmap prioritization, delivery risk review, and stakeholder status updates.
+- Technical-writing assistants cover docs audits, docs authoring, API reference, release notes, and troubleshooting guides.
 
 ## Documentation
 

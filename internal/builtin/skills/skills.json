@@ -17,7 +17,7 @@
 			"id": "product-leadership",
 			"slug": "product-leadership",
 			"displayName": "Product and Leadership",
-			"description": "Skills for product specs, decision records, feedback analysis, roadmap prioritization, delivery risk review, and status updates.",
+			"description": "Skills for PRDs, MRDs, decision records, feedback analysis, roadmap prioritization, delivery risk review, and status updates.",
 			"isEnabled": true,
 			"isBuiltIn": true,
 			"createdAt": "2026-05-25T00:00:00Z",
@@ -210,16 +210,16 @@
 			}
 		},
 		"product-leadership": {
-			"product-spec-authoring": {
+			"prd-mrd-authoring": {
 				"schemaVersion": "2026-02-10",
-				"id": "product-spec-authoring",
-				"slug": "product-spec-authoring",
+				"id": "prd-mrd-authoring",
+				"slug": "prd-mrd-authoring",
 				"type": "embeddedfs",
-				"location": "product-leadership/product-spec-authoring",
-				"name": "product-spec-authoring",
-				"displayName": "Product Spec Authoring",
-				"description": "Turn goals, research notes, constraints, and stakeholder input into a product spec with testable requirements and acceptance criteria. Source-grounded; flags assumptions and missing inputs explicitly.",
-				"tags": ["product-leadership", "builtin", "spec", "requirements"],
+				"location": "product-leadership/prd-mrd-authoring",
+				"name": "prd-mrd-authoring",
+				"displayName": "PRD/MRD Authoring",
+				"description": "Turn goals, market or user research, constraints, and stakeholder input into a PRD, MRD, or product requirements artifact with testable requirements and acceptance criteria.",
+				"tags": ["product-leadership", "builtin", "prd", "mrd", "requirements"],
 				"presence": {
 					"status": "present",
 					"lastCheckedAt": "2026-05-25T00:00:00Z",
@@ -340,7 +340,7 @@
 				"location": "technical-content-writing/docs-audit",
 				"name": "docs-audit",
 				"displayName": "Docs Audit",
-				"description": "Audit docs or README files for structural gaps, stale claims, duplication, missing content, and navigation issues. Produces an audit and rewrite plan; does not rewrite docs.",
+				"description": "Read-only audit of docs or README files for structural gaps, stale claims, duplication, missing content, and navigation issues. Produces an audit and rewrite plan; does not rewrite docs.",
 				"tags": ["technical-content-writing", "builtin", "docs", "audit"],
 				"presence": {
 					"status": "present",

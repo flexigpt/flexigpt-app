@@ -988,3 +988,7 @@
 - [x] should document what to check to know the prompts supplied for presets, how to modify prompts etc.
 
 - [x] Add a onboarding flow where the first api key addition and getting started is seamless.
+- [x] once you open a tool in edit mode and then close without editing, next edit modal doesn't open
+  - [x] this is the react double rendering problem in dev with no solution as of now.
+- [x] product spec writer needs better name to identify with common prd mrd type things
+- [x] may be docs auditor can be a read only thing?

@@ -7,6 +7,7 @@ For setup tasks such as OpenRouter, local models, creating assistant presets, pr
 ## Table of contents <!-- omit from toc -->
 
 - [How to use these recipes](#how-to-use-these-recipes)
+- [Develop a feature](#develop-a-feature)
 - [Analyze a file](#analyze-a-file)
 - [Review code](#review-code)
 - [Investigate a bug](#investigate-a-bug)
@@ -26,6 +27,37 @@ For reliable results:
 - inspect assistant preset details before assuming what it does
 - start tools in manual mode
 - use local providers only after confirming the endpoint is actually local
+
+## Develop a feature
+
+Use this when you want FlexiGPT to inspect a repo, scope a bounded change, edit code, and verify the result.
+
+Suggested setup:
+
+- Home starter: **Develop a Feature**
+- Assistant preset: **Spec Driven Development**
+- Context: repo path, changed files, issue text, requirements, screenshots, failing tests, or design notes
+- Tools: read/write/shell capable preset, with write and shell calls reviewed manually
+- Previous user turns: usually `0` or `1`
+
+Steps:
+
+1. Open the home screen.
+2. Choose **Develop a Feature**.
+3. Replace the placeholder with a repo path and the feature request.
+4. Add any issue text, acceptance criteria, screenshots, or relevant files.
+5. Send the draft.
+6. Review the proposed spec or scope if the assistant asks for confirmation.
+7. Let it implement the confirmed scope.
+8. Review write and shell tool calls before running them.
+9. Inspect verification results and remaining gaps.
+
+Starter prompt:
+
+    Develop this feature in `/absolute/path/to/repo`:
+    <describe the change>
+
+    First inspect relevant files, write a concise spec, ask for confirmation if scope or behavior is unclear, then implement and verify with focused tests or checks.
 
 ## Analyze a file
 

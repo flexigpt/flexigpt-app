@@ -71,6 +71,7 @@ Examples:
 - Explain this attached file.
 - Summarize these notes.
 - Compare these two approaches.
+- Develop this feature in the attached repo. First inspect relevant files, write a short spec, then implement after confirmation.
 - Review this code snippet for correctness and test gaps.
 - Rewrite this paragraph for a technical README.
 - Turn this stack trace and log excerpt into likely causes and next checks.

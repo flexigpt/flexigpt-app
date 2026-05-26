@@ -1,16 +1,16 @@
 ---
-name: product-spec-authoring
-description: Turn goals, research notes, constraints, and stakeholder input into a product spec with testable requirements and acceptance criteria. Source-grounded; flags assumptions and missing inputs explicitly.
+name: prd-mrd-authoring
+description: Turn goals, market or user research, constraints, and stakeholder input into a PRD, MRD, or product requirements artifact with testable requirements and acceptance criteria. Source-grounded; flags assumptions and missing inputs explicitly.
 ---
 
-# Product Spec Authoring
+# PRD/MRD Authoring
 
-Convert goals and source material into a product spec with testable requirements and acceptance criteria. Source-grounded. Mark assumptions explicitly.
+Convert goals and source material into a PRD, MRD, or product requirements artifact with testable requirements and acceptance criteria. Source-grounded. Mark assumptions explicitly.
 
 ## Use when
 
-- producing a product spec from goals, research, or stakeholder input
-- turning a rough brief into a structured, reviewable spec
+- producing a PRD, MRD, or product requirements document from goals, research, market context, or stakeholder input
+- turning a rough brief into a structured, reviewable requirements artifact
 - preparing a spec for engineering or design handoff
 
 ## Do not use when
@@ -45,7 +45,9 @@ Diagrams only when they clarify. Include a Mermaid diagram only when a workflow,
 
 ## Artifact format
 
-Use only sections that matter.
+Use only sections that matter. Choose the document type explicitly:
+
+document-type: PRD | MRD | product requirements brief.
 
 problem: what problem is being solved and why now; cite sources.
 
