@@ -1,6 +1,6 @@
 # FlexiGPT backend map
 
-> FlexiGPT is a local-first AI workspace built as a Wails desktop app with a Go backend.
+> FlexiGPT is a local-first BYOK AI workspace built as a Wails desktop app with a Go backend.
 >
 > This document is organized around backend architecture, data flow, and store/runtime behavior so an LLM can understand the system quickly.
 > HTTP handler files are intentionally omitted because they are not useful for architecture-first backend context.

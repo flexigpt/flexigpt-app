@@ -83,10 +83,10 @@ const CORE_ASSISTANTS_BUNDLE_ID = '019d2423-01b0-7f87-be39-fe02d844453a';
 const workflowStarters: WorkflowStarter[] = [
 	{
 		title: 'Analyze File',
-		description: 'Attach a file and get a guided explanation of purpose, or any other query.',
+		description: 'Attach a file and get a guided explanation of purpose, or any other query',
 		workflowID: 'analyze-file',
 		assistantPresetBundleID: CORE_ASSISTANTS_BUNDLE_ID,
-		assistantPresetSlug: 'fs-exec',
+		assistantPresetSlug: 'local-reader',
 		assistantPresetVersion: 'v1.0.0',
 		prompt: [
 			'<Attach the file or paste/replace this line with file contents, or replace this line with the full local path to inspect: `/absolute/path/to/file`>',
@@ -98,7 +98,7 @@ const workflowStarters: WorkflowStarter[] = [
 	{
 		title: 'Code Review',
 		description:
-			'Review the code or diff for correctness, security, reliability, maintainability, and test gaps. Focus on concrete findings and narrow fixes.',
+			'Review the code or diff for correctness, security, reliability, maintainability, and test gaps. Focus on concrete findings and narrow fixes',
 		workflowID: 'code-review',
 		assistantPresetBundleID: SOFTWARE_ASSISTANTS_BUNDLE_ID,
 		assistantPresetSlug: 'reviewing-code',
@@ -113,10 +113,10 @@ const workflowStarters: WorkflowStarter[] = [
 	{
 		title: 'Bug Investigation',
 		description:
-			'Investigate a bug. Identify likely root cause, evidence, missing evidence, the smallest safe fix direction, and verification steps.',
+			'Diagnose root cause, identify missing evidence, the smallest safe fix direction, and verification steps from logs, errors, stack traces, failing outputs, code, and config',
 		workflowID: 'bug-investigation',
-		assistantPresetBundleID: CORE_ASSISTANTS_BUNDLE_ID,
-		assistantPresetSlug: 'fs-exec',
+		assistantPresetBundleID: SOFTWARE_ASSISTANTS_BUNDLE_ID,
+		assistantPresetSlug: 'bug-investigator',
 		assistantPresetVersion: 'v1.0.0',
 		prompt: [
 			'<Paste the error, stack trace, failing test output, or replace this line with the relevant repo/file path: `/absolute/path/to/repo-or-file`>',
@@ -128,7 +128,7 @@ const workflowStarters: WorkflowStarter[] = [
 	{
 		title: 'Architecture Review',
 		description:
-			'Review the architecture. Identify boundaries, risks, coupling, unclear ownership, and the simplest viable improvements.',
+			'Review the architecture. Identify boundaries, risks, coupling, unclear ownership, and the simplest viable improvements',
 		workflowID: 'architecture-review',
 		assistantPresetBundleID: SOFTWARE_ASSISTANTS_BUNDLE_ID,
 		assistantPresetSlug: 'designing-system-architecture',
@@ -221,8 +221,8 @@ export default function HomePage() {
 					</div>
 
 					<p className="text-base-content/70 max-w-5xl text-sm leading-relaxed">
-						Local-first AI workspace for reusable assistants/agents, prompts, tools, skills, model choices, attachments,
-						and private local history across multiple LLM providers.
+						Local-first BYOK AI workspace for reusable assistants/agents, prompts, tools, skills, model choices,
+						attachments, and private local history across multiple LLM providers.
 					</p>
 				</div>
 

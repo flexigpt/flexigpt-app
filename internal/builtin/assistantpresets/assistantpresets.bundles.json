@@ -6,7 +6,7 @@
 			"id": "019d2423-01b0-7f87-be39-fe02d844453a",
 			"slug": "core-assistants",
 			"displayName": "Core Assistants",
-			"description": "Built-in general-purpose assistant presets.",
+			"description": "Built-in general-purpose assistant presets",
 			"isEnabled": true,
 			"isBuiltIn": true,
 			"createdAt": "2026-03-25T00:00:00Z",
@@ -17,11 +17,44 @@
 			"id": "019d676e-2533-7fdf-a0af-d3a571ab4f4f",
 			"slug": "software-assistants",
 			"displayName": "Software Assistants",
-			"description": "Built-in Software Dev assistant presets.",
+			"description": "Built-in Software Dev assistant presets",
 			"isEnabled": true,
 			"isBuiltIn": true,
 			"createdAt": "2026-04-07T00:00:00Z",
 			"modifiedAt": "2026-04-07T00:00:00Z"
+		},
+		"019e6265-4a12-7c8d-8a1f-1b273eb58eb5": {
+			"schemaVersion": "2026-03-22",
+			"id": "019e6265-4a12-7c8d-8a1f-1b273eb58eb5",
+			"slug": "product-leadership-assistants",
+			"displayName": "Product and Leadership",
+			"description": "Product spec, decision record, feedback analysis, prioritization, delivery risk, and status update assistant presets",
+			"isEnabled": true,
+			"isBuiltIn": true,
+			"createdAt": "2026-05-26T00:00:00Z",
+			"modifiedAt": "2026-05-26T00:00:00Z"
+		},
+		"019e6265-f3c4-7055-95d0-0cb52ae15a1c": {
+			"schemaVersion": "2026-03-22",
+			"id": "019e6265-f3c4-7055-95d0-0cb52ae15a1c",
+			"slug": "technical-content-writing-assistants",
+			"displayName": "Technical Content Writing",
+			"description": "Documentation, API reference, release notes, and troubleshooting guide assistant presets",
+			"isEnabled": true,
+			"isBuiltIn": true,
+			"createdAt": "2026-05-26T00:00:00Z",
+			"modifiedAt": "2026-05-26T00:00:00Z"
+		},
+		"019e6266-5953-7150-b9cc-a7ff46426563": {
+			"schemaVersion": "2026-03-22",
+			"id": "019e6266-5953-7150-b9cc-a7ff46426563",
+			"slug": "research-analysis-assistants",
+			"displayName": "Research and Analysis",
+			"description": "Research brief assistant presets for attached or local source material",
+			"isEnabled": true,
+			"isBuiltIn": true,
+			"createdAt": "2026-05-26T00:00:00Z",
+			"modifiedAt": "2026-05-26T00:00:00Z"
 		}
 	}
 }

@@ -977,3 +977,10 @@
   - [x] search files (and may be others too), need to explicit setting to exclude hidden files/folders. (may be list dir too.)
   - [x] read/replace text utils, may need to support approx line numbers so that llm can be more specific on where to read / write etc.
     - [x] replace has lots of ambiguous mismatch errors. need a way to narrow down, and have errors better communicated back that are actionable.
+
+- [x] menu classes cleanup in dropdowns
+- [x] docs update to place product as repeatable workflows rather than just chat
+- [x] starter workflows in homepage and load it in chats
+- [x] better security privacy and workflow recipe guides
+- [x] better assistant presets: definitely need one which is just fs read and explore setup rather than whole fs exec thing. may have read only, read write read write exec presets
+- [x] better assistants that are more of a good starter recipes for full development
