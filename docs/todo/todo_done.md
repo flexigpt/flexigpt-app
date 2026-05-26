@@ -986,3 +986,5 @@
 - [x] better assistants that are more of a good starter recipes for full development
 - [x] assistant preset behavior notes to document: all things are starter including prompts, tools, skills etc. all things can change as required.
 - [x] should document what to check to know the prompts supplied for presets, how to modify prompts etc.
+
+- [x] Add a onboarding flow where the first api key addition and getting started is seamless.
