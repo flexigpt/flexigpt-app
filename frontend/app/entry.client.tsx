@@ -1,13 +1,12 @@
-import { StrictMode } from 'react';
+import {
+	installGlobalFrontendErrorHandlers,
+	renderFatalStartupScreen,
+	reportFrontendError,
+} from '@/lib/frontend_error_reporter';
 
-import ReactDOM from 'react-dom/client';
-import { HydratedRouter } from 'react-router/dom';
+installGlobalFrontendErrorHandlers();
 
-import '@/globals.css';
-
-ReactDOM.hydrateRoot(
-	document,
-	<StrictMode>
-		<HydratedRouter />
-	</StrictMode>
-);
+void import('./entry.client.bootstrap').catch((error: unknown) => {
+	reportFrontendError(error, { phase: 'entry.bootstrap_import' });
+	renderFatalStartupScreen(error);
+});

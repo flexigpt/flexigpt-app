@@ -1,4 +1,5 @@
 import { IS_WAILS_PLATFORM } from '@/lib/features';
+import { setFrontendErrorLogger } from '@/lib/frontend_error_reporter';
 
 import type {
 	IAggregateAPI,
@@ -37,6 +38,7 @@ export let assistantPresetStoreAPI: IAssistantPresetStoreAPI;
 if (IS_WAILS_PLATFORM) {
 	// Initialize with Wails implementations
 	log = new wailsImpl.WailsLogger();
+	setFrontendErrorLogger(log);
 
 	attachmentsDropAPI = new wailsImpl.WailsAttachmentsDropAPI();
 	backendAPI = new wailsImpl.WailsBackendAPI();

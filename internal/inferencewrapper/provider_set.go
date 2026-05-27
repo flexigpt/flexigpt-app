@@ -186,7 +186,7 @@ func (ps *ProviderSetAPI) AddProvider(
 	if _, err := ps.inner.AddProvider(ctx, req.Provider, cfg); err != nil {
 		return nil, err
 	}
-	ps.logger.Info("add provider", "name", req.Provider)
+
 	return &spec.AddProviderResponse{}, nil
 }
 
@@ -201,7 +201,7 @@ func (ps *ProviderSetAPI) DeleteProvider(
 	if err := ps.inner.DeleteProvider(ctx, req.Provider); err != nil {
 		return nil, err
 	}
-	ps.logger.Info("deleteProvider", "name", req.Provider)
+
 	return &spec.DeleteProviderResponse{}, nil
 }
 

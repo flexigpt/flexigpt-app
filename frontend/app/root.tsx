@@ -1,5 +1,5 @@
 /* eslint-disable no-restricted-exports */
-import { type ReactNode, useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import {
 	isRouteErrorResponse,
@@ -16,6 +16,7 @@ import { type AppTheme, ThemeType } from '@/spec/setting';
 import { CustomThemeDark, CustomThemeLight } from '@/spec/theme_consts';
 
 import { IS_WAILS_PLATFORM } from '@/lib/features';
+import { recordFrontendCrash, reportFrontendError } from '@/lib/frontend_error_reporter';
 
 import { initBuiltIns } from '@/hooks/use_builtin_provider';
 import { ensureWorker } from '@/hooks/use_highlight';
@@ -24,6 +25,7 @@ import { GenericThemeProvider } from '@/hooks/use_theme_provider';
 
 import { attachmentsDropAPI } from '@/apis/baseapi';
 
+import { ErrorRecoveryScreen } from '@/components/error_recovery_screen';
 import { Sidebar } from '@/components/sidebar';
 
 import '@/globals.css';
@@ -100,10 +102,22 @@ function domReady() {
 export async function clientLoader() {
 	// Wait for DOM content to be loaded and Wails runtime to be injected
 	await domReady();
-	attachmentsDropAPI.startListener();
-	// Now it's safe to call Wails backend functions
-	await Promise.all([initBuiltIns(), initStartupTheme()]);
-	// console.log('root builtins loaded');
+	try {
+		attachmentsDropAPI.startListener();
+	} catch (error) {
+		reportFrontendError(error, { phase: 'root.client_loader.attachments_drop_start' });
+	}
+
+	// These are startup initializers. If one fails, log it but do not blank the app.
+	// If you later decide one of these is truly mandatory, rethrow that specific failure.
+	const results = await Promise.allSettled([initBuiltIns(), initStartupTheme()]);
+	const names = ['initBuiltIns', 'initStartupTheme'];
+
+	results.forEach((result, index) => {
+		if (result.status === 'rejected') {
+			reportFrontendError(result.reason, { phase: 'root.client_loader', task: names[index] });
+		}
+	});
 }
 
 // Important! Force the client loader to run during hydration and not just during ssr build.
@@ -116,8 +130,41 @@ export default function Root() {
 
 	// Init worker on mount.
 	useEffect(() => {
-		if ('requestIdleCallback' in window) requestIdleCallback(() => ensureWorker());
-		else setTimeout(() => ensureWorker(), 300);
+		let cancelled = false;
+		let cancelScheduled: (() => void) | undefined;
+
+		const startWorker = () => {
+			if (cancelled) return;
+
+			try {
+				void Promise.resolve(ensureWorker()).catch((error: unknown) => {
+					reportFrontendError(error, { phase: 'highlight_worker.ensure_async' });
+				});
+			} catch (error) {
+				reportFrontendError(error, { phase: 'highlight_worker.ensure_sync' });
+			}
+		};
+
+		let requestCallAvailable: boolean = false;
+		if ('requestIdleCallback' in window) {
+			requestCallAvailable = true;
+		}
+		if (requestCallAvailable) {
+			const idleID = window.requestIdleCallback(startWorker);
+			cancelScheduled = () => {
+				window.cancelIdleCallback(idleID);
+			};
+		} else {
+			const timerID = window.setTimeout(startWorker, 300);
+			cancelScheduled = () => {
+				window.clearTimeout(timerID);
+			};
+		}
+
+		return () => {
+			cancelled = true;
+			cancelScheduled?.();
+		};
 	}, []);
 
 	useEffect(() => {
@@ -129,9 +176,13 @@ export default function Root() {
 	// chat input registers as drop target.
 	useEffect(() => {
 		attachmentsDropAPI.setNoTargetHandler(() => {
-			const p = pathnameRef.current || '';
-			if (p.startsWith('/chats')) return;
-			navigate('/chats', { replace: false });
+			try {
+				const p = pathnameRef.current || '';
+				if (p.startsWith('/chats')) return;
+				navigate('/chats', { replace: false });
+			} catch (error) {
+				reportFrontendError(error, { phase: 'attachments_drop.no_target_handler' });
+			}
 		});
 
 		return () => {
@@ -149,28 +200,53 @@ export default function Root() {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-	let message = 'Oops!';
-	let details = 'An unexpected error occurred.';
-	let stack: string | undefined;
+	const navigate = useNavigate();
+	const [crashCount, setCrashCount] = useState(0);
+
+	useEffect(() => {
+		const isNotFound = isRouteErrorResponse(error) && error.status === 404;
+		if (isNotFound) return;
+
+		// eslint-disable-next-line react-hooks/set-state-in-effect, react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+		setCrashCount(recordFrontendCrash('react_router.root_error_boundary'));
+
+		reportFrontendError(error, {
+			phase: 'react_router.root_error_boundary',
+		});
+	}, [error]);
+
+	let title = 'Something went wrong';
+	let message = 'This page hit an unexpected error.';
+	let technicalDetails: string | undefined;
 
 	if (isRouteErrorResponse(error)) {
-		message = error.status === 404 ? '404' : 'Error';
-		details = error.status === 404 ? 'The requested page could not be found.' : error.statusText || details;
-	} else if (import.meta.env.DEV && error && error instanceof Error) {
-		details = error.message;
-		stack = error.stack;
+		title = error.status === 404 ? '404' : 'Error';
+		message =
+			error.status === 404
+				? 'The requested page could not be found.'
+				: error.statusText || `The page failed with status ${error.status}.`;
+
+		if (error.status !== 404) {
+			technicalDetails = `${error.status} ${error.statusText}`;
+		}
+	} else if (error instanceof Error) {
+		message = error.message || message;
+		technicalDetails = error.stack || error.message;
+	} else if (error) {
+		message = JSON.stringify(error, null, 2);
+		technicalDetails = message;
 	}
 
 	return (
-		<main className="container mx-auto p-4 pt-16">
-			<h1>{message}</h1>
-			<p>{details}</p>
-			{stack && (
-				<pre className="w-full overflow-x-auto p-4">
-					<code>{stack}</code>
-				</pre>
-			)}
-		</main>
+		<ErrorRecoveryScreen
+			title={title}
+			message={message}
+			technicalDetails={technicalDetails}
+			showResetLocalState={crashCount >= 2}
+			onGoHome={() => {
+				navigate('/', { replace: true });
+			}}
+		/>
 	);
 }
 
