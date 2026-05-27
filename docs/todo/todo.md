@@ -2,12 +2,6 @@
 
 ## Laundry list
 
-- [ ] block autoexec should be a high level button for just in case things i.e the llm is spiralling and you want the next turn to not autoexec as you want to give some direction to llm. this should be visible when there is atleast 2 ato exec tool during send. but it should be active during streaming and busy periods too, and value should be used during next autoexec run after assistant message. in enxt turn again if there are no autoexec tools, the button shuld not be visible. it should be present just above the stop streaming button, and should be indicative enough to tell that it is autoexec stop.
-
-- [ ] may be in chats page even if there is no message card focus and someone does a page up/down when no modals are open, we can still scroll up/down. as of now lack of focus creates a issue.
-
-- [ ] cursor up and down has some jerk in composer, this is post a paste of some code. check any rerenders anyplace that can cause this.
-
 - [ ] would be a good idea to have a "starting text" in assistant preset. this can be inserted in the box if there is no text already there in composer.
 
 - [ ] easier preset import bundles and flows. e.g: just import a preset bundle that has assistant, models, prompts, tools etc.

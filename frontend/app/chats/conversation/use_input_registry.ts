@@ -156,6 +156,7 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 		const hydratedToolCalls = deriveHydratedLastAssistantToolCalls(conversation);
 		if (hydratedToolCalls.length > 0) {
 			input.loadToolCalls(hydratedToolCalls);
+			input.finishAssistantTurn({ loadedRunnableToolCallCount: hydratedToolCalls.length });
 		}
 	}, []);
 

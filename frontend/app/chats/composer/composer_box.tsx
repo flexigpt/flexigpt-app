@@ -22,7 +22,11 @@ import { useAssistantPresetManager } from '@/chats/composer/assistantpresets/use
 import { EditorContextBar } from '@/chats/composer/contextarea/context_bar';
 import { useAssistantContextState } from '@/chats/composer/contextarea/use_context_state';
 import { EditorArea, type EditorAreaHandle } from '@/chats/composer/editor/editor_area';
-import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
+import type {
+	AssistantTurnFinishedPayload,
+	EditorExternalMessage,
+	EditorSubmitPayload,
+} from '@/chats/composer/editor/editor_types';
 import { useComposerSystemPrompt } from '@/chats/composer/systemprompts/use_composer_system_prompt';
 import type { ChatWorkflowStarter, ChatWorkflowStarterAssistantPresetRef } from '@/chats/conversation/starter_intent';
 
@@ -37,6 +41,7 @@ export interface ComposerBoxHandle {
 	loadWorkflowStarter: (starter: ChatWorkflowStarter) => Promise<boolean>;
 	loadExternalMessage: (msg: EditorExternalMessage) => void;
 	loadToolCalls: (toolCalls: UIToolCall[]) => void;
+	finishAssistantTurn: (payload: AssistantTurnFinishedPayload) => void;
 	setConversationToolsFromChoices: (tools: ToolStoreChoice[]) => void;
 	setWebSearchFromChoices: (tools: ToolStoreChoice[]) => void;
 	applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => void;
@@ -278,6 +283,9 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 			},
 			loadToolCalls: toolCalls => {
 				editorAreaRef.current?.loadToolCalls(toolCalls);
+			},
+			finishAssistantTurn: payload => {
+				editorAreaRef.current?.finishAssistantTurn(payload);
 			},
 			applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => {
 				editorAreaRef.current?.applyAttachmentsDrop(payload);

@@ -439,7 +439,15 @@ export function useSendMessage({
 						requestAnimationFrame(() => {
 							if (!tabExists(tabId)) return;
 							if (requestIdByTabRef.current.get(tabId) !== reqId) return;
-							inputRefs.current.get(tabId)?.loadToolCalls(queuedRunnableToolCalls);
+							const input = inputRefs.current.get(tabId);
+							input?.loadToolCalls(queuedRunnableToolCalls);
+							input?.finishAssistantTurn({
+								loadedRunnableToolCallCount: queuedRunnableToolCalls.length,
+							});
+						});
+					} else {
+						inputRefs.current.get(tabId)?.finishAssistantTurn({
+							loadedRunnableToolCallCount: 0,
 						});
 					}
 				}

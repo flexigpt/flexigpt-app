@@ -10,7 +10,17 @@ import {
 	useState,
 } from 'react';
 
-import { FiAlertTriangle, FiEdit2, FiFastForward, FiPlay, FiSend, FiSquare, FiX } from 'react-icons/fi';
+import {
+	FiAlertTriangle,
+	FiEdit2,
+	FiFastForward,
+	FiPlay,
+	FiSend,
+	FiSquare,
+	FiTool,
+	FiX,
+	FiZapOff,
+} from 'react-icons/fi';
 
 import { useMenuStore, useStoreState } from '@ariakit/react';
 import { Plate, PlateContent } from 'platejs/react';
@@ -35,7 +45,11 @@ import {
 import { useComposerAttachments } from '@/chats/composer/attachments/use_composer_attachments';
 import { EditorBottomBar } from '@/chats/composer/editor/editor_bottom_bar';
 import { EditorChipsBar } from '@/chats/composer/editor/editor_chips_bar';
-import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
+import type {
+	AssistantTurnFinishedPayload,
+	EditorExternalMessage,
+	EditorSubmitPayload,
+} from '@/chats/composer/editor/editor_types';
 import { buildEditorValueFromPlainText, hasNonEmptyUserText } from '@/chats/composer/platedoc/platedoc_utils';
 import {
 	getInstructionPromptPartsFromSelections,
@@ -93,6 +107,7 @@ export interface EditorAreaHandle {
 	setWebSearchFromChoices: (tools: ToolStoreChoice[]) => void;
 	applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => void;
 	setSkillStateFromMessage: (enabledRefs: SkillRef[], activeRefs: SkillRef[], options?: SkillStateApplyOptions) => void;
+	finishAssistantTurn: (payload: AssistantTurnFinishedPayload) => void;
 }
 
 interface EditorAreaProps {
@@ -106,6 +121,17 @@ interface EditorAreaProps {
 	editingMessageId: string | null;
 	cancelEditing: () => void;
 	systemPrompt: ComposerSystemPromptController;
+}
+
+function isAutoExecutableToolChoice(choice: ToolStoreChoice): boolean {
+	return (
+		choice.autoExecute &&
+		(choice.toolType === ToolStoreChoiceType.Function || choice.toolType === ToolStoreChoiceType.Custom)
+	);
+}
+
+function countAutoExecutableToolChoices(choices: ToolStoreChoice[]): number {
+	return choices.filter(isAutoExecutableToolChoice).length;
 }
 
 type SubmitOptions = { runPendingTools: boolean };
@@ -226,6 +252,31 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, [editor, selectionInfo]);
 	const hasEffectiveTextForSubmit = effectiveSubmitText.trim().length > 0;
 
+	const [autoExecStopVisible, setAutoExecStopVisible] = useState(false);
+	const [autoExecStopRequested, setAutoExecStopRequested] = useState(false);
+	const [autoExecBlockedByUser, setAutoExecBlockedByUser] = useState(false);
+	const [activeAutoExecBatchCount, setActiveAutoExecBatchCount] = useState(0);
+	const autoExecStopRequestedRef = useRef(false);
+	const autoExecBlockedByUserRef = useRef(false);
+
+	const clearAutoExecStopState = useCallback(() => {
+		autoExecStopRequestedRef.current = false;
+		autoExecBlockedByUserRef.current = false;
+		setAutoExecStopRequested(false);
+		setAutoExecBlockedByUser(false);
+		setAutoExecStopVisible(false);
+		setActiveAutoExecBatchCount(0);
+	}, []);
+
+	const requestBlockNextAutoExec = useCallback(() => {
+		autoExecStopRequestedRef.current = true;
+		autoExecBlockedByUserRef.current = true;
+		setAutoExecStopRequested(true);
+		setAutoExecBlockedByUser(true);
+		setAutoExecStopVisible(true);
+		resetAutoSubmitTracker();
+	}, [resetAutoSubmitTracker]);
+
 	const {
 		toolCalls,
 		toolOutputs,
@@ -257,11 +308,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		setActiveSkillRefs,
 		getCurrentSkillSessionID,
 		getAttachedToolEntries: getAttachedToolEntriesSnapshot,
-		externalExecutionBlocked: fastForwardPending,
+		externalExecutionBlocked: fastForwardPending || autoExecBlockedByUser,
 	});
 
 	const previousProviderSDKTypeRef = useRef(currentProviderSDKType);
 	const hasBlockingToolArgs = toolArgsBlocked || webSearchArgsBlocked;
+
 	useLayoutEffect(() => {
 		if (previousProviderSDKTypeRef.current === currentProviderSDKType) return;
 
@@ -654,9 +706,17 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		setToolDetailsState(null);
 		setToolArgsTarget(null);
 		resetAutoSubmitTracker();
+		clearAutoExecStopState();
 		clearAttachments();
 		clearComposerToolsState();
-	}, [clearAttachments, clearComposerToolsState, closeAllMenus, resetAutoSubmitTracker, setSubmitting]);
+	}, [
+		clearAttachments,
+		clearAutoExecStopState,
+		clearComposerToolsState,
+		closeAllMenus,
+		resetAutoSubmitTracker,
+		setSubmitting,
+	]);
 
 	const startFastForwardRun = useCallback(
 		(pendingRunnableToolCallIDs: string[]) => {
@@ -763,6 +823,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 			let didSend = false;
 			let submittedToolChoices: ToolStoreChoice[] | null = null;
+			let shouldShowAutoExecStopAfterSend = false;
 
 			try {
 				let effectiveSkillSessionID = getCurrentSkillSessionID();
@@ -848,6 +909,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				const webSearchChoices = buildWebSearchChoicesForSubmit(webSearchTemplates);
 
 				const finalToolChoices = dedupeToolChoices([...explicitChoices, ...conversationChoices, ...webSearchChoices]);
+				shouldShowAutoExecStopAfterSend = countAutoExecutableToolChoices(finalToolChoices) >= 1;
 
 				const payload: EditorSubmitPayload = {
 					text: textToSend,
@@ -873,6 +935,14 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				// Only clear the editor if we actually sent something.
 				if (didSend) {
 					resetEditor();
+					if (shouldShowAutoExecStopAfterSend) {
+						autoExecStopRequestedRef.current = false;
+						autoExecBlockedByUserRef.current = false;
+						setAutoExecStopRequested(false);
+						setAutoExecBlockedByUser(false);
+						setAutoExecStopVisible(true);
+					}
+
 					// If we were editing, the old snapshot is no longer relevant.
 					clearPreEditSnapshot();
 
@@ -991,6 +1061,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		if (autoExecState.phase !== 'idle') return;
 		if (tracker.observedCallKeys.size === 0) return;
 		if (!tracker.allObservedCallsAreAutoExecute) return;
+		if (autoExecBlockedByUser) return;
 		if (isGenerating || isInputLocked || isSubmittingRef.current) return;
 
 		if (templateBlocked || hasBlockingToolArgs) return;
@@ -1021,6 +1092,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		tracker.attemptedBatchSignature = batchSignature;
 		void doSubmit({ runPendingTools: false });
 	}, [
+		autoExecBlockedByUser,
 		autoExecState.phase,
 		doSubmit,
 		getToolRuntimeSnapshot,
@@ -1156,9 +1228,35 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const handleLoadToolCalls = useCallback(
 		(toolCallsToLoad: UIToolCall[]) => {
 			resetAutoSubmitTracker();
-			loadToolCalls(toolCallsToLoad);
+			const autoEligibleCount = toolCallsToLoad.filter(isAutoSubmitEligibleToolCall).length;
+			const shouldSuppressAutoExec = autoExecStopRequestedRef.current || autoExecBlockedByUserRef.current;
+
+			const preparedToolCalls = shouldSuppressAutoExec
+				? toolCallsToLoad.map(toolCall =>
+						isAutoSubmitEligibleToolCall(toolCall) ? { ...toolCall, suppressAutoExecute: true } : toolCall
+					)
+				: toolCallsToLoad;
+
+			setActiveAutoExecBatchCount(autoEligibleCount >= 1 ? autoEligibleCount : 0);
+
+			if (shouldSuppressAutoExec || autoEligibleCount === 0) {
+				autoExecStopRequestedRef.current = false;
+				autoExecBlockedByUserRef.current = false;
+				setAutoExecStopRequested(false);
+				setAutoExecBlockedByUser(false);
+				setAutoExecStopVisible(false);
+			}
+
+			loadToolCalls(preparedToolCalls);
 		},
 		[loadToolCalls, resetAutoSubmitTracker]
+	);
+
+	const finishAssistantTurn = useCallback(
+		(payload: AssistantTurnFinishedPayload) => {
+			if (payload.loadedRunnableToolCallCount === 0) clearAutoExecStopState();
+		},
+		[clearAutoExecStopState]
 	);
 
 	useImperativeHandle(
@@ -1186,6 +1284,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			setSkillStateFromMessage: (enabledRefs, activeRefs, options) => {
 				void applySkillSelectionState(enabledRefs, activeRefs, options);
 			},
+			finishAssistantTurn,
 		}),
 		[
 			loadExternalMessage,
@@ -1195,6 +1294,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			applyConversationToolsFromChoices,
 			applyWebSearchFromChoices,
 			applyAttachmentsDrop,
+			finishAssistantTurn,
 			focusEditorAtEnd,
 			openTemplatePicker,
 			openToolPicker,
@@ -1237,6 +1337,23 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		!fastForwardPending &&
 		!templateBlocked &&
 		!hasBlockingToolArgs;
+
+	const showAutoExecStopButton = autoExecStopVisible || activeAutoExecBatchCount >= 2;
+	const erroredToolOutputsReadyToSubmit =
+		toolOutputs.some(output => output.isError) &&
+		!hasPendingToolCalls &&
+		!hasRunningToolCalls &&
+		!hasBlockingToolArgs &&
+		!templateBlocked &&
+		!isInputLocked;
+
+	useEffect(() => {
+		if (toolCalls.length === 0 && autoExecState.phase === 'idle' && !isGenerating && activeAutoExecBatchCount > 0) {
+			// eslint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
+			setActiveAutoExecBatchCount(0);
+		}
+	}, [activeAutoExecBatchCount, autoExecState.phase, isGenerating, toolCalls.length]);
+
 	useEffect(() => {
 		onAssistantPresetRuntimeStateChange?.({
 			conversationToolChoices: conversationToolsToChoices(conversationToolsState),
@@ -1244,6 +1361,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			enabledSkillRefs,
 		});
 	}, [conversationToolsState, enabledSkillRefs, onAssistantPresetRuntimeStateChange, webSearchTemplates]);
+
 	return (
 		<>
 			<form
@@ -1255,6 +1373,14 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					<div className="alert alert-error mx-4 mt-3 mb-1 flex items-start gap-2 text-sm" role="alert">
 						<FiAlertTriangle size={16} className="mt-0.5" />
 						<span>{submitError}</span>
+					</div>
+				) : null}
+				{!submitError && erroredToolOutputsReadyToSubmit ? (
+					<div className="alert alert-warning mx-4 mt-3 mb-1 flex items-start gap-2 text-sm" role="status">
+						<FiTool size={16} className="mt-0.5" />
+						<span>
+							A tool returned an error result. It is ready to submit as tool output, or you can retry/discard it.
+						</span>
 					</div>
 				) : null}
 				<Plate editor={editor} onChange={handleEditorDocumentChange}>
@@ -1332,6 +1458,28 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						</div>
 						{/* Primary / secondary actions anchored at bottom-right */}
 						<div className="flex flex-col items-end justify-end gap-2 p-1">
+							{showAutoExecStopButton ? (
+								<HoverTip
+									content={
+										autoExecStopRequested
+											? 'Auto-exec stop armed for the next assistant tool-call batch'
+											: 'Stop auto-exec for the next assistant tool-call batch'
+									}
+									placement="left"
+								>
+									<button
+										type="button"
+										className={`btn btn-circle btn-sm shrink-0 ${
+											autoExecStopRequested || autoExecBlockedByUser ? 'btn-warning' : 'btn-neutral'
+										}`}
+										onClick={requestBlockNextAutoExec}
+										aria-label="Stop auto-exec for next tool calls"
+										aria-pressed={autoExecStopRequested || autoExecBlockedByUser}
+									>
+										<FiZapOff size={18} />
+									</button>
+								</HoverTip>
+							) : null}
 							{isGenerating ? (
 								<HoverTip content="Stop response" placement="left">
 									<button

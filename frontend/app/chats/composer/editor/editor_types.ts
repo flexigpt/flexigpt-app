@@ -24,3 +24,7 @@ export interface EditorSubmitPayload {
 	activeSkillRefs?: SkillRef[];
 	skillSessionID?: string;
 }
+
+export interface AssistantTurnFinishedPayload {
+	loadedRunnableToolCallCount: number;
+}
