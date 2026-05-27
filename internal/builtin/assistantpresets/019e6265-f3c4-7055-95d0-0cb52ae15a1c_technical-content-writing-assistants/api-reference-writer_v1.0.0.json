@@ -7,6 +7,7 @@
 	"description": "Generate or update API/SDK reference and examples from code, schemas, OpenAPI, proto files, or existing docs",
 	"isEnabled": true,
 	"isBuiltIn": true,
+	"startingText": "<Attach code/schema/OpenAPI/proto/existing docs or replace this line with absolute paths to the API/SDK surface, for example `/absolute/path/to/repo/api/docs`. Include the target audience or doc location if known.>\n\nGenerate or update accurate API reference content with endpoints/functions, parameters, defaults, constraints, responses/returns, errors, examples, edge cases, and versioning notes using the associated skill",
 	"startingIncludeModelSystemPrompt": true,
 	"startingInstructionTemplateRefs": [
 		{

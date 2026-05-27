@@ -7,6 +7,7 @@
 	"description": "Turn attached or local source material into a research brief with findings, evidence, uncertainty, recommendations, and next questions. Local and attached sources only",
 	"isEnabled": true,
 	"isBuiltIn": true,
+	"startingText": "<Attach source material or replace this line with local paths to notes/articles/transcripts/docs. State the research question or decision the brief should support.>\n\nCreate a research brief using only the provided/local sources. Include source table, key findings with evidence, disagreements, uncertainty, recommendations, and next questions. Use the associated skill",
 	"startingIncludeModelSystemPrompt": true,
 	"startingInstructionTemplateRefs": [
 		{

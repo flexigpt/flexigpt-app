@@ -7,6 +7,7 @@
 	"description": "Review plans, specs, milestones, issue lists, or status notes for delivery risks, dependency risks, blockers, unclear owners, and mitigations",
 	"isEnabled": true,
 	"isBuiltIn": true,
+	"startingText": "<Attach or paste the plan, milestone list, issue summary, status notes, or delivery commitment to review.>\n\nReview delivery risk using the associated skill",
 	"startingIncludeModelSystemPrompt": true,
 	"startingInstructionTemplateRefs": [
 		{

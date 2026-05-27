@@ -7,6 +7,7 @@
 	"description": "Read only assistant and analyze local files, folders, repos, docs, and notes",
 	"isEnabled": true,
 	"isBuiltIn": true,
+	"startingText": "<Attach files or replace this line with the local path(s) to inspect, for example `/absolute/path/to/file-or-folder`>\n\nAnalyze this material. Summarize what it is, the important structure, notable details, risks or gaps, and what to inspect next",
 	"startingIncludeModelSystemPrompt": true,
 	"startingInstructionTemplateRefs": [
 		{

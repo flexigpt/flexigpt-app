@@ -210,12 +210,13 @@ Use it to inspect and remove context before sending.
 ## Recommended pattern
 
 1. choose an assistant preset if you want a starter workflow
-2. confirm provider/model
-3. keep **Previous user turns** small and intentional
-4. attach only the source material that matters
-5. use prompt templates for repeated structure
-6. add tools only when execution is useful
-7. use manual tool review first
-8. enable skills when a workflow mode helps
-9. inspect output, citations, tool outputs, and message details
-10. adjust one layer at a time
+2. replace any preset starting-text placeholder with your task
+3. confirm provider/model
+4. keep **Previous user turns** small and intentional
+5. attach only the source material that matters
+6. use prompt templates for repeated structure
+7. add tools only when execution is useful
+8. use manual tool review first
+9. enable skills when a workflow mode helps
+10. inspect output, citations, tool outputs, and message details
+11. adjust one layer at a time

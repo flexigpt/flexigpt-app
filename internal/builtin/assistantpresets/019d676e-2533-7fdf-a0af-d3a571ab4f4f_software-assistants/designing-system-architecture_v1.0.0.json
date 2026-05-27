@@ -7,6 +7,7 @@
 	"description": "Software-dev preset for architecture decisions, boundary mapping, and event-pattern evaluation with read-oriented workspace tools",
 	"isEnabled": true,
 	"isBuiltIn": true,
+	"startingText": "<Describe the system/change and attach docs or provide repo paths. Include constraints such as scale, team ownership, consistency, compliance, or deadline.>\n\nRecommend the simplest viable architecture using the associated skill",
 	"startingIncludeModelSystemPrompt": true,
 	"startingInstructionTemplateRefs": [
 		{

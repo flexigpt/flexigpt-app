@@ -77,6 +77,7 @@ Examples:
 - Turn this stack trace and log excerpt into likely causes and next checks.
 
 Avoid beginning with a huge folder, many tools, and long chat history. Add complexity after the basic path works.
+If a starter workflow prefills the composer, replace its placeholder with your concrete task before sending.
 
 ## After the response
 

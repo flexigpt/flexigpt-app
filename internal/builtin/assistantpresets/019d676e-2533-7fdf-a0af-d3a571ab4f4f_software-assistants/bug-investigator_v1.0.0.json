@@ -7,6 +7,7 @@
 	"description": "Diagnose root cause, identify missing evidence, the smallest safe fix direction, and verification steps from logs, errors, stack traces, failing outputs, code, and config",
 	"isEnabled": true,
 	"isBuiltIn": true,
+	"startingText": "<Paste the error, stack trace, failing test output, bug report, or replace this line with the relevant repo/file path: `/absolute/path/to/repo-or-file`.>\n\nInvestigate this bug using the associated skill",
 	"startingIncludeModelSystemPrompt": true,
 	"startingInstructionTemplateRefs": [
 		{

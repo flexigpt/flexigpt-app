@@ -7,6 +7,7 @@
 	"description": "Software-dev preset for evidence-based code review with read-oriented workspace tools",
 	"isEnabled": true,
 	"isBuiltIn": true,
+	"startingText": "<Attach changed files, paste a diff, or replace this line with repo path plus commit/branch/PR context: `/absolute/path/to/repo`.>\n\nReview the code or diff using the associated skill",
 	"startingIncludeModelSystemPrompt": true,
 	"startingInstructionTemplateRefs": [
 		{

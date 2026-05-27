@@ -7,6 +7,7 @@
 	"description": "Turn goals, market or user research, constraints, and stakeholder input into a PRD, MRD, or product requirements artifact with testable requirements and acceptance criteria",
 	"isEnabled": true,
 	"isBuiltIn": true,
+	"startingText": "<Attach research/notes or describe the product goal, target users, constraints, and desired document type: PRD, MRD, or product requirements brief.>\n\nCreate a source-grounded requirements artifact with problem, users, goals, non-goals, testable requirements, acceptance criteria, risks, open questions, and handoff notes using the associated skill",
 	"startingIncludeModelSystemPrompt": true,
 	"startingInstructionTemplateRefs": [
 		{

@@ -7,6 +7,7 @@
 	"description": "Create or update READMEs, guides, how-tos, tutorials, conceptual docs, and internal docs from source context",
 	"isEnabled": true,
 	"isBuiltIn": true,
+	"startingText": "<Attach source material or replace this line with repo/docs paths plus the doc you want created or updated, for example `/absolute/path/to/repo/docs`. Include audience and desired doc type.>\n\nCreate or update documentation grounded in the provided source. Include a clear outline, steps or sections, concrete examples, limitations, and source-grounded troubleshooting notes. Use the associated skill",
 	"startingIncludeModelSystemPrompt": true,
 	"startingInstructionTemplateRefs": [
 		{

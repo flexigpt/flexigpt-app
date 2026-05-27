@@ -7,6 +7,7 @@
 	"description": "Full local development workspace with read, write, and shell command access",
 	"isEnabled": true,
 	"isBuiltIn": true,
+	"startingText": "<Replace this line with the repo/project path and the task. Example: `/absolute/path/to/repo`>\n\nInspect the relevant files, make the requested changes, and verify with focused shell commands where useful. Keep write and shell actions scoped.",
 	"startingIncludeModelSystemPrompt": true,
 	"startingInstructionTemplateRefs": [
 		{

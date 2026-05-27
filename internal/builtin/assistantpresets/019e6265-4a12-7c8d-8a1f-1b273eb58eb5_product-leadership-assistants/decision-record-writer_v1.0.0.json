@@ -7,6 +7,7 @@
 	"description": "Write a decision record from context, options, constraints, evidence, and trade-offs",
 	"isEnabled": true,
 	"isBuiltIn": true,
+	"startingText": "<Describe the decision to make, options considered, constraints, evidence, stakeholders, and any deadline. Attach supporting notes if available.>\n\nWrite a decision record with a clear recommendation, rationale, trade-offs accepted, risks, next steps, and concrete revisit triggers using the associated skill",
 	"startingIncludeModelSystemPrompt": true,
 	"startingInstructionTemplateRefs": [
 		{

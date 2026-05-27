@@ -7,6 +7,7 @@
 	"description": "Software-dev preset for disciplined discovery, scoped implementation, and verification with full file, text, and shell tooling",
 	"isEnabled": true,
 	"isBuiltIn": true,
+	"startingText": "<Replace this line with the repo path and feature/change request. Example: `/absolute/path/to/repo`>\n\nDevelop this change end to end using the associated skill",
 	"startingIncludeModelSystemPrompt": true,
 	"startingInstructionTemplateRefs": [
 		{

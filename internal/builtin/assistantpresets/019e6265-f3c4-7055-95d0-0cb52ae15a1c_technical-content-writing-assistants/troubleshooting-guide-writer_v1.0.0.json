@@ -7,6 +7,7 @@
 	"description": "Turn errors, logs, bug reports, support notes, and fixes into troubleshooting or knowledge-base articles",
 	"isEnabled": true,
 	"isBuiltIn": true,
+	"startingText": "<Attach or paste errors, logs, bug reports, support notes, or confirmed fixes. Include the intended audience and product/version if known.>\n\nWrite a troubleshooting/KB article with symptom, confirmed vs possible causes, safe diagnostic steps, fixes or workarounds, verification, prevention, and escalation notes. Use the associated skill",
 	"startingIncludeModelSystemPrompt": true,
 	"startingInstructionTemplateRefs": [
 		{

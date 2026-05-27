@@ -7,6 +7,7 @@
 	"description": "Understand an unfamiliar repo or module by mapping entry points, modules, flows, configs, tests, dependencies, risks, and what to inspect next",
 	"isEnabled": true,
 	"isBuiltIn": true,
+	"startingText": "<Replace this line with the repo/module path and what you want to understand. Example: `/absolute/path/to/repo/internal/search` >\n\nExplore this codebase area using the associated skill",
 	"startingIncludeModelSystemPrompt": true,
 	"startingInstructionTemplateRefs": [
 		{

@@ -128,17 +128,18 @@ Steps:
    - slug: `docs-reviewer`
    - version: `v1.0.0`
    - enabled: on
-7. Select a starting model preset.
-8. Set **Include Model System Prompt**:
+7. Add starting text if you want the composer to open with a reusable first draft.
+8. Select a starting model preset.
+9. Set **Include Model System Prompt**:
    - `Include` if you want the model preset’s default prompt
    - `Do Not Include` if this assistant should rely only on selected instructions
    - `Not Set` if the preset should not decide
-9. Add instruction templates if you have resolved instructions-only prompts.
-10. Leave tools and skills empty for the first version.
-11. Save.
-12. Open **Chats**.
-13. Select the new assistant preset.
-14. Click **View** in the assistant dropdown to inspect what it supplies.
+10. Add instruction templates if you have resolved instructions-only prompts.
+11. Leave tools and skills empty for the first version.
+12. Save.
+13. Open **Chats**.
+14. Select the new assistant preset.
+15. Click **View** in the assistant dropdown to inspect what it supplies.
 
 Test prompt:
 
@@ -148,6 +149,7 @@ Test prompt:
 Expected result:
 
 - the assistant preset seeds the selected sections
+- starting text appears as an editable draft when configured
 - you can still change model, prompts, tools, skills, and attachments after applying it
 
 Next version ideas:

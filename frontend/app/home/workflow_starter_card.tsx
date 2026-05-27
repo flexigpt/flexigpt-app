@@ -8,7 +8,7 @@ type WorkflowStarter = {
 	title: string;
 	description: string;
 	workflowID: string;
-	prompt: string;
+	draft?: string;
 	icon: ReactNode;
 	assistantPresetBundleID?: string;
 	assistantPresetSlug?: string;
@@ -25,11 +25,6 @@ export const workflowStarters: WorkflowStarter[] = [
 		assistantPresetBundleID: SOFTWARE_ASSISTANTS_BUNDLE_ID,
 		assistantPresetSlug: 'spec-driven-dev',
 		assistantPresetVersion: 'v1.0.0',
-		prompt: [
-			'<Replace this line with the repo path and feature request. Example: `/absolute/path/to/repo` Add export filters to the conversation search results.>',
-			'',
-			'Develop this feature end to end. Follow the workflow in attached skill',
-		].join('\n'),
 		icon: <FiCode size={24} />,
 	},
 	{
@@ -39,11 +34,7 @@ export const workflowStarters: WorkflowStarter[] = [
 		assistantPresetBundleID: SOFTWARE_ASSISTANTS_BUNDLE_ID,
 		assistantPresetSlug: 'reviewing-code',
 		assistantPresetVersion: 'v1.0.0',
-		prompt: [
-			'<Attach changed files, paste a diff, or replace this line with the repo path plus commit/branch/PR context: `/absolute/path/to/repo`>',
-			'',
-			'Review the code or diff for correctness, security, reliability, maintainability, and test gaps. Focus on concrete findings and narrow fixes.',
-		].join('\n'),
+
 		icon: <FiCheckCircle size={24} />,
 	},
 	{
@@ -54,11 +45,6 @@ export const workflowStarters: WorkflowStarter[] = [
 		assistantPresetBundleID: SOFTWARE_ASSISTANTS_BUNDLE_ID,
 		assistantPresetSlug: 'bug-investigator',
 		assistantPresetVersion: 'v1.0.0',
-		prompt: [
-			'<Paste the error, stack trace, failing test output, or replace this line with the relevant repo/file path: `/absolute/path/to/repo-or-file`>',
-			'',
-			'Investigate this bug. Identify likely root cause, evidence, missing evidence, the smallest safe fix direction, and verification steps.',
-		].join('\n'),
 		icon: <FiAlertTriangle size={24} />,
 	},
 ];
@@ -66,9 +52,10 @@ export const workflowStarters: WorkflowStarter[] = [
 function buildWorkflowStarterHref(workflow: WorkflowStarter) {
 	const params = new URLSearchParams({
 		workflow: workflow.workflowID,
-		draft: workflow.prompt,
 	});
-
+	if (workflow.draft?.trim()) {
+		params.set('draft', workflow.draft);
+	}
 	if (workflow.assistantPresetBundleID) {
 		params.set('assistantPresetBundleID', workflow.assistantPresetBundleID);
 	}

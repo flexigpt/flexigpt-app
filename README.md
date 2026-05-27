@@ -85,7 +85,7 @@ FlexiGPT does not proxy normal LLM calls through a FlexiGPT-hosted service. Requ
 
 ### Assistants, tools, and agentic workflows with human-in-loop controls
 
-- Assistant presets bundle model choice, instructions, tools, and skills into reusable starting setups.
+- Assistant presets bundle starting text, model choice, instructions, tools, and skills into reusable starting setups.
 - Tools can be attached per conversation or per message and configured for manual review or auto-execution.
 - When an eligible auto-execute tool is called, FlexiGPT can run it and submit the result back to the model.
 - Keep tools manual when you want tighter control over execution.

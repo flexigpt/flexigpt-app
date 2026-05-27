@@ -7,6 +7,7 @@
 	"description": "Convert project notes, changelogs, meeting notes, or issue summaries into stakeholder-ready updates",
 	"isEnabled": true,
 	"isBuiltIn": true,
+	"startingText": "<Attach or paste project notes, changelog, meeting notes, issue summaries, or raw status bullets. Include the audience and time period.>\n\nTurn this into a stakeholder-ready status update with summary status, progress, changes shipped, risks, blockers, decisions needed, and next steps using the associated skill",
 	"startingIncludeModelSystemPrompt": true,
 	"startingInstructionTemplateRefs": [
 		{

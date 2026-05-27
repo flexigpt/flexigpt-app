@@ -2,9 +2,6 @@
 
 ## Laundry list
 
-- [x] would be a good idea to have a "starting text" in assistant preset. this can be inserted in the box if there is no text already there in composer.
-  - [ ] populate current builtins with a good starting text. see if home needs better or same.
-
 - [ ] easier preset import bundles and flows. e.g: just import a preset bundle that has assistant, models, prompts, tools etc.
   - [ ] may be as a json import bundle or jsonc format
 

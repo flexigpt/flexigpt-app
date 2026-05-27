@@ -25,6 +25,7 @@ For reliable results:
 - keep attachments focused
 - keep **Previous user turns** intentional
 - inspect assistant preset details before assuming what it does
+- when a workflow card or assistant preset pre-fills starting text, replace the placeholder line (between <>) with your real task
 - start tools in manual mode
 - use local providers only after confirming the endpoint is actually local
 
@@ -44,7 +45,7 @@ Steps:
 
 1. Open the home screen.
 2. Choose **Develop a Feature**.
-3. Replace the placeholder with a repo path and the feature request.
+3. Replace the prefilled placeholder with a repo path and the feature request.
 4. Add any issue text, acceptance criteria, screenshots, or relevant files.
 5. Send the draft.
 6. Review the proposed spec or scope if the assistant asks for confirmation.
@@ -52,7 +53,7 @@ Steps:
 8. Review write and shell tool calls before running them.
 9. Inspect verification results and remaining gaps.
 
-Starter prompt:
+Equivalent prompt if starting from blank:
 
     Develop this feature in `/absolute/path/to/repo`:
     <describe the change>
@@ -77,7 +78,7 @@ Steps:
 4. Confirm attachment mode is readable.
 5. Send a focused request.
 
-Starter prompt:
+Equivalent prompt if starting from blank:
 
     Explain the attached file.
     Cover its purpose, main flows, important types/functions, dependencies, and risky or surprising behavior.
@@ -94,7 +95,7 @@ Suggested setup:
 - Tools: read-only tools if useful
 - Previous user turns: small and intentional
 
-Starter prompt:
+Equivalent prompt if starting from blank:
 
     Review the attached code or diff for correctness, security, reliability, maintainability, and test gaps.
     Focus on concrete issues.
@@ -118,7 +119,7 @@ Suggested setup:
 - Context: stack trace, logs, failing command, relevant code, recent diff
 - Tools: manual first
 
-Starter prompt:
+Equivalent prompt if starting from blank:
 
     Investigate this bug from the attached logs, stack trace, and code.
     Identify the likely root cause, evidence, missing evidence, narrow fix, and verification steps.
@@ -133,7 +134,7 @@ Suggested setup:
 - Assistant preset: Designing System Architecture
 - Context: README, architecture docs, code map, API contracts, constraints
 
-Starter prompt:
+Equivalent prompt if starting from blank:
 
     Review the attached architecture or code structure.
     Identify current boundaries, risks, coupling, unclear ownership, and the simplest viable improvements.
@@ -148,7 +149,7 @@ Suggested setup:
 - Assistant preset: Docs Writer or Local Reader
 - Context: source files, existing docs, examples, screenshots, command output
 
-Starter prompt:
+Equivalent prompt if starting from blank:
 
     Generate clear user-facing documentation from the attached context.
     Include overview, setup, common workflow, examples, troubleshooting, and limitations.
@@ -163,7 +164,7 @@ Suggested setup:
 - Assistant preset: Research Brief Writer
 - Optional: provider-supported web search if current information matters
 
-Starter prompt:
+Equivalent prompt if starting from blank:
 
     Turn the attached research material into a brief with:
     - key findings
@@ -212,7 +213,7 @@ Change only:
 
 - model preset
 
-Starter prompt:
+Equivalent prompt if starting from blank:
 
     Answer this task using only the attached context.
     Then list assumptions, uncertainty, and the strongest reason your answer might be wrong.

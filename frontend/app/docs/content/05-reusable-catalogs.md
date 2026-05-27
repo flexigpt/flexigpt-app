@@ -49,6 +49,7 @@ Examples:
 
 Assistant presets are starters, not locked modes. Applying one can seed the current chat, but you can still change:
 
+- current draft text
 - model
 - model parameters
 - system prompt sources
@@ -63,6 +64,7 @@ Assistant presets are starters, not locked modes. Applying one can seed the curr
 
 | Preset field                | User-facing effect                                                                                                                                  |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Starting text               | Seeds the composer/editor with an initial draft for the workflow.                                                                                   |
 | Starting model preset       | Selects a provider/model preset in Chats.                                                                                                           |
 | Starting model patch        | Overrides runtime knobs such as streaming, token limits, temperature, reasoning, output settings, timeout, stop sequences, and raw JSON parameters. |
 | Include model system prompt | Controls whether the selected model’s default system prompt is included.                                                                            |
@@ -91,6 +93,7 @@ Examples:
 - no skill selections means applying the preset does not necessarily clear current skills
 - no instruction template refs means applying the preset does not replace prompt sources
 - no starting model means applying the preset does not force a model
+- no starting text means applying the preset does not seed a composer draft
 
 A preset can be only a prompt setup, only a model setup, only a tool setup, or a full workflow.
 

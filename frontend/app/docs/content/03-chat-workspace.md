@@ -52,7 +52,7 @@ The request control bar sits above the editor and controls how the next turn run
 
 | Control                      | What it affects                                                                                                   |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| **Assistant**                | Applies a starter recipe for model, instructions, tools, web search, and skills.                                  |
+| **Assistant**                | Applies a starter recipe for starting text, model, instructions, tools, web search, and skills.                   |
 | **Model**                    | Chooses the provider/model preset.                                                                                |
 | **Temperature or reasoning** | Controls model style or reasoning behavior where supported.                                                       |
 | **Effort/verbosity**         | Controls output verbosity where supported.                                                                        |
@@ -76,6 +76,7 @@ Use **View** to inspect what a preset contributes to the current chat. The detai
 
 Expected behavior:
 
+- if a preset defines starting text, applying it can seed the composer draft
 - if a preset defines a model, applying it selects that model preset
 - if a preset defines instruction templates, it selects those saved instruction sources
 - if a preset defines tools or web search, it applies those selections

@@ -25,7 +25,7 @@ A chat turn is assembled in layers:
 2. **Model preset**
    - The provider/model choice and request defaults.
 3. **Assistant setup**
-   - Optional starter workflow: model, instructions, tools, and skills.
+   - Optional starter workflow: starting text, model, instructions, tools, and skills.
 4. **Conversation history**
    - Earlier turns included by **Previous user turns**.
 5. **Current message**
@@ -39,7 +39,7 @@ When a result changes, compare these layers one at a time.
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Provider**            | The API family or endpoint FlexiGPT talks to, such as OpenAI, Anthropic, Google Gemini API, xAI, Mistral, Hugging Face, OpenRouter, `llama.cpp`, or a compatible custom endpoint.  |
 | **Model preset**        | A saved provider/model choice with defaults such as model name, streaming, timeout, prompt/output limits, temperature, reasoning, output format, and provider-specific parameters. |
-| **Assistant preset**    | A reusable starter setup that can apply a model preset, instruction templates, tool selections, web search choices, and skill selections.                                          |
+| **Assistant preset**    | A reusable starter setup that can apply starting text, a model preset, instruction templates, tool selections, web search choices, and skill selections.                           |
 | **System prompt**       | Durable instruction context that shapes assistant behavior.                                                                                                                        |
 | **Prompt template**     | Reusable request structure inserted into the current draft. It may contain variables and multiple role blocks.                                                                     |
 | **Attachment**          | Message-scoped source material such as files, folders, images, PDFs, or URLs.                                                                                                      |
@@ -57,7 +57,7 @@ Use an **assistant preset** when the question is:
 
 > What kind of workflow should I start from?
 
-An assistant preset is a starter recipe, not a locked mode. After applying one, you can still change the model, instructions, tools, skills, attachments, web search, prompt templates, and history setting.
+An assistant preset is a starter recipe, not a locked mode. After applying one, you can still change the model, instructions, tools, skills, attachments, web search, prompt templates, and history setting. If the preset defines starting text, treat it as a replaceable first draft rather than a locked prompt.
 
 The detailed rules for assistant preset contents, empty sections, modified state, inspection, and versioning live in [Reusable Catalogs](/docs?doc=reusable-catalogs#assistant-presets).
 

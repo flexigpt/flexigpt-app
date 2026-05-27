@@ -7,6 +7,7 @@
 	"description": "Design test scenarios from specs, requirements, bug reports, or code paths. Produces a test plan, not test code",
 	"isEnabled": true,
 	"isBuiltIn": true,
+	"startingText": "<Attach a spec/bug report/code path or replace this line with the relevant repo/file path and behavior to test.>\n\nDesign a traceable test plan using the associated skill",
 	"startingIncludeModelSystemPrompt": true,
 	"startingInstructionTemplateRefs": [
 		{

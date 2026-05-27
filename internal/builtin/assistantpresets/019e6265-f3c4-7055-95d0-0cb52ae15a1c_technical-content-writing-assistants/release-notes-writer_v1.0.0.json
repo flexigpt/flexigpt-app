@@ -7,6 +7,7 @@
 	"description": "Create release notes and changelogs from diffs, commit notes, PR descriptions, issue summaries, or version notes",
 	"isEnabled": true,
 	"isBuiltIn": true,
+	"startingText": "<Attach or paste diffs, PR summaries, commit notes, issue lists, or version notes for the release. Include the version if known.>\n\nCreate release notes from this source material. Separate added, changed, fixed, breaking changes, migration notes, known issues, and internal-only changes. Mark gaps as draft. Use the associated skill",
 	"startingIncludeModelSystemPrompt": true,
 	"startingInstructionTemplateRefs": [
 		{
