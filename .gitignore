@@ -117,6 +117,7 @@ web_modules/
 .vercel
 
 __todo.md
+_todo.md
 
 asarex
 .flatpak-builder

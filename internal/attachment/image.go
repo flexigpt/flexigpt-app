@@ -3,6 +3,7 @@ package attachment
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -47,6 +48,14 @@ func (ref *ImageRef) PopulateRef(ctx context.Context, replaceOrig bool) error {
 		return errors.Join(ErrUnreadableFile, err)
 	}
 
+	if !toolOut.Exists {
+		return fmt.Errorf("%w: file does not exist: %s", ErrUnreadableFile, path)
+	}
+
+	if toolOut.ModTime == nil {
+		return fmt.Errorf("%w: file modtime missing: %s", ErrUnreadableFile, path)
+	}
+
 	if strings.TrimSpace(ref.OrigPath) == "" || replaceOrig {
 		ref.OrigPath = toolOut.Path
 		ref.OrigSize = toolOut.SizeBytes
@@ -75,6 +84,9 @@ func (ref *ImageRef) IsModified() bool {
 		return false
 	}
 	if !ref.Exists {
+		return true
+	}
+	if ref.ModTime == nil {
 		return true
 	}
 	if ref.Path != ref.OrigPath {

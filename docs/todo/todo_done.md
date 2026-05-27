@@ -999,3 +999,4 @@
 - [x] add msg to msg jump button: seems more and more useful for large prompts. these should be along with other up and down current scroll buttons. like forward fast forward, back fast back but jump scroll counterparts. icons should indicate accordingly. their trigger shoudl be presense or absense of last/next messages rather than busy states.
 
 - [x] high cpu due to system prompt rerenders
+- [x] check if attachments becoming stale and getting new or files deleted causes panic anywhere. it is seen that lets say i attached attachment a, sent message, then got llm response, now underlying files changed. i.e some files changed and some files got deleted. then i started edit. also, lets say i added a folder that was going to deduplicate against previous time attachments but now in the edit message. a prod bundled thing actually crashes without any trace as of now. check if there is a frontend thing issue or not.

@@ -3,6 +3,7 @@ package attachment
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"time"
@@ -41,6 +42,18 @@ func (ref *FileRef) PopulateRef(ctx context.Context, replaceOrig bool) error {
 		return ErrUnreadableFile
 	}
 
+	if !pathInfo.Exists {
+		return fmt.Errorf("%w: file does not exist: %s", ErrUnreadableFile, path)
+	}
+
+	if pathInfo.IsDir {
+		return fmt.Errorf("%w: path is a directory: %s", ErrUnreadableFile, path)
+	}
+
+	if pathInfo.ModTime == nil {
+		return fmt.Errorf("%w: file modtime missing: %s", ErrUnreadableFile, path)
+	}
+
 	// Capture original snapshot once.
 	if strings.TrimSpace(ref.OrigPath) == "" || replaceOrig {
 		ref.OrigPath = pathInfo.Path
@@ -64,23 +77,31 @@ func (ref *FileRef) IsModified() bool {
 	if ref == nil {
 		return false
 	}
+
 	if strings.TrimSpace(ref.OrigPath) == "" {
-		// No baseline; treat as not modified.
 		return false
 	}
-	// If the file no longer exists or any key metadata changed, mark as modified.
+
 	if !ref.Exists {
 		return true
 	}
+
+	if ref.ModTime == nil {
+		return true
+	}
+
 	if ref.Path != ref.OrigPath {
 		return true
 	}
+
 	if ref.Size != ref.OrigSize {
 		return true
 	}
+
 	if !ref.ModTime.Equal(ref.OrigModTime) {
 		return true
 	}
+
 	return false
 }
 

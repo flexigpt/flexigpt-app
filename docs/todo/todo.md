@@ -8,8 +8,6 @@
 
 - [ ] cursor up and down has some jerk in composer, this is post a paste of some code. check any rerenders anyplace that can cause this.
 
-- [ ] check if attachments becoming stale and getting new or files deleted causes panic anywhere. it is seen that lets say i attached attachment a, sent message, then got llm response, now underlying files changed. i.e some files changed and some files got deleted. then i started edit. also, lets say i added a folder that was going to deduplicate against previous time attachments but now in the edit message. a prod bundled thing actually crashes without any trace as of now. check if there is a frontend thing issue or not.
-
 - [ ] would be a good idea to have a "starting text" in assistant preset. this can be inserted in the box if there is no text already there in composer.
 
 - [ ] easier preset import bundles and flows. e.g: just import a preset bundle that has assistant, models, prompts, tools etc.

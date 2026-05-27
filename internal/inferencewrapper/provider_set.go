@@ -601,8 +601,8 @@ func (ps *ProviderSetAPI) buildInputs(
 	if len(msgContentItems) > 0 {
 		// Try to merge into the last user InputMessage if present.
 		merged := false
-		for _, v := range slices.Backward(currentOut) {
-			iu := &v
+		for idx := range slices.Backward(currentOut) {
+			iu := &currentOut[idx]
 			if iu.Kind == inferenceSpec.InputKindInputMessage &&
 				iu.InputMessage != nil &&
 				iu.InputMessage.Role == inferenceSpec.RoleUser {
