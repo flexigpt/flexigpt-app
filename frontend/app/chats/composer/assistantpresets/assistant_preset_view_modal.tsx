@@ -268,6 +268,8 @@ export function AssistantPresetViewModal({
 		: [];
 
 	const description = viewedPreset.description || viewedPreset.preset.description;
+	const presetStartingText = viewedPreset.preset.startingText ?? '';
+	const hasPresetStartingText = presetStartingText.trim().length > 0;
 	const showCurrentModel = shouldShowActiveComparison && modificationSummary.model;
 	const showCurrentInstructions = shouldShowActiveComparison && modificationSummary.instructions;
 	const showCurrentTools = shouldShowActiveComparison && modificationSummary.tools;
@@ -348,6 +350,17 @@ export function AssistantPresetViewModal({
 					</div>
 
 					<div className="space-y-4">
+						{hasPresetStartingText ? (
+							<SectionCard title="Starting text">
+								<div className="mb-2 text-xs font-semibold opacity-70">
+									Inserted only when the composer text is empty.
+								</div>
+								<pre className="bg-base-300 overflow-x-auto rounded-xl p-3 text-xs whitespace-pre-wrap">
+									{presetStartingText}
+								</pre>
+							</SectionCard>
+						) : null}
+
 						{appliedModelState ? (
 							<SectionCard
 								title="Model and advanced params"
@@ -454,7 +467,8 @@ export function AssistantPresetViewModal({
 							</SectionCard>
 						) : null}
 
-						{!appliedModelState &&
+						{!hasPresetStartingText &&
+						!appliedModelState &&
 						appliedInstructionKeys.length === 0 &&
 						appliedToolItems.length === 0 &&
 						appliedSkillItems.length === 0 ? (

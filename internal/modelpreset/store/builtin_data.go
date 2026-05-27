@@ -205,10 +205,11 @@ func (b *BuiltInPresets) SetProviderEnabled(
 	pp.IsEnabled = enabled
 	pp.ModifiedAt = flag.ModifiedAt
 	b.viewProv[name] = pp
+	cloned := cloneProviderPreset(pp)
 	b.mu.Unlock()
 
 	b.rebuilder.Trigger()
-	return cloneProviderPreset(pp), nil
+	return cloned, nil
 }
 
 // SetModelPresetEnabled toggles a model preset.
@@ -292,10 +293,11 @@ func (b *BuiltInPresets) SetDefaultModelPreset(
 	pp.DefaultModelPresetID = modelID
 	pp.ModifiedAt = flag.ModifiedAt
 	b.viewProv[provider] = pp
+	cloned := cloneProviderPreset(pp)
 	b.mu.Unlock()
 
 	b.rebuilder.Trigger()
-	return cloneProviderPreset(pp), nil
+	return cloned, nil
 }
 
 // rebuildSnapshot applies overlay flags onto the immutable base sets.

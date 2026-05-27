@@ -75,6 +75,7 @@ func TestCloneJSONValue(t *testing.T) {
 
 func TestCloneAssistantPreset(t *testing.T) {
 	orig := newTestPreset(t, "clone", true)
+	orig.StartingText = "original starting text\nline two"
 	orig.StartingModelPresetRef = &modelpresetSpec.ModelPresetRef{
 		ProviderName:  "provider-1",
 		ModelPresetID: "mp-1",
@@ -107,13 +108,16 @@ func TestCloneAssistantPreset(t *testing.T) {
 	}
 
 	got := cloneAssistantPreset(orig)
-
+	orig.StartingText = "changed starting text"
 	orig.StartingModelPresetRef.ProviderName = "changed-provider"
 	*orig.StartingIncludeModelSystemPrompt = false
 	orig.StartingInstructionTemplateRefs[0].TemplateSlug = "changed-template"
 	orig.StartingToolSelections[0].ToolRef.ToolSlug = "changed-tool"
 	orig.StartingSkillSelections[0].SkillRef.SkillSlug = "changed-skill"
 
+	if got.StartingText != "original starting text\nline two" {
+		t.Fatalf("cloned StartingText = %q", got.StartingText)
+	}
 	if got.StartingModelPresetRef == nil || got.StartingModelPresetRef.ProviderName != "provider-1" {
 		t.Fatalf("cloned StartingModelPresetRef = %#v", got.StartingModelPresetRef)
 	}
@@ -433,6 +437,24 @@ func TestValidateAssistantPresetStructure(t *testing.T) {
 				return &p
 			}(),
 			wantErrContains: "modifiedAt is zero",
+		},
+		{
+			name: "startingText invalid utf8",
+			preset: func() *spec.AssistantPreset {
+				p := valid
+				p.StartingText = string([]byte{0xff})
+				return &p
+			}(),
+			wantErrContains: "startingText must be valid UTF-8",
+		},
+		{
+			name: "startingText too large",
+			preset: func() *spec.AssistantPreset {
+				p := valid
+				p.StartingText = strings.Repeat("x", spec.MaxStartingTextBytes+1)
+				return &p
+			}(),
+			wantErrContains: "startingText is too large",
 		},
 		{
 			name: "duplicate instruction refs",

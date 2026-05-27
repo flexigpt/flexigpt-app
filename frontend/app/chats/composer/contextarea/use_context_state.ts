@@ -515,6 +515,10 @@ export function useAssistantContextState(): AssistantContextController {
 			}
 
 			const { preset } = option;
+
+			const nextStartingText = preset.startingText ?? '';
+			const hasStartingTextSelection = nextStartingText.trim().length > 0;
+
 			const currentSelectedModel = selectedModelRef.current;
 			let nextSelectedModel = currentSelectedModel;
 			let hasModelSelection = false;
@@ -638,6 +642,8 @@ export function useAssistantContextState(): AssistantContextController {
 				presetKey,
 				option,
 				preset,
+				hasStartingTextSelection,
+				nextStartingText,
 				hasModelSelection,
 				nextSelectedModel,
 				hasIncludeModelSystemPromptSelection: false,

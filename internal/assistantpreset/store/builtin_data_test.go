@@ -58,6 +58,8 @@ func TestBuiltInData_EmptyManifest(t *testing.T) {
 func TestBuiltInData_ListBuiltInData_DeepCopyAndGetters(t *testing.T) {
 	bundle := newTestBundle(t, "deepcopy", true)
 	preset := newTestPreset(t, "deepcopy", true)
+	preset.StartingText = "Original starting text\nLine 2"
+
 	preset.StartingModelPresetRef = &modelpresetSpec.ModelPresetRef{
 		ProviderName:  "provider-a",
 		ModelPresetID: "mp-a",
@@ -145,6 +147,7 @@ func TestBuiltInData_ListBuiltInData_DeepCopyAndGetters(t *testing.T) {
 
 	p := presets[bundle.ID][preset.ID]
 	p.DisplayName = "mutated preset"
+	p.StartingText = "mutated starting text"
 	*p.StartingIncludeModelSystemPrompt = false
 	p.StartingInstructionTemplateRefs[0].TemplateSlug = "mutated-template"
 	p.StartingToolSelections[0].ToolRef.ToolSlug = "mutated-tool"
@@ -171,6 +174,9 @@ func TestBuiltInData_ListBuiltInData_DeepCopyAndGetters(t *testing.T) {
 	}
 	if gotPreset.DisplayName != preset.DisplayName {
 		t.Fatalf("GetBuiltInAssistantPreset().DisplayName = %q, want %q", gotPreset.DisplayName, preset.DisplayName)
+	}
+	if gotPreset.StartingText != preset.StartingText {
+		t.Fatalf("GetBuiltInAssistantPreset().StartingText = %q, want %q", gotPreset.StartingText, preset.StartingText)
 	}
 	if gotPreset.StartingIncludeModelSystemPrompt == nil || *gotPreset.StartingIncludeModelSystemPrompt != true {
 		t.Fatalf(

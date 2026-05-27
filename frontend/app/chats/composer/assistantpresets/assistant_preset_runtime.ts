@@ -54,6 +54,9 @@ export interface AssistantPresetPreparedApplication {
 	option: AssistantPresetOptionItem;
 	preset: AssistantPreset;
 
+	hasStartingTextSelection: boolean;
+	nextStartingText: string;
+
 	hasModelSelection: boolean;
 	nextSelectedModel: UIChatOption;
 

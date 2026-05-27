@@ -105,6 +105,10 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 
 	const applyAssistantPresetRuntimeSelections = useCallback(
 		(prepared: AssistantPresetPreparedApplication) => {
+			if (prepared.hasStartingTextSelection && prepared.nextStartingText.trim().length > 0) {
+				editorAreaRef.current?.setDraftTextIfEmpty(prepared.nextStartingText);
+			}
+
 			if (prepared.runtimeSelections.hasToolsSelection) {
 				editorAreaRef.current?.setConversationToolsFromChoices(prepared.runtimeSelections.conversationToolChoices);
 				editorAreaRef.current?.setWebSearchFromChoices(prepared.runtimeSelections.webSearchChoices);

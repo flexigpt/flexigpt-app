@@ -3,6 +3,7 @@ package store
 import (
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -573,6 +574,75 @@ func TestAssistantPresetStore_ListAssistantPresetBundles_PaginationAndTieBreak(t
 	}
 	if resp2.Body.NextPageToken != nil {
 		t.Fatal("expected nil next page token on last page")
+	}
+}
+
+func TestAssistantPresetStore_PutAssistantPreset_StartingText(t *testing.T) {
+	s := newTestStore(t, nil)
+
+	bundleID := testBundleID(t, "starttext")
+	bundleSlug := testBundleSlug(t, "starttext")
+	version := testItemVersion(t)
+
+	mustPutBundle(t, s, bundleID, bundleSlug, true)
+
+	slug := testItemSlug(t, "starttext")
+	startingText := strings.Join([]string{
+		"<Replace this line with the repo path and feature request. Example: `/absolute/path/to/repo` Add export filters to the conversation search results.>",
+		"",
+		"Develop this feature end to end. Follow the workflow in attached skill",
+	}, "\n")
+
+	_, err := s.PutAssistantPreset(t.Context(), &spec.PutAssistantPresetRequest{
+		BundleID:            bundleID,
+		AssistantPresetSlug: slug,
+		Version:             version,
+		Body: &spec.PutAssistantPresetRequestBody{
+			DisplayName:  "Preset with starting text",
+			Description:  "desc",
+			IsEnabled:    true,
+			StartingText: startingText,
+		},
+	})
+	if err != nil {
+		t.Fatalf("PutAssistantPreset() error: %v", err)
+	}
+
+	got := mustGetAssistantPreset(t, s, bundleID, slug, version)
+	if got.StartingText != startingText {
+		t.Fatalf("StartingText = %q, want %q", got.StartingText, startingText)
+	}
+
+	resp, err := s.GetAssistantPreset(t.Context(), &spec.GetAssistantPresetRequest{
+		BundleID:            bundleID,
+		AssistantPresetSlug: slug,
+		Version:             version,
+	})
+	if err != nil {
+		t.Fatalf("GetAssistantPreset() error: %v", err)
+	}
+	if resp == nil || resp.Body == nil {
+		t.Fatal("GetAssistantPreset() returned nil body")
+	}
+	if resp.Body.StartingText != startingText {
+		t.Fatalf("GetAssistantPreset().StartingText = %q, want %q", resp.Body.StartingText, startingText)
+	}
+
+	_, err = s.PutAssistantPreset(t.Context(), &spec.PutAssistantPresetRequest{
+		BundleID:            bundleID,
+		AssistantPresetSlug: testItemSlug(t, "starttextbad"),
+		Version:             version,
+		Body: &spec.PutAssistantPresetRequestBody{
+			DisplayName:  "Preset with too much starting text",
+			IsEnabled:    true,
+			StartingText: strings.Repeat("x", spec.MaxStartingTextBytes+1),
+		},
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "startingText is too large") {
+		t.Fatalf("err = %q, want startingText size validation", err.Error())
 	}
 }
 

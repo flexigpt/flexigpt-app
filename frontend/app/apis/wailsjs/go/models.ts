@@ -890,6 +890,7 @@ export namespace spec {
 	    description?: string;
 	    isEnabled: boolean;
 	    isBuiltIn: boolean;
+	    startingText?: string;
 	    startingModelPresetRef?: ModelPresetRef;
 	    startingModelPresetPatch?: ModelPresetPatch;
 	    startingIncludeModelSystemPrompt?: boolean;
@@ -915,6 +916,7 @@ export namespace spec {
 	        this.description = source["description"];
 	        this.isEnabled = source["isEnabled"];
 	        this.isBuiltIn = source["isBuiltIn"];
+	        this.startingText = source["startingText"];
 	        this.startingModelPresetRef = this.convertValues(source["startingModelPresetRef"], ModelPresetRef);
 	        this.startingModelPresetPatch = this.convertValues(source["startingModelPresetPatch"], ModelPresetPatch);
 	        this.startingIncludeModelSystemPrompt = source["startingIncludeModelSystemPrompt"];
@@ -6557,6 +6559,7 @@ export namespace spec {
 	    displayName: string;
 	    description?: string;
 	    isEnabled: boolean;
+	    startingText?: string;
 	    startingModelPresetRef?: ModelPresetRef;
 	    startingModelPresetPatch?: ModelPresetPatch;
 	    startingIncludeModelSystemPrompt?: boolean;
@@ -6573,6 +6576,7 @@ export namespace spec {
 	        this.displayName = source["displayName"];
 	        this.description = source["description"];
 	        this.isEnabled = source["isEnabled"];
+	        this.startingText = source["startingText"];
 	        this.startingModelPresetRef = this.convertValues(source["startingModelPresetRef"], ModelPresetRef);
 	        this.startingModelPresetPatch = this.convertValues(source["startingModelPresetPatch"], ModelPresetPatch);
 	        this.startingIncludeModelSystemPrompt = source["startingIncludeModelSystemPrompt"];

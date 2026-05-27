@@ -606,6 +606,7 @@ func (s *AssistantPresetStore) PutAssistantPreset(
 		Description:                      req.Body.Description,
 		IsEnabled:                        req.Body.IsEnabled,
 		IsBuiltIn:                        false,
+		StartingText:                     req.Body.StartingText,
 		StartingModelPresetRef:           cloneJSONValue(req.Body.StartingModelPresetRef),
 		StartingModelPresetPatch:         cloneJSONValue(req.Body.StartingModelPresetPatch),
 		StartingIncludeModelSystemPrompt: cloneJSONValue(req.Body.StartingIncludeModelSystemPrompt),

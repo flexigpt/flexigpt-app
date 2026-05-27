@@ -70,6 +70,7 @@ type PutAssistantPresetRequestBody struct {
 	Description string `json:"description,omitempty"`
 	IsEnabled   bool   `json:"isEnabled"             required:"true"`
 
+	StartingText           string                          `json:"startingText,omitempty"`
 	StartingModelPresetRef *modelpresetSpec.ModelPresetRef `json:"startingModelPresetRef,omitempty"`
 
 	// Validation rules:

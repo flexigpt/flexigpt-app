@@ -31,6 +31,7 @@ export interface AssistantPreset {
 	description?: string;
 	isEnabled: boolean;
 	isBuiltIn: boolean;
+	startingText?: string;
 	startingModelPresetRef?: ModelPresetRef;
 	startingModelPresetPatch?: AssistantPresetStartingModelPresetPatch;
 	startingIncludeModelSystemPrompt?: boolean;
@@ -74,6 +75,7 @@ export interface PutAssistantPresetPayload {
 	displayName: string;
 	description?: string;
 	isEnabled: boolean;
+	startingText?: string;
 	startingModelPresetRef?: ModelPresetRef;
 	startingModelPresetPatch?: AssistantPresetStartingModelPresetPatch;
 	startingIncludeModelSystemPrompt?: boolean;

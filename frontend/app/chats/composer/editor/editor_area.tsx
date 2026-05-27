@@ -101,6 +101,7 @@ export interface EditorAreaHandle {
 	openAttachmentMenu: () => void;
 	loadExternalMessage: (msg: EditorExternalMessage) => void;
 	setDraftText: (text: string) => void;
+	setDraftTextIfEmpty: (text: string) => boolean;
 	resetEditor: () => void;
 	loadToolCalls: (toolCalls: UIToolCall[]) => void;
 	setConversationToolsFromChoices: (tools: ToolStoreChoice[]) => void;
@@ -1182,6 +1183,23 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		[closeAllMenus, focusEditorAtEnd, replaceEditorDocument, resetAutoSubmitTracker]
 	);
 
+	const setDraftTextIfEmpty = useCallback(
+		(text: string) => {
+			if (text.trim().length === 0) {
+				return false;
+			}
+
+			const hasCurrentText = hasNonEmptyUserText(editor) || editor.api.string([]).trim().length > 0;
+			if (hasCurrentText) {
+				return false;
+			}
+
+			setDraftText(text);
+			return true;
+		},
+		[editor, setDraftText]
+	);
+
 	const handleEditorDocumentChange = useCallback(() => {
 		const didProcessChange = onEditorChange();
 		if (!didProcessChange) return;
@@ -1276,6 +1294,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			},
 			loadExternalMessage,
 			setDraftText,
+			setDraftTextIfEmpty,
 			resetEditor,
 			loadToolCalls: handleLoadToolCalls,
 			setConversationToolsFromChoices: applyConversationToolsFromChoices,
@@ -1289,6 +1308,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		[
 			loadExternalMessage,
 			setDraftText,
+			setDraftTextIfEmpty,
 			resetEditor,
 			handleLoadToolCalls,
 			applyConversationToolsFromChoices,

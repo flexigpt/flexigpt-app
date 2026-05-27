@@ -17,6 +17,7 @@ const (
 	SchemaVersion                           = "2026-03-22"
 	MaxPageSize                             = 256
 	DefaultPageSize                         = 25
+	MaxStartingTextBytes                    = 16 * 1024
 )
 
 var (
@@ -49,6 +50,10 @@ type AssistantPreset struct {
 
 	IsEnabled bool `json:"isEnabled"`
 	IsBuiltIn bool `json:"isBuiltIn"`
+
+	// StartingText is optional initial composer/editor draft text.
+	// It is stored verbatim, including whitespace and newlines.
+	StartingText string `json:"startingText,omitempty"`
 
 	StartingModelPresetRef *modelpresetSpec.ModelPresetRef `json:"startingModelPresetRef,omitempty"`
 

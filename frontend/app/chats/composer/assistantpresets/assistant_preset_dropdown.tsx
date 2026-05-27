@@ -303,7 +303,7 @@ export function AssistantPresetDropdown({
 						className={actionTriggerMenuWideClasses}
 					>
 						<div className="mb-2 px-1 text-xs opacity-70">
-							Assistant presets seeds model, instructions, tools, and skills.
+							Assistant presets seed starting text, model, instructions, tools, and skills.
 						</div>
 
 						{error ? (

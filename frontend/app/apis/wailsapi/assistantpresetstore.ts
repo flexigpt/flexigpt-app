@@ -173,6 +173,7 @@ export class WailsAssistantPresetStoreAPI implements IAssistantPresetStoreAPI {
 			displayName: payload.displayName,
 			description: payload.description,
 			isEnabled: payload.isEnabled,
+			startingText: payload.startingText,
 			startingModelPresetRef: payload.startingModelPresetRef,
 			startingModelPresetPatch: payload.startingModelPresetPatch,
 			startingIncludeModelSystemPrompt: payload.startingIncludeModelSystemPrompt,

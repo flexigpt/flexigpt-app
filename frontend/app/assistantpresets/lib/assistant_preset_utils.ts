@@ -165,6 +165,11 @@ export function toPutAssistantPresetPayload(input: AssistantPresetUpsertInput): 
 		payload.description = description;
 	}
 
+	const startingText = input.startingText?.trim();
+	if (startingText) {
+		payload.startingText = startingText;
+	}
+
 	if (input.startingModelPresetRef) {
 		payload.startingModelPresetRef = {
 			providerName: input.startingModelPresetRef.providerName,

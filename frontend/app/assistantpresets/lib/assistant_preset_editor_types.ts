@@ -65,10 +65,11 @@ type ToolSelectionFormItem = {
 export type AssistantPresetFormData = {
 	displayName: string;
 	slug: string;
+	version: string;
 	description: string;
 	isEnabled: boolean;
-	version: string;
 
+	startingText: string;
 	startingModelPresetKey: string;
 	startingIncludeModelSystemPrompt: TriStateBoolean;
 	modelPatch: ModelPatchFormData;

@@ -276,9 +276,11 @@ function getInitialFormData(
 		return {
 			displayName: src.displayName,
 			slug: src.slug,
+			version: nextVersion,
 			description: src.description ?? '',
 			isEnabled: src.isEnabled,
-			version: nextVersion,
+
+			startingText: src.startingText ?? '',
 			startingModelPresetKey: src.startingModelPresetRef ? buildModelPresetRefKey(src.startingModelPresetRef) : '',
 			startingIncludeModelSystemPrompt: booleanToTriState(src.startingIncludeModelSystemPrompt),
 			modelPatch: getInitialModelPatchFormData(src.startingModelPresetPatch),
@@ -299,9 +301,10 @@ function getInitialFormData(
 	return {
 		displayName: '',
 		slug: '',
+		version: DEFAULT_SEMVER,
 		description: '',
 		isEnabled: true,
-		version: DEFAULT_SEMVER,
+		startingText: '',
 		startingModelPresetKey: '',
 		startingIncludeModelSystemPrompt: '',
 		modelPatch: getDefaultModelPatchFormData(),
@@ -1278,9 +1281,10 @@ function AddEditAssistantPresetModalContent({
 			const payload: AssistantPresetUpsertInput = {
 				displayName: formData.displayName.trim(),
 				slug: (initialData?.preset.slug ?? formData.slug).trim(),
+				version: formData.version.trim(),
 				description: formData.description.trim(),
 				isEnabled: formData.isEnabled,
-				version: formData.version.trim(),
+				startingText: formData.startingText.trim() || undefined,
 				startingModelPresetRef,
 				startingModelPresetPatch: buildModelPatchFromFormData(formData.modelPatch),
 				startingIncludeModelSystemPrompt: startingModelPresetRef
@@ -1496,6 +1500,35 @@ function AddEditAssistantPresetModalContent({
 							</div>
 						</div>
 
+						<div className="grid grid-cols-12 items-start gap-2">
+							<label className="label col-span-3">
+								<span className="label-text text-sm">Starting Text</span>
+								<span
+									className="label-text-alt tooltip tooltip-right"
+									data-tip="Optional starting text for the user, inserted into the composer only when the composer text is empty."
+								>
+									<FiHelpCircle size={12} />
+								</span>
+							</label>
+							<div className="col-span-9">
+								<textarea
+									value={formData.startingText}
+									onChange={e => {
+										const value = e.target.value;
+										updateFormData(prev => ({ ...prev, startingText: value }));
+									}}
+									readOnly={isViewMode}
+									className="textarea textarea-bordered h-28 w-full rounded-xl"
+									spellCheck="false"
+									placeholder="Optional prompt to start the user off..."
+								/>
+								<div className="label">
+									<span className="label-text-alt text-base-content/70 text-xs">
+										Used as a starter prompt when this preset is applied and the composer has no text.
+									</span>
+								</div>
+							</div>
+						</div>
 						<div className="divider">Starting Model</div>
 
 						<div className="grid grid-cols-12 items-start gap-2">

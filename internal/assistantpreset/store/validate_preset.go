@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/flexigpt/flexigpt-app/internal/assistantpreset/spec"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
@@ -85,6 +86,10 @@ func validateAssistantPresetStructure(preset *spec.AssistantPreset) error {
 	if preset.ModifiedAt.IsZero() {
 		return errors.New("modifiedAt is zero")
 	}
+
+	if err := validateStartingText(preset.StartingText); err != nil {
+		return err
+	}
 	if err := validateStartingModelPresetPatch(preset.StartingModelPresetPatch); err != nil {
 		return err
 	}
@@ -125,6 +130,23 @@ func validateAssistantPresetStructure(preset *spec.AssistantPreset) error {
 		seenSkillRefs[key] = struct{}{}
 	}
 
+	return nil
+}
+
+func validateStartingText(value string) error {
+	if value == "" {
+		return nil
+	}
+	if !utf8.ValidString(value) {
+		return errors.New("startingText must be valid UTF-8")
+	}
+	if len(value) > spec.MaxStartingTextBytes {
+		return fmt.Errorf(
+			"startingText is too large: %d bytes exceeds max %d bytes",
+			len(value),
+			spec.MaxStartingTextBytes,
+		)
+	}
 	return nil
 }
 
