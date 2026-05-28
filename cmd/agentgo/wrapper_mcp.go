@@ -62,12 +62,16 @@ func (w *MCPWrapper) PatchMCPServerEnabled(
 	req *spec.PatchMCPServerEnabledRequest,
 ) (*spec.PatchMCPServerEnabledResponse, error) {
 	return middleware.WithRecoveryResp(func() (*spec.PatchMCPServerEnabledResponse, error) {
+		resp, err := w.store.PatchMCPServerEnabled(context.Background(), req)
+		if err != nil {
+			return nil, err
+		}
 		if req != nil && req.Body != nil && !req.Body.Enabled {
 			_, _ = w.runtime.Disconnect(context.Background(), &spec.DisconnectMCPServerRequest{
 				ServerID: req.ServerID,
 			})
 		}
-		return w.store.PatchMCPServerEnabled(context.Background(), req)
+		return resp, nil
 	})
 }
 
@@ -81,12 +85,16 @@ func (w *MCPWrapper) PatchMCPServerPolicy(
 
 func (w *MCPWrapper) DeleteMCPServer(req *spec.DeleteMCPServerRequest) (*spec.DeleteMCPServerResponse, error) {
 	return middleware.WithRecoveryResp(func() (*spec.DeleteMCPServerResponse, error) {
+		resp, err := w.store.DeleteMCPServer(context.Background(), req)
+		if err != nil {
+			return nil, err
+		}
 		if req != nil {
 			_, _ = w.runtime.Disconnect(context.Background(), &spec.DisconnectMCPServerRequest{
 				ServerID: req.ServerID,
 			})
 		}
-		return w.store.DeleteMCPServer(context.Background(), req)
+		return resp, nil
 	})
 }
 

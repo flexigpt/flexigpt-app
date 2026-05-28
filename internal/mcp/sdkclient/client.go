@@ -46,9 +46,14 @@ func (f *Factory) Connect(
 	ctx context.Context,
 	cfg spec.MCPServerConfig,
 	resolved runtime.ResolvedTransportAuth,
+	events runtime.ClientNotificationSink,
 ) (runtime.ClientSession, error) {
 	logger := f.log()
-
+	emit := func(ctx context.Context, event runtime.ClientNotification) {
+		if events != nil {
+			events.OnClientNotification(ctx, event)
+		}
+	}
 	client := mcpSDK.NewClient(
 		&mcpSDK.Implementation{
 			Name:    spec.MCPHostName,
@@ -67,43 +72,60 @@ func (f *Factory) Connect(
 
 			ToolListChangedHandler: func(ctx context.Context, req *mcpSDK.ToolListChangedRequest) {
 				logger.Info("mcp tools list changed", "sessionID", safeClientSessionID(req))
+				emit(ctx, runtime.ClientNotification{
+					ServerID: cfg.ID,
+					Kind:     runtime.ClientNotificationToolListChanged,
+				})
 			},
 			PromptListChangedHandler: func(ctx context.Context, req *mcpSDK.PromptListChangedRequest) {
 				logger.Info("mcp prompts list changed", "sessionID", safeClientSessionID(req))
+				emit(ctx, runtime.ClientNotification{
+					ServerID: cfg.ID,
+					Kind:     runtime.ClientNotificationPromptListChanged,
+				})
 			},
 			ResourceListChangedHandler: func(ctx context.Context, req *mcpSDK.ResourceListChangedRequest) {
 				logger.Info("mcp resources list changed", "sessionID", safeClientSessionID(req))
+				emit(ctx, runtime.ClientNotification{
+					ServerID: cfg.ID,
+					Kind:     runtime.ClientNotificationResourceListChanged,
+				})
 			},
 			ResourceUpdatedHandler: func(ctx context.Context, req *mcpSDK.ResourceUpdatedNotificationRequest) {
 				uri := ""
 				if req != nil && req.Params != nil {
 					uri = req.Params.URI
 				}
-				logger.Info("mcp resource updated", "sessionID", safeClientSessionID(req), "uri", uri)
+				emit(ctx, runtime.ClientNotification{
+					ServerID:    cfg.ID,
+					Kind:        runtime.ClientNotificationResourceUpdated,
+					ResourceURI: uri,
+				})
 			},
 			LoggingMessageHandler: func(ctx context.Context, req *mcpSDK.LoggingMessageRequest) {
 				if req == nil || req.Params == nil {
 					return
 				}
-				logger.Info(
-					"mcp server log",
-					"sessionID", safeClientSessionID(req),
-					"logger", req.Params.Logger,
-					"level", string(req.Params.Level),
-					"data", req.Params.Data,
-				)
+
+				emit(ctx, runtime.ClientNotification{
+					ServerID:     cfg.ID,
+					Kind:         runtime.ClientNotificationLoggingMessage,
+					LoggerName:   req.Params.Logger,
+					LoggingLevel: string(req.Params.Level),
+					LogData:      req.Params.Data,
+				})
 			},
 			ProgressNotificationHandler: func(ctx context.Context, req *mcpSDK.ProgressNotificationClientRequest) {
 				if req == nil || req.Params == nil {
 					return
 				}
-				logger.Debug(
-					"mcp progress",
-					"sessionID", safeClientSessionID(req),
-					"progress", req.Params.Progress,
-					"total", req.Params.Total,
-					"message", req.Params.Message,
-				)
+				emit(ctx, runtime.ClientNotification{
+					ServerID: cfg.ID,
+					Kind:     runtime.ClientNotificationProgress,
+					Progress: req.Params.Progress,
+					Total:    req.Params.Total,
+					Message:  req.Params.Message,
+				})
 			},
 		},
 	)
@@ -309,6 +331,9 @@ func (s *Session) CallTool(
 	if err != nil {
 		return nil, err
 	}
+	if res == nil {
+		res = &mcpSDK.CallToolResult{}
+	}
 
 	return &spec.InvokeMCPToolResponseBody{
 		ToolName:          toolName,
@@ -453,7 +478,7 @@ func (s *Session) listAllTools(
 				Description: t.Description,
 
 				InputSchema:  schemaToMap(t.InputSchema),
-				OutputSchema: schemaToMap(t.OutputSchema),
+				OutputSchema: optionalSchemaToMap(t.OutputSchema),
 
 				Annotations:  toolAnnotationsToSpec(t.Annotations),
 				InferredRisk: inferRisk(t.Annotations, trustLevel),
@@ -907,18 +932,25 @@ func completionReference(req spec.MCPCompleteArgumentRequestBody) (*mcpSDK.Compl
 }
 
 func schemaToMap(v any) map[string]any {
-	fallback := map[string]any{"type": "object"}
+	return schemaToMapWithFallback(v, map[string]any{"type": "object"})
+}
+
+func optionalSchemaToMap(v any) map[string]any {
+	return schemaToMapWithFallback(v, nil)
+}
+
+func schemaToMapWithFallback(v any, fallback map[string]any) map[string]any {
 	if v == nil {
-		return fallback
+		return cloneMap(fallback)
 	}
 
 	var out map[string]any
 	raw, err := json.Marshal(v)
 	if err != nil {
-		return fallback
+		return cloneMap(fallback)
 	}
 	if err := json.Unmarshal(raw, &out); err != nil || out == nil {
-		return fallback
+		return cloneMap(fallback)
 	}
 	return out
 }

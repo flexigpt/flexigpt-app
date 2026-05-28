@@ -22,6 +22,7 @@ type ClientFactory interface {
 		ctx context.Context,
 		cfg spec.MCPServerConfig,
 		resolved ResolvedTransportAuth,
+		events ClientNotificationSink,
 	) (ClientSession, error)
 }
 
@@ -56,19 +57,21 @@ type RuntimeManager struct {
 	auth    *AuthManager
 	factory ClientFactory
 
-	mu           sync.RWMutex
-	sessions     map[spec.MCPServerID]*sessionState
-	generations  map[spec.MCPServerID]uint64
-	shuttingDown bool
+	mu                        sync.RWMutex
+	sessions                  map[spec.MCPServerID]*sessionState
+	generations               map[spec.MCPServerID]uint64
+	notificationRefreshTimers map[spec.MCPServerID]*time.Timer
+	shuttingDown              bool
 }
 
 func NewRuntimeManager(st *store.Store, authMgr *AuthManager, factory ClientFactory) *RuntimeManager {
 	return &RuntimeManager{
-		store:       st,
-		auth:        authMgr,
-		factory:     factory,
-		sessions:    map[spec.MCPServerID]*sessionState{},
-		generations: map[spec.MCPServerID]uint64{},
+		store:                     st,
+		auth:                      authMgr,
+		factory:                   factory,
+		sessions:                  map[spec.MCPServerID]*sessionState{},
+		generations:               map[spec.MCPServerID]uint64{},
+		notificationRefreshTimers: map[spec.MCPServerID]*time.Timer{},
 	}
 }
 
@@ -79,12 +82,20 @@ func (m *RuntimeManager) Close(ctx context.Context) error {
 	for _, st := range m.sessions {
 		states = append(states, st)
 	}
+	timers := make([]*time.Timer, 0, len(m.notificationRefreshTimers))
+	for _, timer := range m.notificationRefreshTimers {
+		timers = append(timers, timer)
+	}
 	m.sessions = map[spec.MCPServerID]*sessionState{}
+	m.notificationRefreshTimers = map[spec.MCPServerID]*time.Timer{}
+
 	for id := range m.generations {
 		m.generations[id]++
 	}
 	m.mu.Unlock()
-
+	for _, timer := range timers {
+		timer.Stop()
+	}
 	var first error
 	for _, st := range states {
 		if st.client != nil {
@@ -147,9 +158,9 @@ func (m *RuntimeManager) Connect(
 	cctx, cancel := context.WithTimeout(ctx, connectTimeout)
 	defer cancel()
 
-	client, err := m.factory.Connect(cctx, cfg, resolved)
+	client, err := m.factory.Connect(cctx, cfg, resolved, m)
 	if err != nil {
-		m.setError(req.ServerID, err)
+		m.setErrorIfCurrent(req.ServerID, generation, err)
 		return nil, err
 	}
 
@@ -266,6 +277,44 @@ func (m *RuntimeManager) Status(
 		return nil, fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
 	}
 	return &spec.GetMCPServerStatusResponse{Body: m.snapshotFromState(req.ServerID)}, nil
+}
+
+func (m *RuntimeManager) OnClientNotification(ctx context.Context, event ClientNotification) {
+	if m == nil || event.ServerID == "" {
+		return
+	}
+
+	switch event.Kind {
+	case ClientNotificationToolListChanged,
+		ClientNotificationResourceListChanged,
+		ClientNotificationPromptListChanged:
+		m.scheduleNotificationRefresh(ctx, event.ServerID, string(event.Kind))
+
+	case ClientNotificationResourceUpdated:
+		slog.Info(
+			"mcp resource updated notification received",
+			"serverID", event.ServerID,
+			"uri", event.ResourceURI,
+		)
+
+	case ClientNotificationLoggingMessage:
+		slog.Info(
+			"mcp server log notification received",
+			"serverID", event.ServerID,
+			"logger", event.LoggerName,
+			"level", event.LoggingLevel,
+			"data", event.LogData,
+		)
+
+	case ClientNotificationProgress:
+		slog.Debug(
+			"mcp progress notification received",
+			"serverID", event.ServerID,
+			"progress", event.Progress,
+			"total", event.Total,
+			"message", event.Message,
+		)
+	}
 }
 
 func (m *RuntimeManager) ListTools(
@@ -479,6 +528,99 @@ func (m *RuntimeManager) CallToolDryRun(
 		ToolName:         req.ToolName,
 		ProviderToolName: req.ProviderToolName,
 	}, cfg, tool, nil
+}
+
+func (m *RuntimeManager) scheduleNotificationRefresh(ctx context.Context, serverID spec.MCPServerID, reason string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.shuttingDown {
+		return
+	}
+
+	if timer := m.notificationRefreshTimers[serverID]; timer != nil {
+		timer.Reset(notificationRefreshDebounce)
+		return
+	}
+
+	var timer *time.Timer
+	timer = time.AfterFunc(notificationRefreshDebounce, func() {
+		m.refreshFromNotification(ctx, serverID, reason, timer)
+	})
+	m.notificationRefreshTimers[serverID] = timer
+}
+
+func (m *RuntimeManager) refreshFromNotification(
+	ctx context.Context,
+	serverID spec.MCPServerID,
+	reason string,
+	timer *time.Timer,
+) {
+	ctx, cancel := context.WithTimeout(
+		ctx,
+		time.Duration(spec.DefaultRequestTimeoutMS)*time.Millisecond,
+	)
+	defer cancel()
+
+	m.mu.Lock()
+	if current := m.notificationRefreshTimers[serverID]; current == timer {
+		delete(m.notificationRefreshTimers, serverID)
+	}
+	if m.shuttingDown {
+		m.mu.Unlock()
+		return
+	}
+
+	state := m.sessions[serverID]
+	if state == nil || state.status != spec.MCPServerStatusReady || state.client == nil {
+		m.mu.Unlock()
+		return
+	}
+
+	client := state.client
+	generation := m.generations[serverID]
+	m.mu.Unlock()
+
+	cfgResp, err := m.store.GetMCPServer(ctx, &spec.GetMCPServerRequest{ServerID: serverID})
+	if err != nil {
+		m.setErrorIfCurrent(serverID, generation, err)
+		return
+	}
+	cfg := *cfgResp.Body
+	if !cfg.Enabled {
+		return
+	}
+
+	snap, err := client.Discover(ctx, serverID, cfg.DefaultPolicy, cfg.TrustLevel)
+	if err != nil {
+		m.setErrorIfCurrent(serverID, generation, err)
+		return
+	}
+
+	normalizeSnapshot(&snap)
+	if err := m.store.SaveLastKnownSnapshot(ctx, snap); err != nil {
+		slog.Warn("mcp: save notification-refreshed snapshot failed", "serverID", serverID, "err", err)
+	}
+
+	now := time.Now().UTC()
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.shuttingDown || m.generations[serverID] != generation {
+		return
+	}
+
+	state = m.sessions[serverID]
+	if state == nil || state.client != client || state.status != spec.MCPServerStatusReady {
+		return
+	}
+
+	state.snapshot = cloneDiscoverySnapshot(snap)
+	state.lastSyncedAt = now
+	state.lastError = ""
+
+	slog.Info("mcp discovery refreshed from notification", "serverID", serverID, "reason", reason)
 }
 
 func (m *RuntimeManager) currentSnapshot(

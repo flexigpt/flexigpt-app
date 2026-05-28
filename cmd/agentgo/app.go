@@ -57,8 +57,8 @@ func NewApp() *App {
 	app.modelPresetsDirPath = filepath.Join(app.dataBasePath, "modelpresetsv1")
 	app.promptsDirPath = filepath.Join(app.dataBasePath, "prompttemplatesv1")
 	app.toolsDirPath = filepath.Join(app.dataBasePath, "toolsv1")
-	app.skillsDirPath = filepath.Join(app.dataBasePath, "skills")
-	app.mcpsDirPath = filepath.Join(app.dataBasePath, "mcps")
+	app.skillsDirPath = filepath.Join(app.dataBasePath, "skillsv1")
+	app.mcpsDirPath = filepath.Join(app.dataBasePath, "mcpsv1")
 	app.assistantPresetsDirPath = filepath.Join(app.dataBasePath, "assistantpresetsv1")
 
 	if app.settingsDirPath == "" || app.conversationsDirPath == "" ||
