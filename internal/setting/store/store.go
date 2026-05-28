@@ -127,6 +127,16 @@ func (s *SettingStore) Migrate(ctx context.Context) error {
 		return fmt.Errorf("migrate: decode: %w", err)
 	}
 
+	ensureAuthKeyNamespaces(&schema)
+	if _, ok := schema.AuthKeys[spec.AuthKeyTypeMCP]; !ok {
+		if err := s.store.SetKey(
+			[]string{settingKeyAuthKeys, string(spec.AuthKeyTypeMCP)},
+			map[string]any{},
+		); err != nil {
+			return fmt.Errorf("migrate: ensure MCP auth namespace: %w", err)
+		}
+	}
+
 	addedBuiltInAuthKeys := 0
 	debugChanged := false
 
@@ -398,6 +408,7 @@ func (s *SettingStore) GetSettings(
 	if err := jsonencdec.MapToStructWithJSONTags(raw, &schema); err != nil {
 		return nil, err
 	}
+	ensureAuthKeyNamespaces(&schema)
 	schema.Debug, _ = normalizeDebugSettings(schema.Debug)
 
 	// Convert to DTO (secrets stripped).
@@ -444,6 +455,18 @@ func (s *SettingStore) applyDebugSettings(ctx context.Context, cfg spec.DebugSet
 		return nil
 	}
 	return s.debugSettingsApplier(ctx, cfg)
+}
+
+func ensureAuthKeyNamespaces(schema *spec.SettingsSchema) {
+	if schema.AuthKeys == nil {
+		schema.AuthKeys = spec.AuthKeysSchema{}
+	}
+	if _, ok := schema.AuthKeys[spec.AuthKeyTypeProvider]; !ok {
+		schema.AuthKeys[spec.AuthKeyTypeProvider] = map[spec.AuthKeyName]spec.AuthKey{}
+	}
+	if _, ok := schema.AuthKeys[spec.AuthKeyTypeMCP]; !ok {
+		schema.AuthKeys[spec.AuthKeyTypeMCP] = map[spec.AuthKeyName]spec.AuthKey{}
+	}
 }
 
 // computeSHA returns the hex SHA-256 of the given string.

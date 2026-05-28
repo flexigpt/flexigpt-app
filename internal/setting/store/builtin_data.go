@@ -32,6 +32,7 @@ var DefaultDebugSettingsData = spec.DebugSettings{
 var DefaultSettingsData = func() spec.SettingsSchema {
 	ak := spec.AuthKeysSchema{
 		spec.AuthKeyTypeProvider: map[spec.AuthKeyName]spec.AuthKey{},
+		spec.AuthKeyTypeMCP:      map[spec.AuthKeyName]spec.AuthKey{},
 	}
 	for _, p := range builtin.BuiltInProviderNames {
 		ak[spec.AuthKeyTypeProvider][spec.AuthKeyName(p)] = spec.AuthKey{

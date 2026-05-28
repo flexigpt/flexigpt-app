@@ -54,7 +54,12 @@ type DebugSettings struct {
 // AuthKeyType groups keys (e.g. "provider", "github").
 type AuthKeyType string
 
-const AuthKeyTypeProvider AuthKeyType = "provider"
+const (
+	AuthKeyTypeProvider AuthKeyType = "provider"
+	// AuthKeyTypeMCP is the dedicated namespace for MCP-related secrets.
+	// Use this for MCP transport auth tokens, headers, and env wiring.
+	AuthKeyTypeMCP AuthKeyType = "mcp"
+)
 
 // AuthKeyName is the unique key within its type.
 type AuthKeyName string

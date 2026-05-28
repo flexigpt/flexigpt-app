@@ -2,15 +2,58 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
+
+	"github.com/flexigpt/flexigpt-app/internal/middleware"
 
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/sdkclient"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/store"
 
-	"github.com/flexigpt/flexigpt-app/internal/middleware"
+	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
 )
+
+type mcpAuthKeyReader interface {
+	GetAuthKey(ctx context.Context, req *settingSpec.GetAuthKeyRequest) (*settingSpec.GetAuthKeyResponse, error)
+}
+
+type settingSecretResolver struct {
+	store mcpAuthKeyReader
+}
+
+func newSettingSecretResolver(s mcpAuthKeyReader) runtime.SecretResolver {
+	if s == nil {
+		return runtime.StaticSecretResolver{}
+	}
+	return &settingSecretResolver{store: s}
+}
+
+func (r *settingSecretResolver) ResolveSecret(
+	ctx context.Context,
+	keyName string,
+) (string, error) {
+	if r == nil || r.store == nil {
+		return "", errors.New("secret resolver is not configured")
+	}
+	if keyName == "" {
+		return "", errors.New("invalid secret ref")
+	}
+
+	resp, err := r.store.GetAuthKey(ctx, &settingSpec.GetAuthKeyRequest{
+		Type:    settingSpec.AuthKeyTypeMCP,
+		KeyName: settingSpec.AuthKeyName(keyName),
+	})
+	if err != nil {
+		return "", err
+	}
+	if resp == nil || resp.Body == nil {
+		return "", fmt.Errorf("secret ref %s/%s returned empty response", settingSpec.AuthKeyTypeMCP, keyName)
+	}
+	return resp.Body.Secret, nil
+}
 
 type MCPWrapper struct {
 	store      *store.Store

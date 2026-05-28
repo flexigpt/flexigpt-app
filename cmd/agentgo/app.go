@@ -58,7 +58,7 @@ func NewApp() *App {
 	app.promptsDirPath = filepath.Join(app.dataBasePath, "prompttemplatesv1")
 	app.toolsDirPath = filepath.Join(app.dataBasePath, "toolsv1")
 	app.skillsDirPath = filepath.Join(app.dataBasePath, "skillsv1")
-	app.mcpsDirPath = filepath.Join(app.dataBasePath, "mcpsv1")
+	app.mcpsDirPath = filepath.Join(app.dataBasePath, "mcpserversv1")
 	app.assistantPresetsDirPath = filepath.Join(app.dataBasePath, "assistantpresetsv1")
 
 	if app.settingsDirPath == "" || app.conversationsDirPath == "" ||
@@ -142,10 +142,11 @@ func NewApp() *App {
 	if err := os.MkdirAll(app.mcpsDirPath, os.FileMode(0o770)); err != nil {
 		slog.Error(
 			"failed to create mcp directory",
-			"skills path", app.mcpsDirPath,
+			"mcps path", app.mcpsDirPath,
 			"error", err,
 		)
-		panic("failed to initialize app: could not create mcp directory")
+		panic("failed to initialize app: could not create mcp server directory")
+
 	}
 	if err := os.MkdirAll(app.assistantPresetsDirPath, os.FileMode(0o770)); err != nil {
 		slog.Error(
@@ -232,7 +233,22 @@ func (a *App) initManagers() {
 	}
 	slog.Info("skill store initialized", "directory", a.skillsDirPath)
 
-	err = InitMCPWrapper(a.mcpAPI, a.mcpsDirPath, nil)
+	err = InitSettingStoreWrapper(a.settingStoreAPI, a.settingsDirPath)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize settings store",
+			"directory", a.settingsDirPath,
+			"error", err,
+		)
+		panic("failed to initialize managers: settings store initialization failed\n" + err.Error())
+	}
+	slog.Info("settings store initialized", "directory", a.settingsDirPath)
+
+	err = InitMCPWrapper(
+		a.mcpAPI,
+		a.mcpsDirPath,
+		newSettingSecretResolver(a.settingStoreAPI.store),
+	)
 	if err != nil {
 		slog.Error(
 			"couldn't initialize mcp host",
@@ -278,17 +294,6 @@ func (a *App) initManagers() {
 		"dir", a.assistantPresetsDirPath,
 	)
 
-	err = InitSettingStoreWrapper(a.settingStoreAPI, a.settingsDirPath)
-	if err != nil {
-		slog.Error(
-			"couldn't initialize settings store",
-			"directory", a.settingsDirPath,
-			"error", err,
-		)
-		panic("failed to initialize managers: settings store initialization failed\n" + err.Error())
-	}
-	slog.Info("settings store initialized", "directory", a.settingsDirPath)
-
 	err = InitAggregrateWrapper(
 		a.aggregateAPI,
 		a.modelPresetStoreAPI.store,
@@ -332,9 +337,7 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	// Perform any teardown here.
 
 	// Stop background goroutines + flushes for stores that need it.
-	if a.settingStoreAPI != nil {
-		a.settingStoreAPI.close()
-	}
+
 	if a.assistantPresetStoreAPI != nil {
 		a.assistantPresetStoreAPI.close()
 	}
@@ -344,6 +347,9 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	if a.mcpAPI != nil {
 		//nolint:contextcheck // Need separate context in shutdown.
 		a.mcpAPI.close()
+	}
+	if a.settingStoreAPI != nil {
+		a.settingStoreAPI.close()
 	}
 	if a.skillStoreAPI != nil {
 		a.skillStoreAPI.close()
