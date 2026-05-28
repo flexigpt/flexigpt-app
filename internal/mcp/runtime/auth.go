@@ -1,0 +1,127 @@
+package runtime
+
+import (
+	"context"
+	"fmt"
+	"maps"
+	"strings"
+	"time"
+
+	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
+)
+
+type SecretResolver interface {
+	ResolveSecret(ctx context.Context, ref string) (string, error)
+}
+
+type StaticSecretResolver map[string]string
+
+func (r StaticSecretResolver) ResolveSecret(ctx context.Context, ref string) (string, error) {
+	v, ok := r[ref]
+	if !ok {
+		return "", fmt.Errorf("secret ref not found: %s", ref)
+	}
+	return v, nil
+}
+
+type ResolvedTransportAuth struct {
+	Headers map[string]string
+	Env     map[string]string
+	Status  spec.MCPAuthStatus
+}
+
+type AuthManager struct {
+	secrets SecretResolver
+}
+
+func NewAuthManager(secrets SecretResolver) *AuthManager {
+	if secrets == nil {
+		secrets = StaticSecretResolver{}
+	}
+	return &AuthManager{secrets: secrets}
+}
+
+func (m *AuthManager) PrepareTransportAuth(
+	ctx context.Context,
+	cfg spec.MCPServerConfig,
+) (ResolvedTransportAuth, error) {
+	out := ResolvedTransportAuth{
+		Headers: map[string]string{},
+		Env:     map[string]string{},
+		Status: spec.MCPAuthStatus{
+			ServerID: cfg.ID,
+			AuthMode: spec.MCPHTTPAuthNone,
+			State:    spec.MCPAuthStateNotRequired,
+		},
+	}
+
+	if cfg.Transport == spec.MCPTransportStdio && cfg.Stdio != nil {
+		out.Env = maps.Clone(cfg.Stdio.Env)
+		for key, ref := range cfg.Stdio.SecretEnvRefs {
+			v, err := m.secrets.ResolveSecret(ctx, ref)
+			if err != nil {
+				return out, err
+			}
+			out.Env[key] = v
+		}
+		return out, nil
+	}
+
+	if cfg.Transport != spec.MCPTransportStreamableHTTP || cfg.StreamableHTTP == nil {
+		return out, nil
+	}
+
+	httpCfg := cfg.StreamableHTTP
+	out.Headers = maps.Clone(httpCfg.CustomHeaders)
+	for key, ref := range httpCfg.SecretHeaderRefs {
+		v, err := m.secrets.ResolveSecret(ctx, ref)
+		if err != nil {
+			return out, err
+		}
+		out.Headers[key] = v
+	}
+
+	mode := httpCfg.AuthMode
+	out.Status.AuthMode = mode
+
+	switch mode {
+	case "", spec.MCPHTTPAuthNone:
+		out.Status.State = spec.MCPAuthStateNotRequired
+
+	case spec.MCPHTTPAuthCustomBearer:
+		if cfg.AuthRef == nil || strings.TrimSpace(cfg.AuthRef.TokenRef) == "" {
+			out.Status.State = spec.MCPAuthStateRequired
+			return out, spec.ErrMCPAuthRequired
+		}
+		token, err := m.secrets.ResolveSecret(ctx, cfg.AuthRef.TokenRef)
+		if err != nil {
+			out.Status.State = spec.MCPAuthStateError
+			out.Status.LastError = err.Error()
+			return out, err
+		}
+		out.Headers["Authorization"] = "Bearer " + token
+		out.Status.State = spec.MCPAuthStateAuthorized
+
+	case spec.MCPHTTPAuthCustomHeaders:
+		out.Status.State = spec.MCPAuthStateAuthorized
+
+	case spec.MCPHTTPAuthOAuth, spec.MCPHTTPAuthClientCredentials:
+		out.Status.State = spec.MCPAuthStateRequired
+		out.Status.LastError = "OAuth token acquisition is scaffolded but not wired to frontend callback yet"
+		return out, fmt.Errorf("%w: %s", spec.ErrMCPAuthRequired, mode)
+
+	default:
+		out.Status.State = spec.MCPAuthStateError
+		out.Status.LastError = "unsupported auth mode"
+		return out, fmt.Errorf("%w: unsupported auth mode %s", spec.ErrMCPInvalidRequest, mode)
+	}
+
+	return out, nil
+}
+
+func Expired(expiresAt *time.Time) bool {
+	if expiresAt == nil || expiresAt.IsZero() {
+		return false
+	}
+	return time.Now().UTC().After(expiresAt.Add(-30 * time.Second))
+}

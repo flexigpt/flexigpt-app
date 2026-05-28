@@ -24,6 +24,7 @@ type App struct {
 	toolStoreAPI            *ToolStoreWrapper
 	toolRuntimeAPI          *ToolRuntimeWrapper
 	skillStoreAPI           *SkillStoreWrapper
+	mcpAPI                  *MCPWrapper
 	aggregateAPI            *AggregrateWrapper
 	assistantPresetStoreAPI *AssistantPresetStoreWrapper
 
@@ -35,6 +36,7 @@ type App struct {
 	promptsDirPath          string
 	toolsDirPath            string
 	skillsDirPath           string
+	mcpsDirPath             string
 	assistantPresetsDirPath string
 }
 
@@ -56,11 +58,12 @@ func NewApp() *App {
 	app.promptsDirPath = filepath.Join(app.dataBasePath, "prompttemplatesv1")
 	app.toolsDirPath = filepath.Join(app.dataBasePath, "toolsv1")
 	app.skillsDirPath = filepath.Join(app.dataBasePath, "skills")
+	app.mcpsDirPath = filepath.Join(app.dataBasePath, "mcps")
 	app.assistantPresetsDirPath = filepath.Join(app.dataBasePath, "assistantpresetsv1")
 
 	if app.settingsDirPath == "" || app.conversationsDirPath == "" ||
 		app.modelPresetsDirPath == "" || app.promptsDirPath == "" ||
-		app.assistantPresetsDirPath == "" || app.toolsDirPath == "" || app.skillsDirPath == "" {
+		app.assistantPresetsDirPath == "" || app.toolsDirPath == "" || app.skillsDirPath == "" || app.mcpsDirPath == "" {
 		slog.Error(
 			"invalid app path configuration",
 			"settingsDirPath", app.settingsDirPath,
@@ -70,6 +73,7 @@ func NewApp() *App {
 			"assistantPresetsDirPath", app.assistantPresetsDirPath,
 			"toolsDirPath", app.toolsDirPath,
 			"skillsDirPath", app.skillsDirPath,
+			"mcpsDirPath", app.mcpsDirPath,
 		)
 		panic("failed to initialize app: invalid path configuration")
 	}
@@ -82,6 +86,7 @@ func NewApp() *App {
 	app.promptTemplateStoreAPI = &PromptTemplateStoreWrapper{}
 	app.toolStoreAPI = &ToolStoreWrapper{}
 	app.skillStoreAPI = &SkillStoreWrapper{}
+	app.mcpAPI = &MCPWrapper{}
 	app.toolRuntimeAPI = &ToolRuntimeWrapper{}
 	app.aggregateAPI = &AggregrateWrapper{}
 	app.assistantPresetStoreAPI = &AssistantPresetStoreWrapper{}
@@ -134,6 +139,14 @@ func NewApp() *App {
 		)
 		panic("failed to initialize app: could not create skills directory")
 	}
+	if err := os.MkdirAll(app.mcpsDirPath, os.FileMode(0o770)); err != nil {
+		slog.Error(
+			"failed to create mcp directory",
+			"skills path", app.mcpsDirPath,
+			"error", err,
+		)
+		panic("failed to initialize app: could not create mcp directory")
+	}
 	if err := os.MkdirAll(app.assistantPresetsDirPath, os.FileMode(0o770)); err != nil {
 		slog.Error(
 			"failed to create assistant presets directory",
@@ -152,6 +165,7 @@ func NewApp() *App {
 		"promptsDirPath", app.promptsDirPath,
 		"toolsDirPath", app.toolsDirPath,
 		"skillsDirPath", app.skillsDirPath,
+		"mcpsDirPath", app.mcpsDirPath,
 		"assistantPresetsDirPath", app.assistantPresetsDirPath,
 	)
 	return app
@@ -217,6 +231,17 @@ func (a *App) initManagers() {
 		panic("failed to initialize managers: skill store initialization failed\n" + err.Error())
 	}
 	slog.Info("skill store initialized", "directory", a.skillsDirPath)
+
+	err = InitMCPWrapper(a.mcpAPI, a.mcpsDirPath, nil)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize mcp host",
+			"directory", a.mcpsDirPath,
+			"error", err,
+		)
+		panic("failed to initialize managers: mcp store initialization failed\n" + err.Error())
+	}
+	slog.Info("mcp host initialized", "directory", a.mcpsDirPath)
 
 	err = InitModelPresetStoreWrapper(
 		a.modelPresetStoreAPI,
@@ -318,6 +343,10 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	}
 	if a.skillStoreAPI != nil {
 		a.skillStoreAPI.close()
+	}
+	if a.mcpAPI != nil {
+		//nolint:contextcheck // Need separate context in shutdown.
+		a.mcpAPI.close()
 	}
 	if a.toolStoreAPI != nil {
 		a.toolStoreAPI.close()

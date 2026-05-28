@@ -106,6 +106,7 @@ func main() {
 			app.toolStoreAPI,
 			app.toolRuntimeAPI,
 			app.skillStoreAPI,
+			app.mcpAPI,
 			app.aggregateAPI,
 			app.assistantPresetStoreAPI,
 		},
