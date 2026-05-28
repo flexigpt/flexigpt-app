@@ -110,11 +110,14 @@ type GetMCPServerStatusResponse struct {
 }
 
 type ListMCPServerToolsRequest struct {
-	ServerID MCPServerID `path:"serverID" required:"true"`
+	ServerID  MCPServerID `path:"serverID" required:"true"`
+	PageSize  int         `                                query:"pageSize"`
+	PageToken string      `                                query:"pageToken"`
 }
 
 type ListMCPServerToolsResponseBody struct {
-	Tools []MCPToolCapability `json:"tools"`
+	Tools         []MCPToolCapability `json:"tools"`
+	NextPageToken *string             `json:"nextPageToken,omitempty"`
 }
 
 type ListMCPServerToolsResponse struct {
@@ -122,13 +125,14 @@ type ListMCPServerToolsResponse struct {
 }
 
 type ListMCPServerResourcesRequest struct {
-	ServerID MCPServerID `path:"serverID" required:"true"`
-	Cursor   string      `                                query:"cursor"`
+	ServerID  MCPServerID `path:"serverID" required:"true"`
+	PageSize  int         `                                query:"pageSize"`
+	PageToken string      `                                query:"pageToken"`
 }
 
 type ListMCPServerResourcesResponseBody struct {
-	Resources  []MCPResourceRef `json:"resources"`
-	NextCursor string           `json:"nextCursor,omitempty"`
+	Resources     []MCPResourceRef `json:"resources"`
+	NextPageToken *string          `json:"nextPageToken,omitempty"`
 }
 
 type ListMCPServerResourcesResponse struct {
@@ -136,13 +140,14 @@ type ListMCPServerResourcesResponse struct {
 }
 
 type ListMCPServerResourceTemplatesRequest struct {
-	ServerID MCPServerID `path:"serverID" required:"true"`
-	Cursor   string      `                                query:"cursor"`
+	ServerID  MCPServerID `path:"serverID" required:"true"`
+	PageSize  int         `                                query:"pageSize"`
+	PageToken string      `                                query:"pageToken"`
 }
 
 type ListMCPServerResourceTemplatesResponseBody struct {
 	ResourceTemplates []MCPResourceTemplateRef `json:"resourceTemplates"`
-	NextCursor        string                   `json:"nextCursor,omitempty"`
+	NextPageToken     *string                  `json:"nextPageToken,omitempty"`
 }
 
 type ListMCPServerResourceTemplatesResponse struct {
@@ -150,13 +155,14 @@ type ListMCPServerResourceTemplatesResponse struct {
 }
 
 type ListMCPServerPromptsRequest struct {
-	ServerID MCPServerID `path:"serverID" required:"true"`
-	Cursor   string      `                                query:"cursor"`
+	ServerID  MCPServerID `path:"serverID" required:"true"`
+	PageSize  int         `                                query:"pageSize"`
+	PageToken string      `                                query:"pageToken"`
 }
 
 type ListMCPServerPromptsResponseBody struct {
-	Prompts    []MCPPromptRef `json:"prompts"`
-	NextCursor string         `json:"nextCursor,omitempty"`
+	Prompts       []MCPPromptRef `json:"prompts"`
+	NextPageToken *string        `json:"nextPageToken,omitempty"`
 }
 
 type ListMCPServerPromptsResponse struct {

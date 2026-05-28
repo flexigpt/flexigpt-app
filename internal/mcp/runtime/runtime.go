@@ -2,9 +2,6 @@ package runtime
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -328,8 +325,21 @@ func (m *RuntimeManager) ListTools(
 	if err != nil {
 		return nil, err
 	}
+	sort.Slice(snap.Tools, func(i, j int) bool {
+		return snap.Tools[i].ToolName < snap.Tools[j].ToolName
+	})
+	digest := computeDiscoverySnapshotDigest(snap)
+	tools, next, err := paginateDiscoveryItems(
+		req.ServerID, digest, discoveryPageKindTools, snap.Tools, req.PageSize, req.PageToken,
+	)
+	if err != nil {
+		return nil, err
+	}
 	return &spec.ListMCPServerToolsResponse{
-		Body: &spec.ListMCPServerToolsResponseBody{Tools: snap.Tools},
+		Body: &spec.ListMCPServerToolsResponseBody{
+			Tools:         tools,
+			NextPageToken: next,
+		},
 	}, nil
 }
 
@@ -344,8 +354,21 @@ func (m *RuntimeManager) ListResources(
 	if err != nil {
 		return nil, err
 	}
+	sort.Slice(snap.Resources, func(i, j int) bool {
+		return snap.Resources[i].URI < snap.Resources[j].URI
+	})
+	digest := computeDiscoverySnapshotDigest(snap)
+	resources, next, err := paginateDiscoveryItems(
+		req.ServerID, digest, discoveryPageKindResources, snap.Resources, req.PageSize, req.PageToken,
+	)
+	if err != nil {
+		return nil, err
+	}
 	return &spec.ListMCPServerResourcesResponse{
-		Body: &spec.ListMCPServerResourcesResponseBody{Resources: snap.Resources},
+		Body: &spec.ListMCPServerResourcesResponseBody{
+			Resources:     resources,
+			NextPageToken: next,
+		},
 	}, nil
 }
 
@@ -360,8 +383,21 @@ func (m *RuntimeManager) ListResourceTemplates(
 	if err != nil {
 		return nil, err
 	}
+	sort.Slice(snap.ResourceTemplates, func(i, j int) bool {
+		return snap.ResourceTemplates[i].URITemplate < snap.ResourceTemplates[j].URITemplate
+	})
+	digest := computeDiscoverySnapshotDigest(snap)
+	templates, next, err := paginateDiscoveryItems(
+		req.ServerID, digest, discoveryPageKindResourceTemplates, snap.ResourceTemplates, req.PageSize, req.PageToken,
+	)
+	if err != nil {
+		return nil, err
+	}
 	return &spec.ListMCPServerResourceTemplatesResponse{
-		Body: &spec.ListMCPServerResourceTemplatesResponseBody{ResourceTemplates: snap.ResourceTemplates},
+		Body: &spec.ListMCPServerResourceTemplatesResponseBody{
+			ResourceTemplates: templates,
+			NextPageToken:     next,
+		},
 	}, nil
 }
 
@@ -376,8 +412,21 @@ func (m *RuntimeManager) ListPrompts(
 	if err != nil {
 		return nil, err
 	}
+	sort.Slice(snap.Prompts, func(i, j int) bool {
+		return snap.Prompts[i].PromptName < snap.Prompts[j].PromptName
+	})
+	digest := computeDiscoverySnapshotDigest(snap)
+	prompts, next, err := paginateDiscoveryItems(
+		req.ServerID, digest, discoveryPageKindPrompts, snap.Prompts, req.PageSize, req.PageToken,
+	)
+	if err != nil {
+		return nil, err
+	}
 	return &spec.ListMCPServerPromptsResponse{
-		Body: &spec.ListMCPServerPromptsResponseBody{Prompts: snap.Prompts},
+		Body: &spec.ListMCPServerPromptsResponseBody{
+			Prompts:       prompts,
+			NextPageToken: next,
+		},
 	}, nil
 }
 
@@ -556,10 +605,8 @@ func (m *RuntimeManager) refreshFromNotification(
 	reason string,
 	timer *time.Timer,
 ) {
-	ctx, cancel := context.WithTimeout(
-		ctx,
-		time.Duration(spec.DefaultRequestTimeoutMS)*time.Millisecond,
-	)
+	ctx = context.WithoutCancel(ctx)
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(spec.DefaultRequestTimeoutMS)*time.Millisecond)
 	defer cancel()
 
 	m.mu.Lock()
@@ -716,6 +763,10 @@ func (m *RuntimeManager) snapshotFromState(id spec.MCPServerID) *spec.MCPServerR
 		return &spec.MCPServerRuntimeSnapshot{ServerID: id, Status: spec.MCPServerStatusDisconnected}
 	}
 
+	snapshotDigest := st.snapshot.Digest
+	if snapshotDigest == "" {
+		snapshotDigest = computeDiscoverySnapshotDigest(st.snapshot)
+	}
 	out := &spec.MCPServerRuntimeSnapshot{
 		ServerID:                  id,
 		Status:                    st.status,
@@ -728,7 +779,7 @@ func (m *RuntimeManager) snapshotFromState(id spec.MCPServerID) *spec.MCPServerR
 		ResourceCount:             len(st.snapshot.Resources),
 		ResourceTemplateCount:     len(st.snapshot.ResourceTemplates),
 		PromptCount:               len(st.snapshot.Prompts),
-		SnapshotDigest:            st.snapshot.Digest,
+		SnapshotDigest:            snapshotDigest,
 	}
 	if !st.lastConnectedAt.IsZero() {
 		out.LastConnectedAt = st.lastConnectedAt.Format(time.RFC3339Nano)
@@ -750,21 +801,7 @@ func normalizeSnapshot(snap *spec.MCPDiscoverySnapshot) {
 	if snap.SyncedAt == "" {
 		snap.SyncedAt = time.Now().UTC().Format(time.RFC3339Nano)
 	}
-	if snap.Digest == "" {
-		raw, _ := json.Marshal(struct {
-			Tools             []spec.MCPToolCapability      `json:"tools"`
-			Resources         []spec.MCPResourceRef         `json:"resources"`
-			ResourceTemplates []spec.MCPResourceTemplateRef `json:"resourceTemplates"`
-			Prompts           []spec.MCPPromptRef           `json:"prompts"`
-		}{
-			Tools:             snap.Tools,
-			Resources:         snap.Resources,
-			ResourceTemplates: snap.ResourceTemplates,
-			Prompts:           snap.Prompts,
-		})
-		sum := sha256.Sum256(raw)
-		snap.Digest = hex.EncodeToString(sum[:])
-	}
+	snap.Digest = computeDiscoverySnapshotDigest(*snap)
 }
 
 func withDefaultRequestTimeout(ctx context.Context) (context.Context, context.CancelFunc) {

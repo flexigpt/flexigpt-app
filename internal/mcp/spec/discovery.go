@@ -21,6 +21,17 @@ type MCPServerRuntimeSnapshot struct {
 	SnapshotDigest string `json:"snapshotDigest,omitempty"`
 }
 
+// MCPDiscoveryPageToken is an opaque cursor for paginating cached discovery
+// snapshots. It is encoded as base64(JSON) and should not be interpreted by
+// callers.
+type MCPDiscoveryPageToken struct {
+	ServerID       MCPServerID `json:"sid"`
+	SnapshotDigest string      `json:"dig"`
+	Kind           string      `json:"k"`
+	PageSize       int         `json:"ps"`
+	Index          int         `json:"i"`
+}
+
 type MCPDiscoverySnapshot struct {
 	ServerID MCPServerID `json:"serverID"`
 
