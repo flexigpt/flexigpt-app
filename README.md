@@ -168,7 +168,7 @@ Architecture reference:
 
 ## Contributing
 
-Developer setup is documented in [devsetup.md](./docs/contributing/devsetup.md).
+Developer setup is documented in [devsetup.md](./devdocs/contributing/devsetup.md).
 
 ## License
 

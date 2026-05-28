@@ -339,7 +339,7 @@ In a chat, users must be able to:
 
 Conversation messages must persist MCP context as part of durable conversation data.
 
-Persisted MCP context must include:
+Persisted MCP context must include all things that help forming a conversation message, such as:
 
 - selected servers
 - tool exposure mode per server
@@ -432,7 +432,7 @@ Prompts:
 
 ### FR-12. MCP Apps extension
 
-FlexiGPT must support MCP Apps extension `io.modelcontextprotocol/ui` when app sandboxing is available.
+FlexiGPT must support MCP Apps extension `io.modelcontextprotocol/ui`.
 
 Support includes:
 
