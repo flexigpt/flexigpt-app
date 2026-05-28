@@ -341,12 +341,12 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	if a.modelPresetStoreAPI != nil {
 		a.modelPresetStoreAPI.close()
 	}
-	if a.skillStoreAPI != nil {
-		a.skillStoreAPI.close()
-	}
 	if a.mcpAPI != nil {
 		//nolint:contextcheck // Need separate context in shutdown.
 		a.mcpAPI.close()
+	}
+	if a.skillStoreAPI != nil {
+		a.skillStoreAPI.close()
 	}
 	if a.toolStoreAPI != nil {
 		a.toolStoreAPI.close()
