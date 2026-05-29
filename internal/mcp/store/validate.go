@@ -211,6 +211,9 @@ func validateHTTPConfig(serverID spec.MCPServerID, c *spec.MCPStreamableHTTPConf
 		if err := validateHTTPHeaderName(k); err != nil {
 			return fmt.Errorf("streamableHttp.secretHeaderRefs[%q]: %w", k, err)
 		}
+		if err := validateUserHTTPHeaderAllowed(k); err != nil {
+			return fmt.Errorf("streamableHttp.secretHeaderRefs[%q]: %w", k, err)
+		}
 		if err := secret.ValidateMCPSecretRef(ref, serverID, spec.MCPSecretKindHTTPHeader, k); err != nil {
 			return fmt.Errorf("streamableHttp.secretHeaderRefs[%q]: %w", k, err)
 		}
@@ -316,8 +319,50 @@ func validateHTTPAuthRef(c *spec.MCPServerConfig) error {
 		}
 		return nil
 
-	case spec.MCPHTTPAuthOAuth, spec.MCPHTTPAuthClientCredentials:
-		return fmt.Errorf("streamableHttp.authMode %q is not yet supported", mode)
+	case spec.MCPHTTPAuthOAuth:
+		if authMode != "" && authMode != mode {
+			return fmt.Errorf("authRef.authMode %q must match streamableHttp.authMode %q", authMode, mode)
+		}
+		if tokenRef != "" {
+			return errors.New("authRef.tokenRef must be empty for oauth authMode")
+		}
+		if clientCredentialRef != "" {
+			if err := secret.ValidateMCPSecretRef(
+				clientCredentialRef,
+				c.ID,
+				spec.MCPSecretKindOAuthClientCredentials,
+				"clientCredentials",
+			); err != nil {
+				return err
+			}
+		}
+		if metadataRef != "" {
+			return errors.New("authRef.metadataRef is reserved for future OAuth metadata storage")
+		}
+		return nil
+
+	case spec.MCPHTTPAuthClientCredentials:
+		if authMode != "" && authMode != mode {
+			return fmt.Errorf("authRef.authMode %q must match streamableHttp.authMode %q", authMode, mode)
+		}
+		if tokenRef != "" {
+			return errors.New("authRef.tokenRef must be empty for clientCredentials authMode")
+		}
+		if clientCredentialRef == "" {
+			return errors.New("authRef.clientCredentialRef is required for clientCredentials authMode")
+		}
+		if err := secret.ValidateMCPSecretRef(
+			clientCredentialRef,
+			c.ID,
+			spec.MCPSecretKindOAuthClientCredentials,
+			"clientCredentials",
+		); err != nil {
+			return err
+		}
+		if metadataRef != "" {
+			return errors.New("authRef.metadataRef is reserved for future OAuth metadata storage")
+		}
+		return nil
 
 	default:
 		return fmt.Errorf("invalid streamableHttp.authMode %q", mode)

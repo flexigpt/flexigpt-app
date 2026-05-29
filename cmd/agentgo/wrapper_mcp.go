@@ -9,6 +9,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 
+	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/sdkclient"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/secret"
@@ -26,9 +27,9 @@ type settingSecretResolver struct {
 	store mcpAuthKeyReader
 }
 
-func newSettingSecretResolver(s mcpAuthKeyReader) runtime.SecretResolver {
+func newSettingSecretResolver(s mcpAuthKeyReader) auth.SecretResolver {
 	if s == nil {
-		return runtime.StaticSecretResolver{}
+		return auth.StaticSecretResolver{}
 	}
 	return &settingSecretResolver{store: s}
 }
@@ -68,19 +69,22 @@ func (r *settingSecretResolver) ResolveSecret(
 
 type MCPWrapper struct {
 	store      *store.Store
-	auth       *runtime.AuthManager
+	auth       *auth.AuthManager
 	runtime    *runtime.RuntimeManager
 	approvals  *runtime.ApprovalManager
 	toolBridge *runtime.ToolBridge
 }
 
-func InitMCPWrapper(w *MCPWrapper, baseDir string, secrets runtime.SecretResolver) error {
+func InitMCPWrapper(w *MCPWrapper, baseDir string, secrets auth.SecretResolver) error {
 	st, err := store.NewStore(baseDir)
 	if err != nil {
 		return err
 	}
 
-	authMgr := runtime.NewAuthManager(secrets)
+	authMgr := auth.NewAuthManager(
+		secrets,
+		auth.WithAuthStatusSink(st),
+	)
 	rt := runtime.NewRuntimeManager(st, authMgr, sdkclient.NewFactory())
 	appr := runtime.NewApprovalManager(5 * time.Minute)
 	tb := runtime.NewToolBridge(rt, appr)

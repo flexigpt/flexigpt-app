@@ -9,6 +9,8 @@ const (
 	MCPSecretKindHTTPHeader        MCPSecretKind = "httpHeader"
 	MCPSecretKindHTTPToken         MCPSecretKind = "httpToken"
 	MCPSecretKindOAuthClientSecret MCPSecretKind = "oauthClientSecret" //nolint:gosec // Enum val.
+	// MCPSecretKindOAuthClientCredentials stores a JSON object: {"clientID":"...","clientSecret":"..."}.
+	MCPSecretKindOAuthClientCredentials MCPSecretKind = "oauthClientCredentials" //nolint:gosec // Enum val.
 )
 
 type MCPSecretRef struct {

@@ -12,6 +12,26 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
+func ValidateMCPSecretRef(raw string, serverID spec.MCPServerID, kind spec.MCPSecretKind, slot string) error {
+	ref, err := ParseMCPSecretRef(raw)
+	if err != nil {
+		return err
+	}
+	serverID = spec.MCPServerID(strings.TrimSpace(string(serverID)))
+	kind = normalizeSecretKind(kind)
+	slot = normalizeSecretSlot(slot)
+	if ref.ServerID != serverID {
+		return fmt.Errorf("secret ref serverID %q does not match config serverID %q", ref.ServerID, serverID)
+	}
+	if ref.Kind != kind {
+		return fmt.Errorf("secret ref kind %q does not match expected kind %q", ref.Kind, kind)
+	}
+	if !strings.EqualFold(ref.Slot, slot) {
+		return fmt.Errorf("secret ref slot %q does not match expected slot %q", ref.Slot, slot)
+	}
+	return nil
+}
+
 func ParseMCPSecretRef(raw string) (spec.MCPSecretRef, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -45,26 +65,6 @@ func ParseMCPSecretRef(raw string) (spec.MCPSecretRef, error) {
 		return spec.MCPSecretRef{}, err
 	}
 	return ref, nil
-}
-
-func ValidateMCPSecretRef(raw string, serverID spec.MCPServerID, kind spec.MCPSecretKind, slot string) error {
-	ref, err := ParseMCPSecretRef(raw)
-	if err != nil {
-		return err
-	}
-	serverID = spec.MCPServerID(strings.TrimSpace(string(serverID)))
-	kind = normalizeSecretKind(kind)
-	slot = normalizeSecretSlot(slot)
-	if ref.ServerID != serverID {
-		return fmt.Errorf("secret ref serverID %q does not match config serverID %q", ref.ServerID, serverID)
-	}
-	if ref.Kind != kind {
-		return fmt.Errorf("secret ref kind %q does not match expected kind %q", ref.Kind, kind)
-	}
-	if !strings.EqualFold(ref.Slot, slot) {
-		return fmt.Errorf("secret ref slot %q does not match expected slot %q", ref.Slot, slot)
-	}
-	return nil
 }
 
 func GetMCPSecretRefStorageKey(r spec.MCPSecretRef) string {
@@ -108,7 +108,8 @@ func validateSecret(r spec.MCPSecretRef) error {
 	case spec.MCPSecretKindStdioEnv,
 		spec.MCPSecretKindHTTPHeader,
 		spec.MCPSecretKindHTTPToken,
-		spec.MCPSecretKindOAuthClientSecret:
+		spec.MCPSecretKindOAuthClientSecret,
+		spec.MCPSecretKindOAuthClientCredentials:
 	default:
 		return fmt.Errorf("secret ref kind %q is invalid", r.Kind)
 	}

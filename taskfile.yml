@@ -146,11 +146,6 @@ tasks:
       - pnpm run touch:tmp
       - golangci-lint run ./... -v
 
-  lint:
-    cmds:
-      - task: lint-go
-      - pnpm -F frontend run lint
-
   test-go:
     cmds:
       - pnpm run touch:tmp
@@ -159,6 +154,16 @@ tasks:
       - go test -count=1 -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./...
       - go tool cover -func=coverage.out
       - go-test-coverage --config=./.testcoverage.yml
+
+  lt-go:
+    cmds:
+      - task: lint-go
+      - task: test-go
+
+  lint:
+    cmds:
+      - task: lint-go
+      - pnpm -F frontend run lint
 
   test:
     cmds:

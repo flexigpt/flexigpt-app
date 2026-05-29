@@ -403,6 +403,10 @@ linters:
 
       # List of aliases
       alias:
+        - pkg: "github.com/modelcontextprotocol/go-sdk/auth"
+          alias: mcpAuth
+        - pkg: "github.com/modelcontextprotocol/go-sdk/auth/extauth"
+          alias: mcpExtAuth
         - pkg: "github.com/modelcontextprotocol/go-sdk/mcp"
           alias: mcpSDK
         - pkg: github.com/openai/openai-go/v3/shared/constant

@@ -13,6 +13,7 @@ import (
 
 	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
@@ -41,7 +42,7 @@ func NewFactoryWithLogger(logger *slog.Logger) *Factory {
 func (f *Factory) Connect(
 	ctx context.Context,
 	cfg spec.MCPServerConfig,
-	resolved runtime.ResolvedTransportAuth,
+	resolved auth.ResolvedTransportAuth,
 	events runtime.ClientNotificationSink,
 ) (runtime.ClientSession, error) {
 	logger := f.log()
@@ -156,7 +157,7 @@ func (f *Factory) Connect(
 			logger,
 			string(cfg.ID),
 			"mcp stdio stderr",
-			newSecretRedactor(resolved),
+			auth.NewSecretRedactor(resolved),
 		)
 
 		transport = &mcpSDK.CommandTransport{
@@ -184,6 +185,7 @@ func (f *Factory) Connect(
 			HTTPClient:           httpClient,
 			MaxRetries:           defaultHTTPMaxRetries,
 			DisableStandaloneSSE: false,
+			OAuthHandler:         resolved.OAuthHandler,
 		}
 
 	default:

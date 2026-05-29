@@ -1,16 +1,14 @@
-package sdkclient
+package auth
 
 import (
 	"strings"
-
-	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 )
 
-type secretRedactor struct {
+type SecretRedactor struct {
 	values []string
 }
 
-func newSecretRedactor(resolved runtime.ResolvedTransportAuth) *secretRedactor {
+func NewSecretRedactor(resolved ResolvedTransportAuth) *SecretRedactor {
 	seen := make(map[string]struct{})
 	values := make([]string, 0, len(resolved.SensitiveValues))
 	for _, v := range resolved.SensitiveValues {
@@ -26,10 +24,10 @@ func newSecretRedactor(resolved runtime.ResolvedTransportAuth) *secretRedactor {
 		values = append(values, v)
 	}
 
-	return &secretRedactor{values: values}
+	return &SecretRedactor{values: values}
 }
 
-func (r *secretRedactor) Redact(s string) string {
+func (r *SecretRedactor) Redact(s string) string {
 	if r == nil || len(r.values) == 0 || s == "" {
 		return s
 	}

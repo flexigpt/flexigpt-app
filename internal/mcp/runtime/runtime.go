@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/store"
 )
@@ -34,7 +35,7 @@ type ClientFactory interface {
 	Connect(
 		ctx context.Context,
 		cfg spec.MCPServerConfig,
-		resolved ResolvedTransportAuth,
+		resolved auth.ResolvedTransportAuth,
 		events ClientNotificationSink,
 	) (ClientSession, error)
 }
@@ -51,7 +52,7 @@ type sessionState struct {
 
 type RuntimeManager struct {
 	store   *store.Store
-	auth    *AuthManager
+	auth    *auth.AuthManager
 	factory ClientFactory
 
 	mu                        sync.RWMutex
@@ -61,7 +62,7 @@ type RuntimeManager struct {
 	shuttingDown              bool
 }
 
-func NewRuntimeManager(st *store.Store, authMgr *AuthManager, factory ClientFactory) *RuntimeManager {
+func NewRuntimeManager(st *store.Store, authMgr *auth.AuthManager, factory ClientFactory) *RuntimeManager {
 	return &RuntimeManager{
 		store:                     st,
 		auth:                      authMgr,

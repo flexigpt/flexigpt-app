@@ -4,13 +4,15 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+
+	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
 )
 
 type slogLineWriter struct {
 	logger   *slog.Logger
 	serverID string
 	message  string
-	redactor *secretRedactor
+	redactor *auth.SecretRedactor
 
 	mu  sync.Mutex
 	buf []byte
@@ -20,7 +22,7 @@ func newSlogLineWriter(
 	logger *slog.Logger,
 	serverID string,
 	message string,
-	redactor *secretRedactor,
+	redactor *auth.SecretRedactor,
 ) *slogLineWriter {
 	if logger == nil {
 		logger = slog.Default()
