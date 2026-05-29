@@ -245,6 +245,7 @@ func (a *App) initManagers() {
 	slog.Info("settings store initialized", "directory", a.settingsDirPath)
 
 	err = InitMCPWrapper(
+		context.Background(),
 		a.mcpAPI,
 		a.mcpsDirPath,
 		newSettingSecretResolver(a.settingStoreAPI.store),

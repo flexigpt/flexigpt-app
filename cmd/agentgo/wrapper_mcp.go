@@ -68,22 +68,31 @@ func (r *settingSecretResolver) ResolveSecret(
 }
 
 type MCPWrapper struct {
-	store      *store.Store
-	auth       *auth.AuthManager
-	runtime    *runtime.RuntimeManager
-	approvals  *runtime.ApprovalManager
-	toolBridge *runtime.ToolBridge
+	store       *store.Store
+	auth        *auth.AuthManager
+	oauthBroker *auth.OAuthLoopbackBroker
+	runtime     *runtime.RuntimeManager
+	approvals   *runtime.ApprovalManager
+	toolBridge  *runtime.ToolBridge
 }
 
-func InitMCPWrapper(w *MCPWrapper, baseDir string, secrets auth.SecretResolver) error {
+func InitMCPWrapper(ctx context.Context, w *MCPWrapper, baseDir string, secrets auth.SecretResolver) error {
 	st, err := store.NewStore(baseDir)
 	if err != nil {
+		return err
+	}
+
+	oauthBroker, err := auth.NewOAuthLoopbackBroker(ctx, nil)
+	if err != nil {
+		_ = st.Close()
 		return err
 	}
 
 	authMgr := auth.NewAuthManager(
 		secrets,
 		auth.WithAuthStatusSink(st),
+		auth.WithOAuthAuthorizationBroker(oauthBroker),
+		auth.WithOAuthRedirectURL(oauthBroker.RedirectURL()),
 	)
 	rt := runtime.NewRuntimeManager(st, authMgr, sdkclient.NewFactory())
 	appr := runtime.NewApprovalManager(5 * time.Minute)
@@ -91,6 +100,7 @@ func InitMCPWrapper(w *MCPWrapper, baseDir string, secrets auth.SecretResolver) 
 
 	w.store = st
 	w.auth = authMgr
+	w.oauthBroker = oauthBroker
 	w.runtime = rt
 	w.approvals = appr
 	w.toolBridge = tb
@@ -276,6 +286,37 @@ func (w *MCPWrapper) InvokeMCPTool(req *spec.InvokeMCPToolRequest) (*spec.Invoke
 	})
 }
 
+func (w *MCPWrapper) ListPendingMCPOAuthAuthorizations(
+	req *spec.ListPendingMCPOAuthAuthorizationsRequest,
+) (*spec.ListPendingMCPOAuthAuthorizationsResponse, error) {
+	return middleware.WithRecoveryResp(func() (*spec.ListPendingMCPOAuthAuthorizationsResponse, error) {
+		body := &spec.ListPendingMCPOAuthAuthorizationsResponseBody{
+			Authorizations: []spec.MCPOAuthAuthorization{},
+		}
+		if w != nil && w.oauthBroker != nil {
+			body.Authorizations = w.oauthBroker.Pending()
+			if body.Authorizations == nil {
+				body.Authorizations = []spec.MCPOAuthAuthorization{}
+			}
+		}
+		return &spec.ListPendingMCPOAuthAuthorizationsResponse{Body: body}, nil
+	})
+}
+
+func (w *MCPWrapper) CancelPendingMCPOAuthAuthorization(
+	req *spec.CancelPendingMCPOAuthAuthorizationRequest,
+) (*spec.CancelPendingMCPOAuthAuthorizationResponse, error) {
+	return middleware.WithRecoveryResp(func() (*spec.CancelPendingMCPOAuthAuthorizationResponse, error) {
+		if req == nil || req.ServerID == "" {
+			return nil, fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
+		}
+		if w != nil && w.oauthBroker != nil {
+			_ = w.oauthBroker.Cancel(req.ServerID)
+		}
+		return &spec.CancelPendingMCPOAuthAuthorizationResponse{}, nil
+	})
+}
+
 func (w *MCPWrapper) close() {
 	if w == nil {
 		return
@@ -286,6 +327,9 @@ func (w *MCPWrapper) close() {
 
 	if w.runtime != nil {
 		_ = w.runtime.Close(ctx)
+	}
+	if w.oauthBroker != nil {
+		_ = w.oauthBroker.Close()
 	}
 	if w.store != nil {
 		_ = w.store.Close()

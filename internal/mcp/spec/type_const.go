@@ -237,3 +237,9 @@ type TimeRange struct {
 	From *time.Time `json:"from,omitempty"`
 	To   *time.Time `json:"to,omitempty"`
 }
+
+type MCPOAuthAuthorization struct {
+	ServerID         MCPServerID `json:"serverID"`
+	AuthorizationURL string      `json:"authorizationURL"`
+	ExpiresAt        string      `json:"expiresAt,omitempty"`
+}

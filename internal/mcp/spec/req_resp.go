@@ -189,3 +189,19 @@ type ResolveMCPApprovalRequest struct {
 type ResolveMCPApprovalResponse struct {
 	Body *MCPApprovalToken
 }
+
+type ListPendingMCPOAuthAuthorizationsRequest struct{}
+
+type ListPendingMCPOAuthAuthorizationsResponseBody struct {
+	Authorizations []MCPOAuthAuthorization `json:"authorizations"`
+}
+
+type ListPendingMCPOAuthAuthorizationsResponse struct {
+	Body *ListPendingMCPOAuthAuthorizationsResponseBody
+}
+
+type CancelPendingMCPOAuthAuthorizationRequest struct {
+	ServerID MCPServerID `path:"serverID" required:"true"`
+}
+
+type CancelPendingMCPOAuthAuthorizationResponse struct{}

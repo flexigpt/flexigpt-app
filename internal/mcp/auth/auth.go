@@ -247,6 +247,13 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 				ClientName:      spec.MCPHostName,
 				SoftwareID:      "flexigpt",
 				SoftwareVersion: spec.MCPHostVersion,
+				// Desktop clients are public clients. Requesting "none" avoids
+				// receiving/storing a dynamically issued client secret. If a server
+				// requires a confidential client, users can configure a pre-registered
+				// client credential ref.
+				TokenEndpointAuthMethod: "none",
+				ResponseTypes:           []string{"code"},
+				GrantTypes:              []string{"authorization_code", "refresh_token"},
 			},
 		}
 	}
@@ -275,9 +282,13 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 				Iss:   res.Iss,
 			}, nil
 		},
-		// Keep OAuth tokens volatile and process-local.
-		// App restart must force reauthorization.
-		RequestRefreshToken: false,
+		// Keep OAuth tokens volatile and process-local, but still request refresh
+		// token capability so token refresh can work correctly during this app
+		// process. Nothing returned by the authorization server is persisted by
+		// FlexiGPT. App restart forces reauthorization.
+		//
+		// The SDK stores the resulting oauth2.TokenSource in memory only.
+		RequestRefreshToken: true,
 		Client:              m.httpClient,
 	})
 	if err != nil {

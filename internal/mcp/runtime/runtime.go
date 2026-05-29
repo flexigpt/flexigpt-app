@@ -16,6 +16,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/store"
 )
 
+const defaultOAuthAuthorizationTimeout = 10 * time.Minute
+
 type ClientSession interface {
 	Close(ctx context.Context) error
 	Ping(ctx context.Context) error
@@ -163,6 +165,12 @@ func (m *RuntimeManager) Connect(
 	}
 	if cfg.Transport == spec.MCPTransportStdio && cfg.Stdio != nil && cfg.Stdio.StartupTimeoutMS > 0 {
 		connectTimeout = time.Duration(cfg.Stdio.StartupTimeoutMS) * time.Millisecond
+	}
+	if cfg.Transport == spec.MCPTransportStreamableHTTP &&
+		cfg.StreamableHTTP != nil &&
+		cfg.StreamableHTTP.AuthMode == spec.MCPHTTPAuthOAuth &&
+		connectTimeout < defaultOAuthAuthorizationTimeout {
+		connectTimeout = defaultOAuthAuthorizationTimeout
 	}
 
 	cctx, cancel := context.WithTimeout(ctx, connectTimeout)

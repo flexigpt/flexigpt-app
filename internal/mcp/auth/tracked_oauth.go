@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -18,7 +19,21 @@ type trackedOAuthHandler struct {
 }
 
 func (h *trackedOAuthHandler) TokenSource(ctx context.Context) (oauth2.TokenSource, error) {
-	return h.inner.TokenSource(ctx)
+	ts, err := h.inner.TokenSource(ctx)
+	if err != nil {
+		h.publish(context.WithoutCancel(ctx), authStatusFromTokenError(h.status, err))
+		return nil, err
+	}
+	if ts == nil {
+		//nolint:nilnil // Ok to return nik when token source is nil.
+		return nil, nil
+	}
+
+	return &trackingTokenSource{
+		source: ts,
+		sink:   h.sink,
+		status: h.status,
+	}, nil
 }
 
 func (h *trackedOAuthHandler) Authorize(
@@ -35,8 +50,28 @@ func (h *trackedOAuthHandler) Authorize(
 	st := h.status
 	st.State = spec.MCPAuthStateAuthorized
 	st.LastError = ""
+
+	if tokenStatus, ok := h.currentTokenStatus(ctx); ok {
+		st = tokenStatus
+	}
 	h.publish(ctx, st)
 	return nil
+}
+
+func (h *trackedOAuthHandler) currentTokenStatus(ctx context.Context) (spec.MCPAuthStatus, bool) {
+	ts, err := h.inner.TokenSource(ctx)
+	if err != nil {
+		return authStatusFromTokenError(h.status, err), true
+	}
+	if ts == nil {
+		return spec.MCPAuthStatus{}, false
+	}
+
+	tok, err := ts.Token()
+	if err != nil {
+		return authStatusFromTokenError(h.status, err), true
+	}
+	return authStatusFromToken(h.status, tok), true
 }
 
 func (h *trackedOAuthHandler) publish(ctx context.Context, st spec.MCPAuthStatus) {
@@ -45,6 +80,81 @@ func (h *trackedOAuthHandler) publish(ctx context.Context, st spec.MCPAuthStatus
 	}
 
 	_ = h.sink.SaveAuthStatus(context.WithoutCancel(ctx), st)
+}
+
+type trackingTokenSource struct {
+	source oauth2.TokenSource
+	sink   AuthStatusSink
+	status spec.MCPAuthStatus
+}
+
+func (s *trackingTokenSource) Token() (*oauth2.Token, error) {
+	tok, err := s.source.Token()
+	if err != nil {
+		if s.sink != nil {
+			_ = s.sink.SaveAuthStatus(context.Background(), authStatusFromTokenError(s.status, err))
+		}
+		return nil, err
+	}
+	return tok, nil
+}
+
+func authStatusFromToken(base spec.MCPAuthStatus, tok *oauth2.Token) spec.MCPAuthStatus {
+	st := base
+	st.State = spec.MCPAuthStateAuthorized
+	st.LastError = ""
+
+	if tok == nil {
+		return st
+	}
+
+	if !tok.Expiry.IsZero() {
+		expiresAt := tok.Expiry.UTC()
+		st.ExpiresAt = &expiresAt
+	}
+	if scopes := scopesFromOAuthToken(tok); len(scopes) > 0 {
+		st.Scopes = scopes
+	}
+
+	return st
+}
+
+func authStatusFromTokenError(base spec.MCPAuthStatus, err error) spec.MCPAuthStatus {
+	st := base
+	st.State = spec.MCPAuthStateError
+	if err != nil {
+		st.LastError = err.Error()
+	}
+
+	var retrieveErr *oauth2.RetrieveError
+	if errors.As(err, &retrieveErr) && retrieveErr.ErrorCode == "invalid_grant" {
+		st.State = spec.MCPAuthStateExpired
+	}
+
+	return st
+}
+
+func scopesFromOAuthToken(tok *oauth2.Token) []string {
+	if tok == nil {
+		return nil
+	}
+
+	switch v := tok.Extra("scope").(type) {
+	case string:
+		return strings.Fields(v)
+	case []string:
+		return append([]string(nil), v...)
+	case []any:
+		out := make([]string, 0, len(v))
+		for _, item := range v {
+			if s, ok := item.(string); ok && strings.TrimSpace(s) != "" {
+				out = append(out, s)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
 }
 
 func authStatusFromHTTPFailure(
