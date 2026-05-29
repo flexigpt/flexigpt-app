@@ -272,14 +272,13 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 			return &mcpAuth.AuthorizationResult{
 				Code:  res.Code,
 				State: res.State,
-				// Iss:   res.Iss, // No such field.
+				Iss:   res.Iss,
 			}, nil
 		},
-		// Token persistence and refresh-token durability should be added when the
-		// frontend OAuth callback flow is wired. Until then, keep SDK token state
-		// in memory only.
-		// RequestRefreshToken: false, // No such field.
-		Client: m.httpClient,
+		// Keep OAuth tokens volatile and process-local.
+		// App restart must force reauthorization.
+		RequestRefreshToken: false,
+		Client:              m.httpClient,
 	})
 	if err != nil {
 		out.Status.State = spec.MCPAuthStateError
