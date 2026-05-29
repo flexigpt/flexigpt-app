@@ -102,7 +102,10 @@ func validateServerConfig(c *spec.MCPServerConfig) error {
 		if c.Stdio != nil {
 			return errors.New("stdio must be empty for streamableHttp transport")
 		}
-		return validateHTTPConfig(c.StreamableHTTP)
+		if err := validateHTTPConfig(c.StreamableHTTP); err != nil {
+			return err
+		}
+		return validateHTTPAuthRef(c)
 	default:
 		return fmt.Errorf("invalid transport %q", c.Transport)
 	}
@@ -243,16 +246,51 @@ func validateNoEnvKeyOverlap(env, secretEnvRefs map[string]string) error {
 		if strings.TrimSpace(k) == "" {
 			return errors.New("stdio.env contains empty key")
 		}
-		seen[k] = "stdio.env"
+		seen[strings.ToLower(strings.TrimSpace(k))] = "stdio.env"
 	}
 	for k := range secretEnvRefs {
 		if strings.TrimSpace(k) == "" {
 			return errors.New("stdio.secretEnvRefs contains empty key")
 		}
-		if prev, ok := seen[k]; ok {
+		key := strings.ToLower(strings.TrimSpace(k))
+		if prev, ok := seen[key]; ok {
 			return fmt.Errorf("%s and stdio.secretEnvRefs both define %q", prev, k)
 		}
 	}
+	return nil
+}
+
+func validateHTTPAuthRef(c *spec.MCPServerConfig) error {
+	if c == nil || c.StreamableHTTP == nil || c.AuthRef == nil {
+		return nil
+	}
+
+	mode := c.StreamableHTTP.AuthMode
+	authMode := spec.MCPHTTPAuthMode(strings.TrimSpace(string(c.AuthRef.AuthMode)))
+	tokenRef := strings.TrimSpace(c.AuthRef.TokenRef)
+	clientCredentialRef := strings.TrimSpace(c.AuthRef.ClientCredentialRef)
+	metadataRef := strings.TrimSpace(c.AuthRef.MetadataRef)
+
+	if tokenRef != "" && mode != spec.MCPHTTPAuthCustomBearer {
+		return errors.New("authRef.tokenRef is only valid when streamableHttp.authMode is customBearer")
+	}
+
+	if mode == spec.MCPHTTPAuthCustomBearer {
+		if tokenRef == "" {
+			return errors.New("authRef.tokenRef is required for customBearer authMode")
+		}
+		if authMode != "" && authMode != mode {
+			return fmt.Errorf("authRef.authMode %q must match streamableHttp.authMode %q", authMode, mode)
+		}
+		if clientCredentialRef != "" || metadataRef != "" {
+			return errors.New(
+				"authRef.clientCredentialRef and authRef.metadataRef must be empty for customBearer authMode",
+			)
+		}
+	} else if authMode == spec.MCPHTTPAuthCustomBearer {
+		return fmt.Errorf("authRef.authMode %q does not match streamableHttp.authMode %q", authMode, mode)
+	}
+
 	return nil
 }
 

@@ -1,22 +1,5 @@
 package spec
 
-type MCPConversationContext struct {
-	Servers           []MCPServerSelection     `json:"servers"`
-	Resources         []MCPResourceRef         `json:"resources,omitempty"`
-	ResourceTemplates []MCPResourceTemplateRef `json:"resourceTemplates,omitempty"`
-	Prompts           []MCPPromptRef           `json:"prompts,omitempty"`
-}
-
-type MCPServerSelection struct {
-	ServerID       MCPServerID `json:"serverID"`
-	SnapshotDigest string      `json:"snapshotDigest,omitempty"`
-
-	ToolExposure  string             `json:"toolExposure"` // none | all | selected
-	SelectedTools []MCPToolSelection `json:"selectedTools,omitempty"`
-
-	IncludeServerInstructions bool `json:"includeServerInstructions,omitempty"`
-}
-
 type MCPToolSelection struct {
 	ServerID         MCPServerID `json:"serverID"`
 	ToolName         string      `json:"toolName"`
@@ -38,6 +21,22 @@ type MCPProviderToolMapping struct {
 	Visibility       []string    `json:"visibility,omitempty"`
 }
 
+type MCPServerSelection struct {
+	ServerID       MCPServerID `json:"serverID"`
+	SnapshotDigest string      `json:"snapshotDigest,omitempty"`
+
+	ToolExposure  string             `json:"toolExposure"` // none | all | selected
+	SelectedTools []MCPToolSelection `json:"selectedTools,omitempty"`
+
+	IncludeServerInstructions bool `json:"includeServerInstructions,omitempty"`
+}
+
+type MCPConversationContext struct {
+	Servers           []MCPServerSelection     `json:"servers"`
+	Resources         []MCPResourceRef         `json:"resources,omitempty"`
+	ResourceTemplates []MCPResourceTemplateRef `json:"resourceTemplates,omitempty"`
+	Prompts           []MCPPromptRef           `json:"prompts,omitempty"`
+}
 type MCPToolCallProvenance struct {
 	ServerID          MCPServerID `json:"serverID"`
 	ServerDisplayName string      `json:"serverDisplayName,omitempty"`

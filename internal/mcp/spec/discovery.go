@@ -32,21 +32,9 @@ type MCPDiscoveryPageToken struct {
 	Index          int         `json:"i"`
 }
 
-type MCPDiscoverySnapshot struct {
-	ServerID MCPServerID `json:"serverID"`
-
-	NegotiatedProtocolVersion string                        `json:"negotiatedProtocolVersion,omitempty"`
-	ServerInfo                *MCPImplementationInfo        `json:"serverInfo,omitempty"`
-	ServerCapabilities        *MCPServerCapabilitiesSummary `json:"serverCapabilities,omitempty"`
-	Instructions              string                        `json:"instructions,omitempty"`
-
-	Tools             []MCPToolCapability      `json:"tools,omitempty"`
-	Resources         []MCPResourceRef         `json:"resources,omitempty"`
-	ResourceTemplates []MCPResourceTemplateRef `json:"resourceTemplates,omitempty"`
-	Prompts           []MCPPromptRef           `json:"prompts,omitempty"`
-
-	Digest   string `json:"digest,omitempty"`
-	SyncedAt string `json:"syncedAt,omitempty"`
+type MCPToolAppInfo struct {
+	ResourceURI string   `json:"resourceUri,omitempty"`
+	Visibility  []string `json:"visibility,omitempty"`
 }
 
 type MCPToolCapability struct {
@@ -75,11 +63,6 @@ type MCPToolCapability struct {
 	Digest  string `json:"digest"`
 	Enabled bool   `json:"enabled"`
 	Stale   bool   `json:"stale,omitempty"`
-}
-
-type MCPToolAppInfo struct {
-	ResourceURI string   `json:"resourceUri,omitempty"`
-	Visibility  []string `json:"visibility,omitempty"`
 }
 
 type MCPResourceRef struct {
@@ -116,4 +99,21 @@ type MCPPromptRef struct {
 	Description string            `json:"description,omitempty"`
 	Arguments   map[string]string `json:"arguments,omitempty"`
 	Digest      string            `json:"digest,omitempty"`
+}
+
+type MCPDiscoverySnapshot struct {
+	ServerID MCPServerID `json:"serverID"`
+
+	NegotiatedProtocolVersion string                        `json:"negotiatedProtocolVersion,omitempty"`
+	ServerInfo                *MCPImplementationInfo        `json:"serverInfo,omitempty"`
+	ServerCapabilities        *MCPServerCapabilitiesSummary `json:"serverCapabilities,omitempty"`
+	Instructions              string                        `json:"instructions,omitempty"`
+
+	Tools             []MCPToolCapability      `json:"tools,omitempty"`
+	Resources         []MCPResourceRef         `json:"resources,omitempty"`
+	ResourceTemplates []MCPResourceTemplateRef `json:"resourceTemplates,omitempty"`
+	Prompts           []MCPPromptRef           `json:"prompts,omitempty"`
+
+	Digest   string `json:"digest,omitempty"`
+	SyncedAt string `json:"syncedAt,omitempty"`
 }

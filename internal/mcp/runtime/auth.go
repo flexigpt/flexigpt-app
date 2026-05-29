@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"strings"
@@ -9,6 +10,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
+
+const maxResolvedHTTPHeaderValueLen = 4096
 
 type SecretResolver interface {
 	ResolveSecret(ctx context.Context, ref string) (string, error)
@@ -82,6 +85,19 @@ func (m *AuthManager) PrepareTransportAuth(
 	}
 
 	mode := httpCfg.AuthMode
+	if cfg.AuthRef != nil {
+		authMode := spec.MCPHTTPAuthMode(strings.TrimSpace(string(cfg.AuthRef.AuthMode)))
+		if authMode != "" && authMode != mode {
+			out.Status.State = spec.MCPAuthStateError
+			out.Status.LastError = fmt.Sprintf(
+				"authRef.authMode %q does not match streamableHttp.authMode %q",
+				authMode,
+				mode,
+			)
+			return out, fmt.Errorf("%w: %s", spec.ErrMCPInvalidRequest, out.Status.LastError)
+		}
+	}
+
 	out.Status.AuthMode = mode
 
 	switch mode {
@@ -115,7 +131,11 @@ func (m *AuthManager) PrepareTransportAuth(
 		out.Status.LastError = "unsupported auth mode"
 		return out, fmt.Errorf("%w: unsupported auth mode %s", spec.ErrMCPInvalidRequest, mode)
 	}
-
+	if err := validateResolvedHTTPHeaders(out.Headers); err != nil {
+		out.Status.State = spec.MCPAuthStateError
+		out.Status.LastError = err.Error()
+		return out, err
+	}
 	return out, nil
 }
 
@@ -124,4 +144,23 @@ func Expired(expiresAt *time.Time) bool {
 		return false
 	}
 	return time.Now().UTC().After(expiresAt.Add(-30 * time.Second))
+}
+
+func validateResolvedHTTPHeaders(headers map[string]string) error {
+	for key, value := range headers {
+		if strings.TrimSpace(key) == "" {
+			return errors.New("resolved HTTP header name cannot be empty")
+		}
+		if strings.ContainsAny(value, "\r\n") {
+			return fmt.Errorf("resolved HTTP header %q contains newline characters", key)
+		}
+		if len(value) > maxResolvedHTTPHeaderValueLen {
+			return fmt.Errorf(
+				"resolved HTTP header %q exceeds maximum length of %d",
+				key,
+				maxResolvedHTTPHeaderValueLen,
+			)
+		}
+	}
+	return nil
 }

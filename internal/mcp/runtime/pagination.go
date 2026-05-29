@@ -15,26 +15,6 @@ const (
 	discoveryPageKindPrompts           = "prompts"
 )
 
-func encodeDiscoveryPageToken(tok spec.MCPDiscoveryPageToken) (string, error) {
-	raw, err := json.Marshal(tok)
-	if err != nil {
-		return "", err
-	}
-	return base64.URLEncoding.EncodeToString(raw), nil
-}
-
-func decodeDiscoveryPageToken(token string) (spec.MCPDiscoveryPageToken, error) {
-	raw, err := base64.URLEncoding.DecodeString(token)
-	if err != nil {
-		return spec.MCPDiscoveryPageToken{}, err
-	}
-	var tok spec.MCPDiscoveryPageToken
-	if err := json.Unmarshal(raw, &tok); err != nil {
-		return spec.MCPDiscoveryPageToken{}, err
-	}
-	return tok, nil
-}
-
 func paginateDiscoveryItems[T any](
 	serverID spec.MCPServerID,
 	snapshotDigest string,
@@ -91,4 +71,24 @@ func paginateDiscoveryItems[T any](
 	}
 
 	return out, next, nil
+}
+
+func encodeDiscoveryPageToken(tok spec.MCPDiscoveryPageToken) (string, error) {
+	raw, err := json.Marshal(tok)
+	if err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(raw), nil
+}
+
+func decodeDiscoveryPageToken(token string) (spec.MCPDiscoveryPageToken, error) {
+	raw, err := base64.URLEncoding.DecodeString(token)
+	if err != nil {
+		return spec.MCPDiscoveryPageToken{}, err
+	}
+	var tok spec.MCPDiscoveryPageToken
+	if err := json.Unmarshal(raw, &tok); err != nil {
+		return spec.MCPDiscoveryPageToken{}, err
+	}
+	return tok, nil
 }

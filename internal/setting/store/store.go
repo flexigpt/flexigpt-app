@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/setting/spec"
 	"github.com/flexigpt/mapstore-go"
@@ -283,6 +284,10 @@ func (s *SettingStore) SetAuthKey(
 	if req == nil || req.Body == nil || req.Type == "" || req.KeyName == "" {
 		return nil, spec.ErrInvalidArgument
 	}
+	t, keyName, err := normalizeAuthKeyRef(req.Type, req.KeyName)
+	if err != nil {
+		return nil, err
+	}
 
 	nonEmptySecret := req.Body.Secret != ""
 
@@ -294,18 +299,19 @@ func (s *SettingStore) SetAuthKey(
 	}
 
 	// Persist secret (encrypted) then sha (plain).
-	secretPath := []string{settingKeyAuthKeys, string(req.Type), string(req.KeyName), settingKeySecret}
+	secretPath := []string{settingKeyAuthKeys, string(t), string(keyName), settingKeySecret}
+
 	if err := s.store.SetKey(secretPath, newAk.Secret); err != nil {
 		return nil, err
 	}
-	shaPath := []string{settingKeyAuthKeys, string(req.Type), string(req.KeyName), settingKeySHA256}
+	shaPath := []string{settingKeyAuthKeys, string(t), string(keyName), settingKeySHA256}
 	if err := s.store.SetKey(shaPath, newAk.SHA256); err != nil {
 		return nil, err
 	}
 	nonEmptyPath := []string{
 		settingKeyAuthKeys,
-		string(req.Type),
-		string(req.KeyName),
+		string(t),
+		string(keyName),
 		settingKeyNonEmpty,
 	}
 	if err := s.store.SetKey(nonEmptyPath, newAk.NonEmpty); err != nil {
@@ -313,8 +319,8 @@ func (s *SettingStore) SetAuthKey(
 	}
 
 	slog.Info("authKey set",
-		"type", req.Type, "keyName", req.KeyName,
-		"builtIn", isBuiltInKey(req.Type, req.KeyName))
+		"type", t, "keyName", keyName,
+		"builtIn", isBuiltInKey(t, keyName))
 	return &spec.SetAuthKeyResponse{}, nil
 }
 
@@ -326,12 +332,16 @@ func (s *SettingStore) DeleteAuthKey(
 	if req == nil || req.Type == "" || req.KeyName == "" {
 		return nil, spec.ErrInvalidArgument
 	}
-	if isBuiltInKey(req.Type, req.KeyName) {
+	t, keyName, err := normalizeAuthKeyRef(req.Type, req.KeyName)
+	if err != nil {
+		return nil, err
+	}
+	if isBuiltInKey(t, keyName) {
 		return nil, spec.ErrBuiltInAuthKeyReadOnly
 	}
 
 	// Delete the key map entirely (secret + sha).
-	keyPath := []string{settingKeyAuthKeys, string(req.Type), string(req.KeyName)}
+	keyPath := []string{settingKeyAuthKeys, string(t), string(keyName)}
 	if err := s.store.DeleteKey(keyPath); err != nil {
 		return nil, err
 	}
@@ -343,12 +353,11 @@ func (s *SettingStore) DeleteAuthKey(
 	}
 
 	if akRaw, ok := raw[settingKeyAuthKeys].(map[string]any); ok {
-		if typRaw, ok := akRaw[string(req.Type)].(map[string]any); ok && len(typRaw) == 0 {
-			_ = s.store.DeleteKey([]string{settingKeyAuthKeys, string(req.Type)})
+		if typRaw, ok := akRaw[string(t)].(map[string]any); ok && len(typRaw) == 0 {
+			_ = s.store.DeleteKey([]string{settingKeyAuthKeys, string(t)})
 		}
 	}
-
-	slog.Info("authKey deleted", "type", req.Type, "keyName", req.KeyName)
+	slog.Info("authKey deleted", "type", t, "keyName", keyName)
 	return &spec.DeleteAuthKeyResponse{}, nil
 }
 
@@ -359,6 +368,10 @@ func (s *SettingStore) GetAuthKey(
 ) (*spec.GetAuthKeyResponse, error) {
 	if req == nil || req.Type == "" || req.KeyName == "" {
 		return nil, spec.ErrInvalidArgument
+	}
+	t, keyName, err := normalizeAuthKeyRef(req.Type, req.KeyName)
+	if err != nil {
+		return nil, err
 	}
 
 	raw, err := s.store.GetAll(false)
@@ -371,11 +384,11 @@ func (s *SettingStore) GetAuthKey(
 		return nil, err
 	}
 
-	typData, ok := schema.AuthKeys[req.Type]
+	typData, ok := schema.AuthKeys[t]
 	if !ok {
 		return nil, spec.ErrAuthKeyNotFound
 	}
-	ak, ok := typData[req.KeyName]
+	ak, ok := typData[keyName]
 	if !ok {
 		return nil, spec.ErrAuthKeyNotFound
 	}
@@ -467,6 +480,17 @@ func ensureAuthKeyNamespaces(schema *spec.SettingsSchema) {
 	if _, ok := schema.AuthKeys[spec.AuthKeyTypeMCP]; !ok {
 		schema.AuthKeys[spec.AuthKeyTypeMCP] = map[spec.AuthKeyName]spec.AuthKey{}
 	}
+}
+
+func normalizeAuthKeyRef(t spec.AuthKeyType, name spec.AuthKeyName) (spec.AuthKeyType, spec.AuthKeyName, error) {
+	t = spec.AuthKeyType(strings.TrimSpace(string(t)))
+	name = spec.AuthKeyName(strings.TrimSpace(string(name)))
+
+	if t == "" || name == "" {
+		return "", "", spec.ErrInvalidArgument
+	}
+
+	return t, name, nil
 }
 
 // computeSHA returns the hex SHA-256 of the given string.

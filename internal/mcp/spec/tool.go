@@ -23,6 +23,10 @@ type InvokeMCPToolRequest struct {
 	Body *InvokeMCPToolRequestBody
 }
 
+type MCPToolAppRenderInfo struct {
+	ResourceURI string `json:"resourceUri,omitempty"`
+	MimeType    string `json:"mimeType,omitempty"`
+}
 type InvokeMCPToolResponseBody struct {
 	ServerID         MCPServerID `json:"serverID"`
 	ToolName         string      `json:"toolName"`
@@ -38,9 +42,4 @@ type InvokeMCPToolResponseBody struct {
 
 type InvokeMCPToolResponse struct {
 	Body *InvokeMCPToolResponseBody
-}
-
-type MCPToolAppRenderInfo struct {
-	ResourceURI string `json:"resourceUri,omitempty"`
-	MimeType    string `json:"mimeType,omitempty"`
 }

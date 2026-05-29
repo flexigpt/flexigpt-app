@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
@@ -38,6 +39,7 @@ func (r *settingSecretResolver) ResolveSecret(
 	if r == nil || r.store == nil {
 		return "", errors.New("secret resolver is not configured")
 	}
+	keyName = strings.TrimSpace(keyName)
 	if keyName == "" {
 		return "", errors.New("invalid secret ref")
 	}

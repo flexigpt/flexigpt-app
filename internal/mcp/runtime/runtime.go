@@ -14,15 +14,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/store"
 )
 
-type ClientFactory interface {
-	Connect(
-		ctx context.Context,
-		cfg spec.MCPServerConfig,
-		resolved ResolvedTransportAuth,
-		events ClientNotificationSink,
-	) (ClientSession, error)
-}
-
 type ClientSession interface {
 	Close(ctx context.Context) error
 	Ping(ctx context.Context) error
@@ -37,6 +28,14 @@ type ClientSession interface {
 	ReadResource(ctx context.Context, uri string) (*spec.MCPReadResourceResponseBody, error)
 	GetPrompt(ctx context.Context, name string, args map[string]string) (*spec.MCPGetPromptResponseBody, error)
 	Complete(ctx context.Context, req spec.MCPCompleteArgumentRequestBody) (*spec.MCPCompletionResult, error)
+}
+type ClientFactory interface {
+	Connect(
+		ctx context.Context,
+		cfg spec.MCPServerConfig,
+		resolved ResolvedTransportAuth,
+		events ClientNotificationSink,
+	) (ClientSession, error)
 }
 
 type sessionState struct {
@@ -717,15 +716,6 @@ func (m *RuntimeManager) readyClient(
 	return nil, cfg, fmt.Errorf("%w: server %s not connected", spec.ErrMCPRuntimeNotReady, serverID)
 }
 
-func (m *RuntimeManager) getOrCreateLocked(id spec.MCPServerID) *sessionState {
-	st := m.sessions[id]
-	if st == nil {
-		st = &sessionState{serverID: id, status: spec.MCPServerStatusDisconnected}
-		m.sessions[id] = st
-	}
-	return st
-}
-
 func (m *RuntimeManager) setError(id spec.MCPServerID, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -747,6 +737,15 @@ func (m *RuntimeManager) setErrorIfCurrent(id spec.MCPServerID, generation uint6
 	if err != nil {
 		st.lastError = err.Error()
 	}
+}
+
+func (m *RuntimeManager) getOrCreateLocked(id spec.MCPServerID) *sessionState {
+	st := m.sessions[id]
+	if st == nil {
+		st = &sessionState{serverID: id, status: spec.MCPServerStatusDisconnected}
+		m.sessions[id] = st
+	}
+	return st
 }
 
 func (m *RuntimeManager) bumpGenerationLocked(id spec.MCPServerID) uint64 {

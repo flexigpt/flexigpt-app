@@ -158,6 +158,21 @@ const (
 	MCPContentTypeResource     MCPContentType = "resource"
 )
 
+type MCPResourceContents struct {
+	URI      string         `json:"uri"`
+	MIMEType string         `json:"mimeType,omitempty"`
+	Text     string         `json:"text,omitempty"`
+	Blob     []byte         `json:"blob,omitempty"`
+	Meta     map[string]any `json:"_meta,omitempty"`
+}
+
+type MCPIcon struct {
+	Source   string   `json:"src"`
+	MIMEType string   `json:"mimeType,omitempty"`
+	Sizes    []string `json:"sizes,omitempty"`
+	Theme    string   `json:"theme,omitempty"`
+}
+
 type MCPContent struct {
 	Type MCPContentType `json:"type"`
 
@@ -178,14 +193,6 @@ type MCPContent struct {
 	Icons       []MCPIcon      `json:"icons,omitempty"`
 }
 
-type MCPResourceContents struct {
-	URI      string         `json:"uri"`
-	MIMEType string         `json:"mimeType,omitempty"`
-	Text     string         `json:"text,omitempty"`
-	Blob     []byte         `json:"blob,omitempty"`
-	Meta     map[string]any `json:"_meta,omitempty"`
-}
-
 type MCPPromptMessage struct {
 	Role    string     `json:"role"`
 	Content MCPContent `json:"content"`
@@ -197,13 +204,6 @@ type MCPToolAnnotations struct {
 	OpenWorldHint   *bool  `json:"openWorldHint,omitempty"`
 	ReadOnlyHint    bool   `json:"readOnlyHint"`
 	Title           string `json:"title,omitempty"`
-}
-
-type MCPIcon struct {
-	Source   string   `json:"src"`
-	MIMEType string   `json:"mimeType,omitempty"`
-	Sizes    []string `json:"sizes,omitempty"`
-	Theme    string   `json:"theme,omitempty"`
 }
 
 type MCPImplementationInfo struct {
