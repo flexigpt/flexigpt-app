@@ -37,9 +37,9 @@ func ParseMCPSecretRef(raw string) (spec.MCPSecretRef, error) {
 	}
 
 	ref := spec.MCPSecretRef{
-		ServerID: wire.ServerID,
-		Kind:     wire.Kind,
-		Slot:     wire.Slot,
+		ServerID: spec.MCPServerID(strings.TrimSpace(string(wire.ServerID))),
+		Kind:     normalizeSecretKind(wire.Kind),
+		Slot:     normalizeSecretSlot(wire.Slot),
 	}
 	if err := validateSecret(ref); err != nil {
 		return spec.MCPSecretRef{}, err
@@ -52,6 +52,9 @@ func ValidateMCPSecretRef(raw string, serverID spec.MCPServerID, kind spec.MCPSe
 	if err != nil {
 		return err
 	}
+	serverID = spec.MCPServerID(strings.TrimSpace(string(serverID)))
+	kind = normalizeSecretKind(kind)
+	slot = normalizeSecretSlot(slot)
 	if ref.ServerID != serverID {
 		return fmt.Errorf("secret ref serverID %q does not match config serverID %q", ref.ServerID, serverID)
 	}
@@ -113,4 +116,12 @@ func validateSecret(r spec.MCPSecretRef) error {
 		return errors.New("secret ref slot is empty")
 	}
 	return nil
+}
+
+func normalizeSecretKind(kind spec.MCPSecretKind) spec.MCPSecretKind {
+	return spec.MCPSecretKind(strings.TrimSpace(string(kind)))
+}
+
+func normalizeSecretSlot(slot string) string {
+	return strings.ToLower(strings.TrimSpace(slot))
 }

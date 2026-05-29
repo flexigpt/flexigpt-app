@@ -181,6 +181,7 @@ export function EditorContextBar({ context, assistantPreset, systemPrompt }: Edi
 
 			{context.verbosityEnabled && (
 				<OutputVerbosityDropdown
+					sdkType={context.selectedModel.providerSDKType}
 					verbosity={context.selectedModel.outputParam?.verbosity}
 					setVerbosity={context.setOutputVerbosity}
 					disabled={!context.verbosityEnabled}

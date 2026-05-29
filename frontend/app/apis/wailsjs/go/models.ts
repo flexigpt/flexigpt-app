@@ -2218,6 +2218,150 @@ export namespace spec {
 		}
 	}
 	
+	export class ConnectMCPServerRequest {
+	    ServerID: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ConnectMCPServerRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ServerID = source["ServerID"];
+	    }
+	}
+	export class MCPServerCapabilitiesSummary {
+	    tools?: boolean;
+	    toolsListChanged?: boolean;
+	    resources?: boolean;
+	    resourcesSubscribe?: boolean;
+	    resourcesListChanged?: boolean;
+	    prompts?: boolean;
+	    promptsListChanged?: boolean;
+	    logging?: boolean;
+	    completions?: boolean;
+	    experimental?: Record<string, any>;
+	    extensions?: Record<string, any>;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPServerCapabilitiesSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.tools = source["tools"];
+	        this.toolsListChanged = source["toolsListChanged"];
+	        this.resources = source["resources"];
+	        this.resourcesSubscribe = source["resourcesSubscribe"];
+	        this.resourcesListChanged = source["resourcesListChanged"];
+	        this.prompts = source["prompts"];
+	        this.promptsListChanged = source["promptsListChanged"];
+	        this.logging = source["logging"];
+	        this.completions = source["completions"];
+	        this.experimental = source["experimental"];
+	        this.extensions = source["extensions"];
+	    }
+	}
+	export class MCPImplementationInfo {
+	    name?: string;
+	    version?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPImplementationInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.version = source["version"];
+	    }
+	}
+	export class MCPServerRuntimeSnapshot {
+	    serverID: string;
+	    status: string;
+	    negotiatedProtocolVersion?: string;
+	    serverInfo?: MCPImplementationInfo;
+	    serverCapabilities?: MCPServerCapabilitiesSummary;
+	    instructions?: string;
+	    lastError?: string;
+	    lastConnectedAt?: string;
+	    lastSyncedAt?: string;
+	    toolCount: number;
+	    resourceCount: number;
+	    resourceTemplateCount: number;
+	    promptCount: number;
+	    snapshotDigest?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPServerRuntimeSnapshot(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.serverID = source["serverID"];
+	        this.status = source["status"];
+	        this.negotiatedProtocolVersion = source["negotiatedProtocolVersion"];
+	        this.serverInfo = this.convertValues(source["serverInfo"], MCPImplementationInfo);
+	        this.serverCapabilities = this.convertValues(source["serverCapabilities"], MCPServerCapabilitiesSummary);
+	        this.instructions = source["instructions"];
+	        this.lastError = source["lastError"];
+	        this.lastConnectedAt = source["lastConnectedAt"];
+	        this.lastSyncedAt = source["lastSyncedAt"];
+	        this.toolCount = source["toolCount"];
+	        this.resourceCount = source["resourceCount"];
+	        this.resourceTemplateCount = source["resourceTemplateCount"];
+	        this.promptCount = source["promptCount"];
+	        this.snapshotDigest = source["snapshotDigest"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ConnectMCPServerResponse {
+	    Body?: MCPServerRuntimeSnapshot;
+	
+	    static createFrom(source: any = {}) {
+	        return new ConnectMCPServerResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], MCPServerRuntimeSnapshot);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	
 	
@@ -2552,6 +2696,30 @@ export namespace spec {
 	
 	    }
 	}
+	export class DeleteMCPServerRequest {
+	    ServerID: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeleteMCPServerRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ServerID = source["ServerID"];
+	    }
+	}
+	export class DeleteMCPServerResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new DeleteMCPServerResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
 	export class DeleteModelPresetRequest {
 	    ProviderName: string;
 	    ModelPresetID: string;
@@ -2756,7 +2924,181 @@ export namespace spec {
 	
 	    }
 	}
+	export class DisconnectMCPServerRequest {
+	    ServerID: string;
 	
+	    static createFrom(source: any = {}) {
+	        return new DisconnectMCPServerRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ServerID = source["ServerID"];
+	    }
+	}
+	export class DisconnectMCPServerResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new DisconnectMCPServerResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
+	
+	export class InvokeMCPToolRequestBody {
+	    source: string;
+	    serverID: string;
+	    toolName: string;
+	    providerToolName?: string;
+	    toolDigest?: string;
+	    arguments?: Record<string, any>;
+	    approvalToken?: string;
+	    conversationID?: string;
+	    messageID?: string;
+	    toolUseID?: string;
+	    appInstanceID?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new InvokeMCPToolRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.source = source["source"];
+	        this.serverID = source["serverID"];
+	        this.toolName = source["toolName"];
+	        this.providerToolName = source["providerToolName"];
+	        this.toolDigest = source["toolDigest"];
+	        this.arguments = source["arguments"];
+	        this.approvalToken = source["approvalToken"];
+	        this.conversationID = source["conversationID"];
+	        this.messageID = source["messageID"];
+	        this.toolUseID = source["toolUseID"];
+	        this.appInstanceID = source["appInstanceID"];
+	    }
+	}
+	export class EvaluateMCPToolCallRequest {
+	    Body?: InvokeMCPToolRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new EvaluateMCPToolCallRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], InvokeMCPToolRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class MCPApprovalSummary {
+	    serverID: string;
+	    serverDisplayName?: string;
+	    toolName: string;
+	    toolDigest?: string;
+	    risk: string;
+	    arguments?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPApprovalSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.serverID = source["serverID"];
+	        this.serverDisplayName = source["serverDisplayName"];
+	        this.toolName = source["toolName"];
+	        this.toolDigest = source["toolDigest"];
+	        this.risk = source["risk"];
+	        this.arguments = source["arguments"];
+	    }
+	}
+	export class MCPApprovalEvaluation {
+	    decision: string;
+	    reason?: string;
+	    approvalID?: string;
+	    summary?: MCPApprovalSummary;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPApprovalEvaluation(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.decision = source["decision"];
+	        this.reason = source["reason"];
+	        this.approvalID = source["approvalID"];
+	        this.summary = this.convertValues(source["summary"], MCPApprovalSummary);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class EvaluateMCPToolCallResponse {
+	    Body?: MCPApprovalEvaluation;
+	
+	    static createFrom(source: any = {}) {
+	        return new EvaluateMCPToolCallResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], MCPApprovalEvaluation);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	export class GetAssistantPresetRequest {
 	    BundleID: string;
@@ -2966,6 +3308,273 @@ export namespace spec {
 		}
 	}
 	
+	export class GetMCPServerRequest {
+	    ServerID: string;
+	    IncludeDeleted: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new GetMCPServerRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ServerID = source["ServerID"];
+	        this.IncludeDeleted = source["IncludeDeleted"];
+	    }
+	}
+	export class MCPAuthRef {
+	    authMode: string;
+	    tokenRef?: string;
+	    clientCredentialRef?: string;
+	    metadataRef?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPAuthRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.authMode = source["authMode"];
+	        this.tokenRef = source["tokenRef"];
+	        this.clientCredentialRef = source["clientCredentialRef"];
+	        this.metadataRef = source["metadataRef"];
+	    }
+	}
+	export class MCPAppsPolicy {
+	    enabled: boolean;
+	    allowAppInitiatedToolCalls: boolean;
+	    requireApprovalForOpenLink: boolean;
+	    requireApprovalForContextUpdates: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPAppsPolicy(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	        this.allowAppInitiatedToolCalls = source["allowAppInitiatedToolCalls"];
+	        this.requireApprovalForOpenLink = source["requireApprovalForOpenLink"];
+	        this.requireApprovalForContextUpdates = source["requireApprovalForContextUpdates"];
+	    }
+	}
+	export class MCPToolPolicyOverride {
+	    toolName: string;
+	    approvalRule?: string;
+	    executionMode?: string;
+	    allowStaleDigest?: boolean;
+	    expectedDigest?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPToolPolicyOverride(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.toolName = source["toolName"];
+	        this.approvalRule = source["approvalRule"];
+	        this.executionMode = source["executionMode"];
+	        this.allowStaleDigest = source["allowStaleDigest"];
+	        this.expectedDigest = source["expectedDigest"];
+	    }
+	}
+	export class MCPServerPolicy {
+	    defaultApprovalRule: string;
+	    defaultExecutionMode: string;
+	    requireApprovalForUnknownRisk: boolean;
+	    requireApprovalForWrite: boolean;
+	    requireApprovalForDestructive: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPServerPolicy(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.defaultApprovalRule = source["defaultApprovalRule"];
+	        this.defaultExecutionMode = source["defaultExecutionMode"];
+	        this.requireApprovalForUnknownRisk = source["requireApprovalForUnknownRisk"];
+	        this.requireApprovalForWrite = source["requireApprovalForWrite"];
+	        this.requireApprovalForDestructive = source["requireApprovalForDestructive"];
+	    }
+	}
+	export class MCPStreamableHTTPConfig {
+	    url: string;
+	    timeoutMS?: number;
+	    customHeaders?: Record<string, string>;
+	    secretHeaderRefs?: Record<string, string>;
+	    authMode: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPStreamableHTTPConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.url = source["url"];
+	        this.timeoutMS = source["timeoutMS"];
+	        this.customHeaders = source["customHeaders"];
+	        this.secretHeaderRefs = source["secretHeaderRefs"];
+	        this.authMode = source["authMode"];
+	    }
+	}
+	export class MCPStdioConfig {
+	    command: string;
+	    args?: string[];
+	    workingDir?: string;
+	    env?: Record<string, string>;
+	    secretEnvRefs?: Record<string, string>;
+	    startupTimeoutMS?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPStdioConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.command = source["command"];
+	        this.args = source["args"];
+	        this.workingDir = source["workingDir"];
+	        this.env = source["env"];
+	        this.secretEnvRefs = source["secretEnvRefs"];
+	        this.startupTimeoutMS = source["startupTimeoutMS"];
+	    }
+	}
+	export class MCPServerConfig {
+	    schemaVersion: string;
+	    id: string;
+	    displayName: string;
+	    enabled: boolean;
+	    transport: string;
+	    stdio?: MCPStdioConfig;
+	    streamableHttp?: MCPStreamableHTTPConfig;
+	    availability: string;
+	    trustLevel: string;
+	    defaultPolicy: MCPServerPolicy;
+	    toolPolicies?: Record<string, MCPToolPolicyOverride>;
+	    appsPolicy?: MCPAppsPolicy;
+	    authRef?: MCPAuthRef;
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    modifiedAt: any;
+	    // Go type: time
+	    softDeletedAt?: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPServerConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.schemaVersion = source["schemaVersion"];
+	        this.id = source["id"];
+	        this.displayName = source["displayName"];
+	        this.enabled = source["enabled"];
+	        this.transport = source["transport"];
+	        this.stdio = this.convertValues(source["stdio"], MCPStdioConfig);
+	        this.streamableHttp = this.convertValues(source["streamableHttp"], MCPStreamableHTTPConfig);
+	        this.availability = source["availability"];
+	        this.trustLevel = source["trustLevel"];
+	        this.defaultPolicy = this.convertValues(source["defaultPolicy"], MCPServerPolicy);
+	        this.toolPolicies = this.convertValues(source["toolPolicies"], MCPToolPolicyOverride, true);
+	        this.appsPolicy = this.convertValues(source["appsPolicy"], MCPAppsPolicy);
+	        this.authRef = this.convertValues(source["authRef"], MCPAuthRef);
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
+	        this.softDeletedAt = this.convertValues(source["softDeletedAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class GetMCPServerResponse {
+	    Body?: MCPServerConfig;
+	
+	    static createFrom(source: any = {}) {
+	        return new GetMCPServerResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], MCPServerConfig);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class GetMCPServerStatusRequest {
+	    ServerID: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new GetMCPServerStatusRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ServerID = source["ServerID"];
+	    }
+	}
+	export class GetMCPServerStatusResponse {
+	    Body?: MCPServerRuntimeSnapshot;
+	
+	    static createFrom(source: any = {}) {
+	        return new GetMCPServerStatusResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], MCPServerRuntimeSnapshot);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class GetModelPresetRequest {
 	    ProviderName: string;
 	    ModelPresetID: string;
@@ -3975,6 +4584,246 @@ export namespace spec {
 	        this.secrets = source["secrets"];
 	    }
 	}
+	export class InvokeMCPToolRequest {
+	    Body?: InvokeMCPToolRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new InvokeMCPToolRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], InvokeMCPToolRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class MCPToolAppRenderInfo {
+	    resourceUri?: string;
+	    mimeType?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPToolAppRenderInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.resourceUri = source["resourceUri"];
+	        this.mimeType = source["mimeType"];
+	    }
+	}
+	export class MCPToolCallProvenance {
+	    serverID: string;
+	    serverDisplayName?: string;
+	    toolName: string;
+	    providerToolName: string;
+	    toolDigest?: string;
+	    toolUseID?: string;
+	    approvalID?: string;
+	    appResourceUri?: string;
+	    appInstanceID?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPToolCallProvenance(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.serverID = source["serverID"];
+	        this.serverDisplayName = source["serverDisplayName"];
+	        this.toolName = source["toolName"];
+	        this.providerToolName = source["providerToolName"];
+	        this.toolDigest = source["toolDigest"];
+	        this.toolUseID = source["toolUseID"];
+	        this.approvalID = source["approvalID"];
+	        this.appResourceUri = source["appResourceUri"];
+	        this.appInstanceID = source["appInstanceID"];
+	    }
+	}
+	export class MCPIcon {
+	    src: string;
+	    mimeType?: string;
+	    sizes?: string[];
+	    theme?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPIcon(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.src = source["src"];
+	        this.mimeType = source["mimeType"];
+	        this.sizes = source["sizes"];
+	        this.theme = source["theme"];
+	    }
+	}
+	export class MCPResourceContents {
+	    uri: string;
+	    mimeType?: string;
+	    text?: string;
+	    blob?: number[];
+	    _meta?: Record<string, any>;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPResourceContents(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.uri = source["uri"];
+	        this.mimeType = source["mimeType"];
+	        this.text = source["text"];
+	        this.blob = source["blob"];
+	        this._meta = source["_meta"];
+	    }
+	}
+	export class MCPContent {
+	    type: string;
+	    text?: string;
+	    data?: number[];
+	    mimeType?: string;
+	    uri?: string;
+	    name?: string;
+	    title?: string;
+	    description?: string;
+	    size?: number;
+	    resource?: MCPResourceContents;
+	    annotations?: Record<string, any>;
+	    _meta?: Record<string, any>;
+	    icons?: MCPIcon[];
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPContent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.text = source["text"];
+	        this.data = source["data"];
+	        this.mimeType = source["mimeType"];
+	        this.uri = source["uri"];
+	        this.name = source["name"];
+	        this.title = source["title"];
+	        this.description = source["description"];
+	        this.size = source["size"];
+	        this.resource = this.convertValues(source["resource"], MCPResourceContents);
+	        this.annotations = source["annotations"];
+	        this._meta = source["_meta"];
+	        this.icons = this.convertValues(source["icons"], MCPIcon);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class InvokeMCPToolResponseBody {
+	    serverID: string;
+	    toolName: string;
+	    providerToolName?: string;
+	    content?: MCPContent[];
+	    structuredContent?: any;
+	    isError?: boolean;
+	    provenance: MCPToolCallProvenance;
+	    app?: MCPToolAppRenderInfo;
+	
+	    static createFrom(source: any = {}) {
+	        return new InvokeMCPToolResponseBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.serverID = source["serverID"];
+	        this.toolName = source["toolName"];
+	        this.providerToolName = source["providerToolName"];
+	        this.content = this.convertValues(source["content"], MCPContent);
+	        this.structuredContent = source["structuredContent"];
+	        this.isError = source["isError"];
+	        this.provenance = this.convertValues(source["provenance"], MCPToolCallProvenance);
+	        this.app = this.convertValues(source["app"], MCPToolAppRenderInfo);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class InvokeMCPToolResponse {
+	    Body?: InvokeMCPToolResponseBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new InvokeMCPToolResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], InvokeMCPToolResponseBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class InvokeSkillToolRequestBody {
 	    sessionID: string;
 	    toolName: string;
@@ -4532,6 +5381,585 @@ export namespace spec {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], ListConversationsResponseBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class ListMCPServerPromptsRequest {
+	    ServerID: string;
+	    PageSize: number;
+	    PageToken: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListMCPServerPromptsRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ServerID = source["ServerID"];
+	        this.PageSize = source["PageSize"];
+	        this.PageToken = source["PageToken"];
+	    }
+	}
+	export class MCPPromptRef {
+	    serverID: string;
+	    promptName: string;
+	    title?: string;
+	    displayName: string;
+	    description?: string;
+	    arguments?: Record<string, string>;
+	    digest?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPPromptRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.serverID = source["serverID"];
+	        this.promptName = source["promptName"];
+	        this.title = source["title"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.arguments = source["arguments"];
+	        this.digest = source["digest"];
+	    }
+	}
+	export class ListMCPServerPromptsResponseBody {
+	    prompts: MCPPromptRef[];
+	    nextPageToken?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListMCPServerPromptsResponseBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.prompts = this.convertValues(source["prompts"], MCPPromptRef);
+	        this.nextPageToken = source["nextPageToken"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ListMCPServerPromptsResponse {
+	    Body?: ListMCPServerPromptsResponseBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListMCPServerPromptsResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], ListMCPServerPromptsResponseBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class ListMCPServerResourceTemplatesRequest {
+	    ServerID: string;
+	    PageSize: number;
+	    PageToken: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListMCPServerResourceTemplatesRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ServerID = source["ServerID"];
+	        this.PageSize = source["PageSize"];
+	        this.PageToken = source["PageToken"];
+	    }
+	}
+	export class MCPResourceTemplateRef {
+	    serverID: string;
+	    uriTemplate: string;
+	    name?: string;
+	    title?: string;
+	    displayName: string;
+	    description?: string;
+	    mimeType?: string;
+	    arguments?: Record<string, string>;
+	    annotations?: Record<string, any>;
+	    digest?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPResourceTemplateRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.serverID = source["serverID"];
+	        this.uriTemplate = source["uriTemplate"];
+	        this.name = source["name"];
+	        this.title = source["title"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.mimeType = source["mimeType"];
+	        this.arguments = source["arguments"];
+	        this.annotations = source["annotations"];
+	        this.digest = source["digest"];
+	    }
+	}
+	export class ListMCPServerResourceTemplatesResponseBody {
+	    resourceTemplates: MCPResourceTemplateRef[];
+	    nextPageToken?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListMCPServerResourceTemplatesResponseBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.resourceTemplates = this.convertValues(source["resourceTemplates"], MCPResourceTemplateRef);
+	        this.nextPageToken = source["nextPageToken"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ListMCPServerResourceTemplatesResponse {
+	    Body?: ListMCPServerResourceTemplatesResponseBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListMCPServerResourceTemplatesResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], ListMCPServerResourceTemplatesResponseBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class ListMCPServerResourcesRequest {
+	    ServerID: string;
+	    PageSize: number;
+	    PageToken: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListMCPServerResourcesRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ServerID = source["ServerID"];
+	        this.PageSize = source["PageSize"];
+	        this.PageToken = source["PageToken"];
+	    }
+	}
+	export class MCPResourceRef {
+	    serverID: string;
+	    uri: string;
+	    name?: string;
+	    title?: string;
+	    displayName: string;
+	    description?: string;
+	    mimeType?: string;
+	    size?: number;
+	    annotations?: Record<string, any>;
+	    digest?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPResourceRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.serverID = source["serverID"];
+	        this.uri = source["uri"];
+	        this.name = source["name"];
+	        this.title = source["title"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.mimeType = source["mimeType"];
+	        this.size = source["size"];
+	        this.annotations = source["annotations"];
+	        this.digest = source["digest"];
+	    }
+	}
+	export class ListMCPServerResourcesResponseBody {
+	    resources: MCPResourceRef[];
+	    nextPageToken?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListMCPServerResourcesResponseBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.resources = this.convertValues(source["resources"], MCPResourceRef);
+	        this.nextPageToken = source["nextPageToken"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ListMCPServerResourcesResponse {
+	    Body?: ListMCPServerResourcesResponseBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListMCPServerResourcesResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], ListMCPServerResourcesResponseBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class ListMCPServerToolsRequest {
+	    ServerID: string;
+	    PageSize: number;
+	    PageToken: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListMCPServerToolsRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ServerID = source["ServerID"];
+	        this.PageSize = source["PageSize"];
+	        this.PageToken = source["PageToken"];
+	    }
+	}
+	export class MCPToolAppInfo {
+	    resourceUri?: string;
+	    visibility?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPToolAppInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.resourceUri = source["resourceUri"];
+	        this.visibility = source["visibility"];
+	    }
+	}
+	export class MCPToolAnnotations {
+	    destructiveHint?: boolean;
+	    idempotentHint: boolean;
+	    openWorldHint?: boolean;
+	    readOnlyHint: boolean;
+	    title?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPToolAnnotations(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.destructiveHint = source["destructiveHint"];
+	        this.idempotentHint = source["idempotentHint"];
+	        this.openWorldHint = source["openWorldHint"];
+	        this.readOnlyHint = source["readOnlyHint"];
+	        this.title = source["title"];
+	    }
+	}
+	export class MCPToolCapability {
+	    serverID: string;
+	    toolName: string;
+	    providerToolName: string;
+	    choiceID: string;
+	    title?: string;
+	    displayName: string;
+	    description?: string;
+	    inputSchema?: Record<string, any>;
+	    outputSchema?: Record<string, any>;
+	    annotations?: MCPToolAnnotations;
+	    inferredRisk: string;
+	    approvalRule: string;
+	    executionMode: string;
+	    taskSupport: string;
+	    app?: MCPToolAppInfo;
+	    digest: string;
+	    enabled: boolean;
+	    stale?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPToolCapability(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.serverID = source["serverID"];
+	        this.toolName = source["toolName"];
+	        this.providerToolName = source["providerToolName"];
+	        this.choiceID = source["choiceID"];
+	        this.title = source["title"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.inputSchema = source["inputSchema"];
+	        this.outputSchema = source["outputSchema"];
+	        this.annotations = this.convertValues(source["annotations"], MCPToolAnnotations);
+	        this.inferredRisk = source["inferredRisk"];
+	        this.approvalRule = source["approvalRule"];
+	        this.executionMode = source["executionMode"];
+	        this.taskSupport = source["taskSupport"];
+	        this.app = this.convertValues(source["app"], MCPToolAppInfo);
+	        this.digest = source["digest"];
+	        this.enabled = source["enabled"];
+	        this.stale = source["stale"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ListMCPServerToolsResponseBody {
+	    tools: MCPToolCapability[];
+	    nextPageToken?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListMCPServerToolsResponseBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.tools = this.convertValues(source["tools"], MCPToolCapability);
+	        this.nextPageToken = source["nextPageToken"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ListMCPServerToolsResponse {
+	    Body?: ListMCPServerToolsResponseBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListMCPServerToolsResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], ListMCPServerToolsResponseBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class ListMCPServersRequest {
+	    ServerIDs: string[];
+	    Enabled?: boolean;
+	    PageSize: number;
+	    PageToken: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListMCPServersRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ServerIDs = source["ServerIDs"];
+	        this.Enabled = source["Enabled"];
+	        this.PageSize = source["PageSize"];
+	        this.PageToken = source["PageToken"];
+	    }
+	}
+	export class ListMCPServersResponseBody {
+	    servers: MCPServerConfig[];
+	    nextPageToken?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListMCPServersResponseBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.servers = this.convertValues(source["servers"], MCPServerConfig);
+	        this.nextPageToken = source["nextPageToken"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ListMCPServersResponse {
+	    Body?: ListMCPServersResponseBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListMCPServersResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], ListMCPServersResponseBody);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -5553,6 +6981,371 @@ export namespace spec {
 	
 	
 	
+	export class MCPApprovalToken {
+	    approvalID: string;
+	    token: string;
+	    expiresAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPApprovalToken(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.approvalID = source["approvalID"];
+	        this.token = source["token"];
+	        this.expiresAt = source["expiresAt"];
+	    }
+	}
+	
+	
+	export class MCPCompleteArgumentRequestBody {
+	    serverID: string;
+	    refType: string;
+	    name: string;
+	    argumentName: string;
+	    argumentValue?: string;
+	    context?: Record<string, string>;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPCompleteArgumentRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.serverID = source["serverID"];
+	        this.refType = source["refType"];
+	        this.name = source["name"];
+	        this.argumentName = source["argumentName"];
+	        this.argumentValue = source["argumentValue"];
+	        this.context = source["context"];
+	    }
+	}
+	export class MCPCompleteArgumentRequest {
+	    Body?: MCPCompleteArgumentRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPCompleteArgumentRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], MCPCompleteArgumentRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class MCPCompletionResult {
+	    values?: string[];
+	    total?: number;
+	    hasMore?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPCompletionResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.values = source["values"];
+	        this.total = source["total"];
+	        this.hasMore = source["hasMore"];
+	    }
+	}
+	
+	export class MCPGetPromptRequestBody {
+	    serverID: string;
+	    promptName: string;
+	    arguments?: Record<string, string>;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPGetPromptRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.serverID = source["serverID"];
+	        this.promptName = source["promptName"];
+	        this.arguments = source["arguments"];
+	    }
+	}
+	export class MCPGetPromptRequest {
+	    Body?: MCPGetPromptRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPGetPromptRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], MCPGetPromptRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class MCPPromptMessage {
+	    role: string;
+	    content: MCPContent;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPPromptMessage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.role = source["role"];
+	        this.content = this.convertValues(source["content"], MCPContent);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class MCPGetPromptResponseBody {
+	    serverID: string;
+	    promptName: string;
+	    description?: string;
+	    messages?: MCPPromptMessage[];
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPGetPromptResponseBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.serverID = source["serverID"];
+	        this.promptName = source["promptName"];
+	        this.description = source["description"];
+	        this.messages = this.convertValues(source["messages"], MCPPromptMessage);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class MCPGetPromptResponse {
+	    Body?: MCPGetPromptResponseBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPGetPromptResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], MCPGetPromptResponseBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	
+	
+	
+	export class MCPReadResourceRequestBody {
+	    serverID: string;
+	    uri: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPReadResourceRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.serverID = source["serverID"];
+	        this.uri = source["uri"];
+	    }
+	}
+	export class MCPReadResourceRequest {
+	    Body?: MCPReadResourceRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPReadResourceRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], MCPReadResourceRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class MCPReadResourceResponseBody {
+	    serverID: string;
+	    uri: string;
+	    contents?: MCPContent[];
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPReadResourceResponseBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.serverID = source["serverID"];
+	        this.uri = source["uri"];
+	        this.contents = this.convertValues(source["contents"], MCPContent);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class MCPReadResourceResponse {
+	    Body?: MCPReadResourceResponseBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPReadResourceResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], MCPReadResourceResponseBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	
 	
@@ -5725,6 +7518,141 @@ export namespace spec {
 	
 	    static createFrom(source: any = {}) {
 	        return new PatchDefaultProviderResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
+	export class PatchMCPServerEnabledRequestBody {
+	    enabled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchMCPServerEnabledRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	    }
+	}
+	export class PatchMCPServerEnabledRequest {
+	    ServerID: string;
+	    Body?: PatchMCPServerEnabledRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchMCPServerEnabledRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ServerID = source["ServerID"];
+	        this.Body = this.convertValues(source["Body"], PatchMCPServerEnabledRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class PatchMCPServerEnabledResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchMCPServerEnabledResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
+	export class PatchMCPServerPolicyPayload {
+	    defaultPolicy?: MCPServerPolicy;
+	    toolPolicies?: Record<string, MCPToolPolicyOverride>;
+	    appsPolicy?: MCPAppsPolicy;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchMCPServerPolicyPayload(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.defaultPolicy = this.convertValues(source["defaultPolicy"], MCPServerPolicy);
+	        this.toolPolicies = this.convertValues(source["toolPolicies"], MCPToolPolicyOverride, true);
+	        this.appsPolicy = this.convertValues(source["appsPolicy"], MCPAppsPolicy);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PatchMCPServerPolicyRequest {
+	    ServerID: string;
+	    Body?: PatchMCPServerPolicyPayload;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchMCPServerPolicyRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ServerID = source["ServerID"];
+	        this.Body = this.convertValues(source["Body"], PatchMCPServerPolicyPayload);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PatchMCPServerPolicyResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchMCPServerPolicyResponse(source);
 	    }
 	
 	    constructor(source: any = {}) {
@@ -6737,6 +8665,100 @@ export namespace spec {
 	
 	    }
 	}
+	export class PutMCPServerPayload {
+	    displayName: string;
+	    enabled: boolean;
+	    transport: string;
+	    stdio?: MCPStdioConfig;
+	    streamableHttp?: MCPStreamableHTTPConfig;
+	    availability?: string;
+	    trustLevel?: string;
+	    defaultPolicy?: MCPServerPolicy;
+	    toolPolicies?: Record<string, MCPToolPolicyOverride>;
+	    appsPolicy?: MCPAppsPolicy;
+	    authRef?: MCPAuthRef;
+	
+	    static createFrom(source: any = {}) {
+	        return new PutMCPServerPayload(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.displayName = source["displayName"];
+	        this.enabled = source["enabled"];
+	        this.transport = source["transport"];
+	        this.stdio = this.convertValues(source["stdio"], MCPStdioConfig);
+	        this.streamableHttp = this.convertValues(source["streamableHttp"], MCPStreamableHTTPConfig);
+	        this.availability = source["availability"];
+	        this.trustLevel = source["trustLevel"];
+	        this.defaultPolicy = this.convertValues(source["defaultPolicy"], MCPServerPolicy);
+	        this.toolPolicies = this.convertValues(source["toolPolicies"], MCPToolPolicyOverride, true);
+	        this.appsPolicy = this.convertValues(source["appsPolicy"], MCPAppsPolicy);
+	        this.authRef = this.convertValues(source["authRef"], MCPAuthRef);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PutMCPServerRequest {
+	    ServerID: string;
+	    Body?: PutMCPServerPayload;
+	
+	    static createFrom(source: any = {}) {
+	        return new PutMCPServerRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ServerID = source["ServerID"];
+	        this.Body = this.convertValues(source["Body"], PutMCPServerPayload);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PutMCPServerResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new PutMCPServerResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
 	export class PutMessagesToConversationRequestBody {
 	    title: string;
 	    messages: ConversationMessage[];
@@ -7266,6 +9288,123 @@ export namespace spec {
 	}
 	
 	
+	export class RefreshMCPServerRequest {
+	    ServerID: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RefreshMCPServerRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ServerID = source["ServerID"];
+	    }
+	}
+	export class RefreshMCPServerResponse {
+	    Body?: MCPServerRuntimeSnapshot;
+	
+	    static createFrom(source: any = {}) {
+	        return new RefreshMCPServerResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], MCPServerRuntimeSnapshot);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ResolveMCPApprovalRequestBody {
+	    approvalID: string;
+	    resolution: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ResolveMCPApprovalRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.approvalID = source["approvalID"];
+	        this.resolution = source["resolution"];
+	    }
+	}
+	export class ResolveMCPApprovalRequest {
+	    Body?: ResolveMCPApprovalRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new ResolveMCPApprovalRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], ResolveMCPApprovalRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class ResolveMCPApprovalResponse {
+	    Body?: MCPApprovalToken;
+	
+	    static createFrom(source: any = {}) {
+	        return new ResolveMCPApprovalResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], MCPApprovalToken);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	
 	

@@ -2,7 +2,7 @@ import { FiCheck } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
-import { OutputVerbosity } from '@/spec/inference';
+import { OutputVerbosity, ProviderSDKType } from '@/spec/inference';
 
 import {
 	actionTriggerChipButtonClasses,
@@ -13,6 +13,7 @@ import {
 import { HoverTip } from '@/components/ariakit_hover_tip';
 
 type OutputVerbosityDropdownProps = {
+	sdkType: ProviderSDKType;
 	verbosity?: OutputVerbosity;
 	disabled?: boolean;
 	setVerbosity: (v?: OutputVerbosity) => void;
@@ -35,7 +36,12 @@ function labelFor(v?: OutputVerbosity) {
 	return ': ' + l;
 }
 
-export function OutputVerbosityDropdown({ verbosity, disabled = false, setVerbosity }: OutputVerbosityDropdownProps) {
+export function OutputVerbosityDropdown({
+	sdkType,
+	verbosity,
+	disabled = false,
+	setVerbosity,
+}: OutputVerbosityDropdownProps) {
 	const menu = useMenuStore({ placement: 'top', focusLoop: true });
 
 	const open = useStoreState(menu, 'open');
@@ -53,7 +59,7 @@ export function OutputVerbosityDropdown({ verbosity, disabled = false, setVerbos
 						className={`${actionTriggerChipButtonClasses} w-full flex-1 justify-center ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
 					>
 						<ActionTriggerChipContent
-							label={`Effort${labelFor(verbosity)}`}
+							label={`${sdkType === ProviderSDKType.ProviderSDKTypeAnthropic ? 'Effort' : 'Verbosity'}${labelFor(verbosity)}`}
 							open={open}
 							labelClassName="min-w-0 truncate text-center text-xs font-normal"
 							className="w-full justify-center"
