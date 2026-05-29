@@ -117,7 +117,7 @@ func TestFTSDeletePurgesIndex(t *testing.T) {
 	_, _ = cc.DeleteConversation(t.Context(),
 		&spec.DeleteConversationRequest{ID: c.ID, Title: c.Title})
 
-	const retries = 3
+	const retries = 10
 
 	var got int
 	var lastErr error

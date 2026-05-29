@@ -1062,6 +1062,30 @@ export namespace spec {
 	    }
 	}
 	
+	export class CancelPendingMCPOAuthAuthorizationRequest {
+	    ServerID: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CancelPendingMCPOAuthAuthorizationRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ServerID = source["ServerID"];
+	    }
+	}
+	export class CancelPendingMCPOAuthAuthorizationResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new CancelPendingMCPOAuthAuthorizationResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
 	export class URLCitation {
 	    url: string;
 	    title: string;
@@ -2956,6 +2980,7 @@ export namespace spec {
 	    providerToolName?: string;
 	    toolDigest?: string;
 	    arguments?: Record<string, any>;
+	    approvalID?: string;
 	    approvalToken?: string;
 	    conversationID?: string;
 	    messageID?: string;
@@ -2974,6 +2999,7 @@ export namespace spec {
 	        this.providerToolName = source["providerToolName"];
 	        this.toolDigest = source["toolDigest"];
 	        this.arguments = source["arguments"];
+	        this.approvalID = source["approvalID"];
 	        this.approvalToken = source["approvalToken"];
 	        this.conversationID = source["conversationID"];
 	        this.messageID = source["messageID"];
@@ -5981,6 +6007,95 @@ export namespace spec {
 		}
 	}
 	
+	export class ListPendingMCPOAuthAuthorizationsRequest {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new ListPendingMCPOAuthAuthorizationsRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
+	export class MCPOAuthAuthorization {
+	    serverID: string;
+	    authorizationURL: string;
+	    expiresAt?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPOAuthAuthorization(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.serverID = source["serverID"];
+	        this.authorizationURL = source["authorizationURL"];
+	        this.expiresAt = source["expiresAt"];
+	    }
+	}
+	export class ListPendingMCPOAuthAuthorizationsResponseBody {
+	    authorizations: MCPOAuthAuthorization[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ListPendingMCPOAuthAuthorizationsResponseBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.authorizations = this.convertValues(source["authorizations"], MCPOAuthAuthorization);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ListPendingMCPOAuthAuthorizationsResponse {
+	    Body?: ListPendingMCPOAuthAuthorizationsResponseBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListPendingMCPOAuthAuthorizationsResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], ListPendingMCPOAuthAuthorizationsResponseBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class ListPromptBundlesRequest {
 	    BundleIDs: string[];
 	    IncludeDisabled: boolean;
@@ -7214,6 +7329,7 @@ export namespace spec {
 		    return a;
 		}
 	}
+	
 	
 	
 	
