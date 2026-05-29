@@ -7,10 +7,10 @@ require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.1
 	github.com/adrg/xdg v0.5.3
 	github.com/danielgtaylor/huma/v2 v2.38.0
-	github.com/flexigpt/agentskills-go v0.14.2
+	github.com/flexigpt/agentskills-go v0.14.3
 	github.com/flexigpt/inference-go v0.20.1
-	github.com/flexigpt/llmtools-go v0.20.1
-	github.com/flexigpt/mapstore-go v0.3.2
+	github.com/flexigpt/llmtools-go v0.20.2
+	github.com/flexigpt/mapstore-go v0.3.3
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/google/uuid v1.6.0
 	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
@@ -20,7 +20,7 @@ require (
 	golang.org/x/net v0.55.0
 )
 
-require golang.org/x/oauth2 v0.35.0
+require golang.org/x/oauth2 v0.36.0
 
 require (
 	cloud.google.com/go v0.116.0 // indirect
