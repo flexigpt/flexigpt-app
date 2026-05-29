@@ -14,10 +14,11 @@ func newSecretRedactor(resolved runtime.ResolvedTransportAuth) *secretRedactor {
 	seen := make(map[string]struct{})
 	values := make([]string, 0, len(resolved.SensitiveValues))
 	for _, v := range resolved.SensitiveValues {
-		v = strings.TrimSpace(v)
-		if v == "" {
+
+		if v == "" || strings.TrimSpace(v) == "" {
 			continue
 		}
+		// Preserve exact value. Trimming can cause redaction misses.
 		if _, ok := seen[v]; ok {
 			continue
 		}

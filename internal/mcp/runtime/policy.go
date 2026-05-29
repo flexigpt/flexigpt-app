@@ -19,6 +19,14 @@ func Evaluate(in EvaluationInput) spec.MCPApprovalEvaluation {
 		p = spec.DefaultMCPServerPolicy()
 	}
 
+	if !in.Tool.Enabled {
+		return spec.MCPApprovalEvaluation{
+			Decision: spec.MCPApprovalDecisionDenied,
+			Reason:   "tool is disabled or unsupported",
+			Summary:  summary(in),
+		}
+	}
+
 	if in.Tool.TaskSupport == spec.MCPTaskSupportRequired {
 		return spec.MCPApprovalEvaluation{
 			Decision: spec.MCPApprovalDecisionDenied,
@@ -28,24 +36,13 @@ func Evaluate(in EvaluationInput) spec.MCPApprovalEvaluation {
 	}
 
 	rule := p.DefaultApprovalRule
+	digestChanged := false
 	if ov, ok := in.Server.ToolPolicies[in.Tool.ToolName]; ok {
 		if ov.ApprovalRule != nil {
 			rule = *ov.ApprovalRule
 		}
 		if ov.ExpectedDigest != "" && ov.ExpectedDigest != in.Tool.Digest && !ov.AllowStaleDigest {
-			return spec.MCPApprovalEvaluation{
-				Decision: spec.MCPApprovalDecisionApprovalRequired,
-				Reason:   "tool digest changed",
-				Summary:  summary(in),
-			}
-		}
-	}
-
-	if in.Tool.TaskSupport == spec.MCPTaskSupportRequired {
-		return spec.MCPApprovalEvaluation{
-			Decision: spec.MCPApprovalDecisionDenied,
-			Reason:   "task-required MCP tools are unsupported",
-			Summary:  summary(in),
+			digestChanged = true
 		}
 	}
 
@@ -53,6 +50,14 @@ func Evaluate(in EvaluationInput) spec.MCPApprovalEvaluation {
 		return spec.MCPApprovalEvaluation{
 			Decision: spec.MCPApprovalDecisionDenied,
 			Reason:   "server/tool policy denies this tool",
+			Summary:  summary(in),
+		}
+	}
+
+	if digestChanged {
+		return spec.MCPApprovalEvaluation{
+			Decision: spec.MCPApprovalDecisionApprovalRequired,
+			Reason:   "tool digest changed",
 			Summary:  summary(in),
 		}
 	}

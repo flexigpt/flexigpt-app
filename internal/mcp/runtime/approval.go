@@ -94,7 +94,8 @@ func (m *ApprovalManager) Resolve(
 		if res == spec.MCPApprovalResolutionDenyAlways {
 			m.decisions[getApprovalDecisionKey(p.Summary)] = res
 		}
-		return nil, spec.ErrMCPPolicyDenied
+		//nolint:nilnil // Deny resolution is a successful resolution without a token.
+		return nil, nil
 
 	case spec.MCPApprovalResolutionAllowOnce, spec.MCPApprovalResolutionAllowAlways:
 		token, err := randomToken()
@@ -142,9 +143,9 @@ func (m *ApprovalManager) VerifyAndConsumeToken(
 	ctx context.Context,
 	token string,
 	expected spec.MCPApprovalSummary,
-) error {
+) (string, error) {
 	if token == "" {
-		return fmt.Errorf("%w: approval token required", spec.ErrMCPApprovalNeeded)
+		return "", fmt.Errorf("%w: approval token required", spec.ErrMCPApprovalNeeded)
 	}
 
 	m.mu.Lock()
@@ -157,10 +158,11 @@ func (m *ApprovalManager) VerifyAndConsumeToken(
 		if subtle.ConstantTimeCompare([]byte(p.Token), []byte(token)) != 1 {
 			continue
 		}
-		return m.verifyLocked(p, token, &expected)
+		id := p.ID
+		return id, m.verifyLocked(p, token, &expected)
 	}
 
-	return fmt.Errorf("%w: approval not found", spec.ErrMCPApprovalNeeded)
+	return "", fmt.Errorf("%w: approval not found", spec.ErrMCPApprovalNeeded)
 }
 
 func (m *ApprovalManager) verifyLocked(
@@ -210,10 +212,14 @@ func summaryMatches(stored, expected spec.MCPApprovalSummary) bool {
 	if stored.ToolName != expected.ToolName {
 		return false
 	}
+	if stored.Risk != expected.Risk {
+		return false
+	}
 	if stored.ToolDigest != "" && expected.ToolDigest != "" && stored.ToolDigest != expected.ToolDigest {
 		return false
 	}
-	if stored.Arguments != "" && expected.Arguments != "" && stored.Arguments != expected.Arguments {
+	if stored.Arguments != "" && expected.Arguments != "" &&
+		normalizeRawJSON(stored.Arguments) != normalizeRawJSON(expected.Arguments) {
 		return false
 	}
 	return true
@@ -228,8 +234,18 @@ func randomToken() (string, error) {
 }
 
 func normalizeRawJSON(s spec.JSONRawString) spec.JSONRawString {
-	if strings.TrimSpace(s) == "" {
+	trimmed := strings.TrimSpace(s)
+	if trimmed == "" {
 		return spec.JSONRawString(`{}`)
 	}
-	return s
+
+	var v any
+	if err := json.Unmarshal([]byte(trimmed), &v); err != nil {
+		return trimmed
+	}
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return trimmed
+	}
+	return spec.JSONRawString(raw)
 }

@@ -60,7 +60,7 @@ func (m *AuthManager) PrepareTransportAuth(
 	}
 
 	if cfg.Transport == spec.MCPTransportStdio && cfg.Stdio != nil {
-		out.Env = maps.Clone(cfg.Stdio.Env)
+		out.Env = cloneStringMapNonNil(cfg.Stdio.Env)
 		for key, ref := range cfg.Stdio.SecretEnvRefs {
 			v, err := m.secrets.ResolveSecret(ctx, ref)
 			if err != nil {
@@ -77,7 +77,7 @@ func (m *AuthManager) PrepareTransportAuth(
 	}
 
 	httpCfg := cfg.StreamableHTTP
-	out.Headers = maps.Clone(httpCfg.CustomHeaders)
+	out.Headers = cloneStringMapNonNil(httpCfg.CustomHeaders)
 	for key, ref := range httpCfg.SecretHeaderRefs {
 		v, err := m.secrets.ResolveSecret(ctx, ref)
 		if err != nil {
@@ -155,6 +155,10 @@ func validateResolvedHTTPHeaders(headers map[string]string) error {
 		if strings.TrimSpace(key) == "" {
 			return errors.New("resolved HTTP header name cannot be empty")
 		}
+		if err := validateResolvedHTTPHeaderName(key); err != nil {
+			return err
+		}
+
 		if strings.ContainsAny(value, "\r\n") {
 			return fmt.Errorf("resolved HTTP header %q contains newline characters", key)
 		}
@@ -167,4 +171,21 @@ func validateResolvedHTTPHeaders(headers map[string]string) error {
 		}
 	}
 	return nil
+}
+
+func validateResolvedHTTPHeaderName(name string) error {
+	for _, c := range name {
+		if c <= 0x20 || c > 0x7E || c == ':' {
+			return fmt.Errorf("invalid resolved HTTP header name %q", name)
+		}
+	}
+	return nil
+}
+
+func cloneStringMapNonNil(in map[string]string) map[string]string {
+	out := maps.Clone(in)
+	if out == nil {
+		return map[string]string{}
+	}
+	return out
 }

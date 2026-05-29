@@ -10,6 +10,7 @@ type InvokeMCPToolRequestBody struct {
 
 	Arguments map[string]any `json:"arguments,omitempty"`
 
+	ApprovalID    string `json:"approvalID,omitempty"`
 	ApprovalToken string `json:"approvalToken,omitempty"`
 
 	ConversationID string `json:"conversationID,omitempty"`

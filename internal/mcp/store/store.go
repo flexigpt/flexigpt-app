@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"sort"
 	"sync"
@@ -118,6 +119,13 @@ func (s *Store) PutMCPServer(
 
 	if err := validateServerConfig(&cfg); err != nil {
 		return nil, fmt.Errorf("%w: %w", spec.ErrMCPInvalidRequest, err)
+	}
+
+	if old, ok := sc.Servers[req.ServerID]; ok && serverConnectionMaterialChanged(old, cfg) {
+		// A changed endpoint/process/auth ref invalidates the live/discovered
+		// view. Runtime disconnect is handled by the wrapper.
+		delete(sc.LastKnownSnapshots, req.ServerID)
+		delete(sc.AuthStatuses, req.ServerID)
 	}
 
 	sc.Servers[req.ServerID] = cloneServerConfig(cfg)
@@ -419,6 +427,9 @@ func (s *Store) SaveAuthStatus(ctx context.Context, st spec.MCPAuthStatus) error
 	if err != nil {
 		return err
 	}
+	if _, ok := sc.Servers[st.ServerID]; !ok {
+		return fmt.Errorf("%w: %s", spec.ErrMCPServerNotFound, st.ServerID)
+	}
 	sc.AuthStatuses[st.ServerID] = st
 	return s.writeAll(sc)
 }
@@ -490,4 +501,11 @@ func (s *Store) writeAll(sc storeSchema) error {
 		return err
 	}
 	return s.file.SetAll(mp)
+}
+
+func serverConnectionMaterialChanged(a, b spec.MCPServerConfig) bool {
+	return a.Transport != b.Transport ||
+		!reflect.DeepEqual(a.Stdio, b.Stdio) ||
+		!reflect.DeepEqual(a.StreamableHTTP, b.StreamableHTTP) ||
+		!reflect.DeepEqual(a.AuthRef, b.AuthRef)
 }

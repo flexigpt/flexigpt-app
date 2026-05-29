@@ -131,13 +131,16 @@ func validateStdioConfig(serverID spec.MCPServerID, c *spec.MCPStdioConfig) erro
 	}
 
 	for k := range c.Env {
-		if strings.TrimSpace(k) == "" {
-			return errors.New("stdio.env contains empty key")
+		if err := validateEnvKey(k); err != nil {
+			return fmt.Errorf("stdio.env[%q]: %w", k, err)
 		}
 	}
 	for k, ref := range c.SecretEnvRefs {
-		if strings.TrimSpace(k) == "" || strings.TrimSpace(ref) == "" {
-			return errors.New("stdio.secretEnvRefs contains empty key or ref")
+		if err := validateEnvKey(k); err != nil {
+			return fmt.Errorf("stdio.secretEnvRefs[%q]: %w", k, err)
+		}
+		if strings.TrimSpace(ref) == "" {
+			return fmt.Errorf("stdio.secretEnvRefs[%q] contains empty ref", k)
 		}
 		if err := secret.ValidateMCPSecretRef(ref, serverID, spec.MCPSecretKindStdioEnv, k); err != nil {
 			return fmt.Errorf("stdio.secretEnvRefs[%q]: %w", k, err)
@@ -188,8 +191,14 @@ func validateHTTPConfig(serverID spec.MCPServerID, c *spec.MCPStreamableHTTPConf
 		if err := validateHTTPHeaderName(k); err != nil {
 			return fmt.Errorf("streamableHttp.customHeaders[%q]: %w", k, err)
 		}
+		if err := validateUserHTTPHeaderAllowed(k); err != nil {
+			return fmt.Errorf("streamableHttp.customHeaders[%q]: %w", k, err)
+		}
 		if len(v) > maxMCPHeaderValueLen {
 			return errors.New("streamableHttp.customHeaders contains oversized key/value")
+		}
+		if strings.ContainsAny(v, "\r\n") {
+			return fmt.Errorf("streamableHttp.customHeaders[%q] contains newline characters", k)
 		}
 	}
 	for k, ref := range c.SecretHeaderRefs {
@@ -250,8 +259,8 @@ func validateToolPolicyOverride(p spec.MCPToolPolicyOverride) error {
 func validateNoEnvKeyOverlap(env, secretEnvRefs map[string]string) error {
 	seen := make(map[string]string, len(env))
 	for k := range env {
-		if strings.TrimSpace(k) == "" {
-			return errors.New("stdio.env contains empty key")
+		if err := validateEnvKey(k); err != nil {
+			return fmt.Errorf("stdio.env[%q]: %w", k, err)
 		}
 		seen[strings.ToLower(strings.TrimSpace(k))] = "stdio.env"
 	}
@@ -333,7 +342,7 @@ func validateNoHeaderOverlap(customHeaders, secretHeaderRefs map[string]string) 
 				return fmt.Errorf("%s[%q] contains empty secret ref", kind, k)
 			}
 
-			lower := strings.ToLower(k)
+			lower := strings.ToLower(strings.TrimSpace(k))
 			if prev, ok := seen[lower]; ok {
 				return fmt.Errorf("%s overlaps %s on header %q", prev, kind, k)
 			}
@@ -358,6 +367,51 @@ func validateHTTPHeaderName(name string) error {
 		}
 	}
 	return nil
+}
+
+func validateEnvKey(key string) error {
+	if strings.TrimSpace(key) == "" {
+		return errors.New("env key is empty")
+	}
+	if strings.TrimSpace(key) != key {
+		return errors.New("env key has leading/trailing whitespace")
+	}
+	if strings.ContainsAny(key, "=\x00") {
+		return errors.New("env key must not contain '=' or NUL")
+	}
+	for _, c := range key {
+		if c < 0x20 || c == 0x7f {
+			return fmt.Errorf("env key contains control character %q", c)
+		}
+	}
+	return nil
+}
+
+func validateUserHTTPHeaderAllowed(name string) error {
+	switch {
+	case strings.EqualFold(name, "accept"):
+		return errors.New("header is managed by MCP transport")
+	case strings.EqualFold(name, "content-type"):
+		return errors.New("header is managed by MCP transport")
+	case strings.EqualFold(name, "mcp-protocol-version"):
+		return errors.New("header is managed by MCP transport")
+	case strings.EqualFold(name, "mcp-session-id"):
+		return errors.New("header is managed by MCP transport")
+	case strings.EqualFold(name, "mcp-method"):
+		return errors.New("header is managed by MCP transport")
+	case strings.EqualFold(name, "mcp-name"):
+		return errors.New("header is managed by MCP transport")
+	case strings.EqualFold(name, "last-event-id"):
+		return errors.New("header is managed by MCP transport")
+	case strings.EqualFold(name, "content-length"):
+		return errors.New("header is managed by HTTP transport")
+	case strings.EqualFold(name, "host"):
+		return errors.New("header is managed by HTTP transport")
+	case strings.EqualFold(name, "connection"):
+		return errors.New("header is managed by HTTP transport")
+	default:
+		return nil
+	}
 }
 
 func isSoftDeleted(c *spec.MCPServerConfig) bool {

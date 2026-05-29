@@ -96,7 +96,16 @@ func InitMCPWrapper(w *MCPWrapper, baseDir string, secrets runtime.SecretResolve
 
 func (w *MCPWrapper) PutMCPServer(req *spec.PutMCPServerRequest) (*spec.PutMCPServerResponse, error) {
 	return middleware.WithRecoveryResp(func() (*spec.PutMCPServerResponse, error) {
-		return w.store.PutMCPServer(context.Background(), req)
+		resp, err := w.store.PutMCPServer(context.Background(), req)
+		if err != nil {
+			return nil, err
+		}
+		if req != nil && req.ServerID != "" {
+			_, _ = w.runtime.Disconnect(context.Background(), &spec.DisconnectMCPServerRequest{
+				ServerID: req.ServerID,
+			})
+		}
+		return resp, nil
 	})
 }
 

@@ -38,6 +38,8 @@ func (b *ToolBridge) Evaluate(
 		Req:    *req.Body,
 	})
 
+	eval = b.applyCachedDecision(eval)
+
 	if eval.Decision == spec.MCPApprovalDecisionApprovalRequired && eval.Summary != nil {
 		id, err := b.approvals.Create(ctx, *eval.Summary)
 		if err != nil {
@@ -71,19 +73,7 @@ func (b *ToolBridge) Invoke(
 		Req:    *req.Body,
 	})
 
-	if eval.Decision == spec.MCPApprovalDecisionApprovalRequired && eval.Summary != nil {
-		if cached, ok := b.approvals.LookupDecision(*eval.Summary); ok {
-			switch cached {
-			case spec.MCPApprovalResolutionAllowAlways:
-				eval.Decision = spec.MCPApprovalDecisionAllowed
-				eval.Reason = "cached allow-always decision"
-			case spec.MCPApprovalResolutionDenyAlways:
-				eval.Decision = spec.MCPApprovalDecisionDenied
-				eval.Reason = "cached deny-always decision"
-			default:
-			}
-		}
-	}
+	eval = b.applyCachedDecision(eval)
 
 	switch eval.Decision {
 	case spec.MCPApprovalDecisionDenied:
@@ -96,9 +86,11 @@ func (b *ToolBridge) Invoke(
 		if eval.Summary == nil {
 			return nil, fmt.Errorf("%w: missing approval summary", spec.ErrMCPApprovalNeeded)
 		}
-		if err := b.approvals.VerifyAndConsumeToken(ctx, req.Body.ApprovalToken, *eval.Summary); err != nil {
+		approvalID, err := b.approvals.VerifyAndConsumeToken(ctx, req.Body.ApprovalToken, *eval.Summary)
+		if err != nil {
 			return nil, err
 		}
+		req.Body.ApprovalID = approvalID
 
 	case spec.MCPApprovalDecisionAllowed:
 		// Continue.
@@ -112,4 +104,24 @@ func (b *ToolBridge) Invoke(
 		return nil, err
 	}
 	return &spec.InvokeMCPToolResponse{Body: out}, nil
+}
+
+func (b *ToolBridge) applyCachedDecision(eval spec.MCPApprovalEvaluation) spec.MCPApprovalEvaluation {
+	if eval.Decision != spec.MCPApprovalDecisionApprovalRequired || eval.Summary == nil {
+		return eval
+	}
+	cached, ok := b.approvals.LookupDecision(*eval.Summary)
+	if !ok {
+		return eval
+	}
+	switch cached {
+	case spec.MCPApprovalResolutionAllowAlways:
+		eval.Decision = spec.MCPApprovalDecisionAllowed
+		eval.Reason = "cached allow-always decision"
+	case spec.MCPApprovalResolutionDenyAlways:
+		eval.Decision = spec.MCPApprovalDecisionDenied
+		eval.Reason = "cached deny-always decision"
+	default:
+	}
+	return eval
 }

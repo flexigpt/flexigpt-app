@@ -65,7 +65,10 @@ func (w *slogLineWriter) Write(p []byte) (int, error) {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
-		w.logger.Info(w.message, "serverID", w.serverID, "line", w.redactor.Redact(line))
+		if w.redactor != nil {
+			line = w.redactor.Redact(line)
+		}
+		w.logger.Info(w.message, "serverID", w.serverID, "line", line)
 	}
 
 	return len(p), nil

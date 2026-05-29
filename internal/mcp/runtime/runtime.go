@@ -129,10 +129,15 @@ func (m *RuntimeManager) Connect(
 		m.setErrorIfCurrent(req.ServerID, generation, err)
 		return nil, err
 	}
+	if cfgResp == nil || cfgResp.Body == nil {
+		err := fmt.Errorf("%w: empty server config response", spec.ErrMCPRuntimeNotReady)
+		m.setErrorIfCurrent(req.ServerID, generation, err)
+		return nil, err
+	}
 	cfg := *cfgResp.Body
 	if !cfg.Enabled {
 		err := fmt.Errorf("%w: %s", spec.ErrMCPServerDisabled, cfg.ID)
-		m.setErrorIfCurrent(req.ServerID, generation, err)
+		m.setStatusIfCurrent(req.ServerID, generation, spec.MCPServerStatusDisabled, "")
 		return nil, err
 	}
 
@@ -224,8 +229,12 @@ func (m *RuntimeManager) Disconnect(
 
 	state := m.sessions[req.ServerID]
 	delete(m.sessions, req.ServerID)
+	timer := m.notificationRefreshTimers[req.ServerID]
+	delete(m.notificationRefreshTimers, req.ServerID)
 	m.mu.Unlock()
-
+	if timer != nil {
+		timer.Stop()
+	}
 	if state != nil && state.client != nil {
 		if err := state.client.Close(ctx); err != nil {
 			return nil, err
@@ -281,7 +290,16 @@ func (m *RuntimeManager) Status(
 	if req == nil || req.ServerID == "" {
 		return nil, fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
 	}
-	return &spec.GetMCPServerStatusResponse{Body: m.snapshotFromState(req.ServerID)}, nil
+	cfgResp, err := m.store.GetMCPServer(ctx, &spec.GetMCPServerRequest{ServerID: req.ServerID})
+	if err != nil {
+		return nil, err
+	}
+	snap := m.snapshotFromState(req.ServerID)
+	if cfgResp != nil && cfgResp.Body != nil && !cfgResp.Body.Enabled {
+		snap.Status = spec.MCPServerStatusDisabled
+		snap.LastError = ""
+	}
+	return &spec.GetMCPServerStatusResponse{Body: snap}, nil
 }
 
 func (m *RuntimeManager) OnClientNotification(ctx context.Context, event ClientNotification) {
@@ -553,6 +571,11 @@ func (m *RuntimeManager) CallTool(
 	if !found {
 		return nil, cfg, spec.MCPToolCapability{}, fmt.Errorf("%w: tool %s", spec.ErrMCPInvalidRequest, req.ToolName)
 	}
+	if !tool.Enabled || tool.TaskSupport == spec.MCPTaskSupportRequired {
+		return nil, cfg, tool, fmt.Errorf(
+			"%w: tool %s is disabled or unsupported", spec.ErrMCPPolicyDenied, req.ToolName,
+		)
+	}
 	if req.ToolDigest != "" && req.ToolDigest != tool.Digest {
 		if ov, ok := cfg.ToolPolicies[tool.ToolName]; !ok || !ov.AllowStaleDigest {
 			return nil, cfg, tool, fmt.Errorf("%w: tool digest changed", spec.ErrMCPStaleReference)
@@ -579,6 +602,8 @@ func (m *RuntimeManager) CallTool(
 	body.Provenance.ProviderToolName = req.ProviderToolName
 	body.Provenance.ToolDigest = tool.Digest
 	body.Provenance.ToolUseID = req.ToolUseID
+	body.Provenance.ApprovalID = req.ApprovalID
+
 	return body, cfg, tool, nil
 }
 
@@ -673,6 +698,14 @@ func (m *RuntimeManager) refreshFromNotification(
 		m.setErrorIfCurrent(serverID, generation, err)
 		return
 	}
+	if cfgResp == nil || cfgResp.Body == nil {
+		m.setErrorIfCurrent(
+			serverID,
+			generation,
+			fmt.Errorf("%w: empty server config response", spec.ErrMCPRuntimeNotReady),
+		)
+		return
+	}
 	cfg := *cfgResp.Body
 	if !cfg.Enabled {
 		return
@@ -740,6 +773,9 @@ func (m *RuntimeManager) readyClient(
 	if err != nil {
 		return nil, spec.MCPServerConfig{}, err
 	}
+	if cfgResp == nil || cfgResp.Body == nil {
+		return nil, spec.MCPServerConfig{}, fmt.Errorf("%w: empty server config response", spec.ErrMCPRuntimeNotReady)
+	}
 	cfg := *cfgResp.Body
 	if !cfg.Enabled {
 		return nil, cfg, fmt.Errorf("%w: %s", spec.ErrMCPServerDisabled, serverID)
@@ -765,6 +801,22 @@ func (m *RuntimeManager) setError(id spec.MCPServerID, err error) {
 	if err != nil {
 		st.lastError = err.Error()
 	}
+}
+
+func (m *RuntimeManager) setStatusIfCurrent(
+	id spec.MCPServerID,
+	generation uint64,
+	status spec.MCPServerStatus,
+	lastErr string,
+) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.generations[id] != generation {
+		return
+	}
+	st := m.getOrCreateLocked(id)
+	st.status = status
+	st.lastError = lastErr
 }
 
 func (m *RuntimeManager) setErrorIfCurrent(id spec.MCPServerID, generation uint64, err error) {
