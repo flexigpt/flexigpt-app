@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/mcp/secret"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
@@ -94,7 +95,7 @@ func validateServerConfig(c *spec.MCPServerConfig) error {
 		if c.StreamableHTTP != nil {
 			return errors.New("streamableHttp must be empty for stdio transport")
 		}
-		return validateStdioConfig(c.Stdio)
+		return validateStdioConfig(c.ID, c.Stdio)
 	case spec.MCPTransportStreamableHTTP:
 		if c.StreamableHTTP == nil {
 			return errors.New("streamableHttp config required")
@@ -102,7 +103,7 @@ func validateServerConfig(c *spec.MCPServerConfig) error {
 		if c.Stdio != nil {
 			return errors.New("stdio must be empty for streamableHttp transport")
 		}
-		if err := validateHTTPConfig(c.StreamableHTTP); err != nil {
+		if err := validateHTTPConfig(c.ID, c.StreamableHTTP); err != nil {
 			return err
 		}
 		return validateHTTPAuthRef(c)
@@ -111,7 +112,7 @@ func validateServerConfig(c *spec.MCPServerConfig) error {
 	}
 }
 
-func validateStdioConfig(c *spec.MCPStdioConfig) error {
+func validateStdioConfig(serverID spec.MCPServerID, c *spec.MCPStdioConfig) error {
 	if strings.TrimSpace(c.Command) == "" {
 		return errors.New("stdio.command is empty")
 	}
@@ -138,6 +139,9 @@ func validateStdioConfig(c *spec.MCPStdioConfig) error {
 		if strings.TrimSpace(k) == "" || strings.TrimSpace(ref) == "" {
 			return errors.New("stdio.secretEnvRefs contains empty key or ref")
 		}
+		if err := secret.ValidateMCPSecretRef(ref, serverID, spec.MCPSecretKindStdioEnv, k); err != nil {
+			return fmt.Errorf("stdio.secretEnvRefs[%q]: %w", k, err)
+		}
 	}
 	if err := validateNoEnvKeyOverlap(c.Env, c.SecretEnvRefs); err != nil {
 		return err
@@ -145,7 +149,7 @@ func validateStdioConfig(c *spec.MCPStdioConfig) error {
 	return nil
 }
 
-func validateHTTPConfig(c *spec.MCPStreamableHTTPConfig) error {
+func validateHTTPConfig(serverID spec.MCPServerID, c *spec.MCPStreamableHTTPConfig) error {
 	raw := strings.TrimSpace(c.URL)
 	if raw == "" {
 		return errors.New("streamableHttp.url is empty")
@@ -196,6 +200,9 @@ func validateHTTPConfig(c *spec.MCPStreamableHTTPConfig) error {
 			return errors.New("authorization must use authRef/tokenRef, not secretHeaderRefs")
 		}
 		if err := validateHTTPHeaderName(k); err != nil {
+			return fmt.Errorf("streamableHttp.secretHeaderRefs[%q]: %w", k, err)
+		}
+		if err := secret.ValidateMCPSecretRef(ref, serverID, spec.MCPSecretKindHTTPHeader, k); err != nil {
 			return fmt.Errorf("streamableHttp.secretHeaderRefs[%q]: %w", k, err)
 		}
 	}
@@ -278,6 +285,14 @@ func validateHTTPAuthRef(c *spec.MCPServerConfig) error {
 	if mode == spec.MCPHTTPAuthCustomBearer {
 		if tokenRef == "" {
 			return errors.New("authRef.tokenRef is required for customBearer authMode")
+		}
+		if err := secret.ValidateMCPSecretRef(
+			tokenRef,
+			c.ID,
+			spec.MCPSecretKindHTTPToken,
+			"authorization",
+		); err != nil {
+			return err
 		}
 		if authMode != "" && authMode != mode {
 			return fmt.Errorf("authRef.authMode %q must match streamableHttp.authMode %q", authMode, mode)

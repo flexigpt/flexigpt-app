@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,6 +19,14 @@ import (
 )
 
 const defaultApprovalTTL = 5 * time.Minute
+
+type approvalDecisionKey struct {
+	ServerID   spec.MCPServerID   `json:"serverID"`
+	ToolName   string             `json:"toolName"`
+	ToolDigest string             `json:"toolDigest,omitempty"`
+	Risk       spec.MCPToolRisk   `json:"risk"`
+	Arguments  spec.JSONRawString `json:"arguments,omitempty"`
+}
 
 type pendingApproval struct {
 	ID        string
@@ -83,7 +92,7 @@ func (m *ApprovalManager) Resolve(
 	case spec.MCPApprovalResolutionDenyOnce, spec.MCPApprovalResolutionDenyAlways:
 		delete(m.pending, id)
 		if res == spec.MCPApprovalResolutionDenyAlways {
-			m.decisions[approvalDecisionKey(p.Summary)] = res
+			m.decisions[getApprovalDecisionKey(p.Summary)] = res
 		}
 		return nil, spec.ErrMCPPolicyDenied
 
@@ -94,7 +103,7 @@ func (m *ApprovalManager) Resolve(
 		}
 		p.Token = token
 		if res == spec.MCPApprovalResolutionAllowAlways {
-			m.decisions[approvalDecisionKey(p.Summary)] = res
+			m.decisions[getApprovalDecisionKey(p.Summary)] = res
 		}
 		return &spec.MCPApprovalToken{
 			ApprovalID: id,
@@ -110,14 +119,8 @@ func (m *ApprovalManager) Resolve(
 func (m *ApprovalManager) LookupDecision(summary spec.MCPApprovalSummary) (spec.MCPApprovalResolution, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	res, ok := m.decisions[approvalDecisionKey(summary)]
+	res, ok := m.decisions[getApprovalDecisionKey(summary)]
 	return res, ok
-}
-
-func approvalDecisionKey(summary spec.MCPApprovalSummary) string {
-	raw, _ := json.Marshal(summary)
-	sum := sha256.Sum256(raw)
-	return hex.EncodeToString(sum[:])
 }
 
 func (m *ApprovalManager) VerifyAndConsume(ctx context.Context, id, token string) error {
@@ -187,6 +190,19 @@ func (m *ApprovalManager) verifyLocked(
 	return nil
 }
 
+func getApprovalDecisionKey(summary spec.MCPApprovalSummary) string {
+	key := approvalDecisionKey{
+		ServerID:   summary.ServerID,
+		ToolName:   summary.ToolName,
+		ToolDigest: summary.ToolDigest,
+		Risk:       summary.Risk,
+		Arguments:  normalizeRawJSON(summary.Arguments),
+	}
+	raw, _ := json.Marshal(key)
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:])
+}
+
 func summaryMatches(stored, expected spec.MCPApprovalSummary) bool {
 	if stored.ServerID != expected.ServerID {
 		return false
@@ -209,4 +225,11 @@ func randomToken() (string, error) {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(b[:]), nil
+}
+
+func normalizeRawJSON(s spec.JSONRawString) spec.JSONRawString {
+	if strings.TrimSpace(s) == "" {
+		return spec.JSONRawString(`{}`)
+	}
+	return s
 }

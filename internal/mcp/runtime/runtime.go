@@ -324,9 +324,22 @@ func (m *RuntimeManager) ListTools(
 	if err != nil {
 		return nil, err
 	}
+	cfgResp, err := m.store.GetMCPServer(ctx, &spec.GetMCPServerRequest{ServerID: req.ServerID})
+	if err != nil {
+		// Best effort: keep the snapshot if the config read fails.
+		slog.Warn("mcp: tool policy overlay skipped", "serverID", req.ServerID, "err", err)
+	}
+
 	sort.Slice(snap.Tools, func(i, j int) bool {
 		return snap.Tools[i].ToolName < snap.Tools[j].ToolName
 	})
+
+	if cfgResp != nil && cfgResp.Body != nil {
+		for i := range snap.Tools {
+			snap.Tools[i] = applyToolPolicyOverlay(snap.Tools[i], *cfgResp.Body)
+		}
+	}
+
 	digest := computeDiscoverySnapshotDigest(snap)
 	tools, next, err := paginateDiscoveryItems(
 		req.ServerID, digest, discoveryPageKindTools, snap.Tools, req.PageSize, req.PageToken,
@@ -518,9 +531,10 @@ func (m *RuntimeManager) CallTool(
 		return nil, cfg, spec.MCPToolCapability{}, fmt.Errorf("%w: tool %s", spec.ErrMCPInvalidRequest, req.ToolName)
 	}
 	if req.ToolDigest != "" && req.ToolDigest != tool.Digest {
-		return nil, cfg, tool, fmt.Errorf("%w: tool digest changed", spec.ErrMCPStaleReference)
+		if ov, ok := cfg.ToolPolicies[tool.ToolName]; !ok || !ov.AllowStaleDigest {
+			return nil, cfg, tool, fmt.Errorf("%w: tool digest changed", spec.ErrMCPStaleReference)
+		}
 	}
-
 	rctx, cancel := withDefaultRequestTimeout(ctx)
 	defer cancel()
 
@@ -567,10 +581,10 @@ func (m *RuntimeManager) CallToolDryRun(
 	if !found {
 		return nil, cfg, spec.MCPToolCapability{}, fmt.Errorf("%w: tool %s", spec.ErrMCPInvalidRequest, req.ToolName)
 	}
+	tool = applyToolPolicyOverlay(tool, cfg)
 	if req.ToolDigest != "" && req.ToolDigest != tool.Digest {
-		return nil, cfg, tool, fmt.Errorf("%w: tool digest changed", spec.ErrMCPStaleReference)
+		tool.Stale = true
 	}
-
 	return &spec.InvokeMCPToolResponseBody{
 		ServerID:         req.ServerID,
 		ToolName:         req.ToolName,
@@ -787,6 +801,21 @@ func (m *RuntimeManager) snapshotFromState(id spec.MCPServerID) *spec.MCPServerR
 		out.LastSyncedAt = st.lastSyncedAt.Format(time.RFC3339Nano)
 	}
 	return out
+}
+
+func applyToolPolicyOverlay(tool spec.MCPToolCapability, cfg spec.MCPServerConfig) spec.MCPToolCapability {
+	if ov, ok := cfg.ToolPolicies[tool.ToolName]; ok {
+		if ov.ApprovalRule != nil {
+			tool.ApprovalRule = *ov.ApprovalRule
+		}
+		if ov.ExecutionMode != nil {
+			tool.ExecutionMode = *ov.ExecutionMode
+		}
+		if ov.ExpectedDigest != "" && ov.ExpectedDigest != tool.Digest {
+			tool.Stale = true
+		}
+	}
+	return tool
 }
 
 func normalizeSnapshot(snap *spec.MCPDiscoverySnapshot) {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/sdkclient"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/secret"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/store"
 
@@ -44,9 +45,14 @@ func (r *settingSecretResolver) ResolveSecret(
 		return "", errors.New("invalid secret ref")
 	}
 
+	ref, err := secret.ParseMCPSecretRef(keyName)
+	if err != nil {
+		return "", err
+	}
+
 	resp, err := r.store.GetAuthKey(ctx, &settingSpec.GetAuthKeyRequest{
 		Type:    settingSpec.AuthKeyTypeMCP,
-		KeyName: settingSpec.AuthKeyName(keyName),
+		KeyName: settingSpec.AuthKeyName(secret.GetMCPSecretRefStorageKey(ref)),
 	})
 	if err != nil {
 		return "", err

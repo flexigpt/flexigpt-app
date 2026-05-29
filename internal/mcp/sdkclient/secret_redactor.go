@@ -11,26 +11,18 @@ type secretRedactor struct {
 }
 
 func newSecretRedactor(resolved runtime.ResolvedTransportAuth) *secretRedactor {
-	var values []string
-
-	for _, v := range resolved.Headers {
+	seen := make(map[string]struct{})
+	values := make([]string, 0, len(resolved.SensitiveValues))
+	for _, v := range resolved.SensitiveValues {
 		v = strings.TrimSpace(v)
-		if len(v) >= 8 {
-			values = append(values, v)
+		if v == "" {
+			continue
 		}
-		if strings.HasPrefix(strings.ToLower(v), "bearer ") {
-			token := strings.TrimSpace(v[len("bearer "):])
-			if len(token) >= 8 {
-				values = append(values, token)
-			}
+		if _, ok := seen[v]; ok {
+			continue
 		}
-	}
-
-	for _, v := range resolved.Env {
-		v = strings.TrimSpace(v)
-		if len(v) >= 8 {
-			values = append(values, v)
-		}
+		seen[v] = struct{}{}
+		values = append(values, v)
 	}
 
 	return &secretRedactor{values: values}

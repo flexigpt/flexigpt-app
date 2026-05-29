@@ -92,7 +92,10 @@ func Evaluate(in EvaluationInput) spec.MCPApprovalEvaluation {
 }
 
 func summary(in EvaluationInput) *spec.MCPApprovalSummary {
-	raw, _ := json.Marshal(in.Req.Arguments)
+	raw := []byte(`{}`)
+	if in.Req.Arguments != nil {
+		raw, _ = json.Marshal(in.Req.Arguments)
+	}
 	return &spec.MCPApprovalSummary{
 		ServerID:          in.Server.ID,
 		ServerDisplayName: in.Server.DisplayName,

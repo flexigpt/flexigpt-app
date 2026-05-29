@@ -28,9 +28,10 @@ func (r StaticSecretResolver) ResolveSecret(ctx context.Context, ref string) (st
 }
 
 type ResolvedTransportAuth struct {
-	Headers map[string]string
-	Env     map[string]string
-	Status  spec.MCPAuthStatus
+	Headers         map[string]string
+	Env             map[string]string
+	SensitiveValues []string
+	Status          spec.MCPAuthStatus
 }
 
 type AuthManager struct {
@@ -66,6 +67,7 @@ func (m *AuthManager) PrepareTransportAuth(
 				return out, err
 			}
 			out.Env[key] = v
+			out.SensitiveValues = append(out.SensitiveValues, v)
 		}
 		return out, nil
 	}
@@ -82,6 +84,7 @@ func (m *AuthManager) PrepareTransportAuth(
 			return out, err
 		}
 		out.Headers[key] = v
+		out.SensitiveValues = append(out.SensitiveValues, v)
 	}
 
 	mode := httpCfg.AuthMode
@@ -116,6 +119,7 @@ func (m *AuthManager) PrepareTransportAuth(
 			return out, err
 		}
 		out.Headers["Authorization"] = "Bearer " + token
+		out.SensitiveValues = append(out.SensitiveValues, token)
 		out.Status.State = spec.MCPAuthStateAuthorized
 
 	case spec.MCPHTTPAuthCustomHeaders:
