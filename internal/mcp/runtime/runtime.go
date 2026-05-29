@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -136,7 +137,14 @@ func (m *RuntimeManager) Connect(
 	}
 
 	resolved, err := m.auth.PrepareTransportAuth(ctx, cfg)
-	_ = m.store.SaveAuthStatus(ctx, resolved.Status)
+	if saveErr := m.store.SaveAuthStatus(ctx, resolved.Status); saveErr != nil {
+		if err != nil {
+			err = errors.Join(err, saveErr)
+		} else {
+			err = saveErr
+		}
+	}
+
 	if err != nil {
 		m.setErrorIfCurrent(req.ServerID, generation, err)
 		return nil, err
@@ -247,8 +255,9 @@ func (m *RuntimeManager) Refresh(
 		return nil, err
 	}
 	normalizeSnapshot(&snap)
-	_ = m.store.SaveLastKnownSnapshot(ctx, snap)
-
+	if err := m.store.SaveLastKnownSnapshot(ctx, snap); err != nil {
+		slog.Warn("mcp: save refreshed snapshot failed", "serverID", req.ServerID, "err", err)
+	}
 	now := time.Now().UTC()
 	m.mu.Lock()
 	state := m.sessions[req.ServerID]
@@ -460,6 +469,9 @@ func (m *RuntimeManager) ReadResource(
 	if err != nil {
 		return nil, err
 	}
+	if body == nil {
+		return nil, fmt.Errorf("%w: resource read returned nil response", spec.ErrMCPRuntimeNotReady)
+	}
 	body.ServerID = req.Body.ServerID
 	body.URI = req.Body.URI
 	return &spec.MCPReadResourceResponse{Body: body}, nil
@@ -483,6 +495,9 @@ func (m *RuntimeManager) GetPrompt(
 	if err != nil {
 		return nil, err
 	}
+	if body == nil {
+		return nil, fmt.Errorf("%w: prompt read returned nil response", spec.ErrMCPRuntimeNotReady)
+	}
 	body.ServerID = req.Body.ServerID
 
 	return &spec.MCPGetPromptResponse{Body: body}, nil
@@ -501,7 +516,15 @@ func (m *RuntimeManager) Complete(
 	}
 	rctx, cancel := withDefaultRequestTimeout(ctx)
 	defer cancel()
-	return client.Complete(rctx, *req.Body)
+	res, err := client.Complete(rctx, *req.Body)
+	if err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, fmt.Errorf("%w: completion returned nil response", spec.ErrMCPRuntimeNotReady)
+	}
+
+	return res, nil
 }
 
 func (m *RuntimeManager) CallTool(
@@ -541,6 +564,10 @@ func (m *RuntimeManager) CallTool(
 	body, err := client.CallTool(rctx, req.ToolName, req.Arguments)
 	if err != nil {
 		return nil, cfg, tool, err
+	}
+
+	if body == nil {
+		return nil, cfg, tool, fmt.Errorf("%w: tool call returned nil response", spec.ErrMCPRuntimeNotReady)
 	}
 
 	body.ServerID = req.ServerID
