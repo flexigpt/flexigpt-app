@@ -1,5 +1,13 @@
 package spec
 
+type GetMCPServerAuthStatusRequest struct {
+	ServerID MCPServerID `path:"serverID" required:"true"`
+}
+
+type GetMCPServerAuthStatusResponse struct {
+	Body *MCPAuthStatus
+}
+
 type PutMCPServerPayload struct {
 	DisplayName string           `json:"displayName" required:"true"`
 	Enabled     bool             `json:"enabled"     required:"true"`

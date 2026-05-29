@@ -140,11 +140,14 @@ func extractFTS(fullPath string, m map[string]any) map[string]string {
 		}
 		switch role {
 		case conversationRoleSystem:
-			system.WriteString(txt + "\n")
+			system.WriteString(txt)
+			system.WriteString("\n")
 		case conversationRoleUser:
-			user.WriteString(txt + "\n")
+			user.WriteString(txt)
+			user.WriteString("\n")
 		case conversationRoleAssistant:
-			assist.WriteString(txt + "\n")
+			assist.WriteString(txt)
+			assist.WriteString("\n")
 		default:
 		}
 	}

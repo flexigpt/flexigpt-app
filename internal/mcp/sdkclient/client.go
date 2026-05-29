@@ -181,9 +181,10 @@ func (f *Factory) Connect(
 		}
 
 		transport = &mcpSDK.StreamableClientTransport{
-			Endpoint:             cfg.StreamableHTTP.URL,
-			HTTPClient:           httpClient,
-			MaxRetries:           defaultHTTPMaxRetries,
+			Endpoint:   cfg.StreamableHTTP.URL,
+			HTTPClient: httpClient,
+			MaxRetries: defaultHTTPMaxRetries,
+			// This needs to be false for receiving server notifications.
 			DisableStandaloneSSE: false,
 			OAuthHandler:         resolved.OAuthHandler,
 		}

@@ -131,6 +131,7 @@ func (m *AuthManager) PrepareTransportAuth(
 
 	httpCfg := cfg.StreamableHTTP
 	out.Headers = cloneStringMapNonNil(httpCfg.CustomHeaders)
+	out.Status.Resource = strings.TrimSpace(httpCfg.URL)
 	for key, ref := range httpCfg.SecretHeaderRefs {
 		v, err := m.secrets.ResolveSecret(ctx, ref)
 		if err != nil {
@@ -178,6 +179,7 @@ func (m *AuthManager) PrepareTransportAuth(
 				ServerID: cfg.ID,
 				AuthMode: mode,
 				State:    spec.MCPAuthStateAuthorized,
+				Resource: out.Status.Resource,
 			},
 		}
 		out.SensitiveValues = append(out.SensitiveValues, token)
@@ -304,6 +306,7 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 			ServerID: cfg.ID,
 			AuthMode: spec.MCPHTTPAuthOAuth,
 			State:    spec.MCPAuthStateRequired,
+			Resource: out.Status.Resource,
 		},
 	}
 	return nil
@@ -351,6 +354,7 @@ func (m *AuthManager) configureClientCredentialsOAuth(
 			ServerID: cfg.ID,
 			AuthMode: spec.MCPHTTPAuthClientCredentials,
 			State:    spec.MCPAuthStateAuthorized,
+			Resource: out.Status.Resource,
 		},
 	}
 	out.SensitiveValues = append(out.SensitiveValues, raw)

@@ -12,6 +12,23 @@ import (
 	"golang.org/x/oauth2"
 )
 
+type trackingTokenSource struct {
+	source oauth2.TokenSource
+	sink   AuthStatusSink
+	status spec.MCPAuthStatus
+}
+
+func (s *trackingTokenSource) Token() (*oauth2.Token, error) {
+	tok, err := s.source.Token()
+	if err != nil {
+		if s.sink != nil {
+			_ = s.sink.SaveAuthStatus(context.Background(), authStatusFromTokenError(s.status, err))
+		}
+		return nil, err
+	}
+	return tok, nil
+}
+
 type trackedOAuthHandler struct {
 	inner  mcpAuth.OAuthHandler
 	sink   AuthStatusSink
@@ -21,7 +38,7 @@ type trackedOAuthHandler struct {
 func (h *trackedOAuthHandler) TokenSource(ctx context.Context) (oauth2.TokenSource, error) {
 	ts, err := h.inner.TokenSource(ctx)
 	if err != nil {
-		h.publish(context.WithoutCancel(ctx), authStatusFromTokenError(h.status, err))
+		h.publish(ctx, authStatusFromTokenError(h.status, err))
 		return nil, err
 	}
 	if ts == nil {
@@ -41,6 +58,10 @@ func (h *trackedOAuthHandler) Authorize(
 	req *http.Request,
 	resp *http.Response,
 ) error {
+	resourceURL := ""
+	if req != nil && req.URL != nil {
+		resourceURL = req.URL.String()
+	}
 	err := h.inner.Authorize(ctx, req, resp)
 	if err != nil {
 		h.publish(ctx, authStatusFromHTTPFailure(h.status, resp, err))
@@ -50,8 +71,13 @@ func (h *trackedOAuthHandler) Authorize(
 	st := h.status
 	st.State = spec.MCPAuthStateAuthorized
 	st.LastError = ""
-
+	if st.Resource == "" && resourceURL != "" {
+		st.Resource = resourceURL
+	}
 	if tokenStatus, ok := h.currentTokenStatus(ctx); ok {
+		if tokenStatus.Resource == "" && resourceURL != "" {
+			tokenStatus.Resource = resourceURL
+		}
 		st = tokenStatus
 	}
 	h.publish(ctx, st)
@@ -80,23 +106,6 @@ func (h *trackedOAuthHandler) publish(ctx context.Context, st spec.MCPAuthStatus
 	}
 
 	_ = h.sink.SaveAuthStatus(context.WithoutCancel(ctx), st)
-}
-
-type trackingTokenSource struct {
-	source oauth2.TokenSource
-	sink   AuthStatusSink
-	status spec.MCPAuthStatus
-}
-
-func (s *trackingTokenSource) Token() (*oauth2.Token, error) {
-	tok, err := s.source.Token()
-	if err != nil {
-		if s.sink != nil {
-			_ = s.sink.SaveAuthStatus(context.Background(), authStatusFromTokenError(s.status, err))
-		}
-		return nil, err
-	}
-	return tok, nil
 }
 
 func authStatusFromToken(base spec.MCPAuthStatus, tok *oauth2.Token) spec.MCPAuthStatus {
@@ -178,6 +187,8 @@ func authStatusFromHTTPFailure(
 	switch {
 	case resp.StatusCode == http.StatusForbidden && challengeErr == "insufficient_scope":
 		st.State = spec.MCPAuthStateInsufficientScope
+	case challengeErr == "invalid_token":
+		st.State = spec.MCPAuthStateExpired
 	case resp.StatusCode == http.StatusUnauthorized:
 		st.State = spec.MCPAuthStateRequired
 	case resp.StatusCode == http.StatusForbidden:

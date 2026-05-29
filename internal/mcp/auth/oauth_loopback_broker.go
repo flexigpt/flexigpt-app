@@ -21,6 +21,20 @@ const (
 	defaultOAuthCallbackPath = "/mcp/oauth/callback"
 )
 
+type oauthLoopbackResult struct {
+	Result *OAuthAuthorizationResult
+	Err    error
+}
+type pendingOAuthAuthorization struct {
+	ID               string
+	ServerID         spec.MCPServerID
+	AuthorizationURL string
+	State            string
+	CreatedAt        time.Time
+	ExpiresAt        time.Time
+	ResultCh         chan oauthLoopbackResult
+}
+
 type OAuthLoopbackBrokerOptions struct {
 	TTL          time.Duration
 	CallbackPath string
@@ -40,21 +54,6 @@ type OAuthLoopbackBroker struct {
 
 	pendingByServer map[spec.MCPServerID]*pendingOAuthAuthorization
 	pendingByState  map[string]*pendingOAuthAuthorization
-}
-
-type pendingOAuthAuthorization struct {
-	ID               string
-	ServerID         spec.MCPServerID
-	AuthorizationURL string
-	State            string
-	CreatedAt        time.Time
-	ExpiresAt        time.Time
-	ResultCh         chan oauthLoopbackResult
-}
-
-type oauthLoopbackResult struct {
-	Result *OAuthAuthorizationResult
-	Err    error
 }
 
 func NewOAuthLoopbackBroker(ctx context.Context, opts *OAuthLoopbackBrokerOptions) (*OAuthLoopbackBroker, error) {

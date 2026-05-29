@@ -108,6 +108,37 @@ func InitMCPWrapper(ctx context.Context, w *MCPWrapper, baseDir string, secrets 
 	return nil
 }
 
+func (w *MCPWrapper) GetMCPServerAuthStatus(
+	req *spec.GetMCPServerAuthStatusRequest,
+) (*spec.GetMCPServerAuthStatusResponse, error) {
+	return middleware.WithRecoveryResp(func() (*spec.GetMCPServerAuthStatusResponse, error) {
+		if req == nil || req.ServerID == "" {
+			return nil, fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
+		}
+
+		cfgResp, err := w.store.GetMCPServer(context.Background(), &spec.GetMCPServerRequest{
+			ServerID: req.ServerID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if cfgResp == nil || cfgResp.Body == nil {
+			return nil, fmt.Errorf("%w: empty server config response", spec.ErrMCPRuntimeNotReady)
+		}
+
+		st, ok, err := w.store.GetAuthStatus(context.Background(), req.ServerID)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			st = auth.DefaultMCPAuthStatusFromConfig(*cfgResp.Body)
+		} else {
+			st = auth.MergeMCPAuthStatus(st, *cfgResp.Body)
+		}
+		return &spec.GetMCPServerAuthStatusResponse{Body: &st}, nil
+	})
+}
+
 func (w *MCPWrapper) PutMCPServer(req *spec.PutMCPServerRequest) (*spec.PutMCPServerResponse, error) {
 	return middleware.WithRecoveryResp(func() (*spec.PutMCPServerResponse, error) {
 		resp, err := w.store.PutMCPServer(context.Background(), req)
