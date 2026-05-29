@@ -3,8 +3,11 @@ package runtime
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -25,9 +28,10 @@ type pendingApproval struct {
 }
 
 type ApprovalManager struct {
-	mu      sync.Mutex
-	ttl     time.Duration
-	pending map[string]*pendingApproval
+	mu        sync.Mutex
+	ttl       time.Duration
+	pending   map[string]*pendingApproval
+	decisions map[string]spec.MCPApprovalResolution
 }
 
 func NewApprovalManager(ttl time.Duration) *ApprovalManager {
@@ -35,8 +39,9 @@ func NewApprovalManager(ttl time.Duration) *ApprovalManager {
 		ttl = defaultApprovalTTL
 	}
 	return &ApprovalManager{
-		ttl:     ttl,
-		pending: map[string]*pendingApproval{},
+		ttl:       ttl,
+		pending:   map[string]*pendingApproval{},
+		decisions: map[string]spec.MCPApprovalResolution{},
 	}
 }
 
@@ -77,6 +82,9 @@ func (m *ApprovalManager) Resolve(
 	switch res {
 	case spec.MCPApprovalResolutionDenyOnce, spec.MCPApprovalResolutionDenyAlways:
 		delete(m.pending, id)
+		if res == spec.MCPApprovalResolutionDenyAlways {
+			m.decisions[approvalDecisionKey(p.Summary)] = res
+		}
 		return nil, spec.ErrMCPPolicyDenied
 
 	case spec.MCPApprovalResolutionAllowOnce, spec.MCPApprovalResolutionAllowAlways:
@@ -85,6 +93,9 @@ func (m *ApprovalManager) Resolve(
 			return nil, err
 		}
 		p.Token = token
+		if res == spec.MCPApprovalResolutionAllowAlways {
+			m.decisions[approvalDecisionKey(p.Summary)] = res
+		}
 		return &spec.MCPApprovalToken{
 			ApprovalID: id,
 			Token:      token,
@@ -94,6 +105,19 @@ func (m *ApprovalManager) Resolve(
 	default:
 		return nil, fmt.Errorf("%w: invalid resolution", spec.ErrMCPInvalidRequest)
 	}
+}
+
+func (m *ApprovalManager) LookupDecision(summary spec.MCPApprovalSummary) (spec.MCPApprovalResolution, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	res, ok := m.decisions[approvalDecisionKey(summary)]
+	return res, ok
+}
+
+func approvalDecisionKey(summary spec.MCPApprovalSummary) string {
+	raw, _ := json.Marshal(summary)
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:])
 }
 
 func (m *ApprovalManager) VerifyAndConsume(ctx context.Context, id, token string) error {

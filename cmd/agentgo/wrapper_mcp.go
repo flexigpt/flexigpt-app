@@ -52,6 +52,9 @@ func (r *settingSecretResolver) ResolveSecret(
 	if resp == nil || resp.Body == nil {
 		return "", fmt.Errorf("secret ref %s/%s returned empty response", settingSpec.AuthKeyTypeMCP, keyName)
 	}
+	if !resp.Body.NonEmpty {
+		return "", fmt.Errorf("secret ref %s/%s is empty", settingSpec.AuthKeyTypeMCP, keyName)
+	}
 	return resp.Body.Secret, nil
 }
 

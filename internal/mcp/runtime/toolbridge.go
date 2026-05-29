@@ -71,6 +71,20 @@ func (b *ToolBridge) Invoke(
 		Req:    *req.Body,
 	})
 
+	if eval.Decision == spec.MCPApprovalDecisionApprovalRequired && eval.Summary != nil {
+		if cached, ok := b.approvals.LookupDecision(*eval.Summary); ok {
+			switch cached {
+			case spec.MCPApprovalResolutionAllowAlways:
+				eval.Decision = spec.MCPApprovalDecisionAllowed
+				eval.Reason = "cached allow-always decision"
+			case spec.MCPApprovalResolutionDenyAlways:
+				eval.Decision = spec.MCPApprovalDecisionDenied
+				eval.Reason = "cached deny-always decision"
+			default:
+			}
+		}
+	}
+
 	switch eval.Decision {
 	case spec.MCPApprovalDecisionDenied:
 		return nil, fmt.Errorf("%w: %s", spec.ErrMCPPolicyDenied, eval.Reason)

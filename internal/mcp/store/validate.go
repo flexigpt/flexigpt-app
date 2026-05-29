@@ -136,6 +136,9 @@ func validateStdioConfig(c *spec.MCPStdioConfig) error {
 			return errors.New("stdio.secretEnvRefs contains empty key or ref")
 		}
 	}
+	if err := validateNoEnvKeyOverlap(c.Env, c.SecretEnvRefs); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -175,7 +178,10 @@ func validateHTTPConfig(c *spec.MCPStreamableHTTPConfig) error {
 		if strings.EqualFold(k, "authorization") {
 			return errors.New("authorization must use authRef/tokenRef, not customHeaders")
 		}
-		if len(k) > maxMCPHeaderNameLen || len(v) > maxMCPHeaderValueLen {
+		if err := validateHTTPHeaderName(k); err != nil {
+			return fmt.Errorf("streamableHttp.customHeaders[%q]: %w", k, err)
+		}
+		if len(v) > maxMCPHeaderValueLen {
 			return errors.New("streamableHttp.customHeaders contains oversized key/value")
 		}
 	}
@@ -186,6 +192,12 @@ func validateHTTPConfig(c *spec.MCPStreamableHTTPConfig) error {
 		if strings.EqualFold(k, "authorization") {
 			return errors.New("authorization must use authRef/tokenRef, not secretHeaderRefs")
 		}
+		if err := validateHTTPHeaderName(k); err != nil {
+			return fmt.Errorf("streamableHttp.secretHeaderRefs[%q]: %w", k, err)
+		}
+	}
+	if err := validateNoHeaderOverlap(c.CustomHeaders, c.SecretHeaderRefs); err != nil {
+		return err
 	}
 	return nil
 }
@@ -220,6 +232,70 @@ func validateToolPolicyOverride(p spec.MCPToolPolicyOverride) error {
 		case spec.MCPExecutionModeManual, spec.MCPExecutionModeAuto:
 		default:
 			return fmt.Errorf("invalid executionMode %q", *p.ExecutionMode)
+		}
+	}
+	return nil
+}
+
+func validateNoEnvKeyOverlap(env, secretEnvRefs map[string]string) error {
+	seen := make(map[string]string, len(env))
+	for k := range env {
+		if strings.TrimSpace(k) == "" {
+			return errors.New("stdio.env contains empty key")
+		}
+		seen[k] = "stdio.env"
+	}
+	for k := range secretEnvRefs {
+		if strings.TrimSpace(k) == "" {
+			return errors.New("stdio.secretEnvRefs contains empty key")
+		}
+		if prev, ok := seen[k]; ok {
+			return fmt.Errorf("%s and stdio.secretEnvRefs both define %q", prev, k)
+		}
+	}
+	return nil
+}
+
+func validateNoHeaderOverlap(customHeaders, secretHeaderRefs map[string]string) error {
+	seen := make(map[string]string, len(customHeaders)+len(secretHeaderRefs))
+
+	add := func(kind string, headers map[string]string, valuesAreRefs bool) error {
+		for k, v := range headers {
+			if strings.TrimSpace(k) == "" {
+				return fmt.Errorf("%s contains empty header name", kind)
+			}
+			if strings.EqualFold(k, "authorization") {
+				return fmt.Errorf("%s must not define authorization", kind)
+			}
+			if err := validateHTTPHeaderName(k); err != nil {
+				return fmt.Errorf("%s[%q]: %w", kind, k, err)
+			}
+			if valuesAreRefs && strings.TrimSpace(v) == "" {
+				return fmt.Errorf("%s[%q] contains empty secret ref", kind, k)
+			}
+
+			lower := strings.ToLower(k)
+			if prev, ok := seen[lower]; ok {
+				return fmt.Errorf("%s overlaps %s on header %q", prev, kind, k)
+			}
+			seen[lower] = kind
+		}
+		return nil
+	}
+
+	if err := add("streamableHttp.customHeaders", customHeaders, false); err != nil {
+		return err
+	}
+	if err := add("streamableHttp.secretHeaderRefs", secretHeaderRefs, true); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateHTTPHeaderName(name string) error {
+	for _, c := range name {
+		if c <= 0x20 || c > 0x7E || c == ':' {
+			return fmt.Errorf("invalid header name %q", name)
 		}
 	}
 	return nil
