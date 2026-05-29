@@ -38,8 +38,9 @@ func DefaultMCPAuthStatusFromConfig(cfg spec.MCPServerConfig) spec.MCPAuthStatus
 	switch st.AuthMode {
 	case spec.MCPHTTPAuthOAuth:
 		st.State = spec.MCPAuthStateRequired
-	case spec.MCPHTTPAuthClientCredentials,
-		spec.MCPHTTPAuthCustomBearer,
+	case spec.MCPHTTPAuthClientCredentials:
+		st.State = spec.MCPAuthStateRequired
+	case spec.MCPHTTPAuthCustomBearer,
 		spec.MCPHTTPAuthCustomHeaders:
 		st.State = spec.MCPAuthStateAuthorized
 	case spec.MCPHTTPAuthNone, "":

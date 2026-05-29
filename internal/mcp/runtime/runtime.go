@@ -249,6 +249,13 @@ func (m *RuntimeManager) Disconnect(
 			return nil, err
 		}
 	}
+
+	if m.store != nil {
+		if err := m.store.DeleteAuthStatus(ctx, req.ServerID); err != nil {
+			slog.Warn("mcp: delete auth status failed", "serverID", req.ServerID, "err", err)
+		}
+	}
+
 	return &spec.DisconnectMCPServerResponse{}, nil
 }
 

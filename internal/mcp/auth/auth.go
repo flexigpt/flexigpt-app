@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	mcpAuth "github.com/modelcontextprotocol/go-sdk/auth"
-	mcpExtAuth "github.com/modelcontextprotocol/go-sdk/auth/extauth"
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
 
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
@@ -18,7 +17,6 @@ import (
 
 const (
 	maxResolvedHTTPHeaderValueLen = 4096
-	oauthClientCredentialsSlot    = "clientCredentials"
 )
 
 type ResolvedTransportAuth struct {
@@ -135,6 +133,8 @@ func (m *AuthManager) PrepareTransportAuth(
 	for key, ref := range httpCfg.SecretHeaderRefs {
 		v, err := m.secrets.ResolveSecret(ctx, ref)
 		if err != nil {
+			out.Status.State = spec.MCPAuthStateError
+			out.Status.LastError = err.Error()
 			return out, err
 		}
 		out.Headers[key] = v
@@ -337,10 +337,7 @@ func (m *AuthManager) configureClientCredentialsOAuth(
 		return err
 	}
 
-	handler, err := mcpExtAuth.NewClientCredentialsHandler(&mcpExtAuth.ClientCredentialsHandlerConfig{
-		Credentials: creds,
-		HTTPClient:  m.httpClient,
-	})
+	handler, err := newClientCredentialsOAuthHandler(creds, m.httpClient)
 	if err != nil {
 		out.Status.State = spec.MCPAuthStateError
 		out.Status.LastError = err.Error()
@@ -353,13 +350,13 @@ func (m *AuthManager) configureClientCredentialsOAuth(
 		status: spec.MCPAuthStatus{
 			ServerID: cfg.ID,
 			AuthMode: spec.MCPHTTPAuthClientCredentials,
-			State:    spec.MCPAuthStateAuthorized,
+			State:    spec.MCPAuthStateRequired,
 			Resource: out.Status.Resource,
 		},
 	}
 	out.SensitiveValues = append(out.SensitiveValues, raw)
 	out.SensitiveValues = append(out.SensitiveValues, sensitive...)
-	out.Status.State = spec.MCPAuthStateAuthorized
+	out.Status.State = spec.MCPAuthStateRequired
 	return nil
 }
 

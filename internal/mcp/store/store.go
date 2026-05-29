@@ -446,6 +446,34 @@ func (s *Store) GetAuthStatus(ctx context.Context, serverID spec.MCPServerID) (s
 	return st, ok, nil
 }
 
+func (s *Store) DeleteAuthStatus(ctx context.Context, serverID spec.MCPServerID) error {
+	if serverID == "" {
+		return fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sc, err := s.readAll(false)
+	if err != nil {
+		return err
+	}
+	delete(sc.AuthStatuses, serverID)
+	return s.writeAll(sc)
+}
+
+func (s *Store) ClearAuthStatuses(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sc, err := s.readAll(false)
+	if err != nil {
+		return err
+	}
+	sc.AuthStatuses = map[spec.MCPServerID]spec.MCPAuthStatus{}
+	return s.writeAll(sc)
+}
+
 func (s *Store) readAll(force bool) (storeSchema, error) {
 	raw, err := s.file.GetAll(force)
 	if err != nil {

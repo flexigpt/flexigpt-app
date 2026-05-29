@@ -12,6 +12,10 @@ import (
 	"golang.org/x/oauth2"
 )
 
+type authStatusProvider interface {
+	AuthStatus() (spec.MCPAuthStatus, bool)
+}
+
 type trackingTokenSource struct {
 	source oauth2.TokenSource
 	sink   AuthStatusSink
@@ -66,6 +70,25 @@ func (h *trackedOAuthHandler) Authorize(
 	if err != nil {
 		h.publish(ctx, authStatusFromHTTPFailure(h.status, resp, err))
 		return err
+	}
+
+	if provider, ok := h.inner.(authStatusProvider); ok {
+		if st, ok := provider.AuthStatus(); ok {
+			if st.ServerID == "" {
+				st.ServerID = h.status.ServerID
+			}
+			if st.AuthMode == "" {
+				st.AuthMode = h.status.AuthMode
+			}
+			if st.State == "" {
+				st.State = spec.MCPAuthStateAuthorized
+			}
+			if st.Resource == "" && resourceURL != "" {
+				st.Resource = resourceURL
+			}
+			h.publish(ctx, st)
+			return nil
+		}
 	}
 
 	st := h.status

@@ -82,6 +82,11 @@ func InitMCPWrapper(ctx context.Context, w *MCPWrapper, baseDir string, secrets 
 		return err
 	}
 
+	if err := st.ClearAuthStatuses(ctx); err != nil {
+		_ = st.Close()
+		return err
+	}
+
 	oauthBroker, err := auth.NewOAuthLoopbackBroker(ctx, nil)
 	if err != nil {
 		_ = st.Close()
