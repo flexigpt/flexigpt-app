@@ -137,7 +137,7 @@ func TestFTSDeletePurgesIndex(t *testing.T) {
 		}
 
 		if i < retries-1 {
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond * retries)
 		}
 	}
 
