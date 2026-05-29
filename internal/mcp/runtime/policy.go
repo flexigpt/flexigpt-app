@@ -19,6 +19,14 @@ func Evaluate(in EvaluationInput) spec.MCPApprovalEvaluation {
 		p = spec.DefaultMCPServerPolicy()
 	}
 
+	if in.Tool.TaskSupport == spec.MCPTaskSupportRequired {
+		return spec.MCPApprovalEvaluation{
+			Decision: spec.MCPApprovalDecisionDenied,
+			Reason:   "task-required MCP tools are unsupported",
+			Summary:  summary(in),
+		}
+	}
+
 	rule := p.DefaultApprovalRule
 	if ov, ok := in.Server.ToolPolicies[in.Tool.ToolName]; ok {
 		if ov.ApprovalRule != nil {

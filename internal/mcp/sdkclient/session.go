@@ -271,6 +271,8 @@ func (s *Session) listAllTools(
 				continue
 			}
 
+			taskSupport := taskSupportFromMeta(t.Meta)
+
 			out = append(out, spec.MCPToolCapability{
 				ServerID:         serverID,
 				ToolName:         t.Name,
@@ -290,11 +292,14 @@ func (s *Session) listAllTools(
 				ApprovalRule:  defaultPolicy.DefaultApprovalRule,
 				ExecutionMode: defaultPolicy.DefaultExecutionMode,
 
-				TaskSupport: taskSupportFromMeta(t.Meta),
-				App:         appInfoFromMeta(t.Meta),
+				TaskSupport: taskSupport,
 
-				Digest:  digestAny(t),
-				Enabled: true,
+				App: appInfoFromMeta(t.Meta),
+
+				Digest: digestAny(t),
+				// Task-required tools are surfaced as disabled because this app
+				// does not support MCP task augmentation.
+				Enabled: taskSupport != spec.MCPTaskSupportRequired,
 			})
 		}
 
