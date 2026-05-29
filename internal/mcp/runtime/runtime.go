@@ -15,8 +15,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/store"
 )
 
-const defaultOAuthAuthorizationTimeout = 10 * time.Minute
-
 type ClientSession interface {
 	Close(ctx context.Context) error
 	Ping(ctx context.Context) error
@@ -154,18 +152,13 @@ func (m *RuntimeManager) Connect(
 		resolved.Env = maps.Clone(cfg.Stdio.Env)
 	}
 
-	if m.auth != nil {
-		prepared, err := m.auth.PrepareTransportAuth(ctx, cfg)
-		if err != nil {
-			m.setErrorIfCurrent(req.ServerID, generation, err)
-			return nil, err
-		}
-		mergeResolvedTransportAuth(&resolved, prepared)
-	} else if transportRequiresAuth(cfg) {
-		err := fmt.Errorf("%w: transport authentication is not configured", spec.ErrMCPAuthRequired)
+	prepared, err := m.auth.PrepareTransportAuth(ctx, cfg)
+	if err != nil {
 		m.setErrorIfCurrent(req.ServerID, generation, err)
 		return nil, err
 	}
+	mergeResolvedTransportAuth(&resolved, prepared)
+
 	connectTimeout := time.Duration(spec.DefaultConnectTimeoutMS) * time.Millisecond
 	if cfg.Transport == spec.MCPTransportStreamableHTTP && cfg.StreamableHTTP != nil &&
 		cfg.StreamableHTTP.TimeoutMS > 0 {
@@ -174,12 +167,13 @@ func (m *RuntimeManager) Connect(
 	if cfg.Transport == spec.MCPTransportStdio && cfg.Stdio != nil && cfg.Stdio.StartupTimeoutMS > 0 {
 		connectTimeout = time.Duration(cfg.Stdio.StartupTimeoutMS) * time.Millisecond
 	}
+	// Only the interactive authorization-code flow needs an extended connect window.
+	// "client_credentials" is a single non-interactive token-endpoint call and uses the regular connect timeout.
 	if cfg.Transport == spec.MCPTransportStreamableHTTP &&
 		cfg.StreamableHTTP != nil &&
-		(cfg.StreamableHTTP.AuthMode == spec.MCPHTTPAuthOAuth ||
-			cfg.StreamableHTTP.AuthMode == spec.MCPHTTPAuthClientCredentials) &&
-		connectTimeout < defaultOAuthAuthorizationTimeout {
-		connectTimeout = defaultOAuthAuthorizationTimeout
+		cfg.StreamableHTTP.AuthMode == spec.MCPHTTPAuthOAuth &&
+		connectTimeout < spec.DefaultInteractiveOAuthTimeout {
+		connectTimeout = spec.DefaultInteractiveOAuthTimeout
 	}
 
 	cctx, cancel := context.WithTimeout(ctx, connectTimeout)
@@ -675,12 +669,12 @@ func (m *RuntimeManager) scheduleNotificationRefresh(ctx context.Context, server
 	}
 
 	if timer := m.notificationRefreshTimers[serverID]; timer != nil {
-		timer.Reset(notificationRefreshDebounce)
+		timer.Reset(spec.NotificationRefreshDebounce)
 		return
 	}
 
 	var timer *time.Timer
-	timer = time.AfterFunc(notificationRefreshDebounce, func() {
+	timer = time.AfterFunc(spec.NotificationRefreshDebounce, func() {
 		m.refreshFromNotification(ctx, serverID, reason, timer)
 	})
 	m.notificationRefreshTimers[serverID] = timer
@@ -917,25 +911,6 @@ func applyToolPolicyOverlay(tool spec.MCPToolCapability, cfg spec.MCPServerConfi
 		}
 	}
 	return tool
-}
-
-func transportRequiresAuth(cfg spec.MCPServerConfig) bool {
-	switch cfg.Transport {
-	case spec.MCPTransportStreamableHTTP:
-		if cfg.StreamableHTTP == nil {
-			return false
-		}
-		switch cfg.StreamableHTTP.AuthMode {
-		case spec.MCPHTTPAuthOAuth, spec.MCPHTTPAuthClientCredentials:
-			return true
-		default:
-		}
-	case spec.MCPTransportStdio:
-		return cfg.Stdio != nil && len(cfg.Stdio.SecretEnvRefs) > 0
-	default:
-	}
-
-	return false
 }
 
 func mergeResolvedTransportAuth(dst *auth.ResolvedTransportAuth, src auth.ResolvedTransportAuth) {

@@ -207,12 +207,8 @@ func (b *OAuthLoopbackBroker) Pending() []spec.MCPOAuthAuthorization {
 		})
 	}
 
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].ServerID == out[j].ServerID {
-			return out[i].ExpiresAt < out[j].ExpiresAt
-		}
-		return out[i].ServerID < out[j].ServerID
-	})
+	// One pending authorization per ServerID by construction.
+	sort.Slice(out, func(i, j int) bool { return out[i].ServerID < out[j].ServerID })
 
 	return out
 }

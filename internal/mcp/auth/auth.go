@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	mcpAuth "github.com/modelcontextprotocol/go-sdk/auth"
+	"github.com/modelcontextprotocol/go-sdk/auth/extauth"
 
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
 
@@ -294,7 +295,10 @@ func (m *AuthManager) configureClientCredentialsOAuth(
 		return err
 	}
 
-	handler, err := newClientCredentialsOAuthHandler(creds, m.httpClient)
+	handler, err := extauth.NewClientCredentialsHandler(&extauth.ClientCredentialsHandlerConfig{
+		Credentials: creds,
+		HTTPClient:  m.httpClient,
+	})
 	if err != nil {
 		out.Status.State = spec.MCPAuthStateError
 		out.Status.LastError = err.Error()

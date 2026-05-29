@@ -18,6 +18,14 @@ const (
 
 	MCPHostName    = "FlexiGPT"
 	MCPHostVersion = "dev"
+
+	// DefaultInteractiveOAuthTimeout bounds the connect step for the interactive
+	// OAuth 2.1 authorization-code flow, where a human may need to complete a
+	// browser login. Non-interactive flows (client_credentials, none, stdio) use
+	// the regular configured connect timeout.
+	DefaultInteractiveOAuthTimeout = 10 * time.Minute
+
+	NotificationRefreshDebounce = 1 * time.Second
 )
 
 var (

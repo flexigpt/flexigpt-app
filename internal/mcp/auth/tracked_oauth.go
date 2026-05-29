@@ -3,8 +3,8 @@ package auth
 import (
 	"context"
 	"errors"
-	"io"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
@@ -13,10 +13,9 @@ import (
 	"golang.org/x/oauth2"
 )
 
-type authStatusProvider interface {
-	AuthStatus() (spec.MCPAuthStatus, bool)
-}
-
+// trackingTokenSource wraps an oauth2.TokenSource and pushes status updates to
+// the configured sink on every Token() call. The underlying source already
+// handles caching and refresh; this wrapper only observes results.
 type trackingTokenSource struct {
 	source oauth2.TokenSource
 	sink   AuthStatusSink
@@ -32,19 +31,21 @@ func (s *trackingTokenSource) Token() (*oauth2.Token, error) {
 		return nil, err
 	}
 	if tok == nil {
-		err := errors.New("oauth token source returned nil token")
+		nilErr := errors.New("oauth token source returned nil token")
 		if s.sink != nil {
-			_ = s.sink.SaveAuthStatus(context.Background(), authStatusFromTokenError(s.status, err))
+			_ = s.sink.SaveAuthStatus(context.Background(), authStatusFromTokenError(s.status, nilErr))
 		}
-		return nil, err
+		return nil, nilErr
 	}
 	if s.sink != nil {
 		_ = s.sink.SaveAuthStatus(context.Background(), authStatusFromToken(s.status, tok))
 	}
-
 	return tok, nil
 }
 
+// trackedOAuthHandler decorates a SDK OAuthHandler with auth-status tracking.
+// It never touches the HTTP request/response body itself; body lifecycle is
+// owned by the wrapped SDK handler.
 type trackedOAuthHandler struct {
 	inner  mcpAuth.OAuthHandler
 	sink   AuthStatusSink
@@ -58,10 +59,9 @@ func (h *trackedOAuthHandler) TokenSource(ctx context.Context) (oauth2.TokenSour
 		return nil, err
 	}
 	if ts == nil {
-		//nolint:nilnil // Ok to return nik when token source is nil.
+		//nolint:nilnil // The SDK contract allows a nil token source before authorization.
 		return nil, nil
 	}
-
 	return &trackingTokenSource{
 		source: ts,
 		sink:   h.sink,
@@ -74,50 +74,26 @@ func (h *trackedOAuthHandler) Authorize(
 	req *http.Request,
 	resp *http.Response,
 ) error {
-	defer drainAndClose(resp)
-
-	resourceURL := ""
-	if req != nil && req.URL != nil {
-		resourceURL = req.URL.String()
-	}
+	// Body lifecycle is owned by the inner SDK handler; both
+	// AuthorizationCodeHandler and extauth.ClientCredentialsHandler drain and
+	// close it via their own defers. We must not touch it here.
 	err := h.inner.Authorize(ctx, req, resp)
 	if err != nil {
 		h.publish(ctx, authStatusFromHTTPFailure(h.status, resp, err))
 		return err
 	}
 
-	if provider, ok := h.inner.(authStatusProvider); ok {
-		if st, ok := provider.AuthStatus(); ok {
-			if st.ServerID == "" {
-				st.ServerID = h.status.ServerID
-			}
-			if st.AuthMode == "" {
-				st.AuthMode = h.status.AuthMode
-			}
-			if st.State == "" {
-				st.State = spec.MCPAuthStateAuthorized
-			}
-			if st.Resource == "" && resourceURL != "" {
-				st.Resource = resourceURL
-			}
-			h.publish(ctx, st)
-			return nil
-		}
+	// The SDK returns nil from Authorize in two cases:
+	//   1. Authorization actually happened and a token source was produced.
+	//   2. The SDK chose to retry the call without performing authorization
+	//      (e.g. 403 without an insufficient_scope challenge). In that case
+	//      no new token exists.
+	// Only publish "authorized" in case 1.
+	tokenStatus, ok := h.currentTokenStatus(ctx)
+	if !ok {
+		return nil
 	}
-
-	st := h.status
-	st.State = spec.MCPAuthStateAuthorized
-	st.LastError = ""
-	if st.Resource == "" && resourceURL != "" {
-		st.Resource = resourceURL
-	}
-	if tokenStatus, ok := h.currentTokenStatus(ctx); ok {
-		if tokenStatus.Resource == "" && resourceURL != "" {
-			tokenStatus.Resource = resourceURL
-		}
-		st = tokenStatus
-	}
-	h.publish(ctx, st)
+	h.publish(ctx, tokenStatus)
 	return nil
 }
 
@@ -129,10 +105,12 @@ func (h *trackedOAuthHandler) currentTokenStatus(ctx context.Context) (spec.MCPA
 	if ts == nil {
 		return spec.MCPAuthStatus{}, false
 	}
-
 	tok, err := ts.Token()
 	if err != nil {
 		return authStatusFromTokenError(h.status, err), true
+	}
+	if tok == nil {
+		return spec.MCPAuthStatus{}, false
 	}
 	return authStatusFromToken(h.status, tok), true
 }
@@ -141,7 +119,6 @@ func (h *trackedOAuthHandler) publish(ctx context.Context, st spec.MCPAuthStatus
 	if h == nil || h.sink == nil {
 		return
 	}
-
 	_ = h.sink.SaveAuthStatus(context.WithoutCancel(ctx), st)
 }
 
@@ -153,7 +130,6 @@ func authStatusFromToken(base spec.MCPAuthStatus, tok *oauth2.Token) spec.MCPAut
 	if tok == nil {
 		return st
 	}
-
 	if !tok.Expiry.IsZero() {
 		expiresAt := tok.Expiry.UTC()
 		st.ExpiresAt = &expiresAt
@@ -161,7 +137,6 @@ func authStatusFromToken(base spec.MCPAuthStatus, tok *oauth2.Token) spec.MCPAut
 	if scopes := scopesFromOAuthToken(tok); len(scopes) > 0 {
 		st.Scopes = scopes
 	}
-
 	return st
 }
 
@@ -171,12 +146,10 @@ func authStatusFromTokenError(base spec.MCPAuthStatus, err error) spec.MCPAuthSt
 	if err != nil {
 		st.LastError = err.Error()
 	}
-
 	var retrieveErr *oauth2.RetrieveError
 	if errors.As(err, &retrieveErr) && retrieveErr.ErrorCode == "invalid_grant" {
 		st.State = spec.MCPAuthStateExpired
 	}
-
 	return st
 }
 
@@ -193,7 +166,6 @@ func authStatusFromHTTPFailure(
 	if resp == nil {
 		return st
 	}
-
 	challengeErr, scopes := bearerChallengeValues(resp.Header.Values("WWW-Authenticate"))
 	if len(scopes) > 0 {
 		st.Scopes = scopes
@@ -209,14 +181,6 @@ func authStatusFromHTTPFailure(
 		st.State = spec.MCPAuthStateError
 	}
 	return st
-}
-
-func drainAndClose(resp *http.Response) {
-	if resp == nil || resp.Body == nil {
-		return
-	}
-	defer resp.Body.Close()
-	_, _ = io.Copy(io.Discard, resp.Body)
 }
 
 func bearerChallengeValues(headers []string) (challengeErr string, scopes []string) {
@@ -236,4 +200,29 @@ func bearerChallengeValues(headers []string) (challengeErr string, scopes []stri
 		}
 	}
 	return challengeErr, scopes
+}
+
+// scopesFromOAuthToken extracts a "scope" claim from an oauth2.Token's extras.
+// Some authorization servers return it as a space-separated string, others as
+// an array; tolerate both. Returns nil when no scope information is present.
+func scopesFromOAuthToken(tok *oauth2.Token) []string {
+	if tok == nil {
+		return nil
+	}
+	switch v := tok.Extra("scope").(type) {
+	case string:
+		return strings.Fields(v)
+	case []string:
+		return slices.Clone(v)
+	case []any:
+		out := make([]string, 0, len(v))
+		for _, item := range v {
+			if s, ok := item.(string); ok && strings.TrimSpace(s) != "" {
+				out = append(out, s)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
 }

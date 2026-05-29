@@ -2,12 +2,9 @@ package runtime
 
 import (
 	"context"
-	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
-
-const notificationRefreshDebounce = 500 * time.Millisecond
 
 type ClientNotificationKind string
 
