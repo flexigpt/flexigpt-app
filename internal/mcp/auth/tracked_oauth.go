@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 
@@ -30,6 +31,17 @@ func (s *trackingTokenSource) Token() (*oauth2.Token, error) {
 		}
 		return nil, err
 	}
+	if tok == nil {
+		err := errors.New("oauth token source returned nil token")
+		if s.sink != nil {
+			_ = s.sink.SaveAuthStatus(context.Background(), authStatusFromTokenError(s.status, err))
+		}
+		return nil, err
+	}
+	if s.sink != nil {
+		_ = s.sink.SaveAuthStatus(context.Background(), authStatusFromToken(s.status, tok))
+	}
+
 	return tok, nil
 }
 
@@ -62,6 +74,8 @@ func (h *trackedOAuthHandler) Authorize(
 	req *http.Request,
 	resp *http.Response,
 ) error {
+	defer drainAndClose(resp)
+
 	resourceURL := ""
 	if req != nil && req.URL != nil {
 		resourceURL = req.URL.String()
@@ -166,29 +180,6 @@ func authStatusFromTokenError(base spec.MCPAuthStatus, err error) spec.MCPAuthSt
 	return st
 }
 
-func scopesFromOAuthToken(tok *oauth2.Token) []string {
-	if tok == nil {
-		return nil
-	}
-
-	switch v := tok.Extra("scope").(type) {
-	case string:
-		return strings.Fields(v)
-	case []string:
-		return append([]string(nil), v...)
-	case []any:
-		out := make([]string, 0, len(v))
-		for _, item := range v {
-			if s, ok := item.(string); ok && strings.TrimSpace(s) != "" {
-				out = append(out, s)
-			}
-		}
-		return out
-	default:
-		return nil
-	}
-}
-
 func authStatusFromHTTPFailure(
 	base spec.MCPAuthStatus,
 	resp *http.Response,
@@ -208,7 +199,7 @@ func authStatusFromHTTPFailure(
 		st.Scopes = scopes
 	}
 	switch {
-	case resp.StatusCode == http.StatusForbidden && challengeErr == "insufficient_scope":
+	case challengeErr == "insufficient_scope":
 		st.State = spec.MCPAuthStateInsufficientScope
 	case challengeErr == "invalid_token":
 		st.State = spec.MCPAuthStateExpired
@@ -218,6 +209,14 @@ func authStatusFromHTTPFailure(
 		st.State = spec.MCPAuthStateError
 	}
 	return st
+}
+
+func drainAndClose(resp *http.Response) {
+	if resp == nil || resp.Body == nil {
+		return
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
 }
 
 func bearerChallengeValues(headers []string) (challengeErr string, scopes []string) {

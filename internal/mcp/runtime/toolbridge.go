@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
@@ -77,6 +78,9 @@ func (b *ToolBridge) Invoke(
 
 	switch eval.Decision {
 	case spec.MCPApprovalDecisionDenied:
+		if strings.TrimSpace(eval.Reason) == toolDigestChangedReason {
+			return nil, fmt.Errorf("%w: %s", spec.ErrMCPStaleReference, eval.Reason)
+		}
 		return nil, fmt.Errorf("%w: %s", spec.ErrMCPPolicyDenied, eval.Reason)
 
 	case spec.MCPApprovalDecisionApprovalRequired:

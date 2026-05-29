@@ -12,18 +12,10 @@ type MCPStdioConfig struct {
 }
 
 type MCPStreamableHTTPConfig struct {
-	URL              string            `json:"url"`
-	TimeoutMS        int               `json:"timeoutMS,omitempty"`
-	CustomHeaders    map[string]string `json:"customHeaders,omitempty"`
-	SecretHeaderRefs map[string]string `json:"secretHeaderRefs,omitempty"`
-	AuthMode         MCPHTTPAuthMode   `json:"authMode"`
-}
-
-type MCPAuthRef struct {
+	URL                 string          `json:"url"`
+	TimeoutMS           int             `json:"timeoutMS,omitempty"`
 	AuthMode            MCPHTTPAuthMode `json:"authMode"`
-	TokenRef            string          `json:"tokenRef,omitempty"`
 	ClientCredentialRef string          `json:"clientCredentialRef,omitempty"`
-	MetadataRef         string          `json:"metadataRef,omitempty"`
 }
 
 type MCPAuthStatus struct {
@@ -54,7 +46,6 @@ type MCPServerConfig struct {
 	DefaultPolicy MCPServerPolicy                  `json:"defaultPolicy"`
 	ToolPolicies  map[string]MCPToolPolicyOverride `json:"toolPolicies,omitempty"`
 	AppsPolicy    *MCPAppsPolicy                   `json:"appsPolicy,omitempty"`
-	AuthRef       *MCPAuthRef                      `json:"authRef,omitempty"`
 
 	CreatedAt     time.Time  `json:"createdAt"`
 	ModifiedAt    time.Time  `json:"modifiedAt"`

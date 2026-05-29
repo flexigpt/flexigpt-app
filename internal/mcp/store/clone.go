@@ -21,8 +21,6 @@ func cloneServerConfig(in spec.MCPServerConfig) spec.MCPServerConfig {
 
 	if in.StreamableHTTP != nil {
 		cp := *in.StreamableHTTP
-		cp.CustomHeaders = maps.Clone(in.StreamableHTTP.CustomHeaders)
-		cp.SecretHeaderRefs = maps.Clone(in.StreamableHTTP.SecretHeaderRefs)
 		out.StreamableHTTP = &cp
 	}
 
@@ -35,11 +33,6 @@ func cloneServerConfig(in spec.MCPServerConfig) spec.MCPServerConfig {
 	if in.AppsPolicy != nil {
 		cp := *in.AppsPolicy
 		out.AppsPolicy = &cp
-	}
-
-	if in.AuthRef != nil {
-		cp := *in.AuthRef
-		out.AuthRef = &cp
 	}
 
 	out.SoftDeletedAt = cloneTimePtr(in.SoftDeletedAt)

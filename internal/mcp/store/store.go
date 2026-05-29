@@ -22,7 +22,6 @@ type storeSchema struct {
 	SchemaVersion      string                                         `json:"schemaVersion"`
 	Servers            map[spec.MCPServerID]spec.MCPServerConfig      `json:"servers"`
 	LastKnownSnapshots map[spec.MCPServerID]spec.MCPDiscoverySnapshot `json:"lastKnownSnapshots,omitempty"`
-	AuthStatuses       map[spec.MCPServerID]spec.MCPAuthStatus        `json:"authStatuses,omitempty"`
 }
 
 type Store struct {
@@ -44,7 +43,6 @@ func NewStore(baseDir string) (*Store, error) {
 		SchemaVersion:      spec.MCPSchemaVersion,
 		Servers:            map[spec.MCPServerID]spec.MCPServerConfig{},
 		LastKnownSnapshots: map[spec.MCPServerID]spec.MCPDiscoverySnapshot{},
-		AuthStatuses:       map[spec.MCPServerID]spec.MCPAuthStatus{},
 	})
 	if err != nil {
 		return nil, err
@@ -112,7 +110,6 @@ func (s *Store) PutMCPServer(
 		DefaultPolicy:  policy,
 		ToolPolicies:   req.Body.ToolPolicies,
 		AppsPolicy:     req.Body.AppsPolicy,
-		AuthRef:        req.Body.AuthRef,
 		CreatedAt:      created,
 		ModifiedAt:     now,
 	}
@@ -122,10 +119,9 @@ func (s *Store) PutMCPServer(
 	}
 
 	if old, ok := sc.Servers[req.ServerID]; ok && serverConnectionMaterialChanged(old, cfg) {
-		// A changed endpoint/process/auth ref invalidates the live/discovered
-		// view. Runtime disconnect is handled by the wrapper.
+		// A changed endpoint/process invalidates the live/discovered view.
+		// Runtime disconnect is handled by the wrapper.
 		delete(sc.LastKnownSnapshots, req.ServerID)
-		delete(sc.AuthStatuses, req.ServerID)
 	}
 
 	sc.Servers[req.ServerID] = cloneServerConfig(cfg)
@@ -373,7 +369,6 @@ func (s *Store) DeleteMCPServer(
 	cfg.ModifiedAt = now
 	sc.Servers[req.ServerID] = cloneServerConfig(cfg)
 	delete(sc.LastKnownSnapshots, req.ServerID)
-	delete(sc.AuthStatuses, req.ServerID)
 
 	if err := s.writeAll(sc); err != nil {
 		return nil, err
@@ -415,65 +410,6 @@ func (s *Store) GetLastKnownSnapshot(
 	return cloneDiscoverySnapshot(snap), ok, nil
 }
 
-func (s *Store) SaveAuthStatus(ctx context.Context, st spec.MCPAuthStatus) error {
-	if st.ServerID == "" {
-		return fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	sc, err := s.readAll(false)
-	if err != nil {
-		return err
-	}
-	if _, ok := sc.Servers[st.ServerID]; !ok {
-		return fmt.Errorf("%w: %s", spec.ErrMCPServerNotFound, st.ServerID)
-	}
-	sc.AuthStatuses[st.ServerID] = st
-	return s.writeAll(sc)
-}
-
-func (s *Store) GetAuthStatus(ctx context.Context, serverID spec.MCPServerID) (spec.MCPAuthStatus, bool, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	sc, err := s.readAll(false)
-	if err != nil {
-		return spec.MCPAuthStatus{}, false, err
-	}
-	st, ok := sc.AuthStatuses[serverID]
-	return st, ok, nil
-}
-
-func (s *Store) DeleteAuthStatus(ctx context.Context, serverID spec.MCPServerID) error {
-	if serverID == "" {
-		return fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	sc, err := s.readAll(false)
-	if err != nil {
-		return err
-	}
-	delete(sc.AuthStatuses, serverID)
-	return s.writeAll(sc)
-}
-
-func (s *Store) ClearAuthStatuses(ctx context.Context) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	sc, err := s.readAll(false)
-	if err != nil {
-		return err
-	}
-	sc.AuthStatuses = map[spec.MCPServerID]spec.MCPAuthStatus{}
-	return s.writeAll(sc)
-}
-
 func (s *Store) readAll(force bool) (storeSchema, error) {
 	raw, err := s.file.GetAll(force)
 	if err != nil {
@@ -496,9 +432,6 @@ func (s *Store) readAll(force bool) (storeSchema, error) {
 	if sc.LastKnownSnapshots == nil {
 		sc.LastKnownSnapshots = map[spec.MCPServerID]spec.MCPDiscoverySnapshot{}
 	}
-	if sc.AuthStatuses == nil {
-		sc.AuthStatuses = map[spec.MCPServerID]spec.MCPAuthStatus{}
-	}
 
 	for id, cfg := range sc.Servers {
 		if cfg.ID != id {
@@ -520,9 +453,6 @@ func (s *Store) writeAll(sc storeSchema) error {
 	if sc.LastKnownSnapshots == nil {
 		sc.LastKnownSnapshots = map[spec.MCPServerID]spec.MCPDiscoverySnapshot{}
 	}
-	if sc.AuthStatuses == nil {
-		sc.AuthStatuses = map[spec.MCPServerID]spec.MCPAuthStatus{}
-	}
 
 	mp, err := jsonencdec.StructWithJSONTagsToMap(sc)
 	if err != nil {
@@ -534,6 +464,5 @@ func (s *Store) writeAll(sc storeSchema) error {
 func serverConnectionMaterialChanged(a, b spec.MCPServerConfig) bool {
 	return a.Transport != b.Transport ||
 		!reflect.DeepEqual(a.Stdio, b.Stdio) ||
-		!reflect.DeepEqual(a.StreamableHTTP, b.StreamableHTTP) ||
-		!reflect.DeepEqual(a.AuthRef, b.AuthRef)
+		!reflect.DeepEqual(a.StreamableHTTP, b.StreamableHTTP)
 }

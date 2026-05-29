@@ -3,9 +3,9 @@ package store
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/mcp/secret"
@@ -16,11 +16,7 @@ const (
 	maxMCPDisplayNameLen = 256
 	maxMCPCommandLen     = 4096
 	maxMCPURLLen         = 4096
-	maxMCPHeaderNameLen  = 128
-	maxMCPHeaderValueLen = 4096
 )
-
-var mcpIDRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 
 func validateServerConfig(c *spec.MCPServerConfig) error {
 	if c == nil {
@@ -29,7 +25,7 @@ func validateServerConfig(c *spec.MCPServerConfig) error {
 	if c.SchemaVersion != spec.MCPSchemaVersion {
 		return fmt.Errorf("schemaVersion %q != %q", c.SchemaVersion, spec.MCPSchemaVersion)
 	}
-	if !mcpIDRe.MatchString(string(c.ID)) {
+	if strings.TrimSpace(string(c.ID)) == "" {
 		return errors.New("id must match ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 	}
 	if strings.TrimSpace(c.DisplayName) == "" {
@@ -106,7 +102,7 @@ func validateServerConfig(c *spec.MCPServerConfig) error {
 		if err := validateHTTPConfig(c.ID, c.StreamableHTTP); err != nil {
 			return err
 		}
-		return validateHTTPAuthRef(c)
+		return nil
 	default:
 		return fmt.Errorf("invalid transport %q", c.Transport)
 	}
@@ -171,9 +167,17 @@ func validateHTTPConfig(serverID spec.MCPServerID, c *spec.MCPStreamableHTTPConf
 		return errors.New("streamableHttp.url host is empty")
 	}
 
+	if u.Scheme != "https" {
+		if u.Scheme != "http" {
+			return errors.New("streamableHttp.url scheme must be http or https")
+		}
+		if !isLoopbackHost(u.Hostname()) {
+			return errors.New("streamableHttp.url using http is only allowed for loopback hosts")
+		}
+	}
+
 	switch c.AuthMode {
-	case "", spec.MCPHTTPAuthNone, spec.MCPHTTPAuthOAuth, spec.MCPHTTPAuthClientCredentials,
-		spec.MCPHTTPAuthCustomBearer, spec.MCPHTTPAuthCustomHeaders:
+	case "", spec.MCPHTTPAuthNone, spec.MCPHTTPAuthOAuth, spec.MCPHTTPAuthClientCredentials:
 	default:
 		return fmt.Errorf("invalid streamableHttp.authMode %q", c.AuthMode)
 	}
@@ -181,47 +185,41 @@ func validateHTTPConfig(serverID spec.MCPServerID, c *spec.MCPStreamableHTTPConf
 		c.AuthMode = spec.MCPHTTPAuthNone
 	}
 
-	for k, v := range c.CustomHeaders {
-		if strings.TrimSpace(k) == "" {
-			return errors.New("streamableHttp.customHeaders contains empty header")
+	switch c.AuthMode {
+	case spec.MCPHTTPAuthClientCredentials:
+		if strings.TrimSpace(c.ClientCredentialRef) == "" {
+			return errors.New("streamableHttp.clientCredentialRef is required for clientCredentials authMode")
 		}
-		if strings.EqualFold(k, "authorization") {
-			return errors.New("authorization must use authRef/tokenRef, not customHeaders")
+		if err := validateOAuthClientCredentialRef(serverID, c.ClientCredentialRef); err != nil {
+			return fmt.Errorf("streamableHttp.clientCredentialRef: %w", err)
 		}
-		if err := validateHTTPHeaderName(k); err != nil {
-			return fmt.Errorf("streamableHttp.customHeaders[%q]: %w", k, err)
+	case spec.MCPHTTPAuthOAuth:
+		if strings.TrimSpace(c.ClientCredentialRef) != "" {
+			if err := validateOAuthClientCredentialRef(serverID, c.ClientCredentialRef); err != nil {
+				return fmt.Errorf("streamableHttp.clientCredentialRef: %w", err)
+			}
 		}
-		if err := validateUserHTTPHeaderAllowed(k); err != nil {
-			return fmt.Errorf("streamableHttp.customHeaders[%q]: %w", k, err)
+	case spec.MCPHTTPAuthNone:
+		if strings.TrimSpace(c.ClientCredentialRef) != "" {
+			return errors.New(
+				"streamableHttp.clientCredentialRef is only allowed when authMode is oauth or clientCredentials",
+			)
 		}
-		if len(v) > maxMCPHeaderValueLen {
-			return errors.New("streamableHttp.customHeaders contains oversized key/value")
-		}
-		if strings.ContainsAny(v, "\r\n") {
-			return fmt.Errorf("streamableHttp.customHeaders[%q] contains newline characters", k)
-		}
-	}
-	for k, ref := range c.SecretHeaderRefs {
-		if strings.TrimSpace(k) == "" || strings.TrimSpace(ref) == "" {
-			return errors.New("streamableHttp.secretHeaderRefs contains empty key or ref")
-		}
-		if strings.EqualFold(k, "authorization") {
-			return errors.New("authorization must use authRef/tokenRef, not secretHeaderRefs")
-		}
-		if err := validateHTTPHeaderName(k); err != nil {
-			return fmt.Errorf("streamableHttp.secretHeaderRefs[%q]: %w", k, err)
-		}
-		if err := validateUserHTTPHeaderAllowed(k); err != nil {
-			return fmt.Errorf("streamableHttp.secretHeaderRefs[%q]: %w", k, err)
-		}
-		if err := secret.ValidateMCPSecretRef(ref, serverID, spec.MCPSecretKindHTTPHeader, k); err != nil {
-			return fmt.Errorf("streamableHttp.secretHeaderRefs[%q]: %w", k, err)
-		}
-	}
-	if err := validateNoHeaderOverlap(c.CustomHeaders, c.SecretHeaderRefs); err != nil {
-		return err
 	}
 	return nil
+}
+
+func validateOAuthClientCredentialRef(serverID spec.MCPServerID, ref string) error {
+	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		return errors.New("streamableHttp.clientCredentialRef is empty")
+	}
+	return secret.ValidateMCPSecretRef(
+		ref,
+		serverID,
+		spec.MCPSecretKindOAuthClientCredentials,
+		"clientCredentials",
+	)
 }
 
 func validatePolicy(p spec.MCPServerPolicy) error {
@@ -279,141 +277,6 @@ func validateNoEnvKeyOverlap(env, secretEnvRefs map[string]string) error {
 	return nil
 }
 
-func validateHTTPAuthRef(c *spec.MCPServerConfig) error {
-	if c == nil || c.StreamableHTTP == nil || c.AuthRef == nil {
-		return nil
-	}
-
-	mode := c.StreamableHTTP.AuthMode
-	authMode := spec.MCPHTTPAuthMode(strings.TrimSpace(string(c.AuthRef.AuthMode)))
-	tokenRef := strings.TrimSpace(c.AuthRef.TokenRef)
-	clientCredentialRef := strings.TrimSpace(c.AuthRef.ClientCredentialRef)
-	metadataRef := strings.TrimSpace(c.AuthRef.MetadataRef)
-
-	switch mode {
-	case "", spec.MCPHTTPAuthNone, spec.MCPHTTPAuthCustomHeaders:
-		if authMode != "" || tokenRef != "" || clientCredentialRef != "" || metadataRef != "" {
-			return fmt.Errorf("authRef is not supported when streamableHttp.authMode is %q", mode)
-		}
-		return nil
-
-	case spec.MCPHTTPAuthCustomBearer:
-		if tokenRef == "" {
-			return errors.New("authRef.tokenRef is required for customBearer authMode")
-		}
-		if err := secret.ValidateMCPSecretRef(
-			tokenRef,
-			c.ID,
-			spec.MCPSecretKindHTTPToken,
-			"authorization",
-		); err != nil {
-			return err
-		}
-		if authMode != "" && authMode != mode {
-			return fmt.Errorf("authRef.authMode %q must match streamableHttp.authMode %q", authMode, mode)
-		}
-		if clientCredentialRef != "" || metadataRef != "" {
-			return errors.New(
-				"authRef.clientCredentialRef and authRef.metadataRef must be empty for customBearer authMode",
-			)
-		}
-		return nil
-
-	case spec.MCPHTTPAuthOAuth:
-		if authMode != "" && authMode != mode {
-			return fmt.Errorf("authRef.authMode %q must match streamableHttp.authMode %q", authMode, mode)
-		}
-		if tokenRef != "" {
-			return errors.New("authRef.tokenRef must be empty for oauth authMode")
-		}
-		if clientCredentialRef != "" {
-			if err := secret.ValidateMCPSecretRef(
-				clientCredentialRef,
-				c.ID,
-				spec.MCPSecretKindOAuthClientCredentials,
-				"clientCredentials",
-			); err != nil {
-				return err
-			}
-		}
-		if metadataRef != "" {
-			return errors.New("authRef.metadataRef is reserved for future OAuth metadata storage")
-		}
-		return nil
-
-	case spec.MCPHTTPAuthClientCredentials:
-		if authMode != "" && authMode != mode {
-			return fmt.Errorf("authRef.authMode %q must match streamableHttp.authMode %q", authMode, mode)
-		}
-		if tokenRef != "" {
-			return errors.New("authRef.tokenRef must be empty for clientCredentials authMode")
-		}
-		if clientCredentialRef == "" {
-			return errors.New("authRef.clientCredentialRef is required for clientCredentials authMode")
-		}
-		if err := secret.ValidateMCPSecretRef(
-			clientCredentialRef,
-			c.ID,
-			spec.MCPSecretKindOAuthClientCredentials,
-			"clientCredentials",
-		); err != nil {
-			return err
-		}
-		if metadataRef != "" {
-			return errors.New("authRef.metadataRef is reserved for future OAuth metadata storage")
-		}
-		return nil
-
-	default:
-		return fmt.Errorf("invalid streamableHttp.authMode %q", mode)
-	}
-}
-
-func validateNoHeaderOverlap(customHeaders, secretHeaderRefs map[string]string) error {
-	seen := make(map[string]string, len(customHeaders)+len(secretHeaderRefs))
-
-	add := func(kind string, headers map[string]string, valuesAreRefs bool) error {
-		for k, v := range headers {
-			if strings.TrimSpace(k) == "" {
-				return fmt.Errorf("%s contains empty header name", kind)
-			}
-			if strings.EqualFold(k, "authorization") {
-				return fmt.Errorf("%s must not define authorization", kind)
-			}
-			if err := validateHTTPHeaderName(k); err != nil {
-				return fmt.Errorf("%s[%q]: %w", kind, k, err)
-			}
-			if valuesAreRefs && strings.TrimSpace(v) == "" {
-				return fmt.Errorf("%s[%q] contains empty secret ref", kind, k)
-			}
-
-			lower := strings.ToLower(strings.TrimSpace(k))
-			if prev, ok := seen[lower]; ok {
-				return fmt.Errorf("%s overlaps %s on header %q", prev, kind, k)
-			}
-			seen[lower] = kind
-		}
-		return nil
-	}
-
-	if err := add("streamableHttp.customHeaders", customHeaders, false); err != nil {
-		return err
-	}
-	if err := add("streamableHttp.secretHeaderRefs", secretHeaderRefs, true); err != nil {
-		return err
-	}
-	return nil
-}
-
-func validateHTTPHeaderName(name string) error {
-	for _, c := range name {
-		if c <= 0x20 || c > 0x7E || c == ':' {
-			return fmt.Errorf("invalid header name %q", name)
-		}
-	}
-	return nil
-}
-
 func validateEnvKey(key string) error {
 	if strings.TrimSpace(key) == "" {
 		return errors.New("env key is empty")
@@ -432,33 +295,18 @@ func validateEnvKey(key string) error {
 	return nil
 }
 
-func validateUserHTTPHeaderAllowed(name string) error {
-	switch {
-	case strings.EqualFold(name, "accept"):
-		return errors.New("header is managed by MCP transport")
-	case strings.EqualFold(name, "content-type"):
-		return errors.New("header is managed by MCP transport")
-	case strings.EqualFold(name, "mcp-protocol-version"):
-		return errors.New("header is managed by MCP transport")
-	case strings.EqualFold(name, "mcp-session-id"):
-		return errors.New("header is managed by MCP transport")
-	case strings.EqualFold(name, "mcp-method"):
-		return errors.New("header is managed by MCP transport")
-	case strings.EqualFold(name, "mcp-name"):
-		return errors.New("header is managed by MCP transport")
-	case strings.EqualFold(name, "last-event-id"):
-		return errors.New("header is managed by MCP transport")
-	case strings.EqualFold(name, "content-length"):
-		return errors.New("header is managed by HTTP transport")
-	case strings.EqualFold(name, "host"):
-		return errors.New("header is managed by HTTP transport")
-	case strings.EqualFold(name, "connection"):
-		return errors.New("header is managed by HTTP transport")
-	default:
-		return nil
-	}
-}
-
 func isSoftDeleted(c *spec.MCPServerConfig) bool {
 	return c != nil && c.SoftDeletedAt != nil && !c.SoftDeletedAt.IsZero()
+}
+
+func isLoopbackHost(host string) bool {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return false
+	}
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }

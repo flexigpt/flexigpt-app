@@ -5,12 +5,11 @@ const SecretRefVersion = "mcpv1"
 type MCPSecretKind string
 
 const (
-	MCPSecretKindStdioEnv          MCPSecretKind = "stdioEnv" //nolint:gosec // Enum val.
-	MCPSecretKindHTTPHeader        MCPSecretKind = "httpHeader"
-	MCPSecretKindHTTPToken         MCPSecretKind = "httpToken"
-	MCPSecretKindOAuthClientSecret MCPSecretKind = "oauthClientSecret" //nolint:gosec // Enum val.
+	//nolint:gosec // Enum val.
+	MCPSecretKindStdioEnv MCPSecretKind = "stdioEnv"
 	// MCPSecretKindOAuthClientCredentials stores a JSON object: {"clientID":"...","clientSecret":"..."}.
-	MCPSecretKindOAuthClientCredentials MCPSecretKind = "oauthClientCredentials" //nolint:gosec // Enum val.
+	//nolint:gosec // Enum val.
+	MCPSecretKindOAuthClientCredentials MCPSecretKind = "oauthClientCredentials"
 )
 
 type MCPSecretRef struct {

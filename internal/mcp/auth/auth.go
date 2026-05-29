@@ -3,24 +3,19 @@ package auth
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"maps"
 	"net/http"
 	"strings"
+	"sync"
 
 	mcpAuth "github.com/modelcontextprotocol/go-sdk/auth"
+
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
 
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
-const (
-	maxResolvedHTTPHeaderValueLen = 4096
-)
-
 type ResolvedTransportAuth struct {
-	Headers         map[string]string
 	Env             map[string]string
 	SensitiveValues []string
 	Status          spec.MCPAuthStatus
@@ -51,19 +46,15 @@ type OAuthAuthorizationBroker interface {
 
 type AuthManager struct {
 	secrets          SecretResolver
-	statusSink       AuthStatusSink
 	oauthBroker      OAuthAuthorizationBroker
 	oauthRedirectURL string
 	httpClient       *http.Client
+
+	mu       sync.RWMutex
+	statuses map[spec.MCPServerID]spec.MCPAuthStatus
 }
 
 type AuthManagerOption func(*AuthManager)
-
-func WithAuthStatusSink(sink AuthStatusSink) AuthManagerOption {
-	return func(m *AuthManager) {
-		m.statusSink = sink
-	}
-}
 
 func WithOAuthAuthorizationBroker(broker OAuthAuthorizationBroker) AuthManagerOption {
 	return func(m *AuthManager) {
@@ -87,7 +78,10 @@ func NewAuthManager(secrets SecretResolver, opts ...AuthManagerOption) *AuthMana
 	if secrets == nil {
 		secrets = StaticSecretResolver{}
 	}
-	m := &AuthManager{secrets: secrets}
+	m := &AuthManager{
+		secrets:  secrets,
+		statuses: map[spec.MCPServerID]spec.MCPAuthStatus{},
+	}
 	for _, opt := range opts {
 		if opt != nil {
 			opt(m)
@@ -100,9 +94,18 @@ func (m *AuthManager) PrepareTransportAuth(
 	ctx context.Context,
 	cfg spec.MCPServerConfig,
 ) (ResolvedTransportAuth, error) {
+	if m == nil {
+		return ResolvedTransportAuth{
+			Env: map[string]string{},
+			Status: spec.MCPAuthStatus{
+				ServerID: cfg.ID,
+				AuthMode: spec.MCPHTTPAuthNone,
+				State:    spec.MCPAuthStateNotRequired,
+			},
+		}, nil
+	}
 	out := ResolvedTransportAuth{
-		Headers: map[string]string{},
-		Env:     map[string]string{},
+		Env: map[string]string{},
 		Status: spec.MCPAuthStatus{
 			ServerID: cfg.ID,
 			AuthMode: spec.MCPHTTPAuthNone,
@@ -110,104 +113,67 @@ func (m *AuthManager) PrepareTransportAuth(
 		},
 	}
 
-	if cfg.Transport == spec.MCPTransportStdio && cfg.Stdio != nil {
-		out.Env = cloneStringMapNonNil(cfg.Stdio.Env)
+	saveCtx := ctx
+	defer func() {
+		_ = m.SaveAuthStatus(context.WithoutCancel(saveCtx), out.Status)
+	}()
+
+	switch cfg.Transport {
+	case spec.MCPTransportStdio:
+		if cfg.Stdio == nil {
+			out.Status.State = spec.MCPAuthStateError
+			out.Status.LastError = "missing stdio config"
+			return out, fmt.Errorf("%w: missing stdio config", spec.ErrMCPInvalidRequest)
+		}
 		for key, ref := range cfg.Stdio.SecretEnvRefs {
 			v, err := m.secrets.ResolveSecret(ctx, ref)
 			if err != nil {
+				out.Status.State = spec.MCPAuthStateError
+				out.Status.LastError = err.Error()
 				return out, err
 			}
 			out.Env[key] = v
 			out.SensitiveValues = append(out.SensitiveValues, v)
 		}
 		return out, nil
-	}
+	case spec.MCPTransportStreamableHTTP:
+		if cfg.StreamableHTTP == nil {
+			out.Status.State = spec.MCPAuthStateError
+			out.Status.LastError = "missing streamableHttp config"
+			return out, fmt.Errorf("%w: missing streamableHttp config", spec.ErrMCPInvalidRequest)
+		}
+		httpCfg := cfg.StreamableHTTP
 
-	if cfg.Transport != spec.MCPTransportStreamableHTTP || cfg.StreamableHTTP == nil {
+		out.Status.Resource = strings.TrimSpace(httpCfg.URL)
+		mode := normalizeHTTPAuthMode(httpCfg.AuthMode)
+		out.Status.AuthMode = mode
+
+		switch mode {
+		case spec.MCPHTTPAuthNone:
+			out.Status.State = spec.MCPAuthStateNotRequired
+
+		case spec.MCPHTTPAuthOAuth:
+			if err := m.configureAuthorizationCodeOAuth(ctx, cfg, &out); err != nil {
+				return out, err
+			}
+		case spec.MCPHTTPAuthClientCredentials:
+			if err := m.configureClientCredentialsOAuth(ctx, cfg, &out); err != nil {
+				return out, err
+			}
+
+		default:
+			out.Status.State = spec.MCPAuthStateError
+			out.Status.LastError = "unsupported auth mode"
+			return out, fmt.Errorf("%w: unsupported auth mode %s", spec.ErrMCPInvalidRequest, mode)
+		}
+
 		return out, nil
-	}
 
-	httpCfg := cfg.StreamableHTTP
-	out.Headers = cloneStringMapNonNil(httpCfg.CustomHeaders)
-	out.Status.Resource = strings.TrimSpace(httpCfg.URL)
-	for key, ref := range httpCfg.SecretHeaderRefs {
-		v, err := m.secrets.ResolveSecret(ctx, ref)
-		if err != nil {
-			out.Status.State = spec.MCPAuthStateError
-			out.Status.LastError = err.Error()
-			return out, err
-		}
-		out.Headers[key] = v
-		out.SensitiveValues = append(out.SensitiveValues, v)
-	}
-
-	mode := normalizeHTTPAuthMode(httpCfg.AuthMode)
-	out.Status.AuthMode = mode
-	if cfg.AuthRef != nil {
-		authMode := spec.MCPHTTPAuthMode(strings.TrimSpace(string(cfg.AuthRef.AuthMode)))
-		if authMode != "" && authMode != mode {
-			out.Status.State = spec.MCPAuthStateError
-			out.Status.LastError = fmt.Sprintf(
-				"authRef.authMode %q does not match streamableHttp.authMode %q",
-				authMode,
-				mode,
-			)
-			return out, fmt.Errorf("%w: %s", spec.ErrMCPInvalidRequest, out.Status.LastError)
-		}
-	}
-
-	switch mode {
-	case spec.MCPHTTPAuthNone:
-
-		out.Status.State = spec.MCPAuthStateNotRequired
-
-	case spec.MCPHTTPAuthCustomBearer:
-		if cfg.AuthRef == nil || strings.TrimSpace(cfg.AuthRef.TokenRef) == "" {
-			out.Status.State = spec.MCPAuthStateRequired
-			return out, spec.ErrMCPAuthRequired
-		}
-		token, err := m.secrets.ResolveSecret(ctx, cfg.AuthRef.TokenRef)
-		if err != nil {
-			out.Status.State = spec.MCPAuthStateError
-			out.Status.LastError = err.Error()
-			return out, err
-		}
-		out.OAuthHandler = &trackedOAuthHandler{
-			inner: &staticBearerOAuthHandler{token: token},
-			sink:  m.statusSink,
-			status: spec.MCPAuthStatus{
-				ServerID: cfg.ID,
-				AuthMode: mode,
-				State:    spec.MCPAuthStateAuthorized,
-				Resource: out.Status.Resource,
-			},
-		}
-		out.SensitiveValues = append(out.SensitiveValues, token)
-		out.Status.State = spec.MCPAuthStateAuthorized
-
-	case spec.MCPHTTPAuthCustomHeaders:
-		out.Status.State = spec.MCPAuthStateAuthorized
-
-	case spec.MCPHTTPAuthOAuth:
-		if err := m.configureAuthorizationCodeOAuth(ctx, cfg, &out); err != nil {
-			return out, err
-		}
-
-	case spec.MCPHTTPAuthClientCredentials:
-		if err := m.configureClientCredentialsOAuth(ctx, cfg, &out); err != nil {
-			return out, err
-		}
 	default:
 		out.Status.State = spec.MCPAuthStateError
-		out.Status.LastError = "unsupported auth mode"
-		return out, fmt.Errorf("%w: unsupported auth mode %s", spec.ErrMCPInvalidRequest, mode)
+		out.Status.LastError = "unsupported transport"
+		return out, fmt.Errorf("%w: unsupported transport %s", spec.ErrMCPInvalidRequest, cfg.Transport)
 	}
-	if err := validateResolvedHTTPHeaders(out.Headers); err != nil {
-		out.Status.State = spec.MCPAuthStateError
-		out.Status.LastError = err.Error()
-		return out, err
-	}
-	return out, nil
 }
 
 func (m *AuthManager) configureAuthorizationCodeOAuth(
@@ -222,27 +188,25 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 		return fmt.Errorf("%w: %s", spec.ErrMCPAuthRequired, out.Status.LastError)
 	}
 
-	var preregistered *oauthex.ClientCredentials
-	if cfg.AuthRef != nil && strings.TrimSpace(cfg.AuthRef.ClientCredentialRef) != "" {
-		raw, err := m.secrets.ResolveSecret(ctx, cfg.AuthRef.ClientCredentialRef)
-		if err != nil {
-			out.Status.State = spec.MCPAuthStateError
-			out.Status.LastError = err.Error()
-			return err
-		}
-		creds, sensitive, err := parseOAuthClientCredentialsSecret(raw, false)
+	httpCfg := cfg.StreamableHTTP
+
+	var (
+		preregistered *oauthex.ClientCredentials
+		dcr           *mcpAuth.DynamicClientRegistrationConfig
+	)
+
+	if ref := strings.TrimSpace(httpCfg.ClientCredentialRef); ref != "" {
+		creds, sensitive, err := resolveOAuthClientCredentials(ctx, m.secrets, ref)
 		if err != nil {
 			out.Status.State = spec.MCPAuthStateError
 			out.Status.LastError = err.Error()
 			return err
 		}
 		preregistered = creds
-		out.SensitiveValues = append(out.SensitiveValues, raw)
 		out.SensitiveValues = append(out.SensitiveValues, sensitive...)
-	}
-
-	var dcr *mcpAuth.DynamicClientRegistrationConfig
-	if preregistered == nil {
+	} else {
+		// Dynamic registration is only used when no preregistered client
+		// credentials were configured.
 		dcr = &mcpAuth.DynamicClientRegistrationConfig{
 			Metadata: &oauthex.ClientRegistrationMetadata{
 				RedirectURIs:    []string{m.oauthRedirectURL},
@@ -250,9 +214,7 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 				SoftwareID:      "flexigpt",
 				SoftwareVersion: spec.MCPHostVersion,
 				// Desktop clients are public clients. Requesting "none" avoids
-				// receiving/storing a dynamically issued client secret. If a server
-				// requires a confidential client, users can configure a pre-registered
-				// client credential ref.
+				// receiving/storing a dynamically issued client secret.
 				TokenEndpointAuthMethod: "none",
 				ResponseTypes:           []string{"code"},
 				GrantTypes:              []string{"authorization_code", "refresh_token"},
@@ -301,7 +263,7 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 
 	out.OAuthHandler = &trackedOAuthHandler{
 		inner: handler,
-		sink:  m.statusSink,
+		sink:  m,
 		status: spec.MCPAuthStatus{
 			ServerID: cfg.ID,
 			AuthMode: spec.MCPHTTPAuthOAuth,
@@ -317,20 +279,15 @@ func (m *AuthManager) configureClientCredentialsOAuth(
 	cfg spec.MCPServerConfig,
 	out *ResolvedTransportAuth,
 ) error {
-	if cfg.AuthRef == nil || strings.TrimSpace(cfg.AuthRef.ClientCredentialRef) == "" {
+	if cfg.StreamableHTTP == nil || strings.TrimSpace(cfg.StreamableHTTP.ClientCredentialRef) == "" {
+
 		out.Status.State = spec.MCPAuthStateRequired
-		out.Status.LastError = "authRef.clientCredentialRef is required for clientCredentials auth"
+		out.Status.LastError = "streamableHttp.clientCredentialRef is required for clientCredentials auth"
+
 		return fmt.Errorf("%w: %s", spec.ErrMCPAuthRequired, out.Status.LastError)
 	}
 
-	raw, err := m.secrets.ResolveSecret(ctx, cfg.AuthRef.ClientCredentialRef)
-	if err != nil {
-		out.Status.State = spec.MCPAuthStateError
-		out.Status.LastError = err.Error()
-		return err
-	}
-
-	creds, sensitive, err := parseOAuthClientCredentialsSecret(raw, true)
+	creds, sensitive, err := resolveOAuthClientCredentials(ctx, m.secrets, cfg.StreamableHTTP.ClientCredentialRef)
 	if err != nil {
 		out.Status.State = spec.MCPAuthStateError
 		out.Status.LastError = err.Error()
@@ -346,7 +303,7 @@ func (m *AuthManager) configureClientCredentialsOAuth(
 
 	out.OAuthHandler = &trackedOAuthHandler{
 		inner: handler,
-		sink:  m.statusSink,
+		sink:  m,
 		status: spec.MCPAuthStatus{
 			ServerID: cfg.ID,
 			AuthMode: spec.MCPHTTPAuthClientCredentials,
@@ -354,21 +311,16 @@ func (m *AuthManager) configureClientCredentialsOAuth(
 			Resource: out.Status.Resource,
 		},
 	}
-	out.SensitiveValues = append(out.SensitiveValues, raw)
+
 	out.SensitiveValues = append(out.SensitiveValues, sensitive...)
 	out.Status.State = spec.MCPAuthStateRequired
 	return nil
 }
 
-func parseOAuthClientCredentialsSecret(
-	raw string,
-	requireSecret bool,
-) (*oauthex.ClientCredentials, []string, error) {
+func parseOAuthClientCredentialsSecret(raw string) (*oauthex.ClientCredentials, []string, error) {
 	var wire struct {
-		ClientID          string `json:"clientID"`
-		ClientIDSnake     string `json:"client_id"`
-		ClientSecret      string `json:"clientSecret"`
-		ClientSecretSnake string `json:"client_secret"`
+		ClientID     string `json:"clientID"`
+		ClientSecret string `json:"clientSecret"`
 	}
 	if err := json.Unmarshal([]byte(raw), &wire); err != nil {
 		return nil, nil, fmt.Errorf(
@@ -377,73 +329,36 @@ func parseOAuthClientCredentialsSecret(
 		)
 	}
 
-	clientID := strings.TrimSpace(firstNonEmpty(wire.ClientID, wire.ClientIDSnake))
-	clientSecret := firstNonEmpty(wire.ClientSecret, wire.ClientSecretSnake)
-
-	creds := &oauthex.ClientCredentials{ClientID: clientID}
-	if strings.TrimSpace(clientSecret) != "" {
-		creds.ClientSecretAuth = &oauthex.ClientSecretAuth{ClientSecret: clientSecret}
+	clientID := strings.TrimSpace(wire.ClientID)
+	clientSecret := strings.TrimSpace(wire.ClientSecret)
+	if clientID == "" {
+		return nil, nil, fmt.Errorf("%w: OAuth client credentials secret requires clientID", spec.ErrMCPInvalidRequest)
 	}
-	if requireSecret && creds.ClientSecretAuth == nil {
+	if clientSecret == "" {
 		return nil, nil, fmt.Errorf(
 			"%w: OAuth client credentials secret requires clientSecret",
 			spec.ErrMCPInvalidRequest,
 		)
 	}
+	creds := &oauthex.ClientCredentials{
+		ClientID: clientID,
+		ClientSecretAuth: &oauthex.ClientSecretAuth{
+			ClientSecret: clientSecret,
+		},
+	}
 	if err := creds.Validate(); err != nil {
 		return nil, nil, fmt.Errorf("%w: %w", spec.ErrMCPInvalidRequest, err)
 	}
 
-	var sensitive []string
-	if clientSecret != "" {
-		sensitive = append(sensitive, clientSecret)
-	}
+	sensitive := make([]string, 0, 1)
+	sensitive = append(sensitive, clientSecret)
 	return creds, sensitive, nil
 }
 
-func validateResolvedHTTPHeaders(headers map[string]string) error {
-	for key, value := range headers {
-		if strings.TrimSpace(key) == "" {
-			return errors.New("resolved HTTP header name cannot be empty")
-		}
-		if err := validateResolvedHTTPHeaderName(key); err != nil {
-			return err
-		}
-
-		if strings.EqualFold(key, "authorization") {
-			return errors.New("resolved HTTP headers must not include Authorization; use authRef")
-		}
-		if managedResolvedHTTPHeader(key) {
-			return fmt.Errorf("resolved HTTP header %q is managed by the MCP/HTTP transport", key)
-		}
-
-		if strings.ContainsAny(value, "\r\n") {
-			return fmt.Errorf("resolved HTTP header %q contains newline characters", key)
-		}
-		if len(value) > maxResolvedHTTPHeaderValueLen {
-			return fmt.Errorf(
-				"resolved HTTP header %q exceeds maximum length of %d",
-				key,
-				maxResolvedHTTPHeaderValueLen,
-			)
-		}
+func normalizeHTTPAuthMode(mode spec.MCPHTTPAuthMode) spec.MCPHTTPAuthMode {
+	mode = spec.MCPHTTPAuthMode(strings.TrimSpace(string(mode)))
+	if mode == "" {
+		return spec.MCPHTTPAuthNone
 	}
-	return nil
-}
-
-func validateResolvedHTTPHeaderName(name string) error {
-	for _, c := range name {
-		if c <= 0x20 || c > 0x7E || c == ':' {
-			return fmt.Errorf("invalid resolved HTTP header name %q", name)
-		}
-	}
-	return nil
-}
-
-func cloneStringMapNonNil(in map[string]string) map[string]string {
-	out := maps.Clone(in)
-	if out == nil {
-		return map[string]string{}
-	}
-	return out
+	return mode
 }

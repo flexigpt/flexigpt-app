@@ -2,7 +2,6 @@ package runtime
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -104,6 +103,9 @@ func (m *RuntimeManager) Close(ctx context.Context) error {
 			}
 		}
 	}
+	if m.auth != nil {
+		m.auth.ClearAuthStatuses()
+	}
 	return first
 }
 
@@ -139,25 +141,31 @@ func (m *RuntimeManager) Connect(
 	}
 	cfg := *cfgResp.Body
 	if !cfg.Enabled {
+		if m.auth != nil {
+			m.auth.ClearAuthStatus(req.ServerID)
+		}
 		err := fmt.Errorf("%w: %s", spec.ErrMCPServerDisabled, cfg.ID)
 		m.setStatusIfCurrent(req.ServerID, generation, spec.MCPServerStatusDisabled, "")
 		return nil, err
 	}
 
-	resolved, err := m.auth.PrepareTransportAuth(ctx, cfg)
-	if saveErr := m.store.SaveAuthStatus(ctx, resolved.Status); saveErr != nil {
-		if err != nil {
-			err = errors.Join(err, saveErr)
-		} else {
-			err = saveErr
-		}
+	resolved := auth.ResolvedTransportAuth{Env: map[string]string{}}
+	if cfg.Transport == spec.MCPTransportStdio && cfg.Stdio != nil && len(cfg.Stdio.Env) > 0 {
+		resolved.Env = maps.Clone(cfg.Stdio.Env)
 	}
 
-	if err != nil {
+	if m.auth != nil {
+		prepared, err := m.auth.PrepareTransportAuth(ctx, cfg)
+		if err != nil {
+			m.setErrorIfCurrent(req.ServerID, generation, err)
+			return nil, err
+		}
+		mergeResolvedTransportAuth(&resolved, prepared)
+	} else if transportRequiresAuth(cfg) {
+		err := fmt.Errorf("%w: transport authentication is not configured", spec.ErrMCPAuthRequired)
 		m.setErrorIfCurrent(req.ServerID, generation, err)
 		return nil, err
 	}
-
 	connectTimeout := time.Duration(spec.DefaultConnectTimeoutMS) * time.Millisecond
 	if cfg.Transport == spec.MCPTransportStreamableHTTP && cfg.StreamableHTTP != nil &&
 		cfg.StreamableHTTP.TimeoutMS > 0 {
@@ -168,7 +176,8 @@ func (m *RuntimeManager) Connect(
 	}
 	if cfg.Transport == spec.MCPTransportStreamableHTTP &&
 		cfg.StreamableHTTP != nil &&
-		cfg.StreamableHTTP.AuthMode == spec.MCPHTTPAuthOAuth &&
+		(cfg.StreamableHTTP.AuthMode == spec.MCPHTTPAuthOAuth ||
+			cfg.StreamableHTTP.AuthMode == spec.MCPHTTPAuthClientCredentials) &&
 		connectTimeout < defaultOAuthAuthorizationTimeout {
 		connectTimeout = defaultOAuthAuthorizationTimeout
 	}
@@ -249,11 +258,8 @@ func (m *RuntimeManager) Disconnect(
 			return nil, err
 		}
 	}
-
-	if m.store != nil {
-		if err := m.store.DeleteAuthStatus(ctx, req.ServerID); err != nil {
-			slog.Warn("mcp: delete auth status failed", "serverID", req.ServerID, "err", err)
-		}
+	if m.auth != nil {
+		m.auth.ClearAuthStatus(req.ServerID)
 	}
 
 	return &spec.DisconnectMCPServerResponse{}, nil
@@ -911,6 +917,39 @@ func applyToolPolicyOverlay(tool spec.MCPToolCapability, cfg spec.MCPServerConfi
 		}
 	}
 	return tool
+}
+
+func transportRequiresAuth(cfg spec.MCPServerConfig) bool {
+	switch cfg.Transport {
+	case spec.MCPTransportStreamableHTTP:
+		if cfg.StreamableHTTP == nil {
+			return false
+		}
+		switch cfg.StreamableHTTP.AuthMode {
+		case spec.MCPHTTPAuthOAuth, spec.MCPHTTPAuthClientCredentials:
+			return true
+		default:
+		}
+	case spec.MCPTransportStdio:
+		return cfg.Stdio != nil && len(cfg.Stdio.SecretEnvRefs) > 0
+	default:
+	}
+
+	return false
+}
+
+func mergeResolvedTransportAuth(dst *auth.ResolvedTransportAuth, src auth.ResolvedTransportAuth) {
+	if dst == nil {
+		return
+	}
+	maps.Copy(dst.Env, src.Env)
+	dst.SensitiveValues = append(dst.SensitiveValues, src.SensitiveValues...)
+	if src.OAuthHandler != nil {
+		dst.OAuthHandler = src.OAuthHandler
+	}
+	if src.Status.ServerID != "" {
+		dst.Status = src.Status
+	}
 }
 
 func normalizeSnapshot(snap *spec.MCPDiscoverySnapshot) {

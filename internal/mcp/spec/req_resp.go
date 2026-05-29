@@ -22,7 +22,6 @@ type PutMCPServerPayload struct {
 	DefaultPolicy *MCPServerPolicy                 `json:"defaultPolicy,omitempty"`
 	ToolPolicies  map[string]MCPToolPolicyOverride `json:"toolPolicies,omitempty"`
 	AppsPolicy    *MCPAppsPolicy                   `json:"appsPolicy,omitempty"`
-	AuthRef       *MCPAuthRef                      `json:"authRef,omitempty"`
 }
 
 type PutMCPServerRequest struct {

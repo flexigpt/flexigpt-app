@@ -7,6 +7,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
+const toolDigestChangedReason = "tool digest changed"
+
 type EvaluationInput struct {
 	Server spec.MCPServerConfig
 	Tool   spec.MCPToolCapability
@@ -56,8 +58,8 @@ func Evaluate(in EvaluationInput) spec.MCPApprovalEvaluation {
 
 	if digestChanged {
 		return spec.MCPApprovalEvaluation{
-			Decision: spec.MCPApprovalDecisionApprovalRequired,
-			Reason:   "tool digest changed",
+			Decision: spec.MCPApprovalDecisionDenied,
+			Reason:   toolDigestChangedReason,
 			Summary:  summary(in),
 		}
 	}

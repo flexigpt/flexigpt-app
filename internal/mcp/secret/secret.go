@@ -106,9 +106,6 @@ func validateSecret(r spec.MCPSecretRef) error {
 	}
 	switch r.Kind {
 	case spec.MCPSecretKindStdioEnv,
-		spec.MCPSecretKindHTTPHeader,
-		spec.MCPSecretKindHTTPToken,
-		spec.MCPSecretKindOAuthClientSecret,
 		spec.MCPSecretKindOAuthClientCredentials:
 	default:
 		return fmt.Errorf("secret ref kind %q is invalid", r.Kind)

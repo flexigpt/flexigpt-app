@@ -692,14 +692,11 @@ const (
   MCPHTTPAuthNone              MCPHTTPAuthMode = "none"
   MCPHTTPAuthOAuth             MCPHTTPAuthMode = "oauth"
   MCPHTTPAuthClientCredentials MCPHTTPAuthMode = "clientCredentials"
-  MCPHTTPAuthCustomBearer      MCPHTTPAuthMode = "customBearer"
-  MCPHTTPAuthCustomHeaders     MCPHTTPAuthMode = "customHeaders"
 )
 
 type MCPStreamableHTTPConfig struct {
   URL              string            `json:"url"`
   TimeoutMS        int               `json:"timeoutMS,omitempty"`
-  CustomHeaders    map[string]string `json:"customHeaders,omitempty"`
   SecretHeaderRefs map[string]string `json:"secretHeaderRefs,omitempty"`
   AuthMode         MCPHTTPAuthMode   `json:"authMode"`
 }
@@ -908,7 +905,6 @@ Server config validation must reject:
 - stdio env secret refs pointing to missing secret metadata
 - HTTP URL without scheme
 - HTTP URL with unsupported scheme
-- custom auth fields when auth mode does not allow them
 
 ### UI workflow: add server
 
@@ -1221,12 +1217,7 @@ frontend/app/mcpservers/oauth_callback_state.ts
 ### Auth modes
 
 ```ts
-export type MCPHTTPAuthMode =
-  | "none"
-  | "oauth"
-  | "clientCredentials"
-  | "customBearer"
-  | "customHeaders";
+export type MCPHTTPAuthMode = "none" | "oauth" | "clientCredentials";
 ```
 
 Recommended meaning:
@@ -1234,10 +1225,6 @@ Recommended meaning:
 - `none`: no auth
 - `oauth`: MCP HTTP authorization with Authorization Code + PKCE
 - `clientCredentials`: OAuth Client Credentials extension
-- `customBearer`: user-provided bearer token compatibility mode
-- `customHeaders`: user-provided secret headers compatibility mode
-
-`customBearer` and `customHeaders` are not MCP auth extensions. They are compatibility modes for non-standard deployments and should be labeled as such.
 
 ### Auth metadata model
 

@@ -75,8 +75,6 @@ const (
 	MCPHTTPAuthNone              MCPHTTPAuthMode = "none"
 	MCPHTTPAuthOAuth             MCPHTTPAuthMode = "oauth"
 	MCPHTTPAuthClientCredentials MCPHTTPAuthMode = "clientCredentials"
-	MCPHTTPAuthCustomBearer      MCPHTTPAuthMode = "customBearer"
-	MCPHTTPAuthCustomHeaders     MCPHTTPAuthMode = "customHeaders"
 )
 
 type MCPAuthState string

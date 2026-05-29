@@ -82,11 +82,6 @@ func InitMCPWrapper(ctx context.Context, w *MCPWrapper, baseDir string, secrets 
 		return err
 	}
 
-	if err := st.ClearAuthStatuses(ctx); err != nil {
-		_ = st.Close()
-		return err
-	}
-
 	oauthBroker, err := auth.NewOAuthLoopbackBroker(ctx, nil)
 	if err != nil {
 		_ = st.Close()
@@ -95,7 +90,6 @@ func InitMCPWrapper(ctx context.Context, w *MCPWrapper, baseDir string, secrets 
 
 	authMgr := auth.NewAuthManager(
 		secrets,
-		auth.WithAuthStatusSink(st),
 		auth.WithOAuthAuthorizationBroker(oauthBroker),
 		auth.WithOAuthRedirectURL(oauthBroker.RedirectURL()),
 	)
@@ -131,14 +125,11 @@ func (w *MCPWrapper) GetMCPServerAuthStatus(
 			return nil, fmt.Errorf("%w: empty server config response", spec.ErrMCPRuntimeNotReady)
 		}
 
-		st, ok, err := w.store.GetAuthStatus(context.Background(), req.ServerID)
-		if err != nil {
-			return nil, err
-		}
-		if !ok {
-			st = auth.DefaultMCPAuthStatusFromConfig(*cfgResp.Body)
-		} else {
-			st = auth.MergeMCPAuthStatus(st, *cfgResp.Body)
+		st := auth.DefaultMCPAuthStatusFromConfig(*cfgResp.Body)
+		if w != nil && w.auth != nil {
+			if cur, ok := w.auth.GetAuthStatus(req.ServerID); ok {
+				st = auth.MergeMCPAuthStatus(cur, *cfgResp.Body)
+			}
 		}
 		return &spec.GetMCPServerAuthStatusResponse{Body: &st}, nil
 	})

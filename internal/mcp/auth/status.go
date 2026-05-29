@@ -1,6 +1,9 @@
 package auth
 
 import (
+	"context"
+	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
@@ -40,9 +43,6 @@ func DefaultMCPAuthStatusFromConfig(cfg spec.MCPServerConfig) spec.MCPAuthStatus
 		st.State = spec.MCPAuthStateRequired
 	case spec.MCPHTTPAuthClientCredentials:
 		st.State = spec.MCPAuthStateRequired
-	case spec.MCPHTTPAuthCustomBearer,
-		spec.MCPHTTPAuthCustomHeaders:
-		st.State = spec.MCPAuthStateAuthorized
 	case spec.MCPHTTPAuthNone, "":
 		st.State = spec.MCPAuthStateNotRequired
 	default:
@@ -50,4 +50,69 @@ func DefaultMCPAuthStatusFromConfig(cfg spec.MCPServerConfig) spec.MCPAuthStatus
 	}
 
 	return st
+}
+
+func (m *AuthManager) SaveAuthStatus(ctx context.Context, st spec.MCPAuthStatus) error {
+	if m == nil {
+		return nil
+	}
+	if st.ServerID == "" {
+		return fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
+	}
+
+	cloned := cloneAuthStatus(st)
+
+	m.mu.Lock()
+	if m.statuses == nil {
+		m.statuses = map[spec.MCPServerID]spec.MCPAuthStatus{}
+	}
+	m.statuses[st.ServerID] = cloned
+	m.mu.Unlock()
+
+	return nil
+}
+
+func (m *AuthManager) GetAuthStatus(serverID spec.MCPServerID) (spec.MCPAuthStatus, bool) {
+	if m == nil || serverID == "" {
+		return spec.MCPAuthStatus{}, false
+	}
+
+	m.mu.RLock()
+	st, ok := m.statuses[serverID]
+	m.mu.RUnlock()
+
+	if !ok {
+		return spec.MCPAuthStatus{}, false
+	}
+	return cloneAuthStatus(st), true
+}
+
+func (m *AuthManager) ClearAuthStatus(serverID spec.MCPServerID) {
+	if m == nil || serverID == "" {
+		return
+	}
+
+	m.mu.Lock()
+	delete(m.statuses, serverID)
+	m.mu.Unlock()
+}
+
+func (m *AuthManager) ClearAuthStatuses() {
+	if m == nil {
+		return
+	}
+
+	m.mu.Lock()
+	m.statuses = map[spec.MCPServerID]spec.MCPAuthStatus{}
+	m.mu.Unlock()
+}
+
+func cloneAuthStatus(in spec.MCPAuthStatus) spec.MCPAuthStatus {
+	out := in
+	out.Scopes = slices.Clone(in.Scopes)
+	if in.ExpiresAt != nil {
+		t := *in.ExpiresAt
+		out.ExpiresAt = &t
+	}
+	return out
 }
