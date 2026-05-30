@@ -20,6 +20,7 @@ import type {
 	MCPApprovalToken,
 	MCPAuthHealth,
 	MCPAuthStatus,
+	MCPBundle,
 	MCPCompletionResult,
 	MCPGetPromptResponseBody,
 	InvokeMCPToolResponseBody as MCPInvokeToolResponseBody,
@@ -474,64 +475,95 @@ export interface IAssistantPresetStoreAPI {
  * Heavy structured payloads stay as objects, while simple requests stay flattened.
  */
 export interface IMCPAPI {
+	listMCPBundles(
+		bundleIDs?: string[],
+		includeDisabled?: boolean,
+		pageSize?: number,
+		pageToken?: string
+	): Promise<{ bundles: MCPBundle[]; nextPageToken?: string }>;
+
+	putMCPBundle(
+		bundleID: string,
+		slug: string,
+		displayName: string,
+		isEnabled: boolean,
+		description?: string
+	): Promise<void>;
+
+	patchMCPBundle(bundleID: string, isEnabled: boolean): Promise<void>;
+
+	deleteMCPBundle(bundleID: string): Promise<void>;
+
 	listMCPServers(
+		bundleID: string,
 		serverIDs?: MCPServerID[],
 		enabled?: boolean,
+		includeDisabled?: boolean,
 		pageSize?: number,
 		pageToken?: string
 	): Promise<{ servers: MCPServerConfig[]; nextPageToken?: string }>;
 
-	putMCPServer(serverID: MCPServerID, payload: PutMCPServerPayload): Promise<void>;
+	putMCPServer(bundleID: string, serverID: MCPServerID, payload: PutMCPServerPayload): Promise<void>;
 
-	getMCPServer(serverID: MCPServerID, includeDeleted?: boolean): Promise<MCPServerConfig | undefined>;
+	getMCPServer(bundleID: string, serverID: MCPServerID, includeDeleted?: boolean): Promise<MCPServerConfig | undefined>;
 
-	patchMCPServerEnabled(serverID: MCPServerID, enabled: boolean): Promise<void>;
+	patchMCPServerEnabled(bundleID: string, serverID: MCPServerID, enabled: boolean): Promise<void>;
 
-	patchMCPServerPolicy(serverID: MCPServerID, payload: PatchMCPServerPolicyPayload): Promise<void>;
+	patchMCPServerPolicy(bundleID: string, serverID: MCPServerID, payload: PatchMCPServerPolicyPayload): Promise<void>;
 
-	deleteMCPServer(serverID: MCPServerID): Promise<void>;
+	deleteMCPServer(bundleID: string, serverID: MCPServerID): Promise<void>;
 
-	connectMCPServer(serverID: MCPServerID): Promise<MCPServerRuntimeSnapshot | undefined>;
+	connectMCPServer(bundleID: string, serverID: MCPServerID): Promise<MCPServerRuntimeSnapshot | undefined>;
 
-	disconnectMCPServer(serverID: MCPServerID): Promise<void>;
+	disconnectMCPServer(bundleID: string, serverID: MCPServerID): Promise<void>;
 
-	refreshMCPServer(serverID: MCPServerID): Promise<MCPServerRuntimeSnapshot | undefined>;
+	refreshMCPServer(bundleID: string, serverID: MCPServerID): Promise<MCPServerRuntimeSnapshot | undefined>;
 
-	getMCPServerStatus(serverID: MCPServerID): Promise<MCPServerRuntimeSnapshot | undefined>;
+	getMCPServerStatus(bundleID: string, serverID: MCPServerID): Promise<MCPServerRuntimeSnapshot | undefined>;
 
 	listMCPServerTools(
+		bundleID: string,
 		serverID: MCPServerID,
 		pageSize?: number,
 		pageToken?: string
 	): Promise<{ tools: MCPToolCapability[]; nextPageToken?: string }>;
 
 	listMCPServerResources(
+		bundleID: string,
 		serverID: MCPServerID,
 		pageSize?: number,
 		pageToken?: string
 	): Promise<{ resources: MCPResourceRef[]; nextPageToken?: string }>;
 
 	listMCPServerResourceTemplates(
+		bundleID: string,
 		serverID: MCPServerID,
 		pageSize?: number,
 		pageToken?: string
 	): Promise<{ resourceTemplates: MCPResourceTemplateRef[]; nextPageToken?: string }>;
 
 	listMCPServerPrompts(
+		bundleID: string,
 		serverID: MCPServerID,
 		pageSize?: number,
 		pageToken?: string
 	): Promise<{ prompts: MCPPromptRef[]; nextPageToken?: string }>;
 
-	readMCPResource(serverID: MCPServerID, uri: string): Promise<MCPReadResourceResponseBody | undefined>;
+	readMCPResource(
+		bundleID: string,
+		serverID: MCPServerID,
+		uri: string
+	): Promise<MCPReadResourceResponseBody | undefined>;
 
 	getMCPPrompt(
+		bundleID: string,
 		serverID: MCPServerID,
 		promptName: string,
 		promptArguments?: Record<string, string>
 	): Promise<MCPGetPromptResponseBody | undefined>;
 
 	completeMCPArgument(
+		bundleID: string,
 		serverID: MCPServerID,
 		refType: MCPRefType,
 		name: string,
@@ -540,26 +572,27 @@ export interface IMCPAPI {
 		context?: Record<string, string>
 	): Promise<MCPCompletionResult>;
 
-	evaluateMCPToolCall(request: InvokeMCPToolRequestBody): Promise<MCPApprovalEvaluation | undefined>;
+	evaluateMCPToolCall(bundleID: string, request: InvokeMCPToolRequestBody): Promise<MCPApprovalEvaluation | undefined>;
 
-	invokeMCPTool(request: InvokeMCPToolRequestBody): Promise<MCPInvokeToolResponseBody | undefined>;
+	invokeMCPTool(bundleID: string, request: InvokeMCPToolRequestBody): Promise<MCPInvokeToolResponseBody | undefined>;
 
 	resolveMCPApproval(approvalID: string, resolution: MCPApprovalResolution): Promise<MCPApprovalToken | undefined>;
 
 	listPendingMCPOAuthAuthorizations(): Promise<MCPOAuthAuthorization[]>;
 
-	cancelPendingMCPOAuthAuthorization(serverID: MCPServerID): Promise<void>;
+	cancelPendingMCPOAuthAuthorization(bundleID: string, serverID: MCPServerID): Promise<void>;
 
-	getMCPServerAuthStatus(serverID: MCPServerID): Promise<MCPAuthStatus | undefined>;
+	getMCPServerAuthStatus(bundleID: string, serverID: MCPServerID): Promise<MCPAuthStatus | undefined>;
 
-	getMCPServerAuthHealth(serverID: MCPServerID): Promise<MCPAuthHealth | undefined>;
+	getMCPServerAuthHealth(bundleID: string, serverID: MCPServerID): Promise<MCPAuthHealth | undefined>;
 
 	putMCPServerSecret(
+		bundleID: string,
 		serverID: MCPServerID,
 		kind: MCPSecretKind,
 		slot: string,
 		secret: string
 	): Promise<PutMCPServerSecretResponseBody | undefined>;
 
-	deleteMCPServerSecret(serverID: MCPServerID, kind: MCPSecretKind, slot: string): Promise<void>;
+	deleteMCPServerSecret(bundleID: string, serverID: MCPServerID, kind: MCPSecretKind, slot: string): Promise<void>;
 }

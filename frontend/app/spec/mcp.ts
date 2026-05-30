@@ -208,6 +208,7 @@ export interface MCPStreamableHTTPConfig {
 }
 
 export interface MCPAuthStatus {
+	bundleID: string;
 	serverID: MCPServerID;
 	authMode: MCPHTTPAuthMode;
 	state: MCPAuthState;
@@ -220,6 +221,7 @@ export interface MCPAuthStatus {
 }
 
 export interface MCPAuthHealth {
+	bundleID?: string;
 	serverID: MCPServerID;
 	authMode: MCPHTTPAuthMode;
 	state: MCPAuthHealthState;
@@ -263,6 +265,19 @@ export interface MCPAppsPolicy {
 	requireApprovalForContextUpdates: boolean;
 }
 
+export interface MCPBundle {
+	schemaVersion: string;
+	id: string;
+	slug: string;
+	displayName?: string;
+	description?: string;
+	isEnabled: boolean;
+	createdAt: MCPTimestamp;
+	modifiedAt: MCPTimestamp;
+	isBuiltIn: boolean;
+	softDeletedAt?: MCPTimestamp;
+}
+
 export interface PutMCPServerPayload {
 	displayName: string;
 	enabled: boolean;
@@ -302,6 +317,7 @@ export interface PatchMCPServerEnabledRequestBody {
 }
 
 export interface MCPServerRuntimeSnapshot {
+	bundleID: string;
 	serverID: MCPServerID;
 	status: MCPServerStatus;
 
@@ -337,6 +353,7 @@ export interface MCPToolAppInfo {
 }
 
 export interface MCPToolCapability {
+	bundleID: string;
 	serverID: MCPServerID;
 	toolName: string;
 	providerToolName: string;
@@ -365,6 +382,7 @@ export interface MCPToolCapability {
 }
 
 export interface MCPResourceRef {
+	bundleID: string;
 	serverID: MCPServerID;
 	uri: string;
 	name?: string;
@@ -378,6 +396,7 @@ export interface MCPResourceRef {
 }
 
 export interface MCPResourceTemplateRef {
+	bundleID: string;
 	serverID: MCPServerID;
 	uriTemplate: string;
 	name?: string;
@@ -391,6 +410,7 @@ export interface MCPResourceTemplateRef {
 }
 
 export interface MCPPromptRef {
+	bundleID: string;
 	serverID: MCPServerID;
 	promptName: string;
 	title?: string;
@@ -439,6 +459,7 @@ export interface MCPProviderToolMapping {
 }
 
 export interface MCPServerSelection {
+	bundleID: string;
 	serverID: MCPServerID;
 	snapshotDigest?: string;
 
@@ -456,6 +477,7 @@ export interface MCPConversationContext {
 }
 
 export interface MCPToolCallProvenance {
+	bundleID: string;
 	serverID: MCPServerID;
 	serverDisplayName?: string;
 
@@ -477,12 +499,14 @@ export interface MCPSecretRef {
 }
 
 export interface MCPOAuthAuthorization {
-	serverID: MCPServerID;
+	bundleID: string;
+	serverID: string;
 	authorizationURL: string;
 	expiresAt?: MCPTimestamp;
 }
 
 export interface MCPApprovalSummary {
+	bundleID: string;
 	serverID: MCPServerID;
 	serverDisplayName?: string;
 	toolName: string;
@@ -530,7 +554,8 @@ export interface MCPToolAppRenderInfo {
 }
 
 export interface InvokeMCPToolResponseBody {
-	serverID: MCPServerID;
+	bundleID: string;
+	serverID: string;
 	toolName: string;
 	providerToolName?: string;
 
@@ -548,7 +573,8 @@ export interface MCPReadResourceRequestBody {
 }
 
 export interface MCPReadResourceResponseBody {
-	serverID: MCPServerID;
+	bundleID: string;
+	serverID: string;
 	uri: string;
 	contents?: MCPContent[];
 }
@@ -560,7 +586,8 @@ export interface MCPGetPromptRequestBody {
 }
 
 export interface MCPGetPromptResponseBody {
-	serverID: MCPServerID;
+	bundleID: string;
+	serverID: string;
 	promptName: string;
 	description?: string;
 	messages?: MCPPromptMessage[];
@@ -582,6 +609,7 @@ export interface MCPCompletionResult {
 }
 
 export interface MCPServerConfig {
+	bundleID: string;
 	schemaVersion: string;
 	id: string;
 	displayName: string;
@@ -594,7 +622,8 @@ export interface MCPServerConfig {
 	defaultPolicy: MCPServerPolicy;
 	toolPolicies?: Record<string, MCPToolPolicyOverride>;
 	appsPolicy?: MCPAppsPolicy;
-	createdAt: MCPTimestamp; // Go type: time
-	modifiedAt: MCPTimestamp; // Go type: time
-	softDeletedAt?: MCPTimestamp; // Go type: time
+	isBuiltIn: boolean;
+	createdAt: MCPTimestamp;
+	modifiedAt: MCPTimestamp;
+	softDeletedAt?: MCPTimestamp;
 }

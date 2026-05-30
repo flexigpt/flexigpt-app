@@ -1063,6 +1063,7 @@ export namespace spec {
 	}
 	
 	export class CancelPendingMCPOAuthAuthorizationRequest {
+	    BundleID: string;
 	    ServerID: string;
 	
 	    static createFrom(source: any = {}) {
@@ -1071,6 +1072,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	    }
 	}
@@ -2243,6 +2245,7 @@ export namespace spec {
 	}
 	
 	export class ConnectMCPServerRequest {
+	    BundleID: string;
 	    ServerID: string;
 	
 	    static createFrom(source: any = {}) {
@@ -2251,6 +2254,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	    }
 	}
@@ -2301,6 +2305,7 @@ export namespace spec {
 	    }
 	}
 	export class MCPServerRuntimeSnapshot {
+	    bundleID: string;
 	    serverID: string;
 	    status: string;
 	    negotiatedProtocolVersion?: string;
@@ -2322,6 +2327,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
 	        this.serverID = source["serverID"];
 	        this.status = source["status"];
 	        this.negotiatedProtocolVersion = source["negotiatedProtocolVersion"];
@@ -2720,7 +2726,32 @@ export namespace spec {
 	
 	    }
 	}
+	export class DeleteMCPBundleRequest {
+	    BundleID: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeleteMCPBundleRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	    }
+	}
+	export class DeleteMCPBundleResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new DeleteMCPBundleResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
 	export class DeleteMCPServerRequest {
+	    BundleID: string;
 	    ServerID: string;
 	
 	    static createFrom(source: any = {}) {
@@ -2729,6 +2760,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	    }
 	}
@@ -2745,6 +2777,7 @@ export namespace spec {
 	    }
 	}
 	export class DeleteMCPServerSecretRequest {
+	    BundleID: string;
 	    ServerID: string;
 	    Kind: string;
 	    Slot: string;
@@ -2755,6 +2788,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	        this.Kind = source["Kind"];
 	        this.Slot = source["Slot"];
@@ -2977,6 +3011,7 @@ export namespace spec {
 	    }
 	}
 	export class DisconnectMCPServerRequest {
+	    BundleID: string;
 	    ServerID: string;
 	
 	    static createFrom(source: any = {}) {
@@ -2985,6 +3020,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	    }
 	}
@@ -3003,7 +3039,6 @@ export namespace spec {
 	
 	export class InvokeMCPToolRequestBody {
 	    source: string;
-	    serverID: string;
 	    toolName: string;
 	    providerToolName?: string;
 	    toolDigest?: string;
@@ -3022,7 +3057,6 @@ export namespace spec {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.source = source["source"];
-	        this.serverID = source["serverID"];
 	        this.toolName = source["toolName"];
 	        this.providerToolName = source["providerToolName"];
 	        this.toolDigest = source["toolDigest"];
@@ -3036,6 +3070,8 @@ export namespace spec {
 	    }
 	}
 	export class EvaluateMCPToolCallRequest {
+	    BundleID: string;
+	    ServerID: string;
 	    Body?: InvokeMCPToolRequestBody;
 	
 	    static createFrom(source: any = {}) {
@@ -3044,6 +3080,8 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	        this.ServerID = source["ServerID"];
 	        this.Body = this.convertValues(source["Body"], InvokeMCPToolRequestBody);
 	    }
 	
@@ -3066,6 +3104,7 @@ export namespace spec {
 		}
 	}
 	export class MCPApprovalSummary {
+	    bundleID: string;
 	    serverID: string;
 	    serverDisplayName?: string;
 	    toolName: string;
@@ -3079,6 +3118,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
 	        this.serverID = source["serverID"];
 	        this.serverDisplayName = source["serverDisplayName"];
 	        this.toolName = source["toolName"];
@@ -3363,6 +3403,7 @@ export namespace spec {
 	}
 	
 	export class GetMCPServerAuthHealthRequest {
+	    BundleID: string;
 	    ServerID: string;
 	
 	    static createFrom(source: any = {}) {
@@ -3371,10 +3412,12 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	    }
 	}
 	export class MCPAuthHealth {
+	    bundleID?: string;
 	    serverID: string;
 	    authMode: string;
 	    state: string;
@@ -3394,6 +3437,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
 	        this.serverID = source["serverID"];
 	        this.authMode = source["authMode"];
 	        this.state = source["state"];
@@ -3456,6 +3500,7 @@ export namespace spec {
 		}
 	}
 	export class GetMCPServerAuthStatusRequest {
+	    BundleID: string;
 	    ServerID: string;
 	
 	    static createFrom(source: any = {}) {
@@ -3464,10 +3509,12 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	    }
 	}
 	export class MCPAuthStatus {
+	    bundleID: string;
 	    serverID: string;
 	    authMode: string;
 	    state: string;
@@ -3484,6 +3531,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
 	        this.serverID = source["serverID"];
 	        this.authMode = source["authMode"];
 	        this.state = source["state"];
@@ -3543,6 +3591,7 @@ export namespace spec {
 		}
 	}
 	export class GetMCPServerRequest {
+	    BundleID: string;
 	    ServerID: string;
 	    IncludeDeleted: boolean;
 	
@@ -3552,6 +3601,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	        this.IncludeDeleted = source["IncludeDeleted"];
 	    }
@@ -3658,6 +3708,7 @@ export namespace spec {
 	}
 	export class MCPServerConfig {
 	    schemaVersion: string;
+	    bundleID: string;
 	    id: string;
 	    displayName: string;
 	    enabled: boolean;
@@ -3669,6 +3720,7 @@ export namespace spec {
 	    defaultPolicy: MCPServerPolicy;
 	    toolPolicies?: Record<string, MCPToolPolicyOverride>;
 	    appsPolicy?: MCPAppsPolicy;
+	    isBuiltIn: boolean;
 	    // Go type: time
 	    createdAt: any;
 	    // Go type: time
@@ -3683,6 +3735,7 @@ export namespace spec {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.schemaVersion = source["schemaVersion"];
+	        this.bundleID = source["bundleID"];
 	        this.id = source["id"];
 	        this.displayName = source["displayName"];
 	        this.enabled = source["enabled"];
@@ -3694,6 +3747,7 @@ export namespace spec {
 	        this.defaultPolicy = this.convertValues(source["defaultPolicy"], MCPServerPolicy);
 	        this.toolPolicies = this.convertValues(source["toolPolicies"], MCPToolPolicyOverride, true);
 	        this.appsPolicy = this.convertValues(source["appsPolicy"], MCPAppsPolicy);
+	        this.isBuiltIn = source["isBuiltIn"];
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
 	        this.softDeletedAt = this.convertValues(source["softDeletedAt"], null);
@@ -3748,6 +3802,7 @@ export namespace spec {
 		}
 	}
 	export class GetMCPServerStatusRequest {
+	    BundleID: string;
 	    ServerID: string;
 	
 	    static createFrom(source: any = {}) {
@@ -3756,6 +3811,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	    }
 	}
@@ -4799,6 +4855,8 @@ export namespace spec {
 	    }
 	}
 	export class InvokeMCPToolRequest {
+	    BundleID: string;
+	    ServerID: string;
 	    Body?: InvokeMCPToolRequestBody;
 	
 	    static createFrom(source: any = {}) {
@@ -4807,6 +4865,8 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	        this.ServerID = source["ServerID"];
 	        this.Body = this.convertValues(source["Body"], InvokeMCPToolRequestBody);
 	    }
 	
@@ -4844,6 +4904,7 @@ export namespace spec {
 	    }
 	}
 	export class MCPToolCallProvenance {
+	    bundleID: string;
 	    serverID: string;
 	    serverDisplayName?: string;
 	    toolName: string;
@@ -4860,6 +4921,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
 	        this.serverID = source["serverID"];
 	        this.serverDisplayName = source["serverDisplayName"];
 	        this.toolName = source["toolName"];
@@ -4964,6 +5026,7 @@ export namespace spec {
 		}
 	}
 	export class InvokeMCPToolResponseBody {
+	    bundleID: string;
 	    serverID: string;
 	    toolName: string;
 	    providerToolName?: string;
@@ -4979,6 +5042,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
 	        this.serverID = source["serverID"];
 	        this.toolName = source["toolName"];
 	        this.providerToolName = source["providerToolName"];
@@ -5616,7 +5680,140 @@ export namespace spec {
 		}
 	}
 	
+	export class ListMCPBundlesRequest {
+	    BundleIDs: string[];
+	    IncludeDisabled: boolean;
+	    PageSize: number;
+	    PageToken: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListMCPBundlesRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleIDs = source["BundleIDs"];
+	        this.IncludeDisabled = source["IncludeDisabled"];
+	        this.PageSize = source["PageSize"];
+	        this.PageToken = source["PageToken"];
+	    }
+	}
+	export class MCPBundle {
+	    schemaVersion: string;
+	    id: string;
+	    slug: string;
+	    displayName?: string;
+	    description?: string;
+	    isEnabled: boolean;
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    modifiedAt: any;
+	    isBuiltIn: boolean;
+	    // Go type: time
+	    softDeletedAt?: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPBundle(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.schemaVersion = source["schemaVersion"];
+	        this.id = source["id"];
+	        this.slug = source["slug"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.isEnabled = source["isEnabled"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
+	        this.isBuiltIn = source["isBuiltIn"];
+	        this.softDeletedAt = this.convertValues(source["softDeletedAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ListMCPBundlesResponseBody {
+	    bundles: MCPBundle[];
+	    nextPageToken?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListMCPBundlesResponseBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundles = this.convertValues(source["bundles"], MCPBundle);
+	        this.nextPageToken = source["nextPageToken"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ListMCPBundlesResponse {
+	    Body?: ListMCPBundlesResponseBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new ListMCPBundlesResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], ListMCPBundlesResponseBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class ListMCPServerPromptsRequest {
+	    BundleID: string;
 	    ServerID: string;
 	    PageSize: number;
 	    PageToken: string;
@@ -5627,12 +5824,14 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	        this.PageSize = source["PageSize"];
 	        this.PageToken = source["PageToken"];
 	    }
 	}
 	export class MCPPromptRef {
+	    bundleID: string;
 	    serverID: string;
 	    promptName: string;
 	    title?: string;
@@ -5647,6 +5846,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
 	        this.serverID = source["serverID"];
 	        this.promptName = source["promptName"];
 	        this.title = source["title"];
@@ -5720,6 +5920,7 @@ export namespace spec {
 	}
 	
 	export class ListMCPServerResourceTemplatesRequest {
+	    BundleID: string;
 	    ServerID: string;
 	    PageSize: number;
 	    PageToken: string;
@@ -5730,12 +5931,14 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	        this.PageSize = source["PageSize"];
 	        this.PageToken = source["PageToken"];
 	    }
 	}
 	export class MCPResourceTemplateRef {
+	    bundleID: string;
 	    serverID: string;
 	    uriTemplate: string;
 	    name?: string;
@@ -5753,6 +5956,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
 	        this.serverID = source["serverID"];
 	        this.uriTemplate = source["uriTemplate"];
 	        this.name = source["name"];
@@ -5829,6 +6033,7 @@ export namespace spec {
 	}
 	
 	export class ListMCPServerResourcesRequest {
+	    BundleID: string;
 	    ServerID: string;
 	    PageSize: number;
 	    PageToken: string;
@@ -5839,12 +6044,14 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	        this.PageSize = source["PageSize"];
 	        this.PageToken = source["PageToken"];
 	    }
 	}
 	export class MCPResourceRef {
+	    bundleID: string;
 	    serverID: string;
 	    uri: string;
 	    name?: string;
@@ -5862,6 +6069,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
 	        this.serverID = source["serverID"];
 	        this.uri = source["uri"];
 	        this.name = source["name"];
@@ -5938,6 +6146,7 @@ export namespace spec {
 	}
 	
 	export class ListMCPServerToolsRequest {
+	    BundleID: string;
 	    ServerID: string;
 	    PageSize: number;
 	    PageToken: string;
@@ -5948,6 +6157,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	        this.PageSize = source["PageSize"];
 	        this.PageToken = source["PageToken"];
@@ -5988,6 +6198,7 @@ export namespace spec {
 	    }
 	}
 	export class MCPToolCapability {
+	    bundleID: string;
 	    serverID: string;
 	    toolName: string;
 	    providerToolName: string;
@@ -6013,6 +6224,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
 	        this.serverID = source["serverID"];
 	        this.toolName = source["toolName"];
 	        this.providerToolName = source["providerToolName"];
@@ -6115,8 +6327,10 @@ export namespace spec {
 	}
 	
 	export class ListMCPServersRequest {
+	    BundleID: string;
 	    ServerIDs: string[];
 	    Enabled?: boolean;
+	    IncludeDisabled: boolean;
 	    PageSize: number;
 	    PageToken: string;
 	
@@ -6126,8 +6340,10 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
 	        this.ServerIDs = source["ServerIDs"];
 	        this.Enabled = source["Enabled"];
+	        this.IncludeDisabled = source["IncludeDisabled"];
 	        this.PageSize = source["PageSize"];
 	        this.PageToken = source["PageToken"];
 	    }
@@ -6208,6 +6424,7 @@ export namespace spec {
 	    }
 	}
 	export class MCPOAuthAuthorization {
+	    bundleID: string;
 	    serverID: string;
 	    authorizationURL: string;
 	    expiresAt?: string;
@@ -6218,6 +6435,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
 	        this.serverID = source["serverID"];
 	        this.authorizationURL = source["authorizationURL"];
 	        this.expiresAt = source["expiresAt"];
@@ -7303,8 +7521,8 @@ export namespace spec {
 	
 	
 	
+	
 	export class MCPCompleteArgumentRequestBody {
-	    serverID: string;
 	    refType: string;
 	    name: string;
 	    argumentName: string;
@@ -7317,7 +7535,6 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.serverID = source["serverID"];
 	        this.refType = source["refType"];
 	        this.name = source["name"];
 	        this.argumentName = source["argumentName"];
@@ -7326,6 +7543,8 @@ export namespace spec {
 	    }
 	}
 	export class MCPCompleteArgumentRequest {
+	    BundleID: string;
+	    ServerID: string;
 	    Body?: MCPCompleteArgumentRequestBody;
 	
 	    static createFrom(source: any = {}) {
@@ -7334,6 +7553,8 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	        this.ServerID = source["ServerID"];
 	        this.Body = this.convertValues(source["Body"], MCPCompleteArgumentRequestBody);
 	    }
 	
@@ -7374,7 +7595,6 @@ export namespace spec {
 	}
 	
 	export class MCPGetPromptRequestBody {
-	    serverID: string;
 	    promptName: string;
 	    arguments?: Record<string, string>;
 	
@@ -7384,12 +7604,13 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.serverID = source["serverID"];
 	        this.promptName = source["promptName"];
 	        this.arguments = source["arguments"];
 	    }
 	}
 	export class MCPGetPromptRequest {
+	    BundleID: string;
+	    ServerID: string;
 	    Body?: MCPGetPromptRequestBody;
 	
 	    static createFrom(source: any = {}) {
@@ -7398,6 +7619,8 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	        this.ServerID = source["ServerID"];
 	        this.Body = this.convertValues(source["Body"], MCPGetPromptRequestBody);
 	    }
 	
@@ -7453,6 +7676,7 @@ export namespace spec {
 		}
 	}
 	export class MCPGetPromptResponseBody {
+	    bundleID: string;
 	    serverID: string;
 	    promptName: string;
 	    description?: string;
@@ -7464,6 +7688,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
 	        this.serverID = source["serverID"];
 	        this.promptName = source["promptName"];
 	        this.description = source["description"];
@@ -7525,7 +7750,6 @@ export namespace spec {
 	
 	
 	export class MCPReadResourceRequestBody {
-	    serverID: string;
 	    uri: string;
 	
 	    static createFrom(source: any = {}) {
@@ -7534,11 +7758,12 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.serverID = source["serverID"];
 	        this.uri = source["uri"];
 	    }
 	}
 	export class MCPReadResourceRequest {
+	    BundleID: string;
+	    ServerID: string;
 	    Body?: MCPReadResourceRequestBody;
 	
 	    static createFrom(source: any = {}) {
@@ -7547,6 +7772,8 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	        this.ServerID = source["ServerID"];
 	        this.Body = this.convertValues(source["Body"], MCPReadResourceRequestBody);
 	    }
 	
@@ -7570,6 +7797,7 @@ export namespace spec {
 	}
 	
 	export class MCPReadResourceResponseBody {
+	    bundleID: string;
 	    serverID: string;
 	    uri: string;
 	    contents?: MCPContent[];
@@ -7580,6 +7808,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
 	        this.serverID = source["serverID"];
 	        this.uri = source["uri"];
 	        this.contents = this.convertValues(source["contents"], MCPContent);
@@ -7830,6 +8059,63 @@ export namespace spec {
 	
 	    }
 	}
+	export class PatchMCPBundleRequestBody {
+	    isEnabled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchMCPBundleRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.isEnabled = source["isEnabled"];
+	    }
+	}
+	export class PatchMCPBundleRequest {
+	    BundleID: string;
+	    Body?: PatchMCPBundleRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchMCPBundleRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	        this.Body = this.convertValues(source["Body"], PatchMCPBundleRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class PatchMCPBundleResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchMCPBundleResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
 	export class PatchMCPServerEnabledRequestBody {
 	    enabled: boolean;
 	
@@ -7843,6 +8129,7 @@ export namespace spec {
 	    }
 	}
 	export class PatchMCPServerEnabledRequest {
+	    BundleID: string;
 	    ServerID: string;
 	    Body?: PatchMCPServerEnabledRequestBody;
 	
@@ -7852,6 +8139,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	        this.Body = this.convertValues(source["Body"], PatchMCPServerEnabledRequestBody);
 	    }
@@ -7922,6 +8210,7 @@ export namespace spec {
 		}
 	}
 	export class PatchMCPServerPolicyRequest {
+	    BundleID: string;
 	    ServerID: string;
 	    Body?: PatchMCPServerPolicyPayload;
 	
@@ -7931,6 +8220,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	        this.Body = this.convertValues(source["Body"], PatchMCPServerPolicyPayload);
 	    }
@@ -8970,6 +9260,69 @@ export namespace spec {
 	
 	    }
 	}
+	export class PutMCPBundleRequestBody {
+	    slug: string;
+	    displayName: string;
+	    isEnabled: boolean;
+	    description?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PutMCPBundleRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.slug = source["slug"];
+	        this.displayName = source["displayName"];
+	        this.isEnabled = source["isEnabled"];
+	        this.description = source["description"];
+	    }
+	}
+	export class PutMCPBundleRequest {
+	    BundleID: string;
+	    Body?: PutMCPBundleRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new PutMCPBundleRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	        this.Body = this.convertValues(source["Body"], PutMCPBundleRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class PutMCPBundleResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new PutMCPBundleResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
 	export class PutMCPServerPayload {
 	    displayName: string;
 	    enabled: boolean;
@@ -9019,6 +9372,7 @@ export namespace spec {
 		}
 	}
 	export class PutMCPServerRequest {
+	    BundleID: string;
 	    ServerID: string;
 	    Body?: PutMCPServerPayload;
 	
@@ -9028,6 +9382,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	        this.Body = this.convertValues(source["Body"], PutMCPServerPayload);
 	    }
@@ -9079,6 +9434,7 @@ export namespace spec {
 	    }
 	}
 	export class PutMCPServerSecretRequest {
+	    BundleID: string;
 	    ServerID: string;
 	    Body?: PutMCPServerSecretRequestBody;
 	
@@ -9088,6 +9444,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	        this.Body = this.convertValues(source["Body"], PutMCPServerSecretRequestBody);
 	    }
@@ -9688,6 +10045,7 @@ export namespace spec {
 	
 	
 	export class RefreshMCPServerRequest {
+	    BundleID: string;
 	    ServerID: string;
 	
 	    static createFrom(source: any = {}) {
@@ -9696,6 +10054,7 @@ export namespace spec {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	    }
 	}

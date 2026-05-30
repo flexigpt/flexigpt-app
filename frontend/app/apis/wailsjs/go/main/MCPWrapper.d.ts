@@ -8,6 +8,8 @@ export function CompleteMCPArgument(arg1:spec.MCPCompleteArgumentRequest):Promis
 
 export function ConnectMCPServer(arg1:spec.ConnectMCPServerRequest):Promise<spec.ConnectMCPServerResponse>;
 
+export function DeleteMCPBundle(arg1:spec.DeleteMCPBundleRequest):Promise<spec.DeleteMCPBundleResponse>;
+
 export function DeleteMCPServer(arg1:spec.DeleteMCPServerRequest):Promise<spec.DeleteMCPServerResponse>;
 
 export function DeleteMCPServerSecret(arg1:spec.DeleteMCPServerSecretRequest):Promise<spec.DeleteMCPServerSecretResponse>;
@@ -28,6 +30,8 @@ export function GetMCPServerStatus(arg1:spec.GetMCPServerStatusRequest):Promise<
 
 export function InvokeMCPTool(arg1:spec.InvokeMCPToolRequest):Promise<spec.InvokeMCPToolResponse>;
 
+export function ListMCPBundles(arg1:spec.ListMCPBundlesRequest):Promise<spec.ListMCPBundlesResponse>;
+
 export function ListMCPServerPrompts(arg1:spec.ListMCPServerPromptsRequest):Promise<spec.ListMCPServerPromptsResponse>;
 
 export function ListMCPServerResourceTemplates(arg1:spec.ListMCPServerResourceTemplatesRequest):Promise<spec.ListMCPServerResourceTemplatesResponse>;
@@ -40,9 +44,13 @@ export function ListMCPServers(arg1:spec.ListMCPServersRequest):Promise<spec.Lis
 
 export function ListPendingMCPOAuthAuthorizations(arg1:spec.ListPendingMCPOAuthAuthorizationsRequest):Promise<spec.ListPendingMCPOAuthAuthorizationsResponse>;
 
+export function PatchMCPBundle(arg1:spec.PatchMCPBundleRequest):Promise<spec.PatchMCPBundleResponse>;
+
 export function PatchMCPServerEnabled(arg1:spec.PatchMCPServerEnabledRequest):Promise<spec.PatchMCPServerEnabledResponse>;
 
 export function PatchMCPServerPolicy(arg1:spec.PatchMCPServerPolicyRequest):Promise<spec.PatchMCPServerPolicyResponse>;
+
+export function PutMCPBundle(arg1:spec.PutMCPBundleRequest):Promise<spec.PutMCPBundleResponse>;
 
 export function PutMCPServer(arg1:spec.PutMCPServerRequest):Promise<spec.PutMCPServerResponse>;
 
