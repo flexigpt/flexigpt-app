@@ -2744,6 +2744,34 @@ export namespace spec {
 	
 	    }
 	}
+	export class DeleteMCPServerSecretRequest {
+	    ServerID: string;
+	    Kind: string;
+	    Slot: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeleteMCPServerSecretRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ServerID = source["ServerID"];
+	        this.Kind = source["Kind"];
+	        this.Slot = source["Slot"];
+	    }
+	}
+	export class DeleteMCPServerSecretResponse {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new DeleteMCPServerSecretResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
 	export class DeleteModelPresetRequest {
 	    ProviderName: string;
 	    ModelPresetID: string;
@@ -3334,6 +3362,186 @@ export namespace spec {
 		}
 	}
 	
+	export class GetMCPServerAuthHealthRequest {
+	    ServerID: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new GetMCPServerAuthHealthRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ServerID = source["ServerID"];
+	    }
+	}
+	export class MCPAuthHealth {
+	    serverID: string;
+	    authMode: string;
+	    state: string;
+	    configured: boolean;
+	    resource?: string;
+	    scopes?: string[];
+	    // Go type: time
+	    expiresAt?: any;
+	    authorizationPending?: boolean;
+	    authorizationURL?: string;
+	    authorizationExpiresAt?: string;
+	    lastError?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPAuthHealth(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.serverID = source["serverID"];
+	        this.authMode = source["authMode"];
+	        this.state = source["state"];
+	        this.configured = source["configured"];
+	        this.resource = source["resource"];
+	        this.scopes = source["scopes"];
+	        this.expiresAt = this.convertValues(source["expiresAt"], null);
+	        this.authorizationPending = source["authorizationPending"];
+	        this.authorizationURL = source["authorizationURL"];
+	        this.authorizationExpiresAt = source["authorizationExpiresAt"];
+	        this.lastError = source["lastError"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class GetMCPServerAuthHealthResponse {
+	    Body?: MCPAuthHealth;
+	
+	    static createFrom(source: any = {}) {
+	        return new GetMCPServerAuthHealthResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], MCPAuthHealth);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class GetMCPServerAuthStatusRequest {
+	    ServerID: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new GetMCPServerAuthStatusRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ServerID = source["ServerID"];
+	    }
+	}
+	export class MCPAuthStatus {
+	    serverID: string;
+	    authMode: string;
+	    state: string;
+	    scopes?: string[];
+	    // Go type: time
+	    expiresAt?: any;
+	    lastError?: string;
+	    authorizationServer?: string;
+	    resource?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPAuthStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.serverID = source["serverID"];
+	        this.authMode = source["authMode"];
+	        this.state = source["state"];
+	        this.scopes = source["scopes"];
+	        this.expiresAt = this.convertValues(source["expiresAt"], null);
+	        this.lastError = source["lastError"];
+	        this.authorizationServer = source["authorizationServer"];
+	        this.resource = source["resource"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class GetMCPServerAuthStatusResponse {
+	    Body?: MCPAuthStatus;
+	
+	    static createFrom(source: any = {}) {
+	        return new GetMCPServerAuthStatusResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], MCPAuthStatus);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class GetMCPServerRequest {
 	    ServerID: string;
 	    IncludeDeleted: boolean;
@@ -3346,24 +3554,6 @@ export namespace spec {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ServerID = source["ServerID"];
 	        this.IncludeDeleted = source["IncludeDeleted"];
-	    }
-	}
-	export class MCPAuthRef {
-	    authMode: string;
-	    tokenRef?: string;
-	    clientCredentialRef?: string;
-	    metadataRef?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new MCPAuthRef(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.authMode = source["authMode"];
-	        this.tokenRef = source["tokenRef"];
-	        this.clientCredentialRef = source["clientCredentialRef"];
-	        this.metadataRef = source["metadataRef"];
 	    }
 	}
 	export class MCPAppsPolicy {
@@ -3427,9 +3617,9 @@ export namespace spec {
 	export class MCPStreamableHTTPConfig {
 	    url: string;
 	    timeoutMS?: number;
-	    customHeaders?: Record<string, string>;
-	    secretHeaderRefs?: Record<string, string>;
 	    authMode: string;
+	    clientCredentialRef?: string;
+	    clientIDMetadataDocumentURL?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new MCPStreamableHTTPConfig(source);
@@ -3439,9 +3629,9 @@ export namespace spec {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.url = source["url"];
 	        this.timeoutMS = source["timeoutMS"];
-	        this.customHeaders = source["customHeaders"];
-	        this.secretHeaderRefs = source["secretHeaderRefs"];
 	        this.authMode = source["authMode"];
+	        this.clientCredentialRef = source["clientCredentialRef"];
+	        this.clientIDMetadataDocumentURL = source["clientIDMetadataDocumentURL"];
 	    }
 	}
 	export class MCPStdioConfig {
@@ -3479,7 +3669,6 @@ export namespace spec {
 	    defaultPolicy: MCPServerPolicy;
 	    toolPolicies?: Record<string, MCPToolPolicyOverride>;
 	    appsPolicy?: MCPAppsPolicy;
-	    authRef?: MCPAuthRef;
 	    // Go type: time
 	    createdAt: any;
 	    // Go type: time
@@ -3505,7 +3694,6 @@ export namespace spec {
 	        this.defaultPolicy = this.convertValues(source["defaultPolicy"], MCPServerPolicy);
 	        this.toolPolicies = this.convertValues(source["toolPolicies"], MCPToolPolicyOverride, true);
 	        this.appsPolicy = this.convertValues(source["appsPolicy"], MCPAppsPolicy);
-	        this.authRef = this.convertValues(source["authRef"], MCPAuthRef);
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
 	        this.softDeletedAt = this.convertValues(source["softDeletedAt"], null);
@@ -7114,6 +7302,7 @@ export namespace spec {
 	}
 	
 	
+	
 	export class MCPCompleteArgumentRequestBody {
 	    serverID: string;
 	    refType: string;
@@ -8792,7 +8981,6 @@ export namespace spec {
 	    defaultPolicy?: MCPServerPolicy;
 	    toolPolicies?: Record<string, MCPToolPolicyOverride>;
 	    appsPolicy?: MCPAppsPolicy;
-	    authRef?: MCPAuthRef;
 	
 	    static createFrom(source: any = {}) {
 	        return new PutMCPServerPayload(source);
@@ -8810,7 +8998,6 @@ export namespace spec {
 	        this.defaultPolicy = this.convertValues(source["defaultPolicy"], MCPServerPolicy);
 	        this.toolPolicies = this.convertValues(source["toolPolicies"], MCPToolPolicyOverride, true);
 	        this.appsPolicy = this.convertValues(source["appsPolicy"], MCPAppsPolicy);
-	        this.authRef = this.convertValues(source["authRef"], MCPAuthRef);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -8875,6 +9062,102 @@ export namespace spec {
 	
 	    }
 	}
+	export class PutMCPServerSecretRequestBody {
+	    kind: string;
+	    slot: string;
+	    secret: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PutMCPServerSecretRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.slot = source["slot"];
+	        this.secret = source["secret"];
+	    }
+	}
+	export class PutMCPServerSecretRequest {
+	    ServerID: string;
+	    Body?: PutMCPServerSecretRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new PutMCPServerSecretRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ServerID = source["ServerID"];
+	        this.Body = this.convertValues(source["Body"], PutMCPServerSecretRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class PutMCPServerSecretResponseBody {
+	    secretRef: string;
+	    sha256?: string;
+	    nonEmpty: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new PutMCPServerSecretResponseBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.secretRef = source["secretRef"];
+	        this.sha256 = source["sha256"];
+	        this.nonEmpty = source["nonEmpty"];
+	    }
+	}
+	export class PutMCPServerSecretResponse {
+	    Body?: PutMCPServerSecretResponseBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new PutMCPServerSecretResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], PutMCPServerSecretResponseBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class PutMessagesToConversationRequestBody {
 	    title: string;
 	    messages: ConversationMessage[];

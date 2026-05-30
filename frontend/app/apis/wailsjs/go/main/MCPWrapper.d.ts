@@ -10,6 +10,8 @@ export function ConnectMCPServer(arg1:spec.ConnectMCPServerRequest):Promise<spec
 
 export function DeleteMCPServer(arg1:spec.DeleteMCPServerRequest):Promise<spec.DeleteMCPServerResponse>;
 
+export function DeleteMCPServerSecret(arg1:spec.DeleteMCPServerSecretRequest):Promise<spec.DeleteMCPServerSecretResponse>;
+
 export function DisconnectMCPServer(arg1:spec.DisconnectMCPServerRequest):Promise<spec.DisconnectMCPServerResponse>;
 
 export function EvaluateMCPToolCall(arg1:spec.EvaluateMCPToolCallRequest):Promise<spec.EvaluateMCPToolCallResponse>;
@@ -17,6 +19,10 @@ export function EvaluateMCPToolCall(arg1:spec.EvaluateMCPToolCallRequest):Promis
 export function GetMCPPrompt(arg1:spec.MCPGetPromptRequest):Promise<spec.MCPGetPromptResponse>;
 
 export function GetMCPServer(arg1:spec.GetMCPServerRequest):Promise<spec.GetMCPServerResponse>;
+
+export function GetMCPServerAuthHealth(arg1:spec.GetMCPServerAuthHealthRequest):Promise<spec.GetMCPServerAuthHealthResponse>;
+
+export function GetMCPServerAuthStatus(arg1:spec.GetMCPServerAuthStatusRequest):Promise<spec.GetMCPServerAuthStatusResponse>;
 
 export function GetMCPServerStatus(arg1:spec.GetMCPServerStatusRequest):Promise<spec.GetMCPServerStatusResponse>;
 
@@ -39,6 +45,8 @@ export function PatchMCPServerEnabled(arg1:spec.PatchMCPServerEnabledRequest):Pr
 export function PatchMCPServerPolicy(arg1:spec.PatchMCPServerPolicyRequest):Promise<spec.PatchMCPServerPolicyResponse>;
 
 export function PutMCPServer(arg1:spec.PutMCPServerRequest):Promise<spec.PutMCPServerResponse>;
+
+export function PutMCPServerSecret(arg1:spec.PutMCPServerSecretRequest):Promise<spec.PutMCPServerSecretResponse>;
 
 export function ReadMCPResource(arg1:spec.MCPReadResourceRequest):Promise<spec.MCPReadResourceResponse>;
 

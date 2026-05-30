@@ -18,6 +18,10 @@ export function DeleteMCPServer(arg1) {
   return window['go']['main']['MCPWrapper']['DeleteMCPServer'](arg1);
 }
 
+export function DeleteMCPServerSecret(arg1) {
+  return window['go']['main']['MCPWrapper']['DeleteMCPServerSecret'](arg1);
+}
+
 export function DisconnectMCPServer(arg1) {
   return window['go']['main']['MCPWrapper']['DisconnectMCPServer'](arg1);
 }
@@ -32,6 +36,14 @@ export function GetMCPPrompt(arg1) {
 
 export function GetMCPServer(arg1) {
   return window['go']['main']['MCPWrapper']['GetMCPServer'](arg1);
+}
+
+export function GetMCPServerAuthHealth(arg1) {
+  return window['go']['main']['MCPWrapper']['GetMCPServerAuthHealth'](arg1);
+}
+
+export function GetMCPServerAuthStatus(arg1) {
+  return window['go']['main']['MCPWrapper']['GetMCPServerAuthStatus'](arg1);
 }
 
 export function GetMCPServerStatus(arg1) {
@@ -76,6 +88,10 @@ export function PatchMCPServerPolicy(arg1) {
 
 export function PutMCPServer(arg1) {
   return window['go']['main']['MCPWrapper']['PutMCPServer'](arg1);
+}
+
+export function PutMCPServerSecret(arg1) {
+  return window['go']['main']['MCPWrapper']['PutMCPServerSecret'](arg1);
 }
 
 export function ReadMCPResource(arg1) {
