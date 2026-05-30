@@ -1,12 +1,20 @@
 import type { RoleEnum } from '@/spec/inference';
 
+export const SecretRefVersion = 'mcpv1';
+
 export type MCPServerID = string;
 export type JSONRawString = string;
 export type MCPTimestamp = string;
-export type MCPToolExposure = 'none' | 'all' | 'selected';
-export type MCPRefType = 'resource' | 'prompt';
+export enum MCPToolExposure {
+	MCPToolExposureNone = 'none',
+	MCPToolExposureAll = 'all',
+	MCPToolExposureSelected = 'selected',
+}
 
-export const SecretRefVersion = 'mcpv1';
+export enum MCPRefType {
+	MCPRefTypeResource = 'resource',
+	MCPRefTypePrompt = 'prompt',
+}
 
 export enum MCPSecretKind {
 	MCPSecretKindStdioEnv = 'stdioEnv',
@@ -545,16 +553,6 @@ export interface MCPReadResourceResponseBody {
 	contents?: MCPContent[];
 }
 
-export interface MCPPromptRef {
-	serverID: string;
-	promptName: string;
-	title?: string;
-	displayName: string;
-	description?: string;
-	arguments?: Record<string, string>;
-	digest?: string;
-}
-
 export interface MCPGetPromptRequestBody {
 	serverID: MCPServerID;
 	promptName: string;
@@ -588,15 +586,15 @@ export interface MCPServerConfig {
 	id: string;
 	displayName: string;
 	enabled: boolean;
-	transport: string;
+	transport: MCPTransportType;
 	stdio?: MCPStdioConfig;
 	streamableHttp?: MCPStreamableHTTPConfig;
-	availability: string;
-	trustLevel: string;
+	availability: MCPServerAvailability;
+	trustLevel: MCPTrustLevel;
 	defaultPolicy: MCPServerPolicy;
 	toolPolicies?: Record<string, MCPToolPolicyOverride>;
 	appsPolicy?: MCPAppsPolicy;
-	createdAt: string; // Go type: time
-	modifiedAt: string; // Go type: time
-	softDeletedAt?: string; // Go type: time
+	createdAt: MCPTimestamp; // Go type: time
+	modifiedAt: MCPTimestamp; // Go type: time
+	softDeletedAt?: MCPTimestamp; // Go type: time
 }
