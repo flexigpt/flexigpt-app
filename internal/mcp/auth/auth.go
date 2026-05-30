@@ -17,6 +17,15 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
+const (
+	errStrInvalidGrant         = "invalid_grant"
+	errStrMissingBundleID      = "missing bundleID"
+	errStrMissingServerID      = "missing serverID"
+	errStrMissingStdIOConfig   = "missing stdio config"
+	errStrUnsupportedTransport = "unsupported transport"
+	errStrOAuthNotConfigured   = "OAuth authorization code flow is not configured"
+)
+
 type ResolvedTransportAuth struct {
 	Env             map[string]string
 	SensitiveValues []string
@@ -97,17 +106,6 @@ func (m *AuthManager) PrepareTransportAuth(
 	ctx context.Context,
 	cfg spec.MCPServerConfig,
 ) (ResolvedTransportAuth, error) {
-	if m == nil {
-		return ResolvedTransportAuth{
-			Env: map[string]string{},
-			Status: spec.MCPAuthStatus{
-				BundleID: cfg.BundleID,
-				ServerID: cfg.ID,
-				AuthMode: spec.MCPHTTPAuthNone,
-				State:    spec.MCPAuthStateNotRequired,
-			},
-		}, nil
-	}
 	out := ResolvedTransportAuth{
 		Env: map[string]string{},
 		Status: spec.MCPAuthStatus{
@@ -116,6 +114,20 @@ func (m *AuthManager) PrepareTransportAuth(
 			AuthMode: spec.MCPHTTPAuthNone,
 			State:    spec.MCPAuthStateNotRequired,
 		},
+	}
+
+	if cfg.BundleID == "" {
+		out.Status.State = spec.MCPAuthStateError
+		out.Status.LastError = errStrMissingBundleID
+		return out, fmt.Errorf("%w: %s", spec.ErrMCPInvalidRequest, errStrMissingBundleID)
+	}
+	if cfg.ID == "" {
+		out.Status.State = spec.MCPAuthStateError
+		out.Status.LastError = errStrMissingServerID
+		return out, fmt.Errorf("%w: %s", spec.ErrMCPInvalidRequest, errStrMissingServerID)
+	}
+	if m == nil {
+		return out, nil
 	}
 
 	saveCtx := ctx
@@ -188,7 +200,7 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 ) error {
 	out.Status.State = spec.MCPAuthStateRequired
 
-	if m.oauthBroker == nil || strings.TrimSpace(m.oauthRedirectURL) == "" {
+	if m.oauthBroker == nil || m.oauthRedirectURL == "" {
 		out.Status.LastError = errStrOAuthNotConfigured
 		return fmt.Errorf("%w: %s", spec.ErrMCPAuthRequired, out.Status.LastError)
 	}
@@ -200,12 +212,12 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 		preregistered    *oauthex.ClientCredentials
 		dcr              *mcpAuth.DynamicClientRegistrationConfig
 	)
-	if rawURL := strings.TrimSpace(httpCfg.ClientIDMetadataDocumentURL); rawURL != "" {
+	if rawURL := httpCfg.ClientIDMetadataDocumentURL; rawURL != "" {
 		clientIDMetadata = &mcpAuth.ClientIDMetadataDocumentConfig{
 			URL: rawURL,
 		}
 	}
-	if ref := strings.TrimSpace(httpCfg.ClientCredentialRef); ref != "" {
+	if ref := httpCfg.ClientCredentialRef; ref != "" {
 		creds, sensitive, err := resolveOAuthClientCredentials(ctx, m.secrets, ref, false)
 		if err != nil {
 			out.Status.State = spec.MCPAuthStateError
@@ -242,7 +254,7 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 		DynamicClientRegistrationConfig: dcr,
 		RedirectURL:                     m.oauthRedirectURL,
 		AuthorizationCodeFetcher: func(ctx context.Context, args *mcpAuth.AuthorizationArgs) (*mcpAuth.AuthorizationResult, error) {
-			if args == nil || strings.TrimSpace(args.URL) == "" {
+			if args == nil || args.URL == "" {
 				return nil, fmt.Errorf("%w: missing OAuth authorization URL", spec.ErrMCPAuthRequired)
 			}
 			res, err := m.oauthBroker.FetchAuthorizationCode(ctx, OAuthAuthorizationRequest{
@@ -253,7 +265,7 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 			if err != nil {
 				return nil, err
 			}
-			if res == nil || strings.TrimSpace(res.Code) == "" {
+			if res == nil || res.Code == "" {
 				return nil, fmt.Errorf("%w: OAuth authorization code was not returned", spec.ErrMCPAuthRequired)
 			}
 			return &mcpAuth.AuthorizationResult{
@@ -297,8 +309,7 @@ func (m *AuthManager) configureClientCredentialsOAuth(
 	cfg spec.MCPServerConfig,
 	out *ResolvedTransportAuth,
 ) error {
-	if cfg.StreamableHTTP == nil || strings.TrimSpace(cfg.StreamableHTTP.ClientCredentialRef) == "" {
-
+	if cfg.StreamableHTTP == nil || cfg.StreamableHTTP.ClientCredentialRef == "" {
 		out.Status.State = spec.MCPAuthStateRequired
 		out.Status.LastError = "streamableHttp.clientCredentialRef is required for clientCredentials auth"
 

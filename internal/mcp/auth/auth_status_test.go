@@ -26,30 +26,15 @@ func TestBearerChallengeValues(t *testing.T) {
 		wantErr   string
 		wantScope []string
 	}{
-		{
-			name:      "bearer scope",
-			headers:   []string{`Bearer scope="mcp:tools admin"`},
-			wantErr:   "",
-			wantScope: testWantScope,
-		},
+		{name: "bearer scope", headers: []string{`Bearer scope="mcp:tools admin"`}, wantScope: testWantScope},
 		{
 			name:      "bearer insufficient scope",
 			headers:   []string{`Basic realm="ignored"`, `Bearer error="insufficient_scope", scope="mcp:tools admin"`},
 			wantErr:   "insufficient_scope",
 			wantScope: testWantScope,
 		},
-		{
-			name:      "no bearer challenge",
-			headers:   []string{`Basic realm="ignored"`},
-			wantErr:   "",
-			wantScope: nil,
-		},
-		{
-			name:      "invalid header",
-			headers:   []string{`Bearer foo="bar"`},
-			wantErr:   "",
-			wantScope: nil,
-		},
+		{name: "no bearer challenge", headers: []string{`Basic realm="ignored"`}},
+		{name: "invalid header", headers: []string{`Bearer foo="bar"`}},
 	}
 
 	for _, tt := range tests {
@@ -72,6 +57,7 @@ func TestBearerChallengeValues(t *testing.T) {
 
 func TestAuthStatusFromHTTPFailure(t *testing.T) {
 	base := spec.MCPAuthStatus{
+		BundleID: testBundleID,
 		ServerID: testHTTPServerID,
 		AuthMode: spec.MCPHTTPAuthOAuth,
 		State:    spec.MCPAuthStateRequired,
@@ -106,21 +92,12 @@ func TestAuthStatusFromHTTPFailure(t *testing.T) {
 			wantState:  spec.MCPAuthStateExpired,
 			wantScopes: []string{testScopeMCPTools},
 		},
-		{
-			name:       "403 no challenge",
-			statusCode: http.StatusForbidden,
-			challenge:  "",
-			wantState:  spec.MCPAuthStateError,
-			wantScopes: nil,
-		},
+		{name: "403 no challenge", statusCode: http.StatusForbidden, wantState: spec.MCPAuthStateError},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resp := &http.Response{
-				StatusCode: tt.statusCode,
-				Header:     http.Header{},
-			}
+			resp := &http.Response{StatusCode: tt.statusCode, Header: http.Header{}}
 			if tt.challenge != "" {
 				resp.Header.Set("WWW-Authenticate", tt.challenge)
 			}
@@ -146,6 +123,7 @@ func TestAuthStatusFromHTTPFailure(t *testing.T) {
 
 func TestRedactAuthStatus(t *testing.T) {
 	st := spec.MCPAuthStatus{
+		BundleID:  testBundleID,
 		ServerID:  testHTTPServerID,
 		AuthMode:  spec.MCPHTTPAuthOAuth,
 		State:     spec.MCPAuthStateError,
@@ -173,6 +151,7 @@ func TestAuthManagerStatusLifecycle(t *testing.T) {
 	wantExpiresAt := expiresAt
 
 	in := spec.MCPAuthStatus{
+		BundleID:  testBundleID,
 		ServerID:  testHTTPServerID,
 		AuthMode:  spec.MCPHTTPAuthOAuth,
 		State:     spec.MCPAuthStateAuthorized,
@@ -187,7 +166,7 @@ func TestAuthManagerStatusLifecycle(t *testing.T) {
 	in.Scopes[0] = "mutated"
 	expiresAt = expiresAt.Add(2 * time.Hour)
 
-	got, ok := mgr.GetAuthStatus(testHTTPServerID)
+	got, ok := mgr.GetAuthStatus(testBundleID, testHTTPServerID)
 	if !ok {
 		t.Fatalf("missing status")
 	}
@@ -198,8 +177,8 @@ func TestAuthManagerStatusLifecycle(t *testing.T) {
 		t.Fatalf("ExpiresAt = %#v, want %v", got.ExpiresAt, wantExpiresAt)
 	}
 
-	mgr.ClearAuthStatus(testHTTPServerID)
-	if _, ok := mgr.GetAuthStatus(testHTTPServerID); ok {
+	mgr.ClearAuthStatus(testBundleID, testHTTPServerID)
+	if _, ok := mgr.GetAuthStatus(testBundleID, testHTTPServerID); ok {
 		t.Fatalf("status was not cleared")
 	}
 
@@ -207,7 +186,7 @@ func TestAuthManagerStatusLifecycle(t *testing.T) {
 		t.Fatalf("SaveAuthStatus #2: %v", err)
 	}
 	mgr.ClearAuthStatuses()
-	if _, ok := mgr.GetAuthStatus(testHTTPServerID); ok {
+	if _, ok := mgr.GetAuthStatus(testBundleID, testHTTPServerID); ok {
 		t.Fatalf("statuses were not cleared")
 	}
 }
@@ -222,15 +201,15 @@ func TestDefaultMCPAuthStatusFromConfig(t *testing.T) {
 	}{
 		{
 			name:      "no streamable http config",
-			cfg:       spec.MCPServerConfig{ID: testHTTPServerID},
+			cfg:       spec.MCPServerConfig{BundleID: testBundleID, ID: testHTTPServerID},
 			wantMode:  spec.MCPHTTPAuthNone,
 			wantState: spec.MCPAuthStateNotRequired,
-			wantRes:   "",
 		},
 		{
 			name: "oauth",
 			cfg: spec.MCPServerConfig{
-				ID: testHTTPServerID,
+				BundleID: testBundleID,
+				ID:       testHTTPServerID,
 				StreamableHTTP: &spec.MCPStreamableHTTPConfig{
 					URL:      " https://example.test/mcp ",
 					AuthMode: spec.MCPHTTPAuthOAuth,
@@ -243,7 +222,8 @@ func TestDefaultMCPAuthStatusFromConfig(t *testing.T) {
 		{
 			name: "client credentials",
 			cfg: spec.MCPServerConfig{
-				ID: testHTTPServerID,
+				BundleID: testBundleID,
+				ID:       testHTTPServerID,
 				StreamableHTTP: &spec.MCPStreamableHTTPConfig{
 					URL:      testMCPResource,
 					AuthMode: spec.MCPHTTPAuthClientCredentials,
@@ -258,6 +238,9 @@ func TestDefaultMCPAuthStatusFromConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := DefaultMCPAuthStatusFromConfig(tt.cfg)
+			if got.BundleID != tt.cfg.BundleID {
+				t.Fatalf("BundleID = %q, want %q", got.BundleID, tt.cfg.BundleID)
+			}
 			if got.ServerID != tt.cfg.ID {
 				t.Fatalf("ServerID = %q, want %q", got.ServerID, tt.cfg.ID)
 			}
@@ -276,7 +259,8 @@ func TestDefaultMCPAuthStatusFromConfig(t *testing.T) {
 
 func TestMergeMCPAuthStatus(t *testing.T) {
 	cfgOAuth := spec.MCPServerConfig{
-		ID: testHTTPServerID,
+		BundleID: testBundleID,
+		ID:       testHTTPServerID,
 		StreamableHTTP: &spec.MCPStreamableHTTPConfig{
 			URL:      testMCPResource,
 			AuthMode: spec.MCPHTTPAuthOAuth,
@@ -293,11 +277,14 @@ func TestMergeMCPAuthStatus(t *testing.T) {
 		{
 			name: "fills defaults from config",
 			st: spec.MCPAuthStatus{
-				State:  spec.MCPAuthStateAuthorized,
-				Scopes: []string{testScopeA},
+				BundleID: testBundleID,
+				ServerID: testHTTPServerID,
+				State:    spec.MCPAuthStateAuthorized,
+				Scopes:   []string{testScopeA},
 			},
 			cfg: cfgOAuth,
 			want: spec.MCPAuthStatus{
+				BundleID: testBundleID,
 				ServerID: testHTTPServerID,
 				AuthMode: spec.MCPHTTPAuthOAuth,
 				State:    spec.MCPAuthStateAuthorized,
@@ -308,6 +295,7 @@ func TestMergeMCPAuthStatus(t *testing.T) {
 		{
 			name: "mismatch auth mode resets to default",
 			st: spec.MCPAuthStatus{
+				BundleID:  testBundleID,
 				ServerID:  testHTTPServerID,
 				AuthMode:  spec.MCPHTTPAuthClientCredentials,
 				State:     spec.MCPAuthStateError,
@@ -320,6 +308,7 @@ func TestMergeMCPAuthStatus(t *testing.T) {
 		{
 			name: "none auth clears auth-specific fields",
 			st: spec.MCPAuthStatus{
+				BundleID:            testBundleID,
 				ServerID:            testHTTPServerID,
 				AuthMode:            spec.MCPHTTPAuthNone,
 				State:               spec.MCPAuthStateError,
@@ -327,8 +316,9 @@ func TestMergeMCPAuthStatus(t *testing.T) {
 				LastError:           "boom",
 				AuthorizationServer: "https://issuer.test",
 			},
-			cfg: spec.MCPServerConfig{ID: testHTTPServerID},
+			cfg: spec.MCPServerConfig{BundleID: testBundleID, ID: testHTTPServerID},
 			want: spec.MCPAuthStatus{
+				BundleID: testBundleID,
 				ServerID: testHTTPServerID,
 				AuthMode: spec.MCPHTTPAuthNone,
 				State:    spec.MCPAuthStateNotRequired,
@@ -340,6 +330,9 @@ func TestMergeMCPAuthStatus(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := MergeMCPAuthStatus(tt.st, tt.cfg)
 
+			if got.BundleID != tt.want.BundleID {
+				t.Fatalf("BundleID = %q, want %q", got.BundleID, tt.want.BundleID)
+			}
 			if got.ServerID != tt.want.ServerID {
 				t.Fatalf("ServerID = %q, want %q", got.ServerID, tt.want.ServerID)
 			}

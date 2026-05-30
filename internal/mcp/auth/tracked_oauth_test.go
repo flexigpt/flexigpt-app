@@ -49,15 +49,14 @@ func tokenWithScopes(scopes any, expiry time.Time) *oauth2.Token {
 		TokenType:   "Bearer",
 		Expiry:      expiry,
 	}
-	return tok.WithExtra(map[string]any{
-		"scope": scopes,
-	})
+	return tok.WithExtra(map[string]any{"scope": scopes})
 }
 
 func TestOAuthStatusHelpers(t *testing.T) {
 	t.Run("authStatusFromToken extracts expiry and scopes", func(t *testing.T) {
 		expiry := time.Now().UTC().Add(time.Hour).Truncate(time.Second)
 		base := spec.MCPAuthStatus{
+			BundleID: testBundleID,
 			ServerID: "server",
 			AuthMode: spec.MCPHTTPAuthOAuth,
 			State:    spec.MCPAuthStateRequired,
@@ -103,6 +102,7 @@ func TestOAuthStatusHelpers(t *testing.T) {
 
 	t.Run("authStatusFromTokenError marks invalid_grant expired", func(t *testing.T) {
 		base := spec.MCPAuthStatus{
+			BundleID: testBundleID,
 			ServerID: "server",
 			AuthMode: spec.MCPHTTPAuthOAuth,
 			State:    spec.MCPAuthStateRequired,
@@ -118,6 +118,7 @@ func TestOAuthStatusHelpers(t *testing.T) {
 func TestTrackingTokenSourcePublishesStatus(t *testing.T) {
 	sink := NewAuthManager(nil)
 	base := spec.MCPAuthStatus{
+		BundleID: testBundleID,
 		ServerID: "server",
 		AuthMode: spec.MCPHTTPAuthOAuth,
 		State:    spec.MCPAuthStateRequired,
@@ -127,9 +128,7 @@ func TestTrackingTokenSourcePublishesStatus(t *testing.T) {
 	t.Run("success publishes authorized status", func(t *testing.T) {
 		expiry := time.Now().UTC().Add(30 * time.Minute).Truncate(time.Second)
 		src := &trackingTokenSource{
-			source: staticTokenSource{
-				tok: tokenWithScopes("mcp:tools admin", expiry),
-			},
+			source:          staticTokenSource{tok: tokenWithScopes("mcp:tools admin", expiry)},
 			sink:            sink,
 			status:          base,
 			sensitiveValues: []string{"secret-value"},
@@ -143,9 +142,12 @@ func TestTrackingTokenSourcePublishesStatus(t *testing.T) {
 			t.Fatalf("token = %#v", tok)
 		}
 
-		st, ok := sink.GetAuthStatus(base.ServerID)
+		st, ok := sink.GetAuthStatus(testBundleID, base.ServerID)
 		if !ok {
 			t.Fatalf("missing auth status")
+		}
+		if st.BundleID != testBundleID {
+			t.Fatalf("BundleID = %q, want %q", st.BundleID, testBundleID)
 		}
 		if st.State != spec.MCPAuthStateAuthorized {
 			t.Fatalf("State = %q, want %q", st.State, spec.MCPAuthStateAuthorized)
@@ -162,18 +164,14 @@ func TestTrackingTokenSourcePublishesStatus(t *testing.T) {
 	})
 
 	t.Run("nil token publishes error", func(t *testing.T) {
-		src := &trackingTokenSource{
-			source: staticTokenSource{},
-			sink:   sink,
-			status: base,
-		}
+		src := &trackingTokenSource{source: staticTokenSource{}, sink: sink, status: base}
 
 		tok, err := src.Token()
 		if err == nil || tok != nil {
 			t.Fatalf("Token = %#v, err=%v, want nil token error", tok, err)
 		}
 
-		st, ok := sink.GetAuthStatus(base.ServerID)
+		st, ok := sink.GetAuthStatus(testBundleID, base.ServerID)
 		if !ok {
 			t.Fatalf("missing auth status")
 		}
@@ -187,11 +185,7 @@ func TestTrackingTokenSourcePublishesStatus(t *testing.T) {
 
 	t.Run("invalid_grant publishes expired status", func(t *testing.T) {
 		src := &trackingTokenSource{
-			source: staticTokenSource{
-				err: &oauth2.RetrieveError{
-					ErrorCode: errStrInvalidGrant,
-				},
-			},
+			source: staticTokenSource{err: &oauth2.RetrieveError{ErrorCode: errStrInvalidGrant}},
 			sink:   sink,
 			status: base,
 		}
@@ -201,7 +195,7 @@ func TestTrackingTokenSourcePublishesStatus(t *testing.T) {
 			t.Fatalf("Token = %#v, err=%v, want error", tok, err)
 		}
 
-		st, ok := sink.GetAuthStatus(base.ServerID)
+		st, ok := sink.GetAuthStatus(testBundleID, base.ServerID)
 		if !ok {
 			t.Fatalf("missing auth status")
 		}
@@ -215,14 +209,13 @@ func TestTrackedOAuthHandlerTokenSourceAndAuthorize(t *testing.T) {
 	t.Run("TokenSource error is published", func(t *testing.T) {
 		sink := NewAuthManager(nil)
 		base := spec.MCPAuthStatus{
+			BundleID: testBundleID,
 			ServerID: "server-a",
 			AuthMode: spec.MCPHTTPAuthOAuth,
 			State:    spec.MCPAuthStateRequired,
 		}
 		h := &trackedOAuthHandler{
-			inner: &fakeOAuthHandler{
-				tokenSourceErr: errors.New("token source failed top-secret"),
-			},
+			inner:           &fakeOAuthHandler{tokenSourceErr: errors.New("token source failed top-secret")},
 			sink:            sink,
 			status:          base,
 			sensitiveValues: []string{"top-secret"},
@@ -233,7 +226,7 @@ func TestTrackedOAuthHandlerTokenSourceAndAuthorize(t *testing.T) {
 			t.Fatalf("TokenSource = %#v, err=%v, want error", ts, err)
 		}
 
-		st, ok := sink.GetAuthStatus(base.ServerID)
+		st, ok := sink.GetAuthStatus(testBundleID, base.ServerID)
 		if !ok {
 			t.Fatalf("missing auth status")
 		}
@@ -248,6 +241,7 @@ func TestTrackedOAuthHandlerTokenSourceAndAuthorize(t *testing.T) {
 	t.Run("Authorize success publishes authorized status", func(t *testing.T) {
 		sink := NewAuthManager(nil)
 		base := spec.MCPAuthStatus{
+			BundleID: testBundleID,
 			ServerID: "server-b",
 			AuthMode: spec.MCPHTTPAuthOAuth,
 			State:    spec.MCPAuthStateRequired,
@@ -255,22 +249,13 @@ func TestTrackedOAuthHandlerTokenSourceAndAuthorize(t *testing.T) {
 		}
 		expiry := time.Now().UTC().Add(time.Hour).Truncate(time.Second)
 		tok := tokenWithScopes("scope-a scope-b", expiry)
-		inner := &fakeOAuthHandler{
-			tokenSource: staticTokenSource{tok: tok},
-		}
-		h := &trackedOAuthHandler{
-			inner:           inner,
-			sink:            sink,
-			status:          base,
-			sensitiveValues: []string{"top-secret"},
-		}
+		inner := &fakeOAuthHandler{tokenSource: staticTokenSource{tok: tok}}
+		h := &trackedOAuthHandler{inner: inner, sink: sink, status: base, sensitiveValues: []string{"top-secret"}}
 
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, testMCPResource, http.NoBody)
 		resp := &http.Response{
 			StatusCode: http.StatusUnauthorized,
-			Header: http.Header{
-				"WWW-Authenticate": []string{`Bearer scope="scope-a scope-b"`},
-			},
+			Header:     http.Header{"WWW-Authenticate": []string{`Bearer scope="scope-a scope-b"`}},
 		}
 
 		if err := h.Authorize(t.Context(), req, resp); err != nil {
@@ -283,7 +268,7 @@ func TestTrackedOAuthHandlerTokenSourceAndAuthorize(t *testing.T) {
 			t.Fatalf("TokenSource calls = %d, want 1", inner.tokenSourceCalls)
 		}
 
-		st, ok := sink.GetAuthStatus(base.ServerID)
+		st, ok := sink.GetAuthStatus(testBundleID, base.ServerID)
 		if !ok {
 			t.Fatalf("missing auth status")
 		}

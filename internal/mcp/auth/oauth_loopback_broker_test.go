@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
@@ -69,6 +70,7 @@ func TestOAuthLoopbackBrokerLifecycle(t *testing.T) {
 		resultCh := make(chan oauthAuthorizationResult, 1)
 		go func() {
 			res, err := b.FetchAuthorizationCode(ctx, OAuthAuthorizationRequest{
+				BundleID:         testBundleID,
 				ServerID:         serverID,
 				AuthorizationURL: authURL,
 			})
@@ -80,6 +82,9 @@ func TestOAuthLoopbackBrokerLifecycle(t *testing.T) {
 		pending := b.Pending()
 		if len(pending) != 1 {
 			t.Fatalf("Pending len = %d, want 1", len(pending))
+		}
+		if pending[0].BundleID != bundleitemutils.BundleID(testBundleID) {
+			t.Fatalf("Pending[0].BundleID = %q, want %q", pending[0].BundleID, testBundleID)
 		}
 		if pending[0].ServerID != serverID {
 			t.Fatalf("Pending[0].ServerID = %q, want %q", pending[0].ServerID, serverID)
@@ -148,6 +153,7 @@ func TestOAuthLoopbackBrokerLifecycle(t *testing.T) {
 		resultCh := make(chan oauthAuthorizationResult, 1)
 		go func() {
 			res, err := b.FetchAuthorizationCode(ctx, OAuthAuthorizationRequest{
+				BundleID:         testBundleID,
 				ServerID:         serverID,
 				AuthorizationURL: authURL,
 			})
@@ -209,6 +215,7 @@ func TestOAuthLoopbackBrokerLifecycle(t *testing.T) {
 		startFetch := func(serverID spec.MCPServerID, state string) {
 			go func() {
 				_, err := b.FetchAuthorizationCode(ctx, OAuthAuthorizationRequest{
+					BundleID:         testBundleID,
 					ServerID:         serverID,
 					AuthorizationURL: "https://issuer.test/authorize?state=" + state,
 				})
@@ -229,10 +236,10 @@ func TestOAuthLoopbackBrokerLifecycle(t *testing.T) {
 			t.Fatalf("Pending order = %#v, want a-server then z-server", pending)
 		}
 
-		if !b.Cancel("a-server") {
+		if !b.Cancel(testBundleID, "a-server") {
 			t.Fatalf("Cancel(a-server) = false, want true")
 		}
-		if !b.Cancel("z-server") {
+		if !b.Cancel(testBundleID, "z-server") {
 			t.Fatalf("Cancel(z-server) = false, want true")
 		}
 
@@ -262,6 +269,7 @@ func TestOAuthLoopbackBrokerLifecycle(t *testing.T) {
 		resultCh := make(chan oauthAuthorizationResult, 1)
 		go func() {
 			res, err := b.FetchAuthorizationCode(ctx, OAuthAuthorizationRequest{
+				BundleID:         testBundleID,
 				ServerID:         "expiry-server",
 				AuthorizationURL: "https://issuer.test/authorize?state=expiry-state",
 			})

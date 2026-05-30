@@ -5,10 +5,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 func TestMCPSecretRefRoundTripAndStorageKeys(t *testing.T) {
+	bundleID := bundleitemutils.BundleID("bundle-a")
 	tests := []struct {
 		name       string
 		serverID   spec.MCPServerID
@@ -37,9 +39,12 @@ func TestMCPSecretRefRoundTripAndStorageKeys(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ref, err := NewMCPSecretRef(tt.serverID, tt.kind, tt.slot)
+			ref, err := NewMCPSecretRef(bundleID, tt.serverID, tt.kind, tt.slot)
 			if err != nil {
 				t.Fatalf("NewMCPSecretRef: %v", err)
+			}
+			if ref.BundleID != bundleID {
+				t.Fatalf("BundleID = %q, want %q", ref.BundleID, bundleID)
 			}
 			if ref.ServerID != tt.serverID {
 				t.Fatalf("ServerID = %q, want %q", ref.ServerID, tt.serverID)
@@ -51,7 +56,7 @@ func TestMCPSecretRefRoundTripAndStorageKeys(t *testing.T) {
 				t.Fatalf("Slot = %q, want %q", ref.Slot, tt.wantSlot)
 			}
 
-			raw, err := NewMCPSecretRefString(tt.serverID, tt.kind, tt.slot)
+			raw, err := NewMCPSecretRefString(bundleID, tt.serverID, tt.kind, tt.slot)
 			if err != nil {
 				t.Fatalf("NewMCPSecretRefString: %v", err)
 			}
@@ -63,6 +68,9 @@ func TestMCPSecretRefRoundTripAndStorageKeys(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ParseMCPSecretRef: %v", err)
 			}
+			if parsed.BundleID != bundleID {
+				t.Fatalf("parsed.BundleID = %q, want %q", parsed.BundleID, bundleID)
+			}
 			if parsed.ServerID != tt.serverID {
 				t.Fatalf("parsed.ServerID = %q, want %q", parsed.ServerID, tt.serverID)
 			}
@@ -73,7 +81,7 @@ func TestMCPSecretRefRoundTripAndStorageKeys(t *testing.T) {
 				t.Fatalf("parsed.Slot = %q, want %q", parsed.Slot, tt.wantParsed)
 			}
 
-			if err := ValidateMCPSecretRef(raw, tt.serverID, tt.kind, tt.slot); err != nil {
+			if err := ValidateMCPSecretRef(raw, bundleID, tt.serverID, tt.kind, tt.slot); err != nil {
 				t.Fatalf("ValidateMCPSecretRef: %v", err)
 			}
 
@@ -97,98 +105,83 @@ func TestMCPSecretRefRoundTripAndStorageKeys(t *testing.T) {
 }
 
 func TestMCPSecretRefValidationErrors(t *testing.T) {
+	bundleID := bundleitemutils.BundleID("bundle-a")
 	tests := []struct {
 		name            string
 		fn              func() error
 		wantErrContains string
 	}{
 		{
-			name: "empty serverID",
-			fn: func() error {
-				_, err := NewMCPSecretRef("", spec.MCPSecretKindStdioEnv, "TOKEN")
-				return err
-			},
+			name:            "empty bundleID",
+			fn:              func() error { _, err := NewMCPSecretRef("", "server", spec.MCPSecretKindStdioEnv, "TOKEN"); return err },
+			wantErrContains: "bundleID is empty",
+		},
+		{
+			name:            "empty serverID",
+			fn:              func() error { _, err := NewMCPSecretRef(bundleID, "", spec.MCPSecretKindStdioEnv, "TOKEN"); return err },
 			wantErrContains: "serverID is empty",
 		},
+		{name: "invalid kind", fn: func() error {
+			_, err := NewMCPSecretRef(bundleID, "server", spec.MCPSecretKind("bogus"), "TOKEN")
+			return err
+		}, wantErrContains: "kind"},
+		{name: "stdio env slot invalid", fn: func() error {
+			_, err := NewMCPSecretRef(bundleID, "server", spec.MCPSecretKindStdioEnv, "bad=slot")
+			return err
+		}, wantErrContains: "env key must not contain"},
+		{name: "oauth client credentials slot invalid", fn: func() error {
+			_, err := NewMCPSecretRef(
+				bundleID,
+				"server",
+				spec.MCPSecretKindOAuthClientCredentials,
+				"not-clientCredentials",
+			)
+			return err
+		}, wantErrContains: "expected clientCredentials"},
 		{
-			name: "invalid kind",
-			fn: func() error {
-				_, err := NewMCPSecretRef("server", spec.MCPSecretKind("bogus"), "TOKEN")
-				return err
-			},
-			wantErrContains: "kind",
-		},
-		{
-			name: "stdio env slot invalid",
-			fn: func() error {
-				_, err := NewMCPSecretRef("server", spec.MCPSecretKindStdioEnv, "bad=slot")
-				return err
-			},
-			wantErrContains: "env key must not contain",
-		},
-		{
-			name: "oauth client credentials slot invalid",
-			fn: func() error {
-				_, err := NewMCPSecretRef("server", spec.MCPSecretKindOAuthClientCredentials, "not-clientCredentials")
-				return err
-			},
-			wantErrContains: "expected clientCredentials",
-		},
-		{
-			name: "parse invalid prefix",
-			fn: func() error {
-				_, err := ParseMCPSecretRef("not-a-secret-ref")
-				return err
-			},
+			name:            "parse invalid prefix",
+			fn:              func() error { _, err := ParseMCPSecretRef("not-a-secret-ref"); return err },
 			wantErrContains: "is not a mcpv1 ref",
 		},
-		{
-			name: "parse invalid json",
-			fn: func() error {
-				raw := "mcpv1:" + base64.RawURLEncoding.EncodeToString([]byte("[]"))
-				_, err := ParseMCPSecretRef(raw)
+		{name: "parse invalid json", fn: func() error {
+			raw := "mcpv1:" + base64.RawURLEncoding.EncodeToString([]byte("[]"))
+			_, err := ParseMCPSecretRef(raw)
+			return err
+		}, wantErrContains: "not valid json"},
+		{name: "validate mismatched bundleID", fn: func() error {
+			raw, err := NewMCPSecretRefString(bundleID, "server-a", spec.MCPSecretKindStdioEnv, "TOKEN")
+			if err != nil {
 				return err
-			},
-			wantErrContains: "not valid json",
-		},
-		{
-			name: "validate mismatched serverID",
-			fn: func() error {
-				raw, err := NewMCPSecretRefString("server-a", spec.MCPSecretKindStdioEnv, "TOKEN")
-				if err != nil {
-					return err
-				}
-				return ValidateMCPSecretRef(raw, "server-b", spec.MCPSecretKindStdioEnv, "TOKEN")
-			},
-			wantErrContains: "does not match config serverID",
-		},
-		{
-			name: "validate mismatched kind",
-			fn: func() error {
-				raw, err := NewMCPSecretRefString("server-a", spec.MCPSecretKindStdioEnv, "TOKEN")
-				if err != nil {
-					return err
-				}
-				return ValidateMCPSecretRef(
-					raw,
-					"server-a",
-					spec.MCPSecretKindOAuthClientCredentials,
-					"clientCredentials",
-				)
-			},
-			wantErrContains: "does not match expected kind",
-		},
-		{
-			name: "validate mismatched slot",
-			fn: func() error {
-				raw, err := NewMCPSecretRefString("server-a", spec.MCPSecretKindStdioEnv, "TOKEN")
-				if err != nil {
-					return err
-				}
-				return ValidateMCPSecretRef(raw, "server-a", spec.MCPSecretKindStdioEnv, "OTHER")
-			},
-			wantErrContains: "does not match expected slot",
-		},
+			}
+			return ValidateMCPSecretRef(raw, "bundle-b", "server-a", spec.MCPSecretKindStdioEnv, "TOKEN")
+		}, wantErrContains: "does not match config bundleID"},
+		{name: "validate mismatched serverID", fn: func() error {
+			raw, err := NewMCPSecretRefString(bundleID, "server-a", spec.MCPSecretKindStdioEnv, "TOKEN")
+			if err != nil {
+				return err
+			}
+			return ValidateMCPSecretRef(raw, bundleID, "server-b", spec.MCPSecretKindStdioEnv, "TOKEN")
+		}, wantErrContains: "does not match config serverID"},
+		{name: "validate mismatched kind", fn: func() error {
+			raw, err := NewMCPSecretRefString(bundleID, "server-a", spec.MCPSecretKindStdioEnv, "TOKEN")
+			if err != nil {
+				return err
+			}
+			return ValidateMCPSecretRef(
+				raw,
+				bundleID,
+				"server-a",
+				spec.MCPSecretKindOAuthClientCredentials,
+				"clientCredentials",
+			)
+		}, wantErrContains: "does not match expected kind"},
+		{name: "validate mismatched slot", fn: func() error {
+			raw, err := NewMCPSecretRefString(bundleID, "server-a", spec.MCPSecretKindStdioEnv, "TOKEN")
+			if err != nil {
+				return err
+			}
+			return ValidateMCPSecretRef(raw, bundleID, "server-a", spec.MCPSecretKindStdioEnv, "OTHER")
+		}, wantErrContains: "does not match expected slot"},
 	}
 
 	for _, tt := range tests {
@@ -205,11 +198,15 @@ func TestMCPSecretRefValidationErrors(t *testing.T) {
 }
 
 func TestSecretRefNormalizationAndCanonicalEncoding(t *testing.T) {
-	ref, err := NewMCPSecretRef("  server-a  ", spec.MCPSecretKindStdioEnv, "  TOKEN  ")
+	bundleID := bundleitemutils.BundleID("bundle-a")
+	ref, err := NewMCPSecretRef(bundleID, "  server-a  ", spec.MCPSecretKindStdioEnv, "  TOKEN  ")
 	if err != nil {
 		t.Fatalf("NewMCPSecretRef: %v", err)
 	}
 
+	if ref.BundleID != bundleID {
+		t.Fatalf("BundleID = %q, want %q", ref.BundleID, bundleID)
+	}
 	if ref.ServerID != "server-a" {
 		t.Fatalf("ServerID = %q, want %q", ref.ServerID, "server-a")
 	}
@@ -220,7 +217,7 @@ func TestSecretRefNormalizationAndCanonicalEncoding(t *testing.T) {
 		t.Fatalf("Slot = %q, want %q", ref.Slot, "token")
 	}
 
-	raw, err := NewMCPSecretRefString("server-a", spec.MCPSecretKindStdioEnv, "TOKEN")
+	raw, err := NewMCPSecretRefString(bundleID, "server-a", spec.MCPSecretKindStdioEnv, "TOKEN")
 	if err != nil {
 		t.Fatalf("NewMCPSecretRefString: %v", err)
 	}
@@ -232,6 +229,9 @@ func TestSecretRefNormalizationAndCanonicalEncoding(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseMCPSecretRef: %v", err)
 	}
+	if parsed.BundleID != bundleID {
+		t.Fatalf("parsed.BundleID = %q, want %q", parsed.BundleID, bundleID)
+	}
 	if parsed.ServerID != "server-a" {
 		t.Fatalf("parsed.ServerID = %q, want %q", parsed.ServerID, "server-a")
 	}
@@ -242,7 +242,7 @@ func TestSecretRefNormalizationAndCanonicalEncoding(t *testing.T) {
 		t.Fatalf("parsed.Slot = %q, want %q", parsed.Slot, "token")
 	}
 
-	if err := ValidateMCPSecretRef(raw, "server-a", spec.MCPSecretKindStdioEnv, "TOKEN"); err != nil {
+	if err := ValidateMCPSecretRef(raw, bundleID, "server-a", spec.MCPSecretKindStdioEnv, "TOKEN"); err != nil {
 		t.Fatalf("ValidateMCPSecretRef(case-insensitive slot): %v", err)
 	}
 
@@ -273,35 +273,12 @@ func TestValidateEnvSecretSlotAndKindHelpers(t *testing.T) {
 		slot            string
 		wantErrContains string
 	}{
-		{
-			name: "valid uppercase env key",
-			slot: "TOKEN",
-		},
-		{
-			name:            "leading whitespace",
-			slot:            " TOKEN",
-			wantErrContains: "leading/trailing whitespace",
-		},
-		{
-			name:            "trailing whitespace",
-			slot:            "TOKEN ",
-			wantErrContains: "leading/trailing whitespace",
-		},
-		{
-			name:            "equals sign",
-			slot:            "TO=KEN",
-			wantErrContains: "must not contain '='",
-		},
-		{
-			name:            "nul",
-			slot:            "TO\x00KEN",
-			wantErrContains: "must not contain '=' or NUL",
-		},
-		{
-			name:            "control char",
-			slot:            "TO\tKEN",
-			wantErrContains: "control character",
-		},
+		{name: "valid uppercase env key", slot: "TOKEN"},
+		{name: "leading whitespace", slot: " TOKEN", wantErrContains: "leading/trailing whitespace"},
+		{name: "trailing whitespace", slot: "TOKEN ", wantErrContains: "leading/trailing whitespace"},
+		{name: "equals sign", slot: "TO=KEN", wantErrContains: "must not contain '='"},
+		{name: "nul", slot: "TO\x00KEN", wantErrContains: "must not contain '=' or NUL"},
+		{name: "control char", slot: "TO\tKEN", wantErrContains: "control character"},
 	}
 
 	for _, tt := range tests {
@@ -324,82 +301,62 @@ func TestValidateEnvSecretSlotAndKindHelpers(t *testing.T) {
 }
 
 func TestSecretRefValidationFailures(t *testing.T) {
+	bundleID := bundleitemutils.BundleID("bundle-a")
 	tests := []struct {
 		name            string
 		fn              func() error
 		wantErrContains string
 	}{
 		{
-			name: "empty serverID",
-			fn: func() error {
-				_, err := NewMCPSecretRef("", spec.MCPSecretKindStdioEnv, "TOKEN")
-				return err
-			},
-			wantErrContains: "serverID is empty",
+			name:            "empty bundleID",
+			fn:              func() error { _, err := NewMCPSecretRef("", "server", spec.MCPSecretKindStdioEnv, "TOKEN"); return err },
+			wantErrContains: "bundleID is empty",
 		},
+		{name: "invalid kind", fn: func() error {
+			_, err := NewMCPSecretRef(bundleID, "server", spec.MCPSecretKind("bogus"), "TOKEN")
+			return err
+		}, wantErrContains: "kind"},
+		{name: "oauth client credentials slot invalid", fn: func() error {
+			_, err := NewMCPSecretRef(
+				bundleID,
+				"server",
+				spec.MCPSecretKindOAuthClientCredentials,
+				"not-clientCredentials",
+			)
+			return err
+		}, wantErrContains: "expected clientCredentials"},
 		{
-			name: "invalid kind",
-			fn: func() error {
-				_, err := NewMCPSecretRef("server", spec.MCPSecretKind("bogus"), "TOKEN")
-				return err
-			},
-			wantErrContains: "kind",
-		},
-
-		{
-			name: "oauth client credentials slot invalid",
-			fn: func() error {
-				_, err := NewMCPSecretRef("server", spec.MCPSecretKindOAuthClientCredentials, "not-clientCredentials")
-				return err
-			},
-			wantErrContains: "expected clientCredentials",
-		},
-		{
-			name: "parse invalid prefix",
-			fn: func() error {
-				_, err := ParseMCPSecretRef("not-a-secret-ref")
-				return err
-			},
+			name:            "parse invalid prefix",
+			fn:              func() error { _, err := ParseMCPSecretRef("not-a-secret-ref"); return err },
 			wantErrContains: "is not a mcpv1 ref",
 		},
-		{
-			name: "validate mismatched serverID",
-			fn: func() error {
-				raw, err := NewMCPSecretRefString("server-a", spec.MCPSecretKindStdioEnv, "TOKEN")
-				if err != nil {
-					return err
-				}
-				return ValidateMCPSecretRef(raw, "server-b", spec.MCPSecretKindStdioEnv, "TOKEN")
-			},
-			wantErrContains: "does not match config serverID",
-		},
-		{
-			name: "validate mismatched kind",
-			fn: func() error {
-				raw, err := NewMCPSecretRefString("server-a", spec.MCPSecretKindStdioEnv, "TOKEN")
-				if err != nil {
-					return err
-				}
-				return ValidateMCPSecretRef(
-					raw,
-					"server-a",
-					spec.MCPSecretKindOAuthClientCredentials,
-					"clientCredentials",
-				)
-			},
-			wantErrContains: "does not match expected kind",
-		},
-		{
-			name: "validate mismatched slot",
-			fn: func() error {
-				raw, err := NewMCPSecretRefString("server-a", spec.MCPSecretKindStdioEnv, "TOKEN")
-				if err != nil {
-					return err
-				}
-				return ValidateMCPSecretRef(raw, "server-a", spec.MCPSecretKindStdioEnv, "OTHER")
-			},
-			wantErrContains: "does not match expected slot",
-		},
+		{name: "validate mismatched serverID", fn: func() error {
+			raw, err := NewMCPSecretRefString(bundleID, "server-a", spec.MCPSecretKindStdioEnv, "TOKEN")
+			if err != nil {
+				return err
+			}
+			return ValidateMCPSecretRef(raw, bundleID, "server-b", spec.MCPSecretKindStdioEnv, "TOKEN")
+		}, wantErrContains: "does not match config serverID"},
+		{name: "validate mismatched kind", fn: func() error {
+			raw, err := NewMCPSecretRefString(bundleID, "server-a", spec.MCPSecretKindStdioEnv, "TOKEN")
+			if err != nil {
+				return err
+			}
+			return ValidateMCPSecretRef(
+				raw,
+				bundleID,
+				"server-a",
+				spec.MCPSecretKindOAuthClientCredentials,
+				"clientCredentials",
+			)
+		}, wantErrContains: "does not match expected kind"},
+		{name: "validate mismatched slot", fn: func() error {
+			raw, err := NewMCPSecretRefString(bundleID, "server-a", spec.MCPSecretKindStdioEnv, "TOKEN")
+			if err != nil {
+				return err
+			}
+			return ValidateMCPSecretRef(raw, bundleID, "server-a", spec.MCPSecretKindStdioEnv, "OTHER")
+		}, wantErrContains: "does not match expected slot"},
 	}
 
 	for _, tt := range tests {

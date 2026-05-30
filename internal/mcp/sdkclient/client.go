@@ -11,11 +11,10 @@ import (
 	"strings"
 	"time"
 
-	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
-
 	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
+	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 const (
@@ -51,6 +50,13 @@ func (f *Factory) Connect(
 	resolved auth.ResolvedTransportAuth,
 	events runtime.ClientNotificationSink,
 ) (runtime.ClientSession, error) {
+	if cfg.BundleID == "" {
+		return nil, fmt.Errorf("%w: bundleID required", spec.ErrMCPInvalidRequest)
+	}
+	if cfg.ID == "" {
+		return nil, fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
+	}
+
 	logger := f.log()
 	emit := func(ctx context.Context, event runtime.ClientNotification) {
 		if events != nil {
@@ -206,8 +212,10 @@ func (f *Factory) Connect(
 	}
 
 	return &Session{
-		session: session,
-		logger:  logger,
+		bundleID: cfg.BundleID,
+		serverID: cfg.ID,
+		session:  session,
+		logger:   logger,
 	}, nil
 }
 

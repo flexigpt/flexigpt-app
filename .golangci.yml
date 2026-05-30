@@ -501,6 +501,9 @@ linters:
       - path: '(.+)_test\.go'
         linters:
           - goconst
+      - path: 'httphandler_mcp\.go'
+        linters:
+          - contextcheck
 
 issues:
   max-issues-per-linter: 0

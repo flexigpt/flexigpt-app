@@ -11,6 +11,8 @@ import (
 )
 
 const (
+	testBundleID             = "bundle-a"
+	testOtherBundleID        = "bundle-b"
 	testMCPResource          = "https://example.test/mcp"
 	testPublicRefRaw         = `{"clientID":"public-client"}`
 	testPublicClientID       = "public-client"
@@ -22,27 +24,34 @@ const (
 	testResponseType         = "code"
 )
 
+func assertAuthStatusCore(t *testing.T, got, want spec.MCPAuthStatus) {
+	t.Helper()
+	if got.BundleID != want.BundleID {
+		t.Fatalf("BundleID = %q, want %q", got.BundleID, want.BundleID)
+	}
+	if got.ServerID != want.ServerID {
+		t.Fatalf("ServerID = %q, want %q", got.ServerID, want.ServerID)
+	}
+	if got.AuthMode != want.AuthMode {
+		t.Fatalf("AuthMode = %q, want %q", got.AuthMode, want.AuthMode)
+	}
+	if got.State != want.State {
+		t.Fatalf("State = %q, want %q", got.State, want.State)
+	}
+	if got.Resource != want.Resource {
+		t.Fatalf("Resource = %q, want %q", got.Resource, want.Resource)
+	}
+}
+
 func TestNormalizeHTTPAuthMode(t *testing.T) {
 	tests := []struct {
 		name string
 		in   spec.MCPHTTPAuthMode
 		want spec.MCPHTTPAuthMode
 	}{
-		{
-			name: "blank becomes none",
-			in:   "",
-			want: spec.MCPHTTPAuthNone,
-		},
-		{
-			name: "trim oauth",
-			in:   "  oauth  ",
-			want: spec.MCPHTTPAuthOAuth,
-		},
-		{
-			name: "trim client credentials",
-			in:   " clientCredentials ",
-			want: spec.MCPHTTPAuthClientCredentials,
-		},
+		{name: "blank becomes none", in: "", want: spec.MCPHTTPAuthNone},
+		{name: "trim oauth", in: "  oauth  ", want: spec.MCPHTTPAuthOAuth},
+		{name: "trim client credentials", in: " clientCredentials ", want: spec.MCPHTTPAuthClientCredentials},
 	}
 
 	for _, tt := range tests {
@@ -70,7 +79,6 @@ func TestParseAndValidateOAuthClientCredentialsSecret(t *testing.T) {
 			raw:           testPublicRefRaw,
 			requireSecret: false,
 			wantClientID:  testPublicClientID,
-			wantSecret:    "",
 			wantSensitive: []string{},
 		},
 		{
@@ -140,7 +148,10 @@ func TestParseAndValidateOAuthClientCredentialsSecret(t *testing.T) {
 				if !strings.Contains(err.Error(), tt.wantErrContains) {
 					t.Fatalf("error = %q, want substring %q", err.Error(), tt.wantErrContains)
 				}
-				if err := ValidateOAuthClientCredentialsSecret(tt.raw, tt.requireSecret); err == nil ||
+				if err := ValidateOAuthClientCredentialsSecret(
+					tt.raw,
+					tt.requireSecret,
+				); err == nil ||
 					!strings.Contains(err.Error(), tt.wantErrContains) {
 					t.Fatalf(
 						"ValidateOAuthClientCredentialsSecret error = %v, want substring %q",
@@ -249,12 +260,7 @@ func TestResolveOAuthClientCredentials(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			creds, sensitive, err := resolveOAuthClientCredentials(
-				t.Context(),
-				tt.resolver,
-				tt.ref,
-				tt.requireSecret,
-			)
+			creds, sensitive, err := resolveOAuthClientCredentials(t.Context(), tt.resolver, tt.ref, tt.requireSecret)
 			if tt.wantErrContains != "" {
 				if err == nil {
 					t.Fatalf("resolveOAuthClientCredentials succeeded, want error containing %q", tt.wantErrContains)
@@ -311,6 +317,7 @@ func TestPrepareTransportAuthSuccessCases(t *testing.T) {
 			name: "stdio secret env refs",
 			mgr:  NewAuthManager(StaticSecretResolver{"stdio-secret-ref": testResolvedSecret}),
 			cfg: spec.MCPServerConfig{
+				BundleID:  testBundleID,
 				ID:        testStdIOServerID,
 				Transport: spec.MCPTransportStdio,
 				Stdio: &spec.MCPStdioConfig{
@@ -324,6 +331,7 @@ func TestPrepareTransportAuthSuccessCases(t *testing.T) {
 			wantEnv:       map[string]string{"TOKEN": testResolvedSecret},
 			wantSensitive: []string{testResolvedSecret},
 			wantStatus: spec.MCPAuthStatus{
+				BundleID: testBundleID,
 				ServerID: testStdIOServerID,
 				AuthMode: spec.MCPHTTPAuthNone,
 				State:    spec.MCPAuthStateNotRequired,
@@ -333,6 +341,7 @@ func TestPrepareTransportAuthSuccessCases(t *testing.T) {
 			name: "streamable http none",
 			mgr:  NewAuthManager(nil),
 			cfg: spec.MCPServerConfig{
+				BundleID:  testBundleID,
 				ID:        testHTTPServerID,
 				Transport: spec.MCPTransportStreamableHTTP,
 				StreamableHTTP: &spec.MCPStreamableHTTPConfig{
@@ -343,6 +352,7 @@ func TestPrepareTransportAuthSuccessCases(t *testing.T) {
 			wantEnv:       map[string]string{},
 			wantSensitive: []string{},
 			wantStatus: spec.MCPAuthStatus{
+				BundleID: testBundleID,
 				ServerID: testHTTPServerID,
 				AuthMode: spec.MCPHTTPAuthNone,
 				State:    spec.MCPAuthStateNotRequired,
@@ -377,22 +387,11 @@ func TestPrepareTransportAuthSuccessCases(t *testing.T) {
 				}
 			}
 
-			st, ok := tt.mgr.GetAuthStatus(tt.cfg.ID)
+			st, ok := tt.mgr.GetAuthStatus(tt.cfg.BundleID, tt.cfg.ID)
 			if !ok {
 				t.Fatalf("missing auth status")
 			}
-			if st.ServerID != tt.wantStatus.ServerID {
-				t.Fatalf("ServerID = %q, want %q", st.ServerID, tt.wantStatus.ServerID)
-			}
-			if st.AuthMode != tt.wantStatus.AuthMode {
-				t.Fatalf("AuthMode = %q, want %q", st.AuthMode, tt.wantStatus.AuthMode)
-			}
-			if st.State != tt.wantStatus.State {
-				t.Fatalf("State = %q, want %q", st.State, tt.wantStatus.State)
-			}
-			if st.Resource != tt.wantStatus.Resource {
-				t.Fatalf("Resource = %q, want %q", st.Resource, tt.wantStatus.Resource)
-			}
+			assertAuthStatusCore(t, st, tt.wantStatus)
 		})
 	}
 }
@@ -408,12 +407,14 @@ func TestPrepareTransportAuthErrorCases(t *testing.T) {
 		{
 			name: errStrMissingStdIOConfig,
 			cfg: spec.MCPServerConfig{
+				BundleID:  testBundleID,
 				ID:        testStdIOServerID,
 				Transport: spec.MCPTransportStdio,
 			},
 			wantErrIs:       spec.ErrMCPInvalidRequest,
 			wantErrContains: errStrMissingStdIOConfig,
 			wantStatus: spec.MCPAuthStatus{
+				BundleID: testBundleID,
 				ServerID: testStdIOServerID,
 				AuthMode: spec.MCPHTTPAuthNone,
 				State:    spec.MCPAuthStateError,
@@ -422,12 +423,14 @@ func TestPrepareTransportAuthErrorCases(t *testing.T) {
 		{
 			name: "missing streamable http config",
 			cfg: spec.MCPServerConfig{
+				BundleID:  testBundleID,
 				ID:        testHTTPServerID,
 				Transport: spec.MCPTransportStreamableHTTP,
 			},
 			wantErrIs:       spec.ErrMCPInvalidRequest,
 			wantErrContains: "missing streamableHttp config",
 			wantStatus: spec.MCPAuthStatus{
+				BundleID: testBundleID,
 				ServerID: testHTTPServerID,
 				AuthMode: spec.MCPHTTPAuthNone,
 				State:    spec.MCPAuthStateError,
@@ -436,12 +439,14 @@ func TestPrepareTransportAuthErrorCases(t *testing.T) {
 		{
 			name: errStrUnsupportedTransport,
 			cfg: spec.MCPServerConfig{
+				BundleID:  testBundleID,
 				ID:        "bad-server",
 				Transport: spec.MCPTransportType("bogus"),
 			},
 			wantErrIs:       spec.ErrMCPInvalidRequest,
 			wantErrContains: errStrUnsupportedTransport,
 			wantStatus: spec.MCPAuthStatus{
+				BundleID: testBundleID,
 				ServerID: "bad-server",
 				AuthMode: spec.MCPHTTPAuthNone,
 				State:    spec.MCPAuthStateError,
@@ -450,6 +455,7 @@ func TestPrepareTransportAuthErrorCases(t *testing.T) {
 		{
 			name: "oauth missing broker",
 			cfg: spec.MCPServerConfig{
+				BundleID:  testBundleID,
 				ID:        "oauth-server",
 				Transport: spec.MCPTransportStreamableHTTP,
 				StreamableHTTP: &spec.MCPStreamableHTTPConfig{
@@ -460,6 +466,7 @@ func TestPrepareTransportAuthErrorCases(t *testing.T) {
 			wantErrIs:       spec.ErrMCPAuthRequired,
 			wantErrContains: errStrOAuthNotConfigured,
 			wantStatus: spec.MCPAuthStatus{
+				BundleID: testBundleID,
 				ServerID: "oauth-server",
 				AuthMode: spec.MCPHTTPAuthOAuth,
 				State:    spec.MCPAuthStateRequired,
@@ -469,6 +476,7 @@ func TestPrepareTransportAuthErrorCases(t *testing.T) {
 		{
 			name: "client credentials missing ref",
 			cfg: spec.MCPServerConfig{
+				BundleID:  testBundleID,
 				ID:        "cc-server",
 				Transport: spec.MCPTransportStreamableHTTP,
 				StreamableHTTP: &spec.MCPStreamableHTTPConfig{
@@ -479,6 +487,7 @@ func TestPrepareTransportAuthErrorCases(t *testing.T) {
 			wantErrIs:       spec.ErrMCPAuthRequired,
 			wantErrContains: "clientCredentialRef is required",
 			wantStatus: spec.MCPAuthStatus{
+				BundleID: testBundleID,
 				ServerID: "cc-server",
 				AuthMode: spec.MCPHTTPAuthClientCredentials,
 				State:    spec.MCPAuthStateRequired,
@@ -501,19 +510,11 @@ func TestPrepareTransportAuthErrorCases(t *testing.T) {
 				t.Fatalf("error = %q, want substring %q", err.Error(), tt.wantErrContains)
 			}
 
-			st, ok := mgr.GetAuthStatus(tt.cfg.ID)
+			st, ok := mgr.GetAuthStatus(tt.cfg.BundleID, tt.cfg.ID)
 			if !ok {
 				t.Fatalf("missing auth status")
 			}
-			if st.ServerID != tt.wantStatus.ServerID {
-				t.Fatalf("ServerID = %q, want %q", st.ServerID, tt.wantStatus.ServerID)
-			}
-			if st.AuthMode != tt.wantStatus.AuthMode {
-				t.Fatalf("AuthMode = %q, want %q", st.AuthMode, tt.wantStatus.AuthMode)
-			}
-			if st.State != tt.wantStatus.State {
-				t.Fatalf("State = %q, want %q", st.State, tt.wantStatus.State)
-			}
+			assertAuthStatusCore(t, st, tt.wantStatus)
 			if tt.wantStatus.Resource != "" && st.Resource != tt.wantStatus.Resource {
 				t.Fatalf("Resource = %q, want %q", st.Resource, tt.wantStatus.Resource)
 			}
@@ -524,10 +525,66 @@ func TestPrepareTransportAuthErrorCases(t *testing.T) {
 	}
 }
 
+func TestPrepareTransportAuthRequiresIdentifiers(t *testing.T) {
+	tests := []struct {
+		name            string
+		cfg             spec.MCPServerConfig
+		wantErrContains string
+		wantBundleID    string
+		wantServerID    string
+	}{
+		{
+			name: "missing bundleID",
+			cfg: spec.MCPServerConfig{
+				ID:        testHTTPServerID,
+				Transport: spec.MCPTransportStreamableHTTP,
+			},
+			wantErrContains: errStrMissingBundleID,
+			wantBundleID:    "",
+			wantServerID:    testHTTPServerID,
+		},
+		{
+			name: "missing serverID",
+			cfg: spec.MCPServerConfig{
+				BundleID:  testBundleID,
+				Transport: spec.MCPTransportStreamableHTTP,
+			},
+			wantErrContains: errStrMissingServerID,
+			wantBundleID:    testBundleID,
+			wantServerID:    "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mgr := NewAuthManager(nil)
+			got, err := mgr.PrepareTransportAuth(t.Context(), tt.cfg)
+			if err == nil {
+				t.Fatalf("PrepareTransportAuth succeeded, want error")
+			}
+			if !strings.Contains(err.Error(), tt.wantErrContains) {
+				t.Fatalf("error = %q, want substring %q", err.Error(), tt.wantErrContains)
+			}
+			if got.Status.State != spec.MCPAuthStateError {
+				t.Fatalf("State = %q, want error", got.Status.State)
+			}
+			if got.Status.LastError != tt.wantErrContains {
+				t.Fatalf("LastError = %q, want %q", got.Status.LastError, tt.wantErrContains)
+			}
+			if string(got.Status.BundleID) != tt.wantBundleID {
+				t.Fatalf("BundleID = %q, want %q", got.Status.BundleID, tt.wantBundleID)
+			}
+			if string(got.Status.ServerID) != tt.wantServerID {
+				t.Fatalf("ServerID = %q, want %q", got.Status.ServerID, tt.wantServerID)
+			}
+		})
+	}
+}
+
 func TestPrepareTransportAuthNilManager(t *testing.T) {
 	var mgr *AuthManager
 
-	got, err := mgr.PrepareTransportAuth(t.Context(), spec.MCPServerConfig{ID: "nil-manager"})
+	got, err := mgr.PrepareTransportAuth(t.Context(), spec.MCPServerConfig{BundleID: testBundleID, ID: "nil-manager"})
 	if err != nil {
 		t.Fatalf("PrepareTransportAuth: %v", err)
 	}
@@ -536,6 +593,9 @@ func TestPrepareTransportAuthNilManager(t *testing.T) {
 	}
 	if len(got.Env) != 0 {
 		t.Fatalf("Env len = %d, want 0", len(got.Env))
+	}
+	if got.Status.BundleID != testBundleID {
+		t.Fatalf("BundleID = %q, want %q", got.Status.BundleID, testBundleID)
 	}
 	if got.Status.ServerID != "nil-manager" {
 		t.Fatalf("ServerID = %q, want %q", got.Status.ServerID, "nil-manager")
@@ -557,10 +617,7 @@ func (b *countingBroker) FetchAuthorizationCode(
 	req OAuthAuthorizationRequest,
 ) (*OAuthAuthorizationResult, error) {
 	b.calls++
-	return &OAuthAuthorizationResult{
-		Code:  testResponseType,
-		State: "state",
-	}, nil
+	return &OAuthAuthorizationResult{Code: testResponseType, State: "state"}, nil
 }
 
 func TestAuthManagerOptionsAndUnsupportedAuthMode(t *testing.T) {
@@ -586,6 +643,7 @@ func TestAuthManagerOptionsAndUnsupportedAuthMode(t *testing.T) {
 		mgr := NewAuthManager(nil)
 
 		got, err := mgr.PrepareTransportAuth(t.Context(), spec.MCPServerConfig{
+			BundleID:  testBundleID,
 			ID:        "server",
 			Transport: spec.MCPTransportStreamableHTTP,
 			StreamableHTTP: &spec.MCPStreamableHTTPConfig{
@@ -618,6 +676,7 @@ func TestAuthManagerOptionsAndUnsupportedAuthMode(t *testing.T) {
 		)
 
 		got, err := mgr.PrepareTransportAuth(t.Context(), spec.MCPServerConfig{
+			BundleID:  testBundleID,
 			ID:        "oauth-server",
 			Transport: spec.MCPTransportStreamableHTTP,
 			StreamableHTTP: &spec.MCPStreamableHTTPConfig{
@@ -649,6 +708,7 @@ func TestAuthManagerOptionsAndUnsupportedAuthMode(t *testing.T) {
 		mgr := NewAuthManager(resolver, WithAuthHTTPClient(&http.Client{}))
 
 		got, err := mgr.PrepareTransportAuth(t.Context(), spec.MCPServerConfig{
+			BundleID:  testBundleID,
 			ID:        "cc-server",
 			Transport: spec.MCPTransportStreamableHTTP,
 			StreamableHTTP: &spec.MCPStreamableHTTPConfig{
@@ -666,6 +726,9 @@ func TestAuthManagerOptionsAndUnsupportedAuthMode(t *testing.T) {
 		if len(got.SensitiveValues) != 2 {
 			t.Fatalf("SensitiveValues len = %d, want 2 (raw json + secret)", len(got.SensitiveValues))
 		}
+		if got.Status.BundleID != testBundleID || got.Status.ServerID != "cc-server" {
+			t.Fatalf("Status identifiers = %#v, want bundle/server set", got.Status)
+		}
 		if got.Status.State != spec.MCPAuthStateRequired {
 			t.Fatalf("Status.State = %q, want required", got.Status.State)
 		}
@@ -681,7 +744,8 @@ func TestAuthManagerOptionsAndUnsupportedAuthMode(t *testing.T) {
 		var mgr *AuthManager
 
 		got, err := mgr.PrepareTransportAuth(t.Context(), spec.MCPServerConfig{
-			ID: "nil-manager",
+			BundleID: testBundleID,
+			ID:       "nil-manager",
 		})
 		if err != nil {
 			t.Fatalf("PrepareTransportAuth: %v", err)

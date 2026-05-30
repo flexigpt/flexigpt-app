@@ -140,14 +140,13 @@ func (b *OAuthLoopbackBroker) FetchAuthorizationCode(
 	if b == nil {
 		return nil, fmt.Errorf("%w: OAuth loopback broker is not configured", spec.ErrMCPAuthRequired)
 	}
-	req.BundleID = strings.TrimSpace(req.BundleID)
 	if req.BundleID == "" {
 		return nil, fmt.Errorf("%w: OAuth bundleID required", spec.ErrMCPInvalidRequest)
 	}
 	if req.ServerID == "" {
 		return nil, fmt.Errorf("%w: OAuth serverID required", spec.ErrMCPInvalidRequest)
 	}
-	if strings.TrimSpace(req.AuthorizationURL) == "" {
+	if req.AuthorizationURL == "" {
 		return nil, fmt.Errorf("%w: OAuth authorization URL required", spec.ErrMCPAuthRequired)
 	}
 
@@ -225,7 +224,7 @@ func (b *OAuthLoopbackBroker) Pending() []spec.MCPOAuthAuthorization {
 		})
 	}
 
-	// One pending authorization per ServerID by construction.
+	// One pending authorization per BundleID+ServerID by construction.
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].BundleID == out[j].BundleID {
 			return out[i].ServerID < out[j].ServerID

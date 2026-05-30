@@ -13,13 +13,6 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const (
-	errStrInvalidGrant         = "invalid_grant"
-	errStrMissingStdIOConfig   = "missing stdio config"
-	errStrUnsupportedTransport = "unsupported transport"
-	errStrOAuthNotConfigured   = "OAuth authorization code flow is not configured"
-)
-
 // trackingTokenSource wraps an oauth2.TokenSource and pushes status updates to
 // the configured sink on every Token() call. The underlying source already
 // handles caching and refresh; this wrapper only observes results.

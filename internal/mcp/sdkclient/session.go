@@ -11,14 +11,17 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 type Session struct {
-	session *mcpSDK.ClientSession
-	logger  *slog.Logger
+	bundleID bundleitemutils.BundleID
+	serverID spec.MCPServerID
+	session  *mcpSDK.ClientSession
+	logger   *slog.Logger
 }
 
 func (s *Session) Close(ctx context.Context) error {
@@ -56,7 +59,12 @@ func (s *Session) Discover(
 		return spec.MCPDiscoverySnapshot{}, fmt.Errorf("%w: nil session", spec.ErrMCPRuntimeNotReady)
 	}
 
+	if serverID == "" {
+		serverID = s.serverID
+	}
+
 	out := spec.MCPDiscoverySnapshot{
+		BundleID: s.bundleID,
 		ServerID: serverID,
 	}
 
@@ -140,6 +148,8 @@ func (s *Session) CallTool(
 	}
 
 	return &spec.InvokeMCPToolResponseBody{
+		BundleID:          s.bundleID,
+		ServerID:          s.serverID,
 		ToolName:          toolName,
 		Content:           contentSliceToSpec(res.Content),
 		StructuredContent: res.StructuredContent,
@@ -171,6 +181,8 @@ func (s *Session) ReadResource(
 	}
 
 	return &spec.MCPReadResourceResponseBody{
+		BundleID: s.bundleID,
+		ServerID: s.serverID,
 		URI:      uri,
 		Contents: contents,
 	}, nil
@@ -205,6 +217,8 @@ func (s *Session) GetPrompt(
 	}
 
 	return &spec.MCPGetPromptResponseBody{
+		BundleID:    s.bundleID,
+		ServerID:    s.serverID,
 		PromptName:  name,
 		Description: res.Description,
 		Messages:    messages,
@@ -274,6 +288,7 @@ func (s *Session) listAllTools(
 			taskSupport := taskSupportFromMeta(t.Meta)
 
 			out = append(out, spec.MCPToolCapability{
+				BundleID:         s.bundleID,
 				ServerID:         serverID,
 				ToolName:         t.Name,
 				ProviderToolName: runtime.ProviderToolName(serverID, t.Name),
@@ -333,6 +348,7 @@ func (s *Session) listAllResources(
 			}
 
 			out = append(out, spec.MCPResourceRef{
+				BundleID:    s.bundleID,
 				ServerID:    serverID,
 				URI:         r.URI,
 				Name:        r.Name,
@@ -376,6 +392,7 @@ func (s *Session) listAllResourceTemplates(
 			}
 
 			out = append(out, spec.MCPResourceTemplateRef{
+				BundleID:    s.bundleID,
 				ServerID:    serverID,
 				URITemplate: rt.URITemplate,
 				Name:        rt.Name,
@@ -418,6 +435,7 @@ func (s *Session) listAllPrompts(
 			}
 
 			out = append(out, spec.MCPPromptRef{
+				BundleID:    s.bundleID,
 				ServerID:    serverID,
 				PromptName:  p.Name,
 				Title:       p.Title,
