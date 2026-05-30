@@ -1,9 +1,12 @@
 package spec
 
+import "github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+
 type MCPGetPromptRequestBody struct {
-	ServerID   MCPServerID       `json:"serverID"            required:"true"`
-	PromptName string            `json:"promptName"          required:"true"`
-	Arguments  map[string]string `json:"arguments,omitempty"`
+	BundleID   bundleitemutils.BundleID `json:"bundleID"            required:"true"`
+	ServerID   MCPServerID              `json:"serverID"            required:"true"`
+	PromptName string                   `json:"promptName"          required:"true"`
+	Arguments  map[string]string        `json:"arguments,omitempty"`
 }
 
 type MCPGetPromptRequest struct {
@@ -11,10 +14,11 @@ type MCPGetPromptRequest struct {
 }
 
 type MCPGetPromptResponseBody struct {
-	ServerID    MCPServerID        `json:"serverID"`
-	PromptName  string             `json:"promptName"`
-	Description string             `json:"description,omitempty"`
-	Messages    []MCPPromptMessage `json:"messages,omitempty"`
+	BundleID    bundleitemutils.BundleID `json:"bundleID"`
+	ServerID    MCPServerID              `json:"serverID"`
+	PromptName  string                   `json:"promptName"`
+	Description string                   `json:"description,omitempty"`
+	Messages    []MCPPromptMessage       `json:"messages,omitempty"`
 }
 
 type MCPGetPromptResponse struct {
@@ -22,12 +26,13 @@ type MCPGetPromptResponse struct {
 }
 
 type MCPCompleteArgumentRequestBody struct {
-	ServerID      MCPServerID       `json:"serverID"                required:"true"`
-	RefType       string            `json:"refType"                 required:"true"` // resource | prompt
-	Name          string            `json:"name"                    required:"true"`
-	ArgumentName  string            `json:"argumentName"            required:"true"`
-	ArgumentValue string            `json:"argumentValue,omitempty"`
-	Context       map[string]string `json:"context,omitempty"`
+	BundleID      bundleitemutils.BundleID `json:"bundleID"                required:"true"`
+	ServerID      MCPServerID              `json:"serverID"                required:"true"`
+	RefType       string                   `json:"refType"                 required:"true"` // resource | prompt
+	Name          string                   `json:"name"                    required:"true"`
+	ArgumentName  string                   `json:"argumentName"            required:"true"`
+	ArgumentValue string                   `json:"argumentValue,omitempty"`
+	Context       map[string]string        `json:"context,omitempty"`
 }
 
 type MCPCompleteArgumentRequest struct {

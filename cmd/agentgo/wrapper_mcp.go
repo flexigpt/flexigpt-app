@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 
 	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
@@ -170,7 +171,7 @@ func InitMCPWrapper(ctx context.Context, w *MCPWrapper, baseDir string, secrets 
 	if secrets == nil {
 		secrets = auth.StaticSecretResolver{}
 	}
-	st, err := store.NewStore(baseDir)
+	st, err := store.NewMCPStore(ctx, baseDir)
 	if err != nil {
 		return err
 	}
@@ -202,6 +203,44 @@ func InitMCPWrapper(ctx context.Context, w *MCPWrapper, baseDir string, secrets 
 	w.toolBridge = tb
 
 	return nil
+}
+
+func (w *MCPWrapper) PutMCPBundle(req *spec.PutMCPBundleRequest) (*spec.PutMCPBundleResponse, error) {
+	return middleware.WithRecoveryResp(func() (*spec.PutMCPBundleResponse, error) {
+		return w.store.PutMCPBundle(context.Background(), req)
+	})
+}
+
+func (w *MCPWrapper) PatchMCPBundle(req *spec.PatchMCPBundleRequest) (*spec.PatchMCPBundleResponse, error) {
+	return middleware.WithRecoveryResp(func() (*spec.PatchMCPBundleResponse, error) {
+		resp, err := w.store.PatchMCPBundle(context.Background(), req)
+		if err != nil {
+			return nil, err
+		}
+		if req != nil && req.Body != nil && !req.Body.IsEnabled {
+			w.disconnectBundleServers(context.Background(), req.BundleID)
+		}
+		return resp, nil
+	})
+}
+
+func (w *MCPWrapper) DeleteMCPBundle(req *spec.DeleteMCPBundleRequest) (*spec.DeleteMCPBundleResponse, error) {
+	return middleware.WithRecoveryResp(func() (*spec.DeleteMCPBundleResponse, error) {
+		resp, err := w.store.DeleteMCPBundle(context.Background(), req)
+		if err != nil {
+			return nil, err
+		}
+		if req != nil {
+			w.disconnectBundleServers(context.Background(), req.BundleID)
+		}
+		return resp, nil
+	})
+}
+
+func (w *MCPWrapper) ListMCPBundles(req *spec.ListMCPBundlesRequest) (*spec.ListMCPBundlesResponse, error) {
+	return middleware.WithRecoveryResp(func() (*spec.ListMCPBundlesResponse, error) {
+		return w.store.ListMCPBundles(context.Background(), req)
+	})
 }
 
 func (w *MCPWrapper) GetMCPServerAuthStatus(
@@ -528,6 +567,26 @@ func (w *MCPWrapper) DeleteMCPServerSecret(
 		}
 		return &spec.DeleteMCPServerSecretResponse{}, nil
 	})
+}
+
+func (w *MCPWrapper) disconnectBundleServers(ctx context.Context, bundleID bundleitemutils.BundleID) {
+	if w == nil || w.store == nil || w.runtime == nil || bundleID == "" {
+		return
+	}
+	resp, err := w.store.ListMCPServers(ctx, &spec.ListMCPServersRequest{
+		BundleIDs:       []bundleitemutils.BundleID{bundleID},
+		IncludeDisabled: true,
+		PageSize:        spec.MaxMCPServerPageSize,
+	})
+	if err != nil || resp == nil || resp.Body == nil {
+		return
+	}
+	for _, cfg := range resp.Body.Servers {
+		_, _ = w.runtime.Disconnect(ctx, &spec.DisconnectMCPServerRequest{
+			BundleID: cfg.BundleID,
+			ServerID: cfg.ID,
+		})
+	}
 }
 
 func (w *MCPWrapper) buildMCPAuthHealth(

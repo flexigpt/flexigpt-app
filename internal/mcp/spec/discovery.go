@@ -1,8 +1,11 @@
 package spec
 
+import "github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+
 type MCPServerRuntimeSnapshot struct {
-	ServerID MCPServerID     `json:"serverID"`
-	Status   MCPServerStatus `json:"status"`
+	BundleID bundleitemutils.BundleID `json:"bundleID"`
+	ServerID MCPServerID              `json:"serverID"`
+	Status   MCPServerStatus          `json:"status"`
 
 	NegotiatedProtocolVersion string                        `json:"negotiatedProtocolVersion,omitempty"`
 	ServerInfo                *MCPImplementationInfo        `json:"serverInfo,omitempty"`
@@ -38,10 +41,11 @@ type MCPToolAppInfo struct {
 }
 
 type MCPToolCapability struct {
-	ServerID         MCPServerID `json:"serverID"`
-	ToolName         string      `json:"toolName"`
-	ProviderToolName string      `json:"providerToolName"`
-	ChoiceID         string      `json:"choiceID"`
+	BundleID         bundleitemutils.BundleID `json:"bundleID"`
+	ServerID         MCPServerID              `json:"serverID"`
+	ToolName         string                   `json:"toolName"`
+	ProviderToolName string                   `json:"providerToolName"`
+	ChoiceID         string                   `json:"choiceID"`
 
 	Title       string `json:"title,omitempty"`
 	DisplayName string `json:"displayName"`
@@ -66,43 +70,47 @@ type MCPToolCapability struct {
 }
 
 type MCPResourceRef struct {
-	ServerID    MCPServerID    `json:"serverID"`
-	URI         string         `json:"uri"`
-	Name        string         `json:"name,omitempty"`
-	Title       string         `json:"title,omitempty"`
-	DisplayName string         `json:"displayName"`
-	Description string         `json:"description,omitempty"`
-	MimeType    string         `json:"mimeType,omitempty"`
-	Size        int64          `json:"size,omitempty"`
-	Annotations map[string]any `json:"annotations,omitempty"`
-	Digest      string         `json:"digest,omitempty"`
+	BundleID    bundleitemutils.BundleID `json:"bundleID"`
+	ServerID    MCPServerID              `json:"serverID"`
+	URI         string                   `json:"uri"`
+	Name        string                   `json:"name,omitempty"`
+	Title       string                   `json:"title,omitempty"`
+	DisplayName string                   `json:"displayName"`
+	Description string                   `json:"description,omitempty"`
+	MimeType    string                   `json:"mimeType,omitempty"`
+	Size        int64                    `json:"size,omitempty"`
+	Annotations map[string]any           `json:"annotations,omitempty"`
+	Digest      string                   `json:"digest,omitempty"`
 }
 
 type MCPResourceTemplateRef struct {
-	ServerID    MCPServerID       `json:"serverID"`
-	URITemplate string            `json:"uriTemplate"`
-	Name        string            `json:"name,omitempty"`
-	Title       string            `json:"title,omitempty"`
-	DisplayName string            `json:"displayName"`
-	Description string            `json:"description,omitempty"`
-	MimeType    string            `json:"mimeType,omitempty"`
-	Arguments   map[string]string `json:"arguments,omitempty"`
-	Annotations map[string]any    `json:"annotations,omitempty"`
-	Digest      string            `json:"digest,omitempty"`
+	BundleID    bundleitemutils.BundleID `json:"bundleID"`
+	ServerID    MCPServerID              `json:"serverID"`
+	URITemplate string                   `json:"uriTemplate"`
+	Name        string                   `json:"name,omitempty"`
+	Title       string                   `json:"title,omitempty"`
+	DisplayName string                   `json:"displayName"`
+	Description string                   `json:"description,omitempty"`
+	MimeType    string                   `json:"mimeType,omitempty"`
+	Arguments   map[string]string        `json:"arguments,omitempty"`
+	Annotations map[string]any           `json:"annotations,omitempty"`
+	Digest      string                   `json:"digest,omitempty"`
 }
 
 type MCPPromptRef struct {
-	ServerID    MCPServerID       `json:"serverID"`
-	PromptName  string            `json:"promptName"`
-	Title       string            `json:"title,omitempty"`
-	DisplayName string            `json:"displayName"`
-	Description string            `json:"description,omitempty"`
-	Arguments   map[string]string `json:"arguments,omitempty"`
-	Digest      string            `json:"digest,omitempty"`
+	BundleID    bundleitemutils.BundleID `json:"bundleID"`
+	ServerID    MCPServerID              `json:"serverID"`
+	PromptName  string                   `json:"promptName"`
+	Title       string                   `json:"title,omitempty"`
+	DisplayName string                   `json:"displayName"`
+	Description string                   `json:"description,omitempty"`
+	Arguments   map[string]string        `json:"arguments,omitempty"`
+	Digest      string                   `json:"digest,omitempty"`
 }
 
 type MCPDiscoverySnapshot struct {
-	ServerID MCPServerID `json:"serverID"`
+	BundleID bundleitemutils.BundleID `json:"bundleID"`
+	ServerID MCPServerID              `json:"serverID"`
 
 	NegotiatedProtocolVersion string                        `json:"negotiatedProtocolVersion,omitempty"`
 	ServerInfo                *MCPImplementationInfo        `json:"serverInfo,omitempty"`

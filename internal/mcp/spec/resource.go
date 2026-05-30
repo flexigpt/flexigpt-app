@@ -1,8 +1,11 @@
 package spec
 
+import "github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+
 type MCPReadResourceRequestBody struct {
-	ServerID MCPServerID `json:"serverID" required:"true"`
-	URI      string      `json:"uri"      required:"true"`
+	BundleID bundleitemutils.BundleID `json:"bundleID" required:"true"`
+	ServerID MCPServerID              `json:"serverID" required:"true"`
+	URI      string                   `json:"uri"      required:"true"`
 }
 
 type MCPReadResourceRequest struct {
@@ -10,9 +13,10 @@ type MCPReadResourceRequest struct {
 }
 
 type MCPReadResourceResponseBody struct {
-	ServerID MCPServerID  `json:"serverID"`
-	URI      string       `json:"uri"`
-	Contents []MCPContent `json:"contents,omitempty"`
+	BundleID bundleitemutils.BundleID `json:"bundleID"`
+	ServerID MCPServerID              `json:"serverID"`
+	URI      string                   `json:"uri"`
+	Contents []MCPContent             `json:"contents,omitempty"`
 }
 
 type MCPReadResourceResponse struct {

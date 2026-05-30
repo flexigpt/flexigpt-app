@@ -1,0 +1,15 @@
+{
+	"bundles": {
+		"019e7877-ab0e-7c29-a6ef-7e40370fa821": {
+			"schemaVersion": "2026-05-30",
+			"id": "019e7877-ab0e-7c29-a6ef-7e40370fa821",
+			"slug": "popular-mcp-servers",
+			"displayName": "Popular MCP Servers",
+			"description": "Built-in MCP server definitions. Enable the ones you want to use.",
+			"isEnabled": true,
+			"createdAt": "2026-05-30T00:00:00Z",
+			"modifiedAt": "2026-05-30T00:00:00Z",
+			"isBuiltIn": true
+		}
+	}
+}

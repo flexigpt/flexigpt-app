@@ -29,6 +29,7 @@ type AuthStatusSink interface {
 }
 
 type OAuthAuthorizationRequest struct {
+	BundleID         string
 	ServerID         spec.MCPServerID
 	AuthorizationURL string
 }
@@ -100,6 +101,7 @@ func (m *AuthManager) PrepareTransportAuth(
 		return ResolvedTransportAuth{
 			Env: map[string]string{},
 			Status: spec.MCPAuthStatus{
+				BundleID: cfg.BundleID,
 				ServerID: cfg.ID,
 				AuthMode: spec.MCPHTTPAuthNone,
 				State:    spec.MCPAuthStateNotRequired,
@@ -109,6 +111,7 @@ func (m *AuthManager) PrepareTransportAuth(
 	out := ResolvedTransportAuth{
 		Env: map[string]string{},
 		Status: spec.MCPAuthStatus{
+			BundleID: cfg.BundleID,
 			ServerID: cfg.ID,
 			AuthMode: spec.MCPHTTPAuthNone,
 			State:    spec.MCPAuthStateNotRequired,
@@ -243,6 +246,7 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 				return nil, fmt.Errorf("%w: missing OAuth authorization URL", spec.ErrMCPAuthRequired)
 			}
 			res, err := m.oauthBroker.FetchAuthorizationCode(ctx, OAuthAuthorizationRequest{
+				BundleID:         string(cfg.BundleID),
 				ServerID:         cfg.ID,
 				AuthorizationURL: args.URL,
 			})
@@ -277,6 +281,7 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 		inner: handler,
 		sink:  m,
 		status: spec.MCPAuthStatus{
+			BundleID: cfg.BundleID,
 			ServerID: cfg.ID,
 			AuthMode: spec.MCPHTTPAuthOAuth,
 			State:    spec.MCPAuthStateRequired,
@@ -322,6 +327,7 @@ func (m *AuthManager) configureClientCredentialsOAuth(
 		inner: handler,
 		sink:  m,
 		status: spec.MCPAuthStatus{
+			BundleID: cfg.BundleID,
 			ServerID: cfg.ID,
 			AuthMode: spec.MCPHTTPAuthClientCredentials,
 			State:    spec.MCPAuthStateRequired,

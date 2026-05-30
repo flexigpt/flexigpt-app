@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/secret"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
@@ -19,12 +20,46 @@ const (
 	commandBash          = "bash"
 )
 
+func validateBundle(b *spec.MCPBundle) error {
+	if b == nil {
+		return errors.New("bundle is nil")
+	}
+	if b.SchemaVersion != spec.MCPSchemaVersion {
+		return fmt.Errorf("schemaVersion %q != %q", b.SchemaVersion, spec.MCPSchemaVersion)
+	}
+	if err := bundleitemutils.ValidateBundleSlug(b.Slug); err != nil {
+		return fmt.Errorf("slug: %w", err)
+	}
+	if strings.TrimSpace(string(b.ID)) == "" {
+		return errors.New("id is empty")
+	}
+	if strings.TrimSpace(b.DisplayName) == "" {
+		return errors.New("displayName is empty")
+	}
+	if strings.TrimSpace(b.DisplayName) != b.DisplayName {
+		return errors.New("displayName has leading/trailing whitespace")
+	}
+	if len(b.DisplayName) > maxMCPDisplayNameLen {
+		return fmt.Errorf("displayName too long > %d", maxMCPDisplayNameLen)
+	}
+	if b.CreatedAt.IsZero() || b.ModifiedAt.IsZero() {
+		return errors.New("createdAt/modifiedAt is zero")
+	}
+	if b.ModifiedAt.Before(b.CreatedAt) {
+		return errors.New("modifiedAt is before createdAt")
+	}
+	return nil
+}
+
 func validateServerConfig(c *spec.MCPServerConfig) error {
 	if c == nil {
 		return errors.New("server config is nil")
 	}
 	if c.SchemaVersion != spec.MCPSchemaVersion {
 		return fmt.Errorf("schemaVersion %q != %q", c.SchemaVersion, spec.MCPSchemaVersion)
+	}
+	if strings.TrimSpace(string(c.BundleID)) == "" {
+		return errors.New("bundleID is empty")
 	}
 	if strings.TrimSpace(string(c.ID)) == "" {
 		return errors.New("id must match ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
@@ -44,7 +79,7 @@ func validateServerConfig(c *spec.MCPServerConfig) error {
 	if c.ModifiedAt.Before(c.CreatedAt) {
 		return errors.New("modifiedAt is before createdAt")
 	}
-	if isSoftDeleted(c) && c.Enabled {
+	if isServerSoftDeleted(c) && c.Enabled {
 		return errors.New("soft-deleted server cannot be enabled")
 	}
 
@@ -344,7 +379,11 @@ func validateEnvKey(key string) error {
 	return nil
 }
 
-func isSoftDeleted(c *spec.MCPServerConfig) bool {
+func isBundleSoftDeleted(b spec.MCPBundle) bool {
+	return b.SoftDeletedAt != nil && !b.SoftDeletedAt.IsZero()
+}
+
+func isServerSoftDeleted(c *spec.MCPServerConfig) bool {
 	return c != nil && c.SoftDeletedAt != nil && !c.SoftDeletedAt.IsZero()
 }
 

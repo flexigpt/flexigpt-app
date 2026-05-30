@@ -116,6 +116,7 @@ func summary(in EvaluationInput) *spec.MCPApprovalSummary {
 		raw, _ = json.Marshal(in.Req.Arguments)
 	}
 	return &spec.MCPApprovalSummary{
+		BundleID:          in.Server.BundleID,
 		ServerID:          in.Server.ID,
 		ServerDisplayName: in.Server.DisplayName,
 		ToolName:          in.Tool.ToolName,

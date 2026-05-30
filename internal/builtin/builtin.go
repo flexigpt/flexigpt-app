@@ -18,6 +18,9 @@ var BuiltInSkillBundlesFS embed.FS
 //go:embed assistantpresets
 var BuiltInAssistantPresetBundlesFS embed.FS
 
+//go:embed mcp
+var BuiltInMCPBundlesFS embed.FS
+
 const (
 	BuiltInToolBundlesRootDir = "tools"
 	BuiltInToolBundlesJSON    = "tools.bundles.json"
@@ -30,6 +33,9 @@ const (
 
 	BuiltInAssistantPresetBundlesRootDir = "assistantpresets"
 	BuiltInAssistantPresetBundlesJSON    = "assistantpresets.bundles.json"
+
+	BuiltInMCPBundlesRootDir = "mcp"
+	BuiltInMCPBundlesJSON    = "mcp.bundles.json"
 )
 
 // IMPORTANT: keep these stable (match tools.bundles.json).

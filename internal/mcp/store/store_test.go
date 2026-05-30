@@ -13,9 +13,9 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 	ctx := t.Context()
 	dir := t.TempDir()
 
-	st, err := NewStore(dir)
+	st, err := NewMCPStore(t.Context(), dir)
 	if err != nil {
-		t.Fatalf("NewStore: %v", err)
+		t.Fatalf("NewMCPStore: %v", err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
 
@@ -199,9 +199,9 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 		t.Fatalf("Close(store): %v", err)
 	}
 
-	st2, err := NewStore(dir)
+	st2, err := NewMCPStore(t.Context(), dir)
 	if err != nil {
-		t.Fatalf("NewStore(reopen): %v", err)
+		t.Fatalf("NewMCPStore(reopen): %v", err)
 	}
 	t.Cleanup(func() { _ = st2.Close() })
 
@@ -384,9 +384,9 @@ func TestStoreRejectsInvalidConfigs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st, err := NewStore(t.TempDir())
+			st, err := NewMCPStore(t.Context(), t.TempDir())
 			if err != nil {
-				t.Fatalf("NewStore: %v", err)
+				t.Fatalf("NewMCPStore: %v", err)
 			}
 			t.Cleanup(func() { _ = st.Close() })
 
@@ -406,9 +406,9 @@ func TestStoreRejectsInvalidConfigs(t *testing.T) {
 }
 
 func TestStoreRejectsBadPageToken(t *testing.T) {
-	st, err := NewStore(t.TempDir())
+	st, err := NewMCPStore(t.Context(), t.TempDir())
 	if err != nil {
-		t.Fatalf("NewStore: %v", err)
+		t.Fatalf("NewMCPStore: %v", err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
 

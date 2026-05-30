@@ -1,29 +1,37 @@
 package spec
 
+import "github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+
 type MCPToolSelection struct {
-	ServerID         MCPServerID `json:"serverID"`
-	ToolName         string      `json:"toolName"`
-	ProviderToolName string      `json:"providerToolName,omitempty"`
-	ChoiceID         string      `json:"choiceID,omitempty"`
-	Digest           string      `json:"digest,omitempty"`
+	BundleID         bundleitemutils.BundleID `json:"bundleID"`
+	ServerID         MCPServerID              `json:"serverID"`
+	ToolName         string                   `json:"toolName"`
+	ProviderToolName string                   `json:"providerToolName,omitempty"`
+	ChoiceID         string                   `json:"choiceID,omitempty"`
+	Digest           string                   `json:"digest,omitempty"`
 
 	ApprovalRule  *MCPApprovalRule  `json:"approvalRule,omitempty"`
 	ExecutionMode *MCPExecutionMode `json:"executionMode,omitempty"`
 }
 
 type MCPProviderToolMapping struct {
-	ProviderToolName string      `json:"providerToolName"`
-	ChoiceID         string      `json:"choiceID"`
-	ServerID         MCPServerID `json:"serverID"`
-	ToolName         string      `json:"toolName"`
-	ToolDigest       string      `json:"toolDigest"`
-	AppResourceURI   string      `json:"appResourceUri,omitempty"`
-	Visibility       []string    `json:"visibility,omitempty"`
+	BundleID bundleitemutils.BundleID `json:"bundleID"`
+	ServerID MCPServerID              `json:"serverID"`
+
+	ProviderToolName string `json:"providerToolName"`
+	ChoiceID         string `json:"choiceID"`
+
+	ToolName       string   `json:"toolName"`
+	ToolDigest     string   `json:"toolDigest"`
+	AppResourceURI string   `json:"appResourceUri,omitempty"`
+	Visibility     []string `json:"visibility,omitempty"`
 }
 
 type MCPServerSelection struct {
-	ServerID       MCPServerID `json:"serverID"`
-	SnapshotDigest string      `json:"snapshotDigest,omitempty"`
+	BundleID bundleitemutils.BundleID `json:"bundleID"`
+	ServerID MCPServerID              `json:"serverID"`
+
+	SnapshotDigest string `json:"snapshotDigest,omitempty"`
 
 	ToolExposure  string             `json:"toolExposure"` // none | all | selected
 	SelectedTools []MCPToolSelection `json:"selectedTools,omitempty"`
@@ -38,8 +46,10 @@ type MCPConversationContext struct {
 	Prompts           []MCPPromptRef           `json:"prompts,omitempty"`
 }
 type MCPToolCallProvenance struct {
-	ServerID          MCPServerID `json:"serverID"`
-	ServerDisplayName string      `json:"serverDisplayName,omitempty"`
+	BundleID bundleitemutils.BundleID `json:"bundleID"`
+	ServerID MCPServerID              `json:"serverID"`
+
+	ServerDisplayName string `json:"serverDisplayName,omitempty"`
 
 	ToolName         string `json:"toolName"`
 	ProviderToolName string `json:"providerToolName"`

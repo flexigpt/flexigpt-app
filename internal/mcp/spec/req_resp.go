@@ -1,7 +1,57 @@
 package spec
 
+import "github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+
+type PutMCPBundleRequestBody struct {
+	Slug        bundleitemutils.BundleSlug `json:"slug"                  required:"true"`
+	DisplayName string                     `json:"displayName"           required:"true"`
+	IsEnabled   bool                       `json:"isEnabled"             required:"true"`
+	Description string                     `json:"description,omitempty"`
+}
+
+type PutMCPBundleRequest struct {
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	Body     *PutMCPBundleRequestBody
+}
+
+type PutMCPBundleResponse struct{}
+
+type PatchMCPBundleRequestBody struct {
+	IsEnabled bool `json:"isEnabled" required:"true"`
+}
+
+type PatchMCPBundleRequest struct {
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	Body     *PatchMCPBundleRequestBody
+}
+
+type PatchMCPBundleResponse struct{}
+
+type DeleteMCPBundleRequest struct {
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+}
+
+type DeleteMCPBundleResponse struct{}
+
+type ListMCPBundlesRequest struct {
+	BundleIDs       []bundleitemutils.BundleID `query:"bundleIDs"`
+	IncludeDisabled bool                       `query:"includeDisabled"`
+	PageSize        int                        `query:"pageSize"`
+	PageToken       string                     `query:"pageToken"`
+}
+
+type ListMCPBundlesResponseBody struct {
+	Bundles       []MCPBundle `json:"bundles"`
+	NextPageToken *string     `json:"nextPageToken,omitempty"`
+}
+
+type ListMCPBundlesResponse struct {
+	Body *ListMCPBundlesResponseBody
+}
+
 type GetMCPServerAuthStatusRequest struct {
-	ServerID MCPServerID `path:"serverID" required:"true"`
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	ServerID MCPServerID              `path:"serverID" required:"true"`
 }
 
 type GetMCPServerAuthStatusResponse struct {
@@ -25,15 +75,19 @@ type PutMCPServerPayload struct {
 }
 
 type PutMCPServerRequest struct {
-	ServerID MCPServerID `path:"serverID" required:"true"`
-	Body     *PutMCPServerPayload
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	ServerID MCPServerID              `path:"serverID" required:"true"`
+
+	Body *PutMCPServerPayload
 }
 
 type PutMCPServerResponse struct{}
 
 type GetMCPServerRequest struct {
-	ServerID       MCPServerID `path:"serverID" required:"true"`
-	IncludeDeleted bool        `                                query:"includeDeleted"`
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	ServerID MCPServerID              `path:"serverID" required:"true"`
+
+	IncludeDeleted bool `query:"includeDeleted"`
 }
 
 type GetMCPServerResponse struct {
@@ -41,10 +95,12 @@ type GetMCPServerResponse struct {
 }
 
 type ListMCPServersRequest struct {
-	ServerIDs []MCPServerID `query:"serverIDs"`
-	Enabled   *bool         `query:"enabled"`
-	PageSize  int           `query:"pageSize"`
-	PageToken string        `query:"pageToken"`
+	BundleIDs       []bundleitemutils.BundleID `query:"bundleIDs"`
+	ServerIDs       []MCPServerID              `query:"serverIDs"`
+	Enabled         *bool                      `query:"enabled"`
+	IncludeDisabled bool                       `query:"includeDisabled"`
+	PageSize        int                        `query:"pageSize"`
+	PageToken       string                     `query:"pageToken"`
 }
 
 type ListMCPServersResponseBody struct {
@@ -61,8 +117,10 @@ type PatchMCPServerEnabledRequestBody struct {
 }
 
 type PatchMCPServerEnabledRequest struct {
-	ServerID MCPServerID `path:"serverID" required:"true"`
-	Body     *PatchMCPServerEnabledRequestBody
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	ServerID MCPServerID              `path:"serverID" required:"true"`
+
+	Body *PatchMCPServerEnabledRequestBody
 }
 
 type PatchMCPServerEnabledResponse struct{}
@@ -74,20 +132,24 @@ type PatchMCPServerPolicyPayload struct {
 }
 
 type PatchMCPServerPolicyRequest struct {
-	ServerID MCPServerID `path:"serverID" required:"true"`
-	Body     *PatchMCPServerPolicyPayload
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	ServerID MCPServerID              `path:"serverID" required:"true"`
+
+	Body *PatchMCPServerPolicyPayload
 }
 
 type PatchMCPServerPolicyResponse struct{}
 
 type DeleteMCPServerRequest struct {
-	ServerID MCPServerID `path:"serverID" required:"true"`
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	ServerID MCPServerID              `path:"serverID" required:"true"`
 }
 
 type DeleteMCPServerResponse struct{}
 
 type ConnectMCPServerRequest struct {
-	ServerID MCPServerID `path:"serverID" required:"true"`
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	ServerID MCPServerID              `path:"serverID" required:"true"`
 }
 
 type ConnectMCPServerResponse struct {
@@ -95,13 +157,15 @@ type ConnectMCPServerResponse struct {
 }
 
 type DisconnectMCPServerRequest struct {
-	ServerID MCPServerID `path:"serverID" required:"true"`
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	ServerID MCPServerID              `path:"serverID" required:"true"`
 }
 
 type DisconnectMCPServerResponse struct{}
 
 type RefreshMCPServerRequest struct {
-	ServerID MCPServerID `path:"serverID" required:"true"`
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	ServerID MCPServerID              `path:"serverID" required:"true"`
 }
 
 type RefreshMCPServerResponse struct {
@@ -109,7 +173,8 @@ type RefreshMCPServerResponse struct {
 }
 
 type GetMCPServerStatusRequest struct {
-	ServerID MCPServerID `path:"serverID" required:"true"`
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	ServerID MCPServerID              `path:"serverID" required:"true"`
 }
 
 type GetMCPServerStatusResponse struct {
@@ -117,9 +182,11 @@ type GetMCPServerStatusResponse struct {
 }
 
 type ListMCPServerToolsRequest struct {
-	ServerID  MCPServerID `path:"serverID" required:"true"`
-	PageSize  int         `                                query:"pageSize"`
-	PageToken string      `                                query:"pageToken"`
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	ServerID MCPServerID              `path:"serverID" required:"true"`
+
+	PageSize  int    `query:"pageSize"`
+	PageToken string `query:"pageToken"`
 }
 
 type ListMCPServerToolsResponseBody struct {
@@ -132,9 +199,11 @@ type ListMCPServerToolsResponse struct {
 }
 
 type ListMCPServerResourcesRequest struct {
-	ServerID  MCPServerID `path:"serverID" required:"true"`
-	PageSize  int         `                                query:"pageSize"`
-	PageToken string      `                                query:"pageToken"`
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	ServerID MCPServerID              `path:"serverID" required:"true"`
+
+	PageSize  int    `query:"pageSize"`
+	PageToken string `query:"pageToken"`
 }
 
 type ListMCPServerResourcesResponseBody struct {
@@ -147,9 +216,11 @@ type ListMCPServerResourcesResponse struct {
 }
 
 type ListMCPServerResourceTemplatesRequest struct {
-	ServerID  MCPServerID `path:"serverID" required:"true"`
-	PageSize  int         `                                query:"pageSize"`
-	PageToken string      `                                query:"pageToken"`
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	ServerID MCPServerID              `path:"serverID" required:"true"`
+
+	PageSize  int    `query:"pageSize"`
+	PageToken string `query:"pageToken"`
 }
 
 type ListMCPServerResourceTemplatesResponseBody struct {
@@ -162,9 +233,11 @@ type ListMCPServerResourceTemplatesResponse struct {
 }
 
 type ListMCPServerPromptsRequest struct {
-	ServerID  MCPServerID `path:"serverID" required:"true"`
-	PageSize  int         `                                query:"pageSize"`
-	PageToken string      `                                query:"pageToken"`
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	ServerID MCPServerID              `path:"serverID" required:"true"`
+
+	PageSize  int    `query:"pageSize"`
+	PageToken string `query:"pageToken"`
 }
 
 type ListMCPServerPromptsResponseBody struct {
@@ -214,7 +287,8 @@ type CancelPendingMCPOAuthAuthorizationRequest struct {
 type CancelPendingMCPOAuthAuthorizationResponse struct{}
 
 type GetMCPServerAuthHealthRequest struct {
-	ServerID MCPServerID `path:"serverID" required:"true"`
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	ServerID MCPServerID              `path:"serverID" required:"true"`
 }
 
 type GetMCPServerAuthHealthResponse struct {
@@ -228,8 +302,10 @@ type PutMCPServerSecretRequestBody struct {
 }
 
 type PutMCPServerSecretRequest struct {
-	ServerID MCPServerID `path:"serverID" required:"true"`
-	Body     *PutMCPServerSecretRequestBody
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	ServerID MCPServerID              `path:"serverID" required:"true"`
+
+	Body *PutMCPServerSecretRequestBody
 }
 
 type PutMCPServerSecretResponseBody struct {
@@ -243,9 +319,11 @@ type PutMCPServerSecretResponse struct {
 }
 
 type DeleteMCPServerSecretRequest struct {
-	ServerID MCPServerID   `path:"serverID" required:"true"`
-	Kind     MCPSecretKind `                required:"true" query:"kind"`
-	Slot     string        `                required:"true" query:"slot"`
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	ServerID MCPServerID              `path:"serverID" required:"true"`
+
+	Kind MCPSecretKind `required:"true" query:"kind"`
+	Slot string        `required:"true" query:"slot"`
 }
 
 type DeleteMCPServerSecretResponse struct{}

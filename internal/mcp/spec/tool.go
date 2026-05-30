@@ -1,12 +1,15 @@
 package spec
 
-type InvokeMCPToolRequestBody struct {
-	Source MCPInvocationSource `json:"source" required:"true"`
+import "github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 
-	ServerID         MCPServerID `json:"serverID"                   required:"true"`
-	ToolName         string      `json:"toolName"                   required:"true"`
-	ProviderToolName string      `json:"providerToolName,omitempty"`
-	ToolDigest       string      `json:"toolDigest,omitempty"`
+type InvokeMCPToolRequestBody struct {
+	BundleID bundleitemutils.BundleID `json:"bundleID" required:"true"`
+	ServerID MCPServerID              `json:"serverID" required:"true"`
+
+	Source           MCPInvocationSource `json:"source"                     required:"true"`
+	ToolName         string              `json:"toolName"                   required:"true"`
+	ProviderToolName string              `json:"providerToolName,omitempty"`
+	ToolDigest       string              `json:"toolDigest,omitempty"`
 
 	Arguments map[string]any `json:"arguments,omitempty"`
 
@@ -29,9 +32,11 @@ type MCPToolAppRenderInfo struct {
 	MimeType    string `json:"mimeType,omitempty"`
 }
 type InvokeMCPToolResponseBody struct {
-	ServerID         MCPServerID `json:"serverID"`
-	ToolName         string      `json:"toolName"`
-	ProviderToolName string      `json:"providerToolName,omitempty"`
+	BundleID bundleitemutils.BundleID `json:"bundleID"`
+	ServerID MCPServerID              `json:"serverID"`
+
+	ToolName         string `json:"toolName"`
+	ProviderToolName string `json:"providerToolName,omitempty"`
 
 	Content           []MCPContent `json:"content,omitempty"`
 	StructuredContent any          `json:"structuredContent,omitempty"`

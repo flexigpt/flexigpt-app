@@ -1,6 +1,10 @@
 package spec
 
-import "time"
+import (
+	"time"
+
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+)
 
 type MCPStdioConfig struct {
 	Command          string            `json:"command"`
@@ -28,9 +32,10 @@ type MCPStreamableHTTPConfig struct {
 }
 
 type MCPAuthStatus struct {
-	ServerID MCPServerID     `json:"serverID"`
-	AuthMode MCPHTTPAuthMode `json:"authMode"`
-	State    MCPAuthState    `json:"state"`
+	BundleID bundleitemutils.BundleID `json:"bundleID"`
+	ServerID MCPServerID              `json:"serverID"`
+	AuthMode MCPHTTPAuthMode          `json:"authMode"`
+	State    MCPAuthState             `json:"state"`
 
 	Scopes              []string   `json:"scopes,omitempty"`
 	ExpiresAt           *time.Time `json:"expiresAt,omitempty"`
@@ -40,11 +45,13 @@ type MCPAuthStatus struct {
 }
 
 type MCPServerConfig struct {
-	SchemaVersion string           `json:"schemaVersion"`
-	ID            MCPServerID      `json:"id"`
-	DisplayName   string           `json:"displayName"`
-	Enabled       bool             `json:"enabled"`
-	Transport     MCPTransportType `json:"transport"`
+	SchemaVersion string `json:"schemaVersion"`
+
+	BundleID    bundleitemutils.BundleID `json:"bundleID"`
+	ID          MCPServerID              `json:"id"`
+	DisplayName string                   `json:"displayName"`
+	Enabled     bool                     `json:"enabled"`
+	Transport   MCPTransportType         `json:"transport"`
 
 	Stdio          *MCPStdioConfig          `json:"stdio,omitempty"`
 	StreamableHTTP *MCPStreamableHTTPConfig `json:"streamableHttp,omitempty"`
@@ -56,12 +63,15 @@ type MCPServerConfig struct {
 	ToolPolicies  map[string]MCPToolPolicyOverride `json:"toolPolicies,omitempty"`
 	AppsPolicy    *MCPAppsPolicy                   `json:"appsPolicy,omitempty"`
 
+	IsBuiltIn     bool       `json:"isBuiltIn"`
 	CreatedAt     time.Time  `json:"createdAt"`
 	ModifiedAt    time.Time  `json:"modifiedAt"`
 	SoftDeletedAt *time.Time `json:"softDeletedAt,omitempty"`
 }
 
 type MCPAuthHealth struct {
+	BundleID bundleitemutils.BundleID `json:"bundleID,omitempty"`
+
 	ServerID MCPServerID        `json:"serverID"`
 	AuthMode MCPHTTPAuthMode    `json:"authMode"`
 	State    MCPAuthHealthState `json:"state"`
@@ -77,4 +87,23 @@ type MCPAuthHealth struct {
 	AuthorizationExpiresAt string `json:"authorizationExpiresAt,omitempty"`
 
 	LastError string `json:"lastError,omitempty"`
+}
+
+type MCPBundle struct {
+	SchemaVersion string                     `json:"schemaVersion"`
+	ID            bundleitemutils.BundleID   `json:"id"`
+	Slug          bundleitemutils.BundleSlug `json:"slug"`
+
+	DisplayName string `json:"displayName,omitempty"`
+	Description string `json:"description,omitempty"`
+
+	IsEnabled     bool       `json:"isEnabled"`
+	CreatedAt     time.Time  `json:"createdAt"`
+	ModifiedAt    time.Time  `json:"modifiedAt"`
+	IsBuiltIn     bool       `json:"isBuiltIn"`
+	SoftDeletedAt *time.Time `json:"softDeletedAt,omitempty"`
+}
+
+type AllMCPBundles struct {
+	Bundles map[bundleitemutils.BundleID]MCPBundle `json:"bundles"`
 }

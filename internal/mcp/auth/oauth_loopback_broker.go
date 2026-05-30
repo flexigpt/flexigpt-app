@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
@@ -26,6 +27,7 @@ type oauthLoopbackResult struct {
 	Err    error
 }
 type pendingOAuthAuthorization struct {
+	BundleID         string
 	ID               string
 	ServerID         spec.MCPServerID
 	AuthorizationURL string
@@ -149,6 +151,7 @@ func (b *OAuthLoopbackBroker) FetchAuthorizationCode(
 	id := rand.Text()
 
 	p := &pendingOAuthAuthorization{
+		BundleID:         strings.TrimSpace(req.BundleID),
 		ID:               id,
 		ServerID:         req.ServerID,
 		AuthorizationURL: req.AuthorizationURL,
@@ -204,6 +207,7 @@ func (b *OAuthLoopbackBroker) Pending() []spec.MCPOAuthAuthorization {
 	out := make([]spec.MCPOAuthAuthorization, 0, len(b.pendingByServer))
 	for _, p := range b.pendingByServer {
 		out = append(out, spec.MCPOAuthAuthorization{
+			BundleID:         bundleitemutils.BundleID(p.BundleID),
 			ServerID:         p.ServerID,
 			AuthorizationURL: p.AuthorizationURL,
 			ExpiresAt:        p.ExpiresAt.Format(time.RFC3339Nano),

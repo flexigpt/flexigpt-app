@@ -23,6 +23,9 @@ func MergeMCPAuthStatus(st spec.MCPAuthStatus, cfg spec.MCPServerConfig) spec.MC
 	if st.ServerID == "" {
 		st.ServerID = def.ServerID
 	}
+	if st.BundleID == "" {
+		st.BundleID = def.BundleID
+	}
 	if st.AuthMode == "" {
 		st.AuthMode = def.AuthMode
 	}
@@ -44,6 +47,7 @@ func MergeMCPAuthStatus(st spec.MCPAuthStatus, cfg spec.MCPServerConfig) spec.MC
 
 func DefaultMCPAuthStatusFromConfig(cfg spec.MCPServerConfig) spec.MCPAuthStatus {
 	st := spec.MCPAuthStatus{
+		BundleID: cfg.BundleID,
 		ServerID: cfg.ID,
 		AuthMode: spec.MCPHTTPAuthNone,
 		State:    spec.MCPAuthStateNotRequired,

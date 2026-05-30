@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/store"
@@ -40,6 +41,7 @@ type ClientFactory interface {
 }
 
 type sessionState struct {
+	bundleID        bundleitemutils.BundleID
 	serverID        spec.MCPServerID
 	status          spec.MCPServerStatus
 	client          ClientSession
@@ -194,6 +196,7 @@ func (m *RuntimeManager) Connect(
 		return nil, err
 	}
 
+	hydrateSnapshotIdentity(&snap, cfg.BundleID, cfg.ID)
 	normalizeSnapshot(&snap)
 	if err := m.store.SaveLastKnownSnapshot(ctx, snap); err != nil {
 		slog.Warn("mcp: save last known snapshot failed", "serverID", req.ServerID, "err", err)
@@ -215,6 +218,7 @@ func (m *RuntimeManager) Connect(
 	}
 
 	state = m.getOrCreateLocked(req.ServerID)
+	state.bundleID = cfg.BundleID
 	state.client = client
 	state.status = spec.MCPServerStatusReady
 	state.snapshot = cloneDiscoverySnapshot(snap)
@@ -281,6 +285,7 @@ func (m *RuntimeManager) Refresh(
 		m.setError(req.ServerID, err)
 		return nil, err
 	}
+	hydrateSnapshotIdentity(&snap, cfg.BundleID, cfg.ID)
 	normalizeSnapshot(&snap)
 	if err := m.store.SaveLastKnownSnapshot(ctx, snap); err != nil {
 		slog.Warn("mcp: save refreshed snapshot failed", "serverID", req.ServerID, "err", err)
@@ -313,9 +318,12 @@ func (m *RuntimeManager) Status(
 		return nil, err
 	}
 	snap := m.snapshotFromState(req.ServerID)
-	if cfgResp != nil && cfgResp.Body != nil && !cfgResp.Body.Enabled {
-		snap.Status = spec.MCPServerStatusDisabled
-		snap.LastError = ""
+	if cfgResp != nil && cfgResp.Body != nil {
+		snap.BundleID = cfgResp.Body.BundleID
+		if !cfgResp.Body.Enabled {
+			snap.Status = spec.MCPServerStatusDisabled
+			snap.LastError = ""
+		}
 	}
 	return &spec.GetMCPServerStatusResponse{Body: snap}, nil
 }
@@ -508,6 +516,8 @@ func (m *RuntimeManager) ReadResource(
 	if body == nil {
 		return nil, fmt.Errorf("%w: resource read returned nil response", spec.ErrMCPRuntimeNotReady)
 	}
+	_, cfg, _ := m.readyClient(ctx, req.Body.ServerID)
+	body.BundleID = cfg.BundleID
 	body.ServerID = req.Body.ServerID
 	body.URI = req.Body.URI
 	return &spec.MCPReadResourceResponse{Body: body}, nil
@@ -534,6 +544,8 @@ func (m *RuntimeManager) GetPrompt(
 	if body == nil {
 		return nil, fmt.Errorf("%w: prompt read returned nil response", spec.ErrMCPRuntimeNotReady)
 	}
+	_, cfg, _ := m.readyClient(ctx, req.Body.ServerID)
+	body.BundleID = cfg.BundleID
 	body.ServerID = req.Body.ServerID
 
 	return &spec.MCPGetPromptResponse{Body: body}, nil
@@ -611,9 +623,11 @@ func (m *RuntimeManager) CallTool(
 		return nil, cfg, tool, fmt.Errorf("%w: tool call returned nil response", spec.ErrMCPRuntimeNotReady)
 	}
 
+	body.BundleID = cfg.BundleID
 	body.ServerID = req.ServerID
 	body.ToolName = req.ToolName
 	body.ProviderToolName = req.ProviderToolName
+	body.Provenance.BundleID = cfg.BundleID
 	body.Provenance.ServerID = req.ServerID
 	body.Provenance.ServerDisplayName = cfg.DisplayName
 	body.Provenance.ToolName = req.ToolName
@@ -656,6 +670,7 @@ func (m *RuntimeManager) CallToolDryRun(
 		tool.Stale = true
 	}
 	return &spec.InvokeMCPToolResponseBody{
+		BundleID:         cfg.BundleID,
 		ServerID:         req.ServerID,
 		ToolName:         req.ToolName,
 		ProviderToolName: req.ProviderToolName,
@@ -735,6 +750,7 @@ func (m *RuntimeManager) refreshFromNotification(
 		return
 	}
 
+	hydrateSnapshotIdentity(&snap, cfg.BundleID, serverID)
 	normalizeSnapshot(&snap)
 	if err := m.store.SaveLastKnownSnapshot(ctx, snap); err != nil {
 		slog.Warn("mcp: save notification-refreshed snapshot failed", "serverID", serverID, "err", err)
@@ -878,6 +894,7 @@ func (m *RuntimeManager) snapshotFromState(id spec.MCPServerID) *spec.MCPServerR
 		snapshotDigest = computeDiscoverySnapshotDigest(st.snapshot)
 	}
 	out := &spec.MCPServerRuntimeSnapshot{
+		BundleID:                  st.snapshot.BundleID,
 		ServerID:                  id,
 		Status:                    st.status,
 		LastError:                 st.lastError,
@@ -926,6 +943,34 @@ func mergeResolvedTransportAuth(dst *auth.ResolvedTransportAuth, src auth.Resolv
 	}
 	if src.Status.ServerID != "" {
 		dst.Status = src.Status
+	}
+}
+
+func hydrateSnapshotIdentity(
+	snap *spec.MCPDiscoverySnapshot,
+	bundleID bundleitemutils.BundleID,
+	serverID spec.MCPServerID,
+) {
+	if snap == nil {
+		return
+	}
+	snap.BundleID = bundleID
+	snap.ServerID = serverID
+	for i := range snap.Tools {
+		snap.Tools[i].BundleID = bundleID
+		snap.Tools[i].ServerID = serverID
+	}
+	for i := range snap.Resources {
+		snap.Resources[i].BundleID = bundleID
+		snap.Resources[i].ServerID = serverID
+	}
+	for i := range snap.ResourceTemplates {
+		snap.ResourceTemplates[i].BundleID = bundleID
+		snap.ResourceTemplates[i].ServerID = serverID
+	}
+	for i := range snap.Prompts {
+		snap.Prompts[i].BundleID = bundleID
+		snap.Prompts[i].ServerID = serverID
 	}
 }
 

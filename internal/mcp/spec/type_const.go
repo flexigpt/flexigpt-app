@@ -3,15 +3,17 @@ package spec
 import (
 	"errors"
 	"time"
+
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 )
 
 const (
-	MCPSchemaVersion = "2026-02-10"
+	MCPSchemaVersion = "2026-05-30"
 
-	MCPStoreFileName = "mcpservers.json"
-
-	DefaultConnectTimeoutMS = 30_000
-	DefaultRequestTimeoutMS = 60_000
+	MCPStoreFileName            = "mcpservers.json"
+	MCPBuiltInOverlayDBFileName = "mcpbuiltin.overlay.sqlite"
+	DefaultConnectTimeoutMS     = 30_000
+	DefaultRequestTimeoutMS     = 60_000
 
 	MaxMCPServerPageSize = 256
 	DefaultMCPPageSize   = 25
@@ -26,9 +28,21 @@ const (
 	DefaultInteractiveOAuthTimeout = 10 * time.Minute
 
 	NotificationRefreshDebounce = 1 * time.Second
+
+	BaseMCPBundleID          bundleitemutils.BundleID   = "019e785b-2b96-7ecc-a1c2-9b2bac90e08c"
+	BaseMCPBundleSlug        bundleitemutils.BundleSlug = "base"
+	BaseMCPBundleDisplayName                            = "Base MCP Servers"
+	BaseMCPBundleDescription                            = "Editable starter bundle for custom MCP servers."
 )
 
 var (
+	ErrMCPBundleNotFound         = errors.New("mcp bundle not found")
+	ErrMCPBundleDisabled         = errors.New("mcp bundle is disabled")
+	ErrMCPBundleDeleting         = errors.New("mcp bundle is being deleted")
+	ErrMCPBundleNotEmpty         = errors.New("mcp bundle still contains servers")
+	ErrMCPReservedBundleReadOnly = errors.New("reserved mcp bundle metadata is read-only")
+	ErrMCPBuiltInReadOnly        = errors.New("built-in mcp resource is read-only")
+
 	ErrMCPInvalidRequest  = errors.New("invalid mcp request")
 	ErrMCPConflict        = errors.New("mcp resource already exists")
 	ErrMCPServerNotFound  = errors.New("mcp server not found")
@@ -252,11 +266,21 @@ type MCPServerCapabilitiesSummary struct {
 }
 
 type MCPPageToken struct {
-	PageSize int           `json:"s"`
-	CursorID MCPServerID   `json:"id,omitempty"`
-	CursorAt string        `json:"t,omitempty"`
-	Enabled  *bool         `json:"e,omitempty"`
-	IDs      []MCPServerID `json:"ids,omitempty"`
+	PageSize        int                        `json:"s"`
+	CursorID        MCPServerID                `json:"id,omitempty"`
+	CursorAt        string                     `json:"t,omitempty"`
+	Enabled         *bool                      `json:"e,omitempty"`
+	IncludeDisabled bool                       `json:"d,omitempty"`
+	IDs             []MCPServerID              `json:"ids,omitempty"`
+	BundleIDs       []bundleitemutils.BundleID `json:"bids,omitempty"`
+}
+
+type MCPBundlePageToken struct {
+	BundleIDs       []bundleitemutils.BundleID `json:"ids,omitempty"`
+	IncludeDisabled bool                       `json:"d,omitempty"`
+	PageSize        int                        `json:"s"`
+	CursorMod       string                     `json:"t,omitempty"`
+	CursorID        bundleitemutils.BundleID   `json:"id,omitempty"`
 }
 
 type TimeRange struct {
@@ -265,7 +289,8 @@ type TimeRange struct {
 }
 
 type MCPOAuthAuthorization struct {
-	ServerID         MCPServerID `json:"serverID"`
-	AuthorizationURL string      `json:"authorizationURL"`
-	ExpiresAt        string      `json:"expiresAt,omitempty"`
+	BundleID         bundleitemutils.BundleID `json:"bundleID"`
+	ServerID         MCPServerID              `json:"serverID"`
+	AuthorizationURL string                   `json:"authorizationURL"`
+	ExpiresAt        string                   `json:"expiresAt,omitempty"`
 }

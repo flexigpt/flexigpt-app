@@ -187,9 +187,9 @@ func newRuntimeFixture(
 	t.Helper()
 
 	dir := t.TempDir()
-	st, err := store.NewStore(dir)
+	st, err := store.NewMCPStore(t.Context(), dir)
 	if err != nil {
-		t.Fatalf("NewStore: %v", err)
+		t.Fatalf("NewMCPStore: %v", err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
 
