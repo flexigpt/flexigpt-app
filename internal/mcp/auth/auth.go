@@ -186,7 +186,7 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 	out.Status.State = spec.MCPAuthStateRequired
 
 	if m.oauthBroker == nil || strings.TrimSpace(m.oauthRedirectURL) == "" {
-		out.Status.LastError = "OAuth authorization code flow is not configured"
+		out.Status.LastError = errStrOAuthNotConfigured
 		return fmt.Errorf("%w: %s", spec.ErrMCPAuthRequired, out.Status.LastError)
 	}
 

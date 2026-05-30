@@ -7,7 +7,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
-const toolDigestChangedReason = "tool digest changed"
+const (
+	toolDigestChangedReason = "tool digest changed"
+	toolPolicyDeniesReason  = "server/tool policy denies this tool"
+	policyAllowedReason     = "policy allowed"
+)
 
 type EvaluationInput struct {
 	Server spec.MCPServerConfig
@@ -51,7 +55,7 @@ func Evaluate(in EvaluationInput) spec.MCPApprovalEvaluation {
 	if rule == spec.MCPApprovalRuleDeny {
 		return spec.MCPApprovalEvaluation{
 			Decision: spec.MCPApprovalDecisionDenied,
-			Reason:   "server/tool policy denies this tool",
+			Reason:   toolPolicyDeniesReason,
 			Summary:  summary(in),
 		}
 	}
@@ -101,7 +105,7 @@ func Evaluate(in EvaluationInput) spec.MCPApprovalEvaluation {
 	}
 	return spec.MCPApprovalEvaluation{
 		Decision: spec.MCPApprovalDecisionAllowed,
-		Reason:   "policy allowed",
+		Reason:   policyAllowedReason,
 		Summary:  summary(in),
 	}
 }

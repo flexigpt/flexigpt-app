@@ -527,7 +527,7 @@ func appInfoFromMeta(meta mcpSDK.Meta) *spec.MCPToolAppInfo {
 
 	out.Visibility = stringSliceFromAny(ui["visibility"])
 	if len(out.Visibility) == 0 {
-		out.Visibility = []string{"model", "app"}
+		out.Visibility = []string{visibilityModel, visibilityApp}
 	}
 
 	return out
@@ -562,21 +562,21 @@ func taskSupportFromMeta(meta mcpSDK.Meta) spec.MCPTaskSupport {
 
 func completionReference(req spec.MCPCompleteArgumentRequestBody) (*mcpSDK.CompleteReference, error) {
 	switch strings.TrimSpace(strings.ToLower(req.RefType)) {
-	case "prompt", "ref/prompt":
+	case refTypePrompt, refTypeRefPrompt:
 		if strings.TrimSpace(req.Name) == "" {
 			return nil, fmt.Errorf("%w: completion prompt name required", spec.ErrMCPInvalidRequest)
 		}
 		return &mcpSDK.CompleteReference{
-			Type: "ref/prompt",
+			Type: refTypeRefPrompt,
 			Name: req.Name,
 		}, nil
 
-	case "resource", "ref/resource":
+	case refTypeResource, refTypeRefResource:
 		if strings.TrimSpace(req.Name) == "" {
 			return nil, fmt.Errorf("%w: completion resource uri required", spec.ErrMCPInvalidRequest)
 		}
 		return &mcpSDK.CompleteReference{
-			Type: "ref/resource",
+			Type: refTypeResource,
 			URI:  req.Name,
 		}, nil
 

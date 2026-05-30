@@ -346,7 +346,7 @@ func TestEvaluateAndExecutionMode(t *testing.T) {
 				server.DefaultPolicy.DefaultApprovalRule = deny
 			},
 			wantDecision: spec.MCPApprovalDecisionDenied,
-			wantReason:   "server/tool policy denies this tool",
+			wantReason:   toolPolicyDeniesReason,
 		},
 		{
 			name: "digest changed",
@@ -386,7 +386,7 @@ func TestEvaluateAndExecutionMode(t *testing.T) {
 				tool.InferredRisk = spec.MCPToolRiskRead
 			},
 			wantDecision: spec.MCPApprovalDecisionAllowed,
-			wantReason:   "policy allowed",
+			wantReason:   policyAllowedReason,
 		},
 	}
 

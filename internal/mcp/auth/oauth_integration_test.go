@@ -134,7 +134,7 @@ func (h *oauthHarness) serveAuthorizationServerMetadata(w http.ResponseWriter) {
 		"authorization_endpoint":   h.issuerURL() + "/authorize",
 		"token_endpoint":           h.issuerURL() + "/token",
 		"registration_endpoint":    h.issuerURL() + "/register",
-		"response_types_supported": []string{"code"},
+		"response_types_supported": []string{testResponseType},
 		"grant_types_supported": []string{
 			string(spec.GrantTypeAuthorizationCode),
 			string(spec.GrantTypeRefreshToken),
@@ -221,7 +221,7 @@ func (h *oauthHarness) serveToken(w http.ResponseWriter, r *http.Request) {
 
 	switch grantType {
 	case "authorization_code":
-		if r.Form.Get("code") != "test-code" {
+		if r.Form.Get(testResponseType) != "test-code" {
 			http.Error(w, "bad code", http.StatusBadRequest)
 			return
 		}

@@ -22,6 +22,12 @@ const (
 	defaultStdioTerminateDuration = 5 * time.Second
 	defaultHTTPMaxRetries         = 5
 	defaultClientKeepAlive        = 60 * time.Second
+	visibilityApp                 = "app"
+	visibilityModel               = "model"
+	refTypePrompt                 = "prompt"
+	refTypeRefPrompt              = "ref/prompt"
+	refTypeResource               = "resource"
+	refTypeRefResource            = "ref/resource"
 )
 
 type Factory struct {

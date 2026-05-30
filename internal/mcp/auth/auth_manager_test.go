@@ -1,7 +1,9 @@
 package auth
 
 import (
+	"context"
 	"errors"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -17,6 +19,7 @@ const (
 	testResolvedSecret       = "resolved-secret"
 	testStdIOServerID        = "stdio-server"
 	testHTTPServerID         = "http-server"
+	testResponseType         = "code"
 )
 
 func TestNormalizeHTTPAuthMode(t *testing.T) {
@@ -455,7 +458,7 @@ func TestPrepareTransportAuthErrorCases(t *testing.T) {
 				},
 			},
 			wantErrIs:       spec.ErrMCPAuthRequired,
-			wantErrContains: "OAuth authorization code flow is not configured",
+			wantErrContains: errStrOAuthNotConfigured,
 			wantStatus: spec.MCPAuthStatus{
 				ServerID: "oauth-server",
 				AuthMode: spec.MCPHTTPAuthOAuth,
@@ -543,4 +546,148 @@ func TestPrepareTransportAuthNilManager(t *testing.T) {
 	if got.Status.State != spec.MCPAuthStateNotRequired {
 		t.Fatalf("State = %q, want notRequired", got.Status.State)
 	}
+}
+
+type countingBroker struct {
+	calls int
+}
+
+func (b *countingBroker) FetchAuthorizationCode(
+	ctx context.Context,
+	req OAuthAuthorizationRequest,
+) (*OAuthAuthorizationResult, error) {
+	b.calls++
+	return &OAuthAuthorizationResult{
+		Code:  testResponseType,
+		State: "state",
+	}, nil
+}
+
+func TestAuthManagerOptionsAndUnsupportedAuthMode(t *testing.T) {
+	t.Run("options are applied and secrets default to static resolver", func(t *testing.T) {
+		client := &http.Client{}
+		mgr := NewAuthManager(nil,
+			WithOAuthRedirectURL("  https://example.test/callback  "),
+			WithAuthHTTPClient(client),
+		)
+
+		if mgr.oauthRedirectURL != "https://example.test/callback" {
+			t.Fatalf("oauthRedirectURL = %q, want trimmed URL", mgr.oauthRedirectURL)
+		}
+		if mgr.httpClient != client {
+			t.Fatalf("httpClient not applied")
+		}
+		if _, ok := mgr.secrets.(StaticSecretResolver); !ok {
+			t.Fatalf("default secret resolver is not StaticSecretResolver: %T", mgr.secrets)
+		}
+	})
+
+	t.Run("unsupported auth mode returns invalid request", func(t *testing.T) {
+		mgr := NewAuthManager(nil)
+
+		got, err := mgr.PrepareTransportAuth(t.Context(), spec.MCPServerConfig{
+			ID:        "server",
+			Transport: spec.MCPTransportStreamableHTTP,
+			StreamableHTTP: &spec.MCPStreamableHTTPConfig{
+				URL:      "https://example.test/mcp",
+				AuthMode: spec.MCPHTTPAuthMode("bogus"),
+			},
+		})
+		if err == nil {
+			t.Fatalf("PrepareTransportAuth succeeded, want error")
+		}
+		if !strings.Contains(err.Error(), "unsupported auth mode") {
+			t.Fatalf("err = %q, want unsupported auth mode", err.Error())
+		}
+		if got.Status.State != spec.MCPAuthStateError {
+			t.Fatalf("Status.State = %q, want error", got.Status.State)
+		}
+		if got.Status.LastError != "unsupported auth mode" {
+			t.Fatalf("Status.LastError = %q, want %q", got.Status.LastError, "unsupported auth mode")
+		}
+		if got.Status.AuthMode != spec.MCPHTTPAuthMode("bogus") {
+			t.Fatalf("Status.AuthMode = %q, want bogus", got.Status.AuthMode)
+		}
+	})
+
+	t.Run("oauth auth with blank redirect errors before broker use", func(t *testing.T) {
+		broker := &countingBroker{}
+		mgr := NewAuthManager(nil,
+			WithOAuthAuthorizationBroker(broker),
+			WithOAuthRedirectURL("   "),
+		)
+
+		got, err := mgr.PrepareTransportAuth(t.Context(), spec.MCPServerConfig{
+			ID:        "oauth-server",
+			Transport: spec.MCPTransportStreamableHTTP,
+			StreamableHTTP: &spec.MCPStreamableHTTPConfig{
+				URL:      "https://example.test/mcp",
+				AuthMode: spec.MCPHTTPAuthOAuth,
+			},
+		})
+		if err == nil {
+			t.Fatalf("PrepareTransportAuth succeeded, want error")
+		}
+		if !strings.Contains(err.Error(), errStrOAuthNotConfigured) {
+			t.Fatalf("err = %q, want oauth not configured", err.Error())
+		}
+		if broker.calls != 0 {
+			t.Fatalf("broker calls = %d, want 0", broker.calls)
+		}
+		if got.Status.State != spec.MCPAuthStateRequired {
+			t.Fatalf("Status.State = %q, want required", got.Status.State)
+		}
+		if got.Status.LastError != errStrOAuthNotConfigured {
+			t.Fatalf("Status.LastError = %q, want configured error", got.Status.LastError)
+		}
+	})
+
+	t.Run("client credentials success creates handler", func(t *testing.T) {
+		resolver := StaticSecretResolver{
+			"service-ref": `{"clientID":"service-client","clientSecret":"service-secret"}`,
+		}
+		mgr := NewAuthManager(resolver, WithAuthHTTPClient(&http.Client{}))
+
+		got, err := mgr.PrepareTransportAuth(t.Context(), spec.MCPServerConfig{
+			ID:        "cc-server",
+			Transport: spec.MCPTransportStreamableHTTP,
+			StreamableHTTP: &spec.MCPStreamableHTTPConfig{
+				URL:                 "https://example.test/mcp",
+				AuthMode:            spec.MCPHTTPAuthClientCredentials,
+				ClientCredentialRef: "service-ref",
+			},
+		})
+		if err != nil {
+			t.Fatalf("PrepareTransportAuth: %v", err)
+		}
+		if got.OAuthHandler == nil {
+			t.Fatalf("OAuthHandler is nil")
+		}
+		if len(got.SensitiveValues) != 2 {
+			t.Fatalf("SensitiveValues len = %d, want 2 (raw json + secret)", len(got.SensitiveValues))
+		}
+		if got.Status.State != spec.MCPAuthStateRequired {
+			t.Fatalf("Status.State = %q, want required", got.Status.State)
+		}
+		if got.Status.AuthMode != spec.MCPHTTPAuthClientCredentials {
+			t.Fatalf("Status.AuthMode = %q, want clientCredentials", got.Status.AuthMode)
+		}
+		if got.Status.Resource != "https://example.test/mcp" {
+			t.Fatalf("Status.Resource = %q, want resource URL", got.Status.Resource)
+		}
+	})
+
+	t.Run("nil auth manager still returns not required for nil transport", func(t *testing.T) {
+		var mgr *AuthManager
+
+		got, err := mgr.PrepareTransportAuth(t.Context(), spec.MCPServerConfig{
+			ID: "nil-manager",
+		})
+		if err != nil {
+			t.Fatalf("PrepareTransportAuth: %v", err)
+		}
+		if got.Status.State != spec.MCPAuthStateNotRequired {
+			t.Fatalf("Status.State = %q, want notRequired", got.Status.State)
+		}
+	})
 }

@@ -1,6 +1,6 @@
-import type { RoleEnum } from '@/spec/inference';
-
 export const SecretRefVersion = 'mcpv1';
+export const DefaultMCPPageSize = 25;
+export const MaxMCPServerPageSize = 256;
 
 export type MCPServerID = string;
 export type JSONRawString = string;
@@ -158,7 +158,7 @@ export interface MCPContent {
 }
 
 export interface MCPPromptMessage {
-	role: RoleEnum;
+	role: string;
 	content: MCPContent;
 }
 

@@ -17,6 +17,7 @@ const (
 	errStrInvalidGrant         = "invalid_grant"
 	errStrMissingStdIOConfig   = "missing stdio config"
 	errStrUnsupportedTransport = "unsupported transport"
+	errStrOAuthNotConfigured   = "OAuth authorization code flow is not configured"
 )
 
 // trackingTokenSource wraps an oauth2.TokenSource and pushes status updates to

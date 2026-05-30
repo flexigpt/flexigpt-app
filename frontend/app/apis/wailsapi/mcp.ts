@@ -1,27 +1,29 @@
-import type {
-	InvokeMCPToolRequestBody,
-	InvokeMCPToolResponseBody,
-	MCPApprovalEvaluation,
-	MCPApprovalResolution,
-	MCPApprovalToken,
-	MCPAuthHealth,
-	MCPAuthStatus,
-	MCPCompletionResult,
-	MCPGetPromptResponseBody,
-	MCPOAuthAuthorization,
-	MCPPromptRef,
-	MCPReadResourceResponseBody,
-	MCPRefType,
-	MCPResourceRef,
-	MCPResourceTemplateRef,
-	MCPSecretKind,
-	MCPServerConfig,
-	MCPServerID,
-	MCPServerRuntimeSnapshot,
-	MCPToolCapability,
-	PatchMCPServerPolicyPayload,
-	PutMCPServerPayload,
-	PutMCPServerSecretResponseBody,
+import {
+	DefaultMCPPageSize,
+	type InvokeMCPToolRequestBody,
+	type InvokeMCPToolResponseBody,
+	MaxMCPServerPageSize,
+	type MCPApprovalEvaluation,
+	type MCPApprovalResolution,
+	type MCPApprovalToken,
+	type MCPAuthHealth,
+	type MCPAuthStatus,
+	type MCPCompletionResult,
+	type MCPGetPromptResponseBody,
+	type MCPOAuthAuthorization,
+	type MCPPromptRef,
+	type MCPReadResourceResponseBody,
+	type MCPRefType,
+	type MCPResourceRef,
+	type MCPResourceTemplateRef,
+	type MCPSecretKind,
+	type MCPServerConfig,
+	type MCPServerID,
+	type MCPServerRuntimeSnapshot,
+	type MCPToolCapability,
+	type PatchMCPServerPolicyPayload,
+	type PutMCPServerPayload,
+	type PutMCPServerSecretResponseBody,
 } from '@/spec/mcp';
 
 import type { IMCPAPI } from '@/apis/interface';
@@ -55,6 +57,13 @@ import {
 } from '@/apis/wailsjs/go/main/MCPWrapper';
 import { type spec as wailsSpec } from '@/apis/wailsjs/go/models';
 
+function normalizeMCPPageSize(pageSize?: number): number {
+	if (typeof pageSize !== 'number' || !Number.isFinite(pageSize) || pageSize <= 0) {
+		return DefaultMCPPageSize;
+	}
+	return Math.min(pageSize, MaxMCPServerPageSize);
+}
+
 /**
  * @public
  *
@@ -70,7 +79,7 @@ export class WailsMCPAPI implements IMCPAPI {
 		const resp = await ListMCPServers({
 			ServerIDs: serverIDs,
 			Enabled: enabled,
-			PageSize: pageSize,
+			PageSize: normalizeMCPPageSize(pageSize),
 			PageToken: pageToken,
 		} as wailsSpec.ListMCPServersRequest);
 
@@ -161,7 +170,7 @@ export class WailsMCPAPI implements IMCPAPI {
 	): Promise<{ tools: MCPToolCapability[]; nextPageToken?: string }> {
 		const resp = await ListMCPServerTools({
 			ServerID: serverID,
-			PageSize: pageSize,
+			PageSize: normalizeMCPPageSize(pageSize),
 			PageToken: pageToken,
 		} as wailsSpec.ListMCPServerToolsRequest);
 
@@ -178,7 +187,7 @@ export class WailsMCPAPI implements IMCPAPI {
 	): Promise<{ resources: MCPResourceRef[]; nextPageToken?: string }> {
 		const resp = await ListMCPServerResources({
 			ServerID: serverID,
-			PageSize: pageSize,
+			PageSize: normalizeMCPPageSize(pageSize),
 			PageToken: pageToken,
 		} as wailsSpec.ListMCPServerResourcesRequest);
 
@@ -195,7 +204,7 @@ export class WailsMCPAPI implements IMCPAPI {
 	): Promise<{ resourceTemplates: MCPResourceTemplateRef[]; nextPageToken?: string }> {
 		const resp = await ListMCPServerResourceTemplates({
 			ServerID: serverID,
-			PageSize: pageSize,
+			PageSize: normalizeMCPPageSize(pageSize),
 			PageToken: pageToken,
 		} as wailsSpec.ListMCPServerResourceTemplatesRequest);
 
@@ -212,7 +221,7 @@ export class WailsMCPAPI implements IMCPAPI {
 	): Promise<{ prompts: MCPPromptRef[]; nextPageToken?: string }> {
 		const resp = await ListMCPServerPrompts({
 			ServerID: serverID,
-			PageSize: pageSize,
+			PageSize: normalizeMCPPageSize(pageSize),
 			PageToken: pageToken,
 		} as wailsSpec.ListMCPServerPromptsRequest);
 

@@ -16,6 +16,7 @@ const (
 	maxMCPDisplayNameLen = 256
 	maxMCPCommandLen     = 4096
 	maxMCPURLLen         = 4096
+	commandBash          = "bash"
 )
 
 func validateServerConfig(c *spec.MCPServerConfig) error {
@@ -120,7 +121,7 @@ func validateStdioConfig(serverID spec.MCPServerID, c *spec.MCPStdioConfig) erro
 	}
 
 	base := strings.ToLower(filepath.Base(c.Command))
-	if base == "sh" || base == "bash" || base == "zsh" || base == "cmd" ||
+	if base == commandBash || base == "sh" || base == "zsh" || base == "cmd" ||
 		base == "cmd.exe" || base == "powershell" || base == "powershell.exe" ||
 		base == "pwsh" || base == "pwsh.exe" {
 		return errors.New("stdio.command must execute the server directly, not through a shell")

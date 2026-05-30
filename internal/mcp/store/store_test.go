@@ -295,7 +295,7 @@ func TestStoreRejectsInvalidConfigs(t *testing.T) {
 					Enabled:     true,
 					Transport:   spec.MCPTransportStdio,
 					Stdio: &spec.MCPStdioConfig{
-						Command: "bash",
+						Command: commandBash,
 					},
 				}
 			},
