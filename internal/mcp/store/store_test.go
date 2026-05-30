@@ -5,9 +5,25 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/secret"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
+
+func putTestBundle(t *testing.T, st *Store, bundleID bundleitemutils.BundleID, displayName string) {
+	t.Helper()
+	if _, err := st.PutMCPBundle(t.Context(), &spec.PutMCPBundleRequest{
+		BundleID: bundleID,
+		Body: &spec.PutMCPBundleRequestBody{
+			Slug:        bundleitemutils.BundleSlug(bundleID),
+			DisplayName: displayName,
+			IsEnabled:   true,
+			Description: displayName + " bundle",
+		},
+	}); err != nil {
+		t.Fatalf("PutMCPBundle(%s): %v", bundleID, err)
+	}
+}
 
 func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 	ctx := t.Context()
@@ -18,6 +34,9 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 		t.Fatalf("NewMCPStore: %v", err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
+
+	bundleID := bundleitemutils.BundleID("bundle-a")
+	putTestBundle(t, st, bundleID, "Bundle A")
 
 	alphaPolicy := spec.MCPServerPolicy{
 		DefaultApprovalRule:  spec.MCPApprovalRuleAllow,
@@ -36,7 +55,7 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 	}
 
 	betaID := spec.MCPServerID("beta")
-	betaSecretRef, err := secret.NewMCPSecretRefString(betaID, spec.MCPSecretKindStdioEnv, "TOKEN")
+	betaSecretRef, err := secret.NewMCPSecretRefString(bundleID, betaID, spec.MCPSecretKindStdioEnv, "TOKEN")
 	if err != nil {
 		t.Fatalf("NewMCPSecretRefString: %v", err)
 	}
@@ -56,19 +75,21 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 	}
 
 	if _, err := st.PutMCPServer(ctx, &spec.PutMCPServerRequest{
+		BundleID: bundleID,
 		ServerID: alphaID,
 		Body:     alphaPayload,
 	}); err != nil {
 		t.Fatalf("PutMCPServer(alpha): %v", err)
 	}
 	if _, err := st.PutMCPServer(ctx, &spec.PutMCPServerRequest{
+		BundleID: bundleID,
 		ServerID: betaID,
 		Body:     betaPayload,
 	}); err != nil {
 		t.Fatalf("PutMCPServer(beta): %v", err)
 	}
 
-	gotAlpha, err := st.GetMCPServer(ctx, &spec.GetMCPServerRequest{ServerID: alphaID})
+	gotAlpha, err := st.GetMCPServer(ctx, &spec.GetMCPServerRequest{BundleID: bundleID, ServerID: alphaID})
 	if err != nil {
 		t.Fatalf("GetMCPServer(alpha): %v", err)
 	}
@@ -89,7 +110,7 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 	if gotAlpha.Body.StreamableHTTP != nil {
 		gotAlpha.Body.StreamableHTTP.URL = "mutated"
 	}
-	gotAlpha2, err := st.GetMCPServer(ctx, &spec.GetMCPServerRequest{ServerID: alphaID})
+	gotAlpha2, err := st.GetMCPServer(ctx, &spec.GetMCPServerRequest{BundleID: bundleID, ServerID: alphaID})
 	if err != nil {
 		t.Fatalf("GetMCPServer(alpha #2): %v", err)
 	}
@@ -101,6 +122,7 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 	}
 
 	if _, err := st.PatchMCPServerPolicy(ctx, &spec.PatchMCPServerPolicyRequest{
+		BundleID: bundleID,
 		ServerID: alphaID,
 		Body: &spec.PatchMCPServerPolicyPayload{
 			DefaultPolicy: &spec.MCPServerPolicy{
@@ -113,14 +135,17 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 	}
 
 	if _, err := st.PatchMCPServerEnabled(ctx, &spec.PatchMCPServerEnabledRequest{
+		BundleID: bundleID,
 		ServerID: betaID,
 		Body:     &spec.PatchMCPServerEnabledRequestBody{Enabled: false},
 	}); err != nil {
 		t.Fatalf("PatchMCPServerEnabled(beta): %v", err)
 	}
 
+	enabled := true
 	enabledOnly, err := st.ListMCPServers(ctx, &spec.ListMCPServersRequest{
-		Enabled: new(true),
+		BundleID: bundleID,
+		Enabled:  &enabled,
 	})
 	if err != nil {
 		t.Fatalf("ListMCPServers(enabled=true): %v", err)
@@ -130,6 +155,7 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 	}
 
 	page1, err := st.ListMCPServers(ctx, &spec.ListMCPServersRequest{
+		BundleID: bundleID,
 		PageSize: 1,
 	})
 	if err != nil {
@@ -143,6 +169,7 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 	}
 
 	page2, err := st.ListMCPServers(ctx, &spec.ListMCPServersRequest{
+		BundleID:  bundleID,
 		PageToken: *page1.Body.NextPageToken,
 	})
 	if err != nil {
@@ -160,9 +187,11 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 	}
 
 	snap := spec.MCPDiscoverySnapshot{
+		BundleID: bundleID,
 		ServerID: alphaID,
 		Tools: []spec.MCPToolCapability{
 			{
+				BundleID:    bundleID,
 				ServerID:    alphaID,
 				ToolName:    "echo",
 				DisplayName: "Echo",
@@ -173,7 +202,7 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 	if err := st.SaveLastKnownSnapshot(ctx, snap); err != nil {
 		t.Fatalf("SaveLastKnownSnapshot(alpha): %v", err)
 	}
-	gotSnap, ok, err := st.GetLastKnownSnapshot(ctx, alphaID)
+	gotSnap, ok, err := st.GetLastKnownSnapshot(ctx, bundleID, alphaID)
 	if err != nil {
 		t.Fatalf("GetLastKnownSnapshot(alpha): %v", err)
 	}
@@ -184,7 +213,7 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 		t.Fatalf("snapshot = %#v", gotSnap.Tools)
 	}
 	gotSnap.Tools[0].ToolName = "mutated"
-	gotSnap2, ok, err := st.GetLastKnownSnapshot(ctx, alphaID)
+	gotSnap2, ok, err := st.GetLastKnownSnapshot(ctx, bundleID, alphaID)
 	if err != nil {
 		t.Fatalf("GetLastKnownSnapshot(alpha #2): %v", err)
 	}
@@ -205,7 +234,7 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = st2.Close() })
 
-	reAlpha, err := st2.GetMCPServer(ctx, &spec.GetMCPServerRequest{ServerID: alphaID})
+	reAlpha, err := st2.GetMCPServer(ctx, &spec.GetMCPServerRequest{BundleID: bundleID, ServerID: alphaID})
 	if err != nil {
 		t.Fatalf("GetMCPServer(alpha reopen): %v", err)
 	}
@@ -214,7 +243,7 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 		t.Fatalf("patched policy not persisted: %#v", reAlpha.Body.DefaultPolicy)
 	}
 
-	reBeta, err := st2.GetMCPServer(ctx, &spec.GetMCPServerRequest{ServerID: betaID})
+	reBeta, err := st2.GetMCPServer(ctx, &spec.GetMCPServerRequest{BundleID: bundleID, ServerID: betaID})
 	if err != nil {
 		t.Fatalf("GetMCPServer(beta reopen): %v", err)
 	}
@@ -222,7 +251,7 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 		t.Fatalf("beta Enabled = true, want false")
 	}
 
-	reSnap, ok, err := st2.GetLastKnownSnapshot(ctx, alphaID)
+	reSnap, ok, err := st2.GetLastKnownSnapshot(ctx, bundleID, alphaID)
 	if err != nil {
 		t.Fatalf("GetLastKnownSnapshot(alpha reopen): %v", err)
 	}
@@ -233,12 +262,15 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 		t.Fatalf("snapshot not persisted: %#v", reSnap.Tools)
 	}
 
-	if _, err := st2.DeleteMCPServer(ctx, &spec.DeleteMCPServerRequest{ServerID: alphaID}); err != nil {
+	if _, err := st2.DeleteMCPServer(
+		ctx,
+		&spec.DeleteMCPServerRequest{BundleID: bundleID, ServerID: alphaID},
+	); err != nil {
 		t.Fatalf("DeleteMCPServer(alpha): %v", err)
 	}
 	if _, err := st2.GetMCPServer(
 		ctx,
-		&spec.GetMCPServerRequest{ServerID: alphaID},
+		&spec.GetMCPServerRequest{BundleID: bundleID, ServerID: alphaID},
 	); !errors.Is(
 		err,
 		spec.ErrMCPServerDeleting,
@@ -246,6 +278,7 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 		t.Fatalf("GetMCPServer(alpha deleted) error = %v, want ErrMCPServerDeleting", err)
 	}
 	deleted, err := st2.GetMCPServer(ctx, &spec.GetMCPServerRequest{
+		BundleID:       bundleID,
 		ServerID:       alphaID,
 		IncludeDeleted: true,
 	})
@@ -255,13 +288,13 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 	if deleted.Body.SoftDeletedAt == nil {
 		t.Fatalf("deleted server SoftDeletedAt is nil")
 	}
-	if _, ok, err := st2.GetLastKnownSnapshot(ctx, alphaID); err != nil {
+	if _, ok, err := st2.GetLastKnownSnapshot(ctx, bundleID, alphaID); err != nil {
 		t.Fatalf("GetLastKnownSnapshot(alpha deleted): %v", err)
 	} else if ok {
 		t.Fatalf("snapshot still present after delete")
 	}
 
-	listAfterDelete, err := st2.ListMCPServers(ctx, &spec.ListMCPServersRequest{})
+	listAfterDelete, err := st2.ListMCPServers(ctx, &spec.ListMCPServersRequest{BundleID: bundleID})
 	if err != nil {
 		t.Fatalf("ListMCPServers(after delete): %v", err)
 	}
@@ -273,12 +306,12 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 func TestStoreRejectsInvalidConfigs(t *testing.T) {
 	tests := []struct {
 		name string
-		make func(id spec.MCPServerID) *spec.PutMCPServerPayload
+		make func(bundleID bundleitemutils.BundleID, id spec.MCPServerID) *spec.PutMCPServerPayload
 		want string
 	}{
 		{
 			name: "stdio missing config",
-			make: func(id spec.MCPServerID) *spec.PutMCPServerPayload {
+			make: func(bundleID bundleitemutils.BundleID, id spec.MCPServerID) *spec.PutMCPServerPayload {
 				return &spec.PutMCPServerPayload{
 					DisplayName: "Server",
 					Enabled:     true,
@@ -289,7 +322,7 @@ func TestStoreRejectsInvalidConfigs(t *testing.T) {
 		},
 		{
 			name: "stdio shell command",
-			make: func(id spec.MCPServerID) *spec.PutMCPServerPayload {
+			make: func(bundleID bundleitemutils.BundleID, id spec.MCPServerID) *spec.PutMCPServerPayload {
 				return &spec.PutMCPServerPayload{
 					DisplayName: "Server",
 					Enabled:     true,
@@ -303,8 +336,8 @@ func TestStoreRejectsInvalidConfigs(t *testing.T) {
 		},
 		{
 			name: "stdio env overlap",
-			make: func(id spec.MCPServerID) *spec.PutMCPServerPayload {
-				ref, err := secret.NewMCPSecretRefString(id, spec.MCPSecretKindStdioEnv, "TOKEN")
+			make: func(bundleID bundleitemutils.BundleID, id spec.MCPServerID) *spec.PutMCPServerPayload {
+				ref, err := secret.NewMCPSecretRefString(bundleID, id, spec.MCPSecretKindStdioEnv, "TOKEN")
 				if err != nil {
 					t.Fatalf("NewMCPSecretRefString: %v", err)
 				}
@@ -327,7 +360,7 @@ func TestStoreRejectsInvalidConfigs(t *testing.T) {
 		},
 		{
 			name: "http userinfo",
-			make: func(id spec.MCPServerID) *spec.PutMCPServerPayload {
+			make: func(bundleID bundleitemutils.BundleID, id spec.MCPServerID) *spec.PutMCPServerPayload {
 				return &spec.PutMCPServerPayload{
 					DisplayName: "Server",
 					Enabled:     true,
@@ -342,7 +375,7 @@ func TestStoreRejectsInvalidConfigs(t *testing.T) {
 		},
 		{
 			name: "client credentials missing ref",
-			make: func(id spec.MCPServerID) *spec.PutMCPServerPayload {
+			make: func(bundleID bundleitemutils.BundleID, id spec.MCPServerID) *spec.PutMCPServerPayload {
 				return &spec.PutMCPServerPayload{
 					DisplayName: "Server",
 					Enabled:     true,
@@ -357,8 +390,9 @@ func TestStoreRejectsInvalidConfigs(t *testing.T) {
 		},
 		{
 			name: "stdio wrong secret ref kind",
-			make: func(id spec.MCPServerID) *spec.PutMCPServerPayload {
+			make: func(bundleID bundleitemutils.BundleID, id spec.MCPServerID) *spec.PutMCPServerPayload {
 				ref, err := secret.NewMCPSecretRefString(
+					bundleID,
 					id,
 					spec.MCPSecretKindOAuthClientCredentials,
 					"clientCredentials",
@@ -390,10 +424,14 @@ func TestStoreRejectsInvalidConfigs(t *testing.T) {
 			}
 			t.Cleanup(func() { _ = st.Close() })
 
+			bundleID := bundleitemutils.BundleID("bundle-a")
+			putTestBundle(t, st, bundleID, "Bundle A")
+
 			id := spec.MCPServerID("server")
 			_, err = st.PutMCPServer(t.Context(), &spec.PutMCPServerRequest{
+				BundleID: bundleID,
 				ServerID: id,
-				Body:     tt.make(id),
+				Body:     tt.make(bundleID, id),
 			})
 			if err == nil {
 				t.Fatalf("PutMCPServer succeeded, want error containing %q", tt.want)
@@ -405,6 +443,144 @@ func TestStoreRejectsInvalidConfigs(t *testing.T) {
 	}
 }
 
+func TestStoreRequiresBundleIDForServerOps(t *testing.T) {
+	st, err := NewMCPStore(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatalf("NewMCPStore: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+
+	_, err = st.PutMCPServer(t.Context(), &spec.PutMCPServerRequest{
+		ServerID: "server",
+		Body: &spec.PutMCPServerPayload{
+			DisplayName: "Server",
+			Enabled:     true,
+			Transport:   spec.MCPTransportStreamableHTTP,
+			StreamableHTTP: &spec.MCPStreamableHTTPConfig{
+				URL:      "https://example.test/mcp",
+				AuthMode: spec.MCPHTTPAuthNone,
+			},
+		},
+	})
+	if !errors.Is(err, spec.ErrMCPInvalidRequest) {
+		t.Fatalf("PutMCPServer missing bundleID error = %v, want ErrMCPInvalidRequest", err)
+	}
+}
+
+func TestStoreRejectsDuplicateServerIDsAcrossBundles(t *testing.T) {
+	st, err := NewMCPStore(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatalf("NewMCPStore: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+
+	bundleA := bundleitemutils.BundleID("bundle-a")
+	bundleB := bundleitemutils.BundleID("bundle-b")
+	putTestBundle(t, st, bundleA, "Bundle A")
+	putTestBundle(t, st, bundleB, "Bundle B")
+
+	serverID := spec.MCPServerID("shared-server")
+	payload := &spec.PutMCPServerPayload{
+		DisplayName: "HTTP Server",
+		Enabled:     true,
+		Transport:   spec.MCPTransportStreamableHTTP,
+		StreamableHTTP: &spec.MCPStreamableHTTPConfig{
+			URL:      "http://127.0.0.1:1234/mcp",
+			AuthMode: spec.MCPHTTPAuthNone,
+		},
+	}
+
+	if _, err := st.PutMCPServer(t.Context(), &spec.PutMCPServerRequest{
+		BundleID: bundleA,
+		ServerID: serverID,
+		Body:     payload,
+	}); err != nil {
+		t.Fatalf("PutMCPServer(bundleA): %v", err)
+	}
+
+	_, err = st.PutMCPServer(t.Context(), &spec.PutMCPServerRequest{
+		BundleID: bundleB,
+		ServerID: serverID,
+		Body:     payload,
+	})
+	if !errors.Is(err, spec.ErrMCPConflict) {
+		t.Fatalf("PutMCPServer(bundleB duplicate) error = %v, want ErrMCPConflict", err)
+	}
+}
+
+func TestStoreRejectsPutOnDeletedBundle(t *testing.T) {
+	st, err := NewMCPStore(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatalf("NewMCPStore: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+
+	bundleID := bundleitemutils.BundleID("bundle-a")
+	putTestBundle(t, st, bundleID, "Bundle A")
+
+	if _, err := st.DeleteMCPBundle(t.Context(), &spec.DeleteMCPBundleRequest{BundleID: bundleID}); err != nil {
+		t.Fatalf("DeleteMCPBundle: %v", err)
+	}
+
+	_, err = st.PutMCPBundle(t.Context(), &spec.PutMCPBundleRequest{
+		BundleID: bundleID,
+		Body: &spec.PutMCPBundleRequestBody{
+			Slug:        bundleitemutils.BundleSlug(bundleID),
+			DisplayName: "Bundle A",
+			IsEnabled:   true,
+		},
+	})
+	if !errors.Is(err, spec.ErrMCPBundleDeleting) {
+		t.Fatalf("PutMCPBundle(after delete) error = %v, want ErrMCPBundleDeleting", err)
+	}
+}
+
+func TestStoreRejectsPutOnDeletedServer(t *testing.T) {
+	st, err := NewMCPStore(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatalf("NewMCPStore: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+
+	bundleID := bundleitemutils.BundleID("bundle-a")
+	putTestBundle(t, st, bundleID, "Bundle A")
+
+	serverID := spec.MCPServerID("server")
+	payload := &spec.PutMCPServerPayload{
+		DisplayName: "HTTP Server",
+		Enabled:     true,
+		Transport:   spec.MCPTransportStreamableHTTP,
+		StreamableHTTP: &spec.MCPStreamableHTTPConfig{
+			URL:      "http://127.0.0.1:1234/mcp",
+			AuthMode: spec.MCPHTTPAuthNone,
+		},
+	}
+
+	if _, err := st.PutMCPServer(t.Context(), &spec.PutMCPServerRequest{
+		BundleID: bundleID,
+		ServerID: serverID,
+		Body:     payload,
+	}); err != nil {
+		t.Fatalf("PutMCPServer: %v", err)
+	}
+
+	if _, err := st.DeleteMCPServer(t.Context(), &spec.DeleteMCPServerRequest{
+		BundleID: bundleID,
+		ServerID: serverID,
+	}); err != nil {
+		t.Fatalf("DeleteMCPServer: %v", err)
+	}
+
+	_, err = st.PutMCPServer(t.Context(), &spec.PutMCPServerRequest{
+		BundleID: bundleID,
+		ServerID: serverID,
+		Body:     payload,
+	})
+	if !errors.Is(err, spec.ErrMCPServerDeleting) {
+		t.Fatalf("PutMCPServer(after delete) error = %v, want ErrMCPServerDeleting", err)
+	}
+}
+
 func TestStoreRejectsBadPageToken(t *testing.T) {
 	st, err := NewMCPStore(t.Context(), t.TempDir())
 	if err != nil {
@@ -413,6 +589,7 @@ func TestStoreRejectsBadPageToken(t *testing.T) {
 	t.Cleanup(func() { _ = st.Close() })
 
 	if _, err := st.ListMCPServers(t.Context(), &spec.ListMCPServersRequest{
+		BundleID:  spec.BaseMCPBundleID,
 		PageToken: "not-a-token",
 	}); !errors.Is(err, spec.ErrMCPInvalidRequest) {
 		t.Fatalf("ListMCPServers(bad token) error = %v, want ErrMCPInvalidRequest", err)

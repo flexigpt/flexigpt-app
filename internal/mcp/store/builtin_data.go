@@ -157,8 +157,11 @@ func (d *BuiltInData) GetBuiltInBundle(
 	ctx context.Context,
 	id bundleitemutils.BundleID,
 ) (spec.MCPBundle, error) {
-	if d == nil || id == "" {
-		return spec.MCPBundle{}, fmt.Errorf("%w: %s", spec.ErrMCPBundleNotFound, id)
+	if d == nil {
+		return spec.MCPBundle{}, fmt.Errorf("%w: built-in data unavailable", spec.ErrMCPBundleNotFound)
+	}
+	if err := requireMCPBundleID(id); err != nil {
+		return spec.MCPBundle{}, err
 	}
 	d.mu.RLock()
 	defer d.mu.RUnlock()
@@ -175,8 +178,11 @@ func (d *BuiltInData) GetBuiltInServer(
 	bundleID bundleitemutils.BundleID,
 	serverID spec.MCPServerID,
 ) (spec.MCPServerConfig, error) {
-	if d == nil || bundleID == "" || serverID == "" {
-		return spec.MCPServerConfig{}, fmt.Errorf("%w: %s", spec.ErrMCPServerNotFound, serverID)
+	if d == nil {
+		return spec.MCPServerConfig{}, fmt.Errorf("%w: built-in data unavailable", spec.ErrMCPServerNotFound)
+	}
+	if err := requireMCPBundleServerIDs(bundleID, serverID); err != nil {
+		return spec.MCPServerConfig{}, err
 	}
 
 	d.mu.RLock()
@@ -194,8 +200,11 @@ func (d *BuiltInData) FindBuiltInServerByID(
 	ctx context.Context,
 	serverID spec.MCPServerID,
 ) (spec.MCPServerConfig, error) {
-	if d == nil || serverID == "" {
-		return spec.MCPServerConfig{}, fmt.Errorf("%w: %s", spec.ErrMCPServerNotFound, serverID)
+	if d == nil {
+		return spec.MCPServerConfig{}, fmt.Errorf("%w: built-in data unavailable", spec.ErrMCPServerNotFound)
+	}
+	if serverID == "" {
+		return spec.MCPServerConfig{}, fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
 	}
 
 	d.mu.RLock()
@@ -216,6 +225,9 @@ func (d *BuiltInData) SetBundleEnabled(
 ) (spec.MCPBundle, error) {
 	if d == nil {
 		return spec.MCPBundle{}, fmt.Errorf("%w: built-in data unavailable", spec.ErrMCPBundleNotFound)
+	}
+	if err := requireMCPBundleID(id); err != nil {
+		return spec.MCPBundle{}, err
 	}
 	if _, ok := d.bundles[id]; !ok {
 		return spec.MCPBundle{}, fmt.Errorf("%w: %s", spec.ErrMCPBundleNotFound, id)
@@ -249,13 +261,11 @@ func (d *BuiltInData) SetServerEnabled(
 	if d == nil {
 		return spec.MCPServerConfig{}, fmt.Errorf("%w: built-in data unavailable", spec.ErrMCPServerNotFound)
 	}
-
-	if bundleID == "" {
-		return spec.MCPServerConfig{}, fmt.Errorf("%w: bundleID required", spec.ErrMCPInvalidRequest)
+	if err := requireMCPBundleServerIDs(bundleID, serverID); err != nil {
+		return spec.MCPServerConfig{}, err
 	}
-
-	if d.servers[bundleID] == nil {
-		return spec.MCPServerConfig{}, fmt.Errorf("%w: %s", spec.ErrMCPServerNotFound, serverID)
+	if _, ok := d.servers[bundleID]; !ok {
+		return spec.MCPServerConfig{}, fmt.Errorf("%w: %s", spec.ErrMCPBundleNotFound, bundleID)
 	}
 	if _, ok := d.servers[bundleID][serverID]; !ok {
 		return spec.MCPServerConfig{}, fmt.Errorf("%w: %s", spec.ErrMCPServerNotFound, serverID)

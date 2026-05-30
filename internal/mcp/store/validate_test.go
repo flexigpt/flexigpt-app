@@ -5,14 +5,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/secret"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 func TestValidateServerConfigBranches(t *testing.T) {
+	bundleID := bundleitemutils.BundleID("bundle-a")
+
 	baseHTTP := func() spec.MCPServerConfig {
 		return spec.MCPServerConfig{
 			SchemaVersion: spec.MCPSchemaVersion,
+			BundleID:      bundleID,
 			ID:            "server-a",
 			DisplayName:   "Server A",
 			Enabled:       true,
@@ -30,6 +34,7 @@ func TestValidateServerConfigBranches(t *testing.T) {
 	baseStdio := func() spec.MCPServerConfig {
 		return spec.MCPServerConfig{
 			SchemaVersion: spec.MCPSchemaVersion,
+			BundleID:      bundleID,
 			ID:            "server-b",
 			DisplayName:   "Server B",
 			Enabled:       true,
@@ -61,8 +66,13 @@ func TestValidateServerConfigBranches(t *testing.T) {
 			wantErrContains: "schemaVersion",
 		},
 		{
+			name:            "blank bundle id",
+			cfg:             func() spec.MCPServerConfig { c := baseHTTP(); c.BundleID = ""; return c }(),
+			wantErrContains: "bundleID is empty",
+		},
+		{
 			name:            "blank id",
-			cfg:             func() spec.MCPServerConfig { c := baseHTTP(); c.ID = " "; return c }(),
+			cfg:             func() spec.MCPServerConfig { c := baseHTTP(); c.ID = ""; return c }(),
 			wantErrContains: "id must match",
 		},
 		{
@@ -209,9 +219,11 @@ func TestValidateServerConfigBranches(t *testing.T) {
 }
 
 func TestValidateStdioAndHTTPHelpers(t *testing.T) {
+	bundleID := bundleitemutils.BundleID("bundle-a")
+
 	t.Run("stdio validation branches", func(t *testing.T) {
 		serverID := spec.MCPServerID("server-stdio")
-		validRef, err := secret.NewMCPSecretRefString(serverID, spec.MCPSecretKindStdioEnv, "TOKEN")
+		validRef, err := secret.NewMCPSecretRefString(bundleID, serverID, spec.MCPSecretKindStdioEnv, "TOKEN")
 		if err != nil {
 			t.Fatalf("NewMCPSecretRefString: %v", err)
 		}
@@ -284,7 +296,7 @@ func TestValidateStdioAndHTTPHelpers(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				err := validateStdioConfig(serverID, tt.cfg)
+				err := validateStdioConfig(bundleID, serverID, tt.cfg)
 				if tt.wantErrContains != "" {
 					if err == nil {
 						t.Fatalf("validateStdioConfig succeeded, want error containing %q", tt.wantErrContains)
@@ -304,6 +316,7 @@ func TestValidateStdioAndHTTPHelpers(t *testing.T) {
 	t.Run("HTTP validation branches", func(t *testing.T) {
 		serverID := spec.MCPServerID("server-http")
 		clientRef, err := secret.NewMCPSecretRefString(
+			bundleID,
 			serverID,
 			spec.MCPSecretKindOAuthClientCredentials,
 			"clientCredentials",
@@ -402,7 +415,7 @@ func TestValidateStdioAndHTTPHelpers(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				err := validateHTTPConfig(serverID, tt.cfg)
+				err := validateHTTPConfig(bundleID, serverID, tt.cfg)
 				if tt.wantErrContains != "" {
 					if err == nil {
 						t.Fatalf("validateHTTPConfig succeeded, want error containing %q", tt.wantErrContains)
