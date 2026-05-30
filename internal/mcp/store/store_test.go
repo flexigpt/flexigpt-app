@@ -155,8 +155,9 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 	}
 
 	page1, err := st.ListMCPServers(ctx, &spec.ListMCPServersRequest{
-		BundleID: bundleID,
-		PageSize: 1,
+		BundleID:        bundleID,
+		IncludeDisabled: true,
+		PageSize:        1,
 	})
 	if err != nil {
 		t.Fatalf("ListMCPServers(page1): %v", err)
@@ -169,8 +170,9 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 	}
 
 	page2, err := st.ListMCPServers(ctx, &spec.ListMCPServersRequest{
-		BundleID:  bundleID,
-		PageToken: *page1.Body.NextPageToken,
+		BundleID:        bundleID,
+		IncludeDisabled: true,
+		PageToken:       *page1.Body.NextPageToken,
 	})
 	if err != nil {
 		t.Fatalf("ListMCPServers(page2): %v", err)
@@ -294,7 +296,10 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 		t.Fatalf("snapshot still present after delete")
 	}
 
-	listAfterDelete, err := st2.ListMCPServers(ctx, &spec.ListMCPServersRequest{BundleID: bundleID})
+	listAfterDelete, err := st2.ListMCPServers(
+		ctx,
+		&spec.ListMCPServersRequest{BundleID: bundleID, IncludeDisabled: true},
+	)
 	if err != nil {
 		t.Fatalf("ListMCPServers(after delete): %v", err)
 	}
