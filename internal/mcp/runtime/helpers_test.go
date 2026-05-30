@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
@@ -335,12 +336,14 @@ func TestWithDefaultRequestTimeoutAndIdentifiers(t *testing.T) {
 	})
 
 	t.Run("paginateDiscoveryItems defaults and clamps page size", func(t *testing.T) {
+		bundleID := bundleitemutils.BundleID("bundle-a")
 		items := make([]int, 300)
 		for i := range items {
 			items[i] = i
 		}
 
 		out, next, err := paginateDiscoveryItems(
+			bundleID,
 			"server",
 			"digest",
 			discoveryPageKindTools,
@@ -359,6 +362,7 @@ func TestWithDefaultRequestTimeoutAndIdentifiers(t *testing.T) {
 		}
 
 		out2, next2, err := paginateDiscoveryItems(
+			bundleID,
 			"server",
 			"digest",
 			discoveryPageKindTools,

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
@@ -129,6 +130,19 @@ func TestRuntimeManagerEndToEndWithStreamableHTTP(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = st.Close() })
 
+	bundleID := bundleitemutils.BundleID("bundle-a")
+	if _, err := st.PutMCPBundle(ctx, &spec.PutMCPBundleRequest{
+		BundleID: bundleID,
+		Body: &spec.PutMCPBundleRequestBody{
+			Slug:        bundleitemutils.BundleSlug(bundleID),
+			DisplayName: "Integration Bundle",
+			IsEnabled:   true,
+			Description: "Integration bundle for end-to-end tests",
+		},
+	}); err != nil {
+		t.Fatalf("PutMCPBundle: %v", err)
+	}
+
 	policy := spec.MCPServerPolicy{
 		DefaultApprovalRule:  spec.MCPApprovalRuleAllow,
 		DefaultExecutionMode: spec.MCPExecutionModeManual,
@@ -136,6 +150,7 @@ func TestRuntimeManagerEndToEndWithStreamableHTTP(t *testing.T) {
 	serverID := spec.MCPServerID("integration-server")
 
 	if _, err := st.PutMCPServer(ctx, &spec.PutMCPServerRequest{
+		BundleID: bundleID,
 		ServerID: serverID,
 		Body: &spec.PutMCPServerPayload{
 			DisplayName: "Integration Server",
@@ -156,7 +171,7 @@ func TestRuntimeManagerEndToEndWithStreamableHTTP(t *testing.T) {
 	rm := runtime.NewRuntimeManager(st, authMgr, factory)
 	t.Cleanup(func() { _ = rm.Close(t.Context()) })
 
-	connectResp, err := rm.Connect(ctx, &spec.ConnectMCPServerRequest{ServerID: serverID})
+	connectResp, err := rm.Connect(ctx, &spec.ConnectMCPServerRequest{BundleID: bundleID, ServerID: serverID})
 	if err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
@@ -176,7 +191,7 @@ func TestRuntimeManagerEndToEndWithStreamableHTTP(t *testing.T) {
 		t.Fatalf("SnapshotDigest is empty")
 	}
 
-	stStatus, err := rm.Status(ctx, &spec.GetMCPServerStatusRequest{ServerID: serverID})
+	stStatus, err := rm.Status(ctx, &spec.GetMCPServerStatusRequest{BundleID: bundleID, ServerID: serverID})
 	if err != nil {
 		t.Fatalf("Status: %v", err)
 	}
@@ -184,7 +199,7 @@ func TestRuntimeManagerEndToEndWithStreamableHTTP(t *testing.T) {
 		t.Fatalf("Status = %q, want ready", stStatus.Body.Status)
 	}
 
-	authStatus, ok := authMgr.GetAuthStatus(serverID)
+	authStatus, ok := authMgr.GetAuthStatus(bundleID, serverID)
 	if !ok {
 		t.Fatalf("auth status missing")
 	}
@@ -197,6 +212,7 @@ func TestRuntimeManagerEndToEndWithStreamableHTTP(t *testing.T) {
 
 	t.Run("call tool", func(t *testing.T) {
 		toolsResp, err := rm.ListTools(ctx, &spec.ListMCPServerToolsRequest{
+			BundleID: bundleID,
 			ServerID: serverID,
 		})
 		if err != nil {
@@ -207,9 +223,8 @@ func TestRuntimeManagerEndToEndWithStreamableHTTP(t *testing.T) {
 		}
 		tool := toolsResp.Body.Tools[0]
 
-		body, cfg, returnedTool, err := rm.CallTool(ctx, spec.InvokeMCPToolRequestBody{
+		body, cfg, returnedTool, err := rm.CallTool(ctx, bundleID, serverID, spec.InvokeMCPToolRequestBody{
 			Source:           spec.MCPInvocationSourceUser,
-			ServerID:         serverID,
 			ToolName:         tool.ToolName,
 			ProviderToolName: tool.ProviderToolName,
 			ToolDigest:       tool.Digest,
@@ -243,9 +258,10 @@ func TestRuntimeManagerEndToEndWithStreamableHTTP(t *testing.T) {
 
 	t.Run("resource prompt and completion", func(t *testing.T) {
 		readResp, err := rm.ReadResource(ctx, &spec.MCPReadResourceRequest{
+			BundleID: bundleID,
+			ServerID: serverID,
 			Body: &spec.MCPReadResourceRequestBody{
-				ServerID: serverID,
-				URI:      "file:///demo",
+				URI: "file:///demo",
 			},
 		})
 		if err != nil {
@@ -258,8 +274,9 @@ func TestRuntimeManagerEndToEndWithStreamableHTTP(t *testing.T) {
 			t.Fatalf("ReadResource contents = %#v", readResp.Body.Contents[0])
 		}
 		promptResp, err := rm.GetPrompt(ctx, &spec.MCPGetPromptRequest{
+			BundleID: bundleID,
+			ServerID: serverID,
 			Body: &spec.MCPGetPromptRequestBody{
-				ServerID:   serverID,
 				PromptName: "greet",
 				Arguments: map[string]string{
 					"name": "world",
@@ -277,8 +294,9 @@ func TestRuntimeManagerEndToEndWithStreamableHTTP(t *testing.T) {
 		}
 
 		completeResp, err := rm.Complete(ctx, &spec.MCPCompleteArgumentRequest{
+			BundleID: bundleID,
+			ServerID: serverID,
 			Body: &spec.MCPCompleteArgumentRequestBody{
-				ServerID:      serverID,
 				RefType:       "prompt",
 				Name:          "greet",
 				ArgumentName:  "name",
@@ -299,7 +317,7 @@ func TestRuntimeManagerEndToEndWithStreamableHTTP(t *testing.T) {
 	t.Run("refresh after server change", func(t *testing.T) {
 		addTool("later", "later:ok", &state.laterCalls)
 
-		updated, err := rm.Refresh(ctx, &spec.RefreshMCPServerRequest{ServerID: serverID})
+		updated, err := rm.Refresh(ctx, &spec.RefreshMCPServerRequest{BundleID: bundleID, ServerID: serverID})
 		if err != nil {
 			t.Fatalf("Refresh: %v", err)
 		}
@@ -310,7 +328,7 @@ func TestRuntimeManagerEndToEndWithStreamableHTTP(t *testing.T) {
 			t.Fatalf("Refresh ToolCount = %d, want 2", updated.Body.ToolCount)
 		}
 
-		toolsResp, err := rm.ListTools(ctx, &spec.ListMCPServerToolsRequest{ServerID: serverID})
+		toolsResp, err := rm.ListTools(ctx, &spec.ListMCPServerToolsRequest{BundleID: bundleID, ServerID: serverID})
 		if err != nil {
 			t.Fatalf("ListTools after refresh: %v", err)
 		}
@@ -329,9 +347,8 @@ func TestRuntimeManagerEndToEndWithStreamableHTTP(t *testing.T) {
 			t.Fatalf("later tool not found")
 		}
 
-		body, _, _, err := rm.CallTool(ctx, spec.InvokeMCPToolRequestBody{
+		body, _, _, err := rm.CallTool(ctx, bundleID, serverID, spec.InvokeMCPToolRequestBody{
 			Source:           spec.MCPInvocationSourceUser,
-			ServerID:         serverID,
 			ToolName:         laterTool.ToolName,
 			ProviderToolName: laterTool.ProviderToolName,
 			ToolDigest:       laterTool.Digest,
@@ -352,17 +369,20 @@ func TestRuntimeManagerEndToEndWithStreamableHTTP(t *testing.T) {
 	})
 
 	t.Run("disconnect", func(t *testing.T) {
-		if _, err := rm.Disconnect(ctx, &spec.DisconnectMCPServerRequest{ServerID: serverID}); err != nil {
+		if _, err := rm.Disconnect(
+			ctx,
+			&spec.DisconnectMCPServerRequest{BundleID: bundleID, ServerID: serverID},
+		); err != nil {
 			t.Fatalf("Disconnect: %v", err)
 		}
-		stStatus, err := rm.Status(ctx, &spec.GetMCPServerStatusRequest{ServerID: serverID})
+		stStatus, err := rm.Status(ctx, &spec.GetMCPServerStatusRequest{BundleID: bundleID, ServerID: serverID})
 		if err != nil {
 			t.Fatalf("Status after disconnect: %v", err)
 		}
 		if stStatus.Body.Status != spec.MCPServerStatusDisconnected {
 			t.Fatalf("Status after disconnect = %q, want disconnected", stStatus.Body.Status)
 		}
-		if _, ok := authMgr.GetAuthStatus(serverID); ok {
+		if _, ok := authMgr.GetAuthStatus(bundleID, serverID); ok {
 			t.Fatalf("auth status still present after disconnect")
 		}
 	})

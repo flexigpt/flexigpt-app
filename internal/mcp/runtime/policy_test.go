@@ -4,14 +4,18 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 func TestEvaluationSummaryAndPolicyBranches(t *testing.T) {
+	bundleID := bundleitemutils.BundleID("bundle-a")
+
 	t.Run("summary canonicalizes request args", func(t *testing.T) {
 		in := EvaluationInput{
-			Server: spec.MCPServerConfig{ID: "server", DisplayName: "Server"},
+			Server: spec.MCPServerConfig{BundleID: bundleID, ID: "server", DisplayName: "Server"},
 			Tool: spec.MCPToolCapability{
+				BundleID:     bundleID,
 				ServerID:     "server",
 				ToolName:     "tool",
 				Digest:       "digest",
@@ -19,7 +23,6 @@ func TestEvaluationSummaryAndPolicyBranches(t *testing.T) {
 				InferredRisk: spec.MCPToolRiskRead,
 			},
 			Req: spec.InvokeMCPToolRequestBody{
-				ServerID:  "server",
 				ToolName:  "tool",
 				Arguments: map[string]any{"b": 2, "a": 1},
 			},
@@ -32,15 +35,16 @@ func TestEvaluationSummaryAndPolicyBranches(t *testing.T) {
 		if sum.Arguments != `{"a":1,"b":2}` {
 			t.Fatalf("Arguments = %q, want canonical JSON", sum.Arguments)
 		}
-		if sum.ServerID != "server" || sum.ToolName != "tool" {
+		if sum.BundleID != bundleID || sum.ServerID != "server" || sum.ToolName != "tool" {
 			t.Fatalf("summary = %#v", sum)
 		}
 	})
 
 	t.Run("summary uses empty object for nil args", func(t *testing.T) {
 		in := EvaluationInput{
-			Server: spec.MCPServerConfig{ID: "server"},
+			Server: spec.MCPServerConfig{BundleID: bundleID, ID: "server"},
 			Tool: spec.MCPToolCapability{
+				BundleID:     bundleID,
 				ServerID:     "server",
 				ToolName:     "tool",
 				Digest:       "digest",
@@ -48,7 +52,6 @@ func TestEvaluationSummaryAndPolicyBranches(t *testing.T) {
 				InferredRisk: spec.MCPToolRiskUnknown,
 			},
 			Req: spec.InvokeMCPToolRequestBody{
-				ServerID: "server",
 				ToolName: "tool",
 			},
 		}
@@ -69,7 +72,8 @@ func TestEvaluationSummaryAndPolicyBranches(t *testing.T) {
 		{
 			name: "write risk requires approval",
 			server: spec.MCPServerConfig{
-				ID: "server",
+				BundleID: bundleID,
+				ID:       "server",
 				DefaultPolicy: spec.MCPServerPolicy{
 					DefaultApprovalRule:     spec.MCPApprovalRuleAllow,
 					DefaultExecutionMode:    spec.MCPExecutionModeManual,
@@ -77,6 +81,7 @@ func TestEvaluationSummaryAndPolicyBranches(t *testing.T) {
 				},
 			},
 			tool: spec.MCPToolCapability{
+				BundleID:     bundleID,
 				ServerID:     "server",
 				ToolName:     "write-tool",
 				Digest:       "digest",
@@ -89,7 +94,8 @@ func TestEvaluationSummaryAndPolicyBranches(t *testing.T) {
 		{
 			name: "destructive risk requires approval",
 			server: spec.MCPServerConfig{
-				ID: "server",
+				BundleID: bundleID,
+				ID:       "server",
 				DefaultPolicy: spec.MCPServerPolicy{
 					DefaultApprovalRule:           spec.MCPApprovalRuleAllow,
 					DefaultExecutionMode:          spec.MCPExecutionModeManual,
@@ -97,6 +103,7 @@ func TestEvaluationSummaryAndPolicyBranches(t *testing.T) {
 				},
 			},
 			tool: spec.MCPToolCapability{
+				BundleID:     bundleID,
 				ServerID:     "server",
 				ToolName:     "delete-tool",
 				Digest:       "digest",
@@ -109,7 +116,8 @@ func TestEvaluationSummaryAndPolicyBranches(t *testing.T) {
 		{
 			name: "tool policy deny wins",
 			server: spec.MCPServerConfig{
-				ID: "server",
+				BundleID: bundleID,
+				ID:       "server",
 				DefaultPolicy: spec.MCPServerPolicy{
 					DefaultApprovalRule:  spec.MCPApprovalRuleAllow,
 					DefaultExecutionMode: spec.MCPExecutionModeManual,
@@ -125,6 +133,7 @@ func TestEvaluationSummaryAndPolicyBranches(t *testing.T) {
 				},
 			},
 			tool: spec.MCPToolCapability{
+				BundleID:     bundleID,
 				ServerID:     "server",
 				ToolName:     "tool",
 				Digest:       "digest",
@@ -137,7 +146,8 @@ func TestEvaluationSummaryAndPolicyBranches(t *testing.T) {
 		{
 			name: "allow stale digest avoids deny",
 			server: spec.MCPServerConfig{
-				ID: "server",
+				BundleID: bundleID,
+				ID:       "server",
 				DefaultPolicy: spec.MCPServerPolicy{
 					DefaultApprovalRule:  spec.MCPApprovalRuleAllow,
 					DefaultExecutionMode: spec.MCPExecutionModeManual,
@@ -151,6 +161,7 @@ func TestEvaluationSummaryAndPolicyBranches(t *testing.T) {
 				},
 			},
 			tool: spec.MCPToolCapability{
+				BundleID:     bundleID,
 				ServerID:     "server",
 				ToolName:     "tool",
 				Digest:       "current-digest",
@@ -169,7 +180,6 @@ func TestEvaluationSummaryAndPolicyBranches(t *testing.T) {
 				Tool:   tt.tool,
 				Req: spec.InvokeMCPToolRequestBody{
 					Source:   spec.MCPInvocationSourceUser,
-					ServerID: tt.server.ID,
 					ToolName: tt.tool.ToolName,
 				},
 			})
@@ -188,7 +198,9 @@ func TestEvaluationSummaryAndPolicyBranches(t *testing.T) {
 }
 
 func TestSummaryMatchesAndExecutionModeBranches(t *testing.T) {
+	bundleID := bundleitemutils.BundleID("bundle-a")
 	stored := spec.MCPApprovalSummary{
+		BundleID:   bundleID,
 		ServerID:   "server",
 		ToolName:   "tool",
 		ToolDigest: "digest-a",
@@ -196,6 +208,7 @@ func TestSummaryMatchesAndExecutionModeBranches(t *testing.T) {
 		Arguments:  spec.JSONRawString(`{"a":1,"b":2}`),
 	}
 	expected := spec.MCPApprovalSummary{
+		BundleID:   bundleID,
 		ServerID:   "server",
 		ToolName:   "tool",
 		ToolDigest: "digest-a",
@@ -214,6 +227,12 @@ func TestSummaryMatchesAndExecutionModeBranches(t *testing.T) {
 			expect spec.MCPApprovalSummary
 			want   bool
 		}{
+			{
+				name:   "bundle mismatch",
+				stored: stored,
+				expect: func() spec.MCPApprovalSummary { x := expected; x.BundleID = "other"; return x }(),
+				want:   false,
+			},
 			{
 				name:   "server mismatch",
 				stored: stored,
@@ -280,7 +299,8 @@ func TestSummaryMatchesAndExecutionModeBranches(t *testing.T) {
 
 	t.Run("execution mode defaults and overrides", func(t *testing.T) {
 		server := spec.MCPServerConfig{
-			ID: "server",
+			BundleID: bundleID,
+			ID:       "server",
 			DefaultPolicy: spec.MCPServerPolicy{
 				DefaultApprovalRule:  spec.MCPApprovalRuleAllow,
 				DefaultExecutionMode: "",

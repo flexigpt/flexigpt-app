@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/store"
@@ -176,6 +177,7 @@ func (f *fakeClientFactory) Connect(
 type runtimeFixture struct {
 	mgr      *RuntimeManager
 	session  *fakeClientSession
+	bundleID bundleitemutils.BundleID
 	serverID spec.MCPServerID
 }
 
@@ -193,6 +195,19 @@ func newRuntimeFixture(
 	}
 	t.Cleanup(func() { _ = st.Close() })
 
+	bundleID := bundleitemutils.BundleID("bundle-a")
+	if _, err := st.PutMCPBundle(t.Context(), &spec.PutMCPBundleRequest{
+		BundleID: bundleID,
+		Body: &spec.PutMCPBundleRequestBody{
+			Slug:        bundleitemutils.BundleSlug(bundleID),
+			DisplayName: "Bundle A",
+			IsEnabled:   true,
+			Description: "Bundle A bundle",
+		},
+	}); err != nil {
+		t.Fatalf("PutMCPBundle: %v", err)
+	}
+
 	serverID := spec.MCPServerID("server-1")
 
 	if len(snapshots) == 0 {
@@ -202,6 +217,7 @@ func newRuntimeFixture(
 	}
 
 	if _, err := st.PutMCPServer(t.Context(), &spec.PutMCPServerRequest{
+		BundleID: bundleID,
 		ServerID: serverID,
 		Body: &spec.PutMCPServerPayload{
 			DisplayName: "Fixture Server",
@@ -220,7 +236,10 @@ func newRuntimeFixture(
 	session := &fakeClientSession{discoverSnapshots: snapshots}
 	factory := &fakeClientFactory{session: session}
 	mgr := NewRuntimeManager(st, nil, factory)
-	if _, err := mgr.Connect(t.Context(), &spec.ConnectMCPServerRequest{ServerID: serverID}); err != nil {
+	if _, err := mgr.Connect(
+		t.Context(),
+		&spec.ConnectMCPServerRequest{BundleID: bundleID, ServerID: serverID},
+	); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
 
@@ -229,6 +248,7 @@ func newRuntimeFixture(
 	return &runtimeFixture{
 		mgr:      mgr,
 		session:  session,
+		bundleID: bundleID,
 		serverID: serverID,
 	}
 }
@@ -301,15 +321,18 @@ func TestEvaluateAndExecutionMode(t *testing.T) {
 	ask := spec.MCPApprovalRuleAsk
 	auto := spec.MCPExecutionModeAuto
 	manual := spec.MCPExecutionModeManual
+	bundleID := bundleitemutils.BundleID("bundle-a")
 
 	baseServer := spec.MCPServerConfig{
-		ID: "server",
+		BundleID: bundleID,
+		ID:       "server",
 		DefaultPolicy: spec.MCPServerPolicy{
 			DefaultApprovalRule:  ask,
 			DefaultExecutionMode: manual,
 		},
 	}
 	baseTool := spec.MCPToolCapability{
+		BundleID:     bundleID,
 		ServerID:     baseServer.ID,
 		ToolName:     "echo",
 		Digest:       "digest",
@@ -400,10 +423,11 @@ func TestEvaluateAndExecutionMode(t *testing.T) {
 				Server: server,
 				Tool:   tool,
 				Req: spec.InvokeMCPToolRequestBody{
-					Source:    spec.MCPInvocationSourceUser,
-					ServerID:  server.ID,
-					ToolName:  tool.ToolName,
-					Arguments: map[string]any{"message": "hi"},
+					Source:   spec.MCPInvocationSourceUser,
+					ToolName: tool.ToolName,
+					Arguments: map[string]any{
+						"message": "hi",
+					},
 				},
 			})
 
@@ -416,7 +440,7 @@ func TestEvaluateAndExecutionMode(t *testing.T) {
 			if got.Summary == nil {
 				t.Fatalf("Summary is nil")
 			}
-			if got.Summary.ServerID != server.ID || got.Summary.ToolName != tool.ToolName {
+			if got.Summary.BundleID != server.BundleID || got.Summary.ServerID != server.ID {
 				t.Fatalf("Summary = %#v", got.Summary)
 			}
 		})
@@ -431,6 +455,7 @@ func TestEvaluateAndExecutionMode(t *testing.T) {
 		{
 			name: "default manual",
 			server: spec.MCPServerConfig{
+				BundleID:      bundleID,
 				DefaultPolicy: spec.DefaultMCPServerPolicy(),
 			},
 			tool: spec.MCPToolCapability{ToolName: "echo"},
@@ -439,6 +464,7 @@ func TestEvaluateAndExecutionMode(t *testing.T) {
 		{
 			name: "default auto",
 			server: spec.MCPServerConfig{
+				BundleID: bundleID,
 				DefaultPolicy: spec.MCPServerPolicy{
 					DefaultExecutionMode: auto,
 				},
@@ -449,6 +475,7 @@ func TestEvaluateAndExecutionMode(t *testing.T) {
 		{
 			name: "override",
 			server: spec.MCPServerConfig{
+				BundleID: bundleID,
 				DefaultPolicy: spec.MCPServerPolicy{
 					DefaultExecutionMode: manual,
 				},
@@ -498,6 +525,7 @@ func TestNormalizeRawJSONAndApprovalManager(t *testing.T) {
 	})
 
 	summary := spec.MCPApprovalSummary{
+		BundleID:   bundleitemutils.BundleID("bundle-a"),
 		ServerID:   "server",
 		ToolName:   "tool",
 		ToolDigest: "digest",
@@ -600,7 +628,9 @@ func TestNormalizeRawJSONAndApprovalManager(t *testing.T) {
 }
 
 func TestDiscoverySnapshotDigestAndPagination(t *testing.T) {
+	bundleID := bundleitemutils.BundleID("bundle-a")
 	snapA := spec.MCPDiscoverySnapshot{
+		BundleID: bundleID,
 		ServerID: "server",
 		ServerCapabilities: &spec.MCPServerCapabilitiesSummary{
 			Experimental: map[string]any{
@@ -609,7 +639,7 @@ func TestDiscoverySnapshotDigestAndPagination(t *testing.T) {
 			},
 		},
 		Tools: []spec.MCPToolCapability{
-			{ServerID: "server", ToolName: "alpha", Digest: "1"},
+			{BundleID: bundleID, ServerID: "server", ToolName: "alpha", Digest: "1"},
 		},
 	}
 	snapB := snapA
@@ -645,6 +675,7 @@ func TestDiscoverySnapshotDigestAndPagination(t *testing.T) {
 			name:     "second page",
 			pageSize: 2,
 			token: mustDiscoveryPageToken(t, spec.MCPDiscoveryPageToken{
+				BundleID:       bundleID,
 				ServerID:       "server",
 				SnapshotDigest: digestA,
 				Kind:           discoveryPageKindTools,
@@ -663,6 +694,7 @@ func TestDiscoverySnapshotDigestAndPagination(t *testing.T) {
 		{
 			name: "stale token",
 			token: mustDiscoveryPageToken(t, spec.MCPDiscoveryPageToken{
+				BundleID:       bundleID,
 				ServerID:       "server",
 				SnapshotDigest: "stale-digest",
 				Kind:           discoveryPageKindTools,
@@ -677,6 +709,7 @@ func TestDiscoverySnapshotDigestAndPagination(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, next, err := paginateDiscoveryItems(
+				bundleID,
 				"server",
 				digestA,
 				discoveryPageKindTools,
@@ -743,6 +776,7 @@ func TestToolBridgeApprovalFlow(t *testing.T) {
 			bridge := NewToolBridge(fixture.mgr, approvals)
 
 			listResp, err := fixture.mgr.ListTools(t.Context(), &spec.ListMCPServerToolsRequest{
+				BundleID: fixture.bundleID,
 				ServerID: fixture.serverID,
 			})
 			if err != nil {
@@ -754,9 +788,10 @@ func TestToolBridgeApprovalFlow(t *testing.T) {
 			tool := listResp.Body.Tools[0]
 
 			req := &spec.InvokeMCPToolRequest{
+				BundleID: fixture.bundleID,
+				ServerID: fixture.serverID,
 				Body: &spec.InvokeMCPToolRequestBody{
 					Source:           spec.MCPInvocationSourceUser,
-					ServerID:         fixture.serverID,
 					ToolName:         tool.ToolName,
 					ProviderToolName: tool.ProviderToolName,
 					ToolDigest:       tool.Digest,
@@ -767,7 +802,11 @@ func TestToolBridgeApprovalFlow(t *testing.T) {
 				},
 			}
 
-			eval, err := bridge.Evaluate(t.Context(), &spec.EvaluateMCPToolCallRequest{Body: req.Body})
+			eval, err := bridge.Evaluate(t.Context(), &spec.EvaluateMCPToolCallRequest{
+				BundleID: fixture.bundleID,
+				ServerID: fixture.serverID,
+				Body:     req.Body,
+			})
 			if err != nil {
 				t.Fatalf("Evaluate: %v", err)
 			}
@@ -792,7 +831,11 @@ func TestToolBridgeApprovalFlow(t *testing.T) {
 				t.Fatalf("approval ID = %q, want empty", eval.Body.ApprovalID)
 			}
 
-			got, err := bridge.Invoke(t.Context(), req)
+			got, err := bridge.Invoke(t.Context(), &spec.InvokeMCPToolRequest{
+				BundleID: fixture.bundleID,
+				ServerID: fixture.serverID,
+				Body:     req.Body,
+			})
 			if err != nil {
 				t.Fatalf("Invoke: %v", err)
 			}
@@ -849,6 +892,7 @@ func TestRuntimeManagerRefreshFromNotification(t *testing.T) {
 			ctx := t.Context()
 
 			fixture.mgr.OnClientNotification(ctx, ClientNotification{
+				BundleID: fixture.bundleID,
 				ServerID: fixture.serverID,
 				Kind:     tt.kind,
 			})
@@ -865,7 +909,7 @@ func TestRuntimeManagerRefreshFromNotification(t *testing.T) {
 			delete(fixture.mgr.notificationRefreshTimers, fixture.serverID)
 			fixture.mgr.mu.Unlock()
 
-			fixture.mgr.refreshFromNotification(ctx, fixture.serverID, string(tt.kind), nil)
+			fixture.mgr.refreshFromNotification(ctx, fixture.bundleID, fixture.serverID, string(tt.kind), nil)
 
 			fixture.session.mu.Lock()
 			if fixture.session.discoverCalls != 2 {
@@ -874,7 +918,10 @@ func TestRuntimeManagerRefreshFromNotification(t *testing.T) {
 			}
 			fixture.session.mu.Unlock()
 
-			statusResp, err := fixture.mgr.Status(ctx, &spec.GetMCPServerStatusRequest{ServerID: fixture.serverID})
+			statusResp, err := fixture.mgr.Status(
+				ctx,
+				&spec.GetMCPServerStatusRequest{BundleID: fixture.bundleID, ServerID: fixture.serverID},
+			)
 			if err != nil {
 				t.Fatalf("Status: %v", err)
 			}
@@ -882,7 +929,10 @@ func TestRuntimeManagerRefreshFromNotification(t *testing.T) {
 				t.Fatalf("ToolCount = %d, want 2", statusResp.Body.ToolCount)
 			}
 
-			listResp, err := fixture.mgr.ListTools(ctx, &spec.ListMCPServerToolsRequest{ServerID: fixture.serverID})
+			listResp, err := fixture.mgr.ListTools(
+				ctx,
+				&spec.ListMCPServerToolsRequest{BundleID: fixture.bundleID, ServerID: fixture.serverID},
+			)
 			if err != nil {
 				t.Fatalf("ListTools: %v", err)
 			}
@@ -925,6 +975,7 @@ func TestNormalizeRawJSONStandalone(t *testing.T) {
 func TestApprovalManagerLookupAndExpiry(t *testing.T) {
 	mgr := NewApprovalManager(time.Minute)
 	summary := spec.MCPApprovalSummary{
+		BundleID:   bundleitemutils.BundleID("bundle-a"),
 		ServerID:   "server",
 		ToolName:   "tool",
 		ToolDigest: "digest",

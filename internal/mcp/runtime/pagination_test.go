@@ -5,12 +5,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 func TestDiscoveryPageTokenEncodeDecodeAndPaginationEdges(t *testing.T) {
 	t.Run("round trip token", func(t *testing.T) {
 		in := spec.MCPDiscoveryPageToken{
+			BundleID:       bundleitemutils.BundleID("bundle-a"),
 			ServerID:       "server",
 			SnapshotDigest: "digest",
 			Kind:           discoveryPageKindTools,
@@ -50,10 +52,12 @@ func TestDiscoveryPageTokenEncodeDecodeAndPaginationEdges(t *testing.T) {
 		return out
 	}
 
+	bundleID := bundleitemutils.BundleID("bundle-a")
 	digest := "snapshot-digest"
 
 	tests := []struct {
 		name            string
+		bundleID        bundleitemutils.BundleID
 		serverID        spec.MCPServerID
 		kind            string
 		items           []int
@@ -65,6 +69,7 @@ func TestDiscoveryPageTokenEncodeDecodeAndPaginationEdges(t *testing.T) {
 	}{
 		{
 			name:     "empty items",
+			bundleID: bundleID,
 			serverID: "server",
 			kind:     discoveryPageKindTools,
 			items:    nil,
@@ -74,6 +79,7 @@ func TestDiscoveryPageTokenEncodeDecodeAndPaginationEdges(t *testing.T) {
 		},
 		{
 			name:     "default page size",
+			bundleID: bundleID,
 			serverID: "server",
 			kind:     discoveryPageKindTools,
 			items:    items(30),
@@ -83,6 +89,7 @@ func TestDiscoveryPageTokenEncodeDecodeAndPaginationEdges(t *testing.T) {
 		},
 		{
 			name:     "clamped max page size",
+			bundleID: bundleID,
 			serverID: "server",
 			kind:     discoveryPageKindTools,
 			items:    items(300),
@@ -92,6 +99,7 @@ func TestDiscoveryPageTokenEncodeDecodeAndPaginationEdges(t *testing.T) {
 		},
 		{
 			name:     "exact end no next",
+			bundleID: bundleID,
 			serverID: "server",
 			kind:     discoveryPageKindTools,
 			items:    items(3),
@@ -101,11 +109,13 @@ func TestDiscoveryPageTokenEncodeDecodeAndPaginationEdges(t *testing.T) {
 		},
 		{
 			name:     "continue with token",
+			bundleID: bundleID,
 			serverID: "server",
 			kind:     discoveryPageKindTools,
 			items:    items(3),
 			pageSize: 2,
 			pageToken: mustDiscoveryPageTokenForTest(t, spec.MCPDiscoveryPageToken{
+				BundleID:       bundleID,
 				ServerID:       "server",
 				SnapshotDigest: digest,
 				Kind:           discoveryPageKindTools,
@@ -117,6 +127,7 @@ func TestDiscoveryPageTokenEncodeDecodeAndPaginationEdges(t *testing.T) {
 		},
 		{
 			name:            "bad token",
+			bundleID:        bundleID,
 			serverID:        "server",
 			kind:            discoveryPageKindTools,
 			items:           items(3),
@@ -126,6 +137,7 @@ func TestDiscoveryPageTokenEncodeDecodeAndPaginationEdges(t *testing.T) {
 		},
 		{
 			name:     "stale server",
+			bundleID: bundleID,
 			serverID: "server-a",
 			kind:     discoveryPageKindTools,
 			items:    items(3),
@@ -133,6 +145,7 @@ func TestDiscoveryPageTokenEncodeDecodeAndPaginationEdges(t *testing.T) {
 			pageToken: mustDiscoveryPageTokenForTest(
 				t,
 				spec.MCPDiscoveryPageToken{
+					BundleID:       bundleID,
 					ServerID:       "server-b",
 					SnapshotDigest: digest,
 					Kind:           discoveryPageKindTools,
@@ -144,6 +157,7 @@ func TestDiscoveryPageTokenEncodeDecodeAndPaginationEdges(t *testing.T) {
 		},
 		{
 			name:     "stale digest",
+			bundleID: bundleID,
 			serverID: "server",
 			kind:     discoveryPageKindTools,
 			items:    items(3),
@@ -151,6 +165,7 @@ func TestDiscoveryPageTokenEncodeDecodeAndPaginationEdges(t *testing.T) {
 			pageToken: mustDiscoveryPageTokenForTest(
 				t,
 				spec.MCPDiscoveryPageToken{
+					BundleID:       bundleID,
 					ServerID:       "server",
 					SnapshotDigest: "other",
 					Kind:           discoveryPageKindTools,
@@ -162,6 +177,7 @@ func TestDiscoveryPageTokenEncodeDecodeAndPaginationEdges(t *testing.T) {
 		},
 		{
 			name:     "stale kind",
+			bundleID: bundleID,
 			serverID: "server",
 			kind:     discoveryPageKindResources,
 			items:    items(3),
@@ -169,6 +185,7 @@ func TestDiscoveryPageTokenEncodeDecodeAndPaginationEdges(t *testing.T) {
 			pageToken: mustDiscoveryPageTokenForTest(
 				t,
 				spec.MCPDiscoveryPageToken{
+					BundleID:       bundleID,
 					ServerID:       "server",
 					SnapshotDigest: digest,
 					Kind:           discoveryPageKindTools,
@@ -180,6 +197,7 @@ func TestDiscoveryPageTokenEncodeDecodeAndPaginationEdges(t *testing.T) {
 		},
 		{
 			name:     "stale page size",
+			bundleID: bundleID,
 			serverID: "server",
 			kind:     discoveryPageKindTools,
 			items:    items(3),
@@ -187,6 +205,7 @@ func TestDiscoveryPageTokenEncodeDecodeAndPaginationEdges(t *testing.T) {
 			pageToken: mustDiscoveryPageTokenForTest(
 				t,
 				spec.MCPDiscoveryPageToken{
+					BundleID:       bundleID,
 					ServerID:       "server",
 					SnapshotDigest: digest,
 					Kind:           discoveryPageKindTools,
@@ -198,6 +217,7 @@ func TestDiscoveryPageTokenEncodeDecodeAndPaginationEdges(t *testing.T) {
 		},
 		{
 			name:     "index out of range",
+			bundleID: bundleID,
 			serverID: "server",
 			kind:     discoveryPageKindTools,
 			items:    items(3),
@@ -205,6 +225,7 @@ func TestDiscoveryPageTokenEncodeDecodeAndPaginationEdges(t *testing.T) {
 			pageToken: mustDiscoveryPageTokenForTest(
 				t,
 				spec.MCPDiscoveryPageToken{
+					BundleID:       bundleID,
 					ServerID:       "server",
 					SnapshotDigest: digest,
 					Kind:           discoveryPageKindTools,
@@ -218,7 +239,15 @@ func TestDiscoveryPageTokenEncodeDecodeAndPaginationEdges(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, next, err := paginateDiscoveryItems(tt.serverID, digest, tt.kind, tt.items, tt.pageSize, tt.pageToken)
+			got, next, err := paginateDiscoveryItems(
+				tt.bundleID,
+				tt.serverID,
+				digest,
+				tt.kind,
+				tt.items,
+				tt.pageSize,
+				tt.pageToken,
+			)
 			if tt.wantErrContains != "" {
 				if err == nil {
 					t.Fatalf("paginateDiscoveryItems succeeded, want error containing %q", tt.wantErrContains)
