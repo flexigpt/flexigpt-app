@@ -15,17 +15,19 @@ import (
 
 	"github.com/flexigpt/mapstore-go/uuidv7filename"
 
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
 const defaultApprovalTTL = 5 * time.Minute
 
 type approvalDecisionKey struct {
-	ServerID   spec.MCPServerID   `json:"serverID"`
-	ToolName   string             `json:"toolName"`
-	ToolDigest string             `json:"toolDigest,omitempty"`
-	Risk       spec.MCPToolRisk   `json:"risk"`
-	Arguments  spec.JSONRawString `json:"arguments,omitempty"`
+	BundleID   bundleitemutils.BundleID `json:"bundleID"`
+	ServerID   spec.MCPServerID         `json:"serverID"`
+	ToolName   string                   `json:"toolName"`
+	ToolDigest string                   `json:"toolDigest,omitempty"`
+	Risk       spec.MCPToolRisk         `json:"risk"`
+	Arguments  spec.JSONRawString       `json:"arguments,omitempty"`
 }
 
 type pendingApproval struct {
@@ -194,6 +196,7 @@ func (m *ApprovalManager) verifyLocked(
 
 func getApprovalDecisionKey(summary spec.MCPApprovalSummary) string {
 	key := approvalDecisionKey{
+		BundleID:   summary.BundleID,
 		ServerID:   summary.ServerID,
 		ToolName:   summary.ToolName,
 		ToolDigest: summary.ToolDigest,
@@ -206,6 +209,9 @@ func getApprovalDecisionKey(summary spec.MCPApprovalSummary) string {
 }
 
 func summaryMatches(stored, expected spec.MCPApprovalSummary) bool {
+	if stored.BundleID != expected.BundleID {
+		return false
+	}
 	if stored.ServerID != expected.ServerID {
 		return false
 	}

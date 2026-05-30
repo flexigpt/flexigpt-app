@@ -113,8 +113,8 @@ func (m *RuntimeManager) Connect(
 	ctx context.Context,
 	req *spec.ConnectMCPServerRequest,
 ) (*spec.ConnectMCPServerResponse, error) {
-	if req == nil || req.ServerID == "" {
-		return nil, fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
+	if req == nil || req.BundleID == "" || req.ServerID == "" {
+		return nil, fmt.Errorf("%w: bundleID and serverID required", spec.ErrMCPInvalidRequest)
 	}
 
 	m.mu.Lock()
@@ -123,13 +123,17 @@ func (m *RuntimeManager) Connect(
 		return nil, fmt.Errorf("%w: runtime is shutting down", spec.ErrMCPRuntimeNotReady)
 	}
 	state := m.getOrCreateLocked(req.ServerID)
+	state.bundleID = req.BundleID
 	generation := m.bumpGenerationLocked(req.ServerID)
 
 	state.status = spec.MCPServerStatusConnecting
 	state.lastError = ""
 	m.mu.Unlock()
 
-	cfgResp, err := m.store.GetMCPServer(ctx, &spec.GetMCPServerRequest{ServerID: req.ServerID})
+	cfgResp, err := m.store.GetMCPServer(ctx, &spec.GetMCPServerRequest{
+		BundleID: req.BundleID,
+		ServerID: req.ServerID,
+	})
 	if err != nil {
 		m.setErrorIfCurrent(req.ServerID, generation, err)
 		return nil, err
@@ -142,7 +146,7 @@ func (m *RuntimeManager) Connect(
 	cfg := *cfgResp.Body
 	if !cfg.Enabled {
 		if m.auth != nil {
-			m.auth.ClearAuthStatus(req.ServerID)
+			m.auth.ClearAuthStatus(req.BundleID, req.ServerID)
 		}
 		err := fmt.Errorf("%w: %s", spec.ErrMCPServerDisabled, cfg.ID)
 		m.setStatusIfCurrent(req.ServerID, generation, spec.MCPServerStatusDisabled, "")
@@ -231,21 +235,31 @@ func (m *RuntimeManager) Connect(
 		_ = oldClient.Close(ctx)
 	}
 
-	return &spec.ConnectMCPServerResponse{Body: m.snapshotFromState(req.ServerID)}, nil
+	return &spec.ConnectMCPServerResponse{Body: m.snapshotFromState(req.BundleID, req.ServerID)}, nil
 }
 
 func (m *RuntimeManager) Disconnect(
 	ctx context.Context,
 	req *spec.DisconnectMCPServerRequest,
 ) (*spec.DisconnectMCPServerResponse, error) {
-	if req == nil || req.ServerID == "" {
-		return nil, fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
+	if req == nil || req.BundleID == "" || req.ServerID == "" {
+		return nil, fmt.Errorf("%w: bundleID and serverID required", spec.ErrMCPInvalidRequest)
 	}
 
 	m.mu.Lock()
 	m.bumpGenerationLocked(req.ServerID)
 
 	state := m.sessions[req.ServerID]
+	if state != nil && state.bundleID != "" && state.bundleID != req.BundleID {
+		m.mu.Unlock()
+		return nil, fmt.Errorf(
+			"%w: server %s is connected under bundle %s, not %s",
+			spec.ErrMCPInvalidRequest,
+			req.ServerID,
+			state.bundleID,
+			req.BundleID,
+		)
+	}
 	delete(m.sessions, req.ServerID)
 	timer := m.notificationRefreshTimers[req.ServerID]
 	delete(m.notificationRefreshTimers, req.ServerID)
@@ -259,7 +273,7 @@ func (m *RuntimeManager) Disconnect(
 		}
 	}
 	if m.auth != nil {
-		m.auth.ClearAuthStatus(req.ServerID)
+		m.auth.ClearAuthStatus(req.BundleID, req.ServerID)
 	}
 
 	return &spec.DisconnectMCPServerResponse{}, nil
@@ -269,10 +283,10 @@ func (m *RuntimeManager) Refresh(
 	ctx context.Context,
 	req *spec.RefreshMCPServerRequest,
 ) (*spec.RefreshMCPServerResponse, error) {
-	if req == nil || req.ServerID == "" {
-		return nil, fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
+	if req == nil || req.BundleID == "" || req.ServerID == "" {
+		return nil, fmt.Errorf("%w: bundleID and serverID required", spec.ErrMCPInvalidRequest)
 	}
-	client, cfg, err := m.readyClient(ctx, req.ServerID)
+	client, cfg, err := m.readyClient(ctx, req.BundleID, req.ServerID)
 	if err != nil {
 		return nil, err
 	}
@@ -303,21 +317,25 @@ func (m *RuntimeManager) Refresh(
 	state.lastError = ""
 	m.mu.Unlock()
 
-	return &spec.RefreshMCPServerResponse{Body: m.snapshotFromState(req.ServerID)}, nil
+	return &spec.RefreshMCPServerResponse{Body: m.snapshotFromState(req.BundleID, req.ServerID)}, nil
 }
 
 func (m *RuntimeManager) Status(
 	ctx context.Context,
 	req *spec.GetMCPServerStatusRequest,
 ) (*spec.GetMCPServerStatusResponse, error) {
-	if req == nil || req.ServerID == "" {
-		return nil, fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
+	if req == nil || req.BundleID == "" || req.ServerID == "" {
+		return nil, fmt.Errorf("%w: bundleID and serverID required", spec.ErrMCPInvalidRequest)
 	}
-	cfgResp, err := m.store.GetMCPServer(ctx, &spec.GetMCPServerRequest{ServerID: req.ServerID})
+	cfgResp, err := m.store.GetMCPServer(ctx, &spec.GetMCPServerRequest{
+		BundleID: req.BundleID,
+		ServerID: req.ServerID,
+	})
 	if err != nil {
 		return nil, err
 	}
-	snap := m.snapshotFromState(req.ServerID)
+	snap := m.snapshotFromState(req.BundleID, req.ServerID)
+
 	if cfgResp != nil && cfgResp.Body != nil {
 		snap.BundleID = cfgResp.Body.BundleID
 		if !cfgResp.Body.Enabled {
@@ -337,7 +355,7 @@ func (m *RuntimeManager) OnClientNotification(ctx context.Context, event ClientN
 	case ClientNotificationToolListChanged,
 		ClientNotificationResourceListChanged,
 		ClientNotificationPromptListChanged:
-		m.scheduleNotificationRefresh(ctx, event.ServerID, string(event.Kind))
+		m.scheduleNotificationRefresh(ctx, event.BundleID, event.ServerID, string(event.Kind))
 
 	case ClientNotificationResourceUpdated:
 		slog.Info(
@@ -370,14 +388,17 @@ func (m *RuntimeManager) ListTools(
 	ctx context.Context,
 	req *spec.ListMCPServerToolsRequest,
 ) (*spec.ListMCPServerToolsResponse, error) {
-	if req == nil || req.ServerID == "" {
-		return nil, fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
+	if req == nil || req.BundleID == "" || req.ServerID == "" {
+		return nil, fmt.Errorf("%w: bundleID and serverID required", spec.ErrMCPInvalidRequest)
 	}
-	snap, err := m.currentSnapshot(ctx, req.ServerID)
+	snap, err := m.currentSnapshot(ctx, req.BundleID, req.ServerID)
 	if err != nil {
 		return nil, err
 	}
-	cfgResp, err := m.store.GetMCPServer(ctx, &spec.GetMCPServerRequest{ServerID: req.ServerID})
+	cfgResp, err := m.store.GetMCPServer(ctx, &spec.GetMCPServerRequest{
+		BundleID: req.BundleID,
+		ServerID: req.ServerID,
+	})
 	if err != nil {
 		// Best effort: keep the snapshot if the config read fails.
 		slog.Warn("mcp: tool policy overlay skipped", "serverID", req.ServerID, "err", err)
@@ -395,7 +416,7 @@ func (m *RuntimeManager) ListTools(
 
 	digest := computeDiscoverySnapshotDigest(snap)
 	tools, next, err := paginateDiscoveryItems(
-		req.ServerID, digest, discoveryPageKindTools, snap.Tools, req.PageSize, req.PageToken,
+		req.BundleID, req.ServerID, digest, discoveryPageKindTools, snap.Tools, req.PageSize, req.PageToken,
 	)
 	if err != nil {
 		return nil, err
@@ -412,10 +433,10 @@ func (m *RuntimeManager) ListResources(
 	ctx context.Context,
 	req *spec.ListMCPServerResourcesRequest,
 ) (*spec.ListMCPServerResourcesResponse, error) {
-	if req == nil || req.ServerID == "" {
-		return nil, fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
+	if req == nil || req.BundleID == "" || req.ServerID == "" {
+		return nil, fmt.Errorf("%w: bundleID and serverID required", spec.ErrMCPInvalidRequest)
 	}
-	snap, err := m.currentSnapshot(ctx, req.ServerID)
+	snap, err := m.currentSnapshot(ctx, req.BundleID, req.ServerID)
 	if err != nil {
 		return nil, err
 	}
@@ -424,7 +445,7 @@ func (m *RuntimeManager) ListResources(
 	})
 	digest := computeDiscoverySnapshotDigest(snap)
 	resources, next, err := paginateDiscoveryItems(
-		req.ServerID, digest, discoveryPageKindResources, snap.Resources, req.PageSize, req.PageToken,
+		req.BundleID, req.ServerID, digest, discoveryPageKindResources, snap.Resources, req.PageSize, req.PageToken,
 	)
 	if err != nil {
 		return nil, err
@@ -441,10 +462,10 @@ func (m *RuntimeManager) ListResourceTemplates(
 	ctx context.Context,
 	req *spec.ListMCPServerResourceTemplatesRequest,
 ) (*spec.ListMCPServerResourceTemplatesResponse, error) {
-	if req == nil || req.ServerID == "" {
-		return nil, fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
+	if req == nil || req.BundleID == "" || req.ServerID == "" {
+		return nil, fmt.Errorf("%w: bundleID and serverID required", spec.ErrMCPInvalidRequest)
 	}
-	snap, err := m.currentSnapshot(ctx, req.ServerID)
+	snap, err := m.currentSnapshot(ctx, req.BundleID, req.ServerID)
 	if err != nil {
 		return nil, err
 	}
@@ -453,7 +474,13 @@ func (m *RuntimeManager) ListResourceTemplates(
 	})
 	digest := computeDiscoverySnapshotDigest(snap)
 	templates, next, err := paginateDiscoveryItems(
-		req.ServerID, digest, discoveryPageKindResourceTemplates, snap.ResourceTemplates, req.PageSize, req.PageToken,
+		req.BundleID,
+		req.ServerID,
+		digest,
+		discoveryPageKindResourceTemplates,
+		snap.ResourceTemplates,
+		req.PageSize,
+		req.PageToken,
 	)
 	if err != nil {
 		return nil, err
@@ -470,10 +497,10 @@ func (m *RuntimeManager) ListPrompts(
 	ctx context.Context,
 	req *spec.ListMCPServerPromptsRequest,
 ) (*spec.ListMCPServerPromptsResponse, error) {
-	if req == nil || req.ServerID == "" {
-		return nil, fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
+	if req == nil || req.BundleID == "" || req.ServerID == "" {
+		return nil, fmt.Errorf("%w: bundleID and serverID required", spec.ErrMCPInvalidRequest)
 	}
-	snap, err := m.currentSnapshot(ctx, req.ServerID)
+	snap, err := m.currentSnapshot(ctx, req.BundleID, req.ServerID)
 	if err != nil {
 		return nil, err
 	}
@@ -482,7 +509,7 @@ func (m *RuntimeManager) ListPrompts(
 	})
 	digest := computeDiscoverySnapshotDigest(snap)
 	prompts, next, err := paginateDiscoveryItems(
-		req.ServerID, digest, discoveryPageKindPrompts, snap.Prompts, req.PageSize, req.PageToken,
+		req.BundleID, req.ServerID, digest, discoveryPageKindPrompts, snap.Prompts, req.PageSize, req.PageToken,
 	)
 	if err != nil {
 		return nil, err
@@ -499,10 +526,10 @@ func (m *RuntimeManager) ReadResource(
 	ctx context.Context,
 	req *spec.MCPReadResourceRequest,
 ) (*spec.MCPReadResourceResponse, error) {
-	if req == nil || req.Body == nil || req.Body.ServerID == "" || req.Body.URI == "" {
-		return nil, fmt.Errorf("%w: serverID and uri required", spec.ErrMCPInvalidRequest)
+	if req == nil || req.Body == nil || req.BundleID == "" || req.ServerID == "" || req.Body.URI == "" {
+		return nil, fmt.Errorf("%w: bundleID serverID and uri required", spec.ErrMCPInvalidRequest)
 	}
-	client, _, err := m.readyClient(ctx, req.Body.ServerID)
+	client, _, err := m.readyClient(ctx, req.BundleID, req.ServerID)
 	if err != nil {
 		return nil, err
 	}
@@ -516,9 +543,9 @@ func (m *RuntimeManager) ReadResource(
 	if body == nil {
 		return nil, fmt.Errorf("%w: resource read returned nil response", spec.ErrMCPRuntimeNotReady)
 	}
-	_, cfg, _ := m.readyClient(ctx, req.Body.ServerID)
+	_, cfg, _ := m.readyClient(ctx, req.BundleID, req.ServerID)
 	body.BundleID = cfg.BundleID
-	body.ServerID = req.Body.ServerID
+	body.ServerID = req.ServerID
 	body.URI = req.Body.URI
 	return &spec.MCPReadResourceResponse{Body: body}, nil
 }
@@ -527,10 +554,12 @@ func (m *RuntimeManager) GetPrompt(
 	ctx context.Context,
 	req *spec.MCPGetPromptRequest,
 ) (*spec.MCPGetPromptResponse, error) {
-	if req == nil || req.Body == nil || req.Body.ServerID == "" || req.Body.PromptName == "" {
-		return nil, fmt.Errorf("%w: serverID and promptName required", spec.ErrMCPInvalidRequest)
+	if req == nil || req.Body == nil || req.BundleID == "" || req.ServerID == "" ||
+
+		req.Body.PromptName == "" {
+		return nil, fmt.Errorf("%w: bundleID serverID and promptName required", spec.ErrMCPInvalidRequest)
 	}
-	client, _, err := m.readyClient(ctx, req.Body.ServerID)
+	client, _, err := m.readyClient(ctx, req.BundleID, req.ServerID)
 	if err != nil {
 		return nil, err
 	}
@@ -544,9 +573,9 @@ func (m *RuntimeManager) GetPrompt(
 	if body == nil {
 		return nil, fmt.Errorf("%w: prompt read returned nil response", spec.ErrMCPRuntimeNotReady)
 	}
-	_, cfg, _ := m.readyClient(ctx, req.Body.ServerID)
+	_, cfg, _ := m.readyClient(ctx, req.BundleID, req.ServerID)
 	body.BundleID = cfg.BundleID
-	body.ServerID = req.Body.ServerID
+	body.ServerID = req.ServerID
 
 	return &spec.MCPGetPromptResponse{Body: body}, nil
 }
@@ -555,10 +584,10 @@ func (m *RuntimeManager) Complete(
 	ctx context.Context,
 	req *spec.MCPCompleteArgumentRequest,
 ) (*spec.MCPCompletionResult, error) {
-	if req == nil || req.Body == nil || req.Body.ServerID == "" {
-		return nil, fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
+	if req == nil || req.Body == nil || req.BundleID == "" || req.ServerID == "" {
+		return nil, fmt.Errorf("%w: bundleID serverID required", spec.ErrMCPInvalidRequest)
 	}
-	client, _, err := m.readyClient(ctx, req.Body.ServerID)
+	client, _, err := m.readyClient(ctx, req.BundleID, req.ServerID)
 	if err != nil {
 		return nil, err
 	}
@@ -577,14 +606,16 @@ func (m *RuntimeManager) Complete(
 
 func (m *RuntimeManager) CallTool(
 	ctx context.Context,
+	bundleID bundleitemutils.BundleID,
+	serverID spec.MCPServerID,
 	req spec.InvokeMCPToolRequestBody,
 ) (*spec.InvokeMCPToolResponseBody, spec.MCPServerConfig, spec.MCPToolCapability, error) {
-	client, cfg, err := m.readyClient(ctx, req.ServerID)
+	client, cfg, err := m.readyClient(ctx, bundleID, serverID)
 	if err != nil {
 		return nil, spec.MCPServerConfig{}, spec.MCPToolCapability{}, err
 	}
 
-	snap, err := m.currentSnapshot(ctx, req.ServerID)
+	snap, err := m.currentSnapshot(ctx, bundleID, serverID)
 	if err != nil {
 		return nil, spec.MCPServerConfig{}, spec.MCPToolCapability{}, err
 	}
@@ -624,11 +655,11 @@ func (m *RuntimeManager) CallTool(
 	}
 
 	body.BundleID = cfg.BundleID
-	body.ServerID = req.ServerID
+	body.ServerID = serverID
 	body.ToolName = req.ToolName
 	body.ProviderToolName = req.ProviderToolName
 	body.Provenance.BundleID = cfg.BundleID
-	body.Provenance.ServerID = req.ServerID
+	body.Provenance.ServerID = serverID
 	body.Provenance.ServerDisplayName = cfg.DisplayName
 	body.Provenance.ToolName = req.ToolName
 	body.Provenance.ProviderToolName = req.ProviderToolName
@@ -641,14 +672,16 @@ func (m *RuntimeManager) CallTool(
 
 func (m *RuntimeManager) CallToolDryRun(
 	ctx context.Context,
+	bundleID bundleitemutils.BundleID,
+	serverID spec.MCPServerID,
 	req spec.InvokeMCPToolRequestBody,
 ) (*spec.InvokeMCPToolResponseBody, spec.MCPServerConfig, spec.MCPToolCapability, error) {
-	_, cfg, err := m.readyClient(ctx, req.ServerID)
+	_, cfg, err := m.readyClient(ctx, bundleID, serverID)
 	if err != nil {
 		return nil, spec.MCPServerConfig{}, spec.MCPToolCapability{}, err
 	}
 
-	snap, err := m.currentSnapshot(ctx, req.ServerID)
+	snap, err := m.currentSnapshot(ctx, bundleID, serverID)
 	if err != nil {
 		return nil, spec.MCPServerConfig{}, spec.MCPToolCapability{}, err
 	}
@@ -671,13 +704,18 @@ func (m *RuntimeManager) CallToolDryRun(
 	}
 	return &spec.InvokeMCPToolResponseBody{
 		BundleID:         cfg.BundleID,
-		ServerID:         req.ServerID,
+		ServerID:         serverID,
 		ToolName:         req.ToolName,
 		ProviderToolName: req.ProviderToolName,
 	}, cfg, tool, nil
 }
 
-func (m *RuntimeManager) scheduleNotificationRefresh(ctx context.Context, serverID spec.MCPServerID, reason string) {
+func (m *RuntimeManager) scheduleNotificationRefresh(
+	ctx context.Context,
+	bundleID bundleitemutils.BundleID,
+	serverID spec.MCPServerID,
+	reason string,
+) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -692,13 +730,14 @@ func (m *RuntimeManager) scheduleNotificationRefresh(ctx context.Context, server
 
 	var timer *time.Timer
 	timer = time.AfterFunc(spec.NotificationRefreshDebounce, func() {
-		m.refreshFromNotification(ctx, serverID, reason, timer)
+		m.refreshFromNotification(ctx, bundleID, serverID, reason, timer)
 	})
 	m.notificationRefreshTimers[serverID] = timer
 }
 
 func (m *RuntimeManager) refreshFromNotification(
 	ctx context.Context,
+	bundleID bundleitemutils.BundleID,
 	serverID spec.MCPServerID,
 	reason string,
 	timer *time.Timer,
@@ -726,7 +765,7 @@ func (m *RuntimeManager) refreshFromNotification(
 	generation := m.generations[serverID]
 	m.mu.Unlock()
 
-	cfgResp, err := m.store.GetMCPServer(ctx, &spec.GetMCPServerRequest{ServerID: serverID})
+	cfgResp, err := m.store.GetMCPServer(ctx, &spec.GetMCPServerRequest{BundleID: bundleID, ServerID: serverID})
 	if err != nil {
 		m.setErrorIfCurrent(serverID, generation, err)
 		return
@@ -779,17 +818,20 @@ func (m *RuntimeManager) refreshFromNotification(
 
 func (m *RuntimeManager) currentSnapshot(
 	ctx context.Context,
+	bundleID bundleitemutils.BundleID,
 	serverID spec.MCPServerID,
 ) (spec.MCPDiscoverySnapshot, error) {
 	m.mu.RLock()
-	if st := m.sessions[serverID]; st != nil && st.status == spec.MCPServerStatusReady {
+	if st := m.sessions[serverID]; st != nil &&
+		st.status == spec.MCPServerStatusReady &&
+		st.bundleID == bundleID {
 		snap := cloneDiscoverySnapshot(st.snapshot)
 		m.mu.RUnlock()
 		return snap, nil
 	}
 	m.mu.RUnlock()
 
-	snap, ok, err := m.store.GetLastKnownSnapshot(ctx, serverID)
+	snap, ok, err := m.store.GetLastKnownSnapshot(ctx, bundleID, serverID)
 	if err != nil {
 		return spec.MCPDiscoverySnapshot{}, err
 	}
@@ -801,9 +843,10 @@ func (m *RuntimeManager) currentSnapshot(
 
 func (m *RuntimeManager) readyClient(
 	ctx context.Context,
+	bundleID bundleitemutils.BundleID,
 	serverID spec.MCPServerID,
 ) (ClientSession, spec.MCPServerConfig, error) {
-	cfgResp, err := m.store.GetMCPServer(ctx, &spec.GetMCPServerRequest{ServerID: serverID})
+	cfgResp, err := m.store.GetMCPServer(ctx, &spec.GetMCPServerRequest{BundleID: bundleID, ServerID: serverID})
 	if err != nil {
 		return nil, spec.MCPServerConfig{}, err
 	}
@@ -817,7 +860,9 @@ func (m *RuntimeManager) readyClient(
 
 	m.mu.RLock()
 	st := m.sessions[serverID]
-	if st != nil && st.status == spec.MCPServerStatusReady && st.client != nil {
+	if st != nil && st.status == spec.MCPServerStatusReady &&
+		st.bundleID == bundleID &&
+		st.client != nil {
 		client := st.client
 		m.mu.RUnlock()
 		return client, cfg, nil
@@ -880,13 +925,20 @@ func (m *RuntimeManager) bumpGenerationLocked(id spec.MCPServerID) uint64 {
 	return m.generations[id]
 }
 
-func (m *RuntimeManager) snapshotFromState(id spec.MCPServerID) *spec.MCPServerRuntimeSnapshot {
+func (m *RuntimeManager) snapshotFromState(
+	bundleID bundleitemutils.BundleID,
+	id spec.MCPServerID,
+) *spec.MCPServerRuntimeSnapshot {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	st := m.sessions[id]
 	if st == nil {
-		return &spec.MCPServerRuntimeSnapshot{ServerID: id, Status: spec.MCPServerStatusDisconnected}
+		return &spec.MCPServerRuntimeSnapshot{
+			BundleID: bundleID,
+			ServerID: id,
+			Status:   spec.MCPServerStatusDisconnected,
+		}
 	}
 
 	snapshotDigest := st.snapshot.Digest
@@ -894,7 +946,7 @@ func (m *RuntimeManager) snapshotFromState(id spec.MCPServerID) *spec.MCPServerR
 		snapshotDigest = computeDiscoverySnapshotDigest(st.snapshot)
 	}
 	out := &spec.MCPServerRuntimeSnapshot{
-		BundleID:                  st.snapshot.BundleID,
+		BundleID:                  firstBundleID(st.snapshot.BundleID, st.bundleID, bundleID),
 		ServerID:                  id,
 		Status:                    st.status,
 		LastError:                 st.lastError,
@@ -915,6 +967,15 @@ func (m *RuntimeManager) snapshotFromState(id spec.MCPServerID) *spec.MCPServerR
 		out.LastSyncedAt = st.lastSyncedAt.Format(time.RFC3339Nano)
 	}
 	return out
+}
+
+func firstBundleID(values ...bundleitemutils.BundleID) bundleitemutils.BundleID {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 func applyToolPolicyOverlay(tool spec.MCPToolCapability, cfg spec.MCPServerConfig) spec.MCPToolCapability {

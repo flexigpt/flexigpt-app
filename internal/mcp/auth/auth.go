@@ -54,7 +54,7 @@ type AuthManager struct {
 	httpClient       *http.Client
 
 	mu       sync.RWMutex
-	statuses map[spec.MCPServerID]spec.MCPAuthStatus
+	statuses map[authStatusKey]spec.MCPAuthStatus
 }
 
 type AuthManagerOption func(*AuthManager)
@@ -83,7 +83,7 @@ func NewAuthManager(secrets SecretResolver, opts ...AuthManagerOption) *AuthMana
 	}
 	m := &AuthManager{
 		secrets:  secrets,
-		statuses: map[spec.MCPServerID]spec.MCPAuthStatus{},
+		statuses: map[authStatusKey]spec.MCPAuthStatus{},
 	}
 	for _, opt := range opts {
 		if opt != nil {

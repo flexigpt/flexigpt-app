@@ -28,11 +28,12 @@ type MCPServerRuntimeSnapshot struct {
 // snapshots. It is encoded as base64(JSON) and should not be interpreted by
 // callers.
 type MCPDiscoveryPageToken struct {
-	ServerID       MCPServerID `json:"sid"`
-	SnapshotDigest string      `json:"dig"`
-	Kind           string      `json:"k"`
-	PageSize       int         `json:"ps"`
-	Index          int         `json:"i"`
+	BundleID       bundleitemutils.BundleID `json:"bid"`
+	ServerID       MCPServerID              `json:"sid"`
+	SnapshotDigest string                   `json:"dig"`
+	Kind           string                   `json:"k"`
+	PageSize       int                      `json:"ps"`
+	Index          int                      `json:"i"`
 }
 
 type MCPToolAppInfo struct {

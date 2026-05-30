@@ -95,12 +95,12 @@ type GetMCPServerResponse struct {
 }
 
 type ListMCPServersRequest struct {
-	BundleIDs       []bundleitemutils.BundleID `query:"bundleIDs"`
-	ServerIDs       []MCPServerID              `query:"serverIDs"`
-	Enabled         *bool                      `query:"enabled"`
-	IncludeDisabled bool                       `query:"includeDisabled"`
-	PageSize        int                        `query:"pageSize"`
-	PageToken       string                     `query:"pageToken"`
+	BundleID        bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	ServerIDs       []MCPServerID            `                                query:"serverIDs"`
+	Enabled         *bool                    `                                query:"enabled"`
+	IncludeDisabled bool                     `                                query:"includeDisabled"`
+	PageSize        int                      `                                query:"pageSize"`
+	PageToken       string                   `                                query:"pageToken"`
 }
 
 type ListMCPServersResponseBody struct {
@@ -250,6 +250,9 @@ type ListMCPServerPromptsResponse struct {
 }
 
 type EvaluateMCPToolCallRequest struct {
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	ServerID MCPServerID              `path:"serverID" required:"true"`
+
 	Body *InvokeMCPToolRequestBody
 }
 
@@ -281,7 +284,8 @@ type ListPendingMCPOAuthAuthorizationsResponse struct {
 }
 
 type CancelPendingMCPOAuthAuthorizationRequest struct {
-	ServerID MCPServerID `path:"serverID" required:"true"`
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	ServerID MCPServerID              `path:"serverID" required:"true"`
 }
 
 type CancelPendingMCPOAuthAuthorizationResponse struct{}

@@ -267,6 +267,7 @@ type MCPServerCapabilitiesSummary struct {
 
 type MCPPageToken struct {
 	PageSize        int                        `json:"s"`
+	BundleID        bundleitemutils.BundleID   `json:"bid"`
 	CursorID        MCPServerID                `json:"id,omitempty"`
 	CursorAt        string                     `json:"t,omitempty"`
 	Enabled         *bool                      `json:"e,omitempty"`

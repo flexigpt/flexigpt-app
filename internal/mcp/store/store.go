@@ -315,7 +315,7 @@ func (s *Store) PutMCPServer(
 		return nil, fmt.Errorf("%w: %s", spec.ErrMCPBundleDisabled, req.BundleID)
 	}
 	if s.builtinData != nil {
-		if _, err := s.builtinData.GetBuiltInServer(ctx, "", req.ServerID); err == nil {
+		if _, err := s.builtinData.FindBuiltInServerByID(ctx, req.ServerID); err == nil {
 			return nil, fmt.Errorf("%w: serverID %q belongs to a built-in server", spec.ErrMCPConflict, req.ServerID)
 		}
 	}
@@ -392,10 +392,9 @@ func (s *Store) GetMCPServer(
 	ctx context.Context,
 	req *spec.GetMCPServerRequest,
 ) (*spec.GetMCPServerResponse, error) {
-	if req == nil || req.ServerID == "" {
-		return nil, fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
+	if req == nil || req.BundleID == "" || req.ServerID == "" {
+		return nil, fmt.Errorf("%w: bundleID and serverID required", spec.ErrMCPInvalidRequest)
 	}
-
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -416,6 +415,9 @@ func (s *Store) ListMCPServers(
 	ctx context.Context,
 	req *spec.ListMCPServersRequest,
 ) (*spec.ListMCPServersResponse, error) {
+	if req == nil || req.BundleID == "" {
+		return nil, fmt.Errorf("%w: bundleID required", spec.ErrMCPInvalidRequest)
+	}
 	var (
 		pageSize        = spec.DefaultMCPPageSize
 		cursorAt        time.Time
@@ -423,13 +425,15 @@ func (s *Store) ListMCPServers(
 		enabled         *bool
 		includeDisabled bool
 		filterIDs       []spec.MCPServerID
-		filterBundleIDs []bundleitemutils.BundleID
 	)
 
-	if req != nil && req.PageToken != "" {
+	if req.PageToken != "" {
 		tok, err := jsonutil.Base64JSONDecode[spec.MCPPageToken](req.PageToken)
 		if err != nil {
 			return nil, fmt.Errorf("%w: bad pageToken", spec.ErrMCPInvalidRequest)
+		}
+		if tok.BundleID != req.BundleID {
+			return nil, fmt.Errorf("%w: stale pageToken", spec.ErrMCPInvalidRequest)
 		}
 		pageSize = tok.PageSize
 		if pageSize <= 0 || pageSize > spec.MaxMCPServerPageSize {
@@ -438,7 +442,6 @@ func (s *Store) ListMCPServers(
 		enabled = tok.Enabled
 		includeDisabled = tok.IncludeDisabled
 		filterIDs = slices.Clone(tok.IDs)
-		filterBundleIDs = slices.Clone(tok.BundleIDs)
 
 		if tok.CursorAt != "" {
 			cursorAt, err = time.Parse(time.RFC3339Nano, tok.CursorAt)
@@ -447,7 +450,7 @@ func (s *Store) ListMCPServers(
 			}
 			cursorID = tok.CursorID
 		}
-	} else if req != nil {
+	} else {
 		if req.PageSize > 0 && req.PageSize <= spec.MaxMCPServerPageSize {
 			pageSize = req.PageSize
 		}
@@ -455,18 +458,16 @@ func (s *Store) ListMCPServers(
 		includeDisabled = req.IncludeDisabled
 
 		filterIDs = slices.Clone(req.ServerIDs)
-		filterBundleIDs = slices.Clone(req.BundleIDs)
 
+	}
+	bundle, _, err := s.getAnyBundle(ctx, req.BundleID)
+	if err != nil {
+		return nil, err
 	}
 
 	want := map[spec.MCPServerID]struct{}{}
 	for _, id := range filterIDs {
 		want[id] = struct{}{}
-	}
-
-	wantBundles := map[bundleitemutils.BundleID]struct{}{}
-	for _, id := range filterBundleIDs {
-		wantBundles[id] = struct{}{}
 	}
 
 	s.mu.RLock()
@@ -477,14 +478,12 @@ func (s *Store) ListMCPServers(
 	}
 
 	items := make([]spec.MCPServerConfig, 0)
-	add := func(bundle spec.MCPBundle, cfg spec.MCPServerConfig) {
-		if isServerSoftDeleted(&cfg) || isBundleSoftDeleted(bundle) {
+	add := func(cfg spec.MCPServerConfig) {
+		if cfg.BundleID != req.BundleID {
 			return
 		}
-		if len(wantBundles) > 0 {
-			if _, ok := wantBundles[cfg.BundleID]; !ok {
-				return
-			}
+		if isServerSoftDeleted(&cfg) || isBundleSoftDeleted(bundle) {
+			return
 		}
 		effectiveEnabled := cfg.Enabled && bundle.IsEnabled
 		if !includeDisabled && !effectiveEnabled {
@@ -504,19 +503,13 @@ func (s *Store) ListMCPServers(
 	}
 
 	if s.builtinData != nil {
-		bundles, servers, _ := s.builtinData.ListBuiltInData(ctx)
-		for bid, sm := range servers {
-			b := bundles[bid]
-			for _, cfg := range sm {
-				add(b, cfg)
-			}
+		_, servers, _ := s.builtinData.ListBuiltInData(ctx)
+		for _, cfg := range servers[req.BundleID] {
+			add(cfg)
 		}
 	}
-	for bid, sm := range sc.Servers {
-		b := sc.Bundles[bid]
-		for _, cfg := range sm {
-			add(b, cfg)
-		}
+	for _, cfg := range sc.Servers[req.BundleID] {
+		add(cfg)
 	}
 
 	sort.Slice(items, func(i, j int) bool {
@@ -543,11 +536,11 @@ func (s *Store) ListMCPServers(
 		slices.Sort(filterIDs)
 		next := jsonutil.Base64JSONEncode(spec.MCPPageToken{
 			PageSize:        pageSize,
+			BundleID:        req.BundleID,
 			CursorAt:        items[end-1].ModifiedAt.Format(time.RFC3339Nano),
 			CursorID:        items[end-1].ID,
 			Enabled:         enabled,
 			IDs:             filterIDs,
-			BundleIDs:       filterBundleIDs,
 			IncludeDisabled: includeDisabled,
 		})
 		nextTok = &next
@@ -565,10 +558,9 @@ func (s *Store) PatchMCPServerEnabled(
 	ctx context.Context,
 	req *spec.PatchMCPServerEnabledRequest,
 ) (*spec.PatchMCPServerEnabledResponse, error) {
-	if req == nil || req.Body == nil || req.ServerID == "" {
-		return nil, fmt.Errorf("%w: serverID and body required", spec.ErrMCPInvalidRequest)
+	if req == nil || req.Body == nil || req.BundleID == "" || req.ServerID == "" {
+		return nil, fmt.Errorf("%w: bundleID, serverID, and body required", spec.ErrMCPInvalidRequest)
 	}
-
 	if s.builtinData != nil {
 		if _, err := s.builtinData.GetBuiltInServer(ctx, req.BundleID, req.ServerID); err == nil {
 			if _, err := s.builtinData.SetServerEnabled(ctx, req.BundleID, req.ServerID, req.Body.Enabled); err != nil {
@@ -610,8 +602,8 @@ func (s *Store) PatchMCPServerPolicy(
 	ctx context.Context,
 	req *spec.PatchMCPServerPolicyRequest,
 ) (*spec.PatchMCPServerPolicyResponse, error) {
-	if req == nil || req.Body == nil || req.ServerID == "" {
-		return nil, fmt.Errorf("%w: serverID and body required", spec.ErrMCPInvalidRequest)
+	if req == nil || req.Body == nil || req.BundleID == "" || req.ServerID == "" {
+		return nil, fmt.Errorf("%w: bundleID, serverID, and body required", spec.ErrMCPInvalidRequest)
 	}
 
 	if s.builtinData != nil {
@@ -662,8 +654,8 @@ func (s *Store) DeleteMCPServer(
 	ctx context.Context,
 	req *spec.DeleteMCPServerRequest,
 ) (*spec.DeleteMCPServerResponse, error) {
-	if req == nil || req.ServerID == "" {
-		return nil, fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
+	if req == nil || req.BundleID == "" || req.ServerID == "" {
+		return nil, fmt.Errorf("%w: bundleID and serverID required", spec.ErrMCPInvalidRequest)
 	}
 
 	if s.builtinData != nil {
@@ -699,6 +691,9 @@ func (s *Store) DeleteMCPServer(
 }
 
 func (s *Store) SaveLastKnownSnapshot(ctx context.Context, snap spec.MCPDiscoverySnapshot) error {
+	if snap.BundleID == "" {
+		return fmt.Errorf("%w: bundleID required", spec.ErrMCPInvalidRequest)
+	}
 	if snap.ServerID == "" {
 		return fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
 	}
@@ -724,8 +719,15 @@ func (s *Store) SaveLastKnownSnapshot(ctx context.Context, snap spec.MCPDiscover
 
 func (s *Store) GetLastKnownSnapshot(
 	ctx context.Context,
+	bundleID bundleitemutils.BundleID,
 	serverID spec.MCPServerID,
 ) (spec.MCPDiscoverySnapshot, bool, error) {
+	if bundleID == "" || serverID == "" {
+		return spec.MCPDiscoverySnapshot{}, false, fmt.Errorf(
+			"%w: bundleID and serverID required",
+			spec.ErrMCPInvalidRequest,
+		)
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -734,6 +736,9 @@ func (s *Store) GetLastKnownSnapshot(
 		return spec.MCPDiscoverySnapshot{}, false, err
 	}
 	snap, ok := sc.LastKnownSnapshots[serverID]
+	if ok && snap.BundleID != bundleID {
+		return spec.MCPDiscoverySnapshot{}, false, nil
+	}
 	return cloneDiscoverySnapshot(snap), ok, nil
 }
 
@@ -792,6 +797,15 @@ func (s *Store) readAll(force bool) (storeSchema, error) {
 			}
 			if prev, dup := seen[id]; dup && prev != bid {
 				return storeSchema{}, fmt.Errorf("server id %q appears in multiple bundles", id)
+			}
+			if s.builtinData != nil {
+				if _, err := s.builtinData.FindBuiltInServerByID(context.Background(), id); err == nil {
+					return storeSchema{}, fmt.Errorf(
+						"user server id %q in bundle %q collides with a built-in server",
+						id,
+						bid,
+					)
+				}
 			}
 			seen[id] = bid
 			if err := validateServerConfig(&cfg); err != nil {

@@ -6,11 +6,20 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
+type authStatusKey struct {
+	BundleID bundleitemutils.BundleID
+	ServerID spec.MCPServerID
+}
+
 func MergeMCPAuthStatus(st spec.MCPAuthStatus, cfg spec.MCPServerConfig) spec.MCPAuthStatus {
 	def := DefaultMCPAuthStatusFromConfig(cfg)
+	if st.BundleID != "" && st.BundleID != def.BundleID {
+		return def
+	}
 	if st.ServerID != "" && st.ServerID != def.ServerID {
 		return def
 	}
@@ -76,29 +85,38 @@ func (m *AuthManager) SaveAuthStatus(ctx context.Context, st spec.MCPAuthStatus)
 	if m == nil {
 		return nil
 	}
+	if st.BundleID == "" {
+		return fmt.Errorf("%w: bundleID required", spec.ErrMCPInvalidRequest)
+	}
 	if st.ServerID == "" {
 		return fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
 	}
 
 	cloned := cloneAuthStatus(st)
+	key := authStatusKey{BundleID: st.BundleID, ServerID: st.ServerID}
 
 	m.mu.Lock()
 	if m.statuses == nil {
-		m.statuses = map[spec.MCPServerID]spec.MCPAuthStatus{}
+		m.statuses = map[authStatusKey]spec.MCPAuthStatus{}
 	}
-	m.statuses[st.ServerID] = cloned
+	m.statuses[key] = cloned
+
 	m.mu.Unlock()
 
 	return nil
 }
 
-func (m *AuthManager) GetAuthStatus(serverID spec.MCPServerID) (spec.MCPAuthStatus, bool) {
-	if m == nil || serverID == "" {
+func (m *AuthManager) GetAuthStatus(
+	bundleID bundleitemutils.BundleID,
+	serverID spec.MCPServerID,
+) (spec.MCPAuthStatus, bool) {
+	if m == nil || bundleID == "" || serverID == "" {
 		return spec.MCPAuthStatus{}, false
 	}
 
 	m.mu.RLock()
-	st, ok := m.statuses[serverID]
+	st, ok := m.statuses[authStatusKey{BundleID: bundleID, ServerID: serverID}]
+
 	m.mu.RUnlock()
 
 	if !ok {
@@ -107,13 +125,14 @@ func (m *AuthManager) GetAuthStatus(serverID spec.MCPServerID) (spec.MCPAuthStat
 	return cloneAuthStatus(st), true
 }
 
-func (m *AuthManager) ClearAuthStatus(serverID spec.MCPServerID) {
-	if m == nil || serverID == "" {
+func (m *AuthManager) ClearAuthStatus(bundleID bundleitemutils.BundleID, serverID spec.MCPServerID) {
+	if m == nil || bundleID == "" || serverID == "" {
 		return
 	}
 
 	m.mu.Lock()
-	delete(m.statuses, serverID)
+	delete(m.statuses, authStatusKey{BundleID: bundleID, ServerID: serverID})
+
 	m.mu.Unlock()
 }
 
@@ -123,7 +142,7 @@ func (m *AuthManager) ClearAuthStatuses() {
 	}
 
 	m.mu.Lock()
-	m.statuses = map[spec.MCPServerID]spec.MCPAuthStatus{}
+	m.statuses = map[authStatusKey]spec.MCPAuthStatus{}
 	m.mu.Unlock()
 }
 

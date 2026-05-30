@@ -22,6 +22,11 @@ const (
 	defaultOAuthCallbackPath = "/mcp/oauth/callback"
 )
 
+type oauthPendingKey struct {
+	BundleID string
+	ServerID spec.MCPServerID
+}
+
 type oauthLoopbackResult struct {
 	Result *OAuthAuthorizationResult
 	Err    error
@@ -56,7 +61,7 @@ type OAuthLoopbackBroker struct {
 	server   *http.Server
 	listener net.Listener
 
-	pendingByServer map[spec.MCPServerID]*pendingOAuthAuthorization
+	pendingByServer map[oauthPendingKey]*pendingOAuthAuthorization
 	pendingByState  map[string]*pendingOAuthAuthorization
 }
 
@@ -95,7 +100,7 @@ func NewOAuthLoopbackBroker(ctx context.Context, opts *OAuthLoopbackBrokerOption
 		callbackPath:    callbackPath,
 		logger:          logger,
 		listener:        ln,
-		pendingByServer: map[spec.MCPServerID]*pendingOAuthAuthorization{},
+		pendingByServer: map[oauthPendingKey]*pendingOAuthAuthorization{},
 		pendingByState:  map[string]*pendingOAuthAuthorization{},
 	}
 
@@ -135,6 +140,10 @@ func (b *OAuthLoopbackBroker) FetchAuthorizationCode(
 	if b == nil {
 		return nil, fmt.Errorf("%w: OAuth loopback broker is not configured", spec.ErrMCPAuthRequired)
 	}
+	req.BundleID = strings.TrimSpace(req.BundleID)
+	if req.BundleID == "" {
+		return nil, fmt.Errorf("%w: OAuth bundleID required", spec.ErrMCPInvalidRequest)
+	}
 	if req.ServerID == "" {
 		return nil, fmt.Errorf("%w: OAuth serverID required", spec.ErrMCPInvalidRequest)
 	}
@@ -151,7 +160,7 @@ func (b *OAuthLoopbackBroker) FetchAuthorizationCode(
 	id := rand.Text()
 
 	p := &pendingOAuthAuthorization{
-		BundleID:         strings.TrimSpace(req.BundleID),
+		BundleID:         req.BundleID,
 		ID:               id,
 		ServerID:         req.ServerID,
 		AuthorizationURL: req.AuthorizationURL,
@@ -164,11 +173,13 @@ func (b *OAuthLoopbackBroker) FetchAuthorizationCode(
 	b.mu.Lock()
 	b.purgeExpiredLocked(now)
 
-	if old := b.pendingByServer[req.ServerID]; old != nil {
+	key := oauthPendingKey{BundleID: p.BundleID, ServerID: p.ServerID}
+	if old := b.pendingByServer[key]; old != nil {
 		b.completeLocked(old, nil, fmt.Errorf("%w: OAuth authorization superseded", spec.ErrMCPAuthRequired))
 	}
 
-	b.pendingByServer[p.ServerID] = p
+	b.pendingByServer[key] = p
+
 	b.pendingByState[p.State] = p
 	b.mu.Unlock()
 
@@ -215,20 +226,25 @@ func (b *OAuthLoopbackBroker) Pending() []spec.MCPOAuthAuthorization {
 	}
 
 	// One pending authorization per ServerID by construction.
-	sort.Slice(out, func(i, j int) bool { return out[i].ServerID < out[j].ServerID })
-
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].BundleID == out[j].BundleID {
+			return out[i].ServerID < out[j].ServerID
+		}
+		return out[i].BundleID < out[j].BundleID
+	})
 	return out
 }
 
-func (b *OAuthLoopbackBroker) Cancel(serverID spec.MCPServerID) bool {
-	if b == nil || serverID == "" {
+func (b *OAuthLoopbackBroker) Cancel(bundleID bundleitemutils.BundleID, serverID spec.MCPServerID) bool {
+	if b == nil || bundleID == "" || serverID == "" {
 		return false
 	}
 
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	p := b.pendingByServer[serverID]
+	p := b.pendingByServer[oauthPendingKey{BundleID: string(bundleID), ServerID: serverID}]
+
 	if p == nil {
 		return false
 	}
@@ -343,7 +359,7 @@ func (b *OAuthLoopbackBroker) removeIfCurrent(p *pendingOAuthAuthorization) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if current := b.pendingByServer[p.ServerID]; current == p {
+	if current := b.pendingByServer[oauthPendingKey{BundleID: p.BundleID, ServerID: p.ServerID}]; current == p {
 		b.removeLocked(p)
 	}
 }
@@ -374,7 +390,8 @@ func (b *OAuthLoopbackBroker) completeLocked(
 }
 
 func (b *OAuthLoopbackBroker) removeLocked(p *pendingOAuthAuthorization) {
-	delete(b.pendingByServer, p.ServerID)
+	delete(b.pendingByServer, oauthPendingKey{BundleID: p.BundleID, ServerID: p.ServerID})
+
 	delete(b.pendingByState, p.State)
 }
 

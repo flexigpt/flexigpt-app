@@ -28,7 +28,11 @@ func (b *ToolBridge) Evaluate(
 		return nil, fmt.Errorf("%w: missing request", spec.ErrMCPInvalidRequest)
 	}
 
-	_, cfg, tool, err := b.runtime.CallToolDryRun(ctx, *req.Body)
+	if req.BundleID == "" || req.ServerID == "" {
+		return nil, fmt.Errorf("%w: bundleID and serverID required", spec.ErrMCPInvalidRequest)
+	}
+
+	_, cfg, tool, err := b.runtime.CallToolDryRun(ctx, req.BundleID, req.ServerID, *req.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +67,11 @@ func (b *ToolBridge) Invoke(
 		return nil, fmt.Errorf("%w: missing request", spec.ErrMCPInvalidRequest)
 	}
 
-	_, cfg, tool, err := b.runtime.CallToolDryRun(ctx, *req.Body)
+	if req.BundleID == "" || req.ServerID == "" {
+		return nil, fmt.Errorf("%w: bundleID and serverID required", spec.ErrMCPInvalidRequest)
+	}
+
+	_, cfg, tool, err := b.runtime.CallToolDryRun(ctx, req.BundleID, req.ServerID, *req.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +111,7 @@ func (b *ToolBridge) Invoke(
 		return nil, fmt.Errorf("%w: invalid approval decision %q", spec.ErrMCPInvalidRequest, eval.Decision)
 	}
 
-	out, _, _, err := b.runtime.CallTool(ctx, *req.Body)
+	out, _, _, err := b.runtime.CallTool(ctx, req.BundleID, req.ServerID, *req.Body)
 	if err != nil {
 		return nil, err
 	}

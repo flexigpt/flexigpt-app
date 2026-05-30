@@ -127,7 +127,7 @@ func validateServerConfig(c *spec.MCPServerConfig) error {
 		if c.StreamableHTTP != nil {
 			return errors.New("streamableHttp must be empty for stdio transport")
 		}
-		return validateStdioConfig(c.ID, c.Stdio)
+		return validateStdioConfig(c.BundleID, c.ID, c.Stdio)
 	case spec.MCPTransportStreamableHTTP:
 		if c.StreamableHTTP == nil {
 			return errors.New("streamableHttp config required")
@@ -135,7 +135,7 @@ func validateServerConfig(c *spec.MCPServerConfig) error {
 		if c.Stdio != nil {
 			return errors.New("stdio must be empty for streamableHttp transport")
 		}
-		if err := validateHTTPConfig(c.ID, c.StreamableHTTP); err != nil {
+		if err := validateHTTPConfig(c.BundleID, c.ID, c.StreamableHTTP); err != nil {
 			return err
 		}
 		return nil
@@ -144,7 +144,11 @@ func validateServerConfig(c *spec.MCPServerConfig) error {
 	}
 }
 
-func validateStdioConfig(serverID spec.MCPServerID, c *spec.MCPStdioConfig) error {
+func validateStdioConfig(
+	bundleID bundleitemutils.BundleID,
+	serverID spec.MCPServerID,
+	c *spec.MCPStdioConfig,
+) error {
 	if strings.TrimSpace(c.Command) == "" {
 		return errors.New("stdio.command is empty")
 	}
@@ -174,7 +178,7 @@ func validateStdioConfig(serverID spec.MCPServerID, c *spec.MCPStdioConfig) erro
 		if strings.TrimSpace(ref) == "" {
 			return fmt.Errorf("stdio.secretEnvRefs[%q] contains empty ref", k)
 		}
-		if err := secret.ValidateMCPSecretRef(ref, serverID, spec.MCPSecretKindStdioEnv, k); err != nil {
+		if err := secret.ValidateMCPSecretRef(ref, bundleID, serverID, spec.MCPSecretKindStdioEnv, k); err != nil {
 			return fmt.Errorf("stdio.secretEnvRefs[%q]: %w", k, err)
 		}
 	}
@@ -184,7 +188,11 @@ func validateStdioConfig(serverID spec.MCPServerID, c *spec.MCPStdioConfig) erro
 	return nil
 }
 
-func validateHTTPConfig(serverID spec.MCPServerID, c *spec.MCPStreamableHTTPConfig) error {
+func validateHTTPConfig(
+	bundleID bundleitemutils.BundleID,
+	serverID spec.MCPServerID,
+	c *spec.MCPStreamableHTTPConfig,
+) error {
 	raw := strings.TrimSpace(c.URL)
 	if raw == "" {
 		return errors.New("streamableHttp.url is empty")
@@ -246,12 +254,12 @@ func validateHTTPConfig(serverID spec.MCPServerID, c *spec.MCPStreamableHTTPConf
 		if strings.TrimSpace(c.ClientCredentialRef) == "" {
 			return errors.New("streamableHttp.clientCredentialRef is required for clientCredentials authMode")
 		}
-		if err := validateOAuthClientCredentialRef(serverID, c.ClientCredentialRef); err != nil {
+		if err := validateOAuthClientCredentialRef(bundleID, serverID, c.ClientCredentialRef); err != nil {
 			return fmt.Errorf("streamableHttp.clientCredentialRef: %w", err)
 		}
 	case spec.MCPHTTPAuthOAuth:
 		if strings.TrimSpace(c.ClientCredentialRef) != "" {
-			if err := validateOAuthClientCredentialRef(serverID, c.ClientCredentialRef); err != nil {
+			if err := validateOAuthClientCredentialRef(bundleID, serverID, c.ClientCredentialRef); err != nil {
 				return fmt.Errorf("streamableHttp.clientCredentialRef: %w", err)
 			}
 		}
@@ -270,13 +278,18 @@ func validateHTTPConfig(serverID spec.MCPServerID, c *spec.MCPStreamableHTTPConf
 	return nil
 }
 
-func validateOAuthClientCredentialRef(serverID spec.MCPServerID, ref string) error {
+func validateOAuthClientCredentialRef(
+	bundleID bundleitemutils.BundleID,
+	serverID spec.MCPServerID,
+	ref string,
+) error {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
 		return errors.New("streamableHttp.clientCredentialRef is empty")
 	}
 	return secret.ValidateMCPSecretRef(
 		ref,
+		bundleID,
 		serverID,
 		spec.MCPSecretKindOAuthClientCredentials,
 		"clientCredentials",

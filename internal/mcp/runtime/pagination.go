@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
@@ -16,6 +17,7 @@ const (
 )
 
 func paginateDiscoveryItems[T any](
+	bundleID bundleitemutils.BundleID,
 	serverID spec.MCPServerID,
 	snapshotDigest string,
 	kind string,
@@ -30,7 +32,8 @@ func paginateDiscoveryItems[T any](
 		if err != nil {
 			return nil, nil, fmt.Errorf("%w: bad pageToken", spec.ErrMCPInvalidRequest)
 		}
-		if tok.ServerID != serverID || tok.SnapshotDigest != snapshotDigest || tok.Kind != kind {
+		if tok.BundleID != bundleID || tok.ServerID != serverID ||
+			tok.SnapshotDigest != snapshotDigest || tok.Kind != kind {
 			return nil, nil, fmt.Errorf("%w: stale pageToken", spec.ErrMCPInvalidRequest)
 		}
 		if tok.PageSize <= 0 || tok.PageSize > spec.MaxMCPServerPageSize {
@@ -58,6 +61,7 @@ func paginateDiscoveryItems[T any](
 
 	if end < len(items) {
 		raw, err := encodeDiscoveryPageToken(spec.MCPDiscoveryPageToken{
+			BundleID:       bundleID,
 			ServerID:       serverID,
 			SnapshotDigest: snapshotDigest,
 			Kind:           kind,

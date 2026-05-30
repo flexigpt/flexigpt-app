@@ -3,9 +3,6 @@ package spec
 import "github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 
 type InvokeMCPToolRequestBody struct {
-	BundleID bundleitemutils.BundleID `json:"bundleID" required:"true"`
-	ServerID MCPServerID              `json:"serverID" required:"true"`
-
 	Source           MCPInvocationSource `json:"source"                     required:"true"`
 	ToolName         string              `json:"toolName"                   required:"true"`
 	ProviderToolName string              `json:"providerToolName,omitempty"`
@@ -24,6 +21,9 @@ type InvokeMCPToolRequestBody struct {
 }
 
 type InvokeMCPToolRequest struct {
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	ServerID MCPServerID              `path:"serverID" required:"true"`
+
 	Body *InvokeMCPToolRequestBody
 }
 

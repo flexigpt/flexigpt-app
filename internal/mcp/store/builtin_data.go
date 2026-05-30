@@ -175,22 +175,31 @@ func (d *BuiltInData) GetBuiltInServer(
 	bundleID bundleitemutils.BundleID,
 	serverID spec.MCPServerID,
 ) (spec.MCPServerConfig, error) {
-	if d == nil || serverID == "" {
+	if d == nil || bundleID == "" || serverID == "" {
 		return spec.MCPServerConfig{}, fmt.Errorf("%w: %s", spec.ErrMCPServerNotFound, serverID)
 	}
 
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
-	if bundleID != "" {
-		if servers := d.viewServers[bundleID]; servers != nil {
-			if cfg, ok := servers[serverID]; ok {
-				return cloneServerConfig(cfg), nil
-			}
+	if servers := d.viewServers[bundleID]; servers != nil {
+		if cfg, ok := servers[serverID]; ok {
+			return cloneServerConfig(cfg), nil
 		}
+	}
+	return spec.MCPServerConfig{}, fmt.Errorf("%w: %s", spec.ErrMCPServerNotFound, serverID)
+}
+
+func (d *BuiltInData) FindBuiltInServerByID(
+	ctx context.Context,
+	serverID spec.MCPServerID,
+) (spec.MCPServerConfig, error) {
+	if d == nil || serverID == "" {
 		return spec.MCPServerConfig{}, fmt.Errorf("%w: %s", spec.ErrMCPServerNotFound, serverID)
 	}
 
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	for _, servers := range d.viewServers {
 		if cfg, ok := servers[serverID]; ok {
 			return cloneServerConfig(cfg), nil
@@ -242,11 +251,7 @@ func (d *BuiltInData) SetServerEnabled(
 	}
 
 	if bundleID == "" {
-		cfg, err := d.GetBuiltInServer(ctx, "", serverID)
-		if err != nil {
-			return spec.MCPServerConfig{}, err
-		}
-		bundleID = cfg.BundleID
+		return spec.MCPServerConfig{}, fmt.Errorf("%w: bundleID required", spec.ErrMCPInvalidRequest)
 	}
 
 	if d.servers[bundleID] == nil {
@@ -347,6 +352,14 @@ func (d *BuiltInData) populateDataFromFS(ctx context.Context) error {
 				return fmt.Errorf("%s: %w", inPath, err)
 			}
 
+			if cfg.BundleID != "" && cfg.BundleID != dirInfo.ID {
+				return fmt.Errorf(
+					"%s: bundleID %q does not match parent bundle %q",
+					inPath,
+					cfg.BundleID,
+					dirInfo.ID,
+				)
+			}
 			cfg.BundleID = dirInfo.ID
 			cfg.IsBuiltIn = true
 			cfg.SoftDeletedAt = nil

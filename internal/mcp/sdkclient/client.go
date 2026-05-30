@@ -76,6 +76,7 @@ func (f *Factory) Connect(
 			ToolListChangedHandler: func(ctx context.Context, req *mcpSDK.ToolListChangedRequest) {
 				logger.Info("mcp tools list changed", "sessionID", safeClientSessionID(req))
 				emit(ctx, runtime.ClientNotification{
+					BundleID: cfg.BundleID,
 					ServerID: cfg.ID,
 					Kind:     runtime.ClientNotificationToolListChanged,
 				})
@@ -83,6 +84,7 @@ func (f *Factory) Connect(
 			PromptListChangedHandler: func(ctx context.Context, req *mcpSDK.PromptListChangedRequest) {
 				logger.Info("mcp prompts list changed", "sessionID", safeClientSessionID(req))
 				emit(ctx, runtime.ClientNotification{
+					BundleID: cfg.BundleID,
 					ServerID: cfg.ID,
 					Kind:     runtime.ClientNotificationPromptListChanged,
 				})
@@ -90,6 +92,7 @@ func (f *Factory) Connect(
 			ResourceListChangedHandler: func(ctx context.Context, req *mcpSDK.ResourceListChangedRequest) {
 				logger.Info("mcp resources list changed", "sessionID", safeClientSessionID(req))
 				emit(ctx, runtime.ClientNotification{
+					BundleID: cfg.BundleID,
 					ServerID: cfg.ID,
 					Kind:     runtime.ClientNotificationResourceListChanged,
 				})
@@ -100,6 +103,7 @@ func (f *Factory) Connect(
 					uri = req.Params.URI
 				}
 				emit(ctx, runtime.ClientNotification{
+					BundleID:    cfg.BundleID,
 					ServerID:    cfg.ID,
 					Kind:        runtime.ClientNotificationResourceUpdated,
 					ResourceURI: uri,
@@ -111,6 +115,7 @@ func (f *Factory) Connect(
 				}
 
 				emit(ctx, runtime.ClientNotification{
+					BundleID:     cfg.BundleID,
 					ServerID:     cfg.ID,
 					Kind:         runtime.ClientNotificationLoggingMessage,
 					LoggerName:   req.Params.Logger,
@@ -123,6 +128,7 @@ func (f *Factory) Connect(
 					return
 				}
 				emit(ctx, runtime.ClientNotification{
+					BundleID: cfg.BundleID,
 					ServerID: cfg.ID,
 					Kind:     runtime.ClientNotificationProgress,
 					Progress: req.Params.Progress,

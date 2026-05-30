@@ -1,5 +1,7 @@
 package spec
 
+import "github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+
 const SecretRefVersion = "mcpv1"
 
 type MCPSecretKind string
@@ -16,7 +18,8 @@ const (
 )
 
 type MCPSecretRef struct {
-	ServerID MCPServerID   `json:"serverID"`
-	Kind     MCPSecretKind `json:"kind"`
-	Slot     string        `json:"slot,omitempty"`
+	BundleID bundleitemutils.BundleID `json:"bundleID"`
+	ServerID MCPServerID              `json:"serverID"`
+	Kind     MCPSecretKind            `json:"kind"`
+	Slot     string                   `json:"slot,omitempty"`
 }

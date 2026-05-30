@@ -3,12 +3,13 @@ package spec
 import "github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 
 type MCPReadResourceRequestBody struct {
-	BundleID bundleitemutils.BundleID `json:"bundleID" required:"true"`
-	ServerID MCPServerID              `json:"serverID" required:"true"`
-	URI      string                   `json:"uri"      required:"true"`
+	URI string `json:"uri" required:"true"`
 }
 
 type MCPReadResourceRequest struct {
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	ServerID MCPServerID              `path:"serverID" required:"true"`
+
 	Body *MCPReadResourceRequestBody
 }
 

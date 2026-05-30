@@ -247,11 +247,12 @@ func (w *MCPWrapper) GetMCPServerAuthStatus(
 	req *spec.GetMCPServerAuthStatusRequest,
 ) (*spec.GetMCPServerAuthStatusResponse, error) {
 	return middleware.WithRecoveryResp(func() (*spec.GetMCPServerAuthStatusResponse, error) {
-		if req == nil || req.ServerID == "" {
-			return nil, fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
+		if req == nil || req.BundleID == "" || req.ServerID == "" {
+			return nil, fmt.Errorf("%w: bundleID and serverID required", spec.ErrMCPInvalidRequest)
 		}
 
 		cfgResp, err := w.store.GetMCPServer(context.Background(), &spec.GetMCPServerRequest{
+			BundleID: req.BundleID,
 			ServerID: req.ServerID,
 		})
 		if err != nil {
@@ -263,7 +264,7 @@ func (w *MCPWrapper) GetMCPServerAuthStatus(
 
 		st := auth.DefaultMCPAuthStatusFromConfig(*cfgResp.Body)
 		if w != nil && w.auth != nil {
-			if cur, ok := w.auth.GetAuthStatus(req.ServerID); ok {
+			if cur, ok := w.auth.GetAuthStatus(req.BundleID, req.ServerID); ok {
 				st = auth.MergeMCPAuthStatus(cur, *cfgResp.Body)
 			}
 		}
@@ -279,6 +280,7 @@ func (w *MCPWrapper) PutMCPServer(req *spec.PutMCPServerRequest) (*spec.PutMCPSe
 		}
 		if req != nil && req.ServerID != "" {
 			_, _ = w.runtime.Disconnect(context.Background(), &spec.DisconnectMCPServerRequest{
+				BundleID: req.BundleID,
 				ServerID: req.ServerID,
 			})
 		}
@@ -308,6 +310,7 @@ func (w *MCPWrapper) PatchMCPServerEnabled(
 		}
 		if req != nil && req.Body != nil && !req.Body.Enabled {
 			_, _ = w.runtime.Disconnect(context.Background(), &spec.DisconnectMCPServerRequest{
+				BundleID: req.BundleID,
 				ServerID: req.ServerID,
 			})
 		}
@@ -331,6 +334,7 @@ func (w *MCPWrapper) DeleteMCPServer(req *spec.DeleteMCPServerRequest) (*spec.De
 		}
 		if req != nil {
 			_, _ = w.runtime.Disconnect(context.Background(), &spec.DisconnectMCPServerRequest{
+				BundleID: req.BundleID,
 				ServerID: req.ServerID,
 			})
 		}
@@ -470,11 +474,11 @@ func (w *MCPWrapper) CancelPendingMCPOAuthAuthorization(
 	req *spec.CancelPendingMCPOAuthAuthorizationRequest,
 ) (*spec.CancelPendingMCPOAuthAuthorizationResponse, error) {
 	return middleware.WithRecoveryResp(func() (*spec.CancelPendingMCPOAuthAuthorizationResponse, error) {
-		if req == nil || req.ServerID == "" {
-			return nil, fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
+		if req == nil || req.BundleID == "" || req.ServerID == "" {
+			return nil, fmt.Errorf("%w: bundleID and serverID required", spec.ErrMCPInvalidRequest)
 		}
 		if w != nil && w.oauthBroker != nil {
-			_ = w.oauthBroker.Cancel(req.ServerID)
+			_ = w.oauthBroker.Cancel(req.BundleID, req.ServerID)
 		}
 		return &spec.CancelPendingMCPOAuthAuthorizationResponse{}, nil
 	})
@@ -484,11 +488,12 @@ func (w *MCPWrapper) GetMCPServerAuthHealth(
 	req *spec.GetMCPServerAuthHealthRequest,
 ) (*spec.GetMCPServerAuthHealthResponse, error) {
 	return middleware.WithRecoveryResp(func() (*spec.GetMCPServerAuthHealthResponse, error) {
-		if req == nil || req.ServerID == "" {
-			return nil, fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
+		if req == nil || req.BundleID == "" || req.ServerID == "" {
+			return nil, fmt.Errorf("%w: bundleID and serverID required", spec.ErrMCPInvalidRequest)
 		}
 
 		cfgResp, err := w.store.GetMCPServer(context.Background(), &spec.GetMCPServerRequest{
+			BundleID: req.BundleID,
 			ServerID: req.ServerID,
 		})
 		if err != nil {
@@ -507,20 +512,21 @@ func (w *MCPWrapper) PutMCPServerSecret(
 	req *spec.PutMCPServerSecretRequest,
 ) (*spec.PutMCPServerSecretResponse, error) {
 	return middleware.WithRecoveryResp(func() (*spec.PutMCPServerSecretResponse, error) {
-		if req == nil || req.Body == nil || req.ServerID == "" {
-			return nil, fmt.Errorf("%w: serverID and body required", spec.ErrMCPInvalidRequest)
+		if req == nil || req.Body == nil || req.BundleID == "" || req.ServerID == "" {
+			return nil, fmt.Errorf("%w: bundleID, serverID, and body required", spec.ErrMCPInvalidRequest)
 		}
 		if w == nil || w.secretWriter == nil {
 			return nil, fmt.Errorf("%w: secret writer is not configured", spec.ErrMCPRuntimeNotReady)
 		}
 
 		if _, err := w.store.GetMCPServer(context.Background(), &spec.GetMCPServerRequest{
+			BundleID: req.BundleID,
 			ServerID: req.ServerID,
 		}); err != nil {
 			return nil, err
 		}
 
-		secretRef, err := secret.NewMCPSecretRefString(req.ServerID, req.Body.Kind, req.Body.Slot)
+		secretRef, err := secret.NewMCPSecretRefString(req.BundleID, req.ServerID, req.Body.Kind, req.Body.Slot)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", spec.ErrMCPInvalidRequest, err)
 		}
@@ -550,14 +556,22 @@ func (w *MCPWrapper) DeleteMCPServerSecret(
 	req *spec.DeleteMCPServerSecretRequest,
 ) (*spec.DeleteMCPServerSecretResponse, error) {
 	return middleware.WithRecoveryResp(func() (*spec.DeleteMCPServerSecretResponse, error) {
-		if req == nil || req.ServerID == "" || req.Kind == "" || strings.TrimSpace(req.Slot) == "" {
-			return nil, fmt.Errorf("%w: serverID, kind, and slot required", spec.ErrMCPInvalidRequest)
+		if req == nil || req.BundleID == "" || req.ServerID == "" || req.Kind == "" ||
+			strings.TrimSpace(req.Slot) == "" {
+			return nil, fmt.Errorf("%w: bundleID, serverID, kind, and slot required", spec.ErrMCPInvalidRequest)
 		}
 		if w == nil || w.secretWriter == nil {
 			return nil, fmt.Errorf("%w: secret writer is not configured", spec.ErrMCPRuntimeNotReady)
 		}
 
-		secretRef, err := secret.NewMCPSecretRefString(req.ServerID, req.Kind, req.Slot)
+		if _, err := w.store.GetMCPServer(context.Background(), &spec.GetMCPServerRequest{
+			BundleID: req.BundleID,
+			ServerID: req.ServerID,
+		}); err != nil {
+			return nil, err
+		}
+
+		secretRef, err := secret.NewMCPSecretRefString(req.BundleID, req.ServerID, req.Kind, req.Slot)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", spec.ErrMCPInvalidRequest, err)
 		}
@@ -574,7 +588,7 @@ func (w *MCPWrapper) disconnectBundleServers(ctx context.Context, bundleID bundl
 		return
 	}
 	resp, err := w.store.ListMCPServers(ctx, &spec.ListMCPServersRequest{
-		BundleIDs:       []bundleitemutils.BundleID{bundleID},
+		BundleID:        bundleID,
 		IncludeDisabled: true,
 		PageSize:        spec.MaxMCPServerPageSize,
 	})
@@ -595,12 +609,13 @@ func (w *MCPWrapper) buildMCPAuthHealth(
 ) *spec.MCPAuthHealth {
 	st := auth.DefaultMCPAuthStatusFromConfig(cfg)
 	if w != nil && w.auth != nil {
-		if cur, ok := w.auth.GetAuthStatus(cfg.ID); ok {
+		if cur, ok := w.auth.GetAuthStatus(cfg.BundleID, cfg.ID); ok {
 			st = auth.MergeMCPAuthStatus(cur, cfg)
 		}
 	}
 
 	health := &spec.MCPAuthHealth{
+		BundleID:   cfg.BundleID,
 		ServerID:   cfg.ID,
 		AuthMode:   normalizeWrapperHTTPAuthMode(st.AuthMode),
 		State:      spec.MCPAuthHealthStateAuthorizationNeeded,
@@ -667,7 +682,7 @@ func (w *MCPWrapper) buildMCPAuthHealth(
 			}
 		}
 
-		if pending, ok := w.pendingOAuthAuthorization(cfg.ID); ok {
+		if pending, ok := w.pendingOAuthAuthorization(cfg.BundleID, cfg.ID); ok {
 			health.State = spec.MCPAuthHealthStateAuthorizationPending
 			health.Configured = true
 			health.AuthorizationPending = true
@@ -746,13 +761,14 @@ func (w *MCPWrapper) oauthClientSecretConfigured(
 }
 
 func (w *MCPWrapper) pendingOAuthAuthorization(
+	bundleID bundleitemutils.BundleID,
 	serverID spec.MCPServerID,
 ) (spec.MCPOAuthAuthorization, bool) {
 	if w == nil || w.oauthBroker == nil {
 		return spec.MCPOAuthAuthorization{}, false
 	}
 	for _, pending := range w.oauthBroker.Pending() {
-		if pending.ServerID == serverID {
+		if pending.BundleID == bundleID && pending.ServerID == serverID {
 			return pending, true
 		}
 	}
