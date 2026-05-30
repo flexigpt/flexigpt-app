@@ -12,6 +12,46 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
+func NewMCPSecretRef(
+	serverID spec.MCPServerID,
+	kind spec.MCPSecretKind,
+	slot string,
+) (spec.MCPSecretRef, error) {
+	serverID = spec.MCPServerID(strings.TrimSpace(string(serverID)))
+	kind = normalizeSecretKind(kind)
+
+	normalizedSlot, err := normalizeAndValidateSecretSlot(kind, slot)
+	if err != nil {
+		return spec.MCPSecretRef{}, err
+	}
+
+	ref := spec.MCPSecretRef{
+		ServerID: serverID,
+		Kind:     kind,
+		Slot:     normalizedSlot,
+	}
+	if err := validateSecret(ref); err != nil {
+		return spec.MCPSecretRef{}, err
+	}
+	return ref, nil
+}
+
+func NewMCPSecretRefString(
+	serverID spec.MCPServerID,
+	kind spec.MCPSecretKind,
+	slot string,
+) (string, error) {
+	ref, err := NewMCPSecretRef(serverID, kind, slot)
+	if err != nil {
+		return "", err
+	}
+	out := GetMCPSecretRefString(ref)
+	if out == "" {
+		return "", errors.New("could not encode secret ref")
+	}
+	return out, nil
+}
+
 func ValidateMCPSecretRef(raw string, serverID spec.MCPServerID, kind spec.MCPSecretKind, slot string) error {
 	ref, err := ParseMCPSecretRef(raw)
 	if err != nil {
@@ -112,6 +152,66 @@ func validateSecret(r spec.MCPSecretRef) error {
 	}
 	if strings.TrimSpace(r.Slot) == "" {
 		return errors.New("secret ref slot is empty")
+	}
+	switch r.Kind {
+	case spec.MCPSecretKindOAuthClientCredentials:
+		if r.Slot != normalizeSecretSlot("clientCredentials") {
+			return fmt.Errorf(
+				"secret ref slot %q is invalid for kind %q",
+				r.Slot,
+				r.Kind,
+			)
+		}
+	case spec.MCPSecretKindStdioEnv:
+		if err := validateEnvSecretSlot(r.Slot); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func normalizeAndValidateSecretSlot(kind spec.MCPSecretKind, slot string) (string, error) {
+	raw := strings.TrimSpace(slot)
+	if raw == "" {
+		return "", errors.New("secret ref slot is empty")
+	}
+
+	switch kind {
+	case spec.MCPSecretKindStdioEnv:
+		if err := validateEnvSecretSlot(raw); err != nil {
+			return "", err
+		}
+		return normalizeSecretSlot(raw), nil
+
+	case spec.MCPSecretKindOAuthClientCredentials:
+		if !strings.EqualFold(raw, "clientCredentials") {
+			return "", fmt.Errorf(
+				"secret ref slot %q is invalid for kind %q; expected clientCredentials",
+				slot,
+				kind,
+			)
+		}
+		return normalizeSecretSlot("clientCredentials"), nil
+
+	default:
+		return "", fmt.Errorf("secret ref kind %q is invalid", kind)
+	}
+}
+
+func validateEnvSecretSlot(key string) error {
+	if strings.TrimSpace(key) == "" {
+		return errors.New("env key is empty")
+	}
+	if strings.TrimSpace(key) != key {
+		return errors.New("env key has leading/trailing whitespace")
+	}
+	if strings.ContainsAny(key, "=\x00") {
+		return errors.New("env key must not contain '=' or NUL")
+	}
+	for _, c := range key {
+		if c < 0x20 || c == 0x7f {
+			return fmt.Errorf("env key contains control character %q", c)
+		}
 	}
 	return nil
 }

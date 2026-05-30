@@ -9,6 +9,11 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
 )
 
+func ValidateOAuthClientCredentialsSecret(raw string, requireClientSecret bool) error {
+	_, _, err := parseOAuthClientCredentialsSecret(raw, requireClientSecret)
+	return err
+}
+
 func resolveOAuthClientCredentials(
 	ctx context.Context,
 	secrets SecretResolver,

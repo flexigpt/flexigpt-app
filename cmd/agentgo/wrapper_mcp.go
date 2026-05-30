@@ -19,6 +19,20 @@ import (
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
 )
 
+type mcpAuthKeyStore interface {
+	mcpAuthKeyReader
+	SetAuthKey(ctx context.Context, req *settingSpec.SetAuthKeyRequest) (*settingSpec.SetAuthKeyResponse, error)
+	DeleteAuthKey(
+		ctx context.Context,
+		req *settingSpec.DeleteAuthKeyRequest,
+	) (*settingSpec.DeleteAuthKeyResponse, error)
+}
+
+type mcpSecretWriter interface {
+	SetMCPSecret(ctx context.Context, secretRef, value string) (sha256 string, nonEmpty bool, err error)
+	DeleteMCPSecret(ctx context.Context, secretRef string) error
+}
+
 type mcpAuthKeyReader interface {
 	GetAuthKey(ctx context.Context, req *settingSpec.GetAuthKeyRequest) (*settingSpec.GetAuthKeyResponse, error)
 }
@@ -67,16 +81,95 @@ func (r *settingSecretResolver) ResolveSecret(
 	return resp.Body.Secret, nil
 }
 
+func (r *settingSecretResolver) SetMCPSecret(
+	ctx context.Context,
+	secretRef string,
+	value string,
+) (sha256 string, nonEmpty bool, err error) {
+	if r == nil || r.store == nil {
+		return "", false, errors.New("secret resolver is not configured")
+	}
+	st, ok := r.store.(mcpAuthKeyStore)
+	if !ok {
+		return "", false, errors.New("secret writer is not configured")
+	}
+
+	ref, err := secret.ParseMCPSecretRef(secretRef)
+	if err != nil {
+		return "", false, err
+	}
+
+	keyName := settingSpec.AuthKeyName(secret.GetMCPSecretRefStorageKey(ref))
+	if keyName == "" {
+		return "", false, errors.New("invalid secret ref storage key")
+	}
+
+	if _, err := st.SetAuthKey(ctx, &settingSpec.SetAuthKeyRequest{
+		Type:    settingSpec.AuthKeyTypeMCP,
+		KeyName: keyName,
+		Body: &settingSpec.SetAuthKeyRequestBody{
+			Secret: value,
+		},
+	}); err != nil {
+		return "", false, err
+	}
+
+	resp, err := st.GetAuthKey(ctx, &settingSpec.GetAuthKeyRequest{
+		Type:    settingSpec.AuthKeyTypeMCP,
+		KeyName: keyName,
+	})
+	if err != nil {
+		return "", false, err
+	}
+	if resp == nil || resp.Body == nil {
+		return "", false, errors.New("secret set returned empty response")
+	}
+	return resp.Body.SHA256, resp.Body.NonEmpty, nil
+}
+
+func (r *settingSecretResolver) DeleteMCPSecret(ctx context.Context, secretRef string) error {
+	if r == nil || r.store == nil {
+		return errors.New("secret resolver is not configured")
+	}
+	st, ok := r.store.(mcpAuthKeyStore)
+	if !ok {
+		return errors.New("secret writer is not configured")
+	}
+
+	ref, err := secret.ParseMCPSecretRef(secretRef)
+	if err != nil {
+		return err
+	}
+
+	keyName := settingSpec.AuthKeyName(secret.GetMCPSecretRefStorageKey(ref))
+	if keyName == "" {
+		return errors.New("invalid secret ref storage key")
+	}
+
+	_, err = st.DeleteAuthKey(ctx, &settingSpec.DeleteAuthKeyRequest{
+		Type:    settingSpec.AuthKeyTypeMCP,
+		KeyName: keyName,
+	})
+	return err
+}
+
 type MCPWrapper struct {
-	store       *store.Store
-	auth        *auth.AuthManager
-	oauthBroker *auth.OAuthLoopbackBroker
-	runtime     *runtime.RuntimeManager
-	approvals   *runtime.ApprovalManager
-	toolBridge  *runtime.ToolBridge
+	store *store.Store
+
+	auth           *auth.AuthManager
+	secretResolver auth.SecretResolver
+	secretWriter   mcpSecretWriter
+	oauthBroker    *auth.OAuthLoopbackBroker
+
+	runtime    *runtime.RuntimeManager
+	approvals  *runtime.ApprovalManager
+	toolBridge *runtime.ToolBridge
 }
 
 func InitMCPWrapper(ctx context.Context, w *MCPWrapper, baseDir string, secrets auth.SecretResolver) error {
+	if secrets == nil {
+		secrets = auth.StaticSecretResolver{}
+	}
 	st, err := store.NewStore(baseDir)
 	if err != nil {
 		return err
@@ -99,6 +192,10 @@ func InitMCPWrapper(ctx context.Context, w *MCPWrapper, baseDir string, secrets 
 
 	w.store = st
 	w.auth = authMgr
+	w.secretResolver = secrets
+	if writer, ok := secrets.(mcpSecretWriter); ok {
+		w.secretWriter = writer
+	}
 	w.oauthBroker = oauthBroker
 	w.runtime = rt
 	w.approvals = appr
@@ -342,6 +439,296 @@ func (w *MCPWrapper) CancelPendingMCPOAuthAuthorization(
 		}
 		return &spec.CancelPendingMCPOAuthAuthorizationResponse{}, nil
 	})
+}
+
+func (w *MCPWrapper) GetMCPServerAuthHealth(
+	req *spec.GetMCPServerAuthHealthRequest,
+) (*spec.GetMCPServerAuthHealthResponse, error) {
+	return middleware.WithRecoveryResp(func() (*spec.GetMCPServerAuthHealthResponse, error) {
+		if req == nil || req.ServerID == "" {
+			return nil, fmt.Errorf("%w: serverID required", spec.ErrMCPInvalidRequest)
+		}
+
+		cfgResp, err := w.store.GetMCPServer(context.Background(), &spec.GetMCPServerRequest{
+			ServerID: req.ServerID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if cfgResp == nil || cfgResp.Body == nil {
+			return nil, fmt.Errorf("%w: empty server config response", spec.ErrMCPRuntimeNotReady)
+		}
+
+		health := w.buildMCPAuthHealth(context.Background(), *cfgResp.Body)
+		return &spec.GetMCPServerAuthHealthResponse{Body: health}, nil
+	})
+}
+
+func (w *MCPWrapper) PutMCPServerSecret(
+	req *spec.PutMCPServerSecretRequest,
+) (*spec.PutMCPServerSecretResponse, error) {
+	return middleware.WithRecoveryResp(func() (*spec.PutMCPServerSecretResponse, error) {
+		if req == nil || req.Body == nil || req.ServerID == "" {
+			return nil, fmt.Errorf("%w: serverID and body required", spec.ErrMCPInvalidRequest)
+		}
+		if w == nil || w.secretWriter == nil {
+			return nil, fmt.Errorf("%w: secret writer is not configured", spec.ErrMCPRuntimeNotReady)
+		}
+
+		if _, err := w.store.GetMCPServer(context.Background(), &spec.GetMCPServerRequest{
+			ServerID: req.ServerID,
+		}); err != nil {
+			return nil, err
+		}
+
+		secretRef, err := secret.NewMCPSecretRefString(req.ServerID, req.Body.Kind, req.Body.Slot)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", spec.ErrMCPInvalidRequest, err)
+		}
+
+		if req.Body.Kind == spec.MCPSecretKindOAuthClientCredentials {
+			if err := auth.ValidateOAuthClientCredentialsSecret(req.Body.Secret, false); err != nil {
+				return nil, err
+			}
+		}
+
+		sha, nonEmpty, err := w.secretWriter.SetMCPSecret(context.Background(), secretRef, req.Body.Secret)
+		if err != nil {
+			return nil, err
+		}
+
+		return &spec.PutMCPServerSecretResponse{
+			Body: &spec.PutMCPServerSecretResponseBody{
+				SecretRef: secretRef,
+				SHA256:    sha,
+				NonEmpty:  nonEmpty,
+			},
+		}, nil
+	})
+}
+
+func (w *MCPWrapper) DeleteMCPServerSecret(
+	req *spec.DeleteMCPServerSecretRequest,
+) (*spec.DeleteMCPServerSecretResponse, error) {
+	return middleware.WithRecoveryResp(func() (*spec.DeleteMCPServerSecretResponse, error) {
+		if req == nil || req.ServerID == "" || req.Kind == "" || strings.TrimSpace(req.Slot) == "" {
+			return nil, fmt.Errorf("%w: serverID, kind, and slot required", spec.ErrMCPInvalidRequest)
+		}
+		if w == nil || w.secretWriter == nil {
+			return nil, fmt.Errorf("%w: secret writer is not configured", spec.ErrMCPRuntimeNotReady)
+		}
+
+		secretRef, err := secret.NewMCPSecretRefString(req.ServerID, req.Kind, req.Slot)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", spec.ErrMCPInvalidRequest, err)
+		}
+
+		if err := w.secretWriter.DeleteMCPSecret(context.Background(), secretRef); err != nil {
+			return nil, err
+		}
+		return &spec.DeleteMCPServerSecretResponse{}, nil
+	})
+}
+
+func (w *MCPWrapper) buildMCPAuthHealth(
+	ctx context.Context,
+	cfg spec.MCPServerConfig,
+) *spec.MCPAuthHealth {
+	st := auth.DefaultMCPAuthStatusFromConfig(cfg)
+	if w != nil && w.auth != nil {
+		if cur, ok := w.auth.GetAuthStatus(cfg.ID); ok {
+			st = auth.MergeMCPAuthStatus(cur, cfg)
+		}
+	}
+
+	health := &spec.MCPAuthHealth{
+		ServerID:   cfg.ID,
+		AuthMode:   normalizeWrapperHTTPAuthMode(st.AuthMode),
+		State:      spec.MCPAuthHealthStateAuthorizationNeeded,
+		Configured: true,
+		Resource:   st.Resource,
+		Scopes:     st.Scopes,
+		ExpiresAt:  st.ExpiresAt,
+		LastError:  st.LastError,
+	}
+
+	switch cfg.Transport {
+	case spec.MCPTransportStdio:
+		health.AuthMode = spec.MCPHTTPAuthNone
+		if missing, msg := w.firstMissingStdioSecret(ctx, cfg); missing {
+			health.State = spec.MCPAuthHealthStateNotConfigured
+			health.Configured = false
+			health.LastError = msg
+			return health
+		}
+		health.State = spec.MCPAuthHealthStateNotRequired
+		return health
+
+	case spec.MCPTransportStreamableHTTP:
+		if cfg.StreamableHTTP == nil {
+			health.State = spec.MCPAuthHealthStateNotConfigured
+			health.Configured = false
+			health.LastError = "missing streamableHttp config"
+			return health
+		}
+
+	default:
+		health.State = spec.MCPAuthHealthStateNotConfigured
+		health.Configured = false
+		health.LastError = "unsupported MCP transport"
+		return health
+	}
+
+	httpCfg := cfg.StreamableHTTP
+	mode := normalizeWrapperHTTPAuthMode(httpCfg.AuthMode)
+	health.AuthMode = mode
+	health.Resource = strings.TrimSpace(httpCfg.URL)
+
+	switch mode {
+	case spec.MCPHTTPAuthNone:
+		health.State = spec.MCPAuthHealthStateNotRequired
+		health.Configured = true
+		health.LastError = ""
+		return health
+
+	case spec.MCPHTTPAuthOAuth:
+		if w == nil || w.oauthBroker == nil || strings.TrimSpace(w.oauthBroker.RedirectURL()) == "" {
+			health.State = spec.MCPAuthHealthStateNotConfigured
+			health.Configured = false
+			health.LastError = "OAuth authorization broker is not configured"
+			return health
+		}
+
+		if ref := strings.TrimSpace(httpCfg.ClientCredentialRef); ref != "" {
+			if ok, msg := w.oauthClientSecretConfigured(ctx, ref, false); !ok {
+				health.State = spec.MCPAuthHealthStateNotConfigured
+				health.Configured = false
+				health.LastError = msg
+				return health
+			}
+		}
+
+		if pending, ok := w.pendingOAuthAuthorization(cfg.ID); ok {
+			health.State = spec.MCPAuthHealthStateAuthorizationPending
+			health.Configured = true
+			health.AuthorizationPending = true
+			health.AuthorizationURL = pending.AuthorizationURL
+			health.AuthorizationExpiresAt = pending.ExpiresAt
+			return health
+		}
+
+	case spec.MCPHTTPAuthClientCredentials:
+		ref := strings.TrimSpace(httpCfg.ClientCredentialRef)
+		if ref == "" {
+			health.State = spec.MCPAuthHealthStateNotConfigured
+			health.Configured = false
+			health.LastError = "streamableHttp.clientCredentialRef is required for clientCredentials auth"
+			return health
+		}
+		if ok, msg := w.oauthClientSecretConfigured(ctx, ref, true); !ok {
+			health.State = spec.MCPAuthHealthStateNotConfigured
+			health.Configured = false
+			health.LastError = msg
+			return health
+		}
+
+	default:
+		health.State = spec.MCPAuthHealthStateNotConfigured
+		health.Configured = false
+		health.LastError = "unsupported HTTP auth mode"
+		return health
+	}
+
+	health.State = authHealthStateFromStatus(st)
+	return health
+}
+
+func (w *MCPWrapper) firstMissingStdioSecret(
+	ctx context.Context,
+	cfg spec.MCPServerConfig,
+) (missing bool, msg string) {
+	if cfg.Stdio == nil || len(cfg.Stdio.SecretEnvRefs) == 0 {
+		return false, ""
+	}
+	if w == nil || w.secretResolver == nil {
+		return true, "secret resolver is not configured"
+	}
+	for key, ref := range cfg.Stdio.SecretEnvRefs {
+		value, err := w.secretResolver.ResolveSecret(ctx, ref)
+		if err != nil {
+			return true, fmt.Sprintf("stdio secret %s is not configured: %v", key, err)
+		}
+		if strings.TrimSpace(value) == "" {
+			return true, fmt.Sprintf("stdio secret %s is empty", key)
+		}
+	}
+	return false, ""
+}
+
+func (w *MCPWrapper) oauthClientSecretConfigured(
+	ctx context.Context,
+	ref string,
+	requireClientSecret bool,
+) (ok bool, msg string) {
+	if w == nil || w.secretResolver == nil {
+		return false, "secret resolver is not configured"
+	}
+	raw, err := w.secretResolver.ResolveSecret(ctx, ref)
+	if err != nil {
+		return false, err.Error()
+	}
+	if strings.TrimSpace(raw) == "" {
+		return false, "OAuth client credentials secret is empty"
+	}
+	if err := auth.ValidateOAuthClientCredentialsSecret(raw, requireClientSecret); err != nil {
+		return false, err.Error()
+	}
+	return true, ""
+}
+
+func (w *MCPWrapper) pendingOAuthAuthorization(
+	serverID spec.MCPServerID,
+) (spec.MCPOAuthAuthorization, bool) {
+	if w == nil || w.oauthBroker == nil {
+		return spec.MCPOAuthAuthorization{}, false
+	}
+	for _, pending := range w.oauthBroker.Pending() {
+		if pending.ServerID == serverID {
+			return pending, true
+		}
+	}
+	return spec.MCPOAuthAuthorization{}, false
+}
+
+func authHealthStateFromStatus(st spec.MCPAuthStatus) spec.MCPAuthHealthState {
+	if st.ExpiresAt != nil && time.Now().UTC().After(st.ExpiresAt.UTC()) {
+		return spec.MCPAuthHealthStateExpired
+	}
+
+	switch st.State {
+	case spec.MCPAuthStateNotRequired:
+		return spec.MCPAuthHealthStateNotRequired
+	case spec.MCPAuthStateRequired:
+		return spec.MCPAuthHealthStateAuthorizationNeeded
+	case spec.MCPAuthStateAuthorized:
+		return spec.MCPAuthHealthStateAuthorized
+	case spec.MCPAuthStateExpired:
+		return spec.MCPAuthHealthStateExpired
+	case spec.MCPAuthStateInsufficientScope:
+		return spec.MCPAuthHealthStateInsufficientScope
+	case spec.MCPAuthStateError:
+		return spec.MCPAuthHealthStateError
+	default:
+		return spec.MCPAuthHealthStateAuthorizationNeeded
+	}
+}
+
+func normalizeWrapperHTTPAuthMode(mode spec.MCPHTTPAuthMode) spec.MCPHTTPAuthMode {
+	mode = spec.MCPHTTPAuthMode(strings.TrimSpace(string(mode)))
+	if mode == "" {
+		return spec.MCPHTTPAuthNone
+	}
+	return mode
 }
 
 func (w *MCPWrapper) close() {

@@ -212,3 +212,40 @@ type CancelPendingMCPOAuthAuthorizationRequest struct {
 }
 
 type CancelPendingMCPOAuthAuthorizationResponse struct{}
+
+type GetMCPServerAuthHealthRequest struct {
+	ServerID MCPServerID `path:"serverID" required:"true"`
+}
+
+type GetMCPServerAuthHealthResponse struct {
+	Body *MCPAuthHealth
+}
+
+type PutMCPServerSecretRequestBody struct {
+	Kind   MCPSecretKind `json:"kind"   required:"true"`
+	Slot   string        `json:"slot"   required:"true"`
+	Secret string        `json:"secret" required:"true"`
+}
+
+type PutMCPServerSecretRequest struct {
+	ServerID MCPServerID `path:"serverID" required:"true"`
+	Body     *PutMCPServerSecretRequestBody
+}
+
+type PutMCPServerSecretResponseBody struct {
+	SecretRef string `json:"secretRef"`
+	SHA256    string `json:"sha256,omitempty"`
+	NonEmpty  bool   `json:"nonEmpty"`
+}
+
+type PutMCPServerSecretResponse struct {
+	Body *PutMCPServerSecretResponseBody
+}
+
+type DeleteMCPServerSecretRequest struct {
+	ServerID MCPServerID   `path:"serverID" required:"true"`
+	Kind     MCPSecretKind `                required:"true" query:"kind"`
+	Slot     string        `                required:"true" query:"slot"`
+}
+
+type DeleteMCPServerSecretResponse struct{}

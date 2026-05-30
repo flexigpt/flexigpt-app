@@ -41,6 +41,19 @@ var (
 	ErrMCPStaleReference  = errors.New("mcp stale reference")
 )
 
+type MCPAuthHealthState string
+
+const (
+	MCPAuthHealthStateNotRequired          MCPAuthHealthState = "notRequired"
+	MCPAuthHealthStateNotConfigured        MCPAuthHealthState = "notConfigured"
+	MCPAuthHealthStateAuthorizationNeeded  MCPAuthHealthState = "authorizationNeeded"
+	MCPAuthHealthStateAuthorizationPending MCPAuthHealthState = "authorizationPending"
+	MCPAuthHealthStateAuthorized           MCPAuthHealthState = "authorized"
+	MCPAuthHealthStateExpired              MCPAuthHealthState = "expired"
+	MCPAuthHealthStateInsufficientScope    MCPAuthHealthState = "insufficientScope"
+	MCPAuthHealthStateError                MCPAuthHealthState = "error"
+)
+
 type (
 	MCPServerID   string
 	JSONRawString = string
@@ -83,6 +96,13 @@ const (
 	MCPHTTPAuthNone              MCPHTTPAuthMode = "none"
 	MCPHTTPAuthOAuth             MCPHTTPAuthMode = "oauth"
 	MCPHTTPAuthClientCredentials MCPHTTPAuthMode = "clientCredentials"
+)
+
+type GrantType string
+
+const (
+	GrantTypeAuthorizationCode GrantType = "authorization_code"
+	GrantTypeRefreshToken      GrantType = "refresh_token"
 )
 
 type MCPAuthState string

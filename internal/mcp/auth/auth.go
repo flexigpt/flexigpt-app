@@ -223,9 +223,12 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 				SoftwareVersion: spec.MCPHostVersion,
 				// Desktop clients are public clients. Requesting "none" avoids
 				// receiving/storing a dynamically issued client secret.
-				TokenEndpointAuthMethod: "none",
+				TokenEndpointAuthMethod: string(spec.MCPHTTPAuthNone),
 				ResponseTypes:           []string{"code"},
-				GrantTypes:              []string{"authorization_code", "refresh_token"},
+				GrantTypes: []string{
+					string(spec.GrantTypeAuthorizationCode),
+					string(spec.GrantTypeRefreshToken),
+				},
 			},
 		}
 	}

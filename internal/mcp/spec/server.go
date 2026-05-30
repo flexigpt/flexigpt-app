@@ -60,3 +60,21 @@ type MCPServerConfig struct {
 	ModifiedAt    time.Time  `json:"modifiedAt"`
 	SoftDeletedAt *time.Time `json:"softDeletedAt,omitempty"`
 }
+
+type MCPAuthHealth struct {
+	ServerID MCPServerID        `json:"serverID"`
+	AuthMode MCPHTTPAuthMode    `json:"authMode"`
+	State    MCPAuthHealthState `json:"state"`
+
+	Configured bool `json:"configured"`
+
+	Resource  string     `json:"resource,omitempty"`
+	Scopes    []string   `json:"scopes,omitempty"`
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
+
+	AuthorizationPending   bool   `json:"authorizationPending,omitempty"`
+	AuthorizationURL       string `json:"authorizationURL,omitempty"`
+	AuthorizationExpiresAt string `json:"authorizationExpiresAt,omitempty"`
+
+	LastError string `json:"lastError,omitempty"`
+}
