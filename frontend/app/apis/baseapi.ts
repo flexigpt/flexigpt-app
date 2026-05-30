@@ -8,6 +8,7 @@ import type {
 	IBackendAPI,
 	IConversationStoreAPI,
 	ILogger,
+	IMCPAPI,
 	IModelPresetStoreAPI,
 	IPromptStoreAPI,
 	ISettingStoreAPI,
@@ -25,13 +26,16 @@ export let conversationStoreAPI: IConversationStoreAPI;
 export let aggregateAPI: IAggregateAPI;
 export let settingstoreAPI: ISettingStoreAPI;
 export let modelPresetStoreAPI: IModelPresetStoreAPI;
+
+/**
+ * @public
+ */
+export let mcpAPI: IMCPAPI;
+
 export let promptStoreAPI: IPromptStoreAPI;
 export let toolStoreAPI: IToolStoreAPI;
 export let toolRuntimeAPI: IToolRuntimeAPI;
 export let skillStoreAPI: ISkillStoreAPI;
-/**
- * @public
- */
 export let assistantPresetStoreAPI: IAssistantPresetStoreAPI;
 
 // Conditional initialization
@@ -46,6 +50,7 @@ if (IS_WAILS_PLATFORM) {
 	aggregateAPI = new wailsImpl.WailsAggregateAPI();
 	settingstoreAPI = new wailsImpl.WailsSettingStoreAPI();
 	modelPresetStoreAPI = new wailsImpl.WailsModelPresetStoreAPI();
+	mcpAPI = new wailsImpl.WailsMCPAPI();
 	promptStoreAPI = new wailsImpl.WailsPromptStoreAPI();
 	toolStoreAPI = new wailsImpl.WailsToolStoreAPI();
 	toolRuntimeAPI = new wailsImpl.WailsToolRuntimeAPI();

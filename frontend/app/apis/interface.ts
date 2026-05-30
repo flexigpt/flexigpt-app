@@ -14,6 +14,31 @@ import type {
 import type { ConversationSearchItem, StoreConversation, StoreConversationMessage } from '@/spec/conversation';
 import type { CompletionResponseBody, ModelParam, ProviderName } from '@/spec/inference';
 import type {
+	InvokeMCPToolRequestBody,
+	MCPApprovalEvaluation,
+	MCPApprovalResolution,
+	MCPApprovalToken,
+	MCPAuthHealth,
+	MCPAuthStatus,
+	MCPCompletionResult,
+	MCPGetPromptResponseBody,
+	InvokeMCPToolResponseBody as MCPInvokeToolResponseBody,
+	MCPOAuthAuthorization,
+	MCPPromptRef,
+	MCPReadResourceResponseBody,
+	MCPRefType,
+	MCPResourceRef,
+	MCPResourceTemplateRef,
+	MCPSecretKind,
+	MCPServerConfig,
+	MCPServerID,
+	MCPServerRuntimeSnapshot,
+	MCPToolCapability,
+	PatchMCPServerPolicyPayload,
+	PutMCPServerPayload,
+	PutMCPServerSecretResponseBody,
+} from '@/spec/mcp';
+import type {
 	ModelPresetID,
 	PatchModelPresetPayload,
 	PatchProviderPresetPayload,
@@ -440,4 +465,101 @@ export interface IAssistantPresetStoreAPI {
 		assistantPresetSlug: string,
 		version: string
 	): Promise<AssistantPreset | undefined>;
+}
+
+/**
+ * @public
+ *
+ * Flattened frontend-facing MCP bridge.
+ * Heavy structured payloads stay as objects, while simple requests stay flattened.
+ */
+export interface IMCPAPI {
+	listMCPServers(
+		serverIDs?: MCPServerID[],
+		enabled?: boolean,
+		pageSize?: number,
+		pageToken?: string
+	): Promise<{ servers: MCPServerConfig[]; nextPageToken?: string }>;
+
+	putMCPServer(serverID: MCPServerID, payload: PutMCPServerPayload): Promise<void>;
+
+	getMCPServer(serverID: MCPServerID, includeDeleted?: boolean): Promise<MCPServerConfig | undefined>;
+
+	patchMCPServerEnabled(serverID: MCPServerID, enabled: boolean): Promise<void>;
+
+	patchMCPServerPolicy(serverID: MCPServerID, payload: PatchMCPServerPolicyPayload): Promise<void>;
+
+	deleteMCPServer(serverID: MCPServerID): Promise<void>;
+
+	connectMCPServer(serverID: MCPServerID): Promise<MCPServerRuntimeSnapshot | undefined>;
+
+	disconnectMCPServer(serverID: MCPServerID): Promise<void>;
+
+	refreshMCPServer(serverID: MCPServerID): Promise<MCPServerRuntimeSnapshot | undefined>;
+
+	getMCPServerStatus(serverID: MCPServerID): Promise<MCPServerRuntimeSnapshot | undefined>;
+
+	listMCPServerTools(
+		serverID: MCPServerID,
+		pageSize?: number,
+		pageToken?: string
+	): Promise<{ tools: MCPToolCapability[]; nextPageToken?: string }>;
+
+	listMCPServerResources(
+		serverID: MCPServerID,
+		pageSize?: number,
+		pageToken?: string
+	): Promise<{ resources: MCPResourceRef[]; nextPageToken?: string }>;
+
+	listMCPServerResourceTemplates(
+		serverID: MCPServerID,
+		pageSize?: number,
+		pageToken?: string
+	): Promise<{ resourceTemplates: MCPResourceTemplateRef[]; nextPageToken?: string }>;
+
+	listMCPServerPrompts(
+		serverID: MCPServerID,
+		pageSize?: number,
+		pageToken?: string
+	): Promise<{ prompts: MCPPromptRef[]; nextPageToken?: string }>;
+
+	readMCPResource(serverID: MCPServerID, uri: string): Promise<MCPReadResourceResponseBody | undefined>;
+
+	getMCPPrompt(
+		serverID: MCPServerID,
+		promptName: string,
+		promptArguments?: Record<string, string>
+	): Promise<MCPGetPromptResponseBody | undefined>;
+
+	completeMCPArgument(
+		serverID: MCPServerID,
+		refType: MCPRefType,
+		name: string,
+		argumentName: string,
+		argumentValue?: string,
+		context?: Record<string, string>
+	): Promise<MCPCompletionResult>;
+
+	evaluateMCPToolCall(request: InvokeMCPToolRequestBody): Promise<MCPApprovalEvaluation | undefined>;
+
+	invokeMCPTool(request: InvokeMCPToolRequestBody): Promise<MCPInvokeToolResponseBody | undefined>;
+
+	resolveMCPApproval(approvalID: string, resolution: MCPApprovalResolution): Promise<MCPApprovalToken | undefined>;
+
+	listPendingMCPOAuthAuthorizations(): Promise<MCPOAuthAuthorization[]>;
+
+	cancelPendingMCPOAuthAuthorization(serverID: MCPServerID): Promise<void>;
+
+	getMCPServerAuthStatus(serverID: MCPServerID): Promise<MCPAuthStatus | undefined>;
+
+	getMCPServerAuthHealth(serverID: MCPServerID): Promise<MCPAuthHealth | undefined>;
+
+	putMCPServerSecret(
+		serverID: MCPServerID,
+		kind: MCPSecretKind,
+		slot: string,
+		secret: string
+	): Promise<PutMCPServerSecretResponseBody | undefined>;
+
+	deleteMCPServerSecret(serverID: MCPServerID, kind: MCPSecretKind, slot: string): Promise<void>;
 }
