@@ -153,6 +153,9 @@ func validateHTTPConfig(serverID spec.MCPServerID, c *spec.MCPStreamableHTTPConf
 	if raw == "" {
 		return errors.New("streamableHttp.url is empty")
 	}
+	if raw != c.URL {
+		return errors.New("streamableHttp.url has leading/trailing whitespace")
+	}
 	if len(raw) > maxMCPURLLen {
 		return fmt.Errorf("streamableHttp.url too long > %d", maxMCPURLLen)
 	}
@@ -161,19 +164,19 @@ func validateHTTPConfig(serverID spec.MCPServerID, c *spec.MCPStreamableHTTPConf
 		return fmt.Errorf("streamableHttp.url invalid: %w", err)
 	}
 	if u.Scheme != "https" && u.Scheme != "http" {
-		return errors.New("streamableHttp.url scheme must be http or https")
+		return errors.New("streamableHttp.url scheme must be http/s")
 	}
 	if u.Host == "" {
 		return errors.New("streamableHttp.url host is empty")
 	}
-
-	if u.Scheme != "https" {
-		if u.Scheme != "http" {
-			return errors.New("streamableHttp.url scheme must be http or https")
-		}
-		if !isLoopbackHost(u.Hostname()) {
-			return errors.New("streamableHttp.url using http is only allowed for loopback hosts")
-		}
+	if u.User != nil {
+		return errors.New("streamableHttp.url must not contain user info")
+	}
+	if u.Fragment != "" {
+		return errors.New("streamableHttp.url must not contain a fragment")
+	}
+	if u.Scheme == "http" && !isLoopbackHost(u.Hostname()) {
+		return errors.New("streamableHttp.url using http is only allowed for loopback hosts")
 	}
 
 	switch c.AuthMode {
@@ -185,8 +188,25 @@ func validateHTTPConfig(serverID spec.MCPServerID, c *spec.MCPStreamableHTTPConf
 		c.AuthMode = spec.MCPHTTPAuthNone
 	}
 
+	clientIDMetadataDocumentURL := strings.TrimSpace(c.ClientIDMetadataDocumentURL)
+	if clientIDMetadataDocumentURL != "" {
+		if clientIDMetadataDocumentURL != c.ClientIDMetadataDocumentURL {
+			return errors.New(
+				"streamableHttp.clientIDMetadataDocumentURL has leading/trailing whitespace",
+			)
+		}
+		if err := validateClientIDMetadataDocumentURL(clientIDMetadataDocumentURL); err != nil {
+			return fmt.Errorf("streamableHttp.clientIDMetadataDocumentURL: %w", err)
+		}
+	}
+
 	switch c.AuthMode {
 	case spec.MCPHTTPAuthClientCredentials:
+		if clientIDMetadataDocumentURL != "" {
+			return errors.New(
+				"streamableHttp.clientIDMetadataDocumentURL is only allowed for oauth authMode",
+			)
+		}
 		if strings.TrimSpace(c.ClientCredentialRef) == "" {
 			return errors.New("streamableHttp.clientCredentialRef is required for clientCredentials authMode")
 		}
@@ -205,6 +225,11 @@ func validateHTTPConfig(serverID spec.MCPServerID, c *spec.MCPStreamableHTTPConf
 				"streamableHttp.clientCredentialRef is only allowed when authMode is oauth or clientCredentials",
 			)
 		}
+		if clientIDMetadataDocumentURL != "" {
+			return errors.New(
+				"streamableHttp.clientIDMetadataDocumentURL is only allowed for oauth authMode",
+			)
+		}
 	}
 	return nil
 }
@@ -220,6 +245,29 @@ func validateOAuthClientCredentialRef(serverID spec.MCPServerID, ref string) err
 		spec.MCPSecretKindOAuthClientCredentials,
 		"clientCredentials",
 	)
+}
+
+func validateClientIDMetadataDocumentURL(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+	if u.Scheme != "https" {
+		return errors.New("must use https")
+	}
+	if u.Host == "" {
+		return errors.New("host is empty")
+	}
+	if u.User != nil {
+		return errors.New("must not contain user info")
+	}
+	if u.Path == "" {
+		return errors.New("must include a path")
+	}
+	if u.Fragment != "" {
+		return errors.New("must not contain a fragment")
+	}
+	return nil
 }
 
 func validatePolicy(p spec.MCPServerPolicy) error {

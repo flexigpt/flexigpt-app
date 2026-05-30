@@ -12,10 +12,19 @@ type MCPStdioConfig struct {
 }
 
 type MCPStreamableHTTPConfig struct {
-	URL                 string          `json:"url"`
-	TimeoutMS           int             `json:"timeoutMS,omitempty"`
-	AuthMode            MCPHTTPAuthMode `json:"authMode"`
-	ClientCredentialRef string          `json:"clientCredentialRef,omitempty"`
+	URL       string          `json:"url"`
+	TimeoutMS int             `json:"timeoutMS,omitempty"`
+	AuthMode  MCPHTTPAuthMode `json:"authMode"`
+
+	// ClientCredentialRef references an MCP OAuth client credential secret.
+	// For authMode "oauth", the secret may contain only clientID for a public
+	// PKCE client, or clientID plus clientSecret for a confidential client.
+	// For authMode "clientCredentials", clientSecret is required.
+	ClientCredentialRef string `json:"clientCredentialRef,omitempty"`
+
+	// ClientIDMetadataDocumentURL enables the standard OAuth Client ID Metadata
+	// Document registration path supported by the official MCP Go SDK.
+	ClientIDMetadataDocumentURL string `json:"clientIDMetadataDocumentURL,omitempty"`
 }
 
 type MCPAuthStatus struct {

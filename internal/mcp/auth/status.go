@@ -11,6 +11,15 @@ import (
 
 func MergeMCPAuthStatus(st spec.MCPAuthStatus, cfg spec.MCPServerConfig) spec.MCPAuthStatus {
 	def := DefaultMCPAuthStatusFromConfig(cfg)
+	if st.ServerID != "" && st.ServerID != def.ServerID {
+		return def
+	}
+	if st.AuthMode != "" && st.AuthMode != def.AuthMode {
+		return def
+	}
+	if st.Resource != "" && def.Resource != "" && st.Resource != def.Resource {
+		return def
+	}
 	if st.ServerID == "" {
 		st.ServerID = def.ServerID
 	}
@@ -23,6 +32,13 @@ func MergeMCPAuthStatus(st spec.MCPAuthStatus, cfg spec.MCPServerConfig) spec.MC
 	if st.State == "" {
 		st.State = def.State
 	}
+	if def.AuthMode == spec.MCPHTTPAuthNone {
+		st.State = def.State
+		st.Scopes = nil
+		st.ExpiresAt = nil
+		st.LastError = ""
+		st.AuthorizationServer = ""
+	}
 	return st
 }
 
@@ -34,7 +50,7 @@ func DefaultMCPAuthStatusFromConfig(cfg spec.MCPServerConfig) spec.MCPAuthStatus
 	}
 
 	if cfg.StreamableHTTP != nil {
-		st.AuthMode = cfg.StreamableHTTP.AuthMode
+		st.AuthMode = normalizeHTTPAuthMode(cfg.StreamableHTTP.AuthMode)
 		st.Resource = strings.TrimSpace(cfg.StreamableHTTP.URL)
 	}
 

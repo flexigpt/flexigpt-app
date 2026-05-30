@@ -152,12 +152,14 @@ func (m *RuntimeManager) Connect(
 		resolved.Env = maps.Clone(cfg.Stdio.Env)
 	}
 
-	prepared, err := m.auth.PrepareTransportAuth(ctx, cfg)
-	if err != nil {
-		m.setErrorIfCurrent(req.ServerID, generation, err)
-		return nil, err
+	if m.auth != nil {
+		prepared, err := m.auth.PrepareTransportAuth(ctx, cfg)
+		if err != nil {
+			m.setErrorIfCurrent(req.ServerID, generation, err)
+			return nil, err
+		}
+		mergeResolvedTransportAuth(&resolved, prepared)
 	}
-	mergeResolvedTransportAuth(&resolved, prepared)
 
 	connectTimeout := time.Duration(spec.DefaultConnectTimeoutMS) * time.Millisecond
 	if cfg.Transport == spec.MCPTransportStreamableHTTP && cfg.StreamableHTTP != nil &&

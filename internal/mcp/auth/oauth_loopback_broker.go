@@ -47,7 +47,9 @@ type OAuthLoopbackBroker struct {
 	ttl          time.Duration
 	callbackPath string
 	redirectURL  string
-	logger       *slog.Logger
+	redirectHost string
+
+	logger *slog.Logger
 
 	server   *http.Server
 	listener net.Listener
@@ -101,6 +103,7 @@ func NewOAuthLoopbackBroker(ctx context.Context, opts *OAuthLoopbackBrokerOption
 		Path:   callbackPath,
 	}
 	b.redirectURL = redirect.String()
+	b.redirectHost = redirect.Host
 
 	b.server = &http.Server{
 		Handler:           b,
@@ -262,7 +265,10 @@ func (b *OAuthLoopbackBroker) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		http.NotFound(w, r)
 		return
 	}
-
+	if !b.validCallbackHost(r.Host) {
+		http.Error(w, "invalid OAuth callback host", http.StatusBadRequest)
+		return
+	}
 	q := r.URL.Query()
 	state := q.Get("state")
 	if state == "" {
@@ -275,6 +281,13 @@ func (b *OAuthLoopbackBroker) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	if p == nil {
 		b.mu.Unlock()
 		http.Error(w, "unknown or expired OAuth state", http.StatusBadRequest)
+		return
+	}
+	if time.Now().UTC().After(p.ExpiresAt) {
+		err := fmt.Errorf("%w: OAuth authorization expired", spec.ErrMCPAuthRequired)
+		b.completeLocked(p, nil, err)
+		b.mu.Unlock()
+		http.Error(w, "expired OAuth state", http.StatusBadRequest)
 		return
 	}
 
@@ -313,6 +326,13 @@ func (b *OAuthLoopbackBroker) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("FlexiGPT received the authorization response. You may close this window."))
+}
+
+func (b *OAuthLoopbackBroker) validCallbackHost(host string) bool {
+	if b == nil || b.redirectHost == "" {
+		return true
+	}
+	return strings.EqualFold(host, b.redirectHost)
 }
 
 func (b *OAuthLoopbackBroker) removeIfCurrent(p *pendingOAuthAuthorization) {

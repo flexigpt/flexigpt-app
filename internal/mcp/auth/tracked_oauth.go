@@ -17,28 +17,38 @@ import (
 // the configured sink on every Token() call. The underlying source already
 // handles caching and refresh; this wrapper only observes results.
 type trackingTokenSource struct {
-	source oauth2.TokenSource
-	sink   AuthStatusSink
-	status spec.MCPAuthStatus
+	source          oauth2.TokenSource
+	sink            AuthStatusSink
+	status          spec.MCPAuthStatus
+	sensitiveValues []string
 }
 
 func (s *trackingTokenSource) Token() (*oauth2.Token, error) {
 	tok, err := s.source.Token()
 	if err != nil {
 		if s.sink != nil {
-			_ = s.sink.SaveAuthStatus(context.Background(), authStatusFromTokenError(s.status, err))
+			_ = s.sink.SaveAuthStatus(
+				context.Background(),
+				redactAuthStatus(authStatusFromTokenError(s.status, err), s.sensitiveValues),
+			)
 		}
 		return nil, err
 	}
 	if tok == nil {
 		nilErr := errors.New("oauth token source returned nil token")
 		if s.sink != nil {
-			_ = s.sink.SaveAuthStatus(context.Background(), authStatusFromTokenError(s.status, nilErr))
+			_ = s.sink.SaveAuthStatus(
+				context.Background(),
+				redactAuthStatus(authStatusFromTokenError(s.status, nilErr), s.sensitiveValues),
+			)
 		}
 		return nil, nilErr
 	}
 	if s.sink != nil {
-		_ = s.sink.SaveAuthStatus(context.Background(), authStatusFromToken(s.status, tok))
+		_ = s.sink.SaveAuthStatus(
+			context.Background(),
+			redactAuthStatus(authStatusFromToken(s.status, tok), s.sensitiveValues),
+		)
 	}
 	return tok, nil
 }
@@ -47,9 +57,10 @@ func (s *trackingTokenSource) Token() (*oauth2.Token, error) {
 // It never touches the HTTP request/response body itself; body lifecycle is
 // owned by the wrapped SDK handler.
 type trackedOAuthHandler struct {
-	inner  mcpAuth.OAuthHandler
-	sink   AuthStatusSink
-	status spec.MCPAuthStatus
+	inner           mcpAuth.OAuthHandler
+	sink            AuthStatusSink
+	status          spec.MCPAuthStatus
+	sensitiveValues []string
 }
 
 func (h *trackedOAuthHandler) TokenSource(ctx context.Context) (oauth2.TokenSource, error) {
@@ -63,9 +74,10 @@ func (h *trackedOAuthHandler) TokenSource(ctx context.Context) (oauth2.TokenSour
 		return nil, nil
 	}
 	return &trackingTokenSource{
-		source: ts,
-		sink:   h.sink,
-		status: h.status,
+		source:          ts,
+		sink:            h.sink,
+		status:          h.status,
+		sensitiveValues: h.sensitiveValues,
 	}, nil
 }
 
@@ -119,7 +131,7 @@ func (h *trackedOAuthHandler) publish(ctx context.Context, st spec.MCPAuthStatus
 	if h == nil || h.sink == nil {
 		return
 	}
-	_ = h.sink.SaveAuthStatus(context.WithoutCancel(ctx), st)
+	_ = h.sink.SaveAuthStatus(context.WithoutCancel(ctx), redactAuthStatus(st, h.sensitiveValues))
 }
 
 func authStatusFromToken(base spec.MCPAuthStatus, tok *oauth2.Token) spec.MCPAuthStatus {
@@ -225,4 +237,23 @@ func scopesFromOAuthToken(tok *oauth2.Token) []string {
 	default:
 		return nil
 	}
+}
+
+func redactAuthStatus(st spec.MCPAuthStatus, sensitiveValues []string) spec.MCPAuthStatus {
+	st.LastError = redactSensitive(st.LastError, sensitiveValues)
+	return st
+}
+
+func redactSensitive(in string, sensitiveValues []string) string {
+	if in == "" || len(sensitiveValues) == 0 {
+		return in
+	}
+	out := in
+	for _, v := range sensitiveValues {
+		if v == "" || strings.TrimSpace(v) == "" {
+			continue
+		}
+		out = strings.ReplaceAll(out, v, "[REDACTED]")
+	}
+	return out
 }

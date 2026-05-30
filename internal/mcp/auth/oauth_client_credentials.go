@@ -13,6 +13,7 @@ func resolveOAuthClientCredentials(
 	ctx context.Context,
 	secrets SecretResolver,
 	ref string,
+	requireClientSecret bool,
 ) (*oauthex.ClientCredentials, []string, error) {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
@@ -27,7 +28,7 @@ func resolveOAuthClientCredentials(
 		return nil, nil, err
 	}
 
-	creds, sensitive, err := parseOAuthClientCredentialsSecret(raw)
+	creds, sensitive, err := parseOAuthClientCredentialsSecret(raw, requireClientSecret)
 	if err != nil {
 		return nil, nil, err
 	}

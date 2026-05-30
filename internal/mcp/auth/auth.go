@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -192,12 +193,17 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 	httpCfg := cfg.StreamableHTTP
 
 	var (
-		preregistered *oauthex.ClientCredentials
-		dcr           *mcpAuth.DynamicClientRegistrationConfig
+		clientIDMetadata *mcpAuth.ClientIDMetadataDocumentConfig
+		preregistered    *oauthex.ClientCredentials
+		dcr              *mcpAuth.DynamicClientRegistrationConfig
 	)
-
+	if rawURL := strings.TrimSpace(httpCfg.ClientIDMetadataDocumentURL); rawURL != "" {
+		clientIDMetadata = &mcpAuth.ClientIDMetadataDocumentConfig{
+			URL: rawURL,
+		}
+	}
 	if ref := strings.TrimSpace(httpCfg.ClientCredentialRef); ref != "" {
-		creds, sensitive, err := resolveOAuthClientCredentials(ctx, m.secrets, ref)
+		creds, sensitive, err := resolveOAuthClientCredentials(ctx, m.secrets, ref, false)
 		if err != nil {
 			out.Status.State = spec.MCPAuthStateError
 			out.Status.LastError = err.Error()
@@ -205,9 +211,10 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 		}
 		preregistered = creds
 		out.SensitiveValues = append(out.SensitiveValues, sensitive...)
-	} else {
-		// Dynamic registration is only used when no preregistered client
-		// credentials were configured.
+	}
+	if preregistered == nil {
+		// Dynamic registration is only used when no preregistered client credentials were configured.
+		// If a Client ID Metadata Document URL is also configured, the SDK will try it before falling back to DCR.
 		dcr = &mcpAuth.DynamicClientRegistrationConfig{
 			Metadata: &oauthex.ClientRegistrationMetadata{
 				RedirectURIs:    []string{m.oauthRedirectURL},
@@ -224,6 +231,7 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 	}
 
 	handler, err := mcpAuth.NewAuthorizationCodeHandler(&mcpAuth.AuthorizationCodeHandlerConfig{
+		ClientIDMetadataDocumentConfig:  clientIDMetadata,
 		PreregisteredClient:             preregistered,
 		DynamicClientRegistrationConfig: dcr,
 		RedirectURL:                     m.oauthRedirectURL,
@@ -271,6 +279,7 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 			State:    spec.MCPAuthStateRequired,
 			Resource: out.Status.Resource,
 		},
+		sensitiveValues: append([]string(nil), out.SensitiveValues...),
 	}
 	return nil
 }
@@ -288,7 +297,7 @@ func (m *AuthManager) configureClientCredentialsOAuth(
 		return fmt.Errorf("%w: %s", spec.ErrMCPAuthRequired, out.Status.LastError)
 	}
 
-	creds, sensitive, err := resolveOAuthClientCredentials(ctx, m.secrets, cfg.StreamableHTTP.ClientCredentialRef)
+	creds, sensitive, err := resolveOAuthClientCredentials(ctx, m.secrets, cfg.StreamableHTTP.ClientCredentialRef, true)
 	if err != nil {
 		out.Status.State = spec.MCPAuthStateError
 		out.Status.LastError = err.Error()
@@ -304,6 +313,7 @@ func (m *AuthManager) configureClientCredentialsOAuth(
 		out.Status.LastError = err.Error()
 		return err
 	}
+	out.SensitiveValues = append(out.SensitiveValues, sensitive...)
 
 	out.OAuthHandler = &trackedOAuthHandler{
 		inner: handler,
@@ -314,48 +324,74 @@ func (m *AuthManager) configureClientCredentialsOAuth(
 			State:    spec.MCPAuthStateRequired,
 			Resource: out.Status.Resource,
 		},
+		sensitiveValues: append([]string(nil), out.SensitiveValues...),
 	}
 
-	out.SensitiveValues = append(out.SensitiveValues, sensitive...)
 	out.Status.State = spec.MCPAuthStateRequired
 	return nil
 }
 
-func parseOAuthClientCredentialsSecret(raw string) (*oauthex.ClientCredentials, []string, error) {
+func parseOAuthClientCredentialsSecret(
+	raw string,
+	requireClientSecret bool,
+) (*oauthex.ClientCredentials, []string, error) {
 	var wire struct {
 		ClientID     string `json:"clientID"`
 		ClientSecret string `json:"clientSecret"`
 	}
-	if err := json.Unmarshal([]byte(raw), &wire); err != nil {
+	dec := json.NewDecoder(strings.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&wire); err != nil {
 		return nil, nil, fmt.Errorf(
 			"%w: OAuth client credentials secret must be a JSON object",
 			spec.ErrMCPInvalidRequest,
 		)
 	}
-
-	clientID := strings.TrimSpace(wire.ClientID)
-	clientSecret := strings.TrimSpace(wire.ClientSecret)
-	if clientID == "" {
+	if err := dec.Decode(&struct{}{}); err != io.EOF {
+		return nil, nil, fmt.Errorf(
+			"%w: OAuth client credentials secret must contain a single JSON object",
+			spec.ErrMCPInvalidRequest,
+		)
+	}
+	if strings.TrimSpace(wire.ClientID) == "" {
 		return nil, nil, fmt.Errorf("%w: OAuth client credentials secret requires clientID", spec.ErrMCPInvalidRequest)
 	}
-	if clientSecret == "" {
+	if strings.TrimSpace(wire.ClientID) != wire.ClientID {
+		return nil, nil, fmt.Errorf(
+			"%w: OAuth client credentials clientID must not have leading/trailing whitespace",
+			spec.ErrMCPInvalidRequest,
+		)
+	}
+
+	if requireClientSecret && strings.TrimSpace(wire.ClientSecret) == "" {
 		return nil, nil, fmt.Errorf(
 			"%w: OAuth client credentials secret requires clientSecret",
 			spec.ErrMCPInvalidRequest,
 		)
 	}
+
+	if wire.ClientSecret != "" && strings.TrimSpace(wire.ClientSecret) == "" {
+		return nil, nil, fmt.Errorf(
+			"%w: OAuth client credentials clientSecret must not be only whitespace",
+			spec.ErrMCPInvalidRequest,
+		)
+	}
 	creds := &oauthex.ClientCredentials{
-		ClientID: clientID,
-		ClientSecretAuth: &oauthex.ClientSecretAuth{
-			ClientSecret: clientSecret,
-		},
+		ClientID: wire.ClientID,
+	}
+	if wire.ClientSecret != "" {
+		creds.ClientSecretAuth = &oauthex.ClientSecretAuth{
+			ClientSecret: wire.ClientSecret,
+		}
 	}
 	if err := creds.Validate(); err != nil {
 		return nil, nil, fmt.Errorf("%w: %w", spec.ErrMCPInvalidRequest, err)
 	}
 
 	sensitive := make([]string, 0, 1)
-	sensitive = append(sensitive, clientSecret)
+	if wire.ClientSecret != "" {
+		sensitive = append(sensitive, wire.ClientSecret)
+	}
 	return creds, sensitive, nil
 }
 
