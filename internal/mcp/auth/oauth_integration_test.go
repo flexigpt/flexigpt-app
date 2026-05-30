@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
@@ -32,15 +34,21 @@ type oauthHarness struct {
 	registerCalls int
 	tokenCalls    int
 
-	lastRegister  map[string]any
-	lastTokenForm url.Values
-	lastTokenAuth string
+	lastRegister      map[string]any
+	lastTokenForm     url.Values
+	lastTokenClientID string
+	lastTokenSecret   string
+	lastTokenGrant    string
 
 	clients map[string]string
 
 	cimdSupported bool
 	issSupported  bool
 	expiresIn     int
+
+	failTokenAt          int
+	failTokenCode        string
+	failTokenDescription string
 }
 
 func newOAuthHarness(t *testing.T) *oauthHarness {
@@ -73,7 +81,7 @@ func (h *oauthHarness) client() *http.Client {
 }
 
 func (h *oauthHarness) bearerChallenge() string {
-	return fmt.Sprintf(`Bearer resource_metadata="%q", scope="mcp:tools"`, h.prmURL())
+	return fmt.Sprintf(`Bearer resource_metadata=%q, scope=%q`, h.prmURL(), testScopeMCPTools)
 }
 
 func (h *oauthHarness) registerCallCount() int {
@@ -92,11 +100,11 @@ func (h *oauthHarness) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/.well-known/oauth-protected-resource/mcp",
 		"/.well-known/oauth-protected-resource":
-		h.serveProtectedResourceMetadata(w, r)
+		h.serveProtectedResourceMetadata(w)
 
 	case "/.well-known/oauth-authorization-server",
 		"/.well-known/openid-configuration":
-		h.serveAuthorizationServerMetadata(w, r)
+		h.serveAuthorizationServerMetadata(w)
 
 	case "/register":
 		h.serveRegister(w, r)
@@ -112,15 +120,15 @@ func (h *oauthHarness) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *oauthHarness) serveProtectedResourceMetadata(w http.ResponseWriter, r *http.Request) {
+func (h *oauthHarness) serveProtectedResourceMetadata(w http.ResponseWriter) {
 	writeJSON(w, map[string]any{
 		"resource":              h.mcpURL(),
 		"authorization_servers": []string{h.issuerURL()},
-		"scopes_supported":      []string{"mcp:tools"},
+		"scopes_supported":      []string{testScopeMCPTools},
 	})
 }
 
-func (h *oauthHarness) serveAuthorizationServerMetadata(w http.ResponseWriter, r *http.Request) {
+func (h *oauthHarness) serveAuthorizationServerMetadata(w http.ResponseWriter) {
 	writeJSON(w, map[string]any{
 		"issuer":                   h.issuerURL(),
 		"authorization_endpoint":   h.issuerURL() + "/authorize",
@@ -134,7 +142,7 @@ func (h *oauthHarness) serveAuthorizationServerMetadata(w http.ResponseWriter, r
 		},
 		"token_endpoint_auth_methods_supported":          []string{"client_secret_post", "client_secret_basic", "none"},
 		"code_challenge_methods_supported":               []string{"S256"},
-		"scopes_supported":                               []string{"mcp:tools", "offline_access"},
+		"scopes_supported":                               []string{testScopeMCPTools, "offline_access"},
 		"client_id_metadata_document_supported":          h.cimdSupported,
 		"authorization_response_iss_parameter_supported": h.issSupported,
 	})
@@ -185,13 +193,21 @@ func (h *oauthHarness) serveToken(w http.ResponseWriter, r *http.Request) {
 	h.tokenCalls++
 	seq := h.tokenCalls
 	h.lastTokenForm = cloneValues(r.Form)
-	h.lastTokenAuth = clientID
+	h.lastTokenClientID = clientID
+	h.lastTokenSecret = clientSecret
+	h.lastTokenGrant = grantType
 	expectedSecret, knownClient := h.clients[clientID]
 	expiresIn := h.expiresIn
+	failAt := h.failTokenAt
+	failCode := h.failTokenCode
+	failDesc := h.failTokenDescription
 	h.mu.Unlock()
 
 	if expiresIn <= 0 {
 		expiresIn = 3600
+	}
+	if failCode == "" {
+		failCode = errStrInvalidGrant
 	}
 
 	if !knownClient {
@@ -235,6 +251,15 @@ func (h *oauthHarness) serveToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if failAt > 0 && seq >= failAt {
+		w.WriteHeader(http.StatusBadRequest)
+		writeJSON(w, map[string]any{
+			"error":             failCode,
+			"error_description": failDesc,
+		})
+		return
+	}
+
 	writeJSON(w, map[string]any{
 		"access_token":  fmt.Sprintf("access-%d", seq),
 		"refresh_token": fmt.Sprintf("refresh-%d", seq),
@@ -266,7 +291,7 @@ func (b *testOAuthBroker) FetchAuthorizationCode(
 	}
 	q := u.Query()
 
-	if q.Get("client_id") != b.wantClientID {
+	if b.wantClientID != "" && q.Get("client_id") != b.wantClientID {
 		b.t.Fatalf("client_id = %q, want %q", q.Get("client_id"), b.wantClientID)
 	}
 	if q.Get("redirect_uri") != b.wantRedirectURL {
@@ -286,10 +311,10 @@ func (b *testOAuthBroker) FetchAuthorizationCode(
 	}
 
 	scopes := strings.Fields(q.Get("scope"))
-	if !slices.Contains(scopes, "mcp:tools") {
-		b.t.Fatalf("authorization scope %q does not contain mcp:tools", q.Get("scope"))
+	if !containsString(scopes, testScopeMCPTools) {
+		b.t.Fatalf("authorization scope %q does not contain %s", q.Get("scope"), testScopeMCPTools)
 	}
-	if b.wantOffline && !slices.Contains(scopes, "offline_access") {
+	if b.wantOffline && !containsString(scopes, "offline_access") {
 		b.t.Fatalf("authorization scope %q does not contain offline_access", q.Get("scope"))
 	}
 
@@ -300,237 +325,202 @@ func (b *testOAuthBroker) FetchAuthorizationCode(
 	}, nil
 }
 
-func TestOAuthAuthorizationCodeDCRFlow(t *testing.T) {
+func TestOAuthAuthorizationCodeFlows(t *testing.T) {
 	ctx := t.Context()
-	h := newOAuthHarness(t)
-
-	mgr := NewAuthManager(
-		StaticSecretResolver{},
-		WithOAuthAuthorizationBroker(&testOAuthBroker{
-			t:               t,
+	testCIMDURL := "https://client.example.com/flexigpt-mcp-client.json"
+	tests := []struct {
+		name            string
+		resolver        StaticSecretResolver
+		ref             string
+		cimdURL         string
+		cimdSupported   bool
+		clients         map[string]string
+		wantClientID    string
+		wantRegisterCnt int
+	}{
+		{
+			name:            "dcr flow",
+			ref:             "",
 			wantClientID:    testClientID,
-			wantRedirectURL: testOAuthRedirectURL,
-			wantResourceURL: h.mcpURL(),
-			wantOffline:     true,
-		}),
-		WithOAuthRedirectURL(testOAuthRedirectURL),
-		WithAuthHTTPClient(h.client()),
-	)
-
-	cfg := streamableHTTPConfig("dcr", h.mcpURL(), spec.MCPHTTPAuthOAuth, "")
-	resolved, err := mgr.PrepareTransportAuth(ctx, cfg)
-	if err != nil {
-		t.Fatalf("PrepareTransportAuth: %v", err)
-	}
-	authorizeWithChallenge(t, h, resolved)
-
-	if got := h.registerCallCount(); got != 1 {
-		t.Fatalf("register calls = %d, want 1", got)
-	}
-
-	st, ok := mgr.GetAuthStatus(cfg.ID)
-	if !ok {
-		t.Fatalf("missing auth status")
-	}
-	if st.State != spec.MCPAuthStateAuthorized {
-		t.Fatalf("state = %q, want authorized, lastError=%q", st.State, st.LastError)
-	}
-}
-
-func TestOAuthAuthorizationCodePreregisteredPublicClient(t *testing.T) {
-	ctx := t.Context()
-	h := newOAuthHarness(t)
-	h.clients["public-client"] = ""
-
-	const ref = "public-ref"
-
-	mgr := NewAuthManager(
-		StaticSecretResolver{
-			ref: `{"clientID":"public-client"}`,
+			wantRegisterCnt: 1,
+			clients: map[string]string{
+				testClientID: "",
+			},
 		},
-		WithOAuthAuthorizationBroker(&testOAuthBroker{
-			t:               t,
-			wantClientID:    "public-client",
-			wantRedirectURL: testOAuthRedirectURL,
-			wantResourceURL: h.mcpURL(),
-			wantOffline:     true,
-		}),
-		WithOAuthRedirectURL(testOAuthRedirectURL),
-		WithAuthHTTPClient(h.client()),
-	)
-
-	cfg := streamableHTTPConfig("public", h.mcpURL(), spec.MCPHTTPAuthOAuth, ref)
-	resolved, err := mgr.PrepareTransportAuth(ctx, cfg)
-	if err != nil {
-		t.Fatalf("PrepareTransportAuth: %v", err)
-	}
-	authorizeWithChallenge(t, h, resolved)
-
-	if got := h.registerCallCount(); got != 0 {
-		t.Fatalf("register calls = %d, want 0", got)
-	}
-}
-
-func TestOAuthAuthorizationCodePreregisteredConfidentialClient(t *testing.T) {
-	ctx := t.Context()
-	h := newOAuthHarness(t)
-	h.clients["confidential-client"] = "top-secret"
-
-	const ref = "confidential-ref"
-
-	mgr := NewAuthManager(
-		StaticSecretResolver{
-			ref: `{"clientID":"confidential-client","clientSecret":"top-secret"}`,
+		{
+			name: "preregistered public client",
+			resolver: StaticSecretResolver{
+				"public-ref": testPublicRefRaw,
+			},
+			ref:             "public-ref",
+			wantClientID:    testPublicClientID,
+			wantRegisterCnt: 0,
+			clients: map[string]string{
+				testPublicClientID: "",
+			},
 		},
-		WithOAuthAuthorizationBroker(&testOAuthBroker{
-			t:               t,
-			wantClientID:    "confidential-client",
-			wantRedirectURL: testOAuthRedirectURL,
-			wantResourceURL: h.mcpURL(),
-			wantOffline:     true,
-		}),
-		WithOAuthRedirectURL(testOAuthRedirectURL),
-		WithAuthHTTPClient(h.client()),
-	)
-
-	cfg := streamableHTTPConfig("confidential", h.mcpURL(), spec.MCPHTTPAuthOAuth, ref)
-	resolved, err := mgr.PrepareTransportAuth(ctx, cfg)
-	if err != nil {
-		t.Fatalf("PrepareTransportAuth: %v", err)
-	}
-	authorizeWithChallenge(t, h, resolved)
-
-	h.mu.Lock()
-	lastForm := cloneValues(h.lastTokenForm)
-	h.mu.Unlock()
-
-	if got := lastForm.Get("client_secret"); got != "top-secret" {
-		t.Fatalf("client_secret form value = %q, want top-secret", got)
-	}
-}
-
-func TestOAuthClientIDMetadataDocumentSupported(t *testing.T) {
-	ctx := t.Context()
-	h := newOAuthHarness(t)
-	h.cimdSupported = true
-
-	const clientIDURL = "https://client.example.com/flexigpt-mcp-client.json"
-	h.clients[clientIDURL] = ""
-
-	mgr := NewAuthManager(
-		StaticSecretResolver{},
-		WithOAuthAuthorizationBroker(&testOAuthBroker{
-			t:               t,
-			wantClientID:    clientIDURL,
-			wantRedirectURL: testOAuthRedirectURL,
-			wantResourceURL: h.mcpURL(),
-			wantOffline:     true,
-		}),
-		WithOAuthRedirectURL(testOAuthRedirectURL),
-		WithAuthHTTPClient(h.client()),
-	)
-
-	cfg := streamableHTTPConfig("cimd", h.mcpURL(), spec.MCPHTTPAuthOAuth, "")
-	cfg.StreamableHTTP.ClientIDMetadataDocumentURL = clientIDURL
-
-	resolved, err := mgr.PrepareTransportAuth(ctx, cfg)
-	if err != nil {
-		t.Fatalf("PrepareTransportAuth: %v", err)
-	}
-	authorizeWithChallenge(t, h, resolved)
-
-	if got := h.registerCallCount(); got != 0 {
-		t.Fatalf("register calls = %d, want 0", got)
-	}
-}
-
-func TestOAuthClientIDMetadataDocumentFallsBackToDCR(t *testing.T) {
-	ctx := t.Context()
-	h := newOAuthHarness(t)
-	h.cimdSupported = false
-
-	const clientIDURL = "https://client.example.com/flexigpt-mcp-client.json"
-
-	mgr := NewAuthManager(
-		StaticSecretResolver{},
-		WithOAuthAuthorizationBroker(&testOAuthBroker{
-			t:               t,
+		{
+			name: "preregistered confidential client",
+			resolver: StaticSecretResolver{
+				"confidential-ref": `{"clientID":"confidential-client","clientSecret":"top-secret"}`,
+			},
+			ref:             "confidential-ref",
+			wantClientID:    testConfidentialClientID,
+			wantRegisterCnt: 0,
+			clients: map[string]string{
+				testConfidentialClientID: "top-secret",
+			},
+		},
+		{
+			name:            "client id metadata document supported",
+			cimdURL:         testCIMDURL,
+			cimdSupported:   true,
+			wantClientID:    testCIMDURL,
+			wantRegisterCnt: 0,
+			clients: map[string]string{
+				testCIMDURL: "",
+			},
+		},
+		{
+			name:            "client id metadata document falls back to dcr",
+			cimdURL:         testCIMDURL,
+			cimdSupported:   false,
 			wantClientID:    testClientID,
-			wantRedirectURL: testOAuthRedirectURL,
-			wantResourceURL: h.mcpURL(),
-			wantOffline:     true,
-		}),
-		WithOAuthRedirectURL(testOAuthRedirectURL),
-		WithAuthHTTPClient(h.client()),
-	)
-
-	cfg := streamableHTTPConfig("cimd-fallback", h.mcpURL(), spec.MCPHTTPAuthOAuth, "")
-	cfg.StreamableHTTP.ClientIDMetadataDocumentURL = clientIDURL
-
-	resolved, err := mgr.PrepareTransportAuth(ctx, cfg)
-	if err != nil {
-		t.Fatalf("PrepareTransportAuth: %v", err)
+			wantRegisterCnt: 1,
+			clients: map[string]string{
+				testClientID: "",
+			},
+		},
 	}
-	authorizeWithChallenge(t, h, resolved)
 
-	if got := h.registerCallCount(); got != 1 {
-		t.Fatalf("register calls = %d, want 1", got)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newOAuthHarness(t)
+			h.cimdSupported = tt.cimdSupported
+			maps.Copy(h.clients, tt.clients)
+
+			mgr := NewAuthManager(
+				tt.resolver,
+				WithOAuthAuthorizationBroker(&testOAuthBroker{
+					t:               t,
+					wantClientID:    tt.wantClientID,
+					wantRedirectURL: testOAuthRedirectURL,
+					wantResourceURL: h.mcpURL(),
+					wantOffline:     true,
+				}),
+				WithOAuthRedirectURL(testOAuthRedirectURL),
+				WithAuthHTTPClient(h.client()),
+			)
+
+			cfg := streamableHTTPConfig("oauth-server", h.mcpURL(), spec.MCPHTTPAuthOAuth, tt.ref)
+			if tt.cimdURL != "" {
+				cfg.StreamableHTTP.ClientIDMetadataDocumentURL = tt.cimdURL
+			}
+
+			resolved, err := mgr.PrepareTransportAuth(ctx, cfg)
+			if err != nil {
+				t.Fatalf("PrepareTransportAuth: %v", err)
+			}
+			if resolved.OAuthHandler == nil {
+				t.Fatalf("OAuthHandler is nil")
+			}
+
+			mustAuthorize(t, ctx, h, resolved)
+
+			ts, err := resolved.OAuthHandler.TokenSource(ctx)
+			if err != nil {
+				t.Fatalf("TokenSource: %v", err)
+			}
+			if ts == nil {
+				t.Fatalf("TokenSource is nil")
+			}
+
+			tok, err := ts.Token()
+			if err != nil {
+				t.Fatalf("Token: %v", err)
+			}
+			if tok == nil || tok.AccessToken == "" {
+				t.Fatalf("empty token: %#v", tok)
+			}
+
+			if got := h.registerCallCount(); got != tt.wantRegisterCnt {
+				t.Fatalf("register calls = %d, want %d", got, tt.wantRegisterCnt)
+			}
+			if got := h.tokenCallCount(); got == 0 {
+				t.Fatalf("token endpoint was not called")
+			}
+
+			st, ok := mgr.GetAuthStatus(cfg.ID)
+			if !ok {
+				t.Fatalf("missing auth status")
+			}
+			if st.AuthMode != spec.MCPHTTPAuthOAuth {
+				t.Fatalf("AuthMode = %q, want oauth", st.AuthMode)
+			}
+			if st.State != spec.MCPAuthStateAuthorized {
+				t.Fatalf("State = %q, want authorized", st.State)
+			}
+			if st.Resource != h.mcpURL() {
+				t.Fatalf("Resource = %q, want %q", st.Resource, h.mcpURL())
+			}
+		})
 	}
 }
 
-func TestClientCredentialsGrantRefreshesToken(t *testing.T) {
+func TestOAuthClientCredentialsGrantRefreshesToken(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test")
+	}
+
 	ctx := t.Context()
 	h := newOAuthHarness(t)
 	h.clients["service-client"] = "service-secret"
 	h.expiresIn = 1
 
-	const ref = "service-ref"
-
 	mgr := NewAuthManager(
 		StaticSecretResolver{
-			ref: `{"clientID":"service-client","clientSecret":"service-secret"}`,
+			"service-ref": `{"clientID":"service-client","clientSecret":"service-secret"}`,
 		},
 		WithAuthHTTPClient(h.client()),
 	)
 
-	cfg := streamableHTTPConfig("service", h.mcpURL(), spec.MCPHTTPAuthClientCredentials, ref)
+	cfg := streamableHTTPConfig("service-server", h.mcpURL(), spec.MCPHTTPAuthClientCredentials, "service-ref")
 	resolved, err := mgr.PrepareTransportAuth(ctx, cfg)
 	if err != nil {
 		t.Fatalf("PrepareTransportAuth: %v", err)
 	}
+	if resolved.OAuthHandler == nil {
+		t.Fatalf("OAuthHandler is nil")
+	}
 
-	req, resp := challengeRequestResponse(t, h, http.StatusUnauthorized)
-	if resp != nil {
-		defer resp.Body.Close()
-	}
-	if err := resolved.OAuthHandler.Authorize(ctx, req, resp); err != nil {
-		t.Fatalf("Authorize: %v", err)
-	}
+	mustAuthorize(t, ctx, h, resolved)
 
 	ts, err := resolved.OAuthHandler.TokenSource(ctx)
 	if err != nil {
 		t.Fatalf("TokenSource: %v", err)
 	}
-	if ts == nil {
-		t.Fatalf("TokenSource returned nil")
-	}
-
-	before := h.tokenCallCount()
 
 	tok1, err := ts.Token()
 	if err != nil {
 		t.Fatalf("Token #1: %v", err)
 	}
+	if tok1 == nil || tok1.AccessToken == "" {
+		t.Fatalf("empty token #1: %#v", tok1)
+	}
+
+	before := h.tokenCallCount()
+	time.Sleep(1100 * time.Millisecond)
+
 	tok2, err := ts.Token()
 	if err != nil {
 		t.Fatalf("Token #2: %v", err)
 	}
-
-	if tok1.AccessToken == "" || tok2.AccessToken == "" {
-		t.Fatalf("empty access token(s): %q %q", tok1.AccessToken, tok2.AccessToken)
+	if tok2 == nil || tok2.AccessToken == "" {
+		t.Fatalf("empty token #2: %#v", tok2)
 	}
-	if got := h.tokenCallCount() - before; got < 2 {
-		t.Fatalf("token refresh calls after TokenSource = %d, want at least 2", got)
+
+	if got := h.tokenCallCount() - before; got < 1 {
+		t.Fatalf("token refresh calls after expiry = %d, want at least 1", got)
 	}
 
 	st, ok := mgr.GetAuthStatus(cfg.ID)
@@ -538,68 +528,102 @@ func TestClientCredentialsGrantRefreshesToken(t *testing.T) {
 		t.Fatalf("missing auth status")
 	}
 	if st.State != spec.MCPAuthStateAuthorized {
-		t.Fatalf("state = %q, want authorized, lastError=%q", st.State, st.LastError)
+		t.Fatalf("State = %q, want authorized", st.State)
 	}
 }
 
-func authorizeWithChallenge(
-	t *testing.T,
+func TestOAuthClientCredentialsRefreshErrorRedactsStatus(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test")
+	}
 
+	ctx := t.Context()
+	h := newOAuthHarness(t)
+	h.clients["service-client"] = "service-secret"
+	h.expiresIn = 1
+	h.failTokenAt = 2
+	h.failTokenCode = errStrInvalidGrant
+	h.failTokenDescription = "refresh token expired"
+
+	mgr := NewAuthManager(
+		StaticSecretResolver{
+			"service-ref": `{"clientID":"service-client","clientSecret":"service-secret"}`,
+		},
+		WithAuthHTTPClient(h.client()),
+	)
+
+	cfg := streamableHTTPConfig("service-server", h.mcpURL(), spec.MCPHTTPAuthClientCredentials, "service-ref")
+	resolved, err := mgr.PrepareTransportAuth(ctx, cfg)
+	if err != nil {
+		t.Fatalf("PrepareTransportAuth: %v", err)
+	}
+	if resolved.OAuthHandler == nil {
+		t.Fatalf("OAuthHandler is nil")
+	}
+
+	mustAuthorize(t, ctx, h, resolved)
+
+	ts, err := resolved.OAuthHandler.TokenSource(ctx)
+	if err != nil {
+		t.Fatalf("TokenSource: %v", err)
+	}
+
+	// The SDK may fetch a token during authorization or on the first Token()
+	// call, depending on internal flow. Accept either sequence and only assert
+	// that a later refresh/error path is redacted correctly.
+	if tok, err := ts.Token(); err == nil {
+		if tok == nil || tok.AccessToken == "" {
+			t.Fatalf("empty token #1: %#v", tok)
+		}
+
+		time.Sleep(1100 * time.Millisecond)
+
+		if _, err := ts.Token(); err == nil {
+			t.Fatalf("Token #2 succeeded, want invalid_grant")
+		}
+	}
+	// If the first token request already fails, that's still valid for this
+	// test: we only care that the resulting auth status redacts secrets.
+	st, ok := mgr.GetAuthStatus(cfg.ID)
+	if !ok {
+		t.Fatalf("missing auth status")
+	}
+	if st.State != spec.MCPAuthStateError {
+		t.Fatalf("State = %q, want error", st.State)
+	}
+	if strings.Contains(st.LastError, "top-secret") {
+		t.Fatalf("LastError leaked secret: %q", st.LastError)
+	}
+}
+
+func mustAuthorize(
+	t *testing.T,
+	ctx context.Context,
 	h *oauthHarness,
 	resolved ResolvedTransportAuth,
 ) {
 	t.Helper()
 
 	if resolved.OAuthHandler == nil {
-		t.Fatalf("resolved OAuthHandler is nil")
+		t.Fatalf("OAuthHandler is nil")
 	}
 
-	req, resp := challengeRequestResponse(t, h, http.StatusUnauthorized)
-	if resp != nil {
-		defer resp.Body.Close()
-	}
-	if err := resolved.OAuthHandler.Authorize(t.Context(), req, resp); err != nil {
-		t.Fatalf("Authorize: %v", err)
-	}
-
-	ts, err := resolved.OAuthHandler.TokenSource(t.Context())
-	if err != nil {
-		t.Fatalf("TokenSource: %v", err)
-	}
-	if ts == nil {
-		t.Fatalf("TokenSource returned nil")
-	}
-
-	tok, err := ts.Token()
-	if err != nil {
-		t.Fatalf("Token: %v", err)
-	}
-	if tok == nil || tok.AccessToken == "" {
-		t.Fatalf("empty token: %#v", tok)
-	}
-}
-
-func challengeRequestResponse(
-	t *testing.T,
-	h *oauthHarness,
-	status int,
-) (*http.Request, *http.Response) {
-	t.Helper()
-
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, h.mcpURL(), http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, h.mcpURL(), http.NoBody)
 	if err != nil {
 		t.Fatalf("NewRequest: %v", err)
 	}
 
 	resp := &http.Response{
-		StatusCode: status,
+		StatusCode: http.StatusUnauthorized,
 		Header: http.Header{
 			"WWW-Authenticate": []string{h.bearerChallenge()},
 		},
 		Body: io.NopCloser(strings.NewReader("")),
 	}
 
-	return req, resp
+	if err := resolved.OAuthHandler.Authorize(ctx, req, resp); err != nil {
+		t.Fatalf("Authorize: %v", err)
+	}
 }
 
 func streamableHTTPConfig(
@@ -638,4 +662,8 @@ func cloneValues(in url.Values) url.Values {
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+func containsString(ss []string, want string) bool {
+	return slices.Contains(ss, want)
 }

@@ -124,8 +124,8 @@ func (m *AuthManager) PrepareTransportAuth(
 	case spec.MCPTransportStdio:
 		if cfg.Stdio == nil {
 			out.Status.State = spec.MCPAuthStateError
-			out.Status.LastError = "missing stdio config"
-			return out, fmt.Errorf("%w: missing stdio config", spec.ErrMCPInvalidRequest)
+			out.Status.LastError = errStrMissingStdIOConfig
+			return out, fmt.Errorf("%w: %s", spec.ErrMCPInvalidRequest, errStrMissingStdIOConfig)
 		}
 		for key, ref := range cfg.Stdio.SecretEnvRefs {
 			v, err := m.secrets.ResolveSecret(ctx, ref)
@@ -173,7 +173,7 @@ func (m *AuthManager) PrepareTransportAuth(
 
 	default:
 		out.Status.State = spec.MCPAuthStateError
-		out.Status.LastError = "unsupported transport"
+		out.Status.LastError = errStrUnsupportedTransport
 		return out, fmt.Errorf("%w: unsupported transport %s", spec.ErrMCPInvalidRequest, cfg.Transport)
 	}
 }
@@ -366,16 +366,15 @@ func parseOAuthClientCredentialsSecret(
 		)
 	}
 
-	if requireClientSecret && strings.TrimSpace(wire.ClientSecret) == "" {
-		return nil, nil, fmt.Errorf(
-			"%w: OAuth client credentials secret requires clientSecret",
-			spec.ErrMCPInvalidRequest,
-		)
-	}
-
 	if wire.ClientSecret != "" && strings.TrimSpace(wire.ClientSecret) == "" {
 		return nil, nil, fmt.Errorf(
 			"%w: OAuth client credentials clientSecret must not be only whitespace",
+			spec.ErrMCPInvalidRequest,
+		)
+	}
+	if requireClientSecret && strings.TrimSpace(wire.ClientSecret) == "" {
+		return nil, nil, fmt.Errorf(
+			"%w: OAuth client credentials secret requires clientSecret",
 			spec.ErrMCPInvalidRequest,
 		)
 	}

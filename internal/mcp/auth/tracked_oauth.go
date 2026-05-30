@@ -13,6 +13,12 @@ import (
 	"golang.org/x/oauth2"
 )
 
+const (
+	errStrInvalidGrant         = "invalid_grant"
+	errStrMissingStdIOConfig   = "missing stdio config"
+	errStrUnsupportedTransport = "unsupported transport"
+)
+
 // trackingTokenSource wraps an oauth2.TokenSource and pushes status updates to
 // the configured sink on every Token() call. The underlying source already
 // handles caching and refresh; this wrapper only observes results.
@@ -159,7 +165,7 @@ func authStatusFromTokenError(base spec.MCPAuthStatus, err error) spec.MCPAuthSt
 		st.LastError = err.Error()
 	}
 	var retrieveErr *oauth2.RetrieveError
-	if errors.As(err, &retrieveErr) && retrieveErr.ErrorCode == "invalid_grant" {
+	if errors.As(err, &retrieveErr) && retrieveErr.ErrorCode == errStrInvalidGrant {
 		st.State = spec.MCPAuthStateExpired
 	}
 	return st

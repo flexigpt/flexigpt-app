@@ -1,226 +1,371 @@
 package auth
 
 import (
-	"context"
-	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"strings"
-	"sync"
 	"testing"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
-	mcpAuth "github.com/modelcontextprotocol/go-sdk/auth"
-	"golang.org/x/oauth2"
 )
 
 const (
-	testServerID       = "server"
-	testBearerHeader   = "Bearer"
-	testSensitiveValue = "top-secret"
+	testScopeMCPTools = "mcp:tools"
+	testScopeAdmin    = "admin"
+	testScopeA        = "scope-a"
+	testScopeB        = "scope-b"
 )
 
-func TestAuthStatusFromHTTPFailureStatusTransitions(t *testing.T) {
-	base := spec.MCPAuthStatus{
-		ServerID: testServerID,
-		AuthMode: spec.MCPHTTPAuthOAuth,
-		State:    spec.MCPAuthStateRequired,
-		Resource: "https://example.test/mcp",
-	}
+var testWantScope = []string{testScopeMCPTools, testScopeAdmin}
 
+func TestBearerChallengeValues(t *testing.T) {
 	tests := []struct {
-		name   string
-		status int
-		header string
-		want   spec.MCPAuthState
+		name      string
+		headers   []string
+		wantErr   string
+		wantScope []string
 	}{
 		{
-			name:   "401 means required",
-			status: http.StatusUnauthorized,
-			header: testBearerHeader,
-			want:   spec.MCPAuthStateRequired,
+			name:      "bearer scope",
+			headers:   []string{`Bearer scope="mcp:tools admin"`},
+			wantErr:   "",
+			wantScope: testWantScope,
 		},
 		{
-			name:   "403 without insufficient_scope remains error",
-			status: http.StatusForbidden,
-			header: testBearerHeader,
-			want:   spec.MCPAuthStateError,
+			name:      "bearer insufficient scope",
+			headers:   []string{`Basic realm="ignored"`, `Bearer error="insufficient_scope", scope="mcp:tools admin"`},
+			wantErr:   "insufficient_scope",
+			wantScope: testWantScope,
+		},
+		{
+			name:      "no bearer challenge",
+			headers:   []string{`Basic realm="ignored"`},
+			wantErr:   "",
+			wantScope: nil,
+		},
+		{
+			name:      "invalid header",
+			headers:   []string{`Bearer foo="bar"`},
+			wantErr:   "",
+			wantScope: nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resp := &http.Response{
-				StatusCode: tt.status,
-				Header: http.Header{
-					"WWW-Authenticate": []string{tt.header},
-				},
+			gotErr, gotScopes := bearerChallengeValues(tt.headers)
+			if gotErr != tt.wantErr {
+				t.Fatalf("challengeErr = %q, want %q", gotErr, tt.wantErr)
 			}
-			st := authStatusFromHTTPFailure(base, resp, errors.New("request failed"))
-			if st.State != tt.want {
-				p, _ := json.MarshalIndent(resp, "", "")
-				t.Fatalf("state = %q, want %q http %s", st.State, tt.want, string(p))
+			if len(gotScopes) != len(tt.wantScope) {
+				t.Fatalf("scopes len = %d, want %d", len(gotScopes), len(tt.wantScope))
 			}
-			if tt.want == spec.MCPAuthStateInsufficientScope {
-				if got := strings.Join(st.Scopes, " "); got != "mcp:tools admin" {
-					t.Fatalf("scopes = %q, want %q", got, "mcp:tools admin")
+			for i := range tt.wantScope {
+				if gotScopes[i] != tt.wantScope[i] {
+					t.Fatalf("scope[%d] = %q, want %q", i, gotScopes[i], tt.wantScope[i])
 				}
 			}
 		})
 	}
 }
 
-func TestAuthStatusFromTokenErrorInvalidGrantIsExpired(t *testing.T) {
+func TestAuthStatusFromHTTPFailure(t *testing.T) {
 	base := spec.MCPAuthStatus{
-		ServerID: testServerID,
+		ServerID: testHTTPServerID,
 		AuthMode: spec.MCPHTTPAuthOAuth,
-		State:    spec.MCPAuthStateAuthorized,
+		State:    spec.MCPAuthStateRequired,
+		Resource: testMCPResource,
 	}
 
-	st := authStatusFromTokenError(base, &oauth2.RetrieveError{
-		ErrorCode:        "invalid_grant",
-		ErrorDescription: "refresh token expired",
-	})
-	if st.State != spec.MCPAuthStateExpired {
-		t.Fatalf("state = %q, want expired", st.State)
+	tests := []struct {
+		name       string
+		statusCode int
+		challenge  string
+		wantState  spec.MCPAuthState
+		wantScopes []string
+	}{
+		{
+			name:       "401 required",
+			statusCode: http.StatusUnauthorized,
+			challenge:  `Bearer scope="mcp:tools admin"`,
+			wantState:  spec.MCPAuthStateRequired,
+			wantScopes: testWantScope,
+		},
+		{
+			name:       "403 insufficient scope",
+			statusCode: http.StatusForbidden,
+			challenge:  `Bearer error="insufficient_scope", scope="mcp:tools admin"`,
+			wantState:  spec.MCPAuthStateInsufficientScope,
+			wantScopes: testWantScope,
+		},
+		{
+			name:       "403 invalid token",
+			statusCode: http.StatusForbidden,
+			challenge:  `Bearer error="invalid_token", scope="mcp:tools"`,
+			wantState:  spec.MCPAuthStateExpired,
+			wantScopes: []string{testScopeMCPTools},
+		},
+		{
+			name:       "403 no challenge",
+			statusCode: http.StatusForbidden,
+			challenge:  "",
+			wantState:  spec.MCPAuthStateError,
+			wantScopes: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp := &http.Response{
+				StatusCode: tt.statusCode,
+				Header:     http.Header{},
+			}
+			if tt.challenge != "" {
+				resp.Header.Set("WWW-Authenticate", tt.challenge)
+			}
+
+			st := authStatusFromHTTPFailure(base, resp, errors.New("request failed"))
+			if st.State != tt.wantState {
+				t.Fatalf("State = %q, want %q", st.State, tt.wantState)
+			}
+			if st.LastError != "request failed" {
+				t.Fatalf("LastError = %q, want %q", st.LastError, "request failed")
+			}
+			if len(st.Scopes) != len(tt.wantScopes) {
+				t.Fatalf("Scopes len = %d, want %d", len(st.Scopes), len(tt.wantScopes))
+			}
+			for i := range tt.wantScopes {
+				if st.Scopes[i] != tt.wantScopes[i] {
+					t.Fatalf("Scopes[%d] = %q, want %q", i, st.Scopes[i], tt.wantScopes[i])
+				}
+			}
+		})
 	}
 }
 
-func TestTrackedOAuthHandlerRedactsAuthorizeErrorsInStatus(t *testing.T) {
-	sink := &captureAuthStatusSink{}
-	inner := &fakeOAuthHandler{
-		authorizeErr: errors.New("token endpoint rejected client secret top-secret"),
+func TestRedactAuthStatus(t *testing.T) {
+	st := spec.MCPAuthStatus{
+		ServerID:  testHTTPServerID,
+		AuthMode:  spec.MCPHTTPAuthOAuth,
+		State:     spec.MCPAuthStateError,
+		LastError: "token endpoint rejected top-secret",
+		Resource:  testMCPResource,
 	}
 
-	h := &trackedOAuthHandler{
-		inner: inner,
-		sink:  sink,
-		status: spec.MCPAuthStatus{
-			ServerID: testServerID,
-			AuthMode: spec.MCPHTTPAuthOAuth,
-			State:    spec.MCPAuthStateRequired,
-		},
-		sensitiveValues: []string{testSensitiveValue},
+	got := redactAuthStatus(st, []string{"top-secret", "", "   "})
+
+	if strings.Contains(got.LastError, "top-secret") {
+		t.Fatalf("LastError leaked secret: %q", got.LastError)
+	}
+	if !strings.Contains(got.LastError, "[REDACTED]") {
+		t.Fatalf("LastError was not redacted: %q", got.LastError)
+	}
+	if got.Resource != st.Resource {
+		t.Fatalf("Resource changed: got %q want %q", got.Resource, st.Resource)
+	}
+}
+
+func TestAuthManagerStatusLifecycle(t *testing.T) {
+	mgr := NewAuthManager(nil)
+
+	expiresAt := time.Now().UTC().Add(time.Hour)
+	wantExpiresAt := expiresAt
+
+	in := spec.MCPAuthStatus{
+		ServerID:  testHTTPServerID,
+		AuthMode:  spec.MCPHTTPAuthOAuth,
+		State:     spec.MCPAuthStateAuthorized,
+		Scopes:    []string{testScopeA, testScopeB},
+		ExpiresAt: &expiresAt,
 	}
 
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "https://example.test/mcp", http.NoBody)
-	if err != nil {
-		t.Fatalf("NewRequest: %v", err)
-	}
-	resp := &http.Response{
-		StatusCode: http.StatusUnauthorized,
-		Header:     http.Header{},
-		Body:       io.NopCloser(strings.NewReader("")),
+	if err := mgr.SaveAuthStatus(t.Context(), in); err != nil {
+		t.Fatalf("SaveAuthStatus: %v", err)
 	}
 
-	if err := h.Authorize(t.Context(), req, resp); err == nil {
-		t.Fatalf("Authorize returned nil error")
-	}
+	in.Scopes[0] = "mutated"
+	expiresAt = expiresAt.Add(2 * time.Hour)
 
-	st, ok := sink.last()
+	got, ok := mgr.GetAuthStatus(testHTTPServerID)
 	if !ok {
-		t.Fatalf("missing saved status")
+		t.Fatalf("missing status")
 	}
-	if strings.Contains(st.LastError, testSensitiveValue) {
-		t.Fatalf("LastError leaked secret: %q", st.LastError)
+	if got.Scopes[0] != testScopeA || got.Scopes[1] != testScopeB {
+		t.Fatalf("Scopes were not cloned: %#v", got.Scopes)
 	}
-	if !strings.Contains(st.LastError, "[REDACTED]") {
-		t.Fatalf("LastError was not redacted: %q", st.LastError)
+	if got.ExpiresAt == nil || !got.ExpiresAt.Equal(wantExpiresAt) {
+		t.Fatalf("ExpiresAt = %#v, want %v", got.ExpiresAt, wantExpiresAt)
+	}
+
+	mgr.ClearAuthStatus(testHTTPServerID)
+	if _, ok := mgr.GetAuthStatus(testHTTPServerID); ok {
+		t.Fatalf("status was not cleared")
+	}
+
+	if err := mgr.SaveAuthStatus(t.Context(), in); err != nil {
+		t.Fatalf("SaveAuthStatus #2: %v", err)
+	}
+	mgr.ClearAuthStatuses()
+	if _, ok := mgr.GetAuthStatus(testHTTPServerID); ok {
+		t.Fatalf("statuses were not cleared")
 	}
 }
 
-func TestTrackedOAuthHandlerRedactsTokenSourceErrorsInStatus(t *testing.T) {
-	sink := &captureAuthStatusSink{}
-	inner := &fakeOAuthHandler{
-		tokenSource: errorTokenSource{
-			err: errors.New("refresh failed for top-secret"),
+func TestDefaultMCPAuthStatusFromConfig(t *testing.T) {
+	tests := []struct {
+		name      string
+		cfg       spec.MCPServerConfig
+		wantMode  spec.MCPHTTPAuthMode
+		wantState spec.MCPAuthState
+		wantRes   string
+	}{
+		{
+			name:      "no streamable http config",
+			cfg:       spec.MCPServerConfig{ID: testHTTPServerID},
+			wantMode:  spec.MCPHTTPAuthNone,
+			wantState: spec.MCPAuthStateNotRequired,
+			wantRes:   "",
+		},
+		{
+			name: "oauth",
+			cfg: spec.MCPServerConfig{
+				ID: testHTTPServerID,
+				StreamableHTTP: &spec.MCPStreamableHTTPConfig{
+					URL:      " https://example.test/mcp ",
+					AuthMode: spec.MCPHTTPAuthOAuth,
+				},
+			},
+			wantMode:  spec.MCPHTTPAuthOAuth,
+			wantState: spec.MCPAuthStateRequired,
+			wantRes:   testMCPResource,
+		},
+		{
+			name: "client credentials",
+			cfg: spec.MCPServerConfig{
+				ID: testHTTPServerID,
+				StreamableHTTP: &spec.MCPStreamableHTTPConfig{
+					URL:      testMCPResource,
+					AuthMode: spec.MCPHTTPAuthClientCredentials,
+				},
+			},
+			wantMode:  spec.MCPHTTPAuthClientCredentials,
+			wantState: spec.MCPAuthStateRequired,
+			wantRes:   testMCPResource,
 		},
 	}
 
-	h := &trackedOAuthHandler{
-		inner: inner,
-		sink:  sink,
-		status: spec.MCPAuthStatus{
-			ServerID: testServerID,
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := DefaultMCPAuthStatusFromConfig(tt.cfg)
+			if got.ServerID != tt.cfg.ID {
+				t.Fatalf("ServerID = %q, want %q", got.ServerID, tt.cfg.ID)
+			}
+			if got.AuthMode != tt.wantMode {
+				t.Fatalf("AuthMode = %q, want %q", got.AuthMode, tt.wantMode)
+			}
+			if got.State != tt.wantState {
+				t.Fatalf("State = %q, want %q", got.State, tt.wantState)
+			}
+			if got.Resource != tt.wantRes {
+				t.Fatalf("Resource = %q, want %q", got.Resource, tt.wantRes)
+			}
+		})
+	}
+}
+
+func TestMergeMCPAuthStatus(t *testing.T) {
+	cfgOAuth := spec.MCPServerConfig{
+		ID: testHTTPServerID,
+		StreamableHTTP: &spec.MCPStreamableHTTPConfig{
+			URL:      testMCPResource,
 			AuthMode: spec.MCPHTTPAuthOAuth,
-			State:    spec.MCPAuthStateAuthorized,
 		},
-		sensitiveValues: []string{testSensitiveValue},
+	}
+	defOAuth := DefaultMCPAuthStatusFromConfig(cfgOAuth)
+
+	tests := []struct {
+		name string
+		st   spec.MCPAuthStatus
+		cfg  spec.MCPServerConfig
+		want spec.MCPAuthStatus
+	}{
+		{
+			name: "fills defaults from config",
+			st: spec.MCPAuthStatus{
+				State:  spec.MCPAuthStateAuthorized,
+				Scopes: []string{testScopeA},
+			},
+			cfg: cfgOAuth,
+			want: spec.MCPAuthStatus{
+				ServerID: testHTTPServerID,
+				AuthMode: spec.MCPHTTPAuthOAuth,
+				State:    spec.MCPAuthStateAuthorized,
+				Resource: testMCPResource,
+				Scopes:   []string{testScopeA},
+			},
+		},
+		{
+			name: "mismatch auth mode resets to default",
+			st: spec.MCPAuthStatus{
+				ServerID:  testHTTPServerID,
+				AuthMode:  spec.MCPHTTPAuthClientCredentials,
+				State:     spec.MCPAuthStateError,
+				LastError: "boom",
+				Resource:  testMCPResource,
+			},
+			cfg:  cfgOAuth,
+			want: defOAuth,
+		},
+		{
+			name: "none auth clears auth-specific fields",
+			st: spec.MCPAuthStatus{
+				ServerID:            testHTTPServerID,
+				AuthMode:            spec.MCPHTTPAuthNone,
+				State:               spec.MCPAuthStateError,
+				Scopes:              []string{testScopeA},
+				LastError:           "boom",
+				AuthorizationServer: "https://issuer.test",
+			},
+			cfg: spec.MCPServerConfig{ID: testHTTPServerID},
+			want: spec.MCPAuthStatus{
+				ServerID: testHTTPServerID,
+				AuthMode: spec.MCPHTTPAuthNone,
+				State:    spec.MCPAuthStateNotRequired,
+			},
+		},
 	}
 
-	ts, err := h.TokenSource(t.Context())
-	if err != nil {
-		t.Fatalf("TokenSource: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := MergeMCPAuthStatus(tt.st, tt.cfg)
+
+			if got.ServerID != tt.want.ServerID {
+				t.Fatalf("ServerID = %q, want %q", got.ServerID, tt.want.ServerID)
+			}
+			if got.AuthMode != tt.want.AuthMode {
+				t.Fatalf("AuthMode = %q, want %q", got.AuthMode, tt.want.AuthMode)
+			}
+			if got.State != tt.want.State {
+				t.Fatalf("State = %q, want %q", got.State, tt.want.State)
+			}
+			if got.Resource != tt.want.Resource {
+				t.Fatalf("Resource = %q, want %q", got.Resource, tt.want.Resource)
+			}
+			if len(got.Scopes) != len(tt.want.Scopes) {
+				t.Fatalf("Scopes len = %d, want %d", len(got.Scopes), len(tt.want.Scopes))
+			}
+			for i := range tt.want.Scopes {
+				if got.Scopes[i] != tt.want.Scopes[i] {
+					t.Fatalf("Scopes[%d] = %q, want %q", i, got.Scopes[i], tt.want.Scopes[i])
+				}
+			}
+			if tt.want.LastError == "" && got.LastError != "" {
+				t.Fatalf("LastError = %q, want empty", got.LastError)
+			}
+			if tt.want.AuthorizationServer == "" && got.AuthorizationServer != "" {
+				t.Fatalf("AuthorizationServer = %q, want empty", got.AuthorizationServer)
+			}
+		})
 	}
-	if ts == nil {
-		t.Fatalf("TokenSource returned nil")
-	}
-
-	if _, err := ts.Token(); err == nil {
-		t.Fatalf("Token returned nil error")
-	}
-
-	st, ok := sink.last()
-	if !ok {
-		t.Fatalf("missing saved status")
-	}
-	if strings.Contains(st.LastError, testSensitiveValue) {
-		t.Fatalf("LastError leaked secret: %q", st.LastError)
-	}
-	if !strings.Contains(st.LastError, "[REDACTED]") {
-		t.Fatalf("LastError was not redacted: %q", st.LastError)
-	}
-}
-
-type captureAuthStatusSink struct {
-	mu       sync.Mutex
-	statuses []spec.MCPAuthStatus
-}
-
-func (s *captureAuthStatusSink) SaveAuthStatus(ctx context.Context, st spec.MCPAuthStatus) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.statuses = append(s.statuses, cloneAuthStatus(st))
-	return nil
-}
-
-func (s *captureAuthStatusSink) last() (spec.MCPAuthStatus, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if len(s.statuses) == 0 {
-		return spec.MCPAuthStatus{}, false
-	}
-	return cloneAuthStatus(s.statuses[len(s.statuses)-1]), true
-}
-
-type fakeOAuthHandler struct {
-	tokenSource  oauth2.TokenSource
-	tokenErr     error
-	authorizeErr error
-}
-
-func (h *fakeOAuthHandler) TokenSource(ctx context.Context) (oauth2.TokenSource, error) {
-	if h.tokenErr != nil {
-		return nil, h.tokenErr
-	}
-	return h.tokenSource, nil
-}
-
-func (h *fakeOAuthHandler) Authorize(ctx context.Context, req *http.Request, resp *http.Response) error {
-	if resp != nil && resp.Body != nil {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}
-	return h.authorizeErr
-}
-
-var _ mcpAuth.OAuthHandler = (*fakeOAuthHandler)(nil)
-
-type errorTokenSource struct {
-	err error
-}
-
-func (s errorTokenSource) Token() (*oauth2.Token, error) {
-	return nil, s.err
 }
