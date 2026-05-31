@@ -7,6 +7,7 @@ export default [
 	route('assistantpresets', './assistantpresets/page.tsx'),
 	route('skills', './skills/page.tsx'),
 	route('tools', './tools/page.tsx'),
+	route('mcpservers', './mcpservers/page.tsx'),
 	route('prompts', './prompts/page.tsx'),
 	route('modelpresets', './modelpresets/page.tsx'),
 	route('docs', './docs/page.tsx'),

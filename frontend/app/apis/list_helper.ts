@@ -1,10 +1,19 @@
 import type { ProviderName } from '@/spec/inference';
+import type {
+	MCPBundle,
+	MCPPromptRef,
+	MCPResourceRef,
+	MCPResourceTemplateRef,
+	MCPServerConfig,
+	MCPServerID,
+	MCPToolCapability,
+} from '@/spec/mcp';
 import type { ProviderPreset } from '@/spec/modelpreset';
 import type { PromptBundle, PromptTemplateKind, PromptTemplateListItem } from '@/spec/prompt';
 import type { SkillBundle, SkillListItem, SkillType } from '@/spec/skill';
 import type { ToolBundle, ToolListItem } from '@/spec/tool';
 
-import { modelPresetStoreAPI, promptStoreAPI, skillStoreAPI, toolStoreAPI } from '@/apis/baseapi';
+import { mcpAPI, modelPresetStoreAPI, promptStoreAPI, skillStoreAPI, toolStoreAPI } from '@/apis/baseapi';
 
 export async function getAllProviderPresetsMap(
 	includeDisabled?: boolean
@@ -165,5 +174,115 @@ export async function getAllSkills(
 		if (!nextPageToken) break;
 		pageToken = nextPageToken;
 	} while (pageToken);
+	return all;
+}
+
+export async function getAllMCPBundles(bundleIDs?: string[], includeDisabled?: boolean): Promise<MCPBundle[]> {
+	const all: MCPBundle[] = [];
+	let pageToken: string | undefined = undefined;
+	const pageSize = 25;
+
+	do {
+		const { bundles, nextPageToken } = await mcpAPI.listMCPBundles(bundleIDs, includeDisabled, pageSize, pageToken);
+
+		all.push(...bundles);
+		pageToken = nextPageToken;
+	} while (pageToken);
+
+	return all;
+}
+
+export async function getAllMCPServers(
+	bundleID: string,
+	serverIDs?: MCPServerID[],
+	enabled?: boolean,
+	includeDisabled?: boolean
+): Promise<MCPServerConfig[]> {
+	const all: MCPServerConfig[] = [];
+	let pageToken: string | undefined = undefined;
+	const pageSize = 25;
+
+	do {
+		const { servers, nextPageToken } = await mcpAPI.listMCPServers(
+			bundleID,
+			serverIDs,
+			enabled,
+			includeDisabled,
+			pageSize,
+			pageToken
+		);
+
+		all.push(...servers);
+		pageToken = nextPageToken;
+	} while (pageToken);
+
+	return all;
+}
+
+export async function getAllMCPServerTools(bundleID: string, serverID: MCPServerID): Promise<MCPToolCapability[]> {
+	const all: MCPToolCapability[] = [];
+	let pageToken: string | undefined = undefined;
+	const pageSize = 25;
+
+	do {
+		const { tools, nextPageToken } = await mcpAPI.listMCPServerTools(bundleID, serverID, pageSize, pageToken);
+
+		all.push(...tools);
+		pageToken = nextPageToken;
+	} while (pageToken);
+
+	return all;
+}
+
+export async function getAllMCPServerResources(bundleID: string, serverID: MCPServerID): Promise<MCPResourceRef[]> {
+	const all: MCPResourceRef[] = [];
+	let pageToken: string | undefined = undefined;
+	const pageSize = 25;
+
+	do {
+		const { resources, nextPageToken } = await mcpAPI.listMCPServerResources(bundleID, serverID, pageSize, pageToken);
+
+		all.push(...resources);
+		pageToken = nextPageToken;
+	} while (pageToken);
+
+	return all;
+}
+
+export async function getAllMCPServerResourceTemplates(
+	bundleID: string,
+	serverID: MCPServerID
+): Promise<MCPResourceTemplateRef[]> {
+	const all: MCPResourceTemplateRef[] = [];
+	let pageToken: string | undefined = undefined;
+	const pageSize = 25;
+
+	do {
+		const { resourceTemplates, nextPageToken } = await mcpAPI.listMCPServerResourceTemplates(
+			bundleID,
+			serverID,
+			pageSize,
+			pageToken
+		);
+
+		all.push(...resourceTemplates);
+		pageToken = nextPageToken;
+	} while (pageToken);
+
+	return all;
+}
+
+export async function getAllMCPServerPrompts(bundleID: string, serverID: MCPServerID): Promise<MCPPromptRef[]> {
+	const all: MCPPromptRef[] = [];
+	let pageToken: string | undefined = undefined;
+	const pageSize = 25;
+
+	do {
+		const { prompts, nextPageToken } = await mcpAPI.listMCPServerPrompts(bundleID, serverID, pageSize, pageToken);
+
+		all.push(...prompts);
+		pageToken = nextPageToken;
+	} while (pageToken);
+
 	return all;
 }
