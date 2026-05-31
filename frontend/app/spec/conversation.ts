@@ -13,6 +13,7 @@ import type {
 	UIToolOutput,
 	URLCitation,
 } from '@/spec/inference';
+import type { MCPConversationContext } from '@/spec/mcp';
 import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
@@ -35,6 +36,7 @@ export interface StoreConversationMessage {
 	toolChoices?: ToolChoice[];
 
 	toolStoreChoices?: ToolStoreChoice[];
+	mcpContext?: MCPConversationContext;
 	attachments?: Attachment[];
 	enabledSkillRefs?: SkillRef[];
 	activeSkillRefs?: SkillRef[];
@@ -82,6 +84,7 @@ export interface RestorableConversationContext {
 	modelPresetRef?: ModelPresetRef;
 	modelParam?: ModelParam;
 	toolChoices: ToolStoreChoice[];
+	mcpContext?: MCPConversationContext;
 	webSearchChoices: ToolStoreChoice[];
 	enabledSkillRefs: SkillRef[];
 	activeSkillRefs: SkillRef[];

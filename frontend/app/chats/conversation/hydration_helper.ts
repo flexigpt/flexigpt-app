@@ -20,6 +20,7 @@ import {
 	type UIToolCall,
 	type UIToolOutput,
 } from '@/spec/inference';
+import type { MCPConversationContext } from '@/spec/mcp';
 import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
 import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
@@ -53,6 +54,15 @@ export function initConversationMessage(role: RoleEnum): ConversationMessage {
 		status: Status.None,
 		uiContent: '',
 	};
+}
+
+function deriveMCPContextFromMessages(messages: ConversationMessage[]): MCPConversationContext | undefined {
+	for (let i = messages.length - 1; i >= 0; i -= 1) {
+		const message = messages[i];
+		if (message.role !== RoleEnum.User) continue;
+		return message.mcpContext;
+	}
+	return undefined;
 }
 
 function deriveConversationToolsFromMessages(messages: ConversationMessage[]): ToolStoreChoice[] {
@@ -152,6 +162,7 @@ export function deriveRestorableConversationContextFromMessages(
 		modelParam: findLastModelParam(messages),
 		toolChoices: deriveConversationToolsFromMessages(messages),
 		webSearchChoices: deriveWebSearchChoiceFromMessages(messages),
+		mcpContext: deriveMCPContextFromMessages(messages),
 		enabledSkillRefs,
 		activeSkillRefs,
 	};
@@ -219,6 +230,7 @@ export function buildUserConversationMessageFromEditor(
 
 	const toolStoreChoices = payload.finalToolChoices.length > 0 ? payload.finalToolChoices : undefined;
 	const toolOutputs = payload.toolOutputs.length > 0 ? payload.toolOutputs : undefined;
+	const mcpContext = payload.mcpContext;
 
 	const enabledSkillRefs = normalizeSkillRefs(payload.enabledSkillRefs);
 	const activeSkillRefs = clampActiveSkillRefsToEnabled(enabledSkillRefs, payload.activeSkillRefs);
@@ -232,6 +244,7 @@ export function buildUserConversationMessageFromEditor(
 		inputs,
 		attachments,
 		toolStoreChoices,
+		mcpContext,
 		enabledSkillRefs: enabledSkillRefs.length > 0 ? enabledSkillRefs : undefined,
 		activeSkillRefs: activeSkillRefs.length > 0 ? activeSkillRefs : undefined,
 		uiContent: text,

@@ -438,6 +438,7 @@ export interface MCPDiscoverySnapshot {
 }
 
 export interface MCPToolSelection {
+	bundleID: string;
 	serverID: MCPServerID;
 	toolName: string;
 	providerToolName?: string;

@@ -6,6 +6,8 @@ import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import { DirectoryChip } from '@/chats/composer/attachments/attachment_directory_chip';
 import { type DirectoryAttachmentGroup, uiAttachmentKey } from '@/chats/composer/attachments/attachment_editor_utils';
 import { StandaloneAttachmentsChip } from '@/chats/composer/attachments/attachment_standalone_chips';
+import { MCPComposerChips } from '@/chats/composer/mcp/mcp_chips';
+import type { UseComposerMCPResult } from '@/chats/composer/mcp/mcp_composer_types';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import { ConversationToolsChip } from '@/chats/composer/tools/conversation_tools_chip';
 import { ToolChipsComposerRow } from '@/chats/composer/tools/tool_chips_composer';
@@ -16,6 +18,7 @@ interface EditorChipsBarProps {
 	attachments: UIAttachment[];
 	directoryGroups: DirectoryAttachmentGroup[];
 	conversationTools?: ConversationToolStateEntry[];
+	mcpState?: UseComposerMCPResult;
 
 	// Tool calls & outputs (tool runners / results)
 	toolCalls?: UIToolCall[];
@@ -57,6 +60,7 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 	attachments,
 	directoryGroups,
 	conversationTools = [],
+	mcpState,
 	toolCalls = [],
 	toolOutputs = [],
 	toolEntries,
@@ -86,6 +90,7 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 
 	const hasAnyChips =
 		(conversationTools?.length ?? 0) > 0 ||
+		(mcpState?.selectedServerCount ?? 0) > 0 ||
 		attachments.length > 0 ||
 		directoryGroups.length > 0 ||
 		toolEntries.length > 0 ||
@@ -125,7 +130,7 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 				onShowToolDetails={openConversationToolDetails}
 				toolArgsEventTarget={toolArgsEventTarget}
 			/>
-
+			{mcpState ? <MCPComposerChips state={mcpState} isBusy={isBusy} /> : null}
 			{/* Aggregated chip for standalone attachments */}
 			<StandaloneAttachmentsChip
 				attachments={standaloneAttachments}

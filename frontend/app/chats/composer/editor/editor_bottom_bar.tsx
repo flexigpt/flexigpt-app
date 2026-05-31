@@ -34,6 +34,8 @@ import { HoverTip } from '@/components/ariakit_hover_tip';
 
 import { UrlAttachmentModal } from '@/chats/composer/attachments/attachment_url_modal';
 import { CommandTipsMenu } from '@/chats/composer/inputtips/command_tips_menu';
+import { MCPBottomBarChip } from '@/chats/composer/mcp/mcp_bottom_bar_chip';
+import type { UseComposerMCPResult } from '@/chats/composer/mcp/mcp_composer_types';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import { SkillDropDown } from '@/chats/composer/skills/skill_dropdown';
 import { SystemPromptDropdown } from '@/chats/composer/systemprompts/system_prompt_dropdown';
@@ -98,6 +100,7 @@ interface EditorBottomBarProps {
 	onDisableAllSkills: () => void;
 	isInputLocked?: boolean;
 	systemPrompt: ComposerSystemPromptController;
+	mcpState: UseComposerMCPResult;
 }
 
 interface PickerButtonProps {
@@ -192,6 +195,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	onDisableAllSkills,
 	isInputLocked = false,
 	systemPrompt,
+	mcpState,
 }: EditorBottomBarProps) {
 	const [isUrlModalOpen, setIsUrlModalOpen] = useState(false);
 	const templateMenuOpen = useStoreState(templateMenuState, 'open');
@@ -518,6 +522,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						onDisableAll={onDisableAllSkills}
 						isInputLocked={isInputLocked}
 					/>
+					<MCPBottomBarChip state={mcpState} isInputLocked={isInputLocked} />
 
 					<WebSearchBottomBarChip
 						eligibleTools={eligibleWebSearchTools}

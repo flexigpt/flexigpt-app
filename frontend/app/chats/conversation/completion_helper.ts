@@ -17,6 +17,7 @@ import {
 	type UIToolCall,
 	type UIToolOutput,
 } from '@/spec/inference';
+import type { MCPConversationContext } from '@/spec/mcp';
 import type { ModelPresetID } from '@/spec/modelpreset';
 import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
@@ -39,6 +40,7 @@ export async function HandleCompletion(
 	currentUserMsg: ConversationMessage,
 	history: ConversationMessage[],
 	toolStoreChoices: ToolStoreChoice[] | undefined,
+	mcpContext: MCPConversationContext | undefined,
 	assistantPlaceholder: ConversationMessage,
 	skillSessionID?: string,
 	requestId?: string,
@@ -59,6 +61,7 @@ export async function HandleCompletion(
 		currentUserMsg,
 		history,
 		toolStoreChoices,
+		mcpContext,
 		skillSessionID,
 		requestId,
 		signal,

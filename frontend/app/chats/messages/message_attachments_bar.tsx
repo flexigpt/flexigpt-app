@@ -15,6 +15,7 @@ import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariaki
 import type { Attachment } from '@/spec/attachment';
 import { AttachmentContentBlockMode, AttachmentKind } from '@/spec/attachment';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
+import type { MCPConversationContext } from '@/spec/mcp';
 import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
 import { getAttachmentDisplayLabel } from '@/chats/composer/attachments/attachment_editor_utils';
@@ -22,6 +23,7 @@ import {
 	getAttachmentContentBlockModeLabel,
 	getAttachmentContentBlockModeTooltip,
 } from '@/chats/composer/attachments/attachment_mode_menu';
+import { MCPMessageContextChip } from '@/chats/composer/mcp/mcp_chips';
 import { formatToolCallLabel } from '@/tools/lib/tool_call_utils';
 import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';
 
@@ -928,6 +930,7 @@ function WebSearchChoicesGroupChip({ choices, onChoiceDetails }: WebSearchChoice
 interface MessageAttachmentsBarProps {
 	attachments?: Attachment[];
 	toolChoices?: ToolStoreChoice[];
+	mcpContext?: MCPConversationContext;
 	toolCalls?: UIToolCall[];
 	toolOutputs?: UIToolOutput[];
 	onToolChoiceDetails?: (choice: ToolStoreChoice) => void;
@@ -946,6 +949,7 @@ interface MessageAttachmentsBarProps {
 export function MessageAttachmentsBar({
 	attachments,
 	toolChoices,
+	mcpContext,
 	toolCalls,
 	toolOutputs,
 	onToolChoiceDetails,
@@ -967,6 +971,7 @@ export function MessageAttachmentsBar({
 
 	const hasAttachments = !!attachments && attachments.length > 0;
 	const hasTools = normalToolChoices.length > 0;
+	const hasMCP = (mcpContext?.servers?.length ?? 0) > 0;
 	const hasWebSearchTools = webSearchChoices.length > 0;
 	const hasToolCalls = normalToolCalls.length > 0;
 	const hasWebSearchCalls = webSearchCalls.length > 0;
@@ -976,6 +981,7 @@ export function MessageAttachmentsBar({
 	if (
 		!hasAttachments &&
 		!hasTools &&
+		!hasMCP &&
 		!hasWebSearchTools &&
 		!hasToolCalls &&
 		!hasWebSearchCalls &&
@@ -994,6 +1000,8 @@ export function MessageAttachmentsBar({
 
 			{/* Regular tools for this turn */}
 			{hasTools && <ToolChoicesGroupChip tools={normalToolChoices} onToolChoiceDetails={onToolChoiceDetails} />}
+
+			{hasMCP && <MCPMessageContextChip context={mcpContext} />}
 
 			{/* Web‑search config for this turn */}
 			{hasWebSearchTools && (

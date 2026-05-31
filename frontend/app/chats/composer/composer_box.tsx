@@ -249,6 +249,7 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 			},
 			resetForNewConversation: async () => {
 				resetComposerStateForNewConversation();
+				editorAreaRef.current?.clearMCPContext();
 				const ok = await assistantPreset.resetToBasePreset();
 				if (!ok) {
 					pendingPresetResolutionModeRef.current = 'ensure-active';
@@ -321,6 +322,7 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 				systemPrompt.restoreConversationContext(nextSelectedModel?.systemPrompt ?? '', context.modelParam);
 				editorAreaRef.current?.setConversationToolsFromChoices(context.toolChoices);
 				editorAreaRef.current?.setWebSearchFromChoices(context.webSearchChoices);
+				editorAreaRef.current?.setMCPContextFromMessage(context.mcpContext);
 				editorAreaRef.current?.setSkillStateFromMessage(context.enabledSkillRefs, context.activeSkillRefs, {
 					syncSession: 'none',
 					forceResetSession: true,

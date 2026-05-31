@@ -181,6 +181,7 @@ export const ChatMessage = memo(function ChatMessage({
 							<MessageAttachmentsBar
 								attachments={message.attachments}
 								toolChoices={message.toolStoreChoices}
+								mcpContext={message.mcpContext}
 								toolCalls={message.uiToolCalls}
 								toolOutputs={message.uiToolOutputs}
 								onToolChoiceDetails={choice => {

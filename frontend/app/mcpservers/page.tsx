@@ -58,6 +58,10 @@ function mergeBundleData(
 	};
 }
 
+function sleep(ms: number): Promise<void> {
+	return new Promise(resolve => window.setTimeout(resolve, ms));
+}
+
 // eslint-disable-next-line no-restricted-exports
 export default function MCPServersPage() {
 	const [bundles, setBundles] = useState<BundleData[]>([]);
@@ -424,8 +428,21 @@ export default function MCPServersPage() {
 
 	const handleConnectServer = useCallback(
 		async (bundleID: string, serverID: string) => {
-			const snapshot = await mcpAPI.connectMCPServer(bundleID, serverID);
+			let settled = false;
 
+			const connectPromise = mcpAPI.connectMCPServer(bundleID, serverID).finally(() => {
+				settled = true;
+			});
+
+			while (!settled) {
+				await Promise.race([connectPromise.catch(() => undefined), sleep(1000)]);
+
+				if (!settled) {
+					await refreshServerRuntimeAndAuth(bundleID, serverID).catch(() => undefined);
+				}
+			}
+
+			const snapshot = await connectPromise;
 			if (snapshot) {
 				setBundles(prev =>
 					prev.map(bundleData =>

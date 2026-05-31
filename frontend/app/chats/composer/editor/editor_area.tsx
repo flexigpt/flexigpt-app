@@ -27,6 +27,7 @@ import { Plate, PlateContent } from 'platejs/react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { ProviderSDKType, UIToolCall, UIToolOutput } from '@/spec/inference';
+import type { MCPConversationContext } from '@/spec/mcp';
 import type { PromptTemplate } from '@/spec/prompt';
 import type { SkillRef } from '@/spec/skill';
 import { type ToolArgsTarget, type ToolListItem, type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
@@ -50,6 +51,7 @@ import type {
 	EditorExternalMessage,
 	EditorSubmitPayload,
 } from '@/chats/composer/editor/editor_types';
+import { useComposerMCP } from '@/chats/composer/mcp/use_composer_mcp';
 import { buildEditorValueFromPlainText, hasNonEmptyUserText } from '@/chats/composer/platedoc/platedoc_utils';
 import {
 	getInstructionPromptPartsFromSelections,
@@ -105,6 +107,8 @@ export interface EditorAreaHandle {
 	resetEditor: () => void;
 	loadToolCalls: (toolCalls: UIToolCall[]) => void;
 	setConversationToolsFromChoices: (tools: ToolStoreChoice[]) => void;
+	setMCPContextFromMessage: (context?: MCPConversationContext) => void;
+	clearMCPContext: () => void;
 	setWebSearchFromChoices: (tools: ToolStoreChoice[]) => void;
 	applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => void;
 	setSkillStateFromMessage: (enabledRefs: SkillRef[], activeRefs: SkillRef[], options?: SkillStateApplyOptions) => void;
@@ -153,6 +157,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	ref
 ) {
 	const autoSubmitTrackerRef = useRef(createAutoSubmitTracker());
+	const mcp = useComposerMCP();
 	const resetAutoSubmitTracker = useCallback(() => {
 		autoSubmitTrackerRef.current = createAutoSubmitTracker();
 	}, []);
@@ -498,6 +503,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	// conversation-tool + web-search config. Keep a snapshot so Cancel restores it.
 	const preEditConversationToolsRef = useRef<ConversationToolStateEntry[] | null>(null);
 	const preEditWebSearchTemplatesRef = useRef<WebSearchChoiceTemplate[] | null>(null);
+	const preEditMCPContextRef = useRef<MCPConversationContext | undefined | null>(null);
 	const preEditEnabledSkillRefsRef = useRef<SkillRef[] | null>(null);
 	const preEditActiveSkillRefsRef = useRef<SkillRef[] | null>(null);
 
@@ -512,6 +518,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const clearPreEditSnapshot = useCallback(() => {
 		preEditConversationToolsRef.current = null;
 		preEditWebSearchTemplatesRef.current = null;
+		preEditMCPContextRef.current = null;
 		preEditEnabledSkillRefsRef.current = null;
 		preEditActiveSkillRefsRef.current = null;
 	}, []);
@@ -609,11 +616,13 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const restorePreEditContext = useCallback(() => {
 		const prevConv = preEditConversationToolsRef.current;
 		const prevWs = preEditWebSearchTemplatesRef.current;
+		const prevMCP = preEditMCPContextRef.current;
 		const prevSkills = preEditEnabledSkillRefsRef.current;
 		const prevActive = preEditActiveSkillRefsRef.current;
 
 		if (prevConv) setConversationToolsState(prevConv);
 		if (prevWs) setWebSearchTemplates(prevWs);
+		if (prevMCP !== null) mcp.restoreContext(prevMCP ?? undefined);
 		if (prevSkills || prevActive) {
 			applySkillSelectionState(prevSkills ?? getCurrentEnabledSkillRefs(), prevActive ?? getCurrentActiveSkillRefs());
 		}
@@ -623,6 +632,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		clearPreEditSnapshot,
 		getCurrentActiveSkillRefs,
 		getCurrentEnabledSkillRefs,
+		mcp,
 		setConversationToolsState,
 		setWebSearchTemplates,
 	]);
@@ -920,6 +930,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					attachments,
 					toolOutputs: finalToolOutputs,
 					finalToolChoices,
+					mcpContext: mcp.mcpContext,
 					enabledSkillRefs: effectiveEnabledSkillRefs,
 					activeSkillRefs: activeForMessage,
 					skillSessionID: effectiveSkillSessionID ?? undefined,
@@ -972,6 +983,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			isInputLocked,
 			isSendButtonEnabled,
 			listActiveSkillRefs,
+			mcp.mcpContext,
 			onSubmit,
 			resetEditor,
 			selectionInfo.firstPendingVar,
@@ -1120,6 +1132,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				if (!preEditWebSearchTemplatesRef.current) {
 					preEditWebSearchTemplatesRef.current = webSearchTemplates;
 				}
+				if (preEditMCPContextRef.current === null) {
+					preEditMCPContextRef.current = mcp.mcpContext;
+				}
 				if (!preEditEnabledSkillRefsRef.current) {
 					preEditEnabledSkillRefsRef.current = getCurrentEnabledSkillRefs();
 				}
@@ -1140,7 +1155,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				const incomingToolChoices = incoming.toolChoices ?? [];
 				applyConversationToolsFromChoices(incomingToolChoices);
 				applyWebSearchFromChoices(incomingToolChoices);
-
+				mcp.restoreContext(incoming.mcpContext);
 				// 4) Restore enabled/active skills together so invariants hold immediately.
 				void applySkillSelectionState(incoming.enabledSkillRefs ?? [], incoming.activeSkillRefs ?? [], {
 					syncSession: 'none',
@@ -1164,6 +1179,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			getCurrentActiveSkillRefs,
 			getCurrentEnabledSkillRefs,
 			loadAttachmentsFromMessage,
+			mcp,
 			replaceEditorDocument,
 			setToolOutputs,
 			webSearchTemplates,
@@ -1299,6 +1315,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			loadToolCalls: handleLoadToolCalls,
 			setConversationToolsFromChoices: applyConversationToolsFromChoices,
 			setWebSearchFromChoices: applyWebSearchFromChoices,
+			setMCPContextFromMessage: context => {
+				mcp.restoreContext(context);
+			},
+			clearMCPContext: () => {
+				mcp.clear();
+			},
 			applyAttachmentsDrop,
 			setSkillStateFromMessage: (enabledRefs, activeRefs, options) => {
 				void applySkillSelectionState(enabledRefs, activeRefs, options);
@@ -1319,6 +1341,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			openTemplatePicker,
 			openToolPicker,
 			openAttachmentPicker,
+			mcp,
 			applySkillSelectionState,
 		]
 	);
@@ -1454,6 +1477,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									toolCalls={toolCalls}
 									toolOutputs={toolOutputs}
 									toolEntries={attachedToolEntries}
+									mcpState={mcp}
 									isBusy={isGenerating || isSubmitting || isInputLocked || fastForwardPending}
 									onRunToolCall={handleRunSingleToolCall}
 									onDiscardToolCall={handleDiscardToolCall}
@@ -1615,6 +1639,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						onDisableAllSkills={disableAllSkills}
 						isInputLocked={isInputLocked || fastForwardPending}
 						systemPrompt={systemPrompt}
+						mcpState={mcp}
 					/>
 				</Plate>
 			</form>
