@@ -19,6 +19,7 @@ import {
 import { omitManyKeys } from '@/lib/obj_utils';
 import { validateSlug } from '@/lib/text_utils';
 
+import { Dropdown, type DropdownItem } from '@/components/dropdown';
 import { ModalBackdrop } from '@/components/modal_backdrop';
 
 import {
@@ -38,6 +39,38 @@ import {
 } from '@/mcpservers/lib/mcp_server_utils';
 
 type ModalMode = 'add' | 'edit';
+
+const TRANSPORT_DROPDOWN_ITEMS: Record<MCPTransportType, DropdownItem> = {
+	[MCPTransportType.MCPTransportTypeStreamableHTTP]: { isEnabled: true },
+	[MCPTransportType.MCPTransportTypeStdio]: { isEnabled: true },
+};
+
+const AVAILABILITY_DROPDOWN_ITEMS: Record<MCPServerAvailability, DropdownItem> = {
+	[MCPServerAvailability.MCPServerAvailabilityManual]: { isEnabled: true },
+	[MCPServerAvailability.MCPServerAvailabilityAutoAttach]: { isEnabled: true },
+};
+
+const TRUST_DROPDOWN_ITEMS: Record<MCPTrustLevel, DropdownItem> = {
+	[MCPTrustLevel.MCPTrustLevelUntrusted]: { isEnabled: true },
+	[MCPTrustLevel.MCPTrustLevelTrusted]: { isEnabled: true },
+};
+
+const AUTH_MODE_DROPDOWN_ITEMS: Record<MCPHTTPAuthMode, DropdownItem> = {
+	[MCPHTTPAuthMode.MCPHTTPAuthNone]: { isEnabled: true },
+	[MCPHTTPAuthMode.MCPHTTPAuthOAuth]: { isEnabled: true },
+	[MCPHTTPAuthMode.MCPHTTPAuthClientCredentials]: { isEnabled: true },
+};
+
+const APPROVAL_RULE_DROPDOWN_ITEMS: Record<MCPApprovalRule, DropdownItem> = {
+	[MCPApprovalRule.MCPApprovalRuleAsk]: { isEnabled: true },
+	[MCPApprovalRule.MCPApprovalRuleAllow]: { isEnabled: true },
+	[MCPApprovalRule.MCPApprovalRuleDeny]: { isEnabled: true },
+};
+
+const EXECUTION_MODE_DROPDOWN_ITEMS: Record<MCPExecutionMode, DropdownItem> = {
+	[MCPExecutionMode.MCPExecutionModeManual]: { isEnabled: true },
+	[MCPExecutionMode.MCPExecutionModeAuto]: { isEnabled: true },
+};
 
 interface AddEditMCPServerModalProps {
 	isOpen: boolean;
@@ -463,7 +496,7 @@ function AddEditMCPServerModalContent({
 		setErrors(validateForm(next));
 	};
 
-	const handleInput = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+	const handleInput = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
 		const target = e.target as HTMLInputElement;
 		const { name, value, type, checked } = target;
 		const newVal = type === 'checkbox' ? checked : value;
@@ -784,18 +817,16 @@ function AddEditMCPServerModalContent({
 								<span className="label-text text-sm">Transport*</span>
 							</label>
 							<div className="col-span-9">
-								<select
-									name="transport"
-									value={formData.transport}
-									onChange={handleInput}
-									className="select select-bordered w-full rounded-xl"
-								>
-									{Object.values(MCPTransportType).map(transport => (
-										<option key={transport} value={transport}>
-											{getMCPTransportLabel(transport)}
-										</option>
-									))}
-								</select>
+								<Dropdown
+									dropdownItems={TRANSPORT_DROPDOWN_ITEMS}
+									selectedKey={formData.transport}
+									onChange={transport => {
+										setFormDataAndValidate({ ...formData, transport });
+									}}
+									getDisplayName={getMCPTransportLabel}
+									title="Transport"
+									inlineMenu={true}
+								/>
 							</div>
 						</div>
 
@@ -804,36 +835,32 @@ function AddEditMCPServerModalContent({
 								<span className="label-text text-sm">Availability</span>
 							</label>
 							<div className="col-span-4">
-								<select
-									name="availability"
-									value={formData.availability}
-									onChange={handleInput}
-									className="select select-bordered w-full rounded-xl"
-								>
-									{Object.values(MCPServerAvailability).map(availability => (
-										<option key={availability} value={availability}>
-											{getMCPAvailabilityLabel(availability)}
-										</option>
-									))}
-								</select>
+								<Dropdown
+									dropdownItems={AVAILABILITY_DROPDOWN_ITEMS}
+									selectedKey={formData.availability}
+									onChange={availability => {
+										setFormDataAndValidate({ ...formData, availability });
+									}}
+									getDisplayName={getMCPAvailabilityLabel}
+									title="Availability"
+									inlineMenu={true}
+								/>
 							</div>
 
 							<label className="label col-span-2">
 								<span className="label-text text-sm">Trust</span>
 							</label>
 							<div className="col-span-3">
-								<select
-									name="trustLevel"
-									value={formData.trustLevel}
-									onChange={handleInput}
-									className="select select-bordered w-full rounded-xl"
-								>
-									{Object.values(MCPTrustLevel).map(trustLevel => (
-										<option key={trustLevel} value={trustLevel}>
-											{getMCPTrustLevelLabel(trustLevel)}
-										</option>
-									))}
-								</select>
+								<Dropdown
+									dropdownItems={TRUST_DROPDOWN_ITEMS}
+									selectedKey={formData.trustLevel}
+									onChange={trustLevel => {
+										setFormDataAndValidate({ ...formData, trustLevel });
+									}}
+									getDisplayName={getMCPTrustLevelLabel}
+									title="Trust level"
+									inlineMenu={true}
+								/>
 							</div>
 						</div>
 
@@ -1125,18 +1152,16 @@ function AddEditMCPServerModalContent({
 										<span className="label-text text-sm">Auth Mode</span>
 									</label>
 									<div className="col-span-9">
-										<select
-											name="httpAuthMode"
-											value={formData.httpAuthMode}
-											onChange={handleInput}
-											className="select select-bordered w-full rounded-xl"
-										>
-											{Object.values(MCPHTTPAuthMode).map(modeValue => (
-												<option key={modeValue} value={modeValue}>
-													{getMCPHTTPAuthModeLabel(modeValue)}
-												</option>
-											))}
-										</select>
+										<Dropdown
+											dropdownItems={AUTH_MODE_DROPDOWN_ITEMS}
+											selectedKey={formData.httpAuthMode}
+											onChange={httpAuthMode => {
+												setFormDataAndValidate({ ...formData, httpAuthMode });
+											}}
+											getDisplayName={getMCPHTTPAuthModeLabel}
+											title="Auth mode"
+											inlineMenu={true}
+										/>
 									</div>
 								</div>
 
@@ -1236,36 +1261,32 @@ function AddEditMCPServerModalContent({
 								<span className="label-text text-sm">Approval</span>
 							</label>
 							<div className="col-span-4">
-								<select
-									name="defaultApprovalRule"
-									value={formData.defaultApprovalRule}
-									onChange={handleInput}
-									className="select select-bordered w-full rounded-xl"
-								>
-									{Object.values(MCPApprovalRule).map(rule => (
-										<option key={rule} value={rule}>
-											{getMCPApprovalRuleLabel(rule)}
-										</option>
-									))}
-								</select>
+								<Dropdown
+									dropdownItems={APPROVAL_RULE_DROPDOWN_ITEMS}
+									selectedKey={formData.defaultApprovalRule}
+									onChange={defaultApprovalRule => {
+										setFormDataAndValidate({ ...formData, defaultApprovalRule });
+									}}
+									getDisplayName={getMCPApprovalRuleLabel}
+									title="Default approval"
+									inlineMenu={true}
+								/>
 							</div>
 
 							<label className="label col-span-2">
 								<span className="label-text text-sm">Execution</span>
 							</label>
 							<div className="col-span-3">
-								<select
-									name="defaultExecutionMode"
-									value={formData.defaultExecutionMode}
-									onChange={handleInput}
-									className="select select-bordered w-full rounded-xl"
-								>
-									{Object.values(MCPExecutionMode).map(modeValue => (
-										<option key={modeValue} value={modeValue}>
-											{getMCPExecutionModeLabel(modeValue)}
-										</option>
-									))}
-								</select>
+								<Dropdown
+									dropdownItems={EXECUTION_MODE_DROPDOWN_ITEMS}
+									selectedKey={formData.defaultExecutionMode}
+									onChange={defaultExecutionMode => {
+										setFormDataAndValidate({ ...formData, defaultExecutionMode });
+									}}
+									getDisplayName={getMCPExecutionModeLabel}
+									title="Default execution"
+									inlineMenu={true}
+								/>
 							</div>
 						</div>
 

@@ -16,6 +16,7 @@ import {
 
 import { ActionTriggerChipContent, actionTriggerChipSurfaceClasses } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
+import { Dropdown, type DropdownItem } from '@/components/dropdown';
 
 import {
 	type MCPComposerServerOption,
@@ -82,6 +83,12 @@ function CheckboxRow({
 	);
 }
 
+const TOOL_EXPOSURE_DROPDOWN_ITEMS: Record<MCPToolExposure, DropdownItem> = {
+	[MCPToolExposure.MCPToolExposureNone]: { isEnabled: true },
+	[MCPToolExposure.MCPToolExposureAll]: { isEnabled: true },
+	[MCPToolExposure.MCPToolExposureSelected]: { isEnabled: true },
+};
+
 function ServerDiscoverySection({
 	option,
 	state,
@@ -113,18 +120,27 @@ function ServerDiscoverySection({
 			<div className="grid grid-cols-2 gap-2">
 				<label className="text-xs">
 					<div className="text-base-content/70 mb-1">Tool exposure</div>
-					<select
-						className="select select-bordered select-xs w-full rounded-lg"
-						disabled={isInputLocked}
-						value={selection.toolExposure}
-						onChange={e => {
-							state.setToolExposure(option.bundle.id, option.server.id, e.currentTarget.value as MCPToolExposure);
+					<Dropdown
+						dropdownItems={TOOL_EXPOSURE_DROPDOWN_ITEMS}
+						selectedKey={selection.toolExposure}
+						onChange={next => {
+							state.setToolExposure(option.bundle.id, option.server.id, next);
 						}}
-					>
-						<option value={MCPToolExposure.MCPToolExposureNone}>No tools</option>
-						<option value={MCPToolExposure.MCPToolExposureAll}>All tools</option>
-						<option value={MCPToolExposure.MCPToolExposureSelected}>Selected tools</option>
-					</select>
+						getDisplayName={exposure => {
+							switch (exposure) {
+								case MCPToolExposure.MCPToolExposureNone:
+									return 'No tools';
+								case MCPToolExposure.MCPToolExposureAll:
+									return 'All tools';
+								case MCPToolExposure.MCPToolExposureSelected:
+									return 'Selected tools';
+								default:
+									return exposure;
+							}
+						}}
+						title="Tool exposure"
+						inlineMenu={true}
+					/>
 				</label>
 
 				<label className="flex items-end gap-2 text-xs">

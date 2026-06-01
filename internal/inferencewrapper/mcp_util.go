@@ -350,12 +350,15 @@ func (b *MCPInferenceBridge) toolsForSelection(
 	case mcpSpec.MCPToolExposureAll:
 		out := make([]mcpSpec.MCPToolCapability, 0, len(allTools))
 		for _, tool := range allTools {
-			if tool.Enabled && tool.TaskSupport != mcpSpec.MCPTaskSupportRequired {
-				out = append(out, tool)
+			if !tool.Enabled || tool.TaskSupport == mcpSpec.MCPTaskSupportRequired {
+				continue
 			}
+			if !mcpToolVisibleToModel(tool) {
+				continue
+			}
+			out = append(out, tool)
 		}
 		return out, nil
-
 	case mcpSpec.MCPToolExposureSelected:
 		out := make([]mcpSpec.MCPToolCapability, 0, len(selection.SelectedTools))
 		for _, selected := range selection.SelectedTools {
@@ -364,6 +367,9 @@ func (b *MCPInferenceBridge) toolsForSelection(
 				continue
 			}
 			if !tool.Enabled || tool.TaskSupport == mcpSpec.MCPTaskSupportRequired {
+				continue
+			}
+			if !mcpToolVisibleToModel(tool) {
 				continue
 			}
 			out = append(out, tool)
@@ -449,6 +455,18 @@ func (b *MCPInferenceBridge) getPromptAsText(
 		parts = append(parts, fmt.Sprintf("Role: %s\n%s", role, text))
 	}
 	return strings.Join(parts, "\n\n---\n\n"), nil
+}
+
+func mcpToolVisibleToModel(tool mcpSpec.MCPToolCapability) bool {
+	if tool.App == nil || len(tool.App.Visibility) == 0 {
+		return true
+	}
+	for _, v := range tool.App.Visibility {
+		if strings.EqualFold(strings.TrimSpace(v), "model") {
+			return true
+		}
+	}
+	return false
 }
 
 func toolChoiceFromMCPTool(tool mcpSpec.MCPToolCapability) inferenceSpec.ToolChoice {

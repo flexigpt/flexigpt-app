@@ -144,32 +144,41 @@ export function useComposerMCP(): UseComposerMCPResult {
 
 		try {
 			const bundles = await getAllMCPBundles(undefined, true);
-			const nextOptions: MCPComposerServerOption[] = [];
+			const bundleOptions = await Promise.all(
+				bundles.map(async bundle => {
+					try {
+						const servers = await getAllMCPServers(bundle.id, undefined, undefined, true).catch(() => []);
 
-			for (const bundle of bundles) {
-				const servers = await getAllMCPServers(bundle.id, undefined, undefined, true).catch(() => []);
+						const serverOptions = await Promise.all(
+							servers.map(async server => {
+								const [runtime, authHealth] = await Promise.all([
+									mcpAPI.getMCPServerStatus(bundle.id, server.id).catch(() => undefined),
+									mcpAPI.getMCPServerAuthHealth(bundle.id, server.id).catch(() => undefined),
+								]);
 
-				for (const server of servers) {
-					const [runtime, authHealth] = await Promise.all([
-						mcpAPI.getMCPServerStatus(bundle.id, server.id).catch(() => undefined),
-						mcpAPI.getMCPServerAuthHealth(bundle.id, server.id).catch(() => undefined),
-					]);
+								return {
+									bundle,
+									server,
+									runtime,
+									authHealth,
+									tools: [],
+									resources: [],
+									resourceTemplates: [],
+									prompts: [],
+									discoveryLoaded: false,
+									discoveryLoading: false,
+								} satisfies MCPComposerServerOption;
+							})
+						);
 
-					nextOptions.push({
-						bundle,
-						server,
-						runtime,
-						authHealth,
-						tools: [],
-						resources: [],
-						resourceTemplates: [],
-						prompts: [],
-						discoveryLoaded: false,
-						discoveryLoading: false,
-					});
-				}
-			}
+						return serverOptions;
+					} catch {
+						return [] as MCPComposerServerOption[];
+					}
+				})
+			);
 
+			const nextOptions = bundleOptions.flat();
 			if (!mountedRef.current) return;
 			optionsRef.current = nextOptions;
 			setOptions(nextOptions);
@@ -209,13 +218,24 @@ export function useComposerMCP(): UseComposerMCPResult {
 			});
 
 			const promise = (async (): Promise<MCPDiscoveryLoadResult | undefined> => {
-				const [tools, resources, resourceTemplates, prompts] = await Promise.all([
-					getAllMCPServerTools(bundleID, serverID).catch(() => []),
-					getAllMCPServerResources(bundleID, serverID).catch(() => []),
-					getAllMCPServerResourceTemplates(bundleID, serverID).catch(() => []),
-					getAllMCPServerPrompts(bundleID, serverID).catch(() => []),
+				const [toolsResult, resourcesResult, resourceTemplatesResult, promptsResult] = await Promise.allSettled([
+					getAllMCPServerTools(bundleID, serverID),
+					getAllMCPServerResources(bundleID, serverID),
+					getAllMCPServerResourceTemplates(bundleID, serverID),
+					getAllMCPServerPrompts(bundleID, serverID),
 				]);
 
+				const tools = toolsResult.status === 'fulfilled' ? toolsResult.value : [];
+				const resources = resourcesResult.status === 'fulfilled' ? resourcesResult.value : [];
+				const resourceTemplates = resourceTemplatesResult.status === 'fulfilled' ? resourceTemplatesResult.value : [];
+				const prompts = promptsResult.status === 'fulfilled' ? promptsResult.value : [];
+
+				const discoveryErrors = [
+					toolsResult.status === 'rejected' ? getErrorMessage(toolsResult.reason, '') : '',
+					resourcesResult.status === 'rejected' ? getErrorMessage(resourcesResult.reason, '') : '',
+					resourceTemplatesResult.status === 'rejected' ? getErrorMessage(resourceTemplatesResult.reason, '') : '',
+					promptsResult.status === 'rejected' ? getErrorMessage(promptsResult.reason, '') : '',
+				].filter((message): message is string => message.trim().length > 0);
 				if (!mountedRef.current) return undefined;
 
 				patchOption(bundleID, serverID, {
@@ -223,40 +243,40 @@ export function useComposerMCP(): UseComposerMCPResult {
 					resources,
 					resourceTemplates,
 					prompts,
-					discoveryLoaded: true,
+					discoveryLoaded: discoveryErrors.length === 0,
 					discoveryLoading: false,
+					discoveryError: discoveryErrors[0],
 				});
 				commitSelectedByServerKey(prev => {
 					const currentSelection = prev[key];
-					if (!currentSelection || currentSelection.toolExposure !== MCPToolExposure.MCPToolExposureAll) {
-						return prev;
-					}
+					if (!currentSelection) return prev;
+					if (currentSelection.toolExposure !== MCPToolExposure.MCPToolExposureAll) return prev;
 
-					const next = {
+					return {
 						...prev,
 						[key]: {
 							...currentSelection,
 							selectedTools: tools.filter(tool => tool.enabled).map(toolToSelection),
 						},
 					};
-
-					return next;
 				});
-
-				return {
-					tools,
-					resources,
-					resourceTemplates,
-					prompts,
-				};
+				return discoveryErrors.length === 0
+					? {
+							tools,
+							resources,
+							resourceTemplates,
+							prompts,
+						}
+					: undefined;
 			})().catch((err: unknown) => {
 				if (!mountedRef.current) return undefined;
 
 				patchOption(bundleID, serverID, {
 					discoveryLoading: false,
+					discoveryLoaded: false,
 					discoveryError: getErrorMessage(err, 'Failed to load MCP discovery.'),
 				});
-				throw err;
+				return undefined;
 			});
 
 			discoveryPromisesRef.current.set(key, promise);
