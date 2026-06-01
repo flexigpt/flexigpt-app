@@ -308,6 +308,28 @@ export function useComposerToolRuntime({
 	const retryErroredOutput = useCallback((output: UIToolOutput) => {
 		if (!output.isError || !output.arguments) return;
 
+		if (output.mcpToolSelection) {
+			const call: UIToolCall = {
+				id: output.id,
+				callID: output.callID || output.id,
+				name: output.name,
+				arguments: output.arguments,
+				webSearchToolCallItems: output.webSearchToolCallItems,
+				choiceID: output.choiceID,
+				type: output.type,
+				status: 'pending',
+				toolStoreChoice: output.toolStoreChoice,
+				mcpToolSelection: output.mcpToolSelection,
+			};
+
+			dispatch({
+				type: 'add-call-and-remove-output',
+				call,
+				outputId: output.id,
+			});
+			return;
+		}
+
 		const isSkills = isSkillsToolName(output.name);
 
 		if (!isSkills) {

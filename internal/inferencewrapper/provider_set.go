@@ -263,6 +263,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	if err != nil {
 		return nil, err
 	}
+
 	if len(inputs) == 0 {
 		return nil, errors.New("no usable inputs to send to inference-go")
 	}

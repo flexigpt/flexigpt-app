@@ -71,7 +71,8 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 	if b == nil || b.runtime == nil || req.Context == nil {
 		return out, nil
 	}
-
+	// Keep hydrating even if some MCP selections are stale or temporarily unavailable.
+	// We prefer best-effort context over hard failure.
 	var (
 		warnings        []string
 		contextSections []string
@@ -128,7 +129,10 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 			continue
 		}
 
-		tools, err := b.toolsForSelection(ctx, serverSelection)
+		tools, toolWarnings, err := b.toolsForSelection(ctx, serverSelection)
+		if len(toolWarnings) > 0 {
+			warnings = append(warnings, toolWarnings...)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -181,7 +185,14 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 
 		text, err := b.readResourceAsText(ctx, resource.BundleID, resource.ServerID, resource.URI)
 		if err != nil {
-			return nil, err
+			warnings = append(warnings, fmt.Sprintf(
+				"MCP resource skipped for %s/%s %q: %v",
+				resource.BundleID,
+				resource.ServerID,
+				resource.URI,
+				err,
+			))
+			continue
 		}
 		if strings.TrimSpace(text) == "" {
 			warnings = append(warnings, fmt.Sprintf("MCP resource %s returned no text content", resource.URI))
@@ -211,18 +222,26 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 
 		uri, err := resolveMCPResourceTemplateURI(tmpl.URITemplate, tmpl.Arguments)
 		if err != nil {
-			return nil, fmt.Errorf(
-				"failed to resolve MCP resource template %s/%s/%s: %w",
+			warnings = append(warnings, fmt.Sprintf(
+				"MCP resource template skipped for %s/%s/%s: %v",
 				tmpl.BundleID,
 				tmpl.ServerID,
 				tmpl.URITemplate,
 				err,
-			)
+			))
+			continue
 		}
 
 		text, err := b.readResourceAsText(ctx, tmpl.BundleID, tmpl.ServerID, uri)
 		if err != nil {
-			return nil, err
+			warnings = append(warnings, fmt.Sprintf(
+				"MCP resource template skipped for %s/%s %q: %v",
+				tmpl.BundleID,
+				tmpl.ServerID,
+				uri,
+				err,
+			))
+			continue
 		}
 		if strings.TrimSpace(text) == "" {
 			warnings = append(
@@ -255,7 +274,11 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 
 		text, err := b.getPromptAsText(ctx, prompt.BundleID, prompt.ServerID, prompt.PromptName, prompt.Arguments)
 		if err != nil {
-			return nil, err
+			warnings = append(warnings, fmt.Sprintf(
+				"MCP prompt skipped for %s/%s %q: %v",
+				prompt.BundleID, prompt.ServerID, prompt.PromptName, err,
+			))
+			continue
 		}
 		if strings.TrimSpace(text) == "" {
 			warnings = append(warnings, fmt.Sprintf("MCP prompt %s returned no messages", prompt.PromptName))
@@ -298,6 +321,36 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 	return out, nil
 }
 
+func (b *MCPInferenceBridge) listAllMCPTools(
+	ctx context.Context,
+	bundleID bundleitemutils.BundleID,
+	serverID mcpSpec.MCPServerID,
+) ([]mcpSpec.MCPToolCapability, error) {
+	all := make([]mcpSpec.MCPToolCapability, 0)
+	pageToken := ""
+
+	for range 20 {
+		resp, err := b.runtime.ListTools(ctx, &mcpSpec.ListMCPServerToolsRequest{
+			BundleID:  bundleID,
+			ServerID:  serverID,
+			PageSize:  mcpSpec.MaxMCPServerPageSize,
+			PageToken: pageToken,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if resp == nil || resp.Body == nil {
+			break
+		}
+		all = append(all, resp.Body.Tools...)
+		if resp.Body.NextPageToken == nil || *resp.Body.NextPageToken == "" {
+			break
+		}
+		pageToken = *resp.Body.NextPageToken
+	}
+	return all, nil
+}
+
 func (b *MCPInferenceBridge) serverInstructions(
 	ctx context.Context,
 	bundleID bundleitemutils.BundleID,
@@ -319,25 +372,19 @@ func (b *MCPInferenceBridge) serverInstructions(
 func (b *MCPInferenceBridge) toolsForSelection(
 	ctx context.Context,
 	selection mcpSpec.MCPServerSelection,
-) ([]mcpSpec.MCPToolCapability, error) {
-	resp, err := b.runtime.ListTools(ctx, &mcpSpec.ListMCPServerToolsRequest{
-		BundleID: selection.BundleID,
-		ServerID: selection.ServerID,
-		PageSize: mcpSpec.MaxMCPServerPageSize,
-	})
-	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to list MCP tools for %s/%s: %w",
-			selection.BundleID,
-			selection.ServerID,
-			err,
-		)
-	}
-	if resp == nil || resp.Body == nil {
-		return nil, nil
+) ([]mcpSpec.MCPToolCapability, []string, error) {
+	warnings := make([]string, 0)
+
+	if b == nil || b.runtime == nil {
+		return nil, []string{"MCP runtime unavailable; skipped tool hydration."}, nil
 	}
 
-	allTools := append([]mcpSpec.MCPToolCapability(nil), resp.Body.Tools...)
+	allTools, err := b.listAllMCPTools(ctx, selection.BundleID, selection.ServerID)
+	if err != nil {
+		return nil, []string{
+			fmt.Sprintf("MCP tools skipped for %s/%s: %v", selection.BundleID, selection.ServerID, err),
+		}, nil
+	}
 	byName := make(map[string]mcpSpec.MCPToolCapability, len(allTools))
 	for _, tool := range allTools {
 		if tool.ToolName != "" {
@@ -358,29 +405,51 @@ func (b *MCPInferenceBridge) toolsForSelection(
 			}
 			out = append(out, tool)
 		}
-		return out, nil
+		return out, warnings, nil
+
 	case mcpSpec.MCPToolExposureSelected:
 		out := make([]mcpSpec.MCPToolCapability, 0, len(selection.SelectedTools))
+		seen := make(map[string]struct{}, len(selection.SelectedTools))
+
 		for _, selected := range selection.SelectedTools {
-			tool, ok := byName[selected.ToolName]
+			current, ok := byName[selected.ToolName]
 			if !ok {
+				warnings = append(warnings, fmt.Sprintf(
+					"MCP tool skipped for %s/%s: tool %q no longer exists",
+					selection.BundleID,
+					selection.ServerID,
+					selected.ToolName,
+				))
 				continue
 			}
-			if !tool.Enabled || tool.TaskSupport == mcpSpec.MCPTaskSupportRequired {
+			if selected.Digest != "" && current.Digest != "" && selected.Digest != current.Digest {
+				warnings = append(warnings, fmt.Sprintf(
+					"MCP tool skipped for %s/%s: tool %q digest changed",
+					selection.BundleID,
+					selection.ServerID,
+					selected.ToolName,
+				))
 				continue
 			}
-			if !mcpToolVisibleToModel(tool) {
+			if !current.Enabled || current.TaskSupport == mcpSpec.MCPTaskSupportRequired {
 				continue
 			}
-			out = append(out, tool)
+			if !mcpToolVisibleToModel(current) {
+				continue
+			}
+			if _, ok := seen[current.ToolName]; ok {
+				continue
+			}
+			seen[current.ToolName] = struct{}{}
+			out = append(out, current)
 		}
-		return out, nil
+		return out, warnings, nil
 
 	case "", mcpSpec.MCPToolExposureNone:
-		return nil, nil
+		return nil, warnings, nil
 
 	default:
-		return nil, fmt.Errorf(
+		return nil, warnings, fmt.Errorf(
 			"%w: invalid MCP tool exposure %q for %s/%s",
 			mcpSpec.ErrMCPInvalidRequest,
 			selection.ToolExposure,

@@ -519,20 +519,30 @@ func (w *MCPWrapper) PutMCPServerSecret(
 			return nil, fmt.Errorf("%w: secret writer is not configured", spec.ErrMCPRuntimeNotReady)
 		}
 
-		if _, err := w.store.GetMCPServer(context.Background(), &spec.GetMCPServerRequest{
+		cfgResp, err := w.store.GetMCPServer(context.Background(), &spec.GetMCPServerRequest{
 			BundleID: req.BundleID,
 			ServerID: req.ServerID,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, err
 		}
-
+		if cfgResp == nil || cfgResp.Body == nil {
+			return nil, fmt.Errorf("%w: empty server config response", spec.ErrMCPRuntimeNotReady)
+		}
 		secretRef, err := secret.NewMCPSecretRefString(req.BundleID, req.ServerID, req.Body.Kind, req.Body.Slot)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", spec.ErrMCPInvalidRequest, err)
 		}
 
 		if req.Body.Kind == spec.MCPSecretKindOAuthClientCredentials {
-			if err := auth.ValidateOAuthClientCredentialsSecret(req.Body.Secret, false); err != nil {
+			requireClientSecret := false
+			if cfgResp.Body.Transport == spec.MCPTransportStreamableHTTP &&
+				cfgResp.Body.StreamableHTTP != nil &&
+				cfgResp.Body.StreamableHTTP.AuthMode == spec.MCPHTTPAuthClientCredentials {
+				requireClientSecret = true
+			}
+
+			if err := auth.ValidateOAuthClientCredentialsSecret(req.Body.Secret, requireClientSecret); err != nil {
 				return nil, err
 			}
 		}
