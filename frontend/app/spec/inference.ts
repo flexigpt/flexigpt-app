@@ -1,3 +1,4 @@
+import type { MCPToolSelection } from '@/spec/mcp';
 import type { ToolOutputUnion, ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
 export type ProviderName = string;
@@ -480,6 +481,12 @@ export interface UIToolCall {
 	toolStoreChoice?: ToolStoreChoice;
 
 	/**
+	 * Optional MCP identity for dynamically hydrated MCP tool calls.
+	 * Static FlexiGPT tools use `toolStoreChoice`; MCP tools use this.
+	 */
+	mcpToolSelection?: MCPToolSelection;
+
+	/**
 	 * UI-only hydration flag.
 	 * Restored tool calls from persisted history should be shown and remain
 	 * manually runnable, but must not enter the auto-exec / auto-submit flow
@@ -503,6 +510,10 @@ export interface UIToolOutput {
 	 * For regular tool-store tools we typically hydrate this.
 	 */
 	toolStoreChoice?: ToolStoreChoice;
+	/**
+	 * Optional MCP identity for dynamically executed MCP tool outputs.
+	 */
+	mcpToolSelection?: MCPToolSelection;
 
 	/** Short human-readable label used in chips. */
 	summary: string;

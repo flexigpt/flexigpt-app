@@ -1,6 +1,16 @@
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
+import {
+	type InvokeMCPToolRequestBody,
+	MCPApprovalDecision,
+	MCPApprovalResolution,
+	type MCPContent,
+	MCPContentType,
+	MCPInvocationSource,
+	type MCPToolSelection,
+} from '@/spec/mcp';
+import { ToolOutputKind } from '@/spec/tool';
 
-import { skillStoreAPI, toolRuntimeAPI } from '@/apis/baseapi';
+import { mcpAPI, skillStoreAPI, toolRuntimeAPI } from '@/apis/baseapi';
 
 import { isRunnableComposerToolCall } from '@/chats/composer/toolruntime/tool_runtime_utils';
 import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
@@ -25,6 +35,246 @@ function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: string)
 			}
 		);
 	});
+}
+
+function parseToolArguments(raw?: string): Record<string, any> | undefined {
+	if (!raw || raw.trim().length === 0) return undefined;
+
+	const parsed = JSON.parse(raw) as unknown;
+	if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+		throw new Error('Tool arguments must be a JSON object.');
+	}
+
+	return parsed as Record<string, any>;
+}
+
+function mcpContentToText(content: MCPContent): string {
+	switch (content.type) {
+		case MCPContentType.MCPContentTypeText:
+			return content.text ?? '';
+
+		case MCPContentType.MCPContentTypeResource:
+			if (content.resource?.text) return content.resource.text;
+			return JSON.stringify(content.resource ?? content, null, 2);
+
+		case MCPContentType.MCPContentTypeResourceLink:
+			return [content.title || content.name || content.uri, content.description, content.uri]
+				.filter(Boolean)
+				.join('\n');
+
+		case MCPContentType.MCPContentTypeImage:
+			return `[MCP image content${content.mimeType ? `: ${content.mimeType}` : ''}]`;
+
+		case MCPContentType.MCPContentTypeAudio:
+			return `[MCP audio content${content.mimeType ? `: ${content.mimeType}` : ''}]`;
+
+		default:
+			return JSON.stringify(content, null, 2);
+	}
+}
+
+function mcpToolLabel(selection: MCPToolSelection, fallbackName: string): string {
+	return selection.toolName || selection.providerToolName || fallbackName;
+}
+
+function buildMCPToolOutput(args: {
+	toolCall: UIToolCall;
+	selection: MCPToolSelection;
+	text: string;
+	isError?: boolean;
+	errorMessage?: string;
+}): UIToolOutput {
+	const name = mcpToolLabel(args.selection, args.toolCall.name);
+	const firstLine = args.text
+		.split('\n')
+		.find(line => line.trim().length > 0)
+		?.trim();
+
+	return {
+		id: args.toolCall.id,
+		callID: args.toolCall.callID,
+		name,
+		choiceID: args.toolCall.choiceID,
+		type: args.toolCall.type,
+		summary: args.isError
+			? `MCP error: ${firstLine?.slice(0, 80) || name}`
+			: `MCP result: ${firstLine?.slice(0, 80) || name}`,
+		toolOutputs: [
+			{
+				kind: ToolOutputKind.Text,
+				textItem: {
+					text: args.text,
+				},
+			},
+		],
+		isError: !!args.isError,
+		errorMessage: args.errorMessage,
+		arguments: args.toolCall.arguments,
+		webSearchToolCallItems: args.toolCall.webSearchToolCallItems,
+		toolStoreChoice: args.toolCall.toolStoreChoice,
+		mcpToolSelection: args.selection,
+	};
+}
+
+function approvalSummaryText(req: InvokeMCPToolRequestBody, selection: MCPToolSelection, reason?: string): string {
+	const parts = [
+		'MCP tool approval required.',
+		'',
+		`Server: ${selection.serverID}`,
+		`Tool: ${selection.toolName}`,
+		reason ? `Reason: ${reason}` : '',
+		req.arguments ? `Arguments:\n${JSON.stringify(req.arguments, null, 2)}` : '',
+		'',
+		'Allow this tool call once?',
+	];
+
+	return parts.filter(Boolean).join('\n');
+}
+
+async function executeMCPToolCall(
+	toolCall: UIToolCall,
+	selection: MCPToolSelection
+): Promise<ExecuteComposerToolCallResult> {
+	const bundleID = selection.bundleID;
+	if (!bundleID || !selection.serverID || !selection.toolName) {
+		return {
+			ok: false,
+			errorMessage: 'Cannot resolve MCP tool identity for this call.',
+		};
+	}
+
+	let parsedArgs: Record<string, any> | undefined;
+	try {
+		parsedArgs = parseToolArguments(toolCall.arguments);
+	} catch (err) {
+		return {
+			ok: true,
+			output: buildMCPToolOutput({
+				toolCall,
+				selection,
+				text: (err as Error)?.message || 'Invalid MCP tool arguments.',
+				isError: true,
+				errorMessage: (err as Error)?.message || 'Invalid MCP tool arguments.',
+			}),
+		};
+	}
+
+	const req: InvokeMCPToolRequestBody = {
+		source: MCPInvocationSource.MCPInvocationSourceModel,
+		serverID: selection.serverID,
+		toolName: selection.toolName,
+		providerToolName: selection.providerToolName || toolCall.name,
+		toolDigest: selection.digest,
+		arguments: parsedArgs,
+		toolUseID: toolCall.callID || toolCall.id,
+	};
+
+	const evaluation = await mcpAPI.evaluateMCPToolCall(bundleID, req);
+
+	if (evaluation?.decision === MCPApprovalDecision.MCPApprovalDecisionDenied) {
+		const message = evaluation.reason || 'MCP policy denied this tool call.';
+		return {
+			ok: true,
+			output: buildMCPToolOutput({
+				toolCall,
+				selection,
+				text: message,
+				isError: true,
+				errorMessage: message,
+			}),
+		};
+	}
+
+	if (evaluation?.decision === MCPApprovalDecision.MCPApprovalDecisionApprovalRequired) {
+		if (!evaluation.approvalID) {
+			const message = 'MCP approval was required but no approval ID was returned.';
+			return {
+				ok: true,
+				output: buildMCPToolOutput({
+					toolCall,
+					selection,
+					text: message,
+					isError: true,
+					errorMessage: message,
+				}),
+			};
+		}
+
+		const allow =
+			typeof window !== 'undefined' ? window.confirm(approvalSummaryText(req, selection, evaluation.reason)) : false;
+
+		if (!allow) {
+			const message = 'MCP tool call denied by user.';
+			return {
+				ok: true,
+				output: buildMCPToolOutput({
+					toolCall,
+					selection,
+					text: message,
+					isError: true,
+					errorMessage: message,
+				}),
+			};
+		}
+
+		const token = await mcpAPI.resolveMCPApproval(
+			evaluation.approvalID,
+			MCPApprovalResolution.MCPApprovalResolutionAllowOnce
+		);
+
+		if (!token?.token) {
+			const message = 'MCP approval did not return a usable token.';
+			return {
+				ok: true,
+				output: buildMCPToolOutput({
+					toolCall,
+					selection,
+					text: message,
+					isError: true,
+					errorMessage: message,
+				}),
+			};
+		}
+
+		req.approvalID = token.approvalID;
+		req.approvalToken = token.token;
+	}
+
+	try {
+		const resp = await withTimeout(
+			mcpAPI.invokeMCPTool(bundleID, req),
+			TOOL_CALL_TIMEOUT_MS,
+			`MCP tool call "${selection.toolName}" timed out after ${Math.round(TOOL_CALL_TIMEOUT_MS / 1000)} seconds.`
+		);
+
+		const contentText = (resp?.content ?? []).map(mcpContentToText).filter(Boolean).join('\n\n');
+		const structuredText = resp?.structuredContent !== undefined ? JSON.stringify(resp.structuredContent, null, 2) : '';
+		const text = [contentText, structuredText].filter(Boolean).join('\n\n') || 'MCP tool returned no content.';
+		const isError = !!resp?.isError;
+
+		return {
+			ok: true,
+			output: buildMCPToolOutput({
+				toolCall,
+				selection,
+				text,
+				isError,
+				errorMessage: isError ? text.split('\n')[0] : undefined,
+			}),
+		};
+	} catch (err) {
+		const message = (err as Error)?.message || 'MCP tool invocation failed.';
+		return {
+			ok: true,
+			output: buildMCPToolOutput({
+				toolCall,
+				selection,
+				text: message,
+				isError: true,
+				errorMessage: message,
+			}),
+		};
+	}
 }
 
 interface ExecuteComposerToolCallArgs {
@@ -113,6 +363,10 @@ export async function executeComposerToolCall({
 				errorMessage: (err as Error)?.message || 'Skill tool invocation failed.',
 			};
 		}
+	}
+
+	if (toolCall.mcpToolSelection) {
+		return executeMCPToolCall(toolCall, toolCall.mcpToolSelection);
 	}
 
 	const bundleID = toolCall.toolStoreChoice?.bundleID;

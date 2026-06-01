@@ -17,7 +17,7 @@ import {
 	type UIToolCall,
 	type UIToolOutput,
 } from '@/spec/inference';
-import type { MCPConversationContext } from '@/spec/mcp';
+import type { MCPConversationContext, MCPToolSelection } from '@/spec/mcp';
 import type { ModelPresetID } from '@/spec/modelpreset';
 import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
@@ -78,7 +78,13 @@ export async function HandleCompletion(
 	const hasOutputs = !!inf?.outputs && inf.outputs.length > 0;
 
 	if (!hasModelError || hasOutputs) {
-		const assistantMsg = buildAssistantMessageFromResponse(assistantPlaceholder.id, modelParams, resp, choiceMap);
+		const assistantMsg = buildAssistantMessageFromResponse(
+			assistantPlaceholder.id,
+			modelParams,
+			resp,
+			choiceMap,
+			mcpContext
+		);
 		return { responseMessage: assistantMsg, rawResponse: resp };
 	}
 
@@ -237,11 +243,65 @@ export function getDebugDetailsMarkdown(debugObj?: any, errorObj?: any): string 
 	return parts.join('\n\n');
 }
 
+function mcpSelectionKeys(selection: MCPToolSelection): string[] {
+	const keys: string[] = [];
+
+	if (selection.choiceID) keys.push(`choice:${selection.choiceID}`);
+	if (selection.providerToolName) keys.push(`name:${selection.providerToolName}`);
+	if (selection.toolName) keys.push(`name:${selection.toolName}`);
+
+	return keys;
+}
+
+export function buildMCPToolSelectionMap(
+	mcpContext?: MCPConversationContext
+): Map<string, MCPToolSelection> | undefined {
+	if (!mcpContext?.servers?.length) return undefined;
+
+	const map = new Map<string, MCPToolSelection>();
+
+	for (const server of mcpContext.servers) {
+		for (const tool of server.selectedTools ?? []) {
+			const normalized: MCPToolSelection = {
+				...tool,
+				bundleID: tool.bundleID || server.bundleID,
+				serverID: tool.serverID || server.serverID,
+			};
+
+			for (const key of mcpSelectionKeys(normalized)) {
+				map.set(key, normalized);
+			}
+		}
+	}
+
+	return map.size > 0 ? map : undefined;
+}
+
+function findMCPToolSelectionForToolLike(
+	value: { choiceID?: string; name?: string },
+	mcpToolSelectionMap?: Map<string, MCPToolSelection>
+): MCPToolSelection | undefined {
+	if (!mcpToolSelectionMap) return undefined;
+
+	if (value.choiceID) {
+		const byChoice = mcpToolSelectionMap.get(`choice:${value.choiceID}`);
+		if (byChoice) return byChoice;
+	}
+
+	if (value.name) {
+		const byName = mcpToolSelectionMap.get(`name:${value.name}`);
+		if (byName) return byName;
+	}
+
+	return undefined;
+}
+
 function buildAssistantMessageFromResponse(
 	baseId: string,
 	modelParams: ModelParam,
 	resp: CompletionResponseBody,
-	choiceMap: Map<string, ToolStoreChoice>
+	choiceMap: Map<string, ToolStoreChoice>,
+	mcpContext?: MCPConversationContext
 ): ConversationMessage | undefined {
 	const now = new Date();
 	const id = baseId || getUUIDv7();
@@ -257,7 +317,8 @@ function buildAssistantMessageFromResponse(
 
 	const { uiContent, uiReasoningContents, uiToolCalls, uiToolOutputs, uiCitations } = deriveUIFieldsFromOutputUnion(
 		outputs,
-		choiceMap
+		choiceMap,
+		buildMCPToolSelectionMap(mcpContext)
 	);
 	const debugDetails = inf.debugDetails;
 	const uiDebugDetails = getDebugDetailsMarkdown(inf.debugDetails, inf.error);
@@ -286,7 +347,8 @@ function buildAssistantMessageFromResponse(
 
 export function deriveUIFieldsFromOutputUnion(
 	outputs: OutputUnion[] | undefined,
-	choiceMap: Map<string, ToolStoreChoice>
+	choiceMap: Map<string, ToolStoreChoice>,
+	mcpToolSelectionMap?: Map<string, MCPToolSelection>
 ): {
 	uiContent: string;
 	uiReasoningContents?: ReasoningContent[];
@@ -342,17 +404,17 @@ export function deriveUIFieldsFromOutputUnion(
 				break;
 
 			case OutputKind.FunctionToolCall: {
-				const uiFunctionToolCall = deriveUIToolCallFromToolCall(o.functionToolCall, choiceMap);
+				const uiFunctionToolCall = deriveUIToolCallFromToolCall(o.functionToolCall, choiceMap, mcpToolSelectionMap);
 				if (uiFunctionToolCall) toolCalls.push(uiFunctionToolCall);
 				break;
 			}
 			case OutputKind.CustomToolCall: {
-				const uiCustomToolCall = deriveUIToolCallFromToolCall(o.customToolCall, choiceMap);
+				const uiCustomToolCall = deriveUIToolCallFromToolCall(o.customToolCall, choiceMap, mcpToolSelectionMap);
 				if (uiCustomToolCall) toolCalls.push(uiCustomToolCall);
 				break;
 			}
 			case OutputKind.WebSearchToolCall: {
-				const uiWebsearchToolCall = deriveUIToolCallFromToolCall(o.webSearchToolCall, choiceMap);
+				const uiWebsearchToolCall = deriveUIToolCallFromToolCall(o.webSearchToolCall, choiceMap, mcpToolSelectionMap);
 				if (uiWebsearchToolCall) toolCalls.push(uiWebsearchToolCall);
 				break;
 			}
@@ -365,7 +427,7 @@ export function deriveUIFieldsFromOutputUnion(
 						toolCallMap = collectToolCallsFromOutputs(outputs);
 					}
 					// Only called when a real ToolOutput exists.
-					toolOutputs.push(buildUIToolOutputFromToolOutput(out, choiceMap, toolCallMap));
+					toolOutputs.push(buildUIToolOutputFromToolOutput(out, choiceMap, toolCallMap, mcpToolSelectionMap));
 				}
 				break;
 			}
@@ -385,7 +447,8 @@ export function deriveUIFieldsFromOutputUnion(
 
 function deriveUIToolCallFromToolCall(
 	toolCall: ToolCall | undefined,
-	choiceMap: Map<string, ToolStoreChoice>
+	choiceMap: Map<string, ToolStoreChoice>,
+	mcpToolSelectionMap?: Map<string, MCPToolSelection>
 ): UIToolCall | undefined {
 	if (!toolCall) return undefined;
 
@@ -395,6 +458,7 @@ function deriveUIToolCallFromToolCall(
 	// NOTE: runtime-injected tools (e.g. skills-*) are not in toolStoreChoices,
 	// so they will not be present in this map. Do NOT drop the tool call.
 	const toolStoreChoice = choiceMap.get(choiceID); // ToolStoreChoice | undefined
+	const mcpToolSelection = findMCPToolSelectionForToolLike(toolCall, mcpToolSelectionMap);
 
 	const type = toolCall.type as unknown as ToolStoreChoiceType;
 
@@ -416,17 +480,22 @@ function deriveUIToolCallFromToolCall(
 		// for us the call is pending here and then it will run and move to final status.
 		status: status,
 		toolStoreChoice,
+		mcpToolSelection,
 	};
 }
 
 export function buildUIToolOutputFromToolOutput(
 	out: ToolOutput,
 	choiceMap: Map<string, ToolStoreChoice>,
-	toolCallMap?: Map<string, ToolCall>
+	toolCallMap?: Map<string, ToolCall>,
+	mcpToolSelectionMap?: Map<string, MCPToolSelection>
 ): UIToolOutput {
 	const isError = out.isError;
 	const toolStoreChoice = choiceMap.get(out.choiceID);
 	const call = toolCallMap?.get(out.callID);
+	const mcpToolSelection = call
+		? findMCPToolSelectionForToolLike(call, mcpToolSelectionMap)
+		: findMCPToolSelectionForToolLike(out, mcpToolSelectionMap);
 	const summaryBase = formatToolOutputSummary(out.name);
 
 	const toolOutputs = mapToolOutputItemsToToolOutputs(out.contents);
@@ -452,6 +521,7 @@ export function buildUIToolOutputFromToolOutput(
 		webSearchToolOutputItems: webSearchOutputs,
 
 		toolStoreChoice,
+		mcpToolSelection,
 		isError: isError,
 		errorMessage: isError ? primaryText : undefined,
 

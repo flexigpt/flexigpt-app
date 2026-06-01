@@ -20,6 +20,7 @@ import {
 import { type ToolStoreChoice } from '@/spec/tool';
 
 import {
+	buildMCPToolSelectionMap,
 	buildUIToolOutputFromToolOutput,
 	deriveUIFieldsFromOutputUnion,
 	getDebugDetailsMarkdown,
@@ -50,6 +51,7 @@ export function toStoreConversation(conversation: Conversation): StoreConversati
 export function hydrateConversation(store: StoreConversation): Conversation {
 	const choiceMap = buildToolStoreChoiceMap(store.messages);
 	const toolCallMap = buildToolCallMap(store.messages);
+	const mcpToolSelectionMap = buildMCPToolSelectionMapFromMessages(store.messages);
 
 	const hydratedMessages: ConversationMessage[] = store.messages.map(message => {
 		const role = message.role;
@@ -64,7 +66,7 @@ export function hydrateConversation(store: StoreConversation): Conversation {
 		const inputs: InputUnion[] | undefined = message.inputs;
 
 		if (role === RoleEnum.Assistant) {
-			const derived = deriveUIFieldsFromOutputUnion(outputs, choiceMap);
+			const derived = deriveUIFieldsFromOutputUnion(outputs, choiceMap, mcpToolSelectionMap);
 
 			uiContent = derived.uiContent;
 			uiReasoningContents = derived.uiReasoningContents;
@@ -73,10 +75,10 @@ export function hydrateConversation(store: StoreConversation): Conversation {
 			uiToolOutputs =
 				derived.uiToolOutputs && derived.uiToolOutputs.length > 0
 					? derived.uiToolOutputs
-					: deriveUIToolOutputsFromInputUnion(inputs, choiceMap, toolCallMap);
+					: deriveUIToolOutputsFromInputUnion(inputs, choiceMap, toolCallMap, mcpToolSelectionMap);
 		} else if (role === RoleEnum.User) {
 			uiContent = deriveUIContentFromInputUnion(inputs);
-			uiToolOutputs = deriveUIToolOutputsFromInputUnion(inputs, choiceMap, toolCallMap);
+			uiToolOutputs = deriveUIToolOutputsFromInputUnion(inputs, choiceMap, toolCallMap, mcpToolSelectionMap);
 		}
 
 		const uiDebugDetails = getDebugDetailsMarkdown(message.debugDetails, message.error);
@@ -96,6 +98,14 @@ export function hydrateConversation(store: StoreConversation): Conversation {
 		...(store as any),
 		messages: hydratedMessages,
 	} as Conversation;
+}
+
+function buildMCPToolSelectionMapFromMessages(messages: StoreConversationMessage[]) {
+	const syntheticContext = {
+		servers: messages.flatMap(message => message.mcpContext?.servers ?? []),
+	};
+
+	return buildMCPToolSelectionMap(syntheticContext);
 }
 
 function buildToolStoreChoiceMap(messages: StoreConversationMessage[]): Map<string, ToolStoreChoice> {
@@ -149,7 +159,8 @@ function deriveUIContentFromInputUnion(inputs?: InputUnion[]): string {
 function deriveUIToolOutputsFromInputUnion(
 	inputs: InputUnion[] | undefined,
 	choiceMap: Map<string, ToolStoreChoice>,
-	toolCallMap: Map<string, ToolCall>
+	toolCallMap: Map<string, ToolCall>,
+	mcpToolSelectionMap?: ReturnType<typeof buildMCPToolSelectionMap>
 ): UIToolOutput[] {
 	if (!inputs || inputs.length === 0) return [];
 
@@ -168,7 +179,7 @@ function deriveUIToolOutputsFromInputUnion(
 			continue;
 		}
 
-		uiOutputs.push(buildUIToolOutputFromToolOutput(out, choiceMap, toolCallMap));
+		uiOutputs.push(buildUIToolOutputFromToolOutput(out, choiceMap, toolCallMap, mcpToolSelectionMap));
 	}
 
 	return uiOutputs;
