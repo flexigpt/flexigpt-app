@@ -1212,6 +1212,198 @@ export namespace spec {
 	        this.reasoningTokens = source["reasoningTokens"];
 	    }
 	}
+	export class MCPPromptRef {
+	    bundleID: string;
+	    serverID: string;
+	    promptName: string;
+	    title?: string;
+	    displayName: string;
+	    description?: string;
+	    arguments?: Record<string, string>;
+	    digest?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPPromptRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
+	        this.serverID = source["serverID"];
+	        this.promptName = source["promptName"];
+	        this.title = source["title"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.arguments = source["arguments"];
+	        this.digest = source["digest"];
+	    }
+	}
+	export class MCPResourceTemplateRef {
+	    bundleID: string;
+	    serverID: string;
+	    uriTemplate: string;
+	    name?: string;
+	    title?: string;
+	    displayName: string;
+	    description?: string;
+	    mimeType?: string;
+	    arguments?: Record<string, string>;
+	    annotations?: Record<string, any>;
+	    digest?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPResourceTemplateRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
+	        this.serverID = source["serverID"];
+	        this.uriTemplate = source["uriTemplate"];
+	        this.name = source["name"];
+	        this.title = source["title"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.mimeType = source["mimeType"];
+	        this.arguments = source["arguments"];
+	        this.annotations = source["annotations"];
+	        this.digest = source["digest"];
+	    }
+	}
+	export class MCPResourceRef {
+	    bundleID: string;
+	    serverID: string;
+	    uri: string;
+	    name?: string;
+	    title?: string;
+	    displayName: string;
+	    description?: string;
+	    mimeType?: string;
+	    size?: number;
+	    annotations?: Record<string, any>;
+	    digest?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPResourceRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
+	        this.serverID = source["serverID"];
+	        this.uri = source["uri"];
+	        this.name = source["name"];
+	        this.title = source["title"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.mimeType = source["mimeType"];
+	        this.size = source["size"];
+	        this.annotations = source["annotations"];
+	        this.digest = source["digest"];
+	    }
+	}
+	export class MCPToolSelection {
+	    bundleID: string;
+	    serverID: string;
+	    toolName: string;
+	    providerToolName?: string;
+	    choiceID?: string;
+	    digest?: string;
+	    approvalRule?: string;
+	    executionMode?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPToolSelection(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
+	        this.serverID = source["serverID"];
+	        this.toolName = source["toolName"];
+	        this.providerToolName = source["providerToolName"];
+	        this.choiceID = source["choiceID"];
+	        this.digest = source["digest"];
+	        this.approvalRule = source["approvalRule"];
+	        this.executionMode = source["executionMode"];
+	    }
+	}
+	export class MCPServerSelection {
+	    bundleID: string;
+	    serverID: string;
+	    snapshotDigest?: string;
+	    toolExposure: string;
+	    selectedTools?: MCPToolSelection[];
+	    includeServerInstructions?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPServerSelection(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bundleID = source["bundleID"];
+	        this.serverID = source["serverID"];
+	        this.snapshotDigest = source["snapshotDigest"];
+	        this.toolExposure = source["toolExposure"];
+	        this.selectedTools = this.convertValues(source["selectedTools"], MCPToolSelection);
+	        this.includeServerInstructions = source["includeServerInstructions"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class MCPConversationContext {
+	    servers: MCPServerSelection[];
+	    resources?: MCPResourceRef[];
+	    resourceTemplates?: MCPResourceTemplateRef[];
+	    prompts?: MCPPromptRef[];
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPConversationContext(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.servers = this.convertValues(source["servers"], MCPServerSelection);
+	        this.resources = this.convertValues(source["resources"], MCPResourceRef);
+	        this.resourceTemplates = this.convertValues(source["resourceTemplates"], MCPResourceTemplateRef);
+	        this.prompts = this.convertValues(source["prompts"], MCPPromptRef);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class ToolStoreChoice {
 	    choiceID: string;
 	    bundleID: string;
@@ -1988,6 +2180,7 @@ export namespace spec {
 	    outputs?: OutputUnion[];
 	    toolChoices?: ToolChoice[];
 	    toolStoreChoices?: ToolStoreChoice[];
+	    mcpContext?: MCPConversationContext;
 	    attachments?: attachment.Attachment[];
 	    enabledSkillRefs?: SkillRef[];
 	    activeSkillRefs?: SkillRef[];
@@ -2012,6 +2205,7 @@ export namespace spec {
 	        this.outputs = this.convertValues(source["outputs"], OutputUnion);
 	        this.toolChoices = this.convertValues(source["toolChoices"], ToolChoice);
 	        this.toolStoreChoices = this.convertValues(source["toolStoreChoices"], ToolStoreChoice);
+	        this.mcpContext = this.convertValues(source["mcpContext"], MCPConversationContext);
 	        this.attachments = this.convertValues(source["attachments"], attachment.Attachment);
 	        this.enabledSkillRefs = this.convertValues(source["enabledSkillRefs"], SkillRef);
 	        this.activeSkillRefs = this.convertValues(source["activeSkillRefs"], SkillRef);
@@ -2096,6 +2290,7 @@ export namespace spec {
 	    history: ConversationMessage[];
 	    current: ConversationMessage;
 	    toolStoreChoices?: ToolStoreChoice[];
+	    mcpContext?: MCPConversationContext;
 	    skillSessionID?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -2108,6 +2303,7 @@ export namespace spec {
 	        this.history = this.convertValues(source["history"], ConversationMessage);
 	        this.current = this.convertValues(source["current"], ConversationMessage);
 	        this.toolStoreChoices = this.convertValues(source["toolStoreChoices"], ToolStoreChoice);
+	        this.mcpContext = this.convertValues(source["mcpContext"], MCPConversationContext);
 	        this.skillSessionID = source["skillSessionID"];
 	    }
 	
@@ -5830,32 +6026,6 @@ export namespace spec {
 	        this.PageToken = source["PageToken"];
 	    }
 	}
-	export class MCPPromptRef {
-	    bundleID: string;
-	    serverID: string;
-	    promptName: string;
-	    title?: string;
-	    displayName: string;
-	    description?: string;
-	    arguments?: Record<string, string>;
-	    digest?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new MCPPromptRef(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.bundleID = source["bundleID"];
-	        this.serverID = source["serverID"];
-	        this.promptName = source["promptName"];
-	        this.title = source["title"];
-	        this.displayName = source["displayName"];
-	        this.description = source["description"];
-	        this.arguments = source["arguments"];
-	        this.digest = source["digest"];
-	    }
-	}
 	export class ListMCPServerPromptsResponseBody {
 	    prompts: MCPPromptRef[];
 	    nextPageToken?: string;
@@ -5937,38 +6107,6 @@ export namespace spec {
 	        this.PageToken = source["PageToken"];
 	    }
 	}
-	export class MCPResourceTemplateRef {
-	    bundleID: string;
-	    serverID: string;
-	    uriTemplate: string;
-	    name?: string;
-	    title?: string;
-	    displayName: string;
-	    description?: string;
-	    mimeType?: string;
-	    arguments?: Record<string, string>;
-	    annotations?: Record<string, any>;
-	    digest?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new MCPResourceTemplateRef(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.bundleID = source["bundleID"];
-	        this.serverID = source["serverID"];
-	        this.uriTemplate = source["uriTemplate"];
-	        this.name = source["name"];
-	        this.title = source["title"];
-	        this.displayName = source["displayName"];
-	        this.description = source["description"];
-	        this.mimeType = source["mimeType"];
-	        this.arguments = source["arguments"];
-	        this.annotations = source["annotations"];
-	        this.digest = source["digest"];
-	    }
-	}
 	export class ListMCPServerResourceTemplatesResponseBody {
 	    resourceTemplates: MCPResourceTemplateRef[];
 	    nextPageToken?: string;
@@ -6048,38 +6186,6 @@ export namespace spec {
 	        this.ServerID = source["ServerID"];
 	        this.PageSize = source["PageSize"];
 	        this.PageToken = source["PageToken"];
-	    }
-	}
-	export class MCPResourceRef {
-	    bundleID: string;
-	    serverID: string;
-	    uri: string;
-	    name?: string;
-	    title?: string;
-	    displayName: string;
-	    description?: string;
-	    mimeType?: string;
-	    size?: number;
-	    annotations?: Record<string, any>;
-	    digest?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new MCPResourceRef(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.bundleID = source["bundleID"];
-	        this.serverID = source["serverID"];
-	        this.uri = source["uri"];
-	        this.name = source["name"];
-	        this.title = source["title"];
-	        this.displayName = source["displayName"];
-	        this.description = source["description"];
-	        this.mimeType = source["mimeType"];
-	        this.size = source["size"];
-	        this.annotations = source["annotations"];
-	        this.digest = source["digest"];
 	    }
 	}
 	export class ListMCPServerResourcesResponseBody {
@@ -7594,6 +7700,7 @@ export namespace spec {
 	    }
 	}
 	
+	
 	export class MCPGetPromptRequestBody {
 	    promptName: string;
 	    arguments?: Record<string, string>;
@@ -7862,6 +7969,8 @@ export namespace spec {
 		    return a;
 		}
 	}
+	
+	
 	
 	
 	

@@ -111,6 +111,7 @@ export class WailsAggregateAPI implements IAggregateAPI {
 			current: current as wailsSpec.ConversationMessage,
 			history: history ? ([...history] as wailsSpec.ConversationMessage[]) : [],
 			toolStoreChoices: toolStoreChoices ? ([...toolStoreChoices] as wailsSpec.ToolStoreChoice[]) : [],
+			mcpContext: mcpContext,
 			skillSessionID: skillSessionID ?? '',
 		} as wailsSpec.CompletionRequestBody;
 
