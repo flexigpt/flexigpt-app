@@ -424,7 +424,6 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 	}, [schedulePersist]);
 
 	useEffect(() => {
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-pass-live-state-to-parent
 		schedulePersist();
 	}, [schedulePersist, selectedTabId]);
 

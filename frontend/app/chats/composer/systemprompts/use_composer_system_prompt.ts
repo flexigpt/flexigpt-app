@@ -132,7 +132,7 @@ export function useComposerSystemPrompt(args: {
 		initializedFromModelRef.current = true;
 		// eslint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setInitializedFromModelState(true);
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-derived-state
+		// eslint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setIncludeModelDefaultState(Boolean(modelDefaultPrompt.trim()));
 	}, [modelOptionsLoaded, modelDefaultPrompt]);
 
