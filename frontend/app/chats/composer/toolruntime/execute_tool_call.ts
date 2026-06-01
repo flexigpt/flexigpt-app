@@ -12,6 +12,7 @@ import { ToolOutputKind } from '@/spec/tool';
 
 import { mcpAPI, skillStoreAPI, toolRuntimeAPI } from '@/apis/baseapi';
 
+import type { RequestMCPApproval } from '@/chats/composer/mcp/use_mcp_approval';
 import { isRunnableComposerToolCall } from '@/chats/composer/toolruntime/tool_runtime_utils';
 import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
 import { formatToolOutputSummary } from '@/tools/lib/tool_output_utils';
@@ -116,24 +117,10 @@ function buildMCPToolOutput(args: {
 	};
 }
 
-function approvalSummaryText(req: InvokeMCPToolRequestBody, selection: MCPToolSelection, reason?: string): string {
-	const parts = [
-		'MCP tool approval required.',
-		'',
-		`Server: ${selection.serverID}`,
-		`Tool: ${selection.toolName}`,
-		reason ? `Reason: ${reason}` : '',
-		req.arguments ? `Arguments:\n${JSON.stringify(req.arguments, null, 2)}` : '',
-		'',
-		'Allow this tool call once?',
-	];
-
-	return parts.filter(Boolean).join('\n');
-}
-
 async function executeMCPToolCall(
 	toolCall: UIToolCall,
-	selection: MCPToolSelection
+	selection: MCPToolSelection,
+	requestMCPApproval?: RequestMCPApproval
 ): Promise<ExecuteComposerToolCallResult> {
 	const bundleID = selection.bundleID;
 	if (!bundleID || !selection.serverID || !selection.toolName) {
@@ -200,11 +187,30 @@ async function executeMCPToolCall(
 			};
 		}
 
-		const allow =
-			typeof window !== 'undefined' ? window.confirm(approvalSummaryText(req, selection, evaluation.reason)) : false;
+		let resolution = MCPApprovalResolution.MCPApprovalResolutionDenyOnce;
 
-		if (!allow) {
-			const message = 'MCP tool call denied by user.';
+		try {
+			resolution =
+				requestMCPApproval && evaluation.summary
+					? await requestMCPApproval({
+							approvalID: evaluation.approvalID,
+							summary: evaluation.summary,
+							reason: evaluation.reason,
+						})
+					: MCPApprovalResolution.MCPApprovalResolutionDenyOnce;
+		} catch {
+			resolution = MCPApprovalResolution.MCPApprovalResolutionDenyOnce;
+		}
+
+		const token = await mcpAPI.resolveMCPApproval(evaluation.approvalID, resolution);
+
+		if (
+			resolution !== MCPApprovalResolution.MCPApprovalResolutionAllowOnce &&
+			resolution !== MCPApprovalResolution.MCPApprovalResolutionAllowAlways
+		) {
+			const message = evaluation.reason
+				? `MCP tool call denied by user. ${evaluation.reason}`
+				: 'MCP tool call denied by user.';
 			return {
 				ok: true,
 				output: buildMCPToolOutput({
@@ -216,11 +222,6 @@ async function executeMCPToolCall(
 				}),
 			};
 		}
-
-		const token = await mcpAPI.resolveMCPApproval(
-			evaluation.approvalID,
-			MCPApprovalResolution.MCPApprovalResolutionAllowOnce
-		);
 
 		if (!token?.token) {
 			const message = 'MCP approval did not return a usable token.';
@@ -281,6 +282,7 @@ interface ExecuteComposerToolCallArgs {
 	toolCall: UIToolCall;
 	ensureSkillSession: () => Promise<string | null>;
 	getCurrentSkillSessionID: () => string | null;
+	requestMCPApproval?: RequestMCPApproval;
 }
 
 type ExecuteComposerToolCallResult =
@@ -298,6 +300,7 @@ export async function executeComposerToolCall({
 	toolCall,
 	ensureSkillSession,
 	getCurrentSkillSessionID,
+	requestMCPApproval,
 }: ExecuteComposerToolCallArgs): Promise<ExecuteComposerToolCallResult> {
 	if (!isRunnableComposerToolCall(toolCall)) {
 		return {
@@ -366,7 +369,7 @@ export async function executeComposerToolCall({
 	}
 
 	if (toolCall.mcpToolSelection) {
-		return executeMCPToolCall(toolCall, toolCall.mcpToolSelection);
+		return executeMCPToolCall(toolCall, toolCall.mcpToolSelection, requestMCPApproval);
 	}
 
 	const bundleID = toolCall.toolStoreChoice?.bundleID;

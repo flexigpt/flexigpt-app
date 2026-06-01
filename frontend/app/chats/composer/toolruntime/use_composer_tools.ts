@@ -4,6 +4,7 @@ import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
 
+import type { RequestMCPApproval } from '@/chats/composer/mcp/use_mcp_approval';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import { useComposerToolConfig } from '@/chats/composer/toolruntime/use_composer_tool_config';
 import { type AutoExecState, useToolAutoExecDrainer } from '@/chats/composer/toolruntime/use_tool_auto_exec_drainer';
@@ -21,6 +22,7 @@ interface UseComposerToolsArgs {
 	getCurrentSkillSessionID: () => string | null;
 	getAttachedToolEntries: (uniqueByIdentity?: boolean) => AttachedToolEntry[];
 	externalExecutionBlocked?: boolean;
+	requestMCPApproval?: RequestMCPApproval;
 }
 
 interface UseComposerToolsResult {
@@ -58,12 +60,14 @@ export function useComposerTools({
 	getCurrentSkillSessionID,
 	getAttachedToolEntries,
 	externalExecutionBlocked = false,
+	requestMCPApproval,
 }: UseComposerToolsArgs): UseComposerToolsResult {
 	const runtime = useComposerToolRuntime({
 		ensureSkillSession,
 		listActiveSkillRefs,
 		setActiveSkillRefs,
 		getCurrentSkillSessionID,
+		requestMCPApproval,
 	});
 
 	const config = useComposerToolConfig({

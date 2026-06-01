@@ -51,7 +51,9 @@ import type {
 	EditorExternalMessage,
 	EditorSubmitPayload,
 } from '@/chats/composer/editor/editor_types';
+import { MCPApprovalModal } from '@/chats/composer/mcp/mcp_approval_modal';
 import { useComposerMCP } from '@/chats/composer/mcp/use_composer_mcp';
+import { useMCPApproval } from '@/chats/composer/mcp/use_mcp_approval';
 import { buildEditorValueFromPlainText, hasNonEmptyUserText } from '@/chats/composer/platedoc/platedoc_utils';
 import {
 	getInstructionPromptPartsFromSelections,
@@ -158,6 +160,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 ) {
 	const autoSubmitTrackerRef = useRef(createAutoSubmitTracker());
 	const mcp = useComposerMCP();
+	const mcpApproval = useMCPApproval();
 	const resetAutoSubmitTracker = useCallback(() => {
 		autoSubmitTrackerRef.current = createAutoSubmitTracker();
 	}, []);
@@ -315,6 +318,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		getCurrentSkillSessionID,
 		getAttachedToolEntries: getAttachedToolEntriesSnapshot,
 		externalExecutionBlocked: fastForwardPending || autoExecBlockedByUser,
+		requestMCPApproval: mcpApproval.requestMCPApproval,
 	});
 
 	const previousProviderSDKTypeRef = useRef(currentProviderSDKType);
@@ -1652,6 +1656,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					setToolDetailsState(null);
 				}}
 			/>
+
+			<MCPApprovalModal approvalRequest={mcpApproval.approvalRequest} onResolve={mcpApproval.resolveMCPApproval} />
 
 			<ToolArgsModalHost
 				attachedToolEntries={attachedToolEntries}

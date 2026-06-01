@@ -7,6 +7,7 @@ import { ToolStoreChoiceType } from '@/spec/tool';
 import { resolveStateUpdate } from '@/lib/hook_utils';
 import { ensureMakeID, getUUIDv7 } from '@/lib/uuid_utils';
 
+import type { RequestMCPApproval } from '@/chats/composer/mcp/use_mcp_approval';
 import { executeComposerToolCall } from '@/chats/composer/toolruntime/execute_tool_call';
 import {
 	getPendingRunnableToolCalls,
@@ -24,6 +25,7 @@ interface UseComposerToolRuntimeArgs {
 	listActiveSkillRefs: (sid: string) => Promise<SkillRef[]>;
 	setActiveSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
 	getCurrentSkillSessionID: () => string | null;
+	requestMCPApproval?: RequestMCPApproval;
 }
 
 type Action =
@@ -108,6 +110,7 @@ export function useComposerToolRuntime({
 	listActiveSkillRefs,
 	setActiveSkillRefs,
 	getCurrentSkillSessionID,
+	requestMCPApproval,
 }: UseComposerToolRuntimeArgs): {
 	toolCalls: UIToolCall[];
 	toolOutputs: UIToolOutput[];
@@ -221,6 +224,7 @@ export function useComposerToolRuntime({
 					toolCall,
 					ensureSkillSession,
 					getCurrentSkillSessionID,
+					requestMCPApproval,
 				});
 
 				if (!isCurrentToolCallAttempt(id, attemptKey)) {
@@ -264,6 +268,7 @@ export function useComposerToolRuntime({
 			getCurrentSkillSessionID,
 			isCurrentToolCallAttempt,
 			refreshActiveSkillRefs,
+			requestMCPApproval,
 		]
 	);
 
