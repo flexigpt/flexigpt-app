@@ -14,8 +14,10 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper"
-	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
+
+	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
+	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
@@ -49,6 +51,7 @@ func InitAggregrateWrapper(
 	ss *settingStore.SettingStore,
 	ts *toolStore.ToolStore,
 	skillSt *skillStore.SkillStore,
+	mr *mcpRuntime.MCPRuntimeManager,
 ) error {
 	if agg == nil || ts == nil || mps == nil || ss == nil {
 		panic("initializing aggregate store wrapper on nil receivers")
@@ -58,11 +61,19 @@ func InitAggregrateWrapper(
 	agg.modelPresetStore = mps
 	agg.settingStore = ss
 	agg.skillStore = skillSt
+
 	defaultDebugConfig := inferencewrapper.DefaultDebugConfig()
+
+	var bridge *inferencewrapper.MCPInferenceBridge
+	if mr != nil {
+		bridge = inferencewrapper.NewMCPInferenceBridge(mr)
+	}
+
 	p, err := inferencewrapper.NewProviderSetAPI(
 		agg.toolStore,
 		agg.modelPresetStore,
 		agg.skillStore,
+		bridge,
 		inferencewrapper.WithLogger(slog.Default()),
 		inferencewrapper.WithDebugConfig(&defaultDebugConfig),
 	)

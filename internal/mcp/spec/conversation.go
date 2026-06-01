@@ -33,7 +33,7 @@ type MCPServerSelection struct {
 
 	SnapshotDigest string `json:"snapshotDigest,omitempty"`
 
-	ToolExposure  string             `json:"toolExposure"` // none | all | selected
+	ToolExposure  MCPToolExposure    `json:"toolExposure"` // none | all | selected
 	SelectedTools []MCPToolSelection `json:"selectedTools,omitempty"`
 
 	IncludeServerInstructions bool `json:"includeServerInstructions,omitempty"`

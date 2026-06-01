@@ -2,6 +2,14 @@ package spec
 
 import "github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 
+type MCPToolExposure string
+
+const (
+	MCPToolExposureNone     MCPToolExposure = "none"
+	MCPToolExposureAll      MCPToolExposure = "all"
+	MCPToolExposureSelected MCPToolExposure = "selected"
+)
+
 type InvokeMCPToolRequestBody struct {
 	Source           MCPInvocationSource `json:"source"                     required:"true"`
 	ToolName         string              `json:"toolName"                   required:"true"`

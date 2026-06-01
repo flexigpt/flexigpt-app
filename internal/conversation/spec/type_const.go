@@ -3,12 +3,12 @@ package spec
 import (
 	"time"
 
-	inferenceSpec "github.com/flexigpt/inference-go/spec"
-
 	"github.com/flexigpt/flexigpt-app/internal/attachment"
+	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
 const (
@@ -49,6 +49,9 @@ type ConversationMessage struct {
 	// For the next completion, the app can choose to reuse or override these.
 	ToolChoices      []inferenceSpec.ToolChoice `json:"toolChoices,omitempty"`
 	ToolStoreChoices []toolSpec.ToolStoreChoice `json:"toolStoreChoices,omitempty"`
+
+	MCPContext *mcpSpec.MCPConversationContext `json:"mcpContext,omitempty"`
+
 	// Attachments that backed this turn's user input (files, URLs, etc).
 	// These are ref attachments; ContentBlock may or may not be hydrated.
 	Attachments      []attachment.Attachment `json:"attachments,omitempty"`

@@ -2,7 +2,6 @@ package inferencewrapper
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -16,34 +15,17 @@ import (
 	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
-
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 
 	"github.com/google/uuid"
 
-	"github.com/flexigpt/flexigpt-app/internal/attachment"
-	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
 	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
 	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
-	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 )
-
-var defaultDebugConfig = debugclient.DebugConfig{
-	Disable:                 false,
-	DisableRequestBody:      false,
-	DisableResponseBody:     false,
-	DisableContentStripping: false,
-	LogToSlog:               false,
-}
-
-func DefaultDebugConfig() debugclient.DebugConfig {
-	return defaultDebugConfig
-}
 
 // ProviderSetAPI is a thin aggregator on top of inference-go's ProviderSetAPI.
 // It owns:
@@ -51,10 +33,12 @@ func DefaultDebugConfig() debugclient.DebugConfig {
 //   - attachment/tool hydration,
 //   - mapping Conversation+CurrentTurn -> inference-go FetchCompletionRequest.
 type ProviderSetAPI struct {
-	inner      *inference.ProviderSetAPI
-	toolStore  *toolStore.ToolStore
-	mpStore    *modelpresetStore.ModelPresetStore
-	skillStore *skillStore.SkillStore
+	inner *inference.ProviderSetAPI
+
+	toolStore          *toolStore.ToolStore
+	mpStore            *modelpresetStore.ModelPresetStore
+	skillStore         *skillStore.SkillStore
+	mcpInferenceBridge *MCPInferenceBridge
 
 	logger             *slog.Logger
 	debugger           *debugclient.HTTPCompletionDebugger
@@ -96,15 +80,17 @@ func NewProviderSetAPI(
 	ts *toolStore.ToolStore,
 	mps *modelpresetStore.ModelPresetStore,
 	ss *skillStore.SkillStore,
+	mcpBridge *MCPInferenceBridge,
 	opts ...ProviderSetOption,
 ) (*ProviderSetAPI, error) {
 	if ts == nil || mps == nil {
 		return nil, errors.New("no tool store or model preset store provided to inference wrapper provider set")
 	}
 	ps := &ProviderSetAPI{
-		toolStore:  ts,
-		mpStore:    mps,
-		skillStore: ss,
+		toolStore:          ts,
+		mpStore:            mps,
+		skillStore:         ss,
+		mcpInferenceBridge: mcpBridge,
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -282,7 +268,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	}
 
 	// Build tool choices for this call.
-	toolChoices, err := ps.buildToolChoices(ctx, body.ToolStoreChoices)
+	toolChoices, err := buildToolChoices(ctx, ps.toolStore, body.ToolStoreChoices)
 	if err != nil {
 		return nil, err
 	}
@@ -364,6 +350,34 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		}
 	}
 
+	mcpContext := body.MCPContext
+	if mcpContext == nil {
+		mcpContext = body.Current.MCPContext
+	}
+
+	var mcpDebugDetails map[string]any
+	if ps.mcpInferenceBridge != nil && mcpContext != nil {
+		hydrated, err := ps.mcpInferenceBridge.HydrateCompletion(ctx, MCPCompletionHydrationRequest{
+			Context:       mcpContext,
+			ModelParam:    modelParam,
+			Inputs:        inputs,
+			CurrentInputs: currentInputs,
+			ToolChoices:   toolChoices,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to hydrate MCP context: %w", err)
+		}
+		if hydrated != nil {
+			if hydrated.ModelParam != nil {
+				modelParam = hydrated.ModelParam
+			}
+			inputs = hydrated.Inputs
+			currentInputs = hydrated.CurrentInputs
+			toolChoices = hydrated.ToolChoices
+			mcpDebugDetails = hydrated.DebugDetails
+		}
+	}
+
 	infReq := &inferenceSpec.FetchCompletionRequest{
 		ModelParam:  *modelParam,
 		Inputs:      inputs,
@@ -384,6 +398,9 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	}
 
 	b, err := ps.inner.FetchCompletion(ctx, req.Provider, infReq, opts)
+	if b != nil && mcpDebugDetails != nil {
+		b.DebugDetails = mergeCompletionDebugDetails(b.DebugDetails, "mcp", mcpDebugDetails)
+	}
 
 	resp := &spec.CompletionResponse{Body: &spec.CompletionResponseBody{
 		InferenceResponse:     b,
@@ -472,55 +489,6 @@ func inferenceModelPresetFromApp(
 		},
 		CapabilitiesOverride: capabilityoverride.CloneModelCapabilitiesOverride(mp.CapabilitiesOverride),
 	}
-}
-
-func buildSkillToolChoices(includeAll, includeRunScript bool) ([]inferenceSpec.ToolChoice, error) {
-	mk := func(choiceID, toolName string, t llmtoolsSpec.Tool) (inferenceSpec.ToolChoice, error) {
-		schema, err := decodeToolArgSchema(toolSpec.JSONRawString(t.ArgSchema))
-		if err != nil {
-			return inferenceSpec.ToolChoice{}, err
-		}
-		return inferenceSpec.ToolChoice{
-			Type:        inferenceSpec.ToolTypeFunction,
-			ID:          choiceID, // choiceID (ToolCall.choiceID)
-			Name:        toolName, // ToolCall.name
-			Description: t.Description,
-			Arguments:   schema,
-		}, nil
-	}
-
-	var out []inferenceSpec.ToolChoice
-	tc, err := mk("builtin.skills-load", "skills-load", agentskillsSpec.SkillsLoadTool())
-	if err != nil {
-		return nil, err
-	}
-	out = append(out, tc)
-
-	if includeAll {
-		if tc, err = mk("builtin.skills-unload", "skills-unload", agentskillsSpec.SkillsUnloadTool()); err != nil {
-			return nil, err
-		}
-		out = append(out, tc)
-		if tc, err = mk(
-			"builtin.skills-readresource",
-			"skills-readresource",
-			agentskillsSpec.SkillsReadResourceTool(),
-		); err != nil {
-			return nil, err
-		}
-		out = append(out, tc)
-		if includeRunScript {
-			if tc, err = mk(
-				"builtin.skills-runscript",
-				"skills-runscript",
-				agentskillsSpec.SkillsRunScriptTool(),
-			); err != nil {
-				return nil, err
-			}
-			out = append(out, tc)
-		}
-	}
-	return out, nil
 }
 
 // resolveModelParam chooses the effective ModelParam for this call.
@@ -636,339 +604,6 @@ func (ps *ProviderSetAPI) buildInputs(
 	return out, currentOut, nil
 }
 
-// outputToInput converts an OutputUnion from a previous completion into an
-// InputUnion so it can be replayed as prior context in the next call.
-func outputToInput(o inferenceSpec.OutputUnion) *inferenceSpec.InputUnion {
-	switch o.Kind {
-	case inferenceSpec.OutputKindOutputMessage:
-		return &inferenceSpec.InputUnion{
-			Kind:          inferenceSpec.InputKindOutputMessage,
-			OutputMessage: o.OutputMessage,
-		}
-	case inferenceSpec.OutputKindReasoningMessage:
-		return &inferenceSpec.InputUnion{
-			Kind:             inferenceSpec.InputKindReasoningMessage,
-			ReasoningMessage: o.ReasoningMessage,
-		}
-	case inferenceSpec.OutputKindFunctionToolCall:
-		return &inferenceSpec.InputUnion{
-			Kind:             inferenceSpec.InputKindFunctionToolCall,
-			FunctionToolCall: o.FunctionToolCall,
-		}
-	case inferenceSpec.OutputKindCustomToolCall:
-		return &inferenceSpec.InputUnion{
-			Kind:           inferenceSpec.InputKindCustomToolCall,
-			CustomToolCall: o.CustomToolCall,
-		}
-	case inferenceSpec.OutputKindWebSearchToolCall:
-		return &inferenceSpec.InputUnion{
-			Kind:              inferenceSpec.InputKindWebSearchToolCall,
-			WebSearchToolCall: o.WebSearchToolCall,
-		}
-	case inferenceSpec.OutputKindWebSearchToolOutput:
-		return &inferenceSpec.InputUnion{
-			Kind:                inferenceSpec.InputKindWebSearchToolOutput,
-			WebSearchToolOutput: o.WebSearchToolOutput,
-		}
-	default:
-		// Unknown kinds are dropped.
-		return nil
-	}
-}
-
-func buildContentItemsFromAttachments(
-	ctx context.Context,
-	atts []attachment.Attachment,
-) ([]inferenceSpec.InputOutputContentItemUnion, error) {
-	items := make([]inferenceSpec.InputOutputContentItemUnion, 0)
-	if len(atts) == 0 {
-		return items, nil
-	}
-
-	blocks, err := attachment.BuildContentBlocks(
-		ctx,
-		atts,
-		attachment.WithOverrideOriginalContentBlock(true),
-		attachment.WithOnlyTextKindContentBlock(false),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, b := range blocks {
-		switch b.Kind {
-		case attachment.ContentBlockText:
-			if b.Text == nil {
-				continue
-			}
-			txt := strings.TrimSpace(*b.Text)
-			if txt == "" {
-				continue
-			}
-			formattedTxt, err := attachment.FormatTextBlockForLLM(b)
-			if err != nil {
-				return nil, err
-			}
-			if formattedTxt == "" {
-				continue
-			}
-			items = append(items, inferenceSpec.InputOutputContentItemUnion{
-				Kind: inferenceSpec.ContentItemKindText,
-				TextItem: &inferenceSpec.ContentItemText{
-					Text: formattedTxt,
-				},
-			})
-
-		case attachment.ContentBlockImage:
-			var data, urlStr string
-			if b.Base64Data != nil {
-				data = strings.TrimSpace(*b.Base64Data)
-			}
-			if b.URL != nil {
-				urlStr = strings.TrimSpace(*b.URL)
-			}
-			// Require at least one of base64 or URL to be present.
-			if data == "" && urlStr == "" {
-				continue
-			}
-			mime := inferenceSpec.DefaultImageDataMIME
-			if b.MIMEType != nil && strings.TrimSpace(*b.MIMEType) != "" {
-				mime = strings.TrimSpace(*b.MIMEType)
-			}
-			name := ""
-			if b.FileName != nil {
-				name = strings.TrimSpace(*b.FileName)
-			}
-			img := &inferenceSpec.ContentItemImage{
-				ImageName: name,
-				ImageMIME: mime,
-			}
-			if data != "" {
-				img.ImageData = data
-			}
-			if urlStr != "" {
-				img.ImageURL = urlStr
-			}
-			items = append(items, inferenceSpec.InputOutputContentItemUnion{
-				Kind:      inferenceSpec.ContentItemKindImage,
-				ImageItem: img,
-			})
-
-		case attachment.ContentBlockFile:
-			var data, urlStr string
-			if b.Base64Data != nil {
-				data = strings.TrimSpace(*b.Base64Data)
-			}
-			if b.URL != nil {
-				urlStr = strings.TrimSpace(*b.URL)
-			}
-			// Require at least one of base64 or URL to be present.
-			if data == "" && urlStr == "" {
-				continue
-			}
-			mime := inferenceSpec.DefaultFileDataMIME
-			if b.MIMEType != nil && strings.TrimSpace(*b.MIMEType) != "" {
-				mime = strings.TrimSpace(*b.MIMEType)
-			}
-			name := ""
-			if b.FileName != nil {
-				name = strings.TrimSpace(*b.FileName)
-			}
-
-			file := &inferenceSpec.ContentItemFile{
-				FileName: name,
-				FileMIME: mime,
-			}
-			if data != "" {
-				file.FileData = data
-			}
-			if urlStr != "" {
-				file.FileURL = urlStr
-			}
-
-			items = append(items, inferenceSpec.InputOutputContentItemUnion{
-				Kind:     inferenceSpec.ContentItemKindFile,
-				FileItem: file,
-			})
-		}
-	}
-
-	return items, nil
-}
-
-func (ps *ProviderSetAPI) buildToolChoices(
-	ctx context.Context,
-	toolStoreChoices []toolSpec.ToolStoreChoice,
-) ([]inferenceSpec.ToolChoice, error) {
-	out := make([]inferenceSpec.ToolChoice, 0)
-	if len(toolStoreChoices) == 0 {
-		return nil, nil
-	}
-
-	if ps.toolStore == nil {
-		return nil, errors.New("tool store not configured for provider set")
-	}
-
-	for _, sc := range toolStoreChoices {
-		if sc.ChoiceID == "" || sc.BundleID == "" || sc.ToolSlug == "" || strings.TrimSpace(sc.ToolVersion) == "" {
-			return nil, fmt.Errorf(
-				"invalid tool store choice: choiceID/bundleID/toolSlug/toolVersion required: %+v",
-				sc,
-			)
-		}
-		tc, err := ps.hydrateToolChoice(ctx, sc)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, *tc)
-	}
-
-	if len(out) == 0 {
-		return nil, nil
-	}
-	return out, nil
-}
-
-// hydrateToolChoice loads the Tool definition from tool-store and converts it
-// into an inference-go ToolChoice. This is only called when we don't already
-// have a ToolChoice persisted in the conversation for the same tool.
-func (ps *ProviderSetAPI) hydrateToolChoice(
-	ctx context.Context,
-	sc toolSpec.ToolStoreChoice,
-) (toolChoice *inferenceSpec.ToolChoice, err error) {
-	if sc.ChoiceID == "" {
-		return nil, errors.New("invalid choiceID for tool store choice")
-	}
-	req := &toolSpec.GetToolRequest{
-		BundleID: sc.BundleID,
-		ToolSlug: sc.ToolSlug,
-		Version:  bundleitemutils.ItemVersion(sc.ToolVersion),
-	}
-	resp, err := ps.toolStore.GetTool(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to load tool %s/%s@%s: %w",
-			sc.BundleID,
-			sc.ToolSlug,
-			sc.ToolVersion,
-			err,
-		)
-	}
-	if resp == nil || resp.Body == nil {
-		return nil, fmt.Errorf(
-			"tool %s/%s@%s not found",
-			sc.BundleID,
-			sc.ToolSlug,
-			sc.ToolVersion,
-		)
-	}
-	tool := resp.Body
-	if !tool.IsEnabled {
-		return nil, fmt.Errorf(
-			"tool %s/%s@%s is disabled",
-			sc.BundleID,
-			sc.ToolSlug,
-			sc.ToolVersion,
-		)
-	}
-	if !tool.LLMCallable {
-		return nil, fmt.Errorf(
-			"tool %s/%s@%s is not LLM-callable",
-			sc.BundleID, sc.ToolSlug, sc.ToolVersion,
-		)
-	}
-	name := string(sc.ToolSlug)
-	desc := tool.Description
-	if desc == "" {
-		desc = sc.Description
-	}
-
-	tc := &inferenceSpec.ToolChoice{
-		Type:        inferenceSpec.ToolType(sc.ToolType),
-		ID:          sc.ChoiceID,
-		Name:        name,
-		Description: desc,
-	}
-
-	switch tool.Type {
-	case toolSpec.ToolTypeGo, toolSpec.ToolTypeHTTP:
-		argSchema, err := decodeToolArgSchema(string(tool.ArgSchema))
-		if err != nil {
-			return nil, fmt.Errorf(
-				"invalid argSchema for %s/%s@%s: %w",
-				sc.BundleID,
-				sc.ToolSlug,
-				sc.ToolVersion,
-				err,
-			)
-		}
-		tc.Arguments = argSchema
-
-	case toolSpec.ToolTypeSDK:
-		// SDK-backed server tools. Semantics come from sc.ToolType
-		// (e.g., "webSearch"), while implementation is described by
-		// tool.SDK and user configuration by tool.UserArgSchema plus
-		// sc.Config.
-		switch sc.ToolType {
-		case toolSpec.ToolStoreChoiceTypeWebSearch:
-			// Decode per-choice config (if any) and map to the
-			// inference-go WebSearchToolChoiceItem.
-			var cfg inferenceSpec.WebSearchToolChoiceItem
-			rawCfg := strings.TrimSpace(sc.UserArgSchemaInstance)
-			if rawCfg != "" {
-				if err := json.Unmarshal([]byte(rawCfg), &cfg); err != nil {
-					return nil, fmt.Errorf(
-						"invalid config for webSearch tool %s/%s@%s: %w",
-						sc.BundleID, sc.ToolSlug, sc.ToolVersion, err,
-					)
-				}
-			}
-			tc.Type = inferenceSpec.ToolTypeWebSearch
-			tc.WebSearchArguments = &cfg
-
-		default:
-			// Future SDK-backed tool kinds (function/custom) could be added here.
-			// For now, we treat anything other than webSearch as unsupported.
-			return nil, fmt.Errorf(
-				"unsupported ToolType %q for sdk tool %s/%s@%s",
-				sc.ToolType, sc.BundleID, sc.ToolSlug, sc.ToolVersion,
-			)
-		}
-
-	default:
-		return nil, fmt.Errorf("unsupported tool impl type %q", tool.Type)
-	}
-
-	return tc, nil
-}
-
-func decodeToolArgSchema(raw toolSpec.JSONRawString) (map[string]any, error) {
-	s := strings.TrimSpace(raw)
-	if s == "" {
-		return map[string]any{"type": "object"}, nil
-	}
-	var schema map[string]any
-	if err := json.Unmarshal([]byte(s), &schema); err != nil {
-		return nil, err
-	}
-	if len(schema) == 0 {
-		schema = map[string]any{"type": "object"}
-	}
-	return schema, nil
-}
-
-func skillsRulesPrompt(includeAll, includeRunScript bool) string {
-	if !includeAll {
-		return agentskillsSpec.SkillsRulesPromptLoadOnly
-	}
-
-	if !includeRunScript {
-		return agentskillsSpec.SkillsRulesPromptWithoutRunScript
-	}
-
-	return agentskillsSpec.SkillsRulesPromptAll
-}
-
 func appendToSystemPrompt(base string, parts ...string) string {
 	base = strings.TrimSpace(base)
 	var out []string
@@ -1007,10 +642,4 @@ func makeStreamHandler(
 		}
 		return nil
 	}
-}
-
-func disabledDebugConfig() debugclient.DebugConfig {
-	cfg := defaultDebugConfig
-	cfg.Disable = true
-	return cfg
 }

@@ -4,6 +4,7 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
+	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
@@ -63,7 +64,9 @@ type CompletionRequestBody struct {
 	// slice; it does NOT infer tools from History[i].ToolChoices or Current.ToolChoices.
 	// (Those are persisted for UI/analytics only.)
 	ToolStoreChoices []toolSpec.ToolStoreChoice `json:"toolStoreChoices,omitempty"`
-	SkillSessionID   string                     `json:"skillSessionID,omitempty"`
+
+	MCPContext     *mcpSpec.MCPConversationContext `json:"mcpContext,omitempty"`
+	SkillSessionID string                          `json:"skillSessionID,omitempty"`
 }
 
 type CompletionRequest struct {

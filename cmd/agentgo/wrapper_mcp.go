@@ -162,7 +162,7 @@ type MCPWrapper struct {
 	secretWriter   mcpSecretWriter
 	oauthBroker    *auth.OAuthLoopbackBroker
 
-	runtime    *runtime.RuntimeManager
+	runtime    *runtime.MCPRuntimeManager
 	approvals  *runtime.ApprovalManager
 	toolBridge *runtime.ToolBridge
 }
@@ -187,7 +187,7 @@ func InitMCPWrapper(ctx context.Context, w *MCPWrapper, baseDir string, secrets 
 		auth.WithOAuthAuthorizationBroker(oauthBroker),
 		auth.WithOAuthRedirectURL(oauthBroker.RedirectURL()),
 	)
-	rt := runtime.NewRuntimeManager(st, authMgr, sdkclient.NewFactory())
+	rt := runtime.NewMCPRuntimeManager(st, authMgr, sdkclient.NewFactory())
 	appr := runtime.NewApprovalManager(5 * time.Minute)
 	tb := runtime.NewToolBridge(rt, appr)
 

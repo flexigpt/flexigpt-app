@@ -6,6 +6,7 @@
   - [ ] may be as a json import bundle or jsonc format
 
 - [ ] test with some skill that has scripts too
+- [ ] mcp integrate in http backend
 
 ## Milestone thoughts
 

@@ -175,7 +175,7 @@ func (f *fakeClientFactory) Connect(
 }
 
 type runtimeFixture struct {
-	mgr      *RuntimeManager
+	mgr      *MCPRuntimeManager
 	session  *fakeClientSession
 	bundleID bundleitemutils.BundleID
 	serverID spec.MCPServerID
@@ -235,7 +235,7 @@ func newRuntimeFixture(
 
 	session := &fakeClientSession{discoverSnapshots: snapshots}
 	factory := &fakeClientFactory{session: session}
-	mgr := NewRuntimeManager(st, nil, factory)
+	mgr := NewMCPRuntimeManager(st, nil, factory)
 	if _, err := mgr.Connect(
 		t.Context(),
 		&spec.ConnectMCPServerRequest{BundleID: bundleID, ServerID: serverID},
@@ -868,7 +868,7 @@ func TestToolBridgeApprovalFlow(t *testing.T) {
 	}
 }
 
-func TestRuntimeManagerRefreshFromNotification(t *testing.T) {
+func TestMCPRuntimeManagerRefreshFromNotification(t *testing.T) {
 	allowPolicy := spec.MCPServerPolicy{
 		DefaultApprovalRule:  spec.MCPApprovalRuleAllow,
 		DefaultExecutionMode: spec.MCPExecutionModeManual,

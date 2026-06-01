@@ -9,11 +9,11 @@ import (
 )
 
 type ToolBridge struct {
-	runtime   *RuntimeManager
+	runtime   *MCPRuntimeManager
 	approvals *ApprovalManager
 }
 
-func NewToolBridge(rt *RuntimeManager, approvals *ApprovalManager) *ToolBridge {
+func NewToolBridge(rt *MCPRuntimeManager, approvals *ApprovalManager) *ToolBridge {
 	return &ToolBridge{runtime: rt, approvals: approvals}
 }
 

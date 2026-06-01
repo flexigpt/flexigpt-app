@@ -111,7 +111,6 @@ type MCPServerFormData = {
 };
 
 const ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
-const SECRET_SLOT_RE = /^[A-Za-z0-9_.:-]+$/;
 
 function makeRowID(): string {
 	return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -360,7 +359,6 @@ function AddEditMCPServerModalContent({
 			const seenEnvNames = new Set<string>();
 			for (const row of state.stdioSecretRows) {
 				const envName = row.envName.trim();
-				const slot = row.slot.trim();
 
 				if (!envName) {
 					nextErrors.stdioSecrets = 'Every secret env row needs an environment variable name.';
@@ -378,16 +376,6 @@ function AddEditMCPServerModalContent({
 				}
 
 				seenEnvNames.add(envName);
-
-				if (!slot) {
-					nextErrors.stdioSecrets = 'Every secret env row needs a slot.';
-					break;
-				}
-
-				if (!SECRET_SLOT_RE.test(slot)) {
-					nextErrors.stdioSecrets = 'Secret slots may only contain letters, numbers, underscore, dash, dot, and colon.';
-					break;
-				}
 
 				if (!row.existingSecretRef && !row.secretValue.trim()) {
 					nextErrors.stdioSecrets = `Secret value is required for ${envName}.`;
@@ -510,7 +498,7 @@ function AddEditMCPServerModalContent({
 
 				const merged = { ...row, ...patch };
 
-				if (patch.envName !== undefined && (!row.slot || row.slot === row.envName)) {
+				if (patch.envName !== undefined) {
 					merged.slot = patch.envName.trim();
 				}
 
@@ -1005,15 +993,14 @@ function AddEditMCPServerModalContent({
 
 													<div className="col-span-12 md:col-span-3">
 														<label className="label py-1">
-															<span className="label-text text-sm">Slot</span>
+															<span className="label-text text-sm">Secret Slot</span>
 														</label>
 														<input
-															value={row.slot}
-															onChange={e => {
-																updateSecretRow(row.rowID, { slot: e.target.value });
-															}}
-															className="input input-bordered w-full rounded-xl"
+															value={row.envName.trim() || '(matches env name)'}
+															readOnly
+															className="input input-bordered bg-base-200 w-full rounded-xl"
 															spellCheck="false"
+															title="Stdio secret slots are derived from the environment variable name."
 														/>
 													</div>
 

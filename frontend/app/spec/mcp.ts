@@ -5,6 +5,7 @@ export const MaxMCPServerPageSize = 256;
 export type MCPServerID = string;
 export type JSONRawString = string;
 export type MCPTimestamp = string;
+
 export enum MCPToolExposure {
 	MCPToolExposureNone = 'none',
 	MCPToolExposureAll = 'all',

@@ -98,6 +98,17 @@ export function useComposerMCP(): UseComposerMCPResult {
 		selectedByServerKeyRef.current = selectedByServerKey;
 	}, [selectedByServerKey]);
 
+	const commitSelectedByServerKey = useCallback(
+		(updater: (prev: Record<string, MCPComposerServerSelection>) => Record<string, MCPComposerServerSelection>) => {
+			setSelectedByServerKey(prev => {
+				const next = updater(prev);
+				selectedByServerKeyRef.current = next;
+				return next;
+			});
+		},
+		[]
+	);
+
 	const patchOption = useCallback((bundleID: string, serverID: string, patch: Partial<MCPComposerServerOption>) => {
 		setOptions(prev => {
 			const next = prev.map(option =>
@@ -215,7 +226,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 					discoveryLoaded: true,
 					discoveryLoading: false,
 				});
-				setSelectedByServerKey(prev => {
+				commitSelectedByServerKey(prev => {
 					const currentSelection = prev[key];
 					if (!currentSelection || currentSelection.toolExposure !== MCPToolExposure.MCPToolExposureAll) {
 						return prev;
@@ -228,7 +239,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 							selectedTools: tools.filter(tool => tool.enabled).map(toolToSelection),
 						},
 					};
-					selectedByServerKeyRef.current = next;
+
 					return next;
 				});
 
@@ -256,7 +267,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 				discoveryPromisesRef.current.delete(key);
 			}
 		},
-		[patchOption]
+		[commitSelectedByServerKey, patchOption]
 	);
 
 	const ensureDiscoveryLoaded = useCallback(
@@ -320,154 +331,175 @@ export function useComposerMCP(): UseComposerMCPResult {
 		backendAPI.openURL(url);
 	}, []);
 
-	const setServerSelected = useCallback((option: MCPComposerServerOption, selected: boolean) => {
-		const key = optionKey(option);
+	const setServerSelected = useCallback(
+		(option: MCPComposerServerOption, selected: boolean) => {
+			const key = optionKey(option);
 
-		setSelectedByServerKey(prev => {
-			if (!selected) {
-				let next = { ...prev };
-				next = omitManyKeys(next, [key]);
-				selectedByServerKeyRef.current = next;
+			commitSelectedByServerKey(prev => {
+				if (!selected) {
+					let next = { ...prev };
+					next = omitManyKeys(next, [key]);
+
+					return next;
+				}
+
+				if (prev[key]) return prev;
+
+				const next = {
+					...prev,
+					[key]: {
+						bundleID: option.bundle.id,
+						serverID: option.server.id,
+						snapshotDigest: option.runtime?.snapshotDigest,
+						toolExposure: MCPToolExposure.MCPToolExposureAll,
+						selectedTools: option.discoveryLoaded ? option.tools.filter(tool => tool.enabled).map(toolToSelection) : [],
+
+						selectedResources: [],
+						selectedResourceTemplates: [],
+						selectedPrompts: [],
+						includeServerInstructions: false,
+					},
+				};
+
 				return next;
-			}
+			});
+		},
+		[commitSelectedByServerKey]
+	);
 
-			if (prev[key]) return prev;
+	const setToolExposure = useCallback(
+		(bundleID: string, serverID: string, exposure: MCPToolExposure) => {
+			const key = mcpServerKey(bundleID, serverID);
+			commitSelectedByServerKey(prev => {
+				const current = prev[key];
+				if (!current) return prev;
+				const option = optionsRef.current.find(item => item.bundle.id === bundleID && item.server.id === serverID);
+				const next = {
+					...prev,
+					[key]: {
+						...current,
+						toolExposure: exposure,
+						selectedTools:
+							exposure === MCPToolExposure.MCPToolExposureAll
+								? (option?.tools ?? []).filter(tool => tool.enabled).map(toolToSelection)
+								: exposure === MCPToolExposure.MCPToolExposureNone
+									? []
+									: current.selectedTools,
+					},
+				};
 
-			const next = {
-				...prev,
-				[key]: {
-					bundleID: option.bundle.id,
-					serverID: option.server.id,
-					snapshotDigest: option.runtime?.snapshotDigest,
-					toolExposure: MCPToolExposure.MCPToolExposureAll,
-					selectedTools: option.discoveryLoaded ? option.tools.filter(tool => tool.enabled).map(toolToSelection) : [],
+				return next;
+			});
+		},
+		[commitSelectedByServerKey]
+	);
 
-					selectedResources: [],
-					selectedResourceTemplates: [],
-					selectedPrompts: [],
-					includeServerInstructions: false,
-				},
-			};
-			selectedByServerKeyRef.current = next;
-			return next;
-		});
-	}, []);
+	const setIncludeServerInstructions = useCallback(
+		(bundleID: string, serverID: string, include: boolean) => {
+			const key = mcpServerKey(bundleID, serverID);
+			commitSelectedByServerKey(prev => {
+				const current = prev[key];
+				if (!current) return prev;
+				return {
+					...prev,
+					[key]: {
+						...current,
+						includeServerInstructions: include,
+					},
+				};
+			});
+		},
+		[commitSelectedByServerKey]
+	);
 
-	const setToolExposure = useCallback((bundleID: string, serverID: string, exposure: MCPToolExposure) => {
-		const key = mcpServerKey(bundleID, serverID);
-		setSelectedByServerKey(prev => {
-			const current = prev[key];
-			if (!current) return prev;
-			const option = optionsRef.current.find(item => item.bundle.id === bundleID && item.server.id === serverID);
-			const next = {
-				...prev,
-				[key]: {
-					...current,
-					toolExposure: exposure,
-					selectedTools:
-						exposure === MCPToolExposure.MCPToolExposureAll
-							? (option?.tools ?? []).filter(tool => tool.enabled).map(toolToSelection)
-							: exposure === MCPToolExposure.MCPToolExposureNone
-								? []
-								: current.selectedTools,
-				},
-			};
-			selectedByServerKeyRef.current = next;
-			return next;
-		});
-	}, []);
+	const toggleTool = useCallback(
+		(tool: MCPToolCapability, selected: boolean) => {
+			const key = mcpServerKey(tool.bundleID, tool.serverID);
+			const selection = toolToSelection(tool);
 
-	const setIncludeServerInstructions = useCallback((bundleID: string, serverID: string, include: boolean) => {
-		const key = mcpServerKey(bundleID, serverID);
-		setSelectedByServerKey(prev => {
-			const current = prev[key];
-			if (!current) return prev;
-			return {
-				...prev,
-				[key]: {
-					...current,
-					includeServerInstructions: include,
-				},
-			};
-		});
-	}, []);
+			commitSelectedByServerKey(prev => {
+				const current = prev[key];
+				if (!current) return prev;
 
-	const toggleTool = useCallback((tool: MCPToolCapability, selected: boolean) => {
-		const key = mcpServerKey(tool.bundleID, tool.serverID);
-		const selection = toolToSelection(tool);
+				return {
+					...prev,
+					[key]: {
+						...current,
+						selectedTools: selected
+							? upsertByKey(current.selectedTools, mcpToolKey, selection)
+							: removeByKey(current.selectedTools, mcpToolKey, selection),
+					},
+				};
+			});
+		},
+		[commitSelectedByServerKey]
+	);
 
-		setSelectedByServerKey(prev => {
-			const current = prev[key];
-			if (!current) return prev;
+	const toggleResource = useCallback(
+		(resource: MCPResourceRef, selected: boolean) => {
+			const key = mcpServerKey(resource.bundleID, resource.serverID);
 
-			return {
-				...prev,
-				[key]: {
-					...current,
-					selectedTools: selected
-						? upsertByKey(current.selectedTools, mcpToolKey, selection)
-						: removeByKey(current.selectedTools, mcpToolKey, selection),
-				},
-			};
-		});
-	}, []);
+			commitSelectedByServerKey(prev => {
+				const current = prev[key];
+				if (!current) return prev;
 
-	const toggleResource = useCallback((resource: MCPResourceRef, selected: boolean) => {
-		const key = mcpServerKey(resource.bundleID, resource.serverID);
+				return {
+					...prev,
+					[key]: {
+						...current,
+						selectedResources: selected
+							? upsertByKey(current.selectedResources, mcpResourceKey, resource)
+							: removeByKey(current.selectedResources, mcpResourceKey, resource),
+					},
+				};
+			});
+		},
+		[commitSelectedByServerKey]
+	);
 
-		setSelectedByServerKey(prev => {
-			const current = prev[key];
-			if (!current) return prev;
+	const toggleResourceTemplate = useCallback(
+		(template: MCPResourceTemplateRef, selected: boolean) => {
+			const key = mcpServerKey(template.bundleID, template.serverID);
 
-			return {
-				...prev,
-				[key]: {
-					...current,
-					selectedResources: selected
-						? upsertByKey(current.selectedResources, mcpResourceKey, resource)
-						: removeByKey(current.selectedResources, mcpResourceKey, resource),
-				},
-			};
-		});
-	}, []);
+			commitSelectedByServerKey(prev => {
+				const current = prev[key];
+				if (!current) return prev;
 
-	const toggleResourceTemplate = useCallback((template: MCPResourceTemplateRef, selected: boolean) => {
-		const key = mcpServerKey(template.bundleID, template.serverID);
+				return {
+					...prev,
+					[key]: {
+						...current,
+						selectedResourceTemplates: selected
+							? upsertByKey(current.selectedResourceTemplates, mcpResourceTemplateKey, template)
+							: removeByKey(current.selectedResourceTemplates, mcpResourceTemplateKey, template),
+					},
+				};
+			});
+		},
+		[commitSelectedByServerKey]
+	);
 
-		setSelectedByServerKey(prev => {
-			const current = prev[key];
-			if (!current) return prev;
+	const togglePrompt = useCallback(
+		(prompt: MCPPromptRef, selected: boolean) => {
+			const key = mcpServerKey(prompt.bundleID, prompt.serverID);
 
-			return {
-				...prev,
-				[key]: {
-					...current,
-					selectedResourceTemplates: selected
-						? upsertByKey(current.selectedResourceTemplates, mcpResourceTemplateKey, template)
-						: removeByKey(current.selectedResourceTemplates, mcpResourceTemplateKey, template),
-				},
-			};
-		});
-	}, []);
+			commitSelectedByServerKey(prev => {
+				const current = prev[key];
+				if (!current) return prev;
 
-	const togglePrompt = useCallback((prompt: MCPPromptRef, selected: boolean) => {
-		const key = mcpServerKey(prompt.bundleID, prompt.serverID);
-
-		setSelectedByServerKey(prev => {
-			const current = prev[key];
-			if (!current) return prev;
-
-			return {
-				...prev,
-				[key]: {
-					...current,
-					selectedPrompts: selected
-						? upsertByKey(current.selectedPrompts, mcpPromptKey, prompt)
-						: removeByKey(current.selectedPrompts, mcpPromptKey, prompt),
-				},
-			};
-		});
-	}, []);
+				return {
+					...prev,
+					[key]: {
+						...current,
+						selectedPrompts: selected
+							? upsertByKey(current.selectedPrompts, mcpPromptKey, prompt)
+							: removeByKey(current.selectedPrompts, mcpPromptKey, prompt),
+					},
+				};
+			});
+		},
+		[commitSelectedByServerKey]
+	);
 
 	const clear = useCallback(() => {
 		selectedByServerKeyRef.current = {};
@@ -507,10 +539,9 @@ export function useComposerMCP(): UseComposerMCPResult {
 		}
 
 		selectedByServerKeyRef.current = nextSelections;
-		setSelectedByServerKey(nextSelections);
-
+		commitSelectedByServerKey(() => nextSelections);
 		return mcpSelectionToContext(nextSelections);
-	}, [loadDiscoveryForServer]);
+	}, [commitSelectedByServerKey, loadDiscoveryForServer]);
 
 	const mcpContext = useMemo(() => mcpSelectionToContext(selectedByServerKey), [selectedByServerKey]);
 	const selectedServerCount = Object.keys(selectedByServerKey).length;

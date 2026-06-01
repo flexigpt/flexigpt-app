@@ -301,6 +301,7 @@ func (a *App) initManagers() {
 		a.settingStoreAPI.store,
 		a.toolStoreAPI.store,
 		a.skillStoreAPI.store,
+		a.mcpAPI.runtime,
 	)
 	if err != nil {
 		slog.Error(

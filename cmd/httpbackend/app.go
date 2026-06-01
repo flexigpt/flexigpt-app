@@ -231,6 +231,7 @@ func (a *BackendApp) initProviderSet() {
 		a.toolStoreAPI,
 		a.modelPresetStoreAPI,
 		a.skillStoreAPI,
+		nil,
 		inferencewrapper.WithLogger(slog.Default()),
 		inferencewrapper.WithDebugConfig(&defaultDebugConfig),
 	)

@@ -26,7 +26,7 @@ type integrationState struct {
 	laterCalls int
 }
 
-func TestRuntimeManagerEndToEndWithStreamableHTTP(t *testing.T) {
+func TestMCPRuntimeManagerEndToEndWithStreamableHTTP(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 
@@ -168,7 +168,7 @@ func TestRuntimeManagerEndToEndWithStreamableHTTP(t *testing.T) {
 
 	authMgr := auth.NewAuthManager(nil)
 	factory := sdkclient.NewFactory()
-	rm := runtime.NewRuntimeManager(st, authMgr, factory)
+	rm := runtime.NewMCPRuntimeManager(st, authMgr, factory)
 	t.Cleanup(func() { _ = rm.Close(t.Context()) })
 
 	connectResp, err := rm.Connect(ctx, &spec.ConnectMCPServerRequest{BundleID: bundleID, ServerID: serverID})
