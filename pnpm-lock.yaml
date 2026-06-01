@@ -181,8 +181,8 @@ importers:
         specifier: ^7.1.1
         version: 7.1.1(eslint@9.39.4(jiti@2.7.0))
       eslint-plugin-react-you-might-not-need-an-effect:
-        specifier: ^0.10.2
-        version: 0.10.2(eslint@9.39.4(jiti@2.7.0))
+        specifier: ^1.0.0
+        version: 1.0.0(eslint@9.39.4(jiti@2.7.0))
       eslint-plugin-tailwind-canonical-classes:
         specifier: ^1.3.3
         version: 1.3.3(eslint@9.39.4(jiti@2.7.0))
@@ -2478,8 +2478,8 @@ packages:
     peerDependencies:
       eslint: ^3.0.0 || ^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0-0 || ^9.0.0 || ^10.0.0
 
-  eslint-plugin-react-you-might-not-need-an-effect@0.10.2:
-    resolution: {integrity: sha512-cqm9DXcsISYZHnFXT5zPH+ITsMx/bYscmq6zIsbtYvei1vj4dZ+BxN9LgoMmjEdm7sTaWxKVRY5IqQRQvau/GQ==}
+  eslint-plugin-react-you-might-not-need-an-effect@1.0.0:
+    resolution: {integrity: sha512-8exakZ5dCJdZb7TA3P8vD47HlnM3IllA9sjKzU22wyLEx0PZBDjFPxT5+5Rb10tSE6uWmwoBsgClIDNuJ8UW6g==}
     engines: {node: '>=14.0.0'}
     peerDependencies:
       eslint: '>=8.40.0'
@@ -6893,7 +6893,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-plugin-react-you-might-not-need-an-effect@0.10.2(eslint@9.39.4(jiti@2.7.0)):
+  eslint-plugin-react-you-might-not-need-an-effect@1.0.0(eslint@9.39.4(jiti@2.7.0)):
     dependencies:
       eslint: 9.39.4(jiti@2.7.0)
       globals: 16.5.0
