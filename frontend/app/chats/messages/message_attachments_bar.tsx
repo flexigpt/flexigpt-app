@@ -15,7 +15,7 @@ import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariaki
 import type { Attachment } from '@/spec/attachment';
 import { AttachmentContentBlockMode, AttachmentKind } from '@/spec/attachment';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
-import type { MCPConversationContext } from '@/spec/mcp';
+import { type MCPConversationContext, MCPExecutionMode } from '@/spec/mcp';
 import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
 import { getAttachmentDisplayLabel } from '@/chats/composer/attachments/attachment_editor_utils';
@@ -164,15 +164,21 @@ function MessageToolCallChip({ call, fullWidth = false, onClick }: MessageToolCa
 		choiceID: call.choiceID,
 		status: call.status,
 		toolStoreChoice: call.toolStoreChoice,
+		mcpToolSelection: call.mcpToolSelection,
 		errorMessage: call.errorMessage,
 	};
 
 	const label = formatToolCallLabel(tmpCall);
 
 	const statusLabel = call.status ? ` (${call.status})` : '';
-	const autoLabel = call.toolStoreChoice?.autoExecute ? ' • Auto-execute: enabled' : '';
-	const title = `Suggested tool call: ${label}${statusLabel}${autoLabel}`;
-
+	const isAutoExecute =
+		Boolean(call.toolStoreChoice?.autoExecute) ||
+		call.mcpToolSelection?.executionMode === MCPExecutionMode.MCPExecutionModeAuto;
+	const autoLabel = isAutoExecute ? ' • Auto-execute: enabled' : '';
+	const mcpLabel = call.mcpToolSelection
+		? `\nMCP: ${call.mcpToolSelection.serverID}/${call.mcpToolSelection.toolName}`
+		: '';
+	const title = `Suggested tool call: ${label}${statusLabel}${autoLabel}${mcpLabel}`;
 	return (
 		<div
 			className={[
@@ -200,7 +206,7 @@ function MessageToolCallChip({ call, fullWidth = false, onClick }: MessageToolCa
 		>
 			<FiTerminal size={14} />
 			<span className={fullWidth ? 'min-w-0 flex-1 truncate' : 'max-w-44 truncate'}>{label}</span>
-			{call.toolStoreChoice?.autoExecute ? <span className="badge badge-ghost badge-xs">Auto</span> : null}
+			{isAutoExecute ? <span className="badge badge-ghost badge-xs">Auto</span> : null}
 			<FiCode className="text-base-content/60" title="Details" size={14} />
 		</div>
 	);
@@ -221,6 +227,9 @@ function MessageToolOutputChip({ output, fullWidth = false, onClick }: MessageTo
 	const prettyName = getPrettyToolName(output.name);
 	const label = output.summary || `Result: ${prettyName}`;
 	const titleLines = [label, `Tool: ${output.name}`, `Call ID: ${output.callID}`];
+	if (output.mcpToolSelection) {
+		titleLines.push(`MCP: ${output.mcpToolSelection.serverID}/${output.mcpToolSelection.toolName}`);
+	}
 	const title = titleLines.join('\n');
 
 	return (

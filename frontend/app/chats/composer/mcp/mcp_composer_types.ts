@@ -55,6 +55,8 @@ export interface UseComposerMCPResult {
 	refreshAll: () => Promise<void>;
 	refreshServer: (bundleID: string, serverID: string) => Promise<void>;
 	ensureDiscoveryLoaded: (bundleID: string, serverID: string) => Promise<void>;
+	prepareForSubmit: () => Promise<MCPConversationContext | undefined>;
+
 	connectServer: (bundleID: string, serverID: string) => Promise<void>;
 	disconnectServer: (bundleID: string, serverID: string) => Promise<void>;
 	cancelOAuth: (bundleID: string, serverID: string) => Promise<void>;
@@ -107,7 +109,7 @@ export function mcpSelectionToContext(
 		snapshotDigest: selection.snapshotDigest,
 		toolExposure: selection.toolExposure,
 		selectedTools:
-			selection.toolExposure === MCPToolExposure.MCPToolExposureSelected
+			selection.toolExposure !== MCPToolExposure.MCPToolExposureNone && selection.selectedTools.length > 0
 				? selection.selectedTools.map(tool => ({
 						...tool,
 						bundleID: tool.bundleID ?? selection.bundleID,

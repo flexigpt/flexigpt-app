@@ -40,6 +40,14 @@ export interface MCPOAuthClientCredentialsInput {
 
 export interface MCPServerUpsertInput {
 	serverID: string;
+	/**
+	 * Optional first-pass payload used when the final payload cannot be
+	 * validated until secrets are created. Example: new HTTP
+	 * clientCredentials servers need a clientCredentialRef, but the secret
+	 * endpoint requires the server to already exist.
+	 */
+	initialPayload?: PutMCPServerPayload;
+
 	payload: PutMCPServerPayload;
 	stdioSecretEnv: MCPStdioSecretEnvInput[];
 	oauthClientCredentials?: MCPOAuthClientCredentialsInput;

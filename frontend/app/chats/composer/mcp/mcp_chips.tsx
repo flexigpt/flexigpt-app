@@ -7,7 +7,10 @@ import { type MCPConversationContext, type MCPServerSelection, MCPToolExposure }
 import type { UseComposerMCPResult } from '@/chats/composer/mcp/mcp_composer_types';
 
 function toolExposureLabel(server: MCPServerSelection): string {
-	if (server.toolExposure === MCPToolExposure.MCPToolExposureAll) return 'All tools';
+	if (server.toolExposure === MCPToolExposure.MCPToolExposureAll) {
+		const count = server.selectedTools?.length ?? 0;
+		return count > 0 ? `All tools (${count})` : 'All tools';
+	}
 	if (server.toolExposure === MCPToolExposure.MCPToolExposureSelected)
 		return `${server.selectedTools?.length ?? 0} tools`;
 	return 'No tools';

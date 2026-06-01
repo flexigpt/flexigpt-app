@@ -1,4 +1,5 @@
 import type { UIToolCall } from '@/spec/inference';
+import { MCPExecutionMode } from '@/spec/mcp';
 import { SKILLS_AUTOEXEC_TOOL_CHOICES } from '@/spec/skill';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
@@ -24,7 +25,9 @@ export function isAutoSubmitEligibleToolCall(toolCall: UIToolCall): boolean {
 	return (
 		!toolCall.suppressAutoExecute &&
 		(toolCall.type === ToolStoreChoiceType.Function || toolCall.type === ToolStoreChoiceType.Custom) &&
-		(Boolean(toolCall.toolStoreChoice?.autoExecute) || SKILLS_AUTOEXEC_TOOL_CHOICES.has(toolCall.choiceID))
+		(Boolean(toolCall.toolStoreChoice?.autoExecute) ||
+			toolCall.mcpToolSelection?.executionMode === MCPExecutionMode.MCPExecutionModeAuto ||
+			SKILLS_AUTOEXEC_TOOL_CHOICES.has(toolCall.choiceID))
 	);
 }
 

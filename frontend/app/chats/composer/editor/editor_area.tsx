@@ -922,6 +922,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				const finalToolChoices = dedupeToolChoices([...explicitChoices, ...conversationChoices, ...webSearchChoices]);
 				shouldShowAutoExecStopAfterSend = countAutoExecutableToolChoices(finalToolChoices) >= 1;
 
+				const preparedMCPContext = await mcp.prepareForSubmit();
+
 				const payload: EditorSubmitPayload = {
 					text: textToSend,
 					resolvedSystemPrompt,
@@ -930,7 +932,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					attachments,
 					toolOutputs: finalToolOutputs,
 					finalToolChoices,
-					mcpContext: mcp.mcpContext,
+					mcpContext: preparedMCPContext,
 					enabledSkillRefs: effectiveEnabledSkillRefs,
 					activeSkillRefs: activeForMessage,
 					skillSessionID: effectiveSkillSessionID ?? undefined,
@@ -983,7 +985,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			isInputLocked,
 			isSendButtonEnabled,
 			listActiveSkillRefs,
-			mcp.mcpContext,
+			mcp,
 			onSubmit,
 			resetEditor,
 			selectionInfo.firstPendingVar,

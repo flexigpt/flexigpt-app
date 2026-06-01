@@ -13,6 +13,7 @@ import {
 	type MCPToolPolicyOverride,
 	MCPTransportType,
 	MCPTrustLevel,
+	type PutMCPServerPayload,
 } from '@/spec/mcp';
 
 import { omitManyKeys } from '@/lib/obj_utils';
@@ -52,10 +53,12 @@ type ErrorState = {
 	displayName?: string;
 	stdioCommand?: string;
 	stdioEnvJSON?: string;
+	stdioStartupTimeoutMS?: string;
 	stdioSecrets?: string;
 	httpURL?: string;
 	httpTimeoutMS?: string;
 	httpClientCredentials?: string;
+	httpClientIDMetadataDocumentURL?: string;
 	policies?: string;
 	toolPoliciesJSON?: string;
 };
@@ -209,7 +212,13 @@ function validateOAuthClientCredentials(raw: string, requireClientSecret: boolea
 	}
 
 	const obj = parsed as Record<string, unknown>;
+	const allowedKeys = new Set(['clientID', 'clientSecret']);
 
+	for (const key of Object.keys(obj)) {
+		if (!allowedKeys.has(key)) {
+			return `Unsupported client credentials field "${key}". Allowed fields: clientID, clientSecret.`;
+		}
+	}
 	if (typeof obj.clientID !== 'string' || obj.clientID.trim().length === 0) {
 		return 'Client credentials must include a non-empty clientID string.';
 	}
@@ -223,6 +232,33 @@ function validateOAuthClientCredentials(raw: string, requireClientSecret: boolea
 	}
 
 	return undefined;
+}
+
+function validateClientIDMetadataURL(raw: string): string | undefined {
+	const value = raw.trim();
+	if (!value) return undefined;
+
+	try {
+		const url = new URL(value);
+		if (url.protocol !== 'https:') {
+			return 'Client ID metadata URL must use https.';
+		}
+		if (!url.host) {
+			return 'Client ID metadata URL host is required.';
+		}
+		if (url.username || url.password) {
+			return 'Client ID metadata URL must not include user info.';
+		}
+		if (!url.pathname || url.pathname === '/') {
+			return 'Client ID metadata URL must include a path.';
+		}
+		if (url.hash) {
+			return 'Client ID metadata URL must not include a fragment.';
+		}
+		return undefined;
+	} catch {
+		return 'Client ID metadata URL must be valid.';
+	}
 }
 
 function AddEditMCPServerModalContent({
@@ -316,7 +352,9 @@ function AddEditMCPServerModalContent({
 			}
 
 			if (state.stdioStartupTimeoutMS.trim() && normalizePositiveInteger(state.stdioStartupTimeoutMS) === undefined) {
-				nextErrors.stdioCommand = 'Startup timeout must be a positive integer.';
+				nextErrors.stdioStartupTimeoutMS = 'Startup timeout must be a positive integer.';
+			} else {
+				nextErrors = omitManyKeys(nextErrors, ['stdioStartupTimeoutMS']);
 			}
 
 			const seenEnvNames = new Set<string>();
@@ -382,10 +420,15 @@ function AddEditMCPServerModalContent({
 
 			if (state.httpTimeoutMS.trim() && normalizePositiveInteger(state.httpTimeoutMS) === undefined) {
 				nextErrors.httpTimeoutMS = 'Timeout must be a positive integer.';
+			} else {
+				nextErrors = omitManyKeys(nextErrors, ['httpTimeoutMS']);
 			}
 
 			const hasExistingClientCredentials =
-				Boolean(state.httpClientCredentialRef.trim()) && !state.httpDeleteClientCredentials;
+				state.httpAuthMode !== MCPHTTPAuthMode.MCPHTTPAuthNone &&
+				Boolean(state.httpClientCredentialRef.trim()) &&
+				!state.httpDeleteClientCredentials;
+
 			const hasNewClientCredentials = Boolean(state.httpClientCredentialsSecret.trim());
 
 			if (
@@ -404,6 +447,16 @@ function AddEditMCPServerModalContent({
 				} else {
 					nextErrors = omitManyKeys(nextErrors, ['httpClientCredentials']);
 				}
+			}
+			if (state.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth) {
+				const metadataURLError = validateClientIDMetadataURL(state.httpClientIDMetadataDocumentURL);
+				if (metadataURLError) {
+					nextErrors.httpClientIDMetadataDocumentURL = metadataURLError;
+				} else {
+					nextErrors = omitManyKeys(nextErrors, ['httpClientIDMetadataDocumentURL']);
+				}
+			} else {
+				nextErrors = omitManyKeys(nextErrors, ['httpClientIDMetadataDocumentURL']);
 			}
 		}
 
@@ -543,33 +596,63 @@ function AddEditMCPServerModalContent({
 			};
 		}
 
+		const existingClientCredentialRef = formData.httpClientCredentialRef.trim();
+		const shouldDeleteExistingClientCredentials =
+			Boolean(existingClientCredentialRef) &&
+			(formData.httpDeleteClientCredentials || formData.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthNone);
 		const clientCredentialRef =
-			formData.httpClientCredentialRef.trim() && !formData.httpDeleteClientCredentials
+			formData.httpAuthMode !== MCPHTTPAuthMode.MCPHTTPAuthNone &&
+			existingClientCredentialRef &&
+			!shouldDeleteExistingClientCredentials
 				? formData.httpClientCredentialRef.trim()
 				: undefined;
+		const streamableHttp = {
+			url: formData.httpURL.trim(),
+			timeoutMS: normalizePositiveInteger(formData.httpTimeoutMS),
+			authMode: formData.httpAuthMode,
+			clientCredentialRef,
+			clientIDMetadataDocumentURL:
+				formData.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth
+					? formData.httpClientIDMetadataDocumentURL.trim() || undefined
+					: undefined,
+		};
+
+		const finalPayload: PutMCPServerPayload = {
+			...payloadBase,
+			streamableHttp,
+		};
+
+		const needsClientCredentialsStaging =
+			formData.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthClientCredentials &&
+			!clientCredentialRef &&
+			Boolean(formData.httpClientCredentialsSecret.trim());
+
+		const initialPayload: PutMCPServerPayload | undefined = needsClientCredentialsStaging
+			? {
+					...payloadBase,
+					streamableHttp: {
+						...streamableHttp,
+						authMode: MCPHTTPAuthMode.MCPHTTPAuthOAuth,
+						clientCredentialRef: undefined,
+						clientIDMetadataDocumentURL: undefined,
+					},
+				}
+			: undefined;
 
 		return {
 			serverID: formData.serverID.trim(),
-			payload: {
-				...payloadBase,
-				streamableHttp: {
-					url: formData.httpURL.trim(),
-					timeoutMS: normalizePositiveInteger(formData.httpTimeoutMS),
-					authMode: formData.httpAuthMode,
-					clientCredentialRef,
-					clientIDMetadataDocumentURL: formData.httpClientIDMetadataDocumentURL.trim() || undefined,
-				},
-			},
+			initialPayload,
+			payload: finalPayload,
 			stdioSecretEnv: [],
 			oauthClientCredentials:
-				formData.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth ||
-				formData.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthClientCredentials ||
-				formData.httpClientCredentialRef
+				formData.httpAuthMode !== MCPHTTPAuthMode.MCPHTTPAuthNone ||
+				existingClientCredentialRef ||
+				shouldDeleteExistingClientCredentials
 					? {
 							slot: MCP_OAUTH_CLIENT_CREDENTIALS_SLOT,
-							existingSecretRef: formData.httpClientCredentialRef.trim() || undefined,
+							existingSecretRef: existingClientCredentialRef || undefined,
 							secretValue: formData.httpClientCredentialsSecret,
-							deleteExisting: formData.httpDeleteClientCredentials,
+							deleteExisting: shouldDeleteExistingClientCredentials,
 						}
 					: undefined,
 		};
@@ -867,9 +950,18 @@ function AddEditMCPServerModalContent({
 											name="stdioStartupTimeoutMS"
 											value={formData.stdioStartupTimeoutMS}
 											onChange={handleInput}
-											className="input input-bordered w-full rounded-xl"
+											className={`input input-bordered w-full rounded-xl ${
+												errors.stdioStartupTimeoutMS ? 'input-error' : ''
+											}`}
 											min={1}
 										/>
+										{errors.stdioStartupTimeoutMS && (
+											<div className="label">
+												<span className="label-text-alt text-error flex items-center gap-1">
+													<FiAlertCircle size={12} /> {errors.stdioStartupTimeoutMS}
+												</span>
+											</div>
+										)}
 									</div>
 								</div>
 
@@ -1117,22 +1209,34 @@ function AddEditMCPServerModalContent({
 											</div>
 										)}
 
-										<div className="grid grid-cols-12 items-center gap-2">
-											<label className="label col-span-3">
-												<span className="label-text text-sm">Client ID Metadata URL</span>
-											</label>
-											<div className="col-span-9">
-												<input
-													type="text"
-													name="httpClientIDMetadataDocumentURL"
-													value={formData.httpClientIDMetadataDocumentURL}
-													onChange={handleInput}
-													className="input input-bordered w-full rounded-xl"
-													spellCheck="false"
-													autoComplete="off"
-												/>
+										{formData.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth && (
+											<div className="grid grid-cols-12 items-center gap-2">
+												<label className="label col-span-3">
+													<span className="label-text text-sm">Client ID Metadata URL</span>
+												</label>
+												<div className="col-span-9">
+													<input
+														type="text"
+														name="httpClientIDMetadataDocumentURL"
+														value={formData.httpClientIDMetadataDocumentURL}
+														onChange={handleInput}
+														className={`input input-bordered w-full rounded-xl ${
+															errors.httpClientIDMetadataDocumentURL ? 'input-error' : ''
+														}`}
+														spellCheck="false"
+														autoComplete="off"
+														placeholder="https://client.example.com/flexigpt-mcp-client.json"
+													/>
+													{errors.httpClientIDMetadataDocumentURL && (
+														<div className="label">
+															<span className="label-text-alt text-error flex items-center gap-1">
+																<FiAlertCircle size={12} /> {errors.httpClientIDMetadataDocumentURL}
+															</span>
+														</div>
+													)}
+												</div>
 											</div>
-										</div>
+										)}
 									</>
 								)}
 							</>

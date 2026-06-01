@@ -1,6 +1,7 @@
 import { FiAlertTriangle, FiCode, FiPlay, FiTerminal, FiTool, FiX } from 'react-icons/fi';
 
 import { type UIToolCall, type UIToolOutput } from '@/spec/inference';
+import { MCPExecutionMode } from '@/spec/mcp';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
 import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
@@ -163,6 +164,9 @@ function ToolCallComposerChipView({ toolCall, isBusy, onRun, onDiscard, onDetail
 	const isFailed = toolCall.status === 'failed';
 
 	const isRunnableType = toolCall.type === ToolStoreChoiceType.Function || toolCall.type === ToolStoreChoiceType.Custom;
+	const isAutoExecute =
+		Boolean(toolCall.toolStoreChoice?.autoExecute) ||
+		toolCall.mcpToolSelection?.executionMode === MCPExecutionMode.MCPExecutionModeAuto;
 
 	const canRun = isRunnableType && (isPending || isFailed) && !isBusy;
 
@@ -172,8 +176,11 @@ function ToolCallComposerChipView({ toolCall, isBusy, onRun, onDiscard, onDetail
 	if (toolCall.errorMessage && isFailed) {
 		titleLines.push(`Error: ${toolCall.errorMessage}`);
 	}
-	if (toolCall.toolStoreChoice?.autoExecute) {
+	if (isAutoExecute) {
 		titleLines.push('Auto-execute: enabled');
+	}
+	if (toolCall.mcpToolSelection) {
+		titleLines.push(`MCP: ${toolCall.mcpToolSelection.serverID}/${toolCall.mcpToolSelection.toolName}`);
 	}
 	const title = titleLines.join('\n');
 
@@ -184,7 +191,7 @@ function ToolCallComposerChipView({ toolCall, isBusy, onRun, onDiscard, onDetail
 			data-attachment-chip="tool-call"
 		>
 			<FiTerminal size={14} className={isFailed ? 'text-error' : ''} />
-			{toolCall.toolStoreChoice?.autoExecute ? <span className="badge badge-primary badge-xs">Auto</span> : null}
+			{isAutoExecute ? <span className="badge badge-primary badge-xs">Auto</span> : null}
 			<span className="max-w-64 truncate">{truncatedLabel}</span>
 
 			<div className="ml-auto flex items-center gap-2 p-0">
@@ -259,8 +266,10 @@ function ToolOutputComposerChipView({ output, onOpen, onRemove, onRetry }: ToolO
 
 	const hasResolvableStoredTool =
 		!!output.toolStoreChoice?.bundleID && !!output.toolStoreChoice?.toolSlug && !!output.toolStoreChoice?.toolVersion;
-	const canRetry = isError && !!output.arguments && (isSkillsToolName(output.name) || hasResolvableStoredTool);
-
+	const canRetry =
+		isError &&
+		!!output.arguments &&
+		(isSkillsToolName(output.name) || hasResolvableStoredTool || !!output.mcpToolSelection);
 	const titleLines = [
 		isError ? `Errored result from: ${label}` : label,
 		`Tool: ${output.name}`,

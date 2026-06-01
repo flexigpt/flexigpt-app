@@ -344,10 +344,10 @@ export default function MCPServersPage() {
 				throw new Error('MCP server ID cannot be changed.');
 			}
 
-			await mcpAPI.putMCPServer(bundleID, input.serverID, input.payload);
+			await mcpAPI.putMCPServer(bundleID, input.serverID, input.initialPayload ?? input.payload);
 
 			const finalPayload = clonePayload(input.payload);
-			let requiresFinalPut = false;
+			let requiresFinalPut = Boolean(input.initialPayload);
 
 			if (finalPayload.stdio) {
 				let refs: Record<string, string> = { ...(finalPayload.stdio.secretEnvRefs ?? {}) };
