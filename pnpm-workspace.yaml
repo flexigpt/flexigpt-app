@@ -2,9 +2,10 @@ packages:
   - frontend
 ignoreWorkspaceRootCheck: true
 allowBuilds:
-  '@tailwindcss/oxide': true
+  "@tailwindcss/oxide": true
   esbuild: true
   oxc-resolver: true
 minimumReleaseAgeExclude:
   - eslint-plugin-react-you-might-not-need-an-effect@1.0.0
   - knip@6.15.0
+  - vite@8.0.15
