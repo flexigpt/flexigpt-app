@@ -372,8 +372,8 @@ export function useComposerMCP(): UseComposerMCPResult {
 						serverID: option.server.id,
 						snapshotDigest: option.runtime?.snapshotDigest,
 						toolExposure: MCPToolExposure.MCPToolExposureAll,
-						selectedTools: option.discoveryLoaded ? option.tools.filter(tool => tool.enabled).map(toolToSelection) : [],
-
+						selectedTools:
+							option.tools.length > 0 ? option.tools.filter(tool => tool.enabled).map(toolToSelection) : [],
 						selectedResources: [],
 						selectedResourceTemplates: [],
 						selectedPrompts: [],
