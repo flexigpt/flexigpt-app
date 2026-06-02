@@ -105,7 +105,16 @@ function buildMCPToolSelectionMapFromMessages(messages: StoreConversationMessage
 		servers: messages.flatMap(message => message.mcpContext?.servers ?? []),
 	};
 
-	return buildMCPToolSelectionMap(syntheticContext);
+	const combined = buildMCPToolSelectionMap(syntheticContext) ?? new Map();
+
+	for (const message of messages) {
+		const fromDebug = buildMCPToolSelectionMap(undefined, message.debugDetails);
+		for (const [key, selection] of fromDebug ?? []) {
+			combined.set(key, selection);
+		}
+	}
+
+	return combined.size > 0 ? combined : undefined;
 }
 
 function buildToolStoreChoiceMap(messages: StoreConversationMessage[]): Map<string, ToolStoreChoice> {

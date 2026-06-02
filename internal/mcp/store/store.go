@@ -118,6 +118,10 @@ func (s *Store) PutMCPBundle(
 		return nil, err
 	}
 
+	if err := s.ensureUniqueBundleSlug(ctx, req.BundleID, req.Body.Slug, sc); err != nil {
+		return nil, err
+	}
+
 	now := time.Now().UTC()
 	created := now
 	if old, ok := sc.Bundles[req.BundleID]; ok {
@@ -1001,6 +1005,35 @@ func (s *Store) getAnyServerLocked(
 		)
 	}
 	return cfg, false, bundle, true, nil
+}
+
+func (s *Store) ensureUniqueBundleSlug(
+	ctx context.Context,
+	bundleID bundleitemutils.BundleID,
+	slug bundleitemutils.BundleSlug,
+	sc storeSchema,
+) error {
+	for id, bundle := range sc.Bundles {
+		if id == bundleID || isBundleSoftDeleted(bundle) {
+			continue
+		}
+		if bundle.Slug == slug {
+			return fmt.Errorf("%w: bundle slug %q already exists", spec.ErrMCPConflict, slug)
+		}
+	}
+
+	if s.builtinData != nil {
+		bundles, _, err := s.builtinData.ListBuiltInData(ctx)
+		if err == nil {
+			for id, bundle := range bundles {
+				if id != bundleID && bundle.Slug == slug {
+					return fmt.Errorf("%w: bundle slug %q already exists", spec.ErrMCPConflict, slug)
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 func findUserServer(

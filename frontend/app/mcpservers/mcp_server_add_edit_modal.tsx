@@ -72,6 +72,25 @@ const EXECUTION_MODE_DROPDOWN_ITEMS: Record<MCPExecutionMode, DropdownItem> = {
 	[MCPExecutionMode.MCPExecutionModeAuto]: { isEnabled: true },
 };
 
+function isIPv4LoopbackHost(host: string): boolean {
+	const parts = host.split('.').map(part => Number(part));
+
+	return (
+		parts.length === 4 && parts.every(part => Number.isInteger(part) && part >= 0 && part <= 255) && parts[0] === 127
+	);
+}
+
+function isLoopbackHTTPHost(host: string): boolean {
+	const normalized = host.trim().toLowerCase().replace(/^\[/, '').replace(/\]$/, '');
+
+	if (!normalized) return false;
+	if (normalized === 'localhost') return true;
+	if (normalized === '::1') return true;
+	if (normalized === '0:0:0:0:0:0:0:1') return true;
+
+	return isIPv4LoopbackHost(normalized);
+}
+
 interface AddEditMCPServerModalProps {
 	isOpen: boolean;
 	onClose: () => void;
@@ -372,12 +391,13 @@ function AddEditMCPServerModalContent({
 		}
 
 		if (state.transport === MCPTransportType.MCPTransportTypeStdio) {
+			let parsedStdioEnv: Record<string, string> | undefined;
 			if (!state.stdioCommand.trim()) {
 				nextErrors.stdioCommand = 'Command is required for stdio servers.';
 			}
 
 			try {
-				parseMCPStringRecordJSON(state.stdioEnvJSON, 'Environment');
+				parsedStdioEnv = parseMCPStringRecordJSON(state.stdioEnvJSON, 'Environment');
 				nextErrors = omitManyKeys(nextErrors, ['stdioEnvJSON']);
 			} catch (error) {
 				nextErrors.stdioEnvJSON = error instanceof Error ? error.message : 'Environment must be valid JSON.';
@@ -388,7 +408,11 @@ function AddEditMCPServerModalContent({
 			} else {
 				nextErrors = omitManyKeys(nextErrors, ['stdioStartupTimeoutMS']);
 			}
-
+			const plainEnvNames = new Set(
+				Object.keys(parsedStdioEnv ?? {})
+					.map(key => key.trim().toLowerCase())
+					.filter(Boolean)
+			);
 			const seenEnvNames = new Set<string>();
 			for (const row of state.stdioSecretRows) {
 				const envName = row.envName.trim();
@@ -407,7 +431,10 @@ function AddEditMCPServerModalContent({
 					nextErrors.stdioSecrets = 'Secret env names must be unique.';
 					break;
 				}
-
+				if (plainEnvNames.has(envName.toLowerCase())) {
+					nextErrors.stdioSecrets = `Secret env ${envName} is also present in plain Env JSON.`;
+					break;
+				}
 				seenEnvNames.add(envName);
 
 				if (!row.existingSecretRef && !row.secretValue.trim()) {
@@ -431,6 +458,9 @@ function AddEditMCPServerModalContent({
 					const url = new URL(rawURL);
 					if (url.protocol !== 'http:' && url.protocol !== 'https:') {
 						nextErrors.httpURL = 'URL must use http or https.';
+					} else if (url.protocol === 'http:' && !isLoopbackHTTPHost(url.hostname)) {
+						nextErrors.httpURL =
+							'HTTP URLs are only allowed for localhost or loopback hosts. Use HTTPS for remote servers.';
 					} else {
 						nextErrors = omitManyKeys(nextErrors, ['httpURL']);
 					}

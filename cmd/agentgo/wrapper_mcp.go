@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -274,11 +275,24 @@ func (w *MCPWrapper) GetMCPServerAuthStatus(
 
 func (w *MCPWrapper) PutMCPServer(req *spec.PutMCPServerRequest) (*spec.PutMCPServerResponse, error) {
 	return middleware.WithRecoveryResp(func() (*spec.PutMCPServerResponse, error) {
+		var previous *spec.MCPServerConfig
+
+		if req != nil && req.BundleID != "" && req.ServerID != "" && w != nil && w.store != nil {
+			oldResp, oldErr := w.store.GetMCPServer(context.Background(), &spec.GetMCPServerRequest{
+				BundleID: req.BundleID,
+				ServerID: req.ServerID,
+			})
+			if oldErr == nil && oldResp != nil && oldResp.Body != nil {
+				old := *oldResp.Body
+				previous = &old
+			}
+		}
+
 		resp, err := w.store.PutMCPServer(context.Background(), req)
 		if err != nil {
 			return nil, err
 		}
-		if req != nil && req.ServerID != "" {
+		if shouldDisconnectMCPServerAfterPut(previous, req) {
 			_, _ = w.runtime.Disconnect(context.Background(), &spec.DisconnectMCPServerRequest{
 				BundleID: req.BundleID,
 				ServerID: req.ServerID,
@@ -783,6 +797,24 @@ func (w *MCPWrapper) pendingOAuthAuthorization(
 		}
 	}
 	return spec.MCPOAuthAuthorization{}, false
+}
+
+func shouldDisconnectMCPServerAfterPut(previous *spec.MCPServerConfig, req *spec.PutMCPServerRequest) bool {
+	if req == nil || req.Body == nil || req.BundleID == "" || req.ServerID == "" {
+		return false
+	}
+
+	if !req.Body.Enabled {
+		return true
+	}
+
+	if previous == nil {
+		return false
+	}
+
+	return previous.Transport != req.Body.Transport ||
+		!reflect.DeepEqual(previous.Stdio, req.Body.Stdio) ||
+		!reflect.DeepEqual(previous.StreamableHTTP, req.Body.StreamableHTTP)
 }
 
 func authHealthStateFromStatus(st spec.MCPAuthStatus) spec.MCPAuthHealthState {

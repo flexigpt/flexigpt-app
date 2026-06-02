@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/url"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
@@ -19,6 +20,8 @@ const (
 	maxMCPURLLen         = 4096
 	commandBash          = "bash"
 )
+
+var mcpServerIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 
 func validateBundle(b *spec.MCPBundle) error {
 	if b == nil {
@@ -61,7 +64,8 @@ func validateServerConfig(c *spec.MCPServerConfig) error {
 	if strings.TrimSpace(string(c.BundleID)) == "" {
 		return errors.New("bundleID is empty")
 	}
-	if strings.TrimSpace(string(c.ID)) == "" {
+	id := strings.TrimSpace(string(c.ID))
+	if id == "" || id != string(c.ID) || !mcpServerIDPattern.MatchString(id) {
 		return errors.New("id must match ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 	}
 	if strings.TrimSpace(c.DisplayName) == "" {

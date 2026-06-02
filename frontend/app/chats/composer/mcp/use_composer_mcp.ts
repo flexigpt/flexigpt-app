@@ -124,20 +124,6 @@ export function useComposerMCP(): UseComposerMCPResult {
 		});
 	}, []);
 
-	const refreshServer = useCallback(
-		async (bundleID: string, serverID: string) => {
-			const [runtime, authHealth] = await Promise.all([
-				mcpAPI.getMCPServerStatus(bundleID, serverID).catch(() => undefined),
-				mcpAPI.getMCPServerAuthHealth(bundleID, serverID).catch(() => undefined),
-			]);
-
-			if (!mountedRef.current) return;
-
-			patchOption(bundleID, serverID, { runtime, authHealth });
-		},
-		[patchOption]
-	);
-
 	const refreshAll = useCallback(async () => {
 		setLoading(true);
 		setError(undefined);
@@ -303,6 +289,50 @@ export function useComposerMCP(): UseComposerMCPResult {
 		}
 	}, [ensureDiscoveryLoaded, selectedByServerKey]);
 
+	const refreshServerStatus = useCallback(
+		async (bundleID: string, serverID: string) => {
+			const [runtime, authHealth] = await Promise.all([
+				mcpAPI.getMCPServerStatus(bundleID, serverID).catch(() => undefined),
+				mcpAPI.getMCPServerAuthHealth(bundleID, serverID).catch(() => undefined),
+			]);
+
+			if (!mountedRef.current) return;
+
+			patchOption(bundleID, serverID, { runtime, authHealth });
+		},
+		[patchOption]
+	);
+
+	const refreshServer = useCallback(
+		async (bundleID: string, serverID: string) => {
+			patchOption(bundleID, serverID, {
+				discoveryLoaded: false,
+				discoveryLoading: true,
+				discoveryError: undefined,
+			});
+
+			try {
+				const snapshot = await mcpAPI.refreshMCPServer(bundleID, serverID);
+				if (snapshot && mountedRef.current) {
+					patchOption(bundleID, serverID, { runtime: snapshot });
+				}
+			} catch (err) {
+				if (mountedRef.current) {
+					patchOption(bundleID, serverID, {
+						discoveryLoading: false,
+						discoveryError: getErrorMessage(err, 'Failed to refresh MCP discovery.'),
+					});
+				}
+				await refreshServerStatus(bundleID, serverID).catch(() => undefined);
+				return;
+			}
+
+			await refreshServerStatus(bundleID, serverID).catch(() => undefined);
+			await loadDiscoveryForServer(bundleID, serverID, true).catch(() => undefined);
+		},
+		[loadDiscoveryForServer, patchOption, refreshServerStatus]
+	);
+
 	const connectServer = useCallback(
 		async (bundleID: string, serverID: string) => {
 			let settled = false;
@@ -313,7 +343,9 @@ export function useComposerMCP(): UseComposerMCPResult {
 
 			while (!settled) {
 				await Promise.race([connectPromise.catch(() => undefined), sleep(1000)]);
-				await refreshServer(bundleID, serverID).catch(() => undefined);
+				if (!settled) {
+					await refreshServerStatus(bundleID, serverID).catch(() => undefined);
+				}
 			}
 
 			const snapshot = await connectPromise;
@@ -324,26 +356,26 @@ export function useComposerMCP(): UseComposerMCPResult {
 				});
 			}
 
-			await refreshServer(bundleID, serverID).catch(() => undefined);
+			await refreshServerStatus(bundleID, serverID).catch(() => undefined);
 			await ensureDiscoveryLoaded(bundleID, serverID).catch(() => undefined);
 		},
-		[ensureDiscoveryLoaded, patchOption, refreshServer]
+		[ensureDiscoveryLoaded, patchOption, refreshServerStatus]
 	);
 
 	const disconnectServer = useCallback(
 		async (bundleID: string, serverID: string) => {
 			await mcpAPI.disconnectMCPServer(bundleID, serverID);
-			await refreshServer(bundleID, serverID);
+			await refreshServerStatus(bundleID, serverID);
 		},
-		[refreshServer]
+		[refreshServerStatus]
 	);
 
 	const cancelOAuth = useCallback(
 		async (bundleID: string, serverID: string) => {
 			await mcpAPI.cancelPendingMCPOAuthAuthorization(bundleID, serverID);
-			await refreshServer(bundleID, serverID);
+			await refreshServerStatus(bundleID, serverID);
 		},
-		[refreshServer]
+		[refreshServerStatus]
 	);
 
 	const openAuthURL = useCallback((url: string) => {

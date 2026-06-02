@@ -451,6 +451,7 @@ export interface MCPToolSelection {
 }
 
 export interface MCPProviderToolMapping {
+	bundleID: string;
 	providerToolName: string;
 	choiceID: string;
 	serverID: MCPServerID;

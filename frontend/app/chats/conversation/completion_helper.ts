@@ -17,7 +17,7 @@ import {
 	type UIToolCall,
 	type UIToolOutput,
 } from '@/spec/inference';
-import type { MCPConversationContext, MCPToolSelection } from '@/spec/mcp';
+import type { MCPConversationContext, MCPProviderToolMapping, MCPToolSelection } from '@/spec/mcp';
 import type { ModelPresetID } from '@/spec/modelpreset';
 import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
@@ -243,6 +243,36 @@ export function getDebugDetailsMarkdown(debugObj?: any, errorObj?: any): string 
 	return parts.join('\n\n');
 }
 
+export function buildMCPToolSelectionMap(
+	mcpContext?: MCPConversationContext,
+	debugDetails?: any
+): Map<string, MCPToolSelection> | undefined {
+	const map = new Map<string, MCPToolSelection>();
+
+	for (const server of mcpContext?.servers ?? []) {
+		for (const tool of server.selectedTools ?? []) {
+			const normalized: MCPToolSelection = {
+				...tool,
+				bundleID: tool.bundleID || server.bundleID,
+				serverID: tool.serverID || server.serverID,
+			};
+
+			addMCPToolSelectionToMap(map, normalized);
+		}
+	}
+	for (const mapping of extractMCPToolMappings(debugDetails)) {
+		const selection = mappingToMCPToolSelection(mapping);
+		if (selection) addMCPToolSelectionToMap(map, selection);
+	}
+
+	return map.size > 0 ? map : undefined;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+	return value as Record<string, unknown>;
+}
+
 function mcpSelectionKeys(selection: MCPToolSelection): string[] {
 	const keys: string[] = [];
 
@@ -253,28 +283,40 @@ function mcpSelectionKeys(selection: MCPToolSelection): string[] {
 	return keys;
 }
 
-export function buildMCPToolSelectionMap(
-	mcpContext?: MCPConversationContext
-): Map<string, MCPToolSelection> | undefined {
-	if (!mcpContext?.servers?.length) return undefined;
-
-	const map = new Map<string, MCPToolSelection>();
-
-	for (const server of mcpContext.servers) {
-		for (const tool of server.selectedTools ?? []) {
-			const normalized: MCPToolSelection = {
-				...tool,
-				bundleID: tool.bundleID || server.bundleID,
-				serverID: tool.serverID || server.serverID,
-			};
-
-			for (const key of mcpSelectionKeys(normalized)) {
-				map.set(key, normalized);
-			}
-		}
+function addMCPToolSelectionToMap(map: Map<string, MCPToolSelection>, selection: MCPToolSelection) {
+	for (const key of mcpSelectionKeys(selection)) {
+		map.set(key, selection);
 	}
+}
+function mappingToMCPToolSelection(mapping: unknown): MCPToolSelection | undefined {
+	const obj = asRecord(mapping);
+	if (!obj) return undefined;
+	const bundleID = obj.bundleID;
+	const serverID = obj.serverID;
+	const toolName = obj.toolName;
+	const providerToolName = obj.providerToolName;
+	const choiceID = obj.choiceID;
+	const toolDigest = obj.toolDigest;
+	if (typeof bundleID !== 'string' || !bundleID) return undefined;
+	if (typeof serverID !== 'string' || !serverID) return undefined;
+	if (typeof toolName !== 'string' || !toolName) return undefined;
+	return {
+		bundleID,
+		serverID,
+		toolName,
+		providerToolName: typeof providerToolName === 'string' ? providerToolName : undefined,
+		choiceID: typeof choiceID === 'string' ? choiceID : undefined,
+		digest: typeof toolDigest === 'string' ? toolDigest : undefined,
+	};
+}
 
-	return map.size > 0 ? map : undefined;
+function extractMCPToolMappings(debugDetails?: any): MCPProviderToolMapping[] {
+	const root = asRecord(debugDetails);
+	if (!root) return [];
+	const mcpDebug = asRecord(root.mcp) ?? root;
+	const rawMappings = mcpDebug.toolMappings;
+	if (!Array.isArray(rawMappings)) return [];
+	return rawMappings.filter(mapping => mappingToMCPToolSelection(mapping)) as MCPProviderToolMapping[];
 }
 
 function findMCPToolSelectionForToolLike(
@@ -318,7 +360,7 @@ function buildAssistantMessageFromResponse(
 	const { uiContent, uiReasoningContents, uiToolCalls, uiToolOutputs, uiCitations } = deriveUIFieldsFromOutputUnion(
 		outputs,
 		choiceMap,
-		buildMCPToolSelectionMap(mcpContext)
+		buildMCPToolSelectionMap(mcpContext, inf.debugDetails)
 	);
 	const debugDetails = inf.debugDetails;
 	const uiDebugDetails = getDebugDetailsMarkdown(inf.debugDetails, inf.error);
