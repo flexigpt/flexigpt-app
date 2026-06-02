@@ -26,7 +26,6 @@ import {
 	getDefaultMCPAppsPolicy,
 	getDefaultMCPServerPolicy,
 	getMCPApprovalRuleLabel,
-	getMCPAvailabilityLabel,
 	getMCPExecutionModeLabel,
 	getMCPHTTPAuthModeLabel,
 	getMCPTransportLabel,
@@ -43,11 +42,6 @@ type ModalMode = 'add' | 'edit';
 const TRANSPORT_DROPDOWN_ITEMS: Record<MCPTransportType, DropdownItem> = {
 	[MCPTransportType.MCPTransportTypeStreamableHTTP]: { isEnabled: true },
 	[MCPTransportType.MCPTransportTypeStdio]: { isEnabled: true },
-};
-
-const AVAILABILITY_DROPDOWN_ITEMS: Record<MCPServerAvailability, DropdownItem> = {
-	[MCPServerAvailability.MCPServerAvailabilityManual]: { isEnabled: true },
-	[MCPServerAvailability.MCPServerAvailabilityAutoAttach]: { isEnabled: true },
 };
 
 const TRUST_DROPDOWN_ITEMS: Record<MCPTrustLevel, DropdownItem> = {
@@ -130,10 +124,7 @@ type MCPServerFormData = {
 	displayName: string;
 	enabled: boolean;
 	transport: MCPTransportType;
-
-	availability: MCPServerAvailability;
 	trustLevel: MCPTrustLevel;
-
 	stdioCommand: string;
 	stdioArgsText: string;
 	stdioWorkingDir: string;
@@ -214,8 +205,6 @@ function getInitialFormData(initialData: MCPServerConfig | undefined): MCPServer
 		displayName: initialData?.displayName ?? '',
 		enabled: initialData?.enabled ?? true,
 		transport: initialData?.transport ?? MCPTransportType.MCPTransportTypeStreamableHTTP,
-
-		availability: initialData?.availability ?? MCPServerAvailability.MCPServerAvailabilityManual,
 		trustLevel: initialData?.trustLevel ?? MCPTrustLevel.MCPTrustLevelUntrusted,
 
 		stdioCommand: initialData?.stdio?.command ?? '',
@@ -645,7 +634,7 @@ function AddEditMCPServerModalContent({
 			displayName: formData.displayName.trim(),
 			enabled: formData.enabled,
 			transport: formData.transport,
-			availability: formData.availability,
+			availability: MCPServerAvailability.MCPServerAvailabilityManual,
 			trustLevel: formData.trustLevel,
 			defaultPolicy,
 			toolPolicies,
@@ -922,22 +911,6 @@ function AddEditMCPServerModalContent({
 						</div>
 
 						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
-								<span className="label-text text-sm">Availability</span>
-							</label>
-							<div className="col-span-4">
-								<Dropdown
-									dropdownItems={AVAILABILITY_DROPDOWN_ITEMS}
-									selectedKey={formData.availability}
-									onChange={availability => {
-										setFormDataAndValidate({ ...formData, availability });
-									}}
-									getDisplayName={getMCPAvailabilityLabel}
-									title="Availability"
-									inlineMenu={true}
-								/>
-							</div>
-
 							<label className="label col-span-2">
 								<span className="label-text text-sm">Trust</span>
 							</label>

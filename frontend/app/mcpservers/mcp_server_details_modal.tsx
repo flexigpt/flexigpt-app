@@ -249,7 +249,6 @@ export function MCPServerDetailsModal({
 												clientCredentialRef: server.streamableHttp.clientCredentialRef ? '[configured]' : undefined,
 											}
 										: undefined,
-									availability: server.availability,
 									trustLevel: server.trustLevel,
 									defaultPolicy: server.defaultPolicy,
 									toolPolicies: server.toolPolicies,

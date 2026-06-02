@@ -88,7 +88,7 @@ func validateServerConfig(c *spec.MCPServerConfig) error {
 	}
 
 	switch c.Availability {
-	case "", spec.MCPServerAvailabilityManual, spec.MCPServerAvailabilityAutoAttach:
+	case "", spec.MCPServerAvailabilityManual:
 	default:
 		return fmt.Errorf("invalid availability %q", c.Availability)
 	}

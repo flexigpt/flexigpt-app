@@ -37,7 +37,6 @@ export enum MCPTransportType {
 
 export enum MCPServerAvailability {
 	MCPServerAvailabilityManual = 'manual',
-	MCPServerAvailabilityAutoAttach = 'autoAttach',
 }
 
 export enum MCPTrustLevel {

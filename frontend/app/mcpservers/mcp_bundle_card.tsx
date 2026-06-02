@@ -31,7 +31,6 @@ import {
 	getEffectiveMCPServerStatus,
 	getMCPAuthHealthBadgeClass,
 	getMCPAuthHealthLabel,
-	getMCPAvailabilityLabel,
 	getMCPStatusBadgeClass,
 	getMCPStatusLabel,
 	getMCPTransportLabel,
@@ -334,10 +333,6 @@ export function MCPBundleCard({
 
 											<InfoPill label="Transport">
 												<TruncatedValue value={getMCPTransportLabel(server.transport)} />
-											</InfoPill>
-
-											<InfoPill label="Availability">
-												<TruncatedValue value={getMCPAvailabilityLabel(server.availability)} />
 											</InfoPill>
 
 											<InfoPill label="Trust">

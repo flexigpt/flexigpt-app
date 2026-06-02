@@ -83,8 +83,7 @@ const (
 type MCPServerAvailability string
 
 const (
-	MCPServerAvailabilityManual     MCPServerAvailability = "manual"
-	MCPServerAvailabilityAutoAttach MCPServerAvailability = "autoAttach"
+	MCPServerAvailabilityManual MCPServerAvailability = "manual"
 )
 
 type MCPTrustLevel string

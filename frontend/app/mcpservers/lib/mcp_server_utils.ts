@@ -5,7 +5,6 @@ import {
 	MCPAuthHealthState,
 	MCPExecutionMode,
 	MCPHTTPAuthMode,
-	MCPServerAvailability,
 	type MCPServerPolicy,
 	type MCPServerRuntimeSnapshot,
 	MCPServerStatus,
@@ -81,17 +80,6 @@ export function getMCPTransportLabel(transport: MCPTransportType): string {
 			return 'Stdio';
 		default:
 			return String(transport);
-	}
-}
-
-export function getMCPAvailabilityLabel(availability: MCPServerAvailability): string {
-	switch (availability) {
-		case MCPServerAvailability.MCPServerAvailabilityAutoAttach:
-			return 'Auto Attach';
-		case MCPServerAvailability.MCPServerAvailabilityManual:
-			return 'Manual';
-		default:
-			return String(availability);
 	}
 }
 

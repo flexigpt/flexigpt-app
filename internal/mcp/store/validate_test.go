@@ -180,15 +180,13 @@ func TestValidateServerConfigBranches(t *testing.T) {
 			wantTrustLevel:   spec.MCPTrustLevelUntrusted,
 		},
 		{
-			name: "valid http config trusted/autoAttach",
+			name: "valid http config trusted",
 			cfg: func() spec.MCPServerConfig {
 				c := baseHTTP()
-				c.Availability = spec.MCPServerAvailabilityAutoAttach
 				c.TrustLevel = spec.MCPTrustLevelTrusted
 				return c
 			}(),
-			wantAvailability: spec.MCPServerAvailabilityAutoAttach,
-			wantTrustLevel:   spec.MCPTrustLevelTrusted,
+			wantTrustLevel: spec.MCPTrustLevelTrusted,
 		},
 	}
 
