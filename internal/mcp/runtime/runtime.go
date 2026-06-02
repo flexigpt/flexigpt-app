@@ -117,6 +117,7 @@ func (m *MCPRuntimeManager) Connect(
 	if req == nil || req.BundleID == "" || req.ServerID == "" {
 		return nil, fmt.Errorf("%w: bundleID and serverID required", spec.ErrMCPInvalidRequest)
 	}
+	var oldClientToClose ClientSession
 
 	m.mu.Lock()
 	if m.shuttingDown {
@@ -125,12 +126,29 @@ func (m *MCPRuntimeManager) Connect(
 	}
 	state := m.getOrCreateLocked(req.ServerID)
 	state.bundleID = req.BundleID
+
+	if state.client != nil {
+		oldClientToClose = state.client
+		state.client = nil
+	}
+
 	generation := m.bumpGenerationLocked(req.ServerID)
 
 	state.status = spec.MCPServerStatusConnecting
 	state.lastError = ""
+	state.snapshot = spec.MCPDiscoverySnapshot{
+		BundleID: req.BundleID,
+		ServerID: req.ServerID,
+	}
+	state.lastConnectedAt = time.Time{}
+	state.lastSyncedAt = time.Time{}
 	m.mu.Unlock()
-
+	if oldClientToClose != nil {
+		closeCtx := context.WithoutCancel(ctx)
+		closeCtx, closeCancel := context.WithTimeout(closeCtx, 5*time.Second)
+		_ = oldClientToClose.Close(closeCtx)
+		closeCancel()
+	}
 	cfgResp, err := m.store.GetMCPServer(ctx, &spec.GetMCPServerRequest{
 		BundleID: req.BundleID,
 		ServerID: req.ServerID,
@@ -260,7 +278,6 @@ func (m *MCPRuntimeManager) Disconnect(
 	}
 
 	m.mu.Lock()
-	m.bumpGenerationLocked(req.ServerID)
 
 	state := m.sessions[req.ServerID]
 	if state != nil && state.bundleID != "" && state.bundleID != req.BundleID {
@@ -273,6 +290,7 @@ func (m *MCPRuntimeManager) Disconnect(
 			req.BundleID,
 		)
 	}
+	m.bumpGenerationLocked(req.ServerID)
 	delete(m.sessions, req.ServerID)
 	timer := m.notificationRefreshTimers[req.ServerID]
 	delete(m.notificationRefreshTimers, req.ServerID)

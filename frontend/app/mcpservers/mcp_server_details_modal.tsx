@@ -138,27 +138,28 @@ export function MCPServerDetailsModal({
 		// eslint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setDiscoveryError('');
 
-		Promise.all([
+		Promise.allSettled([
 			getAllMCPServerTools(bundle.id, server.id),
 			getAllMCPServerResources(bundle.id, server.id),
 			getAllMCPServerResourceTemplates(bundle.id, server.id),
 			getAllMCPServerPrompts(bundle.id, server.id),
 		])
-			.then(([tools, resources, resourceTemplates, prompts]) => {
+			.then(results => {
 				if (cancelled) return;
-
+				const [toolsResult, resourcesResult, resourceTemplatesResult, promptsResult] = results;
+				const errors = results
+					.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+					.map(result => (result.reason instanceof Error ? result.reason.message : 'Failed to load discovery section.'))
+					.filter(Boolean);
 				setDiscovery({
-					tools,
-					resources,
-					resourceTemplates,
-					prompts,
+					tools: toolsResult.status === 'fulfilled' ? toolsResult.value : [],
+					resources: resourcesResult.status === 'fulfilled' ? resourcesResult.value : [],
+					resourceTemplates: resourceTemplatesResult.status === 'fulfilled' ? resourceTemplatesResult.value : [],
+					prompts: promptsResult.status === 'fulfilled' ? promptsResult.value : [],
 				});
-			})
-			.catch((error: unknown) => {
-				if (cancelled) return;
-
-				const message = error instanceof Error ? error.message : 'Failed to load MCP discovery cache.';
-				setDiscoveryError(message);
+				if (errors.length > 0) {
+					setDiscoveryError(errors[0]);
+				}
 			})
 			.finally(() => {
 				if (cancelled) return;

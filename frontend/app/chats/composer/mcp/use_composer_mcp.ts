@@ -310,7 +310,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 		for (const selection of Object.values(selectedByServerKey)) {
 			void ensureDiscoveryLoaded(selection.bundleID, selection.serverID);
 		}
-	}, [ensureDiscoveryLoaded, selectedByServerKey]);
+	}, [ensureDiscoveryLoaded, options, selectedByServerKey]);
 
 	const refreshServerStatus = useCallback(
 		async (bundleID: string, serverID: string) => {

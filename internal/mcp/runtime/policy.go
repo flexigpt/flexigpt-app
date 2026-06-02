@@ -43,13 +43,23 @@ func Evaluate(in EvaluationInput) spec.MCPApprovalEvaluation {
 
 	rule := p.DefaultApprovalRule
 	digestChanged := false
+	allowStaleDigest := false
+
 	if ov, ok := in.Server.ToolPolicies[in.Tool.ToolName]; ok {
+		allowStaleDigest = ov.AllowStaleDigest
 		if ov.ApprovalRule != nil {
 			rule = *ov.ApprovalRule
 		}
 		if ov.ExpectedDigest != "" && ov.ExpectedDigest != in.Tool.Digest && !ov.AllowStaleDigest {
 			digestChanged = true
 		}
+	}
+
+	if in.Req.ToolDigest != "" &&
+		in.Tool.Digest != "" &&
+		in.Req.ToolDigest != in.Tool.Digest &&
+		!allowStaleDigest {
+		digestChanged = true
 	}
 
 	if rule == spec.MCPApprovalRuleDeny {

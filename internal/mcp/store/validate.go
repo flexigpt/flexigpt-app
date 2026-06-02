@@ -121,6 +121,7 @@ func validateServerConfig(c *spec.MCPServerConfig) error {
 		if err := validateToolPolicyOverride(p); err != nil {
 			return fmt.Errorf("toolPolicies[%s]: %w", k, err)
 		}
+		c.ToolPolicies[k] = p
 	}
 
 	switch c.Transport {

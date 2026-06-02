@@ -289,6 +289,9 @@ func (s *Session) listAllTools(
 		if err != nil {
 			return nil, err
 		}
+		if res == nil {
+			return nil, fmt.Errorf("%w: tools/list returned nil response", spec.ErrMCPRuntimeNotReady)
+		}
 
 		for _, t := range res.Tools {
 			if t == nil {
@@ -351,7 +354,9 @@ func (s *Session) listAllResources(
 		if err != nil {
 			return nil, err
 		}
-
+		if res == nil {
+			return nil, fmt.Errorf("%w: resources/list returned nil response", spec.ErrMCPRuntimeNotReady)
+		}
 		for _, r := range res.Resources {
 			if r == nil {
 				continue
@@ -395,7 +400,9 @@ func (s *Session) listAllResourceTemplates(
 		if err != nil {
 			return nil, err
 		}
-
+		if res == nil {
+			return nil, fmt.Errorf("%w: resources/templates/list returned nil response", spec.ErrMCPRuntimeNotReady)
+		}
 		for _, rt := range res.ResourceTemplates {
 			if rt == nil {
 				continue
@@ -440,7 +447,9 @@ func (s *Session) listAllPrompts(
 		if err != nil {
 			return nil, err
 		}
-
+		if res == nil {
+			return nil, fmt.Errorf("%w: prompts/list returned nil response", spec.ErrMCPRuntimeNotReady)
+		}
 		for _, p := range res.Prompts {
 			if p == nil {
 				continue

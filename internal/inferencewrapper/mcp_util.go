@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"net/url"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -13,6 +15,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
+
+var simpleMCPURITemplateVariableRE = regexp.MustCompile(`\{([A-Za-z_][A-Za-z0-9_.-]*)\}`)
 
 type MCPRuntime interface {
 	Status(ctx context.Context, req *mcpSpec.GetMCPServerStatusRequest) (*mcpSpec.GetMCPServerStatusResponse, error)
@@ -717,50 +721,45 @@ func buildMCPContextInput(text string) inferenceSpec.InputUnion {
 }
 
 func resolveMCPResourceTemplateURI(uriTemplate string, args map[string]string) (string, error) {
-	out := strings.TrimSpace(uriTemplate)
-	if out == "" {
+	raw := strings.TrimSpace(uriTemplate)
+	if raw == "" {
 		return "", fmt.Errorf("%w: empty uriTemplate", mcpSpec.ErrMCPInvalidRequest)
 	}
 
 	missing := map[string]struct{}{}
 
-	for {
-		start := strings.Index(out, "{")
-		if start < 0 {
-			break
+	out := simpleMCPURITemplateVariableRE.ReplaceAllStringFunc(raw, func(match string) string {
+		parts := simpleMCPURITemplateVariableRE.FindStringSubmatch(match)
+		if len(parts) != 2 {
+			return match
 		}
-		end := strings.Index(out[start+1:], "}")
-		if end < 0 {
-			break
-		}
-		end = start + 1 + end
-		name := strings.TrimSpace(out[start+1 : end])
-		if strings.HasPrefix(name, "{") && strings.HasSuffix(name, "}") {
-			name = strings.TrimSuffix(strings.TrimPrefix(name, "{"), "}")
-		}
-		if name == "" {
-			break
-		}
+		name := strings.TrimSpace(parts[1])
 		value, ok := args[name]
 		if !ok {
 			missing[name] = struct{}{}
-			out = out[:start] + out[end+1:]
-			continue
+			return ""
 		}
-		out = out[:start] + value + out[end+1:]
-	}
+		return url.PathEscape(value)
+	})
 
 	if len(missing) > 0 {
 		names := make([]string, 0, len(missing))
 		for name := range missing {
 			names = append(names, name)
 		}
+		slices.Sort(names)
 		return "", fmt.Errorf(
 			"%w: missing resource template arguments: %s",
 			mcpSpec.ErrMCPInvalidRequest,
 			strings.Join(names, ", "),
 		)
 	}
-
+	if strings.ContainsAny(out, "{}") {
+		return "", fmt.Errorf(
+			"%w: unsupported resource URI template syntax %q; only simple {name} variables are supported",
+			mcpSpec.ErrMCPInvalidRequest,
+			uriTemplate,
+		)
+	}
 	return out, nil
 }
