@@ -792,8 +792,12 @@ func toolAnnotationsToSpec(a *mcpSDK.ToolAnnotations) *spec.MCPToolAnnotations {
 	}
 }
 
+func getEmptySchema() map[string]any {
+	return map[string]any{"type": "object"}
+}
+
 func schemaToMap(v any) map[string]any {
-	return schemaToMapWithFallback(v, map[string]any{"type": "object"})
+	return schemaToMapWithFallback(v, getEmptySchema())
 }
 
 func optionalSchemaToMap(v any) map[string]any {

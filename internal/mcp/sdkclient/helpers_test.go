@@ -67,7 +67,7 @@ func TestSchemaMapAndDigestHelpers(t *testing.T) {
 		}
 
 		fallback := schemaToMap(nil)
-		wantFallback := map[string]any{"type": "object"}
+		wantFallback := getEmptySchema()
 		if !reflect.DeepEqual(fallback, wantFallback) {
 			t.Fatalf("schemaToMap(nil) = %#v, want %#v", fallback, wantFallback)
 		}
