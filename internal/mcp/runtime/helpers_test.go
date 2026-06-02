@@ -50,7 +50,7 @@ func TestCloneDiscoverySnapshotMakesDeepCopy(t *testing.T) {
 			{
 				ServerID:    "server",
 				URITemplate: "tmpl://{x}",
-				Arguments:   map[string]string{"x": "1"},
+				Arguments:   map[string]spec.MCPArgumentDefinition{"x": {Name: "1"}},
 				Annotations: map[string]any{"a": "b"},
 			},
 		},
@@ -58,7 +58,7 @@ func TestCloneDiscoverySnapshotMakesDeepCopy(t *testing.T) {
 			{
 				ServerID:   "server",
 				PromptName: "prompt-a",
-				Arguments:  map[string]string{"p": "q"},
+				Arguments:  map[string]spec.MCPArgumentDefinition{"p": {Name: "q"}},
 			},
 		},
 	}
@@ -73,9 +73,9 @@ func TestCloneDiscoverySnapshotMakesDeepCopy(t *testing.T) {
 	orig.Tools[0].Annotations.Title = "changed"
 	orig.Tools[0].App.Visibility[0] = "changed"
 	orig.Resources[0].Annotations["k"] = "changed"
-	orig.ResourceTemplates[0].Arguments["x"] = "changed"
+	orig.ResourceTemplates[0].Arguments["x"] = spec.MCPArgumentDefinition{Name: "changed"}
 	orig.ResourceTemplates[0].Annotations["a"] = "changed"
-	orig.Prompts[0].Arguments["p"] = "changed"
+	orig.Prompts[0].Arguments["p"] = spec.MCPArgumentDefinition{Name: "changed"}
 
 	if clone.ServerInfo == nil || clone.ServerInfo.Name != "name" || clone.ServerInfo.Version != "v1" {
 		t.Fatalf("ServerInfo was not deep-cloned: %#v", clone.ServerInfo)
@@ -96,10 +96,10 @@ func TestCloneDiscoverySnapshotMakesDeepCopy(t *testing.T) {
 	if clone.Resources[0].Annotations["k"] != "v" {
 		t.Fatalf("Resource annotations were not deep-cloned: %#v", clone.Resources[0].Annotations)
 	}
-	if clone.ResourceTemplates[0].Arguments["x"] != "1" || clone.ResourceTemplates[0].Annotations["a"] != "b" {
+	if clone.ResourceTemplates[0].Arguments["x"].Name != "1" || clone.ResourceTemplates[0].Annotations["a"] != "b" {
 		t.Fatalf("Resource template fields were not deep-cloned: %#v", clone.ResourceTemplates[0])
 	}
-	if clone.Prompts[0].Arguments["p"] != "q" {
+	if clone.Prompts[0].Arguments["p"].Name != "q" {
 		t.Fatalf("Prompt arguments were not deep-cloned: %#v", clone.Prompts[0].Arguments)
 	}
 }

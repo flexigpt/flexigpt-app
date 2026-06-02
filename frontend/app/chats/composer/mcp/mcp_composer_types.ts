@@ -1,10 +1,13 @@
 import {
+	type MCPArgumentDefinition,
 	type MCPAuthHealth,
 	type MCPBundle,
 	type MCPConversationContext,
 	type MCPPromptRef,
+	type MCPPromptSelection,
 	type MCPResourceRef,
 	type MCPResourceTemplateRef,
+	type MCPResourceTemplateSelection,
 	type MCPServerConfig,
 	type MCPServerRuntimeSnapshot,
 	type MCPServerSelection,
@@ -36,8 +39,8 @@ export interface MCPComposerServerSelection {
 	toolExposure: MCPToolExposure;
 	selectedTools: MCPToolSelection[];
 	selectedResources: MCPResourceRef[];
-	selectedResourceTemplates: MCPResourceTemplateRef[];
-	selectedPrompts: MCPPromptRef[];
+	selectedResourceTemplates: MCPResourceTemplateSelection[];
+	selectedPrompts: MCPPromptSelection[];
 	includeServerInstructions?: boolean;
 }
 
@@ -51,6 +54,8 @@ export interface UseComposerMCPResult {
 	selectedToolCount: number;
 	selectedResourceCount: number;
 	selectedPromptCount: number;
+	requiredArgumentMissingCount: number;
+	argumentsBlocked: boolean;
 
 	refreshAll: () => Promise<void>;
 	refreshServer: (bundleID: string, serverID: string) => Promise<void>;
@@ -69,6 +74,20 @@ export interface UseComposerMCPResult {
 	toggleResource: (resource: MCPResourceRef, selected: boolean) => void;
 	toggleResourceTemplate: (template: MCPResourceTemplateRef, selected: boolean) => void;
 	togglePrompt: (prompt: MCPPromptRef, selected: boolean) => void;
+	setResourceTemplateArgumentValue: (
+		bundleID: string,
+		serverID: string,
+		uriTemplate: string,
+		argumentName: string,
+		value: string
+	) => void;
+	setPromptArgumentValue: (
+		bundleID: string,
+		serverID: string,
+		promptName: string,
+		argumentName: string,
+		value: string
+	) => void;
 	clear: () => void;
 	restoreContext: (context?: MCPConversationContext) => void;
 }
@@ -95,6 +114,49 @@ export function mcpResourceTemplateKey(
 
 export function mcpPromptKey(prompt: Pick<MCPPromptRef, 'bundleID' | 'serverID' | 'promptName'>): string {
 	return `${prompt.bundleID}::${prompt.serverID}::${prompt.promptName}`;
+}
+
+export function normalizeMCPArgumentDefinitions(
+	args?: Record<string, MCPArgumentDefinition | string>
+): MCPArgumentDefinition[] {
+	if (!args) return [];
+
+	return Object.entries(args)
+		.map(([key, value]) => {
+			if (typeof value === 'string') {
+				return {
+					name: key,
+					description: value,
+					required: false,
+				} satisfies MCPArgumentDefinition;
+			}
+
+			return {
+				...value,
+				name: value.name || key,
+				required: Boolean(value.required),
+			} satisfies MCPArgumentDefinition;
+		})
+		.filter(arg => arg.name.trim().length > 0)
+		.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function countMissingRequiredMCPArguments(
+	items: Array<{
+		arguments?: Record<string, MCPArgumentDefinition | string>;
+		argumentValues?: Record<string, string>;
+	}>
+): number {
+	let count = 0;
+
+	for (const item of items) {
+		for (const arg of normalizeMCPArgumentDefinitions(item.arguments)) {
+			if (!arg.required) continue;
+			if (!item.argumentValues?.[arg.name]?.trim()) count++;
+		}
+	}
+
+	return count;
 }
 
 export function mcpSelectionToContext(

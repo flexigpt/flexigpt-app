@@ -6,6 +6,13 @@ export type MCPServerID = string;
 export type JSONRawString = string;
 export type MCPTimestamp = string;
 
+export interface MCPArgumentDefinition {
+	name: string;
+	title?: string;
+	description?: string;
+	required?: boolean;
+}
+
 export enum MCPToolExposure {
 	MCPToolExposureNone = 'none',
 	MCPToolExposureAll = 'all',
@@ -405,7 +412,7 @@ export interface MCPResourceTemplateRef {
 	displayName: string;
 	description?: string;
 	mimeType?: string;
-	arguments?: Record<string, string>;
+	arguments?: Record<string, MCPArgumentDefinition>;
 	annotations?: Record<string, any>;
 	digest?: string;
 }
@@ -417,7 +424,7 @@ export interface MCPPromptRef {
 	title?: string;
 	displayName: string;
 	description?: string;
-	arguments?: Record<string, string>;
+	arguments?: Record<string, MCPArgumentDefinition>;
 	digest?: string;
 }
 
@@ -436,6 +443,14 @@ export interface MCPDiscoverySnapshot {
 
 	digest?: string;
 	syncedAt?: MCPTimestamp;
+}
+
+export interface MCPResourceTemplateSelection extends MCPResourceTemplateRef {
+	argumentValues?: Record<string, string>;
+}
+
+export interface MCPPromptSelection extends MCPPromptRef {
+	argumentValues?: Record<string, string>;
 }
 
 export interface MCPToolSelection {
@@ -457,6 +472,8 @@ export interface MCPProviderToolMapping {
 	serverID: MCPServerID;
 	toolName: string;
 	toolDigest: string;
+	approvalRule?: MCPApprovalRule;
+	executionMode?: MCPExecutionMode;
 	appResourceUri?: string;
 	visibility?: string[];
 }
@@ -475,8 +492,8 @@ export interface MCPServerSelection {
 export interface MCPConversationContext {
 	servers: MCPServerSelection[];
 	resources?: MCPResourceRef[];
-	resourceTemplates?: MCPResourceTemplateRef[];
-	prompts?: MCPPromptRef[];
+	resourceTemplates?: MCPResourceTemplateSelection[];
+	prompts?: MCPPromptSelection[];
 }
 
 export interface MCPToolCallProvenance {

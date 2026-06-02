@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -16,6 +17,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+var uriTemplateVariableRE = regexp.MustCompile(`\{([A-Za-z_][A-Za-z0-9_.-]*)\}`)
 
 type Session struct {
 	bundleID bundleitemutils.BundleID
@@ -400,6 +403,8 @@ func (s *Session) listAllResourceTemplates(
 				DisplayName: displayNameFirstNonEmpty(rt.Title, rt.Name, rt.URITemplate),
 				Description: rt.Description,
 				MimeType:    rt.MIMEType,
+				Arguments:   resourceTemplateArgumentsToSpec(rt.URITemplate),
+
 				Annotations: annotationsToMap(rt.Annotations),
 				Digest:      digestAny(rt),
 			})
@@ -441,6 +446,7 @@ func (s *Session) listAllPrompts(
 				Title:       p.Title,
 				DisplayName: displayNameFirstNonEmpty(p.Title, p.Name),
 				Description: p.Description,
+				Arguments:   promptArgumentsToSpec(p.Arguments),
 				Digest:      digestAny(p),
 			})
 		}
@@ -594,13 +600,64 @@ func completionReference(req spec.MCPCompleteArgumentRequestBody) (*mcpSDK.Compl
 			return nil, fmt.Errorf("%w: completion resource uri required", spec.ErrMCPInvalidRequest)
 		}
 		return &mcpSDK.CompleteReference{
-			Type: refTypeResource,
+			Type: refTypeRefResource,
 			URI:  req.Name,
 		}, nil
 
 	default:
 		return nil, fmt.Errorf("%w: invalid completion refType %q", spec.ErrMCPInvalidRequest, req.RefType)
 	}
+}
+
+func promptArgumentsToSpec(in []*mcpSDK.PromptArgument) map[string]spec.MCPArgumentDefinition {
+	if len(in) == 0 {
+		return nil
+	}
+
+	out := make(map[string]spec.MCPArgumentDefinition, len(in))
+	for _, arg := range in {
+		if arg == nil || strings.TrimSpace(arg.Name) == "" {
+			continue
+		}
+		name := strings.TrimSpace(arg.Name)
+		out[name] = spec.MCPArgumentDefinition{
+			Name:        name,
+			Description: arg.Description,
+			Required:    arg.Required,
+		}
+	}
+
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func resourceTemplateArgumentsToSpec(uriTemplate string) map[string]spec.MCPArgumentDefinition {
+	matches := uriTemplateVariableRE.FindAllStringSubmatch(uriTemplate, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+
+	out := map[string]spec.MCPArgumentDefinition{}
+	for _, match := range matches {
+		if len(match) < 2 {
+			continue
+		}
+		name := strings.TrimSpace(match[1])
+		if name == "" {
+			continue
+		}
+		out[name] = spec.MCPArgumentDefinition{
+			Name:     name,
+			Required: true,
+		}
+	}
+
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func contentSliceToSpec(in []mcpSDK.Content) []spec.MCPContent {

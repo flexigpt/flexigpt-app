@@ -288,6 +288,22 @@ func (w *MCPWrapper) PutMCPServer(req *spec.PutMCPServerRequest) (*spec.PutMCPSe
 			}
 		}
 
+		if req != nil &&
+			req.Body != nil &&
+			req.Body.StreamableHTTP != nil &&
+			req.Body.StreamableHTTP.AuthMode == spec.MCPHTTPAuthClientCredentials {
+			ref := strings.TrimSpace(req.Body.StreamableHTTP.ClientCredentialRef)
+			if ref == "" {
+				return nil, fmt.Errorf(
+					"%w: streamableHttp.clientCredentialRef is required for clientCredentials auth",
+					spec.ErrMCPInvalidRequest,
+				)
+			}
+			if ok, msg := w.oauthClientSecretConfigured(context.Background(), ref, true); !ok {
+				return nil, fmt.Errorf("%w: %s", spec.ErrMCPInvalidRequest, msg)
+			}
+		}
+
 		resp, err := w.store.PutMCPServer(context.Background(), req)
 		if err != nil {
 			return nil, err

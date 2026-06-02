@@ -3,8 +3,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
 	type MCPConversationContext,
 	type MCPPromptRef,
+	type MCPPromptSelection,
 	type MCPResourceRef,
 	type MCPResourceTemplateRef,
+	type MCPResourceTemplateSelection,
 	type MCPToolCapability,
 	MCPToolExposure,
 	type MCPToolSelection,
@@ -23,6 +25,7 @@ import {
 } from '@/apis/list_helper';
 
 import {
+	countMissingRequiredMCPArguments,
 	type MCPComposerServerOption,
 	type MCPComposerServerSelection,
 	mcpContextToSelectionMap,
@@ -72,6 +75,26 @@ function upsertByKey<T>(items: T[], keyFn: (item: T) => string, item: T): T[] {
 function removeByKey<T>(items: T[], keyFn: (item: T) => string, item: T): T[] {
 	const key = keyFn(item);
 	return items.filter(existing => keyFn(existing) !== key);
+}
+
+function withArgumentValue<T extends { argumentValues?: Record<string, string> }>(
+	item: T,
+	argumentName: string,
+	value: string
+): T {
+	let nextValues = {
+		...(item.argumentValues ?? {}),
+		[argumentName]: value,
+	};
+
+	if (!value.trim()) {
+		nextValues = omitManyKeys(nextValues, [argumentName]);
+	}
+
+	return {
+		...item,
+		argumentValues: Object.keys(nextValues).length > 0 ? nextValues : undefined,
+	};
 }
 
 export function useComposerMCP(): UseComposerMCPResult {
@@ -512,7 +535,10 @@ export function useComposerMCP(): UseComposerMCPResult {
 	const toggleResourceTemplate = useCallback(
 		(template: MCPResourceTemplateRef, selected: boolean) => {
 			const key = mcpServerKey(template.bundleID, template.serverID);
-
+			const templateSelection: MCPResourceTemplateSelection = {
+				...template,
+				argumentValues: {},
+			};
 			commitSelectedByServerKey(prev => {
 				const current = prev[key];
 				if (!current) return prev;
@@ -522,8 +548,8 @@ export function useComposerMCP(): UseComposerMCPResult {
 					[key]: {
 						...current,
 						selectedResourceTemplates: selected
-							? upsertByKey(current.selectedResourceTemplates, mcpResourceTemplateKey, template)
-							: removeByKey(current.selectedResourceTemplates, mcpResourceTemplateKey, template),
+							? upsertByKey(current.selectedResourceTemplates, mcpResourceTemplateKey, templateSelection)
+							: removeByKey(current.selectedResourceTemplates, mcpResourceTemplateKey, templateSelection),
 					},
 				};
 			});
@@ -534,7 +560,10 @@ export function useComposerMCP(): UseComposerMCPResult {
 	const togglePrompt = useCallback(
 		(prompt: MCPPromptRef, selected: boolean) => {
 			const key = mcpServerKey(prompt.bundleID, prompt.serverID);
-
+			const promptSelection: MCPPromptSelection = {
+				...prompt,
+				argumentValues: {},
+			};
 			commitSelectedByServerKey(prev => {
 				const current = prev[key];
 				if (!current) return prev;
@@ -544,8 +573,50 @@ export function useComposerMCP(): UseComposerMCPResult {
 					[key]: {
 						...current,
 						selectedPrompts: selected
-							? upsertByKey(current.selectedPrompts, mcpPromptKey, prompt)
-							: removeByKey(current.selectedPrompts, mcpPromptKey, prompt),
+							? upsertByKey(current.selectedPrompts, mcpPromptKey, promptSelection)
+							: removeByKey(current.selectedPrompts, mcpPromptKey, promptSelection),
+					},
+				};
+			});
+		},
+		[commitSelectedByServerKey]
+	);
+
+	const setResourceTemplateArgumentValue = useCallback(
+		(bundleID: string, serverID: string, uriTemplate: string, argumentName: string, value: string) => {
+			const key = mcpServerKey(bundleID, serverID);
+			commitSelectedByServerKey(prev => {
+				const current = prev[key];
+				if (!current) return prev;
+
+				return {
+					...prev,
+					[key]: {
+						...current,
+						selectedResourceTemplates: current.selectedResourceTemplates.map(template =>
+							template.uriTemplate === uriTemplate ? withArgumentValue(template, argumentName, value) : template
+						),
+					},
+				};
+			});
+		},
+		[commitSelectedByServerKey]
+	);
+
+	const setPromptArgumentValue = useCallback(
+		(bundleID: string, serverID: string, promptName: string, argumentName: string, value: string) => {
+			const key = mcpServerKey(bundleID, serverID);
+			commitSelectedByServerKey(prev => {
+				const current = prev[key];
+				if (!current) return prev;
+
+				return {
+					...prev,
+					[key]: {
+						...current,
+						selectedPrompts: current.selectedPrompts.map(prompt =>
+							prompt.promptName === promptName ? withArgumentValue(prompt, argumentName, value) : prompt
+						),
 					},
 				};
 			});
@@ -592,6 +663,14 @@ export function useComposerMCP(): UseComposerMCPResult {
 
 		selectedByServerKeyRef.current = nextSelections;
 		commitSelectedByServerKey(() => nextSelections);
+		const missing = countMissingRequiredMCPArguments([
+			...Object.values(nextSelections).flatMap(selection => selection.selectedResourceTemplates),
+			...Object.values(nextSelections).flatMap(selection => selection.selectedPrompts),
+		]);
+
+		if (missing > 0) {
+			throw new Error(`Fill ${missing} required MCP argument${missing === 1 ? '' : 's'} before sending.`);
+		}
 		return mcpSelectionToContext(nextSelections);
 	}, [commitSelectedByServerKey, loadDiscoveryForServer]);
 
@@ -613,7 +692,10 @@ export function useComposerMCP(): UseComposerMCPResult {
 		(sum, selection) => sum + selection.selectedPrompts.length,
 		0
 	);
-
+	const requiredArgumentMissingCount = countMissingRequiredMCPArguments([
+		...Object.values(selectedByServerKey).flatMap(selection => selection.selectedResourceTemplates),
+		...Object.values(selectedByServerKey).flatMap(selection => selection.selectedPrompts),
+	]);
 	return {
 		options,
 		loading,
@@ -624,6 +706,8 @@ export function useComposerMCP(): UseComposerMCPResult {
 		selectedToolCount,
 		selectedResourceCount,
 		selectedPromptCount,
+		requiredArgumentMissingCount,
+		argumentsBlocked: requiredArgumentMissingCount > 0,
 		refreshAll,
 		refreshServer,
 		ensureDiscoveryLoaded,
@@ -639,6 +723,8 @@ export function useComposerMCP(): UseComposerMCPResult {
 		toggleResource,
 		toggleResourceTemplate,
 		togglePrompt,
+		setResourceTemplateArgumentValue,
+		setPromptArgumentValue,
 		clear,
 		restoreContext,
 	};

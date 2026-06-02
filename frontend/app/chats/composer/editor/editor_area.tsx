@@ -322,7 +322,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	});
 
 	const previousProviderSDKTypeRef = useRef(currentProviderSDKType);
-	const hasBlockingToolArgs = toolArgsBlocked || webSearchArgsBlocked;
+	const hasBlockingMCPArgs = mcp.argumentsBlocked;
+	const hasBlockingToolArgs = toolArgsBlocked || webSearchArgsBlocked || hasBlockingMCPArgs;
 
 	useLayoutEffect(() => {
 		if (previousProviderSDKTypeRef.current === currentProviderSDKType) return;
@@ -807,7 +808,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			// Guard explicitly here as well, so even programmatic calls respect it.
 			if (hasBlockingToolArgs) {
 				setSubmitError(
-					'Some tools or web-search options require configuration. Fill the required options before sending.'
+					hasBlockingMCPArgs
+						? 'Some MCP prompts or resource templates require arguments. Fill the required arguments before sending.'
+						: 'Some tools or web-search options require configuration. Fill the required options before sending.'
 				);
 				return;
 			}
@@ -926,8 +929,13 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				const finalToolChoices = dedupeToolChoices([...explicitChoices, ...conversationChoices, ...webSearchChoices]);
 				shouldShowAutoExecStopAfterSend = countAutoExecutableToolChoices(finalToolChoices) >= 1;
 
-				const preparedMCPContext = await mcp.prepareForSubmit();
-
+				let preparedMCPContext;
+				try {
+					preparedMCPContext = await mcp.prepareForSubmit();
+				} catch (err) {
+					setSubmitError((err as Error)?.message || 'Fill required MCP arguments before sending.');
+					return;
+				}
 				const payload: EditorSubmitPayload = {
 					text: textToSend,
 					resolvedSystemPrompt,
@@ -985,6 +993,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			getCurrentEnabledSkillRefs,
 			getCurrentSkillSessionID,
 			getToolRuntimeSnapshot,
+			hasBlockingMCPArgs,
 			hasBlockingToolArgs,
 			isInputLocked,
 			isSendButtonEnabled,

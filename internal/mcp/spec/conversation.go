@@ -21,10 +21,13 @@ type MCPProviderToolMapping struct {
 	ProviderToolName string `json:"providerToolName"`
 	ChoiceID         string `json:"choiceID"`
 
-	ToolName       string   `json:"toolName"`
-	ToolDigest     string   `json:"toolDigest"`
-	AppResourceURI string   `json:"appResourceUri,omitempty"`
-	Visibility     []string `json:"visibility,omitempty"`
+	ToolName   string `json:"toolName"`
+	ToolDigest string `json:"toolDigest"`
+
+	ApprovalRule   MCPApprovalRule  `json:"approvalRule,omitempty"`
+	ExecutionMode  MCPExecutionMode `json:"executionMode,omitempty"`
+	AppResourceURI string           `json:"appResourceUri,omitempty"`
+	Visibility     []string         `json:"visibility,omitempty"`
 }
 
 type MCPServerSelection struct {
@@ -39,11 +42,23 @@ type MCPServerSelection struct {
 	IncludeServerInstructions bool `json:"includeServerInstructions,omitempty"`
 }
 
+type MCPResourceTemplateSelection struct {
+	MCPResourceTemplateRef
+
+	ArgumentValues map[string]string `json:"argumentValues,omitempty"`
+}
+
+type MCPPromptSelection struct {
+	MCPPromptRef
+
+	ArgumentValues map[string]string `json:"argumentValues,omitempty"`
+}
+
 type MCPConversationContext struct {
-	Servers           []MCPServerSelection     `json:"servers"`
-	Resources         []MCPResourceRef         `json:"resources,omitempty"`
-	ResourceTemplates []MCPResourceTemplateRef `json:"resourceTemplates,omitempty"`
-	Prompts           []MCPPromptRef           `json:"prompts,omitempty"`
+	Servers           []MCPServerSelection           `json:"servers"`
+	Resources         []MCPResourceRef               `json:"resources,omitempty"`
+	ResourceTemplates []MCPResourceTemplateSelection `json:"resourceTemplates,omitempty"`
+	Prompts           []MCPPromptSelection           `json:"prompts,omitempty"`
 }
 type MCPToolCallProvenance struct {
 	BundleID bundleitemutils.BundleID `json:"bundleID"`

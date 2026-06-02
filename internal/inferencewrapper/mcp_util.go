@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
@@ -168,6 +169,8 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 				ChoiceID:         tool.ChoiceID,
 				ToolName:         tool.ToolName,
 				ToolDigest:       tool.Digest,
+				ApprovalRule:     tool.ApprovalRule,
+				ExecutionMode:    tool.ExecutionMode,
 			}
 			if tool.App != nil {
 				mapping.AppResourceURI = tool.App.ResourceURI
@@ -220,7 +223,18 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 			continue
 		}
 
-		uri, err := resolveMCPResourceTemplateURI(tmpl.URITemplate, tmpl.Arguments)
+		if missing := missingRequiredMCPArguments(tmpl.Arguments, tmpl.ArgumentValues); len(missing) > 0 {
+			warnings = append(warnings, fmt.Sprintf(
+				"MCP resource template skipped for %s/%s/%s: missing required arguments: %s",
+				tmpl.BundleID,
+				tmpl.ServerID,
+				tmpl.URITemplate,
+				strings.Join(missing, ", "),
+			))
+			continue
+		}
+
+		uri, err := resolveMCPResourceTemplateURI(tmpl.URITemplate, tmpl.ArgumentValues)
 		if err != nil {
 			warnings = append(warnings, fmt.Sprintf(
 				"MCP resource template skipped for %s/%s/%s: %v",
@@ -272,7 +286,18 @@ func (b *MCPInferenceBridge) HydrateCompletion(
 			continue
 		}
 
-		text, err := b.getPromptAsText(ctx, prompt.BundleID, prompt.ServerID, prompt.PromptName, prompt.Arguments)
+		if missing := missingRequiredMCPArguments(prompt.Arguments, prompt.ArgumentValues); len(missing) > 0 {
+			warnings = append(warnings, fmt.Sprintf(
+				"MCP prompt skipped for %s/%s/%s: missing required arguments: %s",
+				prompt.BundleID,
+				prompt.ServerID,
+				prompt.PromptName,
+				strings.Join(missing, ", "),
+			))
+			continue
+		}
+
+		text, err := b.getPromptAsText(ctx, prompt.BundleID, prompt.ServerID, prompt.PromptName, prompt.ArgumentValues)
 		if err != nil {
 			warnings = append(warnings, fmt.Sprintf(
 				"MCP prompt skipped for %s/%s %q: %v",
@@ -524,6 +549,32 @@ func (b *MCPInferenceBridge) getPromptAsText(
 		parts = append(parts, fmt.Sprintf("Role: %s\n%s", role, text))
 	}
 	return strings.Join(parts, "\n\n---\n\n"), nil
+}
+
+func missingRequiredMCPArguments(
+	defs map[string]mcpSpec.MCPArgumentDefinition,
+	values map[string]string,
+) []string {
+	if len(defs) == 0 {
+		return nil
+	}
+
+	missing := make([]string, 0)
+	for name, def := range defs {
+		argName := strings.TrimSpace(def.Name)
+		if argName == "" {
+			argName = strings.TrimSpace(name)
+		}
+		if argName == "" || !def.Required {
+			continue
+		}
+		if strings.TrimSpace(values[argName]) == "" {
+			missing = append(missing, argName)
+		}
+	}
+
+	slices.Sort(missing)
+	return missing
 }
 
 func mcpToolVisibleToModel(tool mcpSpec.MCPToolCapability) bool {

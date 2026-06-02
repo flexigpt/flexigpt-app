@@ -118,6 +118,7 @@ type ErrorState = {
 type SecretEnvRow = {
 	rowID: string;
 	envName: string;
+	originalEnvName?: string;
 	slot: string;
 	existingSecretRef?: string;
 	secretValue: string;
@@ -200,6 +201,7 @@ function getInitialFormData(initialData: MCPServerConfig | undefined): MCPServer
 		([envName, secretRef]) => ({
 			rowID: makeRowID(),
 			envName,
+			originalEnvName: envName,
 			slot: envName,
 			existingSecretRef: secretRef,
 			secretValue: '',
@@ -427,7 +429,8 @@ function AddEditMCPServerModalContent({
 					break;
 				}
 
-				if (seenEnvNames.has(envName)) {
+				const normalizedEnvName = envName.toLowerCase();
+				if (seenEnvNames.has(normalizedEnvName)) {
 					nextErrors.stdioSecrets = 'Secret env names must be unique.';
 					break;
 				}
@@ -435,7 +438,19 @@ function AddEditMCPServerModalContent({
 					nextErrors.stdioSecrets = `Secret env ${envName} is also present in plain Env JSON.`;
 					break;
 				}
-				seenEnvNames.add(envName);
+
+				seenEnvNames.add(normalizedEnvName);
+
+				if (
+					row.existingSecretRef &&
+					row.originalEnvName &&
+					row.originalEnvName !== envName &&
+					!row.secretValue.trim() &&
+					!row.deleteExisting
+				) {
+					nextErrors.stdioSecrets = `Changing ${row.originalEnvName} to ${envName} requires a replacement secret value.`;
+					break;
+				}
 
 				if (!row.existingSecretRef && !row.secretValue.trim()) {
 					nextErrors.stdioSecrets = `Secret value is required for ${envName}.`;
@@ -619,7 +634,8 @@ function AddEditMCPServerModalContent({
 			for (const row of formData.stdioSecretRows) {
 				const envName = row.envName.trim();
 
-				if (row.existingSecretRef && !row.deleteExisting) {
+				const envNameUnchanged = !row.originalEnvName || row.originalEnvName === envName;
+				if (row.existingSecretRef && !row.deleteExisting && !row.secretValue.trim() && envNameUnchanged) {
 					secretEnvRefs[envName] = row.existingSecretRef;
 				}
 			}

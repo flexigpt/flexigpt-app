@@ -73,6 +73,29 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 	);
 }
 
+function ArgumentSummary({ args }: { args?: Record<string, { required?: boolean; description?: string } | string> }) {
+	if (!args || Object.keys(args).length === 0) return <span>-</span>;
+
+	return (
+		<div className="flex flex-wrap justify-center gap-1">
+			{Object.entries(args).map(([name, def]) => {
+				const required = typeof def === 'object' && Boolean(def.required);
+				const description = typeof def === 'object' ? def.description : def;
+				return (
+					<span
+						key={name}
+						className={`badge badge-xs rounded-xl ${required ? 'badge-warning' : 'badge-ghost'}`}
+						title={description}
+					>
+						{name}
+						{required ? '*' : ''}
+					</span>
+				);
+			})}
+		</div>
+	);
+}
+
 export function MCPServerDetailsModal({
 	isOpen,
 	onClose,
@@ -348,7 +371,7 @@ export function MCPServerDetailsModal({
 										<tr className="bg-base-300 text-sm font-semibold">
 											<th>Display Name</th>
 											<th>URI Template</th>
-											<th className="text-center">MIME</th>
+											<th className="text-center">Arguments</th>
 										</tr>
 									</thead>
 									<tbody>
@@ -362,12 +385,15 @@ export function MCPServerDetailsModal({
 												</td>
 												<td className="max-w-lg break-all">{template.uriTemplate}</td>
 												<td className="text-center">{template.mimeType || '-'}</td>
+												<td className="text-center">
+													<ArgumentSummary args={template.arguments} />
+												</td>
 											</tr>
 										))}
 
 										{discovery.resourceTemplates.length === 0 && (
 											<tr>
-												<td colSpan={3} className="py-3 text-center text-sm">
+												<td colSpan={4} className="py-3 text-center text-sm">
 													No resource templates discovered.
 												</td>
 											</tr>
@@ -399,7 +425,7 @@ export function MCPServerDetailsModal({
 												</td>
 												<td className="text-center">{prompt.promptName}</td>
 												<td className="text-center">
-													{prompt.arguments ? Object.keys(prompt.arguments).join(', ') : '-'}
+													<ArgumentSummary args={prompt.arguments} />
 												</td>
 											</tr>
 										))}

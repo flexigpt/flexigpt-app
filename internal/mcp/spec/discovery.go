@@ -70,6 +70,13 @@ type MCPToolCapability struct {
 	Stale   bool   `json:"stale,omitempty"`
 }
 
+type MCPArgumentDefinition struct {
+	Name        string `json:"name"`
+	Title       string `json:"title,omitempty"`
+	Description string `json:"description,omitempty"`
+	Required    bool   `json:"required,omitempty"`
+}
+
 type MCPResourceRef struct {
 	BundleID    bundleitemutils.BundleID `json:"bundleID"`
 	ServerID    MCPServerID              `json:"serverID"`
@@ -85,28 +92,28 @@ type MCPResourceRef struct {
 }
 
 type MCPResourceTemplateRef struct {
-	BundleID    bundleitemutils.BundleID `json:"bundleID"`
-	ServerID    MCPServerID              `json:"serverID"`
-	URITemplate string                   `json:"uriTemplate"`
-	Name        string                   `json:"name,omitempty"`
-	Title       string                   `json:"title,omitempty"`
-	DisplayName string                   `json:"displayName"`
-	Description string                   `json:"description,omitempty"`
-	MimeType    string                   `json:"mimeType,omitempty"`
-	Arguments   map[string]string        `json:"arguments,omitempty"`
-	Annotations map[string]any           `json:"annotations,omitempty"`
-	Digest      string                   `json:"digest,omitempty"`
+	BundleID    bundleitemutils.BundleID         `json:"bundleID"`
+	ServerID    MCPServerID                      `json:"serverID"`
+	URITemplate string                           `json:"uriTemplate"`
+	Name        string                           `json:"name,omitempty"`
+	Title       string                           `json:"title,omitempty"`
+	DisplayName string                           `json:"displayName"`
+	Description string                           `json:"description,omitempty"`
+	MimeType    string                           `json:"mimeType,omitempty"`
+	Arguments   map[string]MCPArgumentDefinition `json:"arguments,omitempty"`
+	Annotations map[string]any                   `json:"annotations,omitempty"`
+	Digest      string                           `json:"digest,omitempty"`
 }
 
 type MCPPromptRef struct {
-	BundleID    bundleitemutils.BundleID `json:"bundleID"`
-	ServerID    MCPServerID              `json:"serverID"`
-	PromptName  string                   `json:"promptName"`
-	Title       string                   `json:"title,omitempty"`
-	DisplayName string                   `json:"displayName"`
-	Description string                   `json:"description,omitempty"`
-	Arguments   map[string]string        `json:"arguments,omitempty"`
-	Digest      string                   `json:"digest,omitempty"`
+	BundleID    bundleitemutils.BundleID         `json:"bundleID"`
+	ServerID    MCPServerID                      `json:"serverID"`
+	PromptName  string                           `json:"promptName"`
+	Title       string                           `json:"title,omitempty"`
+	DisplayName string                           `json:"displayName"`
+	Description string                           `json:"description,omitempty"`
+	Arguments   map[string]MCPArgumentDefinition `json:"arguments,omitempty"`
+	Digest      string                           `json:"digest,omitempty"`
 }
 
 type MCPDiscoverySnapshot struct {

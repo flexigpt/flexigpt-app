@@ -175,10 +175,16 @@ func validateStdioConfig(
 			return fmt.Errorf("stdio.env[%q]: %w", k, err)
 		}
 	}
+	seenSecretSlots := map[string]string{}
 	for k, ref := range c.SecretEnvRefs {
 		if err := validateEnvKey(k); err != nil {
 			return fmt.Errorf("stdio.secretEnvRefs[%q]: %w", k, err)
 		}
+		slotKey := strings.ToLower(strings.TrimSpace(k))
+		if prev := seenSecretSlots[slotKey]; prev != "" {
+			return fmt.Errorf("stdio.secretEnvRefs keys %q and %q collide after secret-slot normalization", prev, k)
+		}
+		seenSecretSlots[slotKey] = k
 		if strings.TrimSpace(ref) == "" {
 			return fmt.Errorf("stdio.secretEnvRefs[%q] contains empty ref", k)
 		}

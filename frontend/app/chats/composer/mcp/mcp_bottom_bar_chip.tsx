@@ -1,4 +1,4 @@
-import { type MouseEvent, useMemo } from 'react';
+import { type MouseEvent, useEffect, useMemo, useState } from 'react';
 
 import { FiCheck, FiExternalLink, FiRefreshCw, FiServer, FiWifi, FiWifiOff, FiX } from 'react-icons/fi';
 
@@ -7,12 +7,17 @@ import { Menu, MenuButton, useMenuStore, useStoreState } from '@ariakit/react';
 import {
 	MCPAuthHealthState,
 	type MCPPromptRef,
+	type MCPPromptSelection,
+	MCPRefType,
 	type MCPResourceRef,
 	type MCPResourceTemplateRef,
+	type MCPResourceTemplateSelection,
 	MCPServerStatus,
 	type MCPToolCapability,
 	MCPToolExposure,
 } from '@/spec/mcp';
+
+import { mcpAPI } from '@/apis/baseapi';
 
 import { ActionTriggerChipContent, actionTriggerChipSurfaceClasses } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
@@ -25,6 +30,7 @@ import {
 	mcpResourceTemplateKey,
 	mcpServerKey,
 	mcpToolKey,
+	normalizeMCPArgumentDefinitions,
 	type UseComposerMCPResult,
 } from '@/chats/composer/mcp/mcp_composer_types';
 import { optionKey } from '@/chats/composer/mcp/use_composer_mcp';
@@ -106,7 +112,10 @@ function ServerDiscoverySection({
 	const selectedResourceKeys = new Set(selection.selectedResources.map(mcpResourceKey));
 	const selectedTemplateKeys = new Set(selection.selectedResourceTemplates.map(mcpResourceTemplateKey));
 	const selectedPromptKeys = new Set(selection.selectedPrompts.map(mcpPromptKey));
-
+	const selectedTemplateByKey = new Map(
+		selection.selectedResourceTemplates.map(template => [mcpResourceTemplateKey(template), template] as const)
+	);
+	const selectedPromptByKey = new Map(selection.selectedPrompts.map(prompt => [mcpPromptKey(prompt), prompt] as const));
 	const discoveryText = option.discoveryLoading
 		? 'Loading discovery…'
 		: option.discoveryError
@@ -211,23 +220,48 @@ function ServerDiscoverySection({
 						/>
 					))}
 
-					{option.resourceTemplates.map((template: MCPResourceTemplateRef) => (
-						<CheckboxRow
-							key={mcpResourceTemplateKey(template)}
-							checked={selectedTemplateKeys.has(mcpResourceTemplateKey(template))}
-							disabled={isInputLocked}
-							title={template.uriTemplate}
-							label={
-								<div className="min-w-0">
-									<div className="truncate">{template.displayName || template.name || template.uriTemplate}</div>
-									<div className="text-base-content/60 truncate">{template.uriTemplate}</div>
-								</div>
-							}
-							onChange={next => {
-								state.toggleResourceTemplate(template, next);
-							}}
-						/>
-					))}
+					{option.resourceTemplates.map((template: MCPResourceTemplateRef) => {
+						const templateKey = mcpResourceTemplateKey(template);
+						const selectedTemplate = selectedTemplateByKey.get(templateKey);
+
+						return (
+							<div key={templateKey}>
+								<CheckboxRow
+									checked={selectedTemplateKeys.has(templateKey)}
+									disabled={isInputLocked}
+									title={template.uriTemplate}
+									label={
+										<div className="min-w-0">
+											<div className="truncate">{template.displayName || template.name || template.uriTemplate}</div>
+											<div className="text-base-content/60 truncate">{template.uriTemplate}</div>
+										</div>
+									}
+									onChange={next => {
+										state.toggleResourceTemplate(template, next);
+									}}
+								/>
+								{selectedTemplate ? (
+									<MCPArgumentFields
+										bundleID={template.bundleID}
+										serverID={template.serverID}
+										refType={MCPRefType.MCPRefTypeResource}
+										name={template.uriTemplate}
+										item={selectedTemplate}
+										disabled={isInputLocked}
+										onValueChange={(argumentName, value) => {
+											state.setResourceTemplateArgumentValue(
+												template.bundleID,
+												template.serverID,
+												template.uriTemplate,
+												argumentName,
+												value
+											);
+										}}
+									/>
+								) : null}
+							</div>
+						);
+					})}
 				</div>
 			)}
 
@@ -236,23 +270,48 @@ function ServerDiscoverySection({
 				<div className="text-base-content/60 px-2 text-xs">No prompts discovered.</div>
 			) : (
 				<div className="max-h-40 overflow-y-auto">
-					{option.prompts.map((prompt: MCPPromptRef) => (
-						<CheckboxRow
-							key={mcpPromptKey(prompt)}
-							checked={selectedPromptKeys.has(mcpPromptKey(prompt))}
-							disabled={isInputLocked}
-							title={prompt.description}
-							label={
-								<div className="min-w-0">
-									<div className="truncate">{prompt.displayName || prompt.promptName}</div>
-									<div className="text-base-content/60 truncate">{prompt.promptName}</div>
-								</div>
-							}
-							onChange={next => {
-								state.togglePrompt(prompt, next);
-							}}
-						/>
-					))}
+					{option.prompts.map((prompt: MCPPromptRef) => {
+						const promptKey = mcpPromptKey(prompt);
+						const selectedPrompt = selectedPromptByKey.get(promptKey);
+
+						return (
+							<div key={promptKey}>
+								<CheckboxRow
+									checked={selectedPromptKeys.has(promptKey)}
+									disabled={isInputLocked}
+									title={prompt.description}
+									label={
+										<div className="min-w-0">
+											<div className="truncate">{prompt.displayName || prompt.promptName}</div>
+											<div className="text-base-content/60 truncate">{prompt.promptName}</div>
+										</div>
+									}
+									onChange={next => {
+										state.togglePrompt(prompt, next);
+									}}
+								/>
+								{selectedPrompt ? (
+									<MCPArgumentFields
+										bundleID={prompt.bundleID}
+										serverID={prompt.serverID}
+										refType={MCPRefType.MCPRefTypePrompt}
+										name={prompt.promptName}
+										item={selectedPrompt}
+										disabled={isInputLocked}
+										onValueChange={(argumentName, value) => {
+											state.setPromptArgumentValue(
+												prompt.bundleID,
+												prompt.serverID,
+												prompt.promptName,
+												argumentName,
+												value
+											);
+										}}
+									/>
+								) : null}
+							</div>
+						);
+					})}
 				</div>
 			)}
 		</div>
@@ -385,6 +444,116 @@ function ServerRow({
 	);
 }
 
+function MCPArgumentFields({
+	bundleID,
+	serverID,
+	refType,
+	name,
+	item,
+	disabled,
+	onValueChange,
+}: {
+	bundleID: string;
+	serverID: string;
+	refType: MCPRefType;
+	name: string;
+	item: MCPPromptSelection | MCPResourceTemplateSelection;
+	disabled?: boolean;
+	onValueChange: (argumentName: string, value: string) => void;
+}) {
+	const args = normalizeMCPArgumentDefinitions(item.arguments);
+	const [focusedArg, setFocusedArg] = useState<string | null>(null);
+	const [completionsByArg, setCompletionsByArg] = useState<Record<string, string[]>>({});
+
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	const values = item.argumentValues ?? {};
+
+	const focusedValue = focusedArg ? (values[focusedArg] ?? '') : '';
+
+	useEffect(() => {
+		if (!focusedArg) return;
+
+		let cancelled = false;
+		const timer = window.setTimeout(() => {
+			void mcpAPI
+				.completeMCPArgument(bundleID, serverID, refType, name, focusedArg, focusedValue, values)
+				.then(result => {
+					if (cancelled) return;
+					setCompletionsByArg(prev => ({
+						...prev,
+						[focusedArg]: result.values ?? [],
+					}));
+				})
+				.catch(() => {
+					if (cancelled) return;
+					setCompletionsByArg(prev => ({
+						...prev,
+						[focusedArg]: [],
+					}));
+				});
+		}, 200);
+
+		return () => {
+			cancelled = true;
+			window.clearTimeout(timer);
+		};
+	}, [bundleID, focusedArg, focusedValue, name, refType, serverID, values]);
+
+	if (args.length === 0) return null;
+
+	return (
+		<div className="bg-base-200/70 mx-2 mb-1 rounded-lg px-2 py-2">
+			<div className="text-base-content/70 mb-1 text-[10px] font-semibold uppercase">Arguments</div>
+			<div className="space-y-2">
+				{args.map(arg => {
+					const value = values[arg.name] ?? '';
+					const listID = `mcp-arg-${bundleID}-${serverID}-${refType}-${name}-${arg.name}`.replace(
+						/[^A-Za-z0-9_-]/g,
+						'_'
+					);
+					const missing = arg.required && value.trim().length === 0;
+
+					return (
+						<label key={arg.name} className="block text-xs">
+							<div className="mb-1 flex items-center gap-2">
+								<span className={missing ? 'text-warning' : ''}>
+									{arg.name}
+									{arg.required ? '*' : ''}
+								</span>
+								{arg.description ? (
+									<span className="text-base-content/50 truncate" title={arg.description}>
+										{arg.description}
+									</span>
+								) : null}
+							</div>
+							<input
+								className={`input input-bordered input-xs w-full rounded-lg ${missing ? 'input-warning' : ''}`}
+								value={value}
+								list={listID}
+								disabled={disabled}
+								onFocus={() => {
+									setFocusedArg(arg.name);
+								}}
+								onBlur={() => {
+									setFocusedArg(null);
+								}}
+								onChange={event => {
+									onValueChange(arg.name, event.currentTarget.value);
+								}}
+							/>
+							<datalist id={listID}>
+								{(completionsByArg[arg.name] ?? []).map(option => (
+									<option key={option} value={option} />
+								))}
+							</datalist>
+						</label>
+					);
+				})}
+			</div>
+		</div>
+	);
+}
+
 export function MCPBottomBarChip({
 	state,
 	isInputLocked = false,
@@ -404,8 +573,17 @@ export function MCPBottomBarChip({
 		if (state.selectedToolCount > 0) lines.push(`Tools: ${state.selectedToolCount}`);
 		if (state.selectedResourceCount > 0) lines.push(`Resources: ${state.selectedResourceCount}`);
 		if (state.selectedPromptCount > 0) lines.push(`Prompts: ${state.selectedPromptCount}`);
+		if (state.requiredArgumentMissingCount > 0) {
+			lines.push(`Missing required args: ${state.requiredArgumentMissingCount}`);
+		}
 		return lines.join('\n');
-	}, [enabledCount, state.selectedPromptCount, state.selectedResourceCount, state.selectedToolCount]);
+	}, [
+		enabledCount,
+		state.requiredArgumentMissingCount,
+		state.selectedPromptCount,
+		state.selectedResourceCount,
+		state.selectedToolCount,
+	]);
 
 	return (
 		<HoverTip content={title} placement="top" wrapperElement="div" wrapperClassName="inline-flex max-w-full">
@@ -429,7 +607,13 @@ export function MCPBottomBarChip({
 								<span className="badge badge-success badge-xs bg-success/30">{enabledCount}</span>
 							) : undefined
 						}
-						suffix={enabledCount > 0 ? <FiCheck size={14} className="shrink-0" /> : undefined}
+						suffix={
+							state.argumentsBlocked ? (
+								<span className="badge badge-warning badge-xs">Args</span>
+							) : enabledCount > 0 ? (
+								<FiCheck size={14} className="shrink-0" />
+							) : undefined
+						}
 						open={open}
 					/>
 				</MenuButton>
