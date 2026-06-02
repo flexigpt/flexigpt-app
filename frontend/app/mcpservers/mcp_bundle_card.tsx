@@ -15,6 +15,7 @@ import {
 } from 'react-icons/fi';
 
 import {
+	BaseMCPBundleID,
 	type MCPAuthHealth,
 	MCPAuthHealthState,
 	type MCPBundle,
@@ -46,6 +47,7 @@ type ServerModalMode = 'add' | 'edit';
 interface MCPBundleCardProps {
 	bundle: MCPBundle;
 	servers: MCPServerConfig[];
+	existingServerIDs: string[];
 	runtimeByServerID: Record<string, MCPServerRuntimeSnapshot | undefined>;
 	authHealthByServerID: Record<string, MCPAuthHealth | undefined>;
 
@@ -88,6 +90,7 @@ function TruncatedValue({ value }: { value: ReactNode }) {
 export function MCPBundleCard({
 	bundle,
 	servers,
+	existingServerIDs,
 	runtimeByServerID,
 	authHealthByServerID,
 	onToggleBundleEnabled,
@@ -102,6 +105,7 @@ export function MCPBundleCard({
 	onDeleteBundleRequested,
 }: MCPBundleCardProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
+	const isReservedBundle = bundle.id === BaseMCPBundleID;
 
 	const [isDeleteServerModalOpen, setIsDeleteServerModalOpen] = useState(false);
 	const [serverToDelete, setServerToDelete] = useState<MCPServerConfig | null>(null);
@@ -150,6 +154,10 @@ export function MCPBundleCard({
 	};
 
 	const handleToggleBundleEnable = async () => {
+		if (isReservedBundle) {
+			openAlert('The base MCP bundle metadata is reserved and cannot be disabled.');
+			return;
+		}
 		try {
 			setIsBundleTogglePending(true);
 			await onToggleBundleEnabled(bundle.id, !bundle.isEnabled);
@@ -242,7 +250,7 @@ export function MCPBundleCard({
 
 				<div className="flex items-center justify-end gap-4">
 					<span className="text-base-content/60 text-xs tracking-wide uppercase">
-						{bundle.isBuiltIn ? 'Built-in' : 'Custom'}
+						{bundle.isBuiltIn ? 'Built-in' : isReservedBundle ? 'Base' : 'Custom'}
 					</span>
 
 					<div className="flex items-center gap-1">
@@ -251,7 +259,8 @@ export function MCPBundleCard({
 							type="checkbox"
 							className="toggle toggle-accent"
 							checked={bundle.isEnabled}
-							disabled={isBundleTogglePending}
+							disabled={isBundleTogglePending || isReservedBundle}
+							title={isReservedBundle ? 'The base MCP bundle is always enabled.' : undefined}
 							onChange={() => {
 								void handleToggleBundleEnable();
 							}}
@@ -469,6 +478,7 @@ export function MCPBundleCard({
 												disabled={
 													!bundle.isEnabled ||
 													!server.enabled ||
+													!isReady ||
 													isConnecting ||
 													pendingActionKeys.has(`refresh:${server.id}`)
 												}
@@ -500,9 +510,19 @@ export function MCPBundleCard({
 						<div className="flex items-center justify-between">
 							<button
 								className="btn btn-md btn-ghost flex items-center rounded-2xl"
-								disabled={servers.length > 0}
-								title={servers.length > 0 ? 'Delete all servers from this bundle first.' : 'Delete Bundle'}
+								disabled={isReservedBundle || servers.length > 0}
+								title={
+									isReservedBundle
+										? 'The base MCP bundle cannot be deleted.'
+										: servers.length > 0
+											? 'Delete all servers from this bundle first.'
+											: 'Delete Bundle'
+								}
 								onClick={() => {
+									if (isReservedBundle) {
+										openAlert('The base MCP bundle cannot be deleted.');
+										return;
+									}
 									onDeleteBundleRequested(bundle.id);
 								}}
 							>
@@ -545,7 +565,7 @@ export function MCPBundleCard({
 				onSubmit={handleModifySubmit}
 				mode={serverModalMode}
 				initialData={serverToEdit}
-				existingServerIDs={servers.map(server => server.id)}
+				existingServerIDs={existingServerIDs}
 			/>
 
 			<MCPServerDetailsModal

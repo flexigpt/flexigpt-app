@@ -404,6 +404,21 @@ func (b *MCPInferenceBridge) toolsForSelection(
 		return nil, []string{"MCP runtime unavailable; skipped tool hydration."}, nil
 	}
 
+	statusResp, statusErr := b.runtime.Status(ctx, &mcpSpec.GetMCPServerStatusRequest{
+		BundleID: selection.BundleID,
+		ServerID: selection.ServerID,
+	})
+	if statusErr != nil {
+		return nil, []string{
+			fmt.Sprintf("MCP tools skipped for %s/%s: %v", selection.BundleID, selection.ServerID, statusErr),
+		}, nil
+	}
+	if statusResp != nil && statusResp.Body != nil && statusResp.Body.Status == mcpSpec.MCPServerStatusDisabled {
+		return nil, []string{
+			fmt.Sprintf("MCP tools skipped for %s/%s: server is disabled", selection.BundleID, selection.ServerID),
+		}, nil
+	}
+
 	allTools, err := b.listAllMCPTools(ctx, selection.BundleID, selection.ServerID)
 	if err != nil {
 		return nil, []string{

@@ -158,7 +158,21 @@ async function executeMCPToolCall(
 
 	const evaluation = await mcpAPI.evaluateMCPToolCall(bundleID, req);
 
-	if (evaluation?.decision === MCPApprovalDecision.MCPApprovalDecisionDenied) {
+	if (!evaluation) {
+		const message = 'MCP approval evaluation did not return a decision.';
+		return {
+			ok: true,
+			output: buildMCPToolOutput({
+				toolCall,
+				selection,
+				text: message,
+				isError: true,
+				errorMessage: message,
+			}),
+		};
+	}
+
+	if (evaluation.decision === MCPApprovalDecision.MCPApprovalDecisionDenied) {
 		const message = evaluation.reason || 'MCP policy denied this tool call.';
 		return {
 			ok: true,
@@ -172,7 +186,7 @@ async function executeMCPToolCall(
 		};
 	}
 
-	if (evaluation?.decision === MCPApprovalDecision.MCPApprovalDecisionApprovalRequired) {
+	if (evaluation.decision === MCPApprovalDecision.MCPApprovalDecisionApprovalRequired) {
 		if (!evaluation.approvalID) {
 			const message = 'MCP approval was required but no approval ID was returned.';
 			return {
@@ -239,6 +253,18 @@ async function executeMCPToolCall(
 
 		req.approvalID = token.approvalID;
 		req.approvalToken = token.token;
+	} else if (evaluation.decision !== MCPApprovalDecision.MCPApprovalDecisionAllowed) {
+		const message = `Unsupported MCP approval decision: ${String(evaluation.decision)}`;
+		return {
+			ok: true,
+			output: buildMCPToolOutput({
+				toolCall,
+				selection,
+				text: message,
+				isError: true,
+				errorMessage: message,
+			}),
+		};
 	}
 
 	try {

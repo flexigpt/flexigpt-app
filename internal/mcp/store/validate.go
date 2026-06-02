@@ -320,7 +320,7 @@ func validateClientIDMetadataDocumentURL(raw string) error {
 	if u.User != nil {
 		return errors.New("must not contain user info")
 	}
-	if u.Path == "" {
+	if u.Path == "" || u.Path == "/" {
 		return errors.New("must include a path")
 	}
 	if u.Fragment != "" {

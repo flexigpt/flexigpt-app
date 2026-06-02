@@ -306,7 +306,7 @@ export function useComposerToolRuntime({
 	}, []);
 
 	const retryErroredOutput = useCallback((output: UIToolOutput) => {
-		if (!output.isError || !output.arguments) return;
+		if (!output.isError) return;
 
 		if (output.mcpToolSelection) {
 			const call: UIToolCall = {

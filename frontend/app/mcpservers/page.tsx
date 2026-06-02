@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { FiPlus } from 'react-icons/fi';
 
 import {
+	BaseMCPBundleID,
 	type MCPAuthHealth,
 	type MCPBundle,
 	MCPSecretKind,
@@ -355,11 +356,17 @@ export default function MCPServersPage() {
 				for (const row of input.stdioSecretEnv) {
 					const envName = row.envName.trim();
 					const slot = row.slot.trim();
+					const deleteSlot = (row.deleteSlot ?? slot).trim();
 
 					if (!envName || !slot) continue;
 
-					if (row.deleteExisting && row.existingSecretRef) {
-						await mcpAPI.deleteMCPServerSecret(bundleID, input.serverID, MCPSecretKind.MCPSecretKindStdioEnv, slot);
+					if (row.deleteExisting && row.existingSecretRef && deleteSlot) {
+						await mcpAPI.deleteMCPServerSecret(
+							bundleID,
+							input.serverID,
+							MCPSecretKind.MCPSecretKindStdioEnv,
+							deleteSlot
+						);
 						refs = omitManyKeys(refs, [envName]);
 						requiresFinalPut = true;
 					}
@@ -509,7 +516,12 @@ export default function MCPServersPage() {
 		if (!bundleToDeleteID) {
 			return;
 		}
-
+		if (bundleToDeleteID === BaseMCPBundleID) {
+			setAlertMsg('The base MCP bundle cannot be deleted.');
+			setShowAlert(true);
+			setBundleToDeleteID(null);
+			return;
+		}
 		try {
 			await mcpAPI.deleteMCPBundle(bundleToDeleteID);
 
@@ -543,6 +555,8 @@ export default function MCPServersPage() {
 		return <Loader text="Loading MCP servers…" />;
 	}
 
+	const allServerIDs = bundles.flatMap(bundleData => bundleData.servers.map(server => server.id));
+
 	return (
 		<PageFrame>
 			<div className="flex h-full w-full flex-col items-center">
@@ -570,6 +584,7 @@ export default function MCPServersPage() {
 								key={bundleData.bundle.id}
 								bundle={bundleData.bundle}
 								servers={bundleData.servers}
+								existingServerIDs={allServerIDs}
 								runtimeByServerID={bundleData.runtimeByServerID}
 								authHealthByServerID={bundleData.authHealthByServerID}
 								onToggleBundleEnabled={handleToggleBundleEnabled}
@@ -584,6 +599,11 @@ export default function MCPServersPage() {
 								}}
 								onCancelOAuth={handleCancelOAuth}
 								onDeleteBundleRequested={bundleID => {
+									if (bundleID === BaseMCPBundleID) {
+										setAlertMsg('The base MCP bundle cannot be deleted.');
+										setShowAlert(true);
+										return;
+									}
 									setBundleToDeleteID(bundleID);
 								}}
 							/>

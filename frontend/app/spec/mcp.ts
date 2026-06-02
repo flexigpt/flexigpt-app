@@ -1,3 +1,4 @@
+export const BaseMCPBundleID = '019e785b-2b96-7ecc-a1c2-9b2bac90e08c';
 export const SecretRefVersion = 'mcpv1';
 export const DefaultMCPPageSize = 25;
 export const MaxMCPServerPageSize = 256;

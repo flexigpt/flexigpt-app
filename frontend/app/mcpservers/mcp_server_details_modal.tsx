@@ -371,6 +371,7 @@ export function MCPServerDetailsModal({
 										<tr className="bg-base-300 text-sm font-semibold">
 											<th>Display Name</th>
 											<th>URI Template</th>
+											<th className="text-center">MIME</th>
 											<th className="text-center">Arguments</th>
 										</tr>
 									</thead>

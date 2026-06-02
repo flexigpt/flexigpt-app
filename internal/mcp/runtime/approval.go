@@ -107,6 +107,7 @@ func (m *ApprovalManager) Resolve(
 		p.Token = token
 		if res == spec.MCPApprovalResolutionAllowAlways {
 			m.decisions[getApprovalDecisionKey(p.Summary)] = res
+			delete(m.pending, id)
 		}
 		return &spec.MCPApprovalToken{
 			ApprovalID: id,

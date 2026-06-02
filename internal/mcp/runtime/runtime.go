@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -166,7 +167,17 @@ func (m *MCPRuntimeManager) Connect(
 		}
 		mergeResolvedTransportAuth(&resolved, prepared)
 	}
-
+	redactor := auth.NewSecretRedactor(resolved)
+	redactErr := func(err error) error {
+		if err == nil {
+			return nil
+		}
+		redacted := redactor.Redact(err.Error())
+		if redacted == err.Error() {
+			return err
+		}
+		return errors.New(redacted)
+	}
 	connectTimeout := time.Duration(spec.DefaultConnectTimeoutMS) * time.Millisecond
 	if cfg.Transport == spec.MCPTransportStreamableHTTP && cfg.StreamableHTTP != nil &&
 		cfg.StreamableHTTP.TimeoutMS > 0 {
@@ -189,15 +200,17 @@ func (m *MCPRuntimeManager) Connect(
 
 	client, err := m.factory.Connect(cctx, cfg, resolved, m)
 	if err != nil {
-		m.setErrorIfCurrent(req.ServerID, generation, err)
-		return nil, err
+		safeErr := redactErr(err)
+		m.setErrorIfCurrent(req.ServerID, generation, safeErr)
+		return nil, safeErr
 	}
 
 	snap, err := client.Discover(cctx, cfg.ID, cfg.DefaultPolicy, cfg.TrustLevel)
 	if err != nil {
 		_ = client.Close(ctx)
-		m.setErrorIfCurrent(req.ServerID, generation, err)
-		return nil, err
+		safeErr := redactErr(err)
+		m.setErrorIfCurrent(req.ServerID, generation, safeErr)
+		return nil, safeErr
 	}
 
 	hydrateSnapshotIdentity(&snap, cfg.BundleID, cfg.ID)

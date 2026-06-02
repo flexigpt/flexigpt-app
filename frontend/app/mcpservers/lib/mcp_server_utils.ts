@@ -23,6 +23,7 @@ export const MCP_OAUTH_CLIENT_CREDENTIALS_SLOT = 'clientCredentials';
 export interface MCPStdioSecretEnvInput {
 	envName: string;
 	slot: string;
+	deleteSlot?: string;
 	existingSecretRef?: string;
 	secretValue?: string;
 	deleteExisting?: boolean;

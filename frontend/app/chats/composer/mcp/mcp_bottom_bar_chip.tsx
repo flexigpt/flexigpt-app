@@ -95,6 +95,8 @@ const TOOL_EXPOSURE_DROPDOWN_ITEMS: Record<MCPToolExposure, DropdownItem> = {
 	[MCPToolExposure.MCPToolExposureSelected]: { isEnabled: true },
 };
 
+const EMPTY_MCP_ARGUMENT_VALUES: Record<string, string> = {};
+
 function ServerDiscoverySection({
 	option,
 	state,
@@ -331,6 +333,8 @@ function ServerRow({
 	const selected = Boolean(state.selectedByServerKey[key]);
 	const status = getEffectiveMCPServerStatus(option.server.enabled, option.bundle.isEnabled, option.runtime);
 	const isReady = status === MCPServerStatus.MCPServerStatusReady;
+	const selectable = option.bundle.isEnabled && option.server.enabled;
+
 	const authPending =
 		option.authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending &&
 		Boolean(option.authHealth.authorizationURL);
@@ -342,8 +346,11 @@ function ServerRow({
 					type="checkbox"
 					className="checkbox checkbox-xs mt-1 rounded-sm"
 					checked={selected}
-					disabled={isInputLocked}
+					disabled={isInputLocked || (!selected && !selectable)}
+					title={!selectable ? 'Enable the MCP bundle and server before selecting it.' : undefined}
 					onChange={e => {
+						if (e.currentTarget.checked && !selectable) return;
+
 						state.setServerSelected(option, e.currentTarget.checked);
 						if (e.currentTarget.checked) {
 							void state.ensureDiscoveryLoaded(option.bundle.id, option.server.id);
@@ -413,9 +420,9 @@ function ServerRow({
 						onClick={e => {
 							stop(e);
 							if (isReady) {
-								void state.disconnectServer(option.bundle.id, option.server.id);
+								void state.disconnectServer(option.bundle.id, option.server.id).catch(console.error);
 							} else {
-								void state.connectServer(option.bundle.id, option.server.id);
+								void state.connectServer(option.bundle.id, option.server.id).catch(console.error);
 							}
 						}}
 						disabled={isInputLocked || !option.bundle.isEnabled || !option.server.enabled}
@@ -427,12 +434,14 @@ function ServerRow({
 						type="button"
 						className="btn btn-ghost btn-xs px-1"
 						title="Refresh"
+						disabled={isInputLocked || !isReady}
 						onClick={e => {
 							stop(e);
-							void state.refreshServer(option.bundle.id, option.server.id);
-							void state.ensureDiscoveryLoaded(option.bundle.id, option.server.id);
+							void state
+								.refreshServer(option.bundle.id, option.server.id)
+								.then(() => state.ensureDiscoveryLoaded(option.bundle.id, option.server.id))
+								.catch(console.error);
 						}}
-						disabled={isInputLocked}
 					>
 						<FiRefreshCw size={12} />
 					</button>
@@ -465,8 +474,7 @@ function MCPArgumentFields({
 	const [focusedArg, setFocusedArg] = useState<string | null>(null);
 	const [completionsByArg, setCompletionsByArg] = useState<Record<string, string[]>>({});
 
-	// eslint-disable-next-line react-hooks/exhaustive-deps
-	const values = item.argumentValues ?? {};
+	const values = item.argumentValues ?? EMPTY_MCP_ARGUMENT_VALUES;
 
 	const focusedValue = focusedArg ? (values[focusedArg] ?? '') : '';
 

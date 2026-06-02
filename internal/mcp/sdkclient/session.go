@@ -174,6 +174,9 @@ func (s *Session) ReadResource(
 	if err != nil {
 		return nil, err
 	}
+	if res == nil {
+		return nil, fmt.Errorf("%w: resource read returned nil response", spec.ErrMCPRuntimeNotReady)
+	}
 
 	contents := make([]spec.MCPContent, 0, len(res.Contents))
 	for _, rc := range res.Contents {
@@ -207,7 +210,9 @@ func (s *Session) GetPrompt(
 	if err != nil {
 		return nil, err
 	}
-
+	if res == nil {
+		return nil, fmt.Errorf("%w: prompt read returned nil response", spec.ErrMCPRuntimeNotReady)
+	}
 	messages := make([]spec.MCPPromptMessage, 0, len(res.Messages))
 	for _, msg := range res.Messages {
 		if msg == nil {
@@ -254,7 +259,9 @@ func (s *Session) Complete(
 	if err != nil {
 		return nil, err
 	}
-
+	if res == nil {
+		return nil, fmt.Errorf("%w: completion returned nil response", spec.ErrMCPRuntimeNotReady)
+	}
 	return &spec.MCPCompletionResult{
 		Values:  res.Completion.Values,
 		Total:   res.Completion.Total,

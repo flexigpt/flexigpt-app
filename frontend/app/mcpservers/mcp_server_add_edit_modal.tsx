@@ -276,12 +276,20 @@ function validateOAuthClientCredentials(raw: string, requireClientSecret: boolea
 		return 'Client credentials must include a non-empty clientID string.';
 	}
 
-	if (requireClientSecret && (typeof obj.clientSecret !== 'string' || obj.clientSecret.trim().length === 0)) {
-		return 'Client credentials auth requires a non-empty clientSecret string.';
+	if (obj.clientID.trim() !== obj.clientID) {
+		return 'clientID must not have leading or trailing whitespace.';
 	}
 
 	if (obj.clientSecret !== undefined && typeof obj.clientSecret !== 'string') {
 		return 'clientSecret must be a string when provided.';
+	}
+
+	if (obj.clientSecret !== undefined && obj.clientSecret.trim().length === 0) {
+		return 'clientSecret must not be only whitespace.';
+	}
+
+	if (requireClientSecret && (typeof obj.clientSecret !== 'string' || obj.clientSecret.trim().length === 0)) {
+		return 'Client credentials auth requires a non-empty clientSecret string.';
 	}
 
 	return undefined;
@@ -327,6 +335,7 @@ function AddEditMCPServerModalContent({
 	const [formData, setFormData] = useState<MCPServerFormData>(() => getInitialFormData(initialData));
 	const [errors, setErrors] = useState<ErrorState>({});
 	const [submitError, setSubmitError] = useState('');
+	const [deletedStdioSecretRows, setDeletedStdioSecretRows] = useState<SecretEnvRow[]>([]);
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const isUnmountingRef = useRef(false);
@@ -380,7 +389,7 @@ function AddEditMCPServerModalContent({
 			if (err) {
 				nextErrors.serverID = err;
 			} else if (!isEditMode && existingServerIDs.includes(serverID)) {
-				nextErrors.serverID = 'Server ID already exists in this bundle.';
+				nextErrors.serverID = 'Server ID already exists.';
 			} else {
 				nextErrors = omitManyKeys(nextErrors, ['serverID']);
 			}
@@ -588,6 +597,21 @@ function AddEditMCPServerModalContent({
 	};
 
 	const removeSecretRow = (rowID: string) => {
+		const rowToRemove = formData.stdioSecretRows.find(row => row.rowID === rowID);
+		if (rowToRemove?.existingSecretRef) {
+			const originalSlot = (rowToRemove.originalEnvName ?? rowToRemove.slot ?? rowToRemove.envName).trim();
+			setDeletedStdioSecretRows(prev => [
+				...prev.filter(row => row.existingSecretRef !== rowToRemove.existingSecretRef),
+				{
+					...rowToRemove,
+					envName: originalSlot,
+					slot: originalSlot,
+					secretValue: '',
+					deleteExisting: true,
+				},
+			]);
+		}
+
 		const next: MCPServerFormData = {
 			...formData,
 			stdioSecretRows: formData.stdioSecretRows.filter(row => row.rowID !== rowID),
@@ -639,6 +663,33 @@ function AddEditMCPServerModalContent({
 					secretEnvRefs[envName] = row.existingSecretRef;
 				}
 			}
+			const deletedSecretOps = deletedStdioSecretRows.map(row => {
+				const deleteSlot = (row.originalEnvName ?? row.slot ?? row.envName).trim();
+				return {
+					envName: deleteSlot,
+					slot: deleteSlot,
+					deleteSlot,
+					existingSecretRef: row.existingSecretRef,
+					secretValue: '',
+					deleteExisting: true,
+				};
+			});
+
+			const activeSecretOps = formData.stdioSecretRows.map(row => {
+				const envName = row.envName.trim();
+				const originalSlot = (row.originalEnvName ?? row.slot).trim();
+				const renamedExistingSecret =
+					Boolean(row.existingSecretRef) && Boolean(row.originalEnvName) && row.originalEnvName !== envName;
+
+				return {
+					envName,
+					slot: row.slot.trim(),
+					deleteSlot: originalSlot || row.slot.trim(),
+					existingSecretRef: row.existingSecretRef,
+					secretValue: row.secretValue,
+					deleteExisting: row.deleteExisting || renamedExistingSecret,
+				};
+			});
 
 			return {
 				serverID: formData.serverID.trim(),
@@ -653,13 +704,7 @@ function AddEditMCPServerModalContent({
 						startupTimeoutMS: normalizePositiveInteger(formData.stdioStartupTimeoutMS),
 					},
 				},
-				stdioSecretEnv: formData.stdioSecretRows.map(row => ({
-					envName: row.envName.trim(),
-					slot: row.slot.trim(),
-					existingSecretRef: row.existingSecretRef,
-					secretValue: row.secretValue,
-					deleteExisting: row.deleteExisting,
-				})),
+				stdioSecretEnv: [...deletedSecretOps, ...activeSecretOps],
 			};
 		}
 
