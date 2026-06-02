@@ -1,13 +1,276 @@
 package secret
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
+
+type secretRefWire struct {
+	BundleID bundleitemutils.BundleID `json:"bundleID"`
+	ServerID spec.MCPServerID         `json:"serverID"`
+	Kind     spec.MCPSecretKind       `json:"kind"`
+	Slot     string                   `json:"slot"`
+}
+
+func encodeSecretWire(t *testing.T, wire secretRefWire) string {
+	t.Helper()
+
+	raw, err := json.Marshal(wire)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+	return spec.SecretRefVersion + ":" + base64.RawURLEncoding.EncodeToString(raw)
+}
+
+func TestSecretRefRoundTripAndCanonicalStorageKey(t *testing.T) {
+	tests := []struct {
+		name     string
+		bundleID bundleitemutils.BundleID
+		serverID spec.MCPServerID
+		kind     spec.MCPSecretKind
+		slot     string
+		wantSlot string
+		wantJSON string
+	}{
+		{
+			name:     "stdio env",
+			bundleID: bundleitemutils.BundleID("  bundle-a  "),
+			serverID: spec.MCPServerID("  server-a  "),
+			kind:     spec.MCPSecretKindStdioEnv,
+			slot:     " TOKEN ",
+			wantSlot: "token",
+			wantJSON: `{"bundleID":"bundle-a","serverID":"server-a","kind":"stdioEnv","slot":"token"}`,
+		},
+		{
+			name:     "oauth client credentials",
+			bundleID: bundleitemutils.BundleID("  bundle-a  "),
+			serverID: spec.MCPServerID("  server-b  "),
+			kind:     spec.MCPSecretKindOAuthClientCredentials,
+			slot:     " clientCredentials ",
+			wantSlot: "clientcredentials",
+			wantJSON: `{"bundleID":"bundle-a","serverID":"server-b","kind":"oauthClientCredentials","slot":"clientcredentials"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ref, err := NewMCPSecretRef(tt.bundleID, tt.serverID, tt.kind, tt.slot)
+			if err != nil {
+				t.Fatalf("NewMCPSecretRef: %v", err)
+			}
+
+			if ref.BundleID != bundleitemutils.BundleID("bundle-a") {
+				t.Fatalf("BundleID = %q, want %q", ref.BundleID, bundleitemutils.BundleID("bundle-a"))
+			}
+			if ref.ServerID != spec.MCPServerID(strings.TrimSpace(string(tt.serverID))) {
+				t.Fatalf("ServerID = %q, want %q", ref.ServerID, strings.TrimSpace(string(tt.serverID)))
+			}
+			if ref.Kind != tt.kind {
+				t.Fatalf("Kind = %q, want %q", ref.Kind, tt.kind)
+			}
+			if ref.Slot != tt.wantSlot {
+				t.Fatalf("Slot = %q, want %q", ref.Slot, tt.wantSlot)
+			}
+
+			raw, err := canonicalSecret(ref)
+			if err != nil {
+				t.Fatalf("canonicalSecret: %v", err)
+			}
+			if got := string(raw); got != tt.wantJSON {
+				t.Fatalf("canonicalSecret = %q, want %q", got, tt.wantJSON)
+			}
+
+			refString, err := NewMCPSecretRefString(tt.bundleID, tt.serverID, tt.kind, tt.slot)
+			if err != nil {
+				t.Fatalf("NewMCPSecretRefString: %v", err)
+			}
+			wantString := spec.SecretRefVersion + ":" + base64.RawURLEncoding.EncodeToString(raw)
+			if refString != wantString {
+				t.Fatalf("NewMCPSecretRefString = %q, want %q", refString, wantString)
+			}
+			if got := GetMCPSecretRefString(ref); got != refString {
+				t.Fatalf("GetMCPSecretRefString = %q, want %q", got, refString)
+			}
+
+			parsed, err := ParseMCPSecretRef(refString)
+			if err != nil {
+				t.Fatalf("ParseMCPSecretRef: %v", err)
+			}
+			if parsed != ref {
+				t.Fatalf("ParseMCPSecretRef = %#v, want %#v", parsed, ref)
+			}
+
+			if err := ValidateMCPSecretRef(refString, tt.bundleID, tt.serverID, tt.kind, tt.slot); err != nil {
+				t.Fatalf("ValidateMCPSecretRef: %v", err)
+			}
+
+			sum := sha256.Sum256(raw)
+			wantStorageKey := spec.SecretRefVersion + ":" + hex.EncodeToString(sum[:])
+			if got := GetMCPSecretRefStorageKey(ref); got != wantStorageKey {
+				t.Fatalf("GetMCPSecretRefStorageKey = %q, want %q", got, wantStorageKey)
+			}
+		})
+	}
+}
+
+func TestSecretRefParseAndValidationErrorBranches(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{
+			name: "empty",
+			raw:  "",
+			want: "secret ref is empty",
+		},
+		{
+			name: "bad prefix",
+			raw:  "not-a-secret-ref",
+			want: "is not a mcpv1 ref",
+		},
+		{
+			name: "bad base64",
+			raw:  spec.SecretRefVersion + ":!!!",
+			want: "not valid base64",
+		},
+		{
+			name: "bad json",
+			raw:  spec.SecretRefVersion + ":" + base64.RawURLEncoding.EncodeToString([]byte("[]")),
+			want: "not valid json",
+		},
+		{
+			name: "empty bundleID",
+			raw: encodeSecretWire(t, secretRefWire{
+				BundleID: "",
+				ServerID: "server-a",
+				Kind:     spec.MCPSecretKindStdioEnv,
+				Slot:     "TOKEN",
+			}),
+			want: "bundleID is empty",
+		},
+		{
+			name: "empty serverID",
+			raw: encodeSecretWire(t, secretRefWire{
+				BundleID: bundleitemutils.BundleID("bundle-a"),
+				ServerID: "",
+				Kind:     spec.MCPSecretKindStdioEnv,
+				Slot:     "TOKEN",
+			}),
+			want: "serverID is empty",
+		},
+		{
+			name: "invalid kind",
+			raw: encodeSecretWire(t, secretRefWire{
+				BundleID: bundleitemutils.BundleID("bundle-a"),
+				ServerID: "server-a",
+				Kind:     spec.MCPSecretKind("bogus"),
+				Slot:     "TOKEN",
+			}),
+			want: "kind",
+		},
+		{
+			name: "stdio env invalid slot",
+			raw: encodeSecretWire(t, secretRefWire{
+				BundleID: bundleitemutils.BundleID("bundle-a"),
+				ServerID: "server-a",
+				Kind:     spec.MCPSecretKindStdioEnv,
+				Slot:     "TO=KEN",
+			}),
+			want: "must not contain '='",
+		},
+		{
+			name: "oauth client credentials invalid slot",
+			raw: encodeSecretWire(t, secretRefWire{
+				BundleID: bundleitemutils.BundleID("bundle-a"),
+				ServerID: "server-a",
+				Kind:     spec.MCPSecretKindOAuthClientCredentials,
+				Slot:     "not-clientCredentials",
+			}),
+			want: "invalid",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseMCPSecretRef(tt.raw)
+			if err == nil {
+				t.Fatalf("ParseMCPSecretRef succeeded, want error containing %q", tt.want)
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %q, want substring %q", err.Error(), tt.want)
+			}
+		})
+	}
+
+	t.Run("invalid refs render empty strings", func(t *testing.T) {
+		if got := GetMCPSecretRefString(spec.MCPSecretRef{}); got != "" {
+			t.Fatalf("GetMCPSecretRefString(invalid) = %q, want empty", got)
+		}
+		if got := GetMCPSecretRefStorageKey(spec.MCPSecretRef{}); got != "" {
+			t.Fatalf("GetMCPSecretRefStorageKey(invalid) = %q, want empty", got)
+		}
+		if _, err := canonicalSecret(spec.MCPSecretRef{}); err == nil {
+			t.Fatalf("canonicalSecret(invalid) succeeded, want error")
+		}
+	})
+}
+
+func TestSecretRefNormalizationAndValidationHelpers(t *testing.T) {
+	t.Run("normalize helpers", func(t *testing.T) {
+		if got := normalizeSecretKind(spec.MCPSecretKind("  stdioEnv  ")); got != spec.MCPSecretKindStdioEnv {
+			t.Fatalf("normalizeSecretKind = %q, want %q", got, spec.MCPSecretKindStdioEnv)
+		}
+		if got := normalizeSecretSlot("  MiXeD  "); got != "mixed" {
+			t.Fatalf("normalizeSecretSlot = %q, want %q", got, "mixed")
+		}
+	})
+
+	t.Run("normalizeAndValidateSecretSlot", func(t *testing.T) {
+		slot, err := normalizeAndValidateSecretSlot(spec.MCPSecretKindStdioEnv, " TOKEN_1 ")
+		if err != nil {
+			t.Fatalf("normalizeAndValidateSecretSlot(stdio): %v", err)
+		}
+		if slot != "token_1" {
+			t.Fatalf("normalizeAndValidateSecretSlot(stdio) = %q, want %q", slot, "token_1")
+		}
+
+		if _, err := normalizeAndValidateSecretSlot(spec.MCPSecretKindStdioEnv, "TO=KEN"); err == nil ||
+			!strings.Contains(err.Error(), "must not contain '='") {
+			t.Fatalf("normalizeAndValidateSecretSlot(stdio invalid) err = %v, want env key error", err)
+		}
+
+		slot, err = normalizeAndValidateSecretSlot(spec.MCPSecretKindOAuthClientCredentials, " clientCredentials ")
+		if err != nil {
+			t.Fatalf("normalizeAndValidateSecretSlot(oauth): %v", err)
+		}
+		if slot != "clientcredentials" {
+			t.Fatalf("normalizeAndValidateSecretSlot(oauth) = %q, want %q", slot, "clientcredentials")
+		}
+
+		if _, err := normalizeAndValidateSecretSlot(spec.MCPSecretKindOAuthClientCredentials, "wrong"); err == nil ||
+			!strings.Contains(err.Error(), "expected clientCredentials") {
+			t.Fatalf("normalizeAndValidateSecretSlot(oauth invalid) err = %v, want clientCredentials error", err)
+		}
+	})
+
+	t.Run("validateEnvSecretSlot", func(t *testing.T) {
+		if err := validateEnvSecretSlot("TOKEN_1"); err != nil {
+			t.Fatalf("validateEnvSecretSlot(valid): %v", err)
+		}
+		if err := validateEnvSecretSlot("TO\tKEN"); err == nil ||
+			!strings.Contains(err.Error(), "control character") {
+			t.Fatalf("validateEnvSecretSlot(control char) err = %v, want control character error", err)
+		}
+	})
+}
 
 func TestMCPSecretRefRoundTripAndStorageKeys(t *testing.T) {
 	bundleID := bundleitemutils.BundleID("bundle-a")

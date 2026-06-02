@@ -1,8 +1,10 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +20,275 @@ const (
 )
 
 var testWantScope = []string{testScopeMCPTools, testScopeAdmin}
+
+type observingSecretResolver struct {
+	called      bool
+	sawCanceled bool
+	lastRef     string
+	err         error
+}
+
+func (r *observingSecretResolver) ResolveSecret(ctx context.Context, ref string) (string, error) {
+	r.called = true
+	r.lastRef = ref
+	if ctx != nil {
+		r.sawCanceled = ctx.Err() != nil
+	}
+	if r.err != nil {
+		return "", r.err
+	}
+	return "resolved-secret", nil
+}
+
+func trackedBaseStatus(serverID spec.MCPServerID) spec.MCPAuthStatus {
+	return spec.MCPAuthStatus{
+		BundleID: testBundleID,
+		ServerID: serverID,
+		AuthMode: spec.MCPHTTPAuthOAuth,
+		State:    spec.MCPAuthStateRequired,
+		Resource: testMCPResource,
+	}
+}
+
+func TestStaticSecretResolverResolveSecret(t *testing.T) {
+	resolver := StaticSecretResolver{
+		"ref-a": "secret-a",
+	}
+
+	got, err := resolver.ResolveSecret(t.Context(), "ref-a")
+	if err != nil {
+		t.Fatalf("ResolveSecret(existing): %v", err)
+	}
+	if got != "secret-a" {
+		t.Fatalf("ResolveSecret(existing) = %q, want %q", got, "secret-a")
+	}
+
+	_, err = resolver.ResolveSecret(t.Context(), "missing")
+	if err == nil {
+		t.Fatalf("ResolveSecret(missing) succeeded, want error")
+	}
+	if !strings.Contains(err.Error(), "secret ref not found: missing") {
+		t.Fatalf("ResolveSecret(missing) error = %q, want secret ref not found", err.Error())
+	}
+}
+
+func TestSecretRedactorEdgeCases(t *testing.T) {
+	t.Run("nil receiver and blank values are no-op", func(t *testing.T) {
+		var redactor *SecretRedactor
+		if got := redactor.Redact("keep me"); got != "keep me" {
+			t.Fatalf("nil redactor changed string: %q", got)
+		}
+
+		got := NewSecretRedactor(ResolvedTransportAuth{
+			SensitiveValues: []string{"", "   "},
+		}).Redact("keep me")
+		if got != "keep me" {
+			t.Fatalf("blank-only redactor changed string: %q", got)
+		}
+	})
+
+	t.Run("deduplicates and redacts exact values", func(t *testing.T) {
+		redactor := NewSecretRedactor(ResolvedTransportAuth{
+			SensitiveValues: []string{
+				"alpha",
+				"alpha",
+				"  spaced-secret  ",
+				"",
+				"   ",
+			},
+		})
+
+		got := redactor.Redact("alpha /  spaced-secret  / alpha")
+		want := "[REDACTED] /[REDACTED]/ [REDACTED]"
+		if got != want {
+			t.Fatalf("Redact = %q, want %q", got, want)
+		}
+	})
+}
+
+func TestAuthManagerPrepareTransportAuthPersistsErrorStatusWithCanceledContext(t *testing.T) {
+	resolver := &observingSecretResolver{
+		err: errors.New("secret ref not found: missing-ref"),
+	}
+
+	mgr := NewAuthManager(resolver)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	cfg := spec.MCPServerConfig{
+		BundleID:  testBundleID,
+		ID:        testStdIOServerID,
+		Transport: spec.MCPTransportStdio,
+		Stdio: &spec.MCPStdioConfig{
+			Command: "server-binary",
+			SecretEnvRefs: map[string]string{
+				"TOKEN": "missing-ref",
+			},
+		},
+	}
+
+	_, err := mgr.PrepareTransportAuth(ctx, cfg)
+	if err == nil {
+		t.Fatalf("PrepareTransportAuth succeeded, want error")
+	}
+	if !strings.Contains(err.Error(), "secret ref not found: missing-ref") {
+		t.Fatalf("error = %q, want secret ref not found", err.Error())
+	}
+
+	if !resolver.called {
+		t.Fatalf("secret resolver was not called")
+	}
+	if resolver.lastRef != "missing-ref" {
+		t.Fatalf("resolver.lastRef = %q, want %q", resolver.lastRef, "missing-ref")
+	}
+	if !resolver.sawCanceled {
+		t.Fatalf("resolver did not observe canceled context")
+	}
+
+	st, ok := mgr.GetAuthStatus(testBundleID, testStdIOServerID)
+	if !ok {
+		t.Fatalf("missing saved auth status")
+	}
+
+	wantStatus := spec.MCPAuthStatus{
+		BundleID: testBundleID,
+		ServerID: testStdIOServerID,
+		AuthMode: spec.MCPHTTPAuthNone,
+		State:    spec.MCPAuthStateError,
+	}
+	assertAuthStatusCore(t, st, wantStatus)
+
+	if st.LastError != "secret ref not found: missing-ref" {
+		t.Fatalf("LastError = %q, want %q", st.LastError, "secret ref not found: missing-ref")
+	}
+}
+
+func TestAuthStatusHelperBranches(t *testing.T) {
+	base := trackedBaseStatus(testHTTPServerID)
+
+	t.Run("authStatusFromToken handles nil token", func(t *testing.T) {
+		got := authStatusFromToken(base, nil)
+		if got.State != spec.MCPAuthStateAuthorized {
+			t.Fatalf("State = %q, want %q", got.State, spec.MCPAuthStateAuthorized)
+		}
+		if got.LastError != "" {
+			t.Fatalf("LastError = %q, want empty", got.LastError)
+		}
+		if got.ExpiresAt != nil {
+			t.Fatalf("ExpiresAt = %#v, want nil", got.ExpiresAt)
+		}
+		if len(got.Scopes) != 0 {
+			t.Fatalf("Scopes = %#v, want empty", got.Scopes)
+		}
+	})
+
+	t.Run("authStatusFromTokenError covers generic and nil errors", func(t *testing.T) {
+		got := authStatusFromTokenError(base, errors.New("boom"))
+		if got.State != spec.MCPAuthStateError {
+			t.Fatalf("State = %q, want %q", got.State, spec.MCPAuthStateError)
+		}
+		if got.LastError != "boom" {
+			t.Fatalf("LastError = %q, want %q", got.LastError, "boom")
+		}
+
+		gotNil := authStatusFromTokenError(base, nil)
+		if gotNil.State != spec.MCPAuthStateError {
+			t.Fatalf("nil error State = %q, want %q", gotNil.State, spec.MCPAuthStateError)
+		}
+		if gotNil.LastError != "" {
+			t.Fatalf("nil error LastError = %q, want empty", gotNil.LastError)
+		}
+	})
+
+	t.Run("authStatusFromHTTPFailure handles nil response and 401 without challenge", func(t *testing.T) {
+		gotNil := authStatusFromHTTPFailure(base, nil, errors.New("request failed"))
+		if gotNil.State != spec.MCPAuthStateError {
+			t.Fatalf("nil response State = %q, want %q", gotNil.State, spec.MCPAuthStateError)
+		}
+		if gotNil.LastError != "request failed" {
+			t.Fatalf("nil response LastError = %q, want %q", gotNil.LastError, "request failed")
+		}
+
+		resp := &http.Response{
+			StatusCode: http.StatusUnauthorized,
+			Header:     http.Header{},
+		}
+		got401 := authStatusFromHTTPFailure(base, resp, errors.New("unauthorized"))
+		if got401.State != spec.MCPAuthStateRequired {
+			t.Fatalf("401 State = %q, want %q", got401.State, spec.MCPAuthStateRequired)
+		}
+		if got401.LastError != "unauthorized" {
+			t.Fatalf("401 LastError = %q, want %q", got401.LastError, "unauthorized")
+		}
+	})
+
+	t.Run("scopesFromOAuthToken handles nil token", func(t *testing.T) {
+		if got := scopesFromOAuthToken(nil); got != nil {
+			t.Fatalf("scopesFromOAuthToken(nil) = %#v, want nil", got)
+		}
+	})
+}
+
+func TestTrackedOAuthHandlerAdditionalBranches(t *testing.T) {
+	t.Run("TokenSource returns nil source without publishing status", func(t *testing.T) {
+		serverID := spec.MCPServerID("tracked-nil-source")
+		sink := NewAuthManager(nil)
+		h := &trackedOAuthHandler{
+			inner: &fakeOAuthHandler{
+				tokenSource: nil,
+			},
+			sink:   sink,
+			status: trackedBaseStatus(serverID),
+		}
+
+		ts, err := h.TokenSource(t.Context())
+		if err != nil {
+			t.Fatalf("TokenSource: %v", err)
+		}
+		if ts != nil {
+			t.Fatalf("TokenSource = %#v, want nil", ts)
+		}
+
+		if _, ok := sink.GetAuthStatus(testBundleID, serverID); ok {
+			t.Fatalf("auth status was published unexpectedly")
+		}
+	})
+
+	t.Run("Authorize with no token source does not publish status", func(t *testing.T) {
+		serverID := spec.MCPServerID("tracked-authorize-no-token-source")
+		sink := NewAuthManager(nil)
+		inner := &fakeOAuthHandler{
+			tokenSource: nil,
+		}
+		h := &trackedOAuthHandler{
+			inner:  inner,
+			sink:   sink,
+			status: trackedBaseStatus(serverID),
+		}
+
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, testMCPResource, http.NoBody)
+		resp := &http.Response{
+			StatusCode: http.StatusUnauthorized,
+			Header:     http.Header{},
+		}
+
+		if err := h.Authorize(t.Context(), req, resp); err != nil {
+			t.Fatalf("Authorize: %v", err)
+		}
+
+		if inner.authorizeCalls != 1 {
+			t.Fatalf("Authorize calls = %d, want 1", inner.authorizeCalls)
+		}
+		if inner.tokenSourceCalls != 1 {
+			t.Fatalf("TokenSource calls = %d, want 1", inner.tokenSourceCalls)
+		}
+
+		if _, ok := sink.GetAuthStatus(testBundleID, serverID); ok {
+			t.Fatalf("auth status was published unexpectedly")
+		}
+	})
+}
 
 func TestBearerChallengeValues(t *testing.T) {
 	tests := []struct {
