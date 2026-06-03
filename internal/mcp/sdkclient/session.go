@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/apps"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -549,12 +550,20 @@ func appInfoFromMeta(meta mcpSDK.Meta) *spec.MCPToolAppInfo {
 		return nil
 	}
 
-	rawUI, ok := meta["ui"]
-	if !ok || rawUI == nil {
-		return nil
+	ui := map[string]any{}
+	if rawUI, ok := meta["ui"]; ok && rawUI != nil {
+		ui = anyToMap(rawUI)
+	}
+	// Deprecated MCP Apps shape. Keep accepting it during migration.
+	if flatResourceURI, ok := meta["ui/resourceUri"].(string); ok && strings.TrimSpace(flatResourceURI) != "" {
+		if ui == nil {
+			ui = map[string]any{}
+		}
+		if _, exists := ui["resourceUri"]; !exists {
+			ui["resourceUri"] = flatResourceURI
+		}
 	}
 
-	ui := anyToMap(rawUI)
 	if len(ui) == 0 {
 		return nil
 	}
@@ -562,14 +571,43 @@ func appInfoFromMeta(meta mcpSDK.Meta) *spec.MCPToolAppInfo {
 	out := &spec.MCPToolAppInfo{}
 
 	if resourceURI, ok := ui["resourceUri"].(string); ok {
-		out.ResourceURI = resourceURI
+		resourceURI = strings.TrimSpace(resourceURI)
+		if strings.HasPrefix(resourceURI, "ui://") {
+			out.ResourceURI = resourceURI
+		}
 	}
 
-	out.Visibility = stringSliceFromAny(ui["visibility"])
+	out.Visibility = normalizeAppVisibility(stringSliceFromAny(ui["visibility"]))
+
 	if len(out.Visibility) == 0 {
-		out.Visibility = []string{visibilityModel, visibilityApp}
+		out.Visibility = []string{apps.VisibilityModel, apps.VisibilityApp}
+	}
+	if out.ResourceURI == "" && len(out.Visibility) == 0 {
+		return nil
+	}
+	return out
+}
+
+func normalizeAppVisibility(in []string) []string {
+	if len(in) == 0 {
+		return nil
 	}
 
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(in))
+	for _, raw := range in {
+		v := strings.ToLower(strings.TrimSpace(raw))
+		switch v {
+		case apps.VisibilityModel, apps.VisibilityApp:
+		default:
+			continue
+		}
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
 	return out
 }
 

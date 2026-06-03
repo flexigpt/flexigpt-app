@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/mcp/apps"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
@@ -35,6 +36,12 @@ func (b *ToolBridge) Evaluate(
 	_, cfg, tool, err := b.runtime.CallToolDryRun(ctx, req.BundleID, req.ServerID, *req.Body)
 	if err != nil {
 		return nil, err
+	}
+
+	if req.Body.Source == spec.MCPInvocationSourceApp {
+		if err := apps.ValidateAppToolInvocation(cfg, tool, req.ServerID); err != nil {
+			return nil, err
+		}
 	}
 
 	eval := Evaluate(EvaluationInput{
@@ -74,6 +81,12 @@ func (b *ToolBridge) Invoke(
 	_, cfg, tool, err := b.runtime.CallToolDryRun(ctx, req.BundleID, req.ServerID, *req.Body)
 	if err != nil {
 		return nil, err
+	}
+
+	if req.Body.Source == spec.MCPInvocationSourceApp {
+		if err := apps.ValidateAppToolInvocation(cfg, tool, req.ServerID); err != nil {
+			return nil, err
+		}
 	}
 
 	eval := Evaluate(EvaluationInput{

@@ -8,6 +8,7 @@ import (
 
 	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/flexigpt/flexigpt-app/internal/mcp/apps"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
@@ -126,7 +127,7 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 		info := appInfoFromMeta(mcpSDK.Meta{
 			"ui": map[string]any{
 				"resourceUri": "ui://demo",
-				"visibility":  []any{visibilityModel, visibilityApp, ""},
+				"visibility":  []any{apps.VisibilityModel, apps.VisibilityApp, ""},
 			},
 		})
 		if info == nil {
@@ -135,7 +136,7 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 		if info.ResourceURI != "ui://demo" {
 			t.Fatalf("ResourceURI = %q, want %q", info.ResourceURI, "ui://demo")
 		}
-		if !slices.Equal(info.Visibility, []string{visibilityModel, visibilityApp}) {
+		if !slices.Equal(info.Visibility, []string{apps.VisibilityModel, apps.VisibilityApp}) {
 			t.Fatalf("Visibility = %#v, want [model app]", info.Visibility)
 		}
 
@@ -144,7 +145,7 @@ func TestConversionAndInferenceHelpers(t *testing.T) {
 				"resourceUri": "ui://fallback",
 			},
 		})
-		if !slices.Equal(info2.Visibility, []string{visibilityModel, visibilityApp}) {
+		if !slices.Equal(info2.Visibility, []string{apps.VisibilityModel, apps.VisibilityApp}) {
 			t.Fatalf("default Visibility = %#v, want [model app]", info2.Visibility)
 		}
 

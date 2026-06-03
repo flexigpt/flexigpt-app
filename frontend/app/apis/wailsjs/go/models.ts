@@ -1369,6 +1369,8 @@ export namespace spec {
 	    digest?: string;
 	    approvalRule?: string;
 	    executionMode?: string;
+	    appResourceUri?: string;
+	    visibility?: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new MCPToolSelection(source);
@@ -1384,6 +1386,8 @@ export namespace spec {
 	        this.digest = source["digest"];
 	        this.approvalRule = source["approvalRule"];
 	        this.executionMode = source["executionMode"];
+	        this.appResourceUri = source["appResourceUri"];
+	        this.visibility = source["visibility"];
 	    }
 	}
 	export class MCPServerSelection {
@@ -5146,6 +5150,9 @@ export namespace spec {
 	export class MCPToolAppRenderInfo {
 	    resourceUri?: string;
 	    mimeType?: string;
+	    content?: MCPContent[];
+	    structuredContent?: any;
+	    isError?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new MCPToolAppRenderInfo(source);
@@ -5155,7 +5162,28 @@ export namespace spec {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.resourceUri = source["resourceUri"];
 	        this.mimeType = source["mimeType"];
+	        this.content = this.convertValues(source["content"], MCPContent);
+	        this.structuredContent = source["structuredContent"];
+	        this.isError = source["isError"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class MCPToolCallProvenance {
 	    bundleID: string;

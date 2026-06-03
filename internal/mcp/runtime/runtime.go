@@ -8,10 +8,12 @@ import (
 	"maps"
 	"slices"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/apps"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/store"
@@ -697,7 +699,16 @@ func (m *MCPRuntimeManager) CallTool(
 	body.Provenance.ToolDigest = tool.Digest
 	body.Provenance.ToolUseID = req.ToolUseID
 	body.Provenance.ApprovalID = req.ApprovalID
+	body.Provenance.AppInstanceID = req.AppInstanceID
 
+	// Propagate MCP Apps render info. Mime is left empty here; frontend fills
+	// it after fetching the ui:// resource via readMCPResource.
+	if apps.EffectiveAppsPolicy(cfg).Enabled && tool.App != nil && strings.TrimSpace(tool.App.ResourceURI) != "" {
+		body.Provenance.AppResourceURI = tool.App.ResourceURI
+		if body.App == nil {
+			body.App = &spec.MCPToolAppRenderInfo{ResourceURI: tool.App.ResourceURI}
+		}
+	}
 	return body, cfg, tool, nil
 }
 

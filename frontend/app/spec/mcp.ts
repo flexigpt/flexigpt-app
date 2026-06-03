@@ -141,7 +141,7 @@ export interface MCPResourceContents {
 	uri: string;
 	mimeType?: string;
 	text?: string;
-	blob?: number[];
+	blob?: string | number[];
 	_meta?: Record<string, any>;
 }
 
@@ -463,6 +463,9 @@ export interface MCPToolSelection {
 
 	approvalRule?: MCPApprovalRule;
 	executionMode?: MCPExecutionMode;
+
+	appResourceUri?: string;
+	visibility?: string[];
 }
 
 export interface MCPProviderToolMapping {
@@ -571,6 +574,9 @@ export interface InvokeMCPToolRequestBody {
 export interface MCPToolAppRenderInfo {
 	resourceUri?: string;
 	mimeType?: string;
+	content?: MCPContent[];
+	structuredContent?: any;
+	isError?: boolean;
 }
 
 export interface InvokeMCPToolResponseBody {

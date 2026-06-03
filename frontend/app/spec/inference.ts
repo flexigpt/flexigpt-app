@@ -1,4 +1,4 @@
-import type { MCPToolSelection } from '@/spec/mcp';
+import type { MCPToolAppRenderInfo, MCPToolSelection } from '@/spec/mcp';
 import type { ToolOutputUnion, ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
 export type ProviderName = string;
@@ -514,6 +514,10 @@ export interface UIToolOutput {
 	 * Optional MCP identity for dynamically executed MCP tool outputs.
 	 */
 	mcpToolSelection?: MCPToolSelection;
+	/**
+	 * Optional MCP Apps render info for tool calls that produced a UI resource.
+	 */
+	mcpApp?: MCPToolAppRenderInfo;
 
 	/** Short human-readable label used in chips. */
 	summary: string;

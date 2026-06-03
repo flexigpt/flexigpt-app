@@ -1405,7 +1405,7 @@ function AddEditMCPServerModalContent({
 										onChange={handleInput}
 										className="checkbox checkbox-sm"
 									/>
-									<span className="label-text text-sm">Enable MCP Apps</span>
+									<span className="label-text text-sm">Advertise and render MCP Apps</span>
 								</label>
 
 								<label className="label cursor-pointer justify-start gap-3">
@@ -1416,7 +1416,7 @@ function AddEditMCPServerModalContent({
 										onChange={handleInput}
 										className="checkbox checkbox-sm"
 									/>
-									<span className="label-text text-sm">Allow app tool calls</span>
+									<span className="label-text text-sm">Allow app-initiated tool calls</span>
 								</label>
 
 								<label className="label cursor-pointer justify-start gap-3">

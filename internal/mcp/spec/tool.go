@@ -36,9 +36,13 @@ type InvokeMCPToolRequest struct {
 }
 
 type MCPToolAppRenderInfo struct {
-	ResourceURI string `json:"resourceUri,omitempty"`
-	MimeType    string `json:"mimeType,omitempty"`
+	ResourceURI       string       `json:"resourceUri,omitempty"`
+	MimeType          string       `json:"mimeType,omitempty"`
+	Content           []MCPContent `json:"content,omitempty"`
+	StructuredContent any          `json:"structuredContent,omitempty"`
+	IsError           bool         `json:"isError,omitempty"`
 }
+
 type InvokeMCPToolResponseBody struct {
 	BundleID bundleitemutils.BundleID `json:"bundleID"`
 	ServerID MCPServerID              `json:"serverID"`

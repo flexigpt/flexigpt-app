@@ -285,6 +285,8 @@ export function MCPServerDetailsModal({
 											<th className="text-center">Approval</th>
 											<th className="text-center">Execution</th>
 											<th className="text-center">Enabled</th>
+											<th className="text-center">App</th>
+
 											<th className="text-center">Stale</th>
 										</tr>
 									</thead>
@@ -309,6 +311,18 @@ export function MCPServerDetailsModal({
 													{tool.enabled ? <FiCheck className="mx-auto" /> : <FiX className="mx-auto" />}
 												</td>
 												<td className="text-center">
+													{tool.app?.resourceUri ? (
+														<span
+															className="badge badge-info badge-xs rounded-xl"
+															title={`${tool.app.resourceUri}\nVisibility: ${(tool.app.visibility ?? []).join(', ')}`}
+														>
+															App
+														</span>
+													) : (
+														'-'
+													)}
+												</td>
+												<td className="text-center">
 													{tool.stale ? <FiCheck className="mx-auto" /> : <FiX className="mx-auto" />}
 												</td>
 											</tr>
@@ -316,7 +330,7 @@ export function MCPServerDetailsModal({
 
 										{discovery.tools.length === 0 && (
 											<tr>
-												<td colSpan={7} className="py-3 text-center text-sm">
+												<td colSpan={8} className="py-3 text-center text-sm">
 													No tools discovered.
 												</td>
 											</tr>

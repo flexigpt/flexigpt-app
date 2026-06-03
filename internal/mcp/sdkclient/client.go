@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/mcp/apps"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/auth"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
@@ -21,8 +22,6 @@ const (
 	defaultStdioTerminateDuration = 5 * time.Second
 	defaultHTTPMaxRetries         = 5
 	defaultClientKeepAlive        = 60 * time.Second
-	visibilityApp                 = "app"
-	visibilityModel               = "model"
 	refTypePrompt                 = "prompt"
 	refTypeRefPrompt              = "ref/prompt"
 	refTypeResource               = "resource"
@@ -75,7 +74,7 @@ func (f *Factory) Connect(
 			// A nil Capabilities value makes the SDK advertise its historical
 			// roots default. FlexiGPT must not advertise roots, sampling, or
 			// elicitation until the product has explicit UX and safety policy.
-			Capabilities: &mcpSDK.ClientCapabilities{},
+			Capabilities: buildClientCapabilities(cfg),
 
 			KeepAlive: defaultClientKeepAlive,
 
@@ -224,6 +223,24 @@ func (f *Factory) log() *slog.Logger {
 		return f.logger
 	}
 	return slog.Default()
+}
+
+// buildClientCapabilities returns the client capability set advertised on
+// MCP initialize. FlexiGPT does not advertise roots, sampling, or elicitation.
+// It advertises the MCP Apps extension only when Apps are enabled for this
+// server config.
+func buildClientCapabilities(cfg spec.MCPServerConfig) *mcpSDK.ClientCapabilities {
+	c := &mcpSDK.ClientCapabilities{}
+	if apps.EffectiveAppsPolicy(cfg).Enabled {
+		c.AddExtension(apps.AppExtensionID, map[string]any{
+			"mimeTypes": []string{apps.AppMIMEType},
+			"host": map[string]any{
+				"platform": "desktop",
+			},
+		})
+	}
+
+	return c
 }
 
 func envMapToList(m map[string]string) []string {

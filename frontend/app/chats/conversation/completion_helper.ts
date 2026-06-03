@@ -297,6 +297,8 @@ function mappingToMCPToolSelection(mapping: unknown): MCPToolSelection | undefin
 	const providerToolName = obj.providerToolName;
 	const choiceID = obj.choiceID;
 	const toolDigest = obj.toolDigest;
+	const appResourceUri = obj.appResourceUri;
+	const visibility = obj.visibility;
 	if (typeof bundleID !== 'string' || !bundleID) return undefined;
 	if (typeof serverID !== 'string' || !serverID) return undefined;
 	if (typeof toolName !== 'string' || !toolName) return undefined;
@@ -307,6 +309,8 @@ function mappingToMCPToolSelection(mapping: unknown): MCPToolSelection | undefin
 		providerToolName: typeof providerToolName === 'string' ? providerToolName : undefined,
 		choiceID: typeof choiceID === 'string' ? choiceID : undefined,
 		digest: typeof toolDigest === 'string' ? toolDigest : undefined,
+		appResourceUri: typeof appResourceUri === 'string' ? appResourceUri : undefined,
+		visibility: Array.isArray(visibility) ? visibility.filter((v): v is string => typeof v === 'string') : undefined,
 	};
 }
 
@@ -538,6 +542,7 @@ export function buildUIToolOutputFromToolOutput(
 	const mcpToolSelection = call
 		? findMCPToolSelectionForToolLike(call, mcpToolSelectionMap)
 		: findMCPToolSelectionForToolLike(out, mcpToolSelectionMap);
+	const mcpApp = mcpToolSelection?.appResourceUri ? { resourceUri: mcpToolSelection.appResourceUri } : undefined;
 	const summaryBase = formatToolOutputSummary(out.name);
 
 	const toolOutputs = mapToolOutputItemsToToolOutputs(out.contents);
@@ -564,6 +569,7 @@ export function buildUIToolOutputFromToolOutput(
 
 		toolStoreChoice,
 		mcpToolSelection,
+		mcpApp,
 		isError: isError,
 		errorMessage: isError ? primaryText : undefined,
 

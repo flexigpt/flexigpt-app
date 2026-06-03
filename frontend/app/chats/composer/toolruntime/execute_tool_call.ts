@@ -6,6 +6,7 @@ import {
 	type MCPContent,
 	MCPContentType,
 	MCPInvocationSource,
+	type MCPToolAppRenderInfo,
 	type MCPToolSelection,
 } from '@/spec/mcp';
 import { ToolOutputKind } from '@/spec/tool';
@@ -84,6 +85,7 @@ function buildMCPToolOutput(args: {
 	text: string;
 	isError?: boolean;
 	errorMessage?: string;
+	mcpApp?: MCPToolAppRenderInfo;
 }): UIToolOutput {
 	const name = mcpToolLabel(args.selection, args.toolCall.name);
 	const firstLine = args.text
@@ -114,6 +116,7 @@ function buildMCPToolOutput(args: {
 		webSearchToolCallItems: args.toolCall.webSearchToolCallItems,
 		toolStoreChoice: args.toolCall.toolStoreChoice,
 		mcpToolSelection: args.selection,
+		mcpApp: args.mcpApp,
 	};
 }
 
@@ -278,6 +281,15 @@ async function executeMCPToolCall(
 		const structuredText = resp?.structuredContent !== undefined ? JSON.stringify(resp.structuredContent, null, 2) : '';
 		const text = [contentText, structuredText].filter(Boolean).join('\n\n') || 'MCP tool returned no content.';
 		const isError = !!resp?.isError;
+		const appRenderInfo =
+			resp?.app && resp.app.resourceUri
+				? {
+						...resp.app,
+						content: resp.content,
+						structuredContent: resp.structuredContent,
+						isError,
+					}
+				: undefined;
 
 		return {
 			ok: true,
@@ -287,6 +299,7 @@ async function executeMCPToolCall(
 				text,
 				isError,
 				errorMessage: isError ? text.split('\n')[0] : undefined,
+				mcpApp: appRenderInfo,
 			}),
 		};
 	} catch (err) {

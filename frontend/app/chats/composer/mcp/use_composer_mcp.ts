@@ -63,6 +63,8 @@ function toolToSelection(tool: MCPToolCapability): MCPToolSelection {
 		digest: tool.digest,
 		approvalRule: tool.approvalRule,
 		executionMode: tool.executionMode,
+		appResourceUri: tool.app?.resourceUri,
+		visibility: tool.app?.visibility,
 	};
 }
 

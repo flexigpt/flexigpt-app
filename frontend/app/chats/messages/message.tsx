@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 
 import { FiUser, FiZap } from 'react-icons/fi';
 
@@ -6,6 +6,8 @@ import type { ConversationMessage } from '@/spec/conversation';
 import { RoleEnum, Status } from '@/spec/inference';
 
 import { ToolDetailsModal, type ToolDetailsState } from '@/chats/composer/tools/tool_details_modal';
+import { buildAppInstanceFromToolOutput } from '@/chats/mcpapps/mcp_app_types';
+import { MCPAppView } from '@/chats/mcpapps/mcp_app_view';
 import { MessageAttachmentsBar } from '@/chats/messages/message_attachments_bar';
 import { MessageCitationsBar } from '@/chats/messages/message_citations_bar';
 import { MessageContentCard } from '@/chats/messages/message_content_card';
@@ -102,10 +104,26 @@ export const ChatMessage = memo(function ChatMessage({
 		(message.uiToolCalls?.length ?? 0) > 0 ||
 		(message.uiToolOutputs?.length ?? 0) > 0;
 
+	// Detect MCP Apps in this message's tool outputs.
+	const mcpAppViews = useMemo(() => {
+		const outputs = message.uiToolOutputs ?? [];
+		const callsById = new Map((message.uiToolCalls ?? []).map(c => [c.callID || c.id, c] as const));
+		return outputs
+			.map(out => {
+				const instance = buildAppInstanceFromToolOutput(out);
+				if (!instance) return null;
+				const call = callsById.get(out.callID);
+				return { instance, call, output: out } as const;
+			})
+			.filter((v): v is NonNullable<typeof v> => v !== null);
+	}, [message.uiToolCalls, message.uiToolOutputs]);
+
+	const hasMCPAppsView = mcpAppViews.length > 0;
+
 	// Body wrapper should exist only if something inside can render:
 	// - content (final/streamed) OR
 	// - busy (content card will show loader while busy)
-	const showBody = isBusy || hasAnyContent || hasError;
+	const showBody = isBusy || hasAnyContent || hasError || hasMCPAppsView;
 	return (
 		<div className="grid grid-cols-12 p-1" style={{ fontSize: 14 }}>
 			{/* Row 1 ── icon + message bubble (only when showCardRow) */}
@@ -146,6 +164,29 @@ export const ChatMessage = memo(function ChatMessage({
 								</div>
 							)}
 						</div>
+						{/* MCP Apps row, One iframe per app-capable tool output. */}
+						{mcpAppViews.length > 0 && (
+							<>
+								<div className={`${leftColSpan} flex justify-end`} />
+								<div className="col-span-10 mt-2 min-w-0 lg:col-span-9">
+									<div className="space-y-2">
+										{mcpAppViews.map(({ instance, call, output }) => (
+											<MCPAppView
+												key={instance.instanceID}
+												instance={instance}
+												toolInput={call?.arguments}
+												toolResult={{
+													content: output.mcpApp?.content,
+													structuredContent: output.mcpApp?.structuredContent ?? output.toolOutputs,
+													isError: output.mcpApp?.isError ?? output.isError,
+												}}
+											/>
+										))}
+									</div>
+								</div>
+								<div className={`${rightColSpan} flex justify-start`} />
+							</>
+						)}
 						{hasCitations && (
 							<div className="border-base-300 border-t p-1">
 								<MessageCitationsBar citations={message.uiCitations} />{' '}

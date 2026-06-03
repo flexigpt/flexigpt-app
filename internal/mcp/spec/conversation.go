@@ -12,6 +12,9 @@ type MCPToolSelection struct {
 
 	ApprovalRule  *MCPApprovalRule  `json:"approvalRule,omitempty"`
 	ExecutionMode *MCPExecutionMode `json:"executionMode,omitempty"`
+
+	AppResourceURI string   `json:"appResourceUri,omitempty"`
+	Visibility     []string `json:"visibility,omitempty"`
 }
 
 type MCPProviderToolMapping struct {
