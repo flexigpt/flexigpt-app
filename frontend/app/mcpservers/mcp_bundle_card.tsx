@@ -71,9 +71,11 @@ function getErrorMessage(error: unknown, fallback: string): string {
 
 function InfoPill({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
 	return (
-		<div className={`bg-base-200 min-w-0 rounded-xl px-3 py-2 ${className}`}>
-			<div className="text-base-content/60 text-[10px] tracking-wide uppercase">{label}</div>
-			<div className="mt-1 min-w-0 text-xs">{children}</div>
+		<div className={`bg-base-200 flex min-w-0 rounded-xl p-2 ${className}`}>
+			<div className="grid h-full w-full grid-cols-3 items-center gap-4">
+				<div className="text-base-content/60 col-span-1 text-[10px] uppercase">{label}</div>
+				<div className="col-span-2 text-xs">{children}</div>
+			</div>
 		</div>
 	);
 }
@@ -285,7 +287,7 @@ export function MCPBundleCard({
 							No MCP servers in this bundle.
 						</div>
 					) : (
-						<div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+						<div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
 							{servers.map(server => {
 								const runtime = runtimeByServerID[server.id];
 								const authHealth = authHealthByServerID[server.id];
@@ -299,29 +301,29 @@ export function MCPBundleCard({
 										key={server.id}
 										className="border-base-content/10 bg-base-100 min-w-0 rounded-2xl border p-4 shadow-sm"
 									>
-										<div className="mb-3 flex min-w-0 items-start justify-between gap-3">
-											<div className="min-w-0">
+										<div className="mb-2 flex min-w-0 items-start justify-between gap-3">
+											<div className="flex min-w-0 items-center gap-2">
 												<div className="truncate text-sm font-semibold" title={server.displayName}>
 													{server.displayName}
 												</div>
-												<div className="text-base-content/60 mt-1 text-xs break-all">{server.id}</div>
+												<div className="text-base-content/60 text-xs break-all">{server.id}</div>
 											</div>
 
-											<div className="flex shrink-0 flex-col items-end gap-2">
-												<span className={`badge rounded-xl ${getMCPStatusBadgeClass(status)}`}>
+											<div className="flex shrink-0 items-end gap-2">
+												<span className={`badge badge-xs rounded-xl ${getMCPStatusBadgeClass(status)}`}>
 													{getMCPStatusLabel(status)}
 												</span>
-												<span className={`badge rounded-xl ${getMCPAuthHealthBadgeClass(authHealth?.state)}`}>
+												<span className={`badge badge-xs rounded-xl ${getMCPAuthHealthBadgeClass(authHealth?.state)}`}>
 													{getMCPAuthHealthLabel(authHealth?.state)}
 												</span>
 											</div>
 										</div>
 
-										<div className="mb-3 grid grid-cols-2 gap-2">
+										<div className="grid grid-cols-2 gap-2">
 											<InfoPill label="Enabled">
 												<input
 													type="checkbox"
-													className="toggle toggle-accent"
+													className="toggle toggle-accent toggle-sm"
 													checked={server.enabled}
 													disabled={pendingActionKeys.has(`toggle:${server.id}`) || !bundle.isEnabled}
 													title={!bundle.isEnabled ? 'Enable the bundle first.' : undefined}
@@ -339,161 +341,164 @@ export function MCPBundleCard({
 												<TruncatedValue value={getMCPTrustLevelLabel(server.trustLevel)} />
 											</InfoPill>
 
+											<InfoPill label="Kind">{server.isBuiltIn ? 'Built-in' : 'Custom'}</InfoPill>
+
 											<InfoPill label="Discovery" className="col-span-2">
 												{runtime
 													? `${runtime.toolCount} tools / ${runtime.resourceCount} resources / ${runtime.resourceTemplateCount} templates / ${runtime.promptCount} prompts`
 													: '-'}
 											</InfoPill>
-
-											<InfoPill label="Kind">{server.isBuiltIn ? 'Built-in' : 'Custom'}</InfoPill>
 										</div>
 
-										<div className="min-h-10 space-y-1">
-											{runtime?.lastError && (
-												<div className="text-error truncate text-xs" title={runtime.lastError}>
-													{runtime.lastError}
-												</div>
-											)}
-
-											{authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending &&
-												authHealth.authorizationURL && (
-													<div className="flex flex-wrap gap-1">
-														<button
-															className="btn btn-xs btn-ghost rounded-xl"
-															onClick={() => {
-																onOpenURL(authHealth.authorizationURL ?? '');
-															}}
-															title="Open authorization URL"
-														>
-															<FiExternalLink size={12} />
-														</button>
-														<button
-															className="btn btn-xs btn-ghost rounded-xl"
-															onClick={() => {
-																void runServerAction(
-																	`cancel-oauth:${server.id}`,
-																	() => onCancelOAuth(bundle.id, server.id),
-																	'Failed to cancel OAuth authorization.'
-																);
-															}}
-															title="Cancel authorization"
-														>
-															<FiX size={12} />
-														</button>
+										<div className="mt-4 flex flex-col flex-wrap items-center">
+											<div className="flex w-full items-center gap-2">
+												{runtime?.lastError && (
+													<div className="text-error truncate text-xs" title={runtime.lastError}>
+														{runtime.lastError}
 													</div>
 												)}
-											{authHealth?.lastError && (
-												<div className="text-error truncate text-xs" title={authHealth.lastError}>
-													{authHealth.lastError}
-												</div>
-											)}
-										</div>
 
-										<div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-											<button
-												className="btn btn-sm btn-ghost rounded-2xl"
-												onClick={() => {
-													setServerDetails(server);
-												}}
-												title="View"
-												aria-label="View"
-											>
-												<FiEye size={16} />
-											</button>
+												{authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending &&
+													authHealth.authorizationURL && (
+														<div className="flex flex-wrap gap-1">
+															<button
+																className="btn btn-xs btn-ghost rounded-xl"
+																onClick={() => {
+																	onOpenURL(authHealth.authorizationURL ?? '');
+																}}
+																title="Open authorization URL"
+															>
+																<FiExternalLink size={12} />
+															</button>
+															<button
+																className="btn btn-xs btn-ghost rounded-xl"
+																onClick={() => {
+																	void runServerAction(
+																		`cancel-oauth:${server.id}`,
+																		() => onCancelOAuth(bundle.id, server.id),
+																		'Failed to cancel OAuth authorization.'
+																	);
+																}}
+																title="Cancel authorization"
+															>
+																<FiX size={12} />
+															</button>
+														</div>
+													)}
+												{authHealth?.lastError && (
+													<div className="text-error truncate text-xs" title={authHealth.lastError}>
+														{authHealth.lastError}
+													</div>
+												)}
+											</div>
+											<div className="flex w-full items-center justify-end gap-2">
+												<button
+													className="btn btn-sm btn-ghost rounded-2xl"
+													onClick={() => {
+														setServerDetails(server);
+													}}
+													title="View"
+													aria-label="View"
+												>
+													<FiEye size={16} />
+												</button>
 
-											<button
-												className="btn btn-sm btn-ghost rounded-2xl"
-												onClick={() => {
-													openServerModal('edit', server);
-												}}
-												disabled={server.isBuiltIn || bundle.isBuiltIn || !bundle.isEnabled}
-												title={
-													server.isBuiltIn || bundle.isBuiltIn
-														? 'Built-in items cannot be edited'
-														: !bundle.isEnabled
-															? 'Enable the bundle first.'
-															: 'Edit'
-												}
-												aria-label="Edit"
-											>
-												<FiEdit2 size={16} />
-											</button>
+												<button
+													className="btn btn-sm btn-ghost rounded-2xl"
+													onClick={() => {
+														openServerModal('edit', server);
+													}}
+													disabled={server.isBuiltIn || bundle.isBuiltIn || !bundle.isEnabled}
+													title={
+														server.isBuiltIn || bundle.isBuiltIn
+															? 'Built-in items cannot be edited'
+															: !bundle.isEnabled
+																? 'Enable the bundle first.'
+																: 'Edit'
+													}
+													aria-label="Edit"
+												>
+													<FiEdit2 size={16} />
+												</button>
 
-											<button
-												className="btn btn-sm btn-ghost rounded-2xl"
-												onClick={() => {
-													void runServerAction(
-														`connect:${server.id}`,
-														() => onConnectServer(bundle.id, server.id),
-														'Failed to connect MCP server.'
-													);
-												}}
-												disabled={
-													!bundle.isEnabled ||
-													!server.enabled ||
-													isReady ||
-													isConnecting ||
-													pendingActionKeys.has(`connect:${server.id}`)
-												}
-												title={authActionable ? 'Authorization pending. Open auth URL first if needed.' : 'Connect'}
-												aria-label="Connect"
-											>
-												<FiWifi size={16} />
-											</button>
+												<button
+													className="btn btn-sm btn-ghost rounded-2xl"
+													onClick={() => {
+														void runServerAction(
+															`connect:${server.id}`,
+															() => onConnectServer(bundle.id, server.id),
+															'Failed to connect MCP server.'
+														);
+													}}
+													disabled={
+														!bundle.isEnabled ||
+														!server.enabled ||
+														isReady ||
+														isConnecting ||
+														pendingActionKeys.has(`connect:${server.id}`)
+													}
+													title={authActionable ? 'Authorization pending. Open auth URL first if needed.' : 'Connect'}
+													aria-label="Connect"
+												>
+													<FiWifi size={16} />
+												</button>
 
-											<button
-												className="btn btn-sm btn-ghost rounded-2xl"
-												onClick={() => {
-													void runServerAction(
-														`disconnect:${server.id}`,
-														() => onDisconnectServer(bundle.id, server.id),
-														'Failed to disconnect MCP server.'
-													);
-												}}
-												disabled={
-													!isReady ||
-													pendingActionKeys.has(`disconnect:${server.id}`) ||
-													pendingActionKeys.has(`connect:${server.id}`)
-												}
-												title="Disconnect"
-												aria-label="Disconnect"
-											>
-												<FiWifiOff size={16} />
-											</button>
+												<button
+													className="btn btn-sm btn-ghost rounded-2xl"
+													onClick={() => {
+														void runServerAction(
+															`disconnect:${server.id}`,
+															() => onDisconnectServer(bundle.id, server.id),
+															'Failed to disconnect MCP server.'
+														);
+													}}
+													disabled={
+														!isReady ||
+														pendingActionKeys.has(`disconnect:${server.id}`) ||
+														pendingActionKeys.has(`connect:${server.id}`)
+													}
+													title="Disconnect"
+													aria-label="Disconnect"
+												>
+													<FiWifiOff size={16} />
+												</button>
 
-											<button
-												className="btn btn-sm btn-ghost rounded-2xl"
-												onClick={() => {
-													void runServerAction(
-														`refresh:${server.id}`,
-														() => onRefreshServer(bundle.id, server.id),
-														'Failed to refresh MCP server.'
-													);
-												}}
-												disabled={
-													!bundle.isEnabled ||
-													!server.enabled ||
-													!isReady ||
-													isConnecting ||
-													pendingActionKeys.has(`refresh:${server.id}`)
-												}
-												title="Refresh discovery"
-												aria-label="Refresh discovery"
-											>
-												<FiRefreshCw size={16} />
-											</button>
+												<button
+													className="btn btn-sm btn-ghost rounded-2xl"
+													onClick={() => {
+														void runServerAction(
+															`refresh:${server.id}`,
+															() => onRefreshServer(bundle.id, server.id),
+															'Failed to refresh MCP server.'
+														);
+													}}
+													disabled={
+														!bundle.isEnabled ||
+														!server.enabled ||
+														!isReady ||
+														isConnecting ||
+														pendingActionKeys.has(`refresh:${server.id}`)
+													}
+													title="Refresh discovery"
+													aria-label="Refresh discovery"
+												>
+													<FiRefreshCw size={16} />
+												</button>
 
-											<button
-												className="btn btn-sm btn-ghost rounded-2xl"
-												onClick={() => {
-													requestDeleteServer(server);
-												}}
-												disabled={server.isBuiltIn || bundle.isBuiltIn}
-												title={server.isBuiltIn || bundle.isBuiltIn ? 'Deleting disabled for built-in items' : 'Delete'}
-												aria-label="Delete"
-											>
-												<FiTrash2 size={16} />
-											</button>
+												<button
+													className="btn btn-sm btn-ghost rounded-2xl"
+													onClick={() => {
+														requestDeleteServer(server);
+													}}
+													disabled={server.isBuiltIn || bundle.isBuiltIn}
+													title={
+														server.isBuiltIn || bundle.isBuiltIn ? 'Deleting disabled for built-in items' : 'Delete'
+													}
+													aria-label="Delete"
+												>
+													<FiTrash2 size={16} />
+												</button>
+											</div>
 										</div>
 									</article>
 								);
