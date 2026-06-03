@@ -46,6 +46,17 @@ export const JSONRPC_ERR_METHOD_NOT_FOUND = -32601;
 export const JSONRPC_ERR_INVALID_PARAMS = -32602;
 export const JSONRPC_ERR_BLOCKED_BY_POLICY = -32001;
 
+export function isJSONRPCResponse(value: unknown): value is JSONRPCResponse {
+	if (!value || typeof value !== 'object') return false;
+	const m = value as Partial<JSONRPCResponse> & { method?: unknown };
+	return (
+		m.jsonrpc === '2.0' &&
+		(typeof m.id === 'number' || typeof m.id === 'string') &&
+		!('method' in m) &&
+		('result' in m || 'error' in m)
+	);
+}
+
 export function isJSONRPCRequest(value: unknown): value is JSONRPCRequest {
 	if (!value || typeof value !== 'object') return false;
 	const m = value as Partial<JSONRPCRequest>;

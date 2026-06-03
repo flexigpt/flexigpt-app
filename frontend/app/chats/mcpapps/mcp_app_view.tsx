@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { FiAlertTriangle } from 'react-icons/fi';
 
-import { type MCPAppModelContextUpdate, type MCPContent, MCPContentType } from '@/spec/mcp';
+import { type MCPAppModelContextUpdate, type MCPAppsPolicy, type MCPContent, MCPContentType } from '@/spec/mcp';
 
 import { backendAPI, mcpAPI } from '@/apis/baseapi';
 
@@ -29,6 +29,16 @@ import { MCPAppSandbox } from '@/chats/mcpapps/mcp_app_sandbox';
 import { type JSONRPCRequest, type JSONRPCResponse, type MCPAppInstance } from '@/chats/mcpapps/mcp_app_types';
 
 const APP_MIME = 'text/html;profile=mcp-app';
+const UNKNOWN_APP_POLICY: MCPAppsPolicy = {
+	enabled: true,
+	allowAppInitiatedToolCalls: false,
+	requireApprovalForOpenLink: true,
+	requireApprovalForContextUpdates: true,
+};
+
+const MIN_APP_HEIGHT = 160;
+const MAX_APP_HEIGHT = 1200;
+
 type LoadedMCPAppResource = {
 	html: string;
 	mimeType: string;
@@ -111,12 +121,18 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 	> | null>(null);
 	const [blockedURL, setBlockedURL] = useState<string | null>(null);
 	const [viewInitialized, setViewInitialized] = useState(false);
+	const [appsPolicy, setAppsPolicy] = useState<MCPAppsPolicy | null>(null);
+	const [policyError, setPolicyError] = useState<string | null>(null);
+	const [frameHeight, setFrameHeight] = useState(height);
 
 	const approvalResolverRef = useRef<((ok: boolean) => void) | null>(null);
 	const mcpApproval = useMCPApproval();
 
 	const bridgeRef = useRef<MCPAppPostMessageBridge | null>(null);
 	const iframeRef = useRef<HTMLIFrameElement | null>(null);
+	const sizeAnimationFrameRef = useRef<number | null>(null);
+
+	const effectiveAppsPolicy = appsPolicy ?? UNKNOWN_APP_POLICY;
 
 	useEffect(() => {
 		let cancelled = false;
@@ -148,14 +164,74 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 		};
 	}, [instance.bundleID, instance.resourceUri, instance.serverID]);
 
-	const requestOpenLinkApproval = useCallback(async (url: string) => {
-		if (!isSafeExternalURL(url)) {
-			setBlockedURL(url);
-			return false;
-		}
-		return await new Promise<boolean>(resolve => {
-			approvalResolverRef.current = resolve;
-			setPendingURL(url);
+	useEffect(() => {
+		let cancelled = false;
+		// eslint-disable-next-line react-hooks/set-state-in-effect, react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+		setPolicyError(null);
+		// eslint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+		setAppsPolicy(null);
+
+		void mcpAPI
+			.getMCPServer(instance.bundleID, instance.serverID)
+			.then(server => {
+				if (cancelled) return;
+				const nextPolicy = server?.appsPolicy ?? null;
+				setAppsPolicy(nextPolicy);
+				if (nextPolicy && !nextPolicy.enabled) {
+					setPolicyError('MCP Apps is currently disabled for this server.');
+				}
+			})
+			.catch((err: unknown) => {
+				if (cancelled) return;
+				setPolicyError(err instanceof Error ? err.message : 'Could not verify MCP Apps policy.');
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [instance.bundleID, instance.serverID]);
+
+	useEffect(() => {
+		return () => {
+			if (sizeAnimationFrameRef.current !== null) {
+				window.cancelAnimationFrame(sizeAnimationFrameRef.current);
+			}
+		};
+	}, []);
+
+	const requestOpenLinkApproval = useCallback(
+		async (url: string) => {
+			if (!isSafeExternalURL(url)) {
+				setBlockedURL(url);
+				return false;
+			}
+			if (!effectiveAppsPolicy.requireApprovalForOpenLink) {
+				try {
+					backendAPI.openURL(url);
+					return true;
+				} catch {
+					setBlockedURL(url);
+					return false;
+				}
+			}
+			return await new Promise<boolean>(resolve => {
+				approvalResolverRef.current = resolve;
+				setPendingURL(url);
+			});
+		},
+		[effectiveAppsPolicy.requireApprovalForOpenLink]
+	);
+
+	const applySizeChanged = useCallback((params: unknown) => {
+		if (!params || typeof params !== 'object') return;
+		const heightValue = Number((params as Record<string, unknown>).height);
+		if (!Number.isFinite(heightValue) || heightValue <= 0) return;
+		const nextHeight = Math.max(MIN_APP_HEIGHT, Math.min(MAX_APP_HEIGHT, Math.round(heightValue)));
+
+		if (sizeAnimationFrameRef.current !== null) window.cancelAnimationFrame(sizeAnimationFrameRef.current);
+		sizeAnimationFrameRef.current = window.requestAnimationFrame(() => {
+			sizeAnimationFrameRef.current = null;
+			setFrameHeight(current => (Math.abs(current - nextHeight) < 4 ? current : nextHeight));
 		});
 	}, []);
 
@@ -174,17 +250,27 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 				onUIMessage: message => {
 					dispatchMCPAppUIMessage(instance, message);
 				},
-				requestModelContextUpdateApproval: async update =>
-					await new Promise<boolean>(resolve => {
+				requestModelContextUpdateApproval: async update => {
+					if (!effectiveAppsPolicy.requireApprovalForContextUpdates) {
+						return true;
+					}
+
+					return await new Promise<boolean>(resolve => {
 						approvalResolverRef.current = resolve;
 						setPendingContextUpdate(update);
-					}),
+					});
+				},
 				onModelContextUpdate: update => {
 					dispatchMCPAppModelContextUpdate(instance, update);
 				},
 				onAppLog: () => {},
 			}),
-		[instance, mcpApproval.requestMCPApproval, requestOpenLinkApproval]
+		[
+			effectiveAppsPolicy.requireApprovalForContextUpdates,
+			instance,
+			mcpApproval.requestMCPApproval,
+			requestOpenLinkApproval,
+		]
 	);
 
 	const handleIframeReady = useCallback(
@@ -202,7 +288,7 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 							result: buildMCPAppHostContext({
 								width: iframe.clientWidth,
 								height: iframe.clientHeight,
-								allowToolCalls: true,
+								allowToolCalls: effectiveAppsPolicy.enabled && effectiveAppsPolicy.allowAppInitiatedToolCalls,
 							}),
 						};
 					}
@@ -213,6 +299,10 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 						setViewInitialized(true);
 						return;
 					}
+					if (note.method === 'ui/notifications/size-changed') {
+						applySizeChanged(note.params);
+						return;
+					}
 					if (note.method === 'notifications/message') {
 						console.info('MCP App message', instance.instanceID, note.params);
 					}
@@ -220,7 +310,13 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 			});
 			bridgeRef.current = bridge;
 		},
-		[instance.instanceID, router]
+		[
+			applySizeChanged,
+			effectiveAppsPolicy.allowAppInitiatedToolCalls,
+			effectiveAppsPolicy.enabled,
+			instance.instanceID,
+			router,
+		]
 	);
 
 	useEffect(() => {
@@ -251,14 +347,28 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 
 	useEffect(() => {
 		return () => {
-			bridgeRef.current?.sendNotification('ui/resource-teardown', {
-				resourceUri: instance.resourceUri,
-			});
-			bridgeRef.current?.dispose();
+			const bridge = bridgeRef.current;
 			bridgeRef.current = null;
+			if (!bridge) return;
+
+			void bridge
+				.sendRequest('ui/resource-teardown', { resourceUri: instance.resourceUri, reason: 'view unmounted' }, 500)
+				.catch(() => undefined)
+				.finally(() => {
+					bridge.dispose();
+				});
 		};
 	}, [instance.resourceUri]);
-
+	if (policyError) {
+		return (
+			<div className="alert alert-warning rounded-2xl text-sm">
+				<div className="flex items-center gap-2">
+					<FiAlertTriangle size={14} />
+					<span>MCP App is unavailable: {policyError}</span>
+				</div>
+			</div>
+		);
+	}
 	if (loadError) {
 		return (
 			<div className="alert alert-warning rounded-2xl text-sm">
@@ -286,7 +396,7 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 					csp={buildMCPAppCSP(loadedResource.meta)}
 					title={`MCP App ${instance.toolName}`}
 					onIframeReady={handleIframeReady}
-					height={height}
+					height={frameHeight}
 					allow={buildMCPAppAllowAttribute(loadedResource.meta)}
 				/>
 			</div>

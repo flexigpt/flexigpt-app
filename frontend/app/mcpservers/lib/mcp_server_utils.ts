@@ -1,6 +1,7 @@
 import {
 	MCPApprovalRule,
 	type MCPAppsPolicy,
+	MCPAppVisibility,
 	type MCPAuthHealth,
 	MCPAuthHealthState,
 	MCPExecutionMode,
@@ -8,6 +9,7 @@ import {
 	type MCPServerPolicy,
 	type MCPServerRuntimeSnapshot,
 	MCPServerStatus,
+	type MCPToolCapability,
 	MCPToolRisk,
 	MCPTransportType,
 	MCPTrustLevel,
@@ -70,6 +72,20 @@ export function getDefaultMCPAppsPolicy(): MCPAppsPolicy {
 		requireApprovalForOpenLink: true,
 		requireApprovalForContextUpdates: true,
 	};
+}
+
+function isMCPAppVisibilityAllowed(visibility: string[] | undefined, target: 'model' | 'app'): boolean {
+	if (!visibility || visibility.length === 0) return true;
+
+	return visibility.some(item => item.trim().toLowerCase() === target);
+}
+
+export function isMCPToolVisibleToModel(tool: Pick<MCPToolCapability, 'app'>): boolean {
+	return isMCPAppVisibilityAllowed(tool.app?.visibility, MCPAppVisibility.MCPAppVisibilityModel);
+}
+
+export function isMCPToolModelSelectable(tool: Pick<MCPToolCapability, 'app' | 'enabled'>): boolean {
+	return tool.enabled && isMCPToolVisibleToModel(tool);
 }
 
 export function getMCPTransportLabel(transport: MCPTransportType): string {

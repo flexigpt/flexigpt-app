@@ -37,6 +37,7 @@ import {
 	mcpToolKey,
 	type UseComposerMCPResult,
 } from '@/chats/composer/mcp/mcp_composer_types';
+import { isMCPToolModelSelectable, isMCPToolVisibleToModel } from '@/mcpservers/lib/mcp_server_utils';
 
 type MCPDiscoveryLoadResult = Pick<MCPComposerServerOption, 'tools' | 'resources' | 'resourceTemplates' | 'prompts'>;
 
@@ -97,6 +98,10 @@ function withArgumentValue<T extends { argumentValues?: Record<string, string> }
 		...item,
 		argumentValues: Object.keys(nextValues).length > 0 ? nextValues : undefined,
 	};
+}
+
+function modelSelectableTools(tools: MCPToolCapability[]): MCPToolCapability[] {
+	return tools.filter(isMCPToolModelSelectable);
 }
 
 export function useComposerMCP(): UseComposerMCPResult {
@@ -267,7 +272,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 						...prev,
 						[key]: {
 							...currentSelection,
-							selectedTools: tools.filter(tool => tool.enabled).map(toolToSelection),
+							selectedTools: modelSelectableTools(tools).map(toolToSelection),
 						},
 					};
 				});
@@ -429,8 +434,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 						serverID: option.server.id,
 						snapshotDigest: option.runtime?.snapshotDigest,
 						toolExposure: MCPToolExposure.MCPToolExposureAll,
-						selectedTools:
-							option.tools.length > 0 ? option.tools.filter(tool => tool.enabled).map(toolToSelection) : [],
+						selectedTools: option.tools.length > 0 ? modelSelectableTools(option.tools).map(toolToSelection) : [],
 						selectedResources: [],
 						selectedResourceTemplates: [],
 						selectedPrompts: [],
@@ -458,7 +462,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 						toolExposure: exposure,
 						selectedTools:
 							exposure === MCPToolExposure.MCPToolExposureAll
-								? (option?.tools ?? []).filter(tool => tool.enabled).map(toolToSelection)
+								? modelSelectableTools(option?.tools ?? []).map(toolToSelection)
 								: exposure === MCPToolExposure.MCPToolExposureNone
 									? []
 									: current.selectedTools,
@@ -491,6 +495,8 @@ export function useComposerMCP(): UseComposerMCPResult {
 
 	const toggleTool = useCallback(
 		(tool: MCPToolCapability, selected: boolean) => {
+			if (selected && !isMCPToolVisibleToModel(tool)) return;
+
 			const key = mcpServerKey(tool.bundleID, tool.serverID);
 			const selection = toolToSelection(tool);
 
@@ -653,7 +659,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 			if (selection.toolExposure === MCPToolExposure.MCPToolExposureAll) {
 				const discovery = await loadDiscoveryForServer(selection.bundleID, selection.serverID).catch(() => undefined);
 				const tools = discovery?.tools ?? option?.tools ?? [];
-				selectedTools = tools.filter(tool => tool.enabled).map(toolToSelection);
+				selectedTools = modelSelectableTools(tools).map(toolToSelection);
 			}
 
 			nextSelections[key] = {

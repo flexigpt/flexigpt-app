@@ -41,6 +41,7 @@ import {
 	getMCPStatusBadgeClass,
 	getMCPStatusLabel,
 	getMCPTransportLabel,
+	isMCPToolVisibleToModel,
 } from '@/mcpservers/lib/mcp_server_utils';
 
 function stop(e: MouseEvent) {
@@ -177,23 +178,32 @@ function ServerDiscoverySection({
 						<div className="text-base-content/60 px-2 text-xs">No tools discovered.</div>
 					) : (
 						<div className="max-h-40 overflow-y-auto">
-							{option.tools.map((tool: MCPToolCapability) => (
-								<CheckboxRow
-									key={mcpToolKey(tool)}
-									checked={selectedToolKeys.has(mcpToolKey(tool))}
-									disabled={isInputLocked || !tool.enabled}
-									title={tool.description}
-									label={
-										<div className="min-w-0">
-											<div className="truncate">{tool.displayName || tool.toolName}</div>
-											<div className="text-base-content/60 truncate">{tool.toolName}</div>
-										</div>
-									}
-									onChange={next => {
-										state.toggleTool(tool, next);
-									}}
-								/>
-							))}
+							{option.tools.map((tool: MCPToolCapability) => {
+								const visibleToModel = isMCPToolVisibleToModel(tool);
+
+								return (
+									<CheckboxRow
+										key={mcpToolKey(tool)}
+										checked={selectedToolKeys.has(mcpToolKey(tool))}
+										disabled={isInputLocked || !tool.enabled || !visibleToModel}
+										title={
+											!visibleToModel ? 'This tool is app-only and is not exposed to the model.' : tool.description
+										}
+										label={
+											<div className="min-w-0">
+												<div className="flex min-w-0 items-center gap-1">
+													<span className="truncate">{tool.displayName || tool.toolName}</span>
+													{!visibleToModel ? <span className="badge badge-ghost badge-xs">App only</span> : null}
+												</div>
+												<div className="text-base-content/60 truncate">{tool.toolName}</div>
+											</div>
+										}
+										onChange={next => {
+											state.toggleTool(tool, next);
+										}}
+									/>
+								);
+							})}
 						</div>
 					)}
 				</>

@@ -32,6 +32,9 @@ func (b *ToolBridge) Evaluate(
 	if req.BundleID == "" || req.ServerID == "" {
 		return nil, fmt.Errorf("%w: bundleID and serverID required", spec.ErrMCPInvalidRequest)
 	}
+	if err := validateAppInvocationEnvelope(req.Body); err != nil {
+		return nil, err
+	}
 
 	_, cfg, tool, err := b.runtime.CallToolDryRun(ctx, req.BundleID, req.ServerID, *req.Body)
 	if err != nil {
@@ -77,7 +80,9 @@ func (b *ToolBridge) Invoke(
 	if req.BundleID == "" || req.ServerID == "" {
 		return nil, fmt.Errorf("%w: bundleID and serverID required", spec.ErrMCPInvalidRequest)
 	}
-
+	if err := validateAppInvocationEnvelope(req.Body); err != nil {
+		return nil, err
+	}
 	_, cfg, tool, err := b.runtime.CallToolDryRun(ctx, req.BundleID, req.ServerID, *req.Body)
 	if err != nil {
 		return nil, err
@@ -149,4 +154,14 @@ func (b *ToolBridge) applyCachedDecision(eval spec.MCPApprovalEvaluation) spec.M
 	default:
 	}
 	return eval
+}
+
+func validateAppInvocationEnvelope(req *spec.InvokeMCPToolRequestBody) error {
+	if req == nil || req.Source != spec.MCPInvocationSourceApp {
+		return nil
+	}
+	if strings.TrimSpace(req.AppInstanceID) == "" {
+		return fmt.Errorf("%w: appInstanceID is required for app-initiated MCP tool calls", spec.ErrMCPInvalidRequest)
+	}
+	return nil
 }

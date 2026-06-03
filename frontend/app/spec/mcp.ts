@@ -8,6 +8,11 @@ export type MCPServerID = string;
 export type JSONRawString = string;
 export type MCPTimestamp = string;
 
+export enum MCPAppVisibility {
+	MCPAppVisibilityModel = 'model',
+	MCPAppVisibilityApp = 'app',
+}
+
 export interface MCPArgumentDefinition {
 	name: string;
 	title?: string;

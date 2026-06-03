@@ -13,6 +13,7 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/apps"
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
@@ -444,7 +445,7 @@ func (b *MCPInferenceBridge) toolsForSelection(
 			if !tool.Enabled || tool.TaskSupport == mcpSpec.MCPTaskSupportRequired {
 				continue
 			}
-			if !mcpToolVisibleToModel(tool) {
+			if !apps.ToolVisibleToModel(tool.App) {
 				continue
 			}
 			out = append(out, tool)
@@ -478,7 +479,7 @@ func (b *MCPInferenceBridge) toolsForSelection(
 			if !current.Enabled || current.TaskSupport == mcpSpec.MCPTaskSupportRequired {
 				continue
 			}
-			if !mcpToolVisibleToModel(current) {
+			if !apps.ToolVisibleToModel(current.App) {
 				continue
 			}
 			if _, ok := seen[current.ToolName]; ok {
@@ -594,18 +595,6 @@ func missingRequiredMCPArguments(
 
 	slices.Sort(missing)
 	return missing
-}
-
-func mcpToolVisibleToModel(tool mcpSpec.MCPToolCapability) bool {
-	if tool.App == nil || len(tool.App.Visibility) == 0 {
-		return true
-	}
-	for _, v := range tool.App.Visibility {
-		if strings.EqualFold(strings.TrimSpace(v), "model") {
-			return true
-		}
-	}
-	return false
 }
 
 func toolChoiceFromMCPTool(tool mcpSpec.MCPToolCapability) inferenceSpec.ToolChoice {

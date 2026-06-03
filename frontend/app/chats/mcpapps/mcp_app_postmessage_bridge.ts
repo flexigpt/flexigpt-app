@@ -1,6 +1,7 @@
 import {
 	isJSONRPCNotification,
 	isJSONRPCRequest,
+	isJSONRPCResponse,
 	type JSONRPCMessage,
 	type JSONRPCNotification,
 	type JSONRPCRequest,
@@ -9,6 +10,12 @@ import {
 
 export type AppRequestHandler = (req: JSONRPCRequest) => Promise<JSONRPCResponse>;
 export type AppNotificationHandler = (note: JSONRPCNotification) => void;
+
+type PendingHostRequest = {
+	resolve: (response: JSONRPCResponse) => void;
+	reject: (error: Error) => void;
+	timer: number;
+};
 
 /**
  * Low-level postMessage bridge between the FlexiGPT host and one MCP App
@@ -25,6 +32,8 @@ export class MCPAppPostMessageBridge {
 	private readonly onNotification: AppNotificationHandler;
 	private readonly listener: (e: MessageEvent) => void;
 	private disposed = false;
+	private nextHostRequestID = 1;
+	private readonly pendingHostRequests = new Map<number | string, PendingHostRequest>();
 
 	constructor(args: {
 		iframe: HTMLIFrameElement;
@@ -44,6 +53,35 @@ export class MCPAppPostMessageBridge {
 		if (this.disposed) return;
 		this.disposed = true;
 		window.removeEventListener('message', this.listener);
+		for (const pending of this.pendingHostRequests.values()) {
+			window.clearTimeout(pending.timer);
+			pending.reject(new Error('MCP App bridge disposed.'));
+		}
+		this.pendingHostRequests.clear();
+	}
+
+	sendRequest(method: string, params?: unknown, timeoutMS = 1000): Promise<JSONRPCResponse> {
+		if (this.disposed) {
+			return Promise.reject(new Error('MCP App bridge disposed.'));
+		}
+
+		const id = `host-${this.nextHostRequestID++}`;
+		const req: JSONRPCRequest = {
+			jsonrpc: '2.0',
+			id,
+			method,
+			params,
+		};
+
+		return new Promise<JSONRPCResponse>((resolve, reject) => {
+			const timer = window.setTimeout(() => {
+				this.pendingHostRequests.delete(id);
+				reject(new Error(`MCP App request ${method} timed out.`));
+			}, timeoutMS);
+
+			this.pendingHostRequests.set(id, { resolve, reject, timer });
+			this.post(req);
+		});
 	}
 
 	sendNotification(method: string, params?: unknown) {
@@ -57,6 +95,19 @@ export class MCPAppPostMessageBridge {
 		if (!this.iframe.contentWindow || e.source !== this.iframe.contentWindow) return;
 		const data = e.data as unknown;
 		if (!data || typeof data !== 'object') return;
+		if (isJSONRPCResponse(data)) {
+			const pending = this.pendingHostRequests.get(data.id);
+			if (!pending) return;
+
+			this.pendingHostRequests.delete(data.id);
+			window.clearTimeout(pending.timer);
+			if (data.error) {
+				pending.reject(new Error(data.error.message));
+			} else {
+				pending.resolve(data);
+			}
+			return;
+		}
 
 		if (isJSONRPCRequest(data)) {
 			try {
