@@ -50,7 +50,8 @@ type ConversationMessage struct {
 	ToolChoices      []inferenceSpec.ToolChoice `json:"toolChoices,omitempty"`
 	ToolStoreChoices []toolSpec.ToolStoreChoice `json:"toolStoreChoices,omitempty"`
 
-	MCPContext *mcpSpec.MCPConversationContext `json:"mcpContext,omitempty"`
+	MCPContext           *mcpSpec.MCPConversationContext    `json:"mcpContext,omitempty"`
+	MCPAppContextUpdates []mcpSpec.MCPAppModelContextUpdate `json:"mcpAppContextUpdates,omitempty"`
 
 	// Attachments that backed this turn's user input (files, URLs, etc).
 	// These are ref attachments; ContentBlock may or may not be hydrated.

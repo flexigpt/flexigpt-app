@@ -560,6 +560,7 @@ export function useSendMessage({
 				attachments: message.attachments,
 				toolChoices: message.toolStoreChoices,
 				mcpContext: message.mcpContext,
+				mcpAppContextUpdates: message.mcpAppContextUpdates,
 				toolOutputs: message.uiToolOutputs,
 				enabledSkillRefs: message.enabledSkillRefs,
 				activeSkillRefs: message.activeSkillRefs,

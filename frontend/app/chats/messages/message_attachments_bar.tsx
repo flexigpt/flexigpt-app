@@ -6,6 +6,7 @@ import {
 	FiImage,
 	FiLink,
 	FiPaperclip,
+	FiServer,
 	FiTerminal,
 	FiTool,
 } from 'react-icons/fi';
@@ -15,7 +16,7 @@ import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariaki
 import type { Attachment } from '@/spec/attachment';
 import { AttachmentContentBlockMode, AttachmentKind } from '@/spec/attachment';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
-import { type MCPConversationContext, MCPExecutionMode } from '@/spec/mcp';
+import { type MCPAppModelContextUpdate, type MCPConversationContext, MCPExecutionMode } from '@/spec/mcp';
 import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
 import { getAttachmentDisplayLabel } from '@/chats/composer/attachments/attachment_editor_utils';
@@ -940,6 +941,7 @@ interface MessageAttachmentsBarProps {
 	attachments?: Attachment[];
 	toolChoices?: ToolStoreChoice[];
 	mcpContext?: MCPConversationContext;
+	mcpAppContextUpdates?: MCPAppModelContextUpdate[];
 	toolCalls?: UIToolCall[];
 	toolOutputs?: UIToolOutput[];
 	onToolChoiceDetails?: (choice: ToolStoreChoice) => void;
@@ -959,6 +961,7 @@ export function MessageAttachmentsBar({
 	attachments,
 	toolChoices,
 	mcpContext,
+	mcpAppContextUpdates,
 	toolCalls,
 	toolOutputs,
 	onToolChoiceDetails,
@@ -981,6 +984,8 @@ export function MessageAttachmentsBar({
 	const hasAttachments = !!attachments && attachments.length > 0;
 	const hasTools = normalToolChoices.length > 0;
 	const hasMCP = (mcpContext?.servers?.length ?? 0) > 0;
+	const hasMCPAppContext = (mcpAppContextUpdates?.length ?? 0) > 0;
+
 	const hasWebSearchTools = webSearchChoices.length > 0;
 	const hasToolCalls = normalToolCalls.length > 0;
 	const hasWebSearchCalls = webSearchCalls.length > 0;
@@ -991,6 +996,7 @@ export function MessageAttachmentsBar({
 		!hasAttachments &&
 		!hasTools &&
 		!hasMCP &&
+		!hasMCPAppContext &&
 		!hasWebSearchTools &&
 		!hasToolCalls &&
 		!hasWebSearchCalls &&
@@ -1011,7 +1017,19 @@ export function MessageAttachmentsBar({
 			{hasTools && <ToolChoicesGroupChip tools={normalToolChoices} onToolChoiceDetails={onToolChoiceDetails} />}
 
 			{hasMCP && <MCPMessageContextChip context={mcpContext} />}
-
+			{hasMCPAppContext && (
+				<div
+					className="bg-secondary/10 text-base-content border-secondary/40 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
+					title={`MCP App model context\n${mcpAppContextUpdates?.length ?? 0} update${
+						(mcpAppContextUpdates?.length ?? 0) === 1 ? '' : 's'
+					}`}
+					data-message-chip="mcp-app-context"
+				>
+					<FiServer size={14} />
+					<span className="max-w-28 truncate">App context</span>
+					<span className="text-base-content/60 whitespace-nowrap">{mcpAppContextUpdates?.length ?? 0}</span>
+				</div>
+			)}
 			{/* Web‑search config for this turn */}
 			{hasWebSearchTools && (
 				<WebSearchChoicesGroupChip choices={webSearchChoices} onChoiceDetails={onToolChoiceDetails} />

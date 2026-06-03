@@ -2,19 +2,26 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { FiAlertTriangle } from 'react-icons/fi';
 
-import { type MCPContent, MCPContentType } from '@/spec/mcp';
+import { type MCPAppModelContextUpdate, type MCPContent, MCPContentType } from '@/spec/mcp';
 
 import { backendAPI, mcpAPI } from '@/apis/baseapi';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 
+import { MCPApprovalModal } from '@/chats/composer/mcp/mcp_approval_modal';
 import {
 	buildMCPAppAllowAttribute,
 	buildMCPAppCSP,
 	getMCPAppUIResourceMeta,
 	type MCPAppUIResourceMeta,
 } from '@/chats/composer/mcp/mcp_apps_csp';
+import { useMCPApproval } from '@/chats/composer/mcp/use_mcp_approval';
+import {
+	dispatchMCPAppModelContextUpdate,
+	dispatchMCPAppUIMessage,
+	type MCPAppUIMessage,
+} from '@/chats/mcpapps/mcp_app_events';
 import { buildMCPAppHostContext } from '@/chats/mcpapps/mcp_app_host_context';
 import { MCPAppPostMessageBridge } from '@/chats/mcpapps/mcp_app_postmessage_bridge';
 import { MCPAppRPCRouter } from '@/chats/mcpapps/mcp_app_rpc_router';
@@ -97,10 +104,16 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 	const [loadedResource, setLoadedResource] = useState<LoadedMCPAppResource | null>(null);
 	const [loadError, setLoadError] = useState<string | null>(null);
 	const [pendingURL, setPendingURL] = useState<string | null>(null);
+	const [pendingUIMessage, setPendingUIMessage] = useState<MCPAppUIMessage | null>(null);
+	const [pendingContextUpdate, setPendingContextUpdate] = useState<Omit<
+		MCPAppModelContextUpdate,
+		'instanceID' | 'bundleID' | 'serverID' | 'resourceUri' | 'updatedAt'
+	> | null>(null);
 	const [blockedURL, setBlockedURL] = useState<string | null>(null);
 	const [viewInitialized, setViewInitialized] = useState(false);
 
 	const approvalResolverRef = useRef<((ok: boolean) => void) | null>(null);
+	const mcpApproval = useMCPApproval();
 
 	const bridgeRef = useRef<MCPAppPostMessageBridge | null>(null);
 	const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -152,9 +165,26 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 			new MCPAppRPCRouter({
 				instance,
 				requestOpenLinkApproval,
+				requestMCPApproval: mcpApproval.requestMCPApproval,
+				requestUIMessageApproval: async message =>
+					await new Promise<boolean>(resolve => {
+						approvalResolverRef.current = resolve;
+						setPendingUIMessage(message);
+					}),
+				onUIMessage: message => {
+					dispatchMCPAppUIMessage(instance, message);
+				},
+				requestModelContextUpdateApproval: async update =>
+					await new Promise<boolean>(resolve => {
+						approvalResolverRef.current = resolve;
+						setPendingContextUpdate(update);
+					}),
+				onModelContextUpdate: update => {
+					dispatchMCPAppModelContextUpdate(instance, update);
+				},
 				onAppLog: () => {},
 			}),
-		[instance, requestOpenLinkApproval]
+		[instance, mcpApproval.requestMCPApproval, requestOpenLinkApproval]
 	);
 
 	const handleIframeReady = useCallback(
@@ -289,7 +319,39 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 					approvalResolverRef.current = null;
 				}}
 			/>
+			<DeleteConfirmationModal
+				isOpen={pendingUIMessage !== null}
+				title="Add message from MCP App?"
+				message={`The MCP App for ${instance.serverID} wants to add this draft message:\n\n${pendingUIMessage?.text ?? ''}`}
+				confirmButtonText="Add draft"
+				onConfirm={() => {
+					setPendingUIMessage(null);
+					approvalResolverRef.current?.(true);
+					approvalResolverRef.current = null;
+				}}
+				onClose={() => {
+					setPendingUIMessage(null);
+					approvalResolverRef.current?.(false);
+					approvalResolverRef.current = null;
+				}}
+			/>
 
+			<DeleteConfirmationModal
+				isOpen={pendingContextUpdate !== null}
+				title="Allow MCP App model context?"
+				message={`The MCP App for ${instance.serverID} wants to add context to the next model request.`}
+				confirmButtonText="Allow"
+				onConfirm={() => {
+					setPendingContextUpdate(null);
+					approvalResolverRef.current?.(true);
+					approvalResolverRef.current = null;
+				}}
+				onClose={() => {
+					setPendingContextUpdate(null);
+					approvalResolverRef.current?.(false);
+					approvalResolverRef.current = null;
+				}}
+			/>
 			<ActionDeniedAlertModal
 				isOpen={blockedURL !== null}
 				onClose={() => {
@@ -297,6 +359,7 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 				}}
 				message={`Could not open ${blockedURL ?? ''}.`}
 			/>
+			<MCPApprovalModal approvalRequest={mcpApproval.approvalRequest} onResolve={mcpApproval.resolveMCPApproval} />
 		</>
 	);
 }

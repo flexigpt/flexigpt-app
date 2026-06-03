@@ -22,7 +22,10 @@ export interface MCPAppUIResourceMeta {
 function normalizeSource(raw: string): string | undefined {
 	const value = raw.trim();
 	if (!value) return undefined;
-
+	const wildcard = value.match(/^(https|wss):\/\/\*\.[A-Za-z0-9.-]+(?::\d+)?$/);
+	if (wildcard) {
+		return value.toLowerCase();
+	}
 	try {
 		const url = new URL(value);
 

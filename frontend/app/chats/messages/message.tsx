@@ -51,6 +51,8 @@ function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
 	if (prev.message.status !== next.message.status) return false;
 	if (prev.message.outputs !== next.message.outputs) return false;
 	if (prev.message.uiCitations !== next.message.uiCitations) return false;
+	if (prev.message.uiToolCalls !== next.message.uiToolCalls) return false;
+	if (prev.message.uiToolOutputs !== next.message.uiToolOutputs) return false;
 
 	if (prev.streamedText !== next.streamedText) return false;
 	if (prev.streamedThinking !== next.streamedThinking) return false;
@@ -101,6 +103,7 @@ export const ChatMessage = memo(function ChatMessage({
 	const hasAttachmentsBar =
 		(message.attachments?.length ?? 0) > 0 ||
 		(message.toolStoreChoices?.length ?? 0) > 0 ||
+		(message.mcpAppContextUpdates?.length ?? 0) > 0 ||
 		(message.uiToolCalls?.length ?? 0) > 0 ||
 		(message.uiToolOutputs?.length ?? 0) > 0;
 
@@ -164,28 +167,24 @@ export const ChatMessage = memo(function ChatMessage({
 								</div>
 							)}
 						</div>
-						{/* MCP Apps row, One iframe per app-capable tool output. */}
+						{/* MCP Apps row. One sandboxed iframe per app-capable MCP tool output. */}
 						{mcpAppViews.length > 0 && (
-							<>
-								<div className={`${leftColSpan} flex justify-end`} />
-								<div className="col-span-10 mt-2 min-w-0 lg:col-span-9">
-									<div className="space-y-2">
-										{mcpAppViews.map(({ instance, call, output }) => (
-											<MCPAppView
-												key={instance.instanceID}
-												instance={instance}
-												toolInput={call?.arguments}
-												toolResult={{
-													content: output.mcpApp?.content,
-													structuredContent: output.mcpApp?.structuredContent ?? output.toolOutputs,
-													isError: output.mcpApp?.isError ?? output.isError,
-												}}
-											/>
-										))}
-									</div>
+							<div className="border-base-300 border-t px-4 py-3">
+								<div className="space-y-2">
+									{mcpAppViews.map(({ instance, call, output }) => (
+										<MCPAppView
+											key={instance.instanceID}
+											instance={instance}
+											toolInput={call?.arguments}
+											toolResult={{
+												content: output.mcpApp?.content,
+												structuredContent: output.mcpApp?.structuredContent ?? output.toolOutputs,
+												isError: output.mcpApp?.isError ?? output.isError,
+											}}
+										/>
+									))}
 								</div>
-								<div className={`${rightColSpan} flex justify-start`} />
-							</>
+							</div>
 						)}
 						{hasCitations && (
 							<div className="border-base-300 border-t p-1">
@@ -223,6 +222,7 @@ export const ChatMessage = memo(function ChatMessage({
 								attachments={message.attachments}
 								toolChoices={message.toolStoreChoices}
 								mcpContext={message.mcpContext}
+								mcpAppContextUpdates={message.mcpAppContextUpdates}
 								toolCalls={message.uiToolCalls}
 								toolOutputs={message.uiToolOutputs}
 								onToolChoiceDetails={choice => {

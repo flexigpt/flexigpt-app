@@ -2,6 +2,7 @@ export const BaseMCPBundleID = '019e785b-2b96-7ecc-a1c2-9b2bac90e08c';
 export const SecretRefVersion = 'mcpv1';
 export const DefaultMCPPageSize = 25;
 export const MaxMCPServerPageSize = 256;
+export const MCPAppHTMLMimeType = 'text/html;profile=mcp-app';
 
 export type MCPServerID = string;
 export type JSONRawString = string;
@@ -652,4 +653,45 @@ export interface MCPServerConfig {
 	createdAt: MCPTimestamp;
 	modifiedAt: MCPTimestamp;
 	softDeletedAt?: MCPTimestamp;
+}
+
+export interface MCPUIResourceCSP {
+	connectDomains?: string[];
+	resourceDomains?: string[];
+	frameDomains?: string[];
+	baseUriDomains?: string[];
+}
+
+export interface MCPUIResourcePermissions {
+	camera?: Record<string, never>;
+	microphone?: Record<string, never>;
+	geolocation?: Record<string, never>;
+	clipboardWrite?: Record<string, never>;
+}
+
+export interface MCPUIResourceMeta {
+	csp?: MCPUIResourceCSP;
+	permissions?: MCPUIResourcePermissions;
+	domain?: string;
+	prefersBorder?: boolean;
+}
+
+export interface MCPUIResourceContent {
+	bundleID: string;
+	serverID: MCPServerID;
+	uri: string;
+	mimeType: string;
+	html: string;
+	meta?: MCPUIResourceMeta;
+	digest?: string;
+}
+
+export interface MCPAppModelContextUpdate {
+	instanceID?: string;
+	bundleID?: string;
+	serverID?: MCPServerID;
+	resourceUri?: string;
+	content?: MCPContent[];
+	structuredContent?: any;
+	updatedAt?: MCPTimestamp;
 }

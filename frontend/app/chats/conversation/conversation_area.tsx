@@ -16,6 +16,12 @@ import { useInputRegistry } from '@/chats/conversation/use_input_registry';
 import { useScrollRestore } from '@/chats/conversation/use_scroll_restore';
 import { useSendMessage } from '@/chats/conversation/use_send_message';
 import { useStreamingRuntime } from '@/chats/conversation/use_streaming_runtime';
+import {
+	MCP_APP_MODEL_CONTEXT_UPDATE_EVENT,
+	MCP_APP_UI_MESSAGE_EVENT,
+	type MCPAppModelContextUpdateEventDetail,
+	type MCPAppUIMessageEventDetail,
+} from '@/chats/mcpapps/mcp_app_events';
 import { ChatMessage } from '@/chats/messages/message';
 import type { ChatTabState } from '@/chats/tabs/tabs_model';
 
@@ -149,6 +155,39 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		queuePendingDrop,
 		flushPendingDrops,
 	});
+
+	useEffect(() => {
+		const handleUIMessage = (event: Event) => {
+			const detail = (event as CustomEvent<MCPAppUIMessageEventDetail>).detail;
+			const text = detail?.message?.text?.trim();
+			if (!text) return;
+
+			const tabId = selectedTabIdRef.current;
+			if (!tabExists(tabId)) return;
+
+			inputRefs.current.get(tabId)?.loadExternalMessage({ text });
+			inputRefs.current.get(tabId)?.focus();
+		};
+
+		const handleModelContextUpdate = (event: Event) => {
+			const detail = (event as CustomEvent<MCPAppModelContextUpdateEventDetail>).detail;
+			if (!detail?.update) return;
+
+			const tabId = selectedTabIdRef.current;
+			if (!tabExists(tabId)) return;
+
+			inputRefs.current.get(tabId)?.appendMCPAppContextUpdate(detail.update);
+			inputRefs.current.get(tabId)?.focus();
+		};
+
+		window.addEventListener(MCP_APP_UI_MESSAGE_EVENT, handleUIMessage);
+		window.addEventListener(MCP_APP_MODEL_CONTEXT_UPDATE_EVENT, handleModelContextUpdate);
+
+		return () => {
+			window.removeEventListener(MCP_APP_UI_MESSAGE_EVENT, handleUIMessage);
+			window.removeEventListener(MCP_APP_MODEL_CONTEXT_UPDATE_EVENT, handleModelContextUpdate);
+		};
+	}, [inputRefs, selectedTabIdRef, tabExists]);
 
 	const {
 		setScrollContainerRef,

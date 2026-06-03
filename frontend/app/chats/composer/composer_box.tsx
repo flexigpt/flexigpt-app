@@ -3,6 +3,7 @@ import { forwardRef, type RefObject, useCallback, useEffect, useImperativeHandle
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { RestorableConversationContext } from '@/spec/conversation';
 import type { UIToolCall } from '@/spec/inference';
+import type { MCPAppModelContextUpdate } from '@/spec/mcp';
 import { type UIChatOption } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
@@ -44,6 +45,7 @@ export interface ComposerBoxHandle {
 	finishAssistantTurn: (payload: AssistantTurnFinishedPayload) => void;
 	setConversationToolsFromChoices: (tools: ToolStoreChoice[]) => void;
 	setWebSearchFromChoices: (tools: ToolStoreChoice[]) => void;
+	appendMCPAppContextUpdate: (update: MCPAppModelContextUpdate) => void;
 	applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => void;
 	setSkillStateFromMessage: (
 		enabledRefs: SkillRef[],
@@ -310,6 +312,9 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 					webSearchChoices: [...choices],
 				}));
 			},
+			appendMCPAppContextUpdate: update => {
+				editorAreaRef.current?.appendMCPAppContextUpdate(update);
+			},
 			setSkillStateFromMessage: (enabledRefs, activeRefs, options) => {
 				editorAreaRef.current?.setSkillStateFromMessage(enabledRefs, activeRefs, options);
 				updateAssistantRuntimeSnapshot(prev => ({
@@ -324,6 +329,7 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 				editorAreaRef.current?.setConversationToolsFromChoices(context.toolChoices);
 				editorAreaRef.current?.setWebSearchFromChoices(context.webSearchChoices);
 				editorAreaRef.current?.setMCPContextFromMessage(context.mcpContext);
+				editorAreaRef.current?.setMCPAppContextUpdatesFromMessage(context.mcpAppContextUpdates);
 				editorAreaRef.current?.setSkillStateFromMessage(context.enabledSkillRefs, context.activeSkillRefs, {
 					syncSession: 'none',
 					forceResetSession: true,

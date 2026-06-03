@@ -1212,6 +1212,140 @@ export namespace spec {
 	        this.reasoningTokens = source["reasoningTokens"];
 	    }
 	}
+	export class MCPIcon {
+	    src: string;
+	    mimeType?: string;
+	    sizes?: string[];
+	    theme?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPIcon(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.src = source["src"];
+	        this.mimeType = source["mimeType"];
+	        this.sizes = source["sizes"];
+	        this.theme = source["theme"];
+	    }
+	}
+	export class MCPResourceContents {
+	    uri: string;
+	    mimeType?: string;
+	    text?: string;
+	    blob?: number[];
+	    _meta?: Record<string, any>;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPResourceContents(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.uri = source["uri"];
+	        this.mimeType = source["mimeType"];
+	        this.text = source["text"];
+	        this.blob = source["blob"];
+	        this._meta = source["_meta"];
+	    }
+	}
+	export class MCPContent {
+	    type: string;
+	    text?: string;
+	    data?: number[];
+	    mimeType?: string;
+	    uri?: string;
+	    name?: string;
+	    title?: string;
+	    description?: string;
+	    size?: number;
+	    resource?: MCPResourceContents;
+	    annotations?: Record<string, any>;
+	    _meta?: Record<string, any>;
+	    icons?: MCPIcon[];
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPContent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.text = source["text"];
+	        this.data = source["data"];
+	        this.mimeType = source["mimeType"];
+	        this.uri = source["uri"];
+	        this.name = source["name"];
+	        this.title = source["title"];
+	        this.description = source["description"];
+	        this.size = source["size"];
+	        this.resource = this.convertValues(source["resource"], MCPResourceContents);
+	        this.annotations = source["annotations"];
+	        this._meta = source["_meta"];
+	        this.icons = this.convertValues(source["icons"], MCPIcon);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class MCPAppModelContextUpdate {
+	    instanceID?: string;
+	    bundleID?: string;
+	    serverID?: string;
+	    resourceUri?: string;
+	    content?: MCPContent[];
+	    structuredContent?: any;
+	    updatedAt?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPAppModelContextUpdate(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.instanceID = source["instanceID"];
+	        this.bundleID = source["bundleID"];
+	        this.serverID = source["serverID"];
+	        this.resourceUri = source["resourceUri"];
+	        this.content = this.convertValues(source["content"], MCPContent);
+	        this.structuredContent = source["structuredContent"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class MCPPromptSelection {
 	    bundleID: string;
 	    serverID: string;
@@ -2243,6 +2377,7 @@ export namespace spec {
 	    toolChoices?: ToolChoice[];
 	    toolStoreChoices?: ToolStoreChoice[];
 	    mcpContext?: MCPConversationContext;
+	    mcpAppContextUpdates?: MCPAppModelContextUpdate[];
 	    attachments?: attachment.Attachment[];
 	    enabledSkillRefs?: SkillRef[];
 	    activeSkillRefs?: SkillRef[];
@@ -2268,6 +2403,7 @@ export namespace spec {
 	        this.toolChoices = this.convertValues(source["toolChoices"], ToolChoice);
 	        this.toolStoreChoices = this.convertValues(source["toolStoreChoices"], ToolStoreChoice);
 	        this.mcpContext = this.convertValues(source["mcpContext"], MCPConversationContext);
+	        this.mcpAppContextUpdates = this.convertValues(source["mcpAppContextUpdates"], MCPAppModelContextUpdate);
 	        this.attachments = this.convertValues(source["attachments"], attachment.Attachment);
 	        this.enabledSkillRefs = this.convertValues(source["enabledSkillRefs"], SkillRef);
 	        this.activeSkillRefs = this.convertValues(source["activeSkillRefs"], SkillRef);
@@ -5215,98 +5351,6 @@ export namespace spec {
 	        this.appInstanceID = source["appInstanceID"];
 	    }
 	}
-	export class MCPIcon {
-	    src: string;
-	    mimeType?: string;
-	    sizes?: string[];
-	    theme?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new MCPIcon(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.src = source["src"];
-	        this.mimeType = source["mimeType"];
-	        this.sizes = source["sizes"];
-	        this.theme = source["theme"];
-	    }
-	}
-	export class MCPResourceContents {
-	    uri: string;
-	    mimeType?: string;
-	    text?: string;
-	    blob?: number[];
-	    _meta?: Record<string, any>;
-	
-	    static createFrom(source: any = {}) {
-	        return new MCPResourceContents(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.uri = source["uri"];
-	        this.mimeType = source["mimeType"];
-	        this.text = source["text"];
-	        this.blob = source["blob"];
-	        this._meta = source["_meta"];
-	    }
-	}
-	export class MCPContent {
-	    type: string;
-	    text?: string;
-	    data?: number[];
-	    mimeType?: string;
-	    uri?: string;
-	    name?: string;
-	    title?: string;
-	    description?: string;
-	    size?: number;
-	    resource?: MCPResourceContents;
-	    annotations?: Record<string, any>;
-	    _meta?: Record<string, any>;
-	    icons?: MCPIcon[];
-	
-	    static createFrom(source: any = {}) {
-	        return new MCPContent(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.type = source["type"];
-	        this.text = source["text"];
-	        this.data = source["data"];
-	        this.mimeType = source["mimeType"];
-	        this.uri = source["uri"];
-	        this.name = source["name"];
-	        this.title = source["title"];
-	        this.description = source["description"];
-	        this.size = source["size"];
-	        this.resource = this.convertValues(source["resource"], MCPResourceContents);
-	        this.annotations = source["annotations"];
-	        this._meta = source["_meta"];
-	        this.icons = this.convertValues(source["icons"], MCPIcon);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class InvokeMCPToolResponseBody {
 	    bundleID: string;
 	    serverID: string;
@@ -7785,6 +7829,7 @@ export namespace spec {
 		    return a;
 		}
 	}
+	
 	
 	
 	

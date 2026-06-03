@@ -27,7 +27,7 @@ import { Plate, PlateContent } from 'platejs/react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { ProviderSDKType, UIToolCall, UIToolOutput } from '@/spec/inference';
-import type { MCPConversationContext } from '@/spec/mcp';
+import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp';
 import type { PromptTemplate } from '@/spec/prompt';
 import type { SkillRef } from '@/spec/skill';
 import { type ToolArgsTarget, type ToolListItem, type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
@@ -110,6 +110,8 @@ export interface EditorAreaHandle {
 	loadToolCalls: (toolCalls: UIToolCall[]) => void;
 	setConversationToolsFromChoices: (tools: ToolStoreChoice[]) => void;
 	setMCPContextFromMessage: (context?: MCPConversationContext) => void;
+	setMCPAppContextUpdatesFromMessage: (updates?: MCPAppModelContextUpdate[]) => void;
+	appendMCPAppContextUpdate: (update: MCPAppModelContextUpdate) => void;
 	clearMCPContext: () => void;
 	setWebSearchFromChoices: (tools: ToolStoreChoice[]) => void;
 	applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => void;
@@ -222,6 +224,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const isSubmittingRef = useRef(false);
 	const submitVisualFrameRef = useRef<number | null>(null);
 
+	const [mcpAppContextUpdates, setMCPAppContextUpdates] = useState<MCPAppModelContextUpdate[]>([]);
 	const [fastForwardPending, setFastForwardPending] = useState(false);
 
 	// Guard: while true, handleEditorDocumentChange skips auto-cancel logic.
@@ -725,6 +728,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		clearAutoExecStopState();
 		clearAttachments();
 		clearComposerToolsState();
+		setMCPAppContextUpdates([]);
 	}, [
 		clearAttachments,
 		clearAutoExecStopState,
@@ -945,6 +949,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					toolOutputs: finalToolOutputs,
 					finalToolChoices,
 					mcpContext: preparedMCPContext,
+					mcpAppContextUpdates:
+						mcpAppContextUpdates.length > 0 ? mcpAppContextUpdates.map(update => ({ ...update })) : undefined,
 					enabledSkillRefs: effectiveEnabledSkillRefs,
 					activeSkillRefs: activeForMessage,
 					skillSessionID: effectiveSkillSessionID ?? undefined,
@@ -999,6 +1005,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			isSendButtonEnabled,
 			listActiveSkillRefs,
 			mcp,
+			mcpAppContextUpdates,
 			onSubmit,
 			resetEditor,
 			selectionInfo.firstPendingVar,
@@ -1171,6 +1178,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				applyConversationToolsFromChoices(incomingToolChoices);
 				applyWebSearchFromChoices(incomingToolChoices);
 				mcp.restoreContext(incoming.mcpContext);
+				setMCPAppContextUpdates(incoming.mcpAppContextUpdates ?? []);
 				// 4) Restore enabled/active skills together so invariants hold immediately.
 				void applySkillSelectionState(incoming.enabledSkillRefs ?? [], incoming.activeSkillRefs ?? [], {
 					syncSession: 'none',
@@ -1333,6 +1341,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			setMCPContextFromMessage: context => {
 				mcp.restoreContext(context);
 			},
+			setMCPAppContextUpdatesFromMessage: updates => {
+				setMCPAppContextUpdates(updates ?? []);
+			},
+			appendMCPAppContextUpdate: update => {
+				setMCPAppContextUpdates(prev => [...prev, update]);
+			},
 			clearMCPContext: () => {
 				mcp.clear();
 			},
@@ -1439,6 +1453,27 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						<span>
 							A tool returned an error result. It is ready to submit as tool output, or you can retry/discard it.
 						</span>
+					</div>
+				) : null}
+				{mcpAppContextUpdates.length > 0 ? (
+					<div className="alert alert-info mx-4 mt-3 mb-1 flex items-start justify-between gap-2 text-sm" role="status">
+						<div className="flex items-start gap-2">
+							<FiAlertTriangle size={16} className="mt-0.5" />
+							<span>
+								MCP App model context queued for the next send: {mcpAppContextUpdates.length} update
+								{mcpAppContextUpdates.length === 1 ? '' : 's'}.
+							</span>
+						</div>
+						<button
+							type="button"
+							className="btn btn-ghost btn-xs"
+							onClick={() => {
+								setMCPAppContextUpdates([]);
+							}}
+							aria-label="Clear MCP App model context"
+						>
+							<FiX size={14} />
+						</button>
 					</div>
 				) : null}
 				<Plate editor={editor} onChange={handleEditorDocumentChange}>

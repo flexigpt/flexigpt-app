@@ -267,7 +267,9 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	if len(inputs) == 0 {
 		return nil, errors.New("no usable inputs to send to inference-go")
 	}
-
+	if appCtxInput := buildMCPAppContextInput(body.Current.MCPAppContextUpdates); appCtxInput != nil {
+		inputs, currentInputs = prependCurrentInput(inputs, currentInputs, *appCtxInput)
+	}
 	// Build tool choices for this call.
 	toolChoices, err := buildToolChoices(ctx, ps.toolStore, body.ToolStoreChoices)
 	if err != nil {

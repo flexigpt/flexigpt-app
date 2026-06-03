@@ -1,7 +1,15 @@
-import { type InvokeMCPToolRequestBody, MCPApprovalDecision, MCPInvocationSource } from '@/spec/mcp';
+import {
+	type InvokeMCPToolRequestBody,
+	type MCPAppModelContextUpdate,
+	MCPApprovalDecision,
+	MCPApprovalResolution,
+	MCPInvocationSource,
+} from '@/spec/mcp';
 
 import { mcpAPI } from '@/apis/baseapi';
 
+import type { MCPApprovalRequest } from '@/chats/composer/mcp/use_mcp_approval';
+import type { MCPAppUIMessage } from '@/chats/mcpapps/mcp_app_events';
 import {
 	JSONRPC_ERR_BLOCKED_BY_POLICY,
 	JSONRPC_ERR_INVALID_PARAMS,
@@ -15,6 +23,15 @@ export interface MCPAppRouterDeps {
 	instance: MCPAppInstance;
 	/** Returns true if the user approves opening this URL. */
 	requestOpenLinkApproval: (url: string) => Promise<boolean>;
+	requestMCPApproval?: (request: MCPApprovalRequest) => Promise<MCPApprovalResolution>;
+	requestUIMessageApproval?: (message: MCPAppUIMessage) => Promise<boolean>;
+	onUIMessage?: (message: MCPAppUIMessage) => void;
+	requestModelContextUpdateApproval?: (
+		update: Omit<MCPAppModelContextUpdate, 'instanceID' | 'bundleID' | 'serverID' | 'resourceUri' | 'updatedAt'>
+	) => Promise<boolean>;
+	onModelContextUpdate?: (
+		update: Omit<MCPAppModelContextUpdate, 'instanceID' | 'bundleID' | 'serverID' | 'resourceUri' | 'updatedAt'>
+	) => void;
 	/** Routes a "log" notification from the app for the diagnostics surface. */
 	onAppLog?: (level: string, data: unknown) => void;
 }
@@ -50,13 +67,10 @@ export class MCPAppRPCRouter {
 			case 'ui/request-display-mode':
 				return this.handleDisplayMode(req);
 			case 'ui/message':
-				return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'ui/message is not enabled in this host surface');
+				return this.handleUIMessage(req);
 			case 'ui/update-model-context':
-				return errorResp(
-					req.id,
-					JSONRPC_ERR_BLOCKED_BY_POLICY,
-					'ui/update-model-context is not enabled in this host surface'
-				);
+				return this.handleUpdateModelContext(req);
+
 			default:
 				return {
 					jsonrpc: '2.0',
@@ -94,9 +108,31 @@ export class MCPAppRPCRouter {
 			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, evaluation.reason || 'Denied by policy');
 		}
 		if (evaluation.decision === MCPApprovalDecision.MCPApprovalDecisionApprovalRequired) {
-			// Approval modal is owned by composer; for app-initiated calls we
-			// fail closed and surface the reason to the app.
-			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, evaluation.reason || 'Approval required');
+			if (!evaluation.approvalID || !evaluation.summary || !this.deps.requestMCPApproval) {
+				return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, evaluation.reason || 'Approval required');
+			}
+
+			const resolution = await this.deps.requestMCPApproval({
+				approvalID: evaluation.approvalID,
+				summary: evaluation.summary,
+				reason: evaluation.reason,
+			});
+
+			const token = await mcpAPI.resolveMCPApproval(evaluation.approvalID, resolution);
+
+			if (
+				resolution !== MCPApprovalResolution.MCPApprovalResolutionAllowOnce &&
+				resolution !== MCPApprovalResolution.MCPApprovalResolutionAllowAlways
+			) {
+				return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'User denied this tool call');
+			}
+
+			if (!token?.token) {
+				return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'Approval did not return a usable token');
+			}
+
+			callReq.approvalID = token.approvalID;
+			callReq.approvalToken = token.token;
 		}
 		// Allowed.
 		try {
@@ -137,6 +173,54 @@ export class MCPAppRPCRouter {
 			};
 		}
 		return { jsonrpc: '2.0', id: req.id, result: { mode: 'inline' } };
+	}
+
+	private async handleUIMessage(req: JSONRPCRequest): Promise<JSONRPCResponse> {
+		const params = (req.params as Record<string, unknown>) ?? {};
+		const role = params.role === 'user' ? 'user' : '';
+		const content = params.content as Record<string, unknown> | undefined;
+		const text = content?.type === 'text' && typeof content.text === 'string' ? content.text.trim() : '';
+
+		if (role !== 'user' || !text) {
+			return errorResp(req.id, JSONRPC_ERR_INVALID_PARAMS, 'ui/message requires role=user and text content');
+		}
+
+		const message: MCPAppUIMessage = { role: 'user', text };
+		const approved = this.deps.requestUIMessageApproval ? await this.deps.requestUIMessageApproval(message) : false;
+
+		if (!approved) {
+			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'User denied adding this message');
+		}
+
+		this.deps.onUIMessage?.(message);
+		return { jsonrpc: '2.0', id: req.id, result: {} };
+	}
+
+	private async handleUpdateModelContext(req: JSONRPCRequest): Promise<JSONRPCResponse> {
+		const params = (req.params as Record<string, unknown>) ?? {};
+		const update = {
+			content: Array.isArray(params.content) ? params.content : undefined,
+			structuredContent: params.structuredContent,
+		} satisfies Omit<MCPAppModelContextUpdate, 'instanceID' | 'bundleID' | 'serverID' | 'resourceUri' | 'updatedAt'>;
+
+		if (!update.content && update.structuredContent === undefined) {
+			return errorResp(
+				req.id,
+				JSONRPC_ERR_INVALID_PARAMS,
+				'ui/update-model-context requires content or structuredContent'
+			);
+		}
+
+		const approved = this.deps.requestModelContextUpdateApproval
+			? await this.deps.requestModelContextUpdateApproval(update)
+			: false;
+
+		if (!approved) {
+			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'User denied the model context update');
+		}
+
+		this.deps.onModelContextUpdate?.(update);
+		return { jsonrpc: '2.0', id: req.id, result: {} };
 	}
 
 	private async handleOpenLink(req: JSONRPCRequest): Promise<JSONRPCResponse> {
