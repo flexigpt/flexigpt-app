@@ -8,7 +8,7 @@ require (
 	github.com/adrg/xdg v0.5.3
 	github.com/danielgtaylor/huma/v2 v2.38.0
 	github.com/flexigpt/agentskills-go v0.14.3
-	github.com/flexigpt/inference-go v0.20.1
+	github.com/flexigpt/inference-go v0.20.2
 	github.com/flexigpt/llmtools-go v0.20.2
 	github.com/flexigpt/mapstore-go v0.3.3
 	github.com/glebarez/go-sqlite v1.22.0
@@ -69,7 +69,7 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
-	github.com/openai/openai-go/v3 v3.37.0 // indirect
+	github.com/openai/openai-go/v3 v3.38.0 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
