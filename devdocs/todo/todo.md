@@ -4,27 +4,28 @@
 
 - [ ] easier preset import bundles and flows. e.g: just import a preset bundle that has assistant, models, prompts, tools etc.
   - [ ] may be as a json import bundle or jsonc format
+  - [ ] better thing is to establish a jsonschema format for each thing, and then ship corresponding json as individual outputs.
 
 - [ ] test with some skill that has scripts too
-- [ ] mcp integrate in http backend
+- [ ] MCP local connections and hooks
+  - [ ] mcp integrate in http backend
 
 ## Milestone thoughts
 
 - [ ] M-Future
-  - [ ] App SDK, etc
   - [ ] i18n
   - [ ] Better context
     - [ ] Text support
       - [ ] extracted other docs input, sheets and docx mainly.
-    - [ ] MCP local connections and hooks
-    - [ ] MCP options in apis connections and hooks
     - [ ] Doc stores/vector stores connections: Only if MCP cannot serve this.
 
 - [ ] Deferred.
   - [ ] Image output: See inference-go notes.
   - [ ] audio in/out
   - [ ] check the reference calculator tool in claude docs
-
+  - [ ] App SDK, etc
+  - [ ] MCP options in server apis connections and hooks.
+    - [ ] This app should focus on local first with stateless api behavior rather than stateful, vendor specific server side operations.
   - [ ] tool search tool: we may need a tool search tool that does sqlite based bm25 search or regex search like from anthropic
     - [ ] Not needed as of now. May be a progressive disclosure runtime like skills will be better.
     - [ ] May need to check when there are actually a lot of tools.
