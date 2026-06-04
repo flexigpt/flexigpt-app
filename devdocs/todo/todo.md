@@ -6,9 +6,13 @@
   - [ ] may be as a json import bundle or jsonc format
   - [ ] better thing is to establish a jsonschema format for each thing, and then ship corresponding json as individual outputs.
 
-- [ ] test with some skill that has scripts too
+- [ ] easier add of skill.
+
 - [ ] MCP local connections and hooks
   - [ ] mcp integrate in http backend
+  - [ ] easier add of mcp.
+
+- [ ] test with some skill that has scripts too
 
 ## Milestone thoughts
 
