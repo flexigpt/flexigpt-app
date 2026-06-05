@@ -351,7 +351,63 @@ func (b *OAuthLoopbackBroker) validCallbackHost(host string) bool {
 	if b == nil || b.redirectHost == "" {
 		return true
 	}
-	return strings.EqualFold(host, b.redirectHost)
+	host = strings.TrimSpace(host)
+	if strings.EqualFold(host, b.redirectHost) {
+		return true
+	}
+
+	// Some OAuth providers normalize loopback redirect hosts between
+	// 127.0.0.1 and localhost even when the registered redirect URI used the
+	// other spelling. Treat loopback aliases as equivalent, but still require
+	// the exact same callback port. This keeps the CSRF/state protection intact
+	// and avoids accepting non-loopback hosts.
+	return sameOAuthLoopbackEndpoint(host, b.redirectHost)
+}
+
+func sameOAuthLoopbackEndpoint(callbackHost, redirectHost string) bool {
+	callbackHostname, callbackPort, ok := splitOAuthHostPort(callbackHost)
+	if !ok {
+		return false
+	}
+	redirectHostname, redirectPort, ok := splitOAuthHostPort(redirectHost)
+	if !ok {
+		return false
+	}
+	if callbackPort == "" || redirectPort == "" || callbackPort != redirectPort {
+		return false
+	}
+	return isOAuthLoopbackHost(callbackHostname) && isOAuthLoopbackHost(redirectHostname)
+}
+
+func splitOAuthHostPort(hostport string) (host, port string, ok bool) {
+	hostport = strings.TrimSpace(hostport)
+	if hostport == "" {
+		return "", "", false
+	}
+
+	host, port, err := net.SplitHostPort(hostport)
+	if err == nil {
+		return host, port, true
+	}
+
+	// Missing port. This is not useful for the loopback OAuth callback because
+	// the listener is always on an ephemeral non-default port, but returning it
+	// lets callers make an explicit port mismatch decision.
+	if !strings.Contains(hostport, ":") {
+		return hostport, "", true
+	}
+
+	return "", "", false
+}
+
+func isOAuthLoopbackHost(host string) bool {
+	host = strings.TrimSpace(host)
+	host = strings.TrimSuffix(host, ".")
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 func (b *OAuthLoopbackBroker) removeIfCurrent(p *pendingOAuthAuthorization) {

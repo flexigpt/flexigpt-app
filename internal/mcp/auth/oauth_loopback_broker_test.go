@@ -390,6 +390,49 @@ func TestOAuthLoopbackBrokerServeHTTPValidation(t *testing.T) {
 	})
 }
 
+func TestOAuthLoopbackBrokerValidCallbackHostAllowsLoopbackAliases(t *testing.T) {
+	tests := []struct {
+		name         string
+		redirectHost string
+		callbackHost string
+		want         bool
+	}{
+		{
+			name:         "exact host",
+			redirectHost: "127.0.0.1:37033",
+			callbackHost: "127.0.0.1:37033",
+			want:         true,
+		},
+		{
+			name:         "localhost alias",
+			redirectHost: "127.0.0.1:37033",
+			callbackHost: "localhost:37033",
+			want:         true,
+		},
+		{
+			name:         "same loopback different port rejected",
+			redirectHost: "127.0.0.1:37033",
+			callbackHost: "localhost:37034",
+			want:         false,
+		},
+		{
+			name:         "non loopback rejected",
+			redirectHost: "127.0.0.1:37033",
+			callbackHost: "example.com:37033",
+			want:         false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := &OAuthLoopbackBroker{redirectHost: tt.redirectHost}
+			if got := b.validCallbackHost(tt.callbackHost); got != tt.want {
+				t.Fatalf("validCallbackHost(%q) = %v, want %v", tt.callbackHost, got, tt.want)
+			}
+		})
+	}
+}
+
 func waitForPendingCount(t *testing.T, b *OAuthLoopbackBroker, want int) {
 	t.Helper()
 

@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 
 import {
 	FiChevronDown,
@@ -38,6 +38,7 @@ import {
 	isMCPAuthActionable,
 	type MCPServerUpsertInput,
 } from '@/mcpservers/lib/mcp_server_utils';
+import { MCPOAuthAuthorizationModal } from '@/mcpservers/mcp_oauth_authorization_modal';
 import { AddEditMCPServerModal } from '@/mcpservers/mcp_server_add_edit_modal';
 import { MCPServerDetailsModal } from '@/mcpservers/mcp_server_details_modal';
 
@@ -60,6 +61,10 @@ interface MCPBundleCardProps {
 	onOpenURL: (url: string) => void;
 	onCancelOAuth: (bundleID: string, serverID: string) => Promise<void>;
 	onDeleteBundleRequested: (bundleID: string) => void;
+}
+
+function oauthDismissKey(bundleID: string, serverID: string, authHealth?: MCPAuthHealth): string {
+	return `${bundleID}:${serverID}:${authHealth?.authorizationURL ?? authHealth?.state ?? ''}`;
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -122,6 +127,8 @@ export function MCPBundleCard({
 
 	const [isBundleTogglePending, setIsBundleTogglePending] = useState(false);
 	const [pendingActionKeys, setPendingActionKeys] = useState<Set<string>>(() => new Set());
+	const [oauthModalServerID, setOAuthModalServerID] = useState<string | null>(null);
+	const [dismissedOAuthKeys, setDismissedOAuthKeys] = useState<Set<string>>(() => new Set());
 
 	const openAlert = (message: string) => {
 		setAlertMsg(message);
@@ -238,7 +245,61 @@ export function MCPBundleCard({
 	const handleModifySubmit = async (input: MCPServerUpsertInput) => {
 		await onSubmitServer(bundle.id, serverToEdit?.id, input);
 	};
+	useEffect(() => {
+		if (oauthModalServerID) return;
 
+		// eslint-disable-next-line react-you-might-not-need-an-effect/no-pass-live-state-to-parent, react-you-might-not-need-an-effect/no-pass-data-to-parent
+		const candidate = servers.find(server => {
+			const authHealth = authHealthByServerID[server.id];
+			if (!isMCPAuthActionable(authHealth)) return false;
+
+			const key = oauthDismissKey(bundle.id, server.id, authHealth);
+			return !dismissedOAuthKeys.has(key);
+		});
+
+		if (candidate) {
+			// eslint-disable-next-line react-hooks/set-state-in-effect, react-you-might-not-need-an-effect/no-derived-state, react-you-might-not-need-an-effect/no-chain-state-updates
+			setOAuthModalServerID(candidate.id);
+		}
+	}, [authHealthByServerID, bundle.id, dismissedOAuthKeys, oauthModalServerID, servers]);
+
+	useEffect(() => {
+		if (!oauthModalServerID) return;
+
+		const authHealth = authHealthByServerID[oauthModalServerID];
+		if (
+			authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateAuthorized ||
+			authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateNotRequired
+		) {
+			// eslint-disable-next-line react-hooks/set-state-in-effect, react-you-might-not-need-an-effect/no-chain-state-updates, react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+			setOAuthModalServerID(null);
+		}
+	}, [authHealthByServerID, oauthModalServerID]);
+
+	const oauthModalServer = oauthModalServerID
+		? (servers.find(server => server.id === oauthModalServerID) ?? null)
+		: null;
+	const oauthModalAuthHealth = oauthModalServer ? authHealthByServerID[oauthModalServer.id] : undefined;
+
+	const dismissOAuthModal = () => {
+		if (oauthModalServerID) {
+			const authHealth = authHealthByServerID[oauthModalServerID];
+			const key = oauthDismissKey(bundle.id, oauthModalServerID, authHealth);
+			setDismissedOAuthKeys(prev => new Set(prev).add(key));
+		}
+		setOAuthModalServerID(null);
+	};
+
+	const cancelOAuthModal = async () => {
+		if (!oauthModalServer) return;
+
+		await runServerAction(
+			`cancel-oauth:${oauthModalServer.id}`,
+			() => onCancelOAuth(bundle.id, oauthModalServer.id),
+			'Failed to cancel OAuth authorization.'
+		);
+		dismissOAuthModal();
+	};
 	return (
 		<div className="bg-base-100 mb-8 rounded-2xl p-4 shadow-lg">
 			<div className="flex items-center justify-between">
@@ -354,7 +415,7 @@ export function MCPBundleCard({
 										</div>
 
 										<div className="mt-4 flex flex-col flex-wrap items-center">
-											<div className="flex w-full items-center gap-2">
+											<div className="flex w-full flex-col gap-2">
 												{runtime?.lastError && (
 													<div className="text-error truncate text-xs" title={runtime.lastError}>
 														{runtime.lastError}
@@ -363,35 +424,48 @@ export function MCPBundleCard({
 
 												{(authActionable ||
 													authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending) && (
-													<div className="flex flex-wrap gap-1">
-														{authActionable && (
-															<button
-																className="btn btn-xs btn-ghost rounded-xl"
-																onClick={() => {
-																	onOpenURL(authHealth?.authorizationURL ?? '');
-																}}
-																title="Open authorization URL"
-															>
-																<FiExternalLink size={12} />
-															</button>
-														)}
-														{authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending && (
-															<button
-																className="btn btn-xs btn-ghost rounded-xl"
-																onClick={() => {
-																	void runServerAction(
-																		`cancel-oauth:${server.id}`,
-																		() => onCancelOAuth(bundle.id, server.id),
-																		'Failed to cancel OAuth authorization.'
-																	);
-																}}
-																title="Cancel authorization"
-															>
-																<FiX size={12} />
-															</button>
-														)}
+													<div className="border-info/20 bg-info/10 flex flex-wrap items-center justify-between gap-2 rounded-2xl border p-2">
+														<div className="min-w-0 text-xs">
+															<div className="font-semibold">OAuth authorization required</div>
+															<div className="text-base-content/70">
+																Open the browser authorization page, complete login, then return here.
+															</div>
+														</div>
+
+														<div className="flex shrink-0 flex-wrap gap-1">
+															{authActionable && (
+																<button
+																	className="btn btn-xs btn-primary rounded-xl"
+																	onClick={() => {
+																		setOAuthModalServerID(server.id);
+																	}}
+																	title="Authorize MCP server"
+																>
+																	<FiExternalLink size={12} />
+																	<span className="ml-1">Authorize</span>
+																</button>
+															)}
+
+															{authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending && (
+																<button
+																	className="btn btn-xs bg-base-300 rounded-xl"
+																	onClick={() => {
+																		void runServerAction(
+																			`cancel-oauth:${server.id}`,
+																			() => onCancelOAuth(bundle.id, server.id),
+																			'Failed to cancel OAuth authorization.'
+																		);
+																	}}
+																	title="Cancel authorization"
+																>
+																	<FiX size={12} />
+																	<span className="ml-1">Cancel</span>
+																</button>
+															)}
+														</div>
 													</div>
 												)}
+
 												{authHealth?.lastError && (
 													<div className="text-error truncate text-xs" title={authHealth.lastError}>
 														{authHealth.lastError}
@@ -584,6 +658,15 @@ export function MCPBundleCard({
 				server={serverDetails}
 				runtime={serverDetails ? runtimeByServerID[serverDetails.id] : undefined}
 				authHealth={serverDetails ? authHealthByServerID[serverDetails.id] : undefined}
+			/>
+
+			<MCPOAuthAuthorizationModal
+				isOpen={oauthModalServer !== null}
+				onClose={dismissOAuthModal}
+				server={oauthModalServer}
+				authHealth={oauthModalAuthHealth}
+				onOpenURL={onOpenURL}
+				onCancel={cancelOAuthModal}
 			/>
 
 			<ActionDeniedAlertModal
