@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
@@ -64,7 +64,7 @@ function JSONBlock({ value }: { value: unknown }) {
 	);
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
 	return (
 		<div className="grid grid-cols-12 gap-2 text-sm">
 			<div className="col-span-3 font-semibold">{label}</div>
@@ -96,89 +96,107 @@ function ArgumentSummary({ args }: { args?: Record<string, { required?: boolean;
 	);
 }
 
-export function MCPServerDetailsModal({
-	isOpen,
+function getEmptyDiscoveryData(): DiscoveryData {
+	return {
+		tools: [],
+		resources: [],
+		resourceTemplates: [],
+		prompts: [],
+	};
+}
+
+interface MCPServerDetailsModalContentProps {
+	onClose: () => void;
+	bundle: MCPBundle;
+	server: MCPServerConfig;
+	runtime?: MCPServerRuntimeSnapshot;
+	authHealth?: MCPAuthHealth;
+}
+
+function MCPServerDetailsModalContent({
 	onClose,
 	bundle,
 	server,
 	runtime,
 	authHealth,
-}: MCPServerDetailsModalProps) {
+}: MCPServerDetailsModalContentProps) {
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
+	const isUnmountingRef = useRef(false);
 
-	const [discovery, setDiscovery] = useState<DiscoveryData>({
-		tools: [],
-		resources: [],
-		resourceTemplates: [],
-		prompts: [],
-	});
-	const [loadingDiscovery, setLoadingDiscovery] = useState(false);
+	const [discovery, setDiscovery] = useState<DiscoveryData>(() => getEmptyDiscoveryData());
+	const [loadingDiscovery, setLoadingDiscovery] = useState(true);
 	const [discoveryError, setDiscoveryError] = useState('');
 
 	useEffect(() => {
-		if (!isOpen) return;
-
 		const dialog = dialogRef.current;
 		if (!dialog) return;
 
-		if (!dialog.open) dialog.showModal();
-
+		if (!dialog.open) {
+			try {
+				dialog.showModal();
+			} catch {
+				// Ignore showModal errors and keep rendering safely.
+			}
+		}
 		return () => {
-			if (dialog.open) dialog.close();
+			isUnmountingRef.current = true;
+
+			if (dialog.open) {
+				dialog.close();
+			}
 		};
-	}, [isOpen]);
+	}, []);
 
 	useEffect(() => {
-		if (!isOpen || !bundle || !server) return;
-
 		let cancelled = false;
-
-		// eslint-disable-next-line react-hooks/set-state-in-effect, react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setLoadingDiscovery(true);
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setDiscoveryError('');
 
 		Promise.allSettled([
 			getAllMCPServerTools(bundle.id, server.id),
 			getAllMCPServerResources(bundle.id, server.id),
 			getAllMCPServerResourceTemplates(bundle.id, server.id),
 			getAllMCPServerPrompts(bundle.id, server.id),
-		])
-			.then(results => {
-				if (cancelled) return;
-				const [toolsResult, resourcesResult, resourceTemplatesResult, promptsResult] = results;
-				const errors = results
-					.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
-					.map(result => (result.reason instanceof Error ? result.reason.message : 'Failed to load discovery section.'))
-					.filter(Boolean);
-				setDiscovery({
-					tools: toolsResult.status === 'fulfilled' ? toolsResult.value : [],
-					resources: resourcesResult.status === 'fulfilled' ? resourcesResult.value : [],
-					resourceTemplates: resourceTemplatesResult.status === 'fulfilled' ? resourceTemplatesResult.value : [],
-					prompts: promptsResult.status === 'fulfilled' ? promptsResult.value : [],
-				});
-				if (errors.length > 0) {
-					setDiscoveryError(errors[0]);
-				}
-			})
-			.finally(() => {
-				if (cancelled) return;
-				setLoadingDiscovery(false);
+		]).then(results => {
+			if (cancelled) return;
+
+			const [toolsResult, resourcesResult, resourceTemplatesResult, promptsResult] = results;
+			const errors = results
+				.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+				.map(result => (result.reason instanceof Error ? result.reason.message : 'Failed to load discovery section.'))
+				.filter(Boolean);
+
+			setDiscovery({
+				tools: toolsResult.status === 'fulfilled' ? toolsResult.value : [],
+				resources: resourcesResult.status === 'fulfilled' ? resourcesResult.value : [],
+				resourceTemplates: resourceTemplatesResult.status === 'fulfilled' ? resourceTemplatesResult.value : [],
+				prompts: promptsResult.status === 'fulfilled' ? promptsResult.value : [],
 			});
+			setDiscoveryError(errors[0] ?? '');
+			setLoadingDiscovery(false);
+		});
 
 		return () => {
 			cancelled = true;
 		};
-	}, [bundle, isOpen, server]);
+	}, [bundle.id, server.id]);
 
 	const handleDialogClose = () => {
+		if (isUnmountingRef.current) return;
+
 		onClose();
 	};
 
-	if (!isOpen || !bundle || !server) return null;
-	if (typeof document === 'undefined' || !document.body) return null;
+	const requestClose = () => {
+		const dialog = dialogRef.current;
 
-	return createPortal(
+		if (dialog?.open) {
+			dialog.close();
+			return;
+		}
+
+		onClose();
+	};
+
+	return (
 		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose}>
 			<div className="modal-box bg-base-200 max-h-[85vh] max-w-6xl overflow-hidden rounded-2xl p-0">
 				<div className="max-h-[85vh] overflow-y-auto p-6">
@@ -187,7 +205,7 @@ export function MCPServerDetailsModal({
 						<button
 							type="button"
 							className="btn btn-sm btn-circle bg-base-300"
-							onClick={() => dialogRef.current?.close()}
+							onClick={requestClose}
 							aria-label="Close"
 						>
 							<FiX size={12} />
@@ -459,14 +477,39 @@ export function MCPServerDetailsModal({
 					</div>
 
 					<div className="modal-action">
-						<button type="button" className="btn bg-base-300 rounded-xl" onClick={() => dialogRef.current?.close()}>
+						<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
 							Close
 						</button>
 					</div>
 				</div>
 			</div>
 			<ModalBackdrop enabled={true} />
-		</dialog>,
+		</dialog>
+	);
+}
+
+export function MCPServerDetailsModal({
+	isOpen,
+	onClose,
+	bundle,
+	server,
+	runtime,
+	authHealth,
+}: MCPServerDetailsModalProps) {
+	if (!isOpen || !bundle || !server) return null;
+	if (typeof document === 'undefined' || !document.body) return null;
+
+	const remountKey = `${bundle.id}:${server.id}:${server.modifiedAt}`;
+
+	return createPortal(
+		<MCPServerDetailsModalContent
+			key={remountKey}
+			onClose={onClose}
+			bundle={bundle}
+			server={server}
+			runtime={runtime}
+			authHealth={authHealth}
+		/>,
 		document.body
 	);
 }

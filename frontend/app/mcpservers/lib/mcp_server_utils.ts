@@ -302,8 +302,7 @@ export function parseMCPStringRecordJSON(raw: string, fieldLabel: string): Recor
 	return Object.keys(result).length > 0 ? result : undefined;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
-export function parseMCPObjectJSON<T extends Record<string, unknown>>(raw: string, fieldLabel: string): T | undefined {
+export function parseMCPObjectJSON(raw: string, fieldLabel: string): Record<string, unknown> | undefined {
 	const value = raw.trim();
 
 	if (!value) {
@@ -322,7 +321,7 @@ export function parseMCPObjectJSON<T extends Record<string, unknown>>(raw: strin
 		throw new Error(`${fieldLabel} must be a JSON object.`);
 	}
 
-	return parsed as T;
+	return parsed as Record<string, unknown>;
 }
 
 export function stringifyMCPJSON(value: unknown): string {

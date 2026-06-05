@@ -169,22 +169,26 @@ export default function MCPServersPage() {
 		);
 	}, []);
 
+	const loadAllBundleData = useCallback(async (): Promise<BundleData[]> => {
+		const mcpBundles = await getAllMCPBundles(undefined, true);
+
+		return Promise.all(
+			mcpBundles.map(async bundle => {
+				try {
+					const { servers, runtimeByServerID, authHealthByServerID } = await loadServersForBundle(bundle.id);
+					return mergeBundleData(bundle, servers, runtimeByServerID, authHealthByServerID);
+				} catch {
+					return mergeBundleData(bundle, [], {}, {});
+				}
+			})
+		);
+	}, [loadServersForBundle]);
+
 	const fetchAll = useCallback(async () => {
 		setLoading(true);
 
 		try {
-			const mcpBundles = await getAllMCPBundles(undefined, true);
-
-			const bundleResults: BundleData[] = await Promise.all(
-				mcpBundles.map(async bundle => {
-					try {
-						const { servers, runtimeByServerID, authHealthByServerID } = await loadServersForBundle(bundle.id);
-						return mergeBundleData(bundle, servers, runtimeByServerID, authHealthByServerID);
-					} catch {
-						return mergeBundleData(bundle, [], {}, {});
-					}
-				})
-			);
+			const bundleResults = await loadAllBundleData();
 
 			setBundles(bundleResults);
 		} catch (error) {
@@ -194,12 +198,32 @@ export default function MCPServersPage() {
 		} finally {
 			setLoading(false);
 		}
-	}, [loadServersForBundle]);
+	}, [loadAllBundleData]);
 
 	useEffect(() => {
-		// eslint-disable-next-line react-hooks/set-state-in-effect
-		void fetchAll();
-	}, [fetchAll]);
+		let isCancelled = false;
+
+		void loadAllBundleData()
+			.then(bundleResults => {
+				if (isCancelled) return;
+				setBundles(bundleResults);
+			})
+			.catch((error: unknown) => {
+				if (isCancelled) return;
+
+				console.error('Failed to load MCP bundles:', error);
+				setAlertMsg(getErrorMessage(error, 'Failed to load MCP bundles. Please try again.'));
+				setShowAlert(true);
+			})
+			.finally(() => {
+				if (isCancelled) return;
+				setLoading(false);
+			});
+
+		return () => {
+			isCancelled = true;
+		};
+	}, [loadAllBundleData]);
 
 	useEffect(() => {
 		const pendingServers = bundles.flatMap(bundleData =>

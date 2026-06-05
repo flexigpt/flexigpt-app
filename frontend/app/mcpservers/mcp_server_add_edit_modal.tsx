@@ -1,4 +1,4 @@
-import { type ChangeEvent, type SubmitEventHandler, useEffect, useMemo, useRef, useState } from 'react';
+import { type ChangeEvent, type SubmitEventHandler, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
@@ -366,173 +366,177 @@ function AddEditMCPServerModalContent({
 		onClose();
 	};
 
-	const validateForm = (state: MCPServerFormData): ErrorState => {
-		let nextErrors: ErrorState = {};
-		const serverID = state.serverID.trim();
-		const displayName = state.displayName.trim();
+	const validateForm = useCallback(
+		(state: MCPServerFormData): ErrorState => {
+			let nextErrors: ErrorState = {};
+			const serverID = state.serverID.trim();
+			const displayName = state.displayName.trim();
 
-		if (!serverID) {
-			nextErrors.serverID = 'Server ID is required.';
-		} else {
-			const err = validateSlug(serverID);
-			if (err) {
-				nextErrors.serverID = err;
-			} else if (!isEditMode && existingServerIDs.includes(serverID)) {
-				nextErrors.serverID = 'Server ID already exists.';
+			if (!serverID) {
+				nextErrors.serverID = 'Server ID is required.';
 			} else {
-				nextErrors = omitManyKeys(nextErrors, ['serverID']);
-			}
-		}
-
-		if (!displayName) {
-			nextErrors.displayName = 'Display name is required.';
-		} else {
-			nextErrors = omitManyKeys(nextErrors, ['displayName']);
-		}
-
-		if (state.transport === MCPTransportType.MCPTransportTypeStdio) {
-			let parsedStdioEnv: Record<string, string> | undefined;
-			if (!state.stdioCommand.trim()) {
-				nextErrors.stdioCommand = 'Command is required for stdio servers.';
+				const err = validateSlug(serverID);
+				if (err) {
+					nextErrors.serverID = err;
+				} else if (!isEditMode && existingServerIDs.includes(serverID)) {
+					nextErrors.serverID = 'Server ID already exists.';
+				} else {
+					nextErrors = omitManyKeys(nextErrors, ['serverID']);
+				}
 			}
 
-			try {
-				parsedStdioEnv = parseMCPStringRecordJSON(state.stdioEnvJSON, 'Environment');
-				nextErrors = omitManyKeys(nextErrors, ['stdioEnvJSON']);
-			} catch (error) {
-				nextErrors.stdioEnvJSON = error instanceof Error ? error.message : 'Environment must be valid JSON.';
-			}
-
-			if (state.stdioStartupTimeoutMS.trim() && normalizePositiveInteger(state.stdioStartupTimeoutMS) === undefined) {
-				nextErrors.stdioStartupTimeoutMS = 'Startup timeout must be a positive integer.';
+			if (!displayName) {
+				nextErrors.displayName = 'Display name is required.';
 			} else {
-				nextErrors = omitManyKeys(nextErrors, ['stdioStartupTimeoutMS']);
+				nextErrors = omitManyKeys(nextErrors, ['displayName']);
 			}
-			const plainEnvNames = new Set(
-				Object.keys(parsedStdioEnv ?? {})
-					.map(key => key.trim().toLowerCase())
-					.filter(Boolean)
-			);
-			const seenEnvNames = new Set<string>();
-			for (const row of state.stdioSecretRows) {
-				const envName = row.envName.trim();
 
-				if (!envName) {
-					nextErrors.stdioSecrets = 'Every secret env row needs an environment variable name.';
-					break;
+			if (state.transport === MCPTransportType.MCPTransportTypeStdio) {
+				let parsedStdioEnv: Record<string, string> | undefined;
+				if (!state.stdioCommand.trim()) {
+					nextErrors.stdioCommand = 'Command is required for stdio servers.';
 				}
 
-				if (!ENV_NAME_RE.test(envName)) {
-					nextErrors.stdioSecrets = 'Secret env names must match [A-Za-z_][A-Za-z0-9_]*.';
-					break;
+				try {
+					parsedStdioEnv = parseMCPStringRecordJSON(state.stdioEnvJSON, 'Environment');
+					nextErrors = omitManyKeys(nextErrors, ['stdioEnvJSON']);
+				} catch (error) {
+					nextErrors.stdioEnvJSON = error instanceof Error ? error.message : 'Environment must be valid JSON.';
 				}
 
-				const normalizedEnvName = envName.toLowerCase();
-				if (seenEnvNames.has(normalizedEnvName)) {
-					nextErrors.stdioSecrets = 'Secret env names must be unique.';
-					break;
+				if (state.stdioStartupTimeoutMS.trim() && normalizePositiveInteger(state.stdioStartupTimeoutMS) === undefined) {
+					nextErrors.stdioStartupTimeoutMS = 'Startup timeout must be a positive integer.';
+				} else {
+					nextErrors = omitManyKeys(nextErrors, ['stdioStartupTimeoutMS']);
 				}
-				if (plainEnvNames.has(envName.toLowerCase())) {
-					nextErrors.stdioSecrets = `Secret env ${envName} is also present in plain Env JSON.`;
-					break;
+				const plainEnvNames = new Set(
+					Object.keys(parsedStdioEnv ?? {})
+						.map(key => key.trim().toLowerCase())
+						.filter(Boolean)
+				);
+				const seenEnvNames = new Set<string>();
+				for (const row of state.stdioSecretRows) {
+					const envName = row.envName.trim();
+
+					if (!envName) {
+						nextErrors.stdioSecrets = 'Every secret env row needs an environment variable name.';
+						break;
+					}
+
+					if (!ENV_NAME_RE.test(envName)) {
+						nextErrors.stdioSecrets = 'Secret env names must match [A-Za-z_][A-Za-z0-9_]*.';
+						break;
+					}
+
+					const normalizedEnvName = envName.toLowerCase();
+					if (seenEnvNames.has(normalizedEnvName)) {
+						nextErrors.stdioSecrets = 'Secret env names must be unique.';
+						break;
+					}
+					if (plainEnvNames.has(envName.toLowerCase())) {
+						nextErrors.stdioSecrets = `Secret env ${envName} is also present in plain Env JSON.`;
+						break;
+					}
+
+					seenEnvNames.add(normalizedEnvName);
+
+					if (
+						row.existingSecretRef &&
+						row.originalEnvName &&
+						row.originalEnvName !== envName &&
+						!row.secretValue.trim() &&
+						!row.deleteExisting
+					) {
+						nextErrors.stdioSecrets = `Changing ${row.originalEnvName} to ${envName} requires a replacement secret value.`;
+						break;
+					}
+
+					if (!row.existingSecretRef && !row.secretValue.trim()) {
+						nextErrors.stdioSecrets = `Secret value is required for ${envName}.`;
+						break;
+					}
 				}
 
-				seenEnvNames.add(normalizedEnvName);
+				if (!nextErrors.stdioSecrets) {
+					nextErrors = omitManyKeys(nextErrors, ['stdioSecrets']);
+				}
+			}
+
+			if (state.transport === MCPTransportType.MCPTransportTypeStreamableHTTP) {
+				const rawURL = state.httpURL.trim();
+
+				if (!rawURL) {
+					nextErrors.httpURL = 'URL is required for Streamable HTTP servers.';
+				} else {
+					try {
+						const url = new URL(rawURL);
+						if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+							nextErrors.httpURL = 'URL must use http or https.';
+						} else if (url.protocol === 'http:' && !isLoopbackHTTPHost(url.hostname)) {
+							nextErrors.httpURL =
+								'HTTP URLs are only allowed for localhost or loopback hosts. Use HTTPS for remote servers.';
+						} else {
+							nextErrors = omitManyKeys(nextErrors, ['httpURL']);
+						}
+					} catch {
+						nextErrors.httpURL = 'URL must be valid.';
+					}
+				}
+
+				if (state.httpTimeoutMS.trim() && normalizePositiveInteger(state.httpTimeoutMS) === undefined) {
+					nextErrors.httpTimeoutMS = 'Timeout must be a positive integer.';
+				} else {
+					nextErrors = omitManyKeys(nextErrors, ['httpTimeoutMS']);
+				}
+
+				const hasExistingClientCredentials =
+					state.httpAuthMode !== MCPHTTPAuthMode.MCPHTTPAuthNone &&
+					Boolean(state.httpClientCredentialRef.trim()) &&
+					!state.httpDeleteClientCredentials;
+
+				const hasNewClientCredentials = Boolean(state.httpClientCredentialsSecret.trim());
 
 				if (
-					row.existingSecretRef &&
-					row.originalEnvName &&
-					row.originalEnvName !== envName &&
-					!row.secretValue.trim() &&
-					!row.deleteExisting
+					state.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthClientCredentials &&
+					!hasExistingClientCredentials &&
+					!hasNewClientCredentials
 				) {
-					nextErrors.stdioSecrets = `Changing ${row.originalEnvName} to ${envName} requires a replacement secret value.`;
-					break;
-				}
-
-				if (!row.existingSecretRef && !row.secretValue.trim()) {
-					nextErrors.stdioSecrets = `Secret value is required for ${envName}.`;
-					break;
-				}
-			}
-
-			if (!nextErrors.stdioSecrets) {
-				nextErrors = omitManyKeys(nextErrors, ['stdioSecrets']);
-			}
-		}
-
-		if (state.transport === MCPTransportType.MCPTransportTypeStreamableHTTP) {
-			const rawURL = state.httpURL.trim();
-
-			if (!rawURL) {
-				nextErrors.httpURL = 'URL is required for Streamable HTTP servers.';
-			} else {
-				try {
-					const url = new URL(rawURL);
-					if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-						nextErrors.httpURL = 'URL must use http or https.';
-					} else if (url.protocol === 'http:' && !isLoopbackHTTPHost(url.hostname)) {
-						nextErrors.httpURL =
-							'HTTP URLs are only allowed for localhost or loopback hosts. Use HTTPS for remote servers.';
-					} else {
-						nextErrors = omitManyKeys(nextErrors, ['httpURL']);
-					}
-				} catch {
-					nextErrors.httpURL = 'URL must be valid.';
-				}
-			}
-
-			if (state.httpTimeoutMS.trim() && normalizePositiveInteger(state.httpTimeoutMS) === undefined) {
-				nextErrors.httpTimeoutMS = 'Timeout must be a positive integer.';
-			} else {
-				nextErrors = omitManyKeys(nextErrors, ['httpTimeoutMS']);
-			}
-
-			const hasExistingClientCredentials =
-				state.httpAuthMode !== MCPHTTPAuthMode.MCPHTTPAuthNone &&
-				Boolean(state.httpClientCredentialRef.trim()) &&
-				!state.httpDeleteClientCredentials;
-
-			const hasNewClientCredentials = Boolean(state.httpClientCredentialsSecret.trim());
-
-			if (
-				state.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthClientCredentials &&
-				!hasExistingClientCredentials &&
-				!hasNewClientCredentials
-			) {
-				nextErrors.httpClientCredentials = 'Client credentials auth requires a credentials secret.';
-			} else {
-				const secretError = validateOAuthClientCredentials(
-					state.httpClientCredentialsSecret,
-					state.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthClientCredentials
-				);
-				if (secretError) {
-					nextErrors.httpClientCredentials = secretError;
+					nextErrors.httpClientCredentials = 'Client credentials auth requires a credentials secret.';
 				} else {
-					nextErrors = omitManyKeys(nextErrors, ['httpClientCredentials']);
+					const secretError = validateOAuthClientCredentials(
+						state.httpClientCredentialsSecret,
+						state.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthClientCredentials
+					);
+					if (secretError) {
+						nextErrors.httpClientCredentials = secretError;
+					} else {
+						nextErrors = omitManyKeys(nextErrors, ['httpClientCredentials']);
+					}
 				}
-			}
-			if (state.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth) {
-				const metadataURLError = validateClientIDMetadataURL(state.httpClientIDMetadataDocumentURL);
-				if (metadataURLError) {
-					nextErrors.httpClientIDMetadataDocumentURL = metadataURLError;
+				if (state.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth) {
+					const metadataURLError = validateClientIDMetadataURL(state.httpClientIDMetadataDocumentURL);
+					if (metadataURLError) {
+						nextErrors.httpClientIDMetadataDocumentURL = metadataURLError;
+					} else {
+						nextErrors = omitManyKeys(nextErrors, ['httpClientIDMetadataDocumentURL']);
+					}
 				} else {
 					nextErrors = omitManyKeys(nextErrors, ['httpClientIDMetadataDocumentURL']);
 				}
-			} else {
-				nextErrors = omitManyKeys(nextErrors, ['httpClientIDMetadataDocumentURL']);
 			}
-		}
 
-		try {
-			parseMCPObjectJSON<Record<string, MCPToolPolicyOverride>>(state.toolPoliciesJSON, 'Tool policies');
-			nextErrors = omitManyKeys(nextErrors, ['toolPoliciesJSON']);
-		} catch (error) {
-			nextErrors.toolPoliciesJSON = error instanceof Error ? error.message : 'Tool policies must be valid JSON.';
-		}
+			try {
+				parseMCPObjectJSON(state.toolPoliciesJSON, 'Tool policies');
 
-		return nextErrors;
-	};
+				nextErrors = omitManyKeys(nextErrors, ['toolPoliciesJSON']);
+			} catch (error) {
+				nextErrors.toolPoliciesJSON = error instanceof Error ? error.message : 'Tool policies must be valid JSON.';
+			}
+
+			return nextErrors;
+		},
+		[existingServerIDs, isEditMode]
+	);
 
 	const setFormDataAndValidate = (next: MCPServerFormData) => {
 		setFormData(next);
@@ -625,10 +629,9 @@ function AddEditMCPServerModalContent({
 			requireApprovalForContextUpdates: formData.requireApprovalForContextUpdates,
 		};
 
-		const toolPolicies = parseMCPObjectJSON<Record<string, MCPToolPolicyOverride>>(
-			formData.toolPoliciesJSON,
-			'Tool policies'
-		);
+		const toolPolicies = parseMCPObjectJSON(formData.toolPoliciesJSON, 'Tool policies') as
+			| Record<string, MCPToolPolicyOverride>
+			| undefined;
 
 		const payloadBase = {
 			displayName: formData.displayName.trim(),
@@ -759,12 +762,7 @@ function AddEditMCPServerModalContent({
 		};
 	};
 
-	const isAllValid = useMemo(
-		() => Object.keys(validateForm(formData)).length === 0,
-		// validateForm captures stable modal props for one mount.
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-		[formData]
-	);
+	const isAllValid = useMemo(() => Object.keys(validateForm(formData)).length === 0, [formData, validateForm]);
 
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
 		e.preventDefault();

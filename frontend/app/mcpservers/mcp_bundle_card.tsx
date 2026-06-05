@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 
 import {
 	FiChevronDown,
@@ -61,6 +61,12 @@ interface MCPBundleCardProps {
 	onOpenURL: (url: string) => void;
 	onCancelOAuth: (bundleID: string, serverID: string) => Promise<void>;
 	onDeleteBundleRequested: (bundleID: string) => void;
+}
+
+function isOAuthModalRelevant(authHealth?: MCPAuthHealth): boolean {
+	return (
+		isMCPAuthActionable(authHealth) || authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending
+	);
 }
 
 function oauthDismissKey(bundleID: string, serverID: string, authHealth?: MCPAuthHealth): string {
@@ -127,7 +133,7 @@ export function MCPBundleCard({
 
 	const [isBundleTogglePending, setIsBundleTogglePending] = useState(false);
 	const [pendingActionKeys, setPendingActionKeys] = useState<Set<string>>(() => new Set());
-	const [oauthModalServerID, setOAuthModalServerID] = useState<string | null>(null);
+	const [manualOAuthModalServerID, setManualOAuthModalServerID] = useState<string | null>(null);
 	const [dismissedOAuthKeys, setDismissedOAuthKeys] = useState<Set<string>>(() => new Set());
 
 	const openAlert = (message: string) => {
@@ -245,49 +251,41 @@ export function MCPBundleCard({
 	const handleModifySubmit = async (input: MCPServerUpsertInput) => {
 		await onSubmitServer(bundle.id, serverToEdit?.id, input);
 	};
-	useEffect(() => {
-		if (oauthModalServerID) return;
+	const manualOAuthModalServer = useMemo(() => {
+		if (!manualOAuthModalServerID) return null;
 
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-pass-live-state-to-parent, react-you-might-not-need-an-effect/no-pass-data-to-parent
-		const candidate = servers.find(server => {
-			const authHealth = authHealthByServerID[server.id];
-			if (!isMCPAuthActionable(authHealth)) return false;
+		const server = servers.find(candidate => candidate.id === manualOAuthModalServerID);
+		if (!server) return null;
 
-			const key = oauthDismissKey(bundle.id, server.id, authHealth);
-			return !dismissedOAuthKeys.has(key);
-		});
+		const authHealth = authHealthByServerID[server.id];
+		return isOAuthModalRelevant(authHealth) ? server : null;
+	}, [authHealthByServerID, manualOAuthModalServerID, servers]);
 
-		if (candidate) {
-			// eslint-disable-next-line react-hooks/set-state-in-effect, react-you-might-not-need-an-effect/no-derived-state, react-you-might-not-need-an-effect/no-chain-state-updates
-			setOAuthModalServerID(candidate.id);
-		}
-	}, [authHealthByServerID, bundle.id, dismissedOAuthKeys, oauthModalServerID, servers]);
+	const autoOAuthModalServer = useMemo(() => {
+		if (manualOAuthModalServer) return null;
 
-	useEffect(() => {
-		if (!oauthModalServerID) return;
+		return (
+			servers.find(server => {
+				const authHealth = authHealthByServerID[server.id];
+				if (!isOAuthModalRelevant(authHealth)) return false;
 
-		const authHealth = authHealthByServerID[oauthModalServerID];
-		if (
-			authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateAuthorized ||
-			authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateNotRequired
-		) {
-			// eslint-disable-next-line react-hooks/set-state-in-effect, react-you-might-not-need-an-effect/no-chain-state-updates, react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-			setOAuthModalServerID(null);
-		}
-	}, [authHealthByServerID, oauthModalServerID]);
+				const key = oauthDismissKey(bundle.id, server.id, authHealth);
+				return !dismissedOAuthKeys.has(key);
+			}) ?? null
+		);
+	}, [authHealthByServerID, bundle.id, dismissedOAuthKeys, manualOAuthModalServer, servers]);
 
-	const oauthModalServer = oauthModalServerID
-		? (servers.find(server => server.id === oauthModalServerID) ?? null)
-		: null;
+	const oauthModalServer = manualOAuthModalServer ?? autoOAuthModalServer;
 	const oauthModalAuthHealth = oauthModalServer ? authHealthByServerID[oauthModalServer.id] : undefined;
 
 	const dismissOAuthModal = () => {
-		if (oauthModalServerID) {
-			const authHealth = authHealthByServerID[oauthModalServerID];
-			const key = oauthDismissKey(bundle.id, oauthModalServerID, authHealth);
+		if (oauthModalServer) {
+			const authHealth = authHealthByServerID[oauthModalServer.id];
+			const key = oauthDismissKey(bundle.id, oauthModalServer.id, authHealth);
 			setDismissedOAuthKeys(prev => new Set(prev).add(key));
 		}
-		setOAuthModalServerID(null);
+
+		setManualOAuthModalServerID(null);
 	};
 
 	const cancelOAuthModal = async () => {
@@ -437,7 +435,7 @@ export function MCPBundleCard({
 																<button
 																	className="btn btn-xs btn-primary rounded-xl"
 																	onClick={() => {
-																		setOAuthModalServerID(server.id);
+																		setManualOAuthModalServerID(server.id);
 																	}}
 																	title="Authorize MCP server"
 																>
