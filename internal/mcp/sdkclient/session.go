@@ -830,10 +830,6 @@ func toolAnnotationsToSpec(a *mcpSDK.ToolAnnotations) *spec.MCPToolAnnotations {
 	}
 }
 
-func getEmptySchema() map[string]any {
-	return map[string]any{"type": "object"}
-}
-
 func schemaToMap(v any) map[string]any {
 	return schemaToMapWithFallback(v, getEmptySchema())
 }
@@ -940,4 +936,8 @@ func cloneMap(m map[string]any) map[string]any {
 	out := make(map[string]any, len(m))
 	maps.Copy(out, m)
 	return out
+}
+
+func getEmptySchema() map[string]any {
+	return map[string]any{"type": "object"}
 }

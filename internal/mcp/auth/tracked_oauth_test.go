@@ -43,15 +43,6 @@ func (h *fakeOAuthHandler) Authorize(ctx context.Context, req *http.Request, res
 	return h.authorizeErr
 }
 
-func tokenWithScopes(scopes any, expiry time.Time) *oauth2.Token {
-	tok := &oauth2.Token{
-		AccessToken: "access-token",
-		TokenType:   "Bearer",
-		Expiry:      expiry,
-	}
-	return tok.WithExtra(map[string]any{"scope": scopes})
-}
-
 func TestOAuthStatusHelpers(t *testing.T) {
 	t.Run("authStatusFromToken extracts expiry and scopes", func(t *testing.T) {
 		expiry := time.Now().UTC().Add(time.Hour).Truncate(time.Second)
@@ -282,4 +273,13 @@ func TestTrackedOAuthHandlerTokenSourceAndAuthorize(t *testing.T) {
 			t.Fatalf("Scopes = %#v, want [scope-a scope-b]", st.Scopes)
 		}
 	})
+}
+
+func tokenWithScopes(scopes any, expiry time.Time) *oauth2.Token {
+	tok := &oauth2.Token{
+		AccessToken: "access-token",
+		TokenType:   "Bearer",
+		Expiry:      expiry,
+	}
+	return tok.WithExtra(map[string]any{"scope": scopes})
 }

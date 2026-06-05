@@ -268,7 +268,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		return nil, errors.New("no usable inputs to send to inference-go")
 	}
 	if appCtxInput := buildMCPAppContextInput(body.Current.MCPAppContextUpdates); appCtxInput != nil {
-		inputs, currentInputs = prependCurrentInput(inputs, currentInputs, *appCtxInput)
+		inputs, currentInputs = prependCurrentInputs(inputs, currentInputs, *appCtxInput)
 	}
 	// Build tool choices for this call.
 	toolChoices, err := buildToolChoices(ctx, ps.toolStore, body.ToolStoreChoices)
@@ -361,22 +361,26 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	var mcpDebugDetails map[string]any
 	if ps.mcpInferenceBridge != nil && mcpContext != nil {
 		hydrated, err := ps.mcpInferenceBridge.HydrateCompletion(ctx, MCPCompletionHydrationRequest{
-			Context:       mcpContext,
-			ModelParam:    modelParam,
-			Inputs:        inputs,
-			CurrentInputs: currentInputs,
-			ToolChoices:   toolChoices,
+			Context:             mcpContext,
+			ExistingToolChoices: toolChoices,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to hydrate MCP context: %w", err)
 		}
 		if hydrated != nil {
-			if hydrated.ModelParam != nil {
-				modelParam = hydrated.ModelParam
+			if len(hydrated.SystemPromptParts) > 0 {
+				modelParam.SystemPrompt = appendToSystemPrompt(
+					modelParam.SystemPrompt,
+					hydrated.SystemPromptParts...,
+				)
 			}
-			inputs = hydrated.Inputs
-			currentInputs = hydrated.CurrentInputs
-			toolChoices = hydrated.ToolChoices
+			if len(hydrated.CurrentInputs) > 0 {
+				inputs, currentInputs = prependCurrentInputs(inputs, currentInputs, hydrated.CurrentInputs...)
+			}
+			if len(hydrated.ToolChoices) > 0 {
+				toolChoices = append(toolChoices, hydrated.ToolChoices...)
+			}
+
 			mcpDebugDetails = hydrated.DebugDetails
 		}
 	}
@@ -520,11 +524,13 @@ func (ps *ProviderSetAPI) resolveModelParam(
 		return nil, errors.New("no valid modelparam found")
 	}
 
-	if mp.MaxPromptLength == 0 {
-		mp.MaxPromptLength = defaultMaxPromptTokens
+	mpCopy := *mp
+
+	if mpCopy.MaxPromptLength == 0 {
+		mpCopy.MaxPromptLength = defaultMaxPromptTokens
 	}
 
-	return mp, nil
+	return &mpCopy, nil
 }
 
 // buildInputs flattens History + Current into a single InputUnion slice.
@@ -540,7 +546,7 @@ func (ps *ProviderSetAPI) buildInputs(
 	for _, turn := range body.History {
 		// Inputs first, then Outputs, preserving stored order.
 
-		out = append(out, turn.Inputs...)
+		out = append(out, cloneInputUnionsForLocalMutation(turn.Inputs)...)
 		for _, outEv := range turn.Outputs {
 			// Outputs are not directly part of InputUnion; but for replay
 			// we want them to be visible as prior context. We embed them
@@ -560,7 +566,7 @@ func (ps *ProviderSetAPI) buildInputs(
 	// If the caller already provided normalized InputUnions, just reuse them.
 	currentOut := make([]inferenceSpec.InputUnion, 0)
 	if len(cur.Inputs) > 0 {
-		currentOut = append(currentOut, cur.Inputs...)
+		currentOut = append(currentOut, cloneInputUnionsForLocalMutation(cur.Inputs)...)
 	}
 
 	// Always process attachments into content items.

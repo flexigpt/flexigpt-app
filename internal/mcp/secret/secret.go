@@ -13,6 +13,23 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
+func NewMCPSecretRefString(
+	bundleID bundleitemutils.BundleID,
+	serverID spec.MCPServerID,
+	kind spec.MCPSecretKind,
+	slot string,
+) (string, error) {
+	ref, err := NewMCPSecretRef(bundleID, serverID, kind, slot)
+	if err != nil {
+		return "", err
+	}
+	out := GetMCPSecretRefString(ref)
+	if out == "" {
+		return "", errors.New("could not encode secret ref")
+	}
+	return out, nil
+}
+
 func NewMCPSecretRef(
 	bundleID bundleitemutils.BundleID,
 	serverID spec.MCPServerID,
@@ -37,23 +54,6 @@ func NewMCPSecretRef(
 		return spec.MCPSecretRef{}, err
 	}
 	return ref, nil
-}
-
-func NewMCPSecretRefString(
-	bundleID bundleitemutils.BundleID,
-	serverID spec.MCPServerID,
-	kind spec.MCPSecretKind,
-	slot string,
-) (string, error) {
-	ref, err := NewMCPSecretRef(bundleID, serverID, kind, slot)
-	if err != nil {
-		return "", err
-	}
-	out := GetMCPSecretRefString(ref)
-	if out == "" {
-		return "", errors.New("could not encode secret ref")
-	}
-	return out, nil
 }
 
 func ValidateMCPSecretRef(

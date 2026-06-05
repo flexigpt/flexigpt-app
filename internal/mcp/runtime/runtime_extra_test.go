@@ -21,76 +21,6 @@ const (
 	runtimeCoverageServerID = spec.MCPServerID("server-a")
 )
 
-func newRuntimeStore(t *testing.T, enabled bool) (*store.Store, bundleitemutils.BundleID, spec.MCPServerID) {
-	t.Helper()
-
-	st, err := store.NewMCPStore(t.Context(), t.TempDir())
-	if err != nil {
-		t.Fatalf("NewMCPStore: %v", err)
-	}
-
-	bundleID := runtimeCoverageBundleID
-	if _, err := st.PutMCPBundle(t.Context(), &spec.PutMCPBundleRequest{
-		BundleID: bundleID,
-		Body: &spec.PutMCPBundleRequestBody{
-			Slug:        bundleitemutils.BundleSlug(bundleID),
-			DisplayName: "Bundle A",
-			IsEnabled:   true,
-			Description: "Bundle A bundle",
-		},
-	}); err != nil {
-		t.Fatalf("PutMCPBundle: %v", err)
-	}
-
-	serverID := runtimeCoverageServerID
-	if _, err := st.PutMCPServer(t.Context(), &spec.PutMCPServerRequest{
-		BundleID: bundleID,
-		ServerID: serverID,
-		Body: &spec.PutMCPServerPayload{
-			DisplayName: "Server A",
-			Enabled:     enabled,
-			Transport:   spec.MCPTransportStreamableHTTP,
-			StreamableHTTP: &spec.MCPStreamableHTTPConfig{
-				URL:      "http://127.0.0.1:1234/mcp",
-				AuthMode: spec.MCPHTTPAuthNone,
-			},
-		},
-	}); err != nil {
-		t.Fatalf("PutMCPServer: %v", err)
-	}
-
-	t.Cleanup(func() { _ = st.Close() })
-	return st, bundleID, serverID
-}
-
-func coverageTool(serverID spec.MCPServerID, toolName string) spec.MCPToolCapability {
-	return spec.MCPToolCapability{
-		BundleID:         runtimeCoverageBundleID,
-		ServerID:         serverID,
-		ToolName:         toolName,
-		ProviderToolName: ProviderToolName(serverID, toolName),
-		ChoiceID:         ChoiceID(serverID, toolName),
-		DisplayName:      toolName,
-		Digest:           "digest-" + toolName,
-		Enabled:          true,
-		TaskSupport:      spec.MCPTaskSupportForbidden,
-		InferredRisk:     spec.MCPToolRiskUnknown,
-		ApprovalRule:     spec.MCPApprovalRuleAllow,
-		ExecutionMode:    spec.MCPExecutionModeManual,
-	}
-}
-
-func coverageDiscoverySnapshot(serverID spec.MCPServerID, toolNames ...string) spec.MCPDiscoverySnapshot {
-	snap := spec.MCPDiscoverySnapshot{
-		BundleID: runtimeCoverageBundleID,
-		ServerID: serverID,
-	}
-	for _, name := range toolNames {
-		snap.Tools = append(snap.Tools, coverageTool(serverID, name))
-	}
-	return snap
-}
-
 type sequencedClientFactory struct {
 	mu sync.Mutex
 
@@ -914,4 +844,74 @@ func TestToolBridgeCachedDecisionAndDeniedBranches(t *testing.T) {
 			t.Fatalf("Invoke(stale digest) err = %v, want stale reference", err)
 		}
 	})
+}
+
+func newRuntimeStore(t *testing.T, enabled bool) (*store.Store, bundleitemutils.BundleID, spec.MCPServerID) {
+	t.Helper()
+
+	st, err := store.NewMCPStore(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatalf("NewMCPStore: %v", err)
+	}
+
+	bundleID := runtimeCoverageBundleID
+	if _, err := st.PutMCPBundle(t.Context(), &spec.PutMCPBundleRequest{
+		BundleID: bundleID,
+		Body: &spec.PutMCPBundleRequestBody{
+			Slug:        bundleitemutils.BundleSlug(bundleID),
+			DisplayName: "Bundle A",
+			IsEnabled:   true,
+			Description: "Bundle A bundle",
+		},
+	}); err != nil {
+		t.Fatalf("PutMCPBundle: %v", err)
+	}
+
+	serverID := runtimeCoverageServerID
+	if _, err := st.PutMCPServer(t.Context(), &spec.PutMCPServerRequest{
+		BundleID: bundleID,
+		ServerID: serverID,
+		Body: &spec.PutMCPServerPayload{
+			DisplayName: "Server A",
+			Enabled:     enabled,
+			Transport:   spec.MCPTransportStreamableHTTP,
+			StreamableHTTP: &spec.MCPStreamableHTTPConfig{
+				URL:      "http://127.0.0.1:1234/mcp",
+				AuthMode: spec.MCPHTTPAuthNone,
+			},
+		},
+	}); err != nil {
+		t.Fatalf("PutMCPServer: %v", err)
+	}
+
+	t.Cleanup(func() { _ = st.Close() })
+	return st, bundleID, serverID
+}
+
+func coverageDiscoverySnapshot(serverID spec.MCPServerID, toolNames ...string) spec.MCPDiscoverySnapshot {
+	snap := spec.MCPDiscoverySnapshot{
+		BundleID: runtimeCoverageBundleID,
+		ServerID: serverID,
+	}
+	for _, name := range toolNames {
+		snap.Tools = append(snap.Tools, coverageTool(serverID, name))
+	}
+	return snap
+}
+
+func coverageTool(serverID spec.MCPServerID, toolName string) spec.MCPToolCapability {
+	return spec.MCPToolCapability{
+		BundleID:         runtimeCoverageBundleID,
+		ServerID:         serverID,
+		ToolName:         toolName,
+		ProviderToolName: ProviderToolName(serverID, toolName),
+		ChoiceID:         ChoiceID(serverID, toolName),
+		DisplayName:      toolName,
+		Digest:           "digest-" + toolName,
+		Enabled:          true,
+		TaskSupport:      spec.MCPTaskSupportForbidden,
+		InferredRisk:     spec.MCPToolRiskUnknown,
+		ApprovalRule:     spec.MCPApprovalRuleAllow,
+		ExecutionMode:    spec.MCPExecutionModeManual,
+	}
 }

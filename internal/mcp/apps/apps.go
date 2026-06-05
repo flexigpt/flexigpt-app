@@ -41,32 +41,6 @@ func ToolVisibleToModel(info *spec.MCPToolAppInfo) bool {
 	return false
 }
 
-// ToolVisibleToApp reports whether the tool may be called by an MCP App.
-func ToolVisibleToApp(info *spec.MCPToolAppInfo) bool {
-	if info == nil || len(info.Visibility) == 0 {
-		return true
-	}
-	for _, v := range info.Visibility {
-		if strings.EqualFold(strings.TrimSpace(v), VisibilityApp) {
-			return true
-		}
-	}
-	return false
-}
-
-// EffectiveAppsPolicy returns the configured policy or a safe default.
-func EffectiveAppsPolicy(cfg spec.MCPServerConfig) spec.MCPAppsPolicy {
-	if cfg.AppsPolicy != nil {
-		return *cfg.AppsPolicy
-	}
-	return spec.MCPAppsPolicy{
-		Enabled:                          false,
-		AllowAppInitiatedToolCalls:       false,
-		RequireApprovalForOpenLink:       true,
-		RequireApprovalForContextUpdates: true,
-	}
-}
-
 // ValidateAppToolInvocation enforces the cross-server, visibility, and
 // policy constraints for tool calls whose source is "app".
 //
@@ -97,6 +71,32 @@ func ValidateAppToolInvocation(
 		return fmt.Errorf("%w: tool %q is not visible to apps", spec.ErrMCPPolicyDenied, tool.ToolName)
 	}
 	return nil
+}
+
+// ToolVisibleToApp reports whether the tool may be called by an MCP App.
+func ToolVisibleToApp(info *spec.MCPToolAppInfo) bool {
+	if info == nil || len(info.Visibility) == 0 {
+		return true
+	}
+	for _, v := range info.Visibility {
+		if strings.EqualFold(strings.TrimSpace(v), VisibilityApp) {
+			return true
+		}
+	}
+	return false
+}
+
+// EffectiveAppsPolicy returns the configured policy or a safe default.
+func EffectiveAppsPolicy(cfg spec.MCPServerConfig) spec.MCPAppsPolicy {
+	if cfg.AppsPolicy != nil {
+		return *cfg.AppsPolicy
+	}
+	return spec.MCPAppsPolicy{
+		Enabled:                          false,
+		AllowAppInitiatedToolCalls:       false,
+		RequireApprovalForOpenLink:       true,
+		RequireApprovalForContextUpdates: true,
+	}
 }
 
 // DefaultSandboxCSP returns a restrictive CSP suitable for srcdoc iframes

@@ -21,6 +21,9 @@ import (
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
 )
 
+type mcpAuthKeyReader interface {
+	GetAuthKey(ctx context.Context, req *settingSpec.GetAuthKeyRequest) (*settingSpec.GetAuthKeyResponse, error)
+}
 type mcpAuthKeyStore interface {
 	mcpAuthKeyReader
 	SetAuthKey(ctx context.Context, req *settingSpec.SetAuthKeyRequest) (*settingSpec.SetAuthKeyResponse, error)
@@ -33,10 +36,6 @@ type mcpAuthKeyStore interface {
 type mcpSecretWriter interface {
 	SetMCPSecret(ctx context.Context, secretRef, value string) (sha256 string, nonEmpty bool, err error)
 	DeleteMCPSecret(ctx context.Context, secretRef string) error
-}
-
-type mcpAuthKeyReader interface {
-	GetAuthKey(ctx context.Context, req *settingSpec.GetAuthKeyRequest) (*settingSpec.GetAuthKeyResponse, error)
 }
 
 type settingSecretResolver struct {

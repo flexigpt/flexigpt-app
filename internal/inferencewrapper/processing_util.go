@@ -26,26 +26,72 @@ func disabledDebugConfig() debugclient.DebugConfig {
 	return cfg
 }
 
-func prependCurrentInput(
+func cloneInputUnionsForLocalMutation(in []inferenceSpec.InputUnion) []inferenceSpec.InputUnion {
+	if len(in) == 0 {
+		return nil
+	}
+
+	out := make([]inferenceSpec.InputUnion, len(in))
+	for i := range in {
+		out[i] = cloneInputUnionForLocalMutation(in[i])
+	}
+	return out
+}
+
+func cloneInputUnionForLocalMutation(in inferenceSpec.InputUnion) inferenceSpec.InputUnion {
+	out := in
+
+	if in.InputMessage != nil {
+		msg := *in.InputMessage
+		msg.Contents = cloneContentItemsForLocalMutation(msg.Contents)
+		out.InputMessage = &msg
+	}
+
+	if in.OutputMessage != nil {
+		msg := *in.OutputMessage
+		msg.Contents = cloneContentItemsForLocalMutation(msg.Contents)
+		out.OutputMessage = &msg
+	}
+
+	return out
+}
+
+func cloneContentItemsForLocalMutation(
+	in []inferenceSpec.InputOutputContentItemUnion,
+) []inferenceSpec.InputOutputContentItemUnion {
+	out := make([]inferenceSpec.InputOutputContentItemUnion, len(in))
+	copy(out, in)
+	return out
+}
+
+func prependCurrentInputs(
 	all []inferenceSpec.InputUnion,
 	current []inferenceSpec.InputUnion,
-	extra inferenceSpec.InputUnion,
+	extras ...inferenceSpec.InputUnion,
 ) (nextAll, nextCurrent []inferenceSpec.InputUnion) {
-	nextCurrent = make([]inferenceSpec.InputUnion, 0, len(current)+1)
-	nextCurrent = append(nextCurrent, extra)
+	if len(extras) == 0 {
+		nextAll = append([]inferenceSpec.InputUnion(nil), all...)
+		nextCurrent = append([]inferenceSpec.InputUnion(nil), current...)
+		return nextAll, nextCurrent
+	}
+
+	nextCurrent = make([]inferenceSpec.InputUnion, 0, len(current)+len(extras))
+	nextCurrent = append(nextCurrent, extras...)
 	nextCurrent = append(nextCurrent, current...)
 
 	historyLen := len(all) - len(current)
 	if historyLen < 0 || historyLen > len(all) {
-		nextAll := make([]inferenceSpec.InputUnion, 0, len(all)+1)
-		nextAll = append(nextAll, extra)
+
+		nextAll := make([]inferenceSpec.InputUnion, 0, len(all)+len(extras))
+		nextAll = append(nextAll, extras...)
 		nextAll = append(nextAll, all...)
 		return nextAll, nextCurrent
 	}
 
-	nextAll = make([]inferenceSpec.InputUnion, 0, len(all)+1)
+	nextAll = make([]inferenceSpec.InputUnion, 0, len(all)+len(extras))
 	nextAll = append(nextAll, all[:historyLen]...)
-	nextAll = append(nextAll, extra)
+
+	nextAll = append(nextAll, extras...)
 	nextAll = append(nextAll, all[historyLen:]...)
 
 	return nextAll, nextCurrent

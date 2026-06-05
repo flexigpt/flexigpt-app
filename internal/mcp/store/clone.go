@@ -9,12 +9,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
-func cloneBundle(in spec.MCPBundle) spec.MCPBundle {
-	out := in
-	out.SoftDeletedAt = cloneTimePtr(in.SoftDeletedAt)
-	return out
-}
-
 func cloneBundleMap(in map[bundleitemutils.BundleID]spec.MCPBundle) map[bundleitemutils.BundleID]spec.MCPBundle {
 	out := make(map[bundleitemutils.BundleID]spec.MCPBundle, len(in))
 	for id, b := range in {
@@ -23,11 +17,9 @@ func cloneBundleMap(in map[bundleitemutils.BundleID]spec.MCPBundle) map[bundleit
 	return out
 }
 
-func cloneServerMap(in map[spec.MCPServerID]spec.MCPServerConfig) map[spec.MCPServerID]spec.MCPServerConfig {
-	out := make(map[spec.MCPServerID]spec.MCPServerConfig, len(in))
-	for id, cfg := range in {
-		out[id] = cloneServerConfig(cfg)
-	}
+func cloneBundle(in spec.MCPBundle) spec.MCPBundle {
+	out := in
+	out.SoftDeletedAt = cloneTimePtr(in.SoftDeletedAt)
 	return out
 }
 
@@ -37,6 +29,14 @@ func cloneAllServerMaps(
 	out := make(map[bundleitemutils.BundleID]map[spec.MCPServerID]spec.MCPServerConfig, len(in))
 	for bid, servers := range in {
 		out[bid] = cloneServerMap(servers)
+	}
+	return out
+}
+
+func cloneServerMap(in map[spec.MCPServerID]spec.MCPServerConfig) map[spec.MCPServerID]spec.MCPServerConfig {
+	out := make(map[spec.MCPServerID]spec.MCPServerConfig, len(in))
+	for id, cfg := range in {
+		out[id] = cloneServerConfig(cfg)
 	}
 	return out
 }

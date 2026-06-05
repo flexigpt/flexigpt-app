@@ -40,16 +40,6 @@ func (r *observingSecretResolver) ResolveSecret(ctx context.Context, ref string)
 	return "resolved-secret", nil
 }
 
-func trackedBaseStatus(serverID spec.MCPServerID) spec.MCPAuthStatus {
-	return spec.MCPAuthStatus{
-		BundleID: testBundleID,
-		ServerID: serverID,
-		AuthMode: spec.MCPHTTPAuthOAuth,
-		State:    spec.MCPAuthStateRequired,
-		Resource: testMCPResource,
-	}
-}
-
 func TestStaticSecretResolverResolveSecret(t *testing.T) {
 	resolver := StaticSecretResolver{
 		"ref-a": "secret-a",
@@ -631,5 +621,15 @@ func TestMergeMCPAuthStatus(t *testing.T) {
 				t.Fatalf("AuthorizationServer = %q, want empty", got.AuthorizationServer)
 			}
 		})
+	}
+}
+
+func trackedBaseStatus(serverID spec.MCPServerID) spec.MCPAuthStatus {
+	return spec.MCPAuthStatus{
+		BundleID: testBundleID,
+		ServerID: serverID,
+		AuthMode: spec.MCPHTTPAuthOAuth,
+		State:    spec.MCPAuthStateRequired,
+		Resource: testMCPResource,
 	}
 }

@@ -22,21 +22,6 @@ const (
 	storeTestServerB = "server-b"
 )
 
-func putTestBundle(t *testing.T, st *Store, bundleID bundleitemutils.BundleID, displayName string) {
-	t.Helper()
-	if _, err := st.PutMCPBundle(t.Context(), &spec.PutMCPBundleRequest{
-		BundleID: bundleID,
-		Body: &spec.PutMCPBundleRequestBody{
-			Slug:        bundleitemutils.BundleSlug(bundleID),
-			DisplayName: displayName,
-			IsEnabled:   true,
-			Description: displayName + " bundle",
-		},
-	}); err != nil {
-		t.Fatalf("PutMCPBundle(%s): %v", bundleID, err)
-	}
-}
-
 func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 	ctx := t.Context()
 	dir := t.TempDir()
@@ -611,137 +596,6 @@ func TestStoreRejectsBadPageToken(t *testing.T) {
 	}); !errors.Is(err, spec.ErrMCPInvalidRequest) {
 		t.Fatalf("ListMCPServers(bad token) error = %v, want ErrMCPInvalidRequest", err)
 	}
-}
-
-func newValidStoreBundle(
-	id bundleitemutils.BundleID,
-	slug bundleitemutils.BundleSlug,
-	displayName string,
-	enabled bool,
-) spec.MCPBundle {
-	now := time.Now().UTC()
-	return spec.MCPBundle{
-		SchemaVersion: spec.MCPSchemaVersion,
-		ID:            id,
-		Slug:          slug,
-		DisplayName:   displayName,
-		Description:   displayName + " bundle",
-		IsEnabled:     enabled,
-		CreatedAt:     now.Add(-time.Minute),
-		ModifiedAt:    now,
-	}
-}
-
-func newValidStoreHTTPServer(
-	bundleID bundleitemutils.BundleID,
-	serverID spec.MCPServerID,
-	displayName string,
-	enabled bool,
-) spec.MCPServerConfig {
-	now := time.Now().UTC()
-	return spec.MCPServerConfig{
-		SchemaVersion: spec.MCPSchemaVersion,
-		BundleID:      bundleID,
-		ID:            serverID,
-		DisplayName:   displayName,
-		Enabled:       enabled,
-		Transport:     spec.MCPTransportStreamableHTTP,
-		StreamableHTTP: &spec.MCPStreamableHTTPConfig{
-			URL:      "http://127.0.0.1:1234/mcp",
-			AuthMode: spec.MCPHTTPAuthNone,
-		},
-		DefaultPolicy: spec.DefaultMCPServerPolicy(),
-		CreatedAt:     now.Add(-time.Minute),
-		ModifiedAt:    now,
-	}
-}
-
-func mustCreateBundle(
-	t *testing.T,
-	st *Store,
-	bundleID bundleitemutils.BundleID,
-	slug bundleitemutils.BundleSlug,
-	displayName string,
-	enabled bool,
-) {
-	t.Helper()
-
-	_, err := st.PutMCPBundle(t.Context(), &spec.PutMCPBundleRequest{
-		BundleID: bundleID,
-		Body: &spec.PutMCPBundleRequestBody{
-			Slug:        slug,
-			DisplayName: displayName,
-			IsEnabled:   enabled,
-			Description: displayName + " bundle",
-		},
-	})
-	if err != nil {
-		t.Fatalf("PutMCPBundle(%s): %v", bundleID, err)
-	}
-}
-
-func mustCreateHTTPServer(
-	t *testing.T,
-	st *Store,
-	bundleID bundleitemutils.BundleID,
-	serverID spec.MCPServerID,
-	displayName string,
-	enabled bool,
-) {
-	t.Helper()
-
-	_, err := st.PutMCPServer(t.Context(), &spec.PutMCPServerRequest{
-		BundleID: bundleID,
-		ServerID: serverID,
-		Body: &spec.PutMCPServerPayload{
-			DisplayName: displayName,
-			Enabled:     enabled,
-			Transport:   spec.MCPTransportStreamableHTTP,
-			StreamableHTTP: &spec.MCPStreamableHTTPConfig{
-				URL:      "http://127.0.0.1:1234/mcp",
-				AuthMode: spec.MCPHTTPAuthNone,
-			},
-			DefaultPolicy: func() *spec.MCPServerPolicy {
-				p := spec.DefaultMCPServerPolicy()
-				return &p
-			}(),
-		},
-	})
-	if err != nil {
-		t.Fatalf("PutMCPServer(%s/%s): %v", bundleID, serverID, err)
-	}
-}
-
-func mustSelectBuiltInPair(t *testing.T, data *BuiltInData) (bundleitemutils.BundleID, spec.MCPServerID) {
-	t.Helper()
-
-	bundles, servers, err := data.ListBuiltInData(t.Context())
-	if err != nil {
-		t.Fatalf("ListBuiltInData: %v", err)
-	}
-	if len(bundles) == 0 {
-		t.Fatalf("no built-in bundles")
-	}
-	bundleIDs := make([]string, 0, len(bundles))
-	for id := range bundles {
-		bundleIDs = append(bundleIDs, string(id))
-	}
-	slices.Sort(bundleIDs)
-	for _, bundleStr := range bundleIDs {
-		bid := bundleitemutils.BundleID(bundleStr)
-		serverMap := servers[bid]
-		if len(serverMap) == 0 {
-			continue
-		}
-		serverIDs := make([]string, 0, len(serverMap))
-		for sid := range serverMap {
-			serverIDs = append(serverIDs, string(sid))
-		}
-		slices.Sort(serverIDs)
-		return bid, spec.MCPServerID(serverIDs[0])
-	}
-	t.Fatalf("no built-in bundle with servers")
-	return "", ""
 }
 
 func TestStoreValidationHelpers(t *testing.T) {
@@ -1650,5 +1504,151 @@ func TestStoreListBundlesAndServersWithBadTokens(t *testing.T) {
 		}),
 	}); err == nil || !strings.Contains(err.Error(), "cannot parse") {
 		t.Fatalf("ListMCPBundles(bad cursor time) = %v", err)
+	}
+}
+
+func newValidStoreBundle(
+	id bundleitemutils.BundleID,
+	slug bundleitemutils.BundleSlug,
+	displayName string,
+	enabled bool,
+) spec.MCPBundle {
+	now := time.Now().UTC()
+	return spec.MCPBundle{
+		SchemaVersion: spec.MCPSchemaVersion,
+		ID:            id,
+		Slug:          slug,
+		DisplayName:   displayName,
+		Description:   displayName + " bundle",
+		IsEnabled:     enabled,
+		CreatedAt:     now.Add(-time.Minute),
+		ModifiedAt:    now,
+	}
+}
+
+func newValidStoreHTTPServer(
+	bundleID bundleitemutils.BundleID,
+	serverID spec.MCPServerID,
+	displayName string,
+	enabled bool,
+) spec.MCPServerConfig {
+	now := time.Now().UTC()
+	return spec.MCPServerConfig{
+		SchemaVersion: spec.MCPSchemaVersion,
+		BundleID:      bundleID,
+		ID:            serverID,
+		DisplayName:   displayName,
+		Enabled:       enabled,
+		Transport:     spec.MCPTransportStreamableHTTP,
+		StreamableHTTP: &spec.MCPStreamableHTTPConfig{
+			URL:      "http://127.0.0.1:1234/mcp",
+			AuthMode: spec.MCPHTTPAuthNone,
+		},
+		DefaultPolicy: spec.DefaultMCPServerPolicy(),
+		CreatedAt:     now.Add(-time.Minute),
+		ModifiedAt:    now,
+	}
+}
+
+func mustCreateBundle(
+	t *testing.T,
+	st *Store,
+	bundleID bundleitemutils.BundleID,
+	slug bundleitemutils.BundleSlug,
+	displayName string,
+	enabled bool,
+) {
+	t.Helper()
+
+	_, err := st.PutMCPBundle(t.Context(), &spec.PutMCPBundleRequest{
+		BundleID: bundleID,
+		Body: &spec.PutMCPBundleRequestBody{
+			Slug:        slug,
+			DisplayName: displayName,
+			IsEnabled:   enabled,
+			Description: displayName + " bundle",
+		},
+	})
+	if err != nil {
+		t.Fatalf("PutMCPBundle(%s): %v", bundleID, err)
+	}
+}
+
+func mustCreateHTTPServer(
+	t *testing.T,
+	st *Store,
+	bundleID bundleitemutils.BundleID,
+	serverID spec.MCPServerID,
+	displayName string,
+	enabled bool,
+) {
+	t.Helper()
+
+	_, err := st.PutMCPServer(t.Context(), &spec.PutMCPServerRequest{
+		BundleID: bundleID,
+		ServerID: serverID,
+		Body: &spec.PutMCPServerPayload{
+			DisplayName: displayName,
+			Enabled:     enabled,
+			Transport:   spec.MCPTransportStreamableHTTP,
+			StreamableHTTP: &spec.MCPStreamableHTTPConfig{
+				URL:      "http://127.0.0.1:1234/mcp",
+				AuthMode: spec.MCPHTTPAuthNone,
+			},
+			DefaultPolicy: func() *spec.MCPServerPolicy {
+				p := spec.DefaultMCPServerPolicy()
+				return &p
+			}(),
+		},
+	})
+	if err != nil {
+		t.Fatalf("PutMCPServer(%s/%s): %v", bundleID, serverID, err)
+	}
+}
+
+func mustSelectBuiltInPair(t *testing.T, data *BuiltInData) (bundleitemutils.BundleID, spec.MCPServerID) {
+	t.Helper()
+
+	bundles, servers, err := data.ListBuiltInData(t.Context())
+	if err != nil {
+		t.Fatalf("ListBuiltInData: %v", err)
+	}
+	if len(bundles) == 0 {
+		t.Fatalf("no built-in bundles")
+	}
+	bundleIDs := make([]string, 0, len(bundles))
+	for id := range bundles {
+		bundleIDs = append(bundleIDs, string(id))
+	}
+	slices.Sort(bundleIDs)
+	for _, bundleStr := range bundleIDs {
+		bid := bundleitemutils.BundleID(bundleStr)
+		serverMap := servers[bid]
+		if len(serverMap) == 0 {
+			continue
+		}
+		serverIDs := make([]string, 0, len(serverMap))
+		for sid := range serverMap {
+			serverIDs = append(serverIDs, string(sid))
+		}
+		slices.Sort(serverIDs)
+		return bid, spec.MCPServerID(serverIDs[0])
+	}
+	t.Fatalf("no built-in bundle with servers")
+	return "", ""
+}
+
+func putTestBundle(t *testing.T, st *Store, bundleID bundleitemutils.BundleID, displayName string) {
+	t.Helper()
+	if _, err := st.PutMCPBundle(t.Context(), &spec.PutMCPBundleRequest{
+		BundleID: bundleID,
+		Body: &spec.PutMCPBundleRequestBody{
+			Slug:        bundleitemutils.BundleSlug(bundleID),
+			DisplayName: displayName,
+			IsEnabled:   true,
+			Description: displayName + " bundle",
+		},
+	}); err != nil {
+		t.Fatalf("PutMCPBundle(%s): %v", bundleID, err)
 	}
 }

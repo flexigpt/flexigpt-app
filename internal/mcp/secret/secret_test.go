@@ -19,16 +19,6 @@ type secretRefWire struct {
 	Slot     string                   `json:"slot"`
 }
 
-func encodeSecretWire(t *testing.T, wire secretRefWire) string {
-	t.Helper()
-
-	raw, err := json.Marshal(wire)
-	if err != nil {
-		t.Fatalf("json.Marshal: %v", err)
-	}
-	return spec.SecretRefVersion + ":" + base64.RawURLEncoding.EncodeToString(raw)
-}
-
 func TestSecretRefRoundTripAndCanonicalStorageKey(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -633,4 +623,14 @@ func TestSecretRefValidationFailures(t *testing.T) {
 			}
 		})
 	}
+}
+
+func encodeSecretWire(t *testing.T, wire secretRefWire) string {
+	t.Helper()
+
+	raw, err := json.Marshal(wire)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+	return spec.SecretRefVersion + ":" + base64.RawURLEncoding.EncodeToString(raw)
 }

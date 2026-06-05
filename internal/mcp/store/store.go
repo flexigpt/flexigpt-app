@@ -773,105 +773,6 @@ func (s *Store) GetLastKnownSnapshot(
 	return cloneDiscoverySnapshot(snap), ok, nil
 }
 
-func (s *Store) readAll(ctx context.Context, force bool) (storeSchema, error) {
-	raw, err := s.file.GetAll(force)
-	if err != nil {
-		return storeSchema{}, err
-	}
-
-	var sc storeSchema
-	if err := jsonencdec.MapToStructWithJSONTags(raw, &sc); err != nil {
-		return storeSchema{}, err
-	}
-	if sc.SchemaVersion == "" {
-		sc.SchemaVersion = spec.MCPSchemaVersion
-	}
-	if sc.SchemaVersion != spec.MCPSchemaVersion {
-		return storeSchema{}, fmt.Errorf("mcp store schemaVersion %q != %q", sc.SchemaVersion, spec.MCPSchemaVersion)
-	}
-	if sc.Bundles == nil {
-		sc.Bundles = map[bundleitemutils.BundleID]spec.MCPBundle{}
-	}
-
-	if sc.Servers == nil {
-		sc.Servers = map[bundleitemutils.BundleID]map[spec.MCPServerID]spec.MCPServerConfig{}
-	}
-	if sc.LastKnownSnapshots == nil {
-		sc.LastKnownSnapshots = map[spec.MCPServerID]spec.MCPDiscoverySnapshot{}
-	}
-
-	for id, b := range sc.Bundles {
-		if b.ID != id {
-			return storeSchema{}, fmt.Errorf("bundle key %q != bundle.id %q", id, b.ID)
-		}
-		if err := validateBundle(&b); err != nil {
-			return storeSchema{}, fmt.Errorf("invalid mcp bundle %q: %w", id, err)
-		}
-		sc.Bundles[id] = cloneBundle(b)
-		if sc.Servers[id] == nil {
-			sc.Servers[id] = map[spec.MCPServerID]spec.MCPServerConfig{}
-		}
-	}
-
-	seen := map[spec.MCPServerID]bundleitemutils.BundleID{}
-	for bid, servers := range sc.Servers {
-		if _, ok := sc.Bundles[bid]; !ok {
-			return storeSchema{}, fmt.Errorf("servers contain unknown bundle %q", bid)
-		}
-
-		for id, cfg := range servers {
-			if cfg.ID != id {
-				return storeSchema{}, fmt.Errorf("server key %q != server.id %q", id, cfg.ID)
-			}
-			if cfg.BundleID != bid {
-				return storeSchema{}, fmt.Errorf("server %q bundleID %q != parent %q", id, cfg.BundleID, bid)
-			}
-			if prev, dup := seen[id]; dup && prev != bid {
-				return storeSchema{}, fmt.Errorf("server id %q appears in multiple bundles", id)
-			}
-			if s.builtinData != nil {
-				if _, err := s.builtinData.FindBuiltInServerByID(ctx, id); err == nil {
-					return storeSchema{}, fmt.Errorf(
-						"user server id %q in bundle %q collides with a built-in server",
-						id,
-						bid,
-					)
-				}
-			}
-			seen[id] = bid
-			if err := validateServerConfig(&cfg); err != nil {
-				return storeSchema{}, fmt.Errorf("invalid mcp server %q: %w", id, err)
-			}
-			sc.Servers[bid][id] = cloneServerConfig(cfg)
-		}
-	}
-	return sc, nil
-}
-
-func (s *Store) writeAll(sc storeSchema) error {
-	sc.SchemaVersion = spec.MCPSchemaVersion
-	if sc.Bundles == nil {
-		sc.Bundles = map[bundleitemutils.BundleID]spec.MCPBundle{}
-	}
-	if sc.Servers == nil {
-		sc.Servers = map[bundleitemutils.BundleID]map[spec.MCPServerID]spec.MCPServerConfig{}
-	}
-	for bid := range sc.Bundles {
-		if sc.Servers[bid] == nil {
-			sc.Servers[bid] = map[spec.MCPServerID]spec.MCPServerConfig{}
-		}
-	}
-	if sc.LastKnownSnapshots == nil {
-		sc.LastKnownSnapshots = map[spec.MCPServerID]spec.MCPDiscoverySnapshot{}
-	}
-
-	mp, err := jsonencdec.StructWithJSONTagsToMap(sc)
-	if err != nil {
-		return err
-	}
-	return s.file.SetAll(mp)
-}
-
 func (s *Store) ensureBaseBundleHydrated(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1036,6 +937,110 @@ func (s *Store) ensureUniqueBundleSlug(
 	return nil
 }
 
+func (s *Store) readAll(ctx context.Context, force bool) (storeSchema, error) {
+	raw, err := s.file.GetAll(force)
+	if err != nil {
+		return storeSchema{}, err
+	}
+
+	var sc storeSchema
+	if err := jsonencdec.MapToStructWithJSONTags(raw, &sc); err != nil {
+		return storeSchema{}, err
+	}
+	if sc.SchemaVersion == "" {
+		sc.SchemaVersion = spec.MCPSchemaVersion
+	}
+	if sc.SchemaVersion != spec.MCPSchemaVersion {
+		return storeSchema{}, fmt.Errorf("mcp store schemaVersion %q != %q", sc.SchemaVersion, spec.MCPSchemaVersion)
+	}
+	if sc.Bundles == nil {
+		sc.Bundles = map[bundleitemutils.BundleID]spec.MCPBundle{}
+	}
+
+	if sc.Servers == nil {
+		sc.Servers = map[bundleitemutils.BundleID]map[spec.MCPServerID]spec.MCPServerConfig{}
+	}
+	if sc.LastKnownSnapshots == nil {
+		sc.LastKnownSnapshots = map[spec.MCPServerID]spec.MCPDiscoverySnapshot{}
+	}
+
+	for id, b := range sc.Bundles {
+		if b.ID != id {
+			return storeSchema{}, fmt.Errorf("bundle key %q != bundle.id %q", id, b.ID)
+		}
+		if err := validateBundle(&b); err != nil {
+			return storeSchema{}, fmt.Errorf("invalid mcp bundle %q: %w", id, err)
+		}
+		sc.Bundles[id] = cloneBundle(b)
+		if sc.Servers[id] == nil {
+			sc.Servers[id] = map[spec.MCPServerID]spec.MCPServerConfig{}
+		}
+	}
+
+	seen := map[spec.MCPServerID]bundleitemutils.BundleID{}
+	for bid, servers := range sc.Servers {
+		if _, ok := sc.Bundles[bid]; !ok {
+			return storeSchema{}, fmt.Errorf("servers contain unknown bundle %q", bid)
+		}
+
+		for id, cfg := range servers {
+			if cfg.ID != id {
+				return storeSchema{}, fmt.Errorf("server key %q != server.id %q", id, cfg.ID)
+			}
+			if cfg.BundleID != bid {
+				return storeSchema{}, fmt.Errorf("server %q bundleID %q != parent %q", id, cfg.BundleID, bid)
+			}
+			if prev, dup := seen[id]; dup && prev != bid {
+				return storeSchema{}, fmt.Errorf("server id %q appears in multiple bundles", id)
+			}
+			if s.builtinData != nil {
+				if _, err := s.builtinData.FindBuiltInServerByID(ctx, id); err == nil {
+					return storeSchema{}, fmt.Errorf(
+						"user server id %q in bundle %q collides with a built-in server",
+						id,
+						bid,
+					)
+				}
+			}
+			seen[id] = bid
+			if err := validateServerConfig(&cfg); err != nil {
+				return storeSchema{}, fmt.Errorf("invalid mcp server %q: %w", id, err)
+			}
+			sc.Servers[bid][id] = cloneServerConfig(cfg)
+		}
+	}
+	return sc, nil
+}
+
+func (s *Store) writeAll(sc storeSchema) error {
+	sc.SchemaVersion = spec.MCPSchemaVersion
+	if sc.Bundles == nil {
+		sc.Bundles = map[bundleitemutils.BundleID]spec.MCPBundle{}
+	}
+	if sc.Servers == nil {
+		sc.Servers = map[bundleitemutils.BundleID]map[spec.MCPServerID]spec.MCPServerConfig{}
+	}
+	for bid := range sc.Bundles {
+		if sc.Servers[bid] == nil {
+			sc.Servers[bid] = map[spec.MCPServerID]spec.MCPServerConfig{}
+		}
+	}
+	if sc.LastKnownSnapshots == nil {
+		sc.LastKnownSnapshots = map[spec.MCPServerID]spec.MCPDiscoverySnapshot{}
+	}
+
+	mp, err := jsonencdec.StructWithJSONTagsToMap(sc)
+	if err != nil {
+		return err
+	}
+	return s.file.SetAll(mp)
+}
+
+func findUserServerBundle(sc storeSchema, serverID spec.MCPServerID) (bundleitemutils.BundleID, bool) {
+	bid, _, ok := findUserServer(sc, "", serverID)
+	return bid, ok
+}
+
 func findUserServer(
 	sc storeSchema,
 	bundleID bundleitemutils.BundleID,
@@ -1053,11 +1058,6 @@ func findUserServer(
 		}
 	}
 	return "", spec.MCPServerConfig{}, false
-}
-
-func findUserServerBundle(sc storeSchema, serverID spec.MCPServerID) (bundleitemutils.BundleID, bool) {
-	bid, _, ok := findUserServer(sc, "", serverID)
-	return bid, ok
 }
 
 //nolint:gocritic // page results are large.

@@ -24,25 +24,6 @@ const (
 	testResponseType         = "code"
 )
 
-func assertAuthStatusCore(t *testing.T, got, want spec.MCPAuthStatus) {
-	t.Helper()
-	if got.BundleID != want.BundleID {
-		t.Fatalf("BundleID = %q, want %q", got.BundleID, want.BundleID)
-	}
-	if got.ServerID != want.ServerID {
-		t.Fatalf("ServerID = %q, want %q", got.ServerID, want.ServerID)
-	}
-	if got.AuthMode != want.AuthMode {
-		t.Fatalf("AuthMode = %q, want %q", got.AuthMode, want.AuthMode)
-	}
-	if got.State != want.State {
-		t.Fatalf("State = %q, want %q", got.State, want.State)
-	}
-	if got.Resource != want.Resource {
-		t.Fatalf("Resource = %q, want %q", got.Resource, want.Resource)
-	}
-}
-
 func TestNormalizeHTTPAuthMode(t *testing.T) {
 	tests := []struct {
 		name string
@@ -754,4 +735,23 @@ func TestAuthManagerOptionsAndUnsupportedAuthMode(t *testing.T) {
 			t.Fatalf("Status.State = %q, want notRequired", got.Status.State)
 		}
 	})
+}
+
+func assertAuthStatusCore(t *testing.T, got, want spec.MCPAuthStatus) {
+	t.Helper()
+	if got.BundleID != want.BundleID {
+		t.Fatalf("BundleID = %q, want %q", got.BundleID, want.BundleID)
+	}
+	if got.ServerID != want.ServerID {
+		t.Fatalf("ServerID = %q, want %q", got.ServerID, want.ServerID)
+	}
+	if got.AuthMode != want.AuthMode {
+		t.Fatalf("AuthMode = %q, want %q", got.AuthMode, want.AuthMode)
+	}
+	if got.State != want.State {
+		t.Fatalf("State = %q, want %q", got.State, want.State)
+	}
+	if got.Resource != want.Resource {
+		t.Fatalf("Resource = %q, want %q", got.Resource, want.Resource)
+	}
 }
