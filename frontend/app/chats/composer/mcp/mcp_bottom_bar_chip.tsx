@@ -1,4 +1,4 @@
-import { type MouseEvent, useEffect, useMemo, useState } from 'react';
+import { type MouseEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
 
 import { FiCheck, FiExternalLink, FiRefreshCw, FiServer, FiWifi, FiWifiOff, FiX } from 'react-icons/fi';
 
@@ -49,7 +49,7 @@ function stop(e: MouseEvent) {
 	e.stopPropagation();
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
+function SectionTitle({ children }: { children: ReactNode }) {
 	return <div className="text-base-content/70 mt-2 mb-1 text-xs font-semibold">{children}</div>;
 }
 
@@ -62,7 +62,7 @@ function CheckboxRow({
 }: {
 	checked: boolean;
 	disabled?: boolean;
-	label: React.ReactNode;
+	label: ReactNode;
 	title?: string;
 	onChange: (next: boolean) => void;
 }) {
@@ -98,6 +98,114 @@ const TOOL_EXPOSURE_DROPDOWN_ITEMS: Record<MCPToolExposure, DropdownItem> = {
 
 const EMPTY_MCP_ARGUMENT_VALUES: Record<string, string> = {};
 
+function MCPArgumentFields({
+	bundleID,
+	serverID,
+	refType,
+	name,
+	item,
+	disabled,
+	onValueChange,
+}: {
+	bundleID: string;
+	serverID: string;
+	refType: MCPRefType;
+	name: string;
+	item: MCPPromptSelection | MCPResourceTemplateSelection;
+	disabled?: boolean;
+	onValueChange: (argumentName: string, value: string) => void;
+}) {
+	const args = normalizeMCPArgumentDefinitions(item.arguments);
+	const [focusedArg, setFocusedArg] = useState<string | null>(null);
+	const [completionsByArg, setCompletionsByArg] = useState<Record<string, string[]>>({});
+
+	const values = item.argumentValues ?? EMPTY_MCP_ARGUMENT_VALUES;
+	const focusedValue = focusedArg ? (values[focusedArg] ?? '') : '';
+
+	useEffect(() => {
+		if (!focusedArg) return;
+
+		let cancelled = false;
+		const timer = window.setTimeout(() => {
+			void mcpAPI
+				.completeMCPArgument(bundleID, serverID, refType, name, focusedArg, focusedValue, values)
+				.then(result => {
+					if (cancelled) return;
+					setCompletionsByArg(prev => ({
+						...prev,
+						[focusedArg]: result.values ?? [],
+					}));
+				})
+				.catch(() => {
+					if (cancelled) return;
+					setCompletionsByArg(prev => ({
+						...prev,
+						[focusedArg]: [],
+					}));
+				});
+		}, 200);
+
+		return () => {
+			cancelled = true;
+			window.clearTimeout(timer);
+		};
+	}, [bundleID, focusedArg, focusedValue, name, refType, serverID, values]);
+
+	if (args.length === 0) return null;
+
+	return (
+		<div className="bg-base-200/70 mx-2 mb-1 rounded-lg px-2 py-2">
+			<div className="text-base-content/70 mb-1 text-[10px] font-semibold uppercase">Arguments</div>
+			<div className="space-y-2">
+				{args.map(arg => {
+					const value = values[arg.name] ?? '';
+					const listID = `mcp-arg-${bundleID}-${serverID}-${refType}-${name}-${arg.name}`.replace(
+						/[^A-Za-z0-9_-]/g,
+						'_'
+					);
+					const missing = arg.required && value.trim().length === 0;
+
+					return (
+						<label key={arg.name} className="block text-xs">
+							<div className="mb-1 flex items-center gap-2">
+								<span className={missing ? 'text-warning' : ''}>
+									{arg.name}
+									{arg.required ? '*' : ''}
+								</span>
+								{arg.description ? (
+									<span className="text-base-content/50 truncate" title={arg.description}>
+										{arg.description}
+									</span>
+								) : null}
+							</div>
+							<input
+								className={`input input-bordered input-xs w-full rounded-lg ${missing ? 'input-warning' : ''}`}
+								value={value}
+								list={listID}
+								disabled={disabled}
+								onFocus={() => {
+									setFocusedArg(arg.name);
+								}}
+								onBlur={() => {
+									setFocusedArg(null);
+								}}
+								onChange={event => {
+									onValueChange(arg.name, event.currentTarget.value);
+								}}
+							/>
+							<datalist id={listID}>
+								{(completionsByArg[arg.name] ?? []).map(option => (
+									<option key={option} value={option} />
+								))}
+							</datalist>
+						</label>
+					);
+				})}
+			</div>
+		</div>
+	);
+}
+
 function ServerDiscoverySection({
 	option,
 	state,
@@ -119,6 +227,7 @@ function ServerDiscoverySection({
 		selection.selectedResourceTemplates.map(template => [mcpResourceTemplateKey(template), template] as const)
 	);
 	const selectedPromptByKey = new Map(selection.selectedPrompts.map(prompt => [mcpPromptKey(prompt), prompt] as const));
+
 	const discoveryText = option.discoveryLoading
 		? 'Loading discovery…'
 		: option.discoveryError
@@ -129,7 +238,7 @@ function ServerDiscoverySection({
 
 	return (
 		<div className="bg-base-100 rounded-xl p-2">
-			<div className="mb-1 flex items-center gap-2">
+			<div className="mb-1 flex flex-wrap items-center gap-2">
 				<div className="text-base-content/70 text-xs">Tools</div>
 				<label className="text-xs">
 					<Dropdown
@@ -154,6 +263,7 @@ function ServerDiscoverySection({
 						inlineMenu={true}
 						maxMenuHeight={160}
 						maxSummaryHeight={24}
+						disabled={isInputLocked}
 					/>
 				</label>
 
@@ -173,7 +283,7 @@ function ServerDiscoverySection({
 
 			{discoveryText ? <div className="text-base-content/70 mt-2 text-xs">{discoveryText}</div> : null}
 
-			{selection.toolExposure === MCPToolExposure.MCPToolExposureSelected && (
+			{selection.toolExposure === MCPToolExposure.MCPToolExposureSelected ? (
 				<>
 					<SectionTitle>Tools</SectionTitle>
 					{option.tools.length === 0 ? (
@@ -209,7 +319,7 @@ function ServerDiscoverySection({
 						</div>
 					)}
 				</>
-			)}
+			) : null}
 
 			{option.resources.length !== 0 || option.resourceTemplates.length !== 0 ? (
 				<>
@@ -467,130 +577,27 @@ function ServerRow({
 	);
 }
 
-function MCPArgumentFields({
-	bundleID,
-	serverID,
-	refType,
-	name,
-	item,
-	disabled,
-	onValueChange,
-}: {
-	bundleID: string;
-	serverID: string;
-	refType: MCPRefType;
-	name: string;
-	item: MCPPromptSelection | MCPResourceTemplateSelection;
-	disabled?: boolean;
-	onValueChange: (argumentName: string, value: string) => void;
-}) {
-	const args = normalizeMCPArgumentDefinitions(item.arguments);
-	const [focusedArg, setFocusedArg] = useState<string | null>(null);
-	const [completionsByArg, setCompletionsByArg] = useState<Record<string, string[]>>({});
-
-	const values = item.argumentValues ?? EMPTY_MCP_ARGUMENT_VALUES;
-
-	const focusedValue = focusedArg ? (values[focusedArg] ?? '') : '';
-
-	useEffect(() => {
-		if (!focusedArg) return;
-
-		let cancelled = false;
-		const timer = window.setTimeout(() => {
-			void mcpAPI
-				.completeMCPArgument(bundleID, serverID, refType, name, focusedArg, focusedValue, values)
-				.then(result => {
-					if (cancelled) return;
-					setCompletionsByArg(prev => ({
-						...prev,
-						[focusedArg]: result.values ?? [],
-					}));
-				})
-				.catch(() => {
-					if (cancelled) return;
-					setCompletionsByArg(prev => ({
-						...prev,
-						[focusedArg]: [],
-					}));
-				});
-		}, 200);
-
-		return () => {
-			cancelled = true;
-			window.clearTimeout(timer);
-		};
-	}, [bundleID, focusedArg, focusedValue, name, refType, serverID, values]);
-
-	if (args.length === 0) return null;
-
-	return (
-		<div className="bg-base-200/70 mx-2 mb-1 rounded-lg px-2 py-2">
-			<div className="text-base-content/70 mb-1 text-[10px] font-semibold uppercase">Arguments</div>
-			<div className="space-y-2">
-				{args.map(arg => {
-					const value = values[arg.name] ?? '';
-					const listID = `mcp-arg-${bundleID}-${serverID}-${refType}-${name}-${arg.name}`.replace(
-						/[^A-Za-z0-9_-]/g,
-						'_'
-					);
-					const missing = arg.required && value.trim().length === 0;
-
-					return (
-						<label key={arg.name} className="block text-xs">
-							<div className="mb-1 flex items-center gap-2">
-								<span className={missing ? 'text-warning' : ''}>
-									{arg.name}
-									{arg.required ? '*' : ''}
-								</span>
-								{arg.description ? (
-									<span className="text-base-content/50 truncate" title={arg.description}>
-										{arg.description}
-									</span>
-								) : null}
-							</div>
-							<input
-								className={`input input-bordered input-xs w-full rounded-lg ${missing ? 'input-warning' : ''}`}
-								value={value}
-								list={listID}
-								disabled={disabled}
-								onFocus={() => {
-									setFocusedArg(arg.name);
-								}}
-								onBlur={() => {
-									setFocusedArg(null);
-								}}
-								onChange={event => {
-									onValueChange(arg.name, event.currentTarget.value);
-								}}
-							/>
-							<datalist id={listID}>
-								{(completionsByArg[arg.name] ?? []).map(option => (
-									<option key={option} value={option} />
-								))}
-							</datalist>
-						</label>
-					);
-				})}
-			</div>
-		</div>
-	);
-}
-
 export function MCPBottomBarChip({
 	state,
 	isInputLocked = false,
+	appContextUpdateCount = 0,
+	onClearAppContextUpdates,
 }: {
 	state: UseComposerMCPResult;
 	isInputLocked?: boolean;
+	appContextUpdateCount?: number;
+	onClearAppContextUpdates?: () => void;
 }) {
 	const menu = useMenuStore({ placement: 'top', focusLoop: true });
 	const open = useStoreState(menu, 'open');
 
 	const enabledCount = state.selectedServerCount;
+	const hasAppContextUpdates = appContextUpdateCount > 0;
+	const hasBlockingArgs = state.argumentsBlocked;
+
 	const title = useMemo(() => {
 		const lines = ['MCP'];
 		lines.push('Choose MCP servers, tools, resources, and prompts for the next message.');
-
 		lines.push(
 			enabledCount > 0 ? `Status: Enabled (${enabledCount} server${enabledCount === 1 ? '' : 's'})` : 'Status: Disabled'
 		);
@@ -600,112 +607,147 @@ export function MCPBottomBarChip({
 		if (state.requiredArgumentMissingCount > 0) {
 			lines.push(`Missing required args: ${state.requiredArgumentMissingCount}`);
 		}
+		if (hasAppContextUpdates) {
+			lines.push(`Queued app context updates: ${appContextUpdateCount}`);
+		}
 		return lines.join('\n');
 	}, [
+		appContextUpdateCount,
 		enabledCount,
+		hasAppContextUpdates,
 		state.requiredArgumentMissingCount,
 		state.selectedPromptCount,
 		state.selectedResourceCount,
 		state.selectedToolCount,
 	]);
+
 	useEffect(() => {
 		if (isInputLocked) menu.hide();
 	}, [isInputLocked, menu]);
-	return (
-		<HoverTip content={title} placement="top" wrapperElement="div" wrapperClassName="inline-flex max-w-full">
-			<div
-				className={`${actionTriggerChipSurfaceClasses} border ${
-					enabledCount > 0
-						? 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
-						: open
-							? 'border-base-300 bg-base-300/60'
-							: 'border-transparent'
-				} ${isInputLocked ? 'opacity-60' : ''}`}
-				data-bottom-bar-mcp
-			>
-				<MenuButton
-					store={menu}
-					className="btn btn-xs text-neutral-custom bg-base-200/70 hover:bg-base-300/80 h-auto min-h-0 flex-1 gap-0 px-0 py-0 text-left font-normal shadow-none"
-					aria-label="Choose MCP servers"
-					disabled={isInputLocked}
-				>
-					<ActionTriggerChipContent
-						icon={<FiServer size={14} />}
-						label="MCP"
-						count={
-							enabledCount > 0 ? (
-								<span className="badge badge-success badge-xs bg-success/30">{enabledCount}</span>
-							) : undefined
-						}
-						suffix={
-							state.argumentsBlocked ? (
-								<span className="badge badge-warning badge-xs">Args</span>
-							) : enabledCount > 0 ? (
-								<FiCheck size={14} className="shrink-0" />
-							) : undefined
-						}
-						open={open}
-						labelClassName="max-w-20 truncate text-xs font-normal"
-					/>
-				</MenuButton>
 
-				{enabledCount > 0 ? (
-					<button
-						type="button"
-						className="btn btn-xs text-neutral-custom bg-base-200/70 hover:bg-base-300/80 h-auto min-h-0 shrink-0 px-1 py-0 shadow-none"
-						onClick={event => {
-							event.preventDefault();
-							event.stopPropagation();
-							state.clear();
-							menu.hide();
-						}}
-						aria-label="Clear MCP context"
-						title="Clear MCP context"
+	const chipToneClasses = hasBlockingArgs
+		? 'border-warning/70 bg-warning/10 hover:bg-warning/15 animate-pulse'
+		: enabledCount > 0 || hasAppContextUpdates
+			? 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
+			: open
+				? 'border-base-300 bg-base-300/60'
+				: 'border-transparent';
+
+	return (
+		<div className="relative shrink-0" data-bottom-bar-mcp>
+			<HoverTip content={title} placement="top" wrapperElement="div" wrapperClassName="inline-flex max-w-full">
+				<div
+					className={`${actionTriggerChipSurfaceClasses} border ${chipToneClasses} ${isInputLocked ? 'opacity-60' : ''}`}
+				>
+					<MenuButton
+						store={menu}
+						className="btn btn-xs text-neutral-custom h-auto min-h-0 flex-1 gap-0 border-none bg-transparent px-0 py-0 text-left font-normal shadow-none hover:bg-transparent"
+						aria-label="Choose MCP servers"
 						disabled={isInputLocked}
 					>
-						<FiX size={12} />
-					</button>
-				) : null}
+						<ActionTriggerChipContent
+							icon={<FiServer size={14} />}
+							label="MCP"
+							count={
+								enabledCount > 0 ? (
+									<span className="badge badge-success badge-xs bg-success/30">{enabledCount}</span>
+								) : undefined
+							}
+							suffix={
+								hasBlockingArgs ? (
+									<span className="badge badge-warning badge-xs">Args</span>
+								) : hasAppContextUpdates ? (
+									<span className="badge badge-info badge-xs">App {appContextUpdateCount}</span>
+								) : enabledCount > 0 ? (
+									<FiCheck size={14} className="shrink-0" />
+								) : undefined
+							}
+							open={open}
+							labelClassName="max-w-20 truncate text-xs font-normal"
+						/>
+					</MenuButton>
 
-				<Menu
-					store={menu}
-					gutter={8}
-					overflowPadding={8}
-					portal
-					className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-[75vh] w-2xl max-w-[90vw] overflow-y-auto border p-2 shadow-xl"
-					autoFocusOnShow
-				>
-					<div className="mb-2 flex items-center justify-between gap-2">
-						<div className="text-base-content/70 text-xs font-semibold">MCP servers</div>
+					{enabledCount > 0 || hasAppContextUpdates ? (
 						<button
 							type="button"
-							className="btn btn-ghost btn-xs rounded-lg"
-							onClick={e => {
-								stop(e);
-								void state.refreshAll();
+							className="btn btn-ghost btn-xs text-neutral-custom hover:bg-base-300/80 ml-1 h-auto min-h-0 shrink-0 px-1 py-0 shadow-none"
+							onClick={event => {
+								event.preventDefault();
+								event.stopPropagation();
+								state.clear();
+								onClearAppContextUpdates?.();
+								menu.hide();
 							}}
-							disabled={isInputLocked || state.loading}
+							aria-label="Clear MCP context"
+							title="Clear MCP context"
+							disabled={isInputLocked}
 						>
-							<FiRefreshCw size={12} />
-							<span className="ml-1">Refresh</span>
+							<FiX size={12} />
 						</button>
-					</div>
+					) : null}
 
-					{state.loading ? (
-						<div className="text-base-content/60 rounded-xl px-2 py-1 text-xs">Loading MCP servers…</div>
-					) : state.error ? (
-						<div className="text-error rounded-xl px-2 py-1 text-xs">{state.error}</div>
-					) : state.options.length === 0 ? (
-						<div className="text-base-content/60 rounded-xl px-2 py-1 text-xs">
-							No MCP servers configured. Add servers from the MCP Servers management page.
+					<Menu
+						store={menu}
+						gutter={8}
+						overflowPadding={8}
+						portal
+						className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-[75vh] w-2xl max-w-[90vw] overflow-y-auto border p-2 shadow-xl"
+						autoFocusOnShow
+					>
+						<div className="mb-2 flex items-center justify-between gap-2">
+							<div className="text-base-content/70 text-xs font-semibold">MCP servers</div>
+							<button
+								type="button"
+								className="btn btn-ghost btn-xs rounded-lg"
+								onClick={e => {
+									stop(e);
+									void state.refreshAll();
+								}}
+								disabled={isInputLocked || state.loading}
+							>
+								<FiRefreshCw size={12} />
+								<span className="ml-1">Refresh</span>
+							</button>
 						</div>
-					) : (
-						state.options.map(option => (
-							<ServerRow key={optionKey(option)} option={option} state={state} isInputLocked={isInputLocked} />
-						))
-					)}
-				</Menu>
-			</div>
-		</HoverTip>
+
+						{hasAppContextUpdates ? (
+							<div className="border-info/30 bg-info/10 mb-2 rounded-xl border p-2 text-xs">
+								<div className="flex items-center justify-between gap-2">
+									<div>
+										MCP app model context queued for next send: {appContextUpdateCount} update
+										{appContextUpdateCount === 1 ? '' : 's'}.
+									</div>
+									<button
+										type="button"
+										className="btn btn-ghost btn-xs rounded-lg"
+										onClick={e => {
+											stop(e);
+											onClearAppContextUpdates?.();
+										}}
+										disabled={isInputLocked}
+									>
+										Clear
+									</button>
+								</div>
+							</div>
+						) : null}
+
+						{state.loading ? (
+							<div className="text-base-content/60 rounded-xl px-2 py-1 text-xs">Loading MCP servers…</div>
+						) : state.error ? (
+							<div className="text-error rounded-xl px-2 py-1 text-xs">{state.error}</div>
+						) : state.options.length === 0 ? (
+							<div className="text-base-content/60 rounded-xl px-2 py-1 text-xs">
+								No MCP servers configured. Add servers from the MCP Servers management page.
+							</div>
+						) : (
+							state.options.map(option => (
+								<ServerRow key={optionKey(option)} option={option} state={state} isInputLocked={isInputLocked} />
+							))
+						)}
+					</Menu>
+				</div>
+			</HoverTip>
+		</div>
 	);
 }

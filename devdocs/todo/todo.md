@@ -2,8 +2,12 @@
 
 ## Laundry list
 
-- [ ] remove tool chips in composer for choices
-- [ ] make bottom bar choices of skill, sys prompt, tool, mcp coherent and same way. remove web search chip and push inside tools. see where to move shortcuts, input tips etc.
+- [x] remove tool chips in composer for choices
+- [x] make bottom bar choices of skill, sys prompt, tool, mcp coherent and same way. remove web search chip and push inside tools. see where to move shortcuts, input tips etc.
+- [ ] Need more cleanup wrt shortcuts, input tips, shortcuts to add mcp skills etc.
+- [ ] need coherent in message bottom bar.
+- [ ] better more inbuilt mcps.
+- [ ] test web search etc and pending user args etc.
 - easier add via some files/schemas etc
   - [ ] easier preset import bundles and flows. e.g: just import a preset bundle that has assistant, models, prompts, tools etc.
     - [ ] may be as a json import bundle or jsonc format

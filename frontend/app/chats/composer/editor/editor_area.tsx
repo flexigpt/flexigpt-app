@@ -455,14 +455,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		[attachedToolIdentityKeys, editor, handleAttachedToolsChanged]
 	);
 
-	const handleToggleAttachedToolAutoExecute = useCallback(
-		(entry: AttachedToolEntry, autoExecute: boolean) => {
-			const identityKey = toolIdentityKey(entry.bundleID, entry.bundleSlug, entry.toolSlug, entry.toolVersion);
-			handleSetAttachedToolAutoExecuteByKey(identityKey, autoExecute);
-		},
-		[handleSetAttachedToolAutoExecuteByKey]
-	);
-
 	const handleRemoveAttachedTool = useCallback(
 		(entry: AttachedToolEntry) => {
 			const identityKey = toolIdentityKey(entry.bundleID, entry.bundleSlug, entry.toolSlug, entry.toolVersion);
@@ -1446,27 +1438,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						</span>
 					</div>
 				) : null}
-				{mcpAppContextUpdates.length > 0 ? (
-					<div className="alert alert-info mx-4 mt-3 mb-1 flex items-start justify-between gap-2 text-sm" role="status">
-						<div className="flex items-start gap-2">
-							<FiAlertTriangle size={16} className="mt-0.5" />
-							<span>
-								MCP App model context queued for the next send: {mcpAppContextUpdates.length} update
-								{mcpAppContextUpdates.length === 1 ? '' : 's'}.
-							</span>
-						</div>
-						<button
-							type="button"
-							className="btn btn-ghost btn-xs"
-							onClick={() => {
-								setMCPAppContextUpdates([]);
-							}}
-							aria-label="Clear MCP App model context"
-						>
-							<FiX size={14} />
-						</button>
-					</div>
-				) : null}
+
 				<Plate editor={editor} onChange={handleEditorDocumentChange}>
 					<div className="bg-base-100 border-base-200 flex w-full max-w-full min-w-0 overflow-hidden rounded-2xl border">
 						<div className="flex min-w-0 grow flex-col p-0">
@@ -1514,11 +1486,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 								<EditorChipsBar
 									attachments={attachments}
 									directoryGroups={directoryGroups}
-									conversationTools={conversationToolsState}
 									toolCalls={toolCalls}
 									toolOutputs={toolOutputs}
-									toolEntries={attachedToolEntries}
-									mcpState={mcp}
 									isBusy={isGenerating || isSubmitting || isInputLocked || fastForwardPending}
 									onRunToolCall={handleRunSingleToolCall}
 									onDiscardToolCall={handleDiscardToolCall}
@@ -1529,15 +1498,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									onChangeAttachmentContentBlockMode={handleChangeAttachmentContentBlockMode}
 									onRemoveDirectoryGroup={handleRemoveDirectoryGroup}
 									onRemoveOverflowDir={handleRemoveOverflowDir}
-									onConversationToolsChange={setConversationToolsState}
-									onToggleAttachedToolAutoExecute={handleToggleAttachedToolAutoExecute}
-									onRemoveAttachedTool={handleRemoveAttachedTool}
-									onRemoveAllAttachedTools={handleRemoveAllAttachedTools}
-									onEditAttachedToolOptions={handleEditAttachedToolOptions}
 									onOpenToolCallDetails={handleOpenToolCallDetails}
-									onOpenConversationToolDetails={handleOpenConversationToolDetails}
-									onOpenAttachedToolDetails={handleOpenAttachedToolDetails}
-									toolArgsEventTarget={toolArgsEventTarget}
 								/>
 							</div>
 						</div>
@@ -1663,6 +1624,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						shortcutConfig={shortcutConfig}
 						currentProviderSDKType={currentProviderSDKType}
 						attachedToolEntries={attachedToolEntries}
+						conversationToolsState={conversationToolsState}
+						setConversationToolsState={setConversationToolsState}
 						onAttachTool={handleAttachTool}
 						onDetachToolByKey={handleDetachAttachedToolByKey}
 						onSetAttachedToolAutoExecute={handleSetAttachedToolAutoExecuteByKey}
@@ -1671,6 +1634,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						onWebSearchArgsBlockedChange={nextBlocked => {
 							setWebSearchArgsBlocked(nextBlocked);
 						}}
+						onRemoveAttachedTool={handleRemoveAttachedTool}
+						onRemoveAllAttachedTools={handleRemoveAllAttachedTools}
+						onEditAttachedToolOptions={handleEditAttachedToolOptions}
+						onOpenAttachedToolDetails={handleOpenAttachedToolDetails}
+						onOpenConversationToolDetails={handleOpenConversationToolDetails}
 						allSkills={allSkills}
 						skillsLoading={skillsLoading}
 						enabledSkillRefs={enabledSkillRefs}
@@ -1681,6 +1649,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						isInputLocked={isInputLocked || fastForwardPending}
 						systemPrompt={systemPrompt}
 						mcpState={mcp}
+						mcpAppContextUpdateCount={mcpAppContextUpdates.length}
+						onClearMCPAppContextUpdates={() => {
+							setMCPAppContextUpdates([]);
+						}}
 					/>
 				</Plate>
 			</form>

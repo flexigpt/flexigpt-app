@@ -24,7 +24,7 @@ import {
 	getAttachmentContentBlockModeLabel,
 	getAttachmentContentBlockModeTooltip,
 } from '@/chats/composer/attachments/attachment_mode_menu';
-import { MCPMessageContextChip } from '@/chats/composer/mcp/mcp_chips';
+import { MCPMessageContextChip } from '@/chats/messages/mcp_message_context_chip';
 import { formatToolCallLabel } from '@/tools/lib/tool_call_utils';
 import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';
 

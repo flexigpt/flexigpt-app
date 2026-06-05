@@ -9,18 +9,16 @@ import {
 	useState,
 } from 'react';
 
-import { FiFilePlus, FiFolder, FiLink, FiPaperclip, FiTool, FiUpload } from 'react-icons/fi';
+import { FiFilePlus, FiFolder, FiLink, FiPaperclip, FiUpload } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, type MenuStore, useStoreState } from '@ariakit/react';
 
 import type { ProviderSDKType } from '@/spec/inference';
 import type { PromptTemplate, PromptTemplateListItem } from '@/spec/prompt';
 import type { SkillListItem, SkillRef } from '@/spec/skill';
-import { ToolImplType, type ToolListItem, ToolStoreChoiceType } from '@/spec/tool';
+import { type ToolListItem } from '@/spec/tool';
 
 import { formatShortcut, type ShortcutConfig } from '@/lib/keyboard_shortcuts';
-
-import { useTools } from '@/hooks/use_tool';
 
 import { promptStoreAPI } from '@/apis/baseapi';
 
@@ -37,23 +35,14 @@ import { CommandTipsMenu } from '@/chats/composer/inputtips/command_tips_menu';
 import { MCPBottomBarChip } from '@/chats/composer/mcp/mcp_bottom_bar_chip';
 import type { UseComposerMCPResult } from '@/chats/composer/mcp/mcp_composer_types';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
-import { SkillDropDown } from '@/chats/composer/skills/skill_dropdown';
-import { SystemPromptDropdown } from '@/chats/composer/systemprompts/system_prompt_dropdown';
+import { SkillsBottomBarChip } from '@/chats/composer/skills/skills_bottom_bar_chip';
+import { SystemPromptBottomBarChip } from '@/chats/composer/systemprompts/system_prompt_bottom_bar_chip';
 import type { ComposerSystemPromptController } from '@/chats/composer/systemprompts/use_composer_system_prompt';
 import { PromptTemplateDropdown } from '@/chats/composer/templates/prompt_template_dropdown';
-import { dispatchOpenToolArgs } from '@/chats/composer/toolruntime/use_open_toolargs_event';
-import { ToolDropdown } from '@/chats/composer/tools/tool_dropdown';
-import { WebSearchBottomBarChip } from '@/chats/composer/tools/web_search_bottom_bar_chip';
-import {
-	getEligibleWebSearchTools,
-	normalizeWebSearchChoiceTemplates,
-	type WebSearchChoiceTemplate,
-	webSearchIdentityKey,
-	webSearchTemplateFromToolListItem,
-} from '@/chats/composer/tools/websearch_utils';
+import { ToolsBottomBarChip } from '@/chats/composer/tools/tools_bottom_bar_chip';
+import { type WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
 import { usePromptTemplates } from '@/prompts/lib/use_prompt_templates';
-import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
-import { computeToolUserArgsStatus } from '@/tools/lib/tool_userargs_utils';
+import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
 
 interface EditorBottomBarProps {
 	onAttachFiles: () => Promise<void> | void;
@@ -81,9 +70,16 @@ interface EditorBottomBarProps {
 	currentProviderSDKType: ProviderSDKType;
 
 	attachedToolEntries: AttachedToolEntry[];
+	conversationToolsState: ConversationToolStateEntry[];
+	setConversationToolsState: Dispatch<SetStateAction<ConversationToolStateEntry[]>>;
 	onAttachTool: (item: ToolListItem, autoExecute: boolean) => void;
 	onDetachToolByKey: (key: string) => void;
 	onSetAttachedToolAutoExecute: (key: string, autoExecute: boolean) => void;
+	onRemoveAttachedTool: (entry: AttachedToolEntry) => void;
+	onRemoveAllAttachedTools: (entries: AttachedToolEntry[]) => void;
+	onEditAttachedToolOptions: (entry: AttachedToolEntry) => void;
+	onOpenAttachedToolDetails?: (entry: AttachedToolEntry) => void;
+	onOpenConversationToolDetails?: (entry: ConversationToolStateEntry) => void;
 
 	// Web-search state comes from EditorArea (separate UX/state)
 	webSearchTemplates: WebSearchChoiceTemplate[];
@@ -101,6 +97,8 @@ interface EditorBottomBarProps {
 	isInputLocked?: boolean;
 	systemPrompt: ComposerSystemPromptController;
 	mcpState: UseComposerMCPResult;
+	mcpAppContextUpdateCount?: number;
+	onClearMCPAppContextUpdates?: () => void;
 }
 
 interface PickerButtonProps {
@@ -143,7 +141,7 @@ const SystemPromptSection = memo(function SystemPromptSection({
 	isInputLocked: boolean;
 }) {
 	return (
-		<SystemPromptDropdown
+		<SystemPromptBottomBarChip
 			prompts={systemPrompt.prompts}
 			bundles={systemPrompt.systemPromptBundles}
 			selectedPromptKeys={systemPrompt.selectedPromptKeys}
@@ -180,9 +178,16 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	shortcutConfig,
 	currentProviderSDKType,
 	attachedToolEntries,
+	conversationToolsState,
+	setConversationToolsState,
 	onAttachTool,
 	onDetachToolByKey,
 	onSetAttachedToolAutoExecute,
+	onRemoveAttachedTool,
+	onRemoveAllAttachedTools,
+	onEditAttachedToolOptions,
+	onOpenAttachedToolDetails,
+	onOpenConversationToolDetails,
 	webSearchTemplates,
 	setWebSearchTemplates,
 	onWebSearchArgsBlockedChange,
@@ -196,10 +201,11 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	isInputLocked = false,
 	systemPrompt,
 	mcpState,
+	mcpAppContextUpdateCount = 0,
+	onClearMCPAppContextUpdates,
 }: EditorBottomBarProps) {
 	const [isUrlModalOpen, setIsUrlModalOpen] = useState(false);
 	const templateMenuOpen = useStoreState(templateMenuState, 'open');
-	const toolMenuOpen = useStoreState(toolMenuState, 'open');
 
 	const shortcutLabels = useMemo(
 		() => ({
@@ -210,58 +216,6 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 		[shortcutConfig]
 	);
 	const { data: templateData, loading: templatesLoading } = usePromptTemplates();
-	const { data: toolData, loading: toolsLoading } = useTools();
-	const toolEntries = attachedToolEntries;
-
-	const attachedAutoExecByKey = useMemo(() => {
-		const map: Record<string, boolean> = {};
-		for (const node of toolEntries) {
-			const key = toolIdentityKey(node.bundleID, node.bundleSlug, node.toolSlug, node.toolVersion);
-			map[key] = node.autoExecute;
-		}
-		return map;
-	}, [toolEntries]);
-
-	const [toolAutoExecOverrides, setToolAutoExecOverrides] = useState<Record<string, boolean>>({});
-	const getAutoExecForTool = useMemo(() => {
-		return (item: ToolListItem): boolean => {
-			const key = toolIdentityKey(item.bundleID, item.bundleSlug, item.toolSlug, item.toolVersion);
-			if (typeof attachedAutoExecByKey[key] === 'boolean') return attachedAutoExecByKey[key];
-			const override = toolAutoExecOverrides[key];
-			if (typeof override === 'boolean') return override;
-			return item.toolDefinition.autoExecReco ?? false;
-		};
-	}, [toolAutoExecOverrides, attachedAutoExecByKey]);
-
-	const eligibleWebSearchTools = useMemo(() => {
-		if (toolsLoading) return [];
-		return getEligibleWebSearchTools(toolData, currentProviderSDKType);
-	}, [toolData, toolsLoading, currentProviderSDKType]);
-
-	const eligibleWebSearchKeys = useMemo(() => {
-		return new Set(
-			eligibleWebSearchTools.map(tool =>
-				webSearchIdentityKey({
-					bundleID: tool.bundleID,
-					toolSlug: tool.toolSlug,
-					toolVersion: tool.toolVersion,
-				})
-			)
-		);
-	}, [eligibleWebSearchTools]);
-
-	const compatibleWebSearchTemplates = useMemo(
-		() =>
-			normalizeWebSearchChoiceTemplates(
-				webSearchTemplates.filter(template => eligibleWebSearchKeys.has(webSearchIdentityKey(template)))
-			),
-		[eligibleWebSearchKeys, webSearchTemplates]
-	);
-
-	const webSearchEnabled = compatibleWebSearchTemplates.length > 0;
-	const hasConfiguredWebSearch = webSearchTemplates.length > 0;
-	const webSearchSelectionPendingNormalization =
-		hasConfiguredWebSearch && compatibleWebSearchTemplates.length !== webSearchTemplates.length;
 
 	useEffect(() => {
 		if (isInputLocked) {
@@ -272,72 +226,6 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 			setIsUrlModalOpen(false);
 		}
 	}, [attachmentMenuState, isInputLocked, templateMenuState, toolMenuState]);
-
-	useEffect(() => {
-		if (toolsLoading) return;
-		setWebSearchTemplates(prev => {
-			if (prev.length === 0) return prev;
-			const next = prev.filter(template => eligibleWebSearchKeys.has(webSearchIdentityKey(template)));
-			return next.length === prev.length ? prev : next;
-		});
-	}, [eligibleWebSearchKeys, setWebSearchTemplates, toolsLoading]);
-
-	// "Active" web-search tool for the bottom-bar UX (first one wins).
-	const activeWebSearch = compatibleWebSearchTemplates.length > 0 ? compatibleWebSearchTemplates[0] : undefined;
-
-	// Try to find the active tool definition from eligible tools (so we can show args status).
-	const activeWebSearchDef = useMemo(() => {
-		if (!activeWebSearch) return undefined;
-		return eligibleWebSearchTools.find(
-			t =>
-				t.bundleID === activeWebSearch.bundleID &&
-				t.toolSlug === activeWebSearch.toolSlug &&
-				t.toolVersion === activeWebSearch.toolVersion
-		);
-	}, [eligibleWebSearchTools, activeWebSearch]);
-
-	const activeWebSearchArgsStatus = useMemo(() => {
-		const schema = activeWebSearchDef?.toolDefinition.userArgSchema;
-		if (!schema || !activeWebSearch) return undefined;
-		return computeToolUserArgsStatus(schema, activeWebSearch.userArgSchemaInstance);
-	}, [activeWebSearchDef, activeWebSearch]);
-
-	const webSearchDefinitionPending = Boolean(
-		hasConfiguredWebSearch &&
-		(toolsLoading || webSearchSelectionPendingNormalization || (activeWebSearch && !activeWebSearchDef))
-	);
-
-	const webSearchArgsBlocked =
-		webSearchDefinitionPending ||
-		Boolean(webSearchEnabled && activeWebSearchArgsStatus?.hasSchema && !activeWebSearchArgsStatus.isSatisfied);
-
-	useEffect(() => {
-		onWebSearchArgsBlockedChange?.(webSearchArgsBlocked);
-	}, [onWebSearchArgsBlockedChange, webSearchArgsBlocked]);
-
-	const attachedToolKeys = useMemo(() => {
-		return new Set(toolEntries.map(n => toolIdentityKey(n.bundleID, n.bundleSlug, n.toolSlug, n.toolVersion)));
-	}, [toolEntries]);
-
-	const availableTools = useMemo<ToolListItem[]>(() => {
-		if (!toolMenuOpen || toolsLoading) return [];
-		const providerSDKType = currentProviderSDKType.toString();
-
-		return toolData.filter(it => {
-			// Web search is a specially handled tool
-			if (it.toolDefinition.llmToolType === ToolStoreChoiceType.WebSearch) return false;
-
-			// If we know the provider's SDK type, restrict SDK tools to matching ones.
-			if (it.toolDefinition.type === ToolImplType.SDK && it.toolDefinition.sdkImpl) {
-				const sdkType = it.toolDefinition.sdkImpl.sdkType;
-				if (!sdkType) return false;
-				return sdkType === providerSDKType;
-			}
-
-			// Non-SDK tools (Go/HTTP/etc.) are always shown.
-			return true;
-		});
-	}, [currentProviderSDKType, toolData, toolMenuOpen, toolsLoading]);
 
 	const closeTemplateMenu = () => {
 		templateMenuState.hide();
@@ -367,14 +255,6 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 		}
 	};
 
-	const handleAttachToolPick = (item: ToolListItem) => {
-		onAttachTool(item, getAutoExecForTool(item));
-	};
-
-	const handleDetachToolPick = (key: string) => {
-		onDetachToolByKey(key);
-	};
-
 	const handleAttachmentPickFiles = async () => {
 		await onAttachFiles();
 		closeAttachmentMenu();
@@ -389,31 +269,6 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 		onOpenAttachmentUrlModal?.();
 		closeAttachmentMenu();
 		setIsUrlModalOpen(true);
-	};
-
-	const handleWebSearchEnabled = (enabled: boolean) => {
-		if (!enabled) {
-			setWebSearchTemplates([]);
-			return;
-		}
-
-		if (compatibleWebSearchTemplates.length > 0 || eligibleWebSearchTools.length === 0) return;
-
-		const first = eligibleWebSearchTools[0];
-		setWebSearchTemplates([webSearchTemplateFromToolListItem(first)]);
-	};
-
-	const handleWebSearchToolSelected = (tool: ToolListItem) => {
-		// Treat selection as "make this tool active", but preserve any other
-		// configured web-search tools (if present) by moving it to the front.
-		setWebSearchTemplates((prev: WebSearchChoiceTemplate[]) => {
-			const tmpl = webSearchTemplateFromToolListItem(tool);
-			const key = webSearchIdentityKey(tmpl);
-			const rest = prev.filter(
-				(p: { bundleID: string; toolSlug: string; toolVersion: string }) => webSearchIdentityKey(p) !== key
-			);
-			return [tmpl, ...rest];
-		});
 	};
 
 	return (
@@ -485,34 +340,30 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 
 					<SystemPromptSection systemPrompt={systemPrompt} isInputLocked={isInputLocked} />
 
-					<PickerButton
-						label="Tools"
-						icon={<FiTool size={16} />}
-						buttonRef={toolButtonRef}
-						menuState={toolMenuState}
-						shortcut={shortcutLabels.tools}
-						disabled={isInputLocked}
-					/>
-
-					<ToolDropdown
+					<ToolsBottomBarChip
 						store={toolMenuState}
-						open={toolMenuOpen}
-						loading={toolsLoading}
-						tools={availableTools}
-						attachedToolKeys={attachedToolKeys}
-						getAutoExecForTool={getAutoExecForTool}
-						onAutoExecuteChange={(item, key, isAttached, next) => {
-							if (isAttached) {
-								onSetAttachedToolAutoExecute(key, next);
-								return;
-							}
-							setToolAutoExecOverrides(prev => ({ ...prev, [key]: next }));
-						}}
-						onAttachTool={handleAttachToolPick}
-						onDetachTool={handleDetachToolPick}
+						buttonRef={toolButtonRef}
+						shortcut={shortcutLabels.tools}
+						currentProviderSDKType={currentProviderSDKType}
+						attachedToolEntries={attachedToolEntries}
+						conversationToolsState={conversationToolsState}
+						setConversationToolsState={setConversationToolsState}
+						onAttachTool={onAttachTool}
+						onDetachToolByKey={onDetachToolByKey}
+						onSetAttachedToolAutoExecute={onSetAttachedToolAutoExecute}
+						onRemoveAttachedTool={onRemoveAttachedTool}
+						onRemoveAllAttachedTools={onRemoveAllAttachedTools}
+						onEditAttachedToolOptions={onEditAttachedToolOptions}
+						onOpenAttachedToolDetails={onOpenAttachedToolDetails}
+						onOpenConversationToolDetails={onOpenConversationToolDetails}
+						webSearchTemplates={webSearchTemplates}
+						setWebSearchTemplates={setWebSearchTemplates}
+						onWebSearchArgsBlockedChange={onWebSearchArgsBlockedChange}
+						toolArgsEventTarget={toolArgsEventTarget}
+						isInputLocked={isInputLocked}
 					/>
 
-					<SkillDropDown
+					<SkillsBottomBarChip
 						allSkills={allSkills}
 						loading={skillsLoading}
 						enabledSkillRefs={enabledSkillRefs}
@@ -522,32 +373,11 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						onDisableAll={onDisableAllSkills}
 						isInputLocked={isInputLocked}
 					/>
-					<MCPBottomBarChip state={mcpState} isInputLocked={isInputLocked} />
-
-					<WebSearchBottomBarChip
-						eligibleTools={eligibleWebSearchTools}
-						enabled={webSearchEnabled}
-						selectedCount={compatibleWebSearchTemplates.length}
-						selected={
-							activeWebSearch
-								? {
-										bundleID: activeWebSearch.bundleID,
-										toolSlug: activeWebSearch.toolSlug,
-										toolVersion: activeWebSearch.toolVersion,
-									}
-								: undefined
-						}
-						canEdit={!!activeWebSearchDef?.toolDefinition.userArgSchema}
-						argsStatus={activeWebSearchArgsStatus}
-						onEnabledChange={handleWebSearchEnabled}
-						onSelectTool={handleWebSearchToolSelected}
+					<MCPBottomBarChip
+						state={mcpState}
 						isInputLocked={isInputLocked}
-						onEditOptions={() => {
-							// Open the unified tool-args modal targeting "web search".
-							// (ToolArgsModalHost should apply this to the active web-search tool.)
-							if (!activeWebSearch) return;
-							dispatchOpenToolArgs({ kind: 'webSearch' }, toolArgsEventTarget);
-						}}
+						appContextUpdateCount={mcpAppContextUpdateCount}
+						onClearAppContextUpdates={onClearMCPAppContextUpdates}
 					/>
 				</div>
 

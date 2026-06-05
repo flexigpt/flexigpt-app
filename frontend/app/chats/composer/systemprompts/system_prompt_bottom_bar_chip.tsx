@@ -1,6 +1,6 @@
 import { type SyntheticEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { FiCheck, FiGitBranch, FiPlus, FiX } from 'react-icons/fi';
+import { FiCheck, FiFileText, FiGitBranch, FiPlus, FiX } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, Tooltip, useMenuStore, useStoreState, useTooltipStore } from '@ariakit/react';
 
@@ -10,8 +10,8 @@ import { type PromptBundle, PromptRoleEnum } from '@/spec/prompt';
 import { DEFAULT_SEMVER } from '@/lib/version_utils';
 
 import {
-	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
+	actionTriggerChipSurfaceClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
@@ -21,8 +21,8 @@ import { SystemPromptAddModal } from '@/chats/composer/systemprompts/system_prom
 import { countEnabledSystemPromptSources } from '@/prompts/lib/system_prompt_utils';
 import type { SystemPromptDraft, SystemPromptItem } from '@/prompts/lib/use_system_prompts';
 
-/** Minimum interval between automatic refresh calls (ms). */
 const REFRESH_STALE_MS = 60_000;
+
 const PROMPT_SORT_COLLATOR = new Intl.Collator(undefined, {
 	numeric: true,
 	sensitivity: 'base',
@@ -39,7 +39,7 @@ type SystemPromptBundleGroup = {
 	prompts: SystemPromptItem[];
 };
 
-type SystemPromptDropdownProps = {
+type SystemPromptBottomBarChipProps = {
 	prompts: SystemPromptItem[];
 	bundles: PromptBundle[];
 	selectedPromptKeys: string[];
@@ -83,7 +83,7 @@ function stopMenuBubbleEvent(event: SyntheticEvent) {
 	event.stopPropagation();
 }
 
-export function SystemPromptDropdown({
+export function SystemPromptBottomBarChip({
 	prompts,
 	bundles,
 	selectedPromptKeys,
@@ -99,10 +99,11 @@ export function SystemPromptDropdown({
 	onRefreshPrompts,
 	getExistingVersions,
 	isInputLocked = false,
-}: SystemPromptDropdownProps) {
+}: SystemPromptBottomBarChipProps) {
 	const [modalMode, setModalMode] = useState<'add' | 'fork'>('add');
 	const [isComposerOpen, setIsComposerOpen] = useState(false);
 	const [composerInitialDraft, setComposerInitialDraft] = useState<SystemPromptDraft | null>(null);
+
 	const hasModelDefaultPrompt = modelDefaultPrompt.trim().length > 0;
 	const hasWritableCustomBundle = useMemo(
 		() => bundles.some(bundle => !bundle.isBuiltIn && bundle.isEnabled),
@@ -123,11 +124,11 @@ export function SystemPromptDropdown({
 	);
 
 	const menu = useMenuStore({ placement: 'top', focusLoop: true });
+	const promptTooltip = useTooltipStore({ placement: 'right-end' });
 
 	const lastRefreshTsRef = useRef(0);
 	const open = useStoreState(menu, 'open');
 	const selectedKeySet = useMemo(() => new Set(selectedPromptKeys), [selectedPromptKeys]);
-	const promptTooltip = useTooltipStore({ placement: 'right-end' });
 
 	const groupedPrompts = useMemo(() => {
 		const bundlesByID = new Map(bundles.map(bundle => [bundle.id, bundle]));
@@ -181,6 +182,7 @@ export function SystemPromptDropdown({
 
 	const tooltipAnchorEl = useStoreState(promptTooltip, 'anchorElement');
 	const currentPromptText = tooltipAnchorEl?.dataset.prompt ?? '';
+
 	const triggerTooltip =
 		activeSourceCount > 0 ? `System prompt sources enabled: ${activeSourceCount}` : 'System prompt disabled';
 
@@ -210,13 +212,12 @@ export function SystemPromptDropdown({
 		menu.hide();
 	}, [hidePromptTooltip, isInputLocked, menu]);
 
-	// Refresh prompts on open, but at most once per REFRESH_STALE_MS to avoid
-	// repeated backend fetches that make the menu feel sluggish.
 	const handleMenuOpen = useCallback(() => {
 		if (isInputLocked) return;
 
 		const now = Date.now();
 		if (now - lastRefreshTsRef.current < REFRESH_STALE_MS) return;
+
 		lastRefreshTsRef.current = now;
 		void onRefreshPrompts().catch((refreshError: unknown) => {
 			console.error('Failed to refresh system prompts:', refreshError);
@@ -268,29 +269,58 @@ export function SystemPromptDropdown({
 		[bundles, isInputLocked, preferredBundleID]
 	);
 
+	const chipToneClasses =
+		activeSourceCount > 0
+			? 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
+			: open
+				? 'border-base-300 bg-base-300/60'
+				: 'border-transparent';
+
 	return (
-		<div className="relative shrink-0">
-			<HoverTip content={triggerTooltip} placement="top">
-				<MenuButton
-					store={menu}
-					className={`${actionTriggerChipButtonClasses} ${open ? 'bg-base-300/80' : ''} ${
-						isInputLocked ? 'opacity-60' : ''
-					}`}
-					onClick={handleMenuOpen}
-					disabled={isInputLocked}
+		<div className="relative shrink-0" data-bottom-bar-system-prompt>
+			<HoverTip content={triggerTooltip} placement="top" wrapperElement="div" wrapperClassName="inline-flex max-w-full">
+				<div
+					className={`${actionTriggerChipSurfaceClasses} border ${chipToneClasses} ${isInputLocked ? 'opacity-60' : ''}`}
 				>
-					<ActionTriggerChipContent
-						label="System prompt"
-						count={
-							activeSourceCount > 0 ? (
-								<span className="badge badge-success badge-xs bg-success/30">{activeSourceCount}</span>
-							) : undefined
-						}
-						suffix={activeSourceCount > 0 ? <FiCheck size={14} className="shrink-0" /> : undefined}
-						open={open}
-						labelClassName="max-w-28 truncate text-xs font-normal"
-					/>
-				</MenuButton>
+					<MenuButton
+						store={menu}
+						className="btn btn-xs text-neutral-custom h-auto min-h-0 flex-1 gap-0 border-none bg-transparent px-0 py-0 text-left font-normal shadow-none hover:bg-transparent"
+						onClick={handleMenuOpen}
+						disabled={isInputLocked}
+						aria-label="Choose system prompt sources"
+					>
+						<ActionTriggerChipContent
+							icon={<FiFileText size={14} />}
+							label="System prompt"
+							count={
+								activeSourceCount > 0 ? (
+									<span className="badge badge-success badge-xs bg-success/30">{activeSourceCount}</span>
+								) : undefined
+							}
+							suffix={activeSourceCount > 0 ? <FiCheck size={14} className="shrink-0" /> : undefined}
+							open={open}
+							labelClassName="max-w-28 truncate text-xs font-normal"
+						/>
+					</MenuButton>
+
+					{activeSourceCount > 0 ? (
+						<button
+							type="button"
+							className="btn btn-ghost btn-xs text-neutral-custom hover:bg-base-300/80 ml-1 h-auto min-h-0 shrink-0 px-1 py-0 shadow-none"
+							onClick={event => {
+								stopMenuToggleEvent(event);
+								hidePromptTooltip();
+								onClearSelected();
+								menu.hide();
+							}}
+							aria-label="Clear system prompt sources"
+							title="Clear system prompt sources"
+							disabled={isInputLocked}
+						>
+							<FiX size={12} />
+						</button>
+					) : null}
+				</div>
 			</HoverTip>
 
 			<Menu
@@ -312,8 +342,7 @@ export function SystemPromptDropdown({
 					{hasModelDefaultPrompt
 						? 'Active sources are concatenated in this order: model default, then selected saved prompts.'
 						: ''}
-					Bundles cannot be created here; use the Prompt Bundles page. <br />
-					<br />
+					Bundles cannot be created here; use the Prompt Bundles page.
 				</div>
 
 				{hasModelDefaultPrompt ? (
@@ -362,6 +391,7 @@ export function SystemPromptDropdown({
 				) : null}
 
 				<div className="mb-1 px-1 text-xs font-medium opacity-70">Saved prompts</div>
+
 				{loading ? (
 					<div className="m-0 flex cursor-default items-center justify-between rounded-md px-2 py-2 text-xs opacity-70">
 						<span>Loading system prompts…</span>
@@ -500,6 +530,7 @@ export function SystemPromptDropdown({
 							<FiX size={14} className="mr-1" /> Clear all
 						</button>
 					</div>
+
 					{!hasWritableCustomBundle ? (
 						<div className="text-warning px-1 pt-1 text-xs">
 							No enabled custom bundle is available for Add/Fork. Create or enable one in Prompt Bundles.

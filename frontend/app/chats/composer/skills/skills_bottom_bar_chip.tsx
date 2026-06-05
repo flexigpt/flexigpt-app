@@ -8,7 +8,7 @@ import {
 	useRef,
 } from 'react';
 
-import { FiX, FiZap } from 'react-icons/fi';
+import { FiCheck, FiX, FiZap } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
@@ -42,8 +42,7 @@ function stop(e: SyntheticEvent) {
 }
 
 function skillListItemKey(item: SkillListItem): string {
-	const ref = skillRefFromListItem(item);
-	return skillRefKey(ref);
+	return skillRefKey(skillRefFromListItem(item));
 }
 
 function getSkillDisplayLabel(item: SkillListItem): string {
@@ -91,6 +90,7 @@ function BundleCheckbox({
 	isInputLocked: boolean;
 }) {
 	const ref = useRef<HTMLInputElement | null>(null);
+
 	useEffect(() => {
 		if (!ref.current) return;
 		ref.current.indeterminate = indeterminate;
@@ -114,7 +114,7 @@ function BundleCheckbox({
 	);
 }
 
-export function SkillDropDown({
+export function SkillsBottomBarChip({
 	allSkills,
 	loading,
 	enabledSkillRefs,
@@ -150,6 +150,7 @@ export function SkillDropDown({
 
 	const enabledCount = useMemo(() => {
 		if (loading) return enabledKeySet.size;
+
 		let count = 0;
 		for (const key of enabledKeySet) {
 			if (availableSkillKeySet.has(key)) count += 1;
@@ -159,21 +160,25 @@ export function SkillDropDown({
 
 	const activeCount = useMemo(() => {
 		if (loading) return activeKeySet.size;
+
 		let count = 0;
 		for (const key of activeKeySet) {
 			if (availableSkillKeySet.has(key)) count += 1;
 		}
 		return count;
 	}, [activeKeySet, availableSkillKeySet, loading]);
+
 	const totalCount = allSkills.length;
 	const isEnabled = enabledCount > 0;
 
 	const groups: BundleGroup[] = useMemo(() => {
 		const map = new Map<string, BundleGroup>();
+
 		for (const item of [...(allSkills ?? [])].sort(compareSkillListItems)) {
 			const id = item.bundleID || 'unknown-bundle';
 			const slug = item.bundleSlug || id;
 			const existing = map.get(id);
+
 			if (existing) {
 				existing.skills.push(item);
 			} else {
@@ -184,6 +189,7 @@ export function SkillDropDown({
 				});
 			}
 		}
+
 		return Array.from(map.values())
 			.map(group => ({
 				...group,
@@ -195,16 +201,20 @@ export function SkillDropDown({
 	const setSkillEnabled = useCallback(
 		(ref: SkillRef, enabled: boolean) => {
 			const k = skillRefKey(ref);
+
 			setEnabledSkillRefs(prev => {
 				const byKey = new Map<string, SkillRef>();
+
 				for (const r of prev ?? []) {
 					byKey.set(skillRefKey(r), r);
 				}
+
 				if (enabled) {
 					byKey.set(k, ref);
 				} else {
 					byKey.delete(k);
 				}
+
 				return Array.from(byKey.values());
 			});
 		},
@@ -215,8 +225,7 @@ export function SkillDropDown({
 		(item: SkillListItem) => {
 			const ref = skillRefFromListItem(item);
 			const k = skillRefKey(ref);
-			const next = !enabledKeySet.has(k);
-			setSkillEnabled(ref, next);
+			setSkillEnabled(ref, !enabledKeySet.has(k));
 		},
 		[enabledKeySet, setSkillEnabled]
 	);
@@ -228,9 +237,11 @@ export function SkillDropDown({
 
 			setEnabledSkillRefs(prev => {
 				const byKey = new Map<string, SkillRef>();
+
 				for (const r of prev ?? []) {
 					byKey.set(skillRefKey(r), r);
 				}
+
 				if (enabled) {
 					for (const r of refs) {
 						byKey.set(skillRefKey(r), r);
@@ -251,11 +262,18 @@ export function SkillDropDown({
 		const lines: string[] = [];
 		lines.push('Skills');
 		lines.push(isEnabled ? `Status: Enabled (${enabledCount})` : 'Status: Disabled');
-		lines.push(`Active: ${activeCount}`);
+		lines.push(`Active now: ${activeCount}`);
 		if (totalCount > 0) lines.push(`Available: ${totalCount}`);
 		if (loading && totalCount === 0) lines.push('Loading available skills…');
 		return lines.join('\n');
 	}, [activeCount, enabledCount, isEnabled, loading, totalCount]);
+
+	const chipToneClasses =
+		enabledCount > 0
+			? 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
+			: open
+				? 'border-base-300 bg-base-300/60'
+				: 'border-transparent';
 
 	const renderSkillItem = (item: SkillListItem) => {
 		const ref = skillRefFromListItem(item);
@@ -308,28 +326,36 @@ export function SkillDropDown({
 	};
 
 	return (
-		<div className="relative" data-bottom-bar-skills>
-			<HoverTip content={title} placement="top">
-				<MenuButton
-					store={menu}
-					className={`${actionTriggerChipSurfaceClasses} border ${
-						enabledCount > 0
-							? 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
-							: open
-								? 'border-base-300 bg-base-300/60'
-								: 'border-transparent'
-					} ${isInputLocked ? 'opacity-60' : ''}`}
-					aria-label="Choose skills"
-					disabled={isInputLocked}
+		<div className="relative shrink-0" data-bottom-bar-skills>
+			<HoverTip content={title} placement="top" wrapperElement="div" wrapperClassName="inline-flex max-w-full">
+				<div
+					className={`${actionTriggerChipSurfaceClasses} border ${chipToneClasses} ${isInputLocked ? 'opacity-60' : ''}`}
 				>
-					<ActionTriggerChipContent
-						icon={<FiZap size={14} />}
-						label="Skills"
-						count={
-							isEnabled ? <span className="badge badge-success badge-xs bg-success/30">{enabledCount}</span> : undefined
-						}
-						open={open}
-					/>
+					<MenuButton
+						store={menu}
+						className="btn btn-xs text-neutral-custom h-auto min-h-0 flex-1 gap-0 border-none bg-transparent px-0 py-0 text-left font-normal shadow-none hover:bg-transparent"
+						aria-label="Choose skills"
+						disabled={isInputLocked}
+					>
+						<ActionTriggerChipContent
+							icon={<FiZap size={14} />}
+							label="Skills"
+							count={
+								isEnabled ? (
+									<span className="badge badge-success badge-xs bg-success/30">{enabledCount}</span>
+								) : undefined
+							}
+							suffix={
+								activeCount > 0 ? (
+									<span className="badge badge-info badge-xs bg-info/30">Active {activeCount}</span>
+								) : isEnabled ? (
+									<FiCheck size={14} className="shrink-0" />
+								) : undefined
+							}
+							open={open}
+						/>
+					</MenuButton>
+
 					{enabledCount > 0 ? (
 						<button
 							type="button"
@@ -339,14 +365,14 @@ export function SkillDropDown({
 								onDisableAll();
 								menu.hide();
 							}}
-							aria-label="Clear All Skills"
-							title="Clear All Skills"
+							aria-label="Clear all skills"
+							title="Clear all skills"
 							disabled={isInputLocked}
 						>
 							<FiX size={12} />
 						</button>
 					) : null}
-				</MenuButton>
+				</div>
 			</HoverTip>
 
 			<Menu store={menu} gutter={8} overflowPadding={8} className={actionTriggerMenuWideClasses} autoFocusOnShow portal>
@@ -402,8 +428,7 @@ export function SkillDropDown({
 											className="data-active-item:bg-base-200 flex items-center gap-2 rounded-xl px-2 py-1 outline-none"
 											onClick={() => {
 												if (isInputLocked) return;
-												const next = !(bundleEnabled === bundleTotal);
-												setBundleEnabled(group, next);
+												setBundleEnabled(group, bundleEnabled !== bundleTotal);
 											}}
 										>
 											<BundleCheckbox
@@ -463,6 +488,7 @@ export function SkillDropDown({
 								onClick={e => {
 									stop(e);
 									onDisableAll();
+									menu.hide();
 								}}
 								title="Clear all selected skills"
 							>
