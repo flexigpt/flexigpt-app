@@ -14,8 +14,8 @@ import { ToolOutputKind } from '@/spec/tool';
 import { mcpAPI, skillStoreAPI, toolRuntimeAPI } from '@/apis/baseapi';
 
 import type { RequestMCPApproval } from '@/chats/composer/mcp/use_mcp_approval';
-import { isRunnableComposerToolCall } from '@/chats/composer/toolruntime/tool_runtime_utils';
 import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
+import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
 import { formatToolOutputSummary } from '@/tools/lib/tool_output_utils';
 
 const TOOL_CALL_TIMEOUT_MS = 600_000;

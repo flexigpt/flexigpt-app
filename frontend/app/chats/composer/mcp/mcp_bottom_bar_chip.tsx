@@ -347,9 +347,8 @@ function ServerRow({
 	const isReady = status === MCPServerStatus.MCPServerStatusReady;
 	const selectable = option.bundle.isEnabled && option.server.enabled;
 
-	const authPending =
-		option.authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending &&
-		Boolean(option.authHealth.authorizationURL);
+	const authActionable = Boolean(option.authHealth?.authorizationURL);
+	const authPending = option.authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending;
 
 	return (
 		<div className="border-base-300 mb-2 rounded-xl border p-2">
@@ -379,7 +378,10 @@ function ServerRow({
 						<span className={`badge badge-xs rounded-lg ${getMCPStatusBadgeClass(status)}`}>
 							{getMCPStatusLabel(status)}
 						</span>
-						<span className={`badge badge-xs rounded-lg ${getMCPAuthHealthBadgeClass(option.authHealth?.state)}`}>
+						<span
+							className={`badge badge-xs rounded-lg ${getMCPAuthHealthBadgeClass(option.authHealth?.state)}`}
+							title={option.authHealth?.lastError || getMCPAuthHealthLabel(option.authHealth?.state)}
+						>
 							{getMCPAuthHealthLabel(option.authHealth?.state)}
 						</span>
 					</div>
@@ -395,7 +397,7 @@ function ServerRow({
 				</div>
 
 				<div className="flex shrink-0 items-center gap-1">
-					{authPending ? (
+					{authActionable ? (
 						<button
 							type="button"
 							className="btn btn-ghost btn-xs px-1"
@@ -587,6 +589,8 @@ export function MCPBottomBarChip({
 	const enabledCount = state.selectedServerCount;
 	const title = useMemo(() => {
 		const lines = ['MCP'];
+		lines.push('Choose MCP servers, tools, resources, and prompts for the next message.');
+
 		lines.push(
 			enabledCount > 0 ? `Status: Enabled (${enabledCount} server${enabledCount === 1 ? '' : 's'})` : 'Status: Disabled'
 		);
@@ -604,12 +608,18 @@ export function MCPBottomBarChip({
 		state.selectedResourceCount,
 		state.selectedToolCount,
 	]);
-
+	useEffect(() => {
+		if (isInputLocked) menu.hide();
+	}, [isInputLocked, menu]);
 	return (
 		<HoverTip content={title} placement="top" wrapperElement="div" wrapperClassName="inline-flex max-w-full">
 			<div
 				className={`${actionTriggerChipSurfaceClasses} border ${
-					enabledCount > 0 ? 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15' : 'border-transparent'
+					enabledCount > 0
+						? 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
+						: open
+							? 'border-base-300 bg-base-300/60'
+							: 'border-transparent'
 				} ${isInputLocked ? 'opacity-60' : ''}`}
 				data-bottom-bar-mcp
 			>
@@ -635,6 +645,7 @@ export function MCPBottomBarChip({
 							) : undefined
 						}
 						open={open}
+						labelClassName="max-w-20 truncate text-xs font-normal"
 					/>
 				</MenuButton>
 
@@ -649,6 +660,7 @@ export function MCPBottomBarChip({
 							menu.hide();
 						}}
 						aria-label="Clear MCP context"
+						title="Clear MCP context"
 						disabled={isInputLocked}
 					>
 						<FiX size={12} />

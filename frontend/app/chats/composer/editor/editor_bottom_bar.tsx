@@ -465,8 +465,6 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						</MenuItem>
 					</Menu>
 
-					<SystemPromptSection systemPrompt={systemPrompt} isInputLocked={isInputLocked} />
-
 					<PickerButton
 						label="Prompts"
 						icon={<FiFilePlus size={16} />}
@@ -484,6 +482,8 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 							void handleTemplatePick(item);
 						}}
 					/>
+
+					<SystemPromptSection systemPrompt={systemPrompt} isInputLocked={isInputLocked} />
 
 					<PickerButton
 						label="Tools"

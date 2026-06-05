@@ -1,7 +1,8 @@
 import type { UIToolCall } from '@/spec/inference';
 import { MCPExecutionMode } from '@/spec/mcp';
 import { SKILLS_AUTOEXEC_TOOL_CHOICES } from '@/spec/skill';
-import { ToolStoreChoiceType } from '@/spec/tool';
+
+import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
 
 type AutoSubmitTracker = {
 	observedCallKeys: Set<string>;
@@ -24,15 +25,11 @@ export function getToolAutoSubmitKey(value: { id: string; callID: string }): str
 export function isAutoSubmitEligibleToolCall(toolCall: UIToolCall): boolean {
 	return (
 		!toolCall.suppressAutoExecute &&
-		(toolCall.type === ToolStoreChoiceType.Function || toolCall.type === ToolStoreChoiceType.Custom) &&
+		isRunnableComposerToolCall(toolCall) &&
 		(Boolean(toolCall.toolStoreChoice?.autoExecute) ||
 			toolCall.mcpToolSelection?.executionMode === MCPExecutionMode.MCPExecutionModeAuto ||
 			SKILLS_AUTOEXEC_TOOL_CHOICES.has(toolCall.choiceID))
 	);
-}
-
-export function isRunnableComposerToolCall(toolCall: UIToolCall): boolean {
-	return toolCall.type === ToolStoreChoiceType.Function || toolCall.type === ToolStoreChoiceType.Custom;
 }
 
 export function getPendingRunnableToolCalls(toolCalls: UIToolCall[]): UIToolCall[] {

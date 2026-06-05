@@ -8,15 +8,15 @@ import {
 	useRef,
 } from 'react';
 
-import { FiCheck, FiZap } from 'react-icons/fi';
+import { FiX, FiZap } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import type { SkillListItem, SkillRef } from '@/spec/skill';
 
 import {
-	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
+	actionTriggerChipSurfaceClasses,
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
@@ -312,7 +312,13 @@ export function SkillDropDown({
 			<HoverTip content={title} placement="top">
 				<MenuButton
 					store={menu}
-					className={`${actionTriggerChipButtonClasses} ${open ? 'bg-base-300/80' : ''} ${isInputLocked ? 'opacity-60' : ''}`}
+					className={`${actionTriggerChipSurfaceClasses} border ${
+						enabledCount > 0
+							? 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
+							: open
+								? 'border-base-300 bg-base-300/60'
+								: 'border-transparent'
+					} ${isInputLocked ? 'opacity-60' : ''}`}
 					aria-label="Choose skills"
 					disabled={isInputLocked}
 				>
@@ -322,9 +328,24 @@ export function SkillDropDown({
 						count={
 							isEnabled ? <span className="badge badge-success badge-xs bg-success/30">{enabledCount}</span> : undefined
 						}
-						suffix={isEnabled ? <FiCheck size={14} className="shrink-0" /> : undefined}
 						open={open}
 					/>
+					{enabledCount > 0 ? (
+						<button
+							type="button"
+							className="btn btn-ghost btn-xs text-neutral-custom hover:bg-base-300/80 ml-1 h-auto min-h-0 shrink-0 px-1 py-0 shadow-none"
+							onClick={event => {
+								stop(event);
+								onDisableAll();
+								menu.hide();
+							}}
+							aria-label="Clear All Skills"
+							title="Clear All Skills"
+							disabled={isInputLocked}
+						>
+							<FiX size={12} />
+						</button>
+					) : null}
 				</MenuButton>
 			</HoverTip>
 

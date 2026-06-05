@@ -313,7 +313,10 @@ export function MCPBundleCard({
 												<span className={`badge badge-xs rounded-xl ${getMCPStatusBadgeClass(status)}`}>
 													{getMCPStatusLabel(status)}
 												</span>
-												<span className={`badge badge-xs rounded-xl ${getMCPAuthHealthBadgeClass(authHealth?.state)}`}>
+												<span
+													className={`badge badge-xs rounded-xl ${getMCPAuthHealthBadgeClass(authHealth?.state)}`}
+													title={authHealth?.lastError || getMCPAuthHealthLabel(authHealth?.state)}
+												>
 													{getMCPAuthHealthLabel(authHealth?.state)}
 												</span>
 											</div>
@@ -358,18 +361,21 @@ export function MCPBundleCard({
 													</div>
 												)}
 
-												{authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending &&
-													authHealth.authorizationURL && (
-														<div className="flex flex-wrap gap-1">
+												{(authActionable ||
+													authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending) && (
+													<div className="flex flex-wrap gap-1">
+														{authActionable && (
 															<button
 																className="btn btn-xs btn-ghost rounded-xl"
 																onClick={() => {
-																	onOpenURL(authHealth.authorizationURL ?? '');
+																	onOpenURL(authHealth?.authorizationURL ?? '');
 																}}
 																title="Open authorization URL"
 															>
 																<FiExternalLink size={12} />
 															</button>
+														)}
+														{authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending && (
 															<button
 																className="btn btn-xs btn-ghost rounded-xl"
 																onClick={() => {
@@ -383,8 +389,9 @@ export function MCPBundleCard({
 															>
 																<FiX size={12} />
 															</button>
-														</div>
-													)}
+														)}
+													</div>
+												)}
 												{authHealth?.lastError && (
 													<div className="text-error truncate text-xs" title={authHealth.lastError}>
 														{authHealth.lastError}

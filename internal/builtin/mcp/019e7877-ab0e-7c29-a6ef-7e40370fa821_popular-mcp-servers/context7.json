@@ -7,8 +7,8 @@
 	"transport": "streamableHttp",
 	"isBuiltIn": true,
 	"streamableHttp": {
-		"url": "https://mcp.context7.com/mcp",
-		"authMode": "none",
+		"url": "https://mcp.context7.com/mcp/oauth",
+		"authMode": "oauth",
 		"timeoutMS": 30000
 	},
 	"availability": "manual",

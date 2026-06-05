@@ -2,9 +2,9 @@ import { FiAlertTriangle, FiCode, FiPlay, FiTerminal, FiTool, FiX } from 'react-
 
 import { type UIToolCall, type UIToolOutput } from '@/spec/inference';
 import { MCPExecutionMode } from '@/spec/mcp';
-import { ToolStoreChoiceType } from '@/spec/tool';
 
 import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
+import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
 import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';
 
 type OrderedToolChipItem =
@@ -163,7 +163,7 @@ function ToolCallComposerChipView({ toolCall, isBusy, onRun, onDiscard, onDetail
 	const isPending = toolCall.status === 'pending';
 	const isFailed = toolCall.status === 'failed';
 
-	const isRunnableType = toolCall.type === ToolStoreChoiceType.Function || toolCall.type === ToolStoreChoiceType.Custom;
+	const isRunnableType = isRunnableComposerToolCall(toolCall);
 	const isAutoExecute =
 		Boolean(toolCall.toolStoreChoice?.autoExecute) ||
 		toolCall.mcpToolSelection?.executionMode === MCPExecutionMode.MCPExecutionModeAuto;

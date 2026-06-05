@@ -1,4 +1,4 @@
-import { FiChevronUp, FiServer, FiX } from 'react-icons/fi';
+import { FiChevronRight, FiChevronUp, FiServer, FiX } from 'react-icons/fi';
 
 import { Menu, MenuButton, useMenuStore } from '@ariakit/react';
 
@@ -24,7 +24,7 @@ export function MCPComposerChips({ state, isBusy = false }: { state: UseComposer
 
 	return (
 		<div
-			className="bg-secondary/10 text-base-content border-secondary/40 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
+			className="bg-secondary/10 text-base-content border-secondary/40 flex min-h-6 shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
 			title={`MCP\n${count} selected server${count === 1 ? '' : 's'}`}
 			data-attachment-chip="mcp-context"
 		>
@@ -34,7 +34,7 @@ export function MCPComposerChips({ state, isBusy = false }: { state: UseComposer
 
 			<MenuButton
 				store={menu}
-				className="btn btn-ghost btn-xs px-0 py-0 shadow-none"
+				className="btn btn-ghost btn-xs text-error h-5 min-h-0 shrink-0 px-0 py-0 shadow-none"
 				aria-label="Show MCP context"
 				title="Show MCP context"
 			>
@@ -43,7 +43,7 @@ export function MCPComposerChips({ state, isBusy = false }: { state: UseComposer
 
 			<button
 				type="button"
-				className="btn btn-ghost btn-xs text-error shrink-0 px-0 py-0 shadow-none"
+				className="btn btn-ghost btn-xs text-error h-5 min-h-0 shrink-0 px-0 py-0 shadow-none"
 				onClick={() => {
 					state.clear();
 					menu.hide();
@@ -59,6 +59,7 @@ export function MCPComposerChips({ state, isBusy = false }: { state: UseComposer
 				store={menu}
 				gutter={8}
 				overflowPadding={8}
+				portal
 				className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-72 max-w-lg min-w-72 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
 				autoFocusOnShow
 			>
@@ -103,7 +104,7 @@ export function MCPMessageContextChip({ context }: { context?: MCPConversationCo
 
 	return (
 		<div
-			className="bg-secondary/10 text-base-content border-secondary/40 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
+			className="bg-secondary/10 text-base-content border-secondary/40 flex min-h-6 shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
 			title={`MCP\n${count} server${count === 1 ? '' : 's'}`}
 			data-message-chip="mcp-context"
 		>
@@ -113,17 +114,18 @@ export function MCPMessageContextChip({ context }: { context?: MCPConversationCo
 
 			<MenuButton
 				store={menu}
-				className="btn btn-ghost btn-xs px-0 py-0 shadow-none"
-				aria-label="Show MCP context"
-				title="Show MCP context"
+				className="btn btn-ghost btn-xs h-5 min-h-0 px-0 py-0 shadow-none"
+				aria-label="Show MCP context for this message"
+				title="Show MCP context for this message"
 			>
-				<FiChevronUp size={14} />
+				<FiChevronRight size={14} />
 			</MenuButton>
 
 			<Menu
 				store={menu}
 				gutter={8}
 				overflowPadding={8}
+				portal
 				className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-72 max-w-lg min-w-72 overflow-y-auto border p-2 shadow-xl focus-visible:outline-none"
 				autoFocusOnShow
 			>

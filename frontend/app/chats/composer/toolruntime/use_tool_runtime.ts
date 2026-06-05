@@ -9,11 +9,9 @@ import { ensureMakeID, getUUIDv7 } from '@/lib/uuid_utils';
 
 import type { RequestMCPApproval } from '@/chats/composer/mcp/use_mcp_approval';
 import { executeComposerToolCall } from '@/chats/composer/toolruntime/execute_tool_call';
-import {
-	getPendingRunnableToolCalls,
-	isRunnableComposerToolCall,
-} from '@/chats/composer/toolruntime/tool_runtime_utils';
+import { getPendingRunnableToolCalls } from '@/chats/composer/toolruntime/tool_runtime_utils';
 import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
+import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
 
 export interface ComposerToolRuntimeState {
 	toolCalls: UIToolCall[];

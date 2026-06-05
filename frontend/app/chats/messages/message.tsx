@@ -99,13 +99,15 @@ export const ChatMessage = memo(function ChatMessage({
 			false);
 
 	const hasCitations = !isUser && (message.uiCitations?.length ?? 0) > 0;
+	const hasMCPContext = (message.mcpContext?.servers?.length ?? 0) > 0;
 
 	const hasAttachmentsBar =
 		(message.attachments?.length ?? 0) > 0 ||
 		(message.toolStoreChoices?.length ?? 0) > 0 ||
 		(message.mcpAppContextUpdates?.length ?? 0) > 0 ||
 		(message.uiToolCalls?.length ?? 0) > 0 ||
-		(message.uiToolOutputs?.length ?? 0) > 0;
+		(message.uiToolOutputs?.length ?? 0) > 0 ||
+		hasMCPContext;
 
 	// Detect MCP Apps in this message's tool outputs.
 	const mcpAppViews = useMemo(() => {

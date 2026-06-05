@@ -5,6 +5,7 @@ import { FiPlus } from 'react-icons/fi';
 import {
 	BaseMCPBundleID,
 	type MCPAuthHealth,
+	MCPAuthHealthState,
 	type MCPBundle,
 	MCPSecretKind,
 	type MCPServerConfig,
@@ -199,6 +200,35 @@ export default function MCPServersPage() {
 		// eslint-disable-next-line react-hooks/set-state-in-effect
 		void fetchAll();
 	}, [fetchAll]);
+
+	useEffect(() => {
+		const pendingServers = bundles.flatMap(bundleData =>
+			bundleData.servers
+				.filter(
+					server =>
+						bundleData.authHealthByServerID[server.id]?.state ===
+						MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending
+				)
+				.map(server => ({
+					bundleID: bundleData.bundle.id,
+					serverID: server.id,
+				}))
+		);
+
+		if (pendingServers.length === 0) return;
+
+		const timer = window.setInterval(() => {
+			void Promise.all(
+				pendingServers.map(({ bundleID, serverID }) =>
+					refreshServerRuntimeAndAuth(bundleID, serverID).catch(() => undefined)
+				)
+			);
+		}, 3000);
+
+		return () => {
+			window.clearInterval(timer);
+		};
+	}, [bundles, refreshServerRuntimeAndAuth]);
 
 	const handleToggleBundleEnabled = useCallback(
 		async (bundleID: string, enabled: boolean) => {

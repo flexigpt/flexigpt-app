@@ -6,8 +6,17 @@ import {
 	type ToolCall,
 	type UIToolCall,
 } from '@/spec/inference';
+import { ToolStoreChoiceType } from '@/spec/tool';
 
 import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';
+
+export function isRunnableComposerToolCall(toolCall: UIToolCall): boolean {
+	return (
+		toolCall.type === ToolStoreChoiceType.Function ||
+		toolCall.type === ToolStoreChoiceType.Custom ||
+		Boolean(toolCall.mcpToolSelection)
+	);
+}
 
 export function collectToolCallsFromInputs(
 	inputs: InputUnion[] | undefined,

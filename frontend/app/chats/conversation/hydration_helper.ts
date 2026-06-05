@@ -32,6 +32,7 @@ import { getUUIDv7 } from '@/lib/uuid_utils';
 import { uiAttachmentToConversation } from '@/chats/composer/attachments/attachment_editor_utils';
 import type { EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
 import { clampActiveSkillRefsToEnabled, normalizeSkillRefs } from '@/skills/lib/skill_identity_utils';
+import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
 import { mapToolOutputsToToolOutputItems } from '@/tools/lib/tool_output_utils';
 
 export function initConversation(title = 'New Conversation'): Conversation {
@@ -270,7 +271,7 @@ export function deriveHydratedLastAssistantToolCalls(conversation: Conversation)
 	if (!lastMessage || lastMessage.role !== RoleEnum.Assistant) return [];
 
 	return (lastMessage.uiToolCalls ?? [])
-		.filter(call => call.type === ToolStoreChoiceType.Function || call.type === ToolStoreChoiceType.Custom)
+		.filter(call => isRunnableComposerToolCall(call))
 		.map(call => ({ ...call, suppressAutoExecute: true }));
 }
 

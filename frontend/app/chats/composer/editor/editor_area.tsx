@@ -90,6 +90,7 @@ import {
 	conversationToolsToChoices,
 	mergeConversationToolsWithNewChoices,
 } from '@/tools/lib/conversation_tool_utils';
+import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
 import { dedupeToolChoices, uiToolChoiceToToolStoreChoice } from '@/tools/lib/tool_choice_utils';
 import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 
@@ -827,11 +828,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			setSubmitError(null);
 			const pendingRunnableToolCallIDs = runPendingTools
 				? toolCalls
-						.filter(
-							toolCall =>
-								toolCall.status === 'pending' &&
-								(toolCall.type === ToolStoreChoiceType.Function || toolCall.type === ToolStoreChoiceType.Custom)
-						)
+						.filter(toolCall => toolCall.status === 'pending' && isRunnableComposerToolCall(toolCall))
 						.map(toolCall => toolCall.id)
 				: [];
 			const hadPendingTools = pendingRunnableToolCallIDs.length > 0;
@@ -875,13 +872,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				const finalToolOutputs: UIToolOutput[] = runtimeAfterRun.toolOutputs;
 				const unfinishedRunnableToolCalls = runtimeAfterRun.toolCalls.filter(
 					toolCall =>
-						(toolCall.status === 'pending' || toolCall.status === 'running') &&
-						(toolCall.type === ToolStoreChoiceType.Function || toolCall.type === ToolStoreChoiceType.Custom)
+						(toolCall.status === 'pending' || toolCall.status === 'running') && isRunnableComposerToolCall(toolCall)
 				);
 				const failedRunnableToolCalls = runtimeAfterRun.toolCalls.filter(
-					toolCall =>
-						toolCall.status === 'failed' &&
-						(toolCall.type === ToolStoreChoiceType.Function || toolCall.type === ToolStoreChoiceType.Custom)
+					toolCall => toolCall.status === 'failed' && isRunnableComposerToolCall(toolCall)
 				);
 
 				if (unfinishedRunnableToolCalls.length > 0) {
@@ -1036,16 +1030,13 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 		const unfinishedRunnableToolCalls = toolCalls.filter(
 			toolCall =>
-				(toolCall.status === 'pending' || toolCall.status === 'running') &&
-				(toolCall.type === ToolStoreChoiceType.Function || toolCall.type === ToolStoreChoiceType.Custom)
+				(toolCall.status === 'pending' || toolCall.status === 'running') && isRunnableComposerToolCall(toolCall)
 		);
 
 		if (unfinishedRunnableToolCalls.length > 0) return;
 
 		const failedRunnableToolCalls = toolCalls.filter(
-			toolCall =>
-				toolCall.status === 'failed' &&
-				(toolCall.type === ToolStoreChoiceType.Function || toolCall.type === ToolStoreChoiceType.Custom)
+			toolCall => toolCall.status === 'failed' && isRunnableComposerToolCall(toolCall)
 		);
 
 		if (failedRunnableToolCalls.length > 0) {

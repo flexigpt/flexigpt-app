@@ -183,29 +183,30 @@ export function getMCPStatusBadgeClass(status?: MCPServerStatus): string {
 export function getMCPAuthHealthLabel(state?: MCPAuthHealthState): string {
 	switch (state) {
 		case MCPAuthHealthState.MCPAuthHealthStateNotRequired:
-			return 'Not Required';
+			return 'Auth: not required';
 		case MCPAuthHealthState.MCPAuthHealthStateNotConfigured:
-			return 'Not Configured';
+			return 'Auth: config needed';
 		case MCPAuthHealthState.MCPAuthHealthStateAuthorizationNeeded:
-			return 'Authorization Needed';
+			return 'Auth: required';
 		case MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending:
-			return 'Authorization Pending';
+			return 'Auth: pending';
 		case MCPAuthHealthState.MCPAuthHealthStateAuthorized:
-			return 'Authorized';
+			return 'Auth: authorized';
 		case MCPAuthHealthState.MCPAuthHealthStateExpired:
-			return 'Expired';
+			return 'Auth: expired';
 		case MCPAuthHealthState.MCPAuthHealthStateInsufficientScope:
-			return 'Insufficient Scope';
+			return 'Auth: insufficient scope';
 		case MCPAuthHealthState.MCPAuthHealthStateError:
-			return 'Error';
+			return 'Auth: error';
 		default:
-			return 'Unknown';
+			return 'Auth: unknown';
 	}
 }
 
 export function getMCPAuthHealthBadgeClass(state?: MCPAuthHealthState): string {
 	switch (state) {
 		case MCPAuthHealthState.MCPAuthHealthStateNotRequired:
+			return 'badge-ghost';
 		case MCPAuthHealthState.MCPAuthHealthStateAuthorized:
 			return 'badge-success';
 		case MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending:

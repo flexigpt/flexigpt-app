@@ -12,7 +12,7 @@ import {
 	type UIToolCall,
 } from '@/spec/inference';
 import { type ModelPresetRef, type UIChatOption } from '@/spec/modelpreset';
-import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
+import { type ToolStoreChoice } from '@/spec/tool';
 
 import { ensureMakeID, getUUIDv7 } from '@/lib/uuid_utils';
 
@@ -30,6 +30,7 @@ import {
 import type { StreamBuffer } from '@/chats/conversation/use_streaming_runtime';
 import type { ChatTabState } from '@/chats/tabs/tabs_model';
 import { appendSystemPromptParts } from '@/prompts/lib/system_prompt_utils';
+import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
 
 type UseSendMessageArgs = {
 	tabsRef: RefObject<ChatTabState[]>;
@@ -308,8 +309,8 @@ export function useSendMessage({
 					saveUpdatedConversation(tabId, finalChat);
 
 					if (persistedAssistantMessage.uiToolCalls && persistedAssistantMessage.uiToolCalls.length > 0) {
-						queuedRunnableToolCalls = persistedAssistantMessage.uiToolCalls.filter(
-							call => call.type === ToolStoreChoiceType.Function || call.type === ToolStoreChoiceType.Custom
+						queuedRunnableToolCalls = persistedAssistantMessage.uiToolCalls.filter(call =>
+							isRunnableComposerToolCall(call)
 						);
 					}
 				} else {
