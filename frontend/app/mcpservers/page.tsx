@@ -551,11 +551,10 @@ export default function MCPServersPage() {
 		[fetchAll]
 	);
 
+	const allServerIDs = bundles.flatMap(bundleData => bundleData.servers.map(server => server.id));
 	if (loading) {
 		return <Loader text="Loading MCP servers…" />;
 	}
-
-	const allServerIDs = bundles.flatMap(bundleData => bundleData.servers.map(server => server.id));
 
 	return (
 		<PageFrame>

@@ -301,9 +301,9 @@ export function MCPServerDetailsModal({
 												</td>
 												<td className="text-center">{tool.toolName}</td>
 												<td className="text-center">
-													<span className={`badge rounded-xl ${getMCPToolRiskBadgeClass(tool.inferredRisk)}`}>
-														{getMCPToolRiskLabel(tool.inferredRisk)}
-													</span>
+													<div className={`badge rounded-xl ${getMCPToolRiskBadgeClass(tool.inferredRisk)}`}>
+														<div className="p-1 text-xs text-nowrap">{getMCPToolRiskLabel(tool.inferredRisk)}</div>
+													</div>
 												</td>
 												<td className="text-center">{getMCPApprovalRuleLabel(tool.approvalRule)}</td>
 												<td className="text-center">{getMCPExecutionModeLabel(tool.executionMode)}</td>

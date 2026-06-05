@@ -41,6 +41,7 @@ export interface DropdownProps<K extends string> {
 	 * Useful inside scrollable modals so opening the menu expands the modal naturally.
 	 */
 	inlineMenu?: boolean;
+	maxSummaryHeight?: number | string;
 }
 
 // A single reusable dropdown that can be used by passing the appropriate config.
@@ -57,6 +58,7 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 		placeholderLabel = 'Select an option',
 		disabled = false,
 		inlineMenu = false,
+		maxSummaryHeight,
 	} = props;
 
 	const [isOpen, setIsOpen] = useState(false);
@@ -130,6 +132,9 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 					if (disabled) {
 						event.preventDefault();
 					}
+				}}
+				style={{
+					maxHeight: typeof maxSummaryHeight === 'number' ? `${maxSummaryHeight}px` : undefined,
 				}}
 			>
 				<span className="truncate font-normal">{selectedKey ? getItemDisplayName(selectedKey) : placeholderLabel}</span>

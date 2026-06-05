@@ -12,10 +12,10 @@
 		"timeoutMS": 30000
 	},
 	"availability": "manual",
-	"trustLevel": "untrusted",
+	"trustLevel": "trusted",
 	"defaultPolicy": {
-		"defaultApprovalRule": "ask",
-		"defaultExecutionMode": "manual",
+		"defaultApprovalRule": "allow",
+		"defaultExecutionMode": "auto",
 		"requireApprovalForUnknownRisk": true,
 		"requireApprovalForWrite": true,
 		"requireApprovalForDestructive": true

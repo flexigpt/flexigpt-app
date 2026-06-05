@@ -4,31 +4,16 @@ import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiX } from 'react-icons/fi';
 
-import { MCPApprovalResolution, type MCPApprovalSummary, MCPToolRisk } from '@/spec/mcp';
+import { MCPApprovalResolution, type MCPApprovalSummary } from '@/spec/mcp';
 
 import { ModalBackdrop } from '@/components/modal_backdrop';
 
 import type { MCPApprovalRequest } from '@/chats/composer/mcp/use_mcp_approval';
+import { getMCPToolRiskLabel } from '@/mcpservers/lib/mcp_server_utils';
 
 interface MCPApprovalModalProps {
 	approvalRequest: MCPApprovalRequest | null;
 	onResolve: (resolution: MCPApprovalResolution) => void;
-}
-
-function formatRiskLabel(risk?: MCPToolRisk): string {
-	switch (risk) {
-		case MCPToolRisk.MCPToolRiskRead:
-			return 'Read';
-		case MCPToolRisk.MCPToolRiskWrite:
-			return 'Write';
-		case MCPToolRisk.MCPToolRiskDestructive:
-			return 'Destructive';
-		case MCPToolRisk.MCPToolRiskOpenWorld:
-			return 'Open world';
-		case MCPToolRisk.MCPToolRiskUnknown:
-		default:
-			return 'Unknown';
-	}
 }
 
 function formatArguments(summary?: MCPApprovalSummary): string {
@@ -118,7 +103,7 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 								</div>
 
 								<div className="col-span-3 font-semibold">Risk</div>
-								<div className="col-span-9">{formatRiskLabel(summary.risk)}</div>
+								<div className="col-span-9">{getMCPToolRiskLabel(summary.risk)}</div>
 
 								{reason ? (
 									<>

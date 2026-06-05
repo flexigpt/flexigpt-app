@@ -128,10 +128,10 @@ function ServerDiscoverySection({
 				: '';
 
 	return (
-		<div className="bg-base-100 mt-2 rounded-xl p-2">
-			<div className="grid grid-cols-2 gap-2">
+		<div className="bg-base-100 rounded-xl p-2">
+			<div className="mb-1 flex items-center gap-2">
+				<div className="text-base-content/70 text-xs">Tools</div>
 				<label className="text-xs">
-					<div className="text-base-content/70 mb-1">Tool exposure</div>
 					<Dropdown
 						dropdownItems={TOOL_EXPOSURE_DROPDOWN_ITEMS}
 						selectedKey={selection.toolExposure}
@@ -152,6 +152,8 @@ function ServerDiscoverySection({
 						}}
 						title="Tool exposure"
 						inlineMenu={true}
+						maxMenuHeight={160}
+						maxSummaryHeight={24}
 					/>
 				</label>
 
@@ -209,123 +211,123 @@ function ServerDiscoverySection({
 				</>
 			)}
 
-			<SectionTitle>Resources</SectionTitle>
-			{option.resources.length === 0 && option.resourceTemplates.length === 0 ? (
-				<div className="text-base-content/60 px-2 text-xs">No resources discovered.</div>
-			) : (
-				<div className="max-h-40 overflow-y-auto">
-					{option.resources.map((resource: MCPResourceRef) => (
-						<CheckboxRow
-							key={mcpResourceKey(resource)}
-							checked={selectedResourceKeys.has(mcpResourceKey(resource))}
-							disabled={isInputLocked}
-							title={resource.uri}
-							label={
-								<div className="min-w-0">
-									<div className="truncate">{resource.displayName || resource.name || resource.uri}</div>
-									<div className="text-base-content/60 truncate">{resource.uri}</div>
+			{option.resources.length !== 0 || option.resourceTemplates.length !== 0 ? (
+				<>
+					<SectionTitle>Resources</SectionTitle>
+					<div className="max-h-40 overflow-y-auto">
+						{option.resources.map((resource: MCPResourceRef) => (
+							<CheckboxRow
+								key={mcpResourceKey(resource)}
+								checked={selectedResourceKeys.has(mcpResourceKey(resource))}
+								disabled={isInputLocked}
+								title={resource.uri}
+								label={
+									<div className="min-w-0">
+										<div className="truncate">{resource.displayName || resource.name || resource.uri}</div>
+										<div className="text-base-content/60 truncate">{resource.uri}</div>
+									</div>
+								}
+								onChange={next => {
+									state.toggleResource(resource, next);
+								}}
+							/>
+						))}
+
+						{option.resourceTemplates.map((template: MCPResourceTemplateRef) => {
+							const templateKey = mcpResourceTemplateKey(template);
+							const selectedTemplate = selectedTemplateByKey.get(templateKey);
+
+							return (
+								<div key={templateKey}>
+									<CheckboxRow
+										checked={selectedTemplateKeys.has(templateKey)}
+										disabled={isInputLocked}
+										title={template.uriTemplate}
+										label={
+											<div className="min-w-0">
+												<div className="truncate">{template.displayName || template.name || template.uriTemplate}</div>
+												<div className="text-base-content/60 truncate">{template.uriTemplate}</div>
+											</div>
+										}
+										onChange={next => {
+											state.toggleResourceTemplate(template, next);
+										}}
+									/>
+									{selectedTemplate ? (
+										<MCPArgumentFields
+											bundleID={template.bundleID}
+											serverID={template.serverID}
+											refType={MCPRefType.MCPRefTypeResource}
+											name={template.uriTemplate}
+											item={selectedTemplate}
+											disabled={isInputLocked}
+											onValueChange={(argumentName, value) => {
+												state.setResourceTemplateArgumentValue(
+													template.bundleID,
+													template.serverID,
+													template.uriTemplate,
+													argumentName,
+													value
+												);
+											}}
+										/>
+									) : null}
 								</div>
-							}
-							onChange={next => {
-								state.toggleResource(resource, next);
-							}}
-						/>
-					))}
+							);
+						})}
+					</div>
+				</>
+			) : null}
 
-					{option.resourceTemplates.map((template: MCPResourceTemplateRef) => {
-						const templateKey = mcpResourceTemplateKey(template);
-						const selectedTemplate = selectedTemplateByKey.get(templateKey);
+			{option.prompts.length !== 0 ? (
+				<>
+					<SectionTitle>Prompts</SectionTitle>
+					<div className="max-h-40 overflow-y-auto">
+						{option.prompts.map((prompt: MCPPromptRef) => {
+							const promptKey = mcpPromptKey(prompt);
+							const selectedPrompt = selectedPromptByKey.get(promptKey);
 
-						return (
-							<div key={templateKey}>
-								<CheckboxRow
-									checked={selectedTemplateKeys.has(templateKey)}
-									disabled={isInputLocked}
-									title={template.uriTemplate}
-									label={
-										<div className="min-w-0">
-											<div className="truncate">{template.displayName || template.name || template.uriTemplate}</div>
-											<div className="text-base-content/60 truncate">{template.uriTemplate}</div>
-										</div>
-									}
-									onChange={next => {
-										state.toggleResourceTemplate(template, next);
-									}}
-								/>
-								{selectedTemplate ? (
-									<MCPArgumentFields
-										bundleID={template.bundleID}
-										serverID={template.serverID}
-										refType={MCPRefType.MCPRefTypeResource}
-										name={template.uriTemplate}
-										item={selectedTemplate}
+							return (
+								<div key={promptKey}>
+									<CheckboxRow
+										checked={selectedPromptKeys.has(promptKey)}
 										disabled={isInputLocked}
-										onValueChange={(argumentName, value) => {
-											state.setResourceTemplateArgumentValue(
-												template.bundleID,
-												template.serverID,
-												template.uriTemplate,
-												argumentName,
-												value
-											);
+										title={prompt.description}
+										label={
+											<div className="min-w-0">
+												<div className="truncate">{prompt.displayName || prompt.promptName}</div>
+												<div className="text-base-content/60 truncate">{prompt.promptName}</div>
+											</div>
+										}
+										onChange={next => {
+											state.togglePrompt(prompt, next);
 										}}
 									/>
-								) : null}
-							</div>
-						);
-					})}
-				</div>
-			)}
-
-			<SectionTitle>Prompts</SectionTitle>
-			{option.prompts.length === 0 ? (
-				<div className="text-base-content/60 px-2 text-xs">No prompts discovered.</div>
-			) : (
-				<div className="max-h-40 overflow-y-auto">
-					{option.prompts.map((prompt: MCPPromptRef) => {
-						const promptKey = mcpPromptKey(prompt);
-						const selectedPrompt = selectedPromptByKey.get(promptKey);
-
-						return (
-							<div key={promptKey}>
-								<CheckboxRow
-									checked={selectedPromptKeys.has(promptKey)}
-									disabled={isInputLocked}
-									title={prompt.description}
-									label={
-										<div className="min-w-0">
-											<div className="truncate">{prompt.displayName || prompt.promptName}</div>
-											<div className="text-base-content/60 truncate">{prompt.promptName}</div>
-										</div>
-									}
-									onChange={next => {
-										state.togglePrompt(prompt, next);
-									}}
-								/>
-								{selectedPrompt ? (
-									<MCPArgumentFields
-										bundleID={prompt.bundleID}
-										serverID={prompt.serverID}
-										refType={MCPRefType.MCPRefTypePrompt}
-										name={prompt.promptName}
-										item={selectedPrompt}
-										disabled={isInputLocked}
-										onValueChange={(argumentName, value) => {
-											state.setPromptArgumentValue(
-												prompt.bundleID,
-												prompt.serverID,
-												prompt.promptName,
-												argumentName,
-												value
-											);
-										}}
-									/>
-								) : null}
-							</div>
-						);
-					})}
-				</div>
-			)}
+									{selectedPrompt ? (
+										<MCPArgumentFields
+											bundleID={prompt.bundleID}
+											serverID={prompt.serverID}
+											refType={MCPRefType.MCPRefTypePrompt}
+											name={prompt.promptName}
+											item={selectedPrompt}
+											disabled={isInputLocked}
+											onValueChange={(argumentName, value) => {
+												state.setPromptArgumentValue(
+													prompt.bundleID,
+													prompt.serverID,
+													prompt.promptName,
+													argumentName,
+													value
+												);
+											}}
+										/>
+									) : null}
+								</div>
+							);
+						})}
+					</div>
+				</>
+			) : null}
 		</div>
 	);
 }

@@ -116,6 +116,8 @@ export function useComposerMCP(): UseComposerMCPResult {
 	const discoveryPromisesRef = useRef(new Map<string, Promise<MCPDiscoveryLoadResult | undefined>>());
 
 	useEffect(() => {
+		mountedRef.current = true;
+
 		return () => {
 			mountedRef.current = false;
 		};
@@ -202,7 +204,9 @@ export function useComposerMCP(): UseComposerMCPResult {
 			if (!mountedRef.current) return;
 			setError(getErrorMessage(err, 'Failed to load MCP servers.'));
 		} finally {
-			if (mountedRef.current) setLoading(false);
+			if (mountedRef.current) {
+				setLoading(false);
+			}
 		}
 	}, []);
 
@@ -438,7 +442,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 						selectedResources: [],
 						selectedResourceTemplates: [],
 						selectedPrompts: [],
-						includeServerInstructions: false,
+						includeServerInstructions: true,
 					},
 				};
 
