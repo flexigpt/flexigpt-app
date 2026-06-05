@@ -1005,3 +1005,6 @@
 - [x] block autoexec should be a high level button for just in case things i.e the llm is spiralling and you want the next turn to not autoexec as you want to give some direction to llm. this should be visible when there is atleast one auto exec tool during send. but it should be active during streaming and busy periods too, and value should be used during next autoexec run after assistant message. in next turn again if there are no autoexec tools, the button should not be visible. it should be present just above the stop streaming button, and should be indicative enough to tell that it is autoexec stop.
 - [x] would be a good idea to have a "starting text" in assistant preset. this can be inserted in the box if there is no text already there in composer.
   - [x] populate current builtins with a good starting text. see if home needs better or same.
+
+- [x] MCP local connections and hooks
+  - [x] mcp integrate in http backend

@@ -2,14 +2,14 @@
 
 ## Laundry list
 
-- [ ] easier preset import bundles and flows. e.g: just import a preset bundle that has assistant, models, prompts, tools etc.
-  - [ ] may be as a json import bundle or jsonc format
-  - [ ] better thing is to establish a jsonschema format for each thing, and then ship corresponding json as individual outputs.
+- [ ] remove tool chips in composer for choices
+- [ ] make bottom bar choices of skill, sys prompt, tool, mcp coherent and same way. remove web search chip and push inside tools. see where to move shortcuts, input tips etc.
+- easier add via some files/schemas etc
+  - [ ] easier preset import bundles and flows. e.g: just import a preset bundle that has assistant, models, prompts, tools etc.
+    - [ ] may be as a json import bundle or jsonc format
+    - [ ] better thing is to establish a jsonschema format for each thing, and then ship corresponding json as individual outputs.
 
-- [ ] easier add of skill.
-
-- [ ] MCP local connections and hooks
-  - [ ] mcp integrate in http backend
+  - [ ] easier add of skill.
   - [ ] easier add of mcp.
 
 - [ ] test with some skill that has scripts too
