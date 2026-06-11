@@ -1,36 +1,14 @@
-import {
-	type Dispatch,
-	memo,
-	type ReactNode,
-	type RefObject,
-	type SetStateAction,
-	useEffect,
-	useMemo,
-	useState,
-} from 'react';
+import { type Dispatch, memo, type RefObject, type SetStateAction, useMemo } from 'react';
 
-import { FiFilePlus, FiFolder, FiLink, FiPaperclip, FiUpload } from 'react-icons/fi';
-
-import { Menu, MenuButton, MenuItem, type MenuStore, useStoreState } from '@ariakit/react';
+import { type MenuStore } from '@ariakit/react';
 
 import type { ProviderSDKType } from '@/spec/inference';
-import type { PromptTemplate, PromptTemplateListItem } from '@/spec/prompt';
 import type { SkillListItem, SkillRef } from '@/spec/skill';
 import { type ToolListItem } from '@/spec/tool';
 
 import { formatShortcut, type ShortcutConfig } from '@/lib/keyboard_shortcuts';
 
-import { promptStoreAPI } from '@/apis/baseapi';
-
-import {
-	actionTriggerChipButtonClasses,
-	ActionTriggerChipContent,
-	actionTriggerMenuItemClasses,
-	actionTriggerMenuWideClasses,
-} from '@/components/action_trigger_chip';
-import { HoverTip } from '@/components/ariakit_hover_tip';
-
-import { UrlAttachmentModal } from '@/chats/composer/attachments/attachment_url_modal';
+import { AttachmentBottomBarChip } from '@/chats/composer/attachments/attachment_bottom_bar_chip';
 import { CommandTipsMenu } from '@/chats/composer/inputtips/command_tips_menu';
 import { MCPBottomBarChip } from '@/chats/composer/mcp/mcp_bottom_bar_chip';
 import type { UseComposerMCPResult } from '@/chats/composer/mcp/mcp_composer_types';
@@ -38,10 +16,12 @@ import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_
 import { SkillsBottomBarChip } from '@/chats/composer/skills/skills_bottom_bar_chip';
 import { SystemPromptBottomBarChip } from '@/chats/composer/systemprompts/system_prompt_bottom_bar_chip';
 import type { ComposerSystemPromptController } from '@/chats/composer/systemprompts/use_composer_system_prompt';
-import { PromptTemplateDropdown } from '@/chats/composer/templates/prompt_template_dropdown';
+import {
+	PromptTemplateBottomBarChip,
+	type PromptTemplateInsertArgs,
+} from '@/chats/composer/templates/prompt_template_bottom_bar_chip';
 import { ToolsBottomBarChip } from '@/chats/composer/tools/tools_bottom_bar_chip';
 import { type WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
-import { usePromptTemplates } from '@/prompts/lib/use_prompt_templates';
 import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
 
 interface EditorBottomBarProps {
@@ -50,12 +30,7 @@ interface EditorBottomBarProps {
 	onAttachURL: (url: string) => Promise<void> | void;
 	onOpenAttachmentUrlModal?: () => void;
 	onUrlAttachmentModalClose?: () => void;
-	onInsertTemplate: (args: {
-		bundleID: string;
-		templateSlug: string;
-		templateVersion: string;
-		template?: PromptTemplate;
-	}) => Promise<void> | void;
+	onInsertTemplate: (args: PromptTemplateInsertArgs) => Promise<void> | void;
 
 	templateMenuState: MenuStore;
 	toolMenuState: MenuStore;
@@ -101,34 +76,6 @@ interface EditorBottomBarProps {
 	onClearMCPAppContextUpdates?: () => void;
 }
 
-interface PickerButtonProps {
-	label: string;
-	icon: ReactNode;
-	buttonRef: RefObject<HTMLButtonElement | null>;
-	menuState: MenuStore;
-	shortcut?: string;
-	disabled?: boolean;
-}
-
-function PickerButton({ label, icon, buttonRef, menuState, shortcut, disabled }: PickerButtonProps) {
-	const open = useStoreState(menuState, 'open');
-	const tooltip = shortcut ? `${label} (${shortcut})` : label;
-
-	return (
-		<HoverTip content={tooltip} placement="top">
-			<MenuButton
-				ref={buttonRef}
-				store={menuState}
-				disabled={disabled}
-				className={`${actionTriggerChipButtonClasses} hover:text-base-content ${disabled ? 'opacity-60' : ''}`}
-				aria-label={tooltip}
-			>
-				<ActionTriggerChipContent icon={icon} label={label} open={open} />
-			</MenuButton>
-		</HoverTip>
-	);
-}
-
 export const EditorBottomBar = memo(function EditorBottomBar({
 	onAttachFiles,
 	onAttachDirectory,
@@ -172,9 +119,6 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	mcpAppContextUpdateCount = 0,
 	onClearMCPAppContextUpdates,
 }: EditorBottomBarProps) {
-	const [isUrlModalOpen, setIsUrlModalOpen] = useState(false);
-	const templateMenuOpen = useStoreState(templateMenuState, 'open');
-
 	const shortcutLabels = useMemo(
 		() => ({
 			templates: formatShortcut(shortcutConfig.insertTemplate),
@@ -183,61 +127,6 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 		}),
 		[shortcutConfig]
 	);
-	const { data: templateData, loading: templatesLoading } = usePromptTemplates();
-
-	useEffect(() => {
-		if (isInputLocked) {
-			templateMenuState.hide();
-			toolMenuState.hide();
-			attachmentMenuState.hide();
-			// eslint-disable-next-line react-hooks/set-state-in-effect
-			setIsUrlModalOpen(false);
-		}
-	}, [attachmentMenuState, isInputLocked, templateMenuState, toolMenuState]);
-
-	const closeTemplateMenu = () => {
-		templateMenuState.hide();
-	};
-
-	const closeAttachmentMenu = () => {
-		attachmentMenuState.hide();
-	};
-
-	const handleTemplatePick = async (item: PromptTemplateListItem) => {
-		try {
-			const tmpl = await promptStoreAPI.getPromptTemplate(item.bundleID, item.templateSlug, item.templateVersion);
-			await onInsertTemplate({
-				bundleID: item.bundleID,
-				templateSlug: item.templateSlug,
-				templateVersion: item.templateVersion,
-				template: tmpl,
-			});
-		} catch {
-			await onInsertTemplate({
-				bundleID: item.bundleID,
-				templateSlug: item.templateSlug,
-				templateVersion: item.templateVersion,
-			});
-		} finally {
-			closeTemplateMenu();
-		}
-	};
-
-	const handleAttachmentPickFiles = async () => {
-		await onAttachFiles();
-		closeAttachmentMenu();
-	};
-
-	const handleAttachmentPickDirectory = async () => {
-		await onAttachDirectory();
-		closeAttachmentMenu();
-	};
-
-	const handleAttachmentPickURL = () => {
-		onOpenAttachmentUrlModal?.();
-		closeAttachmentMenu();
-		setIsUrlModalOpen(true);
-	};
 
 	return (
 		<div
@@ -247,63 +136,24 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 		>
 			<div className="flex items-center gap-1 overflow-x-auto p-1 text-xs shadow-none">
 				<div className="flex items-center gap-1">
-					<PickerButton
-						label="Attachments"
-						icon={<FiPaperclip size={16} />}
-						buttonRef={attachmentButtonRef}
-						menuState={attachmentMenuState}
-						shortcut={shortcutLabels.attachments}
-						disabled={isInputLocked}
-					/>
-					<Menu
+					<AttachmentBottomBarChip
 						store={attachmentMenuState}
-						gutter={8}
-						overflowPadding={8}
-						portal
-						className={actionTriggerMenuWideClasses}
-						data-menu-kind="attachments"
-						autoFocusOnShow
-					>
-						<MenuItem
-							onClick={() => {
-								void handleAttachmentPickFiles();
-							}}
-							className={actionTriggerMenuItemClasses}
-						>
-							<FiUpload size={14} />
-							<span>Multiple Files...</span>
-						</MenuItem>
-						<MenuItem
-							onClick={() => {
-								void handleAttachmentPickDirectory();
-							}}
-							className={actionTriggerMenuItemClasses}
-						>
-							<FiFolder size={14} />
-							<span>Folder...</span>
-						</MenuItem>
-						<MenuItem onClick={handleAttachmentPickURL} className={actionTriggerMenuItemClasses}>
-							<FiLink size={14} />
-							<span>Link or URL...</span>
-						</MenuItem>
-					</Menu>
-
-					<PickerButton
-						label="Prompts"
-						icon={<FiFilePlus size={16} />}
-						buttonRef={templateButtonRef}
-						menuState={templateMenuState}
-						shortcut={shortcutLabels.templates}
-						disabled={isInputLocked}
+						buttonRef={attachmentButtonRef}
+						shortcut={shortcutLabels.attachments}
+						onAttachFiles={onAttachFiles}
+						onAttachDirectory={onAttachDirectory}
+						onAttachURL={onAttachURL}
+						onOpenAttachmentUrlModal={onOpenAttachmentUrlModal}
+						onUrlAttachmentModalClose={onUrlAttachmentModalClose}
+						isInputLocked={isInputLocked}
 					/>
-					<PromptTemplateDropdown
+
+					<PromptTemplateBottomBarChip
 						store={templateMenuState}
-						open={templateMenuOpen}
-						loading={templatesLoading}
-						items={templateData}
-						onPick={item => {
-							void handleTemplatePick(item);
-						}}
+						buttonRef={templateButtonRef}
+						shortcut={shortcutLabels.templates}
+						onInsertTemplate={onInsertTemplate}
+						isInputLocked={isInputLocked}
 					/>
 
 					<SystemPromptBottomBarChip systemPrompt={systemPrompt} isInputLocked={isInputLocked} />
@@ -353,14 +203,6 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 					<CommandTipsMenu shortcutConfig={shortcutConfig} />
 				</div>
 			</div>
-			<UrlAttachmentModal
-				isOpen={isUrlModalOpen}
-				onClose={() => {
-					setIsUrlModalOpen(false);
-					onUrlAttachmentModalClose?.();
-				}}
-				onAttachURL={onAttachURL}
-			/>
 		</div>
 	);
 });

@@ -3,7 +3,7 @@
 ## Laundry list
 
 - [ ] Need more cleanup wrt shortcuts, input tips, shortcuts to add mcp skills etc.
-- [ ] need coherence in message bottom bar.
+- [x] need coherence in message bottom bar.
 - [ ] better more inbuilt mcps.
 - [ ] mcp apps testing
 

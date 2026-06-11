@@ -1,13 +1,30 @@
-import { useMemo } from 'react';
+import { memo, type RefObject, useEffect, useMemo } from 'react';
 
 import { FiFilePlus } from 'react-icons/fi';
 
-import { Menu, MenuItem, type MenuStore } from '@ariakit/react';
+import { Menu, MenuButton, MenuItem, type MenuStore, useStoreState } from '@ariakit/react';
 
-import type { PromptTemplateListItem } from '@/spec/prompt';
+import type { PromptTemplate, PromptTemplateListItem } from '@/spec/prompt';
 
-import { actionTriggerMenuItemClasses, actionTriggerMenuWideClasses } from '@/components/action_trigger_chip';
+import { promptStoreAPI } from '@/apis/baseapi';
+
+import {
+	actionTriggerChipButtonClasses,
+	ActionTriggerChipContent,
+	actionTriggerMenuItemClasses,
+	actionTriggerMenuWideClasses,
+} from '@/components/action_trigger_chip';
+import { HoverTip } from '@/components/ariakit_hover_tip';
 import { GroupedMenuSection } from '@/components/grouped_menu_sections';
+
+import { usePromptTemplates } from '@/prompts/lib/use_prompt_templates';
+
+export interface PromptTemplateInsertArgs {
+	bundleID: string;
+	templateSlug: string;
+	templateVersion: string;
+	template?: PromptTemplate;
+}
 
 type PromptTemplateGroup = {
 	bundleID: string;
@@ -73,7 +90,7 @@ function groupPromptTemplates(items: PromptTemplateListItem[]): PromptTemplateGr
 	return Array.from(groupsByBundle.values());
 }
 
-export function PromptTemplateDropdown({ store, open, loading, items, onPick }: PromptTemplateDropdownProps) {
+function PromptTemplateDropdown({ store, open, loading, items, onPick }: PromptTemplateDropdownProps) {
 	const groupedTemplates = useMemo(() => groupPromptTemplates(items), [items]);
 
 	return (
@@ -137,3 +154,82 @@ export function PromptTemplateDropdown({ store, open, loading, items, onPick }: 
 		</Menu>
 	);
 }
+
+interface PromptTemplateBottomBarChipProps {
+	store: MenuStore;
+	buttonRef: RefObject<HTMLButtonElement | null>;
+	shortcut?: string;
+	onInsertTemplate: (args: PromptTemplateInsertArgs) => Promise<void> | void;
+	isInputLocked?: boolean;
+}
+
+function PromptTemplateBottomBarChipInner({
+	store,
+	buttonRef,
+	shortcut,
+	onInsertTemplate,
+	isInputLocked = false,
+}: PromptTemplateBottomBarChipProps) {
+	const open = useStoreState(store, 'open');
+	const tooltip = shortcut ? `Prompts (${shortcut})` : 'Prompts';
+
+	const { data: templates, loading } = usePromptTemplates();
+
+	useEffect(() => {
+		if (!isInputLocked) return;
+		store.hide();
+	}, [isInputLocked, store]);
+
+	const handlePick = async (item: PromptTemplateListItem) => {
+		try {
+			const tmpl = await promptStoreAPI.getPromptTemplate(item.bundleID, item.templateSlug, item.templateVersion);
+			await onInsertTemplate({
+				bundleID: item.bundleID,
+				templateSlug: item.templateSlug,
+				templateVersion: item.templateVersion,
+				template: tmpl,
+			});
+		} catch {
+			// Fall back to inserting by ref only; the consumer resolves it lazily.
+			await onInsertTemplate({
+				bundleID: item.bundleID,
+				templateSlug: item.templateSlug,
+				templateVersion: item.templateVersion,
+			});
+		} finally {
+			store.hide();
+		}
+	};
+
+	return (
+		<div className="relative shrink-0" data-bottom-bar-prompt-templates>
+			<HoverTip content={tooltip} placement="top">
+				<MenuButton
+					ref={buttonRef}
+					store={store}
+					disabled={isInputLocked}
+					className={`${actionTriggerChipButtonClasses} hover:text-base-content ${isInputLocked ? 'opacity-60' : ''}`}
+					aria-label={tooltip}
+				>
+					<ActionTriggerChipContent icon={<FiFilePlus size={16} />} label="Prompts" open={open} />
+				</MenuButton>
+			</HoverTip>
+
+			<PromptTemplateDropdown
+				store={store}
+				open={open}
+				loading={loading}
+				items={templates}
+				onPick={item => {
+					void handlePick(item);
+				}}
+			/>
+		</div>
+	);
+}
+
+/**
+ * Isolated wrapper for the prompt-template picker so template loading and
+ * menu open/close state changes don't re-render the entire EditorBottomBar.
+ */
+export const PromptTemplateBottomBarChip = memo(PromptTemplateBottomBarChipInner);
