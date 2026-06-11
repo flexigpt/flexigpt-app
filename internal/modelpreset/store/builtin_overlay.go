@@ -55,9 +55,9 @@ var builtInDisabledModelPresetIDs = map[inferenceSpec.ProviderName]map[spec.Mode
 		spec.ModelPresetID(modelpreset.PresetAnthropicSonnet4):  {},
 	},
 	modelpreset.ProviderGoogleGemini: {
-		spec.ModelPresetID(modelpreset.PresetGoogleGemini31Pro):       {},
 		spec.ModelPresetID(modelpreset.PresetGoogleGemini3Flash):      {},
-		spec.ModelPresetID(modelpreset.PresetGoogleGemini31FlashLite): {},
+		spec.ModelPresetID(modelpreset.PresetGoogleGemini25Flash):     {},
+		spec.ModelPresetID(modelpreset.PresetGoogleGemini25FlashLite): {},
 	},
 	modelpreset.ProviderOpenAIChat: {
 		spec.ModelPresetID(modelpreset.PresetOpenAIChatGPT41Mini): {},

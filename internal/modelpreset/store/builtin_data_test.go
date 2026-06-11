@@ -318,7 +318,7 @@ func TestBuiltInPresetAppOverlays(t *testing.T) {
 		},
 		{
 			provider: modelpreset.ProviderGoogleGemini,
-			modelID:  spec.ModelPresetID(modelpreset.PresetGoogleGemini31Pro),
+			modelID:  spec.ModelPresetID(modelpreset.PresetGoogleGemini3Flash),
 		},
 		{
 			provider: modelpreset.ProviderOpenAIChat,
