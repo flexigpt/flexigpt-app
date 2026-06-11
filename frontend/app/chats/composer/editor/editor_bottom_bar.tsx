@@ -130,7 +130,7 @@ function PickerButton({ label, icon, buttonRef, menuState, shortcut, disabled }:
 }
 
 /**
- * Isolated wrapper for SystemPromptDropdown so its open/close state changes
+ * Isolated wrapper for SystemPromptBottomBarChip so its open/close state changes
  * don't re-render the entire EditorBottomBar.
  */
 const SystemPromptSection = memo(function SystemPromptSection({
@@ -277,7 +277,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 			data-attachments-bottom-bar
 			aria-label="Templates, tools, attachments, skills, and system prompt"
 		>
-			<div className="flex items-center gap-1 p-1 text-xs shadow-none">
+			<div className="flex items-center gap-1 overflow-x-auto p-1 text-xs shadow-none">
 				<div className="flex items-center gap-1">
 					<PickerButton
 						label="Attachments"

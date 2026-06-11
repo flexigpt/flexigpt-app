@@ -1008,3 +1008,6 @@
 
 - [x] MCP local connections and hooks
   - [x] mcp integrate in http backend
+
+- [x] remove tool chips in composer for choices
+- [x] make bottom bar choices of skill, sys prompt, tool, mcp coherent and same way. remove web search chip and push inside tools. see where to move shortcuts, input tips etc.
