@@ -129,38 +129,6 @@ function PickerButton({ label, icon, buttonRef, menuState, shortcut, disabled }:
 	);
 }
 
-/**
- * Isolated wrapper for SystemPromptBottomBarChip so its open/close state changes
- * don't re-render the entire EditorBottomBar.
- */
-const SystemPromptSection = memo(function SystemPromptSection({
-	systemPrompt,
-	isInputLocked,
-}: {
-	systemPrompt: ComposerSystemPromptController;
-	isInputLocked: boolean;
-}) {
-	return (
-		<SystemPromptBottomBarChip
-			prompts={systemPrompt.prompts}
-			bundles={systemPrompt.systemPromptBundles}
-			selectedPromptKeys={systemPrompt.selectedPromptKeys}
-			preferredBundleID={systemPrompt.preferredSystemPromptBundleID}
-			loading={systemPrompt.systemPromptsLoading}
-			error={systemPrompt.systemPromptError}
-			modelDefaultPrompt={systemPrompt.modelDefaultPrompt}
-			includeModelDefault={systemPrompt.includeModelDefault}
-			onTogglePrompt={systemPrompt.togglePromptSelection}
-			onToggleModelDefault={systemPrompt.setIncludeModelDefault}
-			onAddPrompt={systemPrompt.addAndSelectPrompt}
-			onClearSelected={systemPrompt.clearSelectedPromptSources}
-			onRefreshPrompts={systemPrompt.refreshSystemPrompts}
-			getExistingVersions={systemPrompt.getExistingSystemPromptVersions}
-			isInputLocked={isInputLocked}
-		/>
-	);
-});
-
 export const EditorBottomBar = memo(function EditorBottomBar({
 	onAttachFiles,
 	onAttachDirectory,
@@ -338,7 +306,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						}}
 					/>
 
-					<SystemPromptSection systemPrompt={systemPrompt} isInputLocked={isInputLocked} />
+					<SystemPromptBottomBarChip systemPrompt={systemPrompt} isInputLocked={isInputLocked} />
 
 					<ToolsBottomBarChip
 						store={toolMenuState}

@@ -1,4 +1,4 @@
-import { type SyntheticEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, type SyntheticEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { FiCheck, FiFileText, FiGitBranch, FiPlus, FiX } from 'react-icons/fi';
 
@@ -18,6 +18,7 @@ import { HoverTip } from '@/components/ariakit_hover_tip';
 import { GroupedMenuSection } from '@/components/grouped_menu_sections';
 
 import { SystemPromptAddModal } from '@/chats/composer/systemprompts/system_prompt_add_modal';
+import type { ComposerSystemPromptController } from '@/chats/composer/systemprompts/use_composer_system_prompt';
 import { countEnabledSystemPromptSources } from '@/prompts/lib/system_prompt_utils';
 import type { SystemPromptDraft, SystemPromptItem } from '@/prompts/lib/use_system_prompts';
 
@@ -83,7 +84,7 @@ function stopMenuBubbleEvent(event: SyntheticEvent) {
 	event.stopPropagation();
 }
 
-export function SystemPromptBottomBarChip({
+function SystemPromptBottomBarChipInner({
 	prompts,
 	bundles,
 	selectedPromptKeys,
@@ -568,3 +569,35 @@ export function SystemPromptBottomBarChip({
 		</div>
 	);
 }
+
+/**
+ * Isolated wrapper for systemPromptBottomBarChip so its open/close state changes
+ * don't re-render the entire EditorBottomBar.
+ */
+export const SystemPromptBottomBarChip = memo(function SystemPromptBottomBarChip({
+	systemPrompt,
+	isInputLocked,
+}: {
+	systemPrompt: ComposerSystemPromptController;
+	isInputLocked: boolean;
+}) {
+	return (
+		<SystemPromptBottomBarChipInner
+			prompts={systemPrompt.prompts}
+			bundles={systemPrompt.systemPromptBundles}
+			selectedPromptKeys={systemPrompt.selectedPromptKeys}
+			preferredBundleID={systemPrompt.preferredSystemPromptBundleID}
+			loading={systemPrompt.systemPromptsLoading}
+			error={systemPrompt.systemPromptError}
+			modelDefaultPrompt={systemPrompt.modelDefaultPrompt}
+			includeModelDefault={systemPrompt.includeModelDefault}
+			onTogglePrompt={systemPrompt.togglePromptSelection}
+			onToggleModelDefault={systemPrompt.setIncludeModelDefault}
+			onAddPrompt={systemPrompt.addAndSelectPrompt}
+			onClearSelected={systemPrompt.clearSelectedPromptSources}
+			onRefreshPrompts={systemPrompt.refreshSystemPrompts}
+			getExistingVersions={systemPrompt.getExistingSystemPromptVersions}
+			isInputLocked={isInputLocked}
+		/>
+	);
+});
