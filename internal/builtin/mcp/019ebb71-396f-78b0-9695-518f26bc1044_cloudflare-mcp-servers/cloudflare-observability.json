@@ -1,20 +1,20 @@
 {
 	"schemaVersion": "2026-05-30",
-	"bundleID": "019e7877-ab0e-7c29-a6ef-7e40370fa821",
-	"id": "builtin.cloudflare-docs",
-	"displayName": "Cloudflare Docs",
+	"bundleID": "019ebb71-396f-78b0-9695-518f26bc1044",
+	"id": "builtin.cloudflare-observability",
+	"displayName": "Cloudflare Observability",
 	"enabled": false,
 	"transport": "streamableHttp",
 	"isBuiltIn": true,
 	"streamableHttp": {
-		"url": "https://docs.mcp.cloudflare.com/mcp",
+		"url": "https://observability.mcp.cloudflare.com/mcp",
 		"authMode": "oauth",
 		"timeoutMS": 30000
 	},
 	"trustLevel": "trusted",
 	"defaultPolicy": {
-		"defaultApprovalRule": "allow",
-		"defaultExecutionMode": "auto",
+		"defaultApprovalRule": "ask",
+		"defaultExecutionMode": "manual",
 		"requireApprovalForUnknownRisk": true,
 		"requireApprovalForWrite": false,
 		"requireApprovalForDestructive": false

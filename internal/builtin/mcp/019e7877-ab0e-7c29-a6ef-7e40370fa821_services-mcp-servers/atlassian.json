@@ -7,7 +7,7 @@
 	"transport": "streamableHttp",
 	"isBuiltIn": true,
 	"streamableHttp": {
-		"url": "https://mcp.atlassian.com/v1/mcp",
+		"url": "https://mcp.atlassian.com/v1/mcp/authv2",
 		"authMode": "oauth",
 		"timeoutMS": 30000
 	},

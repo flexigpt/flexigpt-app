@@ -1,13 +1,13 @@
 {
 	"schemaVersion": "2026-05-30",
-	"bundleID": "019e7877-ab0e-7c29-a6ef-7e40370fa821",
-	"id": "builtin.cloudflare-observability",
-	"displayName": "Cloudflare Observability",
+	"bundleID": "019ebb71-396f-78b0-9695-518f26bc1044",
+	"id": "builtin.cloudflare-workers",
+	"displayName": "Cloudflare Workers & Bindings",
 	"enabled": false,
 	"transport": "streamableHttp",
 	"isBuiltIn": true,
 	"streamableHttp": {
-		"url": "https://observability.mcp.cloudflare.com/mcp",
+		"url": "https://bindings.mcp.cloudflare.com/mcp",
 		"authMode": "oauth",
 		"timeoutMS": 30000
 	},
@@ -16,8 +16,8 @@
 		"defaultApprovalRule": "ask",
 		"defaultExecutionMode": "manual",
 		"requireApprovalForUnknownRisk": true,
-		"requireApprovalForWrite": false,
-		"requireApprovalForDestructive": false
+		"requireApprovalForWrite": true,
+		"requireApprovalForDestructive": true
 	},
 	"createdAt": "2026-05-30T00:00:00Z",
 	"modifiedAt": "2026-05-30T00:00:00Z"
