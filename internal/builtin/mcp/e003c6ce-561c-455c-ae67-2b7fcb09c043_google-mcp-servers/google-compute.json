@@ -1,20 +1,21 @@
 {
 	"schemaVersion": "2026-05-30",
-	"bundleID": "019e7877-ab0e-7c29-a6ef-7e40370fa821",
-	"id": "builtin.context7",
-	"displayName": "Context7",
+	"bundleID": "e003c6ce-561c-455c-ae67-2b7fcb09c043",
+	"id": "builtin.google-compute",
+	"displayName": "Google Compute Engine",
 	"enabled": false,
 	"transport": "streamableHttp",
 	"isBuiltIn": true,
 	"streamableHttp": {
-		"url": "https://mcp.context7.com/mcp/oauth",
+		"url": "https://compute.googleapis.com/mcp",
 		"authMode": "oauth",
-		"timeoutMS": 30000
+		"timeoutMS": 60000,
+		"clientCredentialRef": ""
 	},
 	"trustLevel": "trusted",
 	"defaultPolicy": {
-		"defaultApprovalRule": "allow",
-		"defaultExecutionMode": "auto",
+		"defaultApprovalRule": "ask",
+		"defaultExecutionMode": "manual",
 		"requireApprovalForUnknownRisk": true,
 		"requireApprovalForWrite": true,
 		"requireApprovalForDestructive": true

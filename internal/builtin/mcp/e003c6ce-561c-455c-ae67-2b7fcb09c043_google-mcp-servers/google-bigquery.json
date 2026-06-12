@@ -1,0 +1,25 @@
+{
+	"schemaVersion": "2026-05-30",
+	"bundleID": "e003c6ce-561c-455c-ae67-2b7fcb09c043",
+	"id": "builtin.google-bigquery",
+	"displayName": "Google BigQuery",
+	"enabled": false,
+	"transport": "streamableHttp",
+	"isBuiltIn": true,
+	"streamableHttp": {
+		"url": "https://bigquery.googleapis.com/mcp",
+		"authMode": "oauth",
+		"timeoutMS": 60000,
+		"clientCredentialRef": ""
+	},
+	"trustLevel": "trusted",
+	"defaultPolicy": {
+		"defaultApprovalRule": "ask",
+		"defaultExecutionMode": "manual",
+		"requireApprovalForUnknownRisk": true,
+		"requireApprovalForWrite": true,
+		"requireApprovalForDestructive": true
+	},
+	"createdAt": "2026-05-30T00:00:00Z",
+	"modifiedAt": "2026-05-30T00:00:00Z"
+}

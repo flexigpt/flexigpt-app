@@ -1,0 +1,24 @@
+{
+	"schemaVersion": "2026-05-30",
+	"bundleID": "b27b7870-6a16-4d57-9de8-3850b15096f0",
+	"id": "builtin.exa",
+	"displayName": "Exa Search",
+	"enabled": true,
+	"transport": "streamableHttp",
+	"isBuiltIn": true,
+	"streamableHttp": {
+		"url": "https://mcp.exa.ai/mcp",
+		"authMode": "none",
+		"timeoutMS": 30000
+	},
+	"trustLevel": "trusted",
+	"defaultPolicy": {
+		"defaultApprovalRule": "allow",
+		"defaultExecutionMode": "auto",
+		"requireApprovalForUnknownRisk": true,
+		"requireApprovalForWrite": false,
+		"requireApprovalForDestructive": false
+	},
+	"createdAt": "2026-05-30T00:00:00Z",
+	"modifiedAt": "2026-05-30T00:00:00Z"
+}

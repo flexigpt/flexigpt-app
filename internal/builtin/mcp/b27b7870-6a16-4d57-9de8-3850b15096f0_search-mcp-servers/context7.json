@@ -1,0 +1,24 @@
+{
+	"schemaVersion": "2026-05-30",
+	"bundleID": "b27b7870-6a16-4d57-9de8-3850b15096f0",
+	"id": "builtin.context7",
+	"displayName": "Context7",
+	"enabled": true,
+	"transport": "streamableHttp",
+	"isBuiltIn": true,
+	"streamableHttp": {
+		"url": "https://mcp.context7.com/mcp/oauth",
+		"authMode": "oauth",
+		"timeoutMS": 30000
+	},
+	"trustLevel": "trusted",
+	"defaultPolicy": {
+		"defaultApprovalRule": "allow",
+		"defaultExecutionMode": "auto",
+		"requireApprovalForUnknownRisk": true,
+		"requireApprovalForWrite": true,
+		"requireApprovalForDestructive": true
+	},
+	"createdAt": "2026-05-30T00:00:00Z",
+	"modifiedAt": "2026-05-30T00:00:00Z"
+}

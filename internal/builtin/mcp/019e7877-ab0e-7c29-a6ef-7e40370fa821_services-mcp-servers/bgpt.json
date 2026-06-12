@@ -1,0 +1,24 @@
+{
+	"schemaVersion": "2026-05-30",
+	"bundleID": "019e7877-ab0e-7c29-a6ef-7e40370fa821",
+	"id": "builtin.bgpt",
+	"displayName": "BGPT (Scientific Papers)",
+	"enabled": false,
+	"transport": "streamableHttp",
+	"isBuiltIn": true,
+	"streamableHttp": {
+		"url": "https://bgpt.pro/mcp/stream",
+		"authMode": "none",
+		"timeoutMS": 30000
+	},
+	"trustLevel": "untrusted",
+	"defaultPolicy": {
+		"defaultApprovalRule": "allow",
+		"defaultExecutionMode": "auto",
+		"requireApprovalForUnknownRisk": true,
+		"requireApprovalForWrite": false,
+		"requireApprovalForDestructive": false
+	},
+	"createdAt": "2026-05-30T00:00:00Z",
+	"modifiedAt": "2026-05-30T00:00:00Z"
+}
