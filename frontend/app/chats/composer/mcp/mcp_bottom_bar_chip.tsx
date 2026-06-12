@@ -3,6 +3,7 @@ import { type MouseEvent, type ReactNode, useEffect, useMemo, useState } from 'r
 import { FiCheck, FiExternalLink, FiRefreshCw, FiServer, FiWifi, FiWifiOff, FiX } from 'react-icons/fi';
 
 import { Menu, MenuButton, useMenuStore, useStoreState } from '@ariakit/react';
+import { Link } from 'react-router';
 
 import {
 	MCPAuthHealthState,
@@ -51,6 +52,10 @@ function stop(e: MouseEvent) {
 
 function SectionTitle({ children }: { children: ReactNode }) {
 	return <div className="text-base-content/70 mt-2 mb-1 text-xs font-semibold">{children}</div>;
+}
+
+function isEnabledMCPOption(option: MCPComposerServerOption) {
+	return option.bundle.isEnabled && option.server.enabled;
 }
 
 function CheckboxRow({
@@ -455,7 +460,7 @@ function ServerRow({
 	const selected = Boolean(state.selectedByServerKey[key]);
 	const status = getEffectiveMCPServerStatus(option.server.enabled, option.bundle.isEnabled, option.runtime);
 	const isReady = status === MCPServerStatus.MCPServerStatusReady;
-	const selectable = option.bundle.isEnabled && option.server.enabled;
+	const selectable = isEnabledMCPOption(option);
 
 	const authActionable = Boolean(option.authHealth?.authorizationURL);
 	const authPending = option.authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending;
@@ -594,6 +599,10 @@ export function MCPBottomBarChip({
 	const enabledCount = state.selectedServerCount;
 	const hasAppContextUpdates = appContextUpdateCount > 0;
 	const hasBlockingArgs = state.argumentsBlocked;
+	const visibleOptions = useMemo(() => state.options.filter(isEnabledMCPOption), [state.options]);
+	const hiddenDisabledServerCount = state.options.length - visibleOptions.length;
+	const hiddenDisabledServerLabel = hiddenDisabledServerCount === 1 ? 'server' : 'servers';
+	const hiddenDisabledServerVerb = hiddenDisabledServerCount === 1 ? 'is' : 'are';
 
 	const title = useMemo(() => {
 		const lines = ['MCP'];
@@ -741,9 +750,29 @@ export function MCPBottomBarChip({
 								No MCP servers configured. Add servers from the MCP Servers management page.
 							</div>
 						) : (
-							state.options.map(option => (
-								<ServerRow key={optionKey(option)} option={option} state={state} isInputLocked={isInputLocked} />
-							))
+							<>
+								{visibleOptions.map(option => (
+									<ServerRow key={optionKey(option)} option={option} state={state} isInputLocked={isInputLocked} />
+								))}
+
+								{hiddenDisabledServerCount > 0 ? (
+									<div className="border-base-300 text-base-content/70 mt-2 border-t pt-2 text-xs">
+										{hiddenDisabledServerCount} disabled MCP {hiddenDisabledServerLabel} {hiddenDisabledServerVerb}{' '}
+										hidden.{' '}
+										<Link
+											to="/mcpservers"
+											className="link link-info"
+											onClick={event => {
+												event.stopPropagation();
+												menu.hide();
+											}}
+										>
+											Go to MCP Servers
+										</Link>{' '}
+										to enable {hiddenDisabledServerCount === 1 ? 'it' : 'them'}.
+									</div>
+								) : null}
+							</>
 						)}
 					</Menu>
 				</div>
