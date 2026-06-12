@@ -93,9 +93,7 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 	if gotAlpha.Body.DisplayName != "Alpha HTTP" {
 		t.Fatalf("Alpha DisplayName = %q, want %q", gotAlpha.Body.DisplayName, "Alpha HTTP")
 	}
-	if gotAlpha.Body.Availability != spec.MCPServerAvailabilityManual {
-		t.Fatalf("Alpha Availability = %q, want manual", gotAlpha.Body.Availability)
-	}
+
 	if gotAlpha.Body.TrustLevel != spec.MCPTrustLevelUntrusted {
 		t.Fatalf("Alpha TrustLevel = %q, want untrusted", gotAlpha.Body.TrustLevel)
 	}
@@ -185,44 +183,6 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 		t.Fatalf("pagination returned wrong IDs: %#v", seen)
 	}
 
-	snap := spec.MCPDiscoverySnapshot{
-		BundleID: bundleID,
-		ServerID: alphaID,
-		Tools: []spec.MCPToolCapability{
-			{
-				BundleID:    bundleID,
-				ServerID:    alphaID,
-				ToolName:    "echo",
-				DisplayName: "Echo",
-				Digest:      "digest-echo",
-			},
-		},
-	}
-	if err := st.SaveLastKnownSnapshot(ctx, snap); err != nil {
-		t.Fatalf("SaveLastKnownSnapshot(alpha): %v", err)
-	}
-	gotSnap, ok, err := st.GetLastKnownSnapshot(ctx, bundleID, alphaID)
-	if err != nil {
-		t.Fatalf("GetLastKnownSnapshot(alpha): %v", err)
-	}
-	if !ok {
-		t.Fatalf("GetLastKnownSnapshot(alpha): ok=false")
-	}
-	if len(gotSnap.Tools) != 1 || gotSnap.Tools[0].ToolName != "echo" {
-		t.Fatalf("snapshot = %#v", gotSnap.Tools)
-	}
-	gotSnap.Tools[0].ToolName = "mutated"
-	gotSnap2, ok, err := st.GetLastKnownSnapshot(ctx, bundleID, alphaID)
-	if err != nil {
-		t.Fatalf("GetLastKnownSnapshot(alpha #2): %v", err)
-	}
-	if !ok {
-		t.Fatalf("GetLastKnownSnapshot(alpha #2): ok=false")
-	}
-	if gotSnap2.Tools[0].ToolName != "echo" {
-		t.Fatalf("snapshot clone not preserved: %#v", gotSnap2.Tools)
-	}
-
 	if err := st.Close(); err != nil {
 		t.Fatalf("Close(store): %v", err)
 	}
@@ -250,17 +210,6 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 		t.Fatalf("beta Enabled = true, want false")
 	}
 
-	reSnap, ok, err := st2.GetLastKnownSnapshot(ctx, bundleID, alphaID)
-	if err != nil {
-		t.Fatalf("GetLastKnownSnapshot(alpha reopen): %v", err)
-	}
-	if !ok {
-		t.Fatalf("snapshot missing after reopen")
-	}
-	if len(reSnap.Tools) != 1 || reSnap.Tools[0].ToolName != "echo" {
-		t.Fatalf("snapshot not persisted: %#v", reSnap.Tools)
-	}
-
 	if _, err := st2.DeleteMCPServer(
 		ctx,
 		&spec.DeleteMCPServerRequest{BundleID: bundleID, ServerID: alphaID},
@@ -286,11 +235,6 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 	}
 	if deleted.Body.SoftDeletedAt == nil {
 		t.Fatalf("deleted server SoftDeletedAt is nil")
-	}
-	if _, ok, err := st2.GetLastKnownSnapshot(ctx, bundleID, alphaID); err != nil {
-		t.Fatalf("GetLastKnownSnapshot(alpha deleted): %v", err)
-	} else if ok {
-		t.Fatalf("snapshot still present after delete")
 	}
 
 	listAfterDelete, err := st2.ListMCPServers(
@@ -654,14 +598,11 @@ func TestStoreValidationHelpers(t *testing.T) {
 		}
 
 		cfg := newValidStoreHTTPServer(storeTestBundleA, storeTestServerA, "Server A", true)
-		cfg.Availability = ""
 		cfg.TrustLevel = ""
 		if err := validateServerConfig(&cfg); err != nil {
 			t.Fatalf("validateServerConfig(valid): %v", err)
 		}
-		if cfg.Availability != spec.MCPServerAvailabilityManual {
-			t.Fatalf("Availability = %q, want manual", cfg.Availability)
-		}
+
 		if cfg.TrustLevel != spec.MCPTrustLevelUntrusted {
 			t.Fatalf("TrustLevel = %q, want untrusted", cfg.TrustLevel)
 		}

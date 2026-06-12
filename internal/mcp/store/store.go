@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"reflect"
 	"slices"
 	"sort"
 	"sync"
@@ -22,10 +21,9 @@ import (
 const builtInSnapshotMaxAge = 24 * time.Hour
 
 type storeSchema struct {
-	SchemaVersion      string                                                                 `json:"schemaVersion"`
-	Bundles            map[bundleitemutils.BundleID]spec.MCPBundle                            `json:"bundles"`
-	Servers            map[bundleitemutils.BundleID]map[spec.MCPServerID]spec.MCPServerConfig `json:"servers"`
-	LastKnownSnapshots map[spec.MCPServerID]spec.MCPDiscoverySnapshot                         `json:"lastKnownSnapshots,omitempty"`
+	SchemaVersion string                                                                 `json:"schemaVersion"`
+	Bundles       map[bundleitemutils.BundleID]spec.MCPBundle                            `json:"bundles"`
+	Servers       map[bundleitemutils.BundleID]map[spec.MCPServerID]spec.MCPServerConfig `json:"servers"`
 }
 
 type Store struct {
@@ -50,10 +48,9 @@ func NewMCPStore(ctx context.Context, baseDir string) (*Store, error) {
 	}
 
 	def, err := jsonencdec.StructWithJSONTagsToMap(storeSchema{
-		SchemaVersion:      spec.MCPSchemaVersion,
-		Bundles:            map[bundleitemutils.BundleID]spec.MCPBundle{},
-		Servers:            map[bundleitemutils.BundleID]map[spec.MCPServerID]spec.MCPServerConfig{},
-		LastKnownSnapshots: map[spec.MCPServerID]spec.MCPDiscoverySnapshot{},
+		SchemaVersion: spec.MCPSchemaVersion,
+		Bundles:       map[bundleitemutils.BundleID]spec.MCPBundle{},
+		Servers:       map[bundleitemutils.BundleID]map[spec.MCPServerID]spec.MCPServerConfig{},
 	})
 	if err != nil {
 		_ = builtInData.Close()
@@ -73,6 +70,14 @@ func NewMCPStore(ctx context.Context, baseDir string) (*Store, error) {
 	}
 
 	st := &Store{baseDir: baseDir, file: file, builtinData: builtInData}
+	// Remove legacy persisted discovery cache. MCP discovery snapshots are
+	// runtime-owned and process-local now.
+	if err := st.dropLegacyLastKnownSnapshots(); err != nil {
+		_ = file.Close()
+		_ = builtInData.Close()
+		return nil, err
+	}
+
 	if err := st.ensureBaseBundleHydrated(ctx); err != nil {
 		_ = file.Close()
 		_ = builtInData.Close()
@@ -374,7 +379,6 @@ func (s *Store) PutMCPServer(
 		Transport:      req.Body.Transport,
 		Stdio:          req.Body.Stdio,
 		StreamableHTTP: req.Body.StreamableHTTP,
-		Availability:   req.Body.Availability,
 		TrustLevel:     req.Body.TrustLevel,
 		DefaultPolicy:  policy,
 		ToolPolicies:   req.Body.ToolPolicies,
@@ -387,12 +391,6 @@ func (s *Store) PutMCPServer(
 
 	if err := validateServerConfig(&cfg); err != nil {
 		return nil, fmt.Errorf("%w: %w", spec.ErrMCPInvalidRequest, err)
-	}
-
-	if old, ok := sc.Servers[req.BundleID][req.ServerID]; ok && serverConnectionMaterialChanged(old, cfg) {
-		// A changed endpoint/process invalidates the live/discovered view.
-		// Runtime disconnect is handled by the wrapper.
-		delete(sc.LastKnownSnapshots, req.ServerID)
 	}
 
 	sc.Servers[req.BundleID][req.ServerID] = cloneServerConfig(cfg)
@@ -714,63 +712,11 @@ func (s *Store) DeleteMCPServer(
 	cfg.SoftDeletedAt = &now
 	cfg.ModifiedAt = now
 	sc.Servers[bid][req.ServerID] = cloneServerConfig(cfg)
-	delete(sc.LastKnownSnapshots, req.ServerID)
 
 	if err := s.writeAll(sc); err != nil {
 		return nil, err
 	}
 	return &spec.DeleteMCPServerResponse{}, nil
-}
-
-func (s *Store) SaveLastKnownSnapshot(ctx context.Context, snap spec.MCPDiscoverySnapshot) error {
-	if err := requireMCPBundleServerIDs(snap.BundleID, snap.ServerID); err != nil {
-		return err
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	sc, err := s.readAll(ctx, false)
-	if err != nil {
-		return err
-	}
-	if bid, cfg, ok := findUserServer(sc, snap.BundleID, snap.ServerID); ok {
-		if isServerSoftDeleted(&cfg) {
-			return fmt.Errorf("%w: %s", spec.ErrMCPServerDeleting, snap.ServerID)
-		}
-		_ = bid
-	} else {
-		if s.builtinData == nil {
-			return fmt.Errorf("%w: %s", spec.ErrMCPServerNotFound, snap.ServerID)
-		}
-		if _, err := s.builtinData.GetBuiltInServer(ctx, snap.BundleID, snap.ServerID); err != nil {
-			return fmt.Errorf("%w: %s", spec.ErrMCPServerNotFound, snap.ServerID)
-		}
-	}
-	sc.LastKnownSnapshots[snap.ServerID] = cloneDiscoverySnapshot(snap)
-	return s.writeAll(sc)
-}
-
-func (s *Store) GetLastKnownSnapshot(
-	ctx context.Context,
-	bundleID bundleitemutils.BundleID,
-	serverID spec.MCPServerID,
-) (spec.MCPDiscoverySnapshot, bool, error) {
-	if err := requireMCPBundleServerIDs(bundleID, serverID); err != nil {
-		return spec.MCPDiscoverySnapshot{}, false, err
-	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	sc, err := s.readAll(ctx, false)
-	if err != nil {
-		return spec.MCPDiscoverySnapshot{}, false, err
-	}
-	snap, ok := sc.LastKnownSnapshots[serverID]
-	if ok && snap.BundleID != bundleID {
-		return spec.MCPDiscoverySnapshot{}, false, nil
-	}
-	return cloneDiscoverySnapshot(snap), ok, nil
 }
 
 func (s *Store) ensureBaseBundleHydrated(ctx context.Context) error {
@@ -960,9 +906,6 @@ func (s *Store) readAll(ctx context.Context, force bool) (storeSchema, error) {
 	if sc.Servers == nil {
 		sc.Servers = map[bundleitemutils.BundleID]map[spec.MCPServerID]spec.MCPServerConfig{}
 	}
-	if sc.LastKnownSnapshots == nil {
-		sc.LastKnownSnapshots = map[spec.MCPServerID]spec.MCPDiscoverySnapshot{}
-	}
 
 	for id, b := range sc.Bundles {
 		if b.ID != id {
@@ -1025,15 +968,27 @@ func (s *Store) writeAll(sc storeSchema) error {
 			sc.Servers[bid] = map[spec.MCPServerID]spec.MCPServerConfig{}
 		}
 	}
-	if sc.LastKnownSnapshots == nil {
-		sc.LastKnownSnapshots = map[spec.MCPServerID]spec.MCPDiscoverySnapshot{}
-	}
 
 	mp, err := jsonencdec.StructWithJSONTagsToMap(sc)
 	if err != nil {
 		return err
 	}
 	return s.file.SetAll(mp)
+}
+
+func (s *Store) dropLegacyLastKnownSnapshots() error {
+	if s == nil || s.file == nil {
+		return nil
+	}
+	raw, err := s.file.GetAll(false)
+	if err != nil {
+		return err
+	}
+	if _, ok := raw["lastKnownSnapshots"]; !ok {
+		return nil
+	}
+	delete(raw, "lastKnownSnapshots")
+	return s.file.SetAll(raw)
 }
 
 func findUserServerBundle(sc storeSchema, serverID spec.MCPServerID) (bundleitemutils.BundleID, bool) {
@@ -1171,10 +1126,4 @@ func isBaseMCPBundleID(id bundleitemutils.BundleID) bool {
 
 func isBaseMCPBundleSlug(slug bundleitemutils.BundleSlug) bool {
 	return slug == spec.BaseMCPBundleSlug
-}
-
-func serverConnectionMaterialChanged(a, b spec.MCPServerConfig) bool {
-	return a.Transport != b.Transport ||
-		!reflect.DeepEqual(a.Stdio, b.Stdio) ||
-		!reflect.DeepEqual(a.StreamableHTTP, b.StreamableHTTP)
 }

@@ -11,7 +11,6 @@
 		"authMode": "oauth",
 		"timeoutMS": 30000
 	},
-	"availability": "manual",
 	"trustLevel": "trusted",
 	"defaultPolicy": {
 		"defaultApprovalRule": "allow",

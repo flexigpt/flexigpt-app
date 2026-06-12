@@ -87,15 +87,6 @@ func validateServerConfig(c *spec.MCPServerConfig) error {
 		return errors.New("soft-deleted server cannot be enabled")
 	}
 
-	switch c.Availability {
-	case "", spec.MCPServerAvailabilityManual:
-	default:
-		return fmt.Errorf("invalid availability %q", c.Availability)
-	}
-	if c.Availability == "" {
-		c.Availability = spec.MCPServerAvailabilityManual
-	}
-
 	switch c.TrustLevel {
 	case "", spec.MCPTrustLevelUntrusted, spec.MCPTrustLevelTrusted:
 	default:

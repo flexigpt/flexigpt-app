@@ -43,15 +43,18 @@ type ClientFactory interface {
 	) (ClientSession, error)
 }
 
+const defaultLastKnownSnapshotTTL = time.Hour
+
 type sessionState struct {
-	bundleID        bundleitemutils.BundleID
-	serverID        spec.MCPServerID
-	status          spec.MCPServerStatus
-	client          ClientSession
-	snapshot        spec.MCPDiscoverySnapshot
-	lastError       string
-	lastConnectedAt time.Time
-	lastSyncedAt    time.Time
+	bundleID          bundleitemutils.BundleID
+	serverID          spec.MCPServerID
+	status            spec.MCPServerStatus
+	client            ClientSession
+	snapshot          spec.MCPDiscoverySnapshot
+	lastError         string
+	lastConnectedAt   time.Time
+	lastSyncedAt      time.Time
+	snapshotExpiresAt time.Time
 }
 
 type MCPRuntimeManager struct {
@@ -64,6 +67,7 @@ type MCPRuntimeManager struct {
 	generations               map[spec.MCPServerID]uint64
 	notificationRefreshTimers map[spec.MCPServerID]*time.Timer
 	shuttingDown              bool
+	lastKnownSnapshotTTL      time.Duration
 }
 
 func NewMCPRuntimeManager(st *store.Store, authMgr *auth.AuthManager, factory ClientFactory) *MCPRuntimeManager {
@@ -74,6 +78,7 @@ func NewMCPRuntimeManager(st *store.Store, authMgr *auth.AuthManager, factory Cl
 		sessions:                  map[spec.MCPServerID]*sessionState{},
 		generations:               map[spec.MCPServerID]uint64{},
 		notificationRefreshTimers: map[spec.MCPServerID]*time.Timer{},
+		lastKnownSnapshotTTL:      defaultLastKnownSnapshotTTL,
 	}
 }
 
@@ -135,15 +140,19 @@ func (m *MCPRuntimeManager) Connect(
 	}
 
 	generation := m.bumpGenerationLocked(req.ServerID)
+	if state.bundleID != "" && state.bundleID != req.BundleID {
+		m.clearSnapshotLocked(ctx, state)
+	}
 
 	state.status = spec.MCPServerStatusConnecting
 	state.lastError = ""
-	state.snapshot = spec.MCPDiscoverySnapshot{
-		BundleID: req.BundleID,
-		ServerID: req.ServerID,
+	if state.snapshot.BundleID == "" || state.snapshot.ServerID == "" {
+		state.snapshot = spec.MCPDiscoverySnapshot{
+			BundleID: req.BundleID,
+			ServerID: req.ServerID,
+		}
 	}
 	state.lastConnectedAt = time.Time{}
-	state.lastSyncedAt = time.Time{}
 	m.mu.Unlock()
 	if oldClientToClose != nil {
 		closeCtx := context.WithoutCancel(ctx)
@@ -235,9 +244,6 @@ func (m *MCPRuntimeManager) Connect(
 
 	hydrateSnapshotIdentity(&snap, cfg.BundleID, cfg.ID)
 	normalizeSnapshot(&snap)
-	if err := m.store.SaveLastKnownSnapshot(ctx, snap); err != nil {
-		slog.Warn("mcp: save last known snapshot failed", "serverID", req.ServerID, "err", err)
-	}
 
 	now := time.Now().UTC()
 	var oldClient ClientSession
@@ -258,10 +264,9 @@ func (m *MCPRuntimeManager) Connect(
 	state.bundleID = cfg.BundleID
 	state.client = client
 	state.status = spec.MCPServerStatusReady
-	state.snapshot = cloneDiscoverySnapshot(snap)
 	state.lastConnectedAt = now
-	state.lastSyncedAt = now
 	state.lastError = ""
+	m.rememberSnapshotLocked(state, snap, now)
 	m.mu.Unlock()
 
 	if oldClient != nil {
@@ -293,7 +298,19 @@ func (m *MCPRuntimeManager) Disconnect(
 		)
 	}
 	m.bumpGenerationLocked(req.ServerID)
-	delete(m.sessions, req.ServerID)
+	if state != nil {
+		state.client = nil
+		state.status = spec.MCPServerStatusDisconnected
+		state.lastError = ""
+		state.bundleID = req.BundleID
+	} else {
+		state = &sessionState{
+			bundleID: req.BundleID,
+			serverID: req.ServerID,
+			status:   spec.MCPServerStatusDisconnected,
+		}
+		m.sessions[req.ServerID] = state
+	}
 	timer := m.notificationRefreshTimers[req.ServerID]
 	delete(m.notificationRefreshTimers, req.ServerID)
 	m.mu.Unlock()
@@ -334,9 +351,7 @@ func (m *MCPRuntimeManager) Refresh(
 	}
 	hydrateSnapshotIdentity(&snap, cfg.BundleID, cfg.ID)
 	normalizeSnapshot(&snap)
-	if err := m.store.SaveLastKnownSnapshot(ctx, snap); err != nil {
-		slog.Warn("mcp: save refreshed snapshot failed", "serverID", req.ServerID, "err", err)
-	}
+
 	now := time.Now().UTC()
 	m.mu.Lock()
 	state := m.sessions[req.ServerID]
@@ -344,8 +359,7 @@ func (m *MCPRuntimeManager) Refresh(
 		m.mu.Unlock()
 		return nil, fmt.Errorf("%w: server %s is no longer connected", spec.ErrMCPRuntimeNotReady, req.ServerID)
 	}
-	state.snapshot = cloneDiscoverySnapshot(snap)
-	state.lastSyncedAt = now
+	m.rememberSnapshotLocked(state, snap, now)
 	state.status = spec.MCPServerStatusReady
 	state.lastError = ""
 	m.mu.Unlock()
@@ -752,6 +766,28 @@ func (m *MCPRuntimeManager) CallToolDryRun(
 	}, cfg, tool, nil
 }
 
+func (m *MCPRuntimeManager) ForgetLastKnownSnapshot(
+	ctx context.Context,
+	bundleID bundleitemutils.BundleID,
+	serverID spec.MCPServerID,
+) {
+	if m == nil || bundleID == "" || serverID == "" {
+		return
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	st := m.sessions[serverID]
+	if st == nil {
+		return
+	}
+	if st.bundleID != "" && st.bundleID != bundleID {
+		return
+	}
+	m.clearSnapshotLocked(ctx, st)
+}
+
 func (m *MCPRuntimeManager) scheduleNotificationRefresh(
 	ctx context.Context,
 	bundleID bundleitemutils.BundleID,
@@ -833,9 +869,6 @@ func (m *MCPRuntimeManager) refreshFromNotification(
 
 	hydrateSnapshotIdentity(&snap, cfg.BundleID, serverID)
 	normalizeSnapshot(&snap)
-	if err := m.store.SaveLastKnownSnapshot(ctx, snap); err != nil {
-		slog.Warn("mcp: save notification-refreshed snapshot failed", "serverID", serverID, "err", err)
-	}
 
 	now := time.Now().UTC()
 
@@ -851,8 +884,7 @@ func (m *MCPRuntimeManager) refreshFromNotification(
 		return
 	}
 
-	state.snapshot = cloneDiscoverySnapshot(snap)
-	state.lastSyncedAt = now
+	m.rememberSnapshotLocked(state, snap, now)
 	state.lastError = ""
 
 	slog.Info("mcp discovery refreshed from notification", "serverID", serverID, "reason", reason)
@@ -871,16 +903,78 @@ func (m *MCPRuntimeManager) currentSnapshot(
 		m.mu.RUnlock()
 		return snap, nil
 	}
+
+	if st := m.sessions[serverID]; st != nil && st.bundleID == bundleID &&
+		st.status != spec.MCPServerStatusReady &&
+		st.snapshotStillValid(time.Now().UTC()) {
+		snap := cloneDiscoverySnapshot(st.snapshot)
+		m.mu.RUnlock()
+		return snap, nil
+	}
 	m.mu.RUnlock()
 
-	snap, ok, err := m.store.GetLastKnownSnapshot(ctx, bundleID, serverID)
-	if err != nil {
-		return spec.MCPDiscoverySnapshot{}, err
+	m.mu.Lock()
+	if st := m.sessions[serverID]; st != nil && st.bundleID == bundleID &&
+		st.status != spec.MCPServerStatusReady &&
+		!st.snapshotExpiresAt.IsZero() &&
+		time.Now().UTC().After(st.snapshotExpiresAt) {
+		m.clearSnapshotLocked(ctx, st)
 	}
-	if !ok {
-		return spec.MCPDiscoverySnapshot{}, fmt.Errorf("%w: no runtime snapshot", spec.ErrMCPRuntimeNotReady)
+	m.mu.Unlock()
+
+	return spec.MCPDiscoverySnapshot{}, fmt.Errorf("%w: no runtime snapshot", spec.ErrMCPRuntimeNotReady)
+}
+
+func (m *MCPRuntimeManager) rememberSnapshotLocked(
+	st *sessionState,
+	snap spec.MCPDiscoverySnapshot,
+	now time.Time,
+) {
+	if st == nil {
+		return
 	}
-	return cloneDiscoverySnapshot(snap), nil
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	st.snapshot = cloneDiscoverySnapshot(snap)
+	st.lastSyncedAt = now
+
+	ttl := m.lastKnownSnapshotTTL
+	if ttl <= 0 {
+		ttl = defaultLastKnownSnapshotTTL
+	}
+	st.snapshotExpiresAt = now.Add(ttl)
+}
+
+func (st *sessionState) snapshotStillValid(now time.Time) bool {
+	if st == nil {
+		return false
+	}
+	if st.snapshot.BundleID == "" || st.snapshot.ServerID == "" || st.snapshot.Digest == "" {
+		return false
+	}
+	if st.status == spec.MCPServerStatusReady {
+		return true
+	}
+	if st.snapshotExpiresAt.IsZero() {
+		return false
+	}
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	return now.Before(st.snapshotExpiresAt)
+}
+
+func (m *MCPRuntimeManager) clearSnapshotLocked(_ context.Context, st *sessionState) {
+	if st == nil {
+		return
+	}
+	st.snapshot = spec.MCPDiscoverySnapshot{
+		BundleID: st.bundleID,
+		ServerID: st.serverID,
+	}
+	st.snapshotExpiresAt = time.Time{}
+	st.lastSyncedAt = time.Time{}
 }
 
 func (m *MCPRuntimeManager) readyClient(
@@ -975,6 +1069,7 @@ func (m *MCPRuntimeManager) snapshotFromState(
 	defer m.mu.RUnlock()
 
 	st := m.sessions[id]
+	now := time.Now().UTC()
 	if st == nil {
 		return &spec.MCPServerRuntimeSnapshot{
 			BundleID: bundleID,
@@ -983,23 +1078,32 @@ func (m *MCPRuntimeManager) snapshotFromState(
 		}
 	}
 
-	snapshotDigest := st.snapshot.Digest
-	if snapshotDigest == "" {
-		snapshotDigest = computeDiscoverySnapshotDigest(st.snapshot)
+	snap := st.snapshot
+	if st.status != spec.MCPServerStatusReady && !st.snapshotStillValid(now) {
+		snap = spec.MCPDiscoverySnapshot{
+			BundleID: firstBundleID(st.bundleID, bundleID),
+			ServerID: id,
+		}
+	}
+
+	snapshotDigest := snap.Digest
+	if snapshotDigest == "" && snap.BundleID != "" && snap.ServerID != "" {
+		snapshotDigest = computeDiscoverySnapshotDigest(snap)
 	}
 	out := &spec.MCPServerRuntimeSnapshot{
-		BundleID:                  firstBundleID(st.snapshot.BundleID, st.bundleID, bundleID),
+		BundleID: firstBundleID(snap.BundleID, st.bundleID, bundleID),
+
 		ServerID:                  id,
 		Status:                    st.status,
 		LastError:                 st.lastError,
-		NegotiatedProtocolVersion: st.snapshot.NegotiatedProtocolVersion,
-		ServerInfo:                clonePtr(st.snapshot.ServerInfo),
-		ServerCapabilities:        cloneCapabilitiesSummary(st.snapshot.ServerCapabilities),
-		Instructions:              st.snapshot.Instructions,
-		ToolCount:                 len(st.snapshot.Tools),
-		ResourceCount:             len(st.snapshot.Resources),
-		ResourceTemplateCount:     len(st.snapshot.ResourceTemplates),
-		PromptCount:               len(st.snapshot.Prompts),
+		NegotiatedProtocolVersion: snap.NegotiatedProtocolVersion,
+		ServerInfo:                clonePtr(snap.ServerInfo),
+		ServerCapabilities:        cloneCapabilitiesSummary(snap.ServerCapabilities),
+		Instructions:              snap.Instructions,
+		ToolCount:                 len(snap.Tools),
+		ResourceCount:             len(snap.Resources),
+		ResourceTemplateCount:     len(snap.ResourceTemplates),
+		PromptCount:               len(snap.Prompts),
 		SnapshotDigest:            snapshotDigest,
 	}
 	if !st.lastConnectedAt.IsZero() {

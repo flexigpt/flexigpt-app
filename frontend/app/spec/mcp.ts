@@ -41,10 +41,6 @@ export enum MCPTransportType {
 	MCPTransportTypeStdio = 'stdio',
 }
 
-export enum MCPServerAvailability {
-	MCPServerAvailabilityManual = 'manual',
-}
-
 export enum MCPTrustLevel {
 	MCPTrustLevelUntrusted = 'untrusted',
 	MCPTrustLevelTrusted = 'trusted',
@@ -297,11 +293,10 @@ export interface PutMCPServerPayload {
 	enabled: boolean;
 	transport: MCPTransportType;
 
+	trustLevel?: MCPTrustLevel;
+
 	stdio?: MCPStdioConfig;
 	streamableHttp?: MCPStreamableHTTPConfig;
-
-	availability?: MCPServerAvailability;
-	trustLevel?: MCPTrustLevel;
 
 	defaultPolicy?: MCPServerPolicy;
 	toolPolicies?: Record<string, MCPToolPolicyOverride>;
@@ -649,7 +644,6 @@ export interface MCPServerConfig {
 	transport: MCPTransportType;
 	stdio?: MCPStdioConfig;
 	streamableHttp?: MCPStreamableHTTPConfig;
-	availability: MCPServerAvailability;
 	trustLevel: MCPTrustLevel;
 	defaultPolicy: MCPServerPolicy;
 	toolPolicies?: Record<string, MCPToolPolicyOverride>;

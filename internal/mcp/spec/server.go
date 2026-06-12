@@ -53,11 +53,10 @@ type MCPServerConfig struct {
 	Enabled     bool                     `json:"enabled"`
 	Transport   MCPTransportType         `json:"transport"`
 
+	TrustLevel MCPTrustLevel `json:"trustLevel"`
+
 	Stdio          *MCPStdioConfig          `json:"stdio,omitempty"`
 	StreamableHTTP *MCPStreamableHTTPConfig `json:"streamableHttp,omitempty"`
-
-	Availability MCPServerAvailability `json:"availability"`
-	TrustLevel   MCPTrustLevel         `json:"trustLevel"`
 
 	DefaultPolicy MCPServerPolicy                  `json:"defaultPolicy"`
 	ToolPolicies  map[string]MCPToolPolicyOverride `json:"toolPolicies,omitempty"`

@@ -4107,10 +4107,9 @@ export namespace spec {
 	    displayName: string;
 	    enabled: boolean;
 	    transport: string;
+	    trustLevel: string;
 	    stdio?: MCPStdioConfig;
 	    streamableHttp?: MCPStreamableHTTPConfig;
-	    availability: string;
-	    trustLevel: string;
 	    defaultPolicy: MCPServerPolicy;
 	    toolPolicies?: Record<string, MCPToolPolicyOverride>;
 	    appsPolicy?: MCPAppsPolicy;
@@ -4134,10 +4133,9 @@ export namespace spec {
 	        this.displayName = source["displayName"];
 	        this.enabled = source["enabled"];
 	        this.transport = source["transport"];
+	        this.trustLevel = source["trustLevel"];
 	        this.stdio = this.convertValues(source["stdio"], MCPStdioConfig);
 	        this.streamableHttp = this.convertValues(source["streamableHttp"], MCPStreamableHTTPConfig);
-	        this.availability = source["availability"];
-	        this.trustLevel = source["trustLevel"];
 	        this.defaultPolicy = this.convertValues(source["defaultPolicy"], MCPServerPolicy);
 	        this.toolPolicies = this.convertValues(source["toolPolicies"], MCPToolPolicyOverride, true);
 	        this.appsPolicy = this.convertValues(source["appsPolicy"], MCPAppsPolicy);
@@ -9664,10 +9662,9 @@ export namespace spec {
 	    displayName: string;
 	    enabled: boolean;
 	    transport: string;
+	    trustLevel?: string;
 	    stdio?: MCPStdioConfig;
 	    streamableHttp?: MCPStreamableHTTPConfig;
-	    availability?: string;
-	    trustLevel?: string;
 	    defaultPolicy?: MCPServerPolicy;
 	    toolPolicies?: Record<string, MCPToolPolicyOverride>;
 	    appsPolicy?: MCPAppsPolicy;
@@ -9681,10 +9678,9 @@ export namespace spec {
 	        this.displayName = source["displayName"];
 	        this.enabled = source["enabled"];
 	        this.transport = source["transport"];
+	        this.trustLevel = source["trustLevel"];
 	        this.stdio = this.convertValues(source["stdio"], MCPStdioConfig);
 	        this.streamableHttp = this.convertValues(source["streamableHttp"], MCPStreamableHTTPConfig);
-	        this.availability = source["availability"];
-	        this.trustLevel = source["trustLevel"];
 	        this.defaultPolicy = this.convertValues(source["defaultPolicy"], MCPServerPolicy);
 	        this.toolPolicies = this.convertValues(source["toolPolicies"], MCPToolPolicyOverride, true);
 	        this.appsPolicy = this.convertValues(source["appsPolicy"], MCPAppsPolicy);

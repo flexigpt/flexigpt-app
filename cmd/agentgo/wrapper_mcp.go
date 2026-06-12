@@ -275,9 +275,9 @@ func (w *MCPWrapper) GetMCPServerAuthStatus(
 func (w *MCPWrapper) PutMCPServer(req *spec.PutMCPServerRequest) (*spec.PutMCPServerResponse, error) {
 	return middleware.WithRecoveryResp(func() (*spec.PutMCPServerResponse, error) {
 		var previous *spec.MCPServerConfig
-
+		ctx := context.Background()
 		if req != nil && req.BundleID != "" && req.ServerID != "" && w != nil && w.store != nil {
-			oldResp, oldErr := w.store.GetMCPServer(context.Background(), &spec.GetMCPServerRequest{
+			oldResp, oldErr := w.store.GetMCPServer(ctx, &spec.GetMCPServerRequest{
 				BundleID: req.BundleID,
 				ServerID: req.ServerID,
 			})
@@ -298,15 +298,19 @@ func (w *MCPWrapper) PutMCPServer(req *spec.PutMCPServerRequest) (*spec.PutMCPSe
 					spec.ErrMCPInvalidRequest,
 				)
 			}
-			if ok, msg := w.oauthClientSecretConfigured(context.Background(), ref, true); !ok {
+			if ok, msg := w.oauthClientSecretConfigured(ctx, ref, true); !ok {
 				return nil, fmt.Errorf("%w: %s", spec.ErrMCPInvalidRequest, msg)
 			}
 		}
 
-		resp, err := w.store.PutMCPServer(context.Background(), req)
+		resp, err := w.store.PutMCPServer(ctx, req)
 		if err != nil {
 			return nil, err
 		}
+		if shouldForgetMCPServerSnapshotAfterPut(previous, req) && w != nil && w.runtime != nil {
+			w.runtime.ForgetLastKnownSnapshot(ctx, req.BundleID, req.ServerID)
+		}
+
 		if shouldDisconnectMCPServerAfterPut(previous, req) {
 			_, _ = w.runtime.Disconnect(context.Background(), &spec.DisconnectMCPServerRequest{
 				BundleID: req.BundleID,
@@ -333,12 +337,16 @@ func (w *MCPWrapper) PatchMCPServerEnabled(
 	req *spec.PatchMCPServerEnabledRequest,
 ) (*spec.PatchMCPServerEnabledResponse, error) {
 	return middleware.WithRecoveryResp(func() (*spec.PatchMCPServerEnabledResponse, error) {
-		resp, err := w.store.PatchMCPServerEnabled(context.Background(), req)
+		ctx := context.Background()
+		resp, err := w.store.PatchMCPServerEnabled(ctx, req)
 		if err != nil {
 			return nil, err
 		}
 		if req != nil && req.Body != nil && !req.Body.Enabled {
-			_, _ = w.runtime.Disconnect(context.Background(), &spec.DisconnectMCPServerRequest{
+			if w != nil && w.runtime != nil {
+				w.runtime.ForgetLastKnownSnapshot(ctx, req.BundleID, req.ServerID)
+			}
+			_, _ = w.runtime.Disconnect(ctx, &spec.DisconnectMCPServerRequest{
 				BundleID: req.BundleID,
 				ServerID: req.ServerID,
 			})
@@ -357,12 +365,16 @@ func (w *MCPWrapper) PatchMCPServerPolicy(
 
 func (w *MCPWrapper) DeleteMCPServer(req *spec.DeleteMCPServerRequest) (*spec.DeleteMCPServerResponse, error) {
 	return middleware.WithRecoveryResp(func() (*spec.DeleteMCPServerResponse, error) {
-		resp, err := w.store.DeleteMCPServer(context.Background(), req)
+		ctx := context.Background()
+		resp, err := w.store.DeleteMCPServer(ctx, req)
 		if err != nil {
 			return nil, err
 		}
+		if req != nil && w != nil && w.runtime != nil {
+			w.runtime.ForgetLastKnownSnapshot(ctx, req.BundleID, req.ServerID)
+		}
 		if req != nil {
-			_, _ = w.runtime.Disconnect(context.Background(), &spec.DisconnectMCPServerRequest{
+			_, _ = w.runtime.Disconnect(ctx, &spec.DisconnectMCPServerRequest{
 				BundleID: req.BundleID,
 				ServerID: req.ServerID,
 			})
@@ -635,6 +647,9 @@ func (w *MCPWrapper) disconnectBundleServers(ctx context.Context, bundleID bundl
 		return
 	}
 	for _, cfg := range resp.Body.Servers {
+		if w.runtime != nil {
+			w.runtime.ForgetLastKnownSnapshot(ctx, cfg.BundleID, cfg.ID)
+		}
 		_, _ = w.runtime.Disconnect(ctx, &spec.DisconnectMCPServerRequest{
 			BundleID: cfg.BundleID,
 			ServerID: cfg.ID,
@@ -814,6 +829,16 @@ func (w *MCPWrapper) pendingOAuthAuthorization(
 	return spec.MCPOAuthAuthorization{}, false
 }
 
+func shouldForgetMCPServerSnapshotAfterPut(previous *spec.MCPServerConfig, req *spec.PutMCPServerRequest) bool {
+	if req == nil || req.Body == nil || req.BundleID == "" || req.ServerID == "" {
+		return false
+	}
+	if !req.Body.Enabled {
+		return true
+	}
+	return mcpServerConnectionMaterialChanged(previous, req)
+}
+
 func shouldDisconnectMCPServerAfterPut(previous *spec.MCPServerConfig, req *spec.PutMCPServerRequest) bool {
 	if req == nil || req.Body == nil || req.BundleID == "" || req.ServerID == "" {
 		return false
@@ -827,6 +852,13 @@ func shouldDisconnectMCPServerAfterPut(previous *spec.MCPServerConfig, req *spec
 		return false
 	}
 
+	return mcpServerConnectionMaterialChanged(previous, req)
+}
+
+func mcpServerConnectionMaterialChanged(previous *spec.MCPServerConfig, req *spec.PutMCPServerRequest) bool {
+	if previous == nil || req == nil || req.Body == nil || req.BundleID == "" || req.ServerID == "" {
+		return false
+	}
 	return previous.Transport != req.Body.Transport ||
 		!reflect.DeepEqual(previous.Stdio, req.Body.Stdio) ||
 		!reflect.DeepEqual(previous.StreamableHTTP, req.Body.StreamableHTTP)

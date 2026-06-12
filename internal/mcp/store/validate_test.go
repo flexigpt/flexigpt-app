@@ -49,11 +49,10 @@ func TestValidateServerConfigBranches(t *testing.T) {
 	}
 
 	tests := []struct {
-		name             string
-		cfg              spec.MCPServerConfig
-		wantErrContains  string
-		wantAvailability spec.MCPServerAvailability
-		wantTrustLevel   spec.MCPTrustLevel
+		name            string
+		cfg             spec.MCPServerConfig
+		wantErrContains string
+		wantTrustLevel  spec.MCPTrustLevel
 	}{
 		{
 			name:            "nil config",
@@ -125,11 +124,7 @@ func TestValidateServerConfigBranches(t *testing.T) {
 			}(),
 			wantErrContains: "soft-deleted server cannot be enabled",
 		},
-		{
-			name:            "invalid availability",
-			cfg:             func() spec.MCPServerConfig { c := baseHTTP(); c.Availability = "bogus"; return c }(),
-			wantErrContains: "invalid availability",
-		},
+
 		{
 			name:            "invalid trust level",
 			cfg:             func() spec.MCPServerConfig { c := baseHTTP(); c.TrustLevel = "bogus"; return c }(),
@@ -158,26 +153,26 @@ func TestValidateServerConfigBranches(t *testing.T) {
 			wantErrContains: "toolPolicies key",
 		},
 		{
-			name: "valid http config defaults availability and trust",
+			name: "valid http config defaults trust",
 			cfg: func() spec.MCPServerConfig {
 				c := baseHTTP()
-				c.Availability = ""
+
 				c.TrustLevel = ""
 				return c
 			}(),
-			wantAvailability: spec.MCPServerAvailabilityManual,
-			wantTrustLevel:   spec.MCPTrustLevelUntrusted,
+
+			wantTrustLevel: spec.MCPTrustLevelUntrusted,
 		},
 		{
-			name: "valid stdio config defaults availability and trust",
+			name: "valid stdio config defaults trust",
 			cfg: func() spec.MCPServerConfig {
 				c := baseStdio()
-				c.Availability = ""
+
 				c.TrustLevel = ""
 				return c
 			}(),
-			wantAvailability: spec.MCPServerAvailabilityManual,
-			wantTrustLevel:   spec.MCPTrustLevelUntrusted,
+
+			wantTrustLevel: spec.MCPTrustLevelUntrusted,
 		},
 		{
 			name: "valid http config trusted",
@@ -206,9 +201,7 @@ func TestValidateServerConfigBranches(t *testing.T) {
 			if err != nil {
 				t.Fatalf("validateServerConfig: %v", err)
 			}
-			if tt.wantAvailability != "" && cfg.Availability != tt.wantAvailability {
-				t.Fatalf("Availability = %q, want %q", cfg.Availability, tt.wantAvailability)
-			}
+
 			if tt.wantTrustLevel != "" && cfg.TrustLevel != tt.wantTrustLevel {
 				t.Fatalf("TrustLevel = %q, want %q", cfg.TrustLevel, tt.wantTrustLevel)
 			}

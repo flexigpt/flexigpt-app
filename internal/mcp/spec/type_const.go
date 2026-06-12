@@ -80,12 +80,6 @@ const (
 	MCPTransportStdio          MCPTransportType = "stdio"
 )
 
-type MCPServerAvailability string
-
-const (
-	MCPServerAvailabilityManual MCPServerAvailability = "manual"
-)
-
 type MCPTrustLevel string
 
 const (

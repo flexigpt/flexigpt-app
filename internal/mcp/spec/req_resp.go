@@ -63,15 +63,13 @@ type PutMCPServerPayload struct {
 	Enabled     bool             `json:"enabled"     required:"true"`
 	Transport   MCPTransportType `json:"transport"   required:"true"`
 
-	Stdio          *MCPStdioConfig          `json:"stdio,omitempty"`
-	StreamableHTTP *MCPStreamableHTTPConfig `json:"streamableHttp,omitempty"`
+	TrustLevel MCPTrustLevel `json:"trustLevel,omitempty"`
 
-	Availability MCPServerAvailability `json:"availability,omitempty"`
-	TrustLevel   MCPTrustLevel         `json:"trustLevel,omitempty"`
-
-	DefaultPolicy *MCPServerPolicy                 `json:"defaultPolicy,omitempty"`
-	ToolPolicies  map[string]MCPToolPolicyOverride `json:"toolPolicies,omitempty"`
-	AppsPolicy    *MCPAppsPolicy                   `json:"appsPolicy,omitempty"`
+	Stdio          *MCPStdioConfig                  `json:"stdio,omitempty"`
+	StreamableHTTP *MCPStreamableHTTPConfig         `json:"streamableHttp,omitempty"`
+	DefaultPolicy  *MCPServerPolicy                 `json:"defaultPolicy,omitempty"`
+	ToolPolicies   map[string]MCPToolPolicyOverride `json:"toolPolicies,omitempty"`
+	AppsPolicy     *MCPAppsPolicy                   `json:"appsPolicy,omitempty"`
 }
 
 type PutMCPServerRequest struct {

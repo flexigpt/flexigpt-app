@@ -350,30 +350,6 @@ func TestRuntimeManagerSnapshotReadyClientAndRefreshBranches(t *testing.T) {
 		}
 	})
 
-	t.Run("currentSnapshot falls back to store and clones results", func(t *testing.T) {
-		storeSnap := coverageDiscoverySnapshot(serverID, "store-tool")
-		if err := st.SaveLastKnownSnapshot(t.Context(), storeSnap); err != nil {
-			t.Fatalf("SaveLastKnownSnapshot: %v", err)
-		}
-
-		got, err := mgr.currentSnapshot(t.Context(), bundleID, serverID)
-		if err != nil {
-			t.Fatalf("currentSnapshot(store fallback): %v", err)
-		}
-		if len(got.Tools) != 1 || got.Tools[0].ToolName != "store-tool" {
-			t.Fatalf("currentSnapshot(store fallback) = %#v", got.Tools)
-		}
-
-		got.Tools[0].ToolName = "mutated"
-		again, err := mgr.currentSnapshot(t.Context(), bundleID, serverID)
-		if err != nil {
-			t.Fatalf("currentSnapshot(store fallback #2): %v", err)
-		}
-		if len(again.Tools) != 1 || again.Tools[0].ToolName != "store-tool" {
-			t.Fatalf("currentSnapshot was not cloned: %#v", again.Tools)
-		}
-	})
-
 	t.Run("refresh without a connected session is not ready", func(t *testing.T) {
 		refreshMgr := NewMCPRuntimeManager(st, nil, nil)
 		_, err := refreshMgr.Refresh(t.Context(), &spec.RefreshMCPServerRequest{
