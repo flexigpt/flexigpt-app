@@ -487,11 +487,13 @@ export default function MCPServersPage() {
 				let refs: Record<string, string> = { ...(finalPayload.streamableHttp.secretHeaderRefs ?? {}) };
 
 				if (plan.deleteExisting && plan.existingSecretRef) {
+					const deleteSlot = (plan.deleteSlot ?? plan.slot).trim();
+
 					await mcpAPI.deleteMCPServerSecret(
 						bundleID,
 						input.serverID,
 						MCPSecretKind.MCPSecretKindHTTPHeader,
-						plan.slot
+						deleteSlot
 					);
 					refs = omitManyKeys(refs, [plan.headerName]);
 					requiresFinalPut = true;
@@ -769,7 +771,7 @@ export default function MCPServersPage() {
 				<MCPSettingsModal
 					isOpen={isSettingsOpen}
 					initialListenAddr={settingsView?.settings.oauthLoopbackListenAddr}
-					activeListenAddr={settingsView?.settings.oauthLoopbackListenAddr}
+					activeListenAddr={settingsView?.oauthLoopbackListenAddr}
 					oauthRedirectURL={settingsView?.oauthRedirectURL}
 					onClose={() => {
 						setIsSettingsOpen(false);

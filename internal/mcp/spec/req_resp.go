@@ -176,9 +176,10 @@ type ConnectMCPServerRequest struct {
 }
 
 type MCPSettingsView struct {
-	Settings             MCPSettings `json:"settings"`
-	OAuthRedirectURL     string      `json:"oauthRedirectURL,omitempty"`
-	OAuthRestartRequired bool        `json:"oauthRestartRequired,omitempty"`
+	Settings                MCPSettings `json:"settings"`
+	OAuthRedirectURL        string      `json:"oauthRedirectURL,omitempty"`
+	OAuthLoopbackListenAddr string      `json:"oauthLoopbackListenAddr,omitempty"`
+	OAuthRestartRequired    bool        `json:"oauthRestartRequired,omitempty"`
 }
 
 type PatchMCPSettingsRequestBody struct {

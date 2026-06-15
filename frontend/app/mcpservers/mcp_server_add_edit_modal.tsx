@@ -142,6 +142,7 @@ type MCPServerFormData = {
 	httpClientIDMetadataDocumentURL: string;
 
 	apiKeyHeaderName: string;
+	apiKeyOriginalHeaderName: string;
 	apiKeyValuePrefix: string;
 	apiKeyValue: string;
 	apiKeyExistingRef?: string;
@@ -162,6 +163,10 @@ type MCPServerFormData = {
 };
 
 const ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+function sameHTTPHeaderName(a: string, b: string): boolean {
+	return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
 
 function makeRowID(): string {
 	return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -196,7 +201,7 @@ function getInitialFormData(initialData: MCPServerConfig | undefined): MCPServer
 	const defaultPolicy = initialData?.defaultPolicy ?? getDefaultMCPServerPolicy();
 	const appsPolicy = initialData?.appsPolicy ?? getDefaultMCPAppsPolicy();
 	const existingSecretHeaderRefs = initialData?.streamableHttp?.secretHeaderRefs ?? {};
-	const isApiKeyMode = initialData?.streamableHttp?.authMode === MCPHTTPAuthMode.MCPHTTPAuthAPIKey;
+	const isAPIKeyMode = initialData?.streamableHttp?.authMode === MCPHTTPAuthMode.MCPHTTPAuthAPIKey;
 	const apiKeyHeaderName =
 		Object.keys(existingSecretHeaderRefs).find(key => key.toLowerCase() === 'authorization') ??
 		Object.keys(existingSecretHeaderRefs)[0] ??
@@ -236,9 +241,10 @@ function getInitialFormData(initialData: MCPServerConfig | undefined): MCPServer
 		httpClientIDMetadataDocumentURL: initialData?.streamableHttp?.clientIDMetadataDocumentURL ?? '',
 
 		apiKeyHeaderName,
+		apiKeyOriginalHeaderName: isAPIKeyMode ? apiKeyHeaderName : '',
 		apiKeyValuePrefix: 'Bearer ',
 		apiKeyValue: '',
-		apiKeyExistingRef: isApiKeyMode ? existingSecretHeaderRefs[apiKeyHeaderName] : undefined,
+		apiKeyExistingRef: isAPIKeyMode ? existingSecretHeaderRefs[apiKeyHeaderName] : undefined,
 		apiKeyDeleteExisting: false,
 
 		defaultApprovalRule: defaultPolicy.defaultApprovalRule,
@@ -514,12 +520,19 @@ function AddEditMCPServerModalContent({
 
 				if (state.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthAPIKey) {
 					const headerName = state.apiKeyHeaderName.trim();
-					const hasExisting = Boolean(state.apiKeyExistingRef) && !state.apiKeyDeleteExisting;
+					const originalHeaderName = state.apiKeyOriginalHeaderName.trim();
+					const headerNameChanged =
+						Boolean(state.apiKeyExistingRef) &&
+						Boolean(originalHeaderName) &&
+						!sameHTTPHeaderName(headerName, originalHeaderName);
+					const hasExisting = Boolean(state.apiKeyExistingRef) && !state.apiKeyDeleteExisting && !headerNameChanged;
 					const hasNew = Boolean(state.apiKeyValue.trim());
 					if (!headerName) {
 						nextErrors.httpAPIKey = 'API key header name is required.';
 					} else if (!/^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/.test(headerName)) {
 						nextErrors.httpAPIKey = 'API key header name contains invalid characters.';
+					} else if (headerNameChanged && !hasNew) {
+						nextErrors.httpAPIKey = `Changing the header name from ${originalHeaderName} requires entering the API key again.`;
 					} else if (!hasExisting && !hasNew) {
 						nextErrors.httpAPIKey = 'API key value is required.';
 					} else {
@@ -740,7 +753,7 @@ function AddEditMCPServerModalContent({
 		const credentialAuthMode =
 			formData.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth ||
 			formData.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthClientCredentials;
-		const isApiKey = formData.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthAPIKey;
+		const isAPIKey = formData.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthAPIKey;
 
 		const existingClientCredentialRef = formData.httpClientCredentialRef.trim();
 		const shouldDeleteExistingClientCredentials =
@@ -751,9 +764,16 @@ function AddEditMCPServerModalContent({
 				: undefined;
 
 		const apiKeyHeaderName = formData.apiKeyHeaderName.trim() || 'Authorization';
-		const existingApiKeyRef = formData.apiKeyExistingRef?.trim() ?? '';
-		const shouldDeleteApiKey = Boolean(existingApiKeyRef) && (formData.apiKeyDeleteExisting || !isApiKey);
-		const apiKeyRef = isApiKey && existingApiKeyRef && !shouldDeleteApiKey ? existingApiKeyRef : undefined;
+		const originalAPIKeyHeaderName = formData.apiKeyOriginalHeaderName.trim();
+
+		const existingAPIKeyRef = formData.apiKeyExistingRef?.trim() ?? '';
+		const apiKeyHeaderChanged =
+			Boolean(existingAPIKeyRef) &&
+			Boolean(originalAPIKeyHeaderName) &&
+			!sameHTTPHeaderName(apiKeyHeaderName, originalAPIKeyHeaderName);
+		const shouldDeleteAPIKey =
+			Boolean(existingAPIKeyRef) && (formData.apiKeyDeleteExisting || !isAPIKey || apiKeyHeaderChanged);
+		const apiKeyRef = isAPIKey && existingAPIKeyRef && !shouldDeleteAPIKey ? existingAPIKeyRef : undefined;
 		const apiKeyFullValue = formData.apiKeyValue ? `${formData.apiKeyValuePrefix}${formData.apiKeyValue}` : '';
 
 		const streamableHttp = {
@@ -777,7 +797,7 @@ function AddEditMCPServerModalContent({
 			formData.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthClientCredentials &&
 			!clientCredentialRef &&
 			Boolean(formData.httpClientCredentialsSecret.trim());
-		const needsApiKeyStaging = isApiKey && !apiKeyRef && Boolean(apiKeyFullValue);
+		const needsAPIKeyStaging = isAPIKey && !apiKeyRef && Boolean(apiKeyFullValue);
 
 		let initialPayload: PutMCPServerPayload | undefined;
 		if (needsClientCredentialsStaging) {
@@ -791,7 +811,7 @@ function AddEditMCPServerModalContent({
 					secretHeaderRefs: undefined,
 				},
 			};
-		} else if (needsApiKeyStaging) {
+		} else if (needsAPIKeyStaging) {
 			initialPayload = {
 				...payloadBase,
 				streamableHttp: {
@@ -818,13 +838,14 @@ function AddEditMCPServerModalContent({
 						}
 					: undefined,
 			httpHeaderSecret:
-				isApiKey || (Boolean(existingApiKeyRef) && shouldDeleteApiKey)
+				isAPIKey || (Boolean(existingAPIKeyRef) && shouldDeleteAPIKey)
 					? {
 							headerName: apiKeyHeaderName,
 							slot: apiKeyHeaderName,
-							existingSecretRef: existingApiKeyRef || undefined,
+							deleteSlot: originalAPIKeyHeaderName || apiKeyHeaderName,
+							existingSecretRef: existingAPIKeyRef || undefined,
 							secretValue: apiKeyFullValue,
-							deleteExisting: shouldDeleteApiKey,
+							deleteExisting: shouldDeleteAPIKey,
 						}
 					: undefined,
 		};

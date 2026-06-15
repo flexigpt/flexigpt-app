@@ -160,10 +160,11 @@ func (r *settingSecretResolver) DeleteMCPSecret(ctx context.Context, secretRef s
 type MCPWrapper struct {
 	store *store.Store
 
-	auth           *auth.AuthManager
-	secretResolver auth.SecretResolver
-	secretWriter   mcpSecretWriter
-	oauthBroker    *auth.OAuthLoopbackBroker
+	auth                           *auth.AuthManager
+	secretResolver                 auth.SecretResolver
+	secretWriter                   mcpSecretWriter
+	oauthLoopbackListenAddrAtStart string
+	oauthBroker                    *auth.OAuthLoopbackBroker
 
 	runtime    *runtime.MCPRuntimeManager
 	approvals  *runtime.ApprovalManager
@@ -185,10 +186,14 @@ func InitMCPWrapper(ctx context.Context, w *MCPWrapper, baseDir string, secrets 
 		return err
 	}
 
+	startupListenAddr := ""
+
 	var opts auth.OAuthLoopbackBrokerOptions
 	if settings != nil && strings.TrimSpace(settings.OAuthLoopbackListenAddr) != "" {
+		startupListenAddr = strings.TrimSpace(settings.OAuthLoopbackListenAddr)
+
 		opts = auth.OAuthLoopbackBrokerOptions{
-			ListenAddr: settings.OAuthLoopbackListenAddr,
+			ListenAddr: startupListenAddr,
 		}
 	}
 
@@ -213,6 +218,7 @@ func InitMCPWrapper(ctx context.Context, w *MCPWrapper, baseDir string, secrets 
 	if writer, ok := secrets.(mcpSecretWriter); ok {
 		w.secretWriter = writer
 	}
+	w.oauthLoopbackListenAddrAtStart = startupListenAddr
 	w.oauthBroker = oauthBroker
 	w.runtime = rt
 	w.approvals = appr
@@ -722,7 +728,11 @@ func (w *MCPWrapper) PutMCPServerSecret(
 				return nil, err
 			}
 		}
-
+		if req.Body.Kind == spec.MCPSecretKindHTTPHeader {
+			if err := validateMCPHTTPHeaderSecretValue(req.Body.Secret); err != nil {
+				return nil, err
+			}
+		}
 		sha, nonEmpty, err := w.secretWriter.SetMCPSecret(context.Background(), secretRef, req.Body.Secret)
 		if err != nil {
 			return nil, err
@@ -1352,6 +1362,9 @@ func (w *MCPWrapper) storeHeaderSecret(
 	cfg spec.MCPServerConfig,
 	header, value string,
 ) (string, error) {
+	if err := validateMCPHTTPHeaderSecretValue(value); err != nil {
+		return "", err
+	}
 	ref, err := secret.NewMCPSecretRefString(cfg.BundleID, cfg.ID, spec.MCPSecretKindHTTPHeader, header)
 	if err != nil {
 		return "", err
@@ -1384,11 +1397,24 @@ func (w *MCPWrapper) buildMCPSettingsView(settings *spec.MCPSettings) *spec.MCPS
 	view := &spec.MCPSettingsView{Settings: *settings}
 	if w != nil && w.oauthBroker != nil {
 		view.OAuthRedirectURL = w.oauthBroker.RedirectURL()
-		requested := strings.TrimSpace(settings.OAuthLoopbackListenAddr)
-		current := strings.TrimSpace(w.oauthBroker.ListenAddr())
-		view.OAuthRestartRequired = requested != "" && requested != current
+		view.OAuthLoopbackListenAddr = w.oauthBroker.ListenAddr()
+		view.OAuthRestartRequired = strings.TrimSpace(settings.OAuthLoopbackListenAddr) !=
+			strings.TrimSpace(w.oauthLoopbackListenAddrAtStart)
 	}
 	return view
+}
+
+func validateMCPHTTPHeaderSecretValue(value string) error {
+	if strings.TrimSpace(value) == "" {
+		return fmt.Errorf("%w: HTTP header secret value is empty", spec.ErrMCPInvalidRequest)
+	}
+	if strings.ContainsAny(value, "\r\n\x00") {
+		return fmt.Errorf(
+			"%w: HTTP header secret value must not contain CR, LF, or NUL",
+			spec.ErrMCPInvalidRequest,
+		)
+	}
+	return nil
 }
 
 func shouldForgetMCPServerSnapshotAfterPut(previous *spec.MCPServerConfig, req *spec.PutMCPServerRequest) bool {

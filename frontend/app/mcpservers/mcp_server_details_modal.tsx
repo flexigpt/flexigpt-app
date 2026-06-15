@@ -266,6 +266,11 @@ function MCPServerDetailsModalContent({
 										? {
 												...server.streamableHttp,
 												clientCredentialRef: server.streamableHttp.clientCredentialRef ? '[configured]' : undefined,
+												secretHeaderRefs: server.streamableHttp.secretHeaderRefs
+													? Object.fromEntries(
+															Object.keys(server.streamableHttp.secretHeaderRefs).map(key => [key, '[configured]'])
+														)
+													: undefined,
 											}
 										: undefined,
 									trustLevel: server.trustLevel,

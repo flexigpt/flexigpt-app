@@ -663,7 +663,7 @@ func setupDeclaresClientCredentials(setup *spec.MCPServerSetup) bool {
 	}
 	for i := range setup.Inputs {
 		in := setup.Inputs[i]
-		if in.Kind == spec.MCPSetupKindOAuthClientCredentials && in.OAuthClientCredentials != nil {
+		if in.Required && in.Kind == spec.MCPSetupKindOAuthClientCredentials && in.OAuthClientCredentials != nil {
 			return true
 		}
 	}
@@ -676,7 +676,7 @@ func setupDeclaresAPIKeyHeader(setup *spec.MCPServerSetup) bool {
 	}
 	for i := range setup.Inputs {
 		in := setup.Inputs[i]
-		if in.Kind == spec.MCPSetupKindHTTPHeader && in.HTTPHeader != nil && in.HTTPHeader.Secret {
+		if in.Required && in.Kind == spec.MCPSetupKindHTTPHeader && in.HTTPHeader != nil && in.HTTPHeader.Secret {
 			return true
 		}
 	}

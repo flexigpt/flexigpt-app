@@ -132,7 +132,7 @@ func (m *MCPRuntimeManager) Connect(
 		return nil, fmt.Errorf("%w: runtime is shutting down", spec.ErrMCPRuntimeNotReady)
 	}
 	state := m.getOrCreateLocked(req.ServerID)
-	state.bundleID = req.BundleID
+	oldBundleID := state.bundleID
 
 	if state.client != nil {
 		oldClientToClose = state.client
@@ -140,7 +140,8 @@ func (m *MCPRuntimeManager) Connect(
 	}
 
 	generation := m.bumpGenerationLocked(req.ServerID)
-	if state.bundleID != "" && state.bundleID != req.BundleID {
+	state.bundleID = req.BundleID
+	if oldBundleID != "" && oldBundleID != req.BundleID {
 		m.clearSnapshotLocked(ctx, state)
 	}
 
@@ -288,6 +289,7 @@ func (m *MCPRuntimeManager) Disconnect(
 	}
 
 	m.mu.Lock()
+	var clientToClose ClientSession
 
 	state := m.sessions[req.ServerID]
 	if state != nil && state.bundleID != "" && state.bundleID != req.BundleID {
@@ -302,6 +304,7 @@ func (m *MCPRuntimeManager) Disconnect(
 	}
 	m.bumpGenerationLocked(req.ServerID)
 	if state != nil {
+		clientToClose = state.client
 		state.client = nil
 		state.status = spec.MCPServerStatusDisconnected
 		state.lastError = ""
@@ -320,8 +323,8 @@ func (m *MCPRuntimeManager) Disconnect(
 	if timer != nil {
 		timer.Stop()
 	}
-	if state != nil && state.client != nil {
-		if err := state.client.Close(ctx); err != nil {
+	if clientToClose != nil {
+		if err := clientToClose.Close(ctx); err != nil {
 			return nil, err
 		}
 	}

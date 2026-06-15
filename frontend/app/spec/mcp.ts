@@ -703,6 +703,7 @@ export interface MCPSettingsView {
 	settings: MCPSettings;
 	oauthRedirectURL?: string;
 	oauthRestartRequired?: boolean;
+	oauthLoopbackListenAddr?: string;
 }
 
 export interface MCPServerConfig {

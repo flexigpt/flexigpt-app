@@ -4427,6 +4427,7 @@ export namespace spec {
 	export class MCPSettingsView {
 	    settings: MCPSettings;
 	    oauthRedirectURL?: string;
+	    oauthLoopbackListenAddr?: string;
 	    oauthRestartRequired?: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -4437,6 +4438,7 @@ export namespace spec {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.settings = this.convertValues(source["settings"], MCPSettings);
 	        this.oauthRedirectURL = source["oauthRedirectURL"];
+	        this.oauthLoopbackListenAddr = source["oauthLoopbackListenAddr"];
 	        this.oauthRestartRequired = source["oauthRestartRequired"];
 	    }
 	

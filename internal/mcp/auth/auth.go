@@ -24,6 +24,8 @@ const (
 	errStrMissingServerID      = "missing serverID"
 	errStrMissingStdIOConfig   = "missing stdio config"
 	errStrUnsupportedTransport = "unsupported transport"
+	//nolint:gosec // Const.
+	errStrAPIKeyHeaderRequired = "streamableHttp.secretHeaderRefs is required for apiKey auth"
 	errStrOAuthNotConfigured   = "OAuth authorization code flow is not configured"
 )
 
@@ -167,6 +169,8 @@ func (m *AuthManager) PrepareTransportAuth(
 		httpCfg := cfg.StreamableHTTP
 
 		out.Status.Resource = strings.TrimSpace(httpCfg.URL)
+		mode := normalizeHTTPAuthMode(httpCfg.AuthMode)
+		out.Status.AuthMode = mode
 		out.Headers = maps.Clone(httpCfg.Headers)
 		if out.Headers == nil {
 			out.Headers = map[string]string{}
@@ -178,17 +182,33 @@ func (m *AuthManager) PrepareTransportAuth(
 				out.Status.LastError = err.Error()
 				return out, err
 			}
+			if strings.TrimSpace(v) == "" {
+				out.Status.State = spec.MCPAuthStateRequired
+				out.Status.LastError = fmt.Sprintf("secret HTTP header %s is empty", key)
+				return out, fmt.Errorf("%w: %s", spec.ErrMCPAuthRequired, out.Status.LastError)
+			}
+			if strings.ContainsAny(v, "\r\n\x00") {
+				out.Status.State = spec.MCPAuthStateError
+				out.Status.LastError = fmt.Sprintf(
+					"secret HTTP header %s must not contain CR, LF, or NUL",
+					key,
+				)
+				return out, fmt.Errorf("%w: %s", spec.ErrMCPInvalidRequest, out.Status.LastError)
+			}
 			out.Headers[key] = v
 			out.SensitiveValues = append(out.SensitiveValues, v)
 		}
-		mode := normalizeHTTPAuthMode(httpCfg.AuthMode)
-		out.Status.AuthMode = mode
 
 		switch mode {
 		case spec.MCPHTTPAuthNone:
 			out.Status.State = spec.MCPAuthStateNotRequired
 
 		case spec.MCPHTTPAuthAPIKey:
+			if len(httpCfg.SecretHeaderRefs) == 0 {
+				out.Status.State = spec.MCPAuthStateRequired
+				out.Status.LastError = errStrAPIKeyHeaderRequired
+				return out, fmt.Errorf("%w: %s", spec.ErrMCPAuthRequired, out.Status.LastError)
+			}
 			// The api key is delivered as a secret HTTP header, already resolved
 			// into out.Headers above. No OAuth handler is required.
 			out.Status.State = spec.MCPAuthStateAuthorized

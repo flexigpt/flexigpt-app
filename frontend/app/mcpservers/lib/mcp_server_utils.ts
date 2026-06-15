@@ -49,6 +49,7 @@ export interface MCPOAuthClientCredentialsInput {
 export interface MCPHTTPHeaderSecretInput {
 	headerName: string;
 	slot: string;
+	deleteSlot?: string;
 	existingSecretRef?: string;
 	secretValue?: string;
 	deleteExisting?: boolean;

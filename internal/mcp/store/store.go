@@ -1006,7 +1006,9 @@ func (s *Store) readAll(ctx context.Context, force bool) (storeSchema, error) {
 	if sc.Servers == nil {
 		sc.Servers = map[bundleitemutils.BundleID]map[spec.MCPServerID]spec.MCPServerConfig{}
 	}
-
+	if sc.Settings == nil {
+		sc.Settings = &spec.MCPSettings{}
+	}
 	for id, b := range sc.Bundles {
 		if b.ID != id {
 			return storeSchema{}, fmt.Errorf("bundle key %q != bundle.id %q", id, b.ID)
