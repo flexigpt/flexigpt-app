@@ -72,6 +72,8 @@ func DefaultMCPAuthStatusFromConfig(cfg spec.MCPServerConfig) spec.MCPAuthStatus
 		st.State = spec.MCPAuthStateRequired
 	case spec.MCPHTTPAuthClientCredentials:
 		st.State = spec.MCPAuthStateRequired
+	case spec.MCPHTTPAuthAPIKey:
+		st.State = spec.MCPAuthStateRequired
 	case spec.MCPHTTPAuthNone, "":
 		st.State = spec.MCPAuthStateNotRequired
 	default:

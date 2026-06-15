@@ -43,6 +43,17 @@ export interface MCPOAuthClientCredentialsInput {
 	deleteExisting?: boolean;
 }
 
+/**
+ * @public
+ */
+export interface MCPHTTPHeaderSecretInput {
+	headerName: string;
+	slot: string;
+	existingSecretRef?: string;
+	secretValue?: string;
+	deleteExisting?: boolean;
+}
+
 export interface MCPServerUpsertInput {
 	serverID: string;
 	/**
@@ -56,6 +67,7 @@ export interface MCPServerUpsertInput {
 	payload: PutMCPServerPayload;
 	stdioSecretEnv: MCPStdioSecretEnvInput[];
 	oauthClientCredentials?: MCPOAuthClientCredentialsInput;
+	httpHeaderSecret?: MCPHTTPHeaderSecretInput;
 }
 
 export function getDefaultMCPServerPolicy(): MCPServerPolicy {
@@ -141,6 +153,8 @@ export function getMCPHTTPAuthModeLabel(mode: MCPHTTPAuthMode): string {
 	switch (mode) {
 		case MCPHTTPAuthMode.MCPHTTPAuthNone:
 			return 'None';
+		case MCPHTTPAuthMode.MCPHTTPAuthAPIKey:
+			return 'API Key';
 		case MCPHTTPAuthMode.MCPHTTPAuthOAuth:
 			return 'OAuth';
 		case MCPHTTPAuthMode.MCPHTTPAuthClientCredentials:
@@ -325,8 +339,32 @@ export function isMCPSetupInputConfigured(server: MCPServerConfig, input: MCPSer
 	}
 }
 
-export function getFirstUnconfiguredRequiredSetupInput(server: MCPServerConfig): MCPServerSetupInput | undefined {
-	return server.setup?.inputs?.find(input => Boolean(input.required) && !isMCPSetupInputConfigured(server, input));
+export interface MCPServerSetupStatus {
+	hasInputs: boolean;
+	requiredTotal: number;
+	requiredConfigured: number;
+	firstUnconfiguredRequired?: MCPServerSetupInput;
+	complete: boolean;
+}
+
+/**
+ * Summarizes setup readiness purely from the persisted server config. This is
+ * intentionally distinct from auth health: setup covers user-supplied config
+ * inputs (URLs, env, headers, OAuth client credentials), while auth health
+ * covers the live OAuth/token state.
+ */
+export function getMCPServerSetupStatus(server: MCPServerConfig): MCPServerSetupStatus {
+	const inputs = server.setup?.inputs ?? [];
+	const required = inputs.filter(input => Boolean(input.required));
+	const firstUnconfiguredRequired = required.find(input => !isMCPSetupInputConfigured(server, input));
+
+	return {
+		hasInputs: inputs.length > 0,
+		requiredTotal: required.length,
+		requiredConfigured: required.filter(input => isMCPSetupInputConfigured(server, input)).length,
+		firstUnconfiguredRequired,
+		complete: !firstUnconfiguredRequired,
+	};
 }
 
 export function parseMCPStringRecordJSON(raw: string, fieldLabel: string): Record<string, string> | undefined {

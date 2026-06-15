@@ -474,14 +474,19 @@ func (w *MCPWrapper) PatchMCPSettings(
 		if err != nil {
 			return nil, err
 		}
-		view := &spec.MCPSettingsView{Settings: *settings}
-		if w != nil && w.oauthBroker != nil {
-			view.OAuthRedirectURL = w.oauthBroker.RedirectURL()
-			requested := strings.TrimSpace(settings.OAuthLoopbackListenAddr)
-			current := strings.TrimSpace(w.oauthBroker.ListenAddr())
-			view.OAuthRestartRequired = requested != "" && requested != current
+		return &spec.PatchMCPSettingsResponse{Body: w.buildMCPSettingsView(settings)}, nil
+	})
+}
+
+func (w *MCPWrapper) GetMCPSettings(
+	req *spec.GetMCPSettingsRequest,
+) (*spec.GetMCPSettingsResponse, error) {
+	return middleware.WithRecoveryResp(func() (*spec.GetMCPSettingsResponse, error) {
+		settings, err := w.store.GetMCPSettings(context.Background())
+		if err != nil {
+			return nil, err
 		}
-		return &spec.PatchMCPSettingsResponse{Body: view}, nil
+		return &spec.GetMCPSettingsResponse{Body: w.buildMCPSettingsView(settings)}, nil
 	})
 }
 
@@ -878,7 +883,17 @@ func (w *MCPWrapper) buildMCPAuthHealth(
 		health.Configured = true
 		health.LastError = ""
 		return health
-
+	case spec.MCPHTTPAuthAPIKey:
+		if len(httpCfg.SecretHeaderRefs) == 0 {
+			health.State = spec.MCPAuthHealthStateNotConfigured
+			health.Configured = false
+			health.LastError = "API key is not configured"
+			return health
+		}
+		health.State = spec.MCPAuthHealthStateAuthorized
+		health.Configured = true
+		health.LastError = ""
+		return health
 	case spec.MCPHTTPAuthOAuth:
 		if w == nil || w.oauthBroker == nil || strings.TrimSpace(w.oauthBroker.RedirectURL()) == "" {
 			health.State = spec.MCPAuthHealthStateNotConfigured
@@ -1362,6 +1377,20 @@ func (w *MCPWrapper) storeStdioEnvSecret(
 	return ref, nil
 }
 
+func (w *MCPWrapper) buildMCPSettingsView(settings *spec.MCPSettings) *spec.MCPSettingsView {
+	if settings == nil {
+		settings = &spec.MCPSettings{}
+	}
+	view := &spec.MCPSettingsView{Settings: *settings}
+	if w != nil && w.oauthBroker != nil {
+		view.OAuthRedirectURL = w.oauthBroker.RedirectURL()
+		requested := strings.TrimSpace(settings.OAuthLoopbackListenAddr)
+		current := strings.TrimSpace(w.oauthBroker.ListenAddr())
+		view.OAuthRestartRequired = requested != "" && requested != current
+	}
+	return view
+}
+
 func shouldForgetMCPServerSnapshotAfterPut(previous *spec.MCPServerConfig, req *spec.PutMCPServerRequest) bool {
 	if req == nil || req.Body == nil || req.BundleID == "" || req.ServerID == "" {
 		return false
@@ -1394,7 +1423,8 @@ func mcpServerConnectionMaterialChanged(previous *spec.MCPServerConfig, req *spe
 	}
 	return previous.Transport != req.Body.Transport ||
 		!reflect.DeepEqual(previous.Stdio, req.Body.Stdio) ||
-		!reflect.DeepEqual(previous.StreamableHTTP, req.Body.StreamableHTTP)
+		!reflect.DeepEqual(previous.StreamableHTTP, req.Body.StreamableHTTP) ||
+		!reflect.DeepEqual(previous.AppsPolicy, req.Body.AppsPolicy)
 }
 
 func authHealthStateFromStatus(st spec.MCPAuthStatus) spec.MCPAuthHealthState {

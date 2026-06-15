@@ -44,6 +44,7 @@ import {
 	GetMCPServerAuthHealth,
 	GetMCPServerAuthStatus,
 	GetMCPServerStatus,
+	GetMCPSettings,
 	InvokeMCPTool,
 	ListMCPBundles,
 	ListMCPServerPrompts,
@@ -227,6 +228,11 @@ export class WailsMCPAPI implements IMCPAPI {
 			} as wailsSpec.PatchMCPSettingsRequestBody,
 		} as wailsSpec.PatchMCPSettingsRequest);
 
+		return resp?.Body as MCPSettingsView | undefined;
+	}
+
+	async getMCPSettings(): Promise<MCPSettingsView | undefined> {
+		const resp = await GetMCPSettings({} as wailsSpec.GetMCPSettingsRequest);
 		return resp?.Body as MCPSettingsView | undefined;
 	}
 

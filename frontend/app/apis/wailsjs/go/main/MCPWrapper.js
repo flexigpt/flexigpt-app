@@ -54,6 +54,10 @@ export function GetMCPServerStatus(arg1) {
   return window['go']['main']['MCPWrapper']['GetMCPServerStatus'](arg1);
 }
 
+export function GetMCPSettings(arg1) {
+  return window['go']['main']['MCPWrapper']['GetMCPSettings'](arg1);
+}
+
 export function InvokeMCPTool(arg1) {
   return window['go']['main']['MCPWrapper']['InvokeMCPTool'](arg1);
 }

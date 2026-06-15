@@ -133,7 +133,13 @@ func validateServerConfig(c *spec.MCPServerConfig) error {
 		if c.Stdio != nil {
 			return errors.New("stdio must be empty for streamableHttp transport")
 		}
-		if err := validateHTTPConfig(c.BundleID, c.ID, c.StreamableHTTP); err != nil {
+		if err := validateHTTPConfig(
+			c.BundleID,
+			c.ID,
+			c.StreamableHTTP,
+			setupDeclaresClientCredentials(c.Setup),
+			setupDeclaresAPIKeyHeader(c.Setup),
+		); err != nil {
 			return err
 		}
 		return nil
@@ -196,6 +202,8 @@ func validateHTTPConfig(
 	bundleID bundleitemutils.BundleID,
 	serverID spec.MCPServerID,
 	c *spec.MCPStreamableHTTPConfig,
+	allowDeferredClientCredentialRef bool,
+	allowDeferredAPIKey bool,
 ) error {
 	raw := strings.TrimSpace(c.URL)
 	if raw == "" {
@@ -228,7 +236,7 @@ func validateHTTPConfig(
 	}
 
 	switch c.AuthMode {
-	case "", spec.MCPHTTPAuthNone, spec.MCPHTTPAuthOAuth, spec.MCPHTTPAuthClientCredentials:
+	case "", spec.MCPHTTPAuthNone, spec.MCPHTTPAuthAPIKey, spec.MCPHTTPAuthOAuth, spec.MCPHTTPAuthClientCredentials:
 	default:
 		return fmt.Errorf("invalid streamableHttp.authMode %q", c.AuthMode)
 	}
@@ -258,9 +266,15 @@ func validateHTTPConfig(
 			)
 		}
 		if strings.TrimSpace(c.ClientCredentialRef) == "" {
-			return errors.New("streamableHttp.clientCredentialRef is required for clientCredentials authMode")
-		}
-		if err := validateOAuthClientCredentialRef(bundleID, serverID, c.ClientCredentialRef); err != nil {
+			// A server may defer the credential to a declared oauthClientCredentials
+			// setup input. Connect-time gating ensures the credential is present
+			// before a session is established.
+			if !allowDeferredClientCredentialRef {
+				return errors.New(
+					"streamableHttp.clientCredentialRef is required for clientCredentials authMode",
+				)
+			}
+		} else if err := validateOAuthClientCredentialRef(bundleID, serverID, c.ClientCredentialRef); err != nil {
 			return fmt.Errorf("streamableHttp.clientCredentialRef: %w", err)
 		}
 	case spec.MCPHTTPAuthOAuth:
@@ -268,6 +282,22 @@ func validateHTTPConfig(
 			if err := validateOAuthClientCredentialRef(bundleID, serverID, c.ClientCredentialRef); err != nil {
 				return fmt.Errorf("streamableHttp.clientCredentialRef: %w", err)
 			}
+		}
+	case spec.MCPHTTPAuthAPIKey:
+		if clientIDMetadataDocumentURL != "" {
+			return errors.New(
+				"streamableHttp.clientIDMetadataDocumentURL is only allowed for oauth authMode",
+			)
+		}
+		if strings.TrimSpace(c.ClientCredentialRef) != "" {
+			return errors.New(
+				"streamableHttp.clientCredentialRef is only allowed when authMode is oauth or clientCredentials",
+			)
+		}
+		if len(c.SecretHeaderRefs) == 0 && !allowDeferredAPIKey {
+			return errors.New(
+				"streamableHttp apikey authMode requires a secret header (provide it via setup or secretHeaderRefs)",
+			)
 		}
 	case spec.MCPHTTPAuthNone:
 		if strings.TrimSpace(c.ClientCredentialRef) != "" {
@@ -466,10 +496,12 @@ func validateHTTPHeaderConfig(
 		}
 	}
 
-	if normalizeHTTPAuthMode(c.AuthMode) != spec.MCPHTTPAuthNone {
+	switch normalizeHTTPAuthMode(c.AuthMode) {
+	case spec.MCPHTTPAuthOAuth, spec.MCPHTTPAuthClientCredentials:
 		if hasHTTPHeader(c.Headers, "Authorization") || hasHTTPHeader(c.SecretHeaderRefs, "Authorization") {
 			return errors.New("streamableHttp Authorization header is not allowed when OAuth authMode is enabled")
 		}
+	default:
 	}
 	return nil
 }
@@ -590,7 +622,7 @@ func validateSetupInputUnion(c *spec.MCPServerConfig, i int, input *spec.MCPServ
 		if err := validateHTTPHeaderName(input.HTTPHeader.HeaderName); err != nil {
 			return fmt.Errorf("inputs[%d].httpHeader.headerName: %w", i, err)
 		}
-		if httpMode != spec.MCPHTTPAuthNone &&
+		if (httpMode == spec.MCPHTTPAuthOAuth || httpMode == spec.MCPHTTPAuthClientCredentials) &&
 			strings.EqualFold(strings.TrimSpace(input.HTTPHeader.HeaderName), "Authorization") {
 			return fmt.Errorf("inputs[%d]: Authorization header not allowed with OAuth authMode", i)
 		}
@@ -623,6 +655,32 @@ func validateSetupInputUnion(c *spec.MCPServerConfig, i int, input *spec.MCPServ
 		return fmt.Errorf("inputs[%d].kind %q is invalid", i, input.Kind)
 	}
 	return nil
+}
+
+func setupDeclaresClientCredentials(setup *spec.MCPServerSetup) bool {
+	if setup == nil {
+		return false
+	}
+	for i := range setup.Inputs {
+		in := setup.Inputs[i]
+		if in.Kind == spec.MCPSetupKindOAuthClientCredentials && in.OAuthClientCredentials != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func setupDeclaresAPIKeyHeader(setup *spec.MCPServerSetup) bool {
+	if setup == nil {
+		return false
+	}
+	for i := range setup.Inputs {
+		in := setup.Inputs[i]
+		if in.Kind == spec.MCPSetupKindHTTPHeader && in.HTTPHeader != nil && in.HTTPHeader.Secret {
+			return true
+		}
+	}
+	return false
 }
 
 func isBundleSoftDeleted(b spec.MCPBundle) bool {

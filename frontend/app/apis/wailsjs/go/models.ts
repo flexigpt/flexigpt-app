@@ -3991,7 +3991,6 @@ export namespace spec {
 	export class GetMCPServerRequest {
 	    BundleID: string;
 	    ServerID: string;
-	    IncludeDeleted: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new GetMCPServerRequest(source);
@@ -4001,7 +4000,6 @@ export namespace spec {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
-	        this.IncludeDeleted = source["IncludeDeleted"];
 	    }
 	}
 	export class MCPSetupClientIDMetadataDocumentURLInput {
@@ -4285,8 +4283,6 @@ export namespace spec {
 	    createdAt: any;
 	    // Go type: time
 	    modifiedAt: any;
-	    // Go type: time
-	    softDeletedAt?: any;
 	
 	    static createFrom(source: any = {}) {
 	        return new MCPServerConfig(source);
@@ -4310,7 +4306,6 @@ export namespace spec {
 	        this.isBuiltIn = source["isBuiltIn"];
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
-	        this.softDeletedAt = this.convertValues(source["softDeletedAt"], null);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -4385,6 +4380,94 @@ export namespace spec {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], MCPServerRuntimeSnapshot);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class GetMCPSettingsRequest {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new GetMCPSettingsRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
+	export class MCPSettings {
+	    oauthLoopbackListenAddr?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPSettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.oauthLoopbackListenAddr = source["oauthLoopbackListenAddr"];
+	    }
+	}
+	export class MCPSettingsView {
+	    settings: MCPSettings;
+	    oauthRedirectURL?: string;
+	    oauthRestartRequired?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPSettingsView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.settings = this.convertValues(source["settings"], MCPSettings);
+	        this.oauthRedirectURL = source["oauthRedirectURL"];
+	        this.oauthRestartRequired = source["oauthRestartRequired"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class GetMCPSettingsResponse {
+	    Body?: MCPSettingsView;
+	
+	    static createFrom(source: any = {}) {
+	        return new GetMCPSettingsResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], MCPSettingsView);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -8390,52 +8473,8 @@ export namespace spec {
 	        this.clientSecret = source["clientSecret"];
 	    }
 	}
-	export class MCPSettings {
-	    oauthLoopbackListenAddr?: string;
 	
-	    static createFrom(source: any = {}) {
-	        return new MCPSettings(source);
-	    }
 	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.oauthLoopbackListenAddr = source["oauthLoopbackListenAddr"];
-	    }
-	}
-	export class MCPSettingsView {
-	    settings: MCPSettings;
-	    oauthRedirectURL?: string;
-	    oauthRestartRequired?: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new MCPSettingsView(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.settings = this.convertValues(source["settings"], MCPSettings);
-	        this.oauthRedirectURL = source["oauthRedirectURL"];
-	        this.oauthRestartRequired = source["oauthRestartRequired"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	
 	
 	

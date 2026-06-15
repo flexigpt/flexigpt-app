@@ -188,6 +188,11 @@ func (m *AuthManager) PrepareTransportAuth(
 		case spec.MCPHTTPAuthNone:
 			out.Status.State = spec.MCPAuthStateNotRequired
 
+		case spec.MCPHTTPAuthAPIKey:
+			// The api key is delivered as a secret HTTP header, already resolved
+			// into out.Headers above. No OAuth handler is required.
+			out.Status.State = spec.MCPAuthStateAuthorized
+
 		case spec.MCPHTTPAuthOAuth:
 			if err := m.configureAuthorizationCodeOAuth(ctx, cfg, &out); err != nil {
 				return out, err

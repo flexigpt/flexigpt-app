@@ -524,6 +524,8 @@ export interface IMCPAPI {
 
 	patchMCPSettings(oauthLoopbackListenAddr?: string): Promise<MCPSettingsView | undefined>;
 
+	getMCPSettings(): Promise<MCPSettingsView | undefined>;
+
 	deleteMCPServer(bundleID: string, serverID: MCPServerID): Promise<void>;
 
 	connectMCPServer(bundleID: string, serverID: MCPServerID): Promise<MCPServerRuntimeSnapshot | undefined>;

@@ -28,6 +28,8 @@ export function GetMCPServerAuthStatus(arg1:spec.GetMCPServerAuthStatusRequest):
 
 export function GetMCPServerStatus(arg1:spec.GetMCPServerStatusRequest):Promise<spec.GetMCPServerStatusResponse>;
 
+export function GetMCPSettings(arg1:spec.GetMCPSettingsRequest):Promise<spec.GetMCPSettingsResponse>;
+
 export function InvokeMCPTool(arg1:spec.InvokeMCPToolRequest):Promise<spec.InvokeMCPToolResponse>;
 
 export function ListMCPBundles(arg1:spec.ListMCPBundlesRequest):Promise<spec.ListMCPBundlesResponse>;

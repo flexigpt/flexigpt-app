@@ -19,7 +19,11 @@ import (
 	"github.com/flexigpt/mapstore-go/jsonencdec"
 )
 
-const builtInSnapshotMaxAge = 24 * time.Hour
+const (
+	builtInSnapshotMaxAge = 24 * time.Hour
+	softDeleteGraceMCP    = 48 * time.Hour
+	cleanupIntervalMCP    = 24 * time.Hour
+)
 
 type storeSchema struct {
 	SchemaVersion string                                                                 `json:"schemaVersion"`
@@ -33,6 +37,12 @@ type Store struct {
 	file        *mapstore.MapFileStore
 	builtinData *BuiltInData
 	mu          sync.RWMutex
+
+	cleanOnce sync.Once
+	cleanKick chan struct{}
+	cleanCtx  context.Context
+	cleanStop context.CancelFunc
+	wg        sync.WaitGroup
 }
 
 func NewMCPStore(ctx context.Context, baseDir string) (*Store, error) {
@@ -86,6 +96,8 @@ func NewMCPStore(ctx context.Context, baseDir string) (*Store, error) {
 		_ = builtInData.Close()
 		return nil, err
 	}
+	//nolint:contextcheck // Background loop.
+	st.startCleanupLoop()
 	return st, nil
 }
 
@@ -93,6 +105,10 @@ func (s *Store) Close() error {
 	if s == nil || s.file == nil {
 		return nil
 	}
+	if s.cleanStop != nil {
+		s.cleanStop()
+	}
+	s.wg.Wait()
 	if s.builtinData != nil {
 		_ = s.builtinData.Close()
 	}
@@ -256,6 +272,7 @@ func (s *Store) DeleteMCPBundle(
 	if err := s.writeAll(sc); err != nil {
 		return nil, err
 	}
+	s.kickCleanupLoop()
 	return &spec.DeleteMCPBundleResponse{}, nil
 }
 
@@ -1072,6 +1089,77 @@ func (s *Store) dropLegacyLastKnownSnapshots() error {
 	}
 	delete(raw, "lastKnownSnapshots")
 	return s.file.SetAll(raw)
+}
+
+func (s *Store) startCleanupLoop() {
+	s.cleanOnce.Do(func() {
+		s.cleanKick = make(chan struct{}, 1)
+		s.cleanCtx, s.cleanStop = context.WithCancel(context.Background())
+		s.wg.Go(func() {
+			tick := time.NewTicker(cleanupIntervalMCP)
+			defer tick.Stop()
+
+			s.sweepSoftDeletedBundles()
+			for {
+				select {
+				case <-s.cleanCtx.Done():
+					return
+				case <-tick.C:
+				case <-s.cleanKick:
+				}
+				s.sweepSoftDeletedBundles()
+			}
+		})
+	})
+}
+
+func (s *Store) kickCleanupLoop() {
+	if s.cleanKick == nil {
+		return
+	}
+	select {
+	case s.cleanKick <- struct{}{}:
+	default:
+	}
+}
+
+// sweepSoftDeletedBundles hard-deletes soft-deleted bundles whose grace period
+// has elapsed. MCP bundles live entirely in the single JSON store, so purging
+// is a map delete of the bundle plus its now-empty server map. The base bundle
+// can never be soft-deleted, so it is always safe.
+func (s *Store) sweepSoftDeletedBundles() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sc, err := s.readAll(context.Background(), false)
+	if err != nil {
+		slog.Error("mcp store: sweep readAll failed", "err", err)
+		return
+	}
+
+	now := time.Now().UTC()
+	changed := false
+	for id, b := range sc.Bundles {
+		if !isBundleSoftDeleted(b) {
+			continue
+		}
+		if now.Sub(b.SoftDeletedAt.UTC()) < softDeleteGraceMCP {
+			continue
+		}
+		if len(sc.Servers[id]) > 0 {
+			// Never purge a bundle that still has servers.
+			continue
+		}
+		delete(sc.Bundles, id)
+		delete(sc.Servers, id)
+		changed = true
+		slog.Info("mcp store: hard-deleted soft-deleted bundle", "bundleID", id)
+	}
+	if changed {
+		if err := s.writeAll(sc); err != nil {
+			slog.Error("mcp store: sweep writeAll failed", "err", err)
+		}
+	}
 }
 
 func findUserServerBundle(sc storeSchema, serverID spec.MCPServerID) (bundleitemutils.BundleID, bool) {

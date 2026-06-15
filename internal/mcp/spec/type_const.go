@@ -100,6 +100,7 @@ type MCPHTTPAuthMode string
 
 const (
 	MCPHTTPAuthNone              MCPHTTPAuthMode = "none"
+	MCPHTTPAuthAPIKey            MCPHTTPAuthMode = "apiKey"
 	MCPHTTPAuthOAuth             MCPHTTPAuthMode = "oauth"
 	MCPHTTPAuthClientCredentials MCPHTTPAuthMode = "clientCredentials"
 )

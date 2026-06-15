@@ -531,8 +531,8 @@ func mergeBuiltInServerOverlay(dst, src spec.MCPBuiltInServerOverlay) spec.MCPBu
 		if out.Stdio == nil {
 			out.Stdio = &spec.MCPStdioConfigOverlay{}
 		}
-		mergeStringMap(out.Stdio.Env, src.Stdio.Env)
-		mergeStringMap(out.Stdio.SecretEnvRefs, src.Stdio.SecretEnvRefs)
+		out.Stdio.Env = mergeStringMap(out.Stdio.Env, src.Stdio.Env)
+		out.Stdio.SecretEnvRefs = mergeStringMap(out.Stdio.SecretEnvRefs, src.Stdio.SecretEnvRefs)
 	}
 	if src.StreamableHTTP != nil {
 		if out.StreamableHTTP == nil {
@@ -550,8 +550,11 @@ func mergeBuiltInServerOverlay(dst, src spec.MCPBuiltInServerOverlay) spec.MCPBu
 		if src.StreamableHTTP.ClientIDMetadataDocumentURL != nil {
 			out.StreamableHTTP.ClientIDMetadataDocumentURL = src.StreamableHTTP.ClientIDMetadataDocumentURL
 		}
-		mergeStringMap(out.StreamableHTTP.Headers, src.StreamableHTTP.Headers)
-		mergeStringMap(out.StreamableHTTP.SecretHeaderRefs, src.StreamableHTTP.SecretHeaderRefs)
+		out.StreamableHTTP.Headers = mergeStringMap(out.StreamableHTTP.Headers, src.StreamableHTTP.Headers)
+		out.StreamableHTTP.SecretHeaderRefs = mergeStringMap(
+			out.StreamableHTTP.SecretHeaderRefs,
+			src.StreamableHTTP.SecretHeaderRefs,
+		)
 	}
 	return out
 }
@@ -573,8 +576,8 @@ func applyServerOverlay(
 		if out.Stdio == nil {
 			out.Stdio = &spec.MCPStdioConfig{}
 		}
-		mergeStringMap(out.Stdio.Env, ov.Stdio.Env)
-		mergeStringMap(out.Stdio.SecretEnvRefs, ov.Stdio.SecretEnvRefs)
+		out.Stdio.Env = mergeStringMap(out.Stdio.Env, ov.Stdio.Env)
+		out.Stdio.SecretEnvRefs = mergeStringMap(out.Stdio.SecretEnvRefs, ov.Stdio.SecretEnvRefs)
 	}
 
 	if ov.StreamableHTTP != nil {
@@ -600,20 +603,24 @@ func applyServerOverlay(
 		if ov.StreamableHTTP.ClientIDMetadataDocumentURL != nil {
 			out.StreamableHTTP.ClientIDMetadataDocumentURL = *ov.StreamableHTTP.ClientIDMetadataDocumentURL
 		}
-		mergeStringMap(out.StreamableHTTP.Headers, ov.StreamableHTTP.Headers)
-		mergeStringMap(out.StreamableHTTP.SecretHeaderRefs, ov.StreamableHTTP.SecretHeaderRefs)
+		out.StreamableHTTP.Headers = mergeStringMap(out.StreamableHTTP.Headers, ov.StreamableHTTP.Headers)
+		out.StreamableHTTP.SecretHeaderRefs = mergeStringMap(
+			out.StreamableHTTP.SecretHeaderRefs,
+			ov.StreamableHTTP.SecretHeaderRefs,
+		)
 	}
 	return out, nil
 }
 
-func mergeStringMap(dst, src map[string]string) {
+func mergeStringMap(dst, src map[string]string) map[string]string {
 	if len(src) == 0 {
-		return
+		return dst
 	}
 	if dst == nil {
-		dst = map[string]string{}
+		dst = make(map[string]string, len(src))
 	}
 	maps.Copy(dst, src)
+	return dst
 }
 
 func builtInServerKey(bundleID bundleitemutils.BundleID, serverID spec.MCPServerID) builtInMCPServerID {

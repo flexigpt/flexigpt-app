@@ -193,6 +193,12 @@ type PatchMCPSettingsResponse struct {
 	Body *MCPSettingsView
 }
 
+type GetMCPSettingsRequest struct{}
+
+type GetMCPSettingsResponse struct {
+	Body *MCPSettingsView
+}
+
 type ConnectMCPServerResponse struct {
 	Body *MCPServerRuntimeSnapshot
 }

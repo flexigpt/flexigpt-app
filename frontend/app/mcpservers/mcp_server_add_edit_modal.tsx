@@ -50,6 +50,7 @@ const TRUST_DROPDOWN_ITEMS: Record<MCPTrustLevel, DropdownItem> = {
 
 const AUTH_MODE_DROPDOWN_ITEMS: Record<MCPHTTPAuthMode, DropdownItem> = {
 	[MCPHTTPAuthMode.MCPHTTPAuthNone]: { isEnabled: true },
+	[MCPHTTPAuthMode.MCPHTTPAuthAPIKey]: { isEnabled: true },
 	[MCPHTTPAuthMode.MCPHTTPAuthOAuth]: { isEnabled: true },
 	[MCPHTTPAuthMode.MCPHTTPAuthClientCredentials]: { isEnabled: true },
 };
@@ -104,6 +105,7 @@ type ErrorState = {
 	httpTimeoutMS?: string;
 	httpClientCredentials?: string;
 	httpClientIDMetadataDocumentURL?: string;
+	httpAPIKey?: string;
 	policies?: string;
 	toolPoliciesJSON?: string;
 };
@@ -138,6 +140,12 @@ type MCPServerFormData = {
 	httpClientCredentialsSecret: string;
 	httpDeleteClientCredentials: boolean;
 	httpClientIDMetadataDocumentURL: string;
+
+	apiKeyHeaderName: string;
+	apiKeyValuePrefix: string;
+	apiKeyValue: string;
+	apiKeyExistingRef?: string;
+	apiKeyDeleteExisting: boolean;
 
 	defaultApprovalRule: MCPApprovalRule;
 	defaultExecutionMode: MCPExecutionMode;
@@ -187,6 +195,12 @@ function stringifyArgs(args?: string[]): string {
 function getInitialFormData(initialData: MCPServerConfig | undefined): MCPServerFormData {
 	const defaultPolicy = initialData?.defaultPolicy ?? getDefaultMCPServerPolicy();
 	const appsPolicy = initialData?.appsPolicy ?? getDefaultMCPAppsPolicy();
+	const existingSecretHeaderRefs = initialData?.streamableHttp?.secretHeaderRefs ?? {};
+	const isApiKeyMode = initialData?.streamableHttp?.authMode === MCPHTTPAuthMode.MCPHTTPAuthAPIKey;
+	const apiKeyHeaderName =
+		Object.keys(existingSecretHeaderRefs).find(key => key.toLowerCase() === 'authorization') ??
+		Object.keys(existingSecretHeaderRefs)[0] ??
+		'Authorization';
 	const stdioSecretRows: SecretEnvRow[] = Object.entries(initialData?.stdio?.secretEnvRefs ?? {}).map(
 		([envName, secretRef]) => ({
 			rowID: makeRowID(),
@@ -220,6 +234,12 @@ function getInitialFormData(initialData: MCPServerConfig | undefined): MCPServer
 		httpClientCredentialsSecret: '',
 		httpDeleteClientCredentials: false,
 		httpClientIDMetadataDocumentURL: initialData?.streamableHttp?.clientIDMetadataDocumentURL ?? '',
+
+		apiKeyHeaderName,
+		apiKeyValuePrefix: 'Bearer ',
+		apiKeyValue: '',
+		apiKeyExistingRef: isApiKeyMode ? existingSecretHeaderRefs[apiKeyHeaderName] : undefined,
+		apiKeyDeleteExisting: false,
 
 		defaultApprovalRule: defaultPolicy.defaultApprovalRule,
 		defaultExecutionMode: defaultPolicy.defaultExecutionMode,
@@ -488,10 +508,29 @@ function AddEditMCPServerModalContent({
 					nextErrors = omitManyKeys(nextErrors, ['httpTimeoutMS']);
 				}
 
+				const credentialAuthMode =
+					state.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth ||
+					state.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthClientCredentials;
+
+				if (state.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthAPIKey) {
+					const headerName = state.apiKeyHeaderName.trim();
+					const hasExisting = Boolean(state.apiKeyExistingRef) && !state.apiKeyDeleteExisting;
+					const hasNew = Boolean(state.apiKeyValue.trim());
+					if (!headerName) {
+						nextErrors.httpAPIKey = 'API key header name is required.';
+					} else if (!/^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/.test(headerName)) {
+						nextErrors.httpAPIKey = 'API key header name contains invalid characters.';
+					} else if (!hasExisting && !hasNew) {
+						nextErrors.httpAPIKey = 'API key value is required.';
+					} else {
+						nextErrors = omitManyKeys(nextErrors, ['httpAPIKey']);
+					}
+				} else {
+					nextErrors = omitManyKeys(nextErrors, ['httpAPIKey']);
+				}
+
 				const hasExistingClientCredentials =
-					state.httpAuthMode !== MCPHTTPAuthMode.MCPHTTPAuthNone &&
-					Boolean(state.httpClientCredentialRef.trim()) &&
-					!state.httpDeleteClientCredentials;
+					credentialAuthMode && Boolean(state.httpClientCredentialRef.trim()) && !state.httpDeleteClientCredentials;
 
 				const hasNewClientCredentials = Boolean(state.httpClientCredentialsSecret.trim());
 
@@ -698,20 +737,30 @@ function AddEditMCPServerModalContent({
 			};
 		}
 
+		const credentialAuthMode =
+			formData.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth ||
+			formData.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthClientCredentials;
+		const isApiKey = formData.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthAPIKey;
+
 		const existingClientCredentialRef = formData.httpClientCredentialRef.trim();
 		const shouldDeleteExistingClientCredentials =
-			Boolean(existingClientCredentialRef) &&
-			(formData.httpDeleteClientCredentials || formData.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthNone);
+			Boolean(existingClientCredentialRef) && (formData.httpDeleteClientCredentials || !credentialAuthMode);
 		const clientCredentialRef =
-			formData.httpAuthMode !== MCPHTTPAuthMode.MCPHTTPAuthNone &&
-			existingClientCredentialRef &&
-			!shouldDeleteExistingClientCredentials
-				? formData.httpClientCredentialRef.trim()
+			credentialAuthMode && existingClientCredentialRef && !shouldDeleteExistingClientCredentials
+				? existingClientCredentialRef
 				: undefined;
+
+		const apiKeyHeaderName = formData.apiKeyHeaderName.trim() || 'Authorization';
+		const existingApiKeyRef = formData.apiKeyExistingRef?.trim() ?? '';
+		const shouldDeleteApiKey = Boolean(existingApiKeyRef) && (formData.apiKeyDeleteExisting || !isApiKey);
+		const apiKeyRef = isApiKey && existingApiKeyRef && !shouldDeleteApiKey ? existingApiKeyRef : undefined;
+		const apiKeyFullValue = formData.apiKeyValue ? `${formData.apiKeyValuePrefix}${formData.apiKeyValue}` : '';
+
 		const streamableHttp = {
 			url: formData.httpURL.trim(),
 			timeoutMS: normalizePositiveInteger(formData.httpTimeoutMS),
 			authMode: formData.httpAuthMode,
+			secretHeaderRefs: apiKeyRef ? { [apiKeyHeaderName]: apiKeyRef } : undefined,
 			clientCredentialRef,
 			clientIDMetadataDocumentURL:
 				formData.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth
@@ -728,33 +777,54 @@ function AddEditMCPServerModalContent({
 			formData.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthClientCredentials &&
 			!clientCredentialRef &&
 			Boolean(formData.httpClientCredentialsSecret.trim());
+		const needsApiKeyStaging = isApiKey && !apiKeyRef && Boolean(apiKeyFullValue);
 
-		const initialPayload: PutMCPServerPayload | undefined = needsClientCredentialsStaging
-			? {
-					...payloadBase,
-					streamableHttp: {
-						...streamableHttp,
-						authMode: MCPHTTPAuthMode.MCPHTTPAuthOAuth,
-						clientCredentialRef: undefined,
-						clientIDMetadataDocumentURL: undefined,
-					},
-				}
-			: undefined;
-
+		let initialPayload: PutMCPServerPayload | undefined;
+		if (needsClientCredentialsStaging) {
+			initialPayload = {
+				...payloadBase,
+				streamableHttp: {
+					...streamableHttp,
+					authMode: MCPHTTPAuthMode.MCPHTTPAuthOAuth,
+					clientCredentialRef: undefined,
+					clientIDMetadataDocumentURL: undefined,
+					secretHeaderRefs: undefined,
+				},
+			};
+		} else if (needsApiKeyStaging) {
+			initialPayload = {
+				...payloadBase,
+				streamableHttp: {
+					...streamableHttp,
+					authMode: MCPHTTPAuthMode.MCPHTTPAuthNone,
+					clientCredentialRef: undefined,
+					clientIDMetadataDocumentURL: undefined,
+					secretHeaderRefs: undefined,
+				},
+			};
+		}
 		return {
 			serverID: formData.serverID.trim(),
 			initialPayload,
 			payload: finalPayload,
 			stdioSecretEnv: [],
 			oauthClientCredentials:
-				formData.httpAuthMode !== MCPHTTPAuthMode.MCPHTTPAuthNone ||
-				existingClientCredentialRef ||
-				shouldDeleteExistingClientCredentials
+				credentialAuthMode || existingClientCredentialRef || shouldDeleteExistingClientCredentials
 					? {
 							slot: MCP_OAUTH_CLIENT_CREDENTIALS_SLOT,
 							existingSecretRef: existingClientCredentialRef || undefined,
 							secretValue: formData.httpClientCredentialsSecret,
 							deleteExisting: shouldDeleteExistingClientCredentials,
+						}
+					: undefined,
+			httpHeaderSecret:
+				isApiKey || (Boolean(existingApiKeyRef) && shouldDeleteApiKey)
+					? {
+							headerName: apiKeyHeaderName,
+							slot: apiKeyHeaderName,
+							existingSecretRef: existingApiKeyRef || undefined,
+							secretValue: apiKeyFullValue,
+							deleteExisting: shouldDeleteApiKey,
 						}
 					: undefined,
 		};
@@ -1225,7 +1295,99 @@ function AddEditMCPServerModalContent({
 									</div>
 								</div>
 
-								{formData.httpAuthMode !== MCPHTTPAuthMode.MCPHTTPAuthNone && (
+								{formData.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthAPIKey && (
+									<>
+										<div className="grid grid-cols-12 items-center gap-2">
+											<label className="label col-span-3">
+												<span className="label-text text-sm">Header Name</span>
+											</label>
+											<div className="col-span-9">
+												<input
+													type="text"
+													name="apiKeyHeaderName"
+													value={formData.apiKeyHeaderName}
+													onChange={handleInput}
+													className="input input-bordered w-full rounded-xl"
+													spellCheck="false"
+													autoComplete="off"
+													placeholder="Authorization"
+												/>
+											</div>
+										</div>
+										<div className="grid grid-cols-12 items-center gap-2">
+											<label className="label col-span-3">
+												<span className="label-text text-sm">Value Prefix</span>
+												<span
+													className="label-text-alt tooltip tooltip-right"
+													data-tip='Prepended to the key, e.g. "Bearer ".'
+												>
+													<FiHelpCircle size={12} />
+												</span>
+											</label>
+											<div className="col-span-9">
+												<input
+													type="text"
+													name="apiKeyValuePrefix"
+													value={formData.apiKeyValuePrefix}
+													onChange={handleInput}
+													className="input input-bordered w-full rounded-xl"
+													spellCheck="false"
+													autoComplete="off"
+													placeholder="Bearer "
+												/>
+											</div>
+										</div>
+										<div className="grid grid-cols-12 items-start gap-2">
+											<label className="label col-span-3">
+												<span className="label-text text-sm">
+													{formData.apiKeyExistingRef ? 'Replace API Key' : 'API Key'}
+												</span>
+											</label>
+											<div className="col-span-9">
+												<input
+													type="password"
+													name="apiKeyValue"
+													value={formData.apiKeyValue}
+													onChange={handleInput}
+													className={`input input-bordered w-full rounded-xl ${errors.httpAPIKey ? 'input-error' : ''}`}
+													autoComplete="new-password"
+												/>
+												{formData.apiKeyExistingRef && (
+													<div className="label">
+														<span className="label-text-alt text-base-content/70">
+															Existing key configured. Leave blank to keep it.
+														</span>
+													</div>
+												)}
+												{errors.httpAPIKey && (
+													<div className="label">
+														<span className="label-text-alt text-error flex items-center gap-1">
+															<FiAlertCircle size={12} /> {errors.httpAPIKey}
+														</span>
+													</div>
+												)}
+											</div>
+										</div>
+										{formData.apiKeyExistingRef && (
+											<div className="grid grid-cols-12 items-center gap-2">
+												<div className="col-span-3"></div>
+												<label className="label col-span-9 cursor-pointer justify-start gap-3">
+													<input
+														type="checkbox"
+														name="apiKeyDeleteExisting"
+														checked={formData.apiKeyDeleteExisting}
+														onChange={handleInput}
+														className="checkbox checkbox-sm"
+													/>
+													<span className="label-text text-sm">Delete existing API key secret</span>
+												</label>
+											</div>
+										)}
+									</>
+								)}
+
+								{(formData.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth ||
+									formData.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthClientCredentials) && (
 									<>
 										<div className="grid grid-cols-12 items-start gap-2">
 											<label className="label col-span-3">

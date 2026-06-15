@@ -1,0 +1,43 @@
+{
+	"schemaVersion": "2026-05-30",
+	"bundleID": "019e7877-ab0e-7c29-a6ef-7e40370fa821",
+	"id": "builtin.github.pat",
+	"displayName": "GitHub (PAT)",
+	"enabled": true,
+	"transport": "streamableHttp",
+	"isBuiltIn": true,
+	"streamableHttp": {
+		"url": "https://api.githubcopilot.com/mcp/",
+		"authMode": "apiKey",
+		"timeoutMS": 30000
+	},
+	"trustLevel": "trusted",
+	"defaultPolicy": {
+		"defaultApprovalRule": "ask",
+		"defaultExecutionMode": "manual",
+		"requireApprovalForUnknownRisk": true,
+		"requireApprovalForWrite": true,
+		"requireApprovalForDestructive": true
+	},
+	"setup": {
+		"note": "Create a GitHub personal access token (fine-grained recommended), then paste it below. FlexiGPT stores it in the OS secret store and sends it as an Authorization: Bearer header.",
+		"inputs": [
+			{
+				"id": "githubPat",
+				"kind": "httpHeader",
+				"label": "GitHub Personal Access Token",
+				"description": "Used as the Authorization bearer token for the GitHub MCP endpoint.",
+				"note": "Stored as a secret and never shown again. Leave blank to keep the existing token.",
+				"placeholder": "github_pat_... or ghp_...",
+				"required": true,
+				"httpHeader": {
+					"headerName": "Authorization",
+					"secret": true,
+					"valuePrefix": "Bearer "
+				}
+			}
+		]
+	},
+	"createdAt": "2026-05-30T00:00:00Z",
+	"modifiedAt": "2026-05-30T00:00:00Z"
+}

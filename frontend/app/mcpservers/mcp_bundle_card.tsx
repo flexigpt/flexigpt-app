@@ -31,9 +31,9 @@ import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal'
 
 import {
 	getEffectiveMCPServerStatus,
-	getFirstUnconfiguredRequiredSetupInput,
 	getMCPAuthHealthBadgeClass,
 	getMCPAuthHealthLabel,
+	getMCPServerSetupStatus,
 	getMCPStatusBadgeClass,
 	getMCPStatusLabel,
 	getMCPTransportLabel,
@@ -366,7 +366,8 @@ export function MCPBundleCard({
 								const isReady = status === MCPServerStatus.MCPServerStatusReady;
 								const isConnecting = status === MCPServerStatus.MCPServerStatusConnecting;
 								const authActionable = isMCPAuthActionable(authHealth);
-
+								const setupStatus = getMCPServerSetupStatus(server);
+								const setupIncomplete = setupStatus.hasInputs && !setupStatus.complete;
 								return (
 									<article
 										key={server.id}
@@ -384,6 +385,18 @@ export function MCPBundleCard({
 												<span className={`badge badge-xs rounded-xl ${getMCPStatusBadgeClass(status)}`}>
 													{getMCPStatusLabel(status)}
 												</span>
+												{setupStatus.hasInputs && (
+													<span
+														className={`badge badge-xs rounded-xl ${setupIncomplete ? 'badge-warning' : 'badge-ghost'}`}
+														title={
+															setupIncomplete
+																? `Setup required: ${setupStatus.requiredConfigured}/${setupStatus.requiredTotal} configured`
+																: 'Setup complete'
+														}
+													>
+														{setupIncomplete ? 'Setup needed' : 'Setup ✓'}
+													</span>
+												)}
 												<span
 													className={`badge badge-xs rounded-xl ${getMCPAuthHealthBadgeClass(authHealth?.state)}`}
 													title={authHealth?.lastError || getMCPAuthHealthLabel(authHealth?.state)}
@@ -542,11 +555,12 @@ export function MCPBundleCard({
 														!server.enabled ||
 														isReady ||
 														isConnecting ||
+														setupIncomplete ||
 														pendingActionKeys.has(`connect:${server.id}`)
 													}
 													title={
-														getFirstUnconfiguredRequiredSetupInput(server)
-															? 'Complete setup before connecting.'
+														setupIncomplete
+															? 'Complete required setup before connecting.'
 															: authActionable
 																? 'Authorization pending. Open auth URL first if needed.'
 																: 'Connect'

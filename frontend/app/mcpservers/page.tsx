@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { FiPlus, FiSettings } from 'react-icons/fi';
 
@@ -11,6 +11,7 @@ import {
 	type MCPServerConfig,
 	type MCPServerRuntimeSnapshot,
 	type MCPServerSetupInputValue,
+	type MCPSettingsView,
 	type PutMCPServerPayload,
 } from '@/spec/mcp';
 
@@ -77,6 +78,7 @@ export default function MCPServersPage() {
 	const [bundleToDeleteID, setBundleToDeleteID] = useState<string | null>(null);
 	const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 	const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+	const [settingsView, setSettingsView] = useState<MCPSettingsView>();
 
 	const bundleToDelete =
 		bundleToDeleteID === null
@@ -480,7 +482,40 @@ export default function MCPServersPage() {
 					requiresFinalPut = true;
 				}
 			}
+			if (finalPayload.streamableHttp && input.httpHeaderSecret) {
+				const plan = input.httpHeaderSecret;
+				let refs: Record<string, string> = { ...(finalPayload.streamableHttp.secretHeaderRefs ?? {}) };
 
+				if (plan.deleteExisting && plan.existingSecretRef) {
+					await mcpAPI.deleteMCPServerSecret(
+						bundleID,
+						input.serverID,
+						MCPSecretKind.MCPSecretKindHTTPHeader,
+						plan.slot
+					);
+					refs = omitManyKeys(refs, [plan.headerName]);
+					requiresFinalPut = true;
+				}
+
+				if (plan.secretValue && plan.secretValue.length > 0) {
+					const resp = await mcpAPI.putMCPServerSecret(
+						bundleID,
+						input.serverID,
+						MCPSecretKind.MCPSecretKindHTTPHeader,
+						plan.slot,
+						plan.secretValue
+					);
+
+					if (!resp?.secretRef) {
+						throw new Error('API key was saved but no secret reference was returned.');
+					}
+
+					refs[plan.headerName] = resp.secretRef;
+					requiresFinalPut = true;
+				}
+
+				finalPayload.streamableHttp.secretHeaderRefs = Object.keys(refs).length > 0 ? refs : undefined;
+			}
 			if (requiresFinalPut) {
 				await mcpAPI.putMCPServer(bundleID, input.serverID, finalPayload);
 			}
@@ -621,20 +656,22 @@ export default function MCPServersPage() {
 
 	const allServerIDs = bundles.flatMap(bundleData => bundleData.servers.map(server => server.id));
 
-	const oauthInfo = useMemo(() => {
-		for (const bundleData of bundles) {
-			for (const serverID of Object.keys(bundleData.authHealthByServerID)) {
-				const health = bundleData.authHealthByServerID[serverID];
-				if (health?.oauthRedirectURL || health?.oauthLoopbackListenAddr) {
-					return health;
-				}
-			}
-		}
-		return undefined;
-	}, [bundles]);
+	useEffect(() => {
+		let cancelled = false;
+		void mcpAPI
+			.getMCPSettings()
+			.then(view => {
+				if (!cancelled) setSettingsView(view);
+			})
+			.catch(() => undefined);
+		return () => {
+			cancelled = true;
+		};
+	}, []);
 
 	const handleSaveSettings = useCallback(async (oauthLoopbackListenAddr: string) => {
 		const view = await mcpAPI.patchMCPSettings(oauthLoopbackListenAddr);
+		if (view) setSettingsView(view);
 		if (view?.oauthRestartRequired) {
 			setAlertMsg('The OAuth loopback address was saved and will take effect after restarting FlexiGPT.');
 			setShowAlert(true);
@@ -731,9 +768,9 @@ export default function MCPServersPage() {
 				/>
 				<MCPSettingsModal
 					isOpen={isSettingsOpen}
-					initialListenAddr={oauthInfo?.oauthLoopbackListenAddr}
-					activeListenAddr={oauthInfo?.oauthLoopbackListenAddr}
-					oauthRedirectURL={oauthInfo?.oauthRedirectURL}
+					initialListenAddr={settingsView?.settings.oauthLoopbackListenAddr}
+					activeListenAddr={settingsView?.settings.oauthLoopbackListenAddr}
+					oauthRedirectURL={settingsView?.oauthRedirectURL}
 					onClose={() => {
 						setIsSettingsOpen(false);
 					}}

@@ -65,6 +65,7 @@ export enum MCPServerStatus {
 
 export enum MCPHTTPAuthMode {
 	MCPHTTPAuthNone = 'none',
+	MCPHTTPAuthAPIKey = 'apiKey',
 	MCPHTTPAuthOAuth = 'oauth',
 	MCPHTTPAuthClientCredentials = 'clientCredentials',
 }

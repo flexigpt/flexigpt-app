@@ -394,7 +394,7 @@ func TestValidateStdioAndHTTPHelpers(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				err := validateHTTPConfig(bundleID, serverID, tt.cfg)
+				err := validateHTTPConfig(bundleID, serverID, tt.cfg, false, false)
 				if tt.wantErrContains != "" {
 					if err == nil {
 						t.Fatalf("validateHTTPConfig succeeded, want error containing %q", tt.wantErrContains)
