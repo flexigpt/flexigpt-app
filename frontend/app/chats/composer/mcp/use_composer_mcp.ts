@@ -375,22 +375,24 @@ export function useComposerMCP(): UseComposerMCPResult {
 				settled = true;
 			});
 
-			while (!settled) {
-				await Promise.race([connectPromise.catch(() => undefined), sleep(1000)]);
-				if (!settled) {
-					await refreshServerStatus(bundleID, serverID).catch(() => undefined);
+			try {
+				while (!settled) {
+					await Promise.race([connectPromise.catch(() => undefined), sleep(1000)]);
+					if (!settled) {
+						await refreshServerStatus(bundleID, serverID).catch(() => undefined);
+					}
 				}
-			}
 
-			const snapshot = await connectPromise;
-			if (snapshot && mountedRef.current) {
-				patchOption(bundleID, serverID, {
-					runtime: snapshot,
-					discoveryLoaded: false,
-				});
+				const snapshot = await connectPromise;
+				if (snapshot && mountedRef.current) {
+					patchOption(bundleID, serverID, {
+						runtime: snapshot,
+						discoveryLoaded: false,
+					});
+				}
+			} finally {
+				await refreshServerStatus(bundleID, serverID).catch(() => undefined);
 			}
-
-			await refreshServerStatus(bundleID, serverID).catch(() => undefined);
 			await ensureDiscoveryLoaded(bundleID, serverID).catch(() => undefined);
 		},
 		[ensureDiscoveryLoaded, patchOption, refreshServerStatus]

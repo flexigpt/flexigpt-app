@@ -168,6 +168,15 @@ function sameHTTPHeaderName(a: string, b: string): boolean {
 	return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
+function getDefaultAPIKeyValuePrefix(headerName: string): string {
+	return sameHTTPHeaderName(headerName, 'Authorization') ? 'Bearer ' : '';
+}
+
+function hasInvalidHTTPHeaderValueChars(value: string): boolean {
+	// eslint-disable-next-line no-control-regex
+	return /[\r\n\u0000]/.test(value);
+}
+
 function makeRowID(): string {
 	return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
@@ -242,7 +251,7 @@ function getInitialFormData(initialData: MCPServerConfig | undefined): MCPServer
 
 		apiKeyHeaderName,
 		apiKeyOriginalHeaderName: isAPIKeyMode ? apiKeyHeaderName : '',
-		apiKeyValuePrefix: 'Bearer ',
+		apiKeyValuePrefix: getDefaultAPIKeyValuePrefix(apiKeyHeaderName),
 		apiKeyValue: '',
 		apiKeyExistingRef: isAPIKeyMode ? existingSecretHeaderRefs[apiKeyHeaderName] : undefined,
 		apiKeyDeleteExisting: false,
@@ -527,6 +536,8 @@ function AddEditMCPServerModalContent({
 						!sameHTTPHeaderName(headerName, originalHeaderName);
 					const hasExisting = Boolean(state.apiKeyExistingRef) && !state.apiKeyDeleteExisting && !headerNameChanged;
 					const hasNew = Boolean(state.apiKeyValue.trim());
+					const fullHeaderValue = `${state.apiKeyValuePrefix}${state.apiKeyValue}`;
+
 					if (!headerName) {
 						nextErrors.httpAPIKey = 'API key header name is required.';
 					} else if (!/^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/.test(headerName)) {
@@ -535,6 +546,8 @@ function AddEditMCPServerModalContent({
 						nextErrors.httpAPIKey = `Changing the header name from ${originalHeaderName} requires entering the API key again.`;
 					} else if (!hasExisting && !hasNew) {
 						nextErrors.httpAPIKey = 'API key value is required.';
+					} else if (hasNew && hasInvalidHTTPHeaderValueChars(fullHeaderValue)) {
+						nextErrors.httpAPIKey = 'API key header value must not contain CR, LF, or NUL.';
 					} else {
 						nextErrors = omitManyKeys(nextErrors, ['httpAPIKey']);
 					}
@@ -1327,7 +1340,19 @@ function AddEditMCPServerModalContent({
 													type="text"
 													name="apiKeyHeaderName"
 													value={formData.apiKeyHeaderName}
-													onChange={handleInput}
+													onChange={e => {
+														const nextHeaderName = e.target.value;
+														const previousDefaultPrefix = getDefaultAPIKeyValuePrefix(formData.apiKeyHeaderName);
+														const shouldUpdatePrefix = formData.apiKeyValuePrefix === previousDefaultPrefix;
+
+														setFormDataAndValidate({
+															...formData,
+															apiKeyHeaderName: nextHeaderName,
+															apiKeyValuePrefix: shouldUpdatePrefix
+																? getDefaultAPIKeyValuePrefix(nextHeaderName)
+																: formData.apiKeyValuePrefix,
+														});
+													}}
 													className="input input-bordered w-full rounded-xl"
 													spellCheck="false"
 													autoComplete="off"

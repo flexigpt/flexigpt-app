@@ -22,14 +22,28 @@ function isLoopbackHost(host: string): boolean {
 	return parts.length === 4 && parts.every(p => Number.isInteger(p) && p >= 0 && p <= 255) && parts[0] === 127;
 }
 
+function splitListenAddr(value: string): { host: string; port: string } | undefined {
+	if (value.startsWith('[')) {
+		const end = value.indexOf(']');
+		if (end <= 1 || value[end + 1] !== ':') return undefined;
+		return {
+			host: value.slice(1, end),
+			port: value.slice(end + 2),
+		};
+	}
+
+	const parts = value.split(':');
+	if (parts.length !== 2) return undefined;
+	return { host: parts[0], port: parts[1] };
+}
+
 function validateListenAddr(raw: string): string {
 	const value = raw.trim();
 	if (!value) return '';
-	const idx = value.lastIndexOf(':');
-	if (idx <= 0) return 'Use host:port, for example 127.0.0.1:37645.';
-	const host = value.slice(0, idx);
-	const port = Number(value.slice(idx + 1));
-	if (!isLoopbackHost(host)) return 'Host must be loopback (localhost or 127.0.0.1).';
+	const parsed = splitListenAddr(value);
+	if (!parsed) return 'Use host:port, for IPv6 use [::1]:37645.';
+	const port = Number(parsed.port);
+	if (!isLoopbackHost(parsed.host)) return 'Host must be loopback (localhost, 127.0.0.1, or ::1).';
 	if (!Number.isInteger(port) || port <= 0 || port > 65535) return 'Port must be 1..65535.';
 	return '';
 }

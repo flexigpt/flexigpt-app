@@ -52,6 +52,27 @@ type DiscoveryData = {
 	prompts: MCPPromptRef[];
 };
 
+const SENSITIVE_HTTP_HEADER_NAMES = new Set([
+	'authorization',
+	'proxy-authorization',
+	'cookie',
+	'set-cookie',
+	'x-api-key',
+	'api-key',
+	'x-auth-token',
+]);
+
+function sanitizeMCPHTTPHeaders(headers?: Record<string, string>): Record<string, string> | undefined {
+	if (!headers || Object.keys(headers).length === 0) return undefined;
+
+	return Object.fromEntries(
+		Object.entries(headers).map(([key, value]) => [
+			key,
+			SENSITIVE_HTTP_HEADER_NAMES.has(key.trim().toLowerCase()) ? '[configured]' : value,
+		])
+	);
+}
+
 function JSONBlock({ value }: { value: unknown }) {
 	if (value === undefined || value === null) {
 		return <span>-</span>;
@@ -265,6 +286,7 @@ function MCPServerDetailsModalContent({
 									streamableHttp: server.streamableHttp
 										? {
 												...server.streamableHttp,
+												headers: sanitizeMCPHTTPHeaders(server.streamableHttp.headers),
 												clientCredentialRef: server.streamableHttp.clientCredentialRef ? '[configured]' : undefined,
 												secretHeaderRefs: server.streamableHttp.secretHeaderRefs
 													? Object.fromEntries(

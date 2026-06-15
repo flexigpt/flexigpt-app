@@ -433,7 +433,7 @@ func (w *MCPWrapper) PatchMCPServerSetup(
 			}
 		}
 
-		overlay, _, err := w.buildSetupOverlay(ctx, cfg, req.Body.InputValues)
+		overlay, _, err := w.buildSetupOverlay(ctx, cfg, req.Body.InputValues, req.Body.Reset)
 		if err != nil {
 			return nil, err
 		}
@@ -853,7 +853,13 @@ func (w *MCPWrapper) buildMCPAuthHealth(
 			health.LastError = "missing streamableHttp config"
 			return health
 		}
-
+		if (st.State == "" || st.State == spec.MCPAuthStateRequired) &&
+			strings.TrimSpace(st.LastError) == "" {
+			health.State = spec.MCPAuthHealthStateAuthorized
+			health.Configured = true
+			health.LastError = ""
+			return health
+		}
 	default:
 		health.State = spec.MCPAuthHealthStateNotConfigured
 		health.Configured = false
@@ -1055,12 +1061,13 @@ func (w *MCPWrapper) close() {
 	}
 }
 
-// buildSetupOverlay converts declared input values into an overlay fragment with secret refs. "directHeaders" is the
-// set of plain (non-secret) header values, used only for the user-server path where we update the config directly.
+// buildSetupOverlay converts declared input values into an overlay fragment with secret refs.
+// "directHeaders" is the set of plain non-secret header values.
 func (w *MCPWrapper) buildSetupOverlay(
 	ctx context.Context,
 	cfg spec.MCPServerConfig,
 	values map[string]spec.MCPServerSetupInputValue,
+	resetExisting bool,
 ) (spec.MCPBuiltInServerOverlay, map[string]string, error) {
 	var overlay spec.MCPBuiltInServerOverlay
 	directHeaders := map[string]string{}
@@ -1098,12 +1105,21 @@ func (w *MCPWrapper) buildSetupOverlay(
 	for _, input := range cfg.Setup.Inputs {
 		v, ok := values[input.ID]
 		if !ok {
-			if input.Required && !setupInputConfigured(cfg, input) {
-				return overlay, directHeaders, fmt.Errorf(
-					"%w: setup input %q is required",
-					spec.ErrMCPInvalidRequest,
-					input.ID,
-				)
+			if input.Required {
+				if resetExisting {
+					return overlay, directHeaders, fmt.Errorf(
+						"%w: setup input %q is required when resetting existing setup",
+						spec.ErrMCPInvalidRequest,
+						input.ID,
+					)
+				}
+				if !setupInputConfigured(cfg, input) {
+					return overlay, directHeaders, fmt.Errorf(
+						"%w: setup input %q is required",
+						spec.ErrMCPInvalidRequest,
+						input.ID,
+					)
+				}
 			}
 			continue
 		}

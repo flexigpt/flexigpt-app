@@ -546,32 +546,33 @@ export default function MCPServersPage() {
 				settled = true;
 			});
 
-			while (!settled) {
-				await Promise.race([connectPromise.catch(() => undefined), sleep(1000)]);
+			try {
+				while (!settled) {
+					await Promise.race([connectPromise.catch(() => undefined), sleep(1000)]);
 
-				if (!settled) {
-					await refreshServerRuntimeAndAuth(bundleID, serverID).catch(() => undefined);
+					if (!settled) {
+						await refreshServerRuntimeAndAuth(bundleID, serverID).catch(() => undefined);
+					}
 				}
+				const snapshot = await connectPromise;
+				if (snapshot) {
+					setBundles(prev =>
+						prev.map(bundleData =>
+							bundleData.bundle.id === bundleID
+								? {
+										...bundleData,
+										runtimeByServerID: {
+											...bundleData.runtimeByServerID,
+											[serverID]: snapshot,
+										},
+									}
+								: bundleData
+						)
+					);
+				}
+			} finally {
+				await refreshServerRuntimeAndAuth(bundleID, serverID).catch(() => undefined);
 			}
-
-			const snapshot = await connectPromise;
-			if (snapshot) {
-				setBundles(prev =>
-					prev.map(bundleData =>
-						bundleData.bundle.id === bundleID
-							? {
-									...bundleData,
-									runtimeByServerID: {
-										...bundleData.runtimeByServerID,
-										[serverID]: snapshot,
-									},
-								}
-							: bundleData
-					)
-				);
-			}
-
-			await refreshServerRuntimeAndAuth(bundleID, serverID);
 		},
 		[refreshServerRuntimeAndAuth]
 	);

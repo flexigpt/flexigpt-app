@@ -95,7 +95,7 @@ func NewOAuthLoopbackBroker(ctx context.Context, opts *OAuthLoopbackBrokerOption
 		listenAddr = "127.0.0.1:0"
 	}
 	lc := &net.ListenConfig{}
-	ln, err := lc.Listen(ctx, "tcp4", listenAddr)
+	ln, err := lc.Listen(ctx, "tcp", listenAddr)
 	if err != nil {
 		return nil, fmt.Errorf("start OAuth loopback listener: %w", err)
 	}

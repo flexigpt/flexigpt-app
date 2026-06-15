@@ -201,7 +201,7 @@ func bearerChallengeValues(headers []string) (challengeErr string, scopes []stri
 		return "", nil
 	}
 	for _, c := range challenges {
-		if c.Scheme != "bearer" {
+		if !strings.EqualFold(c.Scheme, "bearer") {
 			continue
 		}
 		if challengeErr == "" {
