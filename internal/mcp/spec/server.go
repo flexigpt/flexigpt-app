@@ -158,10 +158,9 @@ type MCPServerConfig struct {
 	AppsPolicy    *MCPAppsPolicy                   `json:"appsPolicy,omitempty"`
 	Setup         *MCPServerSetup                  `json:"setup,omitempty"`
 
-	IsBuiltIn     bool       `json:"isBuiltIn"`
-	CreatedAt     time.Time  `json:"createdAt"`
-	ModifiedAt    time.Time  `json:"modifiedAt"`
-	SoftDeletedAt *time.Time `json:"softDeletedAt,omitempty"`
+	IsBuiltIn  bool      `json:"isBuiltIn"`
+	CreatedAt  time.Time `json:"createdAt"`
+	ModifiedAt time.Time `json:"modifiedAt"`
 }
 
 type MCPAuthHealth struct {

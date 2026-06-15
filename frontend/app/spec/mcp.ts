@@ -721,7 +721,6 @@ export interface MCPServerConfig {
 	isBuiltIn: boolean;
 	createdAt: MCPTimestamp;
 	modifiedAt: MCPTimestamp;
-	softDeletedAt?: MCPTimestamp;
 }
 
 export interface MCPUIResourceCSP {

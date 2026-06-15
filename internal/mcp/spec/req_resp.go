@@ -85,8 +85,6 @@ type PutMCPServerResponse struct{}
 type GetMCPServerRequest struct {
 	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
 	ServerID MCPServerID              `path:"serverID" required:"true"`
-
-	IncludeDeleted bool `query:"includeDeleted"`
 }
 
 type GetMCPServerResponse struct {

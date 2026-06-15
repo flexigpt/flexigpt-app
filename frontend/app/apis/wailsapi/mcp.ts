@@ -168,15 +168,10 @@ export class WailsMCPAPI implements IMCPAPI {
 		await PutMCPServer(req);
 	}
 
-	async getMCPServer(
-		bundleID: string,
-		serverID: MCPServerID,
-		includeDeleted?: boolean
-	): Promise<MCPServerConfig | undefined> {
+	async getMCPServer(bundleID: string, serverID: MCPServerID): Promise<MCPServerConfig | undefined> {
 		const resp = await GetMCPServer({
 			BundleID: bundleID,
 			ServerID: serverID,
-			IncludeDeleted: !!includeDeleted,
 		} as wailsSpec.GetMCPServerRequest);
 
 		return resp?.Body as MCPServerConfig | undefined;

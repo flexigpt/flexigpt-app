@@ -47,7 +47,6 @@ var (
 	ErrMCPConflict        = errors.New("mcp resource already exists")
 	ErrMCPServerNotFound  = errors.New("mcp server not found")
 	ErrMCPServerDisabled  = errors.New("mcp server is disabled")
-	ErrMCPServerDeleting  = errors.New("mcp server is being deleted")
 	ErrMCPRuntimeNotReady = errors.New("mcp runtime is not ready")
 	ErrMCPAuthRequired    = errors.New("mcp authorization required")
 	ErrMCPPolicyDenied    = errors.New("mcp policy denied request")

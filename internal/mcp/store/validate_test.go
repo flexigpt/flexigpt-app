@@ -114,18 +114,6 @@ func TestValidateServerConfigBranches(t *testing.T) {
 			wantErrContains: "modifiedAt is before createdAt",
 		},
 		{
-			name: "soft deleted cannot be enabled",
-			cfg: func() spec.MCPServerConfig {
-				c := baseHTTP()
-				now := time.Now().UTC()
-				c.SoftDeletedAt = &now
-				c.Enabled = true
-				return c
-			}(),
-			wantErrContains: "soft-deleted server cannot be enabled",
-		},
-
-		{
 			name:            "invalid trust level",
 			cfg:             func() spec.MCPServerConfig { c := baseHTTP(); c.TrustLevel = "bogus"; return c }(),
 			wantErrContains: "invalid trustLevel",

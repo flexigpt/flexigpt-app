@@ -509,7 +509,7 @@ export interface IMCPAPI {
 
 	putMCPServer(bundleID: string, serverID: MCPServerID, payload: PutMCPServerPayload): Promise<void>;
 
-	getMCPServer(bundleID: string, serverID: MCPServerID, includeDeleted?: boolean): Promise<MCPServerConfig | undefined>;
+	getMCPServer(bundleID: string, serverID: MCPServerID): Promise<MCPServerConfig | undefined>;
 
 	patchMCPServerEnabled(bundleID: string, serverID: MCPServerID, enabled: boolean): Promise<void>;
 

@@ -69,7 +69,7 @@ func cloneServerConfig(in spec.MCPServerConfig) spec.MCPServerConfig {
 		out.AppsPolicy = &cp
 	}
 	out.Setup = cloneServerSetup(in.Setup)
-	out.SoftDeletedAt = clonePtr(in.SoftDeletedAt)
+
 	return out
 }
 

@@ -221,20 +221,9 @@ func TestStorePutGetListPatchDeleteAndPersistence(t *testing.T) {
 		&spec.GetMCPServerRequest{BundleID: bundleID, ServerID: alphaID},
 	); !errors.Is(
 		err,
-		spec.ErrMCPServerDeleting,
+		spec.ErrMCPServerNotFound,
 	) {
-		t.Fatalf("GetMCPServer(alpha deleted) error = %v, want ErrMCPServerDeleting", err)
-	}
-	deleted, err := st2.GetMCPServer(ctx, &spec.GetMCPServerRequest{
-		BundleID:       bundleID,
-		ServerID:       alphaID,
-		IncludeDeleted: true,
-	})
-	if err != nil {
-		t.Fatalf("GetMCPServer(alpha deleted, includeDeleted): %v", err)
-	}
-	if deleted.Body.SoftDeletedAt == nil {
-		t.Fatalf("deleted server SoftDeletedAt is nil")
+		t.Fatalf("GetMCPServer(alpha deleted) error = %v, want ErrMCPServerNotFound", err)
 	}
 
 	listAfterDelete, err := st2.ListMCPServers(
@@ -516,15 +505,6 @@ func TestStoreRejectsPutOnDeletedServer(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("DeleteMCPServer: %v", err)
 	}
-
-	_, err = st.PutMCPServer(t.Context(), &spec.PutMCPServerRequest{
-		BundleID: bundleID,
-		ServerID: serverID,
-		Body:     payload,
-	})
-	if !errors.Is(err, spec.ErrMCPServerDeleting) {
-		t.Fatalf("PutMCPServer(after delete) error = %v, want ErrMCPServerDeleting", err)
-	}
 }
 
 func TestStoreRejectsBadPageToken(t *testing.T) {
@@ -704,9 +684,9 @@ func TestStoreCloneHelpers(t *testing.T) {
 			AppsPolicy: &spec.MCPAppsPolicy{
 				Enabled: true,
 			},
-			SoftDeletedAt: &deleted,
-			CreatedAt:     deleted.Add(-time.Hour),
-			ModifiedAt:    deleted,
+
+			CreatedAt:  deleted.Add(-time.Hour),
+			ModifiedAt: deleted,
 		}
 
 		cloned := cloneServerConfig(cfg)
@@ -717,7 +697,6 @@ func TestStoreCloneHelpers(t *testing.T) {
 		cfg.StreamableHTTP.URL = "https://mutated.test"
 		cfg.ToolPolicies["tool"] = spec.MCPToolPolicyOverride{ToolName: "changed"}
 		cfg.AppsPolicy.Enabled = false
-		*cfg.SoftDeletedAt = cfg.SoftDeletedAt.Add(time.Hour)
 
 		if cloned.DisplayName != "Server A" || cloned.Stdio.Args[0] != "--flag" || cloned.Stdio.Env["A"] != "1" ||
 			cloned.Stdio.SecretEnvRefs["TOKEN"] != "ref-a" || cloned.StreamableHTTP.URL != "https://example.test/mcp" ||
@@ -1278,24 +1257,15 @@ func TestStoreFunctionalBundleServerLifecycle(t *testing.T) {
 		t.Fatalf("DeleteMCPServer(bundleA/serverA): %v", err)
 	}
 
-	deletedServer, err := st.GetMCPServer(ctx, &spec.GetMCPServerRequest{
-		BundleID:       bundleA,
-		ServerID:       storeTestServerA,
-		IncludeDeleted: true,
-	})
-	if err != nil {
-		t.Fatalf("GetMCPServer(includeDeleted): %v", err)
-	}
-	if deletedServer.Body.SoftDeletedAt == nil || deletedServer.Body.Enabled {
-		t.Fatalf("deleted server = %#v", deletedServer.Body)
-	}
-
 	_, err = st.GetMCPServer(ctx, &spec.GetMCPServerRequest{
 		BundleID: bundleA,
 		ServerID: storeTestServerA,
 	})
-	if !errors.Is(err, spec.ErrMCPServerDeleting) {
-		t.Fatalf("GetMCPServer(deleted) = %v, want ErrMCPServerDeleting", err)
+	if err == nil {
+		t.Fatalf("GetMCPServer: %v", err)
+	}
+	if !errors.Is(err, spec.ErrMCPServerNotFound) {
+		t.Fatalf("GetMCPServer(deleted) = %v, want ErrMCPServerNotFound", err)
 	}
 
 	_, err = st.PutMCPServer(ctx, &spec.PutMCPServerRequest{
@@ -1315,25 +1285,13 @@ func TestStoreFunctionalBundleServerLifecycle(t *testing.T) {
 			}(),
 		},
 	})
-	if !errors.Is(err, spec.ErrMCPServerDeleting) {
-		t.Fatalf("PutMCPServer(deleted) = %v, want ErrMCPServerDeleting", err)
+	if err != nil {
+		t.Fatalf("PutMCPServer(deleted) = %v, want nil", err)
 	}
 
 	_, err = st.DeleteMCPBundle(ctx, &spec.DeleteMCPBundleRequest{BundleID: bundleA})
-	if err != nil {
-		t.Fatalf("DeleteMCPBundle(bundleA): %v", err)
-	}
-
-	_, err = st.PutMCPBundle(ctx, &spec.PutMCPBundleRequest{
-		BundleID: bundleA,
-		Body: &spec.PutMCPBundleRequestBody{
-			Slug:        bundleitemutils.BundleSlug(storeTestBundleA),
-			DisplayName: "Bundle A",
-			IsEnabled:   true,
-		},
-	})
-	if !errors.Is(err, spec.ErrMCPBundleDeleting) {
-		t.Fatalf("PutMCPBundle(deleted) = %v, want ErrMCPBundleDeleting", err)
+	if err == nil {
+		t.Fatalf("DeleteMCPBundle(bundleA): want err got nil")
 	}
 }
 

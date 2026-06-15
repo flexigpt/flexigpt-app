@@ -437,7 +437,6 @@ func (d *BuiltInData) populateDataFromFS(ctx context.Context) error {
 			}
 			cfg.BundleID = dirInfo.ID
 			cfg.IsBuiltIn = true
-			cfg.SoftDeletedAt = nil
 
 			if err := validateServerConfig(&cfg); err != nil {
 				return fmt.Errorf("%s: invalid mcp server: %w", inPath, err)

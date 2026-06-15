@@ -243,10 +243,9 @@ func (s *Store) DeleteMCPBundle(
 	if isBundleSoftDeleted(b) {
 		return nil, fmt.Errorf("%w: %s", spec.ErrMCPBundleDeleting, req.BundleID)
 	}
-	for _, cfg := range sc.Servers[req.BundleID] {
-		if !isServerSoftDeleted(&cfg) {
-			return nil, fmt.Errorf("%w: %s", spec.ErrMCPBundleNotEmpty, req.BundleID)
-		}
+
+	if len(sc.Servers[req.BundleID]) > 0 {
+		return nil, fmt.Errorf("%w: %s", spec.ErrMCPBundleNotEmpty, req.BundleID)
 	}
 
 	now := time.Now().UTC()
@@ -348,11 +347,6 @@ func (s *Store) PutMCPServer(
 		sc.Servers[req.BundleID] = map[spec.MCPServerID]spec.MCPServerConfig{}
 	}
 
-	if existing, ok := sc.Servers[req.BundleID][req.ServerID]; ok {
-		if isServerSoftDeleted(&existing) {
-			return nil, fmt.Errorf("%w: %s", spec.ErrMCPServerDeleting, req.ServerID)
-		}
-	}
 	if existingBundle, ok := findUserServerBundle(sc, req.ServerID); ok && existingBundle != req.BundleID {
 		return nil, fmt.Errorf(
 			"%w: serverID %q already exists in bundle %q",
@@ -417,7 +411,7 @@ func (s *Store) GetMCPServer(
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	cfg, _, bundle, ok, err := s.getAnyServerLocked(ctx, req.BundleID, req.ServerID, req.IncludeDeleted)
+	cfg, _, bundle, ok, err := s.getAnyServerLocked(ctx, req.BundleID, req.ServerID)
 	if err != nil {
 		return nil, err
 	}
@@ -504,7 +498,7 @@ func (s *Store) ListMCPServers(
 		if cfg.BundleID != req.BundleID {
 			return
 		}
-		if isServerSoftDeleted(&cfg) || isBundleSoftDeleted(bundle) {
+		if isBundleSoftDeleted(bundle) {
 			return
 		}
 		effectiveEnabled := cfg.Enabled && bundle.IsEnabled
@@ -607,9 +601,7 @@ func (s *Store) PatchMCPServerEnabled(
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", spec.ErrMCPServerNotFound, req.ServerID)
 	}
-	if isServerSoftDeleted(&cfg) {
-		return nil, fmt.Errorf("%w: %s", spec.ErrMCPServerDeleting, req.ServerID)
-	}
+
 	cfg.BundleID = bid
 	cfg.Enabled = req.Body.Enabled
 	cfg.ModifiedAt = time.Now().UTC()
@@ -650,9 +642,6 @@ func (s *Store) PatchMCPServerPolicy(
 	bid, cfg, ok := findUserServer(sc, req.BundleID, req.ServerID)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", spec.ErrMCPServerNotFound, req.ServerID)
-	}
-	if isServerSoftDeleted(&cfg) {
-		return nil, fmt.Errorf("%w: %s", spec.ErrMCPServerDeleting, req.ServerID)
 	}
 
 	if req.Body.DefaultPolicy != nil {
@@ -702,20 +691,11 @@ func (s *Store) DeleteMCPServer(
 	if err != nil {
 		return nil, err
 	}
-	bid, cfg, ok := findUserServer(sc, req.BundleID, req.ServerID)
-
+	bid, _, ok := findUserServer(sc, req.BundleID, req.ServerID)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", spec.ErrMCPServerNotFound, req.ServerID)
 	}
-	if isServerSoftDeleted(&cfg) {
-		return nil, fmt.Errorf("%w: %s", spec.ErrMCPServerDeleting, req.ServerID)
-	}
-
-	now := time.Now().UTC()
-	cfg.Enabled = false
-	cfg.SoftDeletedAt = &now
-	cfg.ModifiedAt = now
-	sc.Servers[bid][req.ServerID] = cloneServerConfig(cfg)
+	delete(sc.Servers[bid], req.ServerID)
 
 	if err := s.writeAll(sc); err != nil {
 		return nil, err
@@ -748,9 +728,6 @@ func (s *Store) ApplyUserServerSetupOverlay(
 	bid, cfg, ok := findUserServer(sc, bundleID, serverID)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", spec.ErrMCPServerNotFound, serverID)
-	}
-	if isServerSoftDeleted(&cfg) {
-		return nil, fmt.Errorf("%w: %s", spec.ErrMCPServerDeleting, serverID)
 	}
 
 	next, err := applyServerOverlay(cfg, patch)
@@ -929,7 +906,6 @@ func (s *Store) getAnyServerLocked(
 	ctx context.Context,
 	bundleID bundleitemutils.BundleID,
 	serverID spec.MCPServerID,
-	includeDeleted bool,
 ) (cfg spec.MCPServerConfig, builtIn bool, bundle spec.MCPBundle, ok bool, err error) {
 	if s.builtinData != nil {
 		if cfg, err = s.builtinData.GetBuiltInServer(ctx, bundleID, serverID); err == nil {
@@ -949,15 +925,9 @@ func (s *Store) getAnyServerLocked(
 	if !ok {
 		return spec.MCPServerConfig{}, false, spec.MCPBundle{}, false, nil
 	}
-	if isServerSoftDeleted(&cfg) && !includeDeleted {
-		return spec.MCPServerConfig{}, false, spec.MCPBundle{}, false, fmt.Errorf(
-			"%w: %s",
-			spec.ErrMCPServerDeleting,
-			serverID,
-		)
-	}
+
 	bundle = sc.Bundles[bid]
-	if isBundleSoftDeleted(bundle) && !includeDeleted {
+	if isBundleSoftDeleted(bundle) {
 		return spec.MCPServerConfig{}, false, spec.MCPBundle{}, false, fmt.Errorf(
 			"%w: %s",
 			spec.ErrMCPBundleDeleting,

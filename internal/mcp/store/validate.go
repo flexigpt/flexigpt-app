@@ -86,9 +86,6 @@ func validateServerConfig(c *spec.MCPServerConfig) error {
 	if c.ModifiedAt.Before(c.CreatedAt) {
 		return errors.New("modifiedAt is before createdAt")
 	}
-	if isServerSoftDeleted(c) && c.Enabled {
-		return errors.New("soft-deleted server cannot be enabled")
-	}
 
 	switch c.TrustLevel {
 	case "", spec.MCPTrustLevelUntrusted, spec.MCPTrustLevelTrusted:
@@ -630,10 +627,6 @@ func validateSetupInputUnion(c *spec.MCPServerConfig, i int, input *spec.MCPServ
 
 func isBundleSoftDeleted(b spec.MCPBundle) bool {
 	return b.SoftDeletedAt != nil && !b.SoftDeletedAt.IsZero()
-}
-
-func isServerSoftDeleted(c *spec.MCPServerConfig) bool {
-	return c != nil && c.SoftDeletedAt != nil && !c.SoftDeletedAt.IsZero()
 }
 
 func isLoopbackHost(host string) bool {
