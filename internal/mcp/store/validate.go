@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
@@ -18,7 +19,9 @@ const (
 	maxMCPDisplayNameLen = 256
 	maxMCPCommandLen     = 4096
 	maxMCPURLLen         = 4096
-	commandBash          = "bash"
+	maxMCPSetupTextLen   = 4096
+
+	commandBash = "bash"
 )
 
 var mcpServerIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
@@ -114,7 +117,9 @@ func validateServerConfig(c *spec.MCPServerConfig) error {
 		}
 		c.ToolPolicies[k] = p
 	}
-
+	if err := validateServerSetup(c); err != nil {
+		return fmt.Errorf("setup: %w", err)
+	}
 	switch c.Transport {
 	case spec.MCPTransportStdio:
 		if c.Stdio == nil {
@@ -233,7 +238,9 @@ func validateHTTPConfig(
 	if c.AuthMode == "" {
 		c.AuthMode = spec.MCPHTTPAuthNone
 	}
-
+	if err := validateHTTPHeaderConfig(bundleID, serverID, c); err != nil {
+		return err
+	}
 	clientIDMetadataDocumentURL := strings.TrimSpace(c.ClientIDMetadataDocumentURL)
 	if clientIDMetadataDocumentURL != "" {
 		if clientIDMetadataDocumentURL != c.ClientIDMetadataDocumentURL {
@@ -390,6 +397,233 @@ func validateEnvKey(key string) error {
 		if c < 0x20 || c == 0x7f {
 			return fmt.Errorf("env key contains control character %q", c)
 		}
+	}
+	return nil
+}
+
+func normalizeHTTPAuthMode(mode spec.MCPHTTPAuthMode) spec.MCPHTTPAuthMode {
+	mode = spec.MCPHTTPAuthMode(strings.TrimSpace(string(mode)))
+	if mode == "" {
+		return spec.MCPHTTPAuthNone
+	}
+	return mode
+}
+
+func validateMCPSettings(s spec.MCPSettings) error {
+	addr := strings.TrimSpace(s.OAuthLoopbackListenAddr)
+	if addr == "" {
+		return nil
+	}
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return fmt.Errorf("oauthLoopbackListenAddr must be host:port: %w", err)
+	}
+	if !isLoopbackHost(host) {
+		return errors.New("oauthLoopbackListenAddr host must be loopback")
+	}
+	n, err := strconv.Atoi(port)
+	if err != nil {
+		return fmt.Errorf("oauthLoopbackListenAddr port must be numeric: %w", err)
+	}
+	if n <= 0 || n > 65535 {
+		return errors.New("oauthLoopbackListenAddr port must be 1..65535")
+	}
+	return nil
+}
+
+func validateHTTPHeaderConfig(
+	bundleID bundleitemutils.BundleID,
+	serverID spec.MCPServerID,
+	c *spec.MCPStreamableHTTPConfig,
+) error {
+	for name, value := range c.Headers {
+		if err := validateHTTPHeaderName(name); err != nil {
+			return fmt.Errorf("streamableHttp.headers[%q]: %w", name, err)
+		}
+		if strings.ContainsAny(value, "\r\n\x00") {
+			return fmt.Errorf("streamableHttp.headers[%q]: value must not contain CR/LF/NUL", name)
+		}
+	}
+
+	seen := map[string]string{}
+	for name, ref := range c.SecretHeaderRefs {
+		if err := validateHTTPHeaderName(name); err != nil {
+			return fmt.Errorf("streamableHttp.secretHeaderRefs[%q]: %w", name, err)
+		}
+		key := strings.ToLower(strings.TrimSpace(name))
+		if prev := seen[key]; prev != "" {
+			return fmt.Errorf("streamableHttp.secretHeaderRefs %q and %q collide", prev, name)
+		}
+		seen[key] = name
+		if strings.TrimSpace(ref) == "" {
+			return fmt.Errorf("streamableHttp.secretHeaderRefs[%q] is empty", name)
+		}
+		if err := secret.ValidateMCPSecretRef(ref, bundleID, serverID, spec.MCPSecretKindHTTPHeader, name); err != nil {
+			return fmt.Errorf("streamableHttp.secretHeaderRefs[%q]: %w", name, err)
+		}
+	}
+
+	for name := range c.Headers {
+		if _, ok := seen[strings.ToLower(strings.TrimSpace(name))]; ok {
+			return fmt.Errorf("streamableHttp header %q defined as both plain and secret", name)
+		}
+	}
+
+	if normalizeHTTPAuthMode(c.AuthMode) != spec.MCPHTTPAuthNone {
+		if hasHTTPHeader(c.Headers, "Authorization") || hasHTTPHeader(c.SecretHeaderRefs, "Authorization") {
+			return errors.New("streamableHttp Authorization header is not allowed when OAuth authMode is enabled")
+		}
+	}
+	return nil
+}
+
+func hasHTTPHeader(m map[string]string, name string) bool {
+	for k := range m {
+		if strings.EqualFold(strings.TrimSpace(k), name) {
+			return true
+		}
+	}
+	return false
+}
+
+func validateHTTPHeaderName(name string) error {
+	if strings.TrimSpace(name) == "" {
+		return errors.New("header name is empty")
+	}
+	if strings.TrimSpace(name) != name {
+		return errors.New("header name has leading/trailing whitespace")
+	}
+	for _, r := range name {
+		if !isHTTPTokenRune(r) {
+			return fmt.Errorf("header name contains invalid character %q", r)
+		}
+	}
+	return nil
+}
+
+func isHTTPTokenRune(r rune) bool {
+	if r >= 'A' && r <= 'Z' ||
+		r >= 'a' && r <= 'z' ||
+		r >= '0' && r <= '9' {
+		return true
+	}
+
+	switch r {
+	case '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '^', '_', '`', '|', '~':
+		return true
+	default:
+		return false
+	}
+}
+
+func validateServerSetup(c *spec.MCPServerConfig) error {
+	if c == nil || c.Setup == nil {
+		return nil
+	}
+	if len(c.Setup.Note) > maxMCPSetupTextLen {
+		return fmt.Errorf("note too long > %d", maxMCPSetupTextLen)
+	}
+
+	seen := map[string]struct{}{}
+	for i := range c.Setup.Inputs {
+		input := &c.Setup.Inputs[i]
+		input.ID = strings.TrimSpace(input.ID)
+		if input.ID == "" {
+			return fmt.Errorf("inputs[%d].id is empty", i)
+		}
+		if _, ok := seen[input.ID]; ok {
+			return fmt.Errorf("inputs[%d].id %q is duplicated", i, input.ID)
+		}
+		seen[input.ID] = struct{}{}
+		if len(input.Description) > maxMCPSetupTextLen || len(input.Note) > maxMCPSetupTextLen {
+			return fmt.Errorf("inputs[%d]: text too long", i)
+		}
+		if err := validateSetupInputUnion(c, i, input); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateSetupInputUnion(c *spec.MCPServerConfig, i int, input *spec.MCPServerSetupInput) error {
+	set := 0
+	if input.OAuthClientCredentials != nil {
+		set++
+	}
+	if input.HTTPHeader != nil {
+		set++
+	}
+	if input.StdioEnv != nil {
+		set++
+	}
+	if input.StreamableHTTPURL != nil {
+		set++
+	}
+	if input.ClientIDMetadataDocumentURL != nil {
+		set++
+	}
+	if set != 1 {
+		return fmt.Errorf("inputs[%d]: exactly one kind-specific block must be set", i)
+	}
+
+	httpMode := spec.MCPHTTPAuthNone
+	if c.StreamableHTTP != nil {
+		httpMode = normalizeHTTPAuthMode(c.StreamableHTTP.AuthMode)
+	}
+
+	switch input.Kind {
+	case spec.MCPSetupKindOAuthClientCredentials:
+		if input.OAuthClientCredentials == nil {
+			return fmt.Errorf("inputs[%d]: kind/block mismatch", i)
+		}
+		if c.Transport != spec.MCPTransportStreamableHTTP {
+			return fmt.Errorf("inputs[%d]: oauthClientCredentials requires streamableHttp", i)
+		}
+		if httpMode != spec.MCPHTTPAuthOAuth && httpMode != spec.MCPHTTPAuthClientCredentials {
+			return fmt.Errorf("inputs[%d]: oauthClientCredentials requires oauth/clientCredentials authMode", i)
+		}
+
+	case spec.MCPSetupKindHTTPHeader:
+		if input.HTTPHeader == nil {
+			return fmt.Errorf("inputs[%d]: kind/block mismatch", i)
+		}
+		if c.Transport != spec.MCPTransportStreamableHTTP {
+			return fmt.Errorf("inputs[%d]: httpHeader requires streamableHttp", i)
+		}
+		if err := validateHTTPHeaderName(input.HTTPHeader.HeaderName); err != nil {
+			return fmt.Errorf("inputs[%d].httpHeader.headerName: %w", i, err)
+		}
+		if httpMode != spec.MCPHTTPAuthNone &&
+			strings.EqualFold(strings.TrimSpace(input.HTTPHeader.HeaderName), "Authorization") {
+			return fmt.Errorf("inputs[%d]: Authorization header not allowed with OAuth authMode", i)
+		}
+
+	case spec.MCPSetupKindStdioEnv:
+		if input.StdioEnv == nil {
+			return fmt.Errorf("inputs[%d]: kind/block mismatch", i)
+		}
+		if c.Transport != spec.MCPTransportStdio {
+			return fmt.Errorf("inputs[%d]: stdioEnv requires stdio", i)
+		}
+		if err := validateEnvKey(input.StdioEnv.EnvName); err != nil {
+			return fmt.Errorf("inputs[%d].stdioEnv.envName: %w", i, err)
+		}
+
+	case spec.MCPSetupKindStreamableHTTPURL:
+		if input.StreamableHTTPURL == nil || c.Transport != spec.MCPTransportStreamableHTTP {
+			return fmt.Errorf("inputs[%d]: streamableHttpUrl requires streamableHttp", i)
+		}
+
+	case spec.MCPSetupKindClientIDMetadataDocURL:
+		if input.ClientIDMetadataDocumentURL == nil || c.Transport != spec.MCPTransportStreamableHTTP {
+			return fmt.Errorf("inputs[%d]: clientIDMetadataDocumentURL requires streamableHttp", i)
+		}
+		if httpMode != spec.MCPHTTPAuthOAuth {
+			return fmt.Errorf("inputs[%d]: clientIDMetadataDocumentURL requires oauth authMode", i)
+		}
+
+	default:
+		return fmt.Errorf("inputs[%d].kind %q is invalid", i, input.Kind)
 	}
 	return nil
 }

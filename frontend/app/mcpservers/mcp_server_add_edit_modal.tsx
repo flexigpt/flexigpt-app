@@ -907,10 +907,10 @@ function AddEditMCPServerModalContent({
 						</div>
 
 						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-2">
+							<label className="label col-span-3">
 								<span className="label-text text-sm">Trust</span>
 							</label>
-							<div className="col-span-3">
+							<div className="col-span-9">
 								<Dropdown
 									dropdownItems={TRUST_DROPDOWN_ITEMS}
 									selectedKey={formData.trustLevel}
@@ -1318,25 +1318,9 @@ function AddEditMCPServerModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Approval</span>
-							</label>
-							<div className="col-span-4">
-								<Dropdown
-									dropdownItems={APPROVAL_RULE_DROPDOWN_ITEMS}
-									selectedKey={formData.defaultApprovalRule}
-									onChange={defaultApprovalRule => {
-										setFormDataAndValidate({ ...formData, defaultApprovalRule });
-									}}
-									getDisplayName={getMCPApprovalRuleLabel}
-									title="Default approval"
-									inlineMenu={true}
-								/>
-							</div>
-
-							<label className="label col-span-2">
 								<span className="label-text text-sm">Execution</span>
 							</label>
-							<div className="col-span-3">
+							<div className="col-span-9">
 								<Dropdown
 									dropdownItems={EXECUTION_MODE_DROPDOWN_ITEMS}
 									selectedKey={formData.defaultExecutionMode}
@@ -1345,6 +1329,23 @@ function AddEditMCPServerModalContent({
 									}}
 									getDisplayName={getMCPExecutionModeLabel}
 									title="Default execution"
+									inlineMenu={true}
+								/>
+							</div>
+						</div>
+						<div className="grid grid-cols-12 items-center gap-2">
+							<label className="label col-span-3">
+								<span className="label-text text-sm">Approval</span>
+							</label>
+							<div className="col-span-9">
+								<Dropdown
+									dropdownItems={APPROVAL_RULE_DROPDOWN_ITEMS}
+									selectedKey={formData.defaultApprovalRule}
+									onChange={defaultApprovalRule => {
+										setFormDataAndValidate({ ...formData, defaultApprovalRule });
+									}}
+									getDisplayName={getMCPApprovalRuleLabel}
+									title="Default approval"
 									inlineMenu={true}
 								/>
 							</div>

@@ -2,6 +2,12 @@
 
 ## Laundry list
 
+- [ ] thinking scrolls even if manual scroll happens by user.
+- [ ] diff can be applied to files by letting UI detect diff files and doing a optimistic dry run of apply to that file and then give manual apply button in UI.
+- [ ] a folder selection/input an be given in context bar to say that your current work folder is so and so, so that any claude.md or skills or anything can be selected and auto injected as a "Starter recipe"
+- [ ] mermaid diagram code needs to be collapsed and then expand on demand or if there is error in rendering.
+- [ ] copy existing functionality verification across mcp and other configs.
+
 - [ ] Need more cleanup wrt shortcuts, input tips, shortcuts to add mcp skills etc.
 - [x] need coherence in message bottom bar.
 - [ ] better more inbuilt mcps.

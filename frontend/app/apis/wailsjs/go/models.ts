@@ -3823,6 +3823,8 @@ export namespace spec {
 	    authorizationPending?: boolean;
 	    authorizationURL?: string;
 	    authorizationExpiresAt?: string;
+	    oauthRedirectURL?: string;
+	    oauthLoopbackListenAddr?: string;
 	    lastError?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -3842,6 +3844,8 @@ export namespace spec {
 	        this.authorizationPending = source["authorizationPending"];
 	        this.authorizationURL = source["authorizationURL"];
 	        this.authorizationExpiresAt = source["authorizationExpiresAt"];
+	        this.oauthRedirectURL = source["oauthRedirectURL"];
+	        this.oauthLoopbackListenAddr = source["oauthLoopbackListenAddr"];
 	        this.lastError = source["lastError"];
 	    }
 	
@@ -4000,6 +4004,164 @@ export namespace spec {
 	        this.IncludeDeleted = source["IncludeDeleted"];
 	    }
 	}
+	export class MCPSetupClientIDMetadataDocumentURLInput {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPSetupClientIDMetadataDocumentURLInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
+	export class MCPSetupStreamableHTTPURLInput {
+	
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPSetupStreamableHTTPURLInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	
+	    }
+	}
+	export class MCPSetupStdioEnvInput {
+	    envName: string;
+	    secret?: boolean;
+	    valuePrefix?: string;
+	    valueSuffix?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPSetupStdioEnvInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.envName = source["envName"];
+	        this.secret = source["secret"];
+	        this.valuePrefix = source["valuePrefix"];
+	        this.valueSuffix = source["valueSuffix"];
+	    }
+	}
+	export class MCPSetupHTTPHeaderInput {
+	    headerName: string;
+	    secret?: boolean;
+	    valuePrefix?: string;
+	    valueSuffix?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPSetupHTTPHeaderInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.headerName = source["headerName"];
+	        this.secret = source["secret"];
+	        this.valuePrefix = source["valuePrefix"];
+	        this.valueSuffix = source["valueSuffix"];
+	    }
+	}
+	export class MCPSetupOAuthClientCredentialsInput {
+	    clientSecretRequired?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPSetupOAuthClientCredentialsInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.clientSecretRequired = source["clientSecretRequired"];
+	    }
+	}
+	export class MCPServerSetupInput {
+	    id: string;
+	    kind: string;
+	    label?: string;
+	    description?: string;
+	    note?: string;
+	    placeholder?: string;
+	    required?: boolean;
+	    oauthClientCredentials?: MCPSetupOAuthClientCredentialsInput;
+	    httpHeader?: MCPSetupHTTPHeaderInput;
+	    stdioEnv?: MCPSetupStdioEnvInput;
+	    // Go type: MCPSetupStreamableHTTPURLInput
+	    streamableHttpUrl?: any;
+	    // Go type: MCPSetupClientIDMetadataDocumentURLInput
+	    clientIDMetadataDocumentURL?: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPServerSetupInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.kind = source["kind"];
+	        this.label = source["label"];
+	        this.description = source["description"];
+	        this.note = source["note"];
+	        this.placeholder = source["placeholder"];
+	        this.required = source["required"];
+	        this.oauthClientCredentials = this.convertValues(source["oauthClientCredentials"], MCPSetupOAuthClientCredentialsInput);
+	        this.httpHeader = this.convertValues(source["httpHeader"], MCPSetupHTTPHeaderInput);
+	        this.stdioEnv = this.convertValues(source["stdioEnv"], MCPSetupStdioEnvInput);
+	        this.streamableHttpUrl = this.convertValues(source["streamableHttpUrl"], null);
+	        this.clientIDMetadataDocumentURL = this.convertValues(source["clientIDMetadataDocumentURL"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class MCPServerSetup {
+	    note?: string;
+	    inputs?: MCPServerSetupInput[];
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPServerSetup(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.note = source["note"];
+	        this.inputs = this.convertValues(source["inputs"], MCPServerSetupInput);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class MCPAppsPolicy {
 	    enabled: boolean;
 	    allowAppInitiatedToolCalls: boolean;
@@ -4062,6 +4224,8 @@ export namespace spec {
 	    url: string;
 	    timeoutMS?: number;
 	    authMode: string;
+	    headers?: Record<string, string>;
+	    secretHeaderRefs?: Record<string, string>;
 	    clientCredentialRef?: string;
 	    clientIDMetadataDocumentURL?: string;
 	
@@ -4074,6 +4238,8 @@ export namespace spec {
 	        this.url = source["url"];
 	        this.timeoutMS = source["timeoutMS"];
 	        this.authMode = source["authMode"];
+	        this.headers = source["headers"];
+	        this.secretHeaderRefs = source["secretHeaderRefs"];
 	        this.clientCredentialRef = source["clientCredentialRef"];
 	        this.clientIDMetadataDocumentURL = source["clientIDMetadataDocumentURL"];
 	    }
@@ -4113,6 +4279,7 @@ export namespace spec {
 	    defaultPolicy: MCPServerPolicy;
 	    toolPolicies?: Record<string, MCPToolPolicyOverride>;
 	    appsPolicy?: MCPAppsPolicy;
+	    setup?: MCPServerSetup;
 	    isBuiltIn: boolean;
 	    // Go type: time
 	    createdAt: any;
@@ -4139,6 +4306,7 @@ export namespace spec {
 	        this.defaultPolicy = this.convertValues(source["defaultPolicy"], MCPServerPolicy);
 	        this.toolPolicies = this.convertValues(source["toolPolicies"], MCPToolPolicyOverride, true);
 	        this.appsPolicy = this.convertValues(source["appsPolicy"], MCPAppsPolicy);
+	        this.setup = this.convertValues(source["setup"], MCPServerSetup);
 	        this.isBuiltIn = source["isBuiltIn"];
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
@@ -8206,6 +8374,73 @@ export namespace spec {
 	
 	
 	
+	export class MCPServerSetupInputValue {
+	    value?: string;
+	    clientID?: string;
+	    clientSecret?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPServerSetupInputValue(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.value = source["value"];
+	        this.clientID = source["clientID"];
+	        this.clientSecret = source["clientSecret"];
+	    }
+	}
+	export class MCPSettings {
+	    oauthLoopbackListenAddr?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPSettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.oauthLoopbackListenAddr = source["oauthLoopbackListenAddr"];
+	    }
+	}
+	export class MCPSettingsView {
+	    settings: MCPSettings;
+	    oauthRedirectURL?: string;
+	    oauthRestartRequired?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPSettingsView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.settings = this.convertValues(source["settings"], MCPSettings);
+	        this.oauthRedirectURL = source["oauthRedirectURL"];
+	        this.oauthRestartRequired = source["oauthRestartRequired"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	
+	
+	
 	
 	
 	
@@ -8589,6 +8824,176 @@ export namespace spec {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	
 	    }
+	}
+	export class PatchMCPServerSetupRequestBody {
+	    reset?: boolean;
+	    inputValues?: Record<string, MCPServerSetupInputValue>;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchMCPServerSetupRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.reset = source["reset"];
+	        this.inputValues = this.convertValues(source["inputValues"], MCPServerSetupInputValue, true);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PatchMCPServerSetupRequest {
+	    BundleID: string;
+	    ServerID: string;
+	    Body?: PatchMCPServerSetupRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchMCPServerSetupRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	        this.ServerID = source["ServerID"];
+	        this.Body = this.convertValues(source["Body"], PatchMCPServerSetupRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class PatchMCPServerSetupResponse {
+	    Body?: MCPServerConfig;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchMCPServerSetupResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], MCPServerConfig);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PatchMCPSettingsRequestBody {
+	    oauthLoopbackListenAddr?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchMCPSettingsRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.oauthLoopbackListenAddr = source["oauthLoopbackListenAddr"];
+	    }
+	}
+	export class PatchMCPSettingsRequest {
+	    Body?: PatchMCPSettingsRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchMCPSettingsRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], PatchMCPSettingsRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class PatchMCPSettingsResponse {
+	    Body?: MCPSettingsView;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchMCPSettingsResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], MCPSettingsView);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class PatchModelPresetRequestBody {
 	    stream?: boolean;
@@ -9668,6 +10073,7 @@ export namespace spec {
 	    defaultPolicy?: MCPServerPolicy;
 	    toolPolicies?: Record<string, MCPToolPolicyOverride>;
 	    appsPolicy?: MCPAppsPolicy;
+	    setup?: MCPServerSetup;
 	
 	    static createFrom(source: any = {}) {
 	        return new PutMCPServerPayload(source);
@@ -9684,6 +10090,7 @@ export namespace spec {
 	        this.defaultPolicy = this.convertValues(source["defaultPolicy"], MCPServerPolicy);
 	        this.toolPolicies = this.convertValues(source["toolPolicies"], MCPToolPolicyOverride, true);
 	        this.appsPolicy = this.convertValues(source["appsPolicy"], MCPAppsPolicy);
+	        this.setup = this.convertValues(source["setup"], MCPServerSetup);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

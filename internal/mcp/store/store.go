@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -24,6 +25,7 @@ type storeSchema struct {
 	SchemaVersion string                                                                 `json:"schemaVersion"`
 	Bundles       map[bundleitemutils.BundleID]spec.MCPBundle                            `json:"bundles"`
 	Servers       map[bundleitemutils.BundleID]map[spec.MCPServerID]spec.MCPServerConfig `json:"servers"`
+	Settings      *spec.MCPSettings                                                      `json:"settings,omitempty"`
 }
 
 type Store struct {
@@ -51,6 +53,7 @@ func NewMCPStore(ctx context.Context, baseDir string) (*Store, error) {
 		SchemaVersion: spec.MCPSchemaVersion,
 		Bundles:       map[bundleitemutils.BundleID]spec.MCPBundle{},
 		Servers:       map[bundleitemutils.BundleID]map[spec.MCPServerID]spec.MCPServerConfig{},
+		Settings:      &spec.MCPSettings{},
 	})
 	if err != nil {
 		_ = builtInData.Close()
@@ -383,6 +386,7 @@ func (s *Store) PutMCPServer(
 		DefaultPolicy:  policy,
 		ToolPolicies:   req.Body.ToolPolicies,
 		AppsPolicy:     req.Body.AppsPolicy,
+		Setup:          req.Body.Setup,
 
 		IsBuiltIn:  false,
 		CreatedAt:  created,
@@ -717,6 +721,115 @@ func (s *Store) DeleteMCPServer(
 		return nil, err
 	}
 	return &spec.DeleteMCPServerResponse{}, nil
+}
+
+// ApplyUserServerSetupOverlay patches only runtime setup fields on a user-owned
+// server. It intentionally avoids PutMCPServer because setup patching should not
+// have create/replace semantics and must preserve raw server.Enabled even when
+// the containing bundle is disabled.
+func (s *Store) ApplyUserServerSetupOverlay(
+	ctx context.Context,
+	bundleID bundleitemutils.BundleID,
+	serverID spec.MCPServerID,
+	patch spec.MCPBuiltInServerOverlay,
+) (*spec.MCPServerConfig, error) {
+	if err := requireMCPBundleServerIDs(bundleID, serverID); err != nil {
+		return nil, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sc, err := s.readAll(ctx, false)
+	if err != nil {
+		return nil, err
+	}
+
+	bid, cfg, ok := findUserServer(sc, bundleID, serverID)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", spec.ErrMCPServerNotFound, serverID)
+	}
+	if isServerSoftDeleted(&cfg) {
+		return nil, fmt.Errorf("%w: %s", spec.ErrMCPServerDeleting, serverID)
+	}
+
+	next, err := applyServerOverlay(cfg, patch)
+	if err != nil {
+		return nil, err
+	}
+	next.ModifiedAt = time.Now().UTC()
+	next.BundleID = bid
+	next.ID = serverID
+	next.IsBuiltIn = false
+
+	if err := validateServerConfig(&next); err != nil {
+		return nil, fmt.Errorf("%w: %w", spec.ErrMCPInvalidRequest, err)
+	}
+
+	sc.Servers[bid][serverID] = cloneServerConfig(next)
+	if err := s.writeAll(sc); err != nil {
+		return nil, err
+	}
+	out := cloneServerConfig(next)
+	return &out, nil
+}
+
+// ApplyBuiltInServerSetupOverlay routes a built-in setup patch to the overlay.
+func (s *Store) ApplyBuiltInServerSetupOverlay(
+	ctx context.Context,
+	bundleID bundleitemutils.BundleID,
+	serverID spec.MCPServerID,
+	patch spec.MCPBuiltInServerOverlay,
+	reset bool,
+) (*spec.MCPServerConfig, error) {
+	if s.builtinData == nil {
+		return nil, fmt.Errorf("%w: built-in data unavailable", spec.ErrMCPServerNotFound)
+	}
+	cfg, err := s.builtinData.ApplyServerSetupOverlay(ctx, bundleID, serverID, patch, reset)
+	if err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
+// GetMCPSettings is an internal read used at init and by settings patch.
+func (s *Store) GetMCPSettings(ctx context.Context) (*spec.MCPSettings, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	sc, err := s.readAll(ctx, false)
+	if err != nil {
+		return &spec.MCPSettings{}, err
+	}
+	return sc.Settings, nil
+}
+
+func (s *Store) PatchMCPSettings(
+	ctx context.Context,
+	req *spec.PatchMCPSettingsRequest,
+) (*spec.MCPSettings, error) {
+	if req == nil || req.Body == nil {
+		return &spec.MCPSettings{}, fmt.Errorf("%w: settings body required", spec.ErrMCPInvalidRequest)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sc, err := s.readAll(ctx, false)
+	if err != nil {
+		return &spec.MCPSettings{}, err
+	}
+	next := sc.Settings
+	if req.Body.OAuthLoopbackListenAddr != nil {
+		next.OAuthLoopbackListenAddr = strings.TrimSpace(*req.Body.OAuthLoopbackListenAddr)
+	}
+	if err := validateMCPSettings(*next); err != nil {
+		return &spec.MCPSettings{}, fmt.Errorf("%w: %w", spec.ErrMCPInvalidRequest, err)
+	}
+	sc.Settings = next
+	if err := s.writeAll(sc); err != nil {
+		return &spec.MCPSettings{}, err
+	}
+	return next, nil
 }
 
 func (s *Store) ensureBaseBundleHydrated(ctx context.Context) error {

@@ -50,6 +50,10 @@ export function PatchMCPServerEnabled(arg1:spec.PatchMCPServerEnabledRequest):Pr
 
 export function PatchMCPServerPolicy(arg1:spec.PatchMCPServerPolicyRequest):Promise<spec.PatchMCPServerPolicyResponse>;
 
+export function PatchMCPServerSetup(arg1:spec.PatchMCPServerSetupRequest):Promise<spec.PatchMCPServerSetupResponse>;
+
+export function PatchMCPSettings(arg1:spec.PatchMCPSettingsRequest):Promise<spec.PatchMCPSettingsResponse>;
+
 export function PutMCPBundle(arg1:spec.PutMCPBundleRequest):Promise<spec.PutMCPBundleResponse>;
 
 export function PutMCPServer(arg1:spec.PutMCPServerRequest):Promise<spec.PutMCPServerResponse>;

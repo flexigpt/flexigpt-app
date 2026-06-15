@@ -3,7 +3,6 @@ package store
 import (
 	"maps"
 	"slices"
-	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
@@ -19,7 +18,7 @@ func cloneBundleMap(in map[bundleitemutils.BundleID]spec.MCPBundle) map[bundleit
 
 func cloneBundle(in spec.MCPBundle) spec.MCPBundle {
 	out := in
-	out.SoftDeletedAt = cloneTimePtr(in.SoftDeletedAt)
+	out.SoftDeletedAt = clonePtr(in.SoftDeletedAt)
 	return out
 }
 
@@ -54,6 +53,8 @@ func cloneServerConfig(in spec.MCPServerConfig) spec.MCPServerConfig {
 
 	if in.StreamableHTTP != nil {
 		cp := *in.StreamableHTTP
+		cp.Headers = maps.Clone(in.StreamableHTTP.Headers)
+		cp.SecretHeaderRefs = maps.Clone(in.StreamableHTTP.SecretHeaderRefs)
 		out.StreamableHTTP = &cp
 	}
 
@@ -67,9 +68,27 @@ func cloneServerConfig(in spec.MCPServerConfig) spec.MCPServerConfig {
 		cp := *in.AppsPolicy
 		out.AppsPolicy = &cp
 	}
-
-	out.SoftDeletedAt = cloneTimePtr(in.SoftDeletedAt)
+	out.Setup = cloneServerSetup(in.Setup)
+	out.SoftDeletedAt = clonePtr(in.SoftDeletedAt)
 	return out
+}
+
+func cloneServerSetup(in *spec.MCPServerSetup) *spec.MCPServerSetup {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	out.Inputs = make([]spec.MCPServerSetupInput, len(in.Inputs))
+	for i, input := range in.Inputs {
+		cp := input
+		cp.OAuthClientCredentials = clonePtr(input.OAuthClientCredentials)
+		cp.HTTPHeader = clonePtr(input.HTTPHeader)
+		cp.StdioEnv = clonePtr(input.StdioEnv)
+		cp.StreamableHTTPURL = clonePtr(input.StreamableHTTPURL)
+		cp.ClientIDMetadataDocumentURL = clonePtr(input.ClientIDMetadataDocumentURL)
+		out.Inputs[i] = cp
+	}
+	return &out
 }
 
 func cloneDiscoverySnapshot(in spec.MCPDiscoverySnapshot) spec.MCPDiscoverySnapshot {
@@ -120,10 +139,10 @@ func cloneDiscoverySnapshot(in spec.MCPDiscoverySnapshot) spec.MCPDiscoverySnaps
 	return out
 }
 
-func cloneTimePtr(t *time.Time) *time.Time {
-	if t == nil {
+func clonePtr[T any](in *T) *T {
+	if in == nil {
 		return nil
 	}
-	v := *t
-	return &v
+	out := *in
+	return &out
 }

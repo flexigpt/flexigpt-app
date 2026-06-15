@@ -98,6 +98,14 @@ export function PatchMCPServerPolicy(arg1) {
   return window['go']['main']['MCPWrapper']['PatchMCPServerPolicy'](arg1);
 }
 
+export function PatchMCPServerSetup(arg1) {
+  return window['go']['main']['MCPWrapper']['PatchMCPServerSetup'](arg1);
+}
+
+export function PatchMCPSettings(arg1) {
+  return window['go']['main']['MCPWrapper']['PatchMCPSettings'](arg1);
+}
+
 export function PutMCPBundle(arg1) {
   return window['go']['main']['MCPWrapper']['PutMCPBundle'](arg1);
 }

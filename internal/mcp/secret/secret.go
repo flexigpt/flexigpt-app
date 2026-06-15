@@ -167,6 +167,7 @@ func validateSecret(r spec.MCPSecretRef) error {
 	}
 	switch r.Kind {
 	case spec.MCPSecretKindStdioEnv,
+		spec.MCPSecretKindHTTPHeader,
 		spec.MCPSecretKindOAuthClientCredentials:
 	default:
 		return fmt.Errorf("secret ref kind %q is invalid", r.Kind)
@@ -187,6 +188,10 @@ func validateSecret(r spec.MCPSecretRef) error {
 		if err := validateEnvSecretSlot(r.Slot); err != nil {
 			return err
 		}
+	case spec.MCPSecretKindHTTPHeader:
+		if err := validateHTTPHeaderSecretSlot(r.Slot); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -203,7 +208,11 @@ func normalizeAndValidateSecretSlot(kind spec.MCPSecretKind, slot string) (strin
 			return "", err
 		}
 		return normalizeSecretSlot(raw), nil
-
+	case spec.MCPSecretKindHTTPHeader:
+		if err := validateHTTPHeaderSecretSlot(raw); err != nil {
+			return "", err
+		}
+		return normalizeSecretSlot(raw), nil
 	case spec.MCPSecretKindOAuthClientCredentials:
 		if !strings.EqualFold(raw, "clientCredentials") {
 			return "", fmt.Errorf(
@@ -216,6 +225,38 @@ func normalizeAndValidateSecretSlot(kind spec.MCPSecretKind, slot string) (strin
 
 	default:
 		return "", fmt.Errorf("secret ref kind %q is invalid", kind)
+	}
+}
+
+func validateHTTPHeaderSecretSlot(name string) error {
+	if strings.TrimSpace(name) == "" {
+		return errors.New("http header name is empty")
+	}
+	if strings.TrimSpace(name) != name {
+		return errors.New("http header name has leading/trailing whitespace")
+	}
+
+	for _, r := range name {
+		if !isHTTPTokenRune(r) {
+			return fmt.Errorf("http header name contains invalid character %q", r)
+		}
+	}
+
+	return nil
+}
+
+func isHTTPTokenRune(r rune) bool {
+	if r >= 'A' && r <= 'Z' ||
+		r >= 'a' && r <= 'z' ||
+		r >= '0' && r <= '9' {
+		return true
+	}
+
+	switch r {
+	case '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '^', '_', '`', '|', '~':
+		return true
+	default:
+		return false
 	}
 }
 

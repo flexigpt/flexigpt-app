@@ -15,6 +15,8 @@ const (
 	// and required for the client_credentials grant.
 	//nolint:gosec // Enum val.
 	MCPSecretKindOAuthClientCredentials MCPSecretKind = "oauthClientCredentials"
+
+	MCPSecretKindHTTPHeader MCPSecretKind = "httpHeader"
 )
 
 type MCPSecretRef struct {

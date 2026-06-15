@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -20,6 +21,8 @@ import (
 
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
 )
+
+const secretResolverNotConfiguredReason = "secret resolver is not configured"
 
 type mcpAuthKeyReader interface {
 	GetAuthKey(ctx context.Context, req *settingSpec.GetAuthKeyRequest) (*settingSpec.GetAuthKeyResponse, error)
@@ -176,7 +179,20 @@ func InitMCPWrapper(ctx context.Context, w *MCPWrapper, baseDir string, secrets 
 		return err
 	}
 
-	oauthBroker, err := auth.NewOAuthLoopbackBroker(ctx, nil)
+	settings, err := st.GetMCPSettings(ctx)
+	if err != nil {
+		_ = st.Close()
+		return err
+	}
+
+	var opts auth.OAuthLoopbackBrokerOptions
+	if settings != nil && strings.TrimSpace(settings.OAuthLoopbackListenAddr) != "" {
+		opts = auth.OAuthLoopbackBrokerOptions{
+			ListenAddr: settings.OAuthLoopbackListenAddr,
+		}
+	}
+
+	oauthBroker, err := auth.NewOAuthLoopbackBroker(ctx, &opts)
 	if err != nil {
 		_ = st.Close()
 		return err
@@ -383,9 +399,123 @@ func (w *MCPWrapper) DeleteMCPServer(req *spec.DeleteMCPServerRequest) (*spec.De
 	})
 }
 
+func (w *MCPWrapper) PatchMCPServerSetup(
+	req *spec.PatchMCPServerSetupRequest,
+) (*spec.PatchMCPServerSetupResponse, error) {
+	return middleware.WithRecoveryResp(func() (*spec.PatchMCPServerSetupResponse, error) {
+		ctx := context.Background()
+		if req == nil || req.Body == nil || req.BundleID == "" || req.ServerID == "" {
+			return nil, fmt.Errorf("%w: bundleID, serverID, and body required", spec.ErrMCPInvalidRequest)
+		}
+
+		cfgResp, err := w.store.GetMCPServer(ctx, &spec.GetMCPServerRequest{
+			BundleID: req.BundleID,
+			ServerID: req.ServerID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if cfgResp == nil || cfgResp.Body == nil {
+			return nil, fmt.Errorf("%w: empty server config response", spec.ErrMCPRuntimeNotReady)
+		}
+		cfg := *cfgResp.Body
+
+		if len(req.Body.InputValues) > 0 && (w == nil || w.secretWriter == nil) {
+			// Only fails if a secret-bearing input is present; checked again below.
+			if setupNeedsSecretWriter(cfg, req.Body.InputValues) {
+				return nil, fmt.Errorf("%w: secret writer is not configured", spec.ErrMCPRuntimeNotReady)
+			}
+		}
+
+		overlay, _, err := w.buildSetupOverlay(ctx, cfg, req.Body.InputValues)
+		if err != nil {
+			return nil, err
+		}
+
+		var updated *spec.MCPServerConfig
+		if cfg.IsBuiltIn {
+			updated, err = w.store.ApplyBuiltInServerSetupOverlay(
+				ctx,
+				req.BundleID,
+				req.ServerID,
+				overlay,
+				req.Body.Reset,
+			)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			if req.Body.Reset {
+				return nil, fmt.Errorf("%w: reset is only supported for built-in servers", spec.ErrMCPInvalidRequest)
+			}
+			updated, err = w.store.ApplyUserServerSetupOverlay(ctx, req.BundleID, req.ServerID, overlay)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if w.runtime != nil {
+			w.runtime.ForgetLastKnownSnapshot(ctx, req.BundleID, req.ServerID)
+			_, _ = w.runtime.Disconnect(ctx, &spec.DisconnectMCPServerRequest{
+				BundleID: req.BundleID,
+				ServerID: req.ServerID,
+			})
+		}
+		return &spec.PatchMCPServerSetupResponse{Body: updated}, nil
+	})
+}
+
+func (w *MCPWrapper) PatchMCPSettings(
+	req *spec.PatchMCPSettingsRequest,
+) (*spec.PatchMCPSettingsResponse, error) {
+	return middleware.WithRecoveryResp(func() (*spec.PatchMCPSettingsResponse, error) {
+		ctx := context.Background()
+		settings, err := w.store.PatchMCPSettings(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+		view := &spec.MCPSettingsView{Settings: *settings}
+		if w != nil && w.oauthBroker != nil {
+			view.OAuthRedirectURL = w.oauthBroker.RedirectURL()
+			requested := strings.TrimSpace(settings.OAuthLoopbackListenAddr)
+			current := strings.TrimSpace(w.oauthBroker.ListenAddr())
+			view.OAuthRestartRequired = requested != "" && requested != current
+		}
+		return &spec.PatchMCPSettingsResponse{Body: view}, nil
+	})
+}
+
 func (w *MCPWrapper) ConnectMCPServer(req *spec.ConnectMCPServerRequest) (*spec.ConnectMCPServerResponse, error) {
 	return middleware.WithRecoveryResp(func() (*spec.ConnectMCPServerResponse, error) {
-		return w.runtime.Connect(context.Background(), req)
+		ctx := context.Background()
+		if req == nil || req.BundleID == "" || req.ServerID == "" {
+			return nil, fmt.Errorf("%w: bundleID and serverID required", spec.ErrMCPInvalidRequest)
+		}
+
+		cfgResp, err := w.store.GetMCPServer(ctx, &spec.GetMCPServerRequest{
+			BundleID: req.BundleID,
+			ServerID: req.ServerID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if cfgResp == nil || cfgResp.Body == nil {
+			return nil, fmt.Errorf("%w: empty server config response", spec.ErrMCPRuntimeNotReady)
+		}
+		if input, ok := firstUnconfiguredRequiredSetupInput(*cfgResp.Body); ok {
+			label := input.Label
+			if strings.TrimSpace(label) == "" {
+				label = input.ID
+			}
+			return nil, fmt.Errorf(
+				"%w: setup input %q (%s) must be configured before connecting",
+				spec.ErrMCPInvalidRequest,
+				input.ID,
+				label,
+			)
+		}
+
+		return w.runtime.Connect(ctx, req)
 	})
 }
 
@@ -689,6 +819,15 @@ func (w *MCPWrapper) buildMCPAuthHealth(
 			health.LastError = msg
 			return health
 		}
+		if input, ok := firstUnconfiguredRequiredSetupInput(cfg); ok {
+			health.State = spec.MCPAuthHealthStateNotConfigured
+			health.Configured = false
+			health.LastError = fmt.Sprintf(
+				"required setup input %q is not configured",
+				input.ID,
+			)
+			return health
+		}
 		health.State = spec.MCPAuthHealthStateNotRequired
 		return health
 
@@ -704,6 +843,27 @@ func (w *MCPWrapper) buildMCPAuthHealth(
 		health.State = spec.MCPAuthHealthStateNotConfigured
 		health.Configured = false
 		health.LastError = "unsupported MCP transport"
+		return health
+	}
+
+	if input, ok := firstUnconfiguredRequiredSetupInput(cfg); ok {
+		health.State = spec.MCPAuthHealthStateNotConfigured
+		health.Configured = false
+		health.LastError = fmt.Sprintf(
+			"required setup input %q is not configured",
+			input.ID,
+		)
+		return health
+	}
+
+	if w != nil && w.oauthBroker != nil {
+		health.OAuthRedirectURL = w.oauthBroker.RedirectURL()
+		health.OAuthLoopbackListenAddr = w.oauthBroker.ListenAddr()
+	}
+	if missing, msg := w.firstMissingHTTPHeaderSecret(ctx, cfg); missing {
+		health.State = spec.MCPAuthHealthStateNotConfigured
+		health.Configured = false
+		health.LastError = msg
 		return health
 	}
 
@@ -771,6 +931,28 @@ func (w *MCPWrapper) buildMCPAuthHealth(
 	return health
 }
 
+func (w *MCPWrapper) firstMissingHTTPHeaderSecret(
+	ctx context.Context,
+	cfg spec.MCPServerConfig,
+) (missing bool, reason string) {
+	if cfg.StreamableHTTP == nil || len(cfg.StreamableHTTP.SecretHeaderRefs) == 0 {
+		return false, ""
+	}
+	if w == nil || w.secretResolver == nil {
+		return true, secretResolverNotConfiguredReason
+	}
+	for header, ref := range cfg.StreamableHTTP.SecretHeaderRefs {
+		value, err := w.secretResolver.ResolveSecret(ctx, ref)
+		if err != nil {
+			return true, fmt.Sprintf("HTTP header secret %s is not configured: %v", header, err)
+		}
+		if strings.TrimSpace(value) == "" {
+			return true, fmt.Sprintf("HTTP header secret %s is empty", header)
+		}
+	}
+	return false, ""
+}
+
 func (w *MCPWrapper) firstMissingStdioSecret(
 	ctx context.Context,
 	cfg spec.MCPServerConfig,
@@ -779,7 +961,7 @@ func (w *MCPWrapper) firstMissingStdioSecret(
 		return false, ""
 	}
 	if w == nil || w.secretResolver == nil {
-		return true, "secret resolver is not configured"
+		return true, secretResolverNotConfiguredReason
 	}
 	for key, ref := range cfg.Stdio.SecretEnvRefs {
 		value, err := w.secretResolver.ResolveSecret(ctx, ref)
@@ -799,7 +981,7 @@ func (w *MCPWrapper) oauthClientSecretConfigured(
 	requireClientSecret bool,
 ) (ok bool, msg string) {
 	if w == nil || w.secretResolver == nil {
-		return false, "secret resolver is not configured"
+		return false, secretResolverNotConfiguredReason
 	}
 	raw, err := w.secretResolver.ResolveSecret(ctx, ref)
 	if err != nil {
@@ -827,6 +1009,357 @@ func (w *MCPWrapper) pendingOAuthAuthorization(
 		}
 	}
 	return spec.MCPOAuthAuthorization{}, false
+}
+
+func (w *MCPWrapper) close() {
+	if w == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if w.runtime != nil {
+		_ = w.runtime.Close(ctx)
+	}
+	if w.oauthBroker != nil {
+		_ = w.oauthBroker.Close()
+	}
+	if w.store != nil {
+		_ = w.store.Close()
+	}
+}
+
+// buildSetupOverlay converts declared input values into an overlay fragment with secret refs. "directHeaders" is the
+// set of plain (non-secret) header values, used only for the user-server path where we update the config directly.
+func (w *MCPWrapper) buildSetupOverlay(
+	ctx context.Context,
+	cfg spec.MCPServerConfig,
+	values map[string]spec.MCPServerSetupInputValue,
+) (spec.MCPBuiltInServerOverlay, map[string]string, error) {
+	var overlay spec.MCPBuiltInServerOverlay
+	directHeaders := map[string]string{}
+
+	if len(values) == 0 {
+		return overlay, directHeaders, nil
+	}
+	if cfg.Setup == nil {
+		return overlay, directHeaders, fmt.Errorf("%w: server declares no setup inputs", spec.ErrMCPInvalidRequest)
+	}
+
+	declared := map[string]spec.MCPServerSetupInput{}
+	for _, input := range cfg.Setup.Inputs {
+		declared[input.ID] = input
+	}
+	for id := range values {
+		if _, ok := declared[id]; !ok {
+			return overlay, directHeaders, fmt.Errorf("%w: unknown setup input %q", spec.ErrMCPInvalidRequest, id)
+		}
+	}
+
+	ensureHTTP := func() *spec.MCPStreamableHTTPConfigOverlay {
+		if overlay.StreamableHTTP == nil {
+			overlay.StreamableHTTP = &spec.MCPStreamableHTTPConfigOverlay{}
+		}
+		return overlay.StreamableHTTP
+	}
+	ensureStdio := func() *spec.MCPStdioConfigOverlay {
+		if overlay.Stdio == nil {
+			overlay.Stdio = &spec.MCPStdioConfigOverlay{}
+		}
+		return overlay.Stdio
+	}
+
+	for _, input := range cfg.Setup.Inputs {
+		v, ok := values[input.ID]
+		if !ok {
+			if input.Required && !setupInputConfigured(cfg, input) {
+				return overlay, directHeaders, fmt.Errorf(
+					"%w: setup input %q is required",
+					spec.ErrMCPInvalidRequest,
+					input.ID,
+				)
+			}
+			continue
+		}
+
+		switch input.Kind {
+		case spec.MCPSetupKindOAuthClientCredentials:
+			if strings.TrimSpace(v.ClientID) == "" {
+				return overlay, directHeaders, fmt.Errorf(
+					"%w: input %q requires clientID",
+					spec.ErrMCPInvalidRequest,
+					input.ID,
+				)
+			}
+			if input.OAuthClientCredentials != nil && input.OAuthClientCredentials.ClientSecretRequired &&
+				strings.TrimSpace(v.ClientSecret) == "" {
+				return overlay, directHeaders, fmt.Errorf(
+					"%w: input %q requires clientSecret",
+					spec.ErrMCPInvalidRequest,
+					input.ID,
+				)
+			}
+			ref, err := w.storeOAuthClientCredentials(ctx, cfg, v.ClientID, v.ClientSecret)
+			if err != nil {
+				return overlay, directHeaders, err
+			}
+			ensureHTTP().ClientCredentialRef = &ref
+
+		case spec.MCPSetupKindHTTPHeader:
+			if input.HTTPHeader == nil {
+				return overlay, directHeaders, fmt.Errorf(
+					"%w: input %q missing httpHeader block",
+					spec.ErrMCPInvalidRequest,
+					input.ID,
+				)
+			}
+			full := input.HTTPHeader.ValuePrefix + v.Value + input.HTTPHeader.ValueSuffix
+			if input.HTTPHeader.Secret {
+				if strings.TrimSpace(v.Value) == "" {
+					return overlay, directHeaders, fmt.Errorf(
+						"%w: input %q requires value",
+						spec.ErrMCPInvalidRequest,
+						input.ID,
+					)
+				}
+				ref, err := w.storeHeaderSecret(ctx, cfg, input.HTTPHeader.HeaderName, full)
+				if err != nil {
+					return overlay, directHeaders, err
+				}
+				h := ensureHTTP()
+				if h.SecretHeaderRefs == nil {
+					h.SecretHeaderRefs = map[string]string{}
+				}
+				h.SecretHeaderRefs[input.HTTPHeader.HeaderName] = ref
+			} else {
+				h := ensureHTTP()
+				if h.Headers == nil {
+					h.Headers = map[string]string{}
+				}
+				h.Headers[input.HTTPHeader.HeaderName] = full
+				directHeaders[input.HTTPHeader.HeaderName] = full
+			}
+
+		case spec.MCPSetupKindStdioEnv:
+			if input.StdioEnv == nil {
+				return overlay, directHeaders, fmt.Errorf(
+					"%w: input %q missing stdioEnv block",
+					spec.ErrMCPInvalidRequest,
+					input.ID,
+				)
+			}
+			full := input.StdioEnv.ValuePrefix + v.Value + input.StdioEnv.ValueSuffix
+			if input.StdioEnv.Secret {
+				if strings.TrimSpace(v.Value) == "" {
+					return overlay, directHeaders, fmt.Errorf(
+						"%w: input %q requires value",
+						spec.ErrMCPInvalidRequest,
+						input.ID,
+					)
+				}
+				ref, err := w.storeStdioEnvSecret(ctx, cfg, input.StdioEnv.EnvName, full)
+				if err != nil {
+					return overlay, directHeaders, err
+				}
+				st := ensureStdio()
+				if st.SecretEnvRefs == nil {
+					st.SecretEnvRefs = map[string]string{}
+				}
+				st.SecretEnvRefs[input.StdioEnv.EnvName] = ref
+			} else {
+				st := ensureStdio()
+				if st.Env == nil {
+					st.Env = map[string]string{}
+				}
+				st.Env[input.StdioEnv.EnvName] = full
+			}
+
+		case spec.MCPSetupKindStreamableHTTPURL:
+			if strings.TrimSpace(v.Value) == "" {
+				return overlay, directHeaders, fmt.Errorf(
+					"%w: input %q requires value",
+					spec.ErrMCPInvalidRequest,
+					input.ID,
+				)
+			}
+			value := v.Value
+			ensureHTTP().URL = &value
+
+		case spec.MCPSetupKindClientIDMetadataDocURL:
+			if strings.TrimSpace(v.Value) == "" {
+				return overlay, directHeaders, fmt.Errorf(
+					"%w: input %q requires value",
+					spec.ErrMCPInvalidRequest,
+					input.ID,
+				)
+			}
+			value := v.Value
+			ensureHTTP().ClientIDMetadataDocumentURL = &value
+
+		default:
+			return overlay, directHeaders, fmt.Errorf(
+				"%w: unsupported setup input kind %q",
+				spec.ErrMCPInvalidRequest,
+				input.Kind,
+			)
+		}
+	}
+
+	return overlay, directHeaders, nil
+}
+
+func firstUnconfiguredRequiredSetupInput(cfg spec.MCPServerConfig) (spec.MCPServerSetupInput, bool) {
+	if cfg.Setup == nil {
+		return spec.MCPServerSetupInput{}, false
+	}
+	for _, input := range cfg.Setup.Inputs {
+		if !input.Required {
+			continue
+		}
+		if !setupInputConfigured(cfg, input) {
+			return input, true
+		}
+	}
+	return spec.MCPServerSetupInput{}, false
+}
+
+func setupInputConfigured(cfg spec.MCPServerConfig, input spec.MCPServerSetupInput) bool {
+	switch input.Kind {
+	case spec.MCPSetupKindOAuthClientCredentials:
+		return cfg.StreamableHTTP != nil &&
+			strings.TrimSpace(cfg.StreamableHTTP.ClientCredentialRef) != ""
+
+	case spec.MCPSetupKindHTTPHeader:
+		if cfg.StreamableHTTP == nil || input.HTTPHeader == nil {
+			return false
+		}
+		header := input.HTTPHeader.HeaderName
+		if input.HTTPHeader.Secret {
+			return hasStringMapKeyFold(cfg.StreamableHTTP.SecretHeaderRefs, header)
+		}
+		return hasStringMapKeyFold(cfg.StreamableHTTP.Headers, header)
+
+	case spec.MCPSetupKindStdioEnv:
+		if cfg.Stdio == nil || input.StdioEnv == nil {
+			return false
+		}
+		env := input.StdioEnv.EnvName
+		if input.StdioEnv.Secret {
+			_, ok := cfg.Stdio.SecretEnvRefs[env]
+			return ok
+		}
+		_, ok := cfg.Stdio.Env[env]
+		return ok
+
+	case spec.MCPSetupKindStreamableHTTPURL:
+		return cfg.StreamableHTTP != nil &&
+			strings.TrimSpace(cfg.StreamableHTTP.URL) != ""
+
+	case spec.MCPSetupKindClientIDMetadataDocURL:
+		return cfg.StreamableHTTP != nil &&
+			strings.TrimSpace(cfg.StreamableHTTP.ClientIDMetadataDocumentURL) != ""
+
+	default:
+		return false
+	}
+}
+
+func hasStringMapKeyFold(m map[string]string, key string) bool {
+	for k := range m {
+		if strings.EqualFold(strings.TrimSpace(k), strings.TrimSpace(key)) {
+			return true
+		}
+	}
+	return false
+}
+
+func setupNeedsSecretWriter(cfg spec.MCPServerConfig, values map[string]spec.MCPServerSetupInputValue) bool {
+	if cfg.Setup == nil {
+		return false
+	}
+	for _, input := range cfg.Setup.Inputs {
+		if _, ok := values[input.ID]; !ok {
+			continue
+		}
+		switch input.Kind {
+		case spec.MCPSetupKindOAuthClientCredentials:
+			return true
+		case spec.MCPSetupKindHTTPHeader:
+			if input.HTTPHeader != nil && input.HTTPHeader.Secret {
+				return true
+			}
+		case spec.MCPSetupKindStdioEnv:
+			if input.StdioEnv != nil && input.StdioEnv.Secret {
+				return true
+			}
+		default:
+		}
+	}
+	return false
+}
+
+func (w *MCPWrapper) storeOAuthClientCredentials(
+	ctx context.Context,
+	cfg spec.MCPServerConfig,
+	clientID, clientSecret string,
+) (string, error) {
+	//nolint:gosec // Type struct.
+	raw, err := json.Marshal(struct {
+		ClientID     string `json:"clientID"`
+		ClientSecret string `json:"clientSecret,omitempty"`
+	}{ClientID: clientID, ClientSecret: clientSecret})
+	if err != nil {
+		return "", err
+	}
+	requireSecret := cfg.StreamableHTTP != nil &&
+		cfg.StreamableHTTP.AuthMode == spec.MCPHTTPAuthClientCredentials
+	if err := auth.ValidateOAuthClientCredentialsSecret(string(raw), requireSecret); err != nil {
+		return "", err
+	}
+	ref, err := secret.NewMCPSecretRefString(
+		cfg.BundleID,
+		cfg.ID,
+		spec.MCPSecretKindOAuthClientCredentials,
+		"clientCredentials",
+	)
+	if err != nil {
+		return "", err
+	}
+	if _, _, err := w.secretWriter.SetMCPSecret(ctx, ref, string(raw)); err != nil {
+		return "", err
+	}
+	return ref, nil
+}
+
+func (w *MCPWrapper) storeHeaderSecret(
+	ctx context.Context,
+	cfg spec.MCPServerConfig,
+	header, value string,
+) (string, error) {
+	ref, err := secret.NewMCPSecretRefString(cfg.BundleID, cfg.ID, spec.MCPSecretKindHTTPHeader, header)
+	if err != nil {
+		return "", err
+	}
+	if _, _, err := w.secretWriter.SetMCPSecret(ctx, ref, value); err != nil {
+		return "", err
+	}
+	return ref, nil
+}
+
+func (w *MCPWrapper) storeStdioEnvSecret(
+	ctx context.Context,
+	cfg spec.MCPServerConfig,
+	env, value string,
+) (string, error) {
+	ref, err := secret.NewMCPSecretRefString(cfg.BundleID, cfg.ID, spec.MCPSecretKindStdioEnv, env)
+	if err != nil {
+		return "", err
+	}
+	if _, _, err := w.secretWriter.SetMCPSecret(ctx, ref, value); err != nil {
+		return "", err
+	}
+	return ref, nil
 }
 
 func shouldForgetMCPServerSnapshotAfterPut(previous *spec.MCPServerConfig, req *spec.PutMCPServerRequest) bool {
@@ -893,23 +1426,4 @@ func normalizeWrapperHTTPAuthMode(mode spec.MCPHTTPAuthMode) spec.MCPHTTPAuthMod
 		return spec.MCPHTTPAuthNone
 	}
 	return mode
-}
-
-func (w *MCPWrapper) close() {
-	if w == nil {
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	if w.runtime != nil {
-		_ = w.runtime.Close(ctx)
-	}
-	if w.oauthBroker != nil {
-		_ = w.oauthBroker.Close()
-	}
-	if w.store != nil {
-		_ = w.store.Close()
-	}
 }

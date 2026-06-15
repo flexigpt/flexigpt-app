@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -28,6 +29,11 @@ type builtInMCPServerID string
 func (builtInMCPServerID) Group() overlay.GroupID { return "servers" }
 func (s builtInMCPServerID) ID() overlay.KeyID    { return overlay.KeyID(s) }
 
+type builtInMCPServerSetupID string
+
+func (builtInMCPServerSetupID) Group() overlay.GroupID { return "serverSetups" }
+func (s builtInMCPServerSetupID) ID() overlay.KeyID    { return overlay.KeyID(s) }
+
 type BuiltInData struct {
 	bundlesFS      fs.FS
 	bundlesDir     string
@@ -39,6 +45,7 @@ type BuiltInData struct {
 	store              *overlay.Store
 	bundleOverlayFlags *overlay.TypedGroup[builtInMCPBundleID, bool]
 	serverOverlayFlags *overlay.TypedGroup[builtInMCPServerID, bool]
+	serverSetups       *overlay.TypedGroup[builtInMCPServerSetupID, spec.MCPBuiltInServerOverlay]
 
 	mu          sync.RWMutex
 	viewBundles map[bundleitemutils.BundleID]spec.MCPBundle
@@ -77,6 +84,7 @@ func NewBuiltInData(
 		filepath.Join(overlayBaseDir, spec.MCPBuiltInOverlayDBFileName),
 		overlay.WithKeyType[builtInMCPBundleID](),
 		overlay.WithKeyType[builtInMCPServerID](),
+		overlay.WithKeyType[builtInMCPServerSetupID](),
 	)
 	if err != nil {
 		return nil, err
@@ -104,7 +112,10 @@ func NewBuiltInData(
 	if err != nil {
 		return nil, err
 	}
-
+	data.serverSetups, err = overlay.NewTypedGroup[builtInMCPServerSetupID, spec.MCPBuiltInServerOverlay](ctx, store)
+	if err != nil {
+		return nil, err
+	}
 	for _, opt := range opts {
 		opt(data)
 	}
@@ -290,6 +301,60 @@ func (d *BuiltInData) SetServerEnabled(
 	return cloneServerConfig(cfg), nil
 }
 
+// ApplyServerSetupOverlay merges a setup overlay fragment into the stored
+// overlay (or starts fresh when reset is true), validates the resulting config,
+// persists, and returns the rebuilt config.
+func (d *BuiltInData) ApplyServerSetupOverlay(
+	ctx context.Context,
+	bundleID bundleitemutils.BundleID,
+	serverID spec.MCPServerID,
+	patch spec.MCPBuiltInServerOverlay,
+	reset bool,
+) (spec.MCPServerConfig, error) {
+	if d == nil {
+		return spec.MCPServerConfig{}, fmt.Errorf("%w: built-in data unavailable", spec.ErrMCPServerNotFound)
+	}
+	if err := requireMCPBundleServerIDs(bundleID, serverID); err != nil {
+		return spec.MCPServerConfig{}, err
+	}
+
+	d.mu.RLock()
+	base, ok := d.servers[bundleID][serverID]
+	d.mu.RUnlock()
+	if !ok {
+		return spec.MCPServerConfig{}, fmt.Errorf("%w: %s", spec.ErrMCPServerNotFound, serverID)
+	}
+
+	current := spec.MCPBuiltInServerOverlay{}
+	if !reset {
+		if flag, ok, err := d.serverSetups.GetFlag(ctx, builtInServerSetupKey(bundleID, serverID)); err != nil {
+			return spec.MCPServerConfig{}, err
+		} else if ok {
+			current = flag.Value
+		}
+	}
+	merged := mergeBuiltInServerOverlay(current, patch)
+
+	candidate, err := applyServerOverlay(base, merged)
+	if err != nil {
+		return spec.MCPServerConfig{}, err
+	}
+	if err := validateServerConfig(&candidate); err != nil {
+		return spec.MCPServerConfig{}, fmt.Errorf("%w: %w", spec.ErrMCPInvalidRequest, err)
+	}
+
+	if _, err := d.serverSetups.SetFlag(ctx, builtInServerSetupKey(bundleID, serverID), merged); err != nil {
+		return spec.MCPServerConfig{}, err
+	}
+
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if err := d.rebuildSnapshot(ctx); err != nil {
+		return spec.MCPServerConfig{}, err
+	}
+	return cloneServerConfig(d.viewServers[bundleID][serverID]), nil
+}
+
 func (d *BuiltInData) populateDataFromFS(ctx context.Context) error {
 	bundlesFS, err := fsutil.ResolveFS(d.bundlesFS, d.bundlesDir)
 	if err != nil {
@@ -433,6 +498,17 @@ func (d *BuiltInData) rebuildSnapshot(ctx context.Context) error {
 				cfg.Enabled = flag.Value
 				cfg.ModifiedAt = flag.ModifiedAt
 			}
+			if flag, ok, err := d.serverSetups.GetFlag(ctx, builtInServerSetupKey(bid, sid)); err != nil {
+				return err
+			} else if ok {
+				cfg, err = applyServerOverlay(cfg, flag.Value)
+				if err != nil {
+					return fmt.Errorf("built-in mcp server setup %s/%s: %w", bid, sid, err)
+				}
+				if flag.ModifiedAt.After(cfg.ModifiedAt) {
+					cfg.ModifiedAt = flag.ModifiedAt
+				}
+			}
 			sub[sid] = cfg
 		}
 		newServers[bid] = sub
@@ -441,6 +517,104 @@ func (d *BuiltInData) rebuildSnapshot(ctx context.Context) error {
 	d.viewBundles = newBundles
 	d.viewServers = newServers
 	return nil
+}
+
+func builtInServerSetupKey(
+	bundleID bundleitemutils.BundleID,
+	serverID spec.MCPServerID,
+) builtInMCPServerSetupID {
+	return builtInMCPServerSetupID(fmt.Sprintf("%s::%s", bundleID, serverID))
+}
+
+func mergeBuiltInServerOverlay(dst, src spec.MCPBuiltInServerOverlay) spec.MCPBuiltInServerOverlay {
+	out := dst
+	if src.Stdio != nil {
+		if out.Stdio == nil {
+			out.Stdio = &spec.MCPStdioConfigOverlay{}
+		}
+		mergeStringMap(out.Stdio.Env, src.Stdio.Env)
+		mergeStringMap(out.Stdio.SecretEnvRefs, src.Stdio.SecretEnvRefs)
+	}
+	if src.StreamableHTTP != nil {
+		if out.StreamableHTTP == nil {
+			out.StreamableHTTP = &spec.MCPStreamableHTTPConfigOverlay{}
+		}
+		if src.StreamableHTTP.URL != nil {
+			out.StreamableHTTP.URL = src.StreamableHTTP.URL
+		}
+		if src.StreamableHTTP.TimeoutMS != nil {
+			out.StreamableHTTP.TimeoutMS = src.StreamableHTTP.TimeoutMS
+		}
+		if src.StreamableHTTP.ClientCredentialRef != nil {
+			out.StreamableHTTP.ClientCredentialRef = src.StreamableHTTP.ClientCredentialRef
+		}
+		if src.StreamableHTTP.ClientIDMetadataDocumentURL != nil {
+			out.StreamableHTTP.ClientIDMetadataDocumentURL = src.StreamableHTTP.ClientIDMetadataDocumentURL
+		}
+		mergeStringMap(out.StreamableHTTP.Headers, src.StreamableHTTP.Headers)
+		mergeStringMap(out.StreamableHTTP.SecretHeaderRefs, src.StreamableHTTP.SecretHeaderRefs)
+	}
+	return out
+}
+
+func applyServerOverlay(
+	cfg spec.MCPServerConfig,
+	ov spec.MCPBuiltInServerOverlay,
+) (spec.MCPServerConfig, error) {
+	out := cloneServerConfig(cfg)
+
+	if ov.Stdio != nil {
+		if out.Transport != spec.MCPTransportStdio {
+			return spec.MCPServerConfig{}, fmt.Errorf(
+				"%w: stdio overlay on %s server",
+				spec.ErrMCPInvalidRequest,
+				out.Transport,
+			)
+		}
+		if out.Stdio == nil {
+			out.Stdio = &spec.MCPStdioConfig{}
+		}
+		mergeStringMap(out.Stdio.Env, ov.Stdio.Env)
+		mergeStringMap(out.Stdio.SecretEnvRefs, ov.Stdio.SecretEnvRefs)
+	}
+
+	if ov.StreamableHTTP != nil {
+		if out.Transport != spec.MCPTransportStreamableHTTP {
+			return spec.MCPServerConfig{}, fmt.Errorf(
+				"%w: streamableHttp overlay on %s server",
+				spec.ErrMCPInvalidRequest,
+				out.Transport,
+			)
+		}
+		if out.StreamableHTTP == nil {
+			out.StreamableHTTP = &spec.MCPStreamableHTTPConfig{}
+		}
+		if ov.StreamableHTTP.URL != nil {
+			out.StreamableHTTP.URL = *ov.StreamableHTTP.URL
+		}
+		if ov.StreamableHTTP.TimeoutMS != nil {
+			out.StreamableHTTP.TimeoutMS = *ov.StreamableHTTP.TimeoutMS
+		}
+		if ov.StreamableHTTP.ClientCredentialRef != nil {
+			out.StreamableHTTP.ClientCredentialRef = *ov.StreamableHTTP.ClientCredentialRef
+		}
+		if ov.StreamableHTTP.ClientIDMetadataDocumentURL != nil {
+			out.StreamableHTTP.ClientIDMetadataDocumentURL = *ov.StreamableHTTP.ClientIDMetadataDocumentURL
+		}
+		mergeStringMap(out.StreamableHTTP.Headers, ov.StreamableHTTP.Headers)
+		mergeStringMap(out.StreamableHTTP.SecretHeaderRefs, ov.StreamableHTTP.SecretHeaderRefs)
+	}
+	return out, nil
+}
+
+func mergeStringMap(dst, src map[string]string) {
+	if len(src) == 0 {
+		return
+	}
+	if dst == nil {
+		dst = map[string]string{}
+	}
+	maps.Copy(dst, src)
 }
 
 func builtInServerKey(bundleID bundleitemutils.BundleID, serverID spec.MCPServerID) builtInMCPServerID {

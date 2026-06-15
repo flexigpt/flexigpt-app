@@ -183,7 +183,10 @@ func (m *MCPRuntimeManager) Connect(
 		return nil, err
 	}
 
-	resolved := auth.ResolvedTransportAuth{Env: map[string]string{}}
+	resolved := auth.ResolvedTransportAuth{
+		Env:     map[string]string{},
+		Headers: map[string]string{},
+	}
 	if cfg.Transport == spec.MCPTransportStdio && cfg.Stdio != nil && len(cfg.Stdio.Env) > 0 {
 		resolved.Env = maps.Clone(cfg.Stdio.Env)
 	}
@@ -1144,6 +1147,10 @@ func mergeResolvedTransportAuth(dst *auth.ResolvedTransportAuth, src auth.Resolv
 		return
 	}
 	maps.Copy(dst.Env, src.Env)
+	if dst.Headers == nil {
+		dst.Headers = map[string]string{}
+	}
+	maps.Copy(dst.Headers, src.Headers)
 	dst.SensitiveValues = append(dst.SensitiveValues, src.SensitiveValues...)
 	if src.OAuthHandler != nil {
 		dst.OAuthHandler = src.OAuthHandler

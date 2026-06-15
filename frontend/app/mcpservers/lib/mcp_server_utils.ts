@@ -6,8 +6,11 @@ import {
 	MCPAuthHealthState,
 	MCPExecutionMode,
 	MCPHTTPAuthMode,
+	type MCPServerConfig,
 	type MCPServerPolicy,
 	type MCPServerRuntimeSnapshot,
+	type MCPServerSetupInput,
+	MCPServerSetupInputKind,
 	MCPServerStatus,
 	type MCPToolCapability,
 	MCPToolRisk,
@@ -268,6 +271,62 @@ export function getEffectiveMCPServerStatus(
 
 export function isMCPAuthActionable(authHealth?: MCPAuthHealth): boolean {
 	return Boolean(authHealth?.authorizationURL);
+}
+
+export function serverHasSetupInputs(server: Pick<MCPServerConfig, 'setup'>): boolean {
+	return (server.setup?.inputs?.length ?? 0) > 0;
+}
+
+export function getMCPSetupInputKindLabel(kind: MCPServerSetupInputKind): string {
+	switch (kind) {
+		case MCPServerSetupInputKind.OAuthClientCredentials:
+			return 'OAuth client credentials';
+		case MCPServerSetupInputKind.HTTPHeader:
+			return 'HTTP header';
+		case MCPServerSetupInputKind.StdioEnv:
+			return 'Environment variable';
+		case MCPServerSetupInputKind.StreamableHTTPURL:
+			return 'Server URL';
+		case MCPServerSetupInputKind.ClientIDMetadataDocumentURL:
+			return 'Client ID metadata URL';
+		default:
+			return String(kind);
+	}
+}
+
+function hasMapKeyFold(map: Record<string, string> | undefined, key: string): boolean {
+	if (!map) return false;
+	const target = key.trim().toLowerCase();
+	return Object.keys(map).some(existing => existing.trim().toLowerCase() === target);
+}
+
+export function isMCPSetupInputConfigured(server: MCPServerConfig, input: MCPServerSetupInput): boolean {
+	switch (input.kind) {
+		case MCPServerSetupInputKind.OAuthClientCredentials:
+			return Boolean(server.streamableHttp?.clientCredentialRef?.trim());
+		case MCPServerSetupInputKind.HTTPHeader: {
+			const name = input.httpHeader?.headerName ?? '';
+			if (!name) return false;
+			return input.httpHeader?.secret
+				? hasMapKeyFold(server.streamableHttp?.secretHeaderRefs, name)
+				: hasMapKeyFold(server.streamableHttp?.headers, name);
+		}
+		case MCPServerSetupInputKind.StdioEnv: {
+			const env = input.stdioEnv?.envName ?? '';
+			if (!env) return false;
+			return input.stdioEnv?.secret ? Boolean(server.stdio?.secretEnvRefs?.[env]) : Boolean(server.stdio?.env?.[env]);
+		}
+		case MCPServerSetupInputKind.StreamableHTTPURL:
+			return Boolean(server.streamableHttp?.url?.trim());
+		case MCPServerSetupInputKind.ClientIDMetadataDocumentURL:
+			return Boolean(server.streamableHttp?.clientIDMetadataDocumentURL?.trim());
+		default:
+			return false;
+	}
+}
+
+export function getFirstUnconfiguredRequiredSetupInput(server: MCPServerConfig): MCPServerSetupInput | undefined {
+	return server.setup?.inputs?.find(input => Boolean(input.required) && !isMCPSetupInputConfigured(server, input));
 }
 
 export function parseMCPStringRecordJSON(raw: string, fieldLabel: string): Record<string, string> | undefined {

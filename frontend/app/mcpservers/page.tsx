@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { FiPlus } from 'react-icons/fi';
+import { FiPlus, FiSettings } from 'react-icons/fi';
 
 import {
 	BaseMCPBundleID,
@@ -10,6 +10,7 @@ import {
 	MCPSecretKind,
 	type MCPServerConfig,
 	type MCPServerRuntimeSnapshot,
+	type MCPServerSetupInputValue,
 	type PutMCPServerPayload,
 } from '@/spec/mcp';
 
@@ -27,6 +28,7 @@ import { PageFrame } from '@/components/page_frame';
 import type { MCPServerUpsertInput } from '@/mcpservers/lib/mcp_server_utils';
 import { AddMCPBundleModal } from '@/mcpservers/mcp_bundle_add_modal';
 import { MCPBundleCard } from '@/mcpservers/mcp_bundle_card';
+import { MCPSettingsModal } from '@/mcpservers/mcp_settings_modal';
 
 interface BundleData {
 	bundle: MCPBundle;
@@ -74,6 +76,7 @@ export default function MCPServersPage() {
 
 	const [bundleToDeleteID, setBundleToDeleteID] = useState<string | null>(null);
 	const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+	const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
 	const bundleToDelete =
 		bundleToDeleteID === null
@@ -486,7 +489,18 @@ export default function MCPServersPage() {
 		},
 		[bundles, refreshBundleServers]
 	);
-
+	const handleSubmitServerSetup = useCallback(
+		async (
+			bundleID: string,
+			serverID: string,
+			inputValues: Record<string, MCPServerSetupInputValue>,
+			reset: boolean
+		) => {
+			await mcpAPI.patchMCPServerSetup(bundleID, serverID, inputValues, reset);
+			await refreshBundleServers(bundleID);
+		},
+		[refreshBundleServers]
+	);
 	const handleConnectServer = useCallback(
 		async (bundleID: string, serverID: string) => {
 			let settled = false;
@@ -606,6 +620,26 @@ export default function MCPServersPage() {
 	);
 
 	const allServerIDs = bundles.flatMap(bundleData => bundleData.servers.map(server => server.id));
+
+	const oauthInfo = useMemo(() => {
+		for (const bundleData of bundles) {
+			for (const serverID of Object.keys(bundleData.authHealthByServerID)) {
+				const health = bundleData.authHealthByServerID[serverID];
+				if (health?.oauthRedirectURL || health?.oauthLoopbackListenAddr) {
+					return health;
+				}
+			}
+		}
+		return undefined;
+	}, [bundles]);
+
+	const handleSaveSettings = useCallback(async (oauthLoopbackListenAddr: string) => {
+		const view = await mcpAPI.patchMCPSettings(oauthLoopbackListenAddr);
+		if (view?.oauthRestartRequired) {
+			setAlertMsg('The OAuth loopback address was saved and will take effect after restarting FlexiGPT.');
+			setShowAlert(true);
+		}
+	}, []);
 	if (loading) {
 		return <Loader text="Loading MCP servers…" />;
 	}
@@ -613,10 +647,21 @@ export default function MCPServersPage() {
 	return (
 		<PageFrame>
 			<div className="flex h-full w-full flex-col items-center">
-				<div className="fixed mt-8 flex w-11/12 items-center px-12 py-2">
-					<h1 className="flex grow items-center justify-center text-xl font-semibold">MCP Servers</h1>
+				<div className="fixed mt-8 flex w-11/12 items-center justify-between px-12 py-2">
 					<button
-						className="btn btn-ghost flex items-center rounded-2xl"
+						className="btn btn-ghost rounded-2xl"
+						onClick={() => {
+							setIsSettingsOpen(true);
+						}}
+						title="MCP OAuth settings"
+					>
+						<FiSettings size={20} /> <span className="ml-1">OAuth Settings</span>
+					</button>
+
+					<h1 className="flex grow items-center justify-center text-xl font-semibold">MCP Servers</h1>
+
+					<button
+						className="btn btn-ghost items-center rounded-2xl"
 						onClick={() => {
 							setIsAddModalOpen(true);
 						}}
@@ -643,6 +688,7 @@ export default function MCPServersPage() {
 								onToggleBundleEnabled={handleToggleBundleEnabled}
 								onToggleServerEnabled={handleToggleServerEnabled}
 								onSubmitServer={handleSubmitServer}
+								onSubmitServerSetup={handleSubmitServerSetup}
 								onDeleteServer={handleDeleteServer}
 								onConnectServer={handleConnectServer}
 								onDisconnectServer={handleDisconnectServer}
@@ -683,7 +729,16 @@ export default function MCPServersPage() {
 					onSubmit={handleAddBundle}
 					existingSlugs={bundles.map(bundleData => bundleData.bundle.slug)}
 				/>
-
+				<MCPSettingsModal
+					isOpen={isSettingsOpen}
+					initialListenAddr={oauthInfo?.oauthLoopbackListenAddr}
+					activeListenAddr={oauthInfo?.oauthLoopbackListenAddr}
+					oauthRedirectURL={oauthInfo?.oauthRedirectURL}
+					onClose={() => {
+						setIsSettingsOpen(false);
+					}}
+					onSubmit={handleSaveSettings}
+				/>
 				<ActionDeniedAlertModal
 					isOpen={showAlert}
 					onClose={() => {

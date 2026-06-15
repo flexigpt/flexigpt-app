@@ -8,6 +8,7 @@ import {
 	FiEye,
 	FiPlus,
 	FiRefreshCw,
+	FiSettings,
 	FiTrash2,
 	FiWifi,
 	FiWifiOff,
@@ -21,6 +22,7 @@ import {
 	type MCPBundle,
 	type MCPServerConfig,
 	type MCPServerRuntimeSnapshot,
+	type MCPServerSetupInputValue,
 	MCPServerStatus,
 } from '@/spec/mcp';
 
@@ -29,6 +31,7 @@ import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal'
 
 import {
 	getEffectiveMCPServerStatus,
+	getFirstUnconfiguredRequiredSetupInput,
 	getMCPAuthHealthBadgeClass,
 	getMCPAuthHealthLabel,
 	getMCPStatusBadgeClass,
@@ -37,10 +40,12 @@ import {
 	getMCPTrustLevelLabel,
 	isMCPAuthActionable,
 	type MCPServerUpsertInput,
+	serverHasSetupInputs,
 } from '@/mcpservers/lib/mcp_server_utils';
 import { MCPOAuthAuthorizationModal } from '@/mcpservers/mcp_oauth_authorization_modal';
 import { AddEditMCPServerModal } from '@/mcpservers/mcp_server_add_edit_modal';
 import { MCPServerDetailsModal } from '@/mcpservers/mcp_server_details_modal';
+import { MCPServerSetupModal } from '@/mcpservers/mcp_server_setup_modal';
 
 type ServerModalMode = 'add' | 'edit';
 
@@ -54,6 +59,12 @@ interface MCPBundleCardProps {
 	onToggleBundleEnabled: (bundleID: string, enabled: boolean) => Promise<void>;
 	onToggleServerEnabled: (bundleID: string, serverID: string, enabled: boolean) => Promise<void>;
 	onSubmitServer: (bundleID: string, serverToEditID: string | undefined, input: MCPServerUpsertInput) => Promise<void>;
+	onSubmitServerSetup: (
+		bundleID: string,
+		serverID: string,
+		inputValues: Record<string, MCPServerSetupInputValue>,
+		reset: boolean
+	) => Promise<void>;
 	onDeleteServer: (bundleID: string, serverID: string) => Promise<void>;
 	onConnectServer: (bundleID: string, serverID: string) => Promise<void>;
 	onDisconnectServer: (bundleID: string, serverID: string) => Promise<void>;
@@ -108,6 +119,7 @@ export function MCPBundleCard({
 	onToggleBundleEnabled,
 	onToggleServerEnabled,
 	onSubmitServer,
+	onSubmitServerSetup,
 	onDeleteServer,
 	onConnectServer,
 	onDisconnectServer,
@@ -127,7 +139,7 @@ export function MCPBundleCard({
 	const [serverToEdit, setServerToEdit] = useState<MCPServerConfig | undefined>(undefined);
 
 	const [serverDetails, setServerDetails] = useState<MCPServerConfig | null>(null);
-
+	const [setupServer, setSetupServer] = useState<MCPServerConfig | null>(null);
 	const [showAlert, setShowAlert] = useState(false);
 	const [alertMsg, setAlertMsg] = useState('');
 
@@ -481,7 +493,23 @@ export function MCPBundleCard({
 												>
 													<FiEye size={16} />
 												</button>
-
+												{serverHasSetupInputs(server) && (
+													<button
+														className="btn btn-sm btn-ghost rounded-2xl"
+														onClick={() => {
+															if (!bundle.isEnabled) {
+																openAlert('Enable the MCP bundle before configuring servers.');
+																return;
+															}
+															setSetupServer(server);
+														}}
+														disabled={!bundle.isEnabled}
+														title="Configure setup"
+														aria-label="Configure setup"
+													>
+														<FiSettings size={16} />
+													</button>
+												)}
 												<button
 													className="btn btn-sm btn-ghost rounded-2xl"
 													onClick={() => {
@@ -516,7 +544,13 @@ export function MCPBundleCard({
 														isConnecting ||
 														pendingActionKeys.has(`connect:${server.id}`)
 													}
-													title={authActionable ? 'Authorization pending. Open auth URL first if needed.' : 'Connect'}
+													title={
+														getFirstUnconfiguredRequiredSetupInput(server)
+															? 'Complete setup before connecting.'
+															: authActionable
+																? 'Authorization pending. Open auth URL first if needed.'
+																: 'Connect'
+													}
 													aria-label="Connect"
 												>
 													<FiWifi size={16} />
@@ -657,7 +691,17 @@ export function MCPBundleCard({
 				runtime={serverDetails ? runtimeByServerID[serverDetails.id] : undefined}
 				authHealth={serverDetails ? authHealthByServerID[serverDetails.id] : undefined}
 			/>
-
+			<MCPServerSetupModal
+				isOpen={setupServer !== null}
+				server={setupServer}
+				onClose={() => {
+					setSetupServer(null);
+				}}
+				onSubmit={async (inputValues, reset) => {
+					if (!setupServer) return;
+					await onSubmitServerSetup(bundle.id, setupServer.id, inputValues, reset);
+				}}
+			/>
 			<MCPOAuthAuthorizationModal
 				isOpen={oauthModalServer !== null}
 				onClose={dismissOAuthModal}

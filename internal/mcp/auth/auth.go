@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"strings"
 	"sync"
@@ -27,7 +28,9 @@ const (
 )
 
 type ResolvedTransportAuth struct {
-	Env             map[string]string
+	Env     map[string]string
+	Headers map[string]string
+
 	SensitiveValues []string
 	Status          spec.MCPAuthStatus
 	OAuthHandler    mcpAuth.OAuthHandler
@@ -107,7 +110,9 @@ func (m *AuthManager) PrepareTransportAuth(
 	cfg spec.MCPServerConfig,
 ) (ResolvedTransportAuth, error) {
 	out := ResolvedTransportAuth{
-		Env: map[string]string{},
+		Env:     map[string]string{},
+		Headers: map[string]string{},
+
 		Status: spec.MCPAuthStatus{
 			BundleID: cfg.BundleID,
 			ServerID: cfg.ID,
@@ -162,6 +167,20 @@ func (m *AuthManager) PrepareTransportAuth(
 		httpCfg := cfg.StreamableHTTP
 
 		out.Status.Resource = strings.TrimSpace(httpCfg.URL)
+		out.Headers = maps.Clone(httpCfg.Headers)
+		if out.Headers == nil {
+			out.Headers = map[string]string{}
+		}
+		for key, ref := range httpCfg.SecretHeaderRefs {
+			v, err := m.secrets.ResolveSecret(ctx, ref)
+			if err != nil {
+				out.Status.State = spec.MCPAuthStateError
+				out.Status.LastError = err.Error()
+				return out, err
+			}
+			out.Headers[key] = v
+			out.SensitiveValues = append(out.SensitiveValues, v)
+		}
 		mode := normalizeHTTPAuthMode(httpCfg.AuthMode)
 		out.Status.AuthMode = mode
 

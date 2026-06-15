@@ -46,6 +46,7 @@ type OAuthLoopbackBrokerOptions struct {
 	TTL          time.Duration
 	CallbackPath string
 	Logger       *slog.Logger
+	ListenAddr   string
 }
 
 type OAuthLoopbackBroker struct {
@@ -55,6 +56,7 @@ type OAuthLoopbackBroker struct {
 	callbackPath string
 	redirectURL  string
 	redirectHost string
+	listenAddr   string
 
 	logger *slog.Logger
 
@@ -88,9 +90,12 @@ func NewOAuthLoopbackBroker(ctx context.Context, opts *OAuthLoopbackBrokerOption
 	if logger == nil {
 		logger = slog.Default()
 	}
-
+	listenAddr := strings.TrimSpace(options.ListenAddr)
+	if listenAddr == "" {
+		listenAddr = "127.0.0.1:0"
+	}
 	lc := &net.ListenConfig{}
-	ln, err := lc.Listen(ctx, "tcp4", "127.0.0.1:0")
+	ln, err := lc.Listen(ctx, "tcp4", listenAddr)
 	if err != nil {
 		return nil, fmt.Errorf("start OAuth loopback listener: %w", err)
 	}
@@ -103,6 +108,7 @@ func NewOAuthLoopbackBroker(ctx context.Context, opts *OAuthLoopbackBrokerOption
 		pendingByServer: map[oauthPendingKey]*pendingOAuthAuthorization{},
 		pendingByState:  map[string]*pendingOAuthAuthorization{},
 	}
+	b.listenAddr = ln.Addr().String()
 
 	redirect := url.URL{
 		Scheme: "http",
@@ -124,6 +130,13 @@ func NewOAuthLoopbackBroker(ctx context.Context, opts *OAuthLoopbackBrokerOption
 	}()
 
 	return b, nil
+}
+
+func (b *OAuthLoopbackBroker) ListenAddr() string {
+	if b == nil {
+		return ""
+	}
+	return b.listenAddr
 }
 
 func (b *OAuthLoopbackBroker) RedirectURL() string {

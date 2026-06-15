@@ -21,6 +21,8 @@ import {
 	type MCPServerConfig,
 	type MCPServerID,
 	type MCPServerRuntimeSnapshot,
+	type MCPServerSetupInputValue,
+	type MCPSettingsView,
 	type MCPToolCapability,
 	type PatchMCPServerPolicyPayload,
 	type PutMCPServerPayload,
@@ -53,6 +55,8 @@ import {
 	PatchMCPBundle,
 	PatchMCPServerEnabled,
 	PatchMCPServerPolicy,
+	PatchMCPServerSetup,
+	PatchMCPSettings,
 	PutMCPBundle,
 	PutMCPServer,
 	PutMCPServerSecret,
@@ -202,6 +206,33 @@ export class WailsMCPAPI implements IMCPAPI {
 		} as wailsSpec.PatchMCPServerPolicyRequest;
 
 		await PatchMCPServerPolicy(req);
+	}
+	async patchMCPServerSetup(
+		bundleID: string,
+		serverID: MCPServerID,
+		inputValues: Record<string, MCPServerSetupInputValue>,
+		reset?: boolean
+	): Promise<MCPServerConfig | undefined> {
+		const resp = await PatchMCPServerSetup({
+			BundleID: bundleID,
+			ServerID: serverID,
+			Body: {
+				reset: reset ?? false,
+				inputValues,
+			} as wailsSpec.PatchMCPServerSetupRequestBody,
+		} as wailsSpec.PatchMCPServerSetupRequest);
+
+		return resp?.Body as MCPServerConfig | undefined;
+	}
+
+	async patchMCPSettings(oauthLoopbackListenAddr?: string): Promise<MCPSettingsView | undefined> {
+		const resp = await PatchMCPSettings({
+			Body: {
+				oauthLoopbackListenAddr,
+			} as wailsSpec.PatchMCPSettingsRequestBody,
+		} as wailsSpec.PatchMCPSettingsRequest);
+
+		return resp?.Body as MCPSettingsView | undefined;
 	}
 
 	async deleteMCPServer(bundleID: string, serverID: MCPServerID): Promise<void> {

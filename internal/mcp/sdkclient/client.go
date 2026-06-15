@@ -190,7 +190,7 @@ func (f *Factory) Connect(
 		// Do not set http.Client.Timeout here. Streamable HTTP may keep a
 		// standalone SSE GET open for the life of the session. Use per-operation
 		// contexts in the runtime layer for request bounds.
-		httpClient := &http.Client{}
+		httpClient := newStreamableHTTPClient(resolved.Headers)
 
 		transport = &mcpSDK.StreamableClientTransport{
 			Endpoint:   cfg.StreamableHTTP.URL,
@@ -216,6 +216,36 @@ func (f *Factory) Connect(
 		session:  session,
 		logger:   logger,
 	}, nil
+}
+
+func newStreamableHTTPClient(headers map[string]string) *http.Client {
+	if len(headers) == 0 {
+		return &http.Client{}
+	}
+	return &http.Client{
+		Transport: &headerRoundTripper{base: http.DefaultTransport, headers: maps.Clone(headers)},
+	}
+}
+
+type headerRoundTripper struct {
+	base    http.RoundTripper
+	headers map[string]string
+}
+
+func (t *headerRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	base := t.base
+	if base == nil {
+		base = http.DefaultTransport
+	}
+	if len(t.headers) == 0 {
+		return base.RoundTrip(req)
+	}
+	cloned := req.Clone(req.Context())
+	cloned.Header = req.Header.Clone()
+	for key, value := range t.headers {
+		cloned.Header.Set(key, value)
+	}
+	return base.RoundTrip(cloned)
 }
 
 func (f *Factory) log() *slog.Logger {

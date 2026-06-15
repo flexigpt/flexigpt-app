@@ -70,6 +70,7 @@ type PutMCPServerPayload struct {
 	DefaultPolicy  *MCPServerPolicy                 `json:"defaultPolicy,omitempty"`
 	ToolPolicies   map[string]MCPToolPolicyOverride `json:"toolPolicies,omitempty"`
 	AppsPolicy     *MCPAppsPolicy                   `json:"appsPolicy,omitempty"`
+	Setup          *MCPServerSetup                  `json:"setup,omitempty"`
 }
 
 type PutMCPServerRequest struct {
@@ -138,6 +139,32 @@ type PatchMCPServerPolicyRequest struct {
 
 type PatchMCPServerPolicyResponse struct{}
 
+type MCPServerSetupInputValue struct {
+	Value        string `json:"value,omitempty"`
+	ClientID     string `json:"clientID,omitempty"`
+	ClientSecret string `json:"clientSecret,omitempty"`
+}
+
+type PatchMCPServerSetupRequestBody struct {
+	// Reset clears existing user setup before applying. Only supported for
+	// built-in servers.
+	Reset bool `json:"reset,omitempty"`
+
+	// InputValues are keyed by MCPServerSetupInput.ID declared on the server.
+	InputValues map[string]MCPServerSetupInputValue `json:"inputValues,omitempty"`
+}
+
+type PatchMCPServerSetupRequest struct {
+	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
+	ServerID MCPServerID              `path:"serverID" required:"true"`
+
+	Body *PatchMCPServerSetupRequestBody
+}
+
+type PatchMCPServerSetupResponse struct {
+	Body *MCPServerConfig
+}
+
 type DeleteMCPServerRequest struct {
 	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
 	ServerID MCPServerID              `path:"serverID" required:"true"`
@@ -148,6 +175,24 @@ type DeleteMCPServerResponse struct{}
 type ConnectMCPServerRequest struct {
 	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
 	ServerID MCPServerID              `path:"serverID" required:"true"`
+}
+
+type MCPSettingsView struct {
+	Settings             MCPSettings `json:"settings"`
+	OAuthRedirectURL     string      `json:"oauthRedirectURL,omitempty"`
+	OAuthRestartRequired bool        `json:"oauthRestartRequired,omitempty"`
+}
+
+type PatchMCPSettingsRequestBody struct {
+	OAuthLoopbackListenAddr *string `json:"oauthLoopbackListenAddr,omitempty"`
+}
+
+type PatchMCPSettingsRequest struct {
+	Body *PatchMCPSettingsRequestBody
+}
+
+type PatchMCPSettingsResponse struct {
+	Body *MCPSettingsView
 }
 
 type ConnectMCPServerResponse struct {

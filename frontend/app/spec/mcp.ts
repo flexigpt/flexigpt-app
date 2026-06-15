@@ -34,6 +34,15 @@ export enum MCPRefType {
 export enum MCPSecretKind {
 	MCPSecretKindStdioEnv = 'stdioEnv',
 	MCPSecretKindOAuthClientCredentials = 'oauthClientCredentials',
+	MCPSecretKindHTTPHeader = 'httpHeader',
+}
+
+export enum MCPServerSetupInputKind {
+	OAuthClientCredentials = 'oauthClientCredentials',
+	HTTPHeader = 'httpHeader',
+	StdioEnv = 'stdioEnv',
+	StreamableHTTPURL = 'streamableHttpUrl',
+	ClientIDMetadataDocumentURL = 'clientIDMetadataDocumentURL',
 }
 
 export enum MCPTransportType {
@@ -212,7 +221,8 @@ export interface MCPStreamableHTTPConfig {
 	url: string;
 	timeoutMS?: number;
 	authMode: MCPHTTPAuthMode;
-
+	headers?: Record<string, string>;
+	secretHeaderRefs?: Record<string, string>;
 	clientCredentialRef?: string;
 	clientIDMetadataDocumentURL?: string;
 }
@@ -245,8 +255,48 @@ export interface MCPAuthHealth {
 	authorizationPending?: boolean;
 	authorizationURL?: string;
 	authorizationExpiresAt?: MCPTimestamp;
-
+	oauthRedirectURL?: string;
+	oauthLoopbackListenAddr?: string;
 	lastError?: string;
+}
+
+export type MCPSetupClientIDMetadataDocumentURLInput = object;
+export type MCPSetupStreamableHTTPURLInput = object;
+export interface MCPSetupStdioEnvInput {
+	envName: string;
+	secret?: boolean;
+	valuePrefix?: string;
+	valueSuffix?: string;
+}
+export interface MCPSetupHTTPHeaderInput {
+	headerName: string;
+	secret?: boolean;
+	valuePrefix?: string;
+	valueSuffix?: string;
+}
+export interface MCPSetupOAuthClientCredentialsInput {
+	clientSecretRequired?: boolean;
+}
+export interface MCPServerSetupInput {
+	id: string;
+	kind: MCPServerSetupInputKind;
+
+	label?: string;
+	description?: string;
+	note?: string;
+	placeholder?: string;
+	required?: boolean;
+	oauthClientCredentials?: MCPSetupOAuthClientCredentialsInput;
+	httpHeader?: MCPSetupHTTPHeaderInput;
+	stdioEnv?: MCPSetupStdioEnvInput;
+	// Go type: MCPSetupStreamableHTTPURLInput
+	streamableHttpUrl?: any;
+	// Go type: MCPSetupClientIDMetadataDocumentURLInput
+	clientIDMetadataDocumentURL?: any;
+}
+export interface MCPServerSetup {
+	note?: string;
+	inputs?: MCPServerSetupInput[];
 }
 
 export interface MCPServerPolicy {
@@ -301,6 +351,8 @@ export interface PutMCPServerPayload {
 	defaultPolicy?: MCPServerPolicy;
 	toolPolicies?: Record<string, MCPToolPolicyOverride>;
 	appsPolicy?: MCPAppsPolicy;
+
+	setup?: MCPServerSetup;
 }
 
 export interface PatchMCPServerPolicyPayload {
@@ -430,6 +482,8 @@ export interface MCPPromptRef {
 }
 
 export interface MCPDiscoverySnapshot {
+	bundleID?: string;
+
 	serverID: MCPServerID;
 
 	negotiatedProtocolVersion?: string;
@@ -517,6 +571,7 @@ export interface MCPToolCallProvenance {
 }
 
 export interface MCPSecretRef {
+	bundleID?: string;
 	serverID: MCPServerID;
 	kind: MCPSecretKind;
 	slot?: string;
@@ -635,6 +690,20 @@ export interface MCPCompletionResult {
 	hasMore?: boolean;
 }
 
+export interface MCPServerSetupInputValue {
+	value?: string;
+	clientID?: string;
+	clientSecret?: string;
+}
+export interface MCPSettings {
+	oauthLoopbackListenAddr?: string;
+}
+export interface MCPSettingsView {
+	settings: MCPSettings;
+	oauthRedirectURL?: string;
+	oauthRestartRequired?: boolean;
+}
+
 export interface MCPServerConfig {
 	bundleID: string;
 	schemaVersion: string;
@@ -648,6 +717,7 @@ export interface MCPServerConfig {
 	defaultPolicy: MCPServerPolicy;
 	toolPolicies?: Record<string, MCPToolPolicyOverride>;
 	appsPolicy?: MCPAppsPolicy;
+	setup?: MCPServerSetup;
 	isBuiltIn: boolean;
 	createdAt: MCPTimestamp;
 	modifiedAt: MCPTimestamp;

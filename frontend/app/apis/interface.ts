@@ -35,6 +35,8 @@ import type {
 	MCPServerConfig,
 	MCPServerID,
 	MCPServerRuntimeSnapshot,
+	MCPServerSetupInputValue,
+	MCPSettingsView,
 	MCPToolCapability,
 	PatchMCPServerPolicyPayload,
 	PutMCPServerPayload,
@@ -512,6 +514,15 @@ export interface IMCPAPI {
 	patchMCPServerEnabled(bundleID: string, serverID: MCPServerID, enabled: boolean): Promise<void>;
 
 	patchMCPServerPolicy(bundleID: string, serverID: MCPServerID, payload: PatchMCPServerPolicyPayload): Promise<void>;
+
+	patchMCPServerSetup(
+		bundleID: string,
+		serverID: MCPServerID,
+		inputValues: Record<string, MCPServerSetupInputValue>,
+		reset?: boolean
+	): Promise<MCPServerConfig | undefined>;
+
+	patchMCPSettings(oauthLoopbackListenAddr?: string): Promise<MCPSettingsView | undefined>;
 
 	deleteMCPServer(bundleID: string, serverID: MCPServerID): Promise<void>;
 
