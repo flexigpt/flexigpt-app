@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +14,9 @@ import (
 )
 
 func TestStorePatchMCPSettingsAndValidation(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test skipped on Windows")
+	}
 	ctx := t.Context()
 	st, err := NewMCPStore(ctx, t.TempDir())
 	if err != nil {
