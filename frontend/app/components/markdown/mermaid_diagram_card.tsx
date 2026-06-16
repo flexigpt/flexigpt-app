@@ -11,7 +11,7 @@ import { useDebounce } from '@/hooks/use_debounce';
 import { renderMermaidQueued, useIsDarkMermaid } from '@/hooks/use_mermaid';
 
 import { DownloadButton } from '@/components/download_button';
-import { MermaidZoomModal } from '@/components/mermaid_zoom_modal';
+import { MermaidZoomModal } from '@/components/markdown/mermaid_zoom_modal';
 
 interface MermaidDiagramProps {
 	code: string;

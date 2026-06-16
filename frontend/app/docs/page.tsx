@@ -6,7 +6,7 @@ import { useLocation, useNavigate } from 'react-router';
 
 import { useTitleBarContent } from '@/hooks/use_title_bar';
 
-import { EnhancedMarkdown } from '@/components/markdown_enhanced';
+import { EnhancedMarkdown } from '@/components/markdown/markdown_enhanced';
 import { PageFrame } from '@/components/page_frame';
 
 import { docsCategories } from '@/docs/manifest';

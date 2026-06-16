@@ -21,9 +21,9 @@ import { CustomMDLanguage } from '@/lib/text_utils';
 
 import { backendAPI } from '@/apis/baseapi';
 
-import { CodeBlock } from '@/components/markdown_code_block';
-import { MdErrorBoundary } from '@/components/markdown_error_boundary';
-import { ThinkingFence } from '@/components/thinking_fence';
+import { CodeBlock } from '@/components/markdown/markdown_code_block';
+import { MdErrorBoundary } from '@/components/markdown/markdown_error_boundary';
+import { ThinkingFence } from '@/components/markdown/thinking_fence';
 
 const strictSchema = {
 	...defaultSchema,

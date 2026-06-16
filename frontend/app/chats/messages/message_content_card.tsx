@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react';
 
-import { EnhancedMarkdown } from '@/components/markdown_enhanced';
+import { EnhancedMarkdown } from '@/components/markdown/markdown_enhanced';
 
 interface MessageContentCardProps {
 	messageID: string;

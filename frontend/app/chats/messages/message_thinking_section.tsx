@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 
 import type { ReasoningContent } from '@/spec/inference';
 
-import { ThinkingFence } from '@/components/thinking_fence';
+import { ThinkingFence } from '@/components/markdown/thinking_fence';
 
 function joinReasoningParts(reasoning: ReasoningContent[] | undefined, key: 'summary' | 'thinking'): string {
 	const items = reasoning ?? [];
