@@ -1,6 +1,16 @@
 import { type MouseEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
 
-import { FiCheck, FiExternalLink, FiRefreshCw, FiServer, FiWifi, FiWifiOff, FiX } from 'react-icons/fi';
+import {
+	FiCheck,
+	FiChevronDown,
+	FiChevronRight,
+	FiExternalLink,
+	FiRefreshCw,
+	FiServer,
+	FiWifi,
+	FiWifiOff,
+	FiX,
+} from 'react-icons/fi';
 
 import { Menu, MenuButton, useMenuStore, useStoreState } from '@ariakit/react';
 import { Link } from 'react-router';
@@ -48,10 +58,6 @@ import {
 function stop(e: MouseEvent) {
 	e.preventDefault();
 	e.stopPropagation();
-}
-
-function SectionTitle({ children }: { children: ReactNode }) {
-	return <div className="text-base-content/70 mt-2 mb-1 text-xs font-semibold">{children}</div>;
 }
 
 function isEnabledMCPOption(option: MCPComposerServerOption) {
@@ -102,6 +108,79 @@ const TOOL_EXPOSURE_DROPDOWN_ITEMS: Record<MCPToolExposure, DropdownItem> = {
 };
 
 const EMPTY_MCP_ARGUMENT_VALUES: Record<string, string> = {};
+
+function DiscoverySection({
+	title,
+	presentCount,
+	selectedCount,
+	children,
+}: {
+	title: string;
+	presentCount: number;
+	selectedCount: number;
+	children: ReactNode;
+}) {
+	const [open, setOpen] = useState(false);
+
+	return (
+		<div className="border-base-300/70 rounded-lg border">
+			<button
+				type="button"
+				className="hover:bg-base-200 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs"
+				onClick={e => {
+					e.stopPropagation();
+					setOpen(value => !value);
+				}}
+			>
+				{open ? <FiChevronDown size={13} /> : <FiChevronRight size={13} />}
+				<span className="min-w-0 flex-1 font-semibold">{title}</span>
+				<span className="badge badge-ghost badge-xs rounded-lg">{presentCount} present</span>
+				<span className="badge badge-info badge-xs rounded-lg">{selectedCount} selected</span>
+			</button>
+
+			{open ? <div className="border-base-300/70 border-t p-2">{children}</div> : null}
+		</div>
+	);
+}
+
+function BulkSelectionChips({
+	onSelectAll,
+	onUnselectAll,
+	selectAllDisabled,
+	unselectAllDisabled,
+}: {
+	onSelectAll: () => void;
+	onUnselectAll: () => void;
+	selectAllDisabled?: boolean;
+	unselectAllDisabled?: boolean;
+}) {
+	return (
+		<div className="flex shrink-0 items-center gap-1">
+			<button
+				type="button"
+				className="btn btn-ghost btn-xs h-5 min-h-0 rounded-full px-2 py-0 text-[11px]"
+				disabled={selectAllDisabled}
+				onClick={e => {
+					stop(e);
+					onSelectAll();
+				}}
+			>
+				Select all
+			</button>
+			<button
+				type="button"
+				className="btn btn-ghost btn-xs h-5 min-h-0 rounded-full px-2 py-0 text-[11px]"
+				disabled={unselectAllDisabled}
+				onClick={e => {
+					stop(e);
+					onUnselectAll();
+				}}
+			>
+				Unselect all
+			</button>
+		</div>
+	);
+}
 
 function MCPArgumentFields({
 	bundleID,
@@ -232,7 +311,17 @@ function ServerDiscoverySection({
 		selection.selectedResourceTemplates.map(template => [mcpResourceTemplateKey(template), template] as const)
 	);
 	const selectedPromptByKey = new Map(selection.selectedPrompts.map(prompt => [mcpPromptKey(prompt), prompt] as const));
-
+	const selectableToolCount = option.tools.filter(tool => tool.enabled && isMCPToolVisibleToModel(tool)).length;
+	const selectedToolCount =
+		selection.toolExposure === MCPToolExposure.MCPToolExposureNone
+			? 0
+			: selection.toolExposure === MCPToolExposure.MCPToolExposureAll
+				? selectableToolCount
+				: selectedToolKeys.size;
+	const resourcePresentCount = option.resources.length + option.resourceTemplates.length;
+	const selectedResourceCount = selectedResourceKeys.size + selectedTemplateKeys.size;
+	const promptPresentCount = option.prompts.length;
+	const selectedPromptCount = selectedPromptKeys.size;
 	const discoveryText = option.discoveryLoading
 		? 'Loading discovery…'
 		: option.discoveryError
@@ -243,35 +332,7 @@ function ServerDiscoverySection({
 
 	return (
 		<div className="bg-base-100 rounded-xl p-2">
-			<div className="mb-1 flex flex-wrap items-center gap-2">
-				<div className="text-base-content/70 text-xs">Tools</div>
-				<label className="text-xs">
-					<Dropdown
-						dropdownItems={TOOL_EXPOSURE_DROPDOWN_ITEMS}
-						selectedKey={selection.toolExposure}
-						onChange={next => {
-							state.setToolExposure(option.bundle.id, option.server.id, next);
-						}}
-						getDisplayName={exposure => {
-							switch (exposure) {
-								case MCPToolExposure.MCPToolExposureNone:
-									return 'No tools';
-								case MCPToolExposure.MCPToolExposureAll:
-									return 'All tools';
-								case MCPToolExposure.MCPToolExposureSelected:
-									return 'Selected tools';
-								default:
-									return exposure;
-							}
-						}}
-						title="Tool exposure"
-						inlineMenu={true}
-						maxMenuHeight={160}
-						maxSummaryHeight={24}
-						disabled={isInputLocked}
-					/>
-				</label>
-
+			<div className="mb-2 flex flex-wrap items-center gap-2">
 				<label className="flex items-end gap-2 text-xs">
 					<input
 						type="checkbox"
@@ -288,161 +349,268 @@ function ServerDiscoverySection({
 
 			{discoveryText ? <div className="text-base-content/70 mt-2 text-xs">{discoveryText}</div> : null}
 
-			{selection.toolExposure === MCPToolExposure.MCPToolExposureSelected ? (
-				<>
-					<SectionTitle>Tools</SectionTitle>
-					{option.tools.length === 0 ? (
-						<div className="text-base-content/60 px-2 text-xs">No tools discovered.</div>
+			<div className="mt-2 space-y-2">
+				<DiscoverySection title="Tools" presentCount={option.tools.length} selectedCount={selectedToolCount}>
+					<div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+						<label className="text-xs">
+							<Dropdown
+								dropdownItems={TOOL_EXPOSURE_DROPDOWN_ITEMS}
+								selectedKey={selection.toolExposure}
+								onChange={next => {
+									state.setToolExposure(option.bundle.id, option.server.id, next);
+									if (
+										next === MCPToolExposure.MCPToolExposureSelected &&
+										selection.toolExposure !== MCPToolExposure.MCPToolExposureSelected
+									) {
+										option.tools.forEach(tool => {
+											state.toggleTool(tool, false);
+										});
+									}
+								}}
+								getDisplayName={exposure => {
+									switch (exposure) {
+										case MCPToolExposure.MCPToolExposureNone:
+											return 'No tools';
+										case MCPToolExposure.MCPToolExposureAll:
+											return 'All tools';
+										case MCPToolExposure.MCPToolExposureSelected:
+											return 'Selected tools';
+										default:
+											return exposure;
+									}
+								}}
+								title="Tool exposure"
+								inlineMenu={true}
+								maxMenuHeight={160}
+								maxSummaryHeight={16}
+								disabled={isInputLocked}
+							/>
+						</label>
+
+						{selection.toolExposure === MCPToolExposure.MCPToolExposureSelected ? (
+							<BulkSelectionChips
+								selectAllDisabled={isInputLocked || selectableToolCount === 0}
+								unselectAllDisabled={isInputLocked || selectedToolKeys.size === 0}
+								onSelectAll={() => {
+									option.tools.forEach(tool => {
+										if (tool.enabled && isMCPToolVisibleToModel(tool)) {
+											state.toggleTool(tool, true);
+										}
+									});
+								}}
+								onUnselectAll={() => {
+									option.tools.forEach(tool => {
+										state.toggleTool(tool, false);
+									});
+								}}
+							/>
+						) : null}
+					</div>
+
+					{selection.toolExposure === MCPToolExposure.MCPToolExposureSelected ? (
+						option.tools.length === 0 ? (
+							<div className="text-base-content/60 px-2 text-xs">No tools discovered.</div>
+						) : (
+							<div className="max-h-40 overflow-y-auto">
+								{option.tools.map((tool: MCPToolCapability) => {
+									const visibleToModel = isMCPToolVisibleToModel(tool);
+
+									return (
+										<CheckboxRow
+											key={mcpToolKey(tool)}
+											checked={selectedToolKeys.has(mcpToolKey(tool))}
+											disabled={isInputLocked || !tool.enabled || !visibleToModel}
+											title={
+												!visibleToModel ? 'This tool is app-only and is not exposed to the model.' : tool.description
+											}
+											label={
+												<div className="min-w-0">
+													<div className="flex min-w-0 items-center gap-1">
+														<span className="truncate">{tool.displayName || tool.toolName}</span>
+														{!visibleToModel ? <span className="badge badge-ghost badge-xs">App only</span> : null}
+													</div>
+													<div className="text-base-content/60 truncate">{tool.toolName}</div>
+												</div>
+											}
+											onChange={next => {
+												state.toggleTool(tool, next);
+											}}
+										/>
+									);
+								})}
+							</div>
+						)
+					) : (
+						<div className="text-base-content/60 px-2 text-xs">
+							{selection.toolExposure === MCPToolExposure.MCPToolExposureAll
+								? 'All enabled model-visible tools will be exposed.'
+								: 'No tools will be exposed.'}
+						</div>
+					)}
+				</DiscoverySection>
+
+				<DiscoverySection title="Resources" presentCount={resourcePresentCount} selectedCount={selectedResourceCount}>
+					<div className="mb-2 flex justify-end">
+						<BulkSelectionChips
+							selectAllDisabled={isInputLocked || resourcePresentCount === 0}
+							unselectAllDisabled={isInputLocked || selectedResourceCount === 0}
+							onSelectAll={() => {
+								option.resources.forEach(resource => {
+									state.toggleResource(resource, true);
+								});
+								option.resourceTemplates.forEach(template => {
+									state.toggleResourceTemplate(template, true);
+								});
+							}}
+							onUnselectAll={() => {
+								option.resources.forEach(resource => {
+									state.toggleResource(resource, false);
+								});
+								option.resourceTemplates.forEach(template => {
+									state.toggleResourceTemplate(template, false);
+								});
+							}}
+						/>
+					</div>
+
+					{resourcePresentCount === 0 ? (
+						<div className="text-base-content/60 px-2 text-xs">No resources discovered.</div>
 					) : (
 						<div className="max-h-40 overflow-y-auto">
-							{option.tools.map((tool: MCPToolCapability) => {
-								const visibleToModel = isMCPToolVisibleToModel(tool);
+							{option.resources.map((resource: MCPResourceRef) => (
+								<CheckboxRow
+									key={mcpResourceKey(resource)}
+									checked={selectedResourceKeys.has(mcpResourceKey(resource))}
+									disabled={isInputLocked}
+									title={resource.uri}
+									label={
+										<div className="min-w-0">
+											<div className="truncate">{resource.displayName || resource.name || resource.uri}</div>
+											<div className="text-base-content/60 truncate">{resource.uri}</div>
+										</div>
+									}
+									onChange={next => {
+										state.toggleResource(resource, next);
+									}}
+								/>
+							))}
+
+							{option.resourceTemplates.map((template: MCPResourceTemplateRef) => {
+								const templateKey = mcpResourceTemplateKey(template);
+								const selectedTemplate = selectedTemplateByKey.get(templateKey);
 
 								return (
-									<CheckboxRow
-										key={mcpToolKey(tool)}
-										checked={selectedToolKeys.has(mcpToolKey(tool))}
-										disabled={isInputLocked || !tool.enabled || !visibleToModel}
-										title={
-											!visibleToModel ? 'This tool is app-only and is not exposed to the model.' : tool.description
-										}
-										label={
-											<div className="min-w-0">
-												<div className="flex min-w-0 items-center gap-1">
-													<span className="truncate">{tool.displayName || tool.toolName}</span>
-													{!visibleToModel ? <span className="badge badge-ghost badge-xs">App only</span> : null}
+									<div key={templateKey}>
+										<CheckboxRow
+											checked={selectedTemplateKeys.has(templateKey)}
+											disabled={isInputLocked}
+											title={template.uriTemplate}
+											label={
+												<div className="min-w-0">
+													<div className="truncate">
+														{template.displayName || template.name || template.uriTemplate}
+													</div>
+													<div className="text-base-content/60 truncate">{template.uriTemplate}</div>
 												</div>
-												<div className="text-base-content/60 truncate">{tool.toolName}</div>
-											</div>
-										}
-										onChange={next => {
-											state.toggleTool(tool, next);
-										}}
-									/>
+											}
+											onChange={next => {
+												state.toggleResourceTemplate(template, next);
+											}}
+										/>
+										{selectedTemplate ? (
+											<MCPArgumentFields
+												bundleID={template.bundleID}
+												serverID={template.serverID}
+												refType={MCPRefType.MCPRefTypeResource}
+												name={template.uriTemplate}
+												item={selectedTemplate}
+												disabled={isInputLocked}
+												onValueChange={(argumentName, value) => {
+													state.setResourceTemplateArgumentValue(
+														template.bundleID,
+														template.serverID,
+														template.uriTemplate,
+														argumentName,
+														value
+													);
+												}}
+											/>
+										) : null}
+									</div>
 								);
 							})}
 						</div>
 					)}
-				</>
-			) : null}
+				</DiscoverySection>
 
-			{option.resources.length !== 0 || option.resourceTemplates.length !== 0 ? (
-				<>
-					<SectionTitle>Resources</SectionTitle>
-					<div className="max-h-40 overflow-y-auto">
-						{option.resources.map((resource: MCPResourceRef) => (
-							<CheckboxRow
-								key={mcpResourceKey(resource)}
-								checked={selectedResourceKeys.has(mcpResourceKey(resource))}
-								disabled={isInputLocked}
-								title={resource.uri}
-								label={
-									<div className="min-w-0">
-										<div className="truncate">{resource.displayName || resource.name || resource.uri}</div>
-										<div className="text-base-content/60 truncate">{resource.uri}</div>
+				<DiscoverySection title="Prompts" presentCount={promptPresentCount} selectedCount={selectedPromptCount}>
+					<div className="mb-2 flex justify-end">
+						<BulkSelectionChips
+							selectAllDisabled={isInputLocked || promptPresentCount === 0}
+							unselectAllDisabled={isInputLocked || selectedPromptCount === 0}
+							onSelectAll={() => {
+								option.prompts.forEach(prompt => {
+									state.togglePrompt(prompt, true);
+								});
+							}}
+							onUnselectAll={() => {
+								option.prompts.forEach(prompt => {
+									state.togglePrompt(prompt, false);
+								});
+							}}
+						/>
+					</div>
+
+					{promptPresentCount === 0 ? (
+						<div className="text-base-content/60 px-2 text-xs">No prompts discovered.</div>
+					) : (
+						<div className="max-h-40 overflow-y-auto">
+							{option.prompts.map((prompt: MCPPromptRef) => {
+								const promptKey = mcpPromptKey(prompt);
+								const selectedPrompt = selectedPromptByKey.get(promptKey);
+
+								return (
+									<div key={promptKey}>
+										<CheckboxRow
+											checked={selectedPromptKeys.has(promptKey)}
+											disabled={isInputLocked}
+											title={prompt.description}
+											label={
+												<div className="min-w-0">
+													<div className="truncate">{prompt.displayName || prompt.promptName}</div>
+													<div className="text-base-content/60 truncate">{prompt.promptName}</div>
+												</div>
+											}
+											onChange={next => {
+												state.togglePrompt(prompt, next);
+											}}
+										/>
+										{selectedPrompt ? (
+											<MCPArgumentFields
+												bundleID={prompt.bundleID}
+												serverID={prompt.serverID}
+												refType={MCPRefType.MCPRefTypePrompt}
+												name={prompt.promptName}
+												item={selectedPrompt}
+												disabled={isInputLocked}
+												onValueChange={(argumentName, value) => {
+													state.setPromptArgumentValue(
+														prompt.bundleID,
+														prompt.serverID,
+														prompt.promptName,
+														argumentName,
+														value
+													);
+												}}
+											/>
+										) : null}
 									</div>
-								}
-								onChange={next => {
-									state.toggleResource(resource, next);
-								}}
-							/>
-						))}
-
-						{option.resourceTemplates.map((template: MCPResourceTemplateRef) => {
-							const templateKey = mcpResourceTemplateKey(template);
-							const selectedTemplate = selectedTemplateByKey.get(templateKey);
-
-							return (
-								<div key={templateKey}>
-									<CheckboxRow
-										checked={selectedTemplateKeys.has(templateKey)}
-										disabled={isInputLocked}
-										title={template.uriTemplate}
-										label={
-											<div className="min-w-0">
-												<div className="truncate">{template.displayName || template.name || template.uriTemplate}</div>
-												<div className="text-base-content/60 truncate">{template.uriTemplate}</div>
-											</div>
-										}
-										onChange={next => {
-											state.toggleResourceTemplate(template, next);
-										}}
-									/>
-									{selectedTemplate ? (
-										<MCPArgumentFields
-											bundleID={template.bundleID}
-											serverID={template.serverID}
-											refType={MCPRefType.MCPRefTypeResource}
-											name={template.uriTemplate}
-											item={selectedTemplate}
-											disabled={isInputLocked}
-											onValueChange={(argumentName, value) => {
-												state.setResourceTemplateArgumentValue(
-													template.bundleID,
-													template.serverID,
-													template.uriTemplate,
-													argumentName,
-													value
-												);
-											}}
-										/>
-									) : null}
-								</div>
-							);
-						})}
-					</div>
-				</>
-			) : null}
-
-			{option.prompts.length !== 0 ? (
-				<>
-					<SectionTitle>Prompts</SectionTitle>
-					<div className="max-h-40 overflow-y-auto">
-						{option.prompts.map((prompt: MCPPromptRef) => {
-							const promptKey = mcpPromptKey(prompt);
-							const selectedPrompt = selectedPromptByKey.get(promptKey);
-
-							return (
-								<div key={promptKey}>
-									<CheckboxRow
-										checked={selectedPromptKeys.has(promptKey)}
-										disabled={isInputLocked}
-										title={prompt.description}
-										label={
-											<div className="min-w-0">
-												<div className="truncate">{prompt.displayName || prompt.promptName}</div>
-												<div className="text-base-content/60 truncate">{prompt.promptName}</div>
-											</div>
-										}
-										onChange={next => {
-											state.togglePrompt(prompt, next);
-										}}
-									/>
-									{selectedPrompt ? (
-										<MCPArgumentFields
-											bundleID={prompt.bundleID}
-											serverID={prompt.serverID}
-											refType={MCPRefType.MCPRefTypePrompt}
-											name={prompt.promptName}
-											item={selectedPrompt}
-											disabled={isInputLocked}
-											onValueChange={(argumentName, value) => {
-												state.setPromptArgumentValue(
-													prompt.bundleID,
-													prompt.serverID,
-													prompt.promptName,
-													argumentName,
-													value
-												);
-											}}
-										/>
-									) : null}
-								</div>
-							);
-						})}
-					</div>
-				</>
-			) : null}
+								);
+							})}
+						</div>
+					)}
+				</DiscoverySection>
+			</div>
 		</div>
 	);
 }

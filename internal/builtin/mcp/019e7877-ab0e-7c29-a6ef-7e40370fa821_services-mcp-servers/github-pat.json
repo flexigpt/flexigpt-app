@@ -13,7 +13,7 @@
 	},
 	"trustLevel": "trusted",
 	"defaultPolicy": {
-		"defaultApprovalRule": "ask",
+		"defaultApprovalRule": "allow",
 		"defaultExecutionMode": "manual",
 		"requireApprovalForUnknownRisk": true,
 		"requireApprovalForWrite": true,
