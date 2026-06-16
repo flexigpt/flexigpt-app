@@ -11,6 +11,8 @@ import {
 } from '@/spec/mcp';
 import { ToolOutputKind } from '@/spec/tool';
 
+import { isJSONObject } from '@/lib/jsonschema_utils';
+
 import { mcpAPI, skillStoreAPI, toolRuntimeAPI } from '@/apis/baseapi';
 
 import type { RequestMCPApproval } from '@/chats/composer/mcp/use_mcp_approval';
@@ -277,16 +279,21 @@ async function executeMCPToolCall(
 			`MCP tool call "${selection.toolName}" timed out after ${Math.round(TOOL_CALL_TIMEOUT_MS / 1000)} seconds.`
 		);
 
-		const contentText = (resp?.content ?? []).map(mcpContentToText).filter(Boolean).join('\n\n');
-		const structuredText = resp?.structuredContent !== undefined ? JSON.stringify(resp.structuredContent, null, 2) : '';
+		const toolContent = Array.isArray(resp?.content) ? resp.content : undefined;
+		const structuredContent = isJSONObject(resp?.structuredContent) ? resp.structuredContent : undefined;
+
+		const contentText = (toolContent ?? []).map(mcpContentToText).filter(Boolean).join('\n\n');
+		const structuredText = structuredContent !== undefined ? JSON.stringify(structuredContent, null, 2) : '';
+
 		const text = [contentText, structuredText].filter(Boolean).join('\n\n') || 'MCP tool returned no content.';
 		const isError = !!resp?.isError;
 		const appRenderInfo =
 			resp?.app && resp.app.resourceUri
 				? {
-						...resp.app,
-						content: resp.content,
-						structuredContent: resp.structuredContent,
+						resourceUri: resp.app.resourceUri,
+						mimeType: resp.app.mimeType,
+						content: toolContent,
+						...(structuredContent !== undefined ? { structuredContent } : {}),
 						isError,
 					}
 				: undefined;

@@ -11,7 +11,7 @@
 - [ ] Need more cleanup wrt shortcuts, input tips, shortcuts to add mcp skills etc.
 - [x] need coherence in message bottom bar.
 - [ ] better more inbuilt mcps.
-- [ ] mcp apps testing
+- [x] mcp apps testing. simple github mcp app get me tested.
 
 - [ ] test web search etc and pending user args etc after bottom bar migration.
 

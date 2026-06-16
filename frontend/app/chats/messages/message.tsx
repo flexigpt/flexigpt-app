@@ -8,6 +8,10 @@ import { RoleEnum, Status } from '@/spec/inference';
 import { ToolDetailsModal, type ToolDetailsState } from '@/chats/composer/tools/tool_details_modal';
 import { buildAppInstanceFromToolOutput } from '@/chats/mcpapps/mcp_app_types';
 import { MCPAppView } from '@/chats/mcpapps/mcp_app_view';
+import {
+	getMCPAppToolResultContent,
+	getMCPAppToolResultStructuredContent,
+} from '@/chats/messages/mcp_message_context_chip';
 import { MessageAttachmentsBar } from '@/chats/messages/message_attachments_bar';
 import { MessageCitationsBar } from '@/chats/messages/message_citations_bar';
 import { MessageContentCard } from '@/chats/messages/message_content_card';
@@ -173,18 +177,23 @@ export const ChatMessage = memo(function ChatMessage({
 						{mcpAppViews.length > 0 && (
 							<div className="border-base-300 border-t px-4 py-3">
 								<div className="space-y-2">
-									{mcpAppViews.map(({ instance, call, output }) => (
-										<MCPAppView
-											key={instance.instanceID}
-											instance={instance}
-											toolInput={call?.arguments}
-											toolResult={{
-												content: output.mcpApp?.content,
-												structuredContent: output.mcpApp?.structuredContent ?? output.toolOutputs,
-												isError: output.mcpApp?.isError ?? output.isError,
-											}}
-										/>
-									))}
+									{mcpAppViews.map(({ instance, call, output }) => {
+										const content = getMCPAppToolResultContent(output);
+										const structuredContent = getMCPAppToolResultStructuredContent(output);
+
+										return (
+											<MCPAppView
+												key={instance.instanceID}
+												instance={instance}
+												toolInput={call?.arguments}
+												toolResult={{
+													content,
+													structuredContent,
+													isError: output.mcpApp?.isError ?? output.isError,
+												}}
+											/>
+										);
+									})}
 								</div>
 							</div>
 						)}

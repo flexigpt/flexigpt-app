@@ -4,6 +4,8 @@ import { FiAlertTriangle } from 'react-icons/fi';
 
 import { type MCPAppModelContextUpdate, type MCPAppsPolicy, type MCPContent, MCPContentType } from '@/spec/mcp';
 
+import { isJSONObject } from '@/lib/jsonschema_utils';
+
 import { backendAPI, mcpAPI } from '@/apis/baseapi';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
@@ -108,6 +110,70 @@ function isSafeExternalURL(raw: string): boolean {
 	} catch {
 		return false;
 	}
+}
+
+function buildToolResultNotificationParams(
+	toolName: string,
+	toolUseID: string,
+	toolResult: NonNullable<MCPAppViewProps['toolResult']>
+): {
+	toolName: string;
+	toolUseID: string;
+	content?: MCPContent[];
+	structuredContent?: Record<string, unknown>;
+	isError?: boolean;
+} {
+	const params: {
+		toolName: string;
+		toolUseID: string;
+		content?: MCPContent[];
+		structuredContent?: Record<string, unknown>;
+		isError?: boolean;
+	} = {
+		toolName,
+		toolUseID,
+	};
+
+	if (Array.isArray(toolResult.content)) {
+		params.content = toolResult.content;
+	}
+
+	if (isJSONObject(toolResult.structuredContent)) {
+		params.structuredContent = toolResult.structuredContent;
+	}
+
+	if (typeof toolResult.isError === 'boolean') {
+		params.isError = toolResult.isError;
+	}
+
+	return params;
+}
+
+function buildToolInputNotificationParams(
+	toolName: string,
+	toolUseID: string,
+	rawToolInput: unknown
+): {
+	toolName: string;
+	toolUseID: string;
+	arguments?: Record<string, unknown>;
+} {
+	const params: {
+		toolName: string;
+		toolUseID: string;
+		arguments?: Record<string, unknown>;
+	} = {
+		toolName,
+		toolUseID,
+	};
+
+	const parsed = parseToolInput(rawToolInput);
+
+	if (isJSONObject(parsed)) {
+		params.arguments = parsed;
+	}
+
+	return params;
 }
 
 export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MCPAppViewProps) {
@@ -324,11 +390,10 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 		if (!bridge || !viewInitialized) return;
 
 		if (toolInput !== undefined) {
-			bridge.sendNotification('ui/notifications/tool-input', {
-				toolName: instance.toolName,
-				toolUseID: instance.toolUseID,
-				arguments: parseToolInput(toolInput),
-			});
+			bridge.sendNotification(
+				'ui/notifications/tool-input',
+				buildToolInputNotificationParams(instance.toolName, instance.toolUseID, toolInput)
+			);
 		}
 	}, [instance.toolName, instance.toolUseID, toolInput, viewInitialized]);
 
@@ -337,14 +402,12 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 		if (!bridge || !viewInitialized) return;
 
 		if (toolResult !== undefined) {
-			bridge.sendNotification('ui/notifications/tool-result', {
-				toolName: instance.toolName,
-				toolUseID: instance.toolUseID,
-				...toolResult,
-			});
+			bridge.sendNotification(
+				'ui/notifications/tool-result',
+				buildToolResultNotificationParams(instance.toolName, instance.toolUseID, toolResult)
+			);
 		}
 	}, [instance.toolName, instance.toolUseID, toolResult, viewInitialized]);
-
 	useEffect(() => {
 		return () => {
 			const bridge = bridgeRef.current;

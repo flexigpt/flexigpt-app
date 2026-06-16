@@ -1,10 +1,14 @@
 import {
 	type InvokeMCPToolRequestBody,
+	type InvokeMCPToolResponseBody,
 	type MCPAppModelContextUpdate,
 	MCPApprovalDecision,
 	MCPApprovalResolution,
+	type MCPContent,
 	MCPInvocationSource,
 } from '@/spec/mcp';
+
+import { isJSONObject } from '@/lib/jsonschema_utils';
 
 import { mcpAPI } from '@/apis/baseapi';
 
@@ -81,13 +85,20 @@ export class MCPAppRPCRouter {
 	}
 
 	private async handleToolCall(req: JSONRPCRequest): Promise<JSONRPCResponse> {
-		const params = (req.params as Record<string, unknown>) ?? {};
+		const params = isJSONObject(req.params) ? req.params : {};
+
 		const name = typeof params.name === 'string' ? params.name : '';
-		const args = (params.arguments as Record<string, unknown>) ?? undefined;
+
 		if (!name) {
 			return errorResp(req.id, JSONRPC_ERR_INVALID_PARAMS, 'tools/call requires a name');
 		}
-
+		let args: Record<string, unknown> | undefined;
+		if (params.arguments !== undefined) {
+			if (!isJSONObject(params.arguments)) {
+				return errorResp(req.id, JSONRPC_ERR_INVALID_PARAMS, 'tools/call arguments must be an object');
+			}
+			args = params.arguments;
+		}
 		const { bundleID, serverID, instanceID } = this.deps.instance;
 		const callReq: InvokeMCPToolRequestBody = {
 			source: MCPInvocationSource.MCPInvocationSourceApp,
@@ -137,7 +148,7 @@ export class MCPAppRPCRouter {
 		// Allowed.
 		try {
 			const resp = await mcpAPI.invokeMCPTool(bundleID, callReq);
-			return { jsonrpc: '2.0', id: req.id, result: resp };
+			return { jsonrpc: '2.0', id: req.id, result: normalizeToolCallResultForApp(resp) };
 		} catch (err) {
 			return errorResp(
 				req.id,
@@ -148,7 +159,8 @@ export class MCPAppRPCRouter {
 	}
 
 	private async handleResourceRead(req: JSONRPCRequest): Promise<JSONRPCResponse> {
-		const params = (req.params as Record<string, unknown>) ?? {};
+		const params = isJSONObject(req.params) ? req.params : {};
+
 		const uri = typeof params.uri === 'string' ? params.uri : '';
 		if (!uri) return errorResp(req.id, JSONRPC_ERR_INVALID_PARAMS, 'resources/read requires uri');
 
@@ -162,7 +174,8 @@ export class MCPAppRPCRouter {
 	}
 
 	private handleDisplayMode(req: JSONRPCRequest): JSONRPCResponse {
-		const params = (req.params as Record<string, unknown>) ?? {};
+		const params = isJSONObject(req.params) ? req.params : {};
+
 		const requested = typeof params.mode === 'string' ? params.mode : 'inline';
 
 		if (requested !== 'inline') {
@@ -176,9 +189,11 @@ export class MCPAppRPCRouter {
 	}
 
 	private async handleUIMessage(req: JSONRPCRequest): Promise<JSONRPCResponse> {
-		const params = (req.params as Record<string, unknown>) ?? {};
+		const params = isJSONObject(req.params) ? req.params : {};
+
 		const role = params.role === 'user' ? 'user' : '';
-		const content = params.content as Record<string, unknown> | undefined;
+		const content = isJSONObject(params.content) ? params.content : undefined;
+
 		const text = content?.type === 'text' && typeof content.text === 'string' ? content.text.trim() : '';
 
 		if (role !== 'user' || !text) {
@@ -197,13 +212,33 @@ export class MCPAppRPCRouter {
 	}
 
 	private async handleUpdateModelContext(req: JSONRPCRequest): Promise<JSONRPCResponse> {
-		const params = (req.params as Record<string, unknown>) ?? {};
+		const params = isJSONObject(req.params) ? req.params : {};
+
+		let content: any;
+		if (params.content !== undefined) {
+			if (!Array.isArray(params.content)) {
+				return errorResp(req.id, JSONRPC_ERR_INVALID_PARAMS, 'ui/update-model-context content must be an array');
+			}
+			content = params.content;
+		}
+
+		let structuredContent: Record<string, unknown> | undefined;
+		if (params.structuredContent !== undefined) {
+			if (!isJSONObject(params.structuredContent)) {
+				return errorResp(
+					req.id,
+					JSONRPC_ERR_INVALID_PARAMS,
+					'ui/update-model-context structuredContent must be an object'
+				);
+			}
+			structuredContent = params.structuredContent;
+		}
 		const update = {
-			content: Array.isArray(params.content) ? params.content : undefined,
-			structuredContent: params.structuredContent,
+			content,
+			...(structuredContent !== undefined ? { structuredContent } : {}),
 		} satisfies Omit<MCPAppModelContextUpdate, 'instanceID' | 'bundleID' | 'serverID' | 'resourceUri' | 'updatedAt'>;
 
-		if (!update.content && update.structuredContent === undefined) {
+		if (!content && structuredContent === undefined) {
 			return errorResp(
 				req.id,
 				JSONRPC_ERR_INVALID_PARAMS,
@@ -224,7 +259,8 @@ export class MCPAppRPCRouter {
 	}
 
 	private async handleOpenLink(req: JSONRPCRequest): Promise<JSONRPCResponse> {
-		const params = (req.params as Record<string, unknown>) ?? {};
+		const params = isJSONObject(req.params) ? req.params : {};
+
 		const url = typeof params.url === 'string' ? params.url : '';
 		if (!url) return errorResp(req.id, JSONRPC_ERR_INVALID_PARAMS, 'ui/open-link requires url');
 
@@ -236,6 +272,30 @@ export class MCPAppRPCRouter {
 			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, err instanceof Error ? err.message : 'Open denied');
 		}
 	}
+}
+
+function normalizeToolCallResultForApp(resp: InvokeMCPToolResponseBody | undefined): {
+	content: MCPContent[];
+	structuredContent?: Record<string, unknown>;
+	isError?: boolean;
+} {
+	const result: {
+		content: MCPContent[];
+		structuredContent?: Record<string, unknown>;
+		isError?: boolean;
+	} = {
+		content: Array.isArray(resp?.content) ? resp.content : [],
+	};
+
+	if (isJSONObject(resp?.structuredContent)) {
+		result.structuredContent = resp.structuredContent;
+	}
+
+	if (typeof resp?.isError === 'boolean') {
+		result.isError = resp.isError;
+	}
+
+	return result;
 }
 
 function errorResp(id: JSONRPCRequest['id'], code: number, message: string): JSONRPCResponse {
