@@ -4,10 +4,9 @@ import { FiArrowDown, FiArrowUp, FiCode, FiEdit2 } from 'react-icons/fi';
 
 import type { InferenceUsage, ReasoningContent } from '@/spec/inference';
 
-import { stripCustomMDFences } from '@/lib/text_utils';
-
 import { HoverTip } from '@/components/ariakit_hover_tip';
 import { CopyButton } from '@/components/copy_button';
+import { stripCustomMDFences } from '@/components/markdown/custom_md_utils';
 
 import { MessageDetailsModal } from '@/chats/messages/message_details_modal';
 

@@ -26,6 +26,13 @@ type NormalizedTabsResult = {
 	addedScratchTabId: string | null;
 };
 
+// keep letters, digits, space and hyphen; trim & limit to 64 chars
+export const sanitizeConversationTitle = (raw: string): string =>
+	raw
+		.replace(/[^a-zA-Z0-9 -]/g, '') //  ← note the blank space and the hyphen at the end
+		.trim()
+		.slice(0, 64);
+
 export function isScratchTab(tab: ChatTabState): boolean {
 	return !tab.isPersisted && tab.conversation.messages.length === 0;
 }

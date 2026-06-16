@@ -16,11 +16,10 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import supersub from 'remark-supersub';
 
-import { SanitizeLaTeXOutsideFences } from '@/lib/markdown_utils';
-import { CustomMDLanguage } from '@/lib/text_utils';
-
 import { backendAPI } from '@/apis/baseapi';
 
+import { CustomMDLanguage } from '@/components/markdown/custom_md_utils';
+import { SanitizeLaTeXOutsideFences } from '@/components/markdown/latex_utils';
 import { CodeBlock } from '@/components/markdown/markdown_code_block';
 import { MdErrorBoundary } from '@/components/markdown/markdown_error_boundary';
 import { ThinkingFence } from '@/components/markdown/thinking_fence';

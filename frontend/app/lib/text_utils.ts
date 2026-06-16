@@ -31,72 +31,10 @@ export function validateTags(tags: string): string | undefined {
 	return undefined;
 }
 
-/**
- * @public
- */
-export function getBlockQuotedLines(content: string): string {
-	// Split the content into lines.
-	const lines = content.split('\n');
-	// Prepend each line with "> ".
-	for (let i = 0; i < lines.length; i++) {
-		lines[i] = '> ' + lines[i];
-	}
-	// Join the lines back together as blockquote.
-	return lines.join('\n');
-}
-
-export enum CustomMDLanguage {
-	ThinkingSummary = 'thinkingsummary',
-	Thinking = 'thinking',
-}
-
-export function stripCustomMDFences(markdown: string): string {
-	// Remove all ~~~thinking blocks
-	let r = markdown.replace(/(^|\n)~~~thinking\s*[\s\S]*?\n~~~\s*/g, '$1');
-	r = r.replace(/(^|\n)~~~thinkingsummary\s*[\s\S]*?\n~~~\s*/g, '$1');
-	return r;
-}
-
-// keep letters, digits, space and hyphen; trim & limit to 64 chars
-export const sanitizeConversationTitle = (raw: string): string =>
-	raw
-		.replace(/[^a-zA-Z0-9 -]/g, '') //  ← note the blank space and the hyphen at the end
-		.trim()
-		.slice(0, 64);
-
-export function expandTabsToSpaces(line: string, tabSize = 2) {
-	let out = '';
-	let col = 0;
-	for (const ch of line) {
-		if (ch === '\t') {
-			const n = tabSize - (col % tabSize);
-			out += ' '.repeat(n);
-			col += n;
-		} else {
-			out += ch;
-			col = ch === '\n' ? 0 : col + 1;
-		}
-	}
-	return out;
-}
-
 export function cssEscape(s: string) {
 	try {
 		return CSS.escape(s);
 	} catch {
 		return s.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
 	}
-}
-
-/**
- * @public
- */
-export function replaceDoubleBraces(text: string, vars: Record<string, unknown>): string {
-	// simple {{var}} replacement using provided values (leave unknown tokens intact)
-	if (!text) return '';
-	return text.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_m, name: string) => {
-		const v = vars[name];
-		// eslint-disable-next-line @typescript-eslint/no-base-to-string
-		return v !== undefined && v !== null ? String(v) : _m;
-	});
 }

@@ -1,8 +1,6 @@
 import { NodeApi, type Value } from 'platejs';
 import type { PlateEditor } from 'platejs/react';
 
-import { expandTabsToSpaces } from '@/lib/text_utils';
-
 import type { getFirstTemplateNodeWithPath } from '@/chats/composer/platedoc/template_document_ops';
 
 // We add a per-chunk prop so Slate doesn't merge them back together.
@@ -98,6 +96,22 @@ export const clearAllMarks = (ed: PlateEditor) => {
 		}
 	});
 };
+
+function expandTabsToSpaces(line: string, tabSize = 2) {
+	let out = '';
+	let col = 0;
+	for (const ch of line) {
+		if (ch === '\t') {
+			const n = tabSize - (col % tabSize);
+			out += ' '.repeat(n);
+			col += n;
+		} else {
+			out += ch;
+			col = ch === '\n' ? 0 : col + 1;
+		}
+	}
+	return out;
+}
 
 export function insertPlainTextAsSingleBlock(ed: PlateEditor | null | undefined, text: string, tabSize = 2) {
 	if (!ed) return;

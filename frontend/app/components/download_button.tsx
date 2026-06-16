@@ -6,7 +6,7 @@ import { FiDownload } from 'react-icons/fi';
 import type { FileFilter } from '@/spec/attachment';
 
 import { Base64EncodeUTF8, GenerateRandomString } from '@/lib/encode_decode';
-import { MimeTypeMap, ProgrammingLanguages } from '@/lib/markdown_utils';
+import { MimeTypeMap, ProgrammingLanguages } from '@/lib/extension_utils';
 
 import { backendAPI } from '@/apis/baseapi';
 

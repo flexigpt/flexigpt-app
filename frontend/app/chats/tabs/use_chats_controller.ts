@@ -8,7 +8,6 @@ import { RoleEnum } from '@/spec/inference';
 
 import { defaultShortcutConfig, type ShortcutConfig, useChatShortcuts } from '@/lib/keyboard_shortcuts';
 import { omitManyKeys } from '@/lib/obj_utils';
-import { sanitizeConversationTitle } from '@/lib/text_utils';
 import { generateTitle } from '@/lib/title_utils';
 
 import { conversationStoreAPI } from '@/apis/baseapi';
@@ -24,6 +23,7 @@ import {
 	isScratchTab,
 	MAX_TABS,
 	normalizeTabsForInvariants,
+	sanitizeConversationTitle,
 	toTimestampMap,
 } from '@/chats/tabs/tabs_model';
 import {
