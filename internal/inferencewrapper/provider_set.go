@@ -27,6 +27,11 @@ import (
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 )
 
+const (
+	defaultFlushIntervalMillis = 32
+	defaultFlushChunkSize      = 512
+)
+
 // ProviderSetAPI is a thin aggregator on top of inference-go's ProviderSetAPI.
 // It owns:
 //   - provider lifecycle (add/delete/set API key),
@@ -399,8 +404,8 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	if req.OnStreamText != nil || req.OnStreamThinking != nil {
 		opts.StreamHandler = makeStreamHandler(req.OnStreamText, req.OnStreamThinking)
 		opts.StreamConfig = &inferenceSpec.StreamConfig{
-			FlushIntervalMillis: 32,
-			FlushChunkSize:      256,
+			FlushIntervalMillis: defaultFlushIntervalMillis,
+			FlushChunkSize:      defaultFlushChunkSize,
 		}
 	}
 
