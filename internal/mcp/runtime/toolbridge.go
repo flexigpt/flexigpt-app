@@ -45,6 +45,10 @@ func (b *ToolBridge) Evaluate(
 		if err := apps.ValidateAppToolInvocation(cfg, tool, req.ServerID); err != nil {
 			return nil, err
 		}
+	} else if apps.EffectiveAppsPolicy(cfg).Enabled && !apps.ToolVisibleToModel(tool.App) {
+		return nil, fmt.Errorf(
+			"%w: tool %q is not visible to the model", spec.ErrMCPPolicyDenied, tool.ToolName,
+		)
 	}
 
 	eval := Evaluate(EvaluationInput{
@@ -92,6 +96,10 @@ func (b *ToolBridge) Invoke(
 		if err := apps.ValidateAppToolInvocation(cfg, tool, req.ServerID); err != nil {
 			return nil, err
 		}
+	} else if apps.EffectiveAppsPolicy(cfg).Enabled && !apps.ToolVisibleToModel(tool.App) {
+		return nil, fmt.Errorf(
+			"%w: tool %q is not visible to the model", spec.ErrMCPPolicyDenied, tool.ToolName,
+		)
 	}
 
 	eval := Evaluate(EvaluationInput{

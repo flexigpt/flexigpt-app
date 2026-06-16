@@ -14,10 +14,16 @@
 	"trustLevel": "trusted",
 	"defaultPolicy": {
 		"defaultApprovalRule": "allow",
-		"defaultExecutionMode": "manual",
+		"defaultExecutionMode": "auto",
 		"requireApprovalForUnknownRisk": true,
 		"requireApprovalForWrite": true,
 		"requireApprovalForDestructive": true
+	},
+	"appsPolicy": {
+		"enabled": true,
+		"allowAppInitiatedToolCalls": true,
+		"requireApprovalForOpenLink": true,
+		"requireApprovalForContextUpdates": true
 	},
 	"setup": {
 		"note": "Create a GitHub personal access token (fine-grained recommended), then paste it below. FlexiGPT stores it in the OS secret store and sends it as an Authorization: Bearer header.",

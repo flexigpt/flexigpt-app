@@ -27,7 +27,6 @@ type approvalDecisionKey struct {
 	ToolName   string                   `json:"toolName"`
 	ToolDigest string                   `json:"toolDigest,omitempty"`
 	Risk       spec.MCPToolRisk         `json:"risk"`
-	Arguments  spec.JSONRawString       `json:"arguments,omitempty"`
 }
 
 type pendingApproval struct {
@@ -202,7 +201,6 @@ func getApprovalDecisionKey(summary spec.MCPApprovalSummary) string {
 		ToolName:   summary.ToolName,
 		ToolDigest: summary.ToolDigest,
 		Risk:       summary.Risk,
-		Arguments:  normalizeRawJSON(summary.Arguments),
 	}
 	raw, _ := json.Marshal(key)
 	sum := sha256.Sum256(raw)

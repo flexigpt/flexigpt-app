@@ -32,7 +32,6 @@ import { mcpAPI } from '@/apis/baseapi';
 
 import { ActionTriggerChipContent, actionTriggerChipSurfaceClasses } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
-import { Dropdown, type DropdownItem } from '@/components/dropdown';
 
 import {
 	type MCPComposerServerOption,
@@ -101,47 +100,7 @@ function CheckboxRow({
 	);
 }
 
-const TOOL_EXPOSURE_DROPDOWN_ITEMS: Record<MCPToolExposure, DropdownItem> = {
-	[MCPToolExposure.MCPToolExposureNone]: { isEnabled: true },
-	[MCPToolExposure.MCPToolExposureAll]: { isEnabled: true },
-	[MCPToolExposure.MCPToolExposureSelected]: { isEnabled: true },
-};
-
 const EMPTY_MCP_ARGUMENT_VALUES: Record<string, string> = {};
-
-function DiscoverySection({
-	title,
-	presentCount,
-	selectedCount,
-	children,
-}: {
-	title: string;
-	presentCount: number;
-	selectedCount: number;
-	children: ReactNode;
-}) {
-	const [open, setOpen] = useState(false);
-
-	return (
-		<div className="border-base-300/70 rounded-lg border">
-			<button
-				type="button"
-				className="hover:bg-base-200 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs"
-				onClick={e => {
-					e.stopPropagation();
-					setOpen(value => !value);
-				}}
-			>
-				{open ? <FiChevronDown size={13} /> : <FiChevronRight size={13} />}
-				<span className="min-w-0 flex-1 font-semibold">{title}</span>
-				<span className="badge badge-ghost badge-xs rounded-lg">{presentCount} present</span>
-				<span className="badge badge-info badge-xs rounded-lg">{selectedCount} selected</span>
-			</button>
-
-			{open ? <div className="border-base-300/70 border-t p-2">{children}</div> : null}
-		</div>
-	);
-}
 
 function BulkSelectionChips({
 	onSelectAll,
@@ -178,6 +137,60 @@ function BulkSelectionChips({
 			>
 				Unselect all
 			</button>
+		</div>
+	);
+}
+
+function DiscoverySection({
+	title,
+	presentCount,
+	selectedCount,
+	showBulkActions = true,
+	selectAllDisabled,
+	unselectAllDisabled,
+	onSelectAll,
+	onUnselectAll,
+	children,
+}: {
+	title: string;
+	presentCount: number;
+	selectedCount: number;
+	showBulkActions?: boolean;
+	selectAllDisabled?: boolean;
+	unselectAllDisabled?: boolean;
+	onSelectAll: () => void;
+	onUnselectAll: () => void;
+	children: ReactNode;
+}) {
+	const [open, setOpen] = useState(false);
+
+	return (
+		<div className="border-base-300/70 rounded-lg border">
+			<div className="flex w-full items-center gap-2 px-2 py-1.5 text-xs">
+				<button
+					type="button"
+					className="hover:bg-base-200 -mx-1 flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 py-0.5 text-left"
+					onClick={e => {
+						e.stopPropagation();
+						setOpen(value => !value);
+					}}
+				>
+					{open ? <FiChevronDown size={13} /> : <FiChevronRight size={13} />}
+					<span className="min-w-0 flex-1 font-semibold">{title}</span>
+					<span className="badge badge-ghost badge-xs rounded-lg">{presentCount} present</span>
+					<span className="badge badge-info badge-xs rounded-lg">{selectedCount} selected</span>
+				</button>
+				{showBulkActions ? (
+					<BulkSelectionChips
+						selectAllDisabled={selectAllDisabled}
+						unselectAllDisabled={unselectAllDisabled}
+						onSelectAll={onSelectAll}
+						onUnselectAll={onUnselectAll}
+					/>
+				) : null}
+			</div>
+
+			{open ? <div className="border-base-300/70 border-t p-2">{children}</div> : null}
 		</div>
 	);
 }
@@ -350,63 +363,26 @@ function ServerDiscoverySection({
 			{discoveryText ? <div className="text-base-content/70 mt-2 text-xs">{discoveryText}</div> : null}
 
 			<div className="mt-2 space-y-2">
-				<DiscoverySection title="Tools" presentCount={option.tools.length} selectedCount={selectedToolCount}>
-					<div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-						<label className="text-xs">
-							<Dropdown
-								dropdownItems={TOOL_EXPOSURE_DROPDOWN_ITEMS}
-								selectedKey={selection.toolExposure}
-								onChange={next => {
-									state.setToolExposure(option.bundle.id, option.server.id, next);
-									if (
-										next === MCPToolExposure.MCPToolExposureSelected &&
-										selection.toolExposure !== MCPToolExposure.MCPToolExposureSelected
-									) {
-										option.tools.forEach(tool => {
-											state.toggleTool(tool, false);
-										});
-									}
-								}}
-								getDisplayName={exposure => {
-									switch (exposure) {
-										case MCPToolExposure.MCPToolExposureNone:
-											return 'No tools';
-										case MCPToolExposure.MCPToolExposureAll:
-											return 'All tools';
-										case MCPToolExposure.MCPToolExposureSelected:
-											return 'Selected tools';
-										default:
-											return exposure;
-									}
-								}}
-								title="Tool exposure"
-								inlineMenu={true}
-								maxMenuHeight={160}
-								maxSummaryHeight={16}
-								disabled={isInputLocked}
-							/>
-						</label>
-
-						{selection.toolExposure === MCPToolExposure.MCPToolExposureSelected ? (
-							<BulkSelectionChips
-								selectAllDisabled={isInputLocked || selectableToolCount === 0}
-								unselectAllDisabled={isInputLocked || selectedToolKeys.size === 0}
-								onSelectAll={() => {
-									option.tools.forEach(tool => {
-										if (tool.enabled && isMCPToolVisibleToModel(tool)) {
-											state.toggleTool(tool, true);
-										}
-									});
-								}}
-								onUnselectAll={() => {
-									option.tools.forEach(tool => {
-										state.toggleTool(tool, false);
-									});
-								}}
-							/>
-						) : null}
-					</div>
-
+				<DiscoverySection
+					title="Tools"
+					presentCount={option.tools.length}
+					selectedCount={selectedToolCount}
+					showBulkActions={selection.toolExposure === MCPToolExposure.MCPToolExposureSelected}
+					selectAllDisabled={isInputLocked || selectableToolCount === 0}
+					unselectAllDisabled={isInputLocked || selectedToolKeys.size === 0}
+					onSelectAll={() => {
+						option.tools.forEach(tool => {
+							if (tool.enabled && isMCPToolVisibleToModel(tool)) {
+								state.toggleTool(tool, true);
+							}
+						});
+					}}
+					onUnselectAll={() => {
+						option.tools.forEach(tool => {
+							state.toggleTool(tool, false);
+						});
+					}}
+				>
 					{selection.toolExposure === MCPToolExposure.MCPToolExposureSelected ? (
 						option.tools.length === 0 ? (
 							<div className="text-base-content/60 px-2 text-xs">No tools discovered.</div>
@@ -449,30 +425,29 @@ function ServerDiscoverySection({
 					)}
 				</DiscoverySection>
 
-				<DiscoverySection title="Resources" presentCount={resourcePresentCount} selectedCount={selectedResourceCount}>
-					<div className="mb-2 flex justify-end">
-						<BulkSelectionChips
-							selectAllDisabled={isInputLocked || resourcePresentCount === 0}
-							unselectAllDisabled={isInputLocked || selectedResourceCount === 0}
-							onSelectAll={() => {
-								option.resources.forEach(resource => {
-									state.toggleResource(resource, true);
-								});
-								option.resourceTemplates.forEach(template => {
-									state.toggleResourceTemplate(template, true);
-								});
-							}}
-							onUnselectAll={() => {
-								option.resources.forEach(resource => {
-									state.toggleResource(resource, false);
-								});
-								option.resourceTemplates.forEach(template => {
-									state.toggleResourceTemplate(template, false);
-								});
-							}}
-						/>
-					</div>
-
+				<DiscoverySection
+					title="Resources"
+					presentCount={resourcePresentCount}
+					selectedCount={selectedResourceCount}
+					selectAllDisabled={isInputLocked || resourcePresentCount === 0}
+					unselectAllDisabled={isInputLocked || selectedResourceCount === 0}
+					onSelectAll={() => {
+						option.resources.forEach(resource => {
+							state.toggleResource(resource, true);
+						});
+						option.resourceTemplates.forEach(template => {
+							state.toggleResourceTemplate(template, true);
+						});
+					}}
+					onUnselectAll={() => {
+						option.resources.forEach(resource => {
+							state.toggleResource(resource, false);
+						});
+						option.resourceTemplates.forEach(template => {
+							state.toggleResourceTemplate(template, false);
+						});
+					}}
+				>
 					{resourcePresentCount === 0 ? (
 						<div className="text-base-content/60 px-2 text-xs">No resources discovered.</div>
 					) : (
@@ -543,24 +518,23 @@ function ServerDiscoverySection({
 					)}
 				</DiscoverySection>
 
-				<DiscoverySection title="Prompts" presentCount={promptPresentCount} selectedCount={selectedPromptCount}>
-					<div className="mb-2 flex justify-end">
-						<BulkSelectionChips
-							selectAllDisabled={isInputLocked || promptPresentCount === 0}
-							unselectAllDisabled={isInputLocked || selectedPromptCount === 0}
-							onSelectAll={() => {
-								option.prompts.forEach(prompt => {
-									state.togglePrompt(prompt, true);
-								});
-							}}
-							onUnselectAll={() => {
-								option.prompts.forEach(prompt => {
-									state.togglePrompt(prompt, false);
-								});
-							}}
-						/>
-					</div>
-
+				<DiscoverySection
+					title="Prompts"
+					presentCount={promptPresentCount}
+					selectedCount={selectedPromptCount}
+					selectAllDisabled={isInputLocked || promptPresentCount === 0}
+					unselectAllDisabled={isInputLocked || selectedPromptCount === 0}
+					onSelectAll={() => {
+						option.prompts.forEach(prompt => {
+							state.togglePrompt(prompt, true);
+						});
+					}}
+					onUnselectAll={() => {
+						option.prompts.forEach(prompt => {
+							state.togglePrompt(prompt, false);
+						});
+					}}
+				>
 					{promptPresentCount === 0 ? (
 						<div className="text-base-content/60 px-2 text-xs">No prompts discovered.</div>
 					) : (

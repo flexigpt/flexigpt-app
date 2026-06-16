@@ -551,14 +551,19 @@ func appInfoFromMeta(meta mcpSDK.Meta) *spec.MCPToolAppInfo {
 	}
 
 	ui := map[string]any{}
-	if rawUI, ok := meta["ui"]; ok && rawUI != nil {
-		ui = anyToMap(rawUI)
+	// The MCP Apps descriptor may live under "_meta.ui" or under the
+	// advertised extension id key (io.modelcontextprotocol/ui).
+	for _, key := range []string{"ui", apps.AppExtensionID} {
+		if raw, ok := meta[key]; ok && raw != nil {
+			for k, v := range anyToMap(raw) {
+				if _, exists := ui[k]; !exists {
+					ui[k] = v
+				}
+			}
+		}
 	}
 	// Deprecated MCP Apps shape. Keep accepting it during migration.
 	if flatResourceURI, ok := meta["ui/resourceUri"].(string); ok && strings.TrimSpace(flatResourceURI) != "" {
-		if ui == nil {
-			ui = map[string]any{}
-		}
 		if _, exists := ui["resourceUri"]; !exists {
 			ui["resourceUri"] = flatResourceURI
 		}
@@ -579,11 +584,16 @@ func appInfoFromMeta(meta mcpSDK.Meta) *spec.MCPToolAppInfo {
 
 	out.Visibility = normalizeAppVisibility(stringSliceFromAny(ui["visibility"]))
 
+	hasExplicitVisibility := len(out.Visibility) > 0
+
+	// Only treat this as an MCP App tool when it actually carries a UI
+	// resource or an explicit visibility constraint. Never fabricate
+	// visibility for ordinary tools.
+	if out.ResourceURI == "" && !hasExplicitVisibility {
+		return nil
+	}
 	if len(out.Visibility) == 0 {
 		out.Visibility = []string{apps.VisibilityModel, apps.VisibilityApp}
-	}
-	if out.ResourceURI == "" && len(out.Visibility) == 0 {
-		return nil
 	}
 	return out
 }
