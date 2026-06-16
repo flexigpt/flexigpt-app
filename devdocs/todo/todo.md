@@ -2,19 +2,14 @@
 
 ## Laundry list
 
-- [ ] thinking scrolls even if manual scroll happens by user.
 - [ ] diff can be applied to files by letting UI detect diff files and doing a optimistic dry run of apply to that file and then give manual apply button in UI.
-- [ ] a folder selection/input an be given in context bar to say that your current work folder is so and so, so that any claude.md or skills or anything can be selected and auto injected as a "Starter recipe"
-- [ ] mermaid diagram code needs to be collapsed and then expand on demand or if there is error in rendering.
-- [ ] copy existing functionality verification across mcp and other configs.
-
+- [ ] copy existing configuration functionality verification across mcp and other configs.
 - [ ] Need more cleanup wrt shortcuts, input tips, shortcuts to add mcp skills etc.
-- [x] need coherence in message bottom bar.
-- [ ] better more inbuilt mcps.
-- [x] mcp apps testing. simple github mcp app get me tested.
 
+- [ ] better more inbuilt mcps. test enhanced mcp apps.
 - [ ] test web search etc and pending user args etc after bottom bar migration.
 
+- [ ] a folder selection/input an be given in context bar to say that your current work folder is so and so, so that any claude.md or skills or anything can be selected and auto injected as a "Starter recipe"
 - easier add via some files/schemas etc
   - [ ] easier preset import bundles and flows. e.g: just import a preset bundle that has assistant, models, prompts, tools etc.
     - [ ] may be as a json import bundle or jsonc format

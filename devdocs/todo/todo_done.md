@@ -1011,3 +1011,8 @@
 
 - [x] remove tool chips in composer for choices
 - [x] make bottom bar choices of skill, sys prompt, tool, mcp coherent and same way. remove web search chip and push inside tools. see where to move shortcuts, input tips etc.
+
+- [x] mcp apps testing. simple github mcp app get me tested.
+- [x] mermaid diagram code needs to be collapsed and then expand on demand or if there is error in rendering.
+- [x] need coherence in message bottom bar.
+- [ ] ~~thinking scrolls even if manual scroll happens by user. not a issue for now.~~
