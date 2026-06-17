@@ -16,6 +16,7 @@ interface ToolMenuRowProps {
 	title?: string;
 	display: string;
 	slug: string;
+	sourceBadge?: string;
 	leftIcon?: ReactNode;
 	isSelected?: boolean;
 
@@ -94,6 +95,7 @@ export function ToolMenuRow({
 	title,
 	display,
 	slug,
+	sourceBadge,
 	leftIcon,
 	isSelected,
 	supportsAutoExecute,
@@ -139,8 +141,16 @@ export function ToolMenuRow({
 				{/* name + slug + check */}
 				<div className="col-span-8 flex items-center gap-1">
 					{toolNode}
-					<div className="flex-1 justify-start truncate">
-						<div className="truncate text-xs font-medium">{truncatedDisplay}</div>
+
+					<div className="min-w-0 flex-1">
+						<div className="flex min-w-0 items-center gap-1">
+							<div className="truncate text-xs font-medium">{truncatedDisplay}</div>
+							{sourceBadge ? (
+								<span className="badge badge-ghost badge-xs text-base-content/55 px-1 text-[10px] font-normal">
+									{sourceBadge}
+								</span>
+							) : null}
+						</div>
 						<div className="text-base-content/70 truncate text-xs">{slug}</div>
 					</div>
 					<div

@@ -46,6 +46,7 @@ type ToolBundleGroup = {
 	bundleSlug: string;
 	isBuiltIn: boolean;
 	attachedOptions: ToolListItem[];
+	conversationOptions: ConversationToolStateEntry[];
 	availableOptions: ToolListItem[];
 };
 
@@ -94,6 +95,15 @@ function getAttachedToolKey(entry: AttachedToolEntry): string {
 	return toolIdentityKey(entry.bundleID, entry.bundleSlug, entry.toolSlug, entry.toolVersion);
 }
 
+function getConversationToolKey(entry: ConversationToolStateEntry): string {
+	return toolIdentityKey(
+		entry.toolStoreChoice.bundleID,
+		entry.toolStoreChoice.bundleSlug ?? entry.toolStoreChoice.bundleID,
+		entry.toolStoreChoice.toolSlug,
+		entry.toolStoreChoice.toolVersion
+	);
+}
+
 function compareToolListItems(a: ToolListItem, b: ToolListItem): number {
 	const bundleSlugCompare = toolMenuCollator.compare(a.bundleSlug, b.bundleSlug);
 	if (bundleSlugCompare !== 0) return bundleSlugCompare;
@@ -110,32 +120,65 @@ function compareToolListItems(a: ToolListItem, b: ToolListItem): number {
 	return toolMenuCollator.compare(getToolKey(a), getToolKey(b));
 }
 
-function groupTools(tools: ToolListItem[], attachedToolKeys: Set<string>): ToolBundleGroup[] {
+function compareToolGroups(a: ToolBundleGroup, b: ToolBundleGroup): number {
+	const bundleSlugCompare = toolMenuCollator.compare(a.bundleSlug, b.bundleSlug);
+	if (bundleSlugCompare !== 0) return bundleSlugCompare;
+	return toolMenuCollator.compare(a.bundleID, b.bundleID);
+}
+
+function groupTools(
+	tools: ToolListItem[],
+	attachedToolKeys: Set<string>,
+	conversationToolByKey: Map<string, ConversationToolStateEntry>
+): ToolBundleGroup[] {
 	const groupsByBundle = new Map<string, ToolBundleGroup>();
+	const remainingConversationTools = new Map(conversationToolByKey);
 
-	for (const item of [...tools].sort(compareToolListItems)) {
-		const groupKey = item.bundleID || item.bundleSlug;
+	function ensureGroup(groupKey: string, bundleID: string, bundleSlug: string, isBuiltIn: boolean): ToolBundleGroup {
 		let group = groupsByBundle.get(groupKey);
-
 		if (!group) {
 			group = {
-				bundleID: item.bundleID,
-				bundleSlug: item.bundleSlug || item.bundleID,
-				isBuiltIn: item.isBuiltIn,
+				bundleID,
+				bundleSlug: bundleSlug || bundleID,
+				isBuiltIn,
 				attachedOptions: [],
+				conversationOptions: [],
 				availableOptions: [],
 			};
 			groupsByBundle.set(groupKey, group);
 		}
-
-		if (attachedToolKeys.has(getToolKey(item))) {
-			group.attachedOptions.push(item);
-		} else {
-			group.availableOptions.push(item);
-		}
+		return group;
 	}
 
-	return Array.from(groupsByBundle.values());
+	for (const item of [...tools].sort(compareToolListItems)) {
+		const groupKey = item.bundleID || item.bundleSlug;
+		const group = ensureGroup(groupKey, item.bundleID, item.bundleSlug || item.bundleID, item.isBuiltIn);
+		const itemKey = getToolKey(item);
+
+		if (attachedToolKeys.has(itemKey)) {
+			group.attachedOptions.push(item);
+			continue;
+		}
+
+		const conversationEntry = remainingConversationTools.get(itemKey);
+		if (conversationEntry) {
+			group.conversationOptions.push(conversationEntry);
+			remainingConversationTools.delete(itemKey);
+			continue;
+		}
+
+		group.availableOptions.push(item);
+	}
+
+	for (const entry of remainingConversationTools.values()) {
+		const bundleID = entry.toolStoreChoice.bundleID || entry.toolStoreChoice.bundleSlug || 'bundle';
+		const bundleSlug = entry.toolStoreChoice.bundleSlug || entry.toolStoreChoice.bundleID || bundleID;
+		const groupKey = bundleID || bundleSlug || entry.key;
+		const group = ensureGroup(groupKey, bundleID, bundleSlug, false);
+		group.conversationOptions.push(entry);
+	}
+
+	return Array.from(groupsByBundle.values()).sort(compareToolGroups);
 }
 
 function getArgsBadgeClass(hasBlockingArgs: boolean) {
@@ -176,6 +219,12 @@ export function ToolsBottomBarChip({
 	const attachedToolKeys = useMemo(() => {
 		return new Set(attachedToolEntries.map(getAttachedToolKey));
 	}, [attachedToolEntries]);
+
+	const conversationToolByKey = useMemo(() => {
+		return new Map<string, ConversationToolStateEntry>(
+			conversationToolsState.map(entry => [getConversationToolKey(entry), entry])
+		);
+	}, [conversationToolsState]);
 
 	const visibleAttachedToolEntries = useMemo(
 		() => attachedToolEntries.filter(entry => entry.toolType !== ToolStoreChoiceType.WebSearch),
@@ -288,7 +337,10 @@ export function ToolsBottomBarChip({
 		});
 	}, [currentProviderSDKType, toolData, toolsLoading]);
 
-	const groupedTools = useMemo(() => groupTools(availableTools, attachedToolKeys), [availableTools, attachedToolKeys]);
+	const groupedTools = useMemo(
+		() => groupTools(availableTools, attachedToolKeys, conversationToolByKey),
+		[availableTools, attachedToolKeys, conversationToolByKey]
+	);
 
 	const attachedArgsMissingCount = useMemo(() => {
 		let count = 0;
@@ -315,9 +367,9 @@ export function ToolsBottomBarChip({
 
 	const missingArgsCount = attachedArgsMissingCount + conversationArgsMissingCount + (webSearchArgsBlocked ? 1 : 0);
 
-	const enabledConversationToolCount = conversationToolsState.filter(entry => entry.enabled).length;
+	const conversationToolCount = conversationToolsState.length;
 	const configuredToolCount =
-		visibleAttachedToolEntries.length + enabledConversationToolCount + compatibleWebSearchTemplates.length;
+		visibleAttachedToolEntries.length + conversationToolCount + compatibleWebSearchTemplates.length;
 
 	const title = useMemo(() => {
 		const lines: string[] = [];
@@ -325,13 +377,13 @@ export function ToolsBottomBarChip({
 		lines.push('Choose per-message tools, conversation tools, and web search.');
 		lines.push(configuredToolCount > 0 ? `Configured: ${configuredToolCount}` : 'No tools configured');
 		if (visibleAttachedToolEntries.length > 0) lines.push(`Per-message tools: ${visibleAttachedToolEntries.length}`);
-		if (enabledConversationToolCount > 0) lines.push(`Conversation tools: ${enabledConversationToolCount}`);
+		if (conversationToolCount > 0) lines.push(`Conversation tools: ${conversationToolCount}`);
 		if (webSearchEnabled) lines.push('Web search: enabled');
 		if (missingArgsCount > 0) lines.push(`Missing required options: ${missingArgsCount}`);
 		return lines.join('\n');
 	}, [
 		configuredToolCount,
-		enabledConversationToolCount,
+		conversationToolCount,
 		missingArgsCount,
 		shortcut,
 		visibleAttachedToolEntries.length,
@@ -604,6 +656,7 @@ export function ToolsBottomBarChip({
 				title={`Conversation tool: ${display} (${slug})`}
 				display={display}
 				slug={slug}
+				sourceBadge="Conversation"
 				isSelected={entry.enabled}
 				selectedTitle={entry.enabled ? 'Enabled for next send' : 'Disabled'}
 				selectedAriaLabel={entry.enabled ? 'Enabled' : 'Disabled'}
@@ -817,28 +870,6 @@ export function ToolsBottomBarChip({
 							</GroupedMenuSection>
 						) : null}
 
-						{conversationToolsState.length > 0 ? (
-							<GroupedMenuSection
-								title="Conversation tools"
-								ariaLabel="Conversation tools"
-								separatorBefore
-								meta={
-									<>
-										<span className="badge badge-ghost badge-xs">
-											{enabledConversationToolCount}/{conversationToolsState.length}
-										</span>
-										{conversationArgsMissingCount > 0 ? (
-											<span className="badge badge-warning badge-xs animate-pulse">
-												Args {conversationArgsMissingCount}
-											</span>
-										) : null}
-									</>
-								}
-							>
-								<div className="space-y-1">{conversationToolsState.map(renderConversationToolRow)}</div>
-							</GroupedMenuSection>
-						) : null}
-
 						<GroupedMenuSection title="Available tools" ariaLabel="Available tools" separatorBefore>
 							{availableTools.length === 0 ? (
 								<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
@@ -847,8 +878,14 @@ export function ToolsBottomBarChip({
 							) : (
 								<div className="space-y-2">
 									{groupedTools.map((group, groupIndex) => {
-										const totalCount = group.attachedOptions.length + group.availableOptions.length;
-										const showSubheadings = group.attachedOptions.length > 0 && group.availableOptions.length > 0;
+										const totalCount =
+											group.attachedOptions.length + group.conversationOptions.length + group.availableOptions.length;
+										const showAttachedSubheading =
+											group.attachedOptions.length > 0 &&
+											(group.conversationOptions.length > 0 || group.availableOptions.length > 0);
+										const showAvailableSubheading =
+											group.availableOptions.length > 0 &&
+											(group.attachedOptions.length > 0 || group.conversationOptions.length > 0);
 
 										return (
 											<GroupedMenuSection
@@ -867,15 +904,21 @@ export function ToolsBottomBarChip({
 											>
 												{group.attachedOptions.length > 0 ? (
 													<>
-														{showSubheadings ? <GroupedMenuSubheading>Attached</GroupedMenuSubheading> : null}
+														{showAttachedSubheading ? <GroupedMenuSubheading>Attached</GroupedMenuSubheading> : null}
 														{group.attachedOptions.map(renderAvailableToolRow)}
 													</>
 												) : null}
 
+												{group.conversationOptions.length > 0 ? (
+													<div className="space-y-1">{group.conversationOptions.map(renderConversationToolRow)}</div>
+												) : null}
+
 												{group.availableOptions.length > 0 ? (
 													<>
-														{showSubheadings ? (
-															<GroupedMenuSubheading separated={group.attachedOptions.length > 0}>
+														{showAvailableSubheading ? (
+															<GroupedMenuSubheading
+																separated={group.attachedOptions.length > 0 || group.conversationOptions.length > 0}
+															>
 																Available
 															</GroupedMenuSubheading>
 														) : null}
