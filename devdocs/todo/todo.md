@@ -2,9 +2,11 @@
 
 ## Laundry list
 
+- [ ] the tools shown in the dropdown: may be dont show tools that are selected below and show them in selected tools only.
 - [ ] diff can be applied to files by letting UI detect diff files and doing a optimistic dry run of apply to that file and then give manual apply button in UI.
 - [ ] copy existing configuration functionality verification across mcp and other configs.
 - [ ] Need more cleanup wrt shortcuts, input tips, shortcuts to add mcp skills etc.
+- [ ] need a file ops only assistant
 
 - [ ] better more inbuilt mcps. test enhanced mcp apps.
 - [ ] test web search etc and pending user args etc after bottom bar migration.

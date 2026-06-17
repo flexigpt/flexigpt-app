@@ -386,6 +386,7 @@ linters:
         - rangeExprCopy
         - rangeValCopy
         - commentedOutCode
+        - tooManyResultsChecker
 
     godot:
       # Comments to be checked: `declarations`, `toplevel`, `noinline` or `all`.
