@@ -3,12 +3,14 @@
 ## Laundry list
 
 - [ ] the tools shown in the dropdown: maybe don't show tools that are selected below, and show them only in selected tools. this is mainly convo vs normal tools i think issue.
-- [ ] diff can be applied to files by letting UI detect diff files and doing a optimistic dry run of apply to that file and then give manual apply button in UI.
+- [x] diff can be applied to files by letting UI detect diff files and doing a optimistic dry run of apply to that file and then give manual apply button in UI.
+- [ ] keep diff previews visible before the final apply action.
+- [ ] add a small diff preview mode so edits can be reviewed before applying them.
+- [ ] need UI cleanup of diff. more styling and better styling needed.
+
 - [ ] verify copy-existing-configuration behavior across MCP and other config types.
 - [ ] Need more cleanup wrt shortcuts, input tips, shortcuts to add mcp skills etc.
 - [ ] need a file ops only assistant
-- [ ] keep diff previews visible before the final apply action.
-- [ ] add a small diff preview mode so edits can be reviewed before applying them.
 
 - [ ] better more inbuilt mcps. test enhanced mcp apps.
 - [ ] test web search etc and pending user args etc after bottom bar migration.

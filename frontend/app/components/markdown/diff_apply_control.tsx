@@ -61,7 +61,11 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 		() => `${language}\u0000${diffText}\u0000${normalizedCandidatePaths.join('\u0000')}`,
 		[diffText, language, normalizedCandidatePaths]
 	);
-
+	useEffect(() => {
+		return () => {
+			requestSeqRef.current += 1;
+		};
+	}, []);
 	const deriveAndStoreTargets = useCallback(
 		(output: ApplyUnifiedDiffOut | undefined, previousTargets?: ApplyUnifiedDiffFileTarget[]) => {
 			if (output?.fileTargets && output.fileTargets.length > 0) {
@@ -105,7 +109,7 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 					candidatePaths: normalizedCandidatePaths.length > 0 ? normalizedCandidatePaths : undefined,
 				});
 
-				if (seq !== requestSeqRef.current) return output;
+				if (seq !== requestSeqRef.current) return undefined;
 
 				deriveAndStoreTargets(output, targets);
 
@@ -179,6 +183,7 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 			message: 'Applying diff.',
 			output: dryRunOutput,
 		});
+		const applySeq = ++requestSeqRef.current;
 
 		try {
 			const output = await aggregateAPI.applyUnifiedDiff({
@@ -188,6 +193,7 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 				fileTargets: applyTargets.length > 0 ? applyTargets : undefined,
 				candidatePaths: normalizedCandidatePaths.length > 0 ? normalizedCandidatePaths : undefined,
 			});
+			if (applySeq !== requestSeqRef.current) return;
 
 			deriveAndStoreTargets(output, applyTargets);
 
@@ -197,6 +203,8 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 				output,
 			});
 		} catch (error) {
+			if (applySeq !== requestSeqRef.current) return;
+
 			setState({
 				status: 'blocked',
 				error: getErrorMessage(error),
@@ -211,17 +219,24 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 	const icon = getButtonIcon(state.status);
 
 	const canMainApply = state.status === 'ready';
-
+	const canOpenModalFromMain = state.status === 'needs-info' || state.status === 'blocked';
 	return (
 		<>
 			<div className="join">
 				<button
 					type="button"
 					className={getPrimaryButtonClassName(state.status)}
-					disabled={!canMainApply || state.status === 'checking' || state.status === 'applying'}
+					disabled={
+						(!canMainApply && !canOpenModalFromMain) || state.status === 'checking' || state.status === 'applying'
+					}
 					onClick={() => {
-						if (!canMainApply) return;
-						void runApply(fileTargets, strict);
+						if (canMainApply) {
+							void runApply(fileTargets, strict);
+							return;
+						}
+						if (canOpenModalFromMain) {
+							setIsEditOpen(true);
+						}
 					}}
 					title={title}
 				>
@@ -249,7 +264,6 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 				onClose={() => {
 					setIsEditOpen(false);
 				}}
-				diffText={diffText}
 				fallbackParsed={fallbackParsed}
 				output={state.output}
 				error={state.error}
@@ -275,7 +289,6 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 interface DiffApplyModalProps {
 	isOpen: boolean;
 	onClose: () => void;
-	diffText: string;
 	fallbackParsed: ReturnType<typeof parseUnifiedDiffForUI>;
 	output?: ApplyUnifiedDiffOut;
 	error?: string;
@@ -356,6 +369,7 @@ function DiffApplyModal({
 	const diagnostics = uniqueStrings([...collectOutputDiagnostics(output), ...(fallbackParsed.diagnostics ?? [])]);
 	const missingCount = localTargets.filter(target => !target.targetPath.trim()).length;
 	const canApplyFromModal = missingCount === 0 && !isRunning;
+	const hasAnyTargets = localTargets.length > 0;
 
 	const updateTarget = (index: number, targetPath: string) => {
 		setLocalTargets(prev =>
@@ -372,6 +386,7 @@ function DiffApplyModal({
 	};
 
 	const handleDryRun = async () => {
+		if (isRunning) return;
 		setIsRunning(true);
 		try {
 			onStrictChange(localStrict);
@@ -382,6 +397,8 @@ function DiffApplyModal({
 	};
 
 	const handleApply = async () => {
+		if (isRunning || !canApplyFromModal) return;
+
 		setIsRunning(true);
 		try {
 			onStrictChange(localStrict);
@@ -455,6 +472,11 @@ function DiffApplyModal({
 					</div>
 
 					<div className="space-y-4">
+						{!hasAnyTargets ? (
+							<div className="bg-base-100 border-base-300 rounded-xl border p-4 text-sm">
+								No file target information could be extracted. Try a dry run, or provide a complete unified diff.
+							</div>
+						) : null}
 						{localTargets.map((target, index) => {
 							const missing = !target.targetPath.trim();
 							const inputId = `diff-apply-target-${target.fileKey ?? index}`;
@@ -483,7 +505,19 @@ function DiffApplyModal({
 									</div>
 
 									{target.message ? <div className="text-base-content/70 mb-2 text-xs">{target.message}</div> : null}
-
+									<div className="mb-2 flex flex-wrap gap-1 text-xs">
+										{typeof target.hunks === 'number' ? (
+											<span className="badge badge-ghost">
+												{target.hunks} hunk{target.hunks === 1 ? '' : 's'}
+											</span>
+										) : null}
+										{typeof target.addedLines === 'number' ? (
+											<span className="badge badge-ghost">+{target.addedLines}</span>
+										) : null}
+										{typeof target.deletedLines === 'number' ? (
+											<span className="badge badge-ghost">-{target.deletedLines}</span>
+										) : null}
+									</div>
 									<label className="mb-1 block text-sm font-semibold" htmlFor={inputId}>
 										Target file path
 									</label>
@@ -638,7 +672,7 @@ function getButtonIcon(status: ControlStatus) {
 }
 
 function getPrimaryButtonClassName(status: ControlStatus): string {
-	const base = 'btn btn-xs join-item shadow-none';
+	const base = 'btn btn-xs join-item shadow-none rounded-sm';
 
 	switch (status) {
 		case 'ready':
@@ -678,7 +712,8 @@ function uniqueStrings(values: Array<string | undefined | null>): string[] {
 		const trimmed = value?.trim();
 		if (!trimmed) continue;
 
-		const key = trimmed.replaceAll('\\', '/').replace(/\/+/g, '/').toLowerCase();
+		const key = trimmed.replaceAll('\\', '/').replace(/\/+/g, '/');
+
 		if (seen.has(key)) continue;
 
 		seen.add(key);

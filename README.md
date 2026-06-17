@@ -50,7 +50,7 @@ Good first workflows:
 
 FlexiGPT does not bill you directly. Usage costs and limits come from the provider account behind the key you configure.
 
-FlexiGPT does not proxy normal LLM calls through a FlexiGPT-hosted service. Requests go directly to the provider or compatible endpoint you configure.
+FlexiGPT does not proxy LLM calls through a FlexiGPT-hosted service. Requests go directly to the provider or endpoint you configure.
 
 ## Screenshots
 
@@ -70,8 +70,8 @@ FlexiGPT does not proxy normal LLM calls through a FlexiGPT-hosted service. Requ
 
 ### Provider-independent model choices with built-in presets
 
-- Built-in support for OpenAI, Anthropic, Google Gemini API, xAI, Mistral, Hugging Face, OpenRouter, and local `llama.cpp`.
-- Compatible custom endpoints across OpenAI Chat Completions, OpenAI Responses, Anthropic Messages, and Google GenerateContent style APIs.
+- Built-in support for OpenAI, Anthropic, Google Gemini, xAI, Mistral, Hugging Face, OpenRouter, and local `llama.cpp`.
+- Custom endpoints across OpenAI Chat Completions, OpenAI Responses, Anthropic Messages, and Google GenerateContent-style APIs.
 - Curated built-in providers and model presets so you can start quickly without manually defining endpoints or defaults first.
 - API keys are stored securely through the OS keyring, not in plain-text exported settings.
 

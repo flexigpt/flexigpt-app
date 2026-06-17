@@ -33,9 +33,15 @@ export function looksLikeUnifiedDiff(value: string, language = ''): boolean {
 	if (isUnifiedDiffLanguage(language)) return true;
 	if (/^diff --git\s+/m.test(text)) return true;
 	if (/^Index:\s+/m.test(text)) return true;
-	if (/^@@\s*-?\d+(?:,\d+)?\s*\+?\d+(?:,\d+)?\s*@@/m.test(text)) return true;
+	const hasPlainFileHeader = /^---\s+/m.test(text) && /^\+\+\+\s+/m.test(text);
+	if (hasPlainFileHeader) return true;
 
-	return /^---\s+/m.test(text) && /^\+\+\+\s+/m.test(text);
+	const hasHunkHeader = /^@@\s*-?\d+(?:,\d+)?\s*\+?\d+(?:,\d+)?\s*@@/m.test(text);
+	if (!hasHunkHeader) return false;
+
+	// Let hunk-only LLM diffs through, but avoid showing the apply UI for
+	// arbitrary code snippets that merely contain an @@ marker.
+	return /^(?:\+[^+\n]|-[^-\n]| [^\n])/m.test(text);
 }
 
 export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifiedDiffForUI {
@@ -396,7 +402,8 @@ function uniqueStrings(values: Array<string | undefined | null>): string[] {
 		const trimmed = value?.trim();
 		if (!trimmed) continue;
 
-		const key = trimmed.replaceAll('\\', '/').replace(/\/+/g, '/').toLowerCase();
+		const key = trimmed.replaceAll('\\', '/').replace(/\/+/g, '/');
+
 		if (seen.has(key)) continue;
 
 		seen.add(key);

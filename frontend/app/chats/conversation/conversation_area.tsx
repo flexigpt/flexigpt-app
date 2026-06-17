@@ -27,6 +27,8 @@ import { ChatMessage } from '@/chats/messages/message';
 import type { ChatTabState } from '@/chats/tabs/tabs_model';
 
 const EMPTY_MESSAGES: ConversationMessage[] = [];
+const MAX_DIFF_CANDIDATE_PATHS = 2048;
+
 function getLocalAttachmentPath(attachment: Attachment): string {
 	return (
 		attachment.fileRef?.origPath ||
@@ -39,7 +41,7 @@ function getLocalAttachmentPath(attachment: Attachment): string {
 }
 
 function normalizeCandidatePathKey(path: string): string {
-	return path.trim().replaceAll('\\', '/').replace(/\/+/g, '/').toLowerCase();
+	return path.trim().replaceAll('\\', '/').replace(/\/+/g, '/');
 }
 
 function buildDiffCandidatePathsByMessageID(messages: ConversationMessage[]): Map<string, string[]> {
@@ -52,6 +54,8 @@ function buildDiffCandidatePathsByMessageID(messages: ConversationMessage[]): Ma
 		let next = cumulative;
 
 		for (const attachment of message.attachments ?? []) {
+			if (next.length >= MAX_DIFF_CANDIDATE_PATHS) break;
+
 			const path = getLocalAttachmentPath(attachment).trim();
 			if (!path) continue;
 
