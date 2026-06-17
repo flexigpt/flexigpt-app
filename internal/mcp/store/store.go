@@ -1188,7 +1188,6 @@ func findUserServer(
 	return "", spec.MCPServerConfig{}, false
 }
 
-//nolint:gocritic // page results are large.
 func parseBundleListPage(req *spec.ListMCPBundlesRequest) (
 	pageSize int,
 	cursorAt time.Time,

@@ -105,6 +105,10 @@ var LLMToolsGoBuiltinCatalog = map[string]LLMToolMeta{
 		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsText),
 		AutoExecReco: false,
 	},
+	"github.com/flexigpt/llmtools-go/texttool/applyunifieddiff.ApplyUnifiedDiff": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsText),
+		AutoExecReco: false,
+	},
 }
 
 func RegisterOutputsToolUsingDefaultGoRegistry[T any](

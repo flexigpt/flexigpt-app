@@ -138,3 +138,11 @@ func DeleteText(ctx context.Context, args texttool.DeleteTextArgs) (*texttool.De
 	}
 	return t.DeleteText(ctx, args)
 }
+
+func ApplyUnifiedDiff(ctx context.Context, args texttool.ApplyUnifiedDiffArgs) (*texttool.ApplyUnifiedDiffOut, error) {
+	t, err := texttool.NewTextTool()
+	if err != nil || t == nil {
+		return nil, err
+	}
+	return t.ApplyUnifiedDiff(ctx, args)
+}
