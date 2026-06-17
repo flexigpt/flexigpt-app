@@ -104,23 +104,26 @@ export function CodeBlock({ language, value, isBusy, hideMermaidCode, diffCandid
 		<>
 			<div className="bg-code my-4 items-start overflow-hidden rounded-lg">
 				<div className="bg-code-header flex items-center justify-between px-4">
-					<span
-						className={`flex items-center gap-1 text-sm ${
-							hasMermaidSyntaxError ? 'text-error' : 'text-code capitalize'
-						}`}
-						title={headerTitle}
-					>
-						{hasMermaidSyntaxError && <FiAlertTriangle aria-hidden="true" size={14} />}
-						{headerLabel}
-					</span>
+					<div className="flex items-center gap-2 text-xs" title={headerTitle}>
+						<span
+							className={`inline-flex shrink-0 items-center gap-1 leading-none ${
+								hasMermaidSyntaxError ? 'text-error' : 'text-code capitalize'
+							}`}
+						>
+							{hasMermaidSyntaxError ? (
+								<FiAlertTriangle aria-hidden="true" size={14} className="block shrink-0" />
+							) : null}
+							<span className="leading-none">{headerLabel}</span>
+						</span>
 
-					<div className="flex items-center space-x-2">
 						<DiffApplyControl
 							language={language}
 							diffText={value}
 							isBusy={isBusy}
 							candidatePaths={diffCandidatePaths}
 						/>
+					</div>
+					<div className="flex items-center space-x-2">
 						<DownloadButton
 							language={language}
 							valueFetcher={fetchValue}

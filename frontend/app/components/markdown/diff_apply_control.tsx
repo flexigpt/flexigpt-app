@@ -4,7 +4,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
-import { FiAlertTriangle, FiCheck, FiEdit3, FiGitPullRequest, FiLoader, FiX } from 'react-icons/fi';
+import {
+	FiAlertTriangle,
+	FiCheckCircle,
+	FiChevronRight,
+	FiEye,
+	FiGitPullRequest,
+	FiInfo,
+	FiLoader,
+	FiX,
+} from 'react-icons/fi';
 
 import { type ApplyUnifiedDiffFileTarget, type ApplyUnifiedDiffOut, ApplyUnifiedDiffStatus } from '@/spec/unified_diff';
 
@@ -53,7 +62,7 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 	const [state, setState] = useState<DiffApplyState>({ status: 'idle' });
 	const [fileTargets, setFileTargets] = useState<ApplyUnifiedDiffFileTarget[]>([]);
 	const [strict, setStrict] = useState(false);
-	const [isEditOpen, setIsEditOpen] = useState(false);
+	const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
 	const requestSeqRef = useRef(0);
 
@@ -215,54 +224,56 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 	if (!isDiffLike || isBusy) return null;
 
 	const title = buildTitle(state, fallbackParsed);
+	const buttonTitle = getButtonTitle(state.status);
 	const label = getButtonLabel(state.status);
 	const icon = getButtonIcon(state.status);
 
 	const canMainApply = state.status === 'ready';
-	const canOpenModalFromMain = state.status === 'needs-info' || state.status === 'blocked';
+
 	return (
 		<>
-			<div className="join">
+			<div className="text-code flex items-center justify-between gap-2">
+				<FiChevronRight size={12} />
+				{canMainApply ? (
+					<div className="flex items-center gap-2">
+						<button
+							type="button"
+							className={getControlButtonClassName()}
+							onClick={() => {
+								setIsDetailsOpen(true);
+							}}
+							title="Open diff details"
+							aria-label="Open diff details"
+						>
+							<FiEye size={12} className="mb-0.5" />
+							<span className="leading-none">View Details</span>
+						</button>
+						<FiChevronRight size={12} />
+					</div>
+				) : null}
+
 				<button
 					type="button"
-					className={getPrimaryButtonClassName(state.status)}
-					disabled={
-						(!canMainApply && !canOpenModalFromMain) || state.status === 'checking' || state.status === 'applying'
-					}
+					className={getControlButtonClassName()}
+					disabled={state.status === 'idle' || state.status === 'checking' || state.status === 'applying'}
 					onClick={() => {
 						if (canMainApply) {
 							void runApply(fileTargets, strict);
 							return;
 						}
-						if (canOpenModalFromMain) {
-							setIsEditOpen(true);
-						}
+						setIsDetailsOpen(true);
 					}}
-					title={title}
+					title={`${buttonTitle}\n${title}`}
 				>
-					{icon}
+					<div className="mb-0.5">{icon}</div>
 					{label}
 				</button>
-
-				{state.status !== 'checking' && state.status !== 'applying' ? (
-					<button
-						type="button"
-						className="btn btn-xs text-code join-item border-none bg-transparent shadow-none hover:opacity-60"
-						onClick={() => {
-							setIsEditOpen(true);
-						}}
-						title="Edit diff apply info"
-						aria-label="Edit diff apply info"
-					>
-						<FiEdit3 size={14} />
-					</button>
-				) : null}
 			</div>
 
 			<DiffApplyModal
-				isOpen={isEditOpen}
+				isOpen={isDetailsOpen}
 				onClose={() => {
-					setIsEditOpen(false);
+					setIsDetailsOpen(false);
 				}}
 				fallbackParsed={fallbackParsed}
 				output={state.output}
@@ -505,7 +516,7 @@ function DiffApplyModal({
 									</div>
 
 									{target.message ? <div className="text-base-content/70 mb-2 text-xs">{target.message}</div> : null}
-									<div className="mb-2 flex flex-wrap gap-1 text-xs">
+									<div className="mb-2 flex flex-wrap gap-2 text-xs">
 										{typeof target.hunks === 'number' ? (
 											<span className="badge badge-ghost">
 												{target.hunks} hunk{target.hunks === 1 ? '' : 's'}
@@ -540,7 +551,7 @@ function DiffApplyModal({
 									) : null}
 
 									{candidates.length > 0 ? (
-										<div className="mt-2 flex flex-wrap gap-1">
+										<div className="mt-2 flex flex-wrap gap-2">
 											{candidates.slice(0, 18).map(candidate => (
 												<button
 													key={candidate}
@@ -640,7 +651,7 @@ function getButtonLabel(status: ControlStatus): string {
 		case 'needs-info':
 			return 'Need info';
 		case 'blocked':
-			return 'Cannot apply';
+			return 'Blocked';
 		case 'applying':
 			return 'Applying';
 		case 'applied':
@@ -652,6 +663,24 @@ function getButtonLabel(status: ControlStatus): string {
 	}
 }
 
+function getButtonTitle(status: ControlStatus): string {
+	switch (status) {
+		case 'checking':
+			return 'Checking unified diff';
+		case 'ready':
+			return 'Apply unified diff';
+		case 'needs-info':
+		case 'blocked':
+		case 'applied':
+		case 'already-applied':
+			return 'Open diff details';
+		case 'applying':
+			return 'Applying unified diff';
+		default:
+			return 'Preparing unified diff';
+	}
+}
+
 function getButtonIcon(status: ControlStatus) {
 	switch (status) {
 		case 'checking':
@@ -660,40 +689,25 @@ function getButtonIcon(status: ControlStatus) {
 		case 'ready':
 			return <FiGitPullRequest size={14} />;
 		case 'needs-info':
-			return <FiEdit3 size={14} />;
+			return <FiInfo size={14} />;
 		case 'blocked':
 			return <FiAlertTriangle size={14} />;
 		case 'applied':
 		case 'already-applied':
-			return <FiCheck size={14} />;
+			return <FiCheckCircle size={14} />;
 		default:
 			return <FiGitPullRequest size={14} />;
 	}
 }
 
-function getPrimaryButtonClassName(status: ControlStatus): string {
-	const base = 'btn btn-xs join-item shadow-none rounded-sm';
-
-	switch (status) {
-		case 'ready':
-		case 'applied':
-		case 'already-applied':
-			return `${base} btn-success`;
-		case 'needs-info':
-			return `${base} btn-warning`;
-		case 'blocked':
-			return `${base} btn-error`;
-		case 'applying':
-			return `${base} btn-info`;
-		case 'checking':
-		default:
-			return `${base} text-code border-none bg-transparent`;
-	}
+function getControlButtonClassName(): string {
+	return 'inline-flex items-center gap-1 leading-none whitespace-nowrap border-none bg-transparent shadow-none hover:opacity-60 disabled:bg-transparent disabled:opacity-50';
 }
 
 function buildTitle(state: DiffApplyState, fallbackParsed: ReturnType<typeof parseUnifiedDiffForUI>): string {
 	const output = state.output;
 	const parts = [
+		getButtonTitle(state.status),
 		summaryLabel(output, fallbackParsed),
 		state.error,
 		state.message,
