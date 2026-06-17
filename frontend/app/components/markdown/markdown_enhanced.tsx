@@ -57,6 +57,7 @@ interface EnhancedMarkdownProps {
 	isBusy?: boolean;
 	hideMermaidCode?: boolean;
 	hideH1Title?: boolean;
+	diffCandidatePaths?: string[];
 	onLinkClick?: (href: string, event: ReactMouseEvent<HTMLAnchorElement>) => boolean;
 }
 
@@ -68,6 +69,7 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 	isBusy = false,
 	hideMermaidCode = false,
 	hideH1Title = false,
+	diffCandidatePaths,
 	onLinkClick,
 }: EnhancedMarkdownProps) {
 	const processedText = useMemo(() => {
@@ -238,10 +240,18 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 					return <ThinkingFence detailsSummary={<span>Thinking</span>} text={value} />;
 				}
 
-				return <CodeBlock language={language} value={value} isBusy={isBusy} hideMermaidCode={hideMermaidCode} />;
+				return (
+					<CodeBlock
+						language={language}
+						value={value}
+						isBusy={isBusy}
+						hideMermaidCode={hideMermaidCode}
+						diffCandidatePaths={diffCandidatePaths}
+					/>
+				);
 			},
 		};
-	}, [align, hideH1Title, hideMermaidCode, isBusy, onLinkClick]);
+	}, [align, diffCandidatePaths, hideH1Title, hideMermaidCode, isBusy, onLinkClick]);
 
 	return (
 		<MdErrorBoundary source={processedText}>

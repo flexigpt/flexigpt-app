@@ -24,6 +24,7 @@ interface ChatMessageProps {
 	streamedThinking: string;
 	isBusy: boolean;
 	isEditing: boolean;
+	diffCandidatePaths?: string[];
 	onEdit: () => void;
 }
 
@@ -57,6 +58,7 @@ function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
 	if (prev.message.uiCitations !== next.message.uiCitations) return false;
 	if (prev.message.uiToolCalls !== next.message.uiToolCalls) return false;
 	if (prev.message.uiToolOutputs !== next.message.uiToolOutputs) return false;
+	if (prev.diffCandidatePaths !== next.diffCandidatePaths) return false;
 
 	if (prev.streamedText !== next.streamedText) return false;
 	if (prev.streamedThinking !== next.streamedThinking) return false;
@@ -75,6 +77,7 @@ export const ChatMessage = memo(function ChatMessage({
 	streamedThinking,
 	isBusy,
 	isEditing,
+	diffCandidatePaths,
 	onEdit,
 }: ChatMessageProps) {
 	const isUser = message.role === RoleEnum.User;
@@ -165,6 +168,7 @@ export const ChatMessage = memo(function ChatMessage({
 								isBusy={isBusy}
 								align={align}
 								renderAsMarkdown={renderMarkdown}
+								diffCandidatePaths={diffCandidatePaths}
 							/>
 							{/* Fallback for error-only messages with no text content */}
 							{!hasAnyContent && hasError && !isBusy && (

@@ -72,6 +72,7 @@ import type {
 } from '@/spec/skill';
 import type { HTTPToolImpl, Tool, ToolBundle, ToolImplType, ToolListItem, ToolStoreChoice } from '@/spec/tool';
 import type { InvokeGoOptions, InvokeHTTPOptions, InvokeToolResponse } from '@/spec/toolruntime';
+import type { ApplyUnifiedDiffArgs, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
 
 import type { JSONRawString, JSONSchema } from '@/lib/jsonschema_utils';
 
@@ -389,9 +390,11 @@ export interface IAttachmentsDropAPI {
 }
 
 export interface IAggregateAPI {
-	postProviderPreset(providerName: ProviderName, payload: PostProviderPresetPayload): Promise<void>;
+	applyUnifiedDiff(args: ApplyUnifiedDiffArgs): Promise<ApplyUnifiedDiffOut>;
 
+	postProviderPreset(providerName: ProviderName, payload: PostProviderPresetPayload): Promise<void>;
 	deleteProviderPreset(providerName: ProviderName): Promise<void>;
+
 	deleteAuthKey: (type: AuthKeyType, keyName: AuthKeyName) => Promise<void>;
 	setAuthKey: (type: AuthKeyType, keyName: AuthKeyName, secret: string) => Promise<void>;
 

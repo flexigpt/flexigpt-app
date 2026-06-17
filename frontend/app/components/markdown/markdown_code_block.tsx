@@ -6,6 +6,7 @@ import { useHighlight } from '@/hooks/use_highlight';
 
 import { CopyButton } from '@/components/copy_button';
 import { DownloadButton } from '@/components/download_button';
+import { DiffApplyControl } from '@/components/markdown/diff_apply_control';
 import { MermaidDiagram, type MermaidRenderStatus } from '@/components/markdown/mermaid_diagram_card';
 
 interface CodeProps {
@@ -13,6 +14,7 @@ interface CodeProps {
 	value: string;
 	isBusy: boolean;
 	hideMermaidCode: boolean;
+	diffCandidatePaths?: string[];
 }
 
 type MermaidResultState = {
@@ -28,7 +30,7 @@ type ExpansionOverrideState = {
 
 const getCodeBlockKey = (language: string, value: string) => `${language.toLowerCase()}\u0000${value}`;
 
-export function CodeBlock({ language, value, isBusy, hideMermaidCode }: CodeProps) {
+export function CodeBlock({ language, value, isBusy, hideMermaidCode, diffCandidatePaths }: CodeProps) {
 	const html = useHighlight(value, language);
 	const codeBodyId = useId();
 
@@ -113,6 +115,12 @@ export function CodeBlock({ language, value, isBusy, hideMermaidCode }: CodeProp
 					</span>
 
 					<div className="flex items-center space-x-2">
+						<DiffApplyControl
+							language={language}
+							diffText={value}
+							isBusy={isBusy}
+							candidatePaths={diffCandidatePaths}
+						/>
 						<DownloadButton
 							language={language}
 							valueFetcher={fetchValue}

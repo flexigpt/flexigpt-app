@@ -4,11 +4,13 @@ import type { MCPConversationContext } from '@/spec/mcp';
 import type { ModelPresetID, PostProviderPresetPayload } from '@/spec/modelpreset';
 import type { AuthKeyName, AuthKeyType } from '@/spec/setting';
 import type { ToolStoreChoice } from '@/spec/tool';
+import type { ApplyUnifiedDiffArgs, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
 
 import { ensureMakeID } from '@/lib/uuid_utils';
 
 import type { IAggregateAPI } from '@/apis/interface';
 import {
+	ApplyUnifiedDiff,
 	CancelCompletion,
 	DeleteAuthKey,
 	DeleteProviderPreset,
@@ -16,27 +18,13 @@ import {
 	PostProviderPreset,
 	SetAuthKey,
 } from '@/apis/wailsjs/go/main/AggregrateWrapper';
-import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
+import type { texttool as texttoolSpec, spec as wailsSpec } from '@/apis/wailsjs/go/models';
 import { EventsOff, EventsOn } from '@/apis/wailsjs/runtime/runtime';
 
 export class WailsAggregateAPI implements IAggregateAPI {
-	async deleteAuthKey(type: AuthKeyType, keyName: AuthKeyName): Promise<void> {
-		const r = {
-			Type: type,
-			KeyName: keyName,
-		};
-		await DeleteAuthKey(r as wailsSpec.DeleteAuthKeyRequest);
-	}
-
-	async setAuthKey(type: AuthKeyType, keyName: AuthKeyName, secret: string): Promise<void> {
-		const r = {
-			Type: type,
-			KeyName: keyName,
-			Body: {
-				secret: secret,
-			},
-		};
-		await SetAuthKey(r as wailsSpec.SetAuthKeyRequest);
+	async applyUnifiedDiff(args: ApplyUnifiedDiffArgs): Promise<ApplyUnifiedDiffOut> {
+		const resp = await ApplyUnifiedDiff(args as texttoolSpec.ApplyUnifiedDiffArgs);
+		return resp as ApplyUnifiedDiffOut;
 	}
 
 	async postProviderPreset(providerName: ProviderName, payload: PostProviderPresetPayload): Promise<void> {
@@ -54,6 +42,25 @@ export class WailsAggregateAPI implements IAggregateAPI {
 			ProviderName: providerName,
 		};
 		await DeleteProviderPreset(r as wailsSpec.DeleteProviderPresetRequest);
+	}
+
+	async deleteAuthKey(type: AuthKeyType, keyName: AuthKeyName): Promise<void> {
+		const r = {
+			Type: type,
+			KeyName: keyName,
+		};
+		await DeleteAuthKey(r as wailsSpec.DeleteAuthKeyRequest);
+	}
+
+	async setAuthKey(type: AuthKeyType, keyName: AuthKeyName, secret: string): Promise<void> {
+		const r = {
+			Type: type,
+			KeyName: keyName,
+			Body: {
+				secret: secret,
+			},
+		};
+		await SetAuthKey(r as wailsSpec.SetAuthKeyRequest);
 	}
 
 	// Need an eventflow for getting completion.

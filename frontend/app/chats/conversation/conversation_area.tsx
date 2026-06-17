@@ -2,6 +2,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 
 import { FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
+import type { Attachment } from '@/spec/attachment';
 import type { Conversation, ConversationMessage } from '@/spec/conversation';
 import { RoleEnum } from '@/spec/inference';
 
@@ -26,6 +27,52 @@ import { ChatMessage } from '@/chats/messages/message';
 import type { ChatTabState } from '@/chats/tabs/tabs_model';
 
 const EMPTY_MESSAGES: ConversationMessage[] = [];
+function getLocalAttachmentPath(attachment: Attachment): string {
+	return (
+		attachment.fileRef?.origPath ||
+		attachment.fileRef?.path ||
+		attachment.imageRef?.origPath ||
+		attachment.imageRef?.path ||
+		attachment.contentBlock?.filePath ||
+		''
+	);
+}
+
+function normalizeCandidatePathKey(path: string): string {
+	return path.trim().replaceAll('\\', '/').replace(/\/+/g, '/').toLowerCase();
+}
+
+function buildDiffCandidatePathsByMessageID(messages: ConversationMessage[]): Map<string, string[]> {
+	const byID = new Map<string, string[]>();
+	const seen = new Set<string>();
+	let cumulative: string[] = [];
+
+	for (let messageIndex = 0; messageIndex < messages.length; messageIndex += 1) {
+		const message = messages[messageIndex];
+		let next = cumulative;
+
+		for (const attachment of message.attachments ?? []) {
+			const path = getLocalAttachmentPath(attachment).trim();
+			if (!path) continue;
+
+			const key = normalizeCandidatePathKey(path);
+			if (!key || seen.has(key)) continue;
+
+			seen.add(key);
+
+			if (next === cumulative) {
+				next = [...cumulative];
+			}
+
+			next.push(path);
+		}
+
+		cumulative = next;
+		byID.set(message.id, cumulative);
+	}
+
+	return byID;
+}
 
 function StreamingLastMessage(props: {
 	message: ConversationMessage;
@@ -36,6 +83,7 @@ function StreamingLastMessage(props: {
 	getSnapshot: () => number;
 	getStreamText: () => string;
 	getStreamThinking: () => string;
+	diffCandidatePaths?: string[];
 }) {
 	useSyncExternalStore(props.subscribe, props.getSnapshot, () => 0);
 
@@ -45,11 +93,12 @@ function StreamingLastMessage(props: {
 	return (
 		<ChatMessage
 			message={props.message}
-			onEdit={props.onEdit}
 			streamedText={streamedText}
 			streamedThinking={streamedThinking}
 			isBusy={props.rowIsBusy}
 			isEditing={props.isEditing}
+			onEdit={props.onEdit}
+			diffCandidatePaths={props.diffCandidatePaths}
 		/>
 	);
 }
@@ -103,6 +152,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	const activeEditingMessageId = activeTab?.editingMessageId ?? null;
 	const messages = activeTab?.conversation?.messages ?? EMPTY_MESSAGES;
 	const messageCount = messages.length;
+	const diffCandidatePathsByMessageID = useMemo(() => buildDiffCandidatePathsByMessageID(messages), [messages]);
 
 	useEffect(() => {
 		tabsRef.current = tabs;
@@ -300,7 +350,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			const isLast = index === messageCount - 1;
 			const isAssistant = message.role === RoleEnum.Assistant;
 			const rowIsBusy = isLast && activeTabIsBusy && isAssistant;
-
+			const diffCandidatePaths = diffCandidatePathsByMessageID.get(message.id);
 			if (rowIsBusy) {
 				return (
 					<StreamingLastMessage
@@ -314,6 +364,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 						getSnapshot={getActiveStreamSnapshot}
 						getStreamText={getActiveStreamText}
 						getStreamThinking={getActiveStreamThinking}
+						diffCandidatePaths={diffCandidatePaths}
 					/>
 				);
 			}
@@ -328,6 +379,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 					onEdit={() => {
 						beginEditMessageForTab(activeTabId, message.id);
 					}}
+					diffCandidatePaths={diffCandidatePaths}
 				/>
 			);
 		},
@@ -336,6 +388,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			activeTabId,
 			activeTabIsBusy,
 			beginEditMessageForTab,
+			diffCandidatePathsByMessageID,
 			getActiveStreamSnapshot,
 			getActiveStreamText,
 			getActiveStreamThinking,

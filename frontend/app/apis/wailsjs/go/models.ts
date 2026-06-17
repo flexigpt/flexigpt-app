@@ -11237,3 +11237,171 @@ export namespace spec {
 
 }
 
+export namespace texttool {
+	
+	export class ApplyUnifiedDiffFileTarget {
+	    fileKey?: string;
+	    oldPath?: string;
+	    newPath?: string;
+	    targetPath: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApplyUnifiedDiffFileTarget(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.fileKey = source["fileKey"];
+	        this.oldPath = source["oldPath"];
+	        this.newPath = source["newPath"];
+	        this.targetPath = source["targetPath"];
+	    }
+	}
+	export class ApplyUnifiedDiffArgs {
+	    diffText: string;
+	    dryRun?: boolean;
+	    strict?: boolean;
+	    fileTargets?: ApplyUnifiedDiffFileTarget[];
+	    candidatePaths?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ApplyUnifiedDiffArgs(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.diffText = source["diffText"];
+	        this.dryRun = source["dryRun"];
+	        this.strict = source["strict"];
+	        this.fileTargets = this.convertValues(source["fileTargets"], ApplyUnifiedDiffFileTarget);
+	        this.candidatePaths = source["candidatePaths"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ApplyUnifiedDiffFileOut {
+	    ok: boolean;
+	    fileKey: string;
+	    oldPath?: string;
+	    newPath?: string;
+	    targetPath?: string;
+	    resolvedPath?: string;
+	    status: string;
+	    message?: string;
+	    candidatePaths?: string[];
+	    diagnostics?: string[];
+	    hunks: number;
+	    appliedHunks: number;
+	    alreadyAppliedHunks: number;
+	    addedLines: number;
+	    deletedLines: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApplyUnifiedDiffFileOut(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.fileKey = source["fileKey"];
+	        this.oldPath = source["oldPath"];
+	        this.newPath = source["newPath"];
+	        this.targetPath = source["targetPath"];
+	        this.resolvedPath = source["resolvedPath"];
+	        this.status = source["status"];
+	        this.message = source["message"];
+	        this.candidatePaths = source["candidatePaths"];
+	        this.diagnostics = source["diagnostics"];
+	        this.hunks = source["hunks"];
+	        this.appliedHunks = source["appliedHunks"];
+	        this.alreadyAppliedHunks = source["alreadyAppliedHunks"];
+	        this.addedLines = source["addedLines"];
+	        this.deletedLines = source["deletedLines"];
+	    }
+	}
+	
+	export class ApplyUnifiedDiffSummary {
+	    files: number;
+	    hunks: number;
+	    appliedHunks: number;
+	    alreadyAppliedHunks: number;
+	    addedLines: number;
+	    deletedLines: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApplyUnifiedDiffSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.files = source["files"];
+	        this.hunks = source["hunks"];
+	        this.appliedHunks = source["appliedHunks"];
+	        this.alreadyAppliedHunks = source["alreadyAppliedHunks"];
+	        this.addedLines = source["addedLines"];
+	        this.deletedLines = source["deletedLines"];
+	    }
+	}
+	export class ApplyUnifiedDiffOut {
+	    ok: boolean;
+	    dryRun: boolean;
+	    status: string;
+	    message?: string;
+	    diagnostics?: string[];
+	    summary: ApplyUnifiedDiffSummary;
+	    fileTargets?: ApplyUnifiedDiffFileTarget[];
+	    files?: ApplyUnifiedDiffFileOut[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ApplyUnifiedDiffOut(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.dryRun = source["dryRun"];
+	        this.status = source["status"];
+	        this.message = source["message"];
+	        this.diagnostics = source["diagnostics"];
+	        this.summary = this.convertValues(source["summary"], ApplyUnifiedDiffSummary);
+	        this.fileTargets = this.convertValues(source["fileTargets"], ApplyUnifiedDiffFileTarget);
+	        this.files = this.convertValues(source["files"], ApplyUnifiedDiffFileOut);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+

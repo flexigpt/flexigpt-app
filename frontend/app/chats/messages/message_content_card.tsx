@@ -12,6 +12,7 @@ interface MessageContentCardProps {
 	isBusy?: boolean;
 	align: string;
 	renderAsMarkdown?: boolean;
+	diffCandidatePaths?: string[];
 }
 
 function areEqual(prev: MessageContentCardProps, next: MessageContentCardProps) {
@@ -21,7 +22,8 @@ function areEqual(prev: MessageContentCardProps, next: MessageContentCardProps) 
 		prev.isStreaming === next.isStreaming &&
 		prev.isBusy === next.isBusy &&
 		prev.align === next.align &&
-		prev.renderAsMarkdown === next.renderAsMarkdown
+		prev.renderAsMarkdown === next.renderAsMarkdown &&
+		prev.diffCandidatePaths === next.diffCandidatePaths
 	);
 }
 
@@ -33,6 +35,7 @@ export const MessageContentCard = memo(function MessageContentCard({
 	isBusy = false,
 	align,
 	renderAsMarkdown = true,
+	diffCandidatePaths,
 }: MessageContentCardProps) {
 	const liveText = isStreaming ? streamedText : content;
 	// Backend already throttles few ms.
@@ -85,6 +88,7 @@ export const MessageContentCard = memo(function MessageContentCard({
 				text={textToRender}
 				align={align}
 				isBusy={renderBusy}
+				diffCandidatePaths={diffCandidatePaths}
 			/>
 			{isStreaming && (
 				<div className="flex items-center gap-2 p-0">

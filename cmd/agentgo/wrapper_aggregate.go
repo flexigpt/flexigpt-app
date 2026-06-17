@@ -12,8 +12,10 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
+	"github.com/flexigpt/llmtools-go/texttool"
 
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper"
+	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 
 	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
@@ -106,6 +108,17 @@ func InitAggregrateWrapper(
 
 func SetWrappedProviderAppContext(w *AggregrateWrapper, ctx context.Context) {
 	w.appContext = ctx
+}
+
+func (w *AggregrateWrapper) ApplyUnifiedDiff(
+	req *texttool.ApplyUnifiedDiffArgs,
+) (*texttool.ApplyUnifiedDiffOut, error) {
+	return middleware.WithRecoveryResp(func() (*texttool.ApplyUnifiedDiffOut, error) {
+		if req == nil {
+			return nil, errors.New("invalid arguments: nil request received")
+		}
+		return llmtoolsutil.ApplyUnifiedDiff(context.Background(), *req)
+	})
 }
 
 func (w *AggregrateWrapper) PostProviderPreset(
