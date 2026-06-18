@@ -2,9 +2,9 @@
 
 ## Laundry list
 
-- [ ] verify copy-existing-configuration behavior across MCP and other config types.
-- [ ] thinking fence scroll behaviour rectify
-- [ ] file wise separation in Diff UI apply.
+- [x] verify copy-existing-configuration behavior across MCP and other config types.
+- [x] thinking fence scroll behaviour rectify
+- [x] file wise separation in Diff UI apply.
 
 - [ ] Need more cleanup wrt shortcuts, input tips, shortcuts to add mcp skills etc.
 

@@ -2,9 +2,14 @@
 import {
 	type ApplyUnifiedDiffDiagnostic,
 	ApplyUnifiedDiffDiagnosticLevel,
-	type ApplyUnifiedDiffFileTarget,
 	type ApplyUnifiedDiffOut,
+	ApplyUnifiedDiffStatus,
 } from '@/spec/unified_diff';
+
+export interface DiffApplyRunOptions {
+	diffText?: string;
+	mergeOutput?: boolean;
+}
 
 interface ParsedUnifiedDiffFileForUI {
 	fileKey: string;
@@ -179,6 +184,7 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 			if (!/^@@\s+-\d+(?:,\d+)?\s+\+\d+(?:,\d+)?\s+@@/.test(line)) {
 				const d: ApplyUnifiedDiffDiagnostic = {
 					level: ApplyUnifiedDiffDiagnosticLevel.Error,
+					code: 'non_standard_hunk_header',
 					message: `Non-standard hunk header detected: ${line}`,
 				};
 				diagnostics.push(d);
@@ -321,17 +327,6 @@ export function buildEditableTargetsFromOutput(
 	return Array.from(byKey.values());
 }
 
-export function editableTargetsToFileTargets(targets: EditableUnifiedDiffTarget[]): ApplyUnifiedDiffFileTarget[] {
-	return targets
-		.map(target => ({
-			fileKey: target.fileKey?.trim() || undefined,
-			oldPath: target.oldPath?.trim() || undefined,
-			newPath: target.newPath?.trim() || undefined,
-			targetPath: target.targetPath.trim(),
-		}))
-		.filter(target => target.targetPath.length > 0);
-}
-
 export function summaryLabel(output: ApplyUnifiedDiffOut | undefined, fallback: ParsedUnifiedDiffForUI): string {
 	const summary = output?.summary;
 	if (summary) {
@@ -360,6 +355,28 @@ export function collectOutputDiagnostics(output?: ApplyUnifiedDiffOut): string[]
 	]);
 }
 
+export type HeaderButtonTone = 'neutral' | 'success' | 'warning' | 'error' | 'info';
+
+export interface DiagnosticSeverityCounts {
+	total: number;
+	error: number;
+	warning: number;
+	info: number;
+}
+
+export interface FileStatusCounts {
+	total: number;
+	applicable: number;
+	notApplicable: number;
+	blocked: number;
+	needsInfo: number;
+	conflict: number;
+	error: number;
+	applied: number;
+	alreadyApplied: number;
+	unknown: number;
+}
+
 export interface EditableUnifiedDiffTarget {
 	fileKey?: string;
 	oldPath?: string;
@@ -379,6 +396,80 @@ export interface EditableUnifiedDiffTarget {
 	alreadyAppliedHunks?: number;
 	addedLines?: number;
 	deletedLines?: number;
+}
+
+export function getHighestDiagnosticLevel(
+	diagnostics: ApplyUnifiedDiffDiagnostic[]
+): ApplyUnifiedDiffDiagnosticLevel | undefined {
+	if (diagnostics.some(diagnostic => diagnostic.level === ApplyUnifiedDiffDiagnosticLevel.Error)) {
+		return ApplyUnifiedDiffDiagnosticLevel.Error;
+	}
+
+	if (diagnostics.some(diagnostic => diagnostic.level === ApplyUnifiedDiffDiagnosticLevel.Warning)) {
+		return ApplyUnifiedDiffDiagnosticLevel.Warning;
+	}
+
+	if (diagnostics.some(diagnostic => diagnostic.level === ApplyUnifiedDiffDiagnosticLevel.Info)) {
+		return ApplyUnifiedDiffDiagnosticLevel.Info;
+	}
+
+	return undefined;
+}
+
+export function getDiagnosticSeverityCounts(diagnostics: ApplyUnifiedDiffDiagnostic[]): DiagnosticSeverityCounts {
+	const counts: DiagnosticSeverityCounts = {
+		total: diagnostics.length,
+		error: 0,
+		warning: 0,
+		info: 0,
+	};
+
+	for (const diagnostic of diagnostics) {
+		switch (diagnostic.level) {
+			case ApplyUnifiedDiffDiagnosticLevel.Error:
+				counts.error += 1;
+				break;
+			case ApplyUnifiedDiffDiagnosticLevel.Warning:
+				counts.warning += 1;
+				break;
+			case ApplyUnifiedDiffDiagnosticLevel.Info:
+			default:
+				counts.info += 1;
+				break;
+		}
+	}
+
+	return counts;
+}
+
+export function formatDiagnosticsTitle(diagnostics: ApplyUnifiedDiffDiagnostic[]): string {
+	const counts = getDiagnosticSeverityCounts(diagnostics);
+	if (counts.total === 0) return '';
+
+	const summary = [
+		counts.error > 0 ? `${counts.error} error${counts.error === 1 ? '' : 's'}` : undefined,
+		counts.warning > 0 ? `${counts.warning} warning${counts.warning === 1 ? '' : 's'}` : undefined,
+		counts.info > 0 ? `${counts.info} info` : undefined,
+	]
+		.filter(Boolean)
+		.join(', ');
+
+	const messages = diagnostics
+		.slice(0, 6)
+		.map(diagnostic => `${diagnostic.level}${diagnostic.code ? ` ${diagnostic.code}` : ''}: ${diagnostic.message}`);
+
+	if (diagnostics.length > 6) {
+		messages.push(`+${diagnostics.length - 6} more`);
+	}
+
+	return [`Patch diagnostics: ${summary}`, ...messages].join('\n');
+}
+
+export function getDiagnosticToneFromCounts(counts: DiagnosticSeverityCounts): HeaderButtonTone {
+	if (counts.error > 0) return 'error';
+	if (counts.warning > 0) return 'warning';
+	if (counts.info > 0) return 'info';
+	return 'neutral';
 }
 
 function mergeParsedUnifiedDiffFiles(files: ParsedUnifiedDiffFileForUI[]): ParsedUnifiedDiffFileForUI[] {
@@ -451,6 +542,100 @@ function getEditableTargetMapKey(target: EditableUnifiedDiffTarget, index: numbe
 	return getPatchFileIdentity(target) || target.fileKey || `target-${index}`;
 }
 
+export function haveSharedPathIdentity(left: Array<string | undefined>, right: Array<string | undefined>): boolean {
+	const leftSet = new Set(left.map(getPathIdentity).filter(Boolean));
+	if (leftSet.size === 0) return false;
+	return right.map(getPathIdentity).some(identity => !!identity && leftSet.has(identity));
+}
+
+export function buildFileStatusCounts(
+	output: ApplyUnifiedDiffOut | undefined,
+	fallbackParsed: ReturnType<typeof parseUnifiedDiffForUI>
+): FileStatusCounts {
+	const files = output?.files ?? [];
+	const total = Math.max(output?.summary?.files ?? 0, files.length, fallbackParsed.files.length);
+	const counts: FileStatusCounts = {
+		total,
+		applicable: 0,
+		notApplicable: 0,
+		blocked: 0,
+		needsInfo: 0,
+		conflict: 0,
+		error: 0,
+		applied: 0,
+		alreadyApplied: 0,
+		unknown: 0,
+	};
+
+	if (files.length === 0 && output) {
+		switch (output.status) {
+			case ApplyUnifiedDiffStatus.Applicable:
+				if (output.ok) {
+					counts.applicable = total;
+				} else {
+					counts.notApplicable = total;
+					counts.blocked = total;
+				}
+				break;
+			case ApplyUnifiedDiffStatus.Applied:
+				counts.applied = total;
+				break;
+			case ApplyUnifiedDiffStatus.AlreadyApplied:
+				counts.alreadyApplied = total;
+				break;
+			case ApplyUnifiedDiffStatus.NeedsInfo:
+				counts.needsInfo = total;
+				counts.blocked = total;
+				break;
+			case ApplyUnifiedDiffStatus.Conflict:
+				counts.conflict = total;
+				counts.blocked = total;
+				break;
+			case ApplyUnifiedDiffStatus.Error:
+			default:
+				counts.error = total;
+				counts.blocked = total;
+				break;
+		}
+	} else {
+		for (const file of files) {
+			switch (file.status) {
+				case ApplyUnifiedDiffStatus.Applicable:
+					if (file.ok) {
+						counts.applicable += 1;
+					} else {
+						counts.notApplicable += 1;
+						counts.blocked += 1;
+					}
+					break;
+				case ApplyUnifiedDiffStatus.Applied:
+					counts.applied += 1;
+					break;
+				case ApplyUnifiedDiffStatus.AlreadyApplied:
+					counts.alreadyApplied += 1;
+					break;
+				case ApplyUnifiedDiffStatus.NeedsInfo:
+					counts.needsInfo += 1;
+					counts.blocked += 1;
+					break;
+				case ApplyUnifiedDiffStatus.Conflict:
+					counts.conflict += 1;
+					counts.blocked += 1;
+					break;
+				case ApplyUnifiedDiffStatus.Error:
+				default:
+					counts.error += 1;
+					counts.blocked += 1;
+					break;
+			}
+		}
+
+		counts.unknown = Math.max(0, total - files.length);
+	}
+
+	return counts;
+}
+
 function mergeEditableTarget(
 	existing: EditableUnifiedDiffTarget | undefined,
 	update: EditableUnifiedDiffTarget
@@ -501,11 +686,11 @@ function mergeEditableTarget(
 		status: update.status ?? existing.status,
 		message: update.message ?? existing.message,
 		diagnostics: uniqueDiagnostics([...(existing.diagnostics ?? []), ...(update.diagnostics ?? [])]),
-		hunks: mergeNumericValue(existing.hunks, update.hunks),
-		appliedHunks: mergeNumericValue(existing.appliedHunks, update.appliedHunks),
-		alreadyAppliedHunks: mergeNumericValue(existing.alreadyAppliedHunks, update.alreadyAppliedHunks),
-		addedLines: mergeNumericValue(existing.addedLines, update.addedLines),
-		deletedLines: mergeNumericValue(existing.deletedLines, update.deletedLines),
+		hunks: mergeNumberMax(existing.hunks, update.hunks),
+		appliedHunks: mergeNumberMax(existing.appliedHunks, update.appliedHunks),
+		alreadyAppliedHunks: mergeNumberMax(existing.alreadyAppliedHunks, update.alreadyAppliedHunks),
+		addedLines: mergeNumberMax(existing.addedLines, update.addedLines),
+		deletedLines: mergeNumberMax(existing.deletedLines, update.deletedLines),
 	};
 }
 
@@ -538,7 +723,7 @@ export function uniqueDiagnostics(
 	return out;
 }
 
-function mergeNumericValue(left: number | undefined, right: number | undefined): number | undefined {
+export function mergeNumberMax(left: number | undefined, right: number | undefined): number | undefined {
 	if (typeof left === 'number' && typeof right === 'number') return Math.max(left, right);
 	if (typeof right === 'number') return right;
 	return left;
@@ -725,7 +910,7 @@ function uniqueStringsFromDiagnostics(values: Array<ApplyUnifiedDiffDiagnostic |
 	return out;
 }
 
-function uniqueStrings(values: Array<string | undefined | null>): string[] {
+export function uniqueStrings(values: Array<string | undefined | null>): string[] {
 	const out: string[] = [];
 	const seen = new Set<string>();
 
@@ -742,4 +927,19 @@ function uniqueStrings(values: Array<string | undefined | null>): string[] {
 	}
 
 	return out;
+}
+
+export function getPathIdentity(value: string | undefined | null): string {
+	const trimmed = value?.trim();
+	if (!trimmed || trimmed === '/dev/null') return '';
+
+	return trimmed
+		.replaceAll('\\', '/')
+		.replace(/\/+/g, '/')
+		.replace(/^(?:\.\/)+/, '');
+}
+
+export function getErrorMessage(error: unknown): string {
+	if (error instanceof Error && error.message.trim()) return error.message;
+	return 'Unexpected error while checking or applying unified diff.';
 }
