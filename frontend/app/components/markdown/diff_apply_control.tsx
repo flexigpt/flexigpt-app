@@ -660,7 +660,7 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 			<div className="text-code flex max-w-full min-w-0 items-center gap-1 overflow-hidden">
 				<button
 					type="button"
-					className={getControlButtonClassName(getHeaderDetailsTone(state.status, patchDiagnostics))}
+					className={getControlButtonClassName()}
 					onClick={() => {
 						setIsDetailsOpen(true);
 					}}

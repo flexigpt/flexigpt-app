@@ -181,14 +181,6 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 			file.hunks += 1;
 			inHunk = true;
 
-			if (!/^@@\s+-\d+(?:,\d+)?\s+\+\d+(?:,\d+)?\s+@@/.test(line)) {
-				const d: ApplyUnifiedDiffDiagnostic = {
-					level: ApplyUnifiedDiffDiagnosticLevel.Error,
-					code: 'non_standard_hunk_header',
-					message: `Non-standard hunk header detected: ${line}`,
-				};
-				diagnostics.push(d);
-			}
 			continue;
 		}
 

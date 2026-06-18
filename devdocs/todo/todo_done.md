@@ -1021,3 +1021,7 @@
 - [x] keep diff previews visible before the final apply action.
 - [x] add a small diff preview mode so edits can be reviewed before applying them.
 - [x] need UI cleanup of diff. more styling and better styling needed.
+
+- [x] verify copy-existing-configuration behavior across MCP and other config types.
+- [x] thinking fence scroll behaviour rectify
+- [x] file wise separation in Diff UI apply.

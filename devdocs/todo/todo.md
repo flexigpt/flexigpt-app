@@ -2,11 +2,9 @@
 
 ## Laundry list
 
-- [x] verify copy-existing-configuration behavior across MCP and other config types.
-- [x] thinking fence scroll behaviour rectify
-- [x] file wise separation in Diff UI apply.
-
-- [ ] Need more cleanup wrt shortcuts, input tips, shortcuts to add mcp skills etc.
+- [ ] Need more cleanup wrt shortcuts, input tips, shortcuts to add mcp, skills etc.
+- [ ] also need to update docs for mcp and diff render support.
+- [ ] Add diff out guidance to md sys prompt
 
 - [ ] need a file ops only assistant, may be add diff to other text things in assitants.
 
