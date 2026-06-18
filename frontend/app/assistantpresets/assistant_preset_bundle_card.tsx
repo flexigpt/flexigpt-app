@@ -9,6 +9,7 @@ import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal'
 
 import { AddEditAssistantPresetModal } from '@/assistantpresets/assistant_preset_add_edit_modal';
 import { AssistantPresetBundleDetailsModal } from '@/assistantpresets/assistant_preset_bundle_details_modal';
+import type { PresetItem } from '@/assistantpresets/lib/assistant_preset_editor_types';
 import {
 	type AssistantPresetUpsertInput,
 	formatAssistantPresetModelRef,
@@ -30,6 +31,7 @@ interface AssistantPresetBundleCardProps {
 		partial: AssistantPresetUpsertInput
 	) => Promise<void>;
 	onDeleteBundleRequested: (bundleID: string) => void;
+	copyablePresets: PresetItem[];
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -47,6 +49,7 @@ export function AssistantPresetBundleCard({
 	onDeletePreset,
 	onSubmitPreset,
 	onDeleteBundleRequested,
+	copyablePresets,
 }: AssistantPresetBundleCardProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
 
@@ -388,6 +391,7 @@ export function AssistantPresetBundleCard({
 					bundleID: bundle.id,
 					assistantPresetSlug: preset.slug,
 				}))}
+				copyablePresets={copyablePresets}
 			/>
 
 			<AssistantPresetBundleDetailsModal

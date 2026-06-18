@@ -1,4 +1,10 @@
-import type { ApplyUnifiedDiffFileTarget, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
+// unified diff parsing and target extraction helpers
+import {
+	type ApplyUnifiedDiffDiagnostic,
+	ApplyUnifiedDiffDiagnosticLevel,
+	type ApplyUnifiedDiffFileTarget,
+	type ApplyUnifiedDiffOut,
+} from '@/spec/unified_diff';
 
 interface ParsedUnifiedDiffFileForUI {
 	fileKey: string;
@@ -9,6 +15,19 @@ interface ParsedUnifiedDiffFileForUI {
 	deletedLines: number;
 	candidatePaths: string[];
 	targetPath?: string;
+	diffText?: string;
+	sectionKeys: string[];
+}
+
+interface WorkingParsedUnifiedDiffFileForUI extends Omit<ParsedUnifiedDiffFileForUI, 'diffText'> {
+	lines: string[];
+}
+
+export interface UnifiedDiffTextForTarget {
+	diffText: string;
+	hunks: number;
+	sectionKeys: string[];
+	verified: boolean;
 }
 
 export interface ParsedUnifiedDiffForUI {
@@ -17,7 +36,7 @@ export interface ParsedUnifiedDiffForUI {
 	hunks: number;
 	addedLines: number;
 	deletedLines: number;
-	diagnostics: string[];
+	diagnostics: ApplyUnifiedDiffDiagnostic[];
 }
 
 const DEV_NULL = '/dev/null';
@@ -51,17 +70,33 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 		.replace(/^\ufeff/, '');
 	const lines = text.split('\n');
 
-	const files: ParsedUnifiedDiffFileForUI[] = [];
-	const diagnostics: string[] = [];
+	const rawFiles: ParsedUnifiedDiffFileForUI[] = [];
+	const diagnostics: ApplyUnifiedDiffDiagnostic[] = [];
 
-	let current: ParsedUnifiedDiffFileForUI | null = null;
+	let current: WorkingParsedUnifiedDiffFileForUI | null = null;
 	let inHunk = false;
+
+	const createWorkingFile = (): WorkingParsedUnifiedDiffFileForUI => ({
+		fileKey: `file-${rawFiles.length + 1}`,
+		hunks: 0,
+		addedLines: 0,
+		deletedLines: 0,
+		candidatePaths: [],
+		sectionKeys: [],
+		lines: [],
+	});
 
 	const pushCurrent = () => {
 		if (!current) return;
 		if (current.oldPath || current.newPath || current.hunks > 0) {
-			current.candidatePaths = uniqueStrings(current.candidatePaths);
-			files.push(current);
+			const { lines: fileLines, ...file } = current;
+
+			rawFiles.push({
+				...file,
+				candidatePaths: uniqueStrings(file.candidatePaths),
+				diffText: fileLines.join('\n'),
+				sectionKeys: [file.fileKey],
+			});
 		}
 		current = null;
 		inHunk = false;
@@ -69,13 +104,7 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 
 	const ensureCurrent = () => {
 		if (!current) {
-			current = {
-				fileKey: `file-${files.length + 1}`,
-				hunks: 0,
-				addedLines: 0,
-				deletedLines: 0,
-				candidatePaths: [],
-			};
+			current = createWorkingFile();
 		}
 		return current;
 	};
@@ -94,14 +123,12 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 			const newPath = stripGitPathPrefix(normalizeDiffPathToken(second.token), 'b');
 
 			current = {
-				fileKey: `file-${files.length + 1}`,
+				...createWorkingFile(),
 				oldPath: oldPath || undefined,
 				newPath: newPath || undefined,
-				hunks: 0,
-				addedLines: 0,
-				deletedLines: 0,
 				candidatePaths: uniqueStrings([oldPath, newPath].filter(isUsablePatchPath)),
 			};
+			current.lines.push(line);
 			inHunk = false;
 			continue;
 		}
@@ -111,14 +138,12 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 
 			const p = normalizeDiffPathToken(line.slice('Index: '.length).trim());
 			current = {
-				fileKey: `file-${files.length + 1}`,
+				...createWorkingFile(),
 				oldPath: p || undefined,
 				newPath: p || undefined,
-				hunks: 0,
-				addedLines: 0,
-				deletedLines: 0,
 				candidatePaths: isUsablePatchPath(p) ? [p] : [],
 			};
+			current.lines.push(line);
 			inHunk = false;
 			continue;
 		}
@@ -126,24 +151,19 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 		if (line.startsWith('--- ') && i + 1 < lines.length && lines[i + 1].startsWith('+++ ')) {
 			if (!current || current.hunks > 0) {
 				pushCurrent();
-				current = {
-					fileKey: `file-${files.length + 1}`,
-					hunks: 0,
-					addedLines: 0,
-					deletedLines: 0,
-					candidatePaths: [],
-				};
+				current = createWorkingFile();
 			}
+
+			const file = ensureCurrent();
+			file.lines.push(line, lines[i + 1]);
 
 			const oldPathRaw = parseDiffHeaderPath(lines[i].slice(4));
 			const newPathRaw = parseDiffHeaderPath(lines[i + 1].slice(4));
 			const [oldPath, newPath] = normalizeUnifiedHeaderPair(oldPathRaw, newPathRaw);
 
-			current.oldPath = oldPath || undefined;
-			current.newPath = newPath || undefined;
-			current.candidatePaths = uniqueStrings(
-				[...(current.candidatePaths ?? []), oldPath, newPath].filter(isUsablePatchPath)
-			);
+			file.oldPath = oldPath || undefined;
+			file.newPath = newPath || undefined;
+			file.candidatePaths = uniqueStrings([...(file.candidatePaths ?? []), oldPath, newPath].filter(isUsablePatchPath));
 
 			i += 1;
 			inHunk = false;
@@ -152,13 +172,22 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 
 		if (line.startsWith('@@')) {
 			const file = ensureCurrent();
+			file.lines.push(line);
 			file.hunks += 1;
 			inHunk = true;
 
 			if (!/^@@\s+-\d+(?:,\d+)?\s+\+\d+(?:,\d+)?\s+@@/.test(line)) {
-				diagnostics.push(`Non-standard hunk header detected: ${line}`);
+				const d: ApplyUnifiedDiffDiagnostic = {
+					level: ApplyUnifiedDiffDiagnosticLevel.Error,
+					message: `Non-standard hunk header detected: ${line}`,
+				};
+				diagnostics.push(d);
 			}
 			continue;
+		}
+
+		if (current) {
+			current.lines.push(line);
 		}
 
 		if (inHunk && current) {
@@ -172,6 +201,8 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 
 	pushCurrent();
 
+	const files = mergeParsedUnifiedDiffFiles(rawFiles);
+
 	return {
 		isDiffLike: looksLikeUnifiedDiff(value, language),
 		files,
@@ -182,67 +213,97 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 	};
 }
 
+export function buildUnifiedDiffTextForTarget(
+	value: string,
+	language: string,
+	target: {
+		fileKey?: string;
+		oldPath?: string;
+		newPath?: string;
+		targetPath?: string;
+		sectionKeys?: string[];
+	}
+): UnifiedDiffTextForTarget | undefined {
+	const parsed = parseUnifiedDiffForUI(value, language);
+	let matches = parsed.files.filter(file => parsedFileMatchesTarget(file, target));
+
+	if (matches.length === 0 && parsed.files.length === 1) {
+		matches = parsed.files;
+	}
+
+	if (matches.length === 0) return undefined;
+
+	const diffText = joinUnifiedDiffTextParts(matches.map(file => file.diffText));
+	if (!diffText) return undefined;
+
+	const hunks = matches.reduce((sum, file) => sum + file.hunks, 0);
+	const detectedHunks = countHunkHeaders(diffText);
+
+	return {
+		diffText,
+		hunks,
+		sectionKeys: uniqueStrings(matches.flatMap(file => [file.fileKey, ...(file.sectionKeys ?? [])])),
+		verified: hunks === 0 || detectedHunks === hunks,
+	};
+}
+
 export function buildEditableTargetsFromOutput(
 	output: ApplyUnifiedDiffOut | undefined,
 	fallback: ParsedUnifiedDiffForUI
 ): EditableUnifiedDiffTarget[] {
 	const byKey = new Map<string, EditableUnifiedDiffTarget>();
 
-	for (const target of output?.fileTargets ?? []) {
-		const key = target.fileKey || `${target.oldPath ?? ''}\u0000${target.newPath ?? ''}\u0000${target.targetPath}`;
-		if (!key) continue;
+	const upsert = (target: EditableUnifiedDiffTarget) => {
+		upsertEditableTarget(byKey, target);
+	};
 
-		byKey.set(key, {
+	for (const file of fallback.files) {
+		upsert({
+			fileKey: file.fileKey,
+			oldPath: file.oldPath,
+			newPath: file.newPath,
+			targetPath: file.targetPath || '',
+			candidatePaths: uniqueStrings(file.candidatePaths),
+			hunks: file.hunks,
+			addedLines: file.addedLines,
+			deletedLines: file.deletedLines,
+			diffText: file.diffText,
+			sectionKeys: file.sectionKeys,
+		});
+	}
+
+	for (const target of output?.fileTargets ?? []) {
+		upsert({
 			fileKey: target.fileKey,
 			oldPath: target.oldPath,
 			newPath: target.newPath,
 			targetPath: target.targetPath,
-			candidatePaths: uniqueStrings([target.targetPath]),
+			candidatePaths: uniqueStrings([target.targetPath, target.newPath, target.oldPath].filter(isUsablePatchPath)),
 		});
 	}
 
 	for (const file of output?.files ?? []) {
-		const key = file.fileKey || `${file.oldPath ?? ''}\u0000${file.newPath ?? ''}`;
-
-		const existing = byKey.get(key);
-		const candidatePaths = uniqueStrings(
-			[
-				...(existing?.candidatePaths ?? []),
-				...(file.candidatePaths ?? []),
-				file.targetPath,
-				file.oldPath,
-				file.newPath,
-			].filter(isUsablePatchPath)
-		);
-
-		byKey.set(key, {
+		upsert({
 			fileKey: file.fileKey,
 			oldPath: file.oldPath,
 			newPath: file.newPath,
-			targetPath: existing?.targetPath || file.targetPath || '',
-			candidatePaths,
+			targetPath: file.targetPath || file.resolvedPath || '',
+			resolvedPath: file.resolvedPath,
+			candidatePaths: uniqueStrings(
+				[...(file.candidatePaths ?? []), file.targetPath, file.resolvedPath, file.oldPath, file.newPath].filter(
+					isUsablePatchPath
+				)
+			),
+			ok: file.ok,
 			status: file.status,
 			message: file.message,
-			diagnostics: file.diagnostics,
+			diagnostics: file.diagnostics ? file.diagnostics.map(d => ({ ...d })) : undefined,
 			hunks: file.hunks,
+			appliedHunks: file.appliedHunks,
+			alreadyAppliedHunks: file.alreadyAppliedHunks,
 			addedLines: file.addedLines,
 			deletedLines: file.deletedLines,
 		});
-	}
-
-	if (byKey.size === 0) {
-		for (const file of fallback.files) {
-			byKey.set(file.fileKey, {
-				fileKey: file.fileKey,
-				oldPath: file.oldPath,
-				newPath: file.newPath,
-				targetPath: file.targetPath || '',
-				candidatePaths: uniqueStrings(file.candidatePaths),
-				hunks: file.hunks,
-				addedLines: file.addedLines,
-				deletedLines: file.deletedLines,
-			});
-		}
 	}
 
 	if (byKey.size === 0) {
@@ -250,6 +311,7 @@ export function buildEditableTargetsFromOutput(
 			fileKey: 'file-1',
 			targetPath: '',
 			candidatePaths: [],
+			sectionKeys: ['file-1'],
 			hunks: 0,
 			addedLines: 0,
 			deletedLines: 0,
@@ -283,12 +345,18 @@ export function summaryLabel(output: ApplyUnifiedDiffOut | undefined, fallback: 
 	}, +${fallback.addedLines}/-${fallback.deletedLines}`;
 }
 
-export function collectOutputDiagnostics(output?: ApplyUnifiedDiffOut): string[] {
-	if (!output) return [];
+export function collectPatchLevelDiagnostics(output?: ApplyUnifiedDiffOut): ApplyUnifiedDiffDiagnostic[] {
+	return uniqueDiagnostics(output?.diagnostics ?? []);
+}
 
-	return uniqueStrings([
-		...(output.diagnostics ?? []),
-		...(output.files ?? []).flatMap(file => file.diagnostics ?? []),
+export function collectFileLevelDiagnostics(output?: ApplyUnifiedDiffOut): ApplyUnifiedDiffDiagnostic[] {
+	return uniqueDiagnostics((output?.files ?? []).flatMap(file => file.diagnostics ?? []));
+}
+
+export function collectOutputDiagnostics(output?: ApplyUnifiedDiffOut): string[] {
+	return uniqueStringsFromDiagnostics([
+		...collectPatchLevelDiagnostics(output),
+		...collectFileLevelDiagnostics(output),
 	]);
 }
 
@@ -297,14 +365,258 @@ export interface EditableUnifiedDiffTarget {
 	oldPath?: string;
 	newPath?: string;
 	targetPath: string;
+	resolvedPath?: string;
 	candidatePaths: string[];
+	diffText?: string;
+	sectionKeys?: string[];
 
+	ok?: boolean;
 	status?: string;
 	message?: string;
-	diagnostics?: string[];
+	diagnostics?: ApplyUnifiedDiffDiagnostic[];
 	hunks?: number;
+	appliedHunks?: number;
+	alreadyAppliedHunks?: number;
 	addedLines?: number;
 	deletedLines?: number;
+}
+
+function mergeParsedUnifiedDiffFiles(files: ParsedUnifiedDiffFileForUI[]): ParsedUnifiedDiffFileForUI[] {
+	const out: ParsedUnifiedDiffFileForUI[] = [];
+	const byIdentity = new Map<string, ParsedUnifiedDiffFileForUI>();
+
+	for (const file of files) {
+		const identity = getPatchFileIdentity(file) || `section:${file.fileKey}`;
+		const existing = byIdentity.get(identity);
+
+		if (!existing) {
+			const next: ParsedUnifiedDiffFileForUI = {
+				...file,
+				fileKey: `file-${out.length + 1}`,
+				candidatePaths: uniqueStrings(file.candidatePaths),
+				sectionKeys: uniqueStrings([file.fileKey, ...(file.sectionKeys ?? [])]),
+			};
+
+			byIdentity.set(identity, next);
+			out.push(next);
+			continue;
+		}
+
+		existing.oldPath = existing.oldPath || file.oldPath;
+		existing.newPath = existing.newPath || file.newPath;
+		existing.hunks += file.hunks;
+		existing.addedLines += file.addedLines;
+		existing.deletedLines += file.deletedLines;
+		existing.candidatePaths = uniqueStrings([...(existing.candidatePaths ?? []), ...(file.candidatePaths ?? [])]);
+		existing.sectionKeys = uniqueStrings([...(existing.sectionKeys ?? []), file.fileKey, ...(file.sectionKeys ?? [])]);
+		existing.diffText = joinUnifiedDiffTextParts([existing.diffText, file.diffText]);
+	}
+
+	return out;
+}
+
+function upsertEditableTarget(byKey: Map<string, EditableUnifiedDiffTarget>, target: EditableUnifiedDiffTarget) {
+	const existingKey = findEditableTargetMapKey(byKey, target);
+	const key = existingKey ?? getEditableTargetMapKey(target, byKey.size);
+	const existing = existingKey ? byKey.get(existingKey) : undefined;
+
+	byKey.set(key, mergeEditableTarget(existing, target));
+}
+
+function findEditableTargetMapKey(
+	byKey: Map<string, EditableUnifiedDiffTarget>,
+	target: EditableUnifiedDiffTarget
+): string | undefined {
+	const fileKey = target.fileKey?.trim();
+
+	if (fileKey) {
+		for (const [key, existing] of byKey.entries()) {
+			if (existing.fileKey === fileKey || existing.sectionKeys?.includes(fileKey)) {
+				return key;
+			}
+		}
+	}
+
+	const identity = getPatchFileIdentity(target);
+	if (!identity) return undefined;
+
+	for (const [key, existing] of byKey.entries()) {
+		if (getPatchFileIdentity(existing) === identity) return key;
+	}
+
+	return undefined;
+}
+
+function getEditableTargetMapKey(target: EditableUnifiedDiffTarget, index: number): string {
+	return getPatchFileIdentity(target) || target.fileKey || `target-${index}`;
+}
+
+function mergeEditableTarget(
+	existing: EditableUnifiedDiffTarget | undefined,
+	update: EditableUnifiedDiffTarget
+): EditableUnifiedDiffTarget {
+	if (!existing) {
+		return {
+			...update,
+			targetPath: update.targetPath || '',
+			candidatePaths: uniqueStrings([
+				...(update.candidatePaths ?? []),
+				update.targetPath,
+				update.resolvedPath,
+				update.newPath,
+				update.oldPath,
+			]),
+			sectionKeys: uniqueStrings([update.fileKey, ...(update.sectionKeys ?? [])]),
+		};
+	}
+
+	return {
+		...existing,
+		...update,
+		fileKey: existing.fileKey || update.fileKey,
+		oldPath: update.oldPath || existing.oldPath,
+		newPath: update.newPath || existing.newPath,
+		targetPath: update.targetPath || existing.targetPath || '',
+		resolvedPath: update.resolvedPath || existing.resolvedPath,
+		candidatePaths: uniqueStrings([
+			...(existing.candidatePaths ?? []),
+			...(update.candidatePaths ?? []),
+			existing.targetPath,
+			update.targetPath,
+			existing.resolvedPath,
+			update.resolvedPath,
+			update.newPath,
+			update.oldPath,
+			existing.newPath,
+			existing.oldPath,
+		]),
+		diffText: update.diffText || existing.diffText,
+		sectionKeys: uniqueStrings([
+			...(existing.sectionKeys ?? []),
+			existing.fileKey,
+			update.fileKey,
+			...(update.sectionKeys ?? []),
+		]),
+		ok: update.ok ?? existing.ok,
+		status: update.status ?? existing.status,
+		message: update.message ?? existing.message,
+		diagnostics: uniqueDiagnostics([...(existing.diagnostics ?? []), ...(update.diagnostics ?? [])]),
+		hunks: mergeNumericValue(existing.hunks, update.hunks),
+		appliedHunks: mergeNumericValue(existing.appliedHunks, update.appliedHunks),
+		alreadyAppliedHunks: mergeNumericValue(existing.alreadyAppliedHunks, update.alreadyAppliedHunks),
+		addedLines: mergeNumericValue(existing.addedLines, update.addedLines),
+		deletedLines: mergeNumericValue(existing.deletedLines, update.deletedLines),
+	};
+}
+
+export function uniqueDiagnostics(
+	values: Array<ApplyUnifiedDiffDiagnostic | undefined | null>
+): ApplyUnifiedDiffDiagnostic[] {
+	const out: ApplyUnifiedDiffDiagnostic[] = [];
+	const seen = new Set<string>();
+
+	for (const value of values) {
+		if (!value) continue;
+
+		const message = value.message.trim();
+		if (!message) continue;
+
+		const level = value.level ?? ApplyUnifiedDiffDiagnosticLevel.Info;
+		const code = value.code?.trim() ?? '';
+		const key = `${level}\u0000${code}\u0000${message.replaceAll('\\', '/').replace(/\/+/g, '/')}`;
+
+		if (seen.has(key)) continue;
+
+		seen.add(key);
+		out.push({
+			level,
+			code: code || undefined,
+			message,
+		});
+	}
+
+	return out;
+}
+
+function mergeNumericValue(left: number | undefined, right: number | undefined): number | undefined {
+	if (typeof left === 'number' && typeof right === 'number') return Math.max(left, right);
+	if (typeof right === 'number') return right;
+	return left;
+}
+
+function parsedFileMatchesTarget(
+	file: ParsedUnifiedDiffFileForUI,
+	target: {
+		fileKey?: string;
+		oldPath?: string;
+		newPath?: string;
+		targetPath?: string;
+		sectionKeys?: string[];
+	}
+): boolean {
+	const targetFileKey = target.fileKey?.trim();
+
+	if (targetFileKey && (file.fileKey === targetFileKey || file.sectionKeys.includes(targetFileKey))) {
+		return true;
+	}
+
+	const targetSectionKeys = uniqueStrings([targetFileKey, ...(target.sectionKeys ?? [])]);
+	if (targetSectionKeys.length > 0) {
+		const fileSectionKeys = uniqueStrings([file.fileKey, ...(file.sectionKeys ?? [])]);
+		if (targetSectionKeys.some(key => fileSectionKeys.includes(key))) {
+			return true;
+		}
+	}
+
+	const targetIdentity = getPatchFileIdentity(target);
+	if (targetIdentity && targetIdentity === getPatchFileIdentity(file)) return true;
+
+	const filePaths = uniqueStrings([file.targetPath, file.newPath, file.oldPath, ...file.candidatePaths]);
+	const targetPaths = uniqueStrings([target.targetPath, target.newPath, target.oldPath]);
+
+	return filePaths.some(filePath =>
+		targetPaths.some(targetPath => normalizePathKey(filePath) === normalizePathKey(targetPath))
+	);
+}
+
+function getPatchFileIdentity(file: {
+	targetPath?: string;
+	resolvedPath?: string;
+	oldPath?: string;
+	newPath?: string;
+}): string {
+	const targetPath = normalizePathKey(file.targetPath);
+	if (targetPath) return `path:${targetPath}`;
+
+	const resolvedPath = normalizePathKey(file.resolvedPath);
+	if (resolvedPath) return `path:${resolvedPath}`;
+
+	const newPath = normalizePathKey(file.newPath);
+	if (newPath) return `path:${newPath}`;
+
+	const oldPath = normalizePathKey(file.oldPath);
+	if (oldPath) return `path:${oldPath}`;
+
+	return '';
+}
+
+function joinUnifiedDiffTextParts(parts: Array<string | undefined>): string | undefined {
+	const normalized = parts.map(part => part?.replace(/\n+$/g, '')).filter((part): part is string => !!part);
+	if (normalized.length === 0) return undefined;
+	return normalized.join('\n');
+}
+
+function countHunkHeaders(diffText: string): number {
+	return diffText.split('\n').filter(line => line.startsWith('@@')).length;
+}
+
+function normalizePathKey(value: string | undefined): string {
+	if (!isUsablePatchPath(value)) return '';
+	return value
+		.trim()
+		.replaceAll('\\', '/')
+		.replace(/\/+/g, '/')
+		.replace(/^(?:\.\/)+/, '');
 }
 
 function parseDiffHeaderPath(input: string): string {
@@ -392,6 +704,25 @@ function stripGitPathPrefix(value: string, prefix: string): string {
 
 function isUsablePatchPath(value: unknown): value is string {
 	return typeof value === 'string' && value.trim().length > 0 && value.trim() !== DEV_NULL;
+}
+
+function uniqueStringsFromDiagnostics(values: Array<ApplyUnifiedDiffDiagnostic | undefined | null>): string[] {
+	const out: string[] = [];
+	const seen = new Set<string>();
+
+	for (const value of values) {
+		const trimmed = value?.message.trim();
+		if (!trimmed) continue;
+
+		const key = trimmed.replaceAll('\\', '/').replace(/\/+/g, '/');
+
+		if (seen.has(key)) continue;
+
+		seen.add(key);
+		out.push(trimmed);
+	}
+
+	return out;
 }
 
 function uniqueStrings(values: Array<string | undefined | null>): string[] {

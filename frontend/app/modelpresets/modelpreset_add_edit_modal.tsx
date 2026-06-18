@@ -382,6 +382,8 @@ function AddEditModelPresetModalContent({
 		return out;
 	}, [allModelPresets]);
 
+	const prefillKeys = useMemo(() => Object.keys(prefillSourceMap) as PrefillKey[], [prefillSourceMap]);
+
 	const prefillDropdownItems: Record<PrefillKey, { isEnabled: boolean; displayName: string }> = useMemo(() => {
 		const out: Record<PrefillKey, { isEnabled: boolean; displayName: string }> = {};
 		for (const [key, mp] of Object.entries(prefillSourceMap)) {
@@ -757,7 +759,8 @@ function AddEditModelPresetModalContent({
 											onClick={() => {
 												setPrefillMode(true);
 											}}
-											disabled={isSubmitting}
+											disabled={isSubmitting || prefillKeys.length === 0}
+											title={prefillKeys.length === 0 ? 'No existing model presets are available to copy.' : undefined}
 										>
 											<FiUpload size={14} />
 											<span className="ml-1">Copy Existing Preset</span>
@@ -768,15 +771,17 @@ function AddEditModelPresetModalContent({
 										<>
 											<Dropdown<PrefillKey>
 												dropdownItems={prefillDropdownItems}
+												orderedKeys={prefillKeys}
 												selectedKey={selectedPrefillKey ?? ('' as PrefillKey)}
 												onChange={key => {
 													setSelectedPrefillKey(key);
 													applyPrefill(key);
 													setPrefillMode(false);
 												}}
+												disabled={prefillKeys.length === 0}
 												filterDisabled={false}
 												title="Select model preset to copy"
-												getDisplayName={k => prefillDropdownItems[k].displayName}
+												getDisplayName={k => prefillDropdownItems[k]?.displayName ?? 'Select model preset to copy'}
 											/>
 											<button
 												type="button"

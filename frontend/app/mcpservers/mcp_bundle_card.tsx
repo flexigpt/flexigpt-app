@@ -53,6 +53,7 @@ interface MCPBundleCardProps {
 	bundle: MCPBundle;
 	servers: MCPServerConfig[];
 	existingServerIDs: string[];
+	prefillServers: MCPServerConfig[];
 	runtimeByServerID: Record<string, MCPServerRuntimeSnapshot | undefined>;
 	authHealthByServerID: Record<string, MCPAuthHealth | undefined>;
 
@@ -114,6 +115,7 @@ export function MCPBundleCard({
 	bundle,
 	servers,
 	existingServerIDs,
+	prefillServers,
 	runtimeByServerID,
 	authHealthByServerID,
 	onToggleBundleEnabled,
@@ -693,6 +695,7 @@ export function MCPBundleCard({
 				mode={serverModalMode}
 				initialData={serverToEdit}
 				existingServerIDs={existingServerIDs}
+				prefillServers={prefillServers}
 			/>
 
 			<MCPServerDetailsModal

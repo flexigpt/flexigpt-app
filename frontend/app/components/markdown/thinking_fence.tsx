@@ -1,4 +1,4 @@
-import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 interface ThinkingFenceProps {
 	/** Summary row content (label, spinner, etc) */
@@ -27,6 +27,13 @@ interface ThinkingFenceProps {
 	maxRows?: number; // defaults to 3 when streaming=true
 	autoScroll?: boolean; // defaults to true when streaming=true
 }
+
+const BOTTOM_EPSILON_PX = 1;
+
+function isAtBottom(el: HTMLElement) {
+	return el.scrollHeight - el.scrollTop - el.clientHeight <= BOTTOM_EPSILON_PX;
+}
+
 export function ThinkingFence({
 	detailsSummary,
 	text,
@@ -45,9 +52,45 @@ export function ThinkingFence({
 
 	const bodyRef = useRef<HTMLDivElement | null>(null);
 	const [streamHeightPx, setStreamHeightPx] = useState<number | undefined>(undefined);
+	const autoScrollPinnedRef = useRef(true);
+	const previousStreamingRef = useRef(streaming);
 
 	const effectiveMaxRows = streaming ? (typeof maxRows === 'number' && maxRows > 0 ? maxRows : 3) : undefined;
 	const effectiveAutoScroll = streaming ? (autoScroll ?? true) : false;
+
+	// A new streaming session starts pinned to bottom by default.
+	// If the user scrolls up, we stop autoscrolling until they manually
+	// reach the absolute bottom again.
+	useEffect(() => {
+		if (!streaming) {
+			autoScrollPinnedRef.current = true;
+			previousStreamingRef.current = false;
+			return;
+		}
+
+		if (!previousStreamingRef.current) {
+			autoScrollPinnedRef.current = true;
+		}
+
+		previousStreamingRef.current = true;
+	}, [streaming]);
+
+	useEffect(() => {
+		if (!streaming || !isOpen || !effectiveAutoScroll) return;
+
+		const el = bodyRef.current;
+		if (!el) return;
+
+		const handleScroll = () => {
+			autoScrollPinnedRef.current = isAtBottom(el);
+		};
+
+		el.addEventListener('scroll', handleScroll, { passive: true });
+		handleScroll();
+		return () => {
+			el.removeEventListener('scroll', handleScroll);
+		};
+	}, [streaming, isOpen, effectiveAutoScroll]);
 
 	const bodyContent = useMemo(() => {
 		if (children != null) return children;
@@ -75,8 +118,8 @@ export function ThinkingFence({
 		const desired = Math.min(Math.max(el.scrollHeight, oneRow), maxH);
 		setStreamHeightPx(desired);
 
-		if (effectiveAutoScroll) {
-			// Always snap to bottom while streaming.
+		if (effectiveAutoScroll && autoScrollPinnedRef.current) {
+			// Stay pinned only while the user has not scrolled away from bottom.
 			el.scrollTop = el.scrollHeight;
 		}
 	}, [bodyContent, streaming, effectiveMaxRows, effectiveAutoScroll, isOpen]);

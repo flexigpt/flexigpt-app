@@ -3,10 +3,15 @@
 ## Laundry list
 
 - [ ] verify copy-existing-configuration behavior across MCP and other config types.
+- [ ] thinking fence scroll behaviour rectify
+- [ ] file wise separation in Diff UI apply.
+
 - [ ] Need more cleanup wrt shortcuts, input tips, shortcuts to add mcp skills etc.
-- [ ] need a file ops only assistant
+
+- [ ] need a file ops only assistant, may be add diff to other text things in assitants.
 
 - [ ] better more inbuilt mcps. test enhanced mcp apps.
+
 - [ ] test web search etc and pending user args etc after bottom bar migration.
 - [ ] test with some skill that has scripts too
 

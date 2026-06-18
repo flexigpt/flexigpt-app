@@ -2,7 +2,7 @@ import { type SubmitEventHandler, useCallback, useEffect, useMemo, useRef, useSt
 
 import { createPortal } from 'react-dom';
 
-import { FiAlertCircle, FiHelpCircle, FiRefreshCw, FiX } from 'react-icons/fi';
+import { FiAlertCircle, FiHelpCircle, FiRefreshCw, FiUpload, FiX } from 'react-icons/fi';
 
 import type { AssistantPreset, AssistantPresetStartingModelPresetPatch } from '@/spec/assistantpreset';
 import type { JSONSchemaParam, OutputFormat, OutputParam } from '@/spec/inference';
@@ -59,6 +59,7 @@ interface AddEditAssistantPresetModalProps {
 	initialData?: PresetItem;
 	existingPresets: PresetItem[];
 	mode?: ModalMode;
+	copyablePresets?: PresetItem[];
 }
 
 type JSONParseResult = { ok: true; value: unknown } | { ok: false; error: string };
@@ -159,6 +160,10 @@ function getSuggestedNextVersion(initialData: PresetItem, existingPresets: Prese
 		initialData.preset.version,
 		existingPresets.filter(item => item.preset.slug === initialData.preset.slug).map(item => item.preset.version)
 	).suggested;
+}
+
+function buildAssistantPresetPrefillKey(item: PresetItem): string {
+	return `${item.bundleID}:${item.preset.id}:${item.preset.version}`;
 }
 
 function buildModelPatchSeedFormData(modelOption?: AssistantModelPresetOption): ModelPatchFormData {
@@ -477,6 +482,7 @@ function AddEditAssistantPresetModalContent({
 	initialData,
 	existingPresets,
 	mode,
+	copyablePresets,
 }: AddEditAssistantPresetModalProps) {
 	const effectiveMode: ModalMode = mode ?? (initialData ? 'edit' : 'add');
 	const isViewMode = effectiveMode === 'view';
@@ -494,6 +500,8 @@ function AddEditAssistantPresetModalContent({
 	const [nextInstructionKey, setNextInstructionKey] = useState('');
 	const [nextToolKey, setNextToolKey] = useState('');
 	const [nextSkillKey, setNextSkillKey] = useState('');
+	const [prefillMode, setPrefillMode] = useState(false);
+	const [selectedPrefillKey, setSelectedPrefillKey] = useState<string | null>(null);
 
 	const initialPresetID = initialData?.preset?.id;
 	const initialPresetSlug = initialData?.preset?.slug;
@@ -558,6 +566,27 @@ function AddEditAssistantPresetModalContent({
 		if (isUnmountingRef.current) return;
 		onClose();
 	}, [onClose]);
+
+	const prefillSourceMap = useMemo<Record<string, PresetItem>>(() => {
+		const sourceItems = copyablePresets ?? existingPresets;
+		return Object.fromEntries(sourceItems.map(item => [buildAssistantPresetPrefillKey(item), item] as const));
+	}, [copyablePresets, existingPresets]);
+
+	const prefillKeys = useMemo(() => Object.keys(prefillSourceMap), [prefillSourceMap]);
+
+	const prefillDropdownItems = useMemo<Record<string, { isEnabled: boolean; displayName: string }>>(
+		() =>
+			Object.fromEntries(
+				Object.entries(prefillSourceMap).map(([key, item]) => [
+					key,
+					{
+						isEnabled: true,
+						displayName: `${item.preset.displayName || item.preset.slug} — ${item.bundleID} (${item.preset.slug}@${item.preset.version})`,
+					},
+				])
+			),
+		[prefillSourceMap]
+	);
 
 	const modelPresetOptions = catalog?.modelPresetOptions ?? EMPTY_MODEL_OPTIONS;
 	const instructionOptions = catalog?.instructionTemplateOptions ?? EMPTY_INSTRUCTION_OPTIONS;
@@ -1223,6 +1252,25 @@ function AddEditAssistantPresetModalContent({
 		[updateFormData]
 	);
 
+	const applyPrefill = useCallback(
+		(key: string) => {
+			const source = prefillSourceMap[key];
+			if (!source) return;
+
+			updateFormData(prev => {
+				const copied = getInitialFormData(source, [], false);
+				return {
+					...copied,
+					slug: prev.slug,
+					version: prev.version,
+					isEnabled: true,
+				};
+			});
+			setSubmitError('');
+		},
+		[prefillSourceMap, updateFormData]
+	);
+
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = async e => {
 		e.preventDefault();
 		e.stopPropagation();
@@ -1359,6 +1407,65 @@ function AddEditAssistantPresetModalContent({
 									<FiRefreshCw size={14} />
 									<span className="ml-1">Retry</span>
 								</button>
+							</div>
+						)}
+
+						{effectiveMode === 'add' && (
+							<div className="grid grid-cols-12 items-center gap-2">
+								<label className="label col-span-3">
+									<span className="label-text text-sm">Prefill from Existing</span>
+								</label>
+
+								<div className="col-span-9 flex items-center gap-2">
+									{!prefillMode && (
+										<button
+											type="button"
+											className="btn btn-sm btn-ghost flex items-center rounded-xl"
+											onClick={() => {
+												setPrefillMode(true);
+											}}
+											disabled={prefillKeys.length === 0}
+											title={
+												prefillKeys.length === 0 ? 'No existing assistant presets are available to copy.' : undefined
+											}
+										>
+											<FiUpload size={14} />
+											<span className="ml-1">Copy Existing Preset</span>
+										</button>
+									)}
+
+									{prefillMode && (
+										<>
+											<Dropdown<string>
+												dropdownItems={prefillDropdownItems}
+												orderedKeys={prefillKeys}
+												selectedKey={selectedPrefillKey ?? ''}
+												onChange={key => {
+													setSelectedPrefillKey(key);
+													applyPrefill(key);
+													setPrefillMode(false);
+												}}
+												disabled={prefillKeys.length === 0}
+												filterDisabled={false}
+												title="Select assistant preset to copy"
+												getDisplayName={key =>
+													prefillDropdownItems[key]?.displayName ?? 'Select assistant preset to copy'
+												}
+											/>
+											<button
+												type="button"
+												className="btn btn-sm btn-ghost rounded-xl"
+												onClick={() => {
+													setPrefillMode(false);
+													setSelectedPrefillKey(null);
+												}}
+												title="Cancel prefill"
+											>
+												<FiX size={12} />
+											</button>
+										</>
+									)}
+								</div>
 							</div>
 						)}
 

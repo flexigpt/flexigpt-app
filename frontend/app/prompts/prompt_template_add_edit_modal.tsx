@@ -2,7 +2,7 @@ import { type ChangeEvent, type SubmitEventHandler, useEffect, useMemo, useRef, 
 
 import { createPortal } from 'react-dom';
 
-import { FiAlertCircle, FiHelpCircle, FiPlus, FiTrash2, FiX } from 'react-icons/fi';
+import { FiAlertCircle, FiHelpCircle, FiPlus, FiTrash2, FiUpload, FiX } from 'react-icons/fi';
 
 import {
 	type MessageBlock,
@@ -78,6 +78,10 @@ function getSuggestedNextVersion(initialData: TemplateItem, existingTemplates: T
 	).suggested;
 }
 
+function buildPromptTemplatePrefillKey(item: TemplateItem): string {
+	return `${item.bundleID}:${item.template.id}:${item.template.version}`;
+}
+
 function getInitialFormData(
 	initialData: TemplateItem | undefined,
 	existingTemplates: TemplateItem[],
@@ -128,6 +132,8 @@ function AddEditPromptTemplateModalContent({
 		getInitialFormData(initialData, existingTemplates, isEditMode)
 	);
 	const [errors, setErrors] = useState<ErrorState>({});
+	const [prefillMode, setPrefillMode] = useState(false);
+	const [selectedPrefillKey, setSelectedPrefillKey] = useState<string | null>(null);
 	const [submitError, setSubmitError] = useState('');
 
 	const initialTemplateId = initialData?.template?.id;
@@ -160,6 +166,26 @@ function AddEditPromptTemplateModalContent({
 		});
 		return obj;
 	}, []);
+
+	const prefillSourceMap = useMemo<Record<string, TemplateItem>>(() => {
+		return Object.fromEntries(existingTemplates.map(item => [buildPromptTemplatePrefillKey(item), item] as const));
+	}, [existingTemplates]);
+
+	const prefillKeys = useMemo(() => Object.keys(prefillSourceMap), [prefillSourceMap]);
+
+	const prefillDropdownItems = useMemo<Record<string, { isEnabled: boolean; displayName: string }>>(
+		() =>
+			Object.fromEntries(
+				Object.entries(prefillSourceMap).map(([key, item]) => [
+					key,
+					{
+						isEnabled: true,
+						displayName: `${item.template.displayName || item.template.slug} (${item.template.slug}@${item.template.version})`,
+					},
+				])
+			),
+		[prefillSourceMap]
+	);
 
 	const suggestedNextVersion = useMemo(() => {
 		if (!initialData) return DEFAULT_SEMVER;
@@ -326,6 +352,31 @@ function AddEditPromptTemplateModalContent({
 		}
 
 		return newErrs;
+	};
+
+	const applyPrefill = (key: string) => {
+		const source = prefillSourceMap[key];
+		if (!source) return;
+
+		const src = source.template;
+		const next: PromptTemplateFormData = {
+			displayName: src.displayName,
+			slug: formData.slug,
+			description: src.description ?? '',
+			tags: (src.tags ?? []).join(', '),
+			isEnabled: true,
+			version: formData.version,
+			blocks: src.blocks?.length
+				? src.blocks.map(block => ({ ...block, id: getUUIDv7() }))
+				: [{ id: getUUIDv7(), role: PromptRoleEnum.User, content: '' }],
+			variables: src.variables?.length ? src.variables.map(cloneVariable) : [],
+		};
+
+		setFormData(next);
+		setErrors(validateForm(next));
+		setSubmitError('');
+		setSelectedPrefillKey(key);
+		setPrefillMode(false);
 	};
 
 	const handleInput = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -517,6 +568,61 @@ function AddEditPromptTemplateModalContent({
 								<div className="flex items-center gap-2">
 									<FiAlertCircle size={14} />
 									<span>{submitError}</span>
+								</div>
+							</div>
+						)}
+
+						{effectiveMode === 'add' && (
+							<div className="grid grid-cols-12 items-center gap-2">
+								<label className="label col-span-3">
+									<span className="label-text text-sm">Prefill from Existing</span>
+								</label>
+
+								<div className="col-span-9 flex items-center gap-2">
+									{!prefillMode && (
+										<button
+											type="button"
+											className="btn btn-sm btn-ghost flex items-center rounded-xl"
+											onClick={() => {
+												setPrefillMode(true);
+											}}
+											disabled={prefillKeys.length === 0}
+											title={
+												prefillKeys.length === 0 ? 'No existing prompt templates are available to copy.' : undefined
+											}
+										>
+											<FiUpload size={14} />
+											<span className="ml-1">Copy Existing Template</span>
+										</button>
+									)}
+
+									{prefillMode && (
+										<>
+											<Dropdown<string>
+												dropdownItems={prefillDropdownItems}
+												orderedKeys={prefillKeys}
+												selectedKey={selectedPrefillKey ?? ''}
+												onChange={applyPrefill}
+												disabled={prefillKeys.length === 0}
+												filterDisabled={false}
+												title="Select prompt template to copy"
+												getDisplayName={key =>
+													prefillDropdownItems[key]?.displayName ?? 'Select prompt template to copy'
+												}
+											/>
+											<button
+												type="button"
+												className="btn btn-sm btn-ghost rounded-xl"
+												onClick={() => {
+													setPrefillMode(false);
+													setSelectedPrefillKey(null);
+												}}
+												title="Cancel prefill"
+											>
+												<FiX size={12} />
+											</button>
+										</>
+									)}
 								</div>
 							</div>
 						)}

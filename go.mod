@@ -9,7 +9,7 @@ require (
 	github.com/danielgtaylor/huma/v2 v2.38.0
 	github.com/flexigpt/agentskills-go v0.15.1
 	github.com/flexigpt/inference-go v0.20.4
-	github.com/flexigpt/llmtools-go v0.21.1
+	github.com/flexigpt/llmtools-go v0.21.2
 	github.com/flexigpt/mapstore-go v0.3.4
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/google/uuid v1.6.0

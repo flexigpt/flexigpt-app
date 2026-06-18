@@ -2,7 +2,7 @@ import { type ChangeEvent, type SubmitEventHandler, useEffect, useMemo, useRef, 
 
 import { createPortal } from 'react-dom';
 
-import { FiAlertCircle, FiAlertTriangle, FiHelpCircle, FiX } from 'react-icons/fi';
+import { FiAlertCircle, FiAlertTriangle, FiHelpCircle, FiUpload, FiX } from 'react-icons/fi';
 
 import { HTTPBodyOutputMode, type Tool, ToolImplType } from '@/spec/tool';
 
@@ -148,6 +148,10 @@ function buildInitialFormData(
 	};
 }
 
+function buildToolPrefillKey(item: ToolItem): string {
+	return `${item.bundleID}:${item.tool.id}:${item.tool.version}`;
+}
+
 function AddEditToolModalContent({
 	onClose,
 	onSubmit,
@@ -163,12 +167,39 @@ function AddEditToolModalContent({
 		buildInitialFormData(initialData, existingTools, isEditMode)
 	);
 	const [errors, setErrors] = useState<ErrorState>({});
+	const [prefillMode, setPrefillMode] = useState(false);
+	const [selectedPrefillKey, setSelectedPrefillKey] = useState<string | null>(null);
 	const [submitError, setSubmitError] = useState('');
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const displayNameInputRef = useRef<HTMLInputElement | null>(null);
 	const httpUrlInputRef = useRef<HTMLInputElement | null>(null);
 	const ignoreCloseRef = useRef(false);
+
+	const copyableTools = useMemo(
+		() => existingTools.filter(item => item.tool.type === ToolImplType.HTTP),
+		[existingTools]
+	);
+
+	const prefillSourceMap = useMemo<Record<string, ToolItem>>(() => {
+		return Object.fromEntries(copyableTools.map(item => [buildToolPrefillKey(item), item] as const));
+	}, [copyableTools]);
+
+	const prefillKeys = useMemo(() => Object.keys(prefillSourceMap), [prefillSourceMap]);
+
+	const prefillDropdownItems = useMemo<Record<string, { isEnabled: boolean; displayName: string }>>(
+		() =>
+			Object.fromEntries(
+				Object.entries(prefillSourceMap).map(([key, item]) => [
+					key,
+					{
+						isEnabled: true,
+						displayName: `${item.tool.displayName || item.tool.slug} (${item.tool.slug}@${item.tool.version})`,
+					},
+				])
+			),
+		[prefillSourceMap]
+	);
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
@@ -335,6 +366,25 @@ function AddEditToolModalContent({
 		}
 
 		return newErrs;
+	};
+
+	const applyPrefill = (key: string) => {
+		const source = prefillSourceMap[key];
+		if (!source) return;
+
+		const copied = buildInitialFormData(source, existingTools, false);
+		const next: ToolFormData = {
+			...copied,
+			slug: formData.slug,
+			version: formData.version,
+			isEnabled: true,
+		};
+
+		setFormData(next);
+		setErrors(validateForm(next));
+		setSubmitError('');
+		setSelectedPrefillKey(key);
+		setPrefillMode(false);
 	};
 
 	const handleInput = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -544,6 +594,61 @@ function AddEditToolModalContent({
 										network endpoints, run shell/script commands, or handle sensitive data unless the workflow is
 										explicitly designed for that risk.
 									</p>
+								</div>
+							</div>
+						)}
+
+						{effectiveMode === 'add' && (
+							<div className="grid grid-cols-12 items-center gap-2">
+								<label className="label col-span-3">
+									<span className="label-text text-sm">Prefill from Existing</span>
+								</label>
+
+								<div className="col-span-9 flex items-center gap-2">
+									{!prefillMode && (
+										<button
+											type="button"
+											className="btn btn-sm btn-ghost flex items-center rounded-xl"
+											onClick={() => {
+												setPrefillMode(true);
+											}}
+											disabled={prefillKeys.length === 0}
+											title={
+												prefillKeys.length === 0
+													? 'No HTTP tools are available to copy. Only HTTP tools can be created here.'
+													: undefined
+											}
+										>
+											<FiUpload size={14} />
+											<span className="ml-1">Copy Existing Tool</span>
+										</button>
+									)}
+
+									{prefillMode && (
+										<>
+											<Dropdown<string>
+												dropdownItems={prefillDropdownItems}
+												orderedKeys={prefillKeys}
+												selectedKey={selectedPrefillKey ?? ''}
+												onChange={applyPrefill}
+												disabled={prefillKeys.length === 0}
+												filterDisabled={false}
+												title="Select tool to copy"
+												getDisplayName={key => prefillDropdownItems[key]?.displayName ?? 'Select tool to copy'}
+											/>
+											<button
+												type="button"
+												className="btn btn-sm btn-ghost rounded-xl"
+												onClick={() => {
+													setPrefillMode(false);
+													setSelectedPrefillKey(null);
+												}}
+												title="Cancel prefill"
+											>
+												<FiX size={12} />
+											</button>
+										</>
+									)}
 								</div>
 							</div>
 						)}

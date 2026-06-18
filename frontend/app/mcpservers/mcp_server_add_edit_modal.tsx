@@ -2,7 +2,7 @@ import { type ChangeEvent, type SubmitEventHandler, useCallback, useEffect, useM
 
 import { createPortal } from 'react-dom';
 
-import { FiAlertCircle, FiHelpCircle, FiPlus, FiTrash2, FiX } from 'react-icons/fi';
+import { FiAlertCircle, FiHelpCircle, FiPlus, FiTrash2, FiUpload, FiX } from 'react-icons/fi';
 
 import {
 	MCPApprovalRule,
@@ -91,6 +91,7 @@ interface AddEditMCPServerModalProps {
 	onSubmit: (serverData: MCPServerUpsertInput) => Promise<void>;
 	initialData?: MCPServerConfig;
 	existingServerIDs: string[];
+	prefillServers?: MCPServerConfig[];
 	mode?: ModalMode;
 }
 
@@ -179,6 +180,10 @@ function hasInvalidHTTPHeaderValueChars(value: string): boolean {
 
 function makeRowID(): string {
 	return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function buildMCPServerPrefillKey(server: MCPServerConfig): string {
+	return `${server.bundleID}:${server.id}`;
 }
 
 function splitArgsText(argsText: string): string[] | undefined {
@@ -271,6 +276,33 @@ function getInitialFormData(initialData: MCPServerConfig | undefined): MCPServer
 	};
 }
 
+function buildCopiedMCPServerFormData(source: MCPServerConfig, current: MCPServerFormData): MCPServerFormData {
+	const copied = getInitialFormData(source);
+
+	return {
+		...copied,
+		serverID: current.serverID,
+		enabled: true,
+		stdioSecretRows: copied.stdioSecretRows.map(row => ({
+			...row,
+			rowID: makeRowID(),
+			existingSecretRef: undefined,
+			originalEnvName: undefined,
+			secretValue: '',
+			deleteExisting: false,
+		})),
+
+		httpClientCredentialRef: '',
+		httpClientCredentialsSecret: '',
+		httpDeleteClientCredentials: false,
+
+		apiKeyOriginalHeaderName: '',
+		apiKeyValue: '',
+		apiKeyExistingRef: undefined,
+		apiKeyDeleteExisting: false,
+	};
+}
+
 function validateOAuthClientCredentials(raw: string, requireClientSecret: boolean): string | undefined {
 	const value = raw.trim();
 	if (!value) return undefined;
@@ -350,18 +382,42 @@ function AddEditMCPServerModalContent({
 	onSubmit,
 	initialData,
 	existingServerIDs,
+	prefillServers = [],
 	mode,
 }: AddEditMCPServerModalProps) {
 	const effectiveMode: ModalMode = mode ?? (initialData ? 'edit' : 'add');
 	const isEditMode = effectiveMode === 'edit';
 
 	const [formData, setFormData] = useState<MCPServerFormData>(() => getInitialFormData(initialData));
+	const [prefillMode, setPrefillMode] = useState(false);
+	const [selectedPrefillKey, setSelectedPrefillKey] = useState<string | null>(null);
 	const [errors, setErrors] = useState<ErrorState>({});
 	const [submitError, setSubmitError] = useState('');
 	const [deletedStdioSecretRows, setDeletedStdioSecretRows] = useState<SecretEnvRow[]>([]);
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const isUnmountingRef = useRef(false);
+
+	const prefillSourceMap = useMemo<Record<string, MCPServerConfig>>(
+		() => Object.fromEntries(prefillServers.map(server => [buildMCPServerPrefillKey(server), server] as const)),
+		[prefillServers]
+	);
+
+	const prefillKeys = useMemo(() => Object.keys(prefillSourceMap), [prefillSourceMap]);
+
+	const prefillDropdownItems = useMemo<Record<string, { isEnabled: boolean; displayName: string }>>(
+		() =>
+			Object.fromEntries(
+				Object.entries(prefillSourceMap).map(([key, server]) => [
+					key,
+					{
+						isEnabled: true,
+						displayName: `${server.displayName || server.id} — ${server.bundleID} (${server.id})`,
+					},
+				])
+			),
+		[prefillSourceMap]
+	);
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
@@ -605,6 +661,19 @@ function AddEditMCPServerModalContent({
 	const setFormDataAndValidate = (next: MCPServerFormData) => {
 		setFormData(next);
 		setErrors(validateForm(next));
+	};
+
+	const applyPrefill = (key: string) => {
+		const source = prefillSourceMap[key];
+		if (!source) return;
+
+		const next = buildCopiedMCPServerFormData(source, formData);
+
+		setDeletedStdioSecretRows([]);
+		setFormDataAndValidate(next);
+		setSubmitError('');
+		setSelectedPrefillKey(key);
+		setPrefillMode(false);
 	};
 
 	const handleInput = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -918,6 +987,62 @@ function AddEditMCPServerModalContent({
 								<div className="flex items-center gap-2">
 									<FiAlertCircle size={14} />
 									<span>{submitError}</span>
+								</div>
+							</div>
+						)}
+
+						{effectiveMode === 'add' && (
+							<div className="grid grid-cols-12 items-start gap-2">
+								<label className="label col-span-3">
+									<span className="label-text text-sm">Prefill from Existing</span>
+								</label>
+
+								<div className="col-span-9 space-y-2">
+									<div className="flex items-center gap-2">
+										{!prefillMode && (
+											<button
+												type="button"
+												className="btn btn-sm btn-ghost flex items-center rounded-xl"
+												onClick={() => {
+													setPrefillMode(true);
+												}}
+												disabled={prefillKeys.length === 0}
+												title={prefillKeys.length === 0 ? 'No existing MCP servers are available to copy.' : undefined}
+											>
+												<FiUpload size={14} />
+												<span className="ml-1">Copy Existing Server</span>
+											</button>
+										)}
+
+										{prefillMode && (
+											<>
+												<Dropdown<string>
+													dropdownItems={prefillDropdownItems}
+													orderedKeys={prefillKeys}
+													selectedKey={selectedPrefillKey ?? ''}
+													onChange={applyPrefill}
+													disabled={prefillKeys.length === 0}
+													filterDisabled={false}
+													title="Select MCP server to copy"
+													getDisplayName={key => prefillDropdownItems[key]?.displayName ?? 'Select MCP server to copy'}
+												/>
+												<button
+													type="button"
+													className="btn btn-sm btn-ghost rounded-xl"
+													onClick={() => {
+														setPrefillMode(false);
+														setSelectedPrefillKey(null);
+													}}
+													title="Cancel prefill"
+												>
+													<FiX size={12} />
+												</button>
+											</>
+										)}
+									</div>
+									<p className="text-base-content/70 text-xs">
+										Secrets are never copied. Enter replacement secret values where needed before saving.
+									</p>
 								</div>
 							</div>
 						)}

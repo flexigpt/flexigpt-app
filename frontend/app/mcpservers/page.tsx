@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { FiPlus, FiSettings } from 'react-icons/fi';
 
@@ -657,6 +657,7 @@ export default function MCPServersPage() {
 		[fetchAll]
 	);
 
+	const allServerConfigs = useMemo(() => bundles.flatMap(bundleData => bundleData.servers), [bundles]);
 	const allServerIDs = bundles.flatMap(bundleData => bundleData.servers.map(server => server.id));
 
 	useEffect(() => {
@@ -723,6 +724,7 @@ export default function MCPServersPage() {
 								bundle={bundleData.bundle}
 								servers={bundleData.servers}
 								existingServerIDs={allServerIDs}
+								prefillServers={allServerConfigs}
 								runtimeByServerID={bundleData.runtimeByServerID}
 								authHealthByServerID={bundleData.authHealthByServerID}
 								onToggleBundleEnabled={handleToggleBundleEnabled}

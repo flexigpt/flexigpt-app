@@ -11295,6 +11295,22 @@ export namespace texttool {
 		    return a;
 		}
 	}
+	export class ApplyUnifiedDiffDiagnostic {
+	    level: string;
+	    code?: string;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApplyUnifiedDiffDiagnostic(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.level = source["level"];
+	        this.code = source["code"];
+	        this.message = source["message"];
+	    }
+	}
 	export class ApplyUnifiedDiffFileOut {
 	    ok: boolean;
 	    fileKey: string;
@@ -11305,7 +11321,7 @@ export namespace texttool {
 	    status: string;
 	    message?: string;
 	    candidatePaths?: string[];
-	    diagnostics?: string[];
+	    diagnostics?: ApplyUnifiedDiffDiagnostic[];
 	    hunks: number;
 	    appliedHunks: number;
 	    alreadyAppliedHunks: number;
@@ -11327,13 +11343,31 @@ export namespace texttool {
 	        this.status = source["status"];
 	        this.message = source["message"];
 	        this.candidatePaths = source["candidatePaths"];
-	        this.diagnostics = source["diagnostics"];
+	        this.diagnostics = this.convertValues(source["diagnostics"], ApplyUnifiedDiffDiagnostic);
 	        this.hunks = source["hunks"];
 	        this.appliedHunks = source["appliedHunks"];
 	        this.alreadyAppliedHunks = source["alreadyAppliedHunks"];
 	        this.addedLines = source["addedLines"];
 	        this.deletedLines = source["deletedLines"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	
 	export class ApplyUnifiedDiffSummary {
@@ -11363,7 +11397,7 @@ export namespace texttool {
 	    dryRun: boolean;
 	    status: string;
 	    message?: string;
-	    diagnostics?: string[];
+	    diagnostics?: ApplyUnifiedDiffDiagnostic[];
 	    summary: ApplyUnifiedDiffSummary;
 	    fileTargets?: ApplyUnifiedDiffFileTarget[];
 	    files?: ApplyUnifiedDiffFileOut[];
@@ -11378,7 +11412,7 @@ export namespace texttool {
 	        this.dryRun = source["dryRun"];
 	        this.status = source["status"];
 	        this.message = source["message"];
-	        this.diagnostics = source["diagnostics"];
+	        this.diagnostics = this.convertValues(source["diagnostics"], ApplyUnifiedDiffDiagnostic);
 	        this.summary = this.convertValues(source["summary"], ApplyUnifiedDiffSummary);
 	        this.fileTargets = this.convertValues(source["fileTargets"], ApplyUnifiedDiffFileTarget);
 	        this.files = this.convertValues(source["files"], ApplyUnifiedDiffFileOut);

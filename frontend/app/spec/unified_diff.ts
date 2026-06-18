@@ -1,6 +1,23 @@
 /**
  * @public
  */
+export enum ApplyUnifiedDiffDiagnosticLevel {
+	Info = 'info',
+	Warning = 'warning',
+	Error = 'error',
+}
+
+/**
+ * @public
+ */
+export interface ApplyUnifiedDiffDiagnostic {
+	level: ApplyUnifiedDiffDiagnosticLevel;
+	code?: string;
+	message: string;
+}
+/**
+ * @public
+ */
 export enum ApplyUnifiedDiffStatus {
 	Applicable = 'applicable',
 	Applied = 'applied',
@@ -41,7 +58,7 @@ export interface ApplyUnifiedDiffFileOut {
 	status: ApplyUnifiedDiffStatus;
 	message?: string;
 	candidatePaths?: string[];
-	diagnostics?: string[];
+	diagnostics?: ApplyUnifiedDiffDiagnostic[];
 	hunks: number;
 	appliedHunks: number;
 	alreadyAppliedHunks: number;
@@ -66,7 +83,7 @@ export interface ApplyUnifiedDiffOut {
 	dryRun: boolean;
 	status: ApplyUnifiedDiffStatus;
 	message?: string;
-	diagnostics?: string[];
+	diagnostics?: ApplyUnifiedDiffDiagnostic[];
 	summary: ApplyUnifiedDiffSummary;
 	fileTargets?: ApplyUnifiedDiffFileTarget[];
 	files?: ApplyUnifiedDiffFileOut[];

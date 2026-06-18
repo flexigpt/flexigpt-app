@@ -123,6 +123,8 @@ function AddEditProviderPresetModalContent({
 		return out;
 	}, [allProviderPresets]);
 
+	const prefillKeys = useMemo(() => Object.keys(prefillDropdownItems) as ProviderName[], [prefillDropdownItems]);
+
 	const sdkDropdownItems: Record<ProviderSDKType, { isEnabled: boolean; displayName: string }> = useMemo(
 		() => ({
 			[ProviderSDKType.ProviderSDKTypeAnthropic]: {
@@ -515,7 +517,8 @@ function AddEditProviderPresetModalContent({
 											onClick={() => {
 												setPrefillMode(true);
 											}}
-											disabled={isSubmitting}
+											disabled={isSubmitting || prefillKeys.length === 0}
+											title={prefillKeys.length === 0 ? 'No existing providers are available to copy.' : undefined}
 										>
 											<FiUpload size={14} />
 											<span className="ml-1">Copy Existing Provider</span>
@@ -526,15 +529,17 @@ function AddEditProviderPresetModalContent({
 										<>
 											<Dropdown<ProviderName>
 												dropdownItems={prefillDropdownItems}
+												orderedKeys={prefillKeys}
 												selectedKey={selectedPrefillKey ?? ('' as ProviderName)}
 												onChange={key => {
 													setSelectedPrefillKey(key);
 													applyPrefill(key);
 													setPrefillMode(false);
 												}}
+												disabled={prefillKeys.length === 0}
 												filterDisabled={false}
 												title="Select provider to copy"
-												getDisplayName={k => prefillDropdownItems[k].displayName}
+												getDisplayName={k => prefillDropdownItems[k]?.displayName ?? 'Select provider to copy'}
 											/>
 											<button
 												type="button"

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { FiPlus } from 'react-icons/fi';
 
@@ -15,6 +15,7 @@ import { PageFrame } from '@/components/page_frame';
 
 import { AddAssistantPresetBundleModal } from '@/assistantpresets/assistant_preset_bundle_add_modal';
 import { AssistantPresetBundleCard } from '@/assistantpresets/assistant_preset_bundle_card';
+import type { PresetItem } from '@/assistantpresets/lib/assistant_preset_editor_types';
 import {
 	getAllAssistantPresetBundles,
 	getAllAssistantPresetListItems,
@@ -52,6 +53,18 @@ export default function AssistantPresetsPage() {
 		bundleToDeleteID === null
 			? null
 			: (bundles.find(bundleData => bundleData.bundle.id === bundleToDeleteID)?.bundle ?? null);
+
+	const allPresetItems = useMemo<PresetItem[]>(
+		() =>
+			bundles.flatMap(bundleData =>
+				bundleData.presets.map(preset => ({
+					preset,
+					bundleID: bundleData.bundle.id,
+					assistantPresetSlug: preset.slug,
+				}))
+			),
+		[bundles]
+	);
 
 	const loadPresetsForBundle = useCallback(async (bundleID: string): Promise<AssistantPreset[]> => {
 		const presetListItems = await getAllAssistantPresetListItems([bundleID], true);
@@ -345,6 +358,7 @@ export default function AssistantPresetsPage() {
 								onDeleteBundleRequested={bundleID => {
 									setBundleToDeleteID(bundleID);
 								}}
+								copyablePresets={allPresetItems}
 							/>
 						))}
 					</div>

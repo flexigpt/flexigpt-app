@@ -2,7 +2,7 @@ import { type ChangeEvent, type SubmitEventHandler, useEffect, useMemo, useRef, 
 
 import { createPortal } from 'react-dom';
 
-import { FiAlertCircle, FiHelpCircle, FiX } from 'react-icons/fi';
+import { FiAlertCircle, FiHelpCircle, FiUpload, FiX } from 'react-icons/fi';
 
 import type { Skill } from '@/spec/skill';
 import { SkillType } from '@/spec/skill';
@@ -88,6 +88,10 @@ function getInitialFormData(initialData?: SkillItem): SkillFormData {
 	};
 }
 
+function buildSkillPrefillKey(item: SkillItem): string {
+	return `${item.bundleID}:${item.skill.id}`;
+}
+
 function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkills, mode }: AddEditSkillModalProps) {
 	const requestedMode: ModalMode = mode ?? (initialData ? 'edit' : 'add');
 	// Match the Tool modal pattern: unsupported impls can exist (viewable),
@@ -101,6 +105,8 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 	const [formData, setFormData] = useState<SkillFormData>(() => getInitialFormData(initialData));
 	const [errors, setErrors] = useState<ErrorState>({});
 	const [submitError, setSubmitError] = useState('');
+	const [prefillMode, setPrefillMode] = useState(false);
+	const [selectedPrefillKey, setSelectedPrefillKey] = useState<string | null>(null);
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const nameInputRef = useRef<HTMLInputElement | null>(null);
@@ -155,6 +161,31 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 		onClose();
 	};
 
+	const copyableSkills = useMemo(
+		() => existingSkills.filter(item => item.skill.type === SkillType.FS),
+		[existingSkills]
+	);
+
+	const prefillSourceMap = useMemo<Record<string, SkillItem>>(() => {
+		return Object.fromEntries(copyableSkills.map(item => [buildSkillPrefillKey(item), item] as const));
+	}, [copyableSkills]);
+
+	const prefillKeys = useMemo(() => Object.keys(prefillSourceMap), [prefillSourceMap]);
+
+	const prefillDropdownItems = useMemo<Record<string, { isEnabled: boolean; displayName: string }>>(
+		() =>
+			Object.fromEntries(
+				Object.entries(prefillSourceMap).map(([key, item]) => [
+					key,
+					{
+						isEnabled: true,
+						displayName: `${item.skill.displayName || item.skill.name || item.skill.slug} (${item.skill.slug})`,
+					},
+				])
+			),
+		[prefillSourceMap]
+	);
+
 	const validateField = (field: keyof ErrorState, val: string | SkillType, currentErrors: ErrorState): ErrorState => {
 		let nextErrors: ErrorState = { ...currentErrors };
 		const v = val.trim();
@@ -206,6 +237,30 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 		next = validateField('location', state.location, next);
 		if (state.tags.trim() !== '') next = validateField('tags', state.tags, next);
 		return next;
+	};
+
+	const applyPrefill = (key: string) => {
+		const source = prefillSourceMap[key];
+		if (!source) return;
+
+		const src = source.skill;
+		const next: SkillFormData = {
+			...formData,
+			displayName: src.displayName ?? '',
+			name: formData.name,
+			slug: formData.slug,
+			type: SkillType.FS,
+			location: src.location ?? '',
+			description: src.description ?? '',
+			tags: (src.tags ?? []).join(', '),
+			isEnabled: true,
+		};
+
+		setFormData(next);
+		setErrors(validateForm(next));
+		setSubmitError('');
+		setSelectedPrefillKey(key);
+		setPrefillMode(false);
 	};
 
 	const onSkillTypeChange = (key: SkillType) => {
@@ -302,6 +357,61 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 								<div className="flex items-center gap-2">
 									<FiAlertCircle size={14} />
 									<span>{submitError}</span>
+								</div>
+							</div>
+						)}
+
+						{isAddMode && (
+							<div className="grid grid-cols-12 items-center gap-2">
+								<label className="label col-span-3">
+									<span className="label-text text-sm">Prefill from Existing</span>
+								</label>
+
+								<div className="col-span-9 flex items-center gap-2">
+									{!prefillMode && (
+										<button
+											type="button"
+											className="btn btn-sm btn-ghost flex items-center rounded-xl"
+											onClick={() => {
+												setPrefillMode(true);
+											}}
+											disabled={prefillKeys.length === 0}
+											title={
+												prefillKeys.length === 0
+													? 'No filesystem skills are available to copy. Only filesystem skills can be created here.'
+													: undefined
+											}
+										>
+											<FiUpload size={14} />
+											<span className="ml-1">Copy Existing Skill</span>
+										</button>
+									)}
+
+									{prefillMode && (
+										<>
+											<Dropdown<string>
+												dropdownItems={prefillDropdownItems}
+												orderedKeys={prefillKeys}
+												selectedKey={selectedPrefillKey ?? ''}
+												onChange={applyPrefill}
+												disabled={prefillKeys.length === 0}
+												filterDisabled={false}
+												title="Select skill to copy"
+												getDisplayName={key => prefillDropdownItems[key]?.displayName ?? 'Select skill to copy'}
+											/>
+											<button
+												type="button"
+												className="btn btn-sm btn-ghost rounded-xl"
+												onClick={() => {
+													setPrefillMode(false);
+													setSelectedPrefillKey(null);
+												}}
+												title="Cancel prefill"
+											>
+												<FiX size={12} />
+											</button>
+										</>
+									)}
 								</div>
 							</div>
 						)}

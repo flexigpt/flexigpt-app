@@ -103,8 +103,8 @@ export function CodeBlock({ language, value, isBusy, hideMermaidCode, diffCandid
 	return (
 		<>
 			<div className="bg-code my-4 items-start overflow-hidden rounded-lg">
-				<div className="bg-code-header flex items-center justify-between px-4">
-					<div className="flex items-center gap-2 text-xs" title={headerTitle}>
+				<div className="bg-code-header flex items-start justify-between gap-3 px-4 py-1 sm:items-center">
+					<div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-xs" title={headerTitle}>
 						<span
 							className={`inline-flex shrink-0 items-center gap-1 leading-none ${
 								hasMermaidSyntaxError ? 'text-error' : 'text-code capitalize'
@@ -123,7 +123,7 @@ export function CodeBlock({ language, value, isBusy, hideMermaidCode, diffCandid
 							candidatePaths={diffCandidatePaths}
 						/>
 					</div>
-					<div className="flex items-center space-x-2">
+					<div className="flex shrink-0 items-center space-x-2 self-start sm:self-center">
 						<DownloadButton
 							language={language}
 							valueFetcher={fetchValue}
