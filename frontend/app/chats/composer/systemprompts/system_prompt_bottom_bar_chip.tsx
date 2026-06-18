@@ -2,7 +2,16 @@ import { memo, type SyntheticEvent, useCallback, useEffect, useMemo, useRef, use
 
 import { FiCheck, FiFileText, FiGitBranch, FiPlus, FiX } from 'react-icons/fi';
 
-import { Menu, MenuButton, MenuItem, Tooltip, useMenuStore, useStoreState, useTooltipStore } from '@ariakit/react';
+import {
+	Menu,
+	MenuButton,
+	MenuItem,
+	type MenuStore,
+	Tooltip,
+	useMenuStore,
+	useStoreState,
+	useTooltipStore,
+} from '@ariakit/react';
 
 import { PREVIOUS_CONVO_SYSTEM_PROMPT_BUNDLEID } from '@/spec/modelpreset';
 import { type PromptBundle, PromptRoleEnum } from '@/spec/prompt';
@@ -41,6 +50,8 @@ type SystemPromptBundleGroup = {
 };
 
 type SystemPromptBottomBarChipProps = {
+	store: MenuStore;
+	shortcut: string;
 	prompts: SystemPromptItem[];
 	bundles: PromptBundle[];
 	selectedPromptKeys: string[];
@@ -85,6 +96,8 @@ function stopMenuBubbleEvent(event: SyntheticEvent) {
 }
 
 function SystemPromptBottomBarChipInner({
+	store,
+	shortcut,
 	prompts,
 	bundles,
 	selectedPromptKeys,
@@ -124,7 +137,8 @@ function SystemPromptBottomBarChipInner({
 		[includeModelDefault, modelDefaultPrompt, promptsByKey, selectedPromptKeys]
 	);
 
-	const menu = useMenuStore({ placement: 'top', focusLoop: true });
+	const internalMenu = useMenuStore({ placement: 'top', focusLoop: true });
+	const menu = store ?? internalMenu;
 	const promptTooltip = useTooltipStore({ placement: 'right-end' });
 
 	const lastRefreshTsRef = useRef(0);
@@ -184,8 +198,10 @@ function SystemPromptBottomBarChipInner({
 	const tooltipAnchorEl = useStoreState(promptTooltip, 'anchorElement');
 	const currentPromptText = tooltipAnchorEl?.dataset.prompt ?? '';
 
-	const triggerTooltip =
-		activeSourceCount > 0 ? `System prompt sources enabled: ${activeSourceCount}` : 'System prompt disabled';
+	const triggerTooltip = [
+		shortcut ? `Insert system prompt (${shortcut})` : 'Insert system prompt',
+		activeSourceCount > 0 ? `System prompt sources enabled: ${activeSourceCount}` : 'System prompt disabled',
+	].join('\n');
 
 	const showPromptTooltip = useCallback(
 		(element: HTMLElement) => {
@@ -288,7 +304,7 @@ function SystemPromptBottomBarChipInner({
 						className="btn btn-xs text-neutral-custom h-auto min-h-0 flex-1 gap-0 border-none bg-transparent px-0 py-0 text-left font-normal shadow-none hover:bg-transparent"
 						onClick={handleMenuOpen}
 						disabled={isInputLocked}
-						aria-label="Choose system prompt sources"
+						aria-label={shortcut ? `Insert system prompt (${shortcut})` : 'Insert system prompt'}
 					>
 						<ActionTriggerChipContent
 							icon={<FiFileText size={14} />}
@@ -575,14 +591,20 @@ function SystemPromptBottomBarChipInner({
  * don't re-render the entire EditorBottomBar.
  */
 export const SystemPromptBottomBarChip = memo(function SystemPromptBottomBarChip({
+	store,
+	shortcut,
 	systemPrompt,
 	isInputLocked,
 }: {
+	store: MenuStore;
+	shortcut: string;
 	systemPrompt: ComposerSystemPromptController;
 	isInputLocked: boolean;
 }) {
 	return (
 		<SystemPromptBottomBarChipInner
+			store={store}
+			shortcut={shortcut}
 			prompts={systemPrompt.prompts}
 			bundles={systemPrompt.systemPromptBundles}
 			selectedPromptKeys={systemPrompt.selectedPromptKeys}

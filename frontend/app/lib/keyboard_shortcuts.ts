@@ -21,6 +21,10 @@ enum ShortcutAction {
 	insertTemplate = 'insertTemplate',
 	insertTool = 'insertTool',
 	insertAttachment = 'insertAttachment',
+	insertSystemPrompt = 'insertSystemPrompt',
+	attachSkills = 'attachSkills',
+	attachMCP = 'attachMCP',
+	stopResponse = 'stopResponse',
 
 	// Editor – marks
 	editorBold = 'editorBold',
@@ -50,7 +54,7 @@ interface ShortcutKeyEvent {
 
 export type ShortcutConfig = Partial<Record<ShortcutAction, ShortcutChord>>;
 
-type ShortcutGroup = 'Chat' | 'Insert' | 'Editor';
+type ShortcutGroup = 'Chat' | 'Composer' | 'Editor';
 
 /**
  * @public
@@ -84,10 +88,14 @@ export const defaultShortcutConfig: ShortcutConfig = {
 	[ShortcutAction.focusSearch]: { key: 'f', ctrlOrMeta: true, shift: true }, // Mod+Shift+F
 	[ShortcutAction.focusInput]: { key: 'i', ctrlOrMeta: true, shift: true }, // Mod+Shift+I
 
-	// Editor/insert actions
+	// Composer actions
 	[ShortcutAction.insertTemplate]: { key: 'p', ctrlOrMeta: true, shift: true }, // Mod+Shift+P
 	[ShortcutAction.insertAttachment]: { key: 'a', ctrlOrMeta: true, shift: true }, // Mod+Shift+A
 	[ShortcutAction.insertTool]: { key: 'k', ctrlOrMeta: true, shift: true }, // Mod+Shift+k
+	[ShortcutAction.insertSystemPrompt]: { key: 's', ctrlOrMeta: true, shift: true }, // Mod+Alt+S
+	[ShortcutAction.attachSkills]: { key: 'l', ctrlOrMeta: true, shift: true }, // Mod+Alt+L
+	[ShortcutAction.attachMCP]: { key: 'm', ctrlOrMeta: true, shift: true }, // Mod+Alt+M
+	[ShortcutAction.stopResponse]: { key: '.', ctrlOrMeta: true }, // Mod+.
 };
 
 type ConfigShortcutMeta = {
@@ -148,27 +156,51 @@ const ACTION_META: Record<ShortcutAction, ShortcutMeta> = {
 		source: 'config',
 	},
 	[ShortcutAction.focusInput]: {
-		label: 'Focus input',
-		group: 'Chat',
+		label: 'Focus composer',
+		group: 'Composer',
 		order: 60,
 		source: 'config',
 	},
 	[ShortcutAction.insertTemplate]: {
-		label: 'Insert template',
-		group: 'Insert',
+		label: 'Insert prompts',
+		group: 'Composer',
 		order: 100,
 		source: 'config',
 	},
 	[ShortcutAction.insertTool]: {
-		label: 'Add tool',
-		group: 'Insert',
+		label: 'Attach tools',
+		group: 'Composer',
 		order: 110,
 		source: 'config',
 	},
 	[ShortcutAction.insertAttachment]: {
-		label: 'Attach context',
-		group: 'Insert',
+		label: 'Attach files',
+		group: 'Composer',
 		order: 120,
+		source: 'config',
+	},
+	[ShortcutAction.insertSystemPrompt]: {
+		label: 'Insert system prompt',
+		group: 'Composer',
+		order: 130,
+		source: 'config',
+	},
+	[ShortcutAction.attachSkills]: {
+		label: 'Attach skills',
+		group: 'Composer',
+		order: 140,
+		source: 'config',
+	},
+	[ShortcutAction.attachMCP]: {
+		label: 'Attach MCP',
+		group: 'Composer',
+		order: 150,
+		source: 'config',
+	},
+	[ShortcutAction.stopResponse]: {
+		label: 'Stop response',
+		group: 'Composer',
+		order: 160,
 		source: 'config',
 	},
 

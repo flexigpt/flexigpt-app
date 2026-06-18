@@ -12,7 +12,7 @@ import {
 	FiX,
 } from 'react-icons/fi';
 
-import { Menu, MenuButton, useMenuStore, useStoreState } from '@ariakit/react';
+import { Menu, MenuButton, type MenuStore, useMenuStore, useStoreState } from '@ariakit/react';
 import { Link } from 'react-router';
 
 import {
@@ -725,17 +725,22 @@ function ServerRow({
 }
 
 export function MCPBottomBarChip({
+	store,
+	shortcut,
 	state,
 	isInputLocked = false,
 	appContextUpdateCount = 0,
 	onClearAppContextUpdates,
 }: {
+	store: MenuStore;
+	shortcut: string;
 	state: UseComposerMCPResult;
 	isInputLocked?: boolean;
 	appContextUpdateCount?: number;
 	onClearAppContextUpdates?: () => void;
 }) {
-	const menu = useMenuStore({ placement: 'top', focusLoop: true });
+	const internalMenu = useMenuStore({ placement: 'top', focusLoop: true });
+	const menu = store ?? internalMenu;
 	const open = useStoreState(menu, 'open');
 
 	const enabledCount = state.selectedServerCount;
@@ -747,7 +752,7 @@ export function MCPBottomBarChip({
 	const hiddenDisabledServerVerb = hiddenDisabledServerCount === 1 ? 'is' : 'are';
 
 	const title = useMemo(() => {
-		const lines = ['MCP'];
+		const lines = [shortcut ? `Attach MCP (${shortcut})` : 'Attach MCP'];
 		lines.push('Choose MCP servers, tools, resources, and prompts for the next message.');
 		lines.push(
 			enabledCount > 0 ? `Status: Enabled (${enabledCount} server${enabledCount === 1 ? '' : 's'})` : 'Status: Disabled'
@@ -766,6 +771,7 @@ export function MCPBottomBarChip({
 		appContextUpdateCount,
 		enabledCount,
 		hasAppContextUpdates,
+		shortcut,
 		state.requiredArgumentMissingCount,
 		state.selectedPromptCount,
 		state.selectedResourceCount,
@@ -793,7 +799,7 @@ export function MCPBottomBarChip({
 					<MenuButton
 						store={menu}
 						className="btn btn-xs text-neutral-custom h-auto min-h-0 flex-1 gap-0 border-none bg-transparent px-0 py-0 text-left font-normal shadow-none hover:bg-transparent"
-						aria-label="Choose MCP servers"
+						aria-label={shortcut ? `Attach MCP (${shortcut})` : 'Attach MCP'}
 						disabled={isInputLocked}
 					>
 						<ActionTriggerChipContent

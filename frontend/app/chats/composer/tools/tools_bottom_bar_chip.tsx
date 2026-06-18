@@ -373,7 +373,7 @@ export function ToolsBottomBarChip({
 
 	const title = useMemo(() => {
 		const lines: string[] = [];
-		lines.push(shortcut ? `Tools (${shortcut})` : 'Tools');
+		lines.push(shortcut ? `Attach tools (${shortcut})` : 'Attach tools');
 		lines.push('Choose per-message tools, conversation tools, and web search.');
 		lines.push(configuredToolCount > 0 ? `Configured: ${configuredToolCount}` : 'No tools configured');
 		if (visibleAttachedToolEntries.length > 0) lines.push(`Per-message tools: ${visibleAttachedToolEntries.length}`);
@@ -766,7 +766,7 @@ export function ToolsBottomBarChip({
 						store={store}
 						disabled={isInputLocked}
 						className="btn btn-xs text-neutral-custom h-auto min-h-0 flex-1 gap-0 border-none bg-transparent px-0 py-0 text-left font-normal shadow-none hover:bg-transparent"
-						aria-label={shortcut ? `Tools (${shortcut})` : 'Tools'}
+						aria-label={shortcut ? `Attach tools (${shortcut})` : 'Attach tools'}
 					>
 						<ActionTriggerChipContent
 							icon={<FiTool size={14} />}

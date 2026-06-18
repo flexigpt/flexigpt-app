@@ -39,6 +39,10 @@ export interface ComposerBoxHandle {
 	openTemplateMenu: () => void;
 	openToolMenu: () => void;
 	openAttachmentMenu: () => void;
+	openSystemPromptMenu: () => void;
+	openSkillsMenu: () => void;
+	openMCPMenu: () => void;
+	requestStopResponse: () => void;
 	loadWorkflowStarter: (starter: ChatWorkflowStarter) => Promise<boolean>;
 	loadExternalMessage: (msg: EditorExternalMessage) => void;
 	loadToolCalls: (toolCalls: UIToolCall[]) => void;
@@ -268,6 +272,18 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 			},
 			openAttachmentMenu: () => {
 				editorAreaRef.current?.openAttachmentMenu();
+			},
+			openSystemPromptMenu: () => {
+				editorAreaRef.current?.openSystemPromptMenu();
+			},
+			openSkillsMenu: () => {
+				editorAreaRef.current?.openSkillsMenu();
+			},
+			openMCPMenu: () => {
+				editorAreaRef.current?.openMCPMenu();
+			},
+			requestStopResponse: () => {
+				editorAreaRef.current?.requestStopResponse();
 			},
 			loadWorkflowStarter: async starter => {
 				resetComposerStateForNewConversation();

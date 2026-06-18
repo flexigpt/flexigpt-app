@@ -117,6 +117,10 @@ export type ConversationAreaHandle = {
 	openTemplateMenu: (tabId: string) => void;
 	openToolMenu: (tabId: string) => void;
 	openAttachmentMenu: (tabId: string) => void;
+	openSystemPromptMenu: (tabId: string) => void;
+	openSkillsMenu: (tabId: string) => void;
+	openMCPMenu: (tabId: string) => void;
+	requestStopResponse: (tabId: string) => void;
 
 	setScrollTopForTab: (tabId: string, top: number) => void;
 	resetScrollToTop: (tabId: string) => void;
@@ -198,6 +202,10 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		openTemplateMenu,
 		openToolMenu,
 		openAttachmentMenu,
+		openSystemPromptMenu,
+		openSkillsMenu,
+		openMCPMenu,
+		requestStopResponse,
 		disposeInputRuntime,
 		applyWorkflowStarterToComposer,
 	} = useInputRegistry({ tabExists });
@@ -309,6 +317,10 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			openTemplateMenu,
 			openToolMenu,
 			openAttachmentMenu,
+			openSystemPromptMenu,
+			openSkillsMenu,
+			openMCPMenu,
+			requestStopResponse,
 			setScrollTopForTab,
 			resetScrollToTop,
 			getScrollTopByTabSnapshot,
@@ -320,6 +332,10 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			focusInput,
 			getScrollTopByTabSnapshot,
 			openAttachmentMenu,
+			openSystemPromptMenu,
+			openSkillsMenu,
+			openMCPMenu,
+			requestStopResponse,
 			openTemplateMenu,
 			openToolMenu,
 			resetComposerForNewConversation,

@@ -10,7 +10,7 @@ import {
 
 import { FiCheck, FiX, FiZap } from 'react-icons/fi';
 
-import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
+import { Menu, MenuButton, MenuItem, type MenuStore, useMenuStore, useStoreState } from '@ariakit/react';
 
 import type { SkillListItem, SkillRef } from '@/spec/skill';
 
@@ -115,6 +115,8 @@ function BundleCheckbox({
 }
 
 export function SkillsBottomBarChip({
+	store,
+	shortcut,
 	allSkills,
 	loading,
 	enabledSkillRefs,
@@ -124,6 +126,8 @@ export function SkillsBottomBarChip({
 	onDisableAll,
 	isInputLocked = false,
 }: {
+	store: MenuStore;
+	shortcut: string;
 	allSkills: SkillListItem[];
 	loading: boolean;
 	enabledSkillRefs: SkillRef[];
@@ -133,7 +137,8 @@ export function SkillsBottomBarChip({
 	onDisableAll: () => void;
 	isInputLocked?: boolean;
 }) {
-	const menu = useMenuStore({ placement: 'top', focusLoop: true });
+	const internalMenu = useMenuStore({ placement: 'top', focusLoop: true });
+	const menu = store ?? internalMenu;
 	const open = useStoreState(menu, 'open');
 
 	useEffect(() => {
@@ -260,13 +265,13 @@ export function SkillsBottomBarChip({
 
 	const title = useMemo(() => {
 		const lines: string[] = [];
-		lines.push('Skills');
+		lines.push(shortcut ? `Attach skills (${shortcut})` : 'Attach skills');
 		lines.push(isEnabled ? `Status: Enabled (${enabledCount})` : 'Status: Disabled');
 		lines.push(`Active now: ${activeCount}`);
 		if (totalCount > 0) lines.push(`Available: ${totalCount}`);
 		if (loading && totalCount === 0) lines.push('Loading available skills…');
 		return lines.join('\n');
-	}, [activeCount, enabledCount, isEnabled, loading, totalCount]);
+	}, [activeCount, enabledCount, isEnabled, loading, shortcut, totalCount]);
 
 	const chipToneClasses =
 		enabledCount > 0
@@ -334,7 +339,7 @@ export function SkillsBottomBarChip({
 					<MenuButton
 						store={menu}
 						className="btn btn-xs text-neutral-custom h-auto min-h-0 flex-1 gap-0 border-none bg-transparent px-0 py-0 text-left font-normal shadow-none hover:bg-transparent"
-						aria-label="Choose skills"
+						aria-label={shortcut ? `Attach skills (${shortcut})` : 'Attach skills'}
 						disabled={isInputLocked}
 					>
 						<ActionTriggerChipContent

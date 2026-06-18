@@ -171,7 +171,7 @@ function PromptTemplateBottomBarChipInner({
 	isInputLocked = false,
 }: PromptTemplateBottomBarChipProps) {
 	const open = useStoreState(store, 'open');
-	const tooltip = shortcut ? `Prompts (${shortcut})` : 'Prompts';
+	const tooltip = shortcut ? `Insert prompts (${shortcut})` : 'Insert prompts';
 
 	const { data: templates, loading } = usePromptTemplates();
 

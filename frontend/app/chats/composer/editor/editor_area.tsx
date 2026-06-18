@@ -32,7 +32,7 @@ import type { PromptTemplate } from '@/spec/prompt';
 import type { SkillRef } from '@/spec/skill';
 import { type ToolArgsTarget, type ToolListItem, type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 
-import { type ShortcutConfig } from '@/lib/keyboard_shortcuts';
+import { formatShortcut, type ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { cssEscape } from '@/lib/text_utils';
 
 import { useEnterSubmit } from '@/hooks/use_enter_submit';
@@ -104,6 +104,10 @@ export interface EditorAreaHandle {
 	openTemplateMenu: () => void;
 	openToolMenu: () => void;
 	openAttachmentMenu: () => void;
+	openSystemPromptMenu: () => void;
+	openSkillsMenu: () => void;
+	openMCPMenu: () => void;
+	requestStopResponse: () => void;
 	loadExternalMessage: (msg: EditorExternalMessage) => void;
 	setDraftText: (text: string) => void;
 	setDraftTextIfEmpty: (text: string) => boolean;
@@ -188,6 +192,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const templateMenu = useMenuStore({ placement: 'top', focusLoop: true });
 	const toolMenu = useMenuStore({ placement: 'top', focusLoop: true });
 	const attachmentMenu = useMenuStore({ placement: 'top', focusLoop: true });
+	const systemPromptMenu = useMenuStore({ placement: 'top', focusLoop: true });
+	const skillsMenu = useMenuStore({ placement: 'top', focusLoop: true });
+	const mcpMenu = useMenuStore({ placement: 'top', focusLoop: true });
 	const templateButtonRef = useRef<HTMLButtonElement | null>(null);
 	const toolButtonRef = useRef<HTMLButtonElement | null>(null);
 	const attachmentButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -199,7 +206,14 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	// Track whether a menu was opened via shortcut so we can:
 	// - force focus into the menu (arrow-key nav)
 	// - optionally restore focus to editor on close (Esc)
-	const menuOpenedByShortcutRef = useRef({ templates: false, tools: false, attachments: false });
+	const menuOpenedByShortcutRef = useRef({
+		templates: false,
+		tools: false,
+		attachments: false,
+		systemPrompt: false,
+		skills: false,
+		mcp: false,
+	});
 	const suppressNextAttachmentMenuFocusRestoreRef = useRef(false);
 
 	const {
@@ -512,9 +526,15 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const templateMenuOpen = useStoreState(templateMenu, 'open');
 	const toolMenuOpen = useStoreState(toolMenu, 'open');
 	const attachmentMenuOpen = useStoreState(attachmentMenu, 'open');
+	const systemPromptMenuOpen = useStoreState(systemPromptMenu, 'open');
+	const skillsMenuOpen = useStoreState(skillsMenu, 'open');
+	const mcpMenuOpen = useStoreState(mcpMenu, 'open');
 	const templateMenuEl = useStoreState(templateMenu, 'contentElement');
 	const toolMenuEl = useStoreState(toolMenu, 'contentElement');
 	const attachmentMenuEl = useStoreState(attachmentMenu, 'contentElement');
+	const systemPromptMenuEl = useStoreState(systemPromptMenu, 'contentElement');
+	const skillsMenuEl = useStoreState(skillsMenu, 'contentElement');
+	const mcpMenuEl = useStoreState(mcpMenu, 'contentElement');
 
 	const clearPreEditSnapshot = useCallback(() => {
 		preEditConversationToolsRef.current = null;
@@ -528,7 +548,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		templateMenu.hide();
 		toolMenu.hide();
 		attachmentMenu.hide();
-	}, [templateMenu, toolMenu, attachmentMenu]);
+		systemPromptMenu.hide();
+		skillsMenu.hide();
+		mcpMenu.hide();
+	}, [attachmentMenu, mcpMenu, skillsMenu, systemPromptMenu, templateMenu, toolMenu]);
 
 	useEffect(() => {
 		if (!templateMenuOpen) {
@@ -586,6 +609,57 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		});
 	}, [attachmentMenuOpen, attachmentMenuEl, focusEditorPreservingSelection]);
 
+	useEffect(() => {
+		if (!systemPromptMenuOpen) {
+			if (menuOpenedByShortcutRef.current.systemPrompt) {
+				menuOpenedByShortcutRef.current.systemPrompt = false;
+				requestAnimationFrame(() => {
+					focusEditorPreservingSelection();
+				});
+			}
+			return;
+		}
+		if (!menuOpenedByShortcutRef.current.systemPrompt) return;
+
+		requestAnimationFrame(() => {
+			systemPromptMenuEl?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+		});
+	}, [focusEditorPreservingSelection, systemPromptMenuEl, systemPromptMenuOpen]);
+
+	useEffect(() => {
+		if (!skillsMenuOpen) {
+			if (menuOpenedByShortcutRef.current.skills) {
+				menuOpenedByShortcutRef.current.skills = false;
+				requestAnimationFrame(() => {
+					focusEditorPreservingSelection();
+				});
+			}
+			return;
+		}
+		if (!menuOpenedByShortcutRef.current.skills) return;
+
+		requestAnimationFrame(() => {
+			skillsMenuEl?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+		});
+	}, [focusEditorPreservingSelection, skillsMenuEl, skillsMenuOpen]);
+
+	useEffect(() => {
+		if (!mcpMenuOpen) {
+			if (menuOpenedByShortcutRef.current.mcp) {
+				menuOpenedByShortcutRef.current.mcp = false;
+				requestAnimationFrame(() => {
+					focusEditorPreservingSelection();
+				});
+			}
+			return;
+		}
+		if (!menuOpenedByShortcutRef.current.mcp) return;
+
+		requestAnimationFrame(() => {
+			mcpMenuEl?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+		});
+	}, [focusEditorPreservingSelection, mcpMenuEl, mcpMenuOpen]);
+
 	const openTemplatePicker = useCallback(() => {
 		if (isInputLocked) return;
 		menuOpenedByShortcutRef.current.templates = true;
@@ -613,6 +687,30 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		attachmentMenu.show();
 		attachmentButtonRef.current?.focus({ preventScroll: true });
 	}, [isInputLocked, closeAllMenus, attachmentMenu]);
+
+	const openSystemPromptPicker = useCallback(() => {
+		if (isInputLocked) return;
+		menuOpenedByShortcutRef.current.systemPrompt = true;
+
+		closeAllMenus();
+		systemPromptMenu.show();
+	}, [closeAllMenus, isInputLocked, systemPromptMenu]);
+
+	const openSkillsPicker = useCallback(() => {
+		if (isInputLocked) return;
+		menuOpenedByShortcutRef.current.skills = true;
+
+		closeAllMenus();
+		skillsMenu.show();
+	}, [closeAllMenus, isInputLocked, skillsMenu]);
+
+	const openMCPPicker = useCallback(() => {
+		if (isInputLocked) return;
+		menuOpenedByShortcutRef.current.mcp = true;
+
+		closeAllMenus();
+		mcpMenu.show();
+	}, [closeAllMenus, isInputLocked, mcpMenu]);
 
 	const restorePreEditContext = useCallback(() => {
 		const prevConv = preEditConversationToolsRef.current;
@@ -1314,6 +1412,18 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			openAttachmentMenu: () => {
 				openAttachmentPicker();
 			},
+			openSystemPromptMenu: () => {
+				openSystemPromptPicker();
+			},
+			openSkillsMenu: () => {
+				openSkillsPicker();
+			},
+			openMCPMenu: () => {
+				openMCPPicker();
+			},
+			requestStopResponse: () => {
+				if (isGenerating) onRequestStop();
+			},
 			loadExternalMessage,
 			setDraftText,
 			setDraftTextIfEmpty,
@@ -1353,8 +1463,13 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			openTemplatePicker,
 			openToolPicker,
 			openAttachmentPicker,
+			openSystemPromptPicker,
+			openSkillsPicker,
+			openMCPPicker,
 			mcp,
 			applySkillSelectionState,
+			isGenerating,
+			onRequestStop,
 		]
 	);
 
@@ -1363,6 +1478,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		restorePreEditContext();
 		cancelEditing();
 	}, [cancelEditing, resetEditor, restorePreEditContext]);
+
+	const stopResponseShortcut = formatShortcut(shortcutConfig.stopResponse);
 
 	const handleRunToolsOnlyClick = useCallback(async () => {
 		if (!hasPendingToolCalls || isInputLocked || isSubmitting || fastForwardPending || hasRunningToolCalls) return;
@@ -1527,7 +1644,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 								</HoverTip>
 							) : null}
 							{isGenerating ? (
-								<HoverTip content="Stop response" placement="left">
+								<HoverTip
+									content={stopResponseShortcut ? `Stop response (${stopResponseShortcut})` : 'Stop response'}
+									placement="left"
+								>
 									<button
 										type="button"
 										className="btn btn-circle btn-neutral btn-sm shrink-0"
@@ -1617,6 +1737,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						templateMenuState={templateMenu}
 						toolMenuState={toolMenu}
 						attachmentMenuState={attachmentMenu}
+						systemPromptMenuState={systemPromptMenu}
+						skillsMenuState={skillsMenu}
+						mcpMenuState={mcpMenu}
 						templateButtonRef={templateButtonRef}
 						toolButtonRef={toolButtonRef}
 						attachmentButtonRef={attachmentButtonRef}

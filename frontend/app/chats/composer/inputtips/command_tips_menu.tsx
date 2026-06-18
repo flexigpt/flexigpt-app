@@ -85,11 +85,11 @@ export function CommandTipsMenu({ shortcutConfig }: CommandTipsMenuProps) {
 		[]
 	);
 
-	// All shortcuts (global + insert) from central config
+	// All shortcuts (global + composer) from central config
 	const shortcutItems = useMemo(() => buildShortcutDisplay(shortcutConfig), [shortcutConfig]);
 
 	const chatShortcuts = shortcutItems.filter(item => item.group === 'Chat');
-	const insertShortcuts = shortcutItems.filter(item => item.group === 'Insert');
+	const composerShortcuts = shortcutItems.filter(item => item.group === 'Composer');
 
 	return (
 		<div className="flex items-center gap-1">
@@ -126,14 +126,14 @@ export function CommandTipsMenu({ shortcutConfig }: CommandTipsMenuProps) {
 					</>
 				)}
 
-				{/* Insert group */}
-				{insertShortcuts.length > 0 && (
+				{/* Composer group */}
+				{composerShortcuts.length > 0 && (
 					<>
 						{chatShortcuts.length > 0 && <div className="border-base-200 mx-2 mt-1 border-t" />}
 						<div className="text-neutral-custom/70 px-3 pt-2 pb-1 text-xs tracking-wide uppercase">
-							Insert shortcuts
+							Composer shortcuts
 						</div>
-						{insertShortcuts.map(item => (
+						{composerShortcuts.map(item => (
 							<MenuItem key={item.action} hideOnClick={false} className={actionTriggerMenuItemClasses}>
 								<span className="flex-1 text-left">{item.label}</span>
 								<span className="text-neutral-custom ml-auto w-30 text-left text-xs whitespace-nowrap">

@@ -776,6 +776,18 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			insertAttachment: () => {
 				conversationAreaRef.current?.openAttachmentMenu(selectedTabIdRef.current);
 			},
+			insertSystemPrompt: () => {
+				conversationAreaRef.current?.openSystemPromptMenu(selectedTabIdRef.current);
+			},
+			attachSkills: () => {
+				conversationAreaRef.current?.openSkillsMenu(selectedTabIdRef.current);
+			},
+			attachMCP: () => {
+				conversationAreaRef.current?.openMCPMenu(selectedTabIdRef.current);
+			},
+			stopResponse: () => {
+				conversationAreaRef.current?.requestStopResponse(selectedTabIdRef.current);
+			},
 		},
 	});
 

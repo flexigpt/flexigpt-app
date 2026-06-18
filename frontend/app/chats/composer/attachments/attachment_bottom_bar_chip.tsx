@@ -39,7 +39,7 @@ function AttachmentBottomBarChipInner({
 }: AttachmentBottomBarChipProps) {
 	const [isUrlModalOpen, setIsUrlModalOpen] = useState(false);
 	const open = useStoreState(store, 'open');
-	const tooltip = shortcut ? `Attachments (${shortcut})` : 'Attachments';
+	const tooltip = shortcut ? `Attach files, folders, or URLs (${shortcut})` : 'Attach files, folders, or URLs';
 
 	useEffect(() => {
 		if (!isInputLocked) return;

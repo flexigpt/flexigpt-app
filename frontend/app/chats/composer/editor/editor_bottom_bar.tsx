@@ -35,6 +35,9 @@ interface EditorBottomBarProps {
 	templateMenuState: MenuStore;
 	toolMenuState: MenuStore;
 	attachmentMenuState: MenuStore;
+	systemPromptMenuState: MenuStore;
+	skillsMenuState: MenuStore;
+	mcpMenuState: MenuStore;
 
 	templateButtonRef: RefObject<HTMLButtonElement | null>;
 	toolButtonRef: RefObject<HTMLButtonElement | null>;
@@ -86,6 +89,9 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	templateMenuState,
 	toolMenuState,
 	attachmentMenuState,
+	systemPromptMenuState,
+	skillsMenuState,
+	mcpMenuState,
 	templateButtonRef,
 	toolButtonRef,
 	attachmentButtonRef,
@@ -124,6 +130,9 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 			templates: formatShortcut(shortcutConfig.insertTemplate),
 			tools: formatShortcut(shortcutConfig.insertTool),
 			attachments: formatShortcut(shortcutConfig.insertAttachment),
+			systemPrompt: formatShortcut(shortcutConfig.insertSystemPrompt),
+			skills: formatShortcut(shortcutConfig.attachSkills),
+			mcp: formatShortcut(shortcutConfig.attachMCP),
 		}),
 		[shortcutConfig]
 	);
@@ -132,7 +141,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 		<div
 			className="bg-base-200 w-full overflow-hidden"
 			data-attachments-bottom-bar
-			aria-label="Templates, tools, attachments, skills, and system prompt"
+			aria-label="Templates, tools, attachments, system prompt, skills, and MCP"
 		>
 			<div className="flex items-center gap-1 overflow-x-auto p-1 text-xs shadow-none">
 				<div className="flex items-center gap-1">
@@ -156,7 +165,12 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						isInputLocked={isInputLocked}
 					/>
 
-					<SystemPromptBottomBarChip systemPrompt={systemPrompt} isInputLocked={isInputLocked} />
+					<SystemPromptBottomBarChip
+						store={systemPromptMenuState}
+						shortcut={shortcutLabels.systemPrompt}
+						systemPrompt={systemPrompt}
+						isInputLocked={isInputLocked}
+					/>
 
 					<ToolsBottomBarChip
 						store={toolMenuState}
@@ -182,6 +196,8 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 					/>
 
 					<SkillsBottomBarChip
+						store={skillsMenuState}
+						shortcut={shortcutLabels.skills}
 						allSkills={allSkills}
 						loading={skillsLoading}
 						enabledSkillRefs={enabledSkillRefs}
@@ -192,6 +208,8 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						isInputLocked={isInputLocked}
 					/>
 					<MCPBottomBarChip
+						store={mcpMenuState}
+						shortcut={shortcutLabels.mcp}
 						state={mcpState}
 						isInputLocked={isInputLocked}
 						appContextUpdateCount={mcpAppContextUpdateCount}
