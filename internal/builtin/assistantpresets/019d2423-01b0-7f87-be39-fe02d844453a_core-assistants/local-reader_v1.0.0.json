@@ -4,10 +4,10 @@
 	"slug": "local-reader",
 	"version": "v1.0.0",
 	"displayName": "Local Reader",
-	"description": "Read only assistant and analyze local files, folders, repos, docs, and notes",
+	"description": "Read-only assistant for local files, folders, repos, docs, and notes",
 	"isEnabled": true,
 	"isBuiltIn": true,
-	"startingText": "<Attach files or replace this line with the local path(s) to inspect, for example `/absolute/path/to/file-or-folder`>\n\nAnalyze this material. Summarize what it is, the important structure, notable details, risks or gaps, and what to inspect next",
+	"startingText": "<Attach files or replace this line with the local path(s) to read or search, for example `/absolute/path/to/file-or-folder`>\n\nAnalyze this material. Summarize what it is, the important structure, notable details, risks or gaps, and what to read next",
 	"startingIncludeModelSystemPrompt": true,
 	"startingInstructionTemplateRefs": [
 		{
@@ -30,17 +30,7 @@
 		{
 			"toolRef": {
 				"bundleID": "018fe0f4-b8cd-7e55-82d5-9df0bd70e400",
-				"toolSlug": "statpath",
-				"toolVersion": "v1.0.0"
-			},
-			"toolChoicePatch": {
-				"autoExecute": true
-			}
-		},
-		{
-			"toolRef": {
-				"bundleID": "018fe0f4-b8cd-7e55-82d5-9df0bd70e400",
-				"toolSlug": "listdirectory",
+				"toolSlug": "readfile",
 				"toolVersion": "v1.0.0"
 			},
 			"toolChoicePatch": {
@@ -60,27 +50,7 @@
 		{
 			"toolRef": {
 				"bundleID": "018fe0f4-b8cd-7e55-82d5-9df0bd70e400",
-				"toolSlug": "readfile",
-				"toolVersion": "v1.0.0"
-			},
-			"toolChoicePatch": {
-				"autoExecute": true
-			}
-		},
-		{
-			"toolRef": {
-				"bundleID": "019c0da2-02d2-7e71-81d7-35f2e5a0bebf",
-				"toolSlug": "readtextrange",
-				"toolVersion": "v1.0.0"
-			},
-			"toolChoicePatch": {
-				"autoExecute": true
-			}
-		},
-		{
-			"toolRef": {
-				"bundleID": "019c0da2-02d2-7e71-81d7-35f2e5a0bebf",
-				"toolSlug": "findtext",
+				"toolSlug": "listdirectory",
 				"toolVersion": "v1.0.0"
 			},
 			"toolChoicePatch": {

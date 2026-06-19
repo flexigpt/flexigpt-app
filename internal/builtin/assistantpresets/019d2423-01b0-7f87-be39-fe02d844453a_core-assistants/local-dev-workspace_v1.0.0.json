@@ -1,13 +1,13 @@
 {
 	"schemaVersion": "2026-03-22",
 	"id": "019d2426-58d7-73f7-9a74-0100ca63069a",
-	"slug": "local-reader-writer-exec",
+	"slug": "local-dev-workspace",
 	"version": "v1.0.0",
-	"displayName": "Local Dev: Read+Write+Execute",
-	"description": "Full local development workspace with read, write, and shell command access",
+	"displayName": "Local Dev Workspace",
+	"description": "Local development workspace with file read, write, unified diff, and shell command access",
 	"isEnabled": true,
 	"isBuiltIn": true,
-	"startingText": "<Replace this line with the repo/project path and the task. Example: `/absolute/path/to/repo`>\n\nInspect the relevant files, make the requested changes, and verify with focused shell commands where useful. Keep write and shell actions scoped.",
+	"startingText": "<Replace this line with the repo/project path and the task. Example: `/absolute/path/to/repo`>\n\nInspect relevant files first, prefer unified diffs for edits, use whole-file writes for create/replace cases, and verify with focused shell commands when useful. Keep write and shell actions scoped.",
 	"startingIncludeModelSystemPrompt": true,
 	"startingInstructionTemplateRefs": [
 		{
@@ -50,16 +50,6 @@
 		{
 			"toolRef": {
 				"bundleID": "018fe0f4-b8cd-7e55-82d5-9df0bd70e400",
-				"toolSlug": "writefile",
-				"toolVersion": "v1.0.0"
-			},
-			"toolChoicePatch": {
-				"autoExecute": false
-			}
-		},
-		{
-			"toolRef": {
-				"bundleID": "018fe0f4-b8cd-7e55-82d5-9df0bd70e400",
 				"toolSlug": "listdirectory",
 				"toolVersion": "v1.0.0"
 			},
@@ -70,37 +60,7 @@
 		{
 			"toolRef": {
 				"bundleID": "018fe0f4-b8cd-7e55-82d5-9df0bd70e400",
-				"toolSlug": "statpath",
-				"toolVersion": "v1.0.0"
-			},
-			"toolChoicePatch": {
-				"autoExecute": true
-			}
-		},
-		{
-			"toolRef": {
-				"bundleID": "019c0da2-02d2-7e71-81d7-35f2e5a0bebf",
-				"toolSlug": "readtextrange",
-				"toolVersion": "v1.0.0"
-			},
-			"toolChoicePatch": {
-				"autoExecute": true
-			}
-		},
-		{
-			"toolRef": {
-				"bundleID": "019c0da2-02d2-7e71-81d7-35f2e5a0bebf",
-				"toolSlug": "findtext",
-				"toolVersion": "v1.0.0"
-			},
-			"toolChoicePatch": {
-				"autoExecute": true
-			}
-		},
-		{
-			"toolRef": {
-				"bundleID": "019c0da2-02d2-7e71-81d7-35f2e5a0bebf",
-				"toolSlug": "inserttext",
+				"toolSlug": "writefile",
 				"toolVersion": "v1.0.0"
 			},
 			"toolChoicePatch": {
@@ -110,17 +70,7 @@
 		{
 			"toolRef": {
 				"bundleID": "019c0da2-02d2-7e71-81d7-35f2e5a0bebf",
-				"toolSlug": "replacetext",
-				"toolVersion": "v1.0.0"
-			},
-			"toolChoicePatch": {
-				"autoExecute": false
-			}
-		},
-		{
-			"toolRef": {
-				"bundleID": "019c0da2-02d2-7e71-81d7-35f2e5a0bebf",
-				"toolSlug": "deletetext",
+				"toolSlug": "applyunifieddiff",
 				"toolVersion": "v1.0.0"
 			},
 			"toolChoicePatch": {
@@ -139,5 +89,5 @@
 		}
 	],
 	"createdAt": "2026-03-25T00:00:00Z",
-	"modifiedAt": "2026-05-26T00:00:00Z"
+	"modifiedAt": "2026-06-19T00:00:00Z"
 }

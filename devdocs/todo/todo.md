@@ -4,11 +4,11 @@
 
 - [x] Need more cleanup wrt shortcuts, and shortcuts to add mcp, skills etc.
 - [x] Need more cleanup input tips
-- [ ] after shortcut click, the abort modal is not on abort as such. for keyboard one it should atleast highlight where it is and then see.
+- [x] after shortcut click, the abort modal is not on abort as such. for keyboard one it should atleast highlight where it is and then see. highlight on close.
 - [ ] need to update docs for mcp and diff render support.
-- [ ] Add diff out guidance to md sys prompt
 
-- [ ] need a file ops only assistant, may be add diff to other text things in assistants.
+- [x] Add diff out guidance to md sys prompt
+- [x] need a file ops only assistant, may be add diff to other text things in assistants.
 
 - [ ] better more inbuilt mcps. test enhanced mcp apps.
 
