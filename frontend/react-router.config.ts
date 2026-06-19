@@ -12,4 +12,5 @@ export default {
 	appDirectory: 'app',
 	ssr: false,
 	buildDirectory: 'dist',
+	prerender: true,
 } satisfies Config;

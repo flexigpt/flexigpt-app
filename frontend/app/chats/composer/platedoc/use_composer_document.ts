@@ -54,10 +54,23 @@ interface UseComposerDocumentResult {
 	getAttachedToolEntriesSnapshot: (uniqueByIdentity?: boolean) => AttachedToolEntry[];
 	onEditorChange: () => boolean;
 	onEditorPaste: (event: ReactClipboardEvent<HTMLDivElement>) => void;
+	scrollSelectionIntoEditorView: (_editor: unknown, domRange: Range) => void;
 	replaceEditorDocument: (nextValue: Value, focus?: ReplaceEditorDocumentFocusMode) => void;
 	resetEditorDocument: () => void;
 	focusEditorAtEnd: () => void;
 	focusEditorPreservingSelection: () => void;
+}
+
+function getUsefulRangeRect(domRange: Range): DOMRect | null {
+	const rects = Array.from(domRange.getClientRects()).filter(rect => rect.width > 0 || rect.height > 0);
+	if (rects.length > 0) {
+		return rects[rects.length - 1];
+	}
+
+	const rect = domRange.getBoundingClientRect();
+	if (rect.width > 0 || rect.height > 0) return rect;
+
+	return null;
 }
 
 export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseComposerDocumentResult {
@@ -153,68 +166,94 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 		}
 	}, []);
 
-	const scrollEditorSelectionIntoView = useCallback(() => {
+	const focusEditableWithoutScrolling = useCallback((currentEditor: PlateEditor) => {
+		const el = contentRef.current;
+		if (el) {
+			try {
+				el.focus({ preventScroll: true });
+				return true;
+			} catch {
+				// Fall through to Plate focus below.
+			}
+		}
+
+		try {
+			currentEditor.tf.focus();
+			return true;
+		} catch {
+			return false;
+		}
+	}, []);
+
+	const scrollDomRangeIntoEditorView = useCallback((domRange: Range | null | undefined) => {
 		const container = contentRef.current;
 		if (!container) return;
 
+		const rect = domRange ? getUsefulRangeRect(domRange) : null;
+
+		if (!rect) {
+			if (isCursorAtDocumentEnd(editorRef.current)) {
+				container.scrollTop = container.scrollHeight;
+			}
+			return;
+		}
+
+		const containerRect = container.getBoundingClientRect();
+		const padding = 12;
+
+		if (rect.bottom > containerRect.bottom - padding) {
+			container.scrollTop += rect.bottom - containerRect.bottom + padding;
+			return;
+		}
+
+		if (rect.top < containerRect.top + padding) {
+			container.scrollTop -= containerRect.top - rect.top + padding;
+		}
+	}, []);
+
+	const scrollSelectionIntoEditorView = useCallback(
+		(_editableEditor: unknown, domRange: Range) => {
+			scrollDomRangeIntoEditorView(domRange);
+		},
+		[scrollDomRangeIntoEditorView]
+	);
+
+	const scrollEditorSelectionIntoView = useCallback(() => {
 		const sel = window.getSelection();
 		if (sel && sel.rangeCount > 0) {
 			try {
 				const range = sel.getRangeAt(0).cloneRange();
 				range.collapse(false);
 
-				const rects = range.getClientRects();
-				const rect = (rects.length > 0 ? rects[rects.length - 1] : null) ?? range.getBoundingClientRect();
-
-				if (rect && (rect.height > 0 || rect.width > 0)) {
-					const containerRect = container.getBoundingClientRect();
-					const padding = 12;
-
-					if (rect.bottom > containerRect.bottom - padding) {
-						container.scrollTop += rect.bottom - containerRect.bottom + padding;
-						return;
-					}
-
-					if (rect.top < containerRect.top + padding) {
-						container.scrollTop -= containerRect.top - rect.top + padding;
-						return;
-					}
-				}
+				scrollDomRangeIntoEditorView(range);
+				return;
 			} catch {
 				// noop
 			}
 		}
 
-		container.scrollTop = container.scrollHeight;
-	}, []);
+		scrollDomRangeIntoEditorView(null);
+	}, [scrollDomRangeIntoEditorView]);
 
 	const focusEditorPreservingSelection = useCallback(() => {
 		const currentEditor = editorRef.current;
 		if (!currentEditor || isBusy) return;
 
 		runAfterNextPaint(() => {
-			try {
-				currentEditor.tf.focus();
-			} catch {
-				return;
-			}
+			if (!focusEditableWithoutScrolling(currentEditor)) return;
 
 			runAfterNextPaint(() => {
 				scrollEditorSelectionIntoView();
 			});
 		});
-	}, [isBusy, runAfterNextPaint, scrollEditorSelectionIntoView]);
+	}, [focusEditableWithoutScrolling, isBusy, runAfterNextPaint, scrollEditorSelectionIntoView]);
 
 	const focusEditorAtEnd = useCallback(() => {
 		const currentEditor = editorRef.current;
 		if (!currentEditor || isBusy) return;
 
 		runAfterNextPaint(() => {
-			try {
-				currentEditor.tf.focus();
-			} catch {
-				return;
-			}
+			if (!focusEditableWithoutScrolling(currentEditor)) return;
 
 			selectEditorEnd();
 
@@ -223,7 +262,7 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 				scrollEditorSelectionIntoView();
 			});
 		});
-	}, [isBusy, runAfterNextPaint, scrollEditorSelectionIntoView, selectEditorEnd]);
+	}, [focusEditableWithoutScrolling, isBusy, runAfterNextPaint, scrollEditorSelectionIntoView, selectEditorEnd]);
 
 	const autoChunkIfNeeded = useCallback(() => {
 		if (isAutoChunkingRef.current) return;
@@ -436,7 +475,8 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 				});
 
 				syncDocumentDerivedState(true);
-				focusEditorAtEnd();
+				selectEditorEnd();
+				scrollEditorSelectionIntoView();
 				cancelScheduledAutoChunk();
 				return;
 			}
@@ -448,9 +488,9 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 		},
 		[
 			cancelScheduledAutoChunk,
-			focusEditorAtEnd,
 			scheduleAutoChunk,
 			scrollEditorSelectionIntoView,
+			selectEditorEnd,
 			syncDocumentDerivedState,
 		]
 	);
@@ -477,6 +517,7 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 		getAttachedToolEntriesSnapshot,
 		onEditorChange,
 		onEditorPaste,
+		scrollSelectionIntoEditorView,
 		replaceEditorDocument,
 		resetEditorDocument,
 		focusEditorAtEnd,

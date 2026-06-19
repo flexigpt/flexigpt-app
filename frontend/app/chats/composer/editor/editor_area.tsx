@@ -181,6 +181,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		getAttachedToolEntriesSnapshot,
 		onEditorChange,
 		onEditorPaste,
+		scrollSelectionIntoEditorView,
 		replaceEditorDocument,
 		resetEditorDocument,
 		focusEditorAtEnd,
@@ -1589,6 +1590,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 										onKeyDown(e);
 									}}
 									onPaste={onEditorPaste}
+									scrollSelectionIntoView={scrollSelectionIntoEditorView}
 									className="max-h-96 min-w-0 flex-1 resize-none overflow-auto bg-transparent p-1 wrap-break-word whitespace-break-spaces tab-2 outline-none focus:outline-none"
 									style={{
 										fontSize: 14,
