@@ -35,17 +35,19 @@ When a result changes, compare these layers one at a time.
 
 ## Main terms
 
-| Term                    | Meaning                                                                                                                                                                            |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Provider**            | The API family or endpoint FlexiGPT talks to, such as OpenAI, Anthropic, Google Gemini API, xAI, Mistral, Hugging Face, OpenRouter, `llama.cpp`, or a compatible custom endpoint.  |
-| **Model preset**        | A saved provider/model choice with defaults such as model name, streaming, timeout, prompt/output limits, temperature, reasoning, output format, and provider-specific parameters. |
-| **Assistant preset**    | A reusable starter setup that can apply starting text, a model preset, instruction templates, tool selections, web search choices, and skill selections.                           |
-| **System prompt**       | Durable instruction context that shapes assistant behavior.                                                                                                                        |
-| **Prompt template**     | Reusable request structure inserted into the current draft. It may contain variables and multiple role blocks.                                                                     |
-| **Attachment**          | Message-scoped source material such as files, folders, images, PDFs, or URLs.                                                                                                      |
-| **Tool**                | A callable capability the model can request during a conversation.                                                                                                                 |
-| **Skill**               | A reusable workflow mode backed by skill runtime/session behavior.                                                                                                                 |
-| **Previous user turns** | The history window for the next request.                                                                                                                                           |
+| Term                         | Meaning                                                                                                                                                                            |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Provider**                 | The API family or endpoint FlexiGPT talks to, such as OpenAI, Anthropic, Google Gemini API, xAI, Mistral, Hugging Face, OpenRouter, `llama.cpp`, or a compatible custom endpoint.  |
+| **Model preset**             | A saved provider/model choice with defaults such as model name, streaming, timeout, prompt/output limits, temperature, reasoning, output format, and provider-specific parameters. |
+| **Assistant preset**         | A reusable starter setup that can apply starting text, a model preset, instruction templates, tool selections, web search choices, and skill selections.                           |
+| **System prompt**            | Durable instruction context that shapes assistant behavior.                                                                                                                        |
+| **Prompt template**          | Reusable request structure inserted into the current draft. It may contain variables and multiple role blocks.                                                                     |
+| **Attachment**               | Message-scoped source material such as files, folders, images, PDFs, or URLs.                                                                                                      |
+| **Tool**                     | A callable capability the model can request during a conversation.                                                                                                                 |
+| **Skill**                    | A reusable workflow mode backed by skill runtime/session behavior.                                                                                                                 |
+| **MCP server**               | One configured MCP (Model context protocol) endpoint inside a bundle, including transport, auth, trust, setup, discovery, and runtime state.                                       |
+| **MCP conversation context** | The selected MCP servers, tools, resources, resource templates, prompts, and arguments attached to the next request.                                                               |
+| **Previous user turns**      | The history window for the next request.                                                                                                                                           |
 
 ## Assistant preset versus model preset
 
@@ -85,14 +87,15 @@ Prompt templates have a derived kind:
 
 Use the right mechanism for the job:
 
-| Need                                       | Use                            |
-| ------------------------------------------ | ------------------------------ |
-| Exact source material                      | Attachment                     |
-| Durable behavior rules                     | System prompt                  |
-| Repeatable current-message structure       | Prompt template                |
-| Let the model ask the app to run something | Tool                           |
-| Keep a workflow mode active across turns   | Skill                          |
-| Recent web information                     | Provider-compatible web search |
+| Need                                             | Use                            |
+| ------------------------------------------------ | ------------------------------ |
+| Exact source material                            | Attachment                     |
+| Durable behavior rules                           | System prompt                  |
+| Repeatable current-message structure             | Prompt template                |
+| Let the model ask the app to run something       | Tool                           |
+| Use context from a model context protocol server | MCP                            |
+| Keep a workflow mode active across turns         | Skill                          |
+| Recent web information                           | Provider-compatible web search |
 
 See [Composer Context](/docs?doc=composer-context) for how these are used while composing a message.
 
@@ -119,6 +122,7 @@ FlexiGPT ships with built-in:
 - prompt templates
 - tools
 - skills
+- MCP server catalogs
 - assistant presets
 - docs
 
@@ -138,6 +142,7 @@ For versioned domains such as prompts and assistant presets:
 | ---------------------------------------------------------------------------------------- | ------------------------------------------ |
 | Do active work with a model                                                              | **Chats**                                  |
 | Attach files, folders, URLs, tools, skills, prompt templates, or web search to a message | **Chats -> Composer**                      |
+| Select MCP server context for a turn                                                     | **Chats -> MCP**                           |
 | Start from a reusable assistant workflow                                                 | **Chats -> Assistant dropdown**            |
 | Create or version assistant presets                                                      | **Assistant Presets**                      |
 | Create or version prompt templates and saved system prompts                              | **Prompts**                                |
@@ -145,6 +150,7 @@ For versioned domains such as prompts and assistant presets:
 | Enable a tool for a conversation                                                         | **Chats -> Tools** or an assistant preset  |
 | Create or maintain skill definitions                                                     | **Skills**                                 |
 | Enable skills for a conversation                                                         | **Chats -> Skills** or an assistant preset |
+| Create or maintain MCP server catalogs                                                   | **MCP Servers**                            |
 | Configure providers and model presets                                                    | **Model Presets**                          |
 | Add provider keys, theme, and debug settings                                             | **Settings**                               |
 | Search and reopen old conversations                                                      | **Chats**                                  |

@@ -12,6 +12,7 @@ For outcome-based LLM tasks, see [Everyday Recipes](/docs?doc=everyday-recipes).
 - [Create your first prompt template](#create-your-first-prompt-template)
 - [Create your first tool-assisted workflow](#create-your-first-tool-assisted-workflow)
 - [Create your first skill-backed workflow](#create-your-first-skill-backed-workflow)
+- [Create your first MCP-backed workflow](#create-your-first-mcp-backed-workflow)
 
 ## Use FlexiGPT with OpenRouter
 
@@ -290,3 +291,46 @@ Add the skill to an assistant preset:
 4. Turn on **Preload as active** if you want it active immediately.
 5. Save.
 6. Apply the preset in Chats and use **View** to confirm the skill selection.
+
+## Create your first MCP-backed workflow
+
+Use this when you want to configure one MCP server and use it from Chats.
+
+Suggested setup:
+
+- MCP Servers page: one custom or built-in-compatible server
+- Context: one server, not many
+- Tool exposure: `selected` or `none` until you trust the server
+- Previous user turns: usually `0` or `1`
+
+Steps:
+
+1. Open **MCP Servers**.
+2. Create or choose a bundle.
+3. Add one server, or copy an existing server if it is a close fit.
+4. Set transport, trust level, auth mode, and any required setup inputs.
+5. Connect the server and confirm that discovery is loaded.
+6. Open **Chats**.
+7. Open the composer **MCP** chip.
+8. Select the server and choose only the context you need.
+9. Fill required arguments before sending.
+10. Send a small test request.
+
+Starter prompt:
+
+- Use the selected MCP server only if it helps.
+- List the tools, resources, or prompts you plan to use, then call out any missing arguments or approval steps before you act.
+
+Expected result:
+
+- the server contributes only the context you selected
+- required arguments are filled before send
+- manual approval still applies where the tool policy requires it
+
+Troubleshooting:
+
+- check bundle enabled
+- check server enabled
+- check auth health
+- refresh discovery after changing server config
+- fill or remove incomplete arguments if send is blocked

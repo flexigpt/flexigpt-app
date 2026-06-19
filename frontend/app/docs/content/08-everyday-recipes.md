@@ -109,6 +109,8 @@ Good output should include:
 - test suggestions
 - uncertainty or missing context
 
+If the result includes a unified diff you want to apply locally, see [Unified Diff Apply](/docs?doc=unified-diff-apply).
+
 ## Investigate a bug
 
 Use this when you have logs, stack traces, failing tests, or confusing behavior.

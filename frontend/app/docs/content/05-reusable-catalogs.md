@@ -1,6 +1,6 @@
 # Reusable Catalogs
 
-The pages outside **Chats** maintain reusable building blocks: assistant presets, prompt templates, tool definitions, skills, model presets, and app settings.
+The pages outside **Chats** maintain reusable building blocks: assistant presets, prompt templates, tool definitions, skills, MCP server catalogs, model presets, and app settings.
 
 Use Chats to apply these things to a conversation. Use the catalog pages to create, inspect, version, enable, disable, or delete reusable definitions.
 
@@ -29,6 +29,7 @@ Use Chats to apply these things to a conversation. Use the catalog pages to crea
 | Create reusable prompt structures or system prompts | Prompts           |
 | Maintain callable capabilities                      | Tools             |
 | Maintain reusable workflow modes                    | Skills            |
+| Create or maintain MCP server catalogs              | MCP Servers       |
 | Configure providers and models                      | Model Presets     |
 | Add auth keys, change theme, or debug settings      | Settings          |
 
@@ -271,6 +272,8 @@ Practical workflow:
 | Create or maintain tool definitions       | Tools                                 |
 | Enable a tool in a chat                   | Chats -> Tools or assistant preset    |
 | Create or maintain skill definitions      | Skills                                |
+| Create or maintain MCP server catalogs    | MCP Servers                           |
+| Select MCP server context for a turn      | Chats -> Composer -> MCP              |
 | Enable skills in a chat                   | Chats -> Skills or assistant preset   |
 | Add an API key                            | Settings                              |
 | Add a local/custom provider               | Model Presets                         |

@@ -13,6 +13,7 @@ This page is about using context in Chats. To create or maintain reusable defini
 - [Tools](#tools)
 - [Web search](#web-search)
 - [Skills](#skills)
+- [MCP servers](#mcp-servers)
 - [Active chips bar](#active-chips-bar)
 - [Recommended pattern](#recommended-pattern)
 
@@ -24,6 +25,7 @@ This page is about using context in Chats. To create or maintain reusable defini
 | Keep behavior rules active across turns     | System prompt                                        |
 | Reuse current-message structure             | Prompt template                                      |
 | Let the model ask FlexiGPT to run something | Tool                                                 |
+| Use server-discovered context               | MCP                                                  |
 | Need recent web information                 | Web search, if compatible with the selected provider |
 | Use a reusable workflow mode                | Skill                                                |
 
@@ -191,6 +193,28 @@ The composer tracks:
 When you send with enabled skills, FlexiGPT may create or refresh a skill session and include skill-related context or tool choices in the request.
 
 Assistant presets can enable skills and mark some as **preload as active**.
+
+## MCP servers
+
+The `MCP` chip turns model context protocol server discovery into per-turn context. It does not edit the server catalog.
+
+Use it when a configured server should contribute tools, resources, resource templates, prompts, or server instructions to the next message.
+
+The usual flow is:
+
+1. Configure and connect the server on [MCP Servers](/docs?doc=mcp-servers).
+2. Open the `MCP` chip in Chats.
+3. Select one or more enabled servers.
+4. Choose `all`, `selected`, or `none` for tool exposure.
+5. Add only the resources, prompts, and arguments that the task needs.
+6. Keep `Include instructions` on only when the server instructions are useful.
+
+A few practical notes:
+
+- app-only tools stay visible, but are not exposed to the model
+- required arguments block send until they are filled
+- if the server produces app context updates, clear them when you no longer need them
+- refresh discovery on the server page when the server contents change
 
 ## Active chips bar
 

@@ -137,6 +137,7 @@ Start here:
 Context and reusable setup:
 
 - [Composer Context](./frontend/app/docs/content/04-composer-context.md)
+- [MCP Servers](./frontend/app/docs/content/10-mcp-servers.md)
 - [Reusable Catalogs](./frontend/app/docs/content/05-reusable-catalogs.md)
 
 Setup, safety, and help:
@@ -147,6 +148,7 @@ Setup, safety, and help:
 Recipes:
 
 - [Everyday Recipes](./frontend/app/docs/content/08-everyday-recipes.md)
+- [Unified Diff Apply](./frontend/app/docs/content/15-unified-diff-apply.md)
 - [Setup Recipes](./frontend/app/docs/content/09-setup-recipes.md)
 
 Architecture reference:

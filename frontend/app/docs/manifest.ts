@@ -7,10 +7,12 @@ import providersAndModelsBody from '@/docs/content/06-providers-and-models.md?ra
 import privacyDataTroubleshootingBody from '@/docs/content/07-privacy-data-and-troubleshooting.md?raw';
 import everydayRecipesBody from '@/docs/content/08-everyday-recipes.md?raw';
 import setupRecipesBody from '@/docs/content/09-setup-recipes.md?raw';
+import mcpServersBody from '@/docs/content/10-mcp-servers.md?raw';
 import architectureOverviewBody from '@/docs/content/11-architecture-overview.md?raw';
 import backendRolesBody from '@/docs/content/12-backend-roles-and-responsibilities.md?raw';
 import frontendRolesBody from '@/docs/content/13-frontend-roles-and-responsibilities.md?raw';
 import chatsWorkspaceComposerDesignBody from '@/docs/content/14-chats-workspace-and-composer-design.md?raw';
+import unifiedDiffApplyBody from '@/docs/content/15-unified-diff-apply.md?raw';
 
 type DocsSection = {
 	id: string;
@@ -57,7 +59,7 @@ export const docsCategories: DocsCategory[] = [
 		id: 'context-and-catalogs',
 		title: 'Context and Catalogs',
 		summary:
-			'Use context inside Chats, then maintain reusable prompts, tools, skills, models, and assistant presets on their own pages.',
+			'Use context inside Chats, then maintain reusable MCP servers, prompts, tools, skills, models, and assistant presets on their own pages.',
 		sections: [
 			{
 				id: 'composer-context',
@@ -65,6 +67,13 @@ export const docsCategories: DocsCategory[] = [
 				summary:
 					'Attach files, folders, URLs, prompt templates, tools, skills, and web search to the message you are composing.',
 				body: composerContextBody,
+			},
+			{
+				id: 'mcp-servers',
+				title: 'MCP Servers',
+				summary:
+					'Configure Model context protocol server bundles, transport, auth, trust, and discovery before selecting the active MCP context in Chats.',
+				body: mcpServersBody,
 			},
 			{
 				id: 'reusable-catalogs',
@@ -108,6 +117,12 @@ export const docsCategories: DocsCategory[] = [
 				summary:
 					'Run common workflows such as feature development, code review, bug investigation, documentation, research, and model comparison.',
 				body: everydayRecipesBody,
+			},
+			{
+				id: 'unified-diff-apply',
+				title: 'Unified Diff Apply',
+				summary: 'Review a patch in a code block, run a dry run, and apply the approved local file changes safely.',
+				body: unifiedDiffApplyBody,
 			},
 			{
 				id: 'setup-recipes',

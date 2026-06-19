@@ -95,6 +95,8 @@ The composer bottom bar is where you add message context:
   - reusable prompt templates for the current message
 - **Tools**
   - tool choices for the draft or conversation
+- **MCP**
+  - Model context protocol servers and their discovered tools, resources, prompts, and server instructions for the next message
 - **Skills**
   - workflow modes for the current session
 - **Web search**
@@ -137,6 +139,7 @@ The timeline can show:
 - message/request details
 - tool calls and outputs
 - attachments
+- recognized unified diff blocks with in-line apply controls for local file changes
 
 Use message details when debugging why a response changed.
 
