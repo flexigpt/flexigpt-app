@@ -1,10 +1,6 @@
-// unified diff parsing and target extraction helpers
-import {
-	type ApplyUnifiedDiffDiagnostic,
-	ApplyUnifiedDiffDiagnosticLevel,
-	type ApplyUnifiedDiffOut,
-	ApplyUnifiedDiffStatus,
-} from '@/spec/unified_diff';
+import { type ApplyUnifiedDiffDiagnostic, type ApplyUnifiedDiffOut, ApplyUnifiedDiffStatus } from '@/spec/unified_diff';
+
+import { uniqueDiagnostics } from '@/components/markdown/diff_diagnostic';
 
 export interface DiffApplyRunOptions {
 	diffText?: string;
@@ -22,6 +18,12 @@ interface ParsedUnifiedDiffFileForUI {
 	targetPath?: string;
 	diffText?: string;
 	sectionKeys: string[];
+}
+
+interface TargetPathInferenceForUI {
+	targetPath: string;
+	sourcePath: string;
+	score: number;
 }
 
 interface WorkingParsedUnifiedDiffFileForUI extends Omit<ParsedUnifiedDiffFileForUI, 'diffText'> {
@@ -247,7 +249,8 @@ export function buildUnifiedDiffTextForTarget(
 
 export function buildEditableTargetsFromOutput(
 	output: ApplyUnifiedDiffOut | undefined,
-	fallback: ParsedUnifiedDiffForUI
+	fallback: ParsedUnifiedDiffForUI,
+	globalCandidatePaths: string[] = []
 ): EditableUnifiedDiffTarget[] {
 	const byKey = new Map<string, EditableUnifiedDiffTarget>();
 
@@ -256,12 +259,18 @@ export function buildEditableTargetsFromOutput(
 	};
 
 	for (const file of fallback.files) {
+		const inferredTargets = inferTargetPathsForUI(file, globalCandidatePaths);
+		const inferredBestTarget = getUniqueBestInferredTarget(inferredTargets);
+
 		upsert({
 			fileKey: file.fileKey,
 			oldPath: file.oldPath,
 			newPath: file.newPath,
-			targetPath: file.targetPath || '',
-			candidatePaths: uniqueStrings(file.candidatePaths),
+			targetPath: chooseEditableTargetPath(file, inferredBestTarget),
+			candidatePaths: uniqueStrings([
+				...(file.candidatePaths ?? []),
+				...inferredTargets.map(candidate => candidate.targetPath),
+			]),
 			hunks: file.hunks,
 			addedLines: file.addedLines,
 			deletedLines: file.deletedLines,
@@ -281,16 +290,24 @@ export function buildEditableTargetsFromOutput(
 	}
 
 	for (const file of output?.files ?? []) {
+		const inferredTargets = inferTargetPathsForUI(file, globalCandidatePaths);
+		const inferredBestTarget = getUniqueBestInferredTarget(inferredTargets);
+
 		upsert({
 			fileKey: file.fileKey,
 			oldPath: file.oldPath,
 			newPath: file.newPath,
-			targetPath: file.targetPath || file.resolvedPath || '',
+			targetPath: chooseEditableTargetPath(file, inferredBestTarget),
 			resolvedPath: file.resolvedPath,
 			candidatePaths: uniqueStrings(
-				[...(file.candidatePaths ?? []), file.targetPath, file.resolvedPath, file.oldPath, file.newPath].filter(
-					isUsablePatchPath
-				)
+				[
+					...inferredTargets.map(candidate => candidate.targetPath),
+					...(file.candidatePaths ?? []),
+					file.targetPath,
+					file.resolvedPath,
+					file.oldPath,
+					file.newPath,
+				].filter(isUsablePatchPath)
 			),
 			ok: file.ok,
 			status: file.status,
@@ -332,30 +349,6 @@ export function summaryLabel(output: ApplyUnifiedDiffOut | undefined, fallback: 
 	}, +${fallback.addedLines}/-${fallback.deletedLines}`;
 }
 
-export function collectPatchLevelDiagnostics(output?: ApplyUnifiedDiffOut): ApplyUnifiedDiffDiagnostic[] {
-	return uniqueDiagnostics(output?.diagnostics ?? []);
-}
-
-export function collectFileLevelDiagnostics(output?: ApplyUnifiedDiffOut): ApplyUnifiedDiffDiagnostic[] {
-	return uniqueDiagnostics((output?.files ?? []).flatMap(file => file.diagnostics ?? []));
-}
-
-export function collectOutputDiagnostics(output?: ApplyUnifiedDiffOut): string[] {
-	return uniqueStringsFromDiagnostics([
-		...collectPatchLevelDiagnostics(output),
-		...collectFileLevelDiagnostics(output),
-	]);
-}
-
-export type HeaderButtonTone = 'neutral' | 'success' | 'warning' | 'error' | 'info';
-
-export interface DiagnosticSeverityCounts {
-	total: number;
-	error: number;
-	warning: number;
-	info: number;
-}
-
 export interface FileStatusCounts {
 	total: number;
 	applicable: number;
@@ -388,80 +381,6 @@ export interface EditableUnifiedDiffTarget {
 	alreadyAppliedHunks?: number;
 	addedLines?: number;
 	deletedLines?: number;
-}
-
-export function getHighestDiagnosticLevel(
-	diagnostics: ApplyUnifiedDiffDiagnostic[]
-): ApplyUnifiedDiffDiagnosticLevel | undefined {
-	if (diagnostics.some(diagnostic => diagnostic.level === ApplyUnifiedDiffDiagnosticLevel.Error)) {
-		return ApplyUnifiedDiffDiagnosticLevel.Error;
-	}
-
-	if (diagnostics.some(diagnostic => diagnostic.level === ApplyUnifiedDiffDiagnosticLevel.Warning)) {
-		return ApplyUnifiedDiffDiagnosticLevel.Warning;
-	}
-
-	if (diagnostics.some(diagnostic => diagnostic.level === ApplyUnifiedDiffDiagnosticLevel.Info)) {
-		return ApplyUnifiedDiffDiagnosticLevel.Info;
-	}
-
-	return undefined;
-}
-
-export function getDiagnosticSeverityCounts(diagnostics: ApplyUnifiedDiffDiagnostic[]): DiagnosticSeverityCounts {
-	const counts: DiagnosticSeverityCounts = {
-		total: diagnostics.length,
-		error: 0,
-		warning: 0,
-		info: 0,
-	};
-
-	for (const diagnostic of diagnostics) {
-		switch (diagnostic.level) {
-			case ApplyUnifiedDiffDiagnosticLevel.Error:
-				counts.error += 1;
-				break;
-			case ApplyUnifiedDiffDiagnosticLevel.Warning:
-				counts.warning += 1;
-				break;
-			case ApplyUnifiedDiffDiagnosticLevel.Info:
-			default:
-				counts.info += 1;
-				break;
-		}
-	}
-
-	return counts;
-}
-
-export function formatDiagnosticsTitle(diagnostics: ApplyUnifiedDiffDiagnostic[]): string {
-	const counts = getDiagnosticSeverityCounts(diagnostics);
-	if (counts.total === 0) return '';
-
-	const summary = [
-		counts.error > 0 ? `${counts.error} error${counts.error === 1 ? '' : 's'}` : undefined,
-		counts.warning > 0 ? `${counts.warning} warning${counts.warning === 1 ? '' : 's'}` : undefined,
-		counts.info > 0 ? `${counts.info} info` : undefined,
-	]
-		.filter(Boolean)
-		.join(', ');
-
-	const messages = diagnostics
-		.slice(0, 6)
-		.map(diagnostic => `${diagnostic.level}${diagnostic.code ? ` ${diagnostic.code}` : ''}: ${diagnostic.message}`);
-
-	if (diagnostics.length > 6) {
-		messages.push(`+${diagnostics.length - 6} more`);
-	}
-
-	return [`Patch diagnostics: ${summary}`, ...messages].join('\n');
-}
-
-export function getDiagnosticToneFromCounts(counts: DiagnosticSeverityCounts): HeaderButtonTone {
-	if (counts.error > 0) return 'error';
-	if (counts.warning > 0) return 'warning';
-	if (counts.info > 0) return 'info';
-	return 'neutral';
 }
 
 function mergeParsedUnifiedDiffFiles(files: ParsedUnifiedDiffFileForUI[]): ParsedUnifiedDiffFileForUI[] {
@@ -510,28 +429,52 @@ function findEditableTargetMapKey(
 	byKey: Map<string, EditableUnifiedDiffTarget>,
 	target: EditableUnifiedDiffTarget
 ): string | undefined {
-	const fileKey = target.fileKey?.trim();
+	const targetSectionKeys = getEditableTargetSectionKeys(target);
 
-	if (fileKey) {
+	if (targetSectionKeys.length > 0) {
 		for (const [key, existing] of byKey.entries()) {
-			if (existing.fileKey === fileKey || existing.sectionKeys?.includes(fileKey)) {
+			const existingSectionKeys = getEditableTargetSectionKeys(existing);
+
+			if (targetSectionKeys.some(sectionKey => existingSectionKeys.includes(sectionKey))) {
 				return key;
 			}
 		}
 	}
 
-	const identity = getPatchFileIdentity(target);
-	if (!identity) return undefined;
+	const targetPatchPaths = getEditableTargetPatchPaths(target);
 
-	for (const [key, existing] of byKey.entries()) {
-		if (getPatchFileIdentity(existing) === identity) return key;
+	if (targetPatchPaths.length > 0) {
+		for (const [key, existing] of byKey.entries()) {
+			if (haveSharedPathIdentity(getEditableTargetPatchPaths(existing), targetPatchPaths)) return key;
+		}
+	}
+
+	const targetResolvedPaths = getEditableTargetResolvedPaths(target);
+
+	if (targetResolvedPaths.length > 0) {
+		for (const [key, existing] of byKey.entries()) {
+			if (getEditableTargetPatchPaths(existing).length > 0) continue;
+			if (haveSharedPathIdentity(getEditableTargetResolvedPaths(existing), targetResolvedPaths)) return key;
+		}
 	}
 
 	return undefined;
 }
 
 function getEditableTargetMapKey(target: EditableUnifiedDiffTarget, index: number): string {
-	return getPatchFileIdentity(target) || target.fileKey || `target-${index}`;
+	return getEditableTargetIdentity(target) || `target-${index}`;
+}
+
+function getEditableTargetSectionKeys(target: { fileKey?: string; sectionKeys?: string[] }): string[] {
+	return uniqueStrings([target.fileKey, ...(target.sectionKeys ?? [])]);
+}
+
+function getEditableTargetPatchPaths(target: { oldPath?: string; newPath?: string }): string[] {
+	return uniqueStrings([target.newPath, target.oldPath].filter(isUsablePatchPath));
+}
+
+function getEditableTargetResolvedPaths(target: { targetPath?: string; resolvedPath?: string }): string[] {
+	return uniqueStrings([target.resolvedPath, target.targetPath].filter(isUsablePatchPath));
 }
 
 export function haveSharedPathIdentity(left: Array<string | undefined>, right: Array<string | undefined>): boolean {
@@ -686,33 +629,177 @@ function mergeEditableTarget(
 	};
 }
 
-export function uniqueDiagnostics(
-	values: Array<ApplyUnifiedDiffDiagnostic | undefined | null>
-): ApplyUnifiedDiffDiagnostic[] {
-	const out: ApplyUnifiedDiffDiagnostic[] = [];
-	const seen = new Set<string>();
+function chooseEditableTargetPath(
+	file: {
+		targetPath?: string;
+		resolvedPath?: string;
+		oldPath?: string;
+		newPath?: string;
+	},
+	inferredBestTarget?: string
+): string {
+	const targetPath = file.targetPath?.trim() ?? '';
+	const resolvedPath = file.resolvedPath?.trim() ?? '';
 
-	for (const value of values) {
-		if (!value) continue;
+	if (targetPath) return targetPath;
 
-		const message = value.message.trim();
-		if (!message) continue;
+	if (inferredBestTarget) return inferredBestTarget;
 
-		const level = value.level ?? ApplyUnifiedDiffDiagnosticLevel.Info;
-		const code = value.code?.trim() ?? '';
-		const key = `${level}\u0000${code}\u0000${message.replaceAll('\\', '/').replace(/\/+/g, '/')}`;
-
-		if (seen.has(key)) continue;
-
-		seen.add(key);
-		out.push({
-			level,
-			code: code || undefined,
-			message,
-		});
+	if (resolvedPath && isAbsolutePathLike(resolvedPath) && isResolvedPathCompatibleWithPatchPath(resolvedPath, file)) {
+		return resolvedPath;
 	}
 
-	return out;
+	return '';
+}
+
+function isResolvedPathCompatibleWithPatchPath(
+	resolvedPath: string,
+	file: {
+		oldPath?: string;
+		newPath?: string;
+	}
+): boolean {
+	const resolvedKey = normalizePathKey(resolvedPath);
+	if (!resolvedKey) return false;
+
+	const patchPaths = getEditableTargetPatchPaths(file);
+	if (patchPaths.length === 0) return true;
+
+	return patchPaths.some(patchPath => {
+		const patchKey = normalizePathKey(patchPath);
+		return !!patchKey && (resolvedKey === patchKey || resolvedKey.endsWith(`/${patchKey}`));
+	});
+}
+
+function inferTargetPathsForUI(
+	file: {
+		oldPath?: string;
+		newPath?: string;
+		candidatePaths?: string[];
+	},
+	globalCandidatePaths: string[]
+): TargetPathInferenceForUI[] {
+	const patchPath = normalizePathKey(file.newPath) || normalizePathKey(file.oldPath);
+	if (!patchPath || isAbsolutePathLike(patchPath)) return [];
+
+	const patchDir = dirnamePathKey(patchPath);
+	const patchDirParts = getPathParts(patchDir);
+	const candidates = uniqueStrings([...(file.candidatePaths ?? []), ...globalCandidatePaths]);
+	const inferences: TargetPathInferenceForUI[] = [];
+
+	for (const candidateRaw of candidates) {
+		const candidate = normalizePathKey(candidateRaw);
+		if (!candidate || !isAbsolutePathLike(candidate)) continue;
+
+		const candidateLooksDirectory = looksLikeDirectoryPath(candidateRaw);
+		const candidateDir = candidateLooksDirectory ? trimTrailingSlashes(candidate) : dirnamePathKey(candidate);
+
+		if (candidateDir && patchDirParts.length > 0) {
+			const candidateDirParts = getPathParts(candidateDir);
+			const maxPrefix = Math.min(patchDirParts.length, candidateDirParts.length);
+
+			for (let prefixLength = maxPrefix; prefixLength >= 1; prefixLength -= 1) {
+				const prefix = patchDirParts.slice(0, prefixLength).join('/');
+				const root = trimPathSuffix(candidateDir, prefix);
+
+				if (root === undefined) continue;
+
+				inferences.push({
+					targetPath: joinPathKey(root, patchPath),
+					sourcePath: candidateRaw,
+					score: prefixLength,
+				});
+				break;
+			}
+		}
+
+		if (candidateLooksDirectory) {
+			inferences.push({
+				targetPath: joinPathKey(trimTrailingSlashes(candidate), patchPath),
+				sourcePath: candidateRaw,
+				score: 0,
+			});
+		}
+	}
+
+	return sortAndDedupeTargetInferences(inferences);
+}
+
+function getUniqueBestInferredTarget(inferences: TargetPathInferenceForUI[]): string | undefined {
+	if (inferences.length === 0) return undefined;
+
+	const bestScore = inferences[0].score;
+	const bestTargets = uniqueStrings(
+		inferences.filter(candidate => candidate.score === bestScore).map(candidate => candidate.targetPath)
+	);
+
+	return bestTargets.length === 1 ? bestTargets[0] : undefined;
+}
+
+function sortAndDedupeTargetInferences(inferences: TargetPathInferenceForUI[]): TargetPathInferenceForUI[] {
+	const byTarget = new Map<string, TargetPathInferenceForUI>();
+
+	for (const inference of inferences) {
+		const key = normalizePathKey(inference.targetPath);
+		if (!key) continue;
+
+		const existing = byTarget.get(key);
+		if (!existing || inference.score > existing.score) {
+			byTarget.set(key, inference);
+		}
+	}
+
+	return Array.from(byTarget.values()).sort((left, right) => {
+		if (left.score !== right.score) return right.score - left.score;
+		return normalizePathKey(left.targetPath).localeCompare(normalizePathKey(right.targetPath));
+	});
+}
+
+function isAbsolutePathLike(value: string | undefined): boolean {
+	const normalized = value?.trim();
+	if (!normalized) return false;
+	return normalized.startsWith('/') || /^[A-Za-z]:[\\/]/.test(normalized) || normalized.startsWith('\\\\');
+}
+
+function looksLikeDirectoryPath(value: string): boolean {
+	const trimmed = value.trim();
+	return trimmed.endsWith('/') || trimmed.endsWith('\\');
+}
+
+function dirnamePathKey(value: string): string {
+	const normalized = normalizePathKey(value);
+	if (!normalized) return '';
+	const index = normalized.lastIndexOf('/');
+	if (index < 0) return '';
+	if (index === 0) return '/';
+	return normalized.slice(0, index);
+}
+
+function getPathParts(value: string): string[] {
+	return trimTrailingSlashes(value).replace(/^\/+/, '').split('/').filter(Boolean);
+}
+
+function trimPathSuffix(value: string, suffix: string): string | undefined {
+	const normalizedValue = trimTrailingSlashes(normalizePathKey(value));
+	const normalizedSuffix = trimTrailingSlashes(normalizePathKey(suffix)).replace(/^\/+/, '');
+	if (!normalizedValue || !normalizedSuffix) return undefined;
+	if (normalizedValue === normalizedSuffix) return '';
+	const marker = `/${normalizedSuffix}`;
+	if (!normalizedValue.endsWith(marker)) return undefined;
+	return normalizedValue.slice(0, normalizedValue.length - marker.length);
+}
+
+function joinPathKey(root: string, rel: string): string {
+	const cleanRoot = trimTrailingSlashes(normalizePathKey(root));
+	const cleanRel = normalizePathKey(rel).replace(/^\/+/, '');
+	if (!cleanRoot) return cleanRel;
+	if (cleanRoot === '/') return `/${cleanRel}`;
+	return `${cleanRoot}/${cleanRel}`;
+}
+
+function trimTrailingSlashes(value: string): string {
+	if (value === '/') return value;
+	return value.replace(/\/+$/g, '');
 }
 
 export function mergeNumberMax(left: number | undefined, right: number | undefined): number | undefined {
@@ -749,7 +836,10 @@ function parsedFileMatchesTarget(
 	if (targetIdentity && targetIdentity === getPatchFileIdentity(file)) return true;
 
 	const filePaths = uniqueStrings([file.targetPath, file.newPath, file.oldPath, ...file.candidatePaths]);
-	const targetPaths = uniqueStrings([target.targetPath, target.newPath, target.oldPath]);
+	const targetPaths = uniqueStrings([target.newPath, target.oldPath]);
+	if (targetPaths.length === 0 && target.targetPath?.trim()) {
+		targetPaths.push(target.targetPath.trim());
+	}
 
 	return filePaths.some(filePath =>
 		targetPaths.some(targetPath => normalizePathKey(filePath) === normalizePathKey(targetPath))
@@ -762,17 +852,37 @@ function getPatchFileIdentity(file: {
 	oldPath?: string;
 	newPath?: string;
 }): string {
+	const patchPath = getEditableTargetPatchPaths(file)[0];
+	if (patchPath) return `path:${normalizePathKey(patchPath)}`;
+
 	const targetPath = normalizePathKey(file.targetPath);
 	if (targetPath) return `path:${targetPath}`;
 
 	const resolvedPath = normalizePathKey(file.resolvedPath);
 	if (resolvedPath) return `path:${resolvedPath}`;
 
-	const newPath = normalizePathKey(file.newPath);
-	if (newPath) return `path:${newPath}`;
+	return '';
+}
 
-	const oldPath = normalizePathKey(file.oldPath);
-	if (oldPath) return `path:${oldPath}`;
+function getEditableTargetIdentity(file: {
+	fileKey?: string;
+	sectionKeys?: string[];
+	targetPath?: string;
+	resolvedPath?: string;
+	oldPath?: string;
+	newPath?: string;
+}): string {
+	const fileKey = file.fileKey?.trim();
+	if (fileKey) return `file:${fileKey}`;
+
+	const sectionKeys = uniqueStrings(file.sectionKeys ?? []);
+	if (sectionKeys.length > 0) return `section:${sectionKeys.join('|')}`;
+
+	const patchPath = getEditableTargetPatchPaths(file)[0];
+	if (patchPath) return `patch:${normalizePathKey(patchPath)}`;
+
+	const resolvedPath = getEditableTargetResolvedPaths(file)[0];
+	if (resolvedPath) return `path:${normalizePathKey(resolvedPath)}`;
 
 	return '';
 }
@@ -881,25 +991,6 @@ function stripGitPathPrefix(value: string, prefix: string): string {
 
 function isUsablePatchPath(value: unknown): value is string {
 	return typeof value === 'string' && value.trim().length > 0 && value.trim() !== DEV_NULL;
-}
-
-function uniqueStringsFromDiagnostics(values: Array<ApplyUnifiedDiffDiagnostic | undefined | null>): string[] {
-	const out: string[] = [];
-	const seen = new Set<string>();
-
-	for (const value of values) {
-		const trimmed = value?.message.trim();
-		if (!trimmed) continue;
-
-		const key = trimmed.replaceAll('\\', '/').replace(/\/+/g, '/');
-
-		if (seen.has(key)) continue;
-
-		seen.add(key);
-		out.push(trimmed);
-	}
-
-	return out;
 }
 
 export function uniqueStrings(values: Array<string | undefined | null>): string[] {

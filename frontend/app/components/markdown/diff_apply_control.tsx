@@ -15,25 +15,27 @@ import { aggregateAPI } from '@/apis/baseapi';
 
 import { DiffApplyModal } from '@/components/markdown/diff_apply_modal';
 import {
-	buildEditableTargetsFromOutput,
-	buildFileStatusCounts,
-	buildUnifiedDiffTextForTarget,
 	collectOutputDiagnostics,
 	collectPatchLevelDiagnostics,
-	type DiffApplyRunOptions,
-	type EditableUnifiedDiffTarget,
-	type FileStatusCounts,
 	formatDiagnosticsTitle,
 	getDiagnosticSeverityCounts,
 	getDiagnosticToneFromCounts,
-	getErrorMessage,
 	getHighestDiagnosticLevel,
-	haveSharedPathIdentity,
 	type HeaderButtonTone,
+	uniqueDiagnostics,
+} from '@/components/markdown/diff_diagnostic';
+import {
+	buildEditableTargetsFromOutput,
+	buildFileStatusCounts,
+	buildUnifiedDiffTextForTarget,
+	type DiffApplyRunOptions,
+	type EditableUnifiedDiffTarget,
+	type FileStatusCounts,
+	getErrorMessage,
+	haveSharedPathIdentity,
 	looksLikeUnifiedDiff,
 	parseUnifiedDiffForUI,
 	summaryLabel,
-	uniqueDiagnostics,
 	uniqueStrings,
 } from '@/components/markdown/unified_diff_block';
 
@@ -208,6 +210,91 @@ function getHeaderDetailsTone(status: ControlStatus, diagnostics: ApplyUnifiedDi
 	return 'neutral';
 }
 
+function getApplyPatchIdentityPaths(file: { newPath?: string; oldPath?: string }): string[] {
+	return uniqueStrings([file.newPath, file.oldPath]).filter(path => path !== '/dev/null');
+}
+
+function getApplyResolvedIdentityPaths(file: { resolvedPath?: string; targetPath?: string }): string[] {
+	return uniqueStrings([file.resolvedPath, file.targetPath]).filter(path => path !== '/dev/null');
+}
+
+function applyOutputFileMatchesTarget(file: ApplyUnifiedDiffFileOut, target: ApplyUnifiedDiffFileTarget): boolean {
+	if (file.fileKey && target.fileKey && file.fileKey === target.fileKey) return true;
+
+	const filePatchPaths = getApplyPatchIdentityPaths(file);
+	const targetPatchPaths = getApplyPatchIdentityPaths(target);
+
+	if (filePatchPaths.length > 0 && targetPatchPaths.length > 0) {
+		return haveSharedPathIdentity(filePatchPaths, targetPatchPaths);
+	}
+
+	if (filePatchPaths.length === 0 && targetPatchPaths.length === 0) {
+		return haveSharedPathIdentity(getApplyResolvedIdentityPaths(file), getApplyResolvedIdentityPaths(target));
+	}
+
+	return false;
+}
+
+function findRequestTargetForOutputFile(
+	file: ApplyUnifiedDiffFileOut,
+	targets: ApplyUnifiedDiffFileTarget[],
+	usedTargetIndexes: Set<number>
+): { target: ApplyUnifiedDiffFileTarget; index: number } | undefined {
+	for (let index = 0; index < targets.length; index += 1) {
+		if (usedTargetIndexes.has(index)) continue;
+
+		const target = targets[index];
+		if (!target) continue;
+
+		if (applyOutputFileMatchesTarget(file, target)) {
+			return { target, index };
+		}
+	}
+
+	return undefined;
+}
+
+function hydrateApplyOutputWithRequestTargets(
+	output: ApplyUnifiedDiffOut,
+	requestTargets: ApplyUnifiedDiffFileTarget[]
+): ApplyUnifiedDiffOut {
+	if (!output.files?.length || requestTargets.length === 0) return output;
+
+	const outputFiles = output.files;
+	const usedTargetIndexes = new Set<number>();
+	const canUsePositionFallback = outputFiles.length === requestTargets.length;
+
+	const files = outputFiles.map((file, index) => {
+		const directMatch = findRequestTargetForOutputFile(file, requestTargets, usedTargetIndexes);
+		let target = directMatch?.target;
+
+		if (directMatch) {
+			usedTargetIndexes.add(directMatch.index);
+		} else if (canUsePositionFallback && requestTargets[index] && !usedTargetIndexes.has(index)) {
+			target = requestTargets[index];
+			usedTargetIndexes.add(index);
+		} else if (outputFiles.length === 1 && requestTargets.length === 1) {
+			target = requestTargets[0];
+		}
+
+		if (!target) return file;
+
+		return {
+			...file,
+			fileKey: target.fileKey || file.fileKey,
+			oldPath: file.oldPath || target.oldPath,
+			newPath: file.newPath || target.newPath,
+			targetPath: target.targetPath || file.targetPath,
+		};
+	});
+
+	return {
+		...output,
+		fileTargets: mergeApplyFileTargets(output.fileTargets ?? [], requestTargets),
+		files,
+	};
+}
+
 function mergeApplyUnifiedDiffOutput(
 	previous: ApplyUnifiedDiffOut | undefined,
 	scoped: ApplyUnifiedDiffOut
@@ -299,18 +386,23 @@ function mergeApplyFileTargets(
 function applyOutputFilesMatch(left: ApplyUnifiedDiffFileOut, right: ApplyUnifiedDiffFileOut): boolean {
 	if (left.fileKey && right.fileKey && left.fileKey === right.fileKey) return true;
 
-	return haveSharedPathIdentity(
-		[left.targetPath, left.resolvedPath, left.newPath, left.oldPath],
-		[right.targetPath, right.resolvedPath, right.newPath, right.oldPath]
-	);
+	const leftPatchPaths = getApplyPatchIdentityPaths(left);
+	const rightPatchPaths = getApplyPatchIdentityPaths(right);
+
+	if (leftPatchPaths.length > 0 && rightPatchPaths.length > 0) {
+		return haveSharedPathIdentity(leftPatchPaths, rightPatchPaths);
+	}
+
+	if (leftPatchPaths.length === 0 && rightPatchPaths.length === 0) {
+		return haveSharedPathIdentity(getApplyResolvedIdentityPaths(left), getApplyResolvedIdentityPaths(right));
+	}
+
+	return false;
 }
 
 function fileTargetsMatch(left: ApplyUnifiedDiffFileTarget, right: ApplyUnifiedDiffFileTarget): boolean {
 	if (left.fileKey && right.fileKey && left.fileKey === right.fileKey) return true;
-	return haveSharedPathIdentity(
-		[left.targetPath, left.newPath, left.oldPath],
-		[right.targetPath, right.newPath, right.oldPath]
-	);
+	return haveSharedPathIdentity([left.newPath, left.oldPath], [right.newPath, right.oldPath]);
 }
 
 function getHeaderStatusSummary(
@@ -399,17 +491,23 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 
 	const deriveAndStoreTargets = useCallback(
 		(output: ApplyUnifiedDiffOut | undefined, previousTargets?: ApplyUnifiedDiffFileTarget[]) => {
-			if (output?.fileTargets && output.fileTargets.length > 0) {
-				setFileTargets(output.fileTargets);
-				return output.fileTargets;
+			const editable = buildEditableTargetsFromOutput(output, fallbackParsed, normalizedCandidatePaths);
+			const next = editableTargetsToFileTargets(editable);
+			const nextWithPrevious =
+				previousTargets && previousTargets.length > 0 ? mergeApplyFileTargets(next, previousTargets) : next;
+
+			if (nextWithPrevious.length > 0) {
+				setFileTargets(nextWithPrevious);
+				return nextWithPrevious;
 			}
 
-			const editable = buildEditableTargetsFromOutput(output, fallbackParsed);
-			const next = editableTargetsToFileTargets(editable);
-
-			if (next.length > 0) {
-				setFileTargets(next);
-				return next;
+			if (output?.fileTargets && output.fileTargets.length > 0) {
+				const outputTargets =
+					previousTargets && previousTargets.length > 0
+						? mergeApplyFileTargets(output.fileTargets, previousTargets)
+						: output.fileTargets;
+				setFileTargets(outputTargets);
+				return outputTargets;
 			}
 
 			if (previousTargets) {
@@ -419,7 +517,7 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 
 			return [];
 		},
-		[fallbackParsed]
+		[fallbackParsed, normalizedCandidatePaths]
 	);
 
 	const buildDiffTextForEditableTargets = useCallback(
@@ -470,7 +568,7 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 			}));
 
 			try {
-				const output = await aggregateAPI.applyUnifiedDiff({
+				const rawOutput = await aggregateAPI.applyUnifiedDiff({
 					diffText: requestDiffText,
 					dryRun: true,
 					strict: nextStrict,
@@ -480,6 +578,7 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 
 				if (seq !== requestSeqRef.current) return undefined;
 
+				const output = hydrateApplyOutputWithRequestTargets(rawOutput, targets);
 				const viewOutput = options?.mergeOutput ? mergeApplyUnifiedDiffOutput(stateRef.current.output, output) : output;
 
 				deriveAndStoreTargets(viewOutput, targets);
@@ -562,8 +661,7 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 			return;
 		}
 
-		const applyTargets =
-			dryRunOutput.fileTargets && dryRunOutput.fileTargets.length > 0 ? dryRunOutput.fileTargets : targets;
+		const applyTargets = deriveAndStoreTargets(dryRunOutput, targets);
 
 		setControlState(previous => ({
 			...previous,
@@ -575,7 +673,7 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 		const applySeq = ++requestSeqRef.current;
 
 		try {
-			const output = await aggregateAPI.applyUnifiedDiff({
+			const rawOutput = await aggregateAPI.applyUnifiedDiff({
 				diffText: requestDiffText,
 				dryRun: false,
 				strict: nextStrict,
@@ -583,6 +681,8 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 				candidatePaths: normalizedCandidatePaths.length > 0 ? normalizedCandidatePaths : undefined,
 			});
 			if (applySeq !== requestSeqRef.current) return;
+
+			const output = hydrateApplyOutputWithRequestTargets(rawOutput, applyTargets);
 
 			const viewOutput = options?.mergeOutput ? mergeApplyUnifiedDiffOutput(stateRef.current.output, output) : output;
 
@@ -623,7 +723,11 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 	const detailTitle = uniqueStrings([headerStatusSummary, title, formatDiagnosticsTitle(patchDiagnostics)]).join('\n');
 	const blockedCount = Math.max(0, statusCounts.blocked - statusCounts.needsInfo);
 
-	const editableTargetsForHeader = buildEditableTargetsFromOutput(state.output, fallbackParsed);
+	const editableTargetsForHeader = buildEditableTargetsFromOutput(
+		state.output,
+		fallbackParsed,
+		normalizedCandidatePaths
+	);
 	const applicableTargets = getApplicableTargetsForOutput(editableTargetsForHeader, state.output);
 	const applicableTargetsHaveMissingPaths =
 		applicableTargets.length > 0 && editableTargetsToFileTargets(applicableTargets).length !== applicableTargets.length;

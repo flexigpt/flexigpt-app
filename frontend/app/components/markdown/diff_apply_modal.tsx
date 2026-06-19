@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
-import { FiAlertTriangle, FiChevronRight, FiGitPullRequest, FiInfo, FiX } from 'react-icons/fi';
+import { FiChevronRight, FiGitPullRequest, FiX } from 'react-icons/fi';
 
 import {
 	type ApplyUnifiedDiffDiagnostic,
@@ -13,24 +13,27 @@ import {
 } from '@/spec/unified_diff';
 
 import {
-	buildEditableTargetsFromOutput,
-	buildFileStatusCounts,
 	collectFileLevelDiagnostics,
 	collectPatchLevelDiagnostics,
 	type DiagnosticSeverityCounts,
-	type DiffApplyRunOptions,
-	type EditableUnifiedDiffTarget,
 	formatDiagnosticsTitle,
 	getDiagnosticSeverityCounts,
 	getDiagnosticToneFromCounts,
-	getHighestDiagnosticLevel,
+	type HeaderButtonTone,
+	renderDiagnosticSeveritySummary,
+	renderDiagnosticsPanel,
+	uniqueDiagnostics,
+} from '@/components/markdown/diff_diagnostic';
+import {
+	buildEditableTargetsFromOutput,
+	buildFileStatusCounts,
+	type DiffApplyRunOptions,
+	type EditableUnifiedDiffTarget,
 	getPathIdentity,
 	haveSharedPathIdentity,
-	type HeaderButtonTone,
 	mergeNumberMax,
 	type parseUnifiedDiffForUI,
 	summaryLabel,
-	uniqueDiagnostics,
 	uniqueStrings,
 } from '@/components/markdown/unified_diff_block';
 import { ModalBackdrop } from '@/components/modal_backdrop';
@@ -38,14 +41,6 @@ import { ModalBackdrop } from '@/components/modal_backdrop';
 type ModalRunningAction = { key: string; kind: 'dry-run' | 'apply' };
 type TargetVisualState = 'neutral' | 'info' | 'success' | 'warning' | 'error';
 
-interface DiagnosticPanelOptions {
-	title: string;
-	description?: string;
-	diagnostics: ApplyUnifiedDiffDiagnostic[];
-	className?: string;
-	footer?: string;
-	limit?: number;
-}
 function getTargetCardClassName(visualState: TargetVisualState): string {
 	switch (visualState) {
 		case 'error':
@@ -111,16 +106,36 @@ function getDiagnosticSummaryBadgeClassName(counts: DiagnosticSeverityCounts): s
 	return getBadgeToneClassName(getDiagnosticToneFromCounts(counts));
 }
 
+function getModalTargetSectionKeys(target: EditableUnifiedDiffTarget): string[] {
+	return uniqueStrings([target.fileKey, ...(target.sectionKeys ?? [])]);
+}
+
+function getModalTargetPatchPaths(target: EditableUnifiedDiffTarget): string[] {
+	return uniqueStrings([target.newPath, target.oldPath]).filter(path => path !== '/dev/null');
+}
+
+function getModalTargetResolvedPaths(target: EditableUnifiedDiffTarget): string[] {
+	return uniqueStrings([target.resolvedPath, target.targetPath]).filter(path => path !== '/dev/null');
+}
+
 function editableTargetsMatch(left: EditableUnifiedDiffTarget, right: EditableUnifiedDiffTarget): boolean {
-	const leftKeys = uniqueStrings([left.fileKey, ...(left.sectionKeys ?? [])]);
-	const rightKeys = uniqueStrings([right.fileKey, ...(right.sectionKeys ?? [])]);
+	const leftKeys = getModalTargetSectionKeys(left);
+	const rightKeys = getModalTargetSectionKeys(right);
 
 	if (leftKeys.some(key => rightKeys.includes(key))) return true;
 
-	return haveSharedPathIdentity(
-		[left.targetPath, left.resolvedPath, left.newPath, left.oldPath, ...(left.candidatePaths ?? [])],
-		[right.targetPath, right.resolvedPath, right.newPath, right.oldPath, ...(right.candidatePaths ?? [])]
-	);
+	const leftPatchPaths = getModalTargetPatchPaths(left);
+	const rightPatchPaths = getModalTargetPatchPaths(right);
+
+	if (leftPatchPaths.length > 0 && rightPatchPaths.length > 0) {
+		return haveSharedPathIdentity(leftPatchPaths, rightPatchPaths);
+	}
+
+	if (leftPatchPaths.length === 0 && rightPatchPaths.length === 0) {
+		return haveSharedPathIdentity(getModalTargetResolvedPaths(left), getModalTargetResolvedPaths(right));
+	}
+
+	return false;
 }
 
 function mergeEditableTargetForModal(
@@ -192,12 +207,47 @@ function upsertEditableTargetForModal(
 	byKey.set(key, mergeEditableTargetForModal(existing, target));
 }
 
-function groupEditableTargetsForModal(targets: EditableUnifiedDiffTarget[]): EditableUnifiedDiffTarget[] {
-	const byKey = new Map<string, EditableUnifiedDiffTarget>();
-	for (const target of targets) {
-		upsertEditableTargetForModal(byKey, target);
-	}
-	return Array.from(byKey.values());
+function mergeEditableTargetPreservingLocalPath(
+	base: EditableUnifiedDiffTarget,
+	local: EditableUnifiedDiffTarget
+): EditableUnifiedDiffTarget {
+	const merged = mergeEditableTargetForModal(local, base);
+	const localTargetPath = local.targetPath.trim();
+
+	if (!localTargetPath) return merged;
+
+	return {
+		...merged,
+		targetPath: local.targetPath,
+		candidatePaths: uniqueStrings([
+			local.targetPath,
+			...(local.candidatePaths ?? []),
+			...(merged.candidatePaths ?? []),
+		]),
+	};
+}
+
+function mergeModalTargetsPreservingLocalEdits(
+	nextTargets: EditableUnifiedDiffTarget[],
+	previousTargets: EditableUnifiedDiffTarget[]
+): EditableUnifiedDiffTarget[] {
+	if (previousTargets.length === 0) return nextTargets;
+
+	const matchedPreviousIndexes = new Set<number>();
+
+	return nextTargets.map(next => {
+		const previousIndex = previousTargets.findIndex(
+			(previous, index) => !matchedPreviousIndexes.has(index) && editableTargetsMatch(previous, next)
+		);
+
+		if (previousIndex < 0) return next;
+
+		const previous = previousTargets[previousIndex];
+		if (!previous) return next;
+
+		matchedPreviousIndexes.add(previousIndex);
+		return mergeEditableTargetPreservingLocalPath(next, previous);
+	});
 }
 
 function isTargetProblem(target: EditableUnifiedDiffTarget, missing: boolean): boolean {
@@ -211,9 +261,9 @@ function isTargetProblem(target: EditableUnifiedDiffTarget, missing: boolean): b
 }
 function getLocalTargetKey(target: EditableUnifiedDiffTarget, index: number): string {
 	return (
-		target.fileKey ||
+		target.fileKey?.trim() ||
 		target.sectionKeys?.join('|') ||
-		getPathIdentity(target.targetPath) ||
+		getPathIdentity(target.resolvedPath) ||
 		getPathIdentity(target.newPath) ||
 		getPathIdentity(target.oldPath) ||
 		`target-${index}`
@@ -237,125 +287,6 @@ function renderPathMeta(label: string, path: string) {
 			<span className="min-w-0 truncate font-mono" title={path}>
 				{path}
 			</span>
-		</div>
-	);
-}
-
-function getDiagnosticDisplay(level: ApplyUnifiedDiffDiagnosticLevel) {
-	switch (level) {
-		case ApplyUnifiedDiffDiagnosticLevel.Error:
-			return {
-				label: 'Error',
-				badgeClassName: 'badge-error',
-				textClassName: 'text-error',
-				icon: <FiX size={12} />,
-			};
-		case ApplyUnifiedDiffDiagnosticLevel.Warning:
-			return {
-				label: 'Warning',
-				badgeClassName: 'badge-warning',
-				textClassName: 'text-warning',
-				icon: <FiAlertTriangle size={12} />,
-			};
-		case ApplyUnifiedDiffDiagnosticLevel.Info:
-		default:
-			return {
-				label: 'Info',
-				badgeClassName: 'badge-info',
-				textClassName: 'text-info',
-				icon: <FiInfo size={12} />,
-			};
-	}
-}
-
-function renderDiagnosticsPanel({
-	title,
-	description,
-	diagnostics,
-	className,
-	footer,
-	limit = 8,
-}: DiagnosticPanelOptions) {
-	if (diagnostics.length === 0) return null;
-
-	const highest = getHighestDiagnosticLevel(diagnostics) ?? ApplyUnifiedDiffDiagnosticLevel.Info;
-	const headerDisplay = getDiagnosticDisplay(highest);
-
-	return (
-		<div className={`border-base-300 bg-base-100 rounded-xl border p-3 shadow-sm ${className ?? ''}`}>
-			<div className="mb-2 flex items-start justify-between gap-3">
-				<div className="min-w-0">
-					<div className="flex items-center gap-2 text-sm font-semibold">
-						<span className={headerDisplay.textClassName}>{headerDisplay.icon}</span>
-						<span>{title}</span>
-					</div>
-					{description ? <div className="text-base-content/60 mt-1 text-xs">{description}</div> : null}
-				</div>
-				{renderDiagnosticSeveritySummary(diagnostics)}
-			</div>
-
-			<div className="space-y-2">
-				{diagnostics.slice(0, limit).map((diagnostic, index) => {
-					const display = getDiagnosticDisplay(diagnostic.level);
-
-					return (
-						<div
-							key={`${diagnostic.level}-${diagnostic.code ?? 'nocode'}-${diagnostic.message}-${index}`}
-							className="border-base-300 bg-base-200/40 text-base-content/75 rounded-lg border px-3 py-2 text-xs"
-						>
-							<div className="flex items-start gap-2">
-								<div className={`mt-0.5 shrink-0 ${display.textClassName}`}>{display.icon}</div>
-								<div className="min-w-0 flex-1">
-									<div className="flex flex-wrap items-center gap-2">
-										<span className={`badge badge-outline badge-xs ${display.badgeClassName}`}>{display.label}</span>
-										{diagnostic.code ? (
-											<span className="badge badge-ghost badge-xs font-mono">{diagnostic.code}</span>
-										) : null}
-									</div>
-									<div className="mt-1 leading-5 whitespace-pre-wrap">{diagnostic.message}</div>
-								</div>
-							</div>
-						</div>
-					);
-				})}
-
-				{diagnostics.length > limit ? (
-					<div className="text-base-content/50 text-xs">
-						+{diagnostics.length - limit} more diagnostic{diagnostics.length - limit === 1 ? '' : 's'}
-					</div>
-				) : null}
-
-				{footer ? (
-					<div className="border-base-300 bg-base-200/40 text-base-content/60 rounded-lg border px-3 py-2 text-xs">
-						{footer}
-					</div>
-				) : null}
-			</div>
-		</div>
-	);
-}
-
-function renderDiagnosticSeveritySummary(diagnostics: ApplyUnifiedDiffDiagnostic[]) {
-	const counts = getDiagnosticSeverityCounts(diagnostics);
-	if (counts.total === 0) return null;
-
-	return (
-		<div className="flex flex-wrap gap-1.5 text-[11px]">
-			{counts.error > 0 ? (
-				<span className="badge badge-outline badge-error">
-					{counts.error} error{counts.error === 1 ? '' : 's'}
-				</span>
-			) : null}
-			{counts.warning > 0 ? (
-				<span className="badge badge-outline badge-warning">
-					{counts.warning} warning{counts.warning === 1 ? '' : 's'}
-				</span>
-			) : null}
-			{counts.info > 0 ? (
-				<span className="badge badge-outline badge-info">
-					{counts.info} info{counts.info === 1 ? '' : 's'}
-				</span>
-			) : null}
 		</div>
 	);
 }
@@ -431,7 +362,7 @@ export function DiffApplyModal({
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 
 	const [localTargets, setLocalTargets] = useState<EditableUnifiedDiffTarget[]>([]);
-	const displayTargets = useMemo(() => groupEditableTargetsForModal(localTargets), [localTargets]);
+	const displayTargets = localTargets;
 
 	const [localStrict, setLocalStrict] = useState(strict);
 	const [runningAction, setRunningAction] = useState<ModalRunningAction | null>(null);
@@ -444,7 +375,7 @@ export function DiffApplyModal({
 	useEffect(() => {
 		if (!isOpen) return;
 
-		const fromOutput = buildEditableTargetsFromOutput(output, fallbackParsed);
+		const fromOutput = buildEditableTargetsFromOutput(output, fallbackParsed, candidatePaths);
 		const byKey = new Map<string, EditableUnifiedDiffTarget>();
 
 		for (const target of fromOutput) {
@@ -462,10 +393,10 @@ export function DiffApplyModal({
 		}
 
 		// eslint-disable-next-line react-hooks/set-state-in-effect, react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setLocalTargets(Array.from(byKey.values()));
+		setLocalTargets(previous => mergeModalTargetsPreservingLocalEdits(Array.from(byKey.values()), previous));
 		// eslint-disable-next-line react-you-might-not-need-an-effect/no-derived-state
 		setLocalStrict(strict);
-	}, [fallbackParsed, fileTargets, isOpen, output, strict]);
+	}, [candidatePaths, fallbackParsed, fileTargets, isOpen, output, strict]);
 
 	useEffect(() => {
 		if (!isOpen) return;
@@ -493,14 +424,14 @@ export function DiffApplyModal({
 	const patchDiagnosticCounts = getDiagnosticSeverityCounts(patchDiagnostics);
 	const blockedFileCount = Math.max(0, counts.blocked - counts.needsInfo);
 
-	const updateTarget = (targetToUpdate: EditableUnifiedDiffTarget, targetPath: string) => {
+	const updateTarget = (index: number, targetPath: string) => {
 		setLocalTargets(prev =>
-			prev.map(target =>
-				editableTargetsMatch(target, targetToUpdate)
+			prev.map((target, currentIndex) =>
+				currentIndex === index
 					? {
 							...target,
 							targetPath,
-							candidatePaths: uniqueStrings([targetPath, ...target.candidatePaths]),
+							candidatePaths: uniqueStrings([targetPath, ...(target.candidatePaths ?? [])]),
 						}
 					: target
 			)
@@ -791,7 +722,7 @@ export function DiffApplyModal({
 										className={`input input-sm input-bordered w-full font-mono text-xs ${missing ? 'input-error' : ''}`}
 										value={target.targetPath}
 										onChange={event => {
-											updateTarget(target, event.target.value);
+											updateTarget(index, event.target.value);
 										}}
 										placeholder="Enter local target file path"
 										spellCheck={false}
@@ -821,7 +752,7 @@ export function DiffApplyModal({
 																className="btn btn-xs btn-ghost h-auto min-h-0 w-full justify-start rounded-md px-2 py-2 text-left font-mono text-[11px] leading-4 whitespace-normal"
 																title={candidate}
 																onClick={() => {
-																	updateTarget(target, candidate);
+																	updateTarget(index, candidate);
 																}}
 															>
 																<span className="min-w-0 break-all">{candidate}</span>
