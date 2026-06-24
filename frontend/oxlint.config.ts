@@ -28,6 +28,13 @@ export default defineConfig({
 
 	jsPlugins: ['eslint-plugin-better-tailwindcss'],
 
+	settings: {
+		'eslint-plugin-better-tailwindcss': {
+			detectComponentClasses: true,
+			entryPoint: './app/globals.css',
+		},
+	},
+
 	overrides: [
 		{
 			files: sourceFiles,
@@ -164,12 +171,5 @@ export default defineConfig({
 			},
 		],
 		'typescript/return-await': ['error', 'error-handling-correctness-only'],
-	},
-
-	settings: {
-		'eslint-plugin-better-tailwindcss': {
-			detectComponentClasses: true,
-			entryPoint: './app/globals.css',
-		},
 	},
 });
