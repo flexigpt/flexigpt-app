@@ -24,6 +24,8 @@ export default defineConfig({
 
 	ignorePatterns: [...new Set([...baseIgnorePatterns, 'dist/**', 'app/apis/wailsjs/**', '.react-router/**'])],
 
+	plugins: ['react'],
+
 	jsPlugins: ['eslint-plugin-better-tailwindcss'],
 
 	overrides: [
@@ -70,8 +72,6 @@ export default defineConfig({
 			},
 		},
 	],
-
-	plugins: ['react'],
 
 	rules: {
 		...baseRules,
