@@ -21,6 +21,7 @@ export class MdErrorBoundary extends Component<MdErrProps, MdErrState> {
 		// Streaming often produces transient invalid intermediate markdown.
 		// If the text changes, allow a fresh render attempt.
 		if (this.state.hasError && prevProps.source !== this.props.source) {
+			// oxlint-disable-next-line react/no-did-update-set-state
 			this.setState({ hasError: false });
 		}
 	}

@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-exports */
+/* oxlint-disable no-restricted-exports */
 import { reactRouter } from '@react-router/dev/vite';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
@@ -6,7 +6,7 @@ import license from 'rollup-plugin-license';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig } from 'vite';
 
-// eslint-disable-next-line no-restricted-imports
+// oxlint-disable-next-line no-restricted-imports
 import pkg from './package.json';
 
 const baseDeps = Object.keys(pkg.dependencies ?? {});

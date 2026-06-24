@@ -67,7 +67,7 @@ function sleep(ms: number): Promise<void> {
 	return new Promise(resolve => window.setTimeout(resolve, ms));
 }
 
-// eslint-disable-next-line no-restricted-exports
+// oxlint-disable-next-line no-restricted-exports
 export default function MCPServersPage() {
 	const [bundles, setBundles] = useState<BundleData[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -410,7 +410,7 @@ export default function MCPServersPage() {
 			let requiresFinalPut = Boolean(input.initialPayload);
 
 			if (finalPayload.stdio) {
-				let refs: Record<string, string> = { ...(finalPayload.stdio.secretEnvRefs ?? {}) };
+				let refs: Record<string, string> = { ...finalPayload.stdio.secretEnvRefs };
 
 				for (const row of input.stdioSecretEnv) {
 					const envName = row.envName.trim();
@@ -484,7 +484,7 @@ export default function MCPServersPage() {
 			}
 			if (finalPayload.streamableHttp && input.httpHeaderSecret) {
 				const plan = input.httpHeaderSecret;
-				let refs: Record<string, string> = { ...(finalPayload.streamableHttp.secretHeaderRefs ?? {}) };
+				let refs: Record<string, string> = { ...finalPayload.streamableHttp.secretHeaderRefs };
 
 				if (plan.deleteExisting && plan.existingSecretRef) {
 					const deleteSlot = (plan.deleteSlot ?? plan.slot).trim();

@@ -86,7 +86,7 @@ function withArgumentValue<T extends { argumentValues?: Record<string, string> }
 	value: string
 ): T {
 	let nextValues = {
-		...(item.argumentValues ?? {}),
+		...item.argumentValues,
 		[argumentName]: value,
 	};
 

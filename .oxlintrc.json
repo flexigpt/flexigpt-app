@@ -1,0 +1,23 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"plugins": ["typescript", "unicorn", "oxc"],
+	"categories": {
+		"correctness": "error"
+	},
+	"options": {
+		"typeAware": true,
+		"typeCheck": true,
+		"reportUnusedDisableDirectives": "off"
+	},
+	"ignorePatterns": [
+		"**/node_modules/**",
+		"**/dist/**",
+		"**/out/**",
+		"frontend/.react-router/**",
+		"frontend/app/apis/wailsjs/**"
+	],
+	"rules": {},
+	"env": {
+		"builtin": true
+	}
+}

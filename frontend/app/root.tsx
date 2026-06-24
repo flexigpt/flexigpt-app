@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-exports */
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import {
@@ -30,7 +29,6 @@ import { Sidebar } from '@/components/sidebar';
 
 import '@/globals.css';
 
-// eslint-disable-next-line no-restricted-imports
 import type { Route } from './+types/root';
 
 export function CustomThemeProvider({ children }: { children: ReactNode }) {
@@ -123,6 +121,7 @@ export async function clientLoader() {
 // Important! Force the client loader to run during hydration and not just during ssr build.
 clientLoader.hydrate = true as const;
 
+// oxlint-disable-next-line no-restricted-exports
 export default function Root() {
 	const navigate = useNavigate();
 	const location = useLocation();

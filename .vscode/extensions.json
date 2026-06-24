@@ -1,6 +1,7 @@
 {
 	"recommendations": [
 		"dbaeumer.vscode-eslint", // ESLint
+		"oxc.oxc-vscode", // OXLint
 		"golang.go", // Go
 		"yzhang.markdown-all-in-one", // Markdown All in One
 		"davidanson.vscode-markdownlint",

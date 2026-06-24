@@ -180,7 +180,7 @@ export function createUrlFieldChangeHandler<FormState extends Record<string, unk
 			if (error) {
 				next[fieldName] = error;
 			} else {
-				// eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+				// oxlint-disable-next-line @typescript-eslint/no-dynamic-delete
 				delete next[fieldName];
 			}
 

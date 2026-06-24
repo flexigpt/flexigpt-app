@@ -14,7 +14,7 @@ import { AuthKeyTable } from '@/settings/authkey_table';
 import { DebugSettingsSection } from '@/settings/debug';
 import { ThemeSelector } from '@/settings/theme';
 
-// eslint-disable-next-line no-restricted-exports
+// oxlint-disable-next-line no-restricted-exports
 export default function SettingsPage() {
 	const [authKeys, setAuthKeys] = useState<AuthKeyMeta[]>([]);
 	const [debugSettings, setDebugSettings] = useState<DebugSettings | null>(null);

@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import eslintConfigPrettier from 'eslint-config-prettier';
+import oxlint from 'eslint-plugin-oxlint';
 import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactYouMightNotNeedAnEffect from 'eslint-plugin-react-you-might-not-need-an-effect';
@@ -13,8 +14,10 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const tsconfigPath = path.join(__dirname, 'tsconfig.json');
+const tailwindCssPath = path.join(__dirname, 'app/globals.css');
 
-// eslint-disable-next-line no-restricted-exports
+// oxlint-disable-next-line no-restricted-exports
 export default defineConfig(
 	globalIgnores(['dist/**', 'app/apis/wailsjs/**', '.react-router/**']),
 
@@ -45,7 +48,7 @@ export default defineConfig(
 			'import/resolver': {
 				typescript: {
 					alwaysTryTypes: true,
-					project: './tsconfig.json',
+					project: tsconfigPath,
 				},
 			},
 			react: {
@@ -53,44 +56,8 @@ export default defineConfig(
 			},
 		},
 		rules: {
-			'no-restricted-imports': [
-				'error',
-				{
-					paths: [
-						{
-							name: 'react',
-							importNames: ['default', 'React'],
-							message: 'Avoid React import directly. Prefer explicitly importing.',
-						},
-						{
-							name: 'react',
-							importNames: ['FC', 'FunctionComponent'],
-							message: 'Avoid FC imports. Prefer explicitly importing or explicitly typing your component props.',
-						},
-					],
-					patterns: [
-						{
-							group: ['./*', '../*'],
-							message: 'Relative imports are not allowed.',
-						},
-					],
-				},
-			],
-			'no-restricted-exports': [
-				'error',
-				{
-					restrictDefaultExports: {
-						direct: true,
-						named: true,
-						defaultFrom: true,
-						namedFrom: true,
-						namespaceFrom: true,
-					},
-				},
-			],
-
 			...reactHooks.configs.flat.recommended.rules,
-			'react-hooks/exhaustive-deps': 'error',
+
 			'react-hooks/unsupported-syntax': 'error',
 			'react-hooks/incompatible-library': 'error',
 
@@ -108,21 +75,21 @@ export default defineConfig(
 			'@typescript-eslint/no-floating-promises': 'off',
 			'@typescript-eslint/no-misused-promises': 'off',
 			'@typescript-eslint/no-unnecessary-condition': 'off',
-			'@typescript-eslint/no-unused-vars': [
-				'error',
-				{
-					argsIgnorePattern: '^_',
-					varsIgnorePattern: '^_',
-					caughtErrorsIgnorePattern: '^_',
-				},
-			],
 
 			'tailwind-canonical-classes/tailwind-canonical-classes': [
 				'error',
 				{
-					cssPath: './app/globals.css',
+					cssPath: tailwindCssPath,
 				},
 			],
+			// Oxlint implements.
+			'no-restricted-imports': 'off',
+			'no-restricted-exports': 'off',
+			'no-control-regex': 'off',
+			'no-unsafe-finally': 'off',
+			'react-hooks/exhaustive-deps': 'off',
+			'@typescript-eslint/no-dynamic-delete': 'off',
+			'@typescript-eslint/no-unused-vars': 'off',
 		},
 	},
 
@@ -132,7 +99,7 @@ export default defineConfig(
 			tailwindcss:
 				/** @type {import('eslint-plugin-tailwindcss').PluginSettings} */
 				({
-					cssConfigPath: './app/globals.css',
+					cssConfigPath: tailwindCssPath,
 				}),
 		},
 		rules: {
@@ -140,6 +107,6 @@ export default defineConfig(
 			'tailwindcss/no-custom-classname': 'off',
 		},
 	},
-
-	eslintConfigPrettier
+	eslintConfigPrettier,
+	...oxlint.buildFromOxlintConfigFile(path.join(__dirname, '.oxlintrc.json'))
 );

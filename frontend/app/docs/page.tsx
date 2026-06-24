@@ -93,7 +93,7 @@ function scrollElementInsideContainer(
 	});
 }
 
-// eslint-disable-next-line no-restricted-exports
+// oxlint-disable-next-line no-restricted-exports
 export default function DocsPage() {
 	const location = useLocation();
 	const navigate = useNavigate();

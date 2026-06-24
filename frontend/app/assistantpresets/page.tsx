@@ -38,7 +38,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 	return fallback;
 }
 
-// eslint-disable-next-line no-restricted-exports
+// oxlint-disable-next-line no-restricted-exports
 export default function AssistantPresetsPage() {
 	const [bundles, setBundles] = useState<BundleData[]>([]);
 	const [loading, setLoading] = useState(true);

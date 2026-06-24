@@ -253,7 +253,7 @@ export function TemplateVariableElement(props: PlateElementProps<any>) {
 		return effectiveVarValueLocal(varDef, tsenode.variables ?? {});
 
 		// we need refreshTick, it is not unnecessary dep.
-		// eslint-disable-next-line react-hooks/exhaustive-deps
+		// oxlint-disable-next-line react-hooks/exhaustive-deps
 	}, [tsenode, varDef, refreshTick]);
 
 	const hasDisplayValue =
@@ -298,7 +298,7 @@ export function TemplateVariableElement(props: PlateElementProps<any>) {
 	function commitValue(next: unknown) {
 		if (!tsenode || !tsPath) return;
 
-		let nextVars = { ...(tsenode.variables ?? {}) };
+		let nextVars = { ...tsenode.variables };
 
 		const shouldUnset = next === undefined || next === null;
 		if (shouldUnset) {

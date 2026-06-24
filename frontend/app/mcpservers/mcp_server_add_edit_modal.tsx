@@ -174,7 +174,7 @@ function getDefaultAPIKeyValuePrefix(headerName: string): string {
 }
 
 function hasInvalidHTTPHeaderValueChars(value: string): boolean {
-	// eslint-disable-next-line no-control-regex
+	// oxlint-disable-next-line no-control-regex
 	return /[\r\n\u0000]/.test(value);
 }
 

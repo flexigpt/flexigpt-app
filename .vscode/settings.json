@@ -5,7 +5,8 @@
 	"editor.formatOnSave": true,
 	"editor.rulers": [120],
 	"editor.codeActionsOnSave": {
-		"source.organizeImports": "explicit"
+		"source.organizeImports": "explicit",
+		"source.fixAll.oxc": "explicit"
 	},
 	"editor.linkedEditing": true,
 	"editor.quickSuggestions": {

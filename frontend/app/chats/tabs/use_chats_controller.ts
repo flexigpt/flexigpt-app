@@ -377,8 +377,8 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		const tabsSnapshot = tabsRef.current.slice(0, MAX_TABS);
 
 		const scrollObj: Record<string, number> = {
-			...(scrollTopSnapshotRef.current ?? {}),
-			...(conversationAreaRef.current?.getScrollTopByTabSnapshot() ?? {}),
+			...scrollTopSnapshotRef.current,
+			...conversationAreaRef.current?.getScrollTopByTabSnapshot(),
 		};
 		scrollTopSnapshotRef.current = scrollObj;
 

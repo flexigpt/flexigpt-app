@@ -350,7 +350,7 @@ export function sanitizeUIChatOptionByCapabilities(option: UIChatOption): UIChat
 
 	// --- Output sanitization ---
 	if (cap?.outputCapabilities?.supportsVerbosity === false && next.outputParam?.verbosity) {
-		const op = { ...(next.outputParam ?? {}) };
+		const op = { ...next.outputParam };
 		delete op.verbosity;
 		next.outputParam = op.format ? op : undefined;
 	}
@@ -358,7 +358,7 @@ export function sanitizeUIChatOptionByCapabilities(option: UIChatOption): UIChat
 	const supportedFormats = getSupportedOutputFormats(cap);
 	if (supportedFormats && next.outputParam?.format?.kind) {
 		if (!supportedFormats.includes(next.outputParam.format.kind)) {
-			const op = { ...(next.outputParam ?? {}) };
+			const op = { ...next.outputParam };
 			delete op.format;
 			next.outputParam = op.verbosity ? op : undefined;
 		}

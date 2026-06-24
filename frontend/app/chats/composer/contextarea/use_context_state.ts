@@ -488,7 +488,7 @@ export function useAssistantContextState(): AssistantContextController {
 	const setOutputVerbosity = useCallback(
 		(verbosity?: OutputVerbosity) => {
 			applySelectedModel(prev => {
-				const next = { ...(prev.outputParam ?? {}) };
+				const next = { ...prev.outputParam };
 
 				if (verbosity === undefined) {
 					delete next.verbosity;

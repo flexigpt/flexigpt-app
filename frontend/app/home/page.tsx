@@ -27,7 +27,7 @@ import {
 import { WorkflowStarterCard, workflowStarters } from '@/home/workflow_starter_card';
 import { AddEditAuthKeyModal } from '@/settings/authkey_add_edit_modal';
 
-// eslint-disable-next-line no-restricted-exports
+// oxlint-disable-next-line no-restricted-exports
 export default function HomePage() {
 	useTitleBarContent(
 		{

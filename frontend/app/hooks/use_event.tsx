@@ -157,6 +157,6 @@ export function emitCustomEvent<Detail = unknown>(
 ): boolean {
 	const tgt = target ?? (typeof window !== 'undefined' ? window : undefined);
 	if (!tgt) return false;
-	const ev = new CustomEvent<Detail>(name, { ...(init ?? {}), detail });
+	const ev = new CustomEvent<Detail>(name, { ...init, detail });
 	return tgt.dispatchEvent(ev);
 }

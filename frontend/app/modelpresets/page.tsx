@@ -54,7 +54,7 @@ async function fetchCanonicalPageData(): Promise<CanonicalPageData> {
 	};
 }
 
-// eslint-disable-next-line no-restricted-exports
+// oxlint-disable-next-line no-restricted-exports
 export default function ModelPresetsPage() {
 	const [defaultProvider, setDefaultProvider] = useState<ProviderName | undefined>(undefined);
 	const [providerPresets, setProviderPresets] = useState<Record<ProviderName, ProviderPreset>>({});

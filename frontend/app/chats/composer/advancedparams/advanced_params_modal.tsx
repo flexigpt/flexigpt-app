@@ -459,7 +459,7 @@ function AdvancedParamsModalInner({
 		}
 
 		const mergedOutputParam: OutputParam | undefined = (() => {
-			const merged: OutputParam = { ...(baseOutputParam ?? {}) };
+			const merged: OutputParam = { ...baseOutputParam };
 
 			if (nextFormat === undefined) delete merged.format;
 			else merged.format = nextFormat;

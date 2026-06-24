@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-exports */
+/* oxlint-disable no-restricted-exports */
 import { index, route, type RouteConfig } from '@react-router/dev/routes';
 
 export default [

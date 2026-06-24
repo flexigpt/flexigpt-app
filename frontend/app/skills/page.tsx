@@ -18,7 +18,7 @@ import { type BundleData, sortBundleData } from '@/skills/lib/skill_bundle_utils
 import { AddSkillBundleModal } from '@/skills/skill_bundle_add_modal';
 import { SkillBundleCard } from '@/skills/skill_bundle_card';
 
-// eslint-disable-next-line no-restricted-exports
+// oxlint-disable-next-line no-restricted-exports
 export default function SkillsPage() {
 	const [bundles, setBundles] = useState<BundleData[]>([]);
 	const [loading, setLoading] = useState(true);

@@ -29,7 +29,7 @@ const getErrorMessage = (err: unknown, fallback: string) => {
 	return fallback;
 };
 
-// eslint-disable-next-line no-restricted-exports
+// oxlint-disable-next-line no-restricted-exports
 export default function ToolsPage() {
 	const [bundles, setBundles] = useState<BundleData[] | undefined>(undefined);
 

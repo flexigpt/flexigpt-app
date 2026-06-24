@@ -4,7 +4,7 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-// eslint-disable-next-line no-restricted-exports
+// oxlint-disable-next-line no-restricted-exports
 export default defineConfig(
 	globalIgnores(['dist/**', 'app/apis/wailsjs/**', '.react-router/**']),
 	{

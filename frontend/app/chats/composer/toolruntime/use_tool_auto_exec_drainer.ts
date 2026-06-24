@@ -100,13 +100,13 @@ export function useToolAutoExecDrainer({ toolCalls, isBlocked, runToolCall }: Us
 			const nextCall = getNextCall();
 			if (!nextCall) {
 				syncState('idle', null);
-				// eslint-disable-next-line no-unsafe-finally
+				// oxlint-disable-next-line no-unsafe-finally
 				return;
 			}
 
 			if (isBlockedRef.current) {
 				syncState('blocked', null);
-				// eslint-disable-next-line no-unsafe-finally
+				// oxlint-disable-next-line no-unsafe-finally
 				return;
 			}
 

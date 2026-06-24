@@ -15,7 +15,7 @@ import { ConversationSearch, type ConversationSearchHandle } from '@/chats/searc
 import { ChatTabsBar } from '@/chats/tabs/chat_tabs_bar';
 import { useChatsController } from '@/chats/tabs/use_chats_controller';
 
-// eslint-disable-next-line no-restricted-exports
+// oxlint-disable-next-line no-restricted-exports
 export default function ChatsPage() {
 	const conversationAreaRef = useRef<ConversationAreaHandle | null>(null);
 	const searchRef = useRef<ConversationSearchHandle | null>(null);
