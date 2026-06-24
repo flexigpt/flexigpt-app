@@ -92,12 +92,12 @@ export function TitleBar({ onToggleDrawer }: TitleBarProps) {
 						aria-label="Open menu"
 						title="Open menu"
 					>
-						<FiMenu className="h-4 w-4" />
+						<FiMenu className="size-4" />
 					</button>
 				)}
 
 				<Link to="/" className="flex min-w-0 items-center gap-2">
-					<img src="/icon.png" alt="FlexiGPT" className="h-5 w-5" />
+					<img src="/icon.png" alt="FlexiGPT" className="size-5" />
 					<div className="min-w-0 truncate text-xs">
 						<span className="opacity-70">FlexiGPT</span>
 						{version ? <span className="ml-2 opacity-70">{version}</span> : null}

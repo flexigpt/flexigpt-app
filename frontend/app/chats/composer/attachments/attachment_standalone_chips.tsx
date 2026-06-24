@@ -41,7 +41,7 @@ export function StandaloneAttachmentsChip({
 
 			<MenuButton
 				store={menu}
-				className="btn btn-ghost btn-xs px-0 py-0 shadow-none"
+				className="btn btn-ghost btn-xs p-0 shadow-none"
 				aria-label="Show attached files and links"
 				title="Show attached files and links"
 			>
@@ -51,7 +51,7 @@ export function StandaloneAttachmentsChip({
 			{/* Remove all standalone attachments */}
 			<button
 				type="button"
-				className="btn btn-ghost btn-xs text-error shrink-0 px-0 py-0 shadow-none"
+				className="btn btn-ghost btn-xs text-error shrink-0 p-0 shadow-none"
 				onClick={() => {
 					// Call the existing single-remove handler for each attachment.
 					for (const att of attachments) {

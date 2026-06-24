@@ -95,7 +95,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 function InfoPill({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
 	return (
 		<div className={`bg-base-200 flex min-w-0 rounded-xl p-2 ${className}`}>
-			<div className="grid h-full w-full grid-cols-3 items-center gap-4">
+			<div className="grid size-full grid-cols-3 items-center gap-4">
 				<div className="text-base-content/60 col-span-1 text-[10px] uppercase">{label}</div>
 				<div className="col-span-2 text-xs">{children}</div>
 			</div>

@@ -765,7 +765,7 @@ export function ToolsBottomBarChip({
 						ref={buttonRef}
 						store={store}
 						disabled={isInputLocked}
-						className="btn btn-xs text-neutral-custom h-auto min-h-0 flex-1 gap-0 border-none bg-transparent px-0 py-0 text-left font-normal shadow-none hover:bg-transparent"
+						className="btn btn-xs text-neutral-custom h-auto min-h-0 flex-1 gap-0 border-none bg-transparent p-0 text-left font-normal shadow-none hover:bg-transparent"
 						aria-label={shortcut ? `Attach tools (${shortcut})` : 'Attach tools'}
 					>
 						<ActionTriggerChipContent

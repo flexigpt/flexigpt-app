@@ -4,6 +4,7 @@ import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactYouMightNotNeedAnEffect from 'eslint-plugin-react-you-might-not-need-an-effect';
 import tailwindCanonicalClasses from 'eslint-plugin-tailwind-canonical-classes';
+import eslintPluginTailwindcss from 'eslint-plugin-tailwindcss';
 import { defineConfig, globalIgnores } from 'eslint/config';
 import globals from 'globals';
 import path from 'path';
@@ -140,6 +141,20 @@ export default defineConfig(
 					},
 				},
 			],
+		},
+	},
+	eslintPluginTailwindcss.configs.recommended,
+	{
+		settings: {
+			tailwindcss:
+				/** @type {import('eslint-plugin-tailwindcss').PluginSettings} */
+				({
+					cssConfigPath: './app/globals.css',
+				}),
+		},
+		rules: {
+			'tailwindcss/classnames-order': 'off',
+			'tailwindcss/no-custom-classname': 'off',
 		},
 	}
 );

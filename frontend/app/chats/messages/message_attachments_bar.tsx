@@ -425,7 +425,7 @@ function AttachmentsGroupChip({ attachments }: AttachmentsGroupChipProps) {
 
 			<MenuButton
 				store={menu}
-				className="btn btn-ghost btn-xs px-0 py-0 shadow-none"
+				className="btn btn-ghost btn-xs p-0 shadow-none"
 				aria-label="Show attachments for this message"
 				title="Show attachments for this message"
 			>
@@ -499,7 +499,7 @@ function ToolChoicesGroupChip({ tools, onToolChoiceDetails }: ToolChoicesGroupCh
 
 			<MenuButton
 				store={menu}
-				className="btn btn-ghost btn-xs px-0 py-0 shadow-none"
+				className="btn btn-ghost btn-xs p-0 shadow-none"
 				aria-label="Show tools for this message"
 				title="Show tools for this message"
 			>
@@ -579,7 +579,7 @@ function ToolOutputsGroupChip({ outputs, onToolOutputDetails }: ToolOutputsGroup
 
 			<MenuButton
 				store={menu}
-				className="btn btn-ghost btn-xs px-0 py-0 shadow-none"
+				className="btn btn-ghost btn-xs p-0 shadow-none"
 				aria-label="Show tool results for this message"
 				title="Show tool results for this message"
 			>
@@ -659,7 +659,7 @@ function ToolCallsGroupChip({ calls, onToolCallDetails }: ToolCallsGroupChipProp
 
 			<MenuButton
 				store={menu}
-				className="btn btn-ghost btn-xs px-0 py-0 shadow-none"
+				className="btn btn-ghost btn-xs p-0 shadow-none"
 				aria-label="Show suggested tool calls for this message"
 				title="Show suggested tool calls for this message"
 			>
@@ -738,7 +738,7 @@ function WebSearchOutputsGroupChip({ outputs, onOutputDetails }: WebSearchOutput
 
 			<MenuButton
 				store={menu}
-				className="btn btn-ghost btn-xs px-0 py-0 shadow-none"
+				className="btn btn-ghost btn-xs p-0 shadow-none"
 				aria-label="Show web‑search results for this turn"
 				title="Show web‑search results for this turn"
 			>
@@ -817,7 +817,7 @@ function WebSearchCallsGroupChip({ calls, onCallDetails }: WebSearchCallsGroupCh
 
 			<MenuButton
 				store={menu}
-				className="btn btn-ghost btn-xs px-0 py-0 shadow-none"
+				className="btn btn-ghost btn-xs p-0 shadow-none"
 				aria-label="Show web‑search queries for this turn"
 				title="Show web‑search queries for this turn"
 			>
@@ -898,7 +898,7 @@ function WebSearchChoicesGroupChip({ choices, onChoiceDetails }: WebSearchChoice
 
 			<MenuButton
 				store={menu}
-				className="btn btn-ghost btn-xs px-0 py-0 shadow-none"
+				className="btn btn-ghost btn-xs p-0 shadow-none"
 				aria-label="Show web‑search configuration for this turn"
 				title="Show web‑search configuration for this turn"
 			>

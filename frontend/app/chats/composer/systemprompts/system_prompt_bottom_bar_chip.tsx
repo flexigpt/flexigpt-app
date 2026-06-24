@@ -301,7 +301,7 @@ function SystemPromptBottomBarChipInner({
 				>
 					<MenuButton
 						store={menu}
-						className="btn btn-xs text-neutral-custom h-auto min-h-0 flex-1 gap-0 border-none bg-transparent px-0 py-0 text-left font-normal shadow-none hover:bg-transparent"
+						className="btn btn-xs text-neutral-custom h-auto min-h-0 flex-1 gap-0 border-none bg-transparent p-0 text-left font-normal shadow-none hover:bg-transparent"
 						onClick={handleMenuOpen}
 						disabled={isInputLocked}
 						aria-label={shortcut ? `Insert system prompt (${shortcut})` : 'Insert system prompt'}
@@ -410,11 +410,11 @@ function SystemPromptBottomBarChipInner({
 				<div className="mb-1 px-1 text-xs font-medium opacity-70">Saved prompts</div>
 
 				{loading ? (
-					<div className="m-0 flex cursor-default items-center justify-between rounded-md px-2 py-2 text-xs opacity-70">
+					<div className="m-0 flex cursor-default items-center justify-between rounded-md p-2 text-xs opacity-70">
 						<span>Loading system prompts…</span>
 					</div>
 				) : error ? (
-					<div className="text-error m-0 flex cursor-default items-center justify-between rounded-md px-2 py-2 text-xs">
+					<div className="text-error m-0 flex cursor-default items-center justify-between rounded-md p-2 text-xs">
 						<span>{error}</span>
 					</div>
 				) : prompts.length > 0 ? (
@@ -512,7 +512,7 @@ function SystemPromptBottomBarChipInner({
 						))}
 					</div>
 				) : (
-					<div className="m-0 flex cursor-default items-center justify-between rounded-md px-2 py-2 text-xs opacity-70">
+					<div className="m-0 flex cursor-default items-center justify-between rounded-md p-2 text-xs opacity-70">
 						<span>No saved prompts</span>
 					</div>
 				)}

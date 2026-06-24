@@ -101,7 +101,7 @@ export default function HomePage() {
 
 	return (
 		<PageFrame>
-			<div className="mx-auto flex h-full w-full max-w-6xl flex-col items-center px-4 py-8">
+			<div className="mx-auto flex size-full max-w-6xl flex-col items-center px-4 py-8">
 				<div className="mt-4 flex w-full flex-1 flex-col items-center justify-between pb-4 xl:mt-16">
 					<div className="flex w-full flex-col items-center">
 						<PrimaryActionCard

@@ -526,7 +526,7 @@ export default function ModelPresetsPage() {
 
 	return (
 		<PageFrame>
-			<div className="flex h-full w-full flex-col items-center">
+			<div className="flex size-full flex-col items-center">
 				<div className="fixed mt-8 flex w-10/12 items-center p-2 lg:w-2/3">
 					<h1 className="flex grow items-center justify-center text-xl font-semibold">Model Presets</h1>
 					<DownloadButton

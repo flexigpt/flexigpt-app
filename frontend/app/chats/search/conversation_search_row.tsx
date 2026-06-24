@@ -31,7 +31,7 @@ export function ConversationSearchRowMeta({
 				<HoverTip content="Delete conversation" placement="right">
 					<button
 						type="button"
-						className="btn btn-ghost btn-xs btn-circle h-5 min-h-0 w-5 shrink-0 p-0 shadow-none"
+						className="btn btn-ghost btn-xs btn-circle size-5 min-h-0 shrink-0 p-0 shadow-none"
 						aria-label="Delete conversation"
 						onClick={e => {
 							e.stopPropagation();

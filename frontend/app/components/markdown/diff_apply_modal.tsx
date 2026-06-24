@@ -553,7 +553,7 @@ export function DiffApplyModal({
 					</div>
 				</div>
 
-				<div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
+				<div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:px-5">
 					{output?.message || error ? (
 						<div className="border-base-300 bg-base-100 mb-4 rounded-xl border px-3 py-2 text-sm">
 							<div className="flex items-start gap-2">
@@ -749,7 +749,7 @@ export function DiffApplyModal({
 														<li key={candidate} className="min-w-0">
 															<button
 																type="button"
-																className="btn btn-xs btn-ghost h-auto min-h-0 w-full justify-start rounded-md px-2 py-2 text-left font-mono text-[11px] leading-4 whitespace-normal"
+																className="btn btn-xs btn-ghost h-auto min-h-0 w-full justify-start rounded-md p-2 text-left font-mono text-[11px] leading-4 whitespace-normal"
 																title={candidate}
 																onClick={() => {
 																	updateTarget(index, candidate);

@@ -143,7 +143,7 @@ export const ChatMessage = memo(function ChatMessage({
 				<>
 					<div className={`${leftColSpan} flex justify-end`}>
 						{isUser && (
-							<div className="my-0 mr-2 ml-0 flex h-8 w-8 items-center justify-center self-end">
+							<div className="my-0 mr-2 ml-0 flex size-8 items-center justify-center self-end">
 								<FiUser size={24} />
 							</div>
 						)}
@@ -210,7 +210,7 @@ export const ChatMessage = memo(function ChatMessage({
 
 					<div className={`${rightColSpan} flex justify-start`}>
 						{!isUser && (
-							<div className="my-0 mr-0 ml-2 flex h-8 w-8 items-center justify-center self-end">
+							<div className="my-0 mr-0 ml-2 flex size-8 items-center justify-center self-end">
 								<FiZap size={24} />
 							</div>
 						)}
@@ -222,7 +222,7 @@ export const ChatMessage = memo(function ChatMessage({
 			<div className={`${leftColSpan} flex justify-end`}>
 				{/* If the card row is hidden, keep the avatar aligned with the footer row */}
 				{!showBody && isUser && (
-					<div className="my-0 mr-2 ml-0 flex h-8 w-8 items-center justify-center">
+					<div className="my-0 mr-2 ml-0 flex size-8 items-center justify-center">
 						<FiUser size={24} />
 					</div>
 				)}
@@ -281,7 +281,7 @@ export const ChatMessage = memo(function ChatMessage({
 			<div className={`${rightColSpan} flex justify-start`}>
 				{/* If the card row is hidden, keep the assistant icon aligned with the footer row */}
 				{!showBody && !isUser && (
-					<div className="my-0 mr-0 ml-2 flex h-8 w-8 items-center justify-center">
+					<div className="my-0 mr-0 ml-2 flex size-8 items-center justify-center">
 						<FiZap size={24} />
 					</div>
 				)}

@@ -73,7 +73,7 @@ export function MCPMessageContextChip({ context }: { context?: MCPConversationCo
 
 			<MenuButton
 				store={menu}
-				className="btn btn-ghost btn-xs h-5 min-h-0 px-0 py-0 shadow-none"
+				className="btn btn-ghost btn-xs h-5 min-h-0 p-0 shadow-none"
 				aria-label="Show MCP context for this message"
 				title="Show MCP context for this message"
 			>

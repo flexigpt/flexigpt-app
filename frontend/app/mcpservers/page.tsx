@@ -687,7 +687,7 @@ export default function MCPServersPage() {
 
 	return (
 		<PageFrame>
-			<div className="flex h-full w-full flex-col items-center">
+			<div className="flex size-full flex-col items-center">
 				<div className="fixed mt-8 flex w-11/12 items-center justify-between px-12 py-2">
 					<button
 						className="btn btn-ghost rounded-2xl"

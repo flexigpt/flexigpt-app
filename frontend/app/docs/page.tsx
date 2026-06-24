@@ -437,7 +437,7 @@ export default function DocsPage() {
 										{prevDocSection ? (
 											<button
 												type="button"
-												className="bg-base-200 hover:bg-base-300 flex h-full w-full items-center gap-3 rounded-2xl px-4 py-4 text-left transition-colors"
+												className="bg-base-200 hover:bg-base-300 flex size-full items-center gap-3 rounded-2xl p-4 text-left transition-colors"
 												onClick={() => {
 													navigateToDocPage(prevDocSection.id);
 												}}
@@ -449,7 +449,7 @@ export default function DocsPage() {
 												</div>
 											</button>
 										) : (
-											<div className="border-base-300/60 h-full rounded-2xl border px-4 py-4 text-sm opacity-50">
+											<div className="border-base-300/60 h-full rounded-2xl border p-4 text-sm opacity-50">
 												Start of docs
 											</div>
 										)}
@@ -459,7 +459,7 @@ export default function DocsPage() {
 										{nextDocSection ? (
 											<button
 												type="button"
-												className="bg-base-200 hover:bg-base-300 flex h-full w-full items-center justify-between gap-3 rounded-2xl px-4 py-4 text-left transition-colors"
+												className="bg-base-200 hover:bg-base-300 flex size-full items-center justify-between gap-3 rounded-2xl p-4 text-left transition-colors"
 												onClick={() => {
 													navigateToDocPage(nextDocSection.id);
 												}}
@@ -471,7 +471,7 @@ export default function DocsPage() {
 												<FiChevronRight size={18} />
 											</button>
 										) : (
-											<div className="border-base-300/60 h-full rounded-2xl border px-4 py-4 text-sm opacity-50">
+											<div className="border-base-300/60 h-full rounded-2xl border p-4 text-sm opacity-50">
 												End of docs
 											</div>
 										)}

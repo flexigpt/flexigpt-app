@@ -70,7 +70,7 @@ export function DirectoryChip({
 			{/* Menu trigger */}
 			<MenuButton
 				store={directoryMenu}
-				className="btn btn-ghost btn-xs px-0 py-0 shadow-none"
+				className="btn btn-ghost btn-xs p-0 shadow-none"
 				aria-label={`Show files in folder ${group.dirPath || group.label}`}
 				title={group.dirPath || group.label}
 			>
@@ -80,7 +80,7 @@ export function DirectoryChip({
 			{/* Remove entire folder group */}
 			<button
 				type="button"
-				className="btn btn-ghost btn-xs text-error shrink-0 px-0 py-0 shadow-none"
+				className="btn btn-ghost btn-xs text-error shrink-0 p-0 shadow-none"
 				onClick={() => {
 					onRemoveDirectoryGroup(group.id);
 				}}

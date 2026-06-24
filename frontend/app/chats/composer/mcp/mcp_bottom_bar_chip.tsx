@@ -251,7 +251,7 @@ function MCPArgumentFields({
 	if (args.length === 0) return null;
 
 	return (
-		<div className="bg-base-200/70 mx-2 mb-1 rounded-lg px-2 py-2">
+		<div className="bg-base-200/70 mx-2 mb-1 rounded-lg p-2">
 			<div className="text-base-content/70 mb-1 text-[10px] font-semibold uppercase">Arguments</div>
 			<div className="space-y-2">
 				{args.map(arg => {
@@ -798,7 +798,7 @@ export function MCPBottomBarChip({
 				>
 					<MenuButton
 						store={menu}
-						className="btn btn-xs text-neutral-custom h-auto min-h-0 flex-1 gap-0 border-none bg-transparent px-0 py-0 text-left font-normal shadow-none hover:bg-transparent"
+						className="btn btn-xs text-neutral-custom h-auto min-h-0 flex-1 gap-0 border-none bg-transparent p-0 text-left font-normal shadow-none hover:bg-transparent"
 						aria-label={shortcut ? `Attach MCP (${shortcut})` : 'Attach MCP'}
 						disabled={isInputLocked}
 					>

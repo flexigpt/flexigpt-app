@@ -456,7 +456,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 				<div
 					ref={setScrollContainerRef}
 					onScroll={handleScroll}
-					className="h-full w-full overscroll-contain py-1"
+					className="size-full overscroll-contain py-1"
 					style={{ scrollbarGutter: 'stable both-edges', overflowAnchor: 'none', overflowY: 'auto' }}
 				>
 					<div ref={setScrollContentRef} className="mx-auto w-11/12 xl:w-5/6">

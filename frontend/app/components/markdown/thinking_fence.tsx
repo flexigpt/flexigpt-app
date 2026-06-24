@@ -144,7 +144,7 @@ export function ThinkingFence({
 			>
 				<div className="min-w-0">{detailsSummary}</div>
 				<svg
-					className="ml-2 h-3 w-3 shrink-0 transition-transform group-open:rotate-90"
+					className="ml-2 size-3 shrink-0 transition-transform group-open:rotate-90"
 					fill="none"
 					viewBox="0 0 24 24"
 					stroke="currentColor"

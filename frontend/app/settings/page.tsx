@@ -63,7 +63,7 @@ export default function SettingsPage() {
 
 	return (
 		<PageFrame>
-			<div className="flex h-full w-full flex-col items-center">
+			<div className="flex size-full flex-col items-center">
 				<div className="fixed mt-8 flex w-11/12 items-center px-12 py-2">
 					<h1 className="flex grow items-center justify-center text-xl font-semibold">Settings</h1>
 					<DownloadButton
