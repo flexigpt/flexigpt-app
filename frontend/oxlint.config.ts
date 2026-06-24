@@ -6,105 +6,60 @@ import baseConfig from '../.oxlintrc.json' with { type: 'json' };
 const baseIgnorePatterns = baseConfig.ignorePatterns ?? [];
 const baseRules = baseConfig.rules ?? {};
 
-const sourceFiles = ['**/*.{js,jsx,mjs,ts,tsx,mts,cts}'];
-
 // oxlint-disable-next-line no-restricted-exports
 export default defineConfig({
 	categories: {
 		correctness: 'error',
+		nursery: 'off',
 		pedantic: 'off',
 		perf: 'off',
 		restriction: 'off',
 		style: 'off',
 		suspicious: 'off',
-		nursery: 'error',
 	},
 
 	extends: [baseConfig as OxlintConfig],
 
 	ignorePatterns: [...new Set([...baseIgnorePatterns, 'dist/**', 'app/apis/wailsjs/**', '.react-router/**'])],
 
-	plugins: ['react'],
-
 	jsPlugins: ['eslint-plugin-better-tailwindcss'],
 
-	settings: {
-		'eslint-plugin-better-tailwindcss': {
-			detectComponentClasses: true,
-			entryPoint: './app/globals.css',
-		},
-	},
-
-	overrides: [
-		{
-			files: sourceFiles,
-			rules: {
-				'constructor-super': 'off',
-				'getter-return': 'off',
-				'no-undef': 'off',
-				'no-class-assign': 'off',
-				'no-const-assign': 'off',
-				'no-dupe-class-members': 'off',
-				'no-dupe-keys': 'off',
-				'no-func-assign': 'off',
-				'no-import-assign': 'off',
-				'no-new-native-nonconstructor': 'off',
-				'no-obj-calls': 'off',
-				'no-redeclare': 'off',
-				'no-setter-return': 'off',
-				'no-this-before-super': 'off',
-				'no-unreachable': 'off',
-				'no-unsafe-negation': 'off',
-				'no-var': 'error',
-				'no-with': 'off',
-				'prefer-const': 'error',
-				'prefer-rest-params': 'error',
-				'prefer-spread': 'error',
-				'no-rest-spread-properties': 'off',
-
-				'typescript/consistent-type-imports': 'error',
-
-				'typescript/prefer-optional-chain': 'off',
-				'typescript/no-unnecessary-condition': 'off',
-				'typescript/no-explicit-any': 'off',
-				'typescript/no-floating-promises': 'off',
-				'typescript/no-misused-promises': 'off',
-				'typescript/no-unnecessary-type-assertion': 'off',
-				'typescript/no-unsafe-argument': 'off',
-				'typescript/no-unsafe-assignment': 'off',
-				'typescript/no-unsafe-call': 'off',
-				'typescript/prefer-promise-reject-errors': 'off',
-				'typescript/require-await': 'off',
-				'typescript/restrict-template-expressions': 'off',
-			},
-		},
-	],
+	plugins: ['react'],
 
 	rules: {
 		...baseRules,
 
+		'better-tailwindcss/enforce-canonical-classes': 'error',
 		'better-tailwindcss/enforce-consistent-class-order': 'off',
-		'better-tailwindcss/enforce-logical-properties': 'off',
-		'better-tailwindcss/enforce-consistent-line-wrapping': 'off',
-
 		'better-tailwindcss/enforce-consistent-important-position': 'error',
+		'better-tailwindcss/enforce-consistent-line-wrapping': 'off',
 		'better-tailwindcss/enforce-consistent-variable-syntax': 'error',
 		'better-tailwindcss/enforce-consistent-variant-order': 'error',
-		'better-tailwindcss/enforce-canonical-classes': 'error',
+		'better-tailwindcss/enforce-logical-properties': 'off',
 		'better-tailwindcss/enforce-shorthand-classes': 'error',
 		'better-tailwindcss/no-conflicting-classes': 'error',
 		'better-tailwindcss/no-deprecated-classes': 'error',
 		'better-tailwindcss/no-duplicate-classes': 'error',
 		'better-tailwindcss/no-restricted-classes': 'error',
-		'better-tailwindcss/no-unnecessary-whitespace': 'error',
-
 		'better-tailwindcss/no-unknown-classes': [
 			'error',
 			{
 				ignore: ['app-*'],
 			},
 		],
-
+		'better-tailwindcss/no-unnecessary-whitespace': 'error',
+		'constructor-super': 'off',
+		'getter-return': 'off',
+		'no-class-assign': 'off',
+		'no-const-assign': 'off',
+		'no-dupe-class-members': 'off',
+		'no-dupe-keys': 'off',
+		'no-func-assign': 'off',
+		'no-import-assign': 'off',
+		'no-new-native-nonconstructor': 'off',
+		'no-obj-calls': 'off',
+		'no-redeclare': 'off',
+		'no-rest-spread-properties': 'off',
 		'no-restricted-exports': [
 			'error',
 			{
@@ -140,6 +95,11 @@ export default defineConfig({
 				],
 			},
 		],
+		'no-setter-return': 'off',
+		'no-this-before-super': 'off',
+		'no-undef': 'off',
+		'no-unreachable': 'off',
+		'no-unsafe-negation': 'off',
 		'no-unused-vars': [
 			'error',
 			{
@@ -148,6 +108,11 @@ export default defineConfig({
 				varsIgnorePattern: '^_',
 			},
 		],
+		'no-var': 'error',
+		'no-with': 'off',
+		'prefer-const': 'error',
+		'prefer-rest-params': 'error',
+		'prefer-spread': 'error',
 		'react/exhaustive-deps': 'error',
 		'react/react-compiler': 'off',
 		'react/rules-of-hooks': 'error',
@@ -157,6 +122,20 @@ export default defineConfig({
 				minimumDescriptionLength: 10,
 			},
 		],
+		'typescript/consistent-type-imports': 'error',
+		'typescript/no-explicit-any': 'off',
+		'typescript/no-floating-promises': 'off',
+		'typescript/no-misused-promises': 'off',
+		'typescript/no-unnecessary-condition': 'off',
+		'typescript/no-unnecessary-type-assertion': 'off',
+		'typescript/no-unsafe-argument': 'off',
+		'typescript/no-unsafe-assignment': 'off',
+		'typescript/no-unsafe-call': 'off',
+		'typescript/no-unsafe-type-assertion': 'off',
+		'typescript/prefer-optional-chain': 'off',
+		'typescript/prefer-promise-reject-errors': 'off',
+		'typescript/require-await': 'off',
+		'typescript/restrict-template-expressions': 'off',
 		'typescript/restrict-plus-operands': [
 			'error',
 			{
@@ -167,17 +146,13 @@ export default defineConfig({
 				allowRegExp: false,
 			},
 		],
-		'typescript/restrict-template-expressions': [
-			'error',
-			{
-				allowAny: false,
-				allowBoolean: false,
-				allowNever: false,
-				allowNullish: false,
-				allowNumber: false,
-				allowRegExp: false,
-			},
-		],
 		'typescript/return-await': ['error', 'error-handling-correctness-only'],
+	},
+
+	settings: {
+		'eslint-plugin-better-tailwindcss': {
+			detectComponentClasses: true,
+			entryPoint: './app/globals.css',
+		},
 	},
 });
