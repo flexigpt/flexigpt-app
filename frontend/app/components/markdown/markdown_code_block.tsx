@@ -73,7 +73,7 @@ export function CodeBlock({ language, value, isBusy, hideMermaidCode, diffCandid
 	const headerTitle = hasMermaidSyntaxError ? (mermaidRenderError ?? 'Mermaid syntax error') : undefined;
 
 	const fallback = (
-		<pre className="text-code overflow-auto rounded bg-transparent p-2 text-sm">
+		<pre className="text-code overflow-auto rounded-sm bg-transparent p-2 text-sm">
 			<code>{value}</code>
 		</pre>
 	);

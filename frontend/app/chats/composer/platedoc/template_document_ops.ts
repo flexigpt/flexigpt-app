@@ -259,7 +259,7 @@ export function toPlainTextReplacingVariables(editor: PlateEditor): string {
 			// Resolve the effective value like the inline pill does
 			const val = effectiveVarValueLocal(def, ctx.userValues);
 			if (val !== undefined && val !== null) {
-				// eslint-disable-next-line @typescript-eslint/no-base-to-string
+				// oxlint-disable-next-line @typescript-eslint/no-base-to-string
 				return String(val);
 			}
 			// If variable is optional and still unresolved, substitute empty string

@@ -363,7 +363,7 @@ function AddEditAuthKeyModalContent({
 						</button>
 					</div>
 					{intro ? (
-						<div className="border-base-300 bg-base-100/70 rounded-2xl border p-4 text-sm leading-relaxed">{intro}</div>
+						<div className="border-base-300 bg-base-100/70 rounded-2xl border p-4 text-sm/relaxed">{intro}</div>
 					) : null}
 				</div>
 

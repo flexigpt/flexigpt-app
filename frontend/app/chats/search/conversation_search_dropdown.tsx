@@ -70,7 +70,7 @@ export function ConversationSearchDropdown({
 	const NO_CONVERSATIONS = 'No conversations yet';
 
 	const getTopBarContent = () => {
-		let left = '';
+		let left = 'Title & message matches';
 		let right = '';
 
 		if (loading && !results.length) {
@@ -100,8 +100,6 @@ export function ConversationSearchDropdown({
 					left = 'Title & message matches';
 					right = SEARCHED_ALL;
 				}
-			} else {
-				left = 'Title & message matches';
 			}
 		}
 

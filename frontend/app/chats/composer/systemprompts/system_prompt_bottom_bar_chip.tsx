@@ -385,7 +385,7 @@ function SystemPromptBottomBarChipInner({
 						<div className="flex w-full items-start gap-2">
 							<input
 								type="checkbox"
-								className="checkbox checkbox-xs mt-0.5 rounded"
+								className="checkbox checkbox-xs mt-0.5 rounded-sm"
 								checked={includeModelDefault}
 								disabled={isInputLocked}
 								onChange={event => {
@@ -464,7 +464,7 @@ function SystemPromptBottomBarChipInner({
 											>
 												<input
 													type="checkbox"
-													className="checkbox checkbox-xs mt-0.5 rounded"
+													className="checkbox checkbox-xs mt-0.5 rounded-sm"
 													checked={isSelected}
 													disabled={isInputLocked}
 													onChange={event => {

@@ -86,7 +86,7 @@ export function HoverTip({
 				gutter={gutter}
 				overflowPadding={overflowPadding}
 				portal
-				className={`rounded-box bg-base-100 text-base-content border-base-300 z-1000 max-w-xs border px-3 py-2 text-xs leading-4 whitespace-pre-line shadow-xl ${tooltipClassName}`}
+				className={`rounded-box bg-base-100 text-base-content border-base-300 z-1000 max-w-xs border px-3 py-2 text-xs/4 whitespace-pre-line shadow-xl ${tooltipClassName}`}
 			>
 				{content}
 			</Tooltip>

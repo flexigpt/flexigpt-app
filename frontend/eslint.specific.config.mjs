@@ -17,7 +17,6 @@ export default defineConfig(
 		plugins: {
 			'react-hooks': reactHooks,
 			'react-you-might-not-need-an-effect': reactYouMightNotNeedAnEffect,
-			// Optional here for now, but keep if you may turn on TS ESLint rules later.
 			'@typescript-eslint': tseslint.plugin,
 		},
 		languageOptions: {

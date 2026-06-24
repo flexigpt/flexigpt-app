@@ -357,7 +357,7 @@ export default function DocsPage() {
 													categoryIsActive ? 'border-primary/30' : 'border-base-300/60'
 												}`}
 											>
-												<div className="bg-base-100/95 sticky top-0 z-10 -mx-1 mb-2 rounded-xl px-3 py-2 backdrop-blur">
+												<div className="bg-base-100/95 sticky top-0 z-10 -mx-1 mb-2 rounded-xl px-3 py-2 backdrop-blur-sm">
 													<div className="text-xs font-semibold tracking-wide uppercase opacity-60">
 														{category.title}
 													</div>
@@ -421,7 +421,7 @@ export default function DocsPage() {
 							</section>
 
 							<article id={activeDocSection.id} className="bg-base-100 rounded-2xl p-8 shadow-lg">
-								<div className="min-w-0 text-sm leading-6">
+								<div className="min-w-0 text-sm/6">
 									<EnhancedMarkdown
 										text={activeDocSection.body}
 										hideMermaidCode={true}

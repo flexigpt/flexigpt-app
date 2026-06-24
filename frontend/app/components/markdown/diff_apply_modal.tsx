@@ -485,7 +485,7 @@ export function DiffApplyModal({
 		if (isRunning) return;
 
 		const target = displayTargets[index];
-		if (!target || !target.targetPath.trim()) return;
+		if (!target?.targetPath.trim()) return;
 
 		const key = getLocalTargetKey(target, index);
 		setRunningAction({ key, kind: 'apply' });
@@ -680,7 +680,7 @@ export function DiffApplyModal({
 											) : null}
 
 											{target.message ? (
-												<div className={`mt-2 rounded-lg px-3 py-2 text-xs leading-5 ${targetMessageClassName}`}>
+												<div className={`mt-2 rounded-lg px-3 py-2 text-xs/5 ${targetMessageClassName}`}>
 													{target.message}
 												</div>
 											) : null}
@@ -749,7 +749,7 @@ export function DiffApplyModal({
 														<li key={candidate} className="min-w-0">
 															<button
 																type="button"
-																className="btn btn-xs btn-ghost h-auto min-h-0 w-full justify-start rounded-md p-2 text-left font-mono text-[11px] leading-4 whitespace-normal"
+																className="btn btn-xs btn-ghost h-auto min-h-0 w-full justify-start rounded-md p-2 text-left font-mono text-[11px]/4 whitespace-normal"
 																title={candidate}
 																onClick={() => {
 																	updateTarget(index, candidate);

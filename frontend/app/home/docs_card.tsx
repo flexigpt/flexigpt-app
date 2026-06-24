@@ -35,7 +35,7 @@ export function DocsCard({ title, description, to }: NavCardProps) {
 						<h3 className="text-sm font-semibold">{title}</h3>
 						<FiArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
 					</div>
-					<div className="text-base-content/70 mt-1 text-xs leading-relaxed">{description}</div>
+					<div className="text-base-content/70 mt-1 text-xs/relaxed">{description}</div>
 				</div>
 			</div>
 		</Link>

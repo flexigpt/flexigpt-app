@@ -206,7 +206,7 @@ async function executeMCPToolCall(
 			};
 		}
 
-		let resolution = MCPApprovalResolution.MCPApprovalResolutionDenyOnce;
+		let resolution: MCPApprovalResolution;
 
 		try {
 			resolution =

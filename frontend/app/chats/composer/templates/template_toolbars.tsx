@@ -103,7 +103,7 @@ function replaceVariablesForSelectionWithText(
 				value = effectiveVarValueLocal(def, vars);
 			}
 
-			// eslint-disable-next-line @typescript-eslint/no-base-to-string
+			// oxlint-disable-next-line @typescript-eslint/no-base-to-string
 			const text = value !== undefined && value !== null && value !== '' ? String(value) : `{{${name}}}`;
 			editor.tf.removeNodes({ at: path });
 			editor.tf.insertNodes({ text }, { at: path });

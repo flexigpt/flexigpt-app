@@ -39,7 +39,7 @@ function ErrorRecoveryContent({
 
 	return (
 		<main className="flex min-h-screen w-full items-center justify-center p-6">
-			<section className="border-base-300 bg-base-100 w-full max-w-3xl rounded-lg border p-6 shadow">
+			<section className="border-base-300 bg-base-100 w-full max-w-3xl rounded-lg border p-6 shadow-sm">
 				<h1 className="mb-3 text-2xl font-semibold">{title}</h1>
 
 				<p className="text-base-content/80 mb-6">{message}</p>
@@ -73,7 +73,7 @@ function ErrorRecoveryContent({
 				{technicalDetails && (
 					<details className="mt-6">
 						<summary className="cursor-pointer">Technical details</summary>
-						<pre className="bg-base-200 mt-3 max-h-96 w-full overflow-auto rounded p-4 text-xs">
+						<pre className="bg-base-200 mt-3 max-h-96 w-full overflow-auto rounded-sm p-4 text-xs">
 							<code>{technicalDetails}</code>
 						</pre>
 					</details>

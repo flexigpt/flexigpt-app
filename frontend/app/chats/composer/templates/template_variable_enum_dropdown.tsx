@@ -251,7 +251,7 @@ function EnumDropdownInlineMenu({
 		<div
 			ref={menuRef}
 			style={style}
-			className="bg-base-100 rounded-xl border p-1 shadow"
+			className="bg-base-100 rounded-xl border p-1 shadow-sm"
 			tabIndex={-1}
 			onMouseDown={stopForSlate}
 			onPointerDown={stopForSlate}

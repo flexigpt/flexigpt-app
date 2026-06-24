@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unnecessary-type-parameters */
 import type { ConversationSearchItem } from '@/spec/conversation';
 
 export const CACHE_EXPIRY_TIME = 60_000;
@@ -9,6 +8,7 @@ export interface SearchResult {
 	snippet?: string;
 }
 
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters
 export const uniqBy = <T, K>(arr: T[], getKey: (item: T) => K): T[] => {
 	const seen = new Set<K>();
 	const out: T[] = [];
@@ -23,6 +23,7 @@ export const uniqBy = <T, K>(arr: T[], getKey: (item: T) => K): T[] => {
 	return out;
 };
 
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters
 export const mergeUniqBy = <T, K>(a: T[], b: T[], getKey: (item: T) => K): T[] => {
 	const seen = new Set<K>();
 	const out: T[] = [];

@@ -543,7 +543,7 @@ export function normalizeStructuredJSONStringDeep(value: unknown): unknown {
 	return value;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters
 export function normalizeStructuredDisplayObject<T extends object>(value: T): Record<string, unknown> {
 	const normalized = normalizeStructuredJSONStringDeep(value);
 	return isRecord(normalized) ? normalized : (value as Record<string, unknown>);

@@ -49,8 +49,7 @@ export function getAttachmentContentBlockModePillClasses(
 	mode: AttachmentContentBlockMode,
 	interactive: boolean
 ): string {
-	const base =
-		'inline-flex items-center gap-1 rounded-full border px-2 py-[1px] text-xs leading-tight ' + 'transition-colors';
+	const base = 'inline-flex items-center gap-1 rounded-full border px-2 py-[1px] text-xs/tight ' + 'transition-colors';
 
 	const interactiveClasses = interactive
 		? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-base-300'

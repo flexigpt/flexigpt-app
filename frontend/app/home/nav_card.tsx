@@ -26,7 +26,7 @@ export function PrimaryActionCard({ title, description, to, icon }: NavCardProps
 						<FiArrowRight size={28} className="shrink-0 transition-transform group-hover:translate-x-1" />
 					</div>
 
-					<div className="text-base-content/70 mt-3 text-sm leading-relaxed">{description}</div>
+					<div className="text-base-content/70 mt-3 text-sm/relaxed">{description}</div>
 				</div>
 			</div>
 		</Link>

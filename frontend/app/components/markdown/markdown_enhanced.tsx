@@ -227,7 +227,7 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 							? children.join('')
 							: children == null
 								? ''
-								: // eslint-disable-next-line @typescript-eslint/no-base-to-string
+								: // oxlint-disable-next-line typescript/no-base-to-string
 									String(children);
 
 				const value = raw.replace(/\r\n/g, '\n').replace(/\n$/, '');

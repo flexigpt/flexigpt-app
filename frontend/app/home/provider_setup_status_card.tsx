@@ -136,9 +136,7 @@ export function ProviderSetupStatus({
 						<FiArrowRight size={18} className="shrink-0 transition-transform group-hover:translate-x-1" />
 					</div>
 
-					<p className="text-base-content/70 mt-1 text-xs leading-relaxed">
-						Choose a built-in provider, paste your key.
-					</p>
+					<p className="text-base-content/70 mt-1 text-xs/relaxed">Choose a built-in provider, paste your key.</p>
 				</div>
 			</div>
 		</button>

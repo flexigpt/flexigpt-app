@@ -53,7 +53,7 @@ export function FloatingToolbarButtons() {
 				nodeType={KEYS.highlight}
 				tooltip={`Highlight (${mod}+${shift}+H)`}
 			>
-				<span className="bg-warning/30 rounded px-1 leading-none">H</span>
+				<span className="bg-warning/30 rounded-sm px-1 leading-none">H</span>
 			</MarkToolbarButton>
 
 			<MarkToolbarButton nodeType={KEYS.code} tooltip={`Code (${mod}+E)`}>

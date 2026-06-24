@@ -54,7 +54,8 @@ function safeJson(value: unknown, maxLength = 20_000): string {
 	try {
 		const json = JSON.stringify(value, (_key, current) => {
 			if (typeof current === 'bigint') return current.toString();
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
+			// oxlint-disable-next-line typescript/no-unsafe-member-access
 			if (typeof current === 'function') return `[Function ${current.name || 'anonymous'}]`;
 
 			if (typeof current === 'object' && current !== null) {
@@ -62,7 +63,7 @@ function safeJson(value: unknown, maxLength = 20_000): string {
 				seen.add(current);
 			}
 
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-return
+			// oxlint-disable-next-line typescript/no-unsafe-return
 			return current;
 		});
 

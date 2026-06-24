@@ -85,7 +85,7 @@ export function WorkflowStarterCard({ workflow }: { workflow: WorkflowStarter })
 						<FiArrowRight size={18} className="shrink-0 transition-transform group-hover:translate-x-1" />
 					</div>
 
-					<div className="text-base-content/70 mt-1 text-xs leading-relaxed">{workflow.description}</div>
+					<div className="text-base-content/70 mt-1 text-xs/relaxed">{workflow.description}</div>
 				</div>
 			</div>
 		</Link>

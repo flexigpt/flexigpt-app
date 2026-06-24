@@ -61,7 +61,7 @@ export function FloatingToolbar({
 					// Positioning/box
 					'absolute p-1 whitespace-nowrap',
 					// DaisyUI surface
-					'border-base-300 bg-base-100 rounded-xl border shadow',
+					'border-base-300 bg-base-100 rounded-xl border shadow-sm',
 					// Misc
 					'print:hidden',
 					className
