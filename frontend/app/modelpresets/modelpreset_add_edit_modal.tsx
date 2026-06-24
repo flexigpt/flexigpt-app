@@ -748,7 +748,7 @@ function AddEditModelPresetModalContent({
 						{mode === 'add' && (
 							<div className="grid grid-cols-12 items-center gap-2">
 								<label className="label col-span-3">
-									<span className="label-text text-sm">Prefill from Existing</span>
+									<span className="text-sm">Prefill from Existing</span>
 								</label>
 
 								<div className="col-span-9 flex items-center gap-2">
@@ -803,11 +803,8 @@ function AddEditModelPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Model Preset ID*</span>
-								<span
-									className="label-text-alt tooltip tooltip-right"
-									data-tip="Unique identifier. Letters, numbers, hyphen."
-								>
+								<span className="text-sm">Model Preset ID*</span>
+								<span className="tooltip tooltip-right" data-tip="Unique identifier. Letters, numbers, hyphen.">
 									<FiHelpCircle size={12} />
 								</span>
 							</label>
@@ -817,7 +814,7 @@ function AddEditModelPresetModalContent({
 										ref={modelPresetIdInputRef}
 										name="modelPresetID"
 										type="text"
-										className={`input input-bordered w-full rounded-xl ${errors.modelPresetID ? 'input-error' : ''}`}
+										className={`input w-full rounded-xl ${errors.modelPresetID ? 'input-error' : ''}`}
 										value={modelPresetID}
 										onChange={handleChange}
 										placeholder="e.g. gpt4-preset"
@@ -830,7 +827,7 @@ function AddEditModelPresetModalContent({
 								)}
 								{errors.modelPresetID && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} />
 											{errors.modelPresetID}
 										</span>
@@ -841,9 +838,9 @@ function AddEditModelPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Model Name*</span>
+								<span className="text-sm">Model Name*</span>
 								<span
-									className="label-text-alt tooltip tooltip-right"
+									className="tooltip tooltip-right"
 									data-tip="The name you send to the completions API (e.g. gpt-4)"
 								>
 									<FiHelpCircle size={12} />
@@ -854,7 +851,7 @@ function AddEditModelPresetModalContent({
 									ref={modelNameInputRef}
 									name="name"
 									type="text"
-									className={`input input-bordered w-full rounded-xl ${errors.name ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.name ? 'input-error' : ''}`}
 									value={formData.name}
 									onChange={handleChange}
 									placeholder="e.g. gpt-4, claude-3-opus-20240229"
@@ -865,7 +862,7 @@ function AddEditModelPresetModalContent({
 								/>
 								{errors.name && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} />
 											{errors.name}
 										</span>
@@ -876,8 +873,8 @@ function AddEditModelPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Preset Label*</span>
-								<span className="label-text-alt tooltip tooltip-right" data-tip="Friendly name shown in the UI">
+								<span className="text-sm">Preset Label*</span>
+								<span className="tooltip tooltip-right" data-tip="Friendly name shown in the UI">
 									<FiHelpCircle size={12} />
 								</span>
 							</label>
@@ -885,7 +882,7 @@ function AddEditModelPresetModalContent({
 								<input
 									name="presetLabel"
 									type="text"
-									className={`input input-bordered w-full rounded-xl ${errors.presetLabel ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.presetLabel ? 'input-error' : ''}`}
 									value={formData.presetLabel}
 									onChange={handleChange}
 									placeholder="e.g. GPT-4 (Creative)"
@@ -896,7 +893,7 @@ function AddEditModelPresetModalContent({
 								/>
 								{errors.presetLabel && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} />
 											{errors.presetLabel}
 										</span>
@@ -907,7 +904,7 @@ function AddEditModelPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3 cursor-pointer">
-								<span className="label-text text-sm">Enabled</span>
+								<span className="text-sm">Enabled</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -923,7 +920,7 @@ function AddEditModelPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3 cursor-pointer">
-								<span className="label-text text-sm">Streaming</span>
+								<span className="text-sm">Streaming</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -939,8 +936,8 @@ function AddEditModelPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3 cursor-pointer">
-								<span className="label-text text-sm">Supports Reasoning</span>
-								<span className="label-text-alt tooltip tooltip-right" data-tip="If enabled, configure below">
+								<span className="text-sm">Supports Reasoning</span>
+								<span className="tooltip tooltip-right" data-tip="If enabled, configure below">
 									<FiHelpCircle size={12} />
 								</span>
 							</label>
@@ -960,7 +957,7 @@ function AddEditModelPresetModalContent({
 							<>
 								<div className="grid grid-cols-12 items-center gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">Reasoning Type</span>
+										<span className="text-sm">Reasoning Type</span>
 									</label>
 									<div className="col-span-9">
 										{isReadOnly ? (
@@ -985,7 +982,7 @@ function AddEditModelPresetModalContent({
 								{formData.reasoningType === ReasoningType.SingleWithLevels && (
 									<div className="grid grid-cols-12 items-center gap-2">
 										<label className="label col-span-3">
-											<span className="label-text text-sm">Reasoning Level</span>
+											<span className="text-sm">Reasoning Level</span>
 										</label>
 										<div className="col-span-9">
 											{isReadOnly ? (
@@ -1011,13 +1008,13 @@ function AddEditModelPresetModalContent({
 								{formData.reasoningType === ReasoningType.HybridWithTokens && (
 									<div className="grid grid-cols-12 items-center gap-2">
 										<label className="label col-span-3">
-											<span className="label-text text-sm">Reasoning Tokens</span>
+											<span className="text-sm">Reasoning Tokens</span>
 										</label>
 										<div className="col-span-9">
 											<input
 												name="reasoningTokens"
 												type="text"
-												className={`input input-bordered w-full rounded-xl ${errors.reasoningTokens ? 'input-error' : ''}`}
+												className={`input w-full rounded-xl ${errors.reasoningTokens ? 'input-error' : ''}`}
 												value={formData.reasoningTokens}
 												onChange={handleChange}
 												placeholder="e.g. 1024"
@@ -1026,7 +1023,7 @@ function AddEditModelPresetModalContent({
 											/>
 											{errors.reasoningTokens && (
 												<div className="label">
-													<span className="label-text-alt text-error flex items-center gap-1">
+													<span className="text-error flex items-center gap-1">
 														<FiAlertCircle size={12} />
 														{errors.reasoningTokens}
 													</span>
@@ -1038,11 +1035,8 @@ function AddEditModelPresetModalContent({
 
 								<div className="grid grid-cols-12 items-center gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">Reasoning Summary</span>
-										<span
-											className="label-text-alt tooltip tooltip-right"
-											data-tip="Optional, reasoning summary style."
-										>
+										<span className="text-sm">Reasoning Summary</span>
+										<span className="tooltip tooltip-right" data-tip="Optional, reasoning summary style.">
 											<FiHelpCircle size={12} />
 										</span>
 									</label>
@@ -1068,8 +1062,8 @@ function AddEditModelPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Temperature (0-1)</span>
-								<span className="label-text-alt tooltip tooltip-right" data-tip="This or Reasoning is needed">
+								<span className="text-sm">Temperature (0-1)</span>
+								<span className="tooltip tooltip-right" data-tip="This or Reasoning is needed">
 									<FiHelpCircle size={12} />
 								</span>
 							</label>
@@ -1077,7 +1071,7 @@ function AddEditModelPresetModalContent({
 								<input
 									name="temperature"
 									type="text"
-									className={`input input-bordered w-full rounded-xl ${errors.temperature ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.temperature ? 'input-error' : ''}`}
 									value={formData.temperature}
 									onChange={handleChange}
 									placeholder={numPlaceholder('temperature')}
@@ -1087,7 +1081,7 @@ function AddEditModelPresetModalContent({
 								/>
 								{errors.temperature && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.temperature}
 										</span>
 									</div>
@@ -1097,13 +1091,13 @@ function AddEditModelPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Timeout (seconds)</span>
+								<span className="text-sm">Timeout (seconds)</span>
 							</label>
 							<div className="col-span-9">
 								<input
 									name="timeout"
 									type="text"
-									className={`input input-bordered w-full rounded-xl ${errors.timeout ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.timeout ? 'input-error' : ''}`}
 									value={formData.timeout}
 									onChange={handleChange}
 									placeholder={numPlaceholder('timeout')}
@@ -1113,7 +1107,7 @@ function AddEditModelPresetModalContent({
 								/>
 								{errors.timeout && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.timeout}
 										</span>
 									</div>
@@ -1124,7 +1118,7 @@ function AddEditModelPresetModalContent({
 						{(['maxPromptLength', 'maxOutputLength'] as const).map(field => (
 							<div className="grid grid-cols-12 items-center gap-2" key={field}>
 								<label className="label col-span-3">
-									<span className="label-text text-sm">
+									<span className="text-sm">
 										{field === 'maxPromptLength' ? 'Max Prompt Tokens' : 'Max Output Tokens'}
 									</span>
 								</label>
@@ -1132,7 +1126,7 @@ function AddEditModelPresetModalContent({
 									<input
 										name={field}
 										type="text"
-										className={`input input-bordered w-full rounded-xl ${errors[field] ? 'input-error' : ''}`}
+										className={`input w-full rounded-xl ${errors[field] ? 'input-error' : ''}`}
 										value={formData[field]}
 										onChange={handleChange}
 										placeholder={numPlaceholder(field)}
@@ -1142,7 +1136,7 @@ function AddEditModelPresetModalContent({
 									/>
 									{errors[field] && (
 										<div className="label">
-											<span className="label-text-alt text-error flex items-center gap-1">
+											<span className="text-error flex items-center gap-1">
 												<FiAlertCircle size={12} /> {errors[field]}
 											</span>
 										</div>
@@ -1155,9 +1149,9 @@ function AddEditModelPresetModalContent({
 							<>
 								<div className="grid grid-cols-12 items-center gap-2">
 									<label className="label col-span-3 cursor-pointer">
-										<span className="label-text text-sm">Cache Control</span>
+										<span className="text-sm">Cache Control</span>
 										<span
-											className="label-text-alt tooltip tooltip-right"
+											className="tooltip tooltip-right"
 											data-tip="Request-level manual cache control for this preset."
 										>
 											<FiHelpCircle size={12} />
@@ -1190,7 +1184,7 @@ function AddEditModelPresetModalContent({
 									<>
 										<div className="grid grid-cols-12 items-center gap-2">
 											<label className="label col-span-3">
-												<span className="label-text text-sm">Cache Kind</span>
+												<span className="text-sm">Cache Kind</span>
 											</label>
 											<div className="col-span-9">
 												{isReadOnly ? (
@@ -1216,7 +1210,7 @@ function AddEditModelPresetModalContent({
 
 										<div className="grid grid-cols-12 items-center gap-2">
 											<label className="label col-span-3">
-												<span className="label-text text-sm">Cache TTL</span>
+												<span className="text-sm">Cache TTL</span>
 											</label>
 											<div className="col-span-9">
 												{isReadOnly ? (
@@ -1239,13 +1233,13 @@ function AddEditModelPresetModalContent({
 										{supportsCacheKey && (
 											<div className="grid grid-cols-12 items-center gap-2">
 												<label className="label col-span-3">
-													<span className="label-text text-sm">Cache Key</span>
+													<span className="text-sm">Cache Key</span>
 												</label>
 												<div className="col-span-9">
 													<input
 														name="cacheControlKey"
 														type="text"
-														className="input input-bordered w-full rounded-xl"
+														className="input w-full rounded-xl"
 														value={formData.cacheControlKey}
 														onChange={handleChange}
 														placeholder="Optional request cache key"
@@ -1264,12 +1258,12 @@ function AddEditModelPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">System Prompt</span>
+								<span className="text-sm">System Prompt</span>
 							</label>
 							<div className="col-span-9">
 								<textarea
 									name="systemPrompt"
-									className="textarea textarea-bordered h-24 w-full rounded-xl"
+									className="textarea h-24 w-full rounded-xl"
 									value={formData.systemPrompt}
 									onChange={handleChange}
 									placeholder="Enter instructions here…"
@@ -1281,8 +1275,8 @@ function AddEditModelPresetModalContent({
 
 						<div className="grid grid-cols-12 items-start gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Stop Sequences</span>
-								<span className="label-text-alt tooltip tooltip-right" data-tip="One per line (commas also supported).">
+								<span className="text-sm">Stop Sequences</span>
+								<span className="tooltip tooltip-right" data-tip="One per line (commas also supported).">
 									<FiHelpCircle size={12} />
 								</span>
 							</label>
@@ -1292,7 +1286,7 @@ function AddEditModelPresetModalContent({
 								) : (
 									<textarea
 										name="stopSequencesRaw"
-										className="textarea textarea-bordered h-20 w-full rounded-xl"
+										className="textarea h-20 w-full rounded-xl"
 										value={formData.stopSequencesRaw}
 										onChange={handleChange}
 										placeholder={'e.g.\n###\n</final>'}
@@ -1305,9 +1299,9 @@ function AddEditModelPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Output Format Kind</span>
+								<span className="text-sm">Output Format Kind</span>
 								<span
-									className="label-text-alt tooltip tooltip-right"
+									className="tooltip tooltip-right"
 									data-tip="Provider-specific output format identifier (if supported)."
 								>
 									<FiHelpCircle size={12} />
@@ -1339,7 +1333,7 @@ function AddEditModelPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Output Verbosity/Effort</span>
+								<span className="text-sm">Output Verbosity/Effort</span>
 							</label>
 							<div className="col-span-9">
 								{isReadOnly ? (

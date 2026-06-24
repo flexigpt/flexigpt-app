@@ -174,7 +174,7 @@ function ChatTabsBarContent({
 	return (
 		<div className="border-base-300 flex h-9 w-full items-center gap-2 border-b bg-inherit">
 			<div
-				className="scrollbar-custom-thin flex min-w-0 flex-1 flex-nowrap items-center overflow-hidden p-1"
+				className="app-scrollbar-thin flex min-w-0 flex-1 flex-nowrap items-center overflow-hidden p-1"
 				style={{ scrollbarGutter: 'stable' }}
 			>
 				<div ref={tabsViewportRef} className="min-w-0 overflow-x-auto overflow-y-hidden overscroll-contain">

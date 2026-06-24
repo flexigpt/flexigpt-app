@@ -56,7 +56,7 @@ function getInitialFormState(tsenode: TemplateSelectionElementNode): TemplateEdi
 
 function HelpHint({ content }: { content: string }) {
 	return (
-		<span className="label-text-alt tooltip tooltip-right ml-1 inline-flex cursor-help" data-tip={content}>
+		<span className="tooltip tooltip-right ml-1 inline-flex cursor-help" data-tip={content}>
 			<FiHelpCircle size={12} />
 		</span>
 	);
@@ -198,13 +198,13 @@ function TemplateEditModalContent({ onClose, tsenode, editor, path }: Omit<Templ
 							<div className="space-y-3">
 								<div className="grid grid-cols-12 items-center gap-3">
 									<label className="label col-span-12 md:col-span-4">
-										<span className="label-text text-sm">Display Name (local)</span>
+										<span className="text-sm">Display Name (local)</span>
 										<HelpHint content="Local override; visible only here." />
 									</label>
 									<div className="col-span-12 md:col-span-8">
 										<input
 											ref={displayNameInputRef}
-											className="input input-bordered input-sm w-full rounded-xl"
+											className="input input-sm w-full rounded-xl"
 											value={formState.displayName}
 											onChange={e => {
 												setFormState(prev => ({ ...prev, displayName: e.target.value }));
@@ -217,12 +217,12 @@ function TemplateEditModalContent({ onClose, tsenode, editor, path }: Omit<Templ
 
 								<div className="grid grid-cols-12 items-center gap-3">
 									<label className="label col-span-12 md:col-span-4">
-										<span className="label-text text-sm">Tags</span>
+										<span className="text-sm">Tags</span>
 										<HelpHint content="Comma-separated tags used for filtering." />
 									</label>
 									<div className="col-span-12 md:col-span-8">
 										<input
-											className="input input-bordered input-sm w-full rounded-xl"
+											className="input input-sm w-full rounded-xl"
 											value={formState.tags}
 											onChange={e => {
 												setFormState(prev => ({ ...prev, tags: e.target.value }));
@@ -235,12 +235,12 @@ function TemplateEditModalContent({ onClose, tsenode, editor, path }: Omit<Templ
 
 								<div className="grid grid-cols-12 items-start gap-3">
 									<label className="label col-span-12 md:col-span-4">
-										<span className="label-text text-sm">Description (local)</span>
+										<span className="text-sm">Description (local)</span>
 										<HelpHint content="Local description for your reference." />
 									</label>
 									<div className="col-span-12 md:col-span-8">
 										<textarea
-											className="textarea textarea-bordered w-full rounded-xl"
+											className="textarea w-full rounded-xl"
 											value={formState.description}
 											onChange={e => {
 												setFormState(prev => ({ ...prev, description: e.target.value }));
@@ -303,7 +303,7 @@ function TemplateEditModalContent({ onClose, tsenode, editor, path }: Omit<Templ
 											<span className="opacity-60">#{idx + 1}</span>
 										</div>
 										<textarea
-											className="textarea textarea-bordered min-h-32 w-full rounded-xl"
+											className="textarea min-h-32 w-full rounded-xl"
 											value={b.content}
 											onChange={e => {
 												setFormState(prev => {
@@ -368,7 +368,7 @@ function VariableEditorRow({
 	const isDisabled = varDef.source === VarSource.Static;
 	const commonHelp = (
 		<div className="label">
-			<span className="label-text-alt text-xs opacity-70">
+			<span className="text-xs opacity-70">
 				{help}
 				{varDef.type === VarType.Enum && varDef.enumValues?.length ? ` | options: ${varDef.enumValues.join(', ')}` : ''}
 			</span>
@@ -377,8 +377,8 @@ function VariableEditorRow({
 
 	const labelCol = (
 		<label htmlFor={id} className="label col-span-12 md:col-span-4">
-			<span className="label-text text-sm">{label}</span>
-			<span className="label-text-alt tooltip tooltip-right" data-tip={help}>
+			<span className="text-sm">{label}</span>
+			<span className="tooltip tooltip-right" data-tip={help}>
 				<FiHelpCircle size={12} />
 			</span>
 		</label>
@@ -413,7 +413,7 @@ function VariableEditorRow({
 						<input
 							id={id}
 							type="number"
-							className="input input-bordered input-sm w-full rounded-xl"
+							className="input input-sm w-full rounded-xl"
 							value={value === undefined || value === null ? '' : (value as number).toString()}
 							disabled={isDisabled}
 							onChange={e => {
@@ -457,7 +457,7 @@ function VariableEditorRow({
 						<input
 							id={id}
 							type="date"
-							className="input input-bordered input-sm w-full rounded-xl"
+							className="input input-sm w-full rounded-xl"
 							value={value ? (value as string) : ''}
 							disabled={isDisabled}
 							onChange={e => {
@@ -477,7 +477,7 @@ function VariableEditorRow({
 					<div className="col-span-12 md:col-span-8">
 						<input
 							id={id}
-							className="input input-bordered input-sm w-full rounded-xl"
+							className="input input-sm w-full rounded-xl"
 							value={value === undefined || value === null ? '' : (value as string)}
 							disabled={isDisabled}
 							onChange={e => {

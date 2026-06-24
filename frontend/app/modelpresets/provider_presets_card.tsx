@@ -304,7 +304,7 @@ export function ProviderPresetCard({
 									<td colSpan={2} className="py-0.5">
 										<div className="flex items-center justify-between py-0.5">
 											<span
-												className="label-text-alt tooltip tooltip-right"
+												className="tooltip tooltip-right"
 												data-tip={
 													providerIsBuiltIn
 														? 'Built-in providers cannot be deleted.'

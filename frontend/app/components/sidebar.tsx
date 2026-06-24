@@ -59,7 +59,7 @@ export function Sidebar({ children }: SidebarProps) {
 				</div>
 			</div>
 			<div className="drawer-side z-10">
-				<label htmlFor="my-drawer" className="drawer-overlay"></label>
+				<label htmlFor="my-drawer"></label>
 				<ul className="menu bg-base-300 text-base-content ms-0 h-full w-12 justify-between ps-0">
 					<div className="mt-8 flex-col p-0">
 						<li className="mt-4" title="Chats" onClick={toggle} aria-label="Chats">

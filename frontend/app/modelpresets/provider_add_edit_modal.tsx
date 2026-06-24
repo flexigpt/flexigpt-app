@@ -506,7 +506,7 @@ function AddEditProviderPresetModalContent({
 						{mode === 'add' && (
 							<div className="grid grid-cols-12 items-center gap-2">
 								<label className="label col-span-3">
-									<span className="label-text text-sm">Prefill from Existing</span>
+									<span className="text-sm">Prefill from Existing</span>
 								</label>
 
 								<div className="col-span-9 flex items-center gap-2">
@@ -561,9 +561,9 @@ function AddEditProviderPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">SDK Type*</span>
+								<span className="text-sm">SDK Type*</span>
 								<span
-									className="label-text-alt tooltip tooltip-right"
+									className="tooltip tooltip-right"
 									data-tip="Select the backend SDK/API compatibility for this provider."
 								>
 									<FiHelpCircle size={12} />
@@ -584,7 +584,7 @@ function AddEditProviderPresetModalContent({
 								)}
 								{errors.sdkType && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.sdkType}
 										</span>
 									</div>
@@ -594,10 +594,10 @@ function AddEditProviderPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Provider ID*</span>
+								<span className="text-sm">Provider ID*</span>
 								{mode === 'add' && (
 									<span
-										className="label-text-alt tooltip tooltip-right"
+										className="tooltip tooltip-right"
 										data-tip="Unique identifier (letters, numbers, dash, underscore)."
 									>
 										<FiHelpCircle size={12} />
@@ -611,7 +611,7 @@ function AddEditProviderPresetModalContent({
 									name="providerName"
 									value={formData.providerName}
 									onChange={handleInput}
-									className={`input input-bordered w-full rounded-xl ${errors.providerName ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.providerName ? 'input-error' : ''}`}
 									readOnly={mode !== 'add'}
 									spellCheck="false"
 									autoComplete="off"
@@ -619,7 +619,7 @@ function AddEditProviderPresetModalContent({
 								/>
 								{errors.providerName && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.providerName}
 										</span>
 									</div>
@@ -629,7 +629,7 @@ function AddEditProviderPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Display Name*</span>
+								<span className="text-sm">Display Name*</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -638,7 +638,7 @@ function AddEditProviderPresetModalContent({
 									name="displayName"
 									value={formData.displayName}
 									onChange={handleInput}
-									className={`input input-bordered w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
 									spellCheck="false"
 									autoComplete="off"
 									readOnly={isReadOnly}
@@ -646,7 +646,7 @@ function AddEditProviderPresetModalContent({
 								/>
 								{errors.displayName && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.displayName}
 										</span>
 									</div>
@@ -656,7 +656,7 @@ function AddEditProviderPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Origin*</span>
+								<span className="text-sm">Origin*</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -665,7 +665,7 @@ function AddEditProviderPresetModalContent({
 									name="origin"
 									value={formData.origin}
 									onChange={handleInput}
-									className={`input input-bordered w-full rounded-xl ${errors.origin ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.origin ? 'input-error' : ''}`}
 									spellCheck="false"
 									autoComplete="off"
 									placeholder="https://api.example.com OR api.example.com"
@@ -674,7 +674,7 @@ function AddEditProviderPresetModalContent({
 								/>
 								{errors.origin && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.origin}
 										</span>
 									</div>
@@ -684,8 +684,8 @@ function AddEditProviderPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Chat Path*</span>
-								<span className="label-text-alt tooltip tooltip-right" data-tip="Endpoint path for chat completions.">
+								<span className="text-sm">Chat Path*</span>
+								<span className="tooltip tooltip-right" data-tip="Endpoint path for chat completions.">
 									<FiHelpCircle size={12} />
 								</span>
 							</label>
@@ -695,7 +695,7 @@ function AddEditProviderPresetModalContent({
 									name="chatCompletionPathPrefix"
 									value={formData.chatCompletionPathPrefix}
 									onChange={handleInput}
-									className="input input-bordered w-full rounded-xl"
+									className="input w-full rounded-xl"
 									spellCheck="false"
 									autoComplete="off"
 									readOnly={isReadOnly}
@@ -703,7 +703,7 @@ function AddEditProviderPresetModalContent({
 								/>
 								{errors.chatCompletionPathPrefix && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.chatCompletionPathPrefix}
 										</span>
 									</div>
@@ -713,7 +713,7 @@ function AddEditProviderPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">API-Key Header Key</span>
+								<span className="text-sm">API-Key Header Key</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -721,7 +721,7 @@ function AddEditProviderPresetModalContent({
 									name="apiKeyHeaderKey"
 									value={formData.apiKeyHeaderKey}
 									onChange={handleInput}
-									className="input input-bordered w-full rounded-xl"
+									className="input w-full rounded-xl"
 									spellCheck="false"
 									autoComplete="off"
 									readOnly={isReadOnly}
@@ -732,23 +732,21 @@ function AddEditProviderPresetModalContent({
 
 						<div className="grid grid-cols-12 items-start gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Default Headers (JSON)</span>
+								<span className="text-sm">Default Headers (JSON)</span>
 							</label>
 							<div className="col-span-9">
 								<textarea
 									name="defaultHeadersRawJSON"
 									value={formData.defaultHeadersRawJSON}
 									onChange={handleInput}
-									className={`textarea textarea-bordered h-24 w-full rounded-xl ${
-										errors.defaultHeadersRawJSON ? 'textarea-error' : ''
-									}`}
+									className={`textarea h-24 w-full rounded-xl ${errors.defaultHeadersRawJSON ? 'textarea-error' : ''}`}
 									spellCheck="false"
 									readOnly={isReadOnly}
 									disabled={isSubmitting}
 								/>
 								{errors.defaultHeadersRawJSON && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.defaultHeadersRawJSON}
 										</span>
 									</div>
@@ -758,9 +756,9 @@ function AddEditProviderPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3 flex flex-col items-start gap-0.5">
-								<span className="label-text text-sm">API-Key*</span>
+								<span className="text-sm">API-Key*</span>
 								{(mode === 'edit' || mode === 'view') && apiKeyAlreadySet && (
-									<span className="label-text-alt text-xs">
+									<span className="text-xs">
 										{mode === 'view' ? '(managed separately; not shown)' : '(leave blank to keep current)'}
 									</span>
 								)}
@@ -771,7 +769,7 @@ function AddEditProviderPresetModalContent({
 									name="apiKey"
 									value={formData.apiKey}
 									onChange={handleInput}
-									className={`input input-bordered w-full rounded-xl ${errors.apiKey ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.apiKey ? 'input-error' : ''}`}
 									placeholder={(mode === 'edit' || mode === 'view') && apiKeyAlreadySet ? '********' : ''}
 									spellCheck="false"
 									autoComplete="off"
@@ -780,7 +778,7 @@ function AddEditProviderPresetModalContent({
 								/>
 								{errors.apiKey && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.apiKey}
 										</span>
 									</div>
@@ -790,7 +788,7 @@ function AddEditProviderPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3 cursor-pointer">
-								<span className="label-text text-sm">Enabled</span>
+								<span className="text-sm">Enabled</span>
 							</label>
 							<div className="col-span-9">
 								<input

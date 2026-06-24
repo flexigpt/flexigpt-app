@@ -159,7 +159,7 @@ function MCPSettingsModalContent({
 							</div>
 							<input
 								type="text"
-								className={`input input-bordered w-full rounded-xl ${error ? 'input-error' : ''}`}
+								className={`input w-full rounded-xl ${error ? 'input-error' : ''}`}
 								value={listenAddr}
 								spellCheck="false"
 								autoComplete="off"
@@ -171,16 +171,14 @@ function MCPSettingsModalContent({
 							/>
 							{error && (
 								<div className="label">
-									<span className="label-text-alt text-error flex items-center gap-1">
+									<span className="text-error flex items-center gap-1">
 										<FiAlertCircle size={12} /> {error}
 									</span>
 								</div>
 							)}
 							{activeListenAddr && (
 								<div className="label">
-									<span className="label-text-alt text-base-content/60 text-xs">
-										Currently active: {activeListenAddr}
-									</span>
+									<span className="text-base-content/60 text-xs">Currently active: {activeListenAddr}</span>
 								</div>
 							)}
 							<p className="text-base-content/60 mt-1 text-xs">

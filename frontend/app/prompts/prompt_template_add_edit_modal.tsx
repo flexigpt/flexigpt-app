@@ -576,7 +576,7 @@ function AddEditPromptTemplateModalContent({
 						{effectiveMode === 'add' && (
 							<div className="grid grid-cols-12 items-center gap-2">
 								<label className="label col-span-3">
-									<span className="label-text text-sm">Prefill from Existing</span>
+									<span className="text-sm">Prefill from Existing</span>
 								</label>
 
 								<div className="col-span-9 flex items-center gap-2">
@@ -629,7 +629,7 @@ function AddEditPromptTemplateModalContent({
 						)}
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Display Name*</span>
+								<span className="text-sm">Display Name*</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -638,7 +638,7 @@ function AddEditPromptTemplateModalContent({
 									value={formData.displayName}
 									onChange={handleInput}
 									readOnly={isViewMode}
-									className={`input input-bordered w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
 									spellCheck="false"
 									autoComplete="off"
 									autoFocus={!isViewMode}
@@ -646,7 +646,7 @@ function AddEditPromptTemplateModalContent({
 								/>
 								{errors.displayName && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.displayName}
 										</span>
 									</div>
@@ -656,8 +656,8 @@ function AddEditPromptTemplateModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Slug*</span>
-								<span className="label-text-alt tooltip tooltip-right" data-tip="Short user friendly command">
+								<span className="text-sm">Slug*</span>
+								<span className="tooltip tooltip-right" data-tip="Short user friendly command">
 									<FiHelpCircle size={12} />
 								</span>
 							</label>
@@ -667,7 +667,7 @@ function AddEditPromptTemplateModalContent({
 									name="slug"
 									value={formData.slug}
 									onChange={handleInput}
-									className={`input input-bordered w-full rounded-xl ${errors.slug ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.slug ? 'input-error' : ''}`}
 									spellCheck="false"
 									autoComplete="off"
 									readOnly={isViewMode || isEditMode}
@@ -675,7 +675,7 @@ function AddEditPromptTemplateModalContent({
 								/>
 								{errors.slug && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.slug}
 										</span>
 									</div>
@@ -686,9 +686,9 @@ function AddEditPromptTemplateModalContent({
 						{/* Version */}
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Version*</span>
+								<span className="text-sm">Version*</span>
 								<span
-									className="label-text-alt tooltip tooltip-right"
+									className="tooltip tooltip-right"
 									data-tip="Once created, existing versions are not edited. Edit creates a new version."
 								>
 									<FiHelpCircle size={12} />
@@ -701,7 +701,7 @@ function AddEditPromptTemplateModalContent({
 									value={formData.version}
 									onChange={handleInput}
 									readOnly={isViewMode}
-									className={`input input-bordered w-full rounded-xl ${errors.version ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.version ? 'input-error' : ''}`}
 									spellCheck="false"
 									autoComplete="off"
 									aria-invalid={Boolean(errors.version)}
@@ -709,7 +709,7 @@ function AddEditPromptTemplateModalContent({
 								/>
 								{isEditMode && initialData?.template && (
 									<div className="label">
-										<span className="label-text-alt text-base-content/70 text-xs">
+										<span className="text-base-content/70 text-xs">
 											Current: {initialData.template.version} · Suggested next: {suggestedNextVersion}
 											{!isSemverVersion(initialData.template.version) ? ' (current is not semver)' : ''}
 										</span>
@@ -717,7 +717,7 @@ function AddEditPromptTemplateModalContent({
 								)}
 								{errors.version && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.version}
 										</span>
 									</div>
@@ -727,7 +727,7 @@ function AddEditPromptTemplateModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3 cursor-pointer">
-								<span className="label-text text-sm">Enabled</span>
+								<span className="text-sm">Enabled</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -743,7 +743,7 @@ function AddEditPromptTemplateModalContent({
 
 						<div className="grid grid-cols-12 items-start gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Description</span>
+								<span className="text-sm">Description</span>
 							</label>
 							<div className="col-span-9">
 								<textarea
@@ -751,7 +751,7 @@ function AddEditPromptTemplateModalContent({
 									value={formData.description}
 									onChange={handleInput}
 									readOnly={isViewMode}
-									className="textarea textarea-bordered h-20 w-full rounded-xl"
+									className="textarea h-20 w-full rounded-xl"
 									spellCheck="false"
 								/>
 							</div>
@@ -759,9 +759,9 @@ function AddEditPromptTemplateModalContent({
 
 						<div className="grid grid-cols-12 items-start gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Derived</span>
+								<span className="text-sm">Derived</span>
 								<span
-									className="label-text-alt tooltip tooltip-right"
+									className="tooltip tooltip-right"
 									data-tip="Kind is derived from block roles. Resolved is derived from whether every referenced placeholder already has a static value or default."
 								>
 									<FiHelpCircle size={12} />
@@ -828,7 +828,7 @@ function AddEditPromptTemplateModalContent({
 									</div>
 
 									<textarea
-										className="textarea textarea-bordered bg-base-100 w-full rounded-xl"
+										className="textarea bg-base-100 w-full rounded-xl"
 										readOnly={isViewMode}
 										spellCheck="false"
 										value={block.content}
@@ -849,7 +849,7 @@ function AddEditPromptTemplateModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Tags</span>
+								<span className="text-sm">Tags</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -858,14 +858,14 @@ function AddEditPromptTemplateModalContent({
 									value={formData.tags}
 									onChange={handleInput}
 									readOnly={isViewMode}
-									className={`input input-bordered w-full rounded-xl ${errors.tags ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.tags ? 'input-error' : ''}`}
 									placeholder="comma, separated, tags"
 									spellCheck="false"
 									aria-invalid={Boolean(errors.tags)}
 								/>
 								{errors.tags && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.tags}
 										</span>
 									</div>
@@ -889,7 +889,7 @@ function AddEditPromptTemplateModalContent({
 										<div>
 											<div className="flex gap-1">
 												<label className="label">
-													<span className="label-text text-sm">Required</span>
+													<span className="text-sm">Required</span>
 												</label>
 												<input
 													type="checkbox"
@@ -922,10 +922,10 @@ function AddEditPromptTemplateModalContent({
 									<div className="grid grid-cols-12 gap-2">
 										<div className="col-span-12 md:col-span-4">
 											<label className="label py-1">
-												<span className="label-text text-sm">Name</span>
+												<span className="text-sm">Name</span>
 											</label>
 											<input
-												className="input input-bordered bg-base-100 w-full rounded-xl"
+												className="input bg-base-100 w-full rounded-xl"
 												readOnly={isViewMode}
 												value={variable.name}
 												onChange={e => {
@@ -936,7 +936,7 @@ function AddEditPromptTemplateModalContent({
 
 										<div className="col-span-6 md:col-span-4">
 											<label className="label py-1">
-												<span className="label-text text-sm">Type</span>
+												<span className="text-sm">Type</span>
 											</label>
 											{isViewMode ? (
 												<ReadOnlyValue value={variable.type} />
@@ -955,7 +955,7 @@ function AddEditPromptTemplateModalContent({
 
 										<div className="col-span-6 md:col-span-4">
 											<label className="label py-1">
-												<span className="label-text text-sm">Source</span>
+												<span className="text-sm">Source</span>
 											</label>
 											{isViewMode ? (
 												<ReadOnlyValue value={variable.source} />
@@ -977,10 +977,10 @@ function AddEditPromptTemplateModalContent({
 
 										<div className="col-span-12">
 											<label className="label py-1">
-												<span className="label-text text-sm">Description</span>
+												<span className="text-sm">Description</span>
 											</label>
 											<input
-												className="input input-bordered bg-base-100 w-full rounded-xl"
+												className="input bg-base-100 w-full rounded-xl"
 												readOnly={isViewMode}
 												value={variable.description ?? ''}
 												onChange={e => {
@@ -991,10 +991,10 @@ function AddEditPromptTemplateModalContent({
 
 										<div className="col-span-6 md:col-span-4">
 											<label className="label py-1">
-												<span className="label-text text-sm">Default</span>
+												<span className="text-sm">Default</span>
 											</label>
 											<input
-												className="input input-bordered bg-base-100 w-full rounded-xl"
+												className="input bg-base-100 w-full rounded-xl"
 												readOnly={isViewMode}
 												value={variable.default ?? ''}
 												onChange={e => {
@@ -1006,10 +1006,10 @@ function AddEditPromptTemplateModalContent({
 										{variable.source === VarSource.Static && (
 											<div className="col-span-12 md:col-span-6">
 												<label className="label py-1">
-													<span className="label-text text-sm">Static Value</span>
+													<span className="text-sm">Static Value</span>
 												</label>
 												<input
-													className="input input-bordered bg-base-100 w-full rounded-xl"
+													className="input bg-base-100 w-full rounded-xl"
 													readOnly={isViewMode}
 													value={variable.staticVal ?? ''}
 													onChange={e => {
@@ -1022,10 +1022,10 @@ function AddEditPromptTemplateModalContent({
 										{variable.type === VarType.Enum && (
 											<div className="col-span-12 md:col-span-6">
 												<label className="label py-1">
-													<span className="label-text text-sm">Enum Values (comma)</span>
+													<span className="text-sm">Enum Values (comma)</span>
 												</label>
 												<input
-													className="input input-bordered bg-base-100 w-full rounded-xl"
+													className="input bg-base-100 w-full rounded-xl"
 													readOnly={isViewMode}
 													value={(variable.enumValues ?? []).join(', ')}
 													onChange={e => {

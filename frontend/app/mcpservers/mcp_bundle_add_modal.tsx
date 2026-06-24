@@ -156,8 +156,8 @@ function AddMCPBundleModalContent({ onClose, onSubmit, existingSlugs }: AddMCPBu
 					<form noValidate onSubmit={handleSubmit} className="space-y-4">
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Bundle Slug*</span>
-								<span className="label-text-alt tooltip tooltip-right" data-tip="Lower-case, URL-friendly.">
+								<span className="text-sm">Bundle Slug*</span>
+								<span className="tooltip tooltip-right" data-tip="Lower-case, URL-friendly.">
 									<FiHelpCircle size={12} />
 								</span>
 							</label>
@@ -165,7 +165,7 @@ function AddMCPBundleModalContent({ onClose, onSubmit, existingSlugs }: AddMCPBu
 							<div className="col-span-9">
 								<input
 									type="text"
-									className={`input input-bordered w-full rounded-xl ${errors.slug ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.slug ? 'input-error' : ''}`}
 									value={formData.slug}
 									onChange={e => {
 										const value = e.target.value;
@@ -179,7 +179,7 @@ function AddMCPBundleModalContent({ onClose, onSubmit, existingSlugs }: AddMCPBu
 								/>
 								{errors.slug && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.slug}
 										</span>
 									</div>
@@ -189,13 +189,13 @@ function AddMCPBundleModalContent({ onClose, onSubmit, existingSlugs }: AddMCPBu
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Display Name*</span>
+								<span className="text-sm">Display Name*</span>
 							</label>
 
 							<div className="col-span-9">
 								<input
 									type="text"
-									className={`input input-bordered w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
 									value={formData.displayName}
 									onChange={e => {
 										const value = e.target.value;
@@ -208,7 +208,7 @@ function AddMCPBundleModalContent({ onClose, onSubmit, existingSlugs }: AddMCPBu
 								/>
 								{errors.displayName && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.displayName}
 										</span>
 									</div>
@@ -218,12 +218,12 @@ function AddMCPBundleModalContent({ onClose, onSubmit, existingSlugs }: AddMCPBu
 
 						<div className="grid grid-cols-12 items-start gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Description</span>
+								<span className="text-sm">Description</span>
 							</label>
 
 							<div className="col-span-9">
 								<textarea
-									className="textarea textarea-bordered h-24 w-full rounded-xl"
+									className="textarea h-24 w-full rounded-xl"
 									value={formData.description}
 									onChange={e => {
 										const value = e.target.value;

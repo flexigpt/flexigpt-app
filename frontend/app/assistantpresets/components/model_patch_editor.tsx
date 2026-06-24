@@ -62,9 +62,9 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 		<div className="flex flex-col space-y-3">
 			<div className="grid grid-cols-12 gap-2">
 				<label className="label col-span-3 cursor-pointer">
-					<span className="label-text text-sm">Starting Model Patch</span>
+					<span className="text-sm">Starting Model Patch</span>
 					<span
-						className="label-text-alt tooltip tooltip-right"
+						className="tooltip tooltip-right"
 						data-tip="Runtime knob patch only. systemPrompt is intentionally not allowed."
 					>
 						<FiHelpCircle size={12} />
@@ -115,7 +115,7 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 					<div className="grid grid-cols-12 gap-2">
 						<div className="col-span-12 md:col-span-4">
 							<label className="label py-1">
-								<span className="label-text text-sm">Stream Override</span>
+								<span className="text-sm">Stream Override</span>
 							</label>
 							<Dropdown<TriStateBoolean>
 								dropdownItems={TRI_STATE_DROPDOWN_ITEMS}
@@ -133,11 +133,11 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 
 						<div className="col-span-12 md:col-span-4">
 							<label className="label py-1">
-								<span className="label-text text-sm">Max Prompt Length</span>
+								<span className="text-sm">Max Prompt Length</span>
 							</label>
 							<input
 								type="text"
-								className="input input-bordered w-full rounded-xl"
+								className="input w-full rounded-xl"
 								readOnly={isViewMode}
 								value={modelPatch.maxPromptLength}
 								onChange={e => {
@@ -149,11 +149,11 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 
 						<div className="col-span-12 md:col-span-4">
 							<label className="label py-1">
-								<span className="label-text text-sm">Max Output Length</span>
+								<span className="text-sm">Max Output Length</span>
 							</label>
 							<input
 								type="text"
-								className="input input-bordered w-full rounded-xl"
+								className="input w-full rounded-xl"
 								readOnly={isViewMode}
 								value={modelPatch.maxOutputLength}
 								onChange={e => {
@@ -165,11 +165,11 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 
 						<div className="col-span-12 md:col-span-4">
 							<label className="label py-1">
-								<span className="label-text text-sm">Temperature</span>
+								<span className="text-sm">Temperature</span>
 							</label>
 							<input
 								type="text"
-								className="input input-bordered w-full rounded-xl"
+								className="input w-full rounded-xl"
 								readOnly={isViewMode}
 								value={modelPatch.temperature}
 								onChange={e => {
@@ -181,11 +181,11 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 
 						<div className="col-span-12 md:col-span-4">
 							<label className="label py-1">
-								<span className="label-text text-sm">Timeout (seconds)</span>
+								<span className="text-sm">Timeout (seconds)</span>
 							</label>
 							<input
 								type="text"
-								className="input input-bordered w-full rounded-xl"
+								className="input w-full rounded-xl"
 								readOnly={isViewMode}
 								value={modelPatch.timeout}
 								onChange={e => {
@@ -197,10 +197,10 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 
 						<div className="col-span-12 md:col-span-4">
 							<label className="label py-1">
-								<span className="label-text text-sm">Stop Sequences</span>
+								<span className="text-sm">Stop Sequences</span>
 							</label>
 							<textarea
-								className="textarea textarea-bordered h-24 w-full rounded-xl"
+								className="textarea h-24 w-full rounded-xl"
 								readOnly={isViewMode}
 								value={modelPatch.stopSequencesText}
 								onChange={e => {
@@ -213,10 +213,10 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 
 						<div className="col-span-12">
 							<label className="label py-1">
-								<span className="label-text text-sm">Additional Parameters Raw JSON</span>
+								<span className="text-sm">Additional Parameters Raw JSON</span>
 							</label>
 							<textarea
-								className="textarea textarea-bordered h-28 w-full rounded-xl font-mono text-xs"
+								className="textarea h-28 w-full rounded-xl font-mono text-xs"
 								readOnly={isViewMode}
 								value={modelPatch.additionalParametersRawJSON}
 								onChange={e => {
@@ -233,7 +233,7 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-3 cursor-pointer">
-							<span className="label-text text-sm">Override Reasoning</span>
+							<span className="text-sm">Override Reasoning</span>
 						</label>
 						<div className="col-span-9">
 							<input
@@ -254,7 +254,7 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 						<div className="grid grid-cols-12 gap-2">
 							<div className="col-span-12 md:col-span-4">
 								<label className="label py-1">
-									<span className="label-text text-sm">Reasoning Type</span>
+									<span className="text-sm">Reasoning Type</span>
 								</label>
 								<Dropdown<ReasoningType>
 									dropdownItems={REASONING_TYPE_DROPDOWN_ITEMS}
@@ -272,7 +272,7 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 
 							<div className="col-span-12 md:col-span-4">
 								<label className="label py-1">
-									<span className="label-text text-sm">Reasoning Level</span>
+									<span className="text-sm">Reasoning Level</span>
 								</label>
 								<Dropdown<ReasoningLevel>
 									dropdownItems={REASONING_LEVEL_DROPDOWN_ITEMS}
@@ -290,11 +290,11 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 
 							<div className="col-span-12 md:col-span-4">
 								<label className="label py-1">
-									<span className="label-text text-sm">Reasoning Tokens</span>
+									<span className="text-sm">Reasoning Tokens</span>
 								</label>
 								<input
 									type="text"
-									className="input input-bordered w-full rounded-xl"
+									className="input w-full rounded-xl"
 									readOnly={isViewMode}
 									value={modelPatch.reasoningTokens}
 									onChange={e => {
@@ -306,7 +306,7 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 
 							<div className="col-span-12 md:col-span-4">
 								<label className="label py-1">
-									<span className="label-text text-sm">Summary Style</span>
+									<span className="text-sm">Summary Style</span>
 								</label>
 								<Dropdown<'' | ReasoningSummaryStyle>
 									dropdownItems={REASONING_SUMMARY_STYLE_DROPDOWN_ITEMS}
@@ -328,7 +328,7 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-3 cursor-pointer">
-							<span className="label-text text-sm">Override Output</span>
+							<span className="text-sm">Override Output</span>
 						</label>
 						<div className="col-span-9">
 							<input
@@ -349,7 +349,7 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 						<div className="grid grid-cols-12 gap-2">
 							<div className="col-span-12 md:col-span-4">
 								<label className="label py-1">
-									<span className="label-text text-sm">Verbosity</span>
+									<span className="text-sm">Verbosity</span>
 								</label>
 								<Dropdown<'' | OutputVerbosity>
 									dropdownItems={OUTPUT_VERBOSITY_DROPDOWN_ITEMS}
@@ -367,7 +367,7 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 
 							<div className="col-span-12 md:col-span-4">
 								<label className="label py-1">
-									<span className="label-text text-sm">Override Output Format</span>
+									<span className="text-sm">Override Output Format</span>
 								</label>
 								<div>
 									<input
@@ -388,7 +388,7 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 								<>
 									<div className="col-span-12 md:col-span-4">
 										<label className="label py-1">
-											<span className="label-text text-sm">Format Kind</span>
+											<span className="text-sm">Format Kind</span>
 										</label>
 										<Dropdown<OutputFormatKind>
 											dropdownItems={OUTPUT_FORMAT_KIND_DROPDOWN_ITEMS}
@@ -408,11 +408,11 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 										<>
 											<div className="col-span-12 md:col-span-6">
 												<label className="label py-1">
-													<span className="label-text text-sm">JSON Schema Name*</span>
+													<span className="text-sm">JSON Schema Name*</span>
 												</label>
 												<input
 													type="text"
-													className="input input-bordered w-full rounded-xl"
+													className="input w-full rounded-xl"
 													readOnly={isViewMode}
 													value={modelPatch.outputJSONSchemaName}
 													onChange={e => {
@@ -426,7 +426,7 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 
 											<div className="col-span-12 md:col-span-6">
 												<label className="label py-1">
-													<span className="label-text text-sm">Strict</span>
+													<span className="text-sm">Strict</span>
 												</label>
 												<Dropdown<TriStateBoolean>
 													dropdownItems={TRI_STATE_DROPDOWN_ITEMS}
@@ -444,11 +444,11 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 
 											<div className="col-span-12">
 												<label className="label py-1">
-													<span className="label-text text-sm">JSON Schema Description</span>
+													<span className="text-sm">JSON Schema Description</span>
 												</label>
 												<input
 													type="text"
-													className="input input-bordered w-full rounded-xl"
+													className="input w-full rounded-xl"
 													readOnly={isViewMode}
 													value={modelPatch.outputJSONSchemaDescription}
 													onChange={e => {
@@ -462,10 +462,10 @@ export const AssistantPresetModelPatchEditor = memo(function AssistantPresetMode
 
 											<div className="col-span-12">
 												<label className="label py-1">
-													<span className="label-text text-sm">JSON Schema Body</span>
+													<span className="text-sm">JSON Schema Body</span>
 												</label>
 												<textarea
-													className="textarea textarea-bordered h-32 w-full rounded-xl font-mono text-xs"
+													className="textarea h-32 w-full rounded-xl font-mono text-xs"
 													readOnly={isViewMode}
 													value={modelPatch.outputJSONSchemaRaw}
 													onChange={e => {

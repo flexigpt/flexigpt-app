@@ -124,28 +124,28 @@
 	:root,
 	:where([data-theme]) {
 		/* light versions */
-		--bg-mermaid-light: color-mix(in oklch, var(--color-base-200) 80%, white 50%);
-		--bg-code-light: var(--color-base-content);
-		--bg-code-header-light: color-mix(in oklch, var(--color-base-content) 90%, white 10%);
-		--text-code-light: var(--color-base-100);
+		--app-bg-mermaid-light: color-mix(in oklch, var(--color-base-200) 80%, white 50%);
+		--app-bg-code-light: var(--color-base-content);
+		--app-bg-code-header-light: color-mix(in oklch, var(--color-base-content) 90%, white 10%);
+		--app-text-code-light: var(--color-base-100);
 		--text-lineno-light: color-mix(in oklch, var(--color-neutral-content) 80%, black 20%);
-		--text-neutral-custom-light: color-mix(in oklch, var(--color-neutral) 80%, white 20%);
+		--app-text-neutral-light: color-mix(in oklch, var(--color-neutral) 80%, white 20%);
 
 		/* dark versions */
-		--bg-mermaid-dark: var(--color-base-300);
-		--bg-code-dark: var(--color-base-300);
-		--bg-code-header-dark: var(--color-base-200);
-		--text-code-dark: var(--color-base-content);
+		--app-bg-mermaid-dark: var(--color-base-300);
+		--app-bg-code-dark: var(--color-base-300);
+		--app-bg-code-header-dark: var(--color-base-200);
+		--app-text-code-dark: var(--color-base-content);
 		--text-lineno-dark: color-mix(in oklch, var(--color-neutral-content) 50%, white 50%);
-		--text-neutral-custom-dark: color-mix(in oklch, var(--color-neutral) 50%, white 50%);
+		--app-text-neutral-dark: color-mix(in oklch, var(--color-neutral) 50%, white 50%);
 
 		/* default applies to all light versions  */
-		--bg-mermaid: var(--bg-mermaid-light);
-		--bg-code: var(--bg-code-light);
-		--bg-code-header: var(--bg-code-header-light);
-		--text-code: var(--text-code-light);
+		--app-bg-mermaid: var(--app-bg-mermaid-light);
+		--app-bg-code: var(--app-bg-code-light);
+		--app-bg-code-header: var(--app-bg-code-header-light);
+		--app-text-code: var(--app-text-code-light);
 		--text-lineno: var(--text-lineno-light);
-		--text-neutral-custom: var(--text-neutral-custom-light);
+		--app-text-neutral: var(--app-text-neutral-light);
 
 		--mermaid-surface-light: color-mix(in oklch, oklch(93.299% 0.01 261.788) 80%, white 50%);
 		--mermaid-header-bg-light: color-mix(in oklch, oklch(32.437% 0.022 264.182) 90%, white 10%);
@@ -171,53 +171,53 @@
 	[data-theme='night'],
 	[data-theme='sunset'],
 	[data-theme='synthwave'] {
-		--bg-mermaid: var(--bg-mermaid-dark);
-		--bg-code: var(--bg-code-dark);
-		--bg-code-header: var(--bg-code-header-dark);
-		--text-code: var(--text-code-dark);
+		--app-bg-mermaid: var(--app-bg-mermaid-dark);
+		--app-bg-code: var(--app-bg-code-dark);
+		--app-bg-code-header: var(--app-bg-code-header-dark);
+		--app-text-code: var(--app-text-code-dark);
 		--text-lineno: var(--text-lineno-dark);
-		--text-neutral-custom: var(--text-neutral-custom-dark);
+		--app-text-neutral: var(--app-text-neutral-dark);
 	}
 }
 
 @layer utilities {
-	.bg-mermaid {
-		background-color: var(--bg-mermaid);
+	.app-bg-mermaid {
+		background-color: var(--app-bg-mermaid);
 	}
-	.bg-code {
-		background-color: var(--bg-code);
+	.app-bg-code {
+		background-color: var(--app-bg-code);
 	}
-	.bg-code-header {
-		background-color: var(--bg-code-header);
+	.app-bg-code-header {
+		background-color: var(--app-bg-code-header);
 	}
-	.text-code {
-		color: var(--text-code);
+	.app-text-code {
+		color: var(--app-text-code);
 	}
-	.text-neutral-custom {
-		color: var(--text-neutral-custom);
+	.app-text-neutral {
+		color: var(--app-text-neutral);
 	}
 
-	.scrollbar-custom-thin {
+	.app-scrollbar-thin {
 		/* Firefox */
 		scrollbar-width: thin;
 		scrollbar-color: rgba(0, 0, 0, 0.5);
 	}
 
-	.scrollbar-custom-thin::-webkit-scrollbar {
+	.app-scrollbar-thin::-webkit-scrollbar {
 		width: 4px !important;
 		height: 4px !important;
 	}
 
-	.scrollbar-custom-thin::-webkit-scrollbar-thumb {
+	.app-scrollbar-thin::-webkit-scrollbar-thumb {
 		background-color: rgba(0, 0, 0, 0.5);
 		border-radius: 999px;
 	}
 
-	.scrollbar-custom-thin::-webkit-scrollbar-track {
+	.app-scrollbar-thin::-webkit-scrollbar-track {
 		background-color: transparent;
 	}
 
-	.scrollbar-custom-thin:hover::-webkit-scrollbar {
+	.app-scrollbar-thin:hover::-webkit-scrollbar {
 		width: 4px !important;
 		height: 4px !important;
 	}
@@ -263,7 +263,7 @@
 }
 
 /* Shiki styling adjustments */
-.shiki-container pre {
+.app-shiki-container pre {
 	background: transparent !important;
 	padding: 0.5em;
 	margin: 0;
@@ -271,7 +271,7 @@
 	overflow-x: auto;
 }
 
-.shiki-container code {
+.app-shiki-container code {
 	background: transparent !important;
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;

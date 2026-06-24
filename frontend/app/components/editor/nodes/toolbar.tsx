@@ -105,9 +105,9 @@ function withTooltip<P extends Tooltipable>(Component: ComponentType<P>) {
 		const content = <Component {...(rest as P)} />;
 
 		if (!tooltip) return content;
-
+		const pos = 'tooltip-' + tooltipPosition;
 		return (
-			<div className={cn('tooltip', `tooltip-${tooltipPosition}`, tooltipClassName)} data-tip={tooltip}>
+			<div className={cn('tooltip', pos, tooltipClassName)} data-tip={tooltip}>
 				{content}
 			</div>
 		);

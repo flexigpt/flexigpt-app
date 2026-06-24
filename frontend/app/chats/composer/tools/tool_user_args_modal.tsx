@@ -246,7 +246,7 @@ function ToolUserArgsModalContent({ onClose, toolLabel, schema, existingInstance
 						<div className="space-y-2">
 							<div className="flex items-center justify-between">
 								<label className="label p-1">
-									<span className="label-text text-sm">Options (JSON)</span>
+									<span className="text-sm">Options (JSON)</span>
 								</label>
 
 								<div className="flex items-center gap-2">
@@ -275,9 +275,7 @@ function ToolUserArgsModalContent({ onClose, toolLabel, schema, existingInstance
 
 							<textarea
 								ref={textareaRef}
-								className={`textarea textarea-bordered w-full rounded-xl font-mono text-xs ${
-									error ? 'textarea-error' : ''
-								}`}
+								className={`textarea w-full rounded-xl font-mono text-xs ${error ? 'textarea-error' : ''}`}
 								rows={12}
 								value={formData.rawJson}
 								onChange={e => {

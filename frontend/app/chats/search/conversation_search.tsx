@@ -146,7 +146,7 @@ export const ConversationSearch = forwardRef<ConversationSearchHandle, Conversat
 					ref={setAnchorElement}
 					className="bg-base-100 border-base-300 focus-within:border-base-300 m-0 flex h-8 items-center rounded-xl border px-2 py-0 shadow-none transition-colors"
 				>
-					<FiSearch size={14} className="text-neutral-custom mx-2 shrink-0" />
+					<FiSearch size={14} className="app-text-neutral mx-2 shrink-0" />
 
 					<input
 						ref={inputRef}
@@ -156,7 +156,7 @@ export const ConversationSearch = forwardRef<ConversationSearchHandle, Conversat
 						onFocus={handleFocus}
 						onKeyDown={handleKeyDown}
 						placeholder="Search conversations..."
-						className="placeholder:text-neutral-custom w-full bg-transparent text-sm outline-none"
+						className="placeholder:app-text-neutral w-full bg-transparent text-sm outline-none"
 						spellCheck={false}
 					/>
 

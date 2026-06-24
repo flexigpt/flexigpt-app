@@ -3,10 +3,10 @@ import type { ReactNode } from 'react';
 import { FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
 export const actionTriggerChipButtonClasses =
-	'btn btn-xs text-neutral-custom bg-base-200/70 hover:bg-base-300/80 h-7 min-h-0 items-center overflow-hidden rounded-full border-none px-2 text-left normal-case shadow-none';
+	'btn btn-xs app-text-neutral bg-base-200/70 hover:bg-base-300/80 h-7 min-h-0 items-center overflow-hidden rounded-full border-none px-2 text-left normal-case shadow-none';
 
 export const actionTriggerChipSurfaceClasses =
-	'text-neutral-custom bg-base-200/70 hover:bg-base-300/80 flex h-7 min-h-0 items-center overflow-hidden rounded-full px-2 shadow-none';
+	'app-text-neutral bg-base-200/70 hover:bg-base-300/80 flex h-7 min-h-0 items-center overflow-hidden rounded-full px-2 shadow-none';
 
 export const actionTriggerMenuWideClasses =
 	'rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-120 max-w-lg min-w-60 overflow-y-auto border p-2 text-xs shadow-xl outline-none';

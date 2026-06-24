@@ -145,7 +145,7 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 				<ul
 					tabIndex={0}
 					className={`menu border-neutral/20 bg-base-300 flex w-full flex-col flex-nowrap overflow-x-hidden overflow-y-auto rounded-2xl shadow-sm ${
-						inlineMenu ? 'mt-2 border' : 'dropdown-content z-50'
+						inlineMenu ? 'mt-2 border' : 'z-50'
 					}`}
 					style={{
 						maxHeight: typeof maxMenuHeight === 'number' ? `${maxMenuHeight}px` : maxMenuHeight,

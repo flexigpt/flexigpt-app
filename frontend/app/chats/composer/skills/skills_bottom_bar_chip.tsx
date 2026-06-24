@@ -338,7 +338,7 @@ export function SkillsBottomBarChip({
 				>
 					<MenuButton
 						store={menu}
-						className="btn btn-xs text-neutral-custom h-auto min-h-0 flex-1 gap-0 border-none bg-transparent p-0 text-left font-normal shadow-none hover:bg-transparent"
+						className="btn btn-xs app-text-neutral h-auto min-h-0 flex-1 gap-0 border-none bg-transparent p-0 text-left font-normal shadow-none hover:bg-transparent"
 						aria-label={shortcut ? `Attach skills (${shortcut})` : 'Attach skills'}
 						disabled={isInputLocked}
 					>
@@ -364,7 +364,7 @@ export function SkillsBottomBarChip({
 					{enabledCount > 0 ? (
 						<button
 							type="button"
-							className="btn btn-ghost btn-xs text-neutral-custom hover:bg-base-300/80 ml-1 h-auto min-h-0 shrink-0 px-1 py-0 shadow-none"
+							className="btn btn-ghost btn-xs app-text-neutral hover:bg-base-300/80 ml-1 h-auto min-h-0 shrink-0 px-1 py-0 shadow-none"
 							onClick={event => {
 								stop(event);
 								onDisableAll();

@@ -88,7 +88,7 @@ function closeDialogSafely(dialog: HTMLDialogElement | null): boolean {
 
 function HelpHint({ content }: { content: string }) {
 	return (
-		<span className="label-text-alt tooltip tooltip-right ml-1 inline-flex cursor-help" data-tip={content}>
+		<span className="tooltip tooltip-right ml-1 inline-flex cursor-help" data-tip={content}>
 			<FiHelpCircle size={12} />
 		</span>
 	);
@@ -313,7 +313,7 @@ function SystemPromptAddModalInner({
 							<input
 								ref={displayNameInputRef}
 								type="text"
-								className={`input input-bordered w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
+								className={`input w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
 								value={formData.displayName}
 								onChange={e => {
 									setFormData(prev => ({ ...prev, displayName: e.target.value }));
@@ -329,7 +329,7 @@ function SystemPromptAddModalInner({
 						<div className="col-span-9">
 							<input
 								type="text"
-								className={`input input-bordered w-full rounded-xl ${errors.slug ? 'input-error' : ''}`}
+								className={`input w-full rounded-xl ${errors.slug ? 'input-error' : ''}`}
 								value={formData.slug}
 								onChange={e => {
 									setFormData(prev => ({ ...prev, slug: e.target.value }));
@@ -348,7 +348,7 @@ function SystemPromptAddModalInner({
 						<div className="col-span-9">
 							<input
 								type="text"
-								className={`input input-bordered w-full rounded-xl ${errors.version ? 'input-error' : ''}`}
+								className={`input w-full rounded-xl ${errors.version ? 'input-error' : ''}`}
 								value={effectiveVersion}
 								onChange={e => {
 									setVersionTouched(true);
@@ -381,7 +381,7 @@ function SystemPromptAddModalInner({
 					</div>
 					<div>
 						<textarea
-							className="textarea textarea-bordered h-40 w-full rounded-xl"
+							className="textarea h-40 w-full rounded-xl"
 							value={formData.content}
 							onChange={e => {
 								const nextContent = e.target.value;

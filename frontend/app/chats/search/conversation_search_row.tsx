@@ -38,7 +38,7 @@ export function ConversationSearchRowMeta({
 							onAskDelete(conversation);
 						}}
 					>
-						<FiTrash2 size={14} className="text-neutral-custom hover:text-error shrink-0" />
+						<FiTrash2 size={14} className="app-text-neutral hover:text-error shrink-0" />
 					</button>
 				</HoverTip>
 			)}
@@ -76,7 +76,7 @@ export function ConversationSearchFlatRow({
 		>
 			<span className="truncate">{result.searchConversation.title}</span>
 
-			<span className="text-neutral-custom hidden text-xs lg:block">
+			<span className="app-text-neutral hidden text-xs lg:block">
 				<ConversationSearchRowMeta
 					result={result}
 					openConversationIdSet={openConversationIdSet}

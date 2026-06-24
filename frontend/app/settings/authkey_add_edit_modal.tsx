@@ -373,14 +373,14 @@ function AddEditAuthKeyModalContent({
 							{!providerOnly && (
 								<div className="grid grid-cols-12 items-start gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">Type*</span>
-										<span className="label-text-alt tooltip tooltip-right" data-tip="Logical grouping of keys">
+										<span className="text-sm">Type*</span>
+										<span className="tooltip tooltip-right" data-tip="Logical grouping of keys">
 											<FiHelpCircle size={12} />
 										</span>
 									</label>
 									<div className="col-span-9">
 										{isReadOnly ? (
-											<input className="input input-bordered w-full rounded-2xl" value={formData.type} disabled />
+											<input className="input w-full rounded-2xl" value={formData.type} disabled />
 										) : (
 											<Dropdown<string>
 												dropdownItems={typeDropdownItems}
@@ -401,7 +401,7 @@ function AddEditAuthKeyModalContent({
 							{!providerOnly && !isReadOnly && formData.type === sentinelAddNew && (
 								<div className="grid grid-cols-12 items-center gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">New Type*</span>
+										<span className="text-sm">New Type*</span>
 									</label>
 									<div className="col-span-9">
 										<input
@@ -409,7 +409,7 @@ function AddEditAuthKeyModalContent({
 											name="newType"
 											value={formData.newType}
 											onChange={handleChange}
-											className={`input input-bordered w-full rounded-2xl ${errors.newType ? 'input-error' : ''}`}
+											className={`input w-full rounded-2xl ${errors.newType ? 'input-error' : ''}`}
 											spellCheck="false"
 										/>
 										{errors.newType && <FieldError msg={errors.newType} />}
@@ -420,9 +420,7 @@ function AddEditAuthKeyModalContent({
 							{/* KEY NAME  */}
 							<div className="grid grid-cols-12 items-start gap-2">
 								<label className="label col-span-3">
-									<span className="label-text text-sm">
-										{formData.type === AuthKeyTypeProvider ? 'Provider*' : 'Key Name*'}
-									</span>
+									<span className="text-sm">{formData.type === AuthKeyTypeProvider ? 'Provider*' : 'Key Name*'}</span>
 								</label>
 								<div className="col-span-9">
 									{/* provider-type dropdown (create) */}
@@ -440,11 +438,7 @@ function AddEditAuthKeyModalContent({
 											/>
 										) : (
 											/* no provider left – show disabled input */
-											<input
-												className="input input-bordered w-full rounded-2xl"
-												value="All providers already configured"
-												disabled
-											/>
+											<input className="input w-full rounded-2xl" value="All providers already configured" disabled />
 										)
 									) : (
 										/* simple text input (non-provider OR read-only mode) */
@@ -453,7 +447,7 @@ function AddEditAuthKeyModalContent({
 											name="keyName"
 											value={formData.keyName}
 											onChange={handleChange}
-											className={`input input-bordered w-full rounded-2xl ${errors.keyName ? 'input-error' : ''}`}
+											className={`input w-full rounded-2xl ${errors.keyName ? 'input-error' : ''}`}
 											disabled={isReadOnly}
 											spellCheck="false"
 										/>
@@ -465,7 +459,7 @@ function AddEditAuthKeyModalContent({
 							{/* SECRET -- */}
 							<div className="grid grid-cols-12 items-center gap-2">
 								<label className="label col-span-3">
-									<span className="label-text text-sm">Secret*</span>
+									<span className="text-sm">Secret*</span>
 								</label>
 								<div className="col-span-9">
 									<input
@@ -474,7 +468,7 @@ function AddEditAuthKeyModalContent({
 										value={formData.secret}
 										onChange={handleChange}
 										placeholder={isEdit && initial?.nonEmpty ? 'Paste replacement secret' : 'Paste API key'}
-										className={`input input-bordered w-full rounded-2xl ${errors.secret ? 'input-error' : ''}`}
+										className={`input w-full rounded-2xl ${errors.secret ? 'input-error' : ''}`}
 										spellCheck="false"
 										autoComplete="off"
 									/>
@@ -502,7 +496,7 @@ function AddEditAuthKeyModalContent({
 function FieldError({ msg }: { msg?: string }) {
 	return msg ? (
 		<div className="label">
-			<span className="label-text-alt text-error flex items-center gap-1">
+			<span className="text-error flex items-center gap-1">
 				<FiAlertCircle size={12} /> {msg}
 			</span>
 		</div>

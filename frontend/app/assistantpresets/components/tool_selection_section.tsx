@@ -123,7 +123,7 @@ export const ToolSelectionSection = memo(function ToolSelectionSection({
 						<div className="mt-3 grid grid-cols-12 gap-2">
 							<div className="col-span-12 md:col-span-4">
 								<label className="label py-1">
-									<span className="label-text text-sm">Auto Execute Override</span>
+									<span className="text-sm">Auto Execute Override</span>
 								</label>
 
 								{isViewMode ? (
@@ -145,10 +145,10 @@ export const ToolSelectionSection = memo(function ToolSelectionSection({
 							{(item.userArgsEditable || item.userArgSchemaInstance.trim().length > 0) && (
 								<div className="col-span-12 md:col-span-8">
 									<label className="label py-1">
-										<span className="label-text text-sm">User Args JSON</span>
+										<span className="text-sm">User Args JSON</span>
 									</label>
 									<textarea
-										className="textarea textarea-bordered h-24 w-full rounded-xl font-mono text-xs"
+										className="textarea h-24 w-full rounded-xl font-mono text-xs"
 										readOnly={isViewMode}
 										value={item.userArgSchemaInstance}
 										onChange={e => {
@@ -158,7 +158,7 @@ export const ToolSelectionSection = memo(function ToolSelectionSection({
 										placeholder='e.g. {"location":"london"}'
 									/>
 									<div className="label">
-										<span className="label-text-alt text-base-content/70 text-xs">{item.userArgsHint}</span>
+										<span className="text-base-content/70 text-xs">{item.userArgsHint}</span>
 									</div>
 								</div>
 							)}

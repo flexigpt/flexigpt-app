@@ -185,7 +185,7 @@ function getButtonIcon(status: ControlStatus) {
 
 function getControlButtonClassName(tone: HeaderButtonTone = 'neutral'): string {
 	const toneClassName: Record<HeaderButtonTone, string> = {
-		neutral: 'text-code',
+		neutral: 'app-text-code',
 		success: 'text-success',
 		warning: 'text-warning',
 		error: 'text-error',
@@ -761,7 +761,7 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 
 	return (
 		<>
-			<div className="text-code flex max-w-full min-w-0 items-center gap-1 overflow-hidden">
+			<div className="app-text-code flex max-w-full min-w-0 items-center gap-1 overflow-hidden">
 				<button
 					type="button"
 					className={getControlButtonClassName()}

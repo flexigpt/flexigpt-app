@@ -994,7 +994,7 @@ function AddEditMCPServerModalContent({
 						{effectiveMode === 'add' && (
 							<div className="grid grid-cols-12 items-start gap-2">
 								<label className="label col-span-3">
-									<span className="label-text text-sm">Prefill from Existing</span>
+									<span className="text-sm">Prefill from Existing</span>
 								</label>
 
 								<div className="col-span-9 space-y-2">
@@ -1049,8 +1049,8 @@ function AddEditMCPServerModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Server ID*</span>
-								<span className="label-text-alt tooltip tooltip-right" data-tip="Stable lower-case server identifier.">
+								<span className="text-sm">Server ID*</span>
+								<span className="tooltip tooltip-right" data-tip="Stable lower-case server identifier.">
 									<FiHelpCircle size={12} />
 								</span>
 							</label>
@@ -1061,7 +1061,7 @@ function AddEditMCPServerModalContent({
 									value={formData.serverID}
 									onChange={handleInput}
 									readOnly={isEditMode}
-									className={`input input-bordered w-full rounded-xl ${errors.serverID ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.serverID ? 'input-error' : ''}`}
 									spellCheck="false"
 									autoComplete="off"
 									autoFocus={!isEditMode}
@@ -1069,7 +1069,7 @@ function AddEditMCPServerModalContent({
 								/>
 								{errors.serverID && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.serverID}
 										</span>
 									</div>
@@ -1079,7 +1079,7 @@ function AddEditMCPServerModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Display Name*</span>
+								<span className="text-sm">Display Name*</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -1087,14 +1087,14 @@ function AddEditMCPServerModalContent({
 									name="displayName"
 									value={formData.displayName}
 									onChange={handleInput}
-									className={`input input-bordered w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
 									spellCheck="false"
 									autoComplete="off"
 									aria-invalid={Boolean(errors.displayName)}
 								/>
 								{errors.displayName && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.displayName}
 										</span>
 									</div>
@@ -1104,7 +1104,7 @@ function AddEditMCPServerModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3 cursor-pointer">
-								<span className="label-text text-sm">Enabled</span>
+								<span className="text-sm">Enabled</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -1119,7 +1119,7 @@ function AddEditMCPServerModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Transport*</span>
+								<span className="text-sm">Transport*</span>
 							</label>
 							<div className="col-span-9">
 								<Dropdown
@@ -1137,7 +1137,7 @@ function AddEditMCPServerModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Trust</span>
+								<span className="text-sm">Trust</span>
 							</label>
 							<div className="col-span-9">
 								<Dropdown
@@ -1159,7 +1159,7 @@ function AddEditMCPServerModalContent({
 
 								<div className="grid grid-cols-12 items-center gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">Command*</span>
+										<span className="text-sm">Command*</span>
 									</label>
 									<div className="col-span-9">
 										<input
@@ -1167,13 +1167,13 @@ function AddEditMCPServerModalContent({
 											name="stdioCommand"
 											value={formData.stdioCommand}
 											onChange={handleInput}
-											className={`input input-bordered w-full rounded-xl ${errors.stdioCommand ? 'input-error' : ''}`}
+											className={`input w-full rounded-xl ${errors.stdioCommand ? 'input-error' : ''}`}
 											spellCheck="false"
 											autoComplete="off"
 										/>
 										{errors.stdioCommand && (
 											<div className="label">
-												<span className="label-text-alt text-error flex items-center gap-1">
+												<span className="text-error flex items-center gap-1">
 													<FiAlertCircle size={12} /> {errors.stdioCommand}
 												</span>
 											</div>
@@ -1183,8 +1183,8 @@ function AddEditMCPServerModalContent({
 
 								<div className="grid grid-cols-12 items-start gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">Args</span>
-										<span className="label-text-alt tooltip tooltip-right" data-tip="One argument per line.">
+										<span className="text-sm">Args</span>
+										<span className="tooltip tooltip-right" data-tip="One argument per line.">
 											<FiHelpCircle size={12} />
 										</span>
 									</label>
@@ -1193,7 +1193,7 @@ function AddEditMCPServerModalContent({
 											name="stdioArgsText"
 											value={formData.stdioArgsText}
 											onChange={handleInput}
-											className="textarea textarea-bordered h-28 w-full rounded-xl"
+											className="textarea h-28 w-full rounded-xl"
 											spellCheck="false"
 										/>
 									</div>
@@ -1201,7 +1201,7 @@ function AddEditMCPServerModalContent({
 
 								<div className="grid grid-cols-12 items-center gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">Working Dir</span>
+										<span className="text-sm">Working Dir</span>
 									</label>
 									<div className="col-span-9">
 										<input
@@ -1209,7 +1209,7 @@ function AddEditMCPServerModalContent({
 											name="stdioWorkingDir"
 											value={formData.stdioWorkingDir}
 											onChange={handleInput}
-											className="input input-bordered w-full rounded-xl"
+											className="input w-full rounded-xl"
 											spellCheck="false"
 											autoComplete="off"
 										/>
@@ -1218,8 +1218,8 @@ function AddEditMCPServerModalContent({
 
 								<div className="grid grid-cols-12 items-start gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">Env JSON</span>
-										<span className="label-text-alt tooltip tooltip-right" data-tip="Plain non-secret env object.">
+										<span className="text-sm">Env JSON</span>
+										<span className="tooltip tooltip-right" data-tip="Plain non-secret env object.">
 											<FiHelpCircle size={12} />
 										</span>
 									</label>
@@ -1228,15 +1228,13 @@ function AddEditMCPServerModalContent({
 											name="stdioEnvJSON"
 											value={formData.stdioEnvJSON}
 											onChange={handleInput}
-											className={`textarea textarea-bordered h-28 w-full rounded-xl ${
-												errors.stdioEnvJSON ? 'textarea-error' : ''
-											}`}
+											className={`textarea h-28 w-full rounded-xl ${errors.stdioEnvJSON ? 'textarea-error' : ''}`}
 											spellCheck="false"
 											placeholder='{"NODE_ENV":"production"}'
 										/>
 										{errors.stdioEnvJSON && (
 											<div className="label">
-												<span className="label-text-alt text-error flex items-center gap-1">
+												<span className="text-error flex items-center gap-1">
 													<FiAlertCircle size={12} /> {errors.stdioEnvJSON}
 												</span>
 											</div>
@@ -1246,7 +1244,7 @@ function AddEditMCPServerModalContent({
 
 								<div className="grid grid-cols-12 items-center gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">Startup Timeout MS</span>
+										<span className="text-sm">Startup Timeout MS</span>
 									</label>
 									<div className="col-span-9">
 										<input
@@ -1254,14 +1252,12 @@ function AddEditMCPServerModalContent({
 											name="stdioStartupTimeoutMS"
 											value={formData.stdioStartupTimeoutMS}
 											onChange={handleInput}
-											className={`input input-bordered w-full rounded-xl ${
-												errors.stdioStartupTimeoutMS ? 'input-error' : ''
-											}`}
+											className={`input w-full rounded-xl ${errors.stdioStartupTimeoutMS ? 'input-error' : ''}`}
 											min={1}
 										/>
 										{errors.stdioStartupTimeoutMS && (
 											<div className="label">
-												<span className="label-text-alt text-error flex items-center gap-1">
+												<span className="text-error flex items-center gap-1">
 													<FiAlertCircle size={12} /> {errors.stdioStartupTimeoutMS}
 												</span>
 											</div>
@@ -1295,26 +1291,26 @@ function AddEditMCPServerModalContent({
 												<div className="grid grid-cols-12 gap-2">
 													<div className="col-span-12 md:col-span-3">
 														<label className="label py-1">
-															<span className="label-text text-sm">Env Name</span>
+															<span className="text-sm">Env Name</span>
 														</label>
 														<input
 															value={row.envName}
 															onChange={e => {
 																updateSecretRow(row.rowID, { envName: e.target.value });
 															}}
-															className="input input-bordered w-full rounded-xl"
+															className="input w-full rounded-xl"
 															spellCheck="false"
 														/>
 													</div>
 
 													<div className="col-span-12 md:col-span-3">
 														<label className="label py-1">
-															<span className="label-text text-sm">Secret Slot</span>
+															<span className="text-sm">Secret Slot</span>
 														</label>
 														<input
 															value={row.envName.trim() || '(matches env name)'}
 															readOnly
-															className="input input-bordered bg-base-200 w-full rounded-xl"
+															className="input bg-base-200 w-full rounded-xl"
 															spellCheck="false"
 															title="Stdio secret slots are derived from the environment variable name."
 														/>
@@ -1322,7 +1318,7 @@ function AddEditMCPServerModalContent({
 
 													<div className="col-span-12 md:col-span-5">
 														<label className="label py-1">
-															<span className="label-text text-sm">
+															<span className="text-sm">
 																{row.existingSecretRef ? 'Replace Secret Value' : 'Secret Value'}
 															</span>
 														</label>
@@ -1332,12 +1328,12 @@ function AddEditMCPServerModalContent({
 															onChange={e => {
 																updateSecretRow(row.rowID, { secretValue: e.target.value });
 															}}
-															className="input input-bordered w-full rounded-xl"
+															className="input w-full rounded-xl"
 															autoComplete="new-password"
 														/>
 														{row.existingSecretRef && (
 															<div className="label">
-																<span className="label-text-alt text-base-content/70">
+																<span className="text-base-content/70">
 																	Existing secret configured. Leave blank to keep it.
 																</span>
 															</div>
@@ -1368,7 +1364,7 @@ function AddEditMCPServerModalContent({
 																		updateSecretRow(row.rowID, { deleteExisting: e.target.checked });
 																	}}
 																/>
-																<span className="label-text text-sm">Delete existing stored secret</span>
+																<span className="text-sm">Delete existing stored secret</span>
 															</label>
 														</div>
 													)}
@@ -1390,7 +1386,7 @@ function AddEditMCPServerModalContent({
 
 								<div className="grid grid-cols-12 items-center gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">URL*</span>
+										<span className="text-sm">URL*</span>
 									</label>
 									<div className="col-span-9">
 										<input
@@ -1398,14 +1394,14 @@ function AddEditMCPServerModalContent({
 											name="httpURL"
 											value={formData.httpURL}
 											onChange={handleInput}
-											className={`input input-bordered w-full rounded-xl ${errors.httpURL ? 'input-error' : ''}`}
+											className={`input w-full rounded-xl ${errors.httpURL ? 'input-error' : ''}`}
 											spellCheck="false"
 											autoComplete="off"
 											placeholder="https://example.com/mcp"
 										/>
 										{errors.httpURL && (
 											<div className="label">
-												<span className="label-text-alt text-error flex items-center gap-1">
+												<span className="text-error flex items-center gap-1">
 													<FiAlertCircle size={12} /> {errors.httpURL}
 												</span>
 											</div>
@@ -1415,7 +1411,7 @@ function AddEditMCPServerModalContent({
 
 								<div className="grid grid-cols-12 items-center gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">Timeout MS</span>
+										<span className="text-sm">Timeout MS</span>
 									</label>
 									<div className="col-span-9">
 										<input
@@ -1423,12 +1419,12 @@ function AddEditMCPServerModalContent({
 											name="httpTimeoutMS"
 											value={formData.httpTimeoutMS}
 											onChange={handleInput}
-											className={`input input-bordered w-full rounded-xl ${errors.httpTimeoutMS ? 'input-error' : ''}`}
+											className={`input w-full rounded-xl ${errors.httpTimeoutMS ? 'input-error' : ''}`}
 											min={1}
 										/>
 										{errors.httpTimeoutMS && (
 											<div className="label">
-												<span className="label-text-alt text-error flex items-center gap-1">
+												<span className="text-error flex items-center gap-1">
 													<FiAlertCircle size={12} /> {errors.httpTimeoutMS}
 												</span>
 											</div>
@@ -1438,7 +1434,7 @@ function AddEditMCPServerModalContent({
 
 								<div className="grid grid-cols-12 items-center gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">Auth Mode</span>
+										<span className="text-sm">Auth Mode</span>
 									</label>
 									<div className="col-span-9">
 										<Dropdown
@@ -1458,7 +1454,7 @@ function AddEditMCPServerModalContent({
 									<>
 										<div className="grid grid-cols-12 items-center gap-2">
 											<label className="label col-span-3">
-												<span className="label-text text-sm">Header Name</span>
+												<span className="text-sm">Header Name</span>
 											</label>
 											<div className="col-span-9">
 												<input
@@ -1478,7 +1474,7 @@ function AddEditMCPServerModalContent({
 																: formData.apiKeyValuePrefix,
 														});
 													}}
-													className="input input-bordered w-full rounded-xl"
+													className="input w-full rounded-xl"
 													spellCheck="false"
 													autoComplete="off"
 													placeholder="Authorization"
@@ -1487,11 +1483,8 @@ function AddEditMCPServerModalContent({
 										</div>
 										<div className="grid grid-cols-12 items-center gap-2">
 											<label className="label col-span-3">
-												<span className="label-text text-sm">Value Prefix</span>
-												<span
-													className="label-text-alt tooltip tooltip-right"
-													data-tip='Prepended to the key, e.g. "Bearer ".'
-												>
+												<span className="text-sm">Value Prefix</span>
+												<span className="tooltip tooltip-right" data-tip='Prepended to the key, e.g. "Bearer ".'>
 													<FiHelpCircle size={12} />
 												</span>
 											</label>
@@ -1501,7 +1494,7 @@ function AddEditMCPServerModalContent({
 													name="apiKeyValuePrefix"
 													value={formData.apiKeyValuePrefix}
 													onChange={handleInput}
-													className="input input-bordered w-full rounded-xl"
+													className="input w-full rounded-xl"
 													spellCheck="false"
 													autoComplete="off"
 													placeholder="Bearer "
@@ -1510,9 +1503,7 @@ function AddEditMCPServerModalContent({
 										</div>
 										<div className="grid grid-cols-12 items-start gap-2">
 											<label className="label col-span-3">
-												<span className="label-text text-sm">
-													{formData.apiKeyExistingRef ? 'Replace API Key' : 'API Key'}
-												</span>
+												<span className="text-sm">{formData.apiKeyExistingRef ? 'Replace API Key' : 'API Key'}</span>
 											</label>
 											<div className="col-span-9">
 												<input
@@ -1520,19 +1511,19 @@ function AddEditMCPServerModalContent({
 													name="apiKeyValue"
 													value={formData.apiKeyValue}
 													onChange={handleInput}
-													className={`input input-bordered w-full rounded-xl ${errors.httpAPIKey ? 'input-error' : ''}`}
+													className={`input w-full rounded-xl ${errors.httpAPIKey ? 'input-error' : ''}`}
 													autoComplete="new-password"
 												/>
 												{formData.apiKeyExistingRef && (
 													<div className="label">
-														<span className="label-text-alt text-base-content/70">
+														<span className="text-base-content/70">
 															Existing key configured. Leave blank to keep it.
 														</span>
 													</div>
 												)}
 												{errors.httpAPIKey && (
 													<div className="label">
-														<span className="label-text-alt text-error flex items-center gap-1">
+														<span className="text-error flex items-center gap-1">
 															<FiAlertCircle size={12} /> {errors.httpAPIKey}
 														</span>
 													</div>
@@ -1550,7 +1541,7 @@ function AddEditMCPServerModalContent({
 														onChange={handleInput}
 														className="checkbox checkbox-sm"
 													/>
-													<span className="label-text text-sm">Delete existing API key secret</span>
+													<span className="text-sm">Delete existing API key secret</span>
 												</label>
 											</div>
 										)}
@@ -1562,9 +1553,9 @@ function AddEditMCPServerModalContent({
 									<>
 										<div className="grid grid-cols-12 items-start gap-2">
 											<label className="label col-span-3">
-												<span className="label-text text-sm">Client Credentials Secret</span>
+												<span className="text-sm">Client Credentials Secret</span>
 												<span
-													className="label-text-alt tooltip tooltip-right"
+													className="tooltip tooltip-right"
 													data-tip='JSON: {"clientID":"...","clientSecret":"..."}'
 												>
 													<FiHelpCircle size={12} />
@@ -1575,7 +1566,7 @@ function AddEditMCPServerModalContent({
 													name="httpClientCredentialsSecret"
 													value={formData.httpClientCredentialsSecret}
 													onChange={handleInput}
-													className={`textarea textarea-bordered h-28 w-full rounded-xl ${
+													className={`textarea h-28 w-full rounded-xl ${
 														errors.httpClientCredentials ? 'textarea-error' : ''
 													}`}
 													spellCheck="false"
@@ -1583,14 +1574,14 @@ function AddEditMCPServerModalContent({
 												/>
 												{formData.httpClientCredentialRef && (
 													<div className="label">
-														<span className="label-text-alt text-base-content/70">
+														<span className="text-base-content/70">
 															Existing credential secret configured. Leave blank to keep it.
 														</span>
 													</div>
 												)}
 												{errors.httpClientCredentials && (
 													<div className="label">
-														<span className="label-text-alt text-error flex items-center gap-1">
+														<span className="text-error flex items-center gap-1">
 															<FiAlertCircle size={12} /> {errors.httpClientCredentials}
 														</span>
 													</div>
@@ -1609,7 +1600,7 @@ function AddEditMCPServerModalContent({
 														onChange={handleInput}
 														className="checkbox checkbox-sm"
 													/>
-													<span className="label-text text-sm">Delete existing client credentials secret</span>
+													<span className="text-sm">Delete existing client credentials secret</span>
 												</label>
 											</div>
 										)}
@@ -1617,7 +1608,7 @@ function AddEditMCPServerModalContent({
 										{formData.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth && (
 											<div className="grid grid-cols-12 items-center gap-2">
 												<label className="label col-span-3">
-													<span className="label-text text-sm">Client ID Metadata URL</span>
+													<span className="text-sm">Client ID Metadata URL</span>
 												</label>
 												<div className="col-span-9">
 													<input
@@ -1625,7 +1616,7 @@ function AddEditMCPServerModalContent({
 														name="httpClientIDMetadataDocumentURL"
 														value={formData.httpClientIDMetadataDocumentURL}
 														onChange={handleInput}
-														className={`input input-bordered w-full rounded-xl ${
+														className={`input w-full rounded-xl ${
 															errors.httpClientIDMetadataDocumentURL ? 'input-error' : ''
 														}`}
 														spellCheck="false"
@@ -1634,7 +1625,7 @@ function AddEditMCPServerModalContent({
 													/>
 													{errors.httpClientIDMetadataDocumentURL && (
 														<div className="label">
-															<span className="label-text-alt text-error flex items-center gap-1">
+															<span className="text-error flex items-center gap-1">
 																<FiAlertCircle size={12} /> {errors.httpClientIDMetadataDocumentURL}
 															</span>
 														</div>
@@ -1651,7 +1642,7 @@ function AddEditMCPServerModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Execution</span>
+								<span className="text-sm">Execution</span>
 							</label>
 							<div className="col-span-9">
 								<Dropdown
@@ -1668,7 +1659,7 @@ function AddEditMCPServerModalContent({
 						</div>
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Approval</span>
+								<span className="text-sm">Approval</span>
 							</label>
 							<div className="col-span-9">
 								<Dropdown
@@ -1695,7 +1686,7 @@ function AddEditMCPServerModalContent({
 										onChange={handleInput}
 										className="checkbox checkbox-sm"
 									/>
-									<span className="label-text text-sm">Unknown risk</span>
+									<span className="text-sm">Unknown risk</span>
 								</label>
 
 								<label className="label cursor-pointer justify-start gap-3">
@@ -1706,7 +1697,7 @@ function AddEditMCPServerModalContent({
 										onChange={handleInput}
 										className="checkbox checkbox-sm"
 									/>
-									<span className="label-text text-sm">Write</span>
+									<span className="text-sm">Write</span>
 								</label>
 
 								<label className="label cursor-pointer justify-start gap-3">
@@ -1717,7 +1708,7 @@ function AddEditMCPServerModalContent({
 										onChange={handleInput}
 										className="checkbox checkbox-sm"
 									/>
-									<span className="label-text text-sm">Destructive</span>
+									<span className="text-sm">Destructive</span>
 								</label>
 							</div>
 						</div>
@@ -1735,7 +1726,7 @@ function AddEditMCPServerModalContent({
 										onChange={handleInput}
 										className="checkbox checkbox-sm"
 									/>
-									<span className="label-text text-sm">Advertise and render MCP Apps</span>
+									<span className="text-sm">Advertise and render MCP Apps</span>
 								</label>
 
 								<label className="label cursor-pointer justify-start gap-3">
@@ -1746,7 +1737,7 @@ function AddEditMCPServerModalContent({
 										onChange={handleInput}
 										className="checkbox checkbox-sm"
 									/>
-									<span className="label-text text-sm">Allow app-initiated tool calls</span>
+									<span className="text-sm">Allow app-initiated tool calls</span>
 								</label>
 
 								<label className="label cursor-pointer justify-start gap-3">
@@ -1757,7 +1748,7 @@ function AddEditMCPServerModalContent({
 										onChange={handleInput}
 										className="checkbox checkbox-sm"
 									/>
-									<span className="label-text text-sm">Approve open link</span>
+									<span className="text-sm">Approve open link</span>
 								</label>
 
 								<label className="label cursor-pointer justify-start gap-3">
@@ -1768,7 +1759,7 @@ function AddEditMCPServerModalContent({
 										onChange={handleInput}
 										className="checkbox checkbox-sm"
 									/>
-									<span className="label-text text-sm">Approve context updates</span>
+									<span className="text-sm">Approve context updates</span>
 								</label>
 							</div>
 						</div>
@@ -1777,9 +1768,9 @@ function AddEditMCPServerModalContent({
 
 						<div className="grid grid-cols-12 items-start gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Tool Policies JSON</span>
+								<span className="text-sm">Tool Policies JSON</span>
 								<span
-									className="label-text-alt tooltip tooltip-right"
+									className="tooltip tooltip-right"
 									data-tip="Optional map keyed by tool name. Values match MCPToolPolicyOverride."
 								>
 									<FiHelpCircle size={12} />
@@ -1790,15 +1781,13 @@ function AddEditMCPServerModalContent({
 									name="toolPoliciesJSON"
 									value={formData.toolPoliciesJSON}
 									onChange={handleInput}
-									className={`textarea textarea-bordered h-36 w-full rounded-xl ${
-										errors.toolPoliciesJSON ? 'textarea-error' : ''
-									}`}
+									className={`textarea h-36 w-full rounded-xl ${errors.toolPoliciesJSON ? 'textarea-error' : ''}`}
 									spellCheck="false"
 									placeholder='{"tool_name":{"toolName":"tool_name","approvalRule":"ask","executionMode":"manual"}}'
 								/>
 								{errors.toolPoliciesJSON && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.toolPoliciesJSON}
 										</span>
 									</div>

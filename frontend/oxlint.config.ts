@@ -83,20 +83,28 @@ export default defineConfig({
 	rules: {
 		...baseRules,
 
-		'better-tailwindcss/enforce-canonical-classes': 'error',
 		'better-tailwindcss/enforce-consistent-class-order': 'off',
-		'better-tailwindcss/enforce-consistent-important-position': 'off',
-		'better-tailwindcss/enforce-consistent-line-wrapping': 'off',
-		'better-tailwindcss/enforce-consistent-variable-syntax': 'off',
-		'better-tailwindcss/enforce-consistent-variant-order': 'off',
 		'better-tailwindcss/enforce-logical-properties': 'off',
+		'better-tailwindcss/enforce-consistent-line-wrapping': 'off',
+
+		'better-tailwindcss/enforce-consistent-important-position': 'error',
+		'better-tailwindcss/enforce-consistent-variable-syntax': 'error',
+		'better-tailwindcss/enforce-consistent-variant-order': 'error',
+		'better-tailwindcss/enforce-canonical-classes': 'error',
 		'better-tailwindcss/enforce-shorthand-classes': 'error',
 		'better-tailwindcss/no-conflicting-classes': 'error',
 		'better-tailwindcss/no-deprecated-classes': 'error',
 		'better-tailwindcss/no-duplicate-classes': 'error',
 		'better-tailwindcss/no-restricted-classes': 'error',
-		'better-tailwindcss/no-unknown-classes': 'off',
-		'better-tailwindcss/no-unnecessary-whitespace': 'off',
+		'better-tailwindcss/no-unnecessary-whitespace': 'error',
+
+		'better-tailwindcss/no-unknown-classes': [
+			'error',
+			{
+				ignore: ['app-*'],
+			},
+		],
+
 		'no-restricted-exports': [
 			'error',
 			{

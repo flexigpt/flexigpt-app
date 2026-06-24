@@ -81,7 +81,7 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 
 	return (
 		<div
-			className="scrollbar-custom-thin flex w-max shrink-0 flex-nowrap items-center gap-1 p-1"
+			className="app-scrollbar-thin flex w-max shrink-0 flex-nowrap items-center gap-1 p-1"
 			style={{ scrollbarGutter: 'stable' }}
 		>
 			{/* Aggregated chip for standalone attachments */}

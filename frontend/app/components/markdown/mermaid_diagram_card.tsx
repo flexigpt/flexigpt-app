@@ -27,9 +27,9 @@ interface MermaidDiagramProps {
 }
 
 type MermaidSurfaceStyle = CSSProperties & {
-	'--bg-mermaid'?: string;
-	'--bg-code-header'?: string;
-	'--text-code'?: string;
+	'--app-bg-mermaid'?: string;
+	'--app-bg-code-header'?: string;
+	'--app-text-code'?: string;
 };
 
 type MermaidRenderState =
@@ -137,9 +137,9 @@ export function MermaidDiagram({
 		const forcedDark = themeMode === 'dark';
 
 		return {
-			'--bg-mermaid': forcedDark ? 'var(--mermaid-surface-dark)' : 'var(--mermaid-surface-light)',
-			'--bg-code-header': forcedDark ? 'var(--mermaid-header-bg-dark)' : 'var(--mermaid-header-bg-light)',
-			'--text-code': forcedDark ? 'var(--mermaid-header-text-dark)' : 'var(--mermaid-header-text-light)',
+			'--app-bg-mermaid': forcedDark ? 'var(--mermaid-surface-dark)' : 'var(--mermaid-surface-light)',
+			'--app-bg-code-header': forcedDark ? 'var(--mermaid-header-bg-dark)' : 'var(--mermaid-header-bg-light)',
+			'--app-text-code': forcedDark ? 'var(--mermaid-header-text-dark)' : 'var(--mermaid-header-text-light)',
 			colorScheme: forcedDark ? 'dark' : 'light',
 		};
 	}, [themeMode]);
@@ -290,16 +290,16 @@ export function MermaidDiagram({
 
 	return (
 		<>
-			<div ref={wrapperRef} className="bg-mermaid my-4 overflow-hidden rounded-lg" style={surfaceStyle}>
-				<div className="bg-code-header flex items-center justify-between px-4">
-					<span className="text-code">Mermaid Diagram</span>
+			<div ref={wrapperRef} className="app-bg-mermaid my-4 overflow-hidden rounded-lg" style={surfaceStyle}>
+				<div className="app-bg-code-header flex items-center justify-between px-4">
+					<span className="app-text-code">Mermaid Diagram</span>
 
 					<div className="flex items-center gap-2">
 						{showThemeToggle && (
 							<div className="join">
 								<button
 									type="button"
-									className={`btn btn-xs text-code join-item border-none bg-transparent shadow-none hover:opacity-60 ${
+									className={`btn btn-xs app-text-code join-item border-none bg-transparent shadow-none hover:opacity-60 ${
 										themeMode === 'auto' ? 'btn-active' : ''
 									}`}
 									onClick={() => {
@@ -313,7 +313,7 @@ export function MermaidDiagram({
 
 								<button
 									type="button"
-									className={`btn btn-xs text-code join-item border-none bg-transparent shadow-none hover:opacity-60 ${
+									className={`btn btn-xs app-text-code join-item border-none bg-transparent shadow-none hover:opacity-60 ${
 										themeMode === 'light' ? 'btn-active' : ''
 									}`}
 									onClick={() => {
@@ -327,7 +327,7 @@ export function MermaidDiagram({
 
 								<button
 									type="button"
-									className={`btn btn-xs text-code join-item border-none bg-transparent shadow-none hover:opacity-60 ${
+									className={`btn btn-xs app-text-code join-item border-none bg-transparent shadow-none hover:opacity-60 ${
 										themeMode === 'dark' ? 'btn-active' : ''
 									}`}
 									onClick={() => {
@@ -347,7 +347,7 @@ export function MermaidDiagram({
 							fileprefix="diagram"
 							isBinary={true}
 							language="mermaid"
-							className="btn btn-sm text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
+							className="btn btn-sm app-text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
 						/>
 					</div>
 				</div>

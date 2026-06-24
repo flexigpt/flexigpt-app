@@ -601,7 +601,7 @@ function AddEditToolModalContent({
 						{effectiveMode === 'add' && (
 							<div className="grid grid-cols-12 items-center gap-2">
 								<label className="label col-span-3">
-									<span className="label-text text-sm">Prefill from Existing</span>
+									<span className="text-sm">Prefill from Existing</span>
 								</label>
 
 								<div className="col-span-9 flex items-center gap-2">
@@ -655,7 +655,7 @@ function AddEditToolModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Display Name*</span>
+								<span className="text-sm">Display Name*</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -665,14 +665,14 @@ function AddEditToolModalContent({
 									value={formData.displayName}
 									onChange={handleInput}
 									readOnly={isViewMode}
-									className={`input input-bordered w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
 									spellCheck="false"
 									autoComplete="off"
 									aria-invalid={Boolean(errors.displayName)}
 								/>
 								{errors.displayName && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.displayName}
 										</span>
 									</div>
@@ -682,8 +682,8 @@ function AddEditToolModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Slug*</span>
-								<span className="tooltip tooltip-right label-text-alt" data-tip="Lower-case, URL-friendly.">
+								<span className="text-sm">Slug*</span>
+								<span className="tooltip tooltip-right" data-tip="Lower-case, URL-friendly.">
 									<FiHelpCircle size={12} />
 								</span>
 							</label>
@@ -693,7 +693,7 @@ function AddEditToolModalContent({
 									name="slug"
 									value={formData.slug}
 									onChange={handleInput}
-									className={`input input-bordered w-full rounded-xl ${errors.slug ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.slug ? 'input-error' : ''}`}
 									spellCheck="false"
 									autoComplete="off"
 									readOnly={isViewMode || isEditMode}
@@ -701,7 +701,7 @@ function AddEditToolModalContent({
 								/>
 								{errors.slug && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.slug}
 										</span>
 									</div>
@@ -711,9 +711,9 @@ function AddEditToolModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Version*</span>
+								<span className="text-sm">Version*</span>
 								<span
-									className="tooltip tooltip-right label-text-alt"
+									className="tooltip tooltip-right"
 									data-tip="Once created, existing versions are not edited. Edit creates a new version."
 								>
 									<FiHelpCircle size={12} />
@@ -726,14 +726,14 @@ function AddEditToolModalContent({
 									value={formData.version}
 									onChange={handleInput}
 									readOnly={isViewMode}
-									className={`input input-bordered w-full rounded-xl ${errors.version ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.version ? 'input-error' : ''}`}
 									spellCheck="false"
 									autoComplete="off"
 									aria-invalid={Boolean(errors.version)}
 								/>
 								{isEditMode && initialData?.tool && (
 									<div className="label">
-										<span className="text-base-content/70 label-text-alt text-xs">
+										<span className="text-base-content/70 text-xs">
 											Current: {initialData.tool.version} · Suggested next:{' '}
 											{
 												suggestNextMinorVersion(
@@ -746,7 +746,7 @@ function AddEditToolModalContent({
 								)}
 								{errors.version && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.version}
 										</span>
 									</div>
@@ -756,7 +756,7 @@ function AddEditToolModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3 cursor-pointer">
-								<span className="label-text text-sm">Enabled</span>
+								<span className="text-sm">Enabled</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -772,7 +772,7 @@ function AddEditToolModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3 cursor-pointer">
-								<span className="label-text text-sm">User Callable</span>
+								<span className="text-sm">User Callable</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -788,7 +788,7 @@ function AddEditToolModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3 cursor-pointer">
-								<span className="label-text text-sm">LLM Callable</span>
+								<span className="text-sm">LLM Callable</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -804,7 +804,7 @@ function AddEditToolModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3 cursor-pointer">
-								<span className="label-text text-sm">AutoExecute</span>
+								<span className="text-sm">AutoExecute</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -820,7 +820,7 @@ function AddEditToolModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Type*</span>
+								<span className="text-sm">Type*</span>
 							</label>
 							<div className="col-span-9">
 								{isEditMode || isViewMode ? (
@@ -837,7 +837,7 @@ function AddEditToolModalContent({
 								)}
 								{errors.type && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.type}
 										</span>
 									</div>
@@ -847,7 +847,7 @@ function AddEditToolModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Description</span>
+								<span className="text-sm">Description</span>
 							</label>
 							<div className="col-span-9">
 								<textarea
@@ -855,7 +855,7 @@ function AddEditToolModalContent({
 									value={formData.description}
 									onChange={handleInput}
 									readOnly={isViewMode}
-									className="textarea textarea-bordered h-20 w-full rounded-xl"
+									className="textarea h-20 w-full rounded-xl"
 									spellCheck="false"
 								/>
 							</div>
@@ -863,8 +863,8 @@ function AddEditToolModalContent({
 
 						<div className="grid grid-cols-12 items-start gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Arg JSONSchema*</span>
-								<span className="tooltip tooltip-right label-text-alt" data-tip="JSON Schema for arguments">
+								<span className="text-sm">Arg JSONSchema*</span>
+								<span className="tooltip tooltip-right" data-tip="JSON Schema for arguments">
 									<FiHelpCircle size={12} />
 								</span>
 							</label>
@@ -874,13 +874,13 @@ function AddEditToolModalContent({
 									value={formData.argSchema}
 									onChange={handleInput}
 									readOnly={isViewMode}
-									className={`textarea textarea-bordered h-24 w-full rounded-xl ${errors.argSchema ? 'textarea-error' : ''}`}
+									className={`textarea h-24 w-full rounded-xl ${errors.argSchema ? 'textarea-error' : ''}`}
 									spellCheck="false"
 									aria-invalid={Boolean(errors.argSchema)}
 								/>
 								{errors.argSchema && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.argSchema}
 										</span>
 									</div>
@@ -901,7 +901,7 @@ function AddEditToolModalContent({
 								</div>
 								<div className="grid grid-cols-12 items-center gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">HTTP URL*</span>
+										<span className="text-sm">HTTP URL*</span>
 									</label>
 									<div className="col-span-9">
 										<input
@@ -911,7 +911,7 @@ function AddEditToolModalContent({
 											value={formData.httpUrl}
 											onChange={handleInput}
 											readOnly={isViewMode}
-											className={`input input-bordered w-full rounded-xl ${errors.httpUrl ? 'input-error' : ''}`}
+											className={`input w-full rounded-xl ${errors.httpUrl ? 'input-error' : ''}`}
 											spellCheck="false"
 											autoComplete="off"
 											aria-invalid={Boolean(errors.httpUrl)}
@@ -919,7 +919,7 @@ function AddEditToolModalContent({
 										/>
 										{errors.httpUrl && (
 											<div className="label">
-												<span className="label-text-alt text-error flex items-center gap-1">
+												<span className="text-error flex items-center gap-1">
 													<FiAlertCircle size={12} /> {errors.httpUrl}
 												</span>
 											</div>
@@ -929,7 +929,7 @@ function AddEditToolModalContent({
 
 								<div className="grid grid-cols-12 items-center gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">HTTP Method</span>
+										<span className="text-sm">HTTP Method</span>
 									</label>
 									<div className="col-span-9">
 										<input
@@ -938,7 +938,7 @@ function AddEditToolModalContent({
 											value={formData.httpMethod}
 											onChange={handleInput}
 											readOnly={isViewMode}
-											className="input input-bordered w-full rounded-xl"
+											className="input w-full rounded-xl"
 											spellCheck="false"
 											autoComplete="off"
 										/>
@@ -947,7 +947,7 @@ function AddEditToolModalContent({
 
 								<div className="grid grid-cols-12 items-start gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">Headers (JSON)</span>
+										<span className="text-sm">Headers (JSON)</span>
 									</label>
 									<div className="col-span-9">
 										<textarea
@@ -955,12 +955,12 @@ function AddEditToolModalContent({
 											value={formData.httpHeaders}
 											onChange={handleInput}
 											readOnly={isViewMode}
-											className={`textarea textarea-bordered h-16 w-full rounded-xl ${errors.httpHeaders ? 'textarea-error' : ''}`}
+											className={`textarea h-16 w-full rounded-xl ${errors.httpHeaders ? 'textarea-error' : ''}`}
 											spellCheck="false"
 										/>
 										{errors.httpHeaders && (
 											<div className="label">
-												<span className="label-text-alt text-error flex items-center gap-1">
+												<span className="text-error flex items-center gap-1">
 													<FiAlertCircle size={12} /> {errors.httpHeaders}
 												</span>
 											</div>
@@ -970,7 +970,7 @@ function AddEditToolModalContent({
 
 								<div className="grid grid-cols-12 items-start gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">Query (JSON)</span>
+										<span className="text-sm">Query (JSON)</span>
 									</label>
 									<div className="col-span-9">
 										<textarea
@@ -978,12 +978,12 @@ function AddEditToolModalContent({
 											value={formData.httpQuery}
 											onChange={handleInput}
 											readOnly={isViewMode}
-											className={`textarea textarea-bordered h-16 w-full rounded-xl ${errors.httpQuery ? 'textarea-error' : ''}`}
+											className={`textarea h-16 w-full rounded-xl ${errors.httpQuery ? 'textarea-error' : ''}`}
 											spellCheck="false"
 										/>
 										{errors.httpQuery && (
 											<div className="label">
-												<span className="label-text-alt text-error flex items-center gap-1">
+												<span className="text-error flex items-center gap-1">
 													<FiAlertCircle size={12} /> {errors.httpQuery}
 												</span>
 											</div>
@@ -993,7 +993,7 @@ function AddEditToolModalContent({
 
 								<div className="grid grid-cols-12 items-start gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">Body</span>
+										<span className="text-sm">Body</span>
 									</label>
 									<div className="col-span-9">
 										<textarea
@@ -1001,7 +1001,7 @@ function AddEditToolModalContent({
 											value={formData.httpBody}
 											onChange={handleInput}
 											readOnly={isViewMode}
-											className="textarea textarea-bordered h-16 w-full rounded-xl"
+											className="textarea h-16 w-full rounded-xl"
 											spellCheck="false"
 										/>
 									</div>
@@ -1009,7 +1009,7 @@ function AddEditToolModalContent({
 
 								<div className="grid grid-cols-12 items-center gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">Timeout (ms)</span>
+										<span className="text-sm">Timeout (ms)</span>
 									</label>
 									<div className="col-span-9">
 										<input
@@ -1018,13 +1018,13 @@ function AddEditToolModalContent({
 											value={formData.httpTimeoutMS}
 											onChange={handleInput}
 											readOnly={isViewMode}
-											className={`input input-bordered w-full rounded-xl ${errors.httpTimeoutMS ? 'input-error' : ''}`}
+											className={`input w-full rounded-xl ${errors.httpTimeoutMS ? 'input-error' : ''}`}
 											spellCheck="false"
 											autoComplete="off"
 										/>
 										{errors.httpTimeoutMS && (
 											<div className="label">
-												<span className="label-text-alt text-error flex items-center gap-1">
+												<span className="text-error flex items-center gap-1">
 													<FiAlertCircle size={12} /> {errors.httpTimeoutMS}
 												</span>
 											</div>
@@ -1034,7 +1034,7 @@ function AddEditToolModalContent({
 
 								<div className="grid grid-cols-12 items-center gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">Auth Type</span>
+										<span className="text-sm">Auth Type</span>
 									</label>
 									<div className="col-span-9">
 										<input
@@ -1043,7 +1043,7 @@ function AddEditToolModalContent({
 											value={formData.httpAuthType}
 											onChange={handleInput}
 											readOnly={isViewMode}
-											className="input input-bordered w-full rounded-xl"
+											className="input w-full rounded-xl"
 											spellCheck="false"
 											autoComplete="off"
 										/>
@@ -1052,7 +1052,7 @@ function AddEditToolModalContent({
 
 								<div className="grid grid-cols-12 items-center gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">Auth In</span>
+										<span className="text-sm">Auth In</span>
 									</label>
 									<div className="col-span-9">
 										<input
@@ -1061,7 +1061,7 @@ function AddEditToolModalContent({
 											value={formData.httpAuthIn}
 											onChange={handleInput}
 											readOnly={isViewMode}
-											className="input input-bordered w-full rounded-xl"
+											className="input w-full rounded-xl"
 											spellCheck="false"
 											autoComplete="off"
 										/>
@@ -1070,7 +1070,7 @@ function AddEditToolModalContent({
 
 								<div className="grid grid-cols-12 items-center gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">Auth Name</span>
+										<span className="text-sm">Auth Name</span>
 									</label>
 									<div className="col-span-9">
 										<input
@@ -1079,7 +1079,7 @@ function AddEditToolModalContent({
 											value={formData.httpAuthName}
 											onChange={handleInput}
 											readOnly={isViewMode}
-											className="input input-bordered w-full rounded-xl"
+											className="input w-full rounded-xl"
 											spellCheck="false"
 											autoComplete="off"
 										/>
@@ -1088,7 +1088,7 @@ function AddEditToolModalContent({
 
 								<div className="grid grid-cols-12 items-center gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">Auth Value Template</span>
+										<span className="text-sm">Auth Value Template</span>
 									</label>
 									<div className="col-span-9">
 										<input
@@ -1097,7 +1097,7 @@ function AddEditToolModalContent({
 											value={formData.httpAuthValueTemplate}
 											onChange={handleInput}
 											readOnly={isViewMode}
-											className="input input-bordered w-full rounded-xl"
+											className="input w-full rounded-xl"
 											spellCheck="false"
 											autoComplete="off"
 										/>
@@ -1106,7 +1106,7 @@ function AddEditToolModalContent({
 
 								<div className="grid grid-cols-12 items-center gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">Success Codes (comma)</span>
+										<span className="text-sm">Success Codes (comma)</span>
 									</label>
 									<div className="col-span-9">
 										<input
@@ -1115,13 +1115,13 @@ function AddEditToolModalContent({
 											value={formData.httpResponseCodes}
 											onChange={handleInput}
 											readOnly={isViewMode}
-											className={`input input-bordered w-full rounded-xl ${errors.httpResponseCodes ? 'input-error' : ''}`}
+											className={`input w-full rounded-xl ${errors.httpResponseCodes ? 'input-error' : ''}`}
 											spellCheck="false"
 											autoComplete="off"
 										/>
 										{errors.httpResponseCodes && (
 											<div className="label">
-												<span className="label-text-alt text-error flex items-center gap-1">
+												<span className="text-error flex items-center gap-1">
 													<FiAlertCircle size={12} /> {errors.httpResponseCodes}
 												</span>
 											</div>
@@ -1131,7 +1131,7 @@ function AddEditToolModalContent({
 
 								<div className="grid grid-cols-12 items-center gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">Error Mode</span>
+										<span className="text-sm">Error Mode</span>
 									</label>
 									<div className="col-span-9">
 										<input
@@ -1140,7 +1140,7 @@ function AddEditToolModalContent({
 											value={formData.httpResponseErrorMode}
 											onChange={handleInput}
 											readOnly={isViewMode}
-											className="input input-bordered w-full rounded-xl"
+											className="input w-full rounded-xl"
 											spellCheck="false"
 											autoComplete="off"
 										/>
@@ -1149,7 +1149,7 @@ function AddEditToolModalContent({
 
 								<div className="grid grid-cols-12 items-center gap-2">
 									<label className="label col-span-3">
-										<span className="label-text text-sm">Body Output Mode</span>
+										<span className="text-sm">Body Output Mode</span>
 									</label>
 									<div className="col-span-9">
 										{isViewMode ? (
@@ -1173,7 +1173,7 @@ function AddEditToolModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Tags</span>
+								<span className="text-sm">Tags</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -1182,14 +1182,14 @@ function AddEditToolModalContent({
 									value={formData.tags}
 									onChange={handleInput}
 									readOnly={isViewMode}
-									className={`input input-bordered w-full rounded-xl ${errors.tags ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.tags ? 'input-error' : ''}`}
 									placeholder="comma, separated, tags"
 									spellCheck="false"
 									aria-invalid={Boolean(errors.tags)}
 								/>
 								{errors.tags && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.tags}
 										</span>
 									</div>

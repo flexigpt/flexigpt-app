@@ -1413,7 +1413,7 @@ function AddEditAssistantPresetModalContent({
 						{effectiveMode === 'add' && (
 							<div className="grid grid-cols-12 items-center gap-2">
 								<label className="label col-span-3">
-									<span className="label-text text-sm">Prefill from Existing</span>
+									<span className="text-sm">Prefill from Existing</span>
 								</label>
 
 								<div className="col-span-9 flex items-center gap-2">
@@ -1471,7 +1471,7 @@ function AddEditAssistantPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Display Name*</span>
+								<span className="text-sm">Display Name*</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -1482,7 +1482,7 @@ function AddEditAssistantPresetModalContent({
 										updateFormData(prev => ({ ...prev, displayName: value }));
 									}}
 									readOnly={isViewMode}
-									className={`input input-bordered w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
 									spellCheck="false"
 									autoComplete="off"
 									autoFocus={!isViewMode}
@@ -1490,7 +1490,7 @@ function AddEditAssistantPresetModalContent({
 								/>
 								{errors.displayName && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.displayName}
 										</span>
 									</div>
@@ -1500,8 +1500,8 @@ function AddEditAssistantPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Slug*</span>
-								<span className="label-text-alt tooltip tooltip-right" data-tip="Short URL-friendly identifier">
+								<span className="text-sm">Slug*</span>
+								<span className="tooltip tooltip-right" data-tip="Short URL-friendly identifier">
 									<FiHelpCircle size={12} />
 								</span>
 							</label>
@@ -1513,7 +1513,7 @@ function AddEditAssistantPresetModalContent({
 										const value = e.target.value;
 										updateFormData(prev => ({ ...prev, slug: value }));
 									}}
-									className={`input input-bordered w-full rounded-xl ${errors.slug ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.slug ? 'input-error' : ''}`}
 									spellCheck="false"
 									autoComplete="off"
 									readOnly={isViewMode || isEditMode}
@@ -1521,7 +1521,7 @@ function AddEditAssistantPresetModalContent({
 								/>
 								{errors.slug && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.slug}
 										</span>
 									</div>
@@ -1531,11 +1531,8 @@ function AddEditAssistantPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Version*</span>
-								<span
-									className="label-text-alt tooltip tooltip-right"
-									data-tip="Versions are immutable. Edit creates a new version."
-								>
+								<span className="text-sm">Version*</span>
+								<span className="tooltip tooltip-right" data-tip="Versions are immutable. Edit creates a new version.">
 									<FiHelpCircle size={12} />
 								</span>
 							</label>
@@ -1548,7 +1545,7 @@ function AddEditAssistantPresetModalContent({
 										updateFormData(prev => ({ ...prev, version: value }));
 									}}
 									readOnly={isViewMode}
-									className={`input input-bordered w-full rounded-xl ${errors.version ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.version ? 'input-error' : ''}`}
 									spellCheck="false"
 									autoComplete="off"
 									aria-invalid={Boolean(errors.version)}
@@ -1556,7 +1553,7 @@ function AddEditAssistantPresetModalContent({
 								/>
 								{isEditMode && initialData?.preset && (
 									<div className="label">
-										<span className="label-text-alt text-base-content/70 text-xs">
+										<span className="text-base-content/70 text-xs">
 											Current: {initialData.preset.version} · Suggested next: {suggestedNextVersion}
 											{!isSemverVersion(initialData.preset.version) ? ' (current is not semver)' : ''}
 										</span>
@@ -1564,7 +1561,7 @@ function AddEditAssistantPresetModalContent({
 								)}
 								{errors.version && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.version}
 										</span>
 									</div>
@@ -1574,7 +1571,7 @@ function AddEditAssistantPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3 cursor-pointer">
-								<span className="label-text text-sm">Enabled</span>
+								<span className="text-sm">Enabled</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -1591,7 +1588,7 @@ function AddEditAssistantPresetModalContent({
 
 						<div className="grid grid-cols-12 items-start gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Description</span>
+								<span className="text-sm">Description</span>
 							</label>
 							<div className="col-span-9">
 								<textarea
@@ -1601,7 +1598,7 @@ function AddEditAssistantPresetModalContent({
 										updateFormData(prev => ({ ...prev, description: value }));
 									}}
 									readOnly={isViewMode}
-									className="textarea textarea-bordered h-20 w-full rounded-xl"
+									className="textarea h-20 w-full rounded-xl"
 									spellCheck="false"
 								/>
 							</div>
@@ -1609,9 +1606,9 @@ function AddEditAssistantPresetModalContent({
 
 						<div className="grid grid-cols-12 items-start gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Starting Text</span>
+								<span className="text-sm">Starting Text</span>
 								<span
-									className="label-text-alt tooltip tooltip-right"
+									className="tooltip tooltip-right"
 									data-tip="Optional starting text for the user, inserted into the composer only when the composer text is empty."
 								>
 									<FiHelpCircle size={12} />
@@ -1625,12 +1622,12 @@ function AddEditAssistantPresetModalContent({
 										updateFormData(prev => ({ ...prev, startingText: value }));
 									}}
 									readOnly={isViewMode}
-									className="textarea textarea-bordered h-28 w-full rounded-xl"
+									className="textarea h-28 w-full rounded-xl"
 									spellCheck="false"
 									placeholder="Optional prompt to start the user off..."
 								/>
 								<div className="label">
-									<span className="label-text-alt text-base-content/70 text-xs">
+									<span className="text-base-content/70 text-xs">
 										Used as a starter prompt when this preset is applied and the composer has no text.
 									</span>
 								</div>
@@ -1640,9 +1637,9 @@ function AddEditAssistantPresetModalContent({
 
 						<div className="grid grid-cols-12 items-start gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Model Preset</span>
+								<span className="text-sm">Model Preset</span>
 								<span
-									className="label-text-alt tooltip tooltip-right"
+									className="tooltip tooltip-right"
 									data-tip="Optional starting model preset reference. Must resolve and be enabled."
 								>
 									<FiHelpCircle size={12} />
@@ -1681,9 +1678,7 @@ function AddEditAssistantPresetModalContent({
 								{currentModelOption && (
 									<div className="label">
 										<span
-											className={`label-text-alt text-xs ${
-												currentModelOption.isSelectable ? 'text-base-content/70' : 'text-warning'
-											}`}
+											className={`text-xs ${currentModelOption.isSelectable ? 'text-base-content/70' : 'text-warning'}`}
 										>
 											{currentModelOption.isSelectable
 												? `${currentModelOption.providerPreset.displayName || currentModelOption.providerPreset.name} / ${
@@ -1696,7 +1691,7 @@ function AddEditAssistantPresetModalContent({
 
 								{errors.modelPreset && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.modelPreset}
 										</span>
 									</div>
@@ -1706,9 +1701,9 @@ function AddEditAssistantPresetModalContent({
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Include Model System Prompt</span>
+								<span className="text-sm">Include Model System Prompt</span>
 								<span
-									className="label-text-alt tooltip tooltip-right"
+									className="tooltip tooltip-right"
 									data-tip="Optional. Not Set leaves the user's current choice unchanged."
 								>
 									<FiHelpCircle size={12} />

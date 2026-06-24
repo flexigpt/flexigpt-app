@@ -106,7 +106,7 @@ export const SkillSelectionSection = memo(function SkillSelectionSection({
 
 						<div className="mt-3">
 							<label className="label cursor-pointer justify-start gap-3 py-1">
-								<span className="label-text text-sm">Preload as active</span>
+								<span className="text-sm">Preload as active</span>
 								{isViewMode ? (
 									<span className="text-sm">{item.preLoadAsActive ? 'Yes' : 'No'}</span>
 								) : (

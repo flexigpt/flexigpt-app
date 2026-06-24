@@ -364,7 +364,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 						{isAddMode && (
 							<div className="grid grid-cols-12 items-center gap-2">
 								<label className="label col-span-3">
-									<span className="label-text text-sm">Prefill from Existing</span>
+									<span className="text-sm">Prefill from Existing</span>
 								</label>
 
 								<div className="col-span-9 flex items-center gap-2">
@@ -419,8 +419,8 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 						{/* Name */}
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Name*</span>
-								<span className="label-text-alt tooltip tooltip-right" data-tip="Must be unique within the bundle.">
+								<span className="text-sm">Name*</span>
+								<span className="tooltip tooltip-right" data-tip="Must be unique within the bundle.">
 									<FiHelpCircle size={12} />
 								</span>
 							</label>
@@ -432,14 +432,14 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 									value={formData.name}
 									onChange={handleInput}
 									readOnly={isViewMode || isEditMode}
-									className={`input input-bordered w-full rounded-xl ${errors.name ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.name ? 'input-error' : ''}`}
 									spellCheck="false"
 									autoComplete="off"
 									aria-invalid={Boolean(errors.name)}
 								/>
 								{errors.name && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.name}
 										</span>
 									</div>
@@ -450,8 +450,8 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 						{/* Slug */}
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Slug*</span>
-								<span className="label-text-alt tooltip tooltip-right" data-tip="Lower-case, URL-friendly.">
+								<span className="text-sm">Slug*</span>
+								<span className="tooltip tooltip-right" data-tip="Lower-case, URL-friendly.">
 									<FiHelpCircle size={12} />
 								</span>
 							</label>
@@ -462,14 +462,14 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 									value={formData.slug}
 									onChange={handleInput}
 									readOnly={isViewMode || isEditMode}
-									className={`input input-bordered w-full rounded-xl ${errors.slug ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.slug ? 'input-error' : ''}`}
 									spellCheck="false"
 									autoComplete="off"
 									aria-invalid={Boolean(errors.slug)}
 								/>
 								{errors.slug && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.slug}
 										</span>
 									</div>
@@ -480,7 +480,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 						{/* Type */}
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Type*</span>
+								<span className="text-sm">Type*</span>
 							</label>
 							<div className="col-span-9">
 								{isEditMode || isViewMode ? (
@@ -497,7 +497,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 								)}
 								{errors.type && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.type}
 										</span>
 									</div>
@@ -508,7 +508,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 						{/* Location */}
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Location*</span>
+								<span className="text-sm">Location*</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -517,14 +517,14 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 									value={formData.location}
 									onChange={handleInput}
 									readOnly={isViewMode}
-									className={`input input-bordered w-full rounded-xl ${errors.location ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.location ? 'input-error' : ''}`}
 									spellCheck="false"
 									autoComplete="off"
 									aria-invalid={Boolean(errors.location)}
 								/>
 								{errors.location && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.location}
 										</span>
 									</div>
@@ -535,7 +535,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 						{/* Display Name */}
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Display Name</span>
+								<span className="text-sm">Display Name</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -544,7 +544,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 									value={formData.displayName}
 									onChange={handleInput}
 									readOnly={isViewMode}
-									className="input input-bordered w-full rounded-xl"
+									className="input w-full rounded-xl"
 									spellCheck="false"
 									autoComplete="off"
 								/>
@@ -554,7 +554,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 						{/* Enabled */}
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3 cursor-pointer">
-								<span className="label-text text-sm">Enabled</span>
+								<span className="text-sm">Enabled</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -571,7 +571,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 						{/* Description */}
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Description</span>
+								<span className="text-sm">Description</span>
 							</label>
 							<div className="col-span-9">
 								<textarea
@@ -579,7 +579,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 									value={formData.description}
 									onChange={handleInput}
 									readOnly={isViewMode}
-									className="textarea textarea-bordered h-20 w-full rounded-xl"
+									className="textarea h-20 w-full rounded-xl"
 									spellCheck="false"
 								/>
 							</div>
@@ -588,7 +588,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 						{/* Tags */}
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="label-text text-sm">Tags</span>
+								<span className="text-sm">Tags</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -597,14 +597,14 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 									value={formData.tags}
 									onChange={handleInput}
 									readOnly={isViewMode}
-									className={`input input-bordered w-full rounded-xl ${errors.tags ? 'input-error' : ''}`}
+									className={`input w-full rounded-xl ${errors.tags ? 'input-error' : ''}`}
 									placeholder="comma, separated, tags"
 									spellCheck="false"
 									aria-invalid={Boolean(errors.tags)}
 								/>
 								{errors.tags && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.tags}
 										</span>
 									</div>

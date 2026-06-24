@@ -66,7 +66,7 @@ export function MermaidZoomModal({ isOpen, onClose, svgNode, surfaceStyle }: Mer
 	return createPortal(
 		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose} aria-label="Enlarged Mermaid diagram">
 			<div
-				className="modal-box bg-mermaid flex h-[90vh] max-w-[90vw] cursor-zoom-out items-center justify-center"
+				className="modal-box app-bg-mermaid flex h-[90vh] max-w-[90vw] cursor-zoom-out items-center justify-center"
 				style={surfaceStyle}
 				onClick={() => {
 					// Close via native dialog API; this will trigger handleDialogClose -> parent onClose()

@@ -139,7 +139,7 @@ function closeDialogSafely(dialog: HTMLDialogElement | null): boolean {
 
 function HelpHint({ content }: { content: string }) {
 	return (
-		<span className="label-text-alt tooltip tooltip-right ml-1 inline-flex cursor-help" data-tip={content}>
+		<span className="tooltip tooltip-right ml-1 inline-flex cursor-help" data-tip={content}>
 			<FiHelpCircle size={12} />
 		</span>
 	);
@@ -525,7 +525,7 @@ function AdvancedParamsModalInner({
 				<form onSubmit={handleSubmit} className="space-y-4">
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-4 cursor-pointer">
-							<span className="label-text text-sm">Streaming</span>
+							<span className="text-sm">Streaming</span>
 							<HelpHint content="Stream data continuously." />
 						</label>
 						<div className="col-span-8">
@@ -542,7 +542,7 @@ function AdvancedParamsModalInner({
 
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-4">
-							<span className="label-text text-sm">Max Prompt Tokens</span>
+							<span className="text-sm">Max Prompt Tokens</span>
 							<HelpHint content="Maximum tokens for input prompt" />
 						</label>
 						<div className="col-span-8">
@@ -553,13 +553,13 @@ function AdvancedParamsModalInner({
 								onChange={e => {
 									updateField('maxPromptLength', e.target.value, setMaxPromptLength);
 								}}
-								className={`input input-bordered w-full rounded-xl ${errors.maxPromptLength ? 'input-error' : ''}`}
+								className={`input w-full rounded-xl ${errors.maxPromptLength ? 'input-error' : ''}`}
 								placeholder={`Default: ${currentModel.maxPromptLength}`}
 								spellCheck="false"
 							/>
 							{errors.maxPromptLength && (
 								<div className="label">
-									<span className="label-text-alt text-error flex items-center gap-1">
+									<span className="text-error flex items-center gap-1">
 										<FiAlertCircle size={12} /> {errors.maxPromptLength}
 									</span>
 								</div>
@@ -569,7 +569,7 @@ function AdvancedParamsModalInner({
 
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-4">
-							<span className="label-text text-sm">Max Output Tokens</span>
+							<span className="text-sm">Max Output Tokens</span>
 							<HelpHint content="Maximum tokens for model output" />
 						</label>
 						<div className="col-span-8">
@@ -579,13 +579,13 @@ function AdvancedParamsModalInner({
 								onChange={e => {
 									updateField('maxOutputLength', e.target.value, setMaxOutputLength);
 								}}
-								className={`input input-bordered w-full rounded-xl ${errors.maxOutputLength ? 'input-error' : ''}`}
+								className={`input w-full rounded-xl ${errors.maxOutputLength ? 'input-error' : ''}`}
 								placeholder={`Default: ${currentModel.maxOutputLength}`}
 								spellCheck="false"
 							/>
 							{errors.maxOutputLength && (
 								<div className="label">
-									<span className="label-text-alt text-error flex items-center gap-1">
+									<span className="text-error flex items-center gap-1">
 										<FiAlertCircle size={12} /> {errors.maxOutputLength}
 									</span>
 								</div>
@@ -595,7 +595,7 @@ function AdvancedParamsModalInner({
 
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-4">
-							<span className="label-text text-sm">Timeout (s)</span>
+							<span className="text-sm">Timeout (s)</span>
 							<HelpHint content="Maximum time a request can take (seconds)" />
 						</label>
 						<div className="col-span-8">
@@ -605,13 +605,13 @@ function AdvancedParamsModalInner({
 								onChange={e => {
 									updateField('timeout', e.target.value, setTimeoutSec);
 								}}
-								className={`input input-bordered w-full rounded-xl ${errors.timeout ? 'input-error' : ''}`}
+								className={`input w-full rounded-xl ${errors.timeout ? 'input-error' : ''}`}
 								placeholder={`Default: ${currentModel.timeout}`}
 								spellCheck="false"
 							/>
 							{errors.timeout && (
 								<div className="label">
-									<span className="label-text-alt text-error flex items-center gap-1">
+									<span className="text-error flex items-center gap-1">
 										<FiAlertCircle size={12} /> {errors.timeout}
 									</span>
 								</div>
@@ -621,7 +621,7 @@ function AdvancedParamsModalInner({
 
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-4">
-							<span className="label-text text-sm">Reasoning Summary</span>
+							<span className="text-sm">Reasoning Summary</span>
 							<HelpHint
 								content={
 									reasoningEnabled
@@ -646,7 +646,7 @@ function AdvancedParamsModalInner({
 
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-4">
-							<span className="label-text text-sm">Output Format</span>
+							<span className="text-sm">Output Format</span>
 							<HelpHint content="Controls output formatting. Verbosity is set in the top bar." />
 						</label>
 						<div className="col-span-8">
@@ -665,12 +665,12 @@ function AdvancedParamsModalInner({
 						<>
 							<div className="grid grid-cols-12 items-center gap-2">
 								<label className="label col-span-4">
-									<span className="label-text text-sm">Schema Name</span>
+									<span className="text-sm">Schema Name</span>
 								</label>
 								<div className="col-span-8">
 									<input
 										type="text"
-										className={`input input-bordered w-full rounded-xl ${errors.jsonSchemaName ? 'input-error' : ''}`}
+										className={`input w-full rounded-xl ${errors.jsonSchemaName ? 'input-error' : ''}`}
 										value={jsonSchemaName}
 										onChange={e => {
 											handleJsonSchemaNameChange(e.target.value);
@@ -680,7 +680,7 @@ function AdvancedParamsModalInner({
 									/>
 									{errors.jsonSchemaName && (
 										<div className="label">
-											<span className="label-text-alt text-error flex items-center gap-1">
+											<span className="text-error flex items-center gap-1">
 												<FiAlertCircle size={12} /> {errors.jsonSchemaName}
 											</span>
 										</div>
@@ -690,12 +690,12 @@ function AdvancedParamsModalInner({
 
 							<div className="grid grid-cols-12 items-center gap-2">
 								<label className="label col-span-4">
-									<span className="label-text text-sm">Description</span>
+									<span className="text-sm">Description</span>
 								</label>
 								<div className="col-span-8">
 									<input
 										type="text"
-										className="input input-bordered w-full rounded-xl"
+										className="input w-full rounded-xl"
 										value={jsonSchemaDescription}
 										onChange={e => {
 											setJsonSchemaDescription(e.target.value);
@@ -708,7 +708,7 @@ function AdvancedParamsModalInner({
 
 							<div className="grid grid-cols-12 items-center gap-2">
 								<label className="label col-span-4 cursor-pointer">
-									<span className="label-text text-sm">Strict</span>
+									<span className="text-sm">Strict</span>
 								</label>
 								<div className="col-span-8">
 									<input
@@ -724,11 +724,11 @@ function AdvancedParamsModalInner({
 
 							<div className="grid grid-cols-12 items-start gap-2">
 								<label className="label col-span-4">
-									<span className="label-text text-sm">Schema JSON</span>
+									<span className="text-sm">Schema JSON</span>
 								</label>
 								<div className="col-span-8">
 									<textarea
-										className={`textarea textarea-bordered w-full rounded-xl ${errors.jsonSchema ? 'textarea-error' : ''}`}
+										className={`textarea w-full rounded-xl ${errors.jsonSchema ? 'textarea-error' : ''}`}
 										rows={8}
 										value={jsonSchemaText}
 										onChange={e => {
@@ -739,7 +739,7 @@ function AdvancedParamsModalInner({
 									/>
 									{errors.jsonSchema && (
 										<div className="label">
-											<span className="label-text-alt text-error flex items-center gap-1">
+											<span className="text-error flex items-center gap-1">
 												<FiAlertCircle size={12} /> {errors.jsonSchema}
 											</span>
 										</div>
@@ -753,7 +753,7 @@ function AdvancedParamsModalInner({
 						<>
 							<div className="grid grid-cols-12 items-center gap-2">
 								<label className="label col-span-4 cursor-pointer">
-									<span className="label-text text-sm">Cache Control</span>
+									<span className="text-sm">Cache Control</span>
 									<HelpHint content="Top-level request cache control, when supported by the selected provider SDK." />
 								</label>
 								<div className="col-span-8">
@@ -775,9 +775,7 @@ function AdvancedParamsModalInner({
 									)}
 									{supportsAutomaticProviderCaching && (
 										<div className="label">
-											<span className="label-text-alt opacity-70">
-												This provider SDK also supports automatic caching behavior.
-											</span>
+											<span className="opacity-70">This provider SDK also supports automatic caching behavior.</span>
 										</div>
 									)}
 								</div>
@@ -787,7 +785,7 @@ function AdvancedParamsModalInner({
 								<>
 									<div className="grid grid-cols-12 items-center gap-2">
 										<label className="label col-span-4">
-											<span className="label-text text-sm">Cache Kind</span>
+											<span className="text-sm">Cache Kind</span>
 										</label>
 										<div className="col-span-8">
 											<Dropdown<CacheControlKind>
@@ -805,7 +803,7 @@ function AdvancedParamsModalInner({
 
 									<div className="grid grid-cols-12 items-center gap-2">
 										<label className="label col-span-4">
-											<span className="label-text text-sm">Cache TTL</span>
+											<span className="text-sm">Cache TTL</span>
 										</label>
 										<div className="col-span-8">
 											<Dropdown<CacheControlTTLSelection>
@@ -824,7 +822,7 @@ function AdvancedParamsModalInner({
 									{supportsCacheKey && (
 										<div className="grid grid-cols-12 items-center gap-2">
 											<label className="label col-span-4">
-												<span className="label-text text-sm">Cache Key</span>
+												<span className="text-sm">Cache Key</span>
 											</label>
 											<div className="col-span-8">
 												<input
@@ -833,7 +831,7 @@ function AdvancedParamsModalInner({
 													onChange={e => {
 														setCacheControlKey(e.target.value);
 													}}
-													className="input input-bordered w-full rounded-xl"
+													className="input w-full rounded-xl"
 													placeholder="Optional request cache key"
 													spellCheck="false"
 												/>
@@ -848,7 +846,7 @@ function AdvancedParamsModalInner({
 					{stopPolicy.isSupported && (
 						<div className="grid grid-cols-12 items-start gap-2">
 							<label className="label col-span-4">
-								<span className="label-text text-sm">Stop Sequences</span>
+								<span className="text-sm">Stop Sequences</span>
 								<HelpHint
 									content={
 										stopSequencesDisabledBecauseReasoning
@@ -860,7 +858,7 @@ function AdvancedParamsModalInner({
 							<div className="col-span-8">
 								<textarea
 									disabled={stopSequencesDisabledBecauseReasoning}
-									className={`textarea textarea-bordered w-full rounded-xl ${
+									className={`textarea w-full rounded-xl ${
 										errors.stopSequences ? 'textarea-error' : ''
 									} ${stopSequencesDisabledBecauseReasoning ? 'cursor-not-allowed opacity-50' : ''}`}
 									rows={4}
@@ -875,14 +873,12 @@ function AdvancedParamsModalInner({
 								/>
 								{stopSequencesDisabledBecauseReasoning && (
 									<div className="label">
-										<span className="label-text-alt opacity-70">
-											Disabled because reasoning is enabled for this model/provider.
-										</span>
+										<span className="opacity-70">Disabled because reasoning is enabled for this model/provider.</span>
 									</div>
 								)}
 								{errors.stopSequences && (
 									<div className="label">
-										<span className="label-text-alt text-error flex items-center gap-1">
+										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.stopSequences}
 										</span>
 									</div>

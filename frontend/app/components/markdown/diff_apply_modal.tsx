@@ -719,7 +719,7 @@ export function DiffApplyModal({
 
 									<input
 										id={inputId}
-										className={`input input-sm input-bordered w-full font-mono text-xs ${missing ? 'input-error' : ''}`}
+										className={`input input-sm w-full font-mono text-xs ${missing ? 'input-error' : ''}`}
 										value={target.targetPath}
 										onChange={event => {
 											updateTarget(index, event.target.value);

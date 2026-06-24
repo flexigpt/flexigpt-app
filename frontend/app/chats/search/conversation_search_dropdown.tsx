@@ -110,13 +110,13 @@ export function ConversationSearchDropdown({
 
 	return (
 		<div className="bg-base-200 overflow-hidden rounded-2xl shadow-lg">
-			<div className="text-neutral-custom border-base-300 sticky top-0 flex items-center justify-between border-b px-8 py-1 text-xs">
+			<div className="app-text-neutral border-base-300 sticky top-0 flex items-center justify-between border-b px-8 py-1 text-xs">
 				<span className="truncate">{barLeft}</span>
 				{barRight && <span className="shrink-0 pl-4">{barRight}</span>}
 			</div>
 
 			{!results.length && !loading ? (
-				<div className="text-neutral-custom py-8 text-center text-sm">
+				<div className="app-text-neutral py-8 text-center text-sm">
 					{query ? 'Try refining your search' : 'Start a conversation to see it here'}
 				</div>
 			) : (
@@ -157,13 +157,13 @@ export function ConversationSearchDropdown({
 
 					{loading && (
 						<div className="flex items-center justify-center py-4">
-							<span className="text-neutral-custom text-sm">{results.length ? 'Loading more...' : 'Searching...'}</span>
+							<span className="app-text-neutral text-sm">{results.length ? 'Loading more...' : 'Searching...'}</span>
 							<span className="loading loading-dots loading-sm" />
 						</div>
 					)}
 
 					{!loading && !hasMore && results.length > 0 && query && (
-						<div className="text-neutral-custom border-base-300 border-t py-1 text-center text-xs">End of results</div>
+						<div className="app-text-neutral border-base-300 border-t py-1 text-center text-xs">End of results</div>
 					)}
 				</div>
 			)}

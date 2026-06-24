@@ -73,7 +73,7 @@ export function CodeBlock({ language, value, isBusy, hideMermaidCode, diffCandid
 	const headerTitle = hasMermaidSyntaxError ? (mermaidRenderError ?? 'Mermaid syntax error') : undefined;
 
 	const fallback = (
-		<pre className="text-code overflow-auto rounded-sm bg-transparent p-2 text-sm">
+		<pre className="app-text-code overflow-auto rounded-sm bg-transparent p-2 text-sm">
 			<code>{value}</code>
 		</pre>
 	);
@@ -102,12 +102,12 @@ export function CodeBlock({ language, value, isBusy, hideMermaidCode, diffCandid
 
 	return (
 		<>
-			<div className="bg-code my-4 overflow-hidden rounded-lg">
-				<div className="bg-code-header flex min-w-0 items-center justify-between gap-2 px-2 py-0.5">
+			<div className="app-bg-code my-4 overflow-hidden rounded-lg">
+				<div className="app-bg-code-header flex min-w-0 items-center justify-between gap-2 px-2 py-0.5">
 					<div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-xs" title={headerTitle}>
 						<span
 							className={`inline-flex max-w-48 min-w-0 shrink-0 items-center gap-1 leading-none ${
-								hasMermaidSyntaxError ? 'text-error' : 'text-code capitalize'
+								hasMermaidSyntaxError ? 'text-error' : 'app-text-code capitalize'
 							}`}
 						>
 							{hasMermaidSyntaxError ? (
@@ -128,17 +128,17 @@ export function CodeBlock({ language, value, isBusy, hideMermaidCode, diffCandid
 							language={language}
 							valueFetcher={fetchValue}
 							size={16}
-							className="btn btn-sm text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
+							className="btn btn-sm app-text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
 						/>
 
 						<CopyButton
 							value={value}
-							className="btn btn-sm text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
+							className="btn btn-sm app-text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
 							size={16}
 						/>
 						<button
 							type="button"
-							className="btn btn-sm text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
+							className="btn btn-sm app-text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
 							onClick={handleToggleExpanded}
 							aria-expanded={isExpanded}
 							aria-controls={codeBodyId}
@@ -155,12 +155,12 @@ export function CodeBlock({ language, value, isBusy, hideMermaidCode, diffCandid
 				</div>
 
 				{isExpanded && (
-					<div id={codeBodyId} className="text-code p-1" style={{ fontSize: 14, lineHeight: 1.5 }}>
+					<div id={codeBodyId} className="app-text-code p-1" style={{ fontSize: 14, lineHeight: 1.5 }}>
 						{showFallback ? (
 							fallback
 						) : (
 							<div
-								className="shiki-container max-w-full overflow-x-auto"
+								className="app-shiki-container max-w-full overflow-x-auto"
 								dangerouslySetInnerHTML={{ __html: highlightedHtml }}
 							/>
 						)}

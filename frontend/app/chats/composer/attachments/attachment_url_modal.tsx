@@ -149,14 +149,14 @@ function UrlAttachmentModalContent({ onClose, onAttachURL }: UrlAttachmentModalC
 					{/* URL input */}
 					<div>
 						<label className="label p-1">
-							<span className="label-text text-sm">URL</span>
+							<span className="text-sm">URL</span>
 						</label>
 						<input
 							ref={inputRef}
 							type="url"
 							value={formData.url}
 							onChange={handleUrlChange}
-							className={`input input-bordered w-full rounded-xl ${urlError ? 'input-error' : ''}`}
+							className={`input w-full rounded-xl ${urlError ? 'input-error' : ''}`}
 							placeholder="https://example.com/resource OR example.com/resource"
 							spellCheck="false"
 						/>

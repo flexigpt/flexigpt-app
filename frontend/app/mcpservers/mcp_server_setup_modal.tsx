@@ -212,7 +212,7 @@ function MCPServerSetupModalContent({
 									{isOAuth ? (
 										<div className="grid grid-cols-1 gap-2 md:grid-cols-2">
 											<input
-												className="input input-bordered w-full rounded-xl"
+												className="input w-full rounded-xl"
 												placeholder="Client ID"
 												value={row.clientID}
 												autoComplete="off"
@@ -223,7 +223,7 @@ function MCPServerSetupModalContent({
 											/>
 											<input
 												type="password"
-												className="input input-bordered w-full rounded-xl"
+												className="input w-full rounded-xl"
 												placeholder={
 													input.oauthClientCredentials?.clientSecretRequired
 														? 'Client Secret'
@@ -239,7 +239,7 @@ function MCPServerSetupModalContent({
 									) : (
 										<input
 											type={isSecret ? 'password' : 'text'}
-											className="input input-bordered w-full rounded-xl"
+											className="input w-full rounded-xl"
 											placeholder={input.placeholder}
 											value={row.value}
 											autoComplete={isSecret ? 'new-password' : 'off'}
@@ -272,7 +272,7 @@ function MCPServerSetupModalContent({
 										setReset(e.target.checked);
 									}}
 								/>
-								<span className="label-text text-sm">Reset existing setup before applying</span>
+								<span className="text-sm">Reset existing setup before applying</span>
 							</label>
 						)}
 
