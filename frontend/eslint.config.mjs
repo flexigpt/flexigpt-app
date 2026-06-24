@@ -1,5 +1,5 @@
 import js from '@eslint/js';
-import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
+import eslintConfigPrettier from 'eslint-config-prettier';
 import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactYouMightNotNeedAnEffect from 'eslint-plugin-react-you-might-not-need-an-effect';
@@ -126,23 +126,6 @@ export default defineConfig(
 		},
 	},
 
-	eslintPluginPrettierRecommended,
-	{
-		rules: {
-			'prettier/prettier': [
-				'error',
-				{
-					endOfLine: 'auto',
-				},
-				{
-					usePrettierrc: true,
-					fileInfoOptions: {
-						ignorePath: path.resolve(__dirname, '../.prettierignore'),
-					},
-				},
-			],
-		},
-	},
 	eslintPluginTailwindcss.configs.recommended,
 	{
 		settings: {
@@ -156,5 +139,7 @@ export default defineConfig(
 			'tailwindcss/classnames-order': 'off',
 			'tailwindcss/no-custom-classname': 'off',
 		},
-	}
+	},
+
+	eslintConfigPrettier
 );
