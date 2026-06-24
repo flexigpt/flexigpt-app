@@ -24,8 +24,6 @@ export default defineConfig({
 
 	jsPlugins: ['eslint-plugin-better-tailwindcss'],
 
-	plugins: ['react'],
-
 	rules: {
 		...baseRules,
 
@@ -48,8 +46,10 @@ export default defineConfig({
 			},
 		],
 		'better-tailwindcss/no-unnecessary-whitespace': 'error',
+
 		'constructor-super': 'off',
 		'getter-return': 'off',
+
 		'no-class-assign': 'off',
 		'no-const-assign': 'off',
 		'no-dupe-class-members': 'off',
