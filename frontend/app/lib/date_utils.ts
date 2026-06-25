@@ -42,7 +42,7 @@ export function parseAnyToTime(val: any): Date | undefined {
 	// If it's a string, try to parse as ISO date
 	if (typeof val === 'string') {
 		const d = new Date(val);
-		if (!isNaN(d.getTime())) return d;
+		if (!Number.isNaN(d.getTime())) return d;
 	}
 
 	// If it's a number, treat as Unix timestamp (seconds or ms)

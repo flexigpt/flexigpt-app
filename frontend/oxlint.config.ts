@@ -1,6 +1,6 @@
 import { defineConfig, type DummyRuleMap, type OxlintConfig } from 'oxlint';
 
-// oxlint-disable-next-line no-restricted-imports
+// oxlint-disable-next-line no-restricted-imports import/no-relative-parent-imports
 import baseConfig from '../.oxlintrc.json' with { type: 'json' };
 
 const baseIgnorePatterns = baseConfig.ignorePatterns ?? [];
@@ -28,19 +28,23 @@ const betterTailwindCSSRules: DummyRuleMap = {
 	'better-tailwindcss/no-unnecessary-whitespace': 'error',
 };
 
-const unicornRules: DummyRuleMap = {
-	// Suspicious. Default On.
-	'unicorn/prefer-add-event-listener': 'off',
-
-	// Pedantic. Default On.
-	'unicorn/no-negated-condition': 'off',
-	'unicorn/no-useless-undefined': 'off',
-};
-
 const eslintRules: DummyRuleMap = {
 	// Correctness. Default On.
 	'constructor-super': 'off',
 	'getter-return': 'off',
+
+	// Restriction. Default On.
+	'no-void': 'off',
+	complexity: 'off',
+	'no-undefined': 'off',
+	'no-console': 'off',
+	'no-empty-function': 'off',
+	'no-use-before-define': 'off',
+	'no-plusplus': 'off',
+	'no-div-regex': 'off',
+	'default-case': 'off',
+	'class-methods-use-this': 'off',
+	'no-bitwise': 'off',
 
 	// Suspicious. Default on.
 	'no-underscore-dangle': 'off',
@@ -54,11 +58,6 @@ const eslintRules: DummyRuleMap = {
 	'require-await': 'off',
 	'no-promise-executor-return': 'off',
 	'max-depth': 'off',
-
-	// Restriction. Default Off.
-	'no-empty': 'error',
-	'no-regex-spaces': 'error',
-	'no-var': 'error',
 
 	// Nursery. Default Off.
 
@@ -118,6 +117,15 @@ const tsRules: DummyRuleMap = {
 	'typescript/no-floating-promises': 'off',
 	'typescript/restrict-template-expressions': 'off',
 
+	// Restriction. Default On.
+	'typescript/promise-function-async': 'off',
+	'typescript/explicit-function-return-type': 'off',
+	'typescript/explicit-module-boundary-types': 'off',
+	'typescript/non-nullable-type-assertion-style': 'off',
+	'typescript/no-explicit-any': 'off',
+	'typescript/explicit-member-accessibility': 'off',
+	'typescript/no-import-type-side-effects': 'off',
+
 	// Suspicious. Default on.
 	'typescript/no-unsafe-type-assertion': 'off',
 	'typescript/consistent-return': 'off',
@@ -134,8 +142,6 @@ const tsRules: DummyRuleMap = {
 	'typescript/no-unsafe-assignment': 'off',
 	'typescript/no-unsafe-call': 'off',
 	'typescript/require-await': 'off',
-
-	// Restriction. Default Off.
 
 	// Nursery. Default Off.
 
@@ -164,29 +170,70 @@ const tsRules: DummyRuleMap = {
 };
 
 const importRules: DummyRuleMap = {
+	// Restriction. Default on.
+	'import/no-default-export': 'off',
+	'import/unambiguous': 'off',
+
 	// Pedantic. Default on.
 	'import/max-dependencies': 'off',
 };
 
 const reactRules: DummyRuleMap = {
+	// Restriction. Default on.
+	'react/no-multi-comp': 'off',
+	'react/jsx-filename-extension': 'off',
+	'react/jsx-no-literals': 'off',
+	'react/forbid-component-props': 'off',
+	'react/button-has-type': 'off',
+	'react/only-export-components': 'off',
+
 	// Suspicious. Default on.
 	'react/react-in-jsx-scope': 'off',
 };
 
 const promiseRules: DummyRuleMap = {
+	// Restriction. Default on.
+	'promise/catch-or-return': 'off',
+
 	// Suspicious. Default on.
 	'promise/always-return': 'off',
+};
+
+const oxcRules: DummyRuleMap = {
+	// Restriction. Default on.
+	'oxc/no-rest-spread-properties': 'off',
+	'oxc/no-optional-chaining': 'off',
+	'oxc/no-async-await': 'off',
+};
+
+const unicornRules: DummyRuleMap = {
+	// Restriction. Default on.
+	'unicorn/prefer-node-protocol': 'off',
+	'unicorn/no-array-for-each': 'off',
+	'unicorn/no-array-reduce': 'off',
+
+	// Suspicious. Default On.
+	'unicorn/prefer-add-event-listener': 'off',
+
+	// Pedantic. Default On.
+	'unicorn/no-negated-condition': 'off',
+	'unicorn/no-useless-undefined': 'off',
+};
+
+const nodeRules: DummyRuleMap = {
+	// Restriction. Default on.
+	'node/no-process-env': 'off',
 };
 
 // oxlint-disable-next-line no-restricted-exports
 export default defineConfig({
 	categories: {
 		correctness: 'error',
+		suspicious: 'error',
+		restriction: 'error',
 		pedantic: 'error',
 		perf: 'off',
-		restriction: 'off',
 		style: 'off',
-		suspicious: 'error',
 		nursery: 'off',
 	},
 
@@ -198,12 +245,14 @@ export default defineConfig({
 
 	rules: {
 		...baseRules,
+		...nodeRules,
 		...promiseRules,
 		...eslintRules,
 		...importRules,
 		...tsRules,
 		...unicornRules,
 		...reactRules,
+		...oxcRules,
 		...betterTailwindCSSRules,
 	},
 

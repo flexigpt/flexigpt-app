@@ -72,7 +72,7 @@ function parsePositiveIntAllowBlank(v: string): number | undefined {
 	const s = v.trim();
 	if (!s) return undefined;
 	const n = Number(s);
-	if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) return NaN;
+	if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) return Number.NaN;
 	return n;
 }
 

@@ -62,6 +62,16 @@ function getInitialFormData(
 	};
 }
 
+function FieldError({ msg }: { msg?: string }) {
+	return msg ? (
+		<div className="label">
+			<span className="text-error flex items-center gap-1">
+				<FiAlertCircle size={12} /> {msg}
+			</span>
+		</div>
+	) : null;
+}
+
 function AddEditAuthKeyModalContent({
 	initial,
 	existing,
@@ -263,6 +273,9 @@ function AddEditAuthKeyModalContent({
 				case 'secret':
 					if (!value.trim()) next.secret = 'Secret cannot be empty';
 					break;
+
+				default:
+				// Ok.
 			}
 
 			return next;
@@ -491,16 +504,6 @@ function AddEditAuthKeyModalContent({
 			</div>
 		</dialog>
 	);
-}
-
-function FieldError({ msg }: { msg?: string }) {
-	return msg ? (
-		<div className="label">
-			<span className="text-error flex items-center gap-1">
-				<FiAlertCircle size={12} /> {msg}
-			</span>
-		</div>
-	) : null;
 }
 
 export function AddEditAuthKeyModal(props: AddEditAuthKeyModalProps) {

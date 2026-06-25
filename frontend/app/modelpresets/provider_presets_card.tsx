@@ -15,12 +15,12 @@ import {
 } from 'react-icons/fi';
 
 import { type ProviderName, SDK_DISPLAY_NAME } from '@/spec/inference';
-import {
-	type ModelPreset,
-	type ModelPresetID,
-	type PatchModelPresetPayload,
-	type PostModelPresetPayload,
-	type ProviderPreset,
+import type {
+	ModelPreset,
+	ModelPresetID,
+	PatchModelPresetPayload,
+	PostModelPresetPayload,
+	ProviderPreset,
 } from '@/spec/modelpreset';
 import type { AuthKeyMeta } from '@/spec/setting';
 import { AuthKeyTypeProvider } from '@/spec/setting';

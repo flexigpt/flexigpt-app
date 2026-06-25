@@ -11,8 +11,8 @@ import {
 	Status,
 	type UIToolCall,
 } from '@/spec/inference';
-import { type ModelPresetRef, type UIChatOption } from '@/spec/modelpreset';
-import { type ToolStoreChoice } from '@/spec/tool';
+import type { ModelPresetRef, UIChatOption } from '@/spec/modelpreset';
+import type { ToolStoreChoice } from '@/spec/tool';
 
 import { ensureMakeID, getUUIDv7 } from '@/lib/uuid_utils';
 

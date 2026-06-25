@@ -129,6 +129,8 @@ export const ConversationSearch = forwardRef<ConversationSearchHandle, Conversat
 							setQuery('');
 						}
 						break;
+					default:
+					// Not handled.
 				}
 			},
 			[focusedIndex, handlePick, isOpen, loading, popover, query, results, searchNow, setQuery]

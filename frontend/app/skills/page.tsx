@@ -41,7 +41,7 @@ export default function SkillsPage() {
 	);
 
 	const fetchAll = useCallback(async () => {
-		const requestId = ++fetchRequestIdRef.current;
+		const requestId = (fetchRequestIdRef.current += 1);
 
 		if (isMountedRef.current) {
 			setLoading(true);

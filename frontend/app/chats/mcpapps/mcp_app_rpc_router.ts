@@ -23,6 +23,34 @@ import {
 	type MCPAppInstance,
 } from '@/chats/mcpapps/mcp_app_types';
 
+function errorResp(id: JSONRPCRequest['id'], code: number, message: string): JSONRPCResponse {
+	return { jsonrpc: '2.0', id, error: { code, message } };
+}
+
+function normalizeToolCallResultForApp(resp: InvokeMCPToolResponseBody | undefined): {
+	content: MCPContent[];
+	structuredContent?: Record<string, unknown>;
+	isError?: boolean;
+} {
+	const result: {
+		content: MCPContent[];
+		structuredContent?: Record<string, unknown>;
+		isError?: boolean;
+	} = {
+		content: Array.isArray(resp?.content) ? resp.content : [],
+	};
+
+	if (isJSONObject(resp?.structuredContent)) {
+		result.structuredContent = resp.structuredContent;
+	}
+
+	if (typeof resp?.isError === 'boolean') {
+		result.isError = resp.isError;
+	}
+
+	return result;
+}
+
 export interface MCPAppRouterDeps {
 	instance: MCPAppInstance;
 	/** Returns true if the user approves opening this URL. */
@@ -173,6 +201,7 @@ export class MCPAppRPCRouter {
 		}
 	}
 
+	// oxlint-disable-next-line class-methods-use-this
 	private handleDisplayMode(req: JSONRPCRequest): JSONRPCResponse {
 		const params = isJSONObject(req.params) ? req.params : {};
 
@@ -272,32 +301,4 @@ export class MCPAppRPCRouter {
 			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, err instanceof Error ? err.message : 'Open denied');
 		}
 	}
-}
-
-function normalizeToolCallResultForApp(resp: InvokeMCPToolResponseBody | undefined): {
-	content: MCPContent[];
-	structuredContent?: Record<string, unknown>;
-	isError?: boolean;
-} {
-	const result: {
-		content: MCPContent[];
-		structuredContent?: Record<string, unknown>;
-		isError?: boolean;
-	} = {
-		content: Array.isArray(resp?.content) ? resp.content : [],
-	};
-
-	if (isJSONObject(resp?.structuredContent)) {
-		result.structuredContent = resp.structuredContent;
-	}
-
-	if (typeof resp?.isError === 'boolean') {
-		result.isError = resp.isError;
-	}
-
-	return result;
-}
-
-function errorResp(id: JSONRPCRequest['id'], code: number, message: string): JSONRPCResponse {
-	return { jsonrpc: '2.0', id, error: { code, message } };
 }

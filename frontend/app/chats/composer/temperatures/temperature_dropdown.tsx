@@ -23,7 +23,7 @@ export function TemperatureDropdown({ temperature, setTemperature }: Temperature
 
 	function clampTemperature(rawValue: string) {
 		let val = Number(rawValue);
-		if (isNaN(val)) {
+		if (Number.isNaN(val)) {
 			val = 0.1;
 		}
 		val = Math.max(0, Math.min(1, val));

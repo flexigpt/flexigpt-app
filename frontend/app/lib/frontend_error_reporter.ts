@@ -260,6 +260,7 @@ export function reloadFrontend() {
 export function resetLocalFrontendStateAndReload() {
 	if (typeof window === 'undefined') return;
 
+	// oxlint-disable-next-line no-alert
 	const confirmed = window.confirm(
 		'Reset local UI state and reload? This clears localStorage/sessionStorage only. Backend data is not deleted.'
 	);

@@ -176,24 +176,28 @@ function MCPServerDetailsModalContent({
 			getAllMCPServerResources(bundle.id, server.id),
 			getAllMCPServerResourceTemplates(bundle.id, server.id),
 			getAllMCPServerPrompts(bundle.id, server.id),
-		]).then(results => {
-			if (cancelled) return;
+		])
+			.then(results => {
+				if (cancelled) return;
 
-			const [toolsResult, resourcesResult, resourceTemplatesResult, promptsResult] = results;
-			const errors = results
-				.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
-				.map(result => (result.reason instanceof Error ? result.reason.message : 'Failed to load discovery section.'))
-				.filter(Boolean);
+				const [toolsResult, resourcesResult, resourceTemplatesResult, promptsResult] = results;
+				const errors = results
+					.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+					.map(result => (result.reason instanceof Error ? result.reason.message : 'Failed to load discovery section.'))
+					.filter(Boolean);
 
-			setDiscovery({
-				tools: toolsResult.status === 'fulfilled' ? toolsResult.value : [],
-				resources: resourcesResult.status === 'fulfilled' ? resourcesResult.value : [],
-				resourceTemplates: resourceTemplatesResult.status === 'fulfilled' ? resourceTemplatesResult.value : [],
-				prompts: promptsResult.status === 'fulfilled' ? promptsResult.value : [],
+				setDiscovery({
+					tools: toolsResult.status === 'fulfilled' ? toolsResult.value : [],
+					resources: resourcesResult.status === 'fulfilled' ? resourcesResult.value : [],
+					resourceTemplates: resourceTemplatesResult.status === 'fulfilled' ? resourceTemplatesResult.value : [],
+					prompts: promptsResult.status === 'fulfilled' ? promptsResult.value : [],
+				});
+				setDiscoveryError(errors[0] ?? '');
+				setLoadingDiscovery(false);
+			})
+			.catch((_err: unknown) => {
+				console.error('could not get mcp tools');
 			});
-			setDiscoveryError(errors[0] ?? '');
-			setLoadingDiscovery(false);
-		});
 
 		return () => {
 			cancelled = true;

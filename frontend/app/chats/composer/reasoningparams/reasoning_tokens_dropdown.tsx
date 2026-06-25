@@ -24,7 +24,7 @@ export function ReasoningTokensDropdown({ tokens, setTokens }: ReasoningTokensDr
 
 	function clampTokens(rawValue: string) {
 		let val = Math.trunc(Number(rawValue));
-		if (isNaN(val)) {
+		if (Number.isNaN(val)) {
 			val = 1024;
 		}
 		if (val < 1024) {

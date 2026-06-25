@@ -359,6 +359,7 @@ export function MermaidDiagram({
 					<div
 						ref={inlineDiagramRef}
 						className="max-h-[60vh] w-full overflow-auto"
+						// oxlint-disable-next-line react/no-danger
 						dangerouslySetInnerHTML={{ __html: svgMarkup }}
 					/>
 				</div>

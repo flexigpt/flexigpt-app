@@ -162,6 +162,7 @@ export function CodeBlock({ language, value, isBusy, hideMermaidCode, diffCandid
 						) : (
 							<div
 								className="app-shiki-container max-w-full overflow-x-auto"
+								// oxlint-disable-next-line react/no-danger
 								dangerouslySetInnerHTML={{ __html: highlightedHtml }}
 							/>
 						)}
