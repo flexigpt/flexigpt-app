@@ -28,7 +28,7 @@ import { buildMCPAppHostContext } from '@/chats/mcpapps/mcp_app_host_context';
 import { MCPAppPostMessageBridge } from '@/chats/mcpapps/mcp_app_postmessage_bridge';
 import { MCPAppRPCRouter } from '@/chats/mcpapps/mcp_app_rpc_router';
 import { MCPAppSandbox } from '@/chats/mcpapps/mcp_app_sandbox';
-import { type JSONRPCRequest, type JSONRPCResponse, type MCPAppInstance } from '@/chats/mcpapps/mcp_app_types';
+import { type JSONRPCResponse, type MCPAppInstance } from '@/chats/mcpapps/mcp_app_types';
 
 const APP_MIME = 'text/html;profile=mcp-app';
 const UNKNOWN_APP_POLICY: MCPAppsPolicy = {
@@ -358,7 +358,7 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 							}),
 						};
 					}
-					return router.handle(req as JSONRPCRequest);
+					return router.handle(req);
 				},
 				onNotification: note => {
 					if (note.method === 'ui/notifications/initialized' || note.method === 'notifications/initialized') {

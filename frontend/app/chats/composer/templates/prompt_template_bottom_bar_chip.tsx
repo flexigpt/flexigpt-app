@@ -71,7 +71,7 @@ function comparePromptTemplateListItems(a: PromptTemplateListItem, b: PromptTemp
 function groupPromptTemplates(items: PromptTemplateListItem[]): PromptTemplateGroup[] {
 	const groupsByBundle = new Map<string, PromptTemplateGroup>();
 
-	for (const item of [...items].sort(comparePromptTemplateListItems)) {
+	for (const item of [...items].toSorted(comparePromptTemplateListItems)) {
 		const groupKey = item.bundleID || item.bundleSlug;
 		let group = groupsByBundle.get(groupKey);
 

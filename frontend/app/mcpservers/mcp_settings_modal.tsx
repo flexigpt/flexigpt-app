@@ -56,7 +56,7 @@ function MCPSettingsModalContent({
 	onSubmit,
 }: MCPSettingsModalProps) {
 	const [listenAddr, setListenAddr] = useState(initialListenAddr ?? '');
-	const [error, setError] = useState('');
+	const [errorState, setErrorState] = useState('');
 	const [submitError, setSubmitError] = useState('');
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
@@ -98,7 +98,7 @@ function MCPSettingsModalContent({
 		setSubmitError('');
 
 		const err = validateListenAddr(listenAddr);
-		setError(err);
+		setErrorState(err);
 		if (err) return;
 
 		void onSubmit(listenAddr.trim())
@@ -159,20 +159,20 @@ function MCPSettingsModalContent({
 							</div>
 							<input
 								type="text"
-								className={`input w-full rounded-xl ${error ? 'input-error' : ''}`}
+								className={`input w-full rounded-xl ${errorState ? 'input-error' : ''}`}
 								value={listenAddr}
 								spellCheck="false"
 								autoComplete="off"
 								placeholder="127.0.0.1:37645 (leave blank for a random port)"
 								onChange={e => {
 									setListenAddr(e.target.value);
-									setError(validateListenAddr(e.target.value));
+									setErrorState(validateListenAddr(e.target.value));
 								}}
 							/>
-							{error && (
+							{errorState && (
 								<div className="label">
 									<span className="text-error flex items-center gap-1">
-										<FiAlertCircle size={12} /> {error}
+										<FiAlertCircle size={12} /> {errorState}
 									</span>
 								</div>
 							)}

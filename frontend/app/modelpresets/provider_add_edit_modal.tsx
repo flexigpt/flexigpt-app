@@ -24,7 +24,7 @@ function parseDefaultHeadersRawJSON(raw: string): Record<string, string> {
 }
 
 function normalizeHeadersRecord(headers: Record<string, string>): Record<string, string> {
-	return Object.fromEntries(Object.entries(headers).sort(([a], [b]) => a.localeCompare(b)));
+	return Object.fromEntries(Object.entries(headers).toSorted(([a], [b]) => a.localeCompare(b)));
 }
 
 function headersEqual(a: Record<string, string>, b: Record<string, string>): boolean {
@@ -123,7 +123,7 @@ function AddEditProviderPresetModalContent({
 		return out;
 	}, [allProviderPresets]);
 
-	const prefillKeys = useMemo(() => Object.keys(prefillDropdownItems) as ProviderName[], [prefillDropdownItems]);
+	const prefillKeys = useMemo(() => Object.keys(prefillDropdownItems), [prefillDropdownItems]);
 
 	const sdkDropdownItems: Record<ProviderSDKType, { isEnabled: boolean; displayName: string }> = useMemo(
 		() => ({

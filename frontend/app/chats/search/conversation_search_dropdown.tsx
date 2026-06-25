@@ -127,6 +127,7 @@ export function ConversationSearchDropdown({
 							focused={focusedIndex}
 							getDate={result => new Date(result.searchConversation.modifiedAt)}
 							getKey={result => result.searchConversation.id}
+							// oxlint-disable-next-line react/no-unstable-nested-components
 							getLabel={result => <span className="truncate">{result.searchConversation.title}</span>}
 							onPick={result => {
 								onPick(result.searchConversation);

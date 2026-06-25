@@ -753,7 +753,7 @@ function sortAndDedupeTargetInferences(inferences: TargetPathInferenceForUI[]): 
 		}
 	}
 
-	return Array.from(byTarget.values()).sort((left, right) => {
+	return Array.from(byTarget.values()).toSorted((left, right) => {
 		if (left.score !== right.score) return right.score - left.score;
 		return normalizePathKey(left.targetPath).localeCompare(normalizePathKey(right.targetPath));
 	});

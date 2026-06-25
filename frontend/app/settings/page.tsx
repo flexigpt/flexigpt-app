@@ -14,6 +14,11 @@ import { AuthKeyTable } from '@/settings/authkey_table';
 import { DebugSettingsSection } from '@/settings/debug';
 import { ThemeSelector } from '@/settings/theme';
 
+async function exportSettings() {
+	const settings = await settingstoreAPI.getSettings(true);
+	return JSON.stringify(settings, null, 2);
+}
+
 // oxlint-disable-next-line no-restricted-exports
 export default function SettingsPage() {
 	const [authKeys, setAuthKeys] = useState<AuthKeyMeta[]>([]);
@@ -54,11 +59,6 @@ export default function SettingsPage() {
 	const showEditModal = (meta: AuthKeyMeta) => {
 		setModalInitial(meta);
 		setIsModalOpen(true);
-	};
-
-	const exportSettings = async () => {
-		const settings = await settingstoreAPI.getSettings(true);
-		return JSON.stringify(settings, null, 2);
 	};
 
 	return (

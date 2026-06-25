@@ -547,6 +547,7 @@ export default function MCPServersPage() {
 			});
 
 			try {
+				// oxlint-disable-next-line no-unmodified-loop-condition
 				while (!settled) {
 					await Promise.race([connectPromise.catch(() => undefined), sleep(1000)]);
 

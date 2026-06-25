@@ -41,6 +41,7 @@ function highlightAsync(code: string, lang: string): Promise<string> {
 	return new Promise((resolve, reject) => {
 		const id = seq++;
 		waiting.set(id, { resolve, reject });
+		// oxlint-disable-next-line unicorn/require-post-message-target-origin
 		ensureWorker().postMessage({ id, code, lang });
 	});
 }

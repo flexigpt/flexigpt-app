@@ -73,7 +73,7 @@ function groupAssistantPresetOptions(presetOptions: AssistantPresetOptionItem[])
 		{ bundleSlug: string; bundleDisplayName: string; options: AssistantPresetOptionItem[] }
 	>();
 
-	for (const option of [...presetOptions].sort(compareAssistantPresetOptions)) {
+	for (const option of [...presetOptions].toSorted(compareAssistantPresetOptions)) {
 		const bundleSlug = getAssistantPresetBundleSlug(option);
 		let group = groupsByBundleSlug.get(bundleSlug);
 

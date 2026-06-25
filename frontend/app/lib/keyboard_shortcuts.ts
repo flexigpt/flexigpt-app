@@ -375,17 +375,16 @@ export function useChatShortcuts({ config, isBusy, handlers }: UseShortcutsOptio
 			);
 			if (inMenuOrDialog) return;
 
-			const { config, isBusy, handlers } = ref.current;
-			const entries = Object.entries(config) as [ShortcutAction, ShortcutChord][];
+			const entries = Object.entries(ref.current.config) as [ShortcutAction, ShortcutChord][];
 
 			for (const [action, chord] of entries) {
-				const handler = handlers[action];
+				const handler = ref.current.handlers[action];
 				if (!handler) continue;
 
 				if (!matchShortcut(event as ShortcutKeyEvent, chord)) continue;
 
 				// Example of busy-sensitive behavior: no new chat while busy
-				if (isBusy && action === ShortcutAction.newChat) return;
+				if (ref.current.isBusy && action === ShortcutAction.newChat) return;
 
 				event.preventDefault();
 				event.stopPropagation();
@@ -440,6 +439,6 @@ export function buildShortcutDisplay(config: ShortcutConfig): ShortcutDisplayIte
 	});
 
 	// Stable order
-	items.sort((a, b) => a.order - b.order);
+	items.toSorted((a, b) => a.order - b.order);
 	return items;
 }

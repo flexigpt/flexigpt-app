@@ -13,8 +13,8 @@ import path from 'path';
 // Oxlint handles almost all typescript-eslint things. mostly here for parser and config base disables etc.
 import { configs } from 'typescript-eslint';
 
-const __dirname = import.meta.dirname;
-const tsconfigPath = path.join(__dirname, 'tsconfig.json');
+const dirname = import.meta.dirname;
+const tsconfigPath = path.join(dirname, 'tsconfig.json');
 
 // oxlint-disable-next-line no-restricted-exports
 export default defineConfig(
@@ -37,7 +37,7 @@ export default defineConfig(
 					jsx: true,
 				},
 				projectService: true,
-				tsconfigRootDir: __dirname,
+				tsconfigRootDir: dirname,
 			},
 			globals: {
 				...globals.browser,
@@ -90,5 +90,5 @@ export default defineConfig(
 	},
 
 	eslintConfigPrettier,
-	...oxlint.buildFromOxlintConfigFile(path.join(__dirname, 'oxlint.config.ts'))
+	...oxlint.buildFromOxlintConfigFile(path.join(dirname, 'oxlint.config.ts'))
 );

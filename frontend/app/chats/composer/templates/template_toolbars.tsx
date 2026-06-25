@@ -88,7 +88,7 @@ function replaceVariablesForSelectionWithText(
 
 	// Replace vars from deepest path to shallow to keep paths valid while mutating
 	varEntries
-		.sort((a, b) => comparePathDeepestFirst(a[1] as number[], b[1] as number[]))
+		.toSorted((a, b) => comparePathDeepestFirst(a[1] as number[], b[1] as number[]))
 		.forEach(([, path]) => {
 			const nentry = NodeApi.get(editor, path);
 			if (!nentry) return;
@@ -173,7 +173,7 @@ function removeSelection(
 
 		// Remove deepest first
 		[...entries, ...textEntries]
-			.sort((a, b) => comparePathDeepestFirst(a[1] as number[], b[1] as number[]))
+			.toSorted((a, b) => comparePathDeepestFirst(a[1] as number[], b[1] as number[]))
 			.forEach(([, p]) => {
 				editor.tf.removeNodes({ at: p });
 			});

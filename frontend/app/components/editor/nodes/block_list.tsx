@@ -24,28 +24,26 @@ const config: Record<
 	},
 };
 
+function List(props: PlateElementProps) {
+	const { listStart, listStyleType } = props.element as TListElement;
+	const { Li, Marker } = config[listStyleType] ?? {};
+	const OList = isOrderedList(props.element) ? 'ol' : 'ul';
+
+	return (
+		<OList className="relative m-1 p-1 pl-2" style={{ listStyleType }} start={listStart}>
+			{Marker && <Marker {...props} />}
+			{Li ? <Li {...props} /> : <li>{props.children}</li>}
+		</OList>
+	);
+}
+
 // oxlint-disable-next-line react/display-name
 export const BlockList: RenderNodeWrapper = props => {
 	if (!props.element.listStyleType) return;
 
+	// oxlint-disable-next-line no-shadow
 	return props => <List {...props} />;
 };
-
-/**
- * @public
- */
-export function List(props: PlateElementProps) {
-	const { listStart, listStyleType } = props.element as TListElement;
-	const { Li, Marker } = config[listStyleType] ?? {};
-	const List = isOrderedList(props.element) ? 'ol' : 'ul';
-
-	return (
-		<List className="relative m-1 p-1 pl-2" style={{ listStyleType }} start={listStart}>
-			{Marker && <Marker {...props} />}
-			{Li ? <Li {...props} /> : <li>{props.children}</li>}
-		</List>
-	);
-}
 
 /**
  * @public

@@ -6,7 +6,7 @@ export interface BundleData {
 }
 
 export function sortBundleData(bundleData: BundleData[]): BundleData[] {
-	return [...bundleData].sort((a, b) => {
+	return [...bundleData].toSorted((a, b) => {
 		if (a.bundle.isBuiltIn !== b.bundle.isBuiltIn) {
 			return a.bundle.isBuiltIn ? -1 : 1;
 		}

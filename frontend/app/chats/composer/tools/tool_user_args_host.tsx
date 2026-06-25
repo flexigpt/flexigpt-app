@@ -41,6 +41,7 @@ export function ToolArgsModalHost({
 	let schema: JSONSchema | undefined;
 	let existingInstance: string | undefined;
 	let modalIdentity: string | undefined;
+	// oxlint-disable-next-line unicorn/consistent-function-scoping
 	let onSave: (newInstance: string) => void = () => {};
 
 	const activeWebSearch = useMemo(

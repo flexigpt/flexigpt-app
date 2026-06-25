@@ -417,7 +417,7 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 	}, []);
 
 	const orderedResults = useMemo(
-		() => (isLocalMode ? [...searchState.results].sort(sortConversationSearchResults) : searchState.results),
+		() => (isLocalMode ? [...searchState.results].toSorted(sortConversationSearchResults) : searchState.results),
 		[isLocalMode, searchState.results]
 	);
 

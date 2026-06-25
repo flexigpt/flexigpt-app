@@ -381,7 +381,7 @@ function AddEditModelPresetModalContent({
 		return out;
 	}, [allModelPresets]);
 
-	const prefillKeys = useMemo(() => Object.keys(prefillSourceMap) as PrefillKey[], [prefillSourceMap]);
+	const prefillKeys = useMemo(() => Object.keys(prefillSourceMap), [prefillSourceMap]);
 
 	const prefillDropdownItems: Record<PrefillKey, { isEnabled: boolean; displayName: string }> = useMemo(() => {
 		const out: Record<PrefillKey, { isEnabled: boolean; displayName: string }> = {};

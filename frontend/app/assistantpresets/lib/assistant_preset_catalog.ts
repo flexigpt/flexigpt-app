@@ -42,7 +42,7 @@ async function collectAllPages<TResponse, TItem>(
 }
 
 function sortByBuiltInThenLabel<T extends { isBuiltIn: boolean; label: string; key: string }>(items: T[]): T[] {
-	return [...items].sort((a, b) => {
+	return [...items].toSorted((a, b) => {
 		if (a.isBuiltIn !== b.isBuiltIn) {
 			return a.isBuiltIn ? 1 : -1;
 		}

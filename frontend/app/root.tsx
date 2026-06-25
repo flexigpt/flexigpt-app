@@ -27,6 +27,7 @@ import { attachmentsDropAPI } from '@/apis/baseapi';
 import { ErrorRecoveryScreen } from '@/components/error_recovery_screen';
 import { Sidebar } from '@/components/sidebar';
 
+// oxlint-disable-next-line import/no-unassigned-import
 import '@/globals.css';
 
 import type { Route } from './+types/root';

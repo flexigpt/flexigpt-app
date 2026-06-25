@@ -150,7 +150,7 @@ function groupTools(
 		return group;
 	}
 
-	for (const item of [...tools].sort(compareToolListItems)) {
+	for (const item of [...tools].toSorted(compareToolListItems)) {
 		const groupKey = item.bundleID || item.bundleSlug;
 		const group = ensureGroup(groupKey, item.bundleID, item.bundleSlug || item.bundleID, item.isBuiltIn);
 		const itemKey = getToolKey(item);
@@ -178,7 +178,7 @@ function groupTools(
 		group.conversationOptions.push(entry);
 	}
 
-	return Array.from(groupsByBundle.values()).sort(compareToolGroups);
+	return Array.from(groupsByBundle.values()).toSorted(compareToolGroups);
 }
 
 function getArgsBadgeClass(hasBlockingArgs: boolean) {
@@ -481,7 +481,7 @@ export function ToolsBottomBarChip({
 	const orderedWebSearchTools = useMemo(() => {
 		if (!activeWebSearch) return eligibleWebSearchTools;
 		const activeKey = webSearchIdentityKey(activeWebSearch);
-		return [...eligibleWebSearchTools].sort((a, b) => {
+		return [...eligibleWebSearchTools].toSorted((a, b) => {
 			const aActive = webSearchIdentityKey(a) === activeKey;
 			const bActive = webSearchIdentityKey(b) === activeKey;
 			if (aActive !== bActive) return aActive ? -1 : 1;

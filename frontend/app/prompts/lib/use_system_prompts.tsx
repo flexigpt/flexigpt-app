@@ -218,7 +218,7 @@ function deriveSystemPromptRole(template: PromptTemplate): SystemPromptRole {
 }
 
 function sortBundles(bundles: PromptBundle[]): PromptBundle[] {
-	return [...bundles].sort((a, b) => {
+	return [...bundles].toSorted((a, b) => {
 		if (a.isBuiltIn !== b.isBuiltIn) {
 			return a.isBuiltIn ? 1 : -1;
 		}
@@ -233,7 +233,7 @@ function sortBundles(bundles: PromptBundle[]): PromptBundle[] {
 }
 
 function sortPrompts(prompts: SystemPromptItem[]): SystemPromptItem[] {
-	return [...prompts].sort((a, b) => {
+	return [...prompts].toSorted((a, b) => {
 		const byDisplay = a.displayName.localeCompare(b.displayName);
 		if (byDisplay !== 0) return byDisplay;
 
@@ -306,7 +306,7 @@ async function loadSystemPromptState(): Promise<void> {
 	}
 	const templateVersionsBySeriesKey: Record<string, string[]> = {};
 	for (const [seriesKey, bucket] of versionSetBySeriesKey) {
-		templateVersionsBySeriesKey[seriesKey] = Array.from(bucket).sort((a, b) => a.localeCompare(b));
+		templateVersionsBySeriesKey[seriesKey] = Array.from(bucket).toSorted((a, b) => a.localeCompare(b));
 	}
 
 	const visibleTemplates = await Promise.all(

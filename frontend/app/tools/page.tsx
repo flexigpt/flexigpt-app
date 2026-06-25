@@ -90,7 +90,7 @@ export default function ToolsPage() {
 			);
 		} catch (err) {
 			console.error('Toggle bundle enable failed:', err);
-			throw new Error(getErrorMessage(err, 'Failed to toggle bundle enable state.'));
+			throw new Error(getErrorMessage(err, 'Failed to toggle bundle enable state.'), { cause: err });
 		}
 	}, []);
 
@@ -110,7 +110,7 @@ export default function ToolsPage() {
 			);
 		} catch (err) {
 			console.error('Toggle tool failed:', err);
-			throw new Error(getErrorMessage(err, 'Failed to toggle tool.'));
+			throw new Error(getErrorMessage(err, 'Failed to toggle tool.'), { cause: err });
 		}
 	}, []);
 
@@ -130,7 +130,7 @@ export default function ToolsPage() {
 			);
 		} catch (err) {
 			console.error('Delete tool failed:', err);
-			throw new Error(getErrorMessage(err, 'Failed to delete tool.'));
+			throw new Error(getErrorMessage(err, 'Failed to delete tool.'), { cause: err });
 		}
 	}, []);
 
@@ -196,7 +196,7 @@ export default function ToolsPage() {
 				await refreshBundleTools(bundleID);
 			} catch (err) {
 				console.error('Save tool failed:', err);
-				throw new Error(getErrorMessage(err, 'Failed to save tool.'));
+				throw new Error(getErrorMessage(err, 'Failed to save tool.'), { cause: err });
 			}
 		},
 		[bundles, refreshBundleTools]

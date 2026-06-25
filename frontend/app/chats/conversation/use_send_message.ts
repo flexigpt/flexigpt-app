@@ -221,7 +221,7 @@ export function useSendMessage({
 
 				const latestUser = updatedChatWithUserMessage.messages
 					.slice()
-					.reverse()
+					.toReversed()
 					.find(message => message.role === RoleEnum.User);
 
 				if (latestUser?.toolStoreChoices && latestUser.toolStoreChoices.length > 0) {
@@ -314,11 +314,11 @@ export function useSendMessage({
 						);
 					}
 				} else {
-					const partialText = getFullStreamTextForTab(tabId);
-					const partialThinking = getFullStreamThinkingForTab(tabId);
-					const hasPartialStream = partialText.trim().length > 0 || partialThinking.trim().length > 0;
+					const newPartialText = getFullStreamTextForTab(tabId);
+					const newPartialThinking = getFullStreamThinkingForTab(tabId);
+					const hasPS = newPartialText.trim().length > 0 || newPartialThinking.trim().length > 0;
 
-					const fallbackBase = hasPartialStream
+					const fallbackBase = hasPS
 						? buildTerminalAssistantMessage({
 								assistantPlaceholder,
 								status: Status.Failed,

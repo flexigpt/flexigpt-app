@@ -52,7 +52,7 @@ function mergeExamples(a: JSONValue, b: JSONValue): JSONValue {
 	if (isPlainObject(a) && isPlainObject(b)) {
 		const out: Record<string, JSONValue> = { ...(a as Record<string, JSONValue>) };
 
-		const entries = Object.entries(b as Record<string, JSONValue>) as [string, JSONValue][];
+		const entries = Object.entries(b as Record<string, JSONValue>);
 		for (const [key, value] of entries) {
 			const existing = out[key];
 
@@ -118,7 +118,7 @@ function scoreExample(ex: unknown): number {
 	}
 
 	if (isPlainObject(ex)) {
-		const values = Object.values(ex) as unknown[];
+		const values = Object.values(ex);
 		let score = 3 + values.length;
 		for (const v of values) {
 			score += scoreExample(v);

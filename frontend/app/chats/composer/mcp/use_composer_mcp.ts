@@ -376,6 +376,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 			});
 
 			try {
+				// oxlint-disable-next-line no-unmodified-loop-condition
 				while (!settled) {
 					await Promise.race([connectPromise.catch(() => undefined), sleep(1000)]);
 					if (!settled) {

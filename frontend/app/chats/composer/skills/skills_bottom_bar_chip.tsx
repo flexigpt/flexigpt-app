@@ -179,7 +179,7 @@ export function SkillsBottomBarChip({
 	const groups: BundleGroup[] = useMemo(() => {
 		const map = new Map<string, BundleGroup>();
 
-		for (const item of [...(allSkills ?? [])].sort(compareSkillListItems)) {
+		for (const item of [...(allSkills ?? [])].toSorted(compareSkillListItems)) {
 			const id = item.bundleID || 'unknown-bundle';
 			const slug = item.bundleSlug || id;
 			const existing = map.get(id);
@@ -198,9 +198,9 @@ export function SkillsBottomBarChip({
 		return Array.from(map.values())
 			.map(group => ({
 				...group,
-				skills: [...group.skills].sort(compareSkillListItems),
+				skills: [...group.skills].toSorted(compareSkillListItems),
 			}))
-			.sort(compareBundleGroups);
+			.toSorted(compareBundleGroups);
 	}, [allSkills]);
 
 	const setSkillEnabled = useCallback(

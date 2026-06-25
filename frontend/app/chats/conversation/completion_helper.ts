@@ -190,19 +190,19 @@ export function getDebugDetailsMarkdown(debugObj?: any, errorObj?: any): string 
 		const isMap = debugObj instanceof Map;
 		const isObjectLike = typeof debugObj === 'object' && !isMap;
 
-		const asRecord: Record<string, unknown> | undefined = isObjectLike
+		const record: Record<string, unknown> | undefined = isObjectLike
 			? (debugObj as Record<string, unknown>)
 			: undefined;
 
 		const hasKey = (key: string): boolean => {
 			if (isMap) return (debugObj as Map<string, unknown>).has(key);
-			if (asRecord) return key in asRecord;
+			if (record) return key in record;
 			return false;
 		};
 
 		const getValue = (key: string): unknown => {
 			if (isMap) return (debugObj as Map<string, unknown>).get(key);
-			if (asRecord) return asRecord[key];
+			if (record) return record[key];
 			return undefined;
 		};
 

@@ -1,3 +1,4 @@
+// oxlint-disable import/no-unassigned-import
 import { StrictMode } from 'react';
 
 import ReactDOM from 'react-dom/client';

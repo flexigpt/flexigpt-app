@@ -1,8 +1,9 @@
+const norm = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
 export function groupByDateBuckets<T>(
 	items: T[],
 	getDate: (item: T) => Date
 ): Record<'Today' | 'Yesterday' | 'Last 7 Days' | 'Older', T[]> {
-	const norm = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 	const today = norm(new Date());
 	const yesterday = new Date(today);
 	yesterday.setDate(today.getDate() - 1);

@@ -138,7 +138,7 @@ export function normalizeMCPArgumentDefinitions(
 			} satisfies MCPArgumentDefinition;
 		})
 		.filter(arg => arg.name.trim().length > 0)
-		.sort((a, b) => a.name.localeCompare(b.name));
+		.toSorted((a, b) => a.name.localeCompare(b.name));
 }
 
 export function countMissingRequiredMCPArguments(

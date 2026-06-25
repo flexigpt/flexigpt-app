@@ -1192,7 +1192,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 		if (runtime.toolCalls.length > 0) return;
 
-		const observedCallKeys = [...tracker.observedCallKeys].sort();
+		const observedCallKeys = [...tracker.observedCallKeys].toSorted();
 		const batchSignature = observedCallKeys.join('::');
 		if (!batchSignature) return;
 		if (tracker.attemptedBatchSignature === batchSignature) return;

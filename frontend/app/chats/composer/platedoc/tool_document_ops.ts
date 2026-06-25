@@ -157,7 +157,7 @@ export function removeToolByKey(editor: PlateEditor, identityKey: string) {
 		}
 	}
 	// Remove from last to first to avoid path shift issues.
-	for (const p of paths.reverse()) {
+	for (const p of paths.toReversed()) {
 		try {
 			editor.tf.removeNodes({ at: p });
 		} catch {

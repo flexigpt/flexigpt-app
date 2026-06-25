@@ -372,7 +372,7 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 		const insertedIds: string[] = [];
 
 		// Process in reverse document order to keep captured paths valid
-		const nodesRev = [...nodes].sort(compareEntryByPathDeepestFirst);
+		const nodesRev = [...nodes].toSorted(compareEntryByPathDeepestFirst);
 
 		for (const [tsenode, originalPath] of nodesRev) {
 			if (!tsenode || !tsenode.selectionID) continue;

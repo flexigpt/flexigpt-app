@@ -34,7 +34,7 @@ function getPresetLabel(preset: Pick<AssistantPreset, 'displayName' | 'slug'>): 
 }
 
 function sortAssistantPresetBundles(bundles: AssistantPresetBundle[]): AssistantPresetBundle[] {
-	return [...bundles].sort((a, b) => {
+	return [...bundles].toSorted((a, b) => {
 		if (a.isBuiltIn !== b.isBuiltIn) {
 			return a.isBuiltIn ? 1 : -1;
 		}
@@ -49,7 +49,7 @@ function sortAssistantPresetBundles(bundles: AssistantPresetBundle[]): Assistant
 }
 
 export function sortAssistantPresets(presets: AssistantPreset[]): AssistantPreset[] {
-	return [...presets].sort((a, b) => {
+	return [...presets].toSorted((a, b) => {
 		if (a.isBuiltIn !== b.isBuiltIn) {
 			return a.isBuiltIn ? 1 : -1;
 		}
@@ -91,7 +91,7 @@ export async function getAllAssistantPresetListItems(
 		response => response.nextPageToken
 	);
 
-	return [...items].sort((a, b) => {
+	return [...items].toSorted((a, b) => {
 		if (a.isBuiltIn !== b.isBuiltIn) {
 			return a.isBuiltIn ? 1 : -1;
 		}

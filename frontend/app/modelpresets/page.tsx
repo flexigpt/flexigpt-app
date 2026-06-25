@@ -241,7 +241,7 @@ export default function ModelPresetsPage() {
 			} catch (toggleError) {
 				console.error(toggleError);
 				await refreshCanonicalDataSafely();
-				throw new Error('Failed toggling provider.');
+				throw new Error('Failed toggling provider.', { cause: toggleError });
 			}
 		},
 		[defaultProvider, providerPresets, refreshCanonicalData, refreshCanonicalDataSafely]
@@ -273,7 +273,7 @@ export default function ModelPresetsPage() {
 			} catch (deleteError) {
 				console.error(deleteError);
 				await refreshCanonicalDataSafely();
-				throw new Error('Failed deleting provider.');
+				throw new Error('Failed deleting provider.', { cause: deleteError });
 			}
 		},
 		[defaultProvider, providerPresets, refreshCanonicalData, refreshCanonicalDataSafely]
@@ -296,7 +296,7 @@ export default function ModelPresetsPage() {
 			} catch (changeError) {
 				console.error(changeError);
 				await refreshCanonicalDataSafely();
-				throw new Error('Failed setting default model.');
+				throw new Error('Failed setting default model.', { cause: changeError });
 			}
 		},
 		[providerPresets, refreshCanonicalData, refreshCanonicalDataSafely]
@@ -324,7 +324,7 @@ export default function ModelPresetsPage() {
 			} catch (toggleError) {
 				console.error(toggleError);
 				await refreshCanonicalDataSafely();
-				throw new Error('Failed toggling model.');
+				throw new Error('Failed toggling model.', { cause: toggleError });
 			}
 		},
 		[providerPresets, refreshCanonicalData, refreshCanonicalDataSafely]
@@ -348,7 +348,7 @@ export default function ModelPresetsPage() {
 			} catch (saveError) {
 				console.error(saveError);
 				await refreshCanonicalDataSafely();
-				throw new Error('Failed saving model preset.');
+				throw new Error('Failed saving model preset.', { cause: saveError });
 			}
 		},
 		[providerPresets, refreshCanonicalData, refreshCanonicalDataSafely]
@@ -369,7 +369,7 @@ export default function ModelPresetsPage() {
 			} catch (patchError) {
 				console.error(patchError);
 				await refreshCanonicalDataSafely();
-				throw new Error('Failed updating model preset.');
+				throw new Error('Failed updating model preset.', { cause: patchError });
 			}
 		},
 		[providerPresets, refreshCanonicalData, refreshCanonicalDataSafely]
@@ -404,7 +404,7 @@ export default function ModelPresetsPage() {
 			} catch (deleteError) {
 				console.error(deleteError);
 				await refreshCanonicalDataSafely();
-				throw new Error('Failed deleting model preset.');
+				throw new Error('Failed deleting model preset.', { cause: deleteError });
 			}
 		},
 		[providerPresets, refreshCanonicalData, refreshCanonicalDataSafely]
@@ -428,7 +428,7 @@ export default function ModelPresetsPage() {
 				console.error(createError);
 				const message = 'Failed adding provider.';
 				showGlobalDenied(message);
-				throw new Error(message);
+				throw new Error(message, { cause: createError });
 			}
 		},
 		[defaultProvider, refreshCanonicalData, showGlobalDenied]
@@ -466,7 +466,7 @@ export default function ModelPresetsPage() {
 				const message = 'Failed updating provider.';
 
 				showGlobalDenied(message);
-				throw new Error(message);
+				throw new Error(message, { cause: patchError });
 			}
 		},
 		[defaultProvider, refreshCanonicalData, refreshCanonicalDataSafely, showGlobalDenied]
@@ -480,7 +480,7 @@ export default function ModelPresetsPage() {
 				await refreshAuthKeys();
 			} catch (refreshError) {
 				console.error(refreshError);
-				throw new Error('Failed refreshing auth key state.');
+				throw new Error('Failed refreshing auth key state.', { cause: refreshError });
 			}
 		},
 		[refreshAuthKeys]
@@ -575,7 +575,7 @@ export default function ModelPresetsPage() {
 
 						{!error &&
 							Object.entries(providerPresets)
-								.sort(sortByDisplayName)
+								.toSorted(sortByDisplayName)
 								.map(([name, preset]) => (
 									<ProviderPresetCard
 										key={name}

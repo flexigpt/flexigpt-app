@@ -175,7 +175,7 @@ function SystemPromptBottomBarChipInner({
 		return Array.from(groupsByBundleID.values())
 			.map(group => ({
 				...group,
-				prompts: [...group.prompts].sort((left, right) => {
+				prompts: [...group.prompts].toSorted((left, right) => {
 					const slugCompare = PROMPT_SORT_COLLATOR.compare(left.templateSlug, right.templateSlug);
 					if (slugCompare !== 0) return slugCompare;
 
@@ -188,7 +188,7 @@ function SystemPromptBottomBarChipInner({
 					return PROMPT_SORT_COLLATOR.compare(left.identityKey, right.identityKey);
 				}),
 			}))
-			.sort((left, right) => {
+			.toSorted((left, right) => {
 				const bundleCompare = PROMPT_SORT_COLLATOR.compare(left.sortKey, right.sortKey);
 				if (bundleCompare !== 0) return bundleCompare;
 				return PROMPT_SORT_COLLATOR.compare(left.bundleID, right.bundleID);

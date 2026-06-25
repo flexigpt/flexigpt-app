@@ -29,6 +29,9 @@ const betterTailwindCSSRules: DummyRuleMap = {
 };
 
 const unicornRules: DummyRuleMap = {
+	// Suspicious. Default On.
+	'unicorn/prefer-add-event-listener': 'off',
+
 	// Pedantic. Default On.
 	'unicorn/no-negated-condition': 'off',
 	'unicorn/no-useless-undefined': 'off',
@@ -38,6 +41,9 @@ const eslintRules: DummyRuleMap = {
 	// Correctness. Default On.
 	'constructor-super': 'off',
 	'getter-return': 'off',
+
+	// Suspicious. Default on.
+	'no-underscore-dangle': 'off',
 
 	// Pedantic. Default On.
 	'max-lines-per-function': 'off',
@@ -112,6 +118,10 @@ const tsRules: DummyRuleMap = {
 	'typescript/no-floating-promises': 'off',
 	'typescript/restrict-template-expressions': 'off',
 
+	// Suspicious. Default on.
+	'typescript/no-unsafe-type-assertion': 'off',
+	'typescript/consistent-return': 'off',
+
 	// Pedantic. Default On.
 	'typescript/strict-void-return': 'off',
 	'typescript/strict-boolean-expressions': 'off',
@@ -154,8 +164,18 @@ const tsRules: DummyRuleMap = {
 };
 
 const importRules: DummyRuleMap = {
-	// Pedantic.
+	// Pedantic. Default on.
 	'import/max-dependencies': 'off',
+};
+
+const reactRules: DummyRuleMap = {
+	// Suspicious. Default on.
+	'react/react-in-jsx-scope': 'off',
+};
+
+const promiseRules: DummyRuleMap = {
+	// Suspicious. Default on.
+	'promise/always-return': 'off',
 };
 
 // oxlint-disable-next-line no-restricted-exports
@@ -166,7 +186,7 @@ export default defineConfig({
 		perf: 'off',
 		restriction: 'off',
 		style: 'off',
-		suspicious: 'off',
+		suspicious: 'error',
 		nursery: 'off',
 	},
 
@@ -178,10 +198,12 @@ export default defineConfig({
 
 	rules: {
 		...baseRules,
+		...promiseRules,
 		...eslintRules,
 		...importRules,
 		...tsRules,
 		...unicornRules,
+		...reactRules,
 		...betterTailwindCSSRules,
 	},
 
