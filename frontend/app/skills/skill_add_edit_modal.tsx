@@ -31,16 +31,16 @@ interface AddEditSkillModalProps {
 	mode?: ModalMode;
 }
 
-type ErrorState = {
+interface ErrorState {
 	displayName?: string;
 	name?: string;
 	slug?: string;
 	type?: string;
 	location?: string;
 	tags?: string;
-};
+}
 
-type SkillFormData = {
+interface SkillFormData {
 	displayName: string;
 	name: string;
 	slug: string;
@@ -49,7 +49,7 @@ type SkillFormData = {
 	description: string;
 	tags: string;
 	isEnabled: boolean;
-};
+}
 
 const skillTypeDropdownItems: Record<SkillType, { isEnabled: boolean; displayName: string }> = {
 	[SkillType.FS]: { isEnabled: true, displayName: 'Filesystem (fs)' },

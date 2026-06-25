@@ -2,13 +2,13 @@ export const DEFAULT_SEMVER = 'v1.0.0';
 
 type SemverIdentifier = number | string;
 
-type ParsedSemver = {
+interface ParsedSemver {
 	hasV: boolean;
 	major: number;
 	minor: number;
 	patch: number;
 	prerelease: SemverIdentifier[];
-};
+}
 
 // Supports:
 // - 1.2.3

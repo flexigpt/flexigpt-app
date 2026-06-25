@@ -12,12 +12,12 @@ import {
 } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 
-type OutputVerbosityDropdownProps = {
+interface OutputVerbosityDropdownProps {
 	sdkType: ProviderSDKType;
 	verbosity?: OutputVerbosity;
 	disabled?: boolean;
 	setVerbosity: (v?: OutputVerbosity) => void;
-};
+}
 
 const VERBOSITY_OPTIONS: Array<{ label: string; value?: OutputVerbosity }> = [
 	{ label: 'Default', value: undefined },

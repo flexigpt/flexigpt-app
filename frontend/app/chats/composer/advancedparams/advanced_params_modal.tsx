@@ -44,13 +44,13 @@ import {
 	supportsReasoningSummaryStyle,
 } from '@/modelpresets/lib/capabilities_override';
 
-type AdvancedParamsModalProps = {
+interface AdvancedParamsModalProps {
 	isOpen: boolean;
 	onClose: () => void;
 	currentModel: UIChatOption;
 	effectiveReasoningEnabled?: boolean;
 	onSave: (updatedModel: UIChatOption) => void;
-};
+}
 
 type OutputFormatChoice = 'default' | 'text' | 'jsonSchema';
 type SummaryStyleChoice = '' | ReasoningSummaryStyle;

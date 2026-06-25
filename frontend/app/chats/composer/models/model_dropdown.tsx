@@ -15,11 +15,11 @@ import {
 import { HoverTip } from '@/components/ariakit_hover_tip';
 import { GroupedMenuSection } from '@/components/grouped_menu_sections';
 
-type ProviderModelGroup = {
+interface ProviderModelGroup {
 	providerName: string;
 	providerDisplayName: string;
 	options: UIChatOption[];
-};
+}
 
 const modelKey = (m: UIChatOption) => `${m.providerName}::${m.modelPresetID}`;
 
@@ -59,11 +59,11 @@ const groupModelOptionsByProvider = (options: UIChatOption[]): ProviderModelGrou
 		.toSorted(compareProviderGroups);
 };
 
-type ModelDropdownProps = {
+interface ModelDropdownProps {
 	selectedModel: UIChatOption;
 	setSelectedModel: Dispatch<SetStateAction<UIChatOption>>;
 	allOptions: UIChatOption[];
-};
+}
 
 export function ModelDropdown({ selectedModel, setSelectedModel, allOptions }: ModelDropdownProps) {
 	const currentKey = modelKey(selectedModel);

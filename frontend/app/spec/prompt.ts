@@ -48,11 +48,11 @@ export interface PromptVariable {
 	default?: string;
 }
 
-export type PromptTemplateRef = {
+export interface PromptTemplateRef {
 	bundleID: string;
 	templateSlug: string;
 	templateVersion: string;
-};
+}
 
 export interface PromptTemplate {
 	kind: PromptTemplateKind;

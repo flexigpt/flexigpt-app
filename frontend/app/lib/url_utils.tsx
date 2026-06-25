@@ -177,7 +177,7 @@ export type FieldErrorState<FormState> = {
 	[K in keyof FormState]?: string;
 };
 
-export function createUrlFieldChangeHandler<FormState extends Record<string, unknown>>(
+export function createUrlFieldChangeHandler<FormState>(
 	fieldName: Extract<keyof FormState, string>,
 	setFormData: React.Dispatch<React.SetStateAction<FormState>>,
 	setErrors: React.Dispatch<React.SetStateAction<FieldErrorState<FormState>>>,

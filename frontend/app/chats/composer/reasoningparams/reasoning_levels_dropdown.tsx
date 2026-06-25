@@ -12,11 +12,11 @@ import {
 } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 
-type SingleReasoningDropdownProps = {
+interface SingleReasoningDropdownProps {
 	reasoningLevel: ReasoningLevel;
 	levelOptions?: ReasoningLevel[];
 	setReasoningLevel: (level: ReasoningLevel) => void;
-};
+}
 
 const levelDisplayNames: Record<ReasoningLevel, string> = {
 	[ReasoningLevel.None]: 'None',

@@ -8,11 +8,11 @@ import { HoverTip } from '@/components/ariakit_hover_tip';
 
 import type { SearchResult } from '@/chats/search/conversation_search_utils';
 
-type ConversationSearchRowMetaProps = {
+interface ConversationSearchRowMetaProps {
 	result: SearchResult;
 	openConversationIdSet: Set<string>;
 	onAskDelete: (item: ConversationSearchItem) => void;
-};
+}
 
 export function ConversationSearchRowMeta({
 	result,
@@ -46,14 +46,14 @@ export function ConversationSearchRowMeta({
 	);
 }
 
-type ConversationSearchFlatRowProps = {
+interface ConversationSearchFlatRowProps {
 	result: SearchResult;
 	index: number;
 	isFocused: boolean;
 	onPick: (item: ConversationSearchItem) => void;
 	openConversationIdSet: Set<string>;
 	onAskDelete: (item: ConversationSearchItem) => void;
-};
+}
 
 export function ConversationSearchFlatRow({
 	result,

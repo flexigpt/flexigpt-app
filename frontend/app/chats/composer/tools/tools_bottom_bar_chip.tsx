@@ -41,16 +41,16 @@ import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_u
 import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 import { computeToolUserArgsStatus } from '@/tools/lib/tool_userargs_utils';
 
-type ToolBundleGroup = {
+interface ToolBundleGroup {
 	bundleID: string;
 	bundleSlug: string;
 	isBuiltIn: boolean;
 	attachedOptions: ToolListItem[];
 	conversationOptions: ConversationToolStateEntry[];
 	availableOptions: ToolListItem[];
-};
+}
 
-type ToolsBottomBarChipProps = {
+interface ToolsBottomBarChipProps {
 	store: MenuStore;
 	buttonRef: RefObject<HTMLButtonElement | null>;
 	shortcut?: string;
@@ -75,7 +75,7 @@ type ToolsBottomBarChipProps = {
 	toolArgsEventTarget?: EventTarget | null;
 
 	isInputLocked?: boolean;
-};
+}
 
 const toolMenuCollator = new Intl.Collator(undefined, {
 	numeric: true,

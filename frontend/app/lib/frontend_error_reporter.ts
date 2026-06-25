@@ -1,4 +1,4 @@
-export type FrontendErrorPayload = {
+export interface FrontendErrorPayload {
 	name: string;
 	message: string;
 	stack: string;
@@ -8,17 +8,17 @@ export type FrontendErrorPayload = {
 	userAgent: string;
 	time: string;
 	extraJson: string;
-};
+}
 
-type FrontendErrorLogger = {
+interface FrontendErrorLogger {
 	error: (...args: unknown[]) => void;
-};
+}
 
-type ErrorExtra = {
+interface ErrorExtra {
 	phase?: string;
 	componentStack?: string;
 	[key: string]: unknown;
-};
+}
 
 const LAST_ERROR_KEY = 'flexigpt.frontend.lastError';
 const ERROR_LOG_KEY = 'flexigpt.frontend.errorLog';

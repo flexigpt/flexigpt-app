@@ -218,6 +218,7 @@ const tsRules: DummyRuleMap = {
 	'typescript/consistent-generic-constructors': 'error',
 	'typescript/consistent-indexed-object-style': 'error',
 	'typescript/consistent-type-assertions': 'error',
+	'typescript/consistent-type-definitions': 'error',
 	'typescript/consistent-type-exports': 'error',
 	'typescript/consistent-type-imports': 'error',
 	'typescript/no-empty-interface': 'error',
@@ -232,7 +233,6 @@ const tsRules: DummyRuleMap = {
 	'typescript/unified-signatures': 'error',
 
 	'typescript/array-type': 'off',
-	'typescript/consistent-type-definitions': 'off',
 	'typescript/dot-notation': 'off',
 	'typescript/method-signature-style': 'off',
 	'typescript/prefer-for-of': 'off',
@@ -249,6 +249,22 @@ const importRules: DummyRuleMap = {
 
 	// Pedantic. Default on.
 	'import/max-dependencies': 'off',
+
+	// Style. Default Off.
+	'import/no-duplicates': 'error',
+
+	'import/consistent-type-specifier-style': 'off',
+	'import/exports-last': 'off',
+	'import/first': 'off',
+	'import/group-exports': 'off',
+	'import/newline-after-import': 'off',
+	'import/no-anonymous-default-export': 'off',
+	'import/no-mutable-exports': 'off',
+	'import/no-named-default': 'off',
+	'import/no-named-export': 'off',
+	'import/no-namespace': 'off',
+	'import/no-nodejs-modules': 'off',
+	'import/prefer-default-export': 'off',
 };
 
 const reactRules: DummyRuleMap = {

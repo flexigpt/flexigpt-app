@@ -12,10 +12,10 @@ import { HoverTip } from '@/components/ariakit_hover_tip';
 
 const defaultTemperatureOptions = [0.0, 0.1, 0.5, 1.0];
 
-type TemperatureDropdownProps = {
+interface TemperatureDropdownProps {
 	temperature: number;
 	setTemperature: (t: number) => void;
-};
+}
 
 export function TemperatureDropdown({ temperature, setTemperature }: TemperatureDropdownProps) {
 	const menu = useMenuStore({ placement: 'top', focusLoop: true });

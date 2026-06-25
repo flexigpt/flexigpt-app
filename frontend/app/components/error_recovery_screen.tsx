@@ -1,6 +1,6 @@
 import { reloadFrontend, resetLocalFrontendStateAndReload } from '@/lib/frontend_error_reporter';
 
-type ErrorRecoveryScreenProps = {
+interface ErrorRecoveryScreenProps {
 	title?: string;
 	message?: string;
 	technicalDetails?: string;
@@ -11,7 +11,7 @@ type ErrorRecoveryScreenProps = {
 	fullDocument?: boolean;
 	onTryAgain?: () => void;
 	onGoHome?: () => void;
-};
+}
 
 function ErrorRecoveryContent({
 	title = 'Something went wrong',

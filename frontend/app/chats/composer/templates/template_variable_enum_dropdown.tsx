@@ -15,7 +15,7 @@ import { createPortal } from 'react-dom';
 
 import { FiCheck, FiChevronDown, FiChevronUp, FiX } from 'react-icons/fi';
 
-type EnumDropdownInlineProps = {
+interface EnumDropdownInlineProps {
 	options: string[];
 	value?: string;
 	onChange: (val: string | undefined) => void;
@@ -33,7 +33,7 @@ type EnumDropdownInlineProps = {
 	placement?: 'top' | 'bottom' | 'auto';
 	minWidthPx?: number;
 	menuMaxHeightPx?: number;
-};
+}
 
 function getInitialActiveIndex(options: string[], value?: string): number {
 	const selectedIdx = value ? options.findIndex(opt => opt === value) : -1;

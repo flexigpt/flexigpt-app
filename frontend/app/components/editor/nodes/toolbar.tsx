@@ -92,11 +92,11 @@ const dropdownArrowVariants = cva('btn btn-square join-item', {
 });
 
 /* DaisyUI tooltip HOC (string-only content) */
-type Tooltipable = {
+interface Tooltipable {
 	tooltip?: string;
 	tooltipClassName?: string;
 	tooltipPosition?: 'top' | 'right' | 'bottom' | 'left';
-};
+}
 
 function withTooltip<P extends Tooltipable>(Component: ComponentType<P>) {
 	return function WithTooltip(props: P) {

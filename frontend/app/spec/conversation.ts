@@ -74,12 +74,12 @@ interface BaseConversation<TMessage> {
 export type StoreConversation = BaseConversation<StoreConversationMessage>;
 export type Conversation = BaseConversation<ConversationMessage>;
 
-export type ConversationSearchItem = {
+export interface ConversationSearchItem {
 	id: string;
 	title: string;
 	idDate: Date;
 	modifiedAt: Date;
-};
+}
 
 export interface RestorableConversationContext {
 	modelPresetRef?: ModelPresetRef;

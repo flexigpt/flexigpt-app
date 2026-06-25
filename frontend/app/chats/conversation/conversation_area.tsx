@@ -113,7 +113,7 @@ function StreamingLastMessage(props: {
 	);
 }
 
-export type ConversationAreaHandle = {
+export interface ConversationAreaHandle {
 	disposeTabRuntime: (tabId: string) => void;
 	clearStreamForTab: (tabId: string) => void;
 	syncComposerFromConversation: (tabId: string, conv: Conversation) => void;
@@ -132,9 +132,9 @@ export type ConversationAreaHandle = {
 	resetScrollToTop: (tabId: string) => void;
 	getScrollTopByTabSnapshot: () => Record<string, number>;
 	applyWorkflowStarter: (tabId: string, starter: ChatWorkflowStarter) => Promise<boolean>;
-};
+}
 
-type ConversationAreaProps = {
+interface ConversationAreaProps {
 	tabs: ChatTabState[];
 	selectedTabId: string;
 	mountedInputTabIds: ReadonlySet<string>;
@@ -142,7 +142,7 @@ type ConversationAreaProps = {
 	initialScrollTopByTab?: Record<string, number>;
 	updateTab: (tabId: string, updater: (tab: ChatTabState) => ChatTabState) => void;
 	saveUpdatedConversation: (tabId: string, updatedConv: Conversation, titleWasExternallyChanged?: boolean) => void;
-};
+}
 
 export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationAreaProps>(function ConversationArea(
 	{

@@ -33,10 +33,10 @@ interface SearchCacheEntry {
 
 const searchCache = new Map<string, SearchCacheEntry>();
 
-type UseConversationSearchArgs = {
+interface UseConversationSearchArgs {
 	onSelectConversation: (item: ConversationSearchItem) => Promise<void>;
 	refreshKey: number;
-};
+}
 
 export function useConversationSearch({ onSelectConversation, refreshKey }: UseConversationSearchArgs) {
 	const [searchState, setSearchState] = useState<SearchState>({

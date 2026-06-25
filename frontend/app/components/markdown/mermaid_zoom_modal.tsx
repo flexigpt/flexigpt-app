@@ -4,12 +4,12 @@ import { createPortal } from 'react-dom';
 
 import { ModalBackdrop } from '@/components/modal_backdrop';
 
-type MermaidZoomModalProps = {
+interface MermaidZoomModalProps {
 	isOpen: boolean;
 	onClose: () => void;
 	svgNode: SVGSVGElement | null;
 	surfaceStyle?: CSSProperties;
-};
+}
 
 export function MermaidZoomModal({ isOpen, onClose, svgNode, surfaceStyle }: MermaidZoomModalProps) {
 	const dialogRef = useRef<HTMLDialogElement | null>(null);

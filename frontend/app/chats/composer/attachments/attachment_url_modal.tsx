@@ -11,15 +11,15 @@ import {
 	validateUrlForInput,
 } from '@/lib/url_utils';
 
-type UrlAttachmentModalProps = {
+interface UrlAttachmentModalProps {
 	isOpen: boolean;
 	onClose: () => void;
 	onAttachURL: (url: string) => Promise<void> | void;
-};
+}
 
-type FormState = {
+interface FormState {
 	url: string;
-};
+}
 
 type UrlAttachmentModalContentProps = Omit<UrlAttachmentModalProps, 'isOpen'>;
 

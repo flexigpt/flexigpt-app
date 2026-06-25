@@ -15,16 +15,16 @@ interface AddSkillBundleModalProps {
 	existingNames: string[]; // bundle name uniqueness constraint
 }
 
-type ErrorState = {
+interface ErrorState {
 	slug?: string;
 	displayName?: string;
-};
+}
 
-type BundleFormData = {
+interface BundleFormData {
 	slug: string;
 	displayName: string;
 	description: string;
-};
+}
 
 function normalizeForUniq(s: string) {
 	return s.trim().toLowerCase();

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-type PageFrameProps = {
+interface PageFrameProps {
 	children: ReactNode;
 	// When true (default), wraps children in an overflow-auto area.
 	// Set to false for pages that manage their own scrolling (e.g., the Chat 3-row grid).
@@ -10,7 +10,7 @@ type PageFrameProps = {
 	contentClassName?: string;
 	// Optional: adjust the outer padding (gap around the rounded box)
 	padClassName?: string; // default: "p-2 md:p-3"
-};
+}
 
 export function PageFrame({
 	children,

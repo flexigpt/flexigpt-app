@@ -38,7 +38,7 @@ const PROMPT_SORT_COLLATOR = new Intl.Collator(undefined, {
 	sensitivity: 'base',
 });
 
-type SystemPromptBundleGroup = {
+interface SystemPromptBundleGroup {
 	bundleID: string;
 	bundleSlug: string;
 	bundleDisplayName: string;
@@ -47,9 +47,9 @@ type SystemPromptBundleGroup = {
 	isBuiltIn: boolean;
 	sortKey: string;
 	prompts: SystemPromptItem[];
-};
+}
 
-type SystemPromptBottomBarChipProps = {
+interface SystemPromptBottomBarChipProps {
 	store: MenuStore;
 	shortcut: string;
 	prompts: SystemPromptItem[];
@@ -67,7 +67,7 @@ type SystemPromptBottomBarChipProps = {
 	onRefreshPrompts: () => Promise<void>;
 	getExistingVersions: (bundleID: string, slug: string) => string[];
 	isInputLocked?: boolean;
-};
+}
 
 function pickInitialBundleID(
 	bundles: PromptBundle[],

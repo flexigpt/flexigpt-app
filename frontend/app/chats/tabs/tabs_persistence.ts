@@ -7,7 +7,7 @@ function canUseStorage(): boolean {
 	return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
 }
 
-type PersistedChatsPageStateV1 = {
+interface PersistedChatsPageStateV1 {
 	v: 1;
 	selectedTabId: string;
 	tabs: Array<{
@@ -19,15 +19,15 @@ type PersistedChatsPageStateV1 = {
 	}>;
 	scrollTopByTab?: Record<string, number>;
 	lastActivatedAtByTab?: Record<string, number>;
-};
+}
 
-export type InitialChatsModel = {
+export interface InitialChatsModel {
 	restoredFromStorage: boolean;
 	selectedTabId: string;
 	tabs: ChatTabState[];
 	scrollTopByTab: Record<string, number>;
 	lastActivatedAtByTab: Record<string, number>;
-};
+}
 
 function readPersistedChatsPageState(): PersistedChatsPageStateV1 | null {
 	if (!canUseStorage()) {

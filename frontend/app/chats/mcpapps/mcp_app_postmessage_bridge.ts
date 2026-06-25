@@ -11,11 +11,11 @@ import {
 export type AppRequestHandler = (req: JSONRPCRequest) => Promise<JSONRPCResponse>;
 export type AppNotificationHandler = (note: JSONRPCNotification) => void;
 
-type PendingHostRequest = {
+interface PendingHostRequest {
 	resolve: (response: JSONRPCResponse) => void;
 	reject: (error: Error) => void;
 	timer: number;
-};
+}
 
 /**
  * Low-level postMessage bridge between the FlexiGPT host and one MCP App

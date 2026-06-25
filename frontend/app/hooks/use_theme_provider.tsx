@@ -11,7 +11,10 @@ const noTransition = () => {
 	});
 };
 
-type ThemeCtx = { theme: string; setTheme: (t: string) => void };
+interface ThemeCtx {
+	theme: string;
+	setTheme: (t: string) => void;
+}
 
 const ThemeContext = createContext<ThemeCtx>({
 	theme: 'system',

@@ -4,7 +4,7 @@ import { useLayoutEffect, useMemo, useSyncExternalStore } from 'react';
 /**
  * @public
  */
-export type TitleBarSlots = {
+export interface TitleBarSlots {
 	/**
 	 * Extra content on the left, AFTER the fixed app title/version (optional).
 	 * Good for page title chips, breadcrumbs, etc.
@@ -16,12 +16,12 @@ export type TitleBarSlots = {
 
 	/** Right content: page actions, etc. (window buttons are always after this) */
 	right?: ReactNode;
-};
+}
 
-type StoreState = {
+interface StoreState {
 	slots: TitleBarSlots;
 	owner: symbol | null;
-};
+}
 
 let state: StoreState = { slots: {}, owner: null };
 const listeners = new Set<() => void>();

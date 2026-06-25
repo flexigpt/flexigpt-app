@@ -14,19 +14,19 @@ import frontendRolesBody from '@/docs/content/13-frontend-roles-and-responsibili
 import chatsWorkspaceComposerDesignBody from '@/docs/content/14-chats-workspace-and-composer-design.md?raw';
 import unifiedDiffApplyBody from '@/docs/content/15-unified-diff-apply.md?raw';
 
-type DocsSection = {
+interface DocsSection {
 	id: string;
 	title: string;
 	summary: string;
 	body: string;
-};
+}
 
-type DocsCategory = {
+interface DocsCategory {
 	id: string;
 	title: string;
 	summary: string;
 	sections: DocsSection[];
-};
+}
 
 export const docsCategories: DocsCategory[] = [
 	{

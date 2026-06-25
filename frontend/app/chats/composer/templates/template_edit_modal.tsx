@@ -18,21 +18,21 @@ import { EnumDropdownInline } from '@/chats/composer/templates/template_variable
 import { dispatchTemplateVarsUpdated } from '@/chats/composer/templates/use_template_toolbar_vars_updated_event';
 import { computeTemplateVarRequirements, effectiveVarValueLocal } from '@/prompts/lib/prompt_template_var_utils';
 
-type TemplateEditModalProps = {
+interface TemplateEditModalProps {
 	open: boolean;
 	onClose: () => void;
 	tsenode: TemplateSelectionElementNode;
 	editor: PlateEditor;
 	path: Path;
-};
+}
 
-type TemplateEditFormState = {
+interface TemplateEditFormState {
 	displayName: string;
 	description: string;
 	tags: string;
 	blockEdits: ReturnType<typeof computeEffectiveTemplate>['blocks'];
 	varValues: Record<string, unknown>;
-};
+}
 
 function getInitialFormState(tsenode: TemplateSelectionElementNode): TemplateEditFormState {
 	const { template, blocks, variablesSchema } = computeEffectiveTemplate(tsenode);

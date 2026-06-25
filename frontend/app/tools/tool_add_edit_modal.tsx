@@ -39,7 +39,7 @@ const TOOL_TYPE_LABEL_GO = 'Go';
 const TOOL_TYPE_LABEL_HTTP = 'HTTP';
 const TOOL_TYPE_LABEL_SDK = 'SDK';
 
-type ErrorState = {
+interface ErrorState {
 	displayName?: string;
 	slug?: string;
 	version?: string;
@@ -52,7 +52,7 @@ type ErrorState = {
 	httpResponseCodes?: string;
 	httpTimeoutMS?: string;
 	tags?: string;
-};
+}
 
 const bodyOutputModeItems: Record<HTTPBodyOutputMode, { isEnabled: boolean; displayName: string }> = {
 	[HTTPBodyOutputMode.Auto]: { isEnabled: true, displayName: 'Auto' },

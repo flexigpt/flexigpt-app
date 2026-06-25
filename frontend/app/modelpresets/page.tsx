@@ -29,11 +29,11 @@ import { ProviderPresetCard } from '@/modelpresets/provider_presets_card';
 const sortByDisplayName = ([, a]: [string, ProviderPreset], [, b]: [string, ProviderPreset]) =>
 	a.displayName.localeCompare(b.displayName);
 
-type CanonicalPageData = {
+interface CanonicalPageData {
 	settings: Awaited<ReturnType<typeof settingstoreAPI.getSettings>>;
 	defaultProvider: ProviderName | undefined;
 	providerPresets: Record<ProviderName, ProviderPreset>;
-};
+}
 
 const buildProviderKeySet = (authKeys: AuthKeyMeta[]): Record<ProviderName, boolean> =>
 	Object.fromEntries(

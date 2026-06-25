@@ -19,7 +19,7 @@ export interface PresetItem {
 export type ModalMode = 'add' | 'edit' | 'view';
 export type TriStateBoolean = '' | 'true' | 'false';
 
-export type ErrorState = {
+export interface ErrorState {
 	displayName?: string;
 	slug?: string;
 	version?: string;
@@ -28,9 +28,9 @@ export type ErrorState = {
 	startingInstructionTemplateRefs?: string;
 	startingToolSelections?: string;
 	startingSkillSelections?: string;
-};
+}
 
-export type ModelPatchFormData = {
+export interface ModelPatchFormData {
 	enabled: boolean;
 	stream: TriStateBoolean;
 	maxPromptLength: string;
@@ -54,15 +54,15 @@ export type ModelPatchFormData = {
 	outputJSONSchemaDescription: string;
 	outputJSONSchemaRaw: string;
 	outputJSONSchemaStrictMode: TriStateBoolean;
-};
+}
 
-type ToolSelectionFormItem = {
+interface ToolSelectionFormItem {
 	toolRef: ToolRef;
 	autoExecuteMode: TriStateBoolean;
 	userArgSchemaInstance: string;
-};
+}
 
-export type AssistantPresetFormData = {
+export interface AssistantPresetFormData {
 	displayName: string;
 	slug: string;
 	version: string;
@@ -77,7 +77,7 @@ export type AssistantPresetFormData = {
 	startingInstructionTemplateRefs: PromptTemplateRef[];
 	startingToolSelections: ToolSelectionFormItem[];
 	startingSkillSelections: SkillSelection[];
-};
+}
 
 export interface SimpleSelectableOption {
 	key: string;

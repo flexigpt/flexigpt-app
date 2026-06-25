@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 /**
  * @public
  */
-export type UseEventOptions<Ev extends Event = Event, D = unknown> = {
+export interface UseEventOptions<Ev extends Event = Event, D = unknown> {
 	// Target to attach the listener to (defaults to window if available)
 	target?: EventTarget | null;
 
@@ -27,12 +27,12 @@ export type UseEventOptions<Ev extends Event = Event, D = unknown> = {
 
 	// Optional "pulse" timeout in ms: sets pulse=true on event, then back to false after this many ms
 	pulseMs?: number;
-};
+}
 
 /**
  * @public
  */
-export type UseEventResult<D = unknown> = {
+export interface UseEventResult<D = unknown> {
 	// True for pulseMs after each event (or always false if pulseMs not provided)
 	pulse: boolean;
 
@@ -41,7 +41,7 @@ export type UseEventResult<D = unknown> = {
 
 	// Manually reset the pulse state to false
 	resetPulse: () => void;
-};
+}
 
 // Overload: native window events
 export function useEvent<K extends keyof WindowEventMap>(

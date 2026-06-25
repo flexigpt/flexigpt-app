@@ -17,16 +17,16 @@ interface CodeProps {
 	diffCandidatePaths?: string[];
 }
 
-type MermaidResultState = {
+interface MermaidResultState {
 	key: string;
 	status: Extract<MermaidRenderStatus, 'rendered' | 'error'>;
 	message?: string;
-};
+}
 
-type ExpansionOverrideState = {
+interface ExpansionOverrideState {
 	key: string;
 	isExpanded: boolean;
-};
+}
 
 const getCodeBlockKey = (language: string, value: string) => `${language.toLowerCase()}\u0000${value}`;
 

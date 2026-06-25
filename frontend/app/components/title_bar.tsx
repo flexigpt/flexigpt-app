@@ -8,9 +8,9 @@ import { useTitleBarSlots } from '@/hooks/use_title_bar';
 
 import { backendAPI } from '@/apis/baseapi';
 
-type TitleBarProps = {
+interface TitleBarProps {
 	onToggleDrawer?: () => void;
-};
+}
 
 export function TitleBar({ onToggleDrawer }: TitleBarProps) {
 	const slots = useTitleBarSlots();

@@ -38,7 +38,10 @@ import {
 } from '@/components/markdown/unified_diff_block';
 import { ModalBackdrop } from '@/components/modal_backdrop';
 
-type ModalRunningAction = { key: string; kind: 'dry-run' | 'apply' };
+interface ModalRunningAction {
+	key: string;
+	kind: 'dry-run' | 'apply';
+}
 type TargetVisualState = 'neutral' | 'info' | 'success' | 'warning' | 'error';
 
 function getTargetCardClassName(visualState: TargetVisualState): string {

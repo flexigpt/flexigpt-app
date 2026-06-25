@@ -3,6 +3,7 @@ import type { Tool, ToolStoreChoiceType } from '@/spec/tool';
 
 export const KEY_TOOL_SELECTION = 'toolSelection';
 
+// oxlint-disable-next-line typescript/consistent-type-definitions
 export type ToolSelectionElementNode = {
 	type: typeof KEY_TOOL_SELECTION;
 	choiceID: string;
@@ -29,6 +30,7 @@ export type ToolSelectionElementNode = {
 export const KEY_TEMPLATE_SELECTION = 'templateSelection';
 export const KEY_TEMPLATE_VARIABLE = 'templateVariable';
 
+// oxlint-disable-next-line typescript/consistent-type-definitions
 export type TemplateVariableElementNode = {
 	type: typeof KEY_TEMPLATE_VARIABLE;
 	bundleID: string;
@@ -41,6 +43,7 @@ export type TemplateVariableElementNode = {
 	children: [{ text: '' }];
 };
 
+// oxlint-disable-next-line typescript/consistent-type-definitions
 export type TemplateSelectionElementNode = {
 	type: typeof KEY_TEMPLATE_SELECTION;
 	bundleID: string;

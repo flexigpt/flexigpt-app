@@ -1,14 +1,14 @@
-export type ChatWorkflowStarterAssistantPresetRef = {
+export interface ChatWorkflowStarterAssistantPresetRef {
 	bundleID: string;
 	assistantPresetSlug: string;
 	assistantPresetVersion: string;
-};
+}
 
-export type ChatWorkflowStarter = {
+export interface ChatWorkflowStarter {
 	workflowID?: string;
 	draft: string;
 	assistantPreset?: ChatWorkflowStarterAssistantPresetRef;
-};
+}
 
 const WORKFLOW_STARTER_QUERY_KEYS = [
 	'workflow',

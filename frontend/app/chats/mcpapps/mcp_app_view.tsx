@@ -41,11 +41,11 @@ const UNKNOWN_APP_POLICY: MCPAppsPolicy = {
 const MIN_APP_HEIGHT = 160;
 const MAX_APP_HEIGHT = 1200;
 
-type LoadedMCPAppResource = {
+interface LoadedMCPAppResource {
 	html: string;
 	mimeType: string;
 	meta?: MCPAppUIResourceMeta;
-};
+}
 interface MCPAppViewProps {
 	instance: MCPAppInstance;
 	toolInput?: unknown;

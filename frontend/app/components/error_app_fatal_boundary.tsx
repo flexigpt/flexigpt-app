@@ -4,14 +4,14 @@ import { recordFrontendCrash, reportFrontendError } from '@/lib/frontend_error_r
 
 import { ErrorRecoveryScreen } from '@/components/error_recovery_screen';
 
-type AppFatalBoundaryProps = {
+interface AppFatalBoundaryProps {
 	children: ReactNode;
-};
+}
 
-type AppFatalBoundaryState = {
+interface AppFatalBoundaryState {
 	error: Error | null;
 	crashCount: number;
-};
+}
 
 export class AppFatalBoundary extends Component<AppFatalBoundaryProps, AppFatalBoundaryState> {
 	state: AppFatalBoundaryState = {

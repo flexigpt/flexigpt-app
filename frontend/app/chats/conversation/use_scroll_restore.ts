@@ -72,12 +72,12 @@ function getMessageJumpAvailability(el: HTMLElement | null, messageCount: number
 	};
 }
 
-type ScrollIndicatorState = {
+interface ScrollIndicatorState {
 	isAtBottom: boolean;
 	isAtTop: boolean;
 	canJumpToPreviousMessage: boolean;
 	canJumpToNextMessage: boolean;
-};
+}
 
 const INITIAL_SCROLL_INDICATOR_STATE: ScrollIndicatorState = {
 	isAtBottom: true,
@@ -86,13 +86,13 @@ const INITIAL_SCROLL_INDICATOR_STATE: ScrollIndicatorState = {
 	canJumpToNextMessage: false,
 };
 
-type UseScrollRestoreArgs = {
+interface UseScrollRestoreArgs {
 	selectedTabId: string;
 	selectedTabIdRef: RefObject<string>;
 	activeTabIsHydrating: boolean;
 	messageCount: number;
 	initialScrollTopByTab?: Record<string, number>;
-};
+}
 
 export function useScrollRestore({
 	selectedTabId,

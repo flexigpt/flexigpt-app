@@ -4,7 +4,7 @@ const groupedMenuSeparatorClasses = 'border-base-300 my-2 border-t';
 const groupedMenuSectionHeaderClasses = 'px-1 pt-1';
 const groupedMenuSectionTitleClasses = 'min-w-0 truncate text-[11px] font-semibold tracking-wide uppercase opacity-70';
 
-type GroupedMenuSectionProps = {
+interface GroupedMenuSectionProps {
 	title: string;
 	ariaLabel?: string;
 	meta?: ReactNode;
@@ -12,7 +12,7 @@ type GroupedMenuSectionProps = {
 	separatorBefore?: boolean;
 	className?: string;
 	headerClassName?: string;
-};
+}
 
 export function GroupedMenuSection({
 	title,
@@ -45,11 +45,11 @@ export function GroupedMenuSection({
 	);
 }
 
-type GroupedMenuSubheadingProps = {
+interface GroupedMenuSubheadingProps {
 	children: ReactNode;
 	tone?: 'muted' | 'warning';
 	separated?: boolean;
-};
+}
 
 export function GroupedMenuSubheading({ children, tone = 'muted', separated = false }: GroupedMenuSubheadingProps) {
 	const toneClass = tone === 'warning' ? 'text-warning opacity-80' : 'opacity-50';

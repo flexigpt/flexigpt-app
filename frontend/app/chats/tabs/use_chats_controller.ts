@@ -32,10 +32,10 @@ import {
 	writePersistedChatsPageState,
 } from '@/chats/tabs/tabs_persistence';
 
-type UseChatsControllerArgs = {
+interface UseChatsControllerArgs {
 	conversationAreaRef: RefObject<ConversationAreaHandle | null>;
 	searchRef: RefObject<ConversationSearchHandle | null>;
-};
+}
 
 function buildNormalizedInitialModel(): InitialChatsModel {
 	const built = buildInitialChatsModel();

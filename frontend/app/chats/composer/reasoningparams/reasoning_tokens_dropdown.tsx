@@ -12,10 +12,10 @@ import { HoverTip } from '@/components/ariakit_hover_tip';
 
 const defaultTokenOptions = [1024, 8192, 32000];
 
-type ReasoningTokensDropdownProps = {
+interface ReasoningTokensDropdownProps {
 	tokens: number;
 	setTokens: (tokens: number) => void;
-};
+}
 
 export function ReasoningTokensDropdown({ tokens, setTokens }: ReasoningTokensDropdownProps) {
 	const menu = useMenuStore({ placement: 'top', focusLoop: true });

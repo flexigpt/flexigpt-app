@@ -33,7 +33,7 @@ function headersEqual(a: Record<string, string>, b: Record<string, string>): boo
 	return JSON.stringify(normalizeHeadersRecord(a)) === JSON.stringify(normalizeHeadersRecord(b));
 }
 
-type ProviderFormData = {
+interface ProviderFormData {
 	providerName: string;
 	displayName: string;
 	sdkType: ProviderSDKType;
@@ -43,7 +43,7 @@ type ProviderFormData = {
 	apiKeyHeaderKey: string;
 	defaultHeadersRawJSON: string;
 	apiKey: string;
-};
+}
 
 const DEFAULT_FORM: ProviderFormData = {
 	providerName: '',

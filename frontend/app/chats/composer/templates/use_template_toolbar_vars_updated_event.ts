@@ -2,7 +2,9 @@ import { emitCustomEvent, useEvent } from '@/hooks/use_event';
 
 const TEMPLATE_VARS_UPDATED_EVENT = 'tpl-vars:updated';
 
-type TemplateVarsUpdatedDetail = { selectionID?: string };
+interface TemplateVarsUpdatedDetail {
+	selectionID?: string;
+}
 /**
  * @public
  * Low-level subscription with typed detail passthrough.

@@ -172,7 +172,7 @@ export enum AttachmentErrorReason {
 	Unreadable = 'unreadable',
 }
 
-export type AttachmentsDroppedPayload = {
+export interface AttachmentsDroppedPayload {
 	dropID: string;
 	x: number;
 	y: number;
@@ -183,7 +183,7 @@ export type AttachmentsDroppedPayload = {
 
 	errors?: string[];
 	maxFilesPerDirectory: number;
-};
+}
 
 /**
  * UIAttachment is the composer-side shape; it extends the backend

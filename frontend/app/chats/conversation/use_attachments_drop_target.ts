@@ -4,13 +4,13 @@ import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 
 import { attachmentsDropAPI } from '@/apis/baseapi';
 
-type UseAttachmentsDropTargetArgs = {
+interface UseAttachmentsDropTargetArgs {
 	selectedTabIdRef: RefObject<string>;
 	tabExists: (tabId: string) => boolean;
 	tryApplyDropToTab: (tabId: string, payload: AttachmentsDroppedPayload) => boolean;
 	queuePendingDrop: (tabId: string, payload: AttachmentsDroppedPayload) => void;
 	flushPendingDrops: () => void;
-};
+}
 
 export function useAttachmentsDropTarget({
 	selectedTabIdRef,

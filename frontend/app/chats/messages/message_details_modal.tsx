@@ -10,7 +10,7 @@ import { ModalBackdrop } from '@/components/modal_backdrop';
 
 import { MessageContentCard } from '@/chats/messages/message_content_card';
 
-type MessageDetailsModalProps = {
+interface MessageDetailsModalProps {
 	isOpen: boolean;
 	onClose: () => void;
 	messageID: string;
@@ -20,7 +20,7 @@ type MessageDetailsModalProps = {
 	reasoningContents?: ReasoningContent[];
 	streamedThinking?: string;
 	showReasoningAtTop?: boolean;
-};
+}
 
 function joinReasoningParts(reasoning: ReasoningContent[] | undefined, key: 'summary' | 'thinking'): string {
 	const items = reasoning ?? [];

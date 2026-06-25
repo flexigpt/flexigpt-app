@@ -25,7 +25,7 @@ const TEMPLATE_PLACEHOLDER_TEST_RE = /\{\{([a-zA-Z_][a-zA-Z0-9_-]*)\}\}/;
 
 export type SystemPromptRole = PromptRoleEnum.System | PromptRoleEnum.Developer;
 
-export type SystemPromptItem = {
+export interface SystemPromptItem {
 	identityKey: string;
 	templateID?: string;
 	bundleID: string;
@@ -39,18 +39,18 @@ export type SystemPromptItem = {
 	isBuiltIn: boolean;
 	createdAt: string;
 	modifiedAt: string;
-};
+}
 
-export type SystemPromptDraft = {
+export interface SystemPromptDraft {
 	bundleID: string;
 	displayName: string;
 	slug: string;
 	version: string;
 	role: SystemPromptRole;
 	content: string;
-};
+}
 
-type SystemPromptStoreState = {
+interface SystemPromptStoreState {
 	prompts: SystemPromptItem[];
 	bundles: PromptBundle[];
 	templateVersionsBySeriesKey: Record<string, string[]>;
@@ -58,7 +58,7 @@ type SystemPromptStoreState = {
 	loading: boolean;
 	error: string | null;
 	initialized: boolean;
-};
+}
 
 const listeners = new Set<() => void>();
 

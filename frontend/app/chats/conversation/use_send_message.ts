@@ -32,7 +32,7 @@ import type { ChatTabState } from '@/chats/tabs/tabs_model';
 import { appendSystemPromptParts } from '@/prompts/lib/system_prompt_utils';
 import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
 
-type UseSendMessageArgs = {
+interface UseSendMessageArgs {
 	tabsRef: RefObject<ChatTabState[]>;
 	selectedTabIdRef: RefObject<string>;
 	updateTab: (tabId: string, updater: (tab: ChatTabState) => ChatTabState) => void;
@@ -51,7 +51,7 @@ type UseSendMessageArgs = {
 	getFullStreamThinkingForTab: (tabId: string) => string;
 
 	inputRefs: RefObject<Map<string, ComposerBoxHandle | null>>;
-};
+}
 
 function buildTerminalAssistantOutputs(assistantMessageId: string, status: Status, uiContent: string): OutputUnion[] {
 	return [

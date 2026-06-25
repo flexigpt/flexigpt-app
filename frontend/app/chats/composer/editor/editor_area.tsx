@@ -94,10 +94,10 @@ import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
 import { dedupeToolChoices, uiToolChoiceToToolStoreChoice } from '@/tools/lib/tool_choice_utils';
 import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 
-type SkillStateApplyOptions = {
+interface SkillStateApplyOptions {
 	syncSession?: 'none' | 'if-session-exists' | 'ensure-if-enabled';
 	forceResetSession?: boolean;
-};
+}
 
 export interface EditorAreaHandle {
 	focus: () => void;
@@ -148,7 +148,9 @@ function countAutoExecutableToolChoices(choices: ToolStoreChoice[]): number {
 	return choices.filter(c => isAutoExecutableToolChoice(c)).length;
 }
 
-type SubmitOptions = { runPendingTools: boolean };
+interface SubmitOptions {
+	runPendingTools: boolean;
+}
 
 export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function EditorArea(
 	{

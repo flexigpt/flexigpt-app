@@ -4,12 +4,12 @@ import { FiArrowRight } from 'react-icons/fi';
 
 import { Link } from 'react-router';
 
-export type NavCardProps = {
+export interface NavCardProps {
 	title: string;
 	description: string;
 	to: string;
 	icon?: ReactNode;
-};
+}
 
 export function PrimaryActionCard({ title, description, to, icon }: NavCardProps) {
 	return (

@@ -25,12 +25,12 @@ type AssistantPresetOptionItemWithBundleSortFields = AssistantPresetOptionItem &
 	};
 };
 
-type AssistantPresetOptionGroup = {
+interface AssistantPresetOptionGroup {
 	bundleSlug: string;
 	bundleDisplayName: string;
 	selectableOptions: AssistantPresetOptionItem[];
 	unavailableOptions: AssistantPresetOptionItem[];
-};
+}
 
 const assistantPresetSlugCollator = new Intl.Collator(undefined, {
 	numeric: true,
@@ -103,7 +103,7 @@ function groupAssistantPresetOptions(presetOptions: AssistantPresetOptionItem[])
 	}));
 }
 
-type AssistantPresetDropdownProps = {
+interface AssistantPresetDropdownProps {
 	presetOptions: AssistantPresetOptionItem[];
 	selectedPresetKey: string | null;
 	selectedPreset: AssistantPresetOptionItem | null;
@@ -118,7 +118,7 @@ type AssistantPresetDropdownProps = {
 	onReapplySelectedPreset: () => Promise<boolean>;
 	onResetToBasePreset: () => Promise<boolean>;
 	onSelectPreset: (presetKey: string) => Promise<boolean>;
-};
+}
 
 export function AssistantPresetDropdown({
 	presetOptions,

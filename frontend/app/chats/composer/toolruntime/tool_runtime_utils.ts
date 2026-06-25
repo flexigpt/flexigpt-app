@@ -4,11 +4,11 @@ import { SKILLS_AUTOEXEC_TOOL_CHOICES } from '@/spec/skill';
 
 import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
 
-type AutoSubmitTracker = {
+interface AutoSubmitTracker {
 	observedCallKeys: Set<string>;
 	allObservedCallsAreAutoExecute: boolean;
 	attemptedBatchSignature: string | null;
-};
+}
 
 export function createAutoSubmitTracker(): AutoSubmitTracker {
 	return {

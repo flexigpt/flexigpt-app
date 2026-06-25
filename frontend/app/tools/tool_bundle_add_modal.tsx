@@ -16,10 +16,10 @@ interface AddToolBundleModalProps {
 
 type AddToolBundleModalContentProps = Omit<AddToolBundleModalProps, 'isOpen'>;
 
-type ErrorState = {
+interface ErrorState {
 	slug?: string;
 	displayName?: string;
-};
+}
 
 const INITIAL_FORM = {
 	slug: '',

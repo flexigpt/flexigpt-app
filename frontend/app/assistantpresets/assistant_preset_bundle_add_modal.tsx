@@ -14,16 +14,16 @@ interface AddAssistantPresetBundleModalProps {
 	existingSlugs: string[];
 }
 
-type ErrorState = {
+interface ErrorState {
 	slug?: string;
 	displayName?: string;
-};
+}
 
-type BundleFormData = {
+interface BundleFormData {
 	slug: string;
 	displayName: string;
 	description: string;
-};
+}
 
 function getInitialFormData(): BundleFormData {
 	return {

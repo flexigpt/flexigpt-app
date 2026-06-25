@@ -3,7 +3,9 @@ import type { ToolArgsTarget } from '@/spec/tool';
 import { emitCustomEvent, useEvent } from '@/hooks/use_event';
 
 const OPEN_TOOL_ARGS_EVENT = 'tool-args:open';
-type Detail = { target: ToolArgsTarget };
+interface Detail {
+	target: ToolArgsTarget;
+}
 
 export function dispatchOpenToolArgs(target: ToolArgsTarget, eventTarget?: EventTarget | null) {
 	emitCustomEvent(OPEN_TOOL_ARGS_EVENT, { target }, eventTarget);

@@ -240,7 +240,7 @@ function buildFinalOptions(
 	return sanitizeUIChatOptionByCapabilities(base);
 }
 
-export type AssistantContextController = {
+export interface AssistantContextController {
 	chatOptions: UIChatOption;
 
 	selectedModel: UIChatOption;
@@ -273,7 +273,7 @@ export type AssistantContextController = {
 
 	verbosityEnabled: boolean;
 	reasoningLevelOptions: ReasoningLevel[];
-};
+}
 
 export function useAssistantContextState(): AssistantContextController {
 	const [selectedModel, setSelectedModel] = useState(DefaultUIChatOptions);

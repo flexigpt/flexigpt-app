@@ -27,20 +27,20 @@ import { ReasoningTokensDropdown } from '@/chats/composer/reasoningparams/reason
 import type { ComposerSystemPromptController } from '@/chats/composer/systemprompts/use_composer_system_prompt';
 import { TemperatureDropdown } from '@/chats/composer/temperatures/temperature_dropdown';
 
-type EditorContextBarProps = {
+interface EditorContextBarProps {
 	context: AssistantContextController;
 	assistantPreset: AssistantPresetManagerState;
 	systemPrompt: Pick<
 		ComposerSystemPromptController,
 		'includeModelDefault' | 'selectedPromptKeys' | 'prompts' | 'prepareAssistantPresetSelections'
 	>;
-};
+}
 
-type AssistantPresetViewState = {
+interface AssistantPresetViewState {
 	option: AssistantPresetOptionItem | null;
 	preparedApplication: AssistantPresetPreparedApplication | null;
 	isActivePreset: boolean;
-};
+}
 
 export function EditorContextBar({ context, assistantPreset, systemPrompt }: EditorContextBarProps) {
 	const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);

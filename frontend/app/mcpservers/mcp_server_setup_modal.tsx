@@ -22,11 +22,11 @@ interface MCPServerSetupModalProps {
 	onSubmit: (inputValues: Record<string, MCPServerSetupInputValue>, reset: boolean) => Promise<void>;
 }
 
-type RowState = {
+interface RowState {
 	value: string;
 	clientID: string;
 	clientSecret: string;
-};
+}
 
 function emptyRow(): RowState {
 	return { value: '', clientID: '', clientSecret: '' };

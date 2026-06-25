@@ -1,11 +1,11 @@
 import type { RefObject } from 'react';
 import { useEffect } from 'react';
 
-type useCloseDetailsProps = {
+interface useCloseDetailsProps {
 	detailsRef: RefObject<HTMLDetailsElement | null>;
 	events?: (keyof DocumentEventMap)[];
 	onClose?: () => void;
-};
+}
 
 export function useCloseDetails({
 	detailsRef,

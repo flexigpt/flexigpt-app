@@ -14,10 +14,10 @@ import {
 } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 
-type PreviousMessagesDropdownProps = {
+interface PreviousMessagesDropdownProps {
 	value: IncludePreviousMessages;
 	setValue: Dispatch<SetStateAction<IncludePreviousMessages>>;
-};
+}
 
 const OPTIONS: IncludePreviousMessages[] = [1, 2, 3, 0, 'all'];
 

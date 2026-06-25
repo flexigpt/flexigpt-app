@@ -6,7 +6,7 @@ import { initConversation } from '@/chats/conversation/hydration_helper';
 
 export const MAX_TABS = 16;
 
-export type ChatTabState = {
+export interface ChatTabState {
 	tabId: string;
 	conversation: Conversation;
 
@@ -18,13 +18,13 @@ export type ChatTabState = {
 	manualTitleLocked: boolean;
 
 	editingMessageId: string | null;
-};
+}
 
-type NormalizedTabsResult = {
+interface NormalizedTabsResult {
 	tabs: ChatTabState[];
 	removedTabIds: string[];
 	addedScratchTabId: string | null;
-};
+}
 
 // keep letters, digits, space and hyphen; trim & limit to 64 chars
 export const sanitizeConversationTitle = (raw: string): string =>

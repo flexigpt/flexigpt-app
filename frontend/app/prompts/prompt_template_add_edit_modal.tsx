@@ -50,7 +50,7 @@ interface AddEditPromptTemplateModalProps {
 	mode?: ModalMode;
 }
 
-type ErrorState = {
+interface ErrorState {
 	displayName?: string;
 	slug?: string;
 	content?: string;
@@ -58,9 +58,9 @@ type ErrorState = {
 	version?: string;
 	blocks?: string;
 	variables?: string;
-};
+}
 
-type PromptTemplateFormData = {
+interface PromptTemplateFormData {
 	displayName: string;
 	slug: string;
 	description: string;
@@ -69,7 +69,7 @@ type PromptTemplateFormData = {
 	version: string;
 	blocks: MessageBlock[];
 	variables: PromptVariable[];
-};
+}
 
 function getSuggestedNextVersion(initialData: TemplateItem, existingTemplates: TemplateItem[]): string {
 	return suggestNextMinorVersion(

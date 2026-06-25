@@ -30,9 +30,9 @@ interface ToolUserArgsModalProps {
 	onSave: (newInstance: string) => void;
 }
 
-type FormState = {
+interface FormState {
 	rawJson: string;
-};
+}
 
 function toPrettyJSON(value: unknown): string {
 	try {

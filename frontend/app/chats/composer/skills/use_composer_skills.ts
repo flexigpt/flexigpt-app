@@ -16,10 +16,10 @@ import {
 } from '@/skills/lib/skill_identity_utils';
 
 type SkillSessionSyncMode = 'none' | 'if-session-exists' | 'ensure-if-enabled';
-type ApplySkillSelectionStateOptions = {
+interface ApplySkillSelectionStateOptions {
 	syncSession?: SkillSessionSyncMode;
 	forceResetSession?: boolean;
-};
+}
 
 interface UseComposerSkillsResult {
 	allSkills: SkillListItem[];

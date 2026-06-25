@@ -14,7 +14,7 @@ import { Dropdown } from '@/components/dropdown';
 
 import type { SystemPromptDraft, SystemPromptRole } from '@/prompts/lib/use_system_prompts';
 
-type SystemPromptAddModalProps = {
+interface SystemPromptAddModalProps {
 	isOpen: boolean;
 	mode: 'add' | 'fork';
 	initialDraft: SystemPromptDraft | null;
@@ -22,17 +22,17 @@ type SystemPromptAddModalProps = {
 	getExistingVersions: (bundleID: string, slug: string) => string[];
 	onClose: () => void;
 	onSave: (draft: SystemPromptDraft) => Promise<void> | void;
-};
+}
 
 type SystemPromptAddModalInnerProps = Omit<SystemPromptAddModalProps, 'isOpen'>;
 
-type ErrorState = {
+interface ErrorState {
 	bundleID?: string;
 	displayName?: string;
 	slug?: string;
 	version?: string;
 	content?: string;
-};
+}
 
 const SYSTEM_PROMPT_PLACEHOLDER_RE = /\{\{([a-zA-Z_][a-zA-Z0-9_-]*)\}\}/g;
 

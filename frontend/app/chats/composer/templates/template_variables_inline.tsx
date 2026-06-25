@@ -29,6 +29,7 @@ const TEMPLATE_VARIABLE_TOKEN_RE = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_-]*)\s*\}\}/g;
 type TemplateVariableDef = ReturnType<typeof computeEffectiveTemplate>['variablesSchema'][number];
 type InlineEditorKeyTarget = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 
+// oxlint-disable-next-line typescript/consistent-type-definitions
 type TemplateInlineTextNode = {
 	text: string;
 	ownerSelectionID?: string;
@@ -105,13 +106,13 @@ function findTemplateNode(
 	return undefined;
 }
 
-type TemplateVariableInlineEditorProps = {
+interface TemplateVariableInlineEditorProps {
 	el: TemplateVariableElementNode;
 	varDef: TemplateVariableDef | undefined;
 	currentValue: unknown;
 	commitValue: (next: unknown) => void;
 	cancelEdit: () => void;
-};
+}
 
 function TemplateVariableInlineEditor({
 	el,

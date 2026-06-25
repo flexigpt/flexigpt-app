@@ -8,7 +8,11 @@ export const LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS = 10000; // start chunking onc
 export const LARGE_TEXT_AUTODECHUNK_THRESHOLD_CHARS = 5000; // merge back once it shrinks below this
 export const LARGE_TEXT_CHUNK_SIZE = 1600; // each leaf ~1.2k chars; adjust 800–2000 based on taste
 
-type ChunkedTextNode = { text: string; __chunk: number };
+// oxlint-disable-next-line typescript/consistent-type-definitions
+type ChunkedTextNode = {
+	text: string;
+	__chunk: number;
+};
 const NON_WHITESPACE_RE = /\S/;
 
 export interface ComposerDocumentSelectionInfo {

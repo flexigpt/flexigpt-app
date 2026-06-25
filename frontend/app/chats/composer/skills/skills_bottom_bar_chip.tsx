@@ -25,11 +25,11 @@ import { GroupedMenuSection, GroupedMenuSubheading } from '@/components/grouped_
 
 import { dedupeSkillRefs, skillRefFromListItem, skillRefKey } from '@/skills/lib/skill_identity_utils';
 
-type BundleGroup = {
+interface BundleGroup {
 	bundleID: string;
 	bundleSlug: string;
 	skills: SkillListItem[];
-};
+}
 
 const skillDropdownCollator = new Intl.Collator(undefined, {
 	numeric: true,

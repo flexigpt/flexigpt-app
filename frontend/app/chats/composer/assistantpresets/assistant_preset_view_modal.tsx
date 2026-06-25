@@ -166,7 +166,7 @@ function SectionCard(props: {
 	);
 }
 
-type AssistantPresetViewModalProps = {
+interface AssistantPresetViewModalProps {
 	isOpen: boolean;
 	onClose: () => void;
 	viewedPreset: AssistantPresetOptionItem | null;
@@ -179,7 +179,7 @@ type AssistantPresetViewModalProps = {
 	currentSelectedPromptKeys: string[];
 	promptItems: SystemPromptItem[];
 	modificationSummary: AssistantPresetModificationSummary;
-};
+}
 
 export function AssistantPresetViewModal({
 	isOpen,

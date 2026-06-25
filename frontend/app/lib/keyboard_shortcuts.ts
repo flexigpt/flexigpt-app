@@ -98,22 +98,22 @@ export const defaultShortcutConfig: ShortcutConfig = {
 	[ShortcutAction.stopResponse]: { key: '.', ctrlOrMeta: true }, // Mod+.
 };
 
-type ConfigShortcutMeta = {
+interface ConfigShortcutMeta {
 	label: string;
 	group: ShortcutGroup;
 	order: number;
 	/** Backed by ShortcutConfig; key combo is configurable */
 	source: 'config';
-};
+}
 
-type StaticShortcutMeta = {
+interface StaticShortcutMeta {
 	label: string;
 	group: ShortcutGroup;
 	order: number;
 	/** Fixed key combo / trigger, handled internally by Plate */
 	source: 'static';
 	keys: string;
-};
+}
 
 type ShortcutMeta = ConfigShortcutMeta | StaticShortcutMeta;
 

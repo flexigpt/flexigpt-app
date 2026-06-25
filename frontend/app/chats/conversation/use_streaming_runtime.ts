@@ -2,21 +2,21 @@ import { type RefObject, useCallback, useEffect, useMemo, useRef } from 'react';
 
 import type { ChatTabState } from '@/chats/tabs/tabs_model';
 
-type StreamChannelBuffer = {
+interface StreamChannelBuffer {
 	chunks: string[];
 	flushedIdx: number;
 	display: string;
-};
+}
 
-export type StreamBuffer = {
+export interface StreamBuffer {
 	text: StreamChannelBuffer;
 	thinking: StreamChannelBuffer;
-};
+}
 
-type UseStreamingRuntimeArgs = {
+interface UseStreamingRuntimeArgs {
 	tabs: ChatTabState[];
 	selectedTabIdRef: RefObject<string>;
-};
+}
 
 export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRuntimeArgs) {
 	const tabIdSet = useMemo(() => new Set(tabs.map(tab => tab.tabId)), [tabs]);

@@ -26,19 +26,19 @@ export interface PromptTemplateInsertArgs {
 	template?: PromptTemplate;
 }
 
-type PromptTemplateGroup = {
+interface PromptTemplateGroup {
 	bundleID: string;
 	bundleSlug: string;
 	options: PromptTemplateListItem[];
-};
+}
 
-type PromptTemplateDropdownProps = {
+interface PromptTemplateDropdownProps {
 	store: MenuStore;
 	open: boolean;
 	loading: boolean;
 	items: PromptTemplateListItem[];
 	onPick: (item: PromptTemplateListItem) => void;
-};
+}
 
 const promptTemplateCollator = new Intl.Collator(undefined, {
 	numeric: true,

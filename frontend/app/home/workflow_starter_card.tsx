@@ -4,7 +4,7 @@ import { FiAlertTriangle, FiArrowRight, FiCheckCircle, FiCode } from 'react-icon
 
 import { Link } from 'react-router';
 
-type WorkflowStarter = {
+interface WorkflowStarter {
 	title: string;
 	description: string;
 	workflowID: string;
@@ -13,7 +13,7 @@ type WorkflowStarter = {
 	assistantPresetBundleID?: string;
 	assistantPresetSlug?: string;
 	assistantPresetVersion?: string;
-};
+}
 
 const SOFTWARE_ASSISTANTS_BUNDLE_ID = '019d676e-2533-7fdf-a0af-d3a571ab4f4f';
 
