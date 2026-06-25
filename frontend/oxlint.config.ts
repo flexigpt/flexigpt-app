@@ -80,7 +80,7 @@ const eslintRules: DummyRuleMap = {
 	'prefer-numeric-literals': 'error',
 	yoda: 'error',
 
-	'prefer-object-has-own': 'off',
+	'prefer-object-has-own': 'error',
 	'no-implicit-coercion': 'off',
 
 	// Configs.
