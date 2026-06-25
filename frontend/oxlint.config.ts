@@ -32,70 +32,25 @@ const eslintRules: DummyRuleMap = {
 	// Correctness. Default On.
 	'constructor-super': 'off',
 	'getter-return': 'off',
-
-	// Restriction. Default On.
-	'no-void': 'off',
-	complexity: 'off',
-	'no-undefined': 'off',
-	'no-console': 'off',
-	'no-empty-function': 'off',
-	'no-use-before-define': 'off',
-	'no-plusplus': 'off',
-	'no-div-regex': 'off',
-	'default-case': 'off',
-	'class-methods-use-this': 'off',
-	'no-bitwise': 'off',
-
-	// Suspicious. Default on.
-	'no-underscore-dangle': 'off',
-
-	// Pedantic. Default On.
-	'max-lines-per-function': 'off',
-	'max-lines': 'off',
-	'no-inline-comments': 'off',
-	'no-negated-condition': 'off',
-	'require-unicode-regexp': 'off',
-	'require-await': 'off',
-	'no-promise-executor-return': 'off',
-	'max-depth': 'off',
-
-	// Nursery. Default Off.
-
-	// Style. Default Off.
-	curly: 'error',
-	'default-param-last': 'error',
-	'guard-for-in': 'error',
-	'no-duplicate-imports': ['error', { allowSeparateTypeImports: true }],
-	'no-multi-assign': 'error',
-	'no-new-func': 'error',
-	'no-return-assign': 'error',
-	'no-script-url': 'error',
-	'no-template-curly-in-string': 'error',
-	'no-useless-computed-key': 'error',
-	'prefer-const': 'error',
-	'prefer-promise-reject-errors': 'error',
-	'prefer-regex-literals': 'error',
-	'prefer-rest-params': 'error',
-	'prefer-spread': 'error',
-	'prefer-numeric-literals': 'error',
-	yoda: 'error',
-
-	'prefer-object-has-own': 'error',
-	'no-implicit-coercion': 'off',
-
-	// Configs.
-	'no-restricted-exports': [
+	'no-unused-vars': [
 		'error',
 		{
-			restrictDefaultExports: {
-				defaultFrom: true,
-				direct: true,
-				named: true,
-				namedFrom: true,
-				namespaceFrom: true,
-			},
+			argsIgnorePattern: '^_',
+			caughtErrorsIgnorePattern: '^_',
+			varsIgnorePattern: '^_',
 		},
 	],
+
+	// Restriction. Default On.
+	complexity: 'off',
+	'class-methods-use-this': 'off',
+	'default-case': 'off',
+	'no-bitwise': 'off',
+	'no-console': 'off',
+	'no-div-regex': 'off',
+	'no-empty-function': 'off',
+	'no-plusplus': 'off',
+
 	'no-restricted-imports': [
 		'error',
 		{
@@ -119,12 +74,91 @@ const eslintRules: DummyRuleMap = {
 			],
 		},
 	],
-	'no-unused-vars': [
+
+	'no-undefined': 'off',
+	'no-use-before-define': 'off',
+	'no-void': 'off',
+
+	// Suspicious. Default on.
+	'no-underscore-dangle': 'off',
+
+	// Pedantic. Default On.
+	'max-lines-per-function': 'off',
+	'max-lines': 'off',
+	'no-inline-comments': 'off',
+	'no-negated-condition': 'off',
+	'require-unicode-regexp': 'off',
+	'require-await': 'off',
+	'no-promise-executor-return': 'off',
+	'max-depth': 'off',
+
+	// Style. Default Off.
+	curly: 'error',
+	'default-case-last': 'error',
+	'default-param-last': 'error',
+	'func-name-matching': 'error',
+	'func-names': 'error',
+	'grouped-accessor-pairs': 'error',
+	'guard-for-in': 'error',
+	'no-duplicate-imports': ['error', { allowSeparateTypeImports: true }],
+	'no-extra-label': 'error',
+	'no-label-var': 'error',
+	'no-labels': 'error',
+	'no-lone-blocks': 'error',
+	'no-multi-assign': 'error',
+	'no-new-func': 'error',
+	'no-return-assign': 'error',
+	'no-script-url': 'error',
+	'no-template-curly-in-string': 'error',
+	'no-useless-computed-key': 'error',
+	'prefer-const': 'error',
+	'prefer-numeric-literals': 'error',
+	'prefer-object-has-own': 'error',
+	'prefer-object-spread': 'error',
+	'prefer-promise-reject-errors': 'error',
+	'prefer-regex-literals': 'error',
+	'prefer-rest-params': 'error',
+	'prefer-spread': 'error',
+	'vars-on-top': 'error',
+	yoda: 'error',
+
+	'arrow-body-style': 'off',
+	'func-style': 'off',
+	'capitalized-comments': 'off',
+	'id-length': 'off',
+	'id-match': 'off',
+	'init-declarations': 'off',
+	'logical-assignment-operators': 'off',
+	'max-params': 'off',
+	'max-statements': 'off',
+	'new-cap': 'off',
+	'no-continue': 'off',
+	'no-implicit-coercion': 'off',
+	'no-magic-numbers': 'off',
+	'no-multi-str': 'off',
+	'no-nested-ternary': 'off',
+	'no-ternary': 'off',
+	'object-shorthand': 'off',
+	'operator-assignment': 'off',
+	'prefer-arrow-callback': 'off',
+	'prefer-destructuring': 'off',
+	'prefer-exponentiation-operator': 'off',
+	'prefer-named-capture-group': 'off',
+	'prefer-template': 'off',
+	'sort-imports': 'off',
+	'sort-keys': 'off',
+
+	// Nursery. Default Off.
+	'no-restricted-exports': [
 		'error',
 		{
-			argsIgnorePattern: '^_',
-			caughtErrorsIgnorePattern: '^_',
-			varsIgnorePattern: '^_',
+			restrictDefaultExports: {
+				defaultFrom: true,
+				direct: true,
+				named: true,
+				namedFrom: true,
+				namespaceFrom: true,
+			},
 		},
 	],
 };
@@ -148,31 +182,20 @@ const tsRules: DummyRuleMap = {
 	'typescript/consistent-return': 'off',
 
 	// Pedantic. Default On.
-	'typescript/strict-void-return': 'off',
-	'typescript/strict-boolean-expressions': 'off',
-	'typescript/prefer-readonly-parameter-types': 'off',
-	'typescript/prefer-nullish-coalescing': 'off',
-	'typescript/prefer-promise-reject-errors': 'off',
-	'typescript/switch-exhaustiveness-check': 'off',
-	'typescript/no-misused-promises': 'off',
-	'typescript/no-unsafe-argument': 'off',
-	'typescript/no-unsafe-assignment': 'off',
-	'typescript/no-unsafe-call': 'off',
-	'typescript/require-await': 'off',
-
-	// Nursery. Default Off.
-
-	// Style. Default Off.
-	'typescript/consistent-type-imports': 'error',
-
-	// Configs.
 	'typescript/ban-ts-comment': [
 		'error',
 		{
 			minimumDescriptionLength: 10,
 		},
 	],
-
+	'typescript/switch-exhaustiveness-check': 'off',
+	'typescript/no-misused-promises': 'off',
+	'typescript/no-unsafe-argument': 'off',
+	'typescript/no-unsafe-assignment': 'off',
+	'typescript/no-unsafe-call': 'off',
+	'typescript/prefer-readonly-parameter-types': 'off',
+	'typescript/prefer-nullish-coalescing': 'off',
+	'typescript/prefer-promise-reject-errors': 'off',
 	'typescript/restrict-plus-operands': [
 		'error',
 		{
@@ -184,6 +207,39 @@ const tsRules: DummyRuleMap = {
 		},
 	],
 	'typescript/return-await': ['error', 'error-handling-correctness-only'],
+	'typescript/require-await': 'off',
+	'typescript/strict-void-return': 'off',
+	'typescript/strict-boolean-expressions': 'off',
+
+	// Style. Default Off.
+	'typescript/adjacent-overload-signatures': 'error',
+	'typescript/ban-tslint-comment': 'error',
+	'typescript/class-literal-property-style': 'error',
+	'typescript/consistent-generic-constructors': 'error',
+	'typescript/consistent-indexed-object-style': 'error',
+	'typescript/consistent-type-assertions': 'error',
+	'typescript/consistent-type-exports': 'error',
+	'typescript/consistent-type-imports': 'error',
+	'typescript/no-empty-interface': 'error',
+	'typescript/no-inferrable-types': 'error',
+	'typescript/no-unnecessary-qualifier': 'error',
+	'typescript/parameter-properties': 'error',
+	'typescript/prefer-find': 'error',
+	'typescript/prefer-function-type': 'error',
+	'typescript/prefer-reduce-type-parameter': 'error',
+	'typescript/prefer-return-this-type': 'error',
+	'typescript/prefer-string-starts-ends-with': 'error',
+	'typescript/unified-signatures': 'error',
+
+	'typescript/array-type': 'off',
+	'typescript/consistent-type-definitions': 'off',
+	'typescript/dot-notation': 'off',
+	'typescript/method-signature-style': 'off',
+	'typescript/prefer-for-of': 'off',
+	'typescript/prefer-readonly': 'off',
+	'typescript/prefer-regexp-exec': 'off',
+
+	// Nursery. Default Off.
 };
 
 const importRules: DummyRuleMap = {

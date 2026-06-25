@@ -45,12 +45,12 @@ interface MCPServerDetailsModalProps {
 	authHealth?: MCPAuthHealth;
 }
 
-type DiscoveryData = {
+interface DiscoveryData {
 	tools: MCPToolCapability[];
 	resources: MCPResourceRef[];
 	resourceTemplates: MCPResourceTemplateRef[];
 	prompts: MCPPromptRef[];
-};
+}
 
 const SENSITIVE_HTTP_HEADER_NAMES = new Set([
 	'authorization',

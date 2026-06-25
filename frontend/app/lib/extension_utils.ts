@@ -1,6 +1,4 @@
-interface LanguageMap {
-	[key: string]: { extension: string; mimeType: string };
-}
+type LanguageMap = Record<string, { extension: string; mimeType: string }>;
 
 export const ProgrammingLanguages: LanguageMap = {
 	javascript: { extension: '.js', mimeType: 'text/javascript' },
@@ -35,7 +33,7 @@ export const ProgrammingLanguages: LanguageMap = {
 };
 
 // Determine the file extension from the MIME type
-export const MimeTypeMap: { [key: string]: string } = {
+export const MimeTypeMap: Record<string, string> = {
 	'image/png': '.png',
 	'image/jpeg': '.jpg',
 	'image/gif': '.gif',

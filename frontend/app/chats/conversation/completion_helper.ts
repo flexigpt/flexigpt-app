@@ -140,7 +140,7 @@ function getErrorStub(
 	];
 
 	// Prefer backend debugDetails if present
-	let detailsMarkdown: string = '';
+	let detailsMarkdown = '';
 	let debugDetails: any;
 	if (rawResponse?.inferenceResponse) {
 		detailsMarkdown =

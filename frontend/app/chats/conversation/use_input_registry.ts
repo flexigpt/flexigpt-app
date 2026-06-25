@@ -10,14 +10,14 @@ import {
 } from '@/chats/conversation/hydration_helper';
 import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';
 
-type PendingDrop = {
+interface PendingDrop {
 	tabId: string;
 	payload: AttachmentsDroppedPayload;
-};
+}
 
-type UseInputRegistryArgs = {
+interface UseInputRegistryArgs {
 	tabExists: (tabId: string) => boolean;
-};
+}
 
 export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 	const inputRefs = useRef(new Map<string, ComposerBoxHandle | null>());

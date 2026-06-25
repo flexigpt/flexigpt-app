@@ -126,7 +126,7 @@ export class WailsAggregateAPI implements IAggregateAPI {
 			skillSessionID: skillSessionID ?? '',
 		} as wailsSpec.CompletionRequestBody;
 
-		const abortPromise: Promise<never> = new Promise((_, reject) => {
+		const abortPromise = new Promise<never>((_, reject) => {
 			if (!signal) {
 				return;
 			}

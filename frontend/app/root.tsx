@@ -147,7 +147,7 @@ export default function Root() {
 			}
 		};
 
-		let requestCallAvailable: boolean = false;
+		let requestCallAvailable = false;
 		if ('requestIdleCallback' in window) {
 			requestCallAvailable = true;
 		}

@@ -103,7 +103,7 @@ interface AddEditMCPServerModalProps {
 	mode?: ModalMode;
 }
 
-type ErrorState = {
+interface ErrorState {
 	serverID?: string;
 	displayName?: string;
 	stdioCommand?: string;
@@ -117,9 +117,9 @@ type ErrorState = {
 	httpAPIKey?: string;
 	policies?: string;
 	toolPoliciesJSON?: string;
-};
+}
 
-type SecretEnvRow = {
+interface SecretEnvRow {
 	rowID: string;
 	envName: string;
 	originalEnvName?: string;
@@ -127,9 +127,9 @@ type SecretEnvRow = {
 	existingSecretRef?: string;
 	secretValue: string;
 	deleteExisting: boolean;
-};
+}
 
-type MCPServerFormData = {
+interface MCPServerFormData {
 	serverID: string;
 	displayName: string;
 	enabled: boolean;
@@ -169,7 +169,7 @@ type MCPServerFormData = {
 	requireApprovalForContextUpdates: boolean;
 
 	toolPoliciesJSON: string;
-};
+}
 
 const ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 

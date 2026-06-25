@@ -121,7 +121,7 @@ export function areAssistantRuntimeSnapshotsEqual(
 }
 
 function hasOwn(value: object, key: string): boolean {
-	return Object.prototype.hasOwnProperty.call(value, key);
+	return Object.hasOwn(value, key);
 }
 
 function mergePatchObject<T>(baseValue: T | undefined, patchValue: unknown): T {

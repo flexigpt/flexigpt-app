@@ -592,7 +592,7 @@ function AddEditModelPresetModalContent({
 					nextErrors.modelPresetID = 'Model Preset ID is required.';
 				} else if (!/^[a-zA-Z0-9-]+$/.test(idTrim)) {
 					nextErrors.modelPresetID = 'Only letters, numbers, and hyphens allowed.';
-				} else if (Object.prototype.hasOwnProperty.call(existingModels, idTrim)) {
+				} else if (Object.hasOwn(existingModels, idTrim)) {
 					nextErrors.modelPresetID = 'Model Preset ID must be unique.';
 				}
 			}

@@ -216,7 +216,7 @@ function buildResolvedPromptVariableValues(variables?: PromptVariable[]): Record
 
 function renderResolvedPromptText(text: string, values: Record<string, string>): string {
 	return text.replace(TEMPLATE_PLACEHOLDER_RE, (match, name: string) =>
-		Object.prototype.hasOwnProperty.call(values, name) ? values[name] : match
+		Object.hasOwn(values, name) ? values[name] : match
 	);
 }
 

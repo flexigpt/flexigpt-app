@@ -10,7 +10,7 @@
 		"typecheck": "pnpm run typegen && pnpm run tsc",
 		"lint:knip": "knip --tags=-lintignore",
 		"lint:oxlint": "oxlint .",
-		"lint:oxlint:fix": "oxlint --fix -A all -D curly .",
+		"lint:oxlint:fix": "oxlint --fix -A all -D prefer-object-has-own .",
 		"lint:eslint": "eslint . -c ./eslint.config.mjs",
 		"lint:specific": "eslint . -c ./eslint.specific.config.mjs --no-config-lookup",
 		"lint:eslintinfo": "eslint --env-info",

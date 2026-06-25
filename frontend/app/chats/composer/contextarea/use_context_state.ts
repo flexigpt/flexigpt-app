@@ -39,7 +39,7 @@ function isHybridReasoningModel(model: UIChatOption): boolean {
 }
 
 function hasOwn(obj: object, key: string): boolean {
-	return Object.prototype.hasOwnProperty.call(obj, key);
+	return Object.hasOwn(obj, key);
 }
 
 function applyPersistedModelParamToSelectedModel(

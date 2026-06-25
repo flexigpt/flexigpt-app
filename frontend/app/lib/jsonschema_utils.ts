@@ -252,11 +252,11 @@ export function buildExampleFromDraft7Schema(
 
 	try {
 		// Highest priority: const/default/examples/enum
-		if (Object.prototype.hasOwnProperty.call(schemaObj, 'const')) {
+		if (Object.hasOwn(schemaObj, 'const')) {
 			return schemaObj['const'] as JSONValue;
 		}
 
-		if (Object.prototype.hasOwnProperty.call(schemaObj, 'default')) {
+		if (Object.hasOwn(schemaObj, 'default')) {
 			return schemaObj['default'] as JSONValue;
 		}
 
@@ -273,9 +273,9 @@ export function buildExampleFromDraft7Schema(
 		}
 
 		// if/then/else (Draft-07): prefer "then" branch example merged with base when possible
-		const hasIf = Object.prototype.hasOwnProperty.call(schemaObj, 'if');
-		const hasThen = Object.prototype.hasOwnProperty.call(schemaObj, 'then');
-		const hasElse = Object.prototype.hasOwnProperty.call(schemaObj, 'else');
+		const hasIf = Object.hasOwn(schemaObj, 'if');
+		const hasThen = Object.hasOwn(schemaObj, 'then');
+		const hasElse = Object.hasOwn(schemaObj, 'else');
 
 		if (hasIf && (hasThen || hasElse)) {
 			const baseSchema: JSONObject = { ...schemaObj };
