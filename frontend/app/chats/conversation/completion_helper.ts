@@ -1,5 +1,4 @@
 import { type ConversationMessage } from '@/spec/conversation';
-import type { ProviderName, URLCitation, WebSearchToolOutputItemUnion } from '@/spec/inference';
 import {
 	CitationKind,
 	type CompletionResponseBody,
@@ -9,6 +8,7 @@ import {
 	type ModelParam,
 	OutputKind,
 	type OutputUnion,
+	type ProviderName,
 	type ReasoningContent,
 	RoleEnum,
 	Status,
@@ -16,6 +16,8 @@ import {
 	type ToolOutput,
 	type UIToolCall,
 	type UIToolOutput,
+	type URLCitation,
+	type WebSearchToolOutputItemUnion,
 } from '@/spec/inference';
 import type { MCPConversationContext, MCPProviderToolMapping, MCPToolSelection } from '@/spec/mcp';
 import type { ModelPresetID } from '@/spec/modelpreset';

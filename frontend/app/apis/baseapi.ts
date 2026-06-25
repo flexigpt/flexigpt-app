@@ -1,3 +1,4 @@
+// oxlint-disable import/no-mutable-exports
 import { IS_WAILS_PLATFORM } from '@/lib/features';
 import { setFrontendErrorLogger } from '@/lib/frontend_error_reporter';
 
@@ -16,6 +17,7 @@ import type {
 	IToolRuntimeAPI,
 	IToolStoreAPI,
 } from '@/apis/interface';
+// oxlint-disable-next-line import/no-namespace
 import * as wailsImpl from '@/apis/wailsapi';
 
 export let log: ILogger;

@@ -252,18 +252,18 @@ const importRules: DummyRuleMap = {
 
 	// Style. Default Off.
 	'import/no-duplicates': 'error',
+	'import/first': 'error',
+	'import/newline-after-import': 'error',
+	'import/no-anonymous-default-export': 'error',
+	'import/no-mutable-exports': 'error',
+	'import/no-namespace': 'error',
+	'import/no-nodejs-modules': ['error', { allow: ['path', 'node:path'] }],
 
 	'import/consistent-type-specifier-style': 'off',
 	'import/exports-last': 'off',
-	'import/first': 'off',
 	'import/group-exports': 'off',
-	'import/newline-after-import': 'off',
-	'import/no-anonymous-default-export': 'off',
-	'import/no-mutable-exports': 'off',
 	'import/no-named-default': 'off',
 	'import/no-named-export': 'off',
-	'import/no-namespace': 'off',
-	'import/no-nodejs-modules': 'off',
 	'import/prefer-default-export': 'off',
 };
 
