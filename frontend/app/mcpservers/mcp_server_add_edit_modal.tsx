@@ -1556,7 +1556,7 @@ function AddEditMCPServerModalContent({
 										</div>
 										{formData.apiKeyExistingRef && (
 											<div className="grid grid-cols-12 items-center gap-2">
-												<div className="col-span-3"></div>
+												<div className="col-span-3" />
 												<label className="label col-span-9 cursor-pointer justify-start gap-3">
 													<input
 														type="checkbox"
@@ -1615,7 +1615,7 @@ function AddEditMCPServerModalContent({
 
 										{formData.httpClientCredentialRef && (
 											<div className="grid grid-cols-12 items-center gap-2">
-												<div className="col-span-3"></div>
+												<div className="col-span-3" />
 												<label className="label col-span-9 cursor-pointer justify-start gap-3">
 													<input
 														type="checkbox"
@@ -1700,7 +1700,7 @@ function AddEditMCPServerModalContent({
 						</div>
 
 						<div className="grid grid-cols-12 items-center gap-2">
-							<div className="col-span-3"></div>
+							<div className="col-span-3" />
 							<div className="col-span-9 grid grid-cols-1 gap-2 md:grid-cols-3">
 								<label className="label cursor-pointer justify-start gap-3">
 									<input
@@ -1740,7 +1740,7 @@ function AddEditMCPServerModalContent({
 						<div className="divider">Apps Policy</div>
 
 						<div className="grid grid-cols-12 items-center gap-2">
-							<div className="col-span-3"></div>
+							<div className="col-span-3" />
 							<div className="col-span-9 grid grid-cols-1 gap-2 md:grid-cols-2">
 								<label className="label cursor-pointer justify-start gap-3">
 									<input

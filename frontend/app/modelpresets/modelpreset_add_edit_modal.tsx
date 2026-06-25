@@ -230,7 +230,7 @@ function parseStopSequencesRaw(raw: string): string[] {
 		.map(s => s.trim())
 		.filter(Boolean);
 
-	return Array.from(new Set(parts));
+	return [...new Set(parts)];
 }
 
 type ValidationField =

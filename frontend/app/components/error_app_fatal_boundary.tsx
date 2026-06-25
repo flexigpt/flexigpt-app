@@ -34,7 +34,7 @@ export class AppFatalBoundary extends Component<AppFatalBoundaryProps, AppFatalB
 		});
 	}
 
-	private tryAgain = () => {
+	private handleTryAgain = () => {
 		this.setState({
 			error: null,
 			crashCount: 0,
@@ -53,7 +53,7 @@ export class AppFatalBoundary extends Component<AppFatalBoundaryProps, AppFatalB
 				message="The interface reached an unrecoverable state. You can go home or reload the UI."
 				technicalDetails={this.state.error.stack || this.state.error.message}
 				showResetLocalState={this.state.crashCount >= 2}
-				onTryAgain={this.tryAgain}
+				onTryAgain={this.handleTryAgain}
 			/>
 		);
 	}

@@ -172,7 +172,7 @@ function SystemPromptBottomBarChipInner({
 			group.prompts.push(item);
 		}
 
-		return Array.from(groupsByBundleID.values())
+		return [...groupsByBundleID.values()]
 			.map(group => ({
 				...group,
 				prompts: [...group.prompts].toSorted((left, right) => {

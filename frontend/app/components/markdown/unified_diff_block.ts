@@ -353,7 +353,7 @@ export function buildEditableTargetsFromOutput(
 		});
 	}
 
-	return Array.from(byKey.values());
+	return [...byKey.values()];
 }
 
 export function summaryLabel(output: ApplyUnifiedDiffOut | undefined, fallback: ParsedUnifiedDiffForUI): string {
@@ -795,7 +795,7 @@ function sortAndDedupeTargetInferences(inferences: TargetPathInferenceForUI[]): 
 		}
 	}
 
-	return Array.from(byTarget.values()).toSorted((left, right) => {
+	return [...byTarget.values()].toSorted((left, right) => {
 		if (left.score !== right.score) {
 			return right.score - left.score;
 		}

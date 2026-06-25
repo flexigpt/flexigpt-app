@@ -68,7 +68,7 @@ function mergeOverflowDirs(
 	if (!changed && byDirPath.size === existing.length) {
 		return existing;
 	}
-	return Array.from(byDirPath.values());
+	return [...byDirPath.values()];
 }
 
 function releaseOwnedKeysFromDirectoryGroups(

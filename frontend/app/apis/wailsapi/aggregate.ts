@@ -126,6 +126,7 @@ export class WailsAggregateAPI implements IAggregateAPI {
 			skillSessionID: skillSessionID ?? '',
 		} as wailsSpec.CompletionRequestBody;
 
+		// oxlint-disable-next-line promise/param-names
 		const abortPromise = new Promise<never>((_, reject) => {
 			if (!signal) {
 				return;

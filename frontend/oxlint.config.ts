@@ -92,7 +92,7 @@ const eslintRules: DummyRuleMap = {
 	'no-promise-executor-return': 'off',
 	'max-depth': 'off',
 
-	// Style. Default Off.
+	// Style. Default on.
 	curly: 'error',
 	'default-case-last': 'error',
 	'default-param-last': 'error',
@@ -211,7 +211,7 @@ const tsRules: DummyRuleMap = {
 	'typescript/strict-void-return': 'off',
 	'typescript/strict-boolean-expressions': 'off',
 
-	// Style. Default Off.
+	// Style. Default on.
 	'typescript/adjacent-overload-signatures': 'error',
 	'typescript/ban-tslint-comment': 'error',
 	'typescript/class-literal-property-style': 'error',
@@ -250,7 +250,7 @@ const importRules: DummyRuleMap = {
 	// Pedantic. Default on.
 	'import/max-dependencies': 'off',
 
-	// Style. Default Off.
+	// Style. Default on.
 	'import/no-duplicates': 'error',
 	'import/first': 'error',
 	'import/newline-after-import': 'error',
@@ -278,6 +278,22 @@ const reactRules: DummyRuleMap = {
 
 	// Suspicious. Default on.
 	'react/react-in-jsx-scope': 'off',
+
+	// Style. Default on.
+	'react/jsx-curly-brace-presence': 'error',
+	'react/jsx-fragments': 'error',
+	'react/jsx-pascal-case': 'error',
+	'react/no-redundant-should-component-update': 'error',
+	'react/prefer-es6-class': 'error',
+	'react/self-closing-comp': 'error',
+
+	'react/hook-use-state': 'off',
+	'react/jsx-boolean-value': 'off',
+	'react/jsx-handler-names': 'off',
+	'react/jsx-max-depth': 'off',
+	'react/jsx-props-no-spreading': 'off',
+	'react/no-set-state': 'off',
+	'react/state-in-constructor': 'off',
 };
 
 const promiseRules: DummyRuleMap = {
@@ -286,6 +302,16 @@ const promiseRules: DummyRuleMap = {
 
 	// Suspicious. Default on.
 	'promise/always-return': 'off',
+
+	// Style. Default on.
+	'promise/no-nesting': 'error',
+	'promise/no-return-wrap': 'error',
+	'promise/param-names': 'error',
+	'promise/prefer-catch': 'error',
+
+	'promise/avoid-new': 'off',
+	'promise/prefer-await-to-callbacks': 'off',
+	'promise/prefer-await-to-then': 'off',
 };
 
 const oxcRules: DummyRuleMap = {
@@ -308,7 +334,10 @@ const unicornRules: DummyRuleMap = {
 	'unicorn/no-negated-condition': 'off',
 	'unicorn/no-useless-undefined': 'off',
 
-	// Style. Default off.
+	// Style. Default on.
+	'unicorn/consistent-date-clone': 'error',
+	'unicorn/consistent-template-literal-escape': 'error',
+	'unicorn/error-message': 'error',
 	'unicorn/filename-case': [
 		'error',
 		{
@@ -316,11 +345,65 @@ const unicornRules: DummyRuleMap = {
 			ignore: ['react-router.config.ts'],
 		},
 	],
+	'unicorn/no-unreadable-array-destructuring': 'error',
+	'unicorn/no-useless-collection-argument': 'error',
+	'unicorn/prefer-array-index-of': 'error',
+	'unicorn/prefer-class-fields': 'error',
+	'unicorn/prefer-classlist-toggle': 'error',
+	'unicorn/prefer-dom-node-text-content': 'error',
+	'unicorn/prefer-includes': 'error',
+	'unicorn/prefer-keyboard-event-key': 'error',
+	'unicorn/prefer-modern-dom-apis': 'error',
+	'unicorn/prefer-object-from-entries': 'error',
+	'unicorn/prefer-optional-catch-binding': 'error',
+	'unicorn/prefer-spread': 'error',
+	'unicorn/prefer-string-trim-start-end': 'error',
+	'unicorn/require-array-join-separator': 'error',
+	'unicorn/text-encoding-identifier-case': 'error',
+	'unicorn/throw-new-error': 'error',
+
+	'unicorn/catch-error-name': 'off',
+	'unicorn/consistent-existence-index-check': 'off',
+	'unicorn/custom-error-definition': 'off',
+	'unicorn/empty-brace-spaces': 'off',
+
+	'unicorn/max-nested-calls': 'off',
+	'unicorn/no-array-method-this-argument': 'off',
+	'unicorn/no-await-expression-member': 'off',
+	'unicorn/no-console-spaces': 'off',
+	'unicorn/no-nested-ternary': 'off',
+	'unicorn/no-null': 'off',
+	'unicorn/no-zero-fractions': 'off',
+	'unicorn/number-literal-case': 'off',
+	'unicorn/numeric-separators-style': 'off',
+	'unicorn/prefer-bigint-literals': 'off',
+	'unicorn/prefer-default-parameters': 'off',
+	'unicorn/prefer-export-from': 'off',
+	'unicorn/prefer-global-this': 'off',
+	'unicorn/prefer-logical-operator-over-ternary': 'off',
+	'unicorn/prefer-negative-index': 'off',
+	'unicorn/prefer-reflect-apply': 'off',
+	'unicorn/prefer-response-static-json': 'off',
+	'unicorn/prefer-string-raw': 'off',
+	'unicorn/prefer-structured-clone': 'off',
+	'unicorn/prefer-ternary': 'off',
+	'unicorn/relative-url-style': 'off',
+	'unicorn/require-module-attributes': 'off',
+	'unicorn/switch-case-braces': 'off',
+	'unicorn/switch-case-break-position': 'off',
 };
 
 const nodeRules: DummyRuleMap = {
 	// Restriction. Default on.
 	'node/no-process-env': 'off',
+
+	// Style. Default on.
+	'node/global-require': 'error',
+	'node/no-exports-assign': 'error',
+	'node/no-mixed-requires': 'error',
+
+	'node/callback-return': 'off',
+	'node/no-sync': 'off',
 };
 
 // oxlint-disable-next-line no-restricted-exports
@@ -330,8 +413,8 @@ export default defineConfig({
 		suspicious: 'error',
 		restriction: 'error',
 		pedantic: 'error',
+		style: 'error',
 		perf: 'off',
-		style: 'off',
 		nursery: 'off',
 	},
 

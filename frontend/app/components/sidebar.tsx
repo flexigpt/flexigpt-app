@@ -23,9 +23,9 @@ interface SidebarProps {
 }
 
 export function Sidebar({ children }: SidebarProps) {
-	const [isDrawerOpen, setDrawerOpen] = useState(false);
+	const [drawerOpen, setDrawerOpen] = useState(false);
 	const toggle = () => {
-		setDrawerOpen(!isDrawerOpen);
+		setDrawerOpen(!drawerOpen);
 	};
 
 	const dropRef = useRef<HTMLDivElement | null>(null);
@@ -46,7 +46,7 @@ export function Sidebar({ children }: SidebarProps) {
 				id="my-drawer"
 				type="checkbox"
 				className="drawer-toggle lg:hidden"
-				checked={isDrawerOpen}
+				checked={drawerOpen}
 				onChange={toggle}
 				spellCheck="false"
 			/>
@@ -61,7 +61,7 @@ export function Sidebar({ children }: SidebarProps) {
 				</div>
 			</div>
 			<div className="drawer-side z-10">
-				<label htmlFor="my-drawer"></label>
+				<label htmlFor="my-drawer" />
 				<ul className="menu bg-base-300 text-base-content ms-0 h-full w-12 justify-between ps-0">
 					<div className="mt-8 flex-col p-0">
 						<li className="mt-4" title="Chats" onClick={toggle} aria-label="Chats">

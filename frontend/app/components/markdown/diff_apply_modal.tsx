@@ -206,7 +206,7 @@ function upsertEditableTargetForModal(
 	byKey: Map<string, EditableUnifiedDiffTarget>,
 	target: EditableUnifiedDiffTarget
 ) {
-	const existingEntry = Array.from(byKey.entries()).find(([, existing]) => editableTargetsMatch(existing, target));
+	const existingEntry = [...byKey.entries()].find(([, existing]) => editableTargetsMatch(existing, target));
 	const key = existingEntry?.[0] ?? getLocalTargetKey(target, byKey.size);
 	const existing = existingEntry?.[1];
 
@@ -411,7 +411,7 @@ export function DiffApplyModal({
 		}
 
 		// eslint-disable-next-line react-hooks/set-state-in-effect, react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setLocalTargets(previous => mergeModalTargetsPreservingLocalEdits(Array.from(byKey.values()), previous));
+		setLocalTargets(previous => mergeModalTargetsPreservingLocalEdits([...byKey.values()], previous));
 		// eslint-disable-next-line react-you-might-not-need-an-effect/no-derived-state
 		setLocalStrict(strict);
 	}, [candidatePaths, fallbackParsed, fileTargets, isOpen, output, strict]);

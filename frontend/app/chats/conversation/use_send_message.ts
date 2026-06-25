@@ -229,8 +229,7 @@ export function useSendMessage({
 			try {
 				let toolStoreChoices: ToolStoreChoice[] | undefined;
 
-				const latestUser = updatedChatWithUserMessage.messages
-					.slice()
+				const latestUser = [...updatedChatWithUserMessage.messages]
 					.toReversed()
 					.find(message => message.role === RoleEnum.User);
 

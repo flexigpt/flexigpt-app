@@ -11,7 +11,7 @@
 		"lint:knip": "knip --tags=-lintignore",
 		"lint:oxlint": "oxlint .",
 		"lint:oxlint:fix": "oxlint --fix .",
-		"lint:oxlint:fixspecific": "oxlint --fix -A all -D prefer-object-has-own .",
+		"lint:oxlint:fixspecific": "oxlint --fix -A all -D unicorn/prefer-spread .",
 		"lint:oxlint:fixdanger": "oxlint --fix-dangerously -A all -D typescript/consistent-type-definitions .",
 		"lint:eslint": "eslint . -c ./eslint.config.mjs",
 		"lint:specific": "eslint . -c ./eslint.specific.config.mjs --no-config-lookup",

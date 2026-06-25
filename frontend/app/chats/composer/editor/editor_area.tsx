@@ -1695,8 +1695,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									ref={contentRef}
 									placeholder="Type message..."
 									spellCheck={false}
-									autoCorrect={'off'}
-									autoCapitalize={'off'}
+									autoCorrect="off"
+									autoCapitalize="off"
 									readOnly={isInputLocked}
 									onKeyDown={e => {
 										onKeyDown(e);
@@ -1907,7 +1907,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				}}
 			/>
 
-			<MCPApprovalModal approvalRequest={mcpApproval.approvalRequest} onResolve={mcpApproval.resolveMCPApproval} />
+			<MCPApprovalModal
+				approvalRequest={mcpApproval.approvalRequest}
+				onResolve={r => {
+					mcpApproval.resolveMCPApproval(r);
+				}}
+			/>
 
 			<ToolArgsModalHost
 				attachedToolEntries={attachedToolEntries}

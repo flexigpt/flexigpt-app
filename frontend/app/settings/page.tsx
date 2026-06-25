@@ -23,7 +23,7 @@ async function exportSettings() {
 export default function SettingsPage() {
 	const [authKeys, setAuthKeys] = useState<AuthKeyMeta[]>([]);
 	const [debugSettings, setDebugSettings] = useState<DebugSettings | null>(null);
-	const [refreshToggle, setRefresh] = useState(false); // helper to force list refresh
+	const [refreshToggle, setRefreshToggle] = useState(false); // helper to force list refresh
 
 	const [isModalOpen, setIsModalOpen] = useState(false);
 	const [modalInitial, setModalInitial] = useState<AuthKeyMeta | null>(null); // null = Add
@@ -50,7 +50,7 @@ export default function SettingsPage() {
 	}, [refreshToggle]);
 
 	const refresh = () => {
-		setRefresh(p => !p);
+		setRefreshToggle(p => !p);
 	};
 	const showAddModal = () => {
 		setModalInitial(null);

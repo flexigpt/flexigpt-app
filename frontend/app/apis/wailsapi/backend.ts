@@ -83,6 +83,7 @@ export class WailsLogger implements ILogger {
 		const msg = formatMessage(args);
 		if (isRuntimeAvailable()) {
 			if (msg) {
+				// oxlint-disable-next-line unicorn/throw-new-error
 				LogError(msg);
 			}
 		} else {
@@ -162,6 +163,7 @@ export class WailsBackendAPI implements IBackendAPI {
 						LogInfo(msg);
 						break;
 					case 'error':
+						// oxlint-disable-next-line unicorn/throw-new-error
 						LogError(msg);
 						break;
 					case 'debug':

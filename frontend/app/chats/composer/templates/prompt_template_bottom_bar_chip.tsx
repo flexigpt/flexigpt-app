@@ -95,7 +95,7 @@ function groupPromptTemplates(items: PromptTemplateListItem[]): PromptTemplateGr
 		group.options.push(item);
 	}
 
-	return Array.from(groupsByBundle.values());
+	return [...groupsByBundle.values()];
 }
 
 function PromptTemplateDropdown({ store, open, loading, items, onPick }: PromptTemplateDropdownProps) {

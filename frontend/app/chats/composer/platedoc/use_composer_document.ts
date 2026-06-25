@@ -62,7 +62,7 @@ interface UseComposerDocumentResult {
 }
 
 function getUsefulRangeRect(domRange: Range): DOMRect | undefined {
-	const rects = Array.from(domRange.getClientRects()).filter(rect => rect.width > 0 || rect.height > 0);
+	const rects = [...domRange.getClientRects()].filter(rect => rect.width > 0 || rect.height > 0);
 	if (rects.length > 0) {
 		return rects.at(-1);
 	}

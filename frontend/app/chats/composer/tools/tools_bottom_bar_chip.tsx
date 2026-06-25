@@ -188,7 +188,7 @@ function groupTools(
 		group.conversationOptions.push(entry);
 	}
 
-	return Array.from(groupsByBundle.values()).toSorted(compareToolGroups);
+	return [...groupsByBundle.values()].toSorted(compareToolGroups);
 }
 
 function getArgsBadgeClass(hasBlockingArgs: boolean) {

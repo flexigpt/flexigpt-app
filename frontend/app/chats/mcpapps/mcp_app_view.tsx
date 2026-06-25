@@ -516,7 +516,7 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 					try {
 						backendAPI.openURL(url);
 						approvalResolverRef.current?.(true);
-					} catch (_err: unknown) {
+					} catch {
 						setBlockedURL(url);
 						approvalResolverRef.current?.(false);
 					}
@@ -568,7 +568,12 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 				}}
 				message={`Could not open ${blockedURL ?? ''}.`}
 			/>
-			<MCPApprovalModal approvalRequest={mcpApproval.approvalRequest} onResolve={mcpApproval.resolveMCPApproval} />
+			<MCPApprovalModal
+				approvalRequest={mcpApproval.approvalRequest}
+				onResolve={r => {
+					mcpApproval.resolveMCPApproval(r);
+				}}
+			/>
 		</>
 	);
 }

@@ -111,7 +111,7 @@ export function MessageFooterArea({
 
 				<div className={`flex items-center justify-end space-x-6 ${!isStreaming && !usage ? 'w-full' : ''}`}>
 					{hasContent && !isBusy && (
-						<label className={`ml-1 flex h-full items-center space-x-2 truncate p-1`} title="Disable Markdown">
+						<label className="ml-1 flex h-full items-center space-x-2 truncate p-1" title="Disable Markdown">
 							<input
 								type="checkbox"
 								checked={disableMarkdown}

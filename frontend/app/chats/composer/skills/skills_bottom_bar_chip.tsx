@@ -221,7 +221,7 @@ export function SkillsBottomBarChip({
 			}
 		}
 
-		return Array.from(map.values())
+		return [...map.values()]
 			.map(group => ({
 				...group,
 				skills: [...group.skills].toSorted(compareSkillListItems),
@@ -246,7 +246,7 @@ export function SkillsBottomBarChip({
 					byKey.delete(k);
 				}
 
-				return Array.from(byKey.values());
+				return [...byKey.values()];
 			});
 		},
 		[setEnabledSkillRefs]
@@ -283,7 +283,7 @@ export function SkillsBottomBarChip({
 					}
 				}
 
-				return dedupeSkillRefs(Array.from(byKey.values()));
+				return dedupeSkillRefs([...byKey.values()]);
 			});
 		},
 		[setEnabledSkillRefs]

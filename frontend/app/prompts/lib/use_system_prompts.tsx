@@ -334,7 +334,7 @@ async function loadSystemPromptState(): Promise<void> {
 	}
 	const templateVersionsBySeriesKey: Record<string, string[]> = {};
 	for (const [seriesKey, bucket] of versionSetBySeriesKey) {
-		templateVersionsBySeriesKey[seriesKey] = Array.from(bucket).toSorted((a, b) => a.localeCompare(b));
+		templateVersionsBySeriesKey[seriesKey] = [...bucket].toSorted((a, b) => a.localeCompare(b));
 	}
 
 	const visibleTemplates = await Promise.all(

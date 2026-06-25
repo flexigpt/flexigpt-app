@@ -256,7 +256,7 @@ export const ChatMessage = memo(function ChatMessage({
 					className={`min-w-0 items-center gap-2 px-2 ${hasAttachmentsBar || !showBody ? 'flex' : ''} ${showBody ? 'pt-1' : isUser ? 'justify-start' : 'justify-end'}`}
 				>
 					{hasAttachmentsBar && (
-						<div className={`flex min-w-0 items-center justify-start overflow-x-hidden px-1 py-0`}>
+						<div className="flex min-w-0 items-center justify-start overflow-x-hidden px-1 py-0">
 							<MessageAttachmentsBar
 								attachments={message.attachments}
 								toolChoices={message.toolStoreChoices}

@@ -267,7 +267,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 				return;
 			}
 
-			const next = current.slice();
+			const next = [...current];
 			next[idx] = updater(next[idx]);
 			normalizeAndCommitTabs(next);
 		},

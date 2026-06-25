@@ -28,16 +28,15 @@ function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: string)
 			reject(new Error(timeoutMessage));
 		}, ms);
 
-		promise.then(
-			value => {
+		promise
+			.then(value => {
 				window.clearTimeout(timer);
 				resolve(value);
-			},
-			(error: unknown) => {
+			})
+			.catch((error: unknown) => {
 				window.clearTimeout(timer);
 				reject(error);
-			}
-		);
+			});
 	});
 }
 

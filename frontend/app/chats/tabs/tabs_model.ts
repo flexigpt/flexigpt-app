@@ -91,7 +91,7 @@ export function normalizeTabsForInvariants(
 	activeId: string,
 	lastActivatedAt: Map<string, number>
 ): NormalizedTabsResult {
-	let next = current.slice();
+	let next = [...current];
 	const removedTabIds = new Set<string>();
 	let addedScratchTabId: string | null = null;
 

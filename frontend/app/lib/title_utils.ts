@@ -274,5 +274,5 @@ export function cleanSearchQuery(input: string): string {
 		noStopTokens = nonOneCharTokens;
 	}
 
-	return Array.from(new Set(noStopTokens)).join(' ');
+	return [...new Set(noStopTokens)].join(' ');
 }

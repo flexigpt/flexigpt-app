@@ -36,6 +36,7 @@ interface EnumDropdownInlineProps {
 }
 
 function getInitialActiveIndex(options: string[], value?: string): number {
+	// oxlint-disable-next-line unicorn/prefer-array-index-of
 	const selectedIdx = value ? options.findIndex(opt => opt === value) : -1;
 	return Math.max(selectedIdx, 0);
 }

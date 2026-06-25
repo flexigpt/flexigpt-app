@@ -17,7 +17,7 @@ function isElementAtTop(el: HTMLElement): boolean {
 }
 
 function getMessageElements(el: HTMLElement): HTMLElement[] {
-	return Array.from(el.querySelectorAll<HTMLElement>('[data-chat-message-index]'));
+	return [...el.querySelectorAll<HTMLElement>('[data-chat-message-index]')];
 }
 
 function getCurrentMessageIndex(el: HTMLElement): number {

@@ -260,7 +260,7 @@ export function HydrateFallback() {
 	return (
 		<div id="loading-splash" className="flex h-screen w-full flex-col items-center justify-center gap-4">
 			<div id="loading-splash-spinner" />
-			<span className="loading loading-dots loading-xl text-primary-content"></span>
+			<span className="loading loading-dots loading-xl text-primary-content" />
 		</div>
 	);
 }

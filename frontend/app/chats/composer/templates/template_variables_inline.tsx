@@ -69,7 +69,7 @@ function getVariablePills(selectionID?: string): HTMLElement[] {
 	if (!selectionID) {
 		return [];
 	}
-	return Array.from(document.querySelectorAll<HTMLElement>(buildVariablePillSelector(selectionID)));
+	return [...document.querySelectorAll<HTMLElement>(buildVariablePillSelector(selectionID))];
 }
 
 function getVariablePill(selectionID?: string, varName?: string): HTMLElement | null {

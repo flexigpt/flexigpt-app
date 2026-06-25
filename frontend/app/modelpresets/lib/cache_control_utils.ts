@@ -12,7 +12,7 @@ export function resolveSupportedCacheControlKinds(
 ): CacheControlKind[] {
 	const next =
 		supportedKinds && supportedKinds.length > 0 ? [...supportedKinds] : existing?.kind ? [existing.kind] : [];
-	return Array.from(new Set(next));
+	return [...new Set(next)];
 }
 
 export function resolveSupportedCacheControlTTLs(
@@ -20,7 +20,7 @@ export function resolveSupportedCacheControlTTLs(
 	existing?: CacheControl
 ): CacheControlTTL[] {
 	const next = supportedTTLs && supportedTTLs.length > 0 ? [...supportedTTLs] : existing?.ttl ? [existing.ttl] : [];
-	return Array.from(new Set(next));
+	return [...new Set(next)];
 }
 
 export function getInitialCacheControlKind(

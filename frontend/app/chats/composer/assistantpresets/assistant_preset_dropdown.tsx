@@ -95,7 +95,7 @@ function groupAssistantPresetOptions(presetOptions: AssistantPresetOptionItem[])
 		group.options.push(option);
 	}
 
-	return Array.from(groupsByBundleSlug.values()).map(group => ({
+	return [...groupsByBundleSlug.values()].map(group => ({
 		bundleSlug: group.bundleSlug,
 		bundleDisplayName: group.bundleDisplayName,
 		selectableOptions: group.options.filter(option => option.isSelectable),

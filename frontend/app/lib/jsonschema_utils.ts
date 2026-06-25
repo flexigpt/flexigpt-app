@@ -561,12 +561,12 @@ export function normalizeStructuredJSONStringDeep(value: unknown): unknown {
 
 	if (value instanceof Map) {
 		return Object.fromEntries(
-			Array.from(value.entries()).map(([key, item]) => [String(key), normalizeStructuredJSONStringDeep(item)])
+			[...value.entries()].map(([key, item]) => [String(key), normalizeStructuredJSONStringDeep(item)])
 		);
 	}
 
 	if (value instanceof Set) {
-		return Array.from(value.values()).map(item => normalizeStructuredJSONStringDeep(item));
+		return [...value.values()].map(item => normalizeStructuredJSONStringDeep(item));
 	}
 
 	if (Array.isArray(value)) {
