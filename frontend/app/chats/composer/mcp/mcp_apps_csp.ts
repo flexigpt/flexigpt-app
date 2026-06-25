@@ -21,7 +21,9 @@ export interface MCPAppUIResourceMeta {
 
 function normalizeSource(raw: string): string | undefined {
 	const value = raw.trim();
-	if (!value) return undefined;
+	if (!value) {
+		return undefined;
+	}
 	const wildcard = value.match(/^(https|wss):\/\/\*\.[A-Za-z0-9.-]+(?::\d+)?$/);
 	if (wildcard) {
 		return value.toLowerCase();
@@ -48,14 +50,18 @@ function normalizeSource(raw: string): string | undefined {
 }
 
 function normalizeSourceList(values?: string[]): string[] {
-	if (!values || values.length === 0) return [];
+	if (!values || values.length === 0) {
+		return [];
+	}
 
 	const seen = new Set<string>();
 	const out: string[] = [];
 
 	for (const value of values) {
 		const normalized = normalizeSource(value);
-		if (!normalized || seen.has(normalized)) continue;
+		if (!normalized || seen.has(normalized)) {
+			continue;
+		}
 		seen.add(normalized);
 		out.push(normalized);
 	}
@@ -68,17 +74,23 @@ function joinSources(values: string[]): string {
 }
 
 export function getMCPAppUIResourceMeta(value: unknown): MCPAppUIResourceMeta | undefined {
-	if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+	if (!value || typeof value !== 'object' || Array.isArray(value)) {
+		return undefined;
+	}
 
 	const root = value as Record<string, unknown>;
 	const meta = root._meta;
 
-	if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return undefined;
+	if (!meta || typeof meta !== 'object' || Array.isArray(meta)) {
+		return undefined;
+	}
 
 	const metaRecord = meta as Record<string, unknown>;
 	const ui = metaRecord.ui;
 
-	if (!ui || typeof ui !== 'object' || Array.isArray(ui)) return undefined;
+	if (!ui || typeof ui !== 'object' || Array.isArray(ui)) {
+		return undefined;
+	}
 
 	return ui as MCPAppUIResourceMeta;
 }
@@ -114,14 +126,24 @@ export function buildMCPAppCSP(meta?: MCPAppUIResourceMeta): string {
 
 export function buildMCPAppAllowAttribute(meta?: MCPAppUIResourceMeta): string | undefined {
 	const permissions = meta?.permissions;
-	if (!permissions) return undefined;
+	if (!permissions) {
+		return undefined;
+	}
 
 	const allow: string[] = [];
 
-	if (permissions.camera) allow.push('camera');
-	if (permissions.microphone) allow.push('microphone');
-	if (permissions.geolocation) allow.push('geolocation');
-	if (permissions.clipboardWrite) allow.push('clipboard-write');
+	if (permissions.camera) {
+		allow.push('camera');
+	}
+	if (permissions.microphone) {
+		allow.push('microphone');
+	}
+	if (permissions.geolocation) {
+		allow.push('geolocation');
+	}
+	if (permissions.clipboardWrite) {
+		allow.push('clipboard-write');
+	}
 
 	return allow.length > 0 ? allow.join('; ') : undefined;
 }

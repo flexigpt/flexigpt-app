@@ -103,8 +103,12 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 
 	const filteredKeys = sourceKeys.filter(typedKey => {
 		const item = dropdownItems[typedKey];
-		if (!item) return false;
-		if (!filterDisabled) return true;
+		if (!item) {
+			return false;
+		}
+		if (!filterDisabled) {
+			return true;
+		}
 		// If the item is enabled or it is the selected key, we keep it.
 		return item.isEnabled || typedKey === selectedKey;
 	});

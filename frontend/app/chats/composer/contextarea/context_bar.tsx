@@ -81,7 +81,9 @@ export function EditorContextBar({ context, assistantPreset, systemPrompt }: Edi
 			void (async () => {
 				try {
 					const basePrepared = await context.prepareAssistantPresetApplication(option.key);
-					if (!basePrepared || assistantPresetViewRequestSeqRef.current !== requestSeq) return;
+					if (!basePrepared || assistantPresetViewRequestSeqRef.current !== requestSeq) {
+						return;
+					}
 
 					const preparedSystemPromptSelections = await systemPrompt.prepareAssistantPresetSelections(
 						basePrepared.preset

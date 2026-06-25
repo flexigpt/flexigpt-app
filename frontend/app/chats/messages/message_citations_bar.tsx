@@ -16,7 +16,9 @@ interface MessageCitationsBarProps {
 export function MessageCitationsBar({ citations }: MessageCitationsBarProps) {
 	const maxTooltipLen = 240;
 
-	if (!citations || citations.length === 0) return null;
+	if (!citations || citations.length === 0) {
+		return null;
+	}
 
 	return (
 		<div className="flex flex-wrap items-center gap-2 text-xs">

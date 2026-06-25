@@ -42,7 +42,9 @@ function AddBundleModalContent({ onClose, onSubmit, existingSlugs }: AddBundleMo
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
 		if (!dialog.open) {
 			try {
@@ -73,7 +75,9 @@ function AddBundleModalContent({ onClose, onSubmit, existingSlugs }: AddBundleMo
 	};
 
 	const handleDialogClose = () => {
-		if (isUnmountingRef.current) return;
+		if (isUnmountingRef.current) {
+			return;
+		}
 		onClose();
 	};
 
@@ -119,7 +123,9 @@ function AddBundleModalContent({ onClose, onSubmit, existingSlugs }: AddBundleMo
 		const nextErrors = validateForm(trimmed);
 		setErrors(nextErrors);
 
-		if (Object.keys(nextErrors).length > 0) return;
+		if (Object.keys(nextErrors).length > 0) {
+			return;
+		}
 
 		onSubmit(trimmed.slug, trimmed.displayName, trimmed.description || undefined);
 		requestClose();
@@ -257,8 +263,12 @@ function AddBundleModalContent({ onClose, onSubmit, existingSlugs }: AddBundleMo
 }
 
 export function AddBundleModal(props: AddBundleModalProps) {
-	if (!props.isOpen) return null;
-	if (typeof document === 'undefined' || !document.body) return null;
+	if (!props.isOpen) {
+		return null;
+	}
+	if (typeof document === 'undefined' || !document.body) {
+		return null;
+	}
 
 	return createPortal(<AddBundleModalContent key="add-prompt-bundle-modal" {...props} />, document.body);
 }

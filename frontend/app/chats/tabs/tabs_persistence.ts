@@ -30,15 +30,23 @@ export type InitialChatsModel = {
 };
 
 function readPersistedChatsPageState(): PersistedChatsPageStateV1 | null {
-	if (!canUseStorage()) return null;
+	if (!canUseStorage()) {
+		return null;
+	}
 
 	try {
 		const raw = localStorage.getItem(CHAT_TABS_PERSIST_KEY);
-		if (!raw) return null;
+		if (!raw) {
+			return null;
+		}
 
 		const parsed = JSON.parse(raw) as PersistedChatsPageStateV1;
-		if (!parsed || parsed.v !== 1) return null;
-		if (!Array.isArray(parsed.tabs)) return null;
+		if (!parsed || parsed.v !== 1) {
+			return null;
+		}
+		if (!Array.isArray(parsed.tabs)) {
+			return null;
+		}
 
 		return parsed;
 	} catch {
@@ -47,7 +55,9 @@ function readPersistedChatsPageState(): PersistedChatsPageStateV1 | null {
 }
 
 export function writePersistedChatsPageState(state: PersistedChatsPageStateV1): void {
-	if (!canUseStorage()) return;
+	if (!canUseStorage()) {
+		return;
+	}
 
 	try {
 		localStorage.setItem(CHAT_TABS_PERSIST_KEY, JSON.stringify(state));
@@ -73,8 +83,12 @@ export function buildInitialChatsModel(): InitialChatsModel {
 	const seen = new Set<string>();
 	const sanitizedTabs = persisted.tabs
 		.filter(tab => {
-			if (!tab?.tabId || typeof tab.tabId !== 'string') return false;
-			if (seen.has(tab.tabId)) return false;
+			if (!tab?.tabId || typeof tab.tabId !== 'string') {
+				return false;
+			}
+			if (seen.has(tab.tabId)) {
+				return false;
+			}
 			seen.add(tab.tabId);
 			return true;
 		})

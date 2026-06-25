@@ -27,7 +27,9 @@ let state: StoreState = { slots: {}, owner: null };
 const listeners = new Set<() => void>();
 
 function emit() {
-	for (const l of listeners) l();
+	for (const l of listeners) {
+		l();
+	}
 }
 
 function subscribe(listener: () => void) {
@@ -49,7 +51,9 @@ function setTitleBarSlots(next: TitleBarSlots, owner: symbol) {
 }
 
 function clearTitleBarSlots(owner: symbol) {
-	if (state.owner !== owner) return;
+	if (state.owner !== owner) {
+		return;
+	}
 	state = { slots: {}, owner: null };
 	emit();
 }

@@ -48,8 +48,12 @@ function runtimeReducer(state: ComposerToolRuntimeState, action: Action): Compos
 		case 'mark-running': {
 			let changed = false;
 			const nextToolCalls = state.toolCalls.map(toolCall => {
-				if (toolCall.id !== action.callId) return toolCall;
-				if (toolCall.status === 'running' && toolCall.errorMessage === undefined) return toolCall;
+				if (toolCall.id !== action.callId) {
+					return toolCall;
+				}
+				if (toolCall.status === 'running' && toolCall.errorMessage === undefined) {
+					return toolCall;
+				}
 				changed = true;
 				return { ...toolCall, status: 'running', errorMessage: undefined } as UIToolCall;
 			});
@@ -59,8 +63,12 @@ function runtimeReducer(state: ComposerToolRuntimeState, action: Action): Compos
 		case 'mark-failed': {
 			let changed = false;
 			const nextToolCalls = state.toolCalls.map(toolCall => {
-				if (toolCall.id !== action.callId) return toolCall;
-				if (toolCall.status === 'failed' && toolCall.errorMessage === action.errorMessage) return toolCall;
+				if (toolCall.id !== action.callId) {
+					return toolCall;
+				}
+				if (toolCall.status === 'failed' && toolCall.errorMessage === action.errorMessage) {
+					return toolCall;
+				}
 				changed = true;
 				return { ...toolCall, status: 'failed', errorMessage: action.errorMessage } as UIToolCall;
 			});
@@ -69,7 +77,9 @@ function runtimeReducer(state: ComposerToolRuntimeState, action: Action): Compos
 
 		case 'succeed': {
 			const exists = state.toolCalls.some(toolCall => toolCall.id === action.callId);
-			if (!exists) return state;
+			if (!exists) {
+				return state;
+			}
 
 			return {
 				toolCalls: state.toolCalls.filter(toolCall => toolCall.id !== action.callId),
@@ -178,8 +188,12 @@ export function useComposerToolRuntime({
 		async (sid: string) => {
 			try {
 				const nextActive = await listActiveSkillRefs(sid);
-				if (!isMountedRef.current) return;
-				if (getCurrentSkillSessionID() !== sid) return;
+				if (!isMountedRef.current) {
+					return;
+				}
+				if (getCurrentSkillSessionID() !== sid) {
+					return;
+				}
 				setActiveSkillRefs(nextActive);
 			} catch {
 				// ignore
@@ -201,8 +215,12 @@ export function useComposerToolRuntime({
 	const runToolCall = useCallback(
 		async (id: string): Promise<UIToolOutput | null> => {
 			const toolCall = stateRef.current.toolCalls.find(current => current.id === id);
-			if (!toolCall) return null;
-			if (toolCall.status !== 'pending' && toolCall.status !== 'failed') return null;
+			if (!toolCall) {
+				return null;
+			}
+			if (toolCall.status !== 'pending' && toolCall.status !== 'failed') {
+				return null;
+			}
 
 			if (!isRunnableComposerToolCall(toolCall)) {
 				const errorMessage = 'This tool call type cannot be executed from the composer.';
@@ -275,11 +293,15 @@ export function useComposerToolRuntime({
 
 		while (true) {
 			const pending = getPendingRunnableToolCalls(stateRef.current.toolCalls);
-			if (pending.length === 0) break;
+			if (pending.length === 0) {
+				break;
+			}
 
 			for (const toolCall of pending) {
 				const latest = stateRef.current.toolCalls.find(current => current.id === toolCall.id);
-				if (!latest || latest.status !== 'pending') continue;
+				if (!latest || latest.status !== 'pending') {
+					continue;
+				}
 
 				const output = await runToolCall(latest.id);
 				if (output) {
@@ -304,7 +326,9 @@ export function useComposerToolRuntime({
 	}, []);
 
 	const retryErroredOutput = useCallback((output: UIToolOutput) => {
-		if (!output.isError) return;
+		if (!output.isError) {
+			return;
+		}
 
 		if (output.mcpToolSelection) {
 			const call: UIToolCall = {
@@ -331,12 +355,20 @@ export function useComposerToolRuntime({
 		const isSkills = isSkillsToolName(output.name);
 
 		if (!isSkills) {
-			if (!output.toolStoreChoice) return;
-			if (output.type !== ToolStoreChoiceType.Function && output.type !== ToolStoreChoiceType.Custom) return;
+			if (!output.toolStoreChoice) {
+				return;
+			}
+			if (output.type !== ToolStoreChoiceType.Function && output.type !== ToolStoreChoiceType.Custom) {
+				return;
+			}
 
 			const { bundleID, toolSlug, toolVersion } = output.toolStoreChoice;
-			if (!bundleID || !toolSlug || !toolVersion) return;
-		} else if (output.type !== ToolStoreChoiceType.Function && output.type !== ToolStoreChoiceType.Custom) return;
+			if (!bundleID || !toolSlug || !toolVersion) {
+				return;
+			}
+		} else if (output.type !== ToolStoreChoiceType.Function && output.type !== ToolStoreChoiceType.Custom) {
+			return;
+		}
 
 		const call: UIToolCall = {
 			id: output.id,

@@ -30,25 +30,37 @@ export interface DirectoryAttachmentGroup {
 
 function pathBasename(path: string | undefined): string {
 	const trimmed = path?.trim() ?? '';
-	if (!trimmed) return '';
+	if (!trimmed) {
+		return '';
+	}
 	return trimmed.split(/[\\/]/).filter(Boolean).pop() ?? trimmed;
 }
 
 export function getAttachmentDisplayLabel(att: Partial<Attachment>): string {
 	const explicit = typeof att.label === 'string' ? att.label.trim() : '';
-	if (explicit) return explicit;
+	if (explicit) {
+		return explicit;
+	}
 
 	const fileName = att.fileRef?.name?.trim() || pathBasename(att.fileRef?.origPath || att.fileRef?.path);
-	if (fileName) return fileName;
+	if (fileName) {
+		return fileName;
+	}
 
 	const imageName = att.imageRef?.name?.trim() || pathBasename(att.imageRef?.origPath || att.imageRef?.path);
-	if (imageName) return imageName;
+	if (imageName) {
+		return imageName;
+	}
 
 	const url = att.urlRef?.url?.trim() || att.urlRef?.normalized?.trim() || att.urlRef?.origNormalized?.trim();
-	if (url) return url;
+	if (url) {
+		return url;
+	}
 
 	const handle = att.genericRef?.origHandle?.trim() || att.genericRef?.handle?.trim();
-	if (handle) return handle;
+	if (handle) {
+		return handle;
+	}
 
 	return 'Attachment';
 }
@@ -171,7 +183,9 @@ export function buildUIAttachmentForURL(att: Attachment): UIAttachment {
 
 // Human-readable explanation for an error attachment, for tooltips.
 export function getAttachmentErrorMessage(att: UIAttachment): string | null {
-	if (!att.isError || !att.errorReason) return null;
+	if (!att.isError || !att.errorReason) {
+		return null;
+	}
 	const limit = formatBytes(MAX_SINGLE_ATTACHMENT_BYTES);
 	let size = 0;
 	if (att.fileRef && att.fileRef.size !== undefined && att.fileRef.size > 0) {
@@ -196,7 +210,9 @@ export function getAttachmentErrorMessage(att: UIAttachment): string | null {
 }
 
 function formatBytes(bytes: number): string {
-	if (!Number.isFinite(bytes) || bytes < 0) return `${bytes} B`;
+	if (!Number.isFinite(bytes) || bytes < 0) {
+		return `${bytes} B`;
+	}
 	const units = ['B', 'KB', 'MB', 'GB', 'TB'];
 	let i = 0;
 	let v = bytes;

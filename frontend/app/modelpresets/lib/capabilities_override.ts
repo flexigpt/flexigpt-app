@@ -45,7 +45,9 @@ function mergeCacheControlCapabilities(
 	providerVal?: CacheControlCapabilitiesOverride,
 	modelVal?: CacheControlCapabilitiesOverride
 ): CacheControlCapabilitiesOverride | undefined {
-	if (!providerVal && !modelVal) return undefined;
+	if (!providerVal && !modelVal) {
+		return undefined;
+	}
 
 	const merged: CacheControlCapabilitiesOverride = {
 		supportedKinds: pick(modelVal?.supportedKinds, providerVal?.supportedKinds),
@@ -67,7 +69,9 @@ function mergeCacheCapabilities(
 	providerVal?: CacheCapabilitiesOverride,
 	modelVal?: CacheCapabilitiesOverride
 ): CacheCapabilitiesOverride | undefined {
-	if (!providerVal && !modelVal) return undefined;
+	if (!providerVal && !modelVal) {
+		return undefined;
+	}
 
 	const merged: CacheCapabilitiesOverride = {
 		supportsAutomaticCaching: pick(modelVal?.supportsAutomaticCaching, providerVal?.supportsAutomaticCaching),
@@ -105,7 +109,9 @@ export function mergeModelCapabilitiesOverride(
 	providerOverride?: ModelCapabilitiesOverride,
 	modelOverride?: ModelCapabilitiesOverride
 ): ModelCapabilitiesOverride | undefined {
-	if (!providerOverride && !modelOverride) return undefined;
+	if (!providerOverride && !modelOverride) {
+		return undefined;
+	}
 
 	const p = providerOverride;
 	const m = modelOverride;
@@ -241,7 +247,9 @@ export function supportsOutputVerbosity(cap?: ModelCapabilitiesOverride): boolea
 
 export function getSupportedOutputFormats(cap?: ModelCapabilitiesOverride): OutputFormatKind[] | undefined {
 	const raw = cap?.outputCapabilities?.supportedOutputFormats;
-	if (!raw || raw.length === 0) return undefined; // undefined means "no restriction"
+	if (!raw || raw.length === 0) {
+		return undefined;
+	} // undefined means "no restriction"
 	const out = raw.filter(r => isOutputFormatKind(r));
 	return out.length > 0 ? out : undefined;
 }
@@ -304,7 +312,9 @@ export function sanitizeUIChatOptionByCapabilities(option: UIChatOption): UIChat
 	const cap = option.capabilitiesOverride;
 	const topLevelCacheCapabilities = getTopLevelCacheControlCapabilities(option.providerSDKType, cap);
 
-	if (!cap && !topLevelCacheCapabilities && !option.cacheControl) return option;
+	if (!cap && !topLevelCacheCapabilities && !option.cacheControl) {
+		return option;
+	}
 
 	let next: UIChatOption = { ...option };
 

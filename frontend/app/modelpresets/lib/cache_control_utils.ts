@@ -51,10 +51,14 @@ export function buildCacheControlFromForm(args: {
 	key: string;
 	supportsKey: boolean;
 }): CacheControl | undefined {
-	if (!args.enabled) return undefined;
+	if (!args.enabled) {
+		return undefined;
+	}
 
 	const kind = args.kind || args.supportedKinds[0];
-	if (!kind) return undefined;
+	if (!kind) {
+		return undefined;
+	}
 
 	const trimmedKey = args.key.trim();
 

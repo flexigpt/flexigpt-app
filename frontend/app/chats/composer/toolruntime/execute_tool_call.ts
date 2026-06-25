@@ -42,7 +42,9 @@ function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: string)
 }
 
 function parseToolArguments(raw?: string): Record<string, any> | undefined {
-	if (!raw || raw.trim().length === 0) return undefined;
+	if (!raw || raw.trim().length === 0) {
+		return undefined;
+	}
 
 	const parsed = JSON.parse(raw) as unknown;
 	if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -58,7 +60,9 @@ function mcpContentToText(content: MCPContent): string {
 			return content.text ?? '';
 
 		case MCPContentType.MCPContentTypeResource:
-			if (content.resource?.text) return content.resource.text;
+			if (content.resource?.text) {
+				return content.resource.text;
+			}
 			return JSON.stringify(content.resource ?? content, null, 2);
 
 		case MCPContentType.MCPContentTypeResourceLink:

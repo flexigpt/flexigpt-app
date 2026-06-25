@@ -91,7 +91,9 @@ export function getDefaultMCPAppsPolicy(): MCPAppsPolicy {
 }
 
 function isMCPAppVisibilityAllowed(visibility: string[] | undefined, target: 'model' | 'app'): boolean {
-	if (!visibility || visibility.length === 0) return true;
+	if (!visibility || visibility.length === 0) {
+		return true;
+	}
 
 	return visibility.some(item => item.trim().toLowerCase() === target);
 }
@@ -307,7 +309,9 @@ export function getMCPSetupInputKindLabel(kind: MCPServerSetupInputKind): string
 }
 
 function hasMapKeyFold(map: Record<string, string> | undefined, key: string): boolean {
-	if (!map) return false;
+	if (!map) {
+		return false;
+	}
 	const target = key.trim().toLowerCase();
 	return Object.keys(map).some(existing => existing.trim().toLowerCase() === target);
 }
@@ -318,14 +322,18 @@ export function isMCPSetupInputConfigured(server: MCPServerConfig, input: MCPSer
 			return Boolean(server.streamableHttp?.clientCredentialRef?.trim());
 		case MCPServerSetupInputKind.HTTPHeader: {
 			const name = input.httpHeader?.headerName ?? '';
-			if (!name) return false;
+			if (!name) {
+				return false;
+			}
 			return input.httpHeader?.secret
 				? hasMapKeyFold(server.streamableHttp?.secretHeaderRefs, name)
 				: hasMapKeyFold(server.streamableHttp?.headers, name);
 		}
 		case MCPServerSetupInputKind.StdioEnv: {
 			const env = input.stdioEnv?.envName ?? '';
-			if (!env) return false;
+			if (!env) {
+				return false;
+			}
 			return input.stdioEnv?.secret ? Boolean(server.stdio?.secretEnvRefs?.[env]) : Boolean(server.stdio?.env?.[env]);
 		}
 		case MCPServerSetupInputKind.StreamableHTTPURL:

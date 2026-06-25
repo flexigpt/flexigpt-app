@@ -4,7 +4,9 @@ import { ToolOutputKind, type ToolOutputUnion } from '@/spec/tool';
 import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';
 
 function mapImageDetail(detail?: string): ImageDetail | undefined {
-	if (!detail) return undefined;
+	if (!detail) {
+		return undefined;
+	}
 	switch (detail.toLowerCase()) {
 		case 'high':
 			return ImageDetail.High;
@@ -21,7 +23,9 @@ function mapImageDetail(detail?: string): ImageDetail | undefined {
  * Map inference ToolOutput.contents -> ToolOutputUnion[]
  */
 export function mapToolOutputItemsToToolOutputs(contents?: ToolOutputItemUnion[]): ToolOutputUnion[] | undefined {
-	if (!contents?.length) return undefined;
+	if (!contents?.length) {
+		return undefined;
+	}
 
 	const outputs: ToolOutputUnion[] = [];
 
@@ -83,7 +87,9 @@ export function mapToolOutputItemsToToolOutputs(contents?: ToolOutputItemUnion[]
  * Map ToolOutputUnion[] -> inference ToolOutputItemUnion[]
  */
 export function mapToolOutputsToToolOutputItems(outputs?: ToolOutputUnion[]): ToolOutputItemUnion[] | undefined {
-	if (!outputs?.length) return undefined;
+	if (!outputs?.length) {
+		return undefined;
+	}
 
 	const contents: ToolOutputItemUnion[] = [];
 
@@ -141,14 +147,18 @@ export function mapToolOutputsToToolOutputItems(outputs?: ToolOutputUnion[]): To
 }
 
 export function extractPrimaryTextFromToolOutputs(outputs?: ToolOutputUnion[]): string | undefined {
-	if (!outputs?.length) return undefined;
+	if (!outputs?.length) {
+		return undefined;
+	}
 
 	const texts = outputs
 		.filter(o => o.kind === ToolOutputKind.Text && o.textItem?.text)
 		.map(o => o.textItem?.text.trim())
 		.filter(Boolean);
 
-	if (texts.length === 0) return undefined;
+	if (texts.length === 0) {
+		return undefined;
+	}
 
 	return texts.join('\n\n');
 }

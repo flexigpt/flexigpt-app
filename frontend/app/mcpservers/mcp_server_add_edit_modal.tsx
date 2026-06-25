@@ -77,10 +77,18 @@ function isIPv4LoopbackHost(host: string): boolean {
 function isLoopbackHTTPHost(host: string): boolean {
 	const normalized = host.trim().toLowerCase().replace(/^\[/, '').replace(/\]$/, '');
 
-	if (!normalized) return false;
-	if (normalized === 'localhost') return true;
-	if (normalized === '::1') return true;
-	if (normalized === '0:0:0:0:0:0:0:1') return true;
+	if (!normalized) {
+		return false;
+	}
+	if (normalized === 'localhost') {
+		return true;
+	}
+	if (normalized === '::1') {
+		return true;
+	}
+	if (normalized === '0:0:0:0:0:0:0:1') {
+		return true;
+	}
 
 	return isIPv4LoopbackHost(normalized);
 }
@@ -197,7 +205,9 @@ function splitArgsText(argsText: string): string[] | undefined {
 
 function normalizePositiveInteger(value: string): number | undefined {
 	const trimmed = value.trim();
-	if (!trimmed) return undefined;
+	if (!trimmed) {
+		return undefined;
+	}
 
 	const parsed = Number(trimmed);
 	if (!Number.isInteger(parsed) || parsed <= 0) {
@@ -305,7 +315,9 @@ function buildCopiedMCPServerFormData(source: MCPServerConfig, current: MCPServe
 
 function validateOAuthClientCredentials(raw: string, requireClientSecret: boolean): string | undefined {
 	const value = raw.trim();
-	if (!value) return undefined;
+	if (!value) {
+		return undefined;
+	}
 
 	let parsed: unknown;
 
@@ -352,7 +364,9 @@ function validateOAuthClientCredentials(raw: string, requireClientSecret: boolea
 
 function validateClientIDMetadataURL(raw: string): string | undefined {
 	const value = raw.trim();
-	if (!value) return undefined;
+	if (!value) {
+		return undefined;
+	}
 
 	try {
 		const url = new URL(value);
@@ -421,7 +435,9 @@ function AddEditMCPServerModalContent({
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
 		if (!dialog.open) {
 			try {
@@ -452,7 +468,9 @@ function AddEditMCPServerModalContent({
 	};
 
 	const handleDialogClose = () => {
-		if (isUnmountingRef.current) return;
+		if (isUnmountingRef.current) {
+			return;
+		}
 		onClose();
 	};
 
@@ -665,7 +683,9 @@ function AddEditMCPServerModalContent({
 
 	const applyPrefill = (key: string) => {
 		const source = prefillSourceMap[key];
-		if (!source) return;
+		if (!source) {
+			return;
+		}
 
 		const next = buildCopiedMCPServerFormData(source, formData);
 
@@ -707,7 +727,9 @@ function AddEditMCPServerModalContent({
 		const next: MCPServerFormData = {
 			...formData,
 			stdioSecretRows: formData.stdioSecretRows.map(row => {
-				if (row.rowID !== rowID) return row;
+				if (row.rowID !== rowID) {
+					return row;
+				}
 
 				const merged = { ...row, ...patch };
 
@@ -944,7 +966,9 @@ function AddEditMCPServerModalContent({
 		const nextErrors = validateForm(formData);
 		setErrors(nextErrors);
 
-		if (Object.keys(nextErrors).length > 0) return;
+		if (Object.keys(nextErrors).length > 0) {
+			return;
+		}
 
 		void onSubmit(buildServerInput())
 			.then(() => {
@@ -1812,8 +1836,12 @@ function AddEditMCPServerModalContent({
 }
 
 export function AddEditMCPServerModal(props: AddEditMCPServerModalProps) {
-	if (!props.isOpen) return null;
-	if (typeof document === 'undefined' || !document.body) return null;
+	if (!props.isOpen) {
+		return null;
+	}
+	if (typeof document === 'undefined' || !document.body) {
+		return null;
+	}
 
 	const remountKey = props.initialData
 		? `${props.mode ?? 'auto'}:${props.initialData.bundleID}:${props.initialData.id}:${props.initialData.modifiedAt}`

@@ -51,16 +51,24 @@ function getSkillDisplayLabel(item: SkillListItem): string {
 
 function compareSkillListItems(a: SkillListItem, b: SkillListItem): number {
 	const bundleSlugCompare = skillDropdownCollator.compare(a.bundleSlug, b.bundleSlug);
-	if (bundleSlugCompare !== 0) return bundleSlugCompare;
+	if (bundleSlugCompare !== 0) {
+		return bundleSlugCompare;
+	}
 
 	const bundleIDCompare = skillDropdownCollator.compare(a.bundleID, b.bundleID);
-	if (bundleIDCompare !== 0) return bundleIDCompare;
+	if (bundleIDCompare !== 0) {
+		return bundleIDCompare;
+	}
 
 	const skillSlugCompare = skillDropdownCollator.compare(a.skillSlug, b.skillSlug);
-	if (skillSlugCompare !== 0) return skillSlugCompare;
+	if (skillSlugCompare !== 0) {
+		return skillSlugCompare;
+	}
 
 	const skillNameCompare = skillDropdownCollator.compare(a.skillDefinition.name, b.skillDefinition.name);
-	if (skillNameCompare !== 0) return skillNameCompare;
+	if (skillNameCompare !== 0) {
+		return skillNameCompare;
+	}
 
 	return skillDropdownCollator.compare(skillListItemKey(a), skillListItemKey(b));
 }
@@ -73,8 +81,12 @@ function compareBundleGroups(a: BundleGroup, b: BundleGroup): number {
 
 function getBundleKindLabel(group: BundleGroup): string {
 	const builtInCount = group.skills.filter(item => item.isBuiltIn).length;
-	if (builtInCount === 0) return 'custom';
-	if (builtInCount === group.skills.length) return 'built-in';
+	if (builtInCount === 0) {
+		return 'custom';
+	}
+	if (builtInCount === group.skills.length) {
+		return 'built-in';
+	}
 	return 'mixed';
 }
 
@@ -92,7 +104,9 @@ function BundleCheckbox({
 	const ref = useRef<HTMLInputElement | null>(null);
 
 	useEffect(() => {
-		if (!ref.current) return;
+		if (!ref.current) {
+			return;
+		}
 		ref.current.indeterminate = indeterminate;
 	}, [indeterminate]);
 
@@ -104,7 +118,9 @@ function BundleCheckbox({
 			disabled={isInputLocked}
 			checked={checked}
 			onChange={e => {
-				if (isInputLocked) return;
+				if (isInputLocked) {
+					return;
+				}
 				onChange(e.currentTarget.checked);
 			}}
 			onPointerDown={stop}
@@ -142,7 +158,9 @@ export function SkillsBottomBarChip({
 	const open = useStoreState(menu, 'open');
 
 	useEffect(() => {
-		if (isInputLocked) menu.hide();
+		if (isInputLocked) {
+			menu.hide();
+		}
 	}, [isInputLocked, menu]);
 
 	const enabledKeySet = useMemo(() => new Set(enabledSkillRefs.map(k => skillRefKey(k))), [enabledSkillRefs]);
@@ -154,21 +172,29 @@ export function SkillsBottomBarChip({
 	);
 
 	const enabledCount = useMemo(() => {
-		if (loading) return enabledKeySet.size;
+		if (loading) {
+			return enabledKeySet.size;
+		}
 
 		let count = 0;
 		for (const key of enabledKeySet) {
-			if (availableSkillKeySet.has(key)) count += 1;
+			if (availableSkillKeySet.has(key)) {
+				count += 1;
+			}
 		}
 		return count;
 	}, [availableSkillKeySet, enabledKeySet, loading]);
 
 	const activeCount = useMemo(() => {
-		if (loading) return activeKeySet.size;
+		if (loading) {
+			return activeKeySet.size;
+		}
 
 		let count = 0;
 		for (const key of activeKeySet) {
-			if (availableSkillKeySet.has(key)) count += 1;
+			if (availableSkillKeySet.has(key)) {
+				count += 1;
+			}
 		}
 		return count;
 	}, [activeKeySet, availableSkillKeySet, loading]);
@@ -270,8 +296,12 @@ export function SkillsBottomBarChip({
 			`Active now: ${activeCount}`,
 		];
 
-		if (totalCount > 0) lines.push(`Available: ${totalCount}`);
-		if (loading && totalCount === 0) lines.push('Loading available skills…');
+		if (totalCount > 0) {
+			lines.push(`Available: ${totalCount}`);
+		}
+		if (loading && totalCount === 0) {
+			lines.push('Loading available skills…');
+		}
 		return lines.join('\n');
 	}, [activeCount, enabledCount, isEnabled, loading, shortcut, totalCount]);
 
@@ -296,7 +326,9 @@ export function SkillsBottomBarChip({
 				className="data-active-item:bg-base-200 flex items-center gap-2 rounded-xl px-2 py-1 pl-6 outline-none"
 				title={`${item.bundleSlug}/${item.skillSlug} • ${item.skillDefinition.type} • ${item.skillDefinition.location}`}
 				onClick={() => {
-					if (isInputLocked) return;
+					if (isInputLocked) {
+						return;
+					}
 					toggleSkillItem(item);
 				}}
 			>
@@ -307,7 +339,9 @@ export function SkillsBottomBarChip({
 					disabled={isInputLocked}
 					onChange={e => {
 						stop(e);
-						if (isInputLocked) return;
+						if (isInputLocked) {
+							return;
+						}
 						setSkillEnabled(ref, e.currentTarget.checked);
 					}}
 					onPointerDown={stop}
@@ -434,7 +468,9 @@ export function SkillsBottomBarChip({
 											hideOnClick={false}
 											className="data-active-item:bg-base-200 flex items-center gap-2 rounded-xl px-2 py-1 outline-none"
 											onClick={() => {
-												if (isInputLocked) return;
+												if (isInputLocked) {
+													return;
+												}
 												setBundleEnabled(group, bundleEnabled !== bundleTotal);
 											}}
 										>

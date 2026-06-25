@@ -84,7 +84,9 @@ self.onmessage = async (evt: MessageEvent<Request>) => {
 			msg.html = hl.codeToHtml(code, { lang: 'text', theme: 'monokai' });
 		} else {
 			// Load on demand - Shiki caches internally.
-			if (!hl.getLoadedLanguages().includes(lang as any)) await hl.loadLanguage(lang as any);
+			if (!hl.getLoadedLanguages().includes(lang as any)) {
+				await hl.loadLanguage(lang as any);
+			}
 
 			msg.html = hl.codeToHtml(code, { lang, theme: 'monokai' });
 		}

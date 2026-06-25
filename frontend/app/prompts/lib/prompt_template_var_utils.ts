@@ -19,7 +19,9 @@ function effectiveVarValue(varDef: PromptVariable, userValues: Record<string, un
 	}
 
 	// Fallback declared default
-	if (varDef.default !== undefined && varDef.default !== '') return varDef.default;
+	if (varDef.default !== undefined && varDef.default !== '') {
+		return varDef.default;
+	}
 
 	return undefined;
 }

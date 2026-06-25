@@ -2,7 +2,9 @@ export const MessageEnterValidURL = 'Please enter a valid URL, for example: http
 
 const isValidIPv4 = (hostname: string): boolean => {
 	// Basic IPv4: 4 dot-separated decimal octets, each 0–255
-	if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname)) return false;
+	if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname)) {
+		return false;
+	}
 
 	return hostname.split('.').every(part => {
 		const n = Number(part);
@@ -12,28 +14,42 @@ const isValidIPv4 = (hostname: string): boolean => {
 
 const isValidDomainName = (hostname: string): boolean => {
 	// Disallow trailing dot: "example.com."
-	if (hostname.endsWith('.')) return false;
+	if (hostname.endsWith('.')) {
+		return false;
+	}
 
 	const labels = hostname.split('.');
 
 	// Require at least two labels: "example.com"
-	if (labels.length < 2) return false;
+	if (labels.length < 2) {
+		return false;
+	}
 
 	// Max total length per RFC
-	if (hostname.length > 253) return false;
+	if (hostname.length > 253) {
+		return false;
+	}
 
 	for (const label of labels) {
 		// Reject empty labels → catches "..", leading ".", trailing "."
-		if (label.length === 0) return false;
+		if (label.length === 0) {
+			return false;
+		}
 
 		// Allowed chars: A-Z, a-z, 0-9, hyphen (punycode: xn--... is fine)
-		if (!/^[a-zA-Z0-9-]+$/.test(label)) return false;
+		if (!/^[a-zA-Z0-9-]+$/.test(label)) {
+			return false;
+		}
 
 		// Cannot start/end with hyphen
-		if (label.startsWith('-') || label.endsWith('-')) return false;
+		if (label.startsWith('-') || label.endsWith('-')) {
+			return false;
+		}
 
 		// Per RFC 1035: label length 1–63
-		if (label.length > 63) return false;
+		if (label.length > 63) {
+			return false;
+		}
 	}
 
 	return true;
@@ -44,7 +60,9 @@ const isValidDomainName = (hostname: string): boolean => {
  */
 export const normalizeUrl = (value: string): string | null => {
 	const raw = value.trim();
-	if (!raw) return null;
+	if (!raw) {
+		return null;
+	}
 
 	if (/\s/.test(raw)) {
 		throw new Error('Only one URL is allowed at a time.');

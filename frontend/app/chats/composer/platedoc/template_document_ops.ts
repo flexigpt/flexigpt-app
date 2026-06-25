@@ -234,7 +234,9 @@ export function toPlainTextReplacingVariables(editor: PlateEditor): string {
 	>();
 
 	for (const [node] of selections) {
-		if (!node.selectionID) continue;
+		if (!node.selectionID) {
+			continue;
+		}
 		const { variablesSchema } = computeEffectiveTemplate(node);
 		ctxBySelection.set(node.selectionID, {
 			defsByName: new Map(variablesSchema.map(v => [v.name, v] as const)),
@@ -242,19 +244,27 @@ export function toPlainTextReplacingVariables(editor: PlateEditor): string {
 		});
 	}
 	function toStringDeepWithVars(n: any): string {
-		if (!n || typeof n !== 'object' || n === null) return '';
+		if (!n || typeof n !== 'object' || n === null) {
+			return '';
+		}
 
 		if (isTemplateVarNode(n)) {
 			const name = n.name;
 			const sid = n.selectionID as string | undefined;
 			const placeholder = `{{${name}}}`;
 
-			if (!sid) return placeholder;
+			if (!sid) {
+				return placeholder;
+			}
 			const ctx = ctxBySelection.get(sid);
-			if (!ctx) return placeholder;
+			if (!ctx) {
+				return placeholder;
+			}
 
 			const def = ctx.defsByName.get(name);
-			if (!def) return placeholder; // unknown var (shouldn't happen)
+			if (!def) {
+				return placeholder;
+			} // unknown var (shouldn't happen)
 
 			// Resolve the effective value like the inline pill does
 			const val = effectiveVarValueLocal(def, ctx.userValues);
@@ -288,7 +298,9 @@ export function toPlainTextReplacingVariables(editor: PlateEditor): string {
 }
 
 function isTemplateVarNode(n: unknown): n is TemplateVariableElementNode {
-	if (!n || typeof n !== 'object') return false;
+	if (!n || typeof n !== 'object') {
+		return false;
+	}
 	const obj = n as Record<PropertyKey, unknown>;
 	return 'type' in obj && obj.type === KEY_TEMPLATE_VARIABLE && 'name' in obj && typeof obj.name === 'string';
 }

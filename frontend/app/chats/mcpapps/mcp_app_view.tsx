@@ -54,13 +54,17 @@ interface MCPAppViewProps {
 }
 
 function isAppMime(mime?: string): boolean {
-	if (!mime) return false;
+	if (!mime) {
+		return false;
+	}
 	const norm = mime.toLowerCase().replaceAll(/\s/g, '');
 	return norm === APP_MIME || norm.startsWith(`${APP_MIME};`);
 }
 
 function decodeMCPBlob(blob: string | number[] | undefined): string {
-	if (!blob) return '';
+	if (!blob) {
+		return '';
+	}
 	if (typeof blob === 'string') {
 		try {
 			return atob(blob);
@@ -77,12 +81,20 @@ function decodeMCPBlob(blob: string | number[] | undefined): string {
 
 function extractAppHTML(contents?: MCPContent[]): LoadedMCPAppResource | null {
 	for (const c of contents ?? []) {
-		if (c.type !== MCPContentType.MCPContentTypeResource) continue;
+		if (c.type !== MCPContentType.MCPContentTypeResource) {
+			continue;
+		}
 		const res = c.resource;
-		if (!res) continue;
-		if (!isAppMime(res.mimeType)) continue;
+		if (!res) {
+			continue;
+		}
+		if (!isAppMime(res.mimeType)) {
+			continue;
+		}
 		const html = typeof res.text === 'string' && res.text.length > 0 ? res.text : decodeMCPBlob(res.blob);
-		if (!html.trim()) continue;
+		if (!html.trim()) {
+			continue;
+		}
 		return {
 			html,
 			mimeType: res.mimeType ?? APP_MIME,
@@ -93,9 +105,13 @@ function extractAppHTML(contents?: MCPContent[]): LoadedMCPAppResource | null {
 }
 
 function parseToolInput(raw: unknown): unknown {
-	if (typeof raw !== 'string') return raw;
+	if (typeof raw !== 'string') {
+		return raw;
+	}
 	const trimmed = raw.trim();
-	if (!trimmed) return undefined;
+	if (!trimmed) {
+		return undefined;
+	}
 	try {
 		return JSON.parse(trimmed);
 	} catch {
@@ -212,7 +228,9 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 		void mcpAPI
 			.readMCPResource(instance.bundleID, instance.serverID, instance.resourceUri)
 			.then(resp => {
-				if (cancelled) return;
+				if (cancelled) {
+					return;
+				}
 				const extracted = extractAppHTML(resp?.contents);
 				if (!extracted) {
 					setLoadError('UI resource did not return MCP App HTML.');
@@ -221,7 +239,9 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 				setLoadedResource(extracted);
 			})
 			.catch((err: unknown) => {
-				if (cancelled) return;
+				if (cancelled) {
+					return;
+				}
 				setLoadError(err instanceof Error ? err.message : 'Failed to load MCP App.');
 			});
 
@@ -240,7 +260,9 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 		void mcpAPI
 			.getMCPServer(instance.bundleID, instance.serverID)
 			.then(server => {
-				if (cancelled) return;
+				if (cancelled) {
+					return;
+				}
 				const nextPolicy = server?.appsPolicy ?? null;
 				setAppsPolicy(nextPolicy);
 				if (nextPolicy && !nextPolicy.enabled) {
@@ -248,7 +270,9 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 				}
 			})
 			.catch((err: unknown) => {
-				if (cancelled) return;
+				if (cancelled) {
+					return;
+				}
 				setPolicyError(err instanceof Error ? err.message : 'Could not verify MCP Apps policy.');
 			});
 
@@ -289,12 +313,18 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 	);
 
 	const applySizeChanged = useCallback((params: unknown) => {
-		if (!params || typeof params !== 'object') return;
+		if (!params || typeof params !== 'object') {
+			return;
+		}
 		const heightValue = Number((params as Record<string, unknown>).height);
-		if (!Number.isFinite(heightValue) || heightValue <= 0) return;
+		if (!Number.isFinite(heightValue) || heightValue <= 0) {
+			return;
+		}
 		const nextHeight = Math.max(MIN_APP_HEIGHT, Math.min(MAX_APP_HEIGHT, Math.round(heightValue)));
 
-		if (sizeAnimationFrameRef.current !== null) window.cancelAnimationFrame(sizeAnimationFrameRef.current);
+		if (sizeAnimationFrameRef.current !== null) {
+			window.cancelAnimationFrame(sizeAnimationFrameRef.current);
+		}
 		sizeAnimationFrameRef.current = window.requestAnimationFrame(() => {
 			sizeAnimationFrameRef.current = null;
 			setFrameHeight(current => (Math.abs(current - nextHeight) < 4 ? current : nextHeight));
@@ -387,7 +417,9 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 
 	useEffect(() => {
 		const bridge = bridgeRef.current;
-		if (!bridge || !viewInitialized) return;
+		if (!bridge || !viewInitialized) {
+			return;
+		}
 
 		if (toolInput !== undefined) {
 			bridge.sendNotification(
@@ -399,7 +431,9 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 
 	useEffect(() => {
 		const bridge = bridgeRef.current;
-		if (!bridge || !viewInitialized) return;
+		if (!bridge || !viewInitialized) {
+			return;
+		}
 
 		if (toolResult !== undefined) {
 			bridge.sendNotification(
@@ -412,7 +446,9 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 		return () => {
 			const bridge = bridgeRef.current;
 			bridgeRef.current = null;
-			if (!bridge) return;
+			if (!bridge) {
+				return;
+			}
 
 			void bridge
 				.sendRequest('ui/resource-teardown', { resourceUri: instance.resourceUri, reason: 'view unmounted' }, 500)

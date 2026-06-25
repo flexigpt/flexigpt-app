@@ -23,7 +23,9 @@ export function toolStoreChoicesToConversationTools(choices: ToolStoreChoice[]):
 	for (const t of choices ?? []) {
 		if (t.toolType !== ToolStoreChoiceType.WebSearch) {
 			const key = toolIdentityKey(t.bundleID, undefined, t.toolSlug, t.toolVersion);
-			if (seen.has(key)) continue;
+			if (seen.has(key)) {
+				continue;
+			}
 			seen.add(key);
 			out.push({ key, toolStoreChoice: t, enabled: true });
 		}
@@ -36,16 +38,22 @@ export function toolStoreChoicesToConversationTools(choices: ToolStoreChoice[]):
  * Extract only the ENABLED tools, deduped by identity, for attachment to a message.
  */
 export function conversationToolsToChoices(entries: ConversationToolStateEntry[]): ToolStoreChoice[] {
-	if (!entries || entries.length === 0) return [];
+	if (!entries || entries.length === 0) {
+		return [];
+	}
 	const out: ToolStoreChoice[] = [];
 	const seen = new Set<string>();
 
 	for (const e of entries) {
-		if (!e.enabled) continue;
+		if (!e.enabled) {
+			continue;
+		}
 		const t = e.toolStoreChoice;
 		if (t.toolType !== ToolStoreChoiceType.WebSearch) {
 			const key = toolIdentityKey(t.bundleID, undefined, t.toolSlug, t.toolVersion);
-			if (seen.has(key)) continue;
+			if (seen.has(key)) {
+				continue;
+			}
 			seen.add(key);
 			out.push(t);
 		}
@@ -63,7 +71,9 @@ export function mergeConversationToolsWithNewChoices(
 	prev: ConversationToolStateEntry[],
 	newTools: ToolStoreChoice[]
 ): ConversationToolStateEntry[] {
-	if (!newTools || newTools.length === 0) return prev;
+	if (!newTools || newTools.length === 0) {
+		return prev;
+	}
 
 	const next = [...prev];
 	const indexByKey = new Map<string, number>();

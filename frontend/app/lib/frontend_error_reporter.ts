@@ -36,7 +36,9 @@ export function setFrontendErrorLogger(nextLogger: FrontendErrorLogger | null) {
 }
 
 function truncate(value: string, maxLength: number): string {
-	if (value.length <= maxLength) return value;
+	if (value.length <= maxLength) {
+		return value;
+	}
 	return `${value.slice(0, maxLength)}...[truncated]`;
 }
 
@@ -53,13 +55,19 @@ function safeJson(value: unknown, maxLength = 20_000): string {
 
 	try {
 		const json = JSON.stringify(value, (_key, current) => {
-			if (typeof current === 'bigint') return current.toString();
+			if (typeof current === 'bigint') {
+				return current.toString();
+			}
 
-			// oxlint-disable-next-line typescript/no-unsafe-member-access
-			if (typeof current === 'function') return `[Function ${current.name || 'anonymous'}]`;
+			if (typeof current === 'function') {
+				// oxlint-disable-next-line typescript/no-unsafe-member-access
+				return `[Function ${current.name || 'anonymous'}]`;
+			}
 
 			if (typeof current === 'object' && current !== null) {
-				if (seen.has(current)) return '[Circular]';
+				if (seen.has(current)) {
+					return '[Circular]';
+				}
 				seen.add(current);
 			}
 
@@ -137,7 +145,9 @@ function shouldSkipDuplicate(payload: FrontendErrorPayload): boolean {
 }
 
 function persistPayload(payload: FrontendErrorPayload) {
-	if (typeof window === 'undefined') return;
+	if (typeof window === 'undefined') {
+		return;
+	}
 
 	try {
 		window.localStorage.setItem(LAST_ERROR_KEY, safeJson(payload, 50_000));
@@ -161,22 +171,32 @@ function formatPayloadForLog(payload: FrontendErrorPayload): string {
 		`message=${payload.message}`,
 	];
 
-	if (payload.stack) parts.push(`stack:\n${payload.stack}`);
-	if (payload.componentStack) parts.push(`componentStack:\n${payload.componentStack}`);
-	if (payload.extraJson && payload.extraJson !== '{}') parts.push(`extra=${payload.extraJson}`);
+	if (payload.stack) {
+		parts.push(`stack:\n${payload.stack}`);
+	}
+	if (payload.componentStack) {
+		parts.push(`componentStack:\n${payload.componentStack}`);
+	}
+	if (payload.extraJson && payload.extraJson !== '{}') {
+		parts.push(`extra=${payload.extraJson}`);
+	}
 
 	return parts.join('\n');
 }
 
 export function reportFrontendError(error: unknown, extra: ErrorExtra = {}) {
-	if (reporting) return;
+	if (reporting) {
+		return;
+	}
 
 	reporting = true;
 
 	try {
 		const payload = makePayload(error, extra);
 
-		if (shouldSkipDuplicate(payload)) return;
+		if (shouldSkipDuplicate(payload)) {
+			return;
+		}
 
 		persistPayload(payload);
 
@@ -196,7 +216,9 @@ export function reportFrontendError(error: unknown, extra: ErrorExtra = {}) {
 }
 
 export function installGlobalFrontendErrorHandlers() {
-	if (typeof window === 'undefined' || handlersInstalled) return;
+	if (typeof window === 'undefined' || handlersInstalled) {
+		return;
+	}
 
 	handlersInstalled = true;
 
@@ -229,7 +251,9 @@ export function installGlobalFrontendErrorHandlers() {
 }
 
 export function recordFrontendCrash(source: string): number {
-	if (typeof window === 'undefined') return 1;
+	if (typeof window === 'undefined') {
+		return 1;
+	}
 
 	try {
 		const now = Date.now();
@@ -253,19 +277,25 @@ export function recordFrontendCrash(source: string): number {
 }
 
 export function reloadFrontend() {
-	if (typeof window === 'undefined') return;
+	if (typeof window === 'undefined') {
+		return;
+	}
 	window.location.reload();
 }
 
 export function resetLocalFrontendStateAndReload() {
-	if (typeof window === 'undefined') return;
+	if (typeof window === 'undefined') {
+		return;
+	}
 
 	// oxlint-disable-next-line no-alert
 	const confirmed = window.confirm(
 		'Reset local UI state and reload? This clears localStorage/sessionStorage only. Backend data is not deleted.'
 	);
 
-	if (!confirmed) return;
+	if (!confirmed) {
+		return;
+	}
 
 	try {
 		window.localStorage.clear();
@@ -278,7 +308,9 @@ export function resetLocalFrontendStateAndReload() {
 }
 
 export function renderFatalStartupScreen(error: unknown) {
-	if (typeof document === 'undefined') return;
+	if (typeof document === 'undefined') {
+		return;
+	}
 
 	reportFrontendError(error, {
 		phase: 'startup.fatal_screen',

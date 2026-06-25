@@ -106,23 +106,33 @@ function getConversationToolKey(entry: ConversationToolStateEntry): string {
 
 function compareToolListItems(a: ToolListItem, b: ToolListItem): number {
 	const bundleSlugCompare = toolMenuCollator.compare(a.bundleSlug, b.bundleSlug);
-	if (bundleSlugCompare !== 0) return bundleSlugCompare;
+	if (bundleSlugCompare !== 0) {
+		return bundleSlugCompare;
+	}
 
 	const bundleIDCompare = toolMenuCollator.compare(a.bundleID, b.bundleID);
-	if (bundleIDCompare !== 0) return bundleIDCompare;
+	if (bundleIDCompare !== 0) {
+		return bundleIDCompare;
+	}
 
 	const toolSlugCompare = toolMenuCollator.compare(a.toolSlug, b.toolSlug);
-	if (toolSlugCompare !== 0) return toolSlugCompare;
+	if (toolSlugCompare !== 0) {
+		return toolSlugCompare;
+	}
 
 	const toolVersionCompare = toolMenuCollator.compare(a.toolVersion, b.toolVersion);
-	if (toolVersionCompare !== 0) return toolVersionCompare;
+	if (toolVersionCompare !== 0) {
+		return toolVersionCompare;
+	}
 
 	return toolMenuCollator.compare(getToolKey(a), getToolKey(b));
 }
 
 function compareToolGroups(a: ToolBundleGroup, b: ToolBundleGroup): number {
 	const bundleSlugCompare = toolMenuCollator.compare(a.bundleSlug, b.bundleSlug);
-	if (bundleSlugCompare !== 0) return bundleSlugCompare;
+	if (bundleSlugCompare !== 0) {
+		return bundleSlugCompare;
+	}
 	return toolMenuCollator.compare(a.bundleID, b.bundleID);
 }
 
@@ -213,7 +223,9 @@ export function ToolsBottomBarChip({
 	const [toolAutoExecOverrides, setToolAutoExecOverrides] = useState<Record<string, boolean>>({});
 
 	useEffect(() => {
-		if (isInputLocked) store.hide();
+		if (isInputLocked) {
+			store.hide();
+		}
 	}, [isInputLocked, store]);
 
 	const attachedToolKeys = useMemo(() => {
@@ -242,15 +254,21 @@ export function ToolsBottomBarChip({
 	const getAutoExecForTool = useMemo(() => {
 		return (item: ToolListItem): boolean => {
 			const key = getToolKey(item);
-			if (typeof attachedAutoExecByKey[key] === 'boolean') return attachedAutoExecByKey[key];
+			if (typeof attachedAutoExecByKey[key] === 'boolean') {
+				return attachedAutoExecByKey[key];
+			}
 			const override = toolAutoExecOverrides[key];
-			if (typeof override === 'boolean') return override;
+			if (typeof override === 'boolean') {
+				return override;
+			}
 			return item.toolDefinition.autoExecReco ?? false;
 		};
 	}, [attachedAutoExecByKey, toolAutoExecOverrides]);
 
 	const eligibleWebSearchTools = useMemo(() => {
-		if (toolsLoading) return [];
+		if (toolsLoading) {
+			return [];
+		}
 		return getEligibleWebSearchTools(toolData, currentProviderSDKType);
 	}, [currentProviderSDKType, toolData, toolsLoading]);
 
@@ -278,18 +296,24 @@ export function ToolsBottomBarChip({
 	const webSearchEnabled = Boolean(activeWebSearch);
 
 	useEffect(() => {
-		if (toolsLoading) return;
+		if (toolsLoading) {
+			return;
+		}
 
 		// eslint-disable-next-line react-you-might-not-need-an-effect/no-pass-data-to-parent
 		setWebSearchTemplates(prev => {
-			if (prev.length === 0) return prev;
+			if (prev.length === 0) {
+				return prev;
+			}
 			const next = prev.filter(template => eligibleWebSearchKeys.has(webSearchIdentityKey(template)));
 			return next.length === prev.length ? prev : next;
 		});
 	}, [eligibleWebSearchKeys, setWebSearchTemplates, toolsLoading]);
 
 	const activeWebSearchDef = useMemo(() => {
-		if (!activeWebSearch) return undefined;
+		if (!activeWebSearch) {
+			return undefined;
+		}
 		return eligibleWebSearchTools.find(
 			tool =>
 				tool.bundleID === activeWebSearch.bundleID &&
@@ -300,7 +324,9 @@ export function ToolsBottomBarChip({
 
 	const activeWebSearchArgsStatus = useMemo(() => {
 		const schema = activeWebSearchDef?.toolDefinition.userArgSchema;
-		if (!schema || !activeWebSearch) return undefined;
+		if (!schema || !activeWebSearch) {
+			return undefined;
+		}
 		return computeToolUserArgsStatus(schema, activeWebSearch.userArgSchemaInstance);
 	}, [activeWebSearch, activeWebSearchDef]);
 
@@ -321,15 +347,21 @@ export function ToolsBottomBarChip({
 	}, [onWebSearchArgsBlockedChange, webSearchArgsBlocked]);
 
 	const availableTools = useMemo<ToolListItem[]>(() => {
-		if (toolsLoading) return [];
+		if (toolsLoading) {
+			return [];
+		}
 		const providerSDKType = currentProviderSDKType.toString();
 
 		return toolData.filter(item => {
-			if (item.toolDefinition.llmToolType === ToolStoreChoiceType.WebSearch) return false;
+			if (item.toolDefinition.llmToolType === ToolStoreChoiceType.WebSearch) {
+				return false;
+			}
 
 			if (item.toolDefinition.type === ToolImplType.SDK && item.toolDefinition.sdkImpl) {
 				const sdkType = item.toolDefinition.sdkImpl.sdkType;
-				if (!sdkType) return false;
+				if (!sdkType) {
+					return false;
+				}
 				return sdkType === providerSDKType;
 			}
 
@@ -346,7 +378,9 @@ export function ToolsBottomBarChip({
 		let count = 0;
 		for (const entry of visibleAttachedToolEntries) {
 			const status = computeToolUserArgsStatus(entry.toolSnapshot?.userArgSchema, entry.userArgSchemaInstance);
-			if (status.hasSchema && !status.isSatisfied) count += 1;
+			if (status.hasSchema && !status.isSatisfied) {
+				count += 1;
+			}
 		}
 		return count;
 	}, [visibleAttachedToolEntries]);
@@ -354,13 +388,17 @@ export function ToolsBottomBarChip({
 	const conversationArgsMissingCount = useMemo(() => {
 		let count = 0;
 		for (const entry of conversationToolsState) {
-			if (!entry.enabled) continue;
+			if (!entry.enabled) {
+				continue;
+			}
 			const status =
 				entry.argStatus ??
 				(entry.toolDefinition
 					? computeToolUserArgsStatus(entry.toolDefinition.userArgSchema, entry.toolStoreChoice.userArgSchemaInstance)
 					: undefined);
-			if (status?.hasSchema && !status.isSatisfied) count += 1;
+			if (status?.hasSchema && !status.isSatisfied) {
+				count += 1;
+			}
 		}
 		return count;
 	}, [conversationToolsState]);
@@ -377,10 +415,18 @@ export function ToolsBottomBarChip({
 			'Choose per-message tools, conversation tools, and web search.',
 			configuredToolCount > 0 ? `Configured: ${configuredToolCount}` : 'No tools configured',
 		];
-		if (visibleAttachedToolEntries.length > 0) lines.push(`Per-message tools: ${visibleAttachedToolEntries.length}`);
-		if (conversationToolCount > 0) lines.push(`Conversation tools: ${conversationToolCount}`);
-		if (webSearchEnabled) lines.push('Web search: enabled');
-		if (missingArgsCount > 0) lines.push(`Missing required options: ${missingArgsCount}`);
+		if (visibleAttachedToolEntries.length > 0) {
+			lines.push(`Per-message tools: ${visibleAttachedToolEntries.length}`);
+		}
+		if (conversationToolCount > 0) {
+			lines.push(`Conversation tools: ${conversationToolCount}`);
+		}
+		if (webSearchEnabled) {
+			lines.push('Web search: enabled');
+		}
+		if (missingArgsCount > 0) {
+			lines.push(`Missing required options: ${missingArgsCount}`);
+		}
 		return lines.join('\n');
 	}, [
 		configuredToolCount,
@@ -456,7 +502,9 @@ export function ToolsBottomBarChip({
 			return;
 		}
 
-		if (compatibleWebSearchTemplates.length > 0 || eligibleWebSearchTools.length === 0) return;
+		if (compatibleWebSearchTemplates.length > 0 || eligibleWebSearchTools.length === 0) {
+			return;
+		}
 
 		const first = eligibleWebSearchTools[0];
 		setWebSearchTemplates([webSearchTemplateFromToolListItem(first)]);
@@ -479,12 +527,16 @@ export function ToolsBottomBarChip({
 	};
 
 	const orderedWebSearchTools = useMemo(() => {
-		if (!activeWebSearch) return eligibleWebSearchTools;
+		if (!activeWebSearch) {
+			return eligibleWebSearchTools;
+		}
 		const activeKey = webSearchIdentityKey(activeWebSearch);
 		return [...eligibleWebSearchTools].toSorted((a, b) => {
 			const aActive = webSearchIdentityKey(a) === activeKey;
 			const bActive = webSearchIdentityKey(b) === activeKey;
-			if (aActive !== bActive) return aActive ? -1 : 1;
+			if (aActive !== bActive) {
+				return aActive ? -1 : 1;
+			}
 			return compareToolListItems(a, b);
 		});
 	}, [activeWebSearch, eligibleWebSearchTools]);
@@ -505,7 +557,9 @@ export function ToolsBottomBarChip({
 				hideOnClick={false}
 				className={`data-active-item:bg-base-200 mb-1 rounded-xl outline-none last:mb-0 ${isActive ? 'bg-base-200' : ''}`}
 				onClick={() => {
-					if (isInputLocked) return;
+					if (isInputLocked) {
+						return;
+					}
 					handleWebSearchToolSelected(tool);
 				}}
 				title={`Web search tool: ${display} (${slug})`}

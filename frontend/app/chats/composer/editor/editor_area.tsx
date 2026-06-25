@@ -345,7 +345,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const hasBlockingToolArgs = toolArgsBlocked || webSearchArgsBlocked || hasBlockingMCPArgs;
 
 	useLayoutEffect(() => {
-		if (previousProviderSDKTypeRef.current === currentProviderSDKType) return;
+		if (previousProviderSDKTypeRef.current === currentProviderSDKType) {
+			return;
+		}
 
 		previousProviderSDKTypeRef.current = currentProviderSDKType;
 
@@ -432,7 +434,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const handleAttachTool = useCallback(
 		(item: ToolListItem, autoExecute: boolean) => {
 			const identityKey = toolIdentityKey(item.bundleID, item.bundleSlug, item.toolSlug, item.toolVersion);
-			if (attachedToolIdentityKeys.has(identityKey)) return;
+			if (attachedToolIdentityKeys.has(identityKey)) {
+				return;
+			}
 
 			insertToolSelectionNode(
 				editor,
@@ -452,7 +456,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const handleDetachAttachedToolByKey = useCallback(
 		(identityKey: string) => {
-			if (!attachedToolIdentityKeys.has(identityKey)) return;
+			if (!attachedToolIdentityKeys.has(identityKey)) {
+				return;
+			}
 
 			removeToolByKey(editor, identityKey);
 			handleAttachedToolsChanged();
@@ -462,7 +468,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const handleSetAttachedToolAutoExecuteByKey = useCallback(
 		(identityKey: string, autoExecute: boolean) => {
-			if (!attachedToolIdentityKeys.has(identityKey)) return;
+			if (!attachedToolIdentityKeys.has(identityKey)) {
+				return;
+			}
 
 			setToolAutoExecuteByKey(editor, identityKey, autoExecute);
 			handleAttachedToolsChanged();
@@ -480,17 +488,23 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const handleRemoveAllAttachedTools = useCallback(
 		(entries: AttachedToolEntry[]) => {
-			if (entries.length === 0) return;
+			if (entries.length === 0) {
+				return;
+			}
 
 			const uniqueKeys = new Set<string>();
 
 			for (const entry of entries) {
 				const identityKey = toolIdentityKey(entry.bundleID, entry.bundleSlug, entry.toolSlug, entry.toolVersion);
-				if (!attachedToolIdentityKeys.has(identityKey) || uniqueKeys.has(identityKey)) continue;
+				if (!attachedToolIdentityKeys.has(identityKey) || uniqueKeys.has(identityKey)) {
+					continue;
+				}
 				uniqueKeys.add(identityKey);
 			}
 
-			if (uniqueKeys.size === 0) return;
+			if (uniqueKeys.size === 0) {
+				return;
+			}
 
 			for (const identityKey of uniqueKeys) {
 				removeToolByKey(editor, identityKey);
@@ -564,7 +578,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			}
 			return;
 		}
-		if (!menuOpenedByShortcutRef.current.templates) return;
+		if (!menuOpenedByShortcutRef.current.templates) {
+			return;
+		}
 
 		requestAnimationFrame(() => {
 			templateMenuEl?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
@@ -581,7 +597,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			}
 			return;
 		}
-		if (!menuOpenedByShortcutRef.current.tools) return;
+		if (!menuOpenedByShortcutRef.current.tools) {
+			return;
+		}
 
 		requestAnimationFrame(() => {
 			toolMenuEl?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
@@ -603,7 +621,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			}
 			return;
 		}
-		if (!menuOpenedByShortcutRef.current.attachments) return;
+		if (!menuOpenedByShortcutRef.current.attachments) {
+			return;
+		}
 
 		requestAnimationFrame(() => {
 			attachmentMenuEl?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
@@ -620,7 +640,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			}
 			return;
 		}
-		if (!menuOpenedByShortcutRef.current.systemPrompt) return;
+		if (!menuOpenedByShortcutRef.current.systemPrompt) {
+			return;
+		}
 
 		requestAnimationFrame(() => {
 			systemPromptMenuEl?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
@@ -637,7 +659,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			}
 			return;
 		}
-		if (!menuOpenedByShortcutRef.current.skills) return;
+		if (!menuOpenedByShortcutRef.current.skills) {
+			return;
+		}
 
 		requestAnimationFrame(() => {
 			skillsMenuEl?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
@@ -654,7 +678,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			}
 			return;
 		}
-		if (!menuOpenedByShortcutRef.current.mcp) return;
+		if (!menuOpenedByShortcutRef.current.mcp) {
+			return;
+		}
 
 		requestAnimationFrame(() => {
 			mcpMenuEl?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
@@ -662,7 +688,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, [focusEditorPreservingSelection, mcpMenuEl, mcpMenuOpen]);
 
 	const openTemplatePicker = useCallback(() => {
-		if (isInputLocked) return;
+		if (isInputLocked) {
+			return;
+		}
 		menuOpenedByShortcutRef.current.templates = true;
 
 		closeAllMenus();
@@ -672,7 +700,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, [closeAllMenus, isInputLocked, templateMenu]);
 
 	const openToolPicker = useCallback(() => {
-		if (isInputLocked) return;
+		if (isInputLocked) {
+			return;
+		}
 		menuOpenedByShortcutRef.current.tools = true;
 
 		closeAllMenus();
@@ -681,7 +711,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, [closeAllMenus, isInputLocked, toolMenu]);
 
 	const openAttachmentPicker = useCallback(() => {
-		if (isInputLocked) return;
+		if (isInputLocked) {
+			return;
+		}
 		menuOpenedByShortcutRef.current.attachments = true;
 
 		closeAllMenus();
@@ -690,7 +722,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, [isInputLocked, closeAllMenus, attachmentMenu]);
 
 	const openSystemPromptPicker = useCallback(() => {
-		if (isInputLocked) return;
+		if (isInputLocked) {
+			return;
+		}
 		menuOpenedByShortcutRef.current.systemPrompt = true;
 
 		closeAllMenus();
@@ -698,7 +732,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, [closeAllMenus, isInputLocked, systemPromptMenu]);
 
 	const openSkillsPicker = useCallback(() => {
-		if (isInputLocked) return;
+		if (isInputLocked) {
+			return;
+		}
 		menuOpenedByShortcutRef.current.skills = true;
 
 		closeAllMenus();
@@ -706,7 +742,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, [closeAllMenus, isInputLocked, skillsMenu]);
 
 	const openMCPPicker = useCallback(() => {
-		if (isInputLocked) return;
+		if (isInputLocked) {
+			return;
+		}
 		menuOpenedByShortcutRef.current.mcp = true;
 
 		closeAllMenus();
@@ -720,9 +758,15 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		const prevSkills = preEditEnabledSkillRefsRef.current;
 		const prevActive = preEditActiveSkillRefsRef.current;
 
-		if (prevConv) setConversationToolsState(prevConv);
-		if (prevWs) setWebSearchTemplates(prevWs);
-		if (prevMCP !== null) mcp.restoreContext(prevMCP ?? undefined);
+		if (prevConv) {
+			setConversationToolsState(prevConv);
+		}
+		if (prevWs) {
+			setWebSearchTemplates(prevWs);
+		}
+		if (prevMCP !== null) {
+			mcp.restoreContext(prevMCP ?? undefined);
+		}
 		if (prevSkills || prevActive) {
 			applySkillSelectionState(prevSkills ?? getCurrentEnabledSkillRefs(), prevActive ?? getCurrentActiveSkillRefs());
 		}
@@ -739,12 +783,22 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const isSendButtonEnabled = useMemo(() => {
 		// Cannot block on tools def loading here.
-		if (isInputLocked) return false;
-		if (isSubmitting) return false;
-		if (templateBlocked) return false;
-		if (hasBlockingToolArgs) return false;
+		if (isInputLocked) {
+			return false;
+		}
+		if (isSubmitting) {
+			return false;
+		}
+		if (templateBlocked) {
+			return false;
+		}
+		if (hasBlockingToolArgs) {
+			return false;
+		}
 
-		if (hasEffectiveTextForSubmit) return true;
+		if (hasEffectiveTextForSubmit) {
+			return true;
+		}
 
 		const hasAttachments = attachments.length > 0;
 		const hasOutputs = toolOutputs.length > 0;
@@ -763,10 +817,18 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const { formRef, onKeyDown } = useEnterSubmit({
 		isBusy: isGenerating || isSubmitting || fastForwardPending,
 		canSubmit: () => {
-			if (isInputLocked) return false;
-			if (isSubmitting) return false;
-			if (hasBlockingToolArgs) return false;
-			if (templateBlocked) return false;
+			if (isInputLocked) {
+				return false;
+			}
+			if (isSubmitting) {
+				return false;
+			}
+			if (hasBlockingToolArgs) {
+				return false;
+			}
+			if (templateBlocked) {
+				return false;
+			}
 
 			// Default Enter behavior is "run pending tools, then send", so allow
 			// submission when pending tools exist even if they are currently the
@@ -775,7 +837,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				return true;
 			}
 
-			if (hasEffectiveTextForSubmit) return true;
+			if (hasEffectiveTextForSubmit) {
+				return true;
+			}
 
 			const hasAttachments = attachments.length > 0;
 			const hasOutputs = toolOutputs.length > 0;
@@ -832,7 +896,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const startFastForwardRun = useCallback(
 		(pendingRunnableToolCallIDs: string[]) => {
-			if (pendingRunnableToolCallIDs.length === 0) return;
+			if (pendingRunnableToolCallIDs.length === 0) {
+				return;
+			}
 
 			setSubmitError(null);
 			setFastForwardPending(true);
@@ -864,8 +930,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		async (options: SubmitOptions) => {
 			const { runPendingTools } = options;
 
-			if (isSubmittingRef.current) return;
-			if (isInputLocked) return;
+			if (isSubmittingRef.current) {
+				return;
+			}
+			if (isInputLocked) {
+				return;
+			}
 
 			// If conversation sync queued enabled/active skill refs via timeout,
 			// flush them now so this submit uses the latest skill selection.
@@ -1109,22 +1179,32 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	 * Default form submit / Enter: "run pending tools, then send".
 	 */
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
-		if (e) e.preventDefault();
+		if (e) {
+			e.preventDefault();
+		}
 		void doSubmit({ runPendingTools: true });
 	};
 
 	useEffect(() => {
-		if (!fastForwardPending) return;
-		if (isGenerating || isInputLocked || isSubmittingRef.current) return;
+		if (!fastForwardPending) {
+			return;
+		}
+		if (isGenerating || isInputLocked || isSubmittingRef.current) {
+			return;
+		}
 
-		if (templateBlocked || hasBlockingToolArgs) return;
+		if (templateBlocked || hasBlockingToolArgs) {
+			return;
+		}
 
 		const unfinishedRunnableToolCalls = toolCalls.filter(
 			toolCall =>
 				(toolCall.status === 'pending' || toolCall.status === 'running') && isRunnableComposerToolCall(toolCall)
 		);
 
-		if (unfinishedRunnableToolCalls.length > 0) return;
+		if (unfinishedRunnableToolCalls.length > 0) {
+			return;
+		}
 
 		const failedRunnableToolCalls = toolCalls.filter(
 			toolCall => toolCall.status === 'failed' && isRunnableComposerToolCall(toolCall)
@@ -1175,13 +1255,25 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			return;
 		}
 
-		if (autoExecState.phase !== 'idle') return;
-		if (tracker.observedCallKeys.size === 0) return;
-		if (!tracker.allObservedCallsAreAutoExecute) return;
-		if (autoExecBlockedByUser) return;
-		if (isGenerating || isInputLocked || isSubmittingRef.current) return;
+		if (autoExecState.phase !== 'idle') {
+			return;
+		}
+		if (tracker.observedCallKeys.size === 0) {
+			return;
+		}
+		if (!tracker.allObservedCallsAreAutoExecute) {
+			return;
+		}
+		if (autoExecBlockedByUser) {
+			return;
+		}
+		if (isGenerating || isInputLocked || isSubmittingRef.current) {
+			return;
+		}
 
-		if (templateBlocked || hasBlockingToolArgs) return;
+		if (templateBlocked || hasBlockingToolArgs) {
+			return;
+		}
 
 		const runtime = getToolRuntimeSnapshot();
 
@@ -1190,12 +1282,18 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			return;
 		}
 
-		if (runtime.toolCalls.length > 0) return;
+		if (runtime.toolCalls.length > 0) {
+			return;
+		}
 
 		const observedCallKeys = [...tracker.observedCallKeys].toSorted();
 		const batchSignature = observedCallKeys.join('::');
-		if (!batchSignature) return;
-		if (tracker.attemptedBatchSignature === batchSignature) return;
+		if (!batchSignature) {
+			return;
+		}
+		if (tracker.attemptedBatchSignature === batchSignature) {
+			return;
+		}
 
 		const outputByCallKey = new Map(runtime.toolOutputs.map(output => [getToolAutoSubmitKey(output), output] as const));
 
@@ -1204,7 +1302,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			return output && !output.isError;
 		});
 
-		if (!allObservedCallsProducedSuccessfulOutputs) return;
+		if (!allObservedCallsProducedSuccessfulOutputs) {
+			return;
+		}
 
 		tracker.attemptedBatchSignature = batchSignature;
 		void doSubmit({ runPendingTools: false });
@@ -1323,7 +1423,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const handleEditorDocumentChange = useCallback(() => {
 		const didProcessChange = onEditorChange();
-		if (!didProcessChange) return;
+		if (!didProcessChange) {
+			return;
+		}
 
 		if (toolCalls.length > 0) {
 			handleAttachedToolsChanged();
@@ -1333,7 +1435,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		}
 		// Skip auto-cancel while loadExternalMessage is in progress.
 		// The transient state (cleared attachments / tool outputs) is not yet restored.
-		if (isLoadingExternalMessageRef.current) return;
+		if (isLoadingExternalMessageRef.current) {
+			return;
+		}
 
 		// Auto-cancel editing when the editor is completely empty
 		// (no text, no tools, no attachments, no tool outputs).
@@ -1393,7 +1497,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const finishAssistantTurn = useCallback(
 		(payload: AssistantTurnFinishedPayload) => {
-			if (payload.loadedRunnableToolCallCount === 0) clearAutoExecStopState();
+			if (payload.loadedRunnableToolCallCount === 0) {
+				clearAutoExecStopState();
+			}
 		},
 		[clearAutoExecStopState]
 	);
@@ -1423,7 +1529,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				openMCPPicker();
 			},
 			requestStopResponse: () => {
-				if (isGenerating) onRequestStop();
+				if (isGenerating) {
+					onRequestStop();
+				}
 			},
 			loadExternalMessage,
 			setDraftText,
@@ -1483,7 +1591,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const stopResponseShortcut = formatShortcut(shortcutConfig.stopResponse);
 
 	const handleRunToolsOnlyClick = useCallback(async () => {
-		if (!hasPendingToolCalls || isInputLocked || isSubmitting || fastForwardPending || hasRunningToolCalls) return;
+		if (!hasPendingToolCalls || isInputLocked || isSubmitting || fastForwardPending || hasRunningToolCalls) {
+			return;
+		}
 		await runAllPendingToolCalls();
 	}, [
 		fastForwardPending,
@@ -1671,7 +1781,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 												}`}
 												disabled={!canRunToolsOnly}
 												onClick={() => {
-													if (!canRunToolsOnly) return;
+													if (!canRunToolsOnly) {
+														return;
+													}
 													void handleRunToolsOnlyClick();
 												}}
 												aria-label="Run tools only"
@@ -1691,7 +1803,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 												}`}
 												disabled={!canRunToolsAndSend}
 												onClick={() => {
-													if (!canRunToolsAndSend) return;
+													if (!canRunToolsAndSend) {
+														return;
+													}
 													void doSubmit({ runPendingTools: true });
 												}}
 												aria-label="Run tools and send"
@@ -1711,7 +1825,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 											className={`btn btn-circle btn-neutral btn-sm shrink-0 ${!canSendOnly ? 'btn-disabled' : ''}`}
 											disabled={!canSendOnly}
 											onClick={() => {
-												if (!canSendOnly) return;
+												if (!canSendOnly) {
+													return;
+												}
 												void doSubmit({ runPendingTools: false });
 											}}
 											aria-label="Send message"

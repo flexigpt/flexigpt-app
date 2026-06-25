@@ -121,7 +121,9 @@ function buildToolStoreChoiceMap(messages: StoreConversationMessage[]): Map<stri
 	const map = new Map<string, ToolStoreChoice>();
 
 	for (const message of messages) {
-		if (!message.toolStoreChoices) continue;
+		if (!message.toolStoreChoices) {
+			continue;
+		}
 
 		for (const choice of message.toolStoreChoices) {
 			map.set(choice.choiceID, choice);
@@ -143,7 +145,9 @@ function buildToolCallMap(messages: StoreConversationMessage[]): Map<string, Too
 }
 
 function deriveUIContentFromInputUnion(inputs?: InputUnion[]): string {
-	if (!inputs || inputs.length === 0) return '';
+	if (!inputs || inputs.length === 0) {
+		return '';
+	}
 
 	for (const input of inputs) {
 		if (
@@ -157,7 +161,9 @@ function deriveUIContentFromInputUnion(inputs?: InputUnion[]): string {
 		for (const content of input.inputMessage.contents) {
 			if (content.kind === ContentItemKind.Text && content.textItem?.text) {
 				const text = content.textItem.text.trim();
-				if (text) return text;
+				if (text) {
+					return text;
+				}
 			}
 		}
 	}
@@ -171,7 +177,9 @@ function deriveUIToolOutputsFromInputUnion(
 	toolCallMap: Map<string, ToolCall>,
 	mcpToolSelectionMap?: ReturnType<typeof buildMCPToolSelectionMap>
 ): UIToolOutput[] {
-	if (!inputs || inputs.length === 0) return [];
+	if (!inputs || inputs.length === 0) {
+		return [];
+	}
 
 	const uiOutputs: UIToolOutput[] = [];
 

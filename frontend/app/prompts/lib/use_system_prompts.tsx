@@ -82,8 +82,12 @@ function emitChange() {
 }
 
 function arePromptsEqual(a: SystemPromptItem[], b: SystemPromptItem[]): boolean {
-	if (a === b) return true;
-	if (a.length !== b.length) return false;
+	if (a === b) {
+		return true;
+	}
+	if (a.length !== b.length) {
+		return false;
+	}
 	for (let i = 0; i < a.length; i++) {
 		const ai = a[i];
 		const bi = b[i];
@@ -100,8 +104,12 @@ function arePromptsEqual(a: SystemPromptItem[], b: SystemPromptItem[]): boolean 
 }
 
 function areBundlesEqual(a: PromptBundle[], b: PromptBundle[]): boolean {
-	if (a === b) return true;
-	if (a.length !== b.length) return false;
+	if (a === b) {
+		return true;
+	}
+	if (a.length !== b.length) {
+		return false;
+	}
 	for (let i = 0; i < a.length; i++) {
 		const ai = a[i];
 		const bi = b[i];
@@ -119,15 +127,25 @@ function areBundlesEqual(a: PromptBundle[], b: PromptBundle[]): boolean {
 }
 
 function areVersionsEqual(a: Record<string, string[]>, b: Record<string, string[]>): boolean {
-	if (a === b) return true;
+	if (a === b) {
+		return true;
+	}
 	const ak = Object.keys(a);
 	const bk = Object.keys(b);
-	if (ak.length !== bk.length) return false;
+	if (ak.length !== bk.length) {
+		return false;
+	}
 	for (const k of ak) {
 		const av = a[k];
 		const bv = b[k];
-		if (!bv || av.length !== bv.length) return false;
-		for (let i = 0; i < av.length; i++) if (av[i] !== bv[i]) return false;
+		if (!bv || av.length !== bv.length) {
+			return false;
+		}
+		for (let i = 0; i < av.length; i++) {
+			if (av[i] !== bv[i]) {
+				return false;
+			}
+		}
 	}
 	return true;
 }
@@ -145,7 +163,9 @@ function isSameState(a: SystemPromptStoreState, b: SystemPromptStoreState): bool
 }
 
 function setState(next: SystemPromptStoreState) {
-	if (isSameState(state, next)) return;
+	if (isSameState(state, next)) {
+		return;
+	}
 	state = next;
 	emitChange();
 }
@@ -177,7 +197,9 @@ function buildResolvedPromptVariableValues(variables?: PromptVariable[]): Record
 
 	for (const variable of variables ?? []) {
 		const name = variable.name?.trim();
-		if (!name) continue;
+		if (!name) {
+			continue;
+		}
 
 		if (variable.source === VarSource.Static && variable.staticVal !== undefined) {
 			values[name] = variable.staticVal;
@@ -226,7 +248,9 @@ function sortBundles(bundles: PromptBundle[]): PromptBundle[] {
 		const aLabel = (a.displayName || a.slug).toLowerCase();
 		const bLabel = (b.displayName || b.slug).toLowerCase();
 		const byLabel = aLabel.localeCompare(bLabel);
-		if (byLabel !== 0) return byLabel;
+		if (byLabel !== 0) {
+			return byLabel;
+		}
 
 		return a.id.localeCompare(b.id);
 	});
@@ -235,10 +259,14 @@ function sortBundles(bundles: PromptBundle[]): PromptBundle[] {
 function sortPrompts(prompts: SystemPromptItem[]): SystemPromptItem[] {
 	return [...prompts].toSorted((a, b) => {
 		const byDisplay = a.displayName.localeCompare(b.displayName);
-		if (byDisplay !== 0) return byDisplay;
+		if (byDisplay !== 0) {
+			return byDisplay;
+		}
 
 		const bySlug = a.templateSlug.localeCompare(b.templateSlug);
-		if (bySlug !== 0) return bySlug;
+		if (bySlug !== 0) {
+			return bySlug;
+		}
 
 		return a.templateVersion.localeCompare(b.templateVersion);
 	});
@@ -318,7 +346,9 @@ async function loadSystemPromptState(): Promise<void> {
 	const nextPrompts = sortPrompts(
 		visibleTemplates
 			.map((template, index) => {
-				if (!template) return null;
+				if (!template) {
+					return null;
+				}
 				return toSystemPromptItem(template, bundleByID.get(visibleSystemPromptListItems[index].bundleID));
 			})
 			.filter(Boolean) as SystemPromptItem[]

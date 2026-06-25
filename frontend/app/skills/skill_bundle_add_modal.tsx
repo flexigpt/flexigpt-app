@@ -47,7 +47,9 @@ function AddSkillBundleModalContent({ onClose, onSubmit, existingSlugs, existing
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
 		if (!dialog.open) {
 			try {
@@ -78,7 +80,9 @@ function AddSkillBundleModalContent({ onClose, onSubmit, existingSlugs, existing
 	};
 
 	const handleDialogClose = () => {
-		if (isUnmountingRef.current) return;
+		if (isUnmountingRef.current) {
+			return;
+		}
 		onClose();
 	};
 
@@ -106,8 +110,11 @@ function AddSkillBundleModalContent({ onClose, onSubmit, existingSlugs, existing
 		if (field === 'displayName') {
 			const norm = normalizeForUniq(v);
 			const clash = existingNames.some(x => normalizeForUniq(x) === norm);
-			if (clash) nextErrors.displayName = 'Bundle name must be unique.';
-			else nextErrors = omitManyKeys(nextErrors, ['displayName']);
+			if (clash) {
+				nextErrors.displayName = 'Bundle name must be unique.';
+			} else {
+				nextErrors = omitManyKeys(nextErrors, ['displayName']);
+			}
 			return nextErrors;
 		}
 
@@ -133,7 +140,9 @@ function AddSkillBundleModalContent({ onClose, onSubmit, existingSlugs, existing
 
 		const nextErrors = validateForm(trimmed);
 		setErrors(nextErrors);
-		if (Object.keys(nextErrors).length > 0) return;
+		if (Object.keys(nextErrors).length > 0) {
+			return;
+		}
 
 		onSubmit(trimmed.slug, trimmed.displayName, trimmed.description || undefined);
 		requestClose();
@@ -256,8 +265,12 @@ function AddSkillBundleModalContent({ onClose, onSubmit, existingSlugs, existing
 }
 
 export function AddSkillBundleModal(props: AddSkillBundleModalProps) {
-	if (!props.isOpen) return null;
-	if (typeof document === 'undefined' || !document.body) return null;
+	if (!props.isOpen) {
+		return null;
+	}
+	if (typeof document === 'undefined' || !document.body) {
+		return null;
+	}
 
 	return createPortal(<AddSkillBundleModalContent key="add-skill-bundle-modal" {...props} />, document.body);
 }

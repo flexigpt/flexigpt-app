@@ -9,7 +9,9 @@ function joinReasoningParts(reasoning: ReasoningContent[] | undefined, key: 'sum
 	const parts: string[] = [];
 	for (const rc of items) {
 		const arr = rc?.[key];
-		if (Array.isArray(arr) && arr.length > 0) parts.push(arr.join('\n'));
+		if (Array.isArray(arr) && arr.length > 0) {
+			parts.push(arr.join('\n'));
+		}
 	}
 	return parts.join('\n\n').trim();
 }
@@ -47,7 +49,9 @@ export function MessageThinkingSection(props: {
 		</div>
 	);
 
-	if (!shouldShow) return null;
+	if (!shouldShow) {
+		return null;
+	}
 
 	return (
 		<div className="m-0 p-0">

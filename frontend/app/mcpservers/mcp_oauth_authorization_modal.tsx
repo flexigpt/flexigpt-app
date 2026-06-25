@@ -35,7 +35,9 @@ function MCPOAuthAuthorizationModalContent({
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
 		if (!dialog.open) {
 			try {
@@ -66,7 +68,9 @@ function MCPOAuthAuthorizationModalContent({
 	};
 
 	const handleDialogClose = () => {
-		if (isUnmountingRef.current) return;
+		if (isUnmountingRef.current) {
+			return;
+		}
 		onClose();
 	};
 
@@ -186,8 +190,12 @@ function MCPOAuthAuthorizationModalContent({
 }
 
 export function MCPOAuthAuthorizationModal(props: MCPOAuthAuthorizationModalProps) {
-	if (!props.isOpen) return null;
-	if (typeof document === 'undefined' || !document.body) return null;
+	if (!props.isOpen) {
+		return null;
+	}
+	if (typeof document === 'undefined' || !document.body) {
+		return null;
+	}
 
 	return createPortal(
 		<MCPOAuthAuthorizationModalContent key="mcp-oauth-authorization-modal" {...props} />,

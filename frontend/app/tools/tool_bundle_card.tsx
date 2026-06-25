@@ -94,7 +94,9 @@ export function ToolBundleCard({
 	};
 
 	const confirmDeleteTool = async () => {
-		if (!toolToDelete) return;
+		if (!toolToDelete) {
+			return;
+		}
 
 		const target = toolToDelete;
 		setBusyToolID(target.id);

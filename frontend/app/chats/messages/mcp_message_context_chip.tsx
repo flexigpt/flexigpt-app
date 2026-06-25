@@ -18,8 +18,9 @@ function toolExposureLabel(server: MCPServerSelection): string {
 		const count = server.selectedTools?.length ?? 0;
 		return count > 0 ? `All tools (${count})` : 'All tools';
 	}
-	if (server.toolExposure === MCPToolExposure.MCPToolExposureSelected)
+	if (server.toolExposure === MCPToolExposure.MCPToolExposureSelected) {
 		return `${server.selectedTools?.length ?? 0} tools`;
+	}
 	return 'No tools';
 }
 
@@ -41,7 +42,9 @@ export function getMCPAppToolResultContent(output: UIToolOutput): MCPContent[] |
 		.map(t => textFromUIToolOutputItem(t))
 		.filter(Boolean)
 		.join('\n\n');
-	if (!text) return undefined;
+	if (!text) {
+		return undefined;
+	}
 
 	return [
 		{
@@ -59,7 +62,9 @@ export function MCPMessageContextChip({ context }: { context?: MCPConversationCo
 	const count = context?.servers?.length ?? 0;
 	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
 
-	if (!context || count === 0) return null;
+	if (!context || count === 0) {
+		return null;
+	}
 
 	const resourceCount = (context.resources?.length ?? 0) + (context.resourceTemplates?.length ?? 0);
 	const promptCount = context.prompts?.length ?? 0;

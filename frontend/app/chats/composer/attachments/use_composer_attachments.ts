@@ -23,14 +23,18 @@ import {
 } from '@/chats/composer/attachments/attachment_editor_utils';
 
 function mergeUniqueStrings(existing: string[], incoming: string[]): string[] {
-	if (incoming.length === 0) return existing;
+	if (incoming.length === 0) {
+		return existing;
+	}
 
 	const seen = new Set(existing);
 	const next = [...existing];
 	let changed = false;
 
 	for (const item of incoming) {
-		if (seen.has(item)) continue;
+		if (seen.has(item)) {
+			continue;
+		}
 		seen.add(item);
 		next.push(item);
 		changed = true;
@@ -43,7 +47,9 @@ function mergeOverflowDirs(
 	existing: DirectoryOverflowInfo[],
 	incoming: DirectoryOverflowInfo[]
 ): DirectoryOverflowInfo[] {
-	if (incoming.length === 0) return existing;
+	if (incoming.length === 0) {
+		return existing;
+	}
 
 	const byDirPath = new Map<string, DirectoryOverflowInfo>();
 	for (const item of existing) {
@@ -59,7 +65,9 @@ function mergeOverflowDirs(
 		byDirPath.set(item.dirPath, item);
 	}
 
-	if (!changed && byDirPath.size === existing.length) return existing;
+	if (!changed && byDirPath.size === existing.length) {
+		return existing;
+	}
 	return Array.from(byDirPath.values());
 }
 
@@ -134,7 +142,9 @@ export function useComposerAttachments({
 	const loadAttachmentsFromMessage = useCallback(
 		(incomingAttachments: Attachment[] | null | undefined) => {
 			setAttachments(() => {
-				if (!incomingAttachments || incomingAttachments.length === 0) return [];
+				if (!incomingAttachments || incomingAttachments.length === 0) {
+					return [];
+				}
 				const next: UIAttachment[] = [];
 				const seen = new Set<string>();
 
@@ -151,10 +161,14 @@ export function useComposerAttachments({
 						ui = buildUIAttachmentForLocalPath(att);
 					}
 
-					if (!ui) continue;
+					if (!ui) {
+						continue;
+					}
 
 					const key = uiAttachmentKey(ui);
-					if (seen.has(key)) continue;
+					if (seen.has(key)) {
+						continue;
+					}
 					seen.add(key);
 					next.push(ui);
 				}
@@ -169,7 +183,9 @@ export function useComposerAttachments({
 
 	const applyFileAttachments = useCallback(
 		(results: Attachment[]) => {
-			if (!results || results.length === 0) return;
+			if (!results || results.length === 0) {
+				return;
+			}
 			const keysToReleaseFromDirectoryOwnership = new Set<string>();
 			setAttachments(prev => {
 				const existing = new Set(prev.map(k => uiAttachmentKey(k)));
@@ -177,7 +193,9 @@ export function useComposerAttachments({
 
 				for (const r of results) {
 					const att = buildUIAttachmentForLocalPath(r);
-					if (!att) continue;
+					if (!att) {
+						continue;
+					}
 
 					const key = uiAttachmentKey(att);
 					if (existing.has(key)) {
@@ -201,7 +219,9 @@ export function useComposerAttachments({
 
 	const applyDirectoryAttachments = useCallback(
 		(result: DirectoryAttachmentsResult) => {
-			if (!result || !result.dirPath) return;
+			if (!result || !result.dirPath) {
+				return;
+			}
 
 			const { dirPath, attachments: dirAttachments, overflowDirs } = result;
 			if ((!dirAttachments || dirAttachments.length === 0) && (!overflowDirs || overflowDirs.length === 0)) {
@@ -217,16 +237,22 @@ export function useComposerAttachments({
 
 			setAttachments(prev => {
 				const existing = new Map<string, UIAttachment>();
-				for (const att of prev) existing.set(uiAttachmentKey(att), att);
+				for (const att of prev) {
+					existing.set(uiAttachmentKey(att), att);
+				}
 
 				const added: UIAttachment[] = [];
 
 				for (const r of dirAttachments ?? []) {
 					const att = buildUIAttachmentForLocalPath(r);
-					if (!att) continue;
+					if (!att) {
+						continue;
+					}
 
 					const key = uiAttachmentKey(att);
-					if (seenKeysForGroup.has(key)) continue;
+					if (seenKeysForGroup.has(key)) {
+						continue;
+					}
 					seenKeysForGroup.add(key);
 
 					attachmentKeysForGroup.push(key);
@@ -312,16 +338,22 @@ export function useComposerAttachments({
 	const attachURL = useCallback(
 		async (rawUrl: string) => {
 			const trimmed = rawUrl.trim();
-			if (!trimmed) return;
+			if (!trimmed) {
+				return;
+			}
 
 			const bAtt = await backendAPI.openURLAsAttachment(trimmed);
-			if (!bAtt) return;
+			if (!bAtt) {
+				return;
+			}
 			const att = buildUIAttachmentForURL(bAtt);
 			const key = uiAttachmentKey(att);
 
 			setAttachments(prev => {
 				const existing = new Set(prev.map(k => uiAttachmentKey(k)));
-				if (existing.has(key)) return prev;
+				if (existing.has(key)) {
+					return prev;
+				}
 				return [...prev, att];
 			});
 
@@ -364,7 +396,9 @@ export function useComposerAttachments({
 		(groupId: string) => {
 			setDirectoryGroups(prevGroups => {
 				const groupToRemove = prevGroups.find(g => g.id === groupId);
-				if (!groupToRemove) return prevGroups;
+				if (!groupToRemove) {
+					return prevGroups;
+				}
 
 				const remainingGroups = prevGroups.filter(g => g.id !== groupId);
 
@@ -380,9 +414,13 @@ export function useComposerAttachments({
 					setAttachments(prevAttachments =>
 						prevAttachments.filter(att => {
 							const key = uiAttachmentKey(att);
-							if (!groupToRemove.ownedAttachmentKeys.includes(key)) return true;
+							if (!groupToRemove.ownedAttachmentKeys.includes(key)) {
+								return true;
+							}
 							// If other groups still own this attachment, keep it.
-							if (keysOwnedByOtherGroups.has(key)) return true;
+							if (keysOwnedByOtherGroups.has(key)) {
+								return true;
+							}
 							// Otherwise, drop it when this folder is removed.
 							return false;
 						})

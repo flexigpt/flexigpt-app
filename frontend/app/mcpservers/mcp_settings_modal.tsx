@@ -17,7 +17,9 @@ interface MCPSettingsModalProps {
 
 function isLoopbackHost(host: string): boolean {
 	const h = host.trim().toLowerCase().replace(/^\[/, '').replace(/\]$/, '');
-	if (h === 'localhost' || h === '::1' || h === '0:0:0:0:0:0:0:1') return true;
+	if (h === 'localhost' || h === '::1' || h === '0:0:0:0:0:0:0:1') {
+		return true;
+	}
 	const parts = h.split('.').map(Number);
 	return parts.length === 4 && parts.every(p => Number.isInteger(p) && p >= 0 && p <= 255) && parts[0] === 127;
 }
@@ -25,7 +27,9 @@ function isLoopbackHost(host: string): boolean {
 function splitListenAddr(value: string): { host: string; port: string } | undefined {
 	if (value.startsWith('[')) {
 		const end = value.indexOf(']');
-		if (end <= 1 || value[end + 1] !== ':') return undefined;
+		if (end <= 1 || value[end + 1] !== ':') {
+			return undefined;
+		}
 		return {
 			host: value.slice(1, end),
 			port: value.slice(end + 2),
@@ -33,18 +37,28 @@ function splitListenAddr(value: string): { host: string; port: string } | undefi
 	}
 
 	const parts = value.split(':');
-	if (parts.length !== 2) return undefined;
+	if (parts.length !== 2) {
+		return undefined;
+	}
 	return { host: parts[0], port: parts[1] };
 }
 
 function validateListenAddr(raw: string): string {
 	const value = raw.trim();
-	if (!value) return '';
+	if (!value) {
+		return '';
+	}
 	const parsed = splitListenAddr(value);
-	if (!parsed) return 'Use host:port, for IPv6 use [::1]:37645.';
+	if (!parsed) {
+		return 'Use host:port, for IPv6 use [::1]:37645.';
+	}
 	const port = Number(parsed.port);
-	if (!isLoopbackHost(parsed.host)) return 'Host must be loopback (localhost, 127.0.0.1, or ::1).';
-	if (!Number.isInteger(port) || port <= 0 || port > 65535) return 'Port must be 1..65535.';
+	if (!isLoopbackHost(parsed.host)) {
+		return 'Host must be loopback (localhost, 127.0.0.1, or ::1).';
+	}
+	if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+		return 'Port must be 1..65535.';
+	}
 	return '';
 }
 
@@ -64,7 +78,9 @@ function MCPSettingsModalContent({
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 		if (!dialog.open) {
 			try {
 				dialog.showModal();
@@ -74,7 +90,9 @@ function MCPSettingsModalContent({
 		}
 		return () => {
 			isUnmountingRef.current = true;
-			if (dialog.open) dialog.close();
+			if (dialog.open) {
+				dialog.close();
+			}
 		};
 	}, []);
 
@@ -88,7 +106,9 @@ function MCPSettingsModalContent({
 	};
 
 	const handleDialogClose = () => {
-		if (isUnmountingRef.current) return;
+		if (isUnmountingRef.current) {
+			return;
+		}
 		onClose();
 	};
 
@@ -99,7 +119,9 @@ function MCPSettingsModalContent({
 
 		const err = validateListenAddr(listenAddr);
 		setErrorState(err);
-		if (err) return;
+		if (err) {
+			return;
+		}
 
 		void onSubmit(listenAddr.trim())
 			.then(() => {
@@ -203,7 +225,11 @@ function MCPSettingsModalContent({
 }
 
 export function MCPSettingsModal(props: MCPSettingsModalProps) {
-	if (!props.isOpen) return null;
-	if (typeof document === 'undefined' || !document.body) return null;
+	if (!props.isOpen) {
+		return null;
+	}
+	if (typeof document === 'undefined' || !document.body) {
+		return null;
+	}
 	return createPortal(<MCPSettingsModalContent key="mcp-settings-modal" {...props} />, document.body);
 }

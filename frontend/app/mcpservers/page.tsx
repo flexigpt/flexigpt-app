@@ -210,18 +210,24 @@ export default function MCPServersPage() {
 
 		void loadAllBundleData()
 			.then(bundleResults => {
-				if (isCancelled) return;
+				if (isCancelled) {
+					return;
+				}
 				setBundles(bundleResults);
 			})
 			.catch((error: unknown) => {
-				if (isCancelled) return;
+				if (isCancelled) {
+					return;
+				}
 
 				console.error('Failed to load MCP bundles:', error);
 				setAlertMsg(getErrorMessage(error, 'Failed to load MCP bundles. Please try again.'));
 				setShowAlert(true);
 			})
 			.finally(() => {
-				if (isCancelled) return;
+				if (isCancelled) {
+					return;
+				}
 				setLoading(false);
 			});
 
@@ -244,7 +250,9 @@ export default function MCPServersPage() {
 				}))
 		);
 
-		if (pendingServers.length === 0) return;
+		if (pendingServers.length === 0) {
+			return;
+		}
 
 		const timer = window.setInterval(() => {
 			void Promise.all(
@@ -417,7 +425,9 @@ export default function MCPServersPage() {
 					const slot = row.slot.trim();
 					const deleteSlot = (row.deleteSlot ?? slot).trim();
 
-					if (!envName || !slot) continue;
+					if (!envName || !slot) {
+						continue;
+					}
 
 					if (row.deleteExisting && row.existingSecretRef && deleteSlot) {
 						await mcpAPI.deleteMCPServerSecret(
@@ -666,7 +676,9 @@ export default function MCPServersPage() {
 		void mcpAPI
 			.getMCPSettings()
 			.then(view => {
-				if (!cancelled) setSettingsView(view);
+				if (!cancelled) {
+					setSettingsView(view);
+				}
 			})
 			.catch(() => undefined);
 		return () => {
@@ -676,7 +688,9 @@ export default function MCPServersPage() {
 
 	const handleSaveSettings = useCallback(async (oauthLoopbackListenAddr: string) => {
 		const view = await mcpAPI.patchMCPSettings(oauthLoopbackListenAddr);
-		if (view) setSettingsView(view);
+		if (view) {
+			setSettingsView(view);
+		}
 		if (view?.oauthRestartRequired) {
 			setAlertMsg('The OAuth loopback address was saved and will take effect after restarting FlexiGPT.');
 			setShowAlert(true);

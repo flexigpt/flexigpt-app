@@ -114,7 +114,9 @@ function buildOutputParamFromForm(
 ): OutputParam | undefined {
 	const formatKind = outputFormatKind !== OUTPUT_FORMAT_NONE ? outputFormatKind : undefined;
 	const verbosity = outputVerbosity !== OUTPUT_VERBOSITY_NONE ? outputVerbosity : undefined;
-	if (!formatKind && !verbosity) return undefined;
+	if (!formatKind && !verbosity) {
+		return undefined;
+	}
 
 	const format =
 		formatKind !== undefined
@@ -195,7 +197,9 @@ function buildReasoningFromForm(
 	formData: ModelPresetFormData,
 	initialReasoning?: ReasoningParam
 ): ReasoningParam | undefined {
-	if (!formData.reasoningSupport) return undefined;
+	if (!formData.reasoningSupport) {
+		return undefined;
+	}
 
 	const type = formData.reasoningType ?? ReasoningType.SingleWithLevels;
 	let tokens = DEFAULT_REASONING_TOKENS;
@@ -246,11 +250,19 @@ const calcNumericError = (
 	strVal: string,
 	minOrRange?: { min?: number; max?: number }
 ): string | undefined => {
-	if (strVal.trim() === '') return;
+	if (strVal.trim() === '') {
+		return;
+	}
 	const num = Number(strVal);
-	if (Number.isNaN(num)) return `${field} must be a valid number.`;
-	if (minOrRange?.min !== undefined && num < minOrRange.min) return `${field} must be ≥ ${minOrRange.min}.`;
-	if (minOrRange?.max !== undefined && num > minOrRange.max) return `${field} must be ≤ ${minOrRange.max}.`;
+	if (Number.isNaN(num)) {
+		return `${field} must be a valid number.`;
+	}
+	if (minOrRange?.min !== undefined && num < minOrRange.min) {
+		return `${field} must be ≥ ${minOrRange.min}.`;
+	}
+	if (minOrRange?.max !== undefined && num > minOrRange.max) {
+		return `${field} must be ≤ ${minOrRange.max}.`;
+	}
 };
 
 function getInitialModelPresetFormData(
@@ -394,7 +406,9 @@ function AddEditModelPresetModalContent({
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
 		if (!dialog.open) {
 			try {
@@ -423,7 +437,9 @@ function AddEditModelPresetModalContent({
 	}, [mode, isReadOnly]);
 
 	const requestClose = useCallback(() => {
-		if (isSubmitting) return;
+		if (isSubmitting) {
+			return;
+		}
 
 		const dialog = dialogRef.current;
 		if (dialog?.open) {
@@ -435,13 +451,17 @@ function AddEditModelPresetModalContent({
 	}, [isSubmitting, onClose]);
 
 	const handleDialogClose = () => {
-		if (isUnmountingRef.current) return;
+		if (isUnmountingRef.current) {
+			return;
+		}
 		onClose();
 	};
 
 	const applyPrefill = (key: PrefillKey) => {
 		const src = prefillSourceMap[key];
-		if (!src) return;
+		if (!src) {
+			return;
+		}
 
 		setFormData(prev => ({
 			...prev,
@@ -475,16 +495,26 @@ function AddEditModelPresetModalContent({
 	};
 
 	const buildPatchPayload = useCallback((): PatchModelPresetPayload => {
-		if (!initialData) return {};
+		if (!initialData) {
+			return {};
+		}
 
 		const patch: PatchModelPresetPayload = {};
 		const nextName = formData.name.trim();
 		const nextDisplayName = formData.presetLabel.trim();
 
-		if (nextName !== initialData.name) patch.name = nextName;
-		if (nextDisplayName !== initialData.displayName) patch.displayName = nextDisplayName;
-		if (formData.isEnabled !== initialData.isEnabled) patch.isEnabled = formData.isEnabled;
-		if (formData.stream !== (initialData.stream ?? false)) patch.stream = formData.stream;
+		if (nextName !== initialData.name) {
+			patch.name = nextName;
+		}
+		if (nextDisplayName !== initialData.displayName) {
+			patch.displayName = nextDisplayName;
+		}
+		if (formData.isEnabled !== initialData.isEnabled) {
+			patch.isEnabled = formData.isEnabled;
+		}
+		if (formData.stream !== (initialData.stream ?? false)) {
+			patch.stream = formData.stream;
+		}
 
 		const nextMaxPromptLength = parseOptionalNumber(formData.maxPromptLength);
 		if (nextMaxPromptLength !== undefined && nextMaxPromptLength !== initialData.maxPromptLength) {
@@ -501,10 +531,14 @@ function AddEditModelPresetModalContent({
 			patch.temperature = nextTemperature;
 		}
 
-		if (formData.systemPrompt !== (initialData.systemPrompt ?? '')) patch.systemPrompt = formData.systemPrompt;
+		if (formData.systemPrompt !== (initialData.systemPrompt ?? '')) {
+			patch.systemPrompt = formData.systemPrompt;
+		}
 
 		const nextTimeout = parseOptionalNumber(formData.timeout);
-		if (nextTimeout !== undefined && nextTimeout !== initialData.timeout) patch.timeout = nextTimeout;
+		if (nextTimeout !== undefined && nextTimeout !== initialData.timeout) {
+			patch.timeout = nextTimeout;
+		}
 
 		const nextCacheControl = buildCacheControlFromModelPresetForm(formData, supportedCacheKinds, supportsCacheKey);
 		if (nextCacheControl && !cacheControlEqual(nextCacheControl, initialData.cacheControl)) {
@@ -516,14 +550,19 @@ function AddEditModelPresetModalContent({
 			formData.outputVerbosity,
 			initialData.outputParam
 		);
-		if (!outputParamsEqual(nextOutputParam, initialData.outputParam) && nextOutputParam)
+		if (!outputParamsEqual(nextOutputParam, initialData.outputParam) && nextOutputParam) {
 			patch.outputParam = nextOutputParam;
+		}
 
 		const nextStopSequences = parseStopSequencesRaw(formData.stopSequencesRaw);
-		if (!arraysEqual(nextStopSequences, initialData.stopSequences ?? [])) patch.stopSequences = nextStopSequences;
+		if (!arraysEqual(nextStopSequences, initialData.stopSequences ?? [])) {
+			patch.stopSequences = nextStopSequences;
+		}
 
 		const nextReasoning = buildReasoningFromForm(formData, initialData.reasoning);
-		if (!reasoningEqual(nextReasoning, initialData.reasoning) && nextReasoning) patch.reasoning = nextReasoning;
+		if (!reasoningEqual(nextReasoning, initialData.reasoning) && nextReasoning) {
+			patch.reasoning = nextReasoning;
+		}
 
 		return patch;
 	}, [formData, initialData, supportedCacheKinds, supportsCacheKey]);
@@ -541,21 +580,29 @@ function AddEditModelPresetModalContent({
 			const fd = overrides?.formDataOverride ?? formData;
 			const mpid = overrides?.modelPresetIDOverride ?? modelPresetID;
 
-			if (isReadOnly) return {};
+			if (isReadOnly) {
+				return {};
+			}
 
 			const nextErrors: ValidationErrors = {};
 
 			if (!isEditMode) {
 				const idTrim = mpid.trim();
-				if (!idTrim) nextErrors.modelPresetID = 'Model Preset ID is required.';
-				else if (!/^[a-zA-Z0-9-]+$/.test(idTrim))
+				if (!idTrim) {
+					nextErrors.modelPresetID = 'Model Preset ID is required.';
+				} else if (!/^[a-zA-Z0-9-]+$/.test(idTrim)) {
 					nextErrors.modelPresetID = 'Only letters, numbers, and hyphens allowed.';
-				else if (Object.prototype.hasOwnProperty.call(existingModels, idTrim))
+				} else if (Object.prototype.hasOwnProperty.call(existingModels, idTrim)) {
 					nextErrors.modelPresetID = 'Model Preset ID must be unique.';
+				}
 			}
 
-			if (!fd.name.trim()) nextErrors.name = 'Model Name is required.';
-			if (!fd.presetLabel.trim()) nextErrors.presetLabel = 'Preset Label is required.';
+			if (!fd.name.trim()) {
+				nextErrors.name = 'Model Name is required.';
+			}
+			if (!fd.presetLabel.trim()) {
+				nextErrors.presetLabel = 'Preset Label is required.';
+			}
 
 			const maybeValidateNumeric = (field: ValidationField, range?: { min?: number; max?: number }) => {
 				const value = field === 'modelPresetID' ? mpid : (fd[field as keyof ModelPresetFormData] as string);
@@ -593,12 +640,16 @@ function AddEditModelPresetModalContent({
 	const runValidation = useCallback(() => computeValidation(), [computeValidation]);
 
 	const isAllValid = useMemo(() => {
-		if (isReadOnly) return true;
+		if (isReadOnly) {
+			return true;
+		}
 		return Object.keys(runValidation()).length === 0;
 	}, [isReadOnly, runValidation]);
 
 	const hasPatchChanges = useMemo(() => {
-		if (!isEditMode) return true;
+		if (!isEditMode) {
+			return true;
+		}
 		return Object.keys(buildPatchPayload()).length > 0;
 	}, [buildPatchPayload, isEditMode]);
 
@@ -619,7 +670,9 @@ function AddEditModelPresetModalContent({
 
 		const validationErrors = runValidation();
 		setErrors(validationErrors);
-		if (Object.keys(validationErrors).length > 0) return;
+		if (Object.keys(validationErrors).length > 0) {
+			return;
+		}
 
 		const finalModelPresetID = modelPresetID.trim();
 
@@ -680,7 +733,9 @@ function AddEditModelPresetModalContent({
 	};
 
 	const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-		if (isSubmitting) return;
+		if (isSubmitting) {
+			return;
+		}
 
 		const target = e.target as HTMLInputElement;
 		const { name, value, type, checked } = target;
@@ -1387,8 +1442,12 @@ function AddEditModelPresetModalContent({
 }
 
 export function AddEditModelPresetModal(props: AddEditModelPresetModalProps) {
-	if (!props.isOpen) return null;
-	if (typeof document === 'undefined' || !document.body) return null;
+	if (!props.isOpen) {
+		return null;
+	}
+	if (typeof document === 'undefined' || !document.body) {
+		return null;
+	}
 
 	const inferredMode: ModalMode = props.initialModelID ? 'edit' : 'add';
 	const effectiveMode: ModalMode = props.mode ?? inferredMode;

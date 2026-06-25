@@ -24,18 +24,24 @@ function omitUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
 }
 
 function toRequiredDate(value: unknown, fieldName: string): Date {
-	if (value instanceof Date) return value;
+	if (value instanceof Date) {
+		return value;
+	}
 
 	if (typeof value === 'string' || typeof value === 'number') {
 		const d = new Date(value);
-		if (!Number.isNaN(d.getTime())) return d;
+		if (!Number.isNaN(d.getTime())) {
+			return d;
+		}
 	}
 
 	throw new Error(`Invalid or missing date for ${fieldName}`);
 }
 
 function toOptionalDate(value: unknown, fieldName: string): Date | undefined {
-	if (value === undefined || value === null || value === '') return undefined;
+	if (value === undefined || value === null || value === '') {
+		return undefined;
+	}
 	return toRequiredDate(value, fieldName);
 }
 

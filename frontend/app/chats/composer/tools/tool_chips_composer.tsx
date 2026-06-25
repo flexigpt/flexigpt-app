@@ -28,7 +28,9 @@ function buildOrderedToolChipItems(toolCalls: UIToolCall[], toolOutputs: UIToolO
 	const seenNonDiscardedCallIDs = new Set<string>();
 
 	for (const toolCall of toolCalls) {
-		if (toolCall.status === 'discarded') continue;
+		if (toolCall.status === 'discarded') {
+			continue;
+		}
 
 		seenNonDiscardedCallIDs.add(toolCall.callID);
 
@@ -56,8 +58,12 @@ function buildOrderedToolChipItems(toolCalls: UIToolCall[], toolOutputs: UIToolO
 
 	// Append outputs that do not correspond to any still-present call.
 	for (const output of toolOutputs) {
-		if (usedOutputIds.has(output.id)) continue;
-		if (seenNonDiscardedCallIDs.has(output.callID)) continue;
+		if (usedOutputIds.has(output.id)) {
+			continue;
+		}
+		if (seenNonDiscardedCallIDs.has(output.callID)) {
+			continue;
+		}
 
 		items.push({
 			key: output.id,
@@ -103,7 +109,9 @@ export function ToolChipsComposerRow({
 	const openCallDetails = onOpenCallDetails ?? noopOpenCallDetails;
 	const orderedItems = buildOrderedToolChipItems(toolCalls, toolOutputs);
 
-	if (orderedItems.length === 0) return null;
+	if (orderedItems.length === 0) {
+		return null;
+	}
 
 	return (
 		<div className="flex shrink-0 items-center gap-1">

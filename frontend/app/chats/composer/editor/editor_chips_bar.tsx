@@ -77,7 +77,9 @@ export const EditorChipsBar = memo(function EditorChipsBar({
 	const retryErroredOutput = onRetryErroredOutput ?? (() => {});
 	const openToolCallDetails = onOpenToolCallDetails ?? (() => {});
 
-	if (!hasAnyChips) return null;
+	if (!hasAnyChips) {
+		return null;
+	}
 
 	return (
 		<div

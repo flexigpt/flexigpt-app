@@ -23,8 +23,12 @@ export function ButtonScrollToBottom({
 			disabled={!show}
 			onClick={e => {
 				onClick?.(e);
-				if (!show) return;
-				if (e.defaultPrevented) return;
+				if (!show) {
+					return;
+				}
+				if (e.defaultPrevented) {
+					return;
+				}
 				onScrollToBottom();
 			}}
 			className={`${className} transition-opacity duration-150 ${show ? 'visible opacity-100' : 'pointer-events-none invisible opacity-0'}`}
@@ -56,8 +60,12 @@ export function ButtonScrollToTop({
 			disabled={!show}
 			onClick={e => {
 				onClick?.(e);
-				if (!show) return;
-				if (e.defaultPrevented) return;
+				if (!show) {
+					return;
+				}
+				if (e.defaultPrevented) {
+					return;
+				}
 				onScrollToTop();
 			}}
 			className={`${className} transition-opacity duration-150 ${show ? 'visible opacity-100' : 'pointer-events-none invisible opacity-0'}`}

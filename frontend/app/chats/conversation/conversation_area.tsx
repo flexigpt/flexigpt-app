@@ -54,13 +54,19 @@ function buildDiffCandidatePathsByMessageID(messages: ConversationMessage[]): Ma
 		let next = cumulative;
 
 		for (const attachment of message.attachments ?? []) {
-			if (next.length >= MAX_DIFF_CANDIDATE_PATHS) break;
+			if (next.length >= MAX_DIFF_CANDIDATE_PATHS) {
+				break;
+			}
 
 			const path = getLocalAttachmentPath(attachment).trim();
-			if (!path) continue;
+			if (!path) {
+				continue;
+			}
 
 			const key = normalizeCandidatePathKey(path);
-			if (!key || seen.has(key)) continue;
+			if (!key || seen.has(key)) {
+				continue;
+			}
 
 			seen.add(key);
 
@@ -222,10 +228,14 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		const handleUIMessage = (event: Event) => {
 			const detail = (event as CustomEvent<MCPAppUIMessageEventDetail>).detail;
 			const text = detail?.message?.text?.trim();
-			if (!text) return;
+			if (!text) {
+				return;
+			}
 
 			const tabId = selectedTabIdRef.current;
-			if (!tabExists(tabId)) return;
+			if (!tabExists(tabId)) {
+				return;
+			}
 
 			inputRefs.current.get(tabId)?.loadExternalMessage({ text });
 			inputRefs.current.get(tabId)?.focus();
@@ -233,10 +243,14 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 		const handleModelContextUpdate = (event: Event) => {
 			const detail = (event as CustomEvent<MCPAppModelContextUpdateEventDetail>).detail;
-			if (!detail?.update) return;
+			if (!detail?.update) {
+				return;
+			}
 
 			const tabId = selectedTabIdRef.current;
-			if (!tabExists(tabId)) return;
+			if (!tabExists(tabId)) {
+				return;
+			}
 
 			inputRefs.current.get(tabId)?.appendMCPAppContextUpdate(detail.update);
 			inputRefs.current.get(tabId)?.focus();
@@ -424,9 +438,15 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 
 	useEffect(() => {
 		const isEditableTarget = (target: EventTarget | null): boolean => {
-			if (!(target instanceof HTMLElement)) return false;
-			if (target.closest('[data-disable-chat-shortcuts="true"]')) return true;
-			if (target.isContentEditable) return true;
+			if (!(target instanceof HTMLElement)) {
+				return false;
+			}
+			if (target.closest('[data-disable-chat-shortcuts="true"]')) {
+				return true;
+			}
+			if (target.isContentEditable) {
+				return true;
+			}
 			const tag = target.tagName.toLowerCase();
 			return tag === 'input' || tag === 'textarea' || tag === 'select';
 		};
@@ -434,11 +454,21 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		const hasOpenModal = () => Boolean(document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]'));
 
 		const onKeyDown = (event: KeyboardEvent) => {
-			if (event.defaultPrevented) return;
-			if (event.altKey || event.ctrlKey || event.metaKey) return;
-			if (event.key !== 'PageUp' && event.key !== 'PageDown') return;
-			if (hasOpenModal()) return;
-			if (isEditableTarget(event.target)) return;
+			if (event.defaultPrevented) {
+				return;
+			}
+			if (event.altKey || event.ctrlKey || event.metaKey) {
+				return;
+			}
+			if (event.key !== 'PageUp' && event.key !== 'PageDown') {
+				return;
+			}
+			if (hasOpenModal()) {
+				return;
+			}
+			if (isEditableTarget(event.target)) {
+				return;
+			}
 
 			event.preventDefault();
 			scrollActivePageBy(event.key === 'PageDown' ? 1 : -1);

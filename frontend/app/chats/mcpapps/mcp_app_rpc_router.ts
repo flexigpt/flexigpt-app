@@ -190,7 +190,9 @@ export class MCPAppRPCRouter {
 		const params = isJSONObject(req.params) ? req.params : {};
 
 		const uri = typeof params.uri === 'string' ? params.uri : '';
-		if (!uri) return errorResp(req.id, JSONRPC_ERR_INVALID_PARAMS, 'resources/read requires uri');
+		if (!uri) {
+			return errorResp(req.id, JSONRPC_ERR_INVALID_PARAMS, 'resources/read requires uri');
+		}
 
 		const { bundleID, serverID } = this.deps.instance;
 		try {
@@ -291,11 +293,15 @@ export class MCPAppRPCRouter {
 		const params = isJSONObject(req.params) ? req.params : {};
 
 		const url = typeof params.url === 'string' ? params.url : '';
-		if (!url) return errorResp(req.id, JSONRPC_ERR_INVALID_PARAMS, 'ui/open-link requires url');
+		if (!url) {
+			return errorResp(req.id, JSONRPC_ERR_INVALID_PARAMS, 'ui/open-link requires url');
+		}
 
 		try {
 			const ok = await this.deps.requestOpenLinkApproval(url);
-			if (!ok) return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'User denied opening the link');
+			if (!ok) {
+				return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'User denied opening the link');
+			}
 			return { jsonrpc: '2.0', id: req.id, result: { opened: true } };
 		} catch (err) {
 			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, err instanceof Error ? err.message : 'Open denied');

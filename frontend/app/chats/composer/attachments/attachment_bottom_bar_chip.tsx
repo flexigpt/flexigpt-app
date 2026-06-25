@@ -42,7 +42,9 @@ function AttachmentBottomBarChipInner({
 	const tooltip = shortcut ? `Attach files, folders, or URLs (${shortcut})` : 'Attach files, folders, or URLs';
 
 	useEffect(() => {
-		if (!isInputLocked) return;
+		if (!isInputLocked) {
+			return;
+		}
 		store.hide();
 		// eslint-disable-next-line react-hooks/set-state-in-effect, react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setIsUrlModalOpen(false);

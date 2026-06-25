@@ -111,12 +111,16 @@ export default function ModelPresetsPage() {
 				setError(null);
 
 				const data = await fetchCanonicalPageData();
-				if (!isActive) return;
+				if (!isActive) {
+					return;
+				}
 
 				applyCanonicalPageData(data);
 			} catch (loadError) {
 				console.error('init model presets error', loadError);
-				if (!isActive) return;
+				if (!isActive) {
+					return;
+				}
 				setError('Failed to load provider presets. Try again.');
 			} finally {
 				if (isActive) {
@@ -154,12 +158,20 @@ export default function ModelPresetsPage() {
 		defaultProvider && enabledProviderPresets[defaultProvider] ? defaultProvider : undefined;
 
 	useEffect(() => {
-		if (loading || isRepairingDefaultProvider) return;
-		if (enabledProviderNames.length === 0) return;
-		if (defaultProvider && providerPresets[defaultProvider]?.isEnabled) return;
+		if (loading || isRepairingDefaultProvider) {
+			return;
+		}
+		if (enabledProviderNames.length === 0) {
+			return;
+		}
+		if (defaultProvider && providerPresets[defaultProvider]?.isEnabled) {
+			return;
+		}
 
 		const fallbackProvider = enabledProviderNames[0];
-		if (!fallbackProvider) return;
+		if (!fallbackProvider) {
+			return;
+		}
 
 		let isActive = true;
 
@@ -361,7 +373,9 @@ export default function ModelPresetsPage() {
 				throw new Error('Provider not found.');
 			}
 
-			if (Object.keys(payload).length === 0) return;
+			if (Object.keys(payload).length === 0) {
+				return;
+			}
 
 			try {
 				await modelPresetStoreAPI.patchModelPreset(providerName, modelPresetID, payload);
@@ -444,7 +458,9 @@ export default function ModelPresetsPage() {
 
 			const hasStorePatch = Object.keys(payload).length > 0;
 			const hasKeyPatch = Boolean(apiKey && apiKey.trim());
-			if (!hasStorePatch && !hasKeyPatch) return;
+			if (!hasStorePatch && !hasKeyPatch) {
+				return;
+			}
 
 			try {
 				if (hasStorePatch) {
@@ -522,7 +538,9 @@ export default function ModelPresetsPage() {
 		setModalOpen(true);
 	};
 
-	if (loading) return <Loader text="Loading model presets…" />;
+	if (loading) {
+		return <Loader text="Loading model presets…" />;
+	}
 
 	return (
 		<PageFrame>
@@ -607,7 +625,9 @@ export default function ModelPresetsPage() {
 						setModalOpen(false);
 					}}
 					onSubmit={async (name, payload, apiKey) => {
-						if (modalMode === 'view') return;
+						if (modalMode === 'view') {
+							return;
+						}
 						if (modalMode === 'add') {
 							await handleCreateProvider(name, payload as PostProviderPresetPayload, apiKey);
 							return;

@@ -18,15 +18,23 @@ export function PromptBundleDetailsModal({ isOpen, onClose, bundle }: PromptBund
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 
 	useEffect(() => {
-		if (!isOpen) return;
+		if (!isOpen) {
+			return;
+		}
 
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
-		if (!dialog.open) dialog.showModal();
+		if (!dialog.open) {
+			dialog.showModal();
+		}
 
 		return () => {
-			if (dialog.open) dialog.close();
+			if (dialog.open) {
+				dialog.close();
+			}
 		};
 	}, [isOpen]);
 
@@ -34,7 +42,9 @@ export function PromptBundleDetailsModal({ isOpen, onClose, bundle }: PromptBund
 		onClose();
 	};
 
-	if (!isOpen || !bundle) return null;
+	if (!isOpen || !bundle) {
+		return null;
+	}
 
 	return createPortal(
 		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose}>

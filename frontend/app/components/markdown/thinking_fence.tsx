@@ -76,10 +76,14 @@ export function ThinkingFence({
 	}, [streaming]);
 
 	useEffect(() => {
-		if (!streaming || !isOpen || !effectiveAutoScroll) return;
+		if (!streaming || !isOpen || !effectiveAutoScroll) {
+			return;
+		}
 
 		const el = bodyRef.current;
-		if (!el) return;
+		if (!el) {
+			return;
+		}
 
 		const handleScroll = () => {
 			autoScrollPinnedRef.current = isAtBottom(el);
@@ -93,17 +97,25 @@ export function ThinkingFence({
 	}, [streaming, isOpen, effectiveAutoScroll]);
 
 	const bodyContent = useMemo(() => {
-		if (children !== null) return children;
+		if (children !== null) {
+			return children;
+		}
 		return text ?? '';
 	}, [children, text]);
 
 	// Streaming behavior: height grows from ~1 line to maxRows, then scroll.
 	useLayoutEffect(() => {
-		if (!streaming) return;
-		if (!isOpen) return;
+		if (!streaming) {
+			return;
+		}
+		if (!isOpen) {
+			return;
+		}
 
 		const el = bodyRef.current;
-		if (!el) return;
+		if (!el) {
+			return;
+		}
 
 		// Measure line height + padding so “rows” feels consistent.
 		const cs = window.getComputedStyle(el);
@@ -129,7 +141,9 @@ export function ThinkingFence({
 			open={isOpen}
 			onToggle={e => {
 				const next = (e.currentTarget as HTMLDetailsElement).open;
-				if (!isControlled) setInternalOpen(next);
+				if (!isControlled) {
+					setInternalOpen(next);
+				}
 				onOpenChange?.(next);
 			}}
 			className="group bg-base-200/60 m-0 overflow-hidden px-2 py-1 shadow-none"

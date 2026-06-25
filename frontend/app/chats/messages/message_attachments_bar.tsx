@@ -72,8 +72,12 @@ function MessageAttachmentInfoChip({ attachment, fullWidth = false }: MessageAtt
 	const path = getAttachmentPath(attachment);
 
 	const tooltipLines: string[] = [];
-	if (isLabelTruncated) tooltipLines.push(label);
-	if (path && path !== label) tooltipLines.push(path);
+	if (isLabelTruncated) {
+		tooltipLines.push(label);
+	}
+	if (path && path !== label) {
+		tooltipLines.push(path);
+	}
 
 	const title = tooltipLines.length > 0 ? tooltipLines.join('\n') : undefined;
 
@@ -114,7 +118,9 @@ function MessageToolChoiceChip({ tool, fullWidth = false, onClick }: MessageTool
 	const name = tool.displayName || tool.toolSlug;
 	const slug = `${tool.bundleID}/${tool.toolSlug}@${tool.toolVersion}`;
 	const tooltipLines: string[] = [name, slug];
-	if (tool.description) tooltipLines.push(tool.description);
+	if (tool.description) {
+		tooltipLines.push(tool.description);
+	}
 
 	return (
 		<div
@@ -133,7 +139,9 @@ function MessageToolChoiceChip({ tool, fullWidth = false, onClick }: MessageTool
 			onKeyDown={
 				onClick
 					? e => {
-							if (e.key === 'Enter' || e.key === ' ') onClick();
+							if (e.key === 'Enter' || e.key === ' ') {
+								onClick();
+							}
 						}
 					: undefined
 			}
@@ -408,7 +416,9 @@ function AttachmentsGroupChip({ attachments }: AttachmentsGroupChipProps) {
 
 	const titleLines = ['Attachments', `${count} item${count === 1 ? '' : 's'} attached`];
 	const title = titleLines.join('\n');
-	if (count === 0) return null;
+	if (count === 0) {
+		return null;
+	}
 	// If there's only one item, show the single chip (no dropdown/group chip)
 	if (count === 1) {
 		return <MessageAttachmentInfoChip attachment={attachments[0]} />;
@@ -470,7 +480,9 @@ function ToolChoicesGroupChip({ tools, onToolChoiceDetails }: ToolChoicesGroupCh
 	const open = useStoreState(menu, 'open');
 	const titleLines = ['Tools', `${count} tool${count === 1 ? '' : 's'} used for this turn`];
 	const title = titleLines.join('\n');
-	if (count === 0) return null;
+	if (count === 0) {
+		return null;
+	}
 	// If there's only one item, show the single chip (no dropdown/group chip)
 	if (count === 1) {
 		const tool = tools[0];
@@ -550,7 +562,9 @@ function ToolOutputsGroupChip({ outputs, onToolOutputDetails }: ToolOutputsGroup
 	const open = useStoreState(menu, 'open');
 	const titleLines = ['Tool outputs', `${count} result${count === 1 ? '' : 's'} used for this turn`];
 	const title = titleLines.join('\n');
-	if (count === 0) return null;
+	if (count === 0) {
+		return null;
+	}
 	// If there's only one item, show the single chip (no dropdown/group chip)
 	if (count === 1) {
 		const out = outputs[0];
@@ -630,7 +644,9 @@ function ToolCallsGroupChip({ calls, onToolCallDetails }: ToolCallsGroupChipProp
 	const open = useStoreState(menu, 'open');
 	const titleLines = ['Suggested tool calls', `${count} suggestion${count === 1 ? '' : 's'} from assistant`];
 	const title = titleLines.join('\n');
-	if (count === 0) return null;
+	if (count === 0) {
+		return null;
+	}
 	// If there's only one item, show the single chip (no dropdown/group chip)
 	if (count === 1) {
 		const call = calls[0];
@@ -709,7 +725,9 @@ function WebSearchOutputsGroupChip({ outputs, onOutputDetails }: WebSearchOutput
 	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
 	const open = useStoreState(menu, 'open');
 	const title = ['Web search results', `${count} result set${count === 1 ? '' : 's'} for this turn`].join('\n');
-	if (count === 0) return null;
+	if (count === 0) {
+		return null;
+	}
 	// If there's only one item, show the single chip (no dropdown/group chip)
 	if (count === 1) {
 		const out = outputs[0];
@@ -788,7 +806,9 @@ function WebSearchCallsGroupChip({ calls, onCallDetails }: WebSearchCallsGroupCh
 	const menu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
 	const open = useStoreState(menu, 'open');
 	const title = ['Web search activity', `${count} web‑search quer${count === 1 ? 'y' : 'ies'} this turn`].join('\n');
-	if (count === 0) return null;
+	if (count === 0) {
+		return null;
+	}
 	// If there's only one item, show the single chip (no dropdown/group chip)
 	if (count === 1) {
 		const call = calls[0];
@@ -869,7 +889,9 @@ function WebSearchChoicesGroupChip({ choices, onChoiceDetails }: WebSearchChoice
 	const title = ['Web search configuration', `${count} web‑search tool${count === 1 ? '' : 's'} in this turn`].join(
 		'\n'
 	);
-	if (count === 0) return null;
+	if (count === 0) {
+		return null;
+	}
 	// If there's only one item, show the single chip (no dropdown/group chip)
 	if (count === 1) {
 		const choice = choices[0];

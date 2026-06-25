@@ -39,7 +39,9 @@ function List(props: PlateElementProps) {
 
 // oxlint-disable-next-line react/display-name
 export const BlockList: RenderNodeWrapper = props => {
-	if (!props.element.listStyleType) return;
+	if (!props.element.listStyleType) {
+		return;
+	}
 
 	// oxlint-disable-next-line no-shadow
 	return props => <List {...props} />;

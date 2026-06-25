@@ -42,7 +42,9 @@ export function useToolAutoExecDrainer({ toolCalls, isBlocked, runToolCall }: Us
 	}, []);
 
 	const syncState = useCallback((phase: AutoExecPhase, runningCallId: string | null) => {
-		if (!isMountedRef.current) return;
+		if (!isMountedRef.current) {
+			return;
+		}
 
 		setState(prev => {
 			if (prev.phase === phase && prev.runningCallId === runningCallId) {
@@ -57,7 +59,9 @@ export function useToolAutoExecDrainer({ toolCalls, isBlocked, runToolCall }: Us
 	}, []);
 
 	const pump = useCallback(async () => {
-		if (isPumpingRef.current) return;
+		if (isPumpingRef.current) {
+			return;
+		}
 
 		const first = getNextCall();
 		if (!first) {

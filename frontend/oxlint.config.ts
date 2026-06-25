@@ -62,9 +62,26 @@ const eslintRules: DummyRuleMap = {
 	// Nursery. Default Off.
 
 	// Style. Default Off.
+	curly: 'error',
+	'default-param-last': 'error',
+	'guard-for-in': 'error',
+	'no-duplicate-imports': ['error', { allowSeparateTypeImports: true }],
+	'no-multi-assign': 'error',
+	'no-new-func': 'error',
+	'no-return-assign': 'error',
+	'no-script-url': 'error',
+	'no-template-curly-in-string': 'error',
+	'no-useless-computed-key': 'error',
 	'prefer-const': 'error',
+	'prefer-promise-reject-errors': 'error',
+	'prefer-regex-literals': 'error',
 	'prefer-rest-params': 'error',
 	'prefer-spread': 'error',
+	'prefer-numeric-literals': 'error',
+	yoda: 'error',
+
+	'prefer-object-has-own': 'off',
+	'no-implicit-coercion': 'off',
 
 	// Configs.
 	'no-restricted-exports': [
@@ -218,6 +235,15 @@ const unicornRules: DummyRuleMap = {
 	// Pedantic. Default On.
 	'unicorn/no-negated-condition': 'off',
 	'unicorn/no-useless-undefined': 'off',
+
+	// Style. Default off.
+	'unicorn/filename-case': [
+		'error',
+		{
+			case: 'snakeCase',
+			ignore: ['react-router.config.ts'],
+		},
+	],
 };
 
 const nodeRules: DummyRuleMap = {

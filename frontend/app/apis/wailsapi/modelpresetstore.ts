@@ -37,7 +37,9 @@ export class WailsModelPresetStoreAPI implements IModelPresetStoreAPI {
 	}
 
 	async patchDefaultProvider(providerName: ProviderName): Promise<void> {
-		if (!providerName) throw new Error('Missing providerName or payload');
+		if (!providerName) {
+			throw new Error('Missing providerName or payload');
+		}
 		const r = {
 			Body: { defaultProvider: providerName } as spec.PatchDefaultProviderRequestBody,
 		};
@@ -45,9 +47,13 @@ export class WailsModelPresetStoreAPI implements IModelPresetStoreAPI {
 	}
 
 	async patchProviderPreset(providerName: ProviderName, payload: PatchProviderPresetPayload): Promise<void> {
-		if (!providerName) throw new Error('Missing providerName');
+		if (!providerName) {
+			throw new Error('Missing providerName');
+		}
 		const body = Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined));
-		if (Object.keys(body).length === 0) throw new Error('Provider patch payload is empty');
+		if (Object.keys(body).length === 0) {
+			throw new Error('Provider patch payload is empty');
+		}
 		const r = {
 			ProviderName: providerName,
 			Body: body as spec.PatchProviderPresetRequestBody,
@@ -60,7 +66,9 @@ export class WailsModelPresetStoreAPI implements IModelPresetStoreAPI {
 		modelPresetID: ModelPresetID,
 		payload: PostModelPresetPayload
 	): Promise<void> {
-		if (!providerName || !modelPresetID) throw new Error('Missing arguments');
+		if (!providerName || !modelPresetID) {
+			throw new Error('Missing arguments');
+		}
 		const r = {
 			ProviderName: providerName,
 			ModelPresetID: modelPresetID,
@@ -74,9 +82,13 @@ export class WailsModelPresetStoreAPI implements IModelPresetStoreAPI {
 		modelPresetID: ModelPresetID,
 		payload: PatchModelPresetPayload
 	): Promise<void> {
-		if (!providerName || !modelPresetID) throw new Error('Missing arguments');
+		if (!providerName || !modelPresetID) {
+			throw new Error('Missing arguments');
+		}
 		const body = Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined));
-		if (Object.keys(body).length === 0) throw new Error('Model patch payload is empty');
+		if (Object.keys(body).length === 0) {
+			throw new Error('Model patch payload is empty');
+		}
 		const r = {
 			ProviderName: providerName,
 			ModelPresetID: modelPresetID,
@@ -86,7 +98,9 @@ export class WailsModelPresetStoreAPI implements IModelPresetStoreAPI {
 	}
 
 	async deleteModelPreset(providerName: ProviderName, modelPresetID: ModelPresetID): Promise<void> {
-		if (!providerName || !modelPresetID) throw new Error('Missing arguments');
+		if (!providerName || !modelPresetID) {
+			throw new Error('Missing arguments');
+		}
 		const r = {
 			ProviderName: providerName,
 			ModelPresetID: modelPresetID,

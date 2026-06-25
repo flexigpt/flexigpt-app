@@ -40,7 +40,9 @@ export function AuthKeyTable({ authKeys, onEdit, onChanged }: AuthKeyTableProps)
 	};
 
 	const confirmDelete = async () => {
-		if (!deleteTarget) return;
+		if (!deleteTarget) {
+			return;
+		}
 		await aggregateAPI.deleteAuthKey(deleteTarget.type, deleteTarget.keyName);
 		setDeleteTarget(null);
 		onChanged();

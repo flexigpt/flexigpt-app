@@ -28,7 +28,9 @@ export class WailsAggregateAPI implements IAggregateAPI {
 	}
 
 	async postProviderPreset(providerName: ProviderName, payload: PostProviderPresetPayload): Promise<void> {
-		if (!providerName) throw new Error('Missing providerName or payload');
+		if (!providerName) {
+			throw new Error('Missing providerName or payload');
+		}
 		const r = {
 			ProviderName: providerName,
 			Body: payload as wailsSpec.PostProviderPresetRequestBody,
@@ -37,7 +39,9 @@ export class WailsAggregateAPI implements IAggregateAPI {
 	}
 
 	async deleteProviderPreset(providerName: ProviderName): Promise<void> {
-		if (!providerName) throw new Error('Missing providerName');
+		if (!providerName) {
+			throw new Error('Missing providerName');
+		}
 		const r = {
 			ProviderName: providerName,
 		};
@@ -123,7 +127,9 @@ export class WailsAggregateAPI implements IAggregateAPI {
 		} as wailsSpec.CompletionRequestBody;
 
 		const abortPromise: Promise<never> = new Promise((_, reject) => {
-			if (!signal) return;
+			if (!signal) {
+				return;
+			}
 
 			// Already aborted before we even start => do NOT start backend call.
 
@@ -157,13 +163,19 @@ export class WailsAggregateAPI implements IAggregateAPI {
 			}
 
 			// Local event cleanup
-			if (textCallbackId) EventsOff(textCallbackId);
-			if (thinkingCallbackId) EventsOff(thinkingCallbackId);
+			if (textCallbackId) {
+				EventsOff(textCallbackId);
+			}
+			if (thinkingCallbackId) {
+				EventsOff(thinkingCallbackId);
+			}
 		}
 	}
 
 	async cancelCompletion(requestId: string): Promise<void> {
-		if (!requestId) return;
+		if (!requestId) {
+			return;
+		}
 		try {
 			await CancelCompletion(requestId);
 		} catch {

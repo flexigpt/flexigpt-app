@@ -91,7 +91,9 @@ function EnumDropdownInlineMenu({
 	const updatePosition = useCallback(() => {
 		const anchor = triggerRef.current;
 		const menu = menuRef.current;
-		if (!anchor || !menu) return;
+		if (!anchor || !menu) {
+			return;
+		}
 
 		const prevVis = menu.style.visibility;
 		const prevTop = menu.style.top;
@@ -125,7 +127,9 @@ function EnumDropdownInlineMenu({
 
 		let left = rect.left + window.scrollX;
 		const maxLeft = window.scrollX + window.innerWidth - menuRect.width - 8;
-		if (left > maxLeft) left = Math.max(window.scrollX + 8, maxLeft);
+		if (left > maxLeft) {
+			left = Math.max(window.scrollX + 8, maxLeft);
+		}
 
 		setStyle({
 			position: 'absolute',
@@ -186,7 +190,9 @@ function EnumDropdownInlineMenu({
 			const path = e.composedPath();
 			const anchor = triggerRef.current;
 			const menu = menuRef.current;
-			if (!anchor || !menu) return;
+			if (!anchor || !menu) {
+				return;
+			}
 			if (!path.includes(anchor) && !path.includes(menu)) {
 				onRequestClose(true);
 			}
@@ -361,13 +367,17 @@ export function EnumDropdownInline({
 				}
 			});
 
-			if (cancel) onCancel?.();
+			if (cancel) {
+				onCancel?.();
+			}
 		},
 		[onCancel]
 	);
 
 	useEffect(() => {
-		if (!autoOpen) return;
+		if (!autoOpen) {
+			return;
+		}
 
 		requestAnimationFrame(() => {
 			triggerRef.current?.focus();
@@ -391,12 +401,16 @@ export function EnumDropdownInline({
 				onPointerDown={stopForSlate}
 				onClick={e => {
 					stopForSlate(e);
-					if (disabled) return;
+					if (disabled) {
+						return;
+					}
 					setOpen(prev => !prev);
 				}}
 				onKeyDown={e => {
 					stopForSlate(e);
-					if (disabled) return;
+					if (disabled) {
+						return;
+					}
 
 					if (e.key === 'Enter' || e.key === ' ') {
 						e.preventDefault();

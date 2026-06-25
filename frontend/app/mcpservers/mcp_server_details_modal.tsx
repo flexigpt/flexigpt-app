@@ -63,7 +63,9 @@ const SENSITIVE_HTTP_HEADER_NAMES = new Set([
 ]);
 
 function sanitizeMCPHTTPHeaders(headers?: Record<string, string>): Record<string, string> | undefined {
-	if (!headers || Object.keys(headers).length === 0) return undefined;
+	if (!headers || Object.keys(headers).length === 0) {
+		return undefined;
+	}
 
 	return Object.fromEntries(
 		Object.entries(headers).map(([key, value]) => [
@@ -95,7 +97,9 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function ArgumentSummary({ args }: { args?: Record<string, { required?: boolean; description?: string } | string> }) {
-	if (!args || Object.keys(args).length === 0) return <span>-</span>;
+	if (!args || Object.keys(args).length === 0) {
+		return <span>-</span>;
+	}
 
 	return (
 		<div className="flex flex-wrap justify-center gap-1">
@@ -150,7 +154,9 @@ function MCPServerDetailsModalContent({
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
 		if (!dialog.open) {
 			try {
@@ -178,7 +184,9 @@ function MCPServerDetailsModalContent({
 			getAllMCPServerPrompts(bundle.id, server.id),
 		])
 			.then(results => {
-				if (cancelled) return;
+				if (cancelled) {
+					return;
+				}
 
 				const [toolsResult, resourcesResult, resourceTemplatesResult, promptsResult] = results;
 				const errors = results
@@ -205,7 +213,9 @@ function MCPServerDetailsModalContent({
 	}, [bundle.id, server.id]);
 
 	const handleDialogClose = () => {
-		if (isUnmountingRef.current) return;
+		if (isUnmountingRef.current) {
+			return;
+		}
 
 		onClose();
 	};
@@ -527,8 +537,12 @@ export function MCPServerDetailsModal({
 	runtime,
 	authHealth,
 }: MCPServerDetailsModalProps) {
-	if (!isOpen || !bundle || !server) return null;
-	if (typeof document === 'undefined' || !document.body) return null;
+	if (!isOpen || !bundle || !server) {
+		return null;
+	}
+	if (typeof document === 'undefined' || !document.body) {
+		return null;
+	}
 
 	const remountKey = `${bundle.id}:${server.id}:${server.modifiedAt}`;
 

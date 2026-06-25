@@ -56,14 +56,24 @@ function isUnifiedDiffLanguage(language: string): boolean {
 export function looksLikeUnifiedDiff(value: string, language = ''): boolean {
 	const text = value.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
 
-	if (isUnifiedDiffLanguage(language)) return true;
-	if (/^diff --git\s+/m.test(text)) return true;
-	if (/^Index:\s+/m.test(text)) return true;
+	if (isUnifiedDiffLanguage(language)) {
+		return true;
+	}
+	if (/^diff --git\s+/m.test(text)) {
+		return true;
+	}
+	if (/^Index:\s+/m.test(text)) {
+		return true;
+	}
 	const hasPlainFileHeader = /^---\s+/m.test(text) && /^\+\+\+\s+/m.test(text);
-	if (hasPlainFileHeader) return true;
+	if (hasPlainFileHeader) {
+		return true;
+	}
 
 	const hasHunkHeader = /^@@\s*-?\d+(?:,\d+)?\s*\+?\d+(?:,\d+)?\s*@@/m.test(text);
-	if (!hasHunkHeader) return false;
+	if (!hasHunkHeader) {
+		return false;
+	}
 
 	// Let hunk-only LLM diffs through, but avoid showing the apply UI for
 	// arbitrary code snippets that merely contain an @@ marker.
@@ -94,7 +104,9 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 	});
 
 	const pushCurrent = () => {
-		if (!current) return;
+		if (!current) {
+			return;
+		}
 		if (current.oldPath || current.newPath || current.hunks > 0) {
 			const { lines: fileLines, ...file } = current;
 
@@ -233,10 +245,14 @@ export function buildUnifiedDiffTextForTarget(
 		matches = parsed.files;
 	}
 
-	if (matches.length === 0) return undefined;
+	if (matches.length === 0) {
+		return undefined;
+	}
 
 	const diffText = joinUnifiedDiffTextParts(matches.map(file => file.diffText));
-	if (!diffText) return undefined;
+	if (!diffText) {
+		return undefined;
+	}
 
 	const hunks = matches.reduce((sum, file) => sum + file.hunks, 0);
 	const detectedHunks = countHunkHeaders(diffText);
@@ -449,7 +465,9 @@ function findEditableTargetMapKey(
 
 	if (targetPatchPaths.length > 0) {
 		for (const [key, existing] of byKey.entries()) {
-			if (haveSharedPathIdentity(getEditableTargetPatchPaths(existing), targetPatchPaths)) return key;
+			if (haveSharedPathIdentity(getEditableTargetPatchPaths(existing), targetPatchPaths)) {
+				return key;
+			}
 		}
 	}
 
@@ -457,8 +475,12 @@ function findEditableTargetMapKey(
 
 	if (targetResolvedPaths.length > 0) {
 		for (const [key, existing] of byKey.entries()) {
-			if (getEditableTargetPatchPaths(existing).length > 0) continue;
-			if (haveSharedPathIdentity(getEditableTargetResolvedPaths(existing), targetResolvedPaths)) return key;
+			if (getEditableTargetPatchPaths(existing).length > 0) {
+				continue;
+			}
+			if (haveSharedPathIdentity(getEditableTargetResolvedPaths(existing), targetResolvedPaths)) {
+				return key;
+			}
 		}
 	}
 
@@ -483,7 +505,9 @@ function getEditableTargetResolvedPaths(target: { targetPath?: string; resolvedP
 
 export function haveSharedPathIdentity(left: Array<string | undefined>, right: Array<string | undefined>): boolean {
 	const leftSet = new Set(left.map(p => getPathIdentity(p)).filter(Boolean));
-	if (leftSet.size === 0) return false;
+	if (leftSet.size === 0) {
+		return false;
+	}
 	return right.map(p => getPathIdentity(p)).some(identity => !!identity && leftSet.has(identity));
 }
 
@@ -645,9 +669,13 @@ function chooseEditableTargetPath(
 	const targetPath = file.targetPath?.trim() ?? '';
 	const resolvedPath = file.resolvedPath?.trim() ?? '';
 
-	if (targetPath) return targetPath;
+	if (targetPath) {
+		return targetPath;
+	}
 
-	if (inferredBestTarget) return inferredBestTarget;
+	if (inferredBestTarget) {
+		return inferredBestTarget;
+	}
 
 	if (resolvedPath && isAbsolutePathLike(resolvedPath) && isResolvedPathCompatibleWithPatchPath(resolvedPath, file)) {
 		return resolvedPath;
@@ -664,10 +692,14 @@ function isResolvedPathCompatibleWithPatchPath(
 	}
 ): boolean {
 	const resolvedKey = normalizePathKey(resolvedPath);
-	if (!resolvedKey) return false;
+	if (!resolvedKey) {
+		return false;
+	}
 
 	const patchPaths = getEditableTargetPatchPaths(file);
-	if (patchPaths.length === 0) return true;
+	if (patchPaths.length === 0) {
+		return true;
+	}
 
 	return patchPaths.some(patchPath => {
 		const patchKey = normalizePathKey(patchPath);
@@ -684,7 +716,9 @@ function inferTargetPathsForUI(
 	globalCandidatePaths: string[]
 ): TargetPathInferenceForUI[] {
 	const patchPath = normalizePathKey(file.newPath) || normalizePathKey(file.oldPath);
-	if (!patchPath || isAbsolutePathLike(patchPath)) return [];
+	if (!patchPath || isAbsolutePathLike(patchPath)) {
+		return [];
+	}
 
 	const patchDir = dirnamePathKey(patchPath);
 	const patchDirParts = getPathParts(patchDir);
@@ -693,7 +727,9 @@ function inferTargetPathsForUI(
 
 	for (const candidateRaw of candidates) {
 		const candidate = normalizePathKey(candidateRaw);
-		if (!candidate || !isAbsolutePathLike(candidate)) continue;
+		if (!candidate || !isAbsolutePathLike(candidate)) {
+			continue;
+		}
 
 		const candidateLooksDirectory = looksLikeDirectoryPath(candidateRaw);
 		const candidateDir = candidateLooksDirectory ? trimTrailingSlashes(candidate) : dirnamePathKey(candidate);
@@ -706,7 +742,9 @@ function inferTargetPathsForUI(
 				const prefix = patchDirParts.slice(0, prefixLength).join('/');
 				const root = trimPathSuffix(candidateDir, prefix);
 
-				if (root === undefined) continue;
+				if (root === undefined) {
+					continue;
+				}
 
 				inferences.push({
 					targetPath: joinPathKey(root, patchPath),
@@ -730,7 +768,9 @@ function inferTargetPathsForUI(
 }
 
 function getUniqueBestInferredTarget(inferences: TargetPathInferenceForUI[]): string | undefined {
-	if (inferences.length === 0) return undefined;
+	if (inferences.length === 0) {
+		return undefined;
+	}
 
 	const bestScore = inferences[0].score;
 	const bestTargets = uniqueStrings(
@@ -745,7 +785,9 @@ function sortAndDedupeTargetInferences(inferences: TargetPathInferenceForUI[]): 
 
 	for (const inference of inferences) {
 		const key = normalizePathKey(inference.targetPath);
-		if (!key) continue;
+		if (!key) {
+			continue;
+		}
 
 		const existing = byTarget.get(key);
 		if (!existing || inference.score > existing.score) {
@@ -754,14 +796,18 @@ function sortAndDedupeTargetInferences(inferences: TargetPathInferenceForUI[]): 
 	}
 
 	return Array.from(byTarget.values()).toSorted((left, right) => {
-		if (left.score !== right.score) return right.score - left.score;
+		if (left.score !== right.score) {
+			return right.score - left.score;
+		}
 		return normalizePathKey(left.targetPath).localeCompare(normalizePathKey(right.targetPath));
 	});
 }
 
 function isAbsolutePathLike(value: string | undefined): boolean {
 	const normalized = value?.trim();
-	if (!normalized) return false;
+	if (!normalized) {
+		return false;
+	}
 	return normalized.startsWith('/') || /^[A-Za-z]:[\\/]/.test(normalized) || normalized.startsWith('\\\\');
 }
 
@@ -772,10 +818,16 @@ function looksLikeDirectoryPath(value: string): boolean {
 
 function dirnamePathKey(value: string): string {
 	const normalized = normalizePathKey(value);
-	if (!normalized) return '';
+	if (!normalized) {
+		return '';
+	}
 	const index = normalized.lastIndexOf('/');
-	if (index < 0) return '';
-	if (index === 0) return '/';
+	if (index < 0) {
+		return '';
+	}
+	if (index === 0) {
+		return '/';
+	}
 	return normalized.slice(0, index);
 }
 
@@ -786,29 +838,45 @@ function getPathParts(value: string): string[] {
 function trimPathSuffix(value: string, suffix: string): string | undefined {
 	const normalizedValue = trimTrailingSlashes(normalizePathKey(value));
 	const normalizedSuffix = trimTrailingSlashes(normalizePathKey(suffix)).replace(/^\/+/, '');
-	if (!normalizedValue || !normalizedSuffix) return undefined;
-	if (normalizedValue === normalizedSuffix) return '';
+	if (!normalizedValue || !normalizedSuffix) {
+		return undefined;
+	}
+	if (normalizedValue === normalizedSuffix) {
+		return '';
+	}
 	const marker = `/${normalizedSuffix}`;
-	if (!normalizedValue.endsWith(marker)) return undefined;
+	if (!normalizedValue.endsWith(marker)) {
+		return undefined;
+	}
 	return normalizedValue.slice(0, normalizedValue.length - marker.length);
 }
 
 function joinPathKey(root: string, rel: string): string {
 	const cleanRoot = trimTrailingSlashes(normalizePathKey(root));
 	const cleanRel = normalizePathKey(rel).replace(/^\/+/, '');
-	if (!cleanRoot) return cleanRel;
-	if (cleanRoot === '/') return `/${cleanRel}`;
+	if (!cleanRoot) {
+		return cleanRel;
+	}
+	if (cleanRoot === '/') {
+		return `/${cleanRel}`;
+	}
 	return `${cleanRoot}/${cleanRel}`;
 }
 
 function trimTrailingSlashes(value: string): string {
-	if (value === '/') return value;
+	if (value === '/') {
+		return value;
+	}
 	return value.replaceAll(/\/+$/g, '');
 }
 
 export function mergeNumberMax(left: number | undefined, right: number | undefined): number | undefined {
-	if (typeof left === 'number' && typeof right === 'number') return Math.max(left, right);
-	if (typeof right === 'number') return right;
+	if (typeof left === 'number' && typeof right === 'number') {
+		return Math.max(left, right);
+	}
+	if (typeof right === 'number') {
+		return right;
+	}
 	return left;
 }
 
@@ -837,7 +905,9 @@ function parsedFileMatchesTarget(
 	}
 
 	const targetIdentity = getPatchFileIdentity(target);
-	if (targetIdentity && targetIdentity === getPatchFileIdentity(file)) return true;
+	if (targetIdentity && targetIdentity === getPatchFileIdentity(file)) {
+		return true;
+	}
 
 	const filePaths = uniqueStrings([file.targetPath, file.newPath, file.oldPath, ...file.candidatePaths]);
 	const targetPaths = uniqueStrings([target.newPath, target.oldPath]);
@@ -857,13 +927,19 @@ function getPatchFileIdentity(file: {
 	newPath?: string;
 }): string {
 	const patchPath = getEditableTargetPatchPaths(file)[0];
-	if (patchPath) return `path:${normalizePathKey(patchPath)}`;
+	if (patchPath) {
+		return `path:${normalizePathKey(patchPath)}`;
+	}
 
 	const targetPath = normalizePathKey(file.targetPath);
-	if (targetPath) return `path:${targetPath}`;
+	if (targetPath) {
+		return `path:${targetPath}`;
+	}
 
 	const resolvedPath = normalizePathKey(file.resolvedPath);
-	if (resolvedPath) return `path:${resolvedPath}`;
+	if (resolvedPath) {
+		return `path:${resolvedPath}`;
+	}
 
 	return '';
 }
@@ -877,23 +953,33 @@ function getEditableTargetIdentity(file: {
 	newPath?: string;
 }): string {
 	const fileKey = file.fileKey?.trim();
-	if (fileKey) return `file:${fileKey}`;
+	if (fileKey) {
+		return `file:${fileKey}`;
+	}
 
 	const sectionKeys = uniqueStrings(file.sectionKeys ?? []);
-	if (sectionKeys.length > 0) return `section:${sectionKeys.join('|')}`;
+	if (sectionKeys.length > 0) {
+		return `section:${sectionKeys.join('|')}`;
+	}
 
 	const patchPath = getEditableTargetPatchPaths(file)[0];
-	if (patchPath) return `patch:${normalizePathKey(patchPath)}`;
+	if (patchPath) {
+		return `patch:${normalizePathKey(patchPath)}`;
+	}
 
 	const resolvedPath = getEditableTargetResolvedPaths(file)[0];
-	if (resolvedPath) return `path:${normalizePathKey(resolvedPath)}`;
+	if (resolvedPath) {
+		return `path:${normalizePathKey(resolvedPath)}`;
+	}
 
 	return '';
 }
 
 function joinUnifiedDiffTextParts(parts: Array<string | undefined>): string | undefined {
 	const normalized = parts.map(part => part?.replaceAll(/\n+$/g, '')).filter((part): part is string => !!part);
-	if (normalized.length === 0) return undefined;
+	if (normalized.length === 0) {
+		return undefined;
+	}
 	return normalized.join('\n');
 }
 
@@ -902,7 +988,9 @@ function countHunkHeaders(diffText: string): number {
 }
 
 function normalizePathKey(value: string | undefined): string {
-	if (!isUsablePatchPath(value)) return '';
+	if (!isUsablePatchPath(value)) {
+		return '';
+	}
 	return value
 		.trim()
 		.replaceAll('\\', '/')
@@ -927,7 +1015,9 @@ function normalizeUnifiedHeaderPair(oldPath: string, newPath: string): [string, 
 
 function readDiffPathToken(input: string): { token: string; rest: string } {
 	const value = input.trim();
-	if (!value) return { token: '', rest: '' };
+	if (!value) {
+		return { token: '', rest: '' };
+	}
 
 	if (!value.startsWith('"')) {
 		const match = /^(\S+)(?:\s+([\s\S]*))?$/.exec(value);
@@ -969,9 +1059,13 @@ function readDiffPathToken(input: string): { token: string; rest: string } {
 
 function normalizeDiffPathToken(input: string): string {
 	let value = input.trim();
-	if (!value) return '';
+	if (!value) {
+		return '';
+	}
 
-	if (value === DEV_NULL) return DEV_NULL;
+	if (value === DEV_NULL) {
+		return DEV_NULL;
+	}
 
 	if (value.startsWith('"')) {
 		value = readDiffPathToken(value).token;
@@ -989,7 +1083,9 @@ function normalizeDiffPathToken(input: string): string {
 
 function stripGitPathPrefix(value: string, prefix: string): string {
 	const marker = `${prefix}/`;
-	if (value.startsWith(marker)) return value.slice(marker.length);
+	if (value.startsWith(marker)) {
+		return value.slice(marker.length);
+	}
 	return value;
 }
 
@@ -1003,11 +1099,15 @@ export function uniqueStrings(values: Array<string | undefined | null>): string[
 
 	for (const value of values) {
 		const trimmed = value?.trim();
-		if (!trimmed) continue;
+		if (!trimmed) {
+			continue;
+		}
 
 		const key = trimmed.replaceAll('\\', '/').replaceAll(/\/+/g, '/');
 
-		if (seen.has(key)) continue;
+		if (seen.has(key)) {
+			continue;
+		}
 
 		seen.add(key);
 		out.push(trimmed);
@@ -1018,7 +1118,9 @@ export function uniqueStrings(values: Array<string | undefined | null>): string[
 
 export function getPathIdentity(value: string | undefined | null): string {
 	const trimmed = value?.trim();
-	if (!trimmed || trimmed === '/dev/null') return '';
+	if (!trimmed || trimmed === '/dev/null') {
+		return '';
+	}
 
 	return trimmed
 		.replaceAll('\\', '/')
@@ -1027,6 +1129,8 @@ export function getPathIdentity(value: string | undefined | null): string {
 }
 
 export function getErrorMessage(error: unknown): string {
-	if (error instanceof Error && error.message.trim()) return error.message;
+	if (error instanceof Error && error.message.trim()) {
+		return error.message;
+	}
 	return 'Unexpected error while checking or applying unified diff.';
 }

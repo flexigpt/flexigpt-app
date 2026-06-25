@@ -18,15 +18,23 @@ export function ToolBundleDetailsModal({ isOpen, onClose, bundle }: ToolBundleDe
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 
 	useEffect(() => {
-		if (!isOpen) return;
+		if (!isOpen) {
+			return;
+		}
 
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
-		if (!dialog.open) dialog.showModal();
+		if (!dialog.open) {
+			dialog.showModal();
+		}
 
 		return () => {
-			if (dialog.open) dialog.close();
+			if (dialog.open) {
+				dialog.close();
+			}
 		};
 	}, [isOpen]);
 
@@ -34,7 +42,9 @@ export function ToolBundleDetailsModal({ isOpen, onClose, bundle }: ToolBundleDe
 		onClose();
 	};
 
-	if (!isOpen || !bundle) return null;
+	if (!isOpen || !bundle) {
+		return null;
+	}
 
 	return createPortal(
 		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose}>

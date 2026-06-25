@@ -19,7 +19,9 @@ import { ReadOnlyValue } from '@/components/read_only_value';
 type ModalMode = 'add' | 'edit' | 'view';
 
 function parseDefaultHeadersRawJSON(raw: string): Record<string, string> {
-	if (!raw.trim()) return {};
+	if (!raw.trim()) {
+		return {};
+	}
 	return JSON.parse(raw.trim()) as Record<string, string>;
 }
 
@@ -149,7 +151,9 @@ function AddEditProviderPresetModalContent({
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
 		if (!dialog.open) {
 			try {
@@ -178,7 +182,9 @@ function AddEditProviderPresetModalContent({
 	}, [isReadOnly, mode]);
 
 	const requestClose = useCallback(() => {
-		if (isSubmitting) return;
+		if (isSubmitting) {
+			return;
+		}
 
 		const dialog = dialogRef.current;
 
@@ -191,7 +197,9 @@ function AddEditProviderPresetModalContent({
 	}, [isSubmitting, onClose]);
 
 	const handleDialogClose = () => {
-		if (isUnmountingRef.current) return;
+		if (isUnmountingRef.current) {
+			return;
+		}
 		onClose();
 	};
 
@@ -202,7 +210,9 @@ function AddEditProviderPresetModalContent({
 			currentErrors: ErrorState,
 			originInput: HTMLInputElement | null = null
 		): ErrorState => {
-			if (isReadOnly) return currentErrors;
+			if (isReadOnly) {
+				return currentErrors;
+			}
 
 			let newErrs: ErrorState = { ...currentErrors };
 			const v = typeof val === 'string' ? val.trim() : val;
@@ -220,19 +230,28 @@ function AddEditProviderPresetModalContent({
 			}
 
 			if (field === 'displayName') {
-				if (!v) newErrs.displayName = 'Display name required.';
-				else newErrs = omitManyKeys(newErrs, ['displayName']);
+				if (!v) {
+					newErrs.displayName = 'Display name required.';
+				} else {
+					newErrs = omitManyKeys(newErrs, ['displayName']);
+				}
 			}
 
 			if (field === 'origin') {
 				const { error } = validateUrlForInput(String(val), originInput, { required: true });
-				if (error) newErrs.origin = error;
-				else newErrs = omitManyKeys(newErrs, ['origin']);
+				if (error) {
+					newErrs.origin = error;
+				} else {
+					newErrs = omitManyKeys(newErrs, ['origin']);
+				}
 			}
 
 			if (field === 'chatCompletionPathPrefix') {
-				if (!String(v).trim()) newErrs.chatCompletionPathPrefix = 'Chat path required.';
-				else newErrs = omitManyKeys(newErrs, ['chatCompletionPathPrefix']);
+				if (!String(v).trim()) {
+					newErrs.chatCompletionPathPrefix = 'Chat path required.';
+				} else {
+					newErrs = omitManyKeys(newErrs, ['chatCompletionPathPrefix']);
+				}
 			}
 
 			if (field === 'defaultHeadersRawJSON') {
@@ -249,8 +268,11 @@ function AddEditProviderPresetModalContent({
 			}
 
 			if (field === 'apiKey' && mode === 'add') {
-				if (!v) newErrs.apiKey = 'API key required.';
-				else newErrs = omitManyKeys(newErrs, ['apiKey']);
+				if (!v) {
+					newErrs.apiKey = 'API key required.';
+				} else {
+					newErrs = omitManyKeys(newErrs, ['apiKey']);
+				}
 			}
 
 			if (field === 'sdkType') {
@@ -268,7 +290,9 @@ function AddEditProviderPresetModalContent({
 
 	const validateForm = useCallback(
 		(state: ProviderFormData): ErrorState => {
-			if (isReadOnly) return {};
+			if (isReadOnly) {
+				return {};
+			}
 
 			let next: ErrorState = {};
 			next = validateField('providerName', state.providerName, next);
@@ -276,7 +300,9 @@ function AddEditProviderPresetModalContent({
 			next = validateField('origin', state.origin, next);
 			next = validateField('chatCompletionPathPrefix', state.chatCompletionPathPrefix, next);
 			next = validateField('defaultHeadersRawJSON', state.defaultHeadersRawJSON, next);
-			if (mode === 'add' || state.apiKey.trim()) next = validateField('apiKey', state.apiKey, next);
+			if (mode === 'add' || state.apiKey.trim()) {
+				next = validateField('apiKey', state.apiKey, next);
+			}
 			next = validateField('sdkType', state.sdkType, next);
 			return next;
 		},
@@ -289,18 +315,32 @@ function AddEditProviderPresetModalContent({
 			normalizedOrigin: string,
 			defaultHeaders: Record<string, string>
 		): PatchProviderPresetPayload => {
-			if (!initialPreset) return {};
+			if (!initialPreset) {
+				return {};
+			}
 
 			const patch: PatchProviderPresetPayload = {};
-			if (state.displayName.trim() !== initialPreset.displayName) patch.displayName = state.displayName.trim();
-			if (state.sdkType !== initialPreset.sdkType) patch.sdkType = state.sdkType;
-			if (state.isEnabled !== initialPreset.isEnabled) patch.isEnabled = state.isEnabled;
-			if (normalizedOrigin !== initialPreset.origin) patch.origin = normalizedOrigin;
-			if (state.chatCompletionPathPrefix.trim() !== initialPreset.chatCompletionPathPrefix)
+			if (state.displayName.trim() !== initialPreset.displayName) {
+				patch.displayName = state.displayName.trim();
+			}
+			if (state.sdkType !== initialPreset.sdkType) {
+				patch.sdkType = state.sdkType;
+			}
+			if (state.isEnabled !== initialPreset.isEnabled) {
+				patch.isEnabled = state.isEnabled;
+			}
+			if (normalizedOrigin !== initialPreset.origin) {
+				patch.origin = normalizedOrigin;
+			}
+			if (state.chatCompletionPathPrefix.trim() !== initialPreset.chatCompletionPathPrefix) {
 				patch.chatCompletionPathPrefix = state.chatCompletionPathPrefix.trim();
-			if (state.apiKeyHeaderKey.trim() !== initialPreset.apiKeyHeaderKey)
+			}
+			if (state.apiKeyHeaderKey.trim() !== initialPreset.apiKeyHeaderKey) {
 				patch.apiKeyHeaderKey = state.apiKeyHeaderKey.trim();
-			if (!headersEqual(defaultHeaders, initialPreset.defaultHeaders ?? {})) patch.defaultHeaders = defaultHeaders;
+			}
+			if (!headersEqual(defaultHeaders, initialPreset.defaultHeaders ?? {})) {
+				patch.defaultHeaders = defaultHeaders;
+			}
 			return patch;
 		},
 		[initialPreset]
@@ -308,7 +348,9 @@ function AddEditProviderPresetModalContent({
 
 	const applyPrefill = (key: ProviderName) => {
 		const src = allProviderPresets[key];
-		if (!src) return;
+		if (!src) {
+			return;
+		}
 
 		const next: ProviderFormData = {
 			...formData,
@@ -327,7 +369,9 @@ function AddEditProviderPresetModalContent({
 	};
 
 	const handleInput = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-		if (isSubmitting) return;
+		if (isSubmitting) {
+			return;
+		}
 
 		const target = e.target as HTMLInputElement;
 		const { name, value, type, checked } = target;
@@ -347,7 +391,9 @@ function AddEditProviderPresetModalContent({
 	};
 
 	const onSdkTypeChange = (key: ProviderSDKType) => {
-		if (isReadOnly || isSubmitting) return;
+		if (isReadOnly || isSubmitting) {
+			return;
+		}
 
 		const defaults = SDK_DEFAULTS[key];
 		const next: ProviderFormData = {
@@ -367,9 +413,15 @@ function AddEditProviderPresetModalContent({
 	};
 
 	const hasEffectiveChanges = useMemo(() => {
-		if (mode !== 'edit') return true;
-		if (formData.apiKey.trim()) return true;
-		if (!initialPreset) return false;
+		if (mode !== 'edit') {
+			return true;
+		}
+		if (formData.apiKey.trim()) {
+			return true;
+		}
+		if (!initialPreset) {
+			return false;
+		}
 
 		let defaultHeaders: Record<string, string>;
 		try {
@@ -386,7 +438,9 @@ function AddEditProviderPresetModalContent({
 	}, [buildPatchPayload, formData, initialPreset, mode]);
 
 	const allValid = useMemo(() => {
-		if (isReadOnly) return true;
+		if (isReadOnly) {
+			return true;
+		}
 
 		const validationErrors = validateForm(formData);
 		const hasErr = Object.values(validationErrors).some(Boolean);
@@ -408,7 +462,9 @@ function AddEditProviderPresetModalContent({
 
 		const finalErrors = validateForm(formData);
 		setErrors(finalErrors);
-		if (Object.values(finalErrors).some(Boolean)) return;
+		if (Object.values(finalErrors).some(Boolean)) {
+			return;
+		}
 
 		const originInput = originInputRef.current;
 		const { normalized: normalizedOrigin, error: originError } = validateUrlForInput(formData.origin, originInput, {
@@ -476,7 +532,9 @@ function AddEditProviderPresetModalContent({
 			className="modal"
 			onClose={handleDialogClose}
 			onCancel={e => {
-				if (!isReadOnly || isSubmitting) e.preventDefault();
+				if (!isReadOnly || isSubmitting) {
+					e.preventDefault();
+				}
 			}}
 		>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-4/5 overflow-hidden rounded-2xl p-0 xl:max-w-3/5">
@@ -831,8 +889,12 @@ function AddEditProviderPresetModalContent({
 }
 
 export function AddEditProviderPresetModal(props: AddEditProviderPresetModalProps) {
-	if (!props.isOpen) return null;
-	if (typeof document === 'undefined' || !document.body) return null;
+	if (!props.isOpen) {
+		return null;
+	}
+	if (typeof document === 'undefined' || !document.body) {
+		return null;
+	}
 
 	const modalKey =
 		props.mode === 'add' ? 'add-provider' : `${props.mode}:${props.initialPreset?.name ?? 'provider-without-name'}`;

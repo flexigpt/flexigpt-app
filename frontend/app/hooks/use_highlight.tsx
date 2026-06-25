@@ -13,7 +13,9 @@ const waiting = new Map<
 >();
 
 export function ensureWorker(): Worker {
-	if (worker) return worker;
+	if (worker) {
+		return worker;
+	}
 
 	worker = new Worker(new URL('./highlight_worker.ts', import.meta.url), { type: 'module' });
 
@@ -25,10 +27,15 @@ export function ensureWorker(): Worker {
 		};
 
 		const rec = waiting.get(id);
-		if (!rec) return;
+		if (!rec) {
+			return;
+		}
 
-		if (error) rec.reject(error);
-		else rec.resolve(html as string);
+		if (error) {
+			rec.reject(error);
+		} else {
+			rec.resolve(html as string);
+		}
 
 		waiting.delete(id);
 	};

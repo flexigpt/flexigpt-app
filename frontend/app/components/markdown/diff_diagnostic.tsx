@@ -69,7 +69,9 @@ export function getDiagnosticSeverityCounts(diagnostics: ApplyUnifiedDiffDiagnos
 
 export function formatDiagnosticsTitle(diagnostics: ApplyUnifiedDiffDiagnostic[]): string {
 	const counts = getDiagnosticSeverityCounts(diagnostics);
-	if (counts.total === 0) return '';
+	if (counts.total === 0) {
+		return '';
+	}
 
 	const summary = [
 		counts.error > 0 ? `${counts.error} error${counts.error === 1 ? '' : 's'}` : undefined,
@@ -91,9 +93,15 @@ export function formatDiagnosticsTitle(diagnostics: ApplyUnifiedDiffDiagnostic[]
 }
 
 export function getDiagnosticToneFromCounts(counts: DiagnosticSeverityCounts): HeaderButtonTone {
-	if (counts.error > 0) return 'error';
-	if (counts.warning > 0) return 'warning';
-	if (counts.info > 0) return 'info';
+	if (counts.error > 0) {
+		return 'error';
+	}
+	if (counts.warning > 0) {
+		return 'warning';
+	}
+	if (counts.info > 0) {
+		return 'info';
+	}
 	return 'neutral';
 }
 
@@ -104,16 +112,22 @@ export function uniqueDiagnostics(
 	const seen = new Set<string>();
 
 	for (const value of values) {
-		if (!value) continue;
+		if (!value) {
+			continue;
+		}
 
 		const message = value.message.trim();
-		if (!message) continue;
+		if (!message) {
+			continue;
+		}
 
 		const level = value.level ?? ApplyUnifiedDiffDiagnosticLevel.Info;
 		const code = value.code?.trim() ?? '';
 		const key = `${level}\u0000${code}\u0000${message.replaceAll('\\', '/').replaceAll(/\/+/g, '/')}`;
 
-		if (seen.has(key)) continue;
+		if (seen.has(key)) {
+			continue;
+		}
 
 		seen.add(key);
 		out.push({
@@ -140,11 +154,15 @@ function uniqueStringsFromDiagnostics(values: Array<ApplyUnifiedDiffDiagnostic |
 
 	for (const value of values) {
 		const trimmed = value?.message.trim();
-		if (!trimmed) continue;
+		if (!trimmed) {
+			continue;
+		}
 
 		const key = trimmed.replaceAll('\\', '/').replaceAll(/\/+/g, '/');
 
-		if (seen.has(key)) continue;
+		if (seen.has(key)) {
+			continue;
+		}
 
 		seen.add(key);
 		out.push(trimmed);
@@ -230,7 +248,9 @@ function renderCollapsedDiagnosticGroup({
 	level: ApplyUnifiedDiffDiagnosticLevel;
 	keyPrefix: string;
 }) {
-	if (diagnostics.length === 0) return null;
+	if (diagnostics.length === 0) {
+		return null;
+	}
 
 	const display = getDiagnosticDisplay(level);
 
@@ -258,7 +278,9 @@ function renderCollapsedDiagnosticGroup({
 
 export function renderDiagnosticSeveritySummary(diagnostics: ApplyUnifiedDiffDiagnostic[]) {
 	const counts = getDiagnosticSeverityCounts(diagnostics);
-	if (counts.total === 0) return null;
+	if (counts.total === 0) {
+		return null;
+	}
 
 	return (
 		<div className="flex flex-wrap gap-1.5 text-[11px]">
@@ -282,7 +304,9 @@ export function renderDiagnosticSeveritySummary(diagnostics: ApplyUnifiedDiffDia
 }
 
 export function renderDiagnosticsPanel({ title, description, diagnostics, className, footer }: DiagnosticPanelOptions) {
-	if (diagnostics.length === 0) return null;
+	if (diagnostics.length === 0) {
+		return null;
+	}
 
 	const highest = getHighestDiagnosticLevel(diagnostics) ?? ApplyUnifiedDiffDiagnosticLevel.Info;
 	const headerDisplay = getDiagnosticDisplay(highest);

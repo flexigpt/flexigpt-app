@@ -18,7 +18,9 @@ interface MCPApprovalModalProps {
 
 function formatArguments(summary?: MCPApprovalSummary): string {
 	const raw = summary?.arguments?.trim() ?? '';
-	if (!raw) return '-';
+	if (!raw) {
+		return '-';
+	}
 
 	try {
 		const parsed = JSON.parse(raw) as unknown;
@@ -32,10 +34,14 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 
 	useEffect(() => {
-		if (!approvalRequest) return;
+		if (!approvalRequest) {
+			return;
+		}
 
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
 		if (!dialog.open) {
 			try {
@@ -52,8 +58,12 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 		};
 	}, [approvalRequest]);
 
-	if (!approvalRequest) return null;
-	if (typeof document === 'undefined' || !document.body) return null;
+	if (!approvalRequest) {
+		return null;
+	}
+	if (typeof document === 'undefined' || !document.body) {
+		return null;
+	}
 
 	const { summary, reason } = approvalRequest;
 

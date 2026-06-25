@@ -38,8 +38,12 @@ const AUTO_EXECUTE_DROPDOWN_ITEMS: Record<TriStateBoolean, { isEnabled: boolean 
 };
 
 function getAutoExecuteDropdownLabel(value: TriStateBoolean): string {
-	if (value === 'true') return 'Force On';
-	if (value === 'false') return 'Force Off';
+	if (value === 'true') {
+		return 'Force On';
+	}
+	if (value === 'false') {
+		return 'Force Off';
+	}
 	return 'Tool Default';
 }
 

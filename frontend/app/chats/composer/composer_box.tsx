@@ -215,7 +215,9 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 	// Only re-run when readiness flips. All other triggers (workflow load,
 	// restore, reset, etc.) call flushPendingPresetResolution() explicitly.
 	useEffect(() => {
-		if (!assistantPresetLayerReady) return;
+		if (!assistantPresetLayerReady) {
+			return;
+		}
 		void flushPendingPresetResolution();
 	}, [assistantPresetLayerReady, flushPendingPresetResolution]);
 
@@ -297,7 +299,9 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 				}
 
 				const ok = await assistantPreset.resetToBasePreset();
-				if (!ok) pendingPresetResolutionModeRef.current = 'ensure-active';
+				if (!ok) {
+					pendingPresetResolutionModeRef.current = 'ensure-active';
+				}
 				void flushPendingPresetResolution();
 				editorAreaRef.current?.focus();
 				return true;

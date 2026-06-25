@@ -68,12 +68,16 @@ function stop(e: MouseEvent) {
 }
 
 function truncate(s: string, max: number) {
-	if (!s) return '';
+	if (!s) {
+		return '';
+	}
 	return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 }
 
 function getArgsBadge(status?: UIToolUserArgsStatus): { label: string; className: string } | null {
-	if (!status?.hasSchema) return null;
+	if (!status?.hasSchema) {
+		return null;
+	}
 	// schema exists, but no required fields
 	if (status.requiredKeys.length === 0) {
 		return { label: 'Args: Optional', className: 'badge badge-ghost badge-xs text-xs p-0' };
@@ -130,7 +134,9 @@ export function ToolMenuRow({
 			hideOnClick={hideOnClick}
 			disabled={disabled}
 			onClick={() => {
-				if (disabled) return;
+				if (disabled) {
+					return;
+				}
 				onRowClick?.();
 			}}
 			className={menuItemClassName}

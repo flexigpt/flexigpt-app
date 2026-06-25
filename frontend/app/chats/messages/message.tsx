@@ -29,8 +29,12 @@ interface ChatMessageProps {
 }
 
 function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
-	if (prev.isBusy !== next.isBusy) return false;
-	if (prev.isEditing !== next.isEditing) return false;
+	if (prev.isBusy !== next.isBusy) {
+		return false;
+	}
+	if (prev.isEditing !== next.isEditing) {
+		return false;
+	}
 
 	if (prev.message.uiDebugDetails !== next.message.uiDebugDetails) {
 		//
@@ -53,19 +57,37 @@ function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
 	}
 
 	// Optional but recommended: these can affect effective rendered markdown too.
-	if (prev.message.status !== next.message.status) return false;
-	if (prev.message.outputs !== next.message.outputs) return false;
-	if (prev.message.uiCitations !== next.message.uiCitations) return false;
-	if (prev.message.uiToolCalls !== next.message.uiToolCalls) return false;
-	if (prev.message.uiToolOutputs !== next.message.uiToolOutputs) return false;
-	if (prev.diffCandidatePaths !== next.diffCandidatePaths) return false;
+	if (prev.message.status !== next.message.status) {
+		return false;
+	}
+	if (prev.message.outputs !== next.message.outputs) {
+		return false;
+	}
+	if (prev.message.uiCitations !== next.message.uiCitations) {
+		return false;
+	}
+	if (prev.message.uiToolCalls !== next.message.uiToolCalls) {
+		return false;
+	}
+	if (prev.message.uiToolOutputs !== next.message.uiToolOutputs) {
+		return false;
+	}
+	if (prev.diffCandidatePaths !== next.diffCandidatePaths) {
+		return false;
+	}
 
-	if (prev.streamedText !== next.streamedText) return false;
-	if (prev.streamedThinking !== next.streamedThinking) return false;
+	if (prev.streamedText !== next.streamedText) {
+		return false;
+	}
+	if (prev.streamedThinking !== next.streamedThinking) {
+		return false;
+	}
 
 	// If the *object reference* for the ConversationMessage changes
 	// react must re-render (content edited, message appended).
-	if (prev.message !== next.message) return false;
+	if (prev.message !== next.message) {
+		return false;
+	}
 
 	// Everything else is the same: skip.
 	return true;
@@ -123,7 +145,9 @@ export const ChatMessage = memo(function ChatMessage({
 		return outputs
 			.map(out => {
 				const instance = buildAppInstanceFromToolOutput(out);
-				if (!instance) return null;
+				if (!instance) {
+					return null;
+				}
 				const call = callsById.get(out.callID);
 				return { instance, call, output: out } as const;
 			})

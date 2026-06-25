@@ -177,20 +177,28 @@ function SystemPromptBottomBarChipInner({
 				...group,
 				prompts: [...group.prompts].toSorted((left, right) => {
 					const slugCompare = PROMPT_SORT_COLLATOR.compare(left.templateSlug, right.templateSlug);
-					if (slugCompare !== 0) return slugCompare;
+					if (slugCompare !== 0) {
+						return slugCompare;
+					}
 
 					const versionCompare = PROMPT_SORT_COLLATOR.compare(left.templateVersion, right.templateVersion);
-					if (versionCompare !== 0) return versionCompare;
+					if (versionCompare !== 0) {
+						return versionCompare;
+					}
 
 					const nameCompare = PROMPT_SORT_COLLATOR.compare(left.displayName, right.displayName);
-					if (nameCompare !== 0) return nameCompare;
+					if (nameCompare !== 0) {
+						return nameCompare;
+					}
 
 					return PROMPT_SORT_COLLATOR.compare(left.identityKey, right.identityKey);
 				}),
 			}))
 			.toSorted((left, right) => {
 				const bundleCompare = PROMPT_SORT_COLLATOR.compare(left.sortKey, right.sortKey);
-				if (bundleCompare !== 0) return bundleCompare;
+				if (bundleCompare !== 0) {
+					return bundleCompare;
+				}
 				return PROMPT_SORT_COLLATOR.compare(left.bundleID, right.bundleID);
 			});
 	}, [bundles, prompts]);
@@ -224,16 +232,22 @@ function SystemPromptBottomBarChipInner({
 	}, [promptTooltip]);
 
 	useEffect(() => {
-		if (!isInputLocked) return;
+		if (!isInputLocked) {
+			return;
+		}
 		hidePromptTooltip();
 		menu.hide();
 	}, [hidePromptTooltip, isInputLocked, menu]);
 
 	const handleMenuOpen = useCallback(() => {
-		if (isInputLocked) return;
+		if (isInputLocked) {
+			return;
+		}
 
 		const now = Date.now();
-		if (now - lastRefreshTsRef.current < REFRESH_STALE_MS) return;
+		if (now - lastRefreshTsRef.current < REFRESH_STALE_MS) {
+			return;
+		}
 
 		lastRefreshTsRef.current = now;
 		void onRefreshPrompts().catch((refreshError: unknown) => {
@@ -242,7 +256,9 @@ function SystemPromptBottomBarChipInner({
 	}, [isInputLocked, onRefreshPrompts]);
 
 	const openAddModal = useCallback(() => {
-		if (isInputLocked) return;
+		if (isInputLocked) {
+			return;
+		}
 
 		setModalMode('add');
 		setComposerInitialDraft({
@@ -261,7 +277,9 @@ function SystemPromptBottomBarChipInner({
 
 	const openForkModal = useCallback(
 		(item: SystemPromptItem) => {
-			if (isInputLocked) return;
+			if (isInputLocked) {
+				return;
+			}
 
 			const isSyntheticPreviousConversationPrompt = item.bundleID === PREVIOUS_CONVO_SYSTEM_PROMPT_BUNDLEID;
 			setModalMode(isSyntheticPreviousConversationPrompt ? 'add' : 'fork');
@@ -378,7 +396,9 @@ function SystemPromptBottomBarChipInner({
 						}}
 						onMouseLeave={hidePromptTooltip}
 						onClick={() => {
-							if (isInputLocked) return;
+							if (isInputLocked) {
+								return;
+							}
 							onToggleModelDefault(!includeModelDefault);
 						}}
 					>
@@ -390,7 +410,9 @@ function SystemPromptBottomBarChipInner({
 								disabled={isInputLocked}
 								onChange={event => {
 									stopMenuBubbleEvent(event);
-									if (isInputLocked) return;
+									if (isInputLocked) {
+										return;
+									}
 									onToggleModelDefault(event.currentTarget.checked);
 								}}
 								onPointerDown={stopMenuToggleEvent}
@@ -458,7 +480,9 @@ function SystemPromptBottomBarChipInner({
 												}}
 												onMouseLeave={hidePromptTooltip}
 												onClick={() => {
-													if (isInputLocked) return;
+													if (isInputLocked) {
+														return;
+													}
 													onTogglePrompt(item.identityKey);
 												}}
 											>
@@ -469,7 +493,9 @@ function SystemPromptBottomBarChipInner({
 													disabled={isInputLocked}
 													onChange={event => {
 														stopMenuBubbleEvent(event);
-														if (isInputLocked) return;
+														if (isInputLocked) {
+															return;
+														}
 														onTogglePrompt(item.identityKey);
 													}}
 													onPointerDown={stopMenuToggleEvent}
@@ -496,7 +522,9 @@ function SystemPromptBottomBarChipInner({
 														disabled={isInputLocked || !hasWritableCustomBundle}
 														onClick={event => {
 															stopMenuToggleEvent(event);
-															if (isInputLocked) return;
+															if (isInputLocked) {
+																return;
+															}
 															hidePromptTooltip();
 															openForkModal(item);
 														}}
@@ -524,7 +552,9 @@ function SystemPromptBottomBarChipInner({
 							className="btn btn-ghost btn-xs rounded-lg"
 							disabled={isInputLocked || !hasWritableCustomBundle}
 							onClick={() => {
-								if (isInputLocked) return;
+								if (isInputLocked) {
+									return;
+								}
 								hidePromptTooltip();
 								openAddModal();
 							}}
@@ -536,7 +566,9 @@ function SystemPromptBottomBarChipInner({
 							type="button"
 							className="btn btn-ghost btn-xs rounded-lg"
 							onClick={() => {
-								if (isInputLocked) return;
+								if (isInputLocked) {
+									return;
+								}
 								hidePromptTooltip();
 								onClearSelected();
 								menu.hide();

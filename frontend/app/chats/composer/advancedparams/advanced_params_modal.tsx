@@ -70,9 +70,13 @@ const MAX_JSON_CHARS = 50_000;
 
 function parsePositiveIntAllowBlank(v: string): number | undefined {
 	const s = v.trim();
-	if (!s) return undefined;
+	if (!s) {
+		return undefined;
+	}
 	const n = Number(s);
-	if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) return Number.NaN;
+	if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) {
+		return Number.NaN;
+	}
 	return n;
 }
 
@@ -82,12 +86,16 @@ function parseStopSequences(raw: string): string[] | undefined {
 		.map(s => s.trim())
 		.filter(Boolean);
 
-	if (lines.length === 0) return undefined;
+	if (lines.length === 0) {
+		return undefined;
+	}
 
 	const seen = new Set<string>();
 	const out: string[] = [];
 	for (const s of lines) {
-		if (seen.has(s)) continue;
+		if (seen.has(s)) {
+			continue;
+		}
 		seen.add(s);
 		out.push(s);
 	}
@@ -113,9 +121,15 @@ function getInitialOutputFormatChoice(
 	const kind = currentModel.outputParam?.format?.kind;
 	const kindIsSupported = !supportedOutputFormats || (kind ? supportedOutputFormats.includes(kind) : true);
 
-	if (!kindIsSupported) return 'default';
-	if (kind === OutputFormatKind.Text) return 'text';
-	if (kind === OutputFormatKind.JSONSchema) return 'jsonSchema';
+	if (!kindIsSupported) {
+		return 'default';
+	}
+	if (kind === OutputFormatKind.Text) {
+		return 'text';
+	}
+	if (kind === OutputFormatKind.JSONSchema) {
+		return 'jsonSchema';
+	}
 	return 'default';
 }
 
@@ -127,7 +141,9 @@ function getInitialReasoningSummaryStyle(
 }
 
 function closeDialogSafely(dialog: HTMLDialogElement | null): boolean {
-	if (!dialog?.open) return false;
+	if (!dialog?.open) {
+		return false;
+	}
 
 	try {
 		dialog.close();
@@ -261,7 +277,9 @@ function AdvancedParamsModalInner({
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 		let raf1 = 0;
 		let raf2 = 0;
 		try {
@@ -295,8 +313,12 @@ function AdvancedParamsModalInner({
 
 	const validateNumberField = (field: 'maxPromptLength' | 'maxOutputLength' | 'timeout', value: string) => {
 		const n = parsePositiveIntAllowBlank(value);
-		if (n === undefined) return undefined;
-		if (!Number.isFinite(n)) return `${field} must be a positive integer.`;
+		if (n === undefined) {
+			return undefined;
+		}
+		if (!Number.isFinite(n)) {
+			return `${field} must be a positive integer.`;
+		}
 		return undefined;
 	};
 
@@ -310,18 +332,26 @@ function AdvancedParamsModalInner({
 	};
 
 	const validateStopSequences = (raw: string): string | undefined => {
-		if (!stopPolicy.isSupported) return undefined;
-		if (stopSequencesDisabledBecauseReasoning) return undefined;
+		if (!stopPolicy.isSupported) {
+			return undefined;
+		}
+		if (stopSequencesDisabledBecauseReasoning) {
+			return undefined;
+		}
 
 		const parsed = parseStopSequences(raw);
-		if (!parsed) return undefined;
+		if (!parsed) {
+			return undefined;
+		}
 
 		if (parsed.length > stopPolicy.maxSequences) {
 			return `Too many stop sequences (max ${stopPolicy.maxSequences}).`;
 		}
 
 		const tooLong = parsed.find(s => s.length > 256);
-		if (tooLong) return 'A stop sequence is too long (max 256 chars per line).';
+		if (tooLong) {
+			return 'A stop sequence is too long (max 256 chars per line).';
+		}
 
 		return undefined;
 	};
@@ -336,17 +366,23 @@ function AdvancedParamsModalInner({
 		}
 
 		const name = nameValue.trim();
-		if (!name) return { nameErr: 'Schema name is required.', schemaErr: undefined };
+		if (!name) {
+			return { nameErr: 'Schema name is required.', schemaErr: undefined };
+		}
 
 		const schemaRaw = schemaTextValue.trim();
-		if (!schemaRaw) return { nameErr: undefined, schemaErr: 'Schema JSON is required.' };
+		if (!schemaRaw) {
+			return { nameErr: undefined, schemaErr: 'Schema JSON is required.' };
+		}
 
 		if (schemaRaw.length > MAX_JSON_CHARS) {
 			return { nameErr: undefined, schemaErr: `Schema JSON too large (max ${MAX_JSON_CHARS} chars).` };
 		}
 
 		const parsed = safeJSONParse(schemaRaw);
-		if (!parsed.ok) return { nameErr: undefined, schemaErr: `Invalid schema JSON: ${parsed.value}` };
+		if (!parsed.ok) {
+			return { nameErr: undefined, schemaErr: `Invalid schema JSON: ${parsed.value}` };
+		}
 
 		if (!isPlainObject(parsed.value)) {
 			return { nameErr: undefined, schemaErr: 'Schema must be a JSON object.' };
@@ -356,7 +392,9 @@ function AdvancedParamsModalInner({
 	};
 
 	const maybeRefreshJSONSchemaErrors = (nextChoice: OutputFormatChoice, nextName: string, nextSchemaText: string) => {
-		if (!errors.jsonSchemaName && !errors.jsonSchema) return;
+		if (!errors.jsonSchemaName && !errors.jsonSchema) {
+			return;
+		}
 
 		const { nameErr, schemaErr } = validateJSONSchema(nextChoice, nextName, nextSchemaText);
 		setErrors(prev => ({
@@ -461,15 +499,20 @@ function AdvancedParamsModalInner({
 		const mergedOutputParam: OutputParam | undefined = (() => {
 			const merged: OutputParam = { ...baseOutputParam };
 
-			if (nextFormat === undefined) delete merged.format;
-			else merged.format = nextFormat;
+			if (nextFormat === undefined) {
+				delete merged.format;
+			} else {
+				merged.format = nextFormat;
+			}
 
 			const hasAny = !!merged.verbosity || !!merged.format;
 			return hasAny ? merged : undefined;
 		})();
 
 		const mergedReasoning = (() => {
-			if (!currentModel.reasoning) return currentModel.reasoning;
+			if (!currentModel.reasoning) {
+				return currentModel.reasoning;
+			}
 
 			const r = { ...currentModel.reasoning };
 			if (!reasoningSummaryStyle) {
@@ -481,8 +524,12 @@ function AdvancedParamsModalInner({
 		})();
 
 		const nextStopSequences = (() => {
-			if (!stopPolicy.isSupported) return undefined;
-			if (stopSequencesDisabledBecauseReasoning) return undefined;
+			if (!stopPolicy.isSupported) {
+				return undefined;
+			}
+			if (stopSequencesDisabledBecauseReasoning) {
+				return undefined;
+			}
 
 			const parsed = parseStopSequences(stopSequencesText);
 			return parsed ? parsed.slice(0, stopPolicy.maxSequences) : undefined;
@@ -908,7 +955,9 @@ export function AdvancedParamsModal({
 	effectiveReasoningEnabled,
 	onSave,
 }: AdvancedParamsModalProps) {
-	if (!isOpen || typeof document === 'undefined') return null;
+	if (!isOpen || typeof document === 'undefined') {
+		return null;
+	}
 
 	const modelIdentity = `${currentModel.providerName}::${currentModel.modelPresetID}`;
 

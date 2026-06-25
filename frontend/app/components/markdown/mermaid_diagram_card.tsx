@@ -66,7 +66,9 @@ const appendInlineStyles = (element: Element, styles: Record<string, string>) =>
 };
 
 const prepareMermaidSvgMarkup = (svgMarkup: string): string => {
-	if (typeof window === 'undefined') return svgMarkup;
+	if (typeof window === 'undefined') {
+		return svgMarkup;
+	}
 
 	try {
 		const parser = new DOMParser();
@@ -77,7 +79,9 @@ const prepareMermaidSvgMarkup = (svgMarkup: string): string => {
 		}
 
 		const svg = doc.querySelector('svg');
-		if (!svg) return svgMarkup;
+		if (!svg) {
+			return svgMarkup;
+		}
 
 		appendInlineStyles(svg, {
 			display: 'block',
@@ -123,7 +127,9 @@ export function MermaidDiagram({
 	const stableCode = useDebounce(code, 150);
 
 	const effectiveMermaidTheme = useMemo<'dark' | 'default'>(() => {
-		if (themeMode === 'auto') return isDark ? 'dark' : 'default';
+		if (themeMode === 'auto') {
+			return isDark ? 'dark' : 'default';
+		}
 		return themeMode === 'dark' ? 'dark' : 'default';
 	}, [themeMode, isDark]);
 
@@ -132,7 +138,9 @@ export function MermaidDiagram({
 	// Per-diagram surface override: only when user explicitly selects light/dark.
 	// In auto mode, it stays consistent with the app’s DaisyUI theme.
 	const surfaceStyle = useMemo<MermaidSurfaceStyle | undefined>(() => {
-		if (themeMode === 'auto') return;
+		if (themeMode === 'auto') {
+			return;
+		}
 
 		const forcedDark = themeMode === 'dark';
 
@@ -170,7 +178,9 @@ export function MermaidDiagram({
 
 		renderMermaidQueued(renderId, stableCode, mermaidConfig)
 			.then(renderResult => {
-				if (isCancelled || token !== latestToken.current) return;
+				if (isCancelled || token !== latestToken.current) {
+					return;
+				}
 
 				setRenderState({
 					key: renderKey,
@@ -181,7 +191,9 @@ export function MermaidDiagram({
 				onRenderStatusChange?.('rendered');
 			})
 			.catch((e: unknown) => {
-				if (isCancelled || token !== latestToken.current) return;
+				if (isCancelled || token !== latestToken.current) {
+					return;
+				}
 
 				setRenderState({
 					key: renderKey,
@@ -204,21 +216,29 @@ export function MermaidDiagram({
 
 	const getDiagramBackgroundColor = (): string => {
 		const el = wrapperRef.current;
-		if (!el) return '#ffffff';
+		if (!el) {
+			return '#ffffff';
+		}
 
 		const bg = window.getComputedStyle(el).backgroundColor;
 
 		// If transparent, default to white so PNG is not transparent-black-ish.
-		if (!bg || bg === 'transparent' || bg === 'rgba(0, 0, 0, 0)') return '#ffffff';
+		if (!bg || bg === 'transparent' || bg === 'rgba(0, 0, 0, 0)') {
+			return '#ffffff';
+		}
 
 		return bg;
 	};
 
 	const fetchDiagramAsBlob = async (): Promise<Blob> => {
-		if (!inlineDiagramRef.current) throw new Error('Container not found');
+		if (!inlineDiagramRef.current) {
+			throw new Error('Container not found');
+		}
 
 		const svg = inlineDiagramRef.current.querySelector('svg');
-		if (!svg) throw new Error('SVG element not found in container');
+		if (!svg) {
+			throw new Error('SVG element not found in container');
+		}
 
 		const svgData = new XMLSerializer().serializeToString(svg);
 		const svgBase64 = Base64EncodeUTF8(svgData);
@@ -269,7 +289,9 @@ export function MermaidDiagram({
 
 	const handleOpenZoom = () => {
 		const svg = inlineDiagramRef.current?.querySelector('svg');
-		if (!svg) return;
+		if (!svg) {
+			return;
+		}
 
 		setZoomState({
 			isOpen: true,

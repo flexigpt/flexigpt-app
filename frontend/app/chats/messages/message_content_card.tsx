@@ -45,7 +45,9 @@ export const MessageContentCard = memo(function MessageContentCard({
 	// Compute plain-text nodes unconditionally to keep hook order stable.
 	// Work is gated by renderAsMarkdown so we avoid heavy work when Markdown is on.
 	const plainTextNodes = useMemo(() => {
-		if (renderAsMarkdown) return null;
+		if (renderAsMarkdown) {
+			return null;
+		}
 		return textToRender.split('\n').map((line, idx) => (
 			<p
 				key={idx}
@@ -61,7 +63,9 @@ export const MessageContentCard = memo(function MessageContentCard({
 	// - while busy: show a small loader so non-streaming doesn't look "empty"
 	// - otherwise: render nothing
 	if (textToRender.trim() === '') {
-		if (!isBusy) return null;
+		if (!isBusy) {
+			return null;
+		}
 		return (
 			<div className="flex items-center gap-2 p-0">
 				Thinking <span className="loading loading-dots loading-sm ml-2" />

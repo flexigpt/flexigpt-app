@@ -60,10 +60,14 @@ export function MessageDetailsModal({
 
 	// Open the dialog natively when isOpen becomes true
 	useEffect(() => {
-		if (!isOpen) return;
+		if (!isOpen) {
+			return;
+		}
 
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
 		if (!dialog.open) {
 			dialog.showModal();
@@ -82,7 +86,9 @@ export function MessageDetailsModal({
 		onClose();
 	};
 
-	if (!isOpen) return null;
+	if (!isOpen) {
+		return null;
+	}
 
 	return createPortal(
 		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose}>

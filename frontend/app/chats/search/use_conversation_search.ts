@@ -164,7 +164,9 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 
 			try {
 				const res = await conversationStoreAPI.searchConversations(query, token, 20);
-				if (requestSeq !== searchRequestSeqRef.current) return;
+				if (requestSeq !== searchRequestSeqRef.current) {
+					return;
+				}
 
 				const nextToken = res.nextToken?.trim() || '';
 				const pageResults: SearchResult[] = res.conversations.map(searchConversation => ({
@@ -203,7 +205,9 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 					}
 				}
 			} catch {
-				if (requestSeq !== searchRequestSeqRef.current) return;
+				if (requestSeq !== searchRequestSeqRef.current) {
+					return;
+				}
 
 				setSearchState(prev => ({
 					...prev,
@@ -310,7 +314,9 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 		}
 
 		const query = searchState.query.trim();
-		if (!query) return;
+		if (!query) {
+			return;
+		}
 
 		void performSearch(searchState.query);
 	}, [performSearch, searchState.query]);
@@ -334,7 +340,9 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 	}, [deleteLoading]);
 
 	const confirmDeleteConversation = useCallback(async () => {
-		if (!deleteTarget) return;
+		if (!deleteTarget) {
+			return;
+		}
 
 		setDeleteLoading(true);
 
@@ -392,7 +400,9 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 	const isLocalMode = searchState.query.length === 0 || showSearchAllHintShortQuery;
 
 	const loadMore = useCallback(() => {
-		if (searchState.loading || !searchState.hasMore || !searchState.nextToken) return;
+		if (searchState.loading || !searchState.hasMore || !searchState.nextToken) {
+			return;
+		}
 
 		if (isLocalMode) {
 			void loadRecentConversations(searchState.nextToken, true);

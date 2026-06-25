@@ -24,13 +24,17 @@ export function getJSONObject(value: unknown): JSONObject | undefined {
  * @public
  */
 export function isStringArray(value: unknown): value is string[] {
-	if (!Array.isArray(value)) return false;
+	if (!Array.isArray(value)) {
+		return false;
+	}
 	return value.every((item: unknown): item is string => typeof item === 'string');
 }
 
 export function getRequiredFromJSONSchema(schema: unknown): string[] | undefined {
 	const obj = getJSONObject(schema);
-	if (!obj) return undefined;
+	if (!obj) {
+		return undefined;
+	}
 
 	const candidate = obj['required'];
 	return isStringArray(candidate) ? candidate : undefined;
@@ -38,7 +42,9 @@ export function getRequiredFromJSONSchema(schema: unknown): string[] | undefined
 
 export function getPropertiesFromJSONSchema(schema: unknown): JSONObject | undefined {
 	const obj = getJSONObject(schema);
-	if (!obj) return undefined;
+	if (!obj) {
+		return undefined;
+	}
 
 	const props = obj['properties'];
 	return getJSONObject(props);
@@ -70,7 +76,9 @@ function pickType(schemaObj: JSONObject): string | undefined {
 	if (Array.isArray(t)) {
 		const arr = t as unknown[];
 		const nonNull = arr.find(x => x !== 'null');
-		if (typeof nonNull === 'string') return nonNull;
+		if (typeof nonNull === 'string') {
+			return nonNull;
+		}
 		const first = arr[0];
 		return typeof first === 'string' ? first : undefined;
 	}
@@ -105,9 +113,13 @@ function exampleForStringFormat(format: string): string {
 }
 
 function scoreExample(ex: unknown): number {
-	if (ex === null || ex === undefined) return 0;
+	if (ex === null || ex === undefined) {
+		return 0;
+	}
 	const t = typeof ex;
-	if (t === 'string' || t === 'number' || t === 'boolean') return 1;
+	if (t === 'string' || t === 'number' || t === 'boolean') {
+		return 1;
+	}
 
 	if (Array.isArray(ex)) {
 		let score = 2;
@@ -165,11 +177,19 @@ function buildNumberExample(schemaObj: JSONObject, integer: boolean): number {
 		n = Math.ceil(n / m) * m;
 	}
 
-	if (typeof maximum === 'number' && n > maximum) n = maximum;
-	if (typeof exclusiveMaximum === 'number' && n >= exclusiveMaximum) n = exclusiveMaximum - 1;
+	if (typeof maximum === 'number' && n > maximum) {
+		n = maximum;
+	}
+	if (typeof exclusiveMaximum === 'number' && n >= exclusiveMaximum) {
+		n = exclusiveMaximum - 1;
+	}
 
-	if (integer) n = Math.trunc(n);
-	if (!Number.isFinite(n)) n = 0;
+	if (integer) {
+		n = Math.trunc(n);
+	}
+	if (!Number.isFinite(n)) {
+		n = 0;
+	}
 
 	return n;
 }
@@ -178,7 +198,9 @@ function buildStringExample(schemaObj: JSONObject): string {
 	const format = schemaObj['format'];
 	if (typeof format === 'string') {
 		const formatted = exampleForStringFormat(format);
-		if (formatted !== '') return formatted;
+		if (formatted !== '') {
+			return formatted;
+		}
 	}
 
 	const minLength = schemaObj['minLength'];
@@ -205,17 +227,27 @@ export function buildExampleFromDraft7Schema(
 	path: Set<JSONObject> = new Set<JSONObject>()
 ): JSONValue {
 	// Draft-07 boolean schemas:
-	if (schemaLike === true) return {} as JSONObject;
-	if (schemaLike === false) return null;
+	if (schemaLike === true) {
+		return {} as JSONObject;
+	}
+	if (schemaLike === false) {
+		return null;
+	}
 
 	const schemaObj = getJSONObject(schemaLike);
-	if (!schemaObj) return null;
+	if (!schemaObj) {
+		return null;
+	}
 
 	// Prevent runaway recursion on pathological schemas
-	if (depth > 10) return null;
+	if (depth > 10) {
+		return null;
+	}
 
 	// Path-based cycle protection (allows re-use in siblings without getting stuck)
-	if (path.has(schemaObj)) return null;
+	if (path.has(schemaObj)) {
+		return null;
+	}
 	path.add(schemaObj);
 
 	try {
@@ -459,10 +491,14 @@ export function buildJSONCodeBlock(value: unknown): string {
 }
 
 function parseStructuredJSONString(raw?: string): unknown {
-	if (typeof raw !== 'string') return undefined;
+	if (typeof raw !== 'string') {
+		return undefined;
+	}
 
 	const trimmed = raw.trim();
-	if (!trimmed) return undefined;
+	if (!trimmed) {
+		return undefined;
+	}
 
 	try {
 		const parsed = JSON.parse(trimmed);

@@ -29,8 +29,12 @@ function getStartupThemeSnapshot(): Readonly<AppTheme> | null {
 
 // Call during bootstrap - **exactly once** per tab.
 export async function initStartupTheme(): Promise<Readonly<AppTheme>> {
-	if (_startupTheme) return _startupTheme;
-	if (_themeInitPromise) return _themeInitPromise; // already running
+	if (_startupTheme) {
+		return _startupTheme;
+	}
+	if (_themeInitPromise) {
+		return _themeInitPromise;
+	} // already running
 
 	_themeInitPromise = (async () => {
 		try {
@@ -51,7 +55,9 @@ export async function initStartupTheme(): Promise<Readonly<AppTheme>> {
 
 // Synchronous access **after** `initStartupTheme()` finished.
 export function getStartupThemeSync(): Readonly<AppTheme> {
-	if (!_startupTheme) throw new Error('Theme has not been initialised - call initStartupTheme() first.');
+	if (!_startupTheme) {
+		throw new Error('Theme has not been initialised - call initStartupTheme() first.');
+	}
 	return _startupTheme;
 }
 

@@ -50,7 +50,9 @@ export class MCPAppPostMessageBridge {
 	}
 
 	dispose() {
-		if (this.disposed) return;
+		if (this.disposed) {
+			return;
+		}
 		this.disposed = true;
 		window.removeEventListener('message', this.listener);
 		for (const pending of this.pendingHostRequests.values()) {
@@ -90,14 +92,22 @@ export class MCPAppPostMessageBridge {
 	}
 
 	private async handle(e: MessageEvent) {
-		if (this.disposed) return;
+		if (this.disposed) {
+			return;
+		}
 		// Source check: must come from our iframe's contentWindow.
-		if (!this.iframe.contentWindow || e.source !== this.iframe.contentWindow) return;
+		if (!this.iframe.contentWindow || e.source !== this.iframe.contentWindow) {
+			return;
+		}
 		const data = e.data as unknown;
-		if (!data || typeof data !== 'object') return;
+		if (!data || typeof data !== 'object') {
+			return;
+		}
 		if (isJSONRPCResponse(data)) {
 			const pending = this.pendingHostRequests.get(data.id);
-			if (!pending) return;
+			if (!pending) {
+				return;
+			}
 
 			this.pendingHostRequests.delete(data.id);
 			window.clearTimeout(pending.timer);

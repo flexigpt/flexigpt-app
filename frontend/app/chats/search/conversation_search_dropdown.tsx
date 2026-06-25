@@ -41,7 +41,9 @@ export function ConversationSearchDropdown({
 
 	const handleScroll = useCallback(() => {
 		const container = scrollRef.current;
-		if (!container || !hasMore || loading) return;
+		if (!container || !hasMore || loading) {
+			return;
+		}
 
 		if ((container.scrollTop + container.clientHeight) / container.scrollHeight >= 0.8) {
 			onLoadMore();
@@ -49,7 +51,9 @@ export function ConversationSearchDropdown({
 	}, [hasMore, loading, onLoadMore]);
 
 	useEffect(() => {
-		if (focusedIndex < 0) return;
+		if (focusedIndex < 0) {
+			return;
+		}
 		const el = scrollRef.current?.querySelector(`[data-index="${focusedIndex}"]`);
 		el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 	}, [focusedIndex]);

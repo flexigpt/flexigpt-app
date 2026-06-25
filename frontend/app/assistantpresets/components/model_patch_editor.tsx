@@ -38,8 +38,12 @@ function buildEnabledDropdownItems<K extends string>(keys: readonly K[]): Record
 }
 
 function getTriStateDropdownLabel(value: TriStateBoolean, defaultLabel: string): string {
-	if (value === 'true') return 'Force On';
-	if (value === 'false') return 'Force Off';
+	if (value === 'true') {
+		return 'Force On';
+	}
+	if (value === 'false') {
+		return 'Force Off';
+	}
 	return defaultLabel;
 }
 

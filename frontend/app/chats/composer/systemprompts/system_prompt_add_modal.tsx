@@ -76,7 +76,9 @@ function pickFallbackDraft(initialDraft: SystemPromptDraft | null): SystemPrompt
 }
 
 function closeDialogSafely(dialog: HTMLDialogElement | null): boolean {
-	if (!dialog?.open) return false;
+	if (!dialog?.open) {
+		return false;
+	}
 
 	try {
 		dialog.close();
@@ -111,7 +113,9 @@ function SystemPromptAddModalInner({
 	const displayNameInputRef = useRef<HTMLInputElement | null>(null);
 	useEffect(() => {
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 		let raf1 = 0;
 		let raf2 = 0;
 		try {
@@ -136,7 +140,9 @@ function SystemPromptAddModalInner({
 	const bundleDropdownItems = useMemo(() => {
 		const map: Record<string, { isEnabled: boolean }> = {};
 		for (const bundle of bundles) {
-			if (bundle.isBuiltIn) continue;
+			if (bundle.isBuiltIn) {
+				continue;
+			}
 			map[bundle.id] = { isEnabled: bundle.isEnabled };
 		}
 		return map;
@@ -157,7 +163,9 @@ function SystemPromptAddModalInner({
 
 	const existingVersions = useMemo(() => {
 		const slug = formData.slug.trim();
-		if (!formData.bundleID || !slug) return [];
+		if (!formData.bundleID || !slug) {
+			return [];
+		}
 		return getExistingVersions(formData.bundleID, slug);
 	}, [formData.bundleID, formData.slug, getExistingVersions]);
 
@@ -215,7 +223,9 @@ function SystemPromptAddModalInner({
 		}
 
 		const contentError = getSystemPromptContentError(state.content);
-		if (contentError) nextErrors.content = contentError;
+		if (contentError) {
+			nextErrors.content = contentError;
+		}
 		return nextErrors;
 	};
 
@@ -223,7 +233,9 @@ function SystemPromptAddModalInner({
 		e.preventDefault();
 		e.stopPropagation();
 
-		if (isSaving) return;
+		if (isSaving) {
+			return;
+		}
 
 		const normalized: SystemPromptDraft = {
 			bundleID: formData.bundleID,
@@ -419,7 +431,9 @@ export function SystemPromptAddModal({
 	onClose,
 	onSave,
 }: SystemPromptAddModalProps) {
-	if (!isOpen || typeof document === 'undefined') return null;
+	if (!isOpen || typeof document === 'undefined') {
+		return null;
+	}
 	const key = initialDraft
 		? `${mode}:${initialDraft.bundleID}:${initialDraft.slug}:${initialDraft.version}`
 		: `${mode}:new`;

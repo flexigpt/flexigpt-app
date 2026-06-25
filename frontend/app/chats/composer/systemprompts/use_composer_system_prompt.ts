@@ -128,7 +128,9 @@ export function useComposerSystemPrompt(args: {
 	// unless a restore/reset has already set the flag. Done in an effect so
 	// we don't trigger an extra render-during-render cycle on every mount.
 	useEffect(() => {
-		if (!modelOptionsLoaded || initializedFromModelRef.current) return;
+		if (!modelOptionsLoaded || initializedFromModelRef.current) {
+			return;
+		}
 		initializedFromModelRef.current = true;
 		// eslint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setInitializedFromModelState(true);

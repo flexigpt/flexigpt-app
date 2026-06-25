@@ -19,10 +19,15 @@ export function groupByDateBuckets<T>(
 
 	items.forEach(item => {
 		const day = norm(getDate(item));
-		if (day >= today) buckets.Today.push(item);
-		else if (day >= yesterday) buckets.Yesterday.push(item);
-		else if (day >= last7) buckets['Last 7 Days'].push(item);
-		else buckets.Older.push(item);
+		if (day >= today) {
+			buckets.Today.push(item);
+		} else if (day >= yesterday) {
+			buckets.Yesterday.push(item);
+		} else if (day >= last7) {
+			buckets['Last 7 Days'].push(item);
+		} else {
+			buckets.Older.push(item);
+		}
 	});
 
 	return buckets;
@@ -37,12 +42,16 @@ export function formatDateAsString(d: Date | string): string {
 }
 
 export function parseAnyToTime(val: any): Date | undefined {
-	if (val === null) return undefined;
+	if (val === null) {
+		return undefined;
+	}
 
 	// If it's a string, try to parse as ISO date
 	if (typeof val === 'string') {
 		const d = new Date(val);
-		if (!Number.isNaN(d.getTime())) return d;
+		if (!Number.isNaN(d.getTime())) {
+			return d;
+		}
 	}
 
 	// If it's a number, treat as Unix timestamp (seconds or ms)

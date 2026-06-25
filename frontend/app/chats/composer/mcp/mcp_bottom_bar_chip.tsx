@@ -220,21 +220,27 @@ function MCPArgumentFields({
 	const focusedValue = focusedArg ? (values[focusedArg] ?? '') : '';
 
 	useEffect(() => {
-		if (!focusedArg) return;
+		if (!focusedArg) {
+			return;
+		}
 
 		let cancelled = false;
 		const timer = window.setTimeout(() => {
 			void mcpAPI
 				.completeMCPArgument(bundleID, serverID, refType, name, focusedArg, focusedValue, values)
 				.then(result => {
-					if (cancelled) return;
+					if (cancelled) {
+						return;
+					}
 					setCompletionsByArg(prev => ({
 						...prev,
 						[focusedArg]: result.values ?? [],
 					}));
 				})
 				.catch(() => {
-					if (cancelled) return;
+					if (cancelled) {
+						return;
+					}
 					setCompletionsByArg(prev => ({
 						...prev,
 						[focusedArg]: [],
@@ -248,7 +254,9 @@ function MCPArgumentFields({
 		};
 	}, [bundleID, focusedArg, focusedValue, name, refType, serverID, values]);
 
-	if (args.length === 0) return null;
+	if (args.length === 0) {
+		return null;
+	}
 
 	return (
 		<div className="bg-base-200/70 mx-2 mb-1 rounded-lg p-2">
@@ -314,7 +322,9 @@ function ServerDiscoverySection({
 }) {
 	const key = mcpServerKey(option.bundle.id, option.server.id);
 	const selection = state.selectedByServerKey[key];
-	if (!selection) return null;
+	if (!selection) {
+		return null;
+	}
 
 	const selectedToolKeys = new Set(selection.selectedTools.map(mcpToolKey));
 	const selectedResourceKeys = new Set(selection.selectedResources.map(mcpResourceKey));
@@ -617,7 +627,9 @@ function ServerRow({
 					disabled={isInputLocked || (!selected && !selectable)}
 					title={!selectable ? 'Enable the MCP bundle and server before selecting it.' : undefined}
 					onChange={e => {
-						if (e.currentTarget.checked && !selectable) return;
+						if (e.currentTarget.checked && !selectable) {
+							return;
+						}
 
 						state.setServerSelected(option, e.currentTarget.checked);
 						if (e.currentTarget.checked) {
@@ -760,9 +772,15 @@ export function MCPBottomBarChip({
 				: 'Status: Disabled',
 		];
 
-		if (state.selectedToolCount > 0) lines.push(`Tools: ${state.selectedToolCount}`);
-		if (state.selectedResourceCount > 0) lines.push(`Resources: ${state.selectedResourceCount}`);
-		if (state.selectedPromptCount > 0) lines.push(`Prompts: ${state.selectedPromptCount}`);
+		if (state.selectedToolCount > 0) {
+			lines.push(`Tools: ${state.selectedToolCount}`);
+		}
+		if (state.selectedResourceCount > 0) {
+			lines.push(`Resources: ${state.selectedResourceCount}`);
+		}
+		if (state.selectedPromptCount > 0) {
+			lines.push(`Prompts: ${state.selectedPromptCount}`);
+		}
 		if (state.requiredArgumentMissingCount > 0) {
 			lines.push(`Missing required args: ${state.requiredArgumentMissingCount}`);
 		}
@@ -782,7 +800,9 @@ export function MCPBottomBarChip({
 	]);
 
 	useEffect(() => {
-		if (isInputLocked) menu.hide();
+		if (isInputLocked) {
+			menu.hide();
+		}
 	}, [isInputLocked, menu]);
 
 	const chipToneClasses = hasBlockingArgs

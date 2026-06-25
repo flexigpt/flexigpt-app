@@ -1,7 +1,11 @@
 export function validateSlug(slug: string): string | undefined {
 	const trimmed = slug.trim();
-	if (!trimmed) return 'Slug is required.';
-	if (trimmed.length > 64) return 'Slug must be at most 64 characters.';
+	if (!trimmed) {
+		return 'Slug is required.';
+	}
+	if (trimmed.length > 64) {
+		return 'Slug must be at most 64 characters.';
+	}
 	if (!/^[a-zA-Z][a-zA-Z0-9-]*$/.test(trimmed)) {
 		return 'Slug must start with a letter, and contain only letters, numbers, and "-".';
 	}

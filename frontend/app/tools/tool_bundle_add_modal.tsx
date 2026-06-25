@@ -37,7 +37,9 @@ function AddToolBundleModalContent({ onClose, onSubmit, existingSlugs }: AddTool
 	// Open the native <dialog> on mount, and close it on unmount.
 	useEffect(() => {
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
 		if (!dialog.open) {
 			dialog.showModal();
@@ -55,7 +57,9 @@ function AddToolBundleModalContent({ onClose, onSubmit, existingSlugs }: AddTool
 	// Sync parent state whenever the dialog is closed by user interaction
 	// or by programmatic close from inside this component.
 	const handleDialogClose = () => {
-		if (ignoreCloseRef.current) return;
+		if (ignoreCloseRef.current) {
+			return;
+		}
 		onClose();
 	};
 
@@ -101,7 +105,9 @@ function AddToolBundleModalContent({ onClose, onSubmit, existingSlugs }: AddTool
 		const nextErrors = validateForm(trimmed);
 		setErrors(nextErrors);
 
-		if (Object.keys(nextErrors).length > 0) return;
+		if (Object.keys(nextErrors).length > 0) {
+			return;
+		}
 
 		onSubmit(trimmed.slug, trimmed.displayName, trimmed.description || undefined);
 
@@ -237,7 +243,9 @@ function AddToolBundleModalContent({ onClose, onSubmit, existingSlugs }: AddTool
 }
 
 export function AddToolBundleModal({ isOpen, ...rest }: AddToolBundleModalProps) {
-	if (!isOpen || typeof document === 'undefined') return null;
+	if (!isOpen || typeof document === 'undefined') {
+		return null;
+	}
 
 	return createPortal(<AddToolBundleModalContent {...rest} />, document.body);
 }

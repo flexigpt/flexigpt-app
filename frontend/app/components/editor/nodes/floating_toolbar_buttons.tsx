@@ -17,7 +17,9 @@ export function FloatingToolbarButtons() {
 	const readOnly = useEditorReadOnly();
 	const { mod, shift } = useModAndShiftSymbols();
 
-	if (readOnly) return null;
+	if (readOnly) {
+		return null;
+	}
 
 	return (
 		<ToolbarGroup>

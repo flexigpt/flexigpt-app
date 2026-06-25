@@ -118,13 +118,17 @@ export function useComposerSkills(): UseComposerSkillsResult {
 
 	const filterSkillRefsToLoadedCatalog = useCallback((refs: SkillRef[] | null | undefined): SkillRef[] => {
 		const normalized = normalizeSkillRefs(refs);
-		if (skillsLoadingRef.current) return normalized;
+		if (skillsLoadingRef.current) {
+			return normalized;
+		}
 
 		return normalized.filter(ref => availableSkillKeySetRef.current.has(skillRefKey(ref)));
 	}, []);
 
 	const closeSkillSessionBestEffort = useCallback((sid: string | null | undefined) => {
-		if (!sid) return;
+		if (!sid) {
+			return;
+		}
 		void skillStoreAPI.closeSkillSession(sid).catch(() => {});
 	}, []);
 
@@ -221,7 +225,9 @@ export function useComposerSkills(): UseComposerSkillsResult {
 				updateActiveSkillRefsState(resolvedActive);
 				sessionStateKeyRef.current = buildSkillSessionStateKey(latestEnabled, resolvedActive);
 			} catch {
-				if (skillSessionSyncVersionRef.current !== syncVersion) return;
+				if (skillSessionSyncVersionRef.current !== syncVersion) {
+					return;
+				}
 				if (prevSessionID) {
 					closeSkillSessionBestEffort(prevSessionID);
 				}
@@ -261,7 +267,9 @@ export function useComposerSkills(): UseComposerSkillsResult {
 	);
 
 	useEffect(() => {
-		if (skillsLoading) return;
+		if (skillsLoading) {
+			return;
+		}
 
 		const nextEnabled = filterSkillRefsToLoadedCatalog(enabledSkillRefsRef.current);
 		const nextActive = clampActiveSkillRefsToEnabled(
@@ -282,7 +290,9 @@ export function useComposerSkills(): UseComposerSkillsResult {
 	useEffect(() => {
 		return () => {
 			const sid = skillSessionIDRef.current;
-			if (!sid) return;
+			if (!sid) {
+				return;
+			}
 			void skillStoreAPI.closeSkillSession(sid).catch(() => {});
 		};
 	}, []);
@@ -303,7 +313,9 @@ export function useComposerSkills(): UseComposerSkillsResult {
 
 			out.push(...(resp.skillListItems ?? []));
 			token = resp.nextPageToken;
-			if (!token) break;
+			if (!token) {
+				break;
+			}
 		}
 
 		return out;
@@ -317,14 +329,20 @@ export function useComposerSkills(): UseComposerSkillsResult {
 
 		loadPromise
 			.then(out => {
-				if (cancelled) return;
+				if (cancelled) {
+					return;
+				}
 				setAllSkills(out);
 			})
 			.catch(() => {
-				if (!cancelled) setAllSkills([]);
+				if (!cancelled) {
+					setAllSkills([]);
+				}
 			})
 			.finally(() => {
-				if (!cancelled) setSkillsLoading(false);
+				if (!cancelled) {
+					setSkillsLoading(false);
+				}
 				if (skillsCatalogLoadPromiseRef.current === loadPromise) {
 					skillsCatalogLoadPromiseRef.current = null;
 				}
@@ -347,8 +365,12 @@ export function useComposerSkills(): UseComposerSkillsResult {
 			const loadedSkills =
 				allSkills.length > 0 ? allSkills : pendingLoad ? await pendingLoad.catch(() => []) : ([] as SkillListItem[]);
 
-			if (enableAllSkillsRequestVersionRef.current !== requestVersion) return;
-			if (loadedSkills.length === 0) return;
+			if (enableAllSkillsRequestVersionRef.current !== requestVersion) {
+				return;
+			}
+			if (loadedSkills.length === 0) {
+				return;
+			}
 
 			void applySkillSelectionState(
 				loadedSkills.map(i => skillRefFromListItem(i)),
@@ -366,7 +388,9 @@ export function useComposerSkills(): UseComposerSkillsResult {
 
 	const listActiveSkillRefs = useCallback(async (sid: string): Promise<SkillRef[]> => {
 		const allowSkillRefs = enabledSkillRefsRef.current;
-		if (!sid || allowSkillRefs.length === 0) return [];
+		if (!sid || allowSkillRefs.length === 0) {
+			return [];
+		}
 
 		const items = await skillStoreAPI.listRuntimeSkills({
 			sessionID: sid,
@@ -382,13 +406,17 @@ export function useComposerSkills(): UseComposerSkillsResult {
 
 	const ensureSkillSession = useCallback(async (): Promise<string | null> => {
 		const currentEnabled = enabledSkillRefsRef.current;
-		if (currentEnabled.length === 0) return null;
+		if (currentEnabled.length === 0) {
+			return null;
+		}
 
 		const currentActive = activeSkillRefsRef.current;
 		const currentStateKey = buildSkillSessionStateKey(currentEnabled, currentActive);
 		const existing = skillSessionIDRef.current;
 
-		if (existing && sessionStateKeyRef.current === currentStateKey) return existing;
+		if (existing && sessionStateKeyRef.current === currentStateKey) {
+			return existing;
+		}
 		const syncVersion = advanceSkillSessionSyncVersion();
 
 		const sess = await skillStoreAPI.createSkillSession(

@@ -64,7 +64,9 @@ export function ToolArgsModalHost({
 	const webSearchToolDef = loadedWebSearchToolDef?.key === activeWebSearchKey ? loadedWebSearchToolDef.def : null;
 
 	useEffect(() => {
-		if (!toolArgsTarget) return;
+		if (!toolArgsTarget) {
+			return;
+		}
 
 		if (toolArgsTarget.kind === 'webSearch' && !activeWebSearch) {
 			setToolArgsTarget(null);
@@ -173,7 +175,9 @@ export function ToolArgsModalHost({
 			onSave = newInstance => {
 				setConversationToolsState(prev =>
 					prev.map(e => {
-						if (e.key !== toolArgsTarget.key) return e;
+						if (e.key !== toolArgsTarget.key) {
+							return e;
+						}
 
 						const nextToolStoreChoice = {
 							...e.toolStoreChoice,
@@ -216,7 +220,9 @@ export function ToolArgsModalHost({
 
 			onSave = newInstance => {
 				setWebSearchTemplates(prev => {
-					if (prev.length === 0) return prev;
+					if (prev.length === 0) {
+						return prev;
+					}
 					const next = [...prev];
 					next[0] = { ...next[0], userArgSchemaInstance: newInstance };
 					return next;

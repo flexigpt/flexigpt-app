@@ -19,7 +19,9 @@ export function useEnterSubmit({ isBusy, canSubmit, insertSoftBreak, onSubmitReq
 
 	const onKeyDown = useCallback(
 		(e: ReactKeyboardEvent<HTMLDivElement>) => {
-			if (e.isDefaultPrevented()) return;
+			if (e.isDefaultPrevented()) {
+				return;
+			}
 
 			const native = e.nativeEvent;
 			const isComposing = (native as KeyboardEvent & { isComposing?: boolean }).isComposing;

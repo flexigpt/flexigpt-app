@@ -203,7 +203,9 @@ function AddEditToolModalContent({
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
 		if (!dialog.open) {
 			dialog.showModal();
@@ -226,7 +228,9 @@ function AddEditToolModalContent({
 	}, [isViewMode]);
 
 	const handleDialogClose = () => {
-		if (ignoreCloseRef.current) return;
+		if (ignoreCloseRef.current) {
+			return;
+		}
 		onClose();
 	};
 
@@ -245,8 +249,11 @@ function AddEditToolModalContent({
 				newErrs.slug = err;
 			} else {
 				const clash = existingTools.some(t => t.tool.slug === v && t.tool.id !== initialData?.tool.id);
-				if (clash) newErrs.slug = 'Slug already in use.';
-				else newErrs = omitManyKeys(newErrs, ['slug']);
+				if (clash) {
+					newErrs.slug = 'Slug already in use.';
+				} else {
+					newErrs = omitManyKeys(newErrs, ['slug']);
+				}
 			}
 		} else if (field === 'version') {
 			if (!v) {
@@ -256,16 +263,22 @@ function AddEditToolModalContent({
 			} else {
 				const slugToCheck = initialData?.tool.slug ?? formData.slug.trim();
 				const versionClash = existingTools.some(t => t.tool.slug === slugToCheck && t.tool.version === v);
-				if (versionClash) newErrs.version = 'That version already exists for this slug.';
-				else newErrs = omitManyKeys(newErrs, ['version']);
+				if (versionClash) {
+					newErrs.version = 'That version already exists for this slug.';
+				} else {
+					newErrs = omitManyKeys(newErrs, ['version']);
+				}
 			}
 		} else if (field === 'tags') {
 			if (v === '') {
 				newErrs = omitManyKeys(newErrs, ['tags']);
 			} else {
 				const err = validateTags(val);
-				if (err) newErrs.tags = err;
-				else newErrs = omitManyKeys(newErrs, ['tags']);
+				if (err) {
+					newErrs.tags = err;
+				} else {
+					newErrs = omitManyKeys(newErrs, ['tags']);
+				}
 			}
 		} else if (field === 'argSchema') {
 			try {
@@ -284,8 +297,11 @@ function AddEditToolModalContent({
 				requiredMessage: 'HTTP URL is required.',
 			});
 
-			if (error) newErrs.httpUrl = error;
-			else newErrs = omitManyKeys(newErrs, ['httpUrl']);
+			if (error) {
+				newErrs.httpUrl = error;
+			} else {
+				newErrs = omitManyKeys(newErrs, ['httpUrl']);
+			}
 		} else if (field === 'httpHeaders') {
 			if (v === '') {
 				newErrs = omitManyKeys(newErrs, ['httpHeaders']);
@@ -326,16 +342,22 @@ function AddEditToolModalContent({
 					.filter(Boolean);
 				const nums = parts.map(Number);
 				const bad = nums.some(n => !Number.isFinite(n) || n <= 0);
-				if (bad) newErrs.httpResponseCodes = 'Success codes must be comma-separated numbers (e.g. 200,201)';
-				else newErrs = omitManyKeys(newErrs, ['httpResponseCodes']);
+				if (bad) {
+					newErrs.httpResponseCodes = 'Success codes must be comma-separated numbers (e.g. 200,201)';
+				} else {
+					newErrs = omitManyKeys(newErrs, ['httpResponseCodes']);
+				}
 			}
 		} else if (field === 'httpTimeoutMS') {
 			if (v === '') {
 				newErrs = omitManyKeys(newErrs, ['httpTimeoutMS']);
 			} else {
 				const n = Number(v);
-				if (!Number.isFinite(n) || n < 1) newErrs.httpTimeoutMS = 'Timeout must be a positive number (ms).';
-				else newErrs = omitManyKeys(newErrs, ['httpTimeoutMS']);
+				if (!Number.isFinite(n) || n < 1) {
+					newErrs.httpTimeoutMS = 'Timeout must be a positive number (ms).';
+				} else {
+					newErrs = omitManyKeys(newErrs, ['httpTimeoutMS']);
+				}
 			}
 		} else {
 			newErrs = omitManyKeys(newErrs, [field]);
@@ -370,7 +392,9 @@ function AddEditToolModalContent({
 
 	const applyPrefill = (key: string) => {
 		const source = prefillSourceMap[key];
-		if (!source) return;
+		if (!source) {
+			return;
+		}
 
 		const copied = buildInitialFormData(source, existingTools, false);
 		const next: ToolFormData = {
@@ -413,7 +437,9 @@ function AddEditToolModalContent({
 	};
 
 	const isAllValid = useMemo(() => {
-		if (isViewMode) return true;
+		if (isViewMode) {
+			return true;
+		}
 
 		const hasErrs = Object.values(errors).some(Boolean);
 		const required =
@@ -430,13 +456,17 @@ function AddEditToolModalContent({
 		e.preventDefault();
 		e.stopPropagation();
 
-		if (isViewMode) return;
+		if (isViewMode) {
+			return;
+		}
 
 		setSubmitError('');
 
 		const nextErrors = validateForm(formData);
 		setErrors(nextErrors);
-		if (Object.values(nextErrors).some(Boolean)) return;
+		if (Object.values(nextErrors).some(Boolean)) {
+			return;
+		}
 
 		const tagsArr = formData.tags
 			.split(',')
@@ -545,7 +575,9 @@ function AddEditToolModalContent({
 	};
 
 	const onToolTypeChange = (key: ToolImplType) => {
-		if (key !== ToolImplType.HTTP) return;
+		if (key !== ToolImplType.HTTP) {
+			return;
+		}
 		setFormData(prev => ({ ...prev, type: key }));
 		setErrors(prev => validateField('type', key, prev));
 	};
@@ -558,7 +590,9 @@ function AddEditToolModalContent({
 			className="modal"
 			onClose={handleDialogClose}
 			onCancel={e => {
-				if (!isViewMode) e.preventDefault();
+				if (!isViewMode) {
+					e.preventDefault();
+				}
 			}}
 		>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-hidden rounded-2xl p-0">
@@ -1236,7 +1270,9 @@ function AddEditToolModalContent({
 }
 
 export function AddEditToolModal({ isOpen, initialData, mode, ...rest }: AddEditToolModalProps) {
-	if (!isOpen || typeof document === 'undefined') return null;
+	if (!isOpen || typeof document === 'undefined') {
+		return null;
+	}
 
 	const effectiveMode: ModalMode = mode ?? (initialData ? 'edit' : 'add');
 	const modalKey = `${effectiveMode}:${initialData?.tool.id ?? 'new'}:${initialData?.tool.version ?? DEFAULT_SEMVER}`;

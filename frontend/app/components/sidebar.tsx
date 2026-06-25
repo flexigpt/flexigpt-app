@@ -31,7 +31,9 @@ export function Sidebar({ children }: SidebarProps) {
 	const dropRef = useRef<HTMLDivElement | null>(null);
 
 	useEffect(() => {
-		if (!dropRef.current) return;
+		if (!dropRef.current) {
+			return;
+		}
 
 		// Ideally installDropGuard returns a cleanup function:
 		const cleanup = installDropGuard(dropRef.current);

@@ -36,7 +36,9 @@ function UrlAttachmentModalContent({ onClose, onAttachURL }: UrlAttachmentModalC
 
 	const focusInputAtEnd = useCallback(() => {
 		const input = inputRef.current;
-		if (!input) return;
+		if (!input) {
+			return;
+		}
 		input.focus({ preventScroll: true });
 		const end = input.value.length;
 		try {
@@ -48,7 +50,9 @@ function UrlAttachmentModalContent({ onClose, onAttachURL }: UrlAttachmentModalC
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
 		if (!dialog.open) {
 			dialog.showModal();
@@ -72,7 +76,9 @@ function UrlAttachmentModalContent({ onClose, onAttachURL }: UrlAttachmentModalC
 	}, [focusInputAtEnd]);
 
 	const handleDialogClose = () => {
-		if (isUnmountingRef.current) return;
+		if (isUnmountingRef.current) {
+			return;
+		}
 		onClose();
 	};
 
@@ -201,8 +207,12 @@ function UrlAttachmentModalContent({ onClose, onAttachURL }: UrlAttachmentModalC
 }
 
 export function UrlAttachmentModal({ isOpen, onClose, onAttachURL }: UrlAttachmentModalProps) {
-	if (!isOpen) return null;
-	if (typeof document === 'undefined' || !document.body) return null;
+	if (!isOpen) {
+		return null;
+	}
+	if (typeof document === 'undefined' || !document.body) {
+		return null;
+	}
 
 	return createPortal(<UrlAttachmentModalContent onClose={onClose} onAttachURL={onAttachURL} />, document.body);
 }

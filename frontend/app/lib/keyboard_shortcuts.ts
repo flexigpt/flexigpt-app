@@ -305,20 +305,38 @@ interface UseShortcutsOptions {
 }
 
 function matchShortcut(event: ShortcutKeyEvent, shortcut?: ShortcutChord): boolean {
-	if (!shortcut) return false;
-	if (shortcut.ctrlOrMeta && !(event.ctrlKey || event.metaKey)) return false;
-	if (!shortcut.ctrlOrMeta && (event.ctrlKey || event.metaKey)) return false;
-	if (shortcut.alt !== undefined && shortcut.alt !== event.altKey) return false;
-	if (shortcut.shift !== undefined && shortcut.shift !== event.shiftKey) return false;
+	if (!shortcut) {
+		return false;
+	}
+	if (shortcut.ctrlOrMeta && !(event.ctrlKey || event.metaKey)) {
+		return false;
+	}
+	if (!shortcut.ctrlOrMeta && (event.ctrlKey || event.metaKey)) {
+		return false;
+	}
+	if (shortcut.alt !== undefined && shortcut.alt !== event.altKey) {
+		return false;
+	}
+	if (shortcut.shift !== undefined && shortcut.shift !== event.shiftKey) {
+		return false;
+	}
 	return event.key.toLowerCase() === shortcut.key.toLowerCase();
 }
 
 export function formatShortcut(shortcut?: ShortcutChord): string {
-	if (!shortcut) return '';
+	if (!shortcut) {
+		return '';
+	}
 	const parts: string[] = [];
-	if (shortcut.ctrlOrMeta) parts.push(MOD_LABEL);
-	if (shortcut.alt) parts.push('Alt');
-	if (shortcut.shift) parts.push('Shift');
+	if (shortcut.ctrlOrMeta) {
+		parts.push(MOD_LABEL);
+	}
+	if (shortcut.alt) {
+		parts.push('Alt');
+	}
+	if (shortcut.shift) {
+		parts.push('Shift');
+	}
 	parts.push(`'${shortcut.key}'`);
 	return parts.join(' + ');
 }
@@ -340,16 +358,22 @@ export function useChatShortcuts({ config, isBusy, handlers }: UseShortcutsOptio
 
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
-			if (event.defaultPrevented) return;
+			if (event.defaultPrevented) {
+				return;
+			}
 
 			// IME composition safety
-			if (event.isComposing) return;
+			if (event.isComposing) {
+				return;
+			}
 
 			// Allow specific widgets (rename inputs, etc.) to opt out of global shortcuts.
 			// Important since we listen in capture phase.
 			const target = event.target as HTMLElement | null;
 
-			if (target?.closest?.('[data-disable-chat-shortcuts="true"]')) return;
+			if (target?.closest?.('[data-disable-chat-shortcuts="true"]')) {
+				return;
+			}
 
 			/**
 			 * Prevent global app shortcuts from firing while the user is interacting
@@ -373,18 +397,26 @@ export function useChatShortcuts({ config, isBusy, handlers }: UseShortcutsOptio
 					'[role="option"]',
 				].join(', ')
 			);
-			if (inMenuOrDialog) return;
+			if (inMenuOrDialog) {
+				return;
+			}
 
 			const entries = Object.entries(ref.current.config) as [ShortcutAction, ShortcutChord][];
 
 			for (const [action, chord] of entries) {
 				const handler = ref.current.handlers[action];
-				if (!handler) continue;
+				if (!handler) {
+					continue;
+				}
 
-				if (!matchShortcut(event as ShortcutKeyEvent, chord)) continue;
+				if (!matchShortcut(event as ShortcutKeyEvent, chord)) {
+					continue;
+				}
 
 				// Example of busy-sensitive behavior: no new chat while busy
-				if (ref.current.isBusy && action === ShortcutAction.newChat) return;
+				if (ref.current.isBusy && action === ShortcutAction.newChat) {
+					return;
+				}
 
 				event.preventDefault();
 				event.stopPropagation();
@@ -415,9 +447,13 @@ export function buildShortcutDisplay(config: ShortcutConfig): ShortcutDisplayIte
 	(Object.entries(ACTION_META) as [ShortcutAction, ShortcutMeta][]).forEach(([action, meta]) => {
 		if (meta.source === 'config') {
 			const chord = config[action];
-			if (!chord) return;
+			if (!chord) {
+				return;
+			}
 			const keys = formatShortcut(chord);
-			if (!keys) return;
+			if (!keys) {
+				return;
+			}
 
 			items.push({
 				action,

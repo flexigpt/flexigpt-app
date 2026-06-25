@@ -42,7 +42,9 @@ function AddMCPBundleModalContent({ onClose, onSubmit, existingSlugs }: AddMCPBu
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
 		if (!dialog.open) {
 			try {
@@ -73,7 +75,9 @@ function AddMCPBundleModalContent({ onClose, onSubmit, existingSlugs }: AddMCPBu
 	};
 
 	const handleDialogClose = () => {
-		if (isUnmountingRef.current) return;
+		if (isUnmountingRef.current) {
+			return;
+		}
 		onClose();
 	};
 
@@ -119,7 +123,9 @@ function AddMCPBundleModalContent({ onClose, onSubmit, existingSlugs }: AddMCPBu
 		const nextErrors = validateForm(trimmed);
 		setErrors(nextErrors);
 
-		if (Object.keys(nextErrors).length > 0) return;
+		if (Object.keys(nextErrors).length > 0) {
+			return;
+		}
 
 		onSubmit(trimmed.slug, trimmed.displayName, trimmed.description || undefined);
 		requestClose();
@@ -250,8 +256,12 @@ function AddMCPBundleModalContent({ onClose, onSubmit, existingSlugs }: AddMCPBu
 }
 
 export function AddMCPBundleModal(props: AddMCPBundleModalProps) {
-	if (!props.isOpen) return null;
-	if (typeof document === 'undefined' || !document.body) return null;
+	if (!props.isOpen) {
+		return null;
+	}
+	if (typeof document === 'undefined' || !document.body) {
+		return null;
+	}
 
 	return createPortal(<AddMCPBundleModalContent key="add-mcp-bundle-modal" {...props} />, document.body);
 }

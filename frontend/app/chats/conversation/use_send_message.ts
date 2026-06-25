@@ -117,7 +117,9 @@ export function useSendMessage({
 }: UseSendMessageArgs) {
 	const updateStreamingMessage = useCallback(
 		async (tabId: string, updatedChatWithUserMessage: Conversation, options: UIChatOption, skillSessionID?: string) => {
-			if (!tabExists(tabId)) return;
+			if (!tabExists(tabId)) {
+				return;
+			}
 
 			const abortRef = getAbortRef(tabId);
 			let queuedRunnableToolCalls: UIToolCall[] = [];
@@ -172,8 +174,12 @@ export function useSendMessage({
 			}
 
 			const onStreamTextData = (textData: string) => {
-				if (!textData) return;
-				if (requestIdByTabRef.current.get(tabId) !== reqId) return;
+				if (!textData) {
+					return;
+				}
+				if (requestIdByTabRef.current.get(tabId) !== reqId) {
+					return;
+				}
 
 				tokensReceivedByTabRef.current.set(tabId, true);
 				getStreamBuffer(tabId).text.chunks.push(textData);
@@ -181,8 +187,12 @@ export function useSendMessage({
 			};
 
 			const onStreamThinkingData = (thinkingData: string) => {
-				if (!thinkingData) return;
-				if (requestIdByTabRef.current.get(tabId) !== reqId) return;
+				if (!thinkingData) {
+					return;
+				}
+				if (requestIdByTabRef.current.get(tabId) !== reqId) {
+					return;
+				}
 
 				tokensReceivedByTabRef.current.set(tabId, true);
 				getStreamBuffer(tabId).thinking.chunks.push(thinkingData);
@@ -244,8 +254,12 @@ export function useSendMessage({
 					onStreamThinkingData
 				);
 
-				if (!tabExists(tabId)) return;
-				if (requestIdByTabRef.current.get(tabId) !== reqId) return;
+				if (!tabExists(tabId)) {
+					return;
+				}
+				if (requestIdByTabRef.current.get(tabId) !== reqId) {
+					return;
+				}
 				const partialText = getFullStreamTextForTab(tabId);
 				const partialThinking = getFullStreamThinkingForTab(tabId);
 				const hasPartialStream = partialText.trim().length > 0 || partialThinking.trim().length > 0;
@@ -359,8 +373,12 @@ export function useSendMessage({
 					saveUpdatedConversation(tabId, finalChat);
 				}
 			} catch (error) {
-				if (!tabExists(tabId)) return;
-				if (requestIdByTabRef.current.get(tabId) !== reqId) return;
+				if (!tabExists(tabId)) {
+					return;
+				}
+				if (requestIdByTabRef.current.get(tabId) !== reqId) {
+					return;
+				}
 
 				if ((error as DOMException).name === 'AbortError') {
 					const tokensReceived = tokensReceivedByTabRef.current.get(tabId);
@@ -368,7 +386,9 @@ export function useSendMessage({
 					if (!tokensReceived) {
 						updateTab(tabId, tab => {
 							const idx = tab.conversation.messages.findIndex(message => message.id === assistantPlaceholder.id);
-							if (idx === -1) return tab;
+							if (idx === -1) {
+								return tab;
+							}
 
 							const messages = tab.conversation.messages.filter((_, i) => i !== idx);
 							return {
@@ -439,8 +459,12 @@ export function useSendMessage({
 
 					if (queuedRunnableToolCalls.length > 0) {
 						requestAnimationFrame(() => {
-							if (!tabExists(tabId)) return;
-							if (requestIdByTabRef.current.get(tabId) !== reqId) return;
+							if (!tabExists(tabId)) {
+								return;
+							}
+							if (requestIdByTabRef.current.get(tabId) !== reqId) {
+								return;
+							}
 							const input = inputRefs.current.get(tabId);
 							input?.loadToolCalls(queuedRunnableToolCalls);
 							input?.finishAssistantTurn({
@@ -477,15 +501,21 @@ export function useSendMessage({
 	const sendMessageForTab = useCallback(
 		async (tabId: string, payload: EditorSubmitPayload, options: UIChatOption) => {
 			const tab = tabsRef.current.find(t => t.tabId === tabId);
-			if (!tab) return;
-			if (tab.isBusy || tab.isHydrating) return;
+			if (!tab) {
+				return;
+			}
+			if (tab.isBusy || tab.isHydrating) {
+				return;
+			}
 
 			const trimmed = payload.text.trim();
 			const hasNonEmptyText = trimmed.length > 0;
 			const hasToolOutputs = payload.toolOutputs.length > 0;
 			const hasAttachments = payload.attachments.length > 0;
 
-			if (!hasNonEmptyText && !hasToolOutputs && !hasAttachments) return;
+			if (!hasNonEmptyText && !hasToolOutputs && !hasAttachments) {
+				return;
+			}
 
 			let sendOptions: UIChatOption = {
 				...options,
@@ -549,12 +579,20 @@ export function useSendMessage({
 	const beginEditMessageForTab = useCallback(
 		(tabId: string, id: string) => {
 			const tab = tabsRef.current.find(t => t.tabId === tabId);
-			if (!tab) return;
-			if (tab.isBusy || tab.isHydrating) return;
+			if (!tab) {
+				return;
+			}
+			if (tab.isBusy || tab.isHydrating) {
+				return;
+			}
 
 			const message = tab.conversation.messages.find(m => m.id === id);
-			if (!message) return;
-			if (message.role !== RoleEnum.User) return;
+			if (!message) {
+				return;
+			}
+			if (message.role !== RoleEnum.User) {
+				return;
+			}
 
 			const external: EditorExternalMessage = {
 				text: message.uiContent ?? '',

@@ -1,7 +1,9 @@
 export const IS_WAILS_PLATFORM = import.meta.env.VITE_PLATFORM === 'wails';
 
 function isMacLike(): boolean {
-	if (typeof navigator === 'undefined') return false; // SSR / safety
+	if (typeof navigator === 'undefined') {
+		return false;
+	} // SSR / safety
 
 	const platform = (navigator.platform || '').toLowerCase();
 	const ua = navigator.userAgent || '';

@@ -52,7 +52,9 @@ export function createEmptyTab(tabId: string = ensureMakeID()): ChatTabState {
 
 export function toTimestampMap(source?: Record<string, number>): Map<string, number> {
 	const map = new Map<string, number>();
-	if (!source) return map;
+	if (!source) {
+		return map;
+	}
 
 	for (const [tabId, ts] of Object.entries(source)) {
 		if (typeof ts === 'number') {
@@ -68,13 +70,17 @@ function pickLRUEvictionCandidateFromMap(
 	activeId: string,
 	lastActivatedAt: Map<string, number>
 ): ChatTabState | null {
-	if (current.length < MAX_TABS) return null;
+	if (current.length < MAX_TABS) {
+		return null;
+	}
 
 	const base = current.filter(tab => tab.tabId !== activeId && !isScratchTab(tab));
 	const nonBusy = base.filter(tab => !tab.isBusy);
 	const candidates = nonBusy.length > 0 ? nonBusy : base;
 
-	if (candidates.length === 0) return null;
+	if (candidates.length === 0) {
+		return null;
+	}
 
 	const ts = (id: string) => lastActivatedAt.get(id) ?? 0;
 	return candidates.reduce((lru, tab) => (ts(tab.tabId) < ts(lru.tabId) ? tab : lru), candidates[0]);
@@ -112,7 +118,9 @@ export function normalizeTabsForInvariants(
 	} else {
 		while (next.length >= MAX_TABS) {
 			const victim = pickLRUEvictionCandidateFromMap(next, activeId, lastActivatedAt);
-			if (!victim) break;
+			if (!victim) {
+				break;
+			}
 
 			removedTabIds.add(victim.tabId);
 			next = next.filter(tab => tab.tabId !== victim.tabId);
@@ -125,7 +133,9 @@ export function normalizeTabsForInvariants(
 
 	while (next.length > MAX_TABS) {
 		const victim = pickLRUEvictionCandidateFromMap(next, activeId, lastActivatedAt);
-		if (!victim) break;
+		if (!victim) {
+			break;
+		}
 
 		removedTabIds.add(victim.tabId);
 		next = next.filter(tab => tab.tabId !== victim.tabId);

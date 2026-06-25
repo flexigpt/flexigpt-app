@@ -35,7 +35,9 @@ function buildToolOutputItemLabel(item: ToolOutputUnion, index: number): string 
 }
 
 function buildToolOutputItemsMarkdown(items?: ToolOutputUnion[]): string | null {
-	if (!items || items.length === 0) return null;
+	if (!items || items.length === 0) {
+		return null;
+	}
 
 	const nonEmptyItems = items.filter(item => {
 		if (item.kind === ToolOutputKind.Text) {
@@ -44,7 +46,9 @@ function buildToolOutputItemsMarkdown(items?: ToolOutputUnion[]): string | null 
 		return true;
 	});
 
-	if (nonEmptyItems.length === 0) return null;
+	if (nonEmptyItems.length === 0) {
+		return null;
+	}
 
 	if (nonEmptyItems.length === 1 && nonEmptyItems[0].kind === ToolOutputKind.Text) {
 		return buildJSONOrTextCodeBlock(nonEmptyItems[0].textItem?.text) ?? null;
@@ -212,13 +216,21 @@ export function ToolDetailsModal({ state, onClose }: ToolDetailsModalProps) {
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 
 	useEffect(() => {
-		if (!state) return;
+		if (!state) {
+			return;
+		}
 		const dialog = dialogRef.current;
-		if (!dialog) return;
-		if (!dialog.open) dialog.showModal();
+		if (!dialog) {
+			return;
+		}
+		if (!dialog.open) {
+			dialog.showModal();
+		}
 
 		return () => {
-			if (dialog.open) dialog.close();
+			if (dialog.open) {
+				dialog.close();
+			}
 		};
 	}, [state]);
 
@@ -226,7 +238,9 @@ export function ToolDetailsModal({ state, onClose }: ToolDetailsModalProps) {
 		onClose();
 	};
 
-	if (!state) return null;
+	if (!state) {
+		return null;
+	}
 	const { title, payload } = buildPayload(state);
 
 	// Raw payload, preferring JSON display with a safe text fallback.

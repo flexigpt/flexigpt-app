@@ -26,7 +26,9 @@ import {
 } from '@/apis/wailsjs/runtime/runtime';
 
 function stringifyLogArg(arg: unknown): string {
-	if (typeof arg === 'string') return arg;
+	if (typeof arg === 'string') {
+		return arg;
+	}
 
 	if (arg instanceof Error) {
 		return arg.stack || `${arg.name}: ${arg.message}`;
@@ -39,10 +41,14 @@ function stringifyLogArg(arg: unknown): string {
 	}
 }
 function formatMessage(args: unknown[]): string {
-	if (args.length === 0) return '';
+	if (args.length === 0) {
+		return '';
+	}
 
 	if (args.length > 0 && typeof args[0] === 'string') {
-		if (args.length === 1) return args[0];
+		if (args.length === 1) {
+			return args[0];
+		}
 
 		try {
 			return sprintf(args[0], ...args.slice(1));

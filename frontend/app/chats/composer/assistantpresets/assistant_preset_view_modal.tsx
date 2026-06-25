@@ -22,7 +22,9 @@ import { buildPromptTemplateRefKey } from '@/prompts/lib/prompt_template_ref';
 import type { SystemPromptItem } from '@/prompts/lib/use_system_prompts';
 
 function closeDialogSafely(dialog: HTMLDialogElement | null): boolean {
-	if (!dialog?.open) return false;
+	if (!dialog?.open) {
+		return false;
+	}
 
 	try {
 		dialog.close();
@@ -128,8 +130,12 @@ function formatPresetToolSelectionLabel(selection: {
 }) {
 	const metaParts = [`${selection.toolRef.bundleID}/${selection.toolRef.toolSlug}@${selection.toolRef.toolVersion}`];
 
-	if (selection.toolChoicePatch?.autoExecute) metaParts.push('auto');
-	if (selection.toolChoicePatch?.userArgSchemaInstance?.trim()) metaParts.push('args');
+	if (selection.toolChoicePatch?.autoExecute) {
+		metaParts.push('auto');
+	}
+	if (selection.toolChoicePatch?.userArgSchemaInstance?.trim()) {
+		metaParts.push('args');
+	}
 
 	return {
 		title: selection.toolRef.toolSlug,
@@ -191,10 +197,14 @@ export function AssistantPresetViewModal({
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 
 	useEffect(() => {
-		if (!isOpen) return;
+		if (!isOpen) {
+			return;
+		}
 
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
 		if (!dialog.open) {
 			dialog.showModal();

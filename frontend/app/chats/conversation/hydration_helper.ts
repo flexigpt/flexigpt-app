@@ -60,7 +60,9 @@ export function initConversationMessage(role: RoleEnum): ConversationMessage {
 function deriveMCPContextFromMessages(messages: ConversationMessage[]): MCPConversationContext | undefined {
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
 		const message = messages[i];
-		if (message.role !== RoleEnum.User) continue;
+		if (message.role !== RoleEnum.User) {
+			continue;
+		}
 		return message.mcpContext;
 	}
 	return undefined;
@@ -69,7 +71,9 @@ function deriveMCPContextFromMessages(messages: ConversationMessage[]): MCPConve
 function deriveMCPAppContextUpdatesFromMessages(messages: ConversationMessage[]): MCPAppModelContextUpdate[] {
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
 		const message = messages[i];
-		if (message.role !== RoleEnum.User) continue;
+		if (message.role !== RoleEnum.User) {
+			continue;
+		}
 		return message.mcpAppContextUpdates ?? [];
 	}
 	return [];
@@ -78,7 +82,9 @@ function deriveMCPAppContextUpdatesFromMessages(messages: ConversationMessage[])
 function deriveConversationToolsFromMessages(messages: ConversationMessage[]): ToolStoreChoice[] {
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
 		const message = messages[i];
-		if (message.role !== RoleEnum.User) continue;
+		if (message.role !== RoleEnum.User) {
+			continue;
+		}
 		return (message.toolStoreChoices ?? []).filter(choice => choice.toolType !== ToolStoreChoiceType.WebSearch);
 	}
 	return [];
@@ -87,7 +93,9 @@ function deriveConversationToolsFromMessages(messages: ConversationMessage[]): T
 function deriveWebSearchChoiceFromMessages(messages: ConversationMessage[]): ToolStoreChoice[] {
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
 		const message = messages[i];
-		if (message.role !== RoleEnum.User) continue;
+		if (message.role !== RoleEnum.User) {
+			continue;
+		}
 		return (message.toolStoreChoices ?? []).filter(choice => choice.toolType === ToolStoreChoiceType.WebSearch);
 	}
 	return [];
@@ -96,7 +104,9 @@ function deriveWebSearchChoiceFromMessages(messages: ConversationMessage[]): Too
 function deriveEnabledSkillRefsFromMessages(messages: ConversationMessage[]): SkillRef[] {
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
 		const message = messages[i];
-		if (message.role !== RoleEnum.User) continue;
+		if (message.role !== RoleEnum.User) {
+			continue;
+		}
 		return message.enabledSkillRefs ?? [];
 	}
 	return [];
@@ -105,7 +115,9 @@ function deriveEnabledSkillRefsFromMessages(messages: ConversationMessage[]): Sk
 function deriveActiveSkillRefsFromMessages(messages: ConversationMessage[]): SkillRef[] {
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
 		const message = messages[i];
-		if (message.role !== RoleEnum.User) continue;
+		if (message.role !== RoleEnum.User) {
+			continue;
+		}
 		return message.activeSkillRefs ?? [];
 	}
 	return [];
@@ -114,8 +126,12 @@ function deriveActiveSkillRefsFromMessages(messages: ConversationMessage[]): Ski
 function findLastModelPresetRef(messages: ConversationMessage[]): ModelPresetRef | undefined {
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
 		const ref = messages[i].modelPresetRef;
-		if (!ref) continue;
-		if (!ref.providerName || !ref.modelPresetID) continue;
+		if (!ref) {
+			continue;
+		}
+		if (!ref.providerName || !ref.modelPresetID) {
+			continue;
+		}
 		return ref;
 	}
 	return undefined;
@@ -124,7 +140,9 @@ function findLastModelPresetRef(messages: ConversationMessage[]): ModelPresetRef
 function findLastModelParam(messages: ConversationMessage[]): ModelParam | undefined {
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
 		const modelParam = messages[i].modelParam;
-		if (modelParam) return modelParam;
+		if (modelParam) {
+			return modelParam;
+		}
 	}
 	return undefined;
 }
@@ -136,7 +154,9 @@ function modelParamsEqual(a?: ModelParam, b?: ModelParam): boolean {
 function findLastPersistedModelParam(messages: ConversationMessage[]): ModelParam | undefined {
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
 		const modelParam = messages[i].modelParam;
-		if (modelParam) return modelParam;
+		if (modelParam) {
+			return modelParam;
+		}
 	}
 	return undefined;
 }
@@ -156,8 +176,11 @@ export function applyAssistantPersistenceContext(
 		modelPresetRef,
 	} as ConversationMessage & { modelParam?: ModelParam };
 
-	if (modelParam) next.modelParam = modelParam;
-	else delete next.modelParam;
+	if (modelParam) {
+		next.modelParam = modelParam;
+	} else {
+		delete next.modelParam;
+	}
 
 	return next;
 }
@@ -214,7 +237,9 @@ export function buildUserConversationMessageFromEditor(
 
 	for (const uiToolOutput of payload.toolOutputs) {
 		const inferenceToolOutput = buildToolOutputFromEditor(uiToolOutput);
-		if (!inferenceToolOutput) continue;
+		if (!inferenceToolOutput) {
+			continue;
+		}
 
 		if (inferenceToolOutput.type === ToolType.Function) {
 			inputs.push({
@@ -268,7 +293,9 @@ export function buildUserConversationMessageFromEditor(
 
 export function deriveHydratedLastAssistantToolCalls(conversation: Conversation): UIToolCall[] {
 	const lastMessage = conversation.messages.at(-1);
-	if (!lastMessage || lastMessage.role !== RoleEnum.Assistant) return [];
+	if (!lastMessage || lastMessage.role !== RoleEnum.Assistant) {
+		return [];
+	}
 
 	return (lastMessage.uiToolCalls ?? [])
 		.filter(call => isRunnableComposerToolCall(call))
@@ -341,14 +368,18 @@ function attachmentRefKey(attachment: Attachment): string {
 }
 
 export function dedupeAttachmentsByRef<T extends Attachment>(attachments?: T[]): T[] | undefined {
-	if (!attachments || attachments.length === 0) return undefined;
+	if (!attachments || attachments.length === 0) {
+		return undefined;
+	}
 
 	const seen = new Set<string>();
 	const out: T[] = [];
 
 	for (const attachment of attachments) {
 		const key = attachmentRefKey(attachment);
-		if (seen.has(key)) continue;
+		if (seen.has(key)) {
+			continue;
+		}
 		seen.add(key);
 		out.push(attachment);
 	}

@@ -119,7 +119,9 @@ export function mcpPromptKey(prompt: Pick<MCPPromptRef, 'bundleID' | 'serverID' 
 export function normalizeMCPArgumentDefinitions(
 	args?: Record<string, MCPArgumentDefinition | string>
 ): MCPArgumentDefinition[] {
-	if (!args) return [];
+	if (!args) {
+		return [];
+	}
 
 	return Object.entries(args)
 		.map(([key, value]) => {
@@ -151,8 +153,12 @@ export function countMissingRequiredMCPArguments(
 
 	for (const item of items) {
 		for (const arg of normalizeMCPArgumentDefinitions(item.arguments)) {
-			if (!arg.required) continue;
-			if (!item.argumentValues?.[arg.name]?.trim()) count++;
+			if (!arg.required) {
+				continue;
+			}
+			if (!item.argumentValues?.[arg.name]?.trim()) {
+				count++;
+			}
 		}
 	}
 
@@ -163,7 +169,9 @@ export function mcpSelectionToContext(
 	selectedByServerKey: Record<string, MCPComposerServerSelection>
 ): MCPConversationContext | undefined {
 	const selections = Object.values(selectedByServerKey);
-	if (selections.length === 0) return undefined;
+	if (selections.length === 0) {
+		return undefined;
+	}
 
 	const servers: MCPServerSelection[] = selections.map(selection => ({
 		bundleID: selection.bundleID,
@@ -194,7 +202,9 @@ export function mcpSelectionToContext(
 }
 
 export function mcpContextToSelectionMap(context?: MCPConversationContext): Record<string, MCPComposerServerSelection> {
-	if (!context) return {};
+	if (!context) {
+		return {};
+	}
 
 	const out: Record<string, MCPComposerServerSelection> = {};
 

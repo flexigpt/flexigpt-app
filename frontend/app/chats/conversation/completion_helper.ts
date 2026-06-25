@@ -176,7 +176,9 @@ export function getDebugDetailsMarkdown(debugObj?: any, errorObj?: any): string 
 
 	const pushDetailsBlock = (title: string, value: unknown) => {
 		const block = buildJSONOrTextCodeBlock(value) ?? undefined;
-		if (!block) return;
+		if (!block) {
+			return;
+		}
 		parts.push(title, block);
 	};
 
@@ -195,14 +197,22 @@ export function getDebugDetailsMarkdown(debugObj?: any, errorObj?: any): string 
 			: undefined;
 
 		const hasKey = (key: string): boolean => {
-			if (isMap) return (debugObj as Map<string, unknown>).has(key);
-			if (record) return key in record;
+			if (isMap) {
+				return (debugObj as Map<string, unknown>).has(key);
+			}
+			if (record) {
+				return key in record;
+			}
 			return false;
 		};
 
 		const getValue = (key: string): unknown => {
-			if (isMap) return (debugObj as Map<string, unknown>).get(key);
-			if (record) return record[key];
+			if (isMap) {
+				return (debugObj as Map<string, unknown>).get(key);
+			}
+			if (record) {
+				return record[key];
+			}
 			return undefined;
 		};
 
@@ -262,23 +272,33 @@ export function buildMCPToolSelectionMap(
 	}
 	for (const mapping of extractMCPToolMappings(debugDetails)) {
 		const selection = mappingToMCPToolSelection(mapping);
-		if (selection) addMCPToolSelectionToMap(map, selection);
+		if (selection) {
+			addMCPToolSelectionToMap(map, selection);
+		}
 	}
 
 	return map.size > 0 ? map : undefined;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
-	if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+	if (!value || typeof value !== 'object' || Array.isArray(value)) {
+		return undefined;
+	}
 	return value as Record<string, unknown>;
 }
 
 function mcpSelectionKeys(selection: MCPToolSelection): string[] {
 	const keys: string[] = [];
 
-	if (selection.choiceID) keys.push(`choice:${selection.choiceID}`);
-	if (selection.providerToolName) keys.push(`name:${selection.providerToolName}`);
-	if (selection.toolName) keys.push(`name:${selection.toolName}`);
+	if (selection.choiceID) {
+		keys.push(`choice:${selection.choiceID}`);
+	}
+	if (selection.providerToolName) {
+		keys.push(`name:${selection.providerToolName}`);
+	}
+	if (selection.toolName) {
+		keys.push(`name:${selection.toolName}`);
+	}
 
 	return keys;
 }
@@ -290,7 +310,9 @@ function addMCPToolSelectionToMap(map: Map<string, MCPToolSelection>, selection:
 }
 function mappingToMCPToolSelection(mapping: unknown): MCPToolSelection | undefined {
 	const obj = asRecord(mapping);
-	if (!obj) return undefined;
+	if (!obj) {
+		return undefined;
+	}
 	const bundleID = obj.bundleID;
 	const serverID = obj.serverID;
 	const toolName = obj.toolName;
@@ -299,9 +321,15 @@ function mappingToMCPToolSelection(mapping: unknown): MCPToolSelection | undefin
 	const toolDigest = obj.toolDigest;
 	const appResourceUri = obj.appResourceUri;
 	const visibility = obj.visibility;
-	if (typeof bundleID !== 'string' || !bundleID) return undefined;
-	if (typeof serverID !== 'string' || !serverID) return undefined;
-	if (typeof toolName !== 'string' || !toolName) return undefined;
+	if (typeof bundleID !== 'string' || !bundleID) {
+		return undefined;
+	}
+	if (typeof serverID !== 'string' || !serverID) {
+		return undefined;
+	}
+	if (typeof toolName !== 'string' || !toolName) {
+		return undefined;
+	}
 	return {
 		bundleID,
 		serverID,
@@ -316,10 +344,14 @@ function mappingToMCPToolSelection(mapping: unknown): MCPToolSelection | undefin
 
 function extractMCPToolMappings(debugDetails?: any): MCPProviderToolMapping[] {
 	const root = asRecord(debugDetails);
-	if (!root) return [];
+	if (!root) {
+		return [];
+	}
 	const mcpDebug = asRecord(root.mcp) ?? root;
 	const rawMappings = mcpDebug.toolMappings;
-	if (!Array.isArray(rawMappings)) return [];
+	if (!Array.isArray(rawMappings)) {
+		return [];
+	}
 	return rawMappings.filter(mapping => mappingToMCPToolSelection(mapping)) as MCPProviderToolMapping[];
 }
 
@@ -327,16 +359,22 @@ function findMCPToolSelectionForToolLike(
 	value: { choiceID?: string; name?: string },
 	mcpToolSelectionMap?: Map<string, MCPToolSelection>
 ): MCPToolSelection | undefined {
-	if (!mcpToolSelectionMap) return undefined;
+	if (!mcpToolSelectionMap) {
+		return undefined;
+	}
 
 	if (value.choiceID) {
 		const byChoice = mcpToolSelectionMap.get(`choice:${value.choiceID}`);
-		if (byChoice) return byChoice;
+		if (byChoice) {
+			return byChoice;
+		}
 	}
 
 	if (value.name) {
 		const byName = mcpToolSelectionMap.get(`name:${value.name}`);
-		if (byName) return byName;
+		if (byName) {
+			return byName;
+		}
 	}
 
 	return undefined;
@@ -419,22 +457,30 @@ export function deriveUIFieldsFromOutputUnion(
 		switch (o.kind) {
 			case OutputKind.OutputMessage: {
 				const msg = o.outputMessage;
-				if (!msg || !msg.contents) break;
+				if (!msg || !msg.contents) {
+					break;
+				}
 				for (const c of msg.contents) {
 					if (c.kind === ContentItemKind.Text && c.textItem) {
 						const raw = c.textItem?.text;
 						// Preserve provider text exactly as produced so the final
 						// message matches the streamed text and does not "jump" on completion.
-						if (typeof raw === 'string' && raw.length > 0) textParts.push(raw);
+						if (typeof raw === 'string' && raw.length > 0) {
+							textParts.push(raw);
+						}
 
 						const itemCitations = c.textItem.citations;
 
 						if (itemCitations && itemCitations.length > 0) {
 							for (const cit of itemCitations) {
-								if (cit.kind !== CitationKind.URL || !cit.urlCitation?.url) continue;
+								if (cit.kind !== CitationKind.URL || !cit.urlCitation?.url) {
+									continue;
+								}
 								const u = cit.urlCitation;
 								const key = `${u.url}|${u.startIndex ?? ''}|${u.endIndex ?? ''}|${u.title ?? ''}`;
-								if (seenCitationKeys.has(key)) continue;
+								if (seenCitationKeys.has(key)) {
+									continue;
+								}
 								seenCitationKeys.add(key);
 								citations.push(u);
 							}
@@ -452,17 +498,23 @@ export function deriveUIFieldsFromOutputUnion(
 
 			case OutputKind.FunctionToolCall: {
 				const uiFunctionToolCall = deriveUIToolCallFromToolCall(o.functionToolCall, choiceMap, mcpToolSelectionMap);
-				if (uiFunctionToolCall) toolCalls.push(uiFunctionToolCall);
+				if (uiFunctionToolCall) {
+					toolCalls.push(uiFunctionToolCall);
+				}
 				break;
 			}
 			case OutputKind.CustomToolCall: {
 				const uiCustomToolCall = deriveUIToolCallFromToolCall(o.customToolCall, choiceMap, mcpToolSelectionMap);
-				if (uiCustomToolCall) toolCalls.push(uiCustomToolCall);
+				if (uiCustomToolCall) {
+					toolCalls.push(uiCustomToolCall);
+				}
 				break;
 			}
 			case OutputKind.WebSearchToolCall: {
 				const uiWebsearchToolCall = deriveUIToolCallFromToolCall(o.webSearchToolCall, choiceMap, mcpToolSelectionMap);
-				if (uiWebsearchToolCall) toolCalls.push(uiWebsearchToolCall);
+				if (uiWebsearchToolCall) {
+					toolCalls.push(uiWebsearchToolCall);
+				}
 				break;
 			}
 
@@ -497,10 +549,14 @@ function deriveUIToolCallFromToolCall(
 	choiceMap: Map<string, ToolStoreChoice>,
 	mcpToolSelectionMap?: Map<string, MCPToolSelection>
 ): UIToolCall | undefined {
-	if (!toolCall) return undefined;
+	if (!toolCall) {
+		return undefined;
+	}
 
 	const choiceID = toolCall.choiceID;
-	if (!choiceID) return undefined;
+	if (!choiceID) {
+		return undefined;
+	}
 
 	// NOTE: runtime-injected tools (e.g. skills-*) are not in toolStoreChoices,
 	// so they will not be present in this map. Do NOT drop the tool call.

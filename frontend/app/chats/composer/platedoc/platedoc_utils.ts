@@ -24,7 +24,9 @@ export const isSelectionOnlyEditorChange = (editor: PlateEditor): boolean => {
 };
 
 function buildChunkedTextChildren(text: string, chunkSize: number): ChunkedTextNode[] {
-	if (!text) return [{ text: '', __chunk: 0 }];
+	if (!text) {
+		return [{ text: '', __chunk: 0 }];
+	}
 	const out: ChunkedTextNode[] = [];
 	let i = 0;
 	let idx = 0;
@@ -44,9 +46,13 @@ export function buildSingleParagraphValueChunked(text: string, chunkSize: number
 }
 
 function areNumberPathsEqual(a: number[] | undefined, b: number[] | undefined): boolean {
-	if (!a || !b || a.length !== b.length) return false;
+	if (!a || !b || a.length !== b.length) {
+		return false;
+	}
 	for (let i = 0; i < a.length; i += 1) {
-		if (a[i] !== b[i]) return false;
+		if (a[i] !== b[i]) {
+			return false;
+		}
 	}
 	return true;
 }
@@ -54,7 +60,9 @@ function areNumberPathsEqual(a: number[] | undefined, b: number[] | undefined): 
 export function isCursorAtDocumentEnd(editor: PlateEditor): boolean {
 	try {
 		const sel = editor.selection;
-		if (!sel) return false;
+		if (!sel) {
+			return false;
+		}
 		// Only treat "cursor at end" as true for a collapsed selection.
 		if (
 			sel.anchor.offset !== sel.focus.offset ||
@@ -64,7 +72,9 @@ export function isCursorAtDocumentEnd(editor: PlateEditor): boolean {
 		}
 
 		const end = editor.api.end([]);
-		if (!end) return false;
+		if (!end) {
+			return false;
+		}
 		return areNumberPathsEqual(sel.anchor.path as number[], end.path as number[]) && sel.anchor.offset === end.offset;
 	} catch {
 		return false;
@@ -72,13 +82,19 @@ export function isCursorAtDocumentEnd(editor: PlateEditor): boolean {
 }
 
 export function isSimpleEmptyParagraphDocument(ed: PlateEditor | null | undefined): boolean {
-	if (!ed) return false;
+	if (!ed) {
+		return false;
+	}
 
 	const children = ed.children ?? [];
-	if (children.length !== 1) return false;
+	if (children.length !== 1) {
+		return false;
+	}
 
 	const p = children[0];
-	if (!p || p.type !== 'p' || !Array.isArray(p.children) || p.children.length !== 1) return false;
+	if (!p || p.type !== 'p' || !Array.isArray(p.children) || p.children.length !== 1) {
+		return false;
+	}
 
 	const child = p.children[0];
 	return typeof child?.text === 'string' && child.text.length === 0;
@@ -114,7 +130,9 @@ function expandTabsToSpaces(line: string, tabSize = 2) {
 }
 
 export function insertPlainTextAsSingleBlock(ed: PlateEditor | null | undefined, text: string, tabSize = 2) {
-	if (!ed) return;
+	if (!ed) {
+		return;
+	}
 	const editor = ed;
 
 	// Normalize line endings
@@ -137,10 +155,14 @@ export function insertPlainTextAsSingleBlock(ed: PlateEditor | null | undefined,
 }
 
 export function hasNonEmptyUserText(ed: PlateEditor | null | undefined): boolean {
-	if (!ed) return false;
+	if (!ed) {
+		return false;
+	}
 	// If NodeApi.texts exists:
 	for (const [t] of NodeApi.texts(ed)) {
-		if (NON_WHITESPACE_RE.test(t.text)) return true;
+		if (NON_WHITESPACE_RE.test(t.text)) {
+			return true;
+		}
 	}
 	return false;
 }
@@ -148,7 +170,9 @@ export function hasNonEmptyUserText(ed: PlateEditor | null | undefined): boolean
 export const createEmptyEditorValue = (): Value => [{ type: 'p', children: [{ text: '' }] }];
 
 export const buildEditorValueFromPlainText = (plain: string): Value => {
-	if (plain.length === 0) return createEmptyEditorValue();
+	if (plain.length === 0) {
+		return createEmptyEditorValue();
+	}
 	return plain.length >= LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS
 		? buildSingleParagraphValueChunked(plain, LARGE_TEXT_CHUNK_SIZE)
 		: buildSingleParagraphValue(plain);

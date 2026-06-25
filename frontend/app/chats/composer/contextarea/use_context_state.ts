@@ -47,7 +47,9 @@ function applyPersistedModelParamToSelectedModel(
 	modelParam?: ModelParam,
 	options?: { preserveName?: boolean }
 ): UIChatOption {
-	if (!modelParam) return sanitizeUIChatOptionByCapabilities(base);
+	if (!modelParam) {
+		return sanitizeUIChatOptionByCapabilities(base);
+	}
 
 	const next: UIChatOption = {
 		...base,
@@ -60,20 +62,35 @@ function applyPersistedModelParamToSelectedModel(
 		next.name = modelParam.name;
 	}
 
-	if (hasOwn(modelParam, 'temperature')) next.temperature = modelParam.temperature;
-	else delete next.temperature;
+	if (hasOwn(modelParam, 'temperature')) {
+		next.temperature = modelParam.temperature;
+	} else {
+		delete next.temperature;
+	}
 
-	if (hasOwn(modelParam, 'reasoning')) next.reasoning = modelParam.reasoning;
-	else delete next.reasoning;
+	if (hasOwn(modelParam, 'reasoning')) {
+		next.reasoning = modelParam.reasoning;
+	} else {
+		delete next.reasoning;
+	}
 
-	if (hasOwn(modelParam, 'outputParam')) next.outputParam = modelParam.outputParam;
-	else delete next.outputParam;
+	if (hasOwn(modelParam, 'outputParam')) {
+		next.outputParam = modelParam.outputParam;
+	} else {
+		delete next.outputParam;
+	}
 
-	if (hasOwn(modelParam, 'stopSequences')) next.stopSequences = modelParam.stopSequences;
-	else delete next.stopSequences;
+	if (hasOwn(modelParam, 'stopSequences')) {
+		next.stopSequences = modelParam.stopSequences;
+	} else {
+		delete next.stopSequences;
+	}
 
-	if (hasOwn(modelParam, 'cacheControl')) next.cacheControl = modelParam.cacheControl;
-	else delete next.cacheControl;
+	if (hasOwn(modelParam, 'cacheControl')) {
+		next.cacheControl = modelParam.cacheControl;
+	} else {
+		delete next.cacheControl;
+	}
 
 	if (hasOwn(modelParam, 'additionalParametersRawJSON')) {
 		next.additionalParametersRawJSON = modelParam.additionalParametersRawJSON;
@@ -108,7 +125,9 @@ function findRestorableModelOption(
 	// 1) Strongest match: exact provider + preset id
 	if (providerName && modelPresetID) {
 		const exactRef = providerScopedOptions.find(option => option.modelPresetID === modelPresetID);
-		if (exactRef) return exactRef;
+		if (exactRef) {
+			return exactRef;
+		}
 	}
 
 	// 2) If provider is known but preset id is stale/missing, prefer matching by
@@ -116,13 +135,17 @@ function findRestorableModelOption(
 	if (providerName && modelName) {
 		const byProviderAndName = providerScopedOptions.filter(option => option.name === modelName);
 		const uniqueByProviderAndName = pickUniqueModelOption(byProviderAndName);
-		if (uniqueByProviderAndName) return uniqueByProviderAndName;
+		if (uniqueByProviderAndName) {
+			return uniqueByProviderAndName;
+		}
 
 		// Secondary provider-scoped fallback in case very old persisted state used
 		// a display-ish name instead of the raw model name.
 		const byProviderAndDisplayName = providerScopedOptions.filter(option => option.modelDisplayName === modelName);
 		const uniqueByProviderAndDisplayName = pickUniqueModelOption(byProviderAndDisplayName);
-		if (uniqueByProviderAndDisplayName) return uniqueByProviderAndDisplayName;
+		if (uniqueByProviderAndDisplayName) {
+			return uniqueByProviderAndDisplayName;
+		}
 
 		// Ambiguous within provider -> do not guess.
 		return undefined;
@@ -132,11 +155,15 @@ function findRestorableModelOption(
 	if (modelName) {
 		const byGlobalName = allOptions.filter(option => option.name === modelName);
 		const uniqueByGlobalName = pickUniqueModelOption(byGlobalName);
-		if (uniqueByGlobalName) return uniqueByGlobalName;
+		if (uniqueByGlobalName) {
+			return uniqueByGlobalName;
+		}
 
 		const byGlobalDisplayName = allOptions.filter(option => option.modelDisplayName === modelName);
 		const uniqueByGlobalDisplayName = pickUniqueModelOption(byGlobalDisplayName);
-		if (uniqueByGlobalDisplayName) return uniqueByGlobalDisplayName;
+		if (uniqueByGlobalDisplayName) {
+			return uniqueByGlobalDisplayName;
+		}
 	}
 
 	return undefined;
@@ -299,13 +326,19 @@ export function useAssistantContextState(): AssistantContextController {
 		);
 
 		return rawAssistantPresetOptions.map(option => {
-			if (!option.isSelectable) return option;
+			if (!option.isSelectable) {
+				return option;
+			}
 
 			const startingModelPresetRef = option.preset.startingModelPresetRef;
-			if (!startingModelPresetRef) return option;
+			if (!startingModelPresetRef) {
+				return option;
+			}
 
 			const modelKey = buildModelPresetRefKey(startingModelPresetRef);
-			if (selectableModelPresetKeys.has(modelKey)) return option;
+			if (selectableModelPresetKeys.has(modelKey)) {
+				return option;
+			}
 
 			return {
 				...option,
@@ -345,7 +378,9 @@ export function useAssistantContextState(): AssistantContextController {
 	const restoreConversationContext = useCallback(
 		(context: RestorableConversationContext) => {
 			pendingRestoreContextRef.current = context;
-			if (!optionsLoaded) return null;
+			if (!optionsLoaded) {
+				return null;
+			}
 			const nextSelectedModel = applyRestoredConversationContext(context, allOptionsRef.current);
 			pendingRestoreContextRef.current = null;
 			return nextSelectedModel;
@@ -408,7 +443,9 @@ export function useAssistantContextState(): AssistantContextController {
 
 		void (async () => {
 			const r = await getChatInputOptions();
-			if (cancelled) return;
+			if (cancelled) {
+				return;
+			}
 
 			const nextSelectedModel = sanitizeUIChatOptionByCapabilities(r.default);
 			const nextIsHybridReasoningEnabled = isHybridReasoningModel(nextSelectedModel);
@@ -478,7 +515,9 @@ export function useAssistantContextState(): AssistantContextController {
 	const setHybridTokens = useCallback(
 		(tokens: number) => {
 			applySelectedModel(prev => {
-				if (!prev.reasoning || prev.reasoning.type !== ReasoningType.HybridWithTokens) return prev;
+				if (!prev.reasoning || prev.reasoning.type !== ReasoningType.HybridWithTokens) {
+					return prev;
+				}
 				return { ...prev, reasoning: { ...prev.reasoning, tokens } };
 			});
 		},

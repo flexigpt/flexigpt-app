@@ -84,14 +84,22 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 function booleanToTriState(value?: boolean): TriStateBoolean {
-	if (value === true) return 'true';
-	if (value === false) return 'false';
+	if (value === true) {
+		return 'true';
+	}
+	if (value === false) {
+		return 'false';
+	}
 	return '';
 }
 
 function triStateToBoolean(value: TriStateBoolean): boolean | undefined {
-	if (value === 'true') return true;
-	if (value === 'false') return false;
+	if (value === 'true') {
+		return true;
+	}
+	if (value === 'false') {
+		return false;
+	}
 	return undefined;
 }
 
@@ -138,20 +146,32 @@ function tryParseJSONRaw(raw: string): JSONParseResult {
 }
 
 function getTriStateLabel(value: TriStateBoolean): string {
-	if (value === 'true') return 'Force On';
-	if (value === 'false') return 'Force Off';
+	if (value === 'true') {
+		return 'Force On';
+	}
+	if (value === 'false') {
+		return 'Force Off';
+	}
 	return 'Not Set';
 }
 
 function getToolAutoExecuteLabel(value: TriStateBoolean): string {
-	if (value === 'true') return 'Force On';
-	if (value === 'false') return 'Force Off';
+	if (value === 'true') {
+		return 'Force On';
+	}
+	if (value === 'false') {
+		return 'Force Off';
+	}
 	return 'Tool Default';
 }
 
 function getIncludeModelSystemPromptLabel(value: TriStateBoolean): string {
-	if (value === 'true') return 'Include';
-	if (value === 'false') return 'Do Not Include';
+	if (value === 'true') {
+		return 'Include';
+	}
+	if (value === 'false') {
+		return 'Do Not Include';
+	}
 	return 'Not Set';
 }
 
@@ -527,7 +547,9 @@ function AddEditAssistantPresetModalContent({
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
 		if (!dialog.open) {
 			try {
@@ -563,7 +585,9 @@ function AddEditAssistantPresetModalContent({
 	}, [onClose]);
 
 	const handleDialogClose = useCallback(() => {
-		if (isUnmountingRef.current) return;
+		if (isUnmountingRef.current) {
+			return;
+		}
 		onClose();
 	}, [onClose]);
 
@@ -853,8 +877,12 @@ function AddEditAssistantPresetModalContent({
 						const invalidArgsSelection = state.startingToolSelections.find(selection => {
 							const option = toolOptionByKey.get(buildToolRefKey(selection.toolRef));
 							const raw = selection.userArgSchemaInstance.trim();
-							if (!raw) return false;
-							if (!option?.hasUserArgSchema) return true;
+							if (!raw) {
+								return false;
+							}
+							if (!option?.hasUserArgSchema) {
+								return true;
+							}
 
 							const parsed = tryParseJSONRaw(raw);
 							return !parsed.ok;
@@ -911,7 +939,9 @@ function AddEditAssistantPresetModalContent({
 	}, []);
 
 	const suggestedNextVersion = useMemo(() => {
-		if (!initialData) return DEFAULT_SEMVER;
+		if (!initialData) {
+			return DEFAULT_SEMVER;
+		}
 		return getSuggestedNextVersion(initialData, existingPresets);
 	}, [initialData, existingPresets]);
 
@@ -1094,7 +1124,9 @@ function AddEditAssistantPresetModalContent({
 
 	const handleAddInstructionTemplate = useCallback(() => {
 		const option = instructionOptions.find(item => item.key === effectiveNextInstructionKey);
-		if (!option) return;
+		if (!option) {
+			return;
+		}
 
 		updateFormData(prev => ({
 			...prev,
@@ -1135,7 +1167,9 @@ function AddEditAssistantPresetModalContent({
 
 	const handleAddToolSelection = useCallback(() => {
 		const option = toolOptions.find(item => item.key === effectiveNextToolKey);
-		if (!option) return;
+		if (!option) {
+			return;
+		}
 
 		updateFormData(prev => ({
 			...prev,
@@ -1213,7 +1247,9 @@ function AddEditAssistantPresetModalContent({
 
 	const handleAddSkillRef = useCallback(() => {
 		const option = skillOptions.find(item => item.key === effectiveNextSkillKey);
-		if (!option) return;
+		if (!option) {
+			return;
+		}
 
 		updateFormData(prev => ({
 			...prev,
@@ -1255,7 +1291,9 @@ function AddEditAssistantPresetModalContent({
 	const applyPrefill = useCallback(
 		(key: string) => {
 			const source = prefillSourceMap[key];
-			if (!source) return;
+			if (!source) {
+				return;
+			}
 
 			updateFormData(prev => {
 				const copied = getInitialFormData(source, [], false);
@@ -1275,7 +1313,9 @@ function AddEditAssistantPresetModalContent({
 		e.preventDefault();
 		e.stopPropagation();
 
-		if (isViewMode) return;
+		if (isViewMode) {
+			return;
+		}
 
 		setSubmitError('');
 
@@ -1363,7 +1403,9 @@ function AddEditAssistantPresetModalContent({
 			className="modal"
 			onClose={handleDialogClose}
 			onCancel={e => {
-				if (!isViewMode) e.preventDefault();
+				if (!isViewMode) {
+					e.preventDefault();
+				}
 			}}
 		>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-5xl overflow-hidden rounded-2xl p-0">
@@ -1663,7 +1705,9 @@ function AddEditAssistantPresetModalContent({
 										placeholderLabel="None"
 										title="Select model preset"
 										getDisplayName={key => {
-											if (!key) return 'None';
+											if (!key) {
+												return 'None';
+											}
 											const option = modelOptionByKey.get(key);
 											if (option) {
 												return option.isSelectable
@@ -1869,8 +1913,12 @@ function AddEditAssistantPresetModalContent({
 }
 
 export function AddEditAssistantPresetModal(props: AddEditAssistantPresetModalProps) {
-	if (!props.isOpen) return null;
-	if (typeof document === 'undefined' || !document.body) return null;
+	if (!props.isOpen) {
+		return null;
+	}
+	if (typeof document === 'undefined' || !document.body) {
+		return null;
+	}
 
 	const remountKey = props.initialData
 		? `${props.mode ?? 'auto'}:${props.initialData.bundleID}:${props.initialData.preset.id}:${props.initialData.preset.version}:${String(props.initialData.preset.modifiedAt)}`

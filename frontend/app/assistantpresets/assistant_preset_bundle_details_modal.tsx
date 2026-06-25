@@ -20,10 +20,14 @@ export function AssistantPresetBundleDetailsModal({ isOpen, onClose, bundle }: A
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 
 	useEffect(() => {
-		if (!isOpen) return;
+		if (!isOpen) {
+			return;
+		}
 
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
 		if (!dialog.open) {
 			dialog.showModal();
@@ -40,7 +44,9 @@ export function AssistantPresetBundleDetailsModal({ isOpen, onClose, bundle }: A
 		onClose();
 	};
 
-	if (!isOpen || !bundle) return null;
+	if (!isOpen || !bundle) {
+		return null;
+	}
 
 	return createPortal(
 		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose}>

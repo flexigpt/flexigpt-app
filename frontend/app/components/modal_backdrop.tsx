@@ -9,7 +9,9 @@ interface ModalBackdropProps {
  * Must be rendered as a direct child of <dialog className="modal">.
  */
 export function ModalBackdrop({ enabled, label = 'Close modal' }: ModalBackdropProps): ReactElement | null {
-	if (!enabled) return null;
+	if (!enabled) {
+		return null;
+	}
 	return (
 		<form method="dialog" className="modal-backdrop">
 			<button type="submit" aria-label={label} />

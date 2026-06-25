@@ -19,28 +19,46 @@ const DEFAULT_TITLE_CANDIDATE: TitleCandidate = { title: DEFAULT_TITLE, score: 0
  */
 function looksLikeCodeLine(line: string): boolean {
 	const t = line.trim();
-	if (!t) return false; // blank line
+	if (!t) {
+		return false;
+	} // blank line
 
 	/* 1.  Quick "certain" matches  */
 
 	// single brace / bracket / semicolon lines:  }, );, ]
-	if (/^[{}[\]()];?$/.test(t)) return true;
+	if (/^[{}[\]()];?$/.test(t)) {
+		return true;
+	}
 
 	// comment markers at line start ( //  #  /*  *  <!-- )
-	if (/^\s*(\/\/|#|\/\*|\*|<!--)/.test(t)) return true;
+	if (/^\s*(\/\/|#|\/\*|\*|<!--)/.test(t)) {
+		return true;
+	}
 
 	// import / class / def at beginning of line
-	if (/^\s*(import|export|package|namespace|using|class|interface|def|func|lambda|const|async)\b/.test(t)) return true;
+	if (/^\s*(import|export|package|namespace|using|class|interface|def|func|lambda|const|async)\b/.test(t)) {
+		return true;
+	}
 
 	/* 2.  Count weaker indicators  */
 
 	let score = 0;
 
-	if (/[{}[$$;]/.test(t)) score++; // braces / semicolon
-	if (/=>|->|::|\+\+|--|&&|\|\||\?\.|\?\?/.test(t)) score++; // multi-char operators
-	if (/[=+\-*/%]=?\s*\w/.test(t)) score++; // assignments / operators
-	if (/\w+\s*$[^)]*$/.test(t)) score++; // foo(...)  or  bar()
-	if (/(['"`]).*\1/.test(t)) score++; // string literal
+	if (/[{}[$$;]/.test(t)) {
+		score++;
+	} // braces / semicolon
+	if (/=>|->|::|\+\+|--|&&|\|\||\?\.|\?\?/.test(t)) {
+		score++;
+	} // multi-char operators
+	if (/[=+\-*/%]=?\s*\w/.test(t)) {
+		score++;
+	} // assignments / operators
+	if (/\w+\s*$[^)]*$/.test(t)) {
+		score++;
+	} // foo(...)  or  bar()
+	if (/(['"`]).*\1/.test(t)) {
+		score++;
+	} // string literal
 
 	// At least two weak indicators -> probably code
 	return score >= 2;
@@ -88,10 +106,14 @@ function selectCandidateParagraphs(paragraphs: string[]): string[] {
 	const nonCode = paragraphs.filter(p => !isCodeParagraph(p));
 
 	// ① first two + last two non-code paragraphs if possible
-	if (nonCode.length >= 4) return [...nonCode.slice(0, 2), ...nonCode.slice(-2)];
+	if (nonCode.length >= 4) {
+		return [...nonCode.slice(0, 2), ...nonCode.slice(-2)];
+	}
 
 	// ② otherwise take whatever non-code we have
-	if (nonCode.length > 0) return nonCode;
+	if (nonCode.length > 0) {
+		return nonCode;
+	}
 
 	// ③ nothing but code -> fall back to very first paragraph
 	return [paragraphs[0]];
@@ -102,12 +124,24 @@ function scoreEn(s: string, idx: number, total: number): number {
 	const t = s.trim();
 	let pts = 0;
 
-	if (t.includes('?')) pts += 3;
-	if (/^(how|what|why|when|where|can|does|do|is|are|should|could|would|will|give)\b/i.test(t)) pts += 2;
-	if (/\b(error|issue|bug|fail|help)\b/i.test(t)) pts += 1.5;
-	if (idx === 0 || idx === total - 1) pts += 1;
-	if (/^(\s*[-*]\s+|\s*\d+\.\s+)/.test(t)) pts += 1;
-	if (t.length < 60) pts += 1;
+	if (t.includes('?')) {
+		pts += 3;
+	}
+	if (/^(how|what|why|when|where|can|does|do|is|are|should|could|would|will|give)\b/i.test(t)) {
+		pts += 2;
+	}
+	if (/\b(error|issue|bug|fail|help)\b/i.test(t)) {
+		pts += 1.5;
+	}
+	if (idx === 0 || idx === total - 1) {
+		pts += 1;
+	}
+	if (/^(\s*[-*]\s+|\s*\d+\.\s+)/.test(t)) {
+		pts += 1;
+	}
+	if (t.length < 60) {
+		pts += 1;
+	}
 
 	const doc = nlp(t);
 	let uniq = new Set([...doc.nouns().out('array'), ...doc.verbs().out('array')]);
@@ -120,9 +154,13 @@ function scoreEn(s: string, idx: number, total: number): number {
 		const noStop: string[] = removeStopwords(tokens);
 		const stopRatio = 1 - noStop.length / tokens.length;
 		// Reward moderate stopword ratio (e.g., 0.2-0.6)
-		if (stopRatio > 0.15 && stopRatio < 0.65) pts += 1.5;
+		if (stopRatio > 0.15 && stopRatio < 0.65) {
+			pts += 1.5;
+		}
 		// Penalize very low or very high stopword ratio
-		else if (stopRatio <= 0.15 || stopRatio >= 0.65) pts -= 0.5;
+		else if (stopRatio <= 0.15 || stopRatio >= 0.65) {
+			pts -= 0.5;
+		}
 	}
 
 	return pts;
@@ -136,9 +174,13 @@ function normalise(raw: number): number {
 /* ───────────────────────  Final polish  ────────────────────────── */
 
 function sentenceCase(str: string) {
-	if (!str) return '';
+	if (!str) {
+		return '';
+	}
 	const match = str.match(/^(\s*)(\S)(.*)$/);
-	if (!match) return str;
+	if (!match) {
+		return str;
+	}
 	const [, leading, first, rest] = match;
 	return leading + first.toUpperCase() + rest;
 }
@@ -156,7 +198,9 @@ function finalise(raw: string): string {
 		// leading / trailing punctuation
 		.replaceAll(/^[\s:;,-]+|[\s:;,.?!-]+$/g, '');
 
-	if (!t) return DEFAULT_TITLE;
+	if (!t) {
+		return DEFAULT_TITLE;
+	}
 
 	if (t.length > MAX_LEN) {
 		const cut = t.slice(0, MAX_LEN);
@@ -169,10 +213,14 @@ function finalise(raw: string): string {
 
 /* ──────────────────────────  Public API  ───────────────────────── */
 export function generateTitle(firstMessage: string): TitleCandidate {
-	if (!firstMessage.trim()) return DEFAULT_TITLE_CANDIDATE;
+	if (!firstMessage.trim()) {
+		return DEFAULT_TITLE_CANDIDATE;
+	}
 
 	const paragraphs = splitParagraphs(firstMessage.trim());
-	if (paragraphs.length === 0) return DEFAULT_TITLE_CANDIDATE;
+	if (paragraphs.length === 0) {
+		return DEFAULT_TITLE_CANDIDATE;
+	}
 
 	/* ① choose candidate paragraphs */
 	const candidates = selectCandidateParagraphs(paragraphs);
@@ -211,7 +259,9 @@ const isSingleLetter = (tok: string) => {
 //  - removes single chars
 export function cleanSearchQuery(input: string): string {
 	const raw = input.trim();
-	if (raw === '') return '';
+	if (raw === '') {
+		return '';
+	}
 
 	const nlpTokens = (nlp(raw).terms().out('array') as string[]).map(t => t.toLowerCase());
 	const nonOneCharTokens = nlpTokens.filter(t => !isSingleLetter(t)); // drop 1-char words

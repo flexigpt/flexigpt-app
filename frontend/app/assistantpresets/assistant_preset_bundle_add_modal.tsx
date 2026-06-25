@@ -48,7 +48,9 @@ function AddAssistantPresetBundleModalContent({
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
 		if (!dialog.open) {
 			try {
@@ -79,7 +81,9 @@ function AddAssistantPresetBundleModalContent({
 	};
 
 	const handleDialogClose = () => {
-		if (isUnmountingRef.current) return;
+		if (isUnmountingRef.current) {
+			return;
+		}
 		onClose();
 	};
 
@@ -115,7 +119,9 @@ function AddAssistantPresetBundleModalContent({
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = async e => {
 		e.preventDefault();
 		e.stopPropagation();
-		if (isSubmitting) return;
+		if (isSubmitting) {
+			return;
+		}
 
 		const trimmed: BundleFormData = {
 			slug: formData.slug.trim(),
@@ -126,7 +132,9 @@ function AddAssistantPresetBundleModalContent({
 		const nextErrors = validateForm(trimmed);
 		setErrors(nextErrors);
 
-		if (Object.keys(nextErrors).length > 0) return;
+		if (Object.keys(nextErrors).length > 0) {
+			return;
+		}
 
 		setSubmitError('');
 		setIsSubmitting(true);
@@ -194,7 +202,9 @@ function AddAssistantPresetBundleModalContent({
 										const value = e.target.value;
 										setFormData(prev => ({ ...prev, slug: value }));
 										setErrors(prev => validateField('slug', value, prev));
-										if (submitError) setSubmitError('');
+										if (submitError) {
+											setSubmitError('');
+										}
 									}}
 									spellCheck="false"
 									autoComplete="off"
@@ -225,7 +235,9 @@ function AddAssistantPresetBundleModalContent({
 										const value = e.target.value;
 										setFormData(prev => ({ ...prev, displayName: value }));
 										setErrors(prev => validateField('displayName', value, prev));
-										if (submitError) setSubmitError('');
+										if (submitError) {
+											setSubmitError('');
+										}
 									}}
 									spellCheck="false"
 									autoComplete="off"
@@ -253,7 +265,9 @@ function AddAssistantPresetBundleModalContent({
 									onChange={e => {
 										const value = e.target.value;
 										setFormData(prev => ({ ...prev, description: value }));
-										if (submitError) setSubmitError('');
+										if (submitError) {
+											setSubmitError('');
+										}
 									}}
 									spellCheck="false"
 								/>
@@ -276,8 +290,12 @@ function AddAssistantPresetBundleModalContent({
 }
 
 export function AddAssistantPresetBundleModal(props: AddAssistantPresetBundleModalProps) {
-	if (!props.isOpen) return null;
-	if (typeof document === 'undefined' || !document.body) return null;
+	if (!props.isOpen) {
+		return null;
+	}
+	if (typeof document === 'undefined' || !document.body) {
+		return null;
+	}
 
 	return createPortal(
 		<AddAssistantPresetBundleModalContent key="add-assistant-preset-bundle-modal" {...props} />,

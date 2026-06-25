@@ -16,10 +16,14 @@ export function normalizeWebSearchChoiceTemplates(
 
 	for (const template of templates ?? []) {
 		const key = `${template.bundleID}/${template.toolSlug}@${template.toolVersion}`;
-		if (seen.has(key)) continue;
+		if (seen.has(key)) {
+			continue;
+		}
 		seen.add(key);
 		out.push(template);
-		if (out.length === 1) break;
+		if (out.length === 1) {
+			break;
+		}
 	}
 
 	return out;
@@ -50,9 +54,13 @@ function buildWebSearchChoiceForSubmit(t: WebSearchChoiceTemplate): ToolStoreCho
 }
 
 function isEligibleWebSearchToolForSDKType(item: ToolListItem, sdkType: ProviderSDKType): boolean {
-	if (item.toolDefinition.llmToolType !== ToolStoreChoiceType.WebSearch) return false;
+	if (item.toolDefinition.llmToolType !== ToolStoreChoiceType.WebSearch) {
+		return false;
+	}
 	// Provider-managed web-search tools are SDK-bound
-	if (item.toolDefinition.type !== ToolImplType.SDK) return false;
+	if (item.toolDefinition.type !== ToolImplType.SDK) {
+		return false;
+	}
 	return item.toolDefinition.sdkImpl?.sdkType === sdkType.toString();
 }
 

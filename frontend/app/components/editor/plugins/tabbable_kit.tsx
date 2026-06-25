@@ -8,7 +8,9 @@ export const TabbableKit = [
 		},
 		options: {
 			query: () => {
-				if (editor.api.isAt({ start: true }) || editor.api.isAt({ end: true })) return false;
+				if (editor.api.isAt({ start: true }) || editor.api.isAt({ end: true })) {
+					return false;
+				}
 
 				return !editor.api.some({
 					match: n => {

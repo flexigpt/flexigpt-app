@@ -27,7 +27,9 @@ interface MessageFooterAreaProps {
 }
 
 function hasReasoningContent(reasoningContents?: ReasoningContent[], streamedThinking = ''): boolean {
-	if (streamedThinking.trim().length > 0) return true;
+	if (streamedThinking.trim().length > 0) {
+		return true;
+	}
 
 	return (
 		reasoningContents?.some(rc => {
@@ -60,7 +62,9 @@ export function MessageFooterArea({
 	const hasDetails = hasDebugDetails || hasInlineHiddenReasoning;
 	const hasContent = !!cardCopyContent;
 	const toggleDetailsModal = () => {
-		if (!hasDetails || isBusy) return;
+		if (!hasDetails || isBusy) {
+			return;
+		}
 		setIsDetailsOpen(prev => !prev);
 	};
 
@@ -68,15 +72,21 @@ export function MessageFooterArea({
 		? (() => {
 				const parts: string[] = [];
 
-				if (usage.inputTokensTotal > 0) parts.push(`Total input tokens: ${usage.inputTokensTotal}`);
+				if (usage.inputTokensTotal > 0) {
+					parts.push(`Total input tokens: ${usage.inputTokensTotal}`);
+				}
 				if (usage.inputTokensCached > 0) {
 					parts.push(`Input cached tokens: ${usage.inputTokensCached}`);
 					if (usage.inputTokensUncached > 0) {
 						parts.push(`Input uncached tokens: ${usage.inputTokensUncached}`);
 					}
 				}
-				if (usage.outputTokens > 0) parts.push(`Total output tokens: ${usage.outputTokens}`);
-				if (usage.reasoningTokens > 0) parts.push(`Reasoning tokens: ${usage.reasoningTokens}`);
+				if (usage.outputTokens > 0) {
+					parts.push(`Total output tokens: ${usage.outputTokens}`);
+				}
+				if (usage.reasoningTokens > 0) {
+					parts.push(`Reasoning tokens: ${usage.reasoningTokens}`);
+				}
 
 				return parts.join('\n');
 			})()

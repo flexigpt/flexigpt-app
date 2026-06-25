@@ -26,10 +26,14 @@ export function DeleteConfirmationModal({
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 
 	useEffect(() => {
-		if (!isOpen) return;
+		if (!isOpen) {
+			return;
+		}
 
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
 		if (!dialog.open) {
 			dialog.showModal();
@@ -59,7 +63,9 @@ export function DeleteConfirmationModal({
 		dialogRef.current?.close();
 	};
 
-	if (!isOpen) return null;
+	if (!isOpen) {
+		return null;
+	}
 
 	return createPortal(
 		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose}>

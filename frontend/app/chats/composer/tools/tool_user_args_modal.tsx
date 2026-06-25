@@ -86,7 +86,9 @@ function ToolUserArgsModalContent({ onClose, toolLabel, schema, existingInstance
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 		let raf1 = 0;
 		let raf2 = 0;
 		if (!dialog.open) {
@@ -124,7 +126,9 @@ function ToolUserArgsModalContent({ onClose, toolLabel, schema, existingInstance
 	};
 
 	const handleDialogClose = () => {
-		if (isUnmountingRef.current) return;
+		if (isUnmountingRef.current) {
+			return;
+		}
 		onClose();
 	};
 
@@ -280,7 +284,9 @@ function ToolUserArgsModalContent({ onClose, toolLabel, schema, existingInstance
 								value={formData.rawJson}
 								onChange={e => {
 									setFormData({ rawJson: e.target.value });
-									if (error) setError(null);
+									if (error) {
+										setError(null);
+									}
 								}}
 								spellCheck={false}
 								placeholder={schemaObj ? '{\n  "key": "value"\n}' : 'JSON object; structure depends on this tool.'}
@@ -349,8 +355,12 @@ function ToolUserArgsModalContent({ onClose, toolLabel, schema, existingInstance
 }
 
 export function ToolUserArgsModal(props: ToolUserArgsModalProps) {
-	if (!props.isOpen) return null;
-	if (typeof document === 'undefined' || !document.body) return null;
+	if (!props.isOpen) {
+		return null;
+	}
+	if (typeof document === 'undefined' || !document.body) {
+		return null;
+	}
 
 	const remountKey = JSON.stringify({
 		modalIdentity: props.modalIdentity ?? props.toolLabel,

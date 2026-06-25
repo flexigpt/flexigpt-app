@@ -14,9 +14,15 @@ import { Dropdown, type DropdownItem } from '@/components/dropdown';
 
 const isOtherThemeName = (n: string): boolean => DAISYUI_BUILTIN_THEMES.includes(n);
 const toThemeType = (name: string): ThemeType => {
-	if (name === CustomThemeLight) return ThemeType.Light;
-	if (name === CustomThemeDark) return ThemeType.Dark;
-	if (name === 'system') return ThemeType.System;
+	if (name === CustomThemeLight) {
+		return ThemeType.Light;
+	}
+	if (name === CustomThemeDark) {
+		return ThemeType.Dark;
+	}
+	if (name === 'system') {
+		return ThemeType.System;
+	}
 	return ThemeType.Other;
 };
 

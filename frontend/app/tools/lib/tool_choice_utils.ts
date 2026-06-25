@@ -24,7 +24,9 @@ export function dedupeToolChoices(choices: ToolStoreChoice[]): ToolStoreChoice[]
 
 	for (const t of choices ?? []) {
 		const key = toolIdentityKey(t.bundleID, undefined, t.toolSlug, t.toolVersion);
-		if (seen.has(key)) continue;
+		if (seen.has(key)) {
+			continue;
+		}
 		seen.add(key);
 		out.push(t);
 	}
@@ -33,8 +35,12 @@ export function dedupeToolChoices(choices: ToolStoreChoice[]): ToolStoreChoice[]
 }
 
 export function areToolChoiceListsEqual(a: ToolStoreChoice[], b: ToolStoreChoice[]): boolean {
-	if (a === b) return true;
-	if (a.length !== b.length) return false;
+	if (a === b) {
+		return true;
+	}
+	if (a.length !== b.length) {
+		return false;
+	}
 
 	for (let i = 0; i < a.length; i += 1) {
 		const left = a[i];

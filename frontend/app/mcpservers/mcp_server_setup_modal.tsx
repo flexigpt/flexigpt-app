@@ -41,7 +41,9 @@ function MCPServerSetupModalContent({
 
 	const [rows, setRows] = useState<Record<string, RowState>>(() => {
 		const init: Record<string, RowState> = {};
-		for (const input of inputs) init[input.id] = emptyRow();
+		for (const input of inputs) {
+			init[input.id] = emptyRow();
+		}
 		return init;
 	});
 	const [reset, setReset] = useState(false);
@@ -52,7 +54,9 @@ function MCPServerSetupModalContent({
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 		if (!dialog.open) {
 			try {
 				dialog.showModal();
@@ -62,7 +66,9 @@ function MCPServerSetupModalContent({
 		}
 		return () => {
 			isUnmountingRef.current = true;
-			if (dialog.open) dialog.close();
+			if (dialog.open) {
+				dialog.close();
+			}
 		};
 	}, []);
 
@@ -76,7 +82,9 @@ function MCPServerSetupModalContent({
 	};
 
 	const handleDialogClose = () => {
-		if (isUnmountingRef.current) return;
+		if (isUnmountingRef.current) {
+			return;
+		}
 		onClose();
 	};
 
@@ -89,8 +97,12 @@ function MCPServerSetupModalContent({
 
 	const validate = (): string => {
 		for (const input of inputs) {
-			if (!input.required) continue;
-			if (effectiveConfigured(input)) continue;
+			if (!input.required) {
+				continue;
+			}
+			if (effectiveConfigured(input)) {
+				continue;
+			}
 
 			const row = rows[input.id] ?? emptyRow();
 			if (input.kind === MCPServerSetupInputKind.OAuthClientCredentials) {
@@ -293,8 +305,12 @@ function MCPServerSetupModalContent({
 }
 
 export function MCPServerSetupModal(props: MCPServerSetupModalProps) {
-	if (!props.isOpen || !props.server) return null;
-	if (typeof document === 'undefined' || !document.body) return null;
+	if (!props.isOpen || !props.server) {
+		return null;
+	}
+	if (typeof document === 'undefined' || !document.body) {
+		return null;
+	}
 
 	const remountKey = `${props.server.bundleID}:${props.server.id}:${props.server.modifiedAt}`;
 	return createPortal(<MCPServerSetupModalContent key={remountKey} {...props} server={props.server} />, document.body);

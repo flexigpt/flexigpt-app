@@ -35,7 +35,9 @@ export async function getAllProviderPresetsMap(
 		}
 		pageToken = nextPageToken;
 		pageCount++;
-		if (pageCount >= MAX_PAGES) break;
+		if (pageCount >= MAX_PAGES) {
+			break;
+		}
 	} while (pageToken);
 
 	return result;
@@ -145,7 +147,9 @@ export async function getAllSkillBundles(bundleIDs?: string[], includeDisabled?:
 			pageToken
 		);
 		all.push(...skillBundles);
-		if (!nextPageToken) break;
+		if (!nextPageToken) {
+			break;
+		}
 		pageToken = nextPageToken;
 	} while (pageToken);
 	return all;
@@ -171,7 +175,9 @@ export async function getAllSkills(
 			pageToken
 		);
 		all.push(...skillListItems);
-		if (!nextPageToken) break;
+		if (!nextPageToken) {
+			break;
+		}
 		pageToken = nextPageToken;
 	} while (pageToken);
 	return all;

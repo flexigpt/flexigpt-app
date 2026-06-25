@@ -17,10 +17,14 @@ export function MermaidZoomModal({ isOpen, onClose, svgNode, surfaceStyle }: Mer
 
 	// Open the dialog natively when isOpen becomes true
 	useEffect(() => {
-		if (!isOpen) return;
+		if (!isOpen) {
+			return;
+		}
 
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
 		if (!dialog.open) {
 			dialog.showModal();
@@ -41,12 +45,16 @@ export function MermaidZoomModal({ isOpen, onClose, svgNode, surfaceStyle }: Mer
 
 	// Inject the SVG into the modal container whenever we have one and the modal is open
 	useEffect(() => {
-		if (!isOpen || !modalRef.current) return;
+		if (!isOpen || !modalRef.current) {
+			return;
+		}
 
 		const container = modalRef.current;
 		container.innerHTML = '';
 
-		if (!svgNode) return;
+		if (!svgNode) {
+			return;
+		}
 
 		const newNode = svgNode.cloneNode(true) as SVGSVGElement;
 		newNode.style.display = 'block';
@@ -57,11 +65,15 @@ export function MermaidZoomModal({ isOpen, onClose, svgNode, surfaceStyle }: Mer
 		newNode.style.maxHeight = '80vh';
 		newNode.style.backgroundColor = 'transparent';
 		const bg = newNode.querySelector('rect.background');
-		if (bg) bg.setAttribute('fill', 'transparent');
+		if (bg) {
+			bg.setAttribute('fill', 'transparent');
+		}
 		container.append(newNode);
 	}, [isOpen, svgNode]);
 
-	if (!isOpen) return null;
+	if (!isOpen) {
+		return null;
+	}
 
 	return createPortal(
 		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose} aria-label="Enlarged Mermaid diagram">

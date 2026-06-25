@@ -54,6 +54,8 @@ export function parseChatWorkflowStarterSearchParams(searchParams: URLSearchPara
 
 export function removeChatWorkflowStarterSearchParams(source: URLSearchParams): URLSearchParams {
 	const next = new URLSearchParams(source);
-	for (const key of WORKFLOW_STARTER_QUERY_KEYS) next.delete(key);
+	for (const key of WORKFLOW_STARTER_QUERY_KEYS) {
+		next.delete(key);
+	}
 	return next;
 }

@@ -25,7 +25,9 @@ export const MCPAppSandbox = forwardRef<HTMLIFrameElement, MCPAppSandboxProps>(f
 
 	useEffect(() => {
 		const el = iframeRef.current;
-		if (!el) return;
+		if (!el) {
+			return;
+		}
 		onIframeReady(el);
 	}, [onIframeReady]);
 

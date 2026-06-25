@@ -22,7 +22,9 @@ function getMessageElements(el: HTMLElement): HTMLElement[] {
 
 function getCurrentMessageIndex(el: HTMLElement): number {
 	const messages = getMessageElements(el);
-	if (messages.length === 0) return -1;
+	if (messages.length === 0) {
+		return -1;
+	}
 
 	const scanTop = el.scrollTop + MESSAGE_SCROLL_MARGIN;
 	let lo = 0;
@@ -47,7 +49,9 @@ function getCurrentMessageIndex(el: HTMLElement): number {
 
 function scrollMessageAtIndex(el: HTMLElement, index: number): boolean {
 	const target = el.querySelector<HTMLElement>(`[data-chat-message-index="${index}"]`);
-	if (!target) return false;
+	if (!target) {
+		return false;
+	}
 
 	el.scrollTo({
 		top: Math.max(0, target.offsetTop - MESSAGE_SCROLL_MARGIN),
@@ -57,7 +61,9 @@ function scrollMessageAtIndex(el: HTMLElement, index: number): boolean {
 }
 
 function getMessageJumpAvailability(el: HTMLElement | null, messageCount: number) {
-	if (!el || messageCount <= 1) return { canJumpToPreviousMessage: false, canJumpToNextMessage: false };
+	if (!el || messageCount <= 1) {
+		return { canJumpToPreviousMessage: false, canJumpToNextMessage: false };
+	}
 
 	const currentIndex = getCurrentMessageIndex(el);
 	return {
@@ -174,7 +180,9 @@ export function useScrollRestore({
 	);
 
 	const scheduleScrollStateUpdate = useCallback(() => {
-		if (scrollStateRafRef.current !== null) return;
+		if (scrollStateRafRef.current !== null) {
+			return;
+		}
 
 		scrollStateRafRef.current = window.requestAnimationFrame(() => {
 			scrollStateRafRef.current = null;
@@ -210,14 +218,18 @@ export function useScrollRestore({
 	const handleScroll = useCallback(() => {
 		const el = scrollContainerRef.current;
 		const tabId = selectedTabIdRef.current;
-		if (!el || !tabId) return;
+		if (!el || !tabId) {
+			return;
+		}
 
 		persistScrollPosition(tabId, el);
 		scheduleScrollStateUpdate();
 	}, [persistScrollPosition, scheduleScrollStateUpdate, selectedTabIdRef]);
 
 	const scrollElementToBottom = useCallback((el: HTMLElement | null) => {
-		if (!el) return;
+		if (!el) {
+			return;
+		}
 		el.scrollTo({ top: el.scrollHeight, behavior: 'auto' });
 	}, []);
 
@@ -277,8 +289,12 @@ export function useScrollRestore({
 
 	useEffect(() => {
 		const contentEl = scrollContentRef.current;
-		if (!contentEl) return;
-		if (typeof ResizeObserver === 'undefined') return;
+		if (!contentEl) {
+			return;
+		}
+		if (typeof ResizeObserver === 'undefined') {
+			return;
+		}
 
 		observedContentSizeRef.current = null;
 
@@ -294,14 +310,18 @@ export function useScrollRestore({
 
 			observedContentSizeRef.current = { width, height };
 
-			if (resizeObserverRafRef.current !== null) return;
+			if (resizeObserverRafRef.current !== null) {
+				return;
+			}
 
 			resizeObserverRafRef.current = window.requestAnimationFrame(() => {
 				resizeObserverRafRef.current = null;
 
 				const scrollerEl = scrollContainerRef.current;
 				const tabId = selectedTabIdRef.current;
-				if (!scrollerEl || !tabId) return;
+				if (!scrollerEl || !tabId) {
+					return;
+				}
 
 				if (!activeTabIsHydratingRef.current && shouldAutoFollowRef.current) {
 					scrollElementToBottom(scrollerEl);
@@ -332,10 +352,14 @@ export function useScrollRestore({
 		(tabId: string) => {
 			requestAnimationFrame(() => {
 				requestAnimationFrame(() => {
-					if (selectedTabIdRef.current !== tabId) return;
+					if (selectedTabIdRef.current !== tabId) {
+						return;
+					}
 
 					const el = scrollContainerRef.current;
-					if (!el) return;
+					if (!el) {
+						return;
+					}
 
 					scrollElementToBottom(el);
 					persistScrollPosition(tabId, el);
@@ -349,7 +373,9 @@ export function useScrollRestore({
 	const scrollActiveToTop = useCallback(() => {
 		const el = scrollContainerRef.current;
 		const tabId = selectedTabIdRef.current;
-		if (!el || !tabId) return;
+		if (!el || !tabId) {
+			return;
+		}
 
 		el.scrollTo({ top: 0, behavior: 'auto' });
 		persistScrollPosition(tabId, el);
@@ -358,11 +384,15 @@ export function useScrollRestore({
 
 	const scrollActiveToBottom = useCallback(() => {
 		const lastIndex = messageCount - 1;
-		if (lastIndex < 0) return;
+		if (lastIndex < 0) {
+			return;
+		}
 
 		const el = scrollContainerRef.current;
 		const tabId = selectedTabIdRef.current;
-		if (!el || !tabId) return;
+		if (!el || !tabId) {
+			return;
+		}
 
 		scrollElementToBottom(el);
 		persistScrollPosition(tabId, el);
@@ -372,10 +402,14 @@ export function useScrollRestore({
 	const scrollActiveToPreviousMessage = useCallback(() => {
 		const el = scrollContainerRef.current;
 		const tabId = selectedTabIdRef.current;
-		if (!el || !tabId) return;
+		if (!el || !tabId) {
+			return;
+		}
 
 		const currentIndex = getCurrentMessageIndex(el);
-		if (currentIndex <= 0) return;
+		if (currentIndex <= 0) {
+			return;
+		}
 
 		if (scrollMessageAtIndex(el, currentIndex - 1)) {
 			persistScrollPosition(tabId, el);
@@ -386,10 +420,14 @@ export function useScrollRestore({
 	const scrollActiveToNextMessage = useCallback(() => {
 		const el = scrollContainerRef.current;
 		const tabId = selectedTabIdRef.current;
-		if (!el || !tabId) return;
+		if (!el || !tabId) {
+			return;
+		}
 
 		const currentIndex = getCurrentMessageIndex(el);
-		if (currentIndex < 0 || currentIndex >= messageCount - 1) return;
+		if (currentIndex < 0 || currentIndex >= messageCount - 1) {
+			return;
+		}
 
 		if (scrollMessageAtIndex(el, currentIndex + 1)) {
 			persistScrollPosition(tabId, el);
@@ -401,7 +439,9 @@ export function useScrollRestore({
 		(direction: 1 | -1) => {
 			const el = scrollContainerRef.current;
 			const tabId = selectedTabIdRef.current;
-			if (!el || !tabId) return;
+			if (!el || !tabId) {
+				return;
+			}
 
 			const delta = Math.max(120, el.clientHeight * 0.85) * direction;
 			el.scrollTo({
@@ -418,9 +458,13 @@ export function useScrollRestore({
 		(tabId: string) => {
 			scrollTopByTabRef.current.set(tabId, 0);
 
-			if (selectedTabIdRef.current !== tabId) return;
+			if (selectedTabIdRef.current !== tabId) {
+				return;
+			}
 			const el = scrollContainerRef.current;
-			if (!el) return;
+			if (!el) {
+				return;
+			}
 
 			el.scrollTo({ top: 0, behavior: 'auto' });
 			persistScrollPosition(tabId, el);

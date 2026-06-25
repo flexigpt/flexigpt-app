@@ -188,7 +188,9 @@ function AddEditPromptTemplateModalContent({
 	);
 
 	const suggestedNextVersion = useMemo(() => {
-		if (!initialData) return DEFAULT_SEMVER;
+		if (!initialData) {
+			return DEFAULT_SEMVER;
+		}
 		return getSuggestedNextVersion(initialData, existingTemplates);
 	}, [initialData, existingTemplates]);
 	const derivedKind = useMemo(() => derivePromptTemplateKind(formData.blocks), [formData.blocks]);
@@ -198,7 +200,9 @@ function AddEditPromptTemplateModalContent({
 	);
 	useEffect(() => {
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
 		if (!dialog.open) {
 			try {
@@ -229,7 +233,9 @@ function AddEditPromptTemplateModalContent({
 	};
 
 	const handleDialogClose = () => {
-		if (isUnmountingRef.current) return;
+		if (isUnmountingRef.current) {
+			return;
+		}
 		onClose();
 	};
 
@@ -256,12 +262,18 @@ function AddEditPromptTemplateModalContent({
 			} else {
 				const clash = existingTemplates.some(t => t.template.slug === v && t.template.id !== initialTemplateId);
 
-				if (clash) newErrs.slug = 'Slug already in use.';
-				else newErrs = omitManyKeys(newErrs, ['slug']);
+				if (clash) {
+					newErrs.slug = 'Slug already in use.';
+				} else {
+					newErrs = omitManyKeys(newErrs, ['slug']);
+				}
 			}
 		} else if (field === 'displayName') {
-			if (!v) newErrs.displayName = 'This field is required.';
-			else newErrs = omitManyKeys(newErrs, ['displayName']);
+			if (!v) {
+				newErrs.displayName = 'This field is required.';
+			} else {
+				newErrs = omitManyKeys(newErrs, ['displayName']);
+			}
 		} else if (field === 'version') {
 			if (!v) {
 				newErrs.version = 'Version is required.';
@@ -273,16 +285,22 @@ function AddEditPromptTemplateModalContent({
 					Boolean(slugToCheck) &&
 					existingTemplates.some(t => t.template.slug === slugToCheck && t.template.version === v);
 
-				if (versionClash) newErrs.version = 'That version already exists for this slug.';
-				else newErrs = omitManyKeys(newErrs, ['version']);
+				if (versionClash) {
+					newErrs.version = 'That version already exists for this slug.';
+				} else {
+					newErrs = omitManyKeys(newErrs, ['version']);
+				}
 			}
 		} else if (field === 'tags') {
 			if (v === '') {
 				newErrs = omitManyKeys(newErrs, ['tags']);
 			} else {
 				const err = validateTags(val);
-				if (err) newErrs.tags = err;
-				else newErrs = omitManyKeys(newErrs, ['tags']);
+				if (err) {
+					newErrs.tags = err;
+				} else {
+					newErrs = omitManyKeys(newErrs, ['tags']);
+				}
 			}
 		} else if (field === 'blocks') {
 			if (blocks.length === 0) {
@@ -318,12 +336,17 @@ function AddEditPromptTemplateModalContent({
 				return Boolean(name) && variable.source === VarSource.User && !placeholders.has(name);
 			});
 
-			if (hasMissing) newErrs.variables = 'All variables must have a name.';
-			else if (invalidName) newErrs.variables = validatePromptVariableName(invalidName.name);
-			else if (hasDupes) newErrs.variables = 'Variable names must be unique.';
-			else if (badEnum) newErrs.variables = 'Enum variables must include at least one enum value.';
-			else if (badEnumDefault) newErrs.variables = 'Enum defaults must be one of the enum values.';
-			else if (badStatic) {
+			if (hasMissing) {
+				newErrs.variables = 'All variables must have a name.';
+			} else if (invalidName) {
+				newErrs.variables = validatePromptVariableName(invalidName.name);
+			} else if (hasDupes) {
+				newErrs.variables = 'Variable names must be unique.';
+			} else if (badEnum) {
+				newErrs.variables = 'Enum variables must include at least one enum value.';
+			} else if (badEnumDefault) {
+				newErrs.variables = 'Enum defaults must be one of the enum values.';
+			} else if (badStatic) {
 				newErrs.variables = 'Static variables must include a non-empty static value.';
 			} else if (badStaticRequired) {
 				newErrs.variables = 'Static variables cannot be required.';
@@ -331,7 +354,9 @@ function AddEditPromptTemplateModalContent({
 				newErrs.variables = 'All placeholders used in blocks must be declared as variables.';
 			} else if (unusedUserVariable) {
 				newErrs.variables = 'User variables must be referenced by at least one block.';
-			} else newErrs = omitManyKeys(newErrs, ['variables']);
+			} else {
+				newErrs = omitManyKeys(newErrs, ['variables']);
+			}
 		} else {
 			newErrs = omitManyKeys(newErrs, [field]);
 		}
@@ -342,7 +367,9 @@ function AddEditPromptTemplateModalContent({
 	const validateForm = (state: PromptTemplateFormData): ErrorState => {
 		let newErrs: ErrorState = {};
 		newErrs = validateField('displayName', state.displayName, state, newErrs);
-		if (!isEditMode) newErrs = validateField('slug', state.slug, state, newErrs);
+		if (!isEditMode) {
+			newErrs = validateField('slug', state.slug, state, newErrs);
+		}
 		newErrs = validateField('version', state.version, state, newErrs);
 		newErrs = validateField('blocks', 'x', state, newErrs);
 		newErrs = validateField('variables', 'x', state, newErrs);
@@ -356,7 +383,9 @@ function AddEditPromptTemplateModalContent({
 
 	const applyPrefill = (key: string) => {
 		const source = prefillSourceMap[key];
-		if (!source) return;
+		if (!source) {
+			return;
+		}
 
 		const src = source.template;
 		const next: PromptTemplateFormData = {
@@ -492,14 +521,18 @@ function AddEditPromptTemplateModalContent({
 		e.preventDefault();
 		e.stopPropagation();
 
-		if (isViewMode) return;
+		if (isViewMode) {
+			return;
+		}
 
 		setSubmitError('');
 
 		const newErrs = validateForm(formData);
 		setErrors(newErrs);
 
-		if (Object.keys(newErrs).length > 0) return;
+		if (Object.keys(newErrs).length > 0) {
+			return;
+		}
 
 		const tagsArr = formData.tags
 			.split(',')
@@ -546,7 +579,9 @@ function AddEditPromptTemplateModalContent({
 			onClose={handleDialogClose}
 			onCancel={e => {
 				// Form mode (add/edit): block Esc close. View mode: allow.
-				if (!isViewMode) e.preventDefault();
+				if (!isViewMode) {
+					e.preventDefault();
+				}
 			}}
 		>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-hidden rounded-2xl p-0">
@@ -1096,8 +1131,12 @@ function AddEditPromptTemplateModalContent({
 }
 
 export function AddEditPromptTemplateModal(props: AddEditPromptTemplateModalProps) {
-	if (!props.isOpen) return null;
-	if (typeof document === 'undefined' || !document.body) return null;
+	if (!props.isOpen) {
+		return null;
+	}
+	if (typeof document === 'undefined' || !document.body) {
+		return null;
+	}
 
 	const remountKey = props.initialData
 		? `${props.mode ?? 'auto'}:${props.initialData.bundleID}:${props.initialData.template.id}:${props.initialData.template.version}:${props.initialData.template.modifiedAt}`

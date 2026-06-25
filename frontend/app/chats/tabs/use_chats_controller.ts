@@ -120,10 +120,14 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 	);
 
 	const markInputMounted = useCallback((tabId: string) => {
-		if (!tabId) return;
+		if (!tabId) {
+			return;
+		}
 
 		setMountedInputTabIds(prev => {
-			if (prev.has(tabId)) return prev;
+			if (prev.has(tabId)) {
+				return prev;
+			}
 			const next = new Set(...prev, tabId);
 			return next;
 		});
@@ -154,7 +158,9 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 
 	const selectTab = useCallback(
 		(nextTabId: string) => {
-			if (!nextTabId) return;
+			if (!nextTabId) {
+				return;
+			}
 
 			selectedTabIdRef.current = nextTabId;
 			markInputMounted(nextTabId);
@@ -257,7 +263,9 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		(tabId: string, updater: (tab: ChatTabState) => ChatTabState) => {
 			const current = tabsRef.current;
 			const idx = current.findIndex(tab => tab.tabId === tabId);
-			if (idx === -1) return;
+			if (idx === -1) {
+				return;
+			}
 
 			const next = current.slice();
 			next[idx] = updater(next[idx]);
@@ -269,7 +277,9 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 	const ensureTabLoaded = useCallback(
 		(tabId: string): Promise<void> => {
 			const existing = hydratePromiseByTabRef.current.get(tabId);
-			if (existing) return existing;
+			if (existing) {
+				return existing;
+			}
 
 			const tab = tabsRef.current.find(current => current.tabId === tabId);
 			if (!tab || tab.isLoaded || tab.isHydrating || !tab.isPersisted || !tab.conversation.id) {
@@ -290,7 +300,9 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			const promise = (async () => {
 				try {
 					const stored = await conversationStoreAPI.getConversation(tab.conversation.id, tab.conversation.title, true);
-					if (!controllerAliveRef.current) return;
+					if (!controllerAliveRef.current) {
+						return;
+					}
 
 					if (!stored) {
 						updateTab(tabId, prev => ({
@@ -321,8 +333,12 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 					}));
 
 					requestAnimationFrame(() => {
-						if (!controllerAliveRef.current) return;
-						if (!tabsRef.current.some(current => current.tabId === tabId)) return;
+						if (!controllerAliveRef.current) {
+							return;
+						}
+						if (!tabsRef.current.some(current => current.tabId === tabId)) {
+							return;
+						}
 
 						conversationAreaRef.current?.syncComposerFromConversation(tabId, hydrated);
 						updateTab(tabId, prev => ({
@@ -334,7 +350,9 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 						}));
 					});
 				} catch (error) {
-					if (!controllerAliveRef.current) return;
+					if (!controllerAliveRef.current) {
+						return;
+					}
 
 					console.error(error);
 					updateTab(tabId, prev => ({
@@ -463,7 +481,9 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 	const saveUpdatedConversation = useCallback(
 		(tabId: string, updatedConv: Conversation, titleWasExternallyChanged = false) => {
 			const tab = tabsRef.current.find(t => t.tabId === tabId);
-			if (!tab) return;
+			if (!tab) {
+				return;
+			}
 
 			let newTitle = updatedConv.title;
 
@@ -520,7 +540,9 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 
 	const getOrCreateScratchTabForStarter = useCallback((): string => {
 		const scratch = tabsRef.current.find(isScratchTab);
-		if (scratch) return scratch.tabId;
+		if (scratch) {
+			return scratch.tabId;
+		}
 
 		const nextScratch = createEmptyTab();
 		touchTab(nextScratch.tabId);
@@ -534,7 +556,9 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 	const preloadWorkflowStarter = useCallback(
 		async (starter: ChatWorkflowStarter): Promise<boolean> => {
 			const targetId = getOrCreateScratchTabForStarter();
-			if (!targetId) return false;
+			if (!targetId) {
+				return false;
+			}
 
 			selectTab(targetId);
 
@@ -543,7 +567,9 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 					resolve();
 				})
 			);
-			if (!controllerAliveRef.current) return false;
+			if (!controllerAliveRef.current) {
+				return false;
+			}
 
 			const applied = await conversationAreaRef.current?.applyWorkflowStarter(targetId, starter);
 			if (applied) {
@@ -557,13 +583,17 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 	const openNewTab = useCallback(() => {
 		const scratch = tabsRef.current.find(isScratchTab) ?? null;
 		const targetId = scratch?.tabId ?? selectedTabIdRef.current;
-		if (!targetId) return;
+		if (!targetId) {
+			return;
+		}
 
 		selectTab(targetId);
 
 		requestAnimationFrame(() => {
 			const area = conversationAreaRef.current;
-			if (!area) return;
+			if (!area) {
+				return;
+			}
 
 			void area.resetComposerForNewConversation(targetId).finally(() => {
 				area.focusInput(targetId);
@@ -575,7 +605,9 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 		(tabId: string) => {
 			const current = tabsRef.current;
 			const idx = current.findIndex(tab => tab.tabId === tabId);
-			if (idx === -1) return;
+			if (idx === -1) {
+				return;
+			}
 
 			const wasActive = tabId === selectedTabIdRef.current;
 
@@ -600,14 +632,18 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 	const cycleTabBy = useCallback(
 		(delta: number) => {
 			const current = tabsRef.current;
-			if (current.length < 2) return;
+			if (current.length < 2) {
+				return;
+			}
 
 			const activeId = selectedTabIdRef.current;
 			const idx = current.findIndex(tab => tab.tabId === activeId);
 			const from = Math.max(idx, 0);
 			const nextIndex = (from + delta + current.length) % current.length;
 			const nextId = current[nextIndex]?.tabId;
-			if (!nextId) return;
+			if (!nextId) {
+				return;
+			}
 
 			selectTab(nextId);
 			requestAnimationFrame(() => {
@@ -628,10 +664,14 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 	const renameTabTitle = useCallback(
 		(tabId: string, newTitle: string) => {
 			const tab = tabsRef.current.find(t => t.tabId === tabId);
-			if (!tab) return;
+			if (!tab) {
+				return;
+			}
 
 			const sanitized = sanitizeConversationTitle(newTitle.trim());
-			if (!sanitized || sanitized === tab.conversation.title) return;
+			if (!sanitized || sanitized === tab.conversation.title) {
+				return;
+			}
 
 			const updatedConv: Conversation = {
 				...tab.conversation,
@@ -655,7 +695,9 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 
 			try {
 				const selectedChat = await conversationStoreAPI.getConversation(item.id, item.title, true);
-				if (!controllerAliveRef.current) return;
+				if (!controllerAliveRef.current) {
+					return;
+				}
 
 				if (!selectedChat) {
 					updateTab(tabId, tab => ({
@@ -686,8 +728,12 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 				conversationAreaRef.current?.resetScrollToTop(tabId);
 
 				requestAnimationFrame(() => {
-					if (!controllerAliveRef.current) return;
-					if (!tabsRef.current.some(current => current.tabId === tabId)) return;
+					if (!controllerAliveRef.current) {
+						return;
+					}
+					if (!tabsRef.current.some(current => current.tabId === tabId)) {
+						return;
+					}
 
 					conversationAreaRef.current?.syncComposerFromConversation(tabId, hydrated);
 
@@ -700,7 +746,9 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 					}));
 				});
 			} catch (error) {
-				if (!controllerAliveRef.current) return;
+				if (!controllerAliveRef.current) {
+					return;
+				}
 
 				console.error(error);
 				updateTab(tabId, tab => ({
@@ -726,7 +774,9 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 
 			const scratch = tabsRef.current.find(isScratchTab);
 			const targetId = scratch?.tabId ?? selectedTabIdRef.current;
-			if (!targetId) return;
+			if (!targetId) {
+				return;
+			}
 
 			selectTab(targetId);
 			await loadConversationIntoTab(targetId, item);
@@ -792,7 +842,9 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 
 	const getConversationForExport = useCallback(async (): Promise<string> => {
 		const tab = tabsRef.current.find(current => current.tabId === selectedTabIdRef.current);
-		if (!tab) return JSON.stringify(null, null, 2);
+		if (!tab) {
+			return JSON.stringify(null, null, 2);
+		}
 
 		const selectedChat = await conversationStoreAPI.getConversation(tab.conversation.id, tab.conversation.title, true);
 		return JSON.stringify(selectedChat ?? null, null, 2);

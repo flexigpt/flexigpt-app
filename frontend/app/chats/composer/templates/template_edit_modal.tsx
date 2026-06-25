@@ -73,7 +73,9 @@ function TemplateEditModalContent({ onClose, tsenode, editor, path }: Omit<Templ
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 		let raf1 = 0;
 		let raf2 = 0;
 		if (!dialog.open) {
@@ -113,7 +115,9 @@ function TemplateEditModalContent({ onClose, tsenode, editor, path }: Omit<Templ
 	};
 
 	const handleDialogClose = () => {
-		if (isUnmountingRef.current) return;
+		if (isUnmountingRef.current) {
+			return;
+		}
 		onClose();
 	};
 
@@ -337,8 +341,12 @@ function TemplateEditModalContent({ onClose, tsenode, editor, path }: Omit<Templ
 }
 
 export function TemplateEditModal({ open, onClose, tsenode, editor, path }: TemplateEditModalProps) {
-	if (!open) return null;
-	if (typeof document === 'undefined' || !document.body) return null;
+	if (!open) {
+		return null;
+	}
+	if (typeof document === 'undefined' || !document.body) {
+		return null;
+	}
 
 	const modalKey = JSON.stringify({ tsenode, path });
 

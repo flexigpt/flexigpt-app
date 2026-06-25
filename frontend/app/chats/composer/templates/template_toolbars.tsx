@@ -91,7 +91,9 @@ function replaceVariablesForSelectionWithText(
 		.toSorted((a, b) => comparePathDeepestFirst(a[1] as number[], b[1] as number[]))
 		.forEach(([, path]) => {
 			const nentry = NodeApi.get(editor, path);
-			if (!nentry) return;
+			if (!nentry) {
+				return;
+			}
 
 			const name: string = (nentry as TElement).name as string;
 
@@ -203,7 +205,9 @@ export function TemplateToolbars() {
 					: n.bundleID === sel.bundleID &&
 						n.templateSlug === sel.templateSlug &&
 						n.templateVersion === sel.templateVersion) && !used.has(pathKey(p));
-			if (ok) used.add(pathKey(p));
+			if (ok) {
+				used.add(pathKey(p));
+			}
 			return ok;
 		});
 		const id = entry ? pathKey(entry[1]) : `${sel.bundleID}:${sel.templateSlug}:${sel.templateVersion}`;
@@ -213,7 +217,9 @@ export function TemplateToolbars() {
 	// Single-open modal keyed by selection path
 	const [openId, setOpenId] = useState<string | null>(null);
 
-	if (items.length === 0) return null;
+	if (items.length === 0) {
+		return null;
+	}
 
 	return (
 		<div className="border-base-300 sticky top-0 left-0 w-full min-w-0 border-b">

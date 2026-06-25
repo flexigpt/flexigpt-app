@@ -98,10 +98,14 @@ export function useEvent(name: string, options: UseEventOptions<Event, any> = {}
 
 	useEffect(() => {
 		const tgt = target ?? (typeof window !== 'undefined' ? window : undefined);
-		if (!tgt || !('addEventListener' in tgt)) return;
+		if (!tgt || !('addEventListener' in tgt)) {
+			return;
+		}
 
 		const listener = (ev: Event) => {
-			if (filterRef.current && !filterRef.current(ev)) return;
+			if (filterRef.current && !filterRef.current(ev)) {
+				return;
+			}
 
 			if (trackDetailRef.current) {
 				if (mapDetailRef.current) {
@@ -156,7 +160,9 @@ export function emitCustomEvent<Detail = unknown>(
 	init?: Omit<CustomEventInit<Detail>, 'detail'>
 ): boolean {
 	const tgt = target ?? (typeof window !== 'undefined' ? window : undefined);
-	if (!tgt) return false;
+	if (!tgt) {
+		return false;
+	}
 	const ev = new CustomEvent<Detail>(name, { ...init, detail });
 	return tgt.dispatchEvent(ev);
 }

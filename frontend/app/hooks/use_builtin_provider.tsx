@@ -14,7 +14,9 @@ let builtInAuthKeys: ReadonlySet<AuthKeyName> | null = null;
 let initPromise: Promise<void> | null = null;
 
 export function initBuiltIns(): Promise<void> {
-	if (initPromise) return initPromise; // already started
+	if (initPromise) {
+		return initPromise;
+	} // already started
 
 	initPromise = (async () => {
 		/* One single call to the remote/helper func */
@@ -42,7 +44,9 @@ function filterBuiltInPresets(presets: Record<ProviderName, ProviderPreset>): Re
  * @public
  */
 export function getBuiltInPresetsSync(): Readonly<Record<ProviderName, ProviderPreset>> {
-	if (!builtInPresets) throw new Error('initBuiltIns() has not finished');
+	if (!builtInPresets) {
+		throw new Error('initBuiltIns() has not finished');
+	}
 	return builtInPresets;
 }
 
@@ -50,12 +54,16 @@ export function getBuiltInPresetsSync(): Readonly<Record<ProviderName, ProviderP
  * @public
  */
 export function getBuiltInProviderAuthKeyNamesSync(): ReadonlySet<AuthKeyName> {
-	if (!builtInAuthKeys) throw new Error('initBuiltIns() has not finished');
+	if (!builtInAuthKeys) {
+		throw new Error('initBuiltIns() has not finished');
+	}
 	return builtInAuthKeys;
 }
 
 export function isBuiltInProviderAuthKeyName(authKeyType: AuthKeyType, name: AuthKeyName): boolean {
-	if (authKeyType !== AuthKeyTypeProvider) return false;
+	if (authKeyType !== AuthKeyTypeProvider) {
+		return false;
+	}
 	return getBuiltInProviderAuthKeyNamesSync().has(name);
 }
 

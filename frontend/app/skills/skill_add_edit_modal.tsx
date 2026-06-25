@@ -114,7 +114,9 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
 		if (!dialog.open) {
 			try {
@@ -128,7 +130,9 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 
 		if (isAddMode) {
 			focusTimer = window.setTimeout(() => {
-				if (dialog.open) nameInputRef.current?.focus();
+				if (dialog.open) {
+					nameInputRef.current?.focus();
+				}
 			}, 0);
 		}
 
@@ -157,7 +161,9 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 	};
 
 	const handleDialogClose = () => {
-		if (isUnmountingRef.current) return;
+		if (isUnmountingRef.current) {
+			return;
+		}
 		onClose();
 	};
 
@@ -203,8 +209,11 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 				nextErrors.slug = err;
 			} else {
 				const clash = existingSkills.some(x => x.skill.slug === v && x.skill.id !== initialData?.skill.id);
-				if (clash) nextErrors.slug = 'Slug already in use in this bundle.';
-				else nextErrors = omitManyKeys(nextErrors, ['slug']);
+				if (clash) {
+					nextErrors.slug = 'Slug already in use in this bundle.';
+				} else {
+					nextErrors = omitManyKeys(nextErrors, ['slug']);
+				}
 			}
 		} else if (field === 'name') {
 			// Constraint: within a bundle, skill.name cannot be duplicated
@@ -212,15 +221,21 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 			const clash = existingSkills.some(
 				x => normalizeForUniq(x.skill.name) === norm && x.skill.id !== initialData?.skill.id
 			);
-			if (clash) nextErrors.name = 'Skill name must be unique within the bundle.';
-			else nextErrors = omitManyKeys(nextErrors, ['name']);
+			if (clash) {
+				nextErrors.name = 'Skill name must be unique within the bundle.';
+			} else {
+				nextErrors = omitManyKeys(nextErrors, ['name']);
+			}
 		} else if (field === 'tags') {
 			if (v === '') {
 				nextErrors = omitManyKeys(nextErrors, ['tags']);
 			} else {
 				const err = validateTags(val);
-				if (err) nextErrors.tags = err;
-				else nextErrors = omitManyKeys(nextErrors, ['tags']);
+				if (err) {
+					nextErrors.tags = err;
+				} else {
+					nextErrors = omitManyKeys(nextErrors, ['tags']);
+				}
 			}
 		} else {
 			nextErrors = omitManyKeys(nextErrors, [field]);
@@ -235,13 +250,17 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 		next = validateField('slug', state.slug, next);
 		next = validateField('type', state.type, next);
 		next = validateField('location', state.location, next);
-		if (state.tags.trim() !== '') next = validateField('tags', state.tags, next);
+		if (state.tags.trim() !== '') {
+			next = validateField('tags', state.tags, next);
+		}
 		return next;
 	};
 
 	const applyPrefill = (key: string) => {
 		const source = prefillSourceMap[key];
-		if (!source) return;
+		if (!source) {
+			return;
+		}
 
 		const src = source.skill;
 		const next: SkillFormData = {
@@ -265,7 +284,9 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 
 	const onSkillTypeChange = (key: SkillType) => {
 		// UI restriction: only FS skills can be created/edited
-		if (key !== SkillType.FS) return;
+		if (key !== SkillType.FS) {
+			return;
+		}
 		setFormData(prev => ({ ...prev, type: key }));
 		setErrors(prev => validateField('type', key, prev));
 	};
@@ -283,7 +304,9 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 	};
 
 	const isAllValid = useMemo(() => {
-		if (isViewMode) return true;
+		if (isViewMode) {
+			return true;
+		}
 		const hasErrs = Object.values(errors).some(Boolean);
 		const required = formData.name.trim() && formData.slug.trim() && formData.location.trim() && formData.type;
 		return Boolean(required) && !hasErrs;
@@ -293,13 +316,17 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 		e.preventDefault();
 		e.stopPropagation();
 
-		if (isViewMode) return;
+		if (isViewMode) {
+			return;
+		}
 
 		setSubmitError('');
 
 		const nextErrors = validateForm(formData);
 		setErrors(nextErrors);
-		if (Object.values(nextErrors).some(Boolean)) return;
+		if (Object.values(nextErrors).some(Boolean)) {
+			return;
+		}
 
 		const tagsArr = formData.tags
 			.split(',')
@@ -334,7 +361,9 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 			onClose={handleDialogClose}
 			onCancel={e => {
 				// Form mode: block Esc close. View mode: allow.
-				if (!isViewMode) e.preventDefault();
+				if (!isViewMode) {
+					e.preventDefault();
+				}
 			}}
 		>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-hidden rounded-2xl p-0">
@@ -651,8 +680,12 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 }
 
 export function AddEditSkillModal(props: AddEditSkillModalProps) {
-	if (!props.isOpen) return null;
-	if (typeof document === 'undefined' || !document.body) return null;
+	if (!props.isOpen) {
+		return null;
+	}
+	if (typeof document === 'undefined' || !document.body) {
+		return null;
+	}
 
 	const remountKey = props.initialData
 		? `${props.mode ?? 'auto'}:${props.initialData.bundleID}:${props.initialData.skill.id}:${String(

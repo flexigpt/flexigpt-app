@@ -134,7 +134,9 @@ export default function Root() {
 		let cancelScheduled: (() => void) | undefined;
 
 		const startWorker = () => {
-			if (cancelled) return;
+			if (cancelled) {
+				return;
+			}
 
 			try {
 				void Promise.resolve(ensureWorker()).catch((error: unknown) => {
@@ -178,7 +180,9 @@ export default function Root() {
 		attachmentsDropAPI.setNoTargetHandler(() => {
 			try {
 				const p = pathnameRef.current || '';
-				if (p.startsWith('/chats')) return;
+				if (p.startsWith('/chats')) {
+					return;
+				}
 				navigate('/chats', { replace: false });
 			} catch (error) {
 				reportFrontendError(error, { phase: 'attachments_drop.no_target_handler' });
@@ -205,7 +209,9 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
 
 	useEffect(() => {
 		const isNotFound = isRouteErrorResponse(error) && error.status === 404;
-		if (isNotFound) return;
+		if (isNotFound) {
+			return;
+		}
 
 		// eslint-disable-next-line react-hooks/set-state-in-effect, react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setCrashCount(recordFrontendCrash('react_router.root_error_boundary'));

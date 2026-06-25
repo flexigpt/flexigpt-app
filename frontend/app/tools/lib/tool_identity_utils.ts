@@ -18,7 +18,9 @@ export function toolIdentityKey(
  *   "toolSlug"
  */
 export function getPrettyToolName(name: string): string {
-	if (!name) return 'Tool';
+	if (!name) {
+		return 'Tool';
+	}
 	let base = name;
 	if (base.includes('/')) {
 		const parts = base.split('/');

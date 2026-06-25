@@ -203,7 +203,9 @@ export default function ToolsPage() {
 	);
 
 	const handleBundleDelete = async () => {
-		if (!bundleToDelete) return;
+		if (!bundleToDelete) {
+			return;
+		}
 
 		try {
 			await toolStoreAPI.deleteToolBundle(bundleToDelete.id);

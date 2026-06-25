@@ -25,10 +25,14 @@ export function collectToolCallsFromInputs(
 	const map = existing ?? new Map<string, ToolCall>();
 
 	const addCall = (call?: ToolCall) => {
-		if (call?.callID) map.set(call.callID, call);
+		if (call?.callID) {
+			map.set(call.callID, call);
+		}
 	};
 
-	if (!inputs) return map;
+	if (!inputs) {
+		return map;
+	}
 
 	for (const iu of inputs) {
 		switch (iu.kind) {
@@ -56,10 +60,14 @@ export function collectToolCallsFromOutputs(
 	const map = existing ?? new Map<string, ToolCall>();
 
 	const addCall = (call?: ToolCall) => {
-		if (call?.callID) map.set(call.callID, call);
+		if (call?.callID) {
+			map.set(call.callID, call);
+		}
 	};
 
-	if (!outputs) return map;
+	if (!outputs) {
+		return map;
+	}
 
 	for (const o of outputs) {
 		switch (o.kind) {
@@ -84,7 +92,9 @@ export function collectToolCallsFromOutputs(
  * Best-effort short summary of tool-call arguments for chip labels.
  */
 function summarizeToolCallArguments(args: string): string | undefined {
-	if (!args) return undefined;
+	if (!args) {
+		return undefined;
+	}
 	try {
 		const parsed = JSON.parse(args);
 		if (parsed === null || typeof parsed !== 'object') {

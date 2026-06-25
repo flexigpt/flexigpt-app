@@ -44,7 +44,9 @@ function joinDiffTextParts(parts: string[]): string {
 }
 
 function isDiffPartHunkComplete(diffPart: string, expectedHunks: number | undefined): boolean {
-	if (typeof expectedHunks !== 'number' || expectedHunks <= 0) return true;
+	if (typeof expectedHunks !== 'number' || expectedHunks <= 0) {
+		return true;
+	}
 	return diffPart.split('\n').filter(line => line.startsWith('@@')).length === expectedHunks;
 }
 
@@ -65,8 +67,12 @@ function resolveRequestDiffText(
 	targets: EditableUnifiedDiffTarget[],
 	options?: DiffApplyRunOptions
 ): string | undefined {
-	if (options?.diffText?.trim()) return options.diffText;
-	if (options?.mergeOutput) return buildScopedDiffText(targets);
+	if (options?.diffText?.trim()) {
+		return options.diffText;
+	}
+	if (options?.mergeOutput) {
+		return buildScopedDiffText(targets);
+	}
 	return fullDiffText;
 }
 
@@ -74,7 +80,9 @@ function getApplicableTargetsForOutput(
 	targets: EditableUnifiedDiffTarget[],
 	output: ApplyUnifiedDiffOut | undefined
 ): EditableUnifiedDiffTarget[] {
-	if (!output) return [];
+	if (!output) {
+		return [];
+	}
 
 	if (output.files && output.files.length > 0) {
 		return targets.filter(target => target.ok !== false && target.status === ApplyUnifiedDiffStatus.Applicable);
@@ -199,12 +207,20 @@ function formatCompactFileCount(count: number): string {
 }
 
 function getHeaderDetailsTone(status: ControlStatus, diagnostics: ApplyUnifiedDiffDiagnostic[]): HeaderButtonTone {
-	if (status === 'blocked') return 'error';
-	if (status === 'needs-info') return 'warning';
+	if (status === 'blocked') {
+		return 'error';
+	}
+	if (status === 'needs-info') {
+		return 'warning';
+	}
 
 	const highest = getHighestDiagnosticLevel(diagnostics);
-	if (highest === ApplyUnifiedDiffDiagnosticLevel.Error) return 'error';
-	if (highest === ApplyUnifiedDiffDiagnosticLevel.Warning) return 'warning';
+	if (highest === ApplyUnifiedDiffDiagnosticLevel.Error) {
+		return 'error';
+	}
+	if (highest === ApplyUnifiedDiffDiagnosticLevel.Warning) {
+		return 'warning';
+	}
 
 	return 'neutral';
 }
@@ -218,7 +234,9 @@ function getApplyResolvedIdentityPaths(file: { resolvedPath?: string; targetPath
 }
 
 function applyOutputFileMatchesTarget(file: ApplyUnifiedDiffFileOut, target: ApplyUnifiedDiffFileTarget): boolean {
-	if (file.fileKey && target.fileKey && file.fileKey === target.fileKey) return true;
+	if (file.fileKey && target.fileKey && file.fileKey === target.fileKey) {
+		return true;
+	}
 
 	const filePatchPaths = getApplyPatchIdentityPaths(file);
 	const targetPatchPaths = getApplyPatchIdentityPaths(target);
@@ -240,10 +258,14 @@ function findRequestTargetForOutputFile(
 	usedTargetIndexes: Set<number>
 ): { target: ApplyUnifiedDiffFileTarget; index: number } | undefined {
 	for (let index = 0; index < targets.length; index += 1) {
-		if (usedTargetIndexes.has(index)) continue;
+		if (usedTargetIndexes.has(index)) {
+			continue;
+		}
 
 		const target = targets[index];
-		if (!target) continue;
+		if (!target) {
+			continue;
+		}
 
 		if (applyOutputFileMatchesTarget(file, target)) {
 			return { target, index };
@@ -257,7 +279,9 @@ function hydrateApplyOutputWithRequestTargets(
 	output: ApplyUnifiedDiffOut,
 	requestTargets: ApplyUnifiedDiffFileTarget[]
 ): ApplyUnifiedDiffOut {
-	if (!output.files?.length || requestTargets.length === 0) return output;
+	if (!output.files?.length || requestTargets.length === 0) {
+		return output;
+	}
 
 	const outputFiles = output.files;
 	const usedTargetIndexes = new Set<number>();
@@ -276,7 +300,9 @@ function hydrateApplyOutputWithRequestTargets(
 			target = requestTargets[0];
 		}
 
-		if (!target) return file;
+		if (!target) {
+			return file;
+		}
 
 		return {
 			...file,
@@ -298,7 +324,9 @@ function mergeApplyUnifiedDiffOutput(
 	previous: ApplyUnifiedDiffOut | undefined,
 	scoped: ApplyUnifiedDiffOut
 ): ApplyUnifiedDiffOut {
-	if (!previous?.files?.length || !scoped.files?.length) return scoped;
+	if (!previous?.files?.length || !scoped.files?.length) {
+		return scoped;
+	}
 
 	const files = [...previous.files];
 
@@ -347,13 +375,24 @@ function getAggregateStatusFromFiles(
 	files: ApplyUnifiedDiffFileOut[],
 	fallbackStatus: ApplyUnifiedDiffStatus
 ): ApplyUnifiedDiffStatus {
-	if (files.some(file => file.status === ApplyUnifiedDiffStatus.Error)) return ApplyUnifiedDiffStatus.Error;
-	if (files.some(file => file.status === ApplyUnifiedDiffStatus.Conflict)) return ApplyUnifiedDiffStatus.Conflict;
-	if (files.some(file => file.status === ApplyUnifiedDiffStatus.NeedsInfo)) return ApplyUnifiedDiffStatus.NeedsInfo;
-	if (files.some(file => file.status === ApplyUnifiedDiffStatus.Applicable)) return ApplyUnifiedDiffStatus.Applicable;
-	if (files.every(file => file.status === ApplyUnifiedDiffStatus.AlreadyApplied))
+	if (files.some(file => file.status === ApplyUnifiedDiffStatus.Error)) {
+		return ApplyUnifiedDiffStatus.Error;
+	}
+	if (files.some(file => file.status === ApplyUnifiedDiffStatus.Conflict)) {
+		return ApplyUnifiedDiffStatus.Conflict;
+	}
+	if (files.some(file => file.status === ApplyUnifiedDiffStatus.NeedsInfo)) {
+		return ApplyUnifiedDiffStatus.NeedsInfo;
+	}
+	if (files.some(file => file.status === ApplyUnifiedDiffStatus.Applicable)) {
+		return ApplyUnifiedDiffStatus.Applicable;
+	}
+	if (files.every(file => file.status === ApplyUnifiedDiffStatus.AlreadyApplied)) {
 		return ApplyUnifiedDiffStatus.AlreadyApplied;
-	if (files.every(file => file.status === ApplyUnifiedDiffStatus.Applied)) return ApplyUnifiedDiffStatus.Applied;
+	}
+	if (files.every(file => file.status === ApplyUnifiedDiffStatus.Applied)) {
+		return ApplyUnifiedDiffStatus.Applied;
+	}
 	return fallbackStatus;
 }
 
@@ -361,7 +400,9 @@ function mergeApplyFileTargets(
 	existingTargets: ApplyUnifiedDiffFileTarget[],
 	nextTargets: ApplyUnifiedDiffFileTarget[]
 ): ApplyUnifiedDiffFileTarget[] {
-	if (nextTargets.length === 0) return existingTargets;
+	if (nextTargets.length === 0) {
+		return existingTargets;
+	}
 
 	const merged = [...existingTargets];
 
@@ -383,7 +424,9 @@ function mergeApplyFileTargets(
 }
 
 function applyOutputFilesMatch(left: ApplyUnifiedDiffFileOut, right: ApplyUnifiedDiffFileOut): boolean {
-	if (left.fileKey && right.fileKey && left.fileKey === right.fileKey) return true;
+	if (left.fileKey && right.fileKey && left.fileKey === right.fileKey) {
+		return true;
+	}
 
 	const leftPatchPaths = getApplyPatchIdentityPaths(left);
 	const rightPatchPaths = getApplyPatchIdentityPaths(right);
@@ -400,7 +443,9 @@ function applyOutputFilesMatch(left: ApplyUnifiedDiffFileOut, right: ApplyUnifie
 }
 
 function fileTargetsMatch(left: ApplyUnifiedDiffFileTarget, right: ApplyUnifiedDiffFileTarget): boolean {
-	if (left.fileKey && right.fileKey && left.fileKey === right.fileKey) return true;
+	if (left.fileKey && right.fileKey && left.fileKey === right.fileKey) {
+		return true;
+	}
 	return haveSharedPathIdentity([left.newPath, left.oldPath], [right.newPath, right.oldPath]);
 }
 
@@ -413,17 +458,33 @@ function getHeaderStatusSummary(
 	const blockedCount = Math.max(0, counts.blocked - counts.needsInfo);
 
 	if (!output) {
-		if (counts.unknown > 0) parts.push(`${counts.unknown} pending`);
+		if (counts.unknown > 0) {
+			parts.push(`${counts.unknown} pending`);
+		}
 		return parts.join(' · ');
 	}
 
-	if (counts.applicable > 0) parts.push(`${counts.applicable} applicable`);
-	if (counts.applied > 0) parts.push(`${counts.applied} applied`);
-	if (counts.alreadyApplied > 0) parts.push(`${counts.alreadyApplied} already applied`);
-	if (counts.needsInfo > 0) parts.push(`${counts.needsInfo} need info`);
-	if (blockedCount > 0) parts.push(`${blockedCount} blocked`);
-	if (counts.notApplicable > 0 && blockedCount === 0) parts.push(`${counts.notApplicable} not applicable`);
-	if (counts.unknown > 0) parts.push(`${counts.unknown} pending`);
+	if (counts.applicable > 0) {
+		parts.push(`${counts.applicable} applicable`);
+	}
+	if (counts.applied > 0) {
+		parts.push(`${counts.applied} applied`);
+	}
+	if (counts.alreadyApplied > 0) {
+		parts.push(`${counts.alreadyApplied} already applied`);
+	}
+	if (counts.needsInfo > 0) {
+		parts.push(`${counts.needsInfo} need info`);
+	}
+	if (blockedCount > 0) {
+		parts.push(`${blockedCount} blocked`);
+	}
+	if (counts.notApplicable > 0 && blockedCount === 0) {
+		parts.push(`${counts.notApplicable} not applicable`);
+	}
+	if (counts.unknown > 0) {
+		parts.push(`${counts.unknown} pending`);
+	}
 
 	return parts.join(' · ');
 }
@@ -521,7 +582,9 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 
 	const buildDiffTextForEditableTargets = useCallback(
 		(targets: EditableUnifiedDiffTarget[]): string | undefined => {
-			if (targets.length === 0) return diffText;
+			if (targets.length === 0) {
+				return diffText;
+			}
 
 			const parts: string[] = [];
 			const seen = new Set<string>();
@@ -538,17 +601,25 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 					return undefined;
 				}
 
-				if (split && !split.verified) return undefined;
-				if (!isDiffPartHunkComplete(part, target.hunks)) return undefined;
+				if (split && !split.verified) {
+					return undefined;
+				}
+				if (!isDiffPartHunkComplete(part, target.hunks)) {
+					return undefined;
+				}
 
 				const key = part.replaceAll(/\n+$/g, '');
-				if (seen.has(key)) continue;
+				if (seen.has(key)) {
+					continue;
+				}
 
 				seen.add(key);
 				parts.push(part);
 			}
 
-			if (parts.length === 0) return targets.length <= 1 ? diffText : undefined;
+			if (parts.length === 0) {
+				return targets.length <= 1 ? diffText : undefined;
+			}
 			return joinDiffTextParts(parts);
 		},
 		[diffText, fallbackParsed.files.length, language]
@@ -575,7 +646,9 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 					candidatePaths: normalizedCandidatePaths.length > 0 ? normalizedCandidatePaths : undefined,
 				});
 
-				if (seq !== requestSeqRef.current) return undefined;
+				if (seq !== requestSeqRef.current) {
+					return undefined;
+				}
 
 				const output = hydrateApplyOutputWithRequestTargets(rawOutput, targets);
 				const viewOutput = options?.mergeOutput ? mergeApplyUnifiedDiffOutput(stateRef.current.output, output) : output;
@@ -590,7 +663,9 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 
 				return output;
 			} catch (error) {
-				if (seq !== requestSeqRef.current) return undefined;
+				if (seq !== requestSeqRef.current) {
+					return undefined;
+				}
 
 				setControlState(previous => ({
 					...previous,
@@ -638,7 +713,9 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 			...options,
 			diffText: requestDiffText,
 		});
-		if (!dryRunOutput) return;
+		if (!dryRunOutput) {
+			return;
+		}
 
 		const dryRunViewOutput = options?.mergeOutput ? (stateRef.current.output ?? dryRunOutput) : dryRunOutput;
 
@@ -679,7 +756,9 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 				fileTargets: applyTargets.length > 0 ? applyTargets : undefined,
 				candidatePaths: normalizedCandidatePaths.length > 0 ? normalizedCandidatePaths : undefined,
 			});
-			if (applySeq !== requestSeqRef.current) return;
+			if (applySeq !== requestSeqRef.current) {
+				return;
+			}
 
 			const output = hydrateApplyOutputWithRequestTargets(rawOutput, applyTargets);
 
@@ -693,7 +772,9 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 				output: viewOutput,
 			});
 		} catch (error) {
-			if (applySeq !== requestSeqRef.current) return;
+			if (applySeq !== requestSeqRef.current) {
+				return;
+			}
 
 			setControlState(previous => ({
 				...previous,
@@ -703,7 +784,9 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 		}
 	};
 
-	if (!isDiffLike || isBusy) return null;
+	if (!isDiffLike || isBusy) {
+		return null;
+	}
 
 	const title = buildTitle(state, fallbackParsed);
 	const buttonTitle = getButtonTitle(state.status);

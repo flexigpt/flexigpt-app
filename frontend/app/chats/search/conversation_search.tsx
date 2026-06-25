@@ -96,7 +96,9 @@ export const ConversationSearch = forwardRef<ConversationSearchHandle, Conversat
 
 		const handleKeyDown = useCallback(
 			(event: KeyboardEvent<HTMLInputElement>) => {
-				if (!isOpen) return;
+				if (!isOpen) {
+					return;
+				}
 
 				switch (event.key) {
 					case 'ArrowDown':

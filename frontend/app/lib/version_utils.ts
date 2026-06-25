@@ -26,7 +26,9 @@ function parseSemver(version?: string): ParsedSemver | null {
 	const raw = (version ?? '').trim();
 	const match = raw.match(SEMVER_REGEX);
 
-	if (!match) return null;
+	if (!match) {
+		return null;
+	}
 
 	const prerelease = (match[5] ?? '')
 		.split('.')
@@ -51,28 +53,48 @@ function compareSemverIdentifier(left: SemverIdentifier, right: SemverIdentifier
 	}
 
 	// Numeric identifiers always have lower precedence than non-numeric ones.
-	if (leftIsNumber) return -1;
-	if (rightIsNumber) return 1;
+	if (leftIsNumber) {
+		return -1;
+	}
+	if (rightIsNumber) {
+		return 1;
+	}
 
 	const leftString = left;
 	const rightString = right;
 
-	if (leftString < rightString) return -1;
-	if (leftString > rightString) return 1;
+	if (leftString < rightString) {
+		return -1;
+	}
+	if (leftString > rightString) {
+		return 1;
+	}
 	return 0;
 }
 
 function compareSemver(left: ParsedSemver, right: ParsedSemver): number {
-	if (left.major !== right.major) return left.major - right.major;
-	if (left.minor !== right.minor) return left.minor - right.minor;
-	if (left.patch !== right.patch) return left.patch - right.patch;
+	if (left.major !== right.major) {
+		return left.major - right.major;
+	}
+	if (left.minor !== right.minor) {
+		return left.minor - right.minor;
+	}
+	if (left.patch !== right.patch) {
+		return left.patch - right.patch;
+	}
 
 	const leftPrerelease = left.prerelease;
 	const rightPrerelease = right.prerelease;
 
-	if (leftPrerelease.length === 0 && rightPrerelease.length === 0) return 0;
-	if (leftPrerelease.length === 0) return 1;
-	if (rightPrerelease.length === 0) return -1;
+	if (leftPrerelease.length === 0 && rightPrerelease.length === 0) {
+		return 0;
+	}
+	if (leftPrerelease.length === 0) {
+		return 1;
+	}
+	if (rightPrerelease.length === 0) {
+		return -1;
+	}
 
 	const len = Math.max(leftPrerelease.length, rightPrerelease.length);
 
@@ -80,11 +102,17 @@ function compareSemver(left: ParsedSemver, right: ParsedSemver): number {
 		const leftPart = leftPrerelease[i];
 		const rightPart = rightPrerelease[i];
 
-		if (leftPart === undefined) return -1;
-		if (rightPart === undefined) return 1;
+		if (leftPart === undefined) {
+			return -1;
+		}
+		if (rightPart === undefined) {
+			return 1;
+		}
 
 		const byPart = compareSemverIdentifier(leftPart, rightPart);
-		if (byPart !== 0) return byPart;
+		if (byPart !== 0) {
+			return byPart;
+		}
 	}
 
 	return 0;
@@ -96,7 +124,9 @@ function formatSuggestedVersion(hasV: boolean, major: number, minor: number): st
 
 function getMaxSemverVersion(versions: ParsedSemver[]): ParsedSemver | undefined {
 	return versions.reduce<ParsedSemver | undefined>((max, current) => {
-		if (!max) return current;
+		if (!max) {
+			return current;
+		}
 		return compareSemver(current, max) > 0 ? current : max;
 	}, undefined);
 }
@@ -125,8 +155,12 @@ export function compareVersionStrings(left: string, right: string): number {
 export function validateVersion(version: string): string | undefined {
 	const trimmed = version.trim();
 
-	if (!trimmed) return 'Version is required.';
-	if (trimmed.length > 64) return 'Version must be at most 64 characters.';
+	if (!trimmed) {
+		return 'Version is required.';
+	}
+	if (trimmed.length > 64) {
+		return 'Version must be at most 64 characters.';
+	}
 	if (!/^[a-zA-Z0-9.+-]+$/.test(trimmed)) {
 		return 'Version may only contain letters, numbers, "-", ".", and "+".';
 	}

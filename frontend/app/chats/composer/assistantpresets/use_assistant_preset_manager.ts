@@ -162,7 +162,9 @@ export function useAssistantPresetManager(args: {
 	const buildPreparedApplication = useCallback(
 		async (presetKey: string): Promise<AssistantPresetPreparedApplication | null> => {
 			const basePrepared = await prepareAssistantPresetApplication(presetKey);
-			if (!basePrepared) return null;
+			if (!basePrepared) {
+				return null;
+			}
 
 			const preparedSystemPromptSelections = await prepareAssistantPresetSelections(basePrepared.preset);
 

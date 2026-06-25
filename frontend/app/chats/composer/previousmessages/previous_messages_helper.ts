@@ -7,11 +7,15 @@ function isInstructionMessage(message: ConversationMessage): boolean {
 }
 
 function messageHasUserToolOutputs(message: ConversationMessage): boolean {
-	if (message.role !== RoleEnum.User) return false;
+	if (message.role !== RoleEnum.User) {
+		return false;
+	}
 
 	// UI-derived field is the cheapest signal and is present for hydrated history
 	// as well as freshly-built user messages from the editor.
-	if ((message.uiToolOutputs?.length ?? 0) > 0) return true;
+	if ((message.uiToolOutputs?.length ?? 0) > 0) {
+		return true;
+	}
 
 	// Fall back to the persisted/raw input unions for robustness.
 	return (
@@ -42,8 +46,12 @@ function findRequestedPureUserStartIndex(
 	messages: ConversationMessage[],
 	includePreviousMessages: IncludePreviousMessages
 ): number {
-	if (messages.length === 0) return 0;
-	if (includePreviousMessages === 'all') return 0;
+	if (messages.length === 0) {
+		return 0;
+	}
+	if (includePreviousMessages === 'all') {
+		return 0;
+	}
 
 	const safeCount = Math.max(0, includePreviousMessages);
 	const targetPureUserTurns = safeCount + 1; // current turn + N previous pure user turns
@@ -51,7 +59,9 @@ function findRequestedPureUserStartIndex(
 	let seenPureUserTurns = 0;
 
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
-		if (!isPureUserTurn(messages[i])) continue;
+		if (!isPureUserTurn(messages[i])) {
+			continue;
+		}
 
 		seenPureUserTurns += 1;
 		if (seenPureUserTurns >= targetPureUserTurns) {
@@ -78,7 +88,9 @@ function collectPinnedInstructionMessagesBeforeIndex(
 	messages: ConversationMessage[],
 	beforeIdx: number
 ): ConversationMessage[] {
-	if (beforeIdx <= 0) return [];
+	if (beforeIdx <= 0) {
+		return [];
+	}
 	return messages.slice(0, beforeIdx).filter(m => isInstructionMessage(m));
 }
 
@@ -95,11 +107,17 @@ export function sliceMessagesForSend(
 	messages: ConversationMessage[],
 	includePreviousMessages: IncludePreviousMessages
 ): ConversationMessage[] {
-	if (messages.length === 0) return [];
-	if (includePreviousMessages === 'all') return messages;
+	if (messages.length === 0) {
+		return [];
+	}
+	if (includePreviousMessages === 'all') {
+		return messages;
+	}
 
 	const startIdx = findRequestedPureUserStartIndex(messages, includePreviousMessages);
-	if (startIdx <= 0) return messages;
+	if (startIdx <= 0) {
+		return messages;
+	}
 
 	const pinnedInstructionPrefix = collectPinnedInstructionMessagesBeforeIndex(messages, startIdx);
 	if (pinnedInstructionPrefix.length === 0) {

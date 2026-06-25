@@ -56,13 +56,19 @@ function compareAssistantPresetOptions(a: AssistantPresetOptionItem, b: Assistan
 		getAssistantPresetBundleSlug(a),
 		getAssistantPresetBundleSlug(b)
 	);
-	if (bundleSlugCompare !== 0) return bundleSlugCompare;
+	if (bundleSlugCompare !== 0) {
+		return bundleSlugCompare;
+	}
 
 	const presetSlugCompare = assistantPresetSlugCollator.compare(a.preset.slug, b.preset.slug);
-	if (presetSlugCompare !== 0) return presetSlugCompare;
+	if (presetSlugCompare !== 0) {
+		return presetSlugCompare;
+	}
 
 	const presetVersionCompare = assistantPresetSlugCollator.compare(a.preset.version, b.preset.version);
-	if (presetVersionCompare !== 0) return presetVersionCompare;
+	if (presetVersionCompare !== 0) {
+		return presetVersionCompare;
+	}
 
 	return assistantPresetSlugCollator.compare(a.key, b.key);
 }
@@ -169,7 +175,9 @@ export function AssistantPresetDropdown({
 							isDisabled ? (option.isSelectable ? 'cursor-wait opacity-70' : 'cursor-not-allowed opacity-60') : ''
 						}`}
 						onClick={() => {
-							if (isDisabled) return;
+							if (isDisabled) {
+								return;
+							}
 							void (async () => {
 								const ok = await onSelectPreset(option.key);
 								if (ok) {

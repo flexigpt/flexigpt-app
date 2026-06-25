@@ -42,7 +42,9 @@ import { isMCPToolModelSelectable, isMCPToolVisibleToModel } from '@/mcpservers/
 type MCPDiscoveryLoadResult = Pick<MCPComposerServerOption, 'tools' | 'resources' | 'resourceTemplates' | 'prompts'>;
 
 function getErrorMessage(error: unknown, fallback: string): string {
-	if (error instanceof Error && error.message.trim().length > 0) return error.message;
+	if (error instanceof Error && error.message.trim().length > 0) {
+		return error.message;
+	}
 	return fallback;
 }
 
@@ -197,11 +199,15 @@ export function useComposerMCP(): UseComposerMCPResult {
 			);
 
 			const nextOptions = bundleOptions.flat();
-			if (!mountedRef.current) return;
+			if (!mountedRef.current) {
+				return;
+			}
 			optionsRef.current = nextOptions;
 			setOptions(nextOptions);
 		} catch (err) {
-			if (!mountedRef.current) return;
+			if (!mountedRef.current) {
+				return;
+			}
 			setError(getErrorMessage(err, 'Failed to load MCP servers.'));
 		} finally {
 			if (mountedRef.current) {
@@ -219,7 +225,9 @@ export function useComposerMCP(): UseComposerMCPResult {
 		async (bundleID: string, serverID: string, force = false): Promise<MCPDiscoveryLoadResult | undefined> => {
 			const key = mcpServerKey(bundleID, serverID);
 			const current = optionsRef.current.find(option => option.bundle.id === bundleID && option.server.id === serverID);
-			if (!current) return undefined;
+			if (!current) {
+				return undefined;
+			}
 
 			if (!force && current.discoveryLoaded) {
 				return {
@@ -231,7 +239,9 @@ export function useComposerMCP(): UseComposerMCPResult {
 			}
 
 			const existing = discoveryPromisesRef.current.get(key);
-			if (existing) return existing;
+			if (existing) {
+				return existing;
+			}
 			patchOption(bundleID, serverID, {
 				discoveryLoading: true,
 				discoveryError: undefined,
@@ -256,7 +266,9 @@ export function useComposerMCP(): UseComposerMCPResult {
 					resourceTemplatesResult.status === 'rejected' ? getErrorMessage(resourceTemplatesResult.reason, '') : '',
 					promptsResult.status === 'rejected' ? getErrorMessage(promptsResult.reason, '') : '',
 				].filter((message): message is string => message.trim().length > 0);
-				if (!mountedRef.current) return undefined;
+				if (!mountedRef.current) {
+					return undefined;
+				}
 
 				patchOption(bundleID, serverID, {
 					tools,
@@ -269,8 +281,12 @@ export function useComposerMCP(): UseComposerMCPResult {
 				});
 				commitSelectedByServerKey(prev => {
 					const currentSelection = prev[key];
-					if (!currentSelection) return prev;
-					if (currentSelection.toolExposure !== MCPToolExposure.MCPToolExposureAll) return prev;
+					if (!currentSelection) {
+						return prev;
+					}
+					if (currentSelection.toolExposure !== MCPToolExposure.MCPToolExposureAll) {
+						return prev;
+					}
 
 					return {
 						...prev,
@@ -289,7 +305,9 @@ export function useComposerMCP(): UseComposerMCPResult {
 						}
 					: undefined;
 			})().catch((err: unknown) => {
-				if (!mountedRef.current) return undefined;
+				if (!mountedRef.current) {
+					return undefined;
+				}
 
 				patchOption(bundleID, serverID, {
 					discoveryLoading: false,
@@ -330,7 +348,9 @@ export function useComposerMCP(): UseComposerMCPResult {
 				mcpAPI.getMCPServerAuthHealth(bundleID, serverID).catch(() => undefined),
 			]);
 
-			if (!mountedRef.current) return;
+			if (!mountedRef.current) {
+				return;
+			}
 
 			patchOption(bundleID, serverID, { runtime, authHealth });
 		},
@@ -416,7 +436,9 @@ export function useComposerMCP(): UseComposerMCPResult {
 	);
 
 	const openAuthURL = useCallback((url: string) => {
-		if (!url) return;
+		if (!url) {
+			return;
+		}
 		backendAPI.openURL(url);
 	}, []);
 
@@ -432,7 +454,9 @@ export function useComposerMCP(): UseComposerMCPResult {
 					return next;
 				}
 
-				if (prev[key]) return prev;
+				if (prev[key]) {
+					return prev;
+				}
 
 				const next = {
 					...prev,
@@ -461,7 +485,9 @@ export function useComposerMCP(): UseComposerMCPResult {
 			const key = mcpServerKey(bundleID, serverID);
 			commitSelectedByServerKey(prev => {
 				const current = prev[key];
-				if (!current) return prev;
+				if (!current) {
+					return prev;
+				}
 				const option = optionsRef.current.find(item => item.bundle.id === bundleID && item.server.id === serverID);
 				const next = {
 					...prev,
@@ -488,7 +514,9 @@ export function useComposerMCP(): UseComposerMCPResult {
 			const key = mcpServerKey(bundleID, serverID);
 			commitSelectedByServerKey(prev => {
 				const current = prev[key];
-				if (!current) return prev;
+				if (!current) {
+					return prev;
+				}
 				return {
 					...prev,
 					[key]: {
@@ -503,14 +531,18 @@ export function useComposerMCP(): UseComposerMCPResult {
 
 	const toggleTool = useCallback(
 		(tool: MCPToolCapability, selected: boolean) => {
-			if (selected && !isMCPToolVisibleToModel(tool)) return;
+			if (selected && !isMCPToolVisibleToModel(tool)) {
+				return;
+			}
 
 			const key = mcpServerKey(tool.bundleID, tool.serverID);
 			const selection = toolToSelection(tool);
 
 			commitSelectedByServerKey(prev => {
 				const current = prev[key];
-				if (!current) return prev;
+				if (!current) {
+					return prev;
+				}
 
 				return {
 					...prev,
@@ -532,7 +564,9 @@ export function useComposerMCP(): UseComposerMCPResult {
 
 			commitSelectedByServerKey(prev => {
 				const current = prev[key];
-				if (!current) return prev;
+				if (!current) {
+					return prev;
+				}
 
 				return {
 					...prev,
@@ -557,7 +591,9 @@ export function useComposerMCP(): UseComposerMCPResult {
 			};
 			commitSelectedByServerKey(prev => {
 				const current = prev[key];
-				if (!current) return prev;
+				if (!current) {
+					return prev;
+				}
 
 				return {
 					...prev,
@@ -582,7 +618,9 @@ export function useComposerMCP(): UseComposerMCPResult {
 			};
 			commitSelectedByServerKey(prev => {
 				const current = prev[key];
-				if (!current) return prev;
+				if (!current) {
+					return prev;
+				}
 
 				return {
 					...prev,
@@ -603,7 +641,9 @@ export function useComposerMCP(): UseComposerMCPResult {
 			const key = mcpServerKey(bundleID, serverID);
 			commitSelectedByServerKey(prev => {
 				const current = prev[key];
-				if (!current) return prev;
+				if (!current) {
+					return prev;
+				}
 
 				return {
 					...prev,
@@ -624,7 +664,9 @@ export function useComposerMCP(): UseComposerMCPResult {
 			const key = mcpServerKey(bundleID, serverID);
 			commitSelectedByServerKey(prev => {
 				const current = prev[key];
-				if (!current) return prev;
+				if (!current) {
+					return prev;
+				}
 
 				return {
 					...prev,
@@ -694,8 +736,12 @@ export function useComposerMCP(): UseComposerMCPResult {
 	const selectedServerCount = Object.keys(selectedByServerKey).length;
 
 	const selectedToolCount = Object.values(selectedByServerKey).reduce((sum, selection) => {
-		if (selection.toolExposure === MCPToolExposure.MCPToolExposureNone) return sum;
-		if (selection.selectedTools.length > 0) return sum + selection.selectedTools.length;
+		if (selection.toolExposure === MCPToolExposure.MCPToolExposureNone) {
+			return sum;
+		}
+		if (selection.selectedTools.length > 0) {
+			return sum + selection.selectedTools.length;
+		}
 		return sum + 1;
 	}, 0);
 

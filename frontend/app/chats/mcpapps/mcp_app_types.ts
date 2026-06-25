@@ -47,7 +47,9 @@ export const JSONRPC_ERR_INVALID_PARAMS = -32602;
 export const JSONRPC_ERR_BLOCKED_BY_POLICY = -32001;
 
 export function isJSONRPCResponse(value: unknown): value is JSONRPCResponse {
-	if (!value || typeof value !== 'object') return false;
+	if (!value || typeof value !== 'object') {
+		return false;
+	}
 	const m = value as Partial<JSONRPCResponse> & { method?: unknown };
 	return (
 		m.jsonrpc === '2.0' &&
@@ -58,13 +60,17 @@ export function isJSONRPCResponse(value: unknown): value is JSONRPCResponse {
 }
 
 export function isJSONRPCRequest(value: unknown): value is JSONRPCRequest {
-	if (!value || typeof value !== 'object') return false;
+	if (!value || typeof value !== 'object') {
+		return false;
+	}
 	const m = value as Partial<JSONRPCRequest>;
 	return m.jsonrpc === '2.0' && (typeof m.id === 'number' || typeof m.id === 'string') && typeof m.method === 'string';
 }
 
 export function isJSONRPCNotification(value: unknown): value is JSONRPCNotification {
-	if (!value || typeof value !== 'object') return false;
+	if (!value || typeof value !== 'object') {
+		return false;
+	}
 	const m = value as Partial<JSONRPCNotification>;
 	return m.jsonrpc === '2.0' && typeof m.method === 'string' && !('id' in m);
 }
@@ -73,7 +79,9 @@ export function isJSONRPCNotification(value: unknown): value is JSONRPCNotificat
 export function buildAppInstanceFromToolOutput(output: UIToolOutput): MCPAppInstance | undefined {
 	const app = output.mcpApp;
 	const sel: MCPToolSelection | undefined = output.mcpToolSelection;
-	if (!app?.resourceUri || !sel?.bundleID || !sel.serverID) return undefined;
+	if (!app?.resourceUri || !sel?.bundleID || !sel.serverID) {
+		return undefined;
+	}
 
 	const resourceUri = app.resourceUri;
 	const instanceID = `mcpapp-${sel.serverID}-${output.callID || output.id}`;

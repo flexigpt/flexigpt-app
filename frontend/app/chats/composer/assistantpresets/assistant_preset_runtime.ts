@@ -402,10 +402,18 @@ export function getAssistantPresetModificationSummary(args: {
 		: false;
 
 	const modifiedLabels: string[] = [];
-	if (model) modifiedLabels.push('Model');
-	if (instructions) modifiedLabels.push('Instructions');
-	if (tools) modifiedLabels.push('Tools');
-	if (skills) modifiedLabels.push('Skills');
+	if (model) {
+		modifiedLabels.push('Model');
+	}
+	if (instructions) {
+		modifiedLabels.push('Instructions');
+	}
+	if (tools) {
+		modifiedLabels.push('Tools');
+	}
+	if (skills) {
+		modifiedLabels.push('Skills');
+	}
 
 	return {
 		model,

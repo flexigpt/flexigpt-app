@@ -98,7 +98,9 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 
 	const getFullStreamTextForTab = useCallback((tabId: string) => {
 		const buffer = streamBuffersRef.current.get(tabId);
-		if (!buffer) return '';
+		if (!buffer) {
+			return '';
+		}
 
 		const channel = buffer.text;
 		if (channel.flushedIdx < channel.chunks.length) {
@@ -111,7 +113,9 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 
 	const getFullStreamThinkingForTab = useCallback((tabId: string) => {
 		const buffer = streamBuffersRef.current.get(tabId);
-		if (!buffer) return '';
+		if (!buffer) {
+			return '';
+		}
 
 		const channel = buffer.thinking;
 		if (channel.flushedIdx < channel.chunks.length) {
@@ -154,7 +158,9 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 			bumpStreamVersion(tabId);
 
 			const listeners = streamListenersRef.current.get(tabId);
-			if (!listeners) return;
+			if (!listeners) {
+				return;
+			}
 
 			for (const cb of listeners) {
 				cb();
@@ -165,10 +171,14 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 
 	const notifyStreamSoon = useCallback(
 		(tabId: string) => {
-			if (selectedTabIdRef.current !== tabId) return;
+			if (selectedTabIdRef.current !== tabId) {
+				return;
+			}
 
 			const existingTimer = notifyTimersRef.current.get(tabId) ?? null;
-			if (existingTimer !== null) return;
+			if (existingTimer !== null) {
+				return;
+			}
 
 			const timer = window.setTimeout(() => {
 				notifyTimersRef.current.set(tabId, null);

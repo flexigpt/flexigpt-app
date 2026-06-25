@@ -68,7 +68,9 @@ function getUsefulRangeRect(domRange: Range): DOMRect | undefined {
 	}
 
 	const rect = domRange.getBoundingClientRect();
-	if (rect.width > 0 || rect.height > 0) return rect;
+	if (rect.width > 0 || rect.height > 0) {
+		return rect;
+	}
 
 	return undefined;
 }
@@ -109,7 +111,9 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 	// Throttle docVersion bumps to at most 1/frame to avoid re-render storms on big documents.
 	const docRafRef = useRef<number | null>(null);
 	const scheduleDocRecompute = useCallback(() => {
-		if (docRafRef.current !== null) return;
+		if (docRafRef.current !== null) {
+			return;
+		}
 		docRafRef.current = window.requestAnimationFrame(() => {
 			docRafRef.current = null;
 			syncDocumentDerivedState(true);
@@ -118,7 +122,9 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 	useEffect(() => {
 		return () => {
-			if (docRafRef.current !== null) window.cancelAnimationFrame(docRafRef.current);
+			if (docRafRef.current !== null) {
+				window.cancelAnimationFrame(docRafRef.current);
+			}
 		};
 	}, []);
 
@@ -127,7 +133,9 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 	const cancelScheduledAutoChunk = useCallback(() => {
 		const jobId = idleChunkJobRef.current;
-		if (jobId === null) return;
+		if (jobId === null) {
+			return;
+		}
 
 		const w = window;
 		if (idleChunkJobKindRef.current === 'idle' && typeof w.cancelIdleCallback === 'function') {
@@ -150,10 +158,14 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 	const selectEditorEnd = useCallback(() => {
 		const currentEditor = editorRef.current;
-		if (!currentEditor) return false;
+		if (!currentEditor) {
+			return false;
+		}
 
 		const end = currentEditor.api.end([]);
-		if (!end) return false;
+		if (!end) {
+			return false;
+		}
 
 		try {
 			currentEditor.tf.withoutNormalizing(() => {
@@ -187,7 +199,9 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 	const scrollDomRangeIntoEditorView = useCallback((domRange: Range | null | undefined) => {
 		const container = contentRef.current;
-		if (!container) return;
+		if (!container) {
+			return;
+		}
 
 		const rect = domRange ? getUsefulRangeRect(domRange) : null;
 
@@ -237,10 +251,14 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 	const focusEditorPreservingSelection = useCallback(() => {
 		const currentEditor = editorRef.current;
-		if (!currentEditor || isBusy) return;
+		if (!currentEditor || isBusy) {
+			return;
+		}
 
 		runAfterNextPaint(() => {
-			if (!focusEditableWithoutScrolling(currentEditor)) return;
+			if (!focusEditableWithoutScrolling(currentEditor)) {
+				return;
+			}
 
 			runAfterNextPaint(() => {
 				scrollEditorSelectionIntoView();
@@ -250,10 +268,14 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 	const focusEditorAtEnd = useCallback(() => {
 		const currentEditor = editorRef.current;
-		if (!currentEditor || isBusy) return;
+		if (!currentEditor || isBusy) {
+			return;
+		}
 
 		runAfterNextPaint(() => {
-			if (!focusEditableWithoutScrolling(currentEditor)) return;
+			if (!focusEditableWithoutScrolling(currentEditor)) {
+				return;
+			}
 
 			selectEditorEnd();
 
@@ -265,8 +287,12 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 	}, [focusEditableWithoutScrolling, isBusy, runAfterNextPaint, scrollEditorSelectionIntoView, selectEditorEnd]);
 
 	const autoChunkIfNeeded = useCallback(() => {
-		if (isAutoChunkingRef.current) return;
-		if (!contentRef.current) return;
+		if (isAutoChunkingRef.current) {
+			return;
+		}
+		if (!contentRef.current) {
+			return;
+		}
 
 		const domLen = (contentRef.current.textContent ?? '').length;
 		const ed = editorRef.current;
@@ -280,19 +306,29 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 		// - single paragraph
 		// - only text children
 		const rootChildren = ed.children ?? [];
-		if (rootChildren.length !== 1) return;
+		if (rootChildren.length !== 1) {
+			return;
+		}
 		const p = rootChildren[0];
-		if (!p || p.type !== 'p' || !Array.isArray(p.children)) return;
+		if (!p || p.type !== 'p' || !Array.isArray(p.children)) {
+			return;
+		}
 		const pChildren = p.children;
-		if (pChildren.some(c => typeof c?.text !== 'string')) return;
+		if (pChildren.some(c => typeof c?.text !== 'string')) {
+			return;
+		}
 
 		// Avoid cursor jumps: only chunk/dechunk when user is typing at the end.
-		if (!isCursorAtDocumentEnd(ed)) return;
+		if (!isCursorAtDocumentEnd(ed)) {
+			return;
+		}
 
 		// Chunk: 1 huge leaf -> many leaves
 		if (domLen >= LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS && pChildren.length === 1) {
 			const text = ed.api.string([]);
-			if (text.length < LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS) return;
+			if (text.length < LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS) {
+				return;
+			}
 
 			isAutoChunkingRef.current = true;
 			try {
@@ -309,7 +345,9 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 		// Dechunk: many leaves -> 1 leaf (when user deletes a lot)
 		if (domLen <= LARGE_TEXT_AUTODECHUNK_THRESHOLD_CHARS && pChildren.length > 1) {
 			const text = ed.api.string([]);
-			if (text.length > LARGE_TEXT_AUTODECHUNK_THRESHOLD_CHARS) return;
+			if (text.length > LARGE_TEXT_AUTODECHUNK_THRESHOLD_CHARS) {
+				return;
+			}
 
 			isAutoChunkingRef.current = true;
 			try {
@@ -366,7 +404,9 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 	// Populate editor with effective USER blocks for EACH template selection (once per selectionID)
 	useEffect(() => {
-		if (!selectionInfo.tplNodeWithPath) return;
+		if (!selectionInfo.tplNodeWithPath) {
+			return;
+		}
 		const populated = lastPopulatedSelectionKeyRef.current;
 		const nodes = getTemplateNodesWithPath(editor);
 		const insertedIds: string[] = [];
@@ -375,9 +415,13 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 		const nodesRev = [...nodes].toSorted(compareEntryByPathDeepestFirst);
 
 		for (const [tsenode, originalPath] of nodesRev) {
-			if (!tsenode || !tsenode.selectionID) continue;
+			if (!tsenode || !tsenode.selectionID) {
+				continue;
+			}
 			const selectionID = tsenode.selectionID;
-			if (populated.has(selectionID)) continue;
+			if (populated.has(selectionID)) {
+				continue;
+			}
 
 			// Build children: keep the selection chip, add parsed user text with variable pills
 			const userText = getUserBlocksContent(tsenode);
@@ -427,7 +471,9 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 	const replaceEditorDocument = useCallback(
 		(nextValue: Value, focus: ReplaceEditorDocumentFocusMode = 'none') => {
 			const currentEditor = editorRef.current;
-			if (!currentEditor) return;
+			if (!currentEditor) {
+				return;
+			}
 
 			lastPopulatedSelectionKeyRef.current.clear();
 
@@ -461,7 +507,9 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 			e.stopPropagation();
 
 			const text = e.clipboardData.getData('text/plain');
-			if (!text) return;
+			if (!text) {
+				return;
+			}
 
 			const currentEditor = editorRef.current;
 			clearAllMarks(currentEditor);

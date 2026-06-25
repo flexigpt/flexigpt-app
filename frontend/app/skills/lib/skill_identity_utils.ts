@@ -17,7 +17,9 @@ export function dedupeSkillRefs(refs: SkillRef[]): SkillRef[] {
 	const seen = new Set<string>();
 	for (const r of refs ?? []) {
 		const k = skillRefKey(r);
-		if (seen.has(k)) continue;
+		if (seen.has(k)) {
+			continue;
+		}
 		seen.add(k);
 		out.push(r);
 	}
@@ -46,7 +48,9 @@ export const clampActiveSkillRefsToEnabled = (
 	activeRefs: SkillRef[] | null | undefined
 ): SkillRef[] => {
 	const enabled = normalizeSkillRefs(enabledRefs);
-	if (enabled.length === 0) return [];
+	if (enabled.length === 0) {
+		return [];
+	}
 
 	const allow = new Set(enabled.map(r => skillRefKey(r)));
 	return dedupeSkillRefs((activeRefs ?? []).filter(ref => allow.has(skillRefKey(ref))));
@@ -56,9 +60,13 @@ export const areSkillRefListsEqual = (a: SkillRef[] | null | undefined, b: Skill
 	const left = a ?? [];
 	const right = b ?? [];
 
-	if (left.length !== right.length) return false;
+	if (left.length !== right.length) {
+		return false;
+	}
 	for (let i = 0; i < left.length; i += 1) {
-		if (skillRefKey(left[i]) !== skillRefKey(right[i])) return false;
+		if (skillRefKey(left[i]) !== skillRefKey(right[i])) {
+			return false;
+		}
 	}
 	return true;
 };

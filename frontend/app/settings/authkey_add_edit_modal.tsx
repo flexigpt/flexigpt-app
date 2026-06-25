@@ -172,7 +172,9 @@ function AddEditAuthKeyModalContent({
 
 	/* fetch provider presets once needed */
 	useEffect(() => {
-		if (formData.type !== AuthKeyTypeProvider || hasProviderPresets) return;
+		if (formData.type !== AuthKeyTypeProvider || hasProviderPresets) {
+			return;
+		}
 
 		let cancelled = false;
 
@@ -194,7 +196,9 @@ function AddEditAuthKeyModalContent({
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
 		if (!dialog.open) {
 			try {
@@ -225,7 +229,9 @@ function AddEditAuthKeyModalContent({
 	};
 
 	const handleDialogClose = () => {
-		if (isUnmountingRef.current) return;
+		if (isUnmountingRef.current) {
+			return;
+		}
 		onClose();
 	};
 
@@ -236,10 +242,16 @@ function AddEditAuthKeyModalContent({
 			providerOnly && t === AuthKeyTypeProvider
 				? false
 				: existing.some(k => {
-						if (k.type !== t || k.keyName !== n) return false; // different pair
+						if (k.type !== t || k.keyName !== n) {
+							return false;
+						} // different pair
 						// allow the SAME pair that we're editing / pre-filling
-						if (isEdit && k === initial) return false;
-						if (isPrefilled && prefill?.type === t && prefill.keyName === n) return false;
+						if (isEdit && k === initial) {
+							return false;
+						}
+						if (isPrefilled && prefill?.type === t && prefill.keyName === n) {
+							return false;
+						}
 						return true;
 					}),
 		[existing, initial, isEdit, isPrefilled, prefill, providerOnly]
@@ -251,11 +263,15 @@ function AddEditAuthKeyModalContent({
 
 			switch (field) {
 				case 'type':
-					if (!value) next.type = 'Select a type';
+					if (!value) {
+						next.type = 'Select a type';
+					}
 					break;
 
 				case 'newType':
-					if (state.type === sentinelAddNew && !value.trim()) next.newType = 'New type required';
+					if (state.type === sentinelAddNew && !value.trim()) {
+						next.newType = 'New type required';
+					}
 					break;
 
 				case 'keyName': {
@@ -271,7 +287,9 @@ function AddEditAuthKeyModalContent({
 				}
 
 				case 'secret':
-					if (!value.trim()) next.secret = 'Secret cannot be empty';
+					if (!value.trim()) {
+						next.secret = 'Secret cannot be empty';
+					}
 					break;
 
 				default:
@@ -338,7 +356,9 @@ function AddEditAuthKeyModalContent({
 
 	/* overall validity */
 	const isAllValid = useMemo(() => {
-		if (noProviderAvailable) return false;
+		if (noProviderAvailable) {
+			return false;
+		}
 		const nextErrors = validateForm(formData);
 		return Object.values(nextErrors).every(v => !v);
 	}, [formData, noProviderAvailable, validateForm]);
@@ -349,7 +369,9 @@ function AddEditAuthKeyModalContent({
 		const nextErrors = validateForm(formData);
 		setErrors(nextErrors);
 
-		if (noProviderAvailable || Object.values(nextErrors).some(Boolean)) return;
+		if (noProviderAvailable || Object.values(nextErrors).some(Boolean)) {
+			return;
+		}
 
 		const finalType = formData.type === sentinelAddNew ? formData.newType.trim() : formData.type;
 
@@ -507,8 +529,12 @@ function AddEditAuthKeyModalContent({
 }
 
 export function AddEditAuthKeyModal(props: AddEditAuthKeyModalProps) {
-	if (!props.isOpen) return null;
-	if (typeof document === 'undefined' || !document.body) return null;
+	if (!props.isOpen) {
+		return null;
+	}
+	if (typeof document === 'undefined' || !document.body) {
+		return null;
+	}
 
 	const modalKey = props.initial
 		? `edit:${props.initial.type}:${props.initial.keyName}`

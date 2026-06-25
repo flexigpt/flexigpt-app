@@ -65,12 +65,16 @@ function buildVariablePillSelector(selectionID?: string, varName?: string): stri
 }
 
 function getVariablePills(selectionID?: string): HTMLElement[] {
-	if (!selectionID) return [];
+	if (!selectionID) {
+		return [];
+	}
 	return Array.from(document.querySelectorAll<HTMLElement>(buildVariablePillSelector(selectionID)));
 }
 
 function getVariablePill(selectionID?: string, varName?: string): HTMLElement | null {
-	if (!varName) return null;
+	if (!varName) {
+		return null;
+	}
 	return document.querySelector<HTMLElement>(buildVariablePillSelector(selectionID, varName));
 }
 
@@ -249,7 +253,9 @@ export function TemplateVariableElement(props: PlateElementProps<any>) {
 	});
 
 	const currentValue = useMemo(() => {
-		if (!tsenode || !varDef) return undefined;
+		if (!tsenode || !varDef) {
+			return undefined;
+		}
 		return effectiveVarValueLocal(varDef, tsenode.variables ?? {});
 
 		// we need refreshTick, it is not unnecessary dep.
@@ -264,7 +270,9 @@ export function TemplateVariableElement(props: PlateElementProps<any>) {
 
 	function focusNextVariablePill() {
 		const selectionID = el.selectionID as string | undefined;
-		if (!selectionID) return;
+		if (!selectionID) {
+			return;
+		}
 
 		requestAnimationFrame(() => {
 			try {
@@ -296,7 +304,9 @@ export function TemplateVariableElement(props: PlateElementProps<any>) {
 	}
 
 	function commitValue(next: unknown) {
-		if (!tsenode || !tsPath) return;
+		if (!tsenode || !tsPath) {
+			return;
+		}
 
 		let nextVars = { ...tsenode.variables };
 

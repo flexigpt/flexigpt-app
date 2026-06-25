@@ -65,9 +65,15 @@ function getTargetStatusBadgeClassName(visualState: TargetVisualState): string {
 }
 
 function getTargetStatusLabel(target: EditableUnifiedDiffTarget, missing: boolean): string {
-	if (missing) return 'needs path';
-	if (target.status) return target.status.replaceAll('_', ' ');
-	if (target.ok === false) return 'blocked';
+	if (missing) {
+		return 'needs path';
+	}
+	if (target.status) {
+		return target.status.replaceAll('_', ' ');
+	}
+	if (target.ok === false) {
+		return 'blocked';
+	}
 	return 'pending';
 }
 
@@ -117,7 +123,9 @@ function editableTargetsMatch(left: EditableUnifiedDiffTarget, right: EditableUn
 	const leftKeys = getModalTargetSectionKeys(left);
 	const rightKeys = getModalTargetSectionKeys(right);
 
-	if (leftKeys.some(key => rightKeys.includes(key))) return true;
+	if (leftKeys.some(key => rightKeys.includes(key))) {
+		return true;
+	}
 
 	const leftPatchPaths = getModalTargetPatchPaths(left);
 	const rightPatchPaths = getModalTargetPatchPaths(right);
@@ -209,7 +217,9 @@ function mergeEditableTargetPreservingLocalPath(
 	const merged = mergeEditableTargetForModal(local, base);
 	const localTargetPath = local.targetPath.trim();
 
-	if (!localTargetPath) return merged;
+	if (!localTargetPath) {
+		return merged;
+	}
 
 	return {
 		...merged,
@@ -226,7 +236,9 @@ function mergeModalTargetsPreservingLocalEdits(
 	nextTargets: EditableUnifiedDiffTarget[],
 	previousTargets: EditableUnifiedDiffTarget[]
 ): EditableUnifiedDiffTarget[] {
-	if (previousTargets.length === 0) return nextTargets;
+	if (previousTargets.length === 0) {
+		return nextTargets;
+	}
 
 	const matchedPreviousIndexes = new Set<number>();
 
@@ -235,10 +247,14 @@ function mergeModalTargetsPreservingLocalEdits(
 			(previous, index) => !matchedPreviousIndexes.has(index) && editableTargetsMatch(previous, next)
 		);
 
-		if (previousIndex < 0) return next;
+		if (previousIndex < 0) {
+			return next;
+		}
 
 		const previous = previousTargets[previousIndex];
-		if (!previous) return next;
+		if (!previous) {
+			return next;
+		}
 
 		matchedPreviousIndexes.add(previousIndex);
 		return mergeEditableTargetPreservingLocalPath(next, previous);
@@ -266,7 +282,9 @@ function getLocalTargetKey(target: EditableUnifiedDiffTarget, index: number): st
 }
 
 function renderStatusCountBadge(label: string, count: number, tone: HeaderButtonTone) {
-	if (count <= 0) return null;
+	if (count <= 0) {
+		return null;
+	}
 
 	return (
 		<span className={`badge badge-outline badge-sm ${getBadgeToneClassName(tone)}`}>
@@ -308,10 +326,15 @@ function getTargetVisualState(
 		return 'warning';
 	}
 
-	if (target.status === ApplyUnifiedDiffStatus.Applicable) return 'success';
-	if (target.status === ApplyUnifiedDiffStatus.Applied || target.status === ApplyUnifiedDiffStatus.AlreadyApplied)
+	if (target.status === ApplyUnifiedDiffStatus.Applicable) {
+		return 'success';
+	}
+	if (target.status === ApplyUnifiedDiffStatus.Applied || target.status === ApplyUnifiedDiffStatus.AlreadyApplied) {
 		return 'info';
-	if (diagnostics.some(diagnostic => diagnostic.level === ApplyUnifiedDiffDiagnosticLevel.Info)) return 'info';
+	}
+	if (diagnostics.some(diagnostic => diagnostic.level === ApplyUnifiedDiffDiagnosticLevel.Info)) {
+		return 'info';
+	}
 	return 'neutral';
 }
 
@@ -363,7 +386,9 @@ export function DiffApplyModal({
 	]);
 
 	useEffect(() => {
-		if (!isOpen) return;
+		if (!isOpen) {
+			return;
+		}
 
 		const fromOutput = buildEditableTargetsFromOutput(output, fallbackParsed, candidatePaths);
 		const byKey = new Map<string, EditableUnifiedDiffTarget>();
@@ -389,21 +414,29 @@ export function DiffApplyModal({
 	}, [candidatePaths, fallbackParsed, fileTargets, isOpen, output, strict]);
 
 	useEffect(() => {
-		if (!isOpen) return;
+		if (!isOpen) {
+			return;
+		}
 
 		const dialog = dialogRef.current;
-		if (!dialog) return;
+		if (!dialog) {
+			return;
+		}
 
 		if (!dialog.open) {
 			dialog.showModal();
 		}
 
 		return () => {
-			if (dialog.open) dialog.close();
+			if (dialog.open) {
+				dialog.close();
+			}
 		};
 	}, [isOpen]);
 
-	if (!isOpen || typeof document === 'undefined') return null;
+	if (!isOpen || typeof document === 'undefined') {
+		return null;
+	}
 
 	const fileDiagnostics = collectFileLevelDiagnostics(output);
 	const summary = summaryLabel(output, fallbackParsed);
@@ -429,7 +462,9 @@ export function DiffApplyModal({
 	};
 
 	const handleDryRun = async () => {
-		if (isRunning) return;
+		if (isRunning) {
+			return;
+		}
 		setRunningAction({ key: 'global', kind: 'dry-run' });
 		try {
 			onStrictChange(localStrict);
@@ -440,7 +475,9 @@ export function DiffApplyModal({
 	};
 
 	const handleApply = async () => {
-		if (isRunning || !canApplyFromModal) return;
+		if (isRunning || !canApplyFromModal) {
+			return;
+		}
 
 		setRunningAction({ key: 'global', kind: 'apply' });
 		try {
@@ -452,11 +489,15 @@ export function DiffApplyModal({
 	};
 
 	const handleTargetDryRun = async (index: number) => {
-		if (isRunning) return;
+		if (isRunning) {
+			return;
+		}
 
 		const target = displayTargets[index];
 
-		if (!target) return;
+		if (!target) {
+			return;
+		}
 
 		const key = getLocalTargetKey(target, index);
 		setRunningAction({ key, kind: 'dry-run' });
@@ -472,10 +513,14 @@ export function DiffApplyModal({
 	};
 
 	const handleTargetApply = async (index: number) => {
-		if (isRunning) return;
+		if (isRunning) {
+			return;
+		}
 
 		const target = displayTargets[index];
-		if (!target?.targetPath.trim()) return;
+		if (!target?.targetPath.trim()) {
+			return;
+		}
 
 		const key = getLocalTargetKey(target, index);
 		setRunningAction({ key, kind: 'apply' });

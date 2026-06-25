@@ -41,7 +41,9 @@ export function getUUIDv7(): string {
 
 export function ensureMakeID(explicit?: string): string {
 	const trimmed = explicit?.trim();
-	if (trimmed) return trimmed;
+	if (trimmed) {
+		return trimmed;
+	}
 	// Strong uniqueness across tabs/windows.
 	if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
 		return crypto.randomUUID();

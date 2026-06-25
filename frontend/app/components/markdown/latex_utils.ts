@@ -22,7 +22,9 @@ function SanitizeLaTeX(content: string) {
 }
 
 export function SanitizeLaTeXOutsideFences(md: string) {
-	if (!testLatexRegex.test(md)) return md;
+	if (!testLatexRegex.test(md)) {
+		return md;
+	}
 
 	const lines = md.split('\n');
 	const out: string[] = [];
@@ -30,7 +32,9 @@ export function SanitizeLaTeXOutsideFences(md: string) {
 	let fence: string | null = null; // e.g. ``` or ~~~ (or longer)
 
 	const flushOutside = () => {
-		if (outside.length === 0) return;
+		if (outside.length === 0) {
+			return;
+		}
 		out.push(SanitizeLaTeX(outside.join('\n')));
 		outside = [];
 	};

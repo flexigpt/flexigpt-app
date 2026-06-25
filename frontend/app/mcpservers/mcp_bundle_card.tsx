@@ -266,22 +266,30 @@ export function MCPBundleCard({
 		await onSubmitServer(bundle.id, serverToEdit?.id, input);
 	};
 	const manualOAuthModalServer = useMemo(() => {
-		if (!manualOAuthModalServerID) return null;
+		if (!manualOAuthModalServerID) {
+			return null;
+		}
 
 		const server = servers.find(candidate => candidate.id === manualOAuthModalServerID);
-		if (!server) return null;
+		if (!server) {
+			return null;
+		}
 
 		const authHealth = authHealthByServerID[server.id];
 		return isOAuthModalRelevant(authHealth) ? server : null;
 	}, [authHealthByServerID, manualOAuthModalServerID, servers]);
 
 	const autoOAuthModalServer = useMemo(() => {
-		if (manualOAuthModalServer) return null;
+		if (manualOAuthModalServer) {
+			return null;
+		}
 
 		return (
 			servers.find(server => {
 				const authHealth = authHealthByServerID[server.id];
-				if (!isOAuthModalRelevant(authHealth)) return false;
+				if (!isOAuthModalRelevant(authHealth)) {
+					return false;
+				}
 
 				const key = oauthDismissKey(bundle.id, server.id, authHealth);
 				return !dismissedOAuthKeys.has(key);
@@ -303,7 +311,9 @@ export function MCPBundleCard({
 	};
 
 	const cancelOAuthModal = async () => {
-		if (!oauthModalServer) return;
+		if (!oauthModalServer) {
+			return;
+		}
 
 		await runServerAction(
 			`cancel-oauth:${oauthModalServer.id}`,
@@ -715,7 +725,9 @@ export function MCPBundleCard({
 					setSetupServer(null);
 				}}
 				onSubmit={async (inputValues, reset) => {
-					if (!setupServer) return;
+					if (!setupServer) {
+						return;
+					}
 					await onSubmitServerSetup(bundle.id, setupServer.id, inputValues, reset);
 				}}
 			/>

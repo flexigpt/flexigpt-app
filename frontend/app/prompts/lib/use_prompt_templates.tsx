@@ -47,7 +47,9 @@ export function usePromptTemplate(bundleID: string, slug: string, version: strin
 	const [tmpl, setTmpl] = useState<PromptTemplate | undefined>();
 
 	useEffect(() => {
-		if (!bundleID || !slug || !version) return;
+		if (!bundleID || !slug || !version) {
+			return;
+		}
 
 		let cancelled = false;
 

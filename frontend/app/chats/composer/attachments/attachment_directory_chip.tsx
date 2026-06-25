@@ -101,7 +101,9 @@ export function DirectoryChip({
 
 				{group.attachmentKeys.map(key => {
 					const att = attachmentByKey.get(key);
-					if (!att) return null;
+					if (!att) {
+						return null;
+					}
 
 					return (
 						<MenuItem

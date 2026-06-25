@@ -20,7 +20,9 @@ export function useAtTopBottom(ref: RefObject<HTMLElement | null>, offset = 0): 
 	// The actual scroll check logic, memoized for consumer use
 	const checkScroll = useCallback(() => {
 		const current = ref.current;
-		if (!current) return;
+		if (!current) {
+			return;
+		}
 		const { scrollTop, scrollHeight, clientHeight } = current;
 		setIsScrollable(scrollHeight > clientHeight);
 		setIsAtBottom(scrollTop + clientHeight >= scrollHeight - offset - 10);
@@ -29,7 +31,9 @@ export function useAtTopBottom(ref: RefObject<HTMLElement | null>, offset = 0): 
 
 	useEffect(() => {
 		const current = ref.current;
-		if (!current) return;
+		if (!current) {
+			return;
+		}
 
 		// Save the latest checkScroll in the ref for ResizeObserver
 		handleScrollRef.current = checkScroll;
@@ -58,7 +62,9 @@ export function useAtTopBottom(ref: RefObject<HTMLElement | null>, offset = 0): 
 		return () => {
 			current.removeEventListener('scroll', throttledScroll);
 			resizeObserver.disconnect();
-			if (throttleTimeout) clearTimeout(throttleTimeout);
+			if (throttleTimeout) {
+				clearTimeout(throttleTimeout);
+			}
 		};
 	}, [ref, offset, checkScroll]);
 

@@ -37,7 +37,9 @@ export async function getChatInputOptions(): Promise<{
 			}
 
 			for (const [modelPresetID, modelPreset] of Object.entries(providerPreset.modelPresets)) {
-				if (!modelPreset.isEnabled) continue;
+				if (!modelPreset.isEnabled) {
+					continue;
+				}
 
 				const modelParams = buildEffectiveModelParamFromModelPreset(modelPreset);
 				const mergedCaps = mergeModelCapabilitiesOverride(

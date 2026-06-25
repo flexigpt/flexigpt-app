@@ -35,7 +35,9 @@ export function GenericThemeProvider({
 }: GenericThemeProviderProps) {
 	const [theme, _setTheme] = useState<string>(() => {
 		const saved = localStorage.getItem(storageKey);
-		if (saved) return saved; // already persisted – just use it
+		if (saved) {
+			return saved;
+		} // already persisted – just use it
 
 		localStorage.setItem(storageKey, defaultTheme);
 		return defaultTheme; // first run → persist + use
@@ -52,7 +54,9 @@ export function GenericThemeProvider({
 
 	/* follow OS preference while in “system” mode */
 	useEffect(() => {
-		if (theme !== 'system') return;
+		if (theme !== 'system') {
+			return;
+		}
 
 		const mql = window.matchMedia('(prefers-color-scheme: dark)');
 

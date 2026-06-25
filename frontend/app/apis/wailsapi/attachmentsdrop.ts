@@ -14,7 +14,9 @@ let pending: AttachmentsDroppedPayload[] = [];
 let onNoTarget: ((payload: AttachmentsDroppedPayload) => void) | null = null;
 
 function initWailsDropListener(): () => void {
-	if (inited) return () => {};
+	if (inited) {
+		return () => {};
+	}
 	inited = true;
 
 	EventsOn('wails:file-drop', (x: number, y: number, paths: string[]) => {
@@ -78,7 +80,9 @@ export class WailsAttachmentsDropAPI implements IAttachmentsDropAPI {
 		}
 
 		return () => {
-			if (activeTarget === fn) activeTarget = null;
+			if (activeTarget === fn) {
+				activeTarget = null;
+			}
 		};
 	}
 

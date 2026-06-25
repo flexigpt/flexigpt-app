@@ -117,7 +117,9 @@ export function getAttachedToolEntries(editor: PlateEditor, uniqueByIdentity?: b
 			const node = el as unknown as ToolSelectionElementNode;
 			if (unique) {
 				const key = toolIdentityKeyFromNode(node);
-				if ((seen as Set<string>).has(key)) continue;
+				if ((seen as Set<string>).has(key)) {
+					continue;
+				}
 				(seen as Set<string>).add(key);
 			}
 			out.push(toAttachedToolEntry(node));
@@ -135,7 +137,9 @@ export function setAttachedToolUserArgSchemaInstanceBySelectionID(
 	for (const [el, path] of NodeApi.elements(editor)) {
 		if (ElementApi.isElementType(el, KEY_TOOL_SELECTION)) {
 			const node = el as unknown as ToolSelectionElementNode;
-			if (node.selectionID !== selectionID) continue;
+			if (node.selectionID !== selectionID) {
+				continue;
+			}
 
 			editor.tf.setNodes<ToolSelectionElementNode>({ userArgSchemaInstance: newInstance }, { at: path });
 			return true;
@@ -175,7 +179,9 @@ export function getAttachedTools(editor: PlateEditor): UIToolStoreChoice[] {
 		if (ElementApi.isElementType(el, KEY_TOOL_SELECTION)) {
 			const n = el as unknown as ToolSelectionElementNode;
 			const key = toolIdentityKeyFromNode(n);
-			if (seen.has(key)) continue;
+			if (seen.has(key)) {
+				continue;
+			}
 			seen.add(key);
 			items.push({
 				choiceID: n.choiceID,
@@ -215,7 +221,9 @@ export function setToolAutoExecuteByKey(editor: PlateEditor, identityKey: string
 		}
 	}
 
-	if (paths.length === 0) return;
+	if (paths.length === 0) {
+		return;
+	}
 
 	editor.tf.withoutNormalizing(() => {
 		for (const p of paths) {

@@ -53,7 +53,9 @@ function ChatTabsBarContent({
 	const [draftTitle, setDraftTitle] = useState('');
 
 	const finishRename = useCallback(() => {
-		if (!editingTabId) return;
+		if (!editingTabId) {
+			return;
+		}
 
 		const currentTitle = tabs.find(tab => tab.tabId === editingTabId)?.title ?? '';
 		const cleaned = sanitizeConversationTitle(draftTitle.trim());
@@ -104,8 +106,12 @@ function ChatTabsBarContent({
 							onBlur={finishRename}
 							onKeyDown={e => {
 								e.stopPropagation();
-								if (e.key === 'Enter') finishRename();
-								if (e.key === 'Escape') setEditingTabId(null);
+								if (e.key === 'Enter') {
+									finishRename();
+								}
+								if (e.key === 'Escape') {
+									setEditingTabId(null);
+								}
 							}}
 							onMouseDown={e => {
 								e.stopPropagation();
@@ -223,8 +229,11 @@ export const ChatTabsBar = memo(function ChatTabsBar(props: ChatTabsBarProps) {
 
 	const setTabEl = useCallback(
 		(id: string) => (el: HTMLElement | null) => {
-			if (!el) tabElById.current.delete(id);
-			else tabElById.current.set(id, el);
+			if (!el) {
+				tabElById.current.delete(id);
+			} else {
+				tabElById.current.set(id, el);
+			}
 		},
 		[]
 	);
@@ -232,13 +241,17 @@ export const ChatTabsBar = memo(function ChatTabsBar(props: ChatTabsBarProps) {
 	useEffect(() => {
 		const tabEl = tabElById.current.get(selectedTabId);
 		const viewportEl = tabsViewportRef.current;
-		if (!tabEl || !viewportEl) return;
+		if (!tabEl || !viewportEl) {
+			return;
+		}
 
 		const viewportRect = viewportEl.getBoundingClientRect();
 		const tabRect = tabEl.getBoundingClientRect();
 		const fullyVisible = tabRect.left >= viewportRect.left && tabRect.right <= viewportRect.right;
 
-		if (fullyVisible) return;
+		if (fullyVisible) {
+			return;
+		}
 
 		tabEl.scrollIntoView({
 			behavior: 'auto',

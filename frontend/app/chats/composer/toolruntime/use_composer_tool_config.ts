@@ -29,7 +29,9 @@ function conversationToolHydrationKey(entry: ConversationToolStateEntry): string
 function areStringArraysEqual(a: string[] | undefined, b: string[] | undefined): boolean {
 	const left = a ?? [];
 	const right = b ?? [];
-	if (left.length !== right.length) return false;
+	if (left.length !== right.length) {
+		return false;
+	}
 	return left.every((item, idx) => item === right[idx]);
 }
 
@@ -37,8 +39,12 @@ function areArgStatusesEqual(
 	a: ConversationToolStateEntry['argStatus'],
 	b: ConversationToolStateEntry['argStatus']
 ): boolean {
-	if (!a && !b) return true;
-	if (!a || !b) return false;
+	if (!a && !b) {
+		return true;
+	}
+	if (!a || !b) {
+		return false;
+	}
 
 	return (
 		a.hasSchema === b.hasSchema &&
@@ -52,7 +58,9 @@ function areArgStatusesEqual(
 
 function getConversationToolArgsBlocked(entries: ConversationToolStateEntry[]): boolean {
 	for (const entry of entries) {
-		if (!entry.enabled) continue;
+		if (!entry.enabled) {
+			continue;
+		}
 
 		const status = entry.argStatus;
 		if (status?.hasSchema && !status.isSatisfied) {
@@ -103,7 +111,9 @@ export function useComposerToolConfig({ getAttachedToolEntries }: UseComposerToo
 		const next = entries.map(entry => {
 			const cacheKey = conversationToolHydrationKey(entry);
 			const def = entry.toolDefinition ?? conversationToolDefsCacheRef.current.get(cacheKey);
-			if (!def) return entry;
+			if (!def) {
+				return entry;
+			}
 
 			const argStatus = computeToolUserArgsStatus(def.userArgSchema, entry.toolStoreChoice.userArgSchemaInstance);
 
@@ -128,7 +138,9 @@ export function useComposerToolConfig({ getAttachedToolEntries }: UseComposerToo
 				return !entry.toolDefinition && !cache.has(cacheKey) && !inFlight.has(cacheKey);
 			});
 
-			if (missing.length === 0) return;
+			if (missing.length === 0) {
+				return;
+			}
 
 			const requestedKeys = new Set<string>();
 			for (const entry of missing) {
@@ -153,16 +165,22 @@ export function useComposerToolConfig({ getAttachedToolEntries }: UseComposerToo
 				})
 			)
 				.then(results => {
-					if (!isMountedRef.current) return;
+					if (!isMountedRef.current) {
+						return;
+					}
 
 					let loadedAny = false;
 					for (const result of results) {
-						if (!result) continue;
+						if (!result) {
+							continue;
+						}
 						cache.set(result.cacheKey, result.def);
 						loadedAny = true;
 					}
 
-					if (!loadedAny) return;
+					if (!loadedAny) {
+						return;
+					}
 
 					setConversationToolsStateRaw(prev => {
 						const next = primeConversationToolsFromCache(prev);

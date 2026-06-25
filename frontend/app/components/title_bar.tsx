@@ -30,7 +30,9 @@ export function TitleBar({ onToggleDrawer }: TitleBarProps) {
 		void (async () => {
 			try {
 				const v = await backendAPI.getAppVersion();
-				if (!cancelled) setVersion(v ?? '');
+				if (!cancelled) {
+					setVersion(v ?? '');
+				}
 			} catch {
 				// ignore
 			}
@@ -39,7 +41,9 @@ export function TitleBar({ onToggleDrawer }: TitleBarProps) {
 		void (async () => {
 			try {
 				const m = await backendAPI.isAppWindowMaximised();
-				if (!cancelled) setIsMax(m);
+				if (!cancelled) {
+					setIsMax(m);
+				}
 			} catch {
 				// ignore
 			}
@@ -59,7 +63,9 @@ export function TitleBar({ onToggleDrawer }: TitleBarProps) {
 	}, [syncMaxState]);
 
 	const toggleMaximise = useCallback(() => {
-		if (isTogglingMax) return;
+		if (isTogglingMax) {
+			return;
+		}
 		setIsTogglingMax(true);
 		try {
 			backendAPI.appWindowToggleMaximise();
@@ -78,7 +84,9 @@ export function TitleBar({ onToggleDrawer }: TitleBarProps) {
 			onDoubleClick={e => {
 				// Don’t toggle when double-clicking on interactive elements
 				const t = e.target as HTMLElement;
-				if (t.closest('.app-no-drag')) return;
+				if (t.closest('.app-no-drag')) {
+					return;
+				}
 				toggleMaximise();
 			}}
 		>

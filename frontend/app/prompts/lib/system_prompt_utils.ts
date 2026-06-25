@@ -43,10 +43,14 @@ export function buildEffectiveSystemPrompt(params: {
 
 	for (const key of params.selectedPromptKeys) {
 		const item = params.promptsByKey.get(key);
-		if (!item) continue;
+		if (!item) {
+			continue;
+		}
 
 		const prompt = normalizePromptPart(item.prompt);
-		if (!prompt) continue;
+		if (!prompt) {
+			continue;
+		}
 
 		parts.push(prompt);
 	}

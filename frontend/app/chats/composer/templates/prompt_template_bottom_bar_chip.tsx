@@ -54,16 +54,24 @@ function humanizeTemplateSlug(slug: string): string {
 
 function comparePromptTemplateListItems(a: PromptTemplateListItem, b: PromptTemplateListItem): number {
 	const bundleSlugCompare = promptTemplateCollator.compare(a.bundleSlug, b.bundleSlug);
-	if (bundleSlugCompare !== 0) return bundleSlugCompare;
+	if (bundleSlugCompare !== 0) {
+		return bundleSlugCompare;
+	}
 
 	const bundleIDCompare = promptTemplateCollator.compare(a.bundleID, b.bundleID);
-	if (bundleIDCompare !== 0) return bundleIDCompare;
+	if (bundleIDCompare !== 0) {
+		return bundleIDCompare;
+	}
 
 	const templateSlugCompare = promptTemplateCollator.compare(a.templateSlug, b.templateSlug);
-	if (templateSlugCompare !== 0) return templateSlugCompare;
+	if (templateSlugCompare !== 0) {
+		return templateSlugCompare;
+	}
 
 	const templateVersionCompare = promptTemplateCollator.compare(a.templateVersion, b.templateVersion);
-	if (templateVersionCompare !== 0) return templateVersionCompare;
+	if (templateVersionCompare !== 0) {
+		return templateVersionCompare;
+	}
 
 	return promptTemplateCollator.compare(promptTemplateKey(a), promptTemplateKey(b));
 }
@@ -176,7 +184,9 @@ function PromptTemplateBottomBarChipInner({
 	const { data: templates, loading } = usePromptTemplates();
 
 	useEffect(() => {
-		if (!isInputLocked) return;
+		if (!isInputLocked) {
+			return;
+		}
 		store.hide();
 	}, [isInputLocked, store]);
 

@@ -26,13 +26,19 @@ function valueToKey(value: IncludePreviousMessages): string {
 }
 
 function displayButtonValue(value: IncludePreviousMessages): string {
-	if (value === 'all') return 'All';
+	if (value === 'all') {
+		return 'All';
+	}
 	return String(value);
 }
 
 function displayOptionLabel(value: IncludePreviousMessages): string {
-	if (value === 'all') return 'All previous user turns';
-	if (value === 0) return 'Current user turn only';
+	if (value === 'all') {
+		return 'All previous user turns';
+	}
+	if (value === 0) {
+		return 'Current user turn only';
+	}
 	return `${value} previous user turn${value === 1 ? '' : 's'}`;
 }
 

@@ -104,7 +104,9 @@ function withTooltip<P extends Tooltipable>(Component: ComponentType<P>) {
 
 		const content = <Component {...(rest as P)} />;
 
-		if (!tooltip) return content;
+		if (!tooltip) {
+			return content;
+		}
 		const pos = 'tooltip-' + tooltipPosition;
 		return (
 			<div className={cn('tooltip', pos, tooltipClassName)} data-tip={tooltip}>
@@ -135,11 +137,15 @@ export const ToolbarToggleItem = forwardRef<HTMLButtonElement, ToolbarToggleItem
 	const isPressed = isControlled ? pressed : internalPressed;
 
 	const handleClick = (e: MouseEvent<HTMLButtonElement>) => {
-		if (disabled) return;
+		if (disabled) {
+			return;
+		}
 		onClick?.(e);
 		if (!e.defaultPrevented) {
 			const next = !isPressed;
-			if (!isControlled) setInternalPressed(next);
+			if (!isControlled) {
+				setInternalPressed(next);
+			}
 			onPressedChange?.(next);
 		}
 	};
