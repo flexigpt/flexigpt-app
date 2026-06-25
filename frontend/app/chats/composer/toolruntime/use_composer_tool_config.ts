@@ -128,7 +128,7 @@ export function useComposerToolConfig({ getAttachedToolEntries }: UseComposerToo
 				return !entry.toolDefinition && !cache.has(cacheKey) && !inFlight.has(cacheKey);
 			});
 
-			if (!missing.length) return;
+			if (missing.length === 0) return;
 
 			const requestedKeys = new Set<string>();
 			for (const entry of missing) {
@@ -251,7 +251,9 @@ export function useComposerToolConfig({ getAttachedToolEntries }: UseComposerToo
 	const applyWebSearchFromChoices = useCallback(
 		(tools: ToolStoreChoice[]) => {
 			const next = normalizeWebSearchChoiceTemplates(
-				(tools ?? []).filter(tool => tool.toolType === ToolStoreChoiceType.WebSearch).map(webSearchTemplateFromChoice)
+				(tools ?? [])
+					.filter(tool => tool.toolType === ToolStoreChoiceType.WebSearch)
+					.map(t => webSearchTemplateFromChoice(t))
 			);
 			setWebSearchTemplates(next);
 		},

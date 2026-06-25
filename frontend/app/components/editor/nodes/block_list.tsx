@@ -24,9 +24,7 @@ const config: Record<
 	},
 };
 
-/**
- * @public
- */
+// oxlint-disable-next-line react/display-name
 export const BlockList: RenderNodeWrapper = props => {
 	if (!props.element.listStyleType) return;
 

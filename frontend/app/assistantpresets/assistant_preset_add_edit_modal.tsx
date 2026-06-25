@@ -289,7 +289,7 @@ function getInitialFormData(
 			startingModelPresetKey: src.startingModelPresetRef ? buildModelPresetRefKey(src.startingModelPresetRef) : '',
 			startingIncludeModelSystemPrompt: booleanToTriState(src.startingIncludeModelSystemPrompt),
 			modelPatch: getInitialModelPatchFormData(src.startingModelPresetPatch),
-			startingInstructionTemplateRefs: (src.startingInstructionTemplateRefs ?? []).map(clonePromptTemplateRef),
+			startingInstructionTemplateRefs: (src.startingInstructionTemplateRefs ?? []).map(r => clonePromptTemplateRef(r)),
 			startingToolSelections: (src.startingToolSelections ?? []).map(selection => ({
 				toolRef: {
 					bundleID: selection.toolRef.bundleID,
@@ -299,7 +299,7 @@ function getInitialFormData(
 				autoExecuteMode: booleanToTriState(selection.toolChoicePatch?.autoExecute),
 				userArgSchemaInstance: selection.toolChoicePatch?.userArgSchemaInstance ?? '',
 			})),
-			startingSkillSelections: (src.startingSkillSelections ?? []).map(cloneSkillSelection),
+			startingSkillSelections: (src.startingSkillSelections ?? []).map(s => cloneSkillSelection(s)),
 		};
 	}
 

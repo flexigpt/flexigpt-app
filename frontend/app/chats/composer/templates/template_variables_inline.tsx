@@ -270,7 +270,7 @@ export function TemplateVariableElement(props: PlateElementProps<any>) {
 			try {
 				const chips = getVariablePills(selectionID);
 
-				if (!chips.length) {
+				if (chips.length === 0) {
 					return;
 				}
 
@@ -408,7 +408,7 @@ export function TemplateVariableElement(props: PlateElementProps<any>) {
 						<span>{el.name}</span>
 						{hasDisplayValue && (
 							<span className="ml-1">
-								= <span>"{displayValue}"</span>
+								= <span>&quot;{displayValue}&quot;</span>
 							</span>
 						)}
 						<FiEdit2 size={10} className="opacity-70" />

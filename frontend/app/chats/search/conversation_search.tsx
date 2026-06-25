@@ -85,7 +85,7 @@ export const ConversationSearch = forwardRef<ConversationSearchHandle, Conversat
 		);
 
 		const handlePick = useCallback(
-			async (conversation: ConversationSearchItem) => {
+			(conversation: ConversationSearchItem) => {
 				popover.setOpen(false);
 				setFocusedIndex(-1);
 				inputRef.current?.blur();
@@ -101,14 +101,14 @@ export const ConversationSearch = forwardRef<ConversationSearchHandle, Conversat
 				switch (event.key) {
 					case 'ArrowDown':
 						event.preventDefault();
-						if (results.length) {
+						if (results.length > 0) {
 							setFocusedIndex(index => (index + 1) % results.length);
 						}
 						break;
 
 					case 'ArrowUp':
 						event.preventDefault();
-						if (results.length) {
+						if (results.length > 0) {
 							setFocusedIndex(index => (index - 1 + results.length) % results.length);
 						}
 						break;
@@ -116,7 +116,7 @@ export const ConversationSearch = forwardRef<ConversationSearchHandle, Conversat
 					case 'Enter':
 						event.preventDefault();
 						if (focusedIndex >= 0 && focusedIndex < results.length) {
-							void handlePick(results[focusedIndex].searchConversation);
+							handlePick(results[focusedIndex].searchConversation);
 						} else if (!loading && query.trim()) {
 							searchNow();
 						}

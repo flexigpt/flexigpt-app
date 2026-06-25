@@ -40,7 +40,7 @@ import {
 } from '@/components/markdown/unified_diff_block';
 
 function joinDiffTextParts(parts: string[]): string {
-	return parts.map(part => part.replace(/\n+$/g, '')).join('\n');
+	return parts.map(part => part.replaceAll(/\n+$/g, '')).join('\n');
 }
 
 function isDiffPartHunkComplete(diffPart: string, expectedHunks: number | undefined): boolean {
@@ -118,8 +118,7 @@ function mapOutputToControlStatus(output: ApplyUnifiedDiffOut): ControlStatus {
 	switch (output.status) {
 		case ApplyUnifiedDiffStatus.NeedsInfo:
 			return 'needs-info';
-		case ApplyUnifiedDiffStatus.Conflict:
-		case ApplyUnifiedDiffStatus.Error:
+
 		default:
 			return 'blocked';
 	}
@@ -542,7 +541,7 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 				if (split && !split.verified) return undefined;
 				if (!isDiffPartHunkComplete(part, target.hunks)) return undefined;
 
-				const key = part.replace(/\n+$/g, '');
+				const key = part.replaceAll(/\n+$/g, '');
 				if (seen.has(key)) continue;
 
 				seen.add(key);

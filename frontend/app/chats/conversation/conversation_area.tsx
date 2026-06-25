@@ -41,7 +41,7 @@ function getLocalAttachmentPath(attachment: Attachment): string {
 }
 
 function normalizeCandidatePathKey(path: string): string {
-	return path.trim().replaceAll('\\', '/').replace(/\/+/g, '/');
+	return path.trim().replaceAll('\\', '/').replaceAll(/\/+/g, '/');
 }
 
 function buildDiffCandidatePathsByMessageID(messages: ConversationMessage[]): Map<string, string[]> {

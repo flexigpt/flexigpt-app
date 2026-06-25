@@ -29,10 +29,11 @@ export function mapToolOutputItemsToToolOutputs(contents?: ToolOutputItemUnion[]
 		switch (item.kind) {
 			case ContentItemKind.Text: {
 				const text = item.textItem?.text;
-				if (text != null) {
+
+				if (text !== null) {
 					outputs.push({
 						kind: ToolOutputKind.Text,
-						textItem: { text },
+						textItem: { text: text ?? '' },
 					});
 				}
 				break;
@@ -75,7 +76,7 @@ export function mapToolOutputItemsToToolOutputs(contents?: ToolOutputItemUnion[]
 		}
 	}
 
-	return outputs.length ? outputs : undefined;
+	return outputs.length > 0 ? outputs : undefined;
 }
 
 /**
@@ -90,10 +91,10 @@ export function mapToolOutputsToToolOutputItems(outputs?: ToolOutputUnion[]): To
 		switch (out.kind) {
 			case ToolOutputKind.Text: {
 				const text = out.textItem?.text;
-				if (text != null) {
+				if (text !== null) {
 					contents.push({
 						kind: ContentItemKind.Text,
-						textItem: { text },
+						textItem: { text: text ?? '' },
 					});
 				}
 				break;
@@ -130,14 +131,13 @@ export function mapToolOutputsToToolOutputItems(outputs?: ToolOutputUnion[]): To
 				break;
 			}
 
-			case ToolOutputKind.None:
 			default:
 				// ignore
 				break;
 		}
 	}
 
-	return contents.length ? contents : undefined;
+	return contents.length > 0 ? contents : undefined;
 }
 
 export function extractPrimaryTextFromToolOutputs(outputs?: ToolOutputUnion[]): string | undefined {
@@ -148,7 +148,7 @@ export function extractPrimaryTextFromToolOutputs(outputs?: ToolOutputUnion[]): 
 		.map(o => o.textItem?.text.trim())
 		.filter(Boolean);
 
-	if (!texts.length) return undefined;
+	if (texts.length === 0) return undefined;
 
 	return texts.join('\n\n');
 }

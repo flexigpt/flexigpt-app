@@ -29,7 +29,7 @@ type NormalizedTabsResult = {
 // keep letters, digits, space and hyphen; trim & limit to 64 chars
 export const sanitizeConversationTitle = (raw: string): string =>
 	raw
-		.replace(/[^a-zA-Z0-9 -]/g, '') //  ← note the blank space and the hyphen at the end
+		.replaceAll(/[^a-zA-Z0-9 -]/g, '') //  ← note the blank space and the hyphen at the end
 		.trim()
 		.slice(0, 64);
 
@@ -89,14 +89,10 @@ export function normalizeTabsForInvariants(
 	const removedTabIds = new Set<string>();
 	let addedScratchTabId: string | null = null;
 
-	const scratchTabs = next.filter(isScratchTab);
+	const scratchTabs = next.filter(t => isScratchTab(t));
 	const selected = next.find(tab => tab.tabId === activeId) ?? null;
 	const keepScratch =
-		scratchTabs.length === 0
-			? null
-			: selected && isScratchTab(selected)
-				? selected
-				: scratchTabs[scratchTabs.length - 1];
+		scratchTabs.length === 0 ? null : selected && isScratchTab(selected) ? selected : scratchTabs.at(-1);
 
 	if (keepScratch) {
 		for (const tab of scratchTabs) {

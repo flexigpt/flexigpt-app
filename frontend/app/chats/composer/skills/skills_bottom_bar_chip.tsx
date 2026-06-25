@@ -145,8 +145,8 @@ export function SkillsBottomBarChip({
 		if (isInputLocked) menu.hide();
 	}, [isInputLocked, menu]);
 
-	const enabledKeySet = useMemo(() => new Set(enabledSkillRefs.map(skillRefKey)), [enabledSkillRefs]);
-	const activeKeySet = useMemo(() => new Set(activeSkillRefs.map(skillRefKey)), [activeSkillRefs]);
+	const enabledKeySet = useMemo(() => new Set(enabledSkillRefs.map(k => skillRefKey(k))), [enabledSkillRefs]);
+	const activeKeySet = useMemo(() => new Set(activeSkillRefs.map(k => skillRefKey(k))), [activeSkillRefs]);
 
 	const availableSkillKeySet = useMemo(
 		() => new Set((allSkills ?? []).map(item => skillRefKey(skillRefFromListItem(item)))),
@@ -238,7 +238,7 @@ export function SkillsBottomBarChip({
 	const setBundleEnabled = useCallback(
 		(group: BundleGroup, enabled: boolean) => {
 			const refs = group.skills.map(skillRefFromListItem);
-			const refKeys = refs.map(skillRefKey);
+			const refKeys = refs.map(k => skillRefKey(k));
 
 			setEnabledSkillRefs(prev => {
 				const byKey = new Map<string, SkillRef>();
@@ -264,10 +264,12 @@ export function SkillsBottomBarChip({
 	);
 
 	const title = useMemo(() => {
-		const lines: string[] = [];
-		lines.push(shortcut ? `Attach skills (${shortcut})` : 'Attach skills');
-		lines.push(isEnabled ? `Status: Enabled (${enabledCount})` : 'Status: Disabled');
-		lines.push(`Active now: ${activeCount}`);
+		const lines: string[] = [
+			shortcut ? `Attach skills (${shortcut})` : 'Attach skills',
+			isEnabled ? `Status: Enabled (${enabledCount})` : 'Status: Disabled',
+			`Active now: ${activeCount}`,
+		];
+
 		if (totalCount > 0) lines.push(`Available: ${totalCount}`);
 		if (loading && totalCount === 0) lines.push('Loading available skills…');
 		return lines.join('\n');
@@ -455,7 +457,7 @@ export function SkillsBottomBarChip({
 										{enabledSkills.length > 0 ? (
 											<>
 												{showSubheadings ? <GroupedMenuSubheading>Enabled</GroupedMenuSubheading> : null}
-												<div className="space-y-1">{enabledSkills.map(renderSkillItem)}</div>
+												<div className="space-y-1">{enabledSkills.map(i => renderSkillItem(i))}</div>
 											</>
 										) : null}
 
@@ -464,7 +466,7 @@ export function SkillsBottomBarChip({
 												{showSubheadings ? (
 													<GroupedMenuSubheading separated={enabledSkills.length > 0}>Available</GroupedMenuSubheading>
 												) : null}
-												<div className="space-y-1">{availableSkills.map(renderSkillItem)}</div>
+												<div className="space-y-1">{availableSkills.map(i => renderSkillItem(i))}</div>
 											</>
 										) : null}
 									</GroupedMenuSection>

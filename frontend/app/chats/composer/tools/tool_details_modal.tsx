@@ -28,7 +28,7 @@ function buildToolOutputItemLabel(item: ToolOutputUnion, index: number): string 
 			return `Image item ${index + 1}`;
 		case ToolOutputKind.File:
 			return `File item ${index + 1}`;
-		case ToolOutputKind.None:
+
 		default:
 			return `Output item ${index + 1}`;
 	}
@@ -123,24 +123,19 @@ function buildPayload(state: Exclude<ToolDetailsState, null>): { title: string; 
 // Human-oriented "primary" view for a tool choice.
 function buildChoicePrimaryContent(choice: ToolStoreChoice): string {
 	const { display, slug } = getChoiceDisplayInfo(choice);
-	const lines: string[] = [];
+	const lines: string[] = [`### Tool: ${display}`];
 
-	lines.push(`### Tool: ${display}`);
 	if (slug) {
 		lines.push(`### ID: \`${slug}\``);
 	}
 
 	if (choice.description) {
-		lines.push('');
-		lines.push(`### Description: ${choice.description}`);
+		lines.push('', `### Description: ${choice.description}`);
 	}
 
 	const userArgsBlock = buildJSONOrTextCodeBlock(choice.userArgSchemaInstance);
 	if (userArgsBlock) {
-		lines.push('');
-		lines.push('### Tool options');
-		lines.push('');
-		lines.push(userArgsBlock);
+		lines.push('', '### Tool options', '', userArgsBlock);
 	}
 
 	return lines.join('\n');
@@ -148,35 +143,28 @@ function buildChoicePrimaryContent(choice: ToolStoreChoice): string {
 
 // Human-oriented "primary" view for a tool call.
 function buildCallPrimaryContent(call: UIToolCall): string {
-	const lines: string[] = [];
+	const lines: string[] = [
+		`### Tool: ${call.name}`,
+		`### Call ID: \`${call.callID}\``,
+		`### Status: \`${call.status}\``,
+	];
 
-	lines.push(`### Tool: ${call.name}`);
-	lines.push(`### Call ID: \`${call.callID}\``);
-	lines.push(`### Status: \`${call.status}\``);
 	const errorBlock = buildJSONOrTextCodeBlock(call.errorMessage);
 	if (errorBlock) {
-		lines.push('');
-		lines.push('### Error details');
-		lines.push('');
-		lines.push(errorBlock);
+		lines.push('', '### Error details', '', errorBlock);
 	}
 
 	lines.push('');
 
 	const argumentsBlock = buildJSONOrTextCodeBlock(call.arguments);
 	if (argumentsBlock) {
-		lines.push('### Arguments');
-		lines.push('');
-		lines.push(argumentsBlock);
+		lines.push('### Arguments', '', argumentsBlock);
 	} else {
 		lines.push('### Arguments: no arguments provided for this call');
 	}
 
 	if (call.webSearchToolCallItems && (call.webSearchToolCallItems as any[]).length > 0) {
-		lines.push('');
-		lines.push('### Web-search call items');
-		lines.push('');
-		lines.push(buildJSONCodeBlock(call.webSearchToolCallItems));
+		lines.push('', '### Web-search call items', '', buildJSONCodeBlock(call.webSearchToolCallItems));
 	}
 
 	return lines.join('\n');
@@ -188,25 +176,18 @@ function buildOutputPrimaryContent(output: UIToolOutput): string {
 
 	const titleText = output.summary && output.summary.length > 0 ? output.summary : formatToolOutputSummary(output.name);
 
-	lines.push(`### Summary: ${titleText}`);
-	lines.push(`### Tool: ${output.name}`);
-	lines.push(`### Call ID: \`${output.callID}\``);
+	lines.push(`### Summary: ${titleText}`, `### Tool: ${output.name}`, `### Call ID: \`${output.callID}\``);
+
 	if (typeof output.isError === 'boolean') {
 		lines.push(`### Status: \`${output.isError ? 'error' : 'ok'}\``);
 	}
 	const argumentsBlock = buildJSONOrTextCodeBlock(output.arguments);
 	if (argumentsBlock) {
-		lines.push('');
-		lines.push('### Arguments');
-		lines.push('');
-		lines.push(argumentsBlock);
+		lines.push('', '### Arguments', '', argumentsBlock);
 	}
 	const errorBlock = buildJSONOrTextCodeBlock(output.errorMessage);
 	if (errorBlock) {
-		lines.push('');
-		lines.push('### Error details');
-		lines.push('');
-		lines.push(errorBlock);
+		lines.push('', '### Error details', '', errorBlock);
 	}
 	lines.push('');
 
@@ -219,13 +200,9 @@ function buildOutputPrimaryContent(output: UIToolOutput): string {
 	}
 
 	if (!resultBlock) {
-		lines.push('### Tool result');
-		lines.push('');
-		lines.push('_Tool returned no output._');
+		lines.push('### Tool result', '', '_Tool returned no output._');
 	} else {
-		lines.push('### Tool result');
-		lines.push('');
-		lines.push(resultBlock);
+		lines.push('### Tool result', '', resultBlock);
 	}
 
 	return lines.join('\n');

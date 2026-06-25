@@ -215,7 +215,7 @@ export function ToolArgsModalHost({
 
 			onSave = newInstance => {
 				setWebSearchTemplates(prev => {
-					if (!prev.length) return prev;
+					if (prev.length === 0) return prev;
 					const next = [...prev];
 					next[0] = { ...next[0], userArgSchemaInstance: newInstance };
 					return next;

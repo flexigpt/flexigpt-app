@@ -36,7 +36,7 @@ export function useAtTopBottom(ref: RefObject<HTMLElement | null>, offset = 0): 
 
 		let throttleTimeout: NodeJS.Timeout | null = null;
 		const throttledScroll = () => {
-			if (throttleTimeout == null) {
+			if (throttleTimeout === null) {
 				throttleTimeout = setTimeout(() => {
 					checkScroll();
 					throttleTimeout = null;

@@ -251,7 +251,6 @@ const calcNumericError = (
 	if (Number.isNaN(num)) return `${field} must be a valid number.`;
 	if (minOrRange?.min !== undefined && num < minOrRange.min) return `${field} must be ≥ ${minOrRange.min}.`;
 	if (minOrRange?.max !== undefined && num > minOrRange.max) return `${field} must be ≤ ${minOrRange.max}.`;
-	return;
 };
 
 function getInitialModelPresetFormData(
@@ -620,7 +619,7 @@ function AddEditModelPresetModalContent({
 
 		const validationErrors = runValidation();
 		setErrors(validationErrors);
-		if (Object.keys(validationErrors).length !== 0) return;
+		if (Object.keys(validationErrors).length > 0) return;
 
 		const finalModelPresetID = modelPresetID.trim();
 

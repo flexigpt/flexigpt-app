@@ -33,15 +33,13 @@ export function TemplateFixedToolbar(props: {
 				className={`flex items-center gap-1 rounded-2xl px-2 py-1 ${selection.variablesSchema.length > 0 ? (selection.requiredCount > 0 ? 'bg-warning text-warning-content' : 'bg-success text-success-content') : 'bg-base-200'}`}
 			>
 				{selection.variablesSchema.length > 0 ? (
-					<>
-						<span
-							className="flex items-center gap-1 px-2 py-0"
-							title={selection.requiredCount > 0 ? `pending ${selection.requiredCount} vars` : 'All vars provided'}
-						>
-							{selection.variablesSchema.length} var{selection.variablesSchema.length === 1 ? '' : 's'}:{' '}
-							{`pending ${selection.requiredCount}`}
-						</span>
-					</>
+					<span
+						className="flex items-center gap-1 px-2 py-0"
+						title={selection.requiredCount > 0 ? `pending ${selection.requiredCount} vars` : 'All vars provided'}
+					>
+						{selection.variablesSchema.length} var{selection.variablesSchema.length === 1 ? '' : 's'}:{' '}
+						{`pending ${selection.requiredCount}`}
+					</span>
 				) : (
 					<span className="flex items-center gap-1 px-2 py-0" title="No vars configured">
 						0 vars <FiX />

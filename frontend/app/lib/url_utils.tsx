@@ -24,7 +24,7 @@ const isValidDomainName = (hostname: string): boolean => {
 
 	for (const label of labels) {
 		// Reject empty labels → catches "..", leading ".", trailing "."
-		if (!label.length) return false;
+		if (label.length === 0) return false;
 
 		// Allowed chars: A-Z, a-z, 0-9, hyphen (punycode: xn--... is fine)
 		if (!/^[a-zA-Z0-9-]+$/.test(label)) return false;

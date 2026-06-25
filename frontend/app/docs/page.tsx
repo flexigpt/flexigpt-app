@@ -78,7 +78,7 @@ function tryParseURL(href: string) {
 
 function scrollElementInsideContainer(
 	container: HTMLElement,
-	element: HTMLElement,
+	element: Element,
 	behavior: ScrollBehavior = 'auto',
 	offset = SCROLL_TOP_OFFSET_PX
 ) {
@@ -131,7 +131,7 @@ export default function DocsPage() {
 	}, []);
 
 	const scrollToTargetInActiveContainer = useCallback((targetID: string, behavior: ScrollBehavior = 'auto') => {
-		const element = document.getElementById(targetID);
+		const element = document.querySelector(`#${targetID}`);
 		if (!element) {
 			return false;
 		}
@@ -207,7 +207,7 @@ export default function DocsPage() {
 					return false;
 				}
 
-				if (document.getElementById(targetID)) {
+				if (document.querySelector(`#${targetID}`)) {
 					scrollInsideCurrentDoc(targetID);
 					return true;
 				}
@@ -244,7 +244,7 @@ export default function DocsPage() {
 				}
 
 				if (urlHashTargetID) {
-					if (document.getElementById(urlHashTargetID)) {
+					if (document.querySelector(`#${urlHashTargetID}`)) {
 						scrollInsideCurrentDoc(urlHashTargetID);
 						return true;
 					}

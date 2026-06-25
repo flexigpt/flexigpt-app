@@ -22,10 +22,10 @@ export function getPrettyToolName(name: string): string {
 	let base = name;
 	if (base.includes('/')) {
 		const parts = base.split('/');
-		base = parts[parts.length - 1] || base;
+		base = parts.at(-1) || base;
 	}
 	if (base.includes('@')) {
 		base = base.split('@')[0] || base;
 	}
-	return base.replace(/[-_]/g, ' ');
+	return base.replaceAll(/[-_]/g, ' ');
 }

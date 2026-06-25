@@ -132,7 +132,7 @@ export function MermaidDiagram({
 	// Per-diagram surface override: only when user explicitly selects light/dark.
 	// In auto mode, it stays consistent with the app’s DaisyUI theme.
 	const surfaceStyle = useMemo<MermaidSurfaceStyle | undefined>(() => {
-		if (themeMode === 'auto') return undefined;
+		if (themeMode === 'auto') return;
 
 		const forcedDark = themeMode === 'dark';
 
@@ -162,7 +162,7 @@ export function MermaidDiagram({
 		const token = ++latestToken.current;
 
 		if (!stableCode.trim()) {
-			return undefined;
+			return;
 		}
 
 		let isCancelled = false;

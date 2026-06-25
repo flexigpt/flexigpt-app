@@ -79,7 +79,7 @@ function collectPinnedInstructionMessagesBeforeIndex(
 	beforeIdx: number
 ): ConversationMessage[] {
 	if (beforeIdx <= 0) return [];
-	return messages.slice(0, beforeIdx).filter(isInstructionMessage);
+	return messages.slice(0, beforeIdx).filter(m => isInstructionMessage(m));
 }
 
 /**

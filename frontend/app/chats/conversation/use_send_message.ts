@@ -145,12 +145,12 @@ export function useSendMessage({
 				return;
 			}
 
-			const currentUserMsg = allMessages[allMessages.length - 1];
+			const currentUserMsg = allMessages.at(-1);
 			const history = allMessages.slice(0, allMessages.length - 1);
 			const effectiveCurrentUserMsg = {
 				...currentUserMsg,
-				attachments: dedupeAttachmentsByRef(currentUserMsg.attachments),
-			};
+				attachments: dedupeAttachmentsByRef(currentUserMsg?.attachments),
+			} as ConversationMessage;
 
 			clearStreamBuffer(tabId);
 			notifyStreamNow(tabId);
@@ -291,7 +291,7 @@ export function useSendMessage({
 						modifiedAt: new Date(),
 					};
 
-					if (rawResponse?.hydratedCurrentInputs && currentUserMsg.id) {
+					if (rawResponse?.hydratedCurrentInputs && currentUserMsg?.id) {
 						const hydratedInputs = rawResponse.hydratedCurrentInputs;
 						finalChat = {
 							...finalChat,

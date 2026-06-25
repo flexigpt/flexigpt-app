@@ -290,7 +290,7 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 	);
 
 	const openSearch = useCallback(async () => {
-		if (!recentConversations.length) {
+		if (recentConversations.length === 0) {
 			await loadRecentConversations();
 			return;
 		}

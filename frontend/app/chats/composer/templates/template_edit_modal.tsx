@@ -469,7 +469,6 @@ function VariableEditorRow({
 				</div>
 			);
 
-		case VarType.String:
 		default:
 			return (
 				<div className="grid grid-cols-12 items-center gap-3">

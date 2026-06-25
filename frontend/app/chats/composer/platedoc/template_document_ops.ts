@@ -62,7 +62,7 @@ function getInstructionPromptPartFromSelection(selection: SelectedTemplateForRun
 }
 
 export function getInstructionPromptPartsFromSelections(selections: SelectedTemplateForRun[]): string[] {
-	return selections.map(getInstructionPromptPartFromSelection).filter(Boolean);
+	return selections.map(s => getInstructionPromptPartFromSelection(s)).filter(Boolean);
 }
 
 /**
@@ -284,7 +284,7 @@ export function toPlainTextReplacingVariables(editor: PlateEditor): string {
 	}
 
 	const rootNodes = editor.children ?? [];
-	return rootNodes.map(toStringDeepWithVars).join('\n');
+	return rootNodes.map(n => toStringDeepWithVars(n)).join('\n');
 }
 
 function isTemplateVarNode(n: unknown): n is TemplateVariableElementNode {

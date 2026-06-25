@@ -43,11 +43,6 @@ type TargetVisualState = 'neutral' | 'info' | 'success' | 'warning' | 'error';
 
 function getTargetCardClassName(visualState: TargetVisualState): string {
 	switch (visualState) {
-		case 'error':
-		case 'warning':
-		case 'success':
-		case 'info':
-		case 'neutral':
 		default:
 			return 'border-base-300 bg-base-100';
 	}
@@ -63,7 +58,7 @@ function getTargetStatusBadgeClassName(visualState: TargetVisualState): string {
 			return 'badge-success';
 		case 'info':
 			return 'badge-info';
-		case 'neutral':
+
 		default:
 			return 'badge-ghost';
 	}
@@ -96,7 +91,7 @@ function getBadgeToneClassName(tone: HeaderButtonTone): string {
 			return 'badge-error';
 		case 'info':
 			return 'badge-info';
-		case 'neutral':
+
 		default:
 			return 'badge-ghost';
 	}
@@ -322,11 +317,6 @@ function getTargetVisualState(
 
 function getTargetMessageClassName(visualState: TargetVisualState): string {
 	switch (visualState) {
-		case 'error':
-		case 'warning':
-		case 'success':
-		case 'info':
-		case 'neutral':
 		default:
 			return 'border border-base-300 bg-base-200/60 text-base-content/75';
 	}

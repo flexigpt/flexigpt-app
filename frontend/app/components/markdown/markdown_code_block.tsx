@@ -78,6 +78,7 @@ export function CodeBlock({ language, value, isBusy, hideMermaidCode, diffCandid
 		</pre>
 	);
 
+	// oxlint-disable-next-line require-await
 	const fetchValue = async () => value;
 
 	const handleToggleExpanded = () => {

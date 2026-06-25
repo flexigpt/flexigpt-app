@@ -107,7 +107,7 @@ export class WailsModelPresetStoreAPI implements IModelPresetStoreAPI {
 			PageToken: pageToken ?? '',
 		};
 		const resp = await ListProviderPresets(r);
-		const providers = ((resp.Body?.providers ?? []) as ProviderPreset[]).map(normalizeProviderPreset);
+		const providers = ((resp.Body?.providers ?? []) as ProviderPreset[]).map(p => normalizeProviderPreset(p));
 		return {
 			providers: providers,
 			nextPageToken: resp.Body?.nextPageToken ?? undefined,

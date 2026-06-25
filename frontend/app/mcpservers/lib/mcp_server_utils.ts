@@ -192,7 +192,6 @@ export function getMCPStatusBadgeClass(status?: MCPServerStatus): string {
 			return 'badge-error';
 		case MCPServerStatus.MCPServerStatusDisabled:
 			return 'badge-neutral';
-		case MCPServerStatus.MCPServerStatusDisconnected:
 		default:
 			return 'badge-warning';
 	}
@@ -251,7 +250,6 @@ export function getMCPToolRiskLabel(risk: MCPToolRisk): string {
 			return 'Destructive';
 		case MCPToolRisk.MCPToolRiskOpenWorld:
 			return 'Open World';
-		case MCPToolRisk.MCPToolRiskUnknown:
 		default:
 			return 'Unknown';
 	}
@@ -266,7 +264,6 @@ export function getMCPToolRiskBadgeClass(risk: MCPToolRisk): string {
 		case MCPToolRisk.MCPToolRiskDestructive:
 		case MCPToolRisk.MCPToolRiskOpenWorld:
 			return 'badge-error';
-		case MCPToolRisk.MCPToolRiskUnknown:
 		default:
 			return 'badge-neutral';
 	}
@@ -391,7 +388,7 @@ export function parseMCPStringRecordJSON(raw: string, fieldLabel: string): Recor
 
 	for (const [key, val] of Object.entries(parsed as Record<string, unknown>)) {
 		if (typeof val !== 'string') {
-			throw new Error(`${fieldLabel} values must all be strings.`);
+			throw new TypeError(`${fieldLabel} values must all be strings.`);
 		}
 
 		result[key] = val;

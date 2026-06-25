@@ -49,7 +49,7 @@ const promptTemplateKey = (item: PromptTemplateListItem) =>
 	`${item.bundleID}::${item.bundleSlug}::${item.templateSlug}::${item.templateVersion}`;
 
 function humanizeTemplateSlug(slug: string): string {
-	return slug.replace(/[-_]/g, ' ');
+	return slug.replaceAll(/[-_]/g, ' ');
 }
 
 function comparePromptTemplateListItems(a: PromptTemplateListItem, b: PromptTemplateListItem): number {

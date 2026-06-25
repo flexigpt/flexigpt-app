@@ -67,7 +67,7 @@ const EXECUTION_MODE_DROPDOWN_ITEMS: Record<MCPExecutionMode, DropdownItem> = {
 };
 
 function isIPv4LoopbackHost(host: string): boolean {
-	const parts = host.split('.').map(part => Number(part));
+	const parts = host.split('.').map(Number);
 
 	return (
 		parts.length === 4 && parts.every(part => Number.isInteger(part) && part >= 0 && part <= 255) && parts[0] === 127

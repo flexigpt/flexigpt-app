@@ -8,7 +8,7 @@ function SanitizeLaTeX(content: string) {
 	if (!testLatexRegex.test(content)) {
 		return content;
 	}
-	let processedContent = content.replace(/(\$)(?=\s?\d)/g, '\\$');
+	let processedContent = content.replaceAll(/(\$)(?=\s?\d)/g, '\\$');
 
 	if (!containsLatexRegex.test(processedContent)) {
 		return processedContent;

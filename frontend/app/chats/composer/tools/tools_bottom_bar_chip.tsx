@@ -217,7 +217,7 @@ export function ToolsBottomBarChip({
 	}, [isInputLocked, store]);
 
 	const attachedToolKeys = useMemo(() => {
-		return new Set(attachedToolEntries.map(getAttachedToolKey));
+		return new Set(attachedToolEntries.map(k => getAttachedToolKey(k)));
 	}, [attachedToolEntries]);
 
 	const conversationToolByKey = useMemo(() => {
@@ -372,10 +372,11 @@ export function ToolsBottomBarChip({
 		visibleAttachedToolEntries.length + conversationToolCount + compatibleWebSearchTemplates.length;
 
 	const title = useMemo(() => {
-		const lines: string[] = [];
-		lines.push(shortcut ? `Attach tools (${shortcut})` : 'Attach tools');
-		lines.push('Choose per-message tools, conversation tools, and web search.');
-		lines.push(configuredToolCount > 0 ? `Configured: ${configuredToolCount}` : 'No tools configured');
+		const lines: string[] = [
+			shortcut ? `Attach tools (${shortcut})` : 'Attach tools',
+			'Choose per-message tools, conversation tools, and web search.',
+			configuredToolCount > 0 ? `Configured: ${configuredToolCount}` : 'No tools configured',
+		];
 		if (visibleAttachedToolEntries.length > 0) lines.push(`Per-message tools: ${visibleAttachedToolEntries.length}`);
 		if (conversationToolCount > 0) lines.push(`Conversation tools: ${conversationToolCount}`);
 		if (webSearchEnabled) lines.push('Web search: enabled');
@@ -854,7 +855,7 @@ export function ToolsBottomBarChip({
 										</button>
 									</div>
 
-									<div className="space-y-1">{orderedWebSearchTools.map(renderWebSearchRow)}</div>
+									<div className="space-y-1">{orderedWebSearchTools.map(r => renderWebSearchRow(r))}</div>
 								</>
 							)}
 						</GroupedMenuSection>
@@ -866,7 +867,7 @@ export function ToolsBottomBarChip({
 								separatorBefore
 								meta={<span className="badge badge-ghost badge-xs">{visibleAttachedToolEntries.length}</span>}
 							>
-								<div className="space-y-1">{visibleAttachedToolEntries.map(renderAttachedToolRow)}</div>
+								<div className="space-y-1">{visibleAttachedToolEntries.map(r => renderAttachedToolRow(r))}</div>
 							</GroupedMenuSection>
 						) : null}
 

@@ -313,7 +313,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 			type: formData.type,
 			location: formData.location.trim(),
 			description: formData.description.trim() || undefined,
-			tags: tagsArr.length ? tagsArr : undefined,
+			tags: tagsArr.length > 0 ? tagsArr : undefined,
 			isEnabled: formData.isEnabled,
 		})
 			.then(() => {

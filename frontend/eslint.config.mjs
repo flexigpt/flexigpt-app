@@ -12,10 +12,8 @@ import globals from 'globals';
 import path from 'path';
 // Oxlint handles almost all typescript-eslint things. mostly here for parser and config base disables etc.
 import { configs } from 'typescript-eslint';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = import.meta.dirname;
 const tsconfigPath = path.join(__dirname, 'tsconfig.json');
 
 // oxlint-disable-next-line no-restricted-exports
@@ -65,7 +63,19 @@ export default defineConfig(
 			...reactYouMightNotNeedAnEffect.configs.strict.rules,
 			'react-you-might-not-need-an-effect/no-event-handler': 'off',
 
+			// Oxlint nursery.
+			'no-undef': 'off',
+
 			// Oxlint implements.
+			'no-case-declarations': 'off',
+			'no-dupe-args': 'off',
+			'no-empty': 'off',
+			'no-fallthrough': 'off',
+			'no-octal': 'off',
+			'no-prototype-builtins': 'off',
+			'no-redeclare': 'off',
+			'no-regex-spaces': 'off',
+
 			'no-restricted-imports': 'off',
 			'no-restricted-exports': 'off',
 			'no-control-regex': 'off',

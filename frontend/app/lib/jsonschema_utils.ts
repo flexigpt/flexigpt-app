@@ -379,6 +379,7 @@ export function buildExampleFromDraft7Schema(
 					}
 
 					while (out.length < count) {
+						// oxlint-disable-next-line unicorn/prefer-at
 						out.push(tupleExamples.length > 0 ? tupleExamples[tupleExamples.length - 1] : null);
 					}
 

@@ -5,7 +5,7 @@ export enum CustomMDLanguage {
 
 export function stripCustomMDFences(markdown: string): string {
 	// Remove all ~~~thinking blocks
-	let r = markdown.replace(/(^|\n)~~~thinking\s*[\s\S]*?\n~~~\s*/g, '$1');
-	r = r.replace(/(^|\n)~~~thinkingsummary\s*[\s\S]*?\n~~~\s*/g, '$1');
+	let r = markdown.replaceAll(/(^|\n)~~~thinking\s*[\s\S]*?\n~~~\s*/g, '$1');
+	r = r.replaceAll(/(^|\n)~~~thinkingsummary\s*[\s\S]*?\n~~~\s*/g, '$1');
 	return r;
 }

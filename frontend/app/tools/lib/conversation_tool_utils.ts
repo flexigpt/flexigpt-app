@@ -75,7 +75,7 @@ export function mergeConversationToolsWithNewChoices(
 		if (t.toolType !== ToolStoreChoiceType.WebSearch) {
 			const key = toolIdentityKey(t.bundleID, undefined, t.toolSlug, t.toolVersion);
 			const existingIdx = indexByKey.get(key);
-			if (existingIdx != null) {
+			if (existingIdx !== null && existingIdx !== undefined) {
 				// Refresh metadata but keep enabled flag.
 				next[existingIdx] = {
 					...next[existingIdx],

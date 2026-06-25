@@ -35,18 +35,15 @@ export function MessageCitationsBar({ citations }: MessageCitationsBarProps) {
 
 				// Build a concise but info-dense tooltip:
 				// Title (or display) • "cited text snippet" • Range • URL
-				const tooltipParts: string[] = [];
-
-				// Title / display always first
-				tooltipParts.push('• ' + display);
+				const tooltipParts: string[] = ['• ' + display];
 
 				if (u.citedText && u.citedText.trim()) {
-					const raw = u.citedText.trim().replace(/\s+/g, ' ');
+					const raw = u.citedText.trim().replaceAll(/\s+/g, ' ');
 					const snippet = raw.length > maxTooltipLen ? `${raw.slice(0, maxTooltipLen - 1)}…` : raw;
 					tooltipParts.push(`“${snippet}”`);
 				}
 
-				if (u.startIndex != null || u.endIndex != null) {
+				if (u.startIndex !== null || u.endIndex !== null) {
 					tooltipParts.push(`Range: ${u.startIndex ?? '?'}–${u.endIndex ?? '?'}`);
 				}
 

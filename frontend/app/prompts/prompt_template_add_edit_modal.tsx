@@ -285,7 +285,7 @@ function AddEditPromptTemplateModalContent({
 				else newErrs = omitManyKeys(newErrs, ['tags']);
 			}
 		} else if (field === 'blocks') {
-			if (!blocks.length) {
+			if (blocks.length === 0) {
 				newErrs.blocks = 'At least one block is required.';
 			} else if (blocks.some(block => !block.content.trim())) {
 				newErrs.blocks = 'All blocks must have non-empty content.';

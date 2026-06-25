@@ -179,11 +179,9 @@ function buildResolvedPromptVariableValues(variables?: PromptVariable[]): Record
 		const name = variable.name?.trim();
 		if (!name) continue;
 
-		if (variable.source === VarSource.Static) {
-			if (variable.staticVal !== undefined) {
-				values[name] = variable.staticVal;
-				continue;
-			}
+		if (variable.source === VarSource.Static && variable.staticVal !== undefined) {
+			values[name] = variable.staticVal;
+			continue;
 		}
 
 		if (variable.default !== undefined) {

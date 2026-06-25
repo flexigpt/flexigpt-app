@@ -37,7 +37,10 @@ export function getMCPAppToolResultContent(output: UIToolOutput): MCPContent[] |
 	// Legacy fallback only: if an older output has an app URI but did not
 	// preserve MCP content, convert FlexiGPT text outputs back into MCP text
 	// content. Never use this as structuredContent.
-	const text = (output.toolOutputs ?? []).map(textFromUIToolOutputItem).filter(Boolean).join('\n\n');
+	const text = (output.toolOutputs ?? [])
+		.map(t => textFromUIToolOutputItem(t))
+		.filter(Boolean)
+		.join('\n\n');
 	if (!text) return undefined;
 
 	return [

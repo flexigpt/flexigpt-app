@@ -62,7 +62,7 @@ export function DownloadButton({
 				mimeType = langInfo.mimeType;
 				contentBase64 = Base64EncodeUTF8(value);
 			} else {
-				throw new Error('Unsupported content type for download');
+				throw new TypeError('Unsupported content type for download');
 			}
 
 			const suggestedFileName = `${fileprefix}-${GenerateRandomString(3, true)}${fileExtension}`;

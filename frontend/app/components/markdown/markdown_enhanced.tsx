@@ -77,6 +77,7 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 	}, [text, isBusy]);
 
 	const components = useMemo(() => {
+		// oxlint-disable-next-line react/display-name
 		const renderHeading =
 			(tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6', baseClassName: string, options?: { hide?: boolean }) =>
 			({ node, children, className, id, ...rest }: CustomComponentProps) => {
@@ -225,12 +226,12 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 						? children
 						: Array.isArray(children)
 							? children.join('')
-							: children == null
+							: children === null
 								? ''
 								: // oxlint-disable-next-line typescript/no-base-to-string
 									String(children);
 
-				const value = raw.replace(/\r\n/g, '\n').replace(/\n$/, '');
+				const value = raw.replaceAll('\r\n', '\n').replace(/\n$/, '');
 
 				if (language === (CustomMDLanguage.ThinkingSummary as string)) {
 					return (

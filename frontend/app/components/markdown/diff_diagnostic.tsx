@@ -57,7 +57,7 @@ export function getDiagnosticSeverityCounts(diagnostics: ApplyUnifiedDiffDiagnos
 			case ApplyUnifiedDiffDiagnosticLevel.Warning:
 				counts.warning += 1;
 				break;
-			case ApplyUnifiedDiffDiagnosticLevel.Info:
+
 			default:
 				counts.info += 1;
 				break;
@@ -111,7 +111,7 @@ export function uniqueDiagnostics(
 
 		const level = value.level ?? ApplyUnifiedDiffDiagnosticLevel.Info;
 		const code = value.code?.trim() ?? '';
-		const key = `${level}\u0000${code}\u0000${message.replaceAll('\\', '/').replace(/\/+/g, '/')}`;
+		const key = `${level}\u0000${code}\u0000${message.replaceAll('\\', '/').replaceAll(/\/+/g, '/')}`;
 
 		if (seen.has(key)) continue;
 
@@ -142,7 +142,7 @@ function uniqueStringsFromDiagnostics(values: Array<ApplyUnifiedDiffDiagnostic |
 		const trimmed = value?.message.trim();
 		if (!trimmed) continue;
 
-		const key = trimmed.replaceAll('\\', '/').replace(/\/+/g, '/');
+		const key = trimmed.replaceAll('\\', '/').replaceAll(/\/+/g, '/');
 
 		if (seen.has(key)) continue;
 
@@ -176,7 +176,6 @@ function getDiagnosticDisplay(level: ApplyUnifiedDiffDiagnosticLevel) {
 				textClassName: 'text-warning',
 				icon: <FiAlertTriangle size={12} />,
 			};
-		case ApplyUnifiedDiffDiagnosticLevel.Info:
 		default:
 			return {
 				label: 'Info',
@@ -215,7 +214,6 @@ function formatDiagnosticLevelCount(level: ApplyUnifiedDiffDiagnosticLevel, coun
 			return `${count} error${count === 1 ? '' : 's'}`;
 		case ApplyUnifiedDiffDiagnosticLevel.Warning:
 			return `${count} warning${count === 1 ? '' : 's'}`;
-		case ApplyUnifiedDiffDiagnosticLevel.Info:
 		default:
 			return `${count} info`;
 	}

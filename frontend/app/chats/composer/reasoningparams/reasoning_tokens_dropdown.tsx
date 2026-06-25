@@ -23,7 +23,7 @@ export function ReasoningTokensDropdown({ tokens, setTokens }: ReasoningTokensDr
 	const open = useStoreState(menu, 'open');
 
 	function clampTokens(rawValue: string) {
-		let val = parseInt(rawValue, 10);
+		let val = Math.trunc(Number(rawValue));
 		if (isNaN(val)) {
 			val = 1024;
 		}

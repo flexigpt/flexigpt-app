@@ -46,7 +46,7 @@ export function AuthKeyTable({ authKeys, onEdit, onChanged }: AuthKeyTableProps)
 		onChanged();
 	};
 
-	if (!authKeys.length) {
+	if (authKeys.length === 0) {
 		return (
 			<div className="border-base-300 bg-base-200/60 my-6 rounded-2xl border p-4 text-sm">
 				<div className="font-semibold">No provider keys configured yet.</div>

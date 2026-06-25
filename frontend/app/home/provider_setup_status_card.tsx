@@ -9,7 +9,7 @@ import { type AuthKeyMeta, AuthKeyTypeProvider } from '@/spec/setting';
 const DEFAULT_PROVIDER_NAME_HINTS = ['openai', 'anthropic', 'gemini', 'google', 'openrouter'];
 
 function normaliseProviderText(value: string) {
-	return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+	return value.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
 }
 
 function providerDisplayName(providerPresets: Record<ProviderName, ProviderPreset>, providerName: string) {
@@ -25,13 +25,13 @@ export function getConfiguredProviderNames(authKeys: AuthKeyMeta[]) {
 
 export function pickDefaultProviderName(providerPresets: Record<ProviderName, ProviderPreset>) {
 	const entries = Object.entries(providerPresets);
-	if (!entries.length) {
+	if (entries.length === 0) {
 		return null;
 	}
 
 	for (const hint of DEFAULT_PROVIDER_NAME_HINTS) {
 		const match = entries.find(([providerName, preset]) => {
-			const values = [providerName, preset.displayName ?? ''].map(normaliseProviderText);
+			const values = [providerName, preset.displayName ?? ''].map(v => normaliseProviderText(v));
 			return values.some(value => value.includes(hint));
 		});
 
@@ -47,13 +47,13 @@ export function formatConfiguredProviderSummary(
 	configuredProviderNames: string[],
 	providerPresets: Record<ProviderName, ProviderPreset>
 ) {
-	if (!configuredProviderNames.length) {
+	if (configuredProviderNames.length === 0) {
 		return '';
 	}
 
 	const [first, ...rest] = configuredProviderNames;
 	const firstName = providerDisplayName(providerPresets, first);
-	return rest.length ? `${firstName} + ${rest.length} more` : firstName;
+	return rest.length > 0 ? `${firstName} + ${rest.length} more` : firstName;
 }
 
 export function HomeAuthKeyModalIntro({ onNavigateAway }: { onNavigateAway: () => void }) {

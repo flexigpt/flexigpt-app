@@ -240,13 +240,13 @@ export function AssistantPresetViewModal({
 
 	const appliedInstructionKeys =
 		preparedApplication?.comparisonState.instructions ??
-		(viewedPreset.preset.startingInstructionTemplateRefs ?? []).map(buildPromptTemplateRefKey);
+		(viewedPreset.preset.startingInstructionTemplateRefs ?? []).map(r => buildPromptTemplateRefKey(r));
 	const appliedToolItems = preparedApplication
 		? [
 				...preparedApplication.runtimeSelections.conversationToolChoices,
 				...preparedApplication.runtimeSelections.webSearchChoices,
-			].map(formatToolLabel)
-		: (viewedPreset.preset.startingToolSelections ?? []).map(formatPresetToolSelectionLabel);
+			].map(t => formatToolLabel(t))
+		: (viewedPreset.preset.startingToolSelections ?? []).map(p => formatPresetToolSelectionLabel(p));
 
 	const currentToolItems = shouldShowActiveComparison
 		? [...currentRuntimeSnapshot.conversationToolChoices, ...currentRuntimeSnapshot.webSearchChoices].map(choice =>
@@ -262,7 +262,7 @@ export function AssistantPresetViewModal({
 			)
 		: [];
 
-	const appliedSkillItems = (viewedPreset.preset.startingSkillSelections ?? []).map(formatSkillSelectionLabel);
+	const appliedSkillItems = (viewedPreset.preset.startingSkillSelections ?? []).map(s => formatSkillSelectionLabel(s));
 	const currentSkillItems = shouldShowActiveComparison
 		? currentRuntimeSnapshot.enabledSkillRefs.map(formatSkillLabel)
 		: [];

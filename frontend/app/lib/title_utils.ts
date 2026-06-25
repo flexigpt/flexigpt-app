@@ -48,7 +48,7 @@ function looksLikeCodeLine(line: string): boolean {
 
 function isCodeParagraph(p: string): boolean {
 	const lines = p.split(/\n/);
-	const codeLike = lines.filter(looksLikeCodeLine).length;
+	const codeLike = lines.filter(l => looksLikeCodeLine(l)).length;
 	return codeLike >= lines.length / 2; // ≥ 50 % lines look like code
 }
 
@@ -57,13 +57,13 @@ function stripCode(txt: string): string {
 	return (
 		txt
 			// ``` ... ```  or  ~~~ ... ~~~
-			.replace(/```[\s\S]*?```|~~~[\s\S]*?~~~/g, '')
+			.replaceAll(/```[\s\S]*?```|~~~[\s\S]*?~~~/g, '')
 			// 4-space / tab indented blocks
-			.replace(/^(?: {4}|\t).*\n?/gm, '')
+			.replaceAll(/^(?: {4}|\t).*\n?/gm, '')
 			// inline `code`
-			.replace(/`[^`\n]*`/g, '')
+			.replaceAll(/`[^`\n]*`/g, '')
 			// very simple HTML tags
-			.replace(/<\/?[a-z][^>]*>/gi, '')
+			.replaceAll(/<\/?[a-z][^>]*>/gi, '')
 	);
 }
 
@@ -91,7 +91,7 @@ function selectCandidateParagraphs(paragraphs: string[]): string[] {
 	if (nonCode.length >= 4) return [...nonCode.slice(0, 2), ...nonCode.slice(-2)];
 
 	// ② otherwise take whatever non-code we have
-	if (nonCode.length) return nonCode;
+	if (nonCode.length > 0) return nonCode;
 
 	// ③ nothing but code -> fall back to very first paragraph
 	return [paragraphs[0]];
@@ -148,13 +148,13 @@ function finalise(raw: string): string {
 		// salutations
 		.replace(/^(hi|hello|hey|dear|greetings|good (morning|afternoon|evening))[,!:.\s-]+/i, '')
 		// emails & phones
-		.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '')
-		.replace(/\+?\d[\d\s.-]{7,}/g, '')
+		.replaceAll(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '')
+		.replaceAll(/\+?\d[\d\s.-]{7,}/g, '')
 		// whitespace
-		.replace(/\s+/g, ' ')
+		.replaceAll(/\s+/g, ' ')
 		.trim()
 		// leading / trailing punctuation
-		.replace(/^[\s:;,-]+|[\s:;,.?!-]+$/g, '');
+		.replaceAll(/^[\s:;,-]+|[\s:;,.?!-]+$/g, '');
 
 	if (!t) return DEFAULT_TITLE;
 
@@ -172,7 +172,7 @@ export function generateTitle(firstMessage: string): TitleCandidate {
 	if (!firstMessage.trim()) return DEFAULT_TITLE_CANDIDATE;
 
 	const paragraphs = splitParagraphs(firstMessage.trim());
-	if (!paragraphs.length) return DEFAULT_TITLE_CANDIDATE;
+	if (paragraphs.length === 0) return DEFAULT_TITLE_CANDIDATE;
 
 	/* ① choose candidate paragraphs */
 	const candidates = selectCandidateParagraphs(paragraphs);
@@ -181,7 +181,7 @@ export function generateTitle(firstMessage: string): TitleCandidate {
 	/* ② collect sentences & drop code-looking lines */
 	const sentences = candidates.flatMap(p => splitSentences(p)).filter(l => !looksLikeCodeLine(l));
 	// console.log('sentences', JSON.stringify(sentences, null, 2));
-	if (!sentences.length) {
+	if (sentences.length === 0) {
 		// still nothing - just clean first paragraph
 		const t: TitleCandidate = { title: finalise(stripCode(paragraphs[0])), score: 0.2 };
 		return t;

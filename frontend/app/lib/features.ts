@@ -7,7 +7,7 @@ function isMacLike(): boolean {
 	const ua = navigator.userAgent || '';
 
 	// Covers macOS, iOS (Safari in Wails/WebView will still report these)
-	return platform.startsWith('mac') || /iphone|ipad|ipod/.test(platform) || /Mac OS X/.test(ua);
+	return platform.startsWith('mac') || /iphone|ipad|ipod/.test(platform) || ua.includes('Mac OS X');
 }
 
 export const MOD_LABEL = isMacLike() ? '⌘' : 'Ctrl';

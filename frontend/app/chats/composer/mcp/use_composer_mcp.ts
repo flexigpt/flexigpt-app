@@ -101,7 +101,7 @@ function withArgumentValue<T extends { argumentValues?: Record<string, string> }
 }
 
 function modelSelectableTools(tools: MCPToolCapability[]): MCPToolCapability[] {
-	return tools.filter(isMCPToolModelSelectable);
+	return tools.filter(t => isMCPToolModelSelectable(t));
 }
 
 export function useComposerMCP(): UseComposerMCPResult {
@@ -276,7 +276,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 						...prev,
 						[key]: {
 							...currentSelection,
-							selectedTools: modelSelectableTools(tools).map(toolToSelection),
+							selectedTools: modelSelectableTools(tools).map(t => toolToSelection(t)),
 						},
 					};
 				});
@@ -440,7 +440,8 @@ export function useComposerMCP(): UseComposerMCPResult {
 						serverID: option.server.id,
 						snapshotDigest: option.runtime?.snapshotDigest,
 						toolExposure: MCPToolExposure.MCPToolExposureAll,
-						selectedTools: option.tools.length > 0 ? modelSelectableTools(option.tools).map(toolToSelection) : [],
+						selectedTools:
+							option.tools.length > 0 ? modelSelectableTools(option.tools).map(t => toolToSelection(t)) : [],
 						selectedResources: [],
 						selectedResourceTemplates: [],
 						selectedPrompts: [],
@@ -468,7 +469,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 						toolExposure: exposure,
 						selectedTools:
 							exposure === MCPToolExposure.MCPToolExposureAll
-								? modelSelectableTools(option?.tools ?? []).map(toolToSelection)
+								? modelSelectableTools(option?.tools ?? []).map(t => toolToSelection(t))
 								: exposure === MCPToolExposure.MCPToolExposureNone
 									? []
 									: current.selectedTools,
@@ -665,7 +666,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 			if (selection.toolExposure === MCPToolExposure.MCPToolExposureAll) {
 				const discovery = await loadDiscoveryForServer(selection.bundleID, selection.serverID).catch(() => undefined);
 				const tools = discovery?.tools ?? option?.tools ?? [];
-				selectedTools = modelSelectableTools(tools).map(toolToSelection);
+				selectedTools = modelSelectableTools(tools).map(t => toolToSelection(t));
 			}
 
 			nextSelections[key] = {

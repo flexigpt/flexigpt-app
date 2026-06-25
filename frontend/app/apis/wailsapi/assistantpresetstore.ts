@@ -83,8 +83,8 @@ export class WailsAssistantPresetStoreAPI implements IAssistantPresetStoreAPI {
 		const resp = await ListAssistantPresetBundles(req);
 
 		return {
-			assistantPresetBundles: ((resp.Body?.assistantPresetBundles ?? []) as AssistantPresetBundle[]).map(
-				normalizeAssistantPresetBundle
+			assistantPresetBundles: ((resp.Body?.assistantPresetBundles ?? []) as AssistantPresetBundle[]).map(b =>
+				normalizeAssistantPresetBundle(b)
 			),
 			nextPageToken: resp.Body?.nextPageToken ?? undefined,
 		};
@@ -145,8 +145,8 @@ export class WailsAssistantPresetStoreAPI implements IAssistantPresetStoreAPI {
 		const resp = await ListAssistantPresets(req);
 
 		return {
-			assistantPresetListItems: ((resp.Body?.assistantPresetListItems ?? []) as AssistantPresetListItem[]).map(
-				normalizeAssistantPresetListItem
+			assistantPresetListItems: ((resp.Body?.assistantPresetListItems ?? []) as AssistantPresetListItem[]).map(i =>
+				normalizeAssistantPresetListItem(i)
 			),
 			nextPageToken: resp.Body?.nextPageToken ?? undefined,
 		};

@@ -14,7 +14,6 @@ function effectiveVarValue(varDef: PromptVariable, userValues: Record<string, un
 			}
 			break;
 
-		case VarSource.User:
 		default:
 			break;
 	}

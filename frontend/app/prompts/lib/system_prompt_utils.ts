@@ -7,7 +7,10 @@ function normalizePromptPart(value: string): string {
 }
 
 function concatenateSystemPromptParts(parts: string[]): string {
-	return parts.map(normalizePromptPart).filter(Boolean).join(SYSTEM_PROMPT_SEPARATOR);
+	return parts
+		.map(p => normalizePromptPart(p))
+		.filter(Boolean)
+		.join(SYSTEM_PROMPT_SEPARATOR);
 }
 
 export function appendSystemPromptParts(basePrompt: string, extraParts: string[]): string {

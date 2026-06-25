@@ -259,7 +259,7 @@ export function useComposerSystemPrompt(args: {
 
 			if (hasInstructionTemplateSelection) {
 				const requestedPromptKeys = dedupeStringArray(
-					(preset.startingInstructionTemplateRefs ?? []).map(buildPromptTemplateRefKey)
+					(preset.startingInstructionTemplateRefs ?? []).map(r => buildPromptTemplateRefKey(r))
 				);
 
 				const instructionOptions = await loadInstructionTemplateOptions();

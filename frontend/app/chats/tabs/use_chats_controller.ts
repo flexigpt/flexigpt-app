@@ -124,8 +124,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 
 		setMountedInputTabIds(prev => {
 			if (prev.has(tabId)) return prev;
-			const next = new Set(prev);
-			next.add(tabId);
+			const next = new Set(...prev, tabId);
 			return next;
 		});
 	}, []);
@@ -529,7 +528,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 
 		return normalizedTabs.some(tab => tab.tabId === nextScratch.tabId)
 			? nextScratch.tabId
-			: (normalizedTabs.find(isScratchTab)?.tabId ?? '');
+			: (normalizedTabs.find(t => isScratchTab(t))?.tabId ?? '');
 	}, [normalizeAndCommitTabs, touchTab]);
 
 	const preloadWorkflowStarter = useCallback(
@@ -605,7 +604,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 
 			const activeId = selectedTabIdRef.current;
 			const idx = current.findIndex(tab => tab.tabId === activeId);
-			const from = idx >= 0 ? idx : 0;
+			const from = Math.max(idx, 0);
 			const nextIndex = (from + delta + current.length) % current.length;
 			const nextId = current[nextIndex]?.tabId;
 			if (!nextId) return;

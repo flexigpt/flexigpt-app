@@ -61,7 +61,7 @@ export function getEligibleWebSearchTools(tools: ToolListItem[], sdkType: Provid
 }
 
 export function buildWebSearchChoicesForSubmit(ts: WebSearchChoiceTemplate[]): ToolStoreChoice[] {
-	return normalizeWebSearchChoiceTemplates(ts).map(buildWebSearchChoiceForSubmit);
+	return normalizeWebSearchChoiceTemplates(ts).map(t => buildWebSearchChoiceForSubmit(t));
 }
 
 export function webSearchIdentityKey(t: { bundleID: string; toolSlug: string; toolVersion: string }): string {

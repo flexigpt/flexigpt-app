@@ -81,7 +81,7 @@ export function buildMCPAppHostContext(opts?: {
 
 function getPreferredTheme(): 'light' | 'dark' {
 	if (typeof document !== 'undefined') {
-		const attr = document.documentElement.getAttribute('data-theme');
+		const attr = document.documentElement.dataset.theme;
 		if (attr && /dark/i.test(attr)) return 'dark';
 	}
 	if (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';

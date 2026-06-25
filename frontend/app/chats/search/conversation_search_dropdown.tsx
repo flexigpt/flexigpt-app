@@ -73,9 +73,9 @@ export function ConversationSearchDropdown({
 		let left = 'Title & message matches';
 		let right = '';
 
-		if (loading && !results.length) {
+		if (loading && results.length === 0) {
 			left = 'Searching...';
-		} else if (!results.length && !loading) {
+		} else if (results.length === 0 && !loading) {
 			if (query.length < 3) {
 				if (showSearchAllHintShortQuery) {
 					left = query ? `No title results for "${query}" ` : NO_CONVERSATIONS;
@@ -115,7 +115,7 @@ export function ConversationSearchDropdown({
 				{barRight && <span className="shrink-0 pl-4">{barRight}</span>}
 			</div>
 
-			{!results.length && !loading ? (
+			{results.length === 0 && !loading ? (
 				<div className="app-text-neutral py-8 text-center text-sm">
 					{query ? 'Try refining your search' : 'Start a conversation to see it here'}
 				</div>
@@ -157,7 +157,9 @@ export function ConversationSearchDropdown({
 
 					{loading && (
 						<div className="flex items-center justify-center py-4">
-							<span className="app-text-neutral text-sm">{results.length ? 'Loading more...' : 'Searching...'}</span>
+							<span className="app-text-neutral text-sm">
+								{results.length > 0 ? 'Loading more...' : 'Searching...'}
+							</span>
 							<span className="loading loading-dots loading-sm" />
 						</div>
 					)}

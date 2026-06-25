@@ -1,3 +1,4 @@
+// oxlint-disable max-classes-per-file
 import { sprintf } from 'sprintf-js';
 
 import type { Attachment, DirectoryAttachmentsResult, FileFilter, PathAttachmentsResult } from '@/spec/attachment';
@@ -47,10 +48,10 @@ function formatMessage(args: unknown[]): string {
 			return sprintf(args[0], ...args.slice(1));
 		} catch (error) {
 			console.error(`Error formatting message: ${error}`);
-			return args.map(stringifyLogArg).join(' ');
+			return args.map(a => stringifyLogArg(a)).join(' ');
 		}
 	}
-	return args.map(stringifyLogArg).join(' ');
+	return args.map(a => stringifyLogArg(a)).join(' ');
 }
 
 function isRuntimeAvailable(): boolean {
@@ -191,7 +192,6 @@ export class WailsBackendAPI implements IBackendAPI {
 		} catch (err) {
 			console.error('Error saving file:', err);
 		}
-		return;
 	}
 
 	async openMultipleFilesAsAttachments(

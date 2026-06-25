@@ -99,7 +99,7 @@ export function DebugSettingsSection({ value, onChanged }: DebugSettingsSectionP
 				<div>
 					<h3 className="text-sm font-semibold">Disable content stripping</h3>
 					<p className="text-base-content/60 text-xs">
-						Don't strip user, assistant and thinking content from per message details in Chat.
+						Don&apos;t strip user, assistant and thinking content from per message details in Chat.
 					</p>
 				</div>
 				<input

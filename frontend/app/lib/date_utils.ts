@@ -36,7 +36,7 @@ export function formatDateAsString(d: Date | string): string {
 }
 
 export function parseAnyToTime(val: any): Date | undefined {
-	if (val == null) return undefined;
+	if (val === null) return undefined;
 
 	// If it's a string, try to parse as ISO date
 	if (typeof val === 'string') {
@@ -49,9 +49,8 @@ export function parseAnyToTime(val: any): Date | undefined {
 		// Heuristic: if it's less than 10^12, treat as seconds, else ms
 		if (val < 1e12) {
 			return new Date(val * 1000); // seconds to ms
-		} else {
-			return new Date(val); // already ms
 		}
+		return new Date(val); // already ms
 	}
 
 	return undefined;

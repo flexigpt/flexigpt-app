@@ -118,7 +118,7 @@ export function insertPlainTextAsSingleBlock(ed: PlateEditor | null | undefined,
 	const editor = ed;
 
 	// Normalize line endings
-	const normalized = text.replace(/\r\n?/g, '\n');
+	const normalized = text.replaceAll(/\r\n?/g, '\n');
 
 	// Expand tabs, but keep everything as one string
 	const expanded = normalized.includes('\t')

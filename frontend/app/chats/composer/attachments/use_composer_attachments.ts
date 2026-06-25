@@ -172,7 +172,7 @@ export function useComposerAttachments({
 			if (!results || results.length === 0) return;
 			const keysToReleaseFromDirectoryOwnership = new Set<string>();
 			setAttachments(prev => {
-				const existing = new Set(prev.map(uiAttachmentKey));
+				const existing = new Set(prev.map(k => uiAttachmentKey(k)));
 				const next: UIAttachment[] = [...prev];
 
 				for (const r of results) {
@@ -320,7 +320,7 @@ export function useComposerAttachments({
 			const key = uiAttachmentKey(att);
 
 			setAttachments(prev => {
-				const existing = new Set(prev.map(uiAttachmentKey));
+				const existing = new Set(prev.map(k => uiAttachmentKey(k)));
 				if (existing.has(key)) return prev;
 				return [...prev, att];
 			});

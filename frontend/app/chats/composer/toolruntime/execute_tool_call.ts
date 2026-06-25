@@ -282,7 +282,10 @@ async function executeMCPToolCall(
 		const toolContent = Array.isArray(resp?.content) ? resp.content : undefined;
 		const structuredContent = isJSONObject(resp?.structuredContent) ? resp.structuredContent : undefined;
 
-		const contentText = (toolContent ?? []).map(mcpContentToText).filter(Boolean).join('\n\n');
+		const contentText = (toolContent ?? [])
+			.map(t => mcpContentToText(t))
+			.filter(Boolean)
+			.join('\n\n');
 		const structuredText = structuredContent !== undefined ? JSON.stringify(structuredContent, null, 2) : '';
 
 		const text = [contentText, structuredText].filter(Boolean).join('\n\n') || 'MCP tool returned no content.';

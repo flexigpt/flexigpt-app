@@ -428,6 +428,7 @@ export function deriveUIFieldsFromOutputUnion(
 						if (typeof raw === 'string' && raw.length > 0) textParts.push(raw);
 
 						const itemCitations = c.textItem.citations;
+
 						if (itemCitations && itemCitations.length > 0) {
 							for (const cit of itemCitations) {
 								if (cit.kind !== CitationKind.URL || !cit.urlCitation?.url) continue;

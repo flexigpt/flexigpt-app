@@ -336,9 +336,7 @@ export function useComposerToolRuntime({
 
 			const { bundleID, toolSlug, toolVersion } = output.toolStoreChoice;
 			if (!bundleID || !toolSlug || !toolVersion) return;
-		} else {
-			if (output.type !== ToolStoreChoiceType.Function && output.type !== ToolStoreChoiceType.Custom) return;
-		}
+		} else if (output.type !== ToolStoreChoiceType.Function && output.type !== ToolStoreChoiceType.Custom) return;
 
 		const call: UIToolCall = {
 			id: output.id,

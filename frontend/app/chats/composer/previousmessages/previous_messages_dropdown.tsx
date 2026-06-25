@@ -41,7 +41,7 @@ function maybeParseCustomValue(rawValue: string): IncludePreviousMessages | unde
 	if (!trimmed) {
 		return undefined;
 	}
-	const parsed = Number.parseInt(trimmed, 10);
+	const parsed = Math.trunc(Number(trimmed));
 	if (Number.isNaN(parsed) || parsed < 0) {
 		return 0;
 	}
@@ -72,7 +72,7 @@ export function PreviousMessagesDropdown({ value, setValue }: PreviousMessagesDr
 					content={
 						<div className="space-y-1">
 							<p>
-								- Send "N" previous pure user turns excluding current message. <br />
+								- Send &quot;N&quot; previous pure user turns excluding current message. <br />
 								- A pure user turn is one without any tool outputs. <br />
 							</p>
 						</div>

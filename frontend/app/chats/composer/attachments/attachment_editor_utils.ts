@@ -126,9 +126,9 @@ export function buildUIAttachmentForLocalPath(att: Attachment): UIAttachment | u
 		return undefined;
 	}
 	let sizeBytes = 0;
-	if (att.fileRef && att.fileRef.size && att.fileRef.size > 0) {
+	if (att.fileRef && att.fileRef.size !== undefined && att.fileRef.size > 0) {
 		sizeBytes = att.fileRef.size;
-	} else if (att.imageRef && att.imageRef.size && att.imageRef.size > 0) {
+	} else if (att.imageRef && att.imageRef.size !== undefined && att.imageRef.size > 0) {
 		sizeBytes = att.imageRef.size;
 	}
 
@@ -174,9 +174,9 @@ export function getAttachmentErrorMessage(att: UIAttachment): string | null {
 	if (!att.isError || !att.errorReason) return null;
 	const limit = formatBytes(MAX_SINGLE_ATTACHMENT_BYTES);
 	let size = 0;
-	if (att.fileRef && att.fileRef.size && att.fileRef.size > 0) {
+	if (att.fileRef && att.fileRef.size !== undefined && att.fileRef.size > 0) {
 		size = att.fileRef.size;
-	} else if (att.imageRef && att.imageRef.size && att.imageRef.size > 0) {
+	} else if (att.imageRef && att.imageRef.size !== undefined && att.imageRef.size > 0) {
 		size = att.imageRef.size;
 	}
 
@@ -189,7 +189,7 @@ export function getAttachmentErrorMessage(att: UIAttachment): string | null {
 		}
 		case AttachmentErrorReason.TooLargeTotal:
 			return 'Too many or too large files in this folder were skipped; only a subset was attached.';
-		case AttachmentErrorReason.Unreadable:
+
 		default:
 			return 'This file type is not supported or could not be read.';
 	}

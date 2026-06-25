@@ -267,7 +267,7 @@ export function buildUserConversationMessageFromEditor(
 }
 
 export function deriveHydratedLastAssistantToolCalls(conversation: Conversation): UIToolCall[] {
-	const lastMessage = conversation.messages[conversation.messages.length - 1];
+	const lastMessage = conversation.messages.at(-1);
 	if (!lastMessage || lastMessage.role !== RoleEnum.Assistant) return [];
 
 	return (lastMessage.uiToolCalls ?? [])

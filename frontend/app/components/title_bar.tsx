@@ -58,7 +58,7 @@ export function TitleBar({ onToggleDrawer }: TitleBarProps) {
 		};
 	}, [syncMaxState]);
 
-	const toggleMaximise = useCallback(async () => {
+	const toggleMaximise = useCallback(() => {
 		if (isTogglingMax) return;
 		setIsTogglingMax(true);
 		try {
@@ -79,7 +79,7 @@ export function TitleBar({ onToggleDrawer }: TitleBarProps) {
 				// Don’t toggle when double-clicking on interactive elements
 				const t = e.target as HTMLElement;
 				if (t.closest('.app-no-drag')) return;
-				void toggleMaximise();
+				toggleMaximise();
 			}}
 		>
 			{/* LEFT */}
@@ -133,7 +133,9 @@ export function TitleBar({ onToggleDrawer }: TitleBarProps) {
 						type="button"
 						className="btn btn-ghost btn-xs btn-circle shrink-0 p-0 opacity-80 hover:opacity-100"
 						disabled={isTogglingMax}
-						onClick={() => void toggleMaximise()}
+						onClick={() => {
+							toggleMaximise();
+						}}
 						aria-label={isMax ? 'Restore' : 'Maximise'}
 						title={isMax ? 'Restore' : 'Maximise'}
 					>

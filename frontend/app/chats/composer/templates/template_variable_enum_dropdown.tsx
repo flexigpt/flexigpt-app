@@ -37,7 +37,7 @@ type EnumDropdownInlineProps = {
 
 function getInitialActiveIndex(options: string[], value?: string): number {
 	const selectedIdx = value ? options.findIndex(opt => opt === value) : -1;
-	return selectedIdx >= 0 ? selectedIdx : 0;
+	return Math.max(selectedIdx, 0);
 }
 
 function EnumDropdownInlineMenu({

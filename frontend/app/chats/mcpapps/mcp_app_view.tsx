@@ -55,7 +55,7 @@ interface MCPAppViewProps {
 
 function isAppMime(mime?: string): boolean {
 	if (!mime) return false;
-	const norm = mime.toLowerCase().replace(/\s/g, '');
+	const norm = mime.toLowerCase().replaceAll(/\s/g, '');
 	return norm === APP_MIME || norm.startsWith(`${APP_MIME};`);
 }
 

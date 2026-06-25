@@ -350,9 +350,13 @@ export function useComposerSkills(): UseComposerSkillsResult {
 			if (enableAllSkillsRequestVersionRef.current !== requestVersion) return;
 			if (loadedSkills.length === 0) return;
 
-			void applySkillSelectionState(loadedSkills.map(skillRefFromListItem), activeSkillRefsRef.current, {
-				syncSession: 'if-session-exists',
-			});
+			void applySkillSelectionState(
+				loadedSkills.map(i => skillRefFromListItem(i)),
+				activeSkillRefsRef.current,
+				{
+					syncSession: 'if-session-exists',
+				}
+			);
 		})();
 	}, [allSkills, applySkillSelectionState]);
 

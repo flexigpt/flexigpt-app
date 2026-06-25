@@ -256,7 +256,7 @@ function MCPArgumentFields({
 			<div className="space-y-2">
 				{args.map(arg => {
 					const value = values[arg.name] ?? '';
-					const listID = `mcp-arg-${bundleID}-${serverID}-${refType}-${name}-${arg.name}`.replace(
+					const listID = `mcp-arg-${bundleID}-${serverID}-${refType}-${name}-${arg.name}`.replaceAll(
 						/[^A-Za-z0-9_-]/g,
 						'_'
 					);
@@ -752,11 +752,14 @@ export function MCPBottomBarChip({
 	const hiddenDisabledServerVerb = hiddenDisabledServerCount === 1 ? 'is' : 'are';
 
 	const title = useMemo(() => {
-		const lines = [shortcut ? `Attach MCP (${shortcut})` : 'Attach MCP'];
-		lines.push('Choose MCP servers, tools, resources, and prompts for the next message.');
-		lines.push(
-			enabledCount > 0 ? `Status: Enabled (${enabledCount} server${enabledCount === 1 ? '' : 's'})` : 'Status: Disabled'
-		);
+		const lines = [
+			shortcut ? `Attach MCP (${shortcut})` : 'Attach MCP',
+			'Choose MCP servers, tools, resources, and prompts for the next message.',
+			enabledCount > 0
+				? `Status: Enabled (${enabledCount} server${enabledCount === 1 ? '' : 's'})`
+				: 'Status: Disabled',
+		];
+
 		if (state.selectedToolCount > 0) lines.push(`Tools: ${state.selectedToolCount}`);
 		if (state.selectedResourceCount > 0) lines.push(`Resources: ${state.selectedResourceCount}`);
 		if (state.selectedPromptCount > 0) lines.push(`Prompts: ${state.selectedPromptCount}`);

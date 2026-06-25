@@ -324,7 +324,7 @@ function AddEditToolModalContent({
 					.split(',')
 					.map(s => s.trim())
 					.filter(Boolean);
-				const nums = parts.map(p => Number(p));
+				const nums = parts.map(Number);
 				const bad = nums.some(n => !Number.isFinite(n) || n <= 0);
 				if (bad) newErrs.httpResponseCodes = 'Success codes must be comma-separated numbers (e.g. 200,201)';
 				else newErrs = omitManyKeys(newErrs, ['httpResponseCodes']);
@@ -529,7 +529,7 @@ function AddEditToolModalContent({
 			userCallable: formData.userCallable,
 			llmCallable: formData.llmCallable,
 			autoExecReco: formData.autoExecReco,
-			tags: tagsArr.length ? tagsArr : undefined,
+			tags: tagsArr.length > 0 ? tagsArr : undefined,
 			type: formData.type,
 			argSchema: parsedArgSchema,
 			httpImpl,

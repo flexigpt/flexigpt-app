@@ -145,7 +145,7 @@ function isAutoExecutableToolChoice(choice: ToolStoreChoice): boolean {
 }
 
 function countAutoExecutableToolChoices(choices: ToolStoreChoice[]): number {
-	return choices.filter(isAutoExecutableToolChoice).length;
+	return choices.filter(c => isAutoExecutableToolChoice(c)).length;
 }
 
 type SubmitOptions = { runPendingTools: boolean };
@@ -1011,7 +1011,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 				// 5) Tool choices (editor-attached + conversation-level).
 				const attachedTools = getAttachedTools(editor);
-				const explicitChoices = attachedTools.map(uiToolChoiceToToolStoreChoice);
+				const explicitChoices = attachedTools.map(c => uiToolChoiceToToolStoreChoice(c));
 				const conversationChoices = conversationToolsToChoices(conversationToolsState);
 				const webSearchChoices = buildWebSearchChoicesForSubmit(webSearchTemplates);
 
@@ -1367,7 +1367,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const handleLoadToolCalls = useCallback(
 		(toolCallsToLoad: UIToolCall[]) => {
 			resetAutoSubmitTracker();
-			const autoEligibleCount = toolCallsToLoad.filter(isAutoSubmitEligibleToolCall).length;
+			const autoEligibleCount = toolCallsToLoad.filter(t => isAutoSubmitEligibleToolCall(t)).length;
 			const shouldSuppressAutoExec = autoExecStopRequestedRef.current || autoExecBlockedByUserRef.current;
 
 			const preparedToolCalls = shouldSuppressAutoExec

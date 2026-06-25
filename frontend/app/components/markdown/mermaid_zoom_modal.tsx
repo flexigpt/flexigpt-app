@@ -58,7 +58,7 @@ export function MermaidZoomModal({ isOpen, onClose, svgNode, surfaceStyle }: Mer
 		newNode.style.backgroundColor = 'transparent';
 		const bg = newNode.querySelector('rect.background');
 		if (bg) bg.setAttribute('fill', 'transparent');
-		container.appendChild(newNode);
+		container.append(newNode);
 	}, [isOpen, svgNode]);
 
 	if (!isOpen) return null;

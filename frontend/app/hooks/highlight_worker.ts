@@ -67,6 +67,7 @@ async function init(): Promise<Highlighter> {
 }
 
 // Kick it off right now so grammars & wasm load while the UI idles.
+// oxlint-disable-next-line unicorn/prefer-top-level-await
 init().catch(console.error);
 
 // Message handler.

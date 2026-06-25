@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useLayoutEffect, useState } from 
 const noTransition = () => {
 	const style = document.createElement('style');
 	style.textContent = '*{transition:none!important;}';
-	document.head.appendChild(style);
+	document.head.append(style);
 	void document.body.offsetHeight;
 	requestAnimationFrame(() => {
 		style.remove();
@@ -47,7 +47,7 @@ export function GenericThemeProvider({
 			theme === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? darkTheme : lightTheme) : theme;
 
 		noTransition();
-		document.documentElement.setAttribute('data-theme', effective);
+		document.documentElement.dataset.theme = effective;
 	}, [theme, darkTheme, lightTheme]);
 
 	/* follow OS preference while in “system” mode */
@@ -59,7 +59,7 @@ export function GenericThemeProvider({
 		const applySystemTheme = () => {
 			noTransition();
 			const effective = mql.matches ? darkTheme : lightTheme;
-			document.documentElement.setAttribute('data-theme', effective);
+			document.documentElement.dataset.theme = effective;
 		};
 
 		applySystemTheme(); // make sure it is correct right now

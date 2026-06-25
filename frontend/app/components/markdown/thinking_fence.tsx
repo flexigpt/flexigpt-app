@@ -93,7 +93,7 @@ export function ThinkingFence({
 	}, [streaming, isOpen, effectiveAutoScroll]);
 
 	const bodyContent = useMemo(() => {
-		if (children != null) return children;
+		if (children !== null) return children;
 		return text ?? '';
 	}, [children, text]);
 
@@ -107,9 +107,9 @@ export function ThinkingFence({
 
 		// Measure line height + padding so “rows” feels consistent.
 		const cs = window.getComputedStyle(el);
-		const lineHeight = Number.parseFloat(cs.lineHeight || '16') || 16;
-		const padTop = Number.parseFloat(cs.paddingTop || '0') || 0;
-		const padBottom = Number.parseFloat(cs.paddingBottom || '0') || 0;
+		const lineHeight = Number(cs.lineHeight || '16') || 16;
+		const padTop = Number(cs.paddingTop || '0') || 0;
+		const padBottom = Number(cs.paddingBottom || '0') || 0;
 
 		const oneRow = lineHeight + padTop + padBottom;
 		const maxH = (effectiveMaxRows ?? 3) * lineHeight + padTop + padBottom;
@@ -171,7 +171,7 @@ export function ThinkingFence({
 						: undefined
 				}
 			>
-				{children != null ? children : (text ?? '')}
+				{children !== null ? children : (text ?? '')}
 			</div>
 		</details>
 	);

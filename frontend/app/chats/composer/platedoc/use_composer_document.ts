@@ -61,16 +61,16 @@ interface UseComposerDocumentResult {
 	focusEditorPreservingSelection: () => void;
 }
 
-function getUsefulRangeRect(domRange: Range): DOMRect | null {
+function getUsefulRangeRect(domRange: Range): DOMRect | undefined {
 	const rects = Array.from(domRange.getClientRects()).filter(rect => rect.width > 0 || rect.height > 0);
 	if (rects.length > 0) {
-		return rects[rects.length - 1];
+		return rects.at(-1);
 	}
 
 	const rect = domRange.getBoundingClientRect();
 	if (rect.width > 0 || rect.height > 0) return rect;
 
-	return null;
+	return undefined;
 }
 
 export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseComposerDocumentResult {
@@ -109,7 +109,7 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 	// Throttle docVersion bumps to at most 1/frame to avoid re-render storms on big documents.
 	const docRafRef = useRef<number | null>(null);
 	const scheduleDocRecompute = useCallback(() => {
-		if (docRafRef.current != null) return;
+		if (docRafRef.current !== null) return;
 		docRafRef.current = window.requestAnimationFrame(() => {
 			docRafRef.current = null;
 			syncDocumentDerivedState(true);
@@ -118,7 +118,7 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 	useEffect(() => {
 		return () => {
-			if (docRafRef.current != null) window.cancelAnimationFrame(docRafRef.current);
+			if (docRafRef.current !== null) window.cancelAnimationFrame(docRafRef.current);
 		};
 	}, []);
 
@@ -389,7 +389,7 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 					if (pathArr.length >= 2) {
 						const blockPath = pathArr.slice(0, pathArr.length - 1);
-						const indexAfter = pathArr[pathArr.length - 1] + 1;
+						const indexAfter = pathArr.at(-1) ?? 0 + 1;
 						const atPath = [...blockPath, indexAfter] as any;
 						editor.tf.insertNodes(inlineChildren, { at: atPath });
 					} else {
@@ -406,11 +406,11 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 		// Focus first variable pill of the last inserted selection (if any)
 		if (insertedIds.length > 0) {
-			const focusId = insertedIds[insertedIds.length - 1];
+			const focusId = insertedIds.at(-1);
 			requestAnimationFrame(() => {
 				try {
 					const sel = contentRef.current?.querySelector(
-						`span[data-template-variable][data-selection-id="${cssEscape(focusId)}"]`
+						`span[data-template-variable][data-selection-id="${cssEscape(focusId ?? '')}"]`
 					) as HTMLElement | null;
 					if (sel && 'focus' in sel && typeof sel.focus === 'function') {
 						sel.focus();

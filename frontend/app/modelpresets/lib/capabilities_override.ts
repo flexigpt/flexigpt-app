@@ -226,7 +226,7 @@ export function getSupportedReasoningLevels(cap?: ModelCapabilitiesOverride): Re
 		];
 	}
 
-	const set = new Set(raw.filter(isReasoningLevel));
+	const set = new Set(raw.filter(r => isReasoningLevel(r)));
 	const ordered = ORDERED_REASONING_LEVELS.filter(l => set.has(l));
 	return ordered.length > 0 ? ordered : [ReasoningLevel.Low, ReasoningLevel.Medium, ReasoningLevel.High];
 }
@@ -242,7 +242,7 @@ export function supportsOutputVerbosity(cap?: ModelCapabilitiesOverride): boolea
 export function getSupportedOutputFormats(cap?: ModelCapabilitiesOverride): OutputFormatKind[] | undefined {
 	const raw = cap?.outputCapabilities?.supportedOutputFormats;
 	if (!raw || raw.length === 0) return undefined; // undefined means "no restriction"
-	const out = raw.filter(isOutputFormatKind);
+	const out = raw.filter(r => isOutputFormatKind(r));
 	return out.length > 0 ? out : undefined;
 }
 
@@ -278,7 +278,7 @@ function getSDKBaseCacheCapabilities(providerSDKType: ProviderSDKType): CacheCap
 					supportsKey: true,
 				},
 			};
-		case (ProviderSDKType.ProviderSDKTypeOpenAIChatCompletions, ProviderSDKType.ProviderSDKTypeGoogleGenerateContent):
+
 		default:
 			return {
 				supportsAutomaticCaching: false,
@@ -311,7 +311,7 @@ export function sanitizeUIChatOptionByCapabilities(option: UIChatOption): UIChat
 	// --- Reasoning sanitization ---
 	const supportedTypesRaw = cap?.reasoningCapabilities?.supportedReasoningTypes;
 	if (supportedTypesRaw && next.reasoning) {
-		const supportedTypes = new Set(supportedTypesRaw.filter(isReasoningType));
+		const supportedTypes = new Set(supportedTypesRaw.filter(r => isReasoningType(r)));
 		if (supportedTypes.size > 0 && !supportedTypes.has(next.reasoning.type)) {
 			delete next.reasoning;
 		}
@@ -356,12 +356,10 @@ export function sanitizeUIChatOptionByCapabilities(option: UIChatOption): UIChat
 	}
 
 	const supportedFormats = getSupportedOutputFormats(cap);
-	if (supportedFormats && next.outputParam?.format?.kind) {
-		if (!supportedFormats.includes(next.outputParam.format.kind)) {
-			const op = { ...next.outputParam };
-			delete op.format;
-			next.outputParam = op.verbosity ? op : undefined;
-		}
+	if (supportedFormats && next.outputParam?.format?.kind && !supportedFormats.includes(next.outputParam.format.kind)) {
+		const op = { ...next.outputParam };
+		delete op.format;
+		next.outputParam = op.verbosity ? op : undefined;
 	}
 
 	// --- Stop sequence sanitization ---

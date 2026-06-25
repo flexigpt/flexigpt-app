@@ -22,7 +22,7 @@ export function TemperatureDropdown({ temperature, setTemperature }: Temperature
 	const open = useStoreState(menu, 'open');
 
 	function clampTemperature(rawValue: string) {
-		let val = parseFloat(rawValue);
+		let val = Number(rawValue);
 		if (isNaN(val)) {
 			val = 0.1;
 		}

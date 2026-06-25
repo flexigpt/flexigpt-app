@@ -36,7 +36,7 @@ export const normalizeSkillRefs = (refs: SkillRef[] | null | undefined): SkillRe
 };
 
 export const buildSkillRefsFingerprint = (refs: SkillRef[] | null | undefined): string => {
-	const keys = normalizeSkillRefs(refs).map(skillRefKey);
+	const keys = normalizeSkillRefs(refs).map(r => skillRefKey(r));
 	keys.sort();
 	return keys.join('|');
 };
@@ -48,7 +48,7 @@ export const clampActiveSkillRefsToEnabled = (
 	const enabled = normalizeSkillRefs(enabledRefs);
 	if (enabled.length === 0) return [];
 
-	const allow = new Set(enabled.map(skillRefKey));
+	const allow = new Set(enabled.map(r => skillRefKey(r)));
 	return dedupeSkillRefs((activeRefs ?? []).filter(ref => allow.has(skillRefKey(ref))));
 };
 

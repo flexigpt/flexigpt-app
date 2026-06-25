@@ -41,7 +41,7 @@ export function HoverTip({
 }: HoverTipProps) {
 	const tooltip = useTooltipStore({ placement });
 	const Wrapper = wrapperElement ?? 'span';
-	const hasContent = !(content == null || (typeof content === 'string' && content.trim() === ''));
+	const hasContent = !(content === null || (typeof content === 'string' && content.trim() === ''));
 
 	const hideTip = () => {
 		tooltip.hide();
@@ -67,6 +67,7 @@ export function HoverTip({
 	};
 
 	if (!hasContent || disabled) {
+		// oxlint-disable-next-line react/jsx-no-useless-fragment
 		return <>{children}</>;
 	}
 

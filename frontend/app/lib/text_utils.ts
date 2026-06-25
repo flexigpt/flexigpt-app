@@ -35,6 +35,6 @@ export function cssEscape(s: string) {
 	try {
 		return CSS.escape(s);
 	} catch {
-		return s.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+		return s.replaceAll(/[^a-zA-Z0-9_-]/g, '\\$&');
 	}
 }

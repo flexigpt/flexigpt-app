@@ -87,7 +87,7 @@ function summarizeToolCallArguments(args: string): string | undefined {
 	if (!args) return undefined;
 	try {
 		const parsed = JSON.parse(args);
-		if (parsed == null || typeof parsed !== 'object') {
+		if (parsed === null || typeof parsed !== 'object') {
 			return typeof parsed === 'string' ? parsed : undefined;
 		}
 		const obj = parsed as Record<string, unknown>;
@@ -95,7 +95,7 @@ function summarizeToolCallArguments(args: string): string | undefined {
 		const parts: string[] = [];
 
 		for (const key of primaryKeys) {
-			if (obj[key] != null) {
+			if (obj[key] !== null) {
 				parts.push(obj[key] as string);
 			}
 		}
@@ -107,7 +107,7 @@ function summarizeToolCallArguments(args: string): string | undefined {
 			}
 		}
 
-		return parts.length ? parts.join(', ') : undefined;
+		return parts.length > 0 ? parts.join(', ') : undefined;
 	} catch {
 		return undefined;
 	}

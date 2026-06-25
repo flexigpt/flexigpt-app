@@ -54,7 +54,7 @@ function isUnifiedDiffLanguage(language: string): boolean {
 }
 
 export function looksLikeUnifiedDiff(value: string, language = ''): boolean {
-	const text = value.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+	const text = value.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
 
 	if (isUnifiedDiffLanguage(language)) return true;
 	if (/^diff --git\s+/m.test(text)) return true;
@@ -72,9 +72,9 @@ export function looksLikeUnifiedDiff(value: string, language = ''): boolean {
 
 export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifiedDiffForUI {
 	const text = value
-		.replace(/\r\n/g, '\n')
-		.replace(/\r/g, '\n')
-		.replace(/^\ufeff/, '');
+		.replaceAll('\r\n', '\n')
+		.replaceAll('\r', '\n')
+		.replace(/^\uFEFF/, '');
 	const lines = text.split('\n');
 
 	const rawFiles: ParsedUnifiedDiffFileForUI[] = [];
@@ -133,7 +133,7 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 				...createWorkingFile(),
 				oldPath: oldPath || undefined,
 				newPath: newPath || undefined,
-				candidatePaths: uniqueStrings([oldPath, newPath].filter(isUsablePatchPath)),
+				candidatePaths: uniqueStrings([oldPath, newPath].filter(p => isUsablePatchPath(p))),
 			};
 			current.lines.push(line);
 			inHunk = false;
@@ -170,7 +170,9 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 
 			file.oldPath = oldPath || undefined;
 			file.newPath = newPath || undefined;
-			file.candidatePaths = uniqueStrings([...(file.candidatePaths ?? []), oldPath, newPath].filter(isUsablePatchPath));
+			file.candidatePaths = uniqueStrings(
+				[...(file.candidatePaths ?? []), oldPath, newPath].filter(p => isUsablePatchPath(p))
+			);
 
 			i += 1;
 			inHunk = false;
@@ -285,7 +287,9 @@ export function buildEditableTargetsFromOutput(
 			oldPath: target.oldPath,
 			newPath: target.newPath,
 			targetPath: target.targetPath,
-			candidatePaths: uniqueStrings([target.targetPath, target.newPath, target.oldPath].filter(isUsablePatchPath)),
+			candidatePaths: uniqueStrings(
+				[target.targetPath, target.newPath, target.oldPath].filter(p => isUsablePatchPath(p))
+			),
 		});
 	}
 
@@ -307,7 +311,7 @@ export function buildEditableTargetsFromOutput(
 					file.resolvedPath,
 					file.oldPath,
 					file.newPath,
-				].filter(isUsablePatchPath)
+				].filter(p => isUsablePatchPath(p))
 			),
 			ok: file.ok,
 			status: file.status,
@@ -470,17 +474,17 @@ function getEditableTargetSectionKeys(target: { fileKey?: string; sectionKeys?: 
 }
 
 function getEditableTargetPatchPaths(target: { oldPath?: string; newPath?: string }): string[] {
-	return uniqueStrings([target.newPath, target.oldPath].filter(isUsablePatchPath));
+	return uniqueStrings([target.newPath, target.oldPath].filter(p => isUsablePatchPath(p)));
 }
 
 function getEditableTargetResolvedPaths(target: { targetPath?: string; resolvedPath?: string }): string[] {
-	return uniqueStrings([target.resolvedPath, target.targetPath].filter(isUsablePatchPath));
+	return uniqueStrings([target.resolvedPath, target.targetPath].filter(p => isUsablePatchPath(p)));
 }
 
 export function haveSharedPathIdentity(left: Array<string | undefined>, right: Array<string | undefined>): boolean {
-	const leftSet = new Set(left.map(getPathIdentity).filter(Boolean));
+	const leftSet = new Set(left.map(p => getPathIdentity(p)).filter(Boolean));
 	if (leftSet.size === 0) return false;
-	return right.map(getPathIdentity).some(identity => !!identity && leftSet.has(identity));
+	return right.map(p => getPathIdentity(p)).some(identity => !!identity && leftSet.has(identity));
 }
 
 export function buildFileStatusCounts(
@@ -526,7 +530,7 @@ export function buildFileStatusCounts(
 				counts.conflict = total;
 				counts.blocked = total;
 				break;
-			case ApplyUnifiedDiffStatus.Error:
+
 			default:
 				counts.error = total;
 				counts.blocked = total;
@@ -557,7 +561,7 @@ export function buildFileStatusCounts(
 					counts.conflict += 1;
 					counts.blocked += 1;
 					break;
-				case ApplyUnifiedDiffStatus.Error:
+
 				default:
 					counts.error += 1;
 					counts.blocked += 1;
@@ -799,7 +803,7 @@ function joinPathKey(root: string, rel: string): string {
 
 function trimTrailingSlashes(value: string): string {
 	if (value === '/') return value;
-	return value.replace(/\/+$/g, '');
+	return value.replaceAll(/\/+$/g, '');
 }
 
 export function mergeNumberMax(left: number | undefined, right: number | undefined): number | undefined {
@@ -888,7 +892,7 @@ function getEditableTargetIdentity(file: {
 }
 
 function joinUnifiedDiffTextParts(parts: Array<string | undefined>): string | undefined {
-	const normalized = parts.map(part => part?.replace(/\n+$/g, '')).filter((part): part is string => !!part);
+	const normalized = parts.map(part => part?.replaceAll(/\n+$/g, '')).filter((part): part is string => !!part);
 	if (normalized.length === 0) return undefined;
 	return normalized.join('\n');
 }
@@ -902,7 +906,7 @@ function normalizePathKey(value: string | undefined): string {
 	return value
 		.trim()
 		.replaceAll('\\', '/')
-		.replace(/\/+/g, '/')
+		.replaceAll(/\/+/g, '/')
 		.replace(/^(?:\.\/)+/, '');
 }
 
@@ -1001,7 +1005,7 @@ export function uniqueStrings(values: Array<string | undefined | null>): string[
 		const trimmed = value?.trim();
 		if (!trimmed) continue;
 
-		const key = trimmed.replaceAll('\\', '/').replace(/\/+/g, '/');
+		const key = trimmed.replaceAll('\\', '/').replaceAll(/\/+/g, '/');
 
 		if (seen.has(key)) continue;
 
@@ -1018,7 +1022,7 @@ export function getPathIdentity(value: string | undefined | null): string {
 
 	return trimmed
 		.replaceAll('\\', '/')
-		.replace(/\/+/g, '/')
+		.replaceAll(/\/+/g, '/')
 		.replace(/^(?:\.\/)+/, '');
 }
 

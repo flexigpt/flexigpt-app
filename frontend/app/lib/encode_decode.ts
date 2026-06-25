@@ -5,7 +5,7 @@ export function Base64EncodeUTF8(str: string): string {
 	// 2. Convert those bytes to a "binary" string that btoa understands
 	let binaryString = '';
 	for (let i = 0; i < utf8Bytes.length; i++) {
-		binaryString += String.fromCharCode(utf8Bytes[i]);
+		binaryString += String.fromCodePoint(utf8Bytes[i]);
 	}
 
 	// 3. btoa() on that binary string

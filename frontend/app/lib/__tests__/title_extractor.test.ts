@@ -132,7 +132,7 @@ benefits human health?  A short answer is fine.
 `;
 		const cand = generateTitle(msg);
 		debugPrint('Banana question', msg, cand);
-		expect(/bananas/.test(cand.title.toLowerCase())).toBe(true);
+		expect(cand.title.toLowerCase().includes('bananas')).toBe(true);
 	});
 });
 

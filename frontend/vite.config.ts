@@ -24,7 +24,7 @@ const extraDepsToOptimize = [
 
 const excludedDepsToOptimize = new Set(['@fontsource-variable/inter']);
 
-const normalize = (id: string) => id.replace(/\\/g, '/');
+const normalize = (id: string) => id.replaceAll('\\', '/');
 
 const depsToOptimize = [...new Set([...baseDeps, ...extraDepsToOptimize])].filter(
 	dep => !excludedDepsToOptimize.has(dep)
