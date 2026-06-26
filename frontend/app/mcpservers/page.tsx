@@ -707,6 +707,7 @@ export default function MCPServersPage() {
 			<div className="flex size-full flex-col items-center">
 				<div className="fixed mt-8 flex w-11/12 items-center justify-between px-12 py-2">
 					<button
+						type="button"
 						className="btn btn-ghost rounded-2xl"
 						onClick={() => {
 							setIsSettingsOpen(true);
@@ -719,6 +720,7 @@ export default function MCPServersPage() {
 					<h1 className="flex grow items-center justify-center text-xl font-semibold">MCP Servers</h1>
 
 					<button
+						type="button"
 						className="btn btn-ghost items-center rounded-2xl"
 						onClick={() => {
 							setIsAddModalOpen(true);

@@ -97,6 +97,7 @@ export function AuthKeyTable({ authKeys, onEdit, onChanged }: AuthKeyTableProps)
 
 									<td className="flex items-center justify-center gap-3 text-center">
 										<button
+											type="button"
 											className="btn btn-xs btn-ghost rounded-2xl"
 											onClick={() => {
 												onEdit(meta);
@@ -107,6 +108,7 @@ export function AuthKeyTable({ authKeys, onEdit, onChanged }: AuthKeyTableProps)
 										</button>
 
 										<button
+											type="button"
 											className="btn btn-xs btn-ghost rounded-2xl"
 											onClick={() => resetKey(meta)}
 											title="Reset Secret"
@@ -115,6 +117,7 @@ export function AuthKeyTable({ authKeys, onEdit, onChanged }: AuthKeyTableProps)
 										</button>
 
 										<button
+											type="button"
 											className="btn btn-xs btn-ghost rounded-2xl"
 											onClick={() => {
 												requestDelete(meta);

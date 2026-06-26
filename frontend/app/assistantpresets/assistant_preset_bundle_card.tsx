@@ -176,6 +176,7 @@ export function AssistantPresetBundleCard({
 
 				<div className="flex items-center justify-end gap-4">
 					<button
+						type="button"
 						className="btn btn-sm btn-ghost p-0"
 						title="View bundle details"
 						onClick={e => {
@@ -268,6 +269,7 @@ export function AssistantPresetBundleCard({
 											<td className="justify-end text-center">
 												<div className="inline-flex items-center gap-2">
 													<button
+														type="button"
 														className="btn btn-sm btn-ghost rounded-2xl"
 														onClick={() => {
 															openPresetModal('view', preset);
@@ -279,6 +281,7 @@ export function AssistantPresetBundleCard({
 													</button>
 
 													<button
+														type="button"
 														className="btn btn-sm btn-ghost rounded-2xl"
 														onClick={() => {
 															openPresetModal('edit', preset);
@@ -297,6 +300,7 @@ export function AssistantPresetBundleCard({
 													</button>
 
 													<button
+														type="button"
 														className="btn btn-sm btn-ghost rounded-2xl"
 														onClick={() => {
 															requestDeletePreset(preset);
@@ -329,6 +333,7 @@ export function AssistantPresetBundleCard({
 					{!bundle.isBuiltIn && (
 						<div className="flex items-center justify-between">
 							<button
+								type="button"
 								className="btn btn-md btn-ghost flex items-center rounded-2xl"
 								disabled={presets.length > 0}
 								title={presets.length > 0 ? 'Delete all assistant presets from this bundle first.' : 'Delete Bundle'}
@@ -340,6 +345,7 @@ export function AssistantPresetBundleCard({
 							</button>
 
 							<button
+								type="button"
 								className="btn btn-md btn-ghost flex items-center rounded-2xl"
 								disabled={!bundle.isEnabled}
 								title={!bundle.isEnabled ? 'Enable the bundle first.' : 'Add Assistant Preset'}

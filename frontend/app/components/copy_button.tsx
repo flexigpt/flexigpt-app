@@ -29,7 +29,13 @@ export function CopyButton({ value, size, ...buttonProps }: CopyButtonProps) {
 	};
 
 	return (
-		<button aria-label="Copy To Clipboard" title="Copy To Clipboard" onClick={handleCopy} {...buttonProps}>
+		<button
+			type="button"
+			aria-label="Copy To Clipboard"
+			title="Copy To Clipboard"
+			onClick={handleCopy}
+			{...buttonProps}
+		>
 			{copied ? <FiCheck size={size} /> : <FiCopy size={size} />}
 		</button>
 	);

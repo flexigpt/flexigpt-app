@@ -240,6 +240,7 @@ export function SkillBundleCard({
 
 				<div className="flex items-center justify-end gap-4">
 					<button
+						type="button"
 						className="btn btn-sm btn-ghost p-0"
 						title="View bundle details"
 						onClick={e => {
@@ -317,6 +318,7 @@ export function SkillBundleCard({
 										<td className="text-center">
 											<div className="inline-flex items-center gap-2">
 												<button
+													type="button"
 													className="btn btn-sm btn-ghost rounded-2xl"
 													onClick={() => {
 														openSkillModal('view', skill);
@@ -328,6 +330,7 @@ export function SkillBundleCard({
 												</button>
 
 												<button
+													type="button"
 													className="btn btn-sm btn-ghost rounded-2xl"
 													onClick={() => {
 														openSkillModal('edit', skill);
@@ -340,6 +343,7 @@ export function SkillBundleCard({
 												</button>
 
 												<button
+													type="button"
 													className="btn btn-sm btn-ghost rounded-2xl"
 													onClick={() => {
 														requestDeleteSkill(skill);
@@ -371,6 +375,7 @@ export function SkillBundleCard({
 					{!bundle.isBuiltIn && (
 						<div className="flex items-center justify-between">
 							<button
+								type="button"
 								className="btn btn-md btn-ghost flex items-center rounded-2xl"
 								onClick={() => {
 									onRequestBundleDelete(bundle);
@@ -380,6 +385,7 @@ export function SkillBundleCard({
 							</button>
 
 							<button
+								type="button"
 								className="btn btn-md btn-ghost flex items-center rounded-2xl"
 								onClick={() => {
 									openSkillModal('add', undefined);

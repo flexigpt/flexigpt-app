@@ -128,6 +128,7 @@ export function MessageFooterArea({
 					{hasDetails && !isBusy && (
 						<HoverTip content="Show message details" placement="top">
 							<button
+								type="button"
 								className="btn btn-sm flex items-center border-none bg-transparent! p-0 shadow-none"
 								onClick={toggleDetailsModal}
 								aria-label="Show message details"
@@ -139,6 +140,7 @@ export function MessageFooterArea({
 					{isUser && !isBusy && (
 						<HoverTip content="Edit and resend from this message" placement="top">
 							<button
+								type="button"
 								className="btn btn-sm flex items-center border-none bg-transparent! p-0 shadow-none"
 								onClick={onEdit}
 								aria-label="Edit and resend from this message"

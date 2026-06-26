@@ -90,7 +90,7 @@ export default function SettingsPage() {
 						<div className="bg-base-100 rounded-2xl p-4 shadow-lg">
 							<div className="mb-4 flex items-center justify-between">
 								<h2 className="mr-8 ml-4 font-semibold">Auth Keys</h2>
-								<button className="btn btn-ghost flex items-center rounded-2xl" onClick={showAddModal}>
+								<button type="button" className="btn btn-ghost flex items-center rounded-2xl" onClick={showAddModal}>
 									<FiPlus className="mr-1" /> Add Key
 								</button>
 							</div>

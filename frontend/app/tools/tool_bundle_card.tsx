@@ -145,6 +145,7 @@ export function ToolBundleCard({
 
 				<div className="flex items-center justify-end gap-4">
 					<button
+						type="button"
 						className="btn btn-sm btn-ghost p-0"
 						title="View bundle details"
 						onClick={e => {
@@ -224,6 +225,7 @@ export function ToolBundleCard({
 											<td className="text-center">
 												<div className="inline-flex items-center gap-2">
 													<button
+														type="button"
 														className="btn btn-sm btn-ghost rounded-2xl"
 														onClick={() => {
 															openToolModal('view', tool);
@@ -236,6 +238,7 @@ export function ToolBundleCard({
 													</button>
 
 													<button
+														type="button"
 														className="btn btn-sm btn-ghost rounded-2xl"
 														onClick={() => {
 															openToolModal('edit', tool);
@@ -252,6 +255,7 @@ export function ToolBundleCard({
 													</button>
 
 													<button
+														type="button"
 														className="btn btn-sm btn-ghost rounded-2xl"
 														onClick={() => {
 															requestDeleteTool(tool);
@@ -284,6 +288,7 @@ export function ToolBundleCard({
 					{!bundle.isBuiltIn && (
 						<div className="flex items-center justify-between">
 							<button
+								type="button"
 								className="btn btn-md btn-ghost flex items-center rounded-2xl"
 								onClick={() => {
 									onRequestDeleteBundle(bundle);
@@ -294,6 +299,7 @@ export function ToolBundleCard({
 								<FiTrash2 /> <span className="ml-1">Delete Bundle</span>
 							</button>
 							<button
+								type="button"
 								className="btn btn-md btn-ghost flex items-center rounded-2xl"
 								onClick={() => {
 									openToolModal('add', undefined);

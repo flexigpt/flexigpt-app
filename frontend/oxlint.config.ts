@@ -316,7 +316,6 @@ const reactRules: DummyRuleMap = {
 	'react/jsx-filename-extension': 'off',
 	'react/jsx-no-literals': 'off',
 	'react/forbid-component-props': 'off',
-	'react/button-has-type': 'off',
 
 	// Suspicious. Default on.
 	'react/react-in-jsx-scope': 'off',

@@ -62,7 +62,7 @@ export function ConversationSearchDropdown({
 		return (
 			<div className="bg-base-200 rounded-2xl p-4 text-center shadow-lg">
 				<p className="text-error mb-2 text-sm">{error}</p>
-				<button className="btn btn-sm btn-primary" onClick={onRetry}>
+				<button type="button" className="btn btn-sm btn-primary" onClick={onRetry}>
 					Retry
 				</button>
 			</div>

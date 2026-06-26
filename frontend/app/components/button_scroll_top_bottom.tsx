@@ -18,6 +18,7 @@ export function ButtonScrollToBottom({
 }: ButtonScrollToBottomProps) {
 	return (
 		<button
+			type="button"
 			aria-label="Scroll To Bottom"
 			title="Scroll To Bottom"
 			disabled={!show}
@@ -55,6 +56,7 @@ export function ButtonScrollToTop({
 }: ButtonScrollToTopProps) {
 	return (
 		<button
+			type="button"
 			aria-label="Scroll To Top"
 			title="Scroll To Top"
 			disabled={!show}

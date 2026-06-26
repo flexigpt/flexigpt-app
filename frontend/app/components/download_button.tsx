@@ -83,7 +83,14 @@ export function DownloadButton({
 	};
 
 	return (
-		<button aria-label="Download" title="Download" onClick={downloadAsFile} disabled={downloading} {...buttonProps}>
+		<button
+			type="button"
+			aria-label="Download"
+			title="Download"
+			onClick={downloadAsFile}
+			disabled={downloading}
+			{...buttonProps}
+		>
 			<FiDownload size={size} />
 		</button>
 	);

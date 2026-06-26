@@ -345,6 +345,7 @@ export default function PromptsPage() {
 				<div className="fixed mt-8 flex w-11/12 items-center px-12 py-2">
 					<h1 className="flex grow items-center justify-center text-xl font-semibold">Prompt Bundles</h1>
 					<button
+						type="button"
 						className="btn btn-ghost flex items-center rounded-2xl"
 						onClick={() => {
 							setIsAddModalOpen(true);

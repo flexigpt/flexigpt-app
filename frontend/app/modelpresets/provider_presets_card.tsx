@@ -319,6 +319,7 @@ export function ProviderPresetCard({
 												}
 											>
 												<button
+													type="button"
 													className={`btn btn-ghost flex items-center rounded-2xl ${
 														!canDeleteProvider ? 'btn-disabled cursor-not-allowed opacity-50' : ''
 													}`}
@@ -333,6 +334,7 @@ export function ProviderPresetCard({
 
 											<div className="flex gap-2">
 												<button
+													type="button"
 													className="btn btn-ghost flex items-center rounded-2xl"
 													onClick={() => {
 														setShowKeyModal(true);
@@ -344,6 +346,7 @@ export function ProviderPresetCard({
 												</button>
 
 												<button
+													type="button"
 													className="btn btn-ghost flex items-center rounded-2xl"
 													onClick={() => {
 														onRequestEdit(provider);
@@ -413,6 +416,7 @@ export function ProviderPresetCard({
 
 							<div className="col-span-3 flex justify-end">
 								<button
+									type="button"
 									className={`btn btn-ghost flex items-center rounded-2xl ${
 										providerIsBuiltIn ? 'btn-disabled cursor-not-allowed opacity-50' : ''
 									}`}
@@ -464,6 +468,7 @@ export function ProviderPresetCard({
 												</td>
 												<td className="space-x-1 text-center">
 													<button
+														type="button"
 														className="btn btn-sm btn-ghost rounded-2xl"
 														onClick={() => {
 															openViewModel(id);
@@ -476,6 +481,7 @@ export function ProviderPresetCard({
 													{canModify ? (
 														<>
 															<button
+																type="button"
 																className="btn btn-sm btn-ghost rounded-2xl"
 																onClick={() => {
 																	openEditOrViewModel(id);
@@ -485,6 +491,7 @@ export function ProviderPresetCard({
 																<FiEdit2 size={16} />
 															</button>
 															<button
+																type="button"
 																className="btn btn-sm btn-ghost rounded-2xl"
 																onClick={() => {
 																	requestDeleteModel(id);

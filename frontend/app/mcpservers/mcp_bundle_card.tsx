@@ -469,6 +469,7 @@ export function MCPBundleCard({
 														<div className="flex shrink-0 flex-wrap gap-1">
 															{authActionable && (
 																<button
+																	type="button"
 																	className="btn btn-xs btn-primary rounded-xl"
 																	onClick={() => {
 																		setManualOAuthModalServerID(server.id);
@@ -482,6 +483,7 @@ export function MCPBundleCard({
 
 															{authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending && (
 																<button
+																	type="button"
 																	className="btn btn-xs bg-base-300 rounded-xl"
 																	onClick={() => {
 																		void runServerAction(
@@ -508,6 +510,7 @@ export function MCPBundleCard({
 											</div>
 											<div className="flex w-full items-center justify-end gap-2">
 												<button
+													type="button"
 													className="btn btn-sm btn-ghost rounded-2xl"
 													onClick={() => {
 														setServerDetails(server);
@@ -519,6 +522,7 @@ export function MCPBundleCard({
 												</button>
 												{serverHasSetupInputs(server) && (
 													<button
+														type="button"
 														className="btn btn-sm btn-ghost rounded-2xl"
 														onClick={() => {
 															if (!bundle.isEnabled) {
@@ -535,6 +539,7 @@ export function MCPBundleCard({
 													</button>
 												)}
 												<button
+													type="button"
 													className="btn btn-sm btn-ghost rounded-2xl"
 													onClick={() => {
 														openServerModal('edit', server);
@@ -553,6 +558,7 @@ export function MCPBundleCard({
 												</button>
 
 												<button
+													type="button"
 													className="btn btn-sm btn-ghost rounded-2xl"
 													onClick={() => {
 														void runServerAction(
@@ -582,6 +588,7 @@ export function MCPBundleCard({
 												</button>
 
 												<button
+													type="button"
 													className="btn btn-sm btn-ghost rounded-2xl"
 													onClick={() => {
 														void runServerAction(
@@ -602,6 +609,7 @@ export function MCPBundleCard({
 												</button>
 
 												<button
+													type="button"
 													className="btn btn-sm btn-ghost rounded-2xl"
 													onClick={() => {
 														void runServerAction(
@@ -624,6 +632,7 @@ export function MCPBundleCard({
 												</button>
 
 												<button
+													type="button"
 													className="btn btn-sm btn-ghost rounded-2xl"
 													onClick={() => {
 														requestDeleteServer(server);
@@ -647,6 +656,7 @@ export function MCPBundleCard({
 					{!bundle.isBuiltIn && (
 						<div className="flex items-center justify-between">
 							<button
+								type="button"
 								className="btn btn-md btn-ghost flex items-center rounded-2xl"
 								disabled={isReservedBundle || servers.length > 0}
 								title={
@@ -668,6 +678,7 @@ export function MCPBundleCard({
 							</button>
 
 							<button
+								type="button"
 								className="btn btn-md btn-ghost flex items-center rounded-2xl"
 								disabled={!bundle.isEnabled}
 								title={!bundle.isEnabled ? 'Enable the bundle first.' : 'Add MCP Server'}

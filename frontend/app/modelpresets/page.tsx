@@ -583,7 +583,7 @@ export default function ModelPresetsPage() {
 								</div>
 
 								<div className="col-span-3 flex justify-end">
-									<button className="btn btn-ghost flex items-center rounded-2xl" onClick={openAddModal}>
+									<button type="button" className="btn btn-ghost flex items-center rounded-2xl" onClick={openAddModal}>
 										<FiPlus /> <span className="ml-1">Add Provider</span>
 									</button>
 								</div>
