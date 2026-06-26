@@ -20,8 +20,12 @@ export function TitleBar({ onToggleDrawer }: TitleBarProps) {
 	const [isTogglingMax, setIsTogglingMax] = useState(false);
 
 	const syncMaxState = useCallback(async () => {
-		const m = await backendAPI.isAppWindowMaximised();
-		setIsMax(m);
+		try {
+			const m = await backendAPI.isAppWindowMaximised();
+			setIsMax(m);
+		} catch {
+			// ignore
+		}
 	}, []);
 
 	useEffect(() => {
@@ -70,7 +74,7 @@ export function TitleBar({ onToggleDrawer }: TitleBarProps) {
 		try {
 			backendAPI.appWindowToggleMaximise();
 			setTimeout(() => {
-				syncMaxState();
+				void syncMaxState();
 			}, 100);
 			// Always re-read actual window state (avoid inverted icon)
 		} finally {

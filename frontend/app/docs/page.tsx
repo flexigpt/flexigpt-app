@@ -182,7 +182,7 @@ export default function DocsPage() {
 				return;
 			}
 
-			navigate(
+			void navigate(
 				{
 					pathname: location.pathname,
 					search: buildDocSearch(options?.baseSearch ?? location.search, docID),
@@ -257,11 +257,11 @@ export default function DocsPage() {
 					return false;
 				}
 
-				navigate(`${url.pathname}${url.search}${url.hash}`);
+				void navigate(`${url.pathname}${url.search}${url.hash}`);
 				return true;
 			}
 
-			navigate(`${url.pathname}${url.search}${url.hash}`);
+			void navigate(`${url.pathname}${url.search}${url.hash}`);
 			return true;
 		},
 		[location.pathname, navigate, navigateToDocPage, scrollInsideCurrentDoc]
@@ -272,7 +272,7 @@ export default function DocsPage() {
 			return;
 		}
 
-		navigate(
+		void navigate(
 			{
 				pathname: location.pathname,
 				search: buildDocSearch(location.search, legacyHashDocID),

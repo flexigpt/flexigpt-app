@@ -769,7 +769,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			mcp.restoreContext(prevMCP ?? undefined);
 		}
 		if (prevSkills || prevActive) {
-			applySkillSelectionState(prevSkills ?? getCurrentEnabledSkillRefs(), prevActive ?? getCurrentActiveSkillRefs());
+			void applySkillSelectionState(
+				prevSkills ?? getCurrentEnabledSkillRefs(),
+				prevActive ?? getCurrentActiveSkillRefs()
+			);
 		}
 		clearPreEditSnapshot();
 	}, [

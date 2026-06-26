@@ -52,8 +52,8 @@ function formatMessage(args: unknown[]): string {
 
 		try {
 			return sprintf(args[0], ...args.slice(1));
-		} catch (error) {
-			console.error(`Error formatting message: ${error}`);
+		} catch (error: unknown) {
+			console.error(`Error formatting message: ${JSON.stringify(error, null, 2)}`);
 			return args.map(a => stringifyLogArg(a)).join(' ');
 		}
 	}

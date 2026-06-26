@@ -168,10 +168,6 @@ const eslintRules: DummyRuleMap = {
 };
 
 const tsRules: DummyRuleMap = {
-	// Correctness. Default On.
-	'typescript/no-floating-promises': 'off',
-	'typescript/restrict-template-expressions': 'off',
-
 	// Restriction. Default On.
 	'typescript/explicit-function-return-type': 'off',
 	'typescript/explicit-member-accessibility': 'off',

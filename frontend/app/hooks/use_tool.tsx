@@ -11,19 +11,23 @@ export function useTools() {
 	useEffect(() => {
 		let cancelled = false;
 
-		getAllTools()
-			.then(res => {
+		void (async () => {
+			try {
+				const res = await getAllTools();
 				if (cancelled) {
 					return;
 				}
 				setData(res);
-			})
-			.finally(() => {
-				if (cancelled) {
-					return;
+			} catch (err) {
+				if (!cancelled) {
+					console.error('Failed to load tools', err);
 				}
-				setLoading(false);
-			});
+			} finally {
+				if (!cancelled) {
+					setLoading(false);
+				}
+			}
+		})();
 
 		return () => {
 			cancelled = true;

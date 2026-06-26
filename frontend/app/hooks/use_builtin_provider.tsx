@@ -72,10 +72,24 @@ export function useBuiltInsReady(): boolean {
 	const [ready, setReady] = useState(false);
 
 	useEffect(() => {
+		let cancelled = false;
+
 		// the global promise is created only once
-		initBuiltIns().then(() => {
-			setReady(true);
-		});
+		void initBuiltIns()
+			.then(() => {
+				if (!cancelled) {
+					setReady(true);
+				}
+			})
+			.catch((err: unknown) => {
+				if (!cancelled) {
+					console.error('Failed to initialize built-ins', err);
+				}
+			});
+
+		return () => {
+			cancelled = true;
+		};
 	}, []);
 
 	return ready;

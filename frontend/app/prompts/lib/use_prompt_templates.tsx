@@ -13,8 +13,9 @@ export function usePromptTemplates() {
 	useEffect(() => {
 		let cancelled = false;
 
-		getAllPromptTemplates(undefined, undefined, false)
-			.then(res => {
+		void (async () => {
+			try {
+				const res = await getAllPromptTemplates(undefined, undefined, false);
 				if (cancelled) {
 					return;
 				}
@@ -25,13 +26,16 @@ export function usePromptTemplates() {
 							(item.kind === PromptTemplateKind.InstructionsOnly && !item.isResolved)
 					)
 				);
-			})
-			.finally(() => {
-				if (cancelled) {
-					return;
+			} catch (err) {
+				if (!cancelled) {
+					console.error('Failed to load prompt templates', err);
 				}
-				setLoading(false);
-			});
+			} finally {
+				if (!cancelled) {
+					setLoading(false);
+				}
+			}
+		})();
 
 		return () => {
 			cancelled = true;
@@ -54,12 +58,19 @@ export function usePromptTemplate(bundleID: string, slug: string, version: strin
 
 		let cancelled = false;
 
-		promptStoreAPI.getPromptTemplate(bundleID, slug, version).then(res => {
-			if (cancelled) {
-				return;
+		void (async () => {
+			try {
+				const res = await promptStoreAPI.getPromptTemplate(bundleID, slug, version);
+				if (cancelled) {
+					return;
+				}
+				setTmpl(res);
+			} catch (err) {
+				if (!cancelled) {
+					console.error('Failed to load prompt template', err);
+				}
 			}
-			setTmpl(res);
-		});
+		})();
 
 		return () => {
 			cancelled = true;

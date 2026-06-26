@@ -31,7 +31,7 @@ export default function SettingsPage() {
 	useEffect(() => {
 		let cancelled = false;
 
-		(async () => {
+		void (async () => {
 			try {
 				const settings = await settingstoreAPI.getSettings();
 

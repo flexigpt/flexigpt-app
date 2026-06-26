@@ -187,7 +187,7 @@ export default function Root() {
 				if (p.startsWith('/chats')) {
 					return;
 				}
-				navigate('/chats', { replace: false });
+				void navigate('/chats', { replace: false });
 			} catch (error) {
 				reportFrontendError(error, { phase: 'attachments_drop.no_target_handler' });
 			}
@@ -254,7 +254,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
 			technicalDetails={technicalDetails}
 			showResetLocalState={crashCount >= 2}
 			onGoHome={() => {
-				navigate('/', { replace: true });
+				void navigate('/', { replace: true });
 			}}
 		/>
 	);

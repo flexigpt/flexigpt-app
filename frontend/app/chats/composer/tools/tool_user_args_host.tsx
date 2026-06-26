@@ -105,7 +105,7 @@ export function ToolArgsModalHost({
 			return;
 		}
 
-		(async () => {
+		void (async () => {
 			try {
 				const def = await toolStoreAPI.getTool(
 					activeWebSearchBundleID,
