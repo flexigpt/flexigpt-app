@@ -30,8 +30,9 @@ const betterTailwindCSSRules: DummyRuleMap = {
 
 const eslintRules: DummyRuleMap = {
 	// Correctness. Default On.
-	'constructor-super': 'off',
-	'getter-return': 'off',
+	'constructor-super': 'error',
+	'getter-return': 'error',
+
 	'no-unused-vars': [
 		'error',
 		{
@@ -259,10 +260,8 @@ const importRules: DummyRuleMap = {
 	'import/max-dependencies': 'off',
 
 	// Style. Default on.
-	'import/no-duplicates': 'error',
 	'import/first': 'error',
 	'import/newline-after-import': 'error',
-	'import/no-anonymous-default-export': 'error',
 	'import/no-mutable-exports': 'error',
 	'import/no-namespace': 'error',
 	'import/no-nodejs-modules': ['error', { allow: ['path', 'node:path'] }],
@@ -270,6 +269,8 @@ const importRules: DummyRuleMap = {
 	'import/consistent-type-specifier-style': 'off',
 	'import/exports-last': 'off',
 	'import/group-exports': 'off',
+	'import/no-anonymous-default-export': 'off',
+	'import/no-duplicates': 'off',
 	'import/no-named-default': 'off',
 	'import/no-named-export': 'off',
 	'import/prefer-default-export': 'off',
