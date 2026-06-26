@@ -1,11 +1,14 @@
-import { ElementApi, NodeApi, type Path } from 'platejs';
+import type { Path } from 'platejs';
+import { ElementApi, NodeApi } from 'platejs';
 import type { PlateEditor } from 'platejs/react';
 
-import { type Tool, ToolStoreChoiceType, type UIToolStoreChoice } from '@/spec/tool';
+import type { Tool, UIToolStoreChoice } from '@/spec/tool';
+import { ToolStoreChoiceType } from '@/spec/tool';
 
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
-import { KEY_TOOL_SELECTION, type ToolSelectionElementNode } from '@/chats/composer/platedoc/nodes';
+import type { ToolSelectionElementNode } from '@/chats/composer/platedoc/nodes';
+import { KEY_TOOL_SELECTION } from '@/chats/composer/platedoc/nodes';
 import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 
 export interface AttachedToolEntry {

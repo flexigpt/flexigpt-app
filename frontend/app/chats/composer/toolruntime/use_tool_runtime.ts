@@ -1,4 +1,5 @@
-import { type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { SkillRef } from '@/spec/skill';

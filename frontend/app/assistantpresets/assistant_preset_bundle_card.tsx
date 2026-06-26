@@ -10,11 +10,8 @@ import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal'
 import { AddEditAssistantPresetModal } from '@/assistantpresets/assistant_preset_add_edit_modal';
 import { AssistantPresetBundleDetailsModal } from '@/assistantpresets/assistant_preset_bundle_details_modal';
 import type { PresetItem } from '@/assistantpresets/lib/assistant_preset_editor_types';
-import {
-	type AssistantPresetUpsertInput,
-	formatAssistantPresetModelRef,
-	getAssistantPresetCounts,
-} from '@/assistantpresets/lib/assistant_preset_utils';
+import type { AssistantPresetUpsertInput } from '@/assistantpresets/lib/assistant_preset_utils';
+import { formatAssistantPresetModelRef, getAssistantPresetCounts } from '@/assistantpresets/lib/assistant_preset_utils';
 
 type PresetModalMode = 'add' | 'edit' | 'view';
 

@@ -1,4 +1,5 @@
-import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { RefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 const SCROLL_AT_TOP_THRESHOLD = 8;
 const SCROLL_AT_BOTTOM_THRESHOLD = 128;

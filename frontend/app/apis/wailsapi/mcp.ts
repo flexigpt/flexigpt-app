@@ -1,33 +1,32 @@
-import {
-	DefaultMCPPageSize,
-	type InvokeMCPToolRequestBody,
-	type InvokeMCPToolResponseBody,
-	MaxMCPServerPageSize,
-	type MCPApprovalEvaluation,
-	type MCPApprovalResolution,
-	type MCPApprovalToken,
-	type MCPAuthHealth,
-	type MCPAuthStatus,
-	type MCPBundle,
-	type MCPCompletionResult,
-	type MCPGetPromptResponseBody,
-	type MCPOAuthAuthorization,
-	type MCPPromptRef,
-	type MCPReadResourceResponseBody,
-	type MCPRefType,
-	type MCPResourceRef,
-	type MCPResourceTemplateRef,
-	type MCPSecretKind,
-	type MCPServerConfig,
-	type MCPServerID,
-	type MCPServerRuntimeSnapshot,
-	type MCPServerSetupInputValue,
-	type MCPSettingsView,
-	type MCPToolCapability,
-	type PatchMCPServerPolicyPayload,
-	type PutMCPServerPayload,
-	type PutMCPServerSecretResponseBody,
+import type {
+	InvokeMCPToolRequestBody,
+	InvokeMCPToolResponseBody,
+	MCPApprovalEvaluation,
+	MCPApprovalResolution,
+	MCPApprovalToken,
+	MCPAuthHealth,
+	MCPAuthStatus,
+	MCPBundle,
+	MCPCompletionResult,
+	MCPGetPromptResponseBody,
+	MCPOAuthAuthorization,
+	MCPPromptRef,
+	MCPReadResourceResponseBody,
+	MCPRefType,
+	MCPResourceRef,
+	MCPResourceTemplateRef,
+	MCPSecretKind,
+	MCPServerConfig,
+	MCPServerID,
+	MCPServerRuntimeSnapshot,
+	MCPServerSetupInputValue,
+	MCPSettingsView,
+	MCPToolCapability,
+	PatchMCPServerPolicyPayload,
+	PutMCPServerPayload,
+	PutMCPServerSecretResponseBody,
 } from '@/spec/mcp';
+import { DefaultMCPPageSize, MaxMCPServerPageSize } from '@/spec/mcp';
 
 import type { IMCPAPI } from '@/apis/interface';
 import {
@@ -65,7 +64,7 @@ import {
 	RefreshMCPServer,
 	ResolveMCPApproval,
 } from '@/apis/wailsjs/go/main/MCPWrapper';
-import { type spec as wailsSpec } from '@/apis/wailsjs/go/models';
+import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
 
 function normalizeMCPPageSize(pageSize?: number): number {
 	if (typeof pageSize !== 'number' || !Number.isFinite(pageSize) || pageSize <= 0) {

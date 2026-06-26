@@ -3,18 +3,18 @@ import { useCallback, useRef, useState } from 'react';
 import { FiSliders } from 'react-icons/fi';
 
 import { ReasoningType } from '@/spec/inference';
-import { type UIChatOption } from '@/spec/modelpreset';
+import type { UIChatOption } from '@/spec/modelpreset';
 
 import { actionTriggerChipButtonClasses, ActionTriggerChipContent } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 
 import { AdvancedParamsModal } from '@/chats/composer/advancedparams/advanced_params_modal';
 import { AssistantPresetDropdown } from '@/chats/composer/assistantpresets/assistant_preset_dropdown';
-import {
-	type AssistantPresetOptionItem,
-	type AssistantPresetPreparedApplication,
-	buildAssistantPresetModelComparisonState,
+import type {
+	AssistantPresetOptionItem,
+	AssistantPresetPreparedApplication,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
+import { buildAssistantPresetModelComparisonState } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import { AssistantPresetViewModal } from '@/chats/composer/assistantpresets/assistant_preset_view_modal';
 import type { AssistantPresetManagerState } from '@/chats/composer/assistantpresets/use_assistant_preset_manager';
 import type { AssistantContextController } from '@/chats/composer/contextarea/use_context_state';

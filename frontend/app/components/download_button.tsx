@@ -1,5 +1,6 @@
 // DownloadButton.tsx
-import { type ButtonHTMLAttributes, useState } from 'react';
+import type { ButtonHTMLAttributes } from 'react';
+import { useState } from 'react';
 
 import { FiDownload } from 'react-icons/fi';
 

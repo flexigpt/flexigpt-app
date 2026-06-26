@@ -1,6 +1,7 @@
 import type { ProviderName } from '@/spec/inference';
 import type { ProviderPreset } from '@/spec/modelpreset';
-import { type AuthKeyMeta, AuthKeyTypeProvider } from '@/spec/setting';
+import type { AuthKeyMeta } from '@/spec/setting';
+import { AuthKeyTypeProvider } from '@/spec/setting';
 
 const DEFAULT_PROVIDER_NAME_HINTS = ['openai', 'anthropic', 'gemini', 'google', 'openrouter'];
 

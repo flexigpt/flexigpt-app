@@ -1,14 +1,13 @@
-import {
-	type CacheControl,
-	type CacheControlKind,
-	type CacheControlTTL,
-	DefaultModelParams,
-	type ModelParam,
-	type OutputParam,
-	type ProviderName,
-	ProviderSDKType,
-	type ReasoningParam,
+import type {
+	CacheControl,
+	CacheControlKind,
+	CacheControlTTL,
+	ModelParam,
+	OutputParam,
+	ProviderName,
+	ReasoningParam,
 } from '@/spec/inference';
+import { DefaultModelParams, ProviderSDKType } from '@/spec/inference';
 
 export const PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY = '__conversation__:previous-system-prompt';
 export const PREVIOUS_CONVO_SYSTEM_PROMPT_BUNDLEID = '__conversation__';

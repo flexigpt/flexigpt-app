@@ -1,16 +1,10 @@
-import {
-	type Dispatch,
-	type SetStateAction,
-	type SyntheticEvent,
-	useCallback,
-	useEffect,
-	useMemo,
-	useRef,
-} from 'react';
+import type { Dispatch, SetStateAction, SyntheticEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { FiCheck, FiX, FiZap } from 'react-icons/fi';
 
-import { Menu, MenuButton, MenuItem, type MenuStore, useMenuStore, useStoreState } from '@ariakit/react';
+import type { MenuStore } from '@ariakit/react';
+import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import type { SkillListItem, SkillRef } from '@/spec/skill';
 

@@ -1,15 +1,12 @@
-import { type SubmitEventHandler, useCallback, useEffect, useRef, useState } from 'react';
+import type { SubmitEventHandler } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiLink, FiX } from 'react-icons/fi';
 
-import {
-	createUrlFieldChangeHandler,
-	type FieldErrorState,
-	MessageEnterValidURL,
-	validateUrlForInput,
-} from '@/lib/url_utils';
+import type { FieldErrorState } from '@/lib/url_utils';
+import { createUrlFieldChangeHandler, MessageEnterValidURL, validateUrlForInput } from '@/lib/url_utils';
 
 interface UrlAttachmentModalProps {
 	isOpen: boolean;

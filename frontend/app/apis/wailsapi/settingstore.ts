@@ -13,7 +13,7 @@ import { DEFAULT_DEBUG_SETTINGS } from '@/spec/setting';
 
 import type { ISettingStoreAPI } from '@/apis/interface';
 import { GetAuthKey, GetSettings, SetAppTheme, SetDebugSettings } from '@/apis/wailsjs/go/main/SettingStoreWrapper';
-import { type spec as wailsSpec } from '@/apis/wailsjs/go/models';
+import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
 
 /**
  * @public

@@ -4,7 +4,8 @@ import type { AssistantPreset } from '@/spec/assistantpreset';
 import type { AssistantModelPresetOption } from '@/spec/modelpreset';
 import type { AssistantInstructionTemplateOption } from '@/spec/prompt';
 import type { AssistantSkillOption } from '@/spec/skill';
-import { type AssistantToolOption, ToolImplType } from '@/spec/tool';
+import type { AssistantToolOption } from '@/spec/tool';
+import { ToolImplType } from '@/spec/tool';
 
 import { assistantPresetStoreAPI } from '@/apis/baseapi';
 
@@ -18,10 +19,8 @@ import {
 	buildSkillRefKey,
 	buildToolRefKey,
 } from '@/assistantpresets/lib/assistant_preset_utils';
-import {
-	type AssistantPresetOptionItem,
-	buildAssistantPresetIdentityKey,
-} from '@/chats/composer/assistantpresets/assistant_preset_runtime';
+import type { AssistantPresetOptionItem } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
+import { buildAssistantPresetIdentityKey } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import { buildPromptTemplateRefKey } from '@/prompts/lib/prompt_template_ref';
 
 function getErrorMessage(error: unknown, fallback: string): string {

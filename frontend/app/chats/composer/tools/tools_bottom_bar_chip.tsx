@@ -1,20 +1,14 @@
-import {
-	type Dispatch,
-	type MouseEvent,
-	type RefObject,
-	type SetStateAction,
-	type SyntheticEvent,
-	useEffect,
-	useMemo,
-	useState,
-} from 'react';
+import type { Dispatch, MouseEvent, RefObject, SetStateAction, SyntheticEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { FiAlertTriangle, FiCheck, FiEdit2, FiGlobe, FiTool, FiX } from 'react-icons/fi';
 
-import { Menu, MenuButton, MenuItem, type MenuStore, useStoreState } from '@ariakit/react';
+import type { MenuStore } from '@ariakit/react';
+import { Menu, MenuButton, MenuItem, useStoreState } from '@ariakit/react';
 
 import type { ProviderSDKType } from '@/spec/inference';
-import { ToolImplType, type ToolListItem, ToolStoreChoiceType } from '@/spec/tool';
+import type { ToolListItem } from '@/spec/tool';
+import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
 import { useTools } from '@/hooks/use_tool';
 
@@ -30,10 +24,10 @@ import { GroupedMenuSection, GroupedMenuSubheading } from '@/components/grouped_
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import { dispatchOpenToolArgs } from '@/chats/composer/toolruntime/use_open_toolargs_event';
 import { ToolMenuRow } from '@/chats/composer/tools/tool_menu_row';
+import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
 import {
 	getEligibleWebSearchTools,
 	normalizeWebSearchChoiceTemplates,
-	type WebSearchChoiceTemplate,
 	webSearchIdentityKey,
 	webSearchTemplateFromToolListItem,
 } from '@/chats/composer/tools/websearch_utils';

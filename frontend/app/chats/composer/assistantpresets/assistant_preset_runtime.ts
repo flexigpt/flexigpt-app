@@ -1,12 +1,13 @@
+import type { AssistantPreset } from '@/spec/assistantpreset';
 import {
-	type AssistantPreset,
 	BASE_ASSISTANT_PRESET_BUNDLEID,
 	BASE_ASSISTANT_PRESET_SLUG,
 	BASE_ASSISTANT_PRESET_VERSION,
 } from '@/spec/assistantpreset';
 import type { UIChatOption } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
-import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
+import type { ToolStoreChoice } from '@/spec/tool';
+import { ToolStoreChoiceType } from '@/spec/tool';
 
 import { cloneJSONLike } from '@/lib/jsonschema_utils';
 import { areComparableValuesEqual } from '@/lib/obj_utils';

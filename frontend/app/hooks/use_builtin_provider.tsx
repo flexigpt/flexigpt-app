@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 
 import type { ProviderName } from '@/spec/inference';
 import type { ProviderPreset } from '@/spec/modelpreset';
-import { type AuthKeyName, type AuthKeyType, AuthKeyTypeProvider } from '@/spec/setting';
+import type { AuthKeyName, AuthKeyType } from '@/spec/setting';
+import { AuthKeyTypeProvider } from '@/spec/setting';
 
 import { getAllProviderPresetsMap } from '@/apis/list_helper';
 

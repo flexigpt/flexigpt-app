@@ -1,11 +1,5 @@
-import {
-	InputKind,
-	type InputUnion,
-	OutputKind,
-	type OutputUnion,
-	type ToolCall,
-	type UIToolCall,
-} from '@/spec/inference';
+import type { InputUnion, OutputUnion, ToolCall, UIToolCall } from '@/spec/inference';
+import { InputKind, OutputKind } from '@/spec/inference';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
 import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';

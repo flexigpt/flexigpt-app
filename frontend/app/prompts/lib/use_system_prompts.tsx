@@ -1,13 +1,7 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 
-import {
-	type PromptBundle,
-	PromptRoleEnum,
-	type PromptTemplate,
-	PromptTemplateKind,
-	type PromptVariable,
-	VarSource,
-} from '@/spec/prompt';
+import type { PromptBundle, PromptTemplate, PromptVariable } from '@/spec/prompt';
+import { PromptRoleEnum, PromptTemplateKind, VarSource } from '@/spec/prompt';
 
 import { getUUIDv7 } from '@/lib/uuid_utils';
 

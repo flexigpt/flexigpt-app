@@ -1,29 +1,22 @@
 import type { Attachment } from '@/spec/attachment';
-import {
-	type Conversation,
-	CONVERSATION_SCHEMA_VERSION,
-	type ConversationMessage,
-	type RestorableConversationContext,
-} from '@/spec/conversation';
-import {
-	ContentItemKind,
-	InputKind,
-	type InputOutputContent,
-	type InputOutputContentItemUnion,
-	type InputUnion,
-	type ModelParam,
-	RoleEnum,
-	Status,
-	type ToolOutput,
-	type ToolOutputItemUnion,
-	ToolType,
-	type UIToolCall,
-	type UIToolOutput,
+import type { Conversation, ConversationMessage, RestorableConversationContext } from '@/spec/conversation';
+import { CONVERSATION_SCHEMA_VERSION } from '@/spec/conversation';
+import type {
+	InputOutputContent,
+	InputOutputContentItemUnion,
+	InputUnion,
+	ModelParam,
+	ToolOutput,
+	ToolOutputItemUnion,
+	UIToolCall,
+	UIToolOutput,
 } from '@/spec/inference';
+import { ContentItemKind, InputKind, RoleEnum, Status, ToolType } from '@/spec/inference';
 import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp';
 import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
-import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
+import type { ToolStoreChoice } from '@/spec/tool';
+import { ToolStoreChoiceType } from '@/spec/tool';
 
 import { stripUndefinedDeep } from '@/lib/obj_utils';
 import { generateTitle } from '@/lib/title_utils';

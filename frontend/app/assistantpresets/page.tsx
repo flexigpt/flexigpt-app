@@ -21,10 +21,8 @@ import {
 	getAllAssistantPresetListItems,
 	sortAssistantPresets,
 } from '@/assistantpresets/lib/assistant_preset_store_list_utils';
-import {
-	type AssistantPresetUpsertInput,
-	toPutAssistantPresetPayload,
-} from '@/assistantpresets/lib/assistant_preset_utils';
+import type { AssistantPresetUpsertInput } from '@/assistantpresets/lib/assistant_preset_utils';
+import { toPutAssistantPresetPayload } from '@/assistantpresets/lib/assistant_preset_utils';
 
 interface BundleData {
 	bundle: AssistantPresetBundle;

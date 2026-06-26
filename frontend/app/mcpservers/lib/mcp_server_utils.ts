@@ -1,22 +1,24 @@
+import type {
+	MCPAppsPolicy,
+	MCPAuthHealth,
+	MCPServerConfig,
+	MCPServerPolicy,
+	MCPServerRuntimeSnapshot,
+	MCPServerSetupInput,
+	MCPToolCapability,
+	PutMCPServerPayload,
+} from '@/spec/mcp';
 import {
 	MCPApprovalRule,
-	type MCPAppsPolicy,
 	MCPAppVisibility,
-	type MCPAuthHealth,
 	MCPAuthHealthState,
 	MCPExecutionMode,
 	MCPHTTPAuthMode,
-	type MCPServerConfig,
-	type MCPServerPolicy,
-	type MCPServerRuntimeSnapshot,
-	type MCPServerSetupInput,
 	MCPServerSetupInputKind,
 	MCPServerStatus,
-	type MCPToolCapability,
 	MCPToolRisk,
 	MCPTransportType,
 	MCPTrustLevel,
-	type PutMCPServerPayload,
 } from '@/spec/mcp';
 
 export const MCP_OAUTH_CLIENT_CREDENTIALS_SLOT = 'clientCredentials';

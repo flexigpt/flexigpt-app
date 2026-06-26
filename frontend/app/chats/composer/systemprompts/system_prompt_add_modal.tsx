@@ -1,10 +1,12 @@
-import { type SubmitEventHandler, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { SubmitEventHandler } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiHelpCircle, FiX } from 'react-icons/fi';
 
-import { type PromptBundle, PromptRoleEnum } from '@/spec/prompt';
+import type { PromptBundle } from '@/spec/prompt';
+import { PromptRoleEnum } from '@/spec/prompt';
 
 import { focusTextInputAtEnd } from '@/lib/focus_input';
 import { validateSlug } from '@/lib/text_utils';

@@ -1,17 +1,16 @@
 import { useState } from 'react';
 
-import { NodeApi, type Path, type TElement, type TNode } from 'platejs';
-import { type PlateEditor, useEditorRef } from 'platejs/react';
+import type { Path, TElement, TNode } from 'platejs';
+import { NodeApi } from 'platejs';
+import type { PlateEditor } from 'platejs/react';
+import { useEditorRef } from 'platejs/react';
 
-import { type PromptVariable } from '@/spec/prompt';
+import type { PromptVariable } from '@/spec/prompt';
 
 import { comparePathDeepestFirst } from '@/lib/path_utils';
 
-import {
-	KEY_TEMPLATE_SELECTION,
-	KEY_TEMPLATE_VARIABLE,
-	type TemplateSelectionElementNode,
-} from '@/chats/composer/platedoc/nodes';
+import type { TemplateSelectionElementNode } from '@/chats/composer/platedoc/nodes';
+import { KEY_TEMPLATE_SELECTION, KEY_TEMPLATE_VARIABLE } from '@/chats/composer/platedoc/nodes';
 import {
 	computeEffectiveTemplate,
 	getTemplateNodesWithPath,

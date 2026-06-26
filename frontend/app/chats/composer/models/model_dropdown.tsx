@@ -1,4 +1,5 @@
-import { type Dispatch, type SetStateAction, useMemo } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
+import { useMemo } from 'react';
 
 import { FiCheck } from 'react-icons/fi';
 

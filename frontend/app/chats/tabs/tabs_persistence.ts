@@ -1,5 +1,6 @@
 import { initConversation } from '@/chats/conversation/hydration_helper';
-import { type ChatTabState, createEmptyTab, MAX_TABS } from '@/chats/tabs/tabs_model';
+import type { ChatTabState } from '@/chats/tabs/tabs_model';
+import { createEmptyTab, MAX_TABS } from '@/chats/tabs/tabs_model';
 
 const CHAT_TABS_PERSIST_KEY = 'app.chats.tabs.v1';
 

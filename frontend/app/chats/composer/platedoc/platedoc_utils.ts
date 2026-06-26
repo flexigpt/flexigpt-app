@@ -1,4 +1,5 @@
-import { NodeApi, type Value } from 'platejs';
+import type { Value } from 'platejs';
+import { NodeApi } from 'platejs';
 import type { PlateEditor } from 'platejs/react';
 
 import type { getFirstTemplateNodeWithPath } from '@/chats/composer/platedoc/template_document_ops';

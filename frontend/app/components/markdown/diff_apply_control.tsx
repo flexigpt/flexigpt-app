@@ -2,18 +2,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { FiAlertTriangle, FiCheckCircle, FiGitPullRequest, FiInfo, FiLoader } from 'react-icons/fi';
 
-import {
-	type ApplyUnifiedDiffDiagnostic,
-	ApplyUnifiedDiffDiagnosticLevel,
-	type ApplyUnifiedDiffFileOut,
-	type ApplyUnifiedDiffFileTarget,
-	type ApplyUnifiedDiffOut,
-	ApplyUnifiedDiffStatus,
+import type {
+	ApplyUnifiedDiffDiagnostic,
+	ApplyUnifiedDiffFileOut,
+	ApplyUnifiedDiffFileTarget,
+	ApplyUnifiedDiffOut,
 } from '@/spec/unified_diff';
+import { ApplyUnifiedDiffDiagnosticLevel, ApplyUnifiedDiffStatus } from '@/spec/unified_diff';
 
 import { aggregateAPI } from '@/apis/baseapi';
 
 import { DiffApplyModal } from '@/components/markdown/diff_apply_modal';
+import type { HeaderButtonTone } from '@/components/markdown/diff_diagnostic';
 import {
 	collectOutputDiagnostics,
 	collectPatchLevelDiagnostics,
@@ -21,16 +21,17 @@ import {
 	getDiagnosticSeverityCounts,
 	getDiagnosticToneFromCounts,
 	getHighestDiagnosticLevel,
-	type HeaderButtonTone,
 	uniqueDiagnostics,
 } from '@/components/markdown/diff_diagnostic';
+import type {
+	DiffApplyRunOptions,
+	EditableUnifiedDiffTarget,
+	FileStatusCounts,
+} from '@/components/markdown/unified_diff_block';
 import {
 	buildEditableTargetsFromOutput,
 	buildFileStatusCounts,
 	buildUnifiedDiffTextForTarget,
-	type DiffApplyRunOptions,
-	type EditableUnifiedDiffTarget,
-	type FileStatusCounts,
 	getErrorMessage,
 	haveSharedPathIdentity,
 	looksLikeUnifiedDiff,

@@ -1,31 +1,34 @@
-import { type ChangeEvent, type SubmitEventHandler, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ChangeEvent, SubmitEventHandler } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiHelpCircle, FiUpload, FiX } from 'react-icons/fi';
 
+import type {
+	CacheControl,
+	CacheControlKind,
+	CacheControlTTL,
+	OutputParam,
+	ProviderName,
+	ProviderSDKType,
+	ReasoningParam,
+} from '@/spec/inference';
 import {
-	type CacheControl,
-	type CacheControlKind,
-	type CacheControlTTL,
 	OutputFormatKind,
-	type OutputParam,
 	OutputVerbosity,
-	type ProviderName,
-	type ProviderSDKType,
 	ReasoningLevel,
-	type ReasoningParam,
 	ReasoningSummaryStyle,
 	ReasoningType,
 } from '@/spec/inference';
-import {
-	DEFAULT_REASONING_TOKENS,
-	type ModelCapabilitiesOverride,
-	type ModelPreset,
-	type ModelPresetID,
-	type PatchModelPresetPayload,
-	type PostModelPresetPayload,
+import type {
+	ModelCapabilitiesOverride,
+	ModelPreset,
+	ModelPresetID,
+	PatchModelPresetPayload,
+	PostModelPresetPayload,
 } from '@/spec/modelpreset';
+import { DEFAULT_REASONING_TOKENS } from '@/spec/modelpreset';
 
 import { arraysEqual, parseOptionalNumber } from '@/lib/obj_utils';
 
@@ -33,12 +36,12 @@ import { Dropdown } from '@/components/dropdown';
 import { ModalBackdrop } from '@/components/modal_backdrop';
 import { ReadOnlyValue } from '@/components/read_only_value';
 
+import type { CacheControlTTLSelection } from '@/modelpresets/lib/cache_control_utils';
 import {
 	buildCacheControlFromForm,
 	buildCacheControlKindDropdownItems,
 	buildCacheControlTTLDropdownItems,
 	CACHE_CONTROL_TTL_PROVIDER_DEFAULT,
-	type CacheControlTTLSelection,
 	getInitialCacheControlKind,
 	getInitialCacheControlTTLSelection,
 	resolveSupportedCacheControlKinds,

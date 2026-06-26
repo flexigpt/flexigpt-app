@@ -1,27 +1,24 @@
-import { type ConversationMessage } from '@/spec/conversation';
-import {
-	CitationKind,
-	type CompletionResponseBody,
-	ContentItemKind,
-	type InferenceError,
-	type InferenceUsage,
-	type ModelParam,
-	OutputKind,
-	type OutputUnion,
-	type ProviderName,
-	type ReasoningContent,
-	RoleEnum,
-	Status,
-	type ToolCall,
-	type ToolOutput,
-	type UIToolCall,
-	type UIToolOutput,
-	type URLCitation,
-	type WebSearchToolOutputItemUnion,
+import type { ConversationMessage } from '@/spec/conversation';
+import type {
+	CompletionResponseBody,
+	InferenceError,
+	InferenceUsage,
+	ModelParam,
+	OutputUnion,
+	ProviderName,
+	ReasoningContent,
+	ToolCall,
+	ToolOutput,
+	UIToolCall,
+	UIToolOutput,
+	URLCitation,
+	WebSearchToolOutputItemUnion,
 } from '@/spec/inference';
+import { CitationKind, ContentItemKind, OutputKind, RoleEnum, Status } from '@/spec/inference';
 import type { MCPConversationContext, MCPProviderToolMapping, MCPToolSelection } from '@/spec/mcp';
 import type { ModelPresetID } from '@/spec/modelpreset';
-import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
+import type { ToolStoreChoice } from '@/spec/tool';
+import { ToolStoreChoiceType } from '@/spec/tool';
 
 import { buildJSONOrTextCodeBlock } from '@/lib/jsonschema_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';

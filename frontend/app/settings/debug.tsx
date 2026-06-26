@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 
 import { FiAlertTriangle } from 'react-icons/fi';
 
-import { DebugLogLevel, type DebugSettings, DEFAULT_DEBUG_SETTINGS } from '@/spec/setting';
+import type { DebugSettings } from '@/spec/setting';
+import { DebugLogLevel, DEFAULT_DEBUG_SETTINGS } from '@/spec/setting';
 
 import { settingstoreAPI } from '@/apis/baseapi';
 

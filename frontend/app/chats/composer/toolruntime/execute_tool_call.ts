@@ -1,14 +1,6 @@
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
-import {
-	type InvokeMCPToolRequestBody,
-	MCPApprovalDecision,
-	MCPApprovalResolution,
-	type MCPContent,
-	MCPContentType,
-	MCPInvocationSource,
-	type MCPToolAppRenderInfo,
-	type MCPToolSelection,
-} from '@/spec/mcp';
+import type { InvokeMCPToolRequestBody, MCPContent, MCPToolAppRenderInfo, MCPToolSelection } from '@/spec/mcp';
+import { MCPApprovalDecision, MCPApprovalResolution, MCPContentType, MCPInvocationSource } from '@/spec/mcp';
 import { ToolOutputKind } from '@/spec/tool';
 
 import { isJSONObject } from '@/lib/jsonschema_utils';

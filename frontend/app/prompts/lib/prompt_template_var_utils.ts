@@ -1,4 +1,5 @@
-import { type PromptVariable, VarSource, VarType } from '@/spec/prompt';
+import type { PromptVariable } from '@/spec/prompt';
+import { VarSource, VarType } from '@/spec/prompt';
 
 function effectiveVarValue(varDef: PromptVariable, userValues: Record<string, unknown>): unknown {
 	// Local override always wins if present

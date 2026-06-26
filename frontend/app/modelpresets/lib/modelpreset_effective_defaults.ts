@@ -1,4 +1,5 @@
-import { DefaultModelParams, type ModelParam } from '@/spec/inference';
+import type { ModelParam } from '@/spec/inference';
+import { DefaultModelParams } from '@/spec/inference';
 import type { ModelPreset } from '@/spec/modelpreset';
 
 /**

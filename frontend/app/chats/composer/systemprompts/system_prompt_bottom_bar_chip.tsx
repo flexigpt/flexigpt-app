@@ -1,20 +1,14 @@
-import { memo, type SyntheticEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { SyntheticEvent } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { FiCheck, FiFileText, FiGitBranch, FiPlus, FiX } from 'react-icons/fi';
 
-import {
-	Menu,
-	MenuButton,
-	MenuItem,
-	type MenuStore,
-	Tooltip,
-	useMenuStore,
-	useStoreState,
-	useTooltipStore,
-} from '@ariakit/react';
+import type { MenuStore } from '@ariakit/react';
+import { Menu, MenuButton, MenuItem, Tooltip, useMenuStore, useStoreState, useTooltipStore } from '@ariakit/react';
 
 import { PREVIOUS_CONVO_SYSTEM_PROMPT_BUNDLEID } from '@/spec/modelpreset';
-import { type PromptBundle, PromptRoleEnum } from '@/spec/prompt';
+import type { PromptBundle } from '@/spec/prompt';
+import { PromptRoleEnum } from '@/spec/prompt';
 
 import { DEFAULT_SEMVER } from '@/lib/version_utils';
 

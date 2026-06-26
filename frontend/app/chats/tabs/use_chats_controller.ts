@@ -1,4 +1,5 @@
-import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useStoreState } from '@ariakit/react';
 import { useTabStore } from '@ariakit/react/tab';
@@ -6,7 +7,8 @@ import { useTabStore } from '@ariakit/react/tab';
 import type { Conversation, ConversationSearchItem } from '@/spec/conversation';
 import { RoleEnum } from '@/spec/inference';
 
-import { defaultShortcutConfig, type ShortcutConfig, useChatShortcuts } from '@/lib/keyboard_shortcuts';
+import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
+import { defaultShortcutConfig, useChatShortcuts } from '@/lib/keyboard_shortcuts';
 import { omitManyKeys } from '@/lib/obj_utils';
 import { generateTitle } from '@/lib/title_utils';
 
@@ -17,8 +19,8 @@ import { hydrateConversation, toStoreConversation } from '@/chats/conversation/c
 import { initConversation } from '@/chats/conversation/hydration_helper';
 import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';
 import type { ConversationSearchHandle } from '@/chats/search/conversation_search';
+import type { ChatTabState } from '@/chats/tabs/tabs_model';
 import {
-	type ChatTabState,
 	createEmptyTab,
 	isScratchTab,
 	MAX_TABS,
@@ -26,11 +28,8 @@ import {
 	sanitizeConversationTitle,
 	toTimestampMap,
 } from '@/chats/tabs/tabs_model';
-import {
-	buildInitialChatsModel,
-	type InitialChatsModel,
-	writePersistedChatsPageState,
-} from '@/chats/tabs/tabs_persistence';
+import type { InitialChatsModel } from '@/chats/tabs/tabs_persistence';
+import { buildInitialChatsModel, writePersistedChatsPageState } from '@/chats/tabs/tabs_persistence';
 
 interface UseChatsControllerArgs {
 	conversationAreaRef: RefObject<ConversationAreaHandle | null>;

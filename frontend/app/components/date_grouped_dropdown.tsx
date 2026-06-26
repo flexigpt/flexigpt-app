@@ -1,4 +1,5 @@
-import { Fragment, type Key, type ReactNode } from 'react';
+import type { Key, ReactNode } from 'react';
+import { Fragment } from 'react';
 
 import { groupByDateBuckets } from '@/lib/date_utils';
 

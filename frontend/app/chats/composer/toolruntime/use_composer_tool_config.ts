@@ -1,21 +1,18 @@
-import { type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { type Tool, type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
+import type { Tool, ToolStoreChoice } from '@/spec/tool';
+import { ToolStoreChoiceType } from '@/spec/tool';
 
 import { resolveStateUpdate } from '@/lib/hook_utils';
 
 import { toolStoreAPI } from '@/apis/baseapi';
 
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
-import {
-	normalizeWebSearchChoiceTemplates,
-	type WebSearchChoiceTemplate,
-	webSearchTemplateFromChoice,
-} from '@/chats/composer/tools/websearch_utils';
-import {
-	type ConversationToolStateEntry,
-	toolStoreChoicesToConversationTools,
-} from '@/tools/lib/conversation_tool_utils';
+import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
+import { normalizeWebSearchChoiceTemplates, webSearchTemplateFromChoice } from '@/chats/composer/tools/websearch_utils';
+import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
+import { toolStoreChoicesToConversationTools } from '@/tools/lib/conversation_tool_utils';
 import { computeToolUserArgsStatus } from '@/tools/lib/tool_userargs_utils';
 
 interface UseComposerToolConfigArgs {

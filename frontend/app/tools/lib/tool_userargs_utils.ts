@@ -1,6 +1,7 @@
 import type { UIToolUserArgsStatus } from '@/spec/tool';
 
-import { getRequiredFromJSONSchema, isJSONObject, type JSONSchema } from '@/lib/jsonschema_utils';
+import type { JSONSchema } from '@/lib/jsonschema_utils';
+import { getRequiredFromJSONSchema, isJSONObject } from '@/lib/jsonschema_utils';
 
 /**
  * Inspect a tool's userArgSchema and a JSON-encoded instance string and

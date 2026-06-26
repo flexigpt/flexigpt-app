@@ -1,6 +1,6 @@
 import { FiAlertTriangle, FiCode, FiPlay, FiTerminal, FiTool, FiX } from 'react-icons/fi';
 
-import { type UIToolCall, type UIToolOutput } from '@/spec/inference';
+import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import { MCPExecutionMode } from '@/spec/mcp';
 
 import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';

@@ -1,12 +1,10 @@
-import {
-	isJSONRPCNotification,
-	isJSONRPCRequest,
-	isJSONRPCResponse,
-	type JSONRPCMessage,
-	type JSONRPCNotification,
-	type JSONRPCRequest,
-	type JSONRPCResponse,
+import type {
+	JSONRPCMessage,
+	JSONRPCNotification,
+	JSONRPCRequest,
+	JSONRPCResponse,
 } from '@/chats/mcpapps/mcp_app_types';
+import { isJSONRPCNotification, isJSONRPCRequest, isJSONRPCResponse } from '@/chats/mcpapps/mcp_app_types';
 
 export type AppRequestHandler = (req: JSONRPCRequest) => Promise<JSONRPCResponse>;
 export type AppNotificationHandler = (note: JSONRPCNotification) => void;

@@ -5,7 +5,8 @@ import { createPortal } from 'react-dom';
 import { FiTool, FiX } from 'react-icons/fi';
 
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
-import { ToolOutputKind, type ToolOutputUnion, type ToolStoreChoice } from '@/spec/tool';
+import type { ToolOutputUnion, ToolStoreChoice } from '@/spec/tool';
+import { ToolOutputKind } from '@/spec/tool';
 
 import {
 	buildJSONCodeBlock,

@@ -1,6 +1,6 @@
+import type { SubmitEventHandler } from 'react';
 import {
 	forwardRef,
-	type SubmitEventHandler,
 	useCallback,
 	useEffect,
 	useImperativeHandle,
@@ -30,19 +30,19 @@ import type { ProviderSDKType, UIToolCall, UIToolOutput } from '@/spec/inference
 import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp';
 import type { PromptTemplate } from '@/spec/prompt';
 import type { SkillRef } from '@/spec/skill';
-import { type ToolArgsTarget, type ToolListItem, type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
+import type { ToolArgsTarget, ToolListItem, ToolStoreChoice } from '@/spec/tool';
+import { ToolStoreChoiceType } from '@/spec/tool';
 
-import { formatShortcut, type ShortcutConfig } from '@/lib/keyboard_shortcuts';
+import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
+import { formatShortcut } from '@/lib/keyboard_shortcuts';
 import { cssEscape } from '@/lib/text_utils';
 
 import { useEnterSubmit } from '@/hooks/use_enter_submit';
 
 import { HoverTip } from '@/components/ariakit_hover_tip';
 
-import {
-	type AssistantPresetRuntimeSnapshot,
-	mapAssistantPresetWebSearchTemplatesToChoices,
-} from '@/chats/composer/assistantpresets/assistant_preset_runtime';
+import type { AssistantPresetRuntimeSnapshot } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
+import { mapAssistantPresetWebSearchTemplatesToChoices } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import { useComposerAttachments } from '@/chats/composer/attachments/use_composer_attachments';
 import { EditorBottomBar } from '@/chats/composer/editor/editor_bottom_bar';
 import { EditorChipsBar } from '@/chats/composer/editor/editor_chips_bar';
@@ -61,8 +61,8 @@ import {
 	insertTemplateSelectionNode,
 	toPlainTextReplacingVariables,
 } from '@/chats/composer/platedoc/template_document_ops';
+import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import {
-	type AttachedToolEntry,
 	getAttachedTools,
 	insertToolSelectionNode,
 	removeToolByKey,
@@ -81,15 +81,14 @@ import {
 } from '@/chats/composer/toolruntime/tool_runtime_utils';
 import { useComposerTools } from '@/chats/composer/toolruntime/use_composer_tools';
 import { dispatchOpenToolArgs, useOpenToolArgs } from '@/chats/composer/toolruntime/use_open_toolargs_event';
-import { ToolDetailsModal, type ToolDetailsState } from '@/chats/composer/tools/tool_details_modal';
+import type { ToolDetailsState } from '@/chats/composer/tools/tool_details_modal';
+import { ToolDetailsModal } from '@/chats/composer/tools/tool_details_modal';
 import { ToolArgsModalHost } from '@/chats/composer/tools/tool_user_args_host';
-import { buildWebSearchChoicesForSubmit, type WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
+import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
+import { buildWebSearchChoicesForSubmit } from '@/chats/composer/tools/websearch_utils';
 import { appendSystemPromptParts } from '@/prompts/lib/system_prompt_utils';
-import {
-	type ConversationToolStateEntry,
-	conversationToolsToChoices,
-	mergeConversationToolsWithNewChoices,
-} from '@/tools/lib/conversation_tool_utils';
+import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
+import { conversationToolsToChoices, mergeConversationToolsWithNewChoices } from '@/tools/lib/conversation_tool_utils';
 import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
 import { dedupeToolChoices, uiToolChoiceToToolStoreChoice } from '@/tools/lib/tool_choice_utils';
 import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';

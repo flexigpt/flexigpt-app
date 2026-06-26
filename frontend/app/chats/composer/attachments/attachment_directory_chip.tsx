@@ -2,10 +2,12 @@ import { FiAlertTriangle, FiChevronUp, FiFolder, FiX } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore } from '@ariakit/react';
 
-import { AttachmentContentBlockMode, type UIAttachment } from '@/spec/attachment';
+import type { UIAttachment } from '@/spec/attachment';
+import { AttachmentContentBlockMode } from '@/spec/attachment';
 
 import { AttachmentChip } from '@/chats/composer/attachments/attachment_chip';
-import { type DirectoryAttachmentGroup, uiAttachmentKey } from '@/chats/composer/attachments/attachment_editor_utils';
+import type { DirectoryAttachmentGroup } from '@/chats/composer/attachments/attachment_editor_utils';
+import { uiAttachmentKey } from '@/chats/composer/attachments/attachment_editor_utils';
 import { getAttachmentContentBlockModePillClasses } from '@/chats/composer/attachments/attachment_mode_menu_utils';
 
 interface DirectoryChipProps {

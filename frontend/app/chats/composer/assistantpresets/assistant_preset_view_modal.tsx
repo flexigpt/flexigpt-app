@@ -11,13 +11,13 @@ import { ToolStoreChoiceType } from '@/spec/tool';
 
 import { ModalBackdrop } from '@/components/modal_backdrop';
 
-import {
-	type AssistantPresetModificationSummary,
-	type AssistantPresetOptionItem,
-	type AssistantPresetPreparedApplication,
-	type AssistantPresetRuntimeSnapshot,
-	buildAssistantPresetModelComparisonState,
+import type {
+	AssistantPresetModificationSummary,
+	AssistantPresetOptionItem,
+	AssistantPresetPreparedApplication,
+	AssistantPresetRuntimeSnapshot,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
+import { buildAssistantPresetModelComparisonState } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import { buildPromptTemplateRefKey } from '@/prompts/lib/prompt_template_ref';
 import type { SystemPromptItem } from '@/prompts/lib/use_system_prompts';
 

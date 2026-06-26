@@ -1,17 +1,11 @@
-import {
-	type AnchorHTMLAttributes,
-	type ButtonHTMLAttributes,
-	type ComponentType,
-	forwardRef,
-	type HTMLAttributes,
-	type MouseEvent,
-	useState,
-} from 'react';
+import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ComponentType, HTMLAttributes, MouseEvent } from 'react';
+import { forwardRef, useState } from 'react';
 
 import { FiChevronDown } from 'react-icons/fi';
 
 import { cn } from '@udecode/cn';
-import { cva, type VariantProps } from 'class-variance-authority';
+import type { VariantProps } from 'class-variance-authority';
+import { cva } from 'class-variance-authority';
 
 /* Root toolbar */
 export const Toolbar = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(function Toolbar(

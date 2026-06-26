@@ -1,10 +1,10 @@
 import type { AssistantPreset } from '@/spec/assistantpreset';
-import {
-	type OutputFormatKind,
-	type OutputVerbosity,
-	type ReasoningLevel,
-	type ReasoningSummaryStyle,
-	type ReasoningType,
+import type {
+	OutputFormatKind,
+	OutputVerbosity,
+	ReasoningLevel,
+	ReasoningSummaryStyle,
+	ReasoningType,
 } from '@/spec/inference';
 import type { PromptTemplateRef } from '@/spec/prompt';
 import type { SkillSelection } from '@/spec/skill';

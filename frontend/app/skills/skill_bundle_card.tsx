@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { FiCheck, FiChevronDown, FiChevronUp, FiEdit2, FiEye, FiPlus, FiTrash2, FiX } from 'react-icons/fi';
 
-import { type Skill, type SkillBundle, SkillPresenceStatus } from '@/spec/skill';
+import type { Skill, SkillBundle } from '@/spec/skill';
+import { SkillPresenceStatus } from '@/spec/skill';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';

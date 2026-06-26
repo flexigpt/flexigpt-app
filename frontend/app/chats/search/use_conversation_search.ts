@@ -6,11 +6,11 @@ import { cleanSearchQuery } from '@/lib/title_utils';
 
 import { conversationStoreAPI } from '@/apis/baseapi';
 
+import type { SearchResult } from '@/chats/search/conversation_search_utils';
 import {
 	CACHE_EXPIRY_TIME,
 	conversationsToSearchResults,
 	mergeUniqBy,
-	type SearchResult,
 	sortConversationSearchResults,
 	uniqBy,
 } from '@/chats/search/conversation_search_utils';

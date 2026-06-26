@@ -1,4 +1,5 @@
-import { type ReactNode, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 
 import {
 	FiChevronDown,
@@ -15,20 +16,19 @@ import {
 	FiX,
 } from 'react-icons/fi';
 
-import {
-	BaseMCPBundleID,
-	type MCPAuthHealth,
-	MCPAuthHealthState,
-	type MCPBundle,
-	type MCPServerConfig,
-	type MCPServerRuntimeSnapshot,
-	type MCPServerSetupInputValue,
-	MCPServerStatus,
+import type {
+	MCPAuthHealth,
+	MCPBundle,
+	MCPServerConfig,
+	MCPServerRuntimeSnapshot,
+	MCPServerSetupInputValue,
 } from '@/spec/mcp';
+import { BaseMCPBundleID, MCPAuthHealthState, MCPServerStatus } from '@/spec/mcp';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 
+import type { MCPServerUpsertInput } from '@/mcpservers/lib/mcp_server_utils';
 import {
 	getEffectiveMCPServerStatus,
 	getMCPAuthHealthBadgeClass,
@@ -39,7 +39,6 @@ import {
 	getMCPTransportLabel,
 	getMCPTrustLevelLabel,
 	isMCPAuthActionable,
-	type MCPServerUpsertInput,
 	serverHasSetupInputs,
 } from '@/mcpservers/lib/mcp_server_utils';
 import { MCPOAuthAuthorizationModal } from '@/mcpservers/mcp_oauth_authorization_modal';

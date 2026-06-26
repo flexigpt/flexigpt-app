@@ -1,4 +1,5 @@
-import { type MessageBlock, PromptRoleEnum, PromptTemplateKind, type PromptVariable, VarSource } from '@/spec/prompt';
+import type { MessageBlock, PromptVariable } from '@/spec/prompt';
+import { PromptRoleEnum, PromptTemplateKind, VarSource } from '@/spec/prompt';
 
 const PROMPT_PLACEHOLDER_RE = /\{\{([a-zA-Z_][a-zA-Z0-9_-]*)\}\}/g;
 const PROMPT_VARIABLE_NAME_RE = /^[a-zA-Z_][a-zA-Z0-9_-]*$/;

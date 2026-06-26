@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import {
-	type MCPConversationContext,
-	type MCPPromptRef,
-	type MCPPromptSelection,
-	type MCPResourceRef,
-	type MCPResourceTemplateRef,
-	type MCPResourceTemplateSelection,
-	type MCPToolCapability,
-	MCPToolExposure,
-	type MCPToolSelection,
+import type {
+	MCPConversationContext,
+	MCPPromptRef,
+	MCPPromptSelection,
+	MCPResourceRef,
+	MCPResourceTemplateRef,
+	MCPResourceTemplateSelection,
+	MCPToolCapability,
+	MCPToolSelection,
 } from '@/spec/mcp';
+import { MCPToolExposure } from '@/spec/mcp';
 
 import { omitManyKeys } from '@/lib/obj_utils';
 
@@ -24,10 +24,13 @@ import {
 	getAllMCPServerTools,
 } from '@/apis/list_helper';
 
+import type {
+	MCPComposerServerOption,
+	MCPComposerServerSelection,
+	UseComposerMCPResult,
+} from '@/chats/composer/mcp/mcp_composer_types';
 import {
 	countMissingRequiredMCPArguments,
-	type MCPComposerServerOption,
-	type MCPComposerServerSelection,
 	mcpContextToSelectionMap,
 	mcpPromptKey,
 	mcpResourceKey,
@@ -35,7 +38,6 @@ import {
 	mcpSelectionToContext,
 	mcpServerKey,
 	mcpToolKey,
-	type UseComposerMCPResult,
 } from '@/chats/composer/mcp/mcp_composer_types';
 import { isMCPToolModelSelectable, isMCPToolVisibleToModel } from '@/mcpservers/lib/mcp_server_utils';
 

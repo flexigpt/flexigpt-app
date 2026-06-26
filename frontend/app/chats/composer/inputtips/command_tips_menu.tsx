@@ -4,7 +4,8 @@ import { FiMoreHorizontal } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, Tooltip, useMenuStore, useStoreState, useTooltipStore } from '@ariakit/react';
 
-import { buildShortcutDisplay, type ShortcutConfig } from '@/lib/keyboard_shortcuts';
+import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
+import { buildShortcutDisplay } from '@/lib/keyboard_shortcuts';
 
 import {
 	actionTriggerChipButtonClasses,

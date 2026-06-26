@@ -4,20 +4,18 @@ import type {
 	StoreConversation,
 	StoreConversationMessage,
 } from '@/spec/conversation';
-import {
-	ContentItemKind,
-	InputKind,
-	type InputUnion,
-	type OutputUnion,
-	type ReasoningContent,
-	RoleEnum,
-	type ToolCall,
-	type ToolOutput,
-	type UIToolCall,
-	type UIToolOutput,
-	type URLCitation,
+import type {
+	InputUnion,
+	OutputUnion,
+	ReasoningContent,
+	ToolCall,
+	ToolOutput,
+	UIToolCall,
+	UIToolOutput,
+	URLCitation,
 } from '@/spec/inference';
-import { type ToolStoreChoice } from '@/spec/tool';
+import { ContentItemKind, InputKind, RoleEnum } from '@/spec/inference';
+import type { ToolStoreChoice } from '@/spec/tool';
 
 import {
 	buildMCPToolSelectionMap,

@@ -3,7 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AssistantPreset } from '@/spec/assistantpreset';
 import type { ModelParam } from '@/spec/inference';
 import { PREVIOUS_CONVO_SYSTEM_PROMPT_BUNDLEID, PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY } from '@/spec/modelpreset';
-import { type PromptBundle, PromptRoleEnum } from '@/spec/prompt';
+import type { PromptBundle } from '@/spec/prompt';
+import { PromptRoleEnum } from '@/spec/prompt';
 
 import { dedupeStringArray } from '@/lib/obj_utils';
 

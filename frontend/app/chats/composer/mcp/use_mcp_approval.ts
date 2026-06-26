@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { MCPApprovalResolution, type MCPApprovalSummary } from '@/spec/mcp';
+import type { MCPApprovalSummary } from '@/spec/mcp';
+import { MCPApprovalResolution } from '@/spec/mcp';
 
 export interface MCPApprovalRequest {
 	approvalID: string;

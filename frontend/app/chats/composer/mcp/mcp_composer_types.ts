@@ -1,20 +1,20 @@
-import {
-	type MCPArgumentDefinition,
-	type MCPAuthHealth,
-	type MCPBundle,
-	type MCPConversationContext,
-	type MCPPromptRef,
-	type MCPPromptSelection,
-	type MCPResourceRef,
-	type MCPResourceTemplateRef,
-	type MCPResourceTemplateSelection,
-	type MCPServerConfig,
-	type MCPServerRuntimeSnapshot,
-	type MCPServerSelection,
-	type MCPToolCapability,
-	MCPToolExposure,
-	type MCPToolSelection,
+import type {
+	MCPArgumentDefinition,
+	MCPAuthHealth,
+	MCPBundle,
+	MCPConversationContext,
+	MCPPromptRef,
+	MCPPromptSelection,
+	MCPResourceRef,
+	MCPResourceTemplateRef,
+	MCPResourceTemplateSelection,
+	MCPServerConfig,
+	MCPServerRuntimeSnapshot,
+	MCPServerSelection,
+	MCPToolCapability,
+	MCPToolSelection,
 } from '@/spec/mcp';
+import { MCPToolExposure } from '@/spec/mcp';
 
 export interface MCPComposerServerOption {
 	bundle: MCPBundle;

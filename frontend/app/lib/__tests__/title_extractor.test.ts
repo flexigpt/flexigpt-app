@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { codeMessage } from '@/lib/__tests__/sample_code_message';
-import { generateTitle, type TitleCandidate } from '@/lib/title_utils';
+import type { TitleCandidate } from '@/lib/title_utils';
+import { generateTitle } from '@/lib/title_utils';
 
 const DEFAULT = 'New conversation';
 const MAX_PREVIEW = 120; // truncate long log lines

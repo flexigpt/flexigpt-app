@@ -1,4 +1,5 @@
-import { type SubmitEventHandler, useEffect, useMemo, useRef, useState } from 'react';
+import type { SubmitEventHandler } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 

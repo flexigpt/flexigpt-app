@@ -2,7 +2,8 @@ import { useCallback, useMemo, useState } from 'react';
 
 import { FiMonitor, FiMoon, FiSun } from 'react-icons/fi';
 
-import { type AppTheme, ThemeType } from '@/spec/setting';
+import type { AppTheme } from '@/spec/setting';
+import { ThemeType } from '@/spec/setting';
 import { CustomThemeDark, CustomThemeLight, CustomThemeSystem, DAISYUI_BUILTIN_THEMES } from '@/spec/theme_consts';
 
 import { updateStartupTheme, useStartupTheme } from '@/hooks/use_startup_theme';
@@ -10,7 +11,8 @@ import { useTheme } from '@/hooks/use_theme_provider';
 
 import { settingstoreAPI } from '@/apis/baseapi';
 
-import { Dropdown, type DropdownItem } from '@/components/dropdown';
+import type { DropdownItem } from '@/components/dropdown';
+import { Dropdown } from '@/components/dropdown';
 
 const isOtherThemeName = (n: string): boolean => DAISYUI_BUILTIN_THEMES.includes(n);
 const toThemeType = (name: string): ThemeType => {

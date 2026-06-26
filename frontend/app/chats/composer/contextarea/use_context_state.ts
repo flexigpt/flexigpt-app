@@ -1,14 +1,13 @@
-import { type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { RestorableConversationContext } from '@/spec/conversation';
-import { type ModelParam, type OutputVerbosity, type ReasoningLevel, ReasoningType } from '@/spec/inference';
-import {
-	DefaultUIChatOptions,
-	type IncludePreviousMessages,
-	type ModelPresetRef,
-	type UIChatOption,
-} from '@/spec/modelpreset';
-import { type Tool, ToolImplType, type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
+import type { ModelParam, OutputVerbosity, ReasoningLevel } from '@/spec/inference';
+import { ReasoningType } from '@/spec/inference';
+import type { IncludePreviousMessages, ModelPresetRef, UIChatOption } from '@/spec/modelpreset';
+import { DefaultUIChatOptions } from '@/spec/modelpreset';
+import type { Tool, ToolStoreChoice } from '@/spec/tool';
+import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
@@ -18,10 +17,12 @@ import {
 	buildSkillRefKey,
 	buildToolRefKey,
 } from '@/assistantpresets/lib/assistant_preset_utils';
+import type {
+	AssistantPresetOptionItem,
+	AssistantPresetPreparedApplication,
+} from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import {
 	applyAssistantPresetModelPatch,
-	type AssistantPresetOptionItem,
-	type AssistantPresetPreparedApplication,
 	normalizeAssistantPresetSkillRefs,
 	normalizeAssistantPresetToolChoices,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';

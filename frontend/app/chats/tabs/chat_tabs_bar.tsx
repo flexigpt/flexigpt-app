@@ -1,4 +1,5 @@
-import { memo, type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from 'react';
+import type { ReactNode, RefObject } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 import { FiEdit2, FiPlus, FiX } from 'react-icons/fi';
 

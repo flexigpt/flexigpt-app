@@ -2,7 +2,8 @@ import type { MouseEvent, ReactNode } from 'react';
 
 import { FiCheck, FiCode, FiEdit2, FiPlus, FiTool, FiX } from 'react-icons/fi';
 
-import { MenuItem, type MenuStore } from '@ariakit/react';
+import type { MenuStore } from '@ariakit/react';
+import { MenuItem } from '@ariakit/react';
 
 import type { UIToolUserArgsStatus } from '@/spec/tool';
 

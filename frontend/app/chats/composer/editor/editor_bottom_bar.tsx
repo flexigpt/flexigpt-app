@@ -1,12 +1,14 @@
-import { type Dispatch, memo, type RefObject, type SetStateAction, useMemo } from 'react';
+import type { Dispatch, RefObject, SetStateAction } from 'react';
+import { memo, useMemo } from 'react';
 
-import { type MenuStore } from '@ariakit/react';
+import type { MenuStore } from '@ariakit/react';
 
 import type { ProviderSDKType } from '@/spec/inference';
 import type { SkillListItem, SkillRef } from '@/spec/skill';
-import { type ToolListItem } from '@/spec/tool';
+import type { ToolListItem } from '@/spec/tool';
 
-import { formatShortcut, type ShortcutConfig } from '@/lib/keyboard_shortcuts';
+import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
+import { formatShortcut } from '@/lib/keyboard_shortcuts';
 
 import { AttachmentBottomBarChip } from '@/chats/composer/attachments/attachment_bottom_bar_chip';
 import { CommandTipsMenu } from '@/chats/composer/inputtips/command_tips_menu';
@@ -16,12 +18,10 @@ import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_
 import { SkillsBottomBarChip } from '@/chats/composer/skills/skills_bottom_bar_chip';
 import { SystemPromptBottomBarChip } from '@/chats/composer/systemprompts/system_prompt_bottom_bar_chip';
 import type { ComposerSystemPromptController } from '@/chats/composer/systemprompts/use_composer_system_prompt';
-import {
-	PromptTemplateBottomBarChip,
-	type PromptTemplateInsertArgs,
-} from '@/chats/composer/templates/prompt_template_bottom_bar_chip';
+import type { PromptTemplateInsertArgs } from '@/chats/composer/templates/prompt_template_bottom_bar_chip';
+import { PromptTemplateBottomBarChip } from '@/chats/composer/templates/prompt_template_bottom_bar_chip';
 import { ToolsBottomBarChip } from '@/chats/composer/tools/tools_bottom_bar_chip';
-import { type WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
+import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
 import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
 
 interface EditorBottomBarProps {

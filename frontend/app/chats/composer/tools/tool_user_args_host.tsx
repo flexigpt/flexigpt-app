@@ -1,4 +1,5 @@
-import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import type { Tool, ToolArgsTarget } from '@/spec/tool';
 
@@ -8,7 +9,7 @@ import { toolStoreAPI } from '@/apis/baseapi';
 
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import { ToolUserArgsModal } from '@/chats/composer/tools/tool_user_args_modal';
-import { type WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
+import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
 import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
 import { computeToolUserArgsStatus } from '@/tools/lib/tool_userargs_utils';
 

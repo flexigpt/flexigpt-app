@@ -1,4 +1,5 @@
-import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useRef } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useCallback, useRef } from 'react';
 
 type BoolOrGetter = boolean | (() => boolean);
 const resolveBool = (v: BoolOrGetter) => (typeof v === 'function' ? v() : v);

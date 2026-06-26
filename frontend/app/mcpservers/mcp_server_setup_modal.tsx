@@ -1,15 +1,12 @@
-import { type SubmitEventHandler, useEffect, useMemo, useRef, useState } from 'react';
+import type { SubmitEventHandler } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiX } from 'react-icons/fi';
 
-import {
-	type MCPServerConfig,
-	type MCPServerSetupInput,
-	MCPServerSetupInputKind,
-	type MCPServerSetupInputValue,
-} from '@/spec/mcp';
+import type { MCPServerConfig, MCPServerSetupInput, MCPServerSetupInputValue } from '@/spec/mcp';
+import { MCPServerSetupInputKind } from '@/spec/mcp';
 
 import { ModalBackdrop } from '@/components/modal_backdrop';
 

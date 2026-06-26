@@ -1,4 +1,4 @@
-import { type CacheControl, type CacheControlKind, type CacheControlTTL } from '@/spec/inference';
+import type { CacheControl, CacheControlKind, CacheControlTTL } from '@/spec/inference';
 
 import { CACHE_CONTROL_KIND_LABELS, CACHE_CONTROL_TTL_LABELS } from '@/modelpresets/lib/capabilities_override';
 

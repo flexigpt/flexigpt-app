@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
-import mermaid, { type MermaidConfig } from 'mermaid';
+import type { MermaidConfig } from 'mermaid';
+import mermaid from 'mermaid';
 
 import { ALL_DARK_THEMES } from '@/spec/theme_consts';
 

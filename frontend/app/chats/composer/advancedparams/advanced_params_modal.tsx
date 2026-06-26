@@ -1,36 +1,23 @@
-import {
-	type Dispatch,
-	type SetStateAction,
-	type SubmitEventHandler,
-	useCallback,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from 'react';
+import type { Dispatch, SetStateAction, SubmitEventHandler } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiHelpCircle, FiX } from 'react-icons/fi';
 
-import {
-	type CacheControlKind,
-	type JSONSchemaParam,
-	OutputFormatKind,
-	type OutputParam,
-	ReasoningSummaryStyle,
-} from '@/spec/inference';
+import type { CacheControlKind, JSONSchemaParam, OutputParam } from '@/spec/inference';
+import { OutputFormatKind, ReasoningSummaryStyle } from '@/spec/inference';
 import type { UIChatOption } from '@/spec/modelpreset';
 
 import { focusTextInputAtEnd } from '@/lib/focus_input';
 
 import { Dropdown } from '@/components/dropdown';
 
+import type { CacheControlTTLSelection } from '@/modelpresets/lib/cache_control_utils';
 import {
 	buildCacheControlFromForm,
 	buildCacheControlKindDropdownItems,
 	buildCacheControlTTLDropdownItems,
-	type CacheControlTTLSelection,
 	getInitialCacheControlKind,
 	getInitialCacheControlTTLSelection,
 	resolveSupportedCacheControlKinds,

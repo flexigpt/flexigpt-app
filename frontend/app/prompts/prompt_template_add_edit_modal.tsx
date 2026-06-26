@@ -1,27 +1,24 @@
-import { type ChangeEvent, type SubmitEventHandler, useEffect, useMemo, useRef, useState } from 'react';
+import type { ChangeEvent, SubmitEventHandler } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiHelpCircle, FiPlus, FiTrash2, FiUpload, FiX } from 'react-icons/fi';
 
-import {
-	type MessageBlock,
-	PromptRoleEnum,
-	type PromptTemplate,
-	type PromptVariable,
-	VarSource,
-	VarType,
-} from '@/spec/prompt';
+import type { MessageBlock, PromptTemplate, PromptVariable } from '@/spec/prompt';
+import { PromptRoleEnum, VarSource, VarType } from '@/spec/prompt';
 
 import { omitManyKeys } from '@/lib/obj_utils';
 import { validateSlug, validateTags } from '@/lib/text_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 import { DEFAULT_SEMVER, isSemverVersion, suggestNextMinorVersion } from '@/lib/version_utils';
 
-import { Dropdown, type DropdownItem } from '@/components/dropdown';
+import type { DropdownItem } from '@/components/dropdown';
+import { Dropdown } from '@/components/dropdown';
 import { ModalBackdrop } from '@/components/modal_backdrop';
 import { ReadOnlyValue } from '@/components/read_only_value';
 
+import type { PromptTemplateUpsertInput } from '@/prompts/lib/prompt_template_utils';
 import {
 	cloneVariable,
 	derivePromptTemplateKind,
@@ -29,7 +26,6 @@ import {
 	extractPromptTemplatePlaceholders,
 	getPromptTemplateKindLabel,
 	getPromptTemplateResolutionLabel,
-	type PromptTemplateUpsertInput,
 	validatePromptVariableName,
 } from '@/prompts/lib/prompt_template_utils';
 

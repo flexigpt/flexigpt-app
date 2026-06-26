@@ -1,24 +1,18 @@
-import {
-	type ClipboardEvent as ReactClipboardEvent,
-	type RefObject,
-	useCallback,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from 'react';
+import type { ClipboardEvent as ReactClipboardEvent, RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { type Value } from 'platejs';
-import { type PlateEditor, usePlateEditor } from 'platejs/react';
+import type { Value } from 'platejs';
+import type { PlateEditor } from 'platejs/react';
+import { usePlateEditor } from 'platejs/react';
 
 import { compareEntryByPathDeepestFirst } from '@/lib/path_utils';
 import { cssEscape } from '@/lib/text_utils';
 
+import type { ComposerDocumentSelectionInfo } from '@/chats/composer/platedoc/platedoc_utils';
 import {
 	buildSingleParagraphValue,
 	buildSingleParagraphValueChunked,
 	clearAllMarks,
-	type ComposerDocumentSelectionInfo,
 	createEmptyEditorValue,
 	hasNonEmptyUserText,
 	insertPlainTextAsSingleBlock,
@@ -36,7 +30,8 @@ import {
 	getTemplateNodesWithPath,
 	getUserBlocksContent,
 } from '@/chats/composer/platedoc/template_document_ops';
-import { type AttachedToolEntry, getAttachedToolEntries } from '@/chats/composer/platedoc/tool_document_ops';
+import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
+import { getAttachedToolEntries } from '@/chats/composer/platedoc/tool_document_ops';
 
 type ReplaceEditorDocumentFocusMode = 'none' | 'preserve' | 'end';
 

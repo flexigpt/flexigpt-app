@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
-import { type PromptTemplate, PromptTemplateKind, type PromptTemplateListItem } from '@/spec/prompt';
+import type { PromptTemplate, PromptTemplateListItem } from '@/spec/prompt';
+import { PromptTemplateKind } from '@/spec/prompt';
 
 import { promptStoreAPI } from '@/apis/baseapi';
 import { getAllPromptTemplates } from '@/apis/list_helper';

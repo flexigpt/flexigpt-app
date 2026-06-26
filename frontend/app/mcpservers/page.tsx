@@ -2,18 +2,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { FiPlus, FiSettings } from 'react-icons/fi';
 
-import {
-	BaseMCPBundleID,
-	type MCPAuthHealth,
-	MCPAuthHealthState,
-	type MCPBundle,
-	MCPSecretKind,
-	type MCPServerConfig,
-	type MCPServerRuntimeSnapshot,
-	type MCPServerSetupInputValue,
-	type MCPSettingsView,
-	type PutMCPServerPayload,
+import type {
+	MCPAuthHealth,
+	MCPBundle,
+	MCPServerConfig,
+	MCPServerRuntimeSnapshot,
+	MCPServerSetupInputValue,
+	MCPSettingsView,
+	PutMCPServerPayload,
 } from '@/spec/mcp';
+import { BaseMCPBundleID, MCPAuthHealthState, MCPSecretKind } from '@/spec/mcp';
 
 import { omitManyKeys } from '@/lib/obj_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';

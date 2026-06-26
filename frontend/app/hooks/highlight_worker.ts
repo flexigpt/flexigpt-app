@@ -1,5 +1,6 @@
 /// <reference lib="webworker" />
-import { bundledLanguages, createHighlighter, type Highlighter } from 'shiki';
+import { bundledLanguages, createHighlighter } from 'shiki';
+import type { Highlighter } from 'shiki';
 
 interface Request {
 	id: number;

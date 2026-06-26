@@ -8,11 +8,12 @@ import { FiAlertCircle, FiHelpCircle, FiX } from 'react-icons/fi';
 import type { Path } from 'platejs';
 import type { PlateEditor } from 'platejs/react';
 
-import { type PromptVariable, VarSource, VarType } from '@/spec/prompt';
+import type { PromptVariable } from '@/spec/prompt';
+import { VarSource, VarType } from '@/spec/prompt';
 
 import { focusTextInputAtEnd } from '@/lib/focus_input';
 
-import { type TemplateSelectionElementNode } from '@/chats/composer/platedoc/nodes';
+import type { TemplateSelectionElementNode } from '@/chats/composer/platedoc/nodes';
 import { computeEffectiveTemplate } from '@/chats/composer/platedoc/template_document_ops';
 import { EnumDropdownInline } from '@/chats/composer/templates/template_variable_enum_dropdown';
 import { dispatchTemplateVarsUpdated } from '@/chats/composer/templates/use_template_toolbar_vars_updated_event';

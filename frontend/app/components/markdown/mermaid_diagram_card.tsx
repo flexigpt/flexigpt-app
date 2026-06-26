@@ -1,8 +1,9 @@
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { FiMoon, FiSun } from 'react-icons/fi';
 
-import { type MermaidConfig } from 'mermaid';
+import type { MermaidConfig } from 'mermaid';
 
 import { Base64EncodeUTF8 } from '@/lib/encode_decode';
 import { getUUIDv7 } from '@/lib/uuid_utils';

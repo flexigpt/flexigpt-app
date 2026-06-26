@@ -1,16 +1,9 @@
-import { type RefObject, useCallback } from 'react';
+import type { RefObject } from 'react';
+import { useCallback } from 'react';
 
 import type { Conversation, ConversationMessage } from '@/spec/conversation';
-import {
-	ContentItemKind,
-	type InferenceError,
-	type ModelParam,
-	OutputKind,
-	type OutputUnion,
-	RoleEnum,
-	Status,
-	type UIToolCall,
-} from '@/spec/inference';
+import type { InferenceError, ModelParam, OutputUnion, UIToolCall } from '@/spec/inference';
+import { ContentItemKind, OutputKind, RoleEnum, Status } from '@/spec/inference';
 import type { ModelPresetRef, UIChatOption } from '@/spec/modelpreset';
 import type { ToolStoreChoice } from '@/spec/tool';
 

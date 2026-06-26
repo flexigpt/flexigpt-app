@@ -1,4 +1,5 @@
-import { defineConfig, type DummyRuleMap, type OxlintConfig } from 'oxlint';
+import type { DummyRuleMap, OxlintConfig } from 'oxlint';
+import { defineConfig } from 'oxlint';
 
 // oxlint-disable-next-line no-restricted-imports import/no-relative-parent-imports
 import baseConfig from '../.oxlintrc.json' with { type: 'json' };
@@ -172,13 +173,12 @@ const tsRules: DummyRuleMap = {
 	'typescript/restrict-template-expressions': 'off',
 
 	// Restriction. Default On.
-	'typescript/promise-function-async': 'off',
 	'typescript/explicit-function-return-type': 'off',
+	'typescript/explicit-member-accessibility': 'off',
 	'typescript/explicit-module-boundary-types': 'off',
 	'typescript/non-nullable-type-assertion-style': 'off',
 	'typescript/no-explicit-any': 'off',
-	'typescript/explicit-member-accessibility': 'off',
-	'typescript/no-import-type-side-effects': 'off',
+	'typescript/promise-function-async': 'off',
 
 	// Suspicious. Default on.
 	'typescript/no-unsafe-type-assertion': 'off',
@@ -191,14 +191,6 @@ const tsRules: DummyRuleMap = {
 			minimumDescriptionLength: 10,
 		},
 	],
-	'typescript/switch-exhaustiveness-check': 'off',
-	'typescript/no-misused-promises': 'off',
-	'typescript/no-unsafe-argument': 'off',
-	'typescript/no-unsafe-assignment': 'off',
-	'typescript/no-unsafe-call': 'off',
-	'typescript/prefer-readonly-parameter-types': 'off',
-	'typescript/prefer-nullish-coalescing': 'off',
-	'typescript/prefer-promise-reject-errors': 'off',
 	'typescript/restrict-plus-operands': [
 		'error',
 		{
@@ -210,6 +202,15 @@ const tsRules: DummyRuleMap = {
 		},
 	],
 	'typescript/return-await': ['error', 'error-handling-correctness-only'],
+	'typescript/switch-exhaustiveness-check': 'off',
+
+	'typescript/no-misused-promises': 'off',
+	'typescript/no-unsafe-argument': 'off',
+	'typescript/no-unsafe-assignment': 'off',
+	'typescript/no-unsafe-call': 'off',
+	'typescript/prefer-readonly-parameter-types': 'off',
+	'typescript/prefer-nullish-coalescing': 'off',
+	'typescript/prefer-promise-reject-errors': 'off',
 	'typescript/require-await': 'off',
 	'typescript/strict-void-return': 'off',
 	'typescript/strict-boolean-expressions': 'off',
@@ -261,8 +262,8 @@ const importRules: DummyRuleMap = {
 	'import/no-mutable-exports': 'error',
 	'import/no-namespace': 'error',
 	'import/no-nodejs-modules': ['error', { allow: ['path', 'node:path'] }],
+	'import/consistent-type-specifier-style': ['error', 'prefer-top-level'],
 
-	'import/consistent-type-specifier-style': 'off',
 	'import/exports-last': 'off',
 	'import/group-exports': 'off',
 	'import/no-anonymous-default-export': 'off',

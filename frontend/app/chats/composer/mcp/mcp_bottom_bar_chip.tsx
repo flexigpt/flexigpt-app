@@ -1,4 +1,5 @@
-import { type MouseEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import {
 	FiCheck,
@@ -12,36 +13,33 @@ import {
 	FiX,
 } from 'react-icons/fi';
 
-import { Menu, MenuButton, type MenuStore, useMenuStore, useStoreState } from '@ariakit/react';
+import type { MenuStore } from '@ariakit/react';
+import { Menu, MenuButton, useMenuStore, useStoreState } from '@ariakit/react';
 import { Link } from 'react-router';
 
-import {
-	MCPAuthHealthState,
-	type MCPPromptRef,
-	type MCPPromptSelection,
-	MCPRefType,
-	type MCPResourceRef,
-	type MCPResourceTemplateRef,
-	type MCPResourceTemplateSelection,
-	MCPServerStatus,
-	type MCPToolCapability,
-	MCPToolExposure,
+import type {
+	MCPPromptRef,
+	MCPPromptSelection,
+	MCPResourceRef,
+	MCPResourceTemplateRef,
+	MCPResourceTemplateSelection,
+	MCPToolCapability,
 } from '@/spec/mcp';
+import { MCPAuthHealthState, MCPRefType, MCPServerStatus, MCPToolExposure } from '@/spec/mcp';
 
 import { mcpAPI } from '@/apis/baseapi';
 
 import { ActionTriggerChipContent, actionTriggerChipSurfaceClasses } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 
+import type { MCPComposerServerOption, UseComposerMCPResult } from '@/chats/composer/mcp/mcp_composer_types';
 import {
-	type MCPComposerServerOption,
 	mcpPromptKey,
 	mcpResourceKey,
 	mcpResourceTemplateKey,
 	mcpServerKey,
 	mcpToolKey,
 	normalizeMCPArgumentDefinitions,
-	type UseComposerMCPResult,
 } from '@/chats/composer/mcp/mcp_composer_types';
 import { optionKey } from '@/chats/composer/mcp/use_composer_mcp';
 import {

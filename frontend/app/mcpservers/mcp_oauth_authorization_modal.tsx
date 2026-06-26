@@ -4,7 +4,8 @@ import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiExternalLink, FiX } from 'react-icons/fi';
 
-import { type MCPAuthHealth, MCPAuthHealthState, type MCPServerConfig } from '@/spec/mcp';
+import { MCPAuthHealthState } from '@/spec/mcp';
+import type { MCPAuthHealth, MCPServerConfig } from '@/spec/mcp';
 
 import { ModalBackdrop } from '@/components/modal_backdrop';
 

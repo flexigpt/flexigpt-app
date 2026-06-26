@@ -1,10 +1,11 @@
-import { forwardRef, type RefObject, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import type { RefObject } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { RestorableConversationContext } from '@/spec/conversation';
 import type { UIToolCall } from '@/spec/inference';
 import type { MCPAppModelContextUpdate } from '@/spec/mcp';
-import { type UIChatOption } from '@/spec/modelpreset';
+import type { UIChatOption } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
 
@@ -12,17 +13,20 @@ import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 
+import type {
+	AssistantPresetPreparedApplication,
+	AssistantPresetRuntimeSnapshot,
+} from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import {
 	areAssistantRuntimeSnapshotsEqual,
-	type AssistantPresetPreparedApplication,
-	type AssistantPresetRuntimeSnapshot,
 	buildAssistantPresetIdentityKey,
 	EMPTY_ASSISTANT_PRESET_RUNTIME_SNAPSHOT,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import { useAssistantPresetManager } from '@/chats/composer/assistantpresets/use_assistant_preset_manager';
 import { EditorContextBar } from '@/chats/composer/contextarea/context_bar';
 import { useAssistantContextState } from '@/chats/composer/contextarea/use_context_state';
-import { EditorArea, type EditorAreaHandle } from '@/chats/composer/editor/editor_area';
+import type { EditorAreaHandle } from '@/chats/composer/editor/editor_area';
+import { EditorArea } from '@/chats/composer/editor/editor_area';
 import type {
 	AssistantTurnFinishedPayload,
 	EditorExternalMessage,

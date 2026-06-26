@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { FiAlertTriangle } from 'react-icons/fi';
 
-import { type MCPAppModelContextUpdate, type MCPAppsPolicy, type MCPContent, MCPContentType } from '@/spec/mcp';
+import type { MCPAppModelContextUpdate, MCPAppsPolicy, MCPContent } from '@/spec/mcp';
+import { MCPContentType } from '@/spec/mcp';
 
 import { isJSONObject } from '@/lib/jsonschema_utils';
 
@@ -12,23 +13,16 @@ import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 
 import { MCPApprovalModal } from '@/chats/composer/mcp/mcp_approval_modal';
-import {
-	buildMCPAppAllowAttribute,
-	buildMCPAppCSP,
-	getMCPAppUIResourceMeta,
-	type MCPAppUIResourceMeta,
-} from '@/chats/composer/mcp/mcp_apps_csp';
+import type { MCPAppUIResourceMeta } from '@/chats/composer/mcp/mcp_apps_csp';
+import { buildMCPAppAllowAttribute, buildMCPAppCSP, getMCPAppUIResourceMeta } from '@/chats/composer/mcp/mcp_apps_csp';
 import { useMCPApproval } from '@/chats/composer/mcp/use_mcp_approval';
-import {
-	dispatchMCPAppModelContextUpdate,
-	dispatchMCPAppUIMessage,
-	type MCPAppUIMessage,
-} from '@/chats/mcpapps/mcp_app_events';
+import type { MCPAppUIMessage } from '@/chats/mcpapps/mcp_app_events';
+import { dispatchMCPAppModelContextUpdate, dispatchMCPAppUIMessage } from '@/chats/mcpapps/mcp_app_events';
 import { buildMCPAppHostContext } from '@/chats/mcpapps/mcp_app_host_context';
 import { MCPAppPostMessageBridge } from '@/chats/mcpapps/mcp_app_postmessage_bridge';
 import { MCPAppRPCRouter } from '@/chats/mcpapps/mcp_app_rpc_router';
 import { MCPAppSandbox } from '@/chats/mcpapps/mcp_app_sandbox';
-import { type JSONRPCResponse, type MCPAppInstance } from '@/chats/mcpapps/mcp_app_types';
+import type { JSONRPCResponse, MCPAppInstance } from '@/chats/mcpapps/mcp_app_types';
 
 const APP_MIME = 'text/html;profile=mcp-app';
 const UNKNOWN_APP_POLICY: MCPAppsPolicy = {

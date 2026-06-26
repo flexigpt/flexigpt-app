@@ -2,7 +2,7 @@ import { FiChevronRight, FiServer } from 'react-icons/fi';
 
 import { Menu, MenuButton, useMenuStore } from '@ariakit/react';
 
-import { type MCPConversationContext } from '@/spec/mcp';
+import type { MCPConversationContext } from '@/spec/mcp';
 
 import { toolExposureLabel } from '@/chats/messages/mcp_message_context_utils';
 

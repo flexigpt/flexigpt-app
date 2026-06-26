@@ -1,10 +1,12 @@
-import { type ChangeEvent, type SubmitEventHandler, useEffect, useMemo, useRef, useState } from 'react';
+import type { ChangeEvent, SubmitEventHandler } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiAlertTriangle, FiHelpCircle, FiUpload, FiX } from 'react-icons/fi';
 
-import { HTTPBodyOutputMode, type Tool, ToolImplType } from '@/spec/tool';
+import type { Tool } from '@/spec/tool';
+import { HTTPBodyOutputMode, ToolImplType } from '@/spec/tool';
 
 import type { JSONSchema } from '@/lib/jsonschema_utils';
 import { omitManyKeys } from '@/lib/obj_utils';

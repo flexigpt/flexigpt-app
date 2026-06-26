@@ -1,4 +1,5 @@
-import { type SyntheticEvent, useRef, useState } from 'react';
+import type { SyntheticEvent } from 'react';
+import { useRef, useState } from 'react';
 
 import { FiCheck, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 

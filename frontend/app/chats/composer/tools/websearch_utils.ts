@@ -1,5 +1,6 @@
 import type { ProviderSDKType } from '@/spec/inference';
-import { ToolImplType, type ToolListItem, type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
+import type { ToolListItem, ToolStoreChoice } from '@/spec/tool';
+import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
 import { getUUIDv7 } from '@/lib/uuid_utils';
 

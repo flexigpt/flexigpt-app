@@ -4,35 +4,31 @@ import { createPortal } from 'react-dom';
 
 import { FiChevronRight, FiGitPullRequest, FiX } from 'react-icons/fi';
 
-import {
-	type ApplyUnifiedDiffDiagnostic,
-	ApplyUnifiedDiffDiagnosticLevel,
-	type ApplyUnifiedDiffFileTarget,
-	type ApplyUnifiedDiffOut,
-	ApplyUnifiedDiffStatus,
-} from '@/spec/unified_diff';
+import type { ApplyUnifiedDiffDiagnostic, ApplyUnifiedDiffFileTarget, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
+import { ApplyUnifiedDiffDiagnosticLevel, ApplyUnifiedDiffStatus } from '@/spec/unified_diff';
 
+import type { DiagnosticSeverityCounts, HeaderButtonTone } from '@/components/markdown/diff_diagnostic';
 import {
 	collectFileLevelDiagnostics,
 	collectPatchLevelDiagnostics,
-	type DiagnosticSeverityCounts,
 	formatDiagnosticsTitle,
 	getDiagnosticSeverityCounts,
 	getDiagnosticToneFromCounts,
-	type HeaderButtonTone,
 	renderDiagnosticSeveritySummary,
 	renderDiagnosticsPanel,
 	uniqueDiagnostics,
 } from '@/components/markdown/diff_diagnostic';
+import type {
+	DiffApplyRunOptions,
+	EditableUnifiedDiffTarget,
+	parseUnifiedDiffForUI,
+} from '@/components/markdown/unified_diff_block';
 import {
 	buildEditableTargetsFromOutput,
 	buildFileStatusCounts,
-	type DiffApplyRunOptions,
-	type EditableUnifiedDiffTarget,
 	getPathIdentity,
 	haveSharedPathIdentity,
 	mergeNumberMax,
-	type parseUnifiedDiffForUI,
 	summaryLabel,
 	uniqueStrings,
 } from '@/components/markdown/unified_diff_block';

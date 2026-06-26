@@ -3,13 +3,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FiPlus } from 'react-icons/fi';
 
 import type { ProviderName } from '@/spec/inference';
-import {
-	type ModelPresetID,
-	type PatchModelPresetPayload,
-	type PatchProviderPresetPayload,
-	type PostModelPresetPayload,
-	type PostProviderPresetPayload,
-	type ProviderPreset,
+import type {
+	ModelPresetID,
+	PatchModelPresetPayload,
+	PatchProviderPresetPayload,
+	PostModelPresetPayload,
+	PostProviderPresetPayload,
+	ProviderPreset,
 } from '@/spec/modelpreset';
 import type { AuthKeyMeta } from '@/spec/setting';
 import { AuthKeyTypeProvider } from '@/spec/setting';
@@ -19,7 +19,8 @@ import { getAllProviderPresetsMap } from '@/apis/list_helper';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DownloadButton } from '@/components/download_button';
-import { Dropdown, type DropdownItem } from '@/components/dropdown';
+import type { DropdownItem } from '@/components/dropdown';
+import { Dropdown } from '@/components/dropdown';
 import { Loader } from '@/components/loader';
 import { PageFrame } from '@/components/page_frame';
 

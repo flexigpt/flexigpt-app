@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 
-import { type AppTheme, ThemeType } from '@/spec/setting';
+import type { AppTheme } from '@/spec/setting';
+import { ThemeType } from '@/spec/setting';
 
 import { settingstoreAPI } from '@/apis/baseapi';
 

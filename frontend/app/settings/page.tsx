@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { FiPlus } from 'react-icons/fi';
 
-import { type AuthKeyMeta, type DebugSettings } from '@/spec/setting';
+import type { AuthKeyMeta, DebugSettings } from '@/spec/setting';
 
 import { settingstoreAPI } from '@/apis/baseapi';
 

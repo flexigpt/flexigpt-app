@@ -17,12 +17,8 @@ import { useInputRegistry } from '@/chats/conversation/use_input_registry';
 import { useScrollRestore } from '@/chats/conversation/use_scroll_restore';
 import { useSendMessage } from '@/chats/conversation/use_send_message';
 import { useStreamingRuntime } from '@/chats/conversation/use_streaming_runtime';
-import {
-	MCP_APP_MODEL_CONTEXT_UPDATE_EVENT,
-	MCP_APP_UI_MESSAGE_EVENT,
-	type MCPAppModelContextUpdateEventDetail,
-	type MCPAppUIMessageEventDetail,
-} from '@/chats/mcpapps/mcp_app_events';
+import type { MCPAppModelContextUpdateEventDetail, MCPAppUIMessageEventDetail } from '@/chats/mcpapps/mcp_app_events';
+import { MCP_APP_MODEL_CONTEXT_UPDATE_EVENT, MCP_APP_UI_MESSAGE_EVENT } from '@/chats/mcpapps/mcp_app_events';
 import { ChatMessage } from '@/chats/messages/message';
 import type { ChatTabState } from '@/chats/tabs/tabs_model';
 

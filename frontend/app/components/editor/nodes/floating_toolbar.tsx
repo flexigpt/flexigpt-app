@@ -1,12 +1,7 @@
 import type { ComponentProps } from 'react';
 
-import {
-	flip,
-	type FloatingToolbarState,
-	offset,
-	useFloatingToolbar,
-	useFloatingToolbarState,
-} from '@platejs/floating';
+import type { FloatingToolbarState } from '@platejs/floating';
+import { flip, offset, useFloatingToolbar, useFloatingToolbarState } from '@platejs/floating';
 import { cn, useComposedRef } from '@udecode/cn';
 import { KEYS } from 'platejs';
 import { useEditorId, useEventEditorValue, usePluginOption } from 'platejs/react';

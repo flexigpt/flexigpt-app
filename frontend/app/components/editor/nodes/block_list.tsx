@@ -4,7 +4,8 @@ import type { FC } from 'react';
 import { isOrderedList } from '@platejs/list';
 import { useTodoListElement, useTodoListElementState } from '@platejs/list/react';
 import type { TListElement } from 'platejs';
-import { type PlateElementProps, type RenderNodeWrapper, useReadOnly } from 'platejs/react';
+import type { PlateElementProps, RenderNodeWrapper } from 'platejs/react';
+import { useReadOnly } from 'platejs/react';
 
 // Tiny helper to merge class names (no external deps)
 function cx(...classes: Array<string | undefined | null | false>) {

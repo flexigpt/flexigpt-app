@@ -1,20 +1,12 @@
-import { ElementApi, NodeApi, type Path } from 'platejs';
+import type { Path } from 'platejs';
+import { ElementApi, NodeApi } from 'platejs';
 import type { PlateEditor } from 'platejs/react';
 
-import {
-	type MessageBlock,
-	PromptRoleEnum,
-	type PromptTemplate,
-	PromptTemplateKind,
-	type PromptVariable,
-} from '@/spec/prompt';
+import type { MessageBlock, PromptTemplate, PromptVariable } from '@/spec/prompt';
+import { PromptRoleEnum, PromptTemplateKind } from '@/spec/prompt';
 
-import {
-	KEY_TEMPLATE_SELECTION,
-	KEY_TEMPLATE_VARIABLE,
-	type TemplateSelectionElementNode,
-	type TemplateVariableElementNode,
-} from '@/chats/composer/platedoc/nodes';
+import type { TemplateSelectionElementNode, TemplateVariableElementNode } from '@/chats/composer/platedoc/nodes';
+import { KEY_TEMPLATE_SELECTION, KEY_TEMPLATE_VARIABLE } from '@/chats/composer/platedoc/nodes';
 import { computeTemplateVarRequirements, effectiveVarValueLocal } from '@/prompts/lib/prompt_template_var_utils';
 
 const TEMPLATE_PLACEHOLDER_RE = /\{\{([a-zA-Z_][a-zA-Z0-9_-]*)\}\}/g;

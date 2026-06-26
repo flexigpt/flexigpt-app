@@ -1,6 +1,8 @@
-import { type ProviderName } from '@/spec/inference';
-import { DefaultUIChatOptions, type UIChatOption } from '@/spec/modelpreset';
-import { AuthKeyTypeProvider, type SettingsSchema } from '@/spec/setting';
+import type { ProviderName } from '@/spec/inference';
+import type { UIChatOption } from '@/spec/modelpreset';
+import { DefaultUIChatOptions } from '@/spec/modelpreset';
+import type { SettingsSchema } from '@/spec/setting';
+import { AuthKeyTypeProvider } from '@/spec/setting';
 
 import { modelPresetStoreAPI, settingstoreAPI } from '@/apis/baseapi';
 import { getAllProviderPresetsMap } from '@/apis/list_helper';

@@ -1,4 +1,5 @@
-import { type SetStateAction, useCallback, useRef, useState } from 'react';
+import type { SetStateAction } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import type {
 	Attachment,
@@ -14,10 +15,10 @@ import { resolveStateUpdate } from '@/lib/hook_utils';
 
 import { backendAPI } from '@/apis/baseapi';
 
+import type { DirectoryAttachmentGroup } from '@/chats/composer/attachments/attachment_editor_utils';
 import {
 	buildUIAttachmentForLocalPath,
 	buildUIAttachmentForURL,
-	type DirectoryAttachmentGroup,
 	MAX_FILES_PER_DIRECTORY,
 	uiAttachmentKey,
 } from '@/chats/composer/attachments/attachment_editor_utils';

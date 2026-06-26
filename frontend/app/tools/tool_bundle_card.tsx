@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { FiCheck, FiChevronDown, FiChevronUp, FiEye, FiGitBranch, FiPlus, FiTrash2, FiX } from 'react-icons/fi';
 
-import { type Tool, type ToolBundle } from '@/spec/tool';
+import type { Tool, ToolBundle } from '@/spec/tool';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';

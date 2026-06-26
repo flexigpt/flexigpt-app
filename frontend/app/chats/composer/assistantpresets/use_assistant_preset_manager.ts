@@ -6,11 +6,13 @@ import {
 	BASE_ASSISTANT_PRESET_VERSION,
 } from '@/spec/assistantpreset';
 
+import type {
+	AssistantPresetModificationSummary,
+	AssistantPresetOptionItem,
+	AssistantPresetPreparedApplication,
+	AssistantPresetRuntimeSnapshot,
+} from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import {
-	type AssistantPresetModificationSummary,
-	type AssistantPresetOptionItem,
-	type AssistantPresetPreparedApplication,
-	type AssistantPresetRuntimeSnapshot,
 	buildAssistantPresetModelComparisonState,
 	EMPTY_ASSISTANT_PRESET_MODIFICATION_SUMMARY,
 	findBaseAssistantPresetOption,

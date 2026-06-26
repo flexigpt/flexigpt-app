@@ -1,17 +1,17 @@
-import { type SubmitEventHandler, useEffect, useMemo, useRef, useState } from 'react';
+import type { SubmitEventHandler } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiRefreshCcw, FiTool, FiX } from 'react-icons/fi';
 
 import { focusTextInputAtEnd } from '@/lib/focus_input';
+import type { JSONObject, JSONSchema } from '@/lib/jsonschema_utils';
 import {
 	buildExampleFromDraft7Schema,
 	getJSONObject,
 	getPropertiesFromJSONSchema,
 	getRequiredFromJSONSchema,
-	type JSONObject,
-	type JSONSchema,
 } from '@/lib/jsonschema_utils';
 
 import { ModalBackdrop } from '@/components/modal_backdrop';

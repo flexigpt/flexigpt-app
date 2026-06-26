@@ -2,7 +2,8 @@ import { FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
-import { AttachmentContentBlockMode, type UIAttachment } from '@/spec/attachment';
+import type { UIAttachment } from '@/spec/attachment';
+import { AttachmentContentBlockMode } from '@/spec/attachment';
 
 import {
 	getAttachmentContentBlockModeLabel,

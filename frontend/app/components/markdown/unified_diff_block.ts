@@ -1,4 +1,5 @@
-import { type ApplyUnifiedDiffDiagnostic, type ApplyUnifiedDiffOut, ApplyUnifiedDiffStatus } from '@/spec/unified_diff';
+import type { ApplyUnifiedDiffDiagnostic, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
+import { ApplyUnifiedDiffStatus } from '@/spec/unified_diff';
 
 import { uniqueDiagnostics } from '@/components/markdown/diff_diagnostic';
 

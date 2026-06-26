@@ -1,12 +1,10 @@
-import {
-	type InvokeMCPToolRequestBody,
-	type InvokeMCPToolResponseBody,
-	type MCPAppModelContextUpdate,
-	MCPApprovalDecision,
-	MCPApprovalResolution,
-	type MCPContent,
-	MCPInvocationSource,
+import type {
+	InvokeMCPToolRequestBody,
+	InvokeMCPToolResponseBody,
+	MCPAppModelContextUpdate,
+	MCPContent,
 } from '@/spec/mcp';
+import { MCPApprovalDecision, MCPApprovalResolution, MCPInvocationSource } from '@/spec/mcp';
 
 import { isJSONObject } from '@/lib/jsonschema_utils';
 
@@ -14,13 +12,11 @@ import { mcpAPI } from '@/apis/baseapi';
 
 import type { MCPApprovalRequest } from '@/chats/composer/mcp/use_mcp_approval';
 import type { MCPAppUIMessage } from '@/chats/mcpapps/mcp_app_events';
+import type { JSONRPCRequest, JSONRPCResponse, MCPAppInstance } from '@/chats/mcpapps/mcp_app_types';
 import {
 	JSONRPC_ERR_BLOCKED_BY_POLICY,
 	JSONRPC_ERR_INVALID_PARAMS,
 	JSONRPC_ERR_METHOD_NOT_FOUND,
-	type JSONRPCRequest,
-	type JSONRPCResponse,
-	type MCPAppInstance,
 } from '@/chats/mcpapps/mcp_app_types';
 
 function errorResp(id: JSONRPCRequest['id'], code: number, message: string): JSONRPCResponse {

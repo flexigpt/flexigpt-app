@@ -14,7 +14,8 @@ import {
 	FiXCircle,
 } from 'react-icons/fi';
 
-import { type ProviderName, SDK_DISPLAY_NAME } from '@/spec/inference';
+import type { ProviderName } from '@/spec/inference';
+import { SDK_DISPLAY_NAME } from '@/spec/inference';
 import type {
 	ModelPreset,
 	ModelPresetID,

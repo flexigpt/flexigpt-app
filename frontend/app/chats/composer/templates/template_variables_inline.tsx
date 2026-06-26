@@ -1,8 +1,10 @@
-import { type KeyboardEvent, type MouseEvent, useMemo, useState } from 'react';
+import type { KeyboardEvent, MouseEvent } from 'react';
+import { useMemo, useState } from 'react';
 
 import { FiEdit2 } from 'react-icons/fi';
 
-import { NodeApi, type Path } from 'platejs';
+import type { Path } from 'platejs';
+import { NodeApi } from 'platejs';
 import type { PlateEditor, PlateElementProps } from 'platejs/react';
 
 import { VarType } from '@/spec/prompt';
@@ -10,11 +12,8 @@ import { VarType } from '@/spec/prompt';
 import { omitManyKeys } from '@/lib/obj_utils';
 import { cssEscape } from '@/lib/text_utils';
 
-import {
-	KEY_TEMPLATE_SELECTION,
-	type TemplateSelectionElementNode,
-	type TemplateVariableElementNode,
-} from '@/chats/composer/platedoc/nodes';
+import type { TemplateSelectionElementNode, TemplateVariableElementNode } from '@/chats/composer/platedoc/nodes';
+import { KEY_TEMPLATE_SELECTION } from '@/chats/composer/platedoc/nodes';
 import { computeEffectiveTemplate } from '@/chats/composer/platedoc/template_document_ops';
 import { EnumDropdownInline } from '@/chats/composer/templates/template_variable_enum_dropdown';
 import {

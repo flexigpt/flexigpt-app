@@ -4,7 +4,8 @@ import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiX } from 'react-icons/fi';
 
-import { MCPApprovalResolution, type MCPApprovalSummary } from '@/spec/mcp';
+import type { MCPApprovalSummary } from '@/spec/mcp';
+import { MCPApprovalResolution } from '@/spec/mcp';
 
 import { ModalBackdrop } from '@/components/modal_backdrop';
 

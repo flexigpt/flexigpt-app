@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { FiPlus } from 'react-icons/fi';
 
-import { type Tool, type ToolBundle, ToolImplType } from '@/spec/tool';
+import type { Tool, ToolBundle } from '@/spec/tool';
+import { ToolImplType } from '@/spec/tool';
 
 import { getUUIDv7 } from '@/lib/uuid_utils';
 

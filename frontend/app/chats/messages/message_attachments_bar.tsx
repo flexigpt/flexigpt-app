@@ -16,8 +16,10 @@ import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariaki
 import type { Attachment } from '@/spec/attachment';
 import { AttachmentContentBlockMode, AttachmentKind } from '@/spec/attachment';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
-import { type MCPAppModelContextUpdate, type MCPConversationContext, MCPExecutionMode } from '@/spec/mcp';
-import { type ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
+import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp';
+import { MCPExecutionMode } from '@/spec/mcp';
+import type { ToolStoreChoice } from '@/spec/tool';
+import { ToolStoreChoiceType } from '@/spec/tool';
 
 import { getAttachmentDisplayLabel } from '@/chats/composer/attachments/attachment_editor_utils';
 import {

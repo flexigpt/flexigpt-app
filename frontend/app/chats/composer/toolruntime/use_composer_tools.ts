@@ -1,4 +1,5 @@
-import { type Dispatch, type SetStateAction, useCallback } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
+import { useCallback } from 'react';
 
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { SkillRef } from '@/spec/skill';
@@ -7,10 +8,11 @@ import type { ToolStoreChoice } from '@/spec/tool';
 import type { RequestMCPApproval } from '@/chats/composer/mcp/use_mcp_approval';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import { useComposerToolConfig } from '@/chats/composer/toolruntime/use_composer_tool_config';
-import { type AutoExecState, useToolAutoExecDrainer } from '@/chats/composer/toolruntime/use_tool_auto_exec_drainer';
+import type { AutoExecState } from '@/chats/composer/toolruntime/use_tool_auto_exec_drainer';
+import { useToolAutoExecDrainer } from '@/chats/composer/toolruntime/use_tool_auto_exec_drainer';
 import type { ComposerToolRuntimeState } from '@/chats/composer/toolruntime/use_tool_runtime';
 import { useComposerToolRuntime } from '@/chats/composer/toolruntime/use_tool_runtime';
-import { type WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
+import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
 import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
 
 interface UseComposerToolsArgs {

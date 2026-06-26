@@ -5,7 +5,8 @@ import { FiUser, FiZap } from 'react-icons/fi';
 import type { ConversationMessage } from '@/spec/conversation';
 import { RoleEnum, Status } from '@/spec/inference';
 
-import { ToolDetailsModal, type ToolDetailsState } from '@/chats/composer/tools/tool_details_modal';
+import type { ToolDetailsState } from '@/chats/composer/tools/tool_details_modal';
+import { ToolDetailsModal } from '@/chats/composer/tools/tool_details_modal';
 import { buildAppInstanceFromToolOutput } from '@/chats/mcpapps/mcp_app_types';
 import { MCPAppView } from '@/chats/mcpapps/mcp_app_view';
 import {

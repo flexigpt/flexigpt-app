@@ -4,7 +4,8 @@ import type { UIChatOption } from '@/spec/modelpreset';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 
-import { ComposerBox, type ComposerBoxHandle } from '@/chats/composer/composer_box';
+import type { ComposerBoxHandle } from '@/chats/composer/composer_box';
+import { ComposerBox } from '@/chats/composer/composer_box';
 import type { EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
 
 export const TabInputPane = memo(function TabInputPane(props: {

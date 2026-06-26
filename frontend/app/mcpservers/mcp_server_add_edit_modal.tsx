@@ -1,26 +1,21 @@
-import { type ChangeEvent, type SubmitEventHandler, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ChangeEvent, SubmitEventHandler } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiHelpCircle, FiPlus, FiTrash2, FiUpload, FiX } from 'react-icons/fi';
 
-import {
-	MCPApprovalRule,
-	MCPExecutionMode,
-	MCPHTTPAuthMode,
-	type MCPServerConfig,
-	type MCPToolPolicyOverride,
-	MCPTransportType,
-	MCPTrustLevel,
-	type PutMCPServerPayload,
-} from '@/spec/mcp';
+import type { MCPServerConfig, MCPToolPolicyOverride, PutMCPServerPayload } from '@/spec/mcp';
+import { MCPApprovalRule, MCPExecutionMode, MCPHTTPAuthMode, MCPTransportType, MCPTrustLevel } from '@/spec/mcp';
 
 import { omitManyKeys } from '@/lib/obj_utils';
 import { validateSlug } from '@/lib/text_utils';
 
-import { Dropdown, type DropdownItem } from '@/components/dropdown';
+import type { DropdownItem } from '@/components/dropdown';
+import { Dropdown } from '@/components/dropdown';
 import { ModalBackdrop } from '@/components/modal_backdrop';
 
+import type { MCPServerUpsertInput } from '@/mcpservers/lib/mcp_server_utils';
 import {
 	getDefaultMCPAppsPolicy,
 	getDefaultMCPServerPolicy,
@@ -30,7 +25,6 @@ import {
 	getMCPTransportLabel,
 	getMCPTrustLevelLabel,
 	MCP_OAUTH_CLIENT_CREDENTIALS_SLOT,
-	type MCPServerUpsertInput,
 	parseMCPObjectJSON,
 	parseMCPStringRecordJSON,
 	stringifyMCPJSON,

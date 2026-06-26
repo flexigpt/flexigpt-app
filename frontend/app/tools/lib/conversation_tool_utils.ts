@@ -1,4 +1,5 @@
-import { type Tool, type ToolStoreChoice, ToolStoreChoiceType, type UIToolUserArgsStatus } from '@/spec/tool';
+import type { Tool, ToolStoreChoice, UIToolUserArgsStatus } from '@/spec/tool';
+import { ToolStoreChoiceType } from '@/spec/tool';
 
 import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 

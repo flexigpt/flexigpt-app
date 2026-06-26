@@ -4,7 +4,8 @@ import type { AttachmentContentBlockMode, UIAttachment } from '@/spec/attachment
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 
 import { DirectoryChip } from '@/chats/composer/attachments/attachment_directory_chip';
-import { type DirectoryAttachmentGroup, uiAttachmentKey } from '@/chats/composer/attachments/attachment_editor_utils';
+import type { DirectoryAttachmentGroup } from '@/chats/composer/attachments/attachment_editor_utils';
+import { uiAttachmentKey } from '@/chats/composer/attachments/attachment_editor_utils';
 import { StandaloneAttachmentsChip } from '@/chats/composer/attachments/attachment_standalone_chips';
 import { ToolChipsComposerRow } from '@/chats/composer/tools/tool_chips_composer';
 

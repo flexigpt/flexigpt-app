@@ -1,10 +1,7 @@
 import { FiAlertTriangle, FiChevronRight, FiInfo, FiX } from 'react-icons/fi';
 
-import {
-	type ApplyUnifiedDiffDiagnostic,
-	ApplyUnifiedDiffDiagnosticLevel,
-	type ApplyUnifiedDiffOut,
-} from '@/spec/unified_diff';
+import type { ApplyUnifiedDiffDiagnostic, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
+import { ApplyUnifiedDiffDiagnosticLevel } from '@/spec/unified_diff';
 
 export type HeaderButtonTone = 'neutral' | 'success' | 'warning' | 'error' | 'info';
 

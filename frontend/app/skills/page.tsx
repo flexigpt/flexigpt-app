@@ -14,7 +14,8 @@ import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal'
 import { Loader } from '@/components/loader';
 import { PageFrame } from '@/components/page_frame';
 
-import { type BundleData, sortBundleData } from '@/skills/lib/skill_bundle_utils';
+import type { BundleData } from '@/skills/lib/skill_bundle_utils';
+import { sortBundleData } from '@/skills/lib/skill_bundle_utils';
 import { AddSkillBundleModal } from '@/skills/skill_bundle_add_modal';
 import { SkillBundleCard } from '@/skills/skill_bundle_card';
 

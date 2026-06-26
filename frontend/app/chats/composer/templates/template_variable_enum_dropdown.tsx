@@ -1,15 +1,5 @@
-import {
-	type CSSProperties,
-	type KeyboardEvent as ReactKeyBoardEvent,
-	type SyntheticEvent,
-	useCallback,
-	useEffect,
-	useId,
-	useLayoutEffect,
-	useMemo,
-	useRef,
-	useState,
-} from 'react';
+import type { CSSProperties, KeyboardEvent as ReactKeyBoardEvent, SyntheticEvent } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 

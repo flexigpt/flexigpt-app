@@ -1,4 +1,5 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
 	isRouteErrorResponse,
@@ -11,7 +12,8 @@ import {
 	useNavigate,
 } from 'react-router';
 
-import { type AppTheme, ThemeType } from '@/spec/setting';
+import type { AppTheme } from '@/spec/setting';
+import { ThemeType } from '@/spec/setting';
 import { CustomThemeDark, CustomThemeLight } from '@/spec/theme_consts';
 
 import { IS_WAILS_PLATFORM } from '@/lib/features';

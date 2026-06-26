@@ -1,8 +1,10 @@
-import { memo, type RefObject, useEffect, useMemo } from 'react';
+import type { RefObject } from 'react';
+import { memo, useEffect, useMemo } from 'react';
 
 import { FiFilePlus } from 'react-icons/fi';
 
-import { Menu, MenuButton, MenuItem, type MenuStore, useStoreState } from '@ariakit/react';
+import type { MenuStore } from '@ariakit/react';
+import { Menu, MenuButton, MenuItem, useStoreState } from '@ariakit/react';
 
 import type { PromptTemplate, PromptTemplateListItem } from '@/spec/prompt';
 
