@@ -406,9 +406,9 @@ export function DiffApplyModal({
 			});
 		}
 
-		// eslint-disable-next-line react-hooks/set-state-in-effect, react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect, react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setLocalTargets(previous => mergeModalTargetsPreservingLocalEdits([...byKey.values()], previous));
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-derived-state
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-derived-state
 		setLocalStrict(strict);
 	}, [candidatePaths, fallbackParsed, fileTargets, isOpen, output, strict]);
 

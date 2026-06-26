@@ -43,9 +43,6 @@
 - [ ] Upgrade sequence:
   - [ ] task checkupgrade; go-mod-upgrade -v ; pnpm up -r
 
-- [ ] eslint 10: pending plugins support.
-  - [ ] monitor oxclint for a while. ecosystem seems weak as of now.
-
 ## Observations
 
 - openai tool loop

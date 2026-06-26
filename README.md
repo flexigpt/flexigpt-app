@@ -166,7 +166,7 @@ Architecture reference:
 - Official Go SDKs by [OpenAI](https://github.com/openai/openai-go), [Anthropic](https://github.com/anthropics/anthropic-sdk-go), and [Google GenAI](https://github.com/googleapis/go-genai).
 - [Vite](https://vite.dev/) and [React Router v7](https://reactrouter.com/) frontend in [TypeScript](https://www.typescriptlang.org/).
 - [DaisyUI](https://daisyui.com/) with [Tailwind CSS](https://tailwindcss.com/) for styling.
-- Tooling: [GolangCI-Lint](https://golangci-lint.run/), [Knip](https://knip.dev/), [ESLint](https://eslint.org/), [Prettier](https://prettier.io/), and [GitHub Actions](https://github.com/features/actions).
+- Tooling: [GolangCI-Lint](https://golangci-lint.run/), [Knip](https://knip.dev/), [OxLint](https://oxc.rs/docs/guide/usage/linter.html), [Prettier](https://prettier.io/), and [GitHub Actions](https://github.com/features/actions).
 
 ## Contributing
 

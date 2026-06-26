@@ -49,7 +49,7 @@ jobs:
         run: rm -f frontend/dist/client/.ci-placeholder
 
   node:
-    name: Node - knip / eslint
+    name: Node - knip / oxlint
     runs-on: ubuntu-latest
 
     steps:

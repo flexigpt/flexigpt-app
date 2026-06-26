@@ -294,7 +294,7 @@ export function ToolsBottomBarChip({
 			return;
 		}
 
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-pass-data-to-parent
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-pass-data-to-parent
 		setWebSearchTemplates(prev => {
 			if (prev.length === 0) {
 				return prev;
@@ -336,7 +336,7 @@ export function ToolsBottomBarChip({
 		Boolean(webSearchEnabled && activeWebSearchArgsStatus?.hasSchema && !activeWebSearchArgsStatus.isSatisfied);
 
 	useEffect(() => {
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-pass-data-to-parent
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-pass-data-to-parent
 		onWebSearchArgsBlockedChange?.(webSearchArgsBlocked);
 	}, [onWebSearchArgsBlockedChange, webSearchArgsBlocked]);
 

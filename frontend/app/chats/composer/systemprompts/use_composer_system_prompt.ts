@@ -133,9 +133,9 @@ export function useComposerSystemPrompt(args: {
 			return;
 		}
 		initializedFromModelRef.current = true;
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setInitializedFromModelState(true);
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setIncludeModelDefaultState(Boolean(modelDefaultPrompt.trim()));
 	}, [modelOptionsLoaded, modelDefaultPrompt]);
 

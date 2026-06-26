@@ -223,7 +223,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 	}, []);
 
 	useEffect(() => {
-		// eslint-disable-next-line react-hooks/set-state-in-effect
+		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect
 		void refreshAll();
 	}, [refreshAll]);
 

@@ -342,7 +342,7 @@ export function useAssistantPresetManager(args: {
 		setSelectionActionError,
 	]);
 
-	// eslint-disable-next-line react-hooks/preserve-manual-memoization
+	// oxlint-disable-next-line jsreact-hooks/preserve-manual-memoization
 	const resetToBasePreset = useCallback(async (): Promise<boolean> => {
 		const targetPresetKey = (basePreset?.isSelectable ? basePreset.key : null) ?? invariantFallbackPresetKey;
 		if (!targetPresetKey) {

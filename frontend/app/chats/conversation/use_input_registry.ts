@@ -99,9 +99,9 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 		}
 	}, [tabExists, tryApplyWorkflowStarterToTab]);
 
-	// eslint-disable-next-line react-hooks/refs
+	// oxlint-disable-next-line jsreact-hooks/refs
 	flushPendingDropsRef.current = flushPendingDrops;
-	// eslint-disable-next-line react-hooks/refs
+	// oxlint-disable-next-line jsreact-hooks/refs
 	flushPendingWorkflowStartersRef.current = flushPendingWorkflowStarters;
 
 	const schedulePendingInputFlush = useCallback(() => {

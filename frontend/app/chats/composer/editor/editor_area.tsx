@@ -1215,22 +1215,22 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		);
 
 		if (failedRunnableToolCalls.length > 0) {
-			// eslint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
+			// oxlint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
 			setFastForwardPending(false);
-			// eslint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
+			// oxlint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
 			setSubmitError('Some tool calls failed. Retry or discard them before sending.');
 			return;
 		}
 
 		if (!hasEffectiveTextForSubmit && attachments.length === 0 && toolOutputs.length === 0) {
-			// eslint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
+			// oxlint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
 			setFastForwardPending(false);
-			// eslint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
+			// oxlint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
 			setSubmitError('Tool calls did not produce any outputs, so there is nothing to send yet.');
 			return;
 		}
 
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
 		setFastForwardPending(false);
 		void doSubmit({ runPendingTools: false });
 	}, [
@@ -1636,7 +1636,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	useEffect(() => {
 		if (toolCalls.length === 0 && autoExecState.phase === 'idle' && !isGenerating && activeAutoExecBatchCount > 0) {
-			// eslint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
+			// oxlint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
 			setActiveAutoExecBatchCount(0);
 		}
 	}, [activeAutoExecBatchCount, autoExecState.phase, isGenerating, toolCalls.length]);

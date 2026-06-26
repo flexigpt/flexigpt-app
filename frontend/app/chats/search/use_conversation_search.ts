@@ -414,7 +414,7 @@ export function useConversationSearch({ onSelectConversation, refreshKey }: UseC
 	useEffect(() => {
 		invalidatePendingSearches();
 		searchCache.clear();
-		// eslint-disable-next-line react-hooks/set-state-in-effect
+		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect
 		void loadRecentConversations();
 	}, [invalidatePendingSearches, loadRecentConversations, refreshKey]);
 

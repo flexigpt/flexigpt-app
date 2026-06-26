@@ -212,11 +212,11 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 
 	useEffect(() => {
 		let cancelled = false;
-		// eslint-disable-next-line react-hooks/set-state-in-effect, react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect, react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setLoadError(null);
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setLoadedResource(null);
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setViewInitialized(false);
 
 		void mcpAPI
@@ -246,9 +246,9 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 
 	useEffect(() => {
 		let cancelled = false;
-		// eslint-disable-next-line react-hooks/set-state-in-effect, react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect, react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setPolicyError(null);
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setAppsPolicy(null);
 
 		void mcpAPI
@@ -327,7 +327,7 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 
 	const router = useMemo(
 		() =>
-			// eslint-disable-next-line react-hooks/refs
+			// oxlint-disable-next-line jsreact-hooks/refs
 			new MCPAppRPCRouter({
 				instance,
 				requestOpenLinkApproval,

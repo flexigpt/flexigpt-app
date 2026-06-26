@@ -683,13 +683,13 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 
 		if (!isDiffLike || isBusy) {
 			setControlState({ status: 'idle' });
-			// eslint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+			// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 			setFileTargets([]);
 			return;
 		}
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setStrict(false);
-		// eslint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setFileTargets([]);
 
 		void runDryRun([], false);

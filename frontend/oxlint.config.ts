@@ -7,6 +7,41 @@ import baseConfig from '../.oxlintrc.json' with { type: 'json' };
 const baseIgnorePatterns = baseConfig.ignorePatterns ?? [];
 const baseRules = baseConfig.rules ?? {};
 
+const reactHooksRules: DummyRuleMap = {
+	// Done by OxLint
+	'jsreact-hooks/exhaustive-deps': 'off',
+	'jsreact-hooks/rules-of-hooks': 'off',
+
+	// Compiler rules
+	'jsreact-hooks/config': 'error',
+	'jsreact-hooks/error-boundaries': 'error',
+	'jsreact-hooks/gating': 'error',
+	'jsreact-hooks/globals': 'error',
+	'jsreact-hooks/immutability': 'error',
+	'jsreact-hooks/preserve-manual-memoization': 'error',
+	'jsreact-hooks/purity': 'error',
+	'jsreact-hooks/refs': 'error',
+	'jsreact-hooks/set-state-in-effect': 'error',
+	'jsreact-hooks/set-state-in-render': 'error',
+	'jsreact-hooks/static-components': 'error',
+	'jsreact-hooks/unsupported-syntax': 'error',
+	'jsreact-hooks/use-memo': 'error',
+	'jsreact-hooks/incompatible-library': 'error',
+};
+
+const reactYouMightNotNeedAnEffectRules: DummyRuleMap = {
+	'react-you-might-not-need-an-effect/no-derived-state': 'error',
+	'react-you-might-not-need-an-effect/no-chain-state-updates': 'error',
+	'react-you-might-not-need-an-effect/no-adjust-state-on-prop-change': 'error',
+	'react-you-might-not-need-an-effect/no-reset-all-state-on-prop-change': 'error',
+	'react-you-might-not-need-an-effect/no-pass-live-state-to-parent': 'error',
+	'react-you-might-not-need-an-effect/no-pass-data-to-parent': 'error',
+	'react-you-might-not-need-an-effect/no-external-store-subscription': 'error',
+	'react-you-might-not-need-an-effect/no-initialize-state': 'error',
+
+	'react-you-might-not-need-an-effect/no-event-handler': 'off',
+};
+
 const betterTailwindCSSRules: DummyRuleMap = {
 	'better-tailwindcss/enforce-canonical-classes': 'error',
 	'better-tailwindcss/enforce-consistent-class-order': 'off',
@@ -461,7 +496,14 @@ export default defineConfig({
 
 	ignorePatterns: [...new Set([...baseIgnorePatterns, 'dist/**', 'app/apis/wailsjs/**', '.react-router/**'])],
 
-	jsPlugins: ['eslint-plugin-better-tailwindcss'],
+	jsPlugins: [
+		{
+			name: 'jsreact-hooks',
+			specifier: 'eslint-plugin-react-hooks',
+		},
+		'eslint-plugin-react-you-might-not-need-an-effect',
+		'eslint-plugin-better-tailwindcss',
+	],
 
 	rules: {
 		...baseRules,
@@ -474,6 +516,8 @@ export default defineConfig({
 		...reactRules,
 		...reactPerfRules,
 		...oxcRules,
+		...reactHooksRules,
+		...reactYouMightNotNeedAnEffectRules,
 		...betterTailwindCSSRules,
 	},
 

@@ -108,7 +108,7 @@ export function useScrollRestore({
 	const scrollIndicatorStateRef = useRef<ScrollIndicatorState>(INITIAL_SCROLL_INDICATOR_STATE);
 
 	const messageCountRef = useRef(messageCount);
-	// eslint-disable-next-line react-hooks/refs
+	// oxlint-disable-next-line jsreact-hooks/refs
 	messageCountRef.current = messageCount;
 	const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 	const scrollContentRef = useRef<HTMLDivElement | null>(null);
@@ -117,7 +117,7 @@ export function useScrollRestore({
 
 	const seededScrollFromStorageRef = useRef(false);
 	const activeTabIsHydratingRef = useRef(activeTabIsHydrating);
-	// eslint-disable-next-line react-hooks/refs
+	// oxlint-disable-next-line jsreact-hooks/refs
 	activeTabIsHydratingRef.current = activeTabIsHydrating;
 
 	const scrollStateRafRef = useRef<number | null>(null);

@@ -199,7 +199,6 @@ export class MCPAppRPCRouter {
 		}
 	}
 
-	// oxlint-disable-next-line class-methods-use-this
 	private handleDisplayMode(req: JSONRPCRequest): JSONRPCResponse {
 		const params = isJSONObject(req.params) ? req.params : {};
 

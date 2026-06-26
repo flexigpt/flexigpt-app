@@ -1033,3 +1033,7 @@
 - [x] Add diff out guidance to md sys prompt
 - [x] need a file ops only assistant, may be add diff to other text things in assistants.
 - [x] when a large text is pasted the composer moves up.
+
+- [x] eslint 10: pending plugins support.
+  - [x] monitor oxclint for a while. ecosystem seems weak as of now.
+  - [x] Added oxlint fully

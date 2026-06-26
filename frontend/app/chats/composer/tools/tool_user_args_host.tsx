@@ -75,7 +75,7 @@ export function ToolArgsModalHost({
 		}
 
 		if (toolArgsTarget.kind === 'attached') {
-			// eslint-disable-next-line react-you-might-not-need-an-effect/no-pass-data-to-parent
+			// oxlint-disable-next-line react-you-might-not-need-an-effect/no-pass-data-to-parent
 			const stillExists = attachedToolEntries.some(entry => entry.selectionID === toolArgsTarget.selectionID);
 			if (!stillExists) {
 				setToolArgsTarget(null);
@@ -84,7 +84,7 @@ export function ToolArgsModalHost({
 		}
 
 		if (toolArgsTarget.kind === 'conversation') {
-			// eslint-disable-next-line react-you-might-not-need-an-effect/no-pass-data-to-parent
+			// oxlint-disable-next-line react-you-might-not-need-an-effect/no-pass-data-to-parent
 			const stillExists = conversationToolsState.some(entry => entry.key === toolArgsTarget.key);
 			if (!stillExists) {
 				setToolArgsTarget(null);
