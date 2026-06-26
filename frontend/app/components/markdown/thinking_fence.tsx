@@ -58,6 +58,7 @@ export function ThinkingFence({
 
 	const effectiveMaxRows = streaming ? (typeof maxRows === 'number' && maxRows > 0 ? maxRows : 3) : undefined;
 	const effectiveAutoScroll = streaming ? (autoScroll ?? true) : false;
+	const hasExplicitChildren = children !== undefined && children !== null;
 
 	// A new streaming session starts pinned to bottom by default.
 	// If the user scrolls up, we stop autoscrolling until they manually
@@ -98,11 +99,11 @@ export function ThinkingFence({
 	}, [streaming, isOpen, effectiveAutoScroll]);
 
 	const bodyContent = useMemo(() => {
-		if (children !== null) {
+		if (hasExplicitChildren) {
 			return children;
 		}
 		return text ?? '';
-	}, [children, text]);
+	}, [children, hasExplicitChildren, text]);
 
 	// Streaming behavior: height grows from ~1 line to maxRows, then scroll.
 	useLayoutEffect(() => {
@@ -186,7 +187,7 @@ export function ThinkingFence({
 						: undefined
 				}
 			>
-				{children !== null ? children : (text ?? '')}
+				{hasExplicitChildren ? children : (text ?? '')}
 			</div>
 		</details>
 	);
