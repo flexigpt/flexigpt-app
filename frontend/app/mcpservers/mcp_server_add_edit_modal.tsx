@@ -293,14 +293,15 @@ function buildCopiedMCPServerFormData(source: MCPServerConfig, current: MCPServe
 		...copied,
 		serverID: current.serverID,
 		enabled: true,
-		stdioSecretRows: copied.stdioSecretRows.map(row => ({
-			...row,
-			rowID: makeRowID(),
-			existingSecretRef: undefined,
-			originalEnvName: undefined,
-			secretValue: '',
-			deleteExisting: false,
-		})),
+		stdioSecretRows: copied.stdioSecretRows.map(row =>
+			Object.assign({}, row, {
+				rowID: makeRowID(),
+				existingSecretRef: undefined,
+				originalEnvName: undefined,
+				secretValue: '',
+				deleteExisting: false,
+			})
+		),
 
 		httpClientCredentialRef: '',
 		httpClientCredentialsSecret: '',

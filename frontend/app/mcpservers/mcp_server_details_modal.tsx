@@ -189,10 +189,10 @@ function MCPServerDetailsModalContent({
 				}
 
 				const [toolsResult, resourcesResult, resourceTemplatesResult, promptsResult] = results;
-				const errors = results
+				const resDiscoveryError = results
 					.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
 					.map(result => (result.reason instanceof Error ? result.reason.message : 'Failed to load discovery section.'))
-					.filter(Boolean);
+					.find(message => message.length > 0);
 
 				setDiscovery({
 					tools: toolsResult.status === 'fulfilled' ? toolsResult.value : [],
@@ -200,7 +200,7 @@ function MCPServerDetailsModalContent({
 					resourceTemplates: resourceTemplatesResult.status === 'fulfilled' ? resourceTemplatesResult.value : [],
 					prompts: promptsResult.status === 'fulfilled' ? promptsResult.value : [],
 				});
-				setDiscoveryError(errors[0] ?? '');
+				setDiscoveryError(resDiscoveryError ?? '');
 				setLoadingDiscovery(false);
 			})
 			.catch((_err: unknown) => {

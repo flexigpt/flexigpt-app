@@ -92,6 +92,10 @@ const eslintRules: DummyRuleMap = {
 	'no-promise-executor-return': 'off',
 	'max-depth': 'off',
 
+	// Perf. Default on.
+	'no-useless-call': 'error',
+	'no-await-in-loop': 'off',
+
 	// Style. Default on.
 	curly: 'error',
 	'default-case-last': 'error',
@@ -114,7 +118,6 @@ const eslintRules: DummyRuleMap = {
 	'prefer-const': 'error',
 	'prefer-numeric-literals': 'error',
 	'prefer-object-has-own': 'error',
-	'prefer-object-spread': 'error',
 	'prefer-promise-reject-errors': 'error',
 	'prefer-regex-literals': 'error',
 	'prefer-rest-params': 'error',
@@ -144,11 +147,14 @@ const eslintRules: DummyRuleMap = {
 	'prefer-destructuring': 'off',
 	'prefer-exponentiation-operator': 'off',
 	'prefer-named-capture-group': 'off',
+	'prefer-object-spread': 'off',
 	'prefer-template': 'off',
 	'sort-imports': 'off',
 	'sort-keys': 'off',
 
 	// Nursery. Default Off.
+	'no-useless-assignment': 'error',
+	'no-undef': 'off',
 	'no-restricted-exports': [
 		'error',
 		{
@@ -240,6 +246,8 @@ const tsRules: DummyRuleMap = {
 	'typescript/prefer-regexp-exec': 'off',
 
 	// Nursery. Default Off.
+	'typescript/no-unnecessary-condition': 'off',
+	'typescript/prefer-optional-chain': 'off',
 };
 
 const importRules: DummyRuleMap = {
@@ -265,6 +273,10 @@ const importRules: DummyRuleMap = {
 	'import/no-named-default': 'off',
 	'import/no-named-export': 'off',
 	'import/prefer-default-export': 'off',
+
+	// Nursery. Default Off.
+	'import/export': 'error',
+	'import/named': 'error',
 };
 
 const reactRules: DummyRuleMap = {
@@ -278,6 +290,11 @@ const reactRules: DummyRuleMap = {
 
 	// Suspicious. Default on.
 	'react/react-in-jsx-scope': 'off',
+
+	// Perf. Default on.
+	'react/jsx-no-constructed-context-values': 'error',
+	'react/no-array-index-key': 'off',
+	'react/no-object-type-as-default-prop': 'off',
 
 	// Style. Default on.
 	'react/jsx-curly-brace-presence': 'error',
@@ -294,6 +311,18 @@ const reactRules: DummyRuleMap = {
 	'react/jsx-props-no-spreading': 'off',
 	'react/no-set-state': 'off',
 	'react/state-in-constructor': 'off',
+
+	// Nursery. Default Off.
+	'react/require-render-return': 'error',
+	'react/react-compiler': 'off',
+};
+
+const reactPerfRules: DummyRuleMap = {
+	// Perf. Default on.
+	'react-perf/jsx-no-jsx-as-prop': 'off',
+	'react-perf/jsx-no-new-array-as-prop': 'off',
+	'react-perf/jsx-no-new-function-as-prop': 'off',
+	'react-perf/jsx-no-new-object-as-prop': 'off',
 };
 
 const promiseRules: DummyRuleMap = {
@@ -312,6 +341,9 @@ const promiseRules: DummyRuleMap = {
 	'promise/avoid-new': 'off',
 	'promise/prefer-await-to-callbacks': 'off',
 	'promise/prefer-await-to-then': 'off',
+
+	// Nursery. Default Off.
+	'promise/no-return-in-finally': 'error',
 };
 
 const oxcRules: DummyRuleMap = {
@@ -319,6 +351,10 @@ const oxcRules: DummyRuleMap = {
 	'oxc/no-rest-spread-properties': 'off',
 	'oxc/no-optional-chaining': 'off',
 	'oxc/no-async-await': 'off',
+
+	// Perf. Default on.
+	'oxc/no-accumulating-spread': 'off',
+	'oxc/no-map-spread': 'error',
 };
 
 const unicornRules: DummyRuleMap = {
@@ -333,6 +369,11 @@ const unicornRules: DummyRuleMap = {
 	// Pedantic. Default On.
 	'unicorn/no-negated-condition': 'off',
 	'unicorn/no-useless-undefined': 'off',
+
+	// Perf. Default on.
+	'unicorn/prefer-set-has': 'error',
+	'unicorn/prefer-array-flat-map': 'error',
+	'unicorn/prefer-array-find': 'error',
 
 	// Style. Default on.
 	'unicorn/consistent-date-clone': 'error',
@@ -391,6 +432,9 @@ const unicornRules: DummyRuleMap = {
 	'unicorn/require-module-attributes': 'off',
 	'unicorn/switch-case-braces': 'off',
 	'unicorn/switch-case-break-position': 'off',
+
+	// Nursery. Default Off.
+	'unicorn/no-useless-iterator-to-array': 'error',
 };
 
 const nodeRules: DummyRuleMap = {
@@ -414,7 +458,7 @@ export default defineConfig({
 		restriction: 'error',
 		pedantic: 'error',
 		style: 'error',
-		perf: 'off',
+		perf: 'error',
 		nursery: 'off',
 	},
 
@@ -433,6 +477,7 @@ export default defineConfig({
 		...tsRules,
 		...unicornRules,
 		...reactRules,
+		...reactPerfRules,
 		...oxcRules,
 		...betterTailwindCSSRules,
 	},

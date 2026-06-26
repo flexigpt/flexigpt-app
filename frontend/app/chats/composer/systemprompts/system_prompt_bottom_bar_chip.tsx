@@ -75,7 +75,7 @@ function pickInitialBundleID(
 	sourceBundleID?: string
 ): string {
 	const writable = bundles.filter(bundle => !bundle.isBuiltIn && bundle.isEnabled);
-	const custom = bundles.filter(bundle => !bundle.isBuiltIn);
+	const customBundle = bundles.find(bundle => !bundle.isBuiltIn);
 
 	if (sourceBundleID && writable.some(bundle => bundle.id === sourceBundleID)) {
 		return sourceBundleID;
@@ -83,7 +83,7 @@ function pickInitialBundleID(
 	if (preferredBundleID && writable.some(bundle => bundle.id === preferredBundleID)) {
 		return preferredBundleID;
 	}
-	return writable[0]?.id ?? custom[0]?.id ?? '';
+	return writable[0]?.id ?? customBundle?.id ?? '';
 }
 
 function stopMenuToggleEvent(event: SyntheticEvent) {
@@ -172,35 +172,36 @@ function SystemPromptBottomBarChipInner({
 			group.prompts.push(item);
 		}
 
-		return [...groupsByBundleID.values()]
-			.map(group => ({
-				...group,
-				prompts: [...group.prompts].toSorted((left, right) => {
-					const slugCompare = PROMPT_SORT_COLLATOR.compare(left.templateSlug, right.templateSlug);
-					if (slugCompare !== 0) {
-						return slugCompare;
-					}
+		const sortedGroups = [...groupsByBundleID.values()];
 
-					const versionCompare = PROMPT_SORT_COLLATOR.compare(left.templateVersion, right.templateVersion);
-					if (versionCompare !== 0) {
-						return versionCompare;
-					}
-
-					const nameCompare = PROMPT_SORT_COLLATOR.compare(left.displayName, right.displayName);
-					if (nameCompare !== 0) {
-						return nameCompare;
-					}
-
-					return PROMPT_SORT_COLLATOR.compare(left.identityKey, right.identityKey);
-				}),
-			}))
-			.toSorted((left, right) => {
-				const bundleCompare = PROMPT_SORT_COLLATOR.compare(left.sortKey, right.sortKey);
-				if (bundleCompare !== 0) {
-					return bundleCompare;
+		for (const group of sortedGroups) {
+			group.prompts = group.prompts.toSorted((left, right) => {
+				const slugCompare = PROMPT_SORT_COLLATOR.compare(left.templateSlug, right.templateSlug);
+				if (slugCompare !== 0) {
+					return slugCompare;
 				}
-				return PROMPT_SORT_COLLATOR.compare(left.bundleID, right.bundleID);
+
+				const versionCompare = PROMPT_SORT_COLLATOR.compare(left.templateVersion, right.templateVersion);
+				if (versionCompare !== 0) {
+					return versionCompare;
+				}
+
+				const nameCompare = PROMPT_SORT_COLLATOR.compare(left.displayName, right.displayName);
+				if (nameCompare !== 0) {
+					return nameCompare;
+				}
+
+				return PROMPT_SORT_COLLATOR.compare(left.identityKey, right.identityKey);
 			});
+		}
+
+		return sortedGroups.toSorted((left, right) => {
+			const bundleCompare = PROMPT_SORT_COLLATOR.compare(left.sortKey, right.sortKey);
+			if (bundleCompare !== 0) {
+				return bundleCompare;
+			}
+			return PROMPT_SORT_COLLATOR.compare(left.bundleID, right.bundleID);
+		});
 	}, [bundles, prompts]);
 
 	const tooltipAnchorEl = useStoreState(promptTooltip, 'anchorElement');

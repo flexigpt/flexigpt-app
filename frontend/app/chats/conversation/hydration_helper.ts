@@ -299,7 +299,7 @@ export function deriveHydratedLastAssistantToolCalls(conversation: Conversation)
 
 	return (lastMessage.uiToolCalls ?? [])
 		.filter(call => isRunnableComposerToolCall(call))
-		.map(call => ({ ...call, suppressAutoExecute: true }));
+		.map(call => Object.assign({}, call, { suppressAutoExecute: true }));
 }
 
 function buildToolOutputFromEditor(ui: UIToolOutput): ToolOutput | undefined {

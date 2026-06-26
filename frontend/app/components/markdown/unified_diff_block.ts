@@ -256,11 +256,20 @@ export function buildUnifiedDiffTextForTarget(
 
 	const hunks = matches.reduce((sum, file) => sum + file.hunks, 0);
 	const detectedHunks = countHunkHeaders(diffText);
+	const sectionKeyCandidates: string[] = [];
+
+	for (const file of matches) {
+		sectionKeyCandidates.push(file.fileKey);
+
+		for (const sectionKey of file.sectionKeys ?? []) {
+			sectionKeyCandidates.push(sectionKey);
+		}
+	}
 
 	return {
 		diffText,
 		hunks,
-		sectionKeys: uniqueStrings(matches.flatMap(file => [file.fileKey, ...(file.sectionKeys ?? [])])),
+		sectionKeys: uniqueStrings(sectionKeyCandidates),
 		verified: hunks === 0 || detectedHunks === hunks,
 	};
 }

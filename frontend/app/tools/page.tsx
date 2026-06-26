@@ -71,7 +71,9 @@ export default function ToolsPage() {
 		const toolListItems = await getAllTools([bundleID], undefined, true);
 		const freshTools = toolListItems.map(itm => itm.toolDefinition);
 
-		setBundles(prev => (prev ?? []).map(bd => (bd.bundle.id === bundleID ? { ...bd, tools: freshTools } : bd)));
+		setBundles(prev =>
+			(prev ?? []).map(bd => (bd.bundle.id === bundleID ? Object.assign({}, bd, { tools: freshTools }) : bd))
+		);
 	}, []);
 
 	useEffect(() => {
@@ -85,7 +87,9 @@ export default function ToolsPage() {
 
 			setBundles(prev =>
 				(prev ?? []).map(bd =>
-					bd.bundle.id === bundleID ? { ...bd, bundle: { ...bd.bundle, isEnabled: enabled } } : bd
+					bd.bundle.id === bundleID
+						? Object.assign({}, bd, { bundle: Object.assign({}, bd.bundle, { isEnabled: enabled }) })
+						: bd
 				)
 			);
 		} catch (err) {
@@ -101,10 +105,9 @@ export default function ToolsPage() {
 			setBundles(prev =>
 				(prev ?? []).map(bd =>
 					bd.bundle.id === bundleID
-						? {
-								...bd,
-								tools: bd.tools.map(t => (t.id === tool.id ? { ...t, isEnabled: enabled } : t)),
-							}
+						? Object.assign({}, bd, {
+								tools: bd.tools.map(t => (t.id === tool.id ? Object.assign({}, t, { isEnabled: enabled }) : t)),
+							})
 						: bd
 				)
 			);
@@ -121,10 +124,9 @@ export default function ToolsPage() {
 			setBundles(prev =>
 				(prev ?? []).map(bd =>
 					bd.bundle.id === bundleID
-						? {
-								...bd,
+						? Object.assign({}, bd, {
 								tools: bd.tools.filter(t => t.id !== tool.id),
-							}
+							})
 						: bd
 				)
 			);

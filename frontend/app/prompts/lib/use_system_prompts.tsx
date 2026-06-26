@@ -274,13 +274,13 @@ function sortPrompts(prompts: SystemPromptItem[]): SystemPromptItem[] {
 
 function pickPreferredBundleID(bundles: PromptBundle[], current: string | null): string | null {
 	const allCustomBundles = bundles.filter(bundle => !bundle.isBuiltIn);
-	const writableCustomBundles = allCustomBundles.filter(bundle => bundle.isEnabled);
+	const writableCustomBundle = allCustomBundles.find(bundle => bundle.isEnabled);
 
 	if (current && allCustomBundles.some(bundle => bundle.id === current)) {
 		return current;
 	}
 
-	return writableCustomBundles[0]?.id ?? allCustomBundles[0]?.id ?? null;
+	return writableCustomBundle?.id ?? allCustomBundles[0]?.id ?? null;
 }
 
 function toSystemPromptItem(template: PromptTemplate, bundle: PromptBundle | undefined): SystemPromptItem | null {

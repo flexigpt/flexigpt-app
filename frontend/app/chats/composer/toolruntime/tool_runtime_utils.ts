@@ -37,10 +37,11 @@ export function getPendingRunnableToolCalls(toolCalls: UIToolCall[]): UIToolCall
 }
 
 export function getNextPendingAutoExecutableToolCall(toolCalls: UIToolCall[]): UIToolCall | null {
-	const tc = toolCalls.filter(toolCall => {
-		return (
-			toolCall.status === 'pending' && isRunnableComposerToolCall(toolCall) && isAutoSubmitEligibleToolCall(toolCall)
-		);
-	});
-	return tc[0] ?? null;
+	return (
+		toolCalls.find(toolCall => {
+			return (
+				toolCall.status === 'pending' && isRunnableComposerToolCall(toolCall) && isAutoSubmitEligibleToolCall(toolCall)
+			);
+		}) ?? null
+	);
 }

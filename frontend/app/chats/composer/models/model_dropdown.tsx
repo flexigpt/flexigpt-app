@@ -54,9 +54,13 @@ const groupModelOptionsByProvider = (options: UIChatOption[]): ProviderModelGrou
 		});
 	}
 
-	return [...groupsByProvider.values()]
-		.map(group => ({ ...group, options: [...group.options].toSorted(compareModelOptions) }))
-		.toSorted(compareProviderGroups);
+	const providerGroups = [...groupsByProvider.values()];
+
+	for (const group of providerGroups) {
+		group.options = group.options.toSorted(compareModelOptions);
+	}
+
+	return providerGroups.toSorted(compareProviderGroups);
 };
 
 interface ModelDropdownProps {

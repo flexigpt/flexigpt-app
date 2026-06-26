@@ -221,12 +221,13 @@ export function SkillsBottomBarChip({
 			}
 		}
 
-		return [...map.values()]
-			.map(group => ({
-				...group,
-				skills: [...group.skills].toSorted(compareSkillListItems),
-			}))
-			.toSorted(compareBundleGroups);
+		const bundleGroups = [...map.values()];
+
+		for (const group of bundleGroups) {
+			group.skills = group.skills.toSorted(compareSkillListItems);
+		}
+
+		return bundleGroups.toSorted(compareBundleGroups);
 	}, [allSkills]);
 
 	const setSkillEnabled = useCallback(

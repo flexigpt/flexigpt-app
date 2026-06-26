@@ -133,11 +133,10 @@ export function normalizeMCPArgumentDefinitions(
 				} satisfies MCPArgumentDefinition;
 			}
 
-			return {
-				...value,
+			return Object.assign({}, value, {
 				name: value.name || key,
 				required: Boolean(value.required),
-			} satisfies MCPArgumentDefinition;
+			}) satisfies MCPArgumentDefinition;
 		})
 		.filter(arg => arg.name.trim().length > 0)
 		.toSorted((a, b) => a.name.localeCompare(b.name));
@@ -180,11 +179,12 @@ export function mcpSelectionToContext(
 		toolExposure: selection.toolExposure,
 		selectedTools:
 			selection.toolExposure !== MCPToolExposure.MCPToolExposureNone && selection.selectedTools.length > 0
-				? selection.selectedTools.map(tool => ({
-						...tool,
-						bundleID: tool.bundleID ?? selection.bundleID,
-						serverID: tool.serverID || selection.serverID,
-					}))
+				? selection.selectedTools.map(tool =>
+						Object.assign({}, tool, {
+							bundleID: tool.bundleID ?? selection.bundleID,
+							serverID: tool.serverID || selection.serverID,
+						})
+					)
 				: undefined,
 		includeServerInstructions: selection.includeServerInstructions,
 	}));
@@ -215,11 +215,12 @@ export function mcpContextToSelectionMap(context?: MCPConversationContext): Reco
 			serverID: server.serverID,
 			snapshotDigest: server.snapshotDigest,
 			toolExposure: server.toolExposure,
-			selectedTools: (server.selectedTools ?? []).map(tool => ({
-				...tool,
-				bundleID: tool.bundleID ?? server.bundleID,
-				serverID: tool.serverID || server.serverID,
-			})),
+			selectedTools: (server.selectedTools ?? []).map(tool =>
+				Object.assign({}, tool, {
+					bundleID: tool.bundleID ?? server.bundleID,
+					serverID: tool.serverID || server.serverID,
+				})
+			),
 			selectedResources: [],
 			selectedResourceTemplates: [],
 			selectedPrompts: [],

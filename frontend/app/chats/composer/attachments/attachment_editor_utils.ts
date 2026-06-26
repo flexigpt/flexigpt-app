@@ -33,7 +33,7 @@ function pathBasename(path: string | undefined): string {
 	if (!trimmed) {
 		return '';
 	}
-	return trimmed.split(/[\\/]/).filter(Boolean).pop() ?? trimmed;
+	return trimmed.split(/[\\/]/).findLast(segment => segment.length > 0) ?? trimmed;
 }
 
 export function getAttachmentDisplayLabel(att: Partial<Attachment>): string {

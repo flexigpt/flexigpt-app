@@ -304,13 +304,12 @@ function hydrateApplyOutputWithRequestTargets(
 			return file;
 		}
 
-		return {
-			...file,
+		return Object.assign({}, file, {
 			fileKey: target.fileKey || file.fileKey,
 			oldPath: file.oldPath || target.oldPath,
 			newPath: file.newPath || target.newPath,
 			targetPath: target.targetPath || file.targetPath,
-		};
+		});
 	});
 
 	return {

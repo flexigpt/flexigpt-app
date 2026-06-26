@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { createContext, useContext, useEffect, useLayoutEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 
 const noTransition = () => {
 	const style = document.createElement('style');
@@ -78,12 +78,17 @@ export function GenericThemeProvider({
 	}, [theme, darkTheme, lightTheme]);
 
 	/* wrapped setter keeps localStorage in-sync */
-	const setTheme = (t: string) => {
-		_setTheme(t);
-		localStorage.setItem(storageKey, t);
-	};
+	const setTheme = useCallback(
+		(t: string) => {
+			_setTheme(t);
+			localStorage.setItem(storageKey, t);
+		},
+		[storageKey]
+	);
 
-	return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;
+	const value = useMemo(() => ({ theme, setTheme }), [theme, setTheme]);
+
+	return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 export const useTheme = (): ThemeCtx => useContext(ThemeContext);
