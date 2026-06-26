@@ -72,25 +72,6 @@ const toolbarButtonVariants = cva(
 	}
 );
 
-/* For the narrow dropdown arrow piece */
-const dropdownArrowVariants = cva('btn btn-square join-item', {
-	variants: {
-		size: {
-			sm: 'btn-sm',
-			default: '',
-			lg: 'btn-lg',
-		},
-		variant: {
-			default: 'btn-ghost',
-			outline: 'btn-outline',
-		},
-	},
-	defaultVariants: {
-		size: 'sm',
-		variant: 'default',
-	},
-});
-
 /* DaisyUI tooltip HOC (string-only content) */
 interface Tooltipable {
 	tooltip?: string;
@@ -210,6 +191,7 @@ const RawToolbarButton = forwardRef<HTMLButtonElement, ToolbarButtonProps>(funct
 	);
 });
 
+// oxlint-disable-next-line react/only-export-components
 export const ToolbarButton = withTooltip(RawToolbarButton);
 
 /* Split button: primary + secondary in a join group */
@@ -226,56 +208,6 @@ export const ToolbarSplitButton = forwardRef<HTMLDivElement, HTMLAttributes<HTML
 		return <div ref={ref} className={cn('join', className)} {...props} />;
 	}
 );
-
-type ToolbarSplitButtonPrimaryProps = Omit<ToolbarToggleItemProps, 'defaultPressed' | 'onPressedChange'> & Tooltipable;
-
-/**
- * @public
- */
-const RawToolbarSplitButtonPrimary = forwardRef<HTMLButtonElement, ToolbarSplitButtonPrimaryProps>(
-	function RawToolbarSplitButtonPrimary({ className, size = 'sm', variant, children, ...props }, ref) {
-		return (
-			<ToolbarToggleItem ref={ref} size={size} variant={variant} className={cn('rounded-r-none', className)} {...props}>
-				{children}
-			</ToolbarToggleItem>
-		);
-	}
-);
-
-/**
- * @public
- */
-export const ToolbarSplitButtonPrimary = withTooltip(RawToolbarSplitButtonPrimary);
-
-type ToolbarSplitButtonSecondaryProps = ButtonHTMLAttributes<HTMLButtonElement> &
-	VariantProps<typeof dropdownArrowVariants> &
-	Tooltipable;
-
-const RawToolbarSplitButtonSecondary = forwardRef<HTMLButtonElement, ToolbarSplitButtonSecondaryProps>(
-	function RawToolbarSplitButtonSecondary({ className, size = 'sm', variant, onClick, ...props }, ref) {
-		return (
-			<button
-				ref={ref}
-				type="button"
-				className={cn(dropdownArrowVariants({ size, variant }), 'rounded-l-none', className)}
-				onClick={e => {
-					e.stopPropagation();
-					onClick?.(e);
-				}}
-				{...props}
-				aria-label="More"
-			>
-				<FiChevronDown className="text-base-content/70" aria-hidden />
-			</button>
-		);
-	}
-);
-
-/**
- * @public
- */
-export const ToolbarSplitButtonSecondary = withTooltip(RawToolbarSplitButtonSecondary);
-
 /* Simple grouping wrapper, use ToolbarSeparator between groups */
 export function ToolbarGroup({ className, children, ...props }: HTMLAttributes<HTMLDivElement>) {
 	return (
@@ -284,7 +216,6 @@ export function ToolbarGroup({ className, children, ...props }: HTMLAttributes<H
 		</div>
 	);
 }
-
 /* DaisyUI menu group (use inside a <ul className="menu">) */
 /**
  * @public

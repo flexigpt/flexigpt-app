@@ -6,7 +6,7 @@ import { AttachmentContentBlockMode, type UIAttachment } from '@/spec/attachment
 
 import { AttachmentChip } from '@/chats/composer/attachments/attachment_chip';
 import { type DirectoryAttachmentGroup, uiAttachmentKey } from '@/chats/composer/attachments/attachment_editor_utils';
-import { getAttachmentContentBlockModePillClasses } from '@/chats/composer/attachments/attachment_mode_menu';
+import { getAttachmentContentBlockModePillClasses } from '@/chats/composer/attachments/attachment_mode_menu_utils';
 
 interface DirectoryChipProps {
 	group: DirectoryAttachmentGroup;

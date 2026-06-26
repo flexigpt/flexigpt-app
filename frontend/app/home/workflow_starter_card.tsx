@@ -1,53 +1,8 @@
-import type { ReactNode } from 'react';
-
-import { FiAlertTriangle, FiArrowRight, FiCheckCircle, FiCode } from 'react-icons/fi';
+import { FiArrowRight } from 'react-icons/fi';
 
 import { Link } from 'react-router';
 
-interface WorkflowStarter {
-	title: string;
-	description: string;
-	workflowID: string;
-	draft?: string;
-	icon: ReactNode;
-	assistantPresetBundleID?: string;
-	assistantPresetSlug?: string;
-	assistantPresetVersion?: string;
-}
-
-const SOFTWARE_ASSISTANTS_BUNDLE_ID = '019d676e-2533-7fdf-a0af-d3a571ab4f4f';
-
-export const workflowStarters: WorkflowStarter[] = [
-	{
-		title: 'Develop a Feature',
-		description: 'Implement a bounded code change from a repo path or attached files, using spec driven development',
-		workflowID: 'develop-feature',
-		assistantPresetBundleID: SOFTWARE_ASSISTANTS_BUNDLE_ID,
-		assistantPresetSlug: 'spec-driven-dev',
-		assistantPresetVersion: 'v1.0.0',
-		icon: <FiCode size={24} />,
-	},
-	{
-		title: 'Review Code',
-		description: 'Review the code or diff for correctness, security, reliability, maintainability, and test gaps',
-		workflowID: 'code-review',
-		assistantPresetBundleID: SOFTWARE_ASSISTANTS_BUNDLE_ID,
-		assistantPresetSlug: 'reviewing-code',
-		assistantPresetVersion: 'v1.0.0',
-
-		icon: <FiCheckCircle size={24} />,
-	},
-	{
-		title: 'Investigate a Bug',
-		description:
-			'Diagnose root cause and the smallest safe fix direction, from logs, errors, stack traces, failing outputs, code, and config',
-		workflowID: 'bug-investigation',
-		assistantPresetBundleID: SOFTWARE_ASSISTANTS_BUNDLE_ID,
-		assistantPresetSlug: 'bug-investigator',
-		assistantPresetVersion: 'v1.0.0',
-		icon: <FiAlertTriangle size={24} />,
-	},
-];
+import type { WorkflowStarter } from '@/home/workflow_starter';
 
 function buildWorkflowStarterHref(workflow: WorkflowStarter) {
 	const params = new URLSearchParams({

@@ -53,6 +53,7 @@ export function CustomThemeProvider({ children }: { children: ReactNode }) {
 	);
 }
 
+// oxlint-disable-next-line react/only-export-components
 export const meta: Route.MetaFunction = () => [
 	{ title: 'FlexiGPT' },
 	{ name: 'description', content: 'The FlexiGPT ecosystem agent' },
@@ -98,6 +99,7 @@ function domReady() {
 	});
 }
 
+// oxlint-disable-next-line react/only-export-components
 export async function clientLoader() {
 	// Wait for DOM content to be loaded and Wails runtime to be injected
 	await domReady();

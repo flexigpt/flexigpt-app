@@ -91,4 +91,5 @@ export function GenericThemeProvider({
 	return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
+// oxlint-disable-next-line react/only-export-components
 export const useTheme = (): ThemeCtx => useContext(ThemeContext);

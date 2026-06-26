@@ -8,12 +8,12 @@ import {
 	getAttachmentErrorMessage,
 	getUIAttachmentPath,
 } from '@/chats/composer/attachments/attachment_editor_utils';
+import { AttachmentContentBlockModeMenu } from '@/chats/composer/attachments/attachment_mode_menu';
 import {
-	AttachmentContentBlockModeMenu,
 	getAttachmentContentBlockModeLabel,
 	getAttachmentContentBlockModePillClasses,
 	getAttachmentContentBlockModeTooltip,
-} from '@/chats/composer/attachments/attachment_mode_menu';
+} from '@/chats/composer/attachments/attachment_mode_menu_utils';
 
 interface AttachmentChipProps {
 	attachment: UIAttachment;

@@ -20,6 +20,91 @@ import { computeTemplateVarRequirements, effectiveVarValueLocal } from '@/prompt
 const TEMPLATE_PLACEHOLDER_RE = /\{\{([a-zA-Z_][a-zA-Z0-9_-]*)\}\}/g;
 type TemplateNodeWithPath = [TemplateSelectionElementNode, Path];
 
+const TEMPLATE_VARIABLE_TOKEN_RE = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_-]*)\s*\}\}/g;
+
+// oxlint-disable-next-line typescript/consistent-type-definitions
+type TemplateInlineTextNode = {
+	text: string;
+	ownerSelectionID?: string;
+};
+
+type TemplateInlineChild = TemplateInlineTextNode | TemplateVariableElementNode;
+
+/**
+ * Merge templateSnapshot with local overrides to produce effective template structures.
+ */
+export function computeEffectiveTemplate(el: TemplateSelectionElementNode): {
+	template: PromptTemplate | undefined;
+	blocks: MessageBlock[];
+	variablesSchema: PromptVariable[];
+} {
+	const base = el.templateSnapshot;
+	const blocks = el.overrides?.blocks ?? base?.blocks ?? [];
+	const variablesSchema = el.overrides?.variables ?? base?.variables ?? [];
+
+	return { template: base, blocks, variablesSchema };
+}
+
+/**
+ * Build Slate inline children from a plain text that may include {{varName}} tokens.
+ * Unknown variables are left as plain text.
+ */
+export function buildUserInlineChildrenFromText(
+	tsenode: TemplateSelectionElementNode,
+	text: string
+): TemplateInlineChild[] {
+	const { variablesSchema } = computeEffectiveTemplate(tsenode);
+	const variablesByName = new Map(variablesSchema.map(v => [v.name, v] as const));
+	const selectionID = tsenode.selectionID;
+
+	const result: TemplateInlineChild[] = [];
+	const re = TEMPLATE_VARIABLE_TOKEN_RE;
+	let idx = 0;
+	let m: RegExpExecArray | null;
+
+	while ((m = re.exec(text)) !== null) {
+		const pre = text.slice(idx, m.index);
+
+		if (pre) {
+			result.push({ text: pre, ownerSelectionID: selectionID });
+		}
+
+		const varName = m[1];
+		const matchedVar = variablesByName.get(varName);
+
+		if (matchedVar) {
+			const node: TemplateVariableElementNode = {
+				type: KEY_TEMPLATE_VARIABLE,
+				bundleID: tsenode.bundleID,
+				templateSlug: tsenode.templateSlug,
+				templateVersion: tsenode.templateVersion,
+				selectionID,
+				name: varName,
+				required: matchedVar.required ?? false,
+				children: [{ text: '' }],
+			};
+
+			result.push(node);
+		} else {
+			// unknown variable -> keep as literal
+			result.push({ text: m[0], ownerSelectionID: selectionID });
+		}
+
+		idx = m.index + m[0].length;
+	}
+
+	const tail = text.slice(idx);
+	if (tail) {
+		result.push({ text: tail, ownerSelectionID: selectionID });
+	}
+
+	if (result.length === 0) {
+		result.push({ text: '', ownerSelectionID: selectionID });
+	}
+
+	return result;
+}
+
 /**
  * Execution-ready derived representation of a selected template.
  */
@@ -63,21 +148,6 @@ function getInstructionPromptPartFromSelection(selection: SelectedTemplateForRun
 
 export function getInstructionPromptPartsFromSelections(selections: SelectedTemplateForRun[]): string[] {
 	return selections.map(s => getInstructionPromptPartFromSelection(s)).filter(Boolean);
-}
-
-/**
- * Merge templateSnapshot with local overrides to produce effective template structures.
- */
-export function computeEffectiveTemplate(el: TemplateSelectionElementNode): {
-	template: PromptTemplate | undefined;
-	blocks: MessageBlock[];
-	variablesSchema: PromptVariable[];
-} {
-	const base = el.templateSnapshot;
-	const blocks = el.overrides?.blocks ?? base?.blocks ?? [];
-	const variablesSchema = el.overrides?.variables ?? base?.variables ?? [];
-
-	return { template: base, blocks, variablesSchema };
 }
 
 function makeSelectedTemplateForRun(tsenode: TemplateSelectionElementNode): SelectedTemplateForRun {

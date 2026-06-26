@@ -30,9 +30,6 @@ const betterTailwindCSSRules: DummyRuleMap = {
 
 const eslintRules: DummyRuleMap = {
 	// Correctness. Default On.
-	'constructor-super': 'error',
-	'getter-return': 'error',
-
 	'no-unused-vars': [
 		'error',
 		{
@@ -90,7 +87,6 @@ const eslintRules: DummyRuleMap = {
 	'no-negated-condition': 'off',
 	'require-unicode-regexp': 'off',
 	'require-await': 'off',
-	'no-promise-executor-return': 'off',
 	'max-depth': 'off',
 
 	// Perf. Default on.
@@ -282,12 +278,13 @@ const importRules: DummyRuleMap = {
 
 const reactRules: DummyRuleMap = {
 	// Restriction. Default on.
+	'react/only-export-components': ['error', { allowConstantExport: true }],
+
 	'react/no-multi-comp': 'off',
 	'react/jsx-filename-extension': 'off',
 	'react/jsx-no-literals': 'off',
 	'react/forbid-component-props': 'off',
 	'react/button-has-type': 'off',
-	'react/only-export-components': 'off',
 
 	// Suspicious. Default on.
 	'react/react-in-jsx-scope': 'off',

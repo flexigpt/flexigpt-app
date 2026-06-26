@@ -64,7 +64,11 @@ function mergeBundleData(
 }
 
 function sleep(ms: number): Promise<void> {
-	return new Promise(resolve => window.setTimeout(resolve, ms));
+	return new Promise(resolve => {
+		window.setTimeout(() => {
+			resolve();
+		}, ms);
+	});
 }
 
 // oxlint-disable-next-line no-restricted-exports

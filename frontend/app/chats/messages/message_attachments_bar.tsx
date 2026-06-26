@@ -23,7 +23,7 @@ import { getAttachmentDisplayLabel } from '@/chats/composer/attachments/attachme
 import {
 	getAttachmentContentBlockModeLabel,
 	getAttachmentContentBlockModeTooltip,
-} from '@/chats/composer/attachments/attachment_mode_menu';
+} from '@/chats/composer/attachments/attachment_mode_menu_utils';
 import { MCPMessageContextChip } from '@/chats/messages/mcp_message_context_chip';
 import { formatToolCallLabel } from '@/tools/lib/tool_call_utils';
 import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';

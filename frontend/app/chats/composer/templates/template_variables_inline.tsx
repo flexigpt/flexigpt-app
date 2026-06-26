@@ -12,7 +12,6 @@ import { cssEscape } from '@/lib/text_utils';
 
 import {
 	KEY_TEMPLATE_SELECTION,
-	KEY_TEMPLATE_VARIABLE,
 	type TemplateSelectionElementNode,
 	type TemplateVariableElementNode,
 } from '@/chats/composer/platedoc/nodes';
@@ -24,18 +23,8 @@ import {
 } from '@/chats/composer/templates/use_template_toolbar_vars_updated_event';
 import { computeTemplateVarRequirements, effectiveVarValueLocal } from '@/prompts/lib/prompt_template_var_utils';
 
-const TEMPLATE_VARIABLE_TOKEN_RE = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_-]*)\s*\}\}/g;
-
 type TemplateVariableDef = ReturnType<typeof computeEffectiveTemplate>['variablesSchema'][number];
 type InlineEditorKeyTarget = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
-
-// oxlint-disable-next-line typescript/consistent-type-definitions
-type TemplateInlineTextNode = {
-	text: string;
-	ownerSelectionID?: string;
-};
-
-type TemplateInlineChild = TemplateInlineTextNode | TemplateVariableElementNode;
 
 const EMPTY_REQUIREMENTS: {
 	variableValues: Record<string, unknown>;
@@ -429,64 +418,4 @@ export function TemplateVariableElement(props: PlateElementProps<any>) {
 			{children}
 		</span>
 	);
-}
-
-/**
- * Build Slate inline children from a plain text that may include {{varName}} tokens.
- * Unknown variables are left as plain text.
- */
-export function buildUserInlineChildrenFromText(
-	tsenode: TemplateSelectionElementNode,
-	text: string
-): TemplateInlineChild[] {
-	const { variablesSchema } = computeEffectiveTemplate(tsenode);
-	const variablesByName = new Map(variablesSchema.map(v => [v.name, v] as const));
-	const selectionID = tsenode.selectionID;
-
-	const result: TemplateInlineChild[] = [];
-	const re = TEMPLATE_VARIABLE_TOKEN_RE;
-	let idx = 0;
-	let m: RegExpExecArray | null;
-
-	while ((m = re.exec(text)) !== null) {
-		const pre = text.slice(idx, m.index);
-
-		if (pre) {
-			result.push({ text: pre, ownerSelectionID: selectionID });
-		}
-
-		const varName = m[1];
-		const matchedVar = variablesByName.get(varName);
-
-		if (matchedVar) {
-			const node: TemplateVariableElementNode = {
-				type: KEY_TEMPLATE_VARIABLE,
-				bundleID: tsenode.bundleID,
-				templateSlug: tsenode.templateSlug,
-				templateVersion: tsenode.templateVersion,
-				selectionID,
-				name: varName,
-				required: matchedVar.required ?? false,
-				children: [{ text: '' }],
-			};
-
-			result.push(node);
-		} else {
-			// unknown variable -> keep as literal
-			result.push({ text: m[0], ownerSelectionID: selectionID });
-		}
-
-		idx = m.index + m[0].length;
-	}
-
-	const tail = text.slice(idx);
-	if (tail) {
-		result.push({ text: tail, ownerSelectionID: selectionID });
-	}
-
-	if (result.length === 0) {
-		result.push({ text: '', ownerSelectionID: selectionID });
-	}
-
-	return result;
 }

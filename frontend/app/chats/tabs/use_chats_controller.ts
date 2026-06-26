@@ -386,7 +386,11 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 
 	const [searchRefreshKey, setSearchRefreshKey] = useState(0);
 	const bumpSearchKey = useCallback(async () => {
-		await new Promise(resolve => setTimeout(resolve, 50));
+		await new Promise<void>(resolve => {
+			setTimeout(() => {
+				resolve();
+			}, 50);
+		});
 		setSearchRefreshKey(key => key + 1);
 	}, []);
 
@@ -562,11 +566,11 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 
 			selectTab(targetId);
 
-			await new Promise<void>(resolve =>
+			await new Promise<void>(resolve => {
 				requestAnimationFrame(() => {
 					resolve();
-				})
-			);
+				});
+			});
 			if (!controllerAliveRef.current) {
 				return false;
 			}

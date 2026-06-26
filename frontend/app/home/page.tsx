@@ -15,16 +15,17 @@ import { getAllProviderPresetsMap } from '@/apis/list_helper';
 
 import { PageFrame } from '@/components/page_frame';
 
-import { DocsCard, docsCards } from '@/home/docs_card';
-import { PrimaryActionCard } from '@/home/nav_card';
+import { DocsCard } from '@/home/docs_card';
+import { docsStarters } from '@/home/docs_starter';
 import {
 	formatConfiguredProviderSummary,
 	getConfiguredProviderNames,
-	HomeAuthKeyModalIntro,
 	pickDefaultProviderName,
-	ProviderSetupStatus,
-} from '@/home/provider_setup_status_card';
-import { WorkflowStarterCard, workflowStarters } from '@/home/workflow_starter_card';
+} from '@/home/home_utils';
+import { PrimaryActionCard } from '@/home/nav_card';
+import { HomeAuthKeyModalIntro, ProviderSetupStatus } from '@/home/provider_setup_status_card';
+import { workflowStarters } from '@/home/workflow_starter';
+import { WorkflowStarterCard } from '@/home/workflow_starter_card';
 import { AddEditAuthKeyModal } from '@/settings/authkey_add_edit_modal';
 
 // oxlint-disable-next-line no-restricted-exports
@@ -154,7 +155,7 @@ export default function HomePage() {
 						</div>
 
 						<div className="mx-auto mt-4 grid w-full max-w-5xl grid-cols-1 gap-6 md:grid-cols-3">
-							{docsCards.map(card => (
+							{docsStarters.map(card => (
 								<DocsCard key={card.to} title={card.title} description={card.description} to={card.to} />
 							))}
 						</div>

@@ -11,7 +11,7 @@ import { MCPAppView } from '@/chats/mcpapps/mcp_app_view';
 import {
 	getMCPAppToolResultContent,
 	getMCPAppToolResultStructuredContent,
-} from '@/chats/messages/mcp_message_context_chip';
+} from '@/chats/messages/mcp_message_context_utils';
 import { MessageAttachmentsBar } from '@/chats/messages/message_attachments_bar';
 import { MessageCitationsBar } from '@/chats/messages/message_citations_bar';
 import { MessageContentCard } from '@/chats/messages/message_content_card';
