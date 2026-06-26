@@ -171,8 +171,8 @@ github.com/mattn/go-isatty v0.0.19/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D
 github.com/mattn/go-isatty v0.0.22 h1:j8l17JJ9i6VGPUFUYoTUKPSgKe/83EYU2zBC7YNKMw4=
 github.com/mattn/go-isatty v0.0.22/go.mod h1:ZXfXG4SQHsB/w3ZeOYbR0PrPwLy+n6xiMrJlRFqopa4=
 github.com/mattn/go-runewidth v0.0.10/go.mod h1:RAqKPSqVFrSLVXbA8x7dzmKdmGzieGRCM46jaSJTDAk=
-github.com/modelcontextprotocol/go-sdk v1.6.1-0.20260529072934-189a85ad92ff h1:UMSrqRr6/X1KmLBD4MRgeekGt80NC1yQVemLnJ8WAAA=
-github.com/modelcontextprotocol/go-sdk v1.6.1-0.20260529072934-189a85ad92ff/go.mod h1:dL7u98E/zjJTGzEq+j30jQ8K2k1mb6LeAH4inEcSGts=
+github.com/modelcontextprotocol/go-sdk v1.7.0-pre.1 h1:GlMIJyMHFX76bBSQuBCLXZ7pB9cGh4VBS6O5wGd0tgI=
+github.com/modelcontextprotocol/go-sdk v1.7.0-pre.1/go.mod h1:dL7u98E/zjJTGzEq+j30jQ8K2k1mb6LeAH4inEcSGts=
 github.com/ncruces/go-strftime v0.1.9 h1:bY0MQC28UADQmHmaF5dgpLmImcShSi2kHU9XLdhx/f4=
 github.com/ncruces/go-strftime v0.1.9/go.mod h1:Fwc5htZGVVkseilnfgOVb9mKy6w1naJmn9CehxcKcls=
 github.com/openai/openai-go/v3 v3.40.0 h1:nohsDVADU/JFPiwi5bD3G6Eo35CjNKv7Ompqc7H2cmY=

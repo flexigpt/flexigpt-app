@@ -15,7 +15,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
 	github.com/markusmobius/go-trafilatura v1.12.2
-	github.com/modelcontextprotocol/go-sdk v1.6.1-0.20260529072934-189a85ad92ff
+	github.com/modelcontextprotocol/go-sdk v1.7.0-pre.1
 	github.com/wailsapp/wails/v2 v2.12.0
 	golang.org/x/net v0.56.0
 	golang.org/x/oauth2 v0.36.0
