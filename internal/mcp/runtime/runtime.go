@@ -417,15 +417,6 @@ func (m *MCPRuntimeManager) OnClientNotification(ctx context.Context, event Clie
 			"uri", event.ResourceURI,
 		)
 
-	case ClientNotificationLoggingMessage:
-		slog.Info(
-			"mcp server log notification received",
-			"serverID", event.ServerID,
-			"logger", event.LoggerName,
-			"level", event.LoggingLevel,
-			"data", event.LogData,
-		)
-
 	case ClientNotificationProgress:
 		slog.Debug(
 			"mcp progress notification received",

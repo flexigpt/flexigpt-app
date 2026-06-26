@@ -65,6 +65,7 @@ export default defineConfig(({ mode }) => {
 		);
 	}
 	return {
+		envDir: false,
 		plugins: [reactRouter(), tailwindcss()],
 
 		base: isProd ? '/frontend/dist/' : '/',

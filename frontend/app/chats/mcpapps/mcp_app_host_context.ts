@@ -9,7 +9,6 @@ export interface MCPAppInitializeResult {
 		serverResources?: {
 			listChanged?: boolean;
 		};
-		logging?: Record<string, never>;
 		sandbox?: {
 			permissions?: Record<string, unknown>;
 			csp?: Record<string, unknown>;
@@ -68,7 +67,6 @@ export function buildMCPAppHostContext(opts?: {
 						listChanged: true,
 					}
 				: undefined,
-			logging: {},
 			sandbox: {},
 		},
 		hostInfo: {

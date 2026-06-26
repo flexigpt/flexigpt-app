@@ -203,7 +203,6 @@ export interface MCPServerCapabilitiesSummary {
 	resourcesListChanged?: boolean;
 	prompts?: boolean;
 	promptsListChanged?: boolean;
-	logging?: boolean;
 	completions?: boolean;
 	experimental?: Record<string, any>;
 	extensions?: Record<string, any>;

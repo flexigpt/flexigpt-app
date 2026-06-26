@@ -14,7 +14,6 @@ const (
 	ClientNotificationResourceListChanged ClientNotificationKind = "resourcesListChanged"
 	ClientNotificationPromptListChanged   ClientNotificationKind = "promptsListChanged"
 	ClientNotificationResourceUpdated     ClientNotificationKind = "resourceUpdated"
-	ClientNotificationLoggingMessage      ClientNotificationKind = "loggingMessage"
 	ClientNotificationProgress            ClientNotificationKind = "progress"
 )
 

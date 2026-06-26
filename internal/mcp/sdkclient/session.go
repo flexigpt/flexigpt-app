@@ -500,7 +500,6 @@ func summarizeCapabilities(caps *mcpSDK.ServerCapabilities) *spec.MCPServerCapab
 		Tools:        caps.Tools != nil,
 		Resources:    caps.Resources != nil,
 		Prompts:      caps.Prompts != nil,
-		Logging:      caps.Logging != nil,
 		Completions:  caps.Completions != nil,
 		Experimental: cloneMap(caps.Experimental),
 		Extensions:   cloneMap(caps.Extensions),

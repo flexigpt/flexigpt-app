@@ -2660,7 +2660,6 @@ export namespace spec {
 	    resourcesListChanged?: boolean;
 	    prompts?: boolean;
 	    promptsListChanged?: boolean;
-	    logging?: boolean;
 	    completions?: boolean;
 	    experimental?: Record<string, any>;
 	    extensions?: Record<string, any>;
@@ -2678,7 +2677,6 @@ export namespace spec {
 	        this.resourcesListChanged = source["resourcesListChanged"];
 	        this.prompts = source["prompts"];
 	        this.promptsListChanged = source["promptsListChanged"];
-	        this.logging = source["logging"];
 	        this.completions = source["completions"];
 	        this.experimental = source["experimental"];
 	        this.extensions = source["extensions"];

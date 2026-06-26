@@ -114,20 +114,6 @@ func (f *Factory) Connect(
 					ResourceURI: uri,
 				})
 			},
-			LoggingMessageHandler: func(ctx context.Context, req *mcpSDK.LoggingMessageRequest) {
-				if req == nil || req.Params == nil {
-					return
-				}
-
-				emit(ctx, runtime.ClientNotification{
-					BundleID:     cfg.BundleID,
-					ServerID:     cfg.ID,
-					Kind:         runtime.ClientNotificationLoggingMessage,
-					LoggerName:   req.Params.Logger,
-					LoggingLevel: string(req.Params.Level),
-					LogData:      req.Params.Data,
-				})
-			},
 			ProgressNotificationHandler: func(ctx context.Context, req *mcpSDK.ProgressNotificationClientRequest) {
 				if req == nil || req.Params == nil {
 					return

@@ -252,7 +252,6 @@ type MCPServerCapabilitiesSummary struct {
 	ResourcesListChanged bool           `json:"resourcesListChanged,omitempty"`
 	Prompts              bool           `json:"prompts,omitempty"`
 	PromptsListChanged   bool           `json:"promptsListChanged,omitempty"`
-	Logging              bool           `json:"logging,omitempty"`
 	Completions          bool           `json:"completions,omitempty"`
 	Experimental         map[string]any `json:"experimental,omitempty"`
 	Extensions           map[string]any `json:"extensions,omitempty"`
