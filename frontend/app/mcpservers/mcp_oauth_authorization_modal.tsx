@@ -4,12 +4,17 @@ import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiExternalLink, FiX } from 'react-icons/fi';
 
-import { MCPAuthHealthState } from '@/spec/mcp';
 import type { MCPAuthHealth, MCPServerConfig } from '@/spec/mcp';
+import { MCPAuthHealthState } from '@/spec/mcp';
 
 import { ModalBackdrop } from '@/components/modal_backdrop';
 
-import { getMCPAuthHealthBadgeClass, getMCPAuthHealthLabel } from '@/mcpservers/lib/mcp_server_utils';
+import {
+	getEffectiveMCPAuthHealthState,
+	getMCPServerAuthHealthBadgeClass,
+	getMCPServerAuthHealthLabel,
+	isMCPAuthActionable,
+} from '@/mcpservers/lib/mcp_server_utils';
 
 interface MCPOAuthAuthorizationModalProps {
 	isOpen: boolean;
@@ -30,9 +35,12 @@ function MCPOAuthAuthorizationModalContent({
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const isUnmountingRef = useRef(false);
 
-	const authorizationURL = authHealth?.authorizationURL ?? '';
-	const isPending = authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending;
-	const isAuthorized = authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateAuthorized;
+	const authState = getEffectiveMCPAuthHealthState(server ?? undefined, authHealth);
+	const authorizationURL = isMCPAuthActionable(authHealth, server ?? undefined)
+		? (authHealth?.authorizationURL ?? '')
+		: '';
+	const isPending = authState === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending;
+	const isAuthorized = authState === MCPAuthHealthState.MCPAuthHealthStateAuthorized;
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
@@ -106,8 +114,8 @@ function MCPOAuthAuthorizationModalContent({
 					</div>
 
 					<div className="mb-4 flex items-center gap-2">
-						<span className={`badge rounded-xl ${getMCPAuthHealthBadgeClass(authHealth?.state)}`}>
-							{getMCPAuthHealthLabel(authHealth?.state)}
+						<span className={`badge rounded-xl ${getMCPServerAuthHealthBadgeClass(server ?? undefined, authHealth)}`}>
+							{getMCPServerAuthHealthLabel(server ?? undefined, authHealth)}
 						</span>
 						{authHealth?.authorizationExpiresAt && (
 							<span className="text-base-content/60 text-xs">Expires at {authHealth.authorizationExpiresAt}</span>

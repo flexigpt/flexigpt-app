@@ -30,9 +30,10 @@ import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal'
 
 import type { MCPServerUpsertInput } from '@/mcpservers/lib/mcp_server_utils';
 import {
+	getEffectiveMCPAuthHealthState,
 	getEffectiveMCPServerStatus,
-	getMCPAuthHealthBadgeClass,
-	getMCPAuthHealthLabel,
+	getMCPServerAuthHealthBadgeClass,
+	getMCPServerAuthHealthLabel,
 	getMCPServerSetupStatus,
 	getMCPStatusBadgeClass,
 	getMCPStatusLabel,
@@ -74,14 +75,32 @@ interface MCPBundleCardProps {
 	onDeleteBundleRequested: (bundleID: string) => void;
 }
 
-function isOAuthModalRelevant(authHealth?: MCPAuthHealth): boolean {
+function isOAuthModalRelevant(server: MCPServerConfig, authHealth?: MCPAuthHealth): boolean {
+	const authState = getEffectiveMCPAuthHealthState(server, authHealth);
+
 	return (
-		isMCPAuthActionable(authHealth) || authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending
+		isMCPAuthActionable(authHealth, server) || authState === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending
 	);
 }
 
 function oauthDismissKey(bundleID: string, serverID: string, authHealth?: MCPAuthHealth): string {
 	return `${bundleID}:${serverID}:${authHealth?.authorizationURL ?? authHealth?.state ?? ''}`;
+}
+
+function getAuthHealthTitle(server: MCPServerConfig, authHealth: MCPAuthHealth | undefined, label: string): string {
+	const serverAuthMode = server.streamableHttp?.authMode ?? 'none';
+	const parts = [
+		authHealth?.lastError || label,
+		`serverAuthMode=${serverAuthMode}`,
+		`healthAuthMode=${authHealth?.authMode ?? 'unknown'}`,
+		`healthState=${authHealth?.state ?? 'unknown'}`,
+		`configured=${authHealth?.configured ?? 'unknown'}`,
+		authHealth?.bundleID ? `healthBundleID=${authHealth.bundleID}` : undefined,
+		authHealth?.serverID ? `healthServerID=${authHealth.serverID}` : undefined,
+		authHealth?.resource ? `resource=${authHealth.resource}` : undefined,
+	].filter(Boolean);
+
+	return parts.join('\n');
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -275,7 +294,7 @@ export function MCPBundleCard({
 		}
 
 		const authHealth = authHealthByServerID[server.id];
-		return isOAuthModalRelevant(authHealth) ? server : null;
+		return isOAuthModalRelevant(server, authHealth) ? server : null;
 	}, [authHealthByServerID, manualOAuthModalServerID, servers]);
 
 	const autoOAuthModalServer = useMemo(() => {
@@ -286,7 +305,7 @@ export function MCPBundleCard({
 		return (
 			servers.find(server => {
 				const authHealth = authHealthByServerID[server.id];
-				if (!isOAuthModalRelevant(authHealth)) {
+				if (!isOAuthModalRelevant(server, authHealth)) {
 					return false;
 				}
 
@@ -376,9 +395,12 @@ export function MCPBundleCard({
 								const status = getEffectiveMCPServerStatus(server.enabled, bundle.isEnabled, runtime);
 								const isReady = status === MCPServerStatus.MCPServerStatusReady;
 								const isConnecting = status === MCPServerStatus.MCPServerStatusConnecting;
-								const authActionable = isMCPAuthActionable(authHealth);
+								const authState = getEffectiveMCPAuthHealthState(server, authHealth);
+								const authActionable = isMCPAuthActionable(authHealth, server);
 								const setupStatus = getMCPServerSetupStatus(server);
 								const setupIncomplete = setupStatus.hasInputs && !setupStatus.complete;
+								const authLabel = getMCPServerAuthHealthLabel(server, authHealth);
+								const authTitle = getAuthHealthTitle(server, authHealth, authLabel);
 								return (
 									<article
 										key={server.id}
@@ -409,10 +431,10 @@ export function MCPBundleCard({
 													</span>
 												)}
 												<span
-													className={`badge badge-xs rounded-xl ${getMCPAuthHealthBadgeClass(authHealth?.state)}`}
-													title={authHealth?.lastError || getMCPAuthHealthLabel(authHealth?.state)}
+													className={`badge badge-xs rounded-xl ${getMCPServerAuthHealthBadgeClass(server, authHealth)}`}
+													title={authTitle}
 												>
-													{getMCPAuthHealthLabel(authHealth?.state)}
+													{authLabel}
 												</span>
 											</div>
 										</div>
@@ -457,7 +479,7 @@ export function MCPBundleCard({
 												)}
 
 												{(authActionable ||
-													authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending) && (
+													authState === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending) && (
 													<div className="border-info/20 bg-info/10 flex flex-wrap items-center justify-between gap-2 rounded-2xl border p-2">
 														<div className="min-w-0 text-xs">
 															<div className="font-semibold">OAuth authorization required</div>
@@ -481,7 +503,7 @@ export function MCPBundleCard({
 																</button>
 															)}
 
-															{authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending && (
+															{authState === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending && (
 																<button
 																	type="button"
 																	className="btn btn-xs bg-base-300 rounded-xl"
@@ -578,9 +600,12 @@ export function MCPBundleCard({
 													title={
 														setupIncomplete
 															? 'Complete required setup before connecting.'
-															: authActionable
+															: authActionable ||
+																  authState === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending
 																? 'Authorization pending. Open auth URL first if needed.'
-																: 'Connect'
+																: authState === MCPAuthHealthState.MCPAuthHealthStateAuthorized
+																	? 'Connect MCP server using saved authorization.'
+																	: 'Connect'
 													}
 													aria-label="Connect"
 												>

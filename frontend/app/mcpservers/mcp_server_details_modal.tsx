@@ -27,9 +27,9 @@ import { ModalBackdrop } from '@/components/modal_backdrop';
 
 import {
 	getMCPApprovalRuleLabel,
-	getMCPAuthHealthBadgeClass,
-	getMCPAuthHealthLabel,
 	getMCPExecutionModeLabel,
+	getMCPServerAuthHealthBadgeClass,
+	getMCPServerAuthHealthLabel,
 	getMCPStatusBadgeClass,
 	getMCPStatusLabel,
 	getMCPToolRiskBadgeClass,
@@ -266,8 +266,8 @@ function MCPServerDetailsModalContent({
 						</Field>
 
 						<Field label="Auth">
-							<span className={`badge rounded-xl ${getMCPAuthHealthBadgeClass(authHealth?.state)}`}>
-								{getMCPAuthHealthLabel(authHealth?.state)}
+							<span className={`badge rounded-xl ${getMCPServerAuthHealthBadgeClass(server, authHealth)}`}>
+								{getMCPServerAuthHealthLabel(server, authHealth)}
 							</span>
 							{authHealth?.lastError && <div className="text-error mt-1 text-xs">{authHealth.lastError}</div>}
 						</Field>

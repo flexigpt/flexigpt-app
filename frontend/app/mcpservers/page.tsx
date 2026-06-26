@@ -5,13 +5,14 @@ import { FiPlus, FiSettings } from 'react-icons/fi';
 import type {
 	MCPAuthHealth,
 	MCPBundle,
+	MCPOAuthAuthorization,
 	MCPServerConfig,
 	MCPServerRuntimeSnapshot,
 	MCPServerSetupInputValue,
 	MCPSettingsView,
 	PutMCPServerPayload,
 } from '@/spec/mcp';
-import { BaseMCPBundleID, MCPAuthHealthState, MCPSecretKind } from '@/spec/mcp';
+import { BaseMCPBundleID, MCPAuthHealthState, MCPHTTPAuthMode, MCPSecretKind, MCPTransportType } from '@/spec/mcp';
 
 import { omitManyKeys } from '@/lib/obj_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
@@ -69,6 +70,152 @@ function sleep(ms: number): Promise<void> {
 	});
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null;
+}
+
+function isMCPServerRuntimeSnapshotValue(value: unknown): value is MCPServerRuntimeSnapshot {
+	return isRecord(value) && typeof value.serverID === 'string' && typeof value.status === 'string';
+}
+
+function getMatchingMCPServerRuntimeSnapshot(
+	bundleID: string,
+	serverID: string,
+	value: unknown
+): MCPServerRuntimeSnapshot | undefined {
+	if (!isMCPServerRuntimeSnapshotValue(value)) {
+		return undefined;
+	}
+
+	if (value.serverID !== serverID || (value.bundleID && value.bundleID !== bundleID)) {
+		console.warn('Ignoring MCP runtime snapshot for a different server.', {
+			requestedBundleID: bundleID,
+			requestedServerID: serverID,
+			responseBundleID: value.bundleID,
+			responseServerID: value.serverID,
+		});
+		return undefined;
+	}
+
+	return value;
+}
+
+function getExpectedMCPServerAuthMode(server: MCPServerConfig): MCPHTTPAuthMode {
+	if (server.transport === MCPTransportType.MCPTransportTypeStdio) {
+		return MCPHTTPAuthMode.MCPHTTPAuthNone;
+	}
+
+	return server.streamableHttp?.authMode ?? MCPHTTPAuthMode.MCPHTTPAuthNone;
+}
+
+function getCoercedMCPAuthHealthStateForMode(authMode: MCPHTTPAuthMode, configured: boolean): MCPAuthHealthState {
+	switch (authMode) {
+		case MCPHTTPAuthMode.MCPHTTPAuthNone:
+			return MCPAuthHealthState.MCPAuthHealthStateNotRequired;
+		case MCPHTTPAuthMode.MCPHTTPAuthOAuth:
+			return configured
+				? MCPAuthHealthState.MCPAuthHealthStateAuthorizationNeeded
+				: MCPAuthHealthState.MCPAuthHealthStateNotConfigured;
+		case MCPHTTPAuthMode.MCPHTTPAuthAPIKey:
+		case MCPHTTPAuthMode.MCPHTTPAuthClientCredentials:
+			return configured
+				? MCPAuthHealthState.MCPAuthHealthStateAuthorized
+				: MCPAuthHealthState.MCPAuthHealthStateNotConfigured;
+		default:
+			return MCPAuthHealthState.MCPAuthHealthStateNotConfigured;
+	}
+}
+
+function getMatchingMCPAuthHealth(
+	bundleID: string,
+	server: MCPServerConfig,
+	value: MCPAuthHealth | undefined
+): MCPAuthHealth | undefined {
+	if (!value) {
+		return undefined;
+	}
+
+	const authHealth = value;
+
+	if (authHealth.serverID !== server.id || (authHealth.bundleID && authHealth.bundleID !== bundleID)) {
+		console.warn('Ignoring MCP auth health for a different server.', {
+			requestedBundleID: bundleID,
+			requestedServerID: server.id,
+			responseBundleID: authHealth.bundleID,
+			responseServerID: authHealth.serverID,
+		});
+		return undefined;
+	}
+
+	const expectedAuthMode = getExpectedMCPServerAuthMode(server);
+
+	if (authHealth.authMode !== expectedAuthMode) {
+		console.warn('Coercing mismatched MCP auth health mode to the server config mode.', {
+			bundleID,
+			serverID: server.id,
+			serverAuthMode: expectedAuthMode,
+			healthAuthMode: authHealth.authMode,
+			healthState: authHealth.state,
+		});
+
+		return {
+			...authHealth,
+			authMode: expectedAuthMode,
+			state: getCoercedMCPAuthHealthStateForMode(expectedAuthMode, authHealth.configured),
+		};
+	}
+
+	if (
+		expectedAuthMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth &&
+		authHealth.state === MCPAuthHealthState.MCPAuthHealthStateAuthorized &&
+		!authHealth.configured
+	) {
+		return {
+			...authHealth,
+			state: MCPAuthHealthState.MCPAuthHealthStateAuthorizationNeeded,
+			authorizationPending: false,
+		};
+	}
+
+	return authHealth;
+}
+
+function isMCPOAuthAuthorizationValue(value: unknown): value is MCPOAuthAuthorization {
+	return isRecord(value) && typeof value.serverID === 'string' && typeof value.authorizationURL === 'string';
+}
+
+function getMCPOAuthAuthorizationResult(value: unknown): MCPOAuthAuthorization | undefined {
+	if (isMCPOAuthAuthorizationValue(value)) {
+		return value;
+	}
+
+	if (isRecord(value) && isMCPOAuthAuthorizationValue(value.authorization)) {
+		return value.authorization;
+	}
+
+	return undefined;
+}
+
+function getPendingOAuthAuthHealth(
+	bundleID: string,
+	serverID: string,
+	authorization: MCPOAuthAuthorization,
+	previous?: MCPAuthHealth
+): MCPAuthHealth {
+	return {
+		...previous,
+		bundleID: authorization.bundleID || bundleID,
+		serverID: authorization.serverID || serverID,
+		authMode: MCPHTTPAuthMode.MCPHTTPAuthOAuth,
+		state: MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending,
+		configured: previous?.configured ?? true,
+		authorizationPending: true,
+		authorizationURL: authorization.authorizationURL,
+		authorizationExpiresAt: authorization.expiresAt,
+		lastError: undefined,
+	};
+}
+
 // oxlint-disable-next-line no-restricted-exports
 export default function MCPServersPage() {
 	const [bundles, setBundles] = useState<BundleData[]>([]);
@@ -90,11 +237,12 @@ export default function MCPServersPage() {
 	const loadRuntimeAndAuth = useCallback(async (bundleID: string, servers: MCPServerConfig[]) => {
 		const entries = await Promise.all(
 			servers.map(async server => {
-				const [runtime, authHealth] = await Promise.all([
+				const [runtimeResult, authHealthResult] = await Promise.all([
 					mcpAPI.getMCPServerStatus(bundleID, server.id).catch(() => undefined),
 					mcpAPI.getMCPServerAuthHealth(bundleID, server.id).catch(() => undefined),
 				]);
-
+				const runtime = getMatchingMCPServerRuntimeSnapshot(bundleID, server.id, runtimeResult);
+				const authHealth = getMatchingMCPAuthHealth(bundleID, server, authHealthResult);
 				return {
 					serverID: server.id,
 					runtime,
@@ -152,27 +300,33 @@ export default function MCPServersPage() {
 	);
 
 	const refreshServerRuntimeAndAuth = useCallback(async (bundleID: string, serverID: string) => {
-		const [runtime, authHealth] = await Promise.all([
+		const [runtimeResult, authHealthResult] = await Promise.all([
 			mcpAPI.getMCPServerStatus(bundleID, serverID).catch(() => undefined),
 			mcpAPI.getMCPServerAuthHealth(bundleID, serverID).catch(() => undefined),
 		]);
 
 		setBundles(prev =>
-			prev.map(bundleData =>
-				bundleData.bundle.id === bundleID
-					? {
-							...bundleData,
-							runtimeByServerID: {
-								...bundleData.runtimeByServerID,
-								[serverID]: runtime,
-							},
-							authHealthByServerID: {
-								...bundleData.authHealthByServerID,
-								[serverID]: authHealth,
-							},
-						}
-					: bundleData
-			)
+			prev.map(bundleData => {
+				if (bundleData.bundle.id !== bundleID) {
+					return bundleData;
+				}
+
+				const server = bundleData.servers.find(candidate => candidate.id === serverID);
+				const runtime = getMatchingMCPServerRuntimeSnapshot(bundleID, serverID, runtimeResult);
+				const authHealth = server ? getMatchingMCPAuthHealth(bundleID, server, authHealthResult) : undefined;
+
+				return {
+					...bundleData,
+					runtimeByServerID: {
+						...bundleData.runtimeByServerID,
+						[serverID]: runtime,
+					},
+					authHealthByServerID: {
+						...bundleData.authHealthByServerID,
+						[serverID]: authHealth,
+					},
+				};
+			})
 		);
 	}, []);
 
@@ -553,7 +707,7 @@ export default function MCPServersPage() {
 	const handleConnectServer = useCallback(
 		async (bundleID: string, serverID: string) => {
 			let settled = false;
-
+			let snapShot: MCPServerRuntimeSnapshot | undefined;
 			const connectPromise = mcpAPI.connectMCPServer(bundleID, serverID).finally(() => {
 				settled = true;
 			});
@@ -567,8 +721,10 @@ export default function MCPServersPage() {
 						await refreshServerRuntimeAndAuth(bundleID, serverID).catch(() => undefined);
 					}
 				}
-				const snapshot = await connectPromise;
-				if (snapshot) {
+
+				snapShot = await connectPromise;
+
+				if (snapShot) {
 					setBundles(prev =>
 						prev.map(bundleData =>
 							bundleData.bundle.id === bundleID
@@ -576,7 +732,7 @@ export default function MCPServersPage() {
 										...bundleData,
 										runtimeByServerID: {
 											...bundleData.runtimeByServerID,
-											[serverID]: snapshot,
+											[serverID]: snapShot,
 										},
 									}
 								: bundleData
@@ -585,6 +741,28 @@ export default function MCPServersPage() {
 				}
 			} finally {
 				await refreshServerRuntimeAndAuth(bundleID, serverID).catch(() => undefined);
+			}
+
+			const authorization = getMCPOAuthAuthorizationResult(snapShot);
+			if (authorization) {
+				setBundles(prev =>
+					prev.map(bundleData =>
+						bundleData.bundle.id === bundleID
+							? {
+									...bundleData,
+									authHealthByServerID: {
+										...bundleData.authHealthByServerID,
+										[serverID]: getPendingOAuthAuthHealth(
+											bundleID,
+											serverID,
+											authorization,
+											bundleData.authHealthByServerID[serverID]
+										),
+									},
+								}
+							: bundleData
+					)
+				);
 			}
 		},
 		[refreshServerRuntimeAndAuth]

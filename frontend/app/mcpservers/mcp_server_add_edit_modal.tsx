@@ -904,7 +904,9 @@ function AddEditMCPServerModalContent({
 				...payloadBase,
 				streamableHttp: {
 					...streamableHttp,
-					authMode: MCPHTTPAuthMode.MCPHTTPAuthOAuth,
+					// Stage as no-auth so creating the server does not enter the
+					// interactive OAuth flow before the client-credentials secret exists.
+					authMode: MCPHTTPAuthMode.MCPHTTPAuthNone,
 					clientCredentialRef: undefined,
 					clientIDMetadataDocumentURL: undefined,
 					secretHeaderRefs: undefined,

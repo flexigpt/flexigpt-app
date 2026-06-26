@@ -169,6 +169,100 @@ export function getMCPHTTPAuthModeLabel(mode: MCPHTTPAuthMode): string {
 	}
 }
 
+export type MCPAuthDisplayServer = Pick<MCPServerConfig, 'transport' | 'streamableHttp'>;
+
+const MCP_AUTH_HEALTH_STATE_VALUES = new Set<string>(Object.values(MCPAuthHealthState));
+
+function hasRecordEntries(record?: Record<string, string>): boolean {
+	return Boolean(record && Object.keys(record).length > 0);
+}
+
+export function getMCPServerAuthMode(
+	server?: MCPAuthDisplayServer,
+	authHealth?: Pick<MCPAuthHealth, 'authMode'>
+): MCPHTTPAuthMode {
+	if (server?.transport === MCPTransportType.MCPTransportTypeStdio) {
+		return MCPHTTPAuthMode.MCPHTTPAuthNone;
+	}
+
+	return server?.streamableHttp?.authMode ?? authHealth?.authMode ?? MCPHTTPAuthMode.MCPHTTPAuthNone;
+}
+
+function isNonInteractiveMCPAuthConfigured(
+	server: MCPAuthDisplayServer | undefined,
+	authMode: MCPHTTPAuthMode
+): boolean {
+	if (!server?.streamableHttp) {
+		return false;
+	}
+
+	switch (authMode) {
+		case MCPHTTPAuthMode.MCPHTTPAuthAPIKey:
+			return (
+				hasRecordEntries(server.streamableHttp.secretHeaderRefs) || hasRecordEntries(server.streamableHttp.headers)
+			);
+		case MCPHTTPAuthMode.MCPHTTPAuthClientCredentials:
+			return Boolean(server.streamableHttp.clientCredentialRef?.trim());
+		default:
+			return false;
+	}
+}
+
+export function getEffectiveMCPAuthHealthState(
+	server?: MCPAuthDisplayServer,
+	authHealth?: MCPAuthHealth
+): MCPAuthHealthState | undefined {
+	const authMode = getMCPServerAuthMode(server, authHealth);
+
+	if (server?.transport === MCPTransportType.MCPTransportTypeStdio || authMode === MCPHTTPAuthMode.MCPHTTPAuthNone) {
+		return MCPAuthHealthState.MCPAuthHealthStateNotRequired;
+	}
+
+	const state = normalizeMCPAuthHealthState(authHealth?.state);
+
+	if (authMode === MCPHTTPAuthMode.MCPHTTPAuthAPIKey || authMode === MCPHTTPAuthMode.MCPHTTPAuthClientCredentials) {
+		const nonInteractiveConfigured =
+			authHealth?.configured ??
+			(isNonInteractiveMCPAuthConfigured(server, authMode) ||
+				state === MCPAuthHealthState.MCPAuthHealthStateAuthorized);
+
+		return nonInteractiveConfigured
+			? MCPAuthHealthState.MCPAuthHealthStateAuthorized
+			: MCPAuthHealthState.MCPAuthHealthStateNotConfigured;
+	}
+
+	if (
+		authHealth?.authorizationPending &&
+		state !== MCPAuthHealthState.MCPAuthHealthStateAuthorized &&
+		state !== MCPAuthHealthState.MCPAuthHealthStateNotRequired
+	) {
+		return MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending;
+	}
+
+	if (authHealth && !authHealth.configured && !state) {
+		return MCPAuthHealthState.MCPAuthHealthStateNotConfigured;
+	}
+
+	return state;
+}
+
+export function normalizeMCPAuthHealthState(state?: MCPAuthHealthState | string): MCPAuthHealthState | undefined {
+	if (!state) {
+		return undefined;
+	}
+
+	if (MCP_AUTH_HEALTH_STATE_VALUES.has(state)) {
+		return state as MCPAuthHealthState;
+	}
+
+	switch (state) {
+		case 'required':
+			return MCPAuthHealthState.MCPAuthHealthStateAuthorizationNeeded;
+		default:
+			return undefined;
+	}
+}
+
 export function getMCPStatusLabel(status?: MCPServerStatus): string {
 	switch (status) {
 		case MCPServerStatus.MCPServerStatusDisabled:
@@ -201,8 +295,10 @@ export function getMCPStatusBadgeClass(status?: MCPServerStatus): string {
 	}
 }
 
-export function getMCPAuthHealthLabel(state?: MCPAuthHealthState): string {
-	switch (state) {
+export function getMCPAuthHealthLabel(state?: MCPAuthHealthState | string): string {
+	const normalizedState = normalizeMCPAuthHealthState(state);
+
+	switch (normalizedState) {
 		case MCPAuthHealthState.MCPAuthHealthStateNotRequired:
 			return 'Auth: not required';
 		case MCPAuthHealthState.MCPAuthHealthStateNotConfigured:
@@ -224,8 +320,10 @@ export function getMCPAuthHealthLabel(state?: MCPAuthHealthState): string {
 	}
 }
 
-export function getMCPAuthHealthBadgeClass(state?: MCPAuthHealthState): string {
-	switch (state) {
+export function getMCPAuthHealthBadgeClass(state?: MCPAuthHealthState | string): string {
+	const normalizedState = normalizeMCPAuthHealthState(state);
+
+	switch (normalizedState) {
 		case MCPAuthHealthState.MCPAuthHealthStateNotRequired:
 			return 'badge-ghost';
 		case MCPAuthHealthState.MCPAuthHealthStateAuthorized:
@@ -242,6 +340,38 @@ export function getMCPAuthHealthBadgeClass(state?: MCPAuthHealthState): string {
 		default:
 			return 'badge-neutral';
 	}
+}
+
+export function getMCPServerAuthHealthLabel(server?: MCPAuthDisplayServer, authHealth?: MCPAuthHealth): string {
+	const authMode = getMCPServerAuthMode(server, authHealth);
+	const state = getEffectiveMCPAuthHealthState(server, authHealth);
+
+	if (
+		(authMode === MCPHTTPAuthMode.MCPHTTPAuthAPIKey || authMode === MCPHTTPAuthMode.MCPHTTPAuthClientCredentials) &&
+		state === MCPAuthHealthState.MCPAuthHealthStateAuthorized
+	) {
+		return 'Auth: configured';
+	}
+
+	if (authMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth && state === MCPAuthHealthState.MCPAuthHealthStateAuthorized) {
+		return 'OAuth: token saved';
+	}
+
+	return getMCPAuthHealthLabel(state);
+}
+
+export function getMCPServerAuthHealthBadgeClass(server?: MCPAuthDisplayServer, authHealth?: MCPAuthHealth): string {
+	const authMode = getMCPServerAuthMode(server, authHealth);
+	const state = getEffectiveMCPAuthHealthState(server, authHealth);
+
+	if (
+		(authMode === MCPHTTPAuthMode.MCPHTTPAuthAPIKey || authMode === MCPHTTPAuthMode.MCPHTTPAuthClientCredentials) &&
+		state === MCPAuthHealthState.MCPAuthHealthStateAuthorized
+	) {
+		return 'badge-ghost';
+	}
+
+	return getMCPAuthHealthBadgeClass(state);
 }
 
 export function getMCPToolRiskLabel(risk: MCPToolRisk): string {
@@ -285,8 +415,21 @@ export function getEffectiveMCPServerStatus(
 	return runtime?.status ?? MCPServerStatus.MCPServerStatusDisconnected;
 }
 
-export function isMCPAuthActionable(authHealth?: MCPAuthHealth): boolean {
-	return Boolean(authHealth?.authorizationURL);
+export function isMCPAuthActionable(authHealth?: MCPAuthHealth, server?: MCPAuthDisplayServer): boolean {
+	if (!authHealth?.authorizationURL) {
+		return false;
+	}
+
+	if (getMCPServerAuthMode(server, authHealth) !== MCPHTTPAuthMode.MCPHTTPAuthOAuth) {
+		return false;
+	}
+
+	const state = getEffectiveMCPAuthHealthState(server, authHealth);
+
+	return (
+		state !== MCPAuthHealthState.MCPAuthHealthStateNotRequired &&
+		state !== MCPAuthHealthState.MCPAuthHealthStateAuthorized
+	);
 }
 
 export function serverHasSetupInputs(server: Pick<MCPServerConfig, 'setup'>): boolean {
