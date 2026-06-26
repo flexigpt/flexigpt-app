@@ -202,7 +202,7 @@ const tsRules: DummyRuleMap = {
 		},
 	],
 	'typescript/return-await': ['error', 'error-handling-correctness-only'],
-	'typescript/switch-exhaustiveness-check': 'off',
+	'typescript/switch-exhaustiveness-check': ['error', { considerDefaultExhaustiveForUnions: true }],
 
 	'typescript/no-misused-promises': 'off',
 	'typescript/no-unsafe-argument': 'off',
