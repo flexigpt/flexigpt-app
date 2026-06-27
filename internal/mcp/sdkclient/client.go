@@ -204,15 +204,6 @@ func (f *Factory) Connect(
 	}, nil
 }
 
-func newStreamableHTTPClient(headers map[string]string) *http.Client {
-	if len(headers) == 0 {
-		return &http.Client{}
-	}
-	return &http.Client{
-		Transport: &headerRoundTripper{base: http.DefaultTransport, headers: maps.Clone(headers)},
-	}
-}
-
 type headerRoundTripper struct {
 	base    http.RoundTripper
 	headers map[string]string
@@ -239,6 +230,15 @@ func (f *Factory) log() *slog.Logger {
 		return f.logger
 	}
 	return slog.Default()
+}
+
+func newStreamableHTTPClient(headers map[string]string) *http.Client {
+	if len(headers) == 0 {
+		return &http.Client{}
+	}
+	return &http.Client{
+		Transport: &headerRoundTripper{base: http.DefaultTransport, headers: maps.Clone(headers)},
+	}
 }
 
 // buildClientCapabilities returns the client capability set advertised on

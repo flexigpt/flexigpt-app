@@ -276,6 +276,12 @@ func (m *MCPRuntimeManager) Connect(
 	if oldClient != nil {
 		_ = oldClient.Close(ctx)
 	}
+	if m.auth != nil && resolved.Status.AuthMode == spec.MCPHTTPAuthAPIKey {
+		st := resolved.Status
+		st.State = spec.MCPAuthStateAuthorized
+		st.LastError = ""
+		_ = m.auth.SaveAuthStatus(context.WithoutCancel(ctx), st)
+	}
 
 	return &spec.ConnectMCPServerResponse{Body: m.snapshotFromState(req.BundleID, req.ServerID)}, nil
 }
@@ -943,25 +949,6 @@ func (m *MCPRuntimeManager) rememberSnapshotLocked(
 	st.snapshotExpiresAt = now.Add(ttl)
 }
 
-func (st *sessionState) snapshotStillValid(now time.Time) bool {
-	if st == nil {
-		return false
-	}
-	if st.snapshot.BundleID == "" || st.snapshot.ServerID == "" || st.snapshot.Digest == "" {
-		return false
-	}
-	if st.status == spec.MCPServerStatusReady {
-		return true
-	}
-	if st.snapshotExpiresAt.IsZero() {
-		return false
-	}
-	if now.IsZero() {
-		now = time.Now().UTC()
-	}
-	return now.Before(st.snapshotExpiresAt)
-}
-
 func (m *MCPRuntimeManager) clearSnapshotLocked(_ context.Context, st *sessionState) {
 	if st == nil {
 		return
@@ -1110,6 +1097,25 @@ func (m *MCPRuntimeManager) snapshotFromState(
 		out.LastSyncedAt = st.lastSyncedAt.Format(time.RFC3339Nano)
 	}
 	return out
+}
+
+func (st *sessionState) snapshotStillValid(now time.Time) bool {
+	if st == nil {
+		return false
+	}
+	if st.snapshot.BundleID == "" || st.snapshot.ServerID == "" || st.snapshot.Digest == "" {
+		return false
+	}
+	if st.status == spec.MCPServerStatusReady {
+		return true
+	}
+	if st.snapshotExpiresAt.IsZero() {
+		return false
+	}
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	return now.Before(st.snapshotExpiresAt)
 }
 
 func firstBundleID(values ...bundleitemutils.BundleID) bundleitemutils.BundleID {

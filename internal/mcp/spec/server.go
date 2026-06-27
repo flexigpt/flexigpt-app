@@ -97,13 +97,6 @@ type MCPServerSetup struct {
 	Inputs []MCPServerSetupInput `json:"inputs,omitempty"`
 }
 
-// MCPBuiltInServerOverlay is user-owned runtime config layered on top of a
-// read-only built-in server. Secret values are referenced, not inlined.
-type MCPBuiltInServerOverlay struct {
-	Stdio          *MCPStdioConfigOverlay          `json:"stdio,omitempty"`
-	StreamableHTTP *MCPStreamableHTTPConfigOverlay `json:"streamableHttp,omitempty"`
-}
-
 type MCPStdioConfigOverlay struct {
 	Env           map[string]string `json:"env,omitempty"`
 	SecretEnvRefs map[string]string `json:"secretEnvRefs,omitempty"`
@@ -118,6 +111,13 @@ type MCPStreamableHTTPConfigOverlay struct {
 
 	ClientCredentialRef         *string `json:"clientCredentialRef,omitempty"`
 	ClientIDMetadataDocumentURL *string `json:"clientIDMetadataDocumentURL,omitempty"`
+}
+
+// MCPBuiltInServerOverlay is user-owned runtime config layered on top of a
+// read-only built-in server. Secret values are referenced, not inlined.
+type MCPBuiltInServerOverlay struct {
+	Stdio          *MCPStdioConfigOverlay          `json:"stdio,omitempty"`
+	StreamableHTTP *MCPStreamableHTTPConfigOverlay `json:"streamableHttp,omitempty"`
 }
 
 type MCPSettings struct {

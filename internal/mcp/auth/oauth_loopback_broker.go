@@ -189,6 +189,9 @@ func (b *OAuthLoopbackBroker) FetchAuthorizationCode(
 	if old := b.pendingByServer[key]; old != nil {
 		b.completeLocked(old, nil, fmt.Errorf("%w: OAuth authorization superseded", spec.ErrMCPAuthRequired))
 	}
+	if old := b.pendingByState[p.State]; old != nil {
+		b.completeLocked(old, nil, fmt.Errorf("%w: OAuth authorization state superseded", spec.ErrMCPAuthRequired))
+	}
 
 	b.pendingByServer[key] = p
 

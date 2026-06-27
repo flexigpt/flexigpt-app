@@ -24,6 +24,7 @@ const (
 	errStrMissingServerID      = "missing serverID"
 	errStrMissingStdIOConfig   = "missing stdio config"
 	errStrUnsupportedTransport = "unsupported transport"
+	errStrUnsupportedAuthMode  = "unsupported auth mode"
 	//nolint:gosec // Const.
 	errStrAPIKeyHeaderRequired = "streamableHttp.secretHeaderRefs is required for apiKey auth"
 	errStrOAuthNotConfigured   = "OAuth authorization code flow is not configured"
@@ -72,6 +73,19 @@ type AuthManager struct {
 }
 
 type AuthManagerOption func(*AuthManager)
+
+type redactedAuthError struct {
+	message string
+	cause   error
+}
+
+func (e redactedAuthError) Error() string {
+	return e.message
+}
+
+func (e redactedAuthError) Unwrap() error {
+	return e.cause
+}
 
 func WithOAuthAuthorizationBroker(broker OAuthAuthorizationBroker) AuthManagerOption {
 	return func(m *AuthManager) {
@@ -209,9 +223,11 @@ func (m *AuthManager) PrepareTransportAuth(
 				out.Status.LastError = errStrAPIKeyHeaderRequired
 				return out, fmt.Errorf("%w: %s", spec.ErrMCPAuthRequired, out.Status.LastError)
 			}
-			// The api key is delivered as a secret HTTP header, already resolved
-			// into out.Headers above. No OAuth handler is required.
-			out.Status.State = spec.MCPAuthStateAuthorized
+			// The API key is configured and will be delivered as a secret HTTP
+			// header, but it has not been accepted by the server yet. The
+			// runtime promotes this to Authorized only after a successful
+			// connect/discovery round trip.
+			out.Status.State = spec.MCPAuthStateRequired
 
 		case spec.MCPHTTPAuthOAuth:
 			if err := m.configureAuthorizationCodeOAuth(ctx, cfg, &out); err != nil {
@@ -224,7 +240,7 @@ func (m *AuthManager) PrepareTransportAuth(
 
 		default:
 			out.Status.State = spec.MCPAuthStateError
-			out.Status.LastError = "unsupported auth mode"
+			out.Status.LastError = errStrUnsupportedAuthMode
 			return out, fmt.Errorf("%w: unsupported auth mode %s", spec.ErrMCPInvalidRequest, mode)
 		}
 
@@ -329,8 +345,8 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 	})
 	if err != nil {
 		out.Status.State = spec.MCPAuthStateError
-		out.Status.LastError = err.Error()
-		return err
+		out.Status.LastError = redactSensitive(err.Error(), out.SensitiveValues)
+		return redactAuthError(err, out.SensitiveValues)
 	}
 
 	out.OAuthHandler = &trackedOAuthHandler{
@@ -366,6 +382,7 @@ func (m *AuthManager) configureClientCredentialsOAuth(
 		out.Status.LastError = err.Error()
 		return err
 	}
+	out.SensitiveValues = append(out.SensitiveValues, sensitive...)
 
 	handler, err := extauth.NewClientCredentialsHandler(&extauth.ClientCredentialsHandlerConfig{
 		Credentials: creds,
@@ -373,10 +390,9 @@ func (m *AuthManager) configureClientCredentialsOAuth(
 	})
 	if err != nil {
 		out.Status.State = spec.MCPAuthStateError
-		out.Status.LastError = err.Error()
-		return err
+		out.Status.LastError = redactSensitive(err.Error(), out.SensitiveValues)
+		return redactAuthError(err, out.SensitiveValues)
 	}
-	out.SensitiveValues = append(out.SensitiveValues, sensitive...)
 
 	out.OAuthHandler = &trackedOAuthHandler{
 		inner: handler,
@@ -393,6 +409,17 @@ func (m *AuthManager) configureClientCredentialsOAuth(
 
 	out.Status.State = spec.MCPAuthStateRequired
 	return nil
+}
+
+func redactAuthError(err error, sensitiveValues []string) error {
+	if err == nil {
+		return nil
+	}
+	redacted := redactSensitive(err.Error(), sensitiveValues)
+	if redacted == err.Error() {
+		return err
+	}
+	return redactedAuthError{message: redacted, cause: err}
 }
 
 func parseOAuthClientCredentialsSecret(

@@ -635,14 +635,14 @@ func TestAuthManagerOptionsAndUnsupportedAuthMode(t *testing.T) {
 		if err == nil {
 			t.Fatalf("PrepareTransportAuth succeeded, want error")
 		}
-		if !strings.Contains(err.Error(), "unsupported auth mode") {
+		if !strings.Contains(err.Error(), errStrUnsupportedAuthMode) {
 			t.Fatalf("err = %q, want unsupported auth mode", err.Error())
 		}
 		if got.Status.State != spec.MCPAuthStateError {
 			t.Fatalf("Status.State = %q, want error", got.Status.State)
 		}
-		if got.Status.LastError != "unsupported auth mode" {
-			t.Fatalf("Status.LastError = %q, want %q", got.Status.LastError, "unsupported auth mode")
+		if got.Status.LastError != errStrUnsupportedAuthMode {
+			t.Fatalf("Status.LastError = %q, want %q", got.Status.LastError, errStrUnsupportedAuthMode)
 		}
 		if got.Status.AuthMode != spec.MCPHTTPAuthMode("bogus") {
 			t.Fatalf("Status.AuthMode = %q, want bogus", got.Status.AuthMode)

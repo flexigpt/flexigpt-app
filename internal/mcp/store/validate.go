@@ -410,32 +410,6 @@ func validateNoEnvKeyOverlap(env, secretEnvRefs map[string]string) error {
 	return nil
 }
 
-func validateEnvKey(key string) error {
-	if strings.TrimSpace(key) == "" {
-		return errors.New("env key is empty")
-	}
-	if strings.TrimSpace(key) != key {
-		return errors.New("env key has leading/trailing whitespace")
-	}
-	if strings.ContainsAny(key, "=\x00") {
-		return errors.New("env key must not contain '=' or NUL")
-	}
-	for _, c := range key {
-		if c < 0x20 || c == 0x7f {
-			return fmt.Errorf("env key contains control character %q", c)
-		}
-	}
-	return nil
-}
-
-func normalizeHTTPAuthMode(mode spec.MCPHTTPAuthMode) spec.MCPHTTPAuthMode {
-	mode = spec.MCPHTTPAuthMode(strings.TrimSpace(string(mode)))
-	if mode == "" {
-		return spec.MCPHTTPAuthNone
-	}
-	return mode
-}
-
 func validateMCPSettings(s spec.MCPSettings) error {
 	addr := strings.TrimSpace(s.OAuthLoopbackListenAddr)
 	if addr == "" {
@@ -513,36 +487,6 @@ func hasHTTPHeader(m map[string]string, name string) bool {
 		}
 	}
 	return false
-}
-
-func validateHTTPHeaderName(name string) error {
-	if strings.TrimSpace(name) == "" {
-		return errors.New("header name is empty")
-	}
-	if strings.TrimSpace(name) != name {
-		return errors.New("header name has leading/trailing whitespace")
-	}
-	for _, r := range name {
-		if !isHTTPTokenRune(r) {
-			return fmt.Errorf("header name contains invalid character %q", r)
-		}
-	}
-	return nil
-}
-
-func isHTTPTokenRune(r rune) bool {
-	if r >= 'A' && r <= 'Z' ||
-		r >= 'a' && r <= 'z' ||
-		r >= '0' && r <= '9' {
-		return true
-	}
-
-	switch r {
-	case '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '^', '_', '`', '|', '~':
-		return true
-	default:
-		return false
-	}
 }
 
 func validateServerSetup(c *spec.MCPServerConfig) error {
@@ -655,6 +599,62 @@ func validateSetupInputUnion(c *spec.MCPServerConfig, i int, input *spec.MCPServ
 		return fmt.Errorf("inputs[%d].kind %q is invalid", i, input.Kind)
 	}
 	return nil
+}
+
+func validateEnvKey(key string) error {
+	if strings.TrimSpace(key) == "" {
+		return errors.New("env key is empty")
+	}
+	if strings.TrimSpace(key) != key {
+		return errors.New("env key has leading/trailing whitespace")
+	}
+	if strings.ContainsAny(key, "=\x00") {
+		return errors.New("env key must not contain '=' or NUL")
+	}
+	for _, c := range key {
+		if c < 0x20 || c == 0x7f {
+			return fmt.Errorf("env key contains control character %q", c)
+		}
+	}
+	return nil
+}
+
+func validateHTTPHeaderName(name string) error {
+	if strings.TrimSpace(name) == "" {
+		return errors.New("header name is empty")
+	}
+	if strings.TrimSpace(name) != name {
+		return errors.New("header name has leading/trailing whitespace")
+	}
+	for _, r := range name {
+		if !isHTTPTokenRune(r) {
+			return fmt.Errorf("header name contains invalid character %q", r)
+		}
+	}
+	return nil
+}
+
+func isHTTPTokenRune(r rune) bool {
+	if r >= 'A' && r <= 'Z' ||
+		r >= 'a' && r <= 'z' ||
+		r >= '0' && r <= '9' {
+		return true
+	}
+
+	switch r {
+	case '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '^', '_', '`', '|', '~':
+		return true
+	default:
+		return false
+	}
+}
+
+func normalizeHTTPAuthMode(mode spec.MCPHTTPAuthMode) spec.MCPHTTPAuthMode {
+	mode = spec.MCPHTTPAuthMode(strings.TrimSpace(string(mode)))
+	if mode == "" {
+		return spec.MCPHTTPAuthNone
+	}
+	return mode
 }
 
 func setupDeclaresClientCredentials(setup *spec.MCPServerSetup) bool {

@@ -8,6 +8,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 )
 
+type testError struct{ msg string }
+
 func TestHTTPHeaderSecretRefRoundTrip(t *testing.T) {
 	bundleID := bundleitemutils.BundleID("bundle-a")
 	serverID := spec.MCPServerID("server-a")
@@ -127,7 +129,5 @@ func TestHTTPHeaderSecretRefValidationBranches(t *testing.T) {
 		})
 	}
 }
-
-type testError struct{ msg string }
 
 func (e *testError) Error() string { return e.msg }

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	mcpAuth "github.com/modelcontextprotocol/go-sdk/auth"
@@ -122,7 +123,8 @@ func (h *trackedOAuthHandler) currentTokenStatus(ctx context.Context) (spec.MCPA
 		return authStatusFromTokenError(h.status, err), true
 	}
 	if tok == nil {
-		return spec.MCPAuthStatus{}, false
+		nilErr := errors.New("oauth token source returned nil token")
+		return authStatusFromTokenError(h.status, nilErr), true
 	}
 	return authStatusFromToken(h.status, tok), true
 }
@@ -136,30 +138,41 @@ func (h *trackedOAuthHandler) publish(ctx context.Context, st spec.MCPAuthStatus
 
 func authStatusFromToken(base spec.MCPAuthStatus, tok *oauth2.Token) spec.MCPAuthStatus {
 	st := base
-	st.State = spec.MCPAuthStateAuthorized
 	st.LastError = ""
 
 	if tok == nil {
-		return st
+		return authStatusFromTokenError(base, errors.New("oauth token source returned nil token"))
+	}
+	if scopes := scopesFromOAuthToken(tok); len(scopes) > 0 {
+		st.Scopes = scopes
 	}
 	if !tok.Expiry.IsZero() {
 		expiresAt := tok.Expiry.UTC()
 		st.ExpiresAt = &expiresAt
 	}
-	if scopes := scopesFromOAuthToken(tok); len(scopes) > 0 {
-		st.Scopes = scopes
+	if strings.TrimSpace(tok.AccessToken) == "" {
+		st.State = spec.MCPAuthStateError
+		st.LastError = "OAuth token is missing an access token"
+		return st
 	}
+	if st.ExpiresAt != nil && !time.Now().UTC().Before(st.ExpiresAt.UTC()) {
+		st.State = spec.MCPAuthStateExpired
+		st.LastError = "OAuth token is expired"
+		return st
+	}
+	st.State = spec.MCPAuthStateAuthorized
 	return st
 }
 
 func authStatusFromTokenError(base spec.MCPAuthStatus, err error) spec.MCPAuthStatus {
 	st := base
 	st.State = spec.MCPAuthStateError
+	st.Scopes = nil
+	st.ExpiresAt = nil
 	if err != nil {
 		st.LastError = err.Error()
 	}
-	var retrieveErr *oauth2.RetrieveError
-	if errors.As(err, &retrieveErr) && retrieveErr.ErrorCode == errStrInvalidGrant {
+	if isExpiredOAuthTokenError(err) {
 		st.State = spec.MCPAuthStateExpired
 	}
 	return st
@@ -182,11 +195,14 @@ func authStatusFromHTTPFailure(
 	if len(scopes) > 0 {
 		st.Scopes = scopes
 	}
+	retrieveErrCode := oauthRetrieveErrorCode(err)
 	switch {
 	case challengeErr == "insufficient_scope":
 		st.State = spec.MCPAuthStateInsufficientScope
-	case challengeErr == "invalid_token":
+	case challengeErr == "invalid_token" || isExpiredOAuthTokenError(err):
 		st.State = spec.MCPAuthStateExpired
+	case retrieveErrCode != "":
+		st.State = spec.MCPAuthStateError
 	case resp.StatusCode == http.StatusUnauthorized:
 		st.State = spec.MCPAuthStateRequired
 	case resp.StatusCode == http.StatusForbidden:
@@ -237,6 +253,25 @@ func scopesFromOAuthToken(tok *oauth2.Token) []string {
 	default:
 		return nil
 	}
+}
+
+func isExpiredOAuthTokenError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if oauthRetrieveErrorCode(err) == errStrInvalidGrant {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, errStrInvalidGrant) ||
+		(strings.Contains(msg, "expired") && strings.Contains(msg, "refresh token"))
+}
+
+func oauthRetrieveErrorCode(err error) string {
+	if retrieveErr, ok := errors.AsType[*oauth2.RetrieveError](err); ok {
+		return retrieveErr.ErrorCode
+	}
+	return ""
 }
 
 func redactAuthStatus(st spec.MCPAuthStatus, sensitiveValues []string) spec.MCPAuthStatus {

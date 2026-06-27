@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
@@ -44,6 +45,17 @@ func MergeMCPAuthStatus(st spec.MCPAuthStatus, cfg spec.MCPServerConfig) spec.MC
 	if st.State == "" {
 		st.State = def.State
 	}
+	if st.State == spec.MCPAuthStateAuthorized {
+		if !authStatusCanBeAuthorized(cfg, def) {
+			return def
+		}
+		if authStatusExpiredByClock(st) {
+			st.State = spec.MCPAuthStateExpired
+			if st.LastError == "" {
+				st.LastError = "OAuth token is expired"
+			}
+		}
+	}
 	if def.AuthMode == spec.MCPHTTPAuthNone {
 		st.State = def.State
 		st.Scopes = nil
@@ -52,6 +64,25 @@ func MergeMCPAuthStatus(st spec.MCPAuthStatus, cfg spec.MCPServerConfig) spec.MC
 		st.AuthorizationServer = ""
 	}
 	return st
+}
+
+func authStatusCanBeAuthorized(cfg spec.MCPServerConfig, def spec.MCPAuthStatus) bool {
+	switch def.AuthMode {
+	case spec.MCPHTTPAuthAPIKey:
+		return cfg.StreamableHTTP != nil && len(cfg.StreamableHTTP.SecretHeaderRefs) > 0
+	case spec.MCPHTTPAuthClientCredentials:
+		return cfg.StreamableHTTP != nil &&
+			strings.TrimSpace(cfg.StreamableHTTP.ClientCredentialRef) != ""
+	default:
+		return true
+	}
+}
+
+func authStatusExpiredByClock(st spec.MCPAuthStatus) bool {
+	if st.ExpiresAt == nil || st.ExpiresAt.IsZero() {
+		return false
+	}
+	return !time.Now().UTC().Before(st.ExpiresAt.UTC())
 }
 
 func DefaultMCPAuthStatusFromConfig(cfg spec.MCPServerConfig) spec.MCPAuthStatus {
@@ -77,7 +108,8 @@ func DefaultMCPAuthStatusFromConfig(cfg spec.MCPServerConfig) spec.MCPAuthStatus
 	case spec.MCPHTTPAuthNone, "":
 		st.State = spec.MCPAuthStateNotRequired
 	default:
-		st.State = spec.MCPAuthStateNotRequired
+		st.State = spec.MCPAuthStateError
+		st.LastError = errStrUnsupportedAuthMode
 	}
 
 	return st

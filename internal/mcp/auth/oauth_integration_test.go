@@ -337,8 +337,8 @@ func TestOAuthClientCredentialsRefreshErrorRedactsStatus(t *testing.T) {
 	if !ok {
 		t.Fatalf("missing auth status")
 	}
-	if st.State != spec.MCPAuthStateError {
-		t.Fatalf("State = %q, want error", st.State)
+	if st.State != spec.MCPAuthStateExpired {
+		t.Fatalf("State = %q, want expired", st.State)
 	}
 	if strings.Contains(st.LastError, "top-secret") {
 		t.Fatalf("LastError leaked secret: %q", st.LastError)

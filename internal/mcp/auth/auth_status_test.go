@@ -159,10 +159,10 @@ func TestAuthStatusHelperBranches(t *testing.T) {
 
 	t.Run("authStatusFromToken handles nil token", func(t *testing.T) {
 		got := authStatusFromToken(base, nil)
-		if got.State != spec.MCPAuthStateAuthorized {
-			t.Fatalf("State = %q, want %q", got.State, spec.MCPAuthStateAuthorized)
+		if got.State != spec.MCPAuthStateError {
+			t.Fatalf("State = %q, want %q", got.State, spec.MCPAuthStateError)
 		}
-		if got.LastError != "" {
+		if got.LastError != "oauth token source returned nil token" {
 			t.Fatalf("LastError = %q, want empty", got.LastError)
 		}
 		if got.ExpiresAt != nil {

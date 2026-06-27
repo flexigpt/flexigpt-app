@@ -46,7 +46,7 @@ func TestPrepareTransportAuthAPIKeyAndSecretHeaderValidation(t *testing.T) {
 				BundleID: testBundleID,
 				ServerID: testHTTPServerID,
 				AuthMode: spec.MCPHTTPAuthAPIKey,
-				State:    spec.MCPAuthStateAuthorized,
+				State:    spec.MCPAuthStateRequired,
 				Resource: testMCPResource,
 			},
 			wantHeaders: map[string]string{
