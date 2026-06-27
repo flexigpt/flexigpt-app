@@ -177,7 +177,7 @@ function hasRecordEntries(record?: Record<string, string>): boolean {
 	return Boolean(record && Object.keys(record).length > 0);
 }
 
-export function getMCPServerAuthMode(
+function getMCPServerAuthMode(
 	server?: MCPAuthDisplayServer,
 	authHealth?: Pick<MCPAuthHealth, 'authMode'>
 ): MCPHTTPAuthMode {
@@ -246,7 +246,7 @@ export function getEffectiveMCPAuthHealthState(
 	return state;
 }
 
-export function normalizeMCPAuthHealthState(state?: MCPAuthHealthState | string): MCPAuthHealthState | undefined {
+function normalizeMCPAuthHealthState(state?: MCPAuthHealthState | string): MCPAuthHealthState | undefined {
 	if (!state) {
 		return undefined;
 	}
