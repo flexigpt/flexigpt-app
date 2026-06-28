@@ -168,7 +168,8 @@ func validateSecret(r spec.MCPSecretRef) error {
 	switch r.Kind {
 	case spec.MCPSecretKindStdioEnv,
 		spec.MCPSecretKindHTTPHeader,
-		spec.MCPSecretKindOAuthClientCredentials:
+		spec.MCPSecretKindOAuthClientCredentials,
+		spec.MCPSecretKindOAuthToken:
 	default:
 		return fmt.Errorf("secret ref kind %q is invalid", r.Kind)
 	}
@@ -178,6 +179,14 @@ func validateSecret(r spec.MCPSecretRef) error {
 	switch r.Kind {
 	case spec.MCPSecretKindOAuthClientCredentials:
 		if r.Slot != normalizeSecretSlot("clientCredentials") {
+			return fmt.Errorf(
+				"secret ref slot %q is invalid for kind %q",
+				r.Slot,
+				r.Kind,
+			)
+		}
+	case spec.MCPSecretKindOAuthToken:
+		if r.Slot != normalizeSecretSlot("token") {
 			return fmt.Errorf(
 				"secret ref slot %q is invalid for kind %q",
 				r.Slot,
@@ -222,6 +231,15 @@ func normalizeAndValidateSecretSlot(kind spec.MCPSecretKind, slot string) (strin
 			)
 		}
 		return normalizeSecretSlot("clientCredentials"), nil
+	case spec.MCPSecretKindOAuthToken:
+		if !strings.EqualFold(raw, "token") {
+			return "", fmt.Errorf(
+				"secret ref slot %q is invalid for kind %q; expected token",
+				slot,
+				kind,
+			)
+		}
+		return normalizeSecretSlot("token"), nil
 
 	default:
 		return "", fmt.Errorf("secret ref kind %q is invalid", kind)

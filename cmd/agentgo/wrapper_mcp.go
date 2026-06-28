@@ -20,9 +20,13 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/store"
 
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
+	"golang.org/x/oauth2"
 )
 
-const secretResolverNotConfiguredReason = "secret resolver is not configured"
+const (
+	secretResolverNotConfiguredReason = "secret resolver is not configured"
+	oauthTokenSecretSlot              = "token"
+)
 
 type mcpAuthKeyReader interface {
 	GetAuthKey(ctx context.Context, req *settingSpec.GetAuthKeyRequest) (*settingSpec.GetAuthKeyResponse, error)
@@ -157,6 +161,81 @@ func (r *settingSecretResolver) DeleteMCPSecret(ctx context.Context, secretRef s
 	return err
 }
 
+func (r *settingSecretResolver) LoadOAuthToken(
+	ctx context.Context,
+	base spec.MCPAuthStatus,
+) (*oauth2.Token, error) {
+	ref, err := oauthTokenSecretRef(base)
+	if err != nil {
+		return nil, err
+	}
+
+	raw, err := r.ResolveSecret(ctx, ref)
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "not found") {
+			return nil, auth.ErrOAuthTokenNotFound
+		}
+		return nil, err
+	}
+	if strings.TrimSpace(raw) == "" {
+		return nil, auth.ErrOAuthTokenNotFound
+	}
+
+	var tok oauth2.Token
+	if err := json.Unmarshal([]byte(raw), &tok); err != nil {
+		return nil, err
+	}
+	return &tok, nil
+}
+
+func (r *settingSecretResolver) SaveOAuthToken(
+	ctx context.Context,
+	base spec.MCPAuthStatus,
+	tok *oauth2.Token,
+) error {
+	if tok == nil || !tok.Valid() {
+		return nil
+	}
+	ref, err := oauthTokenSecretRef(base)
+	if err != nil {
+		return err
+	}
+	//nolint:gosec // Access token.
+	raw, err := json.Marshal(tok)
+	if err != nil {
+		return err
+	}
+	_, _, err = r.SetMCPSecret(ctx, ref, string(raw))
+	return err
+}
+
+func (r *settingSecretResolver) DeleteOAuthToken(
+	ctx context.Context,
+	base spec.MCPAuthStatus,
+) error {
+	ref, err := oauthTokenSecretRef(base)
+	if err != nil {
+		return err
+	}
+	err = r.DeleteMCPSecret(ctx, ref)
+	if err != nil && strings.Contains(strings.ToLower(err.Error()), "not found") {
+		return nil
+	}
+	return err
+}
+
+func oauthTokenSecretRef(base spec.MCPAuthStatus) (string, error) {
+	if base.BundleID == "" || base.ServerID == "" {
+		return "", fmt.Errorf("%w: bundleID and serverID required for OAuth token", spec.ErrMCPInvalidRequest)
+	}
+	return secret.NewMCPSecretRefString(
+		base.BundleID,
+		base.ServerID,
+		spec.MCPSecretKindOAuthToken,
+		oauthTokenSecretSlot,
+	)
+}
+
 type MCPWrapper struct {
 	store *store.Store
 
@@ -203,11 +282,15 @@ func InitMCPWrapper(ctx context.Context, w *MCPWrapper, baseDir string, secrets 
 		return err
 	}
 
-	authMgr := auth.NewAuthManager(
-		secrets,
+	authOptions := []auth.AuthManagerOption{
 		auth.WithOAuthAuthorizationBroker(oauthBroker),
 		auth.WithOAuthRedirectURL(oauthBroker.RedirectURL()),
-	)
+	}
+	if tokenStore, ok := secrets.(auth.OAuthTokenStore); ok {
+		authOptions = append(authOptions, auth.WithOAuthTokenStore(tokenStore))
+	}
+
+	authMgr := auth.NewAuthManager(secrets, authOptions...)
 	rt := runtime.NewMCPRuntimeManager(st, authMgr, sdkclient.NewFactory())
 	appr := runtime.NewApprovalManager(5 * time.Minute)
 	tb := runtime.NewToolBridge(rt, appr)
@@ -333,6 +416,11 @@ func (w *MCPWrapper) PutMCPServer(req *spec.PutMCPServerRequest) (*spec.PutMCPSe
 			w.runtime.ForgetLastKnownSnapshot(ctx, req.BundleID, req.ServerID)
 		}
 
+		if previous != nil && mcpServerAuthMaterialChanged(previous, req) {
+			w.deleteStoredOAuthToken(ctx, previous.BundleID, previous.ID)
+			w.auth.ClearAuthStatus(previous.BundleID, previous.ID)
+		}
+
 		if shouldDisconnectMCPServerAfterPut(previous, req) {
 			_, _ = w.runtime.Disconnect(context.Background(), &spec.DisconnectMCPServerRequest{
 				BundleID: req.BundleID,
@@ -396,6 +484,7 @@ func (w *MCPWrapper) DeleteMCPServer(req *spec.DeleteMCPServerRequest) (*spec.De
 			w.runtime.ForgetLastKnownSnapshot(ctx, req.BundleID, req.ServerID)
 		}
 		if req != nil {
+			w.deleteStoredOAuthToken(ctx, req.BundleID, req.ServerID)
 			_, _ = w.runtime.Disconnect(ctx, &spec.DisconnectMCPServerRequest{
 				BundleID: req.BundleID,
 				ServerID: req.ServerID,
@@ -462,6 +551,8 @@ func (w *MCPWrapper) PatchMCPServerSetup(
 
 		if w.runtime != nil {
 			w.runtime.ForgetLastKnownSnapshot(ctx, req.BundleID, req.ServerID)
+			w.deleteStoredOAuthToken(ctx, req.BundleID, req.ServerID)
+			w.auth.ClearAuthStatus(req.BundleID, req.ServerID)
 			_, _ = w.runtime.Disconnect(ctx, &spec.DisconnectMCPServerRequest{
 				BundleID: req.BundleID,
 				ServerID: req.ServerID,
@@ -733,6 +824,12 @@ func (w *MCPWrapper) PutMCPServerSecret(
 			if err := validateMCPHTTPHeaderSecretValue(req.Body.Secret); err != nil {
 				return nil, err
 			}
+		}
+		if req.Body.Kind == spec.MCPSecretKindOAuthToken {
+			return nil, fmt.Errorf(
+				"%w: OAuth token secrets are managed internally and cannot be edited directly",
+				spec.ErrMCPInvalidRequest,
+			)
 		}
 		sha, nonEmpty, err := w.secretWriter.SetMCPSecret(context.Background(), secretRef, req.Body.Secret)
 		if err != nil {
@@ -1249,4 +1346,38 @@ func mcpServerConnectionMaterialChanged(previous *spec.MCPServerConfig, req *spe
 		!reflect.DeepEqual(previous.Stdio, req.Body.Stdio) ||
 		!reflect.DeepEqual(previous.StreamableHTTP, req.Body.StreamableHTTP) ||
 		!reflect.DeepEqual(previous.AppsPolicy, req.Body.AppsPolicy)
+}
+
+func mcpServerAuthMaterialChanged(previous *spec.MCPServerConfig, req *spec.PutMCPServerRequest) bool {
+	if previous == nil || req == nil || req.Body == nil {
+		return false
+	}
+	prevHTTP := previous.StreamableHTTP
+	nextHTTP := req.Body.StreamableHTTP
+	if prevHTTP == nil || nextHTTP == nil {
+		return prevHTTP != nextHTTP
+	}
+	return prevHTTP.AuthMode != nextHTTP.AuthMode ||
+		prevHTTP.URL != nextHTTP.URL ||
+		prevHTTP.ClientCredentialRef != nextHTTP.ClientCredentialRef ||
+		prevHTTP.ClientIDMetadataDocumentURL != nextHTTP.ClientIDMetadataDocumentURL
+}
+
+func (w *MCPWrapper) deleteStoredOAuthToken(
+	ctx context.Context,
+	bundleID bundleitemutils.BundleID,
+	serverID spec.MCPServerID,
+) {
+	if w == nil || w.secretResolver == nil || bundleID == "" || serverID == "" {
+		return
+	}
+	tokenStore, ok := w.secretResolver.(auth.OAuthTokenStore)
+	if !ok {
+		return
+	}
+	_ = tokenStore.DeleteOAuthToken(ctx, spec.MCPAuthStatus{
+		BundleID: bundleID,
+		ServerID: serverID,
+		AuthMode: spec.MCPHTTPAuthOAuth,
+	})
 }

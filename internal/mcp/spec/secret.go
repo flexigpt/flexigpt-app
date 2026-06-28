@@ -16,6 +16,11 @@ const (
 	//nolint:gosec // Enum val.
 	MCPSecretKindOAuthClientCredentials MCPSecretKind = "oauthClientCredentials"
 
+	// MCPSecretKindOAuthToken stores the app-managed OAuth authorization-code
+	// token JSON for one MCP server. It is internal and is not user-editable via
+	// the MCP server secret UI.
+	MCPSecretKindOAuthToken MCPSecretKind = "oauthToken"
+
 	MCPSecretKindHTTPHeader MCPSecretKind = "httpHeader"
 )
 

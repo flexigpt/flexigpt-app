@@ -130,6 +130,12 @@ func (f *Factory) Connect(
 		},
 	)
 
+	// Compatibility with older MCP servers:
+	// suppress the SDK's new sessionless server/discover probe at the client
+	// middleware layer. Do not wrap the transport connection here, because the
+	// SDK relies on its concrete streamable HTTP connection to receive
+	// sessionUpdated callbacks after initialize.
+	preferLegacyInitializeClient(client)
 	var transport mcpSDK.Transport
 
 	switch cfg.Transport {
@@ -190,13 +196,6 @@ func (f *Factory) Connect(
 	default:
 		return nil, fmt.Errorf("%w: unsupported transport %s", spec.ErrMCPInvalidRequest, cfg.Transport)
 	}
-
-	// App-only compatibility workaround:
-	// the upstream SDK currently probes the sessionless server/discover path
-	// first and has no exported option to force legacy initialize. Wrap the
-	// transport so the probe gets a local method-not-found response and the SDK
-	// falls back to legacy initialize immediately.
-	transport = preferLegacyInitializeTransport(transport)
 
 	session, err := client.Connect(ctx, transport, nil)
 	if err != nil {

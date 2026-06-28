@@ -67,6 +67,7 @@ type AuthManager struct {
 	oauthBroker      OAuthAuthorizationBroker
 	oauthRedirectURL string
 	httpClient       *http.Client
+	oauthTokenStore  OAuthTokenStore
 
 	mu       sync.RWMutex
 	statuses map[authStatusKey]spec.MCPAuthStatus
@@ -85,6 +86,12 @@ func (e redactedAuthError) Error() string {
 
 func (e redactedAuthError) Unwrap() error {
 	return e.cause
+}
+
+func WithOAuthTokenStore(store OAuthTokenStore) AuthManagerOption {
+	return func(m *AuthManager) {
+		m.oauthTokenStore = store
+	}
 }
 
 func WithOAuthAuthorizationBroker(broker OAuthAuthorizationBroker) AuthManagerOption {
@@ -360,6 +367,7 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 			Resource: out.Status.Resource,
 		},
 		sensitiveValues: append([]string(nil), out.SensitiveValues...),
+		tokenStore:      m.oauthTokenStore,
 	}
 	return nil
 }
@@ -405,6 +413,7 @@ func (m *AuthManager) configureClientCredentialsOAuth(
 			Resource: out.Status.Resource,
 		},
 		sensitiveValues: append([]string(nil), out.SensitiveValues...),
+		tokenStore:      m.oauthTokenStore,
 	}
 
 	out.Status.State = spec.MCPAuthStateRequired

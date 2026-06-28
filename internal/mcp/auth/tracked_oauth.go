@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/mcp/spec"
@@ -13,6 +14,14 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
 	"golang.org/x/oauth2"
 )
+
+var ErrOAuthTokenNotFound = errors.New("oauth token not found")
+
+type OAuthTokenStore interface {
+	LoadOAuthToken(ctx context.Context, base spec.MCPAuthStatus) (*oauth2.Token, error)
+	SaveOAuthToken(ctx context.Context, base spec.MCPAuthStatus, tok *oauth2.Token) error
+	DeleteOAuthToken(ctx context.Context, base spec.MCPAuthStatus) error
+}
 
 // trackingTokenSource wraps an oauth2.TokenSource and pushes status updates to
 // the configured sink on every Token() call. The underlying source already
@@ -22,11 +31,15 @@ type trackingTokenSource struct {
 	sink            AuthStatusSink
 	status          spec.MCPAuthStatus
 	sensitiveValues []string
+	tokenStore      OAuthTokenStore
 }
 
 func (s *trackingTokenSource) Token() (*oauth2.Token, error) {
 	tok, err := s.source.Token()
 	if err != nil {
+		if isExpiredOAuthTokenError(err) && s.tokenStore != nil {
+			_ = s.tokenStore.DeleteOAuthToken(context.Background(), s.status)
+		}
 		if s.sink != nil {
 			_ = s.sink.SaveAuthStatus(
 				context.Background(),
@@ -45,6 +58,9 @@ func (s *trackingTokenSource) Token() (*oauth2.Token, error) {
 		}
 		return nil, nilErr
 	}
+	if s.tokenStore != nil && tok.Valid() {
+		_ = s.tokenStore.SaveOAuthToken(context.Background(), s.status, tok)
+	}
 	if s.sink != nil {
 		_ = s.sink.SaveAuthStatus(
 			context.Background(),
@@ -62,6 +78,11 @@ type trackedOAuthHandler struct {
 	sink            AuthStatusSink
 	status          spec.MCPAuthStatus
 	sensitiveValues []string
+	tokenStore      OAuthTokenStore
+
+	persistedMu     sync.Mutex
+	persistedLoaded bool
+	persistedSource oauth2.TokenSource
 }
 
 func (h *trackedOAuthHandler) TokenSource(ctx context.Context) (oauth2.TokenSource, error) {
@@ -71,14 +92,14 @@ func (h *trackedOAuthHandler) TokenSource(ctx context.Context) (oauth2.TokenSour
 		return nil, err
 	}
 	if ts == nil {
-		//nolint:nilnil // The SDK contract allows a nil token source before authorization.
-		return nil, nil
+		return h.persistedTokenSource(ctx)
 	}
 	return &trackingTokenSource{
 		source:          ts,
 		sink:            h.sink,
 		status:          h.status,
 		sensitiveValues: h.sensitiveValues,
+		tokenStore:      h.tokenStore,
 	}, nil
 }
 
@@ -90,6 +111,15 @@ func (h *trackedOAuthHandler) Authorize(
 	// Body lifecycle is owned by the inner SDK handler; both
 	// AuthorizationCodeHandler and extauth.ClientCredentialsHandler drain and
 	// close it via their own defers. We must not touch it here.
+	//
+	// If a persisted access token was rejected by the resource server, delete it
+	// before starting the interactive flow. This covers restart -> valid-looking
+	// but revoked token -> 401 invalid_token.
+	if h.tokenStore != nil && resp != nil && resp.StatusCode == http.StatusUnauthorized {
+		_ = h.tokenStore.DeleteOAuthToken(context.WithoutCancel(ctx), h.status)
+		h.resetPersistedTokenSource()
+	}
+
 	err := h.inner.Authorize(ctx, req, resp)
 	if err != nil {
 		h.publish(ctx, authStatusFromHTTPFailure(h.status, resp, err))
@@ -110,6 +140,68 @@ func (h *trackedOAuthHandler) Authorize(
 	return nil
 }
 
+func (h *trackedOAuthHandler) persistedTokenSource(ctx context.Context) (oauth2.TokenSource, error) {
+	if h == nil || h.tokenStore == nil {
+		//nolint:nilnil // The SDK contract allows a nil token source before authorization.
+		return nil, nil
+	}
+
+	h.persistedMu.Lock()
+	defer h.persistedMu.Unlock()
+
+	if h.persistedLoaded {
+		if h.persistedSource == nil {
+			//nolint:nilnil // No persisted token is available.
+			return nil, nil
+		}
+		return &trackingTokenSource{
+			source:          h.persistedSource,
+			sink:            h.sink,
+			status:          h.status,
+			sensitiveValues: h.sensitiveValues,
+			tokenStore:      h.tokenStore,
+		}, nil
+	}
+	h.persistedLoaded = true
+
+	tok, err := h.tokenStore.LoadOAuthToken(ctx, h.status)
+	if err != nil {
+		if errors.Is(err, ErrOAuthTokenNotFound) {
+			//nolint:nilnil // No persisted token is available.
+			return nil, nil
+		}
+		h.publish(ctx, authStatusFromTokenError(h.status, err))
+		return nil, err
+	}
+	if tok == nil {
+		//nolint:nilnil // No persisted token is available.
+		return nil, nil
+	}
+	if !tok.Valid() {
+		_ = h.tokenStore.DeleteOAuthToken(context.WithoutCancel(ctx), h.status)
+		h.publish(ctx, authStatusFromTokenError(h.status, errors.New("persisted OAuth token is expired")))
+		//nolint:nilnil // Expired persisted token should trigger a fresh auth flow.
+		return nil, nil
+	}
+
+	h.persistedSource = oauth2.StaticTokenSource(tok)
+	h.publish(ctx, authStatusFromToken(h.status, tok))
+	return &trackingTokenSource{
+		source:          h.persistedSource,
+		sink:            h.sink,
+		status:          h.status,
+		sensitiveValues: h.sensitiveValues,
+		tokenStore:      h.tokenStore,
+	}, nil
+}
+
+func (h *trackedOAuthHandler) resetPersistedTokenSource() {
+	h.persistedMu.Lock()
+	h.persistedSource = nil
+	h.persistedLoaded = false
+	h.persistedMu.Unlock()
+}
+
 func (h *trackedOAuthHandler) currentTokenStatus(ctx context.Context) (spec.MCPAuthStatus, bool) {
 	ts, err := h.inner.TokenSource(ctx)
 	if err != nil {
@@ -125,6 +217,9 @@ func (h *trackedOAuthHandler) currentTokenStatus(ctx context.Context) (spec.MCPA
 	if tok == nil {
 		nilErr := errors.New("oauth token source returned nil token")
 		return authStatusFromTokenError(h.status, nilErr), true
+	}
+	if h.tokenStore != nil && tok.Valid() {
+		_ = h.tokenStore.SaveOAuthToken(context.WithoutCancel(ctx), h.status, tok)
 	}
 	return authStatusFromToken(h.status, tok), true
 }

@@ -145,6 +145,12 @@ func (m *AuthManager) BuildAuthHealth(ctx context.Context, cfg spec.MCPServerCon
 		}
 	}
 
+	if def.AuthMode == spec.MCPHTTPAuthOAuth && st.State != spec.MCPAuthStateAuthorized && m != nil {
+		if stored, ok := m.storedOAuthAuthStatus(ctx, def); ok {
+			st = MergeMCPAuthStatus(stored, cfg)
+		}
+	}
+
 	health := spec.MCPAuthHealth{
 		BundleID:  cfg.BundleID,
 		ServerID:  cfg.ID,
@@ -204,6 +210,37 @@ func (m *AuthManager) BuildAuthHealth(ctx context.Context, cfg spec.MCPServerCon
 	health.Configured = configured
 	health.State = state
 	return health
+}
+
+func (m *AuthManager) storedOAuthAuthStatus(
+	ctx context.Context,
+	base spec.MCPAuthStatus,
+) (spec.MCPAuthStatus, bool) {
+	if m == nil || m.oauthTokenStore == nil {
+		return spec.MCPAuthStatus{}, false
+	}
+	tok, err := m.oauthTokenStore.LoadOAuthToken(ctx, base)
+	if err != nil || tok == nil {
+		return spec.MCPAuthStatus{}, false
+	}
+	st := authStatusFromToken(base, tok)
+	if st.State == spec.MCPAuthStateAuthorized {
+		_ = m.SaveAuthStatus(context.WithoutCancel(ctx), st)
+		return st, true
+	}
+
+	// Do not leave an expired or malformed token in storage. The next request
+	// should perform a fresh authorization flow instead of repeatedly trying a
+	// known-bad bearer token.
+	_ = m.oauthTokenStore.DeleteOAuthToken(context.WithoutCancel(ctx), base)
+	if st.State != spec.MCPAuthStateExpired {
+		st.State = spec.MCPAuthStateExpired
+	}
+	if st.LastError == "" {
+		st.LastError = "Persisted OAuth token is expired or invalid"
+	}
+	_ = m.SaveAuthStatus(context.WithoutCancel(ctx), st)
+	return st, true
 }
 
 func (m *AuthManager) findPendingOAuthAuthorization(

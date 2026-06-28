@@ -411,12 +411,13 @@ export default function MCPServersPage() {
 	}, [loadAllBundleData]);
 
 	useEffect(() => {
-		const pendingServers = bundles.flatMap(bundleData =>
+		const oauthServers = bundles.flatMap(bundleData =>
 			bundleData.servers
 				.filter(
 					server =>
+						server.streamableHttp?.authMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth ||
 						bundleData.authHealthByServerID[server.id]?.state ===
-						MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending
+							MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending
 				)
 				.map(server => ({
 					bundleID: bundleData.bundle.id,
@@ -424,13 +425,13 @@ export default function MCPServersPage() {
 				}))
 		);
 
-		if (pendingServers.length === 0) {
+		if (oauthServers.length === 0) {
 			return;
 		}
 
 		const timer = window.setInterval(() => {
 			void Promise.all(
-				pendingServers.map(({ bundleID, serverID }) =>
+				oauthServers.map(({ bundleID, serverID }) =>
 					refreshServerRuntimeAndAuth(bundleID, serverID).catch(() => undefined)
 				)
 			);
