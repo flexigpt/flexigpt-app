@@ -674,7 +674,8 @@ func (w *MCPWrapper) GetMCPServerAuthHealth(
 			return nil, fmt.Errorf("%w: bundleID and serverID required", spec.ErrMCPInvalidRequest)
 		}
 
-		cfgResp, err := w.store.GetMCPServer(context.Background(), &spec.GetMCPServerRequest{
+		ctx := context.Background()
+		cfgResp, err := w.store.GetMCPServer(ctx, &spec.GetMCPServerRequest{
 			BundleID: req.BundleID,
 			ServerID: req.ServerID,
 		})
@@ -685,8 +686,8 @@ func (w *MCPWrapper) GetMCPServerAuthHealth(
 			return nil, fmt.Errorf("%w: empty server config response", spec.ErrMCPRuntimeNotReady)
 		}
 
-		health := w.buildMCPAuthHealth(context.Background(), *cfgResp.Body)
-		return &spec.GetMCPServerAuthHealthResponse{Body: health}, nil
+		health := w.auth.BuildAuthHealth(ctx, *cfgResp.Body)
+		return &spec.GetMCPServerAuthHealthResponse{Body: &health}, nil
 	})
 }
 
@@ -802,210 +803,6 @@ func (w *MCPWrapper) disconnectBundleServers(ctx context.Context, bundleID bundl
 	}
 }
 
-func (w *MCPWrapper) buildMCPAuthHealth(
-	ctx context.Context,
-	cfg spec.MCPServerConfig,
-) *spec.MCPAuthHealth {
-	st := auth.DefaultMCPAuthStatusFromConfig(cfg)
-	if w != nil && w.auth != nil {
-		if cur, ok := w.auth.GetAuthStatus(cfg.BundleID, cfg.ID); ok {
-			st = auth.MergeMCPAuthStatus(cur, cfg)
-		}
-	}
-
-	health := &spec.MCPAuthHealth{
-		BundleID:   cfg.BundleID,
-		ServerID:   cfg.ID,
-		AuthMode:   normalizeWrapperHTTPAuthMode(st.AuthMode),
-		State:      spec.MCPAuthHealthStateAuthorizationNeeded,
-		Configured: true,
-		Resource:   st.Resource,
-		Scopes:     st.Scopes,
-		ExpiresAt:  st.ExpiresAt,
-		LastError:  st.LastError,
-	}
-
-	switch cfg.Transport {
-	case spec.MCPTransportStdio:
-		health.AuthMode = spec.MCPHTTPAuthNone
-		if missing, msg := w.firstMissingStdioSecret(ctx, cfg); missing {
-			health.State = spec.MCPAuthHealthStateNotConfigured
-			health.Configured = false
-			health.LastError = msg
-			return health
-		}
-		if input, ok := firstUnconfiguredRequiredSetupInput(cfg); ok {
-			health.State = spec.MCPAuthHealthStateNotConfigured
-			health.Configured = false
-			health.LastError = fmt.Sprintf(
-				"required setup input %q is not configured",
-				input.ID,
-			)
-			return health
-		}
-		health.State = spec.MCPAuthHealthStateNotRequired
-		return health
-
-	case spec.MCPTransportStreamableHTTP:
-		if cfg.StreamableHTTP == nil {
-			health.State = spec.MCPAuthHealthStateNotConfigured
-			health.Configured = false
-			health.LastError = "missing streamableHttp config"
-			return health
-		}
-		if (st.State == "" || st.State == spec.MCPAuthStateRequired) &&
-			strings.TrimSpace(st.LastError) == "" {
-			health.State = spec.MCPAuthHealthStateAuthorized
-			health.Configured = true
-			health.LastError = ""
-			return health
-		}
-	default:
-		health.State = spec.MCPAuthHealthStateNotConfigured
-		health.Configured = false
-		health.LastError = "unsupported MCP transport"
-		return health
-	}
-
-	if input, ok := firstUnconfiguredRequiredSetupInput(cfg); ok {
-		health.State = spec.MCPAuthHealthStateNotConfigured
-		health.Configured = false
-		health.LastError = fmt.Sprintf(
-			"required setup input %q is not configured",
-			input.ID,
-		)
-		return health
-	}
-
-	if w != nil && w.oauthBroker != nil {
-		health.OAuthRedirectURL = w.oauthBroker.RedirectURL()
-		health.OAuthLoopbackListenAddr = w.oauthBroker.ListenAddr()
-	}
-	if missing, msg := w.firstMissingHTTPHeaderSecret(ctx, cfg); missing {
-		health.State = spec.MCPAuthHealthStateNotConfigured
-		health.Configured = false
-		health.LastError = msg
-		return health
-	}
-
-	httpCfg := cfg.StreamableHTTP
-	mode := normalizeWrapperHTTPAuthMode(httpCfg.AuthMode)
-	health.AuthMode = mode
-	health.Resource = strings.TrimSpace(httpCfg.URL)
-
-	switch mode {
-	case spec.MCPHTTPAuthNone:
-		health.State = spec.MCPAuthHealthStateNotRequired
-		health.Configured = true
-		health.LastError = ""
-		return health
-	case spec.MCPHTTPAuthAPIKey:
-		if len(httpCfg.SecretHeaderRefs) == 0 {
-			health.State = spec.MCPAuthHealthStateNotConfigured
-			health.Configured = false
-			health.LastError = "API key is not configured"
-			return health
-		}
-		health.State = spec.MCPAuthHealthStateAuthorized
-		health.Configured = true
-		health.LastError = ""
-		return health
-	case spec.MCPHTTPAuthOAuth:
-		if w == nil || w.oauthBroker == nil || strings.TrimSpace(w.oauthBroker.RedirectURL()) == "" {
-			health.State = spec.MCPAuthHealthStateNotConfigured
-			health.Configured = false
-			health.LastError = "OAuth authorization broker is not configured"
-			return health
-		}
-
-		if ref := strings.TrimSpace(httpCfg.ClientCredentialRef); ref != "" {
-			if ok, msg := w.oauthClientSecretConfigured(ctx, ref, false); !ok {
-				health.State = spec.MCPAuthHealthStateNotConfigured
-				health.Configured = false
-				health.LastError = msg
-				return health
-			}
-		}
-
-		if pending, ok := w.pendingOAuthAuthorization(cfg.BundleID, cfg.ID); ok {
-			health.State = spec.MCPAuthHealthStateAuthorizationPending
-			health.Configured = true
-			health.AuthorizationPending = true
-			health.AuthorizationURL = pending.AuthorizationURL
-			health.AuthorizationExpiresAt = pending.ExpiresAt
-			return health
-		}
-
-	case spec.MCPHTTPAuthClientCredentials:
-		ref := strings.TrimSpace(httpCfg.ClientCredentialRef)
-		if ref == "" {
-			health.State = spec.MCPAuthHealthStateNotConfigured
-			health.Configured = false
-			health.LastError = "streamableHttp.clientCredentialRef is required for clientCredentials auth"
-			return health
-		}
-		if ok, msg := w.oauthClientSecretConfigured(ctx, ref, true); !ok {
-			health.State = spec.MCPAuthHealthStateNotConfigured
-			health.Configured = false
-			health.LastError = msg
-			return health
-		}
-
-	default:
-		health.State = spec.MCPAuthHealthStateNotConfigured
-		health.Configured = false
-		health.LastError = "unsupported HTTP auth mode"
-		return health
-	}
-
-	health.State = authHealthStateFromStatus(st)
-	return health
-}
-
-func (w *MCPWrapper) firstMissingHTTPHeaderSecret(
-	ctx context.Context,
-	cfg spec.MCPServerConfig,
-) (missing bool, reason string) {
-	if cfg.StreamableHTTP == nil || len(cfg.StreamableHTTP.SecretHeaderRefs) == 0 {
-		return false, ""
-	}
-	if w == nil || w.secretResolver == nil {
-		return true, secretResolverNotConfiguredReason
-	}
-	for header, ref := range cfg.StreamableHTTP.SecretHeaderRefs {
-		value, err := w.secretResolver.ResolveSecret(ctx, ref)
-		if err != nil {
-			return true, fmt.Sprintf("HTTP header secret %s is not configured: %v", header, err)
-		}
-		if strings.TrimSpace(value) == "" {
-			return true, fmt.Sprintf("HTTP header secret %s is empty", header)
-		}
-	}
-	return false, ""
-}
-
-func (w *MCPWrapper) firstMissingStdioSecret(
-	ctx context.Context,
-	cfg spec.MCPServerConfig,
-) (missing bool, msg string) {
-	if cfg.Stdio == nil || len(cfg.Stdio.SecretEnvRefs) == 0 {
-		return false, ""
-	}
-	if w == nil || w.secretResolver == nil {
-		return true, secretResolverNotConfiguredReason
-	}
-	for key, ref := range cfg.Stdio.SecretEnvRefs {
-		value, err := w.secretResolver.ResolveSecret(ctx, ref)
-		if err != nil {
-			return true, fmt.Sprintf("stdio secret %s is not configured: %v", key, err)
-		}
-		if strings.TrimSpace(value) == "" {
-			return true, fmt.Sprintf("stdio secret %s is empty", key)
-		}
-	}
-	return false, ""
-}
-
 func (w *MCPWrapper) oauthClientSecretConfigured(
 	ctx context.Context,
 	ref string,
@@ -1025,21 +822,6 @@ func (w *MCPWrapper) oauthClientSecretConfigured(
 		return false, err.Error()
 	}
 	return true, ""
-}
-
-func (w *MCPWrapper) pendingOAuthAuthorization(
-	bundleID bundleitemutils.BundleID,
-	serverID spec.MCPServerID,
-) (spec.MCPOAuthAuthorization, bool) {
-	if w == nil || w.oauthBroker == nil {
-		return spec.MCPOAuthAuthorization{}, false
-	}
-	for _, pending := range w.oauthBroker.Pending() {
-		if pending.BundleID == bundleID && pending.ServerID == serverID {
-			return pending, true
-		}
-	}
-	return spec.MCPOAuthAuthorization{}, false
 }
 
 func (w *MCPWrapper) close() {
@@ -1467,35 +1249,4 @@ func mcpServerConnectionMaterialChanged(previous *spec.MCPServerConfig, req *spe
 		!reflect.DeepEqual(previous.Stdio, req.Body.Stdio) ||
 		!reflect.DeepEqual(previous.StreamableHTTP, req.Body.StreamableHTTP) ||
 		!reflect.DeepEqual(previous.AppsPolicy, req.Body.AppsPolicy)
-}
-
-func authHealthStateFromStatus(st spec.MCPAuthStatus) spec.MCPAuthHealthState {
-	if st.ExpiresAt != nil && time.Now().UTC().After(st.ExpiresAt.UTC()) {
-		return spec.MCPAuthHealthStateExpired
-	}
-
-	switch st.State {
-	case spec.MCPAuthStateNotRequired:
-		return spec.MCPAuthHealthStateNotRequired
-	case spec.MCPAuthStateRequired:
-		return spec.MCPAuthHealthStateAuthorizationNeeded
-	case spec.MCPAuthStateAuthorized:
-		return spec.MCPAuthHealthStateAuthorized
-	case spec.MCPAuthStateExpired:
-		return spec.MCPAuthHealthStateExpired
-	case spec.MCPAuthStateInsufficientScope:
-		return spec.MCPAuthHealthStateInsufficientScope
-	case spec.MCPAuthStateError:
-		return spec.MCPAuthHealthStateError
-	default:
-		return spec.MCPAuthHealthStateAuthorizationNeeded
-	}
-}
-
-func normalizeWrapperHTTPAuthMode(mode spec.MCPHTTPAuthMode) spec.MCPHTTPAuthMode {
-	mode = spec.MCPHTTPAuthMode(strings.TrimSpace(string(mode)))
-	if mode == "" {
-		return spec.MCPHTTPAuthNone
-	}
-	return mode
 }

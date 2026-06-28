@@ -191,6 +191,13 @@ func (f *Factory) Connect(
 		return nil, fmt.Errorf("%w: unsupported transport %s", spec.ErrMCPInvalidRequest, cfg.Transport)
 	}
 
+	// App-only compatibility workaround:
+	// the upstream SDK currently probes the sessionless server/discover path
+	// first and has no exported option to force legacy initialize. Wrap the
+	// transport so the probe gets a local method-not-found response and the SDK
+	// falls back to legacy initialize immediately.
+	transport = preferLegacyInitializeTransport(transport)
+
 	session, err := client.Connect(ctx, transport, nil)
 	if err != nil {
 		return nil, err

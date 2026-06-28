@@ -234,6 +234,7 @@ func (m *MCPRuntimeManager) Connect(
 	client, err := m.factory.Connect(cctx, cfg, resolved, m)
 	if err != nil {
 		safeErr := redactErr(err)
+		m.recordConnectAuthFailure(context.WithoutCancel(ctx), cfg, resolved, safeErr)
 		m.setErrorIfCurrent(req.ServerID, generation, safeErr)
 		return nil, safeErr
 	}
@@ -242,6 +243,7 @@ func (m *MCPRuntimeManager) Connect(
 	if err != nil {
 		_ = client.Close(ctx)
 		safeErr := redactErr(err)
+		m.recordConnectAuthFailure(context.WithoutCancel(ctx), cfg, resolved, safeErr)
 		m.setErrorIfCurrent(req.ServerID, generation, safeErr)
 		return nil, safeErr
 	}
@@ -1158,6 +1160,46 @@ func mergeResolvedTransportAuth(dst *auth.ResolvedTransportAuth, src auth.Resolv
 	if src.Status.ServerID != "" {
 		dst.Status = src.Status
 	}
+}
+
+func (m *MCPRuntimeManager) recordConnectAuthFailure(
+	ctx context.Context,
+	cfg spec.MCPServerConfig,
+	resolved auth.ResolvedTransportAuth,
+	err error,
+) {
+	if m == nil || m.auth == nil || err == nil {
+		return
+	}
+
+	st := resolved.Status
+	if st.BundleID == "" || st.ServerID == "" || st.AuthMode == "" {
+		st = auth.DefaultMCPAuthStatusFromConfig(cfg)
+	}
+
+	switch st.AuthMode {
+	case spec.MCPHTTPAuthAPIKey:
+		st.State = spec.MCPAuthStateError
+		st.LastError = err.Error()
+	case spec.MCPHTTPAuthClientCredentials:
+		// The tracked OAuth handler usually publishes the precise token-endpoint
+		// failure. This fallback covers failures that happen before the handler
+		// can update status.
+		if st.State != spec.MCPAuthStateExpired &&
+			st.State != spec.MCPAuthStateInsufficientScope {
+			st.State = spec.MCPAuthStateError
+		}
+		st.LastError = err.Error()
+	case spec.MCPHTTPAuthOAuth:
+		// Authorization-code OAuth is handled by trackedOAuthHandler and the
+		// pending loopback broker. Do not overwrite pending authorization with a
+		// generic connect timeout/error.
+		return
+	default:
+		return
+	}
+
+	_ = m.auth.SaveAuthStatus(context.WithoutCancel(ctx), st)
 }
 
 func hydrateSnapshotIdentity(

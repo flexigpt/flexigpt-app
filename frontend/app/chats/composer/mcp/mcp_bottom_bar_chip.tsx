@@ -43,14 +43,17 @@ import {
 } from '@/chats/composer/mcp/mcp_composer_types';
 import { optionKey } from '@/chats/composer/mcp/use_composer_mcp';
 import {
+	getEffectiveMCPAuthHealthState,
 	getEffectiveMCPServerStatus,
-	getMCPAuthHealthBadgeClass,
-	getMCPAuthHealthLabel,
+	getMCPServerAuthHealthBadgeClass,
+	getMCPServerAuthHealthLabel,
 	getMCPStatusBadgeClass,
 	getMCPStatusLabel,
 	getMCPTransportLabel,
+	isMCPAuthActionable,
 	isMCPToolVisibleToModel,
 } from '@/mcpservers/lib/mcp_server_utils';
+import { MCPOAuthAuthorizationModal } from '@/mcpservers/mcp_oauth_authorization_modal';
 
 function stop(e: MouseEvent) {
 	e.preventDefault();
@@ -59,6 +62,18 @@ function stop(e: MouseEvent) {
 
 function isEnabledMCPOption(option: MCPComposerServerOption) {
 	return option.bundle.isEnabled && option.server.enabled;
+}
+
+function isOAuthModalRelevant(option: MCPComposerServerOption): boolean {
+	const authState = getEffectiveMCPAuthHealthState(option.server, option.authHealth);
+	return (
+		isMCPAuthActionable(option.authHealth, option.server) ||
+		authState === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending
+	);
+}
+
+function oauthDismissKey(option: MCPComposerServerOption): string {
+	return `${option.bundle.id}:${option.server.id}:${option.authHealth?.authorizationURL ?? option.authHealth?.state ?? ''}`;
 }
 
 function CheckboxRow({
@@ -601,10 +616,12 @@ function ServerRow({
 	option,
 	state,
 	isInputLocked,
+	onAuthorize,
 }: {
 	option: MCPComposerServerOption;
 	state: UseComposerMCPResult;
 	isInputLocked: boolean;
+	onAuthorize: () => void;
 }) {
 	const key = mcpServerKey(option.bundle.id, option.server.id);
 	const selected = Boolean(state.selectedByServerKey[key]);
@@ -612,8 +629,9 @@ function ServerRow({
 	const isReady = status === MCPServerStatus.MCPServerStatusReady;
 	const selectable = isEnabledMCPOption(option);
 
-	const authActionable = Boolean(option.authHealth?.authorizationURL);
-	const authPending = option.authHealth?.state === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending;
+	const authState = getEffectiveMCPAuthHealthState(option.server, option.authHealth);
+	const authActionable = isMCPAuthActionable(option.authHealth, option.server);
+	const authPending = authState === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending;
 
 	return (
 		<div className="border-base-300 mb-2 rounded-xl border p-2">
@@ -646,10 +664,10 @@ function ServerRow({
 							{getMCPStatusLabel(status)}
 						</span>
 						<span
-							className={`badge badge-xs rounded-lg ${getMCPAuthHealthBadgeClass(option.authHealth?.state)}`}
-							title={option.authHealth?.lastError || getMCPAuthHealthLabel(option.authHealth?.state)}
+							className={`badge badge-xs rounded-lg ${getMCPServerAuthHealthBadgeClass(option.server, option.authHealth)}`}
+							title={option.authHealth?.lastError || getMCPServerAuthHealthLabel(option.server, option.authHealth)}
 						>
-							{getMCPAuthHealthLabel(option.authHealth?.state)}
+							{getMCPServerAuthHealthLabel(option.server, option.authHealth)}
 						</span>
 					</div>
 
@@ -671,7 +689,7 @@ function ServerRow({
 							title="Open authorization URL"
 							onClick={e => {
 								stop(e);
-								state.openAuthURL(option.authHealth?.authorizationURL ?? '');
+								onAuthorize();
 							}}
 							disabled={isInputLocked}
 						>
@@ -752,6 +770,8 @@ export function MCPBottomBarChip({
 	const internalMenu = useMenuStore({ placement: 'top', focusLoop: true });
 	const menu = store ?? internalMenu;
 	const open = useStoreState(menu, 'open');
+	const [manualOAuthModalKey, setManualOAuthModalKey] = useState<string | null>(null);
+	const [dismissedOAuthKeys, setDismissedOAuthKeys] = useState<Set<string>>(() => new Set());
 
 	const enabledCount = state.selectedServerCount;
 	const hasAppContextUpdates = appContextUpdateCount > 0;
@@ -797,6 +817,37 @@ export function MCPBottomBarChip({
 		state.selectedToolCount,
 	]);
 
+	const manualOAuthModalOption = useMemo(() => {
+		if (!manualOAuthModalKey) {
+			return null;
+		}
+		return (
+			state.options.find(option => optionKey(option) === manualOAuthModalKey && isOAuthModalRelevant(option)) ?? null
+		);
+	}, [manualOAuthModalKey, state.options]);
+
+	const autoOAuthModalOption = useMemo(() => {
+		if (manualOAuthModalOption) {
+			return null;
+		}
+		return (
+			visibleOptions.find(option => {
+				if (!isOAuthModalRelevant(option)) {
+					return false;
+				}
+				return !dismissedOAuthKeys.has(oauthDismissKey(option));
+			}) ?? null
+		);
+	}, [dismissedOAuthKeys, manualOAuthModalOption, visibleOptions]);
+
+	const oauthModalOption = manualOAuthModalOption ?? autoOAuthModalOption;
+	const dismissOAuthModal = () => {
+		if (oauthModalOption) {
+			setDismissedOAuthKeys(prev => new Set(prev).add(oauthDismissKey(oauthModalOption)));
+		}
+		setManualOAuthModalKey(null);
+	};
+
 	useEffect(() => {
 		if (isInputLocked) {
 			menu.hide();
@@ -812,140 +863,164 @@ export function MCPBottomBarChip({
 				: 'border-transparent';
 
 	return (
-		<div className="relative shrink-0" data-bottom-bar-mcp>
-			<HoverTip content={title} placement="top" wrapperElement="div" wrapperClassName="inline-flex max-w-full">
-				<div
-					className={`${actionTriggerChipSurfaceClasses} border ${chipToneClasses} ${isInputLocked ? 'opacity-60' : ''}`}
-				>
-					<MenuButton
-						store={menu}
-						className="btn btn-xs app-text-neutral h-auto min-h-0 flex-1 gap-0 border-none bg-transparent p-0 text-left font-normal shadow-none hover:bg-transparent"
-						aria-label={shortcut ? `Attach MCP (${shortcut})` : 'Attach MCP'}
-						disabled={isInputLocked}
+		<>
+			<div className="relative shrink-0" data-bottom-bar-mcp>
+				<HoverTip content={title} placement="top" wrapperElement="div" wrapperClassName="inline-flex max-w-full">
+					<div
+						className={`${actionTriggerChipSurfaceClasses} border ${chipToneClasses} ${isInputLocked ? 'opacity-60' : ''}`}
 					>
-						<ActionTriggerChipContent
-							icon={<FiServer size={14} />}
-							label="MCP"
-							count={
-								enabledCount > 0 ? (
-									<span className="badge badge-success badge-xs bg-success/30">{enabledCount}</span>
-								) : undefined
-							}
-							suffix={
-								hasBlockingArgs ? (
-									<span className="badge badge-warning badge-xs">Args</span>
-								) : hasAppContextUpdates ? (
-									<span className="badge badge-info badge-xs">App {appContextUpdateCount}</span>
-								) : enabledCount > 0 ? (
-									<FiCheck size={14} className="shrink-0" />
-								) : undefined
-							}
-							open={open}
-							labelClassName="max-w-20 truncate text-xs font-normal"
-						/>
-					</MenuButton>
-
-					{enabledCount > 0 || hasAppContextUpdates ? (
-						<button
-							type="button"
-							className="btn btn-ghost btn-xs app-text-neutral hover:bg-base-300/80 ml-1 h-auto min-h-0 shrink-0 px-1 py-0 shadow-none"
-							onClick={event => {
-								event.preventDefault();
-								event.stopPropagation();
-								state.clear();
-								onClearAppContextUpdates?.();
-								menu.hide();
-							}}
-							aria-label="Clear MCP context"
-							title="Clear MCP context"
+						<MenuButton
+							store={menu}
+							className="btn btn-xs app-text-neutral h-auto min-h-0 flex-1 gap-0 border-none bg-transparent p-0 text-left font-normal shadow-none hover:bg-transparent"
+							aria-label={shortcut ? `Attach MCP (${shortcut})` : 'Attach MCP'}
 							disabled={isInputLocked}
 						>
-							<FiX size={12} />
-						</button>
-					) : null}
+							<ActionTriggerChipContent
+								icon={<FiServer size={14} />}
+								label="MCP"
+								count={
+									enabledCount > 0 ? (
+										<span className="badge badge-success badge-xs bg-success/30">{enabledCount}</span>
+									) : undefined
+								}
+								suffix={
+									hasBlockingArgs ? (
+										<span className="badge badge-warning badge-xs">Args</span>
+									) : hasAppContextUpdates ? (
+										<span className="badge badge-info badge-xs">App {appContextUpdateCount}</span>
+									) : enabledCount > 0 ? (
+										<FiCheck size={14} className="shrink-0" />
+									) : undefined
+								}
+								open={open}
+								labelClassName="max-w-20 truncate text-xs font-normal"
+							/>
+						</MenuButton>
 
-					<Menu
-						store={menu}
-						gutter={8}
-						overflowPadding={8}
-						portal
-						className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-[75vh] w-2xl max-w-[90vw] overflow-y-auto border p-2 shadow-xl"
-						autoFocusOnShow
-					>
-						<div className="mb-2 flex items-center justify-between gap-2">
-							<div className="text-base-content/70 text-xs font-semibold">MCP servers</div>
+						{enabledCount > 0 || hasAppContextUpdates ? (
 							<button
 								type="button"
-								className="btn btn-ghost btn-xs rounded-lg"
-								onClick={e => {
-									stop(e);
-									void state.refreshAll();
+								className="btn btn-ghost btn-xs app-text-neutral hover:bg-base-300/80 ml-1 h-auto min-h-0 shrink-0 px-1 py-0 shadow-none"
+								onClick={event => {
+									event.preventDefault();
+									event.stopPropagation();
+									state.clear();
+									onClearAppContextUpdates?.();
+									menu.hide();
 								}}
-								disabled={isInputLocked || state.loading}
+								aria-label="Clear MCP context"
+								title="Clear MCP context"
+								disabled={isInputLocked}
 							>
-								<FiRefreshCw size={12} />
-								<span className="ml-1">Refresh</span>
+								<FiX size={12} />
 							</button>
-						</div>
-
-						{hasAppContextUpdates ? (
-							<div className="border-info/30 bg-info/10 mb-2 rounded-xl border p-2 text-xs">
-								<div className="flex items-center justify-between gap-2">
-									<div>
-										MCP app model context queued for next send: {appContextUpdateCount} update
-										{appContextUpdateCount === 1 ? '' : 's'}.
-									</div>
-									<button
-										type="button"
-										className="btn btn-ghost btn-xs rounded-lg"
-										onClick={e => {
-											stop(e);
-											onClearAppContextUpdates?.();
-										}}
-										disabled={isInputLocked}
-									>
-										Clear
-									</button>
-								</div>
-							</div>
 						) : null}
 
-						{state.loading ? (
-							<div className="text-base-content/60 rounded-xl px-2 py-1 text-xs">Loading MCP servers…</div>
-						) : state.error ? (
-							<div className="text-error rounded-xl px-2 py-1 text-xs">{state.error}</div>
-						) : state.options.length === 0 ? (
-							<div className="text-base-content/60 rounded-xl px-2 py-1 text-xs">
-								No MCP servers configured. Add servers from the MCP Servers management page.
+						<Menu
+							store={menu}
+							gutter={8}
+							overflowPadding={8}
+							portal
+							className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-[75vh] w-2xl max-w-[90vw] overflow-y-auto border p-2 shadow-xl"
+							autoFocusOnShow
+						>
+							<div className="mb-2 flex items-center justify-between gap-2">
+								<div className="text-base-content/70 text-xs font-semibold">MCP servers</div>
+								<button
+									type="button"
+									className="btn btn-ghost btn-xs rounded-lg"
+									onClick={e => {
+										stop(e);
+										void state.refreshAll();
+									}}
+									disabled={isInputLocked || state.loading}
+								>
+									<FiRefreshCw size={12} />
+									<span className="ml-1">Refresh</span>
+								</button>
 							</div>
-						) : (
-							<>
-								{visibleOptions.map(option => (
-									<ServerRow key={optionKey(option)} option={option} state={state} isInputLocked={isInputLocked} />
-								))}
 
-								{hiddenDisabledServerCount > 0 ? (
-									<div className="border-base-300 text-base-content/70 mt-2 border-t pt-2 text-xs">
-										{hiddenDisabledServerCount} disabled MCP {hiddenDisabledServerLabel} {hiddenDisabledServerVerb}{' '}
-										hidden.{' '}
-										<Link
-											to="/mcpservers"
-											className="link link-info"
-											onClick={event => {
-												event.stopPropagation();
-												menu.hide();
+							{hasAppContextUpdates ? (
+								<div className="border-info/30 bg-info/10 mb-2 rounded-xl border p-2 text-xs">
+									<div className="flex items-center justify-between gap-2">
+										<div>
+											MCP app model context queued for next send: {appContextUpdateCount} update
+											{appContextUpdateCount === 1 ? '' : 's'}.
+										</div>
+										<button
+											type="button"
+											className="btn btn-ghost btn-xs rounded-lg"
+											onClick={e => {
+												stop(e);
+												onClearAppContextUpdates?.();
 											}}
+											disabled={isInputLocked}
 										>
-											Go to MCP Servers
-										</Link>{' '}
-										to enable {hiddenDisabledServerCount === 1 ? 'it' : 'them'}.
+											Clear
+										</button>
 									</div>
-								) : null}
-							</>
-						)}
-					</Menu>
-				</div>
-			</HoverTip>
-		</div>
+								</div>
+							) : null}
+
+							{state.loading ? (
+								<div className="text-base-content/60 rounded-xl px-2 py-1 text-xs">Loading MCP servers…</div>
+							) : state.error ? (
+								<div className="text-error rounded-xl px-2 py-1 text-xs">{state.error}</div>
+							) : state.options.length === 0 ? (
+								<div className="text-base-content/60 rounded-xl px-2 py-1 text-xs">
+									No MCP servers configured. Add servers from the MCP Servers management page.
+								</div>
+							) : (
+								<>
+									{visibleOptions.map(option => (
+										<ServerRow
+											key={optionKey(option)}
+											option={option}
+											state={state}
+											isInputLocked={isInputLocked}
+											onAuthorize={() => {
+												setManualOAuthModalKey(optionKey(option));
+											}}
+										/>
+									))}
+
+									{hiddenDisabledServerCount > 0 ? (
+										<div className="border-base-300 text-base-content/70 mt-2 border-t pt-2 text-xs">
+											{hiddenDisabledServerCount} disabled MCP {hiddenDisabledServerLabel} {hiddenDisabledServerVerb}{' '}
+											hidden.{' '}
+											<Link
+												to="/mcpservers"
+												className="link link-info"
+												onClick={event => {
+													event.stopPropagation();
+													menu.hide();
+												}}
+											>
+												Go to MCP Servers
+											</Link>{' '}
+											to enable {hiddenDisabledServerCount === 1 ? 'it' : 'them'}.
+										</div>
+									) : null}
+								</>
+							)}
+						</Menu>
+					</div>
+				</HoverTip>
+			</div>
+			<MCPOAuthAuthorizationModal
+				isOpen={oauthModalOption !== null}
+				onClose={dismissOAuthModal}
+				server={oauthModalOption?.server ?? null}
+				authHealth={oauthModalOption?.authHealth}
+				onOpenURL={state.openAuthURL}
+				onCancel={async () => {
+					if (!oauthModalOption) {
+						return;
+					}
+					await state.cancelOAuth(oauthModalOption.bundle.id, oauthModalOption.server.id);
+					dismissOAuthModal();
+				}}
+			/>
+		</>
 	);
 }

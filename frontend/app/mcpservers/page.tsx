@@ -235,6 +235,7 @@ export default function MCPServersPage() {
 			: (bundles.find(bundleData => bundleData.bundle.id === bundleToDeleteID)?.bundle ?? null);
 
 	const loadRuntimeAndAuth = useCallback(async (bundleID: string, servers: MCPServerConfig[]) => {
+		const pendingAuthorizations = await mcpAPI.listPendingMCPOAuthAuthorizations().catch(() => []);
 		const entries = await Promise.all(
 			servers.map(async server => {
 				const [runtimeResult, authHealthResult] = await Promise.all([
@@ -242,7 +243,16 @@ export default function MCPServersPage() {
 					mcpAPI.getMCPServerAuthHealth(bundleID, server.id).catch(() => undefined),
 				]);
 				const runtime = getMatchingMCPServerRuntimeSnapshot(bundleID, server.id, runtimeResult);
-				const authHealth = getMatchingMCPAuthHealth(bundleID, server, authHealthResult);
+				let authHealth = getMatchingMCPAuthHealth(bundleID, server, authHealthResult);
+				const pending = pendingAuthorizations.find(
+					authorization =>
+						authorization.bundleID === bundleID &&
+						authorization.serverID === server.id &&
+						authorization.authorizationURL
+				);
+				if (pending) {
+					authHealth = getPendingOAuthAuthHealth(bundleID, server.id, pending, authHealth);
+				}
 				return {
 					serverID: server.id,
 					runtime,
@@ -300,9 +310,10 @@ export default function MCPServersPage() {
 	);
 
 	const refreshServerRuntimeAndAuth = useCallback(async (bundleID: string, serverID: string) => {
-		const [runtimeResult, authHealthResult] = await Promise.all([
+		const [runtimeResult, authHealthResult, pendingAuthorizations] = await Promise.all([
 			mcpAPI.getMCPServerStatus(bundleID, serverID).catch(() => undefined),
 			mcpAPI.getMCPServerAuthHealth(bundleID, serverID).catch(() => undefined),
+			mcpAPI.listPendingMCPOAuthAuthorizations().catch(() => []),
 		]);
 
 		setBundles(prev =>
@@ -313,7 +324,14 @@ export default function MCPServersPage() {
 
 				const server = bundleData.servers.find(candidate => candidate.id === serverID);
 				const runtime = getMatchingMCPServerRuntimeSnapshot(bundleID, serverID, runtimeResult);
-				const authHealth = server ? getMatchingMCPAuthHealth(bundleID, server, authHealthResult) : undefined;
+				let authHealth = server ? getMatchingMCPAuthHealth(bundleID, server, authHealthResult) : undefined;
+				const pending = pendingAuthorizations.find(
+					authorization =>
+						authorization.bundleID === bundleID && authorization.serverID === serverID && authorization.authorizationURL
+				);
+				if (pending) {
+					authHealth = getPendingOAuthAuthHealth(bundleID, serverID, pending, authHealth);
+				}
 
 				return {
 					...bundleData,

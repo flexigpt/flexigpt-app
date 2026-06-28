@@ -115,6 +115,157 @@ func DefaultMCPAuthStatusFromConfig(cfg spec.MCPServerConfig) spec.MCPAuthStatus
 	return st
 }
 
+type oauthAuthorizationPendingLister interface {
+	Pending() []spec.MCPOAuthAuthorization
+}
+
+type oauthLoopbackInfoProvider interface {
+	ListenAddr() string
+	RedirectURL() string
+}
+
+// BuildAuthHealth returns the user-facing auth health for a server.
+//
+// Important storage model:
+//   - OAuth authorization-code tokens are process-local. After app restart,
+//     OAuth should show authorization-needed unless a new authorization is
+//     pending in the loopback broker.
+//   - PAT/API-key values are explicit user-provided secrets and are represented
+//     by streamableHttp.secretHeaderRefs. Those are persistent config secrets.
+//
+// This function derives "configured" from the current server config and then
+// overlays process-local runtime status and pending OAuth broker state.
+func (m *AuthManager) BuildAuthHealth(ctx context.Context, cfg spec.MCPServerConfig) spec.MCPAuthHealth {
+	def := DefaultMCPAuthStatusFromConfig(cfg)
+	st := def
+
+	if m != nil {
+		if saved, ok := m.GetAuthStatus(cfg.BundleID, cfg.ID); ok {
+			st = MergeMCPAuthStatus(saved, cfg)
+		}
+	}
+
+	health := spec.MCPAuthHealth{
+		BundleID:  cfg.BundleID,
+		ServerID:  cfg.ID,
+		AuthMode:  def.AuthMode,
+		Resource:  def.Resource,
+		Scopes:    slices.Clone(st.Scopes),
+		ExpiresAt: cloneTimePtr(st.ExpiresAt),
+		LastError: st.LastError,
+	}
+
+	if m != nil {
+		health.OAuthRedirectURL = m.oauthRedirectURL
+		if info, ok := m.oauthBroker.(oauthLoopbackInfoProvider); ok {
+			health.OAuthLoopbackListenAddr = info.ListenAddr()
+			if health.OAuthRedirectURL == "" {
+				health.OAuthRedirectURL = info.RedirectURL()
+			}
+		}
+	}
+
+	configured := authHealthConfigured(cfg, m, def.AuthMode, st)
+	state := authHealthStateFromStatus(st)
+
+	if def.AuthMode == spec.MCPHTTPAuthNone {
+		configured = true
+		state = spec.MCPAuthHealthStateNotRequired
+	}
+
+	if pending := m.findPendingOAuthAuthorization(cfg.BundleID, cfg.ID); pending != nil {
+		configured = true
+		state = spec.MCPAuthHealthStateAuthorizationPending
+		health.AuthorizationPending = true
+		health.AuthorizationURL = pending.AuthorizationURL
+		health.AuthorizationExpiresAt = pending.ExpiresAt
+		health.LastError = ""
+	}
+
+	if !configured && def.AuthMode != spec.MCPHTTPAuthNone {
+		state = spec.MCPAuthHealthStateNotConfigured
+	}
+
+	switch def.AuthMode {
+	case spec.MCPHTTPAuthAPIKey, spec.MCPHTTPAuthClientCredentials:
+		// These modes are non-interactive. "Configured" means the required
+		// secret reference exists. A runtime failure may still override this
+		// with Error via saved process-local status.
+		if configured && state == spec.MCPAuthHealthStateAuthorizationNeeded {
+			state = spec.MCPAuthHealthStateAuthorized
+		}
+	case spec.MCPHTTPAuthOAuth:
+		if configured && state == "" {
+			state = spec.MCPAuthHealthStateAuthorizationNeeded
+		}
+	default:
+	}
+
+	health.Configured = configured
+	health.State = state
+	return health
+}
+
+func (m *AuthManager) findPendingOAuthAuthorization(
+	bundleID bundleitemutils.BundleID,
+	serverID spec.MCPServerID,
+) *spec.MCPOAuthAuthorization {
+	if m == nil || m.oauthBroker == nil || bundleID == "" || serverID == "" {
+		return nil
+	}
+	lister, ok := m.oauthBroker.(oauthAuthorizationPendingLister)
+	if !ok {
+		return nil
+	}
+	for _, pending := range lister.Pending() {
+		if pending.BundleID == bundleID && pending.ServerID == serverID {
+			cp := pending
+			return &cp
+		}
+	}
+	return nil
+}
+
+func authHealthConfigured(
+	cfg spec.MCPServerConfig,
+	m *AuthManager,
+	mode spec.MCPHTTPAuthMode,
+	st spec.MCPAuthStatus,
+) bool {
+	switch mode {
+	case spec.MCPHTTPAuthNone:
+		return true
+	case spec.MCPHTTPAuthAPIKey:
+		return cfg.StreamableHTTP != nil && len(cfg.StreamableHTTP.SecretHeaderRefs) > 0
+	case spec.MCPHTTPAuthClientCredentials:
+		return cfg.StreamableHTTP != nil && strings.TrimSpace(cfg.StreamableHTTP.ClientCredentialRef) != ""
+	case spec.MCPHTTPAuthOAuth:
+		return st.State == spec.MCPAuthStateAuthorized ||
+			(m != nil && m.oauthBroker != nil && strings.TrimSpace(m.oauthRedirectURL) != "")
+	default:
+		return false
+	}
+}
+
+func authHealthStateFromStatus(st spec.MCPAuthStatus) spec.MCPAuthHealthState {
+	switch st.State {
+	case spec.MCPAuthStateNotRequired:
+		return spec.MCPAuthHealthStateNotRequired
+	case spec.MCPAuthStateAuthorized:
+		return spec.MCPAuthHealthStateAuthorized
+	case spec.MCPAuthStateExpired:
+		return spec.MCPAuthHealthStateExpired
+	case spec.MCPAuthStateInsufficientScope:
+		return spec.MCPAuthHealthStateInsufficientScope
+	case spec.MCPAuthStateError:
+		return spec.MCPAuthHealthStateError
+	case spec.MCPAuthStateRequired, "":
+		return spec.MCPAuthHealthStateAuthorizationNeeded
+	default:
+		return spec.MCPAuthHealthStateError
+	}
+}
+
 func (m *AuthManager) SaveAuthStatus(ctx context.Context, st spec.MCPAuthStatus) error {
 	if m == nil {
 		return nil
@@ -188,4 +339,12 @@ func cloneAuthStatus(in spec.MCPAuthStatus) spec.MCPAuthStatus {
 		out.ExpiresAt = &t
 	}
 	return out
+}
+
+func cloneTimePtr(in *time.Time) *time.Time {
+	if in == nil {
+		return nil
+	}
+	t := *in
+	return &t
 }

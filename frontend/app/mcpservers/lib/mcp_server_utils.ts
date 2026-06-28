@@ -198,9 +198,10 @@ function isNonInteractiveMCPAuthConfigured(
 
 	switch (authMode) {
 		case MCPHTTPAuthMode.MCPHTTPAuthAPIKey:
-			return (
-				hasRecordEntries(server.streamableHttp.secretHeaderRefs) || hasRecordEntries(server.streamableHttp.headers)
-			);
+			// apiKey auth requires an explicit secret header ref. Plain headers
+			// may be harmless metadata and must not make a server appear
+			// authenticated.
+			return hasRecordEntries(server.streamableHttp.secretHeaderRefs);
 		case MCPHTTPAuthMode.MCPHTTPAuthClientCredentials:
 			return Boolean(server.streamableHttp.clientCredentialRef?.trim());
 		default:
@@ -221,14 +222,30 @@ export function getEffectiveMCPAuthHealthState(
 	const state = normalizeMCPAuthHealthState(authHealth?.state);
 
 	if (authMode === MCPHTTPAuthMode.MCPHTTPAuthAPIKey || authMode === MCPHTTPAuthMode.MCPHTTPAuthClientCredentials) {
-		const nonInteractiveConfigured =
-			authHealth?.configured ??
-			(isNonInteractiveMCPAuthConfigured(server, authMode) ||
-				state === MCPAuthHealthState.MCPAuthHealthStateAuthorized);
+		const configuredByServer = isNonInteractiveMCPAuthConfigured(server, authMode);
+		const nonInteractiveConfigured = authHealth?.configured ?? configuredByServer;
+
+		// Config is authoritative for non-interactive auth. Do not let a stale
+		// "authorized" health response make an unconfigured server look ready.
+		if (!configuredByServer && authHealth?.configured !== true) {
+			return MCPAuthHealthState.MCPAuthHealthStateNotConfigured;
+		}
+
+		if (
+			state === MCPAuthHealthState.MCPAuthHealthStateError ||
+			state === MCPAuthHealthState.MCPAuthHealthStateExpired ||
+			state === MCPAuthHealthState.MCPAuthHealthStateInsufficientScope
+		) {
+			return state;
+		}
 
 		return nonInteractiveConfigured
 			? MCPAuthHealthState.MCPAuthHealthStateAuthorized
 			: MCPAuthHealthState.MCPAuthHealthStateNotConfigured;
+	}
+
+	if (authMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth && !authHealth) {
+		return MCPAuthHealthState.MCPAuthHealthStateAuthorizationNeeded;
 	}
 
 	if (
@@ -295,7 +312,7 @@ export function getMCPStatusBadgeClass(status?: MCPServerStatus): string {
 	}
 }
 
-export function getMCPAuthHealthLabel(state?: MCPAuthHealthState | string): string {
+function getMCPAuthHealthLabel(state?: MCPAuthHealthState | string): string {
 	const normalizedState = normalizeMCPAuthHealthState(state);
 
 	switch (normalizedState) {
@@ -320,7 +337,7 @@ export function getMCPAuthHealthLabel(state?: MCPAuthHealthState | string): stri
 	}
 }
 
-export function getMCPAuthHealthBadgeClass(state?: MCPAuthHealthState | string): string {
+function getMCPAuthHealthBadgeClass(state?: MCPAuthHealthState | string): string {
 	const normalizedState = normalizeMCPAuthHealthState(state);
 
 	switch (normalizedState) {
@@ -354,7 +371,7 @@ export function getMCPServerAuthHealthLabel(server?: MCPAuthDisplayServer, authH
 	}
 
 	if (authMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth && state === MCPAuthHealthState.MCPAuthHealthStateAuthorized) {
-		return 'OAuth: token saved';
+		return 'OAuth: authorized';
 	}
 
 	return getMCPAuthHealthLabel(state);

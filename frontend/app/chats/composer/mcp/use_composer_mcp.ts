@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
+	MCPAuthHealth,
 	MCPConversationContext,
+	MCPOAuthAuthorization,
 	MCPPromptRef,
 	MCPPromptSelection,
 	MCPResourceRef,
@@ -10,7 +12,7 @@ import type {
 	MCPToolCapability,
 	MCPToolSelection,
 } from '@/spec/mcp';
-import { MCPToolExposure } from '@/spec/mcp';
+import { MCPAuthHealthState, MCPHTTPAuthMode, MCPToolExposure } from '@/spec/mcp';
 
 import { omitManyKeys } from '@/lib/obj_utils';
 
@@ -56,6 +58,35 @@ function sleep(ms: number): Promise<void> {
 			resolve();
 		}, ms);
 	});
+}
+
+function overlayPendingOAuthAuthHealth(
+	bundleID: string,
+	serverID: string,
+	authHealth: MCPAuthHealth | undefined,
+	pendingAuthorizations: MCPOAuthAuthorization[]
+): MCPAuthHealth | undefined {
+	const pending = pendingAuthorizations.find(
+		authorization =>
+			authorization.bundleID === bundleID && authorization.serverID === serverID && authorization.authorizationURL
+	);
+
+	if (!pending) {
+		return authHealth;
+	}
+
+	return {
+		...authHealth,
+		bundleID: pending.bundleID || bundleID,
+		serverID: pending.serverID || serverID,
+		authMode: MCPHTTPAuthMode.MCPHTTPAuthOAuth,
+		state: MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending,
+		configured: authHealth?.configured ?? true,
+		authorizationPending: true,
+		authorizationURL: pending.authorizationURL,
+		authorizationExpiresAt: pending.expiresAt,
+		lastError: undefined,
+	};
 }
 
 export function optionKey(option: MCPComposerServerOption): string {
@@ -169,7 +200,10 @@ export function useComposerMCP(): UseComposerMCPResult {
 		setError(undefined);
 
 		try {
-			const bundles = await getAllMCPBundles(undefined, true);
+			const [bundles, pendingAuthorizations] = await Promise.all([
+				getAllMCPBundles(undefined, true),
+				mcpAPI.listPendingMCPOAuthAuthorizations().catch(() => []),
+			]);
 			const bundleOptions = await Promise.all(
 				bundles.map(async bundle => {
 					try {
@@ -181,12 +215,18 @@ export function useComposerMCP(): UseComposerMCPResult {
 									mcpAPI.getMCPServerStatus(bundle.id, server.id).catch(() => undefined),
 									mcpAPI.getMCPServerAuthHealth(bundle.id, server.id).catch(() => undefined),
 								]);
+								const authHealthWithPending = overlayPendingOAuthAuthHealth(
+									bundle.id,
+									server.id,
+									authHealth,
+									pendingAuthorizations
+								);
 
 								return {
 									bundle,
 									server,
 									runtime,
-									authHealth,
+									authHealth: authHealthWithPending,
 									tools: [],
 									resources: [],
 									resourceTemplates: [],
@@ -349,16 +389,20 @@ export function useComposerMCP(): UseComposerMCPResult {
 
 	const refreshServerStatus = useCallback(
 		async (bundleID: string, serverID: string) => {
-			const [runtime, authHealth] = await Promise.all([
+			const [runtime, authHealth, pendingAuthorizations] = await Promise.all([
 				mcpAPI.getMCPServerStatus(bundleID, serverID).catch(() => undefined),
 				mcpAPI.getMCPServerAuthHealth(bundleID, serverID).catch(() => undefined),
+				mcpAPI.listPendingMCPOAuthAuthorizations().catch(() => []),
 			]);
 
 			if (!mountedRef.current) {
 				return;
 			}
 
-			patchOption(bundleID, serverID, { runtime, authHealth });
+			patchOption(bundleID, serverID, {
+				runtime,
+				authHealth: overlayPendingOAuthAuthHealth(bundleID, serverID, authHealth, pendingAuthorizations),
+			});
 		},
 		[patchOption]
 	);
