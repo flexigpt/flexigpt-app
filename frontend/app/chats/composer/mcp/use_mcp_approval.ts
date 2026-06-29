@@ -11,35 +11,106 @@ export interface MCPApprovalRequest {
 
 export type RequestMCPApproval = (request: MCPApprovalRequest) => Promise<MCPApprovalResolution>;
 
+interface PendingMCPApprovalRequest {
+	request: MCPApprovalRequest;
+	resolve: (resolution: MCPApprovalResolution) => void;
+}
+
 export function useMCPApproval() {
 	const [approvalRequest, setApprovalRequest] = useState<MCPApprovalRequest | null>(null);
-	const resolverRef = useRef<((resolution: MCPApprovalResolution) => void) | null>(null);
+	const activeApprovalRef = useRef<PendingMCPApprovalRequest | null>(null);
+	const queuedApprovalsRef = useRef<PendingMCPApprovalRequest[]>([]);
+	const advanceTimerRef = useRef<number | null>(null);
+	const advancingApprovalRef = useRef(false);
 
-	const resolveMCPApproval = useCallback((resolution: MCPApprovalResolution) => {
-		const resolver = resolverRef.current;
-		resolverRef.current = null;
-		setApprovalRequest(null);
-		resolver?.(resolution);
+	const clearAdvanceTimer = useCallback(() => {
+		advancingApprovalRef.current = false;
+		if (advanceTimerRef.current === null || typeof window === 'undefined') {
+			advanceTimerRef.current = null;
+			return;
+		}
+
+		window.clearTimeout(advanceTimerRef.current);
+		advanceTimerRef.current = null;
 	}, []);
 
-	const requestMCPApproval = useCallback((request: MCPApprovalRequest) => {
-		return new Promise<MCPApprovalResolution>(resolve => {
-			if (resolverRef.current) {
-				resolverRef.current(MCPApprovalResolution.MCPApprovalResolutionDenyOnce);
+	const showNextApproval = useCallback(() => {
+		if (activeApprovalRef.current) {
+			return;
+		}
+
+		advancingApprovalRef.current = false;
+		const next = queuedApprovalsRef.current.shift();
+		if (!next) {
+			setApprovalRequest(null);
+			return;
+		}
+
+		activeApprovalRef.current = next;
+		setApprovalRequest(next.request);
+	}, []);
+
+	const scheduleNextApproval = useCallback(() => {
+		clearAdvanceTimer();
+		advancingApprovalRef.current = true;
+
+		if (typeof window === 'undefined') {
+			showNextApproval();
+			return;
+		}
+
+		advanceTimerRef.current = window.setTimeout(() => {
+			advanceTimerRef.current = null;
+			showNextApproval();
+		}, 0);
+	}, [clearAdvanceTimer, showNextApproval]);
+
+	const resolveMCPApproval = useCallback(
+		(resolution: MCPApprovalResolution) => {
+			const active = activeApprovalRef.current;
+			if (!active) {
+				return;
 			}
 
-			resolverRef.current = resolve;
-			setApprovalRequest(request);
-		});
-	}, []);
+			activeApprovalRef.current = null;
+			setApprovalRequest(null);
+			active.resolve(resolution);
+			scheduleNextApproval();
+		},
+		[scheduleNextApproval]
+	);
+
+	const requestMCPApproval = useCallback(
+		(request: MCPApprovalRequest) => {
+			return new Promise<MCPApprovalResolution>(resolve => {
+				queuedApprovalsRef.current.push({
+					request,
+					resolve,
+				});
+
+				if (!advancingApprovalRef.current) {
+					showNextApproval();
+				}
+			});
+		},
+		[showNextApproval]
+	);
 
 	useEffect(() => {
+		const queuedCurrent = queuedApprovalsRef.current;
+		const active = activeApprovalRef.current;
 		return () => {
-			const resolver = resolverRef.current;
-			resolverRef.current = null;
-			resolver?.(MCPApprovalResolution.MCPApprovalResolutionDenyOnce);
+			clearAdvanceTimer();
+
+			activeApprovalRef.current = null;
+			active?.resolve(MCPApprovalResolution.MCPApprovalResolutionDenyOnce);
+
+			const queued = queuedCurrent.splice(0);
+			for (const item of queued) {
+				item.resolve(MCPApprovalResolution.MCPApprovalResolutionDenyOnce);
+			}
 		};
-	}, []);
+	}, [clearAdvanceTimer]);
 
 	return {
 		approvalRequest,

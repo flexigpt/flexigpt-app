@@ -33,6 +33,7 @@ function formatArguments(summary?: MCPApprovalSummary): string {
 
 export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModalProps) {
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
+	const resolvedApprovalIDRef = useRef<string | null>(null);
 
 	useEffect(() => {
 		if (!approvalRequest) {
@@ -59,6 +60,14 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 		};
 	}, [approvalRequest]);
 
+	useEffect(() => {
+		if (!approvalRequest) {
+			return;
+		}
+
+		resolvedApprovalIDRef.current = null;
+	}, [approvalRequest]);
+
 	if (!approvalRequest) {
 		return null;
 	}
@@ -66,10 +75,19 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 		return null;
 	}
 
-	const { summary, reason } = approvalRequest;
+	const { approvalID, summary, reason } = approvalRequest;
+
+	const resolveOnce = (resolution: MCPApprovalResolution) => {
+		if (resolvedApprovalIDRef.current === approvalID) {
+			return;
+		}
+
+		resolvedApprovalIDRef.current = approvalID;
+		onResolve(resolution);
+	};
 
 	const closeAsDenyOnce = () => {
-		onResolve(MCPApprovalResolution.MCPApprovalResolutionDenyOnce);
+		resolveOnce(MCPApprovalResolution.MCPApprovalResolutionDenyOnce);
 	};
 
 	return createPortal(
@@ -144,7 +162,7 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 								type="button"
 								className="btn btn-sm bg-base-300 rounded-xl"
 								onClick={() => {
-									onResolve(MCPApprovalResolution.MCPApprovalResolutionDenyOnce);
+									resolveOnce(MCPApprovalResolution.MCPApprovalResolutionDenyOnce);
 								}}
 							>
 								Deny once
@@ -153,7 +171,7 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 								type="button"
 								className="btn btn-sm btn-error rounded-xl"
 								onClick={() => {
-									onResolve(MCPApprovalResolution.MCPApprovalResolutionDenyAlways);
+									resolveOnce(MCPApprovalResolution.MCPApprovalResolutionDenyAlways);
 								}}
 							>
 								Deny always
@@ -165,7 +183,7 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 								type="button"
 								className="btn btn-sm bg-base-300 rounded-xl"
 								onClick={() => {
-									onResolve(MCPApprovalResolution.MCPApprovalResolutionAllowOnce);
+									resolveOnce(MCPApprovalResolution.MCPApprovalResolutionAllowOnce);
 								}}
 							>
 								Allow once
@@ -174,7 +192,7 @@ export function MCPApprovalModal({ approvalRequest, onResolve }: MCPApprovalModa
 								type="button"
 								className="btn btn-sm btn-primary rounded-xl"
 								onClick={() => {
-									onResolve(MCPApprovalResolution.MCPApprovalResolutionAllowAlways);
+									resolveOnce(MCPApprovalResolution.MCPApprovalResolutionAllowAlways);
 								}}
 							>
 								Allow always

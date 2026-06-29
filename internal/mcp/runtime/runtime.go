@@ -1130,6 +1130,21 @@ func firstBundleID(values ...bundleitemutils.BundleID) bundleitemutils.BundleID 
 }
 
 func applyToolPolicyOverlay(tool spec.MCPToolCapability, cfg spec.MCPServerConfig) spec.MCPToolCapability {
+	policy := cfg.DefaultPolicy
+	defaultPolicy := spec.DefaultMCPServerPolicy()
+	if policy.DefaultApprovalRule == "" {
+		policy.DefaultApprovalRule = defaultPolicy.DefaultApprovalRule
+	}
+	if policy.DefaultExecutionMode == "" {
+		policy.DefaultExecutionMode = defaultPolicy.DefaultExecutionMode
+	}
+
+	// Discovery snapshots can outlive policy edits while a server remains
+	// connected. Always overlay the current default policy before applying
+	// per-tool overrides so ListTools and dry-run output reflect current config.
+	tool.ApprovalRule = policy.DefaultApprovalRule
+	tool.ExecutionMode = policy.DefaultExecutionMode
+
 	if ov, ok := cfg.ToolPolicies[tool.ToolName]; ok {
 		if ov.ApprovalRule != nil {
 			tool.ApprovalRule = *ov.ApprovalRule
@@ -1137,7 +1152,7 @@ func applyToolPolicyOverlay(tool spec.MCPToolCapability, cfg spec.MCPServerConfi
 		if ov.ExecutionMode != nil {
 			tool.ExecutionMode = *ov.ExecutionMode
 		}
-		if ov.ExpectedDigest != "" && ov.ExpectedDigest != tool.Digest {
+		if ov.ExpectedDigest != "" && ov.ExpectedDigest != tool.Digest && !ov.AllowStaleDigest {
 			tool.Stale = true
 		}
 	}

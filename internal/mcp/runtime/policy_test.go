@@ -197,6 +197,88 @@ func TestEvaluationSummaryAndPolicyBranches(t *testing.T) {
 	}
 }
 
+func TestApplyToolPolicyOverlayUsesCurrentDefaults(t *testing.T) {
+	baseTool := spec.MCPToolCapability{
+		ToolName:      "tool",
+		Digest:        "digest-current",
+		ApprovalRule:  spec.MCPApprovalRuleAsk,
+		ExecutionMode: spec.MCPExecutionModeManual,
+	}
+
+	t.Run("current defaults replace stale snapshot policy", func(t *testing.T) {
+		got := applyToolPolicyOverlay(baseTool, spec.MCPServerConfig{
+			DefaultPolicy: spec.MCPServerPolicy{
+				DefaultApprovalRule:  spec.MCPApprovalRuleAllow,
+				DefaultExecutionMode: spec.MCPExecutionModeAuto,
+			},
+		})
+
+		if got.ApprovalRule != spec.MCPApprovalRuleAllow {
+			t.Fatalf("ApprovalRule = %q, want %q", got.ApprovalRule, spec.MCPApprovalRuleAllow)
+		}
+		if got.ExecutionMode != spec.MCPExecutionModeAuto {
+			t.Fatalf("ExecutionMode = %q, want %q", got.ExecutionMode, spec.MCPExecutionModeAuto)
+		}
+	})
+
+	t.Run("tool override wins over defaults", func(t *testing.T) {
+		approvalRule := spec.MCPApprovalRuleAsk
+		executionMode := spec.MCPExecutionModeManual
+
+		got := applyToolPolicyOverlay(baseTool, spec.MCPServerConfig{
+			DefaultPolicy: spec.MCPServerPolicy{
+				DefaultApprovalRule:  spec.MCPApprovalRuleAllow,
+				DefaultExecutionMode: spec.MCPExecutionModeAuto,
+			},
+			ToolPolicies: map[string]spec.MCPToolPolicyOverride{
+				"tool": {
+					ToolName:      "tool",
+					ApprovalRule:  &approvalRule,
+					ExecutionMode: &executionMode,
+				},
+			},
+		})
+
+		if got.ApprovalRule != spec.MCPApprovalRuleAsk {
+			t.Fatalf("ApprovalRule = %q, want %q", got.ApprovalRule, spec.MCPApprovalRuleAsk)
+		}
+		if got.ExecutionMode != spec.MCPExecutionModeManual {
+			t.Fatalf("ExecutionMode = %q, want %q", got.ExecutionMode, spec.MCPExecutionModeManual)
+		}
+	})
+
+	t.Run("partial default policy fills empty execution mode", func(t *testing.T) {
+		got := applyToolPolicyOverlay(baseTool, spec.MCPServerConfig{
+			DefaultPolicy: spec.MCPServerPolicy{
+				DefaultApprovalRule: spec.MCPApprovalRuleAllow,
+			},
+		})
+
+		if got.ApprovalRule != spec.MCPApprovalRuleAllow {
+			t.Fatalf("ApprovalRule = %q, want %q", got.ApprovalRule, spec.MCPApprovalRuleAllow)
+		}
+		if got.ExecutionMode != spec.MCPExecutionModeManual {
+			t.Fatalf("ExecutionMode = %q, want default manual", got.ExecutionMode)
+		}
+	})
+
+	t.Run("allow stale digest does not mark tool stale", func(t *testing.T) {
+		got := applyToolPolicyOverlay(baseTool, spec.MCPServerConfig{
+			ToolPolicies: map[string]spec.MCPToolPolicyOverride{
+				"tool": {
+					ToolName:         "tool",
+					ExpectedDigest:   "digest-old",
+					AllowStaleDigest: true,
+				},
+			},
+		})
+
+		if got.Stale {
+			t.Fatalf("Stale = true, want false when allowStaleDigest is set")
+		}
+	})
+}
+
 func TestSummaryMatchesAndExecutionModeBranches(t *testing.T) {
 	bundleID := bundleitemutils.BundleID("bundle-a")
 	stored := spec.MCPApprovalSummary{

@@ -15,7 +15,7 @@
 	"defaultPolicy": {
 		"defaultApprovalRule": "allow",
 		"defaultExecutionMode": "auto",
-		"requireApprovalForUnknownRisk": true,
+		"requireApprovalForUnknownRisk": false,
 		"requireApprovalForWrite": true,
 		"requireApprovalForDestructive": true
 	},

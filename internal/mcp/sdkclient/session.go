@@ -276,8 +276,12 @@ func (s *Session) listAllTools(
 	defaultPolicy spec.MCPServerPolicy,
 	trustLevel spec.MCPTrustLevel,
 ) ([]spec.MCPToolCapability, error) {
-	if defaultPolicy == (spec.MCPServerPolicy{}) {
-		defaultPolicy = spec.DefaultMCPServerPolicy()
+	baseDefaultPolicy := spec.DefaultMCPServerPolicy()
+	if defaultPolicy.DefaultApprovalRule == "" {
+		defaultPolicy.DefaultApprovalRule = baseDefaultPolicy.DefaultApprovalRule
+	}
+	if defaultPolicy.DefaultExecutionMode == "" {
+		defaultPolicy.DefaultExecutionMode = baseDefaultPolicy.DefaultExecutionMode
 	}
 
 	out := make([]spec.MCPToolCapability, 0)

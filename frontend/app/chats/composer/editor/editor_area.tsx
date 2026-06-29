@@ -27,7 +27,8 @@ import { Plate, PlateContent } from 'platejs/react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { ProviderSDKType, UIToolCall, UIToolOutput } from '@/spec/inference';
-import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp';
+import type { MCPAppModelContextUpdate, MCPConversationContext, MCPToolSelection } from '@/spec/mcp';
+import { MCPExecutionMode } from '@/spec/mcp';
 import type { PromptTemplate } from '@/spec/prompt';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolArgsTarget, ToolListItem, ToolStoreChoice } from '@/spec/tool';
@@ -147,6 +148,118 @@ function countAutoExecutableToolChoices(choices: ToolStoreChoice[]): number {
 	return choices.filter(c => isAutoExecutableToolChoice(c)).length;
 }
 
+function getMCPContextToolSelections(context?: MCPConversationContext): MCPToolSelection[] {
+	const out: MCPToolSelection[] = [];
+
+	for (const server of context?.servers ?? []) {
+		for (const tool of server.selectedTools ?? []) {
+			out.push({
+				...tool,
+				bundleID: tool.bundleID || server.bundleID,
+				serverID: tool.serverID || server.serverID,
+			});
+		}
+	}
+
+	return out;
+}
+
+function countAutoExecutableMCPTools(context?: MCPConversationContext): number {
+	return getMCPContextToolSelections(context).filter(
+		tool => tool.executionMode === MCPExecutionMode.MCPExecutionModeAuto
+	).length;
+}
+
+function mergeMCPToolSelection(selection: MCPToolSelection, contextSelection: MCPToolSelection): MCPToolSelection {
+	return {
+		...contextSelection,
+		...selection,
+		bundleID: selection.bundleID || contextSelection.bundleID,
+		serverID: selection.serverID || contextSelection.serverID,
+		toolName: selection.toolName || contextSelection.toolName,
+		providerToolName: selection.providerToolName || contextSelection.providerToolName,
+		choiceID: selection.choiceID || contextSelection.choiceID,
+		digest: selection.digest || contextSelection.digest,
+		approvalRule: selection.approvalRule ?? contextSelection.approvalRule,
+		executionMode: selection.executionMode ?? contextSelection.executionMode,
+		appResourceUri: selection.appResourceUri || contextSelection.appResourceUri,
+		visibility: selection.visibility ?? contextSelection.visibility,
+	};
+}
+
+function findMCPToolSelectionForCall(
+	toolCall: UIToolCall,
+	context?: MCPConversationContext
+): MCPToolSelection | undefined {
+	const contextSelections = getMCPContextToolSelections(context);
+	if (contextSelections.length === 0) {
+		return undefined;
+	}
+
+	const selection = toolCall.mcpToolSelection;
+
+	if (selection?.choiceID) {
+		const bySelectionChoiceID = contextSelections.find(candidate => candidate.choiceID === selection.choiceID);
+		if (bySelectionChoiceID) {
+			return bySelectionChoiceID;
+		}
+	}
+
+	if (toolCall.choiceID) {
+		const byCallChoiceID = contextSelections.find(candidate => candidate.choiceID === toolCall.choiceID);
+		if (byCallChoiceID) {
+			return byCallChoiceID;
+		}
+	}
+
+	if (!selection) {
+		return undefined;
+	}
+
+	return contextSelections.find(candidate => {
+		const bundleMatches = !selection.bundleID || selection.bundleID === candidate.bundleID;
+		const serverMatches = !selection.serverID || selection.serverID === candidate.serverID;
+		if (!bundleMatches || !serverMatches) {
+			return false;
+		}
+
+		if (selection.toolName && selection.toolName === candidate.toolName) {
+			return true;
+		}
+		if (selection.providerToolName && selection.providerToolName === candidate.providerToolName) {
+			return true;
+		}
+		if (toolCall.name && toolCall.name === candidate.providerToolName) {
+			return true;
+		}
+
+		return false;
+	});
+}
+
+function enrichMCPToolCallsFromContext(toolCalls: UIToolCall[], context?: MCPConversationContext): UIToolCall[] {
+	let changed = false;
+
+	const next = toolCalls.map(toolCall => {
+		const contextSelection = findMCPToolSelectionForCall(toolCall, context);
+		if (!contextSelection) {
+			return toolCall;
+		}
+
+		const mcpToolSelection = toolCall.mcpToolSelection
+			? mergeMCPToolSelection(toolCall.mcpToolSelection, contextSelection)
+			: contextSelection;
+
+		changed = true;
+		return {
+			...toolCall,
+			mcpToolSelection,
+		};
+	});
+
+	return changed ? next : toolCalls;
+}
+
 interface SubmitOptions {
 	runPendingTools: boolean;
 }
@@ -168,6 +281,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 ) {
 	const autoSubmitTrackerRef = useRef(createAutoSubmitTracker());
 	const mcp = useComposerMCP();
+	const lastSubmittedMCPContextRef = useRef<MCPConversationContext | undefined>(undefined);
 	const mcpApproval = useMCPApproval();
 	const resetAutoSubmitTracker = useCallback(() => {
 		autoSubmitTrackerRef.current = createAutoSubmitTracker();
@@ -1090,15 +1204,17 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				const webSearchChoices = buildWebSearchChoicesForSubmit(webSearchTemplates);
 
 				const finalToolChoices = dedupeToolChoices([...explicitChoices, ...conversationChoices, ...webSearchChoices]);
-				shouldShowAutoExecStopAfterSend = countAutoExecutableToolChoices(finalToolChoices) >= 1;
 
-				let preparedMCPContext;
+				let preparedMCPContext: MCPConversationContext | undefined;
 				try {
 					preparedMCPContext = await mcp.prepareForSubmit();
 				} catch (err) {
 					setSubmitError((err as Error)?.message || 'Fill required MCP arguments before sending.');
 					return;
 				}
+				shouldShowAutoExecStopAfterSend =
+					countAutoExecutableToolChoices(finalToolChoices) + countAutoExecutableMCPTools(preparedMCPContext) >= 1;
+
 				const payload: EditorSubmitPayload = {
 					text: textToSend,
 					resolvedSystemPrompt,
@@ -1115,6 +1231,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					skillSessionID: effectiveSkillSessionID ?? undefined,
 				};
 
+				lastSubmittedMCPContextRef.current = preparedMCPContext;
 				await onSubmit(payload);
 				setSubmitError(null);
 				submittedToolChoices = finalToolChoices;
@@ -1475,14 +1592,26 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const handleLoadToolCalls = useCallback(
 		(toolCallsToLoad: UIToolCall[]) => {
 			resetAutoSubmitTracker();
-			const autoEligibleCount = toolCallsToLoad.filter(t => isAutoSubmitEligibleToolCall(t)).length;
+			const enrichedToolCalls = enrichMCPToolCallsFromContext(
+				toolCallsToLoad,
+				lastSubmittedMCPContextRef.current ?? mcp.mcpContext
+			);
+			const autoEligibleCount = enrichedToolCalls.filter(t => isAutoSubmitEligibleToolCall(t)).length;
 			const shouldSuppressAutoExec = autoExecStopRequestedRef.current || autoExecBlockedByUserRef.current;
 
 			const preparedToolCalls = shouldSuppressAutoExec
-				? toolCallsToLoad.map(toolCall =>
+				? enrichedToolCalls.map(toolCall =>
 						isAutoSubmitEligibleToolCall(toolCall) ? { ...toolCall, suppressAutoExecute: true } : toolCall
 					)
-				: toolCallsToLoad;
+				: enrichedToolCalls;
+
+			const tracker = autoSubmitTrackerRef.current;
+			for (const toolCall of preparedToolCalls) {
+				tracker.observedCallKeys.add(getToolAutoSubmitKey(toolCall));
+				if (!isAutoSubmitEligibleToolCall(toolCall)) {
+					tracker.allObservedCallsAreAutoExecute = false;
+				}
+			}
 
 			setActiveAutoExecBatchCount(autoEligibleCount >= 1 ? autoEligibleCount : 0);
 
@@ -1496,7 +1625,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 			loadToolCalls(preparedToolCalls);
 		},
-		[loadToolCalls, resetAutoSubmitTracker]
+		[loadToolCalls, mcp.mcpContext, resetAutoSubmitTracker]
 	);
 
 	const finishAssistantTurn = useCallback(

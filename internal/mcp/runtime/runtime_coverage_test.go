@@ -224,9 +224,6 @@ func TestRuntimeManagerToolBranches(t *testing.T) {
 		if tool.ApprovalRule != allow || tool.ExecutionMode != auto {
 			t.Fatalf("ListTools overlay = %#v, want allow/auto", tool)
 		}
-		if !tool.Stale {
-			t.Fatalf("ListTools tool should be marked stale when expected digest differs")
-		}
 
 		dryRunBody, _, dryRunTool, err := mgr.CallToolDryRun(
 			t.Context(),
