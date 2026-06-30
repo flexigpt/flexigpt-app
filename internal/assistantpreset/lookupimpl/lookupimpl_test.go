@@ -30,7 +30,7 @@ const (
 )
 
 func TestNewAssistantPresetReferenceLookups(t *testing.T) {
-	got := NewAssistantPresetReferenceLookups(nil, nil, nil, nil)
+	got := NewAssistantPresetReferenceLookups(nil, nil, nil, nil, nil, nil)
 
 	if got.ModelPresets == nil {
 		t.Fatal("ModelPresets is nil")

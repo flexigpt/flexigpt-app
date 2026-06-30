@@ -8,6 +8,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/assistantpreset/lookupimpl"
 	"github.com/flexigpt/flexigpt-app/internal/assistantpreset/spec"
 	assistantpresetStore "github.com/flexigpt/flexigpt-app/internal/assistantpreset/store"
+	mcpRuntime "github.com/flexigpt/flexigpt-app/internal/mcp/runtime"
+	mcpStore "github.com/flexigpt/flexigpt-app/internal/mcp/store"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
 	promptStore "github.com/flexigpt/flexigpt-app/internal/prompt/store"
@@ -26,7 +28,8 @@ func InitAssistantPresetStoreWrapper(
 	promptTemplateSt *promptStore.PromptTemplateStore,
 	toolSt *toolStore.ToolStore,
 	skillSt *skillStore.SkillStore,
-	mcpWrappers ...*MCPWrapper,
+	mcpSt *mcpStore.Store,
+	mcpRt *mcpRuntime.MCPRuntimeManager,
 ) error {
 	if w == nil {
 		panic("initialising AssistantPresetStoreWrapper on nil receiver")
@@ -43,24 +46,21 @@ func InitAssistantPresetStoreWrapper(
 	if skillSt == nil {
 		return errors.New("skill store is nil")
 	}
+	if mcpSt == nil {
+		return errors.New("mcp store is nil")
+	}
+	if mcpRt == nil {
+		return errors.New("mcp runtime is nil")
+	}
 
 	lookups := lookupimpl.NewAssistantPresetReferenceLookups(
 		modelPresetSt,
 		promptTemplateSt,
 		toolSt,
 		skillSt,
+		mcpSt,
+		mcpRt,
 	)
-
-	if len(mcpWrappers) > 0 && mcpWrappers[0] != nil {
-		mcpw := mcpWrappers[0]
-		if mcpw.store == nil {
-			return errors.New("mcp store is nil")
-		}
-		lookups.MCPContext = lookupimpl.NewMCPContextLookup(
-			mcpw.store,
-			mcpw.runtime,
-		)
-	}
 
 	st, err := assistantpresetStore.NewAssistantPresetStore(
 		baseDir,

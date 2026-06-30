@@ -281,6 +281,8 @@ func (a *App) initManagers() {
 		a.promptTemplateStoreAPI.store,
 		a.toolStoreAPI.store,
 		a.skillStoreAPI.store,
+		a.mcpAPI.store,
+		a.mcpAPI.runtime,
 	)
 	if err != nil {
 		slog.Error(

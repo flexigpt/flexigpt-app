@@ -729,8 +729,10 @@ func NewAssistantPresetReferenceLookups(
 	promptTemplateSt *promptStore.PromptTemplateStore,
 	toolSt *toolStore.ToolStore,
 	skillSt *skillStore.SkillStore,
+	mcpServerStore MCPServerConfigStore,
+	mcpDiscovery MCPDiscoveryLookup,
 ) assistantpresetStore.ReferenceLookups {
-	return assistantpresetStore.ReferenceLookups{
+	lookups := assistantpresetStore.ReferenceLookups{
 		ModelPresets: &modelPresetLookupAdapter{
 			store: modelPresetSt,
 		},
@@ -744,22 +746,6 @@ func NewAssistantPresetReferenceLookups(
 			store: skillSt,
 		},
 	}
-}
-
-func NewAssistantPresetReferenceLookupsWithMCP(
-	modelPresetSt *modelpresetStore.ModelPresetStore,
-	promptTemplateSt *promptStore.PromptTemplateStore,
-	toolSt *toolStore.ToolStore,
-	skillSt *skillStore.SkillStore,
-	mcpServerStore MCPServerConfigStore,
-	mcpDiscovery MCPDiscoveryLookup,
-) assistantpresetStore.ReferenceLookups {
-	lookups := NewAssistantPresetReferenceLookups(
-		modelPresetSt,
-		promptTemplateSt,
-		toolSt,
-		skillSt,
-	)
 	if mcpServerStore != nil {
 		lookups.MCPContext = NewMCPContextLookup(mcpServerStore, mcpDiscovery)
 	}
