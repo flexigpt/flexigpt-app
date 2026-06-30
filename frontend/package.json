@@ -23,7 +23,7 @@
 		"build:wails": "rimraf ./dist && pnpm run build:pre && cross-env VITE_PLATFORM=wails react-router build",
 		"test": "vitest run",
 		"coverage": "vitest run --coverage",
-		"licenses:gen": "pnpm run build:pre && cross-env GEN_LICENSES=true VITE_PLATFORM=wails vite build --mode production"
+		"licenses:gen": "pnpm run build:pre && cross-env GEN_LICENSES=true GEN_LICENSES_FORCE_WRITE=true VITE_PLATFORM=wails vite build --mode production"
 	},
 	"keywords": [],
 	"author": "ppipada",

@@ -72,6 +72,12 @@ if ! command -v pnpm >/dev/null 2>&1; then
 fi
 
 # Run frontend generator (does not write dist/ by default because of vite config)
+#
+# React Router's Vite plugin reads frontend/dist/client/.vite/manifest.json
+# while building the SSR/prerender environment. With build.write=false, that
+# manifest is never created and React Router fails with ENOENT. Force writing
+# for license builds; the real Wails build cleans frontend/dist before use.
+export GEN_LICENSES_FORCE_WRITE="${GEN_LICENSES_FORCE_WRITE:-true}"
 pnpm -C "${ROOT_DIR}/frontend" run licenses:gen
 
 if [[ ! -s "${JS_OUT}" ]]; then
