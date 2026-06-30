@@ -105,6 +105,7 @@ export const EMPTY_ASSISTANT_PRESET_RUNTIME_SNAPSHOT: AssistantPresetRuntimeSnap
 	conversationToolChoices: [],
 	webSearchChoices: [],
 	enabledSkillRefs: [],
+	mcpContext: undefined,
 };
 
 export const EMPTY_ASSISTANT_PRESET_MODIFICATION_SUMMARY: AssistantPresetModificationSummary = {
