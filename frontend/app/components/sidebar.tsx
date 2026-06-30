@@ -77,6 +77,11 @@ export function Sidebar({ children }: SidebarProps) {
 								<FiLayers size={24} />
 							</Link>
 						</li>
+						<li className="mt-4" title="MCP Servers" onClick={toggle} aria-label="MCP Servers">
+							<Link to="/mcpservers/" className="flex size-12 items-center justify-center rounded-full p-0">
+								<FiServer size={24} />
+							</Link>
+						</li>
 						<li className="mt-4" title="Skills" onClick={toggle} aria-label="Skills">
 							<Link to="/skills/" className="flex size-12 items-center justify-center rounded-full p-0">
 								<FiPackage size={24} />
@@ -87,13 +92,6 @@ export function Sidebar({ children }: SidebarProps) {
 								<FiTool size={24} />
 							</Link>
 						</li>
-
-						<li className="mt-4" title="MCP Servers" onClick={toggle} aria-label="MCP Servers">
-							<Link to="/mcpservers/" className="flex size-12 items-center justify-center rounded-full p-0">
-								<FiServer size={24} />
-							</Link>
-						</li>
-
 						<li className="mt-4" title="Prompts" onClick={toggle} aria-label="Prompts">
 							<Link to="/prompts/" className="flex size-12 items-center justify-center rounded-full p-0">
 								<FiFilePlus size={24} />

@@ -8,8 +8,7 @@ import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
 import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';
 
 type OrderedToolChipItem =
-	| { key: string; kind: 'call'; call: UIToolCall }
-	| { key: string; kind: 'output'; output: UIToolOutput };
+	{ key: string; kind: 'call'; call: UIToolCall } | { key: string; kind: 'output'; output: UIToolOutput };
 
 const noopOpenCallDetails = (_call: UIToolCall) => {};
 

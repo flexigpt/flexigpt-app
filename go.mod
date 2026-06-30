@@ -8,7 +8,7 @@ require (
 	github.com/adrg/xdg v0.5.3
 	github.com/danielgtaylor/huma/v2 v2.38.0
 	github.com/flexigpt/agentskills-go v0.15.2
-	github.com/flexigpt/inference-go v0.20.5
+	github.com/flexigpt/inference-go v0.20.6
 	github.com/flexigpt/llmtools-go v0.21.3
 	github.com/flexigpt/mapstore-go v0.3.4
 	github.com/glebarez/go-sqlite v1.22.0
@@ -29,7 +29,7 @@ require (
 	github.com/JohannesKaufmann/dom v0.3.1 // indirect
 	github.com/RadhiFadlillah/whatlanggo v0.0.0-20240916001553-aac1f0f737fc // indirect
 	github.com/andybalholm/cascadia v1.3.4 // indirect
-	github.com/anthropics/anthropic-sdk-go v1.51.1 // indirect
+	github.com/anthropics/anthropic-sdk-go v1.53.0 // indirect
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/bep/debounce v1.2.1 // indirect

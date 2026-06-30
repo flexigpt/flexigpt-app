@@ -2,8 +2,11 @@
 
 ## Laundry list
 
-- [ ] better more inbuilt mcps. test enhanced mcp apps.
+- [ ] assistant presets: mcps in poresets
+- [ ] llmtools: git tools?
+- [ ] a folder selection/input an be given in context bar to say that your current work folder is so and so, so that any claude.md or skills or anything can be selected and auto injected as a "Starter recipe"
 
+- [ ] better more inbuilt mcps. test enhanced mcp apps.
 - [ ] test web search etc and pending user args etc after bottom bar migration.
 - [ ] test with some skill that has scripts too
 
@@ -27,8 +30,6 @@
     - [ ] Not needed as of now. May be a progressive disclosure runtime like skills will be better.
     - [ ] May need to check when there are actually a lot of tools.
     - [ ] May be like skills we can also inject a available tools prompt in the sys prompt
-
-  - [ ] a folder selection/input an be given in context bar to say that your current work folder is so and so, so that any claude.md or skills or anything can be selected and auto injected as a "Starter recipe"
 
   - easier add via some files/schemas etc
     - [ ] easier preset import bundles and flows. e.g: just import a preset bundle that has assistant, models, prompts, tools etc.

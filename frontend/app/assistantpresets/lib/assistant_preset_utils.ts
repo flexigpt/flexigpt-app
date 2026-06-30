@@ -16,9 +16,7 @@ export interface AssistantPresetUpsertInput extends PutAssistantPresetPayload {
 }
 
 type AssistantPresetModelPatchLike =
-	| AssistantPreset['startingModelPresetPatch']
-	| AssistantPresetStartingModelPresetPatch
-	| undefined;
+	AssistantPreset['startingModelPresetPatch'] | AssistantPresetStartingModelPresetPatch | undefined;
 
 export function buildModelPresetRefKey(ref: ModelPresetRef): string {
 	return `${ref.providerName}/${ref.modelPresetID}`;

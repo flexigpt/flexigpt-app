@@ -9,3 +9,6 @@ minimumReleaseAgeExclude:
   - eslint-plugin-react-you-might-not-need-an-effect@1.0.0
   - knip@6.15.0
   - vite@8.0.15
+  - '@react-router/dev@8.1.0'
+  - '@react-router/node@8.1.0'
+  - react-router@8.1.0

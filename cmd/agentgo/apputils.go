@@ -4,12 +4,8 @@ import (
 	"embed"
 	"io/fs"
 	"log/slog"
-	"net/http"
 	"runtime"
-	"strings"
 )
-
-const FrontendPathPrefix = "/frontend/dist"
 
 var DIRPages = []string{"/404"}
 
@@ -30,38 +26,4 @@ func LogStackTrace() {
 	n := runtime.Stack(buf, false)
 	// Log the stack trace.
 	slog.Info("stack", "trace", string(buf[:n]))
-}
-
-func URLCleanerMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		// Clean the URL using getActualURL.
-		cleanedURL := getActualURL(req.URL.Path)
-
-		// Update the request URL path.
-		req.URL.Path = cleanedURL
-
-		// Call the next handler.
-		next.ServeHTTP(w, req)
-	})
-}
-
-func getActualURL(origurl string) string {
-	callurl := origurl
-	if !strings.HasPrefix(callurl, FrontendPathPrefix) {
-		return callurl
-	}
-
-	// Handle if it's a page request.
-	if strings.HasSuffix(callurl, "/") {
-		return callurl[len(FrontendPathPrefix):] + "index.html"
-	}
-
-	for _, d := range DIRPages {
-		durl := FrontendPathPrefix + d
-		if callurl == durl {
-			return callurl[len(FrontendPathPrefix):] + "/index.html"
-		}
-	}
-
-	return callurl[len(FrontendPathPrefix):]
 }

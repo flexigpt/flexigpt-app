@@ -100,7 +100,7 @@ tasks:
 
   pack-flatpak:
     cmds:
-      - gh act workflow_dispatch -W "./.github/workflows/flatpak.yml" --artifact-server-path "{{.ROOT_DIR}}/{{.COMMON_APP_DEV_ARTIFACT_DIR}}" --input tag="{{.COMMON_APP_DEV_VERSION}}"
+      - gh act -v workflow_dispatch -W "./.github/workflows/flatpak.yml" --artifact-server-path "{{.ROOT_DIR}}/{{.COMMON_APP_DEV_ARTIFACT_DIR}}" --input tag="{{.COMMON_APP_DEV_VERSION}}"
 
   pack-nsis:
     cmds:

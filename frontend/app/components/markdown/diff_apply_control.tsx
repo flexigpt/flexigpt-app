@@ -497,14 +497,7 @@ interface DiffApplyControlProps {
 }
 
 type ControlStatus =
-	| 'idle'
-	| 'checking'
-	| 'ready'
-	| 'needs-info'
-	| 'blocked'
-	| 'applying'
-	| 'applied'
-	| 'already-applied';
+	'idle' | 'checking' | 'ready' | 'needs-info' | 'blocked' | 'applying' | 'applied' | 'already-applied';
 
 interface DiffApplyState {
 	status: ControlStatus;

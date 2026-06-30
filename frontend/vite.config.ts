@@ -30,8 +30,8 @@ const depsToOptimize = [...new Set([...baseDeps, ...extraDepsToOptimize])].filte
 	dep => !excludedDepsToOptimize.has(dep)
 );
 
+// oxlint-disable-next-line no-unused-vars
 export default defineConfig(({ mode }) => {
-	const isProd = mode === 'production';
 	const genLicenses = process.env.GEN_LICENSES === 'true';
 	const genLicensesForceWrite = process.env.GEN_LICENSES_FORCE_WRITE === 'true';
 	// Allow CI/scripts to override output location deterministically.
@@ -67,8 +67,6 @@ export default defineConfig(({ mode }) => {
 	return {
 		envDir: false,
 		plugins: [reactRouter(), tailwindcss()],
-
-		base: isProd ? '/frontend/dist/' : '/',
 
 		resolve: {
 			// This replaces the need for the vite-tsconfig-paths plugin

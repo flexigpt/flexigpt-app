@@ -780,8 +780,7 @@ function AddEditMCPServerModalContent({
 		};
 
 		const toolPolicies = parseMCPObjectJSON(formData.toolPoliciesJSON, 'Tool policies') as
-			| Record<string, MCPToolPolicyOverride>
-			| undefined;
+			Record<string, MCPToolPolicyOverride> | undefined;
 
 		const payloadBase = {
 			displayName: formData.displayName.trim(),
