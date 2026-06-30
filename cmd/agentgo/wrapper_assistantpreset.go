@@ -26,6 +26,7 @@ func InitAssistantPresetStoreWrapper(
 	promptTemplateSt *promptStore.PromptTemplateStore,
 	toolSt *toolStore.ToolStore,
 	skillSt *skillStore.SkillStore,
+	mcpWrappers ...*MCPWrapper,
 ) error {
 	if w == nil {
 		panic("initialising AssistantPresetStoreWrapper on nil receiver")
@@ -49,6 +50,17 @@ func InitAssistantPresetStoreWrapper(
 		toolSt,
 		skillSt,
 	)
+
+	if len(mcpWrappers) > 0 && mcpWrappers[0] != nil {
+		mcpw := mcpWrappers[0]
+		if mcpw.store == nil {
+			return errors.New("mcp store is nil")
+		}
+		lookups.MCPContext = lookupimpl.NewMCPContextLookup(
+			mcpw.store,
+			mcpw.runtime,
+		)
+	}
 
 	st, err := assistantpresetStore.NewAssistantPresetStore(
 		baseDir,

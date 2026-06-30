@@ -1,3 +1,4 @@
+import type { MCPConversationContext } from '@/spec/mcp';
 import type { ModelPresetPatch, ModelPresetRef } from '@/spec/modelpreset';
 import type { PromptTemplateRef } from '@/spec/prompt';
 import type { SkillSelection } from '@/spec/skill';
@@ -38,6 +39,7 @@ export interface AssistantPreset {
 	startingInstructionTemplateRefs?: PromptTemplateRef[];
 	startingToolSelections?: ToolSelection[];
 	startingSkillSelections?: SkillSelection[];
+	startingMCPContext?: MCPConversationContext;
 	createdAt: Date; // Go type: time
 	modifiedAt: Date; // Go type: time
 }
@@ -82,4 +84,5 @@ export interface PutAssistantPresetPayload {
 	startingInstructionTemplateRefs?: PromptTemplateRef[];
 	startingToolSelections?: ToolSelection[];
 	startingSkillSelections?: SkillSelection[];
+	startingMCPContext?: MCPConversationContext;
 }

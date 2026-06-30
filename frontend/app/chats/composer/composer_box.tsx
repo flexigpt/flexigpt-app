@@ -132,6 +132,10 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 				);
 			}
 
+			if (prepared.runtimeSelections.hasMCPSelection) {
+				editorAreaRef.current?.setMCPContextFromMessage(prepared.runtimeSelections.mcpContext);
+			}
+
 			updateAssistantRuntimeSnapshot(prev => ({
 				conversationToolChoices: prepared.runtimeSelections.hasToolsSelection
 					? [...prepared.runtimeSelections.conversationToolChoices]
@@ -142,6 +146,9 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 				enabledSkillRefs: prepared.runtimeSelections.hasSkillsSelection
 					? [...prepared.runtimeSelections.enabledSkillRefs]
 					: prev.enabledSkillRefs,
+				mcpContext: prepared.runtimeSelections.hasMCPSelection
+					? prepared.runtimeSelections.mcpContext
+					: prev.mcpContext,
 			}));
 		},
 		[updateAssistantRuntimeSnapshot]
@@ -362,6 +369,7 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 					conversationToolChoices: [...context.toolChoices],
 					webSearchChoices: [...context.webSearchChoices],
 					enabledSkillRefs: [...context.enabledSkillRefs],
+					mcpContext: context.mcpContext,
 				});
 				pendingPresetResolutionModeRef.current = 'track-default';
 				void flushPendingPresetResolution();

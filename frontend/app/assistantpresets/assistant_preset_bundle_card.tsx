@@ -229,6 +229,7 @@ export function AssistantPresetBundleCard({
 									<th className="text-center whitespace-nowrap">Instructions</th>
 									<th className="text-center whitespace-nowrap">Tools</th>
 									<th className="text-center whitespace-nowrap">Skills</th>
+									<th className="text-center whitespace-nowrap">MCP</th>
 									<th className="text-center whitespace-nowrap">Version</th>
 									<th className="text-center whitespace-nowrap">Built-In</th>
 									<th className="text-center whitespace-nowrap">Actions</th>
@@ -262,6 +263,7 @@ export function AssistantPresetBundleCard({
 											<td className="text-center">{counts.instructions}</td>
 											<td className="text-center">{counts.tools}</td>
 											<td className="text-center">{counts.skills}</td>
+											<td className="text-center">{counts.mcp}</td>
 											<td className="text-center whitespace-nowrap">{preset.version}</td>
 											<td className="text-center">
 												{preset.isBuiltIn ? <FiCheck className="mx-auto" /> : <FiX className="mx-auto" />}
@@ -321,7 +323,7 @@ export function AssistantPresetBundleCard({
 
 								{presets.length === 0 && (
 									<tr>
-										<td colSpan={10} className="py-3 text-center text-sm">
+										<td colSpan={11} className="py-3 text-center text-sm">
 											No assistant presets in this bundle.
 										</td>
 									</tr>

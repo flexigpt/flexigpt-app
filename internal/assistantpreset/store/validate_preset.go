@@ -93,6 +93,9 @@ func validateAssistantPresetStructure(preset *spec.AssistantPreset) error {
 	if err := validateStartingModelPresetPatch(preset.StartingModelPresetPatch); err != nil {
 		return err
 	}
+	if err := validateStartingMCPContextStructure(preset.StartingMCPContext); err != nil {
+		return err
+	}
 
 	seenInstructionRefs := make(map[string]struct{}, len(preset.StartingInstructionTemplateRefs))
 	for i, ref := range preset.StartingInstructionTemplateRefs {
@@ -228,6 +231,10 @@ func validateAssistantPresetReferences(
 		if !summary.IsEnabled {
 			return fmt.Errorf("startingSkillSelections[%d]: referenced skill is disabled", i)
 		}
+	}
+
+	if err := validateStartingMCPContextReferences(ctx, preset.StartingMCPContext, lookups); err != nil {
+		return err
 	}
 
 	return nil

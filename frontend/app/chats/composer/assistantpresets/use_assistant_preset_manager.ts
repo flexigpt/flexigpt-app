@@ -18,6 +18,7 @@ import {
 	findBaseAssistantPresetOption,
 	findDefaultAssistantPresetOption,
 	getAssistantPresetModificationSummary,
+	normalizeAssistantPresetMCPContext,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import type { AssistantContextController } from '@/chats/composer/contextarea/use_context_state';
 import type { ComposerSystemPromptController } from '@/chats/composer/systemprompts/use_composer_system_prompt';
@@ -170,8 +171,19 @@ export function useAssistantPresetManager(args: {
 
 			const preparedSystemPromptSelections = await prepareAssistantPresetSelections(basePrepared.preset);
 
+			const normalizedPresetMCPContext = normalizeAssistantPresetMCPContext(basePrepared.preset.startingMCPContext);
+			const runtimeSelections = {
+				...basePrepared.runtimeSelections,
+				hasMCPSelection: basePrepared.runtimeSelections.hasMCPSelection ?? Boolean(normalizedPresetMCPContext),
+				mcpContext: basePrepared.runtimeSelections.mcpContext ?? normalizedPresetMCPContext,
+			};
+			const comparisonMCPContext = runtimeSelections.hasMCPSelection
+				? normalizeAssistantPresetMCPContext(runtimeSelections.mcpContext ?? normalizedPresetMCPContext)
+				: undefined;
+
 			return {
 				...basePrepared,
+				runtimeSelections,
 				hasIncludeModelSystemPromptSelection: preparedSystemPromptSelections.hasIncludeModelSystemPromptSelection,
 				nextIncludeModelSystemPrompt: preparedSystemPromptSelections.nextIncludeModelSystemPrompt,
 				hasInstructionTemplateSelection: preparedSystemPromptSelections.hasInstructionTemplateSelection,
@@ -186,6 +198,7 @@ export function useAssistantPresetManager(args: {
 					instructions: preparedSystemPromptSelections.hasInstructionTemplateSelection
 						? [...preparedSystemPromptSelections.nextSelectedPromptKeys]
 						: undefined,
+					mcp: comparisonMCPContext,
 				},
 			};
 		},

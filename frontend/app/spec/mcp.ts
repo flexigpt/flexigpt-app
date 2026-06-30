@@ -401,6 +401,7 @@ export interface MCPServerRuntimeSnapshot {
 
 // Opaque cursor for pagination.
 export interface MCPDiscoveryPageToken {
+	bid: string;
 	sid: MCPServerID;
 	dig: string;
 	k: string;
@@ -482,7 +483,7 @@ export interface MCPPromptRef {
 }
 
 export interface MCPDiscoverySnapshot {
-	bundleID?: string;
+	bundleID: string;
 
 	serverID: MCPServerID;
 

@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 
+	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	promptSpec "github.com/flexigpt/flexigpt-app/internal/prompt/spec"
 	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
@@ -63,9 +64,23 @@ type SkillLookup interface {
 	) (SkillSummary, error)
 }
 
+// MCPContextLookup validates MCP starter contexts without coupling this package
+// to a concrete MCP store/runtime implementation.
+//
+// Implementations should validate persistent server config strictly, but should
+// treat live discovery as best-effort because MCP capabilities are dynamic and
+// may require an active connection/auth session.
+type MCPContextLookup interface {
+	ValidateMCPConversationContext(
+		ctx context.Context,
+		mcpContext mcpSpec.MCPConversationContext,
+	) error
+}
+
 type ReferenceLookups struct {
 	ModelPresets    ModelPresetLookup
 	PromptTemplates PromptTemplateLookup
 	ToolSelections  ToolSelectionLookup
 	Skills          SkillLookup
+	MCPContext      MCPContextLookup
 }

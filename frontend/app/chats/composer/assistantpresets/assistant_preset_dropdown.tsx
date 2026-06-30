@@ -311,7 +311,7 @@ export function AssistantPresetDropdown({
 						className={actionTriggerMenuWideClasses}
 					>
 						<div className="mb-2 px-1 text-xs opacity-70">
-							Assistant presets seed starting text, model, instructions, tools, and skills.
+							Assistant presets seed starting text, model, instructions, tools, skills, and MCP context.
 						</div>
 
 						{error ? (

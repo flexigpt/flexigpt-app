@@ -1775,8 +1775,15 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			conversationToolChoices: conversationToolsToChoices(conversationToolsState),
 			webSearchChoices: mapAssistantPresetWebSearchTemplatesToChoices(webSearchTemplates),
 			enabledSkillRefs,
+			mcpContext: mcp.mcpContext,
 		});
-	}, [conversationToolsState, enabledSkillRefs, onAssistantPresetRuntimeStateChange, webSearchTemplates]);
+	}, [
+		conversationToolsState,
+		enabledSkillRefs,
+		mcp.mcpContext,
+		onAssistantPresetRuntimeStateChange,
+		webSearchTemplates,
+	]);
 
 	return (
 		<>

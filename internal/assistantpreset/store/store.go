@@ -91,6 +91,13 @@ func WithSkillLookup(lookup SkillLookup) Option {
 	}
 }
 
+func WithMCPContextLookup(lookup MCPContextLookup) Option {
+	return func(s *AssistantPresetStore) error {
+		s.lookups.MCPContext = lookup
+		return nil
+	}
+}
+
 func WithBuiltInDataOptions(opts ...BuiltInDataOption) Option {
 	return func(s *AssistantPresetStore) error {
 		s.builtInOpts = append(s.builtInOpts, opts...)
@@ -613,6 +620,7 @@ func (s *AssistantPresetStore) PutAssistantPreset(
 		StartingInstructionTemplateRefs:  cloneJSONValue(req.Body.StartingInstructionTemplateRefs),
 		StartingToolSelections:           cloneJSONValue(req.Body.StartingToolSelections),
 		StartingSkillSelections:          cloneJSONValue(req.Body.StartingSkillSelections),
+		StartingMCPContext:               cloneJSONValue(req.Body.StartingMCPContext),
 		CreatedAt:                        now,
 		ModifiedAt:                       now,
 	}

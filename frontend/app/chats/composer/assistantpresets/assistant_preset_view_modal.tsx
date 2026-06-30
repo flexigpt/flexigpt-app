@@ -2,9 +2,11 @@ import { useEffect, useMemo, useRef } from 'react';
 
 import { createPortal } from 'react-dom';
 
-import { FiSliders, FiTool, FiX, FiZap } from 'react-icons/fi';
+import { FiServer, FiSliders, FiTool, FiX, FiZap } from 'react-icons/fi';
 
 import type { AssistantPreset } from '@/spec/assistantpreset';
+import type { MCPConversationContext } from '@/spec/mcp';
+import { MCPToolExposure } from '@/spec/mcp';
 import type { UIChatOption } from '@/spec/modelpreset';
 import type { SkillSelection } from '@/spec/skill';
 import { ToolStoreChoiceType } from '@/spec/tool';
@@ -17,7 +19,10 @@ import type {
 	AssistantPresetPreparedApplication,
 	AssistantPresetRuntimeSnapshot,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
-import { buildAssistantPresetModelComparisonState } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
+import {
+	buildAssistantPresetModelComparisonState,
+	normalizeAssistantPresetMCPContext,
+} from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import { buildPromptTemplateRefKey } from '@/prompts/lib/prompt_template_ref';
 import type { SystemPromptItem } from '@/prompts/lib/use_system_prompts';
 
@@ -80,6 +85,105 @@ function formatSkillSelectionLabel(sel: SkillSelection) {
 		title: sel.skillRef.skillSlug,
 		meta: metaParts.join(' • '),
 	};
+}
+
+function getMCPToolExposureLabel(exposure: MCPToolExposure | string | undefined, selectedToolCount: number): string {
+	switch (exposure) {
+		case MCPToolExposure.MCPToolExposureAll:
+			return selectedToolCount > 0 ? `All tools (${selectedToolCount})` : 'All tools';
+		case MCPToolExposure.MCPToolExposureSelected:
+			return `${selectedToolCount} selected tool${selectedToolCount === 1 ? '' : 's'}`;
+		case MCPToolExposure.MCPToolExposureNone:
+			return 'No tools';
+		default:
+			return exposure ? exposure : 'Tools not specified';
+	}
+}
+
+function formatMCPArgumentSummary(values?: Record<string, string>): string | undefined {
+	const entries = Object.entries(values ?? {})
+		.filter(([key, value]) => key.trim().length > 0 && value.trim().length > 0)
+		.toSorted(([a], [b]) => a.localeCompare(b));
+
+	if (entries.length === 0) {
+		return undefined;
+	}
+
+	const body = entries
+		.map(([key, value]) => {
+			const clipped = value.length > 32 ? `${value.slice(0, 29)}...` : value;
+			return `${key}=${clipped}`;
+		})
+		.join(', ');
+
+	return `args: ${body}`;
+}
+
+function formatMCPContextLabelItems(context?: MCPConversationContext): Array<{ title: string; meta?: string }> {
+	const normalized = normalizeAssistantPresetMCPContext(context);
+	if (!normalized) {
+		return [];
+	}
+
+	const items: Array<{ title: string; meta?: string }> = [];
+
+	for (const server of normalized.servers ?? []) {
+		const selectedToolCount = server.selectedTools?.length ?? 0;
+		const metaParts = [
+			server.bundleID,
+			getMCPToolExposureLabel(server.toolExposure, selectedToolCount),
+			server.includeServerInstructions ? 'server instructions' : undefined,
+			server.snapshotDigest ? `snapshot ${server.snapshotDigest}` : undefined,
+		].filter(Boolean);
+
+		items.push({
+			title: `Server: ${server.serverID}`,
+			meta: metaParts.join(' • '),
+		});
+
+		for (const tool of server.selectedTools ?? []) {
+			const toolMetaParts = [
+				`${tool.bundleID}/${tool.serverID}`,
+				tool.providerToolName ? `provider ${tool.providerToolName}` : undefined,
+				tool.executionMode ? `execution ${tool.executionMode}` : undefined,
+				tool.approvalRule ? `approval ${tool.approvalRule}` : undefined,
+				tool.digest ? `digest ${tool.digest}` : undefined,
+				tool.appResourceUri ? `app ${tool.appResourceUri}` : undefined,
+			].filter(Boolean);
+
+			items.push({
+				title: `Tool: ${tool.toolName}`,
+				meta: toolMetaParts.join(' • '),
+			});
+		}
+	}
+
+	for (const resource of normalized.resources ?? []) {
+		items.push({
+			title: `Resource: ${resource.uri}`,
+			meta: `${resource.bundleID}/${resource.serverID}${resource.digest ? ` • digest ${resource.digest}` : ''}`,
+		});
+	}
+
+	for (const template of normalized.resourceTemplates ?? []) {
+		items.push({
+			title: `Resource template: ${template.uriTemplate}`,
+			meta: [template.bundleID + '/' + template.serverID, formatMCPArgumentSummary(template.argumentValues)]
+				.filter(Boolean)
+				.join(' • '),
+		});
+	}
+
+	for (const prompt of normalized.prompts ?? []) {
+		items.push({
+			title: `Prompt: ${prompt.promptName}`,
+			meta: [prompt.bundleID + '/' + prompt.serverID, formatMCPArgumentSummary(prompt.argumentValues)]
+				.filter(Boolean)
+				.join(' • '),
+		});
+	}
+
+	return items;
 }
 
 function renderSimpleList(items: Array<{ title: string; meta?: string }>, emptyText: string): React.ReactNode {
@@ -277,6 +381,14 @@ export function AssistantPresetViewModal({
 		? currentRuntimeSnapshot.enabledSkillRefs.map(formatSkillLabel)
 		: [];
 
+	const appliedMCPContext =
+		preparedApplication?.comparisonState.mcp ??
+		normalizeAssistantPresetMCPContext(viewedPreset.preset.startingMCPContext);
+	const appliedMCPItems = formatMCPContextLabelItems(appliedMCPContext);
+	const currentMCPItems = shouldShowActiveComparison
+		? formatMCPContextLabelItems(currentRuntimeSnapshot.mcpContext)
+		: [];
+
 	const description = viewedPreset.description || viewedPreset.preset.description;
 	const presetStartingText = viewedPreset.preset.startingText ?? '';
 	const hasPresetStartingText = presetStartingText.trim().length > 0;
@@ -284,6 +396,7 @@ export function AssistantPresetViewModal({
 	const showCurrentInstructions = shouldShowActiveComparison && modificationSummary.instructions;
 	const showCurrentTools = shouldShowActiveComparison && modificationSummary.tools;
 	const showCurrentSkills = shouldShowActiveComparison && modificationSummary.skills;
+	const showCurrentMCP = shouldShowActiveComparison && modificationSummary.mcp;
 
 	return createPortal(
 		<dialog
@@ -477,11 +590,37 @@ export function AssistantPresetViewModal({
 							</SectionCard>
 						) : null}
 
+						{appliedMCPItems.length > 0 ? (
+							<SectionCard
+								title="MCP context"
+								showSyncState={shouldShowActiveComparison}
+								isModified={modificationSummary.mcp}
+								icon={<FiServer size={14} />}
+							>
+								<div className={`grid gap-4 ${showCurrentMCP ? 'lg:grid-cols-2' : 'grid-cols-1'}`}>
+									<div>
+										<div className="mb-2 text-xs font-semibold opacity-70">
+											{shouldShowActiveComparison ? 'Preset-applied MCP context' : 'Preset MCP context'}
+										</div>
+										{renderSimpleList(appliedMCPItems, 'No MCP context selected.')}
+									</div>
+
+									{showCurrentMCP ? (
+										<div>
+											<div className="mb-2 text-xs font-semibold opacity-70">Current MCP context</div>
+											{renderSimpleList(currentMCPItems, 'No MCP context selected.')}
+										</div>
+									) : null}
+								</div>
+							</SectionCard>
+						) : null}
+
 						{!hasPresetStartingText &&
 						!appliedModelState &&
 						appliedInstructionKeys.length === 0 &&
 						appliedToolItems.length === 0 &&
-						appliedSkillItems.length === 0 ? (
+						appliedSkillItems.length === 0 &&
+						appliedMCPItems.length === 0 ? (
 							<div className="rounded-2xl border p-4 text-sm opacity-70">
 								This preset only carries display metadata right now; it does not manage any current authoring sections.
 							</div>

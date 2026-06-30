@@ -23,6 +23,7 @@ import type {
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import {
 	applyAssistantPresetModelPatch,
+	normalizeAssistantPresetMCPContext,
 	normalizeAssistantPresetSkillRefs,
 	normalizeAssistantPresetToolChoices,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
@@ -678,6 +679,9 @@ export function useAssistantContextState(): AssistantContextController {
 				}
 			}
 
+			const mcpContext = normalizeAssistantPresetMCPContext(preset.startingMCPContext);
+			const hasMCPSelection = Boolean(mcpContext);
+
 			return {
 				presetKey,
 				option,
@@ -697,6 +701,8 @@ export function useAssistantContextState(): AssistantContextController {
 					hasSkillsSelection,
 					enabledSkillRefs,
 					activeSkillRefs,
+					hasMCPSelection,
+					mcpContext,
 				},
 				comparisonState: {
 					model: undefined,
@@ -708,6 +714,7 @@ export function useAssistantContextState(): AssistantContextController {
 							}
 						: undefined,
 					skills: hasSkillsSelection ? normalizeAssistantPresetSkillRefs(enabledSkillRefs) : undefined,
+					mcp: hasMCPSelection ? mcpContext : undefined,
 				},
 			};
 		},

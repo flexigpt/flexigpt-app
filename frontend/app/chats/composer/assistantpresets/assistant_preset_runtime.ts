@@ -4,6 +4,7 @@ import {
 	BASE_ASSISTANT_PRESET_SLUG,
 	BASE_ASSISTANT_PRESET_VERSION,
 } from '@/spec/assistantpreset';
+import type { MCPConversationContext } from '@/spec/mcp';
 import type { UIChatOption } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
@@ -38,6 +39,8 @@ interface AssistantPresetPreparedRuntimeSelections {
 	hasSkillsSelection: boolean;
 	enabledSkillRefs: SkillRef[];
 	activeSkillRefs: SkillRef[];
+	hasMCPSelection: boolean;
+	mcpContext?: MCPConversationContext;
 }
 
 interface AssistantPresetComparisonState {
@@ -48,6 +51,7 @@ interface AssistantPresetComparisonState {
 		webSearchChoices: AssistantPresetNormalizedToolChoice[];
 	};
 	skills?: string[];
+	mcp?: MCPConversationContext;
 }
 
 export interface AssistantPresetPreparedApplication {
@@ -75,6 +79,7 @@ export interface AssistantPresetRuntimeSnapshot {
 	conversationToolChoices: ToolStoreChoice[];
 	webSearchChoices: ToolStoreChoice[];
 	enabledSkillRefs: SkillRef[];
+	mcpContext?: MCPConversationContext;
 }
 
 interface AssistantPresetNormalizedToolChoice {
@@ -91,6 +96,7 @@ export interface AssistantPresetModificationSummary {
 	instructions: boolean;
 	tools: boolean;
 	skills: boolean;
+	mcp: boolean;
 	any: boolean;
 	modifiedLabels: string[];
 }
@@ -106,6 +112,7 @@ export const EMPTY_ASSISTANT_PRESET_MODIFICATION_SUMMARY: AssistantPresetModific
 	instructions: false,
 	tools: false,
 	skills: false,
+	mcp: false,
 	any: false,
 	modifiedLabels: [],
 };
@@ -117,7 +124,11 @@ export function areAssistantRuntimeSnapshotsEqual(
 	return (
 		areToolChoiceListsEqual(a.conversationToolChoices, b.conversationToolChoices) &&
 		areToolChoiceListsEqual(a.webSearchChoices, b.webSearchChoices) &&
-		areSkillRefListsEqual(a.enabledSkillRefs, b.enabledSkillRefs)
+		areSkillRefListsEqual(a.enabledSkillRefs, b.enabledSkillRefs) &&
+		areComparableValuesEqual(
+			normalizeAssistantPresetMCPContext(a.mcpContext),
+			normalizeAssistantPresetMCPContext(b.mcpContext)
+		)
 	);
 }
 
@@ -361,6 +372,187 @@ export function mapAssistantPresetWebSearchTemplatesToChoices(templates: WebSear
 	}));
 }
 
+function normalizeComparableStringList(values?: string[]): string[] | undefined {
+	const out = [...new Set((values ?? []).map(value => value.trim()).filter(Boolean))].toSorted();
+
+	return out.length > 0 ? out : undefined;
+}
+
+function normalizeComparableArgumentValues(values?: Record<string, string>): Record<string, string> | undefined {
+	const entries = Object.entries(values ?? {})
+		.map(([key, value]) => [key.trim(), value] as const)
+		.filter(([key, value]) => key.length > 0 && typeof value === 'string' && value.trim().length > 0)
+		.toSorted(([a], [b]) => a.localeCompare(b));
+
+	return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
+function compareStrings(a: string, b: string): number {
+	return a.localeCompare(b);
+}
+
+/**
+ * Normalizes MCP context for assistant preset comparison.
+ *
+ * The MCP picker can hydrate selections from discovery in a different order
+ * from the saved preset. For sync/modified checks, order is not meaningful,
+ * so compare stable identity fields plus arguments and policy-relevant tool
+ * metadata.
+ */
+export function normalizeAssistantPresetMCPContext(
+	context?: MCPConversationContext
+): MCPConversationContext | undefined {
+	if (!context) {
+		return undefined;
+	}
+
+	type MCPServer = NonNullable<MCPConversationContext['servers']>[number];
+	type MCPSelectedTool = NonNullable<MCPServer['selectedTools']>[number];
+	type MCPResource = NonNullable<MCPConversationContext['resources']>[number];
+	type MCPResourceTemplate = NonNullable<MCPConversationContext['resourceTemplates']>[number];
+	type MCPPrompt = NonNullable<MCPConversationContext['prompts']>[number];
+
+	const servers: MCPConversationContext['servers'] = (context.servers ?? [])
+		.filter(server => server.bundleID?.trim() && server.serverID?.trim())
+		.map(server => {
+			const selectedTools: MCPSelectedTool[] = (server.selectedTools ?? [])
+				.filter(tool => tool.toolName?.trim())
+				.map(tool => {
+					const visibility = normalizeComparableStringList(tool.visibility);
+
+					const selectedTool: MCPSelectedTool = {
+						bundleID: tool.bundleID || server.bundleID,
+						serverID: tool.serverID || server.serverID,
+						toolName: tool.toolName,
+					};
+
+					if (tool.providerToolName) {
+						selectedTool.providerToolName = tool.providerToolName;
+					}
+					if (tool.choiceID) {
+						selectedTool.choiceID = tool.choiceID;
+					}
+					if (tool.digest) {
+						selectedTool.digest = tool.digest;
+					}
+					if (tool.approvalRule) {
+						selectedTool.approvalRule = tool.approvalRule;
+					}
+					if (tool.executionMode) {
+						selectedTool.executionMode = tool.executionMode;
+					}
+					if (tool.appResourceUri) {
+						selectedTool.appResourceUri = tool.appResourceUri;
+					}
+					if (visibility) {
+						selectedTool.visibility = visibility;
+					}
+
+					return selectedTool;
+				})
+				.toSorted((a, b) =>
+					compareStrings(`${a.bundleID}/${a.serverID}/${a.toolName}`, `${b.bundleID}/${b.serverID}/${b.toolName}`)
+				);
+
+			const normalizedServer: MCPServer = {
+				bundleID: server.bundleID,
+				serverID: server.serverID,
+				toolExposure: server.toolExposure,
+			};
+
+			if (server.snapshotDigest) {
+				normalizedServer.snapshotDigest = server.snapshotDigest;
+			}
+			if (selectedTools.length > 0) {
+				normalizedServer.selectedTools = selectedTools;
+			}
+			if (server.includeServerInstructions) {
+				normalizedServer.includeServerInstructions = true;
+			}
+
+			return normalizedServer;
+		})
+		.toSorted((a, b) => compareStrings(`${a.bundleID}/${a.serverID}`, `${b.bundleID}/${b.serverID}`));
+
+	const resources: NonNullable<MCPConversationContext['resources']> = (context.resources ?? [])
+		.filter(resource => resource.bundleID?.trim() && resource.serverID?.trim() && resource.uri?.trim())
+		.map(resource => {
+			const normalizedResource: MCPResource = {
+				bundleID: resource.bundleID,
+				serverID: resource.serverID,
+				uri: resource.uri,
+				displayName: resource.displayName || resource.name || resource.uri,
+			};
+
+			if (resource.digest) {
+				normalizedResource.digest = resource.digest;
+			}
+
+			return normalizedResource;
+		})
+		.toSorted((a, b) => compareStrings(`${a.bundleID}/${a.serverID}/${a.uri}`, `${b.bundleID}/${b.serverID}/${b.uri}`));
+
+	const resourceTemplates: NonNullable<MCPConversationContext['resourceTemplates']> = (context.resourceTemplates ?? [])
+		.filter(template => template.bundleID?.trim() && template.serverID?.trim() && template.uriTemplate?.trim())
+		.map(template => {
+			const argumentValues = normalizeComparableArgumentValues(template.argumentValues);
+
+			const normalizedTemplate: MCPResourceTemplate = {
+				bundleID: template.bundleID,
+				serverID: template.serverID,
+				uriTemplate: template.uriTemplate,
+				displayName: template.displayName || template.name || template.uriTemplate,
+			};
+
+			if (argumentValues) {
+				normalizedTemplate.argumentValues = argumentValues;
+			}
+			if (template.digest) {
+				normalizedTemplate.digest = template.digest;
+			}
+
+			return normalizedTemplate;
+		})
+		.toSorted((a, b) =>
+			compareStrings(`${a.bundleID}/${a.serverID}/${a.uriTemplate}`, `${b.bundleID}/${b.serverID}/${b.uriTemplate}`)
+		);
+
+	const prompts: NonNullable<MCPConversationContext['prompts']> = (context.prompts ?? [])
+		.filter(prompt => prompt.bundleID?.trim() && prompt.serverID?.trim() && prompt.promptName?.trim())
+		.map(prompt => {
+			const argumentValues = normalizeComparableArgumentValues(prompt.argumentValues);
+
+			const normalizedPrompt: MCPPrompt = {
+				bundleID: prompt.bundleID,
+				serverID: prompt.serverID,
+				promptName: prompt.promptName,
+				displayName: prompt.displayName || prompt.promptName,
+			};
+
+			if (argumentValues) {
+				normalizedPrompt.argumentValues = argumentValues;
+			}
+			if (prompt.digest) {
+				normalizedPrompt.digest = prompt.digest;
+			}
+
+			return normalizedPrompt;
+		})
+		.toSorted((a, b) =>
+			compareStrings(`${a.bundleID}/${a.serverID}/${a.promptName}`, `${b.bundleID}/${b.serverID}/${b.promptName}`)
+		);
+	if (servers.length === 0 && resources.length === 0 && resourceTemplates.length === 0 && prompts.length === 0) {
+		return undefined;
+	}
+
+	return {
+		servers,
+		...(resources.length > 0 ? { resources } : {}),
+		...(resourceTemplates.length > 0 ? { resourceTemplates } : {}),
+		...(prompts.length > 0 ? { prompts } : {}),
+	};
+}
+
 export function getAssistantPresetModificationSummary(args: {
 	preparedApplication: AssistantPresetPreparedApplication | null;
 	currentSelectedModel: UIChatOption;
@@ -386,6 +578,8 @@ export function getAssistantPresetModificationSummary(args: {
 
 	const currentSkillsState = normalizeAssistantPresetSkillRefs(args.currentRuntimeSnapshot.enabledSkillRefs);
 
+	const currentMCPState = normalizeAssistantPresetMCPContext(args.currentRuntimeSnapshot.mcpContext);
+
 	const model = preparedApplication.comparisonState.model
 		? !areComparableValuesEqual(preparedApplication.comparisonState.model, currentModelState)
 		: false;
@@ -402,6 +596,10 @@ export function getAssistantPresetModificationSummary(args: {
 		? !areComparableValuesEqual(preparedApplication.comparisonState.skills, currentSkillsState)
 		: false;
 
+	const mcp = preparedApplication.comparisonState.mcp
+		? !areComparableValuesEqual(preparedApplication.comparisonState.mcp, currentMCPState)
+		: false;
+
 	const modifiedLabels: string[] = [];
 	if (model) {
 		modifiedLabels.push('Model');
@@ -415,12 +613,16 @@ export function getAssistantPresetModificationSummary(args: {
 	if (skills) {
 		modifiedLabels.push('Skills');
 	}
+	if (mcp) {
+		modifiedLabels.push('MCP');
+	}
 
 	return {
 		model,
 		instructions,
 		tools,
 		skills,
+		mcp,
 		any: modifiedLabels.length > 0,
 		modifiedLabels,
 	};

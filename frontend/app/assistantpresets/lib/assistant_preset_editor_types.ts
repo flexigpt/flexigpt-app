@@ -6,6 +6,7 @@ import type {
 	ReasoningSummaryStyle,
 	ReasoningType,
 } from '@/spec/inference';
+import type { MCPConversationContext } from '@/spec/mcp';
 import type { PromptTemplateRef } from '@/spec/prompt';
 import type { SkillSelection } from '@/spec/skill';
 import type { ToolRef } from '@/spec/tool';
@@ -28,6 +29,7 @@ export interface ErrorState {
 	startingInstructionTemplateRefs?: string;
 	startingToolSelections?: string;
 	startingSkillSelections?: string;
+	startingMCPContext?: string;
 }
 
 export interface ModelPatchFormData {
@@ -77,6 +79,7 @@ export interface AssistantPresetFormData {
 	startingInstructionTemplateRefs: PromptTemplateRef[];
 	startingToolSelections: ToolSelectionFormItem[];
 	startingSkillSelections: SkillSelection[];
+	startingMCPContext?: MCPConversationContext;
 }
 
 export interface SimpleSelectableOption {

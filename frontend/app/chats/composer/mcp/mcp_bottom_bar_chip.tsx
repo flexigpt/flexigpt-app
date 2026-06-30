@@ -32,7 +32,11 @@ import { mcpAPI } from '@/apis/baseapi';
 import { ActionTriggerChipContent, actionTriggerChipSurfaceClasses } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 
-import type { MCPComposerServerOption, UseComposerMCPResult } from '@/chats/composer/mcp/mcp_composer_types';
+import type {
+	MCPComposerServerOption,
+	MCPComposerServerSelection,
+	UseComposerMCPResult,
+} from '@/chats/composer/mcp/mcp_composer_types';
 import {
 	mcpPromptKey,
 	mcpResourceKey,
@@ -324,6 +328,70 @@ function MCPArgumentFields({
 	);
 }
 
+const MCP_TOOL_EXPOSURE_CHOICES: Array<{
+	value: MCPToolExposure;
+	label: string;
+	title: string;
+}> = [
+	{
+		value: MCPToolExposure.MCPToolExposureNone,
+		label: 'No tools',
+		title: 'Do not expose tools from this MCP server.',
+	},
+	{
+		value: MCPToolExposure.MCPToolExposureAll,
+		label: 'All tools',
+		title: 'Expose all enabled model-visible tools from this MCP server.',
+	},
+	{
+		value: MCPToolExposure.MCPToolExposureSelected,
+		label: 'Selected',
+		title: 'Expose only the checked tools from this MCP server.',
+	},
+];
+
+function ToolExposureControls({
+	option,
+	selection,
+	state,
+	isInputLocked,
+}: {
+	option: MCPComposerServerOption;
+	selection: MCPComposerServerSelection;
+	state: UseComposerMCPResult;
+	isInputLocked: boolean;
+}) {
+	return (
+		<div className="flex flex-wrap items-center gap-1 text-xs">
+			<span className="text-base-content/60 mr-1">Tools:</span>
+			<div className="join">
+				{MCP_TOOL_EXPOSURE_CHOICES.map(choice => {
+					const active = selection.toolExposure === choice.value;
+					return (
+						<button
+							key={choice.value}
+							type="button"
+							className={`btn btn-xs join-item h-6 min-h-0 px-2 ${active ? 'btn-primary' : 'bg-base-300'}`}
+							title={choice.title}
+							aria-pressed={active}
+							disabled={isInputLocked}
+							onClick={e => {
+								stop(e);
+								state.setToolExposure(option.bundle.id, option.server.id, choice.value);
+								if (choice.value !== MCPToolExposure.MCPToolExposureNone) {
+									void state.ensureDiscoveryLoaded(option.bundle.id, option.server.id);
+								}
+							}}
+						>
+							{choice.label}
+						</button>
+					);
+				})}
+			</div>
+		</div>
+	);
+}
+
 function ServerDiscoverySection({
 	option,
 	state,
@@ -368,7 +436,7 @@ function ServerDiscoverySection({
 
 	return (
 		<div className="bg-base-100 rounded-xl p-2">
-			<div className="mb-2 flex flex-wrap items-center gap-2">
+			<div className="mb-2 flex flex-wrap items-center gap-3">
 				<label className="flex items-end gap-2 text-xs">
 					<input
 						type="checkbox"
@@ -381,6 +449,7 @@ function ServerDiscoverySection({
 					/>
 					<span>Include instructions</span>
 				</label>
+				<ToolExposureControls option={option} selection={selection} state={state} isInputLocked={isInputLocked} />
 			</div>
 
 			{discoveryText ? <div className="text-base-content/70 mt-2 text-xs">{discoveryText}</div> : null}

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	promptSpec "github.com/flexigpt/flexigpt-app/internal/prompt/spec"
 	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
@@ -77,6 +78,9 @@ type AssistantPreset struct {
 
 	// Ordered skill selections.
 	StartingSkillSelections []skillSpec.SkillSelection `json:"startingSkillSelections,omitempty"`
+
+	// StartingMCPContext is copied into the first user turn when this preset is applied.
+	StartingMCPContext *mcpSpec.MCPConversationContext `json:"startingMCPContext,omitempty"`
 
 	CreatedAt  time.Time `json:"createdAt"`
 	ModifiedAt time.Time `json:"modifiedAt"`

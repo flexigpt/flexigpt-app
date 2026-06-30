@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	promptSpec "github.com/flexigpt/flexigpt-app/internal/prompt/spec"
 	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
@@ -78,10 +79,11 @@ type PutAssistantPresetRequestBody struct {
 	//   - capabilitiesOverride must be nil
 	StartingModelPresetPatch *modelpresetSpec.ModelPresetPatch `json:"startingModelPresetPatch,omitempty"`
 
-	StartingIncludeModelSystemPrompt *bool                          `json:"startingIncludeModelSystemPrompt,omitempty"`
-	StartingInstructionTemplateRefs  []promptSpec.PromptTemplateRef `json:"startingInstructionTemplateRefs,omitempty"`
-	StartingToolSelections           []toolSpec.ToolSelection       `json:"startingToolSelections,omitempty"`
-	StartingSkillSelections          []skillSpec.SkillSelection     `json:"startingSkillSelections,omitempty"`
+	StartingIncludeModelSystemPrompt *bool                           `json:"startingIncludeModelSystemPrompt,omitempty"`
+	StartingInstructionTemplateRefs  []promptSpec.PromptTemplateRef  `json:"startingInstructionTemplateRefs,omitempty"`
+	StartingToolSelections           []toolSpec.ToolSelection        `json:"startingToolSelections,omitempty"`
+	StartingSkillSelections          []skillSpec.SkillSelection      `json:"startingSkillSelections,omitempty"`
+	StartingMCPContext               *mcpSpec.MCPConversationContext `json:"startingMCPContext,omitempty"`
 }
 
 type PutAssistantPresetRequest struct {

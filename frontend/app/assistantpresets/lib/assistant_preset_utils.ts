@@ -3,6 +3,7 @@ import type {
 	AssistantPresetStartingModelPresetPatch,
 	PutAssistantPresetPayload,
 } from '@/spec/assistantpreset';
+import type { MCPConversationContext } from '@/spec/mcp';
 import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { PromptTemplateRef } from '@/spec/prompt';
 import type { SkillRef, SkillSelection } from '@/spec/skill';
@@ -53,6 +54,27 @@ function cloneToolSelection(selection: ToolSelection): ToolSelection {
 	};
 }
 
+export function cloneMCPConversationContext(context?: MCPConversationContext): MCPConversationContext | undefined {
+	if (!context) {
+		return undefined;
+	}
+
+	return cloneJSONLike(context);
+}
+
+export function hasAssistantPresetMCPContext(context?: MCPConversationContext): boolean {
+	if (!context) {
+		return false;
+	}
+
+	return (
+		(context.servers?.length ?? 0) > 0 ||
+		(context.resources?.length ?? 0) > 0 ||
+		(context.resourceTemplates?.length ?? 0) > 0 ||
+		(context.prompts?.length ?? 0) > 0
+	);
+}
+
 function cloneSkillRef(ref: SkillRef): SkillRef {
 	return {
 		bundleID: ref.bundleID,
@@ -78,13 +100,18 @@ export function formatAssistantPresetModelRef(ref?: ModelPresetRef): string {
 export function getAssistantPresetCounts(
 	preset: Pick<
 		AssistantPreset,
-		'startingInstructionTemplateRefs' | 'startingToolSelections' | 'startingSkillSelections'
+		'startingInstructionTemplateRefs' | 'startingToolSelections' | 'startingSkillSelections' | 'startingMCPContext'
 	>
 ) {
 	return {
 		instructions: preset.startingInstructionTemplateRefs?.length ?? 0,
 		tools: preset.startingToolSelections?.length ?? 0,
 		skills: preset.startingSkillSelections?.length ?? 0,
+		mcp:
+			(preset.startingMCPContext?.servers?.length ?? 0) +
+			(preset.startingMCPContext?.resources?.length ?? 0) +
+			(preset.startingMCPContext?.resourceTemplates?.length ?? 0) +
+			(preset.startingMCPContext?.prompts?.length ?? 0),
 	};
 }
 
@@ -195,6 +222,10 @@ export function toPutAssistantPresetPayload(input: AssistantPresetUpsertInput): 
 
 	if ((input.startingSkillSelections?.length ?? 0) > 0) {
 		payload.startingSkillSelections = input.startingSkillSelections?.map(cloneSkillSelection);
+	}
+
+	if (hasAssistantPresetMCPContext(input.startingMCPContext)) {
+		payload.startingMCPContext = cloneMCPConversationContext(input.startingMCPContext);
 	}
 
 	return payload;

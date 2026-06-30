@@ -5,9 +5,13 @@ import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiHelpCircle, FiRefreshCw, FiUpload, FiX } from 'react-icons/fi';
 
+import { useMenuStore } from '@ariakit/react';
+
 import type { AssistantPreset, AssistantPresetStartingModelPresetPatch } from '@/spec/assistantpreset';
 import type { JSONSchemaParam, OutputFormat, OutputParam } from '@/spec/inference';
 import { OutputFormatKind, ReasoningLevel, ReasoningType } from '@/spec/inference';
+import type { MCPConversationContext } from '@/spec/mcp';
+import { MCPToolExposure } from '@/spec/mcp';
 import type { AssistantModelPresetOption } from '@/spec/modelpreset';
 import type { AssistantInstructionTemplateOption } from '@/spec/prompt';
 import type { AssistantSkillOption } from '@/spec/skill';
@@ -44,11 +48,16 @@ import {
 	buildModelPresetRefKey,
 	buildSkillRefKey,
 	buildToolRefKey,
+	cloneMCPConversationContext,
 	clonePromptTemplateRef,
 	cloneSkillSelection,
 	formatDateish,
+	hasAssistantPresetMCPContext,
 	hasAssistantPresetModelPatch,
 } from '@/assistantpresets/lib/assistant_preset_utils';
+import { normalizeAssistantPresetMCPContext } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
+import { MCPBottomBarChip } from '@/chats/composer/mcp/mcp_bottom_bar_chip';
+import { useComposerMCP } from '@/chats/composer/mcp/use_composer_mcp';
 import { buildEffectiveModelParamFromModelPreset } from '@/modelpresets/lib/modelpreset_effective_defaults';
 import { buildPromptTemplateRefKey } from '@/prompts/lib/prompt_template_ref';
 
@@ -173,6 +182,102 @@ function getIncludeModelSystemPromptLabel(value: TriStateBoolean): string {
 		return 'Do Not Include';
 	}
 	return 'Not Set';
+}
+
+function getMCPToolExposureLabel(exposure: MCPToolExposure | string | undefined, selectedToolCount: number): string {
+	switch (exposure) {
+		case MCPToolExposure.MCPToolExposureAll:
+			return selectedToolCount > 0 ? `All tools (${selectedToolCount})` : 'All tools';
+		case MCPToolExposure.MCPToolExposureSelected:
+			return `${selectedToolCount} selected tool${selectedToolCount === 1 ? '' : 's'}`;
+		case MCPToolExposure.MCPToolExposureNone:
+			return 'No tools';
+		default:
+			return exposure || 'Tools not specified';
+	}
+}
+
+function formatMCPArgumentSummary(values?: Record<string, string>): string | undefined {
+	const entries = Object.entries(values ?? {})
+		.filter(([key, value]) => key.trim().length > 0 && value.trim().length > 0)
+		.toSorted(([a], [b]) => a.localeCompare(b));
+
+	if (entries.length === 0) {
+		return undefined;
+	}
+
+	return entries.map(([key, value]) => `${key}=${value.length > 32 ? `${value.slice(0, 29)}...` : value}`).join(', ');
+}
+
+function getMCPContextDisplayItems(context?: MCPConversationContext): OrderedDisplayItem[] {
+	const normalized = normalizeAssistantPresetMCPContext(context);
+	if (!normalized) {
+		return [];
+	}
+
+	const items: OrderedDisplayItem[] = [];
+
+	for (const server of normalized.servers ?? []) {
+		const selectedToolCount = server.selectedTools?.length ?? 0;
+		const parts = [
+			server.bundleID,
+			getMCPToolExposureLabel(server.toolExposure, selectedToolCount),
+			server.includeServerInstructions ? 'server instructions' : undefined,
+			server.snapshotDigest ? `snapshot ${server.snapshotDigest}` : undefined,
+		].filter(Boolean);
+
+		items.push({
+			key: `server:${server.bundleID}:${server.serverID}`,
+			title: `Server: ${server.serverID}`,
+			subtitle: parts.join(' · '),
+		});
+
+		for (const tool of server.selectedTools ?? []) {
+			const toolParts = [
+				`${tool.bundleID}/${tool.serverID}`,
+				tool.providerToolName ? `provider ${tool.providerToolName}` : undefined,
+				tool.executionMode ? `execution ${tool.executionMode}` : undefined,
+				tool.approvalRule ? `approval ${tool.approvalRule}` : undefined,
+				tool.digest ? `digest ${tool.digest}` : undefined,
+			].filter(Boolean);
+
+			items.push({
+				key: `tool:${tool.bundleID}:${tool.serverID}:${tool.toolName}`,
+				title: `Tool: ${tool.toolName}`,
+				subtitle: toolParts.join(' · '),
+			});
+		}
+	}
+
+	for (const resource of normalized.resources ?? []) {
+		items.push({
+			key: `resource:${resource.bundleID}:${resource.serverID}:${resource.uri}`,
+			title: `Resource: ${resource.uri}`,
+			subtitle: `${resource.bundleID}/${resource.serverID}${resource.digest ? ` · digest ${resource.digest}` : ''}`,
+		});
+	}
+
+	for (const template of normalized.resourceTemplates ?? []) {
+		items.push({
+			key: `resource-template:${template.bundleID}:${template.serverID}:${template.uriTemplate}`,
+			title: `Resource template: ${template.uriTemplate}`,
+			subtitle: [`${template.bundleID}/${template.serverID}`, formatMCPArgumentSummary(template.argumentValues)]
+				.filter(Boolean)
+				.join(' · '),
+		});
+	}
+
+	for (const prompt of normalized.prompts ?? []) {
+		items.push({
+			key: `prompt:${prompt.bundleID}:${prompt.serverID}:${prompt.promptName}`,
+			title: `Prompt: ${prompt.promptName}`,
+			subtitle: [`${prompt.bundleID}/${prompt.serverID}`, formatMCPArgumentSummary(prompt.argumentValues)]
+				.filter(Boolean)
+				.join(' · '),
+		});
+	}
+
+	return items;
 }
 
 function getSuggestedNextVersion(initialData: PresetItem, existingPresets: PresetItem[]): string {
@@ -320,6 +425,7 @@ function getInitialFormData(
 				userArgSchemaInstance: selection.toolChoicePatch?.userArgSchemaInstance ?? '',
 			})),
 			startingSkillSelections: (src.startingSkillSelections ?? []).map(s => cloneSkillSelection(s)),
+			startingMCPContext: cloneMCPConversationContext(src.startingMCPContext),
 		};
 	}
 
@@ -336,6 +442,7 @@ function getInitialFormData(
 		startingInstructionTemplateRefs: [],
 		startingToolSelections: [],
 		startingSkillSelections: [],
+		startingMCPContext: undefined,
 	};
 }
 
@@ -522,6 +629,9 @@ function AddEditAssistantPresetModalContent({
 	const [nextSkillKey, setNextSkillKey] = useState('');
 	const [prefillMode, setPrefillMode] = useState(false);
 	const [selectedPrefillKey, setSelectedPrefillKey] = useState<string | null>(null);
+	const mcpMenu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
+	const mcpState = useComposerMCP();
+	const restoredInitialMCPContextRef = useRef(false);
 
 	const initialPresetID = initialData?.preset?.id;
 	const initialPresetSlug = initialData?.preset?.slug;
@@ -572,6 +682,14 @@ function AddEditAssistantPresetModalContent({
 		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect
 		void loadCatalog();
 	}, [loadCatalog]);
+
+	useEffect(() => {
+		if (restoredInitialMCPContextRef.current) {
+			return;
+		}
+		restoredInitialMCPContextRef.current = true;
+		mcpState.restoreContext(initialData?.preset.startingMCPContext);
+	}, [initialData?.preset.startingMCPContext, mcpState]);
 
 	const requestClose = useCallback(() => {
 		const dialog = dialogRef.current;
@@ -1091,7 +1209,12 @@ function AddEditAssistantPresetModalContent({
 	);
 
 	const isAllValid =
-		isViewMode || (Boolean(catalog) && !catalogLoading && !catalogError && Object.keys(errors).length === 0);
+		isViewMode ||
+		(Boolean(catalog) &&
+			!catalogLoading &&
+			!catalogError &&
+			!mcpState.argumentsBlocked &&
+			Object.keys(errors).length === 0);
 
 	const handleSkillPreLoadChange = useCallback(
 		(index: number, next: boolean) => {
@@ -1258,6 +1381,11 @@ function AddEditAssistantPresetModalContent({
 		setNextSkillKey('');
 	}, [effectiveNextSkillKey, skillOptions, updateFormData]);
 
+	const mcpDisplayItems = useMemo(
+		() => getMCPContextDisplayItems(isViewMode ? initialData?.preset.startingMCPContext : mcpState.mcpContext),
+		[initialData?.preset.startingMCPContext, isViewMode, mcpState.mcpContext]
+	);
+
 	const handleMoveSkillUp = useCallback(
 		(index: number) => {
 			updateFormData(prev => ({
@@ -1304,9 +1432,10 @@ function AddEditAssistantPresetModalContent({
 					isEnabled: true,
 				};
 			});
+			mcpState.restoreContext(source.preset.startingMCPContext);
 			setSubmitError('');
 		},
-		[prefillSourceMap, updateFormData]
+		[mcpState, prefillSourceMap, updateFormData]
 	);
 
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = async e => {
@@ -1366,6 +1495,14 @@ function AddEditAssistantPresetModalContent({
 				};
 			});
 
+			let startingMCPContext: MCPConversationContext | undefined;
+			try {
+				startingMCPContext = await mcpState.prepareForSubmit();
+			} catch (error) {
+				setSubmitError(getErrorMessage(error, 'Fill required MCP arguments before saving this assistant preset.'));
+				return;
+			}
+
 			const payload: AssistantPresetUpsertInput = {
 				displayName: formData.displayName.trim(),
 				slug: (initialData?.preset.slug ?? formData.slug).trim(),
@@ -1381,6 +1518,7 @@ function AddEditAssistantPresetModalContent({
 				startingInstructionTemplateRefs: formData.startingInstructionTemplateRefs.map(clonePromptTemplateRef),
 				startingToolSelections,
 				startingSkillSelections: formData.startingSkillSelections.map(cloneSkillSelection),
+				startingMCPContext: hasAssistantPresetMCPContext(startingMCPContext) ? startingMCPContext : undefined,
 			};
 
 			await onSubmit(payload);
@@ -1854,6 +1992,54 @@ function AddEditAssistantPresetModalContent({
 							onRemove={handleRemoveSkill}
 							onPreLoadAsActiveChange={handleSkillPreLoadChange}
 						/>
+
+						<div className="divider">MCP Context</div>
+
+						<p className="text-base-content/70 text-xs">
+							Optional starting MCP servers, tools, resources, resource templates, prompts, and argument values for the
+							next chat turn.
+						</p>
+
+						{!isViewMode && (
+							<div className="flex flex-wrap items-center gap-2">
+								<MCPBottomBarChip store={mcpMenu} shortcut="" state={mcpState} isInputLocked={false} />
+								{mcpState.loading ? (
+									<span className="text-base-content/70 text-xs">Loading MCP servers…</span>
+								) : mcpState.error ? (
+									<span className="text-error text-xs">{mcpState.error}</span>
+								) : mcpState.selectedServerCount > 0 ? (
+									<span className="text-base-content/70 text-xs">
+										{mcpState.selectedServerCount} server{mcpState.selectedServerCount === 1 ? '' : 's'},
+										{` ${mcpState.selectedToolCount} tool${mcpState.selectedToolCount === 1 ? '' : 's'}`},
+										{` ${mcpState.selectedResourceCount} resource${mcpState.selectedResourceCount === 1 ? '' : 's'}`},
+										{` ${mcpState.selectedPromptCount} prompt${mcpState.selectedPromptCount === 1 ? '' : 's'}`}
+									</span>
+								) : (
+									<span className="text-base-content/70 text-xs">No MCP context configured.</span>
+								)}
+							</div>
+						)}
+
+						{mcpState.requiredArgumentMissingCount > 0 && !isViewMode ? (
+							<div className="text-warning flex items-center gap-1 text-sm">
+								<FiAlertCircle size={12} /> Fill {mcpState.requiredArgumentMissingCount} required MCP argument
+								{mcpState.requiredArgumentMissingCount === 1 ? '' : 's'} before saving.
+							</div>
+						) : null}
+
+						<div className="space-y-3">
+							{mcpDisplayItems.map(item => (
+								<div key={item.key} className="border-base-content/10 rounded-2xl border p-3">
+									<div className="font-medium">{item.title}</div>
+									<div className="text-base-content/70 mt-1 text-xs">{item.subtitle}</div>
+									{item.statusLabel && <div className="badge badge-warning mt-2 rounded-xl">{item.statusLabel}</div>}
+								</div>
+							))}
+
+							{mcpDisplayItems.length === 0 ? (
+								<div className="text-base-content/70 text-sm">No MCP context configured.</div>
+							) : null}
+						</div>
 
 						{isViewMode && initialData?.preset && (
 							<>
