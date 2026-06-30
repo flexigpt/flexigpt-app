@@ -1,5 +1,5 @@
 export namespace attachment {
-
+	
 	export class ContentBlock {
 	    kind: string;
 	    text?: string;
@@ -8,11 +8,11 @@ export namespace attachment {
 	    filePath?: string;
 	    base64Data?: string;
 	    url?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ContentBlock(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.kind = source["kind"];
@@ -27,11 +27,11 @@ export namespace attachment {
 	export class GenericRef {
 	    handle: string;
 	    origHandle: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GenericRef(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.handle = source["handle"];
@@ -42,11 +42,11 @@ export namespace attachment {
 	    url: string;
 	    normalized?: string;
 	    origNormalized: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new URLRef(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.url = source["url"];
@@ -70,11 +70,11 @@ export namespace attachment {
 	    origSize: number;
 	    // Go type: time
 	    origModTime: any;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ImageRef(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
@@ -91,7 +91,7 @@ export namespace attachment {
 	        this.origSize = source["origSize"];
 	        this.origModTime = this.convertValues(source["origModTime"], null);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -122,11 +122,11 @@ export namespace attachment {
 	    origSize: number;
 	    // Go type: time
 	    origModTime: any;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new FileRef(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
@@ -139,7 +139,7 @@ export namespace attachment {
 	        this.origSize = source["origSize"];
 	        this.origModTime = this.convertValues(source["origModTime"], null);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -168,11 +168,11 @@ export namespace attachment {
 	    urlRef?: URLRef;
 	    genericRef?: GenericRef;
 	    contentBlock?: ContentBlock;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Attachment(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.kind = source["kind"];
@@ -185,7 +185,7 @@ export namespace attachment {
 	        this.genericRef = this.convertValues(source["genericRef"], GenericRef);
 	        this.contentBlock = this.convertValues(source["contentBlock"], ContentBlock);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -204,17 +204,17 @@ export namespace attachment {
 		    return a;
 		}
 	}
-
+	
 	export class DirectoryOverflowInfo {
 	    dirPath: string;
 	    relativePath: string;
 	    fileCount: number;
 	    partial: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DirectoryOverflowInfo(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.dirPath = source["dirPath"];
@@ -230,11 +230,11 @@ export namespace attachment {
 	    maxFiles: number;
 	    totalSize: number;
 	    hasMore: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DirectoryAttachmentsResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.dirPath = source["dirPath"];
@@ -244,7 +244,7 @@ export namespace attachment {
 	        this.totalSize = source["totalSize"];
 	        this.hasMore = source["hasMore"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -263,40 +263,40 @@ export namespace attachment {
 		    return a;
 		}
 	}
-
+	
 	export class FileFilter {
 	    DisplayName: string;
 	    Extensions: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new FileFilter(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.DisplayName = source["DisplayName"];
 	        this.Extensions = source["Extensions"];
 	    }
 	}
-
-
-
+	
+	
+	
 	export class PathAttachmentsResult {
 	    fileAttachments: Attachment[];
 	    dirAttachments: DirectoryAttachmentsResult[];
 	    errors?: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PathAttachmentsResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.fileAttachments = this.convertValues(source["fileAttachments"], Attachment);
 	        this.dirAttachments = this.convertValues(source["dirAttachments"], DirectoryAttachmentsResult);
 	        this.errors = source["errors"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -319,17 +319,17 @@ export namespace attachment {
 }
 
 export namespace capabilityoverride {
-
+	
 	export class CacheControlCapabilitiesOverride {
 	    supportsTTL?: boolean;
 	    supportedKinds?: string[];
 	    supportedTTLs?: string[];
 	    supportsKey?: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new CacheControlCapabilitiesOverride(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.supportsTTL = source["supportsTTL"];
@@ -346,11 +346,11 @@ export namespace capabilityoverride {
 	    toolChoice?: CacheControlCapabilitiesOverride;
 	    toolCall?: CacheControlCapabilitiesOverride;
 	    toolOutput?: CacheControlCapabilitiesOverride;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new CacheCapabilitiesOverride(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.supportsAutomaticCaching = source["supportsAutomaticCaching"];
@@ -361,7 +361,7 @@ export namespace capabilityoverride {
 	        this.toolCall = this.convertValues(source["toolCall"], CacheControlCapabilitiesOverride);
 	        this.toolOutput = this.convertValues(source["toolOutput"], CacheControlCapabilitiesOverride);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -380,15 +380,15 @@ export namespace capabilityoverride {
 		    return a;
 		}
 	}
-
+	
 	export class ParamDialectOverride {
 	    maxOutputTokensParamName?: string;
 	    toolChoiceParamStyle?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ParamDialectOverride(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.maxOutputTokensParamName = source["maxOutputTokensParamName"];
@@ -401,11 +401,11 @@ export namespace capabilityoverride {
 	    supportsParallelToolCalls?: boolean;
 	    maxForcedTools?: number;
 	    supportedClientToolOutputFormats?: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ToolCapabilitiesOverride(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.supportedToolTypes = source["supportedToolTypes"];
@@ -418,11 +418,11 @@ export namespace capabilityoverride {
 	export class OutputCapabilitiesOverride {
 	    supportedOutputFormats?: string[];
 	    supportsVerbosity?: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new OutputCapabilitiesOverride(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.supportedOutputFormats = source["supportedOutputFormats"];
@@ -433,11 +433,11 @@ export namespace capabilityoverride {
 	    isSupported?: boolean;
 	    disallowedWithReasoning?: boolean;
 	    maxSequences?: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new StopSequenceCapabilitiesOverride(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.isSupported = source["isSupported"];
@@ -450,11 +450,11 @@ export namespace capabilityoverride {
 	    maxAllowed?: number;
 	    zeroAllowed?: boolean;
 	    minusOneAllowed?: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ReasoningTokenBudgetCapabilitiesOverride(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.minAllowed = source["minAllowed"];
@@ -471,11 +471,11 @@ export namespace capabilityoverride {
 	    supportsSummaryStyle?: boolean;
 	    supportsEncryptedReasoningInput?: boolean;
 	    temperatureDisallowedWhenEnabled?: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ReasoningCapabilitiesOverride(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.supportsReasoningConfig = source["supportsReasoningConfig"];
@@ -486,7 +486,7 @@ export namespace capabilityoverride {
 	        this.supportsEncryptedReasoningInput = source["supportsEncryptedReasoningInput"];
 	        this.temperatureDisallowedWhenEnabled = source["temperatureDisallowedWhenEnabled"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -514,11 +514,11 @@ export namespace capabilityoverride {
 	    toolCapabilities?: ToolCapabilitiesOverride;
 	    cacheCapabilities?: CacheCapabilitiesOverride;
 	    paramDialect?: ParamDialectOverride;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ModelCapabilitiesOverride(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.modalitiesIn = source["modalitiesIn"];
@@ -530,7 +530,7 @@ export namespace capabilityoverride {
 	        this.cacheCapabilities = this.convertValues(source["cacheCapabilities"], CacheCapabilitiesOverride);
 	        this.paramDialect = this.convertValues(source["paramDialect"], ParamDialectOverride);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -549,24 +549,24 @@ export namespace capabilityoverride {
 		    return a;
 		}
 	}
-
-
-
-
-
+	
+	
+	
+	
+	
 
 }
 
 export namespace spec {
-
+	
 	export class AppTheme {
 	    type: string;
 	    name: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new AppTheme(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.type = source["type"];
@@ -583,11 +583,11 @@ export namespace spec {
 	    arguments?: Record<string, MCPArgumentDefinition>;
 	    digest?: string;
 	    argumentValues?: Record<string, string>;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPPromptSelection(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -600,7 +600,7 @@ export namespace spec {
 	        this.digest = source["digest"];
 	        this.argumentValues = source["argumentValues"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -624,11 +624,11 @@ export namespace spec {
 	    title?: string;
 	    description?: string;
 	    required?: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPArgumentDefinition(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -650,11 +650,11 @@ export namespace spec {
 	    annotations?: Record<string, any>;
 	    digest?: string;
 	    argumentValues?: Record<string, string>;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPResourceTemplateSelection(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -670,7 +670,7 @@ export namespace spec {
 	        this.digest = source["digest"];
 	        this.argumentValues = source["argumentValues"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -701,11 +701,11 @@ export namespace spec {
 	    size?: number;
 	    annotations?: Record<string, any>;
 	    digest?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPResourceRef(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -732,11 +732,11 @@ export namespace spec {
 	    executionMode?: string;
 	    appResourceUri?: string;
 	    visibility?: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPToolSelection(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -758,11 +758,11 @@ export namespace spec {
 	    toolExposure: string;
 	    selectedTools?: MCPToolSelection[];
 	    includeServerInstructions?: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPServerSelection(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -772,7 +772,7 @@ export namespace spec {
 	        this.selectedTools = this.convertValues(source["selectedTools"], MCPToolSelection);
 	        this.includeServerInstructions = source["includeServerInstructions"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -796,11 +796,11 @@ export namespace spec {
 	    resources?: MCPResourceRef[];
 	    resourceTemplates?: MCPResourceTemplateSelection[];
 	    prompts?: MCPPromptSelection[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPConversationContext(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.servers = this.convertValues(source["servers"], MCPServerSelection);
@@ -808,7 +808,7 @@ export namespace spec {
 	        this.resourceTemplates = this.convertValues(source["resourceTemplates"], MCPResourceTemplateSelection);
 	        this.prompts = this.convertValues(source["prompts"], MCPPromptSelection);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -831,11 +831,11 @@ export namespace spec {
 	    bundleID: string;
 	    skillSlug: string;
 	    skillID: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SkillRef(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -846,17 +846,17 @@ export namespace spec {
 	export class SkillSelection {
 	    skillRef: SkillRef;
 	    preLoadAsActive: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SkillSelection(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.skillRef = this.convertValues(source["skillRef"], SkillRef);
 	        this.preLoadAsActive = source["preLoadAsActive"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -878,11 +878,11 @@ export namespace spec {
 	export class ToolChoicePatch {
 	    autoExecute?: boolean;
 	    userArgSchemaInstance?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ToolChoicePatch(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.autoExecute = source["autoExecute"];
@@ -893,11 +893,11 @@ export namespace spec {
 	    bundleID: string;
 	    toolSlug: string;
 	    toolVersion: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ToolRef(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -908,17 +908,17 @@ export namespace spec {
 	export class ToolSelection {
 	    toolRef: ToolRef;
 	    toolChoicePatch?: ToolChoicePatch;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ToolSelection(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.toolRef = this.convertValues(source["toolRef"], ToolRef);
 	        this.toolChoicePatch = this.convertValues(source["toolChoicePatch"], ToolChoicePatch);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -941,11 +941,11 @@ export namespace spec {
 	    bundleID: string;
 	    templateSlug: string;
 	    templateVersion: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PromptTemplateRef(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -958,11 +958,11 @@ export namespace spec {
 	    description?: string;
 	    schema?: Record<string, any>;
 	    strict?: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new JSONSchemaParam(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -974,17 +974,17 @@ export namespace spec {
 	export class OutputFormat {
 	    kind: string;
 	    jsonSchemaParam?: JSONSchemaParam;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new OutputFormat(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.kind = source["kind"];
 	        this.jsonSchemaParam = this.convertValues(source["jsonSchemaParam"], JSONSchemaParam);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1006,17 +1006,17 @@ export namespace spec {
 	export class OutputParam {
 	    format?: OutputFormat;
 	    verbosity?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new OutputParam(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.format = this.convertValues(source["format"], OutputFormat);
 	        this.verbosity = source["verbosity"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1039,11 +1039,11 @@ export namespace spec {
 	    kind: string;
 	    ttl?: string;
 	    key?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new CacheControl(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.kind = source["kind"];
@@ -1056,11 +1056,11 @@ export namespace spec {
 	    level: string;
 	    tokens: number;
 	    summaryStyle?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ReasoningParam(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.type = source["type"];
@@ -1082,11 +1082,11 @@ export namespace spec {
 	    stopSequences?: string[];
 	    additionalParametersRawJSON?: string;
 	    capabilitiesOverride?: capabilityoverride.ModelCapabilitiesOverride;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ModelPresetPatch(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.stream = source["stream"];
@@ -1102,7 +1102,7 @@ export namespace spec {
 	        this.additionalParametersRawJSON = source["additionalParametersRawJSON"];
 	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], capabilityoverride.ModelCapabilitiesOverride);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1124,11 +1124,11 @@ export namespace spec {
 	export class ModelPresetRef {
 	    providerName: string;
 	    modelPresetID: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ModelPresetRef(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.providerName = source["providerName"];
@@ -1156,11 +1156,11 @@ export namespace spec {
 	    createdAt: any;
 	    // Go type: time
 	    modifiedAt: any;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new AssistantPreset(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.schemaVersion = source["schemaVersion"];
@@ -1182,7 +1182,7 @@ export namespace spec {
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1215,11 +1215,11 @@ export namespace spec {
 	    modifiedAt: any;
 	    // Go type: time
 	    softDeletedAt?: any;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new AssistantPresetBundle(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.schemaVersion = source["schemaVersion"];
@@ -1233,7 +1233,7 @@ export namespace spec {
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
 	        this.softDeletedAt = this.convertValues(source["softDeletedAt"], null);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1263,11 +1263,11 @@ export namespace spec {
 	    isBuiltIn: boolean;
 	    // Go type: time
 	    modifiedAt?: any;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new AssistantPresetListItem(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -1280,7 +1280,7 @@ export namespace spec {
 	        this.isBuiltIn = source["isBuiltIn"];
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1304,11 +1304,11 @@ export namespace spec {
 	    keyName: string;
 	    sha256: string;
 	    nonEmpty: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new AuthKeyMeta(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.type = source["type"];
@@ -1317,15 +1317,15 @@ export namespace spec {
 	        this.nonEmpty = source["nonEmpty"];
 	    }
 	}
-
+	
 	export class CancelPendingMCPOAuthAuthorizationRequest {
 	    BundleID: string;
 	    ServerID: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new CancelPendingMCPOAuthAuthorizationRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -1333,15 +1333,15 @@ export namespace spec {
 	    }
 	}
 	export class CancelPendingMCPOAuthAuthorizationResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new CancelPendingMCPOAuthAuthorizationResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class URLCitation {
@@ -1351,11 +1351,11 @@ export namespace spec {
 	    startIndex: number;
 	    endIndex: number;
 	    encryptedIndex: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new URLCitation(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.url = source["url"];
@@ -1369,17 +1369,17 @@ export namespace spec {
 	export class Citation {
 	    kind: string;
 	    urlCitation?: URLCitation;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Citation(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.kind = source["kind"];
 	        this.urlCitation = this.convertValues(source["urlCitation"], URLCitation);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1400,11 +1400,11 @@ export namespace spec {
 	}
 	export class CitationConfig {
 	    enabled: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new CitationConfig(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.enabled = source["enabled"];
@@ -1412,36 +1412,36 @@ export namespace spec {
 	}
 	export class CloseSkillSessionRequest {
 	    SessionID: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new CloseSkillSessionRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.SessionID = source["SessionID"];
 	    }
 	}
 	export class CloseSkillSessionResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new CloseSkillSessionResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class Error {
 	    code: string;
 	    message: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Error(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.code = source["code"];
@@ -1454,11 +1454,11 @@ export namespace spec {
 	    inputTokensUncached: number;
 	    outputTokens: number;
 	    reasoningTokens: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Usage(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.inputTokensTotal = source["inputTokensTotal"];
@@ -1473,11 +1473,11 @@ export namespace spec {
 	    mimeType?: string;
 	    sizes?: string[];
 	    theme?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPIcon(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.src = source["src"];
@@ -1492,11 +1492,11 @@ export namespace spec {
 	    text?: string;
 	    blob?: number[];
 	    _meta?: Record<string, any>;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPResourceContents(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.uri = source["uri"];
@@ -1520,11 +1520,11 @@ export namespace spec {
 	    annotations?: Record<string, any>;
 	    _meta?: Record<string, any>;
 	    icons?: MCPIcon[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPContent(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.type = source["type"];
@@ -1541,7 +1541,7 @@ export namespace spec {
 	        this._meta = source["_meta"];
 	        this.icons = this.convertValues(source["icons"], MCPIcon);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1568,11 +1568,11 @@ export namespace spec {
 	    content?: MCPContent[];
 	    structuredContent?: any;
 	    updatedAt?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPAppModelContextUpdate(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.instanceID = source["instanceID"];
@@ -1583,7 +1583,7 @@ export namespace spec {
 	        this.structuredContent = source["structuredContent"];
 	        this.updatedAt = source["updatedAt"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1614,11 +1614,11 @@ export namespace spec {
 	    displayName?: string;
 	    autoExecute: boolean;
 	    userArgSchemaInstance?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ToolStoreChoice(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.choiceID = source["choiceID"];
@@ -1639,11 +1639,11 @@ export namespace spec {
 	    country: string;
 	    region: string;
 	    timezone: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new WebSearchToolChoiceItemUserLocation(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.city = source["city"];
@@ -1658,11 +1658,11 @@ export namespace spec {
 	    allowedDomains: string[];
 	    blockedDomains: string[];
 	    userLocation?: WebSearchToolChoiceItemUserLocation;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new WebSearchToolChoiceItem(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.maxUses = source["maxUses"];
@@ -1671,7 +1671,7 @@ export namespace spec {
 	        this.blockedDomains = source["blockedDomains"];
 	        this.userLocation = this.convertValues(source["userLocation"], WebSearchToolChoiceItemUserLocation);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1698,11 +1698,11 @@ export namespace spec {
 	    description: string;
 	    arguments?: Record<string, any>;
 	    webSearchArguments?: WebSearchToolChoiceItem;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ToolChoice(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.type = source["type"];
@@ -1713,7 +1713,7 @@ export namespace spec {
 	        this.arguments = source["arguments"];
 	        this.webSearchArguments = this.convertValues(source["webSearchArguments"], WebSearchToolChoiceItem);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1740,11 +1740,11 @@ export namespace spec {
 	    customToolCall?: ToolCall;
 	    webSearchToolCall?: ToolCall;
 	    webSearchToolOutput?: ToolOutput;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new OutputUnion(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.kind = source["kind"];
@@ -1755,7 +1755,7 @@ export namespace spec {
 	        this.webSearchToolCall = this.convertValues(source["webSearchToolCall"], ToolCall);
 	        this.webSearchToolOutput = this.convertValues(source["webSearchToolOutput"], ToolOutput);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1776,11 +1776,11 @@ export namespace spec {
 	}
 	export class WebSearchToolOutputError {
 	    code: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new WebSearchToolOutputError(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.code = source["code"];
@@ -1792,11 +1792,11 @@ export namespace spec {
 	    encryptedContent: string;
 	    renderedContent: string;
 	    pageAge: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new WebSearchToolOutputSearch(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.url = source["url"];
@@ -1810,18 +1810,18 @@ export namespace spec {
 	    kind: string;
 	    searchItem?: WebSearchToolOutputSearch;
 	    errorItem?: WebSearchToolOutputError;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new WebSearchToolOutputItemUnion(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.kind = source["kind"];
 	        this.searchItem = this.convertValues(source["searchItem"], WebSearchToolOutputSearch);
 	        this.errorItem = this.convertValues(source["errorItem"], WebSearchToolOutputError);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1845,11 +1845,11 @@ export namespace spec {
 	    textItem?: ContentItemText;
 	    imageItem?: ContentItemImage;
 	    fileItem?: ContentItemFile;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ToolOutputItemUnion(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.kind = source["kind"];
@@ -1857,7 +1857,7 @@ export namespace spec {
 	        this.imageItem = this.convertValues(source["imageItem"], ContentItemImage);
 	        this.fileItem = this.convertValues(source["fileItem"], ContentItemFile);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1889,11 +1889,11 @@ export namespace spec {
 	    signature: string;
 	    contents?: ToolOutputItemUnion[];
 	    webSearchToolOutputItems?: WebSearchToolOutputItemUnion[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ToolOutput(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.type = source["type"];
@@ -1909,7 +1909,7 @@ export namespace spec {
 	        this.contents = this.convertValues(source["contents"], ToolOutputItemUnion);
 	        this.webSearchToolOutputItems = this.convertValues(source["webSearchToolOutputItems"], WebSearchToolOutputItemUnion);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -1931,11 +1931,11 @@ export namespace spec {
 	export class WebSearchToolCallFind {
 	    url: string;
 	    pattern: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new WebSearchToolCallFind(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.url = source["url"];
@@ -1944,11 +1944,11 @@ export namespace spec {
 	}
 	export class WebSearchToolCallOpenPage {
 	    url: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new WebSearchToolCallOpenPage(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.url = source["url"];
@@ -1956,11 +1956,11 @@ export namespace spec {
 	}
 	export class WebSearchToolCallSearchSource {
 	    url: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new WebSearchToolCallSearchSource(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.url = source["url"];
@@ -1970,18 +1970,18 @@ export namespace spec {
 	    query: string;
 	    sources?: WebSearchToolCallSearchSource[];
 	    input?: Record<string, any>;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new WebSearchToolCallSearch(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.query = source["query"];
 	        this.sources = this.convertValues(source["sources"], WebSearchToolCallSearchSource);
 	        this.input = source["input"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2005,11 +2005,11 @@ export namespace spec {
 	    searchItem?: WebSearchToolCallSearch;
 	    openPageItem?: WebSearchToolCallOpenPage;
 	    findItem?: WebSearchToolCallFind;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new WebSearchToolCallItemUnion(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.kind = source["kind"];
@@ -2017,7 +2017,7 @@ export namespace spec {
 	        this.openPageItem = this.convertValues(source["openPageItem"], WebSearchToolCallOpenPage);
 	        this.findItem = this.convertValues(source["findItem"], WebSearchToolCallFind);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2048,11 +2048,11 @@ export namespace spec {
 	    arguments?: string;
 	    signature: string;
 	    webSearchToolCallItems?: WebSearchToolCallItemUnion[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ToolCall(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.type = source["type"];
@@ -2067,7 +2067,7 @@ export namespace spec {
 	        this.signature = source["signature"];
 	        this.webSearchToolCallItems = this.convertValues(source["webSearchToolCallItems"], WebSearchToolCallItemUnion);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2096,11 +2096,11 @@ export namespace spec {
 	    thinking?: string[];
 	    redactedThinking?: string[];
 	    encryptedContent?: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ReasoningContent(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -2113,7 +2113,7 @@ export namespace spec {
 	        this.redactedThinking = source["redactedThinking"];
 	        this.encryptedContent = source["encryptedContent"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2140,11 +2140,11 @@ export namespace spec {
 	    fileData: string;
 	    additionalContext: string;
 	    citationConfig?: CitationConfig;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ContentItemFile(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -2155,7 +2155,7 @@ export namespace spec {
 	        this.additionalContext = source["additionalContext"];
 	        this.citationConfig = this.convertValues(source["citationConfig"], CitationConfig);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2181,11 +2181,11 @@ export namespace spec {
 	    imageMIME: string;
 	    imageURL: string;
 	    imageData: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ContentItemImage(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -2198,11 +2198,11 @@ export namespace spec {
 	}
 	export class ContentItemRefusal {
 	    refusal: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ContentItemRefusal(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.refusal = source["refusal"];
@@ -2212,18 +2212,18 @@ export namespace spec {
 	    text: string;
 	    citations?: Citation[];
 	    signature: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ContentItemText(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.text = source["text"];
 	        this.citations = this.convertValues(source["citations"], Citation);
 	        this.signature = source["signature"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2248,11 +2248,11 @@ export namespace spec {
 	    refusalItem?: ContentItemRefusal;
 	    imageItem?: ContentItemImage;
 	    fileItem?: ContentItemFile;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new InputOutputContentItemUnion(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.kind = source["kind"];
@@ -2261,7 +2261,7 @@ export namespace spec {
 	        this.imageItem = this.convertValues(source["imageItem"], ContentItemImage);
 	        this.fileItem = this.convertValues(source["fileItem"], ContentItemFile);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2286,11 +2286,11 @@ export namespace spec {
 	    status: string;
 	    cacheControl?: CacheControl;
 	    contents?: InputOutputContentItemUnion[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new InputOutputContent(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -2299,7 +2299,7 @@ export namespace spec {
 	        this.cacheControl = this.convertValues(source["cacheControl"], CacheControl);
 	        this.contents = this.convertValues(source["contents"], InputOutputContentItemUnion);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2329,11 +2329,11 @@ export namespace spec {
 	    customToolOutput?: ToolOutput;
 	    webSearchToolCall?: ToolCall;
 	    webSearchToolOutput?: ToolOutput;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new InputUnion(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.kind = source["kind"];
@@ -2347,7 +2347,7 @@ export namespace spec {
 	        this.webSearchToolCall = this.convertValues(source["webSearchToolCall"], ToolCall);
 	        this.webSearchToolOutput = this.convertValues(source["webSearchToolOutput"], ToolOutput);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2387,11 +2387,11 @@ export namespace spec {
 	    error?: Error;
 	    debugDetails?: any;
 	    meta?: Record<string, any>;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ConversationMessage(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -2414,7 +2414,7 @@ export namespace spec {
 	        this.debugDetails = source["debugDetails"];
 	        this.meta = source["meta"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2446,11 +2446,11 @@ export namespace spec {
 	    outputParam?: OutputParam;
 	    stopSequences?: string[];
 	    additionalParametersRawJSON?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ModelParam(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -2466,7 +2466,7 @@ export namespace spec {
 	        this.stopSequences = source["stopSequences"];
 	        this.additionalParametersRawJSON = source["additionalParametersRawJSON"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2492,11 +2492,11 @@ export namespace spec {
 	    toolStoreChoices?: ToolStoreChoice[];
 	    mcpContext?: MCPConversationContext;
 	    skillSessionID?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new CompletionRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.modelParam = this.convertValues(source["modelParam"], ModelParam);
@@ -2506,7 +2506,7 @@ export namespace spec {
 	        this.mcpContext = this.convertValues(source["mcpContext"], MCPConversationContext);
 	        this.skillSessionID = source["skillSessionID"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2528,11 +2528,11 @@ export namespace spec {
 	export class Warning {
 	    code: string;
 	    message: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Warning(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.code = source["code"];
@@ -2545,11 +2545,11 @@ export namespace spec {
 	    error?: Error;
 	    warnings?: Warning[];
 	    debugDetails?: any;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new FetchCompletionResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.outputs = this.convertValues(source["outputs"], OutputUnion);
@@ -2558,7 +2558,7 @@ export namespace spec {
 	        this.warnings = this.convertValues(source["warnings"], Warning);
 	        this.debugDetails = source["debugDetails"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2580,17 +2580,17 @@ export namespace spec {
 	export class CompletionResponseBody {
 	    inferenceResponse?: FetchCompletionResponse;
 	    hydratedCurrentInputs?: InputUnion[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new CompletionResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.inferenceResponse = this.convertValues(source["inferenceResponse"], FetchCompletionResponse);
 	        this.hydratedCurrentInputs = this.convertValues(source["hydratedCurrentInputs"], InputUnion);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2611,16 +2611,16 @@ export namespace spec {
 	}
 	export class CompletionResponse {
 	    Body?: CompletionResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new CompletionResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], CompletionResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2639,15 +2639,15 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class ConnectMCPServerRequest {
 	    BundleID: string;
 	    ServerID: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ConnectMCPServerRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -2665,11 +2665,11 @@ export namespace spec {
 	    completions?: boolean;
 	    experimental?: Record<string, any>;
 	    extensions?: Record<string, any>;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPServerCapabilitiesSummary(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.tools = source["tools"];
@@ -2687,11 +2687,11 @@ export namespace spec {
 	export class MCPImplementationInfo {
 	    name?: string;
 	    version?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPImplementationInfo(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -2714,11 +2714,11 @@ export namespace spec {
 	    resourceTemplateCount: number;
 	    promptCount: number;
 	    snapshotDigest?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPServerRuntimeSnapshot(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -2737,7 +2737,7 @@ export namespace spec {
 	        this.promptCount = source["promptCount"];
 	        this.snapshotDigest = source["snapshotDigest"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2758,16 +2758,16 @@ export namespace spec {
 	}
 	export class ConnectMCPServerResponse {
 	    Body?: MCPServerRuntimeSnapshot;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ConnectMCPServerResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], MCPServerRuntimeSnapshot);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2786,10 +2786,10 @@ export namespace spec {
 		    return a;
 		}
 	}
-
-
-
-
+	
+	
+	
+	
 	export class Conversation {
 	    schemaVersion: string;
 	    id: string;
@@ -2800,11 +2800,11 @@ export namespace spec {
 	    modifiedAt: any;
 	    messages: ConversationMessage[];
 	    meta?: Record<string, any>;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Conversation(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.schemaVersion = source["schemaVersion"];
@@ -2815,7 +2815,7 @@ export namespace spec {
 	        this.messages = this.convertValues(source["messages"], ConversationMessage);
 	        this.meta = source["meta"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2839,18 +2839,18 @@ export namespace spec {
 	    sanatizedTitle: string;
 	    // Go type: time
 	    modifiedAt?: any;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ConversationListItem(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.sanatizedTitle = source["sanatizedTitle"];
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2869,17 +2869,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class CreateSkillSessionRequestBody {
 	    closeSessionID?: string;
 	    maxActivePerSession?: number;
 	    allowSkillRefs?: SkillRef[];
 	    activeSkillRefs?: SkillRef[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new CreateSkillSessionRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.closeSessionID = source["closeSessionID"];
@@ -2887,7 +2887,7 @@ export namespace spec {
 	        this.allowSkillRefs = this.convertValues(source["allowSkillRefs"], SkillRef);
 	        this.activeSkillRefs = this.convertValues(source["activeSkillRefs"], SkillRef);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2908,16 +2908,16 @@ export namespace spec {
 	}
 	export class CreateSkillSessionRequest {
 	    Body?: CreateSkillSessionRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new CreateSkillSessionRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], CreateSkillSessionRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2936,21 +2936,21 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class CreateSkillSessionResponseBody {
 	    sessionID: string;
 	    activeSkillRefs: SkillRef[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new CreateSkillSessionResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.sessionID = source["sessionID"];
 	        this.activeSkillRefs = this.convertValues(source["activeSkillRefs"], SkillRef);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2971,16 +2971,16 @@ export namespace spec {
 	}
 	export class CreateSkillSessionResponse {
 	    Body?: CreateSkillSessionResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new CreateSkillSessionResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], CreateSkillSessionResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -2999,16 +2999,16 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class DebugSettings {
 	    logLLMReqResp: boolean;
 	    disableContentStripping: boolean;
 	    logLevel: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DebugSettings(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.logLLMReqResp = source["logLLMReqResp"];
@@ -3018,37 +3018,37 @@ export namespace spec {
 	}
 	export class DeleteAssistantPresetBundleRequest {
 	    BundleID: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteAssistantPresetBundleRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	    }
 	}
 	export class DeleteAssistantPresetBundleResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteAssistantPresetBundleResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class DeleteAssistantPresetRequest {
 	    BundleID: string;
 	    AssistantPresetSlug: string;
 	    Version: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteAssistantPresetRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -3057,25 +3057,25 @@ export namespace spec {
 	    }
 	}
 	export class DeleteAssistantPresetResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteAssistantPresetResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class DeleteAuthKeyRequest {
 	    Type: string;
 	    KeyName: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteAuthKeyRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Type = source["Type"];
@@ -3083,25 +3083,25 @@ export namespace spec {
 	    }
 	}
 	export class DeleteAuthKeyResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteAuthKeyResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class DeleteConversationRequest {
 	    ID: string;
 	    Title: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteConversationRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ID = source["ID"];
@@ -3109,49 +3109,49 @@ export namespace spec {
 	    }
 	}
 	export class DeleteConversationResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteConversationResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class DeleteMCPBundleRequest {
 	    BundleID: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteMCPBundleRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	    }
 	}
 	export class DeleteMCPBundleResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteMCPBundleResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class DeleteMCPServerRequest {
 	    BundleID: string;
 	    ServerID: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteMCPServerRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -3159,15 +3159,15 @@ export namespace spec {
 	    }
 	}
 	export class DeleteMCPServerResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteMCPServerResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class DeleteMCPServerSecretRequest {
@@ -3175,11 +3175,11 @@ export namespace spec {
 	    ServerID: string;
 	    Kind: string;
 	    Slot: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteMCPServerSecretRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -3189,25 +3189,25 @@ export namespace spec {
 	    }
 	}
 	export class DeleteMCPServerSecretResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteMCPServerSecretResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class DeleteModelPresetRequest {
 	    ProviderName: string;
 	    ModelPresetID: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteModelPresetRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ProviderName = source["ProviderName"];
@@ -3215,50 +3215,50 @@ export namespace spec {
 	    }
 	}
 	export class DeleteModelPresetResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteModelPresetResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class DeletePromptBundleRequest {
 	    BundleID: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DeletePromptBundleRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	    }
 	}
 	export class DeletePromptBundleResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new DeletePromptBundleResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class DeletePromptTemplateRequest {
 	    BundleID: string;
 	    TemplateSlug: string;
 	    Version: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DeletePromptTemplateRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -3267,73 +3267,73 @@ export namespace spec {
 	    }
 	}
 	export class DeletePromptTemplateResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new DeletePromptTemplateResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class DeleteProviderPresetRequest {
 	    ProviderName: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteProviderPresetRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ProviderName = source["ProviderName"];
 	    }
 	}
 	export class DeleteProviderPresetResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteProviderPresetResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class DeleteSkillBundleRequest {
 	    BundleID: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteSkillBundleRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	    }
 	}
 	export class DeleteSkillBundleResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteSkillBundleResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class DeleteSkillRequest {
 	    BundleID: string;
 	    SkillSlug: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteSkillRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -3341,50 +3341,50 @@ export namespace spec {
 	    }
 	}
 	export class DeleteSkillResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteSkillResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class DeleteToolBundleRequest {
 	    BundleID: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteToolBundleRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	    }
 	}
 	export class DeleteToolBundleResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteToolBundleResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class DeleteToolRequest {
 	    BundleID: string;
 	    ToolSlug: string;
 	    Version: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteToolRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -3393,25 +3393,25 @@ export namespace spec {
 	    }
 	}
 	export class DeleteToolResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new DeleteToolResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class DisconnectMCPServerRequest {
 	    BundleID: string;
 	    ServerID: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new DisconnectMCPServerRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -3419,18 +3419,18 @@ export namespace spec {
 	    }
 	}
 	export class DisconnectMCPServerResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new DisconnectMCPServerResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
-
+	
 	export class InvokeMCPToolRequestBody {
 	    source: string;
 	    toolName: string;
@@ -3443,11 +3443,11 @@ export namespace spec {
 	    messageID?: string;
 	    toolUseID?: string;
 	    appInstanceID?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new InvokeMCPToolRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.source = source["source"];
@@ -3467,18 +3467,18 @@ export namespace spec {
 	    BundleID: string;
 	    ServerID: string;
 	    Body?: InvokeMCPToolRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new EvaluateMCPToolCallRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	        this.Body = this.convertValues(source["Body"], InvokeMCPToolRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -3505,11 +3505,11 @@ export namespace spec {
 	    toolDigest?: string;
 	    risk: string;
 	    arguments?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPApprovalSummary(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -3526,11 +3526,11 @@ export namespace spec {
 	    reason?: string;
 	    approvalID?: string;
 	    summary?: MCPApprovalSummary;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPApprovalEvaluation(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.decision = source["decision"];
@@ -3538,7 +3538,7 @@ export namespace spec {
 	        this.approvalID = source["approvalID"];
 	        this.summary = this.convertValues(source["summary"], MCPApprovalSummary);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -3559,16 +3559,16 @@ export namespace spec {
 	}
 	export class EvaluateMCPToolCallResponse {
 	    Body?: MCPApprovalEvaluation;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new EvaluateMCPToolCallResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], MCPApprovalEvaluation);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -3587,16 +3587,16 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class GetAssistantPresetRequest {
 	    BundleID: string;
 	    AssistantPresetSlug: string;
 	    Version: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetAssistantPresetRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -3606,16 +3606,16 @@ export namespace spec {
 	}
 	export class GetAssistantPresetResponse {
 	    Body?: AssistantPreset;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetAssistantPresetResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], AssistantPreset);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -3637,11 +3637,11 @@ export namespace spec {
 	export class GetAuthKeyRequest {
 	    Type: string;
 	    KeyName: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetAuthKeyRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Type = source["Type"];
@@ -3652,11 +3652,11 @@ export namespace spec {
 	    secret: string;
 	    sha256: string;
 	    nonEmpty: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetAuthKeyResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.secret = source["secret"];
@@ -3666,16 +3666,16 @@ export namespace spec {
 	}
 	export class GetAuthKeyResponse {
 	    Body?: GetAuthKeyResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetAuthKeyResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], GetAuthKeyResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -3694,16 +3694,16 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class GetConversationRequest {
 	    ID: string;
 	    Title: string;
 	    ForceFetch: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetConversationRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ID = source["ID"];
@@ -3713,16 +3713,16 @@ export namespace spec {
 	}
 	export class GetConversationResponse {
 	    Body?: Conversation;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetConversationResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], Conversation);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -3742,24 +3742,24 @@ export namespace spec {
 		}
 	}
 	export class GetDefaultProviderRequest {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new GetDefaultProviderRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class GetDefaultProviderResponseBody {
 	    defaultProvider: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetDefaultProviderResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.defaultProvider = source["defaultProvider"];
@@ -3767,16 +3767,16 @@ export namespace spec {
 	}
 	export class GetDefaultProviderResponse {
 	    Body?: GetDefaultProviderResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetDefaultProviderResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], GetDefaultProviderResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -3795,15 +3795,15 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class GetMCPServerAuthHealthRequest {
 	    BundleID: string;
 	    ServerID: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetMCPServerAuthHealthRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -3826,11 +3826,11 @@ export namespace spec {
 	    oauthRedirectURL?: string;
 	    oauthLoopbackListenAddr?: string;
 	    lastError?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPAuthHealth(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -3848,7 +3848,7 @@ export namespace spec {
 	        this.oauthLoopbackListenAddr = source["oauthLoopbackListenAddr"];
 	        this.lastError = source["lastError"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -3869,16 +3869,16 @@ export namespace spec {
 	}
 	export class GetMCPServerAuthHealthResponse {
 	    Body?: MCPAuthHealth;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetMCPServerAuthHealthResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], MCPAuthHealth);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -3900,11 +3900,11 @@ export namespace spec {
 	export class GetMCPServerAuthStatusRequest {
 	    BundleID: string;
 	    ServerID: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetMCPServerAuthStatusRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -3922,11 +3922,11 @@ export namespace spec {
 	    lastError?: string;
 	    authorizationServer?: string;
 	    resource?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPAuthStatus(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -3939,7 +3939,7 @@ export namespace spec {
 	        this.authorizationServer = source["authorizationServer"];
 	        this.resource = source["resource"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -3960,16 +3960,16 @@ export namespace spec {
 	}
 	export class GetMCPServerAuthStatusResponse {
 	    Body?: MCPAuthStatus;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetMCPServerAuthStatusResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], MCPAuthStatus);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -3991,11 +3991,11 @@ export namespace spec {
 	export class GetMCPServerRequest {
 	    BundleID: string;
 	    ServerID: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetMCPServerRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -4003,27 +4003,27 @@ export namespace spec {
 	    }
 	}
 	export class MCPSetupClientIDMetadataDocumentURLInput {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPSetupClientIDMetadataDocumentURLInput(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class MCPSetupStreamableHTTPURLInput {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPSetupStreamableHTTPURLInput(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class MCPSetupStdioEnvInput {
@@ -4031,11 +4031,11 @@ export namespace spec {
 	    secret?: boolean;
 	    valuePrefix?: string;
 	    valueSuffix?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPSetupStdioEnvInput(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.envName = source["envName"];
@@ -4049,11 +4049,11 @@ export namespace spec {
 	    secret?: boolean;
 	    valuePrefix?: string;
 	    valueSuffix?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPSetupHTTPHeaderInput(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.headerName = source["headerName"];
@@ -4064,11 +4064,11 @@ export namespace spec {
 	}
 	export class MCPSetupOAuthClientCredentialsInput {
 	    clientSecretRequired?: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPSetupOAuthClientCredentialsInput(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.clientSecretRequired = source["clientSecretRequired"];
@@ -4089,11 +4089,11 @@ export namespace spec {
 	    streamableHttpUrl?: any;
 	    // Go type: MCPSetupClientIDMetadataDocumentURLInput
 	    clientIDMetadataDocumentURL?: any;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPServerSetupInput(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -4109,7 +4109,7 @@ export namespace spec {
 	        this.streamableHttpUrl = this.convertValues(source["streamableHttpUrl"], null);
 	        this.clientIDMetadataDocumentURL = this.convertValues(source["clientIDMetadataDocumentURL"], null);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -4131,17 +4131,17 @@ export namespace spec {
 	export class MCPServerSetup {
 	    note?: string;
 	    inputs?: MCPServerSetupInput[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPServerSetup(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.note = source["note"];
 	        this.inputs = this.convertValues(source["inputs"], MCPServerSetupInput);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -4165,11 +4165,11 @@ export namespace spec {
 	    allowAppInitiatedToolCalls: boolean;
 	    requireApprovalForOpenLink: boolean;
 	    requireApprovalForContextUpdates: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPAppsPolicy(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.enabled = source["enabled"];
@@ -4184,11 +4184,11 @@ export namespace spec {
 	    executionMode?: string;
 	    allowStaleDigest?: boolean;
 	    expectedDigest?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPToolPolicyOverride(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.toolName = source["toolName"];
@@ -4204,11 +4204,11 @@ export namespace spec {
 	    requireApprovalForUnknownRisk: boolean;
 	    requireApprovalForWrite: boolean;
 	    requireApprovalForDestructive: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPServerPolicy(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.defaultApprovalRule = source["defaultApprovalRule"];
@@ -4226,11 +4226,11 @@ export namespace spec {
 	    secretHeaderRefs?: Record<string, string>;
 	    clientCredentialRef?: string;
 	    clientIDMetadataDocumentURL?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPStreamableHTTPConfig(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.url = source["url"];
@@ -4249,11 +4249,11 @@ export namespace spec {
 	    env?: Record<string, string>;
 	    secretEnvRefs?: Record<string, string>;
 	    startupTimeoutMS?: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPStdioConfig(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.command = source["command"];
@@ -4283,11 +4283,11 @@ export namespace spec {
 	    createdAt: any;
 	    // Go type: time
 	    modifiedAt: any;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPServerConfig(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.schemaVersion = source["schemaVersion"];
@@ -4307,7 +4307,7 @@ export namespace spec {
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -4328,16 +4328,16 @@ export namespace spec {
 	}
 	export class GetMCPServerResponse {
 	    Body?: MCPServerConfig;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetMCPServerResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], MCPServerConfig);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -4359,11 +4359,11 @@ export namespace spec {
 	export class GetMCPServerStatusRequest {
 	    BundleID: string;
 	    ServerID: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetMCPServerStatusRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -4372,16 +4372,16 @@ export namespace spec {
 	}
 	export class GetMCPServerStatusResponse {
 	    Body?: MCPServerRuntimeSnapshot;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetMCPServerStatusResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], MCPServerRuntimeSnapshot);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -4401,24 +4401,24 @@ export namespace spec {
 		}
 	}
 	export class GetMCPSettingsRequest {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new GetMCPSettingsRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class MCPSettings {
 	    oauthLoopbackListenAddr?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPSettings(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.oauthLoopbackListenAddr = source["oauthLoopbackListenAddr"];
@@ -4429,11 +4429,11 @@ export namespace spec {
 	    oauthRedirectURL?: string;
 	    oauthLoopbackListenAddr?: string;
 	    oauthRestartRequired?: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPSettingsView(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.settings = this.convertValues(source["settings"], MCPSettings);
@@ -4441,7 +4441,7 @@ export namespace spec {
 	        this.oauthLoopbackListenAddr = source["oauthLoopbackListenAddr"];
 	        this.oauthRestartRequired = source["oauthRestartRequired"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -4462,16 +4462,16 @@ export namespace spec {
 	}
 	export class GetMCPSettingsResponse {
 	    Body?: MCPSettingsView;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetMCPSettingsResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], MCPSettingsView);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -4494,11 +4494,11 @@ export namespace spec {
 	    ProviderName: string;
 	    ModelPresetID: string;
 	    IncludeDisabled: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetModelPresetRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ProviderName = source["ProviderName"];
@@ -4530,11 +4530,11 @@ export namespace spec {
 	    // Go type: time
 	    modifiedAt: any;
 	    isBuiltIn: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ModelPreset(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.stream = source["stream"];
@@ -4559,7 +4559,7 @@ export namespace spec {
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
 	        this.isBuiltIn = source["isBuiltIn"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -4596,11 +4596,11 @@ export namespace spec {
 	    capabilitiesOverride?: capabilityoverride.ModelCapabilitiesOverride;
 	    defaultModelPresetID: string;
 	    modelPresets: Record<string, ModelPreset>;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ProviderPreset(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.schemaVersion = source["schemaVersion"];
@@ -4619,7 +4619,7 @@ export namespace spec {
 	        this.defaultModelPresetID = source["defaultModelPresetID"];
 	        this.modelPresets = this.convertValues(source["modelPresets"], ModelPreset, true);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -4641,17 +4641,17 @@ export namespace spec {
 	export class GetModelPresetResponseBody {
 	    provider: ProviderPreset;
 	    model: ModelPreset;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetModelPresetResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.provider = this.convertValues(source["provider"], ProviderPreset);
 	        this.model = this.convertValues(source["model"], ModelPreset);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -4672,16 +4672,16 @@ export namespace spec {
 	}
 	export class GetModelPresetResponse {
 	    Body?: GetModelPresetResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetModelPresetResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], GetModelPresetResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -4700,16 +4700,16 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class GetPromptTemplateRequest {
 	    BundleID: string;
 	    TemplateSlug: string;
 	    Version: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetPromptTemplateRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -4726,11 +4726,11 @@ export namespace spec {
 	    staticVal?: string;
 	    enumValues?: string[];
 	    default?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PromptVariable(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -4747,11 +4747,11 @@ export namespace spec {
 	    id: string;
 	    role: string;
 	    content: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MessageBlock(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -4777,11 +4777,11 @@ export namespace spec {
 	    // Go type: time
 	    modifiedAt: any;
 	    isBuiltIn: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PromptTemplate(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.schemaVersion = source["schemaVersion"];
@@ -4800,7 +4800,7 @@ export namespace spec {
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
 	        this.isBuiltIn = source["isBuiltIn"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -4821,16 +4821,16 @@ export namespace spec {
 	}
 	export class GetPromptTemplateResponse {
 	    Body?: PromptTemplate;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetPromptTemplateResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], PromptTemplate);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -4851,11 +4851,11 @@ export namespace spec {
 	}
 	export class GetSettingsRequest {
 	    ForceFetch: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetSettingsRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ForceFetch = source["ForceFetch"];
@@ -4865,18 +4865,18 @@ export namespace spec {
 	    appTheme: AppTheme;
 	    debug: DebugSettings;
 	    authKeys: AuthKeyMeta[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetSettingsResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.appTheme = this.convertValues(source["appTheme"], AppTheme);
 	        this.debug = this.convertValues(source["debug"], DebugSettings);
 	        this.authKeys = this.convertValues(source["authKeys"], AuthKeyMeta);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -4897,16 +4897,16 @@ export namespace spec {
 	}
 	export class GetSettingsResponse {
 	    Body?: GetSettingsResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetSettingsResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], GetSettingsResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -4925,16 +4925,16 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class GetSkillRequest {
 	    BundleID: string;
 	    SkillSlug: string;
 	    IncludeDisabled: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetSkillRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -4951,11 +4951,11 @@ export namespace spec {
 	    // Go type: time
 	    missingSince?: any;
 	    lastCheckError?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SkillPresence(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.status = source["status"];
@@ -4964,7 +4964,7 @@ export namespace spec {
 	        this.missingSince = this.convertValues(source["missingSince"], null);
 	        this.lastCheckError = source["lastCheckError"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5000,11 +5000,11 @@ export namespace spec {
 	    createdAt: any;
 	    // Go type: time
 	    modifiedAt: any;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Skill(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.schemaVersion = source["schemaVersion"];
@@ -5022,7 +5022,7 @@ export namespace spec {
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5043,16 +5043,16 @@ export namespace spec {
 	}
 	export class GetSkillResponse {
 	    Body?: Skill;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetSkillResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], Skill);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5077,11 +5077,11 @@ export namespace spec {
 	    allowSkillRefs?: SkillRef[];
 	    sessionID?: string;
 	    activity?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new RuntimeSkillFilter(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.types = source["types"];
@@ -5090,7 +5090,7 @@ export namespace spec {
 	        this.sessionID = source["sessionID"];
 	        this.activity = source["activity"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5111,16 +5111,16 @@ export namespace spec {
 	}
 	export class GetSkillsPromptRequestBody {
 	    filter?: RuntimeSkillFilter;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetSkillsPromptRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.filter = this.convertValues(source["filter"], RuntimeSkillFilter);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5141,16 +5141,16 @@ export namespace spec {
 	}
 	export class GetSkillsPromptRequest {
 	    Body?: GetSkillsPromptRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetSkillsPromptRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], GetSkillsPromptRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5169,14 +5169,14 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class GetSkillsPromptResponseBody {
 	    prompt: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetSkillsPromptResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.prompt = source["prompt"];
@@ -5184,16 +5184,16 @@ export namespace spec {
 	}
 	export class GetSkillsPromptResponse {
 	    Body?: GetSkillsPromptResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetSkillsPromptResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], GetSkillsPromptResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5212,16 +5212,16 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class GetToolRequest {
 	    BundleID: string;
 	    ToolSlug: string;
 	    Version: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetToolRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -5231,11 +5231,11 @@ export namespace spec {
 	}
 	export class SDKToolImpl {
 	    sdkType: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SDKToolImpl(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.sdkType = source["sdkType"];
@@ -5245,11 +5245,11 @@ export namespace spec {
 	    successCodes?: number[];
 	    errorMode?: string;
 	    bodyOutputMode?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new HTTPResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.successCodes = source["successCodes"];
@@ -5262,11 +5262,11 @@ export namespace spec {
 	    in?: string;
 	    name?: string;
 	    valueTemplate: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new HTTPAuth(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.type = source["type"];
@@ -5283,11 +5283,11 @@ export namespace spec {
 	    body?: string;
 	    auth?: HTTPAuth;
 	    timeoutMS?: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new HTTPRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.method = source["method"];
@@ -5298,7 +5298,7 @@ export namespace spec {
 	        this.auth = this.convertValues(source["auth"], HTTPAuth);
 	        this.timeoutMS = source["timeoutMS"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5320,17 +5320,17 @@ export namespace spec {
 	export class HTTPToolImpl {
 	    request: HTTPRequest;
 	    response: HTTPResponse;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new HTTPToolImpl(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.request = this.convertValues(source["request"], HTTPRequest);
 	        this.response = this.convertValues(source["response"], HTTPResponse);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5351,11 +5351,11 @@ export namespace spec {
 	}
 	export class GoToolImpl {
 	    func: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GoToolImpl(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.func = source["func"];
@@ -5385,11 +5385,11 @@ export namespace spec {
 	    createdAt: any;
 	    // Go type: time
 	    modifiedAt: any;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Tool(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.schemaVersion = source["schemaVersion"];
@@ -5414,7 +5414,7 @@ export namespace spec {
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5435,16 +5435,16 @@ export namespace spec {
 	}
 	export class GetToolResponse {
 	    Body?: Tool;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new GetToolResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], Tool);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5463,21 +5463,21 @@ export namespace spec {
 		    return a;
 		}
 	}
-
-
-
-
-
-
-
-
+	
+	
+	
+	
+	
+	
+	
+	
 	export class InvokeGoOptions {
 	    timeoutMS?: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new InvokeGoOptions(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.timeoutMS = source["timeoutMS"];
@@ -5487,11 +5487,11 @@ export namespace spec {
 	    timeoutMS?: number;
 	    extraHeaders?: Record<string, string>;
 	    secrets?: Record<string, string>;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new InvokeHTTPOptions(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.timeoutMS = source["timeoutMS"];
@@ -5503,18 +5503,18 @@ export namespace spec {
 	    BundleID: string;
 	    ServerID: string;
 	    Body?: InvokeMCPToolRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new InvokeMCPToolRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	        this.Body = this.convertValues(source["Body"], InvokeMCPToolRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5533,18 +5533,18 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class MCPToolAppRenderInfo {
 	    resourceUri?: string;
 	    mimeType?: string;
 	    content?: MCPContent[];
 	    structuredContent?: any;
 	    isError?: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPToolAppRenderInfo(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.resourceUri = source["resourceUri"];
@@ -5553,7 +5553,7 @@ export namespace spec {
 	        this.structuredContent = source["structuredContent"];
 	        this.isError = source["isError"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5583,11 +5583,11 @@ export namespace spec {
 	    approvalID?: string;
 	    appResourceUri?: string;
 	    appInstanceID?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPToolCallProvenance(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -5612,11 +5612,11 @@ export namespace spec {
 	    isError?: boolean;
 	    provenance: MCPToolCallProvenance;
 	    app?: MCPToolAppRenderInfo;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new InvokeMCPToolResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -5629,7 +5629,7 @@ export namespace spec {
 	        this.provenance = this.convertValues(source["provenance"], MCPToolCallProvenance);
 	        this.app = this.convertValues(source["app"], MCPToolAppRenderInfo);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5650,16 +5650,16 @@ export namespace spec {
 	}
 	export class InvokeMCPToolResponse {
 	    Body?: InvokeMCPToolResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new InvokeMCPToolResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], InvokeMCPToolResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5678,16 +5678,16 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class InvokeSkillToolRequestBody {
 	    sessionID: string;
 	    toolName: string;
 	    args?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new InvokeSkillToolRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.sessionID = source["sessionID"];
@@ -5697,16 +5697,16 @@ export namespace spec {
 	}
 	export class InvokeSkillToolRequest {
 	    Body?: InvokeSkillToolRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new InvokeSkillToolRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], InvokeSkillToolRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5725,16 +5725,16 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class ToolOutputFile {
 	    fileName: string;
 	    fileMIME: string;
 	    fileData: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ToolOutputFile(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.fileName = source["fileName"];
@@ -5747,11 +5747,11 @@ export namespace spec {
 	    imageName: string;
 	    imageMIME: string;
 	    imageData: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ToolOutputImage(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.detail = source["detail"];
@@ -5762,11 +5762,11 @@ export namespace spec {
 	}
 	export class ToolOutputText {
 	    text: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ToolOutputText(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.text = source["text"];
@@ -5777,11 +5777,11 @@ export namespace spec {
 	    textItem?: ToolOutputText;
 	    imageItem?: ToolOutputImage;
 	    fileItem?: ToolOutputFile;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ToolOutputUnion(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.kind = source["kind"];
@@ -5789,7 +5789,7 @@ export namespace spec {
 	        this.imageItem = this.convertValues(source["imageItem"], ToolOutputImage);
 	        this.fileItem = this.convertValues(source["fileItem"], ToolOutputFile);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5814,11 +5814,11 @@ export namespace spec {
 	    isBuiltIn: boolean;
 	    isError?: boolean;
 	    errorMessage?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new InvokeSkillToolResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.outputs = this.convertValues(source["outputs"], ToolOutputUnion);
@@ -5827,7 +5827,7 @@ export namespace spec {
 	        this.isError = source["isError"];
 	        this.errorMessage = source["errorMessage"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5848,16 +5848,16 @@ export namespace spec {
 	}
 	export class InvokeSkillToolResponse {
 	    Body?: InvokeSkillToolResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new InvokeSkillToolResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], InvokeSkillToolResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5876,23 +5876,23 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class InvokeToolRequestBody {
 	    args: string;
 	    httpOptions?: InvokeHTTPOptions;
 	    goOptions?: InvokeGoOptions;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new InvokeToolRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.args = source["args"];
 	        this.httpOptions = this.convertValues(source["httpOptions"], InvokeHTTPOptions);
 	        this.goOptions = this.convertValues(source["goOptions"], InvokeGoOptions);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5916,11 +5916,11 @@ export namespace spec {
 	    ToolSlug: string;
 	    Version: string;
 	    Body?: InvokeToolRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new InvokeToolRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -5928,7 +5928,7 @@ export namespace spec {
 	        this.Version = source["Version"];
 	        this.Body = this.convertValues(source["Body"], InvokeToolRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5947,18 +5947,18 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class InvokeToolResponseBody {
 	    outputs?: ToolOutputUnion[];
 	    meta?: Record<string, any>;
 	    isBuiltIn: boolean;
 	    isError: boolean;
 	    errorMessage: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new InvokeToolResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.outputs = this.convertValues(source["outputs"], ToolOutputUnion);
@@ -5967,7 +5967,7 @@ export namespace spec {
 	        this.isError = source["isError"];
 	        this.errorMessage = source["errorMessage"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5988,16 +5988,16 @@ export namespace spec {
 	}
 	export class InvokeToolResponse {
 	    Body?: InvokeToolResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new InvokeToolResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], InvokeToolResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -6016,18 +6016,18 @@ export namespace spec {
 		    return a;
 		}
 	}
-
-
+	
+	
 	export class ListAssistantPresetBundlesRequest {
 	    BundleIDs: string[];
 	    IncludeDisabled: boolean;
 	    PageSize: number;
 	    PageToken: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListAssistantPresetBundlesRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleIDs = source["BundleIDs"];
@@ -6039,17 +6039,17 @@ export namespace spec {
 	export class ListAssistantPresetBundlesResponseBody {
 	    assistantPresetBundles: AssistantPresetBundle[];
 	    nextPageToken?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListAssistantPresetBundlesResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.assistantPresetBundles = this.convertValues(source["assistantPresetBundles"], AssistantPresetBundle);
 	        this.nextPageToken = source["nextPageToken"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -6070,16 +6070,16 @@ export namespace spec {
 	}
 	export class ListAssistantPresetBundlesResponse {
 	    Body?: ListAssistantPresetBundlesResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListAssistantPresetBundlesResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], ListAssistantPresetBundlesResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -6098,17 +6098,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class ListAssistantPresetsRequest {
 	    BundleIDs: string[];
 	    IncludeDisabled: boolean;
 	    RecommendedPageSize: number;
 	    PageToken: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListAssistantPresetsRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleIDs = source["BundleIDs"];
@@ -6120,17 +6120,17 @@ export namespace spec {
 	export class ListAssistantPresetsResponseBody {
 	    assistantPresetListItems: AssistantPresetListItem[];
 	    nextPageToken?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListAssistantPresetsResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.assistantPresetListItems = this.convertValues(source["assistantPresetListItems"], AssistantPresetListItem);
 	        this.nextPageToken = source["nextPageToken"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -6151,16 +6151,16 @@ export namespace spec {
 	}
 	export class ListAssistantPresetsResponse {
 	    Body?: ListAssistantPresetsResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListAssistantPresetsResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], ListAssistantPresetsResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -6179,15 +6179,15 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class ListConversationsRequest {
 	    PageSize: number;
 	    PageToken: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListConversationsRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.PageSize = source["PageSize"];
@@ -6197,17 +6197,17 @@ export namespace spec {
 	export class ListConversationsResponseBody {
 	    conversationListItems: ConversationListItem[];
 	    nextPageToken?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListConversationsResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.conversationListItems = this.convertValues(source["conversationListItems"], ConversationListItem);
 	        this.nextPageToken = source["nextPageToken"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -6228,16 +6228,16 @@ export namespace spec {
 	}
 	export class ListConversationsResponse {
 	    Body?: ListConversationsResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListConversationsResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], ListConversationsResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -6256,17 +6256,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class ListMCPBundlesRequest {
 	    BundleIDs: string[];
 	    IncludeDisabled: boolean;
 	    PageSize: number;
 	    PageToken: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListMCPBundlesRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleIDs = source["BundleIDs"];
@@ -6289,11 +6289,11 @@ export namespace spec {
 	    isBuiltIn: boolean;
 	    // Go type: time
 	    softDeletedAt?: any;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPBundle(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.schemaVersion = source["schemaVersion"];
@@ -6307,7 +6307,7 @@ export namespace spec {
 	        this.isBuiltIn = source["isBuiltIn"];
 	        this.softDeletedAt = this.convertValues(source["softDeletedAt"], null);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -6329,17 +6329,17 @@ export namespace spec {
 	export class ListMCPBundlesResponseBody {
 	    bundles: MCPBundle[];
 	    nextPageToken?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListMCPBundlesResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundles = this.convertValues(source["bundles"], MCPBundle);
 	        this.nextPageToken = source["nextPageToken"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -6360,16 +6360,16 @@ export namespace spec {
 	}
 	export class ListMCPBundlesResponse {
 	    Body?: ListMCPBundlesResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListMCPBundlesResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], ListMCPBundlesResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -6388,17 +6388,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class ListMCPServerPromptsRequest {
 	    BundleID: string;
 	    ServerID: string;
 	    PageSize: number;
 	    PageToken: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListMCPServerPromptsRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -6416,11 +6416,11 @@ export namespace spec {
 	    description?: string;
 	    arguments?: Record<string, MCPArgumentDefinition>;
 	    digest?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPPromptRef(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -6432,7 +6432,7 @@ export namespace spec {
 	        this.arguments = this.convertValues(source["arguments"], MCPArgumentDefinition, true);
 	        this.digest = source["digest"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -6454,17 +6454,17 @@ export namespace spec {
 	export class ListMCPServerPromptsResponseBody {
 	    prompts: MCPPromptRef[];
 	    nextPageToken?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListMCPServerPromptsResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.prompts = this.convertValues(source["prompts"], MCPPromptRef);
 	        this.nextPageToken = source["nextPageToken"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -6485,16 +6485,16 @@ export namespace spec {
 	}
 	export class ListMCPServerPromptsResponse {
 	    Body?: ListMCPServerPromptsResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListMCPServerPromptsResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], ListMCPServerPromptsResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -6513,17 +6513,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class ListMCPServerResourceTemplatesRequest {
 	    BundleID: string;
 	    ServerID: string;
 	    PageSize: number;
 	    PageToken: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListMCPServerResourceTemplatesRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -6544,11 +6544,11 @@ export namespace spec {
 	    arguments?: Record<string, MCPArgumentDefinition>;
 	    annotations?: Record<string, any>;
 	    digest?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPResourceTemplateRef(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -6563,7 +6563,7 @@ export namespace spec {
 	        this.annotations = source["annotations"];
 	        this.digest = source["digest"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -6585,17 +6585,17 @@ export namespace spec {
 	export class ListMCPServerResourceTemplatesResponseBody {
 	    resourceTemplates: MCPResourceTemplateRef[];
 	    nextPageToken?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListMCPServerResourceTemplatesResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.resourceTemplates = this.convertValues(source["resourceTemplates"], MCPResourceTemplateRef);
 	        this.nextPageToken = source["nextPageToken"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -6616,16 +6616,16 @@ export namespace spec {
 	}
 	export class ListMCPServerResourceTemplatesResponse {
 	    Body?: ListMCPServerResourceTemplatesResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListMCPServerResourceTemplatesResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], ListMCPServerResourceTemplatesResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -6644,17 +6644,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class ListMCPServerResourcesRequest {
 	    BundleID: string;
 	    ServerID: string;
 	    PageSize: number;
 	    PageToken: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListMCPServerResourcesRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -6666,17 +6666,17 @@ export namespace spec {
 	export class ListMCPServerResourcesResponseBody {
 	    resources: MCPResourceRef[];
 	    nextPageToken?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListMCPServerResourcesResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.resources = this.convertValues(source["resources"], MCPResourceRef);
 	        this.nextPageToken = source["nextPageToken"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -6697,16 +6697,16 @@ export namespace spec {
 	}
 	export class ListMCPServerResourcesResponse {
 	    Body?: ListMCPServerResourcesResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListMCPServerResourcesResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], ListMCPServerResourcesResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -6725,17 +6725,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class ListMCPServerToolsRequest {
 	    BundleID: string;
 	    ServerID: string;
 	    PageSize: number;
 	    PageToken: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListMCPServerToolsRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -6747,11 +6747,11 @@ export namespace spec {
 	export class MCPToolAppInfo {
 	    resourceUri?: string;
 	    visibility?: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPToolAppInfo(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.resourceUri = source["resourceUri"];
@@ -6764,11 +6764,11 @@ export namespace spec {
 	    openWorldHint?: boolean;
 	    readOnlyHint: boolean;
 	    title?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPToolAnnotations(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.destructiveHint = source["destructiveHint"];
@@ -6798,11 +6798,11 @@ export namespace spec {
 	    digest: string;
 	    enabled: boolean;
 	    stale?: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPToolCapability(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -6825,7 +6825,7 @@ export namespace spec {
 	        this.enabled = source["enabled"];
 	        this.stale = source["stale"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -6847,17 +6847,17 @@ export namespace spec {
 	export class ListMCPServerToolsResponseBody {
 	    tools: MCPToolCapability[];
 	    nextPageToken?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListMCPServerToolsResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.tools = this.convertValues(source["tools"], MCPToolCapability);
 	        this.nextPageToken = source["nextPageToken"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -6878,16 +6878,16 @@ export namespace spec {
 	}
 	export class ListMCPServerToolsResponse {
 	    Body?: ListMCPServerToolsResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListMCPServerToolsResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], ListMCPServerToolsResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -6906,7 +6906,7 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class ListMCPServersRequest {
 	    BundleID: string;
 	    ServerIDs: string[];
@@ -6914,11 +6914,11 @@ export namespace spec {
 	    IncludeDisabled: boolean;
 	    PageSize: number;
 	    PageToken: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListMCPServersRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -6932,17 +6932,17 @@ export namespace spec {
 	export class ListMCPServersResponseBody {
 	    servers: MCPServerConfig[];
 	    nextPageToken?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListMCPServersResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.servers = this.convertValues(source["servers"], MCPServerConfig);
 	        this.nextPageToken = source["nextPageToken"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -6963,16 +6963,16 @@ export namespace spec {
 	}
 	export class ListMCPServersResponse {
 	    Body?: ListMCPServersResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListMCPServersResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], ListMCPServersResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -6991,17 +6991,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class ListPendingMCPOAuthAuthorizationsRequest {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new ListPendingMCPOAuthAuthorizationsRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class MCPOAuthAuthorization {
@@ -7009,11 +7009,11 @@ export namespace spec {
 	    serverID: string;
 	    authorizationURL: string;
 	    expiresAt?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPOAuthAuthorization(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -7024,16 +7024,16 @@ export namespace spec {
 	}
 	export class ListPendingMCPOAuthAuthorizationsResponseBody {
 	    authorizations: MCPOAuthAuthorization[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListPendingMCPOAuthAuthorizationsResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.authorizations = this.convertValues(source["authorizations"], MCPOAuthAuthorization);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -7054,16 +7054,16 @@ export namespace spec {
 	}
 	export class ListPendingMCPOAuthAuthorizationsResponse {
 	    Body?: ListPendingMCPOAuthAuthorizationsResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListPendingMCPOAuthAuthorizationsResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], ListPendingMCPOAuthAuthorizationsResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -7082,17 +7082,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class ListPromptBundlesRequest {
 	    BundleIDs: string[];
 	    IncludeDisabled: boolean;
 	    PageSize: number;
 	    PageToken: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListPromptBundlesRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleIDs = source["BundleIDs"];
@@ -7115,11 +7115,11 @@ export namespace spec {
 	    isBuiltIn: boolean;
 	    // Go type: time
 	    softDeletedAt?: any;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PromptBundle(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.schemaVersion = source["schemaVersion"];
@@ -7133,7 +7133,7 @@ export namespace spec {
 	        this.isBuiltIn = source["isBuiltIn"];
 	        this.softDeletedAt = this.convertValues(source["softDeletedAt"], null);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -7155,17 +7155,17 @@ export namespace spec {
 	export class ListPromptBundlesResponseBody {
 	    promptBundles: PromptBundle[];
 	    nextPageToken?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListPromptBundlesResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.promptBundles = this.convertValues(source["promptBundles"], PromptBundle);
 	        this.nextPageToken = source["nextPageToken"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -7186,16 +7186,16 @@ export namespace spec {
 	}
 	export class ListPromptBundlesResponse {
 	    Body?: ListPromptBundlesResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListPromptBundlesResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], ListPromptBundlesResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -7214,7 +7214,7 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class ListPromptTemplatesRequest {
 	    BundleIDs: string[];
 	    Tags: string[];
@@ -7223,11 +7223,11 @@ export namespace spec {
 	    IncludeDisabled: boolean;
 	    RecommendedPageSize: number;
 	    PageToken: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListPromptTemplatesRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleIDs = source["BundleIDs"];
@@ -7247,11 +7247,11 @@ export namespace spec {
 	    kind: string;
 	    isResolved: boolean;
 	    isBuiltIn: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PromptTemplateListItem(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -7266,17 +7266,17 @@ export namespace spec {
 	export class ListPromptTemplatesResponseBody {
 	    promptTemplateListItems: PromptTemplateListItem[];
 	    nextPageToken?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListPromptTemplatesResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.promptTemplateListItems = this.convertValues(source["promptTemplateListItems"], PromptTemplateListItem);
 	        this.nextPageToken = source["nextPageToken"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -7297,16 +7297,16 @@ export namespace spec {
 	}
 	export class ListPromptTemplatesResponse {
 	    Body?: ListPromptTemplatesResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListPromptTemplatesResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], ListPromptTemplatesResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -7325,17 +7325,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class ListProviderPresetsRequest {
 	    Names: string[];
 	    IncludeDisabled: boolean;
 	    PageSize: number;
 	    PageToken: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListProviderPresetsRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Names = source["Names"];
@@ -7347,17 +7347,17 @@ export namespace spec {
 	export class ListProviderPresetsResponseBody {
 	    providers: ProviderPreset[];
 	    nextPageToken?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListProviderPresetsResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.providers = this.convertValues(source["providers"], ProviderPreset);
 	        this.nextPageToken = source["nextPageToken"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -7378,16 +7378,16 @@ export namespace spec {
 	}
 	export class ListProviderPresetsResponse {
 	    Body?: ListProviderPresetsResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListProviderPresetsResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], ListProviderPresetsResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -7406,19 +7406,19 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class ListRuntimeSkillsRequestBody {
 	    filter?: RuntimeSkillFilter;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListRuntimeSkillsRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.filter = this.convertValues(source["filter"], RuntimeSkillFilter);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -7439,16 +7439,16 @@ export namespace spec {
 	}
 	export class ListRuntimeSkillsRequest {
 	    Body?: ListRuntimeSkillsRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListRuntimeSkillsRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], ListRuntimeSkillsRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -7467,7 +7467,7 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class RuntimeSkillListItem {
 	    skillRef: SkillRef;
 	    type?: string;
@@ -7476,11 +7476,11 @@ export namespace spec {
 	    digest?: string;
 	    isActive?: boolean;
 	    errorMessage?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new RuntimeSkillListItem(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.skillRef = this.convertValues(source["skillRef"], SkillRef);
@@ -7491,7 +7491,7 @@ export namespace spec {
 	        this.isActive = source["isActive"];
 	        this.errorMessage = source["errorMessage"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -7512,16 +7512,16 @@ export namespace spec {
 	}
 	export class ListRuntimeSkillsResponseBody {
 	    skills: RuntimeSkillListItem[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListRuntimeSkillsResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.skills = this.convertValues(source["skills"], RuntimeSkillListItem);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -7542,16 +7542,16 @@ export namespace spec {
 	}
 	export class ListRuntimeSkillsResponse {
 	    Body?: ListRuntimeSkillsResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListRuntimeSkillsResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], ListRuntimeSkillsResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -7570,17 +7570,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class ListSkillBundlesRequest {
 	    BundleIDs: string[];
 	    IncludeDisabled: boolean;
 	    PageSize: number;
 	    PageToken: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListSkillBundlesRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleIDs = source["BundleIDs"];
@@ -7603,11 +7603,11 @@ export namespace spec {
 	    modifiedAt: any;
 	    // Go type: time
 	    softDeletedAt?: any;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SkillBundle(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.schemaVersion = source["schemaVersion"];
@@ -7621,7 +7621,7 @@ export namespace spec {
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
 	        this.softDeletedAt = this.convertValues(source["softDeletedAt"], null);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -7643,17 +7643,17 @@ export namespace spec {
 	export class ListSkillBundlesResponseBody {
 	    skillBundles: SkillBundle[];
 	    nextPageToken?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListSkillBundlesResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.skillBundles = this.convertValues(source["skillBundles"], SkillBundle);
 	        this.nextPageToken = source["nextPageToken"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -7674,16 +7674,16 @@ export namespace spec {
 	}
 	export class ListSkillBundlesResponse {
 	    Body?: ListSkillBundlesResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListSkillBundlesResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], ListSkillBundlesResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -7702,7 +7702,7 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class ListSkillsRequest {
 	    BundleIDs: string[];
 	    Types: string[];
@@ -7710,11 +7710,11 @@ export namespace spec {
 	    IncludeMissing: boolean;
 	    RecommendedPageSize: number;
 	    PageToken: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListSkillsRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleIDs = source["BundleIDs"];
@@ -7731,11 +7731,11 @@ export namespace spec {
 	    skillSlug: string;
 	    isBuiltIn: boolean;
 	    skillDefinition: Skill;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SkillListItem(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -7744,7 +7744,7 @@ export namespace spec {
 	        this.isBuiltIn = source["isBuiltIn"];
 	        this.skillDefinition = this.convertValues(source["skillDefinition"], Skill);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -7766,17 +7766,17 @@ export namespace spec {
 	export class ListSkillsResponseBody {
 	    skillListItems: SkillListItem[];
 	    nextPageToken?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListSkillsResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.skillListItems = this.convertValues(source["skillListItems"], SkillListItem);
 	        this.nextPageToken = source["nextPageToken"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -7797,16 +7797,16 @@ export namespace spec {
 	}
 	export class ListSkillsResponse {
 	    Body?: ListSkillsResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListSkillsResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], ListSkillsResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -7825,17 +7825,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class ListToolBundlesRequest {
 	    BundleIDs: string[];
 	    IncludeDisabled: boolean;
 	    PageSize: number;
 	    PageToken: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListToolBundlesRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleIDs = source["BundleIDs"];
@@ -7858,11 +7858,11 @@ export namespace spec {
 	    modifiedAt: any;
 	    // Go type: time
 	    softDeletedAt?: any;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ToolBundle(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.schemaVersion = source["schemaVersion"];
@@ -7876,7 +7876,7 @@ export namespace spec {
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
 	        this.softDeletedAt = this.convertValues(source["softDeletedAt"], null);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -7898,17 +7898,17 @@ export namespace spec {
 	export class ListToolBundlesResponseBody {
 	    toolBundles: ToolBundle[];
 	    nextPageToken?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListToolBundlesResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.toolBundles = this.convertValues(source["toolBundles"], ToolBundle);
 	        this.nextPageToken = source["nextPageToken"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -7929,16 +7929,16 @@ export namespace spec {
 	}
 	export class ListToolBundlesResponse {
 	    Body?: ListToolBundlesResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListToolBundlesResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], ListToolBundlesResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -7957,18 +7957,18 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class ListToolsRequest {
 	    BundleIDs: string[];
 	    Tags: string[];
 	    IncludeDisabled: boolean;
 	    RecommendedPageSize: number;
 	    PageToken: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListToolsRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleIDs = source["BundleIDs"];
@@ -7985,11 +7985,11 @@ export namespace spec {
 	    toolVersion: string;
 	    isBuiltIn: boolean;
 	    toolDefinition: Tool;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ToolListItem(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -7999,7 +7999,7 @@ export namespace spec {
 	        this.isBuiltIn = source["isBuiltIn"];
 	        this.toolDefinition = this.convertValues(source["toolDefinition"], Tool);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -8021,17 +8021,17 @@ export namespace spec {
 	export class ListToolsResponseBody {
 	    toolListItems: ToolListItem[];
 	    nextPageToken?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListToolsResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.toolListItems = this.convertValues(source["toolListItems"], ToolListItem);
 	        this.nextPageToken = source["nextPageToken"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -8052,16 +8052,16 @@ export namespace spec {
 	}
 	export class ListToolsResponse {
 	    Body?: ListToolsResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ListToolsResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], ListToolsResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -8080,19 +8080,19 @@ export namespace spec {
 		    return a;
 		}
 	}
-
-
-
-
+	
+	
+	
+	
 	export class MCPApprovalToken {
 	    approvalID: string;
 	    token: string;
 	    expiresAt: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPApprovalToken(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.approvalID = source["approvalID"];
@@ -8100,22 +8100,22 @@ export namespace spec {
 	        this.expiresAt = source["expiresAt"];
 	    }
 	}
-
-
-
-
-
+	
+	
+	
+	
+	
 	export class MCPCompleteArgumentRequestBody {
 	    refType: string;
 	    name: string;
 	    argumentName: string;
 	    argumentValue?: string;
 	    context?: Record<string, string>;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPCompleteArgumentRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.refType = source["refType"];
@@ -8129,18 +8129,18 @@ export namespace spec {
 	    BundleID: string;
 	    ServerID: string;
 	    Body?: MCPCompleteArgumentRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPCompleteArgumentRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	        this.Body = this.convertValues(source["Body"], MCPCompleteArgumentRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -8159,16 +8159,16 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class MCPCompletionResult {
 	    values?: string[];
 	    total?: number;
 	    hasMore?: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPCompletionResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.values = source["values"];
@@ -8176,16 +8176,16 @@ export namespace spec {
 	        this.hasMore = source["hasMore"];
 	    }
 	}
-
-
+	
+	
 	export class MCPGetPromptRequestBody {
 	    promptName: string;
 	    arguments?: Record<string, string>;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPGetPromptRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.promptName = source["promptName"];
@@ -8196,18 +8196,18 @@ export namespace spec {
 	    BundleID: string;
 	    ServerID: string;
 	    Body?: MCPGetPromptRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPGetPromptRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	        this.Body = this.convertValues(source["Body"], MCPGetPromptRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -8226,21 +8226,21 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class MCPPromptMessage {
 	    role: string;
 	    content: MCPContent;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPPromptMessage(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.role = source["role"];
 	        this.content = this.convertValues(source["content"], MCPContent);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -8265,11 +8265,11 @@ export namespace spec {
 	    promptName: string;
 	    description?: string;
 	    messages?: MCPPromptMessage[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPGetPromptResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -8278,7 +8278,7 @@ export namespace spec {
 	        this.description = source["description"];
 	        this.messages = this.convertValues(source["messages"], MCPPromptMessage);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -8299,16 +8299,16 @@ export namespace spec {
 	}
 	export class MCPGetPromptResponse {
 	    Body?: MCPGetPromptResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPGetPromptResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], MCPGetPromptResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -8327,20 +8327,20 @@ export namespace spec {
 		    return a;
 		}
 	}
-
-
-
-
-
-
-
+	
+	
+	
+	
+	
+	
+	
 	export class MCPReadResourceRequestBody {
 	    uri: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPReadResourceRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.uri = source["uri"];
@@ -8350,18 +8350,18 @@ export namespace spec {
 	    BundleID: string;
 	    ServerID: string;
 	    Body?: MCPReadResourceRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPReadResourceRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	        this.Body = this.convertValues(source["Body"], MCPReadResourceRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -8380,17 +8380,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class MCPReadResourceResponseBody {
 	    bundleID: string;
 	    serverID: string;
 	    uri: string;
 	    contents?: MCPContent[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPReadResourceResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.bundleID = source["bundleID"];
@@ -8398,7 +8398,7 @@ export namespace spec {
 	        this.uri = source["uri"];
 	        this.contents = this.convertValues(source["contents"], MCPContent);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -8419,16 +8419,16 @@ export namespace spec {
 	}
 	export class MCPReadResourceResponse {
 	    Body?: MCPReadResourceResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPReadResourceResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], MCPReadResourceResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -8447,27 +8447,27 @@ export namespace spec {
 		    return a;
 		}
 	}
-
-
-
-
-
-
-
-
-
-
-
-
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	export class MCPServerSetupInputValue {
 	    value?: string;
 	    clientID?: string;
 	    clientSecret?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MCPServerSetupInputValue(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.value = source["value"];
@@ -8475,35 +8475,35 @@ export namespace spec {
 	        this.clientSecret = source["clientSecret"];
 	    }
 	}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	export class PatchAssistantPresetBundleRequestBody {
 	    isEnabled: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchAssistantPresetBundleRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.isEnabled = source["isEnabled"];
@@ -8512,17 +8512,17 @@ export namespace spec {
 	export class PatchAssistantPresetBundleRequest {
 	    BundleID: string;
 	    Body?: PatchAssistantPresetBundleRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchAssistantPresetBundleRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	        this.Body = this.convertValues(source["Body"], PatchAssistantPresetBundleRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -8541,26 +8541,26 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PatchAssistantPresetBundleResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchAssistantPresetBundleResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PatchAssistantPresetRequestBody {
 	    isEnabled: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchAssistantPresetRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.isEnabled = source["isEnabled"];
@@ -8571,11 +8571,11 @@ export namespace spec {
 	    AssistantPresetSlug: string;
 	    Version: string;
 	    Body?: PatchAssistantPresetRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchAssistantPresetRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -8583,7 +8583,7 @@ export namespace spec {
 	        this.Version = source["Version"];
 	        this.Body = this.convertValues(source["Body"], PatchAssistantPresetRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -8602,26 +8602,26 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PatchAssistantPresetResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchAssistantPresetResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PatchDefaultProviderRequestBody {
 	    defaultProvider: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchDefaultProviderRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.defaultProvider = source["defaultProvider"];
@@ -8629,16 +8629,16 @@ export namespace spec {
 	}
 	export class PatchDefaultProviderRequest {
 	    Body?: PatchDefaultProviderRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchDefaultProviderRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], PatchDefaultProviderRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -8657,26 +8657,26 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PatchDefaultProviderResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchDefaultProviderResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PatchMCPBundleRequestBody {
 	    isEnabled: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchMCPBundleRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.isEnabled = source["isEnabled"];
@@ -8685,17 +8685,17 @@ export namespace spec {
 	export class PatchMCPBundleRequest {
 	    BundleID: string;
 	    Body?: PatchMCPBundleRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchMCPBundleRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	        this.Body = this.convertValues(source["Body"], PatchMCPBundleRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -8714,26 +8714,26 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PatchMCPBundleResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchMCPBundleResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PatchMCPServerEnabledRequestBody {
 	    enabled: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchMCPServerEnabledRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.enabled = source["enabled"];
@@ -8743,18 +8743,18 @@ export namespace spec {
 	    BundleID: string;
 	    ServerID: string;
 	    Body?: PatchMCPServerEnabledRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchMCPServerEnabledRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	        this.Body = this.convertValues(source["Body"], PatchMCPServerEnabledRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -8773,35 +8773,35 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PatchMCPServerEnabledResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchMCPServerEnabledResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PatchMCPServerPolicyPayload {
 	    defaultPolicy?: MCPServerPolicy;
 	    toolPolicies?: Record<string, MCPToolPolicyOverride>;
 	    appsPolicy?: MCPAppsPolicy;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchMCPServerPolicyPayload(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.defaultPolicy = this.convertValues(source["defaultPolicy"], MCPServerPolicy);
 	        this.toolPolicies = this.convertValues(source["toolPolicies"], MCPToolPolicyOverride, true);
 	        this.appsPolicy = this.convertValues(source["appsPolicy"], MCPAppsPolicy);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -8824,18 +8824,18 @@ export namespace spec {
 	    BundleID: string;
 	    ServerID: string;
 	    Body?: PatchMCPServerPolicyPayload;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchMCPServerPolicyRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	        this.Body = this.convertValues(source["Body"], PatchMCPServerPolicyPayload);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -8855,31 +8855,31 @@ export namespace spec {
 		}
 	}
 	export class PatchMCPServerPolicyResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchMCPServerPolicyResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PatchMCPServerSetupRequestBody {
 	    reset?: boolean;
 	    inputValues?: Record<string, MCPServerSetupInputValue>;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchMCPServerSetupRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.reset = source["reset"];
 	        this.inputValues = this.convertValues(source["inputValues"], MCPServerSetupInputValue, true);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -8902,18 +8902,18 @@ export namespace spec {
 	    BundleID: string;
 	    ServerID: string;
 	    Body?: PatchMCPServerSetupRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchMCPServerSetupRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	        this.Body = this.convertValues(source["Body"], PatchMCPServerSetupRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -8932,19 +8932,19 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PatchMCPServerSetupResponse {
 	    Body?: MCPServerConfig;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchMCPServerSetupResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], MCPServerConfig);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -8965,11 +8965,11 @@ export namespace spec {
 	}
 	export class PatchMCPSettingsRequestBody {
 	    oauthLoopbackListenAddr?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchMCPSettingsRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.oauthLoopbackListenAddr = source["oauthLoopbackListenAddr"];
@@ -8977,16 +8977,16 @@ export namespace spec {
 	}
 	export class PatchMCPSettingsRequest {
 	    Body?: PatchMCPSettingsRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchMCPSettingsRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], PatchMCPSettingsRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -9005,19 +9005,19 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PatchMCPSettingsResponse {
 	    Body?: MCPSettingsView;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchMCPSettingsResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], MCPSettingsView);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -9053,11 +9053,11 @@ export namespace spec {
 	    slug?: string;
 	    displayName?: string;
 	    isEnabled?: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchModelPresetRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.stream = source["stream"];
@@ -9077,7 +9077,7 @@ export namespace spec {
 	        this.displayName = source["displayName"];
 	        this.isEnabled = source["isEnabled"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -9100,18 +9100,18 @@ export namespace spec {
 	    ProviderName: string;
 	    ModelPresetID: string;
 	    Body?: PatchModelPresetRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchModelPresetRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ProviderName = source["ProviderName"];
 	        this.ModelPresetID = source["ModelPresetID"];
 	        this.Body = this.convertValues(source["Body"], PatchModelPresetRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -9130,26 +9130,26 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PatchModelPresetResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchModelPresetResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PatchPromptBundleRequestBody {
 	    isEnabled: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchPromptBundleRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.isEnabled = source["isEnabled"];
@@ -9158,17 +9158,17 @@ export namespace spec {
 	export class PatchPromptBundleRequest {
 	    BundleID: string;
 	    Body?: PatchPromptBundleRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchPromptBundleRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	        this.Body = this.convertValues(source["Body"], PatchPromptBundleRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -9187,26 +9187,26 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PatchPromptBundleResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchPromptBundleResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PatchPromptTemplateRequestBody {
 	    isEnabled: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchPromptTemplateRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.isEnabled = source["isEnabled"];
@@ -9217,11 +9217,11 @@ export namespace spec {
 	    TemplateSlug: string;
 	    Version: string;
 	    Body?: PatchPromptTemplateRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchPromptTemplateRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -9229,7 +9229,7 @@ export namespace spec {
 	        this.Version = source["Version"];
 	        this.Body = this.convertValues(source["Body"], PatchPromptTemplateRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -9248,17 +9248,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PatchPromptTemplateResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchPromptTemplateResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PatchProviderPresetRequestBody {
@@ -9271,11 +9271,11 @@ export namespace spec {
 	    defaultHeaders?: Record<string, string>;
 	    defaultModelPresetID?: string;
 	    capabilitiesOverride?: capabilityoverride.ModelCapabilitiesOverride;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchProviderPresetRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.displayName = source["displayName"];
@@ -9288,7 +9288,7 @@ export namespace spec {
 	        this.defaultModelPresetID = source["defaultModelPresetID"];
 	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], capabilityoverride.ModelCapabilitiesOverride);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -9310,17 +9310,17 @@ export namespace spec {
 	export class PatchProviderPresetRequest {
 	    ProviderName: string;
 	    Body?: PatchProviderPresetRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchProviderPresetRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ProviderName = source["ProviderName"];
 	        this.Body = this.convertValues(source["Body"], PatchProviderPresetRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -9339,26 +9339,26 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PatchProviderPresetResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchProviderPresetResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PatchSkillBundleRequestBody {
 	    isEnabled: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchSkillBundleRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.isEnabled = source["isEnabled"];
@@ -9367,17 +9367,17 @@ export namespace spec {
 	export class PatchSkillBundleRequest {
 	    BundleID: string;
 	    Body?: PatchSkillBundleRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchSkillBundleRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	        this.Body = this.convertValues(source["Body"], PatchSkillBundleRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -9396,17 +9396,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PatchSkillBundleResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchSkillBundleResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PatchSkillRequestBody {
@@ -9415,11 +9415,11 @@ export namespace spec {
 	    displayName?: string;
 	    description?: string;
 	    tags?: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchSkillRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.isEnabled = source["isEnabled"];
@@ -9433,18 +9433,18 @@ export namespace spec {
 	    BundleID: string;
 	    SkillSlug: string;
 	    Body?: PatchSkillRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchSkillRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	        this.SkillSlug = source["SkillSlug"];
 	        this.Body = this.convertValues(source["Body"], PatchSkillRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -9463,26 +9463,26 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PatchSkillResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchSkillResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PatchToolBundleRequestBody {
 	    isEnabled: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchToolBundleRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.isEnabled = source["isEnabled"];
@@ -9491,17 +9491,17 @@ export namespace spec {
 	export class PatchToolBundleRequest {
 	    BundleID: string;
 	    Body?: PatchToolBundleRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchToolBundleRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	        this.Body = this.convertValues(source["Body"], PatchToolBundleRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -9520,26 +9520,26 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PatchToolBundleResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchToolBundleResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PatchToolRequestBody {
 	    isEnabled: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchToolRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.isEnabled = source["isEnabled"];
@@ -9550,11 +9550,11 @@ export namespace spec {
 	    ToolSlug: string;
 	    Version: string;
 	    Body?: PatchToolRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchToolRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -9562,7 +9562,7 @@ export namespace spec {
 	        this.Version = source["Version"];
 	        this.Body = this.convertValues(source["Body"], PatchToolRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -9581,17 +9581,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PatchToolResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PatchToolResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PostModelPresetRequestBody {
@@ -9611,11 +9611,11 @@ export namespace spec {
 	    slug: string;
 	    displayName: string;
 	    isEnabled: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PostModelPresetRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.stream = source["stream"];
@@ -9635,7 +9635,7 @@ export namespace spec {
 	        this.displayName = source["displayName"];
 	        this.isEnabled = source["isEnabled"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -9658,18 +9658,18 @@ export namespace spec {
 	    ProviderName: string;
 	    ModelPresetID: string;
 	    Body?: PostModelPresetRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PostModelPresetRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ProviderName = source["ProviderName"];
 	        this.ModelPresetID = source["ModelPresetID"];
 	        this.Body = this.convertValues(source["Body"], PostModelPresetRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -9688,17 +9688,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PostModelPresetResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PostModelPresetResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PostProviderPresetRequestBody {
@@ -9710,11 +9710,11 @@ export namespace spec {
 	    apiKeyHeaderKey?: string;
 	    defaultHeaders?: Record<string, string>;
 	    capabilitiesOverride?: capabilityoverride.ModelCapabilitiesOverride;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PostProviderPresetRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.displayName = source["displayName"];
@@ -9726,7 +9726,7 @@ export namespace spec {
 	        this.defaultHeaders = source["defaultHeaders"];
 	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], capabilityoverride.ModelCapabilitiesOverride);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -9748,17 +9748,17 @@ export namespace spec {
 	export class PostProviderPresetRequest {
 	    ProviderName: string;
 	    Body?: PostProviderPresetRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PostProviderPresetRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ProviderName = source["ProviderName"];
 	        this.Body = this.convertValues(source["Body"], PostProviderPresetRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -9777,35 +9777,35 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PostProviderPresetResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PostProviderPresetResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
-
-
-
-
-
-
+	
+	
+	
+	
+	
+	
 	export class PutAssistantPresetBundleRequestBody {
 	    slug: string;
 	    displayName: string;
 	    description?: string;
 	    isEnabled: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutAssistantPresetBundleRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.slug = source["slug"];
@@ -9817,17 +9817,17 @@ export namespace spec {
 	export class PutAssistantPresetBundleRequest {
 	    BundleID: string;
 	    Body?: PutAssistantPresetBundleRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutAssistantPresetBundleRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	        this.Body = this.convertValues(source["Body"], PutAssistantPresetBundleRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -9846,17 +9846,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PutAssistantPresetBundleResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PutAssistantPresetBundleResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PutAssistantPresetRequestBody {
@@ -9871,11 +9871,11 @@ export namespace spec {
 	    startingToolSelections?: ToolSelection[];
 	    startingSkillSelections?: SkillSelection[];
 	    startingMCPContext?: MCPConversationContext;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutAssistantPresetRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.displayName = source["displayName"];
@@ -9890,7 +9890,7 @@ export namespace spec {
 	        this.startingSkillSelections = this.convertValues(source["startingSkillSelections"], SkillSelection);
 	        this.startingMCPContext = this.convertValues(source["startingMCPContext"], MCPConversationContext);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -9914,11 +9914,11 @@ export namespace spec {
 	    AssistantPresetSlug: string;
 	    Version: string;
 	    Body?: PutAssistantPresetRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutAssistantPresetRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -9926,7 +9926,7 @@ export namespace spec {
 	        this.Version = source["Version"];
 	        this.Body = this.convertValues(source["Body"], PutAssistantPresetRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -9945,17 +9945,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PutAssistantPresetResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PutAssistantPresetResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PutConversationRequestBody {
@@ -9966,11 +9966,11 @@ export namespace spec {
 	    modifiedAt: any;
 	    messages: ConversationMessage[];
 	    meta?: Record<string, any>;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutConversationRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.title = source["title"];
@@ -9979,7 +9979,7 @@ export namespace spec {
 	        this.messages = this.convertValues(source["messages"], ConversationMessage);
 	        this.meta = source["meta"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -10001,17 +10001,17 @@ export namespace spec {
 	export class PutConversationRequest {
 	    ID: string;
 	    Body?: PutConversationRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutConversationRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ID = source["ID"];
 	        this.Body = this.convertValues(source["Body"], PutConversationRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -10030,17 +10030,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PutConversationResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PutConversationResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PutMCPBundleRequestBody {
@@ -10048,11 +10048,11 @@ export namespace spec {
 	    displayName: string;
 	    isEnabled: boolean;
 	    description?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutMCPBundleRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.slug = source["slug"];
@@ -10064,17 +10064,17 @@ export namespace spec {
 	export class PutMCPBundleRequest {
 	    BundleID: string;
 	    Body?: PutMCPBundleRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutMCPBundleRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	        this.Body = this.convertValues(source["Body"], PutMCPBundleRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -10093,17 +10093,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PutMCPBundleResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PutMCPBundleResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PutMCPServerPayload {
@@ -10117,11 +10117,11 @@ export namespace spec {
 	    toolPolicies?: Record<string, MCPToolPolicyOverride>;
 	    appsPolicy?: MCPAppsPolicy;
 	    setup?: MCPServerSetup;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutMCPServerPayload(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.displayName = source["displayName"];
@@ -10135,7 +10135,7 @@ export namespace spec {
 	        this.appsPolicy = this.convertValues(source["appsPolicy"], MCPAppsPolicy);
 	        this.setup = this.convertValues(source["setup"], MCPServerSetup);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -10158,18 +10158,18 @@ export namespace spec {
 	    BundleID: string;
 	    ServerID: string;
 	    Body?: PutMCPServerPayload;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutMCPServerRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	        this.Body = this.convertValues(source["Body"], PutMCPServerPayload);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -10189,26 +10189,26 @@ export namespace spec {
 		}
 	}
 	export class PutMCPServerResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PutMCPServerResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PutMCPServerSecretRequestBody {
 	    kind: string;
 	    slot: string;
 	    secret: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutMCPServerSecretRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.kind = source["kind"];
@@ -10220,18 +10220,18 @@ export namespace spec {
 	    BundleID: string;
 	    ServerID: string;
 	    Body?: PutMCPServerSecretRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutMCPServerSecretRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	        this.ServerID = source["ServerID"];
 	        this.Body = this.convertValues(source["Body"], PutMCPServerSecretRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -10250,16 +10250,16 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PutMCPServerSecretResponseBody {
 	    secretRef: string;
 	    sha256?: string;
 	    nonEmpty: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutMCPServerSecretResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.secretRef = source["secretRef"];
@@ -10269,16 +10269,16 @@ export namespace spec {
 	}
 	export class PutMCPServerSecretResponse {
 	    Body?: PutMCPServerSecretResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutMCPServerSecretResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], PutMCPServerSecretResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -10297,21 +10297,21 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PutMessagesToConversationRequestBody {
 	    title: string;
 	    messages: ConversationMessage[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutMessagesToConversationRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.title = source["title"];
 	        this.messages = this.convertValues(source["messages"], ConversationMessage);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -10333,17 +10333,17 @@ export namespace spec {
 	export class PutMessagesToConversationRequest {
 	    ID: string;
 	    Body?: PutMessagesToConversationRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutMessagesToConversationRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ID = source["ID"];
 	        this.Body = this.convertValues(source["Body"], PutMessagesToConversationRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -10362,17 +10362,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PutMessagesToConversationResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PutMessagesToConversationResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PutPromptBundleRequestBody {
@@ -10380,11 +10380,11 @@ export namespace spec {
 	    displayName: string;
 	    isEnabled: boolean;
 	    description?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutPromptBundleRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.slug = source["slug"];
@@ -10396,17 +10396,17 @@ export namespace spec {
 	export class PutPromptBundleRequest {
 	    BundleID: string;
 	    Body?: PutPromptBundleRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutPromptBundleRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	        this.Body = this.convertValues(source["Body"], PutPromptBundleRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -10425,17 +10425,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PutPromptBundleResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PutPromptBundleResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PutPromptTemplateRequestBody {
@@ -10447,11 +10447,11 @@ export namespace spec {
 	    tags?: string[];
 	    variables?: PromptVariable[];
 	    isResolved: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutPromptTemplateRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.kind = source["kind"];
@@ -10463,7 +10463,7 @@ export namespace spec {
 	        this.variables = this.convertValues(source["variables"], PromptVariable);
 	        this.isResolved = source["isResolved"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -10487,11 +10487,11 @@ export namespace spec {
 	    TemplateSlug: string;
 	    Version: string;
 	    Body?: PutPromptTemplateRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutPromptTemplateRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -10499,7 +10499,7 @@ export namespace spec {
 	        this.Version = source["Version"];
 	        this.Body = this.convertValues(source["Body"], PutPromptTemplateRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -10518,17 +10518,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PutPromptTemplateResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PutPromptTemplateResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PutSkillBundleRequestBody {
@@ -10536,11 +10536,11 @@ export namespace spec {
 	    displayName: string;
 	    isEnabled: boolean;
 	    description?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutSkillBundleRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.slug = source["slug"];
@@ -10552,17 +10552,17 @@ export namespace spec {
 	export class PutSkillBundleRequest {
 	    BundleID: string;
 	    Body?: PutSkillBundleRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutSkillBundleRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	        this.Body = this.convertValues(source["Body"], PutSkillBundleRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -10581,17 +10581,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PutSkillBundleResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PutSkillBundleResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PutSkillRequestBody {
@@ -10602,11 +10602,11 @@ export namespace spec {
 	    displayName?: string;
 	    description?: string;
 	    tags?: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutSkillRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.skillType = source["skillType"];
@@ -10622,18 +10622,18 @@ export namespace spec {
 	    BundleID: string;
 	    SkillSlug: string;
 	    Body?: PutSkillRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutSkillRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	        this.SkillSlug = source["SkillSlug"];
 	        this.Body = this.convertValues(source["Body"], PutSkillRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -10652,17 +10652,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PutSkillResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PutSkillResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PutToolBundleRequestBody {
@@ -10670,11 +10670,11 @@ export namespace spec {
 	    displayName: string;
 	    isEnabled: boolean;
 	    description?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutToolBundleRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.slug = source["slug"];
@@ -10686,17 +10686,17 @@ export namespace spec {
 	export class PutToolBundleRequest {
 	    BundleID: string;
 	    Body?: PutToolBundleRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutToolBundleRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
 	        this.Body = this.convertValues(source["Body"], PutToolBundleRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -10715,17 +10715,17 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PutToolBundleResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PutToolBundleResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class PutToolRequestBody {
@@ -10739,11 +10739,11 @@ export namespace spec {
 	    argSchema: string;
 	    type: string;
 	    httpImpl?: HTTPToolImpl;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutToolRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.displayName = source["displayName"];
@@ -10757,7 +10757,7 @@ export namespace spec {
 	        this.type = source["type"];
 	        this.httpImpl = this.convertValues(source["httpImpl"], HTTPToolImpl);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -10781,11 +10781,11 @@ export namespace spec {
 	    ToolSlug: string;
 	    Version: string;
 	    Body?: PutToolRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PutToolRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -10793,7 +10793,7 @@ export namespace spec {
 	        this.Version = source["Version"];
 	        this.Body = this.convertValues(source["Body"], PutToolRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -10812,29 +10812,29 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class PutToolResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new PutToolResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
-
-
+	
+	
 	export class RefreshMCPServerRequest {
 	    BundleID: string;
 	    ServerID: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new RefreshMCPServerRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleID = source["BundleID"];
@@ -10843,16 +10843,16 @@ export namespace spec {
 	}
 	export class RefreshMCPServerResponse {
 	    Body?: MCPServerRuntimeSnapshot;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new RefreshMCPServerResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], MCPServerRuntimeSnapshot);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -10874,11 +10874,11 @@ export namespace spec {
 	export class ResolveMCPApprovalRequestBody {
 	    approvalID: string;
 	    resolution: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ResolveMCPApprovalRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.approvalID = source["approvalID"];
@@ -10887,16 +10887,16 @@ export namespace spec {
 	}
 	export class ResolveMCPApprovalRequest {
 	    Body?: ResolveMCPApprovalRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ResolveMCPApprovalRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], ResolveMCPApprovalRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -10915,19 +10915,19 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class ResolveMCPApprovalResponse {
 	    Body?: MCPApprovalToken;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ResolveMCPApprovalResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], MCPApprovalToken);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -10946,18 +10946,18 @@ export namespace spec {
 		    return a;
 		}
 	}
-
-
-
+	
+	
+	
 	export class SearchConversationsRequest {
 	    Query: string;
 	    PageToken: string;
 	    PageSize: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SearchConversationsRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Query = source["Query"];
@@ -10968,17 +10968,17 @@ export namespace spec {
 	export class SearchConversationsResponseBody {
 	    conversationListItems: ConversationListItem[];
 	    nextPageToken?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SearchConversationsResponseBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.conversationListItems = this.convertValues(source["conversationListItems"], ConversationListItem);
 	        this.nextPageToken = source["nextPageToken"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -10999,16 +10999,16 @@ export namespace spec {
 	}
 	export class SearchConversationsResponse {
 	    Body?: SearchConversationsResponseBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SearchConversationsResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], SearchConversationsResponseBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -11027,15 +11027,15 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class SetAppThemeRequestBody {
 	    type: string;
 	    name: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SetAppThemeRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.type = source["type"];
@@ -11044,16 +11044,16 @@ export namespace spec {
 	}
 	export class SetAppThemeRequest {
 	    Body?: SetAppThemeRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SetAppThemeRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], SetAppThemeRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -11072,26 +11072,26 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class SetAppThemeResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new SetAppThemeResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class SetAuthKeyRequestBody {
 	    secret: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SetAuthKeyRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.secret = source["secret"];
@@ -11101,18 +11101,18 @@ export namespace spec {
 	    Type: string;
 	    KeyName: string;
 	    Body?: SetAuthKeyRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SetAuthKeyRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Type = source["Type"];
 	        this.KeyName = source["KeyName"];
 	        this.Body = this.convertValues(source["Body"], SetAuthKeyRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -11131,28 +11131,28 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class SetAuthKeyResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new SetAuthKeyResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
 	export class SetDebugSettingsRequestBody {
 	    logLLMReqResp: boolean;
 	    disableContentStripping: boolean;
 	    logLevel: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SetDebugSettingsRequestBody(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.logLLMReqResp = source["logLLMReqResp"];
@@ -11162,16 +11162,16 @@ export namespace spec {
 	}
 	export class SetDebugSettingsRequest {
 	    Body?: SetDebugSettingsRequestBody;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SetDebugSettingsRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], SetDebugSettingsRequestBody);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -11190,67 +11190,67 @@ export namespace spec {
 		    return a;
 		}
 	}
-
+	
 	export class SetDebugSettingsResponse {
-
-
+	
+	
 	    static createFrom(source: any = {}) {
 	        return new SetDebugSettingsResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-
+	
 	    }
 	}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 
 }
 
 export namespace texttool {
-
+	
 	export class ApplyUnifiedDiffFileTarget {
 	    fileKey?: string;
 	    oldPath?: string;
 	    newPath?: string;
 	    targetPath: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ApplyUnifiedDiffFileTarget(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.fileKey = source["fileKey"];
@@ -11265,11 +11265,11 @@ export namespace texttool {
 	    strict?: boolean;
 	    fileTargets?: ApplyUnifiedDiffFileTarget[];
 	    candidatePaths?: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ApplyUnifiedDiffArgs(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.diffText = source["diffText"];
@@ -11278,7 +11278,7 @@ export namespace texttool {
 	        this.fileTargets = this.convertValues(source["fileTargets"], ApplyUnifiedDiffFileTarget);
 	        this.candidatePaths = source["candidatePaths"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -11301,11 +11301,11 @@ export namespace texttool {
 	    level: string;
 	    code?: string;
 	    message: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ApplyUnifiedDiffDiagnostic(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.level = source["level"];
@@ -11329,11 +11329,11 @@ export namespace texttool {
 	    alreadyAppliedHunks: number;
 	    addedLines: number;
 	    deletedLines: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ApplyUnifiedDiffFileOut(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ok = source["ok"];
@@ -11352,7 +11352,7 @@ export namespace texttool {
 	        this.addedLines = source["addedLines"];
 	        this.deletedLines = source["deletedLines"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -11371,7 +11371,7 @@ export namespace texttool {
 		    return a;
 		}
 	}
-
+	
 	export class ApplyUnifiedDiffSummary {
 	    files: number;
 	    hunks: number;
@@ -11379,11 +11379,11 @@ export namespace texttool {
 	    alreadyAppliedHunks: number;
 	    addedLines: number;
 	    deletedLines: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ApplyUnifiedDiffSummary(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.files = source["files"];
@@ -11403,11 +11403,11 @@ export namespace texttool {
 	    summary: ApplyUnifiedDiffSummary;
 	    fileTargets?: ApplyUnifiedDiffFileTarget[];
 	    files?: ApplyUnifiedDiffFileOut[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ApplyUnifiedDiffOut(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ok = source["ok"];
@@ -11419,7 +11419,7 @@ export namespace texttool {
 	        this.fileTargets = this.convertValues(source["fileTargets"], ApplyUnifiedDiffFileTarget);
 	        this.files = this.convertValues(source["files"], ApplyUnifiedDiffFileOut);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;

@@ -5,8 +5,6 @@ import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiHelpCircle, FiRefreshCw, FiUpload, FiX } from 'react-icons/fi';
 
-import { useMenuStore } from '@ariakit/react';
-
 import type { AssistantPreset, AssistantPresetStartingModelPresetPatch } from '@/spec/assistantpreset';
 import type { JSONSchemaParam, OutputFormat, OutputParam } from '@/spec/inference';
 import { OutputFormatKind, ReasoningLevel, ReasoningType } from '@/spec/inference';
@@ -25,6 +23,7 @@ import { DEFAULT_SEMVER, isSemverVersion, suggestNextMinorVersion } from '@/lib/
 import { Dropdown } from '@/components/dropdown';
 import { ModalBackdrop } from '@/components/modal_backdrop';
 
+import { MCPSelectionSection } from '@/assistantpresets/components/mcp_selection_section';
 import { AssistantPresetModelPatchEditor } from '@/assistantpresets/components/model_patch_editor';
 import { OrderedRefSelectionSection } from '@/assistantpresets/components/ordered_ref_selection_section';
 import { SkillSelectionSection } from '@/assistantpresets/components/skill_selection_section';
@@ -56,7 +55,6 @@ import {
 	hasAssistantPresetModelPatch,
 } from '@/assistantpresets/lib/assistant_preset_utils';
 import { normalizeAssistantPresetMCPContext } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
-import { MCPBottomBarChip } from '@/chats/composer/mcp/mcp_bottom_bar_chip';
 import { useComposerMCP } from '@/chats/composer/mcp/use_composer_mcp';
 import { buildEffectiveModelParamFromModelPreset } from '@/modelpresets/lib/modelpreset_effective_defaults';
 import { buildPromptTemplateRefKey } from '@/prompts/lib/prompt_template_ref';
@@ -629,7 +627,6 @@ function AddEditAssistantPresetModalContent({
 	const [nextSkillKey, setNextSkillKey] = useState('');
 	const [prefillMode, setPrefillMode] = useState(false);
 	const [selectedPrefillKey, setSelectedPrefillKey] = useState<string | null>(null);
-	const mcpMenu = useMenuStore({ placement: 'bottom-start', focusLoop: true });
 	const mcpState = useComposerMCP();
 	const restoredInitialMCPContextRef = useRef(false);
 
@@ -2000,25 +1997,7 @@ function AddEditAssistantPresetModalContent({
 							next chat turn.
 						</p>
 
-						{!isViewMode && (
-							<div className="flex flex-wrap items-center gap-2">
-								<MCPBottomBarChip store={mcpMenu} shortcut="" state={mcpState} isInputLocked={false} />
-								{mcpState.loading ? (
-									<span className="text-base-content/70 text-xs">Loading MCP servers…</span>
-								) : mcpState.error ? (
-									<span className="text-error text-xs">{mcpState.error}</span>
-								) : mcpState.selectedServerCount > 0 ? (
-									<span className="text-base-content/70 text-xs">
-										{mcpState.selectedServerCount} server{mcpState.selectedServerCount === 1 ? '' : 's'},
-										{` ${mcpState.selectedToolCount} tool${mcpState.selectedToolCount === 1 ? '' : 's'}`},
-										{` ${mcpState.selectedResourceCount} resource${mcpState.selectedResourceCount === 1 ? '' : 's'}`},
-										{` ${mcpState.selectedPromptCount} prompt${mcpState.selectedPromptCount === 1 ? '' : 's'}`}
-									</span>
-								) : (
-									<span className="text-base-content/70 text-xs">No MCP context configured.</span>
-								)}
-							</div>
-						)}
+						{!isViewMode && <MCPSelectionSection mcpState={mcpState} />}
 
 						{mcpState.requiredArgumentMissingCount > 0 && !isViewMode ? (
 							<div className="text-warning flex items-center gap-1 text-sm">
@@ -2027,19 +2006,21 @@ function AddEditAssistantPresetModalContent({
 							</div>
 						) : null}
 
-						<div className="space-y-3">
-							{mcpDisplayItems.map(item => (
-								<div key={item.key} className="border-base-content/10 rounded-2xl border p-3">
-									<div className="font-medium">{item.title}</div>
-									<div className="text-base-content/70 mt-1 text-xs">{item.subtitle}</div>
-									{item.statusLabel && <div className="badge badge-warning mt-2 rounded-xl">{item.statusLabel}</div>}
-								</div>
-							))}
+						{isViewMode && (
+							<div className="space-y-3">
+								{mcpDisplayItems.map(item => (
+									<div key={item.key} className="border-base-content/10 rounded-2xl border p-3">
+										<div className="font-medium">{item.title}</div>
+										<div className="text-base-content/70 mt-1 text-xs">{item.subtitle}</div>
+										{item.statusLabel && <div className="badge badge-warning mt-2 rounded-xl">{item.statusLabel}</div>}
+									</div>
+								))}
 
-							{mcpDisplayItems.length === 0 ? (
-								<div className="text-base-content/70 text-sm">No MCP context configured.</div>
-							) : null}
-						</div>
+								{mcpDisplayItems.length === 0 ? (
+									<div className="text-base-content/70 text-sm">No MCP context configured.</div>
+								) : null}
+							</div>
+						)}
 
 						{isViewMode && initialData?.preset && (
 							<>
