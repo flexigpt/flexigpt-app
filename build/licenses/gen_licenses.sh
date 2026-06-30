@@ -18,8 +18,6 @@ Generates:
 
 Environment:
   Uses build/buildvars.env for LICENSE_* vars and INSTALL_TOOL_GO_LICENSES etc.
-  Optional:
-    GEN_LICENSES_FORCE_WRITE=true  (fallback if JS license file isn't created)
 EOF
 }
 
@@ -71,20 +69,8 @@ if ! command -v pnpm >/dev/null 2>&1; then
   die "pnpm not found on PATH"
 fi
 
-# Run frontend generator (does not write dist/ by default because of vite config)
-#
-# React Router's Vite plugin reads frontend/dist/client/.vite/manifest.json
-# while building the SSR/prerender environment. With build.write=false, that
-# manifest is never created and React Router fails with ENOENT. Force writing
-# for license builds; the real Wails build cleans frontend/dist before use.
-export GEN_LICENSES_FORCE_WRITE="${GEN_LICENSES_FORCE_WRITE:-true}"
+# Run frontend generator
 pnpm -C "${ROOT_DIR}/frontend" run licenses:gen
-
-if [[ ! -s "${JS_OUT}" ]]; then
-  echo "WARN: JS license file not created. Retrying with GEN_LICENSES_FORCE_WRITE=true ..."
-  export GEN_LICENSES_FORCE_WRITE="true"
-  pnpm -C "${ROOT_DIR}/frontend" run licenses:gen
-fi
 [[ -s "${JS_OUT}" ]] || die "JS licenses output missing/empty at: ${JS_OUT}"
 
 echo "==> Generating Go dependency licenses..."
@@ -133,3 +119,5 @@ echo "==> Writing combined THIRD_PARTY_NOTICES..."
 
 echo "==> Done. Outputs:"
 ls -la "${OUT_DIR}"
+echo "==> Cleaning Licenses Output Dist"
+pnpm -C "${ROOT_DIR}/frontend" run clean

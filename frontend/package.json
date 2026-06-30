@@ -20,10 +20,10 @@
 		"clean": "rimraf ./dist",
 		"run:wailsdev": "cp .env.dev .env && cross-env VITE_PLATFORM=wails react-router dev",
 		"build:pre": "node -e \"const fs=require('fs'); if(fs.existsSync('.env.prod')) fs.copyFileSync('.env.prod','.env');\" && pnpm run typecheck",
-		"build:wails": "rimraf ./dist && pnpm run build:pre && cross-env VITE_PLATFORM=wails react-router build",
+		"build:wails": "echo 'Starting rimraf for building.' && rimraf ./dist && echo 'Done rimraf for building.' && pnpm run build:pre && cross-env VITE_PLATFORM=wails react-router build",
 		"test": "vitest run",
 		"coverage": "vitest run --coverage",
-		"licenses:gen": "pnpm run build:pre && cross-env GEN_LICENSES=true GEN_LICENSES_FORCE_WRITE=true VITE_PLATFORM=wails vite build --mode production"
+		"licenses:gen": "pnpm run build:pre && echo 'Done build pre for licenses building.' && cross-env GEN_LICENSES=true VITE_PLATFORM=wails react-router build --mode production && echo 'Done licenses building.'"
 	},
 	"keywords": [],
 	"author": "ppipada",
