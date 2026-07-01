@@ -20,7 +20,20 @@
 		"requireApprovalForDestructive": true
 	},
 	"setup": {
-		"note": "Official remote Box MCP server. Reference: https://developer.box.com/guides/box-mcp/remote/"
+		"note": "Official Box-hosted remote MCP server. Box requires an admin to enable/configure the Box MCP Server in the Box Admin Console and create Integration Credentials. Add FlexiGPT's OAuth redirect URL to the Box integration, then enter the Box Client ID and Client Secret here. Box docs list authorization URL https://account.box.com/api/oauth2/authorize, token URL https://api.box.com/oauth2/token, and scopes such as root_readwrite, ai.readwrite, and docgen.readwrite. References: https://developer.box.com/guides/box-mcp and https://developer.box.com/guides/box-mcp/setup",
+		"inputs": [
+			{
+				"id": "boxOAuthClient",
+				"kind": "oauthClientCredentials",
+				"label": "Box OAuth Client",
+				"description": "Client ID and Client Secret from Box Admin Console Integration Credentials.",
+				"note": "Store these after registering FlexiGPT's OAuth redirect URL in Box.",
+				"required": true,
+				"oauthClientCredentials": {
+					"clientSecretRequired": true
+				}
+			}
+		]
 	},
 	"createdAt": "2026-05-30T00:00:00Z",
 	"modifiedAt": "2026-05-30T00:00:00Z"

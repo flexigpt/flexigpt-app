@@ -20,7 +20,28 @@
 		"requireApprovalForDestructive": true
 	},
 	"setup": {
-		"note": "Tenant-scoped Microsoft-hosted remote MCP server for Teams. Replace {tenant_id} with your Microsoft Entra tenant ID. References: https://github.com/microsoft/mcp/blob/main/README.md and https://learn.microsoft.com/en-us/microsoftteams/platform/m365-apps/agent-connectors"
+		"note": "Microsoft Work IQ Teams remote MCP server, currently preview. Requires Microsoft 365 Copilot licensing, tenant admin enablement/consent, a Microsoft Entra tenant ID, and an Entra app/client allowed to request the Work IQ Teams MCP permission. Enter the full tenant-scoped URL after replacing {tenantId}. The Entra OAuth client can usually be public PKCE, so a client secret is optional unless your tenant/app registration requires it. References: https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-teams-work-iq and https://learn.microsoft.com/en-us/microsoft-agent-365/tooling-servers-overview",
+		"inputs": [
+			{
+				"id": "microsoftTeamsUrl",
+				"kind": "streamableHttpUrl",
+				"label": "Microsoft Teams MCP URL",
+				"description": "Full tenant-scoped URL, for example https://agent365.svc.cloud.microsoft/agents/tenants/<tenantId>/servers/mcp_TeamsServer",
+				"required": true,
+				"streamableHttpUrl": {}
+			},
+			{
+				"id": "microsoftEntraOAuthClient",
+				"kind": "oauthClientCredentials",
+				"label": "Microsoft Entra OAuth Client",
+				"description": "Client ID, and optionally client secret, for the Microsoft Entra app registration.",
+				"note": "Use the FlexiGPT OAuth redirect URL in the Entra app registration. Client secret is optional for public PKCE clients.",
+				"required": true,
+				"oauthClientCredentials": {
+					"clientSecretRequired": false
+				}
+			}
+		]
 	},
 	"createdAt": "2026-05-30T00:00:00Z",
 	"modifiedAt": "2026-05-30T00:00:00Z"

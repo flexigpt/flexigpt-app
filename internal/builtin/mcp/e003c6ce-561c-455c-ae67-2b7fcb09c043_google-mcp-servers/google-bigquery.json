@@ -9,8 +9,7 @@
 	"streamableHttp": {
 		"url": "https://bigquery.googleapis.com/mcp",
 		"authMode": "oauth",
-		"timeoutMS": 60000,
-		"clientCredentialRef": ""
+		"timeoutMS": 60000
 	},
 	"trustLevel": "trusted",
 	"defaultPolicy": {
@@ -19,6 +18,22 @@
 		"requireApprovalForUnknownRisk": true,
 		"requireApprovalForWrite": true,
 		"requireApprovalForDestructive": true
+	},
+	"setup": {
+		"note": "Official Google Cloud BigQuery remote MCP server. Enable the BigQuery API, verify billing where required, grant MCP Tool User (roles/mcp.toolUser) and product IAM permissions, then create a Google OAuth 2.0 client in Google Auth Platform. Register FlexiGPT's OAuth redirect URL exactly. If FlexiGPT uses a random loopback port, set a fixed OAuth loopback listen address first. Common scopes include https://www.googleapis.com/auth/bigquery or https://www.googleapis.com/auth/cloud-platform. References: https://docs.cloud.google.com/mcp/configure-mcp-ai-application and https://docs.cloud.google.com/bigquery/docs/use-bigquery-mcp",
+		"inputs": [
+			{
+				"id": "googleOAuthClient",
+				"kind": "oauthClientCredentials",
+				"label": "Google OAuth Client",
+				"description": "OAuth client ID and client secret from Google Auth Platform.",
+				"note": "Use the OAuth redirect URL shown by FlexiGPT. For loopback redirects, use a fixed callback port so the Google OAuth client can be registered exactly.",
+				"required": true,
+				"oauthClientCredentials": {
+					"clientSecretRequired": true
+				}
+			}
+		]
 	},
 	"createdAt": "2026-05-30T00:00:00Z",
 	"modifiedAt": "2026-05-30T00:00:00Z"

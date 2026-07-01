@@ -19,6 +19,22 @@
 		"requireApprovalForWrite": false,
 		"requireApprovalForDestructive": false
 	},
+	"setup": {
+		"note": "Official Exa-hosted remote MCP server. No API key is required for the free/default search tools. Add an Exa API key for higher limits or usage-based Agent tools. Exa recommends the x-api-key header rather than query-string secrets. Optional tools can be enabled with the tools query parameter, for example ?tools=web_search_exa,web_fetch_exa,agent_tools. Reference: https://exa.ai/docs/reference/exa-mcp",
+		"inputs": [
+			{
+				"id": "exaApiKey",
+				"kind": "httpHeader",
+				"label": "Exa API Key",
+				"description": "Optional Exa API key for higher limits or Agent tools.",
+				"required": false,
+				"httpHeader": {
+					"headerName": "x-api-key",
+					"secret": true
+				}
+			}
+		]
+	},
 	"createdAt": "2026-05-30T00:00:00Z",
 	"modifiedAt": "2026-05-30T00:00:00Z"
 }

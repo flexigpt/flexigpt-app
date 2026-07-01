@@ -14,10 +14,13 @@
 	"trustLevel": "trusted",
 	"defaultPolicy": {
 		"defaultApprovalRule": "allow",
-		"defaultExecutionMode": "auto",
+		"defaultExecutionMode": "manual",
 		"requireApprovalForUnknownRisk": true,
-		"requireApprovalForWrite": false,
+		"requireApprovalForWrite": true,
 		"requireApprovalForDestructive": false
+	},
+	"setup": {
+		"note": "Official Hugging Face remote MCP server. It can search Hub resources/docs and can expose selected community tools or job-running tools depending on the user's Hugging Face MCP settings, so keep manual execution and write approval enabled. Reference: https://huggingface.co/docs/hub/agents-mcp"
 	},
 	"createdAt": "2026-05-30T00:00:00Z",
 	"modifiedAt": "2026-05-30T00:00:00Z"

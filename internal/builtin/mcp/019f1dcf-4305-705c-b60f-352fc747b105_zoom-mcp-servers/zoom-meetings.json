@@ -1,0 +1,40 @@
+{
+	"schemaVersion": "2026-05-30",
+	"bundleID": "019f1dcf-4305-705c-b60f-352fc747b105",
+	"id": "builtin.zoom-meetings",
+	"displayName": "Zoom Meetings",
+	"enabled": false,
+	"transport": "streamableHttp",
+	"isBuiltIn": true,
+	"streamableHttp": {
+		"url": "https://zoom.us/mcp/meeting/streamable",
+		"authMode": "oauth",
+		"timeoutMS": 30000
+	},
+	"trustLevel": "trusted",
+	"defaultPolicy": {
+		"defaultApprovalRule": "allow",
+		"defaultExecutionMode": "manual",
+		"requireApprovalForUnknownRisk": true,
+		"requireApprovalForWrite": true,
+		"requireApprovalForDestructive": true
+	},
+	"setup": {
+		"note": "Official Zoom MCP server endpoint pattern verified from Zoom docs. Zoom remote MCP servers require manual client registration through a Zoom Marketplace General app, OAuth scopes for the relevant product tools, and OAuth 2.1-compatible authorization code with PKCE. Zoom docs state DCR and Client ID Metadata Documents are not supported. References: https://developers.zoom.us/docs/mcp/servers/ and https://developers.zoom.us/docs/mcp/servers/connect-to-zoom-mcp-servers/",
+		"inputs": [
+			{
+				"id": "zoomOAuthClient",
+				"kind": "oauthClientCredentials",
+				"label": "Zoom OAuth Client",
+				"description": "Client ID and Client Secret from your Zoom Marketplace app.",
+				"note": "Add FlexiGPT's OAuth redirect URL to the Zoom app's OAuth redirect URL settings.",
+				"required": true,
+				"oauthClientCredentials": {
+					"clientSecretRequired": true
+				}
+			}
+		]
+	},
+	"createdAt": "2026-05-30T00:00:00Z",
+	"modifiedAt": "2026-05-30T00:00:00Z"
+}

@@ -16,8 +16,25 @@
 		"defaultApprovalRule": "allow",
 		"defaultExecutionMode": "auto",
 		"requireApprovalForUnknownRisk": true,
-		"requireApprovalForWrite": true,
-		"requireApprovalForDestructive": true
+		"requireApprovalForWrite": false,
+		"requireApprovalForDestructive": false
+	},
+	"setup": {
+		"note": "BGPT hosted remote MCP server for scientific paper search. Streamable HTTP endpoint is https://bgpt.pro/mcp/stream and SSE endpoint is https://bgpt.pro/mcp/sse. No key is required for the free tier. Paid usage can send an Authorization: Bearer token. Reference: https://bgpt.pro/mcp/",
+		"inputs": [
+			{
+				"id": "bgptApiKey",
+				"kind": "httpHeader",
+				"label": "BGPT API Key",
+				"description": "Optional paid BGPT subscription token.",
+				"required": false,
+				"httpHeader": {
+					"headerName": "Authorization",
+					"secret": true,
+					"valuePrefix": "Bearer "
+				}
+			}
+		]
 	},
 	"createdAt": "2026-05-30T00:00:00Z",
 	"modifiedAt": "2026-05-30T00:00:00Z"

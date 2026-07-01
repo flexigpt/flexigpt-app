@@ -20,7 +20,20 @@
 		"requireApprovalForDestructive": true
 	},
 	"setup": {
-		"note": "Official Slack-hosted remote MCP server. Reference: https://docs.slack.dev/ai/slack-mcp-server"
+		"note": "Official Slack-hosted remote MCP server. Slack supports Streamable HTTP at https://mcp.slack.com/mcp, does not support SSE or Dynamic Client Registration, and requires confidential OAuth with a registered Slack app. Only Marketplace-published apps or internal apps may use MCP. Register FlexiGPT's OAuth redirect URL, configure needed user scopes, then enter the Slack Client ID and Client Secret. Reference: https://docs.slack.dev/ai/slack-mcp-server",
+		"inputs": [
+			{
+				"id": "slackOAuthClient",
+				"kind": "oauthClientCredentials",
+				"label": "Slack OAuth Client",
+				"description": "Client ID and Client Secret for the Slack app allowed to use Slack MCP.",
+				"note": "Slack MCP requires confidential OAuth and does not support Dynamic Client Registration.",
+				"required": true,
+				"oauthClientCredentials": {
+					"clientSecretRequired": true
+				}
+			}
+		]
 	},
 	"createdAt": "2026-05-30T00:00:00Z",
 	"modifiedAt": "2026-05-30T00:00:00Z"

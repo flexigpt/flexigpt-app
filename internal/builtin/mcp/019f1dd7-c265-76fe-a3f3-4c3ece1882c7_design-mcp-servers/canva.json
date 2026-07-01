@@ -9,7 +9,7 @@
 	"streamableHttp": {
 		"url": "https://mcp.canva.com/mcp",
 		"authMode": "oauth",
-		"timeoutMS": 30000
+		"timeoutMS": 60000
 	},
 	"trustLevel": "trusted",
 	"defaultPolicy": {
@@ -20,7 +20,7 @@
 		"requireApprovalForDestructive": true
 	},
 	"setup": {
-		"note": "Official remote Canva MCP server. Reference: https://www.canva.dev/docs/mcp/"
+		"note": "Official Canva remote MCP server. Canva docs note that design generation can need a 60 second timeout. Canva also requires redirect URI allowlisting for new integrations and each user authenticates individually. If DCR is unavailable, Canva documents manual registration at https://mcp.canva.com/register. References: https://www.canva.dev/docs/mcp/ and https://www.canva.dev/docs/mcp/troubleshooting/"
 	},
 	"createdAt": "2026-05-30T00:00:00Z",
 	"modifiedAt": "2026-05-30T00:00:00Z"

@@ -7,6 +7,8 @@
   - [ ] test web search etc and pending user args etc after bottom bar migration.
   - [ ] test with some skill that has scripts too
 
+- [ ] if we move out of tab and in background if tool calls come, they are not loaded and auto exec and submitted.
+
 ## M-2
 
 - [ ] Provider setup polish:

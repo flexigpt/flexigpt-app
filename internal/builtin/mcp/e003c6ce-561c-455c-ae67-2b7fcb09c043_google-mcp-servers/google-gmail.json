@@ -20,7 +20,20 @@
 		"requireApprovalForDestructive": true
 	},
 	"setup": {
-		"note": "Google Workspace remote MCP server. Reference: https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server"
+		"note": "Google Workspace Gmail remote MCP server. Developer Preview. Enable Gmail API and Gmail MCP API in a Google Cloud project, configure the OAuth consent screen, add scopes https://www.googleapis.com/auth/gmail.readonly and https://www.googleapis.com/auth/gmail.compose, then create a Google OAuth client and register FlexiGPT's OAuth redirect URL exactly. Use a fixed FlexiGPT loopback port before registration if needed. Reference: https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server",
+		"inputs": [
+			{
+				"id": "googleOAuthClient",
+				"kind": "oauthClientCredentials",
+				"label": "Google OAuth Client",
+				"description": "OAuth client ID and client secret from Google Auth Platform.",
+				"note": "Register the FlexiGPT OAuth redirect URL exactly in Google Auth Platform.",
+				"required": true,
+				"oauthClientCredentials": {
+					"clientSecretRequired": true
+				}
+			}
+		]
 	},
 	"createdAt": "2026-05-30T00:00:00Z",
 	"modifiedAt": "2026-05-30T00:00:00Z"

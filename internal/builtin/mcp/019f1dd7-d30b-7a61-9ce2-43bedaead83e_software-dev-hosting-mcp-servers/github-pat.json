@@ -29,7 +29,7 @@
 		"requireApprovalForContextUpdates": true
 	},
 	"setup": {
-		"note": "Create a GitHub personal access token (fine-grained recommended), then paste it below. FlexiGPT stores it in the OS secret store and sends it as an Authorization: Bearer header.",
+		"note": "Official GitHub-hosted remote MCP server using PAT authentication. Create a GitHub personal access token with only the scopes you need. FlexiGPT stores it in the OS secret store and sends it as an Authorization: Bearer header. OAuth is preferred where supported. Reference: https://docs.github.com/en/copilot/how-tos/provide-context/use-mcp-in-your-ide/set-up-the-github-mcp-server",
 		"inputs": [
 			{
 				"id": "githubPat",

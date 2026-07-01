@@ -14,10 +14,13 @@
 	"trustLevel": "trusted",
 	"defaultPolicy": {
 		"defaultApprovalRule": "allow",
-		"defaultExecutionMode": "auto",
+		"defaultExecutionMode": "manual",
 		"requireApprovalForUnknownRisk": true,
-		"requireApprovalForWrite": false,
+		"requireApprovalForWrite": true,
 		"requireApprovalForDestructive": false
+	},
+	"setup": {
+		"note": "Official Figma remote MCP server. Figma docs say only clients listed in the Figma MCP Catalog can connect; new clients may need to join the waitlist. The server uses Figma OAuth and can write to Figma/FigJam canvases, so write actions should require review. Reference: https://developers.figma.com/docs/figma-mcp-server/remote-server-installation/"
 	},
 	"createdAt": "2026-05-30T00:00:00Z",
 	"modifiedAt": "2026-05-30T00:00:00Z"

@@ -1,0 +1,47 @@
+{
+	"schemaVersion": "2026-05-30",
+	"bundleID": "019f1dd0-6b87-7445-8b85-9f14d06fb9db",
+	"id": "builtin.microsoft-m365-copilot",
+	"displayName": "Microsoft 365 Copilot",
+	"enabled": false,
+	"transport": "streamableHttp",
+	"isBuiltIn": true,
+	"streamableHttp": {
+		"url": "https://agent365.svc.cloud.microsoft/agents/tenants/{tenantId}/servers/mcp_M365Copilot",
+		"authMode": "oauth",
+		"timeoutMS": 60000
+	},
+	"trustLevel": "trusted",
+	"defaultPolicy": {
+		"defaultApprovalRule": "allow",
+		"defaultExecutionMode": "manual",
+		"requireApprovalForUnknownRisk": true,
+		"requireApprovalForWrite": false,
+		"requireApprovalForDestructive": false
+	},
+	"setup": {
+		"note": "Microsoft Work IQ Copilot remote MCP server, currently preview. Searches across Microsoft 365 content through Microsoft 365 Copilot. Requires Microsoft 365 Copilot license, tenant admin enablement/consent, tenant ID, and Entra OAuth client. Reference: https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-copilot-work-iq",
+		"inputs": [
+			{
+				"id": "microsoftM365CopilotUrl",
+				"kind": "streamableHttpUrl",
+				"label": "Microsoft 365 Copilot MCP URL",
+				"description": "Full tenant-scoped URL, replacing {tenantId}.",
+				"required": true,
+				"streamableHttpUrl": {}
+			},
+			{
+				"id": "microsoftEntraOAuthClient",
+				"kind": "oauthClientCredentials",
+				"label": "Microsoft Entra OAuth Client",
+				"description": "Client ID, and optionally client secret, for the Microsoft Entra app registration.",
+				"required": true,
+				"oauthClientCredentials": {
+					"clientSecretRequired": false
+				}
+			}
+		]
+	},
+	"createdAt": "2026-05-30T00:00:00Z",
+	"modifiedAt": "2026-05-30T00:00:00Z"
+}
