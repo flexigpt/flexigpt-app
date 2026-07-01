@@ -9,7 +9,7 @@
 
 ## M-2
 
-- Provider setup polish:
+- [ ] Provider setup polish:
   - should have properly complete and verified presets
   - all models from leading providers including chinese ones via openrouter and hugging face as remote servers
   - local servers support
@@ -17,7 +17,7 @@
   - hf, openrouter
   - ollama, vllm, lm studio, tgi, llmcpp, gpt4all
 
-- better more inbuilt mcps.
+- [ ] better more inbuilt mcps.
   - MCP flows review and harden and more automatic in places where it is a bit jerky today.
   - mcp tools from leading providers presets completions.
     - Management: Atlassian, Notion
@@ -43,12 +43,12 @@
 
 - [ ] llmtools: git tools
 
-- Workflow sharing: easier add via some files/schemas etc. Assistant presets, Model presets, Skills, Tools, MCPs, Prompt templates etc.
+- [ ] Workflow sharing: easier add via some files/schemas etc. Assistant presets, Model presets, Skills, Tools, MCPs, Prompt templates etc.
   - [ ] easier preset import bundles and flows. e.g: just import a preset bundle that has assistant, models, prompts, tools etc.
     - [ ] may be as a json import bundle or jsonc format
     - [ ] better thing is to establish a jsonschema format for each thing, and then ship corresponding json as individual outputs.
 
-- Docs clean: positioning wrt repeatable workflows and enhanced guidance
+- [ ] Docs clean: positioning wrt repeatable workflows and enhanced guidance
   - setup steps for local or custom models
   - recommended models
   - context length notes
