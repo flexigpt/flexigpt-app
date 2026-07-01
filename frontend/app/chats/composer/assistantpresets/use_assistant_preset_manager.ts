@@ -30,6 +30,8 @@ function getErrorMessage(error: unknown, fallback: string): string {
 	return fallback;
 }
 
+const NO_SELECTABLE_PRESET_ERROR = `No selectable assistant preset is available. Expected a "${BASE_ASSISTANT_PRESET_SLUG}" preset or another selectable fallback.`;
+
 export interface AssistantPresetManagerState {
 	presetOptions: AssistantPresetOptionItem[];
 	loading: boolean;
@@ -91,7 +93,6 @@ export function useAssistantPresetManager(args: {
 	});
 	const [isApplying, setIsApplying] = useState(false);
 	const applyRequestSeqRef = useRef(0);
-	const noSelectablePresetError = `No selectable assistant preset is available. Expected a "${BASE_ASSISTANT_PRESET_SLUG}" preset or another selectable fallback.`;
 
 	const setSelectionActionError = useCallback((message: string | null) => {
 		setSelectionState(current => {
@@ -120,6 +121,8 @@ export function useAssistantPresetManager(args: {
 		[assistantPresetOptions]
 	);
 	const isPresetLayerReady = !assistantPresetsLoading && modelOptionsLoaded;
+	const basePresetKey = basePreset?.key ?? null;
+	const basePresetSelectableKey = basePreset?.isSelectable ? basePreset.key : null;
 
 	const invariantFallbackPreset = useMemo(
 		() => findDefaultAssistantPresetOption(assistantPresetOptions),
@@ -296,7 +299,7 @@ export function useAssistantPresetManager(args: {
 		}
 		if (!invariantFallbackPresetKey) {
 			if (assistantPresetOptions.length > 0) {
-				setSelectionActionError(noSelectablePresetError);
+				setSelectionActionError(NO_SELECTABLE_PRESET_ERROR);
 			} else {
 				clearSelectionActionError();
 			}
@@ -309,7 +312,6 @@ export function useAssistantPresetManager(args: {
 		clearSelectionActionError,
 		invariantFallbackPresetKey,
 		isPresetLayerReady,
-		noSelectablePresetError,
 		setSelectionActionError,
 		trackPresetWithoutApplying,
 	]);
@@ -335,7 +337,7 @@ export function useAssistantPresetManager(args: {
 
 		if (!invariantFallbackPresetKey) {
 			if (assistantPresetOptions.length > 0) {
-				setSelectionActionError(noSelectablePresetError);
+				setSelectionActionError(NO_SELECTABLE_PRESET_ERROR);
 			} else {
 				clearSelectionActionError();
 			}
@@ -351,20 +353,19 @@ export function useAssistantPresetManager(args: {
 		invariantFallbackPresetKey,
 		isApplying,
 		isPresetLayerReady,
-		noSelectablePresetError,
 		setSelectionActionError,
 	]);
 
-	// oxlint-disable-next-line jsreact-hooks/preserve-manual-memoization
 	const resetToBasePreset = useCallback(async (): Promise<boolean> => {
-		const targetPresetKey = (basePreset?.isSelectable ? basePreset.key : null) ?? invariantFallbackPresetKey;
+		const targetPresetKey = basePresetSelectableKey ?? invariantFallbackPresetKey;
+
 		if (!targetPresetKey) {
 			if (!isPresetLayerReady) {
 				clearSelectionActionError();
 				return false;
 			}
 
-			setSelectionActionError(noSelectablePresetError);
+			setSelectionActionError(NO_SELECTABLE_PRESET_ERROR);
 
 			return false;
 		}
@@ -372,12 +373,10 @@ export function useAssistantPresetManager(args: {
 		return applyPresetByKey(targetPresetKey);
 	}, [
 		applyPresetByKey,
-		basePreset?.isSelectable,
-		basePreset?.key,
+		basePresetSelectableKey,
 		clearSelectionActionError,
 		invariantFallbackPresetKey,
 		isPresetLayerReady,
-		noSelectablePresetError,
 		setSelectionActionError,
 	]);
 
@@ -385,27 +384,48 @@ export function useAssistantPresetManager(args: {
 		void resetToBasePreset();
 	}, [resetToBasePreset]);
 
-	return {
-		presetOptions: assistantPresetOptions,
-		loading: assistantPresetsLoading,
-		error: assistantPresetError,
-		actionError,
-		isApplying,
-		basePresetKey: basePreset?.key ?? null,
-		isBasePresetSelected,
+	return useMemo(
+		() => ({
+			presetOptions: assistantPresetOptions,
+			loading: assistantPresetsLoading,
+			error: assistantPresetError,
+			actionError,
+			isApplying,
+			basePresetKey,
+			isBasePresetSelected,
 
-		selectedPresetKey,
-		selectedPreset,
-		appliedPresetApplication,
-		runtimeSnapshot,
-		modificationSummary,
+			selectedPresetKey,
+			selectedPreset,
+			appliedPresetApplication,
+			runtimeSnapshot,
+			modificationSummary,
 
-		selectPreset: applyPresetByKey,
-		resetToBasePreset,
-		ensureActivePreset,
-
-		reapplySelectedPreset,
-		clearSelectedPreset,
-		trackDefaultPresetWithoutApplying,
-	};
+			selectPreset: applyPresetByKey,
+			resetToBasePreset,
+			ensureActivePreset,
+			reapplySelectedPreset,
+			clearSelectedPreset,
+			trackDefaultPresetWithoutApplying,
+		}),
+		[
+			actionError,
+			appliedPresetApplication,
+			applyPresetByKey,
+			assistantPresetError,
+			assistantPresetOptions,
+			assistantPresetsLoading,
+			basePresetKey,
+			clearSelectedPreset,
+			ensureActivePreset,
+			isApplying,
+			isBasePresetSelected,
+			modificationSummary,
+			reapplySelectedPreset,
+			resetToBasePreset,
+			runtimeSnapshot,
+			selectedPreset,
+			selectedPresetKey,
+			trackDefaultPresetWithoutApplying,
+		]
+	);
 }

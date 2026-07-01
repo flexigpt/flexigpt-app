@@ -14,7 +14,7 @@ import type {
 } from '@/spec/mcp';
 import { MCPAuthHealthState, MCPHTTPAuthMode, MCPToolExposure } from '@/spec/mcp';
 
-import { omitManyKeys } from '@/lib/obj_utils';
+import { areComparableValuesEqual, omitManyKeys } from '@/lib/obj_utils';
 
 import { backendAPI, mcpAPI } from '@/apis/baseapi';
 import {
@@ -102,6 +102,19 @@ function hasPendingOAuthHealth(option: MCPComposerServerOption): boolean {
 
 export function optionKey(option: MCPComposerServerOption): string {
 	return mcpServerKey(option.bundle.id, option.server.id);
+}
+
+function areMCPAuthHealthEqual(a: MCPAuthHealth | undefined, b: MCPAuthHealth | undefined): boolean {
+	return areComparableValuesEqual(a ?? null, b ?? null);
+}
+
+function hasOptionPatchChanges(option: MCPComposerServerOption, patch: Partial<MCPComposerServerOption>): boolean {
+	for (const [key, value] of Object.entries(patch) as Array<[keyof MCPComposerServerOption, unknown]>) {
+		if (!areComparableValuesEqual(option[key] ?? null, value ?? null)) {
+			return true;
+		}
+	}
+	return false;
 }
 
 function toolToSelection(tool: MCPToolCapability): MCPToolSelection {
@@ -193,14 +206,21 @@ export function useComposerMCP(): UseComposerMCPResult {
 
 	const patchOption = useCallback((bundleID: string, serverID: string, patch: Partial<MCPComposerServerOption>) => {
 		setOptions(prev => {
+			let changed = false;
 			const next = prev.map(option =>
-				option.bundle.id === bundleID && option.server.id === serverID
-					? {
-							...option,
-							...patch,
-						}
+				option.bundle.id === bundleID && option.server.id === serverID && hasOptionPatchChanges(option, patch)
+					? (() => {
+							changed = true;
+							return {
+								...option,
+								...patch,
+							};
+						})()
 					: option
 			);
+			if (!changed) {
+				return prev;
+			}
 			optionsRef.current = next;
 			return next;
 		});
@@ -294,11 +314,19 @@ export function useComposerMCP(): UseComposerMCPResult {
 					prompts: current.prompts,
 				};
 			}
-
 			const existing = discoveryPromisesRef.current.get(key);
 			if (existing) {
 				return existing;
 			}
+
+			if (!force && current.discoveryError) {
+				return undefined;
+			}
+
+			if (!force && current.discoveryLoading) {
+				return undefined;
+			}
+
 			patchOption(bundleID, serverID, {
 				discoveryLoading: true,
 				discoveryError: undefined,
@@ -392,11 +420,17 @@ export function useComposerMCP(): UseComposerMCPResult {
 		[loadDiscoveryForServer]
 	);
 
+	const selectedServerKeys = useMemo(
+		() => Object.keys(selectedByServerKey).toSorted().join('\n'),
+		[selectedByServerKey]
+	);
+
 	useEffect(() => {
-		for (const selection of Object.values(selectedByServerKey)) {
+		const selections = Object.values(selectedByServerKeyRef.current);
+		for (const selection of selections) {
 			void ensureDiscoveryLoaded(selection.bundleID, selection.serverID);
 		}
-	}, [ensureDiscoveryLoaded, options, selectedByServerKey]);
+	}, [ensureDiscoveryLoaded, options.length, selectedServerKeys]);
 
 	const refreshServerStatus = useCallback(
 		async (bundleID: string, serverID: string) => {
@@ -457,12 +491,13 @@ export function useComposerMCP(): UseComposerMCPResult {
 			});
 
 			try {
-				// oxlint-disable-next-line no-unmodified-loop-condition
-				while (!settled) {
+				while (true) {
 					await Promise.race([connectPromise.catch(() => undefined), sleep(1000)]);
-					if (!settled) {
-						await refreshServerStatus(bundleID, serverID).catch(() => undefined);
+					if (settled) {
+						break;
 					}
+
+					await refreshServerStatus(bundleID, serverID).catch(() => undefined);
 				}
 
 				const snapshot = await connectPromise;
@@ -513,6 +548,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 		}
 
 		setOptions(prev => {
+			let changed = false;
 			const next = prev.map(option => {
 				const overlaid = overlayPendingOAuthAuthHealth(
 					option.bundle.id,
@@ -522,8 +558,15 @@ export function useComposerMCP(): UseComposerMCPResult {
 				);
 				const refreshed = freshHealthByKey.get(optionKey(option));
 				const authHealth = refreshed ?? overlaid;
-				return authHealth === option.authHealth ? option : { ...option, authHealth };
+				if (areMCPAuthHealthEqual(authHealth, option.authHealth)) {
+					return option;
+				}
+				changed = true;
+				return { ...option, authHealth };
 			});
+			if (!changed) {
+				return prev;
+			}
 			optionsRef.current = next;
 			return next;
 		});
@@ -842,14 +885,13 @@ export function useComposerMCP(): UseComposerMCPResult {
 		return mcpSelectionToContext(nextSelections);
 	}, [commitSelectedByServerKey, loadDiscoveryForServer]);
 
+	const shouldPollOAuthAuthorizations = useMemo(
+		() => options.some(option => isOAuthServerOption(option) || hasPendingOAuthHealth(option)),
+		[options]
+	);
+
 	useEffect(() => {
-		const hasOAuthServer = options.some(s => {
-			return isOAuthServerOption(s);
-		});
-		const hasPending = options.some(s => {
-			return hasPendingOAuthHealth(s);
-		});
-		if (!hasOAuthServer && !hasPending) {
+		if (!shouldPollOAuthAuthorizations) {
 			return;
 		}
 
@@ -866,7 +908,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 			cancelled = true;
 			window.clearInterval(timer);
 		};
-	}, [options, refreshPendingOAuthAuthorizations]);
+	}, [refreshPendingOAuthAuthorizations, shouldPollOAuthAuthorizations]);
 
 	const mcpContext = useMemo(() => mcpSelectionToContext(selectedByServerKey), [selectedByServerKey]);
 	const selectedServerCount = Object.keys(selectedByServerKey).length;

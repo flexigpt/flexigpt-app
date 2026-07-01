@@ -1306,6 +1306,18 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		void doSubmit({ runPendingTools: true });
 	};
 
+	const finishFastForwardWithError = useCallback((message: string) => {
+		setFastForwardPending(false);
+		setSubmitError(message);
+	}, []);
+
+	const finishFastForwardAndSubmit = useCallback(() => {
+		setFastForwardPending(false);
+		void doSubmit({
+			runPendingTools: false,
+		});
+	}, [doSubmit]);
+
 	useEffect(() => {
 		if (!fastForwardPending) {
 			return;
@@ -1332,28 +1344,22 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		);
 
 		if (failedRunnableToolCalls.length > 0) {
-			// oxlint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
-			setFastForwardPending(false);
-			// oxlint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
-			setSubmitError('Some tool calls failed. Retry or discard them before sending.');
+			finishFastForwardWithError('Some tool calls failed. Retry or discard them before sending.');
 			return;
 		}
 
 		if (!hasEffectiveTextForSubmit && attachments.length === 0 && toolOutputs.length === 0) {
-			// oxlint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
-			setFastForwardPending(false);
-			// oxlint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
-			setSubmitError('Tool calls did not produce any outputs, so there is nothing to send yet.');
+			finishFastForwardWithError('Tool calls did not produce any outputs, so there is nothing to send yet.');
 			return;
 		}
 
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
-		setFastForwardPending(false);
-		void doSubmit({ runPendingTools: false });
+		finishFastForwardAndSubmit();
 	}, [
 		attachments.length,
 		doSubmit,
 		fastForwardPending,
+		finishFastForwardAndSubmit,
+		finishFastForwardWithError,
 		hasBlockingToolArgs,
 		hasEffectiveTextForSubmit,
 		isGenerating,
@@ -1766,7 +1772,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	useEffect(() => {
 		if (toolCalls.length === 0 && autoExecState.phase === 'idle' && !isGenerating && activeAutoExecBatchCount > 0) {
 			// oxlint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
-			setActiveAutoExecBatchCount(0);
+			setActiveAutoExecBatchCount(current => Math.min(0, current));
 		}
 	}, [activeAutoExecBatchCount, autoExecState.phase, isGenerating, toolCalls.length]);
 

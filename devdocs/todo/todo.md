@@ -10,12 +10,12 @@
 ## M-2
 
 - [ ] Provider setup polish:
-  - should have properly complete and verified presets
-  - all models from leading providers including chinese ones via openrouter and hugging face as remote servers
-  - local servers support
-  - anthropic, openai, google gemini, mistral, xai,
-  - hf, openrouter
-  - ollama, vllm, lm studio, tgi, llmcpp, gpt4all
+  - [ ] should have properly complete and verified presets
+  - [ ] all models from leading providers including chinese ones via openrouter and hugging face as remote servers
+  - [ ] local servers support
+  - [x] anthropic, openai, google gemini, mistral, xai,
+  - [x] hf, openrouter
+  - [ ] ollama, vllm, lm studio, tgi, llmcpp, gpt4all
 
 - [ ] better more inbuilt mcps.
   - MCP flows review and harden and more automatic in places where it is a bit jerky today.
@@ -36,6 +36,8 @@
   - [ ] here enhance the file name detection when we are using tool calls and also when we have openai style patch out rather than unified diff.
 
 - [ ] github pr review preset
+
+- [ ] better simple search inside dropdown selectors for context and presets
 
 ## M-3
 

@@ -163,13 +163,7 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 
 	const assistantPresetLayerReady =
 		assistantContext.modelOptionsLoaded && !assistantPreset.loading && !assistantPreset.isApplying;
-
-	// Keep a ref to the latest assistantPreset so we don't churn callback
-	// identities and re-fire the flush effect on every render.
-	const assistantPresetRef = useRef(assistantPreset);
-	useEffect(() => {
-		assistantPresetRef.current = assistantPreset;
-	}, [assistantPreset]);
+	const { ensureActivePreset, resetToBasePreset, selectPreset, trackDefaultPresetWithoutApplying } = assistantPreset;
 
 	const queueOrApplyAssistantPresetRef = useCallback(
 		async (presetRef: ChatWorkflowStarterAssistantPresetRef): Promise<boolean> => {
@@ -184,9 +178,9 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 				presetRef.assistantPresetSlug,
 				presetRef.assistantPresetVersion
 			);
-			return assistantPresetRef.current.selectPreset(presetKey);
+			return selectPreset(presetKey);
 		},
-		[assistantPresetLayerReady]
+		[assistantPresetLayerReady, selectPreset]
 	);
 
 	const flushPendingPresetResolution = useCallback(async () => {
@@ -203,7 +197,7 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 		}
 
 		if (pendingPresetResolutionModeRef.current === 'track-default') {
-			const ok = await assistantPresetRef.current.trackDefaultPresetWithoutApplying();
+			const ok = await trackDefaultPresetWithoutApplying();
 
 			if (ok) {
 				pendingPresetResolutionModeRef.current = 'none';
@@ -212,7 +206,7 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 		}
 
 		if (pendingPresetResolutionModeRef.current === 'ensure-active') {
-			const ok = await assistantPresetRef.current.ensureActivePreset();
+			const ok = await ensureActivePreset();
 
 			if (ok) {
 				pendingPresetResolutionModeRef.current = 'none';
@@ -221,7 +215,12 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 		}
 
 		return true;
-	}, [assistantPresetLayerReady, queueOrApplyAssistantPresetRef]);
+	}, [
+		assistantPresetLayerReady,
+		ensureActivePreset,
+		queueOrApplyAssistantPresetRef,
+		trackDefaultPresetWithoutApplying,
+	]);
 
 	// Only re-run when readiness flips. All other triggers (workflow load,
 	// restore, reset, etc.) call flushPendingPresetResolution() explicitly.
@@ -270,7 +269,7 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 			},
 			resetForNewConversation: async () => {
 				resetComposerStateForNewConversation();
-				const ok = await assistantPreset.resetToBasePreset();
+				const ok = await resetToBasePreset();
 				if (!ok) {
 					pendingPresetResolutionModeRef.current = 'ensure-active';
 					void flushPendingPresetResolution();
@@ -309,7 +308,7 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 					return ok;
 				}
 
-				const ok = await assistantPreset.resetToBasePreset();
+				const ok = await resetToBasePreset();
 				if (!ok) {
 					pendingPresetResolutionModeRef.current = 'ensure-active';
 				}
@@ -377,11 +376,11 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 		}),
 		[
 			assistantContext,
-			assistantPreset,
 			chatOptions,
 			flushPendingPresetResolution,
 			queueOrApplyAssistantPresetRef,
 			replaceAssistantRuntimeSnapshot,
+			resetToBasePreset,
 			resetComposerStateForNewConversation,
 			systemPrompt,
 			updateAssistantRuntimeSnapshot,
