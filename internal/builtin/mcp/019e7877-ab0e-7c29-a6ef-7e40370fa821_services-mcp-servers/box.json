@@ -1,0 +1,27 @@
+{
+	"schemaVersion": "2026-05-30",
+	"bundleID": "019e7877-ab0e-7c29-a6ef-7e40370fa821",
+	"id": "builtin.box",
+	"displayName": "Box",
+	"enabled": false,
+	"transport": "streamableHttp",
+	"isBuiltIn": true,
+	"streamableHttp": {
+		"url": "https://mcp.box.com",
+		"authMode": "oauth",
+		"timeoutMS": 30000
+	},
+	"trustLevel": "trusted",
+	"defaultPolicy": {
+		"defaultApprovalRule": "allow",
+		"defaultExecutionMode": "manual",
+		"requireApprovalForUnknownRisk": true,
+		"requireApprovalForWrite": true,
+		"requireApprovalForDestructive": true
+	},
+	"setup": {
+		"note": "Official remote Box MCP server. Reference: https://developer.box.com/guides/box-mcp/remote/"
+	},
+	"createdAt": "2026-05-30T00:00:00Z",
+	"modifiedAt": "2026-05-30T00:00:00Z"
+}

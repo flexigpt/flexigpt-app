@@ -1,0 +1,27 @@
+{
+	"schemaVersion": "2026-05-30",
+	"bundleID": "e003c6ce-561c-455c-ae67-2b7fcb09c043",
+	"id": "builtin.google-gmail",
+	"displayName": "Google Gmail",
+	"enabled": false,
+	"transport": "streamableHttp",
+	"isBuiltIn": true,
+	"streamableHttp": {
+		"url": "https://gmailmcp.googleapis.com/mcp/v1",
+		"authMode": "oauth",
+		"timeoutMS": 60000
+	},
+	"trustLevel": "trusted",
+	"defaultPolicy": {
+		"defaultApprovalRule": "allow",
+		"defaultExecutionMode": "manual",
+		"requireApprovalForUnknownRisk": true,
+		"requireApprovalForWrite": true,
+		"requireApprovalForDestructive": true
+	},
+	"setup": {
+		"note": "Google Workspace remote MCP server. Reference: https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server"
+	},
+	"createdAt": "2026-05-30T00:00:00Z",
+	"modifiedAt": "2026-05-30T00:00:00Z"
+}

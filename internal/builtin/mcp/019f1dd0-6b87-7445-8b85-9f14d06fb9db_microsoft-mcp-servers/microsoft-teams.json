@@ -1,0 +1,27 @@
+{
+	"schemaVersion": "2026-05-30",
+	"bundleID": "019f1dd0-6b87-7445-8b85-9f14d06fb9db",
+	"id": "builtin.microsoft-teams",
+	"displayName": "Microsoft Teams",
+	"enabled": false,
+	"transport": "streamableHttp",
+	"isBuiltIn": true,
+	"streamableHttp": {
+		"url": "https://agent365.svc.cloud.microsoft/agents/tenants/{tenant_id}/servers/mcp_TeamsServer",
+		"authMode": "oauth",
+		"timeoutMS": 30000
+	},
+	"trustLevel": "trusted",
+	"defaultPolicy": {
+		"defaultApprovalRule": "allow",
+		"defaultExecutionMode": "manual",
+		"requireApprovalForUnknownRisk": true,
+		"requireApprovalForWrite": true,
+		"requireApprovalForDestructive": true
+	},
+	"setup": {
+		"note": "Tenant-scoped Microsoft-hosted remote MCP server for Teams. Replace {tenant_id} with your Microsoft Entra tenant ID. References: https://github.com/microsoft/mcp/blob/main/README.md and https://learn.microsoft.com/en-us/microsoftteams/platform/m365-apps/agent-connectors"
+	},
+	"createdAt": "2026-05-30T00:00:00Z",
+	"modifiedAt": "2026-05-30T00:00:00Z"
+}

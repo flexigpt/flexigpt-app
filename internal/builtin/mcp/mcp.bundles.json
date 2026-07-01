@@ -43,6 +43,28 @@
 			"createdAt": "2026-05-30T00:00:00Z",
 			"modifiedAt": "2026-05-30T00:00:00Z",
 			"isBuiltIn": true
+		},
+		"019f1dcf-4305-705c-b60f-352fc747b105": {
+			"schemaVersion": "2026-05-30",
+			"id": "019f1dcf-4305-705c-b60f-352fc747b105",
+			"slug": "zoom-mcp-servers",
+			"displayName": "Zoom MCP Servers",
+			"description": "Official Zoom-hosted remote MCP servers.",
+			"isEnabled": true,
+			"createdAt": "2026-05-30T00:00:00Z",
+			"modifiedAt": "2026-05-30T00:00:00Z",
+			"isBuiltIn": true
+		},
+		"019f1dd0-6b87-7445-8b85-9f14d06fb9db": {
+			"schemaVersion": "2026-05-30",
+			"id": "019f1dd0-6b87-7445-8b85-9f14d06fb9db",
+			"slug": "microsoft-mcp-servers",
+			"displayName": "Microsoft MCP Servers",
+			"description": "Microsoft-hosted remote MCP servers.",
+			"isEnabled": true,
+			"createdAt": "2026-05-30T00:00:00Z",
+			"modifiedAt": "2026-05-30T00:00:00Z",
+			"isBuiltIn": true
 		}
 	}
 }

@@ -1,0 +1,27 @@
+{
+	"schemaVersion": "2026-05-30",
+	"bundleID": "019e7877-ab0e-7c29-a6ef-7e40370fa821",
+	"id": "builtin.stack-overflow",
+	"displayName": "Stack Overflow",
+	"enabled": false,
+	"transport": "streamableHttp",
+	"isBuiltIn": true,
+	"streamableHttp": {
+		"url": "https://mcp.stackoverflow.com",
+		"authMode": "oauth",
+		"timeoutMS": 30000
+	},
+	"trustLevel": "trusted",
+	"defaultPolicy": {
+		"defaultApprovalRule": "allow",
+		"defaultExecutionMode": "auto",
+		"requireApprovalForUnknownRisk": true,
+		"requireApprovalForWrite": false,
+		"requireApprovalForDestructive": false
+	},
+	"setup": {
+		"note": "Official Stack Overflow MCP server. Reference: https://api.stackexchange.com/docs/mcp-server"
+	},
+	"createdAt": "2026-05-30T00:00:00Z",
+	"modifiedAt": "2026-05-30T00:00:00Z"
+}
