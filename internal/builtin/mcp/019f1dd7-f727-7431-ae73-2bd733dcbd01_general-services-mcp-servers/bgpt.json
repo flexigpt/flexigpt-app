@@ -1,20 +1,20 @@
 {
 	"schemaVersion": "2026-05-30",
-	"bundleID": "019e7877-ab0e-7c29-a6ef-7e40370fa821",
-	"id": "builtin.atlassian",
-	"displayName": "Atlassian Rovo (Jira + Confluence)",
+	"bundleID": "019f1dd7-f727-7431-ae73-2bd733dcbd01",
+	"id": "builtin.bgpt",
+	"displayName": "BGPT (Scientific Papers)",
 	"enabled": false,
 	"transport": "streamableHttp",
 	"isBuiltIn": true,
 	"streamableHttp": {
-		"url": "https://mcp.atlassian.com/v1/mcp/authv2",
-		"authMode": "oauth",
+		"url": "https://bgpt.pro/mcp/stream",
+		"authMode": "none",
 		"timeoutMS": 30000
 	},
 	"trustLevel": "trusted",
 	"defaultPolicy": {
 		"defaultApprovalRule": "allow",
-		"defaultExecutionMode": "manual",
+		"defaultExecutionMode": "auto",
 		"requireApprovalForUnknownRisk": true,
 		"requireApprovalForWrite": true,
 		"requireApprovalForDestructive": true

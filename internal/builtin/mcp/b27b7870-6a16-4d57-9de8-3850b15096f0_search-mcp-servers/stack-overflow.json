@@ -1,6 +1,6 @@
 {
 	"schemaVersion": "2026-05-30",
-	"bundleID": "019e7877-ab0e-7c29-a6ef-7e40370fa821",
+	"bundleID": "b27b7870-6a16-4d57-9de8-3850b15096f0",
 	"id": "builtin.stack-overflow",
 	"displayName": "Stack Overflow",
 	"enabled": false,

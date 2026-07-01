@@ -1,6 +1,6 @@
 {
 	"schemaVersion": "2026-05-30",
-	"bundleID": "019e7877-ab0e-7c29-a6ef-7e40370fa821",
+	"bundleID": "019f1dd7-d30b-7a61-9ce2-43bedaead83e",
 	"id": "builtin.github.pat",
 	"displayName": "GitHub (PAT)",
 	"enabled": true,

@@ -1,13 +1,13 @@
 {
 	"schemaVersion": "2026-05-30",
-	"bundleID": "019e7877-ab0e-7c29-a6ef-7e40370fa821",
-	"id": "builtin.vercel",
-	"displayName": "Vercel",
+	"bundleID": "019f1dd7-e6e1-7891-ac38-fec920597ec9",
+	"id": "builtin.notion",
+	"displayName": "Notion",
 	"enabled": false,
 	"transport": "streamableHttp",
 	"isBuiltIn": true,
 	"streamableHttp": {
-		"url": "https://mcp.vercel.com/",
+		"url": "https://mcp.notion.com/mcp",
 		"authMode": "oauth",
 		"timeoutMS": 30000
 	},

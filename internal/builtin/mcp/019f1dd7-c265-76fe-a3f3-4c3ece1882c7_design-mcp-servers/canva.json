@@ -1,23 +1,26 @@
 {
 	"schemaVersion": "2026-05-30",
-	"bundleID": "019e7877-ab0e-7c29-a6ef-7e40370fa821",
-	"id": "builtin.bgpt",
-	"displayName": "BGPT (Scientific Papers)",
+	"bundleID": "019f1dd7-c265-76fe-a3f3-4c3ece1882c7",
+	"id": "builtin.canva",
+	"displayName": "Canva",
 	"enabled": false,
 	"transport": "streamableHttp",
 	"isBuiltIn": true,
 	"streamableHttp": {
-		"url": "https://bgpt.pro/mcp/stream",
-		"authMode": "none",
+		"url": "https://mcp.canva.com/mcp",
+		"authMode": "oauth",
 		"timeoutMS": 30000
 	},
 	"trustLevel": "trusted",
 	"defaultPolicy": {
 		"defaultApprovalRule": "allow",
-		"defaultExecutionMode": "auto",
+		"defaultExecutionMode": "manual",
 		"requireApprovalForUnknownRisk": true,
 		"requireApprovalForWrite": true,
 		"requireApprovalForDestructive": true
+	},
+	"setup": {
+		"note": "Official remote Canva MCP server. Reference: https://www.canva.dev/docs/mcp/"
 	},
 	"createdAt": "2026-05-30T00:00:00Z",
 	"modifiedAt": "2026-05-30T00:00:00Z"

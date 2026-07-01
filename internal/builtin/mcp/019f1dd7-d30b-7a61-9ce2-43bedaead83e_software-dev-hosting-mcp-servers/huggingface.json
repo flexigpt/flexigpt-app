@@ -1,26 +1,23 @@
 {
 	"schemaVersion": "2026-05-30",
-	"bundleID": "019e7877-ab0e-7c29-a6ef-7e40370fa821",
-	"id": "builtin.canva",
-	"displayName": "Canva",
+	"bundleID": "019f1dd7-d30b-7a61-9ce2-43bedaead83e",
+	"id": "builtin.huggingface",
+	"displayName": "Hugging Face",
 	"enabled": false,
 	"transport": "streamableHttp",
 	"isBuiltIn": true,
 	"streamableHttp": {
-		"url": "https://mcp.canva.com/mcp",
+		"url": "https://huggingface.co/mcp",
 		"authMode": "oauth",
 		"timeoutMS": 30000
 	},
 	"trustLevel": "trusted",
 	"defaultPolicy": {
 		"defaultApprovalRule": "allow",
-		"defaultExecutionMode": "manual",
+		"defaultExecutionMode": "auto",
 		"requireApprovalForUnknownRisk": true,
-		"requireApprovalForWrite": true,
-		"requireApprovalForDestructive": true
-	},
-	"setup": {
-		"note": "Official remote Canva MCP server. Reference: https://www.canva.dev/docs/mcp/"
+		"requireApprovalForWrite": false,
+		"requireApprovalForDestructive": false
 	},
 	"createdAt": "2026-05-30T00:00:00Z",
 	"modifiedAt": "2026-05-30T00:00:00Z"

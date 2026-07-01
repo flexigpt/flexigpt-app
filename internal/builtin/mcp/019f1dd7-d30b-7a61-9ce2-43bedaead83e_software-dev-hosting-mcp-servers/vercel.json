@@ -1,23 +1,23 @@
 {
 	"schemaVersion": "2026-05-30",
-	"bundleID": "019e7877-ab0e-7c29-a6ef-7e40370fa821",
-	"id": "builtin.figma-remote",
-	"displayName": "Figma (Remote)",
+	"bundleID": "019f1dd7-d30b-7a61-9ce2-43bedaead83e",
+	"id": "builtin.vercel",
+	"displayName": "Vercel",
 	"enabled": false,
 	"transport": "streamableHttp",
 	"isBuiltIn": true,
 	"streamableHttp": {
-		"url": "https://mcp.figma.com/mcp",
+		"url": "https://mcp.vercel.com/",
 		"authMode": "oauth",
 		"timeoutMS": 30000
 	},
 	"trustLevel": "trusted",
 	"defaultPolicy": {
 		"defaultApprovalRule": "allow",
-		"defaultExecutionMode": "auto",
+		"defaultExecutionMode": "manual",
 		"requireApprovalForUnknownRisk": true,
-		"requireApprovalForWrite": false,
-		"requireApprovalForDestructive": false
+		"requireApprovalForWrite": true,
+		"requireApprovalForDestructive": true
 	},
 	"createdAt": "2026-05-30T00:00:00Z",
 	"modifiedAt": "2026-05-30T00:00:00Z"

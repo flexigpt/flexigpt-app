@@ -1,11 +1,44 @@
 {
 	"bundles": {
-		"019e7877-ab0e-7c29-a6ef-7e40370fa821": {
+		"019f1dd7-c265-76fe-a3f3-4c3ece1882c7": {
 			"schemaVersion": "2026-05-30",
-			"id": "019e7877-ab0e-7c29-a6ef-7e40370fa821",
-			"slug": "services-mcp-servers",
-			"displayName": "MCP Servers for few Remote services",
-			"description": "Built-in MCP server definitions for remote services. Enable the ones you want to use.",
+			"id": "019f1dd7-c265-76fe-a3f3-4c3ece1882c7",
+			"slug": "design-mcp-servers",
+			"displayName": "Design MCP Servers",
+			"description": "Built-in MCP server definitions for design tools like Figma and Canva.",
+			"isEnabled": true,
+			"createdAt": "2026-05-30T00:00:00Z",
+			"modifiedAt": "2026-05-30T00:00:00Z",
+			"isBuiltIn": true
+		},
+		"019f1dd7-d30b-7a61-9ce2-43bedaead83e": {
+			"schemaVersion": "2026-05-30",
+			"id": "019f1dd7-d30b-7a61-9ce2-43bedaead83e",
+			"slug": "software-dev-hosting-mcp-servers",
+			"displayName": "Software Dev and Hosting MCP Servers",
+			"description": "Built-in MCP server definitions for GitHub, Vercel, Netlify, and Hugging Face.",
+			"isEnabled": true,
+			"createdAt": "2026-05-30T00:00:00Z",
+			"modifiedAt": "2026-05-30T00:00:00Z",
+			"isBuiltIn": true
+		},
+		"019f1dd7-e6e1-7891-ac38-fec920597ec9": {
+			"schemaVersion": "2026-05-30",
+			"id": "019f1dd7-e6e1-7891-ac38-fec920597ec9",
+			"slug": "task-management-communication-mcp-servers",
+			"displayName": "Task Management and Communication MCP Servers",
+			"description": "Built-in MCP server definitions for Atlassian, Notion, and Slack.",
+			"isEnabled": true,
+			"createdAt": "2026-05-30T00:00:00Z",
+			"modifiedAt": "2026-05-30T00:00:00Z",
+			"isBuiltIn": true
+		},
+		"019f1dd7-f727-7431-ae73-2bd733dcbd01": {
+			"schemaVersion": "2026-05-30",
+			"id": "019f1dd7-f727-7431-ae73-2bd733dcbd01",
+			"slug": "general-services-mcp-servers",
+			"displayName": "General Services MCP Servers",
+			"description": "Built-in MCP server definitions for Box, BGPT, and Indeed.",
 			"isEnabled": true,
 			"createdAt": "2026-05-30T00:00:00Z",
 			"modifiedAt": "2026-05-30T00:00:00Z",

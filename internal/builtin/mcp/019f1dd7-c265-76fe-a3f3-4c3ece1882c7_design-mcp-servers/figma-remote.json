@@ -1,23 +1,23 @@
 {
 	"schemaVersion": "2026-05-30",
-	"bundleID": "019e7877-ab0e-7c29-a6ef-7e40370fa821",
-	"id": "builtin.netlify",
-	"displayName": "Netlify",
+	"bundleID": "019f1dd7-c265-76fe-a3f3-4c3ece1882c7",
+	"id": "builtin.figma-remote",
+	"displayName": "Figma (Remote)",
 	"enabled": false,
 	"transport": "streamableHttp",
 	"isBuiltIn": true,
 	"streamableHttp": {
-		"url": "https://netlify-mcp.netlify.app/mcp",
+		"url": "https://mcp.figma.com/mcp",
 		"authMode": "oauth",
 		"timeoutMS": 30000
 	},
 	"trustLevel": "trusted",
 	"defaultPolicy": {
 		"defaultApprovalRule": "allow",
-		"defaultExecutionMode": "manual",
+		"defaultExecutionMode": "auto",
 		"requireApprovalForUnknownRisk": true,
-		"requireApprovalForWrite": true,
-		"requireApprovalForDestructive": true
+		"requireApprovalForWrite": false,
+		"requireApprovalForDestructive": false
 	},
 	"createdAt": "2026-05-30T00:00:00Z",
 	"modifiedAt": "2026-05-30T00:00:00Z"

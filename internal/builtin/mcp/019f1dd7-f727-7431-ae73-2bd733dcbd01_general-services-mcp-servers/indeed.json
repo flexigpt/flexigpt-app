@@ -1,13 +1,13 @@
 {
 	"schemaVersion": "2026-05-30",
-	"bundleID": "019e7877-ab0e-7c29-a6ef-7e40370fa821",
-	"id": "builtin.slack",
-	"displayName": "Slack",
+	"bundleID": "019f1dd7-f727-7431-ae73-2bd733dcbd01",
+	"id": "builtin.indeed",
+	"displayName": "Indeed",
 	"enabled": false,
 	"transport": "streamableHttp",
 	"isBuiltIn": true,
 	"streamableHttp": {
-		"url": "https://mcp.slack.com/mcp",
+		"url": "https://mcp.indeed.com/claude/mcp",
 		"authMode": "oauth",
 		"timeoutMS": 30000
 	},
@@ -18,9 +18,6 @@
 		"requireApprovalForUnknownRisk": true,
 		"requireApprovalForWrite": true,
 		"requireApprovalForDestructive": true
-	},
-	"setup": {
-		"note": "Official Slack-hosted remote MCP server. Reference: https://docs.slack.dev/ai/slack-mcp-server"
 	},
 	"createdAt": "2026-05-30T00:00:00Z",
 	"modifiedAt": "2026-05-30T00:00:00Z"
