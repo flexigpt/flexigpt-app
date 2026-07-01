@@ -28,7 +28,7 @@
 	"keywords": [],
 	"author": "ppipada",
 	"dependencies": {
-		"@ariakit/react": "^0.4.30",
+		"@ariakit/react": "^0.4.31",
 		"@fontsource-variable/inter": "^5.2.8",
 		"@platejs/basic-nodes": "^53.0.0",
 		"@platejs/basic-styles": "^53.0.0",
@@ -46,7 +46,7 @@
 		"platejs": "^53.2.4",
 		"react": "19.2.7",
 		"react-dom": "19.2.7",
-		"react-icons": "^5.6.0",
+		"react-icons": "^5.7.0",
 		"react-markdown": "^10.1.0",
 		"react-router": "^8.1.0",
 		"rehype-katex": "^7.0.1",
