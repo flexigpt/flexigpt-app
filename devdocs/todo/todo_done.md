@@ -1036,4 +1036,6 @@
 
 - [x] eslint 10: pending plugins support.
   - [x] monitor oxclint for a while. ecosystem seems weak as of now.
-  - [x] Added oxlint fully
+  - [x] Added oxlint fully. removed eslint.
+
+- [x] assistant presets: mcps in presets
