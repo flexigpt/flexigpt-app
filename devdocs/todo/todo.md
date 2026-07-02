@@ -11,6 +11,8 @@
 
 ## M-2
 
+- [ ] llmtools: git tools
+
 - [ ] an attachment/tool and apply diff to code preset will be good. simple template and tool
 
 - [ ] github pr review preset
@@ -18,8 +20,6 @@
 ## M-3
 
 - [ ] a folder selection/input an be given in context bar to say that your current work folder is so and so, so that any claude.md or skills or anything can be selected and auto injected as a "Starter recipe"
-
-- [ ] llmtools: git tools
 
 - [ ] Workflow sharing: easier add via some files/schemas etc. Assistant presets, Model presets, Skills, Tools, MCPs, Prompt templates etc.
   - [ ] easier preset import bundles and flows. e.g: just import a preset bundle that has assistant, models, prompts, tools etc.
