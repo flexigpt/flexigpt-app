@@ -12,6 +12,13 @@ import {
 } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 import { GroupedMenuSection, GroupedMenuSubheading } from '@/components/grouped_menu_sections';
+import { searchableMenuEmptyStateClasses, SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
+import {
+	focusFirstSearchableMenuItem,
+	isSearchQueryActive,
+	rankSearchableItems,
+	useSearchableMenuState,
+} from '@/components/searchmenu/searchable_menu_utils';
 
 import type { AssistantPresetOptionItem } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 
@@ -138,6 +145,8 @@ export function AssistantPresetDropdown({
 }: AssistantPresetDropdownProps) {
 	const menu = useMenuStore({ placement: 'top', focusLoop: true });
 	const open = useStoreState(menu, 'open');
+	const menuContentElement = useStoreState(menu, 'contentElement');
+	const [searchQuery, setSearchQuery] = useSearchableMenuState(open);
 
 	const triggerLabel = selectedPreset ? selectedPreset.displayName : 'Assistant';
 	const triggerTitle = selectedPreset
@@ -145,6 +154,47 @@ export function AssistantPresetDropdown({
 		: 'Apply assistant preset';
 
 	const groupedPresetOptions = useMemo(() => groupAssistantPresetOptions(presetOptions), [presetOptions]);
+
+	const displayedGroupedPresetOptions = useMemo(() => {
+		if (!isSearchQueryActive(searchQuery)) {
+			return groupedPresetOptions;
+		}
+
+		const rankedOptions = rankSearchableItems(presetOptions, {
+			query: searchQuery,
+			getKey: option => option.key,
+			getFields: option => [
+				{ value: option.displayName, weight: 6 },
+				{ value: option.preset.slug, weight: 5 },
+				{ value: option.preset.version, weight: 4 },
+				{ value: option.bundleDisplayName, weight: 3 },
+				{ value: option.bundleSlug, weight: 3 },
+				{ value: option.description, weight: 2 },
+				{ value: option.availabilityReason, weight: 1 },
+			],
+			fallbackCompare: compareAssistantPresetOptions,
+		});
+		const rankByKey = new Map(rankedOptions.map((option, index) => [option.key, index] as const));
+		const rankOptions = (options: AssistantPresetOptionItem[]) =>
+			options
+				.filter(option => rankByKey.has(option.key))
+				.toSorted((a, b) => (rankByKey.get(a.key) ?? 0) - (rankByKey.get(b.key) ?? 0));
+
+		return groupedPresetOptions
+			.map(group => ({
+				...group,
+				selectableOptions: rankOptions(group.selectableOptions),
+				unavailableOptions: rankOptions(group.unavailableOptions),
+			}))
+			.filter(group => group.selectableOptions.length > 0 || group.unavailableOptions.length > 0);
+	}, [groupedPresetOptions, presetOptions, searchQuery]);
+
+	const displayedPresetCount = displayedGroupedPresetOptions.reduce(
+		(sum, group) => sum + group.selectableOptions.length + group.unavailableOptions.length,
+		0
+	);
+	const firstSelectablePreset =
+		displayedGroupedPresetOptions.flatMap(group => group.selectableOptions).find(option => option.isSelectable) ?? null;
 
 	const renderPresetOption = (option: AssistantPresetOptionItem) => {
 		const isBasePreset = option.key === basePresetKey;
@@ -170,6 +220,7 @@ export function AssistantPresetDropdown({
 				<div className="flex w-full items-start gap-2">
 					<MenuItem
 						store={menu}
+						data-searchable-menu-item="true"
 						disabled={isDisabled}
 						className={`data-active-item:bg-base-200 flex min-w-0 flex-1 items-start gap-2 rounded-lg p-1 text-left outline-none ${
 							isDisabled ? (option.isSelectable ? 'cursor-wait opacity-70' : 'cursor-not-allowed opacity-60') : ''
@@ -307,11 +358,11 @@ export function AssistantPresetDropdown({
 						portal
 						gutter={8}
 						overflowPadding={8}
-						autoFocusOnShow
+						autoFocusOnShow={false}
 						className={actionTriggerMenuWideClasses}
 					>
 						<div className="mb-2 px-1 text-xs opacity-70">
-							Assistant presets seed starting text, model, instructions, tools, skills, and MCP context.
+							Assistant presets seed starting text, model, instructions, tools, skills, and MCPs.
 						</div>
 
 						{error ? (
@@ -326,6 +377,35 @@ export function AssistantPresetDropdown({
 							</div>
 						) : null}
 
+						{presetOptions.length > 0 ? (
+							<SearchableMenuInput
+								open={open}
+								query={searchQuery}
+								onQueryChange={setSearchQuery}
+								placeholder="Search assistant presets…"
+								resultCount={displayedPresetCount}
+								totalCount={presetOptions.length}
+								disabled={loading}
+								onFocusFirstItem={() => {
+									focusFirstSearchableMenuItem(menuContentElement);
+								}}
+								onEnterFirstResult={() => {
+									if (!firstSelectablePreset || isApplying) {
+										return;
+									}
+									void (async () => {
+										const ok = await onSelectPreset(firstSelectablePreset.key);
+										if (ok) {
+											menu.hide();
+										}
+									})();
+								}}
+								onEscape={() => {
+									menu.hide();
+								}}
+							/>
+						) : null}
+
 						{loading ? (
 							<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default p-2`}>
 								Loading assistant presets…
@@ -334,9 +414,11 @@ export function AssistantPresetDropdown({
 							<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default p-2`}>
 								No enabled assistant presets available.
 							</div>
+						) : displayedPresetCount === 0 ? (
+							<div className={searchableMenuEmptyStateClasses}>No assistant presets match your search.</div>
 						) : (
 							<div className="space-y-2">
-								{groupedPresetOptions.map((group, groupIndex) => (
+								{displayedGroupedPresetOptions.map((group, groupIndex) => (
 									<GroupedMenuSection
 										key={group.bundleSlug}
 										title={group.bundleDisplayName}

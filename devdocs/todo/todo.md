@@ -16,8 +16,6 @@
 
 - [ ] github pr review preset
 
-- [ ] better simple search inside dropdown selectors for context and presets
-
 ## M-3
 
 - [ ] a folder selection/input an be given in context bar to say that your current work folder is so and so, so that any claude.md or skills or anything can be selected and auto injected as a "Starter recipe"

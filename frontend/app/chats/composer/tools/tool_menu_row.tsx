@@ -134,6 +134,7 @@ export function ToolMenuRow({
 			store={store}
 			hideOnClick={hideOnClick}
 			disabled={disabled}
+			data-searchable-menu-item="true"
 			onClick={() => {
 				if (disabled) {
 					return;

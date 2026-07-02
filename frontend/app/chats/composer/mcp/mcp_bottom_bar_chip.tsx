@@ -31,6 +31,13 @@ import { mcpAPI } from '@/apis/baseapi';
 
 import { ActionTriggerChipContent, actionTriggerChipSurfaceClasses } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
+import { searchableMenuEmptyStateClasses, SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
+import {
+	focusFirstSearchableMenuItem,
+	isSearchQueryActive,
+	rankSearchableItems,
+	useSearchableMenuState,
+} from '@/components/searchmenu/searchable_menu_utils';
 
 import type {
 	MCPComposerServerOption,
@@ -686,11 +693,13 @@ function ServerRow({
 	state,
 	isInputLocked,
 	onAuthorize,
+	onToggleSelected,
 }: {
 	option: MCPComposerServerOption;
 	state: UseComposerMCPResult;
 	isInputLocked: boolean;
 	onAuthorize: () => void;
+	onToggleSelected: () => void;
 }) {
 	const key = mcpServerKey(option.bundle.id, option.server.id);
 	const selected = Boolean(state.selectedByServerKey[key]);
@@ -703,7 +712,21 @@ function ServerRow({
 	const authPending = authState === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending;
 
 	return (
-		<div className="border-base-300 mb-2 rounded-xl border p-2">
+		<div
+			className="border-base-300 data-active-item:bg-base-200 mb-2 rounded-xl border p-2 outline-none"
+			tabIndex={0}
+			role="menuitemcheckbox"
+			aria-checked={selected}
+			data-searchable-menu-item="true"
+			onKeyDown={event => {
+				if (event.key !== 'Enter' && event.key !== ' ') {
+					return;
+				}
+				event.preventDefault();
+				event.stopPropagation();
+				onToggleSelected();
+			}}
+		>
 			<div className="flex items-start gap-2">
 				<input
 					type="checkbox"
@@ -821,6 +844,29 @@ function ServerRow({
 	);
 }
 
+function getMCPOptionSearchFields(option: MCPComposerServerOption) {
+	return [
+		{ value: option.server.displayName, weight: 8 },
+		{ value: option.server.id, weight: 7 },
+		{ value: option.bundle.displayName, weight: 5 },
+		{ value: option.bundle.slug, weight: 5 },
+		{ value: option.bundle.id, weight: 3 },
+		{ value: option.runtime?.lastError, weight: 2 },
+		{ value: option.authHealth?.lastError, weight: 2 },
+		{ value: option.tools.map(tool => tool.displayName || tool.toolName), weight: 2 },
+		{ value: option.tools.map(tool => tool.toolName), weight: 2 },
+		{ value: option.tools.map(tool => tool.description ?? ''), weight: 1 },
+		{ value: option.resources.map(resource => resource.displayName || resource.name || resource.uri), weight: 2 },
+		{ value: option.resources.map(resource => resource.uri), weight: 1 },
+		{
+			value: option.resourceTemplates.map(template => template.displayName || template.name || template.uriTemplate),
+			weight: 2,
+		},
+		{ value: option.prompts.map(prompt => prompt.displayName || prompt.promptName), weight: 2 },
+		{ value: option.prompts.map(prompt => prompt.description ?? ''), weight: 1 },
+	];
+}
+
 export function MCPBottomBarChip({
 	store,
 	shortcut,
@@ -839,6 +885,8 @@ export function MCPBottomBarChip({
 	const internalMenu = useMenuStore({ placement: 'top', focusLoop: true });
 	const menu = store ?? internalMenu;
 	const open = useStoreState(menu, 'open');
+	const menuContentElement = useStoreState(menu, 'contentElement');
+	const [searchQuery, setSearchQuery] = useSearchableMenuState(open);
 	const [manualOAuthModalKey, setManualOAuthModalKey] = useState<string | null>(null);
 	const [dismissedOAuthKeys, setDismissedOAuthKeys] = useState<Set<string>>(() => new Set());
 
@@ -849,6 +897,22 @@ export function MCPBottomBarChip({
 	const hiddenDisabledServerCount = state.options.length - visibleOptions.length;
 	const hiddenDisabledServerLabel = hiddenDisabledServerCount === 1 ? 'server' : 'servers';
 	const hiddenDisabledServerVerb = hiddenDisabledServerCount === 1 ? 'is' : 'are';
+
+	const displayedVisibleOptions = useMemo(() => {
+		if (!isSearchQueryActive(searchQuery)) {
+			return visibleOptions;
+		}
+
+		return rankSearchableItems(visibleOptions, {
+			query: searchQuery,
+			getKey: optionKey,
+			getFields: getMCPOptionSearchFields,
+			fallbackCompare: (a, b) =>
+				a.bundle.slug.localeCompare(b.bundle.slug) || a.server.displayName.localeCompare(b.server.displayName),
+		});
+	}, [searchQuery, visibleOptions]);
+
+	const firstVisibleOption = displayedVisibleOptions[0] ?? null;
 
 	const title = useMemo(() => {
 		const lines = [
@@ -931,6 +995,22 @@ export function MCPBottomBarChip({
 				? 'border-base-300 bg-base-300/60'
 				: 'border-transparent';
 
+	const toggleServerOption = (option: MCPComposerServerOption) => {
+		if (isInputLocked) {
+			return;
+		}
+		const key = mcpServerKey(option.bundle.id, option.server.id);
+		const selected = Boolean(state.selectedByServerKey[key]);
+		if (!selected && !isEnabledMCPOption(option)) {
+			return;
+		}
+
+		state.setServerSelected(option, !selected);
+		if (!selected) {
+			void state.ensureDiscoveryLoaded(option.bundle.id, option.server.id);
+		}
+	};
+
 	return (
 		<>
 			<div className="relative shrink-0" data-bottom-bar-mcp>
@@ -991,7 +1071,7 @@ export function MCPBottomBarChip({
 							overflowPadding={8}
 							portal
 							className="rounded-box bg-base-100 text-base-content border-base-300 z-50 max-h-[75vh] w-2xl max-w-[90vw] overflow-y-auto border p-2 shadow-xl"
-							autoFocusOnShow
+							autoFocusOnShow={false}
 						>
 							<div className="mb-2 flex items-center justify-between gap-2">
 								<div className="text-base-content/70 text-xs font-semibold">MCP servers</div>
@@ -1008,6 +1088,27 @@ export function MCPBottomBarChip({
 									<span className="ml-1">Refresh</span>
 								</button>
 							</div>
+
+							<SearchableMenuInput
+								open={open}
+								query={searchQuery}
+								onQueryChange={setSearchQuery}
+								placeholder="Search MCP servers, tools, resources…"
+								resultCount={displayedVisibleOptions.length}
+								totalCount={visibleOptions.length}
+								disabled={state.loading || visibleOptions.length === 0}
+								onFocusFirstItem={() => {
+									focusFirstSearchableMenuItem(menuContentElement);
+								}}
+								onEnterFirstResult={() => {
+									if (firstVisibleOption) {
+										toggleServerOption(firstVisibleOption);
+									}
+								}}
+								onEscape={() => {
+									menu.hide();
+								}}
+							/>
 
 							{hasAppContextUpdates ? (
 								<div className="border-info/30 bg-info/10 mb-2 rounded-xl border p-2 text-xs">
@@ -1039,9 +1140,11 @@ export function MCPBottomBarChip({
 								<div className="text-base-content/60 rounded-xl px-2 py-1 text-xs">
 									No MCP servers configured. Add servers from the MCP Servers management page.
 								</div>
+							) : displayedVisibleOptions.length === 0 ? (
+								<div className={searchableMenuEmptyStateClasses}>No MCP servers match your search.</div>
 							) : (
 								<>
-									{visibleOptions.map(option => (
+									{displayedVisibleOptions.map(option => (
 										<ServerRow
 											key={optionKey(option)}
 											option={option}
@@ -1049,6 +1152,9 @@ export function MCPBottomBarChip({
 											isInputLocked={isInputLocked}
 											onAuthorize={() => {
 												setManualOAuthModalKey(optionKey(option));
+											}}
+											onToggleSelected={() => {
+												toggleServerOption(option);
 											}}
 										/>
 									))}

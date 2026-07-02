@@ -16,6 +16,13 @@ import {
 } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 import { GroupedMenuSection, GroupedMenuSubheading } from '@/components/grouped_menu_sections';
+import { searchableMenuEmptyStateClasses, SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
+import {
+	focusFirstSearchableMenuItem,
+	isSearchQueryActive,
+	rankSearchableItems,
+	useSearchableMenuState,
+} from '@/components/searchmenu/searchable_menu_utils';
 
 import { dedupeSkillRefs, skillRefFromListItem, skillRefKey } from '@/skills/lib/skill_identity_utils';
 
@@ -124,6 +131,19 @@ function BundleCheckbox({
 	);
 }
 
+function getSkillSearchFields(item: SkillListItem) {
+	return [
+		{ value: getSkillDisplayLabel(item), weight: 6 },
+		{ value: item.skillSlug, weight: 5 },
+		{ value: item.skillDefinition.name, weight: 4 },
+		{ value: item.bundleSlug, weight: 3 },
+		{ value: item.bundleID, weight: 2 },
+		{ value: item.skillDefinition.description, weight: 2 },
+		{ value: item.skillDefinition.type, weight: 1 },
+		{ value: item.skillDefinition.location, weight: 1 },
+	];
+}
+
 export function SkillsBottomBarChip({
 	store,
 	shortcut,
@@ -150,6 +170,8 @@ export function SkillsBottomBarChip({
 	const internalMenu = useMenuStore({ placement: 'top', focusLoop: true });
 	const menu = store ?? internalMenu;
 	const open = useStoreState(menu, 'open');
+	const menuContentElement = useStoreState(menu, 'contentElement');
+	const [searchQuery, setSearchQuery] = useSearchableMenuState(open);
 
 	useEffect(() => {
 		if (isInputLocked) {
@@ -223,6 +245,27 @@ export function SkillsBottomBarChip({
 
 		return bundleGroups.toSorted(compareBundleGroups);
 	}, [allSkills]);
+
+	const displayedGroups = useMemo(() => {
+		if (!isSearchQueryActive(searchQuery)) {
+			return groups;
+		}
+
+		return groups
+			.map(group => ({
+				...group,
+				skills: rankSearchableItems(group.skills, {
+					query: searchQuery,
+					getKey: skillListItemKey,
+					getFields: getSkillSearchFields,
+					fallbackCompare: compareSkillListItems,
+				}),
+			}))
+			.filter(group => group.skills.length > 0);
+	}, [groups, searchQuery]);
+
+	const displayedSkillCount = displayedGroups.reduce((sum, group) => sum + group.skills.length, 0);
+	const firstVisibleSkill = displayedGroups[0]?.skills[0] ?? null;
 
 	const setSkillEnabled = useCallback(
 		(ref: SkillRef, enabled: boolean) => {
@@ -317,6 +360,7 @@ export function SkillsBottomBarChip({
 		return (
 			<MenuItem
 				key={k}
+				data-searchable-menu-item="true"
 				hideOnClick={false}
 				className="data-active-item:bg-base-200 flex items-center gap-2 rounded-xl px-2 py-1 pl-6 outline-none"
 				title={`${item.bundleSlug}/${item.skillSlug} • ${item.skillDefinition.type} • ${item.skillDefinition.location}`}
@@ -411,7 +455,14 @@ export function SkillsBottomBarChip({
 				</div>
 			</HoverTip>
 
-			<Menu store={menu} gutter={8} overflowPadding={8} className={actionTriggerMenuWideClasses} autoFocusOnShow portal>
+			<Menu
+				store={menu}
+				gutter={8}
+				overflowPadding={8}
+				className={actionTriggerMenuWideClasses}
+				autoFocusOnShow={false}
+				portal
+			>
 				<div className="mb-2 flex items-center justify-between gap-2 px-1">
 					<div className="text-base-content/70 text-xs font-semibold">Skills</div>
 					<div className="text-base-content/60 flex items-center gap-2 text-xs">
@@ -423,16 +474,39 @@ export function SkillsBottomBarChip({
 					</div>
 				</div>
 
+				<SearchableMenuInput
+					open={open}
+					query={searchQuery}
+					onQueryChange={setSearchQuery}
+					placeholder="Search skills…"
+					resultCount={displayedSkillCount}
+					totalCount={totalCount}
+					disabled={loading || totalCount === 0}
+					onFocusFirstItem={() => {
+						focusFirstSearchableMenuItem(menuContentElement);
+					}}
+					onEnterFirstResult={() => {
+						if (firstVisibleSkill && !isInputLocked) {
+							toggleSkillItem(firstVisibleSkill);
+						}
+					}}
+					onEscape={() => {
+						menu.hide();
+					}}
+				/>
+
 				{loading ? (
 					<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>Loading skills…</div>
 				) : totalCount === 0 ? (
 					<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
 						No skills available
 					</div>
+				) : displayedSkillCount === 0 ? (
+					<div className={searchableMenuEmptyStateClasses}>No skills match your search.</div>
 				) : (
 					<>
 						<div className="space-y-2">
-							{groups.map((group, groupIndex) => {
+							{displayedGroups.map((group, groupIndex) => {
 								const bundleRefs = group.skills.map(skillRefFromListItem);
 								const bundleTotal = bundleRefs.length;
 								const bundleEnabled = bundleRefs.filter(r => enabledKeySet.has(skillRefKey(r))).length;

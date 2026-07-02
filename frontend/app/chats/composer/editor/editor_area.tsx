@@ -260,6 +260,21 @@ function enrichMCPToolCallsFromContext(toolCalls: UIToolCall[], context?: MCPCon
 	return changed ? next : toolCalls;
 }
 
+function focusMenuSearchOrFirstItem(menuElement: HTMLElement | null | undefined) {
+	const searchInput = menuElement?.querySelector<HTMLInputElement>('[data-searchable-menu-input="true"]');
+	if (searchInput) {
+		searchInput.focus({ preventScroll: true });
+		searchInput.select();
+		return;
+	}
+
+	menuElement
+		?.querySelector<HTMLElement>(
+			'[data-searchable-menu-item="true"]:not([aria-disabled="true"]):not(:disabled), [role="menuitem"]'
+		)
+		?.focus();
+}
+
 interface SubmitOptions {
 	runPendingTools: boolean;
 }
@@ -697,7 +712,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		}
 
 		requestAnimationFrame(() => {
-			templateMenuEl?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+			focusMenuSearchOrFirstItem(templateMenuEl);
 		});
 	}, [templateMenuOpen, templateMenuEl, focusEditorPreservingSelection]);
 
@@ -716,7 +731,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		}
 
 		requestAnimationFrame(() => {
-			toolMenuEl?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+			focusMenuSearchOrFirstItem(toolMenuEl);
 		});
 	}, [toolMenuOpen, toolMenuEl, focusEditorPreservingSelection]);
 
@@ -740,7 +755,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		}
 
 		requestAnimationFrame(() => {
-			attachmentMenuEl?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+			focusMenuSearchOrFirstItem(attachmentMenuEl);
 		});
 	}, [attachmentMenuOpen, attachmentMenuEl, focusEditorPreservingSelection]);
 
@@ -759,7 +774,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		}
 
 		requestAnimationFrame(() => {
-			systemPromptMenuEl?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+			focusMenuSearchOrFirstItem(systemPromptMenuEl);
 		});
 	}, [focusEditorPreservingSelection, systemPromptMenuEl, systemPromptMenuOpen]);
 
@@ -778,7 +793,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		}
 
 		requestAnimationFrame(() => {
-			skillsMenuEl?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+			focusMenuSearchOrFirstItem(skillsMenuEl);
 		});
 	}, [focusEditorPreservingSelection, skillsMenuEl, skillsMenuOpen]);
 
@@ -797,7 +812,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		}
 
 		requestAnimationFrame(() => {
-			mcpMenuEl?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+			focusMenuSearchOrFirstItem(mcpMenuEl);
 		});
 	}, [focusEditorPreservingSelection, mcpMenuEl, mcpMenuOpen]);
 

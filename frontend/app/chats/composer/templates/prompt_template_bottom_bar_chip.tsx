@@ -18,6 +18,13 @@ import {
 } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 import { GroupedMenuSection } from '@/components/grouped_menu_sections';
+import { searchableMenuEmptyStateClasses, SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
+import {
+	focusFirstSearchableMenuItem,
+	isSearchQueryActive,
+	rankSearchableItems,
+	useSearchableMenuState,
+} from '@/components/searchmenu/searchable_menu_utils';
 
 import { usePromptTemplates } from '@/prompts/lib/use_prompt_templates';
 
@@ -101,7 +108,32 @@ function groupPromptTemplates(items: PromptTemplateListItem[]): PromptTemplateGr
 }
 
 function PromptTemplateDropdown({ store, open, loading, items, onPick }: PromptTemplateDropdownProps) {
-	const groupedTemplates = useMemo(() => groupPromptTemplates(items), [items]);
+	const menuContentElement = useStoreState(store, 'contentElement');
+	const [searchQuery, setSearchQuery] = useSearchableMenuState(open);
+
+	const displayedItems = useMemo(() => {
+		if (!isSearchQueryActive(searchQuery)) {
+			return items;
+		}
+
+		return rankSearchableItems(items, {
+			query: searchQuery,
+			getKey: promptTemplateKey,
+			getFields: item => [
+				{ value: humanizeTemplateSlug(item.templateSlug), weight: 6 },
+				{ value: item.templateSlug, weight: 5 },
+				{ value: item.templateVersion, weight: 4 },
+				{ value: item.bundleSlug, weight: 3 },
+				{ value: item.bundleID, weight: 2 },
+				{ value: item.kind, weight: 2 },
+				{ value: item.isBuiltIn ? 'built-in' : 'custom', weight: 1 },
+			],
+			fallbackCompare: comparePromptTemplateListItems,
+		});
+	}, [items, searchQuery]);
+
+	const groupedTemplates = useMemo(() => groupPromptTemplates(displayedItems), [displayedItems]);
+	const firstTemplate = displayedItems[0] ?? null;
 
 	return (
 		<Menu
@@ -111,14 +143,39 @@ function PromptTemplateDropdown({ store, open, loading, items, onPick }: PromptT
 			portal
 			className={actionTriggerMenuWideClasses}
 			data-menu-kind="templates"
-			autoFocusOnShow
+			autoFocusOnShow={false}
 		>
+			{!open ? null : (
+				<SearchableMenuInput
+					open={open}
+					query={searchQuery}
+					onQueryChange={setSearchQuery}
+					placeholder="Search prompts…"
+					resultCount={displayedItems.length}
+					totalCount={items.length}
+					disabled={loading || items.length === 0}
+					onFocusFirstItem={() => {
+						focusFirstSearchableMenuItem(menuContentElement);
+					}}
+					onEnterFirstResult={() => {
+						if (firstTemplate) {
+							onPick(firstTemplate);
+						}
+					}}
+					onEscape={() => {
+						store.hide();
+					}}
+				/>
+			)}
+
 			{!open ? null : loading ? (
 				<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>Loading templates…</div>
 			) : items.length === 0 ? (
 				<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
 					No templates available
 				</div>
+			) : displayedItems.length === 0 ? (
+				<div className={searchableMenuEmptyStateClasses}>No prompt templates match your search.</div>
 			) : (
 				<div className="space-y-2">
 					{groupedTemplates.map((group, groupIndex) => (
@@ -132,6 +189,7 @@ function PromptTemplateDropdown({ store, open, loading, items, onPick }: PromptT
 							{group.options.map(item => (
 								<MenuItem
 									key={promptTemplateKey(item)}
+									data-searchable-menu-item="true"
 									onClick={() => {
 										onPick(item);
 									}}

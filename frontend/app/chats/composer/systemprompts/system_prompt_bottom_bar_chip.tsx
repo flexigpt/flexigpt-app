@@ -19,6 +19,13 @@ import {
 } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 import { GroupedMenuSection } from '@/components/grouped_menu_sections';
+import { searchableMenuEmptyStateClasses, SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
+import {
+	focusFirstSearchableMenuItem,
+	isSearchQueryActive,
+	rankSearchableItems,
+	useSearchableMenuState,
+} from '@/components/searchmenu/searchable_menu_utils';
 
 import { SystemPromptAddModal } from '@/chats/composer/systemprompts/system_prompt_add_modal';
 import type { ComposerSystemPromptController } from '@/chats/composer/systemprompts/use_composer_system_prompt';
@@ -89,6 +96,18 @@ function stopMenuBubbleEvent(event: SyntheticEvent) {
 	event.stopPropagation();
 }
 
+function getSystemPromptSearchFields(item: SystemPromptItem) {
+	return [
+		{ value: item.displayName, weight: 7 },
+		{ value: item.templateSlug, weight: 6 },
+		{ value: item.templateVersion, weight: 4 },
+		{ value: item.bundleDisplayName, weight: 3 },
+		{ value: item.bundleID, weight: 2 },
+		{ value: item.role, weight: 2 },
+		{ value: item.prompt, weight: 1 },
+	];
+}
+
 function SystemPromptBottomBarChipInner({
 	store,
 	shortcut,
@@ -137,7 +156,9 @@ function SystemPromptBottomBarChipInner({
 
 	const lastRefreshTsRef = useRef(0);
 	const open = useStoreState(menu, 'open');
+	const menuContentElement = useStoreState(menu, 'contentElement');
 	const selectedKeySet = useMemo(() => new Set(selectedPromptKeys), [selectedPromptKeys]);
+	const [searchQuery, setSearchQuery] = useSearchableMenuState(open);
 
 	const groupedPrompts = useMemo(() => {
 		const bundlesByID = new Map(bundles.map(bundle => [bundle.id, bundle]));
@@ -197,6 +218,43 @@ function SystemPromptBottomBarChipInner({
 			return PROMPT_SORT_COLLATOR.compare(left.bundleID, right.bundleID);
 		});
 	}, [bundles, prompts]);
+
+	const displayedGroupedPrompts = useMemo(() => {
+		if (!isSearchQueryActive(searchQuery)) {
+			return groupedPrompts;
+		}
+
+		return groupedPrompts
+			.map(group => ({
+				...group,
+				prompts: rankSearchableItems(group.prompts, {
+					query: searchQuery,
+					getKey: item => item.identityKey,
+					getFields: getSystemPromptSearchFields,
+					fallbackCompare: (left, right) =>
+						PROMPT_SORT_COLLATOR.compare(left.templateSlug, right.templateSlug) ||
+						PROMPT_SORT_COLLATOR.compare(left.templateVersion, right.templateVersion) ||
+						PROMPT_SORT_COLLATOR.compare(left.displayName, right.displayName) ||
+						PROMPT_SORT_COLLATOR.compare(left.identityKey, right.identityKey),
+				}),
+			}))
+			.filter(group => group.prompts.length > 0);
+	}, [groupedPrompts, searchQuery]);
+
+	const promptSearchActive = isSearchQueryActive(searchQuery);
+	const modelDefaultMatches =
+		hasModelDefaultPrompt &&
+		(!promptSearchActive ||
+			rankSearchableItems([modelDefaultPrompt], {
+				query: searchQuery,
+				getKey: () => 'model-default',
+				getFields: prompt => [
+					{ value: 'Model default', weight: 5 },
+					{ value: prompt, weight: 1 },
+				],
+			}).length > 0);
+	const displayedPromptCount = displayedGroupedPrompts.reduce((sum, group) => sum + group.prompts.length, 0);
+	const firstPromptSearchResult = displayedGroupedPrompts[0]?.prompts[0] ?? null;
 
 	const tooltipAnchorEl = useStoreState(promptTooltip, 'anchorElement');
 	const currentPromptText = tooltipAnchorEl?.dataset.prompt ?? '';
@@ -358,7 +416,7 @@ function SystemPromptBottomBarChipInner({
 				portal
 				gutter={8}
 				overflowPadding={8}
-				autoFocusOnShow
+				autoFocusOnShow={false}
 				className={actionTriggerMenuWideClasses}
 				onKeyDownCapture={event => {
 					if (event.key === 'Escape') {
@@ -375,8 +433,38 @@ function SystemPromptBottomBarChipInner({
 					Bundles cannot be created here; use the Prompt Bundles page.
 				</div>
 
-				{hasModelDefaultPrompt ? (
+				<SearchableMenuInput
+					open={open}
+					query={searchQuery}
+					onQueryChange={setSearchQuery}
+					placeholder="Search system prompts…"
+					resultCount={displayedPromptCount + (modelDefaultMatches ? 1 : 0)}
+					totalCount={prompts.length + (hasModelDefaultPrompt ? 1 : 0)}
+					disabled={loading || (!hasModelDefaultPrompt && prompts.length === 0)}
+					onFocusFirstItem={() => {
+						focusFirstSearchableMenuItem(menuContentElement);
+					}}
+					onEnterFirstResult={() => {
+						if (isInputLocked) {
+							return;
+						}
+						if (modelDefaultMatches) {
+							onToggleModelDefault(!includeModelDefault);
+							return;
+						}
+						if (firstPromptSearchResult) {
+							onTogglePrompt(firstPromptSearchResult.identityKey);
+						}
+					}}
+					onEscape={() => {
+						hidePromptTooltip();
+						menu.hide();
+					}}
+				/>
+
+				{modelDefaultMatches ? (
 					<MenuItem
+						data-searchable-menu-item="true"
 						hideOnClick={false}
 						className={`data-active-item:bg-base-200 border-base-300 mb-2 rounded-lg border p-2 outline-none ${
 							isInputLocked ? 'opacity-60' : ''
@@ -434,9 +522,9 @@ function SystemPromptBottomBarChipInner({
 					<div className="text-error m-0 flex cursor-default items-center justify-between rounded-md p-2 text-xs">
 						<span>{error}</span>
 					</div>
-				) : prompts.length > 0 ? (
+				) : displayedPromptCount > 0 ? (
 					<div className="space-y-2">
-						{groupedPrompts.map((group, groupIndex) => (
+						{displayedGroupedPrompts.map((group, groupIndex) => (
 							<GroupedMenuSection
 								key={group.bundleID}
 								title={group.bundleDisplayName}
@@ -461,6 +549,7 @@ function SystemPromptBottomBarChipInner({
 										return (
 											<MenuItem
 												key={item.identityKey}
+												data-searchable-menu-item="true"
 												hideOnClick={false}
 												data-prompt={item.prompt}
 												className={`data-active-item:bg-base-200 border-base-300 flex items-start gap-2 rounded-lg border p-2 outline-none ${
@@ -535,8 +624,8 @@ function SystemPromptBottomBarChipInner({
 						))}
 					</div>
 				) : (
-					<div className="m-0 flex cursor-default items-center justify-between rounded-md p-2 text-xs opacity-70">
-						<span>No saved prompts</span>
+					<div className={searchableMenuEmptyStateClasses}>
+						{prompts.length === 0 ? 'No saved prompts' : 'No saved prompts match your search.'}
 					</div>
 				)}
 

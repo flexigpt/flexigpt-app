@@ -20,6 +20,13 @@ import {
 } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
 import { GroupedMenuSection, GroupedMenuSubheading } from '@/components/grouped_menu_sections';
+import { SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
+import {
+	focusFirstSearchableMenuItem,
+	isSearchQueryActive,
+	rankSearchableItems,
+	useSearchableMenuState,
+} from '@/components/searchmenu/searchable_menu_utils';
 
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import { dispatchOpenToolArgs } from '@/chats/composer/toolruntime/use_open_toolargs_event';
@@ -130,6 +137,45 @@ function compareToolGroups(a: ToolBundleGroup, b: ToolBundleGroup): number {
 	return toolMenuCollator.compare(a.bundleID, b.bundleID);
 }
 
+function getToolListItemSearchFields(item: ToolListItem) {
+	return [
+		{ value: item.toolDefinition.displayName, weight: 7 },
+		{ value: item.toolSlug, weight: 6 },
+		{ value: item.toolVersion, weight: 4 },
+		{ value: item.bundleSlug, weight: 3 },
+		{ value: item.bundleID, weight: 2 },
+		{ value: item.toolDefinition.description, weight: 2 },
+		{ value: item.toolDefinition.tags, weight: 1 },
+	];
+}
+
+function getAttachedToolSearchFields(entry: AttachedToolEntry) {
+	return [
+		{ value: entry.toolSnapshot?.displayName ?? entry.toolSlug, weight: 7 },
+		{ value: entry.toolSlug, weight: 6 },
+		{ value: entry.toolVersion, weight: 4 },
+		{ value: entry.bundleSlug, weight: 3 },
+		{ value: entry.bundleID, weight: 2 },
+		{ value: entry.toolSnapshot?.description, weight: 2 },
+	];
+}
+
+function getConversationToolSearchFields(entry: ConversationToolStateEntry) {
+	const choice = entry.toolStoreChoice;
+	return [
+		{ value: choice.displayName ?? choice.toolSlug, weight: 7 },
+		{ value: choice.toolSlug, weight: 6 },
+		{ value: choice.toolVersion, weight: 4 },
+		{ value: choice.bundleSlug, weight: 3 },
+		{ value: choice.bundleID, weight: 2 },
+		{ value: choice.description, weight: 2 },
+	];
+}
+
+function compareConversationToolEntries(a: ConversationToolStateEntry, b: ConversationToolStateEntry): number {
+	return toolMenuCollator.compare(getConversationToolKey(a), getConversationToolKey(b));
+}
+
 function groupTools(
 	tools: ToolListItem[],
 	attachedToolKeys: Set<string>,
@@ -212,6 +258,8 @@ export function ToolsBottomBarChip({
 	isInputLocked = false,
 }: ToolsBottomBarChipProps) {
 	const open = useStoreState(store, 'open');
+	const menuContentElement = useStoreState(store, 'contentElement');
+	const [searchQuery, setSearchQuery] = useSearchableMenuState(open);
 	const { data: toolData, loading: toolsLoading } = useTools();
 
 	const [toolAutoExecOverrides, setToolAutoExecOverrides] = useState<Record<string, boolean>>({});
@@ -265,6 +313,19 @@ export function ToolsBottomBarChip({
 		}
 		return getEligibleWebSearchTools(toolData, currentProviderSDKType);
 	}, [currentProviderSDKType, toolData, toolsLoading]);
+
+	const displayedEligibleWebSearchTools = useMemo(() => {
+		if (!isSearchQueryActive(searchQuery)) {
+			return eligibleWebSearchTools;
+		}
+
+		return rankSearchableItems(eligibleWebSearchTools, {
+			query: searchQuery,
+			getKey: getToolKey,
+			getFields: getToolListItemSearchFields,
+			fallbackCompare: compareToolListItems,
+		});
+	}, [eligibleWebSearchTools, searchQuery]);
 
 	const eligibleWebSearchKeys = useMemo(() => {
 		return new Set(
@@ -363,10 +424,51 @@ export function ToolsBottomBarChip({
 		});
 	}, [currentProviderSDKType, toolData, toolsLoading]);
 
+	const displayedAvailableTools = useMemo(() => {
+		if (!isSearchQueryActive(searchQuery)) {
+			return availableTools;
+		}
+
+		return rankSearchableItems(availableTools, {
+			query: searchQuery,
+			getKey: getToolKey,
+			getFields: getToolListItemSearchFields,
+			fallbackCompare: compareToolListItems,
+		});
+	}, [availableTools, searchQuery]);
+
+	const displayedConversationToolByKey = useMemo(() => {
+		if (!isSearchQueryActive(searchQuery)) {
+			return conversationToolByKey;
+		}
+
+		const rankedEntries = rankSearchableItems(conversationToolsState, {
+			query: searchQuery,
+			getKey: entry => entry.key,
+			getFields: getConversationToolSearchFields,
+			fallbackCompare: compareConversationToolEntries,
+		});
+
+		return new Map<string, ConversationToolStateEntry>(
+			rankedEntries.map(entry => [getConversationToolKey(entry), entry] as const)
+		);
+	}, [conversationToolByKey, conversationToolsState, searchQuery]);
+
 	const groupedTools = useMemo(
-		() => groupTools(availableTools, attachedToolKeys, conversationToolByKey),
-		[availableTools, attachedToolKeys, conversationToolByKey]
+		() => groupTools(displayedAvailableTools, attachedToolKeys, displayedConversationToolByKey),
+		[attachedToolKeys, displayedAvailableTools, displayedConversationToolByKey]
 	);
+
+	const displayedVisibleAttachedToolEntries = useMemo(() => {
+		if (!isSearchQueryActive(searchQuery)) {
+			return visibleAttachedToolEntries;
+		}
+		return rankSearchableItems(visibleAttachedToolEntries, {
+			query: searchQuery,
+			getKey: entry => entry.selectionID,
+			getFields: getAttachedToolSearchFields,
+		});
+	}, [searchQuery, visibleAttachedToolEntries]);
 
 	const attachedArgsMissingCount = useMemo(() => {
 		let count = 0;
@@ -522,10 +624,10 @@ export function ToolsBottomBarChip({
 
 	const orderedWebSearchTools = useMemo(() => {
 		if (!activeWebSearch) {
-			return eligibleWebSearchTools;
+			return displayedEligibleWebSearchTools;
 		}
 		const activeKey = webSearchIdentityKey(activeWebSearch);
-		return [...eligibleWebSearchTools].toSorted((a, b) => {
+		return [...displayedEligibleWebSearchTools].toSorted((a, b) => {
 			const aActive = webSearchIdentityKey(a) === activeKey;
 			const bActive = webSearchIdentityKey(b) === activeKey;
 			if (aActive !== bActive) {
@@ -533,7 +635,7 @@ export function ToolsBottomBarChip({
 			}
 			return compareToolListItems(a, b);
 		});
-	}, [activeWebSearch, eligibleWebSearchTools]);
+	}, [activeWebSearch, displayedEligibleWebSearchTools]);
 
 	const renderWebSearchRow = (tool: ToolListItem) => {
 		const key = webSearchIdentityKey(tool);
@@ -548,6 +650,7 @@ export function ToolsBottomBarChip({
 		return (
 			<MenuItem
 				key={key}
+				data-searchable-menu-item="true"
 				hideOnClick={false}
 				className={`data-active-item:bg-base-200 mb-1 rounded-xl outline-none last:mb-0 ${isActive ? 'bg-base-200' : ''}`}
 				onClick={() => {
@@ -804,6 +907,34 @@ export function ToolsBottomBarChip({
 		);
 	};
 
+	const displayedToolResultCount =
+		displayedEligibleWebSearchTools.length +
+		displayedVisibleAttachedToolEntries.length +
+		displayedAvailableTools.length +
+		displayedConversationToolByKey.size;
+
+	const firstAvailableUnattachedTool =
+		displayedAvailableTools.find(item => !attachedToolKeys.has(getToolKey(item))) ?? null;
+	const firstWebSearchTool = displayedEligibleWebSearchTools[0] ?? null;
+	const firstConversationTool = [...displayedConversationToolByKey.values()][0] ?? null;
+
+	const handleFirstToolSearchResult = () => {
+		if (isInputLocked) {
+			return;
+		}
+		if (firstWebSearchTool) {
+			handleWebSearchToolSelected(firstWebSearchTool);
+			return;
+		}
+		if (firstAvailableUnattachedTool) {
+			handleAttachToolPick(firstAvailableUnattachedTool);
+			return;
+		}
+		if (firstConversationTool && !firstConversationTool.enabled) {
+			handleConversationToolEnabled(firstConversationTool.key, true);
+		}
+	};
+
 	return (
 		<div className="relative shrink-0" data-bottom-bar-tools>
 			<HoverTip content={title} placement="top" wrapperElement="div" wrapperClassName="inline-flex max-w-full">
@@ -861,8 +992,32 @@ export function ToolsBottomBarChip({
 				portal
 				className={actionTriggerMenuWideClasses}
 				data-menu-kind="tools"
-				autoFocusOnShow
+				autoFocusOnShow={false}
 			>
+				{!open ? null : (
+					<SearchableMenuInput
+						open={open}
+						query={searchQuery}
+						onQueryChange={setSearchQuery}
+						placeholder="Search tools…"
+						resultCount={displayedToolResultCount}
+						totalCount={
+							eligibleWebSearchTools.length +
+							visibleAttachedToolEntries.length +
+							availableTools.length +
+							conversationToolsState.length
+						}
+						disabled={toolsLoading}
+						onFocusFirstItem={() => {
+							focusFirstSearchableMenuItem(menuContentElement);
+						}}
+						onEnterFirstResult={handleFirstToolSearchResult}
+						onEscape={() => {
+							store.hide();
+						}}
+					/>
+				)}
+
 				{!open ? null : toolsLoading ? (
 					<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>Loading tools…</div>
 				) : (
@@ -872,7 +1027,7 @@ export function ToolsBottomBarChip({
 							ariaLabel="Web search tools"
 							meta={
 								<>
-									<span className="badge badge-ghost badge-xs">{eligibleWebSearchTools.length}</span>
+									<span className="badge badge-ghost badge-xs">{displayedEligibleWebSearchTools.length}</span>
 									{webSearchEnabled ? <span className="badge badge-info badge-xs">enabled</span> : null}
 									{webSearchArgsBlocked ? (
 										<span className="badge badge-warning badge-xs animate-pulse">args</span>
@@ -880,7 +1035,7 @@ export function ToolsBottomBarChip({
 								</>
 							}
 						>
-							{eligibleWebSearchTools.length === 0 ? (
+							{displayedEligibleWebSearchTools.length === 0 ? (
 								<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
 									No web-search tool is available for this model provider.
 								</div>
@@ -908,14 +1063,16 @@ export function ToolsBottomBarChip({
 							)}
 						</GroupedMenuSection>
 
-						{visibleAttachedToolEntries.length > 0 ? (
+						{displayedVisibleAttachedToolEntries.length > 0 ? (
 							<GroupedMenuSection
 								title="This message"
 								ariaLabel="Per-message tools"
 								separatorBefore
-								meta={<span className="badge badge-ghost badge-xs">{visibleAttachedToolEntries.length}</span>}
+								meta={<span className="badge badge-ghost badge-xs">{displayedVisibleAttachedToolEntries.length}</span>}
 							>
-								<div className="space-y-1">{visibleAttachedToolEntries.map(r => renderAttachedToolRow(r))}</div>
+								<div className="space-y-1">
+									{displayedVisibleAttachedToolEntries.map(r => renderAttachedToolRow(r))}
+								</div>
 							</GroupedMenuSection>
 						) : null}
 

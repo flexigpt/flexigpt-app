@@ -1056,3 +1056,5 @@
   - [x] MS: teams, 365
   - [x] Slack
   - [x] Zoom
+
+- [x] better simple search inside dropdown selectors for context and presets
