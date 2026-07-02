@@ -5,6 +5,7 @@ import { FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import type { Attachment } from '@/spec/attachment';
 import type { Conversation, ConversationMessage } from '@/spec/conversation';
 import { RoleEnum } from '@/spec/inference';
+import { ToolOutputKind } from '@/spec/tool';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 
@@ -23,21 +24,321 @@ import { ChatMessage } from '@/chats/messages/message';
 import type { ChatTabState } from '@/chats/tabs/tabs_model';
 
 const EMPTY_MESSAGES: ConversationMessage[] = [];
-const MAX_DIFF_CANDIDATE_PATHS = 2048;
+const MAX_DIFF_CANDIDATE_PATHS = 1024;
 
-function getLocalAttachmentPath(attachment: Attachment): string {
-	return (
-		attachment.fileRef?.origPath ||
-		attachment.fileRef?.path ||
-		attachment.imageRef?.origPath ||
-		attachment.imageRef?.path ||
-		attachment.contentBlock?.filePath ||
-		''
-	);
+const ABSOLUTE_PATH_PATTERN = /(?:[A-Za-z]:[\\/][^\s"'`<>|]+|\\\\[^\s"'`<>|]+|\/[^\s"'`<>|]+)/g;
+const RELATIVE_PATH_PATTERN = /(?:\.{1,2}[\\/])?(?:[A-Za-z0-9_.@+-]+[\\/]){1,}[A-Za-z0-9_.@+-]+/g;
+const PATH_LIKE_KEY_PATTERN =
+	/(?:^|[_-])(path|paths|file|files|dir|dirs|directory|directories|root|workspace)(?:$|[_-])/i;
+
+interface CandidatePathSource {
+	path: string;
+	isDirectory?: boolean;
+}
+
+function cleanCandidatePathToken(value: string): string {
+	return value
+		.trim()
+		.replace(/^[`"'<({[]+/, '')
+		.replaceAll(/[`"'>)}\].,;:!?]+$/g, '');
 }
 
 function normalizeCandidatePathKey(path: string): string {
 	return path.trim().replaceAll('\\', '/').replaceAll(/\/+/g, '/');
+}
+
+function isAbsoluteCandidatePath(path: string): boolean {
+	const normalized = path.trim();
+	return normalized.startsWith('/') || /^[A-Za-z]:[\\/]/.test(normalized) || normalized.startsWith('\\\\');
+}
+
+function looksLikeDirectoryPath(path: string): boolean {
+	const trimmed = path.trim();
+	return trimmed.endsWith('/') || trimmed.endsWith('\\');
+}
+
+function pathBasename(path: string): string {
+	const normalized = path.trim().replaceAll('\\', '/').replaceAll(/\/+$/g, '');
+	const index = normalized.lastIndexOf('/');
+	return index >= 0 ? normalized.slice(index + 1) : normalized;
+}
+
+function pathBasenameLooksLikeFile(path: string): boolean {
+	const basename = pathBasename(path);
+	return /\.[^./]+$/.test(basename);
+}
+
+function stripTrailingCandidateSlashes(path: string): string {
+	const normalized = path.trim().replaceAll('\\', '/').replaceAll(/\/+/g, '/');
+	if (normalized === '/') {
+		return normalized;
+	}
+	return normalized.replaceAll(/\/+$/g, '');
+}
+
+function dirnameCandidatePath(path: string): string {
+	const normalized = stripTrailingCandidateSlashes(path);
+	const index = normalized.lastIndexOf('/');
+
+	if (index < 0) {
+		return '';
+	}
+	if (index === 0) {
+		return '/';
+	}
+	return normalized.slice(0, index);
+}
+
+function formatDirectoryCandidate(path: string): string {
+	const normalized = stripTrailingCandidateSlashes(path);
+	if (!normalized || normalized.endsWith('/')) {
+		return normalized;
+	}
+	return `${normalized}/`;
+}
+
+function pushUniqueCandidatePath(out: string[], seen: Set<string>, path: string): boolean {
+	if (out.length >= MAX_DIFF_CANDIDATE_PATHS) {
+		return false;
+	}
+
+	const cleaned = cleanCandidatePathToken(path);
+	if (!cleaned) {
+		return false;
+	}
+
+	const key = normalizeCandidatePathKey(cleaned);
+	if (!key || seen.has(key)) {
+		return false;
+	}
+
+	seen.add(key);
+	out.push(cleaned);
+	return true;
+}
+
+function appendCandidatePathSource(cumulative: string[], seen: Set<string>, source: CandidatePathSource): string[] {
+	const cleaned = cleanCandidatePathToken(source.path);
+	if (!cleaned) {
+		return cumulative;
+	}
+
+	let next = cumulative;
+	const push = (path: string) => {
+		if (next === cumulative) {
+			next = [...cumulative];
+		}
+		return pushUniqueCandidatePath(next, seen, path);
+	};
+
+	push(cleaned);
+
+	const isAbsolute = isAbsoluteCandidatePath(cleaned);
+	const directoryHint =
+		source.isDirectory || looksLikeDirectoryPath(cleaned) || (isAbsolute && !pathBasenameLooksLikeFile(cleaned));
+
+	if (directoryHint) {
+		push(formatDirectoryCandidate(cleaned));
+	}
+
+	if (!isAbsolute) {
+		return next;
+	}
+
+	let dir =
+		source.isDirectory || looksLikeDirectoryPath(cleaned)
+			? stripTrailingCandidateSlashes(cleaned)
+			: dirnameCandidatePath(cleaned);
+	let depth = 0;
+
+	while (dir && isAbsoluteCandidatePath(dir) && depth < 12 && next.length < MAX_DIFF_CANDIDATE_PATHS) {
+		push(formatDirectoryCandidate(dir));
+
+		const parent = dirnameCandidatePath(dir);
+		if (!parent || parent === dir) {
+			break;
+		}
+
+		dir = parent;
+		depth += 1;
+	}
+
+	return next;
+}
+
+function getAttachmentCandidatePathSources(attachment: Attachment): CandidatePathSource[] {
+	const out: CandidatePathSource[] = [];
+
+	if (attachment.fileRef) {
+		const path = attachment.fileRef.origPath || attachment.fileRef.path;
+		if (path) {
+			out.push({ path, isDirectory: attachment.fileRef.isDir });
+		}
+	}
+
+	if (attachment.imageRef) {
+		const path = attachment.imageRef.origPath || attachment.imageRef.path;
+		if (path) {
+			out.push({ path, isDirectory: attachment.imageRef.isDir });
+		}
+	}
+
+	if (attachment.contentBlock?.filePath) {
+		out.push({ path: attachment.contentBlock.filePath });
+	}
+
+	return out;
+}
+
+function extractPathMentionsFromText(text: string | undefined): string[] {
+	if (!text) {
+		return [];
+	}
+
+	const out: string[] = [];
+
+	for (const match of text.matchAll(ABSOLUTE_PATH_PATTERN)) {
+		const raw = match[0] ?? '';
+		const index = match.index ?? 0;
+		const previous = index > 0 ? text[index - 1] : '';
+
+		// Avoid extracting the path part of URLs such as https://host/path.
+		if (previous === ':' || previous === '/') {
+			continue;
+		}
+
+		const cleaned = cleanCandidatePathToken(raw);
+		if (cleaned) {
+			out.push(cleaned);
+		}
+	}
+
+	for (const match of text.matchAll(RELATIVE_PATH_PATTERN)) {
+		const raw = match[0] ?? '';
+		const index = match.index ?? 0;
+		const previous = index > 0 ? text[index - 1] : '';
+
+		if (previous === '/' || previous === '\\' || previous === ':' || /[A-Za-z0-9_.@+-]/.test(previous)) {
+			continue;
+		}
+		if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) || raw.startsWith('www.')) {
+			continue;
+		}
+
+		const cleaned = cleanCandidatePathToken(raw);
+		if (cleaned) {
+			out.push(cleaned);
+		}
+	}
+
+	return out;
+}
+
+function valueLooksPathLike(value: string): boolean {
+	const cleaned = cleanCandidatePathToken(value);
+	return (
+		!!cleaned &&
+		(isAbsoluteCandidatePath(cleaned) ||
+			looksLikeDirectoryPath(cleaned) ||
+			cleaned.includes('/') ||
+			cleaned.includes('\\') ||
+			cleaned.startsWith('./') ||
+			cleaned.startsWith('../'))
+	);
+}
+
+function collectPathLikeStringsFromJSON(value: unknown, out: string[], keyHint = '', depth = 0) {
+	if (depth > 8 || value === null || value === undefined) {
+		return;
+	}
+
+	if (typeof value === 'string') {
+		if (PATH_LIKE_KEY_PATTERN.test(keyHint) || valueLooksPathLike(value)) {
+			out.push(value);
+		}
+		return;
+	}
+
+	if (Array.isArray(value)) {
+		for (const item of value) {
+			collectPathLikeStringsFromJSON(item, out, keyHint, depth + 1);
+		}
+		return;
+	}
+
+	if (typeof value === 'object') {
+		for (const [key, item] of Object.entries(value)) {
+			collectPathLikeStringsFromJSON(item, out, key, depth + 1);
+		}
+	}
+}
+
+function extractPathMentionsFromStructuredText(text: string | undefined): string[] {
+	if (!text) {
+		return [];
+	}
+
+	const out = [...extractPathMentionsFromText(text)];
+
+	try {
+		const parsed = JSON.parse(text) as unknown;
+		const jsonStrings: string[] = [];
+		collectPathLikeStringsFromJSON(parsed, jsonStrings);
+
+		for (const value of jsonStrings) {
+			if (valueLooksPathLike(value)) {
+				out.push(cleanCandidatePathToken(value));
+			}
+			out.push(...extractPathMentionsFromText(value));
+		}
+	} catch {
+		// Tool arguments are usually JSON, but may also be plain text.
+	}
+
+	return out;
+}
+
+function getMessageCandidatePathSources(message: ConversationMessage): CandidatePathSource[] {
+	const out: CandidatePathSource[] = [];
+
+	for (const attachment of message.attachments ?? []) {
+		out.push(...getAttachmentCandidatePathSources(attachment));
+	}
+
+	for (const path of extractPathMentionsFromText(message.uiContent)) {
+		out.push({ path });
+	}
+
+	for (const call of message.uiToolCalls ?? []) {
+		for (const path of extractPathMentionsFromStructuredText(call.arguments)) {
+			out.push({ path });
+		}
+	}
+
+	for (const output of message.uiToolOutputs ?? []) {
+		for (const path of extractPathMentionsFromStructuredText(output.arguments)) {
+			out.push({ path });
+		}
+		for (const path of extractPathMentionsFromText(output.summary)) {
+			out.push({ path });
+		}
+		for (const path of extractPathMentionsFromText(output.errorMessage)) {
+			out.push({ path });
+		}
+
+		for (const item of output.toolOutputs ?? []) {
+			if (item.kind === ToolOutputKind.Text && item.textItem?.text) {
+				for (const path of extractPathMentionsFromText(item.textItem.text)) {
+					out.push({ path });
+				}
+			}
+			if (item.kind === ToolOutputKind.File && item.fileItem?.fileName) {
+				out.push({ path: item.fileItem.fileName });
+			}
+		}
+	}
+
+	return out;
 }
 
 function buildDiffCandidatePathsByMessageID(messages: ConversationMessage[]): Map<string, string[]> {
@@ -49,28 +350,12 @@ function buildDiffCandidatePathsByMessageID(messages: ConversationMessage[]): Ma
 		const message = messages[messageIndex];
 		let next = cumulative;
 
-		for (const attachment of message.attachments ?? []) {
+		for (const source of getMessageCandidatePathSources(message)) {
 			if (next.length >= MAX_DIFF_CANDIDATE_PATHS) {
 				break;
 			}
 
-			const path = getLocalAttachmentPath(attachment).trim();
-			if (!path) {
-				continue;
-			}
-
-			const key = normalizeCandidatePathKey(path);
-			if (!key || seen.has(key)) {
-				continue;
-			}
-
-			seen.add(key);
-
-			if (next === cumulative) {
-				next = [...cumulative];
-			}
-
-			next.push(path);
+			next = appendCandidatePathSource(next, seen, source);
 		}
 
 		cumulative = next;

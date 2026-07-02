@@ -1058,3 +1058,4 @@
   - [x] Zoom
 
 - [x] better simple search inside dropdown selectors for context and presets
+- [x] enhance the file name detection when we are using tool calls and also when we have openai style patch out rather than unified diff.

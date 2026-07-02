@@ -39,6 +39,13 @@ interface ModalRunningAction {
 	kind: 'dry-run' | 'apply';
 }
 type TargetVisualState = 'neutral' | 'info' | 'success' | 'warning' | 'error';
+const DISPLAY_CANDIDATE_PATH_LIMIT = 32;
+
+interface DisplayCandidatePathList {
+	paths: string[];
+	total: number;
+	isLimited: boolean;
+}
 
 function getTargetCardClassName(visualState: TargetVisualState): string {
 	switch (visualState) {
@@ -258,6 +265,203 @@ function mergeModalTargetsPreservingLocalEdits(
 		matchedPreviousIndexes.add(previousIndex);
 		return mergeEditableTargetPreservingLocalPath(next, previous);
 	});
+}
+
+function normalizePathForDisplayScore(value: string | undefined | null): string {
+	return (value ?? '')
+		.trim()
+		.replaceAll('\\', '/')
+		.replaceAll(/\/+/g, '/')
+		.replace(/^(?:\.\/)+/, '');
+}
+
+function trimTrailingSlashesForDisplayScore(value: string): string {
+	if (value === '/') {
+		return value;
+	}
+	return value.replaceAll(/\/+$/g, '');
+}
+
+function isAbsoluteDisplayPath(value: string): boolean {
+	const trimmed = value.trim();
+	return trimmed.startsWith('/') || /^[A-Za-z]:[\\/]/.test(trimmed) || trimmed.startsWith('\\\\');
+}
+
+function looksLikeDirectoryCandidate(value: string): boolean {
+	const trimmed = value.trim();
+	return trimmed.endsWith('/') || trimmed.endsWith('\\');
+}
+
+function getDisplayPathParts(value: string): string[] {
+	return trimTrailingSlashesForDisplayScore(normalizePathForDisplayScore(value))
+		.replace(/^\/+/, '')
+		.split('/')
+		.filter(Boolean);
+}
+
+function getDisplayPathBasename(value: string): string {
+	const normalized = trimTrailingSlashesForDisplayScore(normalizePathForDisplayScore(value));
+	const index = normalized.lastIndexOf('/');
+	return index >= 0 ? normalized.slice(index + 1) : normalized;
+}
+
+function getDisplayPathDirname(value: string): string {
+	const normalized = trimTrailingSlashesForDisplayScore(normalizePathForDisplayScore(value));
+	const index = normalized.lastIndexOf('/');
+
+	if (index < 0) {
+		return '';
+	}
+	if (index === 0) {
+		return '/';
+	}
+	return normalized.slice(0, index);
+}
+
+function pathEndsWithDisplayPath(value: string, suffix: string): boolean {
+	const normalizedValue = trimTrailingSlashesForDisplayScore(normalizePathForDisplayScore(value));
+	const normalizedSuffix = trimTrailingSlashesForDisplayScore(normalizePathForDisplayScore(suffix)).replace(/^\/+/, '');
+
+	if (!normalizedValue || !normalizedSuffix) {
+		return false;
+	}
+
+	return normalizedValue === normalizedSuffix || normalizedValue.endsWith(`/${normalizedSuffix}`);
+}
+
+function getCommonSuffixPartCount(left: string, right: string): number {
+	const leftParts = getDisplayPathParts(left);
+	const rightParts = getDisplayPathParts(right);
+	let count = 0;
+
+	while (
+		count < leftParts.length &&
+		count < rightParts.length &&
+		leftParts[leftParts.length - 1 - count] === rightParts[rightParts.length - 1 - count]
+	) {
+		count += 1;
+	}
+
+	return count;
+}
+
+function getPatchPathsForDisplayTarget(target: EditableUnifiedDiffTarget): string[] {
+	return uniqueStrings([target.newPath, target.oldPath]).filter(path => path !== '/dev/null');
+}
+
+function scoreDisplayCandidatePath(candidateRaw: string, target: EditableUnifiedDiffTarget): number {
+	const candidate = normalizePathForDisplayScore(candidateRaw);
+	if (!candidate || candidate === '/dev/null') {
+		return Number.NEGATIVE_INFINITY;
+	}
+
+	let score = 0;
+	const isAbsolute = isAbsoluteDisplayPath(candidate);
+	const isDirectory = looksLikeDirectoryCandidate(candidateRaw);
+
+	if (isAbsolute) {
+		score += 1000;
+	}
+	if (isDirectory) {
+		score -= 250;
+	}
+
+	const targetPath = normalizePathForDisplayScore(target.targetPath);
+	const resolvedPath = normalizePathForDisplayScore(target.resolvedPath);
+
+	if (targetPath && candidate === targetPath) {
+		score = Math.max(score, 100_000);
+	}
+	if (resolvedPath && candidate === resolvedPath) {
+		score = Math.max(score, 95_000);
+	}
+
+	for (const patchPathRaw of getPatchPathsForDisplayTarget(target)) {
+		const patchPath = normalizePathForDisplayScore(patchPathRaw);
+		if (!patchPath) {
+			continue;
+		}
+
+		if (candidate === patchPath) {
+			score = Math.max(score, 90_000);
+		}
+
+		if (pathEndsWithDisplayPath(candidate, patchPath)) {
+			score = Math.max(score, 80_000 + getDisplayPathParts(patchPath).length * 100);
+		}
+
+		const commonSuffixParts = getCommonSuffixPartCount(candidate, patchPath);
+		if (commonSuffixParts > 0) {
+			score = Math.max(score, 30_000 + commonSuffixParts * 100);
+		}
+
+		const patchDir = getDisplayPathDirname(patchPath);
+		if (isDirectory && patchDir && pathEndsWithDisplayPath(candidate, patchDir)) {
+			score = Math.max(score, 20_000 + getDisplayPathParts(patchDir).length * 100);
+		}
+
+		const candidateBasename = getDisplayPathBasename(candidate);
+		const patchBasename = getDisplayPathBasename(patchPath);
+		if (candidateBasename && patchBasename && candidateBasename === patchBasename) {
+			score = Math.max(score, 10_000);
+		}
+	}
+
+	return score;
+}
+
+function buildDisplayCandidatePathsForTarget(
+	target: EditableUnifiedDiffTarget,
+	globalCandidatePaths: string[],
+	limit = DISPLAY_CANDIDATE_PATH_LIMIT
+): DisplayCandidatePathList {
+	const rawCandidates = uniqueStrings([
+		target.resolvedPath,
+		target.targetPath,
+		...(target.candidatePaths ?? []),
+		target.newPath,
+		target.oldPath,
+		...globalCandidatePaths,
+	]).filter(path => path !== '/dev/null');
+
+	const byKey = new Map<string, { path: string; score: number; firstIndex: number }>();
+
+	for (let index = 0; index < rawCandidates.length; index += 1) {
+		const path = rawCandidates[index]?.trim();
+		if (!path) {
+			continue;
+		}
+
+		const key = normalizePathForDisplayScore(path);
+		if (!key || key === '/dev/null') {
+			continue;
+		}
+
+		const score = scoreDisplayCandidatePath(path, target);
+		const existing = byKey.get(key);
+
+		if (!existing) {
+			byKey.set(key, { path, score, firstIndex: index });
+		} else if (score > existing.score) {
+			byKey.set(key, { ...existing, path, score });
+		}
+	}
+
+	const sorted = [...byKey.values()].toSorted((left, right) => {
+		if (left.score !== right.score) {
+			return right.score - left.score;
+		}
+		return left.firstIndex - right.firstIndex;
+	});
+
+	const paths =
+		limit > 0 ? sorted.slice(0, limit).map(candidate => candidate.path) : sorted.map(candidate => candidate.path);
+
+	return {
+		paths,
+		total: sorted.length,
+		isLimited: limit > 0 && sorted.length > limit,
+	};
 }
 
 function isTargetProblem(target: EditableUnifiedDiffTarget, missing: boolean): boolean {
@@ -649,15 +853,8 @@ export function DiffApplyModal({
 						{displayTargets.map((target, index) => {
 							const missing = !target.targetPath.trim();
 							const inputId = `diff-apply-target-${target.fileKey ?? index}`;
-							const candidates = uniqueStrings([
-								target.resolvedPath,
-								target.targetPath,
-								...(target.candidatePaths ?? []),
-								target.newPath,
-								target.oldPath,
-								...candidatePaths,
-							]).filter(path => path !== '/dev/null');
-
+							const candidateDisplay = buildDisplayCandidatePathsForTarget(target, candidatePaths);
+							const candidates = candidateDisplay.paths;
 							const targetDiagnostics = uniqueDiagnostics(target.diagnostics ?? []);
 							const targetKey = getLocalTargetKey(target, index);
 							const isTargetDryRunning = runningAction?.key === targetKey && runningAction.kind === 'dry-run';
@@ -774,12 +971,14 @@ export function DiffApplyModal({
 												<span>Candidate paths</span>
 												<span className="text-base-content/50 inline-flex items-center gap-1 font-normal">
 													<FiChevronRight size={11} className="transition group-open:rotate-90" />
-													{candidates.length} options
+													{candidateDisplay.isLimited
+														? `${candidates.length} of ${candidateDisplay.total} options`
+														: `${candidateDisplay.total} options`}
 												</span>
 											</summary>
 											<div className="border-base-300 border-t px-3 py-2">
 												<ul className="grid gap-1.5">
-													{candidates.slice(0, 60).map(candidate => (
+													{candidates.map(candidate => (
 														<li key={candidate} className="min-w-0">
 															<button
 																type="button"
@@ -793,9 +992,9 @@ export function DiffApplyModal({
 															</button>
 														</li>
 													))}
-													{candidates.length > 60 ? (
+													{candidateDisplay.isLimited ? (
 														<li className="text-base-content/50 px-2 py-1 text-xs">
-															+{candidates.length - 60} more candidate paths
+															+{candidateDisplay.total - candidates.length} lower-ranked candidate paths hidden
 														</li>
 													) : null}
 												</ul>

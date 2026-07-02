@@ -1,5 +1,5 @@
 import type { ApplyUnifiedDiffDiagnostic, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
-import { ApplyUnifiedDiffStatus } from '@/spec/unified_diff';
+import { ApplyUnifiedDiffDiagnosticLevel, ApplyUnifiedDiffStatus } from '@/spec/unified_diff';
 
 import { uniqueDiagnostics } from '@/components/markdown/diff_diagnostic';
 
@@ -48,6 +48,8 @@ export interface ParsedUnifiedDiffForUI {
 }
 
 const DEV_NULL = '/dev/null';
+const OPENAI_PATCH_FILE_HEADER_RE = /^\*\*\*\s+(Update|Add|Delete)\s+File:\s*(.+?)\s*$/i;
+const OPENAI_PATCH_MOVE_TO_RE = /^\*\*\*\s+Move\s+to:\s*(.+?)\s*$/i;
 
 function isUnifiedDiffLanguage(language: string): boolean {
 	const normalized = language.trim().toLowerCase();
@@ -57,6 +59,9 @@ function isUnifiedDiffLanguage(language: string): boolean {
 export function looksLikeUnifiedDiff(value: string, language = ''): boolean {
 	const text = value.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
 
+	if (looksLikeOpenAIPatch(text)) {
+		return true;
+	}
 	if (isUnifiedDiffLanguage(language)) {
 		return true;
 	}
@@ -93,6 +98,7 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 
 	let current: WorkingParsedUnifiedDiffFileForUI | null = null;
 	let inHunk = false;
+	let sawOpenAIPatchFormat = false;
 
 	const createWorkingFile = (): WorkingParsedUnifiedDiffFileForUI => ({
 		fileKey: `file-${rawFiles.length + 1}`,
@@ -131,6 +137,51 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 
 	for (let i = 0; i < lines.length; i += 1) {
 		const line = lines[i];
+
+		if (line.trim() === '*** Begin Patch') {
+			sawOpenAIPatchFormat = true;
+			continue;
+		}
+
+		if (line.trim() === '*** End Patch') {
+			sawOpenAIPatchFormat = true;
+			if (current) {
+				current.lines.push(line);
+			}
+			continue;
+		}
+
+		const openAIHeader = parseOpenAIPatchFileHeader(line);
+		if (openAIHeader) {
+			sawOpenAIPatchFormat = true;
+			pushCurrent();
+
+			const p = openAIHeader.path;
+			const oldPath = openAIHeader.kind === 'add' ? DEV_NULL : p;
+			const newPath = openAIHeader.kind === 'delete' ? DEV_NULL : p;
+
+			current = {
+				...createWorkingFile(),
+				oldPath: oldPath || undefined,
+				newPath: newPath || undefined,
+				candidatePaths: isUsablePatchPath(p) ? [p] : [],
+			};
+			current.lines.push(line);
+			inHunk = openAIHeader.kind === 'add' || openAIHeader.kind === 'delete';
+			continue;
+		}
+
+		const openAIMoveTo = parseOpenAIPatchMoveTo(line);
+		if (openAIMoveTo && current) {
+			sawOpenAIPatchFormat = true;
+			current.lines.push(line);
+			current.newPath = openAIMoveTo;
+			current.candidatePaths = uniqueStrings(
+				[...(current.candidatePaths ?? []), current.oldPath, openAIMoveTo].filter(p => isUsablePatchPath(p))
+			);
+			inHunk = false;
+			continue;
+		}
 
 		if (line.startsWith('diff --git ')) {
 			pushCurrent();
@@ -217,6 +268,15 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 	pushCurrent();
 
 	const files = mergeParsedUnifiedDiffFiles(rawFiles);
+
+	if (sawOpenAIPatchFormat) {
+		diagnostics.push({
+			level: ApplyUnifiedDiffDiagnosticLevel.Warning,
+			code: 'openai_patch_format',
+			message:
+				'Detected OpenAI apply_patch format. File paths were extracted for target selection, but this apply control still sends patch text to the unified diff backend. Convert to unified diff if applying fails.',
+		});
+	}
 
 	return {
 		isDiffLike: looksLikeUnifiedDiff(value, language),
@@ -742,6 +802,15 @@ function inferTargetPathsForUI(
 		}
 
 		const candidateLooksDirectory = looksLikeDirectoryPath(candidateRaw);
+
+		if (!candidateLooksDirectory && pathHasSuffixPath(candidate, patchPath)) {
+			inferences.push({
+				targetPath: candidate,
+				sourcePath: candidateRaw,
+				score: getPathParts(patchPath).length + 10,
+			});
+		}
+
 		const candidateDir = candidateLooksDirectory ? trimTrailingSlashes(candidate) : dirnamePathKey(candidate);
 
 		if (candidateDir && patchDirParts.length > 0) {
@@ -859,6 +928,15 @@ function trimPathSuffix(value: string, suffix: string): string | undefined {
 		return undefined;
 	}
 	return normalizedValue.slice(0, normalizedValue.length - marker.length);
+}
+
+function pathHasSuffixPath(value: string, suffix: string): boolean {
+	const normalizedValue = trimTrailingSlashes(normalizePathKey(value));
+	const normalizedSuffix = trimTrailingSlashes(normalizePathKey(suffix)).replace(/^\/+/, '');
+	if (!normalizedValue || !normalizedSuffix) {
+		return false;
+	}
+	return normalizedValue === normalizedSuffix || normalizedValue.endsWith(`/${normalizedSuffix}`);
 }
 
 function joinPathKey(root: string, rel: string): string {
@@ -1010,6 +1088,41 @@ function normalizePathKey(value: string | undefined): string {
 
 function parseDiffHeaderPath(input: string): string {
 	return normalizeDiffPathToken(input);
+}
+
+function looksLikeOpenAIPatch(value: string): boolean {
+	return /^\*\*\*\s+Begin\s+Patch\s*$/im.test(value) || /^\*\*\*\s+(?:Update|Add|Delete)\s+File:\s+/im.test(value);
+}
+
+function parseOpenAIPatchFileHeader(line: string): { kind: 'update' | 'add' | 'delete'; path: string } | undefined {
+	const match = OPENAI_PATCH_FILE_HEADER_RE.exec(line);
+	if (!match?.[1] || !match[2]) {
+		return undefined;
+	}
+
+	const kind = match[1].trim().toLowerCase();
+	const path = normalizeOpenAIPatchPath(match[2]);
+	if (!path) {
+		return undefined;
+	}
+
+	return {
+		kind: kind === 'add' ? 'add' : kind === 'delete' ? 'delete' : 'update',
+		path,
+	};
+}
+
+function parseOpenAIPatchMoveTo(line: string): string | undefined {
+	const match = OPENAI_PATCH_MOVE_TO_RE.exec(line);
+	return match?.[1] ? normalizeOpenAIPatchPath(match[1]) || undefined : undefined;
+}
+
+function normalizeOpenAIPatchPath(input: string): string {
+	const value = input.trim();
+	if (!value) {
+		return '';
+	}
+	return value.startsWith('"') ? readDiffPathToken(value).token.trim() : value;
 }
 
 function normalizeUnifiedHeaderPair(oldPath: string, newPath: string): [string, string] {

@@ -12,7 +12,6 @@
 ## M-2
 
 - [ ] an attachment/tool and apply diff to code preset will be good. simple template and tool
-  - [ ] here enhance the file name detection when we are using tool calls and also when we have openai style patch out rather than unified diff.
 
 - [ ] github pr review preset
 
