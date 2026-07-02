@@ -16,7 +16,7 @@ This page is the shortest path to a useful first request.
 
 ## First successful send
 
-1. Get an API key for a provider you want to use.
+1. Get an API key for a hosted provider, or start a compatible local LLM server.
    - OpenAI
    - Anthropic Claude
    - Google Gemini API
@@ -26,7 +26,8 @@ This page is the shortest path to a useful first request.
    - OpenRouter
    - Any compatible local LLM server
 2. Open **Settings -> Auth Keys**. Add the provider key.
-3. Open **Model Presets**. Confirm the provider and at least one model preset are enabled.
+   - For local endpoints that only require a non-empty value, use a harmless placeholder key.
+3. Open **Model Presets**. Confirm the provider and at least one model preset are enabled, or copy/fork a built-in local provider preset and adjust it for your endpoint.
 4. Open **Chats**. Select a model preset. Type a small test request. Send.
 
 Good first test: `Reply with one sentence confirming the model is working.`
@@ -35,13 +36,13 @@ Once that works, attach source material or use a starter assistant preset.
 
 ## Choose your first path
 
-| If you want to...                       | Start here                                                                                                                          |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Use a normal hosted model               | Add the key in **Settings**, enable the model in **Model Presets**, then use **Chats**.                                             |
-| Try many hosted models through one key  | Use OpenRouter. See [Providers and Models](/docs?doc=providers-and-models#openrouter).                                              |
-| Use a local model server                | Configure a custom compatible provider. See [Providers and Models](/docs?doc=providers-and-models#local-openai-compatible-servers). |
-| Start from a known workflow             | Choose a home screen workflow card or an assistant preset in **Chats**.                                                             |
-| Work with private or sensitive material | Read [Privacy, Data, and Troubleshooting](/docs?doc=privacy-data-and-troubleshooting) before sending.                               |
+| If you want to...                       | Start here                                                                                                                                |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Use a normal hosted model               | Add the key in **Settings**, enable the model in **Model Presets**, then use **Chats**.                                                   |
+| Try many hosted models through one key  | Use OpenRouter. See [Providers and Models](/docs?doc=providers-and-models#openrouter).                                                    |
+| Use a local model server                | Start from a built-in local provider, copy/fork the provider first, then adjust models. See [Local LLM Setup](/docs?doc=local-llm-setup). |
+| Start from a known workflow             | Choose a home screen workflow card or an assistant preset in **Chats**.                                                                   |
+| Work with private or sensitive material | Read [Privacy, Data, and Troubleshooting](/docs?doc=privacy-data-and-troubleshooting) before sending.                                     |
 
 ## What to look at before sending
 

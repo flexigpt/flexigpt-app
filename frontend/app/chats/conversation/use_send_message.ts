@@ -10,7 +10,11 @@ import type { ToolStoreChoice } from '@/spec/tool';
 import { ensureMakeID, getUUIDv7 } from '@/lib/uuid_utils';
 
 import type { ComposerBoxHandle } from '@/chats/composer/composer_box';
-import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
+import type {
+	AssistantTurnFinishedPayload,
+	EditorExternalMessage,
+	EditorSubmitPayload,
+} from '@/chats/composer/editor/editor_types';
 import { sliceMessagesForSend } from '@/chats/composer/previousmessages/previous_messages_helper';
 import { HandleCompletion } from '@/chats/conversation/completion_helper';
 import {
@@ -44,6 +48,11 @@ interface UseSendMessageArgs {
 	getFullStreamThinkingForTab: (tabId: string) => string;
 
 	inputRefs: RefObject<Map<string, ComposerBoxHandle | null>>;
+	loadAssistantTurnForTab: (
+		tabId: string,
+		toolCalls: UIToolCall[],
+		finishPayload: AssistantTurnFinishedPayload
+	) => boolean;
 }
 
 function buildTerminalAssistantOutputs(assistantMessageId: string, status: Status, uiContent: string): OutputUnion[] {
@@ -107,6 +116,7 @@ export function useSendMessage({
 	getFullStreamTextForTab,
 	getFullStreamThinkingForTab,
 	inputRefs,
+	loadAssistantTurnForTab,
 }: UseSendMessageArgs) {
 	const updateStreamingMessage = useCallback(
 		async (tabId: string, updatedChatWithUserMessage: Conversation, options: UIChatOption, skillSessionID?: string) => {
@@ -449,24 +459,24 @@ export function useSendMessage({
 					clearStreamBuffer(tabId);
 					updateTab(tabId, tab => ({ ...tab, isBusy: false }));
 
+					const finishPayload: AssistantTurnFinishedPayload = {
+						loadedRunnableToolCallCount: queuedRunnableToolCalls.length,
+					};
+
+					const deliverAssistantTurn = () => {
+						if (!tabExists(tabId)) {
+							return;
+						}
+						if (requestIdByTabRef.current.get(tabId) !== reqId) {
+							return;
+						}
+						loadAssistantTurnForTab(tabId, queuedRunnableToolCalls, finishPayload);
+					};
+
 					if (queuedRunnableToolCalls.length > 0) {
-						requestAnimationFrame(() => {
-							if (!tabExists(tabId)) {
-								return;
-							}
-							if (requestIdByTabRef.current.get(tabId) !== reqId) {
-								return;
-							}
-							const input = inputRefs.current.get(tabId);
-							input?.loadToolCalls(queuedRunnableToolCalls);
-							input?.finishAssistantTurn({
-								loadedRunnableToolCallCount: queuedRunnableToolCalls.length,
-							});
-						});
+						requestAnimationFrame(deliverAssistantTurn);
 					} else {
-						inputRefs.current.get(tabId)?.finishAssistantTurn({
-							loadedRunnableToolCallCount: 0,
-						});
+						deliverAssistantTurn();
 					}
 				}
 			}
@@ -477,7 +487,7 @@ export function useSendMessage({
 			getFullStreamTextForTab,
 			getFullStreamThinkingForTab,
 			getStreamBuffer,
-			inputRefs,
+			loadAssistantTurnForTab,
 			notifyStreamNow,
 			notifyStreamSoon,
 			requestIdByTabRef,

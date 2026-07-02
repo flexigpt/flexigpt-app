@@ -7,32 +7,9 @@
   - [ ] test web search etc and pending user args etc after bottom bar migration.
   - [ ] test with some skill that has scripts too
 
-- [ ] if we move out of tab and in background if tool calls come, they are not loaded and auto exec and submitted.
-- [ ] pageup after or during paste makes the composer and whole page move up. need steps to reproduce.
 - [ ] MCP flows review and harden and more automatic in places where it is a bit jerky today.
 
 ## M-2
-
-- [x] Provider setup polish:
-  - [x] should have properly complete and verified presets
-  - [x] all models from leading providers including chinese ones via openrouter and hugging face as remote servers
-  - [x] local servers support
-  - [x] anthropic, openai, google gemini, mistral, xai,
-  - [x] hf, openrouter
-  - [x] vllm, lm studio, ollama, localai, slang, llamacpp
-
-- [x] better more inbuilt mcps. mcp tools from leading providers presets completions.
-  - [x] Management: Atlassian, Notion
-  - [x] Documents: Box
-  - [x] Design: Canva, figma
-  - [x] Cloudflare: multiple like Docs, Workers, Observability, etc
-  - [x] Software dev: GitHub, Netlify, Stack Overflow, Vercel, Hugging Face
-  - [x] Jobs: Indeed
-  - [x] Search: Exa, Brave, BGPT
-  - [x] Google: Google Big Query, Google Compute Engine, Google GKE , Google Maps, [Other MCP servers](https://github.com/google/mcp), gmail, calender
-  - [x] MS: teams, 365
-  - [x] Slack
-  - [x] Zoom
 
 - [ ] an attachment/tool and apply diff to code preset will be good. simple template and tool
   - [ ] here enhance the file name detection when we are using tool calls and also when we have openai style patch out rather than unified diff.
@@ -53,7 +30,7 @@
     - [ ] better thing is to establish a jsonschema format for each thing, and then ship corresponding json as individual outputs.
 
 - [ ] Docs clean: positioning wrt repeatable workflows and enhanced guidance
-  - setup steps for local or custom models
+  - [x] setup steps for local or custom models
   - recommended models
   - context length notes
   - limitations

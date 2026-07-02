@@ -388,7 +388,7 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 	);
 
 	return (
-		<div className="bg-base-200 w-full min-w-0">
+		<div className="bg-base-200 w-full min-w-0 overflow-hidden">
 			<EditorContextBar context={assistantContext} assistantPreset={assistantPreset} systemPrompt={systemPrompt} />
 
 			<DeleteConfirmationModal
@@ -405,7 +405,7 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 				confirmButtonText="Abort"
 			/>
 
-			<div className="overflow-x-hidden overflow-y-auto">
+			<div className="max-h-[min(46vh,34rem)] overflow-x-hidden overflow-y-auto overscroll-contain">
 				<EditorArea
 					ref={editorAreaRef}
 					isGenerating={isGenerating}

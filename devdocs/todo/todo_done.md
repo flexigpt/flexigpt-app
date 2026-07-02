@@ -423,8 +423,6 @@
 
 - [x] Add modal portals
 
-## Tasks: Tools
-
 - Tools Page
   - Header
     - [x] Design the header with the title "Tools."
@@ -454,8 +452,6 @@
   - [x] Integrate with json store for tool storage.
   - [x] Implement API endpoints for creating, retrieving, updating, and deleting tools.
   - [x] Ensure schema validation and function execution are supported on the backend.
-
-## Tasks: Prompt templates
 
 - Prompt list page
   - Header
@@ -537,8 +533,6 @@
 - [x] prompt templates to fill in full text including preprocessors and then give back message blocks to caller for exec.
 
 - [x] prompt and tool processing for ai completion call
-
-## Attachments and Tools
 
 - [x] edit message should fall to the editor with attachments/tools so that resend is consistent
 - [x] render images and attachments in msg ui
@@ -1039,3 +1033,26 @@
   - [x] Added oxlint fully. removed eslint.
 
 - [x] assistant presets: mcps in presets
+- [x] if we move out of tab and in background if tool calls come, they are not loaded and auto exec and submitted.
+- [x] pageup after or during paste makes the composer and whole page move up. need steps to reproduce.
+
+- [x] Provider setup polish:
+  - [x] should have properly complete and verified presets
+  - [x] all models from leading providers including chinese ones via openrouter and hugging face as remote servers
+  - [x] local servers support
+  - [x] anthropic, openai, google gemini, mistral, xai,
+  - [x] hf, openrouter
+  - [x] vllm, lm studio, ollama, localai, slang, llamacpp
+
+- [x] better more inbuilt mcps. mcp tools from leading providers presets completions.
+  - [x] Management: Atlassian, Notion
+  - [x] Documents: Box
+  - [x] Design: Canva, figma
+  - [x] Cloudflare: multiple like Docs, Workers, Observability, etc
+  - [x] Software dev: GitHub, Netlify, Stack Overflow, Vercel, Hugging Face
+  - [x] Jobs: Indeed
+  - [x] Search: Exa, Brave, BGPT
+  - [x] Google: Google Big Query, Google Compute Engine, Google GKE , Google Maps, [Other MCP servers](https://github.com/google/mcp), gmail, calender
+  - [x] MS: teams, 365
+  - [x] Slack
+  - [x] Zoom

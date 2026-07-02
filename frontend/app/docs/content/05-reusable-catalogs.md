@@ -230,6 +230,25 @@ It controls:
 
 Use Model Presets when changing how requests run. Use Assistant Presets when changing the kind of workflow you want to start from.
 
+For local and self-hosted LLMs, the recommended customization order is:
+
+1. copy/fork an existing provider preset
+2. adjust provider-level settings
+3. then copy, add, or edit model presets under that provider
+
+Do provider first because the provider owns the shared endpoint contract:
+
+- SDK/API compatibility type
+- origin URL
+- chat path
+- API-key header name
+- default headers
+- provider-wide capability assumptions
+
+Built-in local providers such as LocalAI, LM Studio, `llama.cpp`, Ollama, SGLang, and vLLM are useful defaults, but local server ports, paths, headers, model names, and feature support vary. Use **Add Provider -> Prefill from Existing -> Copy Existing Provider** to create your local fork instead of trying to edit a read-only built-in. Then use **Add Model Preset -> Copy Existing Preset** if an existing model preset is close to the model your server exposes.
+
+See [Local LLM Setup](/docs?doc=local-llm-setup) for a full local runtime setup flow.
+
 ## Settings
 
 The **Settings** page owns app-wide settings:

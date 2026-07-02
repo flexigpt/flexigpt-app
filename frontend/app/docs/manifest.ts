@@ -13,6 +13,7 @@ import backendRolesBody from '@/docs/content/12-backend-roles-and-responsibiliti
 import frontendRolesBody from '@/docs/content/13-frontend-roles-and-responsibilities.md?raw';
 import chatsWorkspaceComposerDesignBody from '@/docs/content/14-chats-workspace-and-composer-design.md?raw';
 import unifiedDiffApplyBody from '@/docs/content/15-unified-diff-apply.md?raw';
+import localLLMSetupBody from '@/docs/content/16-local-llm-setup.md?raw';
 
 interface DocsSection {
 	id: string;
@@ -94,7 +95,7 @@ export const docsCategories: DocsCategory[] = [
 				id: 'providers-and-models',
 				title: 'Providers and Models',
 				summary:
-					'Set up hosted providers, OpenRouter, custom compatible endpoints, Ollama-style servers, and llama.cpp.',
+					'Set up hosted providers, OpenRouter, custom compatible endpoints, and built-in local or self-hosted runtimes.',
 				body: providersAndModelsBody,
 			},
 			{
@@ -103,6 +104,13 @@ export const docsCategories: DocsCategory[] = [
 				summary:
 					'Review local storage, provider request boundaries, logs, backup/reset behavior, and troubleshooting checks.',
 				body: privacyDataTroubleshootingBody,
+			},
+			{
+				id: 'local-llm-setup',
+				title: 'Local LLM Setup',
+				summary:
+					'Use built-in local runtime presets, fork providers before models, adjust endpoints and capabilities, and test local-only inference safely.',
+				body: localLLMSetupBody,
 			},
 		],
 	},

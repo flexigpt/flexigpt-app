@@ -66,6 +66,7 @@ When you send a chat request to a remote provider, the provider may receive:
 Local-first does not mean every inference request is local. If you choose a remote model provider, the assembled request is sent to that provider.
 
 If you choose a local endpoint, review the endpoint origin and confirm it is actually local before treating the request as local-only.
+For local LLMs, also confirm that the local runtime is not configured to proxy requests to a remote provider and that the selected model preset belongs to the local provider you intended to use.
 
 ## Provider proxying and billing
 
@@ -247,5 +248,7 @@ Before sending sensitive work:
 - avoid auto-execute for untrusted tools
 - keep raw debug logging off unless actively diagnosing a problem
 - for local-only work, confirm the provider origin points to a local endpoint you control
+- for local-only work, prefer a forked local provider preset with a clear provider ID and harmless placeholder key
+- confirm local model servers, routers, or gateways are not proxying the request to a remote service
 - close FlexiGPT before copying or deleting the app-data folder
 - remember API key secrets live in the OS keyring, not only in app files

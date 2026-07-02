@@ -104,17 +104,9 @@ export function useToolAutoExecDrainer({ toolCalls, isBlocked, runToolCall }: Us
 			const nextCall = getNextCall();
 			if (!nextCall) {
 				syncState('idle', null);
-				// oxlint-disable-next-line no-unsafe-finally
-				return;
-			}
-
-			if (isBlockedRef.current) {
+			} else if (isBlockedRef.current) {
 				syncState('blocked', null);
-				// oxlint-disable-next-line no-unsafe-finally
-				return;
-			}
-
-			if (scheduledFrameRef.current === null && isMountedRef.current) {
+			} else if (scheduledFrameRef.current === null && isMountedRef.current) {
 				scheduledFrameRef.current = window.requestAnimationFrame(() => {
 					scheduledFrameRef.current = null;
 					void pump();

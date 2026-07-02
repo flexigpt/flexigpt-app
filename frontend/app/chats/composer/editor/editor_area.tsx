@@ -1,4 +1,4 @@
-import type { SubmitEventHandler } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, SubmitEventHandler } from 'react';
 import {
 	forwardRef,
 	useCallback,
@@ -398,7 +398,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const [autoExecStopVisible, setAutoExecStopVisible] = useState(false);
 	const [autoExecStopRequested, setAutoExecStopRequested] = useState(false);
 	const [autoExecBlockedByUser, setAutoExecBlockedByUser] = useState(false);
-	const [activeAutoExecBatchCount, setActiveAutoExecBatchCount] = useState(0);
+
 	const autoExecStopRequestedRef = useRef(false);
 	const autoExecBlockedByUserRef = useRef(false);
 
@@ -408,7 +408,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		setAutoExecStopRequested(false);
 		setAutoExecBlockedByUser(false);
 		setAutoExecStopVisible(false);
-		setActiveAutoExecBatchCount(0);
 	}, []);
 
 	const requestBlockNextAutoExec = useCallback(() => {
@@ -968,6 +967,29 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			editor.tf.insertSoftBreak();
 		},
 	});
+
+	const handleEditorKeyDown = useCallback(
+		(event: ReactKeyboardEvent<HTMLDivElement>) => {
+			onKeyDown(event);
+			if (event.defaultPrevented) {
+				return;
+			}
+			if (event.key !== 'PageUp' && event.key !== 'PageDown') {
+				return;
+			}
+			const editorEl = contentRef.current;
+			if (!editorEl) {
+				return;
+			}
+			event.preventDefault();
+			event.stopPropagation();
+			const direction = event.key === 'PageDown' ? 1 : -1;
+			const delta = Math.max(120, editorEl.clientHeight * 0.85) * direction;
+			const maxTop = Math.max(0, editorEl.scrollHeight - editorEl.clientHeight);
+			editorEl.scrollTop = Math.max(0, Math.min(maxTop, editorEl.scrollTop + delta));
+		},
+		[contentRef, onKeyDown]
+	);
 
 	const setSubmitting = useCallback((next: boolean, options?: { deferVisual?: boolean }) => {
 		isSubmittingRef.current = next;
@@ -1619,8 +1641,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				}
 			}
 
-			setActiveAutoExecBatchCount(autoEligibleCount >= 1 ? autoEligibleCount : 0);
-
 			if (shouldSuppressAutoExec || autoEligibleCount === 0) {
 				autoExecStopRequestedRef.current = false;
 				autoExecBlockedByUserRef.current = false;
@@ -1760,6 +1780,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		!templateBlocked &&
 		!hasBlockingToolArgs;
 
+	const activeAutoExecBatchCount = useMemo(
+		() => toolCalls.filter(toolCall => isAutoSubmitEligibleToolCall(toolCall)).length,
+		[toolCalls]
+	);
+
 	const showAutoExecStopButton = autoExecStopVisible || activeAutoExecBatchCount >= 2;
 	const erroredToolOutputsReadyToSubmit =
 		toolOutputs.some(output => output.isError) &&
@@ -1768,13 +1793,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		!hasBlockingToolArgs &&
 		!templateBlocked &&
 		!isInputLocked;
-
-	useEffect(() => {
-		if (toolCalls.length === 0 && autoExecState.phase === 'idle' && !isGenerating && activeAutoExecBatchCount > 0) {
-			// oxlint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
-			setActiveAutoExecBatchCount(current => Math.min(0, current));
-		}
-	}, [activeAutoExecBatchCount, autoExecState.phase, isGenerating, toolCalls.length]);
 
 	useEffect(() => {
 		onAssistantPresetRuntimeStateChange?.({
@@ -1842,17 +1860,20 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									autoCorrect="off"
 									autoCapitalize="off"
 									readOnly={isInputLocked}
-									onKeyDown={e => {
-										onKeyDown(e);
-									}}
+									onKeyDown={handleEditorKeyDown}
 									onPaste={onEditorPaste}
 									scrollSelectionIntoView={scrollSelectionIntoEditorView}
-									className="max-h-96 min-w-0 flex-1 resize-none overflow-auto bg-transparent p-1 wrap-break-word whitespace-break-spaces tab-2 outline-none focus:outline-none"
+									className="max-h-96 min-w-0 flex-1 resize-none overflow-auto overscroll-contain bg-transparent p-1 wrap-break-word whitespace-break-spaces tab-2 outline-none focus:outline-none"
 									style={{
 										fontSize: 14,
+										lineHeight: 1.5,
 										whiteSpace: 'break-spaces',
 										tabSize: 2,
 										minHeight: '4rem',
+										maxHeight: 'min(30em, 40vh)',
+										boxSizing: 'border-box',
+										overflowAnchor: 'none',
+										overscrollBehavior: 'contain',
 									}}
 								/>
 							</div>

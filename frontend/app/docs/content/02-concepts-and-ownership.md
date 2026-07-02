@@ -35,19 +35,19 @@ When a result changes, compare these layers one at a time.
 
 ## Main terms
 
-| Term                         | Meaning                                                                                                                                                                            |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Provider**                 | The API family or endpoint FlexiGPT talks to, such as OpenAI, Anthropic, Google Gemini API, xAI, Mistral, Hugging Face, OpenRouter, `llama.cpp`, or a compatible custom endpoint.  |
-| **Model preset**             | A saved provider/model choice with defaults such as model name, streaming, timeout, prompt/output limits, temperature, reasoning, output format, and provider-specific parameters. |
-| **Assistant preset**         | A reusable starter setup that can apply starting text, a model preset, instruction templates, tool selections, web search choices, and skill selections.                           |
-| **System prompt**            | Durable instruction context that shapes assistant behavior.                                                                                                                        |
-| **Prompt template**          | Reusable request structure inserted into the current draft. It may contain variables and multiple role blocks.                                                                     |
-| **Attachment**               | Message-scoped source material such as files, folders, images, PDFs, or URLs.                                                                                                      |
-| **Tool**                     | A callable capability the model can request during a conversation.                                                                                                                 |
-| **Skill**                    | A reusable workflow mode backed by skill runtime/session behavior.                                                                                                                 |
-| **MCP server**               | One configured MCP (Model context protocol) endpoint inside a bundle, including transport, auth, trust, setup, discovery, and runtime state.                                       |
-| **MCP conversation context** | The selected MCP servers, tools, resources, resource templates, prompts, and arguments attached to the next request.                                                               |
-| **Previous user turns**      | The history window for the next request.                                                                                                                                           |
+| Term                         | Meaning                                                                                                                                                                                      |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Provider**                 | The API family or endpoint FlexiGPT talks to, such as OpenAI, Anthropic, Google Gemini API, xAI, Mistral, Hugging Face, OpenRouter, a local runtime preset, or a compatible custom endpoint. |
+| **Model preset**             | A saved provider/model choice with defaults such as model name, streaming, timeout, prompt/output limits, temperature, reasoning, output format, and provider-specific parameters.           |
+| **Assistant preset**         | A reusable starter setup that can apply starting text, a model preset, instruction templates, tool selections, web search choices, and skill selections.                                     |
+| **System prompt**            | Durable instruction context that shapes assistant behavior.                                                                                                                                  |
+| **Prompt template**          | Reusable request structure inserted into the current draft. It may contain variables and multiple role blocks.                                                                               |
+| **Attachment**               | Message-scoped source material such as files, folders, images, PDFs, or URLs.                                                                                                                |
+| **Tool**                     | A callable capability the model can request during a conversation.                                                                                                                           |
+| **Skill**                    | A reusable workflow mode backed by skill runtime/session behavior.                                                                                                                           |
+| **MCP server**               | One configured MCP (Model context protocol) endpoint inside a bundle, including transport, auth, trust, setup, discovery, and runtime state.                                                 |
+| **MCP conversation context** | The selected MCP servers, tools, resources, resource templates, prompts, and arguments attached to the next request.                                                                         |
+| **Previous user turns**      | The history window for the next request.                                                                                                                                                     |
 
 ## Assistant preset versus model preset
 
@@ -127,6 +127,7 @@ FlexiGPT ships with built-in:
 - docs
 
 Built-in content is generally read-only. You can usually enable or disable it, but not edit its definition directly.
+For local LLM providers, treat built-ins as starting points: copy/fork the provider preset first, adjust the endpoint and compatibility settings, then copy or add model presets under that provider.
 
 Your local content is stored locally and can be created, edited, deleted, and versioned depending on the page.
 

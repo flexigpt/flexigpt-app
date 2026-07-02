@@ -127,7 +127,11 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			if (prev.has(tabId)) {
 				return prev;
 			}
-			const next = new Set(...prev, tabId);
+			// Background tool-call loop can be lost because mountedInputTabIds can be corrupted by new Set(...prev, tabId).
+			// That can unmount the previous tab’s hidden composer, so final streamed tool calls have nowhere to load or auto-execute.
+			const next = new Set(prev);
+			// oxlint-disable-next-line unicorn/no-immediate-mutation
+			next.add(tabId);
 			return next;
 		});
 	}, []);

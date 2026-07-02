@@ -108,8 +108,6 @@ export function useScrollRestore({
 	const scrollIndicatorStateRef = useRef<ScrollIndicatorState>(INITIAL_SCROLL_INDICATOR_STATE);
 
 	const messageCountRef = useRef(messageCount);
-	// oxlint-disable-next-line jsreact-hooks/refs
-	messageCountRef.current = messageCount;
 	const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 	const scrollContentRef = useRef<HTMLDivElement | null>(null);
 	const scrollTopByTabRef = useRef(new Map<string, number>());
@@ -117,8 +115,14 @@ export function useScrollRestore({
 
 	const seededScrollFromStorageRef = useRef(false);
 	const activeTabIsHydratingRef = useRef(activeTabIsHydrating);
-	// oxlint-disable-next-line jsreact-hooks/refs
-	activeTabIsHydratingRef.current = activeTabIsHydrating;
+
+	useLayoutEffect(() => {
+		messageCountRef.current = messageCount;
+	}, [messageCount]);
+
+	useLayoutEffect(() => {
+		activeTabIsHydratingRef.current = activeTabIsHydrating;
+	}, [activeTabIsHydrating]);
 
 	const scrollStateRafRef = useRef<number | null>(null);
 	const resizeObserverRafRef = useRef<number | null>(null);

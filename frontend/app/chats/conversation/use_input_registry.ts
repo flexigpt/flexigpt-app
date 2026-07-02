@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { Conversation } from '@/spec/conversation';
+import type { UIToolCall } from '@/spec/inference';
 
 import type { ComposerBoxHandle } from '@/chats/composer/composer_box';
+import type { AssistantTurnFinishedPayload } from '@/chats/composer/editor/editor_types';
 import {
 	deriveHydratedLastAssistantToolCalls,
 	deriveRestorableConversationContextFromMessages,
@@ -15,6 +17,12 @@ interface PendingDrop {
 	payload: AttachmentsDroppedPayload;
 }
 
+interface PendingAssistantTurn {
+	tabId: string;
+	toolCalls: UIToolCall[];
+	finishPayload: AssistantTurnFinishedPayload;
+}
+
 interface UseInputRegistryArgs {
 	tabExists: (tabId: string) => boolean;
 }
@@ -22,10 +30,12 @@ interface UseInputRegistryArgs {
 export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 	const inputRefs = useRef(new Map<string, ComposerBoxHandle | null>());
 	const pendingDropsRef = useRef<PendingDrop[]>([]);
+	const pendingAssistantTurnsRef = useRef(new Map<string, PendingAssistantTurn>());
 	const pendingWorkflowStartersRef = useRef(new Map<string, ChatWorkflowStarter>());
 	const inputRefCallbacksRef = useRef(new Map<string, (inst: ComposerBoxHandle | null) => void>());
 	const pendingInputFlushTimerRef = useRef<number | null>(null);
 	const flushPendingDropsRef = useRef<() => void>(() => {});
+	const flushPendingAssistantTurnsRef = useRef<() => void>(() => {});
 	const flushPendingWorkflowStartersRef = useRef<() => void>(() => {});
 
 	const tryApplyDropToTab = useCallback((tabId: string, payload: AttachmentsDroppedPayload): boolean => {
@@ -61,6 +71,37 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 
 		pendingDropsRef.current = remaining;
 	}, [tabExists, tryApplyDropToTab]);
+
+	const tryApplyAssistantTurnToTab = useCallback((tabId: string, turn: PendingAssistantTurn): boolean => {
+		const input = inputRefs.current.get(tabId);
+		if (!input) {
+			return false;
+		}
+
+		if (turn.toolCalls.length > 0) {
+			input.loadToolCalls(turn.toolCalls);
+		}
+		input.finishAssistantTurn(turn.finishPayload);
+		return true;
+	}, []);
+
+	const flushPendingAssistantTurns = useCallback(() => {
+		const pending = pendingAssistantTurnsRef.current;
+		if (pending.size === 0) {
+			return;
+		}
+
+		for (const [tabId, turn] of pending.entries()) {
+			if (!tabExists(tabId)) {
+				pending.delete(tabId);
+				continue;
+			}
+
+			if (tryApplyAssistantTurnToTab(tabId, turn)) {
+				pending.delete(tabId);
+			}
+		}
+	}, [tabExists, tryApplyAssistantTurnToTab]);
 
 	const tryApplyWorkflowStarterToTab = useCallback(
 		async (tabId: string, starter: ChatWorkflowStarter): Promise<boolean> => {
@@ -99,10 +140,17 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 		}
 	}, [tabExists, tryApplyWorkflowStarterToTab]);
 
-	// oxlint-disable-next-line jsreact-hooks/refs
-	flushPendingDropsRef.current = flushPendingDrops;
-	// oxlint-disable-next-line jsreact-hooks/refs
-	flushPendingWorkflowStartersRef.current = flushPendingWorkflowStarters;
+	useLayoutEffect(() => {
+		flushPendingDropsRef.current = flushPendingDrops;
+	}, [flushPendingDrops]);
+
+	useLayoutEffect(() => {
+		flushPendingAssistantTurnsRef.current = flushPendingAssistantTurns;
+	}, [flushPendingAssistantTurns]);
+
+	useLayoutEffect(() => {
+		flushPendingWorkflowStartersRef.current = flushPendingWorkflowStarters;
+	}, [flushPendingWorkflowStarters]);
 
 	const schedulePendingInputFlush = useCallback(() => {
 		if (pendingInputFlushTimerRef.current !== null) {
@@ -112,9 +160,33 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 		pendingInputFlushTimerRef.current = window.setTimeout(() => {
 			pendingInputFlushTimerRef.current = null;
 			flushPendingDropsRef.current();
+			flushPendingAssistantTurnsRef.current();
 			flushPendingWorkflowStartersRef.current();
 		}, 0);
 	}, []);
+
+	const loadAssistantTurnForTab = useCallback(
+		(tabId: string, toolCalls: UIToolCall[], finishPayload: AssistantTurnFinishedPayload): boolean => {
+			if (!tabExists(tabId)) {
+				return false;
+			}
+
+			const turn: PendingAssistantTurn = {
+				tabId,
+				toolCalls: [...toolCalls],
+				finishPayload: { ...finishPayload },
+			};
+
+			if (tryApplyAssistantTurnToTab(tabId, turn)) {
+				return true;
+			}
+
+			pendingAssistantTurnsRef.current.set(tabId, turn);
+			schedulePendingInputFlush();
+			return false;
+		},
+		[schedulePendingInputFlush, tabExists, tryApplyAssistantTurnToTab]
+	);
 
 	useEffect(() => {
 		return () => {
@@ -166,6 +238,7 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 
 	const syncComposerFromConversation = useCallback((tabId: string, conversation: Conversation) => {
 		const input = inputRefs.current.get(tabId);
+		pendingAssistantTurnsRef.current.delete(tabId);
 		if (!input) {
 			return;
 		}
@@ -184,6 +257,7 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 
 	const resetComposerForNewConversation = useCallback(async (tabId: string) => {
 		const input = inputRefs.current.get(tabId);
+		pendingAssistantTurnsRef.current.delete(tabId);
 		if (!input) {
 			return;
 		}
@@ -202,6 +276,7 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 	const disposeInputRuntime = useCallback((tabId: string) => {
 		inputRefs.current.delete(tabId);
 		pendingWorkflowStartersRef.current.delete(tabId);
+		pendingAssistantTurnsRef.current.delete(tabId);
 		inputRefCallbacksRef.current.delete(tabId);
 	}, []);
 
@@ -223,5 +298,6 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 		requestStopResponse,
 		disposeInputRuntime,
 		applyWorkflowStarterToComposer,
+		loadAssistantTurnForTab,
 	};
 }

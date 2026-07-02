@@ -9,10 +9,15 @@ This page covers hosted providers, custom endpoints, and local model setup.
 - [Usual setup path](#usual-setup-path)
 - [Built-in hosted providers](#built-in-hosted-providers)
 - [OpenRouter](#openrouter)
+- [Built-in local and self-hosted runtimes](#built-in-local-and-self-hosted-runtimes)
+- [Fork a local provider before editing models](#fork-a-local-provider-before-editing-models)
 - [Custom compatible endpoints](#custom-compatible-endpoints)
 - [Local OpenAI-compatible servers](#local-openai-compatible-servers)
-- [llama.cpp server](#llamacpp-server)
-- [Ollama-style local setup](#ollama-style-local-setup)
+- [Runtime-specific local notes](#runtime-specific-local-notes)
+  - [LM Studio](#lm-studio)
+  - [`llama.cpp`](#llamacpp)
+  - [Ollama](#ollama)
+  - [LocalAI, SGLang, and vLLM](#localai-sglang-and-vllm)
 - [Capability expectations](#capability-expectations)
 - [Troubleshooting provider setup](#troubleshooting-provider-setup)
 - [Local-first reminder](#local-first-reminder)
@@ -99,6 +104,57 @@ Capabilities can vary by model:
 
 When comparing OpenRouter models, keep everything constant except the model preset.
 
+## Built-in local and self-hosted runtimes
+
+FlexiGPT includes built-in provider and model presets for common local or self-hosted runtimes:
+
+| Built-in provider | Default origin           | Compatibility style in the preset  | Typical use                                                |
+| ----------------- | ------------------------ | ---------------------------------- | ---------------------------------------------------------- |
+| LocalAI           | `http://127.0.0.1:8080`  | OpenAI Responses-compatible        | LocalAI or compatible local server                         |
+| LM Studio         | `http://127.0.0.1:1234`  | OpenAI Responses-compatible        | LM Studio local server                                     |
+| `llama.cpp`       | `http://127.0.0.1:8080`  | OpenAI Chat Completions-compatible | `llama-server` with compatible routes                      |
+| Ollama            | `http://127.0.0.1:11434` | Anthropic-compatible               | Ollama-compatible local route matching the built-in preset |
+| SGLang            | `http://127.0.0.1:30000` | OpenAI Responses-compatible        | Self-hosted SGLang endpoint                                |
+| vLLM              | `http://127.0.0.1:8000`  | OpenAI Responses-compatible        | Self-hosted vLLM endpoint                                  |
+
+These presets are defaults, not guarantees. Local runtime behavior varies by server version, launched model, command-line flags, routing layer, and hardware.
+
+Use a built-in provider directly when your server matches the default origin, path, headers, and model names. Otherwise, copy/fork the provider first and edit the fork.
+
+For a guided local setup, see [Local LLM Setup](/docs?doc=local-llm-setup).
+
+## Fork a local provider before editing models
+
+For local LLMs, prefer this order:
+
+1. fork/copy the provider preset
+2. edit provider settings
+3. then add or copy model presets under that provider
+
+Provider settings come first because they control the shared API contract:
+
+- SDK/API compatibility type
+- origin URL
+- chat path
+- API-key header name
+- default headers
+- provider-wide capability assumptions
+
+Recommended flow:
+
+1. Open **Model Presets**.
+2. Click **Add Provider**.
+3. Use **Prefill from Existing -> Copy Existing Provider**.
+4. Choose the closest built-in local provider, such as LM Studio, `llama.cpp`, Ollama, LocalAI, SGLang, or vLLM.
+5. Give the new provider a stable provider ID, such as `my-lmstudio` or `workstation-vllm`.
+6. Adjust origin, path, SDK type, headers, and API-key header for your server.
+7. Save and enable the provider.
+8. Add a placeholder auth key in **Settings -> Auth Keys** if the server requires one.
+9. Add, copy, or edit model presets under the forked provider.
+10. Select the forked model preset in **Chats** and send a tiny test prompt.
+
+Keep provider IDs stable after use. Chats, assistant presets, and model references may depend on them.
+
 ## Custom compatible endpoints
 
 Use a custom provider when your endpoint implements one of the supported API styles:
@@ -108,7 +164,7 @@ Use a custom provider when your endpoint implements one of the supported API sty
 - Anthropic Messages-compatible
 - Google GenerateContent-compatible
 
-When adding a custom provider, check:
+When adding or forking a custom provider, check:
 
 - provider name is stable
 - SDK/API compatibility type matches the endpoint
@@ -122,7 +178,7 @@ Keep provider IDs stable because chats, assistant presets, and model refs may de
 
 ## Local OpenAI-compatible servers
 
-Many local servers expose an OpenAI-compatible API.
+Many local servers expose an OpenAI-compatible API, but they do not all expose the same API family. Check whether your server expects Chat Completions, Responses, or another compatible route before choosing the SDK type.
 
 Typical values:
 
@@ -138,13 +194,14 @@ Steps:
 
 1. Start the local server.
 2. Open **Model Presets**.
-3. Add a provider preset.
-4. Choose OpenAI Chat Completions-compatible SDK type if your server supports `/v1/chat/completions`.
-5. Set origin and chat path.
-6. Add a model preset with the local model name.
-7. Enable provider and model.
-8. Add a placeholder key in **Settings -> Auth Keys** if required.
-9. Open **Chats** and test.
+3. Copy/fork the closest built-in local provider if one exists.
+4. Otherwise add a provider preset from scratch.
+5. Choose the SDK type that matches the server route.
+6. Set origin and chat path.
+7. Add a model preset with the local model name.
+8. Enable provider and model.
+9. Add a placeholder key in **Settings -> Auth Keys** if required.
+10. Open **Chats** and test.
 
 Test prompt:
 
@@ -152,42 +209,36 @@ Test prompt:
 
 Local endpoints may not support every hosted-model feature. Start without tools, web search, files, or images. Add capabilities one at a time after basic chat works.
 
-## llama.cpp server
+## Runtime-specific local notes
 
-If you run a `llama.cpp` server with OpenAI-compatible routes, configure it as an OpenAI-compatible provider.
+Use these notes after reading the provider-first flow above.
 
-Example server command shape:
+### LM Studio
 
-    llama-server -m /path/to/model.gguf --host 127.0.0.1 --port 8080
+- Start the LM Studio local server.
+- If the default port is still `1234`, try the built-in LM Studio provider directly.
+- If you changed the port, base URL, or route style, copy/fork LM Studio first and edit the fork.
+- Model names often need to match the repository/model identifier exposed by LM Studio.
 
-Then configure:
+### `llama.cpp`
 
-- Origin: `http://127.0.0.1:8080`
-- Chat path: `/v1/chat/completions`
-- SDK type: OpenAI Chat Completions-compatible
-- Model name: the model name expected by your server
+- Start `llama-server` with the host, port, context, and model file you want.
+- The built-in `llama.cpp` provider uses an OpenAI Chat Completions-compatible setup on `http://127.0.0.1:8080`.
+- If your launch command uses another port or path, fork the provider and update the origin/path.
+- Context length and multimodal support depend on the model file and server flags.
 
-Common limitations:
+### Ollama
 
-- lower context length
-- limited tool support
-- limited structured output support
-- limited multimodal support
-- slower generation
-- quantization-specific quality trade-offs
+- The built-in Ollama provider uses the compatibility style configured in its preset.
+- If your Ollama setup exposes a different route, such as an OpenAI-compatible route, fork the provider and adjust SDK type and path to match your server.
+- Use the local model tag that your Ollama instance expects.
 
-## Ollama-style local setup
+### LocalAI, SGLang, and vLLM
 
-If your Ollama setup exposes an OpenAI-compatible endpoint, use the compatible custom provider path.
-
-Typical values:
-
-- Origin: `http://localhost:11434`
-- Chat path: `/v1/chat/completions`
-- SDK type: OpenAI Chat Completions-compatible
-- Model name: local model tag, for example `llama3.1`
-
-If your endpoint differs, use the path and model name from your local Ollama setup.
+- Start the server with the model and route style you intend to use.
+- If the built-in default port matches, enable the built-in provider and test.
+- If the server uses a different port, proxy path, auth header, or feature set, fork the provider first.
+- For self-hosted deployments, confirm whether the endpoint is still local-only or reachable on your network.
 
 ## Capability expectations
 

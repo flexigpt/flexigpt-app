@@ -210,6 +210,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		requestStopResponse,
 		disposeInputRuntime,
 		applyWorkflowStarterToComposer,
+		loadAssistantTurnForTab,
 	} = useInputRegistry({ tabExists });
 
 	useAttachmentsDropTarget({
@@ -304,6 +305,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		getFullStreamTextForTab,
 		getFullStreamThinkingForTab,
 		inputRefs,
+		loadAssistantTurnForTab,
 	});
 
 	const disposeTabRuntime = useCallback(
@@ -428,7 +430,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 	);
 
 	const mountedInputTabs = useMemo(
-		() => tabs.filter(tab => tab.tabId === selectedTabId || mountedInputTabIds.has(tab.tabId)),
+		() => tabs.filter(tab => tab.tabId === selectedTabId || tab.isBusy || mountedInputTabIds.has(tab.tabId)),
 		[mountedInputTabIds, selectedTabId, tabs]
 	);
 
@@ -545,7 +547,7 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 				</div>
 			</div>
 
-			<div className="row-start-3 row-end-4 flex w-full min-w-0 justify-center">
+			<div className="row-start-3 row-end-4 flex min-h-0 w-full min-w-0 justify-center overflow-hidden">
 				<div className="w-11/12 min-w-0 xl:w-5/6">
 					{mountedInputTabs.map(tab => (
 						<TabInputPane

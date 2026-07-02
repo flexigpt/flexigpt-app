@@ -61,31 +61,37 @@ Use this when you want inference to run through a local endpoint you control.
 Prerequisites:
 
 - local model server running
-- API compatibility mode supported by FlexiGPT
-- provider/model preset pointing to the local endpoint
+- a built-in local provider preset that matches your server, or a forked provider preset pointing to your endpoint
+- provider/model preset enabled in FlexiGPT
 
-Supported compatible styles include:
+Built-in local and self-hosted provider presets include:
 
-- OpenAI Chat Completions-compatible
-- OpenAI Responses-compatible
-- Anthropic Messages-compatible
-- Google GenerateContent-compatible
+- LocalAI
+- LM Studio
+- `llama.cpp`
+- Ollama
+- SGLang
+- vLLM
 
-Many local servers use OpenAI Chat Completions-compatible routes.
+These built-ins are good starting points. Because local servers vary in URL, path, headers, API compatibility, model names, and capabilities, the safest durable setup is usually to fork/copy the provider first and then adjust models.
 
 Steps:
 
 1. Start your local model server.
 2. Open **Model Presets**.
-3. Add or edit a provider preset for the local endpoint.
-4. Use an origin like `http://127.0.0.1:8080` or `http://localhost:11434`.
-5. Use the correct chat path, often `/v1/chat/completions`.
-6. Add at least one model preset using the local model name expected by your server.
-7. Enable the provider and model preset.
-8. Add a placeholder auth key if your provider configuration requires a non-empty key.
-9. Open **Chats**.
-10. Select the local model preset.
-11. Send a tiny test prompt.
+3. Click **Add Provider**.
+4. Use **Prefill from Existing -> Copy Existing Provider**.
+5. Choose the closest built-in local provider.
+6. Give the forked provider a stable ID and display name.
+7. Adjust the provider origin, chat path, SDK/API compatibility type, API-key header, and default headers for your server.
+8. Save and enable the provider.
+9. Add a placeholder auth key if the provider configuration requires a non-empty key.
+10. Under the forked provider, add a model preset or use **Copy Existing Preset** from a close built-in model.
+11. Set the model name to the exact name or tag expected by your local server.
+12. Enable the model preset and optionally set it as default for that provider.
+13. Open **Chats**.
+14. Select the local model preset.
+15. Send a tiny test prompt.
 
 Test prompt:
 
@@ -104,8 +110,11 @@ Expectations:
 Safety check:
 
 - local-first only means local inference when the selected provider origin is actually local
+- provider IDs should stay stable after chats or assistant presets use them
+- use harmless placeholder keys for dummy local auth instead of real production API keys
 - confirm the local server is not proxying to a remote service
 - test with harmless content first
+- for the full provider-first flow, see [Local LLM Setup](/docs?doc=local-llm-setup)
 
 ## Create your first assistant preset
 

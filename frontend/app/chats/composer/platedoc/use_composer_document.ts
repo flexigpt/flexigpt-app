@@ -1,5 +1,5 @@
 import type { ClipboardEvent as ReactClipboardEvent, RefObject } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { Value } from 'platejs';
 import type { PlateEditor } from 'platejs/react';
@@ -80,8 +80,10 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 	const contentRef = useRef<HTMLDivElement | null>(null);
 	const editorRef = useRef(editor);
-	// oxlint-disable-next-line jsreact-hooks/refs
-	editorRef.current = editor;
+
+	useLayoutEffect(() => {
+		editorRef.current = editor;
+	}, [editor]);
 
 	// doc version tick to re-run selection computations on any editor change
 	const [docVersion, setDocVersion] = useState(0);

@@ -26,7 +26,7 @@ FlexiGPT is built for people who use LLMs as part of repeatable work, not just o
 
 ## Quick start
 
-1. Get an API key for a provider.
+1. Get an API key for a hosted provider, or start a local LLM server you control.
    - [OpenAI](https://platform.openai.com/settings/organization/api-keys)
    - [Anthropic Claude](https://platform.claude.com/settings/keys)
    - [Google Gemini](https://aistudio.google.com/api-keys)
@@ -35,10 +35,12 @@ FlexiGPT is built for people who use LLMs as part of repeatable work, not just o
    - [OpenRouter](https://openrouter.ai/workspaces/default/keys)
    - [Hugging Face](https://huggingface.co/settings/tokens)
 2. Add the key in **Settings -> Auth Keys**.
-3. Open **Chats**.
-4. Start from a built-in assistant preset or choose a model preset directly.
-5. Attach files, folders, notes, PDFs, URLs, or code when the model needs source material.
-6. Send.
+   - For local endpoints that require a non-empty key, add a harmless placeholder key for the local provider.
+3. Open **Model Presets**. Enable a built-in provider/model or fork a provider preset for your endpoint.
+4. Open **Chats**.
+5. Start from a built-in assistant preset or choose a model preset directly.
+6. Attach files, folders, notes, PDFs, URLs, or code when the model needs source material.
+7. Send.
 
 Good first workflows:
 
@@ -70,9 +72,10 @@ FlexiGPT does not proxy LLM calls through a FlexiGPT-hosted service. Requests go
 
 ### Provider-independent model choices with built-in presets
 
-- Built-in support for OpenAI, Anthropic, Google Gemini, xAI, Mistral, Hugging Face, OpenRouter, and local `llama.cpp`.
+- Built-in support for OpenAI, Anthropic, Google Gemini, xAI, Mistral, Hugging Face, OpenRouter, and local/self-hosted runtimes such as LocalAI, LM Studio, `llama.cpp`, Ollama, SGLang, and vLLM.
 - Custom endpoints across OpenAI Chat Completions, OpenAI Responses, Anthropic Messages, and Google GenerateContent-style APIs.
 - Curated built-in providers and model presets so you can start quickly without manually defining endpoints or defaults first.
+- Provider and model presets are configurable, so local users can copy/fork a built-in provider preset, adjust the endpoint, headers, compatibility type, and model defaults, then use the forked provider in Chats.
 - API keys are stored securely through the OS keyring, not in plain-text exported settings.
 
 ### Repeatable AI workspace
@@ -144,6 +147,7 @@ Setup, safety, and help:
 
 - [Providers and Models](./frontend/app/docs/content/06-providers-and-models.md)
 - [Privacy, Data, and Troubleshooting](./frontend/app/docs/content/07-privacy-data-and-troubleshooting.md)
+- [Local LLM Setup](./frontend/app/docs/content/16-local-llm-setup.md)
 
 Recipes:
 
