@@ -8,31 +8,31 @@
   - [ ] test with some skill that has scripts too
 
 - [ ] if we move out of tab and in background if tool calls come, they are not loaded and auto exec and submitted.
+- [ ] pageup after or during paste makes the composer and whole page move up. need steps to reproduce.
+- [ ] MCP flows review and harden and more automatic in places where it is a bit jerky today.
 
 ## M-2
 
-- [ ] Provider setup polish:
-  - [ ] should have properly complete and verified presets
-  - [ ] all models from leading providers including chinese ones via openrouter and hugging face as remote servers
-  - [ ] local servers support
+- [x] Provider setup polish:
+  - [x] should have properly complete and verified presets
+  - [x] all models from leading providers including chinese ones via openrouter and hugging face as remote servers
+  - [x] local servers support
   - [x] anthropic, openai, google gemini, mistral, xai,
   - [x] hf, openrouter
-  - [ ] ollama, vllm, lm studio, tgi, llmcpp, gpt4all
+  - [x] vllm, lm studio, ollama, localai, slang, llamacpp
 
-- [ ] better more inbuilt mcps.
-  - MCP flows review and harden and more automatic in places where it is a bit jerky today.
-  - mcp tools from leading providers presets completions.
-    - Management: Atlassian, Notion
-    - Documents: Box
-    - Design: Canva, figma
-    - Cloudflare: multiple like Docs, Workers, Observability, etc
-    - Software dev: GitHub, Netlify, Stack Overflow, Vercel, Hugging Face
-    - Jobs: Indeed
-    - Search: Exa, Brave, BGPT
-    - Google: Google Big Query, Google Compute Engine, Google GKE , Google Maps, [Other MCP servers](https://github.com/google/mcp), gmail, calender
-    - MS: teams, 365
-    - Slack
-    - Zoom
+- [x] better more inbuilt mcps. mcp tools from leading providers presets completions.
+  - [x] Management: Atlassian, Notion
+  - [x] Documents: Box
+  - [x] Design: Canva, figma
+  - [x] Cloudflare: multiple like Docs, Workers, Observability, etc
+  - [x] Software dev: GitHub, Netlify, Stack Overflow, Vercel, Hugging Face
+  - [x] Jobs: Indeed
+  - [x] Search: Exa, Brave, BGPT
+  - [x] Google: Google Big Query, Google Compute Engine, Google GKE , Google Maps, [Other MCP servers](https://github.com/google/mcp), gmail, calender
+  - [x] MS: teams, 365
+  - [x] Slack
+  - [x] Zoom
 
 - [ ] an attachment/tool and apply diff to code preset will be good. simple template and tool
   - [ ] here enhance the file name detection when we are using tool calls and also when we have openai style patch out rather than unified diff.

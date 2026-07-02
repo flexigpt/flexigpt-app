@@ -285,18 +285,18 @@ func TestBuiltInPresetAppOverlays(t *testing.T) {
 	}
 
 	openAIResponses := providers[modelpreset.ProviderOpenAIResponses]
-	if openAIResponses.DefaultModelPresetID != spec.ModelPresetID(modelpreset.PresetOpenAIResponsesGPT54Mini) {
+	if openAIResponses.DefaultModelPresetID != spec.ModelPresetID(modelpreset.PresetGPT54Mini) {
 		t.Fatalf("openairesponses default model got %q want %q",
 			openAIResponses.DefaultModelPresetID,
-			modelpreset.PresetOpenAIResponsesGPT54Mini,
+			modelpreset.PresetGPT54Mini,
 		)
 	}
 
 	anthropic := providers[modelpreset.ProviderAnthropic]
-	if anthropic.DefaultModelPresetID != spec.ModelPresetID(modelpreset.PresetAnthropicSonnet46) {
+	if anthropic.DefaultModelPresetID != spec.ModelPresetID(modelpreset.PresetClaudeSonnet5) {
 		t.Fatalf("anthropic default model got %q want %q",
 			anthropic.DefaultModelPresetID,
-			modelpreset.PresetAnthropicSonnet46,
+			modelpreset.PresetClaudeSonnet5,
 		)
 	}
 
@@ -314,19 +314,19 @@ func TestBuiltInPresetAppOverlays(t *testing.T) {
 	}{
 		{
 			provider: modelpreset.ProviderAnthropic,
-			modelID:  spec.ModelPresetID(modelpreset.PresetAnthropicSonnet45),
+			modelID:  spec.ModelPresetID(modelpreset.PresetClaudeSonnet45),
 		},
 		{
 			provider: modelpreset.ProviderGoogleGemini,
-			modelID:  spec.ModelPresetID(modelpreset.PresetGoogleGemini3Flash),
+			modelID:  spec.ModelPresetID(modelpreset.PresetGemini3Flash),
 		},
 		{
 			provider: modelpreset.ProviderOpenAIChat,
-			modelID:  spec.ModelPresetID(modelpreset.PresetOpenAIChatGPT4o),
+			modelID:  spec.ModelPresetID(modelpreset.PresetGPT4o),
 		},
 		{
 			provider: modelpreset.ProviderOpenAIResponses,
-			modelID:  spec.ModelPresetID(modelpreset.PresetOpenAIResponsesGPT52),
+			modelID:  spec.ModelPresetID(modelpreset.PresetGPT52),
 		},
 	}
 
@@ -769,7 +769,7 @@ func TestBuiltInPresetsOverlayPersistsAcrossReopen(t *testing.T) {
 	}
 
 	providerName := modelpreset.ProviderOpenAIResponses
-	modelID := spec.ModelPresetID(modelpreset.PresetOpenAIResponsesGPT54Mini)
+	modelID := spec.ModelPresetID(modelpreset.PresetGPT54Mini)
 
 	providers, models, err := bi1.ListBuiltInPresets(ctx)
 	if err != nil {
@@ -904,7 +904,7 @@ func TestGetBuiltInProviderAndModelPreset(t *testing.T) {
 		t.Fatalf("provider name got %q want %q", provider.Name, modelpreset.ProviderAnthropic)
 	}
 
-	modelID := spec.ModelPresetID(modelpreset.PresetAnthropicSonnet46)
+	modelID := spec.ModelPresetID(modelpreset.PresetClaudeSonnet46)
 	model, err := bi.GetBuiltInModelPreset(ctx, modelpreset.ProviderAnthropic, modelID)
 	if err != nil {
 		t.Fatalf("GetBuiltInModelPreset: %v", err)
