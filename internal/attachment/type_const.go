@@ -10,28 +10,10 @@ var (
 	ErrUnreadableFile                  = errors.New("unreadable file")
 	ErrExistingContentBlock            = errors.New("content block already exists")
 	ErrAttachmentModifiedSinceSnapshot = errors.New("attachment modified since snapshot")
-
-	// ErrResponseTooLarge is used internally by fetchURLBytes to signal
-	// that the remote resource exceeded the configured maxBytes limit.
-	ErrResponseTooLarge = errors.New("remote resource larger than the configured limit")
-
-	// ErrPageTooLarge is returned by ExtractReadableMarkdownFromURL when
-	// the HTML page exceeds maxURLPageContentBytes.
-	ErrPageTooLarge = errors.New("page content too large")
-
-	// ErrNoContentExtracted is returned when the extractor produces no
-	// readable content at all (e.g., empty body, or extraction failure).
-	ErrNoContentExtracted = errors.New("no readable content extracted")
 )
 
 const (
-	maxAttachmentFetchBytes = 16 * 1024 * 1024 // 16MB safety limit
-	maxTotalDirWalkFiles    = 256
-	// Max number of bytes we will download and process as "page content"
-	// for LLM consumption. If a page is larger than this, we will return
-	// ErrPageTooLarge and fall back to link-only at a higher layer.
-	maxURLPageContentBytes = 16 << 20 // 16 MiB
-	defaultHTTPTimeout     = 30 * time.Second
+	maxTotalDirWalkFiles = 256
 )
 
 // AttachmentKind enumerates contextual attachment categories that can be
