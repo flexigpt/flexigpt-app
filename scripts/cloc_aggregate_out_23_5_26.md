@@ -1,6 +1,8 @@
 # CLOC Summary
+
 ## Aggregate overview
-| Metric          | Value                    |
+
+| Metric          |                    Value |
 | :-------------- | -----------------------: |
 | Generated at    | 2026-05-23T10:07:42.189Z |
 | Repos requested |                        5 |
@@ -10,8 +12,10 @@
 | Total code      |                  176,845 |
 | Total comment   |                    7,758 |
 | Total blank     |                   31,681 |
+
 ## By language
-| Language     | Repos | Files | Code   | Comment | Blank  |
+
+| Language     | Repos | Files |   Code | Comment |  Blank |
 | :----------- | ----: | ----: | -----: | ------: | -----: |
 | Go           |     5 |   430 | 96,147 |   4,744 | 11,978 |
 | TypeScript   |     1 |   269 | 51,166 |   1,746 |  7,744 |
@@ -26,17 +30,22 @@
 | Mustache     |     1 |     6 |    103 |       0 |      9 |
 | XML          |     1 |     1 |     68 |       0 |      0 |
 | PowerShell   |     1 |     1 |     41 |       3 |     12 |
+
 ## By repo
-| Repo                      | Status | Files | Code   | Comment | Blank  | Ref / SHA    |
+
+| Repo                      | Status | Files |   Code | Comment |  Blank | Ref / SHA    |
 | :------------------------ | :----- | ----: | -----: | ------: | -----: | :----------- |
 | `flexigpt/flexigpt-app`   | ok     |   535 | 99,412 |   4,153 | 15,001 | ebab8de51a9f |
 | `flexigpt/inference-go`   | ok     |   118 | 35,700 |   1,110 | 11,295 | 840c391e4f49 |
 | `flexigpt/llmtools-go`    | ok     |   135 | 24,582 |   1,221 |  2,980 | 608ce2fa943c |
 | `flexigpt/mapstore-go`    | ok     |    44 |  9,843 |     746 |  1,134 | d40249b245e1 |
 | `flexigpt/agentskills-go` | ok     |    49 |  7,308 |     528 |  1,271 | f6e43522fb5d |
+
 ## Repo language breakdown
+
 ### `flexigpt/flexigpt-app`
-| Metric    | Value        |
+
+| Metric    |        Value |
 | :-------- | -----------: |
 | Status    |           ok |
 | Files     |          535 |
@@ -44,7 +53,8 @@
 | Comment   |        4,153 |
 | Blank     |       15,001 |
 | Ref / SHA | ebab8de51a9f |
-| Language     | Files | Code   | Comment | Blank |
+
+| Language     | Files |   Code | Comment | Blank |
 | :----------- | ----: | -----: | ------: | ----: |
 | TypeScript   |   269 | 51,166 |   1,746 | 7,744 |
 | Go           |   153 | 39,052 |   1,965 | 5,147 |
@@ -59,8 +69,10 @@
 | INI          |     2 |     90 |       0 |    14 |
 | XML          |     1 |     68 |       0 |     0 |
 | PowerShell   |     1 |     41 |       3 |    12 |
+
 ### `flexigpt/inference-go`
-| Metric    | Value        |
+
+| Metric    |        Value |
 | :-------- | -----------: |
 | Status    |           ok |
 | Files     |          118 |
@@ -68,7 +80,8 @@
 | Comment   |        1,110 |
 | Blank     |       11,295 |
 | Ref / SHA | 840c391e4f49 |
-| Language     | Files | Code   | Comment | Blank |
+
+| Language     | Files |   Code | Comment | Blank |
 | :----------- | ----: | -----: | ------: | ----: |
 | Go           |    96 | 17,615 |     904 | 2,237 |
 | Markdown     |     8 | 17,473 |       0 | 8,852 |
@@ -77,8 +90,10 @@
 | Bourne Shell |     2 |     83 |      30 |    24 |
 | Text         |     1 |     49 |       0 |     7 |
 | INI          |     1 |     12 |       0 |     2 |
+
 ### `flexigpt/llmtools-go`
-| Metric    | Value        |
+
+| Metric    |        Value |
 | :-------- | -----------: |
 | Status    |           ok |
 | Files     |          135 |
@@ -86,7 +101,8 @@
 | Comment   |        1,221 |
 | Blank     |        2,980 |
 | Ref / SHA | 608ce2fa943c |
-| Language     | Files | Code   | Comment | Blank |
+
+| Language     | Files |   Code | Comment | Blank |
 | :----------- | ----: | -----: | ------: | ----: |
 | Go           |   119 | 23,722 |   1,015 | 2,671 |
 | YAML         |     7 |    352 |     176 |   163 |
@@ -95,8 +111,10 @@
 | Bourne Shell |     2 |     83 |      30 |    24 |
 | Text         |     1 |     49 |       0 |     7 |
 | INI          |     1 |     12 |       0 |     2 |
+
 ### `flexigpt/mapstore-go`
-| Metric    | Value        |
+
+| Metric    |        Value |
 | :-------- | -----------: |
 | Status    |           ok |
 | Files     |           44 |
@@ -104,7 +122,8 @@
 | Comment   |          746 |
 | Blank     |        1,134 |
 | Ref / SHA | d40249b245e1 |
-| Language     | Files | Code  | Comment | Blank |
+
+| Language     | Files |  Code | Comment | Blank |
 | :----------- | ----: | ----: | ------: | ----: |
 | Go           |    29 | 9,195 |     540 |   908 |
 | YAML         |     7 |   354 |     176 |   163 |
@@ -113,8 +132,10 @@
 | Markdown     |     1 |    74 |       0 |    29 |
 | Text         |     1 |    28 |       0 |     4 |
 | INI          |     1 |    12 |       0 |     2 |
+
 ### `flexigpt/agentskills-go`
-| Metric    | Value        |
+
+| Metric    |        Value |
 | :-------- | -----------: |
 | Status    |           ok |
 | Files     |           49 |
@@ -122,7 +143,8 @@
 | Comment   |          528 |
 | Blank     |        1,271 |
 | Ref / SHA | f6e43522fb5d |
-| Language     | Files | Code  | Comment | Blank |
+
+| Language     | Files |  Code | Comment | Blank |
 | :----------- | ----: | ----: | ------: | ----: |
 | Go           |    33 | 6,563 |     320 | 1,015 |
 | YAML         |     7 |   355 |     177 |   163 |
