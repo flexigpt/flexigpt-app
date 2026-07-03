@@ -11,8 +11,6 @@
 
 ## M-2
 
-- [ ] llmtools: git tools
-
 - [ ] an attachment/tool and apply diff to code preset will be good. simple template and tool
 
 - [ ] github pr review preset

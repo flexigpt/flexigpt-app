@@ -44,6 +44,28 @@
 			"createdAt": "2026-01-30T00:00:00Z",
 			"modifiedAt": "2026-01-30T00:00:00Z"
 		},
+		"019f27b6-10ee-7858-8ad0-a20081c1a88d": {
+			"schemaVersion": "2025-07-01",
+			"id": "019f27b6-10ee-7858-8ad0-a20081c1a88d",
+			"slug": "git",
+			"displayName": "Git utilities",
+			"description": "Common local Git helpers.",
+			"isEnabled": true,
+			"isBuiltIn": true,
+			"createdAt": "2026-07-03T00:00:00Z",
+			"modifiedAt": "2026-07-03T00:00:00Z"
+		},
+		"019f27b6-bce1-742f-8ff9-d3a12ce4361c": {
+			"schemaVersion": "2025-07-01",
+			"id": "019f27b6-bce1-742f-8ff9-d3a12ce4361c",
+			"slug": "web",
+			"displayName": "Web utilities",
+			"description": "Common web helpers to fetch and process pages.",
+			"isEnabled": true,
+			"isBuiltIn": true,
+			"createdAt": "2026-07-03T00:00:00Z",
+			"modifiedAt": "2026-07-03T00:00:00Z"
+		},
 		"019b9293-6f00-70d7-8c91-4a7f28156479": {
 			"schemaVersion": "2025-07-01",
 			"id": "019b9293-6f00-70d7-8c91-4a7f28156479",

@@ -74,6 +74,12 @@ var LLMToolsGoBuiltinCatalog = map[string]LLMToolMeta{
 		AutoExecReco: true,
 	},
 
+	// Web.
+	"github.com/flexigpt/llmtools-go/webtool/fetchurl.FetchURL": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsWeb),
+		AutoExecReco: true,
+	},
+
 	// Exectool (dangerous by default).
 	"github.com/flexigpt/llmtools-go/exectool/shellcommand.ShellCommand": {
 		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsExec),
@@ -108,6 +114,96 @@ var LLMToolsGoBuiltinCatalog = map[string]LLMToolMeta{
 	"github.com/flexigpt/llmtools-go/texttool/applyunifieddiff.ApplyUnifiedDiff": {
 		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsText),
 		AutoExecReco: false,
+	},
+
+	// Git.
+	"github.com/flexigpt/llmtools-go/gittool/status.Status": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsGit),
+		AutoExecReco: true,
+	},
+	"github.com/flexigpt/llmtools-go/gittool/diff.Diff": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsGit),
+		AutoExecReco: true,
+	},
+	"github.com/flexigpt/llmtools-go/gittool/log.Log": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsGit),
+		AutoExecReco: true,
+	},
+	"github.com/flexigpt/llmtools-go/gittool/show.Show": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsGit),
+		AutoExecReco: true,
+	},
+	"github.com/flexigpt/llmtools-go/gittool/branches.Branches": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsGit),
+		AutoExecReco: true,
+	},
+	"github.com/flexigpt/llmtools-go/gittool/tags.Tags": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsGit),
+		AutoExecReco: true,
+	},
+	"github.com/flexigpt/llmtools-go/gittool/createtag.CreateTag": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsGit),
+		AutoExecReco: false,
+	},
+	"github.com/flexigpt/llmtools-go/gittool/deletetag.DeleteTag": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsGit),
+		AutoExecReco: false,
+	},
+	"github.com/flexigpt/llmtools-go/gittool/changedfiles.ChangedFiles": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsGit),
+		AutoExecReco: true,
+	},
+	"github.com/flexigpt/llmtools-go/gittool/listtree.ListTree": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsGit),
+		AutoExecReco: true,
+	},
+	"github.com/flexigpt/llmtools-go/gittool/readblob.ReadBlob": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsGit),
+		AutoExecReco: true,
+	},
+	"github.com/flexigpt/llmtools-go/gittool/findrepos.FindRepos": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsGit),
+		AutoExecReco: true,
+	},
+	"github.com/flexigpt/llmtools-go/gittool/add.Add": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsGit),
+		AutoExecReco: false,
+	},
+	"github.com/flexigpt/llmtools-go/gittool/reset.Reset": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsGit),
+		AutoExecReco: false,
+	},
+	"github.com/flexigpt/llmtools-go/gittool/commit.Commit": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsGit),
+		AutoExecReco: false,
+	},
+	"github.com/flexigpt/llmtools-go/gittool/createbranch.CreateBranch": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsGit),
+		AutoExecReco: false,
+	},
+	"github.com/flexigpt/llmtools-go/gittool/checkout.Checkout": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsGit),
+		AutoExecReco: false,
+	},
+	"github.com/flexigpt/llmtools-go/gittool/init.Init": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsGit),
+		AutoExecReco: false,
+	},
+	"github.com/flexigpt/llmtools-go/gittool/blame.Blame": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsGit),
+		AutoExecReco: true,
+	},
+	"github.com/flexigpt/llmtools-go/gittool/filehistory.FileHistory": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsGit),
+		AutoExecReco: true,
+	},
+	"github.com/flexigpt/llmtools-go/gittool/repoinfo.RepoInfo": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsGit),
+		AutoExecReco: true,
+	},
+	"github.com/flexigpt/llmtools-go/gittool/grep.Grep": {
+		BundleID:     bundleitemutils.BundleID(builtin.BuiltinBundleIDLLMToolsGit),
+		AutoExecReco: true,
 	},
 }
 
