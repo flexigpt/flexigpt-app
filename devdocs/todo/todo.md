@@ -11,8 +11,6 @@
 
 ## M-2
 
-- [ ] an attachment/tool and apply diff to code preset will be good. simple template and tool
-
 - [ ] github pr review preset
 
 ## M-3
@@ -63,8 +61,6 @@
 
 - [ ] Better Text support: extracted other docs input, sheets and docx mainly.
   - [ ] llmtools: may be pdf parsing and any other parsing should be builder hooks that people can input at build time so that adding support etc is easy.
-
-- [x] Doc stores/vector stores connections. No need - MCPs serve this well.
 
 - [ ] Image output: See inference-go notes.
 - [ ] audio in/out

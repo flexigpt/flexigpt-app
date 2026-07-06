@@ -17,11 +17,12 @@ import remarkGemoji from 'remark-gemoji';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import supersub from 'remark-supersub';
+import type { PluggableList } from 'unified';
 
 import { backendAPI } from '@/apis/baseapi';
 
 import { CustomMDLanguage } from '@/components/markdown/custom_md_utils';
-import { SanitizeLaTeXOutsideFences } from '@/components/markdown/latex_utils';
+import { remarkInlineCodeMath, SanitizeLaTeXOutsideFences } from '@/components/markdown/latex_utils';
 import { CodeBlock } from '@/components/markdown/markdown_code_block';
 import { MdErrorBoundary } from '@/components/markdown/markdown_error_boundary';
 import { ThinkingFence } from '@/components/markdown/thinking_fence';
@@ -65,6 +66,10 @@ interface EnhancedMarkdownProps {
 
 const isExternalHref = (href?: string) => !!href && /^(https?:)?\/\/|^mailto:|^tel:/i.test(href);
 
+const rehypeKatexOptions = {
+	throwOnError: false,
+};
+
 export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 	text,
 	align = 'left',
@@ -77,6 +82,24 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 	const processedText = useMemo(() => {
 		return isBusy ? text : SanitizeLaTeXOutsideFences(text);
 	}, [text, isBusy]);
+
+	const remarkPlugins = useMemo<PluggableList>(() => {
+		if (isBusy) {
+			return [remarkGfm, supersub, remarkGemoji];
+		}
+
+		return [remarkGfm, remarkMath, remarkInlineCodeMath, supersub, remarkGemoji];
+	}, [isBusy]);
+
+	const rehypePlugins = useMemo<PluggableList>(() => {
+		const basePlugins: PluggableList = [rehypeRaw, [rehypeSanitize, strictSchema], rehypeSlug];
+
+		if (isBusy) {
+			return basePlugins;
+		}
+
+		return [...basePlugins, [rehypeKatex, rehypeKatexOptions] as const];
+	}, [isBusy]);
 
 	const components = useMemo(() => {
 		// oxlint-disable-next-line react/display-name
@@ -257,6 +280,14 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 					);
 				}
 
+				if (isBusy && language.toLowerCase() === 'math') {
+					return (
+						<pre className="app-text-code app-bg-code my-4 overflow-auto rounded-lg p-2 text-sm">
+							<code>{value}</code>
+						</pre>
+					);
+				}
+
 				return (
 					<CodeBlock
 						language={language}
@@ -272,12 +303,7 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 
 	return (
 		<MdErrorBoundary source={processedText}>
-			<Markdown
-				remarkPlugins={[remarkGfm, remarkMath, supersub, remarkGemoji]}
-				rehypePlugins={[rehypeRaw, [rehypeSanitize, { ...strictSchema }], rehypeSlug, rehypeKatex]}
-				components={components}
-				skipHtml={false}
-			>
+			<Markdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components} skipHtml={false}>
 				{processedText}
 			</Markdown>
 		</MdErrorBoundary>

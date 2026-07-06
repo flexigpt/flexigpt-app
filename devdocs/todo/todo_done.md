@@ -1,5 +1,7 @@
 # Project Done Items
 
+## M1
+
 - Design and implement AppLayout
   - [x] Manages overall layout structure
 
@@ -963,6 +965,8 @@
 
   - [x] Agent Skills but via local "skills" flow
 
+## M2
+
 - [x] inference go
   - [x] move capability override functionality here.
   - [x] add defaults for standard vendors and models there and use it inside builtin data.
@@ -1060,3 +1064,8 @@
 - [x] better simple search inside dropdown selectors for context and presets
 - [x] enhance the file name detection when we are using tool calls and also when we have openai style patch out rather than unified diff.
 - [x] llmtools: git tools, fetch webpage to md
+- [x] an attachment/tool and apply diff to code preset will be good. simple template and tool
+  - [x] this is not needed as of now as if diffs come in they are automatically detected and apply is presented and attachments and tools can be added custom way anycase.
+
+- [x] Doc stores/vector stores connections. No need - MCPs serve this well.
+- [x] inline math seems to have regressed somewhere to not rendering.
