@@ -7,12 +7,6 @@
   - [ ] test web search etc and pending user args etc after bottom bar migration.
   - [ ] test with some skill that has scripts too
 
-- [ ] MCP flows review and harden and more automatic in places where it is a bit jerky today.
-
-## M-2
-
-- [ ] github pr review preset
-
 ## M-3
 
 - [ ] a folder selection/input an be given in context bar to say that your current work folder is so and so, so that any claude.md or skills or anything can be selected and auto injected as a "Starter recipe"

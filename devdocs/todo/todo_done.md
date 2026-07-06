@@ -1069,3 +1069,11 @@
 
 - [x] Doc stores/vector stores connections. No need - MCPs serve this well.
 - [x] inline math seems to have regressed somewhere to not rendering.
+- [x] github pr review preset. Not doing this as of now. Reasoning:
+  - [x] a github pr review flow is so that a user can review someone else's PR, not self (self reviews would be better done on local code rather than github pr).
+  - [x] Reviewing someone else's code means providing them with a review feedback.
+  - [x] this cannot be done unless llms generate a structured review and we attach a analyze LLM output and then submit to github style flow.
+  - [x] this is possible today as LLM generates a tool call and then we attach a UI for it. In MCP world this is better handled as a MCP app extension attached to a tool.
+  - [x] github has few MCP apps, today. no point in entering this area myself for now.
+
+- [x] MCP flows review and harden and more automatic in places where it is a bit jerky today.
