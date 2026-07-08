@@ -61,6 +61,8 @@ import type {
 import type { AppTheme, AuthKey, AuthKeyName, AuthKeyType, DebugSettings, SettingsSchema } from '@/spec/setting';
 import type {
 	InvokeSkillToolResponse,
+	ListSkillsRequest,
+	RenderSkillResponse,
 	RuntimeSkillFilter,
 	RuntimeSkillListItem,
 	Skill,
@@ -283,14 +285,7 @@ export interface ISkillStoreAPI {
 	deleteSkillBundle(bundleID: string): Promise<void>;
 
 	/** List skills, optionally filtered by bundleIDs/types and paginated. */
-	listSkills(
-		bundleIDs?: string[],
-		types?: SkillType[],
-		includeDisabled?: boolean,
-		includeMissing?: boolean,
-		recommendedPageSize?: number,
-		pageToken?: string
-	): Promise<{ skillListItems: SkillListItem[]; nextPageToken?: string }>;
+	listSkills(req: ListSkillsRequest): Promise<{ skillListItems: SkillListItem[]; nextPageToken?: string }>;
 
 	/** Create or update a skill. */
 	putSkill(
@@ -340,6 +335,8 @@ export interface ISkillStoreAPI {
 	listRuntimeSkills(filter?: RuntimeSkillFilter): Promise<RuntimeSkillListItem[]>;
 
 	invokeSkillTool(sessionID: string, toolName: string, args?: JSONRawString): Promise<InvokeSkillToolResponse>;
+
+	renderSkill(ref: SkillRef, args?: Record<string, string>): Promise<RenderSkillResponse>;
 }
 
 export interface IToolRuntimeAPI {

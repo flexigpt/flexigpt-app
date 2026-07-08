@@ -103,6 +103,18 @@ func validateSkill(sk *spec.Skill) error {
 		return err
 	}
 
+	if sk.Insert == "" {
+		sk.Insert = spec.SkillInsertInstructions
+	}
+	switch sk.Insert {
+	case spec.SkillInsertInstructions, spec.SkillInsertUserMessage:
+	default:
+		return fmt.Errorf("invalid insert %q", sk.Insert)
+	}
+	if err := validateSkillArguments(sk.Arguments); err != nil {
+		return err
+	}
+
 	switch sk.Type {
 	case spec.SkillTypeFS:
 		if sk.IsBuiltIn {
@@ -124,5 +136,33 @@ func validateSkill(sk *spec.Skill) error {
 		}
 	}
 
+	return nil
+}
+
+func validateSkillArguments(args []spec.SkillArgument) error {
+	seen := map[string]struct{}{}
+	for i, arg := range args {
+		name := strings.TrimSpace(arg.Name)
+		if name == "" {
+			return fmt.Errorf("arguments[%d].name is empty", i)
+		}
+		if name != arg.Name {
+			return fmt.Errorf("arguments[%d].name has leading/trailing whitespace", i)
+		}
+		for j, r := range name {
+			switch {
+			case r == '_':
+			case r >= 'a' && r <= 'z':
+			case r >= 'A' && r <= 'Z':
+			case j > 0 && r >= '0' && r <= '9':
+			default:
+				return fmt.Errorf("arguments[%d].name contains invalid character %q", i, string(r))
+			}
+		}
+		if _, exists := seen[name]; exists {
+			return fmt.Errorf("duplicate argument %q", name)
+		}
+		seen[name] = struct{}{}
+	}
 	return nil
 }

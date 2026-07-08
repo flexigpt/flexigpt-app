@@ -26,6 +26,7 @@ type ToolSummary struct {
 
 type SkillSummary struct {
 	IsEnabled bool
+	Insert    skillSpec.SkillInsert
 }
 
 // ModelPresetLookup validates/loads model preset refs without coupling this package

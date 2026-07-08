@@ -1,6 +1,9 @@
 package spec
 
-import "github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+import (
+	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
+	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+)
 
 type PutSkillBundleRequestBody struct {
 	Slug        bundleitemutils.BundleSlug `json:"slug"                  required:"true"`
@@ -118,23 +121,27 @@ const (
 // SkillPageToken for paging skills across bundles.
 // Mirrors ToolPageToken but without versioning.
 type SkillPageToken struct {
-	RecommendedPageSize int                        `json:"ps,omitempty"`  //nolint:tagliatelle // Page token specific.
-	IncludeDisabled     bool                       `json:"d,omitempty"`   //nolint:tagliatelle // Page token specific.
-	IncludeMissing      bool                       `json:"m,omitempty"`   //nolint:tagliatelle // Page token specific. // include presence=missing?
-	BundleIDs           []bundleitemutils.BundleID `json:"ids,omitempty"` //nolint:tagliatelle // Page token specific. // optional filter
-	Types               []SkillType                `json:"ty,omitempty"`  //nolint:tagliatelle // Page token specific. // optional filter
-	Phase               ListSkillPhase             `json:"ph,omitempty"`  //nolint:tagliatelle //nolint:tagliatelle // Page token specific.
-	BuiltInCursor       string                     `json:"bc,omitempty"`  //nolint:tagliatelle // opaque: last (bundleID|skillSlug)
-	DirTok              string                     `json:"dt,omitempty"`  //nolint:tagliatelle // user cursor
+	RecommendedPageSize int                           `json:"ps,omitempty"`   //nolint:tagliatelle // Page token specific.
+	IncludeDisabled     bool                          `json:"d,omitempty"`    //nolint:tagliatelle // Page token specific.
+	IncludeMissing      bool                          `json:"m,omitempty"`    //nolint:tagliatelle // Page token specific. // include presence=missing?
+	BundleIDs           []bundleitemutils.BundleID    `json:"ids,omitempty"`  //nolint:tagliatelle // Page token specific. // optional filter
+	Types               []SkillType                   `json:"ty,omitempty"`   //nolint:tagliatelle // Page token specific. // optional filter
+	Inserts             []agentskillsSpec.SkillInsert `json:"in,omitempty"`   //nolint:tagliatelle // Page token specific.
+	Tags                []string                      `json:"tags,omitempty"` //nolint:tagliatelle // Page token specific.
+	Phase               ListSkillPhase                `json:"ph,omitempty"`   //nolint:tagliatelle //nolint:tagliatelle // Page token specific.
+	BuiltInCursor       string                        `json:"bc,omitempty"`   //nolint:tagliatelle // opaque: last (bundleID|skillSlug)
+	DirTok              string                        `json:"dt,omitempty"`   //nolint:tagliatelle // user cursor
 }
 
 type ListSkillsRequest struct {
-	BundleIDs           []bundleitemutils.BundleID `query:"bundleIDs"`
-	Types               []SkillType                `query:"types"`
-	IncludeDisabled     bool                       `query:"includeDisabled"`
-	IncludeMissing      bool                       `query:"includeMissing"`
-	RecommendedPageSize int                        `query:"recommendedPageSize"`
-	PageToken           string                     `query:"pageToken"`
+	BundleIDs           []bundleitemutils.BundleID    `query:"bundleIDs"`
+	Types               []SkillType                   `query:"types"`
+	Inserts             []agentskillsSpec.SkillInsert `query:"inserts"`
+	Tags                []string                      `query:"tags"`
+	IncludeDisabled     bool                          `query:"includeDisabled"`
+	IncludeMissing      bool                          `query:"includeMissing"`
+	RecommendedPageSize int                           `query:"recommendedPageSize"`
+	PageToken           string                        `query:"pageToken"`
 }
 
 type SkillListItem struct {

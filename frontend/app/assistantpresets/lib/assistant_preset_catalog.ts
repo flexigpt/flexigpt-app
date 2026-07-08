@@ -258,7 +258,15 @@ export async function loadSkillOptions(): Promise<AssistantSkillOption[]> {
 			response => response.nextPageToken
 		),
 		collectAllPages(
-			pageToken => skillStoreAPI.listSkills(undefined, undefined, true, true, 200, pageToken),
+			pageToken =>
+				skillStoreAPI.listSkills({
+					bundleIDs: [],
+					types: [],
+					includeDisabled: true,
+					includeMissing: true,
+					recommendedPageSize: 200,
+					pageToken: pageToken,
+				}),
 			response => response.skillListItems,
 			response => response.nextPageToken
 		),

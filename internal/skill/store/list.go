@@ -31,6 +31,10 @@ func (s *SkillStore) ListSkills(ctx context.Context, req *spec.ListSkillsRequest
 		slices.Sort(tok.BundleIDs)
 		tok.Types = slices.Clone(req.Types)
 		slices.Sort(tok.Types)
+		tok.Inserts = slices.Clone(req.Inserts)
+		slices.Sort(tok.Inserts)
+		tok.Tags = slices.Clone(req.Tags)
+		sort.Strings(tok.Tags)
 	}
 
 	if tok.Phase == "" {
@@ -61,6 +65,16 @@ func (s *SkillStore) ListSkills(ctx context.Context, req *spec.ListSkillsRequest
 	for _, ty := range tok.Types {
 		tFilter[ty] = struct{}{}
 	}
+	iFilter := map[spec.SkillInsert]struct{}{}
+	for _, in := range tok.Inserts {
+		if in != "" {
+			iFilter[in] = struct{}{}
+		}
+	}
+	tagFilter := map[string]struct{}{}
+	for _, tag := range tok.Tags {
+		tagFilter[tag] = struct{}{}
+	}
 
 	include := func(bundle spec.SkillBundle, sk spec.Skill) bool {
 		if len(bFilter) > 0 {
@@ -73,11 +87,32 @@ func (s *SkillStore) ListSkills(ctx context.Context, req *spec.ListSkillsRequest
 				return false
 			}
 		}
+		insert := sk.Insert
+		if insert == "" {
+			insert = spec.SkillInsertInstructions
+		}
+		if len(iFilter) > 0 {
+			if _, ok := iFilter[insert]; !ok {
+				return false
+			}
+		}
 		if !tok.IncludeDisabled && (!bundle.IsEnabled || !sk.IsEnabled) {
 			return false
 		}
 		if !tok.IncludeMissing && sk.Presence != nil && sk.Presence.Status == spec.SkillPresenceMissing {
 			return false
+		}
+		if len(tagFilter) > 0 {
+			hit := false
+			for _, tag := range sk.Tags {
+				if _, ok := tagFilter[tag]; ok {
+					hit = true
+					break
+				}
+			}
+			if !hit {
+				return false
+			}
 		}
 		return true
 	}

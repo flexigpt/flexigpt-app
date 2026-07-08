@@ -6,6 +6,7 @@
   - [ ] test enhanced mcp apps.
   - [ ] test web search etc and pending user args etc after bottom bar migration.
   - [ ] test with some skill that has scripts too
+- [ ] there is a significant slowdown during streaming now.
 
 ## M-3
 

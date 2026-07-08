@@ -66,6 +66,10 @@ type AssistantPreset struct {
 	// Nil means the preset does not express a preference.
 	StartingIncludeModelSystemPrompt *bool `json:"startingIncludeModelSystemPrompt,omitempty"`
 
+	// Deprecated compatibility path for the old prompt store.
+	// New presets should use StartingSkillSelections with PreLoadAsActive=true
+	// and skills whose insert value is "instructions".
+	//
 	// Ordered refs. Validation requires:
 	//   - template exists
 	//   - template enabled
@@ -76,7 +80,7 @@ type AssistantPreset struct {
 	// Ordered tool selections.
 	StartingToolSelections []toolSpec.ToolSelection `json:"startingToolSelections,omitempty"`
 
-	// Ordered skill selections.
+	// Ordered skill selections. PreLoadAsActive is only valid for insert=instructions skills.
 	StartingSkillSelections []skillSpec.SkillSelection `json:"startingSkillSelections,omitempty"`
 
 	// StartingMCPContext is copied into the first user turn when this preset is applied.

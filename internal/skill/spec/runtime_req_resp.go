@@ -9,9 +9,10 @@ import (
 type JSONRawString = string
 
 type RuntimeSkillFilter struct {
-	Types          []string   `json:"types,omitempty"`
-	LocationPrefix string     `json:"locationPrefix,omitempty"`
-	AllowSkillRefs []SkillRef `json:"allowSkillRefs,omitempty"`
+	Types          []string                      `json:"types,omitempty"`
+	Inserts        []agentskillsSpec.SkillInsert `json:"inserts,omitempty"`
+	LocationPrefix string                        `json:"locationPrefix,omitempty"`
+	AllowSkillRefs []SkillRef                    `json:"allowSkillRefs,omitempty"`
 
 	SessionID agentskillsSpec.SessionID     `json:"sessionID,omitempty"`
 	Activity  agentskillsSpec.SkillActivity `json:"activity,omitempty"`
@@ -61,6 +62,34 @@ type CloseSkillSessionRequest struct {
 }
 type CloseSkillSessionResponse struct{}
 
+type RenderSkillRequestBody struct {
+	SkillRef  SkillRef          `json:"skillRef"            required:"true"`
+	Arguments map[string]string `json:"arguments,omitempty"`
+}
+
+type RenderSkillRequest struct {
+	Body *RenderSkillRequestBody
+}
+
+type RenderSkillResponseBody struct {
+	Text string `json:"text"`
+
+	Insert agentskillsSpec.SkillInsert `json:"insert"`
+
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	DisplayName string `json:"displayName,omitempty"`
+
+	Arguments        []agentskillsSpec.SkillArgument `json:"arguments,omitempty"`
+	AppliedArguments map[string]string               `json:"appliedArguments,omitempty"`
+	RawFrontmatter   map[string]any                  `json:"rawFrontmatter,omitempty"`
+	Warnings         []string                        `json:"warnings,omitempty"`
+}
+
+type RenderSkillResponse struct {
+	Body *RenderSkillResponseBody
+}
+
 // RuntimeSkillListItem is the public runtime listing shape keyed by store identity (SkillRef).
 // SkillDef is intentionally NOT exposed.
 type RuntimeSkillListItem struct {
@@ -70,8 +99,14 @@ type RuntimeSkillListItem struct {
 	// These are read-only and exist only for display/debug.
 	Type        string `json:"type,omitempty"`
 	Name        string `json:"name,omitempty"`
+	DisplayName string `json:"displayName,omitempty"`
 	Description string `json:"description,omitempty"`
 	Digest      string `json:"digest,omitempty"`
+
+	Insert         agentskillsSpec.SkillInsert     `json:"insert,omitempty"`
+	Arguments      []agentskillsSpec.SkillArgument `json:"arguments,omitempty"`
+	RawFrontmatter map[string]any                  `json:"rawFrontmatter,omitempty"`
+	Warnings       []string                        `json:"warnings,omitempty"`
 
 	// Session-scoped.
 	IsActive bool `json:"isActive,omitempty"`

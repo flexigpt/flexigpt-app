@@ -29,3 +29,5 @@ export function PatchSkillBundle(arg1:spec.PatchSkillBundleRequest):Promise<spec
 export function PutSkill(arg1:spec.PutSkillRequest):Promise<spec.PutSkillResponse>;
 
 export function PutSkillBundle(arg1:spec.PutSkillBundleRequest):Promise<spec.PutSkillBundleResponse>;
+
+export function RenderSkill(arg1:spec.RenderSkillRequest):Promise<spec.RenderSkillResponse>;

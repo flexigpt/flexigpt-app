@@ -4983,6 +4983,22 @@ export namespace spec {
 		    return a;
 		}
 	}
+	export class SkillArgument {
+	    name: string;
+	    description?: string;
+	    default?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SkillArgument(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.default = source["default"];
+	    }
+	}
 	export class Skill {
 	    schemaVersion: string;
 	    id: string;
@@ -4993,6 +5009,11 @@ export namespace spec {
 	    displayName?: string;
 	    description?: string;
 	    tags?: string[];
+	    insert?: string;
+	    arguments?: SkillArgument[];
+	    rawFrontmatter?: Record<string, any>;
+	    runtimeWarnings?: string[];
+	    digest?: string;
 	    presence?: SkillPresence;
 	    isEnabled: boolean;
 	    isBuiltIn: boolean;
@@ -5016,6 +5037,11 @@ export namespace spec {
 	        this.displayName = source["displayName"];
 	        this.description = source["description"];
 	        this.tags = source["tags"];
+	        this.insert = source["insert"];
+	        this.arguments = this.convertValues(source["arguments"], SkillArgument);
+	        this.rawFrontmatter = source["rawFrontmatter"];
+	        this.runtimeWarnings = source["runtimeWarnings"];
+	        this.digest = source["digest"];
 	        this.presence = this.convertValues(source["presence"], SkillPresence);
 	        this.isEnabled = source["isEnabled"];
 	        this.isBuiltIn = source["isBuiltIn"];
@@ -5073,6 +5099,7 @@ export namespace spec {
 	}
 	export class RuntimeSkillFilter {
 	    types?: string[];
+	    inserts?: string[];
 	    locationPrefix?: string;
 	    allowSkillRefs?: SkillRef[];
 	    sessionID?: string;
@@ -5085,6 +5112,7 @@ export namespace spec {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.types = source["types"];
+	        this.inserts = source["inserts"];
 	        this.locationPrefix = source["locationPrefix"];
 	        this.allowSkillRefs = this.convertValues(source["allowSkillRefs"], SkillRef);
 	        this.sessionID = source["sessionID"];
@@ -7472,8 +7500,13 @@ export namespace spec {
 	    skillRef: SkillRef;
 	    type?: string;
 	    name?: string;
+	    displayName?: string;
 	    description?: string;
 	    digest?: string;
+	    insert?: string;
+	    arguments?: SkillArgument[];
+	    rawFrontmatter?: Record<string, any>;
+	    warnings?: string[];
 	    isActive?: boolean;
 	    errorMessage?: string;
 	
@@ -7486,8 +7519,13 @@ export namespace spec {
 	        this.skillRef = this.convertValues(source["skillRef"], SkillRef);
 	        this.type = source["type"];
 	        this.name = source["name"];
+	        this.displayName = source["displayName"];
 	        this.description = source["description"];
 	        this.digest = source["digest"];
+	        this.insert = source["insert"];
+	        this.arguments = this.convertValues(source["arguments"], SkillArgument);
+	        this.rawFrontmatter = source["rawFrontmatter"];
+	        this.warnings = source["warnings"];
 	        this.isActive = source["isActive"];
 	        this.errorMessage = source["errorMessage"];
 	    }
@@ -7706,6 +7744,8 @@ export namespace spec {
 	export class ListSkillsRequest {
 	    BundleIDs: string[];
 	    Types: string[];
+	    Inserts: string[];
+	    Tags: string[];
 	    IncludeDisabled: boolean;
 	    IncludeMissing: boolean;
 	    RecommendedPageSize: number;
@@ -7719,6 +7759,8 @@ export namespace spec {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.BundleIDs = source["BundleIDs"];
 	        this.Types = source["Types"];
+	        this.Inserts = source["Inserts"];
+	        this.Tags = source["Tags"];
 	        this.IncludeDisabled = source["IncludeDisabled"];
 	        this.IncludeMissing = source["IncludeMissing"];
 	        this.RecommendedPageSize = source["RecommendedPageSize"];
@@ -10871,6 +10913,146 @@ export namespace spec {
 		    return a;
 		}
 	}
+	export class RenderSkillRequestBody {
+	    skillRef: SkillRef;
+	    arguments?: Record<string, string>;
+	
+	    static createFrom(source: any = {}) {
+	        return new RenderSkillRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.skillRef = this.convertValues(source["skillRef"], SkillRef);
+	        this.arguments = source["arguments"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class RenderSkillRequest {
+	    Body?: RenderSkillRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new RenderSkillRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], RenderSkillRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class RenderSkillResponseBody {
+	    text: string;
+	    insert: string;
+	    name: string;
+	    description?: string;
+	    displayName?: string;
+	    arguments?: SkillArgument[];
+	    appliedArguments?: Record<string, string>;
+	    rawFrontmatter?: Record<string, any>;
+	    warnings?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new RenderSkillResponseBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.text = source["text"];
+	        this.insert = source["insert"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.displayName = source["displayName"];
+	        this.arguments = this.convertValues(source["arguments"], SkillArgument);
+	        this.appliedArguments = source["appliedArguments"];
+	        this.rawFrontmatter = source["rawFrontmatter"];
+	        this.warnings = source["warnings"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class RenderSkillResponse {
+	    Body?: RenderSkillResponseBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new RenderSkillResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], RenderSkillResponseBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class ResolveMCPApprovalRequestBody {
 	    approvalID: string;
 	    resolution: string;
@@ -11203,6 +11385,7 @@ export namespace spec {
 	
 	    }
 	}
+	
 	
 	
 	

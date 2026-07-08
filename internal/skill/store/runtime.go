@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -115,13 +117,19 @@ func (s *SkillStore) CreateSkillSession(
 			// Best-effort: create session with no initial actives rather than failing.
 			activeDefs = nil
 		} else {
-			known := map[agentskillsSpec.SkillDef]struct{}{}
+			knownInstruction := map[agentskillsSpec.SkillDef]struct{}{}
 			for _, r := range recs {
-				known[r.Def] = struct{}{}
+				insert := r.Insert
+				if insert == "" {
+					insert = agentskillsSpec.SkillInsertInstructions
+				}
+				if insert == agentskillsSpec.SkillInsertInstructions {
+					knownInstruction[r.Def] = struct{}{}
+				}
 			}
 			filtered := make([]agentskillsSpec.SkillDef, 0, len(activeDefs))
 			for _, d := range activeDefs {
-				if _, ok := known[d]; ok {
+				if _, ok := knownInstruction[d]; ok {
 					filtered = append(filtered, d)
 				}
 			}
@@ -220,6 +228,14 @@ func (s *SkillStore) GetSkillsPrompt(
 			allow = res.AllowDefs
 		}
 
+		// Runtime SkillsPrompt is instruction-context only. If caller explicitly asks
+		// only for user-message skills, return no prompt instead of broadening.
+		if len(f.Inserts) > 0 && !containsInsert(f.Inserts, agentskillsSpec.SkillInsertInstructions) {
+			return &spec.GetSkillsPromptResponse{
+				Body: &spec.GetSkillsPromptResponseBody{Prompt: ""},
+			}, nil
+		}
+
 		filter = &agentskills.SkillFilter{
 			Types:          append([]string(nil), f.Types...),
 			LocationPrefix: f.LocationPrefix,
@@ -283,6 +299,7 @@ func (s *SkillStore) ListRuntimeSkills(
 		Types:          append([]string(nil), f.Types...),
 		LocationPrefix: f.LocationPrefix,
 		AllowSkills:    res.AllowDefs,
+		Inserts:        append([]agentskillsSpec.SkillInsert(nil), f.Inserts...),
 		SessionID:      f.SessionID,
 		Activity:       act,
 	}
@@ -326,11 +343,16 @@ func (s *SkillStore) ListRuntimeSkills(
 			seenItem[k] = struct{}{}
 
 			items = append(items, spec.RuntimeSkillListItem{
-				SkillRef:    sr,
-				Type:        r.Def.Type,
-				Name:        r.Def.Name,
-				Description: r.Description,
-				Digest:      r.Digest,
+				SkillRef:       sr,
+				Type:           r.Def.Type,
+				Name:           r.Def.Name,
+				DisplayName:    r.DisplayName,
+				Description:    r.Description,
+				Digest:         r.Digest,
+				Insert:         r.Insert,
+				Arguments:      append([]agentskillsSpec.SkillArgument(nil), r.Arguments...),
+				RawFrontmatter: cloneAnyMap(r.RawFrontmatter),
+				Warnings:       append([]string(nil), r.Warnings...),
 				IsActive: func() bool {
 					if act == agentskillsSpec.SkillActivityActive {
 						return true
@@ -367,6 +389,61 @@ func (s *SkillStore) ListRuntimeSkills(
 	return &spec.ListRuntimeSkillsResponse{
 		Body: out,
 	}, nil
+}
+
+func (s *SkillStore) RenderSkill(
+	ctx context.Context,
+	req *spec.RenderSkillRequest,
+) (*spec.RenderSkillResponse, error) {
+	if s.runtime == nil {
+		return nil, fmt.Errorf("%w: runtime not configured", spec.ErrSkillInvalidRequest)
+	}
+	if req == nil || req.Body == nil {
+		return nil, fmt.Errorf("%w: missing request", spec.ErrSkillInvalidRequest)
+	}
+	if err := validateSkillRef(req.Body.SkillRef); err != nil {
+		return nil, fmt.Errorf("%w: invalid skillRef: %w", spec.ErrSkillInvalidRequest, err)
+	}
+
+	def, ok := s.resolveRuntimeDefForSkillRef(ctx, req.Body.SkillRef)
+	if !ok {
+		return nil, spec.ErrSkillNotFound
+	}
+
+	out, err := s.runtime.RenderSkill(ctx, agentskills.RenderSkillParams{
+		Def:       def,
+		Arguments: req.Body.Arguments,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &spec.RenderSkillResponse{
+		Body: &spec.RenderSkillResponseBody{
+			Text:             out.Text,
+			Insert:           out.Insert,
+			Name:             out.Name,
+			Description:      out.Description,
+			DisplayName:      out.DisplayName,
+			Arguments:        append([]agentskillsSpec.SkillArgument(nil), out.Arguments...),
+			AppliedArguments: cloneStringMap(out.AppliedArguments),
+			RawFrontmatter:   cloneAnyMap(out.RawFrontmatter),
+			Warnings:         append([]string(nil), out.Warnings...),
+		},
+	}, nil
+}
+
+func containsInsert(values []agentskillsSpec.SkillInsert, want agentskillsSpec.SkillInsert) bool {
+	return slices.Contains(values, want)
+}
+
+func cloneStringMap(in map[string]string) map[string]string {
+	if in == nil {
+		return nil
+	}
+	out := make(map[string]string, len(in))
+	maps.Copy(out, in)
+	return out
 }
 
 type resolvedAllowSkillRefs struct {

@@ -20,6 +20,7 @@ export interface SkillSelection {
 
 export interface RuntimeSkillFilter {
 	types?: string[];
+	inserts?: string[];
 	locationPrefix?: string;
 	// Store identity allowlist. Backend resolves to SkillDef internally.
 	allowSkillRefs?: SkillRef[];
@@ -38,12 +39,42 @@ export interface RuntimeSkillListItem {
 	skillRef: SkillRef;
 	type?: string;
 	name?: string;
+	displayName?: string;
 	description?: string;
 	digest?: string;
+	insert?: string;
+	arguments?: SkillArgument[];
+	rawFrontmatter?: Record<string, any>;
+	warnings?: string[];
 	isActive: boolean;
 	errorMessage?: string;
 }
 
+export interface ListSkillsRequest {
+	bundleIDs?: string[];
+	types?: SkillType[];
+	inserts?: string[];
+	tags?: string[];
+	includeDisabled?: boolean;
+	includeMissing?: boolean;
+	recommendedPageSize?: number;
+	pageToken?: string;
+}
+
+/**
+ * @public
+ */
+export interface RenderSkillResponse {
+	text: string;
+	insert: string;
+	name: string;
+	description?: string;
+	displayName?: string;
+	arguments?: SkillArgument[];
+	appliedArguments?: Record<string, string>;
+	rawFrontmatter?: Record<string, any>;
+	warnings?: string[];
+}
 // Mirrors Go: spec.SkillType
 export enum SkillType {
 	FS = 'fs',
@@ -58,6 +89,14 @@ export enum SkillPresenceStatus {
 	Error = 'error',
 }
 
+/**
+ * @public
+ */
+export interface SkillArgument {
+	name: string;
+	description?: string;
+	default?: string;
+}
 /**
  * @public
  *
@@ -84,6 +123,11 @@ export interface Skill {
 	displayName?: string;
 	description?: string;
 	tags?: string[];
+	insert?: string;
+	arguments?: SkillArgument[];
+	rawFrontmatter?: Record<string, any>;
+	runtimeWarnings?: string[];
+	digest?: string;
 
 	presence?: SkillPresence;
 

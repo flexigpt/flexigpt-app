@@ -166,14 +166,14 @@ export async function getAllSkills(
 	const pageSize = 25;
 
 	do {
-		const { skillListItems, nextPageToken } = await skillStoreAPI.listSkills(
-			bundleIDs,
-			types,
-			includeDisabled,
-			includeMissing,
-			pageSize,
-			pageToken
-		);
+		const { skillListItems, nextPageToken } = await skillStoreAPI.listSkills({
+			bundleIDs: bundleIDs,
+			types: types,
+			includeDisabled: includeDisabled,
+			includeMissing: includeMissing,
+			recommendedPageSize: pageSize,
+			pageToken: pageToken,
+		});
 		all.push(...skillListItems);
 		if (!nextPageToken) {
 			break;

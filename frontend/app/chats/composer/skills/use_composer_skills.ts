@@ -303,14 +303,14 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		let token: string | undefined = undefined;
 
 		for (let guard = 0; guard < 50; guard += 1) {
-			const resp = await skillStoreAPI.listSkills(
-				undefined,
-				undefined,
-				false, // includeDisabled
-				false, // includeMissing
-				200, // recommendedPageSize
-				token
-			);
+			const resp = await skillStoreAPI.listSkills({
+				bundleIDs: [],
+				types: [],
+				includeDisabled: false,
+				includeMissing: false,
+				recommendedPageSize: 200,
+				pageToken: token,
+			});
 
 			out.push(...(resp.skillListItems ?? []));
 			token = resp.nextPageToken;

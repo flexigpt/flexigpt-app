@@ -35,9 +35,7 @@ func TestNewAssistantPresetReferenceLookups(t *testing.T) {
 	if got.ModelPresets == nil {
 		t.Fatal("ModelPresets is nil")
 	}
-	if got.PromptTemplates == nil {
-		t.Fatal("PromptTemplates is nil")
-	}
+
 	if got.ToolSelections == nil {
 		t.Fatal("ToolSelections is nil")
 	}
@@ -47,9 +45,6 @@ func TestNewAssistantPresetReferenceLookups(t *testing.T) {
 
 	if _, ok := got.ModelPresets.(*modelPresetLookupAdapter); !ok {
 		t.Fatalf("ModelPresets type = %T, want *modelPresetLookupAdapter", got.ModelPresets)
-	}
-	if _, ok := got.PromptTemplates.(*promptTemplateLookupAdapter); !ok {
-		t.Fatalf("PromptTemplates type = %T, want *promptTemplateLookupAdapter", got.PromptTemplates)
 	}
 	if _, ok := got.ToolSelections.(*toolSelectionLookupAdapter); !ok {
 		t.Fatalf("ToolSelections type = %T, want *toolSelectionLookupAdapter", got.ToolSelections)

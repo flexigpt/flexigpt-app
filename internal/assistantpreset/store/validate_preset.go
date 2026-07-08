@@ -231,6 +231,19 @@ func validateAssistantPresetReferences(
 		if !summary.IsEnabled {
 			return fmt.Errorf("startingSkillSelections[%d]: referenced skill is disabled", i)
 		}
+		if selection.PreLoadAsActive {
+			insert := summary.Insert
+			if insert == "" {
+				insert = skillSpec.SkillInsertInstructions
+			}
+			if insert != skillSpec.SkillInsertInstructions {
+				return fmt.Errorf(
+					"startingSkillSelections[%d]: preloaded skill must have insert=%q",
+					i,
+					skillSpec.SkillInsertInstructions,
+				)
+			}
+		}
 	}
 
 	if err := validateStartingMCPContextReferences(ctx, preset.StartingMCPContext, lookups); err != nil {

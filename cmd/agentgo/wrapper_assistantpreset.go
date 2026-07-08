@@ -37,9 +37,6 @@ func InitAssistantPresetStoreWrapper(
 	if modelPresetSt == nil {
 		return errors.New("model preset store is nil")
 	}
-	if promptTemplateSt == nil {
-		return errors.New("prompt template store is nil")
-	}
 	if toolSt == nil {
 		return errors.New("tool store is nil")
 	}

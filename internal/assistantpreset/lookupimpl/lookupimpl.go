@@ -178,6 +178,7 @@ func (a *skillLookupAdapter) GetSkillSummaryForSelection(
 
 	return assistantpresetStore.SkillSummary{
 		IsEnabled: bundleEnabled && resp.Body.IsEnabled,
+		Insert:    resp.Body.Insert,
 	}, nil
 }
 
@@ -736,15 +737,17 @@ func NewAssistantPresetReferenceLookups(
 		ModelPresets: &modelPresetLookupAdapter{
 			store: modelPresetSt,
 		},
-		PromptTemplates: &promptTemplateLookupAdapter{
-			store: promptTemplateSt,
-		},
 		ToolSelections: &toolSelectionLookupAdapter{
 			store: toolSt,
 		},
 		Skills: &skillLookupAdapter{
 			store: skillSt,
 		},
+	}
+	if promptTemplateSt != nil {
+		lookups.PromptTemplates = &promptTemplateLookupAdapter{
+			store: promptTemplateSt,
+		}
 	}
 	if mcpServerStore != nil {
 		lookups.MCPContext = NewMCPContextLookup(mcpServerStore, mcpDiscovery)

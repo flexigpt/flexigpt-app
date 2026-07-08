@@ -178,7 +178,7 @@ func NewSkillStore(baseDir string, opts ...SkillStoreOption) (*SkillStore, error
 }
 
 func newDefaultRuntime() (*agentskills.Runtime, error) {
-	p, err := fsskillprovider.New()
+	p, err := fsskillprovider.New(fsskillprovider.WithRunScripts(true))
 	if err != nil {
 		return nil, err
 	}
@@ -352,7 +352,7 @@ func (s *SkillStore) PatchSkillBundle(
 						return nil, fmt.Errorf("%w: hydration failed: %w", spec.ErrSkillInvalidRequest, err)
 					}
 					for def := range defCounts {
-						if _, err := s.runtimeTryAddForegroundLocked(ctx, def); err != nil {
+						if _, _, err := s.runtimeTryAddForegroundLocked(ctx, def); err != nil {
 							s.rtResyncMu.Unlock()
 							return nil, fmt.Errorf(
 								"%w: runtime rejected bundle enable: %w",
@@ -678,13 +678,18 @@ func (s *SkillStore) PutSkill(ctx context.Context, req *spec.PutSkillRequest) (*
 			if err != nil {
 				return userWriteSagaOutcome{}, fmt.Errorf("%w: %w", spec.ErrSkillInvalidRequest, err)
 			}
-			if _, rtErr := s.runtimeTryAddForeground(ctx, def); rtErr != nil {
+			if _, rec, rtErr := s.runtimeTryAddForeground(ctx, def); rtErr != nil {
 				return userWriteSagaOutcome{}, fmt.Errorf(
 					"%w: runtime rejected skill: %w",
 					spec.ErrSkillInvalidRequest,
 					rtErr,
 				)
+			} else {
+				applyRuntimeRecordToSkill(&sk, rec)
 			}
+		}
+		if err := validateSkill(&sk); err != nil {
+			return userWriteSagaOutcome{}, err
 		}
 
 		// Store commit (strict via saga helper).
@@ -777,7 +782,7 @@ func (s *SkillStore) PatchSkill(ctx context.Context, req *spec.PatchSkillRequest
 						s.rtResyncMu.Unlock()
 						return nil, fmt.Errorf("%w: hydration failed: %w", spec.ErrSkillInvalidRequest, err)
 					}
-					if _, err := s.runtimeTryAddForegroundLocked(ctx, def); err != nil {
+					if _, _, err := s.runtimeTryAddForegroundLocked(ctx, def); err != nil {
 						s.rtResyncMu.Unlock()
 						return nil, fmt.Errorf("%w: runtime rejected skill: %w", spec.ErrSkillInvalidRequest, err)
 					}
@@ -912,18 +917,25 @@ func (s *SkillStore) PatchSkill(ctx context.Context, req *spec.PatchSkillRequest
 		//    (Do NOT validate new location if the patch disables the skill.)
 		needAddNew := targetDesired && (locationChanged || !curDesired || oldDef != newDef)
 		if needAddNew {
-			if _, rtErr := s.runtimeTryAddForeground(ctx, newDef); rtErr != nil {
+			if _, rec, rtErr := s.runtimeTryAddForeground(ctx, newDef); rtErr != nil {
 				return userWriteSagaOutcome{}, fmt.Errorf(
 					"%w: runtime rejected skill: %w",
 					spec.ErrSkillInvalidRequest,
 					rtErr,
 				)
+			} else {
+				applyRuntimeRecordToSkill(&target, rec)
+				if locationChanged {
+					// Location change invalidates cached presence state.
+					// Runtime validation is still used for safety, but we do not persist
+					// a fresh "present" observation into the store.
+					target.Presence = &spec.SkillPresence{Status: spec.SkillPresenceUnknown}
+				}
 			}
 		}
 
 		// 2) Remove old def if it becomes globally undesired (duplicate-safe).
 		if needMaybeRemoveOld {
-
 			afterOld := desiredCounts[oldDef]
 			// Remove current record contribution.
 			afterOld--
@@ -939,6 +951,10 @@ func (s *SkillStore) PatchSkill(ctx context.Context, req *spec.PatchSkillRequest
 					}, fmt.Errorf("%w: runtime remove failed: %w", spec.ErrSkillInvalidRequest, rtErr)
 				}
 			}
+		}
+
+		if err := validateSkill(&target); err != nil {
+			return userWriteSagaOutcome{}, err
 		}
 
 		// 2) Store commit (strict via saga helper).

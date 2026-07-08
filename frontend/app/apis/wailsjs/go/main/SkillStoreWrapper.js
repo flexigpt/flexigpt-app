@@ -57,3 +57,7 @@ export function PutSkill(arg1) {
 export function PutSkillBundle(arg1) {
   return window['go']['main']['SkillStoreWrapper']['PutSkillBundle'](arg1);
 }
+
+export function RenderSkill(arg1) {
+  return window['go']['main']['SkillStoreWrapper']['RenderSkill'](arg1);
+}

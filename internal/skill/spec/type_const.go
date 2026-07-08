@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 )
 
@@ -90,6 +91,16 @@ type SkillSelection struct {
 	PreLoadAsActive bool     `json:"preLoadAsActive"`
 }
 
+type (
+	SkillInsert   = agentskillsSpec.SkillInsert
+	SkillArgument = agentskillsSpec.SkillArgument
+)
+
+const (
+	SkillInsertInstructions = agentskillsSpec.SkillInsertInstructions
+	SkillInsertUserMessage  = agentskillsSpec.SkillInsertUserMessage
+)
+
 // Skill is the storage + management record.
 // It intentionally includes fields that are useful for JSON persistence, indexing, and listing/paging.
 type Skill struct {
@@ -104,6 +115,21 @@ type Skill struct {
 	DisplayName string   `json:"displayName,omitempty"`
 	Description string   `json:"description,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
+
+	// Parsed from SKILL.md frontmatter field "insert".
+	// Missing/empty defaults to "instructions".
+	Insert SkillInsert `json:"insert,omitempty"`
+
+	// Parsed from SKILL.md frontmatter field "arguments".
+	Arguments []SkillArgument `json:"arguments,omitempty"`
+
+	// Full parsed YAML frontmatter. FlexiGPT only gives semantics to name,
+	// description, insert, and arguments; other fields are preserved for callers.
+	RawFrontmatter map[string]any `json:"rawFrontmatter,omitempty"`
+
+	// Runtime/provider indexing metadata.
+	RuntimeWarnings []string `json:"runtimeWarnings,omitempty"`
+	Digest          string   `json:"digest,omitempty"`
 
 	Presence *SkillPresence `json:"presence,omitempty"`
 

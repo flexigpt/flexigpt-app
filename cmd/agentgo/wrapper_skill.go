@@ -116,6 +116,14 @@ func (s *SkillStoreWrapper) ListRuntimeSkills(
 	})
 }
 
+func (s *SkillStoreWrapper) RenderSkill(
+	req *spec.RenderSkillRequest,
+) (*spec.RenderSkillResponse, error) {
+	return middleware.WithRecoveryResp(func() (*spec.RenderSkillResponse, error) {
+		return s.store.RenderSkill(context.Background(), req)
+	})
+}
+
 func (s *SkillStoreWrapper) InvokeSkillTool(
 	req *spec.InvokeSkillToolRequest,
 ) (*spec.InvokeSkillToolResponse, error) {

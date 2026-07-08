@@ -1,5 +1,7 @@
 import type {
 	InvokeSkillToolResponse,
+	ListSkillsRequest,
+	RenderSkillResponse,
 	RuntimeSkillFilter,
 	RuntimeSkillListItem,
 	Skill,
@@ -28,6 +30,7 @@ import {
 	PatchSkillBundle,
 	PutSkill,
 	PutSkillBundle,
+	RenderSkill,
 } from '@/apis/wailsjs/go/main/SkillStoreWrapper';
 import type { spec } from '@/apis/wailsjs/go/models';
 
@@ -88,23 +91,18 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 		await DeleteSkillBundle(req);
 	}
 
-	async listSkills(
-		bundleIDs?: string[],
-		types?: SkillType[],
-		includeDisabled?: boolean,
-		includeMissing?: boolean,
-		recommendedPageSize?: number,
-		pageToken?: string
-	): Promise<{ skillListItems: SkillListItem[]; nextPageToken?: string }> {
-		const req = {
-			BundleIDs: bundleIDs,
-			Types: types,
-			IncludeDisabled: includeDisabled,
-			IncludeMissing: includeMissing,
-			RecommendedPageSize: recommendedPageSize,
-			PageToken: pageToken,
+	async listSkills(req: ListSkillsRequest): Promise<{ skillListItems: SkillListItem[]; nextPageToken?: string }> {
+		const inReq = {
+			BundleIDs: req.bundleIDs,
+			Types: req.types,
+			Inserts: req.inserts,
+			Tags: req.tags,
+			IncludeDisabled: req.includeDisabled,
+			IncludeMissing: req.includeMissing,
+			RecommendedPageSize: req.recommendedPageSize,
+			PageToken: req.pageToken,
 		};
-		const resp = await ListSkills(req as spec.ListSkillsRequest);
+		const resp = await ListSkills(inReq as spec.ListSkillsRequest);
 		return {
 			skillListItems: (resp.Body?.skillListItems ?? []) as SkillListItem[],
 			nextPageToken: resp.Body?.nextPageToken ?? undefined,
@@ -224,5 +222,15 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 		const resp = await InvokeSkillTool(req);
 
 		return resp?.Body as InvokeSkillToolResponse;
+	}
+
+	async renderSkill(ref: SkillRef, args?: Record<string, string>): Promise<RenderSkillResponse> {
+		const req = {
+			Body: { skillRef: ref, arguments: args } as spec.RenderSkillRequestBody,
+		} as spec.RenderSkillRequest;
+
+		const resp = await RenderSkill(req);
+
+		return resp?.Body as RenderSkillResponse;
 	}
 }

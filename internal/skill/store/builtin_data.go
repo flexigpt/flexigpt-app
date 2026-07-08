@@ -324,6 +324,9 @@ func (b *BuiltInSkills) populateDataFromFS(ctx context.Context) error {
 			if sk.Type != spec.SkillTypeEmbeddedFS {
 				return fmt.Errorf("builtin skill %s/%s: type must be %q", bid, slug, spec.SkillTypeEmbeddedFS)
 			}
+			if sk.Insert == "" {
+				sk.Insert = spec.SkillInsertInstructions
+			}
 			if err := validateSkill(&sk); err != nil {
 				return fmt.Errorf("builtin skill %s/%s: %w", bid, slug, err)
 			}

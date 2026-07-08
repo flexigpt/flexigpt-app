@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -186,9 +187,13 @@ func (s *SkillStore) readAllUser(force bool) (skillStoreSchema, error) {
 			if sk.Slug != slug {
 				return skillStoreSchema{}, fmt.Errorf("skill key %q != skill.slug %q (bundle %q)", slug, sk.Slug, bid)
 			}
+			if sk.Insert == "" {
+				sk.Insert = spec.SkillInsertInstructions
+			}
 			if err := validateSkill(&sk); err != nil {
 				return skillStoreSchema{}, fmt.Errorf("invalid skill %q/%q: %w", bid, slug, err)
 			}
+			sm[slug] = sk
 		}
 	}
 
@@ -202,6 +207,9 @@ func isSoftDeletedSkillBundle(b spec.SkillBundle) bool {
 func cloneSkill(sk spec.Skill) spec.Skill {
 	c := sk
 	c.Tags = slices.Clone(sk.Tags)
+	c.Arguments = slices.Clone(sk.Arguments)
+	c.RuntimeWarnings = slices.Clone(sk.RuntimeWarnings)
+	c.RawFrontmatter = cloneAnyMap(sk.RawFrontmatter)
 	c.Presence = clonePresence(sk.Presence)
 	return c
 }
@@ -229,4 +237,19 @@ func cloneTimePtr(t *time.Time) *time.Time {
 	}
 	v := *t
 	return &v
+}
+
+func cloneAnyMap(in map[string]any) map[string]any {
+	if in == nil {
+		return nil
+	}
+	raw, err := json.Marshal(in)
+	if err != nil {
+		return nil
+	}
+	var out map[string]any
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil
+	}
+	return out
 }

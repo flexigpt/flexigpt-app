@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/flexigpt/agentskills-go"
 	agentskillsSpec "github.com/flexigpt/agentskills-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
@@ -65,7 +66,7 @@ func (s *SkillStore) runtimeApplyUserBundleEnabledDelta(
 	// ENABLE: validate/add all enabled skills in this bundle.
 	if newEnabled {
 		for def := range bundleDefCounts {
-			if _, rtErr := s.runtimeTryAddForeground(ctx, def); rtErr != nil {
+			if _, _, rtErr := s.runtimeTryAddForeground(ctx, def); rtErr != nil {
 				return fmt.Errorf("runtime rejected bundle enable: %w", rtErr)
 			}
 		}
@@ -111,9 +112,15 @@ func (s *SkillStore) runtimeRemoveForegroundStrictLocked(ctx context.Context, de
 
 // runtimeTryAddForeground attempts to add/index a skill in runtime for strict foreground validation.
 // Returns (addedByUs=true) if we successfully added; false if it already existed.
-func (s *SkillStore) runtimeTryAddForeground(ctx context.Context, def agentskillsSpec.SkillDef) (bool, error) {
+func (s *SkillStore) runtimeTryAddForeground(
+	ctx context.Context,
+	def agentskillsSpec.SkillDef,
+) (bool, agentskillsSpec.SkillRecord, error) {
 	if s == nil || s.runtime == nil {
-		return false, fmt.Errorf("%w: runtime not configured", spec.ErrSkillInvalidRequest)
+		return false, agentskillsSpec.SkillRecord{}, fmt.Errorf(
+			"%w: runtime not configured",
+			spec.ErrSkillInvalidRequest,
+		)
 	}
 	s.rtResyncMu.Lock()
 	defer s.rtResyncMu.Unlock()
@@ -121,17 +128,41 @@ func (s *SkillStore) runtimeTryAddForeground(ctx context.Context, def agentskill
 }
 
 // runtimeTryAddForegroundLocked is runtimeTryAddForeground but requires rtResyncMu held.
-func (s *SkillStore) runtimeTryAddForegroundLocked(ctx context.Context, def agentskillsSpec.SkillDef) (bool, error) {
+func (s *SkillStore) runtimeTryAddForegroundLocked(
+	ctx context.Context,
+	def agentskillsSpec.SkillDef,
+) (bool, agentskillsSpec.SkillRecord, error) {
 	ctx, cancel := context.WithTimeout(ctx, runtimeForegroundValidateTimeout)
 	defer cancel()
 
-	if _, err := s.runtime.AddSkill(ctx, def); err != nil {
+	rec, err := s.runtime.AddSkill(ctx, def)
+	if err != nil {
 		if errors.Is(err, agentskillsSpec.ErrSkillAlreadyExists) {
-			return false, nil
+			existing, rerr := s.runtimeRecordForDefLocked(ctx, def)
+			return false, existing, rerr
 		}
-		return false, err
+		return false, agentskillsSpec.SkillRecord{}, err
 	}
-	return true, nil
+	return true, rec, nil
+}
+
+func (s *SkillStore) runtimeRecordForDefLocked(
+	ctx context.Context,
+	def agentskillsSpec.SkillDef,
+) (agentskillsSpec.SkillRecord, error) {
+	recs, err := s.runtime.ListSkills(ctx, &agentskills.SkillListFilter{
+		AllowSkills: []agentskillsSpec.SkillDef{def},
+		Activity:    agentskillsSpec.SkillActivityAny,
+	})
+	if err != nil {
+		return agentskillsSpec.SkillRecord{}, err
+	}
+	for _, rec := range recs {
+		if rec.Def == def {
+			return rec, nil
+		}
+	}
+	return agentskillsSpec.SkillRecord{}, agentskillsSpec.ErrSkillNotFound
 }
 
 // enabledDefCountsInUserBundle returns enabled SkillDef counts for all enabled skills in a bundle.
@@ -601,6 +632,34 @@ func (s *SkillStore) runtimeApplyDesired(
 	}
 
 	return nil
+}
+
+func applyRuntimeRecordToSkill(sk *spec.Skill, rec agentskillsSpec.SkillRecord) {
+	if sk == nil {
+		return
+	}
+	if rec.DisplayName != "" && sk.DisplayName == "" {
+		sk.DisplayName = rec.DisplayName
+	}
+	if rec.Description != "" && sk.Description == "" {
+		sk.Description = rec.Description
+	}
+	if rec.Insert == "" {
+		sk.Insert = spec.SkillInsertInstructions
+	} else {
+		sk.Insert = rec.Insert
+	}
+	sk.Arguments = append([]spec.SkillArgument(nil), rec.Arguments...)
+	sk.RawFrontmatter = cloneAnyMap(rec.RawFrontmatter)
+	sk.RuntimeWarnings = append([]string(nil), rec.Warnings...)
+	sk.Digest = rec.Digest
+
+	now := time.Now().UTC()
+	sk.Presence = &spec.SkillPresence{
+		Status:        spec.SkillPresencePresent,
+		LastCheckedAt: &now,
+		LastSeenAt:    &now,
+	}
 }
 
 // runtimeDefForStoreSkill ensures ALL store skills resolve to the runtime lifecycle selector SkillDef.
