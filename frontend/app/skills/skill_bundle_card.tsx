@@ -8,6 +8,15 @@ import { SkillPresenceStatus } from '@/spec/skill';
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 
+import type { SkillInsertFilter } from '@/skills/lib/skill_artifact_utils';
+import {
+	getSkillArgumentCountLabel,
+	getSkillArgumentTooltip,
+	getSkillInsertDescription,
+	getSkillInsertLabel,
+	getSkillInsertShortLabel,
+	skillMatchesInsertFilter,
+} from '@/skills/lib/skill_artifact_utils';
 import { AddEditSkillModal } from '@/skills/skill_add_edit_modal';
 import { SkillBundleDetailsModal } from '@/skills/skill_bundle_details_modal';
 
@@ -16,6 +25,7 @@ type SkillModalMode = 'add' | 'edit' | 'view';
 interface SkillBundleCardProps {
 	bundle: SkillBundle;
 	skills: Skill[];
+	insertFilter: SkillInsertFilter;
 	onToggleBundleEnable: (bundleID: string, nextEnabled: boolean) => Promise<void>;
 	onToggleSkillEnable: (bundleID: string, skillID: string, skillSlug: string, nextEnabled: boolean) => Promise<void>;
 	onDeleteSkill: (bundleID: string, skillID: string, skillSlug: string) => Promise<void>;
@@ -60,6 +70,7 @@ function PresenceBadge({ skill }: { skill: Skill }) {
 export function SkillBundleCard({
 	bundle,
 	skills,
+	insertFilter,
 	onToggleBundleEnable,
 	onToggleSkillEnable,
 	onDeleteSkill,
@@ -105,6 +116,11 @@ export function SkillBundleCard({
 		[skills, bundle.id]
 	);
 
+	const visibleSkills = useMemo(
+		() => skills.filter(skill => skillMatchesInsertFilter(skill.insert, insertFilter)),
+		[skills, insertFilter]
+	);
+
 	const toggleBundleEnable = async () => {
 		if (busyBundleToggle) {
 			return;
@@ -134,7 +150,7 @@ export function SkillBundleCard({
 		}
 
 		setBusySkillIDs(prev => {
-			const next = new Set(...prev, skill.id);
+			const next = new Set([...prev, skill.id]);
 			return next;
 		});
 
@@ -272,7 +288,10 @@ export function SkillBundleCard({
 							setIsExpanded(prev => !prev);
 						}}
 					>
-						<label className="text-sm whitespace-nowrap">Skills:&nbsp;{skills.length}</label>
+						<label className="text-sm whitespace-nowrap">
+							Skills:&nbsp;{visibleSkills.length}
+							{insertFilter !== 'all' ? <span className="text-base-content/60"> / {skills.length}</span> : null}
+						</label>
 						{isExpanded ? <FiChevronUp /> : <FiChevronDown />}
 					</div>
 				</div>
@@ -280,12 +299,23 @@ export function SkillBundleCard({
 
 			{isExpanded && (
 				<div className="mt-8 space-y-4">
+					{insertFilter !== 'all' && (
+						<div className="alert alert-info rounded-2xl py-3 text-sm">
+							<div>
+								Showing only <span className="font-semibold">{getSkillInsertShortLabel(insertFilter)}</span> skills.{' '}
+								{getSkillInsertDescription(insertFilter)}
+							</div>
+						</div>
+					)}
+
 					<div className="border-base-content/10 overflow-x-auto rounded-2xl border">
 						<table className="table-zebra table w-full">
 							<thead>
 								<tr className="bg-base-300 text-sm font-semibold">
 									<th className="w-full">Display Name</th>
 									<th className="min-w-32 text-center">Slug</th>
+									<th className="min-w-32 text-center">Insert</th>
+									<th className="min-w-24 text-center">Args</th>
 									<th className="min-w-28 text-center">Presence</th>
 									<th className="text-center whitespace-nowrap">Enabled</th>
 									<th className="text-center whitespace-nowrap">Built-In</th>
@@ -294,10 +324,40 @@ export function SkillBundleCard({
 							</thead>
 
 							<tbody>
-								{skills.map(skill => (
+								{visibleSkills.map(skill => (
 									<tr key={skill.id} className="hover:bg-base-300">
-										<td>{skill.displayName || '-'}</td>
+										<td>
+											<div className="flex flex-col">
+												<span>{skill.displayName || skill.name || '-'}</span>
+												<span className="text-base-content/60 text-xs">artifact name: {skill.name}</span>
+												{skill.runtimeWarnings?.length ? (
+													<span className="bg-warning/20 text-warning-content mt-1 inline-flex w-fit rounded-full px-2 py-0.5 text-xs">
+														{skill.runtimeWarnings.length} runtime warning
+														{skill.runtimeWarnings.length === 1 ? '' : 's'}
+													</span>
+												) : null}
+											</div>
+										</td>
 										<td className="text-center">{skill.slug}</td>
+										<td className="text-center">
+											<span
+												className={`badge rounded-xl ${skill.insert === 'user-message' ? 'badge-secondary' : 'badge-info'}`}
+												title={getSkillInsertDescription(skill.insert)}
+											>
+												{getSkillInsertLabel(skill.insert)}
+											</span>
+										</td>
+										<td className="text-center">
+											{skill.arguments?.length ? (
+												<span className="tooltip tooltip-top" data-tip={getSkillArgumentTooltip(skill.arguments)}>
+													<span className="badge badge-outline rounded-xl">
+														{getSkillArgumentCountLabel(skill.arguments)}
+													</span>
+												</span>
+											) : (
+												<span className="text-base-content/60">-</span>
+											)}
+										</td>
 										<td className="text-center">
 											<div className="flex items-center justify-center">
 												<PresenceBadge skill={skill} />
@@ -363,8 +423,16 @@ export function SkillBundleCard({
 
 								{skills.length === 0 && (
 									<tr>
-										<td colSpan={9} className="py-3 text-center text-sm">
+										<td colSpan={8} className="py-3 text-center text-sm">
 											No skills in this bundle.
+										</td>
+									</tr>
+								)}
+
+								{skills.length > 0 && visibleSkills.length === 0 && (
+									<tr>
+										<td colSpan={8} className="py-3 text-center text-sm">
+											No skills match the current insert filter.
 										</td>
 									</tr>
 								)}

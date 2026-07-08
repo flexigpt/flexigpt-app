@@ -6,6 +6,8 @@ export const SKILLS_AUTOEXEC_TOOL_CHOICES = new Set([
 	'builtin.skills-readresource',
 ]);
 
+export type SkillInsert = 'instructions' | 'user-message';
+
 // Store identity for selection/persistence (NOT runtime identity).
 export interface SkillRef {
 	bundleID: string;
@@ -20,7 +22,7 @@ export interface SkillSelection {
 
 export interface RuntimeSkillFilter {
 	types?: string[];
-	inserts?: string[];
+	inserts?: SkillInsert[];
 	locationPrefix?: string;
 	// Store identity allowlist. Backend resolves to SkillDef internally.
 	allowSkillRefs?: SkillRef[];
@@ -42,7 +44,7 @@ export interface RuntimeSkillListItem {
 	displayName?: string;
 	description?: string;
 	digest?: string;
-	insert?: string;
+	insert?: SkillInsert;
 	arguments?: SkillArgument[];
 	rawFrontmatter?: Record<string, any>;
 	warnings?: string[];
@@ -53,7 +55,7 @@ export interface RuntimeSkillListItem {
 export interface ListSkillsRequest {
 	bundleIDs?: string[];
 	types?: SkillType[];
-	inserts?: string[];
+	inserts?: SkillInsert[];
 	tags?: string[];
 	includeDisabled?: boolean;
 	includeMissing?: boolean;
@@ -66,7 +68,7 @@ export interface ListSkillsRequest {
  */
 export interface RenderSkillResponse {
 	text: string;
-	insert: string;
+	insert: SkillInsert;
 	name: string;
 	description?: string;
 	displayName?: string;
@@ -123,7 +125,7 @@ export interface Skill {
 	displayName?: string;
 	description?: string;
 	tags?: string[];
-	insert?: string;
+	insert?: SkillInsert;
 	arguments?: SkillArgument[];
 	rawFrontmatter?: Record<string, any>;
 	runtimeWarnings?: string[];

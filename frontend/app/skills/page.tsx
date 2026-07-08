@@ -14,6 +14,8 @@ import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal'
 import { Loader } from '@/components/loader';
 import { PageFrame } from '@/components/page_frame';
 
+import type { SkillInsertFilter } from '@/skills/lib/skill_artifact_utils';
+import { getSkillInsertCounts, getSkillInsertDescription } from '@/skills/lib/skill_artifact_utils';
 import type { BundleData } from '@/skills/lib/skill_bundle_utils';
 import { sortBundleData } from '@/skills/lib/skill_bundle_utils';
 import { AddSkillBundleModal } from '@/skills/skill_bundle_add_modal';
@@ -23,6 +25,7 @@ import { SkillBundleCard } from '@/skills/skill_bundle_card';
 export default function SkillsPage() {
 	const [bundles, setBundles] = useState<BundleData[]>([]);
 	const [loading, setLoading] = useState(true);
+	const [insertFilter, setInsertFilter] = useState<SkillInsertFilter>('all');
 
 	const [showAlert, setShowAlert] = useState(false);
 	const [alertMsg, setAlertMsg] = useState('');
@@ -39,6 +42,31 @@ export default function SkillsPage() {
 	const existingBundleNames = useMemo(
 		() => bundles.map(bundleData => (bundleData.bundle.displayName ?? bundleData.bundle.slug).trim()),
 		[bundles]
+	);
+	const allSkills = useMemo(() => bundles.flatMap(bundleData => bundleData.skills), [bundles]);
+	const insertCounts = useMemo(() => getSkillInsertCounts(allSkills), [allSkills]);
+	const skillFilterOptions = useMemo(
+		() => [
+			{
+				value: 'all' as const,
+				label: 'All skills',
+				count: allSkills.length,
+				description: 'Show every skill record in every bundle.',
+			},
+			{
+				value: 'instructions' as const,
+				label: 'Instruction skills',
+				count: insertCounts.instructions,
+				description: getSkillInsertDescription('instructions'),
+			},
+			{
+				value: 'user-message' as const,
+				label: 'User-message templates',
+				count: insertCounts['user-message'],
+				description: getSkillInsertDescription('user-message'),
+			},
+		],
+		[allSkills.length, insertCounts]
 	);
 
 	const fetchAll = useCallback(async () => {
@@ -328,6 +356,46 @@ export default function SkillsPage() {
 					</button>
 				</div>
 
+				<div className="mt-16 w-11/12 xl:w-2/3">
+					<div className="alert alert-info rounded-2xl text-sm">
+						<div className="space-y-1">
+							<div className="font-semibold">Skill management guidance</div>
+							<div>
+								Instruction skills can be loaded into a session and may be preloaded by assistant presets. User-message
+								skills are rendered into the composer or user message body and are not active session skills.
+							</div>
+							<div>
+								`insert` and `arguments` come from the skill&apos;s `SKILL.md` frontmatter. This page manages the store
+								record, the bundle, and the source location, while the artifact itself defines how the body is rendered.
+							</div>
+							<div>Prompt bundles and prompt templates still live on the Prompts page for now.</div>
+						</div>
+					</div>
+
+					<div className="border-base-300 bg-base-100 mt-4 flex flex-wrap items-center gap-2 rounded-2xl border p-3">
+						{skillFilterOptions.map(option => {
+							const isActive = insertFilter === option.value;
+
+							return (
+								<button
+									key={option.value}
+									type="button"
+									className={`btn btn-sm rounded-xl ${isActive ? 'btn-primary' : 'btn-ghost'}`}
+									onClick={() => {
+										setInsertFilter(option.value);
+									}}
+									title={option.description}
+								>
+									<span>{option.label}</span>
+									<span className={`badge badge-sm ${isActive ? 'badge-neutral' : 'badge-outline'}`}>
+										{option.count}
+									</span>
+								</button>
+							);
+						})}
+					</div>
+				</div>
+
 				<div
 					className="mt-24 flex w-full grow flex-col items-center overflow-y-auto"
 					style={{ maxHeight: `calc(100vh - 128px)` }}
@@ -340,6 +408,7 @@ export default function SkillsPage() {
 								key={bundleData.bundle.id}
 								bundle={bundleData.bundle}
 								skills={bundleData.skills}
+								insertFilter={insertFilter}
 								onToggleBundleEnable={handleBundleEnableChange}
 								onToggleSkillEnable={handleSkillEnableChange}
 								onDeleteSkill={handleDeleteSkill}

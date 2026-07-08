@@ -15,6 +15,15 @@ import { Dropdown } from '@/components/dropdown';
 import { ModalBackdrop } from '@/components/modal_backdrop';
 import { ReadOnlyValue } from '@/components/read_only_value';
 
+import {
+	formatSkillArgumentList,
+	getSkillArgumentCountLabel,
+	getSkillInsertDescription,
+	getSkillInsertLabel,
+	normalizeSkillInsert,
+	stringifySkillFrontmatter,
+} from '@/skills/lib/skill_artifact_utils';
+
 interface SkillItem {
 	skill: Skill;
 	bundleID: string;
@@ -108,6 +117,11 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 	const [submitError, setSubmitError] = useState('');
 	const [prefillMode, setPrefillMode] = useState(false);
 	const [selectedPrefillKey, setSelectedPrefillKey] = useState<string | null>(null);
+
+	const artifactSkill = initialData?.skill;
+	const normalizedArtifactInsert = normalizeSkillInsert(artifactSkill?.insert);
+	const artifactArgumentLines = formatSkillArgumentList(artifactSkill?.arguments);
+	const artifactFrontmatter = stringifySkillFrontmatter(artifactSkill?.rawFrontmatter);
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const nameInputRef = useRef<HTMLInputElement | null>(null);
@@ -391,6 +405,26 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 							</div>
 						)}
 
+						{artifactSkill && (
+							<div className="alert alert-info rounded-2xl text-sm">
+								<div className="space-y-1">
+									<div className="font-semibold">Skill artifact guidance</div>
+									<div>
+										`insert` controls where the rendered body is used. `instructions` means session context material.
+										`user-message` means the rendered text is inserted into the composer or user message body.
+									</div>
+									<div>
+										`arguments` are simple string substitutions from the skill&apos;s `SKILL.md` frontmatter. Missing
+										values fall back to defaults, then empty strings, and unknown placeholders are left unchanged.
+									</div>
+									<div>
+										The body is treated as plain text here. This page does not execute or sanitize command-like syntax
+										in the body.
+									</div>
+								</div>
+							</div>
+						)}
+
 						{isAddMode && (
 							<div className="grid grid-cols-12 items-center gap-2">
 								<label className="label col-span-3">
@@ -450,7 +484,10 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
 								<span className="text-sm">Name*</span>
-								<span className="tooltip tooltip-right" data-tip="Must be unique within the bundle.">
+								<span
+									className="tooltip tooltip-right"
+									data-tip="Artifact name from SKILL.md. Keep it unique within the bundle and aligned with the skill directory name."
+								>
 									<FiHelpCircle size={12} />
 								</span>
 							</label>
@@ -481,7 +518,10 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
 								<span className="text-sm">Slug*</span>
-								<span className="tooltip tooltip-right" data-tip="Lower-case, URL-friendly.">
+								<span
+									className="tooltip tooltip-right"
+									data-tip="Store slug used to identify this skill within the bundle."
+								>
 									<FiHelpCircle size={12} />
 								</span>
 							</label>
@@ -511,6 +551,12 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
 								<span className="text-sm">Type*</span>
+								<span
+									className="tooltip tooltip-right"
+									data-tip="Filesystem skills are backed by a skill directory. EmbeddedFS skills are built in and read only."
+								>
+									<FiHelpCircle size={12} />
+								</span>
 							</label>
 							<div className="col-span-9">
 								{isEditMode || isViewMode ? (
@@ -539,6 +585,9 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
 								<span className="text-sm">Location*</span>
+								<span className="tooltip tooltip-right" data-tip="Path to the skill directory that contains SKILL.md.">
+									<FiHelpCircle size={12} />
+								</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -566,6 +615,12 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
 								<span className="text-sm">Display Name</span>
+								<span
+									className="tooltip tooltip-right"
+									data-tip="Shown in lists when set. Otherwise the skill name is used."
+								>
+									<FiHelpCircle size={12} />
+								</span>
 							</label>
 							<div className="col-span-9">
 								<input
@@ -642,20 +697,94 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 							</div>
 						</div>
 
-						{isViewMode && initialData?.skill && (
+						{artifactSkill && (
 							<>
-								<div className="divider">Metadata</div>
+								<div className="divider">Artifact metadata</div>
+								<div className="grid grid-cols-12 gap-2 text-sm">
+									<div className="col-span-3 font-semibold">Insert</div>
+									<div className="col-span-9 space-y-1">
+										<div className="flex items-center gap-2">
+											<span
+												className={`badge rounded-xl ${normalizedArtifactInsert.value === 'user-message' ? 'badge-secondary' : 'badge-info'}`}
+											>
+												{getSkillInsertLabel(artifactSkill.insert)}
+											</span>
+											{normalizedArtifactInsert.isDefaulted && (
+												<span className="badge badge-ghost rounded-xl">default</span>
+											)}
+										</div>
+										<div className="text-base-content/70 text-xs">
+											{getSkillInsertDescription(artifactSkill.insert)}
+										</div>
+									</div>
+
+									<div className="col-span-3 font-semibold">Arguments</div>
+									<div className="col-span-9 space-y-2">
+										<div className="text-base-content/70 text-xs">
+											{getSkillArgumentCountLabel(artifactSkill.arguments)}
+										</div>
+										{artifactArgumentLines.length > 0 ? (
+											<ul className="space-y-1">
+												{artifactArgumentLines.map((line, idx) => (
+													<li
+														key={`${line}-${idx}`}
+														className="bg-base-100 rounded-xl px-3 py-2 text-xs whitespace-pre-wrap"
+													>
+														{line}
+													</li>
+												))}
+											</ul>
+										) : (
+											<div className="text-base-content/70 text-xs">No arguments declared.</div>
+										)}
+									</div>
+
+									<div className="col-span-3 font-semibold">Digest</div>
+									<div className="col-span-9 font-mono text-xs break-all">{artifactSkill.digest || '-'}</div>
+
+									<div className="col-span-3 font-semibold">Runtime warnings</div>
+									<div className="col-span-9 space-y-1">
+										{artifactSkill.runtimeWarnings?.length ? (
+											<ul className="list-disc space-y-1 pl-5 text-xs">
+												{artifactSkill.runtimeWarnings.map((warning, idx) => (
+													<li key={`${idx}-${warning}`}>{warning}</li>
+												))}
+											</ul>
+										) : (
+											<div className="text-base-content/70 text-xs">No runtime warnings recorded.</div>
+										)}
+									</div>
+
+									<div className="col-span-3 font-semibold">Raw frontmatter</div>
+									<div className="col-span-9">
+										{artifactFrontmatter ? (
+											<pre className="bg-base-100 max-h-56 overflow-auto rounded-2xl p-3 text-xs whitespace-pre-wrap">
+												{artifactFrontmatter}
+											</pre>
+										) : (
+											<div className="text-base-content/70 text-xs">No raw frontmatter captured.</div>
+										)}
+									</div>
+								</div>
+
+								<div className="divider">Store metadata</div>
 								<div className="grid grid-cols-12 gap-2 text-sm">
 									<div className="col-span-3 font-semibold">ID</div>
-									<div className="col-span-9">{initialData.skill.id}</div>
+									<div className="col-span-9 break-all">{artifactSkill.id}</div>
 									<div className="col-span-3 font-semibold">Schema</div>
-									<div className="col-span-9">{initialData.skill.schemaVersion}</div>
+									<div className="col-span-9">{artifactSkill.schemaVersion}</div>
+									<div className="col-span-3 font-semibold">Type</div>
+									<div className="col-span-9">{artifactSkill.type}</div>
+									<div className="col-span-3 font-semibold">Location</div>
+									<div className="col-span-9 break-all">{artifactSkill.location || '-'}</div>
 									<div className="col-span-3 font-semibold">Built-in</div>
-									<div className="col-span-9">{initialData.skill.isBuiltIn ? 'Yes' : 'No'}</div>
+									<div className="col-span-9">{artifactSkill.isBuiltIn ? 'Yes' : 'No'}</div>
+									<div className="col-span-3 font-semibold">Presence</div>
+									<div className="col-span-9">{artifactSkill.presence?.status ?? 'unknown'}</div>
 									<div className="col-span-3 font-semibold">Created</div>
-									<div className="col-span-9">{String(initialData.skill.createdAt)}</div>
+									<div className="col-span-9">{String(artifactSkill.createdAt)}</div>
 									<div className="col-span-3 font-semibold">Modified</div>
-									<div className="col-span-9">{String(initialData.skill.modifiedAt)}</div>
+									<div className="col-span-9">{String(artifactSkill.modifiedAt)}</div>
 								</div>
 							</>
 						)}
