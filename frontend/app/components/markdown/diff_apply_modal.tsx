@@ -468,11 +468,11 @@ function isTargetProblem(target: EditableUnifiedDiffTarget, missing: boolean): b
 	return (
 		missing ||
 		target.ok === false ||
-		target.status === ApplyUnifiedDiffStatus.NeedsInfo ||
 		target.status === ApplyUnifiedDiffStatus.Conflict ||
 		target.status === ApplyUnifiedDiffStatus.Error
 	);
 }
+
 function getLocalTargetKey(target: EditableUnifiedDiffTarget, index: number): string {
 	return (
 		target.fileKey?.trim() ||

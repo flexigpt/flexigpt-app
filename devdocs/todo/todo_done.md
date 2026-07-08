@@ -1077,3 +1077,4 @@
   - [x] github has few MCP apps, today. no point in entering this area myself for now.
 
 - [x] MCP flows review and harden and more automatic in places where it is a bit jerky today.
+- [x] there is a significant slowdown during streaming now.

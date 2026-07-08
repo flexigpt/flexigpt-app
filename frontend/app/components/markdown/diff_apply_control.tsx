@@ -77,6 +77,20 @@ function resolveRequestDiffText(
 	return fullDiffText;
 }
 
+function buildRequestTargetsFromParsedDiff(
+	fallbackParsed: ReturnType<typeof parseUnifiedDiffForUI>,
+	candidatePaths: string[]
+): ApplyUnifiedDiffFileTarget[] | undefined {
+	if (!fallbackParsed.isOpenAIPatch) {
+		return undefined;
+	}
+
+	const parsedTargets = buildEditableTargetsFromOutput(undefined, fallbackParsed, candidatePaths);
+	const fileTargets = editableTargetsToFileTargets(parsedTargets);
+
+	return fileTargets.length > 0 ? fileTargets : undefined;
+}
+
 function getApplicableTargetsForOutput(
 	targets: EditableUnifiedDiffTarget[],
 	output: ApplyUnifiedDiffOut | undefined
@@ -242,12 +256,22 @@ function applyOutputFileMatchesTarget(file: ApplyUnifiedDiffFileOut, target: App
 	const filePatchPaths = getApplyPatchIdentityPaths(file);
 	const targetPatchPaths = getApplyPatchIdentityPaths(target);
 
-	if (filePatchPaths.length > 0 && targetPatchPaths.length > 0) {
-		return haveSharedPathIdentity(filePatchPaths, targetPatchPaths);
+	if (
+		filePatchPaths.length > 0 &&
+		targetPatchPaths.length > 0 &&
+		haveSharedPathIdentity(filePatchPaths, targetPatchPaths)
+	) {
+		return true;
+	}
+
+	// Fall back to target/resolved paths when the backend normalizes paths
+	// differently from the request patch headers.
+	if (haveSharedPathIdentity(getApplyResolvedIdentityPaths(file), getApplyResolvedIdentityPaths(target))) {
+		return true;
 	}
 
 	if (filePatchPaths.length === 0 && targetPatchPaths.length === 0) {
-		return haveSharedPathIdentity(getApplyResolvedIdentityPaths(file), getApplyResolvedIdentityPaths(target));
+		return true;
 	}
 
 	return false;
@@ -431,12 +455,20 @@ function applyOutputFilesMatch(left: ApplyUnifiedDiffFileOut, right: ApplyUnifie
 	const leftPatchPaths = getApplyPatchIdentityPaths(left);
 	const rightPatchPaths = getApplyPatchIdentityPaths(right);
 
-	if (leftPatchPaths.length > 0 && rightPatchPaths.length > 0) {
-		return haveSharedPathIdentity(leftPatchPaths, rightPatchPaths);
+	if (
+		leftPatchPaths.length > 0 &&
+		rightPatchPaths.length > 0 &&
+		haveSharedPathIdentity(leftPatchPaths, rightPatchPaths)
+	) {
+		return true;
+	}
+
+	if (haveSharedPathIdentity(getApplyResolvedIdentityPaths(left), getApplyResolvedIdentityPaths(right))) {
+		return true;
 	}
 
 	if (leftPatchPaths.length === 0 && rightPatchPaths.length === 0) {
-		return haveSharedPathIdentity(getApplyResolvedIdentityPaths(left), getApplyResolvedIdentityPaths(right));
+		return true;
 	}
 
 	return false;
@@ -446,7 +478,12 @@ function fileTargetsMatch(left: ApplyUnifiedDiffFileTarget, right: ApplyUnifiedD
 	if (left.fileKey && right.fileKey && left.fileKey === right.fileKey) {
 		return true;
 	}
-	return haveSharedPathIdentity([left.newPath, left.oldPath], [right.newPath, right.oldPath]);
+
+	if (haveSharedPathIdentity([left.newPath, left.oldPath], [right.newPath, right.oldPath])) {
+		return true;
+	}
+
+	return haveSharedPathIdentity([left.targetPath], [right.targetPath]);
 }
 
 function getHeaderStatusSummary(
@@ -578,7 +615,12 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 			if (targets.length === 0) {
 				return diffText;
 			}
-
+			// OpenAI patch format needs its original wrapper preserved.
+			// The selected file targets are already sent separately, so sending the
+			// raw patch text is safer than trying to reassemble a partial patch.
+			if (fallbackParsed.isOpenAIPatch) {
+				return diffText;
+			}
 			const parts: string[] = [];
 			const seen = new Set<string>();
 
@@ -615,13 +657,15 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 			}
 			return joinDiffTextParts(parts);
 		},
-		[diffText, fallbackParsed.files.length, language]
+		[diffText, fallbackParsed.files.length, language, fallbackParsed.isOpenAIPatch]
 	);
 
 	const runDryRun = useCallback(
 		async (targets: ApplyUnifiedDiffFileTarget[], nextStrict: boolean, options?: DiffApplyRunOptions) => {
 			const seq = ++requestSeqRef.current;
 			const requestDiffText = options?.diffText ?? diffText;
+			const requestTargets =
+				targets.length > 0 ? targets : buildRequestTargetsFromParsedDiff(fallbackParsed, normalizedCandidatePaths);
 
 			setControlState(previous => ({
 				...previous,
@@ -635,7 +679,7 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 					diffText: requestDiffText,
 					dryRun: true,
 					strict: nextStrict,
-					fileTargets: targets.length > 0 ? targets : undefined,
+					fileTargets: requestTargets,
 					candidatePaths: normalizedCandidatePaths.length > 0 ? normalizedCandidatePaths : undefined,
 				});
 
@@ -668,7 +712,7 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 				return undefined;
 			}
 		},
-		[deriveAndStoreTargets, diffText, normalizedCandidatePaths, setControlState]
+		[deriveAndStoreTargets, diffText, normalizedCandidatePaths, setControlState, fallbackParsed]
 	);
 
 	useEffect(() => {

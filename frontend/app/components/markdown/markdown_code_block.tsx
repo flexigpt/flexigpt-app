@@ -117,12 +117,14 @@ export function CodeBlock({ language, value, isBusy, hideMermaidCode, diffCandid
 							<span className="truncate leading-none">{headerLabel}</span>
 						</span>
 
-						<DiffApplyControl
-							language={language}
-							diffText={value}
-							isBusy={isBusy}
-							candidatePaths={diffCandidatePaths}
-						/>
+						{!isBusy ? (
+							<DiffApplyControl
+								language={language}
+								diffText={value}
+								isBusy={isBusy}
+								candidatePaths={diffCandidatePaths}
+							/>
+						) : null}
 					</div>
 					<div className="flex shrink-0 items-center gap-1">
 						<DownloadButton

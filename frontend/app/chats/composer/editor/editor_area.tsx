@@ -55,7 +55,7 @@ import type {
 import { MCPApprovalModal } from '@/chats/composer/mcp/mcp_approval_modal';
 import { useComposerMCP } from '@/chats/composer/mcp/use_composer_mcp';
 import { useMCPApproval } from '@/chats/composer/mcp/use_mcp_approval';
-import { buildEditorValueFromPlainText, hasNonEmptyUserText } from '@/chats/composer/platedoc/platedoc_utils';
+import { buildEditorValueFromPlainText } from '@/chats/composer/platedoc/platedoc_utils';
 import {
 	getInstructionPromptPartsFromSelections,
 	getTemplateSelections,
@@ -305,6 +305,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const {
 		editor,
 		contentRef,
+		hasText,
 		hasTextRef,
 		selectionInfo,
 		attachedToolEntries,
@@ -404,12 +405,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	} = useComposerSkills();
 
 	const templateBlocked = selectionInfo.hasTemplate && selectionInfo.requiredCount > 0;
-
-	const effectiveSubmitText = useMemo(() => {
-		return selectionInfo.hasTemplate ? toPlainTextReplacingVariables(editor) : editor.api.string([]);
-	}, [editor, selectionInfo]);
-	const hasEffectiveTextForSubmit = effectiveSubmitText.trim().length > 0;
-
 	const [autoExecStopVisible, setAutoExecStopVisible] = useState(false);
 	const [autoExecStopRequested, setAutoExecStopRequested] = useState(false);
 	const [autoExecBlockedByUser, setAutoExecBlockedByUser] = useState(false);
@@ -928,7 +923,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			return false;
 		}
 
-		if (hasEffectiveTextForSubmit) {
+		if (hasText) {
 			return true;
 		}
 
@@ -941,7 +936,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		isSubmitting,
 		templateBlocked,
 		hasBlockingToolArgs,
-		hasEffectiveTextForSubmit,
+		hasText,
 		attachments.length,
 		toolOutputs.length,
 	]);
@@ -969,7 +964,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				return true;
 			}
 
-			if (hasEffectiveTextForSubmit) {
+			if (hasText) {
 				return true;
 			}
 
@@ -1385,7 +1380,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			return;
 		}
 
-		if (!hasEffectiveTextForSubmit && attachments.length === 0 && toolOutputs.length === 0) {
+		if (!hasText && attachments.length === 0 && toolOutputs.length === 0) {
 			finishFastForwardWithError('Tool calls did not produce any outputs, so there is nothing to send yet.');
 			return;
 		}
@@ -1398,7 +1393,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		finishFastForwardAndSubmit,
 		finishFastForwardWithError,
 		hasBlockingToolArgs,
-		hasEffectiveTextForSubmit,
+		hasText,
 		isGenerating,
 		isInputLocked,
 		templateBlocked,
@@ -1574,7 +1569,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				return false;
 			}
 
-			const hasCurrentText = hasNonEmptyUserText(editor) || editor.api.string([]).trim().length > 0;
+			const hasCurrentText = hasTextRef.current;
 			if (hasCurrentText) {
 				return false;
 			}
@@ -1582,7 +1577,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			setDraftText(text);
 			return true;
 		},
-		[editor, setDraftText]
+		[setDraftText, hasTextRef]
 	);
 
 	const handleEditorDocumentChange = useCallback(() => {
@@ -1605,7 +1600,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 		// Auto-cancel editing when the editor is completely empty
 		// (no text, no tools, no attachments, no tool outputs).
-		const hasTextNow = editingMessageId ? hasNonEmptyUserText(editor) : hasTextRef.current;
+		const hasTextNow = hasTextRef.current;
 
 		const hasAttachmentsLocal = attachments.length > 0;
 		const hasToolOutputsLocal = toolOutputs.length > 0;
@@ -1622,7 +1617,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		attachments.length,
 		cancelEditing,
 		editingMessageId,
-		editor,
 		handleAttachedToolsChanged,
 		hasTextRef,
 		onEditorChange,

@@ -17,12 +17,7 @@ function isElementAtTop(el: HTMLElement): boolean {
 	return el.scrollTop <= SCROLL_AT_TOP_THRESHOLD;
 }
 
-function getMessageElements(el: HTMLElement): HTMLElement[] {
-	return [...el.querySelectorAll<HTMLElement>('[data-chat-message-index]')];
-}
-
-function getCurrentMessageIndex(el: HTMLElement): number {
-	const messages = getMessageElements(el);
+function getCurrentMessageIndex(el: HTMLElement, messages: HTMLElement[]): number {
 	if (messages.length === 0) {
 		return -1;
 	}
@@ -48,8 +43,8 @@ function getCurrentMessageIndex(el: HTMLElement): number {
 	return Number(messages[result]?.dataset.chatMessageIndex ?? -1);
 }
 
-function scrollMessageAtIndex(el: HTMLElement, index: number): boolean {
-	const target = el.querySelector<HTMLElement>(`[data-chat-message-index="${index}"]`);
+function scrollMessageAtIndex(el: HTMLElement, messages: HTMLElement[], index: number): boolean {
+	const target = messages[index];
 	if (!target) {
 		return false;
 	}
@@ -61,15 +56,16 @@ function scrollMessageAtIndex(el: HTMLElement, index: number): boolean {
 	return true;
 }
 
-function getMessageJumpAvailability(el: HTMLElement | null, messageCount: number) {
-	if (!el || messageCount <= 1) {
+function getMessageJumpAvailability(el: HTMLElement | null, messages: HTMLElement[]) {
+	if (!el || messages.length <= 1) {
 		return { canJumpToPreviousMessage: false, canJumpToNextMessage: false };
 	}
 
-	const currentIndex = getCurrentMessageIndex(el);
+	const currentIndex = getCurrentMessageIndex(el, messages);
+
 	return {
 		canJumpToPreviousMessage: currentIndex > 0,
-		canJumpToNextMessage: currentIndex >= 0 && currentIndex < messageCount - 1,
+		canJumpToNextMessage: currentIndex >= 0 && currentIndex < messages.length - 1,
 	};
 }
 
@@ -107,19 +103,32 @@ export function useScrollRestore({
 	const { isAtBottom, isAtTop, canJumpToPreviousMessage, canJumpToNextMessage } = scrollIndicatorState;
 	const scrollIndicatorStateRef = useRef<ScrollIndicatorState>(INITIAL_SCROLL_INDICATOR_STATE);
 
-	const messageCountRef = useRef(messageCount);
 	const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 	const scrollContentRef = useRef<HTMLDivElement | null>(null);
+	const messageElementsRef = useRef<HTMLElement[]>([]);
+
 	const scrollTopByTabRef = useRef(new Map<string, number>());
 	const shouldAutoFollowRef = useRef(true);
 
 	const seededScrollFromStorageRef = useRef(false);
 	const activeTabIsHydratingRef = useRef(activeTabIsHydrating);
 
-	useLayoutEffect(() => {
-		messageCountRef.current = messageCount;
-	}, [messageCount]);
+	const refreshMessageElementCache = useCallback(() => {
+		const contentEl = scrollContentRef.current;
+		if (!contentEl) {
+			messageElementsRef.current = [];
+			return;
+		}
 
+		const next: HTMLElement[] = [];
+		for (const child of contentEl.children) {
+			if (child instanceof HTMLElement && child.dataset.chatMessageIndex !== undefined) {
+				next.push(child);
+			}
+		}
+
+		messageElementsRef.current = next;
+	}, []);
 	useLayoutEffect(() => {
 		activeTabIsHydratingRef.current = activeTabIsHydrating;
 	}, [activeTabIsHydrating]);
@@ -172,7 +181,8 @@ export function useScrollRestore({
 			const nextAtBottom = isElementAtBottom(el);
 			shouldAutoFollowRef.current = nextAtBottom;
 
-			const jumpState = getMessageJumpAvailability(el, messageCountRef.current);
+			const jumpState = getMessageJumpAvailability(el, messageElementsRef.current);
+
 			setScrollIndicatorStateIfChanged({
 				isAtBottom: nextAtBottom,
 				isAtTop: nextAtTop,
@@ -238,40 +248,29 @@ export function useScrollRestore({
 		el.scrollTo({ top: el.scrollHeight, behavior: 'auto' });
 	}, []);
 
-	const previousSelectedTabIdRef = useRef<string | null>(null);
-	const previousHydratingRef = useRef(activeTabIsHydrating);
-
-	useLayoutEffect(() => {
-		const el = scrollContainerRef.current;
-		const selectedChanged = previousSelectedTabIdRef.current !== selectedTabId;
-		const justFinishedHydrating =
-			previousSelectedTabIdRef.current === selectedTabId && previousHydratingRef.current && !activeTabIsHydrating;
-
-		if (el && selectedTabId && !activeTabIsHydrating && (selectedChanged || justFinishedHydrating)) {
-			const nextTop = scrollTopByTabRef.current?.get(selectedTabId) ?? 0;
-			el.scrollTo({ top: nextTop, behavior: 'auto' });
-			persistScrollPosition(selectedTabId, el);
-			updateScrollStateNow(el);
-		} else if (el) {
-			updateScrollStateNow(el);
-		}
-
-		previousSelectedTabIdRef.current = selectedTabId;
-		previousHydratingRef.current = activeTabIsHydrating;
-	}, [activeTabIsHydrating, persistScrollPosition, selectedTabId, updateScrollStateNow]);
-
 	const previousRenderRef = useRef({
-		tabId: selectedTabId,
-		messageCount,
+		selectedTabId: '',
+		activeTabIsHydrating: true,
+		messageCount: 0,
 	});
 
 	useLayoutEffect(() => {
+		refreshMessageElementCache();
+
 		const el = scrollContainerRef.current;
 		const previous = previousRenderRef.current;
-		const sameTab = previous.tabId === selectedTabId;
-		const messageCountIncreased = sameTab && messageCount > previous.messageCount;
 
-		if (el && selectedTabId && !activeTabIsHydrating && messageCountIncreased && shouldAutoFollowRef.current) {
+		const selectedChanged = previous.selectedTabId !== selectedTabId;
+		const justFinishedHydrating =
+			previous.selectedTabId === selectedTabId && previous.activeTabIsHydrating && !activeTabIsHydrating;
+		const messageCountIncreased = previous.selectedTabId === selectedTabId && messageCount > previous.messageCount;
+
+		if (el && selectedTabId && !activeTabIsHydrating && (selectedChanged || justFinishedHydrating)) {
+			const nextTop = scrollTopByTabRef.current.get(selectedTabId) ?? 0;
+			el.scrollTo({ top: nextTop, behavior: 'auto' });
+			persistScrollPosition(selectedTabId, el);
+			updateScrollStateNow(el);
+		} else if (el && selectedTabId && !activeTabIsHydrating && messageCountIncreased && shouldAutoFollowRef.current) {
 			scrollElementToBottom(el);
 			persistScrollPosition(selectedTabId, el);
 			updateScrollStateNow(el);
@@ -280,7 +279,8 @@ export function useScrollRestore({
 		}
 
 		previousRenderRef.current = {
-			tabId: selectedTabId,
+			selectedTabId,
+			activeTabIsHydrating,
 			messageCount,
 		};
 	}, [
@@ -290,6 +290,7 @@ export function useScrollRestore({
 		scrollElementToBottom,
 		selectedTabId,
 		updateScrollStateNow,
+		refreshMessageElementCache,
 	]);
 
 	useEffect(() => {
@@ -411,12 +412,13 @@ export function useScrollRestore({
 			return;
 		}
 
-		const currentIndex = getCurrentMessageIndex(el);
+		const messages = messageElementsRef.current;
+		const currentIndex = getCurrentMessageIndex(el, messages);
 		if (currentIndex <= 0) {
 			return;
 		}
 
-		if (scrollMessageAtIndex(el, currentIndex - 1)) {
+		if (scrollMessageAtIndex(el, messages, currentIndex - 1)) {
 			persistScrollPosition(tabId, el);
 			updateScrollStateNow(el);
 		}
@@ -429,12 +431,13 @@ export function useScrollRestore({
 			return;
 		}
 
-		const currentIndex = getCurrentMessageIndex(el);
+		const messages = messageElementsRef.current;
+		const currentIndex = getCurrentMessageIndex(el, messages);
 		if (currentIndex < 0 || currentIndex >= messageCount - 1) {
 			return;
 		}
 
-		if (scrollMessageAtIndex(el, currentIndex + 1)) {
+		if (scrollMessageAtIndex(el, messages, currentIndex + 1)) {
 			persistScrollPosition(tabId, el);
 			updateScrollStateNow(el);
 		}

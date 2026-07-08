@@ -36,6 +36,16 @@ const strictSchema = {
 	},
 };
 
+const streamingRemarkPlugins: PluggableList = [remarkGfm, supersub, remarkGemoji];
+const finalRemarkPlugins: PluggableList = [remarkGfm, remarkMath, remarkInlineCodeMath, supersub, remarkGemoji];
+
+const rehypeKatexOptions = {
+	throwOnError: false,
+};
+
+const streamingRehypePlugins: PluggableList = [rehypeRaw, [rehypeSanitize, strictSchema], rehypeSlug];
+const finalRehypePlugins: PluggableList = [...streamingRehypePlugins, [rehypeKatex, rehypeKatexOptions] as const];
+
 interface CodeComponentProps extends HTMLAttributes<HTMLElement>, ExtraProps {
 	inline?: boolean;
 	className?: string;
@@ -66,10 +76,6 @@ interface EnhancedMarkdownProps {
 
 const isExternalHref = (href?: string) => !!href && /^(https?:)?\/\/|^mailto:|^tel:/i.test(href);
 
-const rehypeKatexOptions = {
-	throwOnError: false,
-};
-
 export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 	text,
 	align = 'left',
@@ -83,23 +89,8 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 		return isBusy ? text : SanitizeLaTeXOutsideFences(text);
 	}, [text, isBusy]);
 
-	const remarkPlugins = useMemo<PluggableList>(() => {
-		if (isBusy) {
-			return [remarkGfm, supersub, remarkGemoji];
-		}
-
-		return [remarkGfm, remarkMath, remarkInlineCodeMath, supersub, remarkGemoji];
-	}, [isBusy]);
-
-	const rehypePlugins = useMemo<PluggableList>(() => {
-		const basePlugins: PluggableList = [rehypeRaw, [rehypeSanitize, strictSchema], rehypeSlug];
-
-		if (isBusy) {
-			return basePlugins;
-		}
-
-		return [...basePlugins, [rehypeKatex, rehypeKatexOptions] as const];
-	}, [isBusy]);
+	const remarkPlugins = isBusy ? streamingRemarkPlugins : finalRemarkPlugins;
+	const rehypePlugins = isBusy ? streamingRehypePlugins : finalRehypePlugins;
 
 	const components = useMemo(() => {
 		// oxlint-disable-next-line react/display-name

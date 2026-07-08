@@ -1,5 +1,5 @@
 import type { ReactNode, RefObject } from 'react';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useLayoutEffect, useRef, useState } from 'react';
 
 import { FiEdit2, FiPlus, FiX } from 'react-icons/fi';
 
@@ -35,6 +35,29 @@ interface ChatTabsBarProps {
 interface ChatTabsBarContentProps extends ChatTabsBarProps {
 	setTabEl: (id: string) => (el: HTMLElement | null) => void;
 	tabsViewportRef: RefObject<HTMLDivElement | null>;
+}
+
+const TAB_SCROLL_PADDING = 12;
+
+function ensureTabVisible(tabEl: HTMLElement, viewportEl: HTMLElement) {
+	const viewportRect = viewportEl.getBoundingClientRect();
+	const tabRect = tabEl.getBoundingClientRect();
+
+	const leftEdge = viewportRect.left + TAB_SCROLL_PADDING;
+	const rightEdge = viewportRect.right - TAB_SCROLL_PADDING;
+
+	let nextScrollLeft = viewportEl.scrollLeft;
+
+	if (tabRect.left < leftEdge) {
+		nextScrollLeft -= leftEdge - tabRect.left;
+	} else if (tabRect.right > rightEdge) {
+		nextScrollLeft += tabRect.right - rightEdge;
+	} else {
+		return;
+	}
+
+	const maxScrollLeft = viewportEl.scrollWidth - viewportEl.clientWidth;
+	viewportEl.scrollTo({ left: Math.max(0, Math.min(maxScrollLeft, nextScrollLeft)), behavior: 'auto' });
 }
 
 function ChatTabsBarContent({
@@ -239,26 +262,14 @@ export const ChatTabsBar = memo(function ChatTabsBar(props: ChatTabsBarProps) {
 		[]
 	);
 
-	useEffect(() => {
+	useLayoutEffect(() => {
 		const tabEl = tabElById.current.get(selectedTabId);
 		const viewportEl = tabsViewportRef.current;
 		if (!tabEl || !viewportEl) {
 			return;
 		}
 
-		const viewportRect = viewportEl.getBoundingClientRect();
-		const tabRect = tabEl.getBoundingClientRect();
-		const fullyVisible = tabRect.left >= viewportRect.left && tabRect.right <= viewportRect.right;
-
-		if (fullyVisible) {
-			return;
-		}
-
-		tabEl.scrollIntoView({
-			behavior: 'auto',
-			block: 'nearest',
-			inline: 'nearest',
-		});
+		ensureTabVisible(tabEl, viewportEl);
 	}, [selectedTabId]);
 
 	return <ChatTabsBarContent {...props} setTabEl={setTabEl} tabsViewportRef={tabsViewportRef} />;

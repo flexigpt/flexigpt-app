@@ -94,6 +94,9 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 	const isAutoChunkingRef = useRef(false);
 	const lastPopulatedSelectionKeyRef = useRef(new Set());
 	const idleChunkJobKindRef = useRef<'idle' | 'timeout' | null>(null);
+	const docAnalysisTimerRef = useRef<number | null>(null);
+	const scrollSelectionFrameRef = useRef<number | null>(null);
+	const pendingScrollRangeRef = useRef<Range | null>(null);
 
 	const syncDocumentDerivedState = useCallback((bumpDocVersion = true) => {
 		const nextHasText = hasNonEmptyUserText(editorRef.current);
@@ -105,22 +108,26 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 		}
 	}, []);
 
-	// Throttle docVersion bumps to at most 1/frame to avoid re-render storms on big documents.
-	const docRafRef = useRef<number | null>(null);
+	// Debounce docVersion bumps so editor analysis runs in small batches.
 	const scheduleDocRecompute = useCallback(() => {
-		if (docRafRef.current !== null) {
+		if (docAnalysisTimerRef.current !== null) {
 			return;
 		}
-		docRafRef.current = window.requestAnimationFrame(() => {
-			docRafRef.current = null;
+		docAnalysisTimerRef.current = window.setTimeout(() => {
+			docAnalysisTimerRef.current = null;
 			syncDocumentDerivedState(true);
-		});
+		}, 5);
 	}, [syncDocumentDerivedState]);
 
 	useEffect(() => {
 		return () => {
-			if (docRafRef.current !== null) {
-				window.cancelAnimationFrame(docRafRef.current);
+			if (docAnalysisTimerRef.current !== null) {
+				window.clearTimeout(docAnalysisTimerRef.current);
+				docAnalysisTimerRef.current = null;
+			}
+			if (scrollSelectionFrameRef.current !== null) {
+				window.cancelAnimationFrame(scrollSelectionFrameRef.current);
+				scrollSelectionFrameRef.current = null;
 			}
 		};
 	}, []);
@@ -222,11 +229,28 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 		}
 	}, []);
 
-	const scrollSelectionIntoEditorView = useCallback(
-		(_editableEditor: unknown, domRange: Range) => {
-			scrollDomRangeIntoEditorView(domRange);
+	const scheduleScrollIntoEditorView = useCallback(
+		(domRange: Range | null | undefined) => {
+			pendingScrollRangeRef.current = domRange ? domRange.cloneRange() : null;
+
+			if (scrollSelectionFrameRef.current !== null) {
+				return;
+			}
+
+			scrollSelectionFrameRef.current = window.requestAnimationFrame(() => {
+				scrollSelectionFrameRef.current = null;
+				scrollDomRangeIntoEditorView(pendingScrollRangeRef.current);
+				pendingScrollRangeRef.current = null;
+			});
 		},
 		[scrollDomRangeIntoEditorView]
+	);
+
+	const scrollSelectionIntoEditorView = useCallback(
+		(_editableEditor: unknown, domRange: Range) => {
+			scheduleScrollIntoEditorView(domRange);
+		},
+		[scheduleScrollIntoEditorView]
 	);
 
 	const scrollEditorSelectionIntoView = useCallback(() => {
@@ -236,15 +260,15 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 				const range = sel.getRangeAt(0).cloneRange();
 				range.collapse(false);
 
-				scrollDomRangeIntoEditorView(range);
+				scheduleScrollIntoEditorView(range);
 				return;
 			} catch {
 				// noop
 			}
 		}
 
-		scrollDomRangeIntoEditorView(null);
-	}, [scrollDomRangeIntoEditorView]);
+		scheduleScrollIntoEditorView(null);
+	}, [scheduleScrollIntoEditorView]);
 
 	const focusEditorPreservingSelection = useCallback(() => {
 		const currentEditor = editorRef.current;
@@ -392,8 +416,8 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 	// oxlint-disable-next-line react-hooks/exhaustive-deps
 	const selectionInfo = useMemo(() => analyzeTemplateSelectionInfo(editor), [editor, docVersion]);
 
-	// Intentionally derived on render so any parent rerender sees current doc state.
-	const attachedToolEntries = getAttachedToolEntries(editor);
+	// oxlint-disable-next-line react-hooks/exhaustive-deps
+	const attachedToolEntries = useMemo(() => getAttachedToolEntries(editor), [editor, docVersion]);
 
 	const getAttachedToolEntriesSnapshot = useCallback((uniqueByIdentity?: boolean) => {
 		return getAttachedToolEntries(editorRef.current, uniqueByIdentity);

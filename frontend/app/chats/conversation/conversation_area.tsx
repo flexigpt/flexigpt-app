@@ -1,4 +1,14 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useSyncExternalStore } from 'react';
+import type { Ref } from 'react';
+import {
+	forwardRef,
+	memo,
+	useCallback,
+	useEffect,
+	useImperativeHandle,
+	useMemo,
+	useRef,
+	useSyncExternalStore,
+} from 'react';
 
 import { FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
@@ -66,6 +76,58 @@ function pathBasename(path: string): string {
 function pathBasenameLooksLikeFile(path: string): boolean {
 	const basename = pathBasename(path);
 	return /\.[^./]+$/.test(basename);
+}
+
+function resolveActiveTab(tabs: ChatTabState[], selectedTabId: string): ChatTabState | undefined {
+	return tabs.find(tab => tab.tabId === selectedTabId) ?? tabs[0];
+}
+
+function getMountedInputPaneSignature(
+	tabs: ChatTabState[],
+	selectedTabId: string,
+	mountedInputTabIds: ReadonlySet<string>
+): string {
+	const parts: string[] = [];
+
+	for (const tab of tabs) {
+		const shouldMount = tab.tabId === selectedTabId || tab.isBusy || mountedInputTabIds.has(tab.tabId);
+		if (!shouldMount) {
+			continue;
+		}
+
+		parts.push(
+			[
+				tab.tabId,
+				tab.tabId === selectedTabId ? '1' : '0',
+				tab.isBusy ? '1' : '0',
+				tab.isHydrating ? '1' : '0',
+				tab.editingMessageId ?? '',
+			].join('|')
+		);
+	}
+
+	return parts.join('||');
+}
+
+function areConversationAreaPropsEqual(prev: ConversationAreaProps, next: ConversationAreaProps): boolean {
+	if (prev.selectedTabId !== next.selectedTabId) {
+		return false;
+	}
+	if (prev.shortcutConfig !== next.shortcutConfig) {
+		return false;
+	}
+	if (prev.initialScrollTopByTab !== next.initialScrollTopByTab) {
+		return false;
+	}
+
+	if (resolveActiveTab(prev.tabs, prev.selectedTabId) !== resolveActiveTab(next.tabs, next.selectedTabId)) {
+		return false;
+	}
+
+	return (
+		getMountedInputPaneSignature(prev.tabs, prev.selectedTabId, prev.mountedInputTabIds) ===
+		getMountedInputPaneSignature(next.tabs, next.selectedTabId, next.mountedInputTabIds)
+	);
 }
 
 function stripTrailingCandidateSlashes(path: string): string {
@@ -425,7 +487,7 @@ interface ConversationAreaProps {
 	saveUpdatedConversation: (tabId: string, updatedConv: Conversation, titleWasExternallyChanged?: boolean) => void;
 }
 
-export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationAreaProps>(function ConversationArea(
+function ConversationAreaInner(
 	{
 		tabs,
 		selectedTabId,
@@ -434,8 +496,8 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 		initialScrollTopByTab,
 		updateTab,
 		saveUpdatedConversation,
-	},
-	ref
+	}: ConversationAreaProps,
+	ref: Ref<ConversationAreaHandle>
 ) {
 	const tabsRef = useRef(tabs);
 	const selectedTabIdRef = useRef(selectedTabId);
@@ -853,4 +915,9 @@ export const ConversationArea = forwardRef<ConversationAreaHandle, ConversationA
 			</div>
 		</>
 	);
-});
+}
+
+export const ConversationArea = memo(
+	forwardRef<ConversationAreaHandle, ConversationAreaProps>(ConversationAreaInner),
+	areConversationAreaPropsEqual
+);

@@ -40,6 +40,7 @@ export interface UnifiedDiffTextForTarget {
 
 export interface ParsedUnifiedDiffForUI {
 	isDiffLike: boolean;
+	isOpenAIPatch: boolean;
 	files: ParsedUnifiedDiffFileForUI[];
 	hunks: number;
 	addedLines: number;
@@ -164,6 +165,7 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 				...createWorkingFile(),
 				oldPath: oldPath || undefined,
 				newPath: newPath || undefined,
+				targetPath: p,
 				candidatePaths: isUsablePatchPath(p) ? [p] : [],
 			};
 			current.lines.push(line);
@@ -176,8 +178,9 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 			sawOpenAIPatchFormat = true;
 			current.lines.push(line);
 			current.newPath = openAIMoveTo;
+			current.targetPath = openAIMoveTo;
 			current.candidatePaths = uniqueStrings(
-				[...(current.candidatePaths ?? []), current.oldPath, openAIMoveTo].filter(p => isUsablePatchPath(p))
+				[...(current.candidatePaths ?? []), current.oldPath, current.targetPath].filter(p => isUsablePatchPath(p))
 			);
 			inHunk = false;
 			continue;
@@ -280,6 +283,7 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 
 	return {
 		isDiffLike: looksLikeUnifiedDiff(value, language),
+		isOpenAIPatch: sawOpenAIPatchFormat,
 		files,
 		hunks: files.reduce((sum, file) => sum + file.hunks, 0),
 		addedLines: files.reduce((sum, file) => sum + file.addedLines, 0),
@@ -357,6 +361,7 @@ export function buildEditableTargetsFromOutput(
 			targetPath: chooseEditableTargetPath(file, inferredBestTarget),
 			candidatePaths: uniqueStrings([
 				...(file.candidatePaths ?? []),
+				file.targetPath,
 				...inferredTargets.map(candidate => candidate.targetPath),
 			]),
 			hunks: file.hunks,
@@ -496,10 +501,16 @@ function mergeParsedUnifiedDiffFiles(files: ParsedUnifiedDiffFileForUI[]): Parse
 
 		existing.oldPath = existing.oldPath || file.oldPath;
 		existing.newPath = existing.newPath || file.newPath;
+		existing.targetPath = existing.targetPath || file.targetPath;
 		existing.hunks += file.hunks;
 		existing.addedLines += file.addedLines;
 		existing.deletedLines += file.deletedLines;
-		existing.candidatePaths = uniqueStrings([...(existing.candidatePaths ?? []), ...(file.candidatePaths ?? [])]);
+		existing.candidatePaths = uniqueStrings([
+			...(existing.candidatePaths ?? []),
+			...(file.candidatePaths ?? []),
+			existing.targetPath,
+			file.targetPath,
+		]);
 		existing.sectionKeys = uniqueStrings([...(existing.sectionKeys ?? []), file.fileKey, ...(file.sectionKeys ?? [])]);
 		existing.diffText = joinUnifiedDiffTextParts([existing.diffText, file.diffText]);
 	}
