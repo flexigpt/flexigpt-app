@@ -4,18 +4,22 @@ import { createPortal } from 'react-dom';
 
 import { FiX } from 'react-icons/fi';
 
-import type { SkillBundle } from '@/spec/skill';
+import type { Skill, SkillBundle } from '@/spec/skill';
 
 import { ModalBackdrop } from '@/components/modal_backdrop';
+
+import { getSkillInsertCounts, getSkillInsertDescription } from '@/skills/lib/skill_artifact_utils';
 
 interface SkillBundleDetailsModalProps {
 	isOpen: boolean;
 	onClose: () => void;
 	bundle: SkillBundle | null;
+	skills: Skill[];
 }
 
-export function SkillBundleDetailsModal({ isOpen, onClose, bundle }: SkillBundleDetailsModalProps) {
+export function SkillBundleDetailsModal({ isOpen, onClose, bundle, skills }: SkillBundleDetailsModalProps) {
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
+	const skillCounts = getSkillInsertCounts(skills);
 
 	useEffect(() => {
 		if (!isOpen) {
@@ -44,6 +48,8 @@ export function SkillBundleDetailsModal({ isOpen, onClose, bundle }: SkillBundle
 	if (!isOpen || !bundle) {
 		return null;
 	}
+
+	const totalSkills = skills.length;
 
 	return createPortal(
 		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose}>
@@ -85,6 +91,34 @@ export function SkillBundleDetailsModal({ isOpen, onClose, bundle }: SkillBundle
 						<div className="grid grid-cols-12 gap-2">
 							<div className="col-span-3 font-semibold">Description</div>
 							<div className="col-span-9 whitespace-pre-wrap">{bundle.description || '-'}</div>
+						</div>
+
+						<div className="divider">Skill summary</div>
+						<div className="grid grid-cols-12 gap-2 text-sm">
+							<div className="col-span-3 font-semibold">Total skills</div>
+							<div className="col-span-9">{totalSkills}</div>
+
+							<div className="col-span-3 font-semibold">Instruction skills</div>
+							<div className="col-span-9">
+								<div className="flex items-center gap-2">
+									<span className="badge badge-info rounded-xl">{skillCounts.instructions}</span>
+									<span className="text-base-content/70 text-xs">{getSkillInsertDescription('instructions')}</span>
+								</div>
+							</div>
+
+							<div className="col-span-3 font-semibold">User-message skills</div>
+							<div className="col-span-9">
+								<div className="flex items-center gap-2">
+									<span className="badge badge-secondary rounded-xl">{skillCounts['user-message']}</span>
+									<span className="text-base-content/70 text-xs">{getSkillInsertDescription('user-message')}</span>
+								</div>
+							</div>
+
+							<div className="col-span-3 font-semibold">Usage note</div>
+							<div className="text-base-content/70 col-span-9 text-xs">
+								Instruction skills affect session state. User-message skills render into the composer or user message
+								body and are not active session skills.
+							</div>
 						</div>
 						<div className="grid grid-cols-12 gap-2">
 							<div className="col-span-3 font-semibold">Created</div>

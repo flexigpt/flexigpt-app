@@ -1,15 +1,17 @@
 import type { ChangeEvent, SubmitEventHandler } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiHelpCircle, FiUpload, FiX } from 'react-icons/fi';
 
-import type { Skill } from '@/spec/skill';
+import type { Skill, SkillArgument, SkillInsert } from '@/spec/skill';
 import { SkillType } from '@/spec/skill';
 
 import { omitManyKeys } from '@/lib/obj_utils';
 import { validateSlug, validateTags } from '@/lib/text_utils';
+
+import { skillStoreAPI } from '@/apis/baseapi';
 
 import { Dropdown } from '@/components/dropdown';
 import { ModalBackdrop } from '@/components/modal_backdrop';
@@ -28,6 +30,10 @@ interface SkillItem {
 	skill: Skill;
 	bundleID: string;
 	skillSlug: string;
+}
+
+function buildSkillPreviewArgs(args?: SkillArgument[] | null): Record<string, string> {
+	return Object.fromEntries((args ?? []).map(arg => [arg.name, arg.default ?? ''] as const));
 }
 
 type ModalMode = 'add' | 'edit' | 'view';
@@ -117,8 +123,20 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 	const [submitError, setSubmitError] = useState('');
 	const [prefillMode, setPrefillMode] = useState(false);
 	const [selectedPrefillKey, setSelectedPrefillKey] = useState<string | null>(null);
+	const [previewArgs, setPreviewArgs] = useState<Record<string, string>>(() =>
+		buildSkillPreviewArgs(initialData?.skill?.arguments)
+	);
+	const [previewResult, setPreviewResult] = useState<{
+		text: string;
+		insert: SkillInsert;
+		appliedArguments?: Record<string, string>;
+		warnings?: string[];
+	} | null>(null);
+	const [previewLoading, setPreviewLoading] = useState(false);
+	const [previewError, setPreviewError] = useState('');
 
 	const artifactSkill = initialData?.skill;
+	const artifactArguments = artifactSkill?.arguments ?? [];
 	const normalizedArtifactInsert = normalizeSkillInsert(artifactSkill?.insert);
 	const artifactArgumentLines = formatSkillArgumentList(artifactSkill?.arguments);
 	const artifactFrontmatter = stringifySkillFrontmatter(artifactSkill?.rawFrontmatter);
@@ -206,6 +224,45 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 			),
 		[prefillSourceMap]
 	);
+
+	const resetPreviewArgs = useCallback(() => {
+		setPreviewArgs(buildSkillPreviewArgs(artifactArguments));
+		setPreviewResult(null);
+		setPreviewError('');
+		// oxlint-disable-next-line react-hooks/exhaustive-deps
+	}, [artifactArguments]);
+
+	const handleRenderPreview = useCallback(async () => {
+		if (!artifactSkill || !initialData) {
+			return;
+		}
+
+		setPreviewLoading(true);
+		setPreviewError('');
+
+		try {
+			const resp = await skillStoreAPI.renderSkill(
+				{
+					bundleID: initialData.bundleID,
+					skillSlug: artifactSkill.slug,
+					skillID: artifactSkill.id,
+				},
+				previewArgs
+			);
+
+			setPreviewResult({
+				text: resp.text,
+				insert: resp.insert,
+				appliedArguments: resp.appliedArguments ?? {},
+				warnings: resp.warnings ?? [],
+			});
+		} catch (err) {
+			setPreviewResult(null);
+			setPreviewError(err instanceof Error && err.message.trim() ? err.message : 'Failed to render skill preview.');
+		} finally {
+			setPreviewLoading(false);
+		}
+	}, [artifactSkill, initialData, previewArgs]);
 
 	const validateField = (field: keyof ErrorState, val: string | SkillType, currentErrors: ErrorState): ErrorState => {
 		let nextErrors: ErrorState = { ...currentErrors };
@@ -354,8 +411,8 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 			slug: formData.slug.trim(),
 			type: formData.type,
 			location: formData.location.trim(),
-			description: formData.description.trim() || undefined,
-			tags: tagsArr.length > 0 ? tagsArr : undefined,
+			description: formData.description.trim(),
+			tags: tagsArr,
 			isEnabled: formData.isEnabled,
 		})
 			.then(() => {
@@ -412,6 +469,10 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 									<div>
 										`insert` controls where the rendered body is used. `instructions` means session context material.
 										`user-message` means the rendered text is inserted into the composer or user message body.
+									</div>
+									<div>
+										Use the render preview section to validate argument defaults and the final output before using the
+										skill in a conversation.
 									</div>
 									<div>
 										`arguments` are simple string substitutions from the skill&apos;s `SKILL.md` frontmatter. Missing
@@ -777,6 +838,20 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 									<div className="col-span-9">{artifactSkill.type}</div>
 									<div className="col-span-3 font-semibold">Location</div>
 									<div className="col-span-9 break-all">{artifactSkill.location || '-'}</div>
+									<div className="col-span-3 font-semibold">Tags</div>
+									<div className="col-span-9">
+										{artifactSkill.tags?.length ? (
+											<div className="flex flex-wrap gap-1">
+												{artifactSkill.tags.map(tag => (
+													<span key={tag} className="badge badge-outline rounded-xl">
+														{tag}
+													</span>
+												))}
+											</div>
+										) : (
+											<div className="text-base-content/70 text-xs">No tags.</div>
+										)}
+									</div>
 									<div className="col-span-3 font-semibold">Built-in</div>
 									<div className="col-span-9">{artifactSkill.isBuiltIn ? 'Yes' : 'No'}</div>
 									<div className="col-span-3 font-semibold">Presence</div>
@@ -785,6 +860,112 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 									<div className="col-span-9">{String(artifactSkill.createdAt)}</div>
 									<div className="col-span-3 font-semibold">Modified</div>
 									<div className="col-span-9">{String(artifactSkill.modifiedAt)}</div>
+								</div>
+
+								<div className="divider">Render preview</div>
+								<div className="alert alert-info rounded-2xl text-sm">
+									<div className="space-y-1">
+										<div className="font-semibold">Preview the rendered skill body</div>
+										<div>
+											This uses the runtime render API only. It does not mutate the stored skill record or the source
+											files on disk.
+										</div>
+									</div>
+								</div>
+
+								<div className="space-y-3">
+									{artifactArguments.length > 0 ? (
+										<div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+											{artifactArguments.map(arg => (
+												<div key={arg.name} className="border-base-content/10 rounded-2xl border p-3">
+													<div className="flex items-start justify-between gap-2">
+														<div>
+															<div className="font-medium">{arg.name}</div>
+															{arg.description ? (
+																<div className="text-base-content/70 mt-1 text-xs">{arg.description}</div>
+															) : null}
+														</div>
+														{arg.default ? (
+															<span className="badge badge-ghost rounded-xl text-xs">default: {arg.default}</span>
+														) : null}
+													</div>
+													<input
+														type="text"
+														className="input bg-base-100 mt-3 w-full rounded-xl"
+														value={previewArgs[arg.name] ?? ''}
+														onChange={e => {
+															setPreviewArgs(prev => ({
+																...prev,
+																[arg.name]: e.target.value,
+															}));
+															setPreviewResult(null);
+															setPreviewError('');
+														}}
+														spellCheck="false"
+														autoComplete="off"
+													/>
+												</div>
+											))}
+										</div>
+									) : (
+										<div className="text-base-content/70 text-xs">
+											This skill declares no arguments. Rendering uses empty string substitutions and frontmatter
+											defaults only.
+										</div>
+									)}
+
+									<div className="flex flex-wrap gap-2">
+										<button
+											type="button"
+											className="btn btn-sm btn-primary rounded-xl"
+											onClick={handleRenderPreview}
+											disabled={previewLoading}
+										>
+											{previewLoading ? <span className="loading loading-spinner loading-xs" /> : null}
+											<span className={previewLoading ? 'ml-2' : ''}>Render Preview</span>
+										</button>
+										<button
+											type="button"
+											className="btn btn-sm btn-ghost rounded-xl"
+											onClick={resetPreviewArgs}
+											disabled={previewLoading}
+										>
+											Reset Arguments
+										</button>
+									</div>
+
+									{previewError && (
+										<div className="alert alert-error rounded-2xl text-sm">
+											<div className="flex items-center gap-2">
+												<FiAlertCircle size={14} />
+												<span>{previewError}</span>
+											</div>
+										</div>
+									)}
+
+									{previewResult && (
+										<div className="space-y-3">
+											<div className="flex flex-wrap items-center gap-2 text-xs">
+												<span className="badge rounded-xl">insert: {previewResult.insert}</span>
+												{Object.keys(previewResult.appliedArguments ?? {}).length > 0 ? (
+													<span className="text-base-content/70">Applied arguments captured from the renderer.</span>
+												) : null}
+											</div>
+											<pre className="bg-base-100 max-h-72 overflow-auto rounded-2xl p-3 text-xs whitespace-pre-wrap">
+												{previewResult.text || '(Rendered output is empty.)'}
+											</pre>
+											{previewResult.warnings?.length ? (
+												<div className="space-y-1">
+													<div className="text-xs font-semibold">Warnings</div>
+													<ul className="list-disc space-y-1 pl-5 text-xs">
+														{previewResult.warnings.map((warning, idx) => (
+															<li key={`${idx}-${warning}`}>{warning}</li>
+														))}
+													</ul>
+												</div>
+											) : null}
+										</div>
+									)}
 								</div>
 							</>
 						)}

@@ -330,6 +330,17 @@ export function SkillBundleCard({
 											<div className="flex flex-col">
 												<span>{skill.displayName || skill.name || '-'}</span>
 												<span className="text-base-content/60 text-xs">artifact name: {skill.name}</span>
+												{(skill.tags ?? []).length > 0 ? (
+													<div className="mt-1 flex flex-wrap gap-1">
+														{(skill.tags ?? []).map(tag => (
+															<span key={tag} className="badge badge-outline badge-xs rounded-xl" title={tag}>
+																{tag}
+															</span>
+														))}
+													</div>
+												) : (
+													<div className="text-base-content/50 mt-1 text-xs">No tags declared.</div>
+												)}
 												{skill.runtimeWarnings?.length ? (
 													<span className="bg-warning/20 text-warning-content mt-1 inline-flex w-fit rounded-full px-2 py-0.5 text-xs">
 														{skill.runtimeWarnings.length} runtime warning
@@ -496,6 +507,7 @@ export function SkillBundleCard({
 					setIsBundleDetailsOpen(false);
 				}}
 				bundle={bundle}
+				skills={skills}
 			/>
 
 			<ActionDeniedAlertModal

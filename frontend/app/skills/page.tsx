@@ -362,13 +362,17 @@ export default function SkillsPage() {
 							<div className="font-semibold">Skill management guidance</div>
 							<div>
 								Instruction skills can be loaded into a session and may be preloaded by assistant presets. User-message
-								skills are rendered into the composer or user message body and are not active session skills.
+								skills are render-only templates that insert into the composer or user message body.
 							</div>
 							<div>
-								`insert` and `arguments` come from the skill&apos;s `SKILL.md` frontmatter. This page manages the store
-								record, the bundle, and the source location, while the artifact itself defines how the body is rendered.
+								`insert`, `arguments`, `tags`, `digest`, and raw frontmatter come from the skill&apos;s `SKILL.md`
+								frontmatter. This page manages the store record, the bundle, and the source location while the artifact
+								itself defines how the body is rendered.
 							</div>
-							<div>Prompt bundles and prompt templates still live on the Prompts page for now.</div>
+							<div>
+								Use the Prompts page only for legacy prompt records. New prompt-like templates should be created here as
+								skills.
+							</div>
 						</div>
 					</div>
 

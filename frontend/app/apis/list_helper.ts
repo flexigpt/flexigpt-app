@@ -10,7 +10,7 @@ import type {
 } from '@/spec/mcp';
 import type { ProviderPreset } from '@/spec/modelpreset';
 import type { PromptBundle, PromptTemplateKind, PromptTemplateListItem } from '@/spec/prompt';
-import type { SkillBundle, SkillListItem, SkillType } from '@/spec/skill';
+import type { SkillBundle, SkillInsert, SkillListItem, SkillType } from '@/spec/skill';
 import type { ToolBundle, ToolListItem } from '@/spec/tool';
 
 import { mcpAPI, modelPresetStoreAPI, promptStoreAPI, skillStoreAPI, toolStoreAPI } from '@/apis/baseapi';
@@ -159,7 +159,9 @@ export async function getAllSkills(
 	bundleIDs?: string[],
 	types?: SkillType[],
 	includeDisabled?: boolean,
-	includeMissing?: boolean
+	includeMissing?: boolean,
+	inserts?: SkillInsert[],
+	tags?: string[]
 ): Promise<SkillListItem[]> {
 	const all: SkillListItem[] = [];
 	let pageToken: string | undefined = undefined;
@@ -169,6 +171,8 @@ export async function getAllSkills(
 		const { skillListItems, nextPageToken } = await skillStoreAPI.listSkills({
 			bundleIDs: bundleIDs,
 			types: types,
+			inserts: inserts,
+			tags: tags,
 			includeDisabled: includeDisabled,
 			includeMissing: includeMissing,
 			recommendedPageSize: pageSize,
