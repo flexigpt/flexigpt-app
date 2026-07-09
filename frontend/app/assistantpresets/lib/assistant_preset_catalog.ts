@@ -286,6 +286,9 @@ export async function loadSkillOptions(): Promise<AssistantSkillOption[]> {
 			availabilityReason = 'Skill bundle is disabled.';
 		} else if (!isSkillEnabled) {
 			availabilityReason = 'Skill is disabled.';
+		} else if ((skill.insert || 'instructions') !== 'instructions') {
+			availabilityReason =
+				'User-message skills are composer templates. Assistant presets can only preload instruction skills.';
 		}
 
 		const sel: SkillSelection = {
@@ -312,7 +315,9 @@ export async function loadSkillOptions(): Promise<AssistantSkillOption[]> {
 			isSkillEnabled,
 			isSelectable: availabilityReason === undefined,
 			availabilityReason,
-			label: `${skill.displayName || skill.name || skill.slug} — ${bundleDisplayName} (${item.skillSlug})`,
+			label: `${skill.displayName || skill.name || skill.slug} — ${bundleDisplayName} (${item.skillSlug} · ${
+				skill.insert || 'instructions'
+			})`,
 		};
 	});
 

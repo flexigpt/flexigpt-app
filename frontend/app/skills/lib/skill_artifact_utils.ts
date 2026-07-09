@@ -7,6 +7,15 @@ export interface NormalizedSkillInsert {
 	isDefaulted: boolean;
 }
 
+export interface SkillMarkdownScaffoldInput {
+	name: string;
+	description?: string;
+	displayName?: string;
+	insert: SkillInsert;
+	arguments?: SkillArgument[];
+	body?: string;
+}
+
 export function normalizeSkillInsert(insert?: string | null): NormalizedSkillInsert {
 	if (insert === 'user-message' || insert === 'instructions') {
 		return { value: insert, isDefaulted: false };
@@ -25,7 +34,8 @@ export function skillMatchesInsertFilter(insert?: string | null, filter: SkillIn
 
 export function getSkillInsertLabel(insert?: string | null): string {
 	const normalized = normalizeSkillInsert(insert);
-	return normalized.isDefaulted ? `${normalized.value} (default)` : normalized.value;
+	const label = normalized.value === 'user-message' ? 'User message' : 'Instructions';
+	return normalized.isDefaulted ? `${label} (default)` : label;
 }
 
 export function getSkillInsertShortLabel(insert?: string | null): string {
@@ -36,6 +46,10 @@ export function getSkillInsertDescription(insert?: string | null): string {
 	return normalizeSkillInsert(insert).value === 'user-message'
 		? 'Rendered into the user message or composer body. It is not loaded as active session context.'
 		: 'Loaded as skill instructions/context. It can be preloaded into sessions and shown to the model.';
+}
+
+export function getSkillInsertBadgeClass(insert?: string | null): string {
+	return normalizeSkillInsert(insert).value === 'user-message' ? 'badge-secondary' : 'badge-info';
 }
 
 export function getSkillArgumentCountLabel(args?: SkillArgument[] | null): string {
@@ -51,7 +65,7 @@ export function getSkillArgumentTooltip(args?: SkillArgument[] | null): string {
 	return args
 		.map(arg => {
 			const pieces = [arg.name];
-			if (arg.default) {
+			if (arg.default !== undefined) {
 				pieces.push(`default: ${arg.default}`);
 			}
 			if (arg.description) {
@@ -71,6 +85,55 @@ export function getSkillInsertCounts(skills: Skill[]): Record<SkillInsert, numbe
 		},
 		{ instructions: 0, 'user-message': 0 }
 	);
+}
+
+export function getAllSkillTags(skills: Skill[]): string[] {
+	const tags = new Set<string>();
+
+	for (const skill of skills) {
+		for (const tag of skill.tags ?? []) {
+			const value = tag.trim();
+			if (value) {
+				tags.add(value);
+			}
+		}
+	}
+
+	return [...tags].toSorted((a, b) => a.localeCompare(b));
+}
+
+export function skillMatchesTags(skill: Skill, tagFilters: string[]): boolean {
+	const filters = tagFilters.map(tag => tag.trim().toLowerCase()).filter(Boolean);
+	if (filters.length === 0) {
+		return true;
+	}
+
+	const tags = new Set((skill.tags ?? []).map(tag => tag.trim().toLowerCase()).filter(Boolean));
+	return filters.some(tag => tags.has(tag));
+}
+
+export function skillMatchesSearch(skill: Skill, rawQuery: string): boolean {
+	const query = rawQuery.trim().toLowerCase();
+	if (!query) {
+		return true;
+	}
+
+	const haystack = [
+		skill.displayName,
+		skill.name,
+		skill.slug,
+		skill.description,
+		skill.type,
+		skill.location,
+		skill.insert,
+		...(skill.tags ?? []),
+		...(skill.arguments ?? []).flatMap(arg => [arg.name, arg.description, arg.default]),
+	]
+		.filter(Boolean)
+		.join('\n')
+		.toLowerCase();
+
+	return haystack.includes(query);
 }
 
 export function stringifySkillFrontmatter(rawFrontmatter?: Record<string, any> | null): string {
@@ -95,9 +158,62 @@ export function formatSkillArgumentList(args?: SkillArgument[] | null): string[]
 		if (arg.description) {
 			segments.push(arg.description);
 		}
-		if (arg.default) {
+		if (arg.default !== undefined) {
 			segments.push(`default: ${arg.default}`);
 		}
 		return segments.join(' · ');
 	});
+}
+
+function yamlQuote(value: string): string {
+	const normalized = value.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+	if (!normalized) {
+		return '""';
+	}
+	return JSON.stringify(normalized);
+}
+
+function humanizeName(name: string): string {
+	return name
+		.trim()
+		.replaceAll(/[-_]+/g, ' ')
+		.replaceAll(/\s+/g, ' ')
+		.replaceAll(/\b\w/g, c => c.toUpperCase());
+}
+
+export function buildSkillMarkdownScaffold(input: SkillMarkdownScaffoldInput): string {
+	const name = input.name.trim() || 'my-skill';
+	const description = input.description?.trim() || 'Describe what this skill does and when to use it.';
+	const insert = normalizeSkillInsert(input.insert).value;
+	const displayName = input.displayName?.trim() || humanizeName(name);
+	const body =
+		input.body?.trim() ||
+		(insert === 'user-message'
+			? 'Write the user-message template body here. Use $argument or {{ argument }} placeholders.'
+			: 'Write instruction/context material here. The model can load this as active session context.');
+	const args = input.arguments?.filter(arg => arg.name.trim()) ?? [];
+
+	const lines: string[] = ['---', `name: ${yamlQuote(name)}`, `description: ${yamlQuote(description)}`];
+
+	if (insert !== 'instructions') {
+		lines.push(`insert: ${yamlQuote(insert)}`);
+	} else {
+		lines.push('insert: instructions');
+	}
+
+	if (args.length > 0) {
+		lines.push('arguments:');
+		for (const arg of args) {
+			lines.push(`  - name: ${yamlQuote(arg.name.trim())}`);
+			if (arg.description?.trim()) {
+				lines.push(`    description: ${yamlQuote(arg.description.trim())}`);
+			}
+			if (arg.default !== undefined) {
+				lines.push(`    default: ${yamlQuote(arg.default)}`);
+			}
+		}
+	}
+
+	lines.push('---', '', `# ${displayName}`, '', body, '');
+	return lines.join('\n');
 }

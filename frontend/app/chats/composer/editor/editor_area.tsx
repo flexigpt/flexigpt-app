@@ -1872,7 +1872,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									onKeyDown={handleEditorKeyDown}
 									onPaste={onEditorPaste}
 									scrollSelectionIntoView={scrollSelectionIntoEditorView}
-									className="max-h-96 min-w-0 flex-1 resize-none overflow-auto overscroll-contain bg-transparent p-1 wrap-break-word whitespace-break-spaces tab-2 outline-none focus:outline-none"
+									className="max-h-84 min-w-0 flex-1 resize-none overflow-auto overscroll-contain bg-transparent p-1 wrap-break-word whitespace-break-spaces tab-2 outline-none focus:outline-none"
 									style={{
 										fontSize: 14,
 										lineHeight: 1.5,

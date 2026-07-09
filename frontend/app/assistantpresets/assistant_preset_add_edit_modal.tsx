@@ -1026,6 +1026,16 @@ function AddEditAssistantPresetModalContent({
 					if (invalid) {
 						nextErrors.startingSkillSelections = 'Every selected skill must still exist and be enabled.';
 					}
+
+					const invalidPreload = state.startingSkillSelections.find(sel => {
+						const option = skillOptionByKey.get(buildSkillRefKey(sel.skillRef));
+						return (
+							sel.preLoadAsActive && option && (option.skillDefinition.insert || 'instructions') !== 'instructions'
+						);
+					});
+					if (!nextErrors.startingSkillSelections && invalidPreload) {
+						nextErrors.startingSkillSelections = 'Only instruction skills can be preloaded as active session skills.';
+					}
 				}
 			}
 
@@ -1967,7 +1977,12 @@ function AddEditAssistantPresetModalContent({
 							onUserArgsChange={handleToolUserArgsChange}
 						/>
 
-						<div className="divider">Enabled Skills</div>
+						<div className="divider">Instruction Skills</div>
+
+						<p className="text-base-content/70 text-xs">
+							Only enabled skills with <span className="font-mono">insert: instructions</span> can be selected here.
+							User-message skills are prompt-like composer templates and are chosen at compose time.
+						</p>
 
 						{errors.startingSkillSelections && (
 							<div className="text-error flex items-center gap-1 text-sm">

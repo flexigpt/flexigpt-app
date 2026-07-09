@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
-import { FiAlertCircle, FiHelpCircle, FiUpload, FiX } from 'react-icons/fi';
+import { FiAlertCircle, FiCopy, FiHelpCircle, FiUpload, FiX } from 'react-icons/fi';
 
 import type { Skill, SkillArgument, SkillInsert } from '@/spec/skill';
 import { SkillType } from '@/spec/skill';
@@ -18,8 +18,10 @@ import { ModalBackdrop } from '@/components/modal_backdrop';
 import { ReadOnlyValue } from '@/components/read_only_value';
 
 import {
+	buildSkillMarkdownScaffold,
 	formatSkillArgumentList,
 	getSkillArgumentCountLabel,
+	getSkillInsertBadgeClass,
 	getSkillInsertDescription,
 	getSkillInsertLabel,
 	normalizeSkillInsert,
@@ -73,6 +75,15 @@ const skillTypeDropdownItems: Record<SkillType, { isEnabled: boolean; displayNam
 	[SkillType.EmbeddedFS]: { isEnabled: false, displayName: 'EmbeddedFS (embeddedfs)' },
 };
 
+const skillInsertDropdownItems = {
+	instructions: { isEnabled: true, displayName: 'Instructions' },
+	'user-message': { isEnabled: true, displayName: 'User-message template' },
+} as Record<SkillInsert, { isEnabled: boolean; displayName: string }>;
+
+const skillInsertOrderedKeys = ['user-message', 'instructions'] as SkillInsert[];
+
+const ARGUMENT_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
 function normalizeForUniq(s: string) {
 	return s.trim().toLowerCase();
 }
@@ -108,6 +119,33 @@ function buildSkillPrefillKey(item: SkillItem): string {
 	return `${item.bundleID}:${item.skill.id}`;
 }
 
+function parseScaffoldArgumentLines(text: string): SkillArgument[] {
+	const out: SkillArgument[] = [];
+	const seen = new Set<string>();
+
+	for (const rawLine of text.split('\n')) {
+		const line = rawLine.trim();
+		if (!line || line.startsWith('#')) {
+			continue;
+		}
+
+		const [rawName, rawDescription, rawDefault] = line.split('|');
+		const name = rawName?.trim() ?? '';
+		if (!ARGUMENT_NAME_RE.test(name) || seen.has(name)) {
+			continue;
+		}
+
+		seen.add(name);
+		out.push({
+			name,
+			description: rawDescription?.trim() || undefined,
+			default: rawDefault !== undefined ? rawDefault.trim() : undefined,
+		});
+	}
+
+	return out;
+}
+
 function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkills, mode }: AddEditSkillModalProps) {
 	const requestedMode: ModalMode = mode ?? (initialData ? 'edit' : 'add');
 	// Match the Tool modal pattern: unsupported impls can exist (viewable),
@@ -134,6 +172,10 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 	} | null>(null);
 	const [previewLoading, setPreviewLoading] = useState(false);
 	const [previewError, setPreviewError] = useState('');
+	const [scaffoldInsert, setScaffoldInsert] = useState<SkillInsert>('user-message');
+	const [scaffoldArgumentsText, setScaffoldArgumentsText] = useState('');
+	const [scaffoldBody, setScaffoldBody] = useState('');
+	const [scaffoldCopied, setScaffoldCopied] = useState(false);
 
 	const artifactSkill = initialData?.skill;
 	const artifactArguments = artifactSkill?.arguments ?? [];
@@ -144,6 +186,20 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const nameInputRef = useRef<HTMLInputElement | null>(null);
 	const isUnmountingRef = useRef(false);
+
+	const scaffoldArguments = useMemo(() => parseScaffoldArgumentLines(scaffoldArgumentsText), [scaffoldArgumentsText]);
+	const scaffoldMarkdown = useMemo(
+		() =>
+			buildSkillMarkdownScaffold({
+				name: formData.name,
+				displayName: formData.displayName,
+				description: formData.description,
+				insert: scaffoldInsert,
+				arguments: scaffoldArguments,
+				body: scaffoldBody,
+			}),
+		[formData.description, formData.displayName, formData.name, scaffoldArguments, scaffoldBody, scaffoldInsert]
+	);
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
@@ -224,6 +280,14 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 			),
 		[prefillSourceMap]
 	);
+
+	const copyScaffold = useCallback(async () => {
+		await navigator.clipboard.writeText(scaffoldMarkdown);
+		setScaffoldCopied(true);
+		window.setTimeout(() => {
+			setScaffoldCopied(false);
+		}, 1400);
+	}, [scaffoldMarkdown]);
 
 	const resetPreviewArgs = useCallback(() => {
 		setPreviewArgs(buildSkillPreviewArgs(artifactArguments));
@@ -541,6 +605,113 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 							</div>
 						)}
 
+						{isAddMode && (
+							<div className="collapse-arrow border-base-content/10 bg-base-100 collapse rounded-2xl border">
+								<input type="checkbox" />
+								<div className="collapse-title text-sm font-semibold">Optional SKILL.md scaffold generator</div>
+								<div className="collapse-content space-y-4 text-sm">
+									<div className="alert alert-info rounded-2xl text-sm">
+										<div className="space-y-1">
+											<div className="font-semibold">Create the artifact first, then register its folder</div>
+											<div>
+												This screen registers a filesystem skill directory. The artifact itself lives in a{' '}
+												<span className="font-mono">SKILL.md</span> file inside that directory.
+											</div>
+											<div>
+												Use this generator to migrate prompt-template creation into skills. Copy the scaffold into
+												<span className="font-mono"> SKILL.md</span>, set Location to that directory, then save.
+											</div>
+										</div>
+									</div>
+
+									<div className="grid grid-cols-12 items-start gap-2">
+										<label className="label col-span-3">
+											<span className="text-sm">Insert</span>
+											<span
+												className="tooltip tooltip-right"
+												data-tip="instructions becomes session context. user-message becomes a composer template."
+											>
+												<FiHelpCircle size={12} />
+											</span>
+										</label>
+										<div className="col-span-9 space-y-1">
+											<Dropdown<SkillInsert>
+												dropdownItems={skillInsertDropdownItems}
+												orderedKeys={skillInsertOrderedKeys}
+												selectedKey={scaffoldInsert}
+												onChange={setScaffoldInsert}
+												filterDisabled={false}
+												title="Select insert behavior"
+												getDisplayName={key => skillInsertDropdownItems[key]?.displayName ?? key}
+											/>
+											<div className="text-base-content/70 text-xs">{getSkillInsertDescription(scaffoldInsert)}</div>
+										</div>
+									</div>
+
+									<div className="grid grid-cols-12 items-start gap-2">
+										<label className="label col-span-3">
+											<span className="text-sm">Arguments</span>
+											<span
+												className="tooltip tooltip-right"
+												data-tip="One per line: name | description | default. Names must match [A-Za-z_][A-Za-z0-9_]*."
+											>
+												<FiHelpCircle size={12} />
+											</span>
+										</label>
+										<div className="col-span-9">
+											<textarea
+												className="textarea h-24 w-full rounded-xl font-mono text-xs"
+												value={scaffoldArgumentsText}
+												onChange={e => {
+													setScaffoldArgumentsText(e.target.value);
+												}}
+												placeholder={'topic | Topic to explain | AI agents\ntext | Text to summarize |'}
+												spellCheck="false"
+											/>
+											<div className="label">
+												<span className="text-base-content/70 text-xs">
+													Parsed {scaffoldArguments.length} argument{scaffoldArguments.length === 1 ? '' : 's'}. Missing
+													values render as defaults, then empty strings.
+												</span>
+											</div>
+										</div>
+									</div>
+
+									<div className="grid grid-cols-12 items-start gap-2">
+										<label className="label col-span-3">
+											<span className="text-sm">Body</span>
+										</label>
+										<div className="col-span-9">
+											<textarea
+												className="textarea h-28 w-full rounded-xl"
+												value={scaffoldBody}
+												onChange={e => {
+													setScaffoldBody(e.target.value);
+												}}
+												placeholder={
+													scaffoldInsert === 'user-message'
+														? 'Summarize the following text in a $tone tone:\n\n$text'
+														: 'Always follow these instructions when this skill is active...'
+												}
+												spellCheck="false"
+											/>
+										</div>
+									</div>
+
+									<div className="flex items-center justify-between">
+										<div className="text-base-content/70 text-xs">Generated SKILL.md</div>
+										<button type="button" className="btn btn-sm btn-ghost rounded-xl" onClick={copyScaffold}>
+											<FiCopy size={14} />
+											<span className="ml-1">{scaffoldCopied ? 'Copied' : 'Copy'}</span>
+										</button>
+									</div>
+									<pre className="bg-base-200 max-h-72 overflow-auto rounded-2xl p-3 text-xs whitespace-pre-wrap">
+										{scaffoldMarkdown}
+									</pre>
+								</div>
+							</div>
+						)}
+
 						{/* Name */}
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
@@ -765,9 +936,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 									<div className="col-span-3 font-semibold">Insert</div>
 									<div className="col-span-9 space-y-1">
 										<div className="flex items-center gap-2">
-											<span
-												className={`badge rounded-xl ${normalizedArtifactInsert.value === 'user-message' ? 'badge-secondary' : 'badge-info'}`}
-											>
+											<span className={`badge rounded-xl ${getSkillInsertBadgeClass(normalizedArtifactInsert.value)}`}>
 												{getSkillInsertLabel(artifactSkill.insert)}
 											</span>
 											{normalizedArtifactInsert.isDefaulted && (
@@ -870,6 +1039,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 											This uses the runtime render API only. It does not mutate the stored skill record or the source
 											files on disk.
 										</div>
+										<div>Preview requires the skill to be enabled and indexed in the runtime.</div>
 									</div>
 								</div>
 

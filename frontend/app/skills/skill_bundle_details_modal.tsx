@@ -119,6 +119,12 @@ export function SkillBundleDetailsModal({ isOpen, onClose, bundle, skills }: Ski
 								Instruction skills affect session state. User-message skills render into the composer or user message
 								body and are not active session skills.
 							</div>
+							<div className="col-span-3 font-semibold">Prompt migration note</div>
+							<div className="text-base-content/70 col-span-9 text-xs">
+								A prompt-like template should be a filesystem skill whose <span className="font-mono">SKILL.md</span>{' '}
+								frontmatter contains <span className="font-mono">insert: user-message</span>. Its declared arguments
+								replace the old prompt variable form.
+							</div>
 						</div>
 						<div className="grid grid-cols-12 gap-2">
 							<div className="col-span-3 font-semibold">Created</div>

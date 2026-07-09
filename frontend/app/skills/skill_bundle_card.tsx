@@ -12,10 +12,14 @@ import type { SkillInsertFilter } from '@/skills/lib/skill_artifact_utils';
 import {
 	getSkillArgumentCountLabel,
 	getSkillArgumentTooltip,
+	getSkillInsertBadgeClass,
 	getSkillInsertDescription,
 	getSkillInsertLabel,
 	getSkillInsertShortLabel,
+	normalizeSkillInsert,
 	skillMatchesInsertFilter,
+	skillMatchesSearch,
+	skillMatchesTags,
 } from '@/skills/lib/skill_artifact_utils';
 import { AddEditSkillModal } from '@/skills/skill_add_edit_modal';
 import { SkillBundleDetailsModal } from '@/skills/skill_bundle_details_modal';
@@ -26,6 +30,8 @@ interface SkillBundleCardProps {
 	bundle: SkillBundle;
 	skills: Skill[];
 	insertFilter: SkillInsertFilter;
+	searchQuery: string;
+	tagFilters: string[];
 	onToggleBundleEnable: (bundleID: string, nextEnabled: boolean) => Promise<void>;
 	onToggleSkillEnable: (bundleID: string, skillID: string, skillSlug: string, nextEnabled: boolean) => Promise<void>;
 	onDeleteSkill: (bundleID: string, skillID: string, skillSlug: string) => Promise<void>;
@@ -71,6 +77,8 @@ export function SkillBundleCard({
 	bundle,
 	skills,
 	insertFilter,
+	searchQuery,
+	tagFilters,
 	onToggleBundleEnable,
 	onToggleSkillEnable,
 	onDeleteSkill,
@@ -117,8 +125,14 @@ export function SkillBundleCard({
 	);
 
 	const visibleSkills = useMemo(
-		() => skills.filter(skill => skillMatchesInsertFilter(skill.insert, insertFilter)),
-		[skills, insertFilter]
+		() =>
+			skills.filter(
+				skill =>
+					skillMatchesInsertFilter(skill.insert, insertFilter) &&
+					skillMatchesSearch(skill, searchQuery) &&
+					skillMatchesTags(skill, tagFilters)
+			),
+		[insertFilter, searchQuery, skills, tagFilters]
 	);
 
 	const toggleBundleEnable = async () => {
@@ -211,6 +225,12 @@ export function SkillBundleCard({
 	};
 
 	const openSkillModal = (mode: SkillModalMode, skill?: Skill) => {
+		if (mode === 'add' && !bundle.isEnabled) {
+			setAlertMsg('Enable the bundle before adding a skill. Enabled skills are indexed by the runtime.');
+			setShowAlert(true);
+			return;
+		}
+
 		if ((mode === 'add' || mode === 'edit') && bundle.isBuiltIn) {
 			setAlertMsg('Cannot add or edit skills in a built-in bundle.');
 			setShowAlert(true);
@@ -307,6 +327,13 @@ export function SkillBundleCard({
 							</div>
 						</div>
 					)}
+					{(searchQuery.trim() || tagFilters.length > 0) && (
+						<div className="text-base-content/70 rounded-2xl px-1 text-xs">
+							Additional filters active: {searchQuery.trim() ? `search "${searchQuery.trim()}"` : ''}
+							{searchQuery.trim() && tagFilters.length > 0 ? ' · ' : ''}
+							{tagFilters.length > 0 ? `tags ${tagFilters.join(', ')}` : ''}
+						</div>
+					)}
 
 					<div className="border-base-content/10 overflow-x-auto rounded-2xl border">
 						<table className="table-zebra table w-full">
@@ -317,6 +344,7 @@ export function SkillBundleCard({
 									<th className="min-w-32 text-center">Insert</th>
 									<th className="min-w-24 text-center">Args</th>
 									<th className="min-w-28 text-center">Presence</th>
+									<th className="min-w-24 text-center">Digest</th>
 									<th className="text-center whitespace-nowrap">Enabled</th>
 									<th className="text-center whitespace-nowrap">Built-In</th>
 									<th className="text-center whitespace-nowrap">Actions</th>
@@ -324,117 +352,131 @@ export function SkillBundleCard({
 							</thead>
 
 							<tbody>
-								{visibleSkills.map(skill => (
-									<tr key={skill.id} className="hover:bg-base-300">
-										<td>
-											<div className="flex flex-col">
-												<span>{skill.displayName || skill.name || '-'}</span>
-												<span className="text-base-content/60 text-xs">artifact name: {skill.name}</span>
-												{(skill.tags ?? []).length > 0 ? (
-													<div className="mt-1 flex flex-wrap gap-1">
-														{(skill.tags ?? []).map(tag => (
-															<span key={tag} className="badge badge-outline badge-xs rounded-xl" title={tag}>
-																{tag}
-															</span>
-														))}
-													</div>
-												) : (
-													<div className="text-base-content/50 mt-1 text-xs">No tags declared.</div>
-												)}
-												{skill.runtimeWarnings?.length ? (
-													<span className="bg-warning/20 text-warning-content mt-1 inline-flex w-fit rounded-full px-2 py-0.5 text-xs">
-														{skill.runtimeWarnings.length} runtime warning
-														{skill.runtimeWarnings.length === 1 ? '' : 's'}
-													</span>
-												) : null}
-											</div>
-										</td>
-										<td className="text-center">{skill.slug}</td>
-										<td className="text-center">
-											<span
-												className={`badge rounded-xl ${skill.insert === 'user-message' ? 'badge-secondary' : 'badge-info'}`}
-												title={getSkillInsertDescription(skill.insert)}
-											>
-												{getSkillInsertLabel(skill.insert)}
-											</span>
-										</td>
-										<td className="text-center">
-											{skill.arguments?.length ? (
-												<span className="tooltip tooltip-top" data-tip={getSkillArgumentTooltip(skill.arguments)}>
-													<span className="badge badge-outline rounded-xl">
-														{getSkillArgumentCountLabel(skill.arguments)}
-													</span>
+								{visibleSkills.map(skill => {
+									const insert = normalizeSkillInsert(skill.insert).value;
+
+									return (
+										<tr key={skill.id} className="hover:bg-base-300">
+											<td>
+												<div className="flex flex-col">
+													<span>{skill.displayName || skill.name || '-'}</span>
+													<span className="text-base-content/60 text-xs">artifact name: {skill.name}</span>
+													{(skill.tags ?? []).length > 0 ? (
+														<div className="mt-1 flex flex-wrap gap-1">
+															{(skill.tags ?? []).map(tag => (
+																<span key={tag} className="badge badge-outline badge-xs rounded-xl" title={tag}>
+																	{tag}
+																</span>
+															))}
+														</div>
+													) : (
+														<div className="text-base-content/50 mt-1 text-xs">No tags declared.</div>
+													)}
+													{skill.runtimeWarnings?.length ? (
+														<span className="bg-warning/20 text-warning-content mt-1 inline-flex w-fit rounded-full px-2 py-0.5 text-xs">
+															{skill.runtimeWarnings.length} runtime warning
+															{skill.runtimeWarnings.length === 1 ? '' : 's'}
+														</span>
+													) : null}
+												</div>
+											</td>
+											<td className="text-center">{skill.slug}</td>
+											<td className="text-center">
+												<span
+													className={`badge rounded-xl ${getSkillInsertBadgeClass(insert)}`}
+													title={getSkillInsertDescription(insert)}
+												>
+													{getSkillInsertLabel(skill.insert)}
 												</span>
-											) : (
-												<span className="text-base-content/60">-</span>
-											)}
-										</td>
-										<td className="text-center">
-											<div className="flex items-center justify-center">
-												<PresenceBadge skill={skill} />
-											</div>
-										</td>
-										<td className="text-center align-middle">
-											<input
-												type="checkbox"
-												className="toggle toggle-accent"
-												checked={skill.isEnabled}
-												onChange={() => patchSkillEnable(skill)}
-												disabled={busySkillIDs.has(skill.id)}
-											/>
-										</td>
-										<td className="text-center">
-											{skill.isBuiltIn ? <FiCheck className="mx-auto" /> : <FiX className="mx-auto" />}
-										</td>
-										<td className="text-center">
-											<div className="inline-flex items-center gap-2">
-												<button
-													type="button"
-													className="btn btn-sm btn-ghost rounded-2xl"
-													onClick={() => {
-														openSkillModal('view', skill);
-													}}
-													title="View"
-													aria-label="View"
-												>
-													<FiEye size={16} />
-												</button>
+											</td>
+											<td className="text-center">
+												{skill.arguments?.length ? (
+													<span className="tooltip tooltip-top" data-tip={getSkillArgumentTooltip(skill.arguments)}>
+														<span className="badge badge-outline rounded-xl">
+															{getSkillArgumentCountLabel(skill.arguments)}
+														</span>
+													</span>
+												) : (
+													<span className="text-base-content/60">-</span>
+												)}
+											</td>
+											<td className="text-center">
+												<div className="flex items-center justify-center">
+													<PresenceBadge skill={skill} />
+												</div>
+											</td>
+											<td className="text-center">
+												{skill.digest ? (
+													<span className="font-mono text-xs" title={skill.digest}>
+														{skill.digest.slice(0, 10)}
+													</span>
+												) : (
+													<span className="text-base-content/60">-</span>
+												)}
+											</td>
+											<td className="text-center align-middle">
+												<input
+													type="checkbox"
+													className="toggle toggle-accent"
+													checked={skill.isEnabled}
+													onChange={() => patchSkillEnable(skill)}
+													disabled={busySkillIDs.has(skill.id) || !bundle.isEnabled}
+													title={!bundle.isEnabled ? 'Enable the bundle first.' : undefined}
+												/>
+											</td>
+											<td className="text-center">
+												{skill.isBuiltIn ? <FiCheck className="mx-auto" /> : <FiX className="mx-auto" />}
+											</td>
+											<td className="text-center">
+												<div className="inline-flex items-center gap-2">
+													<button
+														type="button"
+														className="btn btn-sm btn-ghost rounded-2xl"
+														onClick={() => {
+															openSkillModal('view', skill);
+														}}
+														title="View"
+														aria-label="View"
+													>
+														<FiEye size={16} />
+													</button>
 
-												<button
-													type="button"
-													className="btn btn-sm btn-ghost rounded-2xl"
-													onClick={() => {
-														openSkillModal('edit', skill);
-													}}
-													disabled={skill.isBuiltIn || bundle.isBuiltIn}
-													title={skill.isBuiltIn || bundle.isBuiltIn ? 'Built-in items cannot be edited' : 'Edit'}
-													aria-label="Edit"
-												>
-													<FiEdit2 size={16} />
-												</button>
+													<button
+														type="button"
+														className="btn btn-sm btn-ghost rounded-2xl"
+														onClick={() => {
+															openSkillModal('edit', skill);
+														}}
+														disabled={skill.isBuiltIn || bundle.isBuiltIn}
+														title={skill.isBuiltIn || bundle.isBuiltIn ? 'Built-in items cannot be edited' : 'Edit'}
+														aria-label="Edit"
+													>
+														<FiEdit2 size={16} />
+													</button>
 
-												<button
-													type="button"
-													className="btn btn-sm btn-ghost rounded-2xl"
-													onClick={() => {
-														requestDeleteSkill(skill);
-													}}
-													disabled={skill.isBuiltIn || bundle.isBuiltIn}
-													title={
-														skill.isBuiltIn || bundle.isBuiltIn ? 'Deleting disabled for built-in items' : 'Delete'
-													}
-													aria-label="Delete"
-												>
-													<FiTrash2 size={16} />
-												</button>
-											</div>
-										</td>
-									</tr>
-								))}
+													<button
+														type="button"
+														className="btn btn-sm btn-ghost rounded-2xl"
+														onClick={() => {
+															requestDeleteSkill(skill);
+														}}
+														disabled={skill.isBuiltIn || bundle.isBuiltIn}
+														title={
+															skill.isBuiltIn || bundle.isBuiltIn ? 'Deleting disabled for built-in items' : 'Delete'
+														}
+														aria-label="Delete"
+													>
+														<FiTrash2 size={16} />
+													</button>
+												</div>
+											</td>
+										</tr>
+									);
+								})}
 
 								{skills.length === 0 && (
 									<tr>
-										<td colSpan={8} className="py-3 text-center text-sm">
+										<td colSpan={9} className="py-3 text-center text-sm">
 											No skills in this bundle.
 										</td>
 									</tr>
@@ -442,8 +484,8 @@ export function SkillBundleCard({
 
 								{skills.length > 0 && visibleSkills.length === 0 && (
 									<tr>
-										<td colSpan={8} className="py-3 text-center text-sm">
-											No skills match the current insert filter.
+										<td colSpan={9} className="py-3 text-center text-sm">
+											No skills match the current filters.
 										</td>
 									</tr>
 								)}
@@ -456,6 +498,8 @@ export function SkillBundleCard({
 							<button
 								type="button"
 								className="btn btn-md btn-ghost flex items-center rounded-2xl"
+								disabled={skills.length > 0}
+								title={skills.length > 0 ? 'Delete all skills from this bundle first.' : 'Delete Bundle'}
 								onClick={() => {
 									onRequestBundleDelete(bundle);
 								}}
@@ -466,6 +510,8 @@ export function SkillBundleCard({
 							<button
 								type="button"
 								className="btn btn-md btn-ghost flex items-center rounded-2xl"
+								disabled={!bundle.isEnabled}
+								title={!bundle.isEnabled ? 'Enable the bundle first.' : 'Register a filesystem skill'}
 								onClick={() => {
 									openSkillModal('add', undefined);
 								}}
