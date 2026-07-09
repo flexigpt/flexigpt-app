@@ -8,7 +8,7 @@ import type { Skill, SkillBundle } from '@/spec/skill';
 
 import { ModalBackdrop } from '@/components/modal_backdrop';
 
-import { getSkillInsertCounts, getSkillInsertDescription } from '@/skills/lib/skill_artifact_utils';
+import { getSkillInsertCounts, getSkillInsertDescription, skillHasResources } from '@/skills/lib/skill_artifact_utils';
 
 interface SkillBundleDetailsModalProps {
 	isOpen: boolean;
@@ -50,6 +50,9 @@ export function SkillBundleDetailsModal({ isOpen, onClose, bundle, skills }: Ski
 	}
 
 	const totalSkills = skills.length;
+	const resourceSkillCount = skills.filter(s => {
+		return skillHasResources(s);
+	}).length;
 
 	return createPortal(
 		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose}>
@@ -114,6 +117,14 @@ export function SkillBundleDetailsModal({ isOpen, onClose, bundle, skills }: Ski
 								</div>
 							</div>
 
+							<div className="col-span-3 font-semibold">Skills with resources</div>
+							<div className="col-span-9">
+								<span className="badge badge-outline rounded-xl">{resourceSkillCount}</span>
+								<span className="text-base-content/70 ml-2 text-xs">
+									Resources are regular files under each skill directory.
+								</span>
+							</div>
+
 							<div className="col-span-3 font-semibold">Usage note</div>
 							<div className="text-base-content/70 col-span-9 text-xs">
 								Instruction skills affect session state. User-message skills render into the composer or user message
@@ -121,9 +132,9 @@ export function SkillBundleDetailsModal({ isOpen, onClose, bundle, skills }: Ski
 							</div>
 							<div className="col-span-3 font-semibold">Prompt migration note</div>
 							<div className="text-base-content/70 col-span-9 text-xs">
-								A prompt-like template should be a filesystem skill whose <span className="font-mono">SKILL.md</span>{' '}
+								A prompt-like template should be a filesystem skill whose <span className="font-mono">SKILL.md</span>
 								frontmatter contains <span className="font-mono">insert: user-message</span>. Its declared arguments
-								replace the old prompt variable form.
+								replace the old prompt variable form. There are no prompt versions or role blocks in the new format.
 							</div>
 						</div>
 						<div className="grid grid-cols-12 gap-2">

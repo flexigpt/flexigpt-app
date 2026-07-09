@@ -1,4 +1,4 @@
-import type { Skill, SkillArgument, SkillInsert } from '@/spec/skill';
+import type { Skill, SkillArgument, SkillInsert, SkillResourceInfo } from '@/spec/skill';
 
 export type SkillInsertFilter = 'all' | SkillInsert;
 
@@ -50,6 +50,46 @@ export function getSkillInsertDescription(insert?: string | null): string {
 
 export function getSkillInsertBadgeClass(insert?: string | null): string {
 	return normalizeSkillInsert(insert).value === 'user-message' ? 'badge-secondary' : 'badge-info';
+}
+
+export function getSkillInsertLongGuidance(insert?: string | null): string {
+	return normalizeSkillInsert(insert).value === 'user-message'
+		? 'Use this when the skill is a prompt-like template. The rendered text is inserted into a user message or composer draft. It is not loaded as persistent session context.'
+		: 'Use this when the skill is standing instruction or context. It can be enabled for a conversation and loaded as an active session skill.';
+}
+
+export function getSkillResourceCountLabel(resources?: SkillResourceInfo | null): string {
+	if (!resources?.hasResources || resources.totalCount <= 0) {
+		return 'No resources';
+	}
+
+	return `${resources.totalCount} resource${resources.totalCount === 1 ? '' : 's'}`;
+}
+
+export function getSkillResourceTooltip(resources?: SkillResourceInfo | null): string {
+	if (!resources?.hasResources || resources.totalCount <= 0) {
+		return 'No indexed resource files were reported for this skill.';
+	}
+
+	const lines = [
+		`${resources.totalCount} resource${resources.totalCount === 1 ? '' : 's'} reported by the runtime.`,
+		'Resources are files inside the skill directory, such as references, assets, or scripts.',
+		'They are not executed or inserted automatically by the management UI.',
+	];
+
+	for (const location of resources.locations ?? []) {
+		lines.push(location);
+	}
+
+	if (resources.moreLocations) {
+		lines.push('More resource locations exist but were omitted from this listing.');
+	}
+
+	return lines.join('\n');
+}
+
+export function skillHasResources(skill: Pick<Skill, 'resources'>): boolean {
+	return skill.resources?.hasResources && skill.resources.totalCount > 0;
 }
 
 export function getSkillArgumentCountLabel(args?: SkillArgument[] | null): string {
@@ -126,6 +166,10 @@ export function skillMatchesSearch(skill: Skill, rawQuery: string): boolean {
 		skill.type,
 		skill.location,
 		skill.insert,
+		skill.digest,
+		skill.presence?.status,
+		...(skill.runtimeWarnings ?? []),
+		...(skill.resources?.locations ?? []),
 		...(skill.tags ?? []),
 		...(skill.arguments ?? []).flatMap(arg => [arg.name, arg.description, arg.default]),
 	]
@@ -216,4 +260,19 @@ export function buildSkillMarkdownScaffold(input: SkillMarkdownScaffoldInput): s
 
 	lines.push('---', '', `# ${displayName}`, '', body, '');
 	return lines.join('\n');
+}
+
+export function buildSkillArgumentText(args?: SkillArgument[] | null): string {
+	return (args ?? [])
+		.map(arg => [arg.name, arg.description ?? '', arg.default ?? ''].join(' | ').replace(/\s+\|\s+\|\s*$/, ''))
+		.join('\n');
+}
+
+export function buildSkillForkBodyPlaceholder(source: Skill): string {
+	const insert = normalizeSkillInsert(source.insert).value;
+	const sourceLabel = source.displayName || source.name || source.slug;
+
+	return insert === 'user-message'
+		? `Forked from "${sourceLabel}". Replace this placeholder with the new user-message template body.\n\nUse $argument or {{ argument }} placeholders declared above.`
+		: `Forked from "${sourceLabel}". Replace this placeholder with instruction/context material.\n\nOnly instruction skills can be activated in a skill session.`;
 }

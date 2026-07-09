@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { FiCheck, FiChevronDown, FiChevronUp, FiEdit2, FiEye, FiPlus, FiTrash2, FiX } from 'react-icons/fi';
+import {
+	FiCheck,
+	FiChevronDown,
+	FiChevronUp,
+	FiEdit2,
+	FiEye,
+	FiGitBranch,
+	FiPlus,
+	FiTrash2,
+	FiX,
+} from 'react-icons/fi';
 
 import type { Skill, SkillBundle } from '@/spec/skill';
 import { SkillPresenceStatus } from '@/spec/skill';
@@ -16,7 +26,10 @@ import {
 	getSkillInsertDescription,
 	getSkillInsertLabel,
 	getSkillInsertShortLabel,
+	getSkillResourceCountLabel,
+	getSkillResourceTooltip,
 	normalizeSkillInsert,
+	skillHasResources,
 	skillMatchesInsertFilter,
 	skillMatchesSearch,
 	skillMatchesTags,
@@ -25,7 +38,7 @@ import type { SkillUpsertInput } from '@/skills/skill_add_edit_modal';
 import { AddEditSkillModal } from '@/skills/skill_add_edit_modal';
 import { SkillBundleDetailsModal } from '@/skills/skill_bundle_details_modal';
 
-type SkillModalMode = 'add' | 'edit' | 'view';
+type SkillModalMode = 'add' | 'edit' | 'view' | 'fork';
 
 interface SkillBundleCardProps {
 	bundle: SkillBundle;
@@ -238,6 +251,12 @@ export function SkillBundleCard({
 			return;
 		}
 
+		if (mode === 'fork' && bundle.isBuiltIn) {
+			setAlertMsg('Forking into a built-in bundle is not supported. Create or use a custom bundle first.');
+			setShowAlert(true);
+			return;
+		}
+
 		if (mode === 'edit' && skill?.isBuiltIn) {
 			setAlertMsg('Built-in skills cannot be edited (only enabled/disabled).');
 			setShowAlert(true);
@@ -344,6 +363,7 @@ export function SkillBundleCard({
 									<th className="min-w-32 text-center">Slug</th>
 									<th className="min-w-32 text-center">Insert</th>
 									<th className="min-w-24 text-center">Args</th>
+									<th className="min-w-28 text-center">Resources</th>
 									<th className="min-w-28 text-center">Presence</th>
 									<th className="min-w-24 text-center">Digest</th>
 									<th className="text-center whitespace-nowrap">Enabled</th>
@@ -395,6 +415,21 @@ export function SkillBundleCard({
 													<span className="tooltip tooltip-top" data-tip={getSkillArgumentTooltip(skill.arguments)}>
 														<span className="badge badge-outline rounded-xl">
 															{getSkillArgumentCountLabel(skill.arguments)}
+														</span>
+													</span>
+												) : (
+													<span className="text-base-content/60">-</span>
+												)}
+											</td>
+											<td className="text-center">
+												{skillHasResources(skill) ? (
+													<span className="tooltip tooltip-top" data-tip={getSkillResourceTooltip(skill.resources)}>
+														<span
+															className={`badge rounded-xl ${
+																insert === 'user-message' ? 'badge-warning' : 'badge-outline'
+															}`}
+														>
+															{getSkillResourceCountLabel(skill.resources)}
 														</span>
 													</span>
 												) : (
@@ -459,6 +494,23 @@ export function SkillBundleCard({
 														type="button"
 														className="btn btn-sm btn-ghost rounded-2xl"
 														onClick={() => {
+															openSkillModal('fork', skill);
+														}}
+														disabled={bundle.isBuiltIn}
+														title={
+															bundle.isBuiltIn
+																? 'Forking from this built-in bundle is not available here. Use a custom bundle.'
+																: 'Fork into a new managed SKILL.md artifact'
+														}
+														aria-label="Fork"
+													>
+														<FiGitBranch size={16} />
+													</button>
+
+													<button
+														type="button"
+														className="btn btn-sm btn-ghost rounded-2xl"
+														onClick={() => {
 															requestDeleteSkill(skill);
 														}}
 														disabled={skill.isBuiltIn || bundle.isBuiltIn}
@@ -477,7 +529,7 @@ export function SkillBundleCard({
 
 								{skills.length === 0 && (
 									<tr>
-										<td colSpan={9} className="py-3 text-center text-sm">
+										<td colSpan={10} className="py-3 text-center text-sm">
 											No skills in this bundle.
 										</td>
 									</tr>
@@ -485,7 +537,7 @@ export function SkillBundleCard({
 
 								{skills.length > 0 && visibleSkills.length === 0 && (
 									<tr>
-										<td colSpan={9} className="py-3 text-center text-sm">
+										<td colSpan={10} className="py-3 text-center text-sm">
 											No skills match the current filters.
 										</td>
 									</tr>

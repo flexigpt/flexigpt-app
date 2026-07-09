@@ -18,12 +18,17 @@ import { ModalBackdrop } from '@/components/modal_backdrop';
 import { ReadOnlyValue } from '@/components/read_only_value';
 
 import {
+	buildSkillArgumentText,
+	buildSkillForkBodyPlaceholder,
 	buildSkillMarkdownScaffold,
 	formatSkillArgumentList,
 	getSkillArgumentCountLabel,
 	getSkillInsertBadgeClass,
 	getSkillInsertDescription,
 	getSkillInsertLabel,
+	getSkillInsertLongGuidance,
+	getSkillResourceCountLabel,
+	getSkillResourceTooltip,
 	normalizeSkillInsert,
 	stringifySkillFrontmatter,
 } from '@/skills/lib/skill_artifact_utils';
@@ -43,17 +48,17 @@ export interface SkillUpsertInput extends Partial<Skill> {
 	artifactCreate?: SkillArtifactCreateInput;
 }
 
+function buildSkillPreviewArgs(args?: SkillArgument[] | null): Record<string, string> {
+	return Object.fromEntries((args ?? []).map(arg => [arg.name, arg.default ?? ''] as const));
+}
+
 interface SkillItem {
 	skill: Skill;
 	bundleID: string;
 	skillSlug: string;
 }
 
-function buildSkillPreviewArgs(args?: SkillArgument[] | null): Record<string, string> {
-	return Object.fromEntries((args ?? []).map(arg => [arg.name, arg.default ?? ''] as const));
-}
-
-type ModalMode = 'add' | 'edit' | 'view';
+type ModalMode = 'add' | 'edit' | 'view' | 'fork';
 
 interface AddEditSkillModalProps {
 	isOpen: boolean;
@@ -99,14 +104,44 @@ const skillInsertDropdownItems = {
 const skillInsertOrderedKeys = ['user-message', 'instructions'] as SkillInsert[];
 
 const ARGUMENT_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const SKILL_ARTIFACT_NAME_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
 function normalizeForUniq(s: string) {
 	return s.trim().toLowerCase();
 }
 
-function getInitialFormData(initialData?: SkillItem): SkillFormData {
+function getInitialFormData(
+	initialData: SkillItem | undefined,
+	existingSkills: SkillItem[],
+	mode: ModalMode
+): SkillFormData {
 	if (initialData) {
 		const s = initialData.skill;
+		if (mode === 'fork') {
+			const baseName = `${s.name || s.slug}-copy`
+				.toLowerCase()
+				.replaceAll(/[^a-z0-9-]+/g, '-')
+				.replaceAll(/-+/g, '-')
+				.replaceAll(/^-|-$/g, '')
+				.slice(0, 64);
+			const name = makeUniqueSkillArtifactName(baseName || 'forked-skill', existingSkills);
+			const slug = makeUniqueSlug(
+				`${s.slug || name}-copy`,
+				existingSkills.map(item => item.skill.slug)
+			);
+
+			return {
+				displayName: `${s.displayName || s.name || s.slug} Copy`,
+				name,
+				slug,
+				type: SkillType.FS,
+				location: '',
+				description: s.description ?? '',
+				tags: (s.tags ?? []).join(', '),
+				isEnabled: true,
+			};
+		}
+
 		return {
 			displayName: s.displayName ?? '',
 			name: s.name ?? '',
@@ -129,6 +164,38 @@ function getInitialFormData(initialData?: SkillItem): SkillFormData {
 		tags: '',
 		isEnabled: true,
 	};
+}
+
+function makeUniqueSlug(seed: string, existingSlugs: string[]): string {
+	const normalized = seed
+		.trim()
+		.toLowerCase()
+		.replaceAll(/[^a-z0-9-]+/g, '-')
+		.replaceAll(/-+/g, '-')
+		.replaceAll(/^-|-$/g, '');
+	const base = normalized || 'skill';
+	const existing = new Set(existingSlugs);
+	if (!existing.has(base)) {
+		return base;
+	}
+
+	for (let i = 2; i < 1000; i += 1) {
+		const candidate = `${base}-${i}`;
+		if (!existing.has(candidate)) {
+			return candidate;
+		}
+	}
+
+	return `${base}-${Date.now().toString(36)}`;
+}
+
+function makeUniqueSkillArtifactName(seed: string, existingSkills: SkillItem[]): string {
+	const existing = new Set(existingSkills.map(item => item.skill.name));
+	let candidate = seed.slice(0, 64);
+	for (let i = 2; existing.has(candidate); i += 1) {
+		candidate = `${seed.slice(0, Math.max(1, 63 - String(i).length))}-${i}`;
+	}
+	return candidate;
 }
 
 function buildSkillPrefillKey(item: SkillItem): string {
@@ -162,18 +229,50 @@ function parseScaffoldArgumentLines(text: string): SkillArgument[] {
 	return out;
 }
 
+function validateScaffoldArgumentLines(text: string): string | undefined {
+	const seen = new Set<string>();
+
+	for (const [idx, rawLine] of text.split('\n').entries()) {
+		const line = rawLine.trim();
+		if (!line || line.startsWith('#')) {
+			continue;
+		}
+
+		const [rawName] = line.split('|');
+		const name = rawName?.trim() ?? '';
+
+		if (!name) {
+			return `Argument line ${idx + 1} is missing a name. Use: name | description | default.`;
+		}
+		if (!ARGUMENT_NAME_RE.test(name)) {
+			return `Argument "${name}" is invalid. Use letters, numbers, and underscores, starting with a letter or underscore.`;
+		}
+		if (seen.has(name)) {
+			return `Argument "${name}" is declared more than once.`;
+		}
+
+		seen.add(name);
+	}
+
+	return undefined;
+}
+
 function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkills, mode }: AddEditSkillModalProps) {
 	const requestedMode: ModalMode = mode ?? (initialData ? 'edit' : 'add');
+	const isForkMode = requestedMode === 'fork';
 	// Match the Tool modal pattern: unsupported impls can exist (viewable),
 	// but cannot be created/edited in the UI.
-	const isLockedSkill = Boolean(initialData?.skill?.isBuiltIn) || initialData?.skill?.type === SkillType.EmbeddedFS;
-	const effectiveMode: ModalMode = isLockedSkill ? 'view' : requestedMode;
+	const isLockedSkill =
+		!isForkMode && (Boolean(initialData?.skill?.isBuiltIn) || initialData?.skill?.type === SkillType.EmbeddedFS);
+	const effectiveMode: ModalMode = isLockedSkill ? 'view' : isForkMode ? 'add' : requestedMode;
 	const isViewMode = effectiveMode === 'view';
 	const isEditMode = effectiveMode === 'edit';
 	const isAddMode = effectiveMode === 'add';
 
 	const [creationMode, setCreationMode] = useState<'create' | 'register'>('create');
-	const [formData, setFormData] = useState<SkillFormData>(() => getInitialFormData(initialData));
+	const [formData, setFormData] = useState<SkillFormData>(() =>
+		getInitialFormData(initialData, existingSkills, requestedMode)
+	);
 	const [errors, setErrors] = useState<ErrorState>({});
 	const [submitError, setSubmitError] = useState('');
 	const [prefillMode, setPrefillMode] = useState(false);
@@ -189,16 +288,24 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 	} | null>(null);
 	const [previewLoading, setPreviewLoading] = useState(false);
 	const [previewError, setPreviewError] = useState('');
-	const [scaffoldInsert, setScaffoldInsert] = useState<SkillInsert>('user-message');
-	const [scaffoldArgumentsText, setScaffoldArgumentsText] = useState('');
-	const [scaffoldBody, setScaffoldBody] = useState('');
+	const [scaffoldInsert, setScaffoldInsert] = useState<SkillInsert>(() =>
+		isForkMode ? normalizeSkillInsert(initialData?.skill?.insert).value : 'user-message'
+	);
+	const [scaffoldArgumentsText, setScaffoldArgumentsText] = useState(() =>
+		isForkMode ? buildSkillArgumentText(initialData?.skill?.arguments) : ''
+	);
+	const [scaffoldBody, setScaffoldBody] = useState(() =>
+		isForkMode && initialData?.skill ? buildSkillForkBodyPlaceholder(initialData.skill) : ''
+	);
 	const [scaffoldCopied, setScaffoldCopied] = useState(false);
+	const [locationCopied, setLocationCopied] = useState(false);
 
 	const artifactSkill = initialData?.skill;
 	const artifactArguments = artifactSkill?.arguments ?? [];
 	const normalizedArtifactInsert = normalizeSkillInsert(artifactSkill?.insert);
 	const artifactArgumentLines = formatSkillArgumentList(artifactSkill?.arguments);
 	const artifactFrontmatter = stringifySkillFrontmatter(artifactSkill?.rawFrontmatter);
+	const scaffoldArgumentError = validateScaffoldArgumentLines(scaffoldArgumentsText);
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const nameInputRef = useRef<HTMLInputElement | null>(null);
@@ -306,6 +413,14 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 		}, 1400);
 	}, [scaffoldMarkdown]);
 
+	const copyLocation = useCallback(async () => {
+		await navigator.clipboard.writeText(artifactSkill?.location ?? '');
+		setLocationCopied(true);
+		window.setTimeout(() => {
+			setLocationCopied(false);
+		}, 1400);
+	}, [artifactSkill?.location]);
+
 	const resetPreviewArgs = useCallback(() => {
 		setPreviewArgs(buildSkillPreviewArgs(artifactArguments));
 		setPreviewResult(null);
@@ -376,6 +491,9 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 			);
 			if (clash) {
 				nextErrors.name = 'Skill name must be unique within the bundle.';
+			} else if (!SKILL_ARTIFACT_NAME_RE.test(v)) {
+				nextErrors.name =
+					'Skill name must use lowercase letters, numbers, and hyphens, start with a letter or number, and be at most 64 characters.';
 			} else {
 				nextErrors = omitManyKeys(nextErrors, ['name']);
 			}
@@ -411,6 +529,9 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 		if (isAddMode && creationMode === 'create' && !scaffoldBody.trim()) {
 			next.markdownBody = 'SKILL.md body is required.';
 		}
+		if (isAddMode && creationMode === 'create' && scaffoldArgumentError) {
+			next.markdownBody = scaffoldArgumentError;
+		}
 		return next;
 	};
 
@@ -427,13 +548,18 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 			name: formData.name,
 			slug: formData.slug,
 			type: SkillType.FS,
-			location: src.location ?? '',
+			location: creationMode === 'register' ? (src.location ?? '') : '',
 			description: src.description ?? '',
 			tags: (src.tags ?? []).join(', '),
 			isEnabled: true,
 		};
 
 		setFormData(next);
+		if (creationMode === 'create') {
+			setScaffoldInsert(normalizeSkillInsert(src.insert).value);
+			setScaffoldArgumentsText(buildSkillArgumentText(src.arguments));
+			setScaffoldBody(buildSkillForkBodyPlaceholder(src));
+		}
 		setErrors(validateForm(next));
 		setSubmitError('');
 		setSelectedPrefillKey(key);
@@ -468,9 +594,10 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 		const hasErrs = Object.values(errors).some(Boolean);
 		const locationOk = isAddMode && creationMode === 'create' ? true : formData.location.trim();
 		const bodyOk = isAddMode && creationMode === 'create' ? scaffoldBody.trim() : true;
-		const required = formData.name.trim() && formData.slug.trim() && locationOk && bodyOk && formData.type;
+		const required =
+			formData.name.trim() && formData.slug.trim() && locationOk && bodyOk && formData.type && !scaffoldArgumentError;
 		return Boolean(required) && !hasErrs;
-	}, [creationMode, errors, formData, isAddMode, isViewMode, scaffoldBody]);
+	}, [creationMode, errors, formData, isAddMode, isViewMode, scaffoldArgumentError, scaffoldBody]);
 
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
 		e.preventDefault();
@@ -533,7 +660,13 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 			});
 	};
 
-	const headerTitle = effectiveMode === 'view' ? 'View Skill' : effectiveMode === 'edit' ? 'Edit Skill' : 'Add Skill';
+	const headerTitle = isForkMode
+		? 'Fork Skill'
+		: effectiveMode === 'view'
+			? 'View Skill'
+			: effectiveMode === 'edit'
+				? 'Edit Skill'
+				: 'Add Skill';
 
 	return (
 		<dialog
@@ -595,6 +728,23 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 							</div>
 						)}
 
+						{isForkMode && artifactSkill && (
+							<div className="alert alert-warning rounded-2xl text-sm">
+								<div className="space-y-1">
+									<div className="font-semibold">Fork creates a new managed skill artifact</div>
+									<div>
+										Backend support for reading an existing <span className="font-mono">SKILL.md</span> body is not
+										available yet. This fork copies the source metadata, insert behavior, arguments, and tags, then
+										creates a new <span className="font-mono">SKILL.md</span> with a placeholder body.
+									</div>
+									<div>
+										For an exact clone, open the source location, copy the original body manually, and paste it into the
+										body field below before saving.
+									</div>
+								</div>
+							</div>
+						)}
+
 						{isAddMode && (
 							<div className="border-base-content/10 bg-base-100 rounded-2xl border p-3">
 								<div className="mb-3 text-sm font-semibold">How do you want to add this skill?</div>
@@ -613,7 +763,9 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 											<span className="block font-medium">Create managed SKILL.md</span>
 											<span className="text-base-content/70 block text-xs">
 												FlexiGPT creates a normal skill folder in the app skill store and registers it as a filesystem
-												skill. Only SKILL.md is created.
+												skill. Only <span className="font-mono">SKILL.md</span> is created. Add resources, assets, or
+												scripts to the generated folder after saving, then re-enable the skill or restart to refresh
+												runtime metadata.
 											</span>
 										</span>
 									</label>
@@ -630,8 +782,9 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 										<span>
 											<span className="block font-medium">Register existing folder</span>
 											<span className="text-base-content/70 block text-xs">
-												Use a skill directory that already exists on disk and contains SKILL.md plus any resources,
-												assets, or scripts you manage manually.
+												Use a skill directory that already exists on disk and contains{' '}
+												<span className="font-mono">SKILL.md</span> plus any resources, assets, or scripts you manage
+												manually.
 											</span>
 										</span>
 									</label>
@@ -654,7 +807,6 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 												setPrefillMode(true);
 											}}
 											disabled={prefillKeys.length === 0}
-											hidden={creationMode === 'create'}
 											title={
 												prefillKeys.length === 0
 													? 'No filesystem skills are available to copy. Only filesystem skills can be created here.'
@@ -697,7 +849,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 
 						{isAddMode && creationMode === 'create' && (
 							<div className="collapse-arrow border-base-content/10 bg-base-100 collapse rounded-2xl border">
-								<input type="checkbox" />
+								<input type="checkbox" defaultChecked />
 								<div className="collapse-title text-sm font-semibold">Managed SKILL.md content</div>
 								<div className="collapse-content space-y-4 text-sm">
 									<div className="alert alert-info rounded-2xl text-sm">
@@ -709,7 +861,8 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 											</div>
 											<div>
 												No resources, assets, or scripts are created here. If the body references files, create those
-												files manually inside the generated skill folder after saving.
+												files manually inside the generated skill folder after saving. The saved skill row shows the
+												exact folder location.
 											</div>
 										</div>
 									</div>
@@ -734,7 +887,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 												title="Select insert behavior"
 												getDisplayName={key => skillInsertDropdownItems[key]?.displayName ?? key}
 											/>
-											<div className="text-base-content/70 text-xs">{getSkillInsertDescription(scaffoldInsert)}</div>
+											<div className="text-base-content/70 text-xs">{getSkillInsertLongGuidance(scaffoldInsert)}</div>
 										</div>
 									</div>
 
@@ -764,6 +917,13 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 													values render as defaults, then empty strings.
 												</span>
 											</div>
+											{scaffoldArgumentError && (
+												<div className="label">
+													<span className="text-error flex items-center gap-1">
+														<FiAlertCircle size={12} /> {scaffoldArgumentError}
+													</span>
+												</div>
+											)}
 										</div>
 									</div>
 
@@ -913,7 +1073,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 						{/* Location */}
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
-								<span className="text-sm">Location*</span>
+								<span className="text-sm">Location{isAddMode && creationMode === 'create' ? '' : '*'}</span>
 								<span className="tooltip tooltip-right" data-tip="Path to the skill directory that contains SKILL.md.">
 									<FiHelpCircle size={12} />
 								</span>
@@ -1037,7 +1197,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 							</div>
 						</div>
 
-						{artifactSkill && (
+						{artifactSkill && !isForkMode && (
 							<>
 								<div className="divider">Artifact metadata</div>
 								<div className="grid grid-cols-12 gap-2 text-sm">
@@ -1077,6 +1237,33 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 										)}
 									</div>
 
+									<div className="col-span-3 font-semibold">Resources</div>
+									<div className="col-span-9 space-y-2">
+										<div className="flex flex-wrap items-center gap-2">
+											<span
+												className={`badge rounded-xl ${
+													artifactSkill.resources?.hasResources ? 'badge-outline' : 'badge-ghost'
+												}`}
+												title={getSkillResourceTooltip(artifactSkill.resources)}
+											>
+												{getSkillResourceCountLabel(artifactSkill.resources)}
+											</span>
+											<span className="text-base-content/70 text-xs">
+												Resource files are regular files under the skill folder. They are not automatically executed or
+												rendered by this page.
+											</span>
+										</div>
+										{artifactSkill.resources?.locations?.length ? (
+											<ul className="space-y-1">
+												{artifactSkill.resources.locations.map(location => (
+													<li key={location} className="bg-base-100 rounded-xl px-3 py-2 font-mono text-xs break-all">
+														{location}
+													</li>
+												))}
+											</ul>
+										) : null}
+									</div>
+
 									<div className="col-span-3 font-semibold">Digest</div>
 									<div className="col-span-9 font-mono text-xs break-all">{artifactSkill.digest || '-'}</div>
 
@@ -1114,7 +1301,21 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 									<div className="col-span-3 font-semibold">Type</div>
 									<div className="col-span-9">{artifactSkill.type}</div>
 									<div className="col-span-3 font-semibold">Location</div>
-									<div className="col-span-9 break-all">{artifactSkill.location || '-'}</div>
+									<div className="col-span-9">
+										<div className="flex flex-wrap items-center gap-2">
+											<span className="break-all">{artifactSkill.location || '-'}</span>
+											{artifactSkill.location ? (
+												<button type="button" className="btn btn-xs btn-ghost rounded-xl" onClick={copyLocation}>
+													<FiCopy size={12} />
+													<span className="ml-1">{locationCopied ? 'Copied' : 'Copy'}</span>
+												</button>
+											) : null}
+										</div>
+										<div className="text-base-content/70 mt-1 text-xs">
+											To update resources or edit SKILL.md directly, change files in this folder and then re-enable the
+											skill or restart the app to refresh runtime metadata.
+										</div>
+									</div>
 									<div className="col-span-3 font-semibold">Tags</div>
 									<div className="col-span-9">
 										{artifactSkill.tags?.length ? (

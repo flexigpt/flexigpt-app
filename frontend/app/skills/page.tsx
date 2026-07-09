@@ -19,6 +19,7 @@ import {
 	getAllSkillTags,
 	getSkillInsertCounts,
 	getSkillInsertDescription,
+	skillMatchesInsertFilter,
 	skillMatchesSearch,
 	skillMatchesTags,
 } from '@/skills/lib/skill_artifact_utils';
@@ -65,9 +66,13 @@ export default function SkillsPage() {
 	);
 	const visibleSkillCount = useMemo(
 		() =>
-			allSkills.filter(skill => skillMatchesSearch(skill, searchQuery) && skillMatchesTags(skill, activeTagFilters))
-				.length,
-		[activeTagFilters, allSkills, searchQuery]
+			allSkills.filter(
+				skill =>
+					skillMatchesInsertFilter(skill.insert, insertFilter) &&
+					skillMatchesSearch(skill, searchQuery) &&
+					skillMatchesTags(skill, activeTagFilters)
+			).length,
+		[activeTagFilters, allSkills, insertFilter, searchQuery]
 	);
 
 	const skillFilterOptions = useMemo(
@@ -388,9 +393,9 @@ export default function SkillsPage() {
 			<div className="flex size-full flex-col items-center overflow-hidden">
 				<div className="bg-base-200/95 sticky top-0 z-10 mt-4 flex w-11/12 items-center gap-4 px-4 py-2 backdrop-blur-sm xl:w-2/3">
 					<div className="min-w-0 grow">
-						<h1 className="text-xl font-semibold">Skill Bundles</h1>
+						<h1 className="text-xl font-semibold">Skill and Template Bundles</h1>
 						<p className="text-base-content/70 text-xs">
-							Manage Agent Skills artifacts. Prompt templates are represented here as skills with{' '}
+							Manage Agent Skills artifacts. New prompt templates are represented here as skills with{' '}
 							<span className="font-mono">insert: user-message</span>.
 						</p>
 					</div>
@@ -409,20 +414,27 @@ export default function SkillsPage() {
 					<div className="mt-4 w-11/12 space-y-4 xl:w-2/3">
 						<div className="alert alert-info rounded-2xl text-sm">
 							<div className="space-y-1">
-								<div className="font-semibold">How skill artifacts replace prompt templates</div>
+								<div className="font-semibold">How skills and prompt-like templates work</div>
 								<div>
-									Instruction skills are loaded as standing session context. User-message skills are render-only
-									templates that insert into the composer or user message body.
+									A skill artifact is a directory with a required <span className="font-mono">SKILL.md</span>. FlexiGPT
+									gives special meaning only to <span className="font-mono">name</span>,{' '}
+									<span className="font-mono">description</span>, <span className="font-mono">insert</span>, and{' '}
+									<span className="font-mono">arguments</span>.
 								</div>
 								<div>
-									The artifact file <span className="font-mono">SKILL.md</span> owns{' '}
-									<span className="font-mono">insert</span>, <span className="font-mono">arguments</span>, body text,
-									raw frontmatter, and digest. This page manages bundles, source locations, enablement, tags, metadata
-									overrides, preview rendering, and discovery.
+									<span className="font-semibold">Instruction skills</span> are standing context and can be activated in
+									a conversation session. <span className="font-semibold">User-message skills</span> are render-only
+									prompt templates for the composer.
 								</div>
 								<div>
-									Use legacy Prompt Bundles only for older records. New prompt-like templates should be authored as
-									user-message skills.
+									Managed creation writes only <span className="font-mono">SKILL.md</span>. Add extra files such as{' '}
+									<span className="font-mono">references/</span>, <span className="font-mono">assets/</span>, or{' '}
+									<span className="font-mono">scripts/</span> inside the generated skill folder after saving. Re-enable
+									the skill or restart the app to force runtime metadata to refresh.
+								</div>
+								<div>
+									The old Prompt Bundles page remains available for compatibility. From a management perspective, new
+									instruction snippets and user-message templates should be created here.
 								</div>
 							</div>
 						</div>
@@ -466,6 +478,18 @@ export default function SkillsPage() {
 									placeholder="Filter tags, comma separated"
 									spellCheck="false"
 								/>
+								{tagFilterInput ? (
+									<button
+										type="button"
+										className="btn btn-ghost btn-xs rounded-lg"
+										onClick={() => {
+											setTagFilterInput('');
+										}}
+										aria-label="Clear tag filter"
+									>
+										<FiX size={12} />
+									</button>
+								) : null}
 							</label>
 
 							<div className="text-base-content/70 flex items-center justify-end text-xs lg:col-span-3">
