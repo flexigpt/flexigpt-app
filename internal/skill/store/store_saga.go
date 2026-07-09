@@ -650,6 +650,7 @@ func applyRuntimeRecordToSkill(sk *spec.Skill, rec agentskillsSpec.SkillRecord) 
 		sk.Insert = rec.Insert
 	}
 	sk.Arguments = append([]spec.SkillArgument(nil), rec.Arguments...)
+	sk.Resources = cloneSkillResourceInfo(rec.Resources)
 	sk.RawFrontmatter = cloneAnyMap(rec.RawFrontmatter)
 	sk.RuntimeWarnings = append([]string(nil), rec.Warnings...)
 	sk.Digest = rec.Digest

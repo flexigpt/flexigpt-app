@@ -80,6 +80,8 @@ type RenderSkillResponseBody struct {
 	Description string `json:"description,omitempty"`
 	DisplayName string `json:"displayName,omitempty"`
 
+	Resources agentskillsSpec.SkillResourceInfo `json:"resources"`
+
 	Arguments        []agentskillsSpec.SkillArgument `json:"arguments,omitempty"`
 	AppliedArguments map[string]string               `json:"appliedArguments,omitempty"`
 	RawFrontmatter   map[string]any                  `json:"rawFrontmatter,omitempty"`
@@ -103,10 +105,11 @@ type RuntimeSkillListItem struct {
 	Description string `json:"description,omitempty"`
 	Digest      string `json:"digest,omitempty"`
 
-	Insert         agentskillsSpec.SkillInsert     `json:"insert,omitempty"`
-	Arguments      []agentskillsSpec.SkillArgument `json:"arguments,omitempty"`
-	RawFrontmatter map[string]any                  `json:"rawFrontmatter,omitempty"`
-	Warnings       []string                        `json:"warnings,omitempty"`
+	Insert         agentskillsSpec.SkillInsert       `json:"insert,omitempty"`
+	Arguments      []agentskillsSpec.SkillArgument   `json:"arguments,omitempty"`
+	Resources      agentskillsSpec.SkillResourceInfo `json:"resources"`
+	RawFrontmatter map[string]any                    `json:"rawFrontmatter,omitempty"`
+	Warnings       []string                          `json:"warnings,omitempty"`
 
 	// Session-scoped.
 	IsActive bool `json:"isActive,omitempty"`

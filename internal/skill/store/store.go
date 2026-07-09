@@ -168,6 +168,12 @@ func NewSkillStore(baseDir string, opts ...SkillStoreOption) (*SkillStore, error
 		return nil, err
 	}
 
+	if err := s.ensureBaseSkillBundleHydrated(); err != nil {
+		_ = s.userStore.Close()
+		_ = s.builtin.Close()
+		return nil, err
+	}
+
 	s.startCleanupLoop()
 
 	// Reconcile runtime catalog from enabled bundles/skills (includes best-effort hydration).

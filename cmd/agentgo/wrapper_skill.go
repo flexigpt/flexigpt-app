@@ -60,6 +60,14 @@ func (s *SkillStoreWrapper) PutSkill(req *spec.PutSkillRequest) (*spec.PutSkillR
 	})
 }
 
+func (s *SkillStoreWrapper) PutSkillArtifact(
+	req *spec.PutSkillArtifactRequest,
+) (*spec.PutSkillArtifactResponse, error) {
+	return middleware.WithRecoveryResp(func() (*spec.PutSkillArtifactResponse, error) {
+		return s.store.PutSkillArtifact(context.Background(), req)
+	})
+}
+
 func (s *SkillStoreWrapper) PatchSkill(req *spec.PatchSkillRequest) (*spec.PatchSkillResponse, error) {
 	return middleware.WithRecoveryResp(func() (*spec.PatchSkillResponse, error) {
 		return s.store.PatchSkill(context.Background(), req)

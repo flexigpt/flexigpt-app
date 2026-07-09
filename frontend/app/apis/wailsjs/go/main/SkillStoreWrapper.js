@@ -54,6 +54,10 @@ export function PutSkill(arg1) {
   return window['go']['main']['SkillStoreWrapper']['PutSkill'](arg1);
 }
 
+export function PutSkillArtifact(arg1) {
+  return window['go']['main']['SkillStoreWrapper']['PutSkillArtifact'](arg1);
+}
+
 export function PutSkillBundle(arg1) {
   return window['go']['main']['SkillStoreWrapper']['PutSkillBundle'](arg1);
 }

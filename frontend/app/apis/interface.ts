@@ -62,6 +62,7 @@ import type { AppTheme, AuthKey, AuthKeyName, AuthKeyType, DebugSettings, Settin
 import type {
 	InvokeSkillToolResponse,
 	ListSkillsRequest,
+	PutSkillArtifactPayload,
 	RenderSkillResponse,
 	RuntimeSkillFilter,
 	RuntimeSkillListItem,
@@ -299,6 +300,8 @@ export interface ISkillStoreAPI {
 		description?: string,
 		tags?: string[]
 	): Promise<void>;
+
+	putSkillArtifact(bundleID: string, skillSlug: string, payload: PutSkillArtifactPayload): Promise<Skill>;
 
 	/** Patch a skill (enable/disable, location). */
 	patchSkill(

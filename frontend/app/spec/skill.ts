@@ -37,6 +37,16 @@ export interface SkillSession {
 	activeSkillRefs: SkillRef[];
 }
 
+/**
+ * @public
+ */
+export interface SkillResourceInfo {
+	hasResources: boolean;
+	totalCount: number;
+	locations?: string[];
+	moreLocations: boolean;
+}
+
 export interface RuntimeSkillListItem {
 	skillRef: SkillRef;
 	type?: string;
@@ -46,6 +56,7 @@ export interface RuntimeSkillListItem {
 	digest?: string;
 	insert?: SkillInsert;
 	arguments?: SkillArgument[];
+	resources: SkillResourceInfo;
 	rawFrontmatter?: Record<string, any>;
 	warnings?: string[];
 	isActive: boolean;
@@ -63,6 +74,17 @@ export interface ListSkillsRequest {
 	pageToken?: string;
 }
 
+export interface PutSkillArtifactPayload {
+	name?: string;
+	isEnabled: boolean;
+	displayName?: string;
+	description?: string;
+	insert?: SkillInsert;
+	arguments?: SkillArgument[];
+	tags?: string[];
+	markdownBody: string;
+}
+
 /**
  * @public
  */
@@ -72,6 +94,7 @@ export interface RenderSkillResponse {
 	name: string;
 	description?: string;
 	displayName?: string;
+	resources: SkillResourceInfo;
 	arguments?: SkillArgument[];
 	appliedArguments?: Record<string, string>;
 	rawFrontmatter?: Record<string, any>;
@@ -127,6 +150,7 @@ export interface Skill {
 	tags?: string[];
 	insert?: SkillInsert;
 	arguments?: SkillArgument[];
+	resources: SkillResourceInfo;
 	rawFrontmatter?: Record<string, any>;
 	runtimeWarnings?: string[];
 	digest?: string;

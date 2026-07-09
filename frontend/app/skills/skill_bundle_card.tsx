@@ -21,6 +21,7 @@ import {
 	skillMatchesSearch,
 	skillMatchesTags,
 } from '@/skills/lib/skill_artifact_utils';
+import type { SkillUpsertInput } from '@/skills/skill_add_edit_modal';
 import { AddEditSkillModal } from '@/skills/skill_add_edit_modal';
 import { SkillBundleDetailsModal } from '@/skills/skill_bundle_details_modal';
 
@@ -35,7 +36,7 @@ interface SkillBundleCardProps {
 	onToggleBundleEnable: (bundleID: string, nextEnabled: boolean) => Promise<void>;
 	onToggleSkillEnable: (bundleID: string, skillID: string, skillSlug: string, nextEnabled: boolean) => Promise<void>;
 	onDeleteSkill: (bundleID: string, skillID: string, skillSlug: string) => Promise<void>;
-	onSubmitSkill: (bundleID: string, partial: Partial<Skill>, existingSkillSlug?: string) => Promise<void>;
+	onSubmitSkill: (bundleID: string, partial: SkillUpsertInput, existingSkillSlug?: string) => Promise<void>;
 	onRequestBundleDelete: (bundle: SkillBundle) => void;
 }
 
@@ -248,7 +249,7 @@ export function SkillBundleCard({
 		setIsSkillModalOpen(true);
 	};
 
-	const handleSubmitSkill = async (partial: Partial<Skill>) => {
+	const handleSubmitSkill = async (partial: SkillUpsertInput) => {
 		if (isSkillSubmitPending) {
 			return;
 		}

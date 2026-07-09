@@ -1,6 +1,7 @@
 import type {
 	InvokeSkillToolResponse,
 	ListSkillsRequest,
+	PutSkillArtifactPayload,
 	RenderSkillResponse,
 	RuntimeSkillFilter,
 	RuntimeSkillListItem,
@@ -29,6 +30,7 @@ import {
 	PatchSkill,
 	PatchSkillBundle,
 	PutSkill,
+	PutSkillArtifact,
 	PutSkillBundle,
 	RenderSkill,
 } from '@/apis/wailsjs/go/main/SkillStoreWrapper';
@@ -134,6 +136,16 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 			} as spec.PutSkillRequestBody,
 		};
 		await PutSkill(req as spec.PutSkillRequest);
+	}
+
+	async putSkillArtifact(bundleID: string, skillSlug: string, payload: PutSkillArtifactPayload): Promise<Skill> {
+		const req = {
+			BundleID: bundleID,
+			SkillSlug: skillSlug,
+			Body: payload as spec.PutSkillArtifactRequestBody,
+		};
+		const resp = await PutSkillArtifact(req as spec.PutSkillArtifactRequest);
+		return resp.Body?.skill as Skill;
 	}
 
 	async patchSkill(

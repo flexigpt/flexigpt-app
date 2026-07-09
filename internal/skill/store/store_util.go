@@ -133,6 +133,83 @@ func (s *SkillStore) writeAllUser(sc skillStoreSchema) error {
 	return s.userStore.SetAll(mp)
 }
 
+func (s *SkillStore) ensureBaseSkillBundleHydrated() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	all, err := s.readAllUser(false)
+	if err != nil {
+		return err
+	}
+	if all.Bundles == nil {
+		all.Bundles = map[bundleitemutils.BundleID]spec.SkillBundle{}
+	}
+	if all.Skills == nil {
+		all.Skills = map[bundleitemutils.BundleID]map[spec.SkillSlug]spec.Skill{}
+	}
+
+	now := time.Now().UTC()
+
+	if b, ok := all.Bundles[spec.BaseSkillBundleID]; ok {
+		changed := false
+		if b.SchemaVersion == "" {
+			b.SchemaVersion = spec.SkillSchemaVersion
+			changed = true
+		}
+		if b.Slug == "" {
+			b.Slug = spec.BaseSkillBundleSlug
+			changed = true
+		}
+		if b.DisplayName == "" {
+			b.DisplayName = spec.BaseSkillBundleDisplayName
+			changed = true
+		}
+		if b.Description == "" {
+			b.Description = spec.BaseSkillBundleDescription
+			changed = true
+		}
+		if b.CreatedAt.IsZero() {
+			b.CreatedAt = now
+			changed = true
+		}
+		if !b.IsEnabled {
+			b.IsEnabled = true
+			changed = true
+		}
+		if b.SoftDeletedAt != nil {
+			b.SoftDeletedAt = nil
+			changed = true
+		}
+		if b.IsBuiltIn {
+			b.IsBuiltIn = false
+			changed = true
+		}
+		if changed {
+			b.ModifiedAt = now
+			all.Bundles[spec.BaseSkillBundleID] = b
+			if all.Skills[spec.BaseSkillBundleID] == nil {
+				all.Skills[spec.BaseSkillBundleID] = map[spec.SkillSlug]spec.Skill{}
+			}
+			return s.writeAllUser(all)
+		}
+		return nil
+	}
+
+	all.Bundles[spec.BaseSkillBundleID] = spec.SkillBundle{
+		SchemaVersion: spec.SkillSchemaVersion,
+		ID:            spec.BaseSkillBundleID,
+		Slug:          spec.BaseSkillBundleSlug,
+		DisplayName:   spec.BaseSkillBundleDisplayName,
+		Description:   spec.BaseSkillBundleDescription,
+		IsEnabled:     true,
+		IsBuiltIn:     false,
+		CreatedAt:     now,
+		ModifiedAt:    now,
+	}
+	all.Skills[spec.BaseSkillBundleID] = map[spec.SkillSlug]spec.Skill{}
+	return s.writeAllUser(all)
+}
+
 func (s *SkillStore) readAllUser(force bool) (skillStoreSchema, error) {
 	raw, err := s.userStore.GetAll(force)
 	if err != nil {
@@ -208,10 +285,16 @@ func cloneSkill(sk spec.Skill) spec.Skill {
 	c := sk
 	c.Tags = slices.Clone(sk.Tags)
 	c.Arguments = slices.Clone(sk.Arguments)
+	c.Resources = cloneSkillResourceInfo(sk.Resources)
 	c.RuntimeWarnings = slices.Clone(sk.RuntimeWarnings)
 	c.RawFrontmatter = cloneAnyMap(sk.RawFrontmatter)
 	c.Presence = clonePresence(sk.Presence)
 	return c
+}
+
+func cloneSkillResourceInfo(in spec.SkillResourceInfo) spec.SkillResourceInfo {
+	in.Locations = slices.Clone(in.Locations)
+	return in
 }
 
 func clonePresence(p *spec.SkillPresence) *spec.SkillPresence {

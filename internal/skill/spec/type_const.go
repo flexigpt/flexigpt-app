@@ -13,6 +13,12 @@ const (
 
 	SkillBundlesMetaFileName      = "skills.bundles.json"
 	SkillBuiltInOverlayDBFileName = "skillsbuiltin.overlay.sqlite" // optional: built-in overlay index
+
+	// BaseSkillBundleID is the default writable bundle for user-created skill artifacts.
+	BaseSkillBundleID          bundleitemutils.BundleID   = "019d3150-6a12-7a6b-a34e-d9032342bc31"
+	BaseSkillBundleSlug        bundleitemutils.BundleSlug = "base"
+	BaseSkillBundleDisplayName                            = "Base"
+	BaseSkillBundleDescription                            = "Editable starter bundle for custom skills and prompt-like skill templates."
 )
 
 var (
@@ -92,13 +98,16 @@ type SkillSelection struct {
 }
 
 type (
-	SkillInsert   = agentskillsSpec.SkillInsert
-	SkillArgument = agentskillsSpec.SkillArgument
+	SkillInsert       = agentskillsSpec.SkillInsert
+	SkillArgument     = agentskillsSpec.SkillArgument
+	SkillResourceInfo = agentskillsSpec.SkillResourceInfo
 )
 
 const (
 	SkillInsertInstructions = agentskillsSpec.SkillInsertInstructions
 	SkillInsertUserMessage  = agentskillsSpec.SkillInsertUserMessage
+
+	MaxSkillResourceLocations = agentskillsSpec.MaxSkillResourceLocations
 )
 
 // Skill is the storage + management record.
@@ -109,8 +118,8 @@ type Skill struct {
 	Slug          SkillSlug `json:"slug"` // unique slug identifier
 
 	Type     SkillType `json:"type"`
-	Location string    `json:"location"` // opaque string; for fs usually absolute base dir of SKILL.md
-	Name     string    `json:"name"`     // name of the skill inside Skills.md.
+	Location string    `json:"location"` // opaque provider/app location; user-created fs skills usually use an absolute base dir.
+	Name     string    `json:"name"`     // name of the skill inside SKILL.md.
 
 	DisplayName string   `json:"displayName,omitempty"`
 	Description string   `json:"description,omitempty"`
@@ -122,6 +131,10 @@ type Skill struct {
 
 	// Parsed from SKILL.md frontmatter field "arguments".
 	Arguments []SkillArgument `json:"arguments,omitempty"`
+
+	// Runtime/provider-indexed resource metadata. Locations are provider-defined
+	// values intended for use with skills-readresource.resourceLocation.
+	Resources SkillResourceInfo `json:"resources"`
 
 	// Full parsed YAML frontmatter. FlexiGPT only gives semantics to name,
 	// description, insert, and arguments; other fields are preserved for callers.

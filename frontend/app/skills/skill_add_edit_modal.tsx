@@ -28,6 +28,21 @@ import {
 	stringifySkillFrontmatter,
 } from '@/skills/lib/skill_artifact_utils';
 
+interface SkillArtifactCreateInput {
+	name: string;
+	displayName?: string;
+	description?: string;
+	insert: SkillInsert;
+	arguments?: SkillArgument[];
+	tags?: string[];
+	markdownBody: string;
+	isEnabled: boolean;
+}
+
+export interface SkillUpsertInput extends Partial<Skill> {
+	artifactCreate?: SkillArtifactCreateInput;
+}
+
 interface SkillItem {
 	skill: Skill;
 	bundleID: string;
@@ -43,7 +58,7 @@ type ModalMode = 'add' | 'edit' | 'view';
 interface AddEditSkillModalProps {
 	isOpen: boolean;
 	onClose: () => void;
-	onSubmit: (skillData: Partial<Skill>) => Promise<void>;
+	onSubmit: (skillData: SkillUpsertInput) => Promise<void>;
 	initialData?: SkillItem; // editing/viewing
 	existingSkills: SkillItem[];
 	mode?: ModalMode;
@@ -56,6 +71,7 @@ interface ErrorState {
 	type?: string;
 	location?: string;
 	tags?: string;
+	markdownBody?: string;
 }
 
 interface SkillFormData {
@@ -156,6 +172,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 	const isEditMode = effectiveMode === 'edit';
 	const isAddMode = effectiveMode === 'add';
 
+	const [creationMode, setCreationMode] = useState<'create' | 'register'>('create');
 	const [formData, setFormData] = useState<SkillFormData>(() => getInitialFormData(initialData));
 	const [errors, setErrors] = useState<ErrorState>({});
 	const [submitError, setSubmitError] = useState('');
@@ -385,9 +402,14 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 		next = validateField('name', state.name, next);
 		next = validateField('slug', state.slug, next);
 		next = validateField('type', state.type, next);
-		next = validateField('location', state.location, next);
+		if (!isAddMode || creationMode === 'register') {
+			next = validateField('location', state.location, next);
+		}
 		if (state.tags.trim() !== '') {
 			next = validateField('tags', state.tags, next);
+		}
+		if (isAddMode && creationMode === 'create' && !scaffoldBody.trim()) {
+			next.markdownBody = 'SKILL.md body is required.';
 		}
 		return next;
 	};
@@ -444,9 +466,11 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 			return true;
 		}
 		const hasErrs = Object.values(errors).some(Boolean);
-		const required = formData.name.trim() && formData.slug.trim() && formData.location.trim() && formData.type;
+		const locationOk = isAddMode && creationMode === 'create' ? true : formData.location.trim();
+		const bodyOk = isAddMode && creationMode === 'create' ? scaffoldBody.trim() : true;
+		const required = formData.name.trim() && formData.slug.trim() && locationOk && bodyOk && formData.type;
 		return Boolean(required) && !hasErrs;
-	}, [errors, formData, isViewMode]);
+	}, [creationMode, errors, formData, isAddMode, isViewMode, scaffoldBody]);
 
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
 		e.preventDefault();
@@ -469,16 +493,37 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 			.map(t => t.trim())
 			.filter(Boolean);
 
-		void onSubmit({
+		const common = {
 			displayName: formData.displayName.trim() || undefined,
 			name: formData.name.trim(),
 			slug: formData.slug.trim(),
 			type: formData.type,
-			location: formData.location.trim(),
 			description: formData.description.trim(),
 			tags: tagsArr,
 			isEnabled: formData.isEnabled,
-		})
+		};
+
+		const payload: SkillUpsertInput =
+			isAddMode && creationMode === 'create'
+				? {
+						...common,
+						artifactCreate: {
+							name: formData.name.trim(),
+							displayName: common.displayName,
+							description: common.description,
+							insert: scaffoldInsert,
+							arguments: scaffoldArguments,
+							tags: tagsArr,
+							markdownBody: scaffoldBody,
+							isEnabled: formData.isEnabled,
+						},
+					}
+				: {
+						...common,
+						location: formData.location.trim(),
+					};
+
+		void onSubmit(payload)
 			.then(() => {
 				requestClose();
 			})
@@ -551,6 +596,50 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 						)}
 
 						{isAddMode && (
+							<div className="border-base-content/10 bg-base-100 rounded-2xl border p-3">
+								<div className="mb-3 text-sm font-semibold">How do you want to add this skill?</div>
+								<div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+									<label className="border-base-content/10 hover:bg-base-200 flex cursor-pointer items-start gap-3 rounded-2xl border p-3">
+										<input
+											type="radio"
+											className="radio radio-sm mt-1"
+											checked={creationMode === 'create'}
+											onChange={() => {
+												setCreationMode('create');
+												setSubmitError('');
+											}}
+										/>
+										<span>
+											<span className="block font-medium">Create managed SKILL.md</span>
+											<span className="text-base-content/70 block text-xs">
+												FlexiGPT creates a normal skill folder in the app skill store and registers it as a filesystem
+												skill. Only SKILL.md is created.
+											</span>
+										</span>
+									</label>
+									<label className="border-base-content/10 hover:bg-base-200 flex cursor-pointer items-start gap-3 rounded-2xl border p-3">
+										<input
+											type="radio"
+											className="radio radio-sm mt-1"
+											checked={creationMode === 'register'}
+											onChange={() => {
+												setCreationMode('register');
+												setSubmitError('');
+											}}
+										/>
+										<span>
+											<span className="block font-medium">Register existing folder</span>
+											<span className="text-base-content/70 block text-xs">
+												Use a skill directory that already exists on disk and contains SKILL.md plus any resources,
+												assets, or scripts you manage manually.
+											</span>
+										</span>
+									</label>
+								</div>
+							</div>
+						)}
+
+						{isAddMode && (
 							<div className="grid grid-cols-12 items-center gap-2">
 								<label className="label col-span-3">
 									<span className="text-sm">Prefill from Existing</span>
@@ -565,6 +654,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 												setPrefillMode(true);
 											}}
 											disabled={prefillKeys.length === 0}
+											hidden={creationMode === 'create'}
 											title={
 												prefillKeys.length === 0
 													? 'No filesystem skills are available to copy. Only filesystem skills can be created here.'
@@ -605,21 +695,21 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 							</div>
 						)}
 
-						{isAddMode && (
+						{isAddMode && creationMode === 'create' && (
 							<div className="collapse-arrow border-base-content/10 bg-base-100 collapse rounded-2xl border">
 								<input type="checkbox" />
-								<div className="collapse-title text-sm font-semibold">Optional SKILL.md scaffold generator</div>
+								<div className="collapse-title text-sm font-semibold">Managed SKILL.md content</div>
 								<div className="collapse-content space-y-4 text-sm">
 									<div className="alert alert-info rounded-2xl text-sm">
 										<div className="space-y-1">
-											<div className="font-semibold">Create the artifact first, then register its folder</div>
+											<div className="font-semibold">This will be written to a real skill folder</div>
 											<div>
-												This screen registers a filesystem skill directory. The artifact itself lives in a{' '}
-												<span className="font-mono">SKILL.md</span> file inside that directory.
+												The backend creates <span className="font-mono">SKILL.md</span> under the app-managed skill
+												folder, then registers that folder exactly like any other filesystem skill.
 											</div>
 											<div>
-												Use this generator to migrate prompt-template creation into skills. Copy the scaffold into
-												<span className="font-mono"> SKILL.md</span>, set Location to that directory, then save.
+												No resources, assets, or scripts are created here. If the body references files, create those
+												files manually inside the generated skill folder after saving.
 											</div>
 										</div>
 									</div>
@@ -695,6 +785,13 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 												}
 												spellCheck="false"
 											/>
+											{errors.markdownBody && (
+												<div className="label">
+													<span className="text-error flex items-center gap-1">
+														<FiAlertCircle size={12} /> {errors.markdownBody}
+													</span>
+												</div>
+											)}
 										</div>
 									</div>
 
@@ -825,9 +922,13 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 								<input
 									type="text"
 									name="location"
-									value={formData.location}
+									value={
+										isAddMode && creationMode === 'create'
+											? 'Managed automatically in the app skill store'
+											: formData.location
+									}
 									onChange={handleInput}
-									readOnly={isViewMode}
+									readOnly={isViewMode || (isAddMode && creationMode === 'create')}
 									className={`input w-full rounded-xl ${errors.location ? 'input-error' : ''}`}
 									spellCheck="false"
 									autoComplete="off"
@@ -837,6 +938,13 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 									<div className="label">
 										<span className="text-error flex items-center gap-1">
 											<FiAlertCircle size={12} /> {errors.location}
+										</span>
+									</div>
+								)}
+								{isAddMode && creationMode === 'create' && (
+									<div className="label">
+										<span className="text-base-content/70 text-xs">
+											The saved skill will still be a normal filesystem skill with an absolute location.
 										</span>
 									</div>
 								)}

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { FiPlus, FiSearch, FiTag, FiX } from 'react-icons/fi';
 
-import type { Skill, SkillBundle } from '@/spec/skill';
+import type { SkillBundle } from '@/spec/skill';
 
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
@@ -24,6 +24,7 @@ import {
 } from '@/skills/lib/skill_artifact_utils';
 import type { BundleData } from '@/skills/lib/skill_bundle_utils';
 import { sortBundleData } from '@/skills/lib/skill_bundle_utils';
+import type { SkillUpsertInput } from '@/skills/skill_add_edit_modal';
 import { AddSkillBundleModal } from '@/skills/skill_bundle_add_modal';
 import { SkillBundleCard } from '@/skills/skill_bundle_card';
 
@@ -250,7 +251,7 @@ export default function SkillsPage() {
 	}, []);
 
 	const handleSubmitSkill = useCallback(
-		async (bundleID: string, partial: Partial<Skill>, existingSkillSlug?: string) => {
+		async (bundleID: string, partial: SkillUpsertInput, existingSkillSlug?: string) => {
 			try {
 				if (existingSkillSlug) {
 					await skillStoreAPI.patchSkill(
@@ -262,6 +263,24 @@ export default function SkillsPage() {
 						partial.description,
 						partial.tags
 					);
+				} else if (partial.artifactCreate) {
+					const slug = (partial.slug ?? '').trim();
+					const create = partial.artifactCreate;
+
+					if (!slug) {
+						throw new Error('Missing skill slug.');
+					}
+
+					const _ = await skillStoreAPI.putSkillArtifact(bundleID, slug, {
+						name: create.name,
+						displayName: create.displayName,
+						description: create.description,
+						insert: create.insert,
+						arguments: create.arguments,
+						tags: create.tags,
+						markdownBody: create.markdownBody,
+						isEnabled: create.isEnabled,
+					});
 				} else {
 					const slug = (partial.slug ?? '').trim();
 					const name = (partial.name ?? '').trim();

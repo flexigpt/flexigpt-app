@@ -80,6 +80,37 @@ type PutSkillRequest struct {
 
 type PutSkillResponse struct{}
 
+type PutSkillArtifactRequestBody struct {
+	// Name is the Agent Skills artifact name. If empty, SkillSlug is used.
+	// For filesystem skills, this is also used as the managed directory name.
+	Name string `json:"name,omitempty"`
+
+	IsEnabled bool `json:"isEnabled" required:"true"`
+
+	DisplayName string `json:"displayName,omitempty"`
+	Description string `json:"description,omitempty"`
+
+	// Insert defaults to instructions.
+	Insert agentskillsSpec.SkillInsert `json:"insert,omitempty"`
+
+	Arguments []agentskillsSpec.SkillArgument `json:"arguments,omitempty"`
+	Tags      []string                        `json:"tags,omitempty"`
+
+	// MarkdownBody is written after YAML frontmatter in SKILL.md.
+	MarkdownBody string `json:"markdownBody" required:"true"`
+}
+
+type PutSkillArtifactRequest struct {
+	BundleID  bundleitemutils.BundleID `path:"bundleID"  required:"true"`
+	SkillSlug SkillSlug                `path:"skillSlug" required:"true"`
+	Body      *PutSkillArtifactRequestBody
+}
+
+type PutSkillArtifactResponseBody struct {
+	Skill Skill `json:"skill"`
+}
+type PutSkillArtifactResponse struct{ Body *PutSkillArtifactResponseBody }
+
 type DeleteSkillRequest struct {
 	BundleID  bundleitemutils.BundleID `path:"bundleID"  required:"true"`
 	SkillSlug SkillSlug                `path:"skillSlug" required:"true"`

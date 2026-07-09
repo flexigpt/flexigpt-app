@@ -6,7 +6,7 @@ go 1.26
 require (
 	github.com/adrg/xdg v0.5.3
 	github.com/danielgtaylor/huma/v2 v2.38.0
-	github.com/flexigpt/agentskills-go v0.17.1
+	github.com/flexigpt/agentskills-go v0.18.0
 	github.com/flexigpt/inference-go v0.22.2
 	github.com/flexigpt/llmtools-go v0.22.1
 	github.com/flexigpt/mapstore-go v0.3.5

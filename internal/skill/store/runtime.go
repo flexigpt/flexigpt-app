@@ -351,6 +351,7 @@ func (s *SkillStore) ListRuntimeSkills(
 				Digest:         r.Digest,
 				Insert:         r.Insert,
 				Arguments:      append([]agentskillsSpec.SkillArgument(nil), r.Arguments...),
+				Resources:      cloneSkillResourceInfo(r.Resources),
 				RawFrontmatter: cloneAnyMap(r.RawFrontmatter),
 				Warnings:       append([]string(nil), r.Warnings...),
 				IsActive: func() bool {
@@ -425,6 +426,7 @@ func (s *SkillStore) RenderSkill(
 			Name:             out.Name,
 			Description:      out.Description,
 			DisplayName:      out.DisplayName,
+			Resources:        cloneSkillResourceInfo(out.Resources),
 			Arguments:        append([]agentskillsSpec.SkillArgument(nil), out.Arguments...),
 			AppliedArguments: cloneStringMap(out.AppliedArguments),
 			RawFrontmatter:   cloneAnyMap(out.RawFrontmatter),

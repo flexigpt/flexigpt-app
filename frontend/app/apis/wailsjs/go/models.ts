@@ -4983,6 +4983,24 @@ export namespace spec {
 		    return a;
 		}
 	}
+	export class SkillResourceInfo {
+	    hasResources: boolean;
+	    totalCount: number;
+	    locations?: string[];
+	    moreLocations: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SkillResourceInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.hasResources = source["hasResources"];
+	        this.totalCount = source["totalCount"];
+	        this.locations = source["locations"];
+	        this.moreLocations = source["moreLocations"];
+	    }
+	}
 	export class SkillArgument {
 	    name: string;
 	    description?: string;
@@ -5011,6 +5029,7 @@ export namespace spec {
 	    tags?: string[];
 	    insert?: string;
 	    arguments?: SkillArgument[];
+	    resources: SkillResourceInfo;
 	    rawFrontmatter?: Record<string, any>;
 	    runtimeWarnings?: string[];
 	    digest?: string;
@@ -5039,6 +5058,7 @@ export namespace spec {
 	        this.tags = source["tags"];
 	        this.insert = source["insert"];
 	        this.arguments = this.convertValues(source["arguments"], SkillArgument);
+	        this.resources = this.convertValues(source["resources"], SkillResourceInfo);
 	        this.rawFrontmatter = source["rawFrontmatter"];
 	        this.runtimeWarnings = source["runtimeWarnings"];
 	        this.digest = source["digest"];
@@ -7505,6 +7525,7 @@ export namespace spec {
 	    digest?: string;
 	    insert?: string;
 	    arguments?: SkillArgument[];
+	    resources: SkillResourceInfo;
 	    rawFrontmatter?: Record<string, any>;
 	    warnings?: string[];
 	    isActive?: boolean;
@@ -7524,6 +7545,7 @@ export namespace spec {
 	        this.digest = source["digest"];
 	        this.insert = source["insert"];
 	        this.arguments = this.convertValues(source["arguments"], SkillArgument);
+	        this.resources = this.convertValues(source["resources"], SkillResourceInfo);
 	        this.rawFrontmatter = source["rawFrontmatter"];
 	        this.warnings = source["warnings"];
 	        this.isActive = source["isActive"];
@@ -10573,6 +10595,146 @@ export namespace spec {
 	
 	    }
 	}
+	export class PutSkillArtifactRequestBody {
+	    name?: string;
+	    isEnabled: boolean;
+	    displayName?: string;
+	    description?: string;
+	    insert?: string;
+	    arguments?: SkillArgument[];
+	    tags?: string[];
+	    markdownBody: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PutSkillArtifactRequestBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.isEnabled = source["isEnabled"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.insert = source["insert"];
+	        this.arguments = this.convertValues(source["arguments"], SkillArgument);
+	        this.tags = source["tags"];
+	        this.markdownBody = source["markdownBody"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PutSkillArtifactRequest {
+	    BundleID: string;
+	    SkillSlug: string;
+	    Body?: PutSkillArtifactRequestBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new PutSkillArtifactRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.BundleID = source["BundleID"];
+	        this.SkillSlug = source["SkillSlug"];
+	        this.Body = this.convertValues(source["Body"], PutSkillArtifactRequestBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class PutSkillArtifactResponseBody {
+	    skill: Skill;
+	
+	    static createFrom(source: any = {}) {
+	        return new PutSkillArtifactResponseBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.skill = this.convertValues(source["skill"], Skill);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PutSkillArtifactResponse {
+	    Body?: PutSkillArtifactResponseBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new PutSkillArtifactResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Body = this.convertValues(source["Body"], PutSkillArtifactResponseBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class PutSkillBundleRequestBody {
 	    slug: string;
 	    displayName: string;
@@ -10982,6 +11144,7 @@ export namespace spec {
 	    name: string;
 	    description?: string;
 	    displayName?: string;
+	    resources: SkillResourceInfo;
 	    arguments?: SkillArgument[];
 	    appliedArguments?: Record<string, string>;
 	    rawFrontmatter?: Record<string, any>;
@@ -10998,6 +11161,7 @@ export namespace spec {
 	        this.name = source["name"];
 	        this.description = source["description"];
 	        this.displayName = source["displayName"];
+	        this.resources = this.convertValues(source["resources"], SkillResourceInfo);
 	        this.arguments = this.convertValues(source["arguments"], SkillArgument);
 	        this.appliedArguments = source["appliedArguments"];
 	        this.rawFrontmatter = source["rawFrontmatter"];
@@ -11385,6 +11549,7 @@ export namespace spec {
 	
 	    }
 	}
+	
 	
 	
 	
