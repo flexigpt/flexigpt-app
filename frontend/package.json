@@ -145,8 +145,7 @@
 			"app/apis/wailsjs/go/main/ModelPresetStoreWrapper.js",
 			"app/spec/inference_capabilities.ts",
 			"app/hooks/use_at_top_bottom.tsx",
-			"app/spec/mcp.ts",
-			"app/apis/wailsjs/go/main/PromptTemplateStoreWrapper.js"
+			"app/spec/mcp.ts"
 		],
 		"ignoreBinaries": [],
 		"ignoreDependencies": [
