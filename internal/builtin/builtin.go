@@ -9,9 +9,6 @@ import (
 //go:embed tools
 var BuiltInToolBundlesFS embed.FS
 
-//go:embed prompts
-var BuiltInPromptBundlesFS embed.FS
-
 //go:embed skills
 var BuiltInSkillBundlesFS embed.FS
 
@@ -24,9 +21,6 @@ var BuiltInMCPBundlesFS embed.FS
 const (
 	BuiltInToolBundlesRootDir = "tools"
 	BuiltInToolBundlesJSON    = "tools.bundles.json"
-
-	BuiltInPromptBundlesRootDir = "prompts"
-	BuiltInPromptBundlesJSON    = "prompts.bundles.json"
 
 	BuiltInSkillBundlesRootDir = "skills"
 	BuiltInSkillBundlesJSON    = "skills.json"
