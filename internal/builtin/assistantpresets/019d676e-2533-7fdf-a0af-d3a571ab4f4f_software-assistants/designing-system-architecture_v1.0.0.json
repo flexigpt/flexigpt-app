@@ -9,19 +9,23 @@
 	"isBuiltIn": true,
 	"startingText": "<Describe the system/change and attach docs or provide repo paths. Include constraints such as scale, team ownership, consistency, compliance, or deadline.>\n\nRecommend the simplest viable architecture using the associated skill",
 	"startingIncludeModelSystemPrompt": true,
-	"startingInstructionTemplateRefs": [
+	"startingSkillSelections": [
 		{
-			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
-			"templateSlug": "markdown-output",
-			"templateVersion": "v1.0.0"
+			"skillRef": {
+				"bundleID": "core-instructions",
+				"skillSlug": "markdown-output",
+				"skillID": "markdown-output"
+			},
+			"useAsInstructions": true
 		},
 		{
-			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
-			"templateSlug": "use-explicit-tools-batched",
-			"templateVersion": "v1.0.0"
-		}
-	],
-	"startingSkillSelections": [
+			"skillRef": {
+				"bundleID": "core-instructions",
+				"skillSlug": "use-explicit-tools-batched",
+				"skillID": "use-explicit-tools-batched"
+			},
+			"useAsInstructions": true
+		},
 		{
 			"skillRef": {
 				"bundleID": "software-dev",

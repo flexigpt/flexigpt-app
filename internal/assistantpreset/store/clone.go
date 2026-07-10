@@ -33,7 +33,6 @@ func cloneAssistantPreset(in spec.AssistantPreset) spec.AssistantPreset {
 		v := *in.StartingIncludeModelSystemPrompt
 		out.StartingIncludeModelSystemPrompt = &v
 	}
-	out.StartingInstructionTemplateRefs = cloneJSONValue(in.StartingInstructionTemplateRefs)
 	out.StartingToolSelections = cloneJSONValue(in.StartingToolSelections)
 	out.StartingSkillSelections = cloneJSONValue(in.StartingSkillSelections)
 	out.StartingMCPContext = cloneJSONValue(in.StartingMCPContext)

@@ -12,7 +12,6 @@ import (
 	mcpStore "github.com/flexigpt/flexigpt-app/internal/mcp/store"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
-	promptStore "github.com/flexigpt/flexigpt-app/internal/prompt/store"
 	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 )
@@ -25,7 +24,6 @@ func InitAssistantPresetStoreWrapper(
 	w *AssistantPresetStoreWrapper,
 	baseDir string,
 	modelPresetSt *modelpresetStore.ModelPresetStore,
-	promptTemplateSt *promptStore.PromptTemplateStore,
 	toolSt *toolStore.ToolStore,
 	skillSt *skillStore.SkillStore,
 	mcpSt *mcpStore.Store,
@@ -52,7 +50,6 @@ func InitAssistantPresetStoreWrapper(
 
 	lookups := lookupimpl.NewAssistantPresetReferenceLookups(
 		modelPresetSt,
-		promptTemplateSt,
 		toolSt,
 		skillSt,
 		mcpSt,

@@ -846,6 +846,7 @@ export namespace spec {
 	export class SkillSelection {
 	    skillRef: SkillRef;
 	    preLoadAsActive: boolean;
+	    useAsInstructions: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new SkillSelection(source);
@@ -855,6 +856,7 @@ export namespace spec {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.skillRef = this.convertValues(source["skillRef"], SkillRef);
 	        this.preLoadAsActive = source["preLoadAsActive"];
+	        this.useAsInstructions = source["useAsInstructions"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -936,22 +938,6 @@ export namespace spec {
 		    }
 		    return a;
 		}
-	}
-	export class PromptTemplateRef {
-	    bundleID: string;
-	    templateSlug: string;
-	    templateVersion: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new PromptTemplateRef(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.bundleID = source["bundleID"];
-	        this.templateSlug = source["templateSlug"];
-	        this.templateVersion = source["templateVersion"];
-	    }
 	}
 	export class JSONSchemaParam {
 	    name: string;
@@ -1148,7 +1134,6 @@ export namespace spec {
 	    startingModelPresetRef?: ModelPresetRef;
 	    startingModelPresetPatch?: ModelPresetPatch;
 	    startingIncludeModelSystemPrompt?: boolean;
-	    startingInstructionTemplateRefs?: PromptTemplateRef[];
 	    startingToolSelections?: ToolSelection[];
 	    startingSkillSelections?: SkillSelection[];
 	    startingMCPContext?: MCPConversationContext;
@@ -1175,7 +1160,6 @@ export namespace spec {
 	        this.startingModelPresetRef = this.convertValues(source["startingModelPresetRef"], ModelPresetRef);
 	        this.startingModelPresetPatch = this.convertValues(source["startingModelPresetPatch"], ModelPresetPatch);
 	        this.startingIncludeModelSystemPrompt = source["startingIncludeModelSystemPrompt"];
-	        this.startingInstructionTemplateRefs = this.convertValues(source["startingInstructionTemplateRefs"], PromptTemplateRef);
 	        this.startingToolSelections = this.convertValues(source["startingToolSelections"], ToolSelection);
 	        this.startingSkillSelections = this.convertValues(source["startingSkillSelections"], SkillSelection);
 	        this.startingMCPContext = this.convertValues(source["startingMCPContext"], MCPConversationContext);
@@ -9859,7 +9843,6 @@ export namespace spec {
 	
 	
 	
-	
 	export class PutAssistantPresetBundleRequestBody {
 	    slug: string;
 	    displayName: string;
@@ -9931,7 +9914,6 @@ export namespace spec {
 	    startingModelPresetRef?: ModelPresetRef;
 	    startingModelPresetPatch?: ModelPresetPatch;
 	    startingIncludeModelSystemPrompt?: boolean;
-	    startingInstructionTemplateRefs?: PromptTemplateRef[];
 	    startingToolSelections?: ToolSelection[];
 	    startingSkillSelections?: SkillSelection[];
 	    startingMCPContext?: MCPConversationContext;
@@ -9949,7 +9931,6 @@ export namespace spec {
 	        this.startingModelPresetRef = this.convertValues(source["startingModelPresetRef"], ModelPresetRef);
 	        this.startingModelPresetPatch = this.convertValues(source["startingModelPresetPatch"], ModelPresetPatch);
 	        this.startingIncludeModelSystemPrompt = source["startingIncludeModelSystemPrompt"];
-	        this.startingInstructionTemplateRefs = this.convertValues(source["startingInstructionTemplateRefs"], PromptTemplateRef);
 	        this.startingToolSelections = this.convertValues(source["startingToolSelections"], ToolSelection);
 	        this.startingSkillSelections = this.convertValues(source["startingSkillSelections"], SkillSelection);
 	        this.startingMCPContext = this.convertValues(source["startingMCPContext"], MCPConversationContext);

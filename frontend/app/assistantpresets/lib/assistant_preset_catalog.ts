@@ -298,6 +298,7 @@ export async function loadSkillOptions(): Promise<AssistantSkillOption[]> {
 				skillID: skill.id,
 			},
 			preLoadAsActive: false,
+			useAsInstructions: false,
 		};
 
 		const bundleDisplayName = bundle ? getBundleDisplayName(bundle, item.bundleID) : item.bundleSlug || item.bundleID;

@@ -9,24 +9,31 @@
 	"isBuiltIn": true,
 	"startingText": "<Attach code/schema/OpenAPI/proto/existing docs or replace this line with absolute paths to the API/SDK surface, for example `/absolute/path/to/repo/api/docs`. Include the target audience or doc location if known.>\n\nGenerate or update accurate API reference content with endpoints/functions, parameters, defaults, constraints, responses/returns, errors, examples, edge cases, and versioning notes using the associated skill",
 	"startingIncludeModelSystemPrompt": true,
-	"startingInstructionTemplateRefs": [
-		{
-			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
-			"templateSlug": "markdown-output",
-			"templateVersion": "v1.0.0"
-		},
-		{
-			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
-			"templateSlug": "use-explicit-tools-batched",
-			"templateVersion": "v1.0.0"
-		},
-		{
-			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
-			"templateSlug": "grounded-local-work",
-			"templateVersion": "v1.0.0"
-		}
-	],
 	"startingSkillSelections": [
+		{
+			"skillRef": {
+				"bundleID": "core-instructions",
+				"skillSlug": "markdown-output",
+				"skillID": "markdown-output"
+			},
+			"useAsInstructions": true
+		},
+		{
+			"skillRef": {
+				"bundleID": "core-instructions",
+				"skillSlug": "use-explicit-tools-batched",
+				"skillID": "use-explicit-tools-batched"
+			},
+			"useAsInstructions": true
+		},
+		{
+			"skillRef": {
+				"bundleID": "core-instructions",
+				"skillSlug": "grounded-local-work",
+				"skillID": "grounded-local-work"
+			},
+			"useAsInstructions": true
+		},
 		{
 			"skillRef": {
 				"bundleID": "technical-content-writing",

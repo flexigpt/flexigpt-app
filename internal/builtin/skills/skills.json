@@ -12,6 +12,28 @@
 			"createdAt": "2026-02-10T00:00:00Z",
 			"modifiedAt": "2026-05-25T00:00:00Z"
 		},
+		"core-instructions": {
+			"schemaVersion": "2026-02-10",
+			"id": "core-instructions",
+			"slug": "core-instructions",
+			"displayName": "Core Instructions",
+			"description": "Builtin instruction-only skills migrated from the legacy core prompt templates.",
+			"isEnabled": true,
+			"isBuiltIn": true,
+			"createdAt": "2026-07-10T00:00:00Z",
+			"modifiedAt": "2026-07-10T00:00:00Z"
+		},
+		"software-dev-templates": {
+			"schemaVersion": "2026-02-10",
+			"id": "software-dev-templates",
+			"slug": "software-dev-templates",
+			"displayName": "Software Dev Templates",
+			"description": "Builtin software development template skills migrated from the legacy prompt templates.",
+			"isEnabled": true,
+			"isBuiltIn": true,
+			"createdAt": "2026-07-10T00:00:00Z",
+			"modifiedAt": "2026-07-10T00:00:00Z"
+		},
 		"product-leadership": {
 			"schemaVersion": "2026-02-10",
 			"id": "product-leadership",
@@ -207,6 +229,130 @@
 				"isBuiltIn": true,
 				"createdAt": "2026-05-25T00:00:00Z",
 				"modifiedAt": "2026-05-25T00:00:00Z"
+			}
+		},
+		"core-instructions": {
+			"markdown-output": {
+				"schemaVersion": "2026-02-10",
+				"id": "markdown-output",
+				"slug": "markdown-output",
+				"type": "embeddedfs",
+				"location": "core-instructions/markdown-output",
+				"name": "markdown-output",
+				"displayName": "Markdown Output",
+				"description": "Format responses in plain Markdown using simple headings, bullets, and fenced code blocks.",
+				"tags": ["markdown", "formatting", "output"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-07-10T00:00:00Z",
+					"lastSeenAt": "2026-07-10T00:00:00Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-07-10T00:00:00Z",
+				"modifiedAt": "2026-07-10T00:00:00Z"
+			},
+			"use-explicit-tools-batched": {
+				"schemaVersion": "2026-02-10",
+				"id": "use-explicit-tools-batched",
+				"slug": "use-explicit-tools-batched",
+				"type": "embeddedfs",
+				"location": "core-instructions/use-explicit-tools-batched",
+				"name": "use-explicit-tools-batched",
+				"displayName": "Use Explicit Tools Over Shell and Batched",
+				"description": "Prefer purpose-built filesystem and text tools over shell, batch independent calls, and use safe edit locators.",
+				"tags": ["tools", "shell", "batching", "edits"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-07-10T00:00:00Z",
+					"lastSeenAt": "2026-07-10T00:00:00Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-07-10T00:00:00Z",
+				"modifiedAt": "2026-07-10T00:00:00Z"
+			},
+			"grounded-local-work": {
+				"schemaVersion": "2026-02-10",
+				"id": "grounded-local-work",
+				"slug": "grounded-local-work",
+				"type": "embeddedfs",
+				"location": "core-instructions/grounded-local-work",
+				"name": "grounded-local-work",
+				"displayName": "Grounded Local Work",
+				"description": "Use attached and local context first, separate observed facts from inferred conclusions, and cite source paths.",
+				"tags": ["grounding", "local-context", "evidence", "citations"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-07-10T00:00:00Z",
+					"lastSeenAt": "2026-07-10T00:00:00Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-07-10T00:00:00Z",
+				"modifiedAt": "2026-07-10T00:00:00Z"
+			}
+		},
+		"software-dev-templates": {
+			"diagrams-stage": {
+				"schemaVersion": "2026-02-10",
+				"id": "diagrams-stage",
+				"slug": "diagrams-stage",
+				"type": "embeddedfs",
+				"location": "software-dev-templates/diagrams-stage",
+				"name": "diagrams-stage",
+				"displayName": "Architecture / Interaction Diagrams",
+				"description": "Generate one Mermaid diagram plus concise commentary.",
+				"tags": ["diagram", "mermaid", "visualisation"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-07-10T00:00:00Z",
+					"lastSeenAt": "2026-07-10T00:00:00Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-07-10T00:00:00Z",
+				"modifiedAt": "2026-07-10T00:00:00Z"
+			},
+			"fe-stack-react-vite": {
+				"schemaVersion": "2026-02-10",
+				"id": "fe-stack-react-vite",
+				"slug": "fe-stack-react-vite",
+				"type": "embeddedfs",
+				"location": "software-dev-templates/fe-stack-react-vite",
+				"name": "fe-stack-react-vite",
+				"displayName": "React-Router v7 + Vite + Tailwind 4",
+				"description": "Implementation plan and snippets for the specified React stack.",
+				"tags": ["frontend", "react", "vite", "tailwind", "typescript"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-07-10T00:00:00Z",
+					"lastSeenAt": "2026-07-10T00:00:00Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-07-10T00:00:00Z",
+				"modifiedAt": "2026-07-10T00:00:00Z"
+			},
+			"go-table-tests": {
+				"schemaVersion": "2026-02-10",
+				"id": "go-table-tests",
+				"slug": "go-table-tests",
+				"type": "embeddedfs",
+				"location": "software-dev-templates/go-table-tests",
+				"name": "go-table-tests",
+				"displayName": "Go Table-Driven Tests (stdlib-only)",
+				"description": "Scaffold idiomatic table-driven tests for a given function.",
+				"tags": ["golang", "testing", "table-driven"],
+				"presence": {
+					"status": "present",
+					"lastCheckedAt": "2026-07-10T00:00:00Z",
+					"lastSeenAt": "2026-07-10T00:00:00Z"
+				},
+				"isEnabled": true,
+				"isBuiltIn": true,
+				"createdAt": "2026-07-10T00:00:00Z",
+				"modifiedAt": "2026-07-10T00:00:00Z"
 			}
 		},
 		"product-leadership": {

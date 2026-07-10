@@ -7,8 +7,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
-	promptSpec "github.com/flexigpt/flexigpt-app/internal/prompt/spec"
-	promptStore "github.com/flexigpt/flexigpt-app/internal/prompt/store"
 	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
 	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
@@ -30,7 +28,7 @@ const (
 )
 
 func TestNewAssistantPresetReferenceLookups(t *testing.T) {
-	got := NewAssistantPresetReferenceLookups(nil, nil, nil, nil, nil, nil)
+	got := NewAssistantPresetReferenceLookups(nil, nil, nil, nil, nil)
 
 	if got.ModelPresets == nil {
 		t.Fatal("ModelPresets is nil")
@@ -86,72 +84,6 @@ func TestModelPresetLookupAdapter_GetModelPresetSummary_Errors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := tt.adapter.GetModelPresetSummary(ctx, tt.ref)
-			if err == nil {
-				t.Fatal("expected error, got nil")
-			}
-			if !strings.Contains(err.Error(), tt.wantErrContains) {
-				t.Fatalf("err = %q, want substring %q", err.Error(), tt.wantErrContains)
-			}
-		})
-	}
-}
-
-func TestPromptTemplateLookupAdapter_GetPromptTemplateSummary_Errors(t *testing.T) {
-	ctx := t.Context()
-	validVersion := bundleitemutils.ItemVersion("v1")
-
-	tests := []struct {
-		name            string
-		adapter         *promptTemplateLookupAdapter
-		ref             promptSpec.PromptTemplateRef
-		wantErrContains string
-	}{
-		{
-			name:    testNilReceiver,
-			adapter: nil,
-			ref: promptSpec.PromptTemplateRef{
-				BundleID:        testBundleIDA,
-				TemplateSlug:    testTemplateSlugA,
-				TemplateVersion: validVersion,
-			},
-			wantErrContains: testErrNotConfigured,
-		},
-		{
-			name:    testNilStore,
-			adapter: &promptTemplateLookupAdapter{},
-			ref: promptSpec.PromptTemplateRef{
-				BundleID:        testBundleIDA,
-				TemplateSlug:    testTemplateSlugA,
-				TemplateVersion: validVersion,
-			},
-			wantErrContains: testErrNotConfigured,
-		},
-		{
-			name:    testMissingBundleID,
-			adapter: &promptTemplateLookupAdapter{store: &promptStore.PromptTemplateStore{}},
-			ref: promptSpec.PromptTemplateRef{
-				TemplateSlug:    testTemplateSlugA,
-				TemplateVersion: validVersion,
-			},
-			wantErrContains: testErrIncomplete,
-		},
-		{
-			name:            "missing template slug",
-			adapter:         &promptTemplateLookupAdapter{store: &promptStore.PromptTemplateStore{}},
-			ref:             promptSpec.PromptTemplateRef{BundleID: testBundleIDA, TemplateVersion: validVersion},
-			wantErrContains: testErrIncomplete,
-		},
-		{
-			name:            "missing template version",
-			adapter:         &promptTemplateLookupAdapter{store: &promptStore.PromptTemplateStore{}},
-			ref:             promptSpec.PromptTemplateRef{BundleID: testBundleIDA, TemplateSlug: testTemplateSlugA},
-			wantErrContains: testErrIncomplete,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := tt.adapter.GetPromptTemplateSummary(ctx, tt.ref)
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}

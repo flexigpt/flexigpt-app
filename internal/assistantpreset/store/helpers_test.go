@@ -13,7 +13,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	promptSpec "github.com/flexigpt/flexigpt-app/internal/prompt/spec"
 	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
@@ -377,15 +376,6 @@ func (f fakeModelPresetLookup) GetModelPresetSummary(
 	ctx context.Context,
 	ref modelpresetSpec.ModelPresetRef,
 ) (ModelPresetSummary, error) {
-	return f(ctx, ref)
-}
-
-type fakePromptTemplateLookup func(context.Context, promptSpec.PromptTemplateRef) (PromptTemplateSummary, error)
-
-func (f fakePromptTemplateLookup) GetPromptTemplateSummary(
-	ctx context.Context,
-	ref promptSpec.PromptTemplateRef,
-) (PromptTemplateSummary, error) {
 	return f(ctx, ref)
 }
 

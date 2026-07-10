@@ -5,19 +5,12 @@ import (
 
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	promptSpec "github.com/flexigpt/flexigpt-app/internal/prompt/spec"
 	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
 type ModelPresetSummary struct {
 	IsEnabled bool
-}
-
-type PromptTemplateSummary struct {
-	IsEnabled  bool
-	Kind       promptSpec.PromptTemplateKind
-	IsResolved bool
 }
 
 type ToolSummary struct {
@@ -27,6 +20,10 @@ type ToolSummary struct {
 type SkillSummary struct {
 	IsEnabled bool
 	Insert    skillSpec.SkillInsert
+
+	// HasArguments is used to reject preloaded instruction skills that need runtime input.
+	HasArguments bool
+	HasResources bool
 }
 
 // ModelPresetLookup validates/loads model preset refs without coupling this package
@@ -36,15 +33,6 @@ type ModelPresetLookup interface {
 		ctx context.Context,
 		ref modelpresetSpec.ModelPresetRef,
 	) (ModelPresetSummary, error)
-}
-
-// PromptTemplateLookup validates/loads prompt template refs without coupling this package
-// to a concrete prompt store implementation.
-type PromptTemplateLookup interface {
-	GetPromptTemplateSummary(
-		ctx context.Context,
-		ref promptSpec.PromptTemplateRef,
-	) (PromptTemplateSummary, error)
 }
 
 // ToolSelectionLookup validates/loads tool selections without coupling this package
@@ -79,9 +67,8 @@ type MCPContextLookup interface {
 }
 
 type ReferenceLookups struct {
-	ModelPresets    ModelPresetLookup
-	PromptTemplates PromptTemplateLookup
-	ToolSelections  ToolSelectionLookup
-	Skills          SkillLookup
-	MCPContext      MCPContextLookup
+	ModelPresets   ModelPresetLookup
+	ToolSelections ToolSelectionLookup
+	Skills         SkillLookup
+	MCPContext     MCPContextLookup
 }

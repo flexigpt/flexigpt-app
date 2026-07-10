@@ -9,24 +9,31 @@
 	"isBuiltIn": true,
 	"startingText": "<Attach or paste the backlog/opportunity list plus goals, constraints, time horizon, known effort/impact data, and dependencies.>\n\nPrioritize these items against the stated goals. Use evidence-aware impact/effort/risk ranking, respect dependencies, call out missing inputs, and recommend an order. Use the associated skill.",
 	"startingIncludeModelSystemPrompt": true,
-	"startingInstructionTemplateRefs": [
-		{
-			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
-			"templateSlug": "markdown-output",
-			"templateVersion": "v1.0.0"
-		},
-		{
-			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
-			"templateSlug": "use-explicit-tools-batched",
-			"templateVersion": "v1.0.0"
-		},
-		{
-			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
-			"templateSlug": "grounded-local-work",
-			"templateVersion": "v1.0.0"
-		}
-	],
 	"startingSkillSelections": [
+		{
+			"skillRef": {
+				"bundleID": "core-instructions",
+				"skillSlug": "markdown-output",
+				"skillID": "markdown-output"
+			},
+			"useAsInstructions": true
+		},
+		{
+			"skillRef": {
+				"bundleID": "core-instructions",
+				"skillSlug": "use-explicit-tools-batched",
+				"skillID": "use-explicit-tools-batched"
+			},
+			"useAsInstructions": true
+		},
+		{
+			"skillRef": {
+				"bundleID": "core-instructions",
+				"skillSlug": "grounded-local-work",
+				"skillID": "grounded-local-work"
+			},
+			"useAsInstructions": true
+		},
 		{
 			"skillRef": {
 				"bundleID": "product-leadership",

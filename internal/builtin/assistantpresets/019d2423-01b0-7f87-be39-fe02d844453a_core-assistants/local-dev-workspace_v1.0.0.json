@@ -9,21 +9,30 @@
 	"isBuiltIn": true,
 	"startingText": "<Replace this line with the repo/project path and the task. Example: `/absolute/path/to/repo`>\n\nInspect relevant files first, prefer unified diffs for edits, use whole-file writes for create/replace cases, and verify with focused shell commands when useful. Keep write and shell actions scoped.",
 	"startingIncludeModelSystemPrompt": true,
-	"startingInstructionTemplateRefs": [
+	"startingSkillSelections": [
 		{
-			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
-			"templateSlug": "markdown-output",
-			"templateVersion": "v1.0.0"
+			"skillRef": {
+				"bundleID": "core-instructions",
+				"skillSlug": "markdown-output",
+				"skillID": "markdown-output"
+			},
+			"useAsInstructions": true
 		},
 		{
-			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
-			"templateSlug": "use-explicit-tools-batched",
-			"templateVersion": "v1.0.0"
+			"skillRef": {
+				"bundleID": "core-instructions",
+				"skillSlug": "use-explicit-tools-batched",
+				"skillID": "use-explicit-tools-batched"
+			},
+			"useAsInstructions": true
 		},
 		{
-			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
-			"templateSlug": "grounded-local-work",
-			"templateVersion": "v1.0.0"
+			"skillRef": {
+				"bundleID": "core-instructions",
+				"skillSlug": "grounded-local-work",
+				"skillID": "grounded-local-work"
+			},
+			"useAsInstructions": true
 		}
 	],
 	"startingToolSelections": [

@@ -87,6 +87,7 @@ export function cloneSkillSelection(sel: SkillSelection): SkillSelection {
 	return {
 		skillRef: cloneSkillRef(sel.skillRef),
 		preLoadAsActive: sel.preLoadAsActive,
+		useAsInstructions: sel.useAsInstructions,
 	};
 }
 

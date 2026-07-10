@@ -278,7 +278,6 @@ func (a *App) initManagers() {
 		a.assistantPresetStoreAPI,
 		a.assistantPresetsDirPath,
 		a.modelPresetStoreAPI.store,
-		a.promptTemplateStoreAPI.store,
 		a.toolStoreAPI.store,
 		a.skillStoreAPI.store,
 		a.mcpAPI.store,

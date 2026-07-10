@@ -8,11 +8,14 @@
 	"isEnabled": true,
 	"isBuiltIn": true,
 	"startingIncludeModelSystemPrompt": true,
-	"startingInstructionTemplateRefs": [
+	"startingSkillSelections": [
 		{
-			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
-			"templateSlug": "markdown-output",
-			"templateVersion": "v1.0.0"
+			"skillRef": {
+				"bundleID": "core-instructions",
+				"skillSlug": "markdown-output",
+				"skillID": "markdown-output"
+			},
+			"useAsInstructions": true
 		}
 	],
 	"createdAt": "2026-03-25T00:00:00Z",

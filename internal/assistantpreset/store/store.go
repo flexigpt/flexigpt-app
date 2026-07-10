@@ -70,13 +70,6 @@ func WithModelPresetLookup(lookup ModelPresetLookup) Option {
 	}
 }
 
-func WithPromptTemplateLookup(lookup PromptTemplateLookup) Option {
-	return func(s *AssistantPresetStore) error {
-		s.lookups.PromptTemplates = lookup
-		return nil
-	}
-}
-
 func WithToolSelectionLookup(lookup ToolSelectionLookup) Option {
 	return func(s *AssistantPresetStore) error {
 		s.lookups.ToolSelections = lookup
@@ -617,7 +610,6 @@ func (s *AssistantPresetStore) PutAssistantPreset(
 		StartingModelPresetRef:           cloneJSONValue(req.Body.StartingModelPresetRef),
 		StartingModelPresetPatch:         cloneJSONValue(req.Body.StartingModelPresetPatch),
 		StartingIncludeModelSystemPrompt: cloneJSONValue(req.Body.StartingIncludeModelSystemPrompt),
-		StartingInstructionTemplateRefs:  cloneJSONValue(req.Body.StartingInstructionTemplateRefs),
 		StartingToolSelections:           cloneJSONValue(req.Body.StartingToolSelections),
 		StartingSkillSelections:          cloneJSONValue(req.Body.StartingSkillSelections),
 		StartingMCPContext:               cloneJSONValue(req.Body.StartingMCPContext),

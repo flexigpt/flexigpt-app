@@ -9,21 +9,30 @@
 	"isBuiltIn": true,
 	"startingText": "<Attach files or replace this line with the local path(s) to read or search, for example `/absolute/path/to/file-or-folder`>\n\nAnalyze this material. Summarize what it is, the important structure, notable details, risks or gaps, and what to read next",
 	"startingIncludeModelSystemPrompt": true,
-	"startingInstructionTemplateRefs": [
+	"startingSkillSelections": [
 		{
-			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
-			"templateSlug": "markdown-output",
-			"templateVersion": "v1.0.0"
+			"skillRef": {
+				"bundleID": "core-instructions",
+				"skillSlug": "markdown-output",
+				"skillID": "markdown-output"
+			},
+			"useAsInstructions": true
 		},
 		{
-			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
-			"templateSlug": "use-explicit-tools-batched",
-			"templateVersion": "v1.0.0"
+			"skillRef": {
+				"bundleID": "core-instructions",
+				"skillSlug": "use-explicit-tools-batched",
+				"skillID": "use-explicit-tools-batched"
+			},
+			"useAsInstructions": true
 		},
 		{
-			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
-			"templateSlug": "grounded-local-work",
-			"templateVersion": "v1.0.0"
+			"skillRef": {
+				"bundleID": "core-instructions",
+				"skillSlug": "grounded-local-work",
+				"skillID": "grounded-local-work"
+			},
+			"useAsInstructions": true
 		}
 	],
 	"startingToolSelections": [

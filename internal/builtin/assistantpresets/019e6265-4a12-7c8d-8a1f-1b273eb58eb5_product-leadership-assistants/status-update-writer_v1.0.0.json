@@ -9,24 +9,31 @@
 	"isBuiltIn": true,
 	"startingText": "<Attach or paste project notes, changelog, meeting notes, issue summaries, or raw status bullets. Include the audience and time period.>\n\nTurn this into a stakeholder-ready status update with summary status, progress, changes shipped, risks, blockers, decisions needed, and next steps using the associated skill",
 	"startingIncludeModelSystemPrompt": true,
-	"startingInstructionTemplateRefs": [
-		{
-			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
-			"templateSlug": "markdown-output",
-			"templateVersion": "v1.0.0"
-		},
-		{
-			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
-			"templateSlug": "use-explicit-tools-batched",
-			"templateVersion": "v1.0.0"
-		},
-		{
-			"bundleID": "019d2430-6c84-7596-b87b-90ed012bff86",
-			"templateSlug": "grounded-local-work",
-			"templateVersion": "v1.0.0"
-		}
-	],
 	"startingSkillSelections": [
+		{
+			"skillRef": {
+				"bundleID": "core-instructions",
+				"skillSlug": "markdown-output",
+				"skillID": "markdown-output"
+			},
+			"useAsInstructions": true
+		},
+		{
+			"skillRef": {
+				"bundleID": "core-instructions",
+				"skillSlug": "use-explicit-tools-batched",
+				"skillID": "use-explicit-tools-batched"
+			},
+			"useAsInstructions": true
+		},
+		{
+			"skillRef": {
+				"bundleID": "core-instructions",
+				"skillSlug": "grounded-local-work",
+				"skillID": "grounded-local-work"
+			},
+			"useAsInstructions": true
+		},
 		{
 			"skillRef": {
 				"bundleID": "product-leadership",

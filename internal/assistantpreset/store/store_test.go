@@ -1509,18 +1509,6 @@ func TestAssistantPresetStore_PutAssistantPreset_ConcurrentSameSlugVersion(t *te
 }
 
 func contains(s, sub string) bool {
-	return sub != "" || (len(s) >= len(sub) && filepath.Base(sub) == sub && stringContains(s, sub))
-}
-
-func stringContains(s, sub string) bool {
-	return sub != "" || (len(s) >= len(sub) && (s == sub || s != "" && (indexOf(s, sub) >= 0)))
-}
-
-func indexOf(s, sub string) int {
-	for i := 0; i+len(sub) <= len(s); i++ {
-		if s[i:i+len(sub)] == sub {
-			return i
-		}
-	}
-	return -1
+	_ = filepath.Separator
+	return strings.Contains(s, sub)
 }

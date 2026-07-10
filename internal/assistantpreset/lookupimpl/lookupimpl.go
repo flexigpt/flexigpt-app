@@ -11,8 +11,6 @@ import (
 	mcpSpec "github.com/flexigpt/flexigpt-app/internal/mcp/spec"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
-	promptSpec "github.com/flexigpt/flexigpt-app/internal/prompt/spec"
-	promptStore "github.com/flexigpt/flexigpt-app/internal/prompt/store"
 	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
 	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
@@ -49,48 +47,6 @@ func (a *modelPresetLookupAdapter) GetModelPresetSummary(
 
 	return assistantpresetStore.ModelPresetSummary{
 		IsEnabled: resp.Body.Provider.IsEnabled && resp.Body.Model.IsEnabled,
-	}, nil
-}
-
-type promptTemplateLookupAdapter struct {
-	store *promptStore.PromptTemplateStore
-}
-
-func (a *promptTemplateLookupAdapter) GetPromptTemplateSummary(
-	ctx context.Context,
-	ref promptSpec.PromptTemplateRef,
-) (assistantpresetStore.PromptTemplateSummary, error) {
-	if a == nil || a.store == nil {
-		return assistantpresetStore.PromptTemplateSummary{}, errors.New(
-			"prompt template lookup adapter is not configured",
-		)
-	}
-
-	if ref.BundleID == "" || ref.TemplateSlug == "" || ref.TemplateVersion == "" {
-		return assistantpresetStore.PromptTemplateSummary{}, errors.New("prompt template ref is incomplete")
-	}
-
-	bundleEnabled, err := getPromptBundleEnabled(ctx, a.store, ref.BundleID)
-	if err != nil {
-		return assistantpresetStore.PromptTemplateSummary{}, err
-	}
-
-	resp, err := a.store.GetPromptTemplate(ctx, &promptSpec.GetPromptTemplateRequest{
-		BundleID:     ref.BundleID,
-		TemplateSlug: ref.TemplateSlug,
-		Version:      ref.TemplateVersion,
-	})
-	if err != nil {
-		return assistantpresetStore.PromptTemplateSummary{}, err
-	}
-	if resp == nil || resp.Body == nil {
-		return assistantpresetStore.PromptTemplateSummary{}, errors.New("empty prompt template response")
-	}
-
-	return assistantpresetStore.PromptTemplateSummary{
-		IsEnabled:  bundleEnabled && resp.Body.IsEnabled,
-		Kind:       resp.Body.Kind,
-		IsResolved: resp.Body.IsResolved,
 	}, nil
 }
 
@@ -177,8 +133,10 @@ func (a *skillLookupAdapter) GetSkillSummaryForSelection(
 	}
 
 	return assistantpresetStore.SkillSummary{
-		IsEnabled: bundleEnabled && resp.Body.IsEnabled,
-		Insert:    resp.Body.Insert,
+		IsEnabled:    bundleEnabled && resp.Body.IsEnabled,
+		Insert:       resp.Body.Insert,
+		HasArguments: len(resp.Body.Arguments) > 0,
+		HasResources: resp.Body.Resources.HasResources,
 	}, nil
 }
 
@@ -668,25 +626,6 @@ func isOptionalMCPDiscoveryError(err error) bool {
 		errors.Is(err, mcpSpec.ErrMCPServerDisabled)
 }
 
-func getPromptBundleEnabled(
-	ctx context.Context,
-	store *promptStore.PromptTemplateStore,
-	bundleID bundleitemutils.BundleID,
-) (bool, error) {
-	resp, err := store.ListPromptBundles(ctx, &promptSpec.ListPromptBundlesRequest{
-		BundleIDs:       []bundleitemutils.BundleID{bundleID},
-		IncludeDisabled: true,
-		PageSize:        1,
-	})
-	if err != nil {
-		return false, err
-	}
-	if resp == nil || resp.Body == nil || len(resp.Body.PromptBundles) == 0 {
-		return false, promptSpec.ErrBundleNotFound
-	}
-	return resp.Body.PromptBundles[0].IsEnabled, nil
-}
-
 func getToolBundleEnabled(
 	ctx context.Context,
 	store *toolStore.ToolStore,
@@ -727,7 +666,6 @@ func getSkillBundleEnabled(
 
 func NewAssistantPresetReferenceLookups(
 	modelPresetSt *modelpresetStore.ModelPresetStore,
-	promptTemplateSt *promptStore.PromptTemplateStore,
 	toolSt *toolStore.ToolStore,
 	skillSt *skillStore.SkillStore,
 	mcpServerStore MCPServerConfigStore,
@@ -743,11 +681,6 @@ func NewAssistantPresetReferenceLookups(
 		Skills: &skillLookupAdapter{
 			store: skillSt,
 		},
-	}
-	if promptTemplateSt != nil {
-		lookups.PromptTemplates = &promptTemplateLookupAdapter{
-			store: promptTemplateSt,
-		}
 	}
 	if mcpServerStore != nil {
 		lookups.MCPContext = NewMCPContextLookup(mcpServerStore, mcpDiscovery)

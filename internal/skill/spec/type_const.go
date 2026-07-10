@@ -93,8 +93,9 @@ type SkillRef struct {
 }
 
 type SkillSelection struct {
-	SkillRef        SkillRef `json:"skillRef"`
-	PreLoadAsActive bool     `json:"preLoadAsActive"`
+	SkillRef          SkillRef `json:"skillRef"`
+	PreLoadAsActive   bool     `json:"preLoadAsActive"`
+	UseAsInstructions bool     `json:"useAsInstructions"`
 }
 
 type (

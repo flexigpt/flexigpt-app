@@ -18,6 +18,7 @@ export interface SkillRef {
 export interface SkillSelection {
 	skillRef: SkillRef;
 	preLoadAsActive: boolean;
+	useAsInstructions: boolean;
 }
 
 export interface RuntimeSkillFilter {

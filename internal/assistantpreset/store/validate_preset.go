@@ -12,7 +12,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/assistantpreset/spec"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	promptSpec "github.com/flexigpt/flexigpt-app/internal/prompt/spec"
 	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
@@ -97,18 +96,6 @@ func validateAssistantPresetStructure(preset *spec.AssistantPreset) error {
 		return err
 	}
 
-	seenInstructionRefs := make(map[string]struct{}, len(preset.StartingInstructionTemplateRefs))
-	for i, ref := range preset.StartingInstructionTemplateRefs {
-		key, err := normalizedJSONKey(ref)
-		if err != nil {
-			return fmt.Errorf("startingInstructionTemplateRefs[%d]: %w", i, err)
-		}
-		if _, exists := seenInstructionRefs[key]; exists {
-			return fmt.Errorf("startingInstructionTemplateRefs[%d]: duplicate ref", i)
-		}
-		seenInstructionRefs[key] = struct{}{}
-	}
-
 	seenToolRefs := make(map[string]struct{}, len(preset.StartingToolSelections))
 	for i, selection := range preset.StartingToolSelections {
 		key, err := toolSelectionRefKey(selection)
@@ -178,35 +165,6 @@ func validateAssistantPresetReferences(
 		}
 	}
 
-	for i, ref := range preset.StartingInstructionTemplateRefs {
-		if lookups.PromptTemplates == nil {
-			return errors.New("prompt template lookup not configured")
-		}
-		summary, err := lookups.PromptTemplates.GetPromptTemplateSummary(ctx, ref)
-		if err != nil {
-			return fmt.Errorf("startingInstructionTemplateRefs[%d]: %w", i, err)
-		}
-		if !summary.IsEnabled {
-			return fmt.Errorf(
-				"startingInstructionTemplateRefs[%d]: referenced template is disabled",
-				i,
-			)
-		}
-		if summary.Kind != promptSpec.PromptTemplateKindInstructionsOnly {
-			return fmt.Errorf(
-				"startingInstructionTemplateRefs[%d]: template kind must be %q",
-				i,
-				promptSpec.PromptTemplateKindInstructionsOnly,
-			)
-		}
-		if !summary.IsResolved {
-			return fmt.Errorf(
-				"startingInstructionTemplateRefs[%d]: template must be resolved",
-				i,
-			)
-		}
-	}
-
 	for i, selection := range preset.StartingToolSelections {
 		if lookups.ToolSelections == nil {
 			return errors.New("tool selection lookup not configured")
@@ -241,6 +199,20 @@ func validateAssistantPresetReferences(
 					"startingSkillSelections[%d]: preloaded skill must have insert=%q",
 					i,
 					skillSpec.SkillInsertInstructions,
+				)
+			}
+		}
+		if selection.UseAsInstructions {
+			if summary.HasArguments {
+				return fmt.Errorf(
+					"startingSkillSelections[%d]: instructions skill must not declare arguments",
+					i,
+				)
+			}
+			if summary.HasResources {
+				return fmt.Errorf(
+					"startingSkillSelections[%d]: instructions skill must not have any additional resources",
+					i,
 				)
 			}
 		}

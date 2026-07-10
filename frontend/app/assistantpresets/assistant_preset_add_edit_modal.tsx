@@ -1210,6 +1210,7 @@ function AddEditAssistantPresetModalContent({
 							: (option.availabilityReason ?? 'Unavailable')
 						: 'Missing reference',
 					preLoadAsActive: sel.preLoadAsActive,
+					useAsInstructions: sel.useAsInstructions,
 				};
 			}),
 		[formData.startingSkillSelections, skillOptionByKey]

@@ -11,7 +11,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/assistantpreset/spec"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	promptSpec "github.com/flexigpt/flexigpt-app/internal/prompt/spec"
 	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
@@ -81,13 +80,6 @@ func TestCloneAssistantPreset(t *testing.T) {
 		ModelPresetID: "mp-1",
 	}
 	orig.StartingIncludeModelSystemPrompt = new(true)
-	orig.StartingInstructionTemplateRefs = []promptSpec.PromptTemplateRef{
-		{
-			BundleID:        bundleitemutils.BundleID("bundle-a"),
-			TemplateSlug:    testTemplateSlugA,
-			TemplateVersion: testItemVersion(t),
-		},
-	}
 	orig.StartingToolSelections = []toolSpec.ToolSelection{
 		{
 			ToolRef: toolSpec.ToolRef{
@@ -111,7 +103,6 @@ func TestCloneAssistantPreset(t *testing.T) {
 	orig.StartingText = "changed starting text"
 	orig.StartingModelPresetRef.ProviderName = "changed-provider"
 	*orig.StartingIncludeModelSystemPrompt = false
-	orig.StartingInstructionTemplateRefs[0].TemplateSlug = "changed-template"
 	orig.StartingToolSelections[0].ToolRef.ToolSlug = "changed-tool"
 	orig.StartingSkillSelections[0].SkillRef.SkillSlug = "changed-skill"
 
@@ -123,13 +114,6 @@ func TestCloneAssistantPreset(t *testing.T) {
 	}
 	if got.StartingIncludeModelSystemPrompt == nil || *got.StartingIncludeModelSystemPrompt != true {
 		t.Fatalf("cloned StartingIncludeModelSystemPrompt = %v", got.StartingIncludeModelSystemPrompt)
-	}
-	if got.StartingInstructionTemplateRefs[0].TemplateSlug != testTemplateSlugA {
-		t.Fatalf(
-			"cloned template slug = %q, want %q",
-			got.StartingInstructionTemplateRefs[0].TemplateSlug,
-			testTemplateSlugA,
-		)
 	}
 	if got.StartingToolSelections[0].ToolRef.ToolSlug != testToolA {
 		t.Fatalf("cloned tool slug = %q, want %q", got.StartingToolSelections[0].ToolRef.ToolSlug, testToolA)
@@ -344,11 +328,6 @@ func TestValidateAssistantPresetBundle(t *testing.T) {
 func TestValidateAssistantPresetStructure(t *testing.T) {
 	valid := newTestPreset(t, "structure", true)
 
-	dupPromptRef := promptSpec.PromptTemplateRef{
-		BundleID:        bundleitemutils.BundleID("bundle-a"),
-		TemplateSlug:    testTemplateSlugA,
-		TemplateVersion: testItemVersion(t),
-	}
 	dupToolSelection := toolSpec.ToolSelection{
 		ToolRef: toolSpec.ToolRef{
 			BundleID:    bundleitemutils.BundleID("bundle-a"),
@@ -457,15 +436,6 @@ func TestValidateAssistantPresetStructure(t *testing.T) {
 			wantErrContains: "startingText is too large",
 		},
 		{
-			name: "duplicate instruction refs",
-			preset: func() *spec.AssistantPreset {
-				p := valid
-				p.StartingInstructionTemplateRefs = []promptSpec.PromptTemplateRef{dupPromptRef, dupPromptRef}
-				return &p
-			}(),
-			wantErrContains: "startingInstructionTemplateRefs[1]: duplicate ref",
-		},
-		{
 			name: "duplicate tool refs",
 			preset: func() *spec.AssistantPreset {
 				p := valid
@@ -520,16 +490,6 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 	modelRef := modelpresetSpec.ModelPresetRef{
 		ProviderName:  "provider-a",
 		ModelPresetID: "mp-a",
-	}
-	promptRef1 := promptSpec.PromptTemplateRef{
-		BundleID:        bundleitemutils.BundleID("bundle-a"),
-		TemplateSlug:    testTemplateSlugA,
-		TemplateVersion: version,
-	}
-	promptRef2 := promptSpec.PromptTemplateRef{
-		BundleID:        bundleitemutils.BundleID("bundle-b"),
-		TemplateSlug:    "tmpl-b",
-		TemplateVersion: version,
 	}
 	toolSel := toolSpec.ToolSelection{
 		ToolRef: toolSpec.ToolRef{
@@ -603,122 +563,6 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 				),
 			},
 			wantErrContains: "startingModelPresetRef references a disabled model preset",
-		},
-		{
-			name: "prompt lookup missing",
-			preset: func() *spec.AssistantPreset {
-				p := makeBase()
-				p.StartingInstructionTemplateRefs = []promptSpec.PromptTemplateRef{promptRef1}
-				return p
-			}(),
-			wantErrContains: "prompt template lookup not configured",
-		},
-		{
-			name: "prompt lookup error",
-			preset: func() *spec.AssistantPreset {
-				p := makeBase()
-				p.StartingInstructionTemplateRefs = []promptSpec.PromptTemplateRef{promptRef1}
-				return p
-			}(),
-			lookups: ReferenceLookups{
-				PromptTemplates: fakePromptTemplateLookup(
-					func(context.Context, promptSpec.PromptTemplateRef) (PromptTemplateSummary, error) {
-						return PromptTemplateSummary{}, errors.New("prompt boom")
-					},
-				),
-			},
-			wantErrContains: "startingInstructionTemplateRefs[0]: prompt boom",
-		},
-		{
-			name: "prompt disabled",
-			preset: func() *spec.AssistantPreset {
-				p := makeBase()
-				p.StartingInstructionTemplateRefs = []promptSpec.PromptTemplateRef{promptRef1}
-				return p
-			}(),
-			lookups: ReferenceLookups{
-				PromptTemplates: fakePromptTemplateLookup(
-					func(context.Context, promptSpec.PromptTemplateRef) (PromptTemplateSummary, error) {
-						return PromptTemplateSummary{
-							IsEnabled:  false,
-							Kind:       promptSpec.PromptTemplateKindInstructionsOnly,
-							IsResolved: true,
-						}, nil
-					},
-				),
-			},
-			wantErrContains: "startingInstructionTemplateRefs[0]: referenced template is disabled",
-		},
-		{
-			name: "prompt wrong kind",
-			preset: func() *spec.AssistantPreset {
-				p := makeBase()
-				p.StartingInstructionTemplateRefs = []promptSpec.PromptTemplateRef{promptRef1}
-				return p
-			}(),
-			lookups: ReferenceLookups{
-				PromptTemplates: fakePromptTemplateLookup(
-					func(context.Context, promptSpec.PromptTemplateRef) (PromptTemplateSummary, error) {
-						return PromptTemplateSummary{
-							IsEnabled:  true,
-							Kind:       "not-instructions-only",
-							IsResolved: true,
-						}, nil
-					},
-				),
-			},
-			wantErrContains: "template kind must be",
-		},
-		{
-			name: "prompt unresolved",
-			preset: func() *spec.AssistantPreset {
-				p := makeBase()
-				p.StartingInstructionTemplateRefs = []promptSpec.PromptTemplateRef{promptRef1}
-				return p
-			}(),
-			lookups: ReferenceLookups{
-				PromptTemplates: fakePromptTemplateLookup(
-					func(context.Context, promptSpec.PromptTemplateRef) (PromptTemplateSummary, error) {
-						return PromptTemplateSummary{
-							IsEnabled:  true,
-							Kind:       promptSpec.PromptTemplateKindInstructionsOnly,
-							IsResolved: false,
-						}, nil
-					},
-				),
-			},
-			wantErrContains: "template must be resolved",
-		},
-		{
-			name: "prompt second item index in error",
-			preset: func() *spec.AssistantPreset {
-				p := makeBase()
-				p.StartingInstructionTemplateRefs = []promptSpec.PromptTemplateRef{promptRef1, promptRef2}
-				return p
-			}(),
-			lookups: func() ReferenceLookups {
-				calls := 0
-				return ReferenceLookups{
-					PromptTemplates: fakePromptTemplateLookup(
-						func(context.Context, promptSpec.PromptTemplateRef) (PromptTemplateSummary, error) {
-							calls++
-							if calls == 1 {
-								return PromptTemplateSummary{
-									IsEnabled:  true,
-									Kind:       promptSpec.PromptTemplateKindInstructionsOnly,
-									IsResolved: true,
-								}, nil
-							}
-							return PromptTemplateSummary{
-								IsEnabled:  false,
-								Kind:       promptSpec.PromptTemplateKindInstructionsOnly,
-								IsResolved: true,
-							}, nil
-						},
-					),
-				}
-			}(),
-			wantErrContains: "startingInstructionTemplateRefs[1]",
 		},
 		{
 			name: "tool lookup missing",
@@ -799,11 +643,27 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 			wantErrContains: "startingSkillSelections[0]: referenced skill is disabled",
 		},
 		{
+			name: "user-message skill with arguments is selectable",
+			preset: func() *spec.AssistantPreset {
+				p := makeBase()
+				p.StartingSkillSelections = []skillSpec.SkillSelection{skillSelection}
+				return p
+			}(),
+			lookups: ReferenceLookups{
+				Skills: fakeSkillLookup(func(context.Context, skillSpec.SkillSelection) (SkillSummary, error) {
+					return SkillSummary{
+						IsEnabled:    true,
+						Insert:       skillSpec.SkillInsertUserMessage,
+						HasArguments: true,
+					}, nil
+				}),
+			},
+		},
+		{
 			name: "all references valid",
 			preset: func() *spec.AssistantPreset {
 				p := makeBase()
 				p.StartingModelPresetRef = &modelRef
-				p.StartingInstructionTemplateRefs = []promptSpec.PromptTemplateRef{promptRef1}
 				p.StartingToolSelections = []toolSpec.ToolSelection{toolSel}
 				p.StartingSkillSelections = []skillSpec.SkillSelection{skillSelection}
 				return p
@@ -812,15 +672,6 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 				ModelPresets: fakeModelPresetLookup(
 					func(context.Context, modelpresetSpec.ModelPresetRef) (ModelPresetSummary, error) {
 						return ModelPresetSummary{IsEnabled: true}, nil
-					},
-				),
-				PromptTemplates: fakePromptTemplateLookup(
-					func(context.Context, promptSpec.PromptTemplateRef) (PromptTemplateSummary, error) {
-						return PromptTemplateSummary{
-							IsEnabled:  true,
-							Kind:       promptSpec.PromptTemplateKindInstructionsOnly,
-							IsResolved: true,
-						}, nil
 					},
 				),
 				ToolSelections: fakeToolSelectionLookup(

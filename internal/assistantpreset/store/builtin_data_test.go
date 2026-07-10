@@ -12,7 +12,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/fsutil"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	promptSpec "github.com/flexigpt/flexigpt-app/internal/prompt/spec"
 	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
@@ -65,13 +64,6 @@ func TestBuiltInData_ListBuiltInData_DeepCopyAndGetters(t *testing.T) {
 		ModelPresetID: "mp-a",
 	}
 	preset.StartingIncludeModelSystemPrompt = new(true)
-	preset.StartingInstructionTemplateRefs = []promptSpec.PromptTemplateRef{
-		{
-			BundleID:        bundleitemutils.BundleID("bundle-a"),
-			TemplateSlug:    testTemplateSlugA,
-			TemplateVersion: testItemVersion(t),
-		},
-	}
 	preset.StartingToolSelections = []toolSpec.ToolSelection{
 		{
 			ToolRef: toolSpec.ToolRef{
@@ -95,15 +87,6 @@ func TestBuiltInData_ListBuiltInData_DeepCopyAndGetters(t *testing.T) {
 		ModelPresets: fakeModelPresetLookup(
 			func(context.Context, modelpresetSpec.ModelPresetRef) (ModelPresetSummary, error) {
 				return ModelPresetSummary{IsEnabled: true}, nil
-			},
-		),
-		PromptTemplates: fakePromptTemplateLookup(
-			func(context.Context, promptSpec.PromptTemplateRef) (PromptTemplateSummary, error) {
-				return PromptTemplateSummary{
-					IsEnabled:  true,
-					Kind:       promptSpec.PromptTemplateKindInstructionsOnly,
-					IsResolved: true,
-				}, nil
 			},
 		),
 		ToolSelections: fakeToolSelectionLookup(func(context.Context, toolSpec.ToolSelection) (ToolSummary, error) {
@@ -149,7 +132,6 @@ func TestBuiltInData_ListBuiltInData_DeepCopyAndGetters(t *testing.T) {
 	p.DisplayName = "mutated preset"
 	p.StartingText = "mutated starting text"
 	*p.StartingIncludeModelSystemPrompt = false
-	p.StartingInstructionTemplateRefs[0].TemplateSlug = "mutated-template"
 	p.StartingToolSelections[0].ToolRef.ToolSlug = "mutated-tool"
 	p.StartingSkillSelections[0].SkillRef.SkillSlug = "mutated-skill"
 	presets[bundle.ID][preset.ID] = p
@@ -182,13 +164,6 @@ func TestBuiltInData_ListBuiltInData_DeepCopyAndGetters(t *testing.T) {
 		t.Fatalf(
 			"GetBuiltInAssistantPreset().StartingIncludeModelSystemPrompt = %v, want true",
 			gotPreset.StartingIncludeModelSystemPrompt,
-		)
-	}
-	if gotPreset.StartingInstructionTemplateRefs[0].TemplateSlug != testTemplateSlugA {
-		t.Fatalf(
-			"template slug = %q, want %q",
-			gotPreset.StartingInstructionTemplateRefs[0].TemplateSlug,
-			testTemplateSlugA,
 		)
 	}
 	if gotPreset.StartingToolSelections[0].ToolRef.ToolSlug != testToolA {
