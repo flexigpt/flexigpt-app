@@ -654,18 +654,20 @@ export function useAssistantContextState(): AssistantContextController {
 			}
 
 			const requestedSkillSels = preset.startingSkillSelections ?? [];
+			const sessionSkillSels = requestedSkillSels.filter(selection => !selection.useAsInstructions);
+
 			// Preset semantics: empty or missing means "no opinion", not "clear current skills".
-			const hasSkillsSelection = requestedSkillSels.length > 0;
-			const enabledSkillRefs = hasSkillsSelection ? normalizeSkillSelectionsToRefs(requestedSkillSels) : [];
+			const hasSkillsSelection = sessionSkillSels.length > 0;
+			const enabledSkillRefs = hasSkillsSelection ? normalizeSkillSelectionsToRefs(sessionSkillSels) : [];
 			const activeSkillRefs = hasSkillsSelection
-				? normalizeSkillSelectionsToRefs(requestedSkillSels.filter(sel => sel.preLoadAsActive))
+				? normalizeSkillSelectionsToRefs(sessionSkillSels.filter(sel => sel.preLoadAsActive))
 				: [];
 
 			if (hasSkillsSelection) {
 				const skillOptions = await loadSkillOptions();
 				const skillOptionByKey = new Map(skillOptions.map(item => [item.key, item] as const));
 
-				const invalidSkillSel = requestedSkillSels.find(sel => {
+				const invalidSkillSel = sessionSkillSels.find(sel => {
 					const skillOption = skillOptionByKey.get(buildSkillRefKey(sel.skillRef));
 					return !skillOption || !skillOption.isSelectable;
 				});

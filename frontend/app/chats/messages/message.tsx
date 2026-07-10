@@ -129,7 +129,13 @@ export const ChatMessage = memo(function ChatMessage({
 			false);
 
 	const hasCitations = !isUser && (message.uiCitations?.length ?? 0) > 0;
-	const hasMCPContext = (message.mcpContext?.servers?.length ?? 0) > 0;
+	const mcpContextItemCount =
+		(message.mcpContext?.servers?.length ?? 0) +
+		(message.mcpContext?.resources?.length ?? 0) +
+		(message.mcpContext?.resourceTemplates?.length ?? 0) +
+		(message.mcpContext?.prompts?.length ?? 0);
+	const hasMCPContext = mcpContextItemCount > 0;
+	const hasSkillContext = (message.enabledSkillRefs?.length ?? 0) > 0 || (message.activeSkillRefs?.length ?? 0) > 0;
 
 	const hasAttachmentsBar =
 		(message.attachments?.length ?? 0) > 0 ||
@@ -137,7 +143,8 @@ export const ChatMessage = memo(function ChatMessage({
 		(message.mcpAppContextUpdates?.length ?? 0) > 0 ||
 		(message.uiToolCalls?.length ?? 0) > 0 ||
 		(message.uiToolOutputs?.length ?? 0) > 0 ||
-		hasMCPContext;
+		hasMCPContext ||
+		hasSkillContext;
 
 	// Detect MCP Apps in this message's tool outputs.
 	const mcpAppViews = useMemo(() => {
@@ -263,6 +270,8 @@ export const ChatMessage = memo(function ChatMessage({
 								toolChoices={message.toolStoreChoices}
 								mcpContext={message.mcpContext}
 								mcpAppContextUpdates={message.mcpAppContextUpdates}
+								enabledSkillRefs={message.enabledSkillRefs}
+								activeSkillRefs={message.activeSkillRefs}
 								toolCalls={message.uiToolCalls}
 								toolOutputs={message.uiToolOutputs}
 								onToolChoiceDetails={choice => {

@@ -26,6 +26,7 @@ interface SkillSelectionSectionProps {
 	onMoveDown: (index: number) => void;
 	onRemove: (index: number) => void;
 	onPreLoadAsActiveChange: (index: number, next: boolean) => void;
+	onUseAsInstructionsChange: (index: number, next: boolean) => void;
 }
 
 export const SkillSelectionSection = memo(function SkillSelectionSection({
@@ -41,6 +42,7 @@ export const SkillSelectionSection = memo(function SkillSelectionSection({
 	onMoveDown,
 	onRemove,
 	onPreLoadAsActiveChange,
+	onUseAsInstructionsChange,
 }: SkillSelectionSectionProps) {
 	const dropdownItems = useMemo<Record<string, { isEnabled: boolean }>>(
 		() =>
@@ -104,7 +106,23 @@ export const SkillSelectionSection = memo(function SkillSelectionSection({
 							)}
 						</div>
 
-						<div className="mt-3">
+						<div className="mt-3 space-y-2">
+							<label className="label cursor-pointer justify-start gap-3 py-1">
+								<span className="text-sm">Use as system instructions</span>
+								{isViewMode ? (
+									<span className="text-sm">{item.useAsInstructions ? 'Yes' : 'No'}</span>
+								) : (
+									<input
+										type="checkbox"
+										className="toggle toggle-accent"
+										checked={item.useAsInstructions}
+										onChange={e => {
+											onUseAsInstructionsChange(idx, e.target.checked);
+										}}
+									/>
+								)}
+							</label>
+
 							<label className="label cursor-pointer justify-start gap-3 py-1">
 								<span className="text-sm">Preload as active</span>
 								{isViewMode ? (
@@ -114,6 +132,12 @@ export const SkillSelectionSection = memo(function SkillSelectionSection({
 										type="checkbox"
 										className="toggle toggle-accent"
 										checked={item.preLoadAsActive}
+										disabled={item.useAsInstructions}
+										title={
+											item.useAsInstructions
+												? 'Instruction-prompt selections are not active session skills.'
+												: undefined
+										}
 										onChange={e => {
 											onPreLoadAsActiveChange(idx, e.target.checked);
 										}}

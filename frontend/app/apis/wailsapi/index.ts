@@ -7,7 +7,6 @@ export * from './backend';
 export * from './conversationstore';
 export * from './mcp';
 export * from './modelpresetstore';
-export * from './promptstore';
 export * from './settingstore';
 export * from './skillstore';
 export * from './toolruntime';

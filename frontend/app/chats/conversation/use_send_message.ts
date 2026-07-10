@@ -26,7 +26,6 @@ import {
 } from '@/chats/conversation/hydration_helper';
 import type { StreamBuffer } from '@/chats/conversation/use_streaming_runtime';
 import type { ChatTabState } from '@/chats/tabs/tabs_model';
-import { appendSystemPromptParts } from '@/prompts/lib/system_prompt_utils';
 import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
 
 interface UseSendMessageArgs {
@@ -519,19 +518,11 @@ export function useSendMessage({
 				return;
 			}
 
-			let sendOptions: UIChatOption = {
+			const sendOptions: UIChatOption = {
 				...options,
 				systemPrompt: payload.resolvedSystemPrompt?.trim() || '',
 			};
 			const editingId = tab.editingMessageId ?? undefined;
-			const templateSystemPrompt = payload.templateSystemPrompt?.trim() || undefined;
-
-			if (templateSystemPrompt) {
-				sendOptions = {
-					...sendOptions,
-					systemPrompt: appendSystemPromptParts(sendOptions.systemPrompt ?? '', [templateSystemPrompt]),
-				};
-			}
 
 			const modelPresetRef: ModelPresetRef = {
 				providerName: sendOptions.providerName,

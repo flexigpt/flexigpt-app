@@ -11,7 +11,6 @@ import { OutputFormatKind, ReasoningLevel, ReasoningType } from '@/spec/inferenc
 import type { MCPConversationContext } from '@/spec/mcp';
 import { MCPToolExposure } from '@/spec/mcp';
 import type { AssistantModelPresetOption } from '@/spec/modelpreset';
-import type { AssistantInstructionTemplateOption } from '@/spec/prompt';
 import type { AssistantSkillOption } from '@/spec/skill';
 import type { AssistantToolOption } from '@/spec/tool';
 import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
@@ -25,7 +24,6 @@ import { ModalBackdrop } from '@/components/modal_backdrop';
 
 import { MCPSelectionSection } from '@/assistantpresets/components/mcp_selection_section';
 import { AssistantPresetModelPatchEditor } from '@/assistantpresets/components/model_patch_editor';
-import { OrderedRefSelectionSection } from '@/assistantpresets/components/ordered_ref_selection_section';
 import { SkillSelectionSection } from '@/assistantpresets/components/skill_selection_section';
 import { ToolSelectionSection } from '@/assistantpresets/components/tool_selection_section';
 import type { AssistantPresetEditorCatalog } from '@/assistantpresets/lib/assistant_preset_catalog';
@@ -48,7 +46,6 @@ import {
 	buildSkillRefKey,
 	buildToolRefKey,
 	cloneMCPConversationContext,
-	clonePromptTemplateRef,
 	cloneSkillSelection,
 	formatDateish,
 	hasAssistantPresetMCPContext,
@@ -57,7 +54,11 @@ import {
 import { normalizeAssistantPresetMCPContext } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import { useComposerMCP } from '@/chats/composer/mcp/use_composer_mcp';
 import { buildEffectiveModelParamFromModelPreset } from '@/modelpresets/lib/modelpreset_effective_defaults';
-import { buildPromptTemplateRefKey } from '@/prompts/lib/prompt_template_ref';
+import {
+	getSkillInstructionPromptEligibilityReason,
+	getSkillPreloadEligibilityReason,
+	isInstructionInsertSkill,
+} from '@/skills/lib/skill_artifact_utils';
 
 interface AddEditAssistantPresetModalProps {
 	isOpen: boolean;
@@ -73,7 +74,7 @@ type JSONParseResult = { ok: true; value: unknown } | { ok: false; error: string
 
 const EMPTY_ERROR_STATE: ErrorState = {};
 const EMPTY_MODEL_OPTIONS: AssistantModelPresetOption[] = [];
-const EMPTY_INSTRUCTION_OPTIONS: AssistantInstructionTemplateOption[] = [];
+
 const EMPTY_TOOL_OPTIONS: AssistantToolOption[] = [];
 const EMPTY_SKILL_OPTIONS: AssistantSkillOption[] = [];
 const TRI_STATE_DROPDOWN_ITEMS: Record<TriStateBoolean, { isEnabled: boolean }> = {
@@ -412,7 +413,6 @@ function getInitialFormData(
 			startingModelPresetKey: src.startingModelPresetRef ? buildModelPresetRefKey(src.startingModelPresetRef) : '',
 			startingIncludeModelSystemPrompt: booleanToTriState(src.startingIncludeModelSystemPrompt),
 			modelPatch: getInitialModelPatchFormData(src.startingModelPresetPatch),
-			startingInstructionTemplateRefs: (src.startingInstructionTemplateRefs ?? []).map(r => clonePromptTemplateRef(r)),
 			startingToolSelections: (src.startingToolSelections ?? []).map(selection => ({
 				toolRef: {
 					bundleID: selection.toolRef.bundleID,
@@ -422,7 +422,7 @@ function getInitialFormData(
 				autoExecuteMode: booleanToTriState(selection.toolChoicePatch?.autoExecute),
 				userArgSchemaInstance: selection.toolChoicePatch?.userArgSchemaInstance ?? '',
 			})),
-			startingSkillSelections: (src.startingSkillSelections ?? []).map(s => cloneSkillSelection(s)),
+			startingSkillSelections: (src.startingSkillSelections ?? []).map(selection => cloneSkillSelection(selection)),
 			startingMCPContext: cloneMCPConversationContext(src.startingMCPContext),
 		};
 	}
@@ -437,7 +437,6 @@ function getInitialFormData(
 		startingModelPresetKey: '',
 		startingIncludeModelSystemPrompt: '',
 		modelPatch: getDefaultModelPatchFormData(),
-		startingInstructionTemplateRefs: [],
 		startingToolSelections: [],
 		startingSkillSelections: [],
 		startingMCPContext: undefined,
@@ -622,7 +621,6 @@ function AddEditAssistantPresetModalContent({
 	const [catalogLoading, setCatalogLoading] = useState(true);
 	const [catalogError, setCatalogError] = useState('');
 
-	const [nextInstructionKey, setNextInstructionKey] = useState('');
 	const [nextToolKey, setNextToolKey] = useState('');
 	const [nextSkillKey, setNextSkillKey] = useState('');
 	const [prefillMode, setPrefillMode] = useState(false);
@@ -646,7 +644,7 @@ function AddEditAssistantPresetModalContent({
 			setCatalog(loaded);
 		} catch (error) {
 			console.error('Failed to load assistant preset editor catalog:', error);
-			setCatalogError(getErrorMessage(error, 'Failed to load models, prompts, tools, and skills.'));
+			setCatalogError(getErrorMessage(error, 'Failed to load models, tools, and skills.'));
 		} finally {
 			setCatalogLoading(false);
 		}
@@ -728,28 +726,16 @@ function AddEditAssistantPresetModalContent({
 	);
 
 	const modelPresetOptions = catalog?.modelPresetOptions ?? EMPTY_MODEL_OPTIONS;
-	const instructionOptions = catalog?.instructionTemplateOptions ?? EMPTY_INSTRUCTION_OPTIONS;
+
 	const toolOptions = catalog?.toolOptions ?? EMPTY_TOOL_OPTIONS;
 	const skillOptions = catalog?.skillOptions ?? EMPTY_SKILL_OPTIONS;
 
 	const modelOptionByKey = useMemo(() => createOptionMap(modelPresetOptions), [modelPresetOptions]);
-	const instructionOptionByKey = useMemo(() => createOptionMap(instructionOptions), [instructionOptions]);
 	const toolOptionByKey = useMemo(() => createOptionMap(toolOptions), [toolOptions]);
 	const skillOptionByKey = useMemo(() => createOptionMap(skillOptions), [skillOptions]);
 	const selectedStartingModelOption = formData.startingModelPresetKey
 		? modelOptionByKey.get(formData.startingModelPresetKey)
 		: undefined;
-
-	const availableInstructionOptions = useMemo<SimpleSelectableOption[]>(() => {
-		const selected = new Set(formData.startingInstructionTemplateRefs.map(ref => buildPromptTemplateRefKey(ref)));
-
-		return instructionOptions
-			.filter(option => option.isSelectable && !selected.has(option.key))
-			.map(option => ({
-				key: option.key,
-				label: option.label,
-			}));
-	}, [instructionOptions, formData.startingInstructionTemplateRefs]);
 
 	const availableToolOptions = useMemo<SimpleSelectableOption[]>(() => {
 		const selected = new Set(formData.startingToolSelections.map(selection => buildToolRefKey(selection.toolRef)));
@@ -786,11 +772,6 @@ function AddEditAssistantPresetModalContent({
 				label: option.label,
 			}));
 	}, [skillOptions, formData.startingSkillSelections]);
-
-	const effectiveNextInstructionKey = useMemo(
-		() => getEffectiveOptionKey(availableInstructionOptions, nextInstructionKey),
-		[availableInstructionOptions, nextInstructionKey]
-	);
 
 	const effectiveNextToolKey = useMemo(
 		() => getEffectiveOptionKey(availableToolOptions, nextToolKey),
@@ -928,23 +909,6 @@ function AddEditAssistantPresetModalContent({
 				}
 			}
 
-			if (state.startingInstructionTemplateRefs.length > 0) {
-				const keys = state.startingInstructionTemplateRefs.map(ref => buildPromptTemplateRefKey(ref));
-				if (new Set(keys).size !== keys.length) {
-					nextErrors.startingInstructionTemplateRefs = 'Instruction template selections must be unique.';
-				} else {
-					const invalid = state.startingInstructionTemplateRefs.find(ref => {
-						const option = instructionOptionByKey.get(buildPromptTemplateRefKey(ref));
-						return !option || !option.isSelectable;
-					});
-
-					if (invalid) {
-						nextErrors.startingInstructionTemplateRefs =
-							'Every selected instruction template must still exist, be enabled, be instructions-only, and already be resolved.';
-					}
-				}
-			}
-
 			if (state.startingToolSelections.length > 0) {
 				const keys = state.startingToolSelections.map(selection => buildToolRefKey(selection.toolRef));
 				if (new Set(keys).size !== keys.length) {
@@ -1029,12 +993,31 @@ function AddEditAssistantPresetModalContent({
 
 					const invalidPreload = state.startingSkillSelections.find(sel => {
 						const option = skillOptionByKey.get(buildSkillRefKey(sel.skillRef));
-						return (
-							sel.preLoadAsActive && option && (option.skillDefinition.insert || 'instructions') !== 'instructions'
-						);
+						return sel.preLoadAsActive && option && getSkillPreloadEligibilityReason(option.skillDefinition);
 					});
 					if (!nextErrors.startingSkillSelections && invalidPreload) {
-						nextErrors.startingSkillSelections = 'Only instruction skills can be preloaded as active session skills.';
+						const option = skillOptionByKey.get(buildSkillRefKey(invalidPreload.skillRef));
+						nextErrors.startingSkillSelections =
+							(option && getSkillPreloadEligibilityReason(option.skillDefinition)) ??
+							'Only argumentless instruction skills can be preloaded as active session skills.';
+					}
+
+					const invalidInstructionUse = state.startingSkillSelections.find(sel => {
+						const option = skillOptionByKey.get(buildSkillRefKey(sel.skillRef));
+						return (
+							sel.useAsInstructions &&
+							(!option ||
+								!isInstructionInsertSkill(option.skillDefinition) ||
+								Boolean(getSkillInstructionPromptEligibilityReason(option.skillDefinition)) ||
+								sel.preLoadAsActive)
+						);
+					});
+					if (!nextErrors.startingSkillSelections && invalidInstructionUse) {
+						const option = skillOptionByKey.get(buildSkillRefKey(invalidInstructionUse.skillRef));
+						nextErrors.startingSkillSelections =
+							option && getSkillInstructionPromptEligibilityReason(option.skillDefinition)
+								? getSkillInstructionPromptEligibilityReason(option.skillDefinition)
+								: 'Instruction-prompt skill selections must be simple instruction skills and cannot also be preloaded as active.';
 					}
 				}
 			}
@@ -1046,7 +1029,6 @@ function AddEditAssistantPresetModalContent({
 			initialPresetID,
 			initialPresetSlug,
 			initialPresetVersion,
-			instructionOptionByKey,
 			isEditMode,
 			modelOptionByKey,
 			skillOptionByKey,
@@ -1130,28 +1112,6 @@ function AddEditAssistantPresetModalContent({
 		return [...keys, ...modelPresetOptions.map(option => option.key)];
 	}, [formData.startingModelPresetKey, hasMissingSelectedModel, modelPresetOptions]);
 
-	const instructionDisplayItems = useMemo<OrderedDisplayItem[]>(
-		() =>
-			formData.startingInstructionTemplateRefs.map(ref => {
-				const key = buildPromptTemplateRefKey(ref);
-				const option = instructionOptionByKey.get(key);
-
-				return {
-					key,
-					title: option?.label ?? `${ref.templateSlug}@${ref.templateVersion} — ${ref.bundleID}`,
-					subtitle: option
-						? `${option.bundleDisplayName} · ${option.template.slug}@${option.template.version}`
-						: 'Reference no longer exists in catalog.',
-					statusLabel: option
-						? option.isSelectable
-							? undefined
-							: (option.availabilityReason ?? 'Unavailable')
-						: 'Missing reference',
-				};
-			}),
-		[formData.startingInstructionTemplateRefs, instructionOptionByKey]
-	);
-
 	const toolDisplayItems = useMemo<ToolSelectionDisplayItem[]>(
 		() =>
 			formData.startingToolSelections.map(selection => {
@@ -1231,6 +1191,21 @@ function AddEditAssistantPresetModalContent({
 				startingSkillSelections: updateItemAtIndex(prev.startingSkillSelections, index, item => ({
 					...item,
 					preLoadAsActive: next,
+					useAsInstructions: next ? false : item.useAsInstructions,
+				})),
+			}));
+		},
+		[updateFormData]
+	);
+
+	const handleSkillUseAsInstructionsChange = useCallback(
+		(index: number, next: boolean) => {
+			updateFormData(prev => ({
+				...prev,
+				startingSkillSelections: updateItemAtIndex(prev.startingSkillSelections, index, item => ({
+					...item,
+					useAsInstructions: next,
+					preLoadAsActive: next ? false : item.preLoadAsActive,
 				})),
 			}));
 		},
@@ -1241,10 +1216,6 @@ function AddEditAssistantPresetModalContent({
 		void loadCatalog();
 	}, [loadCatalog]);
 
-	const handleInstructionOptionKeyChange = useCallback((key: string) => {
-		setNextInstructionKey(key);
-	}, []);
-
 	const handleToolOptionKeyChange = useCallback((key: string) => {
 		setNextToolKey(key);
 	}, []);
@@ -1252,49 +1223,6 @@ function AddEditAssistantPresetModalContent({
 	const handleSkillOptionKeyChange = useCallback((key: string) => {
 		setNextSkillKey(key);
 	}, []);
-
-	const handleAddInstructionTemplate = useCallback(() => {
-		const option = instructionOptions.find(item => item.key === effectiveNextInstructionKey);
-		if (!option) {
-			return;
-		}
-
-		updateFormData(prev => ({
-			...prev,
-			startingInstructionTemplateRefs: [...prev.startingInstructionTemplateRefs, clonePromptTemplateRef(option.ref)],
-		}));
-		setNextInstructionKey('');
-	}, [effectiveNextInstructionKey, instructionOptions, updateFormData]);
-
-	const handleMoveInstructionUp = useCallback(
-		(index: number) => {
-			updateFormData(prev => ({
-				...prev,
-				startingInstructionTemplateRefs: moveItem(prev.startingInstructionTemplateRefs, index, index - 1),
-			}));
-		},
-		[updateFormData]
-	);
-
-	const handleMoveInstructionDown = useCallback(
-		(index: number) => {
-			updateFormData(prev => ({
-				...prev,
-				startingInstructionTemplateRefs: moveItem(prev.startingInstructionTemplateRefs, index, index + 1),
-			}));
-		},
-		[updateFormData]
-	);
-
-	const handleRemoveInstruction = useCallback(
-		(index: number) => {
-			updateFormData(prev => ({
-				...prev,
-				startingInstructionTemplateRefs: removeItemAtIndex(prev.startingInstructionTemplateRefs, index),
-			}));
-		},
-		[updateFormData]
-	);
 
 	const handleAddToolSelection = useCallback(() => {
 		const option = toolOptions.find(item => item.key === effectiveNextToolKey);
@@ -1523,7 +1451,6 @@ function AddEditAssistantPresetModalContent({
 				startingIncludeModelSystemPrompt: startingModelPresetRef
 					? triStateToBoolean(formData.startingIncludeModelSystemPrompt)
 					: undefined,
-				startingInstructionTemplateRefs: formData.startingInstructionTemplateRefs.map(clonePromptTemplateRef),
 				startingToolSelections,
 				startingSkillSelections: formData.startingSkillSelections.map(cloneSkillSelection),
 				startingMCPContext: hasAssistantPresetMCPContext(startingMCPContext) ? startingMCPContext : undefined,
@@ -1581,7 +1508,7 @@ function AddEditAssistantPresetModalContent({
 						{catalogLoading && (
 							<div className="alert rounded-2xl text-sm">
 								<span className="loading loading-spinner loading-sm" />
-								<span>Loading models, instruction templates, tools, and skills…</span>
+								<span>Loading models, tools, and skills…</span>
 							</div>
 						)}
 
@@ -1928,32 +1855,6 @@ function AddEditAssistantPresetModalContent({
 							onSeedFromSelectedModel={seedModelPatchFromSelectedModel}
 						/>
 
-						<div className="divider">Instruction Templates</div>
-
-						<p className="text-base-content/70 text-xs">
-							Only enabled, already-resolved system prompt templates may be selected.
-						</p>
-
-						{errors.startingInstructionTemplateRefs && (
-							<div className="text-error flex items-center gap-1 text-sm">
-								<FiAlertCircle size={12} /> {errors.startingInstructionTemplateRefs}
-							</div>
-						)}
-
-						<OrderedRefSelectionSection
-							isViewMode={isViewMode}
-							availableOptions={availableInstructionOptions}
-							selectedOptionKey={effectiveNextInstructionKey}
-							onSelectedOptionKeyChange={handleInstructionOptionKeyChange}
-							onAdd={handleAddInstructionTemplate}
-							emptyOptionsLabel="No eligible instruction templates available"
-							items={instructionDisplayItems}
-							emptyState="No instruction templates selected."
-							onMoveUp={handleMoveInstructionUp}
-							onMoveDown={handleMoveInstructionDown}
-							onRemove={handleRemoveInstruction}
-						/>
-
 						<div className="divider">Tool Selections</div>
 
 						{errors.startingToolSelections && (
@@ -1981,8 +1882,11 @@ function AddEditAssistantPresetModalContent({
 						<div className="divider">Instruction Skills</div>
 
 						<p className="text-base-content/70 text-xs">
-							Only enabled skills with <span className="font-mono">insert: instructions</span> can be selected here.
-							User-message skills are prompt-like composer templates and are chosen at compose time.
+							Add instruction skills as either system instructions or skill-session selections.
+							<span className="font-mono"> useAsInstructions</span> renders simple, argumentless, resource-free
+							instruction skills into LLM instructions. It cannot be combined with active session preload.
+							Argument-backed or resource-backed instruction skills should be enabled or activated through the skill
+							lifecycle instead.
 						</p>
 
 						{errors.startingSkillSelections && (
@@ -2004,6 +1908,7 @@ function AddEditAssistantPresetModalContent({
 							onMoveDown={handleMoveSkillDown}
 							onRemove={handleRemoveSkill}
 							onPreLoadAsActiveChange={handleSkillPreLoadChange}
+							onUseAsInstructionsChange={handleSkillUseAsInstructionsChange}
 						/>
 
 						<div className="divider">MCP Context</div>

@@ -1969,6 +1969,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						onEnableAllSkills={enableAllSkills}
 						onDisableAllSkills={disableAllSkills}
 						onRefreshSkills={refreshSkills}
+						systemPrompt={systemPrompt}
 						isInputLocked={isInputLocked || fastForwardPending}
 						mcpState={mcp}
 						mcpAppContextUpdateCount={mcpAppContextUpdates.length}

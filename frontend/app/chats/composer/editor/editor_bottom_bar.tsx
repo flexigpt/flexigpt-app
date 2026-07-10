@@ -17,6 +17,7 @@ import type { UseComposerMCPResult } from '@/chats/composer/mcp/mcp_composer_typ
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import { SkillTemplateBottomBarChip } from '@/chats/composer/skills/skill_template_bottom_bar_chip';
 import { SkillsBottomBarChip } from '@/chats/composer/skills/skills_bottom_bar_chip';
+import type { ComposerSystemPromptController } from '@/chats/composer/skills/use_composer_system_prompt';
 import { ToolsBottomBarChip } from '@/chats/composer/tools/tools_bottom_bar_chip';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
 import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
@@ -71,6 +72,7 @@ interface EditorBottomBarProps {
 	onEnableAllSkills: () => void;
 	onDisableAllSkills: () => void;
 	onRefreshSkills: () => Promise<void>;
+	systemPrompt: ComposerSystemPromptController;
 	isInputLocked?: boolean;
 	mcpState: UseComposerMCPResult;
 	mcpAppContextUpdateCount?: number;
@@ -119,6 +121,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	onEnableAllSkills,
 	onDisableAllSkills,
 	onRefreshSkills,
+	systemPrompt,
 	isInputLocked = false,
 	mcpState,
 	mcpAppContextUpdateCount = 0,
@@ -199,6 +202,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						onEnableAll={onEnableAllSkills}
 						onDisableAll={onDisableAllSkills}
 						onRefreshSkills={onRefreshSkills}
+						systemPrompt={systemPrompt}
 						isInputLocked={isInputLocked}
 					/>
 

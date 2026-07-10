@@ -5,7 +5,6 @@ import type {
 } from '@/spec/assistantpreset';
 import type { MCPConversationContext } from '@/spec/mcp';
 import type { ModelPresetRef } from '@/spec/modelpreset';
-import type { PromptTemplateRef } from '@/spec/prompt';
 import type { SkillRef, SkillSelection } from '@/spec/skill';
 import type { ToolRef, ToolSelection } from '@/spec/tool';
 
@@ -29,14 +28,6 @@ export function buildToolRefKey(ref: ToolRef): string {
 
 export function buildSkillRefKey(ref: SkillRef): string {
 	return `${ref.bundleID}/${ref.skillSlug}#${ref.skillID}`;
-}
-
-export function clonePromptTemplateRef(ref: PromptTemplateRef): PromptTemplateRef {
-	return {
-		bundleID: ref.bundleID,
-		templateSlug: ref.templateSlug,
-		templateVersion: ref.templateVersion,
-	};
 }
 
 function cloneToolSelection(selection: ToolSelection): ToolSelection {
@@ -99,15 +90,12 @@ export function formatAssistantPresetModelRef(ref?: ModelPresetRef): string {
 }
 
 export function getAssistantPresetCounts(
-	preset: Pick<
-		AssistantPreset,
-		'startingInstructionTemplateRefs' | 'startingToolSelections' | 'startingSkillSelections' | 'startingMCPContext'
-	>
+	preset: Pick<AssistantPreset, 'startingToolSelections' | 'startingSkillSelections' | 'startingMCPContext'>
 ) {
 	return {
-		instructions: preset.startingInstructionTemplateRefs?.length ?? 0,
+		instructions: (preset.startingSkillSelections ?? []).filter(selection => selection.useAsInstructions).length,
 		tools: preset.startingToolSelections?.length ?? 0,
-		skills: preset.startingSkillSelections?.length ?? 0,
+		skills: (preset.startingSkillSelections ?? []).filter(selection => !selection.useAsInstructions).length,
 		mcp:
 			(preset.startingMCPContext?.servers?.length ?? 0) +
 			(preset.startingMCPContext?.resources?.length ?? 0) +
@@ -210,11 +198,6 @@ export function toPutAssistantPresetPayload(input: AssistantPresetUpsertInput): 
 
 	if (input.startingModelPresetRef && input.startingIncludeModelSystemPrompt !== undefined) {
 		payload.startingIncludeModelSystemPrompt = input.startingIncludeModelSystemPrompt;
-	}
-
-	// Assistant presets are starter recipes. An explicit empty list means - leave the user's current state alone, not set empty.
-	if ((input.startingInstructionTemplateRefs?.length ?? 0) > 0) {
-		payload.startingInstructionTemplateRefs = input.startingInstructionTemplateRefs?.map(clonePromptTemplateRef);
 	}
 
 	if ((input.startingToolSelections?.length ?? 0) > 0) {

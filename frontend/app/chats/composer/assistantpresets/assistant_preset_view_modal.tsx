@@ -23,8 +23,7 @@ import {
 	buildAssistantPresetModelComparisonState,
 	normalizeAssistantPresetMCPContext,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
-import { buildPromptTemplateRefKey } from '@/prompts/lib/prompt_template_ref';
-import type { SystemPromptItem } from '@/prompts/lib/use_system_prompts';
+import type { SystemPromptItem } from '@/chats/composer/skills/prompt_utils';
 
 function closeDialogSafely(dialog: HTMLDialogElement | null): boolean {
 	if (!dialog?.open) {
@@ -352,9 +351,10 @@ export function AssistantPresetViewModal({
 			};
 		});
 
-	const appliedInstructionKeys =
-		preparedApplication?.comparisonState.instructions ??
-		(viewedPreset.preset.startingInstructionTemplateRefs ?? []).map(r => buildPromptTemplateRefKey(r));
+	const appliedInstructionKeys = preparedApplication?.comparisonState.instructions ?? [];
+	const fallbackAppliedInstructionItems = (viewedPreset.preset.startingSkillSelections ?? [])
+		.filter(selection => selection.useAsInstructions)
+		.map(selection => formatSkillSelectionLabel(selection));
 	const appliedToolItems = preparedApplication
 		? [
 				...preparedApplication.runtimeSelections.conversationToolChoices,
@@ -376,7 +376,9 @@ export function AssistantPresetViewModal({
 			)
 		: [];
 
-	const appliedSkillItems = (viewedPreset.preset.startingSkillSelections ?? []).map(s => formatSkillSelectionLabel(s));
+	const appliedSkillItems = (viewedPreset.preset.startingSkillSelections ?? [])
+		.filter(selection => !selection.useAsInstructions)
+		.map(selection => formatSkillSelectionLabel(selection));
 	const currentSkillItems = shouldShowActiveComparison
 		? currentRuntimeSnapshot.enabledSkillRefs.map(formatSkillLabel)
 		: [];
@@ -513,9 +515,9 @@ export function AssistantPresetViewModal({
 							</SectionCard>
 						) : null}
 
-						{appliedInstructionKeys.length > 0 ? (
+						{appliedInstructionKeys.length > 0 || fallbackAppliedInstructionItems.length > 0 ? (
 							<SectionCard
-								title="Instruction templates"
+								title="System instruction skills"
 								showSyncState={shouldShowActiveComparison}
 								isModified={modificationSummary.instructions}
 							>
@@ -524,7 +526,12 @@ export function AssistantPresetViewModal({
 										<div className="mb-2 text-xs font-semibold opacity-70">
 											{shouldShowActiveComparison ? 'Preset-applied selection' : 'Preset selection'}
 										</div>
-										{renderSimpleList(promptLabelItems(appliedInstructionKeys), 'No instruction templates selected.')}
+										{renderSimpleList(
+											appliedInstructionKeys.length > 0
+												? promptLabelItems(appliedInstructionKeys)
+												: fallbackAppliedInstructionItems,
+											'No instruction skills selected.'
+										)}
 									</div>
 
 									{showCurrentInstructions ? (
@@ -532,7 +539,7 @@ export function AssistantPresetViewModal({
 											<div className="mb-2 text-xs font-semibold opacity-70">Current selection</div>
 											{renderSimpleList(
 												promptLabelItems(currentSelectedPromptKeys),
-												'No instruction templates selected.'
+												'No instruction skill prompts selected.'
 											)}
 										</div>
 									) : null}
@@ -618,6 +625,7 @@ export function AssistantPresetViewModal({
 						{!hasPresetStartingText &&
 						!appliedModelState &&
 						appliedInstructionKeys.length === 0 &&
+						fallbackAppliedInstructionItems.length === 0 &&
 						appliedToolItems.length === 0 &&
 						appliedSkillItems.length === 0 &&
 						appliedMCPItems.length === 0 ? (

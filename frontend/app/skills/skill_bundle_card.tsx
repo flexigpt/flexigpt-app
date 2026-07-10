@@ -26,6 +26,7 @@ import {
 	getSkillInsertDescription,
 	getSkillInsertLabel,
 	getSkillInsertShortLabel,
+	getSkillInstructionPromptEligibilityReason,
 	getSkillResourceCountLabel,
 	getSkillResourceTooltip,
 	normalizeSkillInsert,
@@ -364,6 +365,7 @@ export function SkillBundleCard({
 									<th className="min-w-32 text-center">Insert</th>
 									<th className="min-w-24 text-center">Args</th>
 									<th className="min-w-28 text-center">Resources</th>
+									<th className="min-w-36 text-center">Instruction use</th>
 									<th className="min-w-28 text-center">Presence</th>
 									<th className="min-w-24 text-center">Digest</th>
 									<th className="text-center whitespace-nowrap">Enabled</th>
@@ -375,6 +377,7 @@ export function SkillBundleCard({
 							<tbody>
 								{visibleSkills.map(skill => {
 									const insert = normalizeSkillInsert(skill.insert).value;
+									const instructionUseReason = getSkillInstructionPromptEligibilityReason(skill);
 
 									return (
 										<tr key={skill.id} className="hover:bg-base-300">
@@ -434,6 +437,27 @@ export function SkillBundleCard({
 													</span>
 												) : (
 													<span className="text-base-content/60">-</span>
+												)}
+											</td>
+											<td className="text-center">
+												{insert === 'user-message' ? (
+													<span
+														className="badge badge-secondary rounded-xl"
+														title="Use from the composer Templates menu."
+													>
+														Composer template
+													</span>
+												) : instructionUseReason ? (
+													<span className="badge badge-warning rounded-xl" title={instructionUseReason}>
+														Session only
+													</span>
+												) : (
+													<span
+														className="badge badge-success rounded-xl"
+														title="Can be rendered and inserted into the system instruction prompt."
+													>
+														System prompt eligible
+													</span>
 												)}
 											</td>
 											<td className="text-center">
@@ -529,7 +553,7 @@ export function SkillBundleCard({
 
 								{skills.length === 0 && (
 									<tr>
-										<td colSpan={10} className="py-3 text-center text-sm">
+										<td colSpan={11} className="py-3 text-center text-sm">
 											No skills in this bundle.
 										</td>
 									</tr>
@@ -537,7 +561,7 @@ export function SkillBundleCard({
 
 								{skills.length > 0 && visibleSkills.length === 0 && (
 									<tr>
-										<td colSpan={10} className="py-3 text-center text-sm">
+										<td colSpan={11} className="py-3 text-center text-sm">
 											No skills match the current filters.
 										</td>
 									</tr>

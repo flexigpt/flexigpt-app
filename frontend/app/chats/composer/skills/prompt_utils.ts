@@ -1,6 +1,27 @@
-import type { SystemPromptItem } from '@/prompts/lib/use_system_prompts';
-
 const SYSTEM_PROMPT_SEPARATOR = '\n---\n';
+
+export enum PromptRoleEnum {
+	System = 'system',
+	Developer = 'developer',
+	User = 'user',
+}
+type SystemPromptRole = PromptRoleEnum.System | PromptRoleEnum.Developer;
+
+export interface SystemPromptItem {
+	identityKey: string;
+	templateID?: string;
+	bundleID: string;
+	templateSlug: string;
+	templateVersion: string;
+	displayName: string;
+	prompt: string;
+	role: SystemPromptRole;
+	bundleDisplayName: string;
+	bundleSlug: string;
+	isBuiltIn: boolean;
+	createdAt: string;
+	modifiedAt: string;
+}
 
 function normalizePromptPart(value: string): string {
 	return (value || '').trim();
@@ -11,19 +32,6 @@ function concatenateSystemPromptParts(parts: string[]): string {
 		.map(p => normalizePromptPart(p))
 		.filter(Boolean)
 		.join(SYSTEM_PROMPT_SEPARATOR);
-}
-
-export function appendSystemPromptParts(basePrompt: string, extraParts: string[]): string {
-	const parts: string[] = [];
-
-	const normalizedBase = normalizePromptPart(basePrompt);
-	if (normalizedBase) {
-		parts.push(normalizedBase);
-	}
-
-	parts.push(...extraParts);
-
-	return concatenateSystemPromptParts(parts);
 }
 
 export function buildEffectiveSystemPrompt(params: {
@@ -56,29 +64,4 @@ export function buildEffectiveSystemPrompt(params: {
 	}
 
 	return concatenateSystemPromptParts(parts);
-}
-
-/**
- * @public
- */
-export function countEnabledSystemPromptSources(params: {
-	modelDefaultPrompt: string;
-	includeModelDefault: boolean;
-	selectedPromptKeys: string[];
-	promptsByKey: Map<string, SystemPromptItem>;
-}): number {
-	let count = 0;
-
-	if (params.includeModelDefault && normalizePromptPart(params.modelDefaultPrompt)) {
-		count += 1;
-	}
-
-	for (const key of params.selectedPromptKeys) {
-		const item = params.promptsByKey.get(key);
-		if (item?.prompt.trim()) {
-			count += 1;
-		}
-	}
-
-	return count;
 }

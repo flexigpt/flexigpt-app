@@ -1,21 +1,18 @@
 import type { AssistantModelPresetOption, ModelPresetRef, ProviderPreset } from '@/spec/modelpreset';
-import type { AssistantInstructionTemplateOption, PromptTemplateRef } from '@/spec/prompt';
-import { PromptTemplateKind } from '@/spec/prompt';
 import type { AssistantSkillOption, SkillSelection } from '@/spec/skill';
 import type { AssistantToolOption, ToolRef } from '@/spec/tool';
 
-import { modelPresetStoreAPI, promptStoreAPI, skillStoreAPI, toolStoreAPI } from '@/apis/baseapi';
+import { modelPresetStoreAPI, skillStoreAPI, toolStoreAPI } from '@/apis/baseapi';
 
 import {
 	buildModelPresetRefKey,
 	buildSkillRefKey,
 	buildToolRefKey,
 } from '@/assistantpresets/lib/assistant_preset_utils';
-import { buildPromptTemplateRefKey } from '@/prompts/lib/prompt_template_ref';
+import { isInstructionInsertSkill } from '@/skills/lib/skill_artifact_utils';
 
 export interface AssistantPresetEditorCatalog {
 	modelPresetOptions: AssistantModelPresetOption[];
-	instructionTemplateOptions: AssistantInstructionTemplateOption[];
 	toolOptions: AssistantToolOption[];
 	skillOptions: AssistantSkillOption[];
 }
@@ -103,90 +100,6 @@ async function loadModelPresetOptions(): Promise<AssistantModelPresetOption[]> {
 			});
 		}
 	}
-
-	return sortByBuiltInThenLabel(options);
-}
-
-export async function loadInstructionTemplateOptions(): Promise<AssistantInstructionTemplateOption[]> {
-	const [promptBundles, listItems] = await Promise.all([
-		collectAllPages(
-			pageToken => promptStoreAPI.listPromptBundles(undefined, true, 200, pageToken),
-			response => response.promptBundles,
-			response => response.nextPageToken
-		),
-		collectAllPages(
-			pageToken =>
-				promptStoreAPI.listPromptTemplates(
-					undefined,
-					undefined,
-					true,
-					[PromptTemplateKind.InstructionsOnly],
-					undefined,
-					200,
-					pageToken
-				),
-			response => response.promptTemplateListItems,
-			response => response.nextPageToken
-		),
-	]);
-
-	const bundleByID = new Map(promptBundles.map(bundle => [bundle.id, bundle]));
-
-	const fullTemplates = await Promise.all(
-		listItems.map(item => promptStoreAPI.getPromptTemplate(item.bundleID, item.templateSlug, item.templateVersion))
-	);
-
-	const options: AssistantInstructionTemplateOption[] = [];
-
-	fullTemplates.forEach((template, index) => {
-		if (!template) {
-			return;
-		}
-
-		const item = listItems[index];
-		const bundle = bundleByID.get(item.bundleID);
-
-		const isBundleEnabled = bundle?.isEnabled ?? true;
-		const isTemplateEnabled = template.isEnabled;
-		const isResolved = template.isResolved;
-
-		let availabilityReason: string | undefined;
-
-		if (!isBundleEnabled) {
-			availabilityReason = 'Prompt bundle is disabled.';
-		} else if (!isTemplateEnabled) {
-			availabilityReason = 'Prompt template is disabled.';
-		} else if (template.kind !== PromptTemplateKind.InstructionsOnly) {
-			availabilityReason = 'Only instructions-only prompt templates are allowed.';
-		} else if (!isResolved) {
-			availabilityReason = 'Prompt template must already be fully resolved.';
-		}
-
-		const ref: PromptTemplateRef = {
-			bundleID: item.bundleID,
-			templateSlug: template.slug,
-			templateVersion: template.version,
-		};
-
-		const bundleDisplayName = bundle ? getBundleDisplayName(bundle, item.bundleID) : item.bundleSlug || item.bundleID;
-
-		options.push({
-			key: buildPromptTemplateRefKey(ref),
-			ref,
-			template,
-
-			bundleSlug: bundle?.slug || item.bundleSlug || item.bundleID,
-			bundleDisplayName,
-
-			isBuiltIn: template.isBuiltIn,
-			isBundleEnabled,
-			isTemplateEnabled,
-			isResolved,
-			isSelectable: availabilityReason === undefined,
-			availabilityReason,
-			label: `${template.displayName || template.slug} — ${bundleDisplayName} (${template.slug}@${template.version})`,
-		});
-	});
 
 	return sortByBuiltInThenLabel(options);
 }
@@ -286,9 +199,9 @@ export async function loadSkillOptions(): Promise<AssistantSkillOption[]> {
 			availabilityReason = 'Skill bundle is disabled.';
 		} else if (!isSkillEnabled) {
 			availabilityReason = 'Skill is disabled.';
-		} else if ((skill.insert || 'instructions') !== 'instructions') {
+		} else if (!isInstructionInsertSkill(skill)) {
 			availabilityReason =
-				'User-message skills are composer templates. Assistant presets can only preload instruction skills.';
+				'User-message skills are composer templates and cannot be assistant preset skill-session selections.';
 		}
 
 		const sel: SkillSelection = {
@@ -326,16 +239,14 @@ export async function loadSkillOptions(): Promise<AssistantSkillOption[]> {
 }
 
 export async function loadAssistantPresetEditorCatalog(): Promise<AssistantPresetEditorCatalog> {
-	const [modelPresetOptions, instructionTemplateOptions, toolOptions, skillOptions] = await Promise.all([
+	const [modelPresetOptions, toolOptions, skillOptions] = await Promise.all([
 		loadModelPresetOptions(),
-		loadInstructionTemplateOptions(),
 		loadToolOptions(),
 		loadSkillOptions(),
 	]);
 
 	return {
 		modelPresetOptions,
-		instructionTemplateOptions,
 		toolOptions,
 		skillOptions,
 	};

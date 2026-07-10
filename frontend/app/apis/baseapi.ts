@@ -11,7 +11,6 @@ import type {
 	ILogger,
 	IMCPAPI,
 	IModelPresetStoreAPI,
-	IPromptStoreAPI,
 	ISettingStoreAPI,
 	ISkillStoreAPI,
 	IToolRuntimeAPI,
@@ -34,7 +33,6 @@ export let modelPresetStoreAPI: IModelPresetStoreAPI;
  */
 export let mcpAPI: IMCPAPI;
 
-export let promptStoreAPI: IPromptStoreAPI;
 export let toolStoreAPI: IToolStoreAPI;
 export let toolRuntimeAPI: IToolRuntimeAPI;
 export let skillStoreAPI: ISkillStoreAPI;
@@ -53,7 +51,6 @@ if (IS_WAILS_PLATFORM) {
 	settingstoreAPI = new wailsImpl.WailsSettingStoreAPI();
 	modelPresetStoreAPI = new wailsImpl.WailsModelPresetStoreAPI();
 	mcpAPI = new wailsImpl.WailsMCPAPI();
-	promptStoreAPI = new wailsImpl.WailsPromptStoreAPI();
 	toolStoreAPI = new wailsImpl.WailsToolStoreAPI();
 	toolRuntimeAPI = new wailsImpl.WailsToolRuntimeAPI();
 	skillStoreAPI = new wailsImpl.WailsSkillStoreAPI();

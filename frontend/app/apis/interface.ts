@@ -50,14 +50,6 @@ import type {
 	PostProviderPresetPayload,
 	ProviderPreset,
 } from '@/spec/modelpreset';
-import type {
-	MessageBlock,
-	PromptBundle,
-	PromptTemplate,
-	PromptTemplateKind,
-	PromptTemplateListItem,
-	PromptVariable,
-} from '@/spec/prompt';
 import type { AppTheme, AuthKey, AuthKeyName, AuthKeyType, DebugSettings, SettingsSchema } from '@/spec/setting';
 import type {
 	InvokeSkillToolResponse,
@@ -110,66 +102,6 @@ export interface ISettingStoreAPI {
 	setDebugSettings: (settings: DebugSettings) => Promise<void>;
 	getAuthKey: (type: AuthKeyType, keyName: AuthKeyName) => Promise<AuthKey>;
 	getSettings: (forceFetch?: boolean) => Promise<SettingsSchema>;
-}
-
-export interface IPromptStoreAPI {
-	/** List bundles, optionally filtered by IDs, disabled, and paginated. */
-	listPromptBundles(
-		bundleIDs?: string[],
-		includeDisabled?: boolean,
-		pageSize?: number,
-		pageToken?: string
-	): Promise<{ promptBundles: PromptBundle[]; nextPageToken?: string }>;
-
-	/** Create or update a bundle. */
-	putPromptBundle(
-		bundleID: string,
-		slug: string,
-		displayName: string,
-		isEnabled: boolean,
-		description?: string
-	): Promise<void>;
-
-	/** Patch (enable/disable) a bundle. */
-	patchPromptBundle(bundleID: string, isEnabled: boolean): Promise<void>;
-
-	/** Delete a bundle. */
-	deletePromptBundle(bundleID: string): Promise<void>;
-
-	/** List templates, optionally filtered by bundleIDs, tags, etc. */
-	listPromptTemplates(
-		bundleIDs?: string[],
-		tags?: string[],
-		includeDisabled?: boolean,
-		kinds?: PromptTemplateKind[],
-		onlyResolved?: boolean,
-		recommendedPageSize?: number,
-		pageToken?: string
-	): Promise<{ promptTemplateListItems: PromptTemplateListItem[]; nextPageToken?: string }>;
-
-	/** Create or update a template. */
-	putPromptTemplate(
-		kind: PromptTemplateKind,
-		bundleID: string,
-		templateSlug: string,
-		displayName: string,
-		isEnabled: boolean,
-		blocks: MessageBlock[],
-		version: string,
-		isResolved: boolean,
-		description?: string,
-		tags?: string[],
-		variables?: PromptVariable[]
-	): Promise<void>;
-
-	/** Patch (enable/disable) a template version. */
-	patchPromptTemplate(bundleID: string, templateSlug: string, version: string, isEnabled: boolean): Promise<void>;
-
-	/** Delete a template version. */
-	deletePromptTemplate(bundleID: string, templateSlug: string, version: string): Promise<void>;
-
-	/** Get a template version. */
-	getPromptTemplate(bundleID: string, templateSlug: string, version: string): Promise<PromptTemplate | undefined>;
 }
 
 export interface IModelPresetStoreAPI {

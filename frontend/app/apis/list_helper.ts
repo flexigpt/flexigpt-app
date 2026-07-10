@@ -9,11 +9,10 @@ import type {
 	MCPToolCapability,
 } from '@/spec/mcp';
 import type { ProviderPreset } from '@/spec/modelpreset';
-import type { PromptBundle, PromptTemplateKind, PromptTemplateListItem } from '@/spec/prompt';
 import type { SkillBundle, SkillInsert, SkillListItem, SkillType } from '@/spec/skill';
 import type { ToolBundle, ToolListItem } from '@/spec/tool';
 
-import { mcpAPI, modelPresetStoreAPI, promptStoreAPI, skillStoreAPI, toolStoreAPI } from '@/apis/baseapi';
+import { mcpAPI, modelPresetStoreAPI, skillStoreAPI, toolStoreAPI } from '@/apis/baseapi';
 
 export async function getAllProviderPresetsMap(
 	includeDisabled?: boolean
@@ -41,53 +40,6 @@ export async function getAllProviderPresetsMap(
 	} while (pageToken);
 
 	return result;
-}
-
-export async function getAllPromptTemplates(
-	bundleIDs?: string[],
-	tags?: string[],
-	includeDisabled?: boolean,
-	kinds?: PromptTemplateKind[],
-	onlyResolved?: boolean
-): Promise<PromptTemplateListItem[]> {
-	const all: PromptTemplateListItem[] = [];
-	let pageToken: string | undefined;
-	const recommendedPageSize = 25;
-	do {
-		const { promptTemplateListItems, nextPageToken } = await promptStoreAPI.listPromptTemplates(
-			bundleIDs,
-			tags,
-			includeDisabled,
-			kinds,
-			onlyResolved,
-			recommendedPageSize,
-			pageToken
-		);
-
-		all.push(...promptTemplateListItems);
-		pageToken = nextPageToken;
-	} while (pageToken);
-
-	return all;
-}
-
-export async function getAllPromptBundles(bundleIDs?: string[], includeDisabled?: boolean): Promise<PromptBundle[]> {
-	const all: PromptBundle[] = [];
-	let pageToken: string | undefined;
-	const pageSize = 25;
-	do {
-		const { promptBundles, nextPageToken } = await promptStoreAPI.listPromptBundles(
-			bundleIDs,
-			includeDisabled,
-			pageSize,
-			pageToken
-		);
-
-		all.push(...promptBundles);
-		pageToken = nextPageToken;
-	} while (pageToken);
-
-	return all;
 }
 
 export async function getAllTools(

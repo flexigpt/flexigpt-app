@@ -38,8 +38,9 @@ export const normalizeSkillRefs = (refs: SkillRef[] | null | undefined): SkillRe
 };
 
 export const buildSkillRefsFingerprint = (refs: SkillRef[] | null | undefined): string => {
-	const keys = normalizeSkillRefs(refs).map(r => skillRefKey(r));
-	keys.toSorted();
+	const keys = normalizeSkillRefs(refs)
+		.map(r => skillRefKey(r))
+		.toSorted();
 	return keys.join('|');
 };
 

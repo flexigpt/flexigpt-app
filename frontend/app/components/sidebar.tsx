@@ -6,7 +6,6 @@ import {
 	FiFilePlus,
 	FiLayers,
 	FiMessageSquare,
-	FiPackage,
 	FiServer,
 	FiSettings,
 	FiSliders,
@@ -82,22 +81,16 @@ export function Sidebar({ children }: SidebarProps) {
 								<FiServer size={24} />
 							</Link>
 						</li>
-						<li className="mt-4" title="Skills" onClick={toggle} aria-label="Skills">
-							<Link to="/skills/" className="flex size-12 items-center justify-center rounded-full p-0">
-								<FiPackage size={24} />
-							</Link>
-						</li>
 						<li className="mt-4" title="Tools" onClick={toggle} aria-label="Tools">
 							<Link to="/tools/" className="flex size-12 items-center justify-center rounded-full p-0">
 								<FiTool size={24} />
 							</Link>
 						</li>
-						<li className="mt-4" title="Prompts" onClick={toggle} aria-label="Prompts">
-							<Link to="/prompts/" className="flex size-12 items-center justify-center rounded-full p-0">
+						<li className="mt-4" title="Skills" onClick={toggle} aria-label="Skills">
+							<Link to="/skills/" className="flex size-12 items-center justify-center rounded-full p-0">
 								<FiFilePlus size={24} />
 							</Link>
 						</li>
-
 						<li className="mt-4" title="Model Presets" onClick={toggle} aria-label="Model Presets">
 							<Link to="/modelpresets/" className="flex size-12 items-center justify-center rounded-full p-0">
 								<FiSliders size={24} />

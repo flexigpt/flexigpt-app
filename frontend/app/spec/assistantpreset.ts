@@ -1,6 +1,5 @@
 import type { MCPConversationContext } from '@/spec/mcp';
 import type { ModelPresetPatch, ModelPresetRef } from '@/spec/modelpreset';
-import type { PromptTemplateRef } from '@/spec/prompt';
 import type { SkillSelection } from '@/spec/skill';
 import type { ToolSelection } from '@/spec/tool';
 
@@ -36,7 +35,6 @@ export interface AssistantPreset {
 	startingModelPresetRef?: ModelPresetRef;
 	startingModelPresetPatch?: AssistantPresetStartingModelPresetPatch;
 	startingIncludeModelSystemPrompt?: boolean;
-	startingInstructionTemplateRefs?: PromptTemplateRef[];
 	startingToolSelections?: ToolSelection[];
 	startingSkillSelections?: SkillSelection[];
 	startingMCPContext?: MCPConversationContext;
@@ -81,7 +79,6 @@ export interface PutAssistantPresetPayload {
 	startingModelPresetRef?: ModelPresetRef;
 	startingModelPresetPatch?: AssistantPresetStartingModelPresetPatch;
 	startingIncludeModelSystemPrompt?: boolean;
-	startingInstructionTemplateRefs?: PromptTemplateRef[];
 	startingToolSelections?: ToolSelection[];
 	startingSkillSelections?: SkillSelection[];
 	startingMCPContext?: MCPConversationContext;

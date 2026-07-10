@@ -182,7 +182,6 @@ export class WailsAssistantPresetStoreAPI implements IAssistantPresetStoreAPI {
 			startingModelPresetRef: payload.startingModelPresetRef,
 			startingModelPresetPatch: payload.startingModelPresetPatch,
 			startingIncludeModelSystemPrompt: payload.startingIncludeModelSystemPrompt,
-			startingInstructionTemplateRefs: payload.startingInstructionTemplateRefs,
 			startingToolSelections: payload.startingToolSelections,
 			startingSkillSelections: payload.startingSkillSelections,
 			startingMCPContext: payload.startingMCPContext,

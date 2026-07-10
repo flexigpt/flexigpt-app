@@ -92,6 +92,58 @@ export function skillHasResources(skill: Pick<Skill, 'resources'>): boolean {
 	return skill.resources?.hasResources && skill.resources.totalCount > 0;
 }
 
+function skillArgumentCount(skill: Pick<Skill, 'arguments'>): number {
+	return skill.arguments?.length ?? 0;
+}
+
+function skillResourceCount(skill: Pick<Skill, 'resources'>): number {
+	return skill.resources?.hasResources ? skill.resources.totalCount : 0;
+}
+
+export function isInstructionInsertSkill(skill: Pick<Skill, 'insert'>): boolean {
+	return normalizeSkillInsert(skill.insert).value === 'instructions';
+}
+
+export function skillCanBeRenderedAsInstructionPrompt(
+	skill: Pick<Skill, 'insert' | 'arguments' | 'resources'>
+): boolean {
+	return isInstructionInsertSkill(skill) && skillArgumentCount(skill) === 0 && skillResourceCount(skill) === 0;
+}
+
+export function skillCanBePreloadedAsActive(skill: Pick<Skill, 'insert' | 'arguments'>): boolean {
+	return isInstructionInsertSkill(skill) && skillArgumentCount(skill) === 0;
+}
+
+export function getSkillInstructionPromptEligibilityReason(
+	skill: Pick<Skill, 'insert' | 'arguments' | 'resources'>
+): string | undefined {
+	if (!isInstructionInsertSkill(skill)) {
+		return 'Only instruction skills can be used as system instructions.';
+	}
+
+	if (skillResourceCount(skill) > 0) {
+		return 'Resource-backed skills cannot be converted into system prompt text. Enable or activate the skill session instead; the model can read resources through skill tools.';
+	}
+
+	if (skillArgumentCount(skill) > 0) {
+		return 'Argument-backed instruction skills cannot be inserted as plain system instructions. Enable the skill instead and let the skill lifecycle handle argumented use.';
+	}
+
+	return undefined;
+}
+
+export function getSkillPreloadEligibilityReason(skill: Pick<Skill, 'insert' | 'arguments'>): string | undefined {
+	if (!isInstructionInsertSkill(skill)) {
+		return 'Only instruction skills can be enabled in a skill session.';
+	}
+
+	if (skillArgumentCount(skill) > 0) {
+		return 'Argument-backed skills cannot be preloaded as active session skills from presets.';
+	}
+
+	return undefined;
+}
+
 export function getSkillArgumentCountLabel(args?: SkillArgument[] | null): string {
 	const count = args?.length ?? 0;
 	return count === 0 ? 'No args' : `${count} arg${count === 1 ? '' : 's'}`;

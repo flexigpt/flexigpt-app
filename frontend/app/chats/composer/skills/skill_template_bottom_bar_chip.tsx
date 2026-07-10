@@ -3,7 +3,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
-import { FiAlertCircle, FiFilePlus, FiPaperclip, FiX } from 'react-icons/fi';
+import { FiAlertCircle, FiFile, FiFilePlus, FiPaperclip, FiX } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
 import { Menu, MenuButton, MenuItem, useStoreState } from '@ariakit/react';
@@ -707,7 +707,7 @@ function SkillTemplateBottomBarChipInner({
 					className={`${actionTriggerChipButtonClasses} hover:text-base-content ${isInputLocked ? 'opacity-60' : ''}`}
 					aria-label={shortcut ? `Insert template (${shortcut})` : 'Insert template'}
 				>
-					<ActionTriggerChipContent icon={<FiFilePlus size={16} />} label="Templates" open={open} />
+					<ActionTriggerChipContent icon={<FiFile size={16} />} label="Templates" open={open} />
 				</MenuButton>
 			</HoverTip>
 

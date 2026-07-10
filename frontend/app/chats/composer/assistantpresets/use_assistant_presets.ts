@@ -12,7 +12,6 @@ import type {
 } from '@/spec/mcp';
 import { MCPToolExposure } from '@/spec/mcp';
 import type { AssistantModelPresetOption } from '@/spec/modelpreset';
-import type { AssistantInstructionTemplateOption } from '@/spec/prompt';
 import type { AssistantSkillOption } from '@/spec/skill';
 import type { AssistantToolOption } from '@/spec/tool';
 import { ToolImplType } from '@/spec/tool';
@@ -40,7 +39,10 @@ import {
 import type { AssistantPresetOptionItem } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import { buildAssistantPresetIdentityKey } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import { isMCPToolModelSelectable } from '@/mcpservers/lib/mcp_server_utils';
-import { buildPromptTemplateRefKey } from '@/prompts/lib/prompt_template_ref';
+import {
+	getSkillInstructionPromptEligibilityReason,
+	getSkillPreloadEligibilityReason,
+} from '@/skills/lib/skill_artifact_utils';
 
 function getErrorMessage(error: unknown, fallback: string): string {
 	if (error instanceof Error && error.message.trim().length > 0) {
@@ -402,7 +404,6 @@ function getAssistantPresetAvailability(
 	preset: AssistantPreset,
 	lookups: {
 		modelOptionsByKey: Map<string, AssistantModelPresetOption>;
-		instructionOptionsByKey: Map<string, AssistantInstructionTemplateOption>;
 		toolOptionsByKey: Map<string, AssistantToolOption>;
 		skillOptionsByKey: Map<string, AssistantSkillOption>;
 		mcpLookups?: AssistantPresetMCPAvailabilityLookups;
@@ -429,25 +430,6 @@ function getAssistantPresetAvailability(
 		}
 
 		targetProviderSDKType = option.providerPreset.sdkType;
-	}
-
-	for (const ref of preset.startingInstructionTemplateRefs ?? []) {
-		const key = buildPromptTemplateRefKey(ref);
-		const option = lookups.instructionOptionsByKey.get(key);
-
-		if (!option) {
-			return {
-				isSelectable: false,
-				availabilityReason: `Instruction template "${key}" no longer exists.`,
-			};
-		}
-
-		if (!option.isSelectable) {
-			return {
-				isSelectable: false,
-				availabilityReason: option.availabilityReason ?? `Instruction template "${key}" is not available.`,
-			};
-		}
 	}
 
 	for (const selection of preset.startingToolSelections ?? []) {
@@ -503,6 +485,25 @@ function getAssistantPresetAvailability(
 				availabilityReason: option.availabilityReason ?? `Skill "${key}" is not available.`,
 			};
 		}
+
+		if (sel.useAsInstructions) {
+			if (sel.preLoadAsActive) {
+				return {
+					isSelectable: false,
+					availabilityReason: `Skill "${key}" cannot be both system instructions and active session preload.`,
+				};
+			}
+
+			const reason = getSkillInstructionPromptEligibilityReason(option.skillDefinition);
+			if (reason) {
+				return { isSelectable: false, availabilityReason: reason };
+			}
+		} else if (sel.preLoadAsActive) {
+			const reason = getSkillPreloadEligibilityReason(option.skillDefinition);
+			if (reason) {
+				return { isSelectable: false, availabilityReason: reason };
+			}
+		}
 	}
 
 	const mcpAvailability = getAssistantPresetMCPAvailability(preset.startingMCPContext, lookups.mcpLookups);
@@ -532,9 +533,6 @@ export function useAssistantPresets() {
 			}
 			const bundleByID = new Map(bundles.map(bundle => [bundle.id, bundle]));
 			const modelOptionsByKey = new Map(catalog.modelPresetOptions.map(option => [option.key, option] as const));
-			const instructionOptionsByKey = new Map(
-				catalog.instructionTemplateOptions.map(option => [option.key, option] as const)
-			);
 			const toolOptionsByKey = new Map(catalog.toolOptions.map(option => [option.key, option] as const));
 			const skillOptionsByKey = new Map(catalog.skillOptions.map(option => [option.key, option] as const));
 
@@ -586,7 +584,6 @@ export function useAssistantPresets() {
 				const label = `${displayName} — ${bundleDisplayName} (${preset.slug}@${preset.version})`;
 				const availability = getAssistantPresetAvailability(preset, {
 					modelOptionsByKey,
-					instructionOptionsByKey,
 					toolOptionsByKey,
 					skillOptionsByKey,
 					mcpLookups,

@@ -9,6 +9,7 @@ import {
 	FiServer,
 	FiTerminal,
 	FiTool,
+	FiZap,
 } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
@@ -18,6 +19,7 @@ import { AttachmentContentBlockMode, AttachmentKind } from '@/spec/attachment';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp';
 import { MCPExecutionMode } from '@/spec/mcp';
+import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
@@ -402,6 +404,53 @@ function MessageWebSearchToolChoiceChip({ tool, fullWidth = false, onClick }: Me
 			<FiGlobe size={14} />
 			<span className={fullWidth ? 'min-w-0 flex-1 truncate' : 'max-w-44 truncate'}>{name}</span>
 			<FiCode className="text-base-content/60" title="Details" size={14} />
+		</div>
+	);
+}
+
+function formatSkillRefForChip(ref: SkillRef): string {
+	return `${ref.bundleID}/${ref.skillSlug}#${ref.skillID}`;
+}
+
+function MessageSkillsContextChip({
+	enabledSkillRefs,
+	activeSkillRefs,
+}: {
+	enabledSkillRefs: SkillRef[];
+	activeSkillRefs: SkillRef[];
+}) {
+	const enabledCount = enabledSkillRefs.length;
+	const activeCount = activeSkillRefs.length;
+
+	if (enabledCount === 0 && activeCount === 0) {
+		return null;
+	}
+
+	const activeKeys = new Set(
+		activeSkillRefs.map(s => {
+			return formatSkillRefForChip(s);
+		})
+	);
+	const titleLines = [
+		'Instruction skills for this turn',
+		`${enabledCount} enabled skill${enabledCount === 1 ? '' : 's'}`,
+		`${activeCount} active skill${activeCount === 1 ? '' : 's'}`,
+		...enabledSkillRefs.map(ref => {
+			const label = formatSkillRefForChip(ref);
+			return activeKeys.has(label) ? `${label} (active)` : label;
+		}),
+	];
+
+	return (
+		<div
+			className="bg-secondary/10 text-base-content border-secondary/40 flex shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
+			title={titleLines.join('\n')}
+			data-message-chip="skills-context"
+		>
+			<FiZap size={14} />
+			<span className="max-w-24 truncate">Skills</span>
+			<span className="text-base-content/60 whitespace-nowrap">{enabledCount}</span>
+			{activeCount > 0 ? <span className="badge badge-info badge-xs">Active {activeCount}</span> : null}
 		</div>
 	);
 }
@@ -966,6 +1015,8 @@ interface MessageAttachmentsBarProps {
 	toolChoices?: ToolStoreChoice[];
 	mcpContext?: MCPConversationContext;
 	mcpAppContextUpdates?: MCPAppModelContextUpdate[];
+	enabledSkillRefs?: SkillRef[];
+	activeSkillRefs?: SkillRef[];
 	toolCalls?: UIToolCall[];
 	toolOutputs?: UIToolOutput[];
 	onToolChoiceDetails?: (choice: ToolStoreChoice) => void;
@@ -986,6 +1037,8 @@ export function MessageAttachmentsBar({
 	toolChoices,
 	mcpContext,
 	mcpAppContextUpdates,
+	enabledSkillRefs,
+	activeSkillRefs,
 	toolCalls,
 	toolOutputs,
 	onToolChoiceDetails,
@@ -995,6 +1048,8 @@ export function MessageAttachmentsBar({
 	const choices = toolChoices ?? [];
 	const calls = toolCalls ?? [];
 	const outputs = toolOutputs ?? [];
+	const enabledSkills = enabledSkillRefs ?? [];
+	const activeSkills = activeSkillRefs ?? [];
 
 	const normalToolChoices = choices.filter(c => c.toolType !== ToolStoreChoiceType.WebSearch);
 	const webSearchChoices = choices.filter(c => c.toolType === ToolStoreChoiceType.WebSearch);
@@ -1007,8 +1062,14 @@ export function MessageAttachmentsBar({
 
 	const hasAttachments = !!attachments && attachments.length > 0;
 	const hasTools = normalToolChoices.length > 0;
-	const hasMCP = (mcpContext?.servers?.length ?? 0) > 0;
+	const hasMCP =
+		(mcpContext?.servers?.length ?? 0) +
+			(mcpContext?.resources?.length ?? 0) +
+			(mcpContext?.resourceTemplates?.length ?? 0) +
+			(mcpContext?.prompts?.length ?? 0) >
+		0;
 	const hasMCPAppContext = (mcpAppContextUpdates?.length ?? 0) > 0;
+	const hasSkillContext = enabledSkills.length > 0 || activeSkills.length > 0;
 
 	const hasWebSearchTools = webSearchChoices.length > 0;
 	const hasToolCalls = normalToolCalls.length > 0;
@@ -1021,6 +1082,7 @@ export function MessageAttachmentsBar({
 		!hasTools &&
 		!hasMCP &&
 		!hasMCPAppContext &&
+		!hasSkillContext &&
 		!hasWebSearchTools &&
 		!hasToolCalls &&
 		!hasWebSearchCalls &&
@@ -1054,6 +1116,8 @@ export function MessageAttachmentsBar({
 					<span className="text-base-content/60 whitespace-nowrap">{mcpAppContextUpdates?.length ?? 0}</span>
 				</div>
 			)}
+			{hasSkillContext && <MessageSkillsContextChip enabledSkillRefs={enabledSkills} activeSkillRefs={activeSkills} />}
+
 			{/* Web‑search config for this turn */}
 			{hasWebSearchTools && (
 				<WebSearchChoicesGroupChip choices={webSearchChoices} onChoiceDetails={onToolChoiceDetails} />

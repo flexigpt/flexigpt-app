@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
-import { FiAlertCircle, FiCheck, FiGitBranch, FiPlus, FiX, FiZap } from 'react-icons/fi';
+import { FiAlertCircle, FiCheck, FiFilePlus, FiGitBranch, FiPlus, FiX } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
@@ -30,6 +30,12 @@ import {
 	useSearchableMenuState,
 } from '@/components/searchmenu/searchable_menu_utils';
 
+import type { ComposerSystemPromptController } from '@/chats/composer/skills/use_composer_system_prompt';
+import {
+	getSkillInstructionPromptEligibilityReason,
+	skillCanBePreloadedAsActive,
+	skillCanBeRenderedAsInstructionPrompt,
+} from '@/skills/lib/skill_artifact_utils';
 import { dedupeSkillRefs, skillRefFromListItem, skillRefKey } from '@/skills/lib/skill_identity_utils';
 
 const SIMPLE_SKILL_NAME_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
@@ -453,6 +459,7 @@ export function SkillsBottomBarChip({
 	onEnableAll,
 	onDisableAll,
 	onRefreshSkills,
+	systemPrompt,
 	isInputLocked = false,
 }: {
 	store: MenuStore;
@@ -466,6 +473,7 @@ export function SkillsBottomBarChip({
 	onEnableAll: () => void;
 	onDisableAll: () => void;
 	onRefreshSkills: () => Promise<void>;
+	systemPrompt: ComposerSystemPromptController;
 	isInputLocked?: boolean;
 }) {
 	const internalMenu = useMenuStore({ placement: 'top', focusLoop: true });
@@ -596,6 +604,24 @@ export function SkillsBottomBarChip({
 		[setActiveSkillRefs, setEnabledSkillRefs]
 	);
 
+	const addSkillAsSystemInstructions = useCallback(
+		async (item: SkillListItem, values: Record<string, string>) => {
+			const rendered = await skillStoreAPI.renderSkill(skillRefFromListItem(item), values);
+			if (rendered.insert !== 'instructions') {
+				throw new Error(`Expected instruction skill, but renderer returned insert=${rendered.insert}.`);
+			}
+
+			systemPrompt.addAndSelectInstructionSkillPrompt({
+				displayName: getSkillDisplayLabel(item),
+				prompt: rendered.text,
+				skillRef: skillRefFromListItem(item),
+			});
+
+			menu.hide();
+		},
+		[menu, systemPrompt]
+	);
+
 	const title = useMemo(() => {
 		const lines: string[] = [
 			shortcut ? `Instruction skills (${shortcut})` : 'Instruction skills',
@@ -660,8 +686,11 @@ export function SkillsBottomBarChip({
 		const isActive = activeKeySet.has(k);
 		const isInstruction = isInstructionSkill(item);
 		const label = getSkillDisplayLabel(item);
+		const args = item.skillDefinition.arguments ?? [];
 		const resources = resourceCount(item);
-		const simpleInstruction = isInstruction && resources === 0;
+		const canUseAsSystemPrompt = isInstruction && skillCanBeRenderedAsInstructionPrompt(item.skillDefinition);
+		const instructionPromptReason = getSkillInstructionPromptEligibilityReason(item.skillDefinition);
+		const canPreloadActive = isInstruction && skillCanBePreloadedAsActive(item.skillDefinition);
 
 		return (
 			<MenuItem
@@ -702,7 +731,7 @@ export function SkillsBottomBarChip({
 								{resources} resource{resources === 1 ? '' : 's'}
 							</span>
 						) : null}
-						{simpleInstruction ? (
+						{isInstruction && args.length === 0 && resources === 0 ? (
 							<span className="badge badge-ghost badge-xs" title="Can be copied or forked as plain instructions.">
 								simple
 							</span>
@@ -731,7 +760,12 @@ export function SkillsBottomBarChip({
 									<button
 										type="button"
 										className="btn btn-xs rounded-lg"
-										disabled={isInputLocked}
+										disabled={isInputLocked || !canPreloadActive}
+										title={
+											!canPreloadActive
+												? 'This skill cannot be preloaded as active because it has arguments.'
+												: undefined
+										}
 										onClick={() => {
 											enableAndActivateSkill(item);
 										}}
@@ -765,7 +799,10 @@ export function SkillsBottomBarChip({
 								<button
 									type="button"
 									className="btn btn-xs rounded-lg"
-									disabled={isInputLocked}
+									disabled={isInputLocked || !canPreloadActive}
+									title={
+										!canPreloadActive ? 'This skill cannot be preloaded as active because it has arguments.' : undefined
+									}
 									onClick={() => {
 										enableAndActivateSkill(item);
 									}}
@@ -778,37 +815,40 @@ export function SkillsBottomBarChip({
 						<span className="text-base-content/60 text-xs">Use Templates</span>
 					)}
 
-					{simpleInstruction ? (
-						<>
-							<button
-								type="button"
-								className="btn btn-xs rounded-lg"
-								disabled={isInputLocked || isActive}
-								title={
-									isActive
-										? 'Already active in this chat.'
-										: 'Enable this instruction skill and activate it as standing session context now.'
+					{isInstruction ? (
+						<button
+							type="button"
+							className="btn btn-xs rounded-lg"
+							disabled={isInputLocked || !canUseAsSystemPrompt}
+							title={
+								canUseAsSystemPrompt
+									? 'Render this simple instruction skill and add it to the system instruction prompt. This does not enable or activate the skill session.'
+									: instructionPromptReason
+							}
+							onClick={() => {
+								if (!canUseAsSystemPrompt) {
+									return;
 								}
-								onClick={() => {
-									enableAndActivateSkill(item);
-									menu.hide();
-								}}
-							>
-								Add as instructions
-							</button>
-							<button
-								type="button"
-								className="btn btn-xs rounded-lg"
-								disabled={isInputLocked}
-								title="Create a new managed instruction skill from this rendered skill text."
-								onClick={() => {
-									void openForkInstructionModal(item);
-								}}
-							>
-								<FiGitBranch size={12} />
-								<span className="ml-1">Fork</span>
-							</button>
-						</>
+								void addSkillAsSystemInstructions(item, {});
+							}}
+						>
+							Add as instructions
+						</button>
+					) : null}
+
+					{isInstruction && args.length === 0 && resources === 0 ? (
+						<button
+							type="button"
+							className="btn btn-xs rounded-lg"
+							disabled={isInputLocked}
+							title="Create a new managed instruction skill from this rendered skill text."
+							onClick={() => {
+								void openForkInstructionModal(item);
+							}}
+						>
+							<FiGitBranch size={12} />
+							<span className="ml-1">Fork</span>
+						</button>
 					) : null}
 				</div>
 			</MenuItem>
@@ -828,7 +868,7 @@ export function SkillsBottomBarChip({
 						disabled={isInputLocked}
 					>
 						<ActionTriggerChipContent
-							icon={<FiZap size={14} />}
+							icon={<FiFilePlus size={14} />}
 							label="Skills"
 							count={
 								isEnabled ? (
