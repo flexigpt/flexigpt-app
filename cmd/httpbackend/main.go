@@ -18,7 +18,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper"
 	"github.com/flexigpt/flexigpt-app/internal/logrotate"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
-	promptStore "github.com/flexigpt/flexigpt-app/internal/prompt/store"
 	settingStore "github.com/flexigpt/flexigpt-app/internal/setting/store"
 	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
@@ -35,7 +34,6 @@ type Options struct {
 	SettingsDirPath         string `doc:"path to directory of settings file"`
 	ConversationsDirPath    string `doc:"path to conversations directory"`
 	ModelPresetsDirPath     string `doc:"path to modelPresets data directory"`
-	PromptTemplatesDirPath  string `doc:"path to prompt templates data directory"`
 	ToolsDirPath            string `doc:"path to tools data directory"`
 	SkillsDirPath           string `doc:"path to skills data directory"`
 	AssistantPresetsDirPath string `doc:"path to assistantpresets data directory"`
@@ -53,7 +51,6 @@ func main() {
 			opts.SettingsDirPath,
 			opts.ConversationsDirPath,
 			opts.ModelPresetsDirPath,
-			opts.PromptTemplatesDirPath,
 			opts.ToolsDirPath,
 			opts.SkillsDirPath,
 			opts.AssistantPresetsDirPath,
@@ -62,7 +59,6 @@ func main() {
 		conversationStore.InitConversationStoreHandlers(api, app.conversationStoreAPI)
 		inferencewrapper.InitProviderSetHandlers(api, app.providerSetAPI)
 		modelpresetStore.InitModelPresetStoreHandlers(api, app.modelPresetStoreAPI)
-		promptStore.InitPromptTemplateStoreHandlers(api, app.promptTemplateStoreAPI)
 		toolStore.InitToolStoreHandlers(api, app.toolStoreAPI)
 		toolruntime.InitToolRuntimeHandlers(api, app.toolRuntimeAPI)
 		skillStore.InitSkillStoreHandlers(api, app.skillStoreAPI)

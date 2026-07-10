@@ -9,7 +9,6 @@ This page gives the vocabulary and explains which page owns each part. Detailed 
 - [Mental model](#mental-model)
 - [Main terms](#main-terms)
 - [Assistant preset versus model preset](#assistant-preset-versus-model-preset)
-- [Prompt types](#prompt-types)
 - [Context and execution](#context-and-execution)
 - [History](#history)
 - [Built-in content and your content](#built-in-content-and-your-content)
@@ -29,7 +28,7 @@ A chat turn is assembled in layers:
 4. **Conversation history**
    - Earlier turns included by **Previous user turns**.
 5. **Current message**
-   - Draft text, prompt template values, attachments, tool outputs, and active composer context.
+   - Draft text, attachments, tool outputs, and active composer context.
 
 When a result changes, compare these layers one at a time.
 
@@ -41,7 +40,6 @@ When a result changes, compare these layers one at a time.
 | **Model preset**             | A saved provider/model choice with defaults such as model name, streaming, timeout, prompt/output limits, temperature, reasoning, output format, and provider-specific parameters.           |
 | **Assistant preset**         | A reusable starter setup that can apply starting text, a model preset, instruction templates, tool selections, web search choices, and skill selections.                                     |
 | **System prompt**            | Durable instruction context that shapes assistant behavior.                                                                                                                                  |
-| **Prompt template**          | Reusable request structure inserted into the current draft. It may contain variables and multiple role blocks.                                                                               |
 | **Attachment**               | Message-scoped source material such as files, folders, images, PDFs, or URLs.                                                                                                                |
 | **Tool**                     | A callable capability the model can request during a conversation.                                                                                                                           |
 | **Skill**                    | A reusable workflow mode backed by skill runtime/session behavior.                                                                                                                           |
@@ -59,29 +57,9 @@ Use an **assistant preset** when the question is:
 
 > What kind of workflow should I start from?
 
-An assistant preset is a starter recipe, not a locked mode. After applying one, you can still change the model, instructions, tools, skills, attachments, web search, prompt templates, and history setting. If the preset defines starting text, treat it as a replaceable first draft rather than a locked prompt.
+An assistant preset is a starter recipe, not a locked mode. After applying one, you can still change the model, instructions, tools, skills, attachments, web search, and history setting. If the preset defines starting text, treat it as a replaceable first draft rather than a locked prompt.
 
 The detailed rules for assistant preset contents, empty sections, modified state, inspection, and versioning live in [Reusable Catalogs](/docs?doc=reusable-catalogs#assistant-presets).
-
-## Prompt types
-
-FlexiGPT uses two related prompt ideas:
-
-| Feature             | Use it when                                            |
-| ------------------- | ------------------------------------------------------ |
-| **System prompt**   | You want durable behavior instructions across turns.   |
-| **Prompt template** | You want a reusable structure for the current message. |
-
-Prompt templates have a derived kind:
-
-- **Instructions Only**
-  - all blocks are `system` or `developer`
-  - can be selected as saved system prompt sources
-  - can be referenced by assistant presets
-- **Generic**
-  - contains at least one `user` block
-  - appears in the composer prompt picker
-  - inserts reusable request text into the current draft
 
 ## Context and execution
 
@@ -90,8 +68,8 @@ Use the right mechanism for the job:
 | Need                                             | Use                            |
 | ------------------------------------------------ | ------------------------------ |
 | Exact source material                            | Attachment                     |
-| Durable behavior rules                           | System prompt                  |
-| Repeatable current-message structure             | Prompt template                |
+| Durable behavior rules                           | System prompt/Instructions     |
+| Repeatable current-message structure             | Template                       |
 | Let the model ask the app to run something       | Tool                           |
 | Use context from a model context protocol server | MCP                            |
 | Keep a workflow mode active across turns         | Skill                          |
@@ -119,7 +97,6 @@ FlexiGPT ships with built-in:
 
 - providers
 - model presets
-- prompt templates
 - tools
 - skills
 - MCP server catalogs
@@ -139,22 +116,21 @@ For versioned domains such as prompts and assistant presets:
 
 ## Page ownership map
 
-| Goal                                                                                     | Page                                       |
-| ---------------------------------------------------------------------------------------- | ------------------------------------------ |
-| Do active work with a model                                                              | **Chats**                                  |
-| Attach files, folders, URLs, tools, skills, prompt templates, or web search to a message | **Chats -> Composer**                      |
-| Select MCP server context for a turn                                                     | **Chats -> MCP**                           |
-| Start from a reusable assistant workflow                                                 | **Chats -> Assistant dropdown**            |
-| Create or version assistant presets                                                      | **Assistant Presets**                      |
-| Create or version prompt templates and saved system prompts                              | **Prompts**                                |
-| Create or maintain tool definitions                                                      | **Tools**                                  |
-| Enable a tool for a conversation                                                         | **Chats -> Tools** or an assistant preset  |
-| Create or maintain skill definitions                                                     | **Skills**                                 |
-| Enable skills for a conversation                                                         | **Chats -> Skills** or an assistant preset |
-| Create or maintain MCP server catalogs                                                   | **MCP Servers**                            |
-| Configure providers and model presets                                                    | **Model Presets**                          |
-| Add provider keys, theme, and debug settings                                             | **Settings**                               |
-| Search and reopen old conversations                                                      | **Chats**                                  |
+| Goal                                                                   | Page                                       |
+| ---------------------------------------------------------------------- | ------------------------------------------ |
+| Do active work with a model                                            | **Chats**                                  |
+| Attach files, folders, URLs, tools, skills, or web search to a message | **Chats -> Composer**                      |
+| Select MCP server context for a turn                                   | **Chats -> MCP**                           |
+| Start from a reusable assistant workflow                               | **Chats -> Assistant dropdown**            |
+| Create or version assistant presets                                    | **Assistant Presets**                      |
+| Create or maintain tool definitions                                    | **Tools**                                  |
+| Enable a tool for a conversation                                       | **Chats -> Tools** or an assistant preset  |
+| Create or maintain skill definitions                                   | **Skills**                                 |
+| Enable skills for a conversation                                       | **Chats -> Skills** or an assistant preset |
+| Create or maintain MCP server catalogs                                 | **MCP Servers**                            |
+| Configure providers and model presets                                  | **Model Presets**                          |
+| Add provider keys, theme, and debug settings                           | **Settings**                               |
+| Search and reopen old conversations                                    | **Chats**                                  |
 
 ## Decision guide
 
@@ -162,7 +138,6 @@ For versioned domains such as prompts and assistant presets:
 | ----------------------------------- | ---------------------------------- |
 | Compare model quality               | only the model preset              |
 | Make answers follow a durable style | system prompt source               |
-| Reuse a task format                 | prompt template                    |
 | Bring exact source material         | attachments                        |
 | Give the model execution ability    | tools                              |
 | Use a structured workflow mode      | skills                             |

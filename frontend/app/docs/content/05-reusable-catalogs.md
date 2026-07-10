@@ -13,7 +13,6 @@ Use Chats to apply these things to a conversation. Use the catalog pages to crea
   - [Inspecting a preset](#inspecting-a-preset)
   - [Modified state in Chats](#modified-state-in-chats)
   - [Versioning and built-ins](#versioning-and-built-ins)
-- [Prompts](#prompts)
 - [Tools](#tools)
 - [Skills](#skills)
 - [Model Presets](#model-presets)
@@ -54,7 +53,6 @@ Assistant presets are starters, not locked modes. Applying one can seed the curr
 - model
 - model parameters
 - system prompt sources
-- prompt templates
 - tools
 - web search
 - skills
@@ -69,7 +67,6 @@ Assistant presets are starters, not locked modes. Applying one can seed the curr
 | Starting model preset       | Selects a provider/model preset in Chats.                                                                                                           |
 | Starting model patch        | Overrides runtime knobs such as streaming, token limits, temperature, reasoning, output settings, timeout, stop sequences, and raw JSON parameters. |
 | Include model system prompt | Controls whether the selected model’s default system prompt is included.                                                                            |
-| Instruction template refs   | Selects saved instructions-only system/developer prompt templates.                                                                                  |
 | Tool selections             | Adds conversation tools and compatible web-search choices.                                                                                          |
 | Skill selections            | Enables skills and optionally preloads some as active.                                                                                              |
 
@@ -149,30 +146,6 @@ Rules:
 - the version must be unique within that slug
 - custom presets can be deleted
 - empty custom bundles can be deleted
-
-## Prompts
-
-The **Prompts** page manages prompt bundles and template versions.
-
-Use it to create:
-
-- generic prompt templates
-- instructions-only system/developer prompts
-- reusable variables
-- reusable prompt versions
-
-Important behavior:
-
-- template kind is derived from block roles
-- instructions-only templates can be used as saved system prompt sources
-- generic templates appear in the composer prompt picker
-- resolved state is derived from placeholders and variable defaults/static values
-- existing custom versions are versioned rather than silently overwritten
-- built-in templates are read-only except enable/disable state
-- custom prompt bundles can be added
-- empty custom prompt bundles can be deleted
-
-Use the Prompts page when you need full variable support. Use Add/Fork in the Chats system prompt menu only for simple resolved system prompt text.
 
 ## Tools
 

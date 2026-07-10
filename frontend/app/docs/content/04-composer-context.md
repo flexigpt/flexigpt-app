@@ -8,8 +8,6 @@ This page is about using context in Chats. To create or maintain reusable defini
 
 - [Quick chooser](#quick-chooser)
 - [Attachments](#attachments)
-- [System prompts](#system-prompts)
-- [Prompt templates](#prompt-templates)
 - [Tools](#tools)
 - [Web search](#web-search)
 - [Skills](#skills)
@@ -19,15 +17,14 @@ This page is about using context in Chats. To create or maintain reusable defini
 
 ## Quick chooser
 
-| Need                                        | Use                                                  |
-| ------------------------------------------- | ---------------------------------------------------- |
-| Bring exact source material into a request  | Attachment                                           |
-| Keep behavior rules active across turns     | System prompt                                        |
-| Reuse current-message structure             | Prompt template                                      |
-| Let the model ask FlexiGPT to run something | Tool                                                 |
-| Use server-discovered context               | MCP                                                  |
-| Need recent web information                 | Web search, if compatible with the selected provider |
-| Use a reusable workflow mode                | Skill                                                |
+| Need                                            | Use                                                  |
+| ----------------------------------------------- | ---------------------------------------------------- |
+| Bring exact source material into a request      | Attachment                                           |
+| Reuse current-message structure                 | Template                                             |
+| Let the model ask FlexiGPT to run something     | Tool                                                 |
+| Use server-discovered context                   | MCP                                                  |
+| Need recent web information                     | Web search, if compatible with the selected provider |
+| Use a reusable workflow mode or LLM instruction | Skill                                                |
 
 ## Attachments
 
@@ -75,60 +72,6 @@ Attachment modes can include:
 | **Not readable** | The app could not safely read or attach the content.       |
 
 Before sending sensitive or large context, check attachment modes.
-
-## System prompts
-
-System prompts are durable behavior instructions.
-
-Use them for rules like:
-
-- answer in a specific style
-- follow a review rubric
-- ask clarifying questions before acting
-- avoid unsupported claims
-- produce structured output
-
-In Chats, system prompt sources can include:
-
-- the selected model preset’s default prompt, when included
-- selected saved system/developer prompts
-- system/developer blocks from inserted prompt templates
-- a restored previous conversation prompt
-
-The system prompt dropdown lets you:
-
-- toggle model default prompt inclusion
-- select saved system prompts
-- add a new resolved system prompt
-- fork an existing saved prompt
-- clear selected prompt sources
-
-Add/Fork from this menu is for simple resolved instruction text. Use the **Prompts** page for full variable support and versioning.
-
-## Prompt templates
-
-Prompt templates are reusable message structures.
-
-Use them for repeated formats such as:
-
-- code review checklist
-- implementation brief
-- bug investigation template
-- documentation generation prompt
-- research synthesis format
-- rewrite request
-
-When inserted into the composer:
-
-- user blocks become visible draft text
-- variables become editable inline pills
-- required variables block sending until filled
-- system/developer blocks contribute instruction context for the send
-- the template toolbar lets you edit, flatten, or remove the inserted instance
-
-Local edits in the toolbar affect only the inserted instance. They do not edit the saved template.
-
-Use **Flatten** when you want to convert visible template content into plain text. After flattening, variable behavior and template-derived instruction blocks no longer participate as a template.
 
 ## Tools
 
@@ -238,9 +181,8 @@ Use it to inspect and remove context before sending.
 3. confirm provider/model
 4. keep **Previous user turns** small and intentional
 5. attach only the source material that matters
-6. use prompt templates for repeated structure
-7. add tools only when execution is useful
-8. use manual tool review first
-9. enable skills when a workflow mode helps
-10. inspect output, citations, tool outputs, and message details
-11. adjust one layer at a time
+6. add tools only when execution is useful
+7. use manual tool review first
+8. enable skills when a workflow mode helps
+9. inspect output, citations, tool outputs, and message details
+10. adjust one layer at a time

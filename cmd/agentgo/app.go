@@ -20,7 +20,6 @@ type App struct {
 	settingStoreAPI         *SettingStoreWrapper
 	conversationStoreAPI    *ConversationCollectionWrapper
 	modelPresetStoreAPI     *ModelPresetStoreWrapper
-	promptTemplateStoreAPI  *PromptTemplateStoreWrapper
 	toolStoreAPI            *ToolStoreWrapper
 	toolRuntimeAPI          *ToolRuntimeWrapper
 	skillStoreAPI           *SkillStoreWrapper
@@ -33,7 +32,6 @@ type App struct {
 	settingsDirPath         string
 	conversationsDirPath    string
 	modelPresetsDirPath     string
-	promptsDirPath          string
 	toolsDirPath            string
 	skillsDirPath           string
 	mcpsDirPath             string
@@ -55,21 +53,19 @@ func NewApp() *App {
 	app.settingsDirPath = filepath.Join(app.dataBasePath, "settings")
 	app.conversationsDirPath = filepath.Join(app.dataBasePath, "conversationsv1")
 	app.modelPresetsDirPath = filepath.Join(app.dataBasePath, "modelpresetsv1")
-	app.promptsDirPath = filepath.Join(app.dataBasePath, "prompttemplatesv1")
 	app.toolsDirPath = filepath.Join(app.dataBasePath, "toolsv1")
 	app.skillsDirPath = filepath.Join(app.dataBasePath, "skillsv1")
 	app.mcpsDirPath = filepath.Join(app.dataBasePath, "mcpserversv1")
 	app.assistantPresetsDirPath = filepath.Join(app.dataBasePath, "assistantpresetsv1")
 
 	if app.settingsDirPath == "" || app.conversationsDirPath == "" ||
-		app.modelPresetsDirPath == "" || app.promptsDirPath == "" ||
+		app.modelPresetsDirPath == "" ||
 		app.assistantPresetsDirPath == "" || app.toolsDirPath == "" || app.skillsDirPath == "" || app.mcpsDirPath == "" {
 		slog.Error(
 			"invalid app path configuration",
 			"settingsDirPath", app.settingsDirPath,
 			"conversationsDirPath", app.conversationsDirPath,
 			"modelPresetsDirPath", app.modelPresetsDirPath,
-			"promptsDirPath", app.promptsDirPath,
 			"assistantPresetsDirPath", app.assistantPresetsDirPath,
 			"toolsDirPath", app.toolsDirPath,
 			"skillsDirPath", app.skillsDirPath,
@@ -83,7 +79,6 @@ func NewApp() *App {
 	app.settingStoreAPI = &SettingStoreWrapper{}
 	app.conversationStoreAPI = &ConversationCollectionWrapper{}
 	app.modelPresetStoreAPI = &ModelPresetStoreWrapper{}
-	app.promptTemplateStoreAPI = &PromptTemplateStoreWrapper{}
 	app.toolStoreAPI = &ToolStoreWrapper{}
 	app.skillStoreAPI = &SkillStoreWrapper{}
 	app.mcpAPI = &MCPWrapper{}
@@ -115,14 +110,7 @@ func NewApp() *App {
 		)
 		panic("failed to initialize app: could not create model presets directory")
 	}
-	if err := os.MkdirAll(app.promptsDirPath, os.FileMode(0o770)); err != nil {
-		slog.Error(
-			"failed to create prompt templates directory",
-			"prompt Templates path", app.promptsDirPath,
-			"error", err,
-		)
-		panic("failed to initialize app: could not create prompt templates directory")
-	}
+
 	if err := os.MkdirAll(app.toolsDirPath, os.FileMode(0o770)); err != nil {
 		slog.Error(
 			"failed to create tools directory",
@@ -163,7 +151,6 @@ func NewApp() *App {
 		"settingsDirPath", app.settingsDirPath,
 		"conversationsDirPath", app.conversationsDirPath,
 		"modelPresetsDirPath", app.modelPresetsDirPath,
-		"promptsDirPath", app.promptsDirPath,
 		"toolsDirPath", app.toolsDirPath,
 		"skillsDirPath", app.skillsDirPath,
 		"mcpsDirPath", app.mcpsDirPath,
@@ -191,17 +178,6 @@ func (a *App) initManagers() {
 		panic("failed to initialize managers: conversation store initialization failed\n" + err.Error())
 	}
 	slog.Info("conversation store initialized", "directory", a.conversationsDirPath)
-
-	err = InitPromptTemplateStoreWrapper(a.promptTemplateStoreAPI, a.promptsDirPath)
-	if err != nil {
-		slog.Error(
-			"couldn't initialize prompt template store",
-			"directory", a.promptsDirPath,
-			"error", err,
-		)
-		panic("failed to initialize managers: prompt template store initialization failed\n" + err.Error())
-	}
-	slog.Info("prompt store initialized", "directory", a.promptsDirPath)
 
 	err = InitToolStoreWrapper(a.toolStoreAPI, a.toolsDirPath)
 	if err != nil {
@@ -360,9 +336,7 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	if a.toolStoreAPI != nil {
 		a.toolStoreAPI.close()
 	}
-	if a.promptTemplateStoreAPI != nil {
-		a.promptTemplateStoreAPI.close()
-	}
+
 	if a.conversationStoreAPI != nil {
 		a.conversationStoreAPI.close()
 	}

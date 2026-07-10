@@ -206,7 +206,6 @@ The chips bar is the live representation of what is already attached to the draf
 Together they cover:
 
 - attachments
-- prompt templates
 - tools
 - skills
 - system prompts

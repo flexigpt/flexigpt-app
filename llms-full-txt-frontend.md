@@ -18,7 +18,6 @@ The frontend is built around a few stable ideas:
 - Catalog pages own editing of reusable data:
   - assistant presets
   - model presets
-  - prompts
   - tools
   - skills
   - settings
@@ -64,7 +63,6 @@ Route map:
 - `/assistantpresets`
 - `/skills`
 - `/tools`
-- `/prompts`
 - `/modelpresets`
 - `/docs`
 - `/settings`
@@ -273,7 +271,6 @@ Top-level files:
 - `app/chats/composer/tools/*`
 - `app/chats/composer/toolruntime/*`
 - `app/chats/composer/skills/*`
-- `app/chats/composer/systemprompts/*`
 - `app/chats/composer/assistantpresets/*`
 - `app/chats/composer/platedoc/*`
 
@@ -319,8 +316,7 @@ The chips bar shows, in order:
 The bottom bar provides:
 
 - attachment picker
-- system prompt selection
-- prompt template picker
+- template picker
 - tool picker
 - skills picker
 - web search controls
@@ -414,20 +410,6 @@ Important detail:
 - SDK tool selections are validated against the selected model’s provider SDK type
 - a preset can be visible but not selectable if one of its required references is unavailable
 
-##### System prompts
-
-System prompt composition is its own controller.
-
-Important behavior:
-
-- the effective system prompt is built from:
-  - model default prompt
-  - user-selected prompt sources
-  - the include-model-default toggle
-- a restored conversation can create a synthetic “previous conversation prompt” source
-- prompt templates are selected from the prompt catalog and can be added from the composer
-- assistant preset application can also drive system prompt selection
-
 ##### Submit and abort behavior
 
 The composer supports three primary actions:
@@ -506,30 +488,6 @@ Important guardrails:
 - cannot delete a provider that still has model presets
 - cannot disable the default model of a provider without changing the default first
 - built-in model presets are read-only
-
-### Prompts page
-
-Files:
-
-- `app/prompts/page.tsx`
-- `app/prompts/*`
-
-Behavior:
-
-- loads prompt bundles and prompt templates, including disabled entries
-- each bundle contains versioned template files
-- allows:
-  - adding bundles
-  - enabling/disabling bundles
-  - adding/editing prompt templates
-  - enabling/disabling prompt versions
-  - deleting user-created template versions
-  - deleting empty user-created bundles
-- when saving a template, the page derives:
-  - template kind
-  - resolved status
-  - validation-related fields
-- built-in prompt bundles/templates are read-only except for enable/disable overlay state
 
 ### Skills page
 
@@ -656,7 +614,6 @@ These files are the frontend-side canonical shapes for:
 - attachments
 - inference
 - model presets
-- prompts
 - settings
 - skills
 - tools
@@ -792,8 +749,6 @@ Important behavior:
   - assistant preset catalog editor
 - `app/modelpresets/`
   - provider and model catalog editor
-- `app/prompts/`
-  - prompt bundle and template editor
 - `app/skills/`
   - skill bundle and skill editor
 - `app/tools/`

@@ -40,7 +40,6 @@ Stored locally by default:
 - conversations and local history search data
 - model presets and provider metadata
 - assistant presets
-- prompt templates
 - tool definitions
 - skill definitions and hydrated built-in skill files when needed
 - app settings metadata

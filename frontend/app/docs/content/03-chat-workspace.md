@@ -2,7 +2,7 @@
 
 The **Chats** page is the main place where FlexiGPT turns reusable setup into work. It brings together tabs, local conversation search, the message timeline, model controls, assistant presets, the composer, streaming responses, and edit/resend flows.
 
-This page is about working in the chat workspace. For the details of attachments, prompt templates, tools, skills, and web search inside the composer, see [Composer Context](/docs?doc=composer-context).
+This page is about working in the chat workspace. For the details of attachments, tools, skills, and web search inside the composer, see [Composer Context](/docs?doc=composer-context).
 
 ## Table of contents <!-- omit from toc -->
 
@@ -89,9 +89,7 @@ The composer bottom bar is where you add message context:
 
 - **Attachments**
   - files, folders, images, PDFs, URLs
-- **System prompt**
-  - model default prompt toggle and saved system/developer prompt sources
-- **Prompts**
+- **Templates**
   - reusable prompt templates for the current message
 - **Tools**
   - tool choices for the draft or conversation
@@ -119,7 +117,6 @@ Common actions:
 
 The composer can block send when:
 
-- required prompt template variables are missing
 - tool or web-search options are incomplete
 - pending runnable tool calls must be run or discarded
 - failed runnable calls must be retried or discarded
@@ -178,7 +175,6 @@ Leave Chats when maintaining reusable building blocks:
 | Goal                                  | Page              |
 | ------------------------------------- | ----------------- |
 | Create or version an assistant preset | Assistant Presets |
-| Create or version a prompt template   | Prompts           |
 | Add or maintain tool definitions      | Tools             |
 | Add or maintain skills                | Skills            |
 | Change providers or model presets     | Model Presets     |

@@ -18,7 +18,7 @@ export const docsStarters: NavCardProps[] = [
 	},
 	{
 		title: 'Composer Context',
-		description: 'Attach files, folders, URLs, prompt templates, tools, skills, and web search to the current message.',
+		description: 'Attach files, folders, URLs, tools, skills, and web search to the current message.',
 		to: '/docs/?doc=composer-context',
 		icon: <FiLayers size={18} />,
 	},

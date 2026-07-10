@@ -4,14 +4,14 @@
 [![lint](https://github.com/flexigpt/flexigpt-app/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/flexigpt/flexigpt-app/actions/workflows/lint.yml)
 [![test](https://github.com/flexigpt/flexigpt-app/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/flexigpt/flexigpt-app/actions/workflows/test.yml)
 
-FlexiGPT is a local-first BYOK AI workspace for power users and teams who need repeatable prompts, tools, skills, model choices, assistants/agents, and private local history across multiple LLM providers.
+FlexiGPT is a local-first BYOK AI workspace for power users and teams who need repeatable tools, skills, model choices, assistants/agents, and private local history across multiple LLM providers.
 
 ## Who FlexiGPT is for
 
 FlexiGPT is built for people who use LLMs as part of repeatable work, not just one-off chat.
 
 - Power and local-first users who want provider choice, private local history, and control over configuration and orchestration.
-- Developers and technical writers who develop features, review diffs, debug failures, write tests/docs, and reuse assistants/agents, prompts, attachments, tools, and model setups.
+- Developers and technical writers who develop features, review diffs, debug failures, write tests/docs, and reuse assistants/agents, skills, attachments, tools, and model setups.
 - Consultants and small teams who want consistent assistant workflows without sending chat history through another hosted app.
 
 ## Install
@@ -79,7 +79,7 @@ FlexiGPT does not proxy LLM calls through a FlexiGPT-hosted service. Requests go
 
 ### Repeatable AI workspace
 
-- One interface for chats, tabs, reusable assistant presets, model presets, prompt templates, attachments, tools, skills, search, and exports.
+- One interface for chats, tabs, reusable assistant presets, model presets, attachments, tools, skills, search, and exports.
 - Build repeatable workflows by combining model choices, instructions, attachments, tools, and skills.
 - Switch providers or models as you iterate.
 - Multi-tab conversations with local history search and resume flows.

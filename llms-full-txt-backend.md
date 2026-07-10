@@ -44,14 +44,13 @@ Read in this order if you want the fastest mental model of the backend:
 3. `cmd/agentgo/wrapper_aggregate.go`
 4. `internal/setting/store/store.go`
 5. `internal/modelpreset/store/store.go`
-6. `internal/prompt/store/store.go`
-7. `internal/tool/store/store.go`
-8. `internal/skill/store/store.go`
-9. `internal/assistantpreset/store/store.go`
-10. `internal/inferencewrapper/provider_set.go`
-11. `internal/toolruntime/toolruntime.go`
-12. `internal/attachment/attachment.go`
-13. `internal/llmtoolsutil/registry.go`
+6. `internal/tool/store/store.go`
+7. `internal/skill/store/store.go`
+8. `internal/assistantpreset/store/store.go`
+9. `internal/inferencewrapper/provider_set.go`
+10. `internal/toolruntime/toolruntime.go`
+11. `internal/attachment/attachment.go`
+12. `internal/llmtoolsutil/registry.go`
 
 ## Functional layout
 
@@ -89,7 +88,6 @@ Files:
 - `wrapper_setting.go`
 - `wrapper_conversation.go`
 - `wrapper_modelpreset.go`
-- `wrapper_prompt.go`
 - `wrapper_tool.go`
 - `wrapper_toolruntime.go`
 - `wrapper_skill.go`
@@ -106,7 +104,6 @@ Important startup behavior:
 - Logging is routed through a rotating file writer under `logs/` in the app data directory.
 - `initManagers()` order matters because later stores depend on earlier stores:
   - conversation
-  - prompts
   - tools
   - tool runtime
   - skills
@@ -122,7 +119,6 @@ Shutdown behavior to remember:
 - `App.shutdown()` currently closes only:
   - assistant presets
   - tools
-  - prompts
   - skills
 - `conversation`, `modelpreset`, and `setting` stores expose `Close()` methods, but `App.shutdown()` does not currently call them.
 - If you add more background workers or runtime resources, this shutdown path should be revisited.
@@ -243,14 +239,12 @@ Files:
 Embedded content roots:
 
 - `tools/`
-- `prompts/`
 - `skills/`
 - `assistantpresets/`
 
 Manifest files:
 
 - `tools.bundles.json`
-- `prompts.bundles.json`
 - `skills.json`
 - `assistantpresets.bundles.json`
 
@@ -362,46 +356,6 @@ Critical behavior:
 Useful detail:
 
 - provider patches and model patches are intentionally split into separate helper files.
-
-#### Prompt templates
-
-Package: `internal/prompt`
-
-Files:
-
-- `spec/type_const.go`
-- `spec/req_resp.go`
-- `store/builtin_data.go`
-- `store/clone.go`
-- `store/sluglock.go`
-- `store/validate_template.go`
-- `store/store.go`
-
-Functionality:
-
-- prompt bundles
-- versioned prompt templates
-- reusable instruction and template catalog
-
-Critical behavior:
-
-- the base bundle is reserved and hydrated on startup
-- built-in bundles/templates are overlaid with local enable flags
-- bundle deletion is soft-delete plus cleanup after a grace period
-- template versions are stored as individual JSON files under a bundle directory
-- list APIs emit built-ins first, then user templates
-- template validation is strict:
-  - block roles must match the template kind
-  - block IDs must be unique
-  - placeholders must be declared as variables
-  - non-static variables must be used
-  - `isResolved` is computed and enforced
-  - enum defaults must exist in the enum list
-
-Important restrictions:
-
-- reserved bundle ID and slug are protected
-- built-in bundles are read-only except for overlay enable/disable state
 
 #### Tools
 
@@ -553,7 +507,7 @@ Validation highlights:
 
 Useful detail:
 
-- assistant presets are the cross-store composition layer and are where model/prompt/tool/skill choices come together.
+- assistant presets are the cross-store composition layer and are where model/tool/skill choices come together.
 
 ### Execution and request orchestration
 
@@ -709,7 +663,6 @@ Main local data roots created under the app data directory:
 - `settings/`
 - `conversationsv1/`
 - `modelpresetsv1/`
-- `prompttemplatesv1/`
 - `toolsv1/`
 - `skills/`
 - `assistantpresetsv1/`
@@ -723,8 +676,6 @@ Primary storage shapes:
   - one JSON file per conversation
 - `modelpresets.json`
   - all provider and model preset data
-- `prompttemplatesv1/` plus `prompts.bundles.json`
-  - prompt bundles and versioned templates
 - `toolsv1/` plus `tools.bundles.json`
   - tool bundles and versioned tools
 - `skills.bundles.json`
@@ -760,7 +711,6 @@ Shutdown flow:
 
 - close assistant presets
 - close tools
-- close prompts
 - close skills
 - conversation/modelpreset/settings stores are not currently closed here, even though some expose `Close()` methods
 
@@ -776,5 +726,5 @@ Shutdown flow:
 - `skill` is the most stateful subsystem because it synchronizes disk state with a live runtime catalog and session model.
 - `attachment` is the input normalization layer that turns files, URLs, and images into model-ready content.
 - `ToolSelection`/`ToolStoreChoice` and `SkillRef` are store identities, not runtime identities.
-- If you add new provider, prompt, tool, skill, or assistant-preset behavior, update the relevant lookup/adapters and runtime hydration paths together.
+- If you add new provider, tool, skill, or assistant-preset behavior, update the relevant lookup/adapters and runtime hydration paths together.
 - Malformed disk records are often skipped in list/read paths, so explicit validation is important when adding new storage rules.

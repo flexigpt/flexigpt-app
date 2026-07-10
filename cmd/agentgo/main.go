@@ -101,7 +101,6 @@ func main() {
 			app.settingStoreAPI,
 			app.conversationStoreAPI,
 			app.modelPresetStoreAPI,
-			app.promptTemplateStoreAPI,
 			app.toolStoreAPI,
 			app.toolRuntimeAPI,
 			app.skillStoreAPI,

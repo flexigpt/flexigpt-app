@@ -57,7 +57,7 @@ Before each important request, check these layers:
 4. **Current message**
    - Is the request clear and specific?
 5. **Context**
-   - Are the right attachments, prompt templates, tools, skills, and web search selections active?
+   - Are the right attachments, tools, skills, and web search selections active?
 6. **History**
    - Is **Previous user turns** small enough to avoid stale context?
 

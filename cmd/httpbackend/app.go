@@ -10,43 +10,39 @@ import (
 	assistantpresetStore "github.com/flexigpt/flexigpt-app/internal/assistantpreset/store"
 	conversationStore "github.com/flexigpt/flexigpt-app/internal/conversation/store"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
-	promptStore "github.com/flexigpt/flexigpt-app/internal/prompt/store"
 	settingStore "github.com/flexigpt/flexigpt-app/internal/setting/store"
 	skillStore "github.com/flexigpt/flexigpt-app/internal/skill/store"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 )
 
 type BackendApp struct {
-	settingStoreAPI        *settingStore.SettingStore
-	conversationStoreAPI   *conversationStore.ConversationCollection
-	providerSetAPI         *inferencewrapper.ProviderSetAPI
-	modelPresetStoreAPI    *modelpresetStore.ModelPresetStore
-	promptTemplateStoreAPI *promptStore.PromptTemplateStore
-	toolStoreAPI           *toolStore.ToolStore
-	toolRuntimeAPI         *toolruntime.ToolRuntime
-	skillStoreAPI          *skillStore.SkillStore
-	assistantPresetAPI     *assistantpresetStore.AssistantPresetStore
+	settingStoreAPI      *settingStore.SettingStore
+	conversationStoreAPI *conversationStore.ConversationCollection
+	providerSetAPI       *inferencewrapper.ProviderSetAPI
+	modelPresetStoreAPI  *modelpresetStore.ModelPresetStore
+	toolStoreAPI         *toolStore.ToolStore
+	toolRuntimeAPI       *toolruntime.ToolRuntime
+	skillStoreAPI        *skillStore.SkillStore
+	assistantPresetAPI   *assistantpresetStore.AssistantPresetStore
 
 	settingsDirPath         string
 	conversationsDirPath    string
 	modelPresetsDirPath     string
-	promptsDirPath          string
 	toolsDirPath            string
 	skillsDirPath           string
 	assistantPresetsDirPath string
 }
 
 func NewBackendApp(
-	settingsDirPath, conversationsDirPath, modelPresetsDirPath, promptsDirPath, toolsDirPath, skillsDirPath, assistantPresetsDirPath string,
+	settingsDirPath, conversationsDirPath, modelPresetsDirPath, toolsDirPath, skillsDirPath, assistantPresetsDirPath string,
 ) *BackendApp {
 	if settingsDirPath == "" || conversationsDirPath == "" ||
-		modelPresetsDirPath == "" || promptsDirPath == "" || toolsDirPath == "" || skillsDirPath == "" || assistantPresetsDirPath == "" {
+		modelPresetsDirPath == "" || toolsDirPath == "" || skillsDirPath == "" || assistantPresetsDirPath == "" {
 		slog.Error(
 			"invalid app path configuration",
 			"settingsDirPath", settingsDirPath,
 			"conversationsDirPath", conversationsDirPath,
 			"modelPresetsDirPath", modelPresetsDirPath,
-			"promptsDirPath", promptsDirPath,
 			"toolsDirPath", toolsDirPath,
 			"skillsDirPath", skillsDirPath,
 			"assistantPresetsDirPath", assistantPresetsDirPath,
@@ -58,7 +54,6 @@ func NewBackendApp(
 		settingsDirPath:         settingsDirPath,
 		conversationsDirPath:    conversationsDirPath,
 		modelPresetsDirPath:     modelPresetsDirPath,
-		promptsDirPath:          promptsDirPath,
 		toolsDirPath:            toolsDirPath,
 		skillsDirPath:           skillsDirPath,
 		assistantPresetsDirPath: assistantPresetsDirPath,
@@ -70,7 +65,6 @@ func NewBackendApp(
 	app.initSkillStore()
 	app.initProviderSet()
 	app.initModelPresetStore()
-	app.initPromptTemplateStore()
 	app.initAssistantPresetsStore()
 	return app
 }
@@ -146,31 +140,6 @@ func (a *BackendApp) initModelPresetStore() {
 	a.modelPresetStoreAPI = ms
 
 	slog.Info("model presets store initialized", "filepath", a.modelPresetsDirPath)
-}
-
-func (a *BackendApp) initPromptTemplateStore() {
-	if err := os.MkdirAll(a.promptsDirPath, os.FileMode(0o770)); err != nil {
-		slog.Error(
-			"failed to create prompt templates directory",
-			"promptsDirPath", a.promptsDirPath,
-			"error", err,
-		)
-		panic("failed to initialize BackendApp: could not create prompt templates directory")
-	}
-
-	ps, err := promptStore.NewPromptTemplateStore(
-		a.promptsDirPath,
-	)
-	if err != nil {
-		slog.Error(
-			"couldn't initialize prompt template store",
-			"promptsDirPath", a.promptsDirPath,
-			"error", err,
-		)
-		panic("failed to initialize BackendApp: prompt template store initialization failed")
-	}
-	a.promptTemplateStoreAPI = ps
-	slog.Info("prompt template store initialized", "directory", a.promptsDirPath)
 }
 
 func (a *BackendApp) initToolStore() {

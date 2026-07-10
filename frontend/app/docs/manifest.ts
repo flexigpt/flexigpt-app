@@ -60,13 +60,12 @@ export const docsCategories: DocsCategory[] = [
 		id: 'context-and-catalogs',
 		title: 'Context and Catalogs',
 		summary:
-			'Use context inside Chats, then maintain reusable MCP servers, prompts, tools, skills, models, and assistant presets on their own pages.',
+			'Use context inside Chats, then maintain reusable MCP servers, tools, skills, models, and assistant presets on their own pages.',
 		sections: [
 			{
 				id: 'composer-context',
 				title: 'Composer Context',
-				summary:
-					'Attach files, folders, URLs, prompt templates, tools, skills, and web search to the message you are composing.',
+				summary: 'Attach files, folders, URLs, tools, skills, and web search to the message you are composing.',
 				body: composerContextBody,
 			},
 			{
@@ -79,8 +78,7 @@ export const docsCategories: DocsCategory[] = [
 			{
 				id: 'reusable-catalogs',
 				title: 'Reusable Catalogs',
-				summary:
-					'Manage assistant presets, prompt templates, tools, skills, model presets, and settings outside the chat flow.',
+				summary: 'Manage assistant presets, tools, skills, model presets, and settings outside the chat flow.',
 				body: reusableCatalogsBody,
 			},
 		],
@@ -136,7 +134,7 @@ export const docsCategories: DocsCategory[] = [
 				id: 'setup-recipes',
 				title: 'Setup Recipes',
 				summary:
-					'Set up OpenRouter, local models, assistant presets, prompt templates, tool-assisted workflows, and skill-backed workflows.',
+					'Set up OpenRouter, local models, assistant presets, tool-assisted workflows, and skill-backed workflows.',
 				body: setupRecipesBody,
 			},
 		],

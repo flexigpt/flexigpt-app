@@ -3,19 +3,12 @@
 ## Terms
 
 - Assistant:
-
-  - Chat persona/preset that sets defaults (model preset, system prompt) and defines allowed catalogs (which model presets, prompt templates, tools, and knowledge/doc sets can be used in this chat). If a category is marked “All allowed,” there’s no restriction for that category.
-
-- Prompt Template:
-
-  - Reusable scaffold of role-tagged messages (System/Developer/User/Assistant), with/without variables, and/or preprocessors. Applied per turn.
+  - Chat persona/preset that sets defaults (model preset, system prompt) and defines allowed catalogs (which model presets, tools, and knowledge/doc sets can be used in this chat). If a category is marked “All allowed,” there’s no restriction for that category.
 
 - Model Preset:
-
   - Named configuration for inference: model ID plus parameters (e.g., temperature, reasoning).
 
 - Tool:
-
   - LLM-callable capability (function/tool call) available to the model during inference.
 
 - Knowledge/Document Set:
@@ -36,7 +29,6 @@
 - This is a Chat-level context. It is persistent until user changes something.
 
 - Assistant dropdown: avatar/name; switch Assistant. Selections persist for the chat.
-
   - On switch, reset to the new Assistant’s defaults for model/system/tools/knowledge.
   - Attempt to preserve the current chat selections if they’re allowed by the new Assistant; otherwise: fallback to the new Assistant’s default.
     - System prompts and recent prompts should not be preserved (Assistant-scoped); options revert to the new Assistant defaults.
@@ -44,24 +36,20 @@
   - Default Assistant allows all models/tools/docs/templates.
 
 - Model params
-
   - Model dropdown: shows available models with a check on the Assistant default; user selection replaces the default and persists.
   - Temperature: dropdown presets (e.g., 0.0, 0.2, 0.5, 0.7, 1.0) + free entry (0–1). Hidden if model doesn’t support it.
   - Reasoning: dropdown with levels (Low/Med/High) or token-based entry (e.g., 0–8192). Hidden if not supported.
 
 - History
-
   - Toggle button (Include prior messages). Current state applies to all turns and persists until changed.
 
 - Tools and Knowledge: availability and chat defaults only. Selection is per turn, see Composer.
-
   - Managed via dropdowns (select-only, no freeform). Selections persist for the chat and are used by default on each turn.
   - Tools dropdown: multi-select of allowed tools (select-only). Selections persist for the chat (defaults). Turn-level additions via “+” don’t change this.
   - Knowledge dropdown: multi-select of allowed sources (select-only). Selections persist for the chat (defaults). Turn-level additions via “#” don’t change this.
   - Managed in a advanced params modal.
 
 - System prompt:
-
   - Dropdown shows: Assistant default (checked), prior selections (recents, max ~5), and any template-injected options after send.
   - When a template with a System is sent, it is appended here and becomes the active selection; removal before send does not add it.
   - During editing and before send, an indicator can show “new system” (e.g., tinted preview) if a template is previewing a different System.
@@ -74,13 +62,11 @@
 - Purpose: show exact request/response for a specific exchange without cluttering the transcript.
 
 - Entry points
-
   - Under the User (request) message: “View request details”.
   - Under the Assistant (response) message: “View response details”.
   - Both open the same Inspector component, deep-linked to the relevant tab/anchor.
 
 - Inspector content
-
   - Request tab (from user message):
     - Composed messages[] (System, examples, user), tool/source config, model params, history state.
     - Template details (name, variables used, preprocessors status).
@@ -103,13 +89,11 @@
 - Text input; Enter/Cmd+Enter to send.
 - Neutral tip below composer: “Shortcuts: / templates, + tools, # knowledge. Type at start or after a space.”
 - Send is enabled only when aggregate text is non-empty and all prerequisites are satisfied. Aggregate text:
-
   - Composer text
   - Compiled User content from a selected template
   - Processed file text (if “Process to text” is on)
 
 - Action: Attach Templates (/)
-
   - Per-message intent; variables filled inline; preprocessors run pre-send with retry; manual override allowed.
   - Multi Role/Message block behavior
     - Last User block behavior (primary mental model):
@@ -137,13 +121,11 @@
     - On success, show a Result chip with actions: Insert at cursor (default for short text), Attach as file (for large/non-text).
 
 - Action: Attach Tools (+)
-
   - Inline “+” opens select-only autocomplete for allowed tools to mark them “eligible/selected” for this turn.
   - Selection ≠ invocation; the model decides, user may confirm/deny calls if required.
   - Inline additions do not change chat defaults unless the user also updates the Tools dropdown.
 
 - Action: Attach Knowledge (#)
-
   - Inline “#” opens select-only autocomplete for allowed sources (retrievers).
   - Inclusion applies to this turn only.
   - Allowed sources here are configured doc sets.

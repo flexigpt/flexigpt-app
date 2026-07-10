@@ -2,7 +2,7 @@
 
 These recipes are outcome-based. They focus on work you want done by the model.
 
-For setup tasks such as OpenRouter, local models, creating assistant presets, prompt templates, tools, or skills, see [Setup Recipes](/docs?doc=setup-recipes).
+For setup tasks such as OpenRouter, local models, creating assistant presets, tools, or skills, see [Setup Recipes](/docs?doc=setup-recipes).
 
 ## Table of contents <!-- omit from toc -->
 
@@ -192,7 +192,7 @@ Steps:
 3. Choose an assistant preset if needed.
 4. Set **Previous user turns** to a fixed value.
 5. Add the same attachments.
-6. Add the same prompt templates, system prompts, tools, web search, and skills.
+6. Add the same templates, tools, web search, and skills.
 7. Send the task with model A.
 8. Open another tab or branch the task.
 9. Change only the **Model** dropdown to model B.

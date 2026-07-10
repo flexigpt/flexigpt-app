@@ -71,7 +71,6 @@ apps --> imageGen
 %% 3. SKILLS / ASSISTANTS AREA
 %% ───────────────────────────────
 subgraph skillsSection["🧩 Skills / Assistants"]
-  prompts["Prompt Templates"]
   tools["Tools"]
   modelPresets["Model Presets"]
   dataSources["Data / Doc Sources"]
