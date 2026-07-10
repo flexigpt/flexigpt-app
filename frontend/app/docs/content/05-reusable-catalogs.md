@@ -1,6 +1,6 @@
 # Reusable Catalogs
 
-The pages outside **Chats** maintain reusable building blocks: assistant presets, prompt templates, tool definitions, skills, MCP server catalogs, model presets, and app settings.
+The pages outside **Chats** maintain reusable building blocks: assistant presets, tools, skills, MCP server catalogs, model presets, and app settings.
 
 Use Chats to apply these things to a conversation. Use the catalog pages to create, inspect, version, enable, disable, or delete reusable definitions.
 
@@ -22,15 +22,14 @@ Use Chats to apply these things to a conversation. Use the catalog pages to crea
 
 ## Catalog ownership
 
-| Goal                                                | Page              |
-| --------------------------------------------------- | ----------------- |
-| Reuse a whole workflow setup                        | Assistant Presets |
-| Create reusable prompt structures or system prompts | Prompts           |
-| Maintain callable capabilities                      | Tools             |
-| Maintain reusable workflow modes                    | Skills            |
-| Create or maintain MCP server catalogs              | MCP Servers       |
-| Configure providers and models                      | Model Presets     |
-| Add auth keys, change theme, or debug settings      | Settings          |
+| Goal                                                 | Page              |
+| ---------------------------------------------------- | ----------------- |
+| Reuse a whole workflow setup                         | Assistant Presets |
+| Create reusable workflow modes or skill-based drafts | Skills            |
+| Maintain callable capabilities                       | Tools             |
+| Create or maintain MCP server catalogs               | MCP Servers       |
+| Configure providers and models                       | Model Presets     |
+| Add auth keys, change theme, or debug settings       | Settings          |
 
 ## Assistant Presets
 
@@ -52,7 +51,6 @@ Assistant presets are starters, not locked modes. Applying one can seed the curr
 - current draft text
 - model
 - model parameters
-- system prompt sources
 - tools
 - web search
 - skills
@@ -61,21 +59,15 @@ Assistant presets are starters, not locked modes. Applying one can seed the curr
 
 ### What an assistant preset can contain
 
-| Preset field                | User-facing effect                                                                                                                                  |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Starting text               | Seeds the composer/editor with an initial draft for the workflow.                                                                                   |
-| Starting model preset       | Selects a provider/model preset in Chats.                                                                                                           |
-| Starting model patch        | Overrides runtime knobs such as streaming, token limits, temperature, reasoning, output settings, timeout, stop sequences, and raw JSON parameters. |
-| Include model system prompt | Controls whether the selected model’s default system prompt is included.                                                                            |
-| Tool selections             | Adds conversation tools and compatible web-search choices.                                                                                          |
-| Skill selections            | Enables skills and optionally preloads some as active.                                                                                              |
+| Preset field         | User-facing effect                                                                                                                                  |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Starting text        | Seeds the composer/editor with an initial draft for the workflow.                                                                                   |
+| Starting model       | Selects a provider/model preset in Chats.                                                                                                           |
+| Starting model patch | Overrides runtime knobs such as streaming, token limits, temperature, reasoning, output settings, timeout, stop sequences, and raw JSON parameters. |
+| Tool selections      | Adds conversation tools and compatible web-search choices.                                                                                          |
+| Skill selections     | Enables skills and optionally preloads some as active. These can include template-style skills or instruction-only skills.                          |
 
-Assistant preset model patches intentionally cannot set:
-
-- `systemPrompt`
-- `capabilitiesOverride`
-
-Those belong to model, prompt, or provider configuration.
+Assistant preset model patches intentionally cannot set skill definitions directly. Skill behavior belongs to the Skills page.
 
 ### Empty preset sections
 
@@ -89,11 +81,10 @@ Examples:
 
 - no tool selections means applying the preset does not necessarily clear current tools
 - no skill selections means applying the preset does not necessarily clear current skills
-- no instruction template refs means applying the preset does not replace prompt sources
 - no starting model means applying the preset does not force a model
 - no starting text means applying the preset does not seed a composer draft
 
-A preset can be only a prompt setup, only a model setup, only a tool setup, or a full workflow.
+A preset can be only a skill setup, only a model setup, only a tool setup, or a full workflow.
 
 ### Inspecting a preset
 
@@ -109,7 +100,7 @@ On **Assistant Presets**:
 
 1. Open **Assistant Presets**.
 2. Expand a bundle.
-3. Review counts for model, instructions, tools, and skills.
+3. Review counts for model, skills, tools, and starting text.
 4. Use **View** on a preset.
 
 This is best for catalog maintenance.
@@ -126,9 +117,9 @@ The assistant dropdown can show:
 Modified sections can include:
 
 - `Model`
-- `Instructions`
-- `Tools`
 - `Skills`
+- `Tools`
+- `Starting text`
 
 Use **Reapply** or **Reset** to restore preset-managed sections. Use **Clear to base** to return to the base assistant preset or fallback selectable preset.
 
@@ -181,7 +172,7 @@ Important behavior:
 - skills can be enabled or disabled
 - skills can show presence status such as present, missing, error, or unknown
 
-Use skills when you want a reusable workflow mode that can participate across turns.
+Use skills when you want a reusable workflow mode, a template-style draft starter, or instruction-only behavior that shapes the request context.
 
 Use assistant presets to preload skills for common workflows.
 
@@ -237,7 +228,7 @@ Be careful with debug options. Raw request/response logging can include prompts,
 
 ## Built-in and custom content
 
-Across model presets, prompts, tools, skills, and assistant presets:
+Across model presets, tools, skills, and assistant presets:
 
 - built-in content ships with the app
 - custom content is stored locally
@@ -254,19 +245,18 @@ Practical workflow:
 
 ## Choosing the right page
 
-| If you want to...                         | Go to...                              |
-| ----------------------------------------- | ------------------------------------- |
-| Start a reusable workflow                 | Chats assistant dropdown              |
-| Inspect the active assistant preset       | Chats assistant dropdown -> View      |
-| Create or version an assistant preset     | Assistant Presets                     |
-| Create reusable prompt text               | Prompts                               |
-| Quickly add/fork a resolved system prompt | Chats -> System prompt menu           |
-| Create or maintain tool definitions       | Tools                                 |
-| Enable a tool in a chat                   | Chats -> Tools or assistant preset    |
-| Create or maintain skill definitions      | Skills                                |
-| Create or maintain MCP server catalogs    | MCP Servers                           |
-| Select MCP server context for a turn      | Chats -> Composer -> MCP              |
-| Enable skills in a chat                   | Chats -> Skills or assistant preset   |
-| Add an API key                            | Settings                              |
-| Add a local/custom provider               | Model Presets                         |
-| Compare models                            | Chats, changing only the model preset |
+| If you want to...                                    | Go to...                              |
+| ---------------------------------------------------- | ------------------------------------- |
+| Start a reusable workflow                            | Chats assistant dropdown              |
+| Inspect the active assistant preset                  | Chats assistant dropdown -> View      |
+| Create or version an assistant preset                | Assistant Presets                     |
+| Create reusable skill-based drafts or behavior rules | Skills                                |
+| Create or maintain tool definitions                  | Tools                                 |
+| Enable a tool in a chat                              | Chats -> Tools or assistant preset    |
+| Create or maintain skill definitions                 | Skills                                |
+| Create or maintain MCP server catalogs               | MCP Servers                           |
+| Select MCP server context for a turn                 | Chats -> Composer -> MCP              |
+| Enable skills in a chat                              | Chats -> Skills or assistant preset   |
+| Add an API key                                       | Settings                              |
+| Add a local/custom provider                          | Model Presets                         |
+| Compare models                                       | Chats, changing only the model preset |

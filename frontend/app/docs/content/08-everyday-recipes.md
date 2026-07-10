@@ -192,7 +192,7 @@ Steps:
 3. Choose an assistant preset if needed.
 4. Set **Previous user turns** to a fixed value.
 5. Add the same attachments.
-6. Add the same templates, tools, web search, and skills.
+6. Add the same tools, skills, and web-search setting.
 7. Send the task with model A.
 8. Open another tab or branch the task.
 9. Change only the **Model** dropdown to model B.
@@ -202,13 +202,11 @@ Steps:
 Keep constant:
 
 - assistant preset
-- prompt text
-- system prompt sources
-- prompt template variables
+- draft text
 - attachments and attachment modes
 - previous user turns
 - tool selections
-- skills
+- selected skills and active skill session state
 - web-search setting
 
 Change only:

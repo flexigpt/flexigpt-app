@@ -29,7 +29,7 @@ It exists because the workspace is the main frontend system where repeatable wor
     - [Attachments](#attachments)
     - [Tools and tool runtime](#tools-and-tool-runtime)
     - [Skills](#skills)
-    - [Assistant presets and system prompts](#assistant-presets-and-system-prompts)
+    - [Assistant presets and skills](#assistant-presets-and-skills)
   - [Composer module boundaries](#composer-module-boundaries)
 - [Backend dependencies](#backend-dependencies)
 - [Architectural decisions and invariants](#architectural-decisions-and-invariants)
@@ -67,7 +67,6 @@ flowchart LR
         Tools[Tools/runtime]
         Skills[Skills/session]
         Presets[Assistant presets]
-        SystemPrompt[System prompt\nand templates]
     end
 
     subgraph Backend[Typed Wails APIs]
@@ -128,7 +127,7 @@ The conversation surface is responsible for restoring a saved thread into the ac
 ### Why hydration is separate
 
 Hydration is separate from the persisted store shape because the UI needs more than raw stored messages.
-It needs derived message content, restored tool calls, restored attachment chips, restored system prompt state, and restored skill state.
+It needs derived message content, restored tool calls, restored attachment chips, restored skill state, and restored draft or instruction skill state.
 
 That means the frontend has two forms of the conversation:
 
@@ -185,7 +184,7 @@ Its job is to turn the current draft, selected workflow setup, and active contex
 
 - own the editable draft document
 - normalize attachments and chip state
-- coordinate tools, skills, presets, and system prompt inputs
+- coordinate tools, skills, presets, and skill-driven instruction inputs
 - validate required parameters before submit
 - execute tool calls when the draft or response flow needs them
 - submit the turn and handle abort or fast-forward behavior
@@ -196,7 +195,7 @@ Its job is to turn the current draft, selected workflow setup, and active contex
 #### Editor and document model
 
 The editor is not a plain text input.
-It is a structured document model with template nodes, tool nodes, and editor-side validation behavior.
+It is a structured document model with skill template nodes, tool nodes, and editor-side validation behavior.
 That is why `EditorArea` sits on top of document helpers rather than embedding all logic inside one component.
 
 #### Bottom bar and chips bar
@@ -208,7 +207,6 @@ Together they cover:
 - attachments
 - tools
 - skills
-- system prompts
 - web search
 - tool calls and tool outputs
 
@@ -227,11 +225,11 @@ The frontend tracks attached tools, conversation-level tool choices, pending too
 Skills have their own catalog and session state.
 The composer keeps enabled and active skill refs in sync and creates or refreshes a skill session when the draft requires it.
 
-#### Assistant presets and system prompts
+#### Assistant presets and skills
 
 Assistant preset selection influences the whole draft context, not just one field.
-The preset manager coordinates model selection, system prompt sources, template selections, and compatibility checks before applying a preset.
-The system prompt controller separately manages the effective prompt text and the sources that contribute to it.
+The preset manager coordinates model selection, skill selections, and compatibility checks before applying a preset.
+The skill subsystem separately manages template-style draft seeding, instruction-only skill text, and active skill state.
 
 ### Composer module boundaries
 
@@ -239,15 +237,15 @@ The system prompt controller separately manages the effective prompt text and th
 | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | `ComposerBox`                                                           | Owns the full composer coordinator and the bridge between editor, runtime, and submit logic. |
 | `EditorArea`                                                            | Owns the editor surface and the send/stop control flow.                                      |
-| `EditorBottomBar`                                                       | Owns the entry points for templates, tools, attachments, skills, and system prompts.         |
+| `EditorBottomBar`                                                       | Owns the entry points for attachments, tools, skills, and web search.                        |
 | `EditorChipsBar`                                                        | Owns the live draft visualization.                                                           |
 | `useComposerDocument`                                                   | Owns the structured editor document state.                                                   |
 | `useComposerAttachments`                                                | Owns attachment normalization and grouping.                                                  |
 | `useComposerTools` / `useComposerToolRuntime` / `useComposerToolConfig` | Own tool selection, tool-call runtime, and tool-argument validation.                         |
-| `useComposerSkills`                                                     | Owns skill refs and skill session lifecycle.                                                 |
+| `useComposerSkills`                                                     | Owns skill refs, skill session lifecycle, and instruction/draft skill sources.               |
 | `useAssistantPresetManager` / `useAssistantPresets`                     | Own preset compatibility and application.                                                    |
-| `useComposerSystemPrompt`                                               | Owns effective prompt composition.                                                           |
 | `useSendMessage` / `useStreamingRuntime`                                | Own request lifecycle and stream buffering.                                                  |
+| `platedoc` helpers                                                      | Define how skill-template and tool nodes are represented inside the editor document.         |
 
 ## Backend dependencies
 
@@ -271,7 +269,7 @@ That keeps the boundary clear and keeps backend concerns out of the workspace co
 - Workspace tabs are browser-local UI state; conversations themselves remain backend data.
 - Hydration is a restore step, not a rendering shortcut.
 - Streaming state is transient and separate from the persisted conversation until the request completes.
-- Tool, skill, preset, and system-prompt behavior remain separate even though they meet in the same submit flow.
+- Tool, skill, preset, and instruction-only skill behavior remain separate even though they meet in the same submit flow.
 - Editing an older message is a replacement workflow, not an in-place append.
 
 This document should be used when making changes that affect the overall chats workspace, its tab model, or any of the composer’s internal architecture.

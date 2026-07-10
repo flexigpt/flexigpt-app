@@ -169,7 +169,7 @@ At a high level, it works like this:
 
 1. the user prepares a message in the chats workspace
 2. the frontend submits the current draft and selected context through the typed API boundary
-3. the backend resolves the active conversation state, model setup, tools, skills, prompts, and attachments
+3. the backend resolves the active conversation state, model setup, tools, skills, and attachments
 4. attachments are normalized into request-ready content
 5. request orchestration sends the request to the selected provider or compatible endpoint
 6. streaming results and related events are returned to the frontend
@@ -189,7 +189,6 @@ The backend owns durable local data such as:
 - conversation search data
 - settings and provider metadata
 - model presets
-- prompts
 - tools
 - skills
 - assistant presets

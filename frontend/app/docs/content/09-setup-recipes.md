@@ -1,6 +1,6 @@
 # Setup Recipes
 
-These recipes are app and workflow setup flows. They help you configure providers, local endpoints, assistant presets, prompt templates, tools, and skills.
+These recipes are app and workflow setup flows. They help you configure providers, local endpoints, assistant presets, tools, and skills.
 
 For outcome-based LLM tasks, see [Everyday Recipes](/docs?doc=everyday-recipes).
 
@@ -139,12 +139,9 @@ Steps:
    - enabled: on
 7. Add starting text if you want the composer to open with a reusable first draft.
 8. Select a starting model preset.
-9. Set **Include Model System Prompt**:
-   - `Include` if you want the model preset’s default prompt
-   - `Do Not Include` if this assistant should rely only on selected instructions
-   - `Not Set` if the preset should not decide
-10. Add instruction templates if you have resolved instructions-only prompts.
-11. Leave tools and skills empty for the first version.
+9. Add the skills that should come with the preset.
+10. Use template-style skills for reusable starter drafts and instruction-only skills for durable behavior rules.
+11. Leave tools empty for the first version if you do not need them yet.
 12. Save.
 13. Open **Chats**.
 14. Select the new assistant preset.
@@ -159,11 +156,11 @@ Expected result:
 
 - the assistant preset seeds the selected sections
 - starting text appears as an editable draft when configured
-- you can still change model, prompts, tools, skills, and attachments after applying it
+- you can still change model, skills, tools, and attachments after applying it
 
 Next version ideas:
 
-- stricter instruction template
+- stricter instruction-only skill
 - local reader skill
 - manual read-only tools
 - different output verbosity
@@ -214,6 +211,12 @@ Use this when you want a reusable workflow mode across turns.
 Goal:
 
 - Enable a skill in a conversation and optionally add it to an assistant preset.
+
+Skills can fill three roles:
+
+- template-style skills seed the draft with reusable structure or starter text
+- instruction-only skills act like durable system-style instructions
+- normal skills add workflow behavior and runtime state across turns
 
 Steps:
 

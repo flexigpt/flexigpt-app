@@ -1,6 +1,6 @@
 # Composer Context
 
-The composer is where you decide what the next message includes. This page covers how to use attachments, prompt templates, system prompts, tools, skills, and web search while composing a chat message.
+The composer is where you decide what the next message includes. This page covers how to use attachments, tools, skills, and web search while composing a chat message.
 
 This page is about using context in Chats. To create or maintain reusable definitions, see [Reusable Catalogs](/docs?doc=reusable-catalogs).
 
@@ -20,11 +20,11 @@ This page is about using context in Chats. To create or maintain reusable defini
 | Need                                            | Use                                                  |
 | ----------------------------------------------- | ---------------------------------------------------- |
 | Bring exact source material into a request      | Attachment                                           |
-| Reuse current-message structure                 | Template                                             |
+| Reuse current-message structure                 | Template-style skill                                 |
 | Let the model ask FlexiGPT to run something     | Tool                                                 |
 | Use server-discovered context                   | MCP                                                  |
 | Need recent web information                     | Web search, if compatible with the selected provider |
-| Use a reusable workflow mode or LLM instruction | Skill                                                |
+| Use a reusable workflow mode or instruction set | Skill                                                |
 
 ## Attachments
 
@@ -126,6 +126,12 @@ Use web search when freshness matters. Do not enable it by default for private o
 
 Skills are reusable workflow modes. They are not just saved text.
 
+FlexiGPT uses skills for three closely related things:
+
+- **Template-style skills** seed the composer with reusable draft structure or starter text.
+- **Instruction-only skills** behave like durable system-style instructions without needing a separate prompt-template.
+- **Normal skills** carry workflow behavior, session state, and any runtime context the workflow needs.
+
 The composer tracks:
 
 | State              | Meaning                                               |
@@ -133,7 +139,7 @@ The composer tracks:
 | **Enabled skills** | Skills allowed in this conversation/session.          |
 | **Active skills**  | Skills currently active in the skill runtime session. |
 
-When you send with enabled skills, FlexiGPT may create or refresh a skill session and include skill-related context or tool choices in the request.
+When you send with enabled skills, FlexiGPT may create or refresh a skill session and include skill-related context, draft structure, or instruction-only behavior in the request.
 
 Assistant presets can enable skills and mark some as **preload as active**.
 

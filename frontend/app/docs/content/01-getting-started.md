@@ -1,6 +1,6 @@
 # Getting Started
 
-FlexiGPT is a local-first BYOK AI workspace for repeatable LLM work. You bring provider keys or local endpoints, then combine models, assistant presets, prompts, attachments, tools, and skills inside a local desktop app.
+FlexiGPT is a local-first BYOK AI workspace for repeatable LLM work. You bring provider keys or local endpoints, then combine models, assistant presets, attachments, tools, and skills inside a local desktop app.
 
 This page is the shortest path to a useful first request.
 
@@ -52,8 +52,8 @@ Before each important request, check these layers:
    - Which endpoint receives the request?
 2. **Assistant preset**
    - Did you apply a starter workflow?
-3. **Instructions**
-   - Are model default prompts or saved system prompts active?
+3. **Instructions and skills**
+   - Are model defaults or active skills changing the request behavior?
 4. **Current message**
    - Is the request clear and specific?
 5. **Context**

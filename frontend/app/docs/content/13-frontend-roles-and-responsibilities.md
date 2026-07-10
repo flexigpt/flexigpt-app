@@ -54,14 +54,12 @@ flowchart LR
             Tools["Tools and tool runtime"]
             Skills["Skills"]
             Presets["Assistant presets"]
-            SystemPrompt["System prompt<br/>and templates"]
 
             ComposerNode --> Editor
             Editor --> Attachments
             Editor --> Tools
             Editor --> Skills
             Editor --> Presets
-            Editor --> SystemPrompt
         end
 
         Docs["Docs system"]
@@ -111,7 +109,7 @@ The frontend owns the parts of the app that the user directly sees and manipulat
 The frontend does **not** own the backend concerns that actually power the app:
 
 - conversation persistence and durable storage
-- catalog storage for presets, prompts, skills, tools, and settings
+- catalog storage for presets, skills, tools, and settings
 - provider execution and streaming transport
 - tool execution and skill runtime
 - search indexing
@@ -124,7 +122,7 @@ Those concerns belong to Go backend services and are reached through typed app A
 | Surface              | Responsibility                       | What it coordinates                                                                               |
 | -------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------- |
 | **Chats workspace**  | Primary work area for conversations. | Tabs, conversation restoration, timeline rendering, search, and the composer.                     |
-| **Management pages** | Maintain reusable catalog content.   | Assistant presets, skills, tools, prompts, model presets, and settings.                           |
+| **Management pages** | Maintain reusable catalog content.   | Assistant presets, skills, tools, model presets, and settings.                                    |
 | **Docs**             | Render bundled documentation in-app. | Markdown content, navigation, architecture reference pages, and route-aware reading.              |
 | **App shell**        | Frame every route consistently.      | Drawer navigation, title bar controls, page framing, theme bootstrap, and Wails script injection. |
 
@@ -172,7 +170,7 @@ It also contains a large amount of UI state that belongs to the active message c
 - tool-call and tool-output runtime state
 - skills enablement and skill session coordination
 - assistant preset selection and compatibility checks
-- system prompt composition and prompt template selection
+- skill-driven instruction selection and template-style draft seeding
 - previous-message edit/replay flows
 - web search selection and options
 - submit, abort, and fast-forward behavior
@@ -180,20 +178,19 @@ It also contains a large amount of UI state that belongs to the active message c
 
 ### Main composer modules
 
-| Module                                                                  | Responsibility                                                                                         |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `ComposerBox`                                                           | Top-level composer coordinator; wires editor, runtime state, and submit behavior together.             |
-| `EditorArea`                                                            | Hosts the editor and the primary draft submission/stop controls.                                       |
-| `EditorBottomBar`                                                       | Manages the pickers and menus for attachments, prompts, tools, skills, system prompts, and web search. |
-| `EditorChipsBar`                                                        | Renders the live draft chips for attachments, tools, tool calls, and outputs.                          |
-| `useComposerDocument`                                                   | Owns the editor document model and editing interactions.                                               |
-| `useComposerAttachments`                                                | Manages file, folder, and URL attachments plus directory grouping.                                     |
-| `useComposerTools` / `useComposerToolRuntime` / `useComposerToolConfig` | Coordinate tool selection, tool-call runtime, tool outputs, and tool-argument validation.              |
-| `useComposerSkills`                                                     | Manages skill catalog loading, enabled/active refs, and skill sessions.                                |
-| `useAssistantPresetManager` / `useAssistantPresets`                     | Load assistant preset options, check compatibility, and apply or restore preset state.                 |
-| `useComposerSystemPrompt`                                               | Builds the effective system prompt from model defaults and selected prompt sources.                    |
-| `useSendMessage` / `useStreamingRuntime`                                | Manage request lifecycle, streaming updates, cancellation, and final conversation write-back.          |
-| `platedoc` helpers                                                      | Define how template and tool nodes are represented inside the editor document.                         |
+| Module                                                                  | Responsibility                                                                                           |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `ComposerBox`                                                           | Top-level composer coordinator; wires editor, runtime state, and submit behavior together.               |
+| `EditorArea`                                                            | Hosts the editor and the primary draft submission/stop controls.                                         |
+| `EditorBottomBar`                                                       | Manages the pickers and menus for attachments, tools, skills, and web search.                            |
+| `EditorChipsBar`                                                        | Renders the live draft chips for attachments, tools, tool calls, and outputs.                            |
+| `useComposerDocument`                                                   | Owns the editor document model and editing interactions.                                                 |
+| `useComposerAttachments`                                                | Manages file, folder, and URL attachments plus directory grouping.                                       |
+| `useComposerTools` / `useComposerToolRuntime` / `useComposerToolConfig` | Coordinate tool selection, tool-call runtime, tool outputs, and tool-argument validation.                |
+| `useComposerSkills`                                                     | Manages skill catalog loading, enabled/active refs, skill sessions, and instruction/draft skill sources. |
+| `useAssistantPresetManager` / `useAssistantPresets`                     | Load assistant preset options, check compatibility, and apply or restore preset state.                   |
+| `useSendMessage` / `useStreamingRuntime`                                | Manage request lifecycle, streaming updates, cancellation, and final conversation write-back.            |
+| `platedoc` helpers                                                      | Define how skill-template and tool nodes are represented inside the editor document.                     |
 
 ## Local browser state and persistence
 

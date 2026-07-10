@@ -89,14 +89,12 @@ The composer bottom bar is where you add message context:
 
 - **Attachments**
   - files, folders, images, PDFs, URLs
-- **Templates**
-  - reusable prompt templates for the current message
 - **Tools**
   - tool choices for the draft or conversation
 - **MCP**
   - Model context protocol servers and their discovered tools, resources, prompts, and server instructions for the next message
 - **Skills**
-  - workflow modes for the current session
+  - workflow modes for the current session, including template-style skills and instruction-only skills
 - **Web search**
   - provider-compatible web search selection
 - **Shortcuts and tips**

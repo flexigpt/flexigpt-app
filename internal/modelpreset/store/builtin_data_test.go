@@ -285,7 +285,7 @@ func TestBuiltInPresetAppOverlays(t *testing.T) {
 	}
 
 	openAIResponses := providers[modelpreset.ProviderOpenAIResponses]
-	if openAIResponses.DefaultModelPresetID != spec.ModelPresetID(modelpreset.PresetGPT54Mini) {
+	if openAIResponses.DefaultModelPresetID != spec.ModelPresetID(modelpreset.PresetGPT56Terra) {
 		t.Fatalf("openairesponses default model got %q want %q",
 			openAIResponses.DefaultModelPresetID,
 			modelpreset.PresetGPT54Mini,

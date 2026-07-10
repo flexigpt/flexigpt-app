@@ -45,7 +45,6 @@ flowchart LR
         subgraph Catalogs["Catalog domains"]
             direction TB
             ModelPresets["Model presets"]
-            Prompts["Prompts"]
             Tools["Tools"]
             Skills["Skills"]
             AssistantPresets["Assistant presets"]
@@ -106,10 +105,6 @@ flowchart LR
     ModelPresets --> SQLite
     ModelPresets --> GoEmbed
 
-    Prompts --> Mapstore
-    Prompts --> SQLite
-    Prompts --> GoEmbed
-
     Tools --> Mapstore
     Tools --> SQLite
     Tools --> GoEmbed
@@ -138,30 +133,29 @@ flowchart LR
 | -------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **App shell**              | Boot the desktop app, wire backend bindings, and expose the typed API boundary to the UI.        | Desktop lifecycle, backend initialization, service wiring, UI-facing backend entrypoints.                                            | Delegates into the backend domains.                                                                                                                       |
 | **Model presets**          | Store provider and model configuration as local workflow catalog content.                        | Provider presets, model presets, defaults, capability overrides, related local catalog state.                                        | `mapstore-go` storage, built-in catalogs from Go embedded files, SQLite overlay for small mutable local state.                                            |
-| **Prompts**                | Store reusable prompt bundles and templates.                                                     | Prompt bundles, template versions, bundle metadata, related local catalog state.                                                     | `mapstore-go` storage, built-in catalogs, SQLite overlay.                                                                                                 |
 | **Tools**                  | Store reusable tool bundles and tool definitions that can be selected during execution.          | Tool bundles, tool definitions, bundle metadata, related local catalog state.                                                        | `mapstore-go` storage, built-in catalogs, SQLite overlay.                                                                                                 |
-| **Skills**                 | Store skill bundles and skill definitions that can participate in skill-aware workflows.         | Skill bundles, skill definitions, bundle metadata, related local catalog state.                                                      | `mapstore-go` storage, built-in catalogs, SQLite overlay. Execution-time skill integration is handled through request orchestration and `agentskills-go`. |
-| **Assistant presets**      | Store reusable starting workspaces that combine catalog choices into a curated setup.            | Presets that tie together model, prompt, tool, and skill selections, plus local preset state.                                        | `mapstore-go` storage, built-in catalogs, SQLite overlay.                                                                                                 |
+| **Skills**                 | Store skill bundles and skill definitions that can participate in skill-aware workflows.         | Skill bundles, skill definitions, bundle metadata, and the workflow content now modeled as skills.                                   | `mapstore-go` storage, built-in catalogs, SQLite overlay. Execution-time skill integration is handled through request orchestration and `agentskills-go`. |
+| **Assistant presets**      | Store reusable starting workspaces that combine catalog choices into a curated setup.            | Presets that tie together model, tool, and skill selections, plus local preset state.                                                | `mapstore-go` storage, built-in catalogs, SQLite overlay.                                                                                                 |
 | **Settings**               | Persist local app configuration and secrets that should stay on the machine.                     | Theme, auth keys, debug settings, local configuration.                                                                               | `mapstore-go` storage.                                                                                                                                    |
 | **Conversations**          | Persist chat threads and keep them searchable without coupling thread storage to query behavior. | Conversation files, message history, conversation metadata, search indexing lifecycle.                                               | `mapstore-go` storage for threads, dedicated FTS engine for search.                                                                                       |
 | **Attachment preparation** | Normalize local files and URLs into provider-ready content blocks before request execution.      | File, image, PDF, and URL conversion behavior.                                                                                       | `llmtools-go`, then hands normalized content into request orchestration.                                                                                  |
 | **Request orchestration**  | Turn active backend state into executable provider requests and manage the response lifecycle.   | Request assembly, provider selection, capability resolution, tool and skill participation, streaming, cancellation, and result flow. | `inference-go` for provider execution, `llmtools-go` for tool-related shapes and execution support, `agentskills-go` for skill-aware runtime integration. |
-| **Built-in catalogs**      | Ship defaults that appear alongside user-created local content.                                  | Read-only starter model presets, prompts, tools, skills, and assistant presets bundled with the app.                                 | Go embedded files exposed to catalog domains.                                                                                                             |
+| **Built-in catalogs**      | Ship defaults that appear alongside user-created local content.                                  | Read-only starter model presets, tools, skills, and assistant presets bundled with the app.                                          | Go embedded files exposed to catalog domains.                                                                                                             |
 
 ## Supporting infrastructure and architectural role
 
 The backend keeps domain logic separate from the supporting primitives that make
 storage, indexing, overlays, and execution possible.
 
-| Support                  | Architectural role                                                                                                                             | Used by                                                                                     |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| **Go embedded files**    | Provide the bundled built-in catalog data that ships with the app.                                                                             | Built-in catalogs consumed by model presets, prompts, tools, skills, and assistant presets. |
-| **`mapstore-go` stores** | Provide the primary local persistence substrate for map-backed files, directory-backed stores, partitioning, listeners, and paged file access. | Settings, conversations, and catalog domains.                                               |
-| **FTS engine**           | Provide dedicated full-text indexing and querying for conversation search.                                                                     | Conversations.                                                                              |
-| **SQLite overlay**       | Provide a lightweight local database for small, keyed, mutable overlay state where a flat file is not the best fit.                            | Model presets, prompts, tools, skills, assistant presets.                                   |
-| **`inference-go`**       | Provide provider registration, capability lookup, request execution, and streaming responses.                                                  | Request orchestration.                                                                      |
-| **`llmtools-go`**        | Provide tool abstractions, tool shapes, and concrete tool implementations, and support attachment normalization paths used by the app.         | Attachment preparation and request orchestration.                                           |
-| **`agentskills-go`**     | Provide the runtime model and builtin skill tool shapes for skill-aware workflows.                                                             | Request orchestration.                                                                      |
+| Support                  | Architectural role                                                                                                                             | Used by                                                                            |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| **Go embedded files**    | Provide the bundled built-in catalog data that ships with the app.                                                                             | Built-in catalogs consumed by model presets, tools, skills, and assistant presets. |
+| **`mapstore-go` stores** | Provide the primary local persistence substrate for map-backed files, directory-backed stores, partitioning, listeners, and paged file access. | Settings, conversations, and catalog domains.                                      |
+| **FTS engine**           | Provide dedicated full-text indexing and querying for conversation search.                                                                     | Conversations.                                                                     |
+| **SQLite overlay**       | Provide a lightweight local database for small, keyed, mutable overlay state where a flat file is not the best fit.                            | Model presets, tools, skills, assistant presets.                                   |
+| **`inference-go`**       | Provide provider registration, capability lookup, request execution, and streaming responses.                                                  | Request orchestration.                                                             |
+| **`llmtools-go`**        | Provide tool abstractions, tool shapes, and concrete tool implementations, and support attachment normalization paths used by the app.         | Attachment preparation and request orchestration.                                  |
+| **`agentskills-go`**     | Provide the runtime model and builtin skill tool shapes for skill-aware workflows.                                                             | Request orchestration.                                                             |
 
 ## Storage and persistence model
 
@@ -193,7 +187,6 @@ the backend uses directory-oriented layouts so related content can live together
 
 This is especially useful for catalog-style domains such as:
 
-- prompts
 - tools
 - skills
 - assistant presets
@@ -214,7 +207,6 @@ to manage local entries in the same domain.
 That pattern is used across the catalog domains that support built-ins:
 
 - model presets
-- prompts
 - tools
 - skills
 - assistant presets

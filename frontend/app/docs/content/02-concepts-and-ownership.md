@@ -24,7 +24,7 @@ A chat turn is assembled in layers:
 2. **Model preset**
    - The provider/model choice and request defaults.
 3. **Assistant setup**
-   - Optional starter workflow: starting text, model, instructions, tools, and skills.
+   - Optional starter workflow: starting text, model, tools, and skills.
 4. **Conversation history**
    - Earlier turns included by **Previous user turns**.
 5. **Current message**
@@ -38,11 +38,11 @@ When a result changes, compare these layers one at a time.
 | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Provider**                 | The API family or endpoint FlexiGPT talks to, such as OpenAI, Anthropic, Google Gemini API, xAI, Mistral, Hugging Face, OpenRouter, a local runtime preset, or a compatible custom endpoint. |
 | **Model preset**             | A saved provider/model choice with defaults such as model name, streaming, timeout, prompt/output limits, temperature, reasoning, output format, and provider-specific parameters.           |
-| **Assistant preset**         | A reusable starter setup that can apply starting text, a model preset, instruction templates, tool selections, web search choices, and skill selections.                                     |
-| **System prompt**            | Durable instruction context that shapes assistant behavior.                                                                                                                                  |
+| **Assistant preset**         | A reusable starter setup that can apply starting text, a model preset, tool selections, web search choices, and skill selections.                                                            |
+| **Instruction context**      | Durable instruction context shaped by model defaults or instruction-only skills.                                                                                                             |
 | **Attachment**               | Message-scoped source material such as files, folders, images, PDFs, or URLs.                                                                                                                |
 | **Tool**                     | A callable capability the model can request during a conversation.                                                                                                                           |
-| **Skill**                    | A reusable workflow mode backed by skill runtime/session behavior.                                                                                                                           |
+| **Skill**                    | A reusable workflow mode, including template-style skills and instruction-only skills that can seed drafts or shape behavior.                                                                |
 | **MCP server**               | One configured MCP (Model context protocol) endpoint inside a bundle, including transport, auth, trust, setup, discovery, and runtime state.                                                 |
 | **MCP conversation context** | The selected MCP servers, tools, resources, resource templates, prompts, and arguments attached to the next request.                                                                         |
 | **Previous user turns**      | The history window for the next request.                                                                                                                                                     |
@@ -68,8 +68,8 @@ Use the right mechanism for the job:
 | Need                                             | Use                            |
 | ------------------------------------------------ | ------------------------------ |
 | Exact source material                            | Attachment                     |
-| Durable behavior rules                           | System prompt/Instructions     |
-| Repeatable current-message structure             | Template                       |
+| Durable behavior rules                           | Instruction-only skill         |
+| Repeatable current-message structure             | Template-style skill           |
 | Let the model ask the app to run something       | Tool                           |
 | Use context from a model context protocol server | MCP                            |
 | Keep a workflow mode active across turns         | Skill                          |
@@ -108,7 +108,7 @@ For local LLM providers, treat built-ins as starting points: copy/fork the provi
 
 Your local content is stored locally and can be created, edited, deleted, and versioned depending on the page.
 
-For versioned domains such as prompts and assistant presets:
+For versioned domains such as skills and assistant presets:
 
 - editing a custom item creates a new version
 - slugs are stable within a version series
@@ -137,7 +137,7 @@ For versioned domains such as prompts and assistant presets:
 | If you want to...                   | Change...                          |
 | ----------------------------------- | ---------------------------------- |
 | Compare model quality               | only the model preset              |
-| Make answers follow a durable style | system prompt source               |
+| Make answers follow a durable style | instruction-only skill source      |
 | Bring exact source material         | attachments                        |
 | Give the model execution ability    | tools                              |
 | Use a structured workflow mode      | skills                             |

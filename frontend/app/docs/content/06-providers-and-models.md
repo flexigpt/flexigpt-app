@@ -284,7 +284,7 @@ If the request works but quality is weak, try:
 - higher prompt/output limits
 - fewer stale previous user turns
 - more focused attachments
-- clearer system prompt
+- stronger instruction skill or assistant preset
 - lower temperature for stricter work
 - stronger reasoning level if supported
 

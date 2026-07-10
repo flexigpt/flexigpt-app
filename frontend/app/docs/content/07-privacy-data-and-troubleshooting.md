@@ -54,8 +54,7 @@ When you send a chat request to a remote provider, the provider may receive:
 
 - the current user message
 - selected prior turns based on **Previous user turns**
-- system prompt content
-- prompt template output
+- instruction-only skill content or template-style skill output
 - attachments included in the request
 - selected tool definitions or tool outputs
 - web-search configuration when supported by the provider
@@ -106,7 +105,6 @@ The app also stores local data for:
 
 - settings metadata
 - provider and model presets
-- prompt bundles and templates
 - tool bundles and tool definitions
 - assistant presets
 - skill bundles and skills
@@ -115,7 +113,7 @@ The app also stores local data for:
 
 ### Bundled app data
 
-Built-in providers, model presets, prompts, tools, skills, assistant presets, and docs ship with the app. Your local changes and user-created entries are stored separately from bundled defaults.
+Built-in providers, model presets, tools, skills, assistant presets, and docs ship with the app. Your local changes and user-created entries are stored separately from bundled defaults.
 
 ## Storage locations
 
@@ -212,7 +210,7 @@ Adjust one layer at a time:
 2. reduce stale history with **Previous user turns**
 3. attach the exact source file or URL that matters
 4. switch to a better model preset
-5. refine system prompt sources or prompt templates
+5. refine the relevant skill selections or instruction-only skill sources
 6. enable tools or skills only if the task truly needs them
 
 ### If a tool flow seems stuck
