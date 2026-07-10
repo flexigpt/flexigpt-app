@@ -29,14 +29,12 @@ import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { ProviderSDKType, UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { MCPAppModelContextUpdate, MCPConversationContext, MCPToolSelection } from '@/spec/mcp';
 import { MCPExecutionMode } from '@/spec/mcp';
-import type { PromptTemplate } from '@/spec/prompt';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolArgsTarget, ToolListItem, ToolStoreChoice } from '@/spec/tool';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { formatShortcut } from '@/lib/keyboard_shortcuts';
-import { cssEscape } from '@/lib/text_utils';
 
 import { useEnterSubmit } from '@/hooks/use_enter_submit';
 
@@ -55,13 +53,7 @@ import type {
 import { MCPApprovalModal } from '@/chats/composer/mcp/mcp_approval_modal';
 import { useComposerMCP } from '@/chats/composer/mcp/use_composer_mcp';
 import { useMCPApproval } from '@/chats/composer/mcp/use_mcp_approval';
-import { buildEditorValueFromPlainText } from '@/chats/composer/platedoc/platedoc_utils';
-import {
-	getInstructionPromptPartsFromSelections,
-	getTemplateSelections,
-	insertTemplateSelectionNode,
-	toPlainTextReplacingVariables,
-} from '@/chats/composer/platedoc/template_document_ops';
+import { buildEditorValueFromPlainText, insertPlainTextAsSingleBlock } from '@/chats/composer/platedoc/platedoc_utils';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import {
 	getAttachedTools,
@@ -72,9 +64,7 @@ import {
 } from '@/chats/composer/platedoc/tool_document_ops';
 import { useComposerDocument } from '@/chats/composer/platedoc/use_composer_document';
 import { useComposerSkills } from '@/chats/composer/skills/use_composer_skills';
-import type { ComposerSystemPromptController } from '@/chats/composer/systemprompts/use_composer_system_prompt';
-import { TemplateToolbars } from '@/chats/composer/templates/template_toolbars';
-import { dispatchTemplateFlashEvent } from '@/chats/composer/templates/use_template_flash_event';
+import type { ComposerSystemPromptController } from '@/chats/composer/skills/use_composer_system_prompt';
 import {
 	createAutoSubmitTracker,
 	getToolAutoSubmitKey,
@@ -87,7 +77,6 @@ import { ToolDetailsModal } from '@/chats/composer/tools/tool_details_modal';
 import { ToolArgsModalHost } from '@/chats/composer/tools/tool_user_args_host';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
 import { buildWebSearchChoicesForSubmit } from '@/chats/composer/tools/websearch_utils';
-import { appendSystemPromptParts } from '@/prompts/lib/system_prompt_utils';
 import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
 import { conversationToolsToChoices, mergeConversationToolsWithNewChoices } from '@/tools/lib/conversation_tool_utils';
 import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
@@ -307,7 +296,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		contentRef,
 		hasText,
 		hasTextRef,
-		selectionInfo,
 		attachedToolEntries,
 		getAttachedToolEntriesSnapshot,
 		onEditorChange,
@@ -324,7 +312,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const templateMenu = useMenuStore({ placement: 'top', focusLoop: true });
 	const toolMenu = useMenuStore({ placement: 'top', focusLoop: true });
 	const attachmentMenu = useMenuStore({ placement: 'top', focusLoop: true });
-	const systemPromptMenu = useMenuStore({ placement: 'top', focusLoop: true });
 	const skillsMenu = useMenuStore({ placement: 'top', focusLoop: true });
 	const mcpMenu = useMenuStore({ placement: 'top', focusLoop: true });
 	const templateButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -342,7 +329,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		templates: false,
 		tools: false,
 		attachments: false,
-		systemPrompt: false,
 		skills: false,
 		mcp: false,
 	});
@@ -354,6 +340,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		attachFiles: handleAttachFiles,
 		attachDirectory: handleAttachDirectory,
 		attachURL: handleAttachURL,
+		attachPathsAsAttachments,
 		changeAttachmentMode: handleChangeAttachmentContentBlockMode,
 		removeAttachment: handleRemoveAttachment,
 		removeDirectoryGroup: handleRemoveDirectoryGroup,
@@ -396,6 +383,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		setActiveSkillRefs,
 		enableAllSkills,
 		disableAllSkills,
+		refreshSkills,
 		applySkillSelectionState,
 		ensureSkillSession,
 		listActiveSkillRefs,
@@ -404,7 +392,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		getCurrentActiveSkillRefs,
 	} = useComposerSkills();
 
-	const templateBlocked = selectionInfo.hasTemplate && selectionInfo.requiredCount > 0;
 	const [autoExecStopVisible, setAutoExecStopVisible] = useState(false);
 	const [autoExecStopRequested, setAutoExecStopRequested] = useState(false);
 	const [autoExecBlockedByUser, setAutoExecBlockedByUser] = useState(false);
@@ -548,11 +535,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		};
 	}, []);
 
-	const handleInsertTemplate = useCallback(
-		(args: { bundleID: string; templateSlug: string; templateVersion: string; template?: PromptTemplate }) => {
-			insertTemplateSelectionNode(editor, args.bundleID, args.templateSlug, args.templateVersion, args.template);
+	const handleInsertTemplateText = useCallback(
+		(text: string) => {
+			insertPlainTextAsSingleBlock(editor, text);
+			focusEditorAtEnd();
 		},
-		[editor]
+		[editor, focusEditorAtEnd]
 	);
 
 	const handleAttachTool = useCallback(
@@ -665,13 +653,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const templateMenuOpen = useStoreState(templateMenu, 'open');
 	const toolMenuOpen = useStoreState(toolMenu, 'open');
 	const attachmentMenuOpen = useStoreState(attachmentMenu, 'open');
-	const systemPromptMenuOpen = useStoreState(systemPromptMenu, 'open');
 	const skillsMenuOpen = useStoreState(skillsMenu, 'open');
 	const mcpMenuOpen = useStoreState(mcpMenu, 'open');
 	const templateMenuEl = useStoreState(templateMenu, 'contentElement');
 	const toolMenuEl = useStoreState(toolMenu, 'contentElement');
 	const attachmentMenuEl = useStoreState(attachmentMenu, 'contentElement');
-	const systemPromptMenuEl = useStoreState(systemPromptMenu, 'contentElement');
 	const skillsMenuEl = useStoreState(skillsMenu, 'contentElement');
 	const mcpMenuEl = useStoreState(mcpMenu, 'contentElement');
 
@@ -687,10 +673,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		templateMenu.hide();
 		toolMenu.hide();
 		attachmentMenu.hide();
-		systemPromptMenu.hide();
 		skillsMenu.hide();
 		mcpMenu.hide();
-	}, [attachmentMenu, mcpMenu, skillsMenu, systemPromptMenu, templateMenu, toolMenu]);
+	}, [attachmentMenu, mcpMenu, skillsMenu, templateMenu, toolMenu]);
 
 	useEffect(() => {
 		if (!templateMenuOpen) {
@@ -753,25 +738,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			focusMenuSearchOrFirstItem(attachmentMenuEl);
 		});
 	}, [attachmentMenuOpen, attachmentMenuEl, focusEditorPreservingSelection]);
-
-	useEffect(() => {
-		if (!systemPromptMenuOpen) {
-			if (menuOpenedByShortcutRef.current.systemPrompt) {
-				menuOpenedByShortcutRef.current.systemPrompt = false;
-				requestAnimationFrame(() => {
-					focusEditorPreservingSelection();
-				});
-			}
-			return;
-		}
-		if (!menuOpenedByShortcutRef.current.systemPrompt) {
-			return;
-		}
-
-		requestAnimationFrame(() => {
-			focusMenuSearchOrFirstItem(systemPromptMenuEl);
-		});
-	}, [focusEditorPreservingSelection, systemPromptMenuEl, systemPromptMenuOpen]);
 
 	useEffect(() => {
 		if (!skillsMenuOpen) {
@@ -845,16 +811,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		attachmentButtonRef.current?.focus({ preventScroll: true });
 	}, [isInputLocked, closeAllMenus, attachmentMenu]);
 
-	const openSystemPromptPicker = useCallback(() => {
-		if (isInputLocked) {
-			return;
-		}
-		menuOpenedByShortcutRef.current.systemPrompt = true;
-
-		closeAllMenus();
-		systemPromptMenu.show();
-	}, [closeAllMenus, isInputLocked, systemPromptMenu]);
-
 	const openSkillsPicker = useCallback(() => {
 		if (isInputLocked) {
 			return;
@@ -916,9 +872,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		if (isSubmitting) {
 			return false;
 		}
-		if (templateBlocked) {
-			return false;
-		}
 		if (hasBlockingToolArgs) {
 			return false;
 		}
@@ -931,15 +884,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		const hasOutputs = toolOutputs.length > 0;
 
 		return hasAttachments || hasOutputs;
-	}, [
-		isInputLocked,
-		isSubmitting,
-		templateBlocked,
-		hasBlockingToolArgs,
-		hasText,
-		attachments.length,
-		toolOutputs.length,
-	]);
+	}, [isInputLocked, isSubmitting, hasBlockingToolArgs, hasText, attachments.length, toolOutputs.length]);
 
 	const { formRef, onKeyDown } = useEnterSubmit({
 		isBusy: isGenerating || isSubmitting || fastForwardPending,
@@ -951,9 +896,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				return false;
 			}
 			if (hasBlockingToolArgs) {
-				return false;
-			}
-			if (templateBlocked) {
 				return false;
 			}
 
@@ -1092,30 +1034,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			const effectiveEnabledSkillRefs = getCurrentEnabledSkillRefs();
 			let activeForMessage = getCurrentActiveSkillRefs();
 
-			// 1) Templates: never allow send when required vars are missing.
-			if (templateBlocked) {
-				// Ask the toolbar (rendered via plugin) to flash.
-				dispatchTemplateFlashEvent();
-
-				// Focus first pending variable pill (if any).
-				const fpv = selectionInfo.firstPendingVar;
-				if (fpv?.name && contentRef.current) {
-					const idSegment = fpv.selectionID ? `[data-selection-id="${cssEscape(fpv.selectionID)}"]` : '';
-					const sel = contentRef.current.querySelector(
-						`span[data-template-variable][data-var-name="${cssEscape(fpv.name)}"]${idSegment}`
-					);
-					if (sel && 'focus' in sel && typeof sel.focus === 'function') {
-						sel.focus();
-					} else {
-						focusEditorAtEnd();
-					}
-				} else {
-					focusEditorAtEnd();
-				}
-				return;
-			}
-
-			// 2) Pure send path: if we're *not* running tools, bail out when we
+			// Pure send path: if we're *not* running tools, bail out when we
 			//    don't already have something to send.
 			if (!runPendingTools && !isSendButtonEnabled) {
 				return;
@@ -1171,15 +1090,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				// can complete and trigger submit before React re-renders the latest
 				// toolOutputs / hasPendingToolCalls values into this component.
 				const runtimeAfterRun = getToolRuntimeSnapshot();
-				const selections = getTemplateSelections(editor);
-				const hasTpl = selections.length > 0;
-				const currentTemplateSystemPrompt = appendSystemPromptParts(
-					'',
-					getInstructionPromptPartsFromSelections(selections)
-				);
 				const resolvedSystemPrompt = systemPrompt.resolvedSystemPrompt.trim() || undefined;
 
-				const textToSend = hasTpl ? toPlainTextReplacingVariables(editor) : editor.api.string([]);
+				const textToSend = editor.api.string([]);
 				const finalToolOutputs: UIToolOutput[] = runtimeAfterRun.toolOutputs;
 				const unfinishedRunnableToolCalls = runtimeAfterRun.toolCalls.filter(
 					toolCall =>
@@ -1250,7 +1163,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				const payload: EditorSubmitPayload = {
 					text: textToSend,
 					resolvedSystemPrompt,
-					templateSystemPrompt: currentTemplateSystemPrompt.trim() || undefined,
 					attachedTools,
 					attachments,
 					toolOutputs: finalToolOutputs,
@@ -1298,11 +1210,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			attachments,
 			clearPreEditSnapshot,
 			closeAllMenus,
-			contentRef,
 			conversationToolsState,
 			editor,
 			ensureSkillSession,
-			focusEditorAtEnd,
 			getCurrentActiveSkillRefs,
 			getCurrentEnabledSkillRefs,
 			getCurrentSkillSessionID,
@@ -1316,13 +1226,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			mcpAppContextUpdates,
 			onSubmit,
 			resetEditor,
-			selectionInfo.firstPendingVar,
 			setActiveSkillRefs,
 			setConversationToolsState,
 			setSubmitting,
 			startFastForwardRun,
 			systemPrompt.resolvedSystemPrompt,
-			templateBlocked,
 			toolCalls,
 			webSearchTemplates,
 		]
@@ -1358,7 +1266,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			return;
 		}
 
-		if (templateBlocked || hasBlockingToolArgs) {
+		if (hasBlockingToolArgs) {
 			return;
 		}
 
@@ -1396,7 +1304,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		hasText,
 		isGenerating,
 		isInputLocked,
-		templateBlocked,
 		toolCalls,
 		toolOutputs.length,
 	]);
@@ -1430,7 +1337,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			return;
 		}
 
-		if (templateBlocked || hasBlockingToolArgs) {
+		if (hasBlockingToolArgs) {
 			return;
 		}
 
@@ -1476,7 +1383,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		isGenerating,
 		isInputLocked,
 		resetAutoSubmitTracker,
-		templateBlocked,
 		toolCalls,
 	]);
 
@@ -1688,7 +1594,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				openAttachmentPicker();
 			},
 			openSystemPromptMenu: () => {
-				openSystemPromptPicker();
+				openSkillsPicker();
 			},
 			openSkillsMenu: () => {
 				openSkillsPicker();
@@ -1740,7 +1646,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			openTemplatePicker,
 			openToolPicker,
 			openAttachmentPicker,
-			openSystemPromptPicker,
 			openSkillsPicker,
 			openMCPPicker,
 			mcp,
@@ -1786,7 +1691,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		!isInputLocked &&
 		!isSubmitting &&
 		!fastForwardPending &&
-		!templateBlocked &&
 		!hasBlockingToolArgs;
 
 	const activeAutoExecBatchCount = useMemo(
@@ -1800,7 +1704,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		!hasPendingToolCalls &&
 		!hasRunningToolCalls &&
 		!hasBlockingToolArgs &&
-		!templateBlocked &&
 		!isInputLocked;
 
 	useEffect(() => {
@@ -1843,7 +1746,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				<Plate editor={editor} onChange={handleEditorDocumentChange}>
 					<div className="bg-base-100 border-base-200 flex w-full max-w-full min-w-0 overflow-hidden rounded-2xl border">
 						<div className="flex min-w-0 grow flex-col p-0">
-							<TemplateToolbars />
 							{editingMessageId && (
 								<div className="flex items-center justify-end gap-2 pt-1 pr-3 pb-0 text-xs">
 									<div className="flex items-center gap-2">
@@ -2027,11 +1929,13 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						onUrlAttachmentModalClose={() => {
 							focusEditorAtEnd();
 						}}
-						onInsertTemplate={handleInsertTemplate}
+						onInsertTemplateText={handleInsertTemplateText}
+						onAttachTemplateResourcePaths={async (p: string[]) => {
+							await attachPathsAsAttachments(p);
+						}}
 						templateMenuState={templateMenu}
 						toolMenuState={toolMenu}
 						attachmentMenuState={attachmentMenu}
-						systemPromptMenuState={systemPromptMenu}
 						skillsMenuState={skillsMenu}
 						mcpMenuState={mcpMenu}
 						templateButtonRef={templateButtonRef}
@@ -2061,10 +1965,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						enabledSkillRefs={enabledSkillRefs}
 						activeSkillRefs={activeSkillRefs}
 						setEnabledSkillRefs={setEnabledSkillRefs}
+						setActiveSkillRefs={setActiveSkillRefs}
 						onEnableAllSkills={enableAllSkills}
 						onDisableAllSkills={disableAllSkills}
+						onRefreshSkills={refreshSkills}
 						isInputLocked={isInputLocked || fastForwardPending}
-						systemPrompt={systemPrompt}
 						mcpState={mcp}
 						mcpAppContextUpdateCount={mcpAppContextUpdates.length}
 						onClearMCPAppContextUpdates={() => {

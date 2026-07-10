@@ -2,8 +2,6 @@ import type { Value } from 'platejs';
 import { NodeApi } from 'platejs';
 import type { PlateEditor } from 'platejs/react';
 
-import type { getFirstTemplateNodeWithPath } from '@/chats/composer/platedoc/template_document_ops';
-
 // We add a per-chunk prop so Slate doesn't merge them back together.
 export const LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS = 10000; // start chunking once draft grows beyond this
 export const LARGE_TEXT_AUTODECHUNK_THRESHOLD_CHARS = 5000; // merge back once it shrinks below this
@@ -15,13 +13,6 @@ type ChunkedTextNode = {
 	__chunk: number;
 };
 const NON_WHITESPACE_RE = /\S/;
-
-export interface ComposerDocumentSelectionInfo {
-	tplNodeWithPath: ReturnType<typeof getFirstTemplateNodeWithPath>;
-	hasTemplate: boolean;
-	requiredCount: number;
-	firstPendingVar: { name: string; selectionID?: string } | undefined;
-}
 
 export const isSelectionOnlyEditorChange = (editor: PlateEditor): boolean => {
 	const operations = editor.operations ?? [];

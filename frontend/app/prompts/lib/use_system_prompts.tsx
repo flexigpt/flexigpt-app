@@ -17,7 +17,7 @@ import {
 const TEMPLATE_PLACEHOLDER_RE = /\{\{([a-zA-Z_][a-zA-Z0-9_-]*)\}\}/g;
 const TEMPLATE_PLACEHOLDER_TEST_RE = /\{\{([a-zA-Z_][a-zA-Z0-9_-]*)\}\}/;
 
-export type SystemPromptRole = PromptRoleEnum.System | PromptRoleEnum.Developer;
+type SystemPromptRole = PromptRoleEnum.System | PromptRoleEnum.Developer;
 
 export interface SystemPromptItem {
 	identityKey: string;

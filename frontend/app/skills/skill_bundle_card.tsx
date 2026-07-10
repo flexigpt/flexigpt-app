@@ -564,12 +564,16 @@ export function SkillBundleCard({
 								type="button"
 								className="btn btn-md btn-ghost flex items-center rounded-2xl"
 								disabled={!bundle.isEnabled}
-								title={!bundle.isEnabled ? 'Enable the bundle first.' : 'Register a filesystem skill'}
+								title={
+									!bundle.isEnabled
+										? 'Enable the bundle first.'
+										: 'Create a managed SKILL.md artifact or register an existing filesystem skill folder.'
+								}
 								onClick={() => {
 									openSkillModal('add', undefined);
 								}}
 							>
-								<FiPlus /> <span className="ml-1">Add Skill</span>
+								<FiPlus /> <span className="ml-1">Add Skill or Template</span>
 							</button>
 						</div>
 					)}

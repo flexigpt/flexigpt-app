@@ -32,7 +32,7 @@ import type {
 	EditorExternalMessage,
 	EditorSubmitPayload,
 } from '@/chats/composer/editor/editor_types';
-import { useComposerSystemPrompt } from '@/chats/composer/systemprompts/use_composer_system_prompt';
+import { useComposerSystemPrompt } from '@/chats/composer/skills/use_composer_system_prompt';
 import type { ChatWorkflowStarter, ChatWorkflowStarterAssistantPresetRef } from '@/chats/conversation/starter_intent';
 
 export interface ComposerBoxHandle {

@@ -15,11 +15,8 @@ import { CommandTipsMenu } from '@/chats/composer/inputtips/command_tips_menu';
 import { MCPBottomBarChip } from '@/chats/composer/mcp/mcp_bottom_bar_chip';
 import type { UseComposerMCPResult } from '@/chats/composer/mcp/mcp_composer_types';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
+import { SkillTemplateBottomBarChip } from '@/chats/composer/skills/skill_template_bottom_bar_chip';
 import { SkillsBottomBarChip } from '@/chats/composer/skills/skills_bottom_bar_chip';
-import { SystemPromptBottomBarChip } from '@/chats/composer/systemprompts/system_prompt_bottom_bar_chip';
-import type { ComposerSystemPromptController } from '@/chats/composer/systemprompts/use_composer_system_prompt';
-import type { PromptTemplateInsertArgs } from '@/chats/composer/templates/prompt_template_bottom_bar_chip';
-import { PromptTemplateBottomBarChip } from '@/chats/composer/templates/prompt_template_bottom_bar_chip';
 import { ToolsBottomBarChip } from '@/chats/composer/tools/tools_bottom_bar_chip';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
 import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
@@ -30,12 +27,12 @@ interface EditorBottomBarProps {
 	onAttachURL: (url: string) => Promise<void> | void;
 	onOpenAttachmentUrlModal?: () => void;
 	onUrlAttachmentModalClose?: () => void;
-	onInsertTemplate: (args: PromptTemplateInsertArgs) => Promise<void> | void;
+	onInsertTemplateText: (text: string) => Promise<void> | void;
+	onAttachTemplateResourcePaths?: (paths: string[]) => Promise<void> | void;
 
 	templateMenuState: MenuStore;
 	toolMenuState: MenuStore;
 	attachmentMenuState: MenuStore;
-	systemPromptMenuState: MenuStore;
 	skillsMenuState: MenuStore;
 	mcpMenuState: MenuStore;
 
@@ -70,10 +67,11 @@ interface EditorBottomBarProps {
 	enabledSkillRefs: SkillRef[];
 	activeSkillRefs: SkillRef[];
 	setEnabledSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
+	setActiveSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
 	onEnableAllSkills: () => void;
 	onDisableAllSkills: () => void;
+	onRefreshSkills: () => Promise<void>;
 	isInputLocked?: boolean;
-	systemPrompt: ComposerSystemPromptController;
 	mcpState: UseComposerMCPResult;
 	mcpAppContextUpdateCount?: number;
 	onClearMCPAppContextUpdates?: () => void;
@@ -85,11 +83,11 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	onAttachURL,
 	onOpenAttachmentUrlModal,
 	onUrlAttachmentModalClose,
-	onInsertTemplate,
+	onInsertTemplateText,
+	onAttachTemplateResourcePaths,
 	templateMenuState,
 	toolMenuState,
 	attachmentMenuState,
-	systemPromptMenuState,
 	skillsMenuState,
 	mcpMenuState,
 	templateButtonRef,
@@ -117,10 +115,11 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	enabledSkillRefs,
 	activeSkillRefs,
 	setEnabledSkillRefs,
+	setActiveSkillRefs,
 	onEnableAllSkills,
 	onDisableAllSkills,
+	onRefreshSkills,
 	isInputLocked = false,
-	systemPrompt,
 	mcpState,
 	mcpAppContextUpdateCount = 0,
 	onClearMCPAppContextUpdates,
@@ -130,7 +129,6 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 			templates: formatShortcut(shortcutConfig.insertTemplate),
 			tools: formatShortcut(shortcutConfig.insertTool),
 			attachments: formatShortcut(shortcutConfig.insertAttachment),
-			systemPrompt: formatShortcut(shortcutConfig.insertSystemPrompt),
 			skills: formatShortcut(shortcutConfig.attachSkills),
 			mcp: formatShortcut(shortcutConfig.attachMCP),
 		}),
@@ -141,7 +139,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 		<div
 			className="bg-base-200 w-full overflow-hidden"
 			data-attachments-bottom-bar
-			aria-label="Templates, tools, attachments, system prompt, skills, and MCP"
+			aria-label="Templates, tools, attachments, skills, and MCP"
 		>
 			<div className="flex items-center gap-1 overflow-x-auto p-1 text-xs shadow-none">
 				<div className="flex items-center gap-1">
@@ -157,19 +155,13 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						isInputLocked={isInputLocked}
 					/>
 
-					<PromptTemplateBottomBarChip
-						store={templateMenuState}
-						buttonRef={templateButtonRef}
-						shortcut={shortcutLabels.templates}
-						onInsertTemplate={onInsertTemplate}
+					<MCPBottomBarChip
+						store={mcpMenuState}
+						shortcut={shortcutLabels.mcp}
+						state={mcpState}
 						isInputLocked={isInputLocked}
-					/>
-
-					<SystemPromptBottomBarChip
-						store={systemPromptMenuState}
-						shortcut={shortcutLabels.systemPrompt}
-						systemPrompt={systemPrompt}
-						isInputLocked={isInputLocked}
+						appContextUpdateCount={mcpAppContextUpdateCount}
+						onClearAppContextUpdates={onClearMCPAppContextUpdates}
 					/>
 
 					<ToolsBottomBarChip
@@ -203,17 +195,20 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						enabledSkillRefs={enabledSkillRefs}
 						activeSkillRefs={activeSkillRefs}
 						setEnabledSkillRefs={setEnabledSkillRefs}
+						setActiveSkillRefs={setActiveSkillRefs}
 						onEnableAll={onEnableAllSkills}
 						onDisableAll={onDisableAllSkills}
+						onRefreshSkills={onRefreshSkills}
 						isInputLocked={isInputLocked}
 					/>
-					<MCPBottomBarChip
-						store={mcpMenuState}
-						shortcut={shortcutLabels.mcp}
-						state={mcpState}
+
+					<SkillTemplateBottomBarChip
+						store={templateMenuState}
+						buttonRef={templateButtonRef}
+						shortcut={shortcutLabels.templates}
+						onInsertTemplateText={onInsertTemplateText}
+						onAttachResourcePaths={onAttachTemplateResourcePaths}
 						isInputLocked={isInputLocked}
-						appContextUpdateCount={mcpAppContextUpdateCount}
-						onClearAppContextUpdates={onClearMCPAppContextUpdates}
 					/>
 				</div>
 

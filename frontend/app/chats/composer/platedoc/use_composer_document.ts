@@ -5,10 +5,6 @@ import type { Value } from 'platejs';
 import type { PlateEditor } from 'platejs/react';
 import { usePlateEditor } from 'platejs/react';
 
-import { compareEntryByPathDeepestFirst } from '@/lib/path_utils';
-import { cssEscape } from '@/lib/text_utils';
-
-import type { ComposerDocumentSelectionInfo } from '@/chats/composer/platedoc/platedoc_utils';
 import {
 	buildSingleParagraphValue,
 	buildSingleParagraphValueChunked,
@@ -24,12 +20,6 @@ import {
 	LARGE_TEXT_CHUNK_SIZE,
 } from '@/chats/composer/platedoc/platedoc_utils';
 import { createComposerEditorPlugins } from '@/chats/composer/platedoc/plugins';
-import {
-	analyzeTemplateSelectionInfo,
-	buildUserInlineChildrenFromText,
-	getTemplateNodesWithPath,
-	getUserBlocksContent,
-} from '@/chats/composer/platedoc/template_document_ops';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import { getAttachedToolEntries } from '@/chats/composer/platedoc/tool_document_ops';
 
@@ -44,7 +34,6 @@ interface UseComposerDocumentResult {
 	contentRef: RefObject<HTMLDivElement | null>;
 	hasText: boolean;
 	hasTextRef: RefObject<boolean>;
-	selectionInfo: ComposerDocumentSelectionInfo;
 	attachedToolEntries: AttachedToolEntry[];
 	getAttachedToolEntriesSnapshot: (uniqueByIdentity?: boolean) => AttachedToolEntry[];
 	onEditorChange: () => boolean;
@@ -410,84 +399,12 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 		return cancelScheduledAutoChunk;
 	}, [cancelScheduledAutoChunk]);
 
-	// Recompute template selection info whenever doc changes.
-	// analyzeTemplateSelectionInfo has a fast-path exit when no template nodes exist.
-	// we need docVersion, it is not unnecessary dep.
-	// oxlint-disable-next-line react-hooks/exhaustive-deps
-	const selectionInfo = useMemo(() => analyzeTemplateSelectionInfo(editor), [editor, docVersion]);
-
 	// oxlint-disable-next-line react-hooks/exhaustive-deps
 	const attachedToolEntries = useMemo(() => getAttachedToolEntries(editor), [editor, docVersion]);
 
 	const getAttachedToolEntriesSnapshot = useCallback((uniqueByIdentity?: boolean) => {
 		return getAttachedToolEntries(editorRef.current, uniqueByIdentity);
 	}, []);
-
-	// Populate editor with effective USER blocks for EACH template selection (once per selectionID)
-	useEffect(() => {
-		if (!selectionInfo.tplNodeWithPath) {
-			return;
-		}
-		const populated = lastPopulatedSelectionKeyRef.current;
-		const nodes = getTemplateNodesWithPath(editor);
-		const insertedIds: string[] = [];
-
-		// Process in reverse document order to keep captured paths valid
-		const nodesRev = [...nodes].toSorted(compareEntryByPathDeepestFirst);
-
-		for (const [tsenode, originalPath] of nodesRev) {
-			if (!tsenode || !tsenode.selectionID) {
-				continue;
-			}
-			const selectionID = tsenode.selectionID;
-			if (populated.has(selectionID)) {
-				continue;
-			}
-
-			// Build children: keep the selection chip, add parsed user text with variable pills
-			const userText = getUserBlocksContent(tsenode);
-			const inlineChildren = buildUserInlineChildrenFromText(tsenode, userText);
-
-			try {
-				editor.tf.withoutNormalizing(() => {
-					const pathArr = Array.isArray(originalPath) ? originalPath : [];
-
-					if (pathArr.length >= 2) {
-						const blockPath = pathArr.slice(0, pathArr.length - 1);
-						const indexAfter = pathArr.at(-1) ?? 0 + 1;
-						const atPath = [...blockPath, indexAfter] as any;
-						editor.tf.insertNodes(inlineChildren, { at: atPath });
-					} else {
-						editor.tf.insertNodes(inlineChildren, { at: [0, 0] as any });
-					}
-				});
-			} catch {
-				editor.tf.insertNodes(inlineChildren);
-			}
-
-			populated.add(selectionID);
-			insertedIds.push(selectionID);
-		}
-
-		// Focus first variable pill of the last inserted selection (if any)
-		if (insertedIds.length > 0) {
-			const focusId = insertedIds.at(-1);
-			requestAnimationFrame(() => {
-				try {
-					const sel = contentRef.current?.querySelector(
-						`span[data-template-variable][data-selection-id="${cssEscape(focusId ?? '')}"]`
-					) as HTMLElement | null;
-					if (sel && 'focus' in sel && typeof sel.focus === 'function') {
-						sel.focus();
-					} else {
-						focusEditorAtEnd();
-					}
-				} catch {
-					focusEditorAtEnd();
-				}
-			});
-		}
-	}, [editor, focusEditorAtEnd, docVersion, selectionInfo.tplNodeWithPath, syncDocumentDerivedState]);
 
 	const replaceEditorDocument = useCallback(
 		(nextValue: Value, focus: ReplaceEditorDocumentFocusMode = 'none') => {
@@ -581,7 +498,6 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 		contentRef,
 		hasText,
 		hasTextRef,
-		selectionInfo,
 		attachedToolEntries,
 		getAttachedToolEntriesSnapshot,
 		onEditorChange,

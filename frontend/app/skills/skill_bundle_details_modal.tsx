@@ -134,7 +134,13 @@ export function SkillBundleDetailsModal({ isOpen, onClose, bundle, skills }: Ski
 							<div className="text-base-content/70 col-span-9 text-xs">
 								A prompt-like template should be a filesystem skill whose <span className="font-mono">SKILL.md</span>
 								frontmatter contains <span className="font-mono">insert: user-message</span>. Its declared arguments
-								replace the old prompt variable form. There are no prompt versions or role blocks in the new format.
+								replace the old prompt variable form. There are no prompt versions, role blocks, typed variables, static
+								variables, required variables, model config, or provider config in the new format.
+							</div>
+							<div className="col-span-3 font-semibold">Resource note</div>
+							<div className="text-base-content/70 col-span-9 text-xs">
+								Resources are ordinary files under the skill directory. Managed creation only writes SKILL.md. Add extra
+								resources manually and re-enable the skill or restart to refresh runtime metadata.
 							</div>
 						</div>
 						<div className="grid grid-cols-12 gap-2">

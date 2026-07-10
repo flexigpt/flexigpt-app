@@ -1,12 +1,18 @@
-import type { Dispatch, SetStateAction, SyntheticEvent } from 'react';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+// oxlint-disable jsreact-hooks/set-state-in-effect react-you-might-not-need-an-effect/no-derived-state react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+import type { Dispatch, SetStateAction, SubmitEventHandler, SyntheticEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { FiCheck, FiX, FiZap } from 'react-icons/fi';
+import { createPortal } from 'react-dom';
+
+import { FiAlertCircle, FiCheck, FiGitBranch, FiPlus, FiX, FiZap } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
-import type { SkillListItem, SkillRef } from '@/spec/skill';
+import type { SkillBundle, SkillListItem, SkillRef } from '@/spec/skill';
+
+import { skillStoreAPI } from '@/apis/baseapi';
+import { getAllSkillBundles } from '@/apis/list_helper';
 
 import {
 	ActionTriggerChipContent,
@@ -15,7 +21,7 @@ import {
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/ariakit_hover_tip';
-import { GroupedMenuSection, GroupedMenuSubheading } from '@/components/grouped_menu_sections';
+import { Dropdown } from '@/components/dropdown';
 import { searchableMenuEmptyStateClasses, SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
 import {
 	focusFirstSearchableMenuItem,
@@ -26,11 +32,21 @@ import {
 
 import { dedupeSkillRefs, skillRefFromListItem, skillRefKey } from '@/skills/lib/skill_identity_utils';
 
-interface BundleGroup {
-	bundleID: string;
-	bundleSlug: string;
-	skills: SkillListItem[];
+const SIMPLE_SKILL_NAME_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+interface InstructionSkillDraft {
+	bundleID?: string;
+	displayName: string;
+	name: string;
+	body: string;
+	description?: string;
 }
+
+const DEFAULT_INSTRUCTION_SKILL_DRAFT: InstructionSkillDraft = {
+	displayName: 'Instruction Skill',
+	name: 'instruction-skill',
+	body: '',
+};
 
 const skillDropdownCollator = new Intl.Collator(undefined, {
 	numeric: true,
@@ -74,63 +90,6 @@ function compareSkillListItems(a: SkillListItem, b: SkillListItem): number {
 	return skillDropdownCollator.compare(skillListItemKey(a), skillListItemKey(b));
 }
 
-function compareBundleGroups(a: BundleGroup, b: BundleGroup): number {
-	return (
-		skillDropdownCollator.compare(a.bundleSlug, b.bundleSlug) || skillDropdownCollator.compare(a.bundleID, b.bundleID)
-	);
-}
-
-function getBundleKindLabel(group: BundleGroup): string {
-	const builtInCount = group.skills.filter(item => item.isBuiltIn).length;
-	if (builtInCount === 0) {
-		return 'custom';
-	}
-	if (builtInCount === group.skills.length) {
-		return 'built-in';
-	}
-	return 'mixed';
-}
-
-function BundleCheckbox({
-	checked,
-	indeterminate,
-	onChange,
-	isInputLocked,
-}: {
-	checked: boolean;
-	indeterminate: boolean;
-	onChange: (next: boolean) => void;
-	isInputLocked: boolean;
-}) {
-	const ref = useRef<HTMLInputElement | null>(null);
-
-	useEffect(() => {
-		if (!ref.current) {
-			return;
-		}
-		ref.current.indeterminate = indeterminate;
-	}, [indeterminate]);
-
-	return (
-		<input
-			ref={ref}
-			type="checkbox"
-			className="checkbox checkbox-xs rounded-sm"
-			disabled={isInputLocked}
-			checked={checked}
-			onChange={e => {
-				if (isInputLocked) {
-					return;
-				}
-				onChange(e.currentTarget.checked);
-			}}
-			onPointerDown={stop}
-			onClick={stop}
-			aria-label="Toggle bundle skills"
-		/>
-	);
-}
-
 function getSkillSearchFields(item: SkillListItem) {
 	return [
 		{ value: getSkillDisplayLabel(item), weight: 6 },
@@ -141,7 +100,345 @@ function getSkillSearchFields(item: SkillListItem) {
 		{ value: item.skillDefinition.description, weight: 2 },
 		{ value: item.skillDefinition.type, weight: 1 },
 		{ value: item.skillDefinition.location, weight: 1 },
+		{ value: item.skillDefinition.insert, weight: 2 },
+		...(item.skillDefinition.tags ?? []).map(tag => ({ value: tag, weight: 2 })),
+		...(item.skillDefinition.arguments ?? []).map(arg => ({ value: arg.name, weight: 1 })),
 	];
+}
+
+function isInstructionSkill(item: SkillListItem): boolean {
+	return (item.skillDefinition.insert || 'instructions') === 'instructions';
+}
+
+function compareSkillRows(a: SkillListItem, b: SkillListItem): number {
+	const ai = isInstructionSkill(a);
+	const bi = isInstructionSkill(b);
+	if (ai !== bi) {
+		return ai ? -1 : 1;
+	}
+	return compareSkillListItems(a, b);
+}
+
+function resourceCount(item: SkillListItem): number {
+	const resources = item.skillDefinition.resources;
+	return resources?.hasResources ? resources.totalCount : 0;
+}
+
+function getDefaultCustomBundle(bundles: SkillBundle[]): string {
+	return bundles.find(bundle => !bundle.isBuiltIn && bundle.isEnabled)?.id ?? '';
+}
+
+function makeUniqueSimpleSkillName(seed: string, allSkills: SkillListItem[]): string {
+	const base = slugifySkillName(seed) || 'instruction-skill';
+	const existing = new Set(allSkills.map(item => item.skillDefinition.name).filter(Boolean));
+
+	if (!existing.has(base)) {
+		return base;
+	}
+
+	for (let i = 2; i < 1000; i += 1) {
+		const suffix = `-${i}`;
+		const candidate = `${base.slice(0, Math.max(1, 64 - suffix.length))}${suffix}`;
+		if (!existing.has(candidate)) {
+			return candidate;
+		}
+	}
+
+	return `${base.slice(0, 54)}-${Date.now().toString(36)}`;
+}
+
+function slugifySkillName(value: string): string {
+	return value
+		.trim()
+		.toLowerCase()
+		.replaceAll(/[^a-z0-9-]+/g, '-')
+		.replaceAll(/-+/g, '-')
+		.replaceAll(/^-|-$/g, '')
+		.slice(0, 64);
+}
+
+function AddInstructionSkillModal({
+	isOpen,
+	allSkills,
+	mode,
+	initialDraft,
+	onClose,
+	onCreated,
+}: {
+	isOpen: boolean;
+	allSkills: SkillListItem[];
+	mode: 'add' | 'fork';
+	initialDraft: InstructionSkillDraft | null;
+	onClose: () => void;
+	onCreated: (item: SkillListItem) => Promise<void> | void;
+}) {
+	const [bundles, setBundles] = useState<SkillBundle[]>([]);
+	const [bundleID, setBundleID] = useState('');
+	const [displayName, setDisplayName] = useState('Instruction Skill');
+	const [name, setName] = useState('instruction-skill');
+	const [body, setBody] = useState('');
+	const [submitError, setSubmitError] = useState('');
+	const [isSubmitting, setIsSubmitting] = useState(false);
+	const dialogRef = useRef<HTMLDialogElement | null>(null);
+	const isUnmountingRef = useRef(false);
+
+	useEffect(() => {
+		if (!isOpen) {
+			return;
+		}
+		void getAllSkillBundles(undefined, true)
+			.then(nextBundles => {
+				const custom = nextBundles.filter(bundle => !bundle.isBuiltIn);
+				setBundles(custom);
+				setBundleID(current => current || initialDraft?.bundleID || getDefaultCustomBundle(custom));
+			})
+			.catch((error: unknown) => {
+				console.error('Failed to load skill bundles:', error);
+				setBundles([]);
+			});
+	}, [initialDraft?.bundleID, isOpen]);
+
+	useEffect(() => {
+		if (!isOpen) {
+			return;
+		}
+
+		const draft = initialDraft ?? DEFAULT_INSTRUCTION_SKILL_DRAFT;
+		setDisplayName(draft.displayName);
+		setName(draft.name);
+		setBody(draft.body);
+		setSubmitError('');
+		setIsSubmitting(false);
+
+		if (draft.bundleID) {
+			setBundleID(draft.bundleID);
+		}
+	}, [initialDraft, isOpen]);
+
+	useEffect(() => {
+		if (!isOpen) {
+			return;
+		}
+		const dialog = dialogRef.current;
+		if (!dialog) {
+			return;
+		}
+		if (!dialog.open) {
+			try {
+				dialog.showModal();
+			} catch {
+				// Keep safe.
+			}
+		}
+		return () => {
+			isUnmountingRef.current = true;
+			if (dialog.open) {
+				dialog.close();
+			}
+		};
+	}, [isOpen]);
+
+	const requestClose = useCallback(() => {
+		const dialog = dialogRef.current;
+		if (dialog?.open) {
+			dialog.close();
+			return;
+		}
+		onClose();
+	}, [onClose]);
+
+	const handleDialogClose = useCallback(() => {
+		if (isUnmountingRef.current) {
+			return;
+		}
+		onClose();
+	}, [onClose]);
+
+	const existingSlugsForBundle = useMemo(
+		() => new Set(allSkills.filter(item => item.bundleID === bundleID).map(item => item.skillSlug)),
+		[allSkills, bundleID]
+	);
+	const normalizedName = slugifySkillName(name);
+	const nameError = !normalizedName
+		? 'Name is required.'
+		: !SIMPLE_SKILL_NAME_RE.test(normalizedName)
+			? 'Use lowercase letters, numbers, and hyphens. Maximum 64 characters.'
+			: existingSlugsForBundle.has(normalizedName)
+				? 'A skill with this slug already exists in the selected bundle.'
+				: '';
+	const bodyError = body.trim() ? '' : 'Instruction body is required.';
+	const bundleError = bundleID ? '' : 'Select a custom enabled skill bundle.';
+	const canSubmit = !nameError && !bodyError && !bundleError && !isSubmitting;
+
+	const handleSubmit: SubmitEventHandler<HTMLFormElement> = event => {
+		event.preventDefault();
+		event.stopPropagation();
+
+		if (!canSubmit) {
+			return;
+		}
+
+		setIsSubmitting(true);
+		setSubmitError('');
+
+		void skillStoreAPI
+			.putSkillArtifact(bundleID, normalizedName, {
+				name: normalizedName,
+				displayName: displayName.trim() || normalizedName,
+				description:
+					initialDraft?.description ||
+					`Instruction skill created from the composer. Use when these instructions should guide the assistant.`,
+				insert: 'instructions',
+				arguments: [],
+				tags: ['composer'],
+				markdownBody: body.trim(),
+				isEnabled: true,
+			})
+			.then(async resp => {
+				const bundle = bundles.find(item => item.id === bundleID);
+				await onCreated({
+					bundleID,
+					bundleSlug: bundle?.slug ?? bundleID,
+					skillSlug: normalizedName,
+					isBuiltIn: false,
+					skillDefinition: resp,
+				});
+				requestClose();
+			})
+			.catch((error: unknown) => {
+				setSubmitError(error instanceof Error ? error.message : 'Failed to create instruction skill.');
+			})
+			.finally(() => {
+				setIsSubmitting(false);
+			});
+	};
+
+	if (!isOpen || typeof document === 'undefined' || !document.body) {
+		return null;
+	}
+
+	const bundleDropdownItems = Object.fromEntries(
+		bundles.map(bundle => [bundle.id, { isEnabled: bundle.isEnabled }] as const)
+	);
+
+	return createPortal(
+		<dialog
+			ref={dialogRef}
+			className="modal"
+			onClose={handleDialogClose}
+			onCancel={event => {
+				event.preventDefault();
+			}}
+		>
+			<div className="modal-box bg-base-200 max-h-[80vh] max-w-xl overflow-auto rounded-2xl">
+				<div className="mb-4 flex items-center justify-between">
+					<h3 className="text-lg font-bold">{mode === 'fork' ? 'Fork Instruction Skill' : 'Add Instruction Skill'}</h3>
+					<button type="button" className="btn btn-sm btn-circle bg-base-300" onClick={requestClose} aria-label="Close">
+						<FiX size={12} />
+					</button>
+				</div>
+
+				<form className="space-y-4" onSubmit={handleSubmit}>
+					{submitError ? (
+						<div className="alert alert-error rounded-2xl text-sm">
+							<FiAlertCircle size={14} />
+							<span>{submitError}</span>
+						</div>
+					) : null}
+
+					<div className="alert alert-info rounded-2xl text-sm">
+						{mode === 'fork' ? (
+							<span>This creates a new managed filesystem instruction skill from the rendered source skill text.</span>
+						) : (
+							<span>
+								This creates a managed filesystem skill with <span className="font-mono">insert: instructions</span>.
+								For arguments, scripts, resources, or user-message templates, use the Skill Bundles page.
+							</span>
+						)}
+					</div>
+
+					<div>
+						<label className="label py-1">
+							<span className="text-sm">Bundle</span>
+						</label>
+						<Dropdown<string>
+							dropdownItems={bundleDropdownItems}
+							orderedKeys={bundles.map(bundle => bundle.id)}
+							selectedKey={bundleID}
+							onChange={setBundleID}
+							filterDisabled={true}
+							title="Select skill bundle"
+							getDisplayName={key => {
+								const bundle = bundles.find(item => item.id === key);
+								return bundle ? `${bundle.displayName || bundle.slug} (${bundle.slug})` : key;
+							}}
+						/>
+						{bundleError ? <div className="text-error mt-1 text-xs">{bundleError}</div> : null}
+					</div>
+
+					<div>
+						<label className="label py-1">
+							<span className="text-sm">Display name</span>
+						</label>
+						<input
+							className="input w-full rounded-xl"
+							value={displayName}
+							onChange={event => {
+								setDisplayName(event.target.value);
+							}}
+							spellCheck="false"
+						/>
+					</div>
+
+					<div>
+						<label className="label py-1">
+							<span className="text-sm">Skill name and slug</span>
+						</label>
+						<input
+							className={`input w-full rounded-xl ${nameError ? 'input-error' : ''}`}
+							value={name}
+							onChange={event => {
+								const next = event.target.value;
+								setName(next);
+								if (displayName === 'Instruction Skill') {
+									setDisplayName(next.replaceAll('-', ' ').replaceAll(/\b\w/g, c => c.toUpperCase()));
+								}
+							}}
+							spellCheck="false"
+						/>
+						<div className="text-base-content/70 mt-1 text-xs">Saved as: {normalizedName || '-'}</div>
+						{nameError ? <div className="text-error mt-1 text-xs">{nameError}</div> : null}
+					</div>
+
+					<div>
+						<label className="label py-1">
+							<span className="text-sm">Instructions</span>
+						</label>
+						<textarea
+							className={`textarea h-36 w-full rounded-xl ${bodyError ? 'textarea-error' : ''}`}
+							value={body}
+							onChange={event => {
+								setBody(event.target.value);
+							}}
+							placeholder="Write standing assistant instructions here..."
+							spellCheck="false"
+						/>
+						{bodyError ? <div className="text-error mt-1 text-xs">{bodyError}</div> : null}
+					</div>
+
+					<div className="modal-action">
+						<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
+							Cancel
+						</button>
+						<button type="submit" className="btn btn-primary rounded-xl" disabled={!canSubmit}>
+							{isSubmitting ? 'Creating…' : mode === 'fork' ? 'Fork and activate' : 'Create and activate'}
+						</button>
+					</div>
+				</form>
+			</div>
+		</dialog>,
+		document.body
+	);
 }
 
 export function SkillsBottomBarChip({
@@ -152,8 +449,10 @@ export function SkillsBottomBarChip({
 	enabledSkillRefs,
 	activeSkillRefs,
 	setEnabledSkillRefs,
+	setActiveSkillRefs,
 	onEnableAll,
 	onDisableAll,
+	onRefreshSkills,
 	isInputLocked = false,
 }: {
 	store: MenuStore;
@@ -163,8 +462,10 @@ export function SkillsBottomBarChip({
 	enabledSkillRefs: SkillRef[];
 	activeSkillRefs: SkillRef[];
 	setEnabledSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
+	setActiveSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
 	onEnableAll: () => void;
 	onDisableAll: () => void;
+	onRefreshSkills: () => Promise<void>;
 	isInputLocked?: boolean;
 }) {
 	const internalMenu = useMenuStore({ placement: 'top', focusLoop: true });
@@ -172,6 +473,9 @@ export function SkillsBottomBarChip({
 	const open = useStoreState(menu, 'open');
 	const menuContentElement = useStoreState(menu, 'contentElement');
 	const [searchQuery, setSearchQuery] = useSearchableMenuState(open);
+	const [isAddInstructionOpen, setIsAddInstructionOpen] = useState(false);
+	const [instructionModalMode, setInstructionModalMode] = useState<'add' | 'fork'>('add');
+	const [instructionDraft, setInstructionDraft] = useState<InstructionSkillDraft | null>(null);
 
 	useEffect(() => {
 		if (isInputLocked) {
@@ -183,7 +487,14 @@ export function SkillsBottomBarChip({
 	const activeKeySet = useMemo(() => new Set(activeSkillRefs.map(k => skillRefKey(k))), [activeSkillRefs]);
 
 	const availableSkillKeySet = useMemo(
-		() => new Set((allSkills ?? []).map(item => skillRefKey(skillRefFromListItem(item)))),
+		() =>
+			new Set(
+				(allSkills ?? [])
+					.filter(s => {
+						return isInstructionSkill(s);
+					})
+					.map(item => skillRefKey(skillRefFromListItem(item)))
+			),
 		[allSkills]
 	);
 
@@ -215,54 +526,30 @@ export function SkillsBottomBarChip({
 		return count;
 	}, [activeKeySet, availableSkillKeySet, loading]);
 
-	const totalCount = allSkills.length;
+	const instructionCount = allSkills.filter(s => {
+		return isInstructionSkill(s);
+	}).length;
+	const totalCount = instructionCount;
 	const isEnabled = enabledCount > 0;
 
-	const groups: BundleGroup[] = useMemo(() => {
-		const map = new Map<string, BundleGroup>();
-
-		for (const item of [...(allSkills ?? [])].toSorted(compareSkillListItems)) {
-			const id = item.bundleID || 'unknown-bundle';
-			const slug = item.bundleSlug || id;
-			const existing = map.get(id);
-
-			if (existing) {
-				existing.skills.push(item);
-			} else {
-				map.set(id, {
-					bundleID: id,
-					bundleSlug: slug,
-					skills: [item],
-				});
-			}
-		}
-
-		const bundleGroups = [...map.values()];
-
-		for (const group of bundleGroups) {
-			group.skills = group.skills.toSorted(compareSkillListItems);
-		}
-
-		return bundleGroups.toSorted(compareBundleGroups);
-	}, [allSkills]);
+	const sortedSkills = useMemo(
+		() => [...(allSkills ?? [])].filter(item => isInstructionSkill(item)).toSorted(compareSkillRows),
+		[allSkills]
+	);
 
 	const displayedGroups = useMemo(() => {
 		if (!isSearchQueryActive(searchQuery)) {
-			return groups;
+			return [{ bundleID: 'flat', bundleSlug: 'skills', skills: sortedSkills }];
 		}
 
-		return groups
-			.map(group => ({
-				...group,
-				skills: rankSearchableItems(group.skills, {
-					query: searchQuery,
-					getKey: skillListItemKey,
-					getFields: getSkillSearchFields,
-					fallbackCompare: compareSkillListItems,
-				}),
-			}))
-			.filter(group => group.skills.length > 0);
-	}, [groups, searchQuery]);
+		const ranked = rankSearchableItems(sortedSkills, {
+			query: searchQuery,
+			getKey: skillListItemKey,
+			getFields: getSkillSearchFields,
+			fallbackCompare: compareSkillRows,
+		});
+		return [{ bundleID: 'flat', bundleSlug: 'skills', skills: ranked }];
+	}, [searchQuery, sortedSkills]);
 
 	const displayedSkillCount = displayedGroups.reduce((sum, group) => sum + group.skills.length, 0);
 	const firstVisibleSkill = displayedGroups[0]?.skills[0] ?? null;
@@ -282,12 +569,13 @@ export function SkillsBottomBarChip({
 					byKey.set(k, ref);
 				} else {
 					byKey.delete(k);
+					setActiveSkillRefs(prevActive => prevActive.filter(activeRef => skillRefKey(activeRef) !== k));
 				}
 
 				return [...byKey.values()];
 			});
 		},
-		[setEnabledSkillRefs]
+		[setActiveSkillRefs, setEnabledSkillRefs]
 	);
 
 	const toggleSkillItem = useCallback(
@@ -299,37 +587,21 @@ export function SkillsBottomBarChip({
 		[enabledKeySet, setSkillEnabled]
 	);
 
-	const setBundleEnabled = useCallback(
-		(group: BundleGroup, enabled: boolean) => {
-			const refs = group.skills.map(skillRefFromListItem);
-			const refKeys = refs.map(k => skillRefKey(k));
-
-			setEnabledSkillRefs(prev => {
-				const byKey = new Map<string, SkillRef>();
-
-				for (const r of prev ?? []) {
-					byKey.set(skillRefKey(r), r);
-				}
-
-				if (enabled) {
-					for (const r of refs) {
-						byKey.set(skillRefKey(r), r);
-					}
-				} else {
-					for (const k of refKeys) {
-						byKey.delete(k);
-					}
-				}
-
-				return dedupeSkillRefs([...byKey.values()]);
-			});
+	const enableAndActivateSkill = useCallback(
+		(item: SkillListItem) => {
+			const ref = skillRefFromListItem(item);
+			setEnabledSkillRefs(prev => dedupeSkillRefs([...prev, ref]));
+			setActiveSkillRefs(prev => dedupeSkillRefs([...prev, ref]));
 		},
-		[setEnabledSkillRefs]
+		[setActiveSkillRefs, setEnabledSkillRefs]
 	);
 
 	const title = useMemo(() => {
 		const lines: string[] = [
-			shortcut ? `Attach skills (${shortcut})` : 'Attach skills',
+			shortcut ? `Instruction skills (${shortcut})` : 'Instruction skills',
+			'Instruction skills can be enabled for this chat or activated as standing session context.',
+			'User-message templates are shown separately in the Templates menu.',
+			'Resource-backed skills can still be enabled or activated, but this menu does not fork or inline-copy their resource context.',
 			isEnabled ? `Status: Enabled (${enabledCount})` : 'Status: Disabled',
 			`Active now: ${activeCount}`,
 		];
@@ -350,55 +622,193 @@ export function SkillsBottomBarChip({
 				? 'border-base-300 bg-base-300/60'
 				: 'border-transparent';
 
+	const openAddInstructionModal = useCallback(() => {
+		setInstructionModalMode('add');
+		setInstructionDraft(null);
+		setIsAddInstructionOpen(true);
+	}, []);
+
+	const openForkInstructionModal = useCallback(
+		async (item: SkillListItem) => {
+			try {
+				const rendered = await skillStoreAPI.renderSkill(skillRefFromListItem(item), {});
+				const sourceLabel = getSkillDisplayLabel(item);
+				const nextName = makeUniqueSimpleSkillName(`${item.skillDefinition.name || item.skillSlug}-fork`, allSkills);
+
+				setInstructionModalMode('fork');
+				setInstructionDraft({
+					bundleID: item.isBuiltIn ? undefined : item.bundleID,
+					displayName: `${sourceLabel} Copy`,
+					name: nextName,
+					body: rendered.text || `Forked from "${sourceLabel}". Replace this placeholder with instructions.`,
+					description:
+						item.skillDefinition.description ||
+						`Forked from ${sourceLabel}. Use when these instructions should guide the assistant.`,
+				});
+				setIsAddInstructionOpen(true);
+			} catch (error) {
+				console.error('Failed to render skill for fork:', error);
+			}
+		},
+		[allSkills]
+	);
+
 	const renderSkillItem = (item: SkillListItem) => {
 		const ref = skillRefFromListItem(item);
 		const k = skillRefKey(ref);
 		const checked = enabledKeySet.has(k);
 		const isActive = activeKeySet.has(k);
+		const isInstruction = isInstructionSkill(item);
 		const label = getSkillDisplayLabel(item);
+		const resources = resourceCount(item);
+		const simpleInstruction = isInstruction && resources === 0;
 
 		return (
 			<MenuItem
 				key={k}
 				data-searchable-menu-item="true"
 				hideOnClick={false}
-				className="data-active-item:bg-base-200 flex items-center gap-2 rounded-xl px-2 py-1 pl-6 outline-none"
-				title={`${item.bundleSlug}/${item.skillSlug} • ${item.skillDefinition.type} • ${item.skillDefinition.location}`}
+				className={`data-active-item:bg-base-200 flex w-full flex-col items-start gap-2 rounded-xl border p-2 outline-none ${
+					!isInstruction ? 'opacity-75' : ''
+				}`}
+				title={
+					isInstruction
+						? `${item.bundleSlug}/${item.skillSlug}\nEnable makes it available. Enable + active loads its instructions now.`
+						: `${item.bundleSlug}/${item.skillSlug}\nThis is a user-message template. Use the Templates menu.`
+				}
 				onClick={() => {
-					if (isInputLocked) {
+					if (isInputLocked || !isInstruction) {
 						return;
 					}
 					toggleSkillItem(item);
 				}}
 			>
-				<input
-					type="checkbox"
-					className="checkbox checkbox-xs rounded-sm"
-					checked={checked}
-					disabled={isInputLocked}
-					onChange={e => {
-						stop(e);
-						if (isInputLocked) {
-							return;
-						}
-						setSkillEnabled(ref, e.currentTarget.checked);
-					}}
-					onPointerDown={stop}
-					onClick={stop}
-					aria-label={`Toggle skill ${label}`}
-				/>
-
-				<div className="min-w-0 flex-1">
-					<div className="truncate text-xs font-medium">{label}</div>
+				<div className="flex w-full flex-col space-y-1">
+					<div className="flex items-center gap-2">
+						<div className="truncate text-xs font-medium">{label}</div>
+						<span className={`badge badge-xs ${isInstruction ? 'badge-info' : 'badge-secondary'}`}>
+							{isInstruction ? 'instructions' : 'template'}
+						</span>
+					</div>
 					<div className="text-base-content/60 truncate text-xs">
-						{item.skillDefinition.type} • {item.skillDefinition.location} • {item.skillDefinition.name}
+						{item.bundleSlug}/{item.skillSlug} • {item.skillDefinition.name}
 					</div>
 
-					{isActive || !item.skillDefinition.isEnabled ? (
-						<div className="mt-1 flex items-center gap-1">
-							{isActive ? <span className="badge badge-success badge-xs">Active</span> : null}
-							{!item.skillDefinition.isEnabled ? <span className="badge badge-warning badge-xs">Disabled</span> : null}
-						</div>
+					<div className="mt-1 flex flex-wrap items-center justify-end gap-1">
+						{checked ? <span className="badge badge-success badge-xs">Enabled</span> : null}
+						{isInstruction && isActive ? <span className="badge badge-info badge-xs">Active</span> : null}
+						{resources > 0 ? (
+							<span className="badge badge-ghost badge-xs">
+								{resources} resource{resources === 1 ? '' : 's'}
+							</span>
+						) : null}
+						{simpleInstruction ? (
+							<span className="badge badge-ghost badge-xs" title="Can be copied or forked as plain instructions.">
+								simple
+							</span>
+						) : null}
+						<span className="badge badge-ghost badge-xs">{item.isBuiltIn ? 'built-in' : 'custom'}</span>
+						{!item.skillDefinition.isEnabled ? <span className="badge badge-warning badge-xs">Disabled</span> : null}
+					</div>
+				</div>
+
+				<div className="ml-2 flex w-full items-center justify-end gap-1" onClick={stop} onPointerDown={stop}>
+					{isInstruction ? (
+						checked ? (
+							<>
+								{isActive ? (
+									<button
+										type="button"
+										className="btn btn-xs rounded-lg"
+										disabled={isInputLocked}
+										onClick={() => {
+											setActiveSkillRefs(prev => prev.filter(activeRef => skillRefKey(activeRef) !== k));
+										}}
+									>
+										Deactivate
+									</button>
+								) : (
+									<button
+										type="button"
+										className="btn btn-xs rounded-lg"
+										disabled={isInputLocked}
+										onClick={() => {
+											enableAndActivateSkill(item);
+										}}
+									>
+										Activate
+									</button>
+								)}
+								<button
+									type="button"
+									className="btn btn-xs rounded-lg"
+									disabled={isInputLocked}
+									onClick={() => {
+										setSkillEnabled(ref, false);
+									}}
+								>
+									Disable
+								</button>
+							</>
+						) : (
+							<>
+								<button
+									type="button"
+									className="btn btn-xs rounded-lg"
+									disabled={isInputLocked}
+									onClick={() => {
+										setSkillEnabled(ref, true);
+									}}
+								>
+									Enable
+								</button>
+								<button
+									type="button"
+									className="btn btn-xs rounded-lg"
+									disabled={isInputLocked}
+									onClick={() => {
+										enableAndActivateSkill(item);
+									}}
+								>
+									Enable + activate
+								</button>
+							</>
+						)
+					) : (
+						<span className="text-base-content/60 text-xs">Use Templates</span>
+					)}
+
+					{simpleInstruction ? (
+						<>
+							<button
+								type="button"
+								className="btn btn-xs rounded-lg"
+								disabled={isInputLocked || isActive}
+								title={
+									isActive
+										? 'Already active in this chat.'
+										: 'Enable this instruction skill and activate it as standing session context now.'
+								}
+								onClick={() => {
+									enableAndActivateSkill(item);
+									menu.hide();
+								}}
+							>
+								Add as instructions
+							</button>
+							<button
+								type="button"
+								className="btn btn-xs rounded-lg"
+								disabled={isInputLocked}
+								title="Create a new managed instruction skill from this rendered skill text."
+								onClick={() => {
+									void openForkInstructionModal(item);
+								}}
+							>
+								<FiGitBranch size={12} />
+								<span className="ml-1">Fork</span>
+							</button>
+						</>
 					) : null}
 				</div>
 			</MenuItem>
@@ -439,7 +849,7 @@ export function SkillsBottomBarChip({
 					{enabledCount > 0 ? (
 						<button
 							type="button"
-							className="btn btn-ghost btn-xs app-text-neutral hover:bg-base-300/80 ml-1 h-auto min-h-0 shrink-0 px-1 py-0 shadow-none"
+							className="btn btn-xs app-text-neutral hover:bg-base-300/80 ml-1 h-auto min-h-0 shrink-0 px-1 py-0 shadow-none"
 							onClick={event => {
 								stop(event);
 								onDisableAll();
@@ -464,7 +874,7 @@ export function SkillsBottomBarChip({
 				portal
 			>
 				<div className="mb-2 flex items-center justify-between gap-2 px-1">
-					<div className="text-base-content/70 text-xs font-semibold">Skills</div>
+					<div className="text-base-content/70 text-xs font-semibold">Instruction Skills</div>
 					<div className="text-base-content/60 flex items-center gap-2 text-xs">
 						<span>Enabled: {enabledCount}</span>
 						<span>•</span>
@@ -495,6 +905,51 @@ export function SkillsBottomBarChip({
 					}}
 				/>
 
+				{!loading && totalCount > 0 ? (
+					<div className="border-base-300 mb-2 flex flex-wrap items-center justify-between gap-2 border-b px-1 pb-2">
+						<button
+							type="button"
+							className="btn btn-xs rounded-lg"
+							disabled={isInputLocked}
+							onClick={openAddInstructionModal}
+							title="Create a simple managed instruction skill and activate it for this chat."
+						>
+							<FiPlus size={12} />
+							<span className="ml-1">Add new instruction skill</span>
+						</button>
+
+						<div className="flex gap-2">
+							<button
+								type="button"
+								className="btn btn-xs rounded-lg"
+								disabled={isInputLocked || totalCount === 0 || enabledCount === totalCount}
+								onClick={e => {
+									stop(e);
+									onEnableAll();
+								}}
+								title="Enable all instruction skills"
+							>
+								Enable all
+							</button>
+
+							<button
+								type="button"
+								className="btn btn-xs rounded-lg"
+								disabled={isInputLocked || enabledCount === 0}
+								onClick={e => {
+									stop(e);
+									onDisableAll();
+									menu.hide();
+								}}
+								title="Disable all selected instruction skills and remove active skill session instructions."
+							>
+								<FiX size={12} />
+								<span className="ml-1">Clear all</span>
+							</button>
+						</div>
+					</div>
+				) : null}
+
 				{loading ? (
 					<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>Loading skills…</div>
 				) : totalCount === 0 ? (
@@ -504,112 +959,35 @@ export function SkillsBottomBarChip({
 				) : displayedSkillCount === 0 ? (
 					<div className={searchableMenuEmptyStateClasses}>No skills match your search.</div>
 				) : (
-					<>
-						<div className="space-y-2">
-							{displayedGroups.map((group, groupIndex) => {
-								const bundleRefs = group.skills.map(skillRefFromListItem);
-								const bundleTotal = bundleRefs.length;
-								const bundleEnabled = bundleRefs.filter(r => enabledKeySet.has(skillRefKey(r))).length;
-
-								const bundleChecked = bundleEnabled > 0 && bundleEnabled === bundleTotal;
-								const bundleIndeterminate = bundleEnabled > 0 && bundleEnabled < bundleTotal;
-
-								const enabledSkills = group.skills.filter(item => enabledKeySet.has(skillListItemKey(item)));
-								const availableSkills = group.skills.filter(item => !enabledKeySet.has(skillListItemKey(item)));
-								const showSubheadings = enabledSkills.length > 0 && availableSkills.length > 0;
-
-								return (
-									<GroupedMenuSection
-										key={group.bundleID}
-										title={group.bundleSlug}
-										ariaLabel={`${group.bundleSlug} skills`}
-										separatorBefore={groupIndex > 0}
-										meta={
-											<>
-												<span className="badge badge-ghost badge-xs">
-													{bundleEnabled}/{bundleTotal}
-												</span>
-												<span className="badge badge-ghost badge-xs">{getBundleKindLabel(group)}</span>
-											</>
-										}
-									>
-										<MenuItem
-											hideOnClick={false}
-											className="data-active-item:bg-base-200 flex items-center gap-2 rounded-xl px-2 py-1 outline-none"
-											onClick={() => {
-												if (isInputLocked) {
-													return;
-												}
-												setBundleEnabled(group, bundleEnabled !== bundleTotal);
-											}}
-										>
-											<BundleCheckbox
-												isInputLocked={isInputLocked}
-												checked={bundleChecked}
-												indeterminate={bundleIndeterminate}
-												onChange={next => {
-													setBundleEnabled(group, next);
-												}}
-											/>
-											<div className="min-w-0 flex-1">
-												<div className="truncate text-xs font-semibold">All skills in bundle</div>
-												<div className="text-base-content/60 text-xs">
-													{bundleEnabled}/{bundleTotal} enabled
-												</div>
-											</div>
-										</MenuItem>
-
-										{enabledSkills.length > 0 ? (
-											<>
-												{showSubheadings ? <GroupedMenuSubheading>Enabled</GroupedMenuSubheading> : null}
-												<div className="space-y-1">{enabledSkills.map(i => renderSkillItem(i))}</div>
-											</>
-										) : null}
-
-										{availableSkills.length > 0 ? (
-											<>
-												{showSubheadings ? (
-													<GroupedMenuSubheading separated={enabledSkills.length > 0}>Available</GroupedMenuSubheading>
-												) : null}
-												<div className="space-y-1">{availableSkills.map(i => renderSkillItem(i))}</div>
-											</>
-										) : null}
-									</GroupedMenuSection>
-								);
-							})}
-						</div>
-
-						<div className="border-base-300 mt-2 flex items-center justify-end gap-2 border-t pt-2">
-							<button
-								type="button"
-								className="btn btn-ghost btn-xs rounded-lg"
-								disabled={isInputLocked || totalCount === 0 || enabledCount === totalCount}
-								onClick={e => {
-									stop(e);
-									onEnableAll();
-								}}
-								title="Select all skills"
-							>
-								Select all
-							</button>
-
-							<button
-								type="button"
-								className="btn btn-ghost btn-xs rounded-lg"
-								disabled={isInputLocked || enabledCount === 0}
-								onClick={e => {
-									stop(e);
-									onDisableAll();
-									menu.hide();
-								}}
-								title="Clear all selected skills"
-							>
-								Clear all
-							</button>
-						</div>
-					</>
+					<div className="space-y-1">
+						{displayedGroups[0]?.skills.map(item => (
+							<div className="w-full" key={skillListItemKey(item)}>
+								{renderSkillItem(item)}
+							</div>
+						))}
+					</div>
 				)}
 			</Menu>
+
+			<AddInstructionSkillModal
+				isOpen={isAddInstructionOpen}
+				allSkills={allSkills}
+				mode={instructionModalMode}
+				initialDraft={instructionDraft}
+				onClose={() => {
+					setIsAddInstructionOpen(false);
+					setInstructionDraft(null);
+				}}
+				onCreated={async item => {
+					await onRefreshSkills();
+					const ref = skillRefFromListItem(item);
+					setEnabledSkillRefs(prev => dedupeSkillRefs([...prev, ref]));
+					setActiveSkillRefs(prev => dedupeSkillRefs([...prev, ref]));
+					setIsAddInstructionOpen(false);
+					setInstructionDraft(null);
+					menu.hide();
+				}}
+			/>
 		</div>
 	);
 }

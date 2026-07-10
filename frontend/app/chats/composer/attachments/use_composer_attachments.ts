@@ -7,6 +7,7 @@ import type {
 	AttachmentsDroppedPayload,
 	DirectoryAttachmentsResult,
 	DirectoryOverflowInfo,
+	PathAttachmentsResult,
 	UIAttachment,
 } from '@/spec/attachment';
 import { AttachmentKind } from '@/spec/attachment';
@@ -105,6 +106,7 @@ interface UseComposerAttachmentsResult {
 	attachFiles: () => Promise<void>;
 	attachDirectory: () => Promise<void>;
 	attachURL: (url: string) => Promise<void>;
+	attachPathsAsAttachments: (paths: string[], maxFilesPerDir?: number) => Promise<PathAttachmentsResult | undefined>;
 	changeAttachmentMode: (att: UIAttachment, mode: AttachmentContentBlockMode) => void;
 	removeAttachment: (att: UIAttachment) => void;
 	removeDirectoryGroup: (groupId: string) => void;
@@ -365,6 +367,27 @@ export function useComposerAttachments({
 		[focusEditorAtEnd, isBusy, setAttachments]
 	);
 
+	const attachPathsAsAttachments = useCallback(
+		async (paths: string[], maxFilesPerDir = MAX_FILES_PER_DIRECTORY) => {
+			const cleanPaths = paths.map(path => path.trim()).filter(Boolean);
+			if (cleanPaths.length === 0) {
+				return undefined;
+			}
+
+			const result = await backendAPI.getPathsAsAttachments(cleanPaths, maxFilesPerDir);
+			applyFileAttachments(result.fileAttachments ?? []);
+			for (const dirResult of result.dirAttachments ?? []) {
+				applyDirectoryAttachments(dirResult);
+			}
+
+			if (!isBusy) {
+				focusEditorAtEnd();
+			}
+			return result;
+		},
+		[applyDirectoryAttachments, applyFileAttachments, focusEditorAtEnd, isBusy]
+	);
+
 	const changeAttachmentMode = useCallback(
 		(att: UIAttachment, newMode: AttachmentContentBlockMode) => {
 			const targetKey = uiAttachmentKey(att);
@@ -472,6 +495,7 @@ export function useComposerAttachments({
 		attachFiles,
 		attachDirectory,
 		attachURL,
+		attachPathsAsAttachments,
 		changeAttachmentMode,
 		removeAttachment,
 		removeDirectoryGroup,

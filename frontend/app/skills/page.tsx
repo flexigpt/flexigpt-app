@@ -393,10 +393,10 @@ export default function SkillsPage() {
 			<div className="flex size-full flex-col items-center overflow-hidden">
 				<div className="bg-base-200/95 sticky top-0 z-10 mt-4 flex w-11/12 items-center gap-4 px-4 py-2 backdrop-blur-sm xl:w-2/3">
 					<div className="min-w-0 grow">
-						<h1 className="text-xl font-semibold">Skill and Template Bundles</h1>
+						<h1 className="text-xl font-semibold">Skills and Templates</h1>
 						<p className="text-base-content/70 text-xs">
-							Manage Agent Skills artifacts. New prompt templates are represented here as skills with{' '}
-							<span className="font-mono">insert: user-message</span>.
+							Manage Agent Skills artifacts. New instruction snippets and prompt-like composer templates should be
+							created here.
 						</p>
 					</div>
 					<button
@@ -414,7 +414,7 @@ export default function SkillsPage() {
 					<div className="mt-4 w-11/12 space-y-4 xl:w-2/3">
 						<div className="alert alert-info rounded-2xl text-sm">
 							<div className="space-y-1">
-								<div className="font-semibold">How skills and prompt-like templates work</div>
+								<div className="font-semibold">How skill artifacts work</div>
 								<div>
 									A skill artifact is a directory with a required <span className="font-mono">SKILL.md</span>. FlexiGPT
 									gives special meaning only to <span className="font-mono">name</span>,{' '}
@@ -422,20 +422,41 @@ export default function SkillsPage() {
 									<span className="font-mono">arguments</span>.
 								</div>
 								<div>
-									<span className="font-semibold">Instruction skills</span> are standing context and can be activated in
-									a conversation session. <span className="font-semibold">User-message skills</span> are render-only
-									prompt templates for the composer.
+									<span className="font-semibold">Instruction skills</span> use{' '}
+									<span className="font-mono">insert: instructions</span>. They are standing context and can be enabled
+									or activated in a conversation session.
 								</div>
 								<div>
-									Managed creation writes only <span className="font-mono">SKILL.md</span>. Add extra files such as{' '}
+									<span className="font-semibold">User-message templates</span> use{' '}
+									<span className="font-mono">insert: user-message</span>. They render into composer text and do not
+									become active session skills.
+								</div>
+								<div>
+									Managed creation writes one simple <span className="font-mono">SKILL.md</span> file. To add resources,
+									assets, or scripts, save the skill first, open the shown skill folder, and add files such as{' '}
 									<span className="font-mono">references/</span>, <span className="font-mono">assets/</span>, or{' '}
-									<span className="font-mono">scripts/</span> inside the generated skill folder after saving. Re-enable
-									the skill or restart the app to force runtime metadata to refresh.
+									<span className="font-mono">scripts/</span>. Re-enable the skill or restart the app to refresh indexed
+									metadata.
 								</div>
 								<div>
-									The old Prompt Bundles page remains available for compatibility. From a management perspective, new
-									instruction snippets and user-message templates should be created here.
+									The Prompt Bundles page remains for compatibility only. For new prompt-template style content, create
+									a user-message skill here.
 								</div>
+							</div>
+						</div>
+
+						<div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+							<div className="bg-base-100 border-base-300 rounded-2xl border p-3">
+								<div className="text-sm font-semibold">Instruction skills</div>
+								<div className="text-base-content/70 mt-1 text-xs">{insertCounts.instructions} configured</div>
+							</div>
+							<div className="bg-base-100 border-base-300 rounded-2xl border p-3">
+								<div className="text-sm font-semibold">User-message templates</div>
+								<div className="text-base-content/70 mt-1 text-xs">{insertCounts['user-message']} configured</div>
+							</div>
+							<div className="bg-base-100 border-base-300 rounded-2xl border p-3">
+								<div className="text-sm font-semibold">Tags</div>
+								<div className="text-base-content/70 mt-1 text-xs">{allTags.length} known tag groups</div>
 							</div>
 						</div>
 

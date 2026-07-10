@@ -9,10 +9,8 @@ import { LineHeightKit } from '@/components/editor/plugins/line_height_kit';
 import { ListKit } from '@/components/editor/plugins/list_kit';
 import { TabbableKit } from '@/components/editor/plugins/tabbable_kit';
 
-import { KEY_TEMPLATE_SELECTION, KEY_TEMPLATE_VARIABLE, KEY_TOOL_SELECTION } from '@/chats/composer/platedoc/nodes';
-import { TemplateSelectionElement } from '@/chats/composer/platedoc/template_selection_element';
+import { KEY_TOOL_SELECTION } from '@/chats/composer/platedoc/nodes';
 import { ToolSelectionElement } from '@/chats/composer/platedoc/tool_selection_element';
-import { TemplateVariableElement } from '@/chats/composer/templates/template_variables_inline';
 
 export const createComposerEditorPlugins = () => [
 	SingleBlockPlugin,
@@ -24,7 +22,6 @@ export const createComposerEditorPlugins = () => [
 	...ListKit,
 	// ...AutoformatKit, // Don't want any formatting on typing
 	...TabbableKit,
-	...TemplateSlashKit,
 	...ToolPlusKit,
 	...FloatingToolbarKit,
 ];
@@ -36,19 +33,3 @@ const ToolSelectionPlugin = createSlatePlugin({
 });
 
 const ToolPlusKit = [ToolSelectionPlugin.withComponent(ToolSelectionElement)];
-
-const TemplateSelectionPlugin = createSlatePlugin({
-	key: KEY_TEMPLATE_SELECTION,
-	// this is the chip “schema”
-	node: { isElement: true, isInline: true, isVoid: true },
-});
-
-const TemplateVariablePlugin = createSlatePlugin({
-	key: KEY_TEMPLATE_VARIABLE,
-	node: { isElement: true, isInline: true, isVoid: true },
-});
-
-const TemplateSlashKit = [
-	TemplateSelectionPlugin.withComponent(TemplateSelectionElement),
-	TemplateVariablePlugin.withComponent(TemplateVariableElement),
-];

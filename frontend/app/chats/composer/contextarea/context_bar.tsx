@@ -24,7 +24,7 @@ import { PreviousMessagesDropdown } from '@/chats/composer/previousmessages/prev
 import { HybridReasoningCheckbox } from '@/chats/composer/reasoningparams/reasoning_hybrid_checkbox';
 import { SingleReasoningDropdown } from '@/chats/composer/reasoningparams/reasoning_levels_dropdown';
 import { ReasoningTokensDropdown } from '@/chats/composer/reasoningparams/reasoning_tokens_dropdown';
-import type { ComposerSystemPromptController } from '@/chats/composer/systemprompts/use_composer_system_prompt';
+import type { ComposerSystemPromptController } from '@/chats/composer/skills/use_composer_system_prompt';
 import { TemperatureDropdown } from '@/chats/composer/temperatures/temperature_dropdown';
 
 interface EditorContextBarProps {

@@ -32,6 +32,7 @@ interface UseComposerSkillsResult {
 	setActiveSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
 	enableAllSkills: () => void;
 	disableAllSkills: () => void;
+	refreshSkills: () => Promise<void>;
 	applySkillSelectionState: (
 		nextEnabledInput: SkillRef[] | null | undefined,
 		nextActiveInput: SkillRef[] | null | undefined,
@@ -46,6 +47,10 @@ interface UseComposerSkillsResult {
 
 function buildSkillSessionStateKey(enabled: SkillRef[], active: SkillRef[]): string {
 	return `${buildSkillRefsFingerprint(enabled)}::${buildSkillRefsFingerprint(active)}`;
+}
+
+function isInstructionSkillListItem(item: SkillListItem): boolean {
+	return (item.skillDefinition.insert || 'instructions') === 'instructions';
 }
 
 export function useComposerSkills(): UseComposerSkillsResult {
@@ -107,9 +112,13 @@ export function useComposerSkills(): UseComposerSkillsResult {
 
 	useEffect(() => {
 		availableSkillKeySetRef.current = new Set(
-			allSkills.map(item => {
-				return skillRefKey(skillRefFromListItem(item));
-			})
+			allSkills
+				.filter(item => {
+					return isInstructionSkillListItem(item);
+				})
+				.map(item => {
+					return skillRefKey(skillRefFromListItem(item));
+				})
 		);
 	}, [allSkills]);
 
@@ -306,6 +315,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 			const resp = await skillStoreAPI.listSkills({
 				bundleIDs: [],
 				types: [],
+				inserts: ['instructions'],
 				includeDisabled: false,
 				includeMissing: false,
 				recommendedPageSize: 200,
@@ -321,6 +331,21 @@ export function useComposerSkills(): UseComposerSkillsResult {
 
 		return out;
 	}, []);
+
+	const refreshSkills = useCallback(async () => {
+		setSkillsLoading(true);
+		try {
+			const out = await fetchAllSkills();
+			setAllSkills(out);
+		} catch {
+			setAllSkills([]);
+		} finally {
+			setSkillsLoading(false);
+			if (skillsCatalogLoadPromiseRef.current) {
+				skillsCatalogLoadPromiseRef.current = null;
+			}
+		}
+	}, [fetchAllSkills]);
 
 	// Fetch skills catalog (store listSkills; NOT runtime listRuntimeSkills).
 	useEffect(() => {
@@ -374,7 +399,11 @@ export function useComposerSkills(): UseComposerSkillsResult {
 			}
 
 			void applySkillSelectionState(
-				loadedSkills.map(i => skillRefFromListItem(i)),
+				loadedSkills
+					.filter(s => {
+						return isInstructionSkillListItem(s);
+					})
+					.map(i => skillRefFromListItem(i)),
 				activeSkillRefsRef.current,
 				{
 					syncSession: 'if-session-exists',
@@ -458,6 +487,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		setActiveSkillRefs,
 		enableAllSkills,
 		disableAllSkills,
+		refreshSkills,
 		applySkillSelectionState,
 		ensureSkillSession,
 		listActiveSkillRefs,

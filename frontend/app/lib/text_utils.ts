@@ -34,11 +34,3 @@ export function validateTags(tags: string): string | undefined {
 	}
 	return undefined;
 }
-
-export function cssEscape(s: string) {
-	try {
-		return CSS.escape(s);
-	} catch {
-		return s.replaceAll(/[^a-zA-Z0-9_-]/g, '\\$&');
-	}
-}

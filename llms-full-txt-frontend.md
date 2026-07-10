@@ -39,10 +39,9 @@ If you want the fastest mental model, read in this order:
 7. `app/chats/conversation/use_send_message.ts`
 8. `app/chats/composer/composer_box.tsx`
 9. `app/chats/composer/editor/editor_area.tsx`
-10. `app/chats/composer/systemprompts/use_composer_system_prompt.ts`
-11. `app/chats/composer/assistantpresets/use_assistant_preset_manager.ts`
-12. `app/apis/interface.ts`
-13. `app/spec/*.ts`
+10. `app/chats/composer/assistantpresets/use_assistant_preset_manager.ts`
+11. `app/apis/interface.ts`
+12. `app/spec/*.ts`
 
 ## Functional layout
 

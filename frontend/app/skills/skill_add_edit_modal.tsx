@@ -666,7 +666,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 			? 'View Skill'
 			: effectiveMode === 'edit'
 				? 'Edit Skill'
-				: 'Add Skill';
+				: 'Add Skill or Template';
 
 	return (
 		<dialog
@@ -700,6 +700,26 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 								<div className="flex items-center gap-2">
 									<FiAlertCircle size={14} />
 									<span>{submitError}</span>
+								</div>
+							</div>
+						)}
+
+						{isAddMode && (
+							<div className="alert alert-info rounded-2xl text-sm">
+								<div className="space-y-1">
+									<div className="font-semibold">Create either a skill or a prompt-like template</div>
+									<div>
+										Use <span className="font-mono">insert: instructions</span> for standing context that can be
+										activated in chat sessions.
+									</div>
+									<div>
+										Use <span className="font-mono">insert: user-message</span> for composer templates. These replace
+										new generic prompt templates and render into user message text.
+									</div>
+									<div>
+										This simplified format intentionally has no prompt versions, role blocks, typed variables, static
+										variables, or model/provider configuration.
+									</div>
 								</div>
 							</div>
 						)}
@@ -765,7 +785,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 												FlexiGPT creates a normal skill folder in the app skill store and registers it as a filesystem
 												skill. Only <span className="font-mono">SKILL.md</span> is created. Add resources, assets, or
 												scripts to the generated folder after saving, then re-enable the skill or restart to refresh
-												runtime metadata.
+												runtime metadata. The saved skill details show the exact folder location.
 											</span>
 										</span>
 									</label>

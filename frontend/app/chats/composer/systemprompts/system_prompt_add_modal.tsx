@@ -14,8 +14,9 @@ import { DEFAULT_SEMVER, suggestNextMinorVersion } from '@/lib/version_utils';
 
 import { Dropdown } from '@/components/dropdown';
 
-import type { SystemPromptDraft, SystemPromptRole } from '@/prompts/lib/use_system_prompts';
+import type { SystemPromptDraft } from '@/prompts/lib/use_system_prompts';
 
+type SystemPromptRole = PromptRoleEnum.System | PromptRoleEnum.Developer;
 interface SystemPromptAddModalProps {
 	isOpen: boolean;
 	mode: 'add' | 'fork';

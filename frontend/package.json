@@ -145,7 +145,10 @@
 			"app/apis/wailsjs/go/main/ModelPresetStoreWrapper.js",
 			"app/spec/inference_capabilities.ts",
 			"app/hooks/use_at_top_bottom.tsx",
-			"app/spec/mcp.ts"
+			"app/spec/mcp.ts",
+			"app/chats/composer/systemprompts/system_prompt_add_modal.tsx",
+			"app/chats/composer/systemprompts/system_prompt_bottom_bar_chip.tsx",
+			"app/chats/composer/systemprompts/use_composer_system_prompt.ts"
 		],
 		"ignoreBinaries": [],
 		"ignoreDependencies": [

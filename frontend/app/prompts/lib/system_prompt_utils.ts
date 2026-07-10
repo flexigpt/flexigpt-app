@@ -58,6 +58,9 @@ export function buildEffectiveSystemPrompt(params: {
 	return concatenateSystemPromptParts(parts);
 }
 
+/**
+ * @public
+ */
 export function countEnabledSystemPromptSources(params: {
 	modelDefaultPrompt: string;
 	includeModelDefault: boolean;
