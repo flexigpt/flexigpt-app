@@ -8,7 +8,8 @@ import { FiAlertCircle, FiFile, FiFilePlus, FiPaperclip, FiX } from 'react-icons
 import type { MenuStore } from '@ariakit/react';
 import { Menu, MenuButton, MenuItem, useStoreState } from '@ariakit/react';
 
-import type { SkillArgument, SkillListItem, SkillRef } from '@/spec/skill';
+import type { SkillArgument, SkillListItem } from '@/spec/skill';
+import { SkillType } from '@/spec/skill';
 
 import { skillStoreAPI } from '@/apis/baseapi';
 
@@ -32,9 +33,7 @@ import { skillRefFromListItem, skillRefKey } from '@/skills/lib/skill_identity_u
 
 interface SkillTemplateInsertArgs {
 	text: string;
-	attachedResourcePaths?: string[];
-	templateRef: SkillRef;
-	templateName: string;
+	attachedSkillPaths?: string[];
 }
 
 interface SkillTemplateGroup {
@@ -60,7 +59,6 @@ interface SkillTemplateRenderModalProps {
 
 interface RenderFormState {
 	arguments: Record<string, string>;
-	attachResources: boolean;
 }
 
 export interface SkillTemplateBottomBarChipProps {
@@ -141,59 +139,20 @@ function getDefaultArgumentValues(args: SkillArgument[]): Record<string, string>
 
 function hasResources(item: SkillListItem | null): boolean {
 	const resources = item?.skillDefinition.resources;
-	return Boolean(resources?.hasResources && resources.totalCount > 0);
+	return resources?.hasResources || (resources?.totalCount ?? 0) > 0;
 }
 
-function normalizeRelativeResourceLocation(location: string): string | null {
-	const raw = location.trim();
-	if (!raw) {
-		return null;
-	}
-
-	const slash = raw.replaceAll('\\', '/');
-	if (slash.startsWith('/') || /^[A-Za-z]:\//.test(slash) || slash.startsWith('//')) {
-		return null;
-	}
-
-	const parts = slash.split('/').filter(Boolean);
-	if (parts.length === 0 || parts.some(part => part === '.' || part === '..')) {
-		return null;
-	}
-
-	return parts.join('/');
-}
-
-function joinSkillResourcePath(skillLocation: string, resourceLocation: string): string | null {
-	const base = skillLocation.trim();
-	const relative = normalizeRelativeResourceLocation(resourceLocation);
-	if (!base || !relative) {
-		return null;
-	}
-
-	const separator = base.includes('\\') && !base.includes('/') ? '\\' : '/';
-	const normalizedRelative = separator === '\\' ? relative.replaceAll('/', '\\') : relative;
-	return `${base.replace(/[\\/]+$/, '')}${separator}${normalizedRelative}`;
-}
-
-function getSafeResourcePaths(item: SkillListItem | null): string[] {
-	if (!item) {
+function getSkillAttachmentPaths(item: SkillListItem | null): string[] {
+	if (!item || !hasResources(item)) {
 		return [];
 	}
 
-	const base = item.skillDefinition.location ?? '';
-	const out: string[] = [];
-	const seen = new Set<string>();
-
-	for (const resourceLocation of item.skillDefinition.resources?.locations ?? []) {
-		const joined = joinSkillResourcePath(base, resourceLocation);
-		if (!joined || seen.has(joined)) {
-			continue;
-		}
-		seen.add(joined);
-		out.push(joined);
+	if (item.skillDefinition.type !== SkillType.FS) {
+		return [];
 	}
 
-	return out;
+	const skillDirectory = item.skillDefinition.location?.trim();
+	return skillDirectory ? [skillDirectory] : [];
 }
 
 async function collectUserMessageSkillTemplates(): Promise<SkillListItem[]> {
@@ -410,10 +369,9 @@ function SkillTemplateDropdown({ store, open, loading, items, onPick }: SkillTem
 
 function SkillTemplateRenderModalContent({ item, onClose, onInsert }: Omit<SkillTemplateRenderModalProps, 'isOpen'>) {
 	const args = useMemo(() => getTemplateArguments(item), [item]);
-	const safeResourcePaths = useMemo(() => getSafeResourcePaths(item), [item]);
+	const skillAttachmentPaths = useMemo(() => getSkillAttachmentPaths(item), [item]);
 	const [formState, setFormState] = useState<RenderFormState>(() => ({
 		arguments: getDefaultArgumentValues(args),
-		attachResources: safeResourcePaths.length > 0,
 	}));
 	const [submitError, setSubmitError] = useState('');
 	const [submitting, setSubmitting] = useState(false);
@@ -456,11 +414,23 @@ function SkillTemplateRenderModalContent({ item, onClose, onInsert }: Omit<Skill
 		onClose();
 	}, [onClose]);
 
+	const missingArgumentNames = args.filter(arg => !(formState.arguments[arg.name] ?? '').trim()).map(arg => arg.name);
+	const resourceAttachmentError =
+		hasResources(item) && skillAttachmentPaths.length === 0
+			? 'This resource-backed template is not a filesystem skill with an attachable directory. It cannot be inserted without losing its referenced files.'
+			: '';
+	const canInsert = missingArgumentNames.length === 0 && !resourceAttachmentError && !submitting;
+
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = event => {
 		event.preventDefault();
 		event.stopPropagation();
 
-		if (!item || submitting) {
+		if (!item || !canInsert) {
+			if (missingArgumentNames.length > 0) {
+				setSubmitError(`Complete all template arguments: ${missingArgumentNames.join(', ')}.`);
+			} else if (resourceAttachmentError) {
+				setSubmitError(resourceAttachmentError);
+			}
 			return;
 		}
 
@@ -475,9 +445,7 @@ function SkillTemplateRenderModalContent({ item, onClose, onInsert }: Omit<Skill
 				}
 				await onInsert({
 					text: rendered.text,
-					attachedResourcePaths: formState.attachResources ? safeResourcePaths : [],
-					templateRef: skillRefFromListItem(item),
-					templateName: getSkillTemplateLabel(item),
+					attachedSkillPaths: skillAttachmentPaths,
 				});
 				requestClose();
 			})
@@ -556,7 +524,12 @@ function SkillTemplateRenderModalContent({ item, onClose, onInsert }: Omit<Skill
 												}}
 												placeholder={arg.default ?? ''}
 												spellCheck="false"
+												required
+												aria-invalid={!(formState.arguments[arg.name] ?? '').trim()}
 											/>
+											{!(formState.arguments[arg.name] ?? '').trim() ? (
+												<div className="text-error mt-1 text-xs">Complete this argument before inserting.</div>
+											) : null}
 										</div>
 									))}
 								</div>
@@ -566,43 +539,34 @@ function SkillTemplateRenderModalContent({ item, onClose, onInsert }: Omit<Skill
 						)}
 
 						{hasResources(item) ? (
-							<div className="border-base-content/10 bg-base-100 rounded-2xl border p-3">
-								<div className="flex items-start gap-3">
-									<input
-										type="checkbox"
-										className="checkbox checkbox-sm mt-1 rounded-sm"
-										checked={formState.attachResources}
-										onChange={event => {
-											setFormState(prev => ({
-												...prev,
-												attachResources: event.target.checked,
-											}));
-										}}
-										disabled={safeResourcePaths.length === 0}
-									/>
-									<div className="min-w-0 flex-1">
-										<div className="font-medium">
-											Attach {resourceCount} resource{resourceCount === 1 ? '' : 's'} as files
-										</div>
-										<div className="text-base-content/70 mt-1 text-xs">
-											Resources are files under the skill folder. They will be attached to this message only, not loaded
-											as active skill-session context.
-										</div>
-										{safeResourcePaths.length > 0 ? (
-											<ul className="mt-2 max-h-32 space-y-1 overflow-auto">
-												{safeResourcePaths.map(path => (
-													<li key={path} className="bg-base-200 rounded-xl px-2 py-1 font-mono text-xs break-all">
-														{path}
-													</li>
-												))}
-											</ul>
-										) : (
-											<div className="text-warning mt-2 text-xs">
-												No safe relative resource paths were available to attach.
-											</div>
-										)}
-									</div>
+							<div
+								className={`border-base-content/10 bg-base-100 rounded-2xl border p-3 ${
+									resourceAttachmentError ? 'border-error/50' : ''
+								}`}
+							>
+								<div className="font-medium">
+									Attach the complete skill folder for {resourceCount} indexed resource
+									{resourceCount === 1 ? '' : 's'}
 								</div>
+								<div className="text-base-content/70 mt-1 text-xs">
+									This template does not enter the skill lifecycle. Its filesystem directory is therefore attached to
+									the user message so SKILL.md, references, assets, and scripts remain available as ordinary
+									attachments.
+								</div>
+
+								{skillAttachmentPaths.length > 0 ? (
+									<ul className="mt-2 max-h-32 space-y-1 overflow-auto">
+										{skillAttachmentPaths.map(path => (
+											<li key={path} className="bg-base-200 rounded-xl px-2 py-1 font-mono text-xs break-all">
+												{path}
+											</li>
+										))}
+									</ul>
+								) : null}
+
+								{resourceAttachmentError ? (
+									<div className="text-error mt-2 text-xs">{resourceAttachmentError}</div>
+								) : null}
 							</div>
 						) : null}
 
@@ -610,8 +574,8 @@ function SkillTemplateRenderModalContent({ item, onClose, onInsert }: Omit<Skill
 							<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
 								Cancel
 							</button>
-							<button type="submit" className="btn btn-primary rounded-xl" disabled={submitting}>
-								{submitting ? 'Rendering…' : 'Insert'}
+							<button type="submit" className="btn btn-primary rounded-xl" disabled={!canInsert}>
+								{submitting ? 'Rendering…' : hasResources(item) ? 'Attach files and insert' : 'Insert'}
 							</button>
 						</div>
 					</form>
@@ -666,8 +630,8 @@ function SkillTemplateBottomBarChipInner({
 
 	const handleInsertRendered = useCallback(
 		async (args: SkillTemplateInsertArgs) => {
-			if (args.attachedResourcePaths?.length) {
-				await onAttachResourcePaths?.(args.attachedResourcePaths);
+			if (args.attachedSkillPaths?.length) {
+				await onAttachResourcePaths?.(args.attachedSkillPaths);
 			}
 			await onInsertTemplateText(args.text);
 			store.hide();

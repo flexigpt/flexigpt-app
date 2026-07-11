@@ -30,6 +30,7 @@ import {
 	useSearchableMenuState,
 } from '@/components/searchmenu/searchable_menu_utils';
 
+import { buildSkillRefKey } from '@/assistantpresets/lib/assistant_preset_utils';
 import type { ComposerSystemPromptController } from '@/chats/composer/skills/use_composer_system_prompt';
 import {
 	getSkillInstructionPromptEligibilityReason,
@@ -70,6 +71,10 @@ function skillListItemKey(item: SkillListItem): string {
 
 function getSkillDisplayLabel(item: SkillListItem): string {
 	return item.skillDefinition.displayName?.trim() || item.skillDefinition.name?.trim() || item.skillSlug;
+}
+
+function getInstructionSourceIdentityKey(item: SkillListItem): string {
+	return `skill-instructions:${buildSkillRefKey(skillRefFromListItem(item))}`;
 }
 
 function compareSkillListItems(a: SkillListItem, b: SkillListItem): number {
@@ -611,25 +616,33 @@ export function SkillsBottomBarChip({
 				throw new Error(`Expected instruction skill, but renderer returned insert=${rendered.insert}.`);
 			}
 
-			systemPrompt.addAndSelectInstructionSkillPrompt({
+			systemPrompt.addAndSelectInstructionSkillSource({
+				identityKey: getInstructionSourceIdentityKey(item),
 				displayName: getSkillDisplayLabel(item),
 				prompt: rendered.text,
 				skillRef: skillRefFromListItem(item),
 			});
-
-			menu.hide();
 		},
-		[menu, systemPrompt]
+		[systemPrompt]
 	);
+
+	const selectedInstructionSourceKeySet = useMemo(
+		() => new Set(systemPrompt.selectedInstructionSourceKeys),
+		[systemPrompt.selectedInstructionSourceKeys]
+	);
+	const selectedInstructionSourceCount =
+		systemPrompt.selectedInstructionSourceKeys.length + (systemPrompt.includeModelDefault ? 1 : 0);
 
 	const title = useMemo(() => {
 		const lines: string[] = [
 			shortcut ? `Instruction skills (${shortcut})` : 'Instruction skills',
 			'Instruction skills can be enabled for this chat or activated as standing session context.',
+			'Simple argumentless resource-free skills can also be independently selected as flattened system instruction sources.',
 			'User-message templates are shown separately in the Templates menu.',
 			'Resource-backed skills can still be enabled or activated, but this menu does not fork or inline-copy their resource context.',
 			isEnabled ? `Status: Enabled (${enabledCount})` : 'Status: Disabled',
 			`Active now: ${activeCount}`,
+			`Flattened instruction sources: ${selectedInstructionSourceCount}`,
 		];
 
 		if (totalCount > 0) {
@@ -639,10 +652,10 @@ export function SkillsBottomBarChip({
 			lines.push('Loading available skills…');
 		}
 		return lines.join('\n');
-	}, [activeCount, enabledCount, isEnabled, loading, shortcut, totalCount]);
+	}, [activeCount, enabledCount, isEnabled, loading, selectedInstructionSourceCount, shortcut, totalCount]);
 
 	const chipToneClasses =
-		enabledCount > 0
+		enabledCount > 0 || selectedInstructionSourceCount > 0
 			? 'border-secondary/50 bg-secondary/10 hover:bg-secondary/15'
 			: open
 				? 'border-base-300 bg-base-300/60'
@@ -691,6 +704,11 @@ export function SkillsBottomBarChip({
 		const canUseAsSystemPrompt = isInstruction && skillCanBeRenderedAsInstructionPrompt(item.skillDefinition);
 		const instructionPromptReason = getSkillInstructionPromptEligibilityReason(item.skillDefinition);
 		const canPreloadActive = isInstruction && skillCanBePreloadedAsActive(item.skillDefinition);
+		const instructionSourceKey = getInstructionSourceIdentityKey(item);
+		const instructionSourceKnown = systemPrompt.instructionSources.some(
+			source => source.identityKey === instructionSourceKey
+		);
+		const instructionSourceSelected = selectedInstructionSourceKeySet.has(instructionSourceKey);
 
 		return (
 			<MenuItem
@@ -735,6 +753,9 @@ export function SkillsBottomBarChip({
 							<span className="badge badge-ghost badge-xs" title="Can be copied or forked as plain instructions.">
 								simple
 							</span>
+						) : null}
+						{instructionSourceSelected ? (
+							<span className="badge badge-secondary badge-xs">System instructions</span>
 						) : null}
 						<span className="badge badge-ghost badge-xs">{item.isBuiltIn ? 'built-in' : 'custom'}</span>
 						{!item.skillDefinition.isEnabled ? <span className="badge badge-warning badge-xs">Disabled</span> : null}
@@ -822,17 +843,27 @@ export function SkillsBottomBarChip({
 							disabled={isInputLocked || !canUseAsSystemPrompt}
 							title={
 								canUseAsSystemPrompt
-									? 'Render this simple instruction skill and add it to the system instruction prompt. This does not enable or activate the skill session.'
+									? instructionSourceSelected
+										? 'Remove this skill from the flattened system instructions.'
+										: 'Select this simple skill as a flattened system instruction source. This does not enable or activate the skill session.'
 									: instructionPromptReason
 							}
 							onClick={() => {
 								if (!canUseAsSystemPrompt) {
 									return;
 								}
+								if (instructionSourceKnown) {
+									systemPrompt.toggleInstructionSource(instructionSourceKey);
+									return;
+								}
 								void addSkillAsSystemInstructions(item, {});
 							}}
 						>
-							Add as instructions
+							{instructionSourceSelected
+								? 'Remove from instructions'
+								: instructionSourceKnown
+									? 'Select as instructions'
+									: 'Add as instructions'}
 						</button>
 					) : null}
 
@@ -924,6 +955,62 @@ export function SkillsBottomBarChip({
 					</div>
 				</div>
 
+				<div className="border-base-300 bg-base-100 mb-2 rounded-xl border p-2">
+					<div className="mb-2 flex items-center justify-between gap-2">
+						<div className="text-xs font-semibold">System instruction sources</div>
+						<button
+							type="button"
+							className="btn btn-ghost btn-xs rounded-lg"
+							disabled={isInputLocked || selectedInstructionSourceCount === 0}
+							onClick={() => {
+								systemPrompt.clearInstructionSources();
+							}}
+						>
+							Clear selected
+						</button>
+					</div>
+
+					<div className="space-y-1">
+						{systemPrompt.modelDefaultPrompt.trim() ? (
+							<label className="flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1">
+								<span className="truncate text-xs">Model default instructions</span>
+								<input
+									type="checkbox"
+									className="checkbox checkbox-xs"
+									checked={systemPrompt.includeModelDefault}
+									disabled={isInputLocked}
+									onChange={event => {
+										systemPrompt.setIncludeModelDefault(event.target.checked);
+									}}
+								/>
+							</label>
+						) : null}
+
+						{systemPrompt.instructionSources.map(source => (
+							<label
+								key={source.identityKey}
+								className="flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1"
+								title={source.text}
+							>
+								<span className="min-w-0 truncate text-xs">{source.displayName}</span>
+								<input
+									type="checkbox"
+									className="checkbox checkbox-xs"
+									checked={selectedInstructionSourceKeySet.has(source.identityKey)}
+									disabled={isInputLocked}
+									onChange={() => {
+										systemPrompt.toggleInstructionSource(source.identityKey);
+									}}
+								/>
+							</label>
+						))}
+
+						{!systemPrompt.modelDefaultPrompt.trim() && systemPrompt.instructionSources.length === 0 ? (
+							<div className="text-base-content/60 px-2 py-1 text-xs">No instruction sources selected.</div>
+						) : null}
+					</div>
+				</div>
+
 				<SearchableMenuInput
 					open={open}
 					query={searchQuery}
@@ -945,7 +1032,7 @@ export function SkillsBottomBarChip({
 					}}
 				/>
 
-				{!loading && totalCount > 0 ? (
+				{!loading ? (
 					<div className="border-base-300 mb-2 flex flex-wrap items-center justify-between gap-2 border-b px-1 pb-2">
 						<button
 							type="button"
@@ -958,35 +1045,37 @@ export function SkillsBottomBarChip({
 							<span className="ml-1">Add new instruction skill</span>
 						</button>
 
-						<div className="flex gap-2">
-							<button
-								type="button"
-								className="btn btn-xs rounded-lg"
-								disabled={isInputLocked || totalCount === 0 || enabledCount === totalCount}
-								onClick={e => {
-									stop(e);
-									onEnableAll();
-								}}
-								title="Enable all instruction skills"
-							>
-								Enable all
-							</button>
+						{totalCount > 0 ? (
+							<div className="flex gap-2">
+								<button
+									type="button"
+									className="btn btn-xs rounded-lg"
+									disabled={isInputLocked || totalCount === 0 || enabledCount === totalCount}
+									onClick={e => {
+										stop(e);
+										onEnableAll();
+									}}
+									title="Enable all instruction skills"
+								>
+									Enable all
+								</button>
 
-							<button
-								type="button"
-								className="btn btn-xs rounded-lg"
-								disabled={isInputLocked || enabledCount === 0}
-								onClick={e => {
-									stop(e);
-									onDisableAll();
-									menu.hide();
-								}}
-								title="Disable all selected instruction skills and remove active skill session instructions."
-							>
-								<FiX size={12} />
-								<span className="ml-1">Clear all</span>
-							</button>
-						</div>
+								<button
+									type="button"
+									className="btn btn-xs rounded-lg"
+									disabled={isInputLocked || enabledCount === 0}
+									onClick={e => {
+										stop(e);
+										onDisableAll();
+										menu.hide();
+									}}
+									title="Disable all selected instruction skills and remove active skill session instructions."
+								>
+									<FiX size={12} />
+									<span className="ml-1">Clear all</span>
+								</button>
+							</div>
+						) : null}
 					</div>
 				) : null}
 

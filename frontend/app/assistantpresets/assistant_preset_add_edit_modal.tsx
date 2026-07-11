@@ -1157,6 +1157,12 @@ function AddEditAssistantPresetModalContent({
 				const ref = sel.skillRef;
 				const key = buildSkillRefKey(ref);
 				const option = skillOptionByKey.get(key);
+				const useAsInstructionsDisabledReason = option
+					? getSkillInstructionPromptEligibilityReason(option.skillDefinition)
+					: 'The referenced skill is unavailable.';
+				const preLoadAsActiveDisabledReason = option
+					? getSkillPreloadEligibilityReason(option.skillDefinition)
+					: 'The referenced skill is unavailable.';
 
 				return {
 					key,
@@ -1171,6 +1177,10 @@ function AddEditAssistantPresetModalContent({
 						: 'Missing reference',
 					preLoadAsActive: sel.preLoadAsActive,
 					useAsInstructions: sel.useAsInstructions,
+					canUseAsInstructions: Boolean(option) && !useAsInstructionsDisabledReason,
+					useAsInstructionsDisabledReason,
+					canPreLoadAsActive: Boolean(option) && !preLoadAsActiveDisabledReason,
+					preLoadAsActiveDisabledReason,
 				};
 			}),
 		[formData.startingSkillSelections, skillOptionByKey]

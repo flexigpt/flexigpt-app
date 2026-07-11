@@ -54,7 +54,7 @@ export function getSkillInsertBadgeClass(insert?: string | null): string {
 
 export function getSkillInsertLongGuidance(insert?: string | null): string {
 	return normalizeSkillInsert(insert).value === 'user-message'
-		? 'Use this when the skill is a prompt-like template. The rendered text is inserted into a user message or composer draft. It is not loaded as persistent session context.'
+		? 'Use this when the skill is a prompt-like template. The rendered text is inserted into a user message or composer draft. Resource-backed filesystem templates also attach their skill files to that message. They are not loaded as persistent session context.'
 		: 'Use this when the skill is standing instruction or context. It can be enabled for a conversation and loaded as an active session skill.';
 }
 
@@ -74,7 +74,7 @@ export function getSkillResourceTooltip(resources?: SkillResourceInfo | null): s
 	const lines = [
 		`${resources.totalCount} resource${resources.totalCount === 1 ? '' : 's'} reported by the runtime.`,
 		'Resources are files inside the skill directory, such as references, assets, or scripts.',
-		'They are not executed or inserted automatically by the management UI.',
+		'User-message template insertion attaches the filesystem skill directory; instruction skills access resources through the skill lifecycle.',
 	];
 
 	for (const location of resources.locations ?? []) {
@@ -89,15 +89,11 @@ export function getSkillResourceTooltip(resources?: SkillResourceInfo | null): s
 }
 
 export function skillHasResources(skill: Pick<Skill, 'resources'>): boolean {
-	return skill.resources?.hasResources && skill.resources.totalCount > 0;
+	return skill.resources?.hasResources || (skill.resources?.totalCount !== undefined && skill.resources.totalCount > 0);
 }
 
 function skillArgumentCount(skill: Pick<Skill, 'arguments'>): number {
 	return skill.arguments?.length ?? 0;
-}
-
-function skillResourceCount(skill: Pick<Skill, 'resources'>): number {
-	return skill.resources?.hasResources ? skill.resources.totalCount : 0;
 }
 
 export function isInstructionInsertSkill(skill: Pick<Skill, 'insert'>): boolean {
@@ -107,7 +103,7 @@ export function isInstructionInsertSkill(skill: Pick<Skill, 'insert'>): boolean 
 export function skillCanBeRenderedAsInstructionPrompt(
 	skill: Pick<Skill, 'insert' | 'arguments' | 'resources'>
 ): boolean {
-	return isInstructionInsertSkill(skill) && skillArgumentCount(skill) === 0 && skillResourceCount(skill) === 0;
+	return isInstructionInsertSkill(skill) && skillArgumentCount(skill) === 0 && !skillHasResources(skill);
 }
 
 export function skillCanBePreloadedAsActive(skill: Pick<Skill, 'insert' | 'arguments'>): boolean {
@@ -121,7 +117,7 @@ export function getSkillInstructionPromptEligibilityReason(
 		return 'Only instruction skills can be used as system instructions.';
 	}
 
-	if (skillResourceCount(skill) > 0) {
+	if (skillHasResources(skill)) {
 		return 'Resource-backed skills cannot be converted into system prompt text. Enable or activate the skill session instead; the model can read resources through skill tools.';
 	}
 

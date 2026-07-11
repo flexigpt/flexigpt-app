@@ -30,6 +30,7 @@ interface UseComposerSkillsResult {
 	skillSessionID: string | null;
 	setEnabledSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
 	setActiveSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
+	setActiveSkillRefsFromSession: Dispatch<SetStateAction<SkillRef[]>>;
 	enableAllSkills: () => void;
 	disableAllSkills: () => void;
 	refreshSkills: () => Promise<void>;
@@ -270,6 +271,17 @@ export function useComposerSkills(): UseComposerSkillsResult {
 			const prevActive = activeSkillRefsRef.current;
 			const nextActive = resolveStateUpdate(update, prevActive);
 			void applySkillSelectionState(enabledSkillRefsRef.current, nextActive, {
+				syncSession: 'if-session-exists',
+			});
+		},
+		[applySkillSelectionState]
+	);
+
+	const setActiveSkillRefsFromSession = useCallback<Dispatch<SetStateAction<SkillRef[]>>>(
+		update => {
+			const prevActive = activeSkillRefsRef.current;
+			const nextActive = resolveStateUpdate(update, prevActive);
+			void applySkillSelectionState(enabledSkillRefsRef.current, nextActive, {
 				syncSession: 'none',
 			});
 		},
@@ -485,6 +497,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		skillSessionID,
 		setEnabledSkillRefs,
 		setActiveSkillRefs,
+		setActiveSkillRefsFromSession,
 		enableAllSkills,
 		disableAllSkills,
 		refreshSkills,

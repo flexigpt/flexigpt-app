@@ -81,9 +81,9 @@ export function useAssistantPresetManager(args: {
 	} = context;
 	const {
 		includeModelDefault,
-		selectedPromptKeys,
-		prepareAssistantPresetSelections,
-		applyPreparedAssistantPresetSelections,
+		selectedInstructionSourceKeys,
+		prepareAssistantPresetInstructionSources,
+		applyPreparedAssistantPresetInstructionSources,
 	} = systemPrompt;
 
 	const [selectionState, setSelectionState] = useState<AssistantPresetSelectionState>({
@@ -160,10 +160,10 @@ export function useAssistantPresetManager(args: {
 			preparedApplication: appliedPresetApplication,
 			currentSelectedModel: selectedModel,
 			currentIncludeModelSystemPrompt: includeModelDefault,
-			currentSelectedPromptKeys: selectedPromptKeys,
+			currentSelectedInstructionSourceKeys: selectedInstructionSourceKeys,
 			currentRuntimeSnapshot: runtimeSnapshot,
 		});
-	}, [appliedPresetApplication, includeModelDefault, runtimeSnapshot, selectedModel, selectedPromptKeys]);
+	}, [appliedPresetApplication, includeModelDefault, runtimeSnapshot, selectedInstructionSourceKeys, selectedModel]);
 
 	const buildPreparedApplication = useCallback(
 		async (presetKey: string): Promise<AssistantPresetPreparedApplication | null> => {
@@ -172,7 +172,7 @@ export function useAssistantPresetManager(args: {
 				return null;
 			}
 
-			const preparedSystemPromptSelections = await prepareAssistantPresetSelections(basePrepared.preset);
+			const preparedSystemPromptSelections = await prepareAssistantPresetInstructionSources(basePrepared.preset);
 
 			const normalizedPresetMCPContext = normalizeAssistantPresetMCPContext(basePrepared.preset.startingMCPContext);
 			const runtimeSelections = {
@@ -189,8 +189,9 @@ export function useAssistantPresetManager(args: {
 				runtimeSelections,
 				hasIncludeModelSystemPromptSelection: preparedSystemPromptSelections.hasIncludeModelSystemPromptSelection,
 				nextIncludeModelSystemPrompt: preparedSystemPromptSelections.nextIncludeModelSystemPrompt,
-				hasInstructionTemplateSelection: preparedSystemPromptSelections.hasInstructionTemplateSelection,
-				nextSelectedPromptKeys: preparedSystemPromptSelections.nextSelectedPromptKeys,
+				hasInstructionSourceSelection: preparedSystemPromptSelections.hasInstructionSourceSelection,
+				nextSelectedInstructionSourceKeys: preparedSystemPromptSelections.nextSelectedInstructionSourceKeys,
+				preparedInstructionSources: preparedSystemPromptSelections.preparedInstructionSources,
 				comparisonState: {
 					...basePrepared.comparisonState,
 					model: buildAssistantPresetModelComparisonState(
@@ -198,14 +199,14 @@ export function useAssistantPresetManager(args: {
 						basePrepared.nextSelectedModel,
 						preparedSystemPromptSelections.nextIncludeModelSystemPrompt
 					),
-					instructions: preparedSystemPromptSelections.hasInstructionTemplateSelection
-						? [...preparedSystemPromptSelections.nextSelectedPromptKeys]
+					instructions: preparedSystemPromptSelections.hasInstructionSourceSelection
+						? [...preparedSystemPromptSelections.nextSelectedInstructionSourceKeys]
 						: undefined,
 					mcp: comparisonMCPContext,
 				},
 			};
 		},
-		[prepareAssistantPresetApplication, prepareAssistantPresetSelections]
+		[prepareAssistantPresetApplication, prepareAssistantPresetInstructionSources]
 	);
 
 	const applyPresetByKey = useCallback(
@@ -225,7 +226,7 @@ export function useAssistantPresetManager(args: {
 				}
 
 				applyPreparedAssistantPreset(prepared);
-				applyPreparedAssistantPresetSelections(prepared);
+				applyPreparedAssistantPresetInstructionSources(prepared);
 				applyRuntimeSelections(prepared);
 
 				setSelectionState({
@@ -250,7 +251,7 @@ export function useAssistantPresetManager(args: {
 		},
 		[
 			applyPreparedAssistantPreset,
-			applyPreparedAssistantPresetSelections,
+			applyPreparedAssistantPresetInstructionSources,
 			applyRuntimeSelections,
 			buildPreparedApplication,
 			clearSelectionActionError,

@@ -11,18 +11,19 @@ import { skillStoreAPI } from '@/apis/baseapi';
 import { loadSkillOptions } from '@/assistantpresets/lib/assistant_preset_catalog';
 import { buildSkillRefKey } from '@/assistantpresets/lib/assistant_preset_utils';
 import type { AssistantPresetPreparedApplication } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
-import type { SystemPromptItem } from '@/chats/composer/skills/prompt_utils';
-import { buildEffectiveSystemPrompt, PromptRoleEnum } from '@/chats/composer/skills/prompt_utils';
+import type { SystemInstructionSource } from '@/chats/composer/skills/prompt_utils';
+import { buildEffectiveSystemPrompt } from '@/chats/composer/skills/prompt_utils';
 import { getSkillInstructionPromptEligibilityReason } from '@/skills/lib/skill_artifact_utils';
 
 interface ComposerSystemPromptPreparedSelection {
 	hasIncludeModelSystemPromptSelection: boolean;
 	nextIncludeModelSystemPrompt: boolean;
-	hasInstructionTemplateSelection: boolean;
-	nextSelectedPromptKeys: string[];
+	hasInstructionSourceSelection: boolean;
+	nextSelectedInstructionSourceKeys: string[];
+	preparedInstructionSources: SystemInstructionSource[];
 }
 
-interface RenderedInstructionSkillPrompt {
+interface RenderedInstructionSkillSource {
 	identityKey?: string;
 	displayName: string;
 	prompt: string;
@@ -31,60 +32,57 @@ interface RenderedInstructionSkillPrompt {
 
 export interface ComposerSystemPromptController {
 	modelDefaultPrompt: string;
-	prompts: SystemPromptItem[];
+	instructionSources: SystemInstructionSource[];
 	includeModelDefault: boolean;
-	selectedPromptKeys: string[];
+	selectedInstructionSourceKeys: string[];
 	resolvedSystemPrompt: string;
 	setIncludeModelDefault: (next: boolean) => void;
-	togglePromptSelection: (identityKey: string) => void;
-	addAndSelectInstructionSkillPrompt: (draft: RenderedInstructionSkillPrompt) => void;
-	clearSelectedPromptSources: () => void;
+	toggleInstructionSource: (identityKey: string) => void;
+	addAndSelectInstructionSkillSource: (draft: RenderedInstructionSkillSource) => void;
+	clearInstructionSources: () => void;
 	resetForNewConversation: (modelDefaultPrompt: string) => void;
 	restoreConversationContext: (modelDefaultPrompt: string, modelParam?: ModelParam) => void;
-	prepareAssistantPresetSelections: (preset: AssistantPreset) => Promise<ComposerSystemPromptPreparedSelection>;
-	applyPreparedAssistantPresetSelections: (
+	prepareAssistantPresetInstructionSources: (preset: AssistantPreset) => Promise<ComposerSystemPromptPreparedSelection>;
+	applyPreparedAssistantPresetInstructionSources: (
 		prepared: Pick<
 			AssistantPresetPreparedApplication,
 			| 'hasIncludeModelSystemPromptSelection'
 			| 'nextIncludeModelSystemPrompt'
-			| 'hasInstructionTemplateSelection'
-			| 'nextSelectedPromptKeys'
+			| 'hasInstructionSourceSelection'
+			| 'nextSelectedInstructionSourceKeys'
+			| 'preparedInstructionSources'
 		>
 	) => void;
 }
 
-function buildPreviousConversationSystemPromptItem(prompt: string): SystemPromptItem {
+function buildPreviousConversationSystemPromptItem(prompt: string): SystemInstructionSource {
 	return {
 		identityKey: PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY,
+		sourceKind: 'restored-conversation',
 		bundleID: PREVIOUS_CONVO_SYSTEM_PROMPT_BUNDLEID,
 		bundleDisplayName: 'Conversation',
+		bundleSlug: 'conversation',
 		displayName: 'Previous conversation prompt',
-		templateSlug: 'previous-conversation-prompt',
-		templateVersion: 'persisted',
-		role: PromptRoleEnum.System,
-		prompt,
+		sourceSlug: 'previous-conversation-prompt',
+		text: prompt,
 		isBuiltIn: true,
-	} as SystemPromptItem;
+	};
 }
 
-function buildInstructionSkillPromptItem(draft: RenderedInstructionSkillPrompt): SystemPromptItem {
-	const now = new Date().toISOString();
+function buildInstructionSkillPromptItem(draft: RenderedInstructionSkillSource): SystemInstructionSource {
 	const stableKey = `skill-instructions:${buildSkillRefKey(draft.skillRef)}`;
 
 	return {
 		identityKey: draft.identityKey ?? stableKey,
+		sourceKind: 'skill',
 		bundleID: draft.skillRef.bundleID,
 		bundleDisplayName: 'Skill instructions',
 		bundleSlug: draft.skillRef.bundleID,
 		displayName: draft.displayName,
-		templateSlug: draft.skillRef.skillSlug,
-		templateVersion: 'skill',
-		role: PromptRoleEnum.System,
-		prompt: draft.prompt,
+		sourceSlug: draft.skillRef.skillSlug,
+		text: draft.prompt,
 		isBuiltIn: false,
-		createdAt: now,
-		modifiedAt: now,
-	} as SystemPromptItem;
+	};
 }
 
 function deriveRestoredPromptSelectionState(
@@ -93,13 +91,13 @@ function deriveRestoredPromptSelectionState(
 ): {
 	restoredConversationSystemPrompt: string | null;
 	includeModelDefault: boolean;
-	selectedPromptKeys: string[];
+	selectedInstructionSourceKeys: string[];
 } {
 	if (!modelParam) {
 		return {
 			restoredConversationSystemPrompt: null,
 			includeModelDefault: Boolean(modelDefaultPrompt.trim()),
-			selectedPromptKeys: [],
+			selectedInstructionSourceKeys: [],
 		};
 	}
 
@@ -108,14 +106,14 @@ function deriveRestoredPromptSelectionState(
 		return {
 			restoredConversationSystemPrompt: restoredSystemPrompt,
 			includeModelDefault: false,
-			selectedPromptKeys: [PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY],
+			selectedInstructionSourceKeys: [PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY],
 		};
 	}
 
 	return {
 		restoredConversationSystemPrompt: null,
 		includeModelDefault: false,
-		selectedPromptKeys: [],
+		selectedInstructionSourceKeys: [],
 	};
 }
 
@@ -125,12 +123,13 @@ export function useComposerSystemPrompt(args: {
 }): ComposerSystemPromptController {
 	const { modelDefaultPrompt, modelOptionsLoaded } = args;
 
-	const [rawSelectedPromptKeys, setRawSelectedPromptKeys] = useState<string[]>([]);
+	const [rawSelectedInstructionSourceKeys, setRawSelectedInstructionSourceKeys] = useState<string[]>([]);
 	const [includeModelDefault, setIncludeModelDefaultState] = useState(false);
 	const [restoredConversationSystemPrompt, setRestoredConversationSystemPrompt] = useState<string | null>(null);
 	const [initializedFromModel, setInitializedFromModelState] = useState(false);
-	const [skillInstructionPrompts, setSkillInstructionPrompts] = useState<SystemPromptItem[]>([]);
+	const [skillInstructionSources, setSkillInstructionSources] = useState<SystemInstructionSource[]>([]);
 	const initializedFromModelRef = useRef(initializedFromModel);
+	const restoreModelDefaultWhenReadyRef = useRef(false);
 
 	useEffect(() => {
 		initializedFromModelRef.current = initializedFromModel;
@@ -150,35 +149,49 @@ export function useComposerSystemPrompt(args: {
 		setIncludeModelDefaultState(Boolean(modelDefaultPrompt.trim()));
 	}, [modelOptionsLoaded, modelDefaultPrompt]);
 
+	const includeModelDefaultRef = useRef(includeModelDefault);
+
+	useEffect(() => {
+		if (!modelOptionsLoaded || !restoreModelDefaultWhenReadyRef.current) {
+			return;
+		}
+		restoreModelDefaultWhenReadyRef.current = false;
+		includeModelDefaultRef.current = Boolean(modelDefaultPrompt.trim());
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
+		setIncludeModelDefaultState(Boolean(modelDefaultPrompt.trim()));
+	}, [modelDefaultPrompt, modelOptionsLoaded]);
+
 	const syntheticPreviousConversationPrompt = useMemo(() => {
 		const prompt = restoredConversationSystemPrompt?.trim();
 		return prompt ? buildPreviousConversationSystemPromptItem(prompt) : null;
 	}, [restoredConversationSystemPrompt]);
 
-	const prompts = useMemo(
+	const instructionSources = useMemo(
 		() =>
 			syntheticPreviousConversationPrompt
-				? [syntheticPreviousConversationPrompt, ...skillInstructionPrompts]
-				: [...skillInstructionPrompts],
-		[skillInstructionPrompts, syntheticPreviousConversationPrompt]
+				? [syntheticPreviousConversationPrompt, ...skillInstructionSources]
+				: [...skillInstructionSources],
+		[skillInstructionSources, syntheticPreviousConversationPrompt]
 	);
 
-	const promptsByKey = useMemo(() => new Map(prompts.map(item => [item.identityKey, item])), [prompts]);
-
-	const selectedPromptKeys = useMemo(
-		() => rawSelectedPromptKeys.filter(key => promptsByKey.has(key)),
-		[promptsByKey, rawSelectedPromptKeys]
+	const instructionSourcesByKey = useMemo(
+		() => new Map(instructionSources.map(item => [item.identityKey, item])),
+		[instructionSources]
 	);
 
-	const includeModelDefaultRef = useRef(includeModelDefault);
+	const selectedInstructionSourceKeys = useMemo(
+		() => rawSelectedInstructionSourceKeys.filter(key => instructionSourcesByKey.has(key)),
+		[instructionSourcesByKey, rawSelectedInstructionSourceKeys]
+	);
+
 	useEffect(() => {
 		includeModelDefaultRef.current = includeModelDefault;
 	}, [includeModelDefault]);
 
-	const selectedPromptKeysRef = useRef(selectedPromptKeys);
+	const selectedInstructionSourceKeysRef = useRef(selectedInstructionSourceKeys);
 	useEffect(() => {
-		selectedPromptKeysRef.current = selectedPromptKeys;
-	}, [selectedPromptKeys]);
+		selectedInstructionSourceKeysRef.current = selectedInstructionSourceKeys;
+	}, [selectedInstructionSourceKeys]);
 
 	const setPromptSelectionState = useCallback(
 		(
@@ -190,9 +203,9 @@ export function useComposerSystemPrompt(args: {
 			includeModelDefaultRef.current = nextIncludeModelDefault;
 			setIncludeModelDefaultState(nextIncludeModelDefault);
 
-			const nextKeys = [...nextSelectedPromptKeys];
-			selectedPromptKeysRef.current = nextKeys;
-			setRawSelectedPromptKeys(nextKeys);
+			const nextKeys = dedupeStringArray(nextSelectedPromptKeys);
+			selectedInstructionSourceKeysRef.current = nextKeys;
+			setRawSelectedInstructionSourceKeys(nextKeys);
 		},
 		[]
 	);
@@ -202,10 +215,10 @@ export function useComposerSystemPrompt(args: {
 			buildEffectiveSystemPrompt({
 				modelDefaultPrompt,
 				includeModelDefault,
-				selectedPromptKeys,
-				promptsByKey,
+				selectedInstructionSourceKeys,
+				instructionSourcesByKey,
 			}),
-		[includeModelDefault, modelDefaultPrompt, promptsByKey, selectedPromptKeys]
+		[includeModelDefault, instructionSourcesByKey, modelDefaultPrompt, selectedInstructionSourceKeys]
 	);
 
 	const setIncludeModelDefault = useCallback((next: boolean) => {
@@ -213,35 +226,41 @@ export function useComposerSystemPrompt(args: {
 		setIncludeModelDefaultState(next);
 	}, []);
 
-	const togglePromptSelection = useCallback((identityKey: string) => {
-		setRawSelectedPromptKeys(prev => {
+	const toggleInstructionSource = useCallback((identityKey: string) => {
+		setRawSelectedInstructionSourceKeys(prev => {
 			const next = prev.includes(identityKey) ? prev.filter(item => item !== identityKey) : [...prev, identityKey];
-			selectedPromptKeysRef.current = next;
+			selectedInstructionSourceKeysRef.current = next;
 			return next;
 		});
 	}, []);
 
-	const addAndSelectInstructionSkillPrompt = useCallback((draft: RenderedInstructionSkillPrompt) => {
-		const item = buildInstructionSkillPromptItem({
-			...draft,
-			identityKey: draft.identityKey ?? `skill-instructions:${buildSkillRefKey(draft.skillRef)}:${Date.now()}`,
-		});
+	const addAndSelectInstructionSkillSource = useCallback((draft: RenderedInstructionSkillSource) => {
+		const item = buildInstructionSkillPromptItem(draft);
 
-		setSkillInstructionPrompts(prev => [...prev.filter(existing => existing.identityKey !== item.identityKey), item]);
-		setRawSelectedPromptKeys(prev => {
-			const next = prev.includes(item.identityKey) ? prev : [...prev, item.identityKey];
-			selectedPromptKeysRef.current = next;
+		setSkillInstructionSources(prev => {
+			const byKey = new Map(prev.map(existing => [existing.identityKey, existing] as const));
+			// oxlint-disable-next-line unicorn/no-immediate-mutation
+			byKey.set(item.identityKey, item);
+			return [...byKey.values()];
+		});
+		setRawSelectedInstructionSourceKeys(prev => {
+			const next = dedupeStringArray([...prev, item.identityKey]);
+			selectedInstructionSourceKeysRef.current = next;
 			return next;
 		});
 	}, []);
 
-	const clearSelectedPromptSources = useCallback(() => {
+	const clearInstructionSources = useCallback(() => {
+		restoreModelDefaultWhenReadyRef.current = false;
+		setSkillInstructionSources([]);
 		setPromptSelectionState(null, false, []);
 	}, [setPromptSelectionState]);
 
 	const resetForNewConversation = useCallback(
 		(nextModelDefaultPrompt: string) => {
 			initializedFromModelRef.current = true;
+			restoreModelDefaultWhenReadyRef.current = false;
+			setSkillInstructionSources([]);
 			setPromptSelectionState(null, Boolean(nextModelDefaultPrompt.trim()), []);
 		},
 		[setPromptSelectionState]
@@ -250,22 +269,19 @@ export function useComposerSystemPrompt(args: {
 	const restoreConversationContext = useCallback(
 		(nextModelDefaultPrompt: string, modelParam?: ModelParam) => {
 			initializedFromModelRef.current = true;
+			restoreModelDefaultWhenReadyRef.current = !modelParam && !nextModelDefaultPrompt.trim() && !modelOptionsLoaded;
+			setSkillInstructionSources([]);
 			const restoredPromptState = deriveRestoredPromptSelectionState(nextModelDefaultPrompt, modelParam);
 			setPromptSelectionState(
 				restoredPromptState.restoredConversationSystemPrompt,
 				restoredPromptState.includeModelDefault,
-				restoredPromptState.selectedPromptKeys
+				restoredPromptState.selectedInstructionSourceKeys
 			);
 		},
-		[setPromptSelectionState]
+		[modelOptionsLoaded, setPromptSelectionState]
 	);
 
-	const promptsByKeyRef = useRef(promptsByKey);
-	useEffect(() => {
-		promptsByKeyRef.current = promptsByKey;
-	}, [promptsByKey]);
-
-	const prepareAssistantPresetSelections = useCallback(
+	const prepareAssistantPresetInstructionSources = useCallback(
 		async (preset: AssistantPreset): Promise<ComposerSystemPromptPreparedSelection> => {
 			const hasIncludeModelSystemPromptSelection = preset.startingIncludeModelSystemPrompt !== undefined;
 			const nextIncludeModelSystemPrompt = hasIncludeModelSystemPromptSelection
@@ -273,17 +289,17 @@ export function useComposerSystemPrompt(args: {
 				: includeModelDefaultRef.current;
 
 			const instructionSkillSelections = (preset.startingSkillSelections ?? []).filter(sel => sel.useAsInstructions);
-			const hasInstructionTemplateSelection = instructionSkillSelections.length > 0;
-			let nextSelectedPromptKeys = selectedPromptKeysRef.current;
+			const hasInstructionSourceSelection = instructionSkillSelections.length > 0;
+			let nextSelectedInstructionSourceKeys = selectedInstructionSourceKeysRef.current;
+			const preparedInstructionSources: SystemInstructionSource[] = [];
 
-			if (hasInstructionTemplateSelection) {
+			if (hasInstructionSourceSelection) {
 				const requestedPromptKeys = dedupeStringArray(
 					instructionSkillSelections.map(sel => `skill-instructions:${buildSkillRefKey(sel.skillRef)}`)
 				);
 
 				const skillOptions = await loadSkillOptions();
 				const skillOptionByKey = new Map(skillOptions.map(item => [item.key, item] as const));
-				const renderedPromptItems: SystemPromptItem[] = [];
 
 				for (const selection of instructionSkillSelections) {
 					const skillKey = buildSkillRefKey(selection.skillRef);
@@ -308,7 +324,7 @@ export function useComposerSystemPrompt(args: {
 						throw new Error(`Skill "${option.skillDefinition.slug}" did not render as instruction text.`);
 					}
 
-					renderedPromptItems.push(
+					preparedInstructionSources.push(
 						buildInstructionSkillPromptItem({
 							identityKey: `skill-instructions:${skillKey}`,
 							displayName:
@@ -318,35 +334,29 @@ export function useComposerSystemPrompt(args: {
 						})
 					);
 				}
-
-				setSkillInstructionPrompts(prev => {
-					const byKey = new Map(prev.map(item => [item.identityKey, item] as const));
-					for (const item of renderedPromptItems) {
-						byKey.set(item.identityKey, item);
-					}
-					return [...byKey.values()];
-				});
-				nextSelectedPromptKeys = requestedPromptKeys;
+				nextSelectedInstructionSourceKeys = requestedPromptKeys;
 			}
 
 			return {
 				hasIncludeModelSystemPromptSelection,
 				nextIncludeModelSystemPrompt,
-				hasInstructionTemplateSelection,
-				nextSelectedPromptKeys,
+				hasInstructionSourceSelection,
+				nextSelectedInstructionSourceKeys,
+				preparedInstructionSources,
 			};
 		},
 		[]
 	);
 
-	const applyPreparedAssistantPresetSelections = useCallback(
+	const applyPreparedAssistantPresetInstructionSources = useCallback(
 		(
 			prepared: Pick<
 				AssistantPresetPreparedApplication,
 				| 'hasIncludeModelSystemPromptSelection'
 				| 'nextIncludeModelSystemPrompt'
-				| 'hasInstructionTemplateSelection'
-				| 'nextSelectedPromptKeys'
+				| 'hasInstructionSourceSelection'
+				| 'nextSelectedInstructionSourceKeys'
+				| 'preparedInstructionSources'
 			>
 		) => {
 			if (prepared.hasIncludeModelSystemPromptSelection) {
@@ -354,9 +364,16 @@ export function useComposerSystemPrompt(args: {
 				setIncludeModelDefaultState(prepared.nextIncludeModelSystemPrompt);
 			}
 
-			if (prepared.hasInstructionTemplateSelection) {
-				selectedPromptKeysRef.current = [...prepared.nextSelectedPromptKeys];
-				setRawSelectedPromptKeys(prepared.nextSelectedPromptKeys);
+			if (prepared.hasInstructionSourceSelection) {
+				setSkillInstructionSources(prev => {
+					const byKey = new Map(prev.map(item => [item.identityKey, item] as const));
+					for (const item of prepared.preparedInstructionSources) {
+						byKey.set(item.identityKey, item);
+					}
+					return [...byKey.values()];
+				});
+				selectedInstructionSourceKeysRef.current = [...prepared.nextSelectedInstructionSourceKeys];
+				setRawSelectedInstructionSourceKeys(prepared.nextSelectedInstructionSourceKeys);
 			}
 		},
 		[]
@@ -364,17 +381,17 @@ export function useComposerSystemPrompt(args: {
 
 	return {
 		modelDefaultPrompt,
-		prompts,
+		instructionSources,
 		includeModelDefault,
-		selectedPromptKeys,
+		selectedInstructionSourceKeys,
 		resolvedSystemPrompt,
 		setIncludeModelDefault,
-		togglePromptSelection,
-		addAndSelectInstructionSkillPrompt,
-		clearSelectedPromptSources,
+		toggleInstructionSource,
+		addAndSelectInstructionSkillSource,
+		clearInstructionSources,
 		resetForNewConversation,
 		restoreConversationContext,
-		prepareAssistantPresetSelections,
-		applyPreparedAssistantPresetSelections,
+		prepareAssistantPresetInstructionSources,
+		applyPreparedAssistantPresetInstructionSources,
 	};
 }

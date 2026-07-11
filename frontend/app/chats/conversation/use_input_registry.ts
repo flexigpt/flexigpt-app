@@ -31,10 +31,12 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 	const inputRefs = useRef(new Map<string, ComposerBoxHandle | null>());
 	const pendingDropsRef = useRef<PendingDrop[]>([]);
 	const pendingAssistantTurnsRef = useRef(new Map<string, PendingAssistantTurn>());
+	const pendingConversationContextsRef = useRef(new Map<string, Conversation>());
 	const pendingWorkflowStartersRef = useRef(new Map<string, ChatWorkflowStarter>());
 	const inputRefCallbacksRef = useRef(new Map<string, (inst: ComposerBoxHandle | null) => void>());
 	const pendingInputFlushTimerRef = useRef<number | null>(null);
 	const flushPendingDropsRef = useRef<() => void>(() => {});
+	const flushPendingConversationContextsRef = useRef<() => void>(() => {});
 	const flushPendingAssistantTurnsRef = useRef<() => void>(() => {});
 	const flushPendingWorkflowStartersRef = useRef<() => void>(() => {});
 
@@ -71,6 +73,43 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 
 		pendingDropsRef.current = remaining;
 	}, [tabExists, tryApplyDropToTab]);
+
+	const applyConversationContextToInput = useCallback((input: ComposerBoxHandle, conversation: Conversation) => {
+		input.resetEditor();
+		input.restoreConversationContext(deriveRestorableConversationContextFromMessages(conversation.messages));
+
+		const hydratedToolCalls = deriveHydratedLastAssistantToolCalls(conversation);
+		if (hydratedToolCalls.length > 0) {
+			input.loadToolCalls(hydratedToolCalls);
+			input.finishAssistantTurn({ loadedRunnableToolCallCount: hydratedToolCalls.length });
+		}
+	}, []);
+
+	const tryApplyConversationContextToTab = useCallback(
+		(tabId: string, conversation: Conversation): boolean => {
+			const input = inputRefs.current.get(tabId);
+			if (!input) {
+				return false;
+			}
+
+			applyConversationContextToInput(input, conversation);
+			return true;
+		},
+		[applyConversationContextToInput]
+	);
+
+	const flushPendingConversationContexts = useCallback(() => {
+		for (const [tabId, conversation] of pendingConversationContextsRef.current.entries()) {
+			if (!tabExists(tabId)) {
+				pendingConversationContextsRef.current.delete(tabId);
+				continue;
+			}
+
+			if (tryApplyConversationContextToTab(tabId, conversation)) {
+				pendingConversationContextsRef.current.delete(tabId);
+			}
+		}
+	}, [tabExists, tryApplyConversationContextToTab]);
 
 	const tryApplyAssistantTurnToTab = useCallback((tabId: string, turn: PendingAssistantTurn): boolean => {
 		const input = inputRefs.current.get(tabId);
@@ -145,6 +184,10 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 	}, [flushPendingDrops]);
 
 	useLayoutEffect(() => {
+		flushPendingConversationContextsRef.current = flushPendingConversationContexts;
+	}, [flushPendingConversationContexts]);
+
+	useLayoutEffect(() => {
 		flushPendingAssistantTurnsRef.current = flushPendingAssistantTurns;
 	}, [flushPendingAssistantTurns]);
 
@@ -160,6 +203,7 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 		pendingInputFlushTimerRef.current = window.setTimeout(() => {
 			pendingInputFlushTimerRef.current = null;
 			flushPendingDropsRef.current();
+			flushPendingConversationContextsRef.current();
 			flushPendingAssistantTurnsRef.current();
 			flushPendingWorkflowStartersRef.current();
 		}, 0);
@@ -236,28 +280,24 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 		[schedulePendingInputFlush]
 	);
 
-	const syncComposerFromConversation = useCallback((tabId: string, conversation: Conversation) => {
-		const input = inputRefs.current.get(tabId);
-		pendingAssistantTurnsRef.current.delete(tabId);
-		if (!input) {
-			return;
-		}
+	const syncComposerFromConversation = useCallback(
+		(tabId: string, conversation: Conversation) => {
+			pendingAssistantTurnsRef.current.delete(tabId);
+			if (tryApplyConversationContextToTab(tabId, conversation)) {
+				pendingConversationContextsRef.current.delete(tabId);
+				return;
+			}
 
-		input.resetEditor();
-		input.restoreConversationContext(deriveRestorableConversationContextFromMessages(conversation.messages));
-		// Match the normal live-chat behavior: if the last hydrated message is an
-		// assistant tool-call turn, restore runnable tool calls into the composer.
-		// Do not auto-execute restored calls; they remain manual until the user acts.
-		const hydratedToolCalls = deriveHydratedLastAssistantToolCalls(conversation);
-		if (hydratedToolCalls.length > 0) {
-			input.loadToolCalls(hydratedToolCalls);
-			input.finishAssistantTurn({ loadedRunnableToolCallCount: hydratedToolCalls.length });
-		}
-	}, []);
+			pendingConversationContextsRef.current.set(tabId, conversation);
+			schedulePendingInputFlush();
+		},
+		[schedulePendingInputFlush, tryApplyConversationContextToTab]
+	);
 
 	const resetComposerForNewConversation = useCallback(async (tabId: string) => {
 		const input = inputRefs.current.get(tabId);
 		pendingAssistantTurnsRef.current.delete(tabId);
+		pendingConversationContextsRef.current.delete(tabId);
 		if (!input) {
 			return;
 		}
@@ -276,6 +316,7 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 	const disposeInputRuntime = useCallback((tabId: string) => {
 		inputRefs.current.delete(tabId);
 		pendingWorkflowStartersRef.current.delete(tabId);
+		pendingConversationContextsRef.current.delete(tabId);
 		pendingAssistantTurnsRef.current.delete(tabId);
 		inputRefCallbacksRef.current.delete(tabId);
 	}, []);

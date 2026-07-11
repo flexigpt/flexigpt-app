@@ -1,26 +1,15 @@
 const SYSTEM_PROMPT_SEPARATOR = '\n---\n';
 
-export enum PromptRoleEnum {
-	System = 'system',
-	Developer = 'developer',
-	User = 'user',
-}
-type SystemPromptRole = PromptRoleEnum.System | PromptRoleEnum.Developer;
-
-export interface SystemPromptItem {
+export interface SystemInstructionSource {
 	identityKey: string;
-	templateID?: string;
+	sourceKind: 'restored-conversation' | 'skill';
 	bundleID: string;
-	templateSlug: string;
-	templateVersion: string;
+	sourceSlug: string;
 	displayName: string;
-	prompt: string;
-	role: SystemPromptRole;
+	text: string;
 	bundleDisplayName: string;
-	bundleSlug: string;
+	bundleSlug?: string;
 	isBuiltIn: boolean;
-	createdAt: string;
-	modifiedAt: string;
 }
 
 function normalizePromptPart(value: string): string {
@@ -37,8 +26,8 @@ function concatenateSystemPromptParts(parts: string[]): string {
 export function buildEffectiveSystemPrompt(params: {
 	modelDefaultPrompt: string;
 	includeModelDefault: boolean;
-	selectedPromptKeys: string[];
-	promptsByKey: Map<string, SystemPromptItem>;
+	selectedInstructionSourceKeys: string[];
+	instructionSourcesByKey: Map<string, SystemInstructionSource>;
 }): string {
 	const parts: string[] = [];
 
@@ -49,13 +38,13 @@ export function buildEffectiveSystemPrompt(params: {
 		}
 	}
 
-	for (const key of params.selectedPromptKeys) {
-		const item = params.promptsByKey.get(key);
+	for (const key of params.selectedInstructionSourceKeys) {
+		const item = params.instructionSourcesByKey.get(key);
 		if (!item) {
 			continue;
 		}
 
-		const prompt = normalizePromptPart(item.prompt);
+		const prompt = normalizePromptPart(item.text);
 		if (!prompt) {
 			continue;
 		}

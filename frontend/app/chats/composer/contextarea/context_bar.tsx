@@ -32,7 +32,10 @@ interface EditorContextBarProps {
 	assistantPreset: AssistantPresetManagerState;
 	systemPrompt: Pick<
 		ComposerSystemPromptController,
-		'includeModelDefault' | 'selectedPromptKeys' | 'prompts' | 'prepareAssistantPresetSelections'
+		| 'includeModelDefault'
+		| 'selectedInstructionSourceKeys'
+		| 'instructionSources'
+		| 'prepareAssistantPresetInstructionSources'
 	>;
 }
 
@@ -85,15 +88,16 @@ export function EditorContextBar({ context, assistantPreset, systemPrompt }: Edi
 						return;
 					}
 
-					const preparedSystemPromptSelections = await systemPrompt.prepareAssistantPresetSelections(
+					const preparedSystemPromptSelections = await systemPrompt.prepareAssistantPresetInstructionSources(
 						basePrepared.preset
 					);
 					const prepared: AssistantPresetPreparedApplication = {
 						...basePrepared,
 						hasIncludeModelSystemPromptSelection: preparedSystemPromptSelections.hasIncludeModelSystemPromptSelection,
 						nextIncludeModelSystemPrompt: preparedSystemPromptSelections.nextIncludeModelSystemPrompt,
-						hasInstructionTemplateSelection: preparedSystemPromptSelections.hasInstructionTemplateSelection,
-						nextSelectedPromptKeys: preparedSystemPromptSelections.nextSelectedPromptKeys,
+						hasInstructionSourceSelection: preparedSystemPromptSelections.hasInstructionSourceSelection,
+						nextSelectedInstructionSourceKeys: preparedSystemPromptSelections.nextSelectedInstructionSourceKeys,
+						preparedInstructionSources: preparedSystemPromptSelections.preparedInstructionSources,
 						comparisonState: {
 							...basePrepared.comparisonState,
 							model: buildAssistantPresetModelComparisonState(
@@ -101,8 +105,8 @@ export function EditorContextBar({ context, assistantPreset, systemPrompt }: Edi
 								basePrepared.nextSelectedModel,
 								preparedSystemPromptSelections.nextIncludeModelSystemPrompt
 							),
-							instructions: preparedSystemPromptSelections.hasInstructionTemplateSelection
-								? [...preparedSystemPromptSelections.nextSelectedPromptKeys]
+							instructions: preparedSystemPromptSelections.hasInstructionSourceSelection
+								? [...preparedSystemPromptSelections.nextSelectedInstructionSourceKeys]
 								: undefined,
 						},
 					};
@@ -248,8 +252,8 @@ export function EditorContextBar({ context, assistantPreset, systemPrompt }: Edi
 				currentRuntimeSnapshot={assistantPreset.runtimeSnapshot}
 				currentModel={context.selectedModel}
 				currentIncludeModelSystemPrompt={systemPrompt.includeModelDefault}
-				currentSelectedPromptKeys={systemPrompt.selectedPromptKeys}
-				promptItems={systemPrompt.prompts}
+				currentSelectedInstructionSourceKeys={systemPrompt.selectedInstructionSourceKeys}
+				instructionSources={systemPrompt.instructionSources}
 				modificationSummary={assistantPreset.modificationSummary}
 			/>
 		</div>

@@ -22,7 +22,7 @@ export interface ComposerToolRuntimeState {
 interface UseComposerToolRuntimeArgs {
 	ensureSkillSession: () => Promise<string | null>;
 	listActiveSkillRefs: (sid: string) => Promise<SkillRef[]>;
-	setActiveSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
+	setActiveSkillRefsFromSession: Dispatch<SetStateAction<SkillRef[]>>;
 	getCurrentSkillSessionID: () => string | null;
 	requestMCPApproval?: RequestMCPApproval;
 }
@@ -117,7 +117,7 @@ function runtimeReducer(state: ComposerToolRuntimeState, action: Action): Compos
 export function useComposerToolRuntime({
 	ensureSkillSession,
 	listActiveSkillRefs,
-	setActiveSkillRefs,
+	setActiveSkillRefsFromSession,
 	getCurrentSkillSessionID,
 	requestMCPApproval,
 }: UseComposerToolRuntimeArgs): {
@@ -195,12 +195,12 @@ export function useComposerToolRuntime({
 				if (getCurrentSkillSessionID() !== sid) {
 					return;
 				}
-				setActiveSkillRefs(nextActive);
+				setActiveSkillRefsFromSession(nextActive);
 			} catch {
 				// ignore
 			}
 		},
-		[getCurrentSkillSessionID, listActiveSkillRefs, setActiveSkillRefs]
+		[getCurrentSkillSessionID, listActiveSkillRefs, setActiveSkillRefsFromSession]
 	);
 
 	const setToolOutputs = useCallback<Dispatch<SetStateAction<UIToolOutput[]>>>(update => {

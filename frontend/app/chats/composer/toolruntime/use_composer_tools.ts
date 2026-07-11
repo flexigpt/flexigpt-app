@@ -20,7 +20,7 @@ interface UseComposerToolsArgs {
 	isSubmitting: boolean;
 	ensureSkillSession: () => Promise<string | null>;
 	listActiveSkillRefs: (sid: string) => Promise<SkillRef[]>;
-	setActiveSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
+	setActiveSkillRefsFromSession: Dispatch<SetStateAction<SkillRef[]>>;
 	getCurrentSkillSessionID: () => string | null;
 	getAttachedToolEntries: (uniqueByIdentity?: boolean) => AttachedToolEntry[];
 	externalExecutionBlocked?: boolean;
@@ -58,7 +58,7 @@ export function useComposerTools({
 	isSubmitting,
 	ensureSkillSession,
 	listActiveSkillRefs,
-	setActiveSkillRefs,
+	setActiveSkillRefsFromSession,
 	getCurrentSkillSessionID,
 	getAttachedToolEntries,
 	externalExecutionBlocked = false,
@@ -67,7 +67,7 @@ export function useComposerTools({
 	const runtime = useComposerToolRuntime({
 		ensureSkillSession,
 		listActiveSkillRefs,
-		setActiveSkillRefs,
+		setActiveSkillRefsFromSession,
 		getCurrentSkillSessionID,
 		requestMCPApproval,
 	});

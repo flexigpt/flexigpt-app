@@ -102,4 +102,8 @@ export interface ToolSelectionDisplayItem extends OrderedDisplayItem {
 export interface SkillSelectionDisplayItem extends OrderedDisplayItem {
 	preLoadAsActive: boolean;
 	useAsInstructions: boolean;
+	canUseAsInstructions: boolean;
+	useAsInstructionsDisabledReason?: string;
+	canPreLoadAsActive: boolean;
+	preLoadAsActiveDisabledReason?: string;
 }

@@ -694,8 +694,9 @@ export function useAssistantContextState(): AssistantContextController {
 				nextSelectedModel,
 				hasIncludeModelSystemPromptSelection: false,
 				nextIncludeModelSystemPrompt: false,
-				hasInstructionTemplateSelection: false,
-				nextSelectedPromptKeys: [],
+				hasInstructionSourceSelection: false,
+				nextSelectedInstructionSourceKeys: [],
+				preparedInstructionSources: [],
 				runtimeSelections: {
 					hasToolsSelection,
 					conversationToolChoices,

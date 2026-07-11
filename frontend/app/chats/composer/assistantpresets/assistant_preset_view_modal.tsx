@@ -23,7 +23,7 @@ import {
 	buildAssistantPresetModelComparisonState,
 	normalizeAssistantPresetMCPContext,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
-import type { SystemPromptItem } from '@/chats/composer/skills/prompt_utils';
+import type { SystemInstructionSource } from '@/chats/composer/skills/prompt_utils';
 
 function closeDialogSafely(dialog: HTMLDialogElement | null): boolean {
 	if (!dialog?.open) {
@@ -279,8 +279,8 @@ interface AssistantPresetViewModalProps {
 	currentRuntimeSnapshot: AssistantPresetRuntimeSnapshot;
 	currentModel: UIChatOption;
 	currentIncludeModelSystemPrompt: boolean;
-	currentSelectedPromptKeys: string[];
-	promptItems: SystemPromptItem[];
+	currentSelectedInstructionSourceKeys: string[];
+	instructionSources: SystemInstructionSource[];
 	modificationSummary: AssistantPresetModificationSummary;
 }
 
@@ -293,8 +293,8 @@ export function AssistantPresetViewModal({
 	currentRuntimeSnapshot,
 	currentModel,
 	currentIncludeModelSystemPrompt,
-	currentSelectedPromptKeys,
-	promptItems,
+	currentSelectedInstructionSourceKeys,
+	instructionSources,
 	modificationSummary,
 }: AssistantPresetViewModalProps) {
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
@@ -320,9 +320,14 @@ export function AssistantPresetViewModal({
 		};
 	}, [isOpen]);
 
-	const promptItemsByKey = useMemo(() => {
-		return new Map(promptItems.map(item => [item.identityKey, item]));
-	}, [promptItems]);
+	const instructionSourcesByKey = useMemo(() => {
+		return new Map(
+			[...instructionSources, ...(viewedPresetApplication?.preparedInstructionSources ?? [])].map(item => [
+				item.identityKey,
+				item,
+			])
+		);
+	}, [instructionSources, viewedPresetApplication?.preparedInstructionSources]);
 
 	if (!isOpen || !viewedPreset || typeof document === 'undefined') {
 		return null;
@@ -344,10 +349,10 @@ export function AssistantPresetViewModal({
 
 	const promptLabelItems = (keys: string[]) =>
 		keys.map(key => {
-			const item = promptItemsByKey.get(key);
+			const item = instructionSourcesByKey.get(key);
 			return {
 				title: item?.displayName || key,
-				meta: item ? `${item.bundleDisplayName} • ${item.templateSlug}@${item.templateVersion}` : key,
+				meta: item ? `${item.bundleDisplayName} • ${item.sourceSlug}` : key,
 			};
 		});
 
@@ -538,7 +543,7 @@ export function AssistantPresetViewModal({
 										<div>
 											<div className="mb-2 text-xs font-semibold opacity-70">Current selection</div>
 											{renderSimpleList(
-												promptLabelItems(currentSelectedPromptKeys),
+												promptLabelItems(currentSelectedInstructionSourceKeys),
 												'No instruction skill prompts selected.'
 											)}
 										</div>

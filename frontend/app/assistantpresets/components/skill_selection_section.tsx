@@ -106,6 +106,16 @@ export const SkillSelectionSection = memo(function SkillSelectionSection({
 							)}
 						</div>
 
+						<div className="mt-2">
+							<span className="badge badge-outline badge-sm">
+								{item.useAsInstructions
+									? 'System instruction source'
+									: item.preLoadAsActive
+										? 'Lifecycle skill: enabled and preloaded'
+										: 'Lifecycle skill: enabled'}
+							</span>
+						</div>
+
 						<div className="mt-3 space-y-2">
 							<label className="label cursor-pointer justify-start gap-3 py-1">
 								<span className="text-sm">Use as system instructions</span>
@@ -116,6 +126,12 @@ export const SkillSelectionSection = memo(function SkillSelectionSection({
 										type="checkbox"
 										className="toggle toggle-accent"
 										checked={item.useAsInstructions}
+										disabled={!item.useAsInstructions && (item.preLoadAsActive || !item.canUseAsInstructions)}
+										title={
+											item.preLoadAsActive
+												? 'A system instruction source cannot also be preloaded.'
+												: item.useAsInstructionsDisabledReason
+										}
 										onChange={e => {
 											onUseAsInstructionsChange(idx, e.target.checked);
 										}}
@@ -132,11 +148,11 @@ export const SkillSelectionSection = memo(function SkillSelectionSection({
 										type="checkbox"
 										className="toggle toggle-accent"
 										checked={item.preLoadAsActive}
-										disabled={item.useAsInstructions}
+										disabled={!item.preLoadAsActive && (item.useAsInstructions || !item.canPreLoadAsActive)}
 										title={
 											item.useAsInstructions
 												? 'Instruction-prompt selections are not active session skills.'
-												: undefined
+												: item.preLoadAsActiveDisabledReason
 										}
 										onChange={e => {
 											onPreLoadAsActiveChange(idx, e.target.checked);

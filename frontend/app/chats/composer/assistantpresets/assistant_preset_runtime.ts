@@ -13,6 +13,7 @@ import { ToolStoreChoiceType } from '@/spec/tool';
 import { cloneJSONLike } from '@/lib/jsonschema_utils';
 import { areComparableValuesEqual } from '@/lib/obj_utils';
 
+import type { SystemInstructionSource } from '@/chats/composer/skills/prompt_utils';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
 import { sanitizeUIChatOptionByCapabilities } from '@/modelpresets/lib/capabilities_override';
 import { areSkillRefListsEqual } from '@/skills/lib/skill_identity_utils';
@@ -68,8 +69,9 @@ export interface AssistantPresetPreparedApplication {
 	hasIncludeModelSystemPromptSelection: boolean;
 	nextIncludeModelSystemPrompt: boolean;
 
-	hasInstructionTemplateSelection: boolean;
-	nextSelectedPromptKeys: string[];
+	hasInstructionSourceSelection: boolean;
+	nextSelectedInstructionSourceKeys: string[];
+	preparedInstructionSources: SystemInstructionSource[];
 
 	runtimeSelections: AssistantPresetPreparedRuntimeSelections;
 	comparisonState: AssistantPresetComparisonState;
@@ -558,7 +560,7 @@ export function getAssistantPresetModificationSummary(args: {
 	preparedApplication: AssistantPresetPreparedApplication | null;
 	currentSelectedModel: UIChatOption;
 	currentIncludeModelSystemPrompt: boolean;
-	currentSelectedPromptKeys: string[];
+	currentSelectedInstructionSourceKeys: string[];
 	currentRuntimeSnapshot: AssistantPresetRuntimeSnapshot;
 }): AssistantPresetModificationSummary {
 	const { preparedApplication } = args;
@@ -586,7 +588,9 @@ export function getAssistantPresetModificationSummary(args: {
 		: false;
 
 	const instructions = preparedApplication.comparisonState.instructions
-		? !areComparableValuesEqual(preparedApplication.comparisonState.instructions, [...args.currentSelectedPromptKeys])
+		? !areComparableValuesEqual(preparedApplication.comparisonState.instructions, [
+				...args.currentSelectedInstructionSourceKeys,
+			])
 		: false;
 
 	const tools = preparedApplication.comparisonState.tools

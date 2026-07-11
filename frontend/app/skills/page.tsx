@@ -429,7 +429,8 @@ export default function SkillsPage() {
 								<div>
 									<span className="font-semibold">User-message templates</span> use{' '}
 									<span className="font-mono">insert: user-message</span>. They render into composer text and do not
-									become active session skills.
+									become active session skills. When a filesystem template has resources, its complete skill directory
+									is attached to the resulting user message.
 								</div>
 								<div>
 									Managed creation writes one simple <span className="font-mono">SKILL.md</span> file. To add resources,
@@ -439,8 +440,8 @@ export default function SkillsPage() {
 									metadata.
 								</div>
 								<div>
-									The Prompt Bundles page remains for compatibility only. For new prompt-template style content, create
-									a user-message skill here.
+									Legacy prompt-store records are not used by the chat composer. New prompt-like content should be
+									created as user-message skills here.
 								</div>
 							</div>
 						</div>
