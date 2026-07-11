@@ -477,10 +477,6 @@ export default function SkillsPage() {
 									<span className="font-mono">scripts/</span>. Re-enable the skill or restart the app to refresh indexed
 									metadata.
 								</div>
-								<div>
-									Legacy prompt-store records are not used by the chat composer. New prompt-like content should be
-									created as user-message skills here.
-								</div>
 							</div>
 						</div>
 

@@ -69,7 +69,7 @@ type AssistantPreset struct {
 	StartingToolSelections []toolSpec.ToolSelection `json:"startingToolSelections,omitempty"`
 
 	// Ordered skill selections. PreLoadAsActive is only valid for argumentless "insert=instructions" skills,
-	// "insert=userMessage" skills behave like user-message templates.
+	// "insert=user-message" skills behave like user-message templates.
 	StartingSkillSelections []skillSpec.SkillSelection `json:"startingSkillSelections,omitempty"`
 
 	// StartingMCPContext is copied into the first user turn when this preset is applied.
