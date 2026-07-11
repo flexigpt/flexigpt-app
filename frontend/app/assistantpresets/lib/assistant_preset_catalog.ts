@@ -1,5 +1,6 @@
 import type { AssistantModelPresetOption, ModelPresetRef, ProviderPreset } from '@/spec/modelpreset';
 import type { AssistantSkillOption, SkillSelection } from '@/spec/skill';
+import { SkillPresenceStatus } from '@/spec/skill';
 import type { AssistantToolOption, ToolRef } from '@/spec/tool';
 
 import { modelPresetStoreAPI, skillStoreAPI, toolStoreAPI } from '@/apis/baseapi';
@@ -15,7 +16,11 @@ export interface AssistantPresetEditorCatalog {
 	modelPresetOptions: AssistantModelPresetOption[];
 	toolOptions: AssistantToolOption[];
 	skillOptions: AssistantSkillOption[];
+	loadErrors?: AssistantPresetCatalogLoadErrors;
 }
+
+type AssistantPresetCatalogSection = 'models' | 'tools' | 'skills';
+export type AssistantPresetCatalogLoadErrors = Partial<Record<AssistantPresetCatalogSection, string>>;
 
 export interface AssistantPresetCatalogLoadOptions {
 	force?: boolean;
@@ -24,23 +29,39 @@ export interface AssistantPresetCatalogLoadOptions {
 interface AsyncCatalogCache<T> {
 	value?: T;
 	promise?: Promise<T>;
+	generation: number;
 }
 
-const modelOptionsCache: AsyncCatalogCache<AssistantModelPresetOption[]> = {};
-const toolOptionsCache: AsyncCatalogCache<AssistantToolOption[]> = {};
-const skillOptionsCache: AsyncCatalogCache<AssistantSkillOption[]> = {};
-const editorCatalogCache: AsyncCatalogCache<AssistantPresetEditorCatalog> = {};
+const modelOptionsCache: AsyncCatalogCache<AssistantModelPresetOption[]> = { generation: 0 };
+const toolOptionsCache: AsyncCatalogCache<AssistantToolOption[]> = { generation: 0 };
+const skillOptionsCache: AsyncCatalogCache<AssistantSkillOption[]> = { generation: 0 };
+const editorCatalogCache: AsyncCatalogCache<AssistantPresetEditorCatalog> = { generation: 0 };
+
+const MAX_CATALOG_PAGE_COUNT = 1_000;
+
+function getErrorMessage(error: unknown, fallback: string): string {
+	if (error instanceof Error && error.message.trim()) {
+		return error.message;
+	}
+	return fallback;
+}
 
 function loadWithCache<T>(cache: AsyncCatalogCache<T>, loader: () => Promise<T>, force: boolean): Promise<T> {
-	if (cache.promise) {
+	if (!force && cache.promise) {
 		return cache.promise;
 	}
 	if (!force && cache.value !== undefined) {
 		return Promise.resolve(cache.value);
 	}
 
+	if (force) {
+		cache.generation += 1;
+	}
+	const requestGeneration = cache.generation;
 	const request = loader().then(value => {
-		cache.value = value;
+		if (cache.generation === requestGeneration) {
+			cache.value = value;
+		}
 		return value;
 	});
 	cache.promise = request;
@@ -66,19 +87,27 @@ async function collectAllPages<TResponse, TItem>(
 	pickNextToken: (response: TResponse) => string | undefined
 ): Promise<TItem[]> {
 	const items: TItem[] = [];
-	let nextPageToken: string | undefined = undefined;
+	const seenPageTokens = new Set<string>();
+	let nextPageToken: string | undefined;
 
-	while (true) {
+	for (let page = 0; page < MAX_CATALOG_PAGE_COUNT; page += 1) {
+		if (nextPageToken) {
+			if (seenPageTokens.has(nextPageToken)) {
+				throw new Error('Catalog pagination returned a repeated page token.');
+			}
+			seenPageTokens.add(nextPageToken);
+		}
+
 		const response = await fetchPage(nextPageToken);
 		items.push(...pickItems(response));
 
 		nextPageToken = pickNextToken(response);
 		if (!nextPageToken) {
-			break;
+			return items;
 		}
 	}
 
-	return items;
+	throw new Error(`Catalog pagination exceeded ${MAX_CATALOG_PAGE_COUNT} pages.`);
 }
 
 function sortByBuiltInThenLabel<T extends { isBuiltIn: boolean; label: string; key: string }>(items: T[]): T[] {
@@ -171,11 +200,14 @@ async function loadToolOptionsUncached(): Promise<AssistantToolOption[]> {
 		const bundle = bundleByID.get(item.bundleID);
 		const tool = item.toolDefinition;
 
-		const isBundleEnabled = bundle?.isEnabled ?? true;
+		const isBundleKnown = bundle !== undefined;
+		const isBundleEnabled = bundle?.isEnabled ?? false;
 		const isToolEnabled = tool.isEnabled;
 
 		let availabilityReason: string | undefined;
-		if (!isBundleEnabled) {
+		if (!isBundleKnown) {
+			availabilityReason = 'Tool bundle no longer exists.';
+		} else if (!isBundleEnabled) {
 			availabilityReason = 'Tool bundle is disabled.';
 		} else if (!isToolEnabled) {
 			availabilityReason = 'Tool is disabled.';
@@ -242,14 +274,21 @@ async function loadSkillOptionsUncached(): Promise<AssistantSkillOption[]> {
 		const bundle = bundleByID.get(item.bundleID);
 		const skill = item.skillDefinition;
 
-		const isBundleEnabled = bundle?.isEnabled ?? true;
+		const isBundleKnown = bundle !== undefined;
+		const isBundleEnabled = bundle?.isEnabled ?? false;
 		const isSkillEnabled = skill.isEnabled;
 
 		let availabilityReason: string | undefined;
-		if (!isBundleEnabled) {
+		if (!isBundleKnown) {
+			availabilityReason = 'Skill bundle no longer exists.';
+		} else if (!isBundleEnabled) {
 			availabilityReason = 'Skill bundle is disabled.';
 		} else if (!isSkillEnabled) {
 			availabilityReason = 'Skill is disabled.';
+		} else if (skill.presence?.status === SkillPresenceStatus.Missing) {
+			availabilityReason = 'Skill files are missing from the configured location.';
+		} else if (skill.presence?.status === SkillPresenceStatus.Error) {
+			availabilityReason = skill.presence.lastCheckError || 'Skill files could not be verified.';
 		} else if (!isInstructionInsertSkill(skill)) {
 			availabilityReason =
 				'User-message skills are composer templates and cannot be assistant preset skill-session selections.';
@@ -301,13 +340,29 @@ export function loadAssistantPresetEditorCatalog(
 	return loadWithCache(
 		editorCatalogCache,
 		async () => {
-			const [modelPresetOptions, toolOptions, skillOptions] = await Promise.all([
+			const [modelsResult, toolsResult, skillsResult] = await Promise.allSettled([
 				loadModelPresetOptions({ force }),
 				loadToolOptions({ force }),
 				loadSkillOptions({ force }),
 			]);
 
-			return { modelPresetOptions, toolOptions, skillOptions };
+			const loadErrors: AssistantPresetCatalogLoadErrors = {};
+			if (modelsResult.status === 'rejected') {
+				loadErrors.models = getErrorMessage(modelsResult.reason, 'Failed to load model presets.');
+			}
+			if (toolsResult.status === 'rejected') {
+				loadErrors.tools = getErrorMessage(toolsResult.reason, 'Failed to load tools.');
+			}
+			if (skillsResult.status === 'rejected') {
+				loadErrors.skills = getErrorMessage(skillsResult.reason, 'Failed to load skills.');
+			}
+
+			return {
+				modelPresetOptions: modelsResult.status === 'fulfilled' ? modelsResult.value : [],
+				toolOptions: toolsResult.status === 'fulfilled' ? toolsResult.value : [],
+				skillOptions: skillsResult.status === 'fulfilled' ? skillsResult.value : [],
+				...(Object.keys(loadErrors).length > 0 ? { loadErrors } : {}),
+			};
 		},
 		force
 	);

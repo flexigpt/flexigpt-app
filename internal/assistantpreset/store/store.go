@@ -556,6 +556,9 @@ func (s *AssistantPresetStore) PutAssistantPreset(
 		return nil, err
 	}
 
+	s.sweepMu.RLock()
+	defer s.sweepMu.RUnlock()
+
 	bundle, isBuiltIn, err := s.getAnyBundle(ctx, req.BundleID)
 	if err != nil {
 		return nil, err
@@ -926,6 +929,8 @@ func (s *AssistantPresetStore) ListAssistantPresets(
 	} else if !tok.BuiltInDone {
 		builtInBundles, builtInPresets, _ := s.builtinData.ListBuiltInData(ctx)
 
+		builtInItems := make([]spec.AssistantPresetListItem, 0)
+
 		bundleIDs := make([]bundleitemutils.BundleID, 0, len(builtInBundles))
 		for bundleID := range builtInBundles {
 			bundleIDs = append(bundleIDs, bundleID)
@@ -943,7 +948,6 @@ func (s *AssistantPresetStore) ListAssistantPresets(
 				continue
 			}
 
-			builtInItems := make([]spec.AssistantPresetListItem, 0, len(builtInPresets[bundleID]))
 			presetIDs := make([]bundleitemutils.ItemID, 0, len(builtInPresets[bundleID]))
 			for presetID := range builtInPresets[bundleID] {
 				presetIDs = append(presetIDs, presetID)
@@ -960,20 +964,15 @@ func (s *AssistantPresetStore) ListAssistantPresets(
 				builtInItems = append(builtInItems, toAssistantPresetListItem(bundleID, bundle.Slug, preset))
 			}
 
-			start := min(tok.BuiltInOffset, len(builtInItems))
-			remaining := pageHint - len(out)
-			end := min(start+remaining, len(builtInItems))
-			out = append(out, builtInItems[start:end]...)
-			tok.BuiltInOffset = end
-
-			if end < len(builtInItems) {
-				break
-			}
-
-			tok.BuiltInOffset = 0
 		}
 
-		if len(out) < pageHint {
+		start := min(tok.BuiltInOffset, len(builtInItems))
+		remaining := pageHint - len(out)
+		end := min(start+remaining, len(builtInItems))
+		out = append(out, builtInItems[start:end]...)
+		tok.BuiltInOffset = end
+
+		if end >= len(builtInItems) {
 			tok.BuiltInDone = true
 			tok.BuiltInOffset = 0
 		}

@@ -35,7 +35,7 @@ import {
 	skillMatchesSearch,
 	skillMatchesTags,
 } from '@/skills/lib/skill_artifact_utils';
-import type { SkillUpsertInput } from '@/skills/skill_add_edit_modal';
+import type { SkillItem, SkillUpsertInput } from '@/skills/skill_add_edit_modal';
 import { AddEditSkillModal } from '@/skills/skill_add_edit_modal';
 import { SkillBundleDetailsModal } from '@/skills/skill_bundle_details_modal';
 
@@ -45,6 +45,7 @@ interface SkillBundleCardProps {
 	bundle: SkillBundle;
 	skills: Skill[];
 	skillLoadError?: string;
+	prefillSkills: SkillItem[];
 	onRefreshSkills: () => Promise<void>;
 	insertFilter: SkillInsertFilter;
 	searchQuery: string;
@@ -94,6 +95,7 @@ export function SkillBundleCard({
 	bundle,
 	skills,
 	skillLoadError,
+	prefillSkills,
 	onRefreshSkills,
 	insertFilter,
 	searchQuery,
@@ -565,7 +567,7 @@ export function SkillBundleCard({
 														disabled={bundle.isBuiltIn || !bundle.isEnabled}
 														title={
 															bundle.isBuiltIn
-																? 'Forking from this built-in bundle is not available here. Use a custom bundle.'
+																? 'To copy this built-in skill, use Add Skill or Template in a custom bundle and choose Copy Existing Skill.'
 																: !bundle.isEnabled
 																	? 'Enable the bundle before forking.'
 																	: 'Fork into a new managed SKILL.md artifact'
@@ -678,6 +680,7 @@ export function SkillBundleCard({
 				mode={skillModalMode}
 				initialData={skillToEdit ? { skill: skillToEdit, bundleID: bundle.id, skillSlug: skillToEdit.slug } : undefined}
 				existingSkills={existingSkillItems}
+				prefillSkills={prefillSkills}
 			/>
 
 			<SkillBundleDetailsModal

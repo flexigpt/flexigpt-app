@@ -47,6 +47,8 @@ interface SkillTemplateDropdownProps {
 	open: boolean;
 	loading: boolean;
 	items: SkillListItem[];
+	error?: string | null;
+	onRetry?: () => void;
 	onPick: (item: SkillListItem) => void;
 }
 
@@ -211,20 +213,25 @@ function getSkillAttachmentPaths(item: SkillListItem | null): string[] {
 	}
 
 	const skillDirectory = item.skillDefinition.location?.trim();
+	if (!skillDirectory || !isAbsoluteLocalPath(skillDirectory) || hasParentTraversal(skillDirectory)) {
+		return [];
+	}
+
 	const resourceLocations = item.skillDefinition.resources?.locations ?? [];
 	const paths = resourceLocations
 		.map(location => location.trim())
 		.filter(Boolean)
 		.map(location => {
-			if (isAbsoluteLocalPath(location)) {
-				return skillDirectory && isPathInsideSkillDirectory(skillDirectory, location) ? location : '';
-			}
-
 			if (hasParentTraversal(location)) {
 				return '';
 			}
 
-			return joinLocalResourcePath(skillDirectory ?? '', location);
+			if (isAbsoluteLocalPath(location)) {
+				return isPathInsideSkillDirectory(skillDirectory, location) ? location : '';
+			}
+
+			const joined = joinLocalResourcePath(skillDirectory, location);
+			return isPathInsideSkillDirectory(skillDirectory, joined) ? joined : '';
 		})
 		.filter(path => path.length > 0 && !isSkillMarkdownPath(path));
 
@@ -259,15 +266,18 @@ async function collectUserMessageSkillTemplates(): Promise<SkillListItem[]> {
 function useUserMessageSkillTemplates(open: boolean) {
 	const [items, setItems] = useState<SkillListItem[]>([]);
 	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState<string | null>(null);
 
 	const refresh = useCallback(async () => {
 		setLoading(true);
+		setError(null);
 		try {
 			const next = await collectUserMessageSkillTemplates();
 			setItems(next);
-		} catch (error) {
-			console.error('Failed to load user-message skill templates:', error);
+		} catch (loadError) {
+			console.error('Failed to load user-message skill templates:', loadError);
 			setItems([]);
+			setError(loadError instanceof Error ? loadError.message : 'Failed to load user-message skill templates.');
 		} finally {
 			setLoading(false);
 		}
@@ -281,7 +291,7 @@ function useUserMessageSkillTemplates(open: boolean) {
 		void refresh();
 	}, [open, refresh]);
 
-	return { items, loading, refresh };
+	return { items, loading, error, refresh };
 }
 
 function renderSkillTemplateMenuItem(item: SkillListItem, onPick: (item: SkillListItem) => void) {
@@ -293,6 +303,7 @@ function renderSkillTemplateMenuItem(item: SkillListItem, onPick: (item: SkillLi
 		<MenuItem
 			key={skillTemplateKey(item)}
 			data-searchable-menu-item="true"
+			hideOnClick={false}
 			onClick={() => {
 				onPick(item);
 			}}
@@ -331,7 +342,7 @@ function renderSkillTemplateMenuItem(item: SkillListItem, onPick: (item: SkillLi
 	);
 }
 
-function SkillTemplateDropdown({ store, open, loading, items, onPick }: SkillTemplateDropdownProps) {
+function SkillTemplateDropdown({ store, open, loading, items, error, onRetry, onPick }: SkillTemplateDropdownProps) {
 	const menuContentElement = useStoreState(store, 'contentElement');
 	const [searchQuery, setSearchQuery] = useSearchableMenuState(open);
 
@@ -380,6 +391,16 @@ function SkillTemplateDropdown({ store, open, loading, items, onPick }: SkillTem
 						Templates are skills with <span className="font-mono">insert: user-message</span>. They render into plain
 						composer text and are not loaded as active skill-session instructions.
 					</div>
+					{error ? (
+						<div className="alert alert-error mb-2 rounded-2xl text-xs">
+							<div className="grow">{error}</div>
+							{onRetry ? (
+								<button type="button" className="btn btn-xs rounded-lg" onClick={onRetry}>
+									Retry
+								</button>
+							) : null}
+						</div>
+					) : null}
 					<SearchableMenuInput
 						open={open}
 						query={searchQuery}
@@ -473,14 +494,21 @@ function SkillTemplateRenderModalContent({ item, onClose, onInsert }: Omit<Skill
 		};
 	}, []);
 
-	const requestClose = useCallback(() => {
-		const dialog = dialogRef.current;
-		if (dialog?.open) {
-			dialog.close();
-			return;
-		}
-		onClose();
-	}, [onClose]);
+	const requestClose = useCallback(
+		(force = false) => {
+			if (submitting && !force) {
+				return;
+			}
+
+			const dialog = dialogRef.current;
+			if (dialog?.open) {
+				dialog.close();
+				return;
+			}
+			onClose();
+		},
+		[onClose, submitting]
+	);
 
 	const handleDialogClose = useCallback(() => {
 		if (isUnmountingRef.current) {
@@ -514,19 +542,27 @@ function SkillTemplateRenderModalContent({ item, onClose, onInsert }: Omit<Skill
 					attachedSkillPaths: selectedAttachmentPaths.length > 0 ? selectedAttachmentPaths : undefined,
 				});
 
+				if (isUnmountingRef.current) {
+					return;
+				}
+
 				if (result?.attachmentError) {
 					setInsertedWithAttachmentWarning(true);
 					setSubmitError(result.attachmentError);
 					return;
 				}
 
-				requestClose();
+				requestClose(true);
 			})
 			.catch((error: unknown) => {
-				setSubmitError(error instanceof Error ? error.message : 'Failed to render template.');
+				if (!isUnmountingRef.current) {
+					setSubmitError(error instanceof Error ? error.message : 'Failed to render template.');
+				}
 			})
 			.finally(() => {
-				setSubmitting(false);
+				if (!isUnmountingRef.current) {
+					setSubmitting(false);
+				}
 			});
 	};
 
@@ -557,7 +593,10 @@ function SkillTemplateRenderModalContent({ item, onClose, onInsert }: Omit<Skill
 						<button
 							type="button"
 							className="btn btn-sm btn-circle bg-base-300"
-							onClick={requestClose}
+							onClick={() => {
+								requestClose();
+							}}
+							disabled={submitting}
 							aria-label="Close"
 						>
 							<FiX size={12} />
@@ -658,14 +697,25 @@ function SkillTemplateRenderModalContent({ item, onClose, onInsert }: Omit<Skill
 						) : null}
 
 						<div className="modal-action">
-							<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
+							<button
+								type="button"
+								className="btn bg-base-300 rounded-xl"
+								onClick={() => {
+									requestClose();
+								}}
+								disabled={submitting}
+							>
 								Cancel
 							</button>
 							<button
 								type={insertedWithAttachmentWarning ? 'button' : 'submit'}
 								className="btn btn-primary rounded-xl"
 								disabled={!canInsert}
-								onClick={insertedWithAttachmentWarning ? requestClose : undefined}
+								onClick={() => {
+									if (insertedWithAttachmentWarning) {
+										requestClose();
+									}
+								}}
 							>
 								{insertedWithAttachmentWarning
 									? 'Close'
@@ -713,8 +763,9 @@ function SkillTemplateBottomBarChipInner({
 	const tooltip = shortcut
 		? `Insert template (${shortcut})\nTemplates are user-message skills rendered into plain composer text.`
 		: 'Insert template\nTemplates are user-message skills rendered into plain composer text.';
-	const { items: templates, loading } = useUserMessageSkillTemplates(open);
+	const { items: templates, loading, error: templateLoadError, refresh } = useUserMessageSkillTemplates(open);
 	const [modalItem, setModalItem] = useState<SkillListItem | null>(null);
+	const [templateActionError, setTemplateActionError] = useState<string | null>(null);
 
 	useEffect(() => {
 		if (!isInputLocked) {
@@ -750,22 +801,29 @@ function SkillTemplateBottomBarChipInner({
 
 	const handlePick = useCallback(
 		async (item: SkillListItem) => {
+			setTemplateActionError(null);
+
 			if ((item.skillDefinition.arguments?.length ?? 0) > 0 || hasResources(item)) {
 				store.hide();
 				setModalItem(item);
 				return;
 			}
 
+			let inserted = false;
 			try {
 				const rendered = await skillStoreAPI.renderSkill(skillRefFromListItem(item), {});
 				if (rendered.insert !== 'user-message') {
 					throw new Error(`Expected a user-message template, but renderer returned insert=${rendered.insert}.`);
 				}
 				await onInsertTemplateText(rendered.text);
+				inserted = true;
 			} catch (error) {
 				console.error('Failed to render skill template:', error);
+				setTemplateActionError(error instanceof Error ? error.message : 'Failed to render template.');
 			} finally {
-				store.hide();
+				if (inserted) {
+					store.hide();
+				}
 			}
 		},
 		[onInsertTemplateText, store]
@@ -790,6 +848,10 @@ function SkillTemplateBottomBarChipInner({
 				open={open}
 				loading={loading}
 				items={templates}
+				error={templateActionError ?? templateLoadError}
+				onRetry={() => {
+					void refresh();
+				}}
 				onPick={item => {
 					void handlePick(item);
 				}}

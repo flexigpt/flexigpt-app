@@ -70,7 +70,11 @@ function AddAssistantPresetBundleModalContent({
 		};
 	}, []);
 
-	const requestClose = () => {
+	const requestClose = (force = false) => {
+		if (isSubmitting && !force) {
+			return;
+		}
+
 		const dialog = dialogRef.current;
 
 		if (dialog?.open) {
@@ -141,11 +145,17 @@ function AddAssistantPresetBundleModalContent({
 		setIsSubmitting(true);
 		try {
 			await onSubmit(trimmed.slug, trimmed.displayName, trimmed.description || undefined);
-			requestClose();
+			if (!isUnmountingRef.current) {
+				requestClose(true);
+			}
 		} catch (error) {
-			setSubmitError(error instanceof Error ? error.message : 'Failed to create assistant preset bundle.');
+			if (!isUnmountingRef.current) {
+				setSubmitError(error instanceof Error ? error.message : 'Failed to create assistant preset bundle.');
+			}
 		} finally {
-			setIsSubmitting(false);
+			if (!isUnmountingRef.current) {
+				setIsSubmitting(false);
+			}
 		}
 	};
 
@@ -170,7 +180,10 @@ function AddAssistantPresetBundleModalContent({
 						<button
 							type="button"
 							className="btn btn-sm btn-circle bg-base-300"
-							onClick={requestClose}
+							onClick={() => {
+								requestClose();
+							}}
+							disabled={isSubmitting}
 							aria-label="Close"
 						>
 							<FiX size={12} />
@@ -276,7 +289,14 @@ function AddAssistantPresetBundleModalContent({
 						</div>
 
 						<div className="modal-action">
-							<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
+							<button
+								type="button"
+								className="btn bg-base-300 rounded-xl"
+								onClick={() => {
+									requestClose();
+								}}
+								disabled={isSubmitting}
+							>
 								Cancel
 							</button>
 							<button type="submit" className="btn btn-primary rounded-xl" disabled={!isFormValid || isSubmitting}>

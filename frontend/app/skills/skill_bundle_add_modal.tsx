@@ -71,8 +71,8 @@ function AddSkillBundleModalContent({ onClose, onSubmit, existingSlugs, existing
 		};
 	}, []);
 
-	const requestClose = () => {
-		if (isSubmitting) {
+	const requestClose = (force = false) => {
+		if (isSubmitting && !force) {
 			return;
 		}
 
@@ -135,7 +135,7 @@ function AddSkillBundleModalContent({ onClose, onSubmit, existingSlugs, existing
 		return next;
 	};
 
-	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
+	const handleSubmit: SubmitEventHandler<HTMLFormElement> = async e => {
 		e.preventDefault();
 		e.stopPropagation();
 
@@ -158,10 +158,14 @@ function AddSkillBundleModalContent({ onClose, onSubmit, existingSlugs, existing
 		setSubmitError('');
 		setIsSubmitting(true);
 		try {
-			void onSubmit(trimmed.slug, trimmed.displayName, trimmed.description || undefined);
-			requestClose();
+			await onSubmit(trimmed.slug, trimmed.displayName, trimmed.description || undefined);
+			if (!isUnmountingRef.current) {
+				requestClose(true);
+			}
 		} catch (error) {
-			setSubmitError(error instanceof Error ? error.message : 'Failed to create skill bundle.');
+			if (!isUnmountingRef.current) {
+				setSubmitError(error instanceof Error ? error.message : 'Failed to create skill bundle.');
+			}
 		} finally {
 			if (!isUnmountingRef.current) {
 				setIsSubmitting(false);
@@ -187,7 +191,15 @@ function AddSkillBundleModalContent({ onClose, onSubmit, existingSlugs, existing
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-auto rounded-2xl">
 				<div className="mb-4 flex items-center justify-between">
 					<h3 className="text-lg font-bold">Add Skill Bundle</h3>
-					<button type="button" className="btn btn-sm btn-circle bg-base-300" onClick={requestClose} aria-label="Close">
+					<button
+						type="button"
+						className="btn btn-sm btn-circle bg-base-300"
+						onClick={() => {
+							requestClose();
+						}}
+						disabled={isSubmitting}
+						aria-label="Close"
+					>
 						<FiX size={12} />
 					</button>
 				</div>
@@ -278,7 +290,14 @@ function AddSkillBundleModalContent({ onClose, onSubmit, existingSlugs, existing
 					</div>
 
 					<div className="modal-action">
-						<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose} disabled={isSubmitting}>
+						<button
+							type="button"
+							className="btn bg-base-300 rounded-xl"
+							onClick={() => {
+								requestClose();
+							}}
+							disabled={isSubmitting}
+						>
 							Cancel
 						</button>
 						<button type="submit" className="btn btn-primary rounded-xl" disabled={!isFormValid || isSubmitting}>

@@ -1103,6 +1103,66 @@ func TestAssistantPresetStore_ListAssistantPresets_PaginationAcrossBuiltInAndUse
 	}
 }
 
+func TestAssistantPresetStore_ListAssistantPresets_PaginatesAcrossMultipleBuiltInBundles(t *testing.T) {
+	bundleA := newTestBundle(t, "builtin-page-a", true)
+	bundleB := newTestBundle(t, "builtin-page-b", true)
+
+	presetA1 := newTestPreset(t, "builtin-page-a1", true)
+	presetA2 := newTestPreset(t, "builtin-page-a2", true)
+	presetB1 := newTestPreset(t, "builtin-page-b1", true)
+	presetB2 := newTestPreset(t, "builtin-page-b2", true)
+
+	s := newTestStore(
+		t,
+		newBuiltInFS(
+			t,
+			map[bundleitemutils.BundleID]spec.AssistantPresetBundle{
+				bundleA.ID: bundleA,
+				bundleB.ID: bundleB,
+			},
+			map[bundleitemutils.BundleID][]spec.AssistantPreset{
+				bundleA.ID: {presetA1, presetA2},
+				bundleB.ID: {presetB1, presetB2},
+			},
+		),
+	)
+
+	seen := map[string]struct{}{}
+	pageToken := ""
+
+	for {
+		req := &spec.ListAssistantPresetsRequest{RecommendedPageSize: 2}
+		if pageToken != "" {
+			req = &spec.ListAssistantPresetsRequest{PageToken: pageToken}
+		}
+
+		resp, err := s.ListAssistantPresets(t.Context(), req)
+		if err != nil {
+			t.Fatalf("ListAssistantPresets() error: %v", err)
+		}
+		if resp == nil || resp.Body == nil {
+			t.Fatal("ListAssistantPresets() returned nil body")
+		}
+
+		for _, item := range resp.Body.AssistantPresetListItems {
+			key := presetListKey(item)
+			if _, duplicate := seen[key]; duplicate {
+				t.Fatalf("duplicate preset returned across pages: %q", key)
+			}
+			seen[key] = struct{}{}
+		}
+
+		if resp.Body.NextPageToken == nil {
+			break
+		}
+		pageToken = *resp.Body.NextPageToken
+	}
+
+	if len(seen) != 4 {
+		t.Fatalf("got %d unique built-in presets, want 4", len(seen))
+	}
+}
+
 func TestAssistantPresetStore_ListAssistantPresets_Filtering(t *testing.T) {
 	s := newTestStore(t, nil)
 

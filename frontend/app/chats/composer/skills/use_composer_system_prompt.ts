@@ -257,7 +257,7 @@ export function useComposerSystemPrompt(args: {
 					instructionSkillSelections.map(sel => `skill-instructions:${buildSkillRefKey(sel.skillRef)}`)
 				);
 
-				const skillOptions = await loadSkillOptions();
+				const skillOptions = await loadSkillOptions({ force: true });
 				const skillOptionByKey = new Map(skillOptions.map(item => [item.key, item] as const));
 
 				for (const selection of instructionSkillSelections) {

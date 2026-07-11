@@ -33,12 +33,6 @@ const TOOL_EXPOSURE_OPTIONS = [
 	MCPToolExposure.MCPToolExposureSelected,
 ];
 
-const TOOL_EXPOSURE_DROPDOWN_ITEMS = {
-	[MCPToolExposure.MCPToolExposureNone]: { isEnabled: true },
-	[MCPToolExposure.MCPToolExposureAll]: { isEnabled: true },
-	[MCPToolExposure.MCPToolExposureSelected]: { isEnabled: true },
-};
-
 function getToolExposureLabel(exposure: MCPToolExposure): string {
 	switch (exposure) {
 		case MCPToolExposure.MCPToolExposureNone:
@@ -89,8 +83,13 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 		[availableServerOptions]
 	);
 
+	const selectableServerKeys = orderedKeys.filter(key => dropdownItems[key]?.isEnabled);
 	const effectiveNextServerKey =
-		orderedKeys.length > 0 ? (orderedKeys.includes(nextServerKey) ? nextServerKey : orderedKeys[0]) : '';
+		selectableServerKeys.length > 0
+			? selectableServerKeys.includes(nextServerKey)
+				? nextServerKey
+				: selectableServerKeys[0]
+			: '';
 
 	const handleAdd = () => {
 		const option = availableServerOptions.find(o => mcpServerKey(o.bundle.id, o.server.id) === effectiveNextServerKey);
@@ -174,6 +173,17 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 					const selectedResourceKeys = new Set(selection.selectedResources.map(mcpResourceKey));
 					const selectedTemplateKeys = new Set(selection.selectedResourceTemplates.map(mcpResourceTemplateKey));
 					const selectedPromptKeys = new Set(selection.selectedPrompts.map(mcpPromptKey));
+
+					const visibleTools = option.tools.filter(isMCPToolVisibleToModel);
+					const canUseSelectedToolExposure =
+						selection.selectedTools.length > 0 || (option.discoveryLoaded && visibleTools.length > 0);
+					const toolExposureDropdownItems: Record<MCPToolExposure, { isEnabled: boolean }> = {
+						[MCPToolExposure.MCPToolExposureNone]: { isEnabled: true },
+						[MCPToolExposure.MCPToolExposureAll]: { isEnabled: true },
+						[MCPToolExposure.MCPToolExposureSelected]: {
+							isEnabled: canUseSelectedToolExposure,
+						},
+					};
 
 					const status = getEffectiveMCPServerStatus(option.server.enabled, option.bundle.isEnabled, option.runtime);
 					const isReady = status === MCPServerStatus.MCPServerStatusReady;
@@ -314,10 +324,13 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 										<span className="text-sm">Tool Exposure</span>
 									</label>
 									<Dropdown<MCPToolExposure>
-										dropdownItems={TOOL_EXPOSURE_DROPDOWN_ITEMS}
+										dropdownItems={toolExposureDropdownItems}
 										orderedKeys={TOOL_EXPOSURE_OPTIONS}
 										selectedKey={selection.toolExposure}
 										onChange={value => {
+											if (value === MCPToolExposure.MCPToolExposureSelected && !canUseSelectedToolExposure) {
+												return;
+											}
 											mcpState.setToolExposure(option.bundle.id, option.server.id, value);
 										}}
 										getDisplayName={getToolExposureLabel}
@@ -325,6 +338,13 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 									/>
 								</div>
 							</div>
+
+							{selection.toolExposure === MCPToolExposure.MCPToolExposureSelected && !canUseSelectedToolExposure ? (
+								<div className="text-warning mt-3 text-xs">
+									Load discovery and select at least one model-visible tool, or switch Tool Exposure to No tools or All
+									tools before saving.
+								</div>
+							) : null}
 
 							{discoveryText && <div className="text-base-content/70 mt-3 text-sm">{discoveryText}</div>}
 
@@ -334,7 +354,7 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 										<div>
 											<div className="mb-2 text-sm font-semibold">Selected Tools</div>
 											<div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-												{option.tools.filter(isMCPToolVisibleToModel).map(tool => (
+												{visibleTools.map(tool => (
 													<label
 														key={mcpToolKey(tool)}
 														className="hover:bg-base-200 flex cursor-pointer items-center gap-2 rounded-lg p-1 text-sm"

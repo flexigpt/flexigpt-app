@@ -488,7 +488,7 @@ export function normalizeAssistantPresetMCPContext(
 				bundleID: resource.bundleID,
 				serverID: resource.serverID,
 				uri: resource.uri,
-				displayName: resource.displayName || resource.name || resource.uri,
+				displayName: resource.uri,
 			};
 
 			if (resource.digest) {
@@ -508,7 +508,7 @@ export function normalizeAssistantPresetMCPContext(
 				bundleID: template.bundleID,
 				serverID: template.serverID,
 				uriTemplate: template.uriTemplate,
-				displayName: template.displayName || template.name || template.uriTemplate,
+				displayName: template.uriTemplate,
 			};
 
 			if (argumentValues) {
@@ -533,7 +533,7 @@ export function normalizeAssistantPresetMCPContext(
 				bundleID: prompt.bundleID,
 				serverID: prompt.serverID,
 				promptName: prompt.promptName,
-				displayName: prompt.displayName || prompt.promptName,
+				displayName: prompt.promptName,
 			};
 
 			if (argumentValues) {

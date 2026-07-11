@@ -33,6 +33,7 @@ import { buildSkillRefKey } from '@/assistantpresets/lib/assistant_preset_utils'
 import type { ComposerSystemPromptController } from '@/chats/composer/skills/use_composer_system_prompt';
 import {
 	getSkillInstructionPromptEligibilityReason,
+	isInstructionInsertSkill,
 	skillCanBePreloadedAsActive,
 	skillCanBeRenderedAsInstructionPrompt,
 } from '@/skills/lib/skill_artifact_utils';
@@ -117,7 +118,7 @@ function getSkillSearchFields(item: SkillListItem) {
 }
 
 function isInstructionSkill(item: SkillListItem): boolean {
-	return (item.skillDefinition.insert || 'instructions') === 'instructions';
+	return isInstructionInsertSkill(item.skillDefinition);
 }
 
 function compareSkillRows(a: SkillListItem, b: SkillListItem): number {

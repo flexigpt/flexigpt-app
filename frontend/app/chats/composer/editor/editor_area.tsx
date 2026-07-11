@@ -1033,8 +1033,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 			// If conversation sync queued enabled/active skill refs via timeout,
 			// flush them now so this submit uses the latest skill selection.
-			const effectiveEnabledSkillRefs = getCurrentEnabledSkillRefs();
-			let activeForMessage = getCurrentActiveSkillRefs();
+			let effectiveEnabledSkillRefs = getCurrentEnabledSkillRefs();
 
 			// Pure send path: if we're *not* running tools, bail out when we
 			//    don't already have something to send.
@@ -1085,6 +1084,18 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						setSubmitError((err as Error)?.message || 'Failed to create skills session.');
 						return;
 					}
+				}
+
+				// A selection update may invalidate an in-flight session creation.
+				// Re-read the refs after awaiting and never send lifecycle selections
+				// without the corresponding authoritative runtime session.
+				effectiveEnabledSkillRefs = getCurrentEnabledSkillRefs();
+				let activeForMessage = getCurrentActiveSkillRefs();
+				if (!effectiveSkillSessionID && effectiveEnabledSkillRefs.length > 0) {
+					setSubmitError(
+						'Selected skills are still being synchronized. Wait briefly and send again so the skill session can be created.'
+					);
+					return;
 				}
 
 				// Build final message content after tools have run.

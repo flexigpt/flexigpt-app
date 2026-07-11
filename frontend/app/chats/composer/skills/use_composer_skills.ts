@@ -7,6 +7,7 @@ import { resolveStateUpdate } from '@/lib/hook_utils';
 
 import { skillStoreAPI } from '@/apis/baseapi';
 
+import { isInstructionInsertSkill } from '@/skills/lib/skill_artifact_utils';
 import {
 	areSkillRefListsEqual,
 	buildSkillRefsFingerprint,
@@ -52,7 +53,7 @@ function buildSkillSessionStateKey(enabled: SkillRef[], active: SkillRef[]): str
 }
 
 function isInstructionSkillListItem(item: SkillListItem): boolean {
-	return (item.skillDefinition.insert || 'instructions') === 'instructions';
+	return isInstructionInsertSkill(item.skillDefinition);
 }
 
 let composerSkillsCatalogCache: SkillListItem[] | undefined;

@@ -18,7 +18,9 @@ type PresetModalMode = 'add' | 'edit' | 'view';
 interface AssistantPresetBundleCardProps {
 	bundle: AssistantPresetBundle;
 	presets: AssistantPreset[];
+	presetLoadError?: string;
 
+	onRefreshPresets: () => Promise<void>;
 	onToggleBundleEnabled: (bundleID: string, enabled: boolean) => Promise<void>;
 	onTogglePresetEnabled: (bundleID: string, presetID: string) => Promise<void>;
 	onDeletePreset: (bundleID: string, presetID: string) => Promise<void>;
@@ -41,6 +43,8 @@ function getErrorMessage(error: unknown, fallback: string): string {
 export function AssistantPresetBundleCard({
 	bundle,
 	presets,
+	presetLoadError,
+	onRefreshPresets,
 	onToggleBundleEnabled,
 	onTogglePresetEnabled,
 	onDeletePreset,
@@ -52,6 +56,8 @@ export function AssistantPresetBundleCard({
 
 	const [isDeletePresetModalOpen, setIsDeletePresetModalOpen] = useState(false);
 	const [presetToDelete, setPresetToDelete] = useState<AssistantPreset | null>(null);
+	const [isDeletePresetPending, setIsDeletePresetPending] = useState(false);
+	const [isRefreshingPresets, setIsRefreshingPresets] = useState(false);
 
 	const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
 	const [presetModalMode, setPresetModalMode] = useState<PresetModalMode>('add');
@@ -84,7 +90,27 @@ export function AssistantPresetBundleCard({
 		});
 	};
 
+	const refreshPresets = async () => {
+		if (isRefreshingPresets) {
+			return;
+		}
+
+		setIsRefreshingPresets(true);
+		try {
+			await onRefreshPresets();
+		} catch (error) {
+			console.error('Reload assistant presets failed:', error);
+			openAlert(getErrorMessage(error, 'Failed to reload assistant presets.'));
+		} finally {
+			setIsRefreshingPresets(false);
+		}
+	};
+
 	const handleToggleBundleEnable = async () => {
+		if (isBundleTogglePending) {
+			return;
+		}
+
 		try {
 			setIsBundleTogglePending(true);
 			await onToggleBundleEnabled(bundle.id, !bundle.isEnabled);
@@ -97,6 +123,10 @@ export function AssistantPresetBundleCard({
 	};
 
 	const handlePresetEnableToggle = async (preset: AssistantPreset) => {
+		if (pendingPresetToggleIDs.has(preset.id)) {
+			return;
+		}
+
 		try {
 			setPresetTogglePending(preset.id, true);
 			await onTogglePresetEnabled(bundle.id, preset.id);
@@ -124,18 +154,24 @@ export function AssistantPresetBundleCard({
 	};
 
 	const confirmDeletePreset = async () => {
-		if (!presetToDelete) {
+		if (!presetToDelete || isDeletePresetPending) {
 			return;
 		}
 
+		setIsDeletePresetPending(true);
+		let deleted = false;
 		try {
 			await onDeletePreset(bundle.id, presetToDelete.id);
+			deleted = true;
 		} catch (error) {
 			console.error('Delete assistant preset failed:', error);
 			openAlert(getErrorMessage(error, 'Failed to delete assistant preset.'));
 		} finally {
-			setIsDeletePresetModalOpen(false);
-			setPresetToDelete(null);
+			setIsDeletePresetPending(false);
+			if (deleted) {
+				setIsDeletePresetModalOpen(false);
+				setPresetToDelete(null);
+			}
 		}
 	};
 
@@ -215,6 +251,25 @@ export function AssistantPresetBundleCard({
 					</div>
 				</div>
 			</div>
+
+			{presetLoadError ? (
+				<div className="alert alert-warning mt-3 rounded-2xl text-sm">
+					<div className="grow">
+						<div className="font-semibold">Assistant presets could not be loaded for this bundle</div>
+						<div>{presetLoadError}</div>
+					</div>
+					<button
+						type="button"
+						className="btn btn-sm rounded-xl"
+						onClick={() => {
+							void refreshPresets();
+						}}
+						disabled={isRefreshingPresets}
+					>
+						{isRefreshingPresets ? 'Reloading…' : 'Retry'}
+					</button>
+				</div>
+			) : null}
 
 			{isExpanded && (
 				<div className="mt-8 space-y-4">
@@ -337,8 +392,14 @@ export function AssistantPresetBundleCard({
 							<button
 								type="button"
 								className="btn btn-md btn-ghost flex items-center rounded-2xl"
-								disabled={presets.length > 0}
-								title={presets.length > 0 ? 'Delete all assistant presets from this bundle first.' : 'Delete Bundle'}
+								disabled={presets.length > 0 || Boolean(presetLoadError)}
+								title={
+									presetLoadError
+										? 'Reload assistant presets before deleting this bundle.'
+										: presets.length > 0
+											? 'Delete all assistant presets from this bundle first.'
+											: 'Delete Bundle'
+								}
 								onClick={() => {
 									onDeleteBundleRequested(bundle.id);
 								}}
@@ -365,8 +426,10 @@ export function AssistantPresetBundleCard({
 			<DeleteConfirmationModal
 				isOpen={isDeletePresetModalOpen}
 				onClose={() => {
-					setIsDeletePresetModalOpen(false);
-					setPresetToDelete(null);
+					if (!isDeletePresetPending) {
+						setIsDeletePresetModalOpen(false);
+						setPresetToDelete(null);
+					}
 				}}
 				onConfirm={confirmDeletePreset}
 				title="Delete Assistant Preset"

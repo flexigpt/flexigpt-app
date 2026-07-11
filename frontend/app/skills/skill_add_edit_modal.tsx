@@ -52,7 +52,7 @@ function buildSkillPreviewArgs(args?: SkillArgument[] | null): Record<string, st
 	return Object.fromEntries((args ?? []).map(arg => [arg.name, arg.default ?? ''] as const));
 }
 
-interface SkillItem {
+export interface SkillItem {
 	skill: Skill;
 	bundleID: string;
 	skillSlug: string;
@@ -66,6 +66,8 @@ interface AddEditSkillModalProps {
 	onSubmit: (skillData: SkillUpsertInput) => Promise<void>;
 	initialData?: SkillItem; // editing/viewing
 	existingSkills: SkillItem[];
+	prefillSkills?: SkillItem[];
+
 	mode?: ModalMode;
 }
 
@@ -238,7 +240,12 @@ function validateScaffoldArgumentLines(text: string): string | undefined {
 			continue;
 		}
 
-		const [rawName] = line.split('|');
+		const columns = line.split('|');
+		if (columns.length > 3) {
+			return `Argument line ${idx + 1} has too many columns. Use: name | description | default.`;
+		}
+
+		const [rawName] = columns;
 		const name = rawName?.trim() ?? '';
 
 		if (!name) {
@@ -257,7 +264,14 @@ function validateScaffoldArgumentLines(text: string): string | undefined {
 	return undefined;
 }
 
-function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkills, mode }: AddEditSkillModalProps) {
+function AddEditSkillModalContent({
+	onClose,
+	onSubmit,
+	initialData,
+	existingSkills,
+	prefillSkills,
+	mode,
+}: AddEditSkillModalProps) {
 	const requestedMode: ModalMode = mode ?? (initialData ? 'edit' : 'add');
 	const isForkMode = requestedMode === 'fork';
 	// Match the Tool modal pattern: unsupported impls can exist (viewable),
@@ -408,9 +422,10 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 		onClose();
 	};
 
+	const prefillCandidates = prefillSkills ?? existingSkills;
 	const copyableSkills = useMemo(
-		() => existingSkills.filter(item => item.skill.type === SkillType.FS),
-		[existingSkills]
+		() => prefillCandidates.filter(item => item.skill.type === SkillType.FS || creationMode === 'create'),
+		[creationMode, prefillCandidates]
 	);
 
 	const prefillSourceMap = useMemo<Record<string, SkillItem>>(() => {
@@ -839,7 +854,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 											disabled={prefillKeys.length === 0}
 											title={
 												prefillKeys.length === 0
-													? 'No filesystem skills are available to copy. Only filesystem skills can be created here.'
+													? 'No compatible source skills are available to copy into this managed skill.'
 													: undefined
 											}
 										>

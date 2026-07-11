@@ -27,6 +27,7 @@ import { toPutAssistantPresetPayload } from '@/assistantpresets/lib/assistant_pr
 interface BundleData {
 	bundle: AssistantPresetBundle;
 	presets: AssistantPreset[];
+	presetLoadError?: string;
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -45,6 +46,7 @@ export default function AssistantPresetsPage() {
 	const [alertMsg, setAlertMsg] = useState('');
 
 	const [bundleToDeleteID, setBundleToDeleteID] = useState<string | null>(null);
+	const [isDeletingBundle, setIsDeletingBundle] = useState(false);
 	const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
 	const bundleToDelete =
@@ -78,13 +80,27 @@ export default function AssistantPresetsPage() {
 
 	const refreshBundlePresets = useCallback(
 		async (bundleID: string) => {
-			const freshPresets = await loadPresetsForBundle(bundleID);
+			try {
+				const freshPresets = await loadPresetsForBundle(bundleID);
 
-			setBundles(prev =>
-				prev.map(bundleData =>
-					bundleData.bundle.id === bundleID ? { ...bundleData, presets: freshPresets } : bundleData
-				)
-			);
+				setBundles(prev =>
+					prev.map(bundleData =>
+						bundleData.bundle.id === bundleID
+							? { ...bundleData, presets: freshPresets, presetLoadError: undefined }
+							: bundleData
+					)
+				);
+			} catch (error) {
+				const message = getErrorMessage(error, 'Failed to load assistant presets for this bundle.');
+
+				setBundles(prev =>
+					prev.map(bundleData =>
+						bundleData.bundle.id === bundleID ? { ...bundleData, presetLoadError: message } : bundleData
+					)
+				);
+
+				throw error;
+			}
 		},
 		[loadPresetsForBundle]
 	);
@@ -100,8 +116,12 @@ export default function AssistantPresetsPage() {
 					try {
 						const presets = await loadPresetsForBundle(bundle.id);
 						return { bundle, presets };
-					} catch {
-						return { bundle, presets: [] };
+					} catch (error) {
+						return {
+							bundle,
+							presets: [],
+							presetLoadError: getErrorMessage(error, 'Failed to load assistant presets for this bundle.'),
+						};
 					}
 				})
 			);
@@ -284,28 +304,51 @@ export default function AssistantPresetsPage() {
 				})
 			);
 
-			await refreshBundlePresets(bundleID);
+			try {
+				await refreshBundlePresets(bundleID);
+			} catch (error) {
+				console.error('Assistant preset was saved but preset list refresh failed:', error);
+				setAlertMsg(
+					'Assistant preset version was saved, but the bundle could not be refreshed. Use Retry on the bundle before making destructive changes.'
+				);
+				setShowAlert(true);
+			}
 		},
 		[bundles, refreshBundlePresets]
 	);
 
 	const handleBundleDelete = useCallback(async () => {
-		if (!bundleToDeleteID) {
+		const deletingBundleID = bundleToDeleteID;
+		if (!deletingBundleID || isDeletingBundle) {
 			return;
 		}
 
-		try {
-			await assistantPresetStoreAPI.deleteAssistantPresetBundle(bundleToDeleteID);
+		const bundleData = bundles.find(item => item.bundle.id === deletingBundleID);
+		if (!bundleData || bundleData.presetLoadError || bundleData.presets.length > 0) {
+			setBundleToDeleteID(null);
+			setAlertMsg(
+				bundleData?.presetLoadError
+					? 'Reload this bundle’s presets before deleting it.'
+					: 'Remove all assistant presets from this bundle before deleting it.'
+			);
+			setShowAlert(true);
+			return;
+		}
 
-			setBundles(prev => prev.filter(bundleData => bundleData.bundle.id !== bundleToDeleteID));
+		setIsDeletingBundle(true);
+		try {
+			await assistantPresetStoreAPI.deleteAssistantPresetBundle(deletingBundleID);
+
+			setBundles(prev => prev.filter(item => item.bundle.id !== deletingBundleID));
 		} catch (error) {
 			console.error('Delete bundle failed:', error);
 			setAlertMsg(getErrorMessage(error, 'Failed to delete assistant preset bundle.'));
 			setShowAlert(true);
 		} finally {
+			setIsDeletingBundle(false);
 			setBundleToDeleteID(null);
 		}
-	}, [bundleToDeleteID]);
+	}, [bundleToDeleteID, bundles, isDeletingBundle]);
 
 	const handleAddBundle = useCallback(
 		async (slug: string, display: string, description?: string) => {
@@ -350,6 +393,8 @@ export default function AssistantPresetsPage() {
 								key={bundleData.bundle.id}
 								bundle={bundleData.bundle}
 								presets={bundleData.presets}
+								presetLoadError={bundleData.presetLoadError}
+								onRefreshPresets={() => refreshBundlePresets(bundleData.bundle.id)}
 								onToggleBundleEnabled={handleToggleBundleEnabled}
 								onTogglePresetEnabled={handleTogglePresetEnabled}
 								onDeletePreset={handleDeletePreset}
@@ -366,7 +411,9 @@ export default function AssistantPresetsPage() {
 				<DeleteConfirmationModal
 					isOpen={bundleToDelete !== null}
 					onClose={() => {
-						setBundleToDeleteID(null);
+						if (!isDeletingBundle) {
+							setBundleToDeleteID(null);
+						}
 					}}
 					onConfirm={handleBundleDelete}
 					title="Delete Assistant Preset Bundle"

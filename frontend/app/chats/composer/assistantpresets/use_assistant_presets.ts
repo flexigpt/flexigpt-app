@@ -26,6 +26,7 @@ import {
 	getAllMCPServerTools,
 } from '@/apis/list_helper';
 
+import type { AssistantPresetCatalogLoadErrors } from '@/assistantpresets/lib/assistant_preset_catalog';
 import { loadAssistantPresetEditorCatalog } from '@/assistantpresets/lib/assistant_preset_catalog';
 import {
 	getAllAssistantPresetBundles,
@@ -406,6 +407,7 @@ function getAssistantPresetAvailability(
 		modelOptionsByKey: Map<string, AssistantModelPresetOption>;
 		toolOptionsByKey: Map<string, AssistantToolOption>;
 		skillOptionsByKey: Map<string, AssistantSkillOption>;
+		catalogLoadErrors?: AssistantPresetCatalogLoadErrors;
 		mcpLookups?: AssistantPresetMCPAvailabilityLookups;
 	}
 ): Pick<AssistantPresetOptionItem, 'isSelectable' | 'availabilityReason'> {
@@ -418,7 +420,9 @@ function getAssistantPresetAvailability(
 		if (!option) {
 			return {
 				isSelectable: false,
-				availabilityReason: `Starting model preset "${key}" no longer exists.`,
+				availabilityReason: lookups.catalogLoadErrors?.models
+					? `Could not verify starting model preset "${key}": ${lookups.catalogLoadErrors.models}`
+					: `Starting model preset "${key}" no longer exists.`,
 			};
 		}
 
@@ -439,7 +443,9 @@ function getAssistantPresetAvailability(
 		if (!option) {
 			return {
 				isSelectable: false,
-				availabilityReason: `Tool "${key}" no longer exists.`,
+				availabilityReason: lookups.catalogLoadErrors?.tools
+					? `Could not verify tool "${key}": ${lookups.catalogLoadErrors.tools}`
+					: `Tool "${key}" no longer exists.`,
 			};
 		}
 
@@ -475,7 +481,9 @@ function getAssistantPresetAvailability(
 		if (!option) {
 			return {
 				isSelectable: false,
-				availabilityReason: `Skill "${key}" no longer exists.`,
+				availabilityReason: lookups.catalogLoadErrors?.skills
+					? `Could not verify skill "${key}": ${lookups.catalogLoadErrors.skills}`
+					: `Skill "${key}" no longer exists.`,
 			};
 		}
 
@@ -572,10 +580,12 @@ async function loadAssistantPresetOptions(force = false): Promise<AssistantPrese
 			return [{ item, preset }];
 		});
 
-		const mcpLookups = await loadAssistantPresetMCPAvailabilityLookups(
-			loadedPresetResults.map(result => result.preset)
-		);
-
+		let mcpLookups: AssistantPresetMCPAvailabilityLookups | undefined;
+		try {
+			mcpLookups = await loadAssistantPresetMCPAvailabilityLookups(loadedPresetResults.map(result => result.preset));
+		} catch (error: unknown) {
+			console.error('Failed to load MCP availability lookups for assistant presets:', error);
+		}
 		return loadedPresetResults.flatMap(({ item, preset }): AssistantPresetOptionItem[] => {
 			const bundle = bundleByID.get(item.bundleID);
 			const bundleDisplayName = bundle ? getBundleDisplayName(bundle, item.bundleID) : item.bundleSlug || item.bundleID;
@@ -586,6 +596,7 @@ async function loadAssistantPresetOptions(force = false): Promise<AssistantPrese
 				modelOptionsByKey,
 				toolOptionsByKey,
 				skillOptionsByKey,
+				catalogLoadErrors: catalog.loadErrors,
 				mcpLookups,
 			});
 

@@ -25,7 +25,7 @@ import {
 } from '@/skills/lib/skill_artifact_utils';
 import type { BundleData } from '@/skills/lib/skill_bundle_utils';
 import { sortBundleData } from '@/skills/lib/skill_bundle_utils';
-import type { SkillUpsertInput } from '@/skills/skill_add_edit_modal';
+import type { SkillItem, SkillUpsertInput } from '@/skills/skill_add_edit_modal';
 import { AddSkillBundleModal } from '@/skills/skill_bundle_add_modal';
 import { SkillBundleCard } from '@/skills/skill_bundle_card';
 
@@ -61,6 +61,17 @@ export default function SkillsPage() {
 		[bundles]
 	);
 	const allSkills = useMemo(() => bundles.flatMap(bundleData => bundleData.skills), [bundles]);
+	const allSkillItems = useMemo<SkillItem[]>(
+		() =>
+			bundles.flatMap(bundleData =>
+				bundleData.skills.map(skill => ({
+					skill,
+					bundleID: bundleData.bundle.id,
+					skillSlug: skill.slug,
+				}))
+			),
+		[bundles]
+	);
 	const insertCounts = useMemo(() => getSkillInsertCounts(allSkills), [allSkills]);
 	const allTags = useMemo(() => getAllSkillTags(allSkills), [allSkills]);
 	const activeTagFilters = useMemo(
@@ -271,6 +282,7 @@ export default function SkillsPage() {
 	const handleSubmitSkill = useCallback(
 		async (bundleID: string, partial: SkillUpsertInput, existingSkillSlug?: string) => {
 			try {
+				// A successful write is authoritative even if the follow-up list refresh fails.
 				if (existingSkillSlug) {
 					await skillStoreAPI.patchSkill(
 						bundleID,
@@ -332,11 +344,21 @@ export default function SkillsPage() {
 						partial.tags
 					);
 				}
-
-				await refreshBundleSkills(bundleID);
 			} catch (err) {
 				console.error(existingSkillSlug ? 'Edit skill failed:' : 'Add skill failed:', err);
 				throw err;
+			}
+
+			try {
+				await refreshBundleSkills(bundleID);
+			} catch (err) {
+				console.error('Skill was saved but bundle refresh failed:', err);
+				if (isMountedRef.current) {
+					setAlertMsg(
+						'The skill was saved, but the bundle could not be refreshed. Use Retry on the bundle before making further changes.'
+					);
+					setShowAlert(true);
+				}
 			}
 		},
 		[refreshBundleSkills]
@@ -592,6 +614,7 @@ export default function SkillsPage() {
 									bundle={bundleData.bundle}
 									skills={bundleData.skills}
 									skillLoadError={bundleData.skillLoadError}
+									prefillSkills={allSkillItems}
 									onRefreshSkills={() => {
 										return refreshBundleSkills(bundleData.bundle.id);
 									}}

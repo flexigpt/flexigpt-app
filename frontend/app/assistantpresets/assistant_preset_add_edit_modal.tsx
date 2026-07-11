@@ -616,6 +616,7 @@ function AddEditAssistantPresetModalContent({
 		getInitialFormData(initialData, existingPresets, isEditMode)
 	);
 	const [submitError, setSubmitError] = useState('');
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	const [catalog, setCatalog] = useState<AssistantPresetEditorCatalog | null>(null);
 	const [catalogLoading, setCatalogLoading] = useState(true);
@@ -640,7 +641,7 @@ function AddEditAssistantPresetModalContent({
 		setCatalogError('');
 
 		try {
-			const loaded = await loadAssistantPresetEditorCatalog();
+			const loaded = await loadAssistantPresetEditorCatalog({ force: true });
 			setCatalog(loaded);
 		} catch (error) {
 			console.error('Failed to load assistant preset editor catalog:', error);
@@ -686,16 +687,23 @@ function AddEditAssistantPresetModalContent({
 		mcpState.restoreContext(initialData?.preset.startingMCPContext);
 	}, [initialData?.preset.startingMCPContext, mcpState]);
 
-	const requestClose = useCallback(() => {
-		const dialog = dialogRef.current;
+	const requestClose = useCallback(
+		(force = false) => {
+			if (isSubmitting && !force) {
+				return;
+			}
 
-		if (dialog?.open) {
-			dialog.close();
-			return;
-		}
+			const dialog = dialogRef.current;
 
-		onClose();
-	}, [onClose]);
+			if (dialog?.open) {
+				dialog.close();
+				return;
+			}
+
+			onClose();
+		},
+		[isSubmitting, onClose]
+	);
 
 	const handleDialogClose = useCallback(() => {
 		if (isUnmountingRef.current) {
@@ -729,6 +737,9 @@ function AddEditAssistantPresetModalContent({
 
 	const toolOptions = catalog?.toolOptions ?? EMPTY_TOOL_OPTIONS;
 	const skillOptions = catalog?.skillOptions ?? EMPTY_SKILL_OPTIONS;
+	const catalogLoadErrors = catalog?.loadErrors;
+	const toolCatalogUnavailable = Boolean(catalogLoadErrors?.tools);
+	const skillCatalogUnavailable = Boolean(catalogLoadErrors?.skills);
 
 	const modelOptionByKey = useMemo(() => createOptionMap(modelPresetOptions), [modelPresetOptions]);
 	const toolOptionByKey = useMemo(() => createOptionMap(toolOptions), [toolOptions]);
@@ -833,7 +844,9 @@ function AddEditAssistantPresetModalContent({
 				const selectedModelOption = modelOptionByKey.get(state.startingModelPresetKey);
 
 				if (!selectedModelOption) {
-					nextErrors.modelPreset = 'Selected model preset no longer exists.';
+					if (!catalogLoadErrors?.models) {
+						nextErrors.modelPreset = 'Selected model preset no longer exists.';
+					}
 				} else if (!selectedModelOption.isSelectable) {
 					nextErrors.modelPreset = selectedModelOption.availabilityReason ?? 'Selected model preset is not available.';
 				}
@@ -919,7 +932,7 @@ function AddEditAssistantPresetModalContent({
 						: undefined;
 					const invalidTool = state.startingToolSelections.find(selection => {
 						const option = toolOptionByKey.get(buildToolRefKey(selection.toolRef));
-						return !option || !option.isSelectable;
+						return option ? !option.isSelectable : !toolCatalogUnavailable;
 					});
 
 					if (invalidTool) {
@@ -959,7 +972,10 @@ function AddEditAssistantPresetModalContent({
 							if (!raw) {
 								return false;
 							}
-							if (!option?.hasUserArgSchema) {
+							if (!option) {
+								return !toolCatalogUnavailable;
+							}
+							if (!option.hasUserArgSchema) {
 								return true;
 							}
 
@@ -984,7 +1000,7 @@ function AddEditAssistantPresetModalContent({
 				} else {
 					const invalid = state.startingSkillSelections.find(sel => {
 						const option = skillOptionByKey.get(buildSkillRefKey(sel.skillRef));
-						return !option || !option.isSelectable;
+						return option ? !option.isSelectable : !skillCatalogUnavailable;
 					});
 
 					if (invalid) {
@@ -1006,10 +1022,11 @@ function AddEditAssistantPresetModalContent({
 						const option = skillOptionByKey.get(buildSkillRefKey(sel.skillRef));
 						return (
 							sel.useAsInstructions &&
-							(!option ||
-								!isInstructionInsertSkill(option.skillDefinition) ||
-								Boolean(getSkillInstructionPromptEligibilityReason(option.skillDefinition)) ||
-								sel.preLoadAsActive)
+							(option
+								? !isInstructionInsertSkill(option.skillDefinition) ||
+									Boolean(getSkillInstructionPromptEligibilityReason(option.skillDefinition)) ||
+									sel.preLoadAsActive
+								: !skillCatalogUnavailable)
 						);
 					});
 					if (!nextErrors.startingSkillSelections && invalidInstructionUse) {
@@ -1028,6 +1045,9 @@ function AddEditAssistantPresetModalContent({
 			existingPresets,
 			initialPresetID,
 			initialPresetSlug,
+			catalogLoadErrors?.models,
+			skillCatalogUnavailable,
+			toolCatalogUnavailable,
 			initialPresetVersion,
 			isEditMode,
 			modelOptionByKey,
@@ -1188,7 +1208,8 @@ function AddEditAssistantPresetModalContent({
 
 	const isAllValid =
 		isViewMode ||
-		(Boolean(catalog) &&
+		(!isSubmitting &&
+			Boolean(catalog) &&
 			!catalogLoading &&
 			!catalogError &&
 			!mcpState.argumentsBlocked &&
@@ -1388,7 +1409,7 @@ function AddEditAssistantPresetModalContent({
 		e.preventDefault();
 		e.stopPropagation();
 
-		if (isViewMode) {
+		if (isViewMode || isSubmitting) {
 			return;
 		}
 
@@ -1404,24 +1425,35 @@ function AddEditAssistantPresetModalContent({
 			return;
 		}
 
+		setIsSubmitting(true);
 		try {
 			let startingModelPresetRef: AssistantPresetUpsertInput['startingModelPresetRef'];
 
 			if (formData.startingModelPresetKey) {
 				const selectedModelOption = modelOptionByKey.get(formData.startingModelPresetKey);
 
-				if (!selectedModelOption || !selectedModelOption.isSelectable) {
+				if (selectedModelOption?.isSelectable) {
+					startingModelPresetRef = selectedModelOption.ref;
+				} else if (
+					catalogLoadErrors?.models &&
+					initialData?.preset.startingModelPresetRef &&
+					buildModelPresetRefKey(initialData.preset.startingModelPresetRef) === formData.startingModelPresetKey
+				) {
+					startingModelPresetRef = {
+						providerName: initialData.preset.startingModelPresetRef.providerName,
+						modelPresetID: initialData.preset.startingModelPresetRef.modelPresetID,
+					};
+				} else {
 					setSubmitError(selectedModelOption?.availabilityReason ?? 'Selected model preset is not available.');
 					return;
 				}
-
-				startingModelPresetRef = selectedModelOption.ref;
 			}
 
 			const startingToolSelections = formData.startingToolSelections.map(selection => {
 				const toolOption = toolOptionByKey.get(buildToolRefKey(selection.toolRef));
 				const autoExecute = triStateToBoolean(selection.autoExecuteMode);
-				const userArgSchemaInstance = toolOption?.hasUserArgSchema ? selection.userArgSchemaInstance.trim() : '';
+				const userArgSchemaInstance =
+					toolOption?.hasUserArgSchema === false ? '' : selection.userArgSchemaInstance.trim();
 
 				const toolChoicePatch =
 					autoExecute === undefined && !userArgSchemaInstance
@@ -1467,9 +1499,15 @@ function AddEditAssistantPresetModalContent({
 			};
 
 			await onSubmit(payload);
-			requestClose();
+			requestClose(true);
 		} catch (error) {
-			setSubmitError(getErrorMessage(error, 'Failed to save assistant preset.'));
+			if (!isUnmountingRef.current) {
+				setSubmitError(getErrorMessage(error, 'Failed to save assistant preset.'));
+			}
+		} finally {
+			if (!isUnmountingRef.current) {
+				setIsSubmitting(false);
+			}
 		}
 	};
 
@@ -1498,7 +1536,10 @@ function AddEditAssistantPresetModalContent({
 						<button
 							type="button"
 							className="btn btn-sm btn-circle bg-base-300"
-							onClick={requestClose}
+							onClick={() => {
+								requestClose();
+							}}
+							disabled={isSubmitting}
 							aria-label="Close"
 						>
 							<FiX size={12} />
@@ -1527,6 +1568,23 @@ function AddEditAssistantPresetModalContent({
 								<div className="flex grow items-center gap-2">
 									<FiAlertCircle size={14} />
 									<span>{catalogError}</span>
+								</div>
+								<button type="button" className="btn btn-sm rounded-xl" onClick={handleCatalogRetry}>
+									<FiRefreshCw size={14} />
+									<span className="ml-1">Retry</span>
+								</button>
+							</div>
+						)}
+
+						{catalogLoadErrors && (
+							<div className="alert alert-warning rounded-2xl text-sm">
+								<div className="grow">
+									<div className="font-semibold">Some dependency catalogs could not be verified</div>
+									<div>{Object.values(catalogLoadErrors).join(' ')}</div>
+									<div className="mt-1 text-xs">
+										Existing references are preserved for backend validation. New unavailable references cannot be
+										added.
+									</div>
 								</div>
 								<button type="button" className="btn btn-sm rounded-xl" onClick={handleCatalogRetry}>
 									<FiRefreshCw size={14} />
@@ -1993,12 +2051,19 @@ function AddEditAssistantPresetModalContent({
 						)}
 
 						<div className="modal-action">
-							<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
+							<button
+								type="button"
+								className="btn bg-base-300 rounded-xl"
+								onClick={() => {
+									requestClose();
+								}}
+								disabled={isSubmitting}
+							>
 								{isViewMode ? 'Close' : 'Cancel'}
 							</button>
 							{!isViewMode && (
 								<button type="submit" className="btn btn-primary rounded-xl" disabled={!isAllValid}>
-									Save
+									{isSubmitting ? 'Saving…' : 'Save'}
 								</button>
 							)}
 						</div>
