@@ -15,7 +15,10 @@ import { generateTitle } from '@/lib/title_utils';
 import { conversationStoreAPI } from '@/apis/baseapi';
 
 import type { ConversationAreaHandle } from '@/chats/conversation/conversation_area';
-import { hydrateConversationAsync, toStoreConversation } from '@/chats/conversation/conversation_persistence_mapper';
+import {
+	hydrateConversationAsync,
+	toStoreConversationAsync,
+} from '@/chats/conversation/conversation_persistence_mapper';
 import { initConversation } from '@/chats/conversation/hydration_helper';
 import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';
 import type { ConversationSearchHandle } from '@/chats/search/conversation_search';
@@ -61,6 +64,18 @@ async function yieldBeforeBackgroundWork(): Promise<void> {
 	}
 	await new Promise<void>(resolve => {
 		window.setTimeout(resolve, 0);
+	});
+}
+
+async function yieldUntilAfterNextPaint(): Promise<void> {
+	if (typeof window === 'undefined' || typeof document === 'undefined' || document.visibilityState === 'hidden') {
+		return;
+	}
+
+	await new Promise<void>(resolve => {
+		window.requestAnimationFrame(() => {
+			window.setTimeout(resolve, 0);
+		});
 	});
 }
 
@@ -377,6 +392,22 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 					}
 
 					conversationAreaRef.current?.clearStreamForTab(tabId);
+
+					updateTab(tabId, prev => ({
+						...prev,
+						isLoaded: true,
+						isBusy: false,
+						isHydrating: true,
+						editingMessageId: null,
+						isPersisted: true,
+						conversation: hydrated,
+					}));
+
+					await yieldUntilAfterNextPaint();
+					if (!isTabLoadCurrent(tabId, loadVersion)) {
+						return;
+					}
+
 					conversationAreaRef.current?.syncComposerFromConversation(tabId, hydrated);
 
 					updateTab(tabId, prev => ({
@@ -385,8 +416,6 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 						isBusy: false,
 						isHydrating: false,
 						editingMessageId: null,
-						isPersisted: true,
-						conversation: hydrated,
 					}));
 				} catch (error) {
 					if (!isTabLoadCurrent(tabId, loadVersion)) {
@@ -594,7 +623,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			}));
 
 			enqueueSaveForTab(tabId, async () => {
-				const storeConversation = toStoreConversation(conversationToSave);
+				const storeConversation = await toStoreConversationAsync(conversationToSave);
 				if (needsFullSave) {
 					await conversationStoreAPI.putConversation(storeConversation);
 					await bumpSearchKey();
@@ -793,7 +822,6 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 				}
 
 				conversationAreaRef.current?.clearStreamForTab(tabId);
-				conversationAreaRef.current?.syncComposerFromConversation(tabId, hydrated);
 				conversationAreaRef.current?.resetScrollToTop(tabId);
 
 				updateTab(tabId, tab => ({
@@ -801,6 +829,22 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 					conversation: hydrated,
 					isPersisted: true,
 					manualTitleLocked: false,
+					editingMessageId: null,
+					isBusy: false,
+					isLoaded: true,
+					isHydrating: true,
+				}));
+
+				await yieldUntilAfterNextPaint();
+				if (!isTabLoadCurrent(tabId, loadVersion)) {
+					return;
+				}
+
+				conversationAreaRef.current?.syncComposerFromConversation(tabId, hydrated);
+
+				updateTab(tabId, tab => ({
+					...tab,
+					isPersisted: true,
 					editingMessageId: null,
 					isBusy: false,
 					isLoaded: true,

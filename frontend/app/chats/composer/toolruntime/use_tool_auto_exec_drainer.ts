@@ -34,15 +34,15 @@ export function useToolAutoExecDrainer({
 	const isMountedRef = useRef(true);
 	const isBlockedRef = useRef(isBlocked);
 	const isPumpingRef = useRef(false);
-	const scheduledFrameRef = useRef<number | null>(null);
+	const scheduledPumpTimerRef = useRef<number | null>(null);
 
 	useEffect(() => {
 		isMountedRef.current = true;
 		return () => {
 			isMountedRef.current = false;
-			if (scheduledFrameRef.current !== null) {
-				window.cancelAnimationFrame(scheduledFrameRef.current);
-				scheduledFrameRef.current = null;
+			if (scheduledPumpTimerRef.current !== null) {
+				window.clearTimeout(scheduledPumpTimerRef.current);
+				scheduledPumpTimerRef.current = null;
 			}
 		};
 	}, []);
@@ -112,11 +112,11 @@ export function useToolAutoExecDrainer({
 				syncState('idle', null);
 			} else if (isBlockedRef.current) {
 				syncState('blocked', null);
-			} else if (scheduledFrameRef.current === null && isMountedRef.current) {
-				scheduledFrameRef.current = window.requestAnimationFrame(() => {
-					scheduledFrameRef.current = null;
+			} else if (scheduledPumpTimerRef.current === null && isMountedRef.current) {
+				scheduledPumpTimerRef.current = window.setTimeout(() => {
+					scheduledPumpTimerRef.current = null;
 					void pump();
-				});
+				}, 0);
 			}
 		}
 	}, [getNextCall, runToolCall, syncState]);
@@ -124,9 +124,9 @@ export function useToolAutoExecDrainer({
 	useEffect(() => {
 		isBlockedRef.current = isBlocked;
 
-		if (scheduledFrameRef.current !== null) {
-			window.cancelAnimationFrame(scheduledFrameRef.current);
-			scheduledFrameRef.current = null;
+		if (scheduledPumpTimerRef.current !== null) {
+			window.clearTimeout(scheduledPumpTimerRef.current);
+			scheduledPumpTimerRef.current = null;
 		}
 
 		void pump();

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 
 const SCROLL_AT_TOP_THRESHOLD = 8;
 const SCROLL_AT_BOTTOM_THRESHOLD = 128;
+const SCROLL_AUTO_FOLLOW_THRESHOLD = 24;
 const MESSAGE_SCROLL_MARGIN = 12;
 
 function getDistanceFromBottom(el: HTMLElement): number {
@@ -11,6 +12,10 @@ function getDistanceFromBottom(el: HTMLElement): number {
 
 function isElementAtBottom(el: HTMLElement): boolean {
 	return getDistanceFromBottom(el) <= SCROLL_AT_BOTTOM_THRESHOLD;
+}
+
+function shouldElementAutoFollow(el: HTMLElement): boolean {
+	return getDistanceFromBottom(el) <= SCROLL_AUTO_FOLLOW_THRESHOLD;
 }
 
 function isElementAtTop(el: HTMLElement): boolean {
@@ -134,8 +139,9 @@ export function useScrollRestore({
 	}, [activeTabIsHydrating]);
 
 	const scrollStateRafRef = useRef<number | null>(null);
+	const scrollStateShouldIncludeJumpsRef = useRef(false);
 	const resizeObserverRafRef = useRef<number | null>(null);
-	const resizeObserverJumpTimerRef = useRef<number | null>(null);
+	const messageJumpTimerRef = useRef<number | null>(null);
 	const observedContentSizeRef = useRef<{ width: number; height: number } | null>(null);
 
 	useEffect(() => {
@@ -180,7 +186,7 @@ export function useScrollRestore({
 
 			const nextAtTop = isElementAtTop(el);
 			const nextAtBottom = isElementAtBottom(el);
-			shouldAutoFollowRef.current = nextAtBottom;
+			shouldAutoFollowRef.current = shouldElementAutoFollow(el);
 
 			const jumpState = includeMessageJumps
 				? getMessageJumpAvailability(el, messageElementsRef.current)
@@ -200,16 +206,36 @@ export function useScrollRestore({
 		[setScrollIndicatorStateIfChanged]
 	);
 
-	const scheduleScrollStateUpdate = useCallback(() => {
-		if (scrollStateRafRef.current !== null) {
-			return;
+	const scheduleScrollStateUpdate = useCallback(
+		(includeMessageJumps = false) => {
+			if (includeMessageJumps) {
+				scrollStateShouldIncludeJumpsRef.current = true;
+			}
+
+			if (scrollStateRafRef.current !== null) {
+				return;
+			}
+
+			scrollStateRafRef.current = window.requestAnimationFrame(() => {
+				scrollStateRafRef.current = null;
+				const shouldIncludeJumps = scrollStateShouldIncludeJumpsRef.current;
+				scrollStateShouldIncludeJumpsRef.current = false;
+				updateScrollStateNow(scrollContainerRef.current, shouldIncludeJumps);
+			});
+		},
+		[updateScrollStateNow]
+	);
+
+	const scheduleMessageJumpStateUpdate = useCallback(() => {
+		if (messageJumpTimerRef.current !== null) {
+			window.clearTimeout(messageJumpTimerRef.current);
 		}
 
-		scrollStateRafRef.current = window.requestAnimationFrame(() => {
-			scrollStateRafRef.current = null;
-			updateScrollStateNow(scrollContainerRef.current);
-		});
-	}, [updateScrollStateNow]);
+		messageJumpTimerRef.current = window.setTimeout(() => {
+			messageJumpTimerRef.current = null;
+			scheduleScrollStateUpdate(true);
+		}, 120);
+	}, [scheduleScrollStateUpdate]);
 
 	useEffect(() => {
 		return () => {
@@ -221,9 +247,9 @@ export function useScrollRestore({
 				window.cancelAnimationFrame(resizeObserverRafRef.current);
 				resizeObserverRafRef.current = null;
 			}
-			if (resizeObserverJumpTimerRef.current !== null) {
-				window.clearTimeout(resizeObserverJumpTimerRef.current);
-				resizeObserverJumpTimerRef.current = null;
+			if (messageJumpTimerRef.current !== null) {
+				window.clearTimeout(messageJumpTimerRef.current);
+				messageJumpTimerRef.current = null;
 			}
 		};
 	}, []);
@@ -231,7 +257,7 @@ export function useScrollRestore({
 	const setScrollContainerRef = useCallback(
 		(el: HTMLDivElement | null) => {
 			scrollContainerRef.current = el;
-			scheduleScrollStateUpdate();
+			scheduleScrollStateUpdate(true);
 		},
 		[scheduleScrollStateUpdate]
 	);
@@ -247,9 +273,11 @@ export function useScrollRestore({
 			return;
 		}
 
+		shouldAutoFollowRef.current = shouldElementAutoFollow(el);
 		persistScrollPosition(tabId, el);
-		scheduleScrollStateUpdate();
-	}, [persistScrollPosition, scheduleScrollStateUpdate, selectedTabIdRef]);
+		scheduleScrollStateUpdate(false);
+		scheduleMessageJumpStateUpdate();
+	}, [persistScrollPosition, scheduleMessageJumpStateUpdate, scheduleScrollStateUpdate, selectedTabIdRef]);
 
 	const scrollElementToBottom = useCallback((el: HTMLElement | null) => {
 		if (!el) {
@@ -285,13 +313,13 @@ export function useScrollRestore({
 			shouldAutoFollowRef.current = false;
 			el.scrollTop = nextTop;
 			persistScrollPosition(selectedTabId, el);
-			scheduleScrollStateUpdate();
+			scheduleScrollStateUpdate(true);
 		} else if (el && selectedTabId && !activeTabIsHydrating && messageCountIncreased && shouldAutoFollowRef.current) {
 			scrollElementToBottom(el);
 			persistScrollPosition(selectedTabId, el);
-			scheduleScrollStateUpdate();
+			scheduleScrollStateUpdate(true);
 		} else if (el) {
-			scheduleScrollStateUpdate();
+			scheduleScrollStateUpdate(true);
 		}
 
 		previousRenderRef.current = {
@@ -352,13 +380,7 @@ export function useScrollRestore({
 
 				updateScrollStateNow(scrollerEl, false);
 
-				if (resizeObserverJumpTimerRef.current !== null) {
-					window.clearTimeout(resizeObserverJumpTimerRef.current);
-				}
-				resizeObserverJumpTimerRef.current = window.setTimeout(() => {
-					resizeObserverJumpTimerRef.current = null;
-					scheduleScrollStateUpdate();
-				}, 120);
+				scheduleMessageJumpStateUpdate();
 			});
 		});
 		observer.observe(contentEl);
@@ -368,12 +390,18 @@ export function useScrollRestore({
 				window.cancelAnimationFrame(resizeObserverRafRef.current);
 				resizeObserverRafRef.current = null;
 			}
-			if (resizeObserverJumpTimerRef.current !== null) {
-				window.clearTimeout(resizeObserverJumpTimerRef.current);
-				resizeObserverJumpTimerRef.current = null;
+			if (messageJumpTimerRef.current !== null) {
+				window.clearTimeout(messageJumpTimerRef.current);
+				messageJumpTimerRef.current = null;
 			}
 		};
-	}, [persistScrollPosition, scheduleScrollStateUpdate, scrollElementToBottom, selectedTabIdRef, updateScrollStateNow]);
+	}, [
+		persistScrollPosition,
+		scheduleMessageJumpStateUpdate,
+		scrollElementToBottom,
+		selectedTabIdRef,
+		updateScrollStateNow,
+	]);
 
 	const scrollTabToBottomSoon = useCallback(
 		(tabId: string) => {

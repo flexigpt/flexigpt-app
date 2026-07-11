@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import { startTransition, useCallback } from 'react';
+import { useCallback } from 'react';
 
 import type { Conversation, ConversationMessage } from '@/spec/conversation';
 import type { InferenceError, ModelParam, OutputUnion, UIToolCall } from '@/spec/inference';
@@ -139,7 +139,10 @@ export function useSendMessage({
 			abortRef.current?.abort();
 			tokensReceivedByTabRef.current.set(tabId, false);
 
-			updateTab(tabId, tab => ({ ...tab, isBusy: true }));
+			const allMessages = sliceMessagesForSend(updatedChatWithUserMessage.messages, options.includePreviousMessages);
+			if (allMessages.length === 0) {
+				return;
+			}
 
 			let reqId: string;
 			try {
@@ -152,12 +155,6 @@ export function useSendMessage({
 
 			const controller = new AbortController();
 			abortRef.current = controller;
-
-			const allMessages = sliceMessagesForSend(updatedChatWithUserMessage.messages, options.includePreviousMessages);
-			if (allMessages.length === 0) {
-				updateTab(tabId, tab => ({ ...tab, isBusy: false }));
-				return;
-			}
 
 			const currentUserMsg = allMessages.at(-1);
 			const history = allMessages.slice(0, allMessages.length - 1);
@@ -179,6 +176,7 @@ export function useSendMessage({
 
 			updateTab(tabId, tab => ({
 				...tab,
+				isBusy: true,
 				conversation: { ...chatWithPlaceholder, messages: [...chatWithPlaceholder.messages] },
 			}));
 
@@ -468,10 +466,8 @@ export function useSendMessage({
 				}
 			} finally {
 				if (tabExists(tabId) && requestIdByTabRef.current.get(tabId) === reqId) {
+					updateTab(tabId, tab => (tab.isBusy ? { ...tab, isBusy: false } : tab));
 					clearStreamBuffer(tabId);
-					startTransition(() => {
-						updateTab(tabId, tab => ({ ...tab, isBusy: false }));
-					});
 
 					const finishPayload: AssistantTurnFinishedPayload = {
 						loadedRunnableToolCallCount: queuedRunnableToolCalls.length,

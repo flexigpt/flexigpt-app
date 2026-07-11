@@ -17,6 +17,49 @@ export interface AssistantPresetEditorCatalog {
 	skillOptions: AssistantSkillOption[];
 }
 
+export interface AssistantPresetCatalogLoadOptions {
+	force?: boolean;
+}
+
+interface AsyncCatalogCache<T> {
+	value?: T;
+	promise?: Promise<T>;
+}
+
+const modelOptionsCache: AsyncCatalogCache<AssistantModelPresetOption[]> = {};
+const toolOptionsCache: AsyncCatalogCache<AssistantToolOption[]> = {};
+const skillOptionsCache: AsyncCatalogCache<AssistantSkillOption[]> = {};
+const editorCatalogCache: AsyncCatalogCache<AssistantPresetEditorCatalog> = {};
+
+function loadWithCache<T>(cache: AsyncCatalogCache<T>, loader: () => Promise<T>, force: boolean): Promise<T> {
+	if (cache.promise) {
+		return cache.promise;
+	}
+	if (!force && cache.value !== undefined) {
+		return Promise.resolve(cache.value);
+	}
+
+	const request = loader().then(value => {
+		cache.value = value;
+		return value;
+	});
+	cache.promise = request;
+
+	void request.then(
+		() => {
+			if (cache.promise === request) {
+				cache.promise = undefined;
+			}
+		},
+		() => {
+			if (cache.promise === request) {
+				cache.promise = undefined;
+			}
+		}
+	);
+	return request;
+}
+
 async function collectAllPages<TResponse, TItem>(
 	fetchPage: (pageToken?: string) => Promise<TResponse>,
 	pickItems: (response: TResponse) => TItem[],
@@ -67,7 +110,7 @@ function getModelAvailabilityReason(provider: ProviderPreset, modelEnabled: bool
 	return undefined;
 }
 
-async function loadModelPresetOptions(): Promise<AssistantModelPresetOption[]> {
+async function loadModelPresetOptionsUncached(): Promise<AssistantModelPresetOption[]> {
 	const providers = await collectAllPages(
 		pageToken => modelPresetStoreAPI.listProviderPresets(undefined, true, 200, pageToken),
 		response => response.providers,
@@ -104,7 +147,11 @@ async function loadModelPresetOptions(): Promise<AssistantModelPresetOption[]> {
 	return sortByBuiltInThenLabel(options);
 }
 
-export async function loadToolOptions(): Promise<AssistantToolOption[]> {
+function loadModelPresetOptions(options: AssistantPresetCatalogLoadOptions = {}) {
+	return loadWithCache(modelOptionsCache, loadModelPresetOptionsUncached, options.force === true);
+}
+
+async function loadToolOptionsUncached(): Promise<AssistantToolOption[]> {
 	const [toolBundles, toolListItems] = await Promise.all([
 		collectAllPages(
 			pageToken => toolStoreAPI.listToolBundles(undefined, true, 200, pageToken),
@@ -163,7 +210,11 @@ export async function loadToolOptions(): Promise<AssistantToolOption[]> {
 	return sortByBuiltInThenLabel(options);
 }
 
-export async function loadSkillOptions(): Promise<AssistantSkillOption[]> {
+export function loadToolOptions(options: AssistantPresetCatalogLoadOptions = {}) {
+	return loadWithCache(toolOptionsCache, loadToolOptionsUncached, options.force === true);
+}
+
+async function loadSkillOptionsUncached(): Promise<AssistantSkillOption[]> {
 	const [skillBundles, skillListItems] = await Promise.all([
 		collectAllPages(
 			pageToken => skillStoreAPI.listSkillBundles(undefined, true, 200, pageToken),
@@ -238,16 +289,26 @@ export async function loadSkillOptions(): Promise<AssistantSkillOption[]> {
 	return sortByBuiltInThenLabel(options);
 }
 
-export async function loadAssistantPresetEditorCatalog(): Promise<AssistantPresetEditorCatalog> {
-	const [modelPresetOptions, toolOptions, skillOptions] = await Promise.all([
-		loadModelPresetOptions(),
-		loadToolOptions(),
-		loadSkillOptions(),
-	]);
+export function loadSkillOptions(options: AssistantPresetCatalogLoadOptions = {}) {
+	return loadWithCache(skillOptionsCache, loadSkillOptionsUncached, options.force === true);
+}
 
-	return {
-		modelPresetOptions,
-		toolOptions,
-		skillOptions,
-	};
+export function loadAssistantPresetEditorCatalog(
+	options: AssistantPresetCatalogLoadOptions = {}
+): Promise<AssistantPresetEditorCatalog> {
+	const force = options.force === true;
+
+	return loadWithCache(
+		editorCatalogCache,
+		async () => {
+			const [modelPresetOptions, toolOptions, skillOptions] = await Promise.all([
+				loadModelPresetOptions({ force }),
+				loadToolOptions({ force }),
+				loadSkillOptions({ force }),
+			]);
+
+			return { modelPresetOptions, toolOptions, skillOptions };
+		},
+		force
+	);
 }

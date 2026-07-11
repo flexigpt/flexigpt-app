@@ -458,6 +458,7 @@ export function SkillsBottomBarChip({
 	shortcut,
 	allSkills,
 	loading,
+	loadError,
 	enabledSkillRefs,
 	activeSkillRefs,
 	setEnabledSkillRefs,
@@ -472,6 +473,7 @@ export function SkillsBottomBarChip({
 	shortcut: string;
 	allSkills: SkillListItem[];
 	loading: boolean;
+	loadError?: string | null;
 	enabledSkillRefs: SkillRef[];
 	activeSkillRefs: SkillRef[];
 	setEnabledSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
@@ -957,6 +959,18 @@ export function SkillsBottomBarChip({
 						<span>{totalCount} available</span>
 					</div>
 				</div>
+
+				{loadError ? (
+					<div className="alert alert-warning mb-2 rounded-xl text-xs">
+						<div className="grow">
+							<div className="font-semibold">Skills could not be refreshed</div>
+							<div>{loadError}</div>
+						</div>
+						<button type="button" className="btn btn-xs rounded-lg" onClick={() => void onRefreshSkills()}>
+							Retry
+						</button>
+					</div>
+				) : null}
 
 				<div className="border-base-300 bg-base-100 mb-2 rounded-xl border p-2">
 					<div className="mb-2 flex items-center justify-between gap-2">

@@ -1,9 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 
-// Utility that talks to the worker and returns a Promise<string>
 let worker: Worker | undefined;
 
 let seq = 0;
+const HIGHLIGHT_CACHE_MAX_ENTRIES = 128;
+const HIGHLIGHT_CACHE_MAX_CHARS = 8 * 1024 * 1024;
+
+const highlightCache = new Map<string, string>();
+const inFlightByKey = new Map<string, Promise<string>>();
+let highlightCacheChars = 0;
+
 const waiting = new Map<
 	number,
 	{
@@ -11,6 +17,31 @@ const waiting = new Map<
 		reject: (err: unknown) => void;
 	}
 >();
+
+function getHighlightKey(code: string, lang: string): string {
+	return `${lang.trim().toLowerCase()}\u0000${code}`;
+}
+
+function cacheHighlightResult(key: string, html: string): void {
+	const previous = highlightCache.get(key);
+	if (previous !== undefined) {
+		highlightCacheChars -= key.length + previous.length;
+		highlightCache.delete(key);
+	}
+
+	highlightCache.set(key, html);
+	highlightCacheChars += key.length + html.length;
+
+	while (highlightCache.size > HIGHLIGHT_CACHE_MAX_ENTRIES || highlightCacheChars > HIGHLIGHT_CACHE_MAX_CHARS) {
+		const oldest = highlightCache.entries().next().value as [string, string] | undefined;
+		if (!oldest) {
+			break;
+		}
+
+		highlightCache.delete(oldest[0]);
+		highlightCacheChars -= oldest[0].length + oldest[1].length;
+	}
+}
 
 export function ensureWorker(): Worker {
 	if (worker) {
@@ -40,7 +71,14 @@ export function ensureWorker(): Worker {
 		waiting.delete(id);
 	};
 
-	console.log('highlight worker initialized');
+	worker.onerror = error => {
+		for (const record of waiting.values()) {
+			record.reject(error);
+		}
+		waiting.clear();
+		worker = undefined;
+	};
+
 	return worker;
 }
 
@@ -53,30 +91,81 @@ function highlightAsync(code: string, lang: string): Promise<string> {
 	});
 }
 
-export function useHighlight(code: string, lang: string) {
-	const [html, setHtml] = useState<string | null>(null);
+function highlightWithCache(code: string, lang: string): Promise<string> {
+	const key = getHighlightKey(code, lang);
+	const cached = highlightCache.get(key);
+	if (cached !== undefined) {
+		return Promise.resolve(cached);
+	}
+
+	const inFlight = inFlightByKey.get(key);
+	if (inFlight) {
+		return inFlight;
+	}
+
+	const request = highlightAsync(code, lang).then(html => {
+		cacheHighlightResult(key, html);
+		return html;
+	});
+
+	inFlightByKey.set(key, request);
+	void request.then(
+		() => {
+			if (inFlightByKey.get(key) === request) {
+				inFlightByKey.delete(key);
+			}
+		},
+		() => {
+			if (inFlightByKey.get(key) === request) {
+				inFlightByKey.delete(key);
+			}
+		}
+	);
+
+	return request;
+}
+
+export function useHighlight(code: string, lang: string, enabled = true) {
+	const key = getHighlightKey(code, lang);
+	const [result, setResult] = useState<{ key: string; html: string | null }>({
+		key: '',
+		html: null,
+	});
 	const ticket = useRef(0);
 
 	useEffect(() => {
 		const myId = ++ticket.current;
 
-		if (!code.trim()) {
+		if (!enabled || !code.trim()) {
 			return;
 		}
 
-		highlightAsync(code, lang)
+		highlightWithCache(code, lang)
 			.then(h => {
 				if (ticket.current === myId) {
-					setHtml(h);
+					setResult({ key, html: h });
 				}
 			})
 			.catch((err: unknown) => {
 				console.error(err);
 				if (ticket.current === myId) {
-					setHtml('');
+					setResult({ key, html: '' });
 				}
 			});
-	}, [code, lang]);
 
-	return code.trim() ? html : '';
+		return () => {
+			if (ticket.current === myId) {
+				ticket.current += 1;
+			}
+		};
+	}, [code, enabled, key, lang]);
+
+	if (!code.trim()) {
+		return '';
+	}
+	if (!enabled) {
+		return null;
+	}
+
+	return result.key === key ? result.html : (highlightCache.get(key) ?? null);
 }

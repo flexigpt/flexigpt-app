@@ -23,6 +23,7 @@ interface StoreState {
 	owner: symbol | null;
 }
 
+const EMPTY_TITLE_BAR_DEPS: readonly unknown[] = [];
 let state: StoreState = { slots: {}, owner: null };
 const listeners = new Set<() => void>();
 
@@ -64,7 +65,7 @@ function clearTitleBarSlots(owner: symbol) {
  * Example:
  *   useTitleBarContent({ center: <MySearch /> }, [someDep])
  */
-export function useTitleBarContent(slots: TitleBarSlots, deps: unknown[] = []) {
+export function useTitleBarContent(slots: TitleBarSlots, deps: readonly unknown[] = EMPTY_TITLE_BAR_DEPS) {
 	const owner = useMemo(() => Symbol('titlebar-owner'), []);
 
 	// useLayoutEffect reduces visual flicker when switching routes
@@ -73,7 +74,5 @@ export function useTitleBarContent(slots: TitleBarSlots, deps: unknown[] = []) {
 		return () => {
 			clearTitleBarSlots(owner);
 		};
-		// Deps is unknown at this stage so a spread deps array.
-		// oxlint-disable-next-line react-hooks/exhaustive-deps
-	}, [owner, slots, ...deps]);
+	}, [deps, owner, slots]);
 }

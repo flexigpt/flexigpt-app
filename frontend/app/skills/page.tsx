@@ -29,6 +29,13 @@ import type { SkillUpsertInput } from '@/skills/skill_add_edit_modal';
 import { AddSkillBundleModal } from '@/skills/skill_bundle_add_modal';
 import { SkillBundleCard } from '@/skills/skill_bundle_card';
 
+function getErrorMessage(error: unknown, fallback: string): string {
+	if (error instanceof Error && error.message.trim()) {
+		return error.message;
+	}
+	return fallback;
+}
+
 // oxlint-disable-next-line no-restricted-exports
 export default function SkillsPage() {
 	const [bundles, setBundles] = useState<BundleData[]>([]);
@@ -116,8 +123,12 @@ export default function SkillsPage() {
 						const bundleSkills = skillListItems.map(item => item.skillDefinition);
 
 						return { bundle, skills: bundleSkills };
-					} catch {
-						return { bundle, skills: [] };
+					} catch (error) {
+						return {
+							bundle,
+							skills: [],
+							skillLoadError: getErrorMessage(error, 'Failed to load this bundle’s skills.'),
+						};
 					}
 				})
 			);
@@ -156,7 +167,9 @@ export default function SkillsPage() {
 
 			setBundles(prev =>
 				prev.map(bundleData =>
-					bundleData.bundle.id === bundleID ? { ...bundleData, skills: freshSkills } : bundleData
+					bundleData.bundle.id === bundleID
+						? { ...bundleData, skills: freshSkills, skillLoadError: undefined }
+						: bundleData
 				)
 			);
 		} catch (err) {
@@ -336,6 +349,18 @@ export default function SkillsPage() {
 			return;
 		}
 
+		const bundleData = bundles.find(item => item.bundle.id === deletingBundle.id);
+		if (!bundleData || bundleData.skillLoadError || bundleData.skills.length > 0) {
+			setBundleToDelete(null);
+			setAlertMsg(
+				bundleData?.skillLoadError
+					? 'Reload this bundle’s skills before deleting it.'
+					: 'Remove all skills from this bundle before deleting it.'
+			);
+			setShowAlert(true);
+			return;
+		}
+
 		setIsDeletingBundle(true);
 
 		try {
@@ -345,7 +370,7 @@ export default function SkillsPage() {
 				return;
 			}
 
-			setBundles(prev => prev.filter(bundleData => bundleData.bundle.id !== deletingBundle.id));
+			setBundles(prev => prev.filter(b => b.bundle.id !== deletingBundle.id));
 		} catch (err) {
 			console.error('Delete skill bundle failed:', err);
 
@@ -359,26 +384,17 @@ export default function SkillsPage() {
 				setBundleToDelete(null);
 			}
 		}
-	}, [bundleToDelete, isDeletingBundle]);
+	}, [bundleToDelete, bundles, isDeletingBundle]);
 
 	const handleAddBundle = useCallback(
 		async (slug: string, display: string, description?: string) => {
 			try {
 				const id = getUUIDv7();
 				await skillStoreAPI.putSkillBundle(id, slug, display, true, description);
-
-				if (isMountedRef.current) {
-					setIsAddModalOpen(false);
-				}
-
 				await fetchAll();
 			} catch (err) {
 				console.error('Add skill bundle failed:', err);
-
-				if (isMountedRef.current) {
-					setAlertMsg(err instanceof Error ? err.message : 'Failed to add skill bundle.');
-					setShowAlert(true);
-				}
+				throw err;
 			}
 		},
 		[fetchAll]
@@ -575,6 +591,10 @@ export default function SkillsPage() {
 									key={bundleData.bundle.id}
 									bundle={bundleData.bundle}
 									skills={bundleData.skills}
+									skillLoadError={bundleData.skillLoadError}
+									onRefreshSkills={() => {
+										return refreshBundleSkills(bundleData.bundle.id);
+									}}
 									insertFilter={insertFilter}
 									searchQuery={searchQuery}
 									tagFilters={activeTagFilters}

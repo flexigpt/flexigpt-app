@@ -377,6 +377,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const {
 		allSkills,
 		skillsLoading,
+		skillsLoadError,
 		enabledSkillRefs,
 		activeSkillRefs,
 		setEnabledSkillRefs,
@@ -1712,12 +1713,14 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			conversationToolChoices: conversationToolsToChoices(conversationToolsState),
 			webSearchChoices: mapAssistantPresetWebSearchTemplatesToChoices(webSearchTemplates),
 			enabledSkillRefs,
+			activeSkillRefs,
 			mcpContext: mcp.mcpContext,
 		});
 	}, [
 		conversationToolsState,
 		enabledSkillRefs,
 		mcp.mcpContext,
+		activeSkillRefs,
 		onAssistantPresetRuntimeStateChange,
 		webSearchTemplates,
 	]);
@@ -1973,6 +1976,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						systemPrompt={systemPrompt}
 						isInputLocked={isInputLocked || fastForwardPending}
 						mcpState={mcp}
+						skillsLoadError={skillsLoadError}
 						mcpAppContextUpdateCount={mcpAppContextUpdates.length}
 						onClearMCPAppContextUpdates={() => {
 							setMCPAppContextUpdates([]);

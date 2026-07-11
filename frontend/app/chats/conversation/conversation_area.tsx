@@ -10,7 +10,6 @@ import {
 	useMemo,
 	useRef,
 	useState,
-	useSyncExternalStore,
 } from 'react';
 
 import { FiChevronDown, FiChevronUp } from 'react-icons/fi';
@@ -39,8 +38,11 @@ import type { ChatTabState } from '@/chats/tabs/tabs_model';
 const EMPTY_MESSAGES: ConversationMessage[] = [];
 const EMPTY_DIFF_CANDIDATE_PATHS = new Map<string, string[]>();
 const MAX_DIFF_CANDIDATE_PATHS = 1024;
-const RICH_RENDER_DEFER_MESSAGE_COUNT = 8;
-const RICH_RENDER_DEFER_TEXT_LENGTH = 12_000;
+const RICH_RENDER_DEFER_MESSAGE_COUNT = 4;
+const RICH_RENDER_DEFER_TEXT_LENGTH = 4_000;
+const RICH_RENDER_BATCH_SIZE = 1;
+const RICH_RENDER_IDLE_TIMEOUT_MS = 250;
+
 const DIFF_MARKDOWN_SIGNAL_PATTERN =
 	/```(?:diff|patch|udiff)\b|^diff --git\s|^\*\*\*\s+Begin\s+Patch\s*$|^---\s+.+\n\+\+\+\s+/m;
 
@@ -489,6 +491,26 @@ function conversationMayContainApplicableDiff(messages: ConversationMessage[]): 
 	return messages.some(message => DIFF_MARKDOWN_SIGNAL_PATTERN.test(message.uiContent ?? ''));
 }
 
+function scheduleDeferredUIWork(work: () => void): () => void {
+	if (typeof window.requestIdleCallback === 'function') {
+		const requestId = window.requestIdleCallback(
+			() => {
+				work();
+			},
+			{ timeout: RICH_RENDER_IDLE_TIMEOUT_MS }
+		);
+
+		return () => {
+			window.cancelIdleCallback(requestId);
+		};
+	}
+
+	const timer = window.setTimeout(work, 16);
+	return () => {
+		window.clearTimeout(timer);
+	};
+}
+
 type MessageItemRenderer = (
 	index: number,
 	message: ConversationMessage,
@@ -499,70 +521,78 @@ type MessageItemRenderer = (
 const ConversationMessageList = memo(function ConversationMessageList(props: {
 	messages: ConversationMessage[];
 	renderItem: MessageItemRenderer;
+	isBusy: boolean;
+	deferRichWork: boolean;
 }) {
-	const { messages, renderItem } = props;
-	const [richRenderingReady, setRichRenderingReady] = useState(() => !shouldDeferInitialRichRendering(messages));
+	const { messages, renderItem, isBusy, deferRichWork } = props;
+
+	const [richReadyCount, setRichReadyCount] = useState(() => {
+		if (deferRichWork || shouldDeferInitialRichRendering(messages)) {
+			return 0;
+		}
+		return Math.max(0, messages.length - (isBusy ? 1 : 0));
+	});
+
+	const richRenderTargetCount = deferRichWork ? 0 : Math.max(0, messages.length - (isBusy ? 1 : 0));
 
 	useEffect(() => {
-		if (richRenderingReady) {
+		if (richReadyCount >= richRenderTargetCount) {
 			return;
 		}
 
-		const frame = window.requestAnimationFrame(() => {
+		return scheduleDeferredUIWork(() => {
 			startTransition(() => {
-				setRichRenderingReady(true);
+				setRichReadyCount(current => Math.min(richRenderTargetCount, current + RICH_RENDER_BATCH_SIZE));
+			});
+		});
+	}, [richReadyCount, richRenderTargetCount]);
+
+	const [diffCandidateState, setDiffCandidateState] = useState<{
+		messages: ConversationMessage[];
+		paths: Map<string, string[]>;
+	} | null>(null);
+
+	const allMessagesAreRich = !deferRichWork && !isBusy && richReadyCount >= messages.length;
+
+	useEffect(() => {
+		if (!allMessagesAreRich) {
+			return;
+		}
+
+		let cancelled = false;
+		const cancelWork = scheduleDeferredUIWork(() => {
+			if (cancelled || !conversationMayContainApplicableDiff(messages)) {
+				return;
+			}
+
+			const paths = buildDiffCandidatePathsByMessageID(messages);
+			startTransition(() => {
+				if (!cancelled) {
+					setDiffCandidateState({ messages, paths });
+				}
 			});
 		});
 
 		return () => {
-			window.cancelAnimationFrame(frame);
+			cancelled = true;
+			cancelWork();
 		};
-	}, [richRenderingReady]);
+	}, [allMessagesAreRich, messages]);
 
-	const diffCandidatePathsByMessageID = useMemo(() => {
-		if (!richRenderingReady || !conversationMayContainApplicableDiff(messages)) {
-			return EMPTY_DIFF_CANDIDATE_PATHS;
-		}
-		return buildDiffCandidatePathsByMessageID(messages);
-	}, [messages, richRenderingReady]);
+	const diffCandidatePathsByMessageID =
+		diffCandidateState?.messages === messages ? diffCandidateState.paths : EMPTY_DIFF_CANDIDATE_PATHS;
 
 	return messages.map((message, index) => (
 		<div key={message.id} data-chat-message-index={index}>
-			{renderItem(index, message, diffCandidatePathsByMessageID.get(message.id), !richRenderingReady)}
+			{renderItem(
+				index,
+				message,
+				diffCandidatePathsByMessageID.get(message.id),
+				deferRichWork || index >= richReadyCount || (isBusy && index === messages.length - 1)
+			)}
 		</div>
 	));
 });
-
-function StreamingLastMessage(props: {
-	message: ConversationMessage;
-	rowIsBusy: boolean;
-	isEditing: boolean;
-	deferRichRendering: boolean;
-	onEdit: () => void;
-	subscribe: (cb: () => void) => () => void;
-	getSnapshot: () => number;
-	getStreamText: () => string;
-	getStreamThinking: () => string;
-	diffCandidatePaths?: string[];
-}) {
-	useSyncExternalStore(props.subscribe, props.getSnapshot, () => 0);
-
-	const streamedText = props.rowIsBusy ? props.getStreamText() : '';
-	const streamedThinking = props.rowIsBusy ? props.getStreamThinking() : '';
-
-	return (
-		<ChatMessage
-			message={props.message}
-			streamedText={streamedText}
-			streamedThinking={streamedThinking}
-			isBusy={props.rowIsBusy}
-			isEditing={props.isEditing}
-			deferRichRendering={props.deferRichRendering}
-			onEdit={props.onEdit}
-			diffCandidatePaths={props.diffCandidatePaths}
-		/>
-	);
-}
 
 export interface ConversationAreaHandle {
 	disposeTabRuntime: (tabId: string) => void;
@@ -617,6 +647,7 @@ function ConversationAreaInner(
 	const activeEditingMessageId = activeTab?.editingMessageId ?? null;
 	const messages = activeTab?.conversation?.messages ?? EMPTY_MESSAGES;
 	const messageCount = messages.length;
+	const activeConversationContentIsHydrating = activeTabIsHydrating && messageCount === 0;
 
 	useLayoutEffect(() => {
 		tabsRef.current = tabs;
@@ -737,7 +768,7 @@ function ConversationAreaInner(
 	} = useScrollRestore({
 		selectedTabId,
 		selectedTabIdRef,
-		activeTabIsHydrating,
+		activeTabIsHydrating: activeConversationContentIsHydrating,
 		messageCount,
 		initialScrollTopByTab,
 	});
@@ -831,6 +862,16 @@ function ConversationAreaInner(
 		[activeTabId, getFullStreamThinkingForTab]
 	);
 
+	const activeStreamSource = useMemo(
+		() => ({
+			subscribe: subscribeToActiveStream,
+			getVersionSnapshot: getActiveStreamSnapshot,
+			getText: getActiveStreamText,
+			getThinking: getActiveStreamThinking,
+		}),
+		[getActiveStreamSnapshot, getActiveStreamText, getActiveStreamThinking, subscribeToActiveStream]
+	);
+
 	const itemContent = useCallback(
 		(
 			index: number,
@@ -844,19 +885,18 @@ function ConversationAreaInner(
 
 			if (rowIsBusy) {
 				return (
-					<StreamingLastMessage
+					<ChatMessage
 						message={message}
-						rowIsBusy={true}
+						streamedText=""
+						streamedThinking=""
+						isBusy={true}
 						isEditing={activeEditingMessageId === message.id}
 						deferRichRendering={deferRichRendering}
 						onEdit={() => {
 							beginEditMessageForTab(activeTabId, message.id);
 						}}
-						subscribe={subscribeToActiveStream}
-						getSnapshot={getActiveStreamSnapshot}
-						getStreamText={getActiveStreamText}
-						getStreamThinking={getActiveStreamThinking}
 						diffCandidatePaths={diffCandidatePaths}
+						streamSource={activeStreamSource}
 					/>
 				);
 			}
@@ -876,17 +916,7 @@ function ConversationAreaInner(
 				/>
 			);
 		},
-		[
-			activeEditingMessageId,
-			activeTabId,
-			activeTabIsBusy,
-			beginEditMessageForTab,
-			getActiveStreamSnapshot,
-			getActiveStreamText,
-			getActiveStreamThinking,
-			messageCount,
-			subscribeToActiveStream,
-		]
+		[activeEditingMessageId, activeTabId, activeTabIsBusy, beginEditMessageForTab, messageCount, activeStreamSource]
 	);
 
 	const mountedInputTabs = useMemo(
@@ -945,7 +975,7 @@ function ConversationAreaInner(
 					ref={setScrollContainerRef}
 					onScroll={handleScroll}
 					className="size-full overscroll-contain py-1"
-					style={{ scrollbarGutter: 'stable both-edges', overflowAnchor: 'none', overflowY: 'auto' }}
+					style={{ scrollbarGutter: 'stable both-edges', overflowAnchor: 'auto', overflowY: 'auto' }}
 				>
 					<div ref={setScrollContentRef} className="mx-auto w-11/12 xl:w-5/6">
 						{activeTabIsHydrating && messageCount === 0 ? (
@@ -957,6 +987,8 @@ function ConversationAreaInner(
 								key={`${activeTabId}:${activeTab?.conversation.id ?? ''}`}
 								messages={messages}
 								renderItem={itemContent}
+								isBusy={activeTabIsBusy}
+								deferRichWork={activeTabIsHydrating}
 							/>
 						)}
 					</div>

@@ -11,7 +11,7 @@ import { validateSlug } from '@/lib/text_utils';
 interface AddSkillBundleModalProps {
 	isOpen: boolean;
 	onClose: () => void;
-	onSubmit: (slug: string, display: string, description?: string) => void;
+	onSubmit: (slug: string, display: string, description?: string) => Promise<void>;
 	existingSlugs: string[];
 	existingNames: string[]; // bundle name uniqueness constraint
 }
@@ -42,6 +42,8 @@ function getInitialFormData(): BundleFormData {
 function AddSkillBundleModalContent({ onClose, onSubmit, existingSlugs, existingNames }: AddSkillBundleModalProps) {
 	const [formData, setFormData] = useState<BundleFormData>(() => getInitialFormData());
 	const [errors, setErrors] = useState<ErrorState>({});
+	const [submitError, setSubmitError] = useState('');
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const isUnmountingRef = useRef(false);
@@ -70,6 +72,10 @@ function AddSkillBundleModalContent({ onClose, onSubmit, existingSlugs, existing
 	}, []);
 
 	const requestClose = () => {
+		if (isSubmitting) {
+			return;
+		}
+
 		const dialog = dialogRef.current;
 
 		if (dialog?.open) {
@@ -133,6 +139,10 @@ function AddSkillBundleModalContent({ onClose, onSubmit, existingSlugs, existing
 		e.preventDefault();
 		e.stopPropagation();
 
+		if (isSubmitting) {
+			return;
+		}
+
 		const trimmed: BundleFormData = {
 			slug: formData.slug.trim(),
 			displayName: formData.displayName.trim(),
@@ -145,8 +155,18 @@ function AddSkillBundleModalContent({ onClose, onSubmit, existingSlugs, existing
 			return;
 		}
 
-		onSubmit(trimmed.slug, trimmed.displayName, trimmed.description || undefined);
-		requestClose();
+		setSubmitError('');
+		setIsSubmitting(true);
+		try {
+			void onSubmit(trimmed.slug, trimmed.displayName, trimmed.description || undefined);
+			requestClose();
+		} catch (error) {
+			setSubmitError(error instanceof Error ? error.message : 'Failed to create skill bundle.');
+		} finally {
+			if (!isUnmountingRef.current) {
+				setIsSubmitting(false);
+			}
+		}
 	};
 
 	const isFormValid = useMemo(
@@ -173,6 +193,14 @@ function AddSkillBundleModalContent({ onClose, onSubmit, existingSlugs, existing
 				</div>
 
 				<form noValidate onSubmit={handleSubmit} className="space-y-4">
+					{submitError && (
+						<div className="alert alert-error rounded-2xl text-sm">
+							<div className="flex items-center gap-2">
+								<FiAlertCircle size={14} />
+								<span>{submitError}</span>
+							</div>
+						</div>
+					)}
 					<div className="grid grid-cols-12 items-center gap-2">
 						<label className="label col-span-3">
 							<span className="text-sm">Bundle Slug*</span>
@@ -250,11 +278,11 @@ function AddSkillBundleModalContent({ onClose, onSubmit, existingSlugs, existing
 					</div>
 
 					<div className="modal-action">
-						<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
+						<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose} disabled={isSubmitting}>
 							Cancel
 						</button>
-						<button type="submit" className="btn btn-primary rounded-xl" disabled={!isFormValid}>
-							Create
+						<button type="submit" className="btn btn-primary rounded-xl" disabled={!isFormValid || isSubmitting}>
+							{isSubmitting ? 'Creating…' : 'Create'}
 						</button>
 					</div>
 				</form>

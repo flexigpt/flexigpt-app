@@ -23,7 +23,6 @@ import (
 )
 
 const (
-	fetchBatchAssistantPresets            = 512
 	maxPageSizeAssistantPresets           = 256
 	defaultPageSizeAssistantPresets       = 25
 	softDeleteGraceAssistantPresetBundles = 48 * time.Hour
@@ -239,12 +238,17 @@ func (s *AssistantPresetStore) PutAssistantPresetBundle(
 	createdAt := now
 
 	if existing, ok := all.Bundles[req.BundleID]; ok {
+		if isSoftDeletedAssistantPresetBundle(existing) {
+			return nil, fmt.Errorf("%w: %s", spec.ErrBundleDeleting, req.BundleID)
+		}
+
 		if existing.Slug != "" && existing.Slug != req.Body.Slug {
 			return nil, fmt.Errorf(
 				"%w: bundle slug is immutable once created",
 				spec.ErrInvalidRequest,
 			)
 		}
+
 		if !existing.CreatedAt.IsZero() {
 			createdAt = existing.CreatedAt
 		}
@@ -930,7 +934,6 @@ func (s *AssistantPresetStore) ListAssistantPresets(
 
 		for _, bundleID := range bundleIDs {
 			bundle := builtInBundles[bundleID]
-
 			if len(bundleFilter) > 0 {
 				if _, ok := bundleFilter[bundleID]; !ok {
 					continue
@@ -940,6 +943,7 @@ func (s *AssistantPresetStore) ListAssistantPresets(
 				continue
 			}
 
+			builtInItems := make([]spec.AssistantPresetListItem, 0, len(builtInPresets[bundleID]))
 			presetIDs := make([]bundleitemutils.ItemID, 0, len(builtInPresets[bundleID]))
 			for presetID := range builtInPresets[bundleID] {
 				presetIDs = append(presetIDs, presetID)
@@ -953,11 +957,26 @@ func (s *AssistantPresetStore) ListAssistantPresets(
 				if !tok.IncludeDisabled && !preset.IsEnabled {
 					continue
 				}
-				out = append(out, toAssistantPresetListItem(bundleID, bundle.Slug, preset))
+				builtInItems = append(builtInItems, toAssistantPresetListItem(bundleID, bundle.Slug, preset))
 			}
+
+			start := min(tok.BuiltInOffset, len(builtInItems))
+			remaining := pageHint - len(out)
+			end := min(start+remaining, len(builtInItems))
+			out = append(out, builtInItems[start:end]...)
+			tok.BuiltInOffset = end
+
+			if end < len(builtInItems) {
+				break
+			}
+
+			tok.BuiltInOffset = 0
 		}
 
-		tok.BuiltInDone = true
+		if len(out) < pageHint {
+			tok.BuiltInDone = true
+			tok.BuiltInOffset = 0
+		}
 	}
 
 	allUserBundles, err := s.readAllBundles(false)
@@ -967,9 +986,14 @@ func (s *AssistantPresetStore) ListAssistantPresets(
 	userBundles := allUserBundles.Bundles
 
 	for len(out) < pageHint {
+		remaining := pageHint - len(out)
+		if remaining <= 0 {
+			break
+		}
+
 		files, next, err := s.presetStore.ListFiles(
 			mapstore.ListingConfig{
-				PageSize:  fetchBatchAssistantPresets,
+				PageSize:  remaining,
 				SortOrder: mapstore.SortOrderDescending,
 			},
 			tok.DirTok,
@@ -1031,7 +1055,6 @@ func (s *AssistantPresetStore) ListAssistantPresets(
 			}
 
 			out = append(out, toAssistantPresetListItem(dirInfo.ID, bundle.Slug, preset))
-
 		}
 
 		tok.DirTok = next

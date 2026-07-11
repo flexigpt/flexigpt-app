@@ -189,19 +189,36 @@ func validateAssistantPresetReferences(
 		if !summary.IsEnabled {
 			return fmt.Errorf("startingSkillSelections[%d]: referenced skill is disabled", i)
 		}
+
+		insert := summary.Insert
+		if insert == "" {
+			insert = skillSpec.SkillInsertInstructions
+		}
+
+		if insert != skillSpec.SkillInsertInstructions {
+			return fmt.Errorf(
+				"startingSkillSelections[%d]: assistant preset skill selections must have insert=%q",
+				i,
+				skillSpec.SkillInsertInstructions,
+			)
+		}
+
+		if selection.PreLoadAsActive && selection.UseAsInstructions {
+			return fmt.Errorf(
+				"startingSkillSelections[%d]: preLoadAsActive and useAsInstructions cannot both be true",
+				i,
+			)
+		}
+
 		if selection.PreLoadAsActive {
-			insert := summary.Insert
-			if insert == "" {
-				insert = skillSpec.SkillInsertInstructions
-			}
-			if insert != skillSpec.SkillInsertInstructions {
+			if summary.HasArguments {
 				return fmt.Errorf(
-					"startingSkillSelections[%d]: preloaded skill must have insert=%q",
+					"startingSkillSelections[%d]: preloaded skill must not declare arguments",
 					i,
-					skillSpec.SkillInsertInstructions,
 				)
 			}
 		}
+
 		if selection.UseAsInstructions {
 			if summary.HasArguments {
 				return fmt.Errorf(
@@ -209,6 +226,7 @@ func validateAssistantPresetReferences(
 					i,
 				)
 			}
+
 			if summary.HasResources {
 				return fmt.Errorf(
 					"startingSkillSelections[%d]: instructions skill must not have any additional resources",

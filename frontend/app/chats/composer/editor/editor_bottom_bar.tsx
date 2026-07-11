@@ -65,6 +65,7 @@ interface EditorBottomBarProps {
 	// Skills state comes from EditorArea (conversation-level)
 	allSkills: SkillListItem[];
 	skillsLoading?: boolean;
+	skillsLoadError?: string | null;
 	enabledSkillRefs: SkillRef[];
 	activeSkillRefs: SkillRef[];
 	setEnabledSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
@@ -114,6 +115,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	onWebSearchArgsBlockedChange,
 	allSkills,
 	skillsLoading = false,
+	skillsLoadError,
 	enabledSkillRefs,
 	activeSkillRefs,
 	setEnabledSkillRefs,
@@ -195,6 +197,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						shortcut={shortcutLabels.skills}
 						allSkills={allSkills}
 						loading={skillsLoading}
+						loadError={skillsLoadError}
 						enabledSkillRefs={enabledSkillRefs}
 						activeSkillRefs={activeSkillRefs}
 						setEnabledSkillRefs={setEnabledSkillRefs}

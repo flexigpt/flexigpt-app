@@ -22,6 +22,7 @@ interface UseStreamingRuntimeArgs {
 const SHORT_STREAM_RENDER_INTERVAL_MS = 32;
 const LONG_STREAM_RENDER_INTERVAL_MS = 50;
 const VERY_LONG_STREAM_RENDER_INTERVAL_MS = 80;
+const BACKGROUND_STREAM_COMPACT_CHUNK_COUNT = 256;
 
 function getStreamRenderInterval(buffer: StreamBuffer): number {
 	const displayedLength = buffer.text.display.length + buffer.thinking.display.length;
@@ -187,7 +188,14 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 
 	const notifyStreamSoon = useCallback(
 		(tabId: string) => {
+			const buffer = getStreamBuffer(tabId);
+
 			if (selectedTabIdRef.current !== tabId) {
+				const pendingChunkCount = buffer.text.chunks.length + buffer.thinking.chunks.length;
+
+				if (pendingChunkCount >= BACKGROUND_STREAM_COMPACT_CHUNK_COUNT) {
+					flushStreamForTab(tabId);
+				}
 				return;
 			}
 
@@ -196,7 +204,6 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 				return;
 			}
 
-			const buffer = getStreamBuffer(tabId);
 			const renderInterval = getStreamRenderInterval(buffer);
 			const timer = window.setTimeout(() => {
 				notifyTimersRef.current.set(tabId, null);
@@ -210,7 +217,7 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 
 			notifyTimersRef.current.set(tabId, timer);
 		},
-		[getStreamBuffer, notifyStreamNow, selectedTabIdRef]
+		[flushStreamForTab, getStreamBuffer, notifyStreamNow, selectedTabIdRef]
 	);
 
 	const clearStreamForTab = useCallback(

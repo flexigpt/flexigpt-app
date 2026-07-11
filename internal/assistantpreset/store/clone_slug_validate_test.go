@@ -643,7 +643,7 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 			wantErrContains: "startingSkillSelections[0]: referenced skill is disabled",
 		},
 		{
-			name: "user-message skill with arguments is selectable",
+			name: "user-message skill is rejected",
 			preset: func() *spec.AssistantPreset {
 				p := makeBase()
 				p.StartingSkillSelections = []skillSpec.SkillSelection{skillSelection}
@@ -658,6 +658,7 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 					}, nil
 				}),
 			},
+			wantErrContains: `assistant preset skill selections must have insert="instructions"`,
 		},
 		{
 			name: "all references valid",
@@ -683,6 +684,43 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 					return SkillSummary{IsEnabled: true}, nil
 				}),
 			},
+		},
+		{
+			name: "preloaded instruction skill with arguments is rejected",
+			preset: func() *spec.AssistantPreset {
+				p := makeBase()
+				selection := skillSelection
+				selection.PreLoadAsActive = true
+				p.StartingSkillSelections = []skillSpec.SkillSelection{selection}
+				return p
+			}(),
+			lookups: ReferenceLookups{
+				Skills: fakeSkillLookup(func(context.Context, skillSpec.SkillSelection) (SkillSummary, error) {
+					return SkillSummary{
+						IsEnabled:    true,
+						Insert:       skillSpec.SkillInsertInstructions,
+						HasArguments: true,
+					}, nil
+				}),
+			},
+			wantErrContains: "preloaded skill must not declare arguments",
+		},
+		{
+			name: "preload and system instructions together are rejected",
+			preset: func() *spec.AssistantPreset {
+				p := makeBase()
+				selection := skillSelection
+				selection.PreLoadAsActive = true
+				selection.UseAsInstructions = true
+				p.StartingSkillSelections = []skillSpec.SkillSelection{selection}
+				return p
+			}(),
+			lookups: ReferenceLookups{
+				Skills: fakeSkillLookup(func(context.Context, skillSpec.SkillSelection) (SkillSummary, error) {
+					return SkillSummary{IsEnabled: true, Insert: skillSpec.SkillInsertInstructions}, nil
+				}),
+			},
+			wantErrContains: "preLoadAsActive and useAsInstructions cannot both be true",
 		},
 	}
 

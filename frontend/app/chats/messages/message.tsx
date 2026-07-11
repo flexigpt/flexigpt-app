@@ -17,6 +17,7 @@ import {
 } from '@/chats/messages/mcp_message_context_utils';
 import { MessageAttachmentsBar } from '@/chats/messages/message_attachments_bar';
 import { MessageCitationsBar } from '@/chats/messages/message_citations_bar';
+import type { MessageStreamSource } from '@/chats/messages/message_content_card';
 import { MessageContentCard } from '@/chats/messages/message_content_card';
 import { MessageFooterArea } from '@/chats/messages/message_footer';
 import { MessageThinkingSection } from '@/chats/messages/message_thinking_section';
@@ -30,6 +31,7 @@ interface ChatMessageProps {
 	deferRichRendering: boolean;
 	diffCandidatePaths?: string[];
 	onEdit: () => void;
+	streamSource?: MessageStreamSource;
 }
 
 function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
@@ -40,6 +42,9 @@ function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
 		return false;
 	}
 	if (prev.deferRichRendering !== next.deferRichRendering) {
+		return false;
+	}
+	if (prev.streamSource !== next.streamSource) {
 		return false;
 	}
 
@@ -115,6 +120,7 @@ export const ChatMessage = memo(function ChatMessage({
 	deferRichRendering,
 	diffCandidatePaths,
 	onEdit,
+	streamSource,
 }: ChatMessageProps) {
 	const isUser = message.role === RoleEnum.User;
 	const align = !isUser ? 'items-end text-left' : 'items-start text-left';
@@ -137,7 +143,10 @@ export const ChatMessage = memo(function ChatMessage({
 		setToolDetailsState({ kind: 'output', output });
 	}, []);
 
-	const bubbleExtra = [streamedText || streamedThinking ? '' : 'shadow-lg', isEditing ? 'ring-2 ring-primary/70' : '']
+	const bubbleExtra = [
+		isBusy || streamedText || streamedThinking ? '' : 'shadow-lg',
+		isEditing ? 'ring-2 ring-primary/70' : '',
+	]
 		.filter(Boolean)
 		.join(' ');
 
@@ -214,11 +223,12 @@ export const ChatMessage = memo(function ChatMessage({
 					<div
 						className={`bg-base-100 col-span-10 mt-1 min-w-0 overflow-x-hidden rounded-2xl p-0 lg:col-span-9 ${bubbleExtra}`}
 					>
-						{!isUser && hasAnyReasoning && (
+						{!isUser && (hasAnyReasoning || (isBusy && streamSource)) && (
 							<MessageThinkingSection
 								isBusy={isBusy}
 								streamedThinking={streamedThinking}
 								reasoningContents={message.uiReasoningContents}
+								streamSource={streamSource}
 							/>
 						)}
 						<div className="px-4 py-2">
@@ -231,6 +241,7 @@ export const ChatMessage = memo(function ChatMessage({
 								align={align}
 								renderAsMarkdown={renderMarkdown && !deferRichRendering}
 								diffCandidatePaths={diffCandidatePaths}
+								streamSource={streamSource}
 							/>
 							{/* Fallback for error-only messages with no text content */}
 							{!hasAnyContent && hasError && !isBusy && (
@@ -324,7 +335,7 @@ export const ChatMessage = memo(function ChatMessage({
 							messageDetails={message.uiDebugDetails ?? ''}
 							reasoningContents={message.uiReasoningContents}
 							streamedThinking={streamedThinking}
-							isStreaming={!!streamedText || !!streamedThinking}
+							isStreaming={isBusy || !!streamedText || !!streamedThinking}
 							isBusy={isBusy}
 							bodyPresent={showBody}
 							disableMarkdown={!renderMarkdown}

@@ -19,6 +19,7 @@ import {
 	findDefaultAssistantPresetOption,
 	getAssistantPresetModificationSummary,
 	normalizeAssistantPresetMCPContext,
+	normalizeAssistantPresetSkillRefs,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import type { AssistantContextController } from '@/chats/composer/contextarea/use_context_state';
 import type { ComposerSystemPromptController } from '@/chats/composer/skills/use_composer_system_prompt';
@@ -203,6 +204,12 @@ export function useAssistantPresetManager(args: {
 						? [...preparedSystemPromptSelections.nextSelectedInstructionSourceKeys]
 						: undefined,
 					mcp: comparisonMCPContext,
+					skills: runtimeSelections.hasSkillsSelection
+						? normalizeAssistantPresetSkillRefs(runtimeSelections.enabledSkillRefs)
+						: undefined,
+					activeSkills: runtimeSelections.hasSkillsSelection
+						? normalizeAssistantPresetSkillRefs(runtimeSelections.activeSkillRefs)
+						: undefined,
 				},
 			};
 		},

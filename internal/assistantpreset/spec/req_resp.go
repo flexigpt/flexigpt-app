@@ -130,6 +130,7 @@ type AssistantPresetPageToken struct {
 	BundleIDs           []bundleitemutils.BundleID `json:"ids,omitempty"` //nolint:tagliatelle // Page token encoding.
 	DirTok              string                     `json:"dt,omitempty"`  //nolint:tagliatelle // Directory scan token.
 	BuiltInDone         bool                       `json:"bi,omitempty"`  //nolint:tagliatelle // Page token encoding.
+	BuiltInOffset       int                        `json:"bo,omitempty"`  //nolint:tagliatelle // Page token encoding.
 }
 
 type ListAssistantPresetsRequest struct {

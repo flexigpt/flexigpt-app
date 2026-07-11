@@ -1,6 +1,13 @@
-import { memo } from 'react';
+import { memo, useLayoutEffect, useRef } from 'react';
 
 import { EnhancedMarkdown } from '@/components/markdown/markdown_enhanced';
+
+export interface MessageStreamSource {
+	subscribe: (callback: () => void) => () => void;
+	getVersionSnapshot: () => number;
+	getText: () => string;
+	getThinking: () => string;
+}
 
 interface MessageContentCardProps {
 	messageID: string;
@@ -13,17 +20,90 @@ interface MessageContentCardProps {
 	align: string;
 	renderAsMarkdown?: boolean;
 	diffCandidatePaths?: string[];
+	streamSource?: MessageStreamSource;
+}
+
+function AppendOnlyStreamingText(props: { source: MessageStreamSource; align: string }) {
+	const textElementRef = useRef<HTMLDivElement | null>(null);
+	const loaderElementRef = useRef<HTMLDivElement | null>(null);
+	const renderedLengthRef = useRef(0);
+	const hasVisibleTextRef = useRef(false);
+
+	useLayoutEffect(() => {
+		const textElement = textElementRef.current;
+		const loaderElement = loaderElementRef.current;
+		if (!textElement || !loaderElement) {
+			return;
+		}
+
+		renderedLengthRef.current = 0;
+		hasVisibleTextRef.current = false;
+		textElement.textContent = '';
+
+		const syncText = () => {
+			const nextText = props.source.getText();
+			const previousLength = renderedLengthRef.current;
+
+			if (nextText.length < previousLength) {
+				textElement.textContent = nextText;
+				renderedLengthRef.current = nextText.length;
+				hasVisibleTextRef.current = /\S/.test(nextText);
+			} else if (nextText.length > previousLength) {
+				const appendedText = nextText.slice(previousLength);
+				const currentTextNode = textElement.firstChild;
+
+				if (previousLength > 0 && currentTextNode instanceof Text && currentTextNode.nextSibling === null) {
+					currentTextNode.appendData(appendedText);
+				} else {
+					textElement.textContent = nextText;
+				}
+
+				renderedLengthRef.current = nextText.length;
+
+				if (!hasVisibleTextRef.current && /\S/.test(appendedText)) {
+					hasVisibleTextRef.current = true;
+				}
+			}
+
+			const hasVisibleText = hasVisibleTextRef.current;
+			textElement.style.display = hasVisibleText ? '' : 'none';
+			loaderElement.style.display = hasVisibleText ? 'none' : '';
+		};
+
+		syncText();
+		return props.source.subscribe(syncText);
+	}, [props.source]);
+
+	return (
+		<>
+			<div
+				ref={textElementRef}
+				className={`${props.align} wrap-break-word whitespace-pre-wrap`}
+				style={{
+					display: 'none',
+					lineHeight: 1.5,
+					fontSize: 14,
+					contain: 'paint',
+				}}
+			/>
+			<div ref={loaderElementRef} className="flex items-center gap-2 p-0">
+				Thinking <span className="loading loading-dots loading-sm ml-2" />
+			</div>
+		</>
+	);
 }
 
 function areEqual(prev: MessageContentCardProps, next: MessageContentCardProps) {
 	return (
+		prev.messageID === next.messageID &&
 		prev.content === next.content &&
 		prev.streamedText === next.streamedText &&
 		prev.isStreaming === next.isStreaming &&
 		prev.isBusy === next.isBusy &&
 		prev.align === next.align &&
 		prev.renderAsMarkdown === next.renderAsMarkdown &&
-		prev.diffCandidatePaths === next.diffCandidatePaths
+		prev.diffCandidatePaths === next.diffCandidatePaths &&
+		prev.streamSource === next.streamSource
 	);
 }
 
@@ -36,11 +116,15 @@ export const MessageContentCard = memo(function MessageContentCard({
 	align,
 	renderAsMarkdown = true,
 	diffCandidatePaths,
+	streamSource,
 }: MessageContentCardProps) {
 	const liveText = isStreaming ? streamedText : content;
-	// Backend already throttles few ms.
 	const textToRender = liveText;
 	const renderBusy = isBusy;
+
+	if (isStreaming && streamSource) {
+		return <AppendOnlyStreamingText source={streamSource} align={align} />;
+	}
 
 	// If we truly have nothing:
 	// - while busy: show a small loader so non-streaming doesn't look "empty"

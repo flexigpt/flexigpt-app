@@ -52,6 +52,7 @@ interface AssistantPresetComparisonState {
 		webSearchChoices: AssistantPresetNormalizedToolChoice[];
 	};
 	skills?: string[];
+	activeSkills?: string[];
 	mcp?: MCPConversationContext;
 }
 
@@ -81,6 +82,7 @@ export interface AssistantPresetRuntimeSnapshot {
 	conversationToolChoices: ToolStoreChoice[];
 	webSearchChoices: ToolStoreChoice[];
 	enabledSkillRefs: SkillRef[];
+	activeSkillRefs?: SkillRef[];
 	mcpContext?: MCPConversationContext;
 }
 
@@ -107,6 +109,7 @@ export const EMPTY_ASSISTANT_PRESET_RUNTIME_SNAPSHOT: AssistantPresetRuntimeSnap
 	conversationToolChoices: [],
 	webSearchChoices: [],
 	enabledSkillRefs: [],
+	activeSkillRefs: [],
 	mcpContext: undefined,
 };
 
@@ -128,6 +131,7 @@ export function areAssistantRuntimeSnapshotsEqual(
 		areToolChoiceListsEqual(a.conversationToolChoices, b.conversationToolChoices) &&
 		areToolChoiceListsEqual(a.webSearchChoices, b.webSearchChoices) &&
 		areSkillRefListsEqual(a.enabledSkillRefs, b.enabledSkillRefs) &&
+		areSkillRefListsEqual(a.activeSkillRefs, b.activeSkillRefs) &&
 		areComparableValuesEqual(
 			normalizeAssistantPresetMCPContext(a.mcpContext),
 			normalizeAssistantPresetMCPContext(b.mcpContext)
@@ -356,7 +360,7 @@ export function normalizeAssistantPresetToolChoices(
 }
 
 export function normalizeAssistantPresetSkillRefs(refs: SkillRef[]): string[] {
-	return refs.map(ref => `${ref.bundleID}/${ref.skillSlug}#${ref.skillID}`);
+	return [...new Set(refs.map(ref => `${ref.bundleID}/${ref.skillSlug}#${ref.skillID}`))].toSorted();
 }
 
 export function mapAssistantPresetWebSearchTemplatesToChoices(templates: WebSearchChoiceTemplate[]): ToolStoreChoice[] {
@@ -580,6 +584,7 @@ export function getAssistantPresetModificationSummary(args: {
 	};
 
 	const currentSkillsState = normalizeAssistantPresetSkillRefs(args.currentRuntimeSnapshot.enabledSkillRefs);
+	const currentActiveSkillsState = normalizeAssistantPresetSkillRefs(args.currentRuntimeSnapshot.activeSkillRefs ?? []);
 
 	const currentMCPState = normalizeAssistantPresetMCPContext(args.currentRuntimeSnapshot.mcpContext);
 
@@ -597,9 +602,11 @@ export function getAssistantPresetModificationSummary(args: {
 		? !areComparableValuesEqual(preparedApplication.comparisonState.tools, currentToolsState)
 		: false;
 
-	const skills = preparedApplication.comparisonState.skills
-		? !areComparableValuesEqual(preparedApplication.comparisonState.skills, currentSkillsState)
-		: false;
+	const skills =
+		preparedApplication.comparisonState.skills || preparedApplication.comparisonState.activeSkills
+			? !areComparableValuesEqual(preparedApplication.comparisonState.skills ?? [], currentSkillsState) ||
+				!areComparableValuesEqual(preparedApplication.comparisonState.activeSkills ?? [], currentActiveSkillsState)
+			: false;
 
 	const mcp = preparedApplication.comparisonState.mcp
 		? !areComparableValuesEqual(preparedApplication.comparisonState.mcp, currentMCPState)

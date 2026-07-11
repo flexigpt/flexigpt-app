@@ -44,6 +44,8 @@ type SkillModalMode = 'add' | 'edit' | 'view' | 'fork';
 interface SkillBundleCardProps {
 	bundle: SkillBundle;
 	skills: Skill[];
+	skillLoadError?: string;
+	onRefreshSkills: () => Promise<void>;
 	insertFilter: SkillInsertFilter;
 	searchQuery: string;
 	tagFilters: string[];
@@ -91,6 +93,8 @@ function PresenceBadge({ skill }: { skill: Skill }) {
 export function SkillBundleCard({
 	bundle,
 	skills,
+	skillLoadError,
+	onRefreshSkills,
 	insertFilter,
 	searchQuery,
 	tagFilters,
@@ -117,6 +121,7 @@ export function SkillBundleCard({
 	const [isBundleDetailsOpen, setIsBundleDetailsOpen] = useState(false);
 
 	const [showAlert, setShowAlert] = useState(false);
+	const [isRefreshingSkills, setIsRefreshingSkills] = useState(false);
 	const [alertMsg, setAlertMsg] = useState('');
 
 	const isMountedRef = useRef(false);
@@ -220,28 +225,32 @@ export function SkillBundleCard({
 		}
 
 		setIsDeleteSkillPending(true);
+		let deleted = false;
 
 		try {
 			await onDeleteSkill(bundle.id, skillToDelete.id, skillToDelete.slug);
+			deleted = true;
 		} catch (err) {
 			console.error('Delete skill failed:', err);
 
 			if (isMountedRef.current) {
-				setAlertMsg('Failed to delete skill.');
+				setAlertMsg(err instanceof Error ? err.message : 'Failed to delete skill.');
 				setShowAlert(true);
 			}
 		} finally {
 			if (isMountedRef.current) {
 				setIsDeleteSkillPending(false);
-				setIsDeleteSkillModalOpen(false);
-				setSkillToDelete(null);
+				if (deleted) {
+					setIsDeleteSkillModalOpen(false);
+					setSkillToDelete(null);
+				}
 			}
 		}
 	};
 
 	const openSkillModal = (mode: SkillModalMode, skill?: Skill) => {
-		if (mode === 'add' && !bundle.isEnabled) {
-			setAlertMsg('Enable the bundle before adding a skill. Enabled skills are indexed by the runtime.');
+		if ((mode === 'add' || mode === 'fork') && !bundle.isEnabled) {
+			setAlertMsg('Enable the bundle before creating or forking a skill. Enabled skills are indexed by the runtime.');
 			setShowAlert(true);
 			return;
 		}
@@ -267,6 +276,22 @@ export function SkillBundleCard({
 		setSkillModalMode(mode);
 		setSkillToEdit(skill);
 		setIsSkillModalOpen(true);
+	};
+
+	const refreshSkills = async () => {
+		if (isRefreshingSkills) {
+			return;
+		}
+
+		setIsRefreshingSkills(true);
+		try {
+			await onRefreshSkills();
+		} catch (error) {
+			setAlertMsg(error instanceof Error ? error.message : 'Failed to reload bundle skills.');
+			setShowAlert(true);
+		} finally {
+			setIsRefreshingSkills(false);
+		}
 	};
 
 	const handleSubmitSkill = async (partial: SkillUpsertInput) => {
@@ -337,6 +362,23 @@ export function SkillBundleCard({
 					</div>
 				</div>
 			</div>
+
+			{skillLoadError ? (
+				<div className="alert alert-warning mt-3 rounded-2xl text-sm">
+					<div className="grow">
+						<div className="font-semibold">Skills could not be loaded for this bundle</div>
+						<div>{skillLoadError}</div>
+					</div>
+					<button
+						type="button"
+						className="btn btn-sm rounded-xl"
+						onClick={() => void refreshSkills()}
+						disabled={isRefreshingSkills}
+					>
+						{isRefreshingSkills ? 'Reloading…' : 'Retry'}
+					</button>
+				</div>
+			) : null}
 
 			{isExpanded && (
 				<div className="mt-8 space-y-4">
@@ -480,7 +522,7 @@ export function SkillBundleCard({
 													className="toggle toggle-accent"
 													checked={skill.isEnabled}
 													onChange={() => patchSkillEnable(skill)}
-													disabled={busySkillIDs.has(skill.id) || !bundle.isEnabled}
+													disabled={busySkillIDs.has(skill.id) || busyBundleToggle || !bundle.isEnabled}
 													title={!bundle.isEnabled ? 'Enable the bundle first.' : undefined}
 												/>
 											</td>
@@ -520,11 +562,13 @@ export function SkillBundleCard({
 														onClick={() => {
 															openSkillModal('fork', skill);
 														}}
-														disabled={bundle.isBuiltIn}
+														disabled={bundle.isBuiltIn || !bundle.isEnabled}
 														title={
 															bundle.isBuiltIn
 																? 'Forking from this built-in bundle is not available here. Use a custom bundle.'
-																: 'Fork into a new managed SKILL.md artifact'
+																: !bundle.isEnabled
+																	? 'Enable the bundle before forking.'
+																	: 'Fork into a new managed SKILL.md artifact'
 														}
 														aria-label="Fork"
 													>
@@ -575,8 +619,14 @@ export function SkillBundleCard({
 							<button
 								type="button"
 								className="btn btn-md btn-ghost flex items-center rounded-2xl"
-								disabled={skills.length > 0}
-								title={skills.length > 0 ? 'Delete all skills from this bundle first.' : 'Delete Bundle'}
+								disabled={skills.length > 0 || Boolean(skillLoadError)}
+								title={
+									skillLoadError
+										? 'Reload bundle skills before deleting the bundle.'
+										: skills.length > 0
+											? 'Delete all skills from this bundle first.'
+											: 'Delete Bundle'
+								}
 								onClick={() => {
 									onRequestBundleDelete(bundle);
 								}}
@@ -607,8 +657,10 @@ export function SkillBundleCard({
 			<DeleteConfirmationModal
 				isOpen={isDeleteSkillModalOpen}
 				onClose={() => {
-					setIsDeleteSkillModalOpen(false);
-					setSkillToDelete(null);
+					if (!isDeleteSkillPending) {
+						setIsDeleteSkillModalOpen(false);
+						setSkillToDelete(null);
+					}
 				}}
 				onConfirm={confirmDeleteSkill}
 				title="Delete Skill"

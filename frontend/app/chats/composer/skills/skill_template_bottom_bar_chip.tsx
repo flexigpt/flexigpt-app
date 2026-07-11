@@ -50,11 +50,17 @@ interface SkillTemplateDropdownProps {
 	onPick: (item: SkillListItem) => void;
 }
 
+interface SkillTemplateInsertResult {
+	attachmentError?: string;
+}
+
 interface SkillTemplateRenderModalProps {
 	isOpen: boolean;
 	item: SkillListItem | null;
 	onClose: () => void;
-	onInsert: (args: SkillTemplateInsertArgs) => Promise<void> | void;
+	onInsert: (
+		args: SkillTemplateInsertArgs
+	) => Promise<SkillTemplateInsertResult | undefined> | SkillTemplateInsertResult | undefined;
 }
 
 interface RenderFormState {
@@ -153,6 +159,30 @@ function isSkillMarkdownPath(path: string): boolean {
 	return basename.toLowerCase() === 'skill.md';
 }
 
+function normalizeLocalPath(path: string): string {
+	return path.trim().replaceAll('\\', '/').replaceAll(/\/+/g, '/').replaceAll(/\/+$/g, '');
+}
+
+function hasParentTraversal(path: string): boolean {
+	return normalizeLocalPath(path)
+		.split('/')
+		.some(segment => segment === '..');
+}
+
+function isPathInsideSkillDirectory(skillDirectory: string, candidate: string): boolean {
+	const base = normalizeLocalPath(skillDirectory);
+	const value = normalizeLocalPath(candidate);
+
+	if (!base || !value) {
+		return false;
+	}
+
+	const caseInsensitive = /^[A-Za-z]:\//.test(base);
+	const normalizedBase = caseInsensitive ? base.toLowerCase() : base;
+	const normalizedValue = caseInsensitive ? value.toLowerCase() : value;
+	return normalizedValue === normalizedBase || normalizedValue.startsWith(`${normalizedBase}/`);
+}
+
 function joinLocalResourcePath(skillDirectory: string, resourceLocation: string): string {
 	const base = skillDirectory.trim().replaceAll(/[\\/]+$/g, '');
 	const relative = resourceLocation
@@ -185,7 +215,17 @@ function getSkillAttachmentPaths(item: SkillListItem | null): string[] {
 	const paths = resourceLocations
 		.map(location => location.trim())
 		.filter(Boolean)
-		.map(location => (isAbsoluteLocalPath(location) ? location : joinLocalResourcePath(skillDirectory ?? '', location)))
+		.map(location => {
+			if (isAbsoluteLocalPath(location)) {
+				return skillDirectory && isPathInsideSkillDirectory(skillDirectory, location) ? location : '';
+			}
+
+			if (hasParentTraversal(location)) {
+				return '';
+			}
+
+			return joinLocalResourcePath(skillDirectory ?? '', location);
+		})
 		.filter(path => path.length > 0 && !isSkillMarkdownPath(path));
 
 	return [...new Set(paths)];
@@ -406,6 +446,7 @@ function SkillTemplateRenderModalContent({ item, onClose, onInsert }: Omit<Skill
 	}));
 	const [submitError, setSubmitError] = useState('');
 	const [submitting, setSubmitting] = useState(false);
+	const [insertedWithAttachmentWarning, setInsertedWithAttachmentWarning] = useState(false);
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const [selectedSkillAttachmentPaths, setSelectedSkillAttachmentPaths] = useState<Set<string>>(
 		() => new Set(skillAttachmentPaths)
@@ -455,7 +496,7 @@ function SkillTemplateRenderModalContent({ item, onClose, onInsert }: Omit<Skill
 		event.preventDefault();
 		event.stopPropagation();
 
-		if (!item || !canInsert) {
+		if (!item || !canInsert || insertedWithAttachmentWarning) {
 			return;
 		}
 
@@ -468,10 +509,17 @@ function SkillTemplateRenderModalContent({ item, onClose, onInsert }: Omit<Skill
 				if (rendered.insert !== 'user-message') {
 					throw new Error(`Expected a user-message template, but renderer returned insert=${rendered.insert}.`);
 				}
-				await onInsert({
+				const result = await onInsert({
 					text: rendered.text,
 					attachedSkillPaths: selectedAttachmentPaths.length > 0 ? selectedAttachmentPaths : undefined,
 				});
+
+				if (result?.attachmentError) {
+					setInsertedWithAttachmentWarning(true);
+					setSubmitError(result.attachmentError);
+					return;
+				}
+
 				requestClose();
 			})
 			.catch((error: unknown) => {
@@ -613,12 +661,19 @@ function SkillTemplateRenderModalContent({ item, onClose, onInsert }: Omit<Skill
 							<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
 								Cancel
 							</button>
-							<button type="submit" className="btn btn-primary rounded-xl" disabled={!canInsert}>
-								{submitting
-									? 'Rendering…'
-									: selectedAttachmentPaths.length > 0
-										? `Insert with ${selectedAttachmentPaths.length} resource attachment${selectedAttachmentPaths.length === 1 ? '' : 's'}`
-										: 'Insert'}
+							<button
+								type={insertedWithAttachmentWarning ? 'button' : 'submit'}
+								className="btn btn-primary rounded-xl"
+								disabled={!canInsert}
+								onClick={insertedWithAttachmentWarning ? requestClose : undefined}
+							>
+								{insertedWithAttachmentWarning
+									? 'Close'
+									: submitting
+										? 'Rendering…'
+										: selectedAttachmentPaths.length > 0
+											? `Insert with ${selectedAttachmentPaths.length} resource attachment${selectedAttachmentPaths.length === 1 ? '' : 's'}`
+											: 'Insert'}
 							</button>
 						</div>
 					</form>
@@ -672,10 +727,22 @@ function SkillTemplateBottomBarChipInner({
 
 	const handleInsertRendered = useCallback(
 		async (args: SkillTemplateInsertArgs) => {
-			if (args.attachedSkillPaths?.length) {
-				await onAttachResourcePaths?.(args.attachedSkillPaths);
-			}
 			await onInsertTemplateText(args.text);
+
+			if (args.attachedSkillPaths?.length) {
+				try {
+					await onAttachResourcePaths?.(args.attachedSkillPaths);
+				} catch (error) {
+					console.error('Template text inserted but resource attachment failed:', error);
+					return {
+						attachmentError:
+							error instanceof Error && error.message.trim()
+								? `Template text was inserted, but resource attachment failed: ${error.message}`
+								: 'Template text was inserted, but resource attachment failed. You can attach the files manually.',
+					};
+				}
+			}
+
 			store.hide();
 		},
 		[onAttachResourcePaths, onInsertTemplateText, store]
@@ -734,7 +801,9 @@ function SkillTemplateBottomBarChipInner({
 				onClose={() => {
 					setModalItem(null);
 				}}
-				onInsert={handleInsertRendered}
+				onInsert={t => {
+					return handleInsertRendered(t);
+				}}
 			/>
 		</div>
 	);

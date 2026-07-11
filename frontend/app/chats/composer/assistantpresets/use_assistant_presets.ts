@@ -514,9 +514,116 @@ function getAssistantPresetAvailability(
 	return { isSelectable: true };
 }
 
+let assistantPresetOptionsCache: AssistantPresetOptionItem[] | undefined;
+let assistantPresetOptionsPromise: Promise<AssistantPresetOptionItem[]> | undefined;
+
+async function loadAssistantPresetOptions(force = false): Promise<AssistantPresetOptionItem[]> {
+	if (assistantPresetOptionsPromise) {
+		return assistantPresetOptionsPromise;
+	}
+	if (!force && assistantPresetOptionsCache !== undefined) {
+		return assistantPresetOptionsCache;
+	}
+
+	const request = (async () => {
+		const bundles = await getAllAssistantPresetBundles(undefined, false);
+		const catalog = await loadAssistantPresetEditorCatalog({ force });
+
+		if (bundles.length === 0) {
+			return [];
+		}
+
+		const bundleByID = new Map(bundles.map(bundle => [bundle.id, bundle]));
+		const modelOptionsByKey = new Map(catalog.modelPresetOptions.map(option => [option.key, option] as const));
+		const toolOptionsByKey = new Map(catalog.toolOptions.map(option => [option.key, option] as const));
+		const skillOptionsByKey = new Map(catalog.skillOptions.map(option => [option.key, option] as const));
+
+		const listItems = await getAllAssistantPresetListItems(
+			bundles.map(bundle => bundle.id),
+			false
+		);
+
+		const fullResults = await Promise.allSettled(
+			listItems.map(async item => {
+				const preset = await assistantPresetStoreAPI.getAssistantPreset(
+					item.bundleID,
+					item.assistantPresetSlug,
+					item.assistantPresetVersion
+				);
+
+				return {
+					item,
+					preset,
+				};
+			})
+		);
+
+		const loadedPresetResults = fullResults.flatMap(result => {
+			if (result.status !== 'fulfilled') {
+				console.error('Failed to load assistant preset:', result.reason);
+				return [];
+			}
+
+			const { item, preset } = result.value;
+			if (!preset) {
+				return [];
+			}
+
+			return [{ item, preset }];
+		});
+
+		const mcpLookups = await loadAssistantPresetMCPAvailabilityLookups(
+			loadedPresetResults.map(result => result.preset)
+		);
+
+		return loadedPresetResults.flatMap(({ item, preset }): AssistantPresetOptionItem[] => {
+			const bundle = bundleByID.get(item.bundleID);
+			const bundleDisplayName = bundle ? getBundleDisplayName(bundle, item.bundleID) : item.bundleSlug || item.bundleID;
+
+			const displayName = preset.displayName || preset.slug;
+			const label = `${displayName} — ${bundleDisplayName} (${preset.slug}@${preset.version})`;
+			const availability = getAssistantPresetAvailability(preset, {
+				modelOptionsByKey,
+				toolOptionsByKey,
+				skillOptionsByKey,
+				mcpLookups,
+			});
+
+			return [
+				{
+					key: buildAssistantPresetIdentityKey(item.bundleID, item.assistantPresetSlug, item.assistantPresetVersion),
+					bundleID: item.bundleID,
+					bundleSlug: item.bundleSlug,
+					bundleDisplayName,
+					displayName,
+					description: preset.description,
+					preset,
+					label,
+					isSelectable: availability.isSelectable,
+					availabilityReason: availability.availabilityReason,
+				},
+			];
+		});
+	})();
+
+	assistantPresetOptionsPromise = request;
+
+	try {
+		const result = await request;
+		assistantPresetOptionsCache = result;
+		return result;
+	} finally {
+		if (assistantPresetOptionsPromise === request) {
+			assistantPresetOptionsPromise = undefined;
+		}
+	}
+}
+
 export function useAssistantPresets() {
-	const [presetOptions, setPresetOptions] = useState<AssistantPresetOptionItem[]>([]);
-	const [loading, setLoading] = useState(true);
+	const [presetOptions, setPresetOptions] = useState<AssistantPresetOptionItem[]>(
+		() => assistantPresetOptionsCache ?? []
+	);
+	const [loading, setLoading] = useState(() => assistantPresetOptionsCache === undefined);
 	const [error, setError] = useState<string | null>(null);
 
 	const refreshPresets = useCallback(async () => {
@@ -524,88 +631,7 @@ export function useAssistantPresets() {
 		setError(null);
 
 		try {
-			const bundles = await getAllAssistantPresetBundles(undefined, false);
-			const catalog = await loadAssistantPresetEditorCatalog();
-
-			if (bundles.length === 0) {
-				setPresetOptions([]);
-				return;
-			}
-			const bundleByID = new Map(bundles.map(bundle => [bundle.id, bundle]));
-			const modelOptionsByKey = new Map(catalog.modelPresetOptions.map(option => [option.key, option] as const));
-			const toolOptionsByKey = new Map(catalog.toolOptions.map(option => [option.key, option] as const));
-			const skillOptionsByKey = new Map(catalog.skillOptions.map(option => [option.key, option] as const));
-
-			const listItems = await getAllAssistantPresetListItems(
-				bundles.map(bundle => bundle.id),
-				false
-			);
-
-			const fullResults = await Promise.allSettled(
-				listItems.map(async item => {
-					const preset = await assistantPresetStoreAPI.getAssistantPreset(
-						item.bundleID,
-						item.assistantPresetSlug,
-						item.assistantPresetVersion
-					);
-
-					return {
-						item,
-						preset,
-					};
-				})
-			);
-
-			const loadedPresetResults = fullResults.flatMap(result => {
-				if (result.status !== 'fulfilled') {
-					console.error('Failed to load assistant preset:', result.reason);
-					return [];
-				}
-
-				const { item, preset } = result.value;
-				if (!preset) {
-					return [];
-				}
-
-				return [{ item, preset }];
-			});
-
-			const mcpLookups = await loadAssistantPresetMCPAvailabilityLookups(
-				loadedPresetResults.map(result => result.preset)
-			);
-
-			const nextOptions: AssistantPresetOptionItem[] = loadedPresetResults.flatMap(({ item, preset }) => {
-				const bundle = bundleByID.get(item.bundleID);
-				const bundleDisplayName = bundle
-					? getBundleDisplayName(bundle, item.bundleID)
-					: item.bundleSlug || item.bundleID;
-
-				const displayName = preset.displayName || preset.slug;
-				const label = `${displayName} — ${bundleDisplayName} (${preset.slug}@${preset.version})`;
-				const availability = getAssistantPresetAvailability(preset, {
-					modelOptionsByKey,
-					toolOptionsByKey,
-					skillOptionsByKey,
-					mcpLookups,
-				});
-
-				return [
-					{
-						key: buildAssistantPresetIdentityKey(item.bundleID, item.assistantPresetSlug, item.assistantPresetVersion),
-						bundleID: item.bundleID,
-						bundleSlug: item.bundleSlug,
-						bundleDisplayName,
-						displayName,
-						description: preset.description,
-						preset,
-						label,
-						isSelectable: availability.isSelectable,
-						availabilityReason: availability.availabilityReason,
-					},
-				];
-			});
-
-			setPresetOptions(nextOptions);
+			setPresetOptions(await loadAssistantPresetOptions(true));
 		} catch (refreshError) {
 			console.error('Failed to load assistant presets:', refreshError);
 			setError(getErrorMessage(refreshError, 'Failed to load assistant presets.'));
@@ -616,9 +642,33 @@ export function useAssistantPresets() {
 	}, []);
 
 	useEffect(() => {
-		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect
-		void refreshPresets();
-	}, [refreshPresets]);
+		let cancelled = false;
+
+		void loadAssistantPresetOptions()
+			.then(options => {
+				if (!cancelled) {
+					setPresetOptions(options);
+				}
+			})
+			.catch((loadError: unknown) => {
+				if (cancelled) {
+					return;
+				}
+
+				console.error('Failed to load assistant presets:', loadError);
+				setError(getErrorMessage(loadError, 'Failed to load assistant presets.'));
+				setPresetOptions([]);
+			})
+			.finally(() => {
+				if (!cancelled) {
+					setLoading(false);
+				}
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, []);
 
 	return {
 		presetOptions,

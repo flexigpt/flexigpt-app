@@ -275,6 +275,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 	);
 	const [errors, setErrors] = useState<ErrorState>({});
 	const [submitError, setSubmitError] = useState('');
+	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [prefillMode, setPrefillMode] = useState(false);
 	const [selectedPrefillKey, setSelectedPrefillKey] = useState<string | null>(null);
 	const [previewArgs, setPreviewArgs] = useState<Record<string, string>>(() =>
@@ -325,6 +326,29 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 		[formData.description, formData.displayName, formData.name, scaffoldArguments, scaffoldBody, scaffoldInsert]
 	);
 
+	const validateForm = (state: SkillFormData): ErrorState => {
+		let next: ErrorState = {};
+		next = validateField('name', state.name, next);
+		next = validateField('slug', state.slug, next);
+		next = validateField('type', state.type, next);
+		if (!isAddMode || creationMode === 'register') {
+			next = validateField('location', state.location, next);
+		}
+		if (state.tags.trim() !== '') {
+			next = validateField('tags', state.tags, next);
+		}
+		if (isAddMode && creationMode === 'create' && !scaffoldBody.trim()) {
+			next.markdownBody = 'SKILL.md body is required.';
+		}
+		if (isAddMode && creationMode === 'create' && scaffoldArgumentError) {
+			next.markdownBody = scaffoldArgumentError;
+		}
+		return next;
+	};
+
+	// oxlint-disable-next-line jsreact-hooks/immutability
+	const isAllValid = isViewMode ? true : !isSubmitting && Object.values(validateForm(formData)).every(error => !error);
+
 	useEffect(() => {
 		const dialog = dialogRef.current;
 		if (!dialog) {
@@ -362,7 +386,11 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 		};
 	}, [isAddMode]);
 
-	const requestClose = () => {
+	const requestClose = (force = false) => {
+		if (isSubmitting && !force) {
+			return;
+		}
+
 		const dialog = dialogRef.current;
 
 		if (dialog?.open) {
@@ -515,24 +543,12 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 		return nextErrors;
 	};
 
-	const validateForm = (state: SkillFormData): ErrorState => {
-		let next: ErrorState = {};
-		next = validateField('name', state.name, next);
-		next = validateField('slug', state.slug, next);
-		next = validateField('type', state.type, next);
-		if (!isAddMode || creationMode === 'register') {
-			next = validateField('location', state.location, next);
-		}
-		if (state.tags.trim() !== '') {
-			next = validateField('tags', state.tags, next);
-		}
-		if (isAddMode && creationMode === 'create' && !scaffoldBody.trim()) {
-			next.markdownBody = 'SKILL.md body is required.';
-		}
-		if (isAddMode && creationMode === 'create' && scaffoldArgumentError) {
-			next.markdownBody = scaffoldArgumentError;
-		}
-		return next;
+	const changeCreationMode = (nextMode: 'create' | 'register') => {
+		setCreationMode(nextMode);
+		setSubmitError('');
+		setErrors(current =>
+			nextMode === 'create' ? omitManyKeys(current, ['location']) : omitManyKeys(current, ['markdownBody'])
+		);
 	};
 
 	const applyPrefill = (key: string) => {
@@ -587,23 +603,11 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 		}
 	};
 
-	const isAllValid = useMemo(() => {
-		if (isViewMode) {
-			return true;
-		}
-		const hasErrs = Object.values(errors).some(Boolean);
-		const locationOk = isAddMode && creationMode === 'create' ? true : formData.location.trim();
-		const bodyOk = isAddMode && creationMode === 'create' ? scaffoldBody.trim() : true;
-		const required =
-			formData.name.trim() && formData.slug.trim() && locationOk && bodyOk && formData.type && !scaffoldArgumentError;
-		return Boolean(required) && !hasErrs;
-	}, [creationMode, errors, formData, isAddMode, isViewMode, scaffoldArgumentError, scaffoldBody]);
-
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
 		e.preventDefault();
 		e.stopPropagation();
 
-		if (isViewMode) {
+		if (isViewMode || isSubmitting) {
 			return;
 		}
 
@@ -650,13 +654,19 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 						location: formData.location.trim(),
 					};
 
+		setIsSubmitting(true);
 		void onSubmit(payload)
 			.then(() => {
-				requestClose();
+				requestClose(true);
 			})
 			.catch((err: unknown) => {
 				const msg = err instanceof Error ? err.message : 'Failed to save skill.';
 				setSubmitError(msg);
+			})
+			.finally(() => {
+				if (!isUnmountingRef.current) {
+					setIsSubmitting(false);
+				}
 			});
 	};
 
@@ -687,7 +697,9 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 						<button
 							type="button"
 							className="btn btn-sm btn-circle bg-base-300"
-							onClick={requestClose}
+							onClick={() => {
+								requestClose(false);
+							}}
 							aria-label="Close"
 						>
 							<FiX size={12} />
@@ -775,8 +787,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 											className="radio radio-sm mt-1"
 											checked={creationMode === 'create'}
 											onChange={() => {
-												setCreationMode('create');
-												setSubmitError('');
+												changeCreationMode('create');
 											}}
 										/>
 										<span>
@@ -795,8 +806,7 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 											className="radio radio-sm mt-1"
 											checked={creationMode === 'register'}
 											onChange={() => {
-												setCreationMode('register');
-												setSubmitError('');
+												changeCreationMode('register');
 											}}
 										/>
 										<span>
@@ -1470,13 +1480,20 @@ function AddEditSkillModalContent({ onClose, onSubmit, initialData, existingSkil
 						)}
 
 						<div className="modal-action">
-							<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
+							<button
+								type="button"
+								className="btn bg-base-300 rounded-xl"
+								onClick={() => {
+									requestClose();
+								}}
+								disabled={isSubmitting}
+							>
 								{isViewMode ? 'Close' : 'Cancel'}
 							</button>
 
 							{!isViewMode && (
 								<button type="submit" className="btn btn-primary rounded-xl" disabled={!isAllValid}>
-									Save
+									{isSubmitting ? 'Saving…' : 'Save'}
 								</button>
 							)}
 						</div>

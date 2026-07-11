@@ -36,6 +36,41 @@ import {
 import { getChatInputOptions } from '@/modelpresets/lib/uichatoption_helper';
 import { normalizeSkillSelectionsToRefs } from '@/skills/lib/skill_identity_utils';
 
+type ChatInputOptionsResult = Awaited<ReturnType<typeof getChatInputOptions>>;
+
+let chatInputOptionsCache: ChatInputOptionsResult | undefined;
+let chatInputOptionsPromise: Promise<ChatInputOptionsResult> | undefined;
+
+function loadChatInputOptionsCached(): Promise<ChatInputOptionsResult> {
+	if (chatInputOptionsCache) {
+		return Promise.resolve(chatInputOptionsCache);
+	}
+	if (chatInputOptionsPromise) {
+		return chatInputOptionsPromise;
+	}
+
+	const request = getChatInputOptions().then(result => {
+		chatInputOptionsCache = result;
+		return result;
+	});
+	chatInputOptionsPromise = request;
+
+	void request.then(
+		() => {
+			if (chatInputOptionsPromise === request) {
+				chatInputOptionsPromise = undefined;
+			}
+		},
+		() => {
+			if (chatInputOptionsPromise === request) {
+				chatInputOptionsPromise = undefined;
+			}
+		}
+	);
+
+	return request;
+}
+
 function isHybridReasoningModel(model: UIChatOption): boolean {
 	return model.reasoning?.type === ReasoningType.HybridWithTokens;
 }
@@ -432,7 +467,7 @@ export function useAssistantContextState(): AssistantContextController {
 		let cancelled = false;
 
 		void (async () => {
-			const r = await getChatInputOptions();
+			const r = await loadChatInputOptionsCached();
 			if (cancelled) {
 				return;
 			}

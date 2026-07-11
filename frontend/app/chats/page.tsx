@@ -83,8 +83,8 @@ export default function ChatsPage() {
 			});
 	}, [preloadWorkflowStarter, setSearchParams, workflowStarter, workflowStarterSearch]);
 
-	useTitleBarContent(
-		{
+	const titleBarSlots = useMemo(
+		() => ({
 			center: (
 				<div className="mx-auto flex w-4/5 items-center justify-center">
 					<ConversationSearch
@@ -96,9 +96,11 @@ export default function ChatsPage() {
 					/>
 				</div>
 			),
-		},
+		}),
 		[handleSelectConversation, openConversationIds, searchRefreshKey]
 	);
+
+	useTitleBarContent(titleBarSlots);
 
 	return (
 		<PageFrame contentScrollable={false}>

@@ -1,4 +1,4 @@
-import { useCallback, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { FiAlertTriangle, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
@@ -32,15 +32,55 @@ interface ExpansionOverrideState {
 
 const getCodeBlockKey = (language: string, value: string) => `${language.toLowerCase()}\u0000${value}`;
 
+function useNearViewport(enabled: boolean) {
+	const elementRef = useRef<HTMLDivElement | null>(null);
+	const [activated, setActivated] = useState(false);
+
+	useEffect(() => {
+		if (!enabled || activated) {
+			return;
+		}
+
+		const element = elementRef.current;
+		if (!element) {
+			return;
+		}
+
+		if (typeof IntersectionObserver === 'undefined') {
+			const frame = window.requestAnimationFrame(() => {
+				setActivated(true);
+			});
+			return () => {
+				window.cancelAnimationFrame(frame);
+			};
+		}
+
+		const observer = new IntersectionObserver(
+			entries => {
+				if (entries.some(entry => entry.isIntersecting)) {
+					setActivated(true);
+					observer.disconnect();
+				}
+			},
+			{ rootMargin: '800px 0px' }
+		);
+
+		observer.observe(element);
+		return () => {
+			observer.disconnect();
+		};
+	}, [activated, enabled]);
+
+	return { elementRef, activated };
+}
+
 export function CodeBlock({ language, value, isBusy, hideMermaidCode, diffCandidatePaths }: CodeProps) {
-	const html = useHighlight(value, language);
 	const codeBodyId = useId();
 
 	const normalizedLanguage = language.toLowerCase();
 	const isMermaid = normalizedLanguage === 'mermaid';
 	const codeBlockKey = getCodeBlockKey(language, value);
 
-	const isDiffLike = useMemo(() => !isBusy && looksLikeUnifiedDiff(value, language), [isBusy, language, value]);
 	const [mermaidResult, setMermaidResult] = useState<MermaidResultState | null>(null);
 	const [expansionOverride, setExpansionOverride] = useState<ExpansionOverrideState | null>(null);
 
@@ -64,6 +104,13 @@ export function CodeBlock({ language, value, isBusy, hideMermaidCode, diffCandid
 	// - errored Mermaid: expanded unless the caller requested hidden Mermaid code behavior
 	const defaultIsExpanded = isMermaid ? hasMermaidSyntaxError && !hideMermaidCode : true;
 	const isExpanded = expansionOverride?.key === codeBlockKey ? expansionOverride.isExpanded : defaultIsExpanded;
+
+	const { elementRef, activated: richCodeWorkActivated } = useNearViewport(!isBusy);
+	const html = useHighlight(value, language, richCodeWorkActivated && isExpanded);
+	const isDiffLike = useMemo(
+		() => richCodeWorkActivated && !isBusy && looksLikeUnifiedDiff(value, language),
+		[isBusy, language, richCodeWorkActivated, value]
+	);
 
 	const highlightedHtml = html ?? '';
 	const showFallback = !value.trim() || html === null || html === '';
@@ -105,7 +152,7 @@ export function CodeBlock({ language, value, isBusy, hideMermaidCode, diffCandid
 
 	return (
 		<>
-			<div className="app-bg-code my-4 overflow-hidden rounded-lg">
+			<div ref={elementRef} className="app-bg-code my-4 overflow-hidden rounded-lg">
 				<div className="app-bg-code-header flex min-w-0 items-center justify-between gap-2 px-2 py-0.5">
 					<div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-xs" title={headerTitle}>
 						<span
@@ -175,7 +222,9 @@ export function CodeBlock({ language, value, isBusy, hideMermaidCode, diffCandid
 				)}
 			</div>
 
-			{isMermaid && !isBusy && <MermaidDiagram code={value} onRenderStatusChange={handleMermaidRenderStatusChange} />}
+			{isMermaid && !isBusy && richCodeWorkActivated ? (
+				<MermaidDiagram code={value} onRenderStatusChange={handleMermaidRenderStatusChange} />
+			) : null}
 		</>
 	);
 }

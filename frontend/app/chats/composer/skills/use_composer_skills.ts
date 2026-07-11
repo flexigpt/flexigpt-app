@@ -25,6 +25,7 @@ interface ApplySkillSelectionStateOptions {
 interface UseComposerSkillsResult {
 	allSkills: SkillListItem[];
 	skillsLoading: boolean;
+	skillsLoadError: string | null;
 	enabledSkillRefs: SkillRef[];
 	activeSkillRefs: SkillRef[];
 	skillSessionID: string | null;
@@ -54,18 +55,78 @@ function isInstructionSkillListItem(item: SkillListItem): boolean {
 	return (item.skillDefinition.insert || 'instructions') === 'instructions';
 }
 
+let composerSkillsCatalogCache: SkillListItem[] | undefined;
+let composerSkillsCatalogPromise: Promise<SkillListItem[]> | undefined;
+
+async function fetchComposerSkillsCatalog(): Promise<SkillListItem[]> {
+	const out: SkillListItem[] = [];
+	let token: string | undefined;
+
+	for (let guard = 0; guard < 50; guard += 1) {
+		const resp = await skillStoreAPI.listSkills({
+			bundleIDs: [],
+			types: [],
+			inserts: ['instructions'],
+			includeDisabled: false,
+			includeMissing: false,
+			recommendedPageSize: 200,
+			pageToken: token,
+		});
+
+		out.push(...(resp.skillListItems ?? []));
+		token = resp.nextPageToken;
+		if (!token) {
+			break;
+		}
+	}
+
+	return out;
+}
+
+function loadComposerSkillsCatalog(force = false): Promise<SkillListItem[]> {
+	if (composerSkillsCatalogPromise) {
+		return composerSkillsCatalogPromise;
+	}
+	if (!force && composerSkillsCatalogCache !== undefined) {
+		return Promise.resolve(composerSkillsCatalogCache);
+	}
+
+	const request = fetchComposerSkillsCatalog().then(items => {
+		composerSkillsCatalogCache = items;
+		return items;
+	});
+	composerSkillsCatalogPromise = request;
+
+	void request.then(
+		() => {
+			if (composerSkillsCatalogPromise === request) {
+				composerSkillsCatalogPromise = undefined;
+			}
+		},
+		() => {
+			if (composerSkillsCatalogPromise === request) {
+				composerSkillsCatalogPromise = undefined;
+			}
+		}
+	);
+
+	return request;
+}
+
 export function useComposerSkills(): UseComposerSkillsResult {
 	const [allSkills, setAllSkills] = useState<SkillListItem[]>([]);
 	const [enabledSkillRefs, setEnabledSkillRefsRaw] = useState<SkillRef[]>([]);
 	const [activeSkillRefs, setActiveSkillRefsRaw] = useState<SkillRef[]>([]);
 	const [skillSessionID, setSkillSessionID] = useState<string | null>(null);
 	const [skillsLoading, setSkillsLoading] = useState(true);
+	const [skillsLoadError, setSkillsLoadError] = useState<string | null>(null);
 
 	const sessionStateKeyRef = useRef('');
 	const skillSessionSyncVersionRef = useRef(0);
 
 	const availableSkillKeySetRef = useRef<Set<string>>(new Set());
 	const skillsLoadingRef = useRef(true);
+	const skillsCatalogReadyRef = useRef(false);
 
 	const skillSessionIDRef = useRef<string | null>(null);
 	const enabledSkillRefsRef = useRef<SkillRef[]>([]);
@@ -129,7 +190,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 
 	const filterSkillRefsToLoadedCatalog = useCallback((refs: SkillRef[] | null | undefined): SkillRef[] => {
 		const normalized = normalizeSkillRefs(refs);
-		if (skillsLoadingRef.current) {
+		if (skillsLoadingRef.current || !skillsCatalogReadyRef.current) {
 			return normalized;
 		}
 
@@ -319,50 +380,32 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		};
 	}, []);
 
-	const fetchAllSkills = useCallback(async (): Promise<SkillListItem[]> => {
-		const out: SkillListItem[] = [];
-		let token: string | undefined = undefined;
-
-		for (let guard = 0; guard < 50; guard += 1) {
-			const resp = await skillStoreAPI.listSkills({
-				bundleIDs: [],
-				types: [],
-				inserts: ['instructions'],
-				includeDisabled: false,
-				includeMissing: false,
-				recommendedPageSize: 200,
-				pageToken: token,
-			});
-
-			out.push(...(resp.skillListItems ?? []));
-			token = resp.nextPageToken;
-			if (!token) {
-				break;
-			}
-		}
-
-		return out;
-	}, []);
-
 	const refreshSkills = useCallback(async () => {
 		setSkillsLoading(true);
+		setSkillsLoadError(null);
 		try {
-			const out = await fetchAllSkills();
+			const out = await loadComposerSkillsCatalog(true);
 			setAllSkills(out);
-		} catch {
-			setAllSkills([]);
+			skillsCatalogReadyRef.current = true;
+		} catch (error) {
+			console.error('Failed to refresh skills catalog:', error);
+			setSkillsLoadError(
+				error instanceof Error && error.message.trim()
+					? error.message
+					: 'Failed to refresh the skills catalog. Existing skill selections were kept.'
+			);
 		} finally {
 			setSkillsLoading(false);
 			if (skillsCatalogLoadPromiseRef.current) {
 				skillsCatalogLoadPromiseRef.current = null;
 			}
 		}
-	}, [fetchAllSkills]);
+	}, []);
 
 	// Fetch skills catalog (store listSkills; NOT runtime listRuntimeSkills).
 	useEffect(() => {
 		let cancelled = false;
-		const loadPromise = fetchAllSkills();
+		const loadPromise = loadComposerSkillsCatalog();
 		skillsCatalogLoadPromiseRef.current = loadPromise;
 
 		loadPromise
@@ -371,10 +414,16 @@ export function useComposerSkills(): UseComposerSkillsResult {
 					return;
 				}
 				setAllSkills(out);
+				setSkillsLoadError(null);
+				skillsCatalogReadyRef.current = true;
 			})
-			.catch(() => {
+			.catch((error: unknown) => {
 				if (!cancelled) {
-					setAllSkills([]);
+					setSkillsLoadError(
+						error instanceof Error && error.message.trim()
+							? error.message
+							: 'Failed to load the skills catalog. Existing skill selections were kept.'
+					);
 				}
 			})
 			.finally(() => {
@@ -392,7 +441,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 				skillsCatalogLoadPromiseRef.current = null;
 			}
 		};
-	}, [fetchAllSkills]);
+	}, []);
 
 	const enableAllSkills = useCallback(() => {
 		const requestVersion = enableAllSkillsRequestVersionRef.current + 1;
@@ -492,6 +541,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 	return {
 		allSkills,
 		skillsLoading,
+		skillsLoadError,
 		enabledSkillRefs,
 		activeSkillRefs,
 		skillSessionID,

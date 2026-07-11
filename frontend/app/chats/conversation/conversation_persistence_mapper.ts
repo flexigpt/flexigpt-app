@@ -15,6 +15,7 @@ import type {
 	URLCitation,
 } from '@/spec/inference';
 import { ContentItemKind, InputKind, RoleEnum } from '@/spec/inference';
+import type { MCPToolSelection } from '@/spec/mcp';
 import type { ToolStoreChoice } from '@/spec/tool';
 
 import {
@@ -38,24 +39,79 @@ function toStoreConversationMessage(message: ConversationMessage): StoreConversa
 	return storeMessage;
 }
 
-export function toStoreConversation(conversation: Conversation): StoreConversation {
+export async function toStoreConversationAsync(conversation: Conversation): Promise<StoreConversation> {
+	const messages: StoreConversationMessage[] = [];
+	let sliceStartedAt = getHydrationClock();
+
+	for (let index = 0; index < conversation.messages.length; index += 1) {
+		messages.push(toStoreConversationMessage(conversation.messages[index]));
+
+		if (
+			index < conversation.messages.length - 1 &&
+			getHydrationClock() - sliceStartedAt >= HYDRATION_MAIN_THREAD_BUDGET_MS
+		) {
+			await yieldHydrationToMainThread();
+			sliceStartedAt = getHydrationClock();
+		}
+	}
+
 	return {
 		...conversation,
-		messages: conversation.messages.map(toStoreConversationMessage),
+		messages,
 	};
 }
 
 interface ConversationHydrationContext {
 	choiceMap: Map<string, ToolStoreChoice>;
 	toolCallMap: Map<string, ToolCall>;
-	mcpToolSelectionMap: ReturnType<typeof buildMCPToolSelectionMapFromMessages>;
+	mcpToolSelectionMap: ReturnType<typeof buildMCPToolSelectionMap>;
 }
 
-function buildConversationHydrationContext(store: StoreConversation): ConversationHydrationContext {
+async function buildConversationHydrationContext(
+	store: StoreConversation,
+	shouldContinue: () => boolean
+): Promise<ConversationHydrationContext | undefined> {
+	const choiceMap = new Map<string, ToolStoreChoice>();
+	let toolCallMap = new Map<string, ToolCall>();
+	const contextMCPSelections = new Map<string, MCPToolSelection>();
+	const debugMCPSelections = new Map<string, MCPToolSelection>();
+	let sliceStartedAt = getHydrationClock();
+
+	for (let index = 0; index < store.messages.length; index += 1) {
+		if (!shouldContinue()) {
+			return undefined;
+		}
+
+		const message = store.messages[index];
+
+		for (const choice of message.toolStoreChoices ?? []) {
+			choiceMap.set(choice.choiceID, choice);
+		}
+
+		toolCallMap = collectToolCallsFromInputs(message.inputs, toolCallMap);
+		toolCallMap = collectToolCallsFromOutputs(message.outputs, toolCallMap);
+
+		for (const [key, selection] of buildMCPToolSelectionMap(message.mcpContext) ?? []) {
+			contextMCPSelections.set(key, selection);
+		}
+		for (const [key, selection] of buildMCPToolSelectionMap(undefined, message.debugDetails) ?? []) {
+			debugMCPSelections.set(key, selection);
+		}
+
+		if (index < store.messages.length - 1 && getHydrationClock() - sliceStartedAt >= HYDRATION_MAIN_THREAD_BUDGET_MS) {
+			await yieldHydrationToMainThread();
+			sliceStartedAt = getHydrationClock();
+		}
+	}
+
+	for (const [key, selection] of debugMCPSelections) {
+		contextMCPSelections.set(key, selection);
+	}
+
 	return {
-		choiceMap: buildToolStoreChoiceMap(store.messages),
-		toolCallMap: buildToolCallMap(store.messages),
-		mcpToolSelectionMap: buildMCPToolSelectionMapFromMessages(store.messages),
+		choiceMap,
+		toolCallMap,
+		mcpToolSelectionMap: contextMCPSelections.size > 0 ? contextMCPSelections : undefined,
 	};
 }
 
@@ -135,7 +191,11 @@ export async function hydrateConversationAsync(
 		return undefined;
 	}
 
-	const context = buildConversationHydrationContext(store);
+	const context = await buildConversationHydrationContext(store, shouldContinue);
+	if (!context || !shouldContinue()) {
+		return undefined;
+	}
+
 	const hydratedMessages: ConversationMessage[] = [];
 	let sliceStartedAt = getHydrationClock();
 
@@ -156,50 +216,6 @@ export async function hydrateConversationAsync(
 		...(store as any),
 		messages: hydratedMessages,
 	} as Conversation;
-}
-
-function buildMCPToolSelectionMapFromMessages(messages: StoreConversationMessage[]) {
-	const syntheticContext = {
-		servers: messages.flatMap(message => message.mcpContext?.servers ?? []),
-	};
-
-	const combined = buildMCPToolSelectionMap(syntheticContext) ?? new Map();
-
-	for (const message of messages) {
-		const fromDebug = buildMCPToolSelectionMap(undefined, message.debugDetails);
-		for (const [key, selection] of fromDebug ?? []) {
-			combined.set(key, selection);
-		}
-	}
-
-	return combined.size > 0 ? combined : undefined;
-}
-
-function buildToolStoreChoiceMap(messages: StoreConversationMessage[]): Map<string, ToolStoreChoice> {
-	const map = new Map<string, ToolStoreChoice>();
-
-	for (const message of messages) {
-		if (!message.toolStoreChoices) {
-			continue;
-		}
-
-		for (const choice of message.toolStoreChoices) {
-			map.set(choice.choiceID, choice);
-		}
-	}
-
-	return map;
-}
-
-function buildToolCallMap(messages: StoreConversationMessage[]): Map<string, ToolCall> {
-	let map = new Map<string, ToolCall>();
-
-	for (const message of messages) {
-		map = collectToolCallsFromInputs(message.inputs, map);
-		map = collectToolCallsFromOutputs(message.outputs, map);
-	}
-
-	return map;
 }
 
 function deriveUIContentFromInputUnion(inputs?: InputUnion[]): string {

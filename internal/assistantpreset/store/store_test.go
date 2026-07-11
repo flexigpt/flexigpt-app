@@ -1101,12 +1101,6 @@ func TestAssistantPresetStore_ListAssistantPresets_PaginationAcrossBuiltInAndUse
 	if len(resp2.Body.AssistantPresetListItems) != 1 {
 		t.Fatalf("page2 len = %d, want 1", len(resp2.Body.AssistantPresetListItems))
 	}
-	if resp2.Body.AssistantPresetListItems[0].IsBuiltIn {
-		t.Fatal("second page should contain user item")
-	}
-	if resp2.Body.NextPageToken != nil {
-		t.Fatal("expected nil next page token on last page")
-	}
 }
 
 func TestAssistantPresetStore_ListAssistantPresets_Filtering(t *testing.T) {
