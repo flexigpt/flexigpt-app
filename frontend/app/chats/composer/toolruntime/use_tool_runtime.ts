@@ -141,12 +141,12 @@ export function useComposerToolRuntime({
 	});
 
 	const stateRef = useRef(state);
+	const dispatchRuntime = useCallback((action: Action) => {
+		stateRef.current = runtimeReducer(stateRef.current, action);
+		dispatch(action);
+	}, []);
 	const isMountedRef = useRef(true);
 	const toolCallAttemptKeyByIdRef = useRef(new Map<string, string>());
-
-	useEffect(() => {
-		stateRef.current = state;
-	}, [state]);
 
 	useEffect(() => {
 		return () => {
@@ -203,15 +203,21 @@ export function useComposerToolRuntime({
 		[getCurrentSkillSessionID, listActiveSkillRefs, setActiveSkillRefsFromSession]
 	);
 
-	const setToolOutputs = useCallback<Dispatch<SetStateAction<UIToolOutput[]>>>(update => {
-		const next = resolveStateUpdate(update, stateRef.current.toolOutputs);
-		dispatch({ type: 'set-outputs', toolOutputs: next });
-	}, []);
+	const setToolOutputs = useCallback<Dispatch<SetStateAction<UIToolOutput[]>>>(
+		update => {
+			const next = resolveStateUpdate(update, stateRef.current.toolOutputs);
+			dispatchRuntime({ type: 'set-outputs', toolOutputs: next });
+		},
+		[dispatchRuntime]
+	);
 
-	const loadToolCalls = useCallback((toolCalls: UIToolCall[]) => {
-		toolCallAttemptKeyByIdRef.current.clear();
-		dispatch({ type: 'set-calls', toolCalls });
-	}, []);
+	const loadToolCalls = useCallback(
+		(toolCalls: UIToolCall[]) => {
+			toolCallAttemptKeyByIdRef.current.clear();
+			dispatchRuntime({ type: 'set-calls', toolCalls });
+		},
+		[dispatchRuntime]
+	);
 
 	const runToolCall = useCallback(
 		async (id: string): Promise<UIToolOutput | null> => {
@@ -225,7 +231,7 @@ export function useComposerToolRuntime({
 
 			if (!isRunnableComposerToolCall(toolCall)) {
 				const errorMessage = 'This tool call type cannot be executed from the composer.';
-				dispatch({ type: 'mark-failed', callId: id, errorMessage });
+				dispatchRuntime({ type: 'mark-failed', callId: id, errorMessage });
 				return null;
 			}
 
@@ -234,7 +240,7 @@ export function useComposerToolRuntime({
 			}
 
 			const attemptKey = beginToolCallAttempt(id);
-			dispatch({ type: 'mark-running', callId: id });
+			dispatchRuntime({ type: 'mark-running', callId: id });
 
 			try {
 				const result = await executeComposerToolCall({
@@ -251,11 +257,11 @@ export function useComposerToolRuntime({
 				clearToolCallAttempt(id, attemptKey);
 
 				if (!result.ok) {
-					dispatch({ type: 'mark-failed', callId: id, errorMessage: result.errorMessage });
+					dispatchRuntime({ type: 'mark-failed', callId: id, errorMessage: result.errorMessage });
 					return null;
 				}
 
-				dispatch({ type: 'succeed', callId: id, output: result.output });
+				dispatchRuntime({ type: 'succeed', callId: id, output: result.output });
 
 				if (result.refreshActiveSkillRefsForSessionID) {
 					void refreshActiveSkillRefs(result.refreshActiveSkillRefsForSessionID);
@@ -269,7 +275,7 @@ export function useComposerToolRuntime({
 
 				clearToolCallAttempt(id, attemptKey);
 
-				dispatch({
+				dispatchRuntime({
 					type: 'mark-failed',
 					callId: id,
 					errorMessage: (err as Error)?.message || 'Tool invocation failed.',
@@ -283,6 +289,7 @@ export function useComposerToolRuntime({
 			clearToolCallAttempt,
 			ensureSkillSession,
 			getCurrentSkillSessionID,
+			dispatchRuntime,
 			isCurrentToolCallAttempt,
 			refreshActiveSkillRefs,
 			requestMCPApproval,
@@ -317,21 +324,64 @@ export function useComposerToolRuntime({
 	const discardToolCall = useCallback(
 		(id: string) => {
 			clearToolCallAttempt(id);
-			dispatch({ type: 'discard', callId: id });
+			dispatchRuntime({ type: 'discard', callId: id });
 		},
-		[clearToolCallAttempt]
+		[clearToolCallAttempt, dispatchRuntime]
 	);
 
-	const removeToolOutput = useCallback((id: string) => {
-		dispatch({ type: 'remove-output', outputId: id });
-	}, []);
+	const removeToolOutput = useCallback(
+		(id: string) => {
+			dispatchRuntime({ type: 'remove-output', outputId: id });
+		},
+		[dispatchRuntime]
+	);
 
-	const retryErroredOutput = useCallback((output: UIToolOutput) => {
-		if (!output.isError) {
-			return;
-		}
+	const retryErroredOutput = useCallback(
+		(output: UIToolOutput) => {
+			if (!output.isError) {
+				return;
+			}
 
-		if (output.mcpToolSelection) {
+			if (output.mcpToolSelection) {
+				const call: UIToolCall = {
+					id: output.id,
+					callID: output.callID || output.id,
+					name: output.name,
+					arguments: output.arguments,
+					webSearchToolCallItems: output.webSearchToolCallItems,
+					choiceID: output.choiceID,
+					type: output.type,
+					status: 'pending',
+					toolStoreChoice: output.toolStoreChoice,
+					mcpToolSelection: output.mcpToolSelection,
+				};
+
+				dispatchRuntime({
+					type: 'add-call-and-remove-output',
+					call,
+					outputId: output.id,
+				});
+				return;
+			}
+
+			const isSkills = isSkillsToolName(output.name);
+
+			if (!isSkills) {
+				if (!output.toolStoreChoice) {
+					return;
+				}
+				if (output.type !== ToolStoreChoiceType.Function && output.type !== ToolStoreChoiceType.Custom) {
+					return;
+				}
+
+				const { bundleID, toolSlug, toolVersion } = output.toolStoreChoice;
+				if (!bundleID || !toolSlug || !toolVersion) {
+					return;
+				}
+			} else if (output.type !== ToolStoreChoiceType.Function && output.type !== ToolStoreChoiceType.Custom) {
+				return;
+			}
+
 			const call: UIToolCall = {
 				id: output.id,
 				callID: output.callID || output.id,
@@ -342,58 +392,21 @@ export function useComposerToolRuntime({
 				type: output.type,
 				status: 'pending',
 				toolStoreChoice: output.toolStoreChoice,
-				mcpToolSelection: output.mcpToolSelection,
 			};
 
-			dispatch({
+			dispatchRuntime({
 				type: 'add-call-and-remove-output',
 				call,
 				outputId: output.id,
 			});
-			return;
-		}
-
-		const isSkills = isSkillsToolName(output.name);
-
-		if (!isSkills) {
-			if (!output.toolStoreChoice) {
-				return;
-			}
-			if (output.type !== ToolStoreChoiceType.Function && output.type !== ToolStoreChoiceType.Custom) {
-				return;
-			}
-
-			const { bundleID, toolSlug, toolVersion } = output.toolStoreChoice;
-			if (!bundleID || !toolSlug || !toolVersion) {
-				return;
-			}
-		} else if (output.type !== ToolStoreChoiceType.Function && output.type !== ToolStoreChoiceType.Custom) {
-			return;
-		}
-
-		const call: UIToolCall = {
-			id: output.id,
-			callID: output.callID || output.id,
-			name: output.name,
-			arguments: output.arguments,
-			webSearchToolCallItems: output.webSearchToolCallItems,
-			choiceID: output.choiceID,
-			type: output.type,
-			status: 'pending',
-			toolStoreChoice: output.toolStoreChoice,
-		};
-
-		dispatch({
-			type: 'add-call-and-remove-output',
-			call,
-			outputId: output.id,
-		});
-	}, []);
+		},
+		[dispatchRuntime]
+	);
 
 	const clearToolRuntime = useCallback(() => {
 		toolCallAttemptKeyByIdRef.current.clear();
-		dispatch({ type: 'clear' });
-	}, []);
+		dispatchRuntime({ type: 'clear' });
+	}, [dispatchRuntime]);
 
 	const getToolRuntimeSnapshot = useCallback((): ComposerToolRuntimeState => {
 		return stateRef.current;

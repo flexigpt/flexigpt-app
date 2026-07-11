@@ -54,7 +54,7 @@ export function getSkillInsertBadgeClass(insert?: string | null): string {
 
 export function getSkillInsertLongGuidance(insert?: string | null): string {
 	return normalizeSkillInsert(insert).value === 'user-message'
-		? 'Use this when the skill is a prompt-like template. The rendered text is inserted into a user message or composer draft. Resource-backed filesystem templates also attach their skill files to that message. They are not loaded as persistent session context.'
+		? 'Use this when the skill is a prompt-like template. The rendered text is inserted into a user message or composer draft. Indexed filesystem resources can be selected as ordinary message attachments. The skill is not loaded as persistent session context.'
 		: 'Use this when the skill is standing instruction or context. It can be enabled for a conversation and loaded as an active session skill.';
 }
 
@@ -74,7 +74,7 @@ export function getSkillResourceTooltip(resources?: SkillResourceInfo | null): s
 	const lines = [
 		`${resources.totalCount} resource${resources.totalCount === 1 ? '' : 's'} reported by the runtime.`,
 		'Resources are files inside the skill directory, such as references, assets, or scripts.',
-		'User-message template insertion attaches the filesystem skill directory; instruction skills access resources through the skill lifecycle.',
+		'User-message template insertion can attach selected indexed resource paths; instruction skills access resources through the skill lifecycle.',
 	];
 
 	for (const location of resources.locations ?? []) {

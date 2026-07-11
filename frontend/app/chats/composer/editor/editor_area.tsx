@@ -1727,7 +1727,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			<form
 				ref={formRef}
 				onSubmit={handleSubmit}
-				className="mx-0 flex w-full max-w-full min-w-0 flex-col overflow-x-hidden overflow-y-visible"
+				className="mx-0 flex max-h-full w-full max-w-full min-w-0 flex-col overflow-hidden"
 			>
 				{submitError ? (
 					<div className="alert alert-error mx-4 mt-3 mb-1 flex items-start gap-2 text-sm" role="alert">
@@ -1745,8 +1745,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				) : null}
 
 				<Plate editor={editor} onChange={handleEditorDocumentChange}>
-					<div className="bg-base-100 border-base-200 flex w-full max-w-full min-w-0 overflow-hidden rounded-2xl border">
-						<div className="flex min-w-0 grow flex-col p-0">
+					<div className="bg-base-100 border-base-200 flex min-h-0 w-full max-w-full min-w-0 flex-[1_1_auto] overflow-hidden rounded-2xl border">
+						<div className="flex min-h-0 min-w-0 grow flex-col p-0">
 							{editingMessageId && (
 								<div className="flex items-center justify-end gap-2 pt-1 pr-3 pb-0 text-xs">
 									<div className="flex items-center gap-2">
@@ -1764,7 +1764,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 								</div>
 							)}
 							{/* Row: editor with send/stop button on the right */}
-							<div className="flex min-h-20 min-w-0 grow gap-2 px-1 py-0">
+							<div className="flex min-h-16 min-w-0 grow gap-2 overflow-hidden px-1 py-0">
 								<PlateContent
 									ref={contentRef}
 									placeholder="Type message..."
@@ -1775,7 +1775,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 									onKeyDown={handleEditorKeyDown}
 									onPaste={onEditorPaste}
 									scrollSelectionIntoView={scrollSelectionIntoEditorView}
-									className="max-h-84 min-w-0 flex-1 resize-none overflow-auto overscroll-contain bg-transparent p-1 wrap-break-word whitespace-break-spaces tab-2 outline-none focus:outline-none"
+									className="min-w-0 flex-1 resize-none overflow-x-hidden overflow-y-auto overscroll-contain bg-transparent p-1 wrap-break-word whitespace-break-spaces tab-2 outline-none focus:outline-none"
 									style={{
 										fontSize: 14,
 										lineHeight: 1.5,
@@ -1790,7 +1790,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 								/>
 							</div>
 							{/* Unified chips bar: attachments, directories, tools, tool calls & outputs (scrollable) */}
-							<div className="w-full min-w-0 items-center overflow-x-auto overscroll-contain p-0 text-xs">
+							<div className="w-full min-w-0 shrink-0 items-center overflow-x-auto overscroll-contain p-0 text-xs">
 								<EditorChipsBar
 									attachments={attachments}
 									directoryGroups={directoryGroups}
@@ -1811,7 +1811,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 							</div>
 						</div>
 						{/* Primary / secondary actions anchored at bottom-right */}
-						<div className="flex flex-col items-end justify-end gap-2 p-1">
+						<div className="flex shrink-0 flex-col items-end justify-end gap-2 p-1">
 							{showAutoExecStopButton ? (
 								<HoverTip
 									content={

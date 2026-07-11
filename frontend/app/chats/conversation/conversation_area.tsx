@@ -894,8 +894,8 @@ function ConversationAreaInner(
 				</div>
 			</div>
 
-			<div className="row-start-3 row-end-4 flex min-h-0 w-full min-w-0 justify-center overflow-hidden">
-				<div className="w-11/12 min-w-0 xl:w-5/6">
+			<div className="row-start-3 row-end-4 flex min-h-0 w-full min-w-0 items-end justify-center overflow-hidden">
+				<div className="max-h-full w-11/12 min-w-0 xl:w-5/6">
 					{mountedInputTabs.map(tab => (
 						<TabInputPane
 							key={tab.tabId}

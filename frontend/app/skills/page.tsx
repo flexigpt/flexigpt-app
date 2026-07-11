@@ -429,8 +429,8 @@ export default function SkillsPage() {
 								<div>
 									<span className="font-semibold">User-message templates</span> use{' '}
 									<span className="font-mono">insert: user-message</span>. They render into composer text and do not
-									become active session skills. When a filesystem template has resources, its complete skill directory
-									is attached to the resulting user message.
+									become active session skills. Indexed filesystem resources may be selected as ordinary attachments
+									when the template is inserted.
 								</div>
 								<div>
 									Managed creation writes one simple <span className="font-mono">SKILL.md</span> file. To add resources,

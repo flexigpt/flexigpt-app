@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import type { AssistantPreset } from '@/spec/assistantpreset';
 import type { ModelParam } from '@/spec/inference';
@@ -29,6 +29,8 @@ interface RenderedInstructionSkillSource {
 	prompt: string;
 	skillRef: { bundleID: string; skillSlug: string; skillID: string };
 }
+
+type IncludeModelDefaultPreference = boolean | 'auto';
 
 export interface ComposerSystemPromptController {
 	modelDefaultPrompt: string;
@@ -90,13 +92,13 @@ function deriveRestoredPromptSelectionState(
 	modelParam?: ModelParam
 ): {
 	restoredConversationSystemPrompt: string | null;
-	includeModelDefault: boolean;
+	includeModelDefaultPreference: IncludeModelDefaultPreference;
 	selectedInstructionSourceKeys: string[];
 } {
 	if (!modelParam) {
 		return {
 			restoredConversationSystemPrompt: null,
-			includeModelDefault: Boolean(modelDefaultPrompt.trim()),
+			includeModelDefaultPreference: modelDefaultPrompt.trim() ? true : 'auto',
 			selectedInstructionSourceKeys: [],
 		};
 	}
@@ -105,14 +107,14 @@ function deriveRestoredPromptSelectionState(
 	if (restoredSystemPrompt) {
 		return {
 			restoredConversationSystemPrompt: restoredSystemPrompt,
-			includeModelDefault: false,
+			includeModelDefaultPreference: false,
 			selectedInstructionSourceKeys: [PREVIOUS_CONVO_SYSTEM_PROMPT_IDENTITY_KEY],
 		};
 	}
 
 	return {
 		restoredConversationSystemPrompt: null,
-		includeModelDefault: false,
+		includeModelDefaultPreference: false,
 		selectedInstructionSourceKeys: [],
 	};
 }
@@ -124,42 +126,14 @@ export function useComposerSystemPrompt(args: {
 	const { modelDefaultPrompt, modelOptionsLoaded } = args;
 
 	const [rawSelectedInstructionSourceKeys, setRawSelectedInstructionSourceKeys] = useState<string[]>([]);
-	const [includeModelDefault, setIncludeModelDefaultState] = useState(false);
+	const [includeModelDefaultPreference, setIncludeModelDefaultPreference] =
+		useState<IncludeModelDefaultPreference>('auto');
 	const [restoredConversationSystemPrompt, setRestoredConversationSystemPrompt] = useState<string | null>(null);
-	const [initializedFromModel, setInitializedFromModelState] = useState(false);
 	const [skillInstructionSources, setSkillInstructionSources] = useState<SystemInstructionSource[]>([]);
-	const initializedFromModelRef = useRef(initializedFromModel);
-	const restoreModelDefaultWhenReadyRef = useRef(false);
-
-	useEffect(() => {
-		initializedFromModelRef.current = initializedFromModel;
-	}, [initializedFromModel]);
-
-	// Initialize includeModelDefault once when model options finish loading,
-	// unless a restore/reset has already set the flag. Done in an effect so
-	// we don't trigger an extra render-during-render cycle on every mount.
-	useEffect(() => {
-		if (!modelOptionsLoaded || initializedFromModelRef.current) {
-			return;
-		}
-		initializedFromModelRef.current = true;
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setInitializedFromModelState(true);
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setIncludeModelDefaultState(Boolean(modelDefaultPrompt.trim()));
-	}, [modelOptionsLoaded, modelDefaultPrompt]);
-
-	const includeModelDefaultRef = useRef(includeModelDefault);
-
-	useEffect(() => {
-		if (!modelOptionsLoaded || !restoreModelDefaultWhenReadyRef.current) {
-			return;
-		}
-		restoreModelDefaultWhenReadyRef.current = false;
-		includeModelDefaultRef.current = Boolean(modelDefaultPrompt.trim());
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setIncludeModelDefaultState(Boolean(modelDefaultPrompt.trim()));
-	}, [modelDefaultPrompt, modelOptionsLoaded]);
+	const includeModelDefault =
+		includeModelDefaultPreference === 'auto'
+			? modelOptionsLoaded && Boolean(modelDefaultPrompt.trim())
+			: includeModelDefaultPreference;
 
 	const syntheticPreviousConversationPrompt = useMemo(() => {
 		const prompt = restoredConversationSystemPrompt?.trim();
@@ -184,24 +158,16 @@ export function useComposerSystemPrompt(args: {
 		[instructionSourcesByKey, rawSelectedInstructionSourceKeys]
 	);
 
-	useEffect(() => {
-		includeModelDefaultRef.current = includeModelDefault;
-	}, [includeModelDefault]);
-
 	const selectedInstructionSourceKeysRef = useRef(selectedInstructionSourceKeys);
-	useEffect(() => {
-		selectedInstructionSourceKeysRef.current = selectedInstructionSourceKeys;
-	}, [selectedInstructionSourceKeys]);
 
 	const setPromptSelectionState = useCallback(
 		(
 			nextRestoredConversationSystemPrompt: string | null,
-			nextIncludeModelDefault: boolean,
+			nextIncludeModelDefaultPreference: IncludeModelDefaultPreference,
 			nextSelectedPromptKeys: string[]
 		) => {
 			setRestoredConversationSystemPrompt(nextRestoredConversationSystemPrompt);
-			includeModelDefaultRef.current = nextIncludeModelDefault;
-			setIncludeModelDefaultState(nextIncludeModelDefault);
+			setIncludeModelDefaultPreference(nextIncludeModelDefaultPreference);
 
 			const nextKeys = dedupeStringArray(nextSelectedPromptKeys);
 			selectedInstructionSourceKeysRef.current = nextKeys;
@@ -222,8 +188,7 @@ export function useComposerSystemPrompt(args: {
 	);
 
 	const setIncludeModelDefault = useCallback((next: boolean) => {
-		includeModelDefaultRef.current = next;
-		setIncludeModelDefaultState(next);
+		setIncludeModelDefaultPreference(next);
 	}, []);
 
 	const toggleInstructionSource = useCallback((identityKey: string) => {
@@ -251,34 +216,28 @@ export function useComposerSystemPrompt(args: {
 	}, []);
 
 	const clearInstructionSources = useCallback(() => {
-		restoreModelDefaultWhenReadyRef.current = false;
-		setSkillInstructionSources([]);
 		setPromptSelectionState(null, false, []);
 	}, [setPromptSelectionState]);
 
 	const resetForNewConversation = useCallback(
 		(nextModelDefaultPrompt: string) => {
-			initializedFromModelRef.current = true;
-			restoreModelDefaultWhenReadyRef.current = false;
 			setSkillInstructionSources([]);
-			setPromptSelectionState(null, Boolean(nextModelDefaultPrompt.trim()), []);
+			setPromptSelectionState(null, nextModelDefaultPrompt.trim() ? true : 'auto', []);
 		},
 		[setPromptSelectionState]
 	);
 
 	const restoreConversationContext = useCallback(
 		(nextModelDefaultPrompt: string, modelParam?: ModelParam) => {
-			initializedFromModelRef.current = true;
-			restoreModelDefaultWhenReadyRef.current = !modelParam && !nextModelDefaultPrompt.trim() && !modelOptionsLoaded;
 			setSkillInstructionSources([]);
 			const restoredPromptState = deriveRestoredPromptSelectionState(nextModelDefaultPrompt, modelParam);
 			setPromptSelectionState(
 				restoredPromptState.restoredConversationSystemPrompt,
-				restoredPromptState.includeModelDefault,
+				restoredPromptState.includeModelDefaultPreference,
 				restoredPromptState.selectedInstructionSourceKeys
 			);
 		},
-		[modelOptionsLoaded, setPromptSelectionState]
+		[setPromptSelectionState]
 	);
 
 	const prepareAssistantPresetInstructionSources = useCallback(
@@ -286,7 +245,7 @@ export function useComposerSystemPrompt(args: {
 			const hasIncludeModelSystemPromptSelection = preset.startingIncludeModelSystemPrompt !== undefined;
 			const nextIncludeModelSystemPrompt = hasIncludeModelSystemPromptSelection
 				? Boolean(preset.startingIncludeModelSystemPrompt)
-				: includeModelDefaultRef.current;
+				: includeModelDefault;
 
 			const instructionSkillSelections = (preset.startingSkillSelections ?? []).filter(sel => sel.useAsInstructions);
 			const hasInstructionSourceSelection = instructionSkillSelections.length > 0;
@@ -345,7 +304,7 @@ export function useComposerSystemPrompt(args: {
 				preparedInstructionSources,
 			};
 		},
-		[]
+		[includeModelDefault]
 	);
 
 	const applyPreparedAssistantPresetInstructionSources = useCallback(
@@ -360,8 +319,7 @@ export function useComposerSystemPrompt(args: {
 			>
 		) => {
 			if (prepared.hasIncludeModelSystemPromptSelection) {
-				includeModelDefaultRef.current = prepared.nextIncludeModelSystemPrompt;
-				setIncludeModelDefaultState(prepared.nextIncludeModelSystemPrompt);
+				setIncludeModelDefaultPreference(prepared.nextIncludeModelSystemPrompt);
 			}
 
 			if (prepared.hasInstructionSourceSelection) {

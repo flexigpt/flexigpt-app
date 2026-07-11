@@ -1,4 +1,3 @@
-// oxlint-disable jsreact-hooks/set-state-in-effect react-you-might-not-need-an-effect/no-derived-state react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 import type { Dispatch, SetStateAction, SubmitEventHandler, SyntheticEvent } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -183,11 +182,12 @@ function AddInstructionSkillModal({
 	onClose: () => void;
 	onCreated: (item: SkillListItem) => Promise<void> | void;
 }) {
+	const initial = initialDraft ?? DEFAULT_INSTRUCTION_SKILL_DRAFT;
 	const [bundles, setBundles] = useState<SkillBundle[]>([]);
-	const [bundleID, setBundleID] = useState('');
-	const [displayName, setDisplayName] = useState('Instruction Skill');
-	const [name, setName] = useState('instruction-skill');
-	const [body, setBody] = useState('');
+	const [bundleID, setBundleID] = useState(initial.bundleID ?? '');
+	const [displayName, setDisplayName] = useState(initial.displayName);
+	const [name, setName] = useState(initial.name);
+	const [body, setBody] = useState(initial.body);
 	const [submitError, setSubmitError] = useState('');
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
@@ -197,33 +197,29 @@ function AddInstructionSkillModal({
 		if (!isOpen) {
 			return;
 		}
+		let cancelled = false;
 		void getAllSkillBundles(undefined, true)
 			.then(nextBundles => {
+				if (cancelled) {
+					return;
+				}
 				const custom = nextBundles.filter(bundle => !bundle.isBuiltIn);
 				setBundles(custom);
-				setBundleID(current => current || initialDraft?.bundleID || getDefaultCustomBundle(custom));
+				const preferredBundleID =
+					initialDraft?.bundleID && custom.some(bundle => bundle.id === initialDraft.bundleID && bundle.isEnabled)
+						? initialDraft.bundleID
+						: getDefaultCustomBundle(custom);
+				setBundleID(preferredBundleID);
 			})
 			.catch((error: unknown) => {
 				console.error('Failed to load skill bundles:', error);
-				setBundles([]);
+				if (!cancelled) {
+					setBundles([]);
+				}
 			});
-	}, [initialDraft?.bundleID, isOpen]);
-
-	useEffect(() => {
-		if (!isOpen) {
-			return;
-		}
-
-		const draft = initialDraft ?? DEFAULT_INSTRUCTION_SKILL_DRAFT;
-		setDisplayName(draft.displayName);
-		setName(draft.name);
-		setBody(draft.body);
-		setSubmitError('');
-		setIsSubmitting(false);
-
-		if (draft.bundleID) {
-			setBundleID(draft.bundleID);
-		}
+		return () => {
+			cancelled = true;
+		};
 	}, [initialDraft, isOpen]);
 
 	useEffect(() => {
@@ -278,7 +274,12 @@ function AddInstructionSkillModal({
 				? 'A skill with this slug already exists in the selected bundle.'
 				: '';
 	const bodyError = body.trim() ? '' : 'Instruction body is required.';
-	const bundleError = bundleID ? '' : 'Select a custom enabled skill bundle.';
+	const selectedBundle = bundles.find(bundle => bundle.id === bundleID);
+	const bundleError = !bundleID
+		? 'Select a custom enabled skill bundle.'
+		: selectedBundle?.isEnabled
+			? ''
+			: 'The selected custom skill bundle is disabled.';
 	const canSubmit = !nameError && !bodyError && !bundleError && !isSubmitting;
 
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = event => {
@@ -442,7 +443,7 @@ function AddInstructionSkillModal({
 							Cancel
 						</button>
 						<button type="submit" className="btn btn-primary rounded-xl" disabled={!canSubmit}>
-							{isSubmitting ? 'Creating…' : mode === 'fork' ? 'Fork and activate' : 'Create and activate'}
+							{isSubmitting ? 'Creating…' : mode === 'fork' ? 'Fork and add to instructions' : 'Create and add'}
 						</button>
 					</div>
 				</form>
@@ -665,7 +666,8 @@ export function SkillsBottomBarChip({
 		setInstructionModalMode('add');
 		setInstructionDraft(null);
 		setIsAddInstructionOpen(true);
-	}, []);
+		menu.hide();
+	}, [menu]);
 
 	const openForkInstructionModal = useCallback(
 		async (item: SkillListItem) => {
@@ -685,11 +687,12 @@ export function SkillsBottomBarChip({
 						`Forked from ${sourceLabel}. Use when these instructions should guide the assistant.`,
 				});
 				setIsAddInstructionOpen(true);
+				menu.hide();
 			} catch (error) {
 				console.error('Failed to render skill for fork:', error);
 			}
 		},
-		[allSkills]
+		[allSkills, menu]
 	);
 
 	const renderSkillItem = (item: SkillListItem) => {
@@ -1039,7 +1042,7 @@ export function SkillsBottomBarChip({
 							className="btn btn-xs rounded-lg"
 							disabled={isInputLocked}
 							onClick={openAddInstructionModal}
-							title="Create a simple managed instruction skill and activate it for this chat."
+							title="Create a simple managed instruction skill and select it as flattened system instructions."
 						>
 							<FiPlus size={12} />
 							<span className="ml-1">Add new instruction skill</span>
@@ -1098,25 +1101,26 @@ export function SkillsBottomBarChip({
 				)}
 			</Menu>
 
-			<AddInstructionSkillModal
-				isOpen={isAddInstructionOpen}
-				allSkills={allSkills}
-				mode={instructionModalMode}
-				initialDraft={instructionDraft}
-				onClose={() => {
-					setIsAddInstructionOpen(false);
-					setInstructionDraft(null);
-				}}
-				onCreated={async item => {
-					await onRefreshSkills();
-					const ref = skillRefFromListItem(item);
-					setEnabledSkillRefs(prev => dedupeSkillRefs([...prev, ref]));
-					setActiveSkillRefs(prev => dedupeSkillRefs([...prev, ref]));
-					setIsAddInstructionOpen(false);
-					setInstructionDraft(null);
-					menu.hide();
-				}}
-			/>
+			{isAddInstructionOpen ? (
+				<AddInstructionSkillModal
+					key={`${instructionModalMode}:${instructionDraft?.name ?? 'new'}`}
+					isOpen={true}
+					allSkills={allSkills}
+					mode={instructionModalMode}
+					initialDraft={instructionDraft}
+					onClose={() => {
+						setIsAddInstructionOpen(false);
+						setInstructionDraft(null);
+					}}
+					onCreated={async item => {
+						await addSkillAsSystemInstructions(item, {});
+						await onRefreshSkills();
+						setIsAddInstructionOpen(false);
+						setInstructionDraft(null);
+						menu.hide();
+					}}
+				/>
+			) : null}
 		</div>
 	);
 }

@@ -293,18 +293,6 @@ export function useAssistantContextState(): AssistantContextController {
 	const defaultLoadedOptionRef = useRef(DefaultUIChatOptions);
 	const pendingRestoreContextRef = useRef<RestorableConversationContext | null>(null);
 
-	useEffect(() => {
-		selectedModelRef.current = selectedModel;
-	}, [selectedModel]);
-
-	useEffect(() => {
-		isHybridReasoningEnabledRef.current = isHybridReasoningEnabled;
-	}, [isHybridReasoningEnabled]);
-
-	useEffect(() => {
-		allOptionsRef.current = allOptions;
-	}, [allOptions]);
-
 	const {
 		presetOptions: rawAssistantPresetOptions,
 		loading: assistantPresetsLoading,
@@ -464,6 +452,8 @@ export function useAssistantContextState(): AssistantContextController {
 				return;
 			}
 
+			selectedModelRef.current = nextSelectedModel;
+			isHybridReasoningEnabledRef.current = nextIsHybridReasoningEnabled;
 			setSelectedModel(nextSelectedModel);
 			setIsHybridReasoningEnabled(nextIsHybridReasoningEnabled);
 			setIncludePreviousMessages(nextSelectedModel.includePreviousMessages);

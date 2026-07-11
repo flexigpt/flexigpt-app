@@ -98,10 +98,6 @@ export function useComposerToolConfig({ getAttachedToolEntries }: UseComposerToo
 		};
 	}, []);
 
-	useEffect(() => {
-		conversationToolsStateRef.current = conversationToolsState;
-	}, [conversationToolsState]);
-
 	const primeConversationToolsFromCache = useCallback((entries: ConversationToolStateEntry[]) => {
 		let changed = false;
 
