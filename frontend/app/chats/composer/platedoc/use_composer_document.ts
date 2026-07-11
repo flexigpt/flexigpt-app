@@ -143,9 +143,7 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 
 	const runAfterNextPaint = useCallback((fn: () => void) => {
 		window.requestAnimationFrame(() => {
-			window.requestAnimationFrame(() => {
-				fn();
-			});
+			fn();
 		});
 	}, []);
 
@@ -399,8 +397,10 @@ export function useComposerDocument({ isBusy }: UseComposerDocumentArgs): UseCom
 		return cancelScheduledAutoChunk;
 	}, [cancelScheduledAutoChunk]);
 
-	// oxlint-disable-next-line react-hooks/exhaustive-deps
-	const attachedToolEntries = useMemo(() => getAttachedToolEntries(editor), [editor, docVersion]);
+	const attachedToolEntries = useMemo(() => {
+		void docVersion;
+		return getAttachedToolEntries(editor);
+	}, [editor, docVersion]);
 
 	const getAttachedToolEntriesSnapshot = useCallback((uniqueByIdentity?: boolean) => {
 		return getAttachedToolEntries(editorRef.current, uniqueByIdentity);

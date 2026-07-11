@@ -404,8 +404,6 @@ function buildAssistantMessageFromResponse(
 		buildMCPToolSelectionMap(mcpContext, inf.debugDetails)
 	);
 	const debugDetails = inf.debugDetails;
-	const uiDebugDetails = getDebugDetailsMarkdown(inf.debugDetails, inf.error);
-
 	const s = error ? Status.Failed : Status.Completed;
 	const msg: ConversationMessage = {
 		id,
@@ -422,7 +420,6 @@ function buildAssistantMessageFromResponse(
 		uiToolCalls,
 		uiToolOutputs,
 		uiCitations,
-		uiDebugDetails,
 	};
 	// console.log('assistant from message out', JSON.stringify(msg, null, 2));
 	return msg;

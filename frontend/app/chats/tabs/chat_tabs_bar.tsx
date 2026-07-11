@@ -1,5 +1,5 @@
 import type { ReactNode, RefObject } from 'react';
-import { memo, useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 import { FiEdit2, FiPlus, FiX } from 'react-icons/fi';
 
@@ -249,27 +249,40 @@ export const ChatTabsBar = memo(function ChatTabsBar(props: ChatTabsBarProps) {
 	const { selectedTabId } = props;
 
 	const tabElById = useRef(new Map<string, HTMLElement | null>());
+	const tabRefCallbackById = useRef(new Map<string, (el: HTMLElement | null) => void>());
 	const tabsViewportRef = useRef<HTMLDivElement | null>(null);
 
-	const setTabEl = useCallback(
-		(id: string) => (el: HTMLElement | null) => {
+	const setTabEl = useCallback((id: string) => {
+		let callback = tabRefCallbackById.current.get(id);
+		if (callback) {
+			return callback;
+		}
+
+		callback = (el: HTMLElement | null) => {
 			if (!el) {
 				tabElById.current.delete(id);
+				tabRefCallbackById.current.delete(id);
 			} else {
 				tabElById.current.set(id, el);
 			}
-		},
-		[]
-	);
+		};
+		tabRefCallbackById.current.set(id, callback);
+		return callback;
+	}, []);
 
-	useLayoutEffect(() => {
-		const tabEl = tabElById.current.get(selectedTabId);
-		const viewportEl = tabsViewportRef.current;
-		if (!tabEl || !viewportEl) {
-			return;
-		}
+	useEffect(() => {
+		const frame = window.requestAnimationFrame(() => {
+			const tabEl = tabElById.current.get(selectedTabId);
+			const viewportEl = tabsViewportRef.current;
+			if (!tabEl || !viewportEl) {
+				return;
+			}
 
-		ensureTabVisible(tabEl, viewportEl);
+			ensureTabVisible(tabEl, viewportEl);
+		});
+		return () => {
+			window.cancelAnimationFrame(frame);
+		};
 	}, [selectedTabId]);
 
 	return <ChatTabsBarContent {...props} setTabEl={setTabEl} tabsViewportRef={tabsViewportRef} />;

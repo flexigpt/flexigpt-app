@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 
 import type { ChatTabState } from '@/chats/tabs/tabs_model';
 
@@ -19,6 +19,34 @@ interface UseStreamingRuntimeArgs {
 	selectedTabIdRef: RefObject<string>;
 }
 
+const SHORT_STREAM_RENDER_INTERVAL_MS = 32;
+const LONG_STREAM_RENDER_INTERVAL_MS = 50;
+const VERY_LONG_STREAM_RENDER_INTERVAL_MS = 80;
+
+function getStreamRenderInterval(buffer: StreamBuffer): number {
+	const displayedLength = buffer.text.display.length + buffer.thinking.display.length;
+	if (displayedLength >= 64_000) {
+		return VERY_LONG_STREAM_RENDER_INTERVAL_MS;
+	}
+	if (displayedLength >= 16_000) {
+		return LONG_STREAM_RENDER_INTERVAL_MS;
+	}
+	return SHORT_STREAM_RENDER_INTERVAL_MS;
+}
+
+function flushStreamChannel(channel: StreamChannelBuffer): void {
+	if (channel.flushedIdx >= channel.chunks.length) {
+		return;
+	}
+
+	const pending =
+		channel.flushedIdx === 0 ? channel.chunks.join('') : channel.chunks.slice(channel.flushedIdx).join('');
+
+	channel.display += pending;
+	channel.chunks = [];
+	channel.flushedIdx = 0;
+}
+
 export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRuntimeArgs) {
 	const tabIdSet = useMemo(() => new Set(tabs.map(tab => tab.tabId)), [tabs]);
 	const tabIdSetRef = useRef(tabIdSet);
@@ -34,7 +62,7 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 	const streamListenersRef = useRef(new Map<string, Set<() => void>>());
 	const notifyTimersRef = useRef(new Map<string, number | null>());
 
-	useEffect(() => {
+	useLayoutEffect(() => {
 		tabIdSetRef.current = tabIdSet;
 	}, [tabIdSet]);
 
@@ -84,15 +112,8 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 		(tabId: string) => {
 			const buffer = getStreamBuffer(tabId);
 
-			const flushChannel = (channel: StreamChannelBuffer) => {
-				if (channel.flushedIdx < channel.chunks.length) {
-					channel.display += channel.chunks.slice(channel.flushedIdx).join('');
-					channel.flushedIdx = channel.chunks.length;
-				}
-			};
-
-			flushChannel(buffer.text);
-			flushChannel(buffer.thinking);
+			flushStreamChannel(buffer.text);
+			flushStreamChannel(buffer.thinking);
 		},
 		[getStreamBuffer]
 	);
@@ -104,10 +125,7 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 		}
 
 		const channel = buffer.text;
-		if (channel.flushedIdx < channel.chunks.length) {
-			channel.display += channel.chunks.slice(channel.flushedIdx).join('');
-			channel.flushedIdx = channel.chunks.length;
-		}
+		flushStreamChannel(channel);
 
 		return channel.display;
 	}, []);
@@ -119,10 +137,7 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 		}
 
 		const channel = buffer.thinking;
-		if (channel.flushedIdx < channel.chunks.length) {
-			channel.display += channel.chunks.slice(channel.flushedIdx).join('');
-			channel.flushedIdx = channel.chunks.length;
-		}
+		flushStreamChannel(channel);
 
 		return channel.display;
 	}, []);
@@ -181,14 +196,21 @@ export function useStreamingRuntime({ tabs, selectedTabIdRef }: UseStreamingRunt
 				return;
 			}
 
+			const buffer = getStreamBuffer(tabId);
+			const renderInterval = getStreamRenderInterval(buffer);
 			const timer = window.setTimeout(() => {
 				notifyTimersRef.current.set(tabId, null);
+
+				if (!tabIdSetRef.current.has(tabId) || selectedTabIdRef.current !== tabId) {
+					return;
+				}
+
 				notifyStreamNow(tabId);
-			}, 16);
+			}, renderInterval);
 
 			notifyTimersRef.current.set(tabId, timer);
 		},
-		[notifyStreamNow, selectedTabIdRef]
+		[getStreamBuffer, notifyStreamNow, selectedTabIdRef]
 	);
 
 	const clearStreamForTab = useCallback(

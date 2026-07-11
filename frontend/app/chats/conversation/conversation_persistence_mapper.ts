@@ -21,7 +21,6 @@ import {
 	buildMCPToolSelectionMap,
 	buildUIToolOutputFromToolOutput,
 	deriveUIFieldsFromOutputUnion,
-	getDebugDetailsMarkdown,
 } from '@/chats/conversation/completion_helper';
 import { collectToolCallsFromInputs, collectToolCallsFromOutputs } from '@/tools/lib/tool_call_utils';
 
@@ -46,51 +45,112 @@ export function toStoreConversation(conversation: Conversation): StoreConversati
 	};
 }
 
-export function hydrateConversation(store: StoreConversation): Conversation {
-	const choiceMap = buildToolStoreChoiceMap(store.messages);
-	const toolCallMap = buildToolCallMap(store.messages);
-	const mcpToolSelectionMap = buildMCPToolSelectionMapFromMessages(store.messages);
+interface ConversationHydrationContext {
+	choiceMap: Map<string, ToolStoreChoice>;
+	toolCallMap: Map<string, ToolCall>;
+	mcpToolSelectionMap: ReturnType<typeof buildMCPToolSelectionMapFromMessages>;
+}
 
-	const hydratedMessages: ConversationMessage[] = store.messages.map(message => {
-		const role = message.role;
+function buildConversationHydrationContext(store: StoreConversation): ConversationHydrationContext {
+	return {
+		choiceMap: buildToolStoreChoiceMap(store.messages),
+		toolCallMap: buildToolCallMap(store.messages),
+		mcpToolSelectionMap: buildMCPToolSelectionMapFromMessages(store.messages),
+	};
+}
 
-		let uiContent = '';
-		let uiReasoningContents: ReasoningContent[] | undefined;
-		let uiToolCalls: UIToolCall[] | undefined;
-		let uiToolOutputs: UIToolOutput[] | undefined;
-		let uiCitations: URLCitation[] | undefined;
+function hydrateConversationMessage(
+	message: StoreConversationMessage,
+	context: ConversationHydrationContext
+): ConversationMessage {
+	const { choiceMap, toolCallMap, mcpToolSelectionMap } = context;
+	const role = message.role;
 
-		const outputs: OutputUnion[] | undefined = message.outputs;
-		const inputs: InputUnion[] | undefined = message.inputs;
+	let uiContent = '';
+	let uiReasoningContents: ReasoningContent[] | undefined;
+	let uiToolCalls: UIToolCall[] | undefined;
+	let uiToolOutputs: UIToolOutput[] | undefined;
+	let uiCitations: URLCitation[] | undefined;
 
-		if (role === RoleEnum.Assistant) {
-			const derived = deriveUIFieldsFromOutputUnion(outputs, choiceMap, mcpToolSelectionMap);
+	const outputs: OutputUnion[] | undefined = message.outputs;
+	const inputs: InputUnion[] | undefined = message.inputs;
 
-			uiContent = derived.uiContent;
-			uiReasoningContents = derived.uiReasoningContents;
-			uiToolCalls = derived.uiToolCalls;
-			uiCitations = derived.uiCitations;
-			uiToolOutputs =
-				derived.uiToolOutputs && derived.uiToolOutputs.length > 0
-					? derived.uiToolOutputs
-					: deriveUIToolOutputsFromInputUnion(inputs, choiceMap, toolCallMap, mcpToolSelectionMap);
-		} else if (role === RoleEnum.User) {
-			uiContent = deriveUIContentFromInputUnion(inputs);
-			uiToolOutputs = deriveUIToolOutputsFromInputUnion(inputs, choiceMap, toolCallMap, mcpToolSelectionMap);
+	if (role === RoleEnum.Assistant) {
+		const derived = deriveUIFieldsFromOutputUnion(outputs, choiceMap, mcpToolSelectionMap);
+
+		uiContent = derived.uiContent;
+		uiReasoningContents = derived.uiReasoningContents;
+		uiToolCalls = derived.uiToolCalls;
+		uiCitations = derived.uiCitations;
+		uiToolOutputs =
+			derived.uiToolOutputs && derived.uiToolOutputs.length > 0
+				? derived.uiToolOutputs
+				: deriveUIToolOutputsFromInputUnion(inputs, choiceMap, toolCallMap, mcpToolSelectionMap);
+	} else if (role === RoleEnum.User) {
+		uiContent = deriveUIContentFromInputUnion(inputs);
+		uiToolOutputs = deriveUIToolOutputsFromInputUnion(inputs, choiceMap, toolCallMap, mcpToolSelectionMap);
+	}
+
+	return {
+		...(message as any),
+		uiContent,
+		uiReasoningContents,
+		uiToolCalls,
+		uiToolOutputs,
+		uiCitations,
+		uiDebugDetails: undefined,
+	} as ConversationMessage;
+}
+
+const HYDRATION_MAIN_THREAD_BUDGET_MS = 8;
+
+function getHydrationClock(): number {
+	return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
+async function yieldHydrationToMainThread(): Promise<void> {
+	const scheduler = (
+		globalThis as typeof globalThis & {
+			scheduler?: {
+				yield?: () => Promise<void>;
+			};
+		}
+	).scheduler;
+
+	if (scheduler?.yield) {
+		await scheduler.yield();
+		return;
+	}
+
+	await new Promise<void>(resolve => {
+		setTimeout(resolve, 0);
+	});
+}
+
+export async function hydrateConversationAsync(
+	store: StoreConversation,
+	shouldContinue: () => boolean = () => true
+): Promise<Conversation | undefined> {
+	if (!shouldContinue()) {
+		return undefined;
+	}
+
+	const context = buildConversationHydrationContext(store);
+	const hydratedMessages: ConversationMessage[] = [];
+	let sliceStartedAt = getHydrationClock();
+
+	for (let index = 0; index < store.messages.length; index += 1) {
+		if (!shouldContinue()) {
+			return undefined;
 		}
 
-		const uiDebugDetails = getDebugDetailsMarkdown(message.debugDetails, message.error);
+		hydratedMessages.push(hydrateConversationMessage(store.messages[index], context));
 
-		return {
-			...(message as any),
-			uiContent,
-			uiReasoningContents,
-			uiToolCalls,
-			uiToolOutputs,
-			uiCitations,
-			uiDebugDetails,
-		} as ConversationMessage;
-	});
+		if (index < store.messages.length - 1 && getHydrationClock() - sliceStartedAt >= HYDRATION_MAIN_THREAD_BUDGET_MS) {
+			await yieldHydrationToMainThread();
+			sliceStartedAt = getHydrationClock();
+		}
+	}
 
 	return {
 		...(store as any),

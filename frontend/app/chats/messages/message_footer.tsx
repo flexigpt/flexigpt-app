@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 
 import { FiArrowDown, FiArrowUp, FiCode, FiEdit2 } from 'react-icons/fi';
 
@@ -8,6 +8,7 @@ import { HoverTip } from '@/components/ariakit_hover_tip';
 import { CopyButton } from '@/components/copy_button';
 import { stripCustomMDFences } from '@/components/markdown/custom_md_utils';
 
+import { getDebugDetailsMarkdown } from '@/chats/conversation/completion_helper';
 import { MessageDetailsModal } from '@/chats/messages/message_details_modal';
 
 interface MessageFooterAreaProps {
@@ -24,23 +25,25 @@ interface MessageFooterAreaProps {
 	disableMarkdown: boolean;
 	onDisableMarkdownChange: (checked: boolean) => void;
 	usage?: InferenceUsage;
+	debugDetails?: unknown;
+	errorDetails?: unknown;
 }
 
 function hasReasoningContent(reasoningContents?: ReasoningContent[], streamedThinking = ''): boolean {
-	if (streamedThinking.trim().length > 0) {
+	if (/\S/.test(streamedThinking)) {
 		return true;
 	}
 
 	return (
 		reasoningContents?.some(rc => {
-			const hasSummary = (rc?.summary ?? []).some(s => (s ?? '').trim().length > 0);
-			const hasThinking = (rc?.thinking ?? []).some(s => (s ?? '').trim().length > 0);
+			const hasSummary = (rc?.summary ?? []).some(s => /\S/.test(s ?? ''));
+			const hasThinking = (rc?.thinking ?? []).some(s => /\S/.test(s ?? ''));
 			return hasSummary || hasThinking;
 		}) ?? false
 	);
 }
 
-export function MessageFooterArea({
+export const MessageFooterArea = memo(function MessageFooterArea({
 	messageID,
 	isUser,
 	cardCopyContent,
@@ -54,19 +57,29 @@ export function MessageFooterArea({
 	disableMarkdown,
 	onDisableMarkdownChange,
 	usage,
+	debugDetails,
+	errorDetails,
 }: MessageFooterAreaProps) {
 	const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
-	const hasDebugDetails = messageDetails.trim().length > 0;
+	const hasDebugDetails = /\S/.test(messageDetails) || debugDetails !== undefined || errorDetails !== undefined;
 	const hasInlineHiddenReasoning = !bodyPresent && hasReasoningContent(reasoningContents, streamedThinking);
 	const hasDetails = hasDebugDetails || hasInlineHiddenReasoning;
 	const hasContent = !!cardCopyContent;
-	const toggleDetailsModal = () => {
+
+	const renderedMessageDetails = useMemo(() => {
+		if (!isDetailsOpen || /\S/.test(messageDetails)) {
+			return messageDetails;
+		}
+		return getDebugDetailsMarkdown(debugDetails, errorDetails) ?? '';
+	}, [debugDetails, errorDetails, isDetailsOpen, messageDetails]);
+
+	const toggleDetailsModal = useCallback(() => {
 		if (!hasDetails || isBusy) {
 			return;
 		}
 		setIsDetailsOpen(prev => !prev);
-	};
+	}, [hasDetails, isBusy]);
 
 	const usageTooltip = usage
 		? (() => {
@@ -163,19 +176,21 @@ export function MessageFooterArea({
 			</div>
 
 			{/* Details modal (works for both user & assistant messages) */}
-			<MessageDetailsModal
-				isOpen={isDetailsOpen && hasDetails}
-				onClose={() => {
-					setIsDetailsOpen(false);
-				}}
-				messageID={messageID}
-				title={isUser ? 'User message details' : 'Assistant message details'}
-				content={messageDetails}
-				isBusy={isBusy}
-				reasoningContents={reasoningContents}
-				streamedThinking={streamedThinking}
-				showReasoningAtTop={!bodyPresent}
-			/>
+			{isDetailsOpen && hasDetails ? (
+				<MessageDetailsModal
+					isOpen={true}
+					onClose={() => {
+						setIsDetailsOpen(false);
+					}}
+					messageID={messageID}
+					title={isUser ? 'User message details' : 'Assistant message details'}
+					content={renderedMessageDetails}
+					isBusy={isBusy}
+					reasoningContents={reasoningContents}
+					streamedThinking={streamedThinking}
+					showReasoningAtTop={!bodyPresent}
+				/>
+			) : null}
 		</div>
 	);
-}
+});

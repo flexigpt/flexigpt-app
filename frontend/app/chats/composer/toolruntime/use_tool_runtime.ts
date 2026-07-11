@@ -149,6 +149,7 @@ export function useComposerToolRuntime({
 	const toolCallAttemptKeyByIdRef = useRef(new Map<string, string>());
 
 	useEffect(() => {
+		isMountedRef.current = true;
 		return () => {
 			isMountedRef.current = false;
 		};

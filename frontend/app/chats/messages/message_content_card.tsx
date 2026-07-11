@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react';
+import { memo } from 'react';
 
 import { EnhancedMarkdown } from '@/components/markdown/markdown_enhanced';
 
@@ -42,27 +42,10 @@ export const MessageContentCard = memo(function MessageContentCard({
 	const textToRender = liveText;
 	const renderBusy = isBusy;
 
-	// Compute plain-text nodes unconditionally to keep hook order stable.
-	// Work is gated by renderAsMarkdown so we avoid heavy work when Markdown is on.
-	const plainTextNodes = useMemo(() => {
-		if (renderAsMarkdown) {
-			return null;
-		}
-		return textToRender.split('\n').map((line, idx) => (
-			<p
-				key={idx}
-				className={`${align} wrap-break-word`}
-				style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5, fontSize: 14 }}
-			>
-				{line === '' ? <br /> : line}
-			</p>
-		));
-	}, [textToRender, align, renderAsMarkdown]);
-
 	// If we truly have nothing:
 	// - while busy: show a small loader so non-streaming doesn't look "empty"
 	// - otherwise: render nothing
-	if (textToRender.trim() === '') {
+	if (!/\S/.test(textToRender)) {
 		if (!isBusy) {
 			return null;
 		}
@@ -72,15 +55,18 @@ export const MessageContentCard = memo(function MessageContentCard({
 			</div>
 		);
 	}
-	if (!renderAsMarkdown) {
+
+	// Parsing the complete accumulated response as Markdown for every token is
+	// the dominant streaming cost. Keep streaming and intentionally deferred
+	// transcript paints on one cheap text node, then render rich Markdown once
+	// the content has settled.
+	if (isStreaming || !renderAsMarkdown) {
 		return (
-			<div className="p-0">
-				{plainTextNodes}
-				{isStreaming && (
-					<div className="flex items-center gap-2 p-0">
-						Streaming <span className="loading loading-dots loading-sm ml-2" />
-					</div>
-				)}
+			<div
+				className={`${align} wrap-break-word whitespace-pre-wrap`}
+				style={{ lineHeight: 1.5, fontSize: 14, contain: 'paint' }}
+			>
+				{textToRender}
 			</div>
 		);
 	}
@@ -94,11 +80,6 @@ export const MessageContentCard = memo(function MessageContentCard({
 				isBusy={renderBusy}
 				diffCandidatePaths={diffCandidatePaths}
 			/>
-			{isStreaming && (
-				<div className="flex items-center gap-2 p-0">
-					Streaming <span className="loading loading-dots loading-sm ml-2" />
-				</div>
-			)}
 		</div>
 	);
 }, areEqual);

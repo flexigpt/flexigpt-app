@@ -135,6 +135,7 @@ export function useScrollRestore({
 
 	const scrollStateRafRef = useRef<number | null>(null);
 	const resizeObserverRafRef = useRef<number | null>(null);
+	const resizeObserverJumpTimerRef = useRef<number | null>(null);
 	const observedContentSizeRef = useRef<{ width: number; height: number } | null>(null);
 
 	useEffect(() => {
@@ -170,7 +171,7 @@ export function useScrollRestore({
 	}, []);
 
 	const updateScrollStateNow = useCallback(
-		(el: HTMLElement | null) => {
+		(el: HTMLElement | null, includeMessageJumps = true) => {
 			if (!el) {
 				shouldAutoFollowRef.current = true;
 				setScrollIndicatorStateIfChanged(INITIAL_SCROLL_INDICATOR_STATE);
@@ -181,7 +182,12 @@ export function useScrollRestore({
 			const nextAtBottom = isElementAtBottom(el);
 			shouldAutoFollowRef.current = nextAtBottom;
 
-			const jumpState = getMessageJumpAvailability(el, messageElementsRef.current);
+			const jumpState = includeMessageJumps
+				? getMessageJumpAvailability(el, messageElementsRef.current)
+				: {
+						canJumpToPreviousMessage: scrollIndicatorStateRef.current.canJumpToPreviousMessage,
+						canJumpToNextMessage: scrollIndicatorStateRef.current.canJumpToNextMessage,
+					};
 
 			setScrollIndicatorStateIfChanged({
 				isAtBottom: nextAtBottom,
@@ -215,15 +221,19 @@ export function useScrollRestore({
 				window.cancelAnimationFrame(resizeObserverRafRef.current);
 				resizeObserverRafRef.current = null;
 			}
+			if (resizeObserverJumpTimerRef.current !== null) {
+				window.clearTimeout(resizeObserverJumpTimerRef.current);
+				resizeObserverJumpTimerRef.current = null;
+			}
 		};
 	}, []);
 
 	const setScrollContainerRef = useCallback(
 		(el: HTMLDivElement | null) => {
 			scrollContainerRef.current = el;
-			updateScrollStateNow(el);
+			scheduleScrollStateUpdate();
 		},
-		[updateScrollStateNow]
+		[scheduleScrollStateUpdate]
 	);
 
 	const setScrollContentRef = useCallback((el: HTMLDivElement | null) => {
@@ -245,7 +255,12 @@ export function useScrollRestore({
 		if (!el) {
 			return;
 		}
-		el.scrollTo({ top: el.scrollHeight, behavior: 'auto' });
+		const nextTop = Math.max(0, el.scrollHeight - el.clientHeight);
+		shouldAutoFollowRef.current = true;
+
+		if (Math.abs(el.scrollTop - nextTop) > 1) {
+			el.scrollTop = nextTop;
+		}
 	}, []);
 
 	const previousRenderRef = useRef({
@@ -267,15 +282,16 @@ export function useScrollRestore({
 
 		if (el && selectedTabId && !activeTabIsHydrating && (selectedChanged || justFinishedHydrating)) {
 			const nextTop = scrollTopByTabRef.current.get(selectedTabId) ?? 0;
-			el.scrollTo({ top: nextTop, behavior: 'auto' });
+			shouldAutoFollowRef.current = false;
+			el.scrollTop = nextTop;
 			persistScrollPosition(selectedTabId, el);
-			updateScrollStateNow(el);
+			scheduleScrollStateUpdate();
 		} else if (el && selectedTabId && !activeTabIsHydrating && messageCountIncreased && shouldAutoFollowRef.current) {
 			scrollElementToBottom(el);
 			persistScrollPosition(selectedTabId, el);
-			updateScrollStateNow(el);
+			scheduleScrollStateUpdate();
 		} else if (el) {
-			updateScrollStateNow(el);
+			scheduleScrollStateUpdate();
 		}
 
 		previousRenderRef.current = {
@@ -289,8 +305,8 @@ export function useScrollRestore({
 		persistScrollPosition,
 		scrollElementToBottom,
 		selectedTabId,
-		updateScrollStateNow,
 		refreshMessageElementCache,
+		scheduleScrollStateUpdate,
 	]);
 
 	useEffect(() => {
@@ -334,7 +350,15 @@ export function useScrollRestore({
 					persistScrollPosition(tabId, scrollerEl);
 				}
 
-				updateScrollStateNow(scrollerEl);
+				updateScrollStateNow(scrollerEl, false);
+
+				if (resizeObserverJumpTimerRef.current !== null) {
+					window.clearTimeout(resizeObserverJumpTimerRef.current);
+				}
+				resizeObserverJumpTimerRef.current = window.setTimeout(() => {
+					resizeObserverJumpTimerRef.current = null;
+					scheduleScrollStateUpdate();
+				}, 120);
 			});
 		});
 		observer.observe(contentEl);
@@ -344,15 +368,12 @@ export function useScrollRestore({
 				window.cancelAnimationFrame(resizeObserverRafRef.current);
 				resizeObserverRafRef.current = null;
 			}
+			if (resizeObserverJumpTimerRef.current !== null) {
+				window.clearTimeout(resizeObserverJumpTimerRef.current);
+				resizeObserverJumpTimerRef.current = null;
+			}
 		};
-	}, [
-		activeTabIsHydrating,
-		persistScrollPosition,
-		scrollElementToBottom,
-		selectedTabId,
-		selectedTabIdRef,
-		updateScrollStateNow,
-	]);
+	}, [persistScrollPosition, scheduleScrollStateUpdate, scrollElementToBottom, selectedTabIdRef, updateScrollStateNow]);
 
 	const scrollTabToBottomSoon = useCallback(
 		(tabId: string) => {

@@ -93,6 +93,7 @@ export function useComposerToolConfig({ getAttachedToolEntries }: UseComposerToo
 	const hydratingConversationToolKeysRef = useRef(new Set<string>());
 
 	useEffect(() => {
+		isMountedRef.current = true;
 		return () => {
 			isMountedRef.current = false;
 		};

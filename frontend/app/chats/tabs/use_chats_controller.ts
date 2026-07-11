@@ -15,7 +15,7 @@ import { generateTitle } from '@/lib/title_utils';
 import { conversationStoreAPI } from '@/apis/baseapi';
 
 import type { ConversationAreaHandle } from '@/chats/conversation/conversation_area';
-import { hydrateConversation, toStoreConversation } from '@/chats/conversation/conversation_persistence_mapper';
+import { hydrateConversationAsync, toStoreConversation } from '@/chats/conversation/conversation_persistence_mapper';
 import { initConversation } from '@/chats/conversation/hydration_helper';
 import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';
 import type { ConversationSearchHandle } from '@/chats/search/conversation_search';
@@ -34,6 +34,34 @@ import { buildInitialChatsModel, writePersistedChatsPageState } from '@/chats/ta
 interface UseChatsControllerArgs {
 	conversationAreaRef: RefObject<ConversationAreaHandle | null>;
 	searchRef: RefObject<ConversationSearchHandle | null>;
+}
+
+function scheduleIdleWork(work: () => void, timeout = 1500): () => void {
+	if (typeof window.requestIdleCallback === 'function') {
+		const requestId = window.requestIdleCallback(
+			() => {
+				work();
+			},
+			{ timeout }
+		);
+		return () => {
+			window.cancelIdleCallback(requestId);
+		};
+	}
+
+	const timer = window.setTimeout(work, Math.min(timeout, 250));
+	return () => {
+		window.clearTimeout(timer);
+	};
+}
+
+async function yieldBeforeBackgroundWork(): Promise<void> {
+	if (typeof window === 'undefined' || typeof document === 'undefined' || document.visibilityState === 'hidden') {
+		return;
+	}
+	await new Promise<void>(resolve => {
+		window.setTimeout(resolve, 0);
+	});
 }
 
 function buildNormalizedInitialModel(): InitialChatsModel {
@@ -127,12 +155,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			if (prev.has(tabId)) {
 				return prev;
 			}
-			// Background tool-call loop can be lost because mountedInputTabIds can be corrupted by new Set(...prev, tabId).
-			// That can unmount the previous tab’s hidden composer, so final streamed tool calls have nowhere to load or auto-execute.
-			const next = new Set(prev);
-			// oxlint-disable-next-line unicorn/no-immediate-mutation
-			next.add(tabId);
-			return next;
+			return new Set([...prev, tabId]);
 		});
 	}, []);
 
@@ -179,6 +202,21 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 	const schedulePersistRef = useRef<() => void>(() => {});
 	const saveQueueByTabRef = useRef(new Map<string, Promise<void>>());
 	const hydratePromiseByTabRef = useRef(new Map<string, Promise<void>>());
+	const tabLoadVersionRef = useRef(new Map<string, number>());
+
+	const beginTabLoad = useCallback((tabId: string): number => {
+		const nextVersion = (tabLoadVersionRef.current.get(tabId) ?? 0) + 1;
+		tabLoadVersionRef.current.set(tabId, nextVersion);
+		return nextVersion;
+	}, []);
+
+	const isTabLoadCurrent = useCallback((tabId: string, version: number): boolean => {
+		return (
+			controllerAliveRef.current &&
+			tabLoadVersionRef.current.get(tabId) === version &&
+			tabsRef.current.some(tab => tab.tabId === tabId)
+		);
+	}, []);
 
 	const disposeTabRuntime = useCallback(
 		(tabId: string) => {
@@ -186,6 +224,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			lastActivatedAtRef.current.delete(tabId);
 			hydratePromiseByTabRef.current.delete(tabId);
 			saveQueueByTabRef.current.delete(tabId);
+			tabLoadVersionRef.current.delete(tabId);
 		},
 		[conversationAreaRef]
 	);
@@ -197,7 +236,10 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			.catch(() => {
 				// ignore previous error so next save still runs
 			})
-			.then(operation)
+			.then(async () => {
+				await yieldBeforeBackgroundWork();
+				await operation();
+			})
 			.catch((error: unknown) => {
 				console.error('Failed to persist conversation state:', error);
 			});
@@ -289,6 +331,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 				return Promise.resolve();
 			}
 
+			const loadVersion = beginTabLoad(tabId);
 			updateTab(tabId, prev =>
 				prev.isLoaded || prev.isHydrating || !prev.isPersisted || !prev.conversation.id
 					? prev
@@ -303,7 +346,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			const promise = (async () => {
 				try {
 					const stored = await conversationStoreAPI.getConversation(tab.conversation.id, tab.conversation.title, true);
-					if (!controllerAliveRef.current) {
+					if (!isTabLoadCurrent(tabId, loadVersion)) {
 						return;
 					}
 
@@ -321,39 +364,32 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 						return;
 					}
 
-					const hydrated = hydrateConversation(stored);
+					const hydrated = await hydrateConversationAsync(
+						stored,
+						() =>
+							isTabLoadCurrent(tabId, loadVersion) &&
+							tabsRef.current.some(
+								current => current.tabId === tabId && current.conversation.id === tab.conversation.id
+							)
+					);
+					if (!hydrated || !isTabLoadCurrent(tabId, loadVersion)) {
+						return;
+					}
 
 					conversationAreaRef.current?.clearStreamForTab(tabId);
+					conversationAreaRef.current?.syncComposerFromConversation(tabId, hydrated);
 
 					updateTab(tabId, prev => ({
 						...prev,
 						isLoaded: true,
 						isBusy: false,
-						isHydrating: true,
+						isHydrating: false,
 						editingMessageId: null,
 						isPersisted: true,
 						conversation: hydrated,
 					}));
-
-					requestAnimationFrame(() => {
-						if (!controllerAliveRef.current) {
-							return;
-						}
-						if (!tabsRef.current.some(current => current.tabId === tabId)) {
-							return;
-						}
-
-						conversationAreaRef.current?.syncComposerFromConversation(tabId, hydrated);
-						updateTab(tabId, prev => ({
-							...prev,
-							isLoaded: true,
-							isBusy: false,
-							isHydrating: false,
-							editingMessageId: null,
-						}));
-					});
 				} catch (error) {
-					if (!controllerAliveRef.current) {
+					if (!isTabLoadCurrent(tabId, loadVersion)) {
 						return;
 					}
 
@@ -380,8 +416,37 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 
 			return promise;
 		},
-		[conversationAreaRef, updateTab]
+		[beginTabLoad, conversationAreaRef, isTabLoadCurrent, updateTab]
 	);
+
+	useEffect(() => {
+		const active = tabs.find(tab => tab.tabId === selectedTabId);
+		if (!active || active.isBusy || active.isHydrating || !active.isLoaded) {
+			return;
+		}
+
+		const scratch = tabs.find(t => {
+			return isScratchTab(t);
+		});
+		if (!scratch || mountedInputTabIds.has(scratch.tabId)) {
+			return;
+		}
+
+		return scheduleIdleWork(() => {
+			if (!controllerAliveRef.current) {
+				return;
+			}
+			const latestScratch = tabsRef.current.find(isScratchTab);
+			if (!latestScratch || latestScratch.tabId !== scratch.tabId) {
+				return;
+			}
+			const latestActive = tabsRef.current.find(tab => tab.tabId === selectedTabIdRef.current);
+			if (!latestActive || latestActive.isBusy || latestActive.isHydrating || !latestActive.isLoaded) {
+				return;
+			}
+			markInputMounted(scratch.tabId);
+		});
+	}, [markInputMounted, mountedInputTabIds, selectedTabId, tabs]);
 
 	useEffect(() => {
 		touchTab(selectedTabId);
@@ -510,15 +575,26 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			}
 
 			const titleChangedByFunction = newTitle !== updatedConv.title;
-			if (titleChangedByFunction) {
-				updatedConv.title = newTitle;
-			}
-
 			const titleChanged = titleWasExternallyChanged || titleChangedByFunction;
-			const storeConversation = toStoreConversation(updatedConv);
+			const conversationToSave = titleChangedByFunction
+				? {
+						...updatedConv,
+						title: newTitle,
+					}
+				: updatedConv;
 			const needsFullSave = !tab.isPersisted || titleChanged;
 
+			updateTab(tabId, current => ({
+				...current,
+				conversation: { ...conversationToSave, messages: [...conversationToSave.messages] },
+				isLoaded: true,
+				isPersisted: true,
+				manualTitleLocked: titleWasExternallyChanged ? true : current.manualTitleLocked,
+				isHydrating: false,
+			}));
+
 			enqueueSaveForTab(tabId, async () => {
+				const storeConversation = toStoreConversation(conversationToSave);
 				if (needsFullSave) {
 					await conversationStoreAPI.putConversation(storeConversation);
 					await bumpSearchKey();
@@ -532,15 +608,6 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 					storeConversation.messages
 				);
 			});
-
-			updateTab(tabId, current => ({
-				...current,
-				conversation: { ...updatedConv, messages: [...updatedConv.messages] },
-				isLoaded: true,
-				isPersisted: true,
-				manualTitleLocked: titleWasExternallyChanged ? true : current.manualTitleLocked,
-				isHydrating: false,
-			}));
 		},
 		[bumpSearchKey, enqueueSaveForTab, updateTab]
 	);
@@ -602,8 +669,10 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 				return;
 			}
 
-			void area.resetComposerForNewConversation(targetId).finally(() => {
-				area.focusInput(targetId);
+			const resetPromise = area.resetComposerForNewConversation(targetId);
+			area.focusInput(targetId);
+			void resetPromise.catch((error: unknown) => {
+				console.error('Failed to reset composer for new conversation:', error);
 			});
 		});
 	}, [conversationAreaRef, selectTab]);
@@ -693,6 +762,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 
 	const loadConversationIntoTab = useCallback(
 		async (tabId: string, item: ConversationSearchItem) => {
+			const loadVersion = beginTabLoad(tabId);
 			updateTab(tabId, tab => ({
 				...tab,
 				isHydrating: true,
@@ -702,7 +772,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 
 			try {
 				const selectedChat = await conversationStoreAPI.getConversation(item.id, item.title, true);
-				if (!controllerAliveRef.current) {
+				if (!isTabLoadCurrent(tabId, loadVersion)) {
 					return;
 				}
 
@@ -717,9 +787,14 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 					return;
 				}
 
-				const hydrated = hydrateConversation(selectedChat);
+				const hydrated = await hydrateConversationAsync(selectedChat, () => isTabLoadCurrent(tabId, loadVersion));
+				if (!hydrated || !isTabLoadCurrent(tabId, loadVersion)) {
+					return;
+				}
 
 				conversationAreaRef.current?.clearStreamForTab(tabId);
+				conversationAreaRef.current?.syncComposerFromConversation(tabId, hydrated);
+				conversationAreaRef.current?.resetScrollToTop(tabId);
 
 				updateTab(tabId, tab => ({
 					...tab,
@@ -729,31 +804,10 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 					editingMessageId: null,
 					isBusy: false,
 					isLoaded: true,
-					isHydrating: true,
+					isHydrating: false,
 				}));
-
-				conversationAreaRef.current?.resetScrollToTop(tabId);
-
-				requestAnimationFrame(() => {
-					if (!controllerAliveRef.current) {
-						return;
-					}
-					if (!tabsRef.current.some(current => current.tabId === tabId)) {
-						return;
-					}
-
-					conversationAreaRef.current?.syncComposerFromConversation(tabId, hydrated);
-
-					updateTab(tabId, tab => ({
-						...tab,
-						isLoaded: true,
-						isHydrating: false,
-						isBusy: false,
-						editingMessageId: null,
-					}));
-				});
 			} catch (error) {
-				if (!controllerAliveRef.current) {
+				if (!isTabLoadCurrent(tabId, loadVersion)) {
 					return;
 				}
 
@@ -767,7 +821,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 				}));
 			}
 		},
-		[conversationAreaRef, updateTab]
+		[beginTabLoad, conversationAreaRef, isTabLoadCurrent, updateTab]
 	);
 
 	const handleSelectConversation = useCallback(

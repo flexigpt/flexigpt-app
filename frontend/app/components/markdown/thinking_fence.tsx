@@ -52,7 +52,6 @@ export function ThinkingFence({
 	const isOpen = isControlled ? open : internalOpen;
 
 	const bodyRef = useRef<HTMLDivElement | null>(null);
-	const [streamHeightPx, setStreamHeightPx] = useState<number | undefined>(undefined);
 	const autoScrollPinnedRef = useRef(true);
 	const previousStreamingRef = useRef(streaming);
 
@@ -105,12 +104,9 @@ export function ThinkingFence({
 		return text ?? '';
 	}, [children, hasExplicitChildren, text]);
 
-	// Streaming behavior: height grows from ~1 line to maxRows, then scroll.
+	// Keep a pinned thinking panel at the bottom without deriving CSS height in React state.
 	useLayoutEffect(() => {
-		if (!streaming) {
-			return;
-		}
-		if (!isOpen) {
+		if (!streaming || !isOpen || !effectiveAutoScroll || !autoScrollPinnedRef.current) {
 			return;
 		}
 
@@ -119,23 +115,7 @@ export function ThinkingFence({
 			return;
 		}
 
-		// Measure line height + padding so “rows” feels consistent.
-		const cs = window.getComputedStyle(el);
-		const lineHeight = Number(cs.lineHeight || '16') || 16;
-		const padTop = Number(cs.paddingTop || '0') || 0;
-		const padBottom = Number(cs.paddingBottom || '0') || 0;
-
-		const oneRow = lineHeight + padTop + padBottom;
-		const maxH = (effectiveMaxRows ?? 3) * lineHeight + padTop + padBottom;
-
-		// scrollHeight includes padding, good.
-		const desired = Math.min(Math.max(el.scrollHeight, oneRow), maxH);
-		setStreamHeightPx(desired);
-
-		if (effectiveAutoScroll && autoScrollPinnedRef.current) {
-			// Stay pinned only while the user has not scrolled away from bottom.
-			el.scrollTop = el.scrollHeight;
-		}
+		el.scrollTop = el.scrollHeight;
 	}, [bodyContent, streaming, effectiveMaxRows, effectiveAutoScroll, isOpen]);
 
 	return (
@@ -181,8 +161,7 @@ export function ThinkingFence({
 				style={
 					streaming
 						? {
-								height: streamHeightPx,
-								maxHeight: undefined, // height is controlled via streamHeightPx
+								maxHeight: `${(effectiveMaxRows ?? 3) * 1.5 + 0.5}em`,
 							}
 						: undefined
 				}

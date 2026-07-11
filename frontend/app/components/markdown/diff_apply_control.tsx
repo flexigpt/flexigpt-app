@@ -164,7 +164,7 @@ function getButtonLabel(status: ControlStatus): string {
 		case 'already-applied':
 			return 'Already applied';
 		default:
-			return 'Diff';
+			return 'Check';
 	}
 }
 
@@ -182,7 +182,7 @@ function getButtonTitle(status: ControlStatus): string {
 		case 'applying':
 			return 'Applying unified diff';
 		default:
-			return 'Preparing unified diff';
+			return 'Check unified diff';
 	}
 }
 
@@ -564,11 +564,6 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 		});
 	}, []);
 
-	const blockKey = useMemo(
-		() => `${language}\u0000${diffText}\u0000${normalizedCandidatePaths.join('\u0000')}`,
-		[diffText, language, normalizedCandidatePaths]
-	);
-
 	useEffect(() => {
 		stateRef.current = state;
 	}, [state]);
@@ -714,23 +709,6 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 		},
 		[deriveAndStoreTargets, diffText, normalizedCandidatePaths, setControlState, fallbackParsed]
 	);
-
-	useEffect(() => {
-		requestSeqRef.current += 1;
-
-		if (!isDiffLike || isBusy) {
-			setControlState({ status: 'idle' });
-			// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-			setFileTargets([]);
-			return;
-		}
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setStrict(false);
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setFileTargets([]);
-
-		void runDryRun([], false);
-	}, [blockKey, isBusy, isDiffLike, runDryRun, setControlState]);
 
 	const runApply = async (
 		targets: ApplyUnifiedDiffFileTarget[],
@@ -1010,8 +988,11 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 					<button
 						type="button"
 						className={getControlButtonClassName(getHeaderDetailsTone(state.status, patchDiagnostics))}
-						disabled={state.status === 'idle'}
 						onClick={() => {
+							if (state.status === 'idle') {
+								void runDryRun(fileTargets, strict);
+								return;
+							}
 							setIsDetailsOpen(true);
 						}}
 						title={`${buttonTitle}\n${detailTitle || title}`}

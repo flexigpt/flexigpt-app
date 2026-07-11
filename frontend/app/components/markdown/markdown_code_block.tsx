@@ -1,4 +1,4 @@
-import { useCallback, useId, useState } from 'react';
+import { useCallback, useId, useMemo, useState } from 'react';
 
 import { FiAlertTriangle, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
@@ -9,6 +9,7 @@ import { DownloadButton } from '@/components/download_button';
 import { DiffApplyControl } from '@/components/markdown/diff_apply_control';
 import type { MermaidRenderStatus } from '@/components/markdown/mermaid_diagram_card';
 import { MermaidDiagram } from '@/components/markdown/mermaid_diagram_card';
+import { looksLikeUnifiedDiff } from '@/components/markdown/unified_diff_block';
 
 interface CodeProps {
 	language: string;
@@ -39,6 +40,7 @@ export function CodeBlock({ language, value, isBusy, hideMermaidCode, diffCandid
 	const isMermaid = normalizedLanguage === 'mermaid';
 	const codeBlockKey = getCodeBlockKey(language, value);
 
+	const isDiffLike = useMemo(() => !isBusy && looksLikeUnifiedDiff(value, language), [isBusy, language, value]);
 	const [mermaidResult, setMermaidResult] = useState<MermaidResultState | null>(null);
 	const [expansionOverride, setExpansionOverride] = useState<ExpansionOverrideState | null>(null);
 
@@ -79,7 +81,7 @@ export function CodeBlock({ language, value, isBusy, hideMermaidCode, diffCandid
 		</pre>
 	);
 
-	const fetchValue = async () => value;
+	const fetchValue = useCallback(async () => value, [value]);
 
 	const handleToggleExpanded = () => {
 		setExpansionOverride({
@@ -117,8 +119,9 @@ export function CodeBlock({ language, value, isBusy, hideMermaidCode, diffCandid
 							<span className="truncate leading-none">{headerLabel}</span>
 						</span>
 
-						{!isBusy ? (
+						{isDiffLike ? (
 							<DiffApplyControl
+								key={codeBlockKey}
 								language={language}
 								diffText={value}
 								isBusy={isBusy}

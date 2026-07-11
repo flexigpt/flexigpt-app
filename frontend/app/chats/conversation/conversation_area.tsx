@@ -1,12 +1,15 @@
-import type { Ref } from 'react';
+import type { ReactNode, Ref } from 'react';
 import {
 	forwardRef,
 	memo,
+	startTransition,
 	useCallback,
 	useEffect,
 	useImperativeHandle,
+	useLayoutEffect,
 	useMemo,
 	useRef,
+	useState,
 	useSyncExternalStore,
 } from 'react';
 
@@ -34,7 +37,12 @@ import { ChatMessage } from '@/chats/messages/message';
 import type { ChatTabState } from '@/chats/tabs/tabs_model';
 
 const EMPTY_MESSAGES: ConversationMessage[] = [];
+const EMPTY_DIFF_CANDIDATE_PATHS = new Map<string, string[]>();
 const MAX_DIFF_CANDIDATE_PATHS = 1024;
+const RICH_RENDER_DEFER_MESSAGE_COUNT = 8;
+const RICH_RENDER_DEFER_TEXT_LENGTH = 12_000;
+const DIFF_MARKDOWN_SIGNAL_PATTERN =
+	/```(?:diff|patch|udiff)\b|^diff --git\s|^\*\*\*\s+Begin\s+Patch\s*$|^---\s+.+\n\+\+\+\s+/m;
 
 const ABSOLUTE_PATH_PATTERN = /(?:[A-Za-z]:[\\/][^\s"'`<>|]+|\\\\[^\s"'`<>|]+|\/[^\s"'`<>|]+)/g;
 const RELATIVE_PATH_PATTERN = /(?:\.{1,2}[\\/])?(?:[A-Za-z0-9_.@+-]+[\\/]){1,}[A-Za-z0-9_.@+-]+/g;
@@ -117,6 +125,12 @@ function areConversationAreaPropsEqual(prev: ConversationAreaProps, next: Conver
 		return false;
 	}
 	if (prev.initialScrollTopByTab !== next.initialScrollTopByTab) {
+		return false;
+	}
+	if (prev.updateTab !== next.updateTab) {
+		return false;
+	}
+	if (prev.saveUpdatedConversation !== next.saveUpdatedConversation) {
 		return false;
 	}
 
@@ -360,7 +374,28 @@ function extractPathMentionsFromStructuredText(text: string | undefined): string
 	return out;
 }
 
+interface CachedMessageCandidatePathSources {
+	uiContent: ConversationMessage['uiContent'];
+	attachments: ConversationMessage['attachments'];
+	uiToolCalls: ConversationMessage['uiToolCalls'];
+	uiToolOutputs: ConversationMessage['uiToolOutputs'];
+	sources: CandidatePathSource[];
+}
+
+const MESSAGE_CANDIDATE_PATH_SOURCE_CACHE = new WeakMap<ConversationMessage, CachedMessageCandidatePathSources>();
+
 function getMessageCandidatePathSources(message: ConversationMessage): CandidatePathSource[] {
+	const cached = MESSAGE_CANDIDATE_PATH_SOURCE_CACHE.get(message);
+	if (
+		cached &&
+		cached.uiContent === message.uiContent &&
+		cached.attachments === message.attachments &&
+		cached.uiToolCalls === message.uiToolCalls &&
+		cached.uiToolOutputs === message.uiToolOutputs
+	) {
+		return cached.sources;
+	}
+
 	const out: CandidatePathSource[] = [];
 
 	for (const attachment of message.attachments ?? []) {
@@ -400,6 +435,13 @@ function getMessageCandidatePathSources(message: ConversationMessage): Candidate
 		}
 	}
 
+	MESSAGE_CANDIDATE_PATH_SOURCE_CACHE.set(message, {
+		uiContent: message.uiContent,
+		attachments: message.attachments,
+		uiToolCalls: message.uiToolCalls,
+		uiToolOutputs: message.uiToolOutputs,
+		sources: out,
+	});
 	return out;
 }
 
@@ -427,10 +469,75 @@ function buildDiffCandidatePathsByMessageID(messages: ConversationMessage[]): Ma
 	return byID;
 }
 
+function shouldDeferInitialRichRendering(messages: ConversationMessage[]): boolean {
+	if (messages.length >= RICH_RENDER_DEFER_MESSAGE_COUNT) {
+		return true;
+	}
+
+	let textLength = 0;
+	for (const message of messages) {
+		textLength += message.uiContent?.length ?? 0;
+		if (textLength >= RICH_RENDER_DEFER_TEXT_LENGTH) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+function conversationMayContainApplicableDiff(messages: ConversationMessage[]): boolean {
+	return messages.some(message => DIFF_MARKDOWN_SIGNAL_PATTERN.test(message.uiContent ?? ''));
+}
+
+type MessageItemRenderer = (
+	index: number,
+	message: ConversationMessage,
+	diffCandidatePaths: string[] | undefined,
+	deferRichRendering: boolean
+) => ReactNode;
+
+const ConversationMessageList = memo(function ConversationMessageList(props: {
+	messages: ConversationMessage[];
+	renderItem: MessageItemRenderer;
+}) {
+	const { messages, renderItem } = props;
+	const [richRenderingReady, setRichRenderingReady] = useState(() => !shouldDeferInitialRichRendering(messages));
+
+	useEffect(() => {
+		if (richRenderingReady) {
+			return;
+		}
+
+		const frame = window.requestAnimationFrame(() => {
+			startTransition(() => {
+				setRichRenderingReady(true);
+			});
+		});
+
+		return () => {
+			window.cancelAnimationFrame(frame);
+		};
+	}, [richRenderingReady]);
+
+	const diffCandidatePathsByMessageID = useMemo(() => {
+		if (!richRenderingReady || !conversationMayContainApplicableDiff(messages)) {
+			return EMPTY_DIFF_CANDIDATE_PATHS;
+		}
+		return buildDiffCandidatePathsByMessageID(messages);
+	}, [messages, richRenderingReady]);
+
+	return messages.map((message, index) => (
+		<div key={message.id} data-chat-message-index={index}>
+			{renderItem(index, message, diffCandidatePathsByMessageID.get(message.id), !richRenderingReady)}
+		</div>
+	));
+});
+
 function StreamingLastMessage(props: {
 	message: ConversationMessage;
 	rowIsBusy: boolean;
 	isEditing: boolean;
+	deferRichRendering: boolean;
 	onEdit: () => void;
 	subscribe: (cb: () => void) => () => void;
 	getSnapshot: () => number;
@@ -450,6 +557,7 @@ function StreamingLastMessage(props: {
 			streamedThinking={streamedThinking}
 			isBusy={props.rowIsBusy}
 			isEditing={props.isEditing}
+			deferRichRendering={props.deferRichRendering}
 			onEdit={props.onEdit}
 			diffCandidatePaths={props.diffCandidatePaths}
 		/>
@@ -509,13 +617,12 @@ function ConversationAreaInner(
 	const activeEditingMessageId = activeTab?.editingMessageId ?? null;
 	const messages = activeTab?.conversation?.messages ?? EMPTY_MESSAGES;
 	const messageCount = messages.length;
-	const diffCandidatePathsByMessageID = useMemo(() => buildDiffCandidatePathsByMessageID(messages), [messages]);
 
-	useEffect(() => {
+	useLayoutEffect(() => {
 		tabsRef.current = tabs;
 	}, [tabs]);
 
-	useEffect(() => {
+	useLayoutEffect(() => {
 		selectedTabIdRef.current = selectedTabId;
 	}, [selectedTabId]);
 
@@ -725,17 +832,23 @@ function ConversationAreaInner(
 	);
 
 	const itemContent = useCallback(
-		(index: number, message: ConversationMessage) => {
+		(
+			index: number,
+			message: ConversationMessage,
+			diffCandidatePaths: string[] | undefined,
+			deferRichRendering: boolean
+		) => {
 			const isLast = index === messageCount - 1;
 			const isAssistant = message.role === RoleEnum.Assistant;
 			const rowIsBusy = isLast && activeTabIsBusy && isAssistant;
-			const diffCandidatePaths = diffCandidatePathsByMessageID.get(message.id);
+
 			if (rowIsBusy) {
 				return (
 					<StreamingLastMessage
 						message={message}
 						rowIsBusy={true}
 						isEditing={activeEditingMessageId === message.id}
+						deferRichRendering={deferRichRendering}
 						onEdit={() => {
 							beginEditMessageForTab(activeTabId, message.id);
 						}}
@@ -755,6 +868,7 @@ function ConversationAreaInner(
 					streamedThinking=""
 					isBusy={false}
 					isEditing={activeEditingMessageId === message.id}
+					deferRichRendering={deferRichRendering}
 					onEdit={() => {
 						beginEditMessageForTab(activeTabId, message.id);
 					}}
@@ -767,7 +881,6 @@ function ConversationAreaInner(
 			activeTabId,
 			activeTabIsBusy,
 			beginEditMessageForTab,
-			diffCandidatePathsByMessageID,
 			getActiveStreamSnapshot,
 			getActiveStreamText,
 			getActiveStreamThinking,
@@ -840,11 +953,11 @@ function ConversationAreaInner(
 								<span className="loading loading-dots loading-md" aria-label="Loading conversation" />
 							</div>
 						) : (
-							messages.map((message, index) => (
-								<div key={message.id} data-chat-message-index={index}>
-									{itemContent(index, message)}
-								</div>
-							))
+							<ConversationMessageList
+								key={`${activeTabId}:${activeTab?.conversation.id ?? ''}`}
+								messages={messages}
+								renderItem={itemContent}
+							/>
 						)}
 					</div>
 				</div>

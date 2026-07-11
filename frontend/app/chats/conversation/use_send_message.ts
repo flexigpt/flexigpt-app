@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import { useCallback } from 'react';
+import { startTransition, useCallback } from 'react';
 
 import type { Conversation, ConversationMessage } from '@/spec/conversation';
 import type { InferenceError, ModelParam, OutputUnion, UIToolCall } from '@/spec/inference';
@@ -98,6 +98,16 @@ function buildTerminalAssistantMessage(args: {
 	};
 }
 
+function findLatestUserMessage(messages: ConversationMessage[]): ConversationMessage | undefined {
+	for (let index = messages.length - 1; index >= 0; index -= 1) {
+		const message = messages[index];
+		if (message.role === RoleEnum.User) {
+			return message;
+		}
+	}
+	return undefined;
+}
+
 export function useSendMessage({
 	tabsRef,
 	selectedTabIdRef,
@@ -158,6 +168,7 @@ export function useSendMessage({
 
 			clearStreamBuffer(tabId);
 			notifyStreamNow(tabId);
+			const streamBuffer = getStreamBuffer(tabId);
 
 			const assistantPlaceholder = initConversationMessage(RoleEnum.Assistant);
 			const chatWithPlaceholder: Conversation = {
@@ -183,8 +194,10 @@ export function useSendMessage({
 					return;
 				}
 
-				tokensReceivedByTabRef.current.set(tabId, true);
-				getStreamBuffer(tabId).text.chunks.push(textData);
+				if (tokensReceivedByTabRef.current.get(tabId) !== true) {
+					tokensReceivedByTabRef.current.set(tabId, true);
+				}
+				streamBuffer.text.chunks.push(textData);
 				notifyStreamSoon(tabId);
 			};
 
@@ -196,8 +209,10 @@ export function useSendMessage({
 					return;
 				}
 
-				tokensReceivedByTabRef.current.set(tabId, true);
-				getStreamBuffer(tabId).thinking.chunks.push(thinkingData);
+				if (tokensReceivedByTabRef.current.get(tabId) !== true) {
+					tokensReceivedByTabRef.current.set(tabId, true);
+				}
+				streamBuffer.thinking.chunks.push(thinkingData);
 				notifyStreamSoon(tabId);
 			};
 
@@ -231,9 +246,7 @@ export function useSendMessage({
 			try {
 				let toolStoreChoices: ToolStoreChoice[] | undefined;
 
-				const latestUser = [...updatedChatWithUserMessage.messages]
-					.toReversed()
-					.find(message => message.role === RoleEnum.User);
+				const latestUser = findLatestUserMessage(updatedChatWithUserMessage.messages);
 
 				if (latestUser?.toolStoreChoices && latestUser.toolStoreChoices.length > 0) {
 					toolStoreChoices = latestUser.toolStoreChoices;
@@ -456,7 +469,9 @@ export function useSendMessage({
 			} finally {
 				if (tabExists(tabId) && requestIdByTabRef.current.get(tabId) === reqId) {
 					clearStreamBuffer(tabId);
-					updateTab(tabId, tab => ({ ...tab, isBusy: false }));
+					startTransition(() => {
+						updateTab(tabId, tab => ({ ...tab, isBusy: false }));
+					});
 
 					const finishPayload: AssistantTurnFinishedPayload = {
 						loadedRunnableToolCallCount: queuedRunnableToolCalls.length,
@@ -472,11 +487,10 @@ export function useSendMessage({
 						loadAssistantTurnForTab(tabId, queuedRunnableToolCalls, finishPayload);
 					};
 
-					if (queuedRunnableToolCalls.length > 0) {
-						requestAnimationFrame(deliverAssistantTurn);
-					} else {
-						deliverAssistantTurn();
-					}
+					// The runtime itself remains blocked by the tab's busy prop until
+					// React commits the completion transition. No animation frame is
+					// needed, and background windows must not pause this delivery.
+					deliverAssistantTurn();
 				}
 			}
 		},

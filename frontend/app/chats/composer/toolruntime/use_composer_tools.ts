@@ -78,50 +78,60 @@ export function useComposerTools({
 
 	const autoExecBlocked = isBusy || isSubmitting || externalExecutionBlocked;
 
+	const runToolCall = runtime.runToolCall;
+	const discardToolCall = runtime.discardToolCall;
+	const removeToolOutput = runtime.removeToolOutput;
+	const retryErroredOutput = runtime.retryErroredOutput;
+	const clearToolRuntime = runtime.clearToolRuntime;
+	const getToolRuntimeSnapshot = runtime.getToolRuntimeSnapshot;
+	const recomputeAttachedToolArgsBlocked = config.recomputeAttachedToolArgsBlocked;
+	const clearAttachedToolValidation = config.clearAttachedToolValidation;
+
+	const getToolCallsSnapshot = useCallback(() => getToolRuntimeSnapshot().toolCalls, [getToolRuntimeSnapshot]);
+
 	const { state: autoExecState } = useToolAutoExecDrainer({
 		toolCalls: runtime.toolCalls,
 		isBlocked: autoExecBlocked,
-		runToolCall: async id => {
-			await runtime.runToolCall(id);
-		},
+		getToolCallsSnapshot,
+		runToolCall,
 	});
 
 	const handleRunSingleToolCall = useCallback(
 		async (id: string) => {
-			await runtime.runToolCall(id);
+			await runToolCall(id);
 		},
-		[runtime]
+		[runToolCall]
 	);
 
 	const handleDiscardToolCall = useCallback(
 		(id: string) => {
-			runtime.discardToolCall(id);
+			discardToolCall(id);
 		},
-		[runtime]
+		[discardToolCall]
 	);
 
 	const handleRemoveToolOutput = useCallback(
 		(id: string) => {
-			runtime.removeToolOutput(id);
+			removeToolOutput(id);
 		},
-		[runtime]
+		[removeToolOutput]
 	);
 
 	const handleRetryErroredOutput = useCallback(
 		(output: UIToolOutput) => {
-			runtime.retryErroredOutput(output);
+			retryErroredOutput(output);
 		},
-		[runtime]
+		[retryErroredOutput]
 	);
 
 	const handleAttachedToolsChanged = useCallback(() => {
-		config.recomputeAttachedToolArgsBlocked();
-	}, [config]);
+		recomputeAttachedToolArgsBlocked();
+	}, [recomputeAttachedToolArgsBlocked]);
 
 	const clearComposerToolsState = useCallback(() => {
-		runtime.clearToolRuntime();
-		config.clearAttachedToolValidation();
-	}, [config, runtime]);
+		clearToolRuntime();
+		clearAttachedToolValidation();
+	}, [clearAttachedToolValidation, clearToolRuntime]);
 
 	return {
 		toolCalls: runtime.toolCalls,

@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { RestorableConversationContext } from '@/spec/conversation';
@@ -76,7 +76,7 @@ interface ComposerBoxProps {
 	onCancelEditing: () => void;
 }
 
-export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(function ComposerBox(
+const ComposerBoxImpl = forwardRef<ComposerBoxHandle, ComposerBoxProps>(function ComposerBox(
 	{ onSend, isBusy, isHydrating, abortRef, shortcutConfig, editingMessageId, onCancelEditing },
 	ref
 ) {
@@ -231,14 +231,17 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 		void flushPendingPresetResolution();
 	}, [assistantPresetLayerReady, flushPendingPresetResolution]);
 
-	const handleSubmitMessage = (payload: EditorSubmitPayload) => {
-		// Clear any stale abort confirmation request before starting a new send.
-		setAbortConfirmationRequested(false);
+	const handleSubmitMessage = useCallback(
+		(payload: EditorSubmitPayload) => {
+			// Clear any stale abort confirmation request before starting a new send.
+			setAbortConfirmationRequested(false);
 
-		// Return the promise so <EditorArea /> can await it and surface
-		// any synchronous errors from sendMessage (e.g. validation).
-		return onSend(payload, chatOptions);
-	};
+			// Return the promise so <EditorArea /> can await it and surface
+			// any synchronous errors from sendMessage.
+			return onSend(payload, chatOptions);
+		},
+		[chatOptions, onSend]
+	);
 
 	const resetComposerStateForNewConversation = useCallback(() => {
 		setAbortConfirmationRequested(false);
@@ -429,3 +432,5 @@ export const ComposerBox = forwardRef<ComposerBoxHandle, ComposerBoxProps>(funct
 		</div>
 	);
 });
+
+export const ComposerBox = memo(ComposerBoxImpl);

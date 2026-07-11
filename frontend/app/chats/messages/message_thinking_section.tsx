@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 
 import type { ReasoningContent } from '@/spec/inference';
 
@@ -16,7 +16,7 @@ function joinReasoningParts(reasoning: ReasoningContent[] | undefined, key: 'sum
 	return parts.join('\n\n').trim();
 }
 
-export function MessageThinkingSection(props: {
+export const MessageThinkingSection = memo(function MessageThinkingSection(props: {
 	/** Busy == request in flight */
 	isBusy: boolean;
 	/** Streaming thinking channel */
@@ -30,11 +30,11 @@ export function MessageThinkingSection(props: {
 	const finalThinking = useMemo(() => joinReasoningParts(reasoningContents, 'thinking'), [reasoningContents]);
 
 	// Prefer streamed thinking while busy; otherwise show final thinking.
-	const thinkingText = (isBusy ? streamedThinking : finalThinking).trimEnd();
+	const thinkingText = isBusy ? streamedThinking : finalThinking.trimEnd();
 
 	// Thinking is optional: only show when we actually have something to display.
-	const hasSummary = finalSummary.trim().length > 0;
-	const hasThinking = thinkingText.trim().length > 0;
+	const hasSummary = /\S/.test(finalSummary);
+	const hasThinking = /\S/.test(thinkingText);
 	const shouldShow = hasSummary || hasThinking;
 
 	const [manualOpen, setManualOpen] = useState<boolean | null>(null);
@@ -83,4 +83,4 @@ export function MessageThinkingSection(props: {
 			) : null}
 		</div>
 	);
-}
+});

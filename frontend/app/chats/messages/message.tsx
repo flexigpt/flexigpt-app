@@ -1,9 +1,11 @@
-import { memo, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 
 import { FiUser, FiZap } from 'react-icons/fi';
 
 import type { ConversationMessage } from '@/spec/conversation';
+import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import { RoleEnum, Status } from '@/spec/inference';
+import type { ToolStoreChoice } from '@/spec/tool';
 
 import type { ToolDetailsState } from '@/chats/composer/tools/tool_details_modal';
 import { ToolDetailsModal } from '@/chats/composer/tools/tool_details_modal';
@@ -25,6 +27,7 @@ interface ChatMessageProps {
 	streamedThinking: string;
 	isBusy: boolean;
 	isEditing: boolean;
+	deferRichRendering: boolean;
 	diffCandidatePaths?: string[];
 	onEdit: () => void;
 }
@@ -36,10 +39,19 @@ function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
 	if (prev.isEditing !== next.isEditing) {
 		return false;
 	}
+	if (prev.deferRichRendering !== next.deferRichRendering) {
+		return false;
+	}
 
 	if (prev.message.uiDebugDetails !== next.message.uiDebugDetails) {
 		//
 		// We need to check details as parent is updating details in place for previous message
+		return false;
+	}
+	if (prev.message.debugDetails !== next.message.debugDetails) {
+		return false;
+	}
+	if (prev.message.error !== next.message.error) {
 		return false;
 	}
 	if (prev.message.usage !== next.message.usage) {
@@ -100,6 +112,7 @@ export const ChatMessage = memo(function ChatMessage({
 	streamedThinking,
 	isBusy,
 	isEditing,
+	deferRichRendering,
 	diffCandidatePaths,
 	onEdit,
 }: ChatMessageProps) {
@@ -111,24 +124,37 @@ export const ChatMessage = memo(function ChatMessage({
 	const [renderMarkdown, setRenderMarkdown] = useState(!isUser);
 	const [toolDetailsState, setToolDetailsState] = useState<ToolDetailsState>(null);
 
+	const handleDisableMarkdownChange = useCallback((checked: boolean) => {
+		setRenderMarkdown(!checked);
+	}, []);
+	const handleToolChoiceDetails = useCallback((choice: ToolStoreChoice) => {
+		setToolDetailsState({ kind: 'choice', choice });
+	}, []);
+	const handleToolCallDetails = useCallback((call: UIToolCall) => {
+		setToolDetailsState({ kind: 'call', call });
+	}, []);
+	const handleToolOutputDetails = useCallback((output: UIToolOutput) => {
+		setToolDetailsState({ kind: 'output', output });
+	}, []);
+
 	const bubbleExtra = [streamedText || streamedThinking ? '' : 'shadow-lg', isEditing ? 'ring-2 ring-primary/70' : '']
 		.filter(Boolean)
 		.join(' ');
 
 	const baseContent = message.uiContent ?? '';
-	const hasAnyContent = baseContent.trim().length > 0 || streamedText.trim().length > 0;
+	const hasAnyContent = /\S/.test(baseContent) || /\S/.test(streamedText);
 	const hasError = message.status === Status.Failed || !!message.error;
 
 	const hasAnyReasoning =
-		streamedThinking.trim().length > 0 ||
+		/\S/.test(streamedThinking) ||
 		(message.uiReasoningContents?.some(rc => {
-			const sum = (rc?.summary ?? []).some(s => (s ?? '').trim().length > 0);
-			const th = (rc?.thinking ?? []).some(s => (s ?? '').trim().length > 0);
+			const sum = (rc?.summary ?? []).some(s => /\S/.test(s ?? ''));
+			const th = (rc?.thinking ?? []).some(s => /\S/.test(s ?? ''));
 			return sum || th;
 		}) ??
 			false);
 
-	const hasCitations = !isUser && (message.uiCitations?.length ?? 0) > 0;
+	const hasCitations = !isUser && !isBusy && (message.uiCitations?.length ?? 0) > 0;
 	const mcpContextItemCount =
 		(message.mcpContext?.servers?.length ?? 0) +
 		(message.mcpContext?.resources?.length ?? 0) +
@@ -148,6 +174,10 @@ export const ChatMessage = memo(function ChatMessage({
 
 	// Detect MCP Apps in this message's tool outputs.
 	const mcpAppViews = useMemo(() => {
+		if (isBusy || deferRichRendering) {
+			return [];
+		}
+
 		const outputs = message.uiToolOutputs ?? [];
 		const callsById = new Map((message.uiToolCalls ?? []).map(c => [c.callID || c.id, c] as const));
 		return outputs
@@ -160,7 +190,7 @@ export const ChatMessage = memo(function ChatMessage({
 				return { instance, call, output: out } as const;
 			})
 			.filter((v): v is NonNullable<typeof v> => v !== null);
-	}, [message.uiToolCalls, message.uiToolOutputs]);
+	}, [deferRichRendering, isBusy, message.uiToolCalls, message.uiToolOutputs]);
 
 	const hasMCPAppsView = mcpAppViews.length > 0;
 
@@ -199,7 +229,7 @@ export const ChatMessage = memo(function ChatMessage({
 								isStreaming={!!streamedText}
 								isBusy={isBusy}
 								align={align}
-								renderAsMarkdown={renderMarkdown}
+								renderAsMarkdown={renderMarkdown && !deferRichRendering}
 								diffCandidatePaths={diffCandidatePaths}
 							/>
 							{/* Fallback for error-only messages with no text content */}
@@ -274,15 +304,9 @@ export const ChatMessage = memo(function ChatMessage({
 								activeSkillRefs={message.activeSkillRefs}
 								toolCalls={message.uiToolCalls}
 								toolOutputs={message.uiToolOutputs}
-								onToolChoiceDetails={choice => {
-									setToolDetailsState({ kind: 'choice', choice });
-								}}
-								onToolCallDetails={call => {
-									setToolDetailsState({ kind: 'call', call });
-								}}
-								onToolOutputDetails={output => {
-									setToolDetailsState({ kind: 'output', output });
-								}}
+								onToolChoiceDetails={handleToolChoiceDetails}
+								onToolCallDetails={handleToolCallDetails}
+								onToolOutputDetails={handleToolOutputDetails}
 							/>
 						</div>
 					)}
@@ -304,10 +328,10 @@ export const ChatMessage = memo(function ChatMessage({
 							isBusy={isBusy}
 							bodyPresent={showBody}
 							disableMarkdown={!renderMarkdown}
-							onDisableMarkdownChange={checked => {
-								setRenderMarkdown(!checked);
-							}}
+							onDisableMarkdownChange={handleDisableMarkdownChange}
 							usage={message.usage}
+							debugDetails={message.debugDetails}
+							errorDetails={message.error}
 						/>
 					</div>
 				</div>
@@ -321,12 +345,14 @@ export const ChatMessage = memo(function ChatMessage({
 				)}
 			</div>
 			{/* Tool choice/call/output details (JSON) */}
-			<ToolDetailsModal
-				state={toolDetailsState}
-				onClose={() => {
-					setToolDetailsState(null);
-				}}
-			/>
+			{toolDetailsState ? (
+				<ToolDetailsModal
+					state={toolDetailsState}
+					onClose={() => {
+						setToolDetailsState(null);
+					}}
+				/>
+			) : null}
 		</div>
 	);
 }, propsAreEqual);

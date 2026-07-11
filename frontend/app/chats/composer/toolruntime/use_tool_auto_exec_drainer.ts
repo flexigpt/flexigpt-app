@@ -14,10 +14,16 @@ export interface AutoExecState {
 interface UseToolAutoExecDrainerArgs {
 	toolCalls: UIToolCall[];
 	isBlocked: boolean;
+	getToolCallsSnapshot: () => UIToolCall[];
 	runToolCall: (id: string) => Promise<unknown>;
 }
 
-export function useToolAutoExecDrainer({ toolCalls, isBlocked, runToolCall }: UseToolAutoExecDrainerArgs): {
+export function useToolAutoExecDrainer({
+	toolCalls,
+	isBlocked,
+	getToolCallsSnapshot,
+	runToolCall,
+}: UseToolAutoExecDrainerArgs): {
 	state: AutoExecState;
 } {
 	const [state, setState] = useState<AutoExecState>({
@@ -27,11 +33,11 @@ export function useToolAutoExecDrainer({ toolCalls, isBlocked, runToolCall }: Us
 
 	const isMountedRef = useRef(true);
 	const isBlockedRef = useRef(isBlocked);
-	const toolCallsRef = useRef(toolCalls);
 	const isPumpingRef = useRef(false);
 	const scheduledFrameRef = useRef<number | null>(null);
 
 	useEffect(() => {
+		isMountedRef.current = true;
 		return () => {
 			isMountedRef.current = false;
 			if (scheduledFrameRef.current !== null) {
@@ -55,8 +61,8 @@ export function useToolAutoExecDrainer({ toolCalls, isBlocked, runToolCall }: Us
 	}, []);
 
 	const getNextCall = useCallback(() => {
-		return getNextPendingAutoExecutableToolCall(toolCallsRef.current);
-	}, []);
+		return getNextPendingAutoExecutableToolCall(getToolCallsSnapshot());
+	}, [getToolCallsSnapshot]);
 
 	const pump = useCallback(async () => {
 		if (isPumpingRef.current) {
@@ -116,7 +122,6 @@ export function useToolAutoExecDrainer({ toolCalls, isBlocked, runToolCall }: Us
 	}, [getNextCall, runToolCall, syncState]);
 
 	useEffect(() => {
-		toolCallsRef.current = toolCalls;
 		isBlockedRef.current = isBlocked;
 
 		if (scheduledFrameRef.current !== null) {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
@@ -577,20 +577,9 @@ export function DiffApplyModal({
 }: DiffApplyModalProps) {
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 
-	const [localTargets, setLocalTargets] = useState<EditableUnifiedDiffTarget[]>([]);
-	const displayTargets = localTargets;
-
-	const [localStrict, setLocalStrict] = useState(strict);
-	const [runningAction, setRunningAction] = useState<ModalRunningAction | null>(null);
-	const isRunning = runningAction !== null;
-	const patchDiagnostics = uniqueDiagnostics([
-		...(fallbackParsed.diagnostics ?? []),
-		...collectPatchLevelDiagnostics(output),
-	]);
-
-	useEffect(() => {
+	const baseTargets = useMemo(() => {
 		if (!isOpen) {
-			return;
+			return [];
 		}
 
 		const fromOutput = buildEditableTargetsFromOutput(output, fallbackParsed, candidatePaths);
@@ -610,11 +599,23 @@ export function DiffApplyModal({
 			});
 		}
 
-		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect, react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setLocalTargets(previous => mergeModalTargetsPreservingLocalEdits([...byKey.values()], previous));
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-derived-state
-		setLocalStrict(strict);
-	}, [candidatePaths, fallbackParsed, fileTargets, isOpen, output, strict]);
+		return [...byKey.values()];
+	}, [candidatePaths, fallbackParsed, fileTargets, isOpen, output]);
+
+	// This array contains only user-edited target paths. Backend/parser state
+	// remains derived from props and cannot become stale.
+	const [localTargets, setLocalTargets] = useState<EditableUnifiedDiffTarget[]>([]);
+	const displayTargets = useMemo(
+		() => mergeModalTargetsPreservingLocalEdits(baseTargets, localTargets),
+		[baseTargets, localTargets]
+	);
+
+	const [runningAction, setRunningAction] = useState<ModalRunningAction | null>(null);
+	const isRunning = runningAction !== null;
+	const patchDiagnostics = uniqueDiagnostics([
+		...(fallbackParsed.diagnostics ?? []),
+		...collectPatchLevelDiagnostics(output),
+	]);
 
 	useEffect(() => {
 		if (!isOpen) {
@@ -651,17 +652,32 @@ export function DiffApplyModal({
 	const blockedFileCount = Math.max(0, counts.blocked - counts.needsInfo);
 
 	const updateTarget = (index: number, targetPath: string) => {
-		setLocalTargets(prev =>
-			prev.map((target, currentIndex) =>
-				currentIndex === index
-					? {
-							...target,
-							targetPath,
-							candidatePaths: uniqueStrings([targetPath, ...(target.candidatePaths ?? [])]),
-						}
-					: target
-			)
-		);
+		const currentTarget = displayTargets[index];
+		if (!currentTarget) {
+			return;
+		}
+
+		const editedTarget: EditableUnifiedDiffTarget = {
+			...currentTarget,
+			targetPath,
+			candidatePaths: uniqueStrings([targetPath, ...(currentTarget.candidatePaths ?? [])]),
+		};
+
+		setLocalTargets(previous => {
+			const existingIndex = previous.findIndex(target => editableTargetsMatch(target, currentTarget));
+			if (existingIndex < 0) {
+				return [...previous, editedTarget];
+			}
+
+			const existing = previous[existingIndex];
+			if (existing.targetPath === targetPath) {
+				return previous;
+			}
+
+			const next = [...previous];
+			next[existingIndex] = editedTarget;
+			return next;
+		});
 	};
 
 	const handleDryRun = async () => {
@@ -670,8 +686,7 @@ export function DiffApplyModal({
 		}
 		setRunningAction({ key: 'global', kind: 'dry-run' });
 		try {
-			onStrictChange(localStrict);
-			await onDryRun(localTargets, localStrict);
+			await onDryRun(displayTargets, strict);
 		} finally {
 			setRunningAction(null);
 		}
@@ -684,8 +699,7 @@ export function DiffApplyModal({
 
 		setRunningAction({ key: 'global', kind: 'apply' });
 		try {
-			onStrictChange(localStrict);
-			await onApply(localTargets, localStrict);
+			await onApply(displayTargets, strict);
 		} finally {
 			setRunningAction(null);
 		}
@@ -706,8 +720,7 @@ export function DiffApplyModal({
 		setRunningAction({ key, kind: 'dry-run' });
 
 		try {
-			onStrictChange(localStrict);
-			await onDryRun([target], localStrict, {
+			await onDryRun([target], strict, {
 				mergeOutput: true,
 			});
 		} finally {
@@ -729,8 +742,7 @@ export function DiffApplyModal({
 		setRunningAction({ key, kind: 'apply' });
 
 		try {
-			onStrictChange(localStrict);
-			await onApply([target], localStrict, {
+			await onApply([target], strict, {
 				mergeOutput: true,
 			});
 		} finally {
@@ -828,9 +840,9 @@ export function DiffApplyModal({
 							<input
 								type="checkbox"
 								className="checkbox checkbox-xs"
-								checked={localStrict}
+								checked={strict}
 								onChange={event => {
-									setLocalStrict(event.target.checked);
+									onStrictChange(event.target.checked);
 								}}
 							/>
 							<span>Strict matching</span>
