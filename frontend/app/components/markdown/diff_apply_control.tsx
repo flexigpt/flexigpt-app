@@ -35,6 +35,7 @@ import {
 	buildUnifiedDiffTextForTarget,
 	getErrorMessage,
 	haveSharedPathIdentity,
+	isTerminalUnifiedDiffStatus,
 	looksLikeUnifiedDiff,
 	parseUnifiedDiffForUI,
 	summaryLabel,
@@ -151,26 +152,15 @@ function buildTitle(state: DiffApplyState, fallbackParsed: ReturnType<typeof par
 }
 
 function mapOutputToControlStatus(output: ApplyUnifiedDiffOut): ControlStatus {
-	if (output.ok) {
-		switch (output.status) {
-			case ApplyUnifiedDiffStatus.Applicable:
-				return 'ready';
-			case ApplyUnifiedDiffStatus.Applied:
-				return 'applied';
-			case ApplyUnifiedDiffStatus.AlreadyApplied:
-				return 'already-applied';
-			default:
-				return 'ready';
-		}
+	if (isTerminalUnifiedDiffStatus(output.status)) {
+		return output.status === ApplyUnifiedDiffStatus.Applied ? 'applied' : 'already-applied';
 	}
 
-	switch (output.status) {
-		case ApplyUnifiedDiffStatus.NeedsInfo:
-			return 'needs-info';
-
-		default:
-			return 'blocked';
+	if (output.status === ApplyUnifiedDiffStatus.NeedsInfo) {
+		return 'needs-info';
 	}
+
+	return output.ok ? 'ready' : 'blocked';
 }
 
 function getButtonLabel(status: ControlStatus): string {
@@ -333,8 +323,16 @@ function hydrateApplyOutputWithRequestTargets(
 	const normalizedOutput = normalizeApplyOutputTargetPaths(output);
 	const normalizedRequestTargets = normalizeApplyFileTargets(requestTargets);
 
+	const mergedFileTargets =
+		normalizedRequestTargets.length > 0
+			? mergeApplyFileTargets(normalizedOutput.fileTargets ?? [], normalizedRequestTargets)
+			: normalizedOutput.fileTargets;
+
 	if (!normalizedOutput.files?.length || normalizedRequestTargets.length === 0) {
-		return normalizedOutput;
+		return {
+			...normalizedOutput,
+			fileTargets: mergedFileTargets,
+		};
 	}
 
 	const outputFiles = normalizedOutput.files;
@@ -368,7 +366,7 @@ function hydrateApplyOutputWithRequestTargets(
 
 	return {
 		...normalizedOutput,
-		fileTargets: mergeApplyFileTargets(normalizedOutput.fileTargets ?? [], normalizedRequestTargets),
+		fileTargets: mergedFileTargets,
 		files,
 	};
 }
@@ -403,7 +401,7 @@ function mergeApplyUnifiedDiffOutput(
 	return {
 		...previous,
 		dryRun: scoped.dryRun,
-		ok: files.every(file => file.ok),
+		ok: files.every(file => file.ok || isTerminalUnifiedDiffStatus(file.status)),
 		status: getAggregateStatusFromFiles(files, scoped.status),
 		message: scoped.message || previous.message,
 		diagnostics: uniqueDiagnostics([...(previous.diagnostics ?? []), ...(scoped.diagnostics ?? [])]),
@@ -440,11 +438,10 @@ function getAggregateStatusFromFiles(
 	if (files.some(file => file.status === ApplyUnifiedDiffStatus.Applicable)) {
 		return ApplyUnifiedDiffStatus.Applicable;
 	}
-	if (files.every(file => file.status === ApplyUnifiedDiffStatus.AlreadyApplied)) {
-		return ApplyUnifiedDiffStatus.AlreadyApplied;
-	}
-	if (files.every(file => file.status === ApplyUnifiedDiffStatus.Applied)) {
-		return ApplyUnifiedDiffStatus.Applied;
+	if (files.length > 0 && files.every(file => isTerminalUnifiedDiffStatus(file.status))) {
+		return files.some(file => file.status === ApplyUnifiedDiffStatus.Applied)
+			? ApplyUnifiedDiffStatus.Applied
+			: ApplyUnifiedDiffStatus.AlreadyApplied;
 	}
 	return fallbackStatus;
 }
@@ -714,7 +711,7 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 					return undefined;
 				}
 
-				const output = hydrateApplyOutputWithRequestTargets(rawOutput, targets);
+				const output = hydrateApplyOutputWithRequestTargets(rawOutput, requestTargets ?? []);
 				const viewOutput = options?.mergeOutput ? mergeApplyUnifiedDiffOutput(stateRef.current.output, output) : output;
 
 				deriveAndStoreTargets(viewOutput, targets);

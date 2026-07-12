@@ -52,6 +52,14 @@ const DEV_NULL = '/dev/null';
 const OPENAI_PATCH_FILE_HEADER_RE = /^\*\*\*\s+(Update|Add|Delete)\s+File:\s*(.+?)\s*$/i;
 const OPENAI_PATCH_MOVE_TO_RE = /^\*\*\*\s+Move\s+to:\s*(.+?)\s*$/i;
 
+/**
+ * Applied and already-applied are terminal, non-error outcomes. Callers must
+ * not let an older applicability `ok` flag override them.
+ */
+export function isTerminalUnifiedDiffStatus(status: unknown): boolean {
+	return status === ApplyUnifiedDiffStatus.Applied || status === ApplyUnifiedDiffStatus.AlreadyApplied;
+}
+
 export function isAbsolutePath(value: string | undefined | null): boolean {
 	const trimmed = value?.trim();
 

@@ -30,6 +30,7 @@ import {
 	getPathIdentity,
 	haveSharedPathIdentity,
 	isAbsolutePath,
+	isTerminalUnifiedDiffStatus,
 	mergeNumberMax,
 	summaryLabel,
 	toAbsolutePath,
@@ -515,6 +516,10 @@ function getTargetVisualState(
 	missing: boolean,
 	diagnostics: ApplyUnifiedDiffDiagnostic[] = []
 ): TargetVisualState {
+	if (isTerminalUnifiedDiffStatus(target.status)) {
+		return 'info';
+	}
+
 	if (
 		target.status === ApplyUnifiedDiffStatus.Conflict ||
 		target.status === ApplyUnifiedDiffStatus.Error ||
@@ -534,9 +539,6 @@ function getTargetVisualState(
 
 	if (target.status === ApplyUnifiedDiffStatus.Applicable) {
 		return 'success';
-	}
-	if (target.status === ApplyUnifiedDiffStatus.Applied || target.status === ApplyUnifiedDiffStatus.AlreadyApplied) {
-		return 'info';
 	}
 	if (diagnostics.some(diagnostic => diagnostic.level === ApplyUnifiedDiffDiagnosticLevel.Info)) {
 		return 'info';
@@ -653,6 +655,8 @@ export function DiffApplyModal({
 	const canApplyFromModal = hasAnyTargets && missingCount === 0 && !isRunning;
 	const patchDiagnosticCounts = getDiagnosticSeverityCounts(patchDiagnostics);
 	const blockedFileCount = Math.max(0, counts.blocked - counts.needsInfo);
+
+	const outputIsSuccessful = output?.ok === true || isTerminalUnifiedDiffStatus(output?.status);
 
 	const updateTarget = (index: number, targetPath: string) => {
 		const currentTarget = displayTargets[index];
@@ -816,10 +820,10 @@ export function DiffApplyModal({
 							<div className="flex items-start gap-2">
 								<span
 									className={`badge badge-outline badge-sm shrink-0 ${getBadgeToneClassName(
-										error ? 'error' : output?.ok ? 'success' : 'warning'
+										error ? 'error' : outputIsSuccessful ? 'success' : 'warning'
 									)}`}
 								>
-									{error ? 'Error' : output?.ok ? 'Ready' : 'Notice'}
+									{error ? 'Error' : outputIsSuccessful ? 'Ready' : 'Notice'}
 								</span>
 								<span className="min-w-0 leading-5">{error || output?.message}</span>
 							</div>

@@ -14,9 +14,17 @@ import { parseHTTPHeadersJSON, redactSensitiveHTTPHeaders } from '@/lib/http_inp
 import { omitManyKeys } from '@/lib/obj_utils';
 import { MessageEnterValidURL, validateUrlForInput } from '@/lib/url_utils';
 
+import { useDialogController } from '@/hooks/use_dialog_controller';
+
 import { Dropdown } from '@/components/dropdown';
 import { MANAGEMENT_MODAL_FORM_CLASS } from '@/components/managementui/management_class_consts';
+import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
+import { ManagementInfoRow } from '@/components/managementui/management_info_row';
+import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalField } from '@/components/modal/modal_field';
+import { ModalHeader } from '@/components/modal/modal_header';
+import { ModalSection } from '@/components/modal/modal_section';
 import { ReadOnlyValue } from '@/components/read_only_value';
 
 type ModalMode = 'add' | 'edit' | 'view';
@@ -116,11 +124,15 @@ function AddEditProviderPresetModalContent({
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [submitError, setSubmitError] = useState('');
 
-	const dialogRef = useRef<HTMLDialogElement | null>(null);
+	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
+		onClose,
+		blockCancel: !isReadOnly,
+		isBusy: isSubmitting,
+	});
+
 	const providerNameInputRef = useRef<HTMLInputElement | null>(null);
 	const displayNameInputRef = useRef<HTMLInputElement | null>(null);
 	const originInputRef = useRef<HTMLInputElement | null>(null);
-	const isUnmountingRef = useRef(false);
 
 	const prefillDropdownItems: Record<ProviderName, { isEnabled: boolean; displayName: string }> = useMemo(() => {
 		const out = {} as Record<ProviderName, { isEnabled: boolean; displayName: string }>;
@@ -157,19 +169,6 @@ function AddEditProviderPresetModalContent({
 	);
 
 	useEffect(() => {
-		const dialog = dialogRef.current;
-		if (!dialog) {
-			return;
-		}
-
-		if (!dialog.open) {
-			try {
-				dialog.showModal();
-			} catch {
-				// Ignore showModal errors and keep rendering safely.
-			}
-		}
-
 		const focusTimer = window.setTimeout(() => {
 			if (mode === 'add') {
 				providerNameInputRef.current?.focus();
@@ -179,36 +178,9 @@ function AddEditProviderPresetModalContent({
 		}, 0);
 
 		return () => {
-			isUnmountingRef.current = true;
 			window.clearTimeout(focusTimer);
-
-			if (dialog.open) {
-				dialog.close();
-			}
 		};
 	}, [isReadOnly, mode]);
-
-	const requestClose = useCallback(() => {
-		if (isSubmitting) {
-			return;
-		}
-
-		const dialog = dialogRef.current;
-
-		if (dialog?.open) {
-			dialog.close();
-			return;
-		}
-
-		onClose();
-	}, [isSubmitting, onClose]);
-
-	const handleDialogClose = () => {
-		if (isUnmountingRef.current) {
-			return;
-		}
-		onClose();
-	};
 
 	const validateField = useCallback(
 		(
@@ -520,13 +492,13 @@ function AddEditProviderPresetModalContent({
 		setIsSubmitting(true);
 		try {
 			await onSubmit(providerName, payload, apiKey);
-			requestClose();
+			requestClose(true);
 		} catch (error) {
-			if (!isUnmountingRef.current) {
+			if (!unmountingRef.current) {
 				setSubmitError(error instanceof Error && error.message.trim() ? error.message : 'Failed to save provider.');
 			}
 		} finally {
-			if (!isUnmountingRef.current) {
+			if (!unmountingRef.current) {
 				setIsSubmitting(false);
 			}
 		}
@@ -541,32 +513,25 @@ function AddEditProviderPresetModalContent({
 	const title = mode === 'add' ? 'Add Provider' : mode === 'edit' ? 'Edit Provider' : 'View Provider';
 
 	return (
-		<dialog
-			ref={dialogRef}
-			className="modal"
-			onClose={handleDialogClose}
-			onCancel={e => {
-				if (!isReadOnly || isSubmitting) {
-					e.preventDefault();
-				}
-			}}
-		>
-			<div className="modal-box bg-base-200 max-h-[80vh] max-w-4/5 overflow-hidden rounded-2xl p-0 xl:max-w-3/5">
-				<div className="max-h-[80vh] overflow-y-auto p-4 sm:p-6">
-					<div className="mb-4 flex items-center justify-between">
-						<h3 className="text-lg font-bold">{title}</h3>
-						<button
-							type="button"
-							className="btn btn-sm btn-circle bg-base-300"
-							onClick={requestClose}
-							aria-label="Close"
-							disabled={isSubmitting}
-						>
-							<FiX size={12} />
-						</button>
-					</div>
+		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
+			<div className="modal-box bg-base-200 flex max-h-[85vh] w-[calc(100%-1rem)] max-w-4xl flex-col overflow-hidden rounded-2xl p-0">
+				<ModalHeader
+					title={title}
+					description={
+						isReadOnly
+							? 'Inspect provider compatibility and connection settings.'
+							: 'Configure provider compatibility, endpoints, defaults, and credentials.'
+					}
+					onClose={() => {
+						requestClose();
+					}}
+					closeDisabled={isSubmitting}
+				/>
 
-					<form noValidate onSubmit={handleSubmit} className={MANAGEMENT_MODAL_FORM_CLASS}>
+				<form noValidate onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col" aria-busy={isSubmitting}>
+					<div
+						className={`app-scrollbar-thin min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 ${MANAGEMENT_MODAL_FORM_CLASS}`}
+					>
 						{submitError ? (
 							<div className="alert alert-error rounded-2xl text-sm" role="alert">
 								<div className="flex items-center gap-2">
@@ -585,108 +550,112 @@ function AddEditProviderPresetModalContent({
 						)}
 
 						{mode === 'add' && (
-							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3">
-									<span className="text-sm">Prefill from Existing</span>
-								</label>
+							<ModalSection
+								title="Copy an existing provider"
+								description="Copy endpoint and compatibility settings. API keys are never copied."
+							>
+								<div className="grid grid-cols-12 items-center gap-2">
+									<label className="label col-span-3">
+										<span className="text-sm">Prefill from Existing</span>
+									</label>
 
-								<div className="col-span-9 flex items-center gap-2">
-									{!prefillMode && (
-										<button
-											type="button"
-											className="btn btn-sm btn-ghost flex items-center rounded-xl"
-											onClick={() => {
-												setPrefillMode(true);
-											}}
-											disabled={isSubmitting || prefillKeys.length === 0}
-											title={prefillKeys.length === 0 ? 'No existing providers are available to copy.' : undefined}
-										>
-											<FiUpload size={14} />
-											<span className="ml-1">Copy Existing Provider</span>
-										</button>
-									)}
-
-									{prefillMode && (
-										<>
-											<Dropdown<ProviderName>
-												dropdownItems={prefillDropdownItems}
-												orderedKeys={prefillKeys}
-												selectedKey={selectedPrefillKey ?? ('' as ProviderName)}
-												onChange={key => {
-													setSelectedPrefillKey(key);
-													applyPrefill(key);
-													setPrefillMode(false);
-												}}
-												disabled={prefillKeys.length === 0}
-												filterDisabled={false}
-												title="Select provider to copy"
-												getDisplayName={k => prefillDropdownItems[k]?.displayName ?? 'Select provider to copy'}
-											/>
+									<div className="col-span-9 flex items-center gap-2">
+										{!prefillMode && (
 											<button
 												type="button"
-												className="btn btn-sm btn-ghost rounded-xl"
+												className="btn btn-sm btn-ghost flex items-center rounded-xl"
 												onClick={() => {
-													setPrefillMode(false);
-													setSelectedPrefillKey(null);
+													setPrefillMode(true);
 												}}
-												title="Cancel prefill"
-												disabled={isSubmitting}
+												disabled={isSubmitting || prefillKeys.length === 0}
+												title={prefillKeys.length === 0 ? 'No existing providers are available to copy.' : undefined}
 											>
-												<FiX size={12} />
+												<FiUpload size={14} />
+												<span className="ml-1">Copy Existing Provider</span>
 											</button>
-										</>
-									)}
+										)}
+
+										{prefillMode && (
+											<>
+												<Dropdown<ProviderName>
+													dropdownItems={prefillDropdownItems}
+													orderedKeys={prefillKeys}
+													selectedKey={selectedPrefillKey ?? ('' as ProviderName)}
+													onChange={key => {
+														setSelectedPrefillKey(key);
+														applyPrefill(key);
+														setPrefillMode(false);
+													}}
+													disabled={prefillKeys.length === 0}
+													filterDisabled={false}
+													title="Select provider to copy"
+													getDisplayName={k => prefillDropdownItems[k]?.displayName ?? 'Select provider to copy'}
+												/>
+												<button
+													type="button"
+													className="btn btn-sm btn-ghost rounded-xl"
+													onClick={() => {
+														setPrefillMode(false);
+														setSelectedPrefillKey(null);
+													}}
+													title="Cancel prefill"
+													disabled={isSubmitting}
+												>
+													<FiX size={12} />
+												</button>
+											</>
+										)}
+									</div>
 								</div>
-							</div>
+							</ModalSection>
 						)}
 
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
-								<span className="text-sm">SDK Type*</span>
-								<span
-									className="tooltip tooltip-right"
-									data-tip="Select the backend SDK/API compatibility for this provider."
-								>
-									<FiHelpCircle size={12} />
-								</span>
-							</label>
-							<div className="col-span-9">
-								{isReadOnly ? (
-									<ReadOnlyValue value={SDK_DISPLAY_NAME[formData.sdkType]} />
-								) : (
-									<Dropdown<ProviderSDKType>
-										dropdownItems={sdkDropdownItems}
-										selectedKey={formData.sdkType}
-										onChange={onSdkTypeChange}
-										filterDisabled={false}
-										title="Select SDK Type"
-										getDisplayName={k => sdkDropdownItems[k].displayName}
-									/>
-								)}
-								{errors.sdkType && (
-									<div className="label">
-										<span className="text-error flex items-center gap-1">
-											<FiAlertCircle size={12} /> {errors.sdkType}
-										</span>
-									</div>
-								)}
-							</div>
-						</div>
-
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
-								<span className="text-sm">Provider ID*</span>
-								{mode === 'add' && (
+						<ModalSection
+							title="Identity and compatibility"
+							description="Choose the compatible SDK before configuring the provider endpoint."
+						>
+							<div className="grid grid-cols-12 items-center gap-2">
+								<label className="label col-span-3">
+									<span className="text-sm">SDK Type*</span>
 									<span
 										className="tooltip tooltip-right"
-										data-tip="Unique identifier (letters, numbers, dash, underscore)."
+										data-tip="Select the backend SDK/API compatibility for this provider."
 									>
 										<FiHelpCircle size={12} />
 									</span>
-								)}
-							</label>
-							<div className="col-span-9">
+								</label>
+								<div className="col-span-9">
+									{isReadOnly ? (
+										<ReadOnlyValue value={SDK_DISPLAY_NAME[formData.sdkType]} />
+									) : (
+										<Dropdown<ProviderSDKType>
+											dropdownItems={sdkDropdownItems}
+											selectedKey={formData.sdkType}
+											onChange={onSdkTypeChange}
+											filterDisabled={false}
+											title="Select SDK Type"
+											getDisplayName={k => sdkDropdownItems[k].displayName}
+										/>
+									)}
+									{errors.sdkType && (
+										<div className="label">
+											<span className="text-error flex items-center gap-1">
+												<FiAlertCircle size={12} /> {errors.sdkType}
+											</span>
+										</div>
+									)}
+								</div>
+							</div>
+
+							<ModalField
+								label="Provider ID"
+								htmlFor="provider-id"
+								required
+								hint={mode === 'add' ? 'Unique identifier using letters, numbers, dashes, and underscores.' : undefined}
+								error={errors.providerName}
+							>
 								<input
+									id="provider-id"
 									ref={providerNameInputRef}
 									type="text"
 									name="providerName"
@@ -698,213 +667,234 @@ function AddEditProviderPresetModalContent({
 									autoComplete="off"
 									disabled={isSubmitting}
 								/>
-								{errors.providerName && (
-									<div className="label">
-										<span className="text-error flex items-center gap-1">
-											<FiAlertCircle size={12} /> {errors.providerName}
-										</span>
-									</div>
-								)}
-							</div>
-						</div>
+							</ModalField>
 
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
-								<span className="text-sm">Display Name*</span>
-							</label>
-							<div className="col-span-9">
-								<input
-									ref={displayNameInputRef}
-									type="text"
-									name="displayName"
-									value={formData.displayName}
-									onChange={handleInput}
-									className={`input w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
-									spellCheck="false"
-									autoComplete="off"
-									readOnly={isReadOnly}
-									disabled={isSubmitting}
-								/>
-								{errors.displayName && (
-									<div className="label">
-										<span className="text-error flex items-center gap-1">
-											<FiAlertCircle size={12} /> {errors.displayName}
-										</span>
-									</div>
-								)}
+							<div className="grid grid-cols-12 items-center gap-2">
+								<label className="label col-span-3">
+									<span className="text-sm">Display Name*</span>
+								</label>
+								<div className="col-span-9">
+									<input
+										ref={displayNameInputRef}
+										type="text"
+										name="displayName"
+										value={formData.displayName}
+										onChange={handleInput}
+										className={`input w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
+										spellCheck="false"
+										autoComplete="off"
+										readOnly={isReadOnly}
+										disabled={isSubmitting}
+									/>
+									{errors.displayName && (
+										<div className="label">
+											<span className="text-error flex items-center gap-1">
+												<FiAlertCircle size={12} /> {errors.displayName}
+											</span>
+										</div>
+									)}
+								</div>
 							</div>
-						</div>
+						</ModalSection>
 
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
-								<span className="text-sm">Origin*</span>
-							</label>
-							<div className="col-span-9">
-								<input
-									ref={originInputRef}
-									type="url"
-									name="origin"
-									value={formData.origin}
-									onChange={handleInput}
-									className={`input w-full rounded-xl ${errors.origin ? 'input-error' : ''}`}
-									spellCheck="false"
-									autoComplete="off"
-									placeholder="https://api.example.com OR api.example.com"
-									readOnly={isReadOnly}
-									disabled={isSubmitting}
-								/>
-								{errors.origin && (
-									<div className="label">
-										<span className="text-error flex items-center gap-1">
-											<FiAlertCircle size={12} /> {errors.origin}
-										</span>
-									</div>
-								)}
+						<ModalSection
+							title="Connection"
+							description="Configure the provider origin, chat endpoint path, and stable request headers."
+						>
+							<div className="grid grid-cols-12 items-center gap-2">
+								<label className="label col-span-3">
+									<span className="text-sm">Origin*</span>
+								</label>
+								<div className="col-span-9">
+									<input
+										ref={originInputRef}
+										type="url"
+										name="origin"
+										value={formData.origin}
+										onChange={handleInput}
+										className={`input w-full rounded-xl ${errors.origin ? 'input-error' : ''}`}
+										spellCheck="false"
+										autoComplete="off"
+										placeholder="https://api.example.com OR api.example.com"
+										readOnly={isReadOnly}
+										disabled={isSubmitting}
+									/>
+									{errors.origin && (
+										<div className="label">
+											<span className="text-error flex items-center gap-1">
+												<FiAlertCircle size={12} /> {errors.origin}
+											</span>
+										</div>
+									)}
+								</div>
 							</div>
-						</div>
 
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
-								<span className="text-sm">Chat Path*</span>
-								<span className="tooltip tooltip-right" data-tip="Endpoint path for chat completions.">
-									<FiHelpCircle size={12} />
-								</span>
-							</label>
-							<div className="col-span-9">
-								<input
-									type="text"
-									name="chatCompletionPathPrefix"
-									value={formData.chatCompletionPathPrefix}
-									onChange={handleInput}
-									className="input w-full rounded-xl"
-									spellCheck="false"
-									autoComplete="off"
-									readOnly={isReadOnly}
-									disabled={isSubmitting}
-								/>
-								{errors.chatCompletionPathPrefix && (
-									<div className="label">
-										<span className="text-error flex items-center gap-1">
-											<FiAlertCircle size={12} /> {errors.chatCompletionPathPrefix}
-										</span>
-									</div>
-								)}
-							</div>
-						</div>
-
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
-								<span className="text-sm">API-Key Header Key</span>
-							</label>
-							<div className="col-span-9">
-								<input
-									type="text"
-									name="apiKeyHeaderKey"
-									value={formData.apiKeyHeaderKey}
-									onChange={handleInput}
-									className="input w-full rounded-xl"
-									spellCheck="false"
-									autoComplete="off"
-									readOnly={isReadOnly}
-									disabled={isSubmitting}
-								/>
-							</div>
-						</div>
-
-						<div className="grid grid-cols-12 items-start gap-2">
-							<label className="label col-span-3">
-								<span className="text-sm">Default Headers (JSON)</span>
-							</label>
-							<div className="col-span-9">
-								<textarea
-									name="defaultHeadersRawJSON"
-									value={formData.defaultHeadersRawJSON}
-									onChange={handleInput}
-									className={`textarea h-24 w-full rounded-xl ${errors.defaultHeadersRawJSON ? 'textarea-error' : ''}`}
-									spellCheck="false"
-									readOnly={isReadOnly}
-									disabled={isSubmitting}
-								/>
-								{errors.defaultHeadersRawJSON && (
-									<div className="label">
-										<span className="text-error flex items-center gap-1">
-											<FiAlertCircle size={12} /> {errors.defaultHeadersRawJSON}
-										</span>
-									</div>
-								)}
-							</div>
-						</div>
-
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3 flex flex-col items-start gap-0.5">
-								<span className="text-sm">API-Key*</span>
-								{(mode === 'edit' || mode === 'view') && apiKeyAlreadySet && (
-									<span className="text-xs">
-										{mode === 'view' ? '(managed separately; not shown)' : '(leave blank to keep current)'}
+							<div className="grid grid-cols-12 items-center gap-2">
+								<label className="label col-span-3">
+									<span className="text-sm">Chat Path*</span>
+									<span className="tooltip tooltip-right" data-tip="Endpoint path for chat completions.">
+										<FiHelpCircle size={12} />
 									</span>
-								)}
-							</label>
-							<div className="col-span-9">
-								<input
-									type="password"
-									name="apiKey"
-									value={formData.apiKey}
-									onChange={handleInput}
-									className={`input w-full rounded-xl ${errors.apiKey ? 'input-error' : ''}`}
-									placeholder={(mode === 'edit' || mode === 'view') && apiKeyAlreadySet ? '********' : ''}
-									spellCheck="false"
-									autoComplete="new-password"
-									readOnly={isReadOnly}
-									disabled={isSubmitting}
-								/>
-								{errors.apiKey && (
-									<div className="label">
-										<span className="text-error flex items-center gap-1">
-											<FiAlertCircle size={12} /> {errors.apiKey}
+								</label>
+								<div className="col-span-9">
+									<input
+										type="text"
+										name="chatCompletionPathPrefix"
+										value={formData.chatCompletionPathPrefix}
+										onChange={handleInput}
+										className="input w-full rounded-xl"
+										spellCheck="false"
+										autoComplete="off"
+										readOnly={isReadOnly}
+										disabled={isSubmitting}
+									/>
+									{errors.chatCompletionPathPrefix && (
+										<div className="label">
+											<span className="text-error flex items-center gap-1">
+												<FiAlertCircle size={12} /> {errors.chatCompletionPathPrefix}
+											</span>
+										</div>
+									)}
+								</div>
+							</div>
+
+							<div className="grid grid-cols-12 items-center gap-2">
+								<label className="label col-span-3">
+									<span className="text-sm">API-Key Header Key</span>
+								</label>
+								<div className="col-span-9">
+									<input
+										type="text"
+										name="apiKeyHeaderKey"
+										value={formData.apiKeyHeaderKey}
+										onChange={handleInput}
+										className="input w-full rounded-xl"
+										spellCheck="false"
+										autoComplete="off"
+										readOnly={isReadOnly}
+										disabled={isSubmitting}
+									/>
+								</div>
+							</div>
+
+							<div className="grid grid-cols-12 items-start gap-2">
+								<label className="label col-span-3">
+									<span className="text-sm">Default Headers (JSON)</span>
+								</label>
+								<div className="col-span-9">
+									<textarea
+										name="defaultHeadersRawJSON"
+										value={formData.defaultHeadersRawJSON}
+										onChange={handleInput}
+										className={`textarea h-24 w-full rounded-xl ${errors.defaultHeadersRawJSON ? 'textarea-error' : ''}`}
+										spellCheck="false"
+										readOnly={isReadOnly}
+										disabled={isSubmitting}
+									/>
+									{errors.defaultHeadersRawJSON && (
+										<div className="label">
+											<span className="text-error flex items-center gap-1">
+												<FiAlertCircle size={12} /> {errors.defaultHeadersRawJSON}
+											</span>
+										</div>
+									)}
+								</div>
+							</div>
+						</ModalSection>
+
+						<ModalSection
+							title="Security and availability"
+							description="Provider API keys remain write-only. Leaving an existing key blank preserves it."
+						>
+							<div className="grid grid-cols-12 items-center gap-2">
+								<label className="label col-span-3 flex flex-col items-start gap-0.5">
+									<span className="text-sm">API-Key*</span>
+									{(mode === 'edit' || mode === 'view') && apiKeyAlreadySet && (
+										<span className="text-xs">
+											{mode === 'view' ? '(managed separately; not shown)' : '(leave blank to keep current)'}
 										</span>
-									</div>
-								)}
+									)}
+								</label>
+								<div className="col-span-9">
+									<input
+										type="password"
+										name="apiKey"
+										value={formData.apiKey}
+										onChange={handleInput}
+										className={`input w-full rounded-xl ${errors.apiKey ? 'input-error' : ''}`}
+										placeholder={(mode === 'edit' || mode === 'view') && apiKeyAlreadySet ? '********' : ''}
+										spellCheck="false"
+										autoComplete="new-password"
+										readOnly={isReadOnly}
+										disabled={isSubmitting}
+									/>
+									{errors.apiKey && (
+										<div className="label">
+											<span className="text-error flex items-center gap-1">
+												<FiAlertCircle size={12} /> {errors.apiKey}
+											</span>
+										</div>
+									)}
+								</div>
 							</div>
-						</div>
 
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3 cursor-pointer">
-								<span className="text-sm">Enabled</span>
-							</label>
-							<div className="col-span-9">
-								<input
-									type="checkbox"
-									name="isEnabled"
-									checked={formData.isEnabled}
-									onChange={handleInput}
-									className="toggle toggle-accent"
-									disabled={isReadOnly || isSubmitting}
-								/>
+							<div className="grid grid-cols-12 items-center gap-2">
+								<label className="label col-span-3 cursor-pointer">
+									<span className="text-sm">Enabled</span>
+								</label>
+								<div className="col-span-9">
+									<input
+										type="checkbox"
+										name="isEnabled"
+										checked={formData.isEnabled}
+										onChange={handleInput}
+										className="toggle toggle-accent"
+										disabled={isReadOnly || isSubmitting}
+									/>
+								</div>
 							</div>
-						</div>
+						</ModalSection>
 
-						<div className="modal-action">
+						{isReadOnly && initialPreset ? (
+							<ModalSection title="Metadata">
+								<ManagementInfoGrid>
+									<ManagementInfoRow label="Provider ID" mono>
+										{initialPreset.name}
+									</ManagementInfoRow>
+									<ManagementInfoRow label="Built-in">{initialPreset.isBuiltIn ? 'Yes' : 'No'}</ManagementInfoRow>
+									<ManagementInfoRow label="Default model" mono>
+										{initialPreset.defaultModelPresetID || '—'}
+									</ManagementInfoRow>
+									<ManagementInfoRow label="Created">{initialPreset.createdAt}</ManagementInfoRow>
+									<ManagementInfoRow label="Modified">{initialPreset.modifiedAt}</ManagementInfoRow>
+								</ManagementInfoGrid>
+							</ModalSection>
+						) : null}
+					</div>
+
+					<ModalActions>
+						<button
+							type="button"
+							className="btn bg-base-300 rounded-xl"
+							onClick={() => {
+								requestClose();
+							}}
+							disabled={isSubmitting}
+						>
+							{isReadOnly ? 'Close' : 'Cancel'}
+						</button>
+
+						{!isReadOnly && (
 							<button
-								type="button"
-								className="btn bg-base-300 rounded-xl"
-								onClick={requestClose}
-								disabled={isSubmitting}
+								type="submit"
+								className="btn btn-primary rounded-xl"
+								disabled={!allValid || (mode === 'edit' && !hasEffectiveChanges) || isSubmitting}
 							>
-								{isReadOnly ? 'Close' : 'Cancel'}
+								{isSubmitting ? 'Saving…' : mode === 'add' ? 'Add Provider' : 'Save'}
 							</button>
-
-							{!isReadOnly && (
-								<button
-									type="submit"
-									className="btn btn-primary rounded-xl"
-									disabled={!allValid || (mode === 'edit' && !hasEffectiveChanges) || isSubmitting}
-								>
-									{isSubmitting ? 'Saving…' : mode === 'add' ? 'Add Provider' : 'Save'}
-								</button>
-							)}
-						</div>
-					</form>
-				</div>
+						)}
+					</ModalActions>
+				</form>
 			</div>
 			<ModalBackdrop enabled={isReadOnly} />
 		</dialog>
