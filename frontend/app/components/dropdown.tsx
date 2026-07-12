@@ -1,9 +1,9 @@
-import type { SyntheticEvent } from 'react';
-import { useRef, useState } from 'react';
+import type { CSSProperties, SyntheticEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+
+import { createPortal } from 'react-dom';
 
 import { FiCheck, FiChevronDown, FiChevronUp } from 'react-icons/fi';
-
-import { useCloseDetails } from '@/hooks/use_close_details';
 
 /**
  * @public
@@ -63,16 +63,18 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 	} = props;
 
 	const [isOpen, setIsOpen] = useState(false);
+	const [floatingStyle, setFloatingStyle] = useState<CSSProperties | null>(null);
 	const detailsRef = useRef<HTMLDetailsElement>(null);
+	const summaryRef = useRef<HTMLElement>(null);
+	const menuRef = useRef<HTMLUListElement>(null);
 
-	// Close the details dropdown if the user clicks outside.
-	useCloseDetails({
-		detailsRef,
-		events: ['mousedown'],
-		onClose: () => {
-			setIsOpen(false);
-		},
-	});
+	const closeMenu = useCallback(() => {
+		if (detailsRef.current) {
+			detailsRef.current.open = false;
+		}
+		setIsOpen(false);
+		setFloatingStyle(null);
+	}, []);
 
 	const handleSelection = (key: K) => {
 		const item = dropdownItems[key];
@@ -80,16 +82,82 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 			return;
 		}
 		onChange(key);
-		if (detailsRef.current) {
-			// Force-close the details dropdown.
-			detailsRef.current.open = false;
-		}
-		setIsOpen(false);
+		closeMenu();
 	};
 
-	// Helper function to derive display name:
-	// 1. Use the consumer's getDisplayName callback if provided
-	// 2. Otherwise, fall back to the key itself.
+	const updateFloatingPosition = useCallback(() => {
+		if (inlineMenu || !isOpen || !summaryRef.current || typeof window === 'undefined') {
+			return;
+		}
+
+		const rect = summaryRef.current.getBoundingClientRect();
+		const viewportPadding = 8;
+		const menuGap = 6;
+		const requestedHeight = typeof maxMenuHeight === 'number' ? maxMenuHeight : 300;
+		const spaceBelow = window.innerHeight - rect.bottom - viewportPadding - menuGap;
+		const spaceAbove = rect.top - viewportPadding - menuGap;
+		const openAbove = spaceBelow < Math.min(180, requestedHeight) && spaceAbove > spaceBelow;
+		const availableHeight = Math.max(120, openAbove ? spaceAbove : spaceBelow);
+		const width = Math.min(Math.max(rect.width, 220), window.innerWidth - viewportPadding * 2);
+		const left = Math.min(
+			Math.max(viewportPadding, rect.left),
+			Math.max(viewportPadding, window.innerWidth - width - viewportPadding)
+		);
+
+		setFloatingStyle({
+			position: 'fixed',
+			left,
+			width,
+			top: openAbove ? undefined : rect.bottom + menuGap,
+			bottom: openAbove ? window.innerHeight - rect.top + menuGap : undefined,
+			maxHeight: Math.min(requestedHeight, availableHeight),
+			zIndex: 1000,
+		});
+	}, [inlineMenu, isOpen, maxMenuHeight]);
+
+	useLayoutEffect(() => {
+		updateFloatingPosition();
+	}, [updateFloatingPosition]);
+
+	useEffect(() => {
+		if (!isOpen) {
+			return;
+		}
+
+		const handleOutsideInteraction = (event: MouseEvent | FocusEvent) => {
+			const target = event.target;
+			if (!(target instanceof Node)) {
+				return;
+			}
+			if (detailsRef.current?.contains(target) || menuRef.current?.contains(target)) {
+				return;
+			}
+			closeMenu();
+		};
+
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.key === 'Escape') {
+				event.preventDefault();
+				closeMenu();
+				summaryRef.current?.focus();
+			}
+		};
+
+		document.addEventListener('mousedown', handleOutsideInteraction);
+		document.addEventListener('focusin', handleOutsideInteraction);
+		document.addEventListener('keydown', handleKeyDown);
+		window.addEventListener('resize', updateFloatingPosition);
+		document.addEventListener('scroll', updateFloatingPosition, true);
+
+		return () => {
+			document.removeEventListener('mousedown', handleOutsideInteraction);
+			document.removeEventListener('focusin', handleOutsideInteraction);
+			document.removeEventListener('keydown', handleKeyDown);
+			window.removeEventListener('resize', updateFloatingPosition);
+			document.removeEventListener('scroll', updateFloatingPosition, true);
+		};
+	}, [closeMenu, isOpen, updateFloatingPosition]);
+
 	const getItemDisplayName = (key: K) => {
 		if (typeof getDisplayName === 'function') {
 			return getDisplayName(key);
@@ -97,7 +165,6 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 		return key;
 	};
 
-	// We can optionally filter out disabled items, unless they are already selected.
 	const sourceKeys = (orderedKeys ?? (Object.keys(dropdownItems) as K[])).filter(
 		key => dropdownItems[key] !== undefined
 	);
@@ -110,14 +177,62 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 		if (!filterDisabled) {
 			return true;
 		}
-		// If the item is enabled or it is the selected key, we keep it.
 		return item.isEnabled || typedKey === selectedKey;
 	});
+
+	const menu = (
+		<ul
+			ref={menuRef}
+			role="listbox"
+			aria-label={title}
+			className={`menu border-neutral/20 bg-base-300 flex w-full flex-col flex-nowrap overflow-x-hidden overflow-y-auto rounded-2xl border shadow-lg ${
+				inlineMenu ? 'mt-2' : ''
+			}`}
+			style={
+				inlineMenu
+					? {
+							maxHeight: typeof maxMenuHeight === 'number' ? `${maxMenuHeight}px` : maxMenuHeight,
+						}
+					: (floatingStyle ?? undefined)
+			}
+		>
+			{filteredKeys.map(key => {
+				const item = dropdownItems[key];
+				const isItemDisabled = disabled || !item?.isEnabled;
+
+				return (
+					<li key={key} className="w-full">
+						<button
+							type="button"
+							role="option"
+							aria-selected={key === selectedKey}
+							disabled={isItemDisabled}
+							className="m-1 flex w-[calc(100%-0.5rem)] min-w-0 items-center justify-between gap-2 rounded-xl p-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
+							onClick={() => {
+								handleSelection(key);
+							}}
+						>
+							<span className="min-w-0 truncate">{getItemDisplayName(key)}</span>
+							{key === selectedKey ? <FiCheck className="shrink-0" /> : null}
+						</button>
+					</li>
+				);
+			})}
+
+			{filteredKeys.length === 0 ? (
+				<li className="text-base-content/60 px-3 py-2 text-sm">{placeholderLabel}</li>
+			) : null}
+		</ul>
+	);
+
+	const portalTarget =
+		// oxlint-disable-next-line jsreact-hooks/refs
+		typeof document !== 'undefined' ? (detailsRef.current?.closest('dialog') ?? document.body) : null;
 
 	return (
 		<details
 			ref={detailsRef}
-			className={`${inlineMenu ? 'relative' : 'dropdown relative'} w-full`}
+			className="relative w-full"
 			onToggle={(event: SyntheticEvent<HTMLElement>) => {
 				const details = event.currentTarget as HTMLDetailsElement;
 				if (disabled && details.open) {
@@ -126,13 +241,19 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 					return;
 				}
 				setIsOpen(details.open);
+				if (!details.open) {
+					setFloatingStyle(null);
+				}
 			}}
 		>
 			<summary
+				ref={summaryRef}
 				className={`btn border-neutral/20 bg-base-200 flex w-full items-center justify-between rounded-2xl px-4 py-2 text-left shadow-none ${
 					disabled ? 'cursor-default opacity-70' : 'cursor-pointer'
 				}`}
 				title={title}
+				aria-expanded={isOpen}
+				aria-haspopup="listbox"
 				onClick={event => {
 					if (disabled) {
 						event.preventDefault();
@@ -146,45 +267,8 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 				{isOpen ? <FiChevronUp size={16} /> : <FiChevronDown size={16} />}
 			</summary>
 
-			{(!inlineMenu || isOpen) && (
-				<ul
-					tabIndex={0}
-					className={`menu border-neutral/20 bg-base-300 flex w-full flex-col flex-nowrap overflow-x-hidden overflow-y-auto rounded-2xl shadow-sm ${
-						inlineMenu ? 'mt-2 border' : 'z-50'
-					}`}
-					style={{
-						maxHeight: typeof maxMenuHeight === 'number' ? `${maxMenuHeight}px` : maxMenuHeight,
-					}}
-				>
-					{filteredKeys.map(key => {
-						const item = dropdownItems[key];
-						const isItemDisabled = disabled || !item?.isEnabled;
-
-						return (
-							<li
-								key={key}
-								className={`w-full rounded-2xl ${isItemDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
-								onClick={() => {
-									if (!isItemDisabled) {
-										handleSelection(key);
-									}
-								}}
-							>
-								<a
-									className="m-1 flex items-center justify-between p-2"
-									aria-disabled={isItemDisabled}
-									onClick={event => {
-										event.preventDefault();
-									}}
-								>
-									<span className="truncate">{getItemDisplayName(key)}</span>
-									{key === selectedKey && <FiCheck />}
-								</a>
-							</li>
-						);
-					})}
-				</ul>
-			)}
+			{inlineMenu && isOpen ? menu : null}
+			{!inlineMenu && isOpen && floatingStyle && portalTarget ? createPortal(menu, portalTarget) : null}
 		</details>
 	);
 };

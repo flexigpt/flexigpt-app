@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 
 import {
-	FiCheck,
 	FiCheckCircle,
 	FiChevronDown,
 	FiChevronUp,
@@ -10,7 +9,6 @@ import {
 	FiKey,
 	FiPlus,
 	FiTrash2,
-	FiX,
 	FiXCircle,
 } from 'react-icons/fi';
 
@@ -29,6 +27,7 @@ import { AuthKeyTypeProvider } from '@/spec/setting';
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 import { Dropdown } from '@/components/dropdown';
+import { ActionRow, ManagementItemCard, MetadataPill, StatusBadge } from '@/components/management_ui';
 
 import { AddEditModelPresetModal } from '@/modelpresets/modelpreset_add_edit_modal';
 import { AddEditAuthKeyModal } from '@/settings/authkey_add_edit_modal';
@@ -431,85 +430,100 @@ export function ProviderPresetCard({
 						</div>
 
 						{hasModels && (
-							<table className="table-zebra table w-full">
-								<thead>
-									<tr className="bg-base-300 text-sm font-semibold">
-										<th>Model Preset Label</th>
-										<th>Model Name</th>
-										<th className="text-center">Enabled</th>
-										<th className="text-center">Reasoning</th>
-										<th className="text-center">Actions</th>
-									</tr>
-								</thead>
+							<div className="border-base-content/10 space-y-3 border-t p-3">
+								{modelEntries.map(([id, modelPreset]) => {
+									const canModify = !modelPreset.isBuiltIn;
+									const isDefault = id === defaultModelPresetID;
 
-								<tbody>
-									{modelEntries.map(([id, modelPreset]) => {
-										const canModify = !modelPreset.isBuiltIn;
-										return (
-											<tr key={id} className="hover:bg-base-300">
-												<td>{modelPreset.displayName || id}</td>
-												<td>{modelPreset.name}</td>
-												<td className="text-center">
-													<input
-														type="checkbox"
-														className="toggle toggle-accent"
-														checked={modelPreset.isEnabled}
-														onChange={() => {
-															toggleModelEnable(id);
-														}}
-													/>
-												</td>
-												<td className="text-center">
-													{'reasoning' in modelPreset && modelPreset.reasoning ? (
-														<FiCheck className="mx-auto" />
-													) : (
-														<FiX className="mx-auto" />
-													)}
-												</td>
-												<td className="space-x-1 text-center">
-													<button
-														type="button"
-														className="btn btn-sm btn-ghost rounded-2xl"
-														onClick={() => {
-															openViewModel(id);
-														}}
-														title="View Model Preset"
-													>
-														<FiEye size={16} />
-													</button>
+									return (
+										<ManagementItemCard
+											key={id}
+											title={modelPreset.displayName || id}
+											subtitle={`${id} · ${modelPreset.name}`}
+											status={
+												<>
+													<StatusBadge tone={modelPreset.isEnabled ? 'success' : 'neutral'}>
+														{modelPreset.isEnabled ? 'Enabled' : 'Disabled'}
+													</StatusBadge>
+													{isDefault ? <StatusBadge tone="info">Default</StatusBadge> : null}
+												</>
+											}
+											metadata={
+												<>
+													<MetadataPill label="Reasoning">
+														{modelPreset.reasoning ? 'Supported' : 'Not configured'}
+													</MetadataPill>
+													<MetadataPill label="Stream">{modelPreset.stream ? 'On' : 'Off'}</MetadataPill>
+													<MetadataPill label="Prompt">{modelPreset.maxPromptLength ?? 'Default'}</MetadataPill>
+													<MetadataPill label="Output">{modelPreset.maxOutputLength ?? 'Default'}</MetadataPill>
+													{modelPreset.isBuiltIn ? <MetadataPill>Built-in</MetadataPill> : null}
+												</>
+											}
+										>
+											<ActionRow
+												leading={
+													<>
+														<label htmlFor={`model-enabled-${provider}-${id}`} className="text-sm">
+															Enabled
+														</label>
+														<input
+															id={`model-enabled-${provider}-${id}`}
+															type="checkbox"
+															className="toggle toggle-accent toggle-sm"
+															checked={modelPreset.isEnabled}
+															onChange={() => {
+																toggleModelEnable(id);
+															}}
+															aria-label={`Enable ${modelPreset.displayName || id}`}
+														/>
+													</>
+												}
+											>
+												<button
+													type="button"
+													className="btn btn-sm btn-ghost rounded-xl"
+													onClick={() => {
+														openViewModel(id);
+													}}
+													title="View Model Preset"
+												>
+													<FiEye size={16} />
+													<span>View</span>
+												</button>
 
-													{canModify ? (
-														<>
-															<button
-																type="button"
-																className="btn btn-sm btn-ghost rounded-2xl"
-																onClick={() => {
-																	openEditOrViewModel(id);
-																}}
-																title="Edit Model Preset"
-															>
-																<FiEdit2 size={16} />
-															</button>
-															<button
-																type="button"
-																className="btn btn-sm btn-ghost rounded-2xl"
-																onClick={() => {
-																	requestDeleteModel(id);
-																}}
-																title="Delete Model Preset"
-															>
-																<FiTrash2 size={16} />
-															</button>
-														</>
-													) : (
-														<span className="ml-2 text-xs opacity-50">Built-in</span>
-													)}
-												</td>
-											</tr>
-										);
-									})}
-								</tbody>
-							</table>
+												{canModify ? (
+													<>
+														<button
+															type="button"
+															className="btn btn-sm btn-ghost rounded-xl"
+															onClick={() => {
+																openEditOrViewModel(id);
+															}}
+															title="Edit Model Preset"
+														>
+															<FiEdit2 size={16} />
+															<span>Edit</span>
+														</button>
+														<button
+															type="button"
+															className="btn btn-sm btn-ghost rounded-xl"
+															onClick={() => {
+																requestDeleteModel(id);
+															}}
+															title="Delete Model Preset"
+														>
+															<FiTrash2 size={16} />
+															<span>Delete</span>
+														</button>
+													</>
+												) : (
+													<span className="text-base-content/60 px-2 text-xs">Read only</span>
+												)}
+											</ActionRow>
+										</ManagementItemCard>
+									);
+								})}
+							</div>
 						)}
 					</div>
 				</div>

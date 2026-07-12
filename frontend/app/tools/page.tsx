@@ -257,16 +257,9 @@ export default function ToolsPage() {
 	};
 
 	const handleAddBundle = async (slug: string, display: string, description?: string) => {
-		try {
-			const id = getUUIDv7();
-			await toolStoreAPI.putToolBundle(id, slug, display, true, description);
-			setIsAddModalOpen(false);
-			await fetchAll(true);
-		} catch (err) {
-			console.error('Add tool bundle failed:', err);
-			setAlertMsg('Failed to add tool bundle.');
-			setShowAlert(true);
-		}
+		const id = getUUIDv7();
+		await toolStoreAPI.putToolBundle(id, slug, display, true, description);
+		await fetchAll(true);
 	};
 
 	if (bundles === undefined) {

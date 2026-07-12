@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
-import { FiAlertCircle, FiCheck, FiX } from 'react-icons/fi';
+import { FiAlertCircle, FiX } from 'react-icons/fi';
 
 import type {
 	MCPAuthHealth,
@@ -15,6 +15,7 @@ import type {
 	MCPServerRuntimeSnapshot,
 	MCPToolCapability,
 } from '@/spec/mcp';
+import { MCPToolRisk } from '@/spec/mcp';
 
 import {
 	getAllMCPServerPrompts,
@@ -23,6 +24,7 @@ import {
 	getAllMCPServerTools,
 } from '@/apis/list_helper';
 
+import { ManagementItemCard, MetadataPill, StatusBadge } from '@/components/management_ui';
 import { ModalBackdrop } from '@/components/modal_backdrop';
 
 import {
@@ -32,7 +34,6 @@ import {
 	getMCPServerAuthHealthLabel,
 	getMCPStatusBadgeClass,
 	getMCPStatusLabel,
-	getMCPToolRiskBadgeClass,
 	getMCPToolRiskLabel,
 	getMCPTransportLabel,
 } from '@/mcpservers/lib/mcp_server_utils';
@@ -103,19 +104,15 @@ function ArgumentSummary({ args }: { args?: Record<string, { required?: boolean;
 	}
 
 	return (
-		<div className="flex flex-wrap justify-center gap-1">
+		<div className="flex flex-wrap gap-1">
 			{Object.entries(args).map(([name, def]) => {
 				const required = typeof def === 'object' && Boolean(def.required);
 				const description = typeof def === 'object' ? def.description : def;
 				return (
-					<span
-						key={name}
-						className={`badge badge-xs rounded-xl ${required ? 'badge-warning' : 'badge-ghost'}`}
-						title={description}
-					>
+					<MetadataPill key={name} title={description}>
 						{name}
 						{required ? '*' : ''}
-					</span>
+					</MetadataPill>
 				);
 			})}
 		</div>
@@ -335,185 +332,124 @@ function MCPServerDetailsModalContent({
 					<div className="space-y-6">
 						<div>
 							<h4 className="mb-2 text-sm font-semibold">Tools ({discovery.tools.length})</h4>
-							<div className="border-base-content/10 overflow-x-auto rounded-2xl border">
-								<table className="table-zebra table w-full">
-									<thead>
-										<tr className="bg-base-300 text-sm font-semibold">
-											<th>Display Name</th>
-											<th className="text-center">Name</th>
-											<th className="text-center">Risk</th>
-											<th className="text-center">Approval</th>
-											<th className="text-center">Execution</th>
-											<th className="text-center">Enabled</th>
-											<th className="text-center">App</th>
+							<div className="space-y-3">
+								{discovery.tools.map(tool => (
+									<ManagementItemCard
+										key={`${tool.serverID}:${tool.toolName}:${tool.digest}`}
+										title={tool.displayName || tool.title || tool.toolName}
+										subtitle={tool.toolName}
+										description={tool.description}
+										status={
+											<>
+												<StatusBadge tone={tool.enabled ? 'success' : 'neutral'}>
+													{tool.enabled ? 'Enabled' : 'Disabled'}
+												</StatusBadge>
+												<StatusBadge
+													tone={
+														tool.inferredRisk === MCPToolRisk.MCPToolRiskRead
+															? 'success'
+															: tool.inferredRisk === MCPToolRisk.MCPToolRiskWrite
+																? 'warning'
+																: 'error'
+													}
+												>
+													{getMCPToolRiskLabel(tool.inferredRisk)}
+												</StatusBadge>
+											</>
+										}
+										metadata={
+											<>
+												<MetadataPill label="Approval">{getMCPApprovalRuleLabel(tool.approvalRule)}</MetadataPill>
+												<MetadataPill label="Execution">{getMCPExecutionModeLabel(tool.executionMode)}</MetadataPill>
+												{tool.app?.resourceUri ? (
+													<MetadataPill label="App" title={tool.app.resourceUri}>
+														Configured
+													</MetadataPill>
+												) : null}
+												{tool.stale ? <MetadataPill>Stale discovery</MetadataPill> : null}
+											</>
+										}
+									/>
+								))}
 
-											<th className="text-center">Stale</th>
-										</tr>
-									</thead>
-									<tbody>
-										{discovery.tools.map(tool => (
-											<tr key={`${tool.serverID}:${tool.toolName}:${tool.digest}`}>
-												<td>
-													<div>{tool.displayName || tool.title || tool.toolName}</div>
-													{tool.description && (
-														<div className="text-base-content/70 max-w-xl text-xs">{tool.description}</div>
-													)}
-												</td>
-												<td className="text-center">{tool.toolName}</td>
-												<td className="text-center">
-													<div className={`badge rounded-xl ${getMCPToolRiskBadgeClass(tool.inferredRisk)}`}>
-														<div className="p-1 text-xs text-nowrap">{getMCPToolRiskLabel(tool.inferredRisk)}</div>
-													</div>
-												</td>
-												<td className="text-center">{getMCPApprovalRuleLabel(tool.approvalRule)}</td>
-												<td className="text-center">{getMCPExecutionModeLabel(tool.executionMode)}</td>
-												<td className="text-center">
-													{tool.enabled ? <FiCheck className="mx-auto" /> : <FiX className="mx-auto" />}
-												</td>
-												<td className="text-center">
-													{tool.app?.resourceUri ? (
-														<span
-															className="badge badge-info badge-xs rounded-xl"
-															title={`${tool.app.resourceUri}\nVisibility: ${(tool.app.visibility ?? []).join(', ')}`}
-														>
-															App
-														</span>
-													) : (
-														'-'
-													)}
-												</td>
-												<td className="text-center">
-													{tool.stale ? <FiCheck className="mx-auto" /> : <FiX className="mx-auto" />}
-												</td>
-											</tr>
-										))}
-
-										{discovery.tools.length === 0 && (
-											<tr>
-												<td colSpan={8} className="py-3 text-center text-sm">
-													No tools discovered.
-												</td>
-											</tr>
-										)}
-									</tbody>
-								</table>
+								{discovery.tools.length === 0 ? (
+									<div className="border-base-content/10 rounded-2xl border py-6 text-center text-sm">
+										No tools discovered.
+									</div>
+								) : null}
 							</div>
 						</div>
 
 						<div>
 							<h4 className="mb-2 text-sm font-semibold">Resources ({discovery.resources.length})</h4>
-							<div className="border-base-content/10 overflow-x-auto rounded-2xl border">
-								<table className="table-zebra table w-full">
-									<thead>
-										<tr className="bg-base-300 text-sm font-semibold">
-											<th>Display Name</th>
-											<th>URI</th>
-											<th className="text-center">MIME</th>
-										</tr>
-									</thead>
-									<tbody>
-										{discovery.resources.map(resource => (
-											<tr key={`${resource.serverID}:${resource.uri}:${resource.digest ?? ''}`}>
-												<td>
-													<div>{resource.displayName}</div>
-													{resource.description && (
-														<div className="text-base-content/70 max-w-xl text-xs">{resource.description}</div>
-													)}
-												</td>
-												<td className="max-w-lg break-all">{resource.uri}</td>
-												<td className="text-center">{resource.mimeType || '-'}</td>
-											</tr>
-										))}
+							<div className="space-y-3">
+								{discovery.resources.map(resource => (
+									<ManagementItemCard
+										key={`${resource.serverID}:${resource.uri}:${resource.digest ?? ''}`}
+										title={resource.displayName || resource.name || resource.uri}
+										subtitle={resource.uri}
+										description={resource.description}
+										metadata={
+											<>
+												<MetadataPill label="MIME">{resource.mimeType || 'Unknown'}</MetadataPill>
+												{resource.size !== undefined ? <MetadataPill label="Size">{resource.size}</MetadataPill> : null}
+											</>
+										}
+									/>
+								))}
 
-										{discovery.resources.length === 0 && (
-											<tr>
-												<td colSpan={3} className="py-3 text-center text-sm">
-													No resources discovered.
-												</td>
-											</tr>
-										)}
-									</tbody>
-								</table>
+								{discovery.resources.length === 0 ? (
+									<div className="border-base-content/10 rounded-2xl border py-6 text-center text-sm">
+										No resources discovered.
+									</div>
+								) : null}
 							</div>
 						</div>
 
 						<div>
 							<h4 className="mb-2 text-sm font-semibold">Resource Templates ({discovery.resourceTemplates.length})</h4>
-							<div className="border-base-content/10 overflow-x-auto rounded-2xl border">
-								<table className="table-zebra table w-full">
-									<thead>
-										<tr className="bg-base-300 text-sm font-semibold">
-											<th>Display Name</th>
-											<th>URI Template</th>
-											<th className="text-center">MIME</th>
-											<th className="text-center">Arguments</th>
-										</tr>
-									</thead>
-									<tbody>
-										{discovery.resourceTemplates.map(template => (
-											<tr key={`${template.serverID}:${template.uriTemplate}:${template.digest ?? ''}`}>
-												<td>
-													<div>{template.displayName}</div>
-													{template.description && (
-														<div className="text-base-content/70 max-w-xl text-xs">{template.description}</div>
-													)}
-												</td>
-												<td className="max-w-lg break-all">{template.uriTemplate}</td>
-												<td className="text-center">{template.mimeType || '-'}</td>
-												<td className="text-center">
-													<ArgumentSummary args={template.arguments} />
-												</td>
-											</tr>
-										))}
+							<div className="space-y-3">
+								{discovery.resourceTemplates.map(template => (
+									<ManagementItemCard
+										key={`${template.serverID}:${template.uriTemplate}:${template.digest ?? ''}`}
+										title={template.displayName || template.name || template.uriTemplate}
+										subtitle={template.uriTemplate}
+										description={template.description}
+										metadata={
+											<>
+												<MetadataPill label="MIME">{template.mimeType || 'Unknown'}</MetadataPill>
+												<ArgumentSummary args={template.arguments} />
+											</>
+										}
+									/>
+								))}
 
-										{discovery.resourceTemplates.length === 0 && (
-											<tr>
-												<td colSpan={4} className="py-3 text-center text-sm">
-													No resource templates discovered.
-												</td>
-											</tr>
-										)}
-									</tbody>
-								</table>
+								{discovery.resourceTemplates.length === 0 ? (
+									<div className="border-base-content/10 rounded-2xl border py-6 text-center text-sm">
+										No resource templates discovered.
+									</div>
+								) : null}
 							</div>
 						</div>
 
 						<div>
 							<h4 className="mb-2 text-sm font-semibold">Prompts ({discovery.prompts.length})</h4>
-							<div className="border-base-content/10 overflow-x-auto rounded-2xl border">
-								<table className="table-zebra table w-full">
-									<thead>
-										<tr className="bg-base-300 text-sm font-semibold">
-											<th>Display Name</th>
-											<th className="text-center">Name</th>
-											<th className="text-center">Arguments</th>
-										</tr>
-									</thead>
-									<tbody>
-										{discovery.prompts.map(prompt => (
-											<tr key={`${prompt.serverID}:${prompt.promptName}:${prompt.digest ?? ''}`}>
-												<td>
-													<div>{prompt.displayName}</div>
-													{prompt.description && (
-														<div className="text-base-content/70 max-w-xl text-xs">{prompt.description}</div>
-													)}
-												</td>
-												<td className="text-center">{prompt.promptName}</td>
-												<td className="text-center">
-													<ArgumentSummary args={prompt.arguments} />
-												</td>
-											</tr>
-										))}
+							<div className="space-y-3">
+								{discovery.prompts.map(prompt => (
+									<ManagementItemCard
+										key={`${prompt.serverID}:${prompt.promptName}:${prompt.digest ?? ''}`}
+										title={prompt.displayName || prompt.promptName}
+										subtitle={prompt.promptName}
+										description={prompt.description}
+										metadata={<ArgumentSummary args={prompt.arguments} />}
+									/>
+								))}
 
-										{discovery.prompts.length === 0 && (
-											<tr>
-												<td colSpan={3} className="py-3 text-center text-sm">
-													No prompts discovered.
-												</td>
-											</tr>
-										)}
-									</tbody>
-								</table>
+								{discovery.prompts.length === 0 ? (
+									<div className="border-base-content/10 rounded-2xl border py-6 text-center text-sm">
+										No prompts discovered.
+									</div>
+								) : null}
 							</div>
 						</div>
 					</div>

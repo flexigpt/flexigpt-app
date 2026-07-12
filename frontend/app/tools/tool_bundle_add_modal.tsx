@@ -11,7 +11,7 @@ import { validateSlug } from '@/lib/text_utils';
 interface AddToolBundleModalProps {
 	isOpen: boolean;
 	onClose: () => void;
-	onSubmit: (slug: string, display: string, description?: string) => void;
+	onSubmit: (slug: string, display: string, description?: string) => Promise<void>;
 	existingSlugs: string[];
 }
 
@@ -31,6 +31,8 @@ const INITIAL_FORM = {
 function AddToolBundleModalContent({ onClose, onSubmit, existingSlugs }: AddToolBundleModalContentProps) {
 	const [formData, setFormData] = useState(INITIAL_FORM);
 	const [errors, setErrors] = useState<ErrorState>({});
+	const [submitError, setSubmitError] = useState('');
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const ignoreCloseRef = useRef(false);
@@ -93,9 +95,13 @@ function AddToolBundleModalContent({ onClose, onSubmit, existingSlugs }: AddTool
 		return nextErrors;
 	};
 
-	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
+	const handleSubmit: SubmitEventHandler<HTMLFormElement> = async e => {
 		e.preventDefault();
 		e.stopPropagation();
+
+		if (isSubmitting) {
+			return;
+		}
 
 		const trimmed = {
 			slug: formData.slug.trim(),
@@ -110,10 +116,22 @@ function AddToolBundleModalContent({ onClose, onSubmit, existingSlugs }: AddTool
 			return;
 		}
 
-		onSubmit(trimmed.slug, trimmed.displayName, trimmed.description || undefined);
-
-		// Close the dialog; this will trigger handleDialogClose -> parent onClose().
-		dialogRef.current?.close();
+		setSubmitError('');
+		setIsSubmitting(true);
+		try {
+			await onSubmit(trimmed.slug, trimmed.displayName, trimmed.description || undefined);
+			if (!ignoreCloseRef.current) {
+				dialogRef.current?.close();
+			}
+		} catch (error) {
+			if (!ignoreCloseRef.current) {
+				setSubmitError(error instanceof Error ? error.message : 'Failed to create tool bundle.');
+			}
+		} finally {
+			if (!ignoreCloseRef.current) {
+				setIsSubmitting(false);
+			}
+		}
 	};
 
 	const isFormValid = useMemo(
@@ -140,21 +158,29 @@ function AddToolBundleModalContent({ onClose, onSubmit, existingSlugs }: AddTool
 						className="btn btn-sm btn-circle bg-base-300 rounded-xl"
 						onClick={() => dialogRef.current?.close()}
 						aria-label="Close"
+						disabled={isSubmitting}
 					>
 						<FiX size={12} />
 					</button>
 				</div>
 
 				<form noValidate onSubmit={handleSubmit} className="space-y-4">
+					{submitError ? (
+						<div className="alert alert-error rounded-2xl text-sm" role="alert">
+							<FiAlertCircle size={14} />
+							<span>{submitError}</span>
+						</div>
+					) : null}
+
 					{/* Slug */}
 					<div className="grid grid-cols-12 items-center gap-2">
-						<label className="label col-span-3">
+						<label className="label col-span-12 sm:col-span-3">
 							<span className="text-sm">Bundle Slug*</span>
 							<span className="tooltip tooltip-right" data-tip="Lower-case, URL-friendly.">
 								<FiHelpCircle size={12} />
 							</span>
 						</label>
-						<div className="col-span-9">
+						<div className="col-span-12 sm:col-span-9">
 							<input
 								type="text"
 								className={`input w-full rounded-xl ${errors.slug ? 'input-error' : ''}`}
@@ -228,11 +254,16 @@ function AddToolBundleModalContent({ onClose, onSubmit, existingSlugs }: AddTool
 
 					{/* Actions */}
 					<div className="modal-action">
-						<button type="button" className="btn bg-base-300 rounded-xl" onClick={() => dialogRef.current?.close()}>
+						<button
+							type="button"
+							className="btn bg-base-300 rounded-xl"
+							onClick={() => dialogRef.current?.close()}
+							disabled={isSubmitting}
+						>
 							Cancel
 						</button>
-						<button type="submit" className="btn btn-primary rounded-xl" disabled={!isFormValid}>
-							Create
+						<button type="submit" className="btn btn-primary rounded-xl" disabled={!isFormValid || isSubmitting}>
+							{isSubmitting ? 'Creating...' : 'Create'}
 						</button>
 					</div>
 				</form>

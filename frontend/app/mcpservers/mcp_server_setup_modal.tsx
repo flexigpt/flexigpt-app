@@ -45,6 +45,7 @@ function MCPServerSetupModalContent({
 	});
 	const [reset, setReset] = useState(false);
 	const [submitError, setSubmitError] = useState('');
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const isUnmountingRef = useRef(false);
@@ -70,6 +71,10 @@ function MCPServerSetupModalContent({
 	}, []);
 
 	const requestClose = () => {
+		if (isSubmitting) {
+			return;
+		}
+
 		const dialog = dialogRef.current;
 		if (dialog?.open) {
 			dialog.close();
@@ -131,9 +136,14 @@ function MCPServerSetupModalContent({
 		return out;
 	};
 
-	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
+	const handleSubmit: SubmitEventHandler<HTMLFormElement> = async e => {
 		e.preventDefault();
 		e.stopPropagation();
+
+		if (isSubmitting) {
+			return;
+		}
+
 		setSubmitError('');
 
 		const err = validate();
@@ -148,13 +158,24 @@ function MCPServerSetupModalContent({
 			return;
 		}
 
-		void onSubmit(values, reset)
-			.then(() => {
-				requestClose();
-			})
-			.catch((error: unknown) => {
+		setIsSubmitting(true);
+		try {
+			await onSubmit(values, reset);
+			if (!isUnmountingRef.current) {
+				const dialog = dialogRef.current;
+				if (dialog?.open) {
+					dialog.close();
+				}
+			}
+		} catch (error) {
+			if (!isUnmountingRef.current) {
 				setSubmitError(error instanceof Error ? error.message : 'Failed to apply setup.');
-			});
+			}
+		} finally {
+			if (!isUnmountingRef.current) {
+				setIsSubmitting(false);
+			}
+		}
 	};
 
 	return (
@@ -180,12 +201,13 @@ function MCPServerSetupModalContent({
 							className="btn btn-sm btn-circle bg-base-300"
 							onClick={requestClose}
 							aria-label="Close"
+							disabled={isSubmitting}
 						>
 							<FiX size={12} />
 						</button>
 					</div>
 
-					<form noValidate onSubmit={handleSubmit} className="space-y-4">
+					<form noValidate onSubmit={handleSubmit} className="space-y-4" aria-busy={isSubmitting}>
 						{server.setup?.note && <div className="bg-base-100 rounded-2xl p-3 text-sm">{server.setup.note}</div>}
 
 						{submitError && (
@@ -286,11 +308,16 @@ function MCPServerSetupModalContent({
 						)}
 
 						<div className="modal-action">
-							<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
+							<button
+								type="button"
+								className="btn bg-base-300 rounded-xl"
+								onClick={requestClose}
+								disabled={isSubmitting}
+							>
 								Cancel
 							</button>
-							<button type="submit" className="btn btn-primary rounded-xl">
-								Save
+							<button type="submit" className="btn btn-primary rounded-xl" disabled={isSubmitting}>
+								{isSubmitting ? 'Saving...' : 'Save'}
 							</button>
 						</div>
 					</form>

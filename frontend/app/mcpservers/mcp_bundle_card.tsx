@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 
 import {
@@ -27,6 +26,7 @@ import { BaseMCPBundleID, MCPAuthHealthState, MCPServerStatus } from '@/spec/mcp
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
+import { MetadataPill, StatusBadge } from '@/components/management_ui';
 
 import type { MCPServerUpsertInput } from '@/mcpservers/lib/mcp_server_utils';
 import {
@@ -110,25 +110,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
 		return error.message;
 	}
 	return fallback;
-}
-
-function InfoPill({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
-	return (
-		<div className={`border-base-content/10 flex min-w-0 rounded-xl border p-2 ${className}`}>
-			<div className="grid size-full grid-cols-3 items-center gap-2">
-				<div className="text-base-content/60 col-span-1 text-[10px] uppercase">{label}</div>
-				<div className="col-span-2 text-xs">{children}</div>
-			</div>
-		</div>
-	);
-}
-
-function TruncatedValue({ value }: { value: ReactNode }) {
-	return (
-		<div className="min-w-0 truncate" title={typeof value === 'string' ? value : undefined}>
-			{value}
-		</div>
-	);
 }
 
 export function MCPBundleCard({
@@ -489,8 +470,8 @@ export function MCPBundleCard({
 											</div>
 										</div>
 
-										<div className="grid grid-cols-2 gap-2">
-											<InfoPill label="Enabled">
+										<div className="mt-3 flex flex-wrap items-center gap-2">
+											<MetadataPill label="Enabled">
 												<input
 													type="checkbox"
 													className="toggle toggle-accent toggle-sm"
@@ -501,23 +482,16 @@ export function MCPBundleCard({
 														void handleServerEnableToggle(server);
 													}}
 												/>
-											</InfoPill>
+											</MetadataPill>
 
-											<InfoPill label="Transport">
-												<TruncatedValue value={getMCPTransportLabel(server.transport)} />
-											</InfoPill>
+											<MetadataPill label="Transport">{getMCPTransportLabel(server.transport)}</MetadataPill>
 
-											<InfoPill label="Trust">
-												<TruncatedValue value={getMCPTrustLevelLabel(server.trustLevel)} />
-											</InfoPill>
+											<MetadataPill label="Trust">{getMCPTrustLevelLabel(server.trustLevel)}</MetadataPill>
 
-											<InfoPill label="Kind">{server.isBuiltIn ? 'Built-in' : 'Custom'}</InfoPill>
-
-											<InfoPill label="Discovery" className="col-span-2">
-												{runtime
-													? `${runtime.toolCount} tools / ${runtime.resourceCount} resources / ${runtime.resourceTemplateCount} templates / ${runtime.promptCount} prompts`
-													: '-'}
-											</InfoPill>
+											<MetadataPill label="Tools">{runtime?.toolCount ?? 0}</MetadataPill>
+											<MetadataPill label="Resources">{runtime?.resourceCount ?? 0}</MetadataPill>
+											<MetadataPill label="Templates">{runtime?.resourceTemplateCount ?? 0}</MetadataPill>
+											<MetadataPill label="Prompts">{runtime?.promptCount ?? 0}</MetadataPill>
 										</div>
 
 										<div className="mt-4 flex flex-col flex-wrap items-center">
@@ -530,19 +504,14 @@ export function MCPBundleCard({
 
 												{(authActionable ||
 													authState === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending) && (
-													<div className="border-info/20 bg-info/10 flex flex-wrap items-center justify-between gap-2 rounded-2xl border p-2">
-														<div className="min-w-0 text-xs">
-															<div className="font-semibold">OAuth authorization required</div>
-															<div className="text-base-content/70">
-																Open the browser authorization page, complete login, then return here.
-															</div>
-														</div>
+													<div className="border-base-content/10 flex w-full flex-wrap items-center justify-between gap-2 rounded-xl border p-2">
+														<StatusBadge tone="warning">OAuth authorization required</StatusBadge>
 
 														<div className="flex shrink-0 flex-wrap gap-1">
 															{authActionable && (
 																<button
 																	type="button"
-																	className="btn btn-xs btn-primary rounded-xl"
+																	className="btn btn-xs btn-ghost rounded-xl"
 																	onClick={() => {
 																		setManualOAuthModalServerID(server.id);
 																	}}

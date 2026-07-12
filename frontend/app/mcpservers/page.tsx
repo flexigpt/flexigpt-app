@@ -893,16 +893,9 @@ export default function MCPServersPage() {
 
 	const handleAddBundle = useCallback(
 		async (slug: string, display: string, description?: string) => {
-			try {
-				const id = getUUIDv7();
-				await mcpAPI.putMCPBundle(id, slug, display, true, description);
-				setIsAddModalOpen(false);
-				await fetchAll();
-			} catch (error) {
-				console.error('Add MCP bundle failed:', error);
-				setAlertMsg(getErrorMessage(error, 'Failed to add MCP bundle.'));
-				setShowAlert(true);
-			}
+			const id = getUUIDv7();
+			await mcpAPI.putMCPBundle(id, slug, display, true, description);
+			await fetchAll();
 		},
 		[fetchAll]
 	);

@@ -6,6 +6,7 @@ import { FiX } from 'react-icons/fi';
 
 import type { Skill, SkillBundle } from '@/spec/skill';
 
+import { MetadataPill } from '@/components/management_ui';
 import { ModalBackdrop } from '@/components/modal_backdrop';
 
 import { getSkillInsertCounts, getSkillInsertDescription, skillHasResources } from '@/skills/lib/skill_artifact_utils';
@@ -104,7 +105,7 @@ export function SkillBundleDetailsModal({ isOpen, onClose, bundle, skills }: Ski
 							<div className="col-span-3 font-semibold">Instruction skills</div>
 							<div className="col-span-9">
 								<div className="flex items-center gap-2">
-									<span className="badge badge-info rounded-xl">{skillCounts.instructions}</span>
+									<MetadataPill label="Count">{skillCounts.instructions}</MetadataPill>
 									<span className="text-base-content/70 text-xs">{getSkillInsertDescription('instructions')}</span>
 								</div>
 							</div>
@@ -112,14 +113,14 @@ export function SkillBundleDetailsModal({ isOpen, onClose, bundle, skills }: Ski
 							<div className="col-span-3 font-semibold">User-message skills</div>
 							<div className="col-span-9">
 								<div className="flex items-center gap-2">
-									<span className="badge badge-secondary rounded-xl">{skillCounts['user-message']}</span>
+									<MetadataPill label="Count">{skillCounts['user-message']}</MetadataPill>
 									<span className="text-base-content/70 text-xs">{getSkillInsertDescription('user-message')}</span>
 								</div>
 							</div>
 
 							<div className="col-span-3 font-semibold">Skills with resources</div>
 							<div className="col-span-9">
-								<span className="badge badge-outline rounded-xl">{resourceSkillCount}</span>
+								<MetadataPill label="Count">{resourceSkillCount}</MetadataPill>
 								<span className="text-base-content/70 ml-2 text-xs">
 									Resources are regular files under each skill directory.
 								</span>

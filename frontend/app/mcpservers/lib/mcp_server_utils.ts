@@ -408,20 +408,6 @@ export function getMCPToolRiskLabel(risk: MCPToolRisk): string {
 	}
 }
 
-export function getMCPToolRiskBadgeClass(risk: MCPToolRisk): string {
-	switch (risk) {
-		case MCPToolRisk.MCPToolRiskRead:
-			return `${STATUS_BADGE_LAYOUT} badge-success`;
-		case MCPToolRisk.MCPToolRiskWrite:
-			return `${STATUS_BADGE_LAYOUT} badge-warning`;
-		case MCPToolRisk.MCPToolRiskDestructive:
-		case MCPToolRisk.MCPToolRiskOpenWorld:
-			return `${STATUS_BADGE_LAYOUT} badge-error`;
-		default:
-			return `${STATUS_BADGE_LAYOUT} badge-neutral`;
-	}
-}
-
 export function getEffectiveMCPServerStatus(
 	serverEnabled: boolean,
 	bundleEnabled: boolean,

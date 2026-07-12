@@ -14,6 +14,7 @@ import { validateSlug, validateTags } from '@/lib/text_utils';
 import { skillStoreAPI } from '@/apis/baseapi';
 
 import { Dropdown } from '@/components/dropdown';
+import { MetadataPill, ModalField, ModalSection } from '@/components/management_ui';
 import { ModalBackdrop } from '@/components/modal_backdrop';
 import { ReadOnlyValue } from '@/components/read_only_value';
 
@@ -23,7 +24,6 @@ import {
 	buildSkillMarkdownScaffold,
 	formatSkillArgumentList,
 	getSkillArgumentCountLabel,
-	getSkillInsertBadgeClass,
 	getSkillInsertDescription,
 	getSkillInsertLabel,
 	getSkillInsertLongGuidance,
@@ -705,8 +705,8 @@ function AddEditSkillModalContent({
 				}
 			}}
 		>
-			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-hidden rounded-2xl p-0">
-				<div className="max-h-[80vh] overflow-y-auto p-6">
+			<div className="modal-box bg-base-200 max-h-[85vh] max-w-5xl overflow-hidden rounded-2xl p-0">
+				<div className="max-h-[85vh] overflow-y-auto p-4 sm:p-6">
 					<div className="mb-4 flex items-center justify-between">
 						<h3 className="text-lg font-bold">{headerTitle}</h3>
 						<button
@@ -732,69 +732,23 @@ function AddEditSkillModalContent({
 						)}
 
 						{isAddMode && (
-							<div className="alert alert-info rounded-2xl text-sm">
-								<div className="space-y-1">
-									<div className="font-semibold">Create either a skill or a prompt-like template</div>
-									<div>
-										Use <span className="font-mono">insert: instructions</span> for standing context that can be
-										activated in chat sessions.
-									</div>
-									<div>
-										Use <span className="font-mono">insert: user-message</span> for composer templates. These replace
-										new generic prompt templates and render into user message text.
-									</div>
-									<div>
-										This simplified format intentionally has no prompt versions, role blocks, typed variables, static
-										variables, or model/provider configuration.
-									</div>
-								</div>
-							</div>
-						)}
-
-						{artifactSkill && (
-							<div className="alert alert-info rounded-2xl text-sm">
-								<div className="space-y-1">
-									<div className="font-semibold">Skill artifact guidance</div>
-									<div>
-										`insert` controls where the rendered body is used. `instructions` means session context material.
-										`user-message` means the rendered text is inserted into the composer or user message body.
-									</div>
-									<div>
-										Use the render preview section to validate argument defaults and the final output before using the
-										skill in a conversation.
-									</div>
-									<div>
-										`arguments` are simple string substitutions from the skill&apos;s `SKILL.md` frontmatter. Missing
-										values fall back to defaults, then empty strings, and unknown placeholders are left unchanged.
-									</div>
-									<div>
-										The body is treated as plain text here. This page does not execute or sanitize command-like syntax
-										in the body.
-									</div>
-								</div>
-							</div>
+							<ModalSection title="Skill behavior">
+								<ul className="text-base-content/70 list-disc space-y-1 pl-5 text-xs">
+									<li>Instructions provide reusable conversation context.</li>
+									<li>User-message templates insert text into the composer.</li>
+									<li>Arguments are optional string substitutions.</li>
+								</ul>
+							</ModalSection>
 						)}
 
 						{isForkMode && artifactSkill && (
-							<div className="alert alert-warning rounded-2xl text-sm">
-								<div className="space-y-1">
-									<div className="font-semibold">Fork creates a new managed skill artifact</div>
-									<div>
-										Backend support for reading an existing <span className="font-mono">SKILL.md</span> body is not
-										available yet. This fork copies the source metadata, insert behavior, arguments, and tags, then
-										creates a new <span className="font-mono">SKILL.md</span> with a placeholder body.
-									</div>
-									<div>
-										For an exact clone, open the source location, copy the original body manually, and paste it into the
-										body field below before saving.
-									</div>
-								</div>
+							<div className="border-warning/30 rounded-xl border p-3 text-sm">
+								The fork copies metadata and arguments. Replace the generated placeholder body before saving.
 							</div>
 						)}
 
 						{isAddMode && (
-							<div className="border-base-content/10 bg-base-100 rounded-2xl border p-3">
-								<div className="mb-3 text-sm font-semibold">How do you want to add this skill?</div>
+							<ModalSection title="Source">
 								<div className="grid grid-cols-1 gap-2 md:grid-cols-2">
 									<label className="border-base-content/10 hover:bg-base-200 flex cursor-pointer items-start gap-3 rounded-2xl border p-3">
 										<input
@@ -808,10 +762,7 @@ function AddEditSkillModalContent({
 										<span>
 											<span className="block font-medium">Create managed SKILL.md</span>
 											<span className="text-base-content/70 block text-xs">
-												FlexiGPT creates a normal skill folder in the app skill store and registers it as a filesystem
-												skill. Only <span className="font-mono">SKILL.md</span> is created. Add resources, assets, or
-												scripts to the generated folder after saving, then re-enable the skill or restart to refresh
-												runtime metadata. The saved skill details show the exact folder location.
+												Create and register a managed skill folder.
 											</span>
 										</span>
 									</label>
@@ -827,14 +778,12 @@ function AddEditSkillModalContent({
 										<span>
 											<span className="block font-medium">Register existing folder</span>
 											<span className="text-base-content/70 block text-xs">
-												Use a skill directory that already exists on disk and contains{' '}
-												<span className="font-mono">SKILL.md</span> plus any resources, assets, or scripts you manage
-												manually.
+												Use an existing folder containing SKILL.md.
 											</span>
 										</span>
 									</label>
 								</div>
-							</div>
+							</ModalSection>
 						)}
 
 						{isAddMode && (
@@ -897,23 +846,8 @@ function AddEditSkillModalContent({
 								<input type="checkbox" defaultChecked />
 								<div className="collapse-title text-sm font-semibold">Managed SKILL.md content</div>
 								<div className="collapse-content space-y-4 text-sm">
-									<div className="alert alert-info rounded-2xl text-sm">
-										<div className="space-y-1">
-											<div className="font-semibold">This will be written to a real skill folder</div>
-											<div>
-												The backend creates <span className="font-mono">SKILL.md</span> under the app-managed skill
-												folder, then registers that folder exactly like any other filesystem skill.
-											</div>
-											<div>
-												No resources, assets, or scripts are created here. If the body references files, create those
-												files manually inside the generated skill folder after saving. The saved skill row shows the
-												exact folder location.
-											</div>
-										</div>
-									</div>
-
 									<div className="grid grid-cols-12 items-start gap-2">
-										<label className="label col-span-3">
+										<label className="label col-span-12 sm:col-span-3">
 											<span className="text-sm">Insert</span>
 											<span
 												className="tooltip tooltip-right"
@@ -922,7 +856,7 @@ function AddEditSkillModalContent({
 												<FiHelpCircle size={12} />
 											</span>
 										</label>
-										<div className="col-span-9 space-y-1">
+										<div className="col-span-12 space-y-1 sm:col-span-9">
 											<Dropdown<SkillInsert>
 												dropdownItems={skillInsertDropdownItems}
 												orderedKeys={skillInsertOrderedKeys}
@@ -937,7 +871,7 @@ function AddEditSkillModalContent({
 									</div>
 
 									<div className="grid grid-cols-12 items-start gap-2">
-										<label className="label col-span-3">
+										<label className="label col-span-12 sm:col-span-3">
 											<span className="text-sm">Arguments</span>
 											<span
 												className="tooltip tooltip-right"
@@ -946,7 +880,7 @@ function AddEditSkillModalContent({
 												<FiHelpCircle size={12} />
 											</span>
 										</label>
-										<div className="col-span-9">
+										<div className="col-span-12 sm:col-span-9">
 											<textarea
 												className="textarea h-24 w-full rounded-xl font-mono text-xs"
 												value={scaffoldArgumentsText}
@@ -973,10 +907,10 @@ function AddEditSkillModalContent({
 									</div>
 
 									<div className="grid grid-cols-12 items-start gap-2">
-										<label className="label col-span-3">
+										<label className="label col-span-12 sm:col-span-3">
 											<span className="text-sm">Body</span>
 										</label>
-										<div className="col-span-9">
+										<div className="col-span-12 sm:col-span-9">
 											<textarea
 												className="textarea h-28 w-full rounded-xl"
 												value={scaffoldBody}
@@ -1014,19 +948,16 @@ function AddEditSkillModalContent({
 							</div>
 						)}
 
-						{/* Name */}
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
-								<span className="text-sm">Name*</span>
-								<span
-									className="tooltip tooltip-right"
-									data-tip="Artifact name from SKILL.md. Keep it unique within the bundle and aligned with the skill directory name."
-								>
-									<FiHelpCircle size={12} />
-								</span>
-							</label>
-							<div className="col-span-9">
+						<ModalSection title="Identity">
+							<ModalField
+								label="Name"
+								htmlFor="skill-name"
+								required
+								hint="Artifact name from SKILL.md."
+								error={errors.name}
+							>
 								<input
+									id="skill-name"
 									ref={nameInputRef}
 									type="text"
 									name="name"
@@ -1038,29 +969,17 @@ function AddEditSkillModalContent({
 									autoComplete="off"
 									aria-invalid={Boolean(errors.name)}
 								/>
-								{errors.name && (
-									<div className="label">
-										<span className="text-error flex items-center gap-1">
-											<FiAlertCircle size={12} /> {errors.name}
-										</span>
-									</div>
-								)}
-							</div>
-						</div>
+							</ModalField>
 
-						{/* Slug */}
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
-								<span className="text-sm">Slug*</span>
-								<span
-									className="tooltip tooltip-right"
-									data-tip="Store slug used to identify this skill within the bundle."
-								>
-									<FiHelpCircle size={12} />
-								</span>
-							</label>
-							<div className="col-span-9">
+							<ModalField
+								label="Slug"
+								htmlFor="skill-slug"
+								required
+								hint="Store identifier within this bundle."
+								error={errors.slug}
+							>
 								<input
+									id="skill-slug"
 									type="text"
 									name="slug"
 									value={formData.slug}
@@ -1071,28 +990,9 @@ function AddEditSkillModalContent({
 									autoComplete="off"
 									aria-invalid={Boolean(errors.slug)}
 								/>
-								{errors.slug && (
-									<div className="label">
-										<span className="text-error flex items-center gap-1">
-											<FiAlertCircle size={12} /> {errors.slug}
-										</span>
-									</div>
-								)}
-							</div>
-						</div>
+							</ModalField>
 
-						{/* Type */}
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
-								<span className="text-sm">Type*</span>
-								<span
-									className="tooltip tooltip-right"
-									data-tip="Filesystem skills are backed by a skill directory. EmbeddedFS skills are built in and read only."
-								>
-									<FiHelpCircle size={12} />
-								</span>
-							</label>
-							<div className="col-span-9">
+							<ModalField label="Type" required hint="Built-in EmbeddedFS skills are read only." error={errors.type}>
 								{isEditMode || isViewMode ? (
 									<ReadOnlyValue value={skillTypeDropdownItems[formData.type].displayName} />
 								) : (
@@ -1105,26 +1005,17 @@ function AddEditSkillModalContent({
 										getDisplayName={k => skillTypeDropdownItems[k].displayName}
 									/>
 								)}
-								{errors.type && (
-									<div className="label">
-										<span className="text-error flex items-center gap-1">
-											<FiAlertCircle size={12} /> {errors.type}
-										</span>
-									</div>
-								)}
-							</div>
-						</div>
+							</ModalField>
 
-						{/* Location */}
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
-								<span className="text-sm">Location{isAddMode && creationMode === 'create' ? '' : '*'}</span>
-								<span className="tooltip tooltip-right" data-tip="Path to the skill directory that contains SKILL.md.">
-									<FiHelpCircle size={12} />
-								</span>
-							</label>
-							<div className="col-span-9">
+							<ModalField
+								label="Location"
+								htmlFor="skill-location"
+								required={!isAddMode || creationMode === 'register'}
+								hint="Folder containing SKILL.md."
+								error={errors.location}
+							>
 								<input
+									id="skill-location"
 									type="text"
 									name="location"
 									value={
@@ -1139,36 +1030,17 @@ function AddEditSkillModalContent({
 									autoComplete="off"
 									aria-invalid={Boolean(errors.location)}
 								/>
-								{errors.location && (
-									<div className="label">
-										<span className="text-error flex items-center gap-1">
-											<FiAlertCircle size={12} /> {errors.location}
-										</span>
-									</div>
-								)}
-								{isAddMode && creationMode === 'create' && (
-									<div className="label">
-										<span className="text-base-content/70 text-xs">
-											The saved skill will still be a normal filesystem skill with an absolute location.
-										</span>
-									</div>
-								)}
-							</div>
-						</div>
+							</ModalField>
+						</ModalSection>
 
-						{/* Display Name */}
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
-								<span className="text-sm">Display Name</span>
-								<span
-									className="tooltip tooltip-right"
-									data-tip="Shown in lists when set. Otherwise the skill name is used."
-								>
-									<FiHelpCircle size={12} />
-								</span>
-							</label>
-							<div className="col-span-9">
+						<ModalSection title="Presentation">
+							<ModalField
+								label="Display Name"
+								htmlFor="skill-display-name"
+								hint="Falls back to the skill name when empty."
+							>
 								<input
+									id="skill-display-name"
 									type="text"
 									name="displayName"
 									value={formData.displayName}
@@ -1178,16 +1050,11 @@ function AddEditSkillModalContent({
 									spellCheck="false"
 									autoComplete="off"
 								/>
-							</div>
-						</div>
+							</ModalField>
 
-						{/* Enabled */}
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3 cursor-pointer">
-								<span className="text-sm">Enabled</span>
-							</label>
-							<div className="col-span-9">
+							<ModalField label="Enabled" htmlFor="skill-enabled">
 								<input
+									id="skill-enabled"
 									type="checkbox"
 									name="isEnabled"
 									checked={formData.isEnabled}
@@ -1195,16 +1062,11 @@ function AddEditSkillModalContent({
 									className="toggle toggle-accent disabled:opacity-80"
 									disabled={isViewMode}
 								/>
-							</div>
-						</div>
+							</ModalField>
 
-						{/* Description */}
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
-								<span className="text-sm">Description</span>
-							</label>
-							<div className="col-span-9">
+							<ModalField label="Description" htmlFor="skill-description" align="start">
 								<textarea
+									id="skill-description"
 									name="description"
 									value={formData.description}
 									onChange={handleInput}
@@ -1212,16 +1074,11 @@ function AddEditSkillModalContent({
 									className="textarea h-20 w-full rounded-xl"
 									spellCheck="false"
 								/>
-							</div>
-						</div>
+							</ModalField>
 
-						{/* Tags */}
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
-								<span className="text-sm">Tags</span>
-							</label>
-							<div className="col-span-9">
+							<ModalField label="Tags" htmlFor="skill-tags" error={errors.tags}>
 								<input
+									id="skill-tags"
 									type="text"
 									name="tags"
 									value={formData.tags}
@@ -1232,15 +1089,8 @@ function AddEditSkillModalContent({
 									spellCheck="false"
 									aria-invalid={Boolean(errors.tags)}
 								/>
-								{errors.tags && (
-									<div className="label">
-										<span className="text-error flex items-center gap-1">
-											<FiAlertCircle size={12} /> {errors.tags}
-										</span>
-									</div>
-								)}
-							</div>
-						</div>
+							</ModalField>
+						</ModalSection>
 
 						{artifactSkill && !isForkMode && (
 							<>
@@ -1249,12 +1099,8 @@ function AddEditSkillModalContent({
 									<div className="col-span-3 font-semibold">Insert</div>
 									<div className="col-span-9 space-y-1">
 										<div className="flex items-center gap-2">
-											<span className={`badge rounded-xl ${getSkillInsertBadgeClass(normalizedArtifactInsert.value)}`}>
-												{getSkillInsertLabel(artifactSkill.insert)}
-											</span>
-											{normalizedArtifactInsert.isDefaulted && (
-												<span className="badge badge-ghost rounded-xl">default</span>
-											)}
+											<MetadataPill>{getSkillInsertLabel(artifactSkill.insert)}</MetadataPill>
+											{normalizedArtifactInsert.isDefaulted && <MetadataPill>Default behavior</MetadataPill>}
 										</div>
 										<div className="text-base-content/70 text-xs">
 											{getSkillInsertDescription(artifactSkill.insert)}
@@ -1285,14 +1131,9 @@ function AddEditSkillModalContent({
 									<div className="col-span-3 font-semibold">Resources</div>
 									<div className="col-span-9 space-y-2">
 										<div className="flex flex-wrap items-center gap-2">
-											<span
-												className={`badge rounded-xl ${
-													artifactSkill.resources?.hasResources ? 'badge-outline' : 'badge-ghost'
-												}`}
-												title={getSkillResourceTooltip(artifactSkill.resources)}
-											>
+											<MetadataPill title={getSkillResourceTooltip(artifactSkill.resources)}>
 												{getSkillResourceCountLabel(artifactSkill.resources)}
-											</span>
+											</MetadataPill>
 											<span className="text-base-content/70 text-xs">
 												Resource files are regular files under the skill folder. They are not automatically executed or
 												rendered by this page.
@@ -1366,9 +1207,7 @@ function AddEditSkillModalContent({
 										{artifactSkill.tags?.length ? (
 											<div className="flex flex-wrap gap-1">
 												{artifactSkill.tags.map(tag => (
-													<span key={tag} className="badge badge-outline rounded-xl">
-														{tag}
-													</span>
+													<MetadataPill key={tag}>{tag}</MetadataPill>
 												))}
 											</div>
 										) : (
@@ -1409,9 +1248,7 @@ function AddEditSkillModalContent({
 																<div className="text-base-content/70 mt-1 text-xs">{arg.description}</div>
 															) : null}
 														</div>
-														{arg.default ? (
-															<span className="badge badge-ghost rounded-xl text-xs">default: {arg.default}</span>
-														) : null}
+														{arg.default ? <MetadataPill label="Default">{arg.default}</MetadataPill> : null}
 													</div>
 													<input
 														type="text"
@@ -1470,7 +1307,7 @@ function AddEditSkillModalContent({
 									{previewResult && (
 										<div className="space-y-3">
 											<div className="flex flex-wrap items-center gap-2 text-xs">
-												<span className="badge rounded-xl">insert: {previewResult.insert}</span>
+												<MetadataPill label="Insert">{previewResult.insert}</MetadataPill>
 												{Object.keys(previewResult.appliedArguments ?? {}).length > 0 ? (
 													<span className="text-base-content/70">Applied arguments captured from the renderer.</span>
 												) : null}

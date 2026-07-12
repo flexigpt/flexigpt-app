@@ -403,6 +403,7 @@ function AddEditMCPServerModalContent({
 	const [errors, setErrors] = useState<ErrorState>({});
 	const [submitError, setSubmitError] = useState('');
 	const [deletedStdioSecretRows, setDeletedStdioSecretRows] = useState<SecretEnvRow[]>([]);
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const isUnmountingRef = useRef(false);
@@ -452,6 +453,10 @@ function AddEditMCPServerModalContent({
 	}, []);
 
 	const requestClose = () => {
+		if (isSubmitting) {
+			return;
+		}
+
 		const dialog = dialogRef.current;
 
 		if (dialog?.open) {
@@ -672,6 +677,10 @@ function AddEditMCPServerModalContent({
 	);
 
 	const setFormDataAndValidate = (next: MCPServerFormData) => {
+		if (isSubmitting) {
+			return;
+		}
+
 		setFormData(next);
 		setErrors(validateForm(next));
 	};
@@ -692,6 +701,10 @@ function AddEditMCPServerModalContent({
 	};
 
 	const handleInput = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+		if (isSubmitting) {
+			return;
+		}
+
 		const target = e.target as HTMLInputElement;
 		const { name, value, type, checked } = target;
 		const newVal = type === 'checkbox' ? checked : value;
@@ -953,9 +966,13 @@ function AddEditMCPServerModalContent({
 
 	const isAllValid = useMemo(() => Object.keys(validateForm(formData)).length === 0, [formData, validateForm]);
 
-	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
+	const handleSubmit: SubmitEventHandler<HTMLFormElement> = async e => {
 		e.preventDefault();
 		e.stopPropagation();
+
+		if (isSubmitting) {
+			return;
+		}
 
 		setSubmitError('');
 
@@ -966,14 +983,27 @@ function AddEditMCPServerModalContent({
 			return;
 		}
 
-		void onSubmit(buildServerInput())
-			.then(() => {
-				requestClose();
-			})
-			.catch((error: unknown) => {
+		setIsSubmitting(true);
+		try {
+			await onSubmit(buildServerInput());
+			if (!isUnmountingRef.current) {
+				const dialog = dialogRef.current;
+				if (dialog?.open) {
+					dialog.close();
+				} else {
+					onClose();
+				}
+			}
+		} catch (error) {
+			if (!isUnmountingRef.current) {
 				const msg = error instanceof Error ? error.message : 'Failed to save MCP server.';
 				setSubmitError(msg);
-			});
+			}
+		} finally {
+			if (!isUnmountingRef.current) {
+				setIsSubmitting(false);
+			}
+		}
 	};
 
 	const headerTitle = isEditMode ? 'Edit MCP Server' : 'Add MCP Server';
@@ -996,12 +1026,13 @@ function AddEditMCPServerModalContent({
 							className="btn btn-sm btn-circle bg-base-300"
 							onClick={requestClose}
 							aria-label="Close"
+							disabled={isSubmitting}
 						>
 							<FiX size={12} />
 						</button>
 					</div>
 
-					<form noValidate onSubmit={handleSubmit} className="space-y-4">
+					<form noValidate onSubmit={handleSubmit} className="space-y-4" aria-busy={isSubmitting}>
 						{submitError && (
 							<div className="alert alert-error rounded-2xl text-sm">
 								<div className="flex items-center gap-2">
@@ -1816,11 +1847,16 @@ function AddEditMCPServerModalContent({
 						</div>
 
 						<div className="modal-action">
-							<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
+							<button
+								type="button"
+								className="btn bg-base-300 rounded-xl"
+								onClick={requestClose}
+								disabled={isSubmitting}
+							>
 								Cancel
 							</button>
-							<button type="submit" className="btn btn-primary rounded-xl" disabled={!isAllValid}>
-								Save
+							<button type="submit" className="btn btn-primary rounded-xl" disabled={!isAllValid || isSubmitting}>
+								{isSubmitting ? 'Saving...' : 'Save'}
 							</button>
 						</div>
 					</form>

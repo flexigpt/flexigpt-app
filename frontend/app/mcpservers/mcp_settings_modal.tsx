@@ -73,6 +73,7 @@ function MCPSettingsModalContent({
 	const [listenAddr, setListenAddr] = useState(initialListenAddr ?? '');
 	const [errorState, setErrorState] = useState('');
 	const [submitError, setSubmitError] = useState('');
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const isUnmountingRef = useRef(false);
@@ -98,6 +99,10 @@ function MCPSettingsModalContent({
 	}, []);
 
 	const requestClose = () => {
+		if (isSubmitting) {
+			return;
+		}
+
 		const dialog = dialogRef.current;
 		if (dialog?.open) {
 			dialog.close();
@@ -113,9 +118,14 @@ function MCPSettingsModalContent({
 		onClose();
 	};
 
-	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
+	const handleSubmit: SubmitEventHandler<HTMLFormElement> = async e => {
 		e.preventDefault();
 		e.stopPropagation();
+
+		if (isSubmitting) {
+			return;
+		}
+
 		setSubmitError('');
 
 		const err = validateListenAddr(listenAddr);
@@ -124,13 +134,24 @@ function MCPSettingsModalContent({
 			return;
 		}
 
-		void onSubmit(listenAddr.trim())
-			.then(() => {
-				requestClose();
-			})
-			.catch((error: unknown) => {
+		setIsSubmitting(true);
+		try {
+			await onSubmit(listenAddr.trim());
+			if (!isUnmountingRef.current) {
+				const dialog = dialogRef.current;
+				if (dialog?.open) {
+					dialog.close();
+				}
+			}
+		} catch (error) {
+			if (!isUnmountingRef.current) {
 				setSubmitError(error instanceof Error ? error.message : 'Failed to save MCP settings.');
-			});
+			}
+		} finally {
+			if (!isUnmountingRef.current) {
+				setIsSubmitting(false);
+			}
+		}
 	};
 
 	return (
@@ -151,12 +172,13 @@ function MCPSettingsModalContent({
 							className="btn btn-sm btn-circle bg-base-300"
 							onClick={requestClose}
 							aria-label="Close"
+							disabled={isSubmitting}
 						>
 							<FiX size={12} />
 						</button>
 					</div>
 
-					<form noValidate onSubmit={handleSubmit} className="space-y-8">
+					<form noValidate onSubmit={handleSubmit} className="space-y-8" aria-busy={isSubmitting}>
 						{submitError && (
 							<div className="alert alert-error rounded-2xl text-sm">
 								<div className="flex items-center gap-2">
@@ -210,11 +232,16 @@ function MCPSettingsModalContent({
 						</div>
 
 						<div className="modal-action">
-							<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
+							<button
+								type="button"
+								className="btn bg-base-300 rounded-xl"
+								onClick={requestClose}
+								disabled={isSubmitting}
+							>
 								Cancel
 							</button>
-							<button type="submit" className="btn btn-primary rounded-xl">
-								Save
+							<button type="submit" className="btn btn-primary rounded-xl" disabled={isSubmitting}>
+								{isSubmitting ? 'Saving...' : 'Save'}
 							</button>
 						</div>
 					</form>

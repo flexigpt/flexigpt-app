@@ -48,10 +48,6 @@ export function getSkillInsertDescription(insert?: string | null): string {
 		: 'Loaded as skill instructions/context. It can be preloaded into sessions and shown to the model.';
 }
 
-export function getSkillInsertBadgeClass(insert?: string | null): string {
-	return normalizeSkillInsert(insert).value === 'user-message' ? 'badge-secondary' : 'badge-info';
-}
-
 export function getSkillInsertLongGuidance(insert?: string | null): string {
 	return normalizeSkillInsert(insert).value === 'user-message'
 		? 'Use this when the skill is a prompt-like template. The rendered text is inserted into a user message or composer draft. Indexed filesystem resources can be selected as ordinary message attachments. The skill is not loaded as persistent session context.'

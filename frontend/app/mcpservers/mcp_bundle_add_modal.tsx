@@ -11,7 +11,7 @@ import { validateSlug } from '@/lib/text_utils';
 interface AddMCPBundleModalProps {
 	isOpen: boolean;
 	onClose: () => void;
-	onSubmit: (slug: string, display: string, description?: string) => void;
+	onSubmit: (slug: string, display: string, description?: string) => Promise<void>;
 	existingSlugs: string[];
 }
 
@@ -37,6 +37,8 @@ function getInitialFormData(): BundleFormData {
 function AddMCPBundleModalContent({ onClose, onSubmit, existingSlugs }: AddMCPBundleModalProps) {
 	const [formData, setFormData] = useState<BundleFormData>(() => getInitialFormData());
 	const [errors, setErrors] = useState<ErrorState>({});
+	const [submitError, setSubmitError] = useState('');
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const isUnmountingRef = useRef(false);
@@ -65,6 +67,10 @@ function AddMCPBundleModalContent({ onClose, onSubmit, existingSlugs }: AddMCPBu
 	}, []);
 
 	const requestClose = () => {
+		if (isSubmitting) {
+			return;
+		}
+
 		const dialog = dialogRef.current;
 
 		if (dialog?.open) {
@@ -111,9 +117,13 @@ function AddMCPBundleModalContent({ onClose, onSubmit, existingSlugs }: AddMCPBu
 		return nextErrors;
 	};
 
-	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
+	const handleSubmit: SubmitEventHandler<HTMLFormElement> = async e => {
 		e.preventDefault();
 		e.stopPropagation();
+
+		if (isSubmitting) {
+			return;
+		}
 
 		const trimmed: BundleFormData = {
 			slug: formData.slug.trim(),
@@ -128,8 +138,25 @@ function AddMCPBundleModalContent({ onClose, onSubmit, existingSlugs }: AddMCPBu
 			return;
 		}
 
-		onSubmit(trimmed.slug, trimmed.displayName, trimmed.description || undefined);
-		requestClose();
+		setSubmitError('');
+		setIsSubmitting(true);
+		try {
+			await onSubmit(trimmed.slug, trimmed.displayName, trimmed.description || undefined);
+			if (!isUnmountingRef.current) {
+				const dialog = dialogRef.current;
+				if (dialog?.open) {
+					dialog.close();
+				}
+			}
+		} catch (error) {
+			if (!isUnmountingRef.current) {
+				setSubmitError(error instanceof Error ? error.message : 'Failed to create MCP bundle.');
+			}
+		} finally {
+			if (!isUnmountingRef.current) {
+				setIsSubmitting(false);
+			}
+		}
 	};
 
 	const isFormValid = useMemo(
@@ -161,15 +188,22 @@ function AddMCPBundleModalContent({ onClose, onSubmit, existingSlugs }: AddMCPBu
 					</div>
 
 					<form noValidate onSubmit={handleSubmit} className="space-y-4">
+						{submitError ? (
+							<div className="alert alert-error rounded-2xl text-sm" role="alert">
+								<FiAlertCircle size={14} />
+								<span>{submitError}</span>
+							</div>
+						) : null}
+
 						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
+							<label className="label col-span-12 sm:col-span-3">
 								<span className="text-sm">Bundle Slug*</span>
 								<span className="tooltip tooltip-right" data-tip="Lower-case, URL-friendly.">
 									<FiHelpCircle size={12} />
 								</span>
 							</label>
 
-							<div className="col-span-9">
+							<div className="col-span-12 sm:col-span-9">
 								<input
 									type="text"
 									className={`input w-full rounded-xl ${errors.slug ? 'input-error' : ''}`}
@@ -242,11 +276,16 @@ function AddMCPBundleModalContent({ onClose, onSubmit, existingSlugs }: AddMCPBu
 						</div>
 
 						<div className="modal-action">
-							<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
+							<button
+								type="button"
+								className="btn bg-base-300 rounded-xl"
+								onClick={requestClose}
+								disabled={isSubmitting}
+							>
 								Cancel
 							</button>
-							<button type="submit" className="btn btn-primary rounded-xl" disabled={!isFormValid}>
-								Create
+							<button type="submit" className="btn btn-primary rounded-xl" disabled={!isFormValid || isSubmitting}>
+								{isSubmitting ? 'Creating...' : 'Create'}
 							</button>
 						</div>
 					</form>

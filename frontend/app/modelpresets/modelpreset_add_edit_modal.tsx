@@ -378,6 +378,7 @@ function AddEditModelPresetModalContent({
 	const [selectedPrefillKey, setSelectedPrefillKey] = useState<string | null>(null);
 	const [errors, setErrors] = useState<ValidationErrors>({});
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [submitError, setSubmitError] = useState('');
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const modelPresetIdInputRef = useRef<HTMLInputElement | null>(null);
@@ -667,6 +668,7 @@ function AddEditModelPresetModalContent({
 			return;
 		}
 
+		setSubmitError('');
 		const nextCacheControl = buildCacheControlFromModelPresetForm(formData, supportedCacheKinds, supportsCacheKey);
 		const nextOutputParam = buildOutputParamFromForm(formData.outputFormatKind, formData.outputVerbosity);
 		const nextReasoning = buildReasoningFromForm(formData);
@@ -722,10 +724,14 @@ function AddEditModelPresetModalContent({
 		try {
 			await onSubmit(finalModelPresetID, payload);
 			requestClose();
-		} catch {
-			// Keep the modal open so the user does not lose their form on failed save.
+		} catch (error) {
+			if (!isUnmountingRef.current) {
+				setSubmitError(error instanceof Error && error.message.trim() ? error.message : 'Failed to save model preset.');
+			}
 		} finally {
-			setIsSubmitting(false);
+			if (!isUnmountingRef.current) {
+				setIsSubmitting(false);
+			}
 		}
 	};
 
@@ -797,6 +803,15 @@ function AddEditModelPresetModalContent({
 					</div>
 
 					<form noValidate onSubmit={handleSubmit} className="space-y-4">
+						{submitError ? (
+							<div className="alert alert-error rounded-2xl text-sm" role="alert">
+								<div className="flex items-center gap-2">
+									<FiAlertCircle size={14} />
+									<span className="wrap-break-word">{submitError}</span>
+								</div>
+							</div>
+						) : null}
+
 						{isEditMode && !isReadOnly && (
 							<div className="border-info/30 bg-info/10 rounded-xl border px-3 py-2 text-xs">
 								Only changed fields are sent while editing.

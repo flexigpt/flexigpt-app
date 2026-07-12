@@ -109,6 +109,7 @@ function AddEditProviderPresetModalContent({
 	const [prefillMode, setPrefillMode] = useState(false);
 	const [selectedPrefillKey, setSelectedPrefillKey] = useState<ProviderName | null>(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [submitError, setSubmitError] = useState('');
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const providerNameInputRef = useRef<HTMLInputElement | null>(null);
@@ -461,6 +462,7 @@ function AddEditProviderPresetModalContent({
 			return;
 		}
 
+		setSubmitError('');
 		const finalErrors = validateForm(formData);
 		setErrors(finalErrors);
 		if (Object.values(finalErrors).some(Boolean)) {
@@ -512,10 +514,14 @@ function AddEditProviderPresetModalContent({
 		try {
 			await onSubmit(providerName, payload, apiKey);
 			requestClose();
-		} catch {
-			// Keep modal open so the user keeps their form on failed save.
+		} catch (error) {
+			if (!isUnmountingRef.current) {
+				setSubmitError(error instanceof Error && error.message.trim() ? error.message : 'Failed to save provider.');
+			}
 		} finally {
-			setIsSubmitting(false);
+			if (!isUnmountingRef.current) {
+				setIsSubmitting(false);
+			}
 		}
 	};
 
@@ -554,6 +560,15 @@ function AddEditProviderPresetModalContent({
 					</div>
 
 					<form noValidate onSubmit={handleSubmit} className="space-y-4">
+						{submitError ? (
+							<div className="alert alert-error rounded-2xl text-sm" role="alert">
+								<div className="flex items-center gap-2">
+									<FiAlertCircle size={14} />
+									<span className="wrap-break-word">{submitError}</span>
+								</div>
+							</div>
+						) : null}
+
 						{mode === 'edit' && !isReadOnly && (
 							<div className="border-info/30 bg-info/10 rounded-xl border px-3 py-2 text-xs">
 								Only changed provider fields are sent while editing.
