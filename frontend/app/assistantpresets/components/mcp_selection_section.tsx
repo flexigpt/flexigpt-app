@@ -23,7 +23,7 @@ import {
 	getMCPStatusBadgeClass,
 	getMCPStatusLabel,
 	isMCPAuthActionable,
-	isMCPToolVisibleToModel,
+	isMCPToolModelSelectable,
 } from '@/mcpservers/lib/mcp_server_utils';
 import { MCPOAuthAuthorizationModal } from '@/mcpservers/mcp_oauth_authorization_modal';
 
@@ -173,10 +173,17 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 					const selectedResourceKeys = new Set(selection.selectedResources.map(mcpResourceKey));
 					const selectedTemplateKeys = new Set(selection.selectedResourceTemplates.map(mcpResourceTemplateKey));
 					const selectedPromptKeys = new Set(selection.selectedPrompts.map(mcpPromptKey));
-
-					const visibleTools = option.tools.filter(isMCPToolVisibleToModel);
+					const modelSelectableTools = option.tools.filter(isMCPToolModelSelectable);
+					const modelSelectableToolKeys = new Set(
+						modelSelectableTools.map(m => {
+							return mcpToolKey(m);
+						})
+					);
+					const selectedModelToolCount = option.discoveryLoaded
+						? selection.selectedTools.filter(tool => modelSelectableToolKeys.has(mcpToolKey(tool))).length
+						: selection.selectedTools.length;
 					const canUseSelectedToolExposure =
-						selection.selectedTools.length > 0 || (option.discoveryLoaded && visibleTools.length > 0);
+						selectedModelToolCount > 0 || (option.discoveryLoaded && modelSelectableTools.length > 0);
 					const toolExposureDropdownItems: Record<MCPToolExposure, { isEnabled: boolean }> = {
 						[MCPToolExposure.MCPToolExposureNone]: { isEnabled: true },
 						[MCPToolExposure.MCPToolExposureAll]: { isEnabled: true },
@@ -341,8 +348,8 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 
 							{selection.toolExposure === MCPToolExposure.MCPToolExposureSelected && !canUseSelectedToolExposure ? (
 								<div className="text-warning mt-3 text-xs">
-									Load discovery and select at least one model-visible tool, or switch Tool Exposure to No tools or All
-									tools before saving.
+									Load discovery and select at least one enabled, model-visible tool, or switch Tool Exposure to No
+									tools or All tools before saving.
 								</div>
 							) : null}
 
@@ -350,29 +357,30 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 
 							{!discoveryText && (
 								<div className="mt-4 space-y-4">
-									{selection.toolExposure === MCPToolExposure.MCPToolExposureSelected && option.tools.length > 0 && (
-										<div>
-											<div className="mb-2 text-sm font-semibold">Selected Tools</div>
-											<div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-												{visibleTools.map(tool => (
-													<label
-														key={mcpToolKey(tool)}
-														className="hover:bg-base-200 flex cursor-pointer items-center gap-2 rounded-lg p-1 text-sm"
-													>
-														<input
-															type="checkbox"
-															className="checkbox checkbox-sm rounded-sm"
-															checked={selectedToolKeys.has(mcpToolKey(tool))}
-															onChange={e => {
-																mcpState.toggleTool(tool, e.target.checked);
-															}}
-														/>
-														<span className="truncate">{tool.displayName || tool.toolName}</span>
-													</label>
-												))}
+									{selection.toolExposure === MCPToolExposure.MCPToolExposureSelected &&
+										modelSelectableTools.length > 0 && (
+											<div>
+												<div className="mb-2 text-sm font-semibold">Selected Tools</div>
+												<div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+													{modelSelectableTools.map(tool => (
+														<label
+															key={mcpToolKey(tool)}
+															className="hover:bg-base-200 flex cursor-pointer items-center gap-2 rounded-lg p-1 text-sm"
+														>
+															<input
+																type="checkbox"
+																className="checkbox checkbox-sm rounded-sm"
+																checked={selectedToolKeys.has(mcpToolKey(tool))}
+																onChange={e => {
+																	mcpState.toggleTool(tool, e.target.checked);
+																}}
+															/>
+															<span className="truncate">{tool.displayName || tool.toolName}</span>
+														</label>
+													))}
+												</div>
 											</div>
-										</div>
-									)}
+										)}
 
 									{option.resources.length > 0 && (
 										<div>

@@ -188,6 +188,13 @@ export default function ToolsPage() {
 				throw new Error('Tool bundle not found.');
 			}
 
+			if (toolToEdit && toolToEdit.type !== ToolImplType.HTTP) {
+				throw new Error('Only HTTP tools can create new versions from this UI.');
+			}
+			if (!toolToEdit && partial.type !== undefined && partial.type !== ToolImplType.HTTP) {
+				throw new Error('Only HTTP tools can be created from this UI.');
+			}
+
 			const slug = (toolToEdit?.slug ?? partial.slug ?? '').trim();
 			const version = (partial.version ?? '').trim();
 

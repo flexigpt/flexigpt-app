@@ -93,7 +93,7 @@ function ThemeSelectorContent({ startupTheme, providerTheme, setTheme }: ThemeSe
 
 	/* ————————————————————————————— UI —————————————————————————————— */
 	return (
-		<div className="flex items-center gap-6">
+		<div className="flex flex-wrap items-center gap-x-6 gap-y-3">
 			<label className="flex cursor-pointer items-center gap-2">
 				<input
 					type="radio"
@@ -132,7 +132,7 @@ function ThemeSelectorContent({ startupTheme, providerTheme, setTheme }: ThemeSe
 				<span className="text-sm">Dark</span>
 			</label>
 
-			<label className="flex cursor-pointer items-center gap-2">
+			<label className="flex w-full cursor-pointer items-center gap-2 sm:w-auto">
 				<input
 					type="radio"
 					className="radio radio-accent"
@@ -141,7 +141,7 @@ function ThemeSelectorContent({ startupTheme, providerTheme, setTheme }: ThemeSe
 						void applyTheme(ThemeType.Other, selectedOtherName);
 					}}
 				/>
-				<div className="w-50">
+				<div className="w-full sm:w-52">
 					<Dropdown<string>
 						dropdownItems={dropdownItems}
 						selectedKey={selectedOtherName}

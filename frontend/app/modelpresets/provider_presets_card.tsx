@@ -240,6 +240,11 @@ export function ProviderPresetCard({
 	};
 
 	const requestDeleteModel = (id: ModelPresetID) => {
+		if (id === defaultModelPresetID) {
+			showLocalDenied('Choose another default model before deleting the current default model preset.');
+			return;
+		}
+
 		if (modelPresets[id].isBuiltIn) {
 			showLocalDenied('Built-in model presets cannot be deleted.');
 			return;
@@ -482,8 +487,12 @@ export function ProviderPresetCard({
 															onClick={() => {
 																requestDeleteModel(id);
 															}}
-															disabled={isPending(`${id}:delete`)}
-															title="Delete Model Preset"
+															disabled={isDefault || isPending(`${id}:delete`)}
+															title={
+																isDefault
+																	? 'Choose another default model before deleting this preset.'
+																	: 'Delete Model Preset'
+															}
 														>
 															<FiTrash2 size={16} />
 															<span>Delete</span>

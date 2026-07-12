@@ -50,6 +50,7 @@ import {
 	isMCPAuthActionable,
 	serverHasSetupInputs,
 } from '@/mcpservers/lib/mcp_server_utils';
+import { MCPBundleDetailsModal } from '@/mcpservers/mcp_bundle_details_modal';
 import { AddEditMCPServerModal } from '@/mcpservers/mcp_server_add_edit_modal';
 import { MCPServerDetailsModal } from '@/mcpservers/mcp_server_details_modal';
 import { MCPServerSetupModal } from '@/mcpservers/mcp_server_setup_modal';
@@ -85,7 +86,6 @@ interface MCPBundleCardProps {
 	onConnectServer: (bundleID: string, serverID: string) => Promise<void>;
 	onDisconnectServer: (bundleID: string, serverID: string) => Promise<void>;
 	onRefreshServer: (bundleID: string, serverID: string) => Promise<void>;
-	onOpenURL: (url: string) => void;
 	onCancelOAuth: (bundleID: string, serverID: string) => Promise<void>;
 	onDeleteBundleRequested: (bundleID: string) => void;
 	onRequestOAuthAuthorization: (bundleID: string, serverID: string) => void;
@@ -148,6 +148,7 @@ export function MCPBundleCard({
 	const [serverToEdit, setServerToEdit] = useState<MCPServerConfig | undefined>(undefined);
 
 	const [serverDetails, setServerDetails] = useState<MCPServerConfig | null>(null);
+	const [isBundleDetailsOpen, setIsBundleDetailsOpen] = useState(false);
 	const [setupServer, setSetupServer] = useState<MCPServerConfig | null>(null);
 
 	const [showAlert, setShowAlert] = useState(false);
@@ -304,13 +305,12 @@ export function MCPBundleCard({
 							type="button"
 							className="btn btn-sm btn-ghost rounded-xl"
 							onClick={() => {
-								setServerDetails(null);
-								openAlert('Select View on a server to inspect its details.');
+								setIsBundleDetailsOpen(true);
 							}}
-							title="Server details are available from each server action row."
+							title="View MCP bundle details"
 						>
 							<FiEye size={16} />
-							<span>Server Details</span>
+							<span>Details</span>
 						</button>
 						{!bundle.isBuiltIn ? (
 							<>
@@ -626,6 +626,15 @@ export function MCPBundleCard({
 				initialData={serverToEdit}
 				existingServerIDs={existingServerIDs}
 				prefillServers={prefillServers}
+			/>
+
+			<MCPBundleDetailsModal
+				isOpen={isBundleDetailsOpen}
+				onClose={() => {
+					setIsBundleDetailsOpen(false);
+				}}
+				bundle={bundle}
+				serverCount={servers.length}
 			/>
 
 			<MCPServerDetailsModal

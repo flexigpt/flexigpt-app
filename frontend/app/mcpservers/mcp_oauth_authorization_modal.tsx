@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiExternalLink, FiX } from 'react-icons/fi';
@@ -32,9 +34,13 @@ function MCPOAuthAuthorizationModalContent({
 	onOpenURL,
 	onCancel,
 }: MCPOAuthAuthorizationModalProps) {
-	const { dialogRef, requestClose, handleClose, handleCancel } = useDialogController({
+	const [isCancelling, setIsCancelling] = useState(false);
+	const [cancelError, setCancelError] = useState('');
+
+	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
 		onClose,
 		blockCancel: true,
+		isBusy: isCancelling,
 	});
 
 	const authState = getEffectiveMCPAuthHealthState(server ?? undefined, authHealth);
@@ -43,6 +49,31 @@ function MCPOAuthAuthorizationModalContent({
 		: '';
 	const isPending = authState === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending;
 	const isAuthorized = authState === MCPAuthHealthState.MCPAuthHealthStateAuthorized;
+
+	const handleAuthorizationCancel = async () => {
+		if (!onCancel || isCancelling) {
+			return;
+		}
+
+		setCancelError('');
+		setIsCancelling(true);
+		try {
+			await onCancel();
+			if (!unmountingRef.current) {
+				requestClose(true);
+			}
+		} catch (error) {
+			if (!unmountingRef.current) {
+				setCancelError(
+					error instanceof Error && error.message.trim() ? error.message : 'Failed to cancel authorization.'
+				);
+			}
+		} finally {
+			if (!unmountingRef.current) {
+				setIsCancelling(false);
+			}
+		}
+	};
 
 	return (
 		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
@@ -64,6 +95,7 @@ function MCPOAuthAuthorizationModalContent({
 								requestClose();
 							}}
 							aria-label="Close"
+							disabled={isCancelling}
 						>
 							<FiX size={12} />
 						</button>
@@ -119,12 +151,28 @@ function MCPOAuthAuthorizationModalContent({
 									</div>
 								</div>
 							)}
+
+							{cancelError && (
+								<div className="alert alert-error rounded-2xl text-sm">
+									<div className="flex items-center gap-2">
+										<FiAlertCircle size={14} />
+										<span>{authHealth?.lastError}</span>
+									</div>
+								</div>
+							)}
 						</div>
 					)}
 
 					<div className="modal-action">
 						{isPending && onCancel && (
-							<button type="button" className="btn bg-base-300 rounded-xl" onClick={() => void onCancel()}>
+							<button
+								type="button"
+								className="btn bg-base-300 rounded-xl"
+								disabled={isCancelling}
+								onClick={() => {
+									void handleAuthorizationCancel();
+								}}
+							>
 								Cancel authorization
 							</button>
 						)}
@@ -149,13 +197,14 @@ function MCPOAuthAuthorizationModalContent({
 							onClick={() => {
 								requestClose();
 							}}
+							disabled={isCancelling}
 						>
 							Close
 						</button>
 					</div>
 				</div>
 			</div>
-			<ModalBackdrop enabled={true} />
+			<ModalBackdrop enabled={!isCancelling} />
 		</dialog>
 	);
 }

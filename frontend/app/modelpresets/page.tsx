@@ -370,17 +370,12 @@ export default function ModelPresetsPage() {
 				throw new Error('Built-in model presets cannot be deleted.');
 			}
 
-			const remainingModelIDs = Object.keys(providerPreset.modelPresets).filter(id => id !== modelPresetID);
+			if (providerPreset.defaultModelPresetID === modelPresetID) {
+				throw new Error('Choose another default model before deleting the current default model preset.');
+			}
 
 			try {
 				await modelPresetStoreAPI.deleteModelPreset(providerName, modelPresetID);
-
-				if (providerPreset.defaultModelPresetID === modelPresetID && remainingModelIDs.length > 0) {
-					await modelPresetStoreAPI.patchProviderPreset(providerName, {
-						defaultModelPresetID: remainingModelIDs[0],
-					});
-				}
-
 				await refreshCanonicalData();
 			} catch (deleteError) {
 				console.error(deleteError);

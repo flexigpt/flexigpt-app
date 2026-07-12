@@ -183,6 +183,16 @@ export default function SkillsPage() {
 				);
 			} catch (err) {
 				console.error('Refresh bundle skills failed:', err);
+				const message = getErrorMessage(err, 'Failed to load this bundle’s skills.');
+
+				if (isMountedRef.current && bundleRefreshRequestIdRef.current[bundleID] === requestId) {
+					setBundles(previous =>
+						previous.map(bundleData =>
+							bundleData.bundle.id === bundleID ? { ...bundleData, skillLoadError: message } : bundleData
+						)
+					);
+				}
+
 				throw err;
 			}
 		},

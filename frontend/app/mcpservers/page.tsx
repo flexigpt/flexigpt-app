@@ -503,7 +503,13 @@ export default function MCPServersPage() {
 			JSON.stringify(
 				bundles.flatMap(bundleData =>
 					bundleData.servers
-						.filter(server => bundleData.bundle.isEnabled && server.enabled)
+						.filter(
+							server =>
+								bundleData.bundle.isEnabled &&
+								server.enabled &&
+								server.transport === MCPTransportType.MCPTransportTypeStreamableHTTP &&
+								server.streamableHttp?.authMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth
+						)
 						.map(server => [bundleData.bundle.id, server.id] as const)
 				)
 			),
@@ -1103,9 +1109,6 @@ export default function MCPServersPage() {
 							onConnectServer={handleConnectServer}
 							onDisconnectServer={handleDisconnectServer}
 							onRefreshServer={handleRefreshServer}
-							onOpenURL={url => {
-								backendAPI.openURL(url);
-							}}
 							onCancelOAuth={handleCancelOAuth}
 							onRequestOAuthAuthorization={requestOAuthAuthorization}
 							onDeleteBundleRequested={bundleID => {

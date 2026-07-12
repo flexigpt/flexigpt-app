@@ -144,6 +144,8 @@ export function SkillBundleCard({
 		[insertFilter, searchQuery, skills, tagFilters]
 	);
 
+	const hasActiveFilters = insertFilter !== 'all' || searchQuery.trim().length > 0 || tagFilters.length > 0;
+
 	const runActionWithAlert = async (key: string, action: () => Promise<void>, fallback: string) => {
 		try {
 			await runAction(key, action);
@@ -171,6 +173,12 @@ export function SkillBundleCard({
 	};
 
 	const requestDeleteSkill = (skill: Skill) => {
+		if (bundle.isBuiltIn) {
+			setAlertMsg('Cannot delete skills from a built-in bundle.');
+			setShowAlert(true);
+			return;
+		}
+
 		if (skill.isBuiltIn) {
 			setAlertMsg('Cannot delete built-in skill.');
 			setShowAlert(true);
@@ -272,7 +280,7 @@ export function SkillBundleCard({
 					>
 						<span className="whitespace-nowrap">
 							Skills: {visibleSkills.length}
-							{insertFilter !== 'all' ? ` / ${skills.length}` : ''}
+							{hasActiveFilters ? ` / ${skills.length}` : ''}
 						</span>
 						{isExpanded ? <FiChevronUp /> : <FiChevronDown />}
 					</button>

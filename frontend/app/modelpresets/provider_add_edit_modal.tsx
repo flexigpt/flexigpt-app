@@ -41,6 +41,18 @@ function headersEqual(a: Record<string, string>, b: Record<string, string>): boo
 	return JSON.stringify(normalizeHeadersRecord(a)) === JSON.stringify(normalizeHeadersRecord(b));
 }
 
+function usesSDKDefaultHeaders(raw: string, sdkType: ProviderSDKType): boolean {
+	if (!raw.trim()) {
+		return true;
+	}
+
+	try {
+		return headersEqual(parseDefaultHeadersRawJSON(raw), SDK_DEFAULTS[sdkType].defaultHeaders);
+	} catch {
+		return false;
+	}
+}
+
 interface ProviderFormData {
 	providerName: string;
 	displayName: string;
@@ -53,15 +65,18 @@ interface ProviderFormData {
 	apiKey: string;
 }
 
+const DEFAULT_SDK_TYPE = ProviderSDKType.ProviderSDKTypeOpenAIChatCompletions;
+const DEFAULT_SDK_DEFAULTS = SDK_DEFAULTS[DEFAULT_SDK_TYPE];
+
 const DEFAULT_FORM: ProviderFormData = {
 	providerName: '',
 	displayName: '',
-	sdkType: ProviderSDKType.ProviderSDKTypeOpenAIChatCompletions,
+	sdkType: DEFAULT_SDK_TYPE,
 	isEnabled: true,
 	origin: '',
-	chatCompletionPathPrefix: '/v1/chat/completions',
-	apiKeyHeaderKey: 'Authorization',
-	defaultHeadersRawJSON: '',
+	chatCompletionPathPrefix: DEFAULT_SDK_DEFAULTS.chatPath,
+	apiKeyHeaderKey: DEFAULT_SDK_DEFAULTS.apiKeyHeaderKey,
+	defaultHeadersRawJSON: JSON.stringify(DEFAULT_SDK_DEFAULTS.defaultHeaders, null, 2),
 	apiKey: '',
 };
 
@@ -378,16 +393,21 @@ function AddEditProviderPresetModalContent({
 		}
 
 		const defaults = SDK_DEFAULTS[key];
+		const previousDefaults = SDK_DEFAULTS[formData.sdkType];
+		const shouldReplacePath =
+			!formData.chatCompletionPathPrefix.trim() ||
+			formData.chatCompletionPathPrefix.trim() === previousDefaults.chatPath;
+		const shouldReplaceHeaderKey =
+			!formData.apiKeyHeaderKey.trim() || formData.apiKeyHeaderKey.trim() === previousDefaults.apiKeyHeaderKey;
+		const shouldReplaceHeaders = usesSDKDefaultHeaders(formData.defaultHeadersRawJSON, formData.sdkType);
 		const next: ProviderFormData = {
 			...formData,
 			sdkType: key,
-			chatCompletionPathPrefix: formData.chatCompletionPathPrefix.trim()
-				? formData.chatCompletionPathPrefix
-				: defaults.chatPath,
-			apiKeyHeaderKey: formData.apiKeyHeaderKey.trim() ? formData.apiKeyHeaderKey : defaults.apiKeyHeaderKey,
-			defaultHeadersRawJSON: formData.defaultHeadersRawJSON.trim()
-				? formData.defaultHeadersRawJSON
-				: JSON.stringify(defaults.defaultHeaders, null, 2),
+			chatCompletionPathPrefix: shouldReplacePath ? defaults.chatPath : formData.chatCompletionPathPrefix,
+			apiKeyHeaderKey: shouldReplaceHeaderKey ? defaults.apiKeyHeaderKey : formData.apiKeyHeaderKey,
+			defaultHeadersRawJSON: shouldReplaceHeaders
+				? JSON.stringify(defaults.defaultHeaders, null, 2)
+				: formData.defaultHeadersRawJSON,
 		};
 
 		setFormData(next);

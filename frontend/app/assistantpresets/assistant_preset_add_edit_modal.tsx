@@ -69,6 +69,7 @@ import {
 	getSkillPreloadEligibilityReason,
 	isInstructionInsertSkill,
 } from '@/skills/lib/skill_artifact_utils';
+import { computeToolUserArgsStatus } from '@/tools/lib/tool_userargs_utils';
 
 interface AddEditAssistantPresetModalProps {
 	isOpen: boolean;
@@ -935,25 +936,37 @@ function AddEditAssistantPresetModalContent({
 						const invalidArgsSelection = state.startingToolSelections.find(selection => {
 							const option = toolOptionByKey.get(buildToolRefKey(selection.toolRef));
 							const raw = selection.userArgSchemaInstance.trim();
-							if (!raw) {
-								return false;
-							}
 							if (!option) {
 								return !toolCatalogUnavailable;
 							}
 							if (!option.hasUserArgSchema) {
+								return raw.length > 0;
+							}
+
+							if (raw && !tryParseJSONRaw(raw).ok) {
 								return true;
 							}
 
-							const parsed = tryParseJSONRaw(raw);
-							return !parsed.ok;
+							return !computeToolUserArgsStatus(option.toolDefinition.userArgSchema, raw).isSatisfied;
 						});
 
 						if (invalidArgsSelection) {
 							const option = toolOptionByKey.get(buildToolRefKey(invalidArgsSelection.toolRef));
-							nextErrors.startingToolSelections = option?.hasUserArgSchema
-								? 'Tool user-args instances must be valid JSON.'
-								: 'Tool args may only be provided for tools that expose a user-args schema.';
+							if (!option?.hasUserArgSchema) {
+								nextErrors.startingToolSelections =
+									'Tool args may only be provided for tools that expose a user-args schema.';
+							} else {
+								const raw = invalidArgsSelection.userArgSchemaInstance.trim();
+								const parsed = raw ? tryParseJSONRaw(raw) : undefined;
+								const status = computeToolUserArgsStatus(option.toolDefinition.userArgSchema, raw);
+
+								nextErrors.startingToolSelections =
+									raw && (!parsed || !parsed.ok)
+										? 'Tool user-args instances must be valid JSON.'
+										: status.missingRequired.length > 0
+											? `Tool user-args must provide required values: ${status.missingRequired.join(', ')}.`
+											: 'Tool user-args must satisfy the tool user-args schema.';
+							}
 						}
 					}
 				}
@@ -1127,7 +1140,7 @@ function AddEditAssistantPresetModalContent({
 					autoExecuteLabel: getToolAutoExecuteLabel(selection.autoExecuteMode),
 					userArgSchemaInstance: selection.userArgSchemaInstance,
 					userArgsHint: option?.hasUserArgSchema
-						? 'This tool exposes a user-args schema.'
+						? 'This tool exposes a user-args schema. Required values must be present before saving.'
 						: hasStaleArgsWithoutSchema
 							? 'This preset still contains saved args, but the tool no longer exposes a user-args schema.'
 							: 'This tool does not expose a user-args schema.',

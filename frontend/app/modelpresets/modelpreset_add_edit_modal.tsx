@@ -9,6 +9,7 @@ import type {
 	CacheControl,
 	CacheControlKind,
 	CacheControlTTL,
+	JSONSchemaParam,
 	OutputParam,
 	ProviderName,
 	ProviderSDKType,
@@ -68,6 +69,47 @@ type OutputFormatKindSelection = OutputFormatKind | typeof OUTPUT_FORMAT_NONE;
 const OUTPUT_VERBOSITY_NONE = '__none__' as const;
 type OutputVerbositySelection = OutputVerbosity | typeof OUTPUT_VERBOSITY_NONE;
 
+type OptionalBooleanSelection = '' | 'true' | 'false';
+type JSONObjectParseResult = { ok: true; value: Record<string, unknown> } | { ok: false; error: string };
+
+const OPTIONAL_BOOLEAN_ORDERED_KEYS: OptionalBooleanSelection[] = ['', 'true', 'false'];
+
+function booleanToOptionalBoolean(value?: boolean): OptionalBooleanSelection {
+	if (value === true) {
+		return 'true';
+	}
+	if (value === false) {
+		return 'false';
+	}
+	return '';
+}
+
+function optionalBooleanToBoolean(value: OptionalBooleanSelection): boolean | undefined {
+	if (value === 'true') {
+		return true;
+	}
+	if (value === 'false') {
+		return false;
+	}
+	return undefined;
+}
+
+function isJSONObjectLike(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function tryParseJSONObject(raw: string): JSONObjectParseResult {
+	try {
+		const value = JSON.parse(raw);
+		if (!isJSONObjectLike(value)) {
+			return { ok: false, error: 'JSON schema body must be a JSON object.' };
+		}
+		return { ok: true, value };
+	} catch {
+		return { ok: false, error: 'JSON schema body must be valid JSON.' };
+	}
+}
+
 const outputFormatKindItems: Record<OutputFormatKindSelection, { isEnabled: boolean; displayName: string }> = {
 	[OUTPUT_FORMAT_NONE]: { isEnabled: true, displayName: 'Default / Unset' },
 	[OutputFormatKind.Text]: { isEnabled: true, displayName: 'Text' },
@@ -82,6 +124,16 @@ const outputVerbosityItems: Record<OutputVerbositySelection, { isEnabled: boolea
 	[OutputVerbosity.XHigh]: { isEnabled: true, displayName: 'XHigh' },
 	[OutputVerbosity.Max]: { isEnabled: true, displayName: 'Max' },
 };
+
+const outputJSONSchemaStrictModeItems: Record<OptionalBooleanSelection, { isEnabled: boolean; displayName: string }> = {
+	'': { isEnabled: true, displayName: 'Leave unset' },
+	true: { isEnabled: true, displayName: 'Strict' },
+	false: { isEnabled: true, displayName: 'Non-strict' },
+};
+
+function getOptionalBooleanDisplayName(value: OptionalBooleanSelection): string {
+	return outputJSONSchemaStrictModeItems[value].displayName;
+}
 
 const reasoningTypeItems: Record<ReasoningType, { isEnabled: boolean; displayName: string }> = {
 	[ReasoningType.SingleWithLevels]: {
@@ -122,30 +174,6 @@ const AddModeDefaults = {
 const EXISTING_FIELD_CLEAR_UNSUPPORTED_MESSAGE =
 	'Clearing an existing value is unavailable until the backend supports nullable patch fields or explicit clear flags. Enter a replacement value instead.';
 
-function buildOutputParamFromForm(
-	outputFormatKind: OutputFormatKindSelection,
-	outputVerbosity: OutputVerbositySelection,
-	initialOutputParam?: OutputParam
-): OutputParam | undefined {
-	const formatKind = outputFormatKind !== OUTPUT_FORMAT_NONE ? outputFormatKind : undefined;
-	const verbosity = outputVerbosity !== OUTPUT_VERBOSITY_NONE ? outputVerbosity : undefined;
-	if (!formatKind && !verbosity) {
-		return undefined;
-	}
-
-	const format =
-		formatKind !== undefined
-			? initialOutputParam?.format?.kind === formatKind
-				? initialOutputParam.format
-				: { kind: formatKind }
-			: undefined;
-
-	return {
-		...(format && { format }),
-		...(verbosity && { verbosity }),
-	};
-}
-
 function buildCacheControlFromModelPresetForm(
 	formData: ModelPresetFormData,
 	supportedKinds: CacheControlKind[],
@@ -183,12 +211,57 @@ interface ModelPresetFormData {
 
 	outputFormatKind: OutputFormatKindSelection;
 	outputVerbosity: OutputVerbositySelection;
+	outputJSONSchemaName: string;
+	outputJSONSchemaDescription: string;
+	outputJSONSchemaRaw: string;
+	outputJSONSchemaStrictMode: OptionalBooleanSelection;
 
 	cacheControlEnabled: boolean;
 	cacheControlKind: CacheControlKind | '';
 	cacheControlTTL: CacheControlTTLSelection;
 	cacheControlKey: string;
 	stopSequencesRaw: string;
+}
+
+function buildOutputParamFromForm(formData: ModelPresetFormData): OutputParam | undefined {
+	const formatKind = formData.outputFormatKind !== OUTPUT_FORMAT_NONE ? formData.outputFormatKind : undefined;
+	const verbosity = formData.outputVerbosity !== OUTPUT_VERBOSITY_NONE ? formData.outputVerbosity : undefined;
+	if (!formatKind && !verbosity) {
+		return undefined;
+	}
+
+	let format: OutputParam['format'] = undefined;
+
+	if (formatKind === OutputFormatKind.JSONSchema) {
+		const jsonSchemaParam: JSONSchemaParam = {
+			name: formData.outputJSONSchemaName.trim(),
+		};
+		const description = formData.outputJSONSchemaDescription.trim();
+		const schemaRaw = formData.outputJSONSchemaRaw.trim();
+		const strict = optionalBooleanToBoolean(formData.outputJSONSchemaStrictMode);
+
+		if (description) {
+			jsonSchemaParam.description = description;
+		}
+		if (schemaRaw) {
+			const parsed = tryParseJSONObject(schemaRaw);
+			if (parsed.ok) {
+				jsonSchemaParam.schema = parsed.value;
+			}
+		}
+		if (strict !== undefined) {
+			jsonSchemaParam.strict = strict;
+		}
+
+		format = { kind: formatKind, jsonSchemaParam };
+	} else if (formatKind) {
+		format = { kind: formatKind };
+	}
+
+	return {
+		...(format ? { format } : {}),
+		...(verbosity ? { verbosity } : {}),
+	};
 }
 
 type ModalMode = 'add' | 'edit' | 'view';
@@ -259,14 +332,16 @@ type ValidationField =
 	| 'maxOutputLength'
 	| 'timeout'
 	| 'cacheControlKey'
-	| 'reasoningTokens';
+	| 'reasoningTokens'
+	| 'outputJSONSchemaName'
+	| 'outputJSONSchemaRaw';
 
 type ValidationErrors = Partial<Record<ValidationField, string>>;
 
 const calcNumericError = (
 	field: ValidationField,
 	strVal: string,
-	minOrRange?: { min?: number; max?: number }
+	minOrRange?: { min?: number; max?: number; integer?: boolean }
 ): string | undefined => {
 	if (strVal.trim() === '') {
 		return;
@@ -274,6 +349,9 @@ const calcNumericError = (
 	const num = Number(strVal);
 	if (Number.isNaN(num)) {
 		return `${field} must be a valid number.`;
+	}
+	if (minOrRange?.integer && !Number.isInteger(num)) {
+		return `${field} must be a whole number.`;
 	}
 	if (minOrRange?.min !== undefined && num < minOrRange.min) {
 		return `${field} must be ≥ ${minOrRange.min}.`;
@@ -307,6 +385,12 @@ function getInitialModelPresetFormData(
 			timeout: initialData.timeout !== undefined ? String(initialData.timeout) : '',
 			outputFormatKind: initialData.outputParam?.format?.kind ?? OUTPUT_FORMAT_NONE,
 			outputVerbosity: initialData.outputParam?.verbosity ?? OUTPUT_VERBOSITY_NONE,
+			outputJSONSchemaName: initialData.outputParam?.format?.jsonSchemaParam?.name ?? '',
+			outputJSONSchemaDescription: initialData.outputParam?.format?.jsonSchemaParam?.description ?? '',
+			outputJSONSchemaRaw: initialData.outputParam?.format?.jsonSchemaParam?.schema
+				? JSON.stringify(initialData.outputParam.format.jsonSchemaParam.schema, null, 2)
+				: '',
+			outputJSONSchemaStrictMode: booleanToOptionalBoolean(initialData.outputParam?.format?.jsonSchemaParam?.strict),
 			cacheControlEnabled: !!initialData.cacheControl,
 			cacheControlKind: getInitialCacheControlKind(initialData.cacheControl, supportedCacheKinds),
 			cacheControlTTL: getInitialCacheControlTTLSelection(initialData.cacheControl, supportedCacheTTLs),
@@ -332,6 +416,10 @@ function getInitialModelPresetFormData(
 		timeout: String(AddModeDefaults.timeout ?? ''),
 		outputFormatKind: OUTPUT_FORMAT_NONE,
 		outputVerbosity: OUTPUT_VERBOSITY_NONE,
+		outputJSONSchemaName: '',
+		outputJSONSchemaDescription: '',
+		outputJSONSchemaRaw: '',
+		outputJSONSchemaStrictMode: '',
 		cacheControlEnabled: false,
 		cacheControlKind: supportedCacheKinds[0] ?? '',
 		cacheControlTTL: CACHE_CONTROL_TTL_PROVIDER_DEFAULT,
@@ -474,8 +562,14 @@ function AddEditModelPresetModalContent({
 			reasoningSummaryStyle: src.reasoning?.summaryStyle ?? prev.reasoningSummaryStyle,
 			systemPrompt: src.systemPrompt ?? prev.systemPrompt,
 			timeout: src.timeout !== undefined ? String(src.timeout) : prev.timeout,
-			outputFormatKind: src.outputParam?.format?.kind ?? prev.outputFormatKind ?? OUTPUT_FORMAT_NONE,
-			outputVerbosity: src.outputParam?.verbosity ?? prev.outputVerbosity ?? OUTPUT_VERBOSITY_NONE,
+			outputFormatKind: src.outputParam?.format?.kind ?? OUTPUT_FORMAT_NONE,
+			outputVerbosity: src.outputParam?.verbosity ?? OUTPUT_VERBOSITY_NONE,
+			outputJSONSchemaName: src.outputParam?.format?.jsonSchemaParam?.name ?? '',
+			outputJSONSchemaDescription: src.outputParam?.format?.jsonSchemaParam?.description ?? '',
+			outputJSONSchemaRaw: src.outputParam?.format?.jsonSchemaParam?.schema
+				? JSON.stringify(src.outputParam.format.jsonSchemaParam.schema, null, 2)
+				: '',
+			outputJSONSchemaStrictMode: booleanToOptionalBoolean(src.outputParam?.format?.jsonSchemaParam?.strict),
 			cacheControlEnabled: supportsManualCacheControl && !!src.cacheControl,
 			cacheControlKind: getInitialCacheControlKind(src.cacheControl, supportedCacheKinds),
 			cacheControlTTL: getInitialCacheControlTTLSelection(src.cacheControl, supportedCacheTTLs),
@@ -545,11 +639,7 @@ function AddEditModelPresetModalContent({
 			patch.cacheControl = nextCacheControl;
 		}
 
-		const nextOutputParam = buildOutputParamFromForm(
-			formData.outputFormatKind,
-			formData.outputVerbosity,
-			initialData.outputParam
-		);
+		const nextOutputParam = buildOutputParamFromForm(formData);
 		if (!outputParamsEqual(nextOutputParam, initialData.outputParam) && nextOutputParam) {
 			patch.outputParam = nextOutputParam;
 		}
@@ -634,6 +724,20 @@ function AddEditModelPresetModalContent({
 				}
 			}
 
+			if (fd.outputFormatKind === OutputFormatKind.JSONSchema) {
+				if (!fd.outputJSONSchemaName.trim()) {
+					nextErrors.outputJSONSchemaName = 'JSON Schema output requires a schema name.';
+				}
+
+				const schemaRaw = fd.outputJSONSchemaRaw.trim();
+				if (schemaRaw) {
+					const parsed = tryParseJSONObject(schemaRaw);
+					if (!parsed.ok) {
+						nextErrors.outputJSONSchemaRaw = parsed.error;
+					}
+				}
+			}
+
 			const hasTemperature = fd.temperature.trim() !== '';
 			const effectiveHasTemperature = hasTemperature || (isEditMode && initialData?.temperature !== undefined);
 			const effectiveHasReasoning = fd.reasoningSupport || (isEditMode && !!initialData?.reasoning);
@@ -693,7 +797,7 @@ function AddEditModelPresetModalContent({
 			supportsCacheTTL,
 			supportsCacheKey
 		);
-		const nextOutputParam = buildOutputParamFromForm(formData.outputFormatKind, formData.outputVerbosity);
+		const nextOutputParam = buildOutputParamFromForm(formData);
 		const nextReasoning = buildReasoningFromForm(formData);
 
 		const validationErrors = runValidation();
@@ -1489,6 +1593,99 @@ function AddEditModelPresetModalContent({
 									) : null}
 								</div>
 							</div>
+
+							{formData.outputFormatKind === OutputFormatKind.JSONSchema ? (
+								<>
+									<ModalField
+										label="JSON Schema Name"
+										htmlFor="model-output-json-schema-name"
+										required
+										error={errors.outputJSONSchemaName}
+									>
+										{isReadOnly ? (
+											<ReadOnlyValue value={formData.outputJSONSchemaName || '—'} />
+										) : (
+											<input
+												id="model-output-json-schema-name"
+												name="outputJSONSchemaName"
+												type="text"
+												className={`input w-full rounded-xl ${errors.outputJSONSchemaName ? 'input-error' : ''}`}
+												value={formData.outputJSONSchemaName}
+												onChange={handleChange}
+												autoComplete="off"
+												spellCheck="false"
+												disabled={isSubmitting}
+											/>
+										)}
+									</ModalField>
+
+									<ModalField label="Strict Mode">
+										{isReadOnly ? (
+											<ReadOnlyValue value={getOptionalBooleanDisplayName(formData.outputJSONSchemaStrictMode)} />
+										) : (
+											<Dropdown<OptionalBooleanSelection>
+												dropdownItems={outputJSONSchemaStrictModeItems}
+												orderedKeys={OPTIONAL_BOOLEAN_ORDERED_KEYS}
+												selectedKey={formData.outputJSONSchemaStrictMode}
+												onChange={outputJSONSchemaStrictMode => {
+													setFormData(previous => ({
+														...previous,
+														outputJSONSchemaStrictMode,
+													}));
+												}}
+												filterDisabled={false}
+												title="Select JSON Schema strictness"
+												getDisplayName={getOptionalBooleanDisplayName}
+												disabled={isSubmitting}
+											/>
+										)}
+									</ModalField>
+
+									<ModalField label="JSON Schema Description" htmlFor="model-output-json-schema-description">
+										{isReadOnly ? (
+											<ReadOnlyValue value={formData.outputJSONSchemaDescription || '—'} />
+										) : (
+											<input
+												id="model-output-json-schema-description"
+												name="outputJSONSchemaDescription"
+												type="text"
+												className="input w-full rounded-xl"
+												value={formData.outputJSONSchemaDescription}
+												onChange={handleChange}
+												autoComplete="off"
+												spellCheck="false"
+												disabled={isSubmitting}
+											/>
+										)}
+									</ModalField>
+
+									<ModalField
+										label="JSON Schema Body"
+										htmlFor="model-output-json-schema-body"
+										error={errors.outputJSONSchemaRaw}
+										align="start"
+									>
+										{isReadOnly ? (
+											<pre className="bg-base-300 max-h-56 overflow-auto rounded-xl p-3 text-xs whitespace-pre-wrap">
+												{formData.outputJSONSchemaRaw || '—'}
+											</pre>
+										) : (
+											<textarea
+												id="model-output-json-schema-body"
+												name="outputJSONSchemaRaw"
+												className={`textarea h-40 w-full rounded-xl font-mono text-xs ${
+													errors.outputJSONSchemaRaw ? 'textarea-error' : ''
+												}`}
+												value={formData.outputJSONSchemaRaw}
+												onChange={handleChange}
+												spellCheck="false"
+												placeholder='{"type":"object","properties":{}}'
+												disabled={isSubmitting}
+											/>
+										)}
+									</ModalField>
+								</>
+							) : null}
 
 							<div className="grid grid-cols-12 items-center gap-2">
 								<label className="label col-span-3">

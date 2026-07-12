@@ -61,12 +61,12 @@ export function DebugSettingsSection({ value, onChanged }: DebugSettingsSectionP
 					</div>
 				</div>
 			)}
-			<div className="flex items-center justify-between gap-4">
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 				<div>
 					<h3 className="text-sm font-semibold">Log level</h3>
 					<p className="text-base-content/60 text-xs">Controls the runtime Go backend log verbosity.</p>
 				</div>
-				<div className="w-60">
+				<div className="w-full sm:w-60">
 					<Dropdown
 						dropdownItems={LOG_LEVEL_DROPDOWN_ITEMS}
 						selectedKey={current.logLevel}
@@ -80,14 +80,14 @@ export function DebugSettingsSection({ value, onChanged }: DebugSettingsSectionP
 				</div>
 			</div>
 
-			<div className="flex items-center justify-between gap-4">
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 				<div>
 					<h3 className="text-sm font-semibold">LLM request and response logging</h3>
 					<p className="text-base-content/60 text-xs">Log raw LLM request and response payloads to the app logs.</p>
 				</div>
 				<input
 					type="checkbox"
-					className="toggle toggle-accent"
+					className="toggle toggle-accent self-start sm:self-auto"
 					checked={current.logLLMReqResp}
 					disabled={saving}
 					onChange={e => {
@@ -96,7 +96,7 @@ export function DebugSettingsSection({ value, onChanged }: DebugSettingsSectionP
 				/>
 			</div>
 
-			<div className="flex items-center justify-between gap-4">
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 				<div>
 					<h3 className="text-sm font-semibold">Disable content stripping</h3>
 					<p className="text-base-content/60 text-xs">
@@ -105,7 +105,7 @@ export function DebugSettingsSection({ value, onChanged }: DebugSettingsSectionP
 				</div>
 				<input
 					type="checkbox"
-					className="toggle toggle-accent"
+					className="toggle toggle-accent self-start sm:self-auto"
 					checked={current.disableContentStripping}
 					disabled={saving}
 					onChange={e => {

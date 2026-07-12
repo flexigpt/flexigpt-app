@@ -1263,7 +1263,7 @@ function AddEditToolModalContent({
 }
 
 export function AddEditToolModal({ isOpen, initialData, mode, ...rest }: AddEditToolModalProps) {
-	if (!isOpen || typeof document === 'undefined') {
+	if (!isOpen || typeof document === 'undefined' || !document.body) {
 		return null;
 	}
 

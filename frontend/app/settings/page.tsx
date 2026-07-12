@@ -101,8 +101,8 @@ export default function SettingsPage() {
 						/>
 					) : null}
 
-					<div className="bg-base-100 flex items-center rounded-2xl p-4 shadow-lg">
-						<h2 className="mr-8 ml-4 font-semibold">Theme</h2>
+					<div className="bg-base-100 flex flex-col gap-3 rounded-2xl p-4 shadow-lg sm:flex-row sm:items-center">
+						<h2 className="font-semibold">Theme</h2>
 						<ThemeSelector />
 					</div>
 

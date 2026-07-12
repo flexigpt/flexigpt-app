@@ -176,9 +176,18 @@ function MCPServerSetupModalContent({
 							</div>
 						)}
 
+						{reset ? (
+							<div className="alert alert-warning rounded-2xl text-sm">
+								<div className="flex items-center gap-2">
+									<FiAlertCircle size={14} />
+									<span>Reset clears existing setup values that are not supplied in this save.</span>
+								</div>
+							</div>
+						) : null}
+
 						{inputs.map(input => {
 							const row = rows[input.id] ?? emptyRow();
-							const configured = isMCPSetupInputConfigured(server, input);
+							const configured = effectiveConfigured(input);
 							const isOAuth = input.kind === MCPServerSetupInputKind.OAuthClientCredentials;
 							const isSecret =
 								isOAuth ||
@@ -205,6 +214,7 @@ function MCPServerSetupModalContent({
 												value={row.clientID}
 												autoComplete="off"
 												spellCheck="false"
+												disabled={isSubmitting}
 												onChange={e => {
 													updateRow(input.id, { clientID: e.target.value });
 												}}
@@ -219,6 +229,7 @@ function MCPServerSetupModalContent({
 												}
 												value={row.clientSecret}
 												autoComplete="new-password"
+												disabled={isSubmitting}
 												onChange={e => {
 													updateRow(input.id, { clientSecret: e.target.value });
 												}}
@@ -232,6 +243,7 @@ function MCPServerSetupModalContent({
 											value={row.value}
 											autoComplete={isSecret ? 'new-password' : 'off'}
 											spellCheck="false"
+											disabled={isSubmitting}
 											onChange={e => {
 												updateRow(input.id, { value: e.target.value });
 											}}
@@ -259,6 +271,7 @@ function MCPServerSetupModalContent({
 									onChange={e => {
 										setReset(e.target.checked);
 									}}
+									disabled={isSubmitting}
 								/>
 								<span className="text-sm">Reset existing setup before applying</span>
 							</label>

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { FiChevronDown, FiChevronUp, FiEye, FiGitBranch, FiPlus, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
 
 import type { Tool, ToolBundle } from '@/spec/tool';
+import { ToolImplType } from '@/spec/tool';
 
 import { usePendingActions } from '@/hooks/use_pending_actions';
 
@@ -142,6 +143,11 @@ export function ToolBundleCard({
 			setShowAlert(true);
 			return;
 		}
+		if (mode === 'edit' && tool && tool.type !== ToolImplType.HTTP) {
+			setAlertMsg('Only HTTP tools can create new versions in this UI. Go and SDK tools are view-only here.');
+			setShowAlert(true);
+			return;
+		}
 		if ((mode === 'add' || mode === 'edit') && !bundle.isEnabled) {
 			setAlertMsg('Enable the bundle before adding or creating a new tool version.');
 			setShowAlert(true);
@@ -248,7 +254,6 @@ export function ToolBundleCard({
 							<div className="wrap-break-word">{toolLoadError}</div>
 						</div>
 						<button
-							id={`tool-bundle-${bundle.id}`}
 							type="button"
 							className="btn btn-sm rounded-xl"
 							onClick={() => {
@@ -321,7 +326,14 @@ export function ToolBundleCard({
 											onClick={() => {
 												openToolModal('edit', tool);
 											}}
-											disabled={!bundle.isEnabled || tool.isBuiltIn || bundle.isBuiltIn}
+											disabled={
+												!bundle.isEnabled || tool.isBuiltIn || bundle.isBuiltIn || tool.type !== ToolImplType.HTTP
+											}
+											title={
+												tool.type !== ToolImplType.HTTP
+													? 'Only HTTP tools can create new versions in this UI.'
+													: 'Create a new version'
+											}
 										>
 											<FiGitBranch size={15} />
 											<span>New version</span>

@@ -35,6 +35,7 @@ import { StatusBadge } from '@/components/managementui/status_badge';
 import { ModalSection } from '@/components/modal/modal_section';
 
 import {
+	getEffectiveMCPServerStatus,
 	getMCPApprovalRuleLabel,
 	getMCPExecutionModeLabel,
 	getMCPServerAuthHealthBadgeClass,
@@ -159,6 +160,8 @@ function MCPServerDetailsModalContent({
 
 	const { discovery, discoveryError } = discoveryResult;
 
+	const effectiveRuntimeStatus = getEffectiveMCPServerStatus(server.enabled, bundle.isEnabled, runtime);
+
 	return (
 		<ManagementDetailsModal
 			isOpen={true}
@@ -181,8 +184,8 @@ function MCPServerDetailsModalContent({
 					<Field label="Modified">{server.modifiedAt}</Field>
 
 					<Field label="Runtime">
-						<span className={`badge rounded-xl ${getMCPStatusBadgeClass(runtime?.status)}`}>
-							{getMCPStatusLabel(runtime?.status)}
+						<span className={`badge rounded-xl ${getMCPStatusBadgeClass(effectiveRuntimeStatus)}`}>
+							{getMCPStatusLabel(effectiveRuntimeStatus)}
 						</span>
 						{runtime?.lastError && <div className="text-error mt-1 text-xs">{runtime.lastError}</div>}
 					</Field>

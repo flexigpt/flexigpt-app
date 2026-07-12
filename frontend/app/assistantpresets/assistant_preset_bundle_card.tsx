@@ -298,7 +298,6 @@ export function AssistantPresetBundleCard({
 							<div>{presetLoadError}</div>
 						</div>
 						<button
-							id={`assistant-bundle-${bundle.id}`}
 							type="button"
 							className="btn btn-sm rounded-xl"
 							onClick={() => {

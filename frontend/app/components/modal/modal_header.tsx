@@ -11,7 +11,7 @@ interface ModalHeaderProps {
 
 export function ModalHeader({ title, description, onClose, closeDisabled = false }: ModalHeaderProps) {
 	return (
-		<header className="border-base-content/10 flex shrink-0 items-start justify-between gap-4 border-b p-4 sm:px-6">
+		<header className="bg-base-200/95 border-base-content/10 sticky top-0 z-20 flex shrink-0 items-start justify-between gap-4 border-b p-4 backdrop-blur-sm sm:px-6">
 			<div className="min-w-0">
 				<h3 className="text-lg font-semibold tracking-tight">{title}</h3>
 				{description ? <div className="text-base-content/70 mt-1 text-sm">{description}</div> : null}
