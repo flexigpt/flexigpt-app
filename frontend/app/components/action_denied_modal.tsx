@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 
 import { FiAlertTriangle } from 'react-icons/fi';
 
-import { ModalBackdrop } from '@/components/modal_backdrop';
+import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 
 interface ActionDeniedAlertModalProps {
 	isOpen: boolean;

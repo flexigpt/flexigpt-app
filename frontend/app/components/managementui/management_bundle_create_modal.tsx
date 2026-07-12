@@ -9,7 +9,9 @@ import { validateSlug } from '@/lib/text_utils';
 
 import { useDialogController } from '@/hooks/use_dialog_controller';
 
-import { ModalActions, ModalField, ModalHeader } from '@/components/management_ui';
+import { ModalActions } from '@/components/modal/modal_actions';
+import { ModalField } from '@/components/modal/modal_field';
+import { ModalHeader } from '@/components/modal/modal_header';
 
 interface ManagementBundleCreateModalProps {
 	isOpen: boolean;

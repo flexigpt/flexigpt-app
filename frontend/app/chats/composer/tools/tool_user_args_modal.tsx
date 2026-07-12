@@ -14,7 +14,7 @@ import {
 	getRequiredFromJSONSchema,
 } from '@/lib/jsonschema_utils';
 
-import { ModalBackdrop } from '@/components/modal_backdrop';
+import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 
 import { MessageContentCard } from '@/chats/messages/message_content_card';
 import { computeToolUserArgsStatus } from '@/tools/lib/tool_userargs_utils';

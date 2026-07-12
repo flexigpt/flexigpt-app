@@ -7,7 +7,7 @@ import { FiAlertCircle, FiExternalLink, FiX } from 'react-icons/fi';
 import type { MCPAuthHealth, MCPServerConfig } from '@/spec/mcp';
 import { MCPAuthHealthState } from '@/spec/mcp';
 
-import { ModalBackdrop } from '@/components/modal_backdrop';
+import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 
 import {
 	getEffectiveMCPAuthHealthState,

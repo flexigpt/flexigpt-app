@@ -26,7 +26,8 @@ import { BaseMCPBundleID, MCPAuthHealthState, MCPServerStatus } from '@/spec/mcp
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
-import { MetadataPill, StatusBadge } from '@/components/management_ui';
+import { MetadataPill } from '@/components/managementui/metadata_pill';
+import { StatusBadge } from '@/components/managementui/status_badge';
 
 import type { MCPServerUpsertInput } from '@/mcpservers/lib/mcp_server_utils';
 import {

@@ -11,7 +11,7 @@ import type { UIChatOption } from '@/spec/modelpreset';
 import type { SkillSelection } from '@/spec/skill';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
-import { ModalBackdrop } from '@/components/modal_backdrop';
+import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 
 import type {
 	AssistantPresetModificationSummary,

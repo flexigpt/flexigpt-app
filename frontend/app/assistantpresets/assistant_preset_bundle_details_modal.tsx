@@ -6,7 +6,7 @@ import { FiX } from 'react-icons/fi';
 
 import type { AssistantPresetBundle } from '@/spec/assistantpreset';
 
-import { ModalBackdrop } from '@/components/modal_backdrop';
+import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 
 import { formatDateish } from '@/assistantpresets/lib/assistant_preset_utils';
 

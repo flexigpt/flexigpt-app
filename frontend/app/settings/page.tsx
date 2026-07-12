@@ -1,13 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { FiPlus } from 'react-icons/fi';
 
-import type { AuthKeyMeta, DebugSettings } from '@/spec/setting';
+import type { AuthKeyMeta, SettingsSchema } from '@/spec/setting';
+
+import { throwIfAborted } from '@/lib/async_utils';
+
+import { useAsyncResource } from '@/hooks/use_async_resource';
 
 import { settingstoreAPI } from '@/apis/baseapi';
 
 import { DownloadButton } from '@/components/download_button';
-import { ManagementPageContent, ManagementPageHeader } from '@/components/management_ui';
+import { Loader } from '@/components/loader';
+import { ManagementPageContent } from '@/components/managementui/management_page_content';
+import { ManagementPageHeader } from '@/components/managementui/management_page_header';
+import { ManagementResourceError } from '@/components/managementui/management_resource_error';
 import { PageFrame } from '@/components/page_frame';
 
 import { AddEditAuthKeyModal } from '@/settings/authkey_add_edit_modal';
@@ -22,36 +29,33 @@ async function exportSettings() {
 
 // oxlint-disable-next-line no-restricted-exports
 export default function SettingsPage() {
-	const [authKeys, setAuthKeys] = useState<AuthKeyMeta[]>([]);
-	const [debugSettings, setDebugSettings] = useState<DebugSettings | null>(null);
-	const [refreshToggle, setRefreshToggle] = useState(false); // helper to force list refresh
+	const loadSettings = useCallback(async (signal: AbortSignal): Promise<SettingsSchema> => {
+		const settings = await settingstoreAPI.getSettings();
+		throwIfAborted(signal);
+		return settings;
+	}, []);
+
+	const {
+		data: settings,
+		error: settingsLoadError,
+		isLoading,
+		isRefreshing,
+		reloadOrThrow,
+		setData: setSettings,
+	} = useAsyncResource(loadSettings, {
+		initialData: null as SettingsSchema | null,
+	});
 
 	const [isModalOpen, setIsModalOpen] = useState(false);
-	const [modalInitial, setModalInitial] = useState<AuthKeyMeta | null>(null); // null = Add
+	const [modalInitial, setModalInitial] = useState<AuthKeyMeta | null>(null);
 
-	useEffect(() => {
-		let cancelled = false;
-
-		void (async () => {
-			try {
-				const settings = await settingstoreAPI.getSettings();
-
-				if (!cancelled) {
-					setAuthKeys(settings.authKeys);
-					setDebugSettings(settings.debug);
-				}
-			} catch (err) {
-				console.error('Failed to load settings', err);
-			}
-		})();
-
-		return () => {
-			cancelled = true;
-		};
-	}, [refreshToggle]);
+	const authKeys = settings?.authKeys ?? [];
+	const debugSettings = settings?.debug ?? null;
 
 	const refresh = () => {
-		setRefreshToggle(p => !p);
+		void reloadOrThrow().catch((error: unknown) => {
+			console.error('Failed to refresh settings', error);
+		});
 	};
 	const showAddModal = () => {
 		setModalInitial(null);
@@ -61,6 +65,10 @@ export default function SettingsPage() {
 		setModalInitial(meta);
 		setIsModalOpen(true);
 	};
+
+	if (isLoading && settings === null) {
+		return <Loader text="Loading settings..." />;
+	}
 
 	return (
 		<PageFrame>
@@ -82,6 +90,17 @@ export default function SettingsPage() {
 				/>
 
 				<ManagementPageContent>
+					{settingsLoadError ? (
+						<ManagementResourceError
+							title="Settings could not be loaded"
+							error={settingsLoadError}
+							isRetrying={isRefreshing}
+							onRetry={async () => {
+								await reloadOrThrow();
+							}}
+						/>
+					) : null}
+
 					<div className="bg-base-100 flex items-center rounded-2xl p-4 shadow-lg">
 						<h2 className="mr-8 ml-4 font-semibold">Theme</h2>
 						<ThemeSelector />
@@ -100,7 +119,12 @@ export default function SettingsPage() {
 
 					<div className="bg-base-100 rounded-2xl p-4 shadow-lg">
 						<h2 className="mr-8 mb-0 ml-4 font-semibold">Debug</h2>
-						<DebugSettingsSection value={debugSettings} onChanged={setDebugSettings} />
+						<DebugSettingsSection
+							value={debugSettings}
+							onChanged={debug => {
+								setSettings(previous => (previous ? { ...previous, debug } : previous));
+							}}
+						/>
 					</div>
 				</ManagementPageContent>
 

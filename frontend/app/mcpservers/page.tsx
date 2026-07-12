@@ -23,8 +23,9 @@ import { getAllMCPBundles, getAllMCPServers } from '@/apis/list_helper';
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 import { Loader } from '@/components/loader';
-import { ManagementBundleCreateModal } from '@/components/management_bundle_create_modal';
-import { ManagementPageContent, ManagementPageHeader } from '@/components/management_ui';
+import { ManagementBundleCreateModal } from '@/components/managementui/management_bundle_create_modal';
+import { ManagementPageContent } from '@/components/managementui/management_page_content';
+import { ManagementPageHeader } from '@/components/managementui/management_page_header';
 import { PageFrame } from '@/components/page_frame';
 
 import type { MCPServerUpsertInput } from '@/mcpservers/lib/mcp_server_utils';

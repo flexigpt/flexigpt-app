@@ -29,6 +29,7 @@ import type {
 	FileStatusCounts,
 } from '@/components/markdown/unified_diff_block';
 import {
+	absolutePathStrings,
 	buildEditableTargetsFromOutput,
 	buildFileStatusCounts,
 	buildUnifiedDiffTextForTarget,
@@ -37,6 +38,7 @@ import {
 	looksLikeUnifiedDiff,
 	parseUnifiedDiffForUI,
 	summaryLabel,
+	toAbsolutePath,
 	uniqueStrings,
 } from '@/components/markdown/unified_diff_block';
 
@@ -51,15 +53,39 @@ function isDiffPartHunkComplete(diffPart: string, expectedHunks: number | undefi
 	return diffPart.split('\n').filter(line => line.startsWith('@@')).length === expectedHunks;
 }
 
-function editableTargetsToFileTargets(targets: EditableUnifiedDiffTarget[]): ApplyUnifiedDiffFileTarget[] {
+function normalizeApplyFileTargets(targets: ApplyUnifiedDiffFileTarget[]): ApplyUnifiedDiffFileTarget[] {
 	return targets
 		.map(target => ({
 			fileKey: target.fileKey?.trim() || undefined,
 			oldPath: target.oldPath?.trim() || undefined,
 			newPath: target.newPath?.trim() || undefined,
-			targetPath: target.targetPath.trim(),
+			targetPath: toAbsolutePath(target.targetPath),
 		}))
 		.filter(target => target.targetPath.length > 0);
+}
+
+function editableTargetsToFileTargets(targets: EditableUnifiedDiffTarget[]): ApplyUnifiedDiffFileTarget[] {
+	return normalizeApplyFileTargets(
+		targets.map(target => ({
+			fileKey: target.fileKey,
+			oldPath: target.oldPath,
+			newPath: target.newPath,
+			targetPath: target.targetPath,
+		}))
+	);
+}
+
+function normalizeApplyOutputTargetPaths(output: ApplyUnifiedDiffOut): ApplyUnifiedDiffOut {
+	return {
+		...output,
+		fileTargets: output.fileTargets ? normalizeApplyFileTargets(output.fileTargets) : undefined,
+		files: output.files?.map(file => ({
+			...file,
+			targetPath: toAbsolutePath(file.targetPath) || undefined,
+			resolvedPath: toAbsolutePath(file.resolvedPath) || undefined,
+			candidatePaths: absolutePathStrings(file.candidatePaths ?? []),
+		})),
+	};
 }
 
 function resolveRequestDiffText(
@@ -304,25 +330,28 @@ function hydrateApplyOutputWithRequestTargets(
 	output: ApplyUnifiedDiffOut,
 	requestTargets: ApplyUnifiedDiffFileTarget[]
 ): ApplyUnifiedDiffOut {
-	if (!output.files?.length || requestTargets.length === 0) {
-		return output;
+	const normalizedOutput = normalizeApplyOutputTargetPaths(output);
+	const normalizedRequestTargets = normalizeApplyFileTargets(requestTargets);
+
+	if (!normalizedOutput.files?.length || normalizedRequestTargets.length === 0) {
+		return normalizedOutput;
 	}
 
-	const outputFiles = output.files;
+	const outputFiles = normalizedOutput.files;
 	const usedTargetIndexes = new Set<number>();
-	const canUsePositionFallback = outputFiles.length === requestTargets.length;
+	const canUsePositionFallback = outputFiles.length === normalizedRequestTargets.length;
 
 	const files = outputFiles.map((file, index) => {
-		const directMatch = findRequestTargetForOutputFile(file, requestTargets, usedTargetIndexes);
+		const directMatch = findRequestTargetForOutputFile(file, normalizedRequestTargets, usedTargetIndexes);
 		let target = directMatch?.target;
 
 		if (directMatch) {
 			usedTargetIndexes.add(directMatch.index);
 		} else if (canUsePositionFallback && requestTargets[index] && !usedTargetIndexes.has(index)) {
-			target = requestTargets[index];
+			target = normalizedRequestTargets[index];
 			usedTargetIndexes.add(index);
-		} else if (outputFiles.length === 1 && requestTargets.length === 1) {
-			target = requestTargets[0];
+		} else if (outputFiles.length === 1 && normalizedRequestTargets.length === 1) {
+			target = normalizedRequestTargets[0];
 		}
 
 		if (!target) {
@@ -333,13 +362,13 @@ function hydrateApplyOutputWithRequestTargets(
 			fileKey: target.fileKey || file.fileKey,
 			oldPath: file.oldPath || target.oldPath,
 			newPath: file.newPath || target.newPath,
-			targetPath: target.targetPath || file.targetPath,
+			targetPath: target.targetPath || toAbsolutePath(file.targetPath) || undefined,
 		});
 	});
 
 	return {
-		...output,
-		fileTargets: mergeApplyFileTargets(output.fileTargets ?? [], requestTargets),
+		...normalizedOutput,
+		fileTargets: mergeApplyFileTargets(normalizedOutput.fileTargets ?? [], normalizedRequestTargets),
 		files,
 	};
 }
@@ -424,13 +453,14 @@ function mergeApplyFileTargets(
 	existingTargets: ApplyUnifiedDiffFileTarget[],
 	nextTargets: ApplyUnifiedDiffFileTarget[]
 ): ApplyUnifiedDiffFileTarget[] {
-	if (nextTargets.length === 0) {
-		return existingTargets;
+	const merged = normalizeApplyFileTargets(existingTargets);
+	const normalizedNextTargets = normalizeApplyFileTargets(nextTargets);
+
+	if (normalizedNextTargets.length === 0) {
+		return merged;
 	}
 
-	const merged = [...existingTargets];
-
-	for (const target of nextTargets) {
+	for (const target of normalizedNextTargets) {
 		const index = merged.findIndex(existing => fileTargetsMatch(existing, target));
 
 		if (index >= 0) {
@@ -546,7 +576,7 @@ interface DiffApplyState {
 export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }: DiffApplyControlProps) {
 	const isDiffLike = useMemo(() => looksLikeUnifiedDiff(diffText, language), [diffText, language]);
 	const fallbackParsed = useMemo(() => parseUnifiedDiffForUI(diffText, language), [diffText, language]);
-	const normalizedCandidatePaths = useMemo(() => uniqueStrings(candidatePaths ?? []), [candidatePaths]);
+	const normalizedCandidatePaths = useMemo(() => absolutePathStrings(candidatePaths ?? []), [candidatePaths]);
 
 	const [state, setState] = useState<DiffApplyState>({ status: 'idle' });
 	const [fileTargets, setFileTargets] = useState<ApplyUnifiedDiffFileTarget[]>([]);
@@ -581,16 +611,18 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 			const nextWithPrevious =
 				previousTargets && previousTargets.length > 0 ? mergeApplyFileTargets(next, previousTargets) : next;
 
+			const safeOutputTargets = normalizeApplyFileTargets(output?.fileTargets ?? []);
+
 			if (nextWithPrevious.length > 0) {
 				setFileTargets(nextWithPrevious);
 				return nextWithPrevious;
 			}
 
-			if (output?.fileTargets && output.fileTargets.length > 0) {
+			if (safeOutputTargets.length > 0) {
 				const outputTargets =
 					previousTargets && previousTargets.length > 0
-						? mergeApplyFileTargets(output.fileTargets, previousTargets)
-						: output.fileTargets;
+						? mergeApplyFileTargets(safeOutputTargets, previousTargets)
+						: safeOutputTargets;
 				setFileTargets(outputTargets);
 				return outputTargets;
 			}
@@ -753,6 +785,16 @@ export function DiffApplyControl({ language, diffText, isBusy, candidatePaths }:
 		}
 
 		const applyTargets = deriveAndStoreTargets(dryRunOutput, targets);
+
+		if (applyTargets.length === 0) {
+			setControlState({
+				status: 'blocked',
+				error:
+					'No absolute target path is available for this diff. Select or enter an absolute target path before applying.',
+				output: dryRunViewOutput,
+			});
+			return;
+		}
 
 		setControlState(previous => ({
 			...previous,

@@ -4,7 +4,10 @@ import { FiPlus, FiSearch, FiTag, FiX } from 'react-icons/fi';
 
 import type { SkillBundle } from '@/spec/skill';
 
+import { mapWithConcurrency, throwIfAborted } from '@/lib/async_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
+
+import { useAsyncResource } from '@/hooks/use_async_resource';
 
 import { skillStoreAPI } from '@/apis/baseapi';
 import { getAllSkillBundles, getAllSkills } from '@/apis/list_helper';
@@ -12,8 +15,10 @@ import { getAllSkillBundles, getAllSkills } from '@/apis/list_helper';
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 import { Loader } from '@/components/loader';
-import { ManagementBundleCreateModal } from '@/components/management_bundle_create_modal';
-import { ManagementPageContent, ManagementPageHeader } from '@/components/management_ui';
+import { ManagementBundleCreateModal } from '@/components/managementui/management_bundle_create_modal';
+import { ManagementPageContent } from '@/components/managementui/management_page_content';
+import { ManagementPageHeader } from '@/components/managementui/management_page_header';
+import { ManagementResourceError } from '@/components/managementui/management_resource_error';
 import { PageFrame } from '@/components/page_frame';
 
 import type { SkillInsertFilter } from '@/skills/lib/skill_artifact_utils';
@@ -37,10 +42,49 @@ function getErrorMessage(error: unknown, fallback: string): string {
 	return fallback;
 }
 
+async function loadSkillBundleData(signal: AbortSignal): Promise<BundleData[]> {
+	const skillBundles = await getAllSkillBundles(undefined, true);
+	throwIfAborted(signal);
+
+	const bundleResults = await mapWithConcurrency(
+		skillBundles,
+		4,
+		async bundle => {
+			try {
+				const skillListItems = await getAllSkills([bundle.id], undefined, true, true);
+				throwIfAborted(signal);
+				return {
+					bundle,
+					skills: skillListItems.map(item => item.skillDefinition),
+				};
+			} catch (error) {
+				throwIfAborted(signal);
+				return {
+					bundle,
+					skills: [],
+					skillLoadError: getErrorMessage(error, 'Failed to load this bundle’s skills.'),
+				};
+			}
+		},
+		signal
+	);
+
+	return sortBundleData(bundleResults);
+}
+
 // oxlint-disable-next-line no-restricted-exports
 export default function SkillsPage() {
-	const [bundles, setBundles] = useState<BundleData[]>([]);
-	const [loading, setLoading] = useState(true);
+	const loadPageData = useCallback((signal: AbortSignal) => loadSkillBundleData(signal), []);
+	const {
+		data: bundles,
+		error: pageLoadError,
+		isLoading,
+		isRefreshing,
+		hasResolved,
+		reloadOrThrow,
+		setData: setBundles,
+	} = useAsyncResource(loadPageData, { initialData: [] as BundleData[] });
+
 	const [insertFilter, setInsertFilter] = useState<SkillInsertFilter>('all');
 	const [searchQuery, setSearchQuery] = useState('');
 	const [tagFilterInput, setTagFilterInput] = useState('');
@@ -53,7 +97,6 @@ export default function SkillsPage() {
 	const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
 	const isMountedRef = useRef(false);
-	const fetchRequestIdRef = useRef(0);
 	const bundleRefreshRequestIdRef = useRef<Record<string, number>>({});
 
 	const existingBundleSlugs = useMemo(() => bundles.map(bundleData => bundleData.bundle.slug), [bundles]);
@@ -118,77 +161,33 @@ export default function SkillsPage() {
 		[allSkills.length, insertCounts]
 	);
 
-	const fetchAll = useCallback(async () => {
-		const requestId = (fetchRequestIdRef.current += 1);
+	const refreshBundleSkills = useCallback(
+		async (bundleID: string) => {
+			const requestId = (bundleRefreshRequestIdRef.current[bundleID] ?? 0) + 1;
+			bundleRefreshRequestIdRef.current[bundleID] = requestId;
 
-		if (isMountedRef.current) {
-			setLoading(true);
-		}
+			try {
+				const skillListItems = await getAllSkills([bundleID], undefined, true, true);
+				const freshSkills = skillListItems.map(item => item.skillDefinition);
 
-		try {
-			const skillBundles = await getAllSkillBundles(undefined, true);
+				if (!isMountedRef.current || bundleRefreshRequestIdRef.current[bundleID] !== requestId) {
+					return;
+				}
 
-			const bundleResults = await Promise.all(
-				skillBundles.map(async bundle => {
-					try {
-						const skillListItems = await getAllSkills([bundle.id], undefined, true, true);
-						const bundleSkills = skillListItems.map(item => item.skillDefinition);
-
-						return { bundle, skills: bundleSkills };
-					} catch (error) {
-						return {
-							bundle,
-							skills: [],
-							skillLoadError: getErrorMessage(error, 'Failed to load this bundle’s skills.'),
-						};
-					}
-				})
-			);
-
-			if (!isMountedRef.current || fetchRequestIdRef.current !== requestId) {
-				return;
+				setBundles(prev =>
+					prev.map(bundleData =>
+						bundleData.bundle.id === bundleID
+							? { ...bundleData, skills: freshSkills, skillLoadError: undefined }
+							: bundleData
+					)
+				);
+			} catch (err) {
+				console.error('Refresh bundle skills failed:', err);
+				throw err;
 			}
-
-			setBundles(sortBundleData(bundleResults));
-		} catch (err) {
-			if (!isMountedRef.current || fetchRequestIdRef.current !== requestId) {
-				return;
-			}
-
-			console.error('Load skill bundles failed:', err);
-			setAlertMsg(err instanceof Error ? err.message : 'Failed to load skill bundles. Please try again.');
-			setShowAlert(true);
-		} finally {
-			if (isMountedRef.current && fetchRequestIdRef.current === requestId) {
-				setLoading(false);
-			}
-		}
-	}, []);
-
-	const refreshBundleSkills = useCallback(async (bundleID: string) => {
-		const requestId = (bundleRefreshRequestIdRef.current[bundleID] ?? 0) + 1;
-		bundleRefreshRequestIdRef.current[bundleID] = requestId;
-
-		try {
-			const skillListItems = await getAllSkills([bundleID], undefined, true, true);
-			const freshSkills = skillListItems.map(item => item.skillDefinition);
-
-			if (!isMountedRef.current || bundleRefreshRequestIdRef.current[bundleID] !== requestId) {
-				return;
-			}
-
-			setBundles(prev =>
-				prev.map(bundleData =>
-					bundleData.bundle.id === bundleID
-						? { ...bundleData, skills: freshSkills, skillLoadError: undefined }
-						: bundleData
-				)
-			);
-		} catch (err) {
-			console.error('Refresh bundle skills failed:', err);
-			throw err;
-		}
-	}, []);
+		},
+		[setBundles]
+	);
 
 	useEffect(() => {
 		isMountedRef.current = true;
@@ -198,34 +197,32 @@ export default function SkillsPage() {
 		};
 	}, []);
 
-	useEffect(() => {
-		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect
-		void fetchAll();
-	}, [fetchAll]);
+	const handleBundleEnableChange = useCallback(
+		async (bundleID: string, nextEnabled: boolean) => {
+			try {
+				await skillStoreAPI.patchSkillBundle(bundleID, nextEnabled);
 
-	const handleBundleEnableChange = useCallback(async (bundleID: string, nextEnabled: boolean) => {
-		try {
-			await skillStoreAPI.patchSkillBundle(bundleID, nextEnabled);
+				if (!isMountedRef.current) {
+					return;
+				}
 
-			if (!isMountedRef.current) {
-				return;
+				setBundles(prev =>
+					prev.map(bundleData =>
+						bundleData.bundle.id === bundleID
+							? {
+									...bundleData,
+									bundle: { ...bundleData.bundle, isEnabled: nextEnabled },
+								}
+							: bundleData
+					)
+				);
+			} catch (err) {
+				console.error('Toggle skill bundle enable failed:', err);
+				throw err;
 			}
-
-			setBundles(prev =>
-				prev.map(bundleData =>
-					bundleData.bundle.id === bundleID
-						? {
-								...bundleData,
-								bundle: { ...bundleData.bundle, isEnabled: nextEnabled },
-							}
-						: bundleData
-				)
-			);
-		} catch (err) {
-			console.error('Toggle skill bundle enable failed:', err);
-			throw err;
-		}
-	}, []);
+		},
+		[setBundles]
+	);
 
 	const handleSkillEnableChange = useCallback(
 		async (bundleID: string, skillID: string, skillSlug: string, nextEnabled: boolean) => {
@@ -253,32 +250,35 @@ export default function SkillsPage() {
 				throw err;
 			}
 		},
-		[]
+		[setBundles]
 	);
 
-	const handleDeleteSkill = useCallback(async (bundleID: string, skillID: string, skillSlug: string) => {
-		try {
-			await skillStoreAPI.deleteSkill(bundleID, skillSlug);
+	const handleDeleteSkill = useCallback(
+		async (bundleID: string, skillID: string, skillSlug: string) => {
+			try {
+				await skillStoreAPI.deleteSkill(bundleID, skillSlug);
 
-			if (!isMountedRef.current) {
-				return;
+				if (!isMountedRef.current) {
+					return;
+				}
+
+				setBundles(prev =>
+					prev.map(bundleData =>
+						bundleData.bundle.id === bundleID
+							? {
+									...bundleData,
+									skills: bundleData.skills.filter(existingSkill => existingSkill.id !== skillID),
+								}
+							: bundleData
+					)
+				);
+			} catch (err) {
+				console.error('Delete skill failed:', err);
+				throw err;
 			}
-
-			setBundles(prev =>
-				prev.map(bundleData =>
-					bundleData.bundle.id === bundleID
-						? {
-								...bundleData,
-								skills: bundleData.skills.filter(existingSkill => existingSkill.id !== skillID),
-							}
-						: bundleData
-				)
-			);
-		} catch (err) {
-			console.error('Delete skill failed:', err);
-			throw err;
-		}
-	}, []);
+		},
+		[setBundles]
+	);
 
 	const handleSubmitSkill = useCallback(
 		async (bundleID: string, partial: SkillUpsertInput, existingSkillSlug?: string) => {
@@ -407,23 +407,23 @@ export default function SkillsPage() {
 				setBundleToDelete(null);
 			}
 		}
-	}, [bundleToDelete, bundles, isDeletingBundle]);
+	}, [bundleToDelete, bundles, isDeletingBundle, setBundles]);
 
 	const handleAddBundle = useCallback(
 		async (slug: string, display: string, description?: string) => {
 			try {
 				const id = getUUIDv7();
 				await skillStoreAPI.putSkillBundle(id, slug, display, true, description);
-				await fetchAll();
+				await reloadOrThrow();
 			} catch (err) {
 				console.error('Add skill bundle failed:', err);
 				throw err;
 			}
 		},
-		[fetchAll]
+		[reloadOrThrow]
 	);
 
-	if (loading) {
+	if (isLoading && !hasResolved) {
 		return <Loader text="Loading skill bundles…" />;
 	}
 
@@ -448,6 +448,17 @@ export default function SkillsPage() {
 				/>
 
 				<ManagementPageContent>
+					{pageLoadError ? (
+						<ManagementResourceError
+							title="Skill bundles could not be loaded"
+							error={pageLoadError}
+							isRetrying={isRefreshing}
+							onRetry={async () => {
+								await reloadOrThrow();
+							}}
+						/>
+					) : null}
+
 					<div className="border-base-content/10 bg-base-100 rounded-2xl border p-4 text-sm">
 						<div className="font-semibold">Skill basics</div>
 						<ul className="text-base-content/70 mt-2 list-disc space-y-1 pl-5 text-xs">

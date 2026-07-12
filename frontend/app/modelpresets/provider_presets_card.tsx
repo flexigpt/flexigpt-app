@@ -27,7 +27,10 @@ import { AuthKeyTypeProvider } from '@/spec/setting';
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 import { Dropdown } from '@/components/dropdown';
-import { ActionRow, ManagementItemCard, MetadataPill, StatusBadge } from '@/components/management_ui';
+import { ActionRow } from '@/components/managementui/action_row';
+import { ManagementItemCard } from '@/components/managementui/management_item_card';
+import { MetadataPill } from '@/components/managementui/metadata_pill';
+import { StatusBadge } from '@/components/managementui/status_badge';
 
 import { AddEditModelPresetModal } from '@/modelpresets/modelpreset_add_edit_modal';
 import { AddEditAuthKeyModal } from '@/settings/authkey_add_edit_modal';

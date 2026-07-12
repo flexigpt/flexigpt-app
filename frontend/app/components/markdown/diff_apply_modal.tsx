@@ -24,15 +24,18 @@ import type {
 	parseUnifiedDiffForUI,
 } from '@/components/markdown/unified_diff_block';
 import {
+	absolutePathStrings,
 	buildEditableTargetsFromOutput,
 	buildFileStatusCounts,
 	getPathIdentity,
 	haveSharedPathIdentity,
+	isAbsolutePath,
 	mergeNumberMax,
 	summaryLabel,
+	toAbsolutePath,
 	uniqueStrings,
 } from '@/components/markdown/unified_diff_block';
-import { ModalBackdrop } from '@/components/modal_backdrop';
+import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 
 interface ModalRunningAction {
 	key: string;
@@ -85,14 +88,10 @@ function getTargetStatusLabel(target: EditableUnifiedDiffTarget, missing: boolea
 
 function getTargetDisplayPath(target: EditableUnifiedDiffTarget): string {
 	return (
-		target.targetPath.trim() ||
-		target.resolvedPath ||
-		target.newPath ||
-		target.oldPath ||
-		target.fileKey ||
-		'Unresolved file'
+		toAbsolutePath(target.targetPath) || toAbsolutePath(target.resolvedPath) || target.fileKey || 'Target path required'
 	);
 }
+
 function getBadgeToneClassName(tone: HeaderButtonTone): string {
 	switch (tone) {
 		case 'success':
@@ -122,7 +121,7 @@ function getModalTargetPatchPaths(target: EditableUnifiedDiffTarget): string[] {
 }
 
 function getModalTargetResolvedPaths(target: EditableUnifiedDiffTarget): string[] {
-	return uniqueStrings([target.resolvedPath, target.targetPath]).filter(path => path !== '/dev/null');
+	return absolutePathStrings([target.resolvedPath, target.targetPath]);
 }
 
 function editableTargetsMatch(left: EditableUnifiedDiffTarget, right: EditableUnifiedDiffTarget): boolean {
@@ -151,14 +150,18 @@ function mergeEditableTargetForModal(
 	existing: EditableUnifiedDiffTarget | undefined,
 	target: EditableUnifiedDiffTarget
 ): EditableUnifiedDiffTarget {
+	const targetPath = toAbsolutePath(target.targetPath);
+	const resolvedPath = toAbsolutePath(target.resolvedPath);
+
 	if (!existing) {
 		return {
 			...target,
-			targetPath: target.targetPath || '',
-			candidatePaths: uniqueStrings([
+			targetPath,
+			resolvedPath: resolvedPath || undefined,
+			candidatePaths: absolutePathStrings([
 				...(target.candidatePaths ?? []),
-				target.targetPath,
-				target.resolvedPath,
+				targetPath,
+				resolvedPath,
 				target.newPath,
 				target.oldPath,
 			]),
@@ -166,21 +169,25 @@ function mergeEditableTargetForModal(
 		};
 	}
 
+	const existingTargetPath = toAbsolutePath(existing.targetPath);
+	const existingResolvedPath = toAbsolutePath(existing.resolvedPath);
+
 	return {
 		...existing,
 		...target,
 		fileKey: existing.fileKey || target.fileKey,
 		oldPath: target.oldPath || existing.oldPath,
 		newPath: target.newPath || existing.newPath,
-		targetPath: target.targetPath || existing.targetPath || '',
-		resolvedPath: target.resolvedPath || existing.resolvedPath,
-		candidatePaths: uniqueStrings([
+		targetPath: targetPath || existingTargetPath,
+		targetPathInput: target.targetPathInput ?? existing.targetPathInput,
+		resolvedPath: resolvedPath || existingResolvedPath || undefined,
+		candidatePaths: absolutePathStrings([
 			...(existing.candidatePaths ?? []),
 			...(target.candidatePaths ?? []),
-			existing.targetPath,
-			target.targetPath,
-			existing.resolvedPath,
-			target.resolvedPath,
+			existingTargetPath,
+			targetPath,
+			existingResolvedPath,
+			resolvedPath,
 			existing.newPath,
 			target.newPath,
 			existing.oldPath,
@@ -221,16 +228,13 @@ function mergeEditableTargetPreservingLocalPath(
 	local: EditableUnifiedDiffTarget
 ): EditableUnifiedDiffTarget {
 	const merged = mergeEditableTargetForModal(local, base);
-	const localTargetPath = local.targetPath.trim();
-
-	if (!localTargetPath) {
-		return merged;
-	}
+	const localTargetPathInput = local.targetPathInput ?? local.targetPath;
 
 	return {
 		...merged,
-		targetPath: local.targetPath,
-		candidatePaths: uniqueStrings([
+		targetPath: toAbsolutePath(local.targetPath),
+		targetPathInput: localTargetPathInput,
+		candidatePaths: absolutePathStrings([
 			local.targetPath,
 			...(local.candidatePaths ?? []),
 			...(merged.candidatePaths ?? []),
@@ -283,8 +287,7 @@ function trimTrailingSlashesForDisplayScore(value: string): string {
 }
 
 function isAbsoluteDisplayPath(value: string): boolean {
-	const trimmed = value.trim();
-	return trimmed.startsWith('/') || /^[A-Za-z]:[\\/]/.test(trimmed) || trimmed.startsWith('\\\\');
+	return isAbsolutePath(value);
 }
 
 function looksLikeDirectoryCandidate(value: string): boolean {
@@ -415,14 +418,14 @@ function buildDisplayCandidatePathsForTarget(
 	globalCandidatePaths: string[],
 	limit = DISPLAY_CANDIDATE_PATH_LIMIT
 ): DisplayCandidatePathList {
-	const rawCandidates = uniqueStrings([
+	const rawCandidates = absolutePathStrings([
 		target.resolvedPath,
 		target.targetPath,
 		...(target.candidatePaths ?? []),
 		target.newPath,
 		target.oldPath,
 		...globalCandidatePaths,
-	]).filter(path => path !== '/dev/null');
+	]);
 
 	const byKey = new Map<string, { path: string; score: number; firstIndex: number }>();
 
@@ -595,7 +598,7 @@ export function DiffApplyModal({
 				oldPath: target.oldPath,
 				newPath: target.newPath,
 				targetPath: target.targetPath,
-				candidatePaths: uniqueStrings([target.targetPath, target.newPath, target.oldPath]),
+				candidatePaths: absolutePathStrings([target.targetPath, target.newPath, target.oldPath]),
 			});
 		}
 
@@ -645,7 +648,7 @@ export function DiffApplyModal({
 	const fileDiagnostics = collectFileLevelDiagnostics(output);
 	const summary = summaryLabel(output, fallbackParsed);
 	const counts = buildFileStatusCounts(output, fallbackParsed);
-	const missingCount = displayTargets.filter(target => !target.targetPath.trim()).length;
+	const missingCount = displayTargets.filter(target => !isAbsolutePath(target.targetPath)).length;
 	const hasAnyTargets = displayTargets.length > 0;
 	const canApplyFromModal = hasAnyTargets && missingCount === 0 && !isRunning;
 	const patchDiagnosticCounts = getDiagnosticSeverityCounts(patchDiagnostics);
@@ -659,8 +662,9 @@ export function DiffApplyModal({
 
 		const editedTarget: EditableUnifiedDiffTarget = {
 			...currentTarget,
-			targetPath,
-			candidatePaths: uniqueStrings([targetPath, ...(currentTarget.candidatePaths ?? [])]),
+			targetPath: toAbsolutePath(targetPath),
+			targetPathInput: targetPath,
+			candidatePaths: absolutePathStrings([targetPath, ...(currentTarget.candidatePaths ?? [])]),
 		};
 
 		setLocalTargets(previous => {
@@ -670,7 +674,10 @@ export function DiffApplyModal({
 			}
 
 			const existing = previous[existingIndex];
-			if (existing.targetPath === targetPath) {
+			if (
+				existing.targetPath === editedTarget.targetPath &&
+				existing.targetPathInput === editedTarget.targetPathInput
+			) {
 				return previous;
 			}
 
@@ -734,7 +741,7 @@ export function DiffApplyModal({
 		}
 
 		const target = displayTargets[index];
-		if (!target?.targetPath.trim()) {
+		if (!target || !isAbsolutePath(target.targetPath)) {
 			return;
 		}
 
@@ -777,7 +784,7 @@ export function DiffApplyModal({
 									</span>
 								) : null}
 								{missingCount > 0 ? (
-									<span className="badge badge-outline badge-warning badge-sm">{missingCount} need paths</span>
+									<span className="badge badge-outline badge-warning badge-sm">{missingCount} need absolute paths</span>
 								) : null}
 							</div>
 							<div className="mt-2 flex flex-wrap gap-1.5 text-xs">
@@ -850,7 +857,7 @@ export function DiffApplyModal({
 
 						{missingCount > 0 ? (
 							<div className="badge badge-outline badge-warning badge-sm">
-								{missingCount} target path{missingCount === 1 ? '' : 's'} need attention.
+								{missingCount} target path{missingCount === 1 ? '' : 's'} must be absolute.
 							</div>
 						) : null}
 					</div>
@@ -863,7 +870,8 @@ export function DiffApplyModal({
 						) : null}
 
 						{displayTargets.map((target, index) => {
-							const missing = !target.targetPath.trim();
+							const missing = !isAbsolutePath(target.targetPath);
+							const targetPathInput = target.targetPathInput ?? target.targetPath;
 							const inputId = `diff-apply-target-${target.fileKey ?? index}`;
 							const candidateDisplay = buildDisplayCandidatePathsForTarget(target, candidatePaths);
 							const candidates = candidateDisplay.paths;
@@ -963,17 +971,19 @@ export function DiffApplyModal({
 									<input
 										id={inputId}
 										className={`input input-sm w-full font-mono text-xs ${missing ? 'input-error' : ''}`}
-										value={target.targetPath}
+										value={targetPathInput}
 										onChange={event => {
 											updateTarget(index, event.target.value);
 										}}
-										placeholder="Enter local target file path"
+										placeholder="Enter an absolute local target file path"
 										spellCheck={false}
 									/>
 
 									{missing ? (
 										<div className="text-error mt-1 text-xs">
-											Target path is required before applying this file patch.
+											{targetPathInput.trim()
+												? 'Target path must be absolute before applying this file patch.'
+												: 'Target path is required before applying this file patch.'}
 										</div>
 									) : null}
 

@@ -21,7 +21,8 @@ import { MessageEnterValidURL, validateUrlForInput } from '@/lib/url_utils';
 import { DEFAULT_SEMVER, isSemverVersion, suggestNextMinorVersion } from '@/lib/version_utils';
 
 import { Dropdown } from '@/components/dropdown';
-import { ModalBackdrop } from '@/components/modal_backdrop';
+import { MANAGEMENT_MODAL_FORM_CLASS } from '@/components/managementui/management_class_consts';
+import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 import { ReadOnlyValue } from '@/components/read_only_value';
 
 interface ToolItem {
@@ -267,7 +268,7 @@ function AddEditToolModalContent({
 			if (err) {
 				newErrs.slug = err;
 			} else {
-				const clash = existingTools.some(t => t.tool.slug === v && t.tool.id !== initialData?.tool.id);
+				const clash = !isEditMode && existingTools.some(t => t.tool.slug === v && t.tool.id !== initialData?.tool.id);
 				if (clash) {
 					newErrs.slug = 'Slug already in use.';
 				} else {
@@ -605,7 +606,7 @@ function AddEditToolModalContent({
 			}}
 		>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-hidden rounded-2xl p-0">
-				<div className="max-h-[80vh] overflow-y-auto p-6">
+				<div className="max-h-[80vh] overflow-y-auto p-4 sm:p-6">
 					<div className="mb-4 flex items-center justify-between">
 						<h3 className="text-lg font-bold">{headerTitle}</h3>
 						<button
@@ -619,7 +620,7 @@ function AddEditToolModalContent({
 						</button>
 					</div>
 
-					<form noValidate onSubmit={handleSubmit} className="space-y-4">
+					<form noValidate onSubmit={handleSubmit} className={MANAGEMENT_MODAL_FORM_CLASS}>
 						{submitError && (
 							<div className="alert alert-error rounded-2xl text-sm">
 								<div className="flex items-center gap-2">

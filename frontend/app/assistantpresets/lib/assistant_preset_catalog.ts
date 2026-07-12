@@ -3,6 +3,8 @@ import type { AssistantSkillOption, SkillSelection } from '@/spec/skill';
 import { SkillPresenceStatus } from '@/spec/skill';
 import type { AssistantToolOption, ToolRef } from '@/spec/tool';
 
+import { raceWithAbortSignal, withTimeout } from '@/lib/async_utils';
+
 import { modelPresetStoreAPI, skillStoreAPI, toolStoreAPI } from '@/apis/baseapi';
 
 import {
@@ -24,6 +26,7 @@ export type AssistantPresetCatalogLoadErrors = Partial<Record<AssistantPresetCat
 
 export interface AssistantPresetCatalogLoadOptions {
 	force?: boolean;
+	signal?: AbortSignal;
 }
 
 interface AsyncCatalogCache<T> {
@@ -40,6 +43,7 @@ const editorCatalogCache: AsyncCatalogCache<AssistantPresetEditorCatalog> = { ge
 
 const MAX_CATALOG_PAGE_COUNT = 1_000;
 const CATALOG_CACHE_TTL_MS = 30_000;
+const CATALOG_SECTION_TIMEOUT_MS = 20_000;
 
 function getErrorMessage(error: unknown, fallback: string): string {
 	if (error instanceof Error && error.message.trim()) {
@@ -341,13 +345,17 @@ export function loadAssistantPresetEditorCatalog(
 ): Promise<AssistantPresetEditorCatalog> {
 	const force = options.force === true;
 
-	return loadWithCache(
+	const catalogPromise = loadWithCache(
 		editorCatalogCache,
 		async () => {
 			const [modelsResult, toolsResult, skillsResult] = await Promise.allSettled([
-				loadModelPresetOptions({ force }),
-				loadToolOptions({ force }),
-				loadSkillOptions({ force }),
+				withTimeout(
+					loadModelPresetOptions({ force }),
+					CATALOG_SECTION_TIMEOUT_MS,
+					'Model preset catalog loading timed out.'
+				),
+				withTimeout(loadToolOptions({ force }), CATALOG_SECTION_TIMEOUT_MS, 'Tool catalog loading timed out.'),
+				withTimeout(loadSkillOptions({ force }), CATALOG_SECTION_TIMEOUT_MS, 'Skill catalog loading timed out.'),
 			]);
 
 			const loadErrors: AssistantPresetCatalogLoadErrors = {};
@@ -370,4 +378,6 @@ export function loadAssistantPresetEditorCatalog(
 		},
 		force
 	);
+
+	return raceWithAbortSignal(catalogPromise, options.signal);
 }

@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { FiPlus } from 'react-icons/fi';
 
 import type { Tool, ToolBundle } from '@/spec/tool';
 import { ToolImplType } from '@/spec/tool';
 
+import { mapWithConcurrency, throwIfAborted } from '@/lib/async_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
+
+import { useAsyncResource } from '@/hooks/use_async_resource';
 
 import { toolStoreAPI } from '@/apis/baseapi';
 import { getAllToolBundles, getAllTools } from '@/apis/list_helper';
@@ -13,8 +16,10 @@ import { getAllToolBundles, getAllTools } from '@/apis/list_helper';
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 import { Loader } from '@/components/loader';
-import { ManagementBundleCreateModal } from '@/components/management_bundle_create_modal';
-import { ManagementPageContent, ManagementPageHeader } from '@/components/management_ui';
+import { ManagementBundleCreateModal } from '@/components/managementui/management_bundle_create_modal';
+import { ManagementPageContent } from '@/components/managementui/management_page_content';
+import { ManagementPageHeader } from '@/components/managementui/management_page_header';
+import { ManagementResourceError } from '@/components/managementui/management_resource_error';
 import { PageFrame } from '@/components/page_frame';
 
 import { ToolBundleCard } from '@/tools/tool_bundle_card';
@@ -32,9 +37,46 @@ const getErrorMessage = (err: unknown, fallback: string) => {
 	return fallback;
 };
 
+async function loadToolBundleData(signal: AbortSignal): Promise<BundleData[]> {
+	const toolBundles = await getAllToolBundles(undefined, true);
+	throwIfAborted(signal);
+
+	return mapWithConcurrency(
+		toolBundles,
+		4,
+		async bundle => {
+			try {
+				const toolListItems = await getAllTools([bundle.id], undefined, true);
+				throwIfAborted(signal);
+				return {
+					bundle,
+					tools: toolListItems.map(item => item.toolDefinition),
+				};
+			} catch (error) {
+				throwIfAborted(signal);
+				return {
+					bundle,
+					tools: [],
+					toolLoadError: getErrorMessage(error, 'Failed to load tools for this bundle.'),
+				};
+			}
+		},
+		signal
+	);
+}
+
 // oxlint-disable-next-line no-restricted-exports
 export default function ToolsPage() {
-	const [bundles, setBundles] = useState<BundleData[] | undefined>(undefined);
+	const loadPageData = useCallback((signal: AbortSignal) => loadToolBundleData(signal), []);
+	const {
+		data: bundles,
+		error: pageLoadError,
+		isLoading,
+		isRefreshing,
+		hasResolved,
+		reloadOrThrow,
+		setData: setBundles,
+	} = useAsyncResource(loadPageData, { initialData: [] as BundleData[] });
 
 	const [showAlert, setShowAlert] = useState(false);
 	const [alertMsg, setAlertMsg] = useState('');
@@ -42,125 +84,102 @@ export default function ToolsPage() {
 	const [bundleToDelete, setBundleToDelete] = useState<ToolBundle | null>(null);
 	const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-	const fetchAll = useCallback(async (showLoader = false) => {
-		if (showLoader) {
-			setBundles(undefined);
-		}
+	const refreshBundleTools = useCallback(
+		async (bundleID: string) => {
+			try {
+				const toolListItems = await getAllTools([bundleID], undefined, true);
+				const freshTools = toolListItems.map(itm => itm.toolDefinition);
 
-		try {
-			const toolBundles = await getAllToolBundles(undefined, true);
-			const bundleResults: BundleData[] = await Promise.all(
-				toolBundles.map(async b => {
-					try {
-						const toolListItems = await getAllTools([b.id], undefined, true);
-						const tools = toolListItems.map(itm => itm.toolDefinition);
-						return { bundle: b, tools };
-					} catch (error) {
-						return {
-							bundle: b,
-							tools: [],
-							toolLoadError: getErrorMessage(error, 'Failed to load tools for this bundle.'),
-						};
-					}
-				})
-			);
+				setBundles(prev =>
+					(prev ?? []).map(bd =>
+						bd.bundle.id === bundleID
+							? Object.assign({}, bd, {
+									tools: freshTools,
+									toolLoadError: undefined,
+								})
+							: bd
+					)
+				);
+			} catch (error) {
+				setBundles(prev =>
+					(prev ?? []).map(bd =>
+						bd.bundle.id === bundleID
+							? Object.assign({}, bd, {
+									toolLoadError: getErrorMessage(error, 'Failed to load tools for this bundle.'),
+								})
+							: bd
+					)
+				);
 
-			setBundles(bundleResults);
-		} catch (err) {
-			console.error('Load tool bundles failed:', err);
-			setAlertMsg('Failed to load tool bundles. Please try again.');
-			setShowAlert(true);
-			setBundles([]);
-		}
-	}, []);
-	const refreshBundleTools = useCallback(async (bundleID: string) => {
-		try {
-			const toolListItems = await getAllTools([bundleID], undefined, true);
-			const freshTools = toolListItems.map(itm => itm.toolDefinition);
+				throw error;
+			}
+		},
+		[setBundles]
+	);
 
-			setBundles(prev =>
-				(prev ?? []).map(bd =>
-					bd.bundle.id === bundleID
-						? Object.assign({}, bd, {
-								tools: freshTools,
-								toolLoadError: undefined,
-							})
-						: bd
-				)
-			);
-		} catch (error) {
-			setBundles(prev =>
-				(prev ?? []).map(bd =>
-					bd.bundle.id === bundleID
-						? Object.assign({}, bd, {
-								toolLoadError: getErrorMessage(error, 'Failed to load tools for this bundle.'),
-							})
-						: bd
-				)
-			);
+	const handleToggleBundleEnable = useCallback(
+		async (bundleID: string, enabled: boolean) => {
+			try {
+				await toolStoreAPI.patchToolBundle(bundleID, enabled);
 
-			throw error;
-		}
-	}, []);
+				setBundles(prev =>
+					(prev ?? []).map(bd =>
+						bd.bundle.id === bundleID
+							? Object.assign({}, bd, { bundle: Object.assign({}, bd.bundle, { isEnabled: enabled }) })
+							: bd
+					)
+				);
+			} catch (err) {
+				console.error('Toggle bundle enable failed:', err);
+				throw new Error(getErrorMessage(err, 'Failed to toggle bundle enable state.'), { cause: err });
+			}
+		},
+		[setBundles]
+	);
 
-	useEffect(() => {
-		void fetchAll();
-	}, [fetchAll]);
+	const handleToggleToolEnable = useCallback(
+		async (bundleID: string, tool: Tool, enabled: boolean) => {
+			try {
+				await toolStoreAPI.patchTool(bundleID, tool.slug, tool.version, enabled);
 
-	const handleToggleBundleEnable = useCallback(async (bundleID: string, enabled: boolean) => {
-		try {
-			await toolStoreAPI.patchToolBundle(bundleID, enabled);
+				setBundles(prev =>
+					(prev ?? []).map(bd =>
+						bd.bundle.id === bundleID
+							? Object.assign({}, bd, {
+									tools: bd.tools.map(t => (t.id === tool.id ? Object.assign({}, t, { isEnabled: enabled }) : t)),
+								})
+							: bd
+					)
+				);
+			} catch (err) {
+				console.error('Toggle tool failed:', err);
+				throw new Error(getErrorMessage(err, 'Failed to toggle tool.'), { cause: err });
+			}
+		},
+		[setBundles]
+	);
 
-			setBundles(prev =>
-				(prev ?? []).map(bd =>
-					bd.bundle.id === bundleID
-						? Object.assign({}, bd, { bundle: Object.assign({}, bd.bundle, { isEnabled: enabled }) })
-						: bd
-				)
-			);
-		} catch (err) {
-			console.error('Toggle bundle enable failed:', err);
-			throw new Error(getErrorMessage(err, 'Failed to toggle bundle enable state.'), { cause: err });
-		}
-	}, []);
+	const handleDeleteTool = useCallback(
+		async (bundleID: string, tool: Tool) => {
+			try {
+				await toolStoreAPI.deleteTool(bundleID, tool.slug, tool.version);
 
-	const handleToggleToolEnable = useCallback(async (bundleID: string, tool: Tool, enabled: boolean) => {
-		try {
-			await toolStoreAPI.patchTool(bundleID, tool.slug, tool.version, enabled);
-
-			setBundles(prev =>
-				(prev ?? []).map(bd =>
-					bd.bundle.id === bundleID
-						? Object.assign({}, bd, {
-								tools: bd.tools.map(t => (t.id === tool.id ? Object.assign({}, t, { isEnabled: enabled }) : t)),
-							})
-						: bd
-				)
-			);
-		} catch (err) {
-			console.error('Toggle tool failed:', err);
-			throw new Error(getErrorMessage(err, 'Failed to toggle tool.'), { cause: err });
-		}
-	}, []);
-
-	const handleDeleteTool = useCallback(async (bundleID: string, tool: Tool) => {
-		try {
-			await toolStoreAPI.deleteTool(bundleID, tool.slug, tool.version);
-
-			setBundles(prev =>
-				(prev ?? []).map(bd =>
-					bd.bundle.id === bundleID
-						? Object.assign({}, bd, {
-								tools: bd.tools.filter(t => t.id !== tool.id),
-							})
-						: bd
-				)
-			);
-		} catch (err) {
-			console.error('Delete tool failed:', err);
-			throw new Error(getErrorMessage(err, 'Failed to delete tool.'), { cause: err });
-		}
-	}, []);
+				setBundles(prev =>
+					(prev ?? []).map(bd =>
+						bd.bundle.id === bundleID
+							? Object.assign({}, bd, {
+									tools: bd.tools.filter(t => t.id !== tool.id),
+								})
+							: bd
+					)
+				);
+			} catch (err: unknown) {
+				console.error('Delete tool failed:', err);
+				throw new Error(getErrorMessage(err, 'Failed to delete tool.'), { cause: err });
+			}
+		},
+		[setBundles]
+	);
 
 	const handleSubmitTool = useCallback(
 		async (bundleID: string, partial: Partial<Tool>, toolToEdit?: Tool) => {
@@ -260,10 +279,10 @@ export default function ToolsPage() {
 	const handleAddBundle = async (slug: string, display: string, description?: string) => {
 		const id = getUUIDv7();
 		await toolStoreAPI.putToolBundle(id, slug, display, true, description);
-		await fetchAll(true);
+		await reloadOrThrow();
 	};
 
-	if (bundles === undefined) {
+	if (isLoading && !hasResolved) {
 		return <Loader text="Loading tool bundles…" />;
 	}
 
@@ -288,6 +307,17 @@ export default function ToolsPage() {
 				/>
 
 				<ManagementPageContent>
+					{pageLoadError ? (
+						<ManagementResourceError
+							title="Tool bundles could not be loaded"
+							error={pageLoadError}
+							isRetrying={isRefreshing}
+							onRetry={async () => {
+								await reloadOrThrow();
+							}}
+						/>
+					) : null}
+
 					{bundles.length === 0 && <p className="mt-8 text-center text-sm">No tool bundles configured yet.</p>}
 
 					{bundles.map(bd => (

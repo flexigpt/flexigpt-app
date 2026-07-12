@@ -8,7 +8,7 @@ import { FiAlertCircle, FiX } from 'react-icons/fi';
 import type { MCPServerConfig, MCPServerSetupInput, MCPServerSetupInputValue } from '@/spec/mcp';
 import { MCPServerSetupInputKind } from '@/spec/mcp';
 
-import { ModalBackdrop } from '@/components/modal_backdrop';
+import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 
 import { getMCPSetupInputKindLabel, isMCPSetupInputConfigured } from '@/mcpservers/lib/mcp_server_utils';
 

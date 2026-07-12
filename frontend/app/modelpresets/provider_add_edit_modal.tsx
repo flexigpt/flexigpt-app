@@ -15,7 +15,8 @@ import { omitManyKeys } from '@/lib/obj_utils';
 import { MessageEnterValidURL, validateUrlForInput } from '@/lib/url_utils';
 
 import { Dropdown } from '@/components/dropdown';
-import { ModalBackdrop } from '@/components/modal_backdrop';
+import { MANAGEMENT_MODAL_FORM_CLASS } from '@/components/managementui/management_class_consts';
+import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 import { ReadOnlyValue } from '@/components/read_only_value';
 
 type ModalMode = 'add' | 'edit' | 'view';
@@ -551,7 +552,7 @@ function AddEditProviderPresetModalContent({
 			}}
 		>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-4/5 overflow-hidden rounded-2xl p-0 xl:max-w-3/5">
-				<div className="max-h-[80vh] overflow-y-auto p-6">
+				<div className="max-h-[80vh] overflow-y-auto p-4 sm:p-6">
 					<div className="mb-4 flex items-center justify-between">
 						<h3 className="text-lg font-bold">{title}</h3>
 						<button
@@ -565,7 +566,7 @@ function AddEditProviderPresetModalContent({
 						</button>
 					</div>
 
-					<form noValidate onSubmit={handleSubmit} className="space-y-4">
+					<form noValidate onSubmit={handleSubmit} className={MANAGEMENT_MODAL_FORM_CLASS}>
 						{submitError ? (
 							<div className="alert alert-error rounded-2xl text-sm" role="alert">
 								<div className="flex items-center gap-2">

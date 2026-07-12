@@ -1,18 +1,23 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { FiPlus } from 'react-icons/fi';
 
 import type { AssistantPreset, AssistantPresetBundle } from '@/spec/assistantpreset';
 
+import { mapWithConcurrency, throwIfAborted } from '@/lib/async_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
+
+import { useAsyncResource } from '@/hooks/use_async_resource';
 
 import { assistantPresetStoreAPI } from '@/apis/baseapi';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 import { Loader } from '@/components/loader';
-import { ManagementBundleCreateModal } from '@/components/management_bundle_create_modal';
-import { ManagementPageContent, ManagementPageHeader } from '@/components/management_ui';
+import { ManagementBundleCreateModal } from '@/components/managementui/management_bundle_create_modal';
+import { ManagementPageContent } from '@/components/managementui/management_page_content';
+import { ManagementPageHeader } from '@/components/managementui/management_page_header';
+import { ManagementResourceError } from '@/components/managementui/management_resource_error';
 import { PageFrame } from '@/components/page_frame';
 
 import { AssistantPresetBundleCard } from '@/assistantpresets/assistant_preset_bundle_card';
@@ -38,10 +43,57 @@ function getErrorMessage(error: unknown, fallback: string): string {
 	return fallback;
 }
 
+async function loadPresetsForBundle(bundleID: string, signal?: AbortSignal): Promise<AssistantPreset[]> {
+	const presetListItems = await getAllAssistantPresetListItems([bundleID], true);
+	throwIfAborted(signal);
+
+	const presets = await mapWithConcurrency(
+		presetListItems,
+		8,
+		item =>
+			assistantPresetStoreAPI.getAssistantPreset(item.bundleID, item.assistantPresetSlug, item.assistantPresetVersion),
+		signal
+	);
+
+	return sortAssistantPresets(presets.filter((preset): preset is AssistantPreset => preset !== undefined));
+}
+
+async function loadAssistantPresetPageData(signal: AbortSignal): Promise<BundleData[]> {
+	const assistantPresetBundles = await getAllAssistantPresetBundles(undefined, true);
+	throwIfAborted(signal);
+
+	return mapWithConcurrency(
+		assistantPresetBundles,
+		4,
+		async bundle => {
+			try {
+				const presets = await loadPresetsForBundle(bundle.id, signal);
+				return { bundle, presets };
+			} catch (error) {
+				throwIfAborted(signal);
+				return {
+					bundle,
+					presets: [],
+					presetLoadError: getErrorMessage(error, 'Failed to load assistant presets for this bundle.'),
+				};
+			}
+		},
+		signal
+	);
+}
+
 // oxlint-disable-next-line no-restricted-exports
 export default function AssistantPresetsPage() {
-	const [bundles, setBundles] = useState<BundleData[]>([]);
-	const [loading, setLoading] = useState(true);
+	const loadPageData = useCallback((signal: AbortSignal) => loadAssistantPresetPageData(signal), []);
+	const {
+		data: bundles,
+		error: pageLoadError,
+		isLoading,
+		isRefreshing,
+		hasResolved,
+		reloadOrThrow,
+		setData: setBundles,
+	} = useAsyncResource(loadPageData, { initialData: [] as BundleData[] });
 
 	const [showAlert, setShowAlert] = useState(false);
 	const [alertMsg, setAlertMsg] = useState('');
@@ -67,18 +119,6 @@ export default function AssistantPresetsPage() {
 		[bundles]
 	);
 
-	const loadPresetsForBundle = useCallback(async (bundleID: string): Promise<AssistantPreset[]> => {
-		const presetListItems = await getAllAssistantPresetListItems([bundleID], true);
-
-		const presetPromises = presetListItems.map(item =>
-			assistantPresetStoreAPI.getAssistantPreset(item.bundleID, item.assistantPresetSlug, item.assistantPresetVersion)
-		);
-
-		return sortAssistantPresets(
-			(await Promise.all(presetPromises)).filter((preset): preset is AssistantPreset => preset !== undefined)
-		);
-	}, []);
-
 	const refreshBundlePresets = useCallback(
 		async (bundleID: string) => {
 			try {
@@ -103,44 +143,8 @@ export default function AssistantPresetsPage() {
 				throw error;
 			}
 		},
-		[loadPresetsForBundle]
+		[setBundles]
 	);
-
-	const fetchAll = useCallback(async () => {
-		setLoading(true);
-
-		try {
-			const assistantPresetBundles = await getAllAssistantPresetBundles(undefined, true);
-
-			const bundleResults: BundleData[] = await Promise.all(
-				assistantPresetBundles.map(async bundle => {
-					try {
-						const presets = await loadPresetsForBundle(bundle.id);
-						return { bundle, presets };
-					} catch (error) {
-						return {
-							bundle,
-							presets: [],
-							presetLoadError: getErrorMessage(error, 'Failed to load assistant presets for this bundle.'),
-						};
-					}
-				})
-			);
-
-			setBundles(bundleResults);
-		} catch (error) {
-			console.error('Failed to load assistant preset bundles:', error);
-			setAlertMsg(getErrorMessage(error, 'Failed to load assistant preset bundles. Please try again.'));
-			setShowAlert(true);
-		} finally {
-			setLoading(false);
-		}
-	}, [loadPresetsForBundle]);
-
-	useEffect(() => {
-		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect
-		void fetchAll();
-	}, [fetchAll]);
 
 	const handleToggleBundleEnabled = useCallback(
 		async (bundleID: string, enabled: boolean) => {
@@ -166,7 +170,7 @@ export default function AssistantPresetsPage() {
 				)
 			);
 		},
-		[bundles]
+		[bundles, setBundles]
 	);
 
 	const handleTogglePresetEnabled = useCallback(
@@ -209,7 +213,7 @@ export default function AssistantPresetsPage() {
 				)
 			);
 		},
-		[bundles]
+		[bundles, setBundles]
 	);
 
 	const handleDeletePreset = useCallback(
@@ -247,7 +251,7 @@ export default function AssistantPresetsPage() {
 				)
 			);
 		},
-		[bundles]
+		[bundles, setBundles]
 	);
 
 	const handleSubmitPreset = useCallback(
@@ -349,18 +353,18 @@ export default function AssistantPresetsPage() {
 			setIsDeletingBundle(false);
 			setBundleToDeleteID(null);
 		}
-	}, [bundleToDeleteID, bundles, isDeletingBundle]);
+	}, [bundleToDeleteID, bundles, isDeletingBundle, setBundles]);
 
 	const handleAddBundle = useCallback(
 		async (slug: string, display: string, description?: string) => {
 			const id = getUUIDv7();
 			await assistantPresetStoreAPI.putAssistantPresetBundle(id, slug, display, true, description);
-			await fetchAll();
+			await reloadOrThrow();
 		},
-		[fetchAll]
+		[reloadOrThrow]
 	);
 
-	if (loading) {
+	if (isLoading && !hasResolved) {
 		return <Loader text="Loading assistant preset bundles…" />;
 	}
 
@@ -385,6 +389,17 @@ export default function AssistantPresetsPage() {
 				/>
 
 				<ManagementPageContent>
+					{pageLoadError ? (
+						<ManagementResourceError
+							title="Assistant preset bundles could not be loaded"
+							error={pageLoadError}
+							isRetrying={isRefreshing}
+							onRetry={async () => {
+								await reloadOrThrow();
+							}}
+						/>
+					) : null}
+
 					{bundles.length === 0 && (
 						<p className="mt-8 text-center text-sm">No assistant preset bundles configured yet.</p>
 					)}

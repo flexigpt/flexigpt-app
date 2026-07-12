@@ -28,8 +28,10 @@ import {
 	getAllMCPServerTools,
 } from '@/apis/list_helper';
 
-import { ManagementItemCard, MetadataPill, StatusBadge } from '@/components/management_ui';
-import { ModalBackdrop } from '@/components/modal_backdrop';
+import { ManagementItemCard } from '@/components/managementui/management_item_card';
+import { MetadataPill } from '@/components/managementui/metadata_pill';
+import { StatusBadge } from '@/components/managementui/status_badge';
+import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 
 import {
 	getMCPApprovalRuleLabel,

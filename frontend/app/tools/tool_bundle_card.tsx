@@ -4,8 +4,17 @@ import { FiChevronDown, FiChevronUp, FiEye, FiGitBranch, FiPlus, FiRefreshCw, Fi
 
 import type { Tool, ToolBundle } from '@/spec/tool';
 
+import { usePendingActions } from '@/hooks/use_pending_actions';
+
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
+import { ActionRow } from '@/components/managementui/action_row';
+import { EnabledControl } from '@/components/managementui/enabled_control';
+import { ManagementBundleCard } from '@/components/managementui/management_bundle_card';
+import { ManagementEmptyState } from '@/components/managementui/management_empty_state';
+import { ManagementItemCard } from '@/components/managementui/management_item_card';
+import { MetadataPill } from '@/components/managementui/metadata_pill';
+import { StatusBadge } from '@/components/managementui/status_badge';
 
 import { AddEditToolModal } from '@/tools/tool_add_edit_modal';
 import { ToolBundleDetailsModal } from '@/tools/tool_bundle_details_modal';
@@ -50,9 +59,7 @@ export function ToolBundleCard({
 	const [showAlert, setShowAlert] = useState(false);
 	const [alertMsg, setAlertMsg] = useState('');
 
-	const [isTogglingBundle, setIsTogglingBundle] = useState(false);
-	const [busyToolID, setBusyToolID] = useState<string | null>(null);
-	const [isRefreshingTools, setIsRefreshingTools] = useState(false);
+	const { isPending, runAction } = usePendingActions();
 
 	const showError = (err: unknown, fallback: string) => {
 		const message = err instanceof Error && err.message.trim() ? err.message : fallback;
@@ -61,41 +68,28 @@ export function ToolBundleCard({
 	};
 
 	const refreshTools = async () => {
-		if (isRefreshingTools) {
-			return;
-		}
-
-		setIsRefreshingTools(true);
 		try {
-			await onRefreshTools();
+			await runAction('bundle:refresh', onRefreshTools);
 		} catch (error) {
 			showError(error, 'Failed to reload tools.');
-		} finally {
-			setIsRefreshingTools(false);
 		}
 	};
 
 	const toggleBundleEnable = async (enabled: boolean) => {
-		setIsTogglingBundle(true);
 		try {
-			await onToggleBundleEnable(bundle.id, enabled);
+			await runAction('bundle:toggle', () => onToggleBundleEnable(bundle.id, enabled));
 		} catch (err) {
 			console.error('Toggle bundle enable failed:', err);
 			showError(err, 'Failed to toggle bundle enable state.');
-		} finally {
-			setIsTogglingBundle(false);
 		}
 	};
 
 	const patchToolEnable = async (tool: Tool, enabled: boolean) => {
-		setBusyToolID(tool.id);
 		try {
-			await onToggleToolEnable(bundle.id, tool, enabled);
+			await runAction(`${tool.id}:toggle`, () => onToggleToolEnable(bundle.id, tool, enabled));
 		} catch (err) {
 			console.error('Toggle tool failed:', err);
 			showError(err, 'Failed to toggle tool.');
-		} finally {
-			setBusyToolID(null);
 		}
 	};
 
@@ -120,17 +114,20 @@ export function ToolBundleCard({
 		}
 
 		const target = toolToDelete;
-		setBusyToolID(target.id);
 
 		try {
-			await onDeleteTool(bundle.id, target);
-			setIsDeleteToolModalOpen(false);
-			setToolToDelete(null);
+			const deleted = await runAction(`${target.id}:delete`, async () => {
+				await onDeleteTool(bundle.id, target);
+				return true;
+			});
+
+			if (deleted) {
+				setIsDeleteToolModalOpen(false);
+				setToolToDelete(null);
+			}
 		} catch (err) {
 			console.error('Delete tool failed:', err);
 			showError(err, 'Failed to delete tool.');
-		} finally {
-			setBusyToolID(null);
 		}
 	};
 
@@ -145,6 +142,11 @@ export function ToolBundleCard({
 			setShowAlert(true);
 			return;
 		}
+		if ((mode === 'add' || mode === 'edit') && !bundle.isEnabled) {
+			setAlertMsg('Enable the bundle before adding or creating a new tool version.');
+			setShowAlert(true);
+			return;
+		}
 		setToolModalMode(mode);
 		setToolToEdit(tool);
 		setIsToolModalOpen(true);
@@ -155,239 +157,207 @@ export function ToolBundleCard({
 	};
 
 	return (
-		<section className="bg-base-100 border-base-content/10 mb-6 rounded-2xl border p-4 shadow-sm">
-			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-				<div className="min-w-0">
-					<h3 className="truncate text-sm font-semibold">
-						<span className="capitalize">{bundle.displayName || bundle.slug}</span>
-						<span className="text-base-content/60 ml-1">({bundle.slug})</span>
-					</h3>
-					<div className="text-base-content/60 mt-1 text-xs">
-						{bundle.isBuiltIn ? 'Built-in bundle' : 'Custom bundle'}
-					</div>
-				</div>
-
-				<div className="flex flex-wrap items-center justify-end gap-3">
-					<button
-						type="button"
-						className="btn btn-sm btn-ghost rounded-xl"
-						title="View bundle details"
-						onClick={e => {
-							e.stopPropagation();
-							setIsBundleDetailsOpen(true);
-						}}
-					>
-						<FiEye size={16} />
-						<span>Details</span>
-					</button>
-
-					<div className="flex items-center gap-1">
-						<label htmlFor={`tool-bundle-${bundle.id}`} className="text-sm">
-							Enabled
-						</label>
-						<input
-							id={`tool-bundle-${bundle.id}`}
-							type="checkbox"
-							className="toggle toggle-accent"
-							checked={bundle.isEnabled}
-							disabled={isTogglingBundle}
-							aria-label={`Enable ${bundle.displayName || bundle.slug}`}
-							onChange={e => {
-								void toggleBundleEnable(e.currentTarget.checked);
-							}}
-						/>
-					</div>
-
+		<>
+			<ManagementBundleCard
+				title={bundle.displayName || bundle.slug}
+				identity={
+					<span className="font-mono">
+						{bundle.slug} / {bundle.id}
+					</span>
+				}
+				description={bundle.description}
+				status={
+					<>
+						<StatusBadge tone={bundle.isEnabled ? 'success' : 'neutral'}>
+							{bundle.isEnabled ? 'Enabled' : 'Disabled'}
+						</StatusBadge>
+						<StatusBadge>{bundle.isBuiltIn ? 'Built-in' : 'Custom'}</StatusBadge>
+					</>
+				}
+				disclosure={
 					<button
 						type="button"
 						className="btn btn-sm btn-ghost rounded-xl"
 						aria-expanded={isExpanded}
 						onClick={() => {
-							setIsExpanded(p => !p);
+							setIsExpanded(previous => !previous);
 						}}
 					>
 						<span className="whitespace-nowrap">Tools: {tools.length}</span>
 						{isExpanded ? <FiChevronUp /> : <FiChevronDown />}
 					</button>
-				</div>
-			</div>
-
-			{toolLoadError ? (
-				<div className="alert alert-warning mt-4 rounded-2xl text-sm" role="status">
-					<div className="min-w-0 grow">
-						<div className="font-semibold">Tools could not be loaded</div>
-						<div className="wrap-break-word">{toolLoadError}</div>
+				}
+				actionLeading={
+					<EnabledControl
+						id={`tool-bundle-${bundle.id}`}
+						checked={bundle.isEnabled}
+						onChange={enabled => {
+							void toggleBundleEnable(enabled);
+						}}
+						disabled={bundle.isBuiltIn}
+						busy={isPending('bundle:toggle')}
+						compact={false}
+					/>
+				}
+				actions={
+					<>
+						<button
+							type="button"
+							className="btn btn-sm btn-ghost rounded-xl"
+							title="View bundle details"
+							onClick={() => {
+								setIsBundleDetailsOpen(true);
+							}}
+						>
+							<FiEye size={16} />
+							<span>Details</span>
+						</button>
+						{!bundle.isBuiltIn ? (
+							<>
+								<button
+									type="button"
+									className="btn btn-sm btn-ghost rounded-xl"
+									onClick={() => {
+										openToolModal('add', undefined);
+									}}
+									disabled={!bundle.isEnabled || Boolean(toolLoadError)}
+								>
+									<FiPlus size={16} />
+									<span>Add Tool</span>
+								</button>
+								<button
+									type="button"
+									className="btn btn-sm btn-ghost rounded-xl"
+									onClick={() => {
+										onRequestDeleteBundle(bundle);
+									}}
+									disabled={tools.length > 0 || Boolean(toolLoadError)}
+								>
+									<FiTrash2 size={16} />
+									<span>Delete Bundle</span>
+								</button>
+							</>
+						) : null}
+					</>
+				}
+			>
+				{toolLoadError ? (
+					<div className="alert alert-warning mt-4 rounded-2xl text-sm" role="status">
+						<div className="min-w-0 grow">
+							<div className="font-semibold">Tools could not be loaded</div>
+							<div className="wrap-break-word">{toolLoadError}</div>
+						</div>
+						<button
+							id={`tool-bundle-${bundle.id}`}
+							type="button"
+							className="btn btn-sm rounded-xl"
+							onClick={() => {
+								void refreshTools();
+							}}
+							disabled={isPending('bundle:refresh')}
+						>
+							<FiRefreshCw size={14} />
+							<span>{isPending('bundle:refresh') ? 'Reloading' : 'Retry'}</span>
+						</button>
 					</div>
-					<button
-						type="button"
-						className="btn btn-sm rounded-xl"
-						onClick={() => void refreshTools()}
-						disabled={isRefreshingTools}
-					>
-						<FiRefreshCw size={14} />
-						<span>{isRefreshingTools ? 'Reloading' : 'Retry'}</span>
-					</button>
-				</div>
-			) : null}
+				) : null}
 
-			{isExpanded && (
-				<div className="mt-6 space-y-4">
-					<div className="space-y-3">
+				{isExpanded ? (
+					<div className="mt-6 space-y-3">
 						{tools.map(tool => {
-							const isBusy = busyToolID === tool.id;
+							const toggleKey = `${tool.id}:toggle`;
+							const deleteKey = `${tool.id}:delete`;
 
 							return (
-								<article
+								<ManagementItemCard
 									key={tool.id}
-									className="border-base-content/10 hover:border-base-content/20 rounded-2xl border p-4 transition-colors"
+									title={tool.displayName || tool.slug}
+									subtitle={`${tool.slug} / version ${tool.version}`}
+									description={tool.description}
+									status={
+										<>
+											<StatusBadge tone={tool.isEnabled ? 'success' : 'neutral'}>
+												{tool.isEnabled ? 'Enabled' : 'Disabled'}
+											</StatusBadge>
+											{tool.isBuiltIn ? <StatusBadge>Built-in</StatusBadge> : null}
+										</>
+									}
+									metadata={
+										<>
+											<MetadataPill label="Type">{tool.type}</MetadataPill>
+											<MetadataPill label="User callable">{tool.userCallable ? 'Yes' : 'No'}</MetadataPill>
+											<MetadataPill label="Model callable">{tool.llmCallable ? 'Yes' : 'No'}</MetadataPill>
+											<MetadataPill label="Auto execute">{tool.autoExecReco ? 'Recommended' : 'No'}</MetadataPill>
+										</>
+									}
 								>
-									<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-										<div className="min-w-0">
-											<div className="truncate font-medium" title={tool.displayName}>
-												{tool.displayName || tool.slug}
-											</div>
-											<div className="text-base-content/60 mt-1 text-xs break-all">
-												{tool.slug} · version {tool.version}
-											</div>
-											{tool.description ? (
-												<p className="text-base-content/70 mt-2 max-h-10 overflow-hidden text-sm">{tool.description}</p>
-											) : null}
-										</div>
-
-										<span
-											className={`badge h-auto px-2 py-1 text-center whitespace-normal ${
-												tool.isEnabled ? 'badge-success' : 'badge-neutral'
-											}`}
-										>
-											{tool.isEnabled ? 'Enabled' : 'Disabled'}
-										</span>
-									</div>
-
-									<div className="mt-3 flex flex-wrap gap-2 text-xs">
-										<span className="border-base-content/20 rounded-xl border px-2 py-1">{tool.type}</span>
-										<span className="border-base-content/20 rounded-xl border px-2 py-1">
-											{tool.userCallable ? 'User callable' : 'Not user callable'}
-										</span>
-										<span className="border-base-content/20 rounded-xl border px-2 py-1">
-											{tool.llmCallable ? 'Model callable' : 'Not model callable'}
-										</span>
-										{tool.isBuiltIn ? (
-											<span className="border-base-content/20 rounded-xl border px-2 py-1">Built-in</span>
-										) : null}
-									</div>
-
-									<div className="border-base-content/10 mt-4 flex flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
-										<div className="flex items-center gap-3">
-											<label htmlFor={`tool-${tool.id}`} className="text-sm">
-												Enabled
-											</label>
-											<input
+									<ActionRow
+										leading={
+											<EnabledControl
 												id={`tool-${tool.id}`}
-												type="checkbox"
-												className="toggle toggle-accent toggle-sm"
 												checked={tool.isEnabled}
-												disabled={isBusy}
-												aria-label={`Enable ${tool.displayName || tool.slug}`}
-												onChange={e => {
-													void patchToolEnable(tool, e.currentTarget.checked);
+												onChange={enabled => {
+													void patchToolEnable(tool, enabled);
 												}}
+												disabled={!bundle.isEnabled}
+												busy={isPending(toggleKey)}
+												title={!bundle.isEnabled ? 'Enable the bundle first.' : undefined}
 											/>
-											{isBusy ? <span className="loading loading-spinner loading-xs" /> : null}
-										</div>
-
-										<div className="flex flex-wrap justify-end gap-2">
-											<button
-												type="button"
-												className="btn btn-sm btn-ghost rounded-xl"
-												onClick={() => {
-													openToolModal('view', tool);
-												}}
-												disabled={isBusy}
-												title="View tool"
-											>
-												<FiEye size={15} />
-												<span>View</span>
-											</button>
-											<button
-												type="button"
-												className="btn btn-sm btn-ghost rounded-xl"
-												onClick={() => {
-													openToolModal('edit', tool);
-												}}
-												disabled={isBusy || tool.isBuiltIn || bundle.isBuiltIn}
-												title={
-													tool.isBuiltIn || bundle.isBuiltIn
-														? 'Built-in items cannot create new versions'
-														: 'Create a new version'
-												}
-											>
-												<FiGitBranch size={15} />
-												<span>New version</span>
-											</button>
-											<button
-												type="button"
-												className="btn btn-sm btn-ghost rounded-xl"
-												onClick={() => {
-													requestDeleteTool(tool);
-												}}
-												disabled={isBusy || tool.isBuiltIn || bundle.isBuiltIn}
-												title={tool.isBuiltIn || bundle.isBuiltIn ? 'Built-in items cannot be deleted' : 'Delete'}
-											>
-												<FiTrash2 size={15} />
-												<span>Delete</span>
-											</button>
-										</div>
-									</div>
-								</article>
+										}
+									>
+										<button
+											type="button"
+											className="btn btn-sm btn-ghost rounded-xl"
+											onClick={() => {
+												openToolModal('view', tool);
+											}}
+										>
+											<FiEye size={15} />
+											<span>View</span>
+										</button>
+										<button
+											type="button"
+											className="btn btn-sm btn-ghost rounded-xl"
+											onClick={() => {
+												openToolModal('edit', tool);
+											}}
+											disabled={!bundle.isEnabled || tool.isBuiltIn || bundle.isBuiltIn}
+										>
+											<FiGitBranch size={15} />
+											<span>New version</span>
+										</button>
+										<button
+											type="button"
+											className="btn btn-sm btn-ghost rounded-xl"
+											onClick={() => {
+												requestDeleteTool(tool);
+											}}
+											disabled={isPending(deleteKey) || tool.isBuiltIn || bundle.isBuiltIn}
+										>
+											<FiTrash2 size={15} />
+											<span>Delete</span>
+										</button>
+									</ActionRow>
+								</ManagementItemCard>
 							);
 						})}
 
 						{tools.length === 0 ? (
-							<div className="border-base-content/10 rounded-2xl border py-6 text-center text-sm">
+							<ManagementEmptyState>
 								{toolLoadError ? 'Tool contents are unavailable.' : 'No tools in this bundle.'}
-							</div>
+							</ManagementEmptyState>
 						) : null}
 					</div>
-
-					{!bundle.isBuiltIn && (
-						<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-							<button
-								type="button"
-								className="btn btn-md btn-ghost flex items-center rounded-2xl"
-								onClick={() => {
-									onRequestDeleteBundle(bundle);
-								}}
-								disabled={tools.length > 0 || Boolean(toolLoadError)}
-								title={
-									toolLoadError
-										? 'Reload tools before deleting this bundle.'
-										: tools.length > 0
-											? 'Delete all tools from this bundle first.'
-											: 'Delete bundle'
-								}
-							>
-								<FiTrash2 /> <span className="ml-1">Delete Bundle</span>
-							</button>
-							<button
-								type="button"
-								className="btn btn-md btn-ghost flex items-center rounded-2xl"
-								onClick={() => {
-									openToolModal('add', undefined);
-								}}
-								disabled={!bundle.isEnabled || Boolean(toolLoadError)}
-								title={!bundle.isEnabled ? 'Enable the bundle first.' : 'Add tool'}
-							>
-								<FiPlus /> <span className="ml-1">Add Tool</span>
-							</button>
-						</div>
-					)}
-				</div>
-			)}
+				) : null}
+			</ManagementBundleCard>
 
 			<DeleteConfirmationModal
 				isOpen={isDeleteToolModalOpen}
 				onClose={() => {
-					setIsDeleteToolModalOpen(false);
+					if (!toolToDelete || !isPending(`${toolToDelete.id}:delete`)) {
+						setIsDeleteToolModalOpen(false);
+						setToolToDelete(null);
+					}
 				}}
 				onConfirm={confirmDeleteTool}
 				title="Delete Tool"
@@ -435,6 +405,6 @@ export function ToolBundleCard({
 				}}
 				message={alertMsg}
 			/>
-		</section>
+		</>
 	);
 }

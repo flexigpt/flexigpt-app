@@ -13,6 +13,7 @@ import type {
 
 interface ToolSelectionSectionProps {
 	isViewMode: boolean;
+	disabled?: boolean;
 
 	availableOptions: readonly SimpleSelectableOption[];
 	selectedOptionKey: string;
@@ -49,6 +50,7 @@ function getAutoExecuteDropdownLabel(value: TriStateBoolean): string {
 
 export const ToolSelectionSection = memo(function ToolSelectionSection({
 	isViewMode,
+	disabled = false,
 	availableOptions,
 	selectedOptionKey,
 	onSelectedOptionKeyChange,
@@ -77,24 +79,24 @@ export const ToolSelectionSection = memo(function ToolSelectionSection({
 		<>
 			{!isViewMode && (
 				<div className="grid grid-cols-12 items-center gap-2">
-					<div className="col-span-10">
+					<div className="col-span-12 sm:col-span-10">
 						<Dropdown<string>
 							dropdownItems={dropdownItems}
 							orderedKeys={orderedKeys}
 							selectedKey={selectedOptionKey}
 							onChange={onSelectedOptionKeyChange}
-							disabled={availableOptions.length === 0}
+							disabled={disabled || availableOptions.length === 0}
 							placeholderLabel={availableOptions.length === 0 ? emptyOptionsLabel : 'Select an option'}
 							title="Select a tool to add"
 							getDisplayName={key => availableOptions.find(option => option.key === key)?.label ?? emptyOptionsLabel}
 						/>
 					</div>
-					<div className="col-span-2">
+					<div className="col-span-12 sm:col-span-2">
 						<button
 							type="button"
 							className="btn btn-ghost w-full rounded-xl"
 							onClick={onAdd}
-							disabled={!selectedOptionKey}
+							disabled={disabled || !selectedOptionKey}
 						>
 							<FiPlus size={14} />
 							<span className="ml-1">Add</span>
@@ -120,6 +122,7 @@ export const ToolSelectionSection = memo(function ToolSelectionSection({
 									onMoveUp={onMoveUp}
 									onMoveDown={onMoveDown}
 									onRemove={onRemove}
+									disabled={disabled}
 								/>
 							)}
 						</div>
@@ -143,6 +146,7 @@ export const ToolSelectionSection = memo(function ToolSelectionSection({
 										placeholderLabel="Tool Default"
 										title="Auto execute override"
 										getDisplayName={getAutoExecuteDropdownLabel}
+										disabled={disabled}
 									/>
 								)}
 							</div>
@@ -153,7 +157,7 @@ export const ToolSelectionSection = memo(function ToolSelectionSection({
 									</label>
 									<textarea
 										className="textarea h-24 w-full rounded-xl font-mono text-xs"
-										readOnly={isViewMode}
+										readOnly={isViewMode || disabled}
 										value={item.userArgSchemaInstance}
 										onChange={e => {
 											onUserArgsChange(idx, e.target.value);

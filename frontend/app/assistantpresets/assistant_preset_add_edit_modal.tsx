@@ -22,7 +22,8 @@ import { DEFAULT_SEMVER, isSemverVersion, suggestNextMinorVersion } from '@/lib/
 import { useAsyncResource } from '@/hooks/use_async_resource';
 
 import { Dropdown } from '@/components/dropdown';
-import { ModalBackdrop } from '@/components/modal_backdrop';
+import { MANAGEMENT_MODAL_FORM_CLASS } from '@/components/managementui/management_class_consts';
+import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 
 import { MCPSelectionSection } from '@/assistantpresets/components/mcp_selection_section';
 import { AssistantPresetModelPatchEditor } from '@/assistantpresets/components/model_patch_editor';
@@ -635,10 +636,10 @@ function AddEditAssistantPresetModalContent({
 	const isUnmountingRef = useRef(false);
 	const forceCatalogReloadRef = useRef(false);
 
-	const loadCatalogResource = useCallback(async (_signal: AbortSignal): Promise<AssistantPresetEditorCatalog> => {
+	const loadCatalogResource = useCallback(async (signal: AbortSignal): Promise<AssistantPresetEditorCatalog> => {
 		const force = forceCatalogReloadRef.current;
 		forceCatalogReloadRef.current = false;
-		return loadAssistantPresetEditorCatalog({ force });
+		return loadAssistantPresetEditorCatalog({ force, signal });
 	}, []);
 
 	const {
@@ -739,6 +740,8 @@ function AddEditAssistantPresetModalContent({
 	const catalogLoadErrors = catalog?.loadErrors;
 	const toolCatalogUnavailable = Boolean(catalogLoadErrors?.tools);
 	const skillCatalogUnavailable = Boolean(catalogLoadErrors?.skills);
+
+	const catalogPending = catalogLoading || catalogRefreshing || catalog === null;
 
 	const modelOptionByKey = useMemo(() => createOptionMap(modelPresetOptions), [modelPresetOptions]);
 	const toolOptionByKey = useMemo(() => createOptionMap(toolOptions), [toolOptions]);
@@ -1418,7 +1421,7 @@ function AddEditAssistantPresetModalContent({
 
 		setSubmitError('');
 
-		if (catalogLoading || !catalog) {
+		if (catalogLoading || catalogRefreshing || !catalog || catalogError) {
 			setSubmitError('The editor catalog could not be loaded yet. Please retry.');
 			return;
 		}
@@ -1533,7 +1536,7 @@ function AddEditAssistantPresetModalContent({
 			}}
 		>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-5xl overflow-hidden rounded-2xl p-0">
-				<div className="max-h-[80vh] overflow-y-auto p-6">
+				<div className="max-h-[80vh] overflow-y-auto p-4 sm:p-6">
 					<div className="mb-4 flex items-center justify-between">
 						<h3 className="text-lg font-bold">{headerTitle}</h3>
 						<button
@@ -1549,7 +1552,12 @@ function AddEditAssistantPresetModalContent({
 						</button>
 					</div>
 
-					<form noValidate onSubmit={handleSubmit} className="space-y-4">
+					<form
+						noValidate
+						onSubmit={handleSubmit}
+						className={MANAGEMENT_MODAL_FORM_CLASS}
+						aria-busy={catalogPending || isSubmitting}
+					>
 						{submitError && (
 							<div className="alert alert-error rounded-2xl text-sm">
 								<div className="flex items-center gap-2">
@@ -1563,6 +1571,13 @@ function AddEditAssistantPresetModalContent({
 							<div className="alert rounded-2xl text-sm">
 								<span className="loading loading-spinner loading-sm" />
 								<span>Loading models, tools, and skills…</span>
+							</div>
+						)}
+
+						{catalogRefreshing && !catalogLoading && (
+							<div className="alert rounded-2xl text-sm">
+								<span className="loading loading-spinner loading-sm" />
+								<span>Refreshing models, tools, and skills...</span>
 							</div>
 						)}
 
@@ -1844,7 +1859,7 @@ function AddEditAssistantPresetModalContent({
 												startingIncludeModelSystemPrompt: value ? prev.startingIncludeModelSystemPrompt : '',
 											}));
 										}}
-										disabled={isViewMode}
+										disabled={isViewMode || catalogPending || Boolean(catalogError)}
 										filterDisabled={false}
 										placeholderLabel="None"
 										title="Select model preset"
@@ -1936,6 +1951,7 @@ function AddEditAssistantPresetModalContent({
 
 						<ToolSelectionSection
 							isViewMode={isViewMode}
+							disabled={catalogPending || Boolean(catalogError)}
 							availableOptions={availableToolOptions}
 							selectedOptionKey={effectiveNextToolKey}
 							onSelectedOptionKeyChange={handleToolOptionKeyChange}
@@ -1968,6 +1984,7 @@ function AddEditAssistantPresetModalContent({
 
 						<SkillSelectionSection
 							isViewMode={isViewMode}
+							disabled={catalogPending || Boolean(catalogError)}
 							availableOptions={availableSkillOptions}
 							selectedOptionKey={effectiveNextSkillKey}
 							onSelectedOptionKeyChange={handleSkillOptionKeyChange}

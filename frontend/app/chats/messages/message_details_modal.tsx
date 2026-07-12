@@ -6,7 +6,7 @@ import { FiCode, FiX } from 'react-icons/fi';
 
 import type { ReasoningContent } from '@/spec/inference';
 
-import { ModalBackdrop } from '@/components/modal_backdrop';
+import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 
 import { MessageContentCard } from '@/chats/messages/message_content_card';
 

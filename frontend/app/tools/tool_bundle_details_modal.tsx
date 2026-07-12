@@ -6,7 +6,7 @@ import { FiX } from 'react-icons/fi';
 
 import type { ToolBundle } from '@/spec/tool';
 
-import { ModalBackdrop } from '@/components/modal_backdrop';
+import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 
 interface ToolBundleDetailsModalProps {
 	isOpen: boolean;

@@ -12,6 +12,7 @@ import type {
 
 interface SkillSelectionSectionProps {
 	isViewMode: boolean;
+	disabled?: boolean;
 
 	availableOptions: readonly SimpleSelectableOption[];
 	selectedOptionKey: string;
@@ -31,6 +32,7 @@ interface SkillSelectionSectionProps {
 
 export const SkillSelectionSection = memo(function SkillSelectionSection({
 	isViewMode,
+	disabled = false,
 	availableOptions,
 	selectedOptionKey,
 	onSelectedOptionKeyChange,
@@ -59,24 +61,24 @@ export const SkillSelectionSection = memo(function SkillSelectionSection({
 		<>
 			{!isViewMode && (
 				<div className="grid grid-cols-12 items-center gap-2">
-					<div className="col-span-10">
+					<div className="col-span-12 sm:col-span-10">
 						<Dropdown<string>
 							dropdownItems={dropdownItems}
 							orderedKeys={orderedKeys}
 							selectedKey={selectedOptionKey}
 							onChange={onSelectedOptionKeyChange}
-							disabled={availableOptions.length === 0}
+							disabled={disabled || availableOptions.length === 0}
 							placeholderLabel={availableOptions.length === 0 ? emptyOptionsLabel : 'Select a skill to add'}
 							title="Select a skill to add"
 							getDisplayName={key => availableOptions.find(option => option.key === key)?.label ?? emptyOptionsLabel}
 						/>
 					</div>
-					<div className="col-span-2">
+					<div className="col-span-12 sm:col-span-2">
 						<button
 							type="button"
 							className="btn btn-ghost w-full rounded-xl"
 							onClick={onAdd}
-							disabled={!selectedOptionKey}
+							disabled={disabled || !selectedOptionKey}
 						>
 							<FiPlus size={14} />
 							<span className="ml-1">Add</span>
@@ -102,6 +104,7 @@ export const SkillSelectionSection = memo(function SkillSelectionSection({
 									onMoveUp={onMoveUp}
 									onMoveDown={onMoveDown}
 									onRemove={onRemove}
+									disabled={disabled}
 								/>
 							)}
 						</div>
@@ -126,7 +129,9 @@ export const SkillSelectionSection = memo(function SkillSelectionSection({
 										type="checkbox"
 										className="toggle toggle-accent"
 										checked={item.useAsInstructions}
-										disabled={!item.useAsInstructions && (item.preLoadAsActive || !item.canUseAsInstructions)}
+										disabled={
+											disabled || (!item.useAsInstructions && (item.preLoadAsActive || !item.canUseAsInstructions))
+										}
 										title={
 											item.preLoadAsActive
 												? 'A system instruction source cannot also be preloaded.'
@@ -148,7 +153,9 @@ export const SkillSelectionSection = memo(function SkillSelectionSection({
 										type="checkbox"
 										className="toggle toggle-accent"
 										checked={item.preLoadAsActive}
-										disabled={!item.preLoadAsActive && (item.useAsInstructions || !item.canPreLoadAsActive)}
+										disabled={
+											disabled || (!item.preLoadAsActive && (item.useAsInstructions || !item.canPreLoadAsActive))
+										}
 										title={
 											item.useAsInstructions
 												? 'Instruction-prompt selections are not active session skills.'

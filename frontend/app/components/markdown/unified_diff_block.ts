@@ -52,6 +52,29 @@ const DEV_NULL = '/dev/null';
 const OPENAI_PATCH_FILE_HEADER_RE = /^\*\*\*\s+(Update|Add|Delete)\s+File:\s*(.+?)\s*$/i;
 const OPENAI_PATCH_MOVE_TO_RE = /^\*\*\*\s+Move\s+to:\s*(.+?)\s*$/i;
 
+export function isAbsolutePath(value: string | undefined | null): boolean {
+	const trimmed = value?.trim();
+
+	return !!(
+		trimmed &&
+		trimmed !== DEV_NULL &&
+		(trimmed.startsWith('/') || /^[A-Za-z]:[\\/]/.test(trimmed) || trimmed.startsWith('\\\\'))
+	);
+}
+
+export function toAbsolutePath(value: string | undefined | null): string {
+	const trimmed = value?.trim() ?? '';
+	return isAbsolutePath(trimmed) ? trimmed : '';
+}
+
+export function absolutePathStrings(values: Array<string | undefined | null>): string[] {
+	return uniqueStrings(
+		values.map(v => {
+			return toAbsolutePath(v);
+		})
+	);
+}
+
 function isUnifiedDiffLanguage(language: string): boolean {
 	const normalized = language.trim().toLowerCase();
 	return normalized === 'diff' || normalized === 'patch' || normalized === 'udiff';
@@ -165,8 +188,8 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 				...createWorkingFile(),
 				oldPath: oldPath || undefined,
 				newPath: newPath || undefined,
-				targetPath: p,
-				candidatePaths: isUsablePatchPath(p) ? [p] : [],
+				targetPath: toAbsolutePath(p) || undefined,
+				candidatePaths: absolutePathStrings([p]),
 			};
 			current.lines.push(line);
 			inHunk = openAIHeader.kind === 'add' || openAIHeader.kind === 'delete';
@@ -178,10 +201,12 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 			sawOpenAIPatchFormat = true;
 			current.lines.push(line);
 			current.newPath = openAIMoveTo;
-			current.targetPath = openAIMoveTo;
-			current.candidatePaths = uniqueStrings(
-				[...(current.candidatePaths ?? []), current.oldPath, current.targetPath].filter(p => isUsablePatchPath(p))
-			);
+			current.targetPath = toAbsolutePath(openAIMoveTo) || undefined;
+			current.candidatePaths = absolutePathStrings([
+				...(current.candidatePaths ?? []),
+				current.oldPath,
+				current.targetPath,
+			]);
 			inHunk = false;
 			continue;
 		}
@@ -200,7 +225,7 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 				...createWorkingFile(),
 				oldPath: oldPath || undefined,
 				newPath: newPath || undefined,
-				candidatePaths: uniqueStrings([oldPath, newPath].filter(p => isUsablePatchPath(p))),
+				candidatePaths: absolutePathStrings([oldPath, newPath]),
 			};
 			current.lines.push(line);
 			inHunk = false;
@@ -215,7 +240,7 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 				...createWorkingFile(),
 				oldPath: p || undefined,
 				newPath: p || undefined,
-				candidatePaths: isUsablePatchPath(p) ? [p] : [],
+				candidatePaths: absolutePathStrings([p]),
 			};
 			current.lines.push(line);
 			inHunk = false;
@@ -237,9 +262,7 @@ export function parseUnifiedDiffForUI(value: string, language = ''): ParsedUnifi
 
 			file.oldPath = oldPath || undefined;
 			file.newPath = newPath || undefined;
-			file.candidatePaths = uniqueStrings(
-				[...(file.candidatePaths ?? []), oldPath, newPath].filter(p => isUsablePatchPath(p))
-			);
+			file.candidatePaths = absolutePathStrings([...(file.candidatePaths ?? []), oldPath, newPath]);
 
 			i += 1;
 			inHunk = false;
@@ -359,7 +382,7 @@ export function buildEditableTargetsFromOutput(
 			oldPath: file.oldPath,
 			newPath: file.newPath,
 			targetPath: chooseEditableTargetPath(file, inferredBestTarget),
-			candidatePaths: uniqueStrings([
+			candidatePaths: absolutePathStrings([
 				...(file.candidatePaths ?? []),
 				file.targetPath,
 				...inferredTargets.map(candidate => candidate.targetPath),
@@ -377,10 +400,8 @@ export function buildEditableTargetsFromOutput(
 			fileKey: target.fileKey,
 			oldPath: target.oldPath,
 			newPath: target.newPath,
-			targetPath: target.targetPath,
-			candidatePaths: uniqueStrings(
-				[target.targetPath, target.newPath, target.oldPath].filter(p => isUsablePatchPath(p))
-			),
+			targetPath: chooseEditableTargetPath(target),
+			candidatePaths: absolutePathStrings([target.targetPath, target.newPath, target.oldPath]),
 		});
 	}
 
@@ -393,17 +414,15 @@ export function buildEditableTargetsFromOutput(
 			oldPath: file.oldPath,
 			newPath: file.newPath,
 			targetPath: chooseEditableTargetPath(file, inferredBestTarget),
-			resolvedPath: file.resolvedPath,
-			candidatePaths: uniqueStrings(
-				[
-					...inferredTargets.map(candidate => candidate.targetPath),
-					...(file.candidatePaths ?? []),
-					file.targetPath,
-					file.resolvedPath,
-					file.oldPath,
-					file.newPath,
-				].filter(p => isUsablePatchPath(p))
-			),
+			resolvedPath: toAbsolutePath(file.resolvedPath) || undefined,
+			candidatePaths: absolutePathStrings([
+				...inferredTargets.map(candidate => candidate.targetPath),
+				...(file.candidatePaths ?? []),
+				file.targetPath,
+				file.resolvedPath,
+				file.oldPath,
+				file.newPath,
+			]),
 			ok: file.ok,
 			status: file.status,
 			message: file.message,
@@ -462,6 +481,7 @@ export interface EditableUnifiedDiffTarget {
 	oldPath?: string;
 	newPath?: string;
 	targetPath: string;
+	targetPathInput?: string;
 	resolvedPath?: string;
 	candidatePaths: string[];
 	diffText?: string;
@@ -490,7 +510,7 @@ function mergeParsedUnifiedDiffFiles(files: ParsedUnifiedDiffFileForUI[]): Parse
 			const next: ParsedUnifiedDiffFileForUI = {
 				...file,
 				fileKey: `file-${out.length + 1}`,
-				candidatePaths: uniqueStrings(file.candidatePaths),
+				candidatePaths: absolutePathStrings(file.candidatePaths),
 				sectionKeys: uniqueStrings([file.fileKey, ...(file.sectionKeys ?? [])]),
 			};
 
@@ -505,7 +525,7 @@ function mergeParsedUnifiedDiffFiles(files: ParsedUnifiedDiffFileForUI[]): Parse
 		existing.hunks += file.hunks;
 		existing.addedLines += file.addedLines;
 		existing.deletedLines += file.deletedLines;
-		existing.candidatePaths = uniqueStrings([
+		existing.candidatePaths = absolutePathStrings([
 			...(existing.candidatePaths ?? []),
 			...(file.candidatePaths ?? []),
 			existing.targetPath,
@@ -581,7 +601,7 @@ function getEditableTargetPatchPaths(target: { oldPath?: string; newPath?: strin
 }
 
 function getEditableTargetResolvedPaths(target: { targetPath?: string; resolvedPath?: string }): string[] {
-	return uniqueStrings([target.resolvedPath, target.targetPath].filter(p => isUsablePatchPath(p)));
+	return absolutePathStrings([target.resolvedPath, target.targetPath]);
 }
 
 export function haveSharedPathIdentity(left: Array<string | undefined>, right: Array<string | undefined>): boolean {
@@ -684,14 +704,18 @@ function mergeEditableTarget(
 	existing: EditableUnifiedDiffTarget | undefined,
 	update: EditableUnifiedDiffTarget
 ): EditableUnifiedDiffTarget {
+	const updateTargetPath = toAbsolutePath(update.targetPath);
+	const updateResolvedPath = toAbsolutePath(update.resolvedPath);
+
 	if (!existing) {
 		return {
 			...update,
-			targetPath: update.targetPath || '',
-			candidatePaths: uniqueStrings([
+			targetPath: updateTargetPath,
+			resolvedPath: updateResolvedPath || undefined,
+			candidatePaths: absolutePathStrings([
 				...(update.candidatePaths ?? []),
-				update.targetPath,
-				update.resolvedPath,
+				updateTargetPath,
+				updateResolvedPath,
 				update.newPath,
 				update.oldPath,
 			]),
@@ -699,21 +723,25 @@ function mergeEditableTarget(
 		};
 	}
 
+	const existingTargetPath = toAbsolutePath(existing.targetPath);
+	const existingResolvedPath = toAbsolutePath(existing.resolvedPath);
+
 	return {
 		...existing,
 		...update,
 		fileKey: existing.fileKey || update.fileKey,
 		oldPath: update.oldPath || existing.oldPath,
 		newPath: update.newPath || existing.newPath,
-		targetPath: update.targetPath || existing.targetPath || '',
-		resolvedPath: update.resolvedPath || existing.resolvedPath,
-		candidatePaths: uniqueStrings([
+		targetPath: updateTargetPath || existingTargetPath,
+		targetPathInput: update.targetPathInput ?? existing.targetPathInput,
+		resolvedPath: updateResolvedPath || existingResolvedPath || undefined,
+		candidatePaths: absolutePathStrings([
 			...(existing.candidatePaths ?? []),
 			...(update.candidatePaths ?? []),
-			existing.targetPath,
-			update.targetPath,
-			existing.resolvedPath,
-			update.resolvedPath,
+			existingTargetPath,
+			updateTargetPath,
+			existingResolvedPath,
+			updateResolvedPath,
 			update.newPath,
 			update.oldPath,
 			existing.newPath,
@@ -747,8 +775,8 @@ function chooseEditableTargetPath(
 	},
 	inferredBestTarget?: string
 ): string {
-	const targetPath = file.targetPath?.trim() ?? '';
-	const resolvedPath = file.resolvedPath?.trim() ?? '';
+	const targetPath = toAbsolutePath(file.targetPath);
+	const resolvedPath = toAbsolutePath(file.resolvedPath);
 
 	if (targetPath) {
 		return targetPath;
@@ -758,11 +786,11 @@ function chooseEditableTargetPath(
 		return inferredBestTarget;
 	}
 
-	if (resolvedPath && isAbsolutePathLike(resolvedPath) && isResolvedPathCompatibleWithPatchPath(resolvedPath, file)) {
+	if (resolvedPath && isResolvedPathCompatibleWithPatchPath(resolvedPath, file)) {
 		return resolvedPath;
 	}
 
-	return '';
+	return toAbsolutePath(file.newPath) || toAbsolutePath(file.oldPath);
 }
 
 function isResolvedPathCompatibleWithPatchPath(
@@ -797,18 +825,18 @@ function inferTargetPathsForUI(
 	globalCandidatePaths: string[]
 ): TargetPathInferenceForUI[] {
 	const patchPath = normalizePathKey(file.newPath) || normalizePathKey(file.oldPath);
-	if (!patchPath || isAbsolutePathLike(patchPath)) {
+	if (!patchPath || isAbsolutePath(patchPath)) {
 		return [];
 	}
 
 	const patchDir = dirnamePathKey(patchPath);
 	const patchDirParts = getPathParts(patchDir);
-	const candidates = uniqueStrings([...(file.candidatePaths ?? []), ...globalCandidatePaths]);
+	const candidates = absolutePathStrings([...(file.candidatePaths ?? []), ...globalCandidatePaths]);
 	const inferences: TargetPathInferenceForUI[] = [];
 
 	for (const candidateRaw of candidates) {
 		const candidate = normalizePathKey(candidateRaw);
-		if (!candidate || !isAbsolutePathLike(candidate)) {
+		if (!candidate || !isAbsolutePath(candidate)) {
 			continue;
 		}
 
@@ -836,21 +864,27 @@ function inferTargetPathsForUI(
 					continue;
 				}
 
-				inferences.push({
-					targetPath: joinPathKey(root, patchPath),
-					sourcePath: candidateRaw,
-					score: prefixLength,
-				});
+				const targetPath = toAbsolutePath(joinPathKey(root, patchPath));
+				if (targetPath) {
+					inferences.push({
+						targetPath,
+						sourcePath: candidateRaw,
+						score: prefixLength,
+					});
+				}
 				break;
 			}
 		}
 
 		if (candidateLooksDirectory) {
-			inferences.push({
-				targetPath: joinPathKey(trimTrailingSlashes(candidate), patchPath),
-				sourcePath: candidateRaw,
-				score: 0,
-			});
+			const targetPath = toAbsolutePath(joinPathKey(trimTrailingSlashes(candidate), patchPath));
+			if (targetPath) {
+				inferences.push({
+					targetPath,
+					sourcePath: candidateRaw,
+					score: 0,
+				});
+			}
 		}
 	}
 
@@ -874,14 +908,15 @@ function sortAndDedupeTargetInferences(inferences: TargetPathInferenceForUI[]): 
 	const byTarget = new Map<string, TargetPathInferenceForUI>();
 
 	for (const inference of inferences) {
-		const key = normalizePathKey(inference.targetPath);
-		if (!key) {
+		const targetPath = toAbsolutePath(inference.targetPath);
+		const key = normalizePathKey(targetPath);
+		if (!targetPath || !key) {
 			continue;
 		}
 
 		const existing = byTarget.get(key);
 		if (!existing || inference.score > existing.score) {
-			byTarget.set(key, inference);
+			byTarget.set(key, { ...inference, targetPath });
 		}
 	}
 
@@ -891,14 +926,6 @@ function sortAndDedupeTargetInferences(inferences: TargetPathInferenceForUI[]): 
 		}
 		return normalizePathKey(left.targetPath).localeCompare(normalizePathKey(right.targetPath));
 	});
-}
-
-function isAbsolutePathLike(value: string | undefined): boolean {
-	const normalized = value?.trim();
-	if (!normalized) {
-		return false;
-	}
-	return normalized.startsWith('/') || /^[A-Za-z]:[\\/]/.test(normalized) || normalized.startsWith('\\\\');
 }
 
 function looksLikeDirectoryPath(value: string): boolean {
@@ -953,8 +980,8 @@ function pathHasSuffixPath(value: string, suffix: string): boolean {
 function joinPathKey(root: string, rel: string): string {
 	const cleanRoot = trimTrailingSlashes(normalizePathKey(root));
 	const cleanRel = normalizePathKey(rel).replace(/^\/+/, '');
-	if (!cleanRoot) {
-		return cleanRel;
+	if (!cleanRoot || !cleanRel) {
+		return '';
 	}
 	if (cleanRoot === '/') {
 		return `/${cleanRel}`;
@@ -1030,12 +1057,12 @@ function getPatchFileIdentity(file: {
 		return `path:${normalizePathKey(patchPath)}`;
 	}
 
-	const targetPath = normalizePathKey(file.targetPath);
+	const targetPath = normalizePathKey(toAbsolutePath(file.targetPath));
 	if (targetPath) {
 		return `path:${targetPath}`;
 	}
 
-	const resolvedPath = normalizePathKey(file.resolvedPath);
+	const resolvedPath = normalizePathKey(toAbsolutePath(file.resolvedPath));
 	if (resolvedPath) {
 		return `path:${resolvedPath}`;
 	}

@@ -7,7 +7,7 @@ import { FiAlertCircle, FiX } from 'react-icons/fi';
 import type { MCPApprovalSummary } from '@/spec/mcp';
 import { MCPApprovalResolution } from '@/spec/mcp';
 
-import { ModalBackdrop } from '@/components/modal_backdrop';
+import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 
 import type { MCPApprovalRequest } from '@/chats/composer/mcp/use_mcp_approval';
 import { getMCPToolRiskLabel } from '@/mcpservers/lib/mcp_server_utils';

@@ -14,8 +14,10 @@ import { validateSlug, validateTags } from '@/lib/text_utils';
 import { skillStoreAPI } from '@/apis/baseapi';
 
 import { Dropdown } from '@/components/dropdown';
-import { MetadataPill, ModalField, ModalSection } from '@/components/management_ui';
-import { ModalBackdrop } from '@/components/modal_backdrop';
+import { MetadataPill } from '@/components/managementui/metadata_pill';
+import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalField } from '@/components/modal/modal_field';
+import { ModalSection } from '@/components/modal/modal_section';
 import { ReadOnlyValue } from '@/components/read_only_value';
 
 import {

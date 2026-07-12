@@ -8,6 +8,7 @@ interface OrderedItemControlsProps {
 	onMoveUp: (index: number) => void;
 	onMoveDown: (index: number) => void;
 	onRemove: (index: number) => void;
+	disabled?: boolean;
 }
 
 export const OrderedItemControls = memo(function OrderedItemControls({
@@ -16,6 +17,7 @@ export const OrderedItemControls = memo(function OrderedItemControls({
 	onMoveUp,
 	onMoveDown,
 	onRemove,
+	disabled = false,
 }: OrderedItemControlsProps) {
 	return (
 		<div className="flex items-center gap-2">
@@ -25,8 +27,9 @@ export const OrderedItemControls = memo(function OrderedItemControls({
 				onClick={() => {
 					onMoveUp(index);
 				}}
-				disabled={index === 0}
+				disabled={disabled || index === 0}
 				title="Move up"
+				aria-label="Move up"
 			>
 				<FiChevronUp size={14} />
 			</button>
@@ -37,8 +40,9 @@ export const OrderedItemControls = memo(function OrderedItemControls({
 				onClick={() => {
 					onMoveDown(index);
 				}}
-				disabled={index === length - 1}
+				disabled={disabled || index === length - 1}
 				title="Move down"
+				aria-label="Move down"
 			>
 				<FiChevronDown size={14} />
 			</button>
@@ -50,6 +54,8 @@ export const OrderedItemControls = memo(function OrderedItemControls({
 					onRemove(index);
 				}}
 				title="Remove"
+				aria-label="Remove"
+				disabled={disabled}
 			>
 				<FiTrash2 size={14} />
 			</button>

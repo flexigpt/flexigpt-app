@@ -6,8 +6,8 @@ import { FiX } from 'react-icons/fi';
 
 import type { Skill, SkillBundle } from '@/spec/skill';
 
-import { MetadataPill } from '@/components/management_ui';
-import { ModalBackdrop } from '@/components/modal_backdrop';
+import { MetadataPill } from '@/components/managementui/metadata_pill';
+import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 
 import { getSkillInsertCounts, getSkillInsertDescription, skillHasResources } from '@/skills/lib/skill_artifact_utils';
 

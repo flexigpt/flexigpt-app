@@ -13,7 +13,8 @@ import { validateSlug } from '@/lib/text_utils';
 
 import type { DropdownItem } from '@/components/dropdown';
 import { Dropdown } from '@/components/dropdown';
-import { ModalBackdrop } from '@/components/modal_backdrop';
+import { MANAGEMENT_MODAL_FORM_CLASS } from '@/components/managementui/management_class_consts';
+import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 
 import type { MCPServerUpsertInput } from '@/mcpservers/lib/mcp_server_utils';
 import {
@@ -1018,7 +1019,7 @@ function AddEditMCPServerModalContent({
 			}}
 		>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-4xl overflow-hidden rounded-2xl p-0">
-				<div className="max-h-[80vh] overflow-y-auto p-6">
+				<div className="max-h-[80vh] overflow-y-auto p-4 sm:p-6">
 					<div className="mb-4 flex items-center justify-between">
 						<h3 className="text-lg font-bold">{headerTitle}</h3>
 						<button
@@ -1032,7 +1033,7 @@ function AddEditMCPServerModalContent({
 						</button>
 					</div>
 
-					<form noValidate onSubmit={handleSubmit} className="space-y-4" aria-busy={isSubmitting}>
+					<form noValidate onSubmit={handleSubmit} className={MANAGEMENT_MODAL_FORM_CLASS} aria-busy={isSubmitting}>
 						{submitError && (
 							<div className="alert alert-error rounded-2xl text-sm">
 								<div className="flex items-center gap-2">

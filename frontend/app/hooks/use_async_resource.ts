@@ -1,6 +1,8 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { createAbortError, isAbortError, raceWithAbortSignal } from '@/lib/async_utils';
+
 type AsyncResourcePhase = 'idle' | 'loading' | 'refreshing' | 'error';
 
 interface AsyncResourceState<T> {
@@ -26,20 +28,6 @@ export interface UseAsyncResourceResult<T> {
 	reload: () => Promise<T | undefined>;
 	reloadOrThrow: () => Promise<T>;
 	setData: Dispatch<SetStateAction<T>>;
-}
-
-function createAbortError(): Error {
-	if (typeof DOMException !== 'undefined') {
-		return new DOMException('The async resource request was cancelled.', 'AbortError');
-	}
-
-	const error = new Error('The async resource request was cancelled.');
-	error.name = 'AbortError';
-	return error;
-}
-
-function isAbortError(error: unknown): boolean {
-	return error instanceof Error && error.name === 'AbortError';
 }
 
 /**
@@ -82,10 +70,10 @@ export function useAsyncResource<T>(
 		}
 
 		try {
-			const value = await loader(controller.signal);
+			const value = await raceWithAbortSignal(loader(controller.signal), controller.signal);
 
 			if (controller.signal.aborted || !mountedRef.current || requestIDRef.current !== requestID) {
-				throw createAbortError();
+				throw createAbortError('The async resource request was cancelled.');
 			}
 
 			setState({

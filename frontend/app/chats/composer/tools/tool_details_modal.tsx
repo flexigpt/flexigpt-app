@@ -15,7 +15,7 @@ import {
 	normalizeStructuredJSONStringDeep,
 } from '@/lib/jsonschema_utils';
 
-import { ModalBackdrop } from '@/components/modal_backdrop';
+import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 
 import { MessageContentCard } from '@/chats/messages/message_content_card';
 import { formatToolCallLabel } from '@/tools/lib/tool_call_utils';

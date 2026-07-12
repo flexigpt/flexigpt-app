@@ -121,7 +121,7 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 			)}
 
 			<div className="grid grid-cols-12 items-center gap-2">
-				<div className="col-span-10">
+				<div className="col-span-12 sm:col-span-10">
 					<Dropdown<string>
 						dropdownItems={dropdownItems}
 						orderedKeys={orderedKeys}
@@ -148,7 +148,7 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 						}}
 					/>
 				</div>
-				<div className="col-span-2">
+				<div className="col-span-12 sm:col-span-2">
 					<button
 						type="button"
 						className="btn btn-ghost w-full rounded-xl"
@@ -201,7 +201,7 @@ export const MCPSelectionSection = memo(function MCPSelectionSection({ mcpState 
 
 					return (
 						<div key={serverKey} className="border-base-content/10 rounded-2xl border p-3">
-							<div className="flex items-start justify-between gap-3">
+							<div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
 								<div className="min-w-0 flex-1">
 									<div className="flex min-w-0 items-center gap-2">
 										<div className="truncate font-medium">{option.server.displayName}</div>

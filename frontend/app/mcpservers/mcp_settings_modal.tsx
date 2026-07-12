@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiX } from 'react-icons/fi';
 
-import { ModalBackdrop } from '@/components/modal_backdrop';
+import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 
 interface MCPSettingsModalProps {
 	isOpen: boolean;

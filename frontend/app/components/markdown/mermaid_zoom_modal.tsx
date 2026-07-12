@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 
 import { createPortal } from 'react-dom';
 
-import { ModalBackdrop } from '@/components/modal_backdrop';
+import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 
 interface MermaidZoomModalProps {
 	isOpen: boolean;
