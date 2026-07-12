@@ -10,6 +10,7 @@ import { ProviderSDKType, SDK_DEFAULTS, SDK_DISPLAY_NAME } from '@/spec/inferenc
 import type { PatchProviderPresetPayload, PostProviderPresetPayload, ProviderPreset } from '@/spec/modelpreset';
 
 import { GenerateRandomNumberString } from '@/lib/encode_decode';
+import { parseHTTPHeadersJSON, redactSensitiveHTTPHeaders } from '@/lib/http_input_utils';
 import { omitManyKeys } from '@/lib/obj_utils';
 import { MessageEnterValidURL, validateUrlForInput } from '@/lib/url_utils';
 
@@ -20,10 +21,7 @@ import { ReadOnlyValue } from '@/components/read_only_value';
 type ModalMode = 'add' | 'edit' | 'view';
 
 function parseDefaultHeadersRawJSON(raw: string): Record<string, string> {
-	if (!raw.trim()) {
-		return {};
-	}
-	return JSON.parse(raw.trim()) as Record<string, string>;
+	return parseHTTPHeadersJSON(raw, 'Default headers');
 }
 
 function normalizeHeadersRecord(headers: Record<string, string>): Record<string, string> {
@@ -70,7 +68,13 @@ function getInitialFormData(mode: ModalMode, initialPreset?: ProviderPreset): Pr
 			origin: initialPreset.origin,
 			chatCompletionPathPrefix: initialPreset.chatCompletionPathPrefix,
 			apiKeyHeaderKey: initialPreset.apiKeyHeaderKey,
-			defaultHeadersRawJSON: JSON.stringify(initialPreset.defaultHeaders ?? {}, null, 2),
+			defaultHeadersRawJSON: JSON.stringify(
+				mode === 'view'
+					? (redactSensitiveHTTPHeaders(initialPreset.defaultHeaders) ?? {})
+					: (initialPreset.defaultHeaders ?? {}),
+				null,
+				2
+			),
 			apiKey: '',
 		};
 	}
@@ -259,10 +263,13 @@ function AddEditProviderPresetModalContent({
 			if (field === 'defaultHeadersRawJSON') {
 				if (v) {
 					try {
-						JSON.parse(String(v));
+						parseDefaultHeadersRawJSON(String(v));
 						newErrs = omitManyKeys(newErrs, ['defaultHeadersRawJSON']);
-					} catch {
-						newErrs.defaultHeadersRawJSON = 'Invalid JSON.';
+					} catch (error) {
+						newErrs.defaultHeadersRawJSON =
+							error instanceof Error
+								? error.message
+								: 'Default headers must be a JSON object containing string values.';
 					}
 				} else {
 					newErrs = omitManyKeys(newErrs, ['defaultHeadersRawJSON']);
@@ -432,8 +439,7 @@ function AddEditProviderPresetModalContent({
 			return true;
 		}
 
-		// oxlint-disable-next-line jsreact-hooks/refs
-		const { normalized } = validateUrlForInput(formData.origin, originInputRef.current, { required: true });
+		const { normalized } = validateUrlForInput(formData.origin, null, { required: true });
 		const normalizedOrigin = normalized ?? formData.origin.trim();
 
 		return Object.keys(buildPatchPayload(formData, normalizedOrigin, defaultHeaders)).length > 0;
@@ -846,7 +852,7 @@ function AddEditProviderPresetModalContent({
 									className={`input w-full rounded-xl ${errors.apiKey ? 'input-error' : ''}`}
 									placeholder={(mode === 'edit' || mode === 'view') && apiKeyAlreadySet ? '********' : ''}
 									spellCheck="false"
-									autoComplete="off"
+									autoComplete="new-password"
 									readOnly={isReadOnly}
 									disabled={isSubmitting}
 								/>

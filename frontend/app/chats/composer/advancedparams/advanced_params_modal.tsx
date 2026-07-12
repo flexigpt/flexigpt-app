@@ -435,6 +435,7 @@ function AdvancedParamsModalInner({
 			supportedKinds: supportedCacheKinds,
 			ttlSelection: cacheControlTTL,
 			key: cacheControlKey,
+			supportsTTL: true,
 			supportsKey: supportsCacheKey,
 		});
 

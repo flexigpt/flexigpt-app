@@ -64,6 +64,7 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 
 	const [isOpen, setIsOpen] = useState(false);
 	const [floatingStyle, setFloatingStyle] = useState<CSSProperties | null>(null);
+	const [portalTarget, setPortalTarget] = useState<Element | null>(null);
 	const detailsRef = useRef<HTMLDetailsElement>(null);
 	const summaryRef = useRef<HTMLElement>(null);
 	const menuRef = useRef<HTMLUListElement>(null);
@@ -74,6 +75,7 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 		}
 		setIsOpen(false);
 		setFloatingStyle(null);
+		setPortalTarget(null);
 	}, []);
 
 	const handleSelection = (key: K) => {
@@ -225,10 +227,6 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 		</ul>
 	);
 
-	const portalTarget =
-		// oxlint-disable-next-line jsreact-hooks/refs
-		typeof document !== 'undefined' ? (detailsRef.current?.closest('dialog') ?? document.body) : null;
-
 	return (
 		<details
 			ref={detailsRef}
@@ -238,11 +236,15 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 				if (disabled && details.open) {
 					details.open = false;
 					setIsOpen(false);
+					setPortalTarget(null);
 					return;
 				}
 				setIsOpen(details.open);
-				if (!details.open) {
+				if (details.open && !inlineMenu && typeof document !== 'undefined') {
+					setPortalTarget(details.closest('dialog') ?? document.body);
+				} else {
 					setFloatingStyle(null);
+					setPortalTarget(null);
 				}
 			}}
 		>
@@ -253,6 +255,8 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 				}`}
 				title={title}
 				aria-expanded={isOpen}
+				aria-disabled={disabled}
+				tabIndex={disabled ? -1 : 0}
 				aria-haspopup="listbox"
 				onClick={event => {
 					if (disabled) {
@@ -260,7 +264,7 @@ export const Dropdown = <K extends string>(props: DropdownProps<K>) => {
 					}
 				}}
 				style={{
-					maxHeight: typeof maxSummaryHeight === 'number' ? `${maxSummaryHeight}px` : undefined,
+					maxHeight: typeof maxSummaryHeight === 'number' ? `${maxSummaryHeight}px` : maxSummaryHeight,
 				}}
 			>
 				<span className="truncate font-normal">{selectedKey ? getItemDisplayName(selectedKey) : placeholderLabel}</span>

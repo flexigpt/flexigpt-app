@@ -1,8 +1,14 @@
 import type { ReactNode } from 'react';
 
-import { FiAlertCircle, FiHelpCircle } from 'react-icons/fi';
+import { FiAlertCircle, FiHelpCircle, FiX } from 'react-icons/fi';
 
 type StatusTone = 'neutral' | 'success' | 'warning' | 'error' | 'info';
+type ManagementWidth = 'standard' | 'wide';
+
+const MANAGEMENT_WIDTH_CLASSES: Record<ManagementWidth, string> = {
+	standard: 'w-11/12 xl:w-2/3',
+	wide: 'w-11/12 xl:w-5/6',
+};
 
 const STATUS_TONE_CLASSES: Record<StatusTone, string> = {
 	neutral: 'badge-neutral',
@@ -17,25 +23,48 @@ interface ManagementPageHeaderProps {
 	description?: string;
 	leadingActions?: ReactNode;
 	actions?: ReactNode;
+	width?: ManagementWidth;
 }
 
-/**
- * @public
- */
-export function ManagementPageHeader({ title, description, leadingActions, actions }: ManagementPageHeaderProps) {
+export function ManagementPageHeader({
+	title,
+	description,
+	leadingActions,
+	actions,
+	width = 'standard',
+}: ManagementPageHeaderProps) {
 	return (
-		<header className="bg-base-200/95 border-base-content/10 sticky top-0 z-20 mt-4 w-11/12 rounded-2xl border px-4 py-3 backdrop-blur-sm xl:w-2/3">
+		<header
+			className={`bg-base-200/95 border-base-content/10 z-20 mt-4 shrink-0 rounded-2xl border px-4 py-3 backdrop-blur-sm ${MANAGEMENT_WIDTH_CLASSES[width]}`}
+		>
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 				<div className="flex min-w-0 items-center gap-2">
 					{leadingActions}
 					<div className="min-w-0">
-						<h1 className="truncate text-xl font-semibold">{title}</h1>
+						<h1 className="text-xl font-semibold tracking-tight">{title}</h1>
 						{description ? <p className="text-base-content/70 mt-1 text-xs">{description}</p> : null}
 					</div>
 				</div>
 				{actions ? <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">{actions}</div> : null}
 			</div>
 		</header>
+	);
+}
+
+interface ManagementPageContentProps {
+	children: ReactNode;
+	width?: ManagementWidth;
+	className?: string;
+}
+
+/**
+ * @public
+ */
+export function ManagementPageContent({ children, width = 'standard', className = '' }: ManagementPageContentProps) {
+	return (
+		<div className="app-scrollbar-thin flex min-h-0 w-full grow flex-col items-center overflow-y-auto">
+			<main className={`mt-4 space-y-4 pb-8 ${MANAGEMENT_WIDTH_CLASSES[width]} ${className}`}>{children}</main>
+		</div>
 	);
 }
 
@@ -162,8 +191,8 @@ export function ActionRow({ children, leading, className = '' }: ActionRowProps)
 		<div
 			className={`border-base-content/10 mt-4 flex flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between ${className}`}
 		>
-			<div className="flex min-w-0 flex-wrap items-center gap-2">{leading}</div>
-			<div className="flex flex-wrap items-center justify-end gap-2">{children}</div>
+			{leading ? <div className="flex min-w-0 flex-wrap items-center gap-2">{leading}</div> : null}
+			<div className={`flex flex-wrap items-center justify-end gap-2 ${leading ? '' : 'sm:ml-auto'}`}>{children}</div>
 		</div>
 	);
 }
@@ -235,5 +264,139 @@ export function ModalSection({ title, description, actions, children, className 
 			</div>
 			<div className="space-y-4">{children}</div>
 		</section>
+	);
+}
+
+interface ManagementEmptyStateProps {
+	children: ReactNode;
+	className?: string;
+}
+
+/**
+ * @public
+ */
+export function ManagementEmptyState({ children, className = '' }: ManagementEmptyStateProps) {
+	return (
+		<div
+			className={`border-base-content/10 text-base-content/70 rounded-2xl border px-4 py-8 text-center text-sm ${className}`}
+		>
+			{children}
+		</div>
+	);
+}
+
+interface ManagementInfoGridProps {
+	children: ReactNode;
+	className?: string;
+}
+
+/**
+ * @public
+ */
+export function ManagementInfoGrid({ children, className = '' }: ManagementInfoGridProps) {
+	return <dl className={`space-y-3 ${className}`}>{children}</dl>;
+}
+
+interface ManagementInfoRowProps {
+	label: ReactNode;
+	children: ReactNode;
+	mono?: boolean;
+	className?: string;
+}
+
+/**
+ * @public
+ */
+export function ManagementInfoRow({ label, children, mono = false, className = '' }: ManagementInfoRowProps) {
+	return (
+		<div
+			className={`border-base-content/10 grid grid-cols-1 gap-1 border-b pb-3 text-sm last:border-b-0 last:pb-0 sm:grid-cols-12 sm:gap-3 ${className}`}
+		>
+			<dt className="text-base-content/60 font-medium sm:col-span-4">{label}</dt>
+			<dd className={`min-w-0 wrap-break-word sm:col-span-8 ${mono ? 'font-mono text-xs' : ''}`}>{children}</dd>
+		</div>
+	);
+}
+
+interface EnabledControlProps {
+	id: string;
+	checked: boolean;
+	onChange: (checked: boolean) => void;
+	disabled?: boolean;
+	label?: string;
+	title?: string;
+	compact?: boolean;
+}
+
+/**
+ * @public
+ */
+export function EnabledControl({
+	id,
+	checked,
+	onChange,
+	disabled = false,
+	label = 'Enabled',
+	title,
+	compact = true,
+}: EnabledControlProps) {
+	return (
+		<label htmlFor={id} className="flex cursor-pointer items-center gap-2 text-sm" title={title}>
+			<span>{label}</span>
+			<input
+				id={id}
+				type="checkbox"
+				className={compact ? 'toggle toggle-accent toggle-sm' : 'toggle toggle-accent'}
+				checked={checked}
+				disabled={disabled}
+				onChange={event => {
+					onChange(event.currentTarget.checked);
+				}}
+			/>
+		</label>
+	);
+}
+
+interface ModalHeaderProps {
+	title: ReactNode;
+	description?: ReactNode;
+	onClose: () => void;
+	closeDisabled?: boolean;
+}
+
+export function ModalHeader({ title, description, onClose, closeDisabled = false }: ModalHeaderProps) {
+	return (
+		<header className="border-base-content/10 flex shrink-0 items-start justify-between gap-4 border-b p-4 sm:px-6">
+			<div className="min-w-0">
+				<h3 className="text-lg font-semibold tracking-tight">{title}</h3>
+				{description ? <div className="text-base-content/70 mt-1 text-sm">{description}</div> : null}
+			</div>
+			<button
+				type="button"
+				className="btn btn-sm btn-circle bg-base-300 shrink-0"
+				onClick={onClose}
+				disabled={closeDisabled}
+				aria-label="Close"
+			>
+				<FiX size={14} />
+			</button>
+		</header>
+	);
+}
+
+interface ModalActionsProps {
+	children: ReactNode;
+	leading?: ReactNode;
+	className?: string;
+}
+
+export function ModalActions({ children, leading, className = '' }: ModalActionsProps) {
+	return (
+		<footer
+			className={`border-base-content/10 flex shrink-0 flex-col gap-3 border-t p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 ${className}`}
+		>
+			{leading ? <div className="flex flex-wrap items-center gap-2">{leading}</div> : <span />}
+			<div className="flex flex-wrap items-center justify-end gap-2">{children}</div>
+		</footer>
 	);
 }

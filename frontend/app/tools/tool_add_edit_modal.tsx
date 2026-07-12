@@ -8,11 +8,17 @@ import { FiAlertCircle, FiAlertTriangle, FiHelpCircle, FiUpload, FiX } from 'rea
 import type { Tool } from '@/spec/tool';
 import { HTTPBodyOutputMode, ToolImplType } from '@/spec/tool';
 
+import {
+	parseHTTPHeadersJSON,
+	parseHTTPStatusCodes,
+	parseStringRecordJSON,
+	redactSensitiveHTTPHeaders,
+} from '@/lib/http_input_utils';
 import type { JSONSchema } from '@/lib/jsonschema_utils';
 import { omitManyKeys } from '@/lib/obj_utils';
 import { validateSlug, validateTags } from '@/lib/text_utils';
 import { MessageEnterValidURL, validateUrlForInput } from '@/lib/url_utils';
-import { DEFAULT_SEMVER, suggestNextMinorVersion } from '@/lib/version_utils';
+import { DEFAULT_SEMVER, isSemverVersion, suggestNextMinorVersion } from '@/lib/version_utils';
 
 import { Dropdown } from '@/components/dropdown';
 import { ModalBackdrop } from '@/components/modal_backdrop';
@@ -106,7 +112,8 @@ type ToolFormData = typeof EMPTY_FORM_DATA;
 function buildInitialFormData(
 	initialData: ToolItem | undefined,
 	existingTools: ToolItem[],
-	isEditMode: boolean
+	isEditMode: boolean,
+	isViewMode = false
 ): ToolFormData {
 	if (!initialData) {
 		return { ...EMPTY_FORM_DATA };
@@ -136,13 +143,22 @@ function buildInitialFormData(
 
 		httpUrl: t.httpImpl?.request.urlTemplate ?? '',
 		httpMethod: t.httpImpl?.request.method ?? 'GET',
-		httpHeaders: JSON.stringify(t.httpImpl?.request.headers ?? {}, null, 2),
+		httpHeaders: JSON.stringify(
+			isViewMode
+				? (redactSensitiveHTTPHeaders(t.httpImpl?.request.headers) ?? {})
+				: (t.httpImpl?.request.headers ?? {}),
+			null,
+			2
+		),
 		httpQuery: JSON.stringify(t.httpImpl?.request.query ?? {}, null, 2),
 		httpBody: t.httpImpl?.request.body ?? '',
 		httpAuthType: t.httpImpl?.request.auth?.type ?? '',
 		httpAuthIn: t.httpImpl?.request.auth?.in ?? '',
 		httpAuthName: t.httpImpl?.request.auth?.name ?? '',
-		httpAuthValueTemplate: t.httpImpl?.request.auth?.valueTemplate ?? '',
+		httpAuthValueTemplate:
+			isViewMode && t.httpImpl?.request.auth?.valueTemplate
+				? '[configured]'
+				: (t.httpImpl?.request.auth?.valueTemplate ?? ''),
 		httpResponseCodes: (t.httpImpl?.response.successCodes ?? []).join(','),
 		httpResponseErrorMode: t.httpImpl?.response.errorMode ?? '',
 		httpResponseBodyOutputMode: t.httpImpl?.response.bodyOutputMode ?? HTTPBodyOutputMode.Auto,
@@ -166,7 +182,7 @@ function AddEditToolModalContent({
 	const isEditMode = effectiveMode === 'edit';
 
 	const [formData, setFormData] = useState<ToolFormData>(() =>
-		buildInitialFormData(initialData, existingTools, isEditMode)
+		buildInitialFormData(initialData, existingTools, isEditMode, isViewMode)
 	);
 	const [errors, setErrors] = useState<ErrorState>({});
 	const [prefillMode, setPrefillMode] = useState(false);
@@ -261,6 +277,8 @@ function AddEditToolModalContent({
 		} else if (field === 'version') {
 			if (!v) {
 				newErrs.version = 'Version is required.';
+			} else if (!isSemverVersion(v)) {
+				newErrs.version = `Version must use semantic version format, for example ${DEFAULT_SEMVER}.`;
 			} else if (isEditMode && initialData?.tool && v === initialData.tool.version) {
 				newErrs.version = 'New version must be different from the current version.';
 			} else {
@@ -310,14 +328,10 @@ function AddEditToolModalContent({
 				newErrs = omitManyKeys(newErrs, ['httpHeaders']);
 			} else {
 				try {
-					const parsed = JSON.parse(val);
-					if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-						newErrs.httpHeaders = 'Headers must be a JSON object';
-					} else {
-						newErrs = omitManyKeys(newErrs, ['httpHeaders']);
-					}
-				} catch {
-					newErrs.httpHeaders = 'Invalid JSON';
+					parseHTTPHeadersJSON(val, 'Headers');
+					newErrs = omitManyKeys(newErrs, ['httpHeaders']);
+				} catch (error) {
+					newErrs.httpHeaders = error instanceof Error ? error.message : 'Headers must be valid JSON.';
 				}
 			}
 		} else if (field === 'httpQuery') {
@@ -325,30 +339,21 @@ function AddEditToolModalContent({
 				newErrs = omitManyKeys(newErrs, ['httpQuery']);
 			} else {
 				try {
-					const parsed = JSON.parse(val);
-					if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-						newErrs.httpQuery = 'Query must be a JSON object';
-					} else {
-						newErrs = omitManyKeys(newErrs, ['httpQuery']);
-					}
-				} catch {
-					newErrs.httpQuery = 'Invalid JSON';
+					parseStringRecordJSON(val, 'Query');
+					newErrs = omitManyKeys(newErrs, ['httpQuery']);
+				} catch (error) {
+					newErrs.httpQuery = error instanceof Error ? error.message : 'Query must be valid JSON.';
 				}
 			}
 		} else if (field === 'httpResponseCodes') {
 			if (v === '') {
 				newErrs = omitManyKeys(newErrs, ['httpResponseCodes']);
 			} else {
-				const parts = v
-					.split(',')
-					.map(s => s.trim())
-					.filter(Boolean);
-				const nums = parts.map(Number);
-				const bad = nums.some(n => !Number.isFinite(n) || n <= 0);
-				if (bad) {
-					newErrs.httpResponseCodes = 'Success codes must be comma-separated numbers (e.g. 200,201)';
-				} else {
+				try {
+					parseHTTPStatusCodes(v);
 					newErrs = omitManyKeys(newErrs, ['httpResponseCodes']);
+				} catch (error) {
+					newErrs.httpResponseCodes = error instanceof Error ? error.message : 'Invalid HTTP status codes.';
 				}
 			}
 		} else if (field === 'httpTimeoutMS') {
@@ -356,8 +361,8 @@ function AddEditToolModalContent({
 				newErrs = omitManyKeys(newErrs, ['httpTimeoutMS']);
 			} else {
 				const n = Number(v);
-				if (!Number.isFinite(n) || n < 1) {
-					newErrs.httpTimeoutMS = 'Timeout must be a positive number (ms).';
+				if (!Number.isInteger(n) || n < 1) {
+					newErrs.httpTimeoutMS = 'Timeout must be a positive integer in milliseconds.';
 				} else {
 					newErrs = omitManyKeys(newErrs, ['httpTimeoutMS']);
 				}
@@ -399,7 +404,7 @@ function AddEditToolModalContent({
 			return;
 		}
 
-		const copied = buildInitialFormData(source, existingTools, false);
+		const copied = buildInitialFormData(source, existingTools, false, false);
 		const next: ToolFormData = {
 			...copied,
 			slug: formData.slug,
@@ -507,27 +512,22 @@ function AddEditToolModalContent({
 			let query: Record<string, string> | undefined;
 
 			try {
-				headers = formData.httpHeaders.trim()
-					? (JSON.parse(formData.httpHeaders) as Record<string, string>)
-					: undefined;
+				const parsed = parseHTTPHeadersJSON(formData.httpHeaders, 'Headers');
+				headers = Object.keys(parsed).length > 0 ? parsed : undefined;
 			} catch {
-				setErrors(prev => ({ ...prev, httpHeaders: 'Invalid JSON' }));
+				setErrors(prev => ({ ...prev, httpHeaders: 'Headers must be a JSON object containing string values.' }));
 				return;
 			}
 
 			try {
-				query = formData.httpQuery.trim() ? (JSON.parse(formData.httpQuery) as Record<string, string>) : undefined;
+				const parsed = parseStringRecordJSON(formData.httpQuery, 'Query');
+				query = Object.keys(parsed).length > 0 ? parsed : undefined;
 			} catch {
-				setErrors(prev => ({ ...prev, httpQuery: 'Invalid JSON' }));
+				setErrors(prev => ({ ...prev, httpQuery: 'Query must be a JSON object containing string values.' }));
 				return;
 			}
 
-			const successCodes = formData.httpResponseCodes.trim()
-				? formData.httpResponseCodes
-						.split(',')
-						.map(s => Number(s.trim()))
-						.filter(n => Number.isFinite(n) && n > 0)
-				: undefined;
+			const successCodes = parseHTTPStatusCodes(formData.httpResponseCodes);
 
 			httpImpl = {
 				request: {

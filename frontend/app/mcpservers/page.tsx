@@ -23,10 +23,11 @@ import { getAllMCPBundles, getAllMCPServers } from '@/apis/list_helper';
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 import { Loader } from '@/components/loader';
+import { ManagementBundleCreateModal } from '@/components/management_bundle_create_modal';
+import { ManagementPageContent, ManagementPageHeader } from '@/components/management_ui';
 import { PageFrame } from '@/components/page_frame';
 
 import type { MCPServerUpsertInput } from '@/mcpservers/lib/mcp_server_utils';
-import { AddMCPBundleModal } from '@/mcpservers/mcp_bundle_add_modal';
 import { MCPBundleCard } from '@/mcpservers/mcp_bundle_card';
 import { MCPSettingsModal } from '@/mcpservers/mcp_settings_modal';
 
@@ -637,7 +638,7 @@ export default function MCPServersPage() {
 							MCPSecretKind.MCPSecretKindStdioEnv,
 							deleteSlot
 						);
-						refs = omitManyKeys(refs, [envName]);
+						refs = omitManyKeys(refs, [envName, deleteSlot]);
 						requiresFinalPut = true;
 					}
 
@@ -706,7 +707,7 @@ export default function MCPServersPage() {
 						MCPSecretKind.MCPSecretKindHTTPHeader,
 						deleteSlot
 					);
-					refs = omitManyKeys(refs, [plan.headerName]);
+					refs = omitManyKeys(refs, [plan.headerName, deleteSlot]);
 					requiresFinalPut = true;
 				}
 
@@ -934,76 +935,77 @@ export default function MCPServersPage() {
 
 	return (
 		<PageFrame>
-			<div className="flex size-full flex-col items-center">
-				<div className="fixed mt-8 flex w-11/12 items-center justify-between px-12 py-2">
-					<button
-						type="button"
-						className="btn btn-ghost rounded-2xl"
-						onClick={() => {
-							setIsSettingsOpen(true);
-						}}
-						title="MCP OAuth settings"
-					>
-						<FiSettings size={20} /> <span className="ml-1">OAuth Settings</span>
-					</button>
+			<div className="flex size-full flex-col items-center overflow-hidden">
+				<ManagementPageHeader
+					title="MCP Servers"
+					description="Configure MCP transports, authorization, discovery, policy, and setup."
+					width="wide"
+					leadingActions={
+						<button
+							type="button"
+							className="btn btn-ghost rounded-xl"
+							onClick={() => {
+								setIsSettingsOpen(true);
+							}}
+							title="MCP OAuth settings"
+						>
+							<FiSettings size={18} />
+							<span className="hidden sm:inline">OAuth Settings</span>
+						</button>
+					}
+					actions={
+						<button
+							type="button"
+							className="btn btn-ghost rounded-xl"
+							onClick={() => {
+								setIsAddModalOpen(true);
+							}}
+						>
+							<FiPlus size={18} />
+							<span>Add Bundle</span>
+						</button>
+					}
+				/>
 
-					<h1 className="flex grow items-center justify-center text-xl font-semibold">MCP Servers</h1>
+				<ManagementPageContent width="wide">
+					{bundles.length === 0 && <p className="mt-8 text-center text-sm">No MCP bundles configured yet.</p>}
 
-					<button
-						type="button"
-						className="btn btn-ghost items-center rounded-2xl"
-						onClick={() => {
-							setIsAddModalOpen(true);
-						}}
-					>
-						<FiPlus size={20} /> <span className="ml-1">Add Bundle</span>
-					</button>
-				</div>
-
-				<div
-					className="mt-24 flex w-full grow flex-col items-center overflow-y-auto"
-					style={{ maxHeight: `calc(100vh - 128px)` }}
-				>
-					<div className="flex w-11/12 flex-col space-y-4 xl:w-5/6">
-						{bundles.length === 0 && <p className="mt-8 text-center text-sm">No MCP bundles configured yet.</p>}
-
-						{bundles.map(bundleData => (
-							<MCPBundleCard
-								key={bundleData.bundle.id}
-								bundle={bundleData.bundle}
-								servers={bundleData.servers}
-								existingServerIDs={allServerIDs}
-								prefillServers={allServerConfigs}
-								runtimeByServerID={bundleData.runtimeByServerID}
-								authHealthByServerID={bundleData.authHealthByServerID}
-								serverLoadError={bundleData.serverLoadError}
-								onRefreshServers={() => {
-									return refreshBundleServers(bundleData.bundle.id);
-								}}
-								onToggleBundleEnabled={handleToggleBundleEnabled}
-								onToggleServerEnabled={handleToggleServerEnabled}
-								onSubmitServer={handleSubmitServer}
-								onSubmitServerSetup={handleSubmitServerSetup}
-								onDeleteServer={handleDeleteServer}
-								onConnectServer={handleConnectServer}
-								onDisconnectServer={handleDisconnectServer}
-								onRefreshServer={handleRefreshServer}
-								onOpenURL={url => {
-									backendAPI.openURL(url);
-								}}
-								onCancelOAuth={handleCancelOAuth}
-								onDeleteBundleRequested={bundleID => {
-									if (bundleID === BaseMCPBundleID) {
-										setAlertMsg('The base MCP bundle cannot be deleted.');
-										setShowAlert(true);
-										return;
-									}
-									setBundleToDeleteID(bundleID);
-								}}
-							/>
-						))}
-					</div>
-				</div>
+					{bundles.map(bundleData => (
+						<MCPBundleCard
+							key={bundleData.bundle.id}
+							bundle={bundleData.bundle}
+							servers={bundleData.servers}
+							existingServerIDs={allServerIDs}
+							prefillServers={allServerConfigs}
+							runtimeByServerID={bundleData.runtimeByServerID}
+							authHealthByServerID={bundleData.authHealthByServerID}
+							serverLoadError={bundleData.serverLoadError}
+							onRefreshServers={() => {
+								return refreshBundleServers(bundleData.bundle.id);
+							}}
+							onToggleBundleEnabled={handleToggleBundleEnabled}
+							onToggleServerEnabled={handleToggleServerEnabled}
+							onSubmitServer={handleSubmitServer}
+							onSubmitServerSetup={handleSubmitServerSetup}
+							onDeleteServer={handleDeleteServer}
+							onConnectServer={handleConnectServer}
+							onDisconnectServer={handleDisconnectServer}
+							onRefreshServer={handleRefreshServer}
+							onOpenURL={url => {
+								backendAPI.openURL(url);
+							}}
+							onCancelOAuth={handleCancelOAuth}
+							onDeleteBundleRequested={bundleID => {
+								if (bundleID === BaseMCPBundleID) {
+									setAlertMsg('The base MCP bundle cannot be deleted.');
+									setShowAlert(true);
+									return;
+								}
+								setBundleToDeleteID(bundleID);
+							}}
+						/>
+					))}
+				</ManagementPageContent>
 
 				<DeleteConfirmationModal
 					isOpen={bundleToDelete !== null}
@@ -1016,13 +1018,16 @@ export default function MCPServersPage() {
 					confirmButtonText="Delete"
 				/>
 
-				<AddMCPBundleModal
+				<ManagementBundleCreateModal
 					isOpen={isAddModalOpen}
+					title="Add MCP Bundle"
+					entityLabel="MCP bundle"
 					onClose={() => {
 						setIsAddModalOpen(false);
 					}}
 					onSubmit={handleAddBundle}
 					existingSlugs={bundles.map(bundleData => bundleData.bundle.slug)}
+					failureMessage="Failed to create MCP bundle."
 				/>
 				<MCPSettingsModal
 					isOpen={isSettingsOpen}

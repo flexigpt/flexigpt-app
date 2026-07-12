@@ -137,6 +137,7 @@ function buildOutputParamFromForm(
 function buildCacheControlFromModelPresetForm(
 	formData: ModelPresetFormData,
 	supportedKinds: CacheControlKind[],
+	supportsTTL: boolean,
 	supportsKey: boolean
 ): CacheControl | undefined {
 	return buildCacheControlFromForm({
@@ -145,6 +146,7 @@ function buildCacheControlFromModelPresetForm(
 		supportedKinds,
 		ttlSelection: formData.cacheControlTTL,
 		key: formData.cacheControlKey,
+		supportsTTL,
 		supportsKey,
 	});
 }
@@ -358,6 +360,7 @@ function AddEditModelPresetModalContent({
 		[topLevelCacheCapabilities?.supportedTTLs, initialData?.cacheControl]
 	);
 	const supportsManualCacheControl = supportedCacheKinds.length > 0;
+	const supportsCacheTTL = topLevelCacheCapabilities?.supportsTTL !== false;
 	const supportsCacheKey =
 		topLevelCacheCapabilities?.supportsKey === true || Boolean(initialData?.cacheControl?.key?.trim());
 	const canDisableCacheControl = mode === 'add' || !initialData?.cacheControl;
@@ -544,7 +547,12 @@ function AddEditModelPresetModalContent({
 			patch.timeout = nextTimeout;
 		}
 
-		const nextCacheControl = buildCacheControlFromModelPresetForm(formData, supportedCacheKinds, supportsCacheKey);
+		const nextCacheControl = buildCacheControlFromModelPresetForm(
+			formData,
+			supportedCacheKinds,
+			supportsCacheTTL,
+			supportsCacheKey
+		);
 		if (nextCacheControl && !cacheControlEqual(nextCacheControl, initialData.cacheControl)) {
 			patch.cacheControl = nextCacheControl;
 		}
@@ -569,7 +577,7 @@ function AddEditModelPresetModalContent({
 		}
 
 		return patch;
-	}, [formData, initialData, supportedCacheKinds, supportsCacheKey]);
+	}, [formData, initialData, supportedCacheKinds, supportsCacheKey, supportsCacheTTL]);
 
 	/**
 	 * Validates the form with optional overrides for the next-state values.
@@ -669,7 +677,12 @@ function AddEditModelPresetModalContent({
 		}
 
 		setSubmitError('');
-		const nextCacheControl = buildCacheControlFromModelPresetForm(formData, supportedCacheKinds, supportsCacheKey);
+		const nextCacheControl = buildCacheControlFromModelPresetForm(
+			formData,
+			supportedCacheKinds,
+			supportsCacheTTL,
+			supportsCacheKey
+		);
 		const nextOutputParam = buildOutputParamFromForm(formData.outputFormatKind, formData.outputVerbosity);
 		const nextReasoning = buildReasoningFromForm(formData);
 

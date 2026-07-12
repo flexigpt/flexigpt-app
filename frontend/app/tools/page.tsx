@@ -13,9 +13,10 @@ import { getAllToolBundles, getAllTools } from '@/apis/list_helper';
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 import { Loader } from '@/components/loader';
+import { ManagementBundleCreateModal } from '@/components/management_bundle_create_modal';
+import { ManagementPageContent, ManagementPageHeader } from '@/components/management_ui';
 import { PageFrame } from '@/components/page_frame';
 
-import { AddToolBundleModal } from '@/tools/tool_bundle_add_modal';
 import { ToolBundleCard } from '@/tools/tool_bundle_card';
 
 interface BundleData {
@@ -268,47 +269,46 @@ export default function ToolsPage() {
 
 	return (
 		<PageFrame>
-			<div className="flex size-full flex-col items-center">
-				<div className="fixed mt-8 flex w-11/12 items-center px-12 py-2">
-					<h1 className="flex grow items-center justify-center text-xl font-semibold">Tool Bundles</h1>
-					<button
-						type="button"
-						className="btn btn-ghost flex items-center rounded-2xl"
-						onClick={() => {
-							setIsAddModalOpen(true);
-						}}
-					>
-						<FiPlus size={20} /> <span className="ml-1">Add Bundle</span>
-					</button>
-				</div>
+			<div className="flex size-full flex-col items-center overflow-hidden">
+				<ManagementPageHeader
+					title="Tool Bundles"
+					description="Manage versioned tools, argument schemas, execution recommendations, and HTTP integrations."
+					actions={
+						<button
+							type="button"
+							className="btn btn-ghost rounded-xl"
+							onClick={() => {
+								setIsAddModalOpen(true);
+							}}
+						>
+							<FiPlus size={18} />
+							<span>Add Bundle</span>
+						</button>
+					}
+				/>
 
-				<div
-					className="mt-24 flex w-full grow flex-col items-center overflow-y-auto"
-					style={{ maxHeight: `calc(100vh - 128px)` }}
-				>
-					<div className="flex w-11/12 flex-col space-y-4 xl:w-2/3">
-						{bundles.length === 0 && <p className="mt-8 text-center text-sm">No tool bundles configured yet.</p>}
+				<ManagementPageContent>
+					{bundles.length === 0 && <p className="mt-8 text-center text-sm">No tool bundles configured yet.</p>}
 
-						{bundles.map(bd => (
-							<ToolBundleCard
-								key={bd.bundle.id}
-								bundle={bd.bundle}
-								tools={bd.tools}
-								toolLoadError={bd.toolLoadError}
-								onRefreshTools={() => {
-									return refreshBundleTools(bd.bundle.id);
-								}}
-								onToggleBundleEnable={handleToggleBundleEnable}
-								onToggleToolEnable={handleToggleToolEnable}
-								onDeleteTool={handleDeleteTool}
-								onSubmitTool={handleSubmitTool}
-								onRequestDeleteBundle={b => {
-									setBundleToDelete(b);
-								}}
-							/>
-						))}
-					</div>
-				</div>
+					{bundles.map(bd => (
+						<ToolBundleCard
+							key={bd.bundle.id}
+							bundle={bd.bundle}
+							tools={bd.tools}
+							toolLoadError={bd.toolLoadError}
+							onRefreshTools={() => {
+								return refreshBundleTools(bd.bundle.id);
+							}}
+							onToggleBundleEnable={handleToggleBundleEnable}
+							onToggleToolEnable={handleToggleToolEnable}
+							onDeleteTool={handleDeleteTool}
+							onSubmitTool={handleSubmitTool}
+							onRequestDeleteBundle={b => {
+								setBundleToDelete(b);
+							}}
+						/>
+					))}
+				</ManagementPageContent>
 
 				<DeleteConfirmationModal
 					isOpen={bundleToDelete !== null}
@@ -321,13 +321,16 @@ export default function ToolsPage() {
 					confirmButtonText="Delete"
 				/>
 
-				<AddToolBundleModal
+				<ManagementBundleCreateModal
 					isOpen={isAddModalOpen}
+					title="Add Tool Bundle"
+					entityLabel="Tool bundle"
 					onClose={() => {
 						setIsAddModalOpen(false);
 					}}
 					onSubmit={handleAddBundle}
 					existingSlugs={bundles.map(b => b.bundle.slug)}
+					failureMessage="Failed to create tool bundle."
 				/>
 
 				<ActionDeniedAlertModal

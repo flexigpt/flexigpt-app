@@ -30,6 +30,7 @@ interface AsyncCatalogCache<T> {
 	value?: T;
 	promise?: Promise<T>;
 	generation: number;
+	updatedAt?: number;
 }
 
 const modelOptionsCache: AsyncCatalogCache<AssistantModelPresetOption[]> = { generation: 0 };
@@ -38,6 +39,7 @@ const skillOptionsCache: AsyncCatalogCache<AssistantSkillOption[]> = { generatio
 const editorCatalogCache: AsyncCatalogCache<AssistantPresetEditorCatalog> = { generation: 0 };
 
 const MAX_CATALOG_PAGE_COUNT = 1_000;
+const CATALOG_CACHE_TTL_MS = 30_000;
 
 function getErrorMessage(error: unknown, fallback: string): string {
 	if (error instanceof Error && error.message.trim()) {
@@ -50,7 +52,12 @@ function loadWithCache<T>(cache: AsyncCatalogCache<T>, loader: () => Promise<T>,
 	if (!force && cache.promise) {
 		return cache.promise;
 	}
-	if (!force && cache.value !== undefined) {
+	if (
+		!force &&
+		cache.value !== undefined &&
+		cache.updatedAt !== undefined &&
+		Date.now() - cache.updatedAt < CATALOG_CACHE_TTL_MS
+	) {
 		return Promise.resolve(cache.value);
 	}
 
@@ -61,23 +68,20 @@ function loadWithCache<T>(cache: AsyncCatalogCache<T>, loader: () => Promise<T>,
 	const request = loader().then(value => {
 		if (cache.generation === requestGeneration) {
 			cache.value = value;
+			cache.updatedAt = Date.now();
 		}
 		return value;
 	});
 	cache.promise = request;
 
-	void request.then(
-		() => {
+	void request
+		.finally(() => {
 			if (cache.promise === request) {
 				cache.promise = undefined;
 			}
-		},
-		() => {
-			if (cache.promise === request) {
-				cache.promise = undefined;
-			}
-		}
-	);
+		})
+		.catch(() => undefined);
+
 	return request;
 }
 

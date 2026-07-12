@@ -49,6 +49,7 @@ export function buildCacheControlFromForm(args: {
 	supportedKinds: CacheControlKind[];
 	ttlSelection: CacheControlTTLSelection;
 	key: string;
+	supportsTTL: boolean;
 	supportsKey: boolean;
 }): CacheControl | undefined {
 	if (!args.enabled) {
@@ -64,7 +65,7 @@ export function buildCacheControlFromForm(args: {
 
 	return {
 		kind,
-		...(args.ttlSelection !== CACHE_CONTROL_TTL_PROVIDER_DEFAULT ? { ttl: args.ttlSelection } : {}),
+		...(args.supportsTTL && args.ttlSelection !== CACHE_CONTROL_TTL_PROVIDER_DEFAULT ? { ttl: args.ttlSelection } : {}),
 		...(args.supportsKey && trimmedKey ? { key: trimmedKey } : {}),
 	};
 }

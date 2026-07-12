@@ -19,6 +19,8 @@ import { parseOptionalNumber, parsePositiveInteger } from '@/lib/obj_utils';
 import { validateSlug } from '@/lib/text_utils';
 import { DEFAULT_SEMVER, isSemverVersion, suggestNextMinorVersion } from '@/lib/version_utils';
 
+import { useAsyncResource } from '@/hooks/use_async_resource';
+
 import { Dropdown } from '@/components/dropdown';
 import { ModalBackdrop } from '@/components/modal_backdrop';
 
@@ -618,10 +620,6 @@ function AddEditAssistantPresetModalContent({
 	const [submitError, setSubmitError] = useState('');
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
-	const [catalog, setCatalog] = useState<AssistantPresetEditorCatalog | null>(null);
-	const [catalogLoading, setCatalogLoading] = useState(true);
-	const [catalogError, setCatalogError] = useState('');
-
 	const [nextToolKey, setNextToolKey] = useState('');
 	const [nextSkillKey, setNextSkillKey] = useState('');
 	const [prefillMode, setPrefillMode] = useState(false);
@@ -635,30 +633,27 @@ function AddEditAssistantPresetModalContent({
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const isUnmountingRef = useRef(false);
-	const catalogRequestIDRef = useRef(0);
+	const forceCatalogReloadRef = useRef(false);
 
-	const loadCatalog = useCallback(async (force = false) => {
-		const requestID = (catalogRequestIDRef.current += 1);
-		setCatalogLoading(true);
-		setCatalogError('');
-
-		try {
-			const loaded = await loadAssistantPresetEditorCatalog({ force });
-			if (isUnmountingRef.current || catalogRequestIDRef.current !== requestID) {
-				return;
-			}
-			setCatalog(loaded);
-		} catch (error) {
-			console.error('Failed to load assistant preset editor catalog:', error);
-			if (!isUnmountingRef.current && catalogRequestIDRef.current === requestID) {
-				setCatalogError(getErrorMessage(error, 'Failed to load models, tools, and skills.'));
-			}
-		} finally {
-			if (!isUnmountingRef.current && catalogRequestIDRef.current === requestID) {
-				setCatalogLoading(false);
-			}
-		}
+	const loadCatalogResource = useCallback(async (_signal: AbortSignal): Promise<AssistantPresetEditorCatalog> => {
+		const force = forceCatalogReloadRef.current;
+		forceCatalogReloadRef.current = false;
+		return loadAssistantPresetEditorCatalog({ force });
 	}, []);
+
+	const {
+		data: catalog,
+		error: catalogLoadError,
+		isLoading: catalogLoading,
+		isRefreshing: catalogRefreshing,
+		reload: reloadCatalog,
+	} = useAsyncResource(loadCatalogResource, {
+		initialData: null as AssistantPresetEditorCatalog | null,
+	});
+
+	const catalogError = catalogLoadError
+		? getErrorMessage(catalogLoadError, 'Failed to load models, tools, and skills.')
+		: '';
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
@@ -682,11 +677,6 @@ function AddEditAssistantPresetModalContent({
 			}
 		};
 	}, []);
-
-	useEffect(() => {
-		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect
-		void loadCatalog(false);
-	}, [loadCatalog]);
 
 	useEffect(() => {
 		if (restoredInitialMCPContextRef.current) {
@@ -836,6 +826,8 @@ function AddEditAssistantPresetModalContent({
 
 			if (!version) {
 				nextErrors.version = 'Version is required.';
+			} else if (!isSemverVersion(version)) {
+				nextErrors.version = `Version must use semantic version format, for example ${DEFAULT_SEMVER}.`;
 			} else if (isEditMode && initialPresetVersion && version === initialPresetVersion) {
 				nextErrors.version = 'New version must be different from the current version.';
 			} else {
@@ -1220,6 +1212,7 @@ function AddEditAssistantPresetModalContent({
 		(!isSubmitting &&
 			Boolean(catalog) &&
 			!catalogLoading &&
+			!catalogRefreshing &&
 			!catalogError &&
 			!mcpState.argumentsBlocked &&
 			Object.keys(errors).length === 0);
@@ -1253,8 +1246,9 @@ function AddEditAssistantPresetModalContent({
 	);
 
 	const handleCatalogRetry = useCallback(() => {
-		void loadCatalog(true);
-	}, [loadCatalog]);
+		forceCatalogReloadRef.current = true;
+		void reloadCatalog();
+	}, [reloadCatalog]);
 
 	const handleToolOptionKeyChange = useCallback((key: string) => {
 		setNextToolKey(key);

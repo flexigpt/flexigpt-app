@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import { createPortal } from 'react-dom';
 
@@ -16,6 +16,10 @@ import type {
 	MCPToolCapability,
 } from '@/spec/mcp';
 import { MCPToolRisk } from '@/spec/mcp';
+
+import { redactSensitiveHTTPHeaders } from '@/lib/http_input_utils';
+
+import { useAsyncResource } from '@/hooks/use_async_resource';
 
 import {
 	getAllMCPServerPrompts,
@@ -52,29 +56,6 @@ interface DiscoveryData {
 	resources: MCPResourceRef[];
 	resourceTemplates: MCPResourceTemplateRef[];
 	prompts: MCPPromptRef[];
-}
-
-const SENSITIVE_HTTP_HEADER_NAMES = new Set([
-	'authorization',
-	'proxy-authorization',
-	'cookie',
-	'set-cookie',
-	'x-api-key',
-	'api-key',
-	'x-auth-token',
-]);
-
-function sanitizeMCPHTTPHeaders(headers?: Record<string, string>): Record<string, string> | undefined {
-	if (!headers || Object.keys(headers).length === 0) {
-		return undefined;
-	}
-
-	return Object.fromEntries(
-		Object.entries(headers).map(([key, value]) => [
-			key,
-			SENSITIVE_HTTP_HEADER_NAMES.has(key.trim().toLowerCase()) ? '[configured]' : value,
-		])
-	);
 }
 
 function JSONBlock({ value }: { value: unknown }) {
@@ -146,9 +127,42 @@ function MCPServerDetailsModalContent({
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const isUnmountingRef = useRef(false);
 
-	const [discovery, setDiscovery] = useState<DiscoveryData>(() => getEmptyDiscoveryData());
-	const [loadingDiscovery, setLoadingDiscovery] = useState(true);
-	const [discoveryError, setDiscoveryError] = useState('');
+	const loadDiscovery = useCallback(
+		async (_signal: AbortSignal) => {
+			const results = await Promise.allSettled([
+				getAllMCPServerTools(bundle.id, server.id),
+				getAllMCPServerResources(bundle.id, server.id),
+				getAllMCPServerResourceTemplates(bundle.id, server.id),
+				getAllMCPServerPrompts(bundle.id, server.id),
+			]);
+
+			const [toolsResult, resourcesResult, resourceTemplatesResult, promptsResult] = results;
+			const discoveryError = results
+				.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+				.map(result => (result.reason instanceof Error ? result.reason.message : 'Failed to load discovery section.'))
+				.find(message => message.length > 0);
+
+			return {
+				discovery: {
+					tools: toolsResult.status === 'fulfilled' ? toolsResult.value : [],
+					resources: resourcesResult.status === 'fulfilled' ? resourcesResult.value : [],
+					resourceTemplates: resourceTemplatesResult.status === 'fulfilled' ? resourceTemplatesResult.value : [],
+					prompts: promptsResult.status === 'fulfilled' ? promptsResult.value : [],
+				} satisfies DiscoveryData,
+				discoveryError: discoveryError ?? '',
+			};
+		},
+		[bundle.id, server.id]
+	);
+
+	const { data: discoveryResult, isLoading: loadingDiscovery } = useAsyncResource(loadDiscovery, {
+		initialData: {
+			discovery: getEmptyDiscoveryData(),
+			discoveryError: '',
+		},
+	});
+
+	const { discovery, discoveryError } = discoveryResult;
 
 	useEffect(() => {
 		const dialog = dialogRef.current;
@@ -171,44 +185,6 @@ function MCPServerDetailsModalContent({
 			}
 		};
 	}, []);
-
-	useEffect(() => {
-		let cancelled = false;
-
-		Promise.allSettled([
-			getAllMCPServerTools(bundle.id, server.id),
-			getAllMCPServerResources(bundle.id, server.id),
-			getAllMCPServerResourceTemplates(bundle.id, server.id),
-			getAllMCPServerPrompts(bundle.id, server.id),
-		])
-			.then(results => {
-				if (cancelled) {
-					return;
-				}
-
-				const [toolsResult, resourcesResult, resourceTemplatesResult, promptsResult] = results;
-				const resDiscoveryError = results
-					.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
-					.map(result => (result.reason instanceof Error ? result.reason.message : 'Failed to load discovery section.'))
-					.find(message => message.length > 0);
-
-				setDiscovery({
-					tools: toolsResult.status === 'fulfilled' ? toolsResult.value : [],
-					resources: resourcesResult.status === 'fulfilled' ? resourcesResult.value : [],
-					resourceTemplates: resourceTemplatesResult.status === 'fulfilled' ? resourceTemplatesResult.value : [],
-					prompts: promptsResult.status === 'fulfilled' ? promptsResult.value : [],
-				});
-				setDiscoveryError(resDiscoveryError ?? '');
-				setLoadingDiscovery(false);
-			})
-			.catch((_err: unknown) => {
-				console.error('could not get mcp tools');
-			});
-
-		return () => {
-			cancelled = true;
-		};
-	}, [bundle.id, server.id]);
 
 	const handleDialogClose = () => {
 		if (isUnmountingRef.current) {
@@ -298,7 +274,7 @@ function MCPServerDetailsModalContent({
 									streamableHttp: server.streamableHttp
 										? {
 												...server.streamableHttp,
-												headers: sanitizeMCPHTTPHeaders(server.streamableHttp.headers),
+												headers: redactSensitiveHTTPHeaders(server.streamableHttp.headers),
 												clientCredentialRef: server.streamableHttp.clientCredentialRef ? '[configured]' : undefined,
 												secretHeaderRefs: server.streamableHttp.secretHeaderRefs
 													? Object.fromEntries(

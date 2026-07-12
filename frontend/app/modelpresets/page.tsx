@@ -22,6 +22,7 @@ import { DownloadButton } from '@/components/download_button';
 import type { DropdownItem } from '@/components/dropdown';
 import { Dropdown } from '@/components/dropdown';
 import { Loader } from '@/components/loader';
+import { ManagementPageContent, ManagementPageHeader } from '@/components/management_ui';
 import { PageFrame } from '@/components/page_frame';
 
 import { AddEditProviderPresetModal } from '@/modelpresets/provider_add_edit_modal';
@@ -545,79 +546,77 @@ export default function ModelPresetsPage() {
 
 	return (
 		<PageFrame>
-			<div className="flex size-full flex-col items-center">
-				<div className="fixed mt-8 flex w-10/12 items-center p-2 lg:w-2/3">
-					<h1 className="flex grow items-center justify-center text-xl font-semibold">Model Presets</h1>
-					<DownloadButton
-						title="Download Model Presets"
-						language="json"
-						valueFetcher={fetchValue}
-						size={20}
-						fileprefix="modelpresets"
-						className="btn btn-sm btn-ghost"
-					/>
-				</div>
+			<div className="flex size-full flex-col items-center overflow-hidden">
+				<ManagementPageHeader
+					title="Model Presets"
+					description="Configure providers, API compatibility, defaults, and model runtime parameters."
+					actions={
+						<>
+							<DownloadButton
+								title="Download Model Presets"
+								language="json"
+								valueFetcher={fetchValue}
+								size={18}
+								fileprefix="modelpresets"
+								className="btn btn-sm btn-ghost rounded-xl"
+							/>
+							<button type="button" className="btn btn-ghost rounded-xl" onClick={openAddModal}>
+								<FiPlus size={18} />
+								<span>Add Provider</span>
+							</button>
+						</>
+					}
+				/>
 
-				<div
-					className="mt-24 flex w-full grow flex-col items-center overflow-y-auto"
-					style={{ maxHeight: 'calc(100vh - 128px)' }}
-				>
-					<div className="flex w-5/6 flex-col space-y-4 xl:w-2/3">
-						<div className="bg-base-100 mb-8 rounded-2xl px-4 py-2 shadow-lg">
-							<div className="grid grid-cols-12 items-center gap-4">
-								<label className="col-span-3 text-sm font-medium">Default Provider</label>
+				<ManagementPageContent>
+					<div className="bg-base-100 mb-8 rounded-2xl px-4 py-2 shadow-lg">
+						<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+							<label className="text-sm font-medium sm:w-48">Default Provider</label>
 
-								<div className="col-span-6">
-									{enabledProviderNames.length > 0 && safeDefaultKey ? (
-										<Dropdown<ProviderName>
-											dropdownItems={enabledProviderPresets as Record<string, DropdownItem>}
-											selectedKey={safeDefaultKey}
-											onChange={handleDefaultProviderChange}
-											filterDisabled={false}
-											title="Select default provider"
-											getDisplayName={k => enabledProviderPresets[k]?.displayName ?? ''}
-										/>
-									) : (
-										<span className="text-error text-sm">Enable at least one provider first.</span>
-									)}
-								</div>
-
-								<div className="col-span-3 flex justify-end">
-									<button type="button" className="btn btn-ghost flex items-center rounded-2xl" onClick={openAddModal}>
-										<FiPlus /> <span className="ml-1">Add Provider</span>
-									</button>
-								</div>
+							<div className="min-w-0 grow">
+								{enabledProviderNames.length > 0 && safeDefaultKey ? (
+									<Dropdown<ProviderName>
+										dropdownItems={enabledProviderPresets as Record<string, DropdownItem>}
+										selectedKey={safeDefaultKey}
+										onChange={handleDefaultProviderChange}
+										filterDisabled={false}
+										title="Select default provider"
+										getDisplayName={k => enabledProviderPresets[k]?.displayName ?? ''}
+									/>
+								) : (
+									<span className="text-error text-sm">Enable at least one provider first.</span>
+								)}
 							</div>
 						</div>
-
-						{error && <p className="text-error mt-8 text-center">{error}</p>}
-
-						{!error &&
-							Object.entries(providerPresets)
-								.toSorted(sortByDisplayName)
-								.map(([name, preset]) => (
-									<ProviderPresetCard
-										key={name}
-										provider={name}
-										preset={preset}
-										defaultProvider={defaultProvider}
-										authKeySet={providerKeySet[name]}
-										authKeys={authKeys}
-										enabledProviders={enabledProviderNames}
-										allProviderPresets={providerPresets}
-										onToggleProvider={handleToggleProvider}
-										onDeleteProvider={handleDeleteProvider}
-										onRequestEdit={openEditModal}
-										onSetDefaultModel={handleSetDefaultModel}
-										onToggleModel={handleToggleModel}
-										onCreateModel={handleCreateModel}
-										onPatchModel={handlePatchModel}
-										onDeleteModel={handleDeleteModel}
-										onProviderAuthKeyChanged={handleProviderAuthKeyChanged}
-									/>
-								))}
 					</div>
-				</div>
+
+					{error && <p className="text-error mt-8 text-center">{error}</p>}
+
+					{!error &&
+						Object.entries(providerPresets)
+							.toSorted(sortByDisplayName)
+							.map(([name, preset]) => (
+								<ProviderPresetCard
+									key={name}
+									provider={name}
+									preset={preset}
+									defaultProvider={defaultProvider}
+									authKeySet={providerKeySet[name]}
+									authKeys={authKeys}
+									enabledProviders={enabledProviderNames}
+									allProviderPresets={providerPresets}
+									onToggleProvider={handleToggleProvider}
+									onDeleteProvider={handleDeleteProvider}
+									onRequestEdit={openEditModal}
+									onSetDefaultModel={handleSetDefaultModel}
+									onToggleModel={handleToggleModel}
+									onCreateModel={handleCreateModel}
+									onPatchModel={handlePatchModel}
+									onDeleteModel={handleDeleteModel}
+									onProviderAuthKeyChanged={handleProviderAuthKeyChanged}
+								/>
+							))}
+				</ManagementPageContent>
 
 				<AddEditProviderPresetModal
 					isOpen={modalOpen}

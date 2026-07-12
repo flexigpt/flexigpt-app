@@ -69,7 +69,7 @@ export function computeToolUserArgsStatus(
 		};
 	}
 
-	if (!parsed || typeof parsed !== 'object') {
+	if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
 		return {
 			...status,
 			isInstanceJSONValid: false,

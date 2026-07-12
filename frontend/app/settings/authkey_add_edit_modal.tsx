@@ -98,6 +98,8 @@ function AddEditAuthKeyModalContent({
 
 	const [formData, setFormData] = useState<FormData>(() => getInitialFormData(initial, prefill, defaultKeyName));
 	const [errors, setErrors] = useState<FormErrors>({});
+	const [submitError, setSubmitError] = useState('');
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	/* raw provider presets fetched from backend */
 	const [providerPresets, setProviderPresets] = useState<Record<ProviderName, ProviderPreset>>({});
@@ -217,7 +219,11 @@ function AddEditAuthKeyModalContent({
 		};
 	}, []);
 
-	const requestClose = () => {
+	const requestClose = (force = false) => {
+		if (isSubmitting && !force) {
+			return;
+		}
+
 		const dialog = dialogRef.current;
 
 		if (dialog?.open) {
@@ -366,6 +372,10 @@ function AddEditAuthKeyModalContent({
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = async e => {
 		e.preventDefault();
 
+		if (isSubmitting) {
+			return;
+		}
+
 		const nextErrors = validateForm(formData);
 		setErrors(nextErrors);
 
@@ -375,10 +385,26 @@ function AddEditAuthKeyModalContent({
 
 		const finalType = formData.type === sentinelAddNew ? formData.newType.trim() : formData.type;
 
-		await aggregateAPI.setAuthKey(finalType, formData.keyName.trim(), formData.secret.trim());
+		setSubmitError('');
+		setIsSubmitting(true);
+		try {
+			await aggregateAPI.setAuthKey(finalType, formData.keyName.trim(), formData.secret.trim());
 
-		onChanged();
-		requestClose();
+			if (!isUnmountingRef.current) {
+				onChanged();
+				requestClose(true);
+			}
+		} catch (error) {
+			if (!isUnmountingRef.current) {
+				setSubmitError(
+					error instanceof Error && error.message.trim() ? error.message : 'Failed to save the authentication key.'
+				);
+			}
+		} finally {
+			if (!isUnmountingRef.current) {
+				setIsSubmitting(false);
+			}
+		}
 	};
 
 	return (
@@ -391,8 +417,11 @@ function AddEditAuthKeyModalContent({
 						<button
 							type="button"
 							className="btn btn-sm btn-circle bg-base-300"
-							onClick={requestClose}
+							onClick={() => {
+								requestClose();
+							}}
 							aria-label="Close"
+							disabled={isSubmitting}
 						>
 							<FiX size={12} />
 						</button>
@@ -400,9 +429,15 @@ function AddEditAuthKeyModalContent({
 					{intro ? (
 						<div className="border-base-300 bg-base-100/70 rounded-2xl border p-4 text-sm/relaxed">{intro}</div>
 					) : null}
+					{submitError ? (
+						<div className="alert alert-error rounded-2xl text-sm" role="alert">
+							<FiAlertCircle size={14} />
+							<span className="wrap-break-word">{submitError}</span>
+						</div>
+					) : null}
 				</div>
 
-				<form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+				<form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col" aria-busy={isSubmitting}>
 					<div className="flex min-h-0 flex-1 flex-col">
 						<div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
 							{!providerOnly && (
@@ -514,11 +549,18 @@ function AddEditAuthKeyModalContent({
 
 						{/* ACTIONS - */}
 						<div className="modal-action mt-2 flex shrink-0 justify-between">
-							<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
+							<button
+								type="button"
+								className="btn bg-base-300 rounded-xl"
+								onClick={() => {
+									requestClose();
+								}}
+								disabled={isSubmitting}
+							>
 								Cancel
 							</button>
-							<button type="submit" disabled={!isAllValid} className="btn btn-primary rounded-xl">
-								{submitLabel}
+							<button type="submit" disabled={!isAllValid || isSubmitting} className="btn btn-primary rounded-xl">
+								{isSubmitting ? 'Saving...' : submitLabel}
 							</button>
 						</div>
 					</div>

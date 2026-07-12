@@ -11,9 +11,10 @@ import { assistantPresetStoreAPI } from '@/apis/baseapi';
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 import { Loader } from '@/components/loader';
+import { ManagementBundleCreateModal } from '@/components/management_bundle_create_modal';
+import { ManagementPageContent, ManagementPageHeader } from '@/components/management_ui';
 import { PageFrame } from '@/components/page_frame';
 
-import { AddAssistantPresetBundleModal } from '@/assistantpresets/assistant_preset_bundle_add_modal';
 import { AssistantPresetBundleCard } from '@/assistantpresets/assistant_preset_bundle_card';
 import type { PresetItem } from '@/assistantpresets/lib/assistant_preset_editor_types';
 import {
@@ -365,48 +366,47 @@ export default function AssistantPresetsPage() {
 
 	return (
 		<PageFrame>
-			<div className="flex size-full flex-col items-center">
-				<div className="fixed mt-8 flex w-11/12 items-center px-12 py-2">
-					<h1 className="flex grow items-center justify-center text-xl font-semibold">Assistant Preset Bundles</h1>
-					<button
-						type="button"
-						className="btn btn-ghost flex items-center rounded-2xl"
-						onClick={() => {
-							setIsAddModalOpen(true);
-						}}
-					>
-						<FiPlus size={20} /> <span className="ml-1">Add Bundle</span>
-					</button>
-				</div>
+			<div className="flex size-full flex-col items-center overflow-hidden">
+				<ManagementPageHeader
+					title="Assistant Preset Bundles"
+					description="Create reusable starting models, tools, skills, text, and MCP context."
+					actions={
+						<button
+							type="button"
+							className="btn btn-ghost rounded-xl"
+							onClick={() => {
+								setIsAddModalOpen(true);
+							}}
+						>
+							<FiPlus size={18} />
+							<span>Add Bundle</span>
+						</button>
+					}
+				/>
 
-				<div
-					className="mt-24 flex w-full grow flex-col items-center overflow-y-auto"
-					style={{ maxHeight: `calc(100vh - 128px)` }}
-				>
-					<div className="flex w-11/12 flex-col space-y-4 xl:w-2/3">
-						{bundles.length === 0 && (
-							<p className="mt-8 text-center text-sm">No assistant preset bundles configured yet.</p>
-						)}
+				<ManagementPageContent>
+					{bundles.length === 0 && (
+						<p className="mt-8 text-center text-sm">No assistant preset bundles configured yet.</p>
+					)}
 
-						{bundles.map(bundleData => (
-							<AssistantPresetBundleCard
-								key={bundleData.bundle.id}
-								bundle={bundleData.bundle}
-								presets={bundleData.presets}
-								presetLoadError={bundleData.presetLoadError}
-								onRefreshPresets={() => refreshBundlePresets(bundleData.bundle.id)}
-								onToggleBundleEnabled={handleToggleBundleEnabled}
-								onTogglePresetEnabled={handleTogglePresetEnabled}
-								onDeletePreset={handleDeletePreset}
-								onSubmitPreset={handleSubmitPreset}
-								onDeleteBundleRequested={bundleID => {
-									setBundleToDeleteID(bundleID);
-								}}
-								copyablePresets={allPresetItems}
-							/>
-						))}
-					</div>
-				</div>
+					{bundles.map(bundleData => (
+						<AssistantPresetBundleCard
+							key={bundleData.bundle.id}
+							bundle={bundleData.bundle}
+							presets={bundleData.presets}
+							presetLoadError={bundleData.presetLoadError}
+							onRefreshPresets={() => refreshBundlePresets(bundleData.bundle.id)}
+							onToggleBundleEnabled={handleToggleBundleEnabled}
+							onTogglePresetEnabled={handleTogglePresetEnabled}
+							onDeletePreset={handleDeletePreset}
+							onSubmitPreset={handleSubmitPreset}
+							onDeleteBundleRequested={bundleID => {
+								setBundleToDeleteID(bundleID);
+							}}
+							copyablePresets={allPresetItems}
+						/>
+					))}
+				</ManagementPageContent>
 
 				<DeleteConfirmationModal
 					isOpen={bundleToDelete !== null}
@@ -421,13 +421,16 @@ export default function AssistantPresetsPage() {
 					confirmButtonText="Delete"
 				/>
 
-				<AddAssistantPresetBundleModal
+				<ManagementBundleCreateModal
 					isOpen={isAddModalOpen}
+					title="Add Assistant Preset Bundle"
+					entityLabel="Assistant preset bundle"
 					onClose={() => {
 						setIsAddModalOpen(false);
 					}}
 					onSubmit={handleAddBundle}
 					existingSlugs={bundles.map(bundleData => bundleData.bundle.slug)}
+					failureMessage="Failed to create assistant preset bundle."
 				/>
 
 				<ActionDeniedAlertModal

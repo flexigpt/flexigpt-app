@@ -215,6 +215,7 @@ export function mergeModelCapabilitiesOverride(
 		merged.stopSequenceCapabilities ||
 		merged.outputCapabilities ||
 		merged.toolCapabilities ||
+		merged.paramDialect ||
 		merged.cacheCapabilities;
 	return hasAny ? merged : undefined;
 }
@@ -400,6 +401,12 @@ export function sanitizeUIChatOptionByCapabilities(option: UIChatOption): UIChat
 		}
 
 		if (next.cacheControl.ttl && supportedTTLs.length > 0 && !supportedTTLs.includes(next.cacheControl.ttl)) {
+			const cc = { ...next.cacheControl };
+			delete cc.ttl;
+			next.cacheControl = cc;
+		}
+
+		if (topLevelCacheCapabilities.supportsTTL === false && next.cacheControl.ttl) {
 			const cc = { ...next.cacheControl };
 			delete cc.ttl;
 			next.cacheControl = cc;

@@ -12,6 +12,8 @@ import { getAllSkillBundles, getAllSkills } from '@/apis/list_helper';
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 import { Loader } from '@/components/loader';
+import { ManagementBundleCreateModal } from '@/components/management_bundle_create_modal';
+import { ManagementPageContent, ManagementPageHeader } from '@/components/management_ui';
 import { PageFrame } from '@/components/page_frame';
 
 import type { SkillInsertFilter } from '@/skills/lib/skill_artifact_utils';
@@ -26,7 +28,6 @@ import {
 import type { BundleData } from '@/skills/lib/skill_bundle_utils';
 import { sortBundleData } from '@/skills/lib/skill_bundle_utils';
 import type { SkillItem, SkillUpsertInput } from '@/skills/skill_add_edit_modal';
-import { AddSkillBundleModal } from '@/skills/skill_bundle_add_modal';
 import { SkillBundleCard } from '@/skills/skill_bundle_card';
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -429,188 +430,184 @@ export default function SkillsPage() {
 	return (
 		<PageFrame>
 			<div className="flex size-full flex-col items-center overflow-hidden">
-				<div className="bg-base-200/95 sticky top-0 z-10 mt-4 flex w-11/12 items-center gap-4 px-4 py-2 backdrop-blur-sm xl:w-2/3">
-					<div className="min-w-0 grow">
-						<h1 className="text-xl font-semibold">Skills and Templates</h1>
-						<p className="text-base-content/70 text-xs">
-							Manage Agent Skills artifacts. New instruction snippets and prompt-like composer templates should be
-							created here.
-						</p>
+				<ManagementPageHeader
+					title="Skills and Templates"
+					description="Manage instruction skills, user-message templates, arguments, resources, and runtime presence."
+					actions={
+						<button
+							type="button"
+							className="btn btn-ghost rounded-xl"
+							onClick={() => {
+								setIsAddModalOpen(true);
+							}}
+						>
+							<FiPlus size={18} />
+							<span>Add Bundle</span>
+						</button>
+					}
+				/>
+
+				<ManagementPageContent>
+					<div className="border-base-content/10 bg-base-100 rounded-2xl border p-4 text-sm">
+						<div className="font-semibold">Skill basics</div>
+						<ul className="text-base-content/70 mt-2 list-disc space-y-1 pl-5 text-xs">
+							<li>Instruction skills provide reusable conversation context.</li>
+							<li>User-message skills insert reusable text into the composer.</li>
+							<li>Managed skills create `SKILL.md`; extra files can be added to the saved folder.</li>
+						</ul>
 					</div>
-					<button
-						type="button"
-						className="btn btn-ghost flex shrink-0 items-center rounded-2xl"
-						onClick={() => {
-							setIsAddModalOpen(true);
-						}}
-					>
-						<FiPlus size={20} /> <span className="ml-1">Add Bundle</span>
-					</button>
-				</div>
 
-				<div className="app-scrollbar-thin flex w-full grow flex-col items-center overflow-y-auto">
-					<div className="mt-4 w-11/12 space-y-4 xl:w-2/3">
-						<div className="border-base-content/10 bg-base-100 rounded-2xl border p-4 text-sm">
-							<div className="font-semibold">Skill basics</div>
-							<ul className="text-base-content/70 mt-2 list-disc space-y-1 pl-5 text-xs">
-								<li>Instruction skills provide reusable conversation context.</li>
-								<li>User-message skills insert reusable text into the composer.</li>
-								<li>Managed skills create `SKILL.md`; extra files can be added to the saved folder.</li>
-							</ul>
+					<div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+						<div className="bg-base-100 border-base-300 rounded-2xl border p-3">
+							<div className="text-sm font-semibold">Instruction skills</div>
+							<div className="text-base-content/70 mt-1 text-xs">{insertCounts.instructions} configured</div>
 						</div>
-
-						<div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-							<div className="bg-base-100 border-base-300 rounded-2xl border p-3">
-								<div className="text-sm font-semibold">Instruction skills</div>
-								<div className="text-base-content/70 mt-1 text-xs">{insertCounts.instructions} configured</div>
-							</div>
-							<div className="bg-base-100 border-base-300 rounded-2xl border p-3">
-								<div className="text-sm font-semibold">User-message templates</div>
-								<div className="text-base-content/70 mt-1 text-xs">{insertCounts['user-message']} configured</div>
-							</div>
-							<div className="bg-base-100 border-base-300 rounded-2xl border p-3">
-								<div className="text-sm font-semibold">Tags</div>
-								<div className="text-base-content/70 mt-1 text-xs">{allTags.length} known tag groups</div>
-							</div>
+						<div className="bg-base-100 border-base-300 rounded-2xl border p-3">
+							<div className="text-sm font-semibold">User-message templates</div>
+							<div className="text-base-content/70 mt-1 text-xs">{insertCounts['user-message']} configured</div>
 						</div>
-
-						<div className="border-base-300 bg-base-100 grid grid-cols-1 gap-3 rounded-2xl border p-3 lg:grid-cols-12">
-							<label className="input input-sm flex items-center gap-2 rounded-xl lg:col-span-5">
-								<FiSearch size={14} />
-								<input
-									type="search"
-									className="grow"
-									value={searchQuery}
-									onChange={e => {
-										setSearchQuery(e.target.value);
-									}}
-									placeholder="Search name, slug, description, location, tags, arguments…"
-									spellCheck="false"
-								/>
-								{searchQuery ? (
-									<button
-										type="button"
-										className="btn btn-ghost btn-xs rounded-lg"
-										onClick={() => {
-											setSearchQuery('');
-										}}
-										aria-label="Clear search"
-									>
-										<FiX size={12} />
-									</button>
-								) : null}
-							</label>
-
-							<label className="input input-sm flex items-center gap-2 rounded-xl border lg:col-span-4">
-								<FiTag size={14} />
-								<input
-									type="text"
-									className="grow"
-									value={tagFilterInput}
-									onChange={e => {
-										setTagFilterInput(e.target.value);
-									}}
-									placeholder="Filter tags, comma separated"
-									spellCheck="false"
-								/>
-								{tagFilterInput ? (
-									<button
-										type="button"
-										className="btn btn-ghost btn-xs rounded-lg"
-										onClick={() => {
-											setTagFilterInput('');
-										}}
-										aria-label="Clear tag filter"
-									>
-										<FiX size={12} />
-									</button>
-								) : null}
-							</label>
-
-							<div className="text-base-content/70 flex items-center justify-end text-xs lg:col-span-3">
-								{visibleSkillCount} matching skill{visibleSkillCount === 1 ? '' : 's'} across {bundles.length} bundle
-								{bundles.length === 1 ? '' : 's'}
-							</div>
-
-							<div className="flex flex-wrap items-center gap-2 lg:col-span-12">
-								{skillFilterOptions.map(option => {
-									const isActive = insertFilter === option.value;
-
-									return (
-										<button
-											key={option.value}
-											type="button"
-											className={`btn btn-sm rounded-xl border ${
-												isActive ? 'border-base-content/30 bg-base-200' : 'border-transparent bg-transparent'
-											}`}
-											onClick={() => {
-												setInsertFilter(option.value);
-											}}
-											title={option.description}
-											aria-pressed={isActive}
-										>
-											<span>{option.label}</span>
-											<span className="border-base-content/20 rounded-lg border px-1.5 py-0.5 text-xs">
-												{option.count}
-											</span>
-										</button>
-									);
-								})}
-							</div>
-
-							{allTags.length > 0 && (
-								<div className="flex flex-wrap items-center gap-1 lg:col-span-12">
-									<span className="text-base-content/60 mr-1 text-xs">Known tags:</span>
-									{allTags.slice(0, 32).map(tag => (
-										<button
-											key={tag}
-											type="button"
-											className="border-base-content/20 hover:bg-base-200 rounded-xl border px-2 py-1 text-xs"
-											onClick={() => {
-												setTagFilterInput(current => {
-													const existing = current
-														.split(',')
-														.map(item => item.trim())
-														.filter(Boolean);
-													return existing.includes(tag) ? current : [...existing, tag].join(', ');
-												});
-											}}
-										>
-											{tag}
-										</button>
-									))}
-								</div>
-							)}
-						</div>
-
-						<div className="flex flex-col space-y-4 pb-8">
-							{bundles.length === 0 && <p className="mt-8 text-center text-sm">No skill bundles configured yet.</p>}
-
-							{bundles.map(bundleData => (
-								<SkillBundleCard
-									key={bundleData.bundle.id}
-									bundle={bundleData.bundle}
-									skills={bundleData.skills}
-									skillLoadError={bundleData.skillLoadError}
-									prefillSkills={allSkillItems}
-									onRefreshSkills={() => {
-										return refreshBundleSkills(bundleData.bundle.id);
-									}}
-									insertFilter={insertFilter}
-									searchQuery={searchQuery}
-									tagFilters={activeTagFilters}
-									onToggleBundleEnable={handleBundleEnableChange}
-									onToggleSkillEnable={handleSkillEnableChange}
-									onDeleteSkill={handleDeleteSkill}
-									onSubmitSkill={handleSubmitSkill}
-									onRequestBundleDelete={bundle => {
-										setBundleToDelete(bundle);
-									}}
-								/>
-							))}
+						<div className="bg-base-100 border-base-300 rounded-2xl border p-3">
+							<div className="text-sm font-semibold">Tags</div>
+							<div className="text-base-content/70 mt-1 text-xs">{allTags.length} known tag groups</div>
 						</div>
 					</div>
-				</div>
+
+					<div className="border-base-300 bg-base-100 grid grid-cols-1 gap-3 rounded-2xl border p-3 lg:grid-cols-12">
+						<label className="input input-sm flex items-center gap-2 rounded-xl lg:col-span-5">
+							<FiSearch size={14} />
+							<input
+								type="search"
+								className="grow"
+								value={searchQuery}
+								onChange={e => {
+									setSearchQuery(e.target.value);
+								}}
+								placeholder="Search name, slug, description, location, tags, arguments…"
+								spellCheck="false"
+							/>
+							{searchQuery ? (
+								<button
+									type="button"
+									className="btn btn-ghost btn-xs rounded-lg"
+									onClick={() => {
+										setSearchQuery('');
+									}}
+									aria-label="Clear search"
+								>
+									<FiX size={12} />
+								</button>
+							) : null}
+						</label>
+
+						<label className="input input-sm flex items-center gap-2 rounded-xl border lg:col-span-4">
+							<FiTag size={14} />
+							<input
+								type="text"
+								className="grow"
+								value={tagFilterInput}
+								onChange={e => {
+									setTagFilterInput(e.target.value);
+								}}
+								placeholder="Filter tags, comma separated"
+								spellCheck="false"
+							/>
+							{tagFilterInput ? (
+								<button
+									type="button"
+									className="btn btn-ghost btn-xs rounded-lg"
+									onClick={() => {
+										setTagFilterInput('');
+									}}
+									aria-label="Clear tag filter"
+								>
+									<FiX size={12} />
+								</button>
+							) : null}
+						</label>
+
+						<div className="text-base-content/70 flex items-center justify-end text-xs lg:col-span-3">
+							{visibleSkillCount} matching skill{visibleSkillCount === 1 ? '' : 's'} across {bundles.length} bundle
+							{bundles.length === 1 ? '' : 's'}
+						</div>
+
+						<div className="flex flex-wrap items-center gap-2 lg:col-span-12">
+							{skillFilterOptions.map(option => {
+								const isActive = insertFilter === option.value;
+
+								return (
+									<button
+										key={option.value}
+										type="button"
+										className={`btn btn-sm rounded-xl border ${
+											isActive ? 'border-base-content/30 bg-base-200' : 'border-transparent bg-transparent'
+										}`}
+										onClick={() => {
+											setInsertFilter(option.value);
+										}}
+										title={option.description}
+										aria-pressed={isActive}
+									>
+										<span>{option.label}</span>
+										<span className="border-base-content/20 rounded-lg border px-1.5 py-0.5 text-xs">
+											{option.count}
+										</span>
+									</button>
+								);
+							})}
+						</div>
+
+						{allTags.length > 0 && (
+							<div className="flex flex-wrap items-center gap-1 lg:col-span-12">
+								<span className="text-base-content/60 mr-1 text-xs">Known tags:</span>
+								{allTags.slice(0, 32).map(tag => (
+									<button
+										key={tag}
+										type="button"
+										className="border-base-content/20 hover:bg-base-200 rounded-xl border px-2 py-1 text-xs"
+										onClick={() => {
+											setTagFilterInput(current => {
+												const existing = current
+													.split(',')
+													.map(item => item.trim())
+													.filter(Boolean);
+												return existing.includes(tag) ? current : [...existing, tag].join(', ');
+											});
+										}}
+									>
+										{tag}
+									</button>
+								))}
+							</div>
+						)}
+					</div>
+
+					<div className="flex flex-col space-y-4 pb-8">
+						{bundles.length === 0 && <p className="mt-8 text-center text-sm">No skill bundles configured yet.</p>}
+
+						{bundles.map(bundleData => (
+							<SkillBundleCard
+								key={bundleData.bundle.id}
+								bundle={bundleData.bundle}
+								skills={bundleData.skills}
+								skillLoadError={bundleData.skillLoadError}
+								prefillSkills={allSkillItems}
+								onRefreshSkills={() => {
+									return refreshBundleSkills(bundleData.bundle.id);
+								}}
+								insertFilter={insertFilter}
+								searchQuery={searchQuery}
+								tagFilters={activeTagFilters}
+								onToggleBundleEnable={handleBundleEnableChange}
+								onToggleSkillEnable={handleSkillEnableChange}
+								onDeleteSkill={handleDeleteSkill}
+								onSubmitSkill={handleSubmitSkill}
+								onRequestBundleDelete={bundle => {
+									setBundleToDelete(bundle);
+								}}
+							/>
+						))}
+					</div>
+				</ManagementPageContent>
 
 				<DeleteConfirmationModal
 					isOpen={bundleToDelete !== null}
@@ -629,14 +626,17 @@ export default function SkillsPage() {
 					confirmButtonText="Delete"
 				/>
 
-				<AddSkillBundleModal
+				<ManagementBundleCreateModal
 					isOpen={isAddModalOpen}
+					title="Add Skill Bundle"
+					entityLabel="Skill bundle"
 					onClose={() => {
 						setIsAddModalOpen(false);
 					}}
 					onSubmit={handleAddBundle}
 					existingSlugs={existingBundleSlugs}
-					existingNames={existingBundleNames}
+					existingDisplayNames={existingBundleNames}
+					failureMessage="Failed to create skill bundle."
 				/>
 
 				<ActionDeniedAlertModal
