@@ -359,7 +359,16 @@ export default function AssistantPresetsPage() {
 		async (slug: string, display: string, description?: string) => {
 			const id = getUUIDv7();
 			await assistantPresetStoreAPI.putAssistantPresetBundle(id, slug, display, true, description);
-			await reloadOrThrow();
+
+			try {
+				await reloadOrThrow();
+			} catch (error) {
+				console.error('Assistant preset bundle was created but refresh failed:', error);
+				setAlertMsg(
+					'Assistant preset bundle was created, but the page could not be refreshed. Reload before making destructive changes.'
+				);
+				setShowAlert(true);
+			}
 		},
 		[reloadOrThrow]
 	);
@@ -445,6 +454,7 @@ export default function AssistantPresetsPage() {
 					}}
 					onSubmit={handleAddBundle}
 					existingSlugs={bundles.map(bundleData => bundleData.bundle.slug)}
+					existingDisplayNames={bundles.map(bundleData => bundleData.bundle.displayName || bundleData.bundle.slug)}
 					failureMessage="Failed to create assistant preset bundle."
 				/>
 

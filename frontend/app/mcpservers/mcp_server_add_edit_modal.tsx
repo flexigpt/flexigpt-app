@@ -8,6 +8,7 @@ import { FiAlertCircle, FiHelpCircle, FiPlus, FiTrash2, FiUpload, FiX } from 're
 import type { MCPServerConfig, MCPToolPolicyOverride, PutMCPServerPayload } from '@/spec/mcp';
 import { MCPApprovalRule, MCPExecutionMode, MCPHTTPAuthMode, MCPTransportType, MCPTrustLevel } from '@/spec/mcp';
 
+import { validateHTTPURLSecurity } from '@/lib/http_input_utils';
 import { omitManyKeys } from '@/lib/obj_utils';
 import { validateSlug } from '@/lib/text_utils';
 
@@ -60,33 +61,6 @@ const EXECUTION_MODE_DROPDOWN_ITEMS: Record<MCPExecutionMode, DropdownItem> = {
 	[MCPExecutionMode.MCPExecutionModeManual]: { isEnabled: true },
 	[MCPExecutionMode.MCPExecutionModeAuto]: { isEnabled: true },
 };
-
-function isIPv4LoopbackHost(host: string): boolean {
-	const parts = host.split('.').map(Number);
-
-	return (
-		parts.length === 4 && parts.every(part => Number.isInteger(part) && part >= 0 && part <= 255) && parts[0] === 127
-	);
-}
-
-function isLoopbackHTTPHost(host: string): boolean {
-	const normalized = host.trim().toLowerCase().replace(/^\[/, '').replace(/\]$/, '');
-
-	if (!normalized) {
-		return false;
-	}
-	if (normalized === 'localhost') {
-		return true;
-	}
-	if (normalized === '::1') {
-		return true;
-	}
-	if (normalized === '0:0:0:0:0:0:0:1') {
-		return true;
-	}
-
-	return isIPv4LoopbackHost(normalized);
-}
 
 interface AddEditMCPServerModalProps {
 	isOpen: boolean;
@@ -577,18 +551,11 @@ function AddEditMCPServerModalContent({
 				if (!rawURL) {
 					nextErrors.httpURL = 'URL is required for Streamable HTTP servers.';
 				} else {
-					try {
-						const url = new URL(rawURL);
-						if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-							nextErrors.httpURL = 'URL must use http or https.';
-						} else if (url.protocol === 'http:' && !isLoopbackHTTPHost(url.hostname)) {
-							nextErrors.httpURL =
-								'HTTP URLs are only allowed for localhost or loopback hosts. Use HTTPS for remote servers.';
-						} else {
-							nextErrors = omitManyKeys(nextErrors, ['httpURL']);
-						}
-					} catch {
-						nextErrors.httpURL = 'URL must be valid.';
+					const urlError = validateHTTPURLSecurity(rawURL, 'MCP server URL');
+					if (urlError) {
+						nextErrors.httpURL = urlError;
+					} else {
+						nextErrors = omitManyKeys(nextErrors, ['httpURL']);
 					}
 				}
 
@@ -1458,6 +1425,11 @@ function AddEditMCPServerModalContent({
 												</span>
 											</div>
 										)}
+										<div className="label">
+											<span className="text-base-content/70 text-xs">
+												Remote MCP endpoints must use HTTPS. Plain HTTP is limited to localhost and loopback addresses.
+											</span>
+										</div>
 									</div>
 								</div>
 

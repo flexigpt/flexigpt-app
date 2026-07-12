@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { FiPlus, FiSettings } from 'react-icons/fi';
 
@@ -14,6 +14,7 @@ import type {
 } from '@/spec/mcp';
 import { BaseMCPBundleID, MCPAuthHealthState, MCPHTTPAuthMode, MCPSecretKind, MCPTransportType } from '@/spec/mcp';
 
+import { mapWithConcurrency, withTimeout } from '@/lib/async_utils';
 import { omitManyKeys } from '@/lib/obj_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
@@ -26,10 +27,13 @@ import { Loader } from '@/components/loader';
 import { ManagementBundleCreateModal } from '@/components/managementui/management_bundle_create_modal';
 import { ManagementPageContent } from '@/components/managementui/management_page_content';
 import { ManagementPageHeader } from '@/components/managementui/management_page_header';
+import { ManagementResourceError } from '@/components/managementui/management_resource_error';
 import { PageFrame } from '@/components/page_frame';
 
 import type { MCPServerUpsertInput } from '@/mcpservers/lib/mcp_server_utils';
+import { getEffectiveMCPAuthHealthState, isMCPAuthActionable } from '@/mcpservers/lib/mcp_server_utils';
 import { MCPBundleCard } from '@/mcpservers/mcp_bundle_card';
+import { MCPOAuthAuthorizationModal } from '@/mcpservers/mcp_oauth_authorization_modal';
 import { MCPSettingsModal } from '@/mcpservers/mcp_settings_modal';
 
 interface BundleData {
@@ -37,8 +41,24 @@ interface BundleData {
 	servers: MCPServerConfig[];
 	runtimeByServerID: Record<string, MCPServerRuntimeSnapshot | undefined>;
 	authHealthByServerID: Record<string, MCPAuthHealth | undefined>;
+	readErrorsByServerID: Record<string, { runtime?: string; auth?: string } | undefined>;
 	serverLoadError?: string;
 }
+
+interface MCPPageResource {
+	bundles: BundleData[];
+	settingsView?: MCPSettingsView;
+	warnings: string[];
+}
+
+interface OAuthAuthorizationTarget {
+	bundleID: string;
+	serverID: string;
+}
+
+const MCP_STATUS_READ_CONCURRENCY = 6;
+const MCP_BUNDLE_LOAD_CONCURRENCY = 4;
+const MCP_CONNECT_TIMEOUT_MS = 60_000;
 
 function getErrorMessage(error: unknown, fallback: string): string {
 	if (error instanceof Error && error.message.trim().length > 0) {
@@ -56,6 +76,7 @@ function mergeBundleData(
 	servers: MCPServerConfig[],
 	runtimeByServerID: Record<string, MCPServerRuntimeSnapshot | undefined>,
 	authHealthByServerID: Record<string, MCPAuthHealth | undefined>,
+	readErrorsByServerID: Record<string, { runtime?: string; auth?: string } | undefined>,
 	serverLoadError?: string
 ): BundleData {
 	return {
@@ -63,6 +84,7 @@ function mergeBundleData(
 		servers,
 		runtimeByServerID,
 		authHealthByServerID,
+		readErrorsByServerID,
 		serverLoadError,
 	};
 }
@@ -185,22 +207,6 @@ function getMatchingMCPAuthHealth(
 	return authHealth;
 }
 
-function isMCPOAuthAuthorizationValue(value: unknown): value is MCPOAuthAuthorization {
-	return isRecord(value) && typeof value.serverID === 'string' && typeof value.authorizationURL === 'string';
-}
-
-function getMCPOAuthAuthorizationResult(value: unknown): MCPOAuthAuthorization | undefined {
-	if (isMCPOAuthAuthorizationValue(value)) {
-		return value;
-	}
-
-	if (isRecord(value) && isMCPOAuthAuthorizationValue(value.authorization)) {
-		return value.authorization;
-	}
-
-	return undefined;
-}
-
 function getPendingOAuthAuthHealth(
 	bundleID: string,
 	serverID: string,
@@ -221,10 +227,19 @@ function getPendingOAuthAuthHealth(
 	};
 }
 
+function isOAuthAuthorizationRelevant(server: MCPServerConfig, authHealth?: MCPAuthHealth): boolean {
+	return (
+		isMCPAuthActionable(authHealth, server) ||
+		getEffectiveMCPAuthHealthState(server, authHealth) === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending
+	);
+}
+
 // oxlint-disable-next-line no-restricted-exports
 export default function MCPServersPage() {
 	const [bundles, setBundles] = useState<BundleData[]>([]);
 	const [loading, setLoading] = useState(true);
+	const [pageLoadError, setPageLoadError] = useState<unknown>(undefined);
+	const [resourceWarnings, setResourceWarnings] = useState<string[]>([]);
 
 	const [showAlert, setShowAlert] = useState(false);
 	const [alertMsg, setAlertMsg] = useState('');
@@ -232,53 +247,94 @@ export default function MCPServersPage() {
 	const [bundleToDeleteID, setBundleToDeleteID] = useState<string | null>(null);
 	const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 	const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-	const [settingsView, setSettingsView] = useState<MCPSettingsView>();
+	const [settingsView, setSettingsView] = useState<MCPSettingsView | undefined>(undefined);
+	const [oauthAuthorizationTarget, setOAuthAuthorizationTarget] = useState<OAuthAuthorizationTarget | null>(null);
+
+	const bundlesRef = useRef<BundleData[]>(bundles);
 
 	const bundleToDelete =
 		bundleToDeleteID === null
 			? null
 			: (bundles.find(bundleData => bundleData.bundle.id === bundleToDeleteID)?.bundle ?? null);
 
+	useEffect(() => {
+		bundlesRef.current = bundles;
+	}, [bundles]);
+
 	const loadRuntimeAndAuth = useCallback(
 		async (bundleID: string, servers: MCPServerConfig[], knownPendingAuthorizations?: MCPOAuthAuthorization[]) => {
-			const pendingAuthorizations =
-				knownPendingAuthorizations ?? (await mcpAPI.listPendingMCPOAuthAuthorizations().catch(() => []));
-			const entries = await Promise.all(
-				servers.map(async server => {
-					const [runtimeResult, authHealthResult] = await Promise.all([
-						mcpAPI.getMCPServerStatus(bundleID, server.id).catch(() => undefined),
-						mcpAPI.getMCPServerAuthHealth(bundleID, server.id).catch(() => undefined),
-					]);
-					const runtime = getMatchingMCPServerRuntimeSnapshot(bundleID, server.id, runtimeResult);
-					let authHealth = getMatchingMCPAuthHealth(bundleID, server, authHealthResult);
-					const pending = pendingAuthorizations.find(
-						authorization =>
-							authorization.bundleID === bundleID &&
-							authorization.serverID === server.id &&
-							authorization.authorizationURL
+			let pendingAuthorizations = knownPendingAuthorizations ?? [];
+			let pendingAuthorizationReadError: string | undefined;
+
+			if (knownPendingAuthorizations === undefined) {
+				const [pendingResult] = await Promise.allSettled([mcpAPI.listPendingMCPOAuthAuthorizations()]);
+
+				if (pendingResult.status === 'fulfilled') {
+					pendingAuthorizations = pendingResult.value;
+				} else {
+					pendingAuthorizationReadError = getErrorMessage(
+						pendingResult.reason,
+						'Pending OAuth authorizations could not be loaded.'
 					);
-					if (pending) {
-						authHealth = getPendingOAuthAuthHealth(bundleID, server.id, pending, authHealth);
-					}
-					return {
-						serverID: server.id,
-						runtime,
-						authHealth,
-					};
-				})
-			);
+				}
+			}
+
+			const entries = await mapWithConcurrency(servers, MCP_STATUS_READ_CONCURRENCY, async server => {
+				const [runtimeResult, authHealthResult] = await Promise.allSettled([
+					mcpAPI.getMCPServerStatus(bundleID, server.id),
+					mcpAPI.getMCPServerAuthHealth(bundleID, server.id),
+				]);
+
+				const readErrors: { runtime?: string; auth?: string } = {};
+				if (runtimeResult.status === 'rejected') {
+					readErrors.runtime = getErrorMessage(runtimeResult.reason, 'Runtime status request failed.');
+				}
+				if (authHealthResult.status === 'rejected') {
+					readErrors.auth = getErrorMessage(authHealthResult.reason, 'Auth health request failed.');
+				}
+
+				const runtime =
+					runtimeResult.status === 'fulfilled'
+						? getMatchingMCPServerRuntimeSnapshot(bundleID, server.id, runtimeResult.value)
+						: undefined;
+				let authHealth =
+					authHealthResult.status === 'fulfilled'
+						? getMatchingMCPAuthHealth(bundleID, server, authHealthResult.value)
+						: undefined;
+
+				const pending = pendingAuthorizations.find(
+					authorization =>
+						authorization.bundleID === bundleID &&
+						authorization.serverID === server.id &&
+						authorization.authorizationURL
+				);
+				if (pending) {
+					authHealth = getPendingOAuthAuthHealth(bundleID, server.id, pending, authHealth);
+				}
+
+				return {
+					serverID: server.id,
+					runtime,
+					authHealth,
+					readErrors: Object.keys(readErrors).length > 0 ? readErrors : undefined,
+				};
+			});
 
 			const runtimeByServerID: Record<string, MCPServerRuntimeSnapshot | undefined> = {};
 			const authHealthByServerID: Record<string, MCPAuthHealth | undefined> = {};
+			const readErrorsByServerID: Record<string, { runtime?: string; auth?: string } | undefined> = {};
 
 			for (const entry of entries) {
 				runtimeByServerID[entry.serverID] = entry.runtime;
 				authHealthByServerID[entry.serverID] = entry.authHealth;
+				readErrorsByServerID[entry.serverID] = entry.readErrors;
 			}
 
 			return {
 				runtimeByServerID,
 				authHealthByServerID,
+				readErrorsByServerID,
+				pendingAuthorizationReadError,
 			};
 		},
 		[]
@@ -287,7 +343,7 @@ export default function MCPServersPage() {
 	const loadServersForBundle = useCallback(
 		async (bundleID: string, pendingAuthorizations?: MCPOAuthAuthorization[]) => {
 			const servers = await getAllMCPServers(bundleID, undefined, undefined, true);
-			const { runtimeByServerID, authHealthByServerID } = await loadRuntimeAndAuth(
+			const { runtimeByServerID, authHealthByServerID, readErrorsByServerID } = await loadRuntimeAndAuth(
 				bundleID,
 				servers,
 				pendingAuthorizations
@@ -297,6 +353,7 @@ export default function MCPServersPage() {
 				servers,
 				runtimeByServerID,
 				authHealthByServerID,
+				readErrorsByServerID,
 			};
 		},
 		[loadRuntimeAndAuth]
@@ -314,6 +371,7 @@ export default function MCPServersPage() {
 								servers: fresh.servers,
 								runtimeByServerID: fresh.runtimeByServerID,
 								authHealthByServerID: fresh.authHealthByServerID,
+								readErrorsByServerID: fresh.readErrorsByServerID,
 								serverLoadError: undefined,
 							}
 						: bundleData
@@ -323,124 +381,129 @@ export default function MCPServersPage() {
 		[loadServersForBundle]
 	);
 
-	const refreshServerRuntimeAndAuth = useCallback(async (bundleID: string, serverID: string) => {
-		const [runtimeResult, authHealthResult, pendingAuthorizations] = await Promise.all([
-			mcpAPI.getMCPServerStatus(bundleID, serverID).catch(() => undefined),
-			mcpAPI.getMCPServerAuthHealth(bundleID, serverID).catch(() => undefined),
-			mcpAPI.listPendingMCPOAuthAuthorizations().catch(() => []),
-		]);
-
-		setBundles(prev =>
-			prev.map(bundleData => {
-				if (bundleData.bundle.id !== bundleID) {
-					return bundleData;
-				}
-
-				const server = bundleData.servers.find(candidate => candidate.id === serverID);
-				const runtime = getMatchingMCPServerRuntimeSnapshot(bundleID, serverID, runtimeResult);
-				let authHealth = server ? getMatchingMCPAuthHealth(bundleID, server, authHealthResult) : undefined;
-				const pending = pendingAuthorizations.find(
-					authorization =>
-						authorization.bundleID === bundleID && authorization.serverID === serverID && authorization.authorizationURL
-				);
-				if (pending) {
-					authHealth = getPendingOAuthAuthHealth(bundleID, serverID, pending, authHealth);
-				}
-
-				return {
-					...bundleData,
-					runtimeByServerID: {
-						...bundleData.runtimeByServerID,
-						[serverID]: runtime,
-					},
-					authHealthByServerID: {
-						...bundleData.authHealthByServerID,
-						[serverID]: authHealth,
-					},
-				};
-			})
-		);
-	}, []);
-
-	const loadAllBundleData = useCallback(async (): Promise<BundleData[]> => {
-		const [mcpBundles, pendingAuthorizations] = await Promise.all([
+	const loadMCPPageResource = useCallback(async (): Promise<MCPPageResource> => {
+		const [bundlesResult, pendingResult, settingsResult] = await Promise.allSettled([
 			getAllMCPBundles(undefined, true),
-			mcpAPI.listPendingMCPOAuthAuthorizations().catch(() => []),
+			mcpAPI.listPendingMCPOAuthAuthorizations(),
+			mcpAPI.getMCPSettings(),
 		]);
 
-		return Promise.all(
-			mcpBundles.map(async bundle => {
-				try {
-					const { servers, runtimeByServerID, authHealthByServerID } = await loadServersForBundle(
-						bundle.id,
-						pendingAuthorizations
-					);
-					return mergeBundleData(bundle, servers, runtimeByServerID, authHealthByServerID);
-				} catch (error) {
-					return mergeBundleData(bundle, [], {}, {}, getErrorMessage(error, 'Failed to load servers for this bundle.'));
-				}
-			})
-		);
+		if (bundlesResult.status === 'rejected') {
+			throw bundlesResult.reason;
+		}
+
+		const pendingAuthorizations = pendingResult.status === 'fulfilled' ? pendingResult.value : [];
+		const warnings = [
+			pendingResult.status === 'rejected'
+				? getErrorMessage(pendingResult.reason, 'Pending OAuth authorizations could not be loaded.')
+				: undefined,
+			settingsResult.status === 'rejected'
+				? getErrorMessage(settingsResult.reason, 'MCP OAuth settings could not be loaded.')
+				: undefined,
+		].filter((warning): warning is string => Boolean(warning));
+
+		const bundleData = await mapWithConcurrency(bundlesResult.value, MCP_BUNDLE_LOAD_CONCURRENCY, async bundle => {
+			try {
+				const loaded = await loadServersForBundle(bundle.id, pendingAuthorizations);
+				return mergeBundleData(
+					bundle,
+					loaded.servers,
+					loaded.runtimeByServerID,
+					loaded.authHealthByServerID,
+					loaded.readErrorsByServerID
+				);
+			} catch (error) {
+				return mergeBundleData(
+					bundle,
+					[],
+					{},
+					{},
+					{},
+					getErrorMessage(error, 'Failed to load servers for this bundle.')
+				);
+			}
+		});
+
+		return {
+			bundles: bundleData,
+			settingsView: settingsResult.status === 'fulfilled' ? settingsResult.value : undefined,
+			warnings,
+		};
 	}, [loadServersForBundle]);
+
+	const refreshServerRuntimeAndAuth = useCallback(
+		async (bundleID: string, serverID: string, knownPendingAuthorizations?: MCPOAuthAuthorization[]) => {
+			const bundleData = bundlesRef.current.find(item => item.bundle.id === bundleID);
+			const server = bundleData?.servers.find(candidate => candidate.id === serverID);
+
+			if (!bundleData || !server) {
+				throw new Error('MCP server not found.');
+			}
+
+			const refreshed = await loadRuntimeAndAuth(bundleID, [server], knownPendingAuthorizations);
+
+			setBundles(previous =>
+				previous.map(current =>
+					current.bundle.id === bundleID
+						? {
+								...current,
+								runtimeByServerID: {
+									...current.runtimeByServerID,
+									[serverID]: refreshed.runtimeByServerID[serverID],
+								},
+								authHealthByServerID: {
+									...current.authHealthByServerID,
+									[serverID]: refreshed.authHealthByServerID[serverID],
+								},
+								readErrorsByServerID: {
+									...current.readErrorsByServerID,
+									[serverID]: refreshed.readErrorsByServerID[serverID],
+								},
+							}
+						: current
+				)
+			);
+
+			if (refreshed.pendingAuthorizationReadError) {
+				setResourceWarnings(previous =>
+					[...new Set([...previous, refreshed.pendingAuthorizationReadError ?? ''])].filter(Boolean)
+				);
+			}
+		},
+		[loadRuntimeAndAuth]
+	);
 
 	const fetchAll = useCallback(async () => {
 		setLoading(true);
+		setPageLoadError(undefined);
 
 		try {
-			const bundleResults = await loadAllBundleData();
-
-			setBundles(bundleResults);
+			const resource = await loadMCPPageResource();
+			setBundles(resource.bundles);
+			setSettingsView(resource.settingsView);
+			setResourceWarnings(resource.warnings);
 		} catch (error) {
 			console.error('Failed to load MCP bundles:', error);
+			setPageLoadError(error);
 			setAlertMsg(getErrorMessage(error, 'Failed to load MCP bundles. Please try again.'));
 			setShowAlert(true);
+			throw error;
 		} finally {
 			setLoading(false);
 		}
-	}, [loadAllBundleData]);
+	}, [loadMCPPageResource]);
 
 	useEffect(() => {
-		let isCancelled = false;
-
-		void loadAllBundleData()
-			.then(bundleResults => {
-				if (isCancelled) {
-					return;
-				}
-				setBundles(bundleResults);
-			})
-			.catch((error: unknown) => {
-				if (isCancelled) {
-					return;
-				}
-
-				console.error('Failed to load MCP bundles:', error);
-				setAlertMsg(getErrorMessage(error, 'Failed to load MCP bundles. Please try again.'));
-				setShowAlert(true);
-			})
-			.finally(() => {
-				if (isCancelled) {
-					return;
-				}
-				setLoading(false);
-			});
-
-		return () => {
-			isCancelled = true;
-		};
-	}, [loadAllBundleData]);
+		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect
+		void fetchAll().catch(() => undefined);
+	}, [fetchAll]);
 
 	const oauthServerPollKey = useMemo(
 		() =>
 			JSON.stringify(
 				bundles.flatMap(bundleData =>
 					bundleData.servers
-						.filter(
-							server =>
-								server.streamableHttp?.authMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth ||
-								bundleData.authHealthByServerID[server.id]?.state ===
-									MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending
-						)
+						.filter(server => bundleData.bundle.isEnabled && server.enabled)
 						.map(server => [bundleData.bundle.id, server.id] as const)
 				)
 			),
@@ -457,15 +520,36 @@ export default function MCPServersPage() {
 			return;
 		}
 
-		const timer = window.setInterval(() => {
-			void Promise.all(
-				oauthServers.map(({ bundleID, serverID }) =>
-					refreshServerRuntimeAndAuth(bundleID, serverID).catch(() => undefined)
-				)
-			);
-		}, 3000);
+		let polling = false;
+		let cancelled = false;
+
+		const pollRuntime = async () => {
+			if (polling || cancelled) {
+				return;
+			}
+
+			polling = true;
+			try {
+				const [pendingResult] = await Promise.allSettled([mcpAPI.listPendingMCPOAuthAuthorizations()]);
+				const pendingAuthorizations = pendingResult.status === 'fulfilled' ? pendingResult.value : [];
+
+				await mapWithConcurrency(oauthServers, MCP_STATUS_READ_CONCURRENCY, async ({ bundleID, serverID }) => {
+					if (!cancelled) {
+						await refreshServerRuntimeAndAuth(bundleID, serverID, pendingAuthorizations);
+					}
+				});
+			} catch (error) {
+				console.error('MCP runtime polling failed:', error);
+			} finally {
+				polling = false;
+			}
+		};
+
+		void pollRuntime();
+		const timer = window.setInterval(() => void pollRuntime(), 4000);
 
 		return () => {
+			cancelled = true;
 			window.clearInterval(timer);
 		};
 	}, [oauthServerPollKey, refreshServerRuntimeAndAuth]);
@@ -753,63 +837,46 @@ export default function MCPServersPage() {
 	);
 	const handleConnectServer = useCallback(
 		async (bundleID: string, serverID: string) => {
-			let settled = false;
-			let snapShot: MCPServerRuntimeSnapshot | undefined;
-			const connectPromise = mcpAPI.connectMCPServer(bundleID, serverID).finally(() => {
-				settled = true;
-			});
+			const connectResult = withTimeout(
+				mcpAPI.connectMCPServer(bundleID, serverID),
+				MCP_CONNECT_TIMEOUT_MS,
+				`Connecting MCP server "${serverID}" timed out after ${MCP_CONNECT_TIMEOUT_MS / 1000} seconds.`
+			).then(
+				snapshot => ({ snapshot }),
+				(error: unknown) => ({ error })
+			);
 
 			try {
-				// oxlint-disable-next-line no-unmodified-loop-condition
-				while (!settled) {
-					await Promise.race([connectPromise.catch(() => undefined), sleep(1000)]);
+				while (true) {
+					const result = await Promise.race([connectResult, sleep(1000).then(() => undefined)]);
 
-					if (!settled) {
-						await refreshServerRuntimeAndAuth(bundleID, serverID).catch(() => undefined);
+					if (result) {
+						if ('error' in result) {
+							throw result.error;
+						}
+
+						if (result.snapshot) {
+							setBundles(previous =>
+								previous.map(bundleData =>
+									bundleData.bundle.id === bundleID
+										? {
+												...bundleData,
+												runtimeByServerID: {
+													...bundleData.runtimeByServerID,
+													[serverID]: result.snapshot,
+												},
+											}
+										: bundleData
+								)
+							);
+						}
+						break;
 					}
-				}
 
-				snapShot = await connectPromise;
-
-				if (snapShot) {
-					setBundles(prev =>
-						prev.map(bundleData =>
-							bundleData.bundle.id === bundleID
-								? {
-										...bundleData,
-										runtimeByServerID: {
-											...bundleData.runtimeByServerID,
-											[serverID]: snapShot,
-										},
-									}
-								: bundleData
-						)
-					);
+					await refreshServerRuntimeAndAuth(bundleID, serverID);
 				}
 			} finally {
-				await refreshServerRuntimeAndAuth(bundleID, serverID).catch(() => undefined);
-			}
-
-			const authorization = getMCPOAuthAuthorizationResult(snapShot);
-			if (authorization) {
-				setBundles(prev =>
-					prev.map(bundleData =>
-						bundleData.bundle.id === bundleID
-							? {
-									...bundleData,
-									authHealthByServerID: {
-										...bundleData.authHealthByServerID,
-										[serverID]: getPendingOAuthAuthHealth(
-											bundleID,
-											serverID,
-											authorization,
-											bundleData.authHealthByServerID[serverID]
-										),
-									},
-								}
-							: bundleData
-					)
-				);
+				await refreshServerRuntimeAndAuth(bundleID, serverID);
 			}
 		},
 		[refreshServerRuntimeAndAuth]
@@ -897,7 +964,15 @@ export default function MCPServersPage() {
 		async (slug: string, display: string, description?: string) => {
 			const id = getUUIDv7();
 			await mcpAPI.putMCPBundle(id, slug, display, true, description);
-			await fetchAll();
+			try {
+				await fetchAll();
+			} catch (error) {
+				console.error('MCP bundle was created but refresh failed:', error);
+				setAlertMsg(
+					'MCP bundle was created, but the page could not be refreshed. Reload the page before making destructive changes.'
+				);
+				setShowAlert(true);
+			}
 		},
 		[fetchAll]
 	);
@@ -905,19 +980,39 @@ export default function MCPServersPage() {
 	const allServerConfigs = useMemo(() => bundles.flatMap(bundleData => bundleData.servers), [bundles]);
 	const allServerIDs = bundles.flatMap(bundleData => bundleData.servers.map(server => server.id));
 
-	useEffect(() => {
-		let cancelled = false;
-		void mcpAPI
-			.getMCPSettings()
-			.then(view => {
-				if (!cancelled) {
-					setSettingsView(view);
-				}
-			})
-			.catch(() => undefined);
-		return () => {
-			cancelled = true;
+	const selectedOAuthAuthorization = useMemo(() => {
+		if (!oauthAuthorizationTarget) {
+			return null;
+		}
+
+		const bundleData = bundles.find(item => item.bundle.id === oauthAuthorizationTarget.bundleID);
+		const server = bundleData?.servers.find(candidate => candidate.id === oauthAuthorizationTarget.serverID);
+
+		if (!bundleData || !server) {
+			return null;
+		}
+
+		return {
+			bundle: bundleData.bundle,
+			server,
+			authHealth: bundleData.authHealthByServerID[server.id],
 		};
+	}, [bundles, oauthAuthorizationTarget]);
+
+	const requestOAuthAuthorization = useCallback((bundleID: string, serverID: string) => {
+		const bundleData = bundlesRef.current.find(item => item.bundle.id === bundleID);
+		const server = bundleData?.servers.find(candidate => candidate.id === serverID);
+		const authHealth = server ? bundleData?.authHealthByServerID[server.id] : undefined;
+
+		if (!server || !isOAuthAuthorizationRelevant(server, authHealth)) {
+			setAlertMsg(
+				'OAuth authorization is no longer available for this MCP server. Refresh the server status and try again.'
+			);
+			setShowAlert(true);
+			return;
+		}
+
+		setOAuthAuthorizationTarget({ bundleID, serverID });
 	}, []);
 
 	const handleSaveSettings = useCallback(async (oauthLoopbackListenAddr: string) => {
@@ -969,6 +1064,21 @@ export default function MCPServersPage() {
 				/>
 
 				<ManagementPageContent width="wide">
+					{pageLoadError ? (
+						<ManagementResourceError
+							title="MCP servers could not be loaded"
+							error={pageLoadError}
+							isRetrying={loading}
+							onRetry={fetchAll}
+						/>
+					) : null}
+
+					{resourceWarnings.map(warning => (
+						<div key={warning} className="alert alert-warning rounded-2xl text-sm">
+							<span>{warning}</span>
+						</div>
+					))}
+
 					{bundles.length === 0 && <p className="mt-8 text-center text-sm">No MCP bundles configured yet.</p>}
 
 					{bundles.map(bundleData => (
@@ -980,6 +1090,7 @@ export default function MCPServersPage() {
 							prefillServers={allServerConfigs}
 							runtimeByServerID={bundleData.runtimeByServerID}
 							authHealthByServerID={bundleData.authHealthByServerID}
+							readErrorsByServerID={bundleData.readErrorsByServerID}
 							serverLoadError={bundleData.serverLoadError}
 							onRefreshServers={() => {
 								return refreshBundleServers(bundleData.bundle.id);
@@ -996,6 +1107,7 @@ export default function MCPServersPage() {
 								backendAPI.openURL(url);
 							}}
 							onCancelOAuth={handleCancelOAuth}
+							onRequestOAuthAuthorization={requestOAuthAuthorization}
 							onDeleteBundleRequested={bundleID => {
 								if (bundleID === BaseMCPBundleID) {
 									setAlertMsg('The base MCP bundle cannot be deleted.');
@@ -1039,6 +1151,30 @@ export default function MCPServersPage() {
 						setIsSettingsOpen(false);
 					}}
 					onSubmit={handleSaveSettings}
+				/>
+				<MCPOAuthAuthorizationModal
+					isOpen={selectedOAuthAuthorization !== null}
+					server={selectedOAuthAuthorization?.server ?? null}
+					authHealth={selectedOAuthAuthorization?.authHealth}
+					onClose={() => {
+						setOAuthAuthorizationTarget(null);
+					}}
+					onOpenURL={url => {
+						backendAPI.openURL(url);
+					}}
+					onCancel={async () => {
+						if (!selectedOAuthAuthorization) {
+							return;
+						}
+
+						try {
+							await handleCancelOAuth(selectedOAuthAuthorization.bundle.id, selectedOAuthAuthorization.server.id);
+							setOAuthAuthorizationTarget(null);
+						} catch (error) {
+							setAlertMsg(getErrorMessage(error, 'Failed to cancel OAuth authorization.'));
+							setShowAlert(true);
+						}
+					}}
 				/>
 				<ActionDeniedAlertModal
 					isOpen={showAlert}

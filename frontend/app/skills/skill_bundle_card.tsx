@@ -1,12 +1,21 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { FiChevronDown, FiChevronUp, FiEdit2, FiEye, FiGitBranch, FiPlus, FiTrash2 } from 'react-icons/fi';
 
 import type { Skill, SkillBundle } from '@/spec/skill';
 import { SkillPresenceStatus } from '@/spec/skill';
 
+import { usePendingActions } from '@/hooks/use_pending_actions';
+
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
+import { ActionRow } from '@/components/managementui/action_row';
+import { EnabledControl } from '@/components/managementui/enabled_control';
+import { ManagementBundleCard } from '@/components/managementui/management_bundle_card';
+import { ManagementEmptyState } from '@/components/managementui/management_empty_state';
+import { ManagementItemCard } from '@/components/managementui/management_item_card';
+import { MetadataPill } from '@/components/managementui/metadata_pill';
+import { StatusBadge } from '@/components/managementui/status_badge';
 
 import type { SkillInsertFilter } from '@/skills/lib/skill_artifact_utils';
 import {
@@ -45,20 +54,20 @@ interface SkillBundleCardProps {
 	onRequestBundleDelete: (bundle: SkillBundle) => void;
 }
 
-function PresenceBadge({ skill }: { skill: Skill }) {
+function PresenceStatusBadge({ skill }: { skill: Skill }) {
 	const p = skill.presence;
 	const status = p?.status ?? SkillPresenceStatus.Unknown;
 
-	const { label, cls } = (() => {
+	const { label, tone } = (() => {
 		switch (status) {
 			case SkillPresenceStatus.Present:
-				return { label: 'Present', cls: 'badge badge-success' };
+				return { label: 'Present', tone: 'success' as const };
 			case SkillPresenceStatus.Missing:
-				return { label: 'Missing', cls: 'badge badge-warning' };
+				return { label: 'Missing', tone: 'warning' as const };
 			case SkillPresenceStatus.Error:
-				return { label: 'Error', cls: 'badge badge-error' };
+				return { label: 'Error', tone: 'error' as const };
 			default:
-				return { label: 'Unknown', cls: 'badge badge-ghost' };
+				return { label: 'Unknown', tone: 'neutral' as const };
 		}
 	})();
 
@@ -73,12 +82,14 @@ function PresenceBadge({ skill }: { skill: Skill }) {
 		.join('\n');
 
 	return (
-		<span className="tooltip tooltip-top" data-tip={tooltip}>
-			<span className={`${cls} badge-sm h-auto max-w-full px-2 py-1 text-center wrap-break-word whitespace-normal`}>
-				{label}
-			</span>
-		</span>
+		<StatusBadge tone={tone} title={tooltip}>
+			{label}
+		</StatusBadge>
 	);
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+	return error instanceof Error && error.message.trim() ? error.message : fallback;
 }
 
 export function SkillBundleCard({
@@ -98,33 +109,19 @@ export function SkillBundleCard({
 }: SkillBundleCardProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
 
-	const [busyBundleToggle, setBusyBundleToggle] = useState(false);
-	const [busySkillIDs, setBusySkillIDs] = useState<Set<string>>(new Set());
-
 	const [isDeleteSkillModalOpen, setIsDeleteSkillModalOpen] = useState(false);
-	const [isDeleteSkillPending, setIsDeleteSkillPending] = useState(false);
 	const [skillToDelete, setSkillToDelete] = useState<Skill | null>(null);
 
 	const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
-	const [isSkillSubmitPending, setIsSkillSubmitPending] = useState(false);
 	const [skillModalMode, setSkillModalMode] = useState<SkillModalMode>('add');
 	const [skillToEdit, setSkillToEdit] = useState<Skill | undefined>(undefined);
 
 	const [isBundleDetailsOpen, setIsBundleDetailsOpen] = useState(false);
 
 	const [showAlert, setShowAlert] = useState(false);
-	const [isRefreshingSkills, setIsRefreshingSkills] = useState(false);
 	const [alertMsg, setAlertMsg] = useState('');
 
-	const isMountedRef = useRef(false);
-
-	useEffect(() => {
-		isMountedRef.current = true;
-
-		return () => {
-			isMountedRef.current = false;
-		};
-	}, []);
+	const { isPending, runAction } = usePendingActions();
 
 	const existingSkillItems = useMemo(
 		() =>
@@ -147,57 +144,30 @@ export function SkillBundleCard({
 		[insertFilter, searchQuery, skills, tagFilters]
 	);
 
-	const toggleBundleEnable = async () => {
-		if (busyBundleToggle) {
-			return;
-		}
-
-		setBusyBundleToggle(true);
-
+	const runActionWithAlert = async (key: string, action: () => Promise<void>, fallback: string) => {
 		try {
-			await onToggleBundleEnable(bundle.id, !bundle.isEnabled);
+			await runAction(key, action);
 		} catch (err) {
-			console.error('Toggle skill bundle enable failed:', err);
-
-			if (isMountedRef.current) {
-				setAlertMsg('Failed to toggle bundle enable state.');
-				setShowAlert(true);
-			}
-		} finally {
-			if (isMountedRef.current) {
-				setBusyBundleToggle(false);
-			}
+			setAlertMsg(getErrorMessage(err, fallback));
+			setShowAlert(true);
+			throw err;
 		}
 	};
 
-	const patchSkillEnable = async (skill: Skill) => {
-		if (busySkillIDs.has(skill.id)) {
-			return;
-		}
+	const toggleBundleEnable = (nextEnabled: boolean) => {
+		void runActionWithAlert(
+			'bundle:toggle',
+			() => onToggleBundleEnable(bundle.id, nextEnabled),
+			'Failed to toggle bundle enable state.'
+		).catch(() => undefined);
+	};
 
-		setBusySkillIDs(prev => {
-			const next = new Set([...prev, skill.id]);
-			return next;
-		});
-
-		try {
-			await onToggleSkillEnable(bundle.id, skill.id, skill.slug, !skill.isEnabled);
-		} catch (err) {
-			console.error('Toggle skill failed:', err);
-
-			if (isMountedRef.current) {
-				setAlertMsg('Failed to toggle skill.');
-				setShowAlert(true);
-			}
-		} finally {
-			if (isMountedRef.current) {
-				setBusySkillIDs(prev => {
-					const next = new Set(prev);
-					next.delete(skill.id);
-					return next;
-				});
-			}
-		}
+	const patchSkillEnable = (skill: Skill, nextEnabled: boolean) => {
+		void runActionWithAlert(
+			`${skill.id}:toggle`,
+			() => onToggleSkillEnable(bundle.id, skill.id, skill.slug, nextEnabled),
+			'Failed to toggle skill.'
+		).catch(() => undefined);
 	};
 
 	const requestDeleteSkill = (skill: Skill) => {
@@ -212,31 +182,20 @@ export function SkillBundleCard({
 	};
 
 	const confirmDeleteSkill = async () => {
-		if (!skillToDelete || isDeleteSkillPending) {
+		if (!skillToDelete) {
 			return;
 		}
 
-		setIsDeleteSkillPending(true);
-		let deleted = false;
-
 		try {
-			await onDeleteSkill(bundle.id, skillToDelete.id, skillToDelete.slug);
-			deleted = true;
-		} catch (err) {
-			console.error('Delete skill failed:', err);
-
-			if (isMountedRef.current) {
-				setAlertMsg(err instanceof Error ? err.message : 'Failed to delete skill.');
-				setShowAlert(true);
-			}
-		} finally {
-			if (isMountedRef.current) {
-				setIsDeleteSkillPending(false);
-				if (deleted) {
-					setIsDeleteSkillModalOpen(false);
-					setSkillToDelete(null);
-				}
-			}
+			await runActionWithAlert(
+				`${skillToDelete.id}:delete`,
+				() => onDeleteSkill(bundle.id, skillToDelete.id, skillToDelete.slug),
+				'Failed to delete skill.'
+			);
+			setIsDeleteSkillModalOpen(false);
+			setSkillToDelete(null);
+		} catch {
+			// ok.
 		}
 	};
 
@@ -271,239 +230,207 @@ export function SkillBundleCard({
 	};
 
 	const refreshSkills = async () => {
-		if (isRefreshingSkills) {
-			return;
-		}
-
-		setIsRefreshingSkills(true);
 		try {
-			await onRefreshSkills();
+			await runAction('bundle:refresh', onRefreshSkills);
 		} catch (error) {
-			setAlertMsg(error instanceof Error ? error.message : 'Failed to reload bundle skills.');
+			setAlertMsg(getErrorMessage(error, 'Failed to reload bundle skills.'));
 			setShowAlert(true);
-		} finally {
-			setIsRefreshingSkills(false);
 		}
 	};
 
 	const handleSubmitSkill = async (partial: SkillUpsertInput) => {
-		if (isSkillSubmitPending) {
-			return;
-		}
-
-		setIsSkillSubmitPending(true);
-
-		try {
-			await onSubmitSkill(bundle.id, partial, skillToEdit?.slug);
-		} finally {
-			if (isMountedRef.current) {
-				setIsSkillSubmitPending(false);
-			}
-		}
+		const existingSkillSlug = skillModalMode === 'edit' ? skillToEdit?.slug : undefined;
+		await runAction(`${skillToEdit?.id ?? 'new'}:save`, () => onSubmitSkill(bundle.id, partial, existingSkillSlug));
 	};
 
 	return (
-		<section className="bg-base-100 border-base-content/10 mb-6 rounded-2xl border p-4 shadow-sm">
-			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-				<div className="min-w-0">
-					<h3 className="truncate text-sm font-semibold">
-						<span className="capitalize">{bundle.displayName || bundle.slug}</span>
-						<span className="text-base-content/60 ml-1">({bundle.slug})</span>
-					</h3>
-					<div className="text-base-content/60 mt-1 text-xs">
-						{bundle.isBuiltIn ? 'Built-in bundle' : 'Custom bundle'}
-					</div>
-				</div>
-
-				<div className="flex flex-wrap items-center justify-end gap-3">
-					<button
-						type="button"
-						className="btn btn-sm btn-ghost rounded-xl"
-						title="View bundle details"
-						onClick={e => {
-							e.stopPropagation();
-							setIsBundleDetailsOpen(true);
-						}}
-					>
-						<FiEye size={16} />
-						<span>Details</span>
-					</button>
-
-					<div className="flex items-center gap-1">
-						<label htmlFor={`skill-bundle-${bundle.id}`} className="text-sm">
-							Enabled
-						</label>
-						<input
-							id={`skill-bundle-${bundle.id}`}
-							type="checkbox"
-							className="toggle toggle-accent"
-							checked={bundle.isEnabled}
-							onChange={toggleBundleEnable}
-							disabled={busyBundleToggle}
-							aria-label={`Enable ${bundle.displayName || bundle.slug}`}
-						/>
-					</div>
-
+		<>
+			<ManagementBundleCard
+				title={bundle.displayName || bundle.slug}
+				identity={
+					<span className="font-mono">
+						{bundle.slug} / {bundle.id}
+					</span>
+				}
+				description={bundle.description}
+				status={
+					<>
+						<StatusBadge tone={bundle.isEnabled ? 'success' : 'neutral'}>
+							{bundle.isEnabled ? 'Enabled' : 'Disabled'}
+						</StatusBadge>
+						<StatusBadge>{bundle.isBuiltIn ? 'Built-in' : 'Custom'}</StatusBadge>
+					</>
+				}
+				disclosure={
 					<button
 						type="button"
 						className="btn btn-sm btn-ghost rounded-xl"
 						aria-expanded={isExpanded}
 						onClick={() => {
-							setIsExpanded(prev => !prev);
+							setIsExpanded(previous => !previous);
 						}}
 					>
-						<span className="text-sm whitespace-nowrap">
+						<span className="whitespace-nowrap">
 							Skills: {visibleSkills.length}
-							{insertFilter !== 'all' ? <span className="text-base-content/60"> / {skills.length}</span> : null}
+							{insertFilter !== 'all' ? ` / ${skills.length}` : ''}
 						</span>
 						{isExpanded ? <FiChevronUp /> : <FiChevronDown />}
 					</button>
-				</div>
-			</div>
-
-			{skillLoadError ? (
-				<div className="alert alert-warning mt-3 rounded-2xl text-sm">
-					<div className="grow">
-						<div className="font-semibold">Skills could not be loaded for this bundle</div>
-						<div>{skillLoadError}</div>
-					</div>
-					<button
-						type="button"
-						className="btn btn-sm rounded-xl"
-						onClick={() => void refreshSkills()}
-						disabled={isRefreshingSkills}
-					>
-						{isRefreshingSkills ? 'Reloading…' : 'Retry'}
-					</button>
-				</div>
-			) : null}
-
-			{isExpanded && (
-				<div className="mt-8 space-y-4">
-					{insertFilter !== 'all' && (
-						<div className="alert alert-info rounded-2xl py-3 text-sm">
-							<div>
-								Showing only <span className="font-semibold">{getSkillInsertShortLabel(insertFilter)}</span> skills.{' '}
-								{getSkillInsertDescription(insertFilter)}
-							</div>
-						</div>
-					)}
-					{(searchQuery.trim() || tagFilters.length > 0) && (
-						<div className="text-base-content/70 rounded-2xl px-1 text-xs">
-							Additional filters active: {searchQuery.trim() ? `search "${searchQuery.trim()}"` : ''}
-							{searchQuery.trim() && tagFilters.length > 0 ? ' · ' : ''}
-							{tagFilters.length > 0 ? `tags ${tagFilters.join(', ')}` : ''}
-						</div>
-					)}
-
-					<div className="space-y-3">
-						{visibleSkills.map(skill => {
-							const insert = normalizeSkillInsert(skill.insert).value;
-							const instructionUseReason = getSkillInstructionPromptEligibilityReason(skill);
-							const usage =
-								insert === 'user-message'
-									? 'Composer template'
-									: instructionUseReason
-										? 'Session only'
-										: 'System prompt eligible';
-
-							return (
-								<article
-									key={skill.id}
-									className="border-base-content/10 hover:border-base-content/20 rounded-2xl border p-4 transition-colors"
+				}
+				actionLeading={
+					<EnabledControl
+						id={`skill-bundle-${bundle.id}`}
+						checked={bundle.isEnabled}
+						onChange={toggleBundleEnable}
+						busy={isPending('bundle:toggle')}
+						compact={false}
+					/>
+				}
+				actions={
+					<>
+						<button
+							type="button"
+							className="btn btn-sm btn-ghost rounded-xl"
+							onClick={() => {
+								setIsBundleDetailsOpen(true);
+							}}
+						>
+							<FiEye size={16} />
+							<span>Details</span>
+						</button>
+						{!bundle.isBuiltIn ? (
+							<>
+								<button
+									type="button"
+									className="btn btn-sm btn-ghost rounded-xl"
+									disabled={!bundle.isEnabled || Boolean(skillLoadError)}
+									onClick={() => {
+										openSkillModal('add');
+									}}
 								>
-									<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-										<div className="min-w-0">
-											<div className="truncate font-medium" title={skill.displayName || skill.name}>
-												{skill.displayName || skill.name || skill.slug}
-											</div>
-											<div className="text-base-content/60 mt-1 text-xs break-all">
-												{skill.slug} · {skill.name}
-											</div>
-											{skill.description ? (
-												<p className="text-base-content/70 mt-2 max-h-10 overflow-hidden text-sm">
-													{skill.description}
-												</p>
-											) : null}
-										</div>
+									<FiPlus size={16} />
+									<span>Add Skill</span>
+								</button>
+								<button
+									type="button"
+									className="btn btn-sm btn-ghost rounded-xl"
+									disabled={skills.length > 0 || Boolean(skillLoadError)}
+									onClick={() => {
+										onRequestBundleDelete(bundle);
+									}}
+								>
+									<FiTrash2 size={16} />
+									<span>Delete Bundle</span>
+								</button>
+							</>
+						) : null}
+					</>
+				}
+			>
+				{skillLoadError ? (
+					<div className="alert alert-warning mt-3 rounded-2xl text-sm">
+						<div className="grow">
+							<div className="font-semibold">Skills could not be loaded for this bundle</div>
+							<div>{skillLoadError}</div>
+						</div>
+						<button
+							type="button"
+							className="btn btn-sm rounded-xl"
+							onClick={() => void refreshSkills()}
+							disabled={isPending('bundle:refresh')}
+						>
+							{isPending('bundle:refresh') ? 'Reloading…' : 'Retry'}
+						</button>
+					</div>
+				) : null}
 
-										<div className="flex shrink-0 flex-wrap items-center gap-2">
-											<PresenceBadge skill={skill} />
-											<span
-												className={`badge h-auto px-2 py-1 text-center whitespace-normal ${
-													skill.isEnabled ? 'badge-success' : 'badge-neutral'
-												}`}
-											>
-												{skill.isEnabled ? 'Enabled' : 'Disabled'}
-											</span>
-										</div>
-									</div>
+				{isExpanded && (
+					<div className="mt-6 space-y-4">
+						{insertFilter !== 'all' && (
+							<div className="alert alert-info rounded-2xl py-3 text-sm">
+								<div>
+									Showing only <span className="font-semibold">{getSkillInsertShortLabel(insertFilter)}</span> skills.{' '}
+									{getSkillInsertDescription(insertFilter)}
+								</div>
+							</div>
+						)}
+						{(searchQuery.trim() || tagFilters.length > 0) && (
+							<div className="text-base-content/70 rounded-2xl px-1 text-xs">
+								Additional filters active: {searchQuery.trim() ? `search "${searchQuery.trim()}"` : ''}
+								{searchQuery.trim() && tagFilters.length > 0 ? ' · ' : ''}
+								{tagFilters.length > 0 ? `tags ${tagFilters.join(', ')}` : ''}
+							</div>
+						)}
 
-									<div className="mt-3 flex flex-wrap gap-2 text-xs">
-										<span
-											className="border-base-content/20 rounded-xl border px-2 py-1"
-											title={getSkillInsertDescription(insert)}
-										>
-											{getSkillInsertLabel(skill.insert)}
-										</span>
-										<span
-											className="border-base-content/20 rounded-xl border px-2 py-1"
-											title={getSkillArgumentTooltip(skill.arguments)}
-										>
-											{getSkillArgumentCountLabel(skill.arguments)}
-										</span>
-										<span
-											className="border-base-content/20 rounded-xl border px-2 py-1"
-											title={getSkillResourceTooltip(skill.resources)}
-										>
-											{getSkillResourceCountLabel(skill.resources)}
-										</span>
-										<span className="border-base-content/20 rounded-xl border px-2 py-1" title={instructionUseReason}>
-											{usage}
-										</span>
-										{skill.isBuiltIn ? (
-											<span className="border-base-content/20 rounded-xl border px-2 py-1">Built-in</span>
+						<div className="space-y-3">
+							{visibleSkills.map(skill => {
+								const insert = normalizeSkillInsert(skill.insert).value;
+								const instructionUseReason = getSkillInstructionPromptEligibilityReason(skill);
+								const usage =
+									insert === 'user-message'
+										? 'Composer template'
+										: instructionUseReason
+											? 'Session only'
+											: 'System prompt eligible';
+
+								return (
+									<ManagementItemCard
+										key={skill.id}
+										title={skill.displayName || skill.name || skill.slug}
+										subtitle={`${skill.slug} / ${skill.name}`}
+										description={skill.description}
+										status={
+											<>
+												<PresenceStatusBadge skill={skill} />
+												<StatusBadge tone={skill.isEnabled ? 'success' : 'neutral'}>
+													{skill.isEnabled ? 'Enabled' : 'Disabled'}
+												</StatusBadge>
+											</>
+										}
+										metadata={
+											<>
+												<MetadataPill label="Insert" title={getSkillInsertDescription(insert)}>
+													{getSkillInsertLabel(skill.insert)}
+												</MetadataPill>
+												<MetadataPill label="Arguments" title={getSkillArgumentTooltip(skill.arguments)}>
+													{getSkillArgumentCountLabel(skill.arguments)}
+												</MetadataPill>
+												<MetadataPill label="Resources" title={getSkillResourceTooltip(skill.resources)}>
+													{getSkillResourceCountLabel(skill.resources)}
+												</MetadataPill>
+												<MetadataPill label="Usage" title={instructionUseReason}>
+													{usage}
+												</MetadataPill>
+												{(skill.tags ?? []).map(tag => (
+													<MetadataPill key={tag} label="Tag">
+														{tag}
+													</MetadataPill>
+												))}
+												{skill.isBuiltIn ? <MetadataPill>Built-in</MetadataPill> : null}
+											</>
+										}
+									>
+										{skill.runtimeWarnings?.length ? (
+											<div className="text-warning mt-3 text-xs">
+												{skill.runtimeWarnings.length} runtime warning
+												{skill.runtimeWarnings.length === 1 ? '' : 's'}
+											</div>
 										) : null}
-									</div>
 
-									{(skill.tags ?? []).length > 0 ? (
-										<div className="mt-3 flex flex-wrap gap-1">
-											{(skill.tags ?? []).map(tag => (
-												<span key={tag} className="border-base-content/20 rounded-lg border px-2 py-0.5 text-xs">
-													{tag}
-												</span>
-											))}
-										</div>
-									) : null}
-
-									{skill.runtimeWarnings?.length ? (
-										<div className="text-warning mt-3 text-xs">
-											{skill.runtimeWarnings.length} runtime warning
-											{skill.runtimeWarnings.length === 1 ? '' : 's'}
-										</div>
-									) : null}
-
-									<div className="border-base-content/10 mt-4 flex flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
-										<div className="flex items-center gap-3">
-											<label htmlFor={`skill-${skill.id}`} className="text-sm">
-												Enabled
-											</label>
-											<input
-												id={`skill-${skill.id}`}
-												type="checkbox"
-												className="toggle toggle-accent toggle-sm"
-												checked={skill.isEnabled}
-												onChange={() => patchSkillEnable(skill)}
-												disabled={busySkillIDs.has(skill.id) || busyBundleToggle || !bundle.isEnabled}
-												title={!bundle.isEnabled ? 'Enable the bundle first.' : undefined}
-												aria-label={`Enable ${skill.displayName || skill.name}`}
-											/>
-											{busySkillIDs.has(skill.id) ? (
-												<span className="loading loading-spinner loading-xs" aria-label="Updating skill" />
-											) : null}
-										</div>
-
-										<div className="flex flex-wrap justify-end gap-2">
+										<ActionRow
+											leading={
+												<EnabledControl
+													id={`skill-${bundle.id}-${skill.id}`}
+													checked={skill.isEnabled}
+													onChange={enabled => {
+														patchSkillEnable(skill, enabled);
+													}}
+													disabled={!bundle.isEnabled}
+													busy={isPending(`${skill.id}:toggle`)}
+													title={!bundle.isEnabled ? 'Enable the bundle first.' : undefined}
+												/>
+											}
+										>
 											<button
 												type="button"
 												className="btn btn-sm btn-ghost rounded-xl"
@@ -545,75 +472,31 @@ export function SkillBundleCard({
 												onClick={() => {
 													requestDeleteSkill(skill);
 												}}
-												disabled={skill.isBuiltIn || bundle.isBuiltIn}
+												disabled={skill.isBuiltIn || bundle.isBuiltIn || isPending(`${skill.id}:delete`)}
 												title={skill.isBuiltIn || bundle.isBuiltIn ? 'Built-in items cannot be deleted' : 'Delete'}
 											>
 												<FiTrash2 size={15} />
 												<span>Delete</span>
 											</button>
-										</div>
-									</div>
-								</article>
-							);
-						})}
+										</ActionRow>
+									</ManagementItemCard>
+								);
+							})}
 
-						{skills.length === 0 ? (
-							<div className="border-base-content/10 rounded-2xl border py-6 text-center text-sm">
-								No skills in this bundle.
-							</div>
-						) : null}
+							{skills.length === 0 ? <ManagementEmptyState>No skills in this bundle.</ManagementEmptyState> : null}
 
-						{skills.length > 0 && visibleSkills.length === 0 ? (
-							<div className="border-base-content/10 rounded-2xl border py-6 text-center text-sm">
-								No skills match the current filters.
-							</div>
-						) : null}
-					</div>
-
-					{!bundle.isBuiltIn && (
-						<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-							<button
-								type="button"
-								className="btn btn-md btn-ghost flex items-center rounded-2xl"
-								disabled={skills.length > 0 || Boolean(skillLoadError)}
-								title={
-									skillLoadError
-										? 'Reload bundle skills before deleting the bundle.'
-										: skills.length > 0
-											? 'Delete all skills from this bundle first.'
-											: 'Delete Bundle'
-								}
-								onClick={() => {
-									onRequestBundleDelete(bundle);
-								}}
-							>
-								<FiTrash2 /> <span className="ml-1">Delete Bundle</span>
-							</button>
-
-							<button
-								type="button"
-								className="btn btn-md btn-ghost flex items-center rounded-2xl"
-								disabled={!bundle.isEnabled}
-								title={
-									!bundle.isEnabled
-										? 'Enable the bundle first.'
-										: 'Create a managed SKILL.md artifact or register an existing filesystem skill folder.'
-								}
-								onClick={() => {
-									openSkillModal('add', undefined);
-								}}
-							>
-								<FiPlus /> <span className="ml-1">Add Skill or Template</span>
-							</button>
+							{skills.length > 0 && visibleSkills.length === 0 ? (
+								<ManagementEmptyState>No skills match the current filters.</ManagementEmptyState>
+							) : null}
 						</div>
-					)}
-				</div>
-			)}
+					</div>
+				)}
+			</ManagementBundleCard>
 
 			<DeleteConfirmationModal
 				isOpen={isDeleteSkillModalOpen}
 				onClose={() => {
-					if (!isDeleteSkillPending) {
+					if (!skillToDelete || !isPending(`${skillToDelete.id}:delete`)) {
 						setIsDeleteSkillModalOpen(false);
 						setSkillToDelete(null);
 					}
@@ -654,6 +537,6 @@ export function SkillBundleCard({
 				}}
 				message={alertMsg}
 			/>
-		</section>
+		</>
 	);
 }

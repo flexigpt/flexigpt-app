@@ -111,6 +111,9 @@ const AddModeDefaults = {
 	timeout: 300,
 };
 
+const EXISTING_FIELD_CLEAR_UNSUPPORTED_MESSAGE =
+	'Clearing an existing value is unavailable until the backend supports nullable patch fields or explicit clear flags. Enter a replacement value instead.';
+
 function buildOutputParamFromForm(
 	outputFormatKind: OutputFormatKindSelection,
 	outputVerbosity: OutputVerbositySelection,
@@ -247,6 +250,7 @@ type ValidationField =
 	| 'maxPromptLength'
 	| 'maxOutputLength'
 	| 'timeout'
+	| 'cacheControlKey'
 	| 'reasoningTokens';
 
 type ValidationErrors = Partial<Record<ValidationField, string>>;
@@ -365,6 +369,16 @@ function AddEditModelPresetModalContent({
 	const supportsCacheKey =
 		topLevelCacheCapabilities?.supportsKey === true || Boolean(initialData?.cacheControl?.key?.trim());
 	const canDisableCacheControl = mode === 'add' || !initialData?.cacheControl;
+	const cannotClearExistingReasoning = isEditMode && initialData?.reasoning !== undefined;
+	const cannotClearExistingOutput = isEditMode && initialData?.outputParam !== undefined;
+	const cannotClearExistingCacheTTL = isEditMode && initialData?.cacheControl?.ttl !== undefined;
+	const cannotClearExistingCacheKey = isEditMode && Boolean(initialData?.cacheControl?.key?.trim());
+	const hasUnsupportedExistingClear =
+		cannotClearExistingReasoning ||
+		cannotClearExistingOutput ||
+		Boolean(initialData?.cacheControl) ||
+		initialData?.temperature !== undefined ||
+		initialData?.timeout !== undefined;
 	const cacheControlKindItems = useMemo(
 		() => buildCacheControlKindDropdownItems(supportedCacheKinds),
 		[supportedCacheKinds]
@@ -627,6 +641,18 @@ function AddEditModelPresetModalContent({
 			maybeValidateNumeric('maxOutputLength', { min: 1 });
 			maybeValidateNumeric('timeout', { min: 1 });
 
+			if (isEditMode && initialData?.temperature !== undefined && !fd.temperature.trim()) {
+				nextErrors.temperature = EXISTING_FIELD_CLEAR_UNSUPPORTED_MESSAGE;
+			}
+
+			if (isEditMode && initialData?.timeout !== undefined && !fd.timeout.trim()) {
+				nextErrors.timeout = EXISTING_FIELD_CLEAR_UNSUPPORTED_MESSAGE;
+			}
+
+			if (cannotClearExistingCacheKey && !fd.cacheControlKey.trim()) {
+				nextErrors.cacheControlKey = EXISTING_FIELD_CLEAR_UNSUPPORTED_MESSAGE;
+			}
+
 			if (fd.reasoningSupport && fd.reasoningType === ReasoningType.HybridWithTokens) {
 				if ((fd.reasoningTokens ?? '').trim() === '') {
 					nextErrors.reasoningTokens = 'Reasoning Tokens is required for Hybrid mode.';
@@ -647,7 +673,17 @@ function AddEditModelPresetModalContent({
 				Object.entries(nextErrors).filter(([key]) => nextErrors[key as ValidationField] !== undefined)
 			) as ValidationErrors;
 		},
-		[existingModels, formData, initialData?.reasoning, initialData?.temperature, isEditMode, isReadOnly, modelPresetID]
+		[
+			cannotClearExistingCacheKey,
+			existingModels,
+			formData,
+			initialData?.reasoning,
+			initialData?.temperature,
+			initialData?.timeout,
+			isEditMode,
+			isReadOnly,
+			modelPresetID,
+		]
 	);
 
 	const runValidation = useCallback(() => computeValidation(), [computeValidation]);
@@ -831,6 +867,15 @@ function AddEditModelPresetModalContent({
 								Only changed fields are sent while editing.
 							</div>
 						)}
+
+						{isEditMode && hasUnsupportedExistingClear ? (
+							<div className="border-warning/40 bg-warning/10 rounded-xl border px-3 py-2 text-xs">
+								Existing model configuration can be changed, but some values cannot be cleared yet. The current patch
+								API omits undefined fields, so treating an empty form field as a clear operation would silently leave
+								the stored value unchanged.
+							</div>
+						) : null}
+
 						{mode === 'add' && (
 							<div className="grid grid-cols-12 items-center gap-2">
 								<label className="label col-span-3">
@@ -1034,8 +1079,18 @@ function AddEditModelPresetModalContent({
 									className="toggle toggle-accent disabled:opacity-80"
 									checked={formData.reasoningSupport}
 									onChange={handleChange}
-									disabled={isReadOnly || isSubmitting}
+									disabled={isReadOnly || isSubmitting || cannotClearExistingReasoning}
+									title={
+										cannotClearExistingReasoning
+											? 'Removing stored reasoning configuration is not supported by the current patch API.'
+											: undefined
+									}
 								/>
+								{cannotClearExistingReasoning ? (
+									<span className="text-base-content/70 ml-2 text-xs">
+										Existing reasoning configuration cannot be cleared yet.
+									</span>
+								) : null}
 							</div>
 						</div>
 
@@ -1260,7 +1315,8 @@ function AddEditModelPresetModalContent({
 										/>
 										{!canDisableCacheControl && (
 											<span className="text-xs opacity-70">
-												Existing cache control can be changed, but clearing it is not supported.
+												Existing cache control can be changed, but clearing it is not supported by the current patch
+												API.
 											</span>
 										)}
 									</div>
@@ -1306,6 +1362,9 @@ function AddEditModelPresetModalContent({
 														dropdownItems={cacheControlTTLItems}
 														selectedKey={formData.cacheControlTTL}
 														onChange={ttl => {
+															if (cannotClearExistingCacheTTL && ttl === CACHE_CONTROL_TTL_PROVIDER_DEFAULT) {
+																return;
+															}
 															setFormData(prev => ({ ...prev, cacheControlTTL: ttl }));
 														}}
 														filterDisabled={false}
@@ -1314,6 +1373,12 @@ function AddEditModelPresetModalContent({
 													/>
 												)}
 											</div>
+											{cannotClearExistingCacheTTL ? (
+												<div className="text-base-content/70 col-span-12 text-xs sm:col-span-9 sm:col-start-4">
+													An existing explicit cache TTL cannot be cleared to provider default until clear semantics are
+													supported by the API.
+												</div>
+											) : null}
 										</div>
 
 										{supportsCacheKey && (
@@ -1325,7 +1390,7 @@ function AddEditModelPresetModalContent({
 													<input
 														name="cacheControlKey"
 														type="text"
-														className="input w-full rounded-xl"
+														className={`input w-full rounded-xl ${errors.cacheControlKey ? 'input-error' : ''}`}
 														value={formData.cacheControlKey}
 														onChange={handleChange}
 														placeholder="Optional request cache key"
@@ -1334,6 +1399,11 @@ function AddEditModelPresetModalContent({
 														readOnly={isReadOnly}
 														disabled={isSubmitting}
 													/>
+													{errors.cacheControlKey ? (
+														<div className="label">
+															<span className="text-error text-xs">{errors.cacheControlKey}</span>
+														</div>
+													) : null}
 												</div>
 											</div>
 										)}
@@ -1407,13 +1477,29 @@ function AddEditModelPresetModalContent({
 										dropdownItems={outputFormatKindItems}
 										selectedKey={formData.outputFormatKind}
 										onChange={k => {
-											setFormData(prev => ({ ...prev, outputFormatKind: k }));
+											setFormData(previous => {
+												if (
+													cannotClearExistingOutput &&
+													k === OUTPUT_FORMAT_NONE &&
+													previous.outputVerbosity === OUTPUT_VERBOSITY_NONE
+												) {
+													return previous;
+												}
+												return { ...previous, outputFormatKind: k };
+											});
 										}}
 										filterDisabled={false}
 										title="Select Output Format Kind"
 										getDisplayName={k => outputFormatKindItems[k].displayName}
 									/>
 								)}
+								{cannotClearExistingOutput ? (
+									<div className="label">
+										<span className="text-base-content/70 text-xs">
+											At least one existing output setting must remain configured until the API supports clearing.
+										</span>
+									</div>
+								) : null}
 							</div>
 						</div>
 
@@ -1435,7 +1521,16 @@ function AddEditModelPresetModalContent({
 										dropdownItems={outputVerbosityItems}
 										selectedKey={formData.outputVerbosity}
 										onChange={v => {
-											setFormData(prev => ({ ...prev, outputVerbosity: v }));
+											setFormData(previous => {
+												if (
+													cannotClearExistingOutput &&
+													v === OUTPUT_VERBOSITY_NONE &&
+													previous.outputFormatKind === OUTPUT_FORMAT_NONE
+												) {
+													return previous;
+												}
+												return { ...previous, outputVerbosity: v };
+											});
 										}}
 										filterDisabled={false}
 										title="Select Output Verbosity"

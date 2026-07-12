@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
 import {
 	FiChevronDown,
@@ -24,8 +24,15 @@ import type {
 } from '@/spec/mcp';
 import { BaseMCPBundleID, MCPAuthHealthState, MCPServerStatus } from '@/spec/mcp';
 
+import { usePendingActions } from '@/hooks/use_pending_actions';
+
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
+import { ActionRow } from '@/components/managementui/action_row';
+import { EnabledControl } from '@/components/managementui/enabled_control';
+import { ManagementBundleCard } from '@/components/managementui/management_bundle_card';
+import { ManagementEmptyState } from '@/components/managementui/management_empty_state';
+import { ManagementItemCard } from '@/components/managementui/management_item_card';
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 
@@ -43,12 +50,16 @@ import {
 	isMCPAuthActionable,
 	serverHasSetupInputs,
 } from '@/mcpservers/lib/mcp_server_utils';
-import { MCPOAuthAuthorizationModal } from '@/mcpservers/mcp_oauth_authorization_modal';
 import { AddEditMCPServerModal } from '@/mcpservers/mcp_server_add_edit_modal';
 import { MCPServerDetailsModal } from '@/mcpservers/mcp_server_details_modal';
 import { MCPServerSetupModal } from '@/mcpservers/mcp_server_setup_modal';
 
 type ServerModalMode = 'add' | 'edit';
+
+interface MCPServerReadErrors {
+	runtime?: string;
+	auth?: string;
+}
 
 interface MCPBundleCardProps {
 	bundle: MCPBundle;
@@ -57,6 +68,7 @@ interface MCPBundleCardProps {
 	prefillServers: MCPServerConfig[];
 	runtimeByServerID: Record<string, MCPServerRuntimeSnapshot | undefined>;
 	authHealthByServerID: Record<string, MCPAuthHealth | undefined>;
+	readErrorsByServerID?: Record<string, MCPServerReadErrors | undefined>;
 
 	serverLoadError?: string;
 	onRefreshServers: () => Promise<void>;
@@ -76,22 +88,12 @@ interface MCPBundleCardProps {
 	onOpenURL: (url: string) => void;
 	onCancelOAuth: (bundleID: string, serverID: string) => Promise<void>;
 	onDeleteBundleRequested: (bundleID: string) => void;
-}
-
-function isOAuthModalRelevant(server: MCPServerConfig, authHealth?: MCPAuthHealth): boolean {
-	const authState = getEffectiveMCPAuthHealthState(server, authHealth);
-
-	return (
-		isMCPAuthActionable(authHealth, server) || authState === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending
-	);
-}
-
-function oauthDismissKey(bundleID: string, serverID: string, authHealth?: MCPAuthHealth): string {
-	return `${bundleID}:${serverID}:${authHealth?.authorizationURL ?? authHealth?.state ?? ''}`;
+	onRequestOAuthAuthorization: (bundleID: string, serverID: string) => void;
 }
 
 function getAuthHealthTitle(server: MCPServerConfig, authHealth: MCPAuthHealth | undefined, label: string): string {
 	const serverAuthMode = server.streamableHttp?.authMode ?? 'none';
+
 	const parts = [
 		authHealth?.lastError || label,
 		`serverAuthMode=${serverAuthMode}`,
@@ -120,6 +122,7 @@ export function MCPBundleCard({
 	prefillServers,
 	runtimeByServerID,
 	authHealthByServerID,
+	readErrorsByServerID = {},
 	serverLoadError,
 	onRefreshServers,
 	onToggleBundleEnabled,
@@ -130,17 +133,15 @@ export function MCPBundleCard({
 	onConnectServer,
 	onDisconnectServer,
 	onRefreshServer,
-	onOpenURL,
 	onCancelOAuth,
 	onDeleteBundleRequested,
+	onRequestOAuthAuthorization,
 }: MCPBundleCardProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
 	const isReservedBundle = bundle.id === BaseMCPBundleID;
 
 	const [isDeleteServerModalOpen, setIsDeleteServerModalOpen] = useState(false);
 	const [serverToDelete, setServerToDelete] = useState<MCPServerConfig | null>(null);
-	const [isDeleteServerPending, setIsDeleteServerPending] = useState(false);
-	const [isRefreshingServers, setIsRefreshingServers] = useState(false);
 
 	const [isServerModalOpen, setIsServerModalOpen] = useState(false);
 	const [serverModalMode, setServerModalMode] = useState<ServerModalMode>('add');
@@ -148,89 +149,53 @@ export function MCPBundleCard({
 
 	const [serverDetails, setServerDetails] = useState<MCPServerConfig | null>(null);
 	const [setupServer, setSetupServer] = useState<MCPServerConfig | null>(null);
+
 	const [showAlert, setShowAlert] = useState(false);
 	const [alertMsg, setAlertMsg] = useState('');
 
-	const [isBundleTogglePending, setIsBundleTogglePending] = useState(false);
-	const [pendingActionKeys, setPendingActionKeys] = useState<Set<string>>(() => new Set());
-	const [manualOAuthModalServerID, setManualOAuthModalServerID] = useState<string | null>(null);
-	const [dismissedOAuthKeys, setDismissedOAuthKeys] = useState<Set<string>>(() => new Set());
+	const { isPending, runAction } = usePendingActions();
 
 	const openAlert = (message: string) => {
 		setAlertMsg(message);
 		setShowAlert(true);
 	};
 
-	const setActionPending = (key: string, pending: boolean) => {
-		setPendingActionKeys(prev => {
-			const next = new Set(prev);
-
-			if (pending) {
-				next.add(key);
-			} else {
-				next.delete(key);
-			}
-
-			return next;
-		});
-	};
-
-	const runServerAction = async (key: string, action: () => Promise<void>, fallback: string) => {
-		if (pendingActionKeys.has(key)) {
-			return;
-		}
-
+	const runActionWithAlert = async (key: string, action: () => Promise<void>, fallback: string) => {
 		try {
-			setActionPending(key, true);
-			await action();
+			await runAction(key, action);
 		} catch (error) {
 			console.error(fallback, error);
 			openAlert(getErrorMessage(error, fallback));
-		} finally {
-			setActionPending(key, false);
+			throw error;
 		}
 	};
 
-	const refreshServers = async () => {
-		if (isRefreshingServers) {
-			return;
-		}
-
-		setIsRefreshingServers(true);
-		try {
-			await onRefreshServers();
-		} catch (error) {
-			openAlert(getErrorMessage(error, 'Failed to reload MCP servers.'));
-		} finally {
-			setIsRefreshingServers(false);
-		}
+	const refreshServers = () => {
+		void runActionWithAlert('bundle:refresh', onRefreshServers, 'Failed to reload MCP servers.').catch(() => undefined);
 	};
 
-	const handleToggleBundleEnable = async () => {
+	const handleToggleBundleEnable = async (enabled: boolean) => {
 		if (isReservedBundle) {
 			openAlert('The base MCP bundle metadata is reserved and cannot be disabled.');
 			return;
 		}
-		try {
-			setIsBundleTogglePending(true);
-			await onToggleBundleEnabled(bundle.id, !bundle.isEnabled);
-		} catch (error) {
-			console.error('Failed to toggle MCP bundle:', error);
-			openAlert(getErrorMessage(error, 'Failed to toggle MCP bundle enable state.'));
-		} finally {
-			setIsBundleTogglePending(false);
-		}
+
+		await runActionWithAlert(
+			'bundle:toggle',
+			() => onToggleBundleEnabled(bundle.id, enabled),
+			'Failed to toggle MCP bundle enable state.'
+		);
 	};
 
-	const handleServerEnableToggle = async (server: MCPServerConfig) => {
+	const handleServerEnableToggle = async (server: MCPServerConfig, enabled: boolean) => {
 		if (!bundle.isEnabled) {
 			openAlert('Enable the MCP bundle before enabling or disabling servers.');
 			return;
 		}
 
-		await runServerAction(
-			`toggle:${server.id}`,
-			() => onToggleServerEnabled(bundle.id, server.id, !server.enabled),
+		await runActionWithAlert(
+			`${server.id}:toggle`,
+			() => onToggleServerEnabled(bundle.id, server.id, enabled),
 			'Failed to toggle MCP server.'
 		);
 	};
@@ -251,21 +216,17 @@ export function MCPBundleCard({
 	};
 
 	const confirmDeleteServer = async () => {
-		if (!serverToDelete || isDeleteServerPending) {
+		if (!serverToDelete) {
 			return;
 		}
 
-		setIsDeleteServerPending(true);
-		try {
-			await onDeleteServer(bundle.id, serverToDelete.id);
-			setIsDeleteServerModalOpen(false);
-			setServerToDelete(null);
-		} catch (error) {
-			console.error('Delete MCP server failed:', error);
-			openAlert(getErrorMessage(error, 'Failed to delete MCP server.'));
-		} finally {
-			setIsDeleteServerPending(false);
-		}
+		await runActionWithAlert(
+			`${serverToDelete.id}:delete`,
+			() => onDeleteServer(bundle.id, serverToDelete.id),
+			'Failed to delete MCP server.'
+		);
+		setIsDeleteServerModalOpen(false);
+		setServerToDelete(null);
 	};
 
 	const openServerModal = (mode: ServerModalMode, server?: MCPServerConfig) => {
@@ -290,467 +251,360 @@ export function MCPBundleCard({
 	};
 
 	const handleModifySubmit = async (input: MCPServerUpsertInput) => {
-		await onSubmitServer(bundle.id, serverToEdit?.id, input);
-	};
-	const manualOAuthModalServer = useMemo(() => {
-		if (!manualOAuthModalServerID) {
-			return null;
-		}
-
-		const server = servers.find(candidate => candidate.id === manualOAuthModalServerID);
-		if (!server) {
-			return null;
-		}
-
-		const authHealth = authHealthByServerID[server.id];
-		return isOAuthModalRelevant(server, authHealth) ? server : null;
-	}, [authHealthByServerID, manualOAuthModalServerID, servers]);
-
-	const autoOAuthModalServer = useMemo(() => {
-		if (manualOAuthModalServer) {
-			return null;
-		}
-
-		return (
-			servers.find(server => {
-				const authHealth = authHealthByServerID[server.id];
-				if (!isOAuthModalRelevant(server, authHealth)) {
-					return false;
-				}
-
-				const key = oauthDismissKey(bundle.id, server.id, authHealth);
-				return !dismissedOAuthKeys.has(key);
-			}) ?? null
-		);
-	}, [authHealthByServerID, bundle.id, dismissedOAuthKeys, manualOAuthModalServer, servers]);
-
-	const oauthModalServer = manualOAuthModalServer ?? autoOAuthModalServer;
-	const oauthModalAuthHealth = oauthModalServer ? authHealthByServerID[oauthModalServer.id] : undefined;
-
-	const dismissOAuthModal = () => {
-		if (oauthModalServer) {
-			const authHealth = authHealthByServerID[oauthModalServer.id];
-			const key = oauthDismissKey(bundle.id, oauthModalServer.id, authHealth);
-			setDismissedOAuthKeys(prev => new Set(prev).add(key));
-		}
-
-		setManualOAuthModalServerID(null);
+		await runAction(`${serverToEdit?.id ?? 'new'}:save`, () => onSubmitServer(bundle.id, serverToEdit?.id, input));
 	};
 
-	const cancelOAuthModal = async () => {
-		if (!oauthModalServer) {
-			return;
-		}
-
-		await runServerAction(
-			`cancel-oauth:${oauthModalServer.id}`,
-			() => onCancelOAuth(bundle.id, oauthModalServer.id),
-			'Failed to cancel OAuth authorization.'
-		);
-		dismissOAuthModal();
-	};
 	return (
-		<section className="bg-base-100 border-base-content/10 mb-6 rounded-2xl border p-4 shadow-sm">
-			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-				<div className="min-w-0">
-					<h3 className="truncate text-sm font-semibold">
-						<span className="capitalize">{bundle.displayName || bundle.slug}</span>
-						<span className="text-base-content/60 ml-1">({bundle.slug})</span>
-					</h3>
-				</div>
-
-				<div className="flex flex-wrap items-center justify-end gap-3">
-					<span className="border-base-content/20 rounded-xl border px-2 py-1 text-xs">
-						{bundle.isBuiltIn ? 'Built-in' : isReservedBundle ? 'Base' : 'Custom'}
+		<>
+			<ManagementBundleCard
+				title={bundle.displayName || bundle.slug}
+				identity={
+					<span className="font-mono">
+						{bundle.slug} / {bundle.id}
 					</span>
-
-					<div className="flex items-center gap-1">
-						<label htmlFor={`mcp-bundle-${bundle.id}`} className="text-sm">
-							Enabled
-						</label>
-						<input
-							id={`mcp-bundle-${bundle.id}`}
-							type="checkbox"
-							className="toggle toggle-accent"
-							checked={bundle.isEnabled}
-							disabled={isBundleTogglePending || isReservedBundle}
-							title={isReservedBundle ? 'The base MCP bundle is always enabled.' : undefined}
-							onChange={() => {
-								void handleToggleBundleEnable();
-							}}
-						/>
-					</div>
-
+				}
+				description={bundle.description}
+				status={
+					<>
+						<StatusBadge tone={bundle.isEnabled ? 'success' : 'neutral'}>
+							{bundle.isEnabled ? 'Enabled' : 'Disabled'}
+						</StatusBadge>
+						<StatusBadge>{bundle.isBuiltIn ? 'Built-in' : isReservedBundle ? 'Base' : 'Custom'}</StatusBadge>
+					</>
+				}
+				disclosure={
 					<button
 						type="button"
 						className="btn btn-sm btn-ghost rounded-xl"
 						aria-expanded={isExpanded}
 						onClick={() => {
-							setIsExpanded(prev => !prev);
+							setIsExpanded(previous => !previous);
 						}}
 					>
 						<span className="whitespace-nowrap">Servers: {servers.length}</span>
 						{isExpanded ? <FiChevronUp /> : <FiChevronDown />}
 					</button>
-				</div>
-			</div>
-
-			{serverLoadError ? (
-				<div className="alert alert-warning mt-4 rounded-2xl text-sm" role="status">
-					<div className="min-w-0 grow">
-						<div className="font-semibold">Servers could not be loaded</div>
-						<div className="wrap-break-word">{serverLoadError}</div>
-					</div>
-					<button
-						type="button"
-						className="btn btn-sm rounded-xl"
-						onClick={() => void refreshServers()}
-						disabled={isRefreshingServers}
-					>
-						<FiRefreshCw size={14} />
-						<span>{isRefreshingServers ? 'Reloading' : 'Retry'}</span>
-					</button>
-				</div>
-			) : null}
-
-			{isExpanded && (
-				<div className="mt-8 space-y-4">
-					{servers.length === 0 ? (
-						<div className="border-base-content/10 rounded-2xl border py-6 text-center text-sm">
-							{serverLoadError ? 'Server contents are unavailable.' : 'No MCP servers in this bundle.'}
+				}
+				actionLeading={
+					<EnabledControl
+						id={`mcp-bundle-${bundle.id}`}
+						checked={bundle.isEnabled}
+						onChange={enabled => {
+							void handleToggleBundleEnable(enabled).catch(() => undefined);
+						}}
+						disabled={isReservedBundle}
+						busy={isPending('bundle:toggle')}
+						compact={false}
+						title={isReservedBundle ? 'The base MCP bundle is always enabled.' : undefined}
+					/>
+				}
+				actions={
+					<>
+						<button
+							type="button"
+							className="btn btn-sm btn-ghost rounded-xl"
+							onClick={() => {
+								setServerDetails(null);
+								openAlert('Select View on a server to inspect its details.');
+							}}
+							title="Server details are available from each server action row."
+						>
+							<FiEye size={16} />
+							<span>Server Details</span>
+						</button>
+						{!bundle.isBuiltIn ? (
+							<>
+								<button
+									type="button"
+									className="btn btn-sm btn-ghost rounded-xl"
+									disabled={!bundle.isEnabled || Boolean(serverLoadError)}
+									onClick={() => {
+										openServerModal('add');
+									}}
+								>
+									<FiPlus size={16} />
+									<span>Add Server</span>
+								</button>
+								<button
+									type="button"
+									className="btn btn-sm btn-ghost rounded-xl"
+									disabled={isReservedBundle || servers.length > 0 || Boolean(serverLoadError)}
+									onClick={() => {
+										onDeleteBundleRequested(bundle.id);
+									}}
+								>
+									<FiTrash2 size={16} />
+									<span>Delete Bundle</span>
+								</button>
+							</>
+						) : null}
+					</>
+				}
+			>
+				{serverLoadError ? (
+					<div className="alert alert-warning mt-3 rounded-2xl text-sm" role="status">
+						<div className="min-w-0 grow">
+							<div className="font-semibold">Servers could not be loaded</div>
+							<div className="wrap-break-word">{serverLoadError}</div>
 						</div>
-					) : (
-						<div className="grid grid-cols-1 gap-4">
-							{servers.map(server => {
-								const runtime = runtimeByServerID[server.id];
-								const authHealth = authHealthByServerID[server.id];
-								const status = getEffectiveMCPServerStatus(server.enabled, bundle.isEnabled, runtime);
-								const isReady = status === MCPServerStatus.MCPServerStatusReady;
-								const isConnecting = status === MCPServerStatus.MCPServerStatusConnecting;
-								const authState = getEffectiveMCPAuthHealthState(server, authHealth);
-								const authActionable = isMCPAuthActionable(authHealth, server);
-								const setupStatus = getMCPServerSetupStatus(server);
-								const setupIncomplete = setupStatus.hasInputs && !setupStatus.complete;
-								const authLabel = getMCPServerAuthHealthLabel(server, authHealth);
-								const authTitle = getAuthHealthTitle(server, authHealth, authLabel);
-								return (
-									<article
-										key={server.id}
-										className="border-base-content/10 bg-base-100 min-w-0 rounded-2xl border p-4 shadow-sm"
-									>
-										<div className="mb-3 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-											<div className="min-w-0">
-												<div className="truncate text-sm font-semibold" title={server.displayName}>
-													{server.displayName}
-												</div>
-												<div className="text-base-content/60 mt-1 text-xs break-all">{server.id}</div>
-											</div>
+						<button
+							type="button"
+							className="btn btn-sm rounded-xl"
+							onClick={refreshServers}
+							disabled={isPending('bundle:refresh')}
+						>
+							<FiRefreshCw size={14} />
+							<span>{isPending('bundle:refresh') ? 'Reloading' : 'Retry'}</span>
+						</button>
+					</div>
+				) : null}
 
-											<div className="flex max-w-full flex-wrap items-center gap-2">
-												<span className={`badge badge-xs rounded-xl ${getMCPStatusBadgeClass(status)}`}>
-													{getMCPStatusLabel(status)}
-												</span>
-												{setupStatus.hasInputs && (
-													<span
-														className={`badge badge-xs rounded-xl ${setupIncomplete ? 'badge-warning' : 'badge-ghost'}`}
-														title={
-															setupIncomplete
-																? `Setup required: ${setupStatus.requiredConfigured}/${setupStatus.requiredTotal} configured`
-																: 'Setup complete'
-														}
+				{isExpanded && (
+					<div className="mt-6 space-y-3">
+						{servers.length === 0 ? (
+							<ManagementEmptyState>
+								{serverLoadError ? 'Server contents are unavailable.' : 'No MCP servers in this bundle.'}
+							</ManagementEmptyState>
+						) : (
+							<div className="space-y-3">
+								{servers.map(server => {
+									const runtime = runtimeByServerID[server.id];
+									const authHealth = authHealthByServerID[server.id];
+									const readErrors = readErrorsByServerID[server.id];
+									const status = getEffectiveMCPServerStatus(server.enabled, bundle.isEnabled, runtime);
+									const isReady = status === MCPServerStatus.MCPServerStatusReady;
+									const isConnecting = status === MCPServerStatus.MCPServerStatusConnecting;
+									const authState = getEffectiveMCPAuthHealthState(server, authHealth);
+									const authActionable = isMCPAuthActionable(authHealth, server);
+									const setupStatus = getMCPServerSetupStatus(server);
+									const setupIncomplete = setupStatus.hasInputs && !setupStatus.complete;
+									const authLabel = getMCPServerAuthHealthLabel(server, authHealth);
+									const authTitle = getAuthHealthTitle(server, authHealth, authLabel);
+
+									return (
+										<ManagementItemCard
+											key={server.id}
+											title={server.displayName}
+											subtitle={server.id}
+											status={
+												<>
+													<StatusBadge className={getMCPStatusBadgeClass(status)}>
+														{getMCPStatusLabel(status)}
+													</StatusBadge>
+													{setupStatus.hasInputs && (
+														<StatusBadge
+															tone={setupIncomplete ? 'warning' : 'neutral'}
+															title={
+																setupIncomplete
+																	? `Setup required: ${setupStatus.requiredConfigured}/${setupStatus.requiredTotal} configured`
+																	: 'Setup complete'
+															}
+														>
+															{setupIncomplete ? 'Setup needed' : 'Setup ✓'}
+														</StatusBadge>
+													)}
+													<StatusBadge
+														className={getMCPServerAuthHealthBadgeClass(server, authHealth)}
+														title={authTitle}
 													>
-														{setupIncomplete ? 'Setup needed' : 'Setup ✓'}
-													</span>
-												)}
-												<span
-													className={`badge badge-xs rounded-xl ${getMCPServerAuthHealthBadgeClass(server, authHealth)}`}
-													title={authTitle}
-												>
-													{authLabel}
-												</span>
-											</div>
-										</div>
-
-										<div className="mt-3 flex flex-wrap items-center gap-2">
-											<MetadataPill label="Enabled">
-												<input
-													type="checkbox"
-													className="toggle toggle-accent toggle-sm"
-													checked={server.enabled}
-													disabled={pendingActionKeys.has(`toggle:${server.id}`) || !bundle.isEnabled}
-													title={!bundle.isEnabled ? 'Enable the bundle first.' : undefined}
-													onChange={() => {
-														void handleServerEnableToggle(server);
-													}}
-												/>
-											</MetadataPill>
-
-											<MetadataPill label="Transport">{getMCPTransportLabel(server.transport)}</MetadataPill>
-
-											<MetadataPill label="Trust">{getMCPTrustLevelLabel(server.trustLevel)}</MetadataPill>
-
-											<MetadataPill label="Tools">{runtime?.toolCount ?? 0}</MetadataPill>
-											<MetadataPill label="Resources">{runtime?.resourceCount ?? 0}</MetadataPill>
-											<MetadataPill label="Templates">{runtime?.resourceTemplateCount ?? 0}</MetadataPill>
-											<MetadataPill label="Prompts">{runtime?.promptCount ?? 0}</MetadataPill>
-										</div>
-
-										<div className="mt-4 flex flex-col flex-wrap items-center">
-											<div className="flex w-full flex-col gap-2">
-												{runtime?.lastError && (
-													<div className="text-error truncate text-xs" title={runtime.lastError}>
+														{authLabel}
+													</StatusBadge>
+												</>
+											}
+											metadata={
+												<>
+													<MetadataPill label="Transport">{getMCPTransportLabel(server.transport)}</MetadataPill>
+													<MetadataPill label="Trust">{getMCPTrustLevelLabel(server.trustLevel)}</MetadataPill>
+													<MetadataPill label="Tools">{runtime ? runtime.toolCount : '—'}</MetadataPill>
+													<MetadataPill label="Resources">{runtime ? runtime.resourceCount : '—'}</MetadataPill>
+													<MetadataPill label="Templates">{runtime ? runtime.resourceTemplateCount : '—'}</MetadataPill>
+													<MetadataPill label="Prompts">{runtime ? runtime.promptCount : '—'}</MetadataPill>
+												</>
+											}
+										>
+											<div className="mt-3 space-y-1">
+												{readErrors?.runtime ? (
+													<div className="text-warning text-xs">
+														Runtime status could not be read: {readErrors.runtime}
+													</div>
+												) : null}
+												{runtime?.lastError ? (
+													<div className="text-error text-xs" title={runtime.lastError}>
 														{runtime.lastError}
 													</div>
-												)}
-
-												{(authActionable ||
-													authState === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending) && (
-													<div className="border-base-content/10 flex w-full flex-wrap items-center justify-between gap-2 rounded-xl border p-2">
-														<StatusBadge tone="warning">OAuth authorization required</StatusBadge>
-
-														<div className="flex shrink-0 flex-wrap gap-1">
-															{authActionable && (
-																<button
-																	type="button"
-																	className="btn btn-xs btn-ghost rounded-xl"
-																	onClick={() => {
-																		setManualOAuthModalServerID(server.id);
-																	}}
-																	title="Authorize MCP server"
-																>
-																	<FiExternalLink size={12} />
-																	<span className="ml-1">Authorize</span>
-																</button>
-															)}
-
-															{authState === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending && (
-																<button
-																	type="button"
-																	className="btn btn-xs bg-base-300 rounded-xl"
-																	onClick={() => {
-																		void runServerAction(
-																			`cancel-oauth:${server.id}`,
-																			() => onCancelOAuth(bundle.id, server.id),
-																			'Failed to cancel OAuth authorization.'
-																		);
-																	}}
-																	title="Cancel authorization"
-																>
-																	<FiX size={12} />
-																	<span className="ml-1">Cancel</span>
-																</button>
-															)}
-														</div>
-													</div>
-												)}
-
-												{authHealth?.lastError && (
-													<div className="text-error truncate text-xs" title={authHealth.lastError}>
+												) : null}
+												{readErrors?.auth ? (
+													<div className="text-warning text-xs">Auth health could not be read: {readErrors.auth}</div>
+												) : null}
+												{authHealth?.lastError ? (
+													<div className="text-error text-xs" title={authHealth.lastError}>
 														{authHealth.lastError}
 													</div>
-												)}
+												) : null}
 											</div>
-											<div className="border-base-content/10 flex w-full flex-wrap items-center justify-end gap-2 border-t pt-3">
+
+											<ActionRow
+												leading={
+													<EnabledControl
+														id={`mcp-server-${bundle.id}-${server.id}`}
+														checked={server.enabled}
+														onChange={enabled => {
+															void handleServerEnableToggle(server, enabled).catch(() => undefined);
+														}}
+														disabled={!bundle.isEnabled}
+														busy={isPending(`${server.id}:toggle`)}
+														title={!bundle.isEnabled ? 'Enable the bundle first.' : undefined}
+													/>
+												}
+											>
 												<button
 													type="button"
-													className="btn btn-xs btn-ghost rounded-xl"
+													className="btn btn-sm btn-ghost rounded-xl"
 													onClick={() => {
 														setServerDetails(server);
 													}}
-													title="View"
-													aria-label="View"
 												>
-													<FiEye size={16} />
+													<FiEye size={15} />
 													<span>View</span>
 												</button>
-												{serverHasSetupInputs(server) && (
+												{serverHasSetupInputs(server) ? (
 													<button
 														type="button"
-														className="btn btn-xs btn-ghost rounded-xl"
+														className="btn btn-sm btn-ghost rounded-xl"
+														disabled={!bundle.isEnabled}
 														onClick={() => {
-															if (!bundle.isEnabled) {
-																openAlert('Enable the MCP bundle before configuring servers.');
-																return;
-															}
 															setSetupServer(server);
 														}}
-														disabled={!bundle.isEnabled}
-														title="Configure setup"
-														aria-label="Configure setup"
 													>
-														<FiSettings size={16} />
+														<FiSettings size={15} />
 														<span>Setup</span>
 													</button>
-												)}
+												) : null}
 												<button
 													type="button"
-													className="btn btn-xs btn-ghost rounded-xl"
+													className="btn btn-sm btn-ghost rounded-xl"
+													disabled={server.isBuiltIn || bundle.isBuiltIn || !bundle.isEnabled}
 													onClick={() => {
 														openServerModal('edit', server);
 													}}
-													disabled={server.isBuiltIn || bundle.isBuiltIn || !bundle.isEnabled}
-													title={
-														server.isBuiltIn || bundle.isBuiltIn
-															? 'Built-in items cannot be edited'
-															: !bundle.isEnabled
-																? 'Enable the bundle first.'
-																: 'Edit'
-													}
-													aria-label="Edit"
 												>
-													<FiEdit2 size={16} />
+													<FiEdit2 size={15} />
 													<span>Edit</span>
 												</button>
-
+												{authActionable ? (
+													<button
+														type="button"
+														className="btn btn-sm btn-ghost rounded-xl"
+														onClick={() => {
+															onRequestOAuthAuthorization(bundle.id, server.id);
+														}}
+													>
+														<FiExternalLink size={15} />
+														<span>Authorize</span>
+													</button>
+												) : null}
+												{authState === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending ? (
+													<button
+														type="button"
+														className="btn btn-sm btn-ghost rounded-xl"
+														disabled={isPending(`${server.id}:cancel-oauth`)}
+														onClick={() => {
+															void runActionWithAlert(
+																`${server.id}:cancel-oauth`,
+																() => onCancelOAuth(bundle.id, server.id),
+																'Failed to cancel OAuth authorization.'
+															).catch(() => undefined);
+														}}
+													>
+														<FiX size={15} />
+														<span>Cancel authorization</span>
+													</button>
+												) : null}
 												<button
 													type="button"
-													className="btn btn-xs btn-ghost rounded-xl"
-													onClick={() => {
-														void runServerAction(
-															`connect:${server.id}`,
-															() => onConnectServer(bundle.id, server.id),
-															'Failed to connect MCP server.'
-														);
-													}}
+													className="btn btn-sm btn-ghost rounded-xl"
 													disabled={
 														!bundle.isEnabled ||
 														!server.enabled ||
 														isReady ||
 														isConnecting ||
 														setupIncomplete ||
-														pendingActionKeys.has(`connect:${server.id}`)
+														isPending(`${server.id}:connect`)
 													}
-													title={
-														setupIncomplete
-															? 'Complete required setup before connecting.'
-															: authActionable ||
-																  authState === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending
-																? 'Authorization pending. Open auth URL first if needed.'
-																: authState === MCPAuthHealthState.MCPAuthHealthStateAuthorized
-																	? 'Connect MCP server using saved authorization.'
-																	: 'Connect'
-													}
-													aria-label="Connect"
+													onClick={() => {
+														void runActionWithAlert(
+															`${server.id}:connect`,
+															() => onConnectServer(bundle.id, server.id),
+															'Failed to connect MCP server.'
+														).catch(() => undefined);
+													}}
 												>
-													<FiWifi size={16} />
+													<FiWifi size={15} />
 													<span>Connect</span>
 												</button>
-
 												<button
 													type="button"
-													className="btn btn-xs btn-ghost rounded-xl"
+													className="btn btn-sm btn-ghost rounded-xl"
 													onClick={() => {
-														void runServerAction(
-															`disconnect:${server.id}`,
+														void runActionWithAlert(
+															`${server.id}:disconnect`,
 															() => onDisconnectServer(bundle.id, server.id),
 															'Failed to disconnect MCP server.'
-														);
+														).catch(() => undefined);
 													}}
 													disabled={
-														!isReady ||
-														pendingActionKeys.has(`disconnect:${server.id}`) ||
-														pendingActionKeys.has(`connect:${server.id}`)
+														!isReady || isPending(`${server.id}:disconnect`) || isPending(`${server.id}:connect`)
 													}
-													title="Disconnect"
-													aria-label="Disconnect"
 												>
-													<FiWifiOff size={16} />
+													<FiWifiOff size={15} />
 													<span>Disconnect</span>
 												</button>
-
 												<button
 													type="button"
-													className="btn btn-xs btn-ghost rounded-xl"
+													className="btn btn-sm btn-ghost rounded-xl"
 													onClick={() => {
-														void runServerAction(
-															`refresh:${server.id}`,
+														void runActionWithAlert(
+															`${server.id}:refresh`,
 															() => onRefreshServer(bundle.id, server.id),
 															'Failed to refresh MCP server.'
-														);
+														).catch(() => undefined);
 													}}
 													disabled={
 														!bundle.isEnabled ||
 														!server.enabled ||
 														!isReady ||
 														isConnecting ||
-														pendingActionKeys.has(`refresh:${server.id}`)
+														isPending(`${server.id}:refresh`)
 													}
-													title="Refresh discovery"
-													aria-label="Refresh discovery"
 												>
-													<FiRefreshCw size={16} />
+													<FiRefreshCw size={15} />
 													<span>Refresh</span>
 												</button>
-
 												<button
 													type="button"
-													className="btn btn-xs btn-ghost rounded-xl"
+													className="btn btn-sm btn-ghost rounded-xl"
 													onClick={() => {
 														requestDeleteServer(server);
 													}}
-													disabled={server.isBuiltIn || bundle.isBuiltIn}
-													title={
-														server.isBuiltIn || bundle.isBuiltIn ? 'Deleting disabled for built-in items' : 'Delete'
-													}
-													aria-label="Delete"
+													disabled={server.isBuiltIn || bundle.isBuiltIn || isPending(`${server.id}:delete`)}
 												>
-													<FiTrash2 size={16} />
+													<FiTrash2 size={15} />
 													<span>Delete</span>
 												</button>
-											</div>
-										</div>
-									</article>
-								);
-							})}
-						</div>
-					)}
-
-					{!bundle.isBuiltIn && (
-						<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-							<button
-								type="button"
-								className="btn btn-md btn-ghost flex items-center rounded-2xl"
-								disabled={isReservedBundle || servers.length > 0 || Boolean(serverLoadError)}
-								title={
-									isReservedBundle
-										? 'The base MCP bundle cannot be deleted.'
-										: serverLoadError
-											? 'Reload servers before deleting this bundle.'
-											: servers.length > 0
-												? 'Delete all servers from this bundle first.'
-												: 'Delete Bundle'
-								}
-								onClick={() => {
-									if (isReservedBundle) {
-										openAlert('The base MCP bundle cannot be deleted.');
-										return;
-									}
-									onDeleteBundleRequested(bundle.id);
-								}}
-							>
-								<FiTrash2 /> <span className="ml-1">Delete Bundle</span>
-							</button>
-
-							<button
-								type="button"
-								className="btn btn-md btn-ghost flex items-center rounded-2xl"
-								disabled={!bundle.isEnabled}
-								title={!bundle.isEnabled ? 'Enable the bundle first.' : 'Add MCP Server'}
-								onClick={() => {
-									openServerModal('add');
-								}}
-							>
-								<FiPlus /> <span className="ml-1">Add Server</span>
-							</button>
-						</div>
-					)}
-				</div>
-			)}
+											</ActionRow>
+										</ManagementItemCard>
+									);
+								})}
+							</div>
+						)}
+					</div>
+				)}
+			</ManagementBundleCard>
 
 			<DeleteConfirmationModal
 				isOpen={isDeleteServerModalOpen}
 				onClose={() => {
-					if (!isDeleteServerPending) {
+					if (!serverToDelete || !isPending(`${serverToDelete.id}:delete`)) {
 						setIsDeleteServerModalOpen(false);
 						setServerToDelete(null);
 					}
@@ -794,16 +648,10 @@ export function MCPBundleCard({
 					if (!setupServer) {
 						return;
 					}
-					await onSubmitServerSetup(bundle.id, setupServer.id, inputValues, reset);
+					await runAction(`${setupServer.id}:setup`, () =>
+						onSubmitServerSetup(bundle.id, setupServer.id, inputValues, reset)
+					);
 				}}
-			/>
-			<MCPOAuthAuthorizationModal
-				isOpen={oauthModalServer !== null}
-				onClose={dismissOAuthModal}
-				server={oauthModalServer}
-				authHealth={oauthModalAuthHealth}
-				onOpenURL={onOpenURL}
-				onCancel={cancelOAuthModal}
 			/>
 
 			<ActionDeniedAlertModal
@@ -814,6 +662,6 @@ export function MCPBundleCard({
 				}}
 				message={alertMsg}
 			/>
-		</section>
+		</>
 	);
 }

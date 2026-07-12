@@ -1,16 +1,6 @@
 import { useMemo, useState } from 'react';
 
-import {
-	FiCheckCircle,
-	FiChevronDown,
-	FiChevronUp,
-	FiEdit2,
-	FiEye,
-	FiKey,
-	FiPlus,
-	FiTrash2,
-	FiXCircle,
-} from 'react-icons/fi';
+import { FiCheckCircle, FiChevronDown, FiChevronUp, FiEdit2, FiEye, FiKey, FiPlus, FiTrash2 } from 'react-icons/fi';
 
 import type { ProviderName } from '@/spec/inference';
 import { SDK_DISPLAY_NAME } from '@/spec/inference';
@@ -24,10 +14,18 @@ import type {
 import type { AuthKeyMeta } from '@/spec/setting';
 import { AuthKeyTypeProvider } from '@/spec/setting';
 
+import { redactSensitiveHTTPHeaders } from '@/lib/http_input_utils';
+
+import { usePendingActions } from '@/hooks/use_pending_actions';
+
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
-import { Dropdown } from '@/components/dropdown';
 import { ActionRow } from '@/components/managementui/action_row';
+import { EnabledControl } from '@/components/managementui/enabled_control';
+import { ManagementBundleCard } from '@/components/managementui/management_bundle_card';
+import { ManagementEmptyState } from '@/components/managementui/management_empty_state';
+import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
+import { ManagementInfoRow } from '@/components/managementui/management_info_row';
 import { ManagementItemCard } from '@/components/managementui/management_item_card';
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
@@ -98,20 +96,18 @@ export function ProviderPresetCard({
 	const [showDenied, setShowDenied] = useState(false);
 	const [deniedMsg, setDeniedMsg] = useState('');
 	const [showKeyModal, setShowKeyModal] = useState(false);
+	const { isPending, runAction } = usePendingActions();
 
 	const isLastEnabled = preset.isEnabled && enabledProviders.length === 1;
 	const providerIsBuiltIn = preset.isBuiltIn;
 
 	const modelPresets = preset.modelPresets;
 	const defaultModelPresetID = preset.defaultModelPresetID;
-	const modelEntries = Object.entries(modelPresets);
+	const modelEntries = Object.entries(modelPresets).toSorted(([, left], [, right]) =>
+		(left.displayName || left.name || left.id).localeCompare(right.displayName || right.name || right.id)
+	);
 	const hasModels = modelEntries.length > 0;
 	const canDeleteProvider = !providerIsBuiltIn && !hasModels;
-
-	const safeDefaultModelID: ModelPresetID =
-		defaultModelPresetID && modelPresets[defaultModelPresetID]
-			? defaultModelPresetID
-			: (Object.keys(modelPresets)[0] ?? '');
 
 	const allModelPresets = useMemo(() => {
 		const out: Record<ProviderName, Record<ModelPresetID, ModelPreset>> = {};
@@ -131,33 +127,41 @@ export function ProviderPresetCard({
 		setShowDenied(true);
 	};
 
-	const toggleProviderEnable = () => {
-		if (provider === defaultProvider && preset.isEnabled) {
+	const runActionWithAlert = async (key: string, action: () => Promise<void>, fallback: string) => {
+		try {
+			await runAction(key, action);
+		} catch (error) {
+			showLocalDenied(getErrorMessage(error, fallback));
+			throw error;
+		}
+	};
+
+	const toggleProviderEnable = (nextEnabled: boolean) => {
+		if (!nextEnabled && provider === defaultProvider && preset.isEnabled) {
 			showLocalDenied('Cannot disable the default provider. Pick another default first.');
 			return;
 		}
 
-		if (isLastEnabled && preset.isEnabled) {
+		if (!nextEnabled && isLastEnabled && preset.isEnabled) {
 			showLocalDenied('Cannot disable the last enabled provider.');
 			return;
 		}
 
-		void (async () => {
-			try {
-				await onToggleProvider(provider, !preset.isEnabled);
-			} catch (error) {
-				showLocalDenied(getErrorMessage(error, 'Failed toggling provider.'));
-			}
-		})();
-	};
-
-	const toggleExpand = () => {
-		setExpanded(prev => !prev);
+		void runActionWithAlert(
+			'bundle:toggle',
+			() => onToggleProvider(provider, nextEnabled),
+			'Failed toggling provider.'
+		).catch(() => undefined);
 	};
 
 	const requestDeleteProvider = () => {
 		if (providerIsBuiltIn) {
 			showLocalDenied('Built-in providers cannot be deleted.');
+			return;
+		}
+
+		if (provider === defaultProvider) {
+			showLocalDenied('Cannot delete the current default provider. Pick another default first.');
 			return;
 		}
 
@@ -170,39 +174,31 @@ export function ProviderPresetCard({
 	};
 
 	const confirmDeleteProvider = async () => {
-		try {
-			await onDeleteProvider(provider);
-			setShowDelProv(false);
-		} catch (error) {
-			showLocalDenied(getErrorMessage(error, 'Failed deleting provider.'));
-		}
+		await runActionWithAlert('bundle:delete', () => onDeleteProvider(provider), 'Failed deleting provider.');
+		setShowDelProv(false);
 	};
 
-	const handleDefaultModelChange = (id: ModelPresetID) => {
-		void (async () => {
-			try {
-				await onSetDefaultModel(provider, id);
-			} catch (error) {
-				showLocalDenied(getErrorMessage(error, 'Failed setting default model.'));
-			}
-		})();
+	const setDefaultModel = (id: ModelPresetID) => {
+		void runActionWithAlert(
+			`${id}:set-default`,
+			() => onSetDefaultModel(provider, id),
+			'Failed setting default model.'
+		).catch(() => undefined);
 	};
 
-	const toggleModelEnable = (id: ModelPresetID) => {
+	const toggleModelEnable = (id: ModelPresetID, nextEnabled: boolean) => {
 		const modelPreset = modelPresets[id];
 
-		if (id === defaultModelPresetID && modelPreset.isEnabled) {
+		if (!nextEnabled && id === defaultModelPresetID && modelPreset.isEnabled) {
 			showLocalDenied('Cannot disable the default model preset. Choose another default first.');
 			return;
 		}
 
-		void (async () => {
-			try {
-				await onToggleModel(provider, id, !modelPreset.isEnabled);
-			} catch (error) {
-				showLocalDenied(getErrorMessage(error, 'Failed toggling model.'));
-			}
-		})();
+		void runActionWithAlert(
+			`${id}:toggle`,
+			() => onToggleModel(provider, id, nextEnabled),
+			'Failed toggling model.'
+		).catch(() => undefined);
 	};
 
 	const openAddModel = () => {
@@ -231,9 +227,9 @@ export function ProviderPresetCard({
 	const handleModifyModelSubmit = async (id: ModelPresetID, data: PostModelPresetPayload | PatchModelPresetPayload) => {
 		try {
 			if (modelModalMode === 'add') {
-				await onCreateModel(provider, id, data as PostModelPresetPayload);
+				await runAction(`${id}:create`, () => onCreateModel(provider, id, data as PostModelPresetPayload));
 			} else if (modelModalMode === 'edit') {
-				await onPatchModel(provider, id, data as PatchModelPresetPayload);
+				await runAction(`${id}:save`, () => onPatchModel(provider, id, data as PatchModelPresetPayload));
 			}
 			setShowModModal(false);
 		} catch (error) {
@@ -258,182 +254,142 @@ export function ProviderPresetCard({
 			return;
 		}
 
-		try {
-			await onDeleteModel(provider, selectedID);
-			setShowDelModel(false);
-		} catch (error) {
-			showLocalDenied(getErrorMessage(error, 'Failed deleting model preset.'));
-		}
+		await runActionWithAlert(
+			`${selectedID}:delete`,
+			() => onDeleteModel(provider, selectedID),
+			'Failed deleting model preset.'
+		);
+		setShowDelModel(false);
+		setSelectedID(null);
 	};
 
 	return (
-		<div className="bg-base-100 mb-8 rounded-2xl p-4 shadow-lg">
-			<div className="flex items-center justify-between">
-				<div className="flex items-center">
-					<h3 className="text-sm font-semibold capitalize">{preset.displayName || provider} </h3>
-				</div>
-
-				<div className="flex items-center justify-end gap-4">
-					<span className="text-base-content/60 text-xs tracking-wide uppercase">
-						{preset.isBuiltIn ? 'Built-in' : 'Custom'}
-					</span>
-
-					<div className="flex items-center gap-1">
-						<label className="text-sm">Enable</label>
-						<input
-							type="checkbox"
-							className="toggle toggle-accent"
-							checked={preset.isEnabled}
-							onChange={toggleProviderEnable}
-						/>
-					</div>
-
-					<div className="flex cursor-pointer items-end justify-end gap-4" onClick={toggleExpand}>
-						<div className="flex items-center">
-							<span className="text-sm">API-Key</span>
-							{authKeySet ? <FiCheckCircle className="text-success mx-1" /> : <FiXCircle className="text-error mx-1" />}
-						</div>
-
-						<div className="flex items-center">
-							<span className="text-sm">Details</span>
-							{expanded ? <FiChevronUp className="mx-1" /> : <FiChevronDown className="mx-1" />}
-						</div>
-					</div>
-				</div>
-			</div>
-
-			{expanded && (
-				<div className="mt-4 space-y-6">
-					<div className="border-base-content/10 mb-4 overflow-x-auto rounded-2xl border">
-						<table className="table w-full">
-							<tbody>
-								<tr>
-									<td colSpan={2} className="py-0.5">
-										<div className="flex items-center justify-between py-0.5">
-											<span
-												className="tooltip tooltip-right"
-												data-tip={
-													providerIsBuiltIn
-														? 'Built-in providers cannot be deleted.'
-														: hasModels
-															? 'Only empty providers can be deleted.'
-															: 'Delete Empty Provider'
-												}
-											>
-												<button
-													type="button"
-													className={`btn btn-ghost flex items-center rounded-2xl ${
-														!canDeleteProvider ? 'btn-disabled cursor-not-allowed opacity-50' : ''
-													}`}
-													onClick={canDeleteProvider ? requestDeleteProvider : undefined}
-													title="Delete Provider"
-													disabled={!canDeleteProvider}
-												>
-													<FiTrash2 />
-													<span className="ml-1 hidden md:inline">Delete Provider</span>
-												</button>
-											</span>
-
-											<div className="flex gap-2">
-												<button
-													type="button"
-													className="btn btn-ghost flex items-center rounded-2xl"
-													onClick={() => {
-														setShowKeyModal(true);
-													}}
-													title={authKeySet ? 'Update API Key' : 'Set API Key'}
-												>
-													<FiKey />
-													<span className="ml-1 hidden md:inline">{authKeySet ? 'Update API Key' : 'Set API Key'}</span>
-												</button>
-
-												<button
-													type="button"
-													className="btn btn-ghost flex items-center rounded-2xl"
-													onClick={() => {
-														onRequestEdit(provider);
-													}}
-													title={providerIsBuiltIn ? 'View Provider' : 'Edit Provider'}
-												>
-													{providerIsBuiltIn ? <FiEye /> : <FiEdit2 />}
-													<span className="ml-1 hidden md:inline">
-														{providerIsBuiltIn ? 'View Provider' : 'Edit Provider'}
-													</span>
-												</button>
-											</div>
-										</div>
-									</td>
-								</tr>
-
-								<tr className="hover:bg-base-300">
-									<td className="w-1/3 text-sm">ID</td>
-									<td className="text-sm">{preset.name}</td>
-								</tr>
-								<tr className="hover:bg-base-300">
-									<td className="w-1/3 text-sm">SDK Type</td>
-									<td className="text-sm">{SDK_DISPLAY_NAME[preset.sdkType]}</td>
-								</tr>
-								<tr className="hover:bg-base-300">
-									<td className="w-1/3 text-sm">Origin</td>
-									<td className="text-sm">{preset.origin}</td>
-								</tr>
-								<tr className="hover:bg-base-300">
-									<td className="w-1/3 text-sm">Chat Path</td>
-									<td className="text-sm">{preset.chatCompletionPathPrefix}</td>
-								</tr>
-								<tr className="hover:bg-base-300">
-									<td className="w-1/3 text-sm">API-Key Header Key</td>
-									<td className="text-sm">{preset.apiKeyHeaderKey || '—'}</td>
-								</tr>
-								<tr className="hover:bg-base-300">
-									<td className="w-1/3 text-sm">Default Headers</td>
-									<td className="text-sm">
-										<pre className="m-0 p-0 text-xs wrap-break-word whitespace-pre-wrap">
-											{JSON.stringify(preset.defaultHeaders ?? {}, null, 2)}
-										</pre>
-									</td>
-								</tr>
-							</tbody>
-						</table>
-					</div>
-
-					<div className="border-base-content/10 mb-2 overflow-x-auto rounded-2xl border">
-						<div className="grid grid-cols-12 items-center gap-4 px-4 py-2">
-							<span className="col-span-3 text-sm font-semibold">Default Model</span>
-
-							<div className="col-span-6 ml-8">
-								{hasModels ? (
-									<Dropdown<ModelPresetID>
-										dropdownItems={modelPresets}
-										selectedKey={safeDefaultModelID}
-										onChange={handleDefaultModelChange}
-										filterDisabled={false}
-										title="Select default model"
-										getDisplayName={k => modelPresets[k].displayName || k}
-									/>
-								) : (
-									<span className="text-sm italic">No model presets configured.</span>
-								)}
-							</div>
-
-							<div className="col-span-3 flex justify-end">
+		<>
+			<ManagementBundleCard
+				title={preset.displayName || provider}
+				identity={<span className="font-mono">{provider}</span>}
+				status={
+					<>
+						<StatusBadge tone={preset.isEnabled ? 'success' : 'neutral'}>
+							{preset.isEnabled ? 'Enabled' : 'Disabled'}
+						</StatusBadge>
+						<StatusBadge>{providerIsBuiltIn ? 'Built-in' : 'Custom'}</StatusBadge>
+						{provider === defaultProvider ? <StatusBadge tone="info">Default provider</StatusBadge> : null}
+						<StatusBadge tone={authKeySet ? 'success' : 'warning'}>
+							{authKeySet ? 'API key configured' : 'API key missing'}
+						</StatusBadge>
+					</>
+				}
+				metadata={
+					<>
+						<MetadataPill label="SDK">{SDK_DISPLAY_NAME[preset.sdkType]}</MetadataPill>
+						<MetadataPill label="Models">{modelEntries.length}</MetadataPill>
+						<MetadataPill label="Origin" title={preset.origin}>
+							{preset.origin}
+						</MetadataPill>
+					</>
+				}
+				disclosure={
+					<button
+						type="button"
+						className="btn btn-sm btn-ghost rounded-xl"
+						aria-expanded={expanded}
+						onClick={() => {
+							setExpanded(previous => !previous);
+						}}
+					>
+						<span className="whitespace-nowrap">Models: {modelEntries.length}</span>
+						{expanded ? <FiChevronUp /> : <FiChevronDown />}
+					</button>
+				}
+				actionLeading={
+					<EnabledControl
+						id={`provider-enabled-${provider}`}
+						checked={preset.isEnabled}
+						onChange={toggleProviderEnable}
+						disabled={(preset.isEnabled && provider === defaultProvider) || (preset.isEnabled && isLastEnabled)}
+						busy={isPending('bundle:toggle')}
+						compact={false}
+						title={
+							preset.isEnabled && provider === defaultProvider
+								? 'Choose another default provider before disabling this one.'
+								: preset.isEnabled && isLastEnabled
+									? 'At least one provider must remain enabled.'
+									: undefined
+						}
+					/>
+				}
+				actions={
+					<>
+						<button
+							type="button"
+							className="btn btn-sm btn-ghost rounded-xl"
+							onClick={() => {
+								setShowKeyModal(true);
+							}}
+						>
+							<FiKey size={16} />
+							<span>{authKeySet ? 'Update API Key' : 'Set API Key'}</span>
+						</button>
+						<button
+							type="button"
+							className="btn btn-sm btn-ghost rounded-xl"
+							onClick={() => {
+								onRequestEdit(provider);
+							}}
+						>
+							{providerIsBuiltIn ? <FiEye size={16} /> : <FiEdit2 size={16} />}
+							<span>{providerIsBuiltIn ? 'View Provider' : 'Edit Provider'}</span>
+						</button>
+						{!providerIsBuiltIn ? (
+							<>
 								<button
 									type="button"
-									className={`btn btn-ghost flex items-center rounded-2xl ${
-										providerIsBuiltIn ? 'btn-disabled cursor-not-allowed opacity-50' : ''
-									}`}
+									className="btn btn-sm btn-ghost rounded-xl"
 									onClick={openAddModel}
-									disabled={providerIsBuiltIn}
-									title="Add Model Preset"
+									disabled={!preset.isEnabled}
 								>
 									<FiPlus size={16} />
-									<span className="ml-1 hidden md:inline">Add Model Preset</span>
+									<span>Add Model</span>
 								</button>
-							</div>
-						</div>
+								<button
+									type="button"
+									className="btn btn-sm btn-ghost rounded-xl"
+									onClick={requestDeleteProvider}
+									disabled={!canDeleteProvider || provider === defaultProvider || isPending('bundle:delete')}
+								>
+									<FiTrash2 size={16} />
+									<span>Delete Provider</span>
+								</button>
+							</>
+						) : null}
+					</>
+				}
+			>
+				{expanded && (
+					<div className="mt-4 space-y-6">
+						<ManagementInfoGrid>
+							<ManagementInfoRow label="Provider ID" mono>
+								{preset.name}
+							</ManagementInfoRow>
+							<ManagementInfoRow label="SDK">{SDK_DISPLAY_NAME[preset.sdkType]}</ManagementInfoRow>
+							<ManagementInfoRow label="Origin" mono>
+								{preset.origin}
+							</ManagementInfoRow>
+							<ManagementInfoRow label="Chat path" mono>
+								{preset.chatCompletionPathPrefix}
+							</ManagementInfoRow>
+							<ManagementInfoRow label="API key header">{preset.apiKeyHeaderKey || '—'}</ManagementInfoRow>
+							<ManagementInfoRow label="Default headers">
+								<pre className="bg-base-300 max-h-48 overflow-auto rounded-xl p-3 text-xs whitespace-pre-wrap">
+									{JSON.stringify(redactSensitiveHTTPHeaders(preset.defaultHeaders) ?? {}, null, 2)}
+								</pre>
+							</ManagementInfoRow>
+						</ManagementInfoGrid>
 
-						{hasModels && (
-							<div className="border-base-content/10 space-y-3 border-t p-3">
+						<div className="divider my-0">Model presets</div>
+						{hasModels ? (
+							<div className="space-y-3">
 								{modelEntries.map(([id, modelPreset]) => {
 									const canModify = !modelPreset.isBuiltIn;
 									const isDefault = id === defaultModelPresetID;
@@ -453,9 +409,7 @@ export function ProviderPresetCard({
 											}
 											metadata={
 												<>
-													<MetadataPill label="Reasoning">
-														{modelPreset.reasoning ? 'Supported' : 'Not configured'}
-													</MetadataPill>
+													<MetadataPill label="Reasoning">{modelPreset.reasoning ? 'Configured' : 'None'}</MetadataPill>
 													<MetadataPill label="Stream">{modelPreset.stream ? 'On' : 'Off'}</MetadataPill>
 													<MetadataPill label="Prompt">{modelPreset.maxPromptLength ?? 'Default'}</MetadataPill>
 													<MetadataPill label="Output">{modelPreset.maxOutputLength ?? 'Default'}</MetadataPill>
@@ -465,21 +419,22 @@ export function ProviderPresetCard({
 										>
 											<ActionRow
 												leading={
-													<>
-														<label htmlFor={`model-enabled-${provider}-${id}`} className="text-sm">
-															Enabled
-														</label>
-														<input
-															id={`model-enabled-${provider}-${id}`}
-															type="checkbox"
-															className="toggle toggle-accent toggle-sm"
-															checked={modelPreset.isEnabled}
-															onChange={() => {
-																toggleModelEnable(id);
-															}}
-															aria-label={`Enable ${modelPreset.displayName || id}`}
-														/>
-													</>
+													<EnabledControl
+														id={`model-enabled-${provider}-${id}`}
+														checked={modelPreset.isEnabled}
+														onChange={enabled => {
+															toggleModelEnable(id, enabled);
+														}}
+														disabled={!preset.isEnabled || (isDefault && modelPreset.isEnabled)}
+														busy={isPending(`${id}:toggle`)}
+														title={
+															isDefault && modelPreset.isEnabled
+																? 'Choose another default model before disabling this one.'
+																: !preset.isEnabled
+																	? 'Enable the provider first.'
+																	: undefined
+														}
+													/>
 												}
 											>
 												<button
@@ -493,6 +448,20 @@ export function ProviderPresetCard({
 													<FiEye size={16} />
 													<span>View</span>
 												</button>
+
+												{!isDefault ? (
+													<button
+														type="button"
+														className="btn btn-sm btn-ghost rounded-xl"
+														disabled={!preset.isEnabled || !modelPreset.isEnabled || isPending(`${id}:set-default`)}
+														onClick={() => {
+															setDefaultModel(id);
+														}}
+													>
+														<FiCheckCircle size={16} />
+														<span>Set default</span>
+													</button>
+												) : null}
 
 												{canModify ? (
 													<>
@@ -513,6 +482,7 @@ export function ProviderPresetCard({
 															onClick={() => {
 																requestDeleteModel(id);
 															}}
+															disabled={isPending(`${id}:delete`)}
 															title="Delete Model Preset"
 														>
 															<FiTrash2 size={16} />
@@ -527,10 +497,12 @@ export function ProviderPresetCard({
 									);
 								})}
 							</div>
+						) : (
+							<ManagementEmptyState>No model presets configured for this provider.</ManagementEmptyState>
 						)}
 					</div>
-				</div>
-			)}
+				)}
+			</ManagementBundleCard>
 
 			<DeleteConfirmationModal
 				isOpen={showDelProv}
@@ -538,9 +510,9 @@ export function ProviderPresetCard({
 					setShowDelProv(false);
 				}}
 				onConfirm={confirmDeleteProvider}
+				confirmButtonText="Delete"
 				title="Delete Provider"
 				message={`Delete provider “${provider}”? This action cannot be undone.`}
-				confirmButtonText="Delete"
 			/>
 
 			<DeleteConfirmationModal
@@ -549,9 +521,9 @@ export function ProviderPresetCard({
 					setShowDelModel(false);
 				}}
 				onConfirm={confirmDeleteModel}
+				confirmButtonText="Delete"
 				title="Delete Model Preset"
 				message={`Delete model preset “${selectedID}”? This action cannot be undone.`}
-				confirmButtonText="Delete"
 			/>
 
 			<AddEditModelPresetModal
@@ -598,6 +570,6 @@ export function ProviderPresetCard({
 				}}
 				message={deniedMsg}
 			/>
-		</div>
+		</>
 	);
 }

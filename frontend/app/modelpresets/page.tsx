@@ -239,8 +239,16 @@ export default function ModelPresetsPage() {
 				throw new Error('Provider not found.');
 			}
 
+			if (!providerPreset.isEnabled) {
+				throw new Error('Enable the provider before selecting its default model.');
+			}
+
 			if (!providerPreset.modelPresets[modelPresetID]) {
 				throw new Error('Model preset not found.');
+			}
+
+			if (!providerPreset.modelPresets[modelPresetID].isEnabled) {
+				throw new Error('Enable the model preset before selecting it as the default.');
 			}
 
 			try {

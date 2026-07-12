@@ -13,6 +13,7 @@ import {
 	parseHTTPStatusCodes,
 	parseStringRecordJSON,
 	redactSensitiveHTTPHeaders,
+	validateHTTPURLSecurity,
 } from '@/lib/http_input_utils';
 import type { JSONSchema } from '@/lib/jsonschema_utils';
 import { omitManyKeys } from '@/lib/obj_utils';
@@ -109,6 +110,20 @@ const EMPTY_FORM_DATA = {
 };
 
 type ToolFormData = typeof EMPTY_FORM_DATA;
+
+function validateHTTPToolURL(raw: string, input: HTMLInputElement | null) {
+	const result = validateUrlForInput(raw, input, {
+		required: true,
+		requiredMessage: 'HTTP URL is required.',
+	});
+
+	return {
+		...result,
+		error:
+			result.error ??
+			(result.normalized ? validateHTTPURLSecurity(result.normalized, 'HTTP tool URL') : MessageEnterValidURL),
+	};
+}
 
 function buildInitialFormData(
 	initialData: ToolItem | undefined,
@@ -314,10 +329,7 @@ function AddEditToolModalContent({
 				newErrs.argSchema = 'Invalid JSON';
 			}
 		} else if (field === 'httpUrl' && formData.type === ToolImplType.HTTP) {
-			const { error } = validateUrlForInput(v, httpUrlInputRef.current, {
-				required: true,
-				requiredMessage: 'HTTP URL is required.',
-			});
+			const { error } = validateHTTPToolURL(v, httpUrlInputRef.current);
 
 			if (error) {
 				newErrs.httpUrl = error;
@@ -494,13 +506,9 @@ function AddEditToolModalContent({
 
 		if (formData.type === ToolImplType.HTTP) {
 			const httpUrlInput = httpUrlInputRef.current;
-			const { normalized: normalizedHttpUrl, error: httpUrlError } = validateUrlForInput(
+			const { normalized: normalizedHttpUrl, error: httpUrlError } = validateHTTPToolURL(
 				formData.httpUrl,
-				httpUrlInput,
-				{
-					required: true,
-					requiredMessage: 'HTTP URL is required.',
-				}
+				httpUrlInput
 			);
 
 			if (!normalizedHttpUrl || httpUrlError) {
@@ -969,6 +977,12 @@ function AddEditToolModalContent({
 												</span>
 											</div>
 										)}
+										<div className="label">
+											<span className="text-base-content/70 text-xs">
+												Remote tool endpoints require HTTPS. Plain HTTP is limited to localhost and loopback addresses.
+												Embedded URL credentials are not allowed.
+											</span>
+										</div>
 									</div>
 								</div>
 

@@ -2,6 +2,63 @@ const HTTP_HEADER_NAME_RE = /^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/;
 // oxlint-disable-next-line no-control-regex
 const HTTP_HEADER_CONTROL_CHAR_RE = /[\r\n\u0000]/;
 
+function isIPv4LoopbackHost(host: string): boolean {
+	const parts = host.split('.').map(Number);
+
+	return (
+		parts.length === 4 && parts.every(part => Number.isInteger(part) && part >= 0 && part <= 255) && parts[0] === 127
+	);
+}
+
+function isLoopbackHTTPHost(host: string): boolean {
+	const normalized = host.trim().toLowerCase().replace(/^\[/, '').replace(/\]$/, '');
+
+	if (!normalized) {
+		return false;
+	}
+
+	return (
+		normalized === 'localhost' ||
+		normalized === '::1' ||
+		normalized === '0:0:0:0:0:0:0:1' ||
+		isIPv4LoopbackHost(normalized)
+	);
+}
+
+/**
+ * Applies the transport security policy used by remotely invoked HTTP tools
+ * and MCP Streamable HTTP servers.
+ *
+ * Plain HTTP is intentionally limited to loopback development endpoints.
+ * URL userinfo is rejected because it is easy to leak in logs, exports, and
+ * view-only configuration surfaces.
+ */
+export function validateHTTPURLSecurity(raw: string, fieldLabel = 'URL'): string | undefined {
+	try {
+		const url = new URL(raw);
+
+		if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+			return `${fieldLabel} must use http or https.`;
+		}
+
+		if (!url.hostname) {
+			return `${fieldLabel} must include a host.`;
+		}
+
+		if (url.username || url.password) {
+			return `${fieldLabel} must not include embedded credentials. Store credentials in the configured secret fields instead.`;
+		}
+
+		if (url.protocol === 'http:' && !isLoopbackHTTPHost(url.hostname)) {
+			return `${fieldLabel} must use https for remote hosts. Plain HTTP is allowed only for localhost or loopback addresses.`;
+		}
+
+		return undefined;
+	} catch {
+		return `${fieldLabel} must be valid.`;
+	}
+}
+
 const SENSITIVE_HEADER_NAMES = new Set([
 	'authorization',
 	'proxy-authorization',
@@ -93,6 +150,7 @@ export function parseHTTPStatusCodes(raw: string): number[] | undefined {
 
 function isSensitiveHTTPHeaderName(name: string): boolean {
 	const normalized = name.trim().toLowerCase();
+
 	if (SENSITIVE_HEADER_NAMES.has(normalized)) {
 		return true;
 	}

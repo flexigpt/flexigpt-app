@@ -279,7 +279,16 @@ export default function ToolsPage() {
 	const handleAddBundle = async (slug: string, display: string, description?: string) => {
 		const id = getUUIDv7();
 		await toolStoreAPI.putToolBundle(id, slug, display, true, description);
-		await reloadOrThrow();
+
+		try {
+			await reloadOrThrow();
+		} catch (error) {
+			console.error('Tool bundle was created but refresh failed:', error);
+			setAlertMsg(
+				'Tool bundle was created, but the page could not be refreshed. Reload before making destructive changes.'
+			);
+			setShowAlert(true);
+		}
 	};
 
 	if (isLoading && !hasResolved) {
@@ -360,6 +369,7 @@ export default function ToolsPage() {
 					}}
 					onSubmit={handleAddBundle}
 					existingSlugs={bundles.map(b => b.bundle.slug)}
+					existingDisplayNames={bundles.map(bundleData => bundleData.bundle.displayName || bundleData.bundle.slug)}
 					failureMessage="Failed to create tool bundle."
 				/>
 

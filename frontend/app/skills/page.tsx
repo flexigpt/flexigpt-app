@@ -414,7 +414,17 @@ export default function SkillsPage() {
 			try {
 				const id = getUUIDv7();
 				await skillStoreAPI.putSkillBundle(id, slug, display, true, description);
-				await reloadOrThrow();
+				try {
+					await reloadOrThrow();
+				} catch (refreshError) {
+					console.error('Skill bundle was created but refresh failed:', refreshError);
+					if (isMountedRef.current) {
+						setAlertMsg(
+							'Skill bundle was created, but the page could not be refreshed. Reload before making destructive changes.'
+						);
+						setShowAlert(true);
+					}
+				}
 			} catch (err) {
 				console.error('Add skill bundle failed:', err);
 				throw err;
