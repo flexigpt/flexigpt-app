@@ -57,6 +57,8 @@ interface MCPBundleCardProps {
 	runtimeByServerID: Record<string, MCPServerRuntimeSnapshot | undefined>;
 	authHealthByServerID: Record<string, MCPAuthHealth | undefined>;
 
+	serverLoadError?: string;
+	onRefreshServers: () => Promise<void>;
 	onToggleBundleEnabled: (bundleID: string, enabled: boolean) => Promise<void>;
 	onToggleServerEnabled: (bundleID: string, serverID: string, enabled: boolean) => Promise<void>;
 	onSubmitServer: (bundleID: string, serverToEditID: string | undefined, input: MCPServerUpsertInput) => Promise<void>;
@@ -112,8 +114,8 @@ function getErrorMessage(error: unknown, fallback: string): string {
 
 function InfoPill({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
 	return (
-		<div className={`bg-base-200 flex min-w-0 rounded-xl p-2 ${className}`}>
-			<div className="grid size-full grid-cols-3 items-center gap-4">
+		<div className={`border-base-content/10 flex min-w-0 rounded-xl border p-2 ${className}`}>
+			<div className="grid size-full grid-cols-3 items-center gap-2">
 				<div className="text-base-content/60 col-span-1 text-[10px] uppercase">{label}</div>
 				<div className="col-span-2 text-xs">{children}</div>
 			</div>
@@ -136,6 +138,8 @@ export function MCPBundleCard({
 	prefillServers,
 	runtimeByServerID,
 	authHealthByServerID,
+	serverLoadError,
+	onRefreshServers,
 	onToggleBundleEnabled,
 	onToggleServerEnabled,
 	onSubmitServer,
@@ -153,6 +157,8 @@ export function MCPBundleCard({
 
 	const [isDeleteServerModalOpen, setIsDeleteServerModalOpen] = useState(false);
 	const [serverToDelete, setServerToDelete] = useState<MCPServerConfig | null>(null);
+	const [isDeleteServerPending, setIsDeleteServerPending] = useState(false);
+	const [isRefreshingServers, setIsRefreshingServers] = useState(false);
 
 	const [isServerModalOpen, setIsServerModalOpen] = useState(false);
 	const [serverModalMode, setServerModalMode] = useState<ServerModalMode>('add');
@@ -188,6 +194,10 @@ export function MCPBundleCard({
 	};
 
 	const runServerAction = async (key: string, action: () => Promise<void>, fallback: string) => {
+		if (pendingActionKeys.has(key)) {
+			return;
+		}
+
 		try {
 			setActionPending(key, true);
 			await action();
@@ -196,6 +206,21 @@ export function MCPBundleCard({
 			openAlert(getErrorMessage(error, fallback));
 		} finally {
 			setActionPending(key, false);
+		}
+	};
+
+	const refreshServers = async () => {
+		if (isRefreshingServers) {
+			return;
+		}
+
+		setIsRefreshingServers(true);
+		try {
+			await onRefreshServers();
+		} catch (error) {
+			openAlert(getErrorMessage(error, 'Failed to reload MCP servers.'));
+		} finally {
+			setIsRefreshingServers(false);
 		}
 	};
 
@@ -244,18 +269,20 @@ export function MCPBundleCard({
 	};
 
 	const confirmDeleteServer = async () => {
-		if (!serverToDelete) {
+		if (!serverToDelete || isDeleteServerPending) {
 			return;
 		}
 
+		setIsDeleteServerPending(true);
 		try {
 			await onDeleteServer(bundle.id, serverToDelete.id);
+			setIsDeleteServerModalOpen(false);
+			setServerToDelete(null);
 		} catch (error) {
 			console.error('Delete MCP server failed:', error);
 			openAlert(getErrorMessage(error, 'Failed to delete MCP server.'));
 		} finally {
-			setIsDeleteServerModalOpen(false);
-			setServerToDelete(null);
+			setIsDeleteServerPending(false);
 		}
 	};
 
@@ -341,23 +368,26 @@ export function MCPBundleCard({
 		dismissOAuthModal();
 	};
 	return (
-		<div className="bg-base-100 mb-8 rounded-2xl p-4 shadow-lg">
-			<div className="flex items-center justify-between">
-				<div className="flex items-center">
-					<h3 className="gap-2 text-sm font-semibold">
+		<section className="bg-base-100 border-base-content/10 mb-6 rounded-2xl border p-4 shadow-sm">
+			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+				<div className="min-w-0">
+					<h3 className="truncate text-sm font-semibold">
 						<span className="capitalize">{bundle.displayName || bundle.slug}</span>
 						<span className="text-base-content/60 ml-1">({bundle.slug})</span>
 					</h3>
 				</div>
 
-				<div className="flex items-center justify-end gap-4">
-					<span className="text-base-content/60 text-xs tracking-wide uppercase">
+				<div className="flex flex-wrap items-center justify-end gap-3">
+					<span className="border-base-content/20 rounded-xl border px-2 py-1 text-xs">
 						{bundle.isBuiltIn ? 'Built-in' : isReservedBundle ? 'Base' : 'Custom'}
 					</span>
 
 					<div className="flex items-center gap-1">
-						<label className="text-sm">Enabled</label>
+						<label htmlFor={`mcp-bundle-${bundle.id}`} className="text-sm">
+							Enabled
+						</label>
 						<input
+							id={`mcp-bundle-${bundle.id}`}
 							type="checkbox"
 							className="toggle toggle-accent"
 							checked={bundle.isEnabled}
@@ -369,26 +399,46 @@ export function MCPBundleCard({
 						/>
 					</div>
 
-					<div
-						className="flex cursor-pointer items-center gap-1"
+					<button
+						type="button"
+						className="btn btn-sm btn-ghost rounded-xl"
+						aria-expanded={isExpanded}
 						onClick={() => {
 							setIsExpanded(prev => !prev);
 						}}
 					>
-						<label className="text-sm whitespace-nowrap">Servers:&nbsp;{servers.length}</label>
+						<span className="whitespace-nowrap">Servers: {servers.length}</span>
 						{isExpanded ? <FiChevronUp /> : <FiChevronDown />}
-					</div>
+					</button>
 				</div>
 			</div>
+
+			{serverLoadError ? (
+				<div className="alert alert-warning mt-4 rounded-2xl text-sm" role="status">
+					<div className="min-w-0 grow">
+						<div className="font-semibold">Servers could not be loaded</div>
+						<div className="wrap-break-word">{serverLoadError}</div>
+					</div>
+					<button
+						type="button"
+						className="btn btn-sm rounded-xl"
+						onClick={() => void refreshServers()}
+						disabled={isRefreshingServers}
+					>
+						<FiRefreshCw size={14} />
+						<span>{isRefreshingServers ? 'Reloading' : 'Retry'}</span>
+					</button>
+				</div>
+			) : null}
 
 			{isExpanded && (
 				<div className="mt-8 space-y-4">
 					{servers.length === 0 ? (
 						<div className="border-base-content/10 rounded-2xl border py-6 text-center text-sm">
-							No MCP servers in this bundle.
+							{serverLoadError ? 'Server contents are unavailable.' : 'No MCP servers in this bundle.'}
 						</div>
 					) : (
-						<div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+						<div className="grid grid-cols-1 gap-4">
 							{servers.map(server => {
 								const runtime = runtimeByServerID[server.id];
 								const authHealth = authHealthByServerID[server.id];
@@ -406,15 +456,15 @@ export function MCPBundleCard({
 										key={server.id}
 										className="border-base-content/10 bg-base-100 min-w-0 rounded-2xl border p-4 shadow-sm"
 									>
-										<div className="mb-2 flex min-w-0 items-start justify-between gap-3">
-											<div className="flex min-w-0 items-center gap-2">
+										<div className="mb-3 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+											<div className="min-w-0">
 												<div className="truncate text-sm font-semibold" title={server.displayName}>
 													{server.displayName}
 												</div>
-												<div className="text-base-content/60 text-xs break-all">{server.id}</div>
+												<div className="text-base-content/60 mt-1 text-xs break-all">{server.id}</div>
 											</div>
 
-											<div className="flex shrink-0 items-end gap-2">
+											<div className="flex max-w-full flex-wrap items-center gap-2">
 												<span className={`badge badge-xs rounded-xl ${getMCPStatusBadgeClass(status)}`}>
 													{getMCPStatusLabel(status)}
 												</span>
@@ -530,10 +580,10 @@ export function MCPBundleCard({
 													</div>
 												)}
 											</div>
-											<div className="flex w-full items-center justify-end gap-2">
+											<div className="border-base-content/10 flex w-full flex-wrap items-center justify-end gap-2 border-t pt-3">
 												<button
 													type="button"
-													className="btn btn-sm btn-ghost rounded-2xl"
+													className="btn btn-xs btn-ghost rounded-xl"
 													onClick={() => {
 														setServerDetails(server);
 													}}
@@ -541,11 +591,12 @@ export function MCPBundleCard({
 													aria-label="View"
 												>
 													<FiEye size={16} />
+													<span>View</span>
 												</button>
 												{serverHasSetupInputs(server) && (
 													<button
 														type="button"
-														className="btn btn-sm btn-ghost rounded-2xl"
+														className="btn btn-xs btn-ghost rounded-xl"
 														onClick={() => {
 															if (!bundle.isEnabled) {
 																openAlert('Enable the MCP bundle before configuring servers.');
@@ -558,11 +609,12 @@ export function MCPBundleCard({
 														aria-label="Configure setup"
 													>
 														<FiSettings size={16} />
+														<span>Setup</span>
 													</button>
 												)}
 												<button
 													type="button"
-													className="btn btn-sm btn-ghost rounded-2xl"
+													className="btn btn-xs btn-ghost rounded-xl"
 													onClick={() => {
 														openServerModal('edit', server);
 													}}
@@ -577,11 +629,12 @@ export function MCPBundleCard({
 													aria-label="Edit"
 												>
 													<FiEdit2 size={16} />
+													<span>Edit</span>
 												</button>
 
 												<button
 													type="button"
-													className="btn btn-sm btn-ghost rounded-2xl"
+													className="btn btn-xs btn-ghost rounded-xl"
 													onClick={() => {
 														void runServerAction(
 															`connect:${server.id}`,
@@ -610,11 +663,12 @@ export function MCPBundleCard({
 													aria-label="Connect"
 												>
 													<FiWifi size={16} />
+													<span>Connect</span>
 												</button>
 
 												<button
 													type="button"
-													className="btn btn-sm btn-ghost rounded-2xl"
+													className="btn btn-xs btn-ghost rounded-xl"
 													onClick={() => {
 														void runServerAction(
 															`disconnect:${server.id}`,
@@ -631,11 +685,12 @@ export function MCPBundleCard({
 													aria-label="Disconnect"
 												>
 													<FiWifiOff size={16} />
+													<span>Disconnect</span>
 												</button>
 
 												<button
 													type="button"
-													className="btn btn-sm btn-ghost rounded-2xl"
+													className="btn btn-xs btn-ghost rounded-xl"
 													onClick={() => {
 														void runServerAction(
 															`refresh:${server.id}`,
@@ -654,11 +709,12 @@ export function MCPBundleCard({
 													aria-label="Refresh discovery"
 												>
 													<FiRefreshCw size={16} />
+													<span>Refresh</span>
 												</button>
 
 												<button
 													type="button"
-													className="btn btn-sm btn-ghost rounded-2xl"
+													className="btn btn-xs btn-ghost rounded-xl"
 													onClick={() => {
 														requestDeleteServer(server);
 													}}
@@ -669,6 +725,7 @@ export function MCPBundleCard({
 													aria-label="Delete"
 												>
 													<FiTrash2 size={16} />
+													<span>Delete</span>
 												</button>
 											</div>
 										</div>
@@ -679,17 +736,19 @@ export function MCPBundleCard({
 					)}
 
 					{!bundle.isBuiltIn && (
-						<div className="flex items-center justify-between">
+						<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 							<button
 								type="button"
 								className="btn btn-md btn-ghost flex items-center rounded-2xl"
-								disabled={isReservedBundle || servers.length > 0}
+								disabled={isReservedBundle || servers.length > 0 || Boolean(serverLoadError)}
 								title={
 									isReservedBundle
 										? 'The base MCP bundle cannot be deleted.'
-										: servers.length > 0
-											? 'Delete all servers from this bundle first.'
-											: 'Delete Bundle'
+										: serverLoadError
+											? 'Reload servers before deleting this bundle.'
+											: servers.length > 0
+												? 'Delete all servers from this bundle first.'
+												: 'Delete Bundle'
 								}
 								onClick={() => {
 									if (isReservedBundle) {
@@ -721,8 +780,10 @@ export function MCPBundleCard({
 			<DeleteConfirmationModal
 				isOpen={isDeleteServerModalOpen}
 				onClose={() => {
-					setIsDeleteServerModalOpen(false);
-					setServerToDelete(null);
+					if (!isDeleteServerPending) {
+						setIsDeleteServerModalOpen(false);
+						setServerToDelete(null);
+					}
 				}}
 				onConfirm={confirmDeleteServer}
 				title="Delete MCP Server"
@@ -783,6 +844,6 @@ export function MCPBundleCard({
 				}}
 				message={alertMsg}
 			/>
-		</div>
+		</section>
 	);
 }

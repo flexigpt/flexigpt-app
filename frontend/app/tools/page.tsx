@@ -21,6 +21,7 @@ import { ToolBundleCard } from '@/tools/tool_bundle_card';
 interface BundleData {
 	bundle: ToolBundle;
 	tools: Tool[];
+	toolLoadError?: string;
 }
 
 const getErrorMessage = (err: unknown, fallback: string) => {
@@ -53,8 +54,12 @@ export default function ToolsPage() {
 						const toolListItems = await getAllTools([b.id], undefined, true);
 						const tools = toolListItems.map(itm => itm.toolDefinition);
 						return { bundle: b, tools };
-					} catch {
-						return { bundle: b, tools: [] };
+					} catch (error) {
+						return {
+							bundle: b,
+							tools: [],
+							toolLoadError: getErrorMessage(error, 'Failed to load tools for this bundle.'),
+						};
 					}
 				})
 			);
@@ -67,18 +72,37 @@ export default function ToolsPage() {
 			setBundles([]);
 		}
 	}, []);
-
 	const refreshBundleTools = useCallback(async (bundleID: string) => {
-		const toolListItems = await getAllTools([bundleID], undefined, true);
-		const freshTools = toolListItems.map(itm => itm.toolDefinition);
+		try {
+			const toolListItems = await getAllTools([bundleID], undefined, true);
+			const freshTools = toolListItems.map(itm => itm.toolDefinition);
 
-		setBundles(prev =>
-			(prev ?? []).map(bd => (bd.bundle.id === bundleID ? Object.assign({}, bd, { tools: freshTools }) : bd))
-		);
+			setBundles(prev =>
+				(prev ?? []).map(bd =>
+					bd.bundle.id === bundleID
+						? Object.assign({}, bd, {
+								tools: freshTools,
+								toolLoadError: undefined,
+							})
+						: bd
+				)
+			);
+		} catch (error) {
+			setBundles(prev =>
+				(prev ?? []).map(bd =>
+					bd.bundle.id === bundleID
+						? Object.assign({}, bd, {
+								toolLoadError: getErrorMessage(error, 'Failed to load tools for this bundle.'),
+							})
+						: bd
+				)
+			);
+
+			throw error;
+		}
 	}, []);
 
 	useEffect(() => {
-		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect
 		void fetchAll();
 	}, [fetchAll]);
 
@@ -209,6 +233,16 @@ export default function ToolsPage() {
 		if (!bundleToDelete) {
 			return;
 		}
+		const bundleData = (bundles ?? []).find(item => item.bundle.id === bundleToDelete.id);
+		if (!bundleData || bundleData.toolLoadError || bundleData.tools.length > 0) {
+			setAlertMsg(
+				bundleData?.toolLoadError
+					? 'Reload this bundle before deleting it.'
+					: 'Remove all tools before deleting the bundle.'
+			);
+			setShowAlert(true);
+			return;
+		}
 
 		try {
 			await toolStoreAPI.deleteToolBundle(bundleToDelete.id);
@@ -267,6 +301,10 @@ export default function ToolsPage() {
 								key={bd.bundle.id}
 								bundle={bd.bundle}
 								tools={bd.tools}
+								toolLoadError={bd.toolLoadError}
+								onRefreshTools={() => {
+									return refreshBundleTools(bd.bundle.id);
+								}}
 								onToggleBundleEnable={handleToggleBundleEnable}
 								onToggleToolEnable={handleToggleToolEnable}
 								onDeleteTool={handleDeleteTool}

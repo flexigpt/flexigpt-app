@@ -450,34 +450,13 @@ export default function SkillsPage() {
 
 				<div className="app-scrollbar-thin flex w-full grow flex-col items-center overflow-y-auto">
 					<div className="mt-4 w-11/12 space-y-4 xl:w-2/3">
-						<div className="alert alert-info rounded-2xl text-sm">
-							<div className="space-y-1">
-								<div className="font-semibold">How skill artifacts work</div>
-								<div>
-									A skill artifact is a directory with a required <span className="font-mono">SKILL.md</span>. FlexiGPT
-									gives special meaning only to <span className="font-mono">name</span>,{' '}
-									<span className="font-mono">description</span>, <span className="font-mono">insert</span>, and{' '}
-									<span className="font-mono">arguments</span>.
-								</div>
-								<div>
-									<span className="font-semibold">Instruction skills</span> use{' '}
-									<span className="font-mono">insert: instructions</span>. They are standing context and can be enabled
-									or activated in a conversation session.
-								</div>
-								<div>
-									<span className="font-semibold">User-message templates</span> use{' '}
-									<span className="font-mono">insert: user-message</span>. They render into composer text and do not
-									become active session skills. Indexed filesystem resources may be selected as ordinary attachments
-									when the template is inserted.
-								</div>
-								<div>
-									Managed creation writes one simple <span className="font-mono">SKILL.md</span> file. To add resources,
-									assets, or scripts, save the skill first, open the shown skill folder, and add files such as{' '}
-									<span className="font-mono">references/</span>, <span className="font-mono">assets/</span>, or{' '}
-									<span className="font-mono">scripts/</span>. Re-enable the skill or restart the app to refresh indexed
-									metadata.
-								</div>
-							</div>
+						<div className="border-base-content/10 bg-base-100 rounded-2xl border p-4 text-sm">
+							<div className="font-semibold">Skill basics</div>
+							<ul className="text-base-content/70 mt-2 list-disc space-y-1 pl-5 text-xs">
+								<li>Instruction skills provide reusable conversation context.</li>
+								<li>User-message skills insert reusable text into the composer.</li>
+								<li>Managed skills create `SKILL.md`; extra files can be added to the saved folder.</li>
+							</ul>
 						</div>
 
 						<div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -561,14 +540,17 @@ export default function SkillsPage() {
 										<button
 											key={option.value}
 											type="button"
-											className={`btn btn-sm rounded-xl ${isActive ? 'btn-primary' : 'btn-ghost'}`}
+											className={`btn btn-sm rounded-xl border ${
+												isActive ? 'border-base-content/30 bg-base-200' : 'border-transparent bg-transparent'
+											}`}
 											onClick={() => {
 												setInsertFilter(option.value);
 											}}
 											title={option.description}
+											aria-pressed={isActive}
 										>
 											<span>{option.label}</span>
-											<span className={`badge badge-sm ${isActive ? 'badge-neutral' : 'badge-outline'}`}>
+											<span className="border-base-content/20 rounded-lg border px-1.5 py-0.5 text-xs">
 												{option.count}
 											</span>
 										</button>
@@ -583,7 +565,7 @@ export default function SkillsPage() {
 										<button
 											key={tag}
 											type="button"
-											className="badge badge-outline rounded-xl"
+											className="border-base-content/20 hover:bg-base-200 rounded-xl border px-2 py-1 text-xs"
 											onClick={() => {
 												setTagFilterInput(current => {
 													const existing = current

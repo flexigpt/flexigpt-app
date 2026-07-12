@@ -99,8 +99,13 @@ function summarizeToolCallArguments(args: string): string | undefined {
 		const parts: string[] = [];
 
 		for (const key of primaryKeys) {
-			if (obj[key] !== null) {
-				parts.push(obj[key] as string);
+			const value = obj[key];
+			if (value !== undefined && value !== null) {
+				// oxlint-disable-next-line typescript/no-base-to-string
+				const text = String(value).trim();
+				if (text) {
+					parts.push(text);
+				}
 			}
 		}
 

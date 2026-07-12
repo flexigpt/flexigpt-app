@@ -297,18 +297,20 @@ export function getMCPStatusLabel(status?: MCPServerStatus): string {
 	}
 }
 
+const STATUS_BADGE_LAYOUT = 'h-auto max-w-full whitespace-normal break-words px-2 py-1 text-center leading-tight';
+
 export function getMCPStatusBadgeClass(status?: MCPServerStatus): string {
 	switch (status) {
 		case MCPServerStatus.MCPServerStatusReady:
-			return 'badge-success';
+			return `${STATUS_BADGE_LAYOUT} badge-success`;
 		case MCPServerStatus.MCPServerStatusConnecting:
-			return 'badge-info';
+			return `${STATUS_BADGE_LAYOUT} badge-info`;
 		case MCPServerStatus.MCPServerStatusError:
-			return 'badge-error';
+			return `${STATUS_BADGE_LAYOUT} badge-error`;
 		case MCPServerStatus.MCPServerStatusDisabled:
-			return 'badge-neutral';
+			return `${STATUS_BADGE_LAYOUT} badge-neutral`;
 		default:
-			return 'badge-warning';
+			return `${STATUS_BADGE_LAYOUT} badge-warning`;
 	}
 }
 
@@ -342,20 +344,20 @@ function getMCPAuthHealthBadgeClass(state?: MCPAuthHealthState | string): string
 
 	switch (normalizedState) {
 		case MCPAuthHealthState.MCPAuthHealthStateNotRequired:
-			return 'badge-ghost';
+			return `${STATUS_BADGE_LAYOUT} badge-ghost`;
 		case MCPAuthHealthState.MCPAuthHealthStateAuthorized:
-			return 'badge-success';
+			return `${STATUS_BADGE_LAYOUT} badge-success`;
 		case MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending:
-			return 'badge-info';
+			return `${STATUS_BADGE_LAYOUT} badge-info`;
 		case MCPAuthHealthState.MCPAuthHealthStateAuthorizationNeeded:
 		case MCPAuthHealthState.MCPAuthHealthStateExpired:
 		case MCPAuthHealthState.MCPAuthHealthStateNotConfigured:
-			return 'badge-warning';
+			return `${STATUS_BADGE_LAYOUT} badge-warning`;
 		case MCPAuthHealthState.MCPAuthHealthStateInsufficientScope:
 		case MCPAuthHealthState.MCPAuthHealthStateError:
-			return 'badge-error';
+			return `${STATUS_BADGE_LAYOUT} badge-error`;
 		default:
-			return 'badge-neutral';
+			return `${STATUS_BADGE_LAYOUT} badge-neutral`;
 	}
 }
 
@@ -409,14 +411,14 @@ export function getMCPToolRiskLabel(risk: MCPToolRisk): string {
 export function getMCPToolRiskBadgeClass(risk: MCPToolRisk): string {
 	switch (risk) {
 		case MCPToolRisk.MCPToolRiskRead:
-			return 'badge-success';
+			return `${STATUS_BADGE_LAYOUT} badge-success`;
 		case MCPToolRisk.MCPToolRiskWrite:
-			return 'badge-warning';
+			return `${STATUS_BADGE_LAYOUT} badge-warning`;
 		case MCPToolRisk.MCPToolRiskDestructive:
 		case MCPToolRisk.MCPToolRiskOpenWorld:
-			return 'badge-error';
+			return `${STATUS_BADGE_LAYOUT} badge-error`;
 		default:
-			return 'badge-neutral';
+			return `${STATUS_BADGE_LAYOUT} badge-neutral`;
 	}
 }
 

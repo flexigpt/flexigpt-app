@@ -1,16 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import {
-	FiCheck,
-	FiChevronDown,
-	FiChevronUp,
-	FiEdit2,
-	FiEye,
-	FiGitBranch,
-	FiPlus,
-	FiTrash2,
-	FiX,
-} from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiEdit2, FiEye, FiGitBranch, FiPlus, FiTrash2 } from 'react-icons/fi';
 
 import type { Skill, SkillBundle } from '@/spec/skill';
 import { SkillPresenceStatus } from '@/spec/skill';
@@ -22,7 +12,6 @@ import type { SkillInsertFilter } from '@/skills/lib/skill_artifact_utils';
 import {
 	getSkillArgumentCountLabel,
 	getSkillArgumentTooltip,
-	getSkillInsertBadgeClass,
 	getSkillInsertDescription,
 	getSkillInsertLabel,
 	getSkillInsertShortLabel,
@@ -30,7 +19,6 @@ import {
 	getSkillResourceCountLabel,
 	getSkillResourceTooltip,
 	normalizeSkillInsert,
-	skillHasResources,
 	skillMatchesInsertFilter,
 	skillMatchesSearch,
 	skillMatchesTags,
@@ -86,7 +74,9 @@ function PresenceBadge({ skill }: { skill: Skill }) {
 
 	return (
 		<span className="tooltip tooltip-top" data-tip={tooltip}>
-			<span className={`${cls} badge-sm whitespace-nowrap`}>{label}</span>
+			<span className={`${cls} badge-sm h-auto max-w-full px-2 py-1 text-center wrap-break-word whitespace-normal`}>
+				{label}
+			</span>
 		</span>
 	);
 }
@@ -313,19 +303,22 @@ export function SkillBundleCard({
 	};
 
 	return (
-		<div className="bg-base-100 mb-8 rounded-2xl p-4 shadow-lg">
-			<div className="flex items-center justify-between">
-				<div className="flex items-center">
-					<h3 className="gap-2 text-sm font-semibold">
+		<section className="bg-base-100 border-base-content/10 mb-6 rounded-2xl border p-4 shadow-sm">
+			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+				<div className="min-w-0">
+					<h3 className="truncate text-sm font-semibold">
 						<span className="capitalize">{bundle.displayName || bundle.slug}</span>
 						<span className="text-base-content/60 ml-1">({bundle.slug})</span>
 					</h3>
+					<div className="text-base-content/60 mt-1 text-xs">
+						{bundle.isBuiltIn ? 'Built-in bundle' : 'Custom bundle'}
+					</div>
 				</div>
 
-				<div className="flex items-center justify-end gap-4">
+				<div className="flex flex-wrap items-center justify-end gap-3">
 					<button
 						type="button"
-						className="btn btn-sm btn-ghost p-0"
+						className="btn btn-sm btn-ghost rounded-xl"
 						title="View bundle details"
 						onClick={e => {
 							e.stopPropagation();
@@ -333,35 +326,38 @@ export function SkillBundleCard({
 						}}
 					>
 						<FiEye size={16} />
+						<span>Details</span>
 					</button>
 
-					<span className="text-base-content/60 text-xs tracking-wide uppercase">
-						{bundle.isBuiltIn ? 'Built-in' : 'Custom'}
-					</span>
-
 					<div className="flex items-center gap-1">
-						<label className="text-sm">Enabled</label>
+						<label htmlFor={`skill-bundle-${bundle.id}`} className="text-sm">
+							Enabled
+						</label>
 						<input
+							id={`skill-bundle-${bundle.id}`}
 							type="checkbox"
 							className="toggle toggle-accent"
 							checked={bundle.isEnabled}
 							onChange={toggleBundleEnable}
 							disabled={busyBundleToggle}
+							aria-label={`Enable ${bundle.displayName || bundle.slug}`}
 						/>
 					</div>
 
-					<div
-						className="flex cursor-pointer items-center gap-1"
+					<button
+						type="button"
+						className="btn btn-sm btn-ghost rounded-xl"
+						aria-expanded={isExpanded}
 						onClick={() => {
 							setIsExpanded(prev => !prev);
 						}}
 					>
-						<label className="text-sm whitespace-nowrap">
-							Skills:&nbsp;{visibleSkills.length}
+						<span className="text-sm whitespace-nowrap">
+							Skills: {visibleSkills.length}
 							{insertFilter !== 'all' ? <span className="text-base-content/60"> / {skills.length}</span> : null}
-						</label>
+						</span>
 						{isExpanded ? <FiChevronUp /> : <FiChevronDown />}
-					</div>
+					</button>
 				</div>
 			</div>
 
@@ -400,224 +396,182 @@ export function SkillBundleCard({
 						</div>
 					)}
 
-					<div className="border-base-content/10 overflow-x-auto rounded-2xl border">
-						<table className="table-zebra table w-full">
-							<thead>
-								<tr className="bg-base-300 text-sm font-semibold">
-									<th className="w-full">Display Name</th>
-									<th className="min-w-32 text-center">Slug</th>
-									<th className="min-w-32 text-center">Insert</th>
-									<th className="min-w-24 text-center">Args</th>
-									<th className="min-w-28 text-center">Resources</th>
-									<th className="min-w-36 text-center">Instruction use</th>
-									<th className="min-w-28 text-center">Presence</th>
-									<th className="min-w-24 text-center">Digest</th>
-									<th className="text-center whitespace-nowrap">Enabled</th>
-									<th className="text-center whitespace-nowrap">Built-In</th>
-									<th className="text-center whitespace-nowrap">Actions</th>
-								</tr>
-							</thead>
+					<div className="space-y-3">
+						{visibleSkills.map(skill => {
+							const insert = normalizeSkillInsert(skill.insert).value;
+							const instructionUseReason = getSkillInstructionPromptEligibilityReason(skill);
+							const usage =
+								insert === 'user-message'
+									? 'Composer template'
+									: instructionUseReason
+										? 'Session only'
+										: 'System prompt eligible';
 
-							<tbody>
-								{visibleSkills.map(skill => {
-									const insert = normalizeSkillInsert(skill.insert).value;
-									const instructionUseReason = getSkillInstructionPromptEligibilityReason(skill);
+							return (
+								<article
+									key={skill.id}
+									className="border-base-content/10 hover:border-base-content/20 rounded-2xl border p-4 transition-colors"
+								>
+									<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+										<div className="min-w-0">
+											<div className="truncate font-medium" title={skill.displayName || skill.name}>
+												{skill.displayName || skill.name || skill.slug}
+											</div>
+											<div className="text-base-content/60 mt-1 text-xs break-all">
+												{skill.slug} · {skill.name}
+											</div>
+											{skill.description ? (
+												<p className="text-base-content/70 mt-2 max-h-10 overflow-hidden text-sm">
+													{skill.description}
+												</p>
+											) : null}
+										</div>
 
-									return (
-										<tr key={skill.id} className="hover:bg-base-300">
-											<td>
-												<div className="flex flex-col">
-													<span>{skill.displayName || skill.name || '-'}</span>
-													<span className="text-base-content/60 text-xs">artifact name: {skill.name}</span>
-													{(skill.tags ?? []).length > 0 ? (
-														<div className="mt-1 flex flex-wrap gap-1">
-															{(skill.tags ?? []).map(tag => (
-																<span key={tag} className="badge badge-outline badge-xs rounded-xl" title={tag}>
-																	{tag}
-																</span>
-															))}
-														</div>
-													) : (
-														<div className="text-base-content/50 mt-1 text-xs">No tags declared.</div>
-													)}
-													{skill.runtimeWarnings?.length ? (
-														<span className="bg-warning/20 text-warning-content mt-1 inline-flex w-fit rounded-full px-2 py-0.5 text-xs">
-															{skill.runtimeWarnings.length} runtime warning
-															{skill.runtimeWarnings.length === 1 ? '' : 's'}
-														</span>
-													) : null}
-												</div>
-											</td>
-											<td className="text-center">{skill.slug}</td>
-											<td className="text-center">
-												<span
-													className={`badge rounded-xl ${getSkillInsertBadgeClass(insert)}`}
-													title={getSkillInsertDescription(insert)}
-												>
-													{getSkillInsertLabel(skill.insert)}
+										<div className="flex shrink-0 flex-wrap items-center gap-2">
+											<PresenceBadge skill={skill} />
+											<span
+												className={`badge h-auto px-2 py-1 text-center whitespace-normal ${
+													skill.isEnabled ? 'badge-success' : 'badge-neutral'
+												}`}
+											>
+												{skill.isEnabled ? 'Enabled' : 'Disabled'}
+											</span>
+										</div>
+									</div>
+
+									<div className="mt-3 flex flex-wrap gap-2 text-xs">
+										<span
+											className="border-base-content/20 rounded-xl border px-2 py-1"
+											title={getSkillInsertDescription(insert)}
+										>
+											{getSkillInsertLabel(skill.insert)}
+										</span>
+										<span
+											className="border-base-content/20 rounded-xl border px-2 py-1"
+											title={getSkillArgumentTooltip(skill.arguments)}
+										>
+											{getSkillArgumentCountLabel(skill.arguments)}
+										</span>
+										<span
+											className="border-base-content/20 rounded-xl border px-2 py-1"
+											title={getSkillResourceTooltip(skill.resources)}
+										>
+											{getSkillResourceCountLabel(skill.resources)}
+										</span>
+										<span className="border-base-content/20 rounded-xl border px-2 py-1" title={instructionUseReason}>
+											{usage}
+										</span>
+										{skill.isBuiltIn ? (
+											<span className="border-base-content/20 rounded-xl border px-2 py-1">Built-in</span>
+										) : null}
+									</div>
+
+									{(skill.tags ?? []).length > 0 ? (
+										<div className="mt-3 flex flex-wrap gap-1">
+											{(skill.tags ?? []).map(tag => (
+												<span key={tag} className="border-base-content/20 rounded-lg border px-2 py-0.5 text-xs">
+													{tag}
 												</span>
-											</td>
-											<td className="text-center">
-												{skill.arguments?.length ? (
-													<span className="tooltip tooltip-top" data-tip={getSkillArgumentTooltip(skill.arguments)}>
-														<span className="badge badge-outline rounded-xl">
-															{getSkillArgumentCountLabel(skill.arguments)}
-														</span>
-													</span>
-												) : (
-													<span className="text-base-content/60">-</span>
-												)}
-											</td>
-											<td className="text-center">
-												{skillHasResources(skill) ? (
-													<span className="tooltip tooltip-top" data-tip={getSkillResourceTooltip(skill.resources)}>
-														<span
-															className={`badge rounded-xl ${
-																insert === 'user-message' ? 'badge-warning' : 'badge-outline'
-															}`}
-														>
-															{getSkillResourceCountLabel(skill.resources)}
-														</span>
-													</span>
-												) : (
-													<span className="text-base-content/60">-</span>
-												)}
-											</td>
-											<td className="text-center">
-												{insert === 'user-message' ? (
-													<span
-														className="badge badge-secondary rounded-xl"
-														title="Use from the composer Templates menu."
-													>
-														Composer template
-													</span>
-												) : instructionUseReason ? (
-													<span className="badge badge-warning rounded-xl" title={instructionUseReason}>
-														Session only
-													</span>
-												) : (
-													<span
-														className="badge badge-success rounded-xl"
-														title="Can be rendered and inserted into the system instruction prompt."
-													>
-														System prompt eligible
-													</span>
-												)}
-											</td>
-											<td className="text-center">
-												<div className="flex items-center justify-center">
-													<PresenceBadge skill={skill} />
-												</div>
-											</td>
-											<td className="text-center">
-												{skill.digest ? (
-													<span className="font-mono text-xs" title={skill.digest}>
-														{skill.digest.slice(0, 10)}
-													</span>
-												) : (
-													<span className="text-base-content/60">-</span>
-												)}
-											</td>
-											<td className="text-center align-middle">
-												<input
-													type="checkbox"
-													className="toggle toggle-accent"
-													checked={skill.isEnabled}
-													onChange={() => patchSkillEnable(skill)}
-													disabled={busySkillIDs.has(skill.id) || busyBundleToggle || !bundle.isEnabled}
-													title={!bundle.isEnabled ? 'Enable the bundle first.' : undefined}
-												/>
-											</td>
-											<td className="text-center">
-												{skill.isBuiltIn ? <FiCheck className="mx-auto" /> : <FiX className="mx-auto" />}
-											</td>
-											<td className="text-center">
-												<div className="inline-flex items-center gap-2">
-													<button
-														type="button"
-														className="btn btn-sm btn-ghost rounded-2xl"
-														onClick={() => {
-															openSkillModal('view', skill);
-														}}
-														title="View"
-														aria-label="View"
-													>
-														<FiEye size={16} />
-													</button>
+											))}
+										</div>
+									) : null}
 
-													<button
-														type="button"
-														className="btn btn-sm btn-ghost rounded-2xl"
-														onClick={() => {
-															openSkillModal('edit', skill);
-														}}
-														disabled={skill.isBuiltIn || bundle.isBuiltIn}
-														title={skill.isBuiltIn || bundle.isBuiltIn ? 'Built-in items cannot be edited' : 'Edit'}
-														aria-label="Edit"
-													>
-														<FiEdit2 size={16} />
-													</button>
+									{skill.runtimeWarnings?.length ? (
+										<div className="text-warning mt-3 text-xs">
+											{skill.runtimeWarnings.length} runtime warning
+											{skill.runtimeWarnings.length === 1 ? '' : 's'}
+										</div>
+									) : null}
 
-													<button
-														type="button"
-														className="btn btn-sm btn-ghost rounded-2xl"
-														onClick={() => {
-															openSkillModal('fork', skill);
-														}}
-														disabled={bundle.isBuiltIn || !bundle.isEnabled}
-														title={
-															bundle.isBuiltIn
-																? 'To copy this built-in skill, use Add Skill or Template in a custom bundle and choose Copy Existing Skill.'
-																: !bundle.isEnabled
-																	? 'Enable the bundle before forking.'
-																	: 'Fork into a new managed SKILL.md artifact'
-														}
-														aria-label="Fork"
-													>
-														<FiGitBranch size={16} />
-													</button>
+									<div className="border-base-content/10 mt-4 flex flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
+										<div className="flex items-center gap-3">
+											<label htmlFor={`skill-${skill.id}`} className="text-sm">
+												Enabled
+											</label>
+											<input
+												id={`skill-${skill.id}`}
+												type="checkbox"
+												className="toggle toggle-accent toggle-sm"
+												checked={skill.isEnabled}
+												onChange={() => patchSkillEnable(skill)}
+												disabled={busySkillIDs.has(skill.id) || busyBundleToggle || !bundle.isEnabled}
+												title={!bundle.isEnabled ? 'Enable the bundle first.' : undefined}
+												aria-label={`Enable ${skill.displayName || skill.name}`}
+											/>
+											{busySkillIDs.has(skill.id) ? (
+												<span className="loading loading-spinner loading-xs" aria-label="Updating skill" />
+											) : null}
+										</div>
 
-													<button
-														type="button"
-														className="btn btn-sm btn-ghost rounded-2xl"
-														onClick={() => {
-															requestDeleteSkill(skill);
-														}}
-														disabled={skill.isBuiltIn || bundle.isBuiltIn}
-														title={
-															skill.isBuiltIn || bundle.isBuiltIn ? 'Deleting disabled for built-in items' : 'Delete'
-														}
-														aria-label="Delete"
-													>
-														<FiTrash2 size={16} />
-													</button>
-												</div>
-											</td>
-										</tr>
-									);
-								})}
+										<div className="flex flex-wrap justify-end gap-2">
+											<button
+												type="button"
+												className="btn btn-sm btn-ghost rounded-xl"
+												onClick={() => {
+													openSkillModal('view', skill);
+												}}
+												title="View skill"
+											>
+												<FiEye size={15} />
+												<span>View</span>
+											</button>
+											<button
+												type="button"
+												className="btn btn-sm btn-ghost rounded-xl"
+												onClick={() => {
+													openSkillModal('edit', skill);
+												}}
+												disabled={skill.isBuiltIn || bundle.isBuiltIn}
+												title={skill.isBuiltIn || bundle.isBuiltIn ? 'Built-in items cannot be edited' : 'Edit'}
+											>
+												<FiEdit2 size={15} />
+												<span>Edit</span>
+											</button>
+											<button
+												type="button"
+												className="btn btn-sm btn-ghost rounded-xl"
+												onClick={() => {
+													openSkillModal('fork', skill);
+												}}
+												disabled={bundle.isBuiltIn || !bundle.isEnabled}
+												title={!bundle.isEnabled ? 'Enable the bundle before forking.' : 'Fork skill'}
+											>
+												<FiGitBranch size={15} />
+												<span>Fork</span>
+											</button>
+											<button
+												type="button"
+												className="btn btn-sm btn-ghost rounded-xl"
+												onClick={() => {
+													requestDeleteSkill(skill);
+												}}
+												disabled={skill.isBuiltIn || bundle.isBuiltIn}
+												title={skill.isBuiltIn || bundle.isBuiltIn ? 'Built-in items cannot be deleted' : 'Delete'}
+											>
+												<FiTrash2 size={15} />
+												<span>Delete</span>
+											</button>
+										</div>
+									</div>
+								</article>
+							);
+						})}
 
-								{skills.length === 0 && (
-									<tr>
-										<td colSpan={11} className="py-3 text-center text-sm">
-											No skills in this bundle.
-										</td>
-									</tr>
-								)}
+						{skills.length === 0 ? (
+							<div className="border-base-content/10 rounded-2xl border py-6 text-center text-sm">
+								No skills in this bundle.
+							</div>
+						) : null}
 
-								{skills.length > 0 && visibleSkills.length === 0 && (
-									<tr>
-										<td colSpan={11} className="py-3 text-center text-sm">
-											No skills match the current filters.
-										</td>
-									</tr>
-								)}
-							</tbody>
-						</table>
+						{skills.length > 0 && visibleSkills.length === 0 ? (
+							<div className="border-base-content/10 rounded-2xl border py-6 text-center text-sm">
+								No skills match the current filters.
+							</div>
+						) : null}
 					</div>
 
 					{!bundle.isBuiltIn && (
-						<div className="flex items-center justify-between">
+						<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 							<button
 								type="button"
 								className="btn btn-md btn-ghost flex items-center rounded-2xl"
@@ -700,6 +654,6 @@ export function SkillBundleCard({
 				}}
 				message={alertMsg}
 			/>
-		</div>
+		</section>
 	);
 }

@@ -4,25 +4,35 @@ import { compareVersionStrings } from '@/lib/version_utils';
 
 import { assistantPresetStoreAPI } from '@/apis/baseapi';
 
+const MAX_PAGE_COUNT = 1_000;
+
 async function collectAllPages<TResponse, TItem>(
 	fetchPage: (pageToken?: string) => Promise<TResponse>,
 	pickItems: (response: TResponse) => TItem[],
 	pickNextToken: (response: TResponse) => string | undefined
 ): Promise<TItem[]> {
 	const items: TItem[] = [];
+	const seenPageTokens = new Set<string>();
 	let nextPageToken: string | undefined = undefined;
 
-	while (true) {
+	for (let page = 0; page < MAX_PAGE_COUNT; page += 1) {
+		if (nextPageToken) {
+			if (seenPageTokens.has(nextPageToken)) {
+				throw new Error('Assistant preset pagination returned a repeated page token.');
+			}
+			seenPageTokens.add(nextPageToken);
+		}
+
 		const response = await fetchPage(nextPageToken);
 		items.push(...pickItems(response));
 
 		nextPageToken = pickNextToken(response);
 		if (!nextPageToken) {
-			break;
+			return items;
 		}
 	}
 
-	return items;
+	throw new Error(`Assistant preset pagination exceeded ${MAX_PAGE_COUNT} pages.`);
 }
 
 function getBundleLabel(bundle: Pick<AssistantPresetBundle, 'displayName' | 'slug'>): string {

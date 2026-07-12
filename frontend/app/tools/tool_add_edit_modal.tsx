@@ -172,6 +172,7 @@ function AddEditToolModalContent({
 	const [prefillMode, setPrefillMode] = useState(false);
 	const [selectedPrefillKey, setSelectedPrefillKey] = useState<string | null>(null);
 	const [submitError, setSubmitError] = useState('');
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const displayNameInputRef = useRef<HTMLInputElement | null>(null);
@@ -458,7 +459,7 @@ function AddEditToolModalContent({
 		e.preventDefault();
 		e.stopPropagation();
 
-		if (isViewMode) {
+		if (isViewMode || isSubmitting) {
 			return;
 		}
 
@@ -553,7 +554,8 @@ function AddEditToolModalContent({
 			};
 		}
 
-		onSubmit({
+		setIsSubmitting(true);
+		void onSubmit({
 			displayName: formData.displayName.trim(),
 			slug: formData.slug.trim(),
 			description: formData.description.trim() || undefined,
@@ -573,6 +575,11 @@ function AddEditToolModalContent({
 			.catch((err: unknown) => {
 				const msg = err instanceof Error ? err.message : 'Failed to save tool.';
 				setSubmitError(msg);
+			})
+			.finally(() => {
+				if (!ignoreCloseRef.current) {
+					setIsSubmitting(false);
+				}
 			});
 	};
 
@@ -606,6 +613,7 @@ function AddEditToolModalContent({
 							className="btn btn-sm btn-circle bg-base-300 rounded-xl"
 							onClick={() => dialogRef.current?.close()}
 							aria-label="Close"
+							disabled={isSubmitting}
 						>
 							<FiX size={12} />
 						</button>
@@ -1254,12 +1262,17 @@ function AddEditToolModalContent({
 						)}
 
 						<div className="modal-action">
-							<button type="button" className="btn bg-base-300 rounded-xl" onClick={() => dialogRef.current?.close()}>
+							<button
+								type="button"
+								className="btn bg-base-300 rounded-xl"
+								onClick={() => dialogRef.current?.close()}
+								disabled={isSubmitting}
+							>
 								{isViewMode ? 'Close' : 'Cancel'}
 							</button>
 							{!isViewMode && (
-								<button type="submit" className="btn btn-primary rounded-xl" disabled={!isAllValid}>
-									Save
+								<button type="submit" className="btn btn-primary rounded-xl" disabled={!isAllValid || isSubmitting}>
+									{isSubmitting ? 'Saving...' : 'Save'}
 								</button>
 							)}
 						</div>

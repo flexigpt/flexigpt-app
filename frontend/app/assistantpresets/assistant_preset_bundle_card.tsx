@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { FiCheck, FiChevronDown, FiChevronUp, FiEye, FiGitBranch, FiPlus, FiTrash2, FiX } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiEye, FiGitBranch, FiPlus, FiTrash2 } from 'react-icons/fi';
 
 import type { AssistantPreset, AssistantPresetBundle } from '@/spec/assistantpreset';
 
@@ -201,19 +201,22 @@ export function AssistantPresetBundleCard({
 	};
 
 	return (
-		<div className="bg-base-100 mb-8 rounded-2xl p-4 shadow-lg">
-			<div className="flex items-center justify-between">
-				<div className="flex items-center">
-					<h3 className="gap-2 text-sm font-semibold">
+		<section className="bg-base-100 border-base-content/10 mb-6 rounded-2xl border p-4 shadow-sm">
+			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+				<div className="min-w-0">
+					<h3 className="truncate text-sm font-semibold">
 						<span className="capitalize">{bundle.displayName || bundle.slug}</span>
 						<span className="text-base-content/60 ml-1">({bundle.slug})</span>
 					</h3>
+					<div className="text-base-content/60 mt-1 text-xs">
+						{bundle.isBuiltIn ? 'Built-in bundle' : 'Custom bundle'}
+					</div>
 				</div>
 
-				<div className="flex items-center justify-end gap-4">
+				<div className="flex flex-wrap items-center justify-end gap-3">
 					<button
 						type="button"
-						className="btn btn-sm btn-ghost p-0"
+						className="btn btn-sm btn-ghost rounded-xl"
 						title="View bundle details"
 						onClick={e => {
 							e.stopPropagation();
@@ -221,34 +224,37 @@ export function AssistantPresetBundleCard({
 						}}
 					>
 						<FiEye size={16} />
+						<span>Details</span>
 					</button>
 
-					<span className="text-base-content/60 text-xs tracking-wide uppercase">
-						{bundle.isBuiltIn ? 'Built-in' : 'Custom'}
-					</span>
-
 					<div className="flex items-center gap-1">
-						<label className="text-sm">Enabled</label>
+						<label htmlFor={`assistant-bundle-${bundle.id}`} className="text-sm">
+							Enabled
+						</label>
 						<input
+							id={`assistant-bundle-${bundle.id}`}
 							type="checkbox"
 							className="toggle toggle-accent"
 							checked={bundle.isEnabled}
 							disabled={isBundleTogglePending}
+							aria-label={`Enable ${bundle.displayName || bundle.slug}`}
 							onChange={() => {
 								void handleToggleBundleEnable();
 							}}
 						/>
 					</div>
 
-					<div
-						className="flex cursor-pointer items-center gap-1"
+					<button
+						type="button"
+						className="btn btn-sm btn-ghost rounded-xl"
+						aria-expanded={isExpanded}
 						onClick={() => {
 							setIsExpanded(prev => !prev);
 						}}
 					>
-						<label className="text-sm whitespace-nowrap">Presets:&nbsp;{presets.length}</label>
+						<span className="whitespace-nowrap">Presets: {presets.length}</span>
 						{isExpanded ? <FiChevronUp /> : <FiChevronDown />}
-					</div>
+					</button>
 				</div>
 			</div>
 
@@ -272,123 +278,146 @@ export function AssistantPresetBundleCard({
 			) : null}
 
 			{isExpanded && (
-				<div className="mt-8 space-y-4">
-					<div className="border-base-content/10 overflow-x-auto rounded-2xl border">
-						<table className="table-zebra table w-full">
-							<thead>
-								<tr className="bg-base-300 text-sm font-semibold">
-									<th className="w-full">Display Name</th>
-									<th className="text-center">Slug</th>
-									<th className="text-center whitespace-nowrap">Enabled</th>
-									<th className="text-center whitespace-nowrap">Model</th>
-									<th className="text-center whitespace-nowrap">Instructions</th>
-									<th className="text-center whitespace-nowrap">Tools</th>
-									<th className="text-center whitespace-nowrap">Skills</th>
-									<th className="text-center whitespace-nowrap">MCP</th>
-									<th className="text-center whitespace-nowrap">Version</th>
-									<th className="text-center whitespace-nowrap">Built-In</th>
-									<th className="text-center whitespace-nowrap">Actions</th>
-								</tr>
-							</thead>
-							<tbody>
-								{presets.map(preset => {
-									const counts = getAssistantPresetCounts(preset);
+				<div className="mt-6 space-y-4">
+					<div className="space-y-3">
+						{presets.map(preset => {
+							const counts = getAssistantPresetCounts(preset);
+							const model = formatAssistantPresetModelRef(preset.startingModelPresetRef);
 
-									return (
-										<tr key={preset.id} className="hover:bg-base-300">
-											<td>
-												<div className="flex items-center gap-2">
-													<span>{preset.displayName}</span>
-												</div>
-											</td>
-											<td className="text-center">{preset.slug}</td>
-											<td className="text-center align-middle">
-												<input
-													type="checkbox"
-													className="toggle toggle-accent"
-													checked={preset.isEnabled}
-													disabled={pendingPresetToggleIDs.has(preset.id) || !bundle.isEnabled}
-													title={!bundle.isEnabled ? 'Enable the bundle first.' : undefined}
-													onChange={() => {
-														void handlePresetEnableToggle(preset);
-													}}
-												/>
-											</td>
-											<td className="text-center">{formatAssistantPresetModelRef(preset.startingModelPresetRef)}</td>
-											<td className="text-center">{counts.instructions}</td>
-											<td className="text-center">{counts.tools}</td>
-											<td className="text-center">{counts.skills}</td>
-											<td className="text-center">{counts.mcp}</td>
-											<td className="text-center whitespace-nowrap">{preset.version}</td>
-											<td className="text-center">
-												{preset.isBuiltIn ? <FiCheck className="mx-auto" /> : <FiX className="mx-auto" />}
-											</td>
-											<td className="justify-end text-center">
-												<div className="inline-flex items-center gap-2">
-													<button
-														type="button"
-														className="btn btn-sm btn-ghost rounded-2xl"
-														onClick={() => {
-															openPresetModal('view', preset);
-														}}
-														title="View"
-														aria-label="View"
-													>
-														<FiEye size={16} />
-													</button>
+							return (
+								<article
+									key={preset.id}
+									className="border-base-content/10 hover:border-base-content/20 rounded-2xl border p-4 transition-colors"
+								>
+									<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+										<div className="min-w-0">
+											<div className="truncate font-medium" title={preset.displayName}>
+												{preset.displayName || preset.slug}
+											</div>
+											<div className="text-base-content/60 mt-1 text-xs break-all">
+												{preset.slug} · version {preset.version}
+											</div>
+											{preset.description ? (
+												<p className="text-base-content/70 mt-2 max-h-10 overflow-hidden text-sm">
+													{preset.description}
+												</p>
+											) : null}
+										</div>
 
-													<button
-														type="button"
-														className="btn btn-sm btn-ghost rounded-2xl"
-														onClick={() => {
-															openPresetModal('edit', preset);
-														}}
-														disabled={preset.isBuiltIn || bundle.isBuiltIn || !bundle.isEnabled}
-														title={
-															preset.isBuiltIn || bundle.isBuiltIn
-																? 'Built-in items cannot create new versions'
-																: !bundle.isEnabled
-																	? 'Enable the bundle first.'
-																	: 'New Version'
-														}
-														aria-label="New Version"
-													>
-														<FiGitBranch size={16} />
-													</button>
+										<div className="flex shrink-0 items-center gap-2">
+											<span
+												className={`badge h-auto max-w-full px-2 py-1 text-center whitespace-normal ${
+													preset.isEnabled ? 'badge-success' : 'badge-neutral'
+												}`}
+											>
+												{preset.isEnabled ? 'Enabled' : 'Disabled'}
+											</span>
+											{pendingPresetToggleIDs.has(preset.id) ? (
+												<span className="loading loading-spinner loading-xs" aria-label="Updating preset" />
+											) : null}
+										</div>
+									</div>
 
-													<button
-														type="button"
-														className="btn btn-sm btn-ghost rounded-2xl"
-														onClick={() => {
-															requestDeletePreset(preset);
-														}}
-														disabled={preset.isBuiltIn || bundle.isBuiltIn}
-														title={
-															preset.isBuiltIn || bundle.isBuiltIn ? 'Deleting disabled for built-in items' : 'Delete'
-														}
-														aria-label="Delete"
-													>
-														<FiTrash2 size={16} />
-													</button>
-												</div>
-											</td>
-										</tr>
-									);
-								})}
+									<dl className="mt-4 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2 lg:grid-cols-3">
+										<div className="border-base-content/10 min-w-0 rounded-xl border px-3 py-2">
+											<dt className="text-base-content/60">Model</dt>
+											<dd className="mt-1 truncate" title={model}>
+												{model}
+											</dd>
+										</div>
+										<div className="border-base-content/10 rounded-xl border px-3 py-2">
+											<dt className="text-base-content/60">Starting content</dt>
+											<dd className="mt-1">
+												{counts.instructions} instructions · {counts.skills} skills
+											</dd>
+										</div>
+										<div className="border-base-content/10 rounded-xl border px-3 py-2">
+											<dt className="text-base-content/60">Integrations</dt>
+											<dd className="mt-1">
+												{counts.tools} tools · {counts.mcp} MCP items
+											</dd>
+										</div>
+									</dl>
 
-								{presets.length === 0 && (
-									<tr>
-										<td colSpan={11} className="py-3 text-center text-sm">
-											No assistant presets in this bundle.
-										</td>
-									</tr>
-								)}
-							</tbody>
-						</table>
+									<div className="border-base-content/10 mt-4 flex flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
+										<div className="flex items-center gap-3">
+											<label htmlFor={`assistant-preset-${preset.id}`} className="text-sm">
+												Enabled
+											</label>
+											<input
+												id={`assistant-preset-${preset.id}`}
+												type="checkbox"
+												className="toggle toggle-accent toggle-sm"
+												checked={preset.isEnabled}
+												disabled={pendingPresetToggleIDs.has(preset.id) || !bundle.isEnabled}
+												title={!bundle.isEnabled ? 'Enable the bundle first.' : undefined}
+												aria-label={`Enable ${preset.displayName || preset.slug}`}
+												onChange={() => {
+													void handlePresetEnableToggle(preset);
+												}}
+											/>
+											{preset.isBuiltIn ? (
+												<span className="border-base-content/20 rounded-xl border px-2 py-1 text-xs">Built-in</span>
+											) : null}
+										</div>
+
+										<div className="flex flex-wrap justify-end gap-2">
+											<button
+												type="button"
+												className="btn btn-sm btn-ghost rounded-xl"
+												onClick={() => {
+													openPresetModal('view', preset);
+												}}
+												title="View assistant preset"
+											>
+												<FiEye size={15} />
+												<span>View</span>
+											</button>
+											<button
+												type="button"
+												className="btn btn-sm btn-ghost rounded-xl"
+												onClick={() => {
+													openPresetModal('edit', preset);
+												}}
+												disabled={preset.isBuiltIn || bundle.isBuiltIn || !bundle.isEnabled}
+												title={
+													preset.isBuiltIn || bundle.isBuiltIn
+														? 'Built-in items cannot create new versions'
+														: !bundle.isEnabled
+															? 'Enable the bundle first.'
+															: 'Create a new version'
+												}
+											>
+												<FiGitBranch size={15} />
+												<span>New version</span>
+											</button>
+											<button
+												type="button"
+												className="btn btn-sm btn-ghost rounded-xl"
+												onClick={() => {
+													requestDeletePreset(preset);
+												}}
+												disabled={preset.isBuiltIn || bundle.isBuiltIn}
+												title={preset.isBuiltIn || bundle.isBuiltIn ? 'Built-in items cannot be deleted' : 'Delete'}
+											>
+												<FiTrash2 size={15} />
+												<span>Delete</span>
+											</button>
+										</div>
+									</div>
+								</article>
+							);
+						})}
+
+						{presets.length === 0 ? (
+							<div className="border-base-content/10 rounded-2xl border py-6 text-center text-sm">
+								No assistant presets in this bundle.
+							</div>
+						) : null}
 					</div>
 
 					{!bundle.isBuiltIn && (
-						<div className="flex items-center justify-between">
+						<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 							<button
 								type="button"
 								className="btn btn-md btn-ghost flex items-center rounded-2xl"
@@ -478,6 +507,6 @@ export function AssistantPresetBundleCard({
 				}}
 				message={alertMsg}
 			/>
-		</div>
+		</section>
 	);
 }

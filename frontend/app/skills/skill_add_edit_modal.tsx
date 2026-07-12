@@ -340,6 +340,61 @@ function AddEditSkillModalContent({
 		[formData.description, formData.displayName, formData.name, scaffoldArguments, scaffoldBody, scaffoldInsert]
 	);
 
+	const validateField = (field: keyof ErrorState, val: string | SkillType, currentErrors: ErrorState): ErrorState => {
+		let nextErrors: ErrorState = { ...currentErrors };
+		const v = val.trim();
+
+		const requiredFields: Array<keyof ErrorState> = ['name', 'slug', 'type', 'location'];
+
+		if (!v && requiredFields.includes(field)) {
+			nextErrors[field] = 'This field is required.';
+			return nextErrors;
+		}
+
+		if (field === 'slug') {
+			const err = validateSlug(v);
+			if (err) {
+				nextErrors.slug = err;
+			} else {
+				const clash = existingSkills.some(x => x.skill.slug === v && x.skill.id !== initialData?.skill.id);
+				if (clash) {
+					nextErrors.slug = 'Slug already in use in this bundle.';
+				} else {
+					nextErrors = omitManyKeys(nextErrors, ['slug']);
+				}
+			}
+		} else if (field === 'name') {
+			// Constraint: within a bundle, skill.name cannot be duplicated
+			const norm = normalizeForUniq(v);
+			const clash = existingSkills.some(
+				x => normalizeForUniq(x.skill.name) === norm && x.skill.id !== initialData?.skill.id
+			);
+			if (clash) {
+				nextErrors.name = 'Skill name must be unique within the bundle.';
+			} else if (!SKILL_ARTIFACT_NAME_RE.test(v)) {
+				nextErrors.name =
+					'Skill name must use lowercase letters, numbers, and hyphens, start with a letter or number, and be at most 64 characters.';
+			} else {
+				nextErrors = omitManyKeys(nextErrors, ['name']);
+			}
+		} else if (field === 'tags') {
+			if (v === '') {
+				nextErrors = omitManyKeys(nextErrors, ['tags']);
+			} else {
+				const err = validateTags(val);
+				if (err) {
+					nextErrors.tags = err;
+				} else {
+					nextErrors = omitManyKeys(nextErrors, ['tags']);
+				}
+			}
+		} else {
+			nextErrors = omitManyKeys(nextErrors, [field]);
+		}
+
+		return nextErrors;
+	};
+
 	const validateForm = (state: SkillFormData): ErrorState => {
 		let next: ErrorState = {};
 		next = validateField('name', state.name, next);
@@ -502,61 +557,6 @@ function AddEditSkillModalContent({
 			setPreviewLoading(false);
 		}
 	}, [artifactSkill, initialData, previewArgs]);
-
-	const validateField = (field: keyof ErrorState, val: string | SkillType, currentErrors: ErrorState): ErrorState => {
-		let nextErrors: ErrorState = { ...currentErrors };
-		const v = val.trim();
-
-		const requiredFields: Array<keyof ErrorState> = ['name', 'slug', 'type', 'location'];
-
-		if (!v && requiredFields.includes(field)) {
-			nextErrors[field] = 'This field is required.';
-			return nextErrors;
-		}
-
-		if (field === 'slug') {
-			const err = validateSlug(v);
-			if (err) {
-				nextErrors.slug = err;
-			} else {
-				const clash = existingSkills.some(x => x.skill.slug === v && x.skill.id !== initialData?.skill.id);
-				if (clash) {
-					nextErrors.slug = 'Slug already in use in this bundle.';
-				} else {
-					nextErrors = omitManyKeys(nextErrors, ['slug']);
-				}
-			}
-		} else if (field === 'name') {
-			// Constraint: within a bundle, skill.name cannot be duplicated
-			const norm = normalizeForUniq(v);
-			const clash = existingSkills.some(
-				x => normalizeForUniq(x.skill.name) === norm && x.skill.id !== initialData?.skill.id
-			);
-			if (clash) {
-				nextErrors.name = 'Skill name must be unique within the bundle.';
-			} else if (!SKILL_ARTIFACT_NAME_RE.test(v)) {
-				nextErrors.name =
-					'Skill name must use lowercase letters, numbers, and hyphens, start with a letter or number, and be at most 64 characters.';
-			} else {
-				nextErrors = omitManyKeys(nextErrors, ['name']);
-			}
-		} else if (field === 'tags') {
-			if (v === '') {
-				nextErrors = omitManyKeys(nextErrors, ['tags']);
-			} else {
-				const err = validateTags(val);
-				if (err) {
-					nextErrors.tags = err;
-				} else {
-					nextErrors = omitManyKeys(nextErrors, ['tags']);
-				}
-			}
-		} else {
-			nextErrors = omitManyKeys(nextErrors, [field]);
-		}
-
-		return nextErrors;
-	};
 
 	const changeCreationMode = (nextMode: 'create' | 'register') => {
 		setCreationMode(nextMode);

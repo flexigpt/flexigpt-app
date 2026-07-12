@@ -135,7 +135,7 @@ function updateItemAtIndex<T>(items: readonly T[], index: number, updater: (item
 	return items.map((item, itemIndex) => (itemIndex === index ? updater(item) : item));
 }
 
-function isJSONObjectLike(value: unknown): value is Record<string, any> {
+function isJSONObjectLike(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
@@ -635,19 +635,28 @@ function AddEditAssistantPresetModalContent({
 
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const isUnmountingRef = useRef(false);
+	const catalogRequestIDRef = useRef(0);
 
-	const loadCatalog = useCallback(async () => {
+	const loadCatalog = useCallback(async (force = false) => {
+		const requestID = (catalogRequestIDRef.current += 1);
 		setCatalogLoading(true);
 		setCatalogError('');
 
 		try {
-			const loaded = await loadAssistantPresetEditorCatalog({ force: true });
+			const loaded = await loadAssistantPresetEditorCatalog({ force });
+			if (isUnmountingRef.current || catalogRequestIDRef.current !== requestID) {
+				return;
+			}
 			setCatalog(loaded);
 		} catch (error) {
 			console.error('Failed to load assistant preset editor catalog:', error);
-			setCatalogError(getErrorMessage(error, 'Failed to load models, tools, and skills.'));
+			if (!isUnmountingRef.current && catalogRequestIDRef.current === requestID) {
+				setCatalogError(getErrorMessage(error, 'Failed to load models, tools, and skills.'));
+			}
 		} finally {
-			setCatalogLoading(false);
+			if (!isUnmountingRef.current && catalogRequestIDRef.current === requestID) {
+				setCatalogLoading(false);
+			}
 		}
 	}, []);
 
@@ -676,7 +685,7 @@ function AddEditAssistantPresetModalContent({
 
 	useEffect(() => {
 		// oxlint-disable-next-line jsreact-hooks/set-state-in-effect
-		void loadCatalog();
+		void loadCatalog(false);
 	}, [loadCatalog]);
 
 	useEffect(() => {
@@ -1244,7 +1253,7 @@ function AddEditAssistantPresetModalContent({
 	);
 
 	const handleCatalogRetry = useCallback(() => {
-		void loadCatalog();
+		void loadCatalog(true);
 	}, [loadCatalog]);
 
 	const handleToolOptionKeyChange = useCallback((key: string) => {
