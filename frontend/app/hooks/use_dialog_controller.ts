@@ -1,5 +1,5 @@
 import type { SyntheticEvent } from 'react';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useLayoutEffect, useRef } from 'react';
 
 interface UseDialogControllerOptions {
 	onClose: () => void;
@@ -18,7 +18,13 @@ export function useDialogController({ onClose, blockCancel = false, isBusy = fal
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 	const unmountingRef = useRef(false);
 
-	useEffect(() => {
+	/*
+	 * React Strict Mode can replay an effect without removing the dialog
+	 * element. Calling close() in the replay cleanup emits `close`, which can
+	 * invoke the parent's onClose handler and unmount a just-opened modal.
+	 * Let conditional rendering remove the dialog on a real unmount instead.
+	 */
+	useLayoutEffect(() => {
 		unmountingRef.current = false;
 
 		const dialog = dialogRef.current;
@@ -29,17 +35,20 @@ export function useDialogController({ onClose, blockCancel = false, isBusy = fal
 		if (!dialog.open) {
 			try {
 				dialog.showModal();
-			} catch (error) {
-				console.error('Failed to open native dialog:', error);
+			} catch (modalError) {
+				console.warn('Failed to open native modal dialog. Falling back to a non-modal dialog.', modalError);
+
+				try {
+					dialog.show();
+				} catch (showError) {
+					console.error('Failed to open native dialog:', showError);
+					dialog.setAttribute('open', '');
+				}
 			}
 		}
 
 		return () => {
 			unmountingRef.current = true;
-
-			if (dialog.open) {
-				dialog.close();
-			}
 		};
 	}, []);
 

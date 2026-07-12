@@ -468,6 +468,20 @@ function hasModelPatchFormValues(modelPatch: ModelPatchFormData): boolean {
 	);
 }
 
+function hasConfiguredModelPatchFormValues(modelPatch: ModelPatchFormData): boolean {
+	return (
+		modelPatch.stream !== '' ||
+		modelPatch.maxPromptLength.trim().length > 0 ||
+		modelPatch.maxOutputLength.trim().length > 0 ||
+		modelPatch.temperature.trim().length > 0 ||
+		modelPatch.timeout.trim().length > 0 ||
+		modelPatch.stopSequencesText.trim().length > 0 ||
+		modelPatch.additionalParametersRawJSON.trim().length > 0 ||
+		modelPatch.reasoningEnabled ||
+		(modelPatch.outputEnabled && (modelPatch.outputVerbosity !== '' || modelPatch.outputFormatEnabled))
+	);
+}
+
 function buildModelPatchFromFormData(
 	modelPatch: ModelPatchFormData
 ): AssistantPresetStartingModelPresetPatch | undefined {
@@ -885,6 +899,11 @@ function AddEditAssistantPresetModalContent({
 						} else if (!isJSONObjectLike(parsed.value)) {
 							nextErrors.modelPatch = 'JSON schema body must be a JSON object.';
 						}
+					}
+
+					if (!nextErrors.modelPatch && !hasConfiguredModelPatchFormValues(state.modelPatch)) {
+						nextErrors.modelPatch =
+							'Choose at least one runtime, reasoning, or output override, or turn off the starting model patch.';
 					}
 				}
 			}
@@ -1501,8 +1520,8 @@ function AddEditAssistantPresetModalContent({
 
 	return (
 		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
-			<div className="modal-box bg-base-200 max-h-[80vh] max-w-5xl overflow-hidden rounded-2xl p-0">
-				<div className="max-h-[80vh] overflow-y-auto p-4 sm:p-6">
+			<div className="modal-box bg-base-200 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-5xl overflow-hidden rounded-2xl p-0">
+				<div className="app-scrollbar-thin max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6">
 					<ModalHeader
 						title={headerTitle}
 						description={

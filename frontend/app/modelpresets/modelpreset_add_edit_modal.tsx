@@ -347,7 +347,7 @@ const calcNumericError = (
 		return;
 	}
 	const num = Number(strVal);
-	if (Number.isNaN(num)) {
+	if (!Number.isFinite(num)) {
 		return `${field} must be a valid number.`;
 	}
 	if (minOrRange?.integer && !Number.isInteger(num)) {

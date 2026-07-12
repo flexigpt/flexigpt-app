@@ -307,23 +307,40 @@ export default function ModelPresetsPage() {
 				throw new Error('Provider not found.');
 			}
 
+			let modelWasCreated = false;
 			try {
 				await modelPresetStoreAPI.postModelPreset(providerName, modelPresetID, payload);
+				modelWasCreated = true;
 
 				if (!providerPreset.defaultModelPresetID) {
 					await modelPresetStoreAPI.patchProviderPreset(providerName, {
 						defaultModelPresetID: modelPresetID,
 					});
 				}
-
-				await refreshCanonicalData();
 			} catch (saveError) {
 				console.error(saveError);
 				await refreshCanonicalDataSafely();
+
+				if (modelWasCreated) {
+					showGlobalDenied(
+						'The model preset was saved, but its default-model update failed. Select a default model manually before using it.'
+					);
+					return;
+				}
+
 				throw new Error('Failed saving model preset.', { cause: saveError });
 			}
+
+			try {
+				await refreshCanonicalData();
+			} catch (refreshError) {
+				console.error('Model preset was saved but provider refresh failed:', refreshError);
+				showGlobalDenied(
+					'The model preset was saved, but the provider could not be refreshed. Reload before making more changes.'
+				);
+			}
 		},
-		[refreshCanonicalData, refreshCanonicalDataSafely]
+		[refreshCanonicalData, refreshCanonicalDataSafely, showGlobalDenied]
 	);
 
 	const handlePatchModel = useCallback(
@@ -390,8 +407,10 @@ export default function ModelPresetsPage() {
 		async (providerName: ProviderName, payload: PostProviderPresetPayload, apiKey: string | null) => {
 			const currentDefaultProvider = canonicalDataRef.current?.defaultProvider;
 
+			let providerWasCreated = false;
 			try {
 				await aggregateAPI.postProviderPreset(providerName, payload);
+				providerWasCreated = true;
 
 				if (apiKey?.trim()) {
 					await aggregateAPI.setAuthKey(AuthKeyTypeProvider, providerName, apiKey.trim());
@@ -400,16 +419,32 @@ export default function ModelPresetsPage() {
 				if (!currentDefaultProvider && payload.isEnabled) {
 					await modelPresetStoreAPI.patchDefaultProvider(providerName);
 				}
-
-				await refreshCanonicalData();
 			} catch (createError) {
 				console.error(createError);
+
+				if (providerWasCreated) {
+					await refreshCanonicalDataSafely();
+					showGlobalDenied(
+						'The provider was created, but its API key or default-provider setup was not completed. Review the provider before sending requests.'
+					);
+					return;
+				}
+
 				const message = 'Failed adding provider.';
 				showGlobalDenied(message);
 				throw new Error(message, { cause: createError });
 			}
+
+			try {
+				await refreshCanonicalData();
+			} catch (refreshError) {
+				console.error('Provider was created but page refresh failed:', refreshError);
+				showGlobalDenied(
+					'The provider was created, but the page could not be refreshed. Reload before making more changes.'
+				);
+			}
 		},
-		[refreshCanonicalData, showGlobalDenied]
+		[refreshCanonicalData, refreshCanonicalDataSafely, showGlobalDenied]
 	);
 
 	const handlePatchProvider = useCallback(

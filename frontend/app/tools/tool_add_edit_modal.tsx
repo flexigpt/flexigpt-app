@@ -259,7 +259,12 @@ function AddEditToolModalContent({
 		};
 	}, [isViewMode]);
 
-	const validateField = (field: keyof ErrorState, val: string, currentErrors: ErrorState): ErrorState => {
+	const validateField = (
+		field: keyof ErrorState,
+		val: string,
+		currentErrors: ErrorState,
+		state: ToolFormData = formData
+	): ErrorState => {
 		let newErrs: ErrorState = { ...currentErrors };
 		const v = val.trim();
 
@@ -288,7 +293,7 @@ function AddEditToolModalContent({
 			} else if (isEditMode && initialData?.tool && v === initialData.tool.version) {
 				newErrs.version = 'New version must be different from the current version.';
 			} else {
-				const slugToCheck = initialData?.tool.slug ?? formData.slug.trim();
+				const slugToCheck = initialData?.tool.slug ?? state.slug.trim();
 				const versionClash = existingTools.some(t => t.tool.slug === slugToCheck && t.tool.version === v);
 				if (versionClash) {
 					newErrs.version = 'That version already exists for this slug.';
@@ -318,7 +323,7 @@ function AddEditToolModalContent({
 			} catch {
 				newErrs.argSchema = 'Invalid JSON';
 			}
-		} else if (field === 'httpUrl' && formData.type === ToolImplType.HTTP) {
+		} else if (field === 'httpUrl' && state.type === ToolImplType.HTTP) {
 			const { error } = validateHTTPToolURL(v, httpUrlInputRef.current);
 
 			if (error) {
@@ -379,23 +384,23 @@ function AddEditToolModalContent({
 
 	const validateForm = (state: ToolFormData): ErrorState => {
 		let newErrs: ErrorState = {};
-		newErrs = validateField('displayName', state.displayName, newErrs);
-		newErrs = validateField('slug', state.slug, newErrs);
-		newErrs = validateField('version', state.version, newErrs);
+		newErrs = validateField('displayName', state.displayName, newErrs, state);
+		newErrs = validateField('slug', state.slug, newErrs, state);
+		newErrs = validateField('version', state.version, newErrs, state);
 
-		newErrs = validateField('type', state.type, newErrs);
-		newErrs = validateField('argSchema', state.argSchema, newErrs);
+		newErrs = validateField('type', state.type, newErrs, state);
+		newErrs = validateField('argSchema', state.argSchema, newErrs, state);
 
 		if (state.tags.trim() !== '') {
-			newErrs = validateField('tags', state.tags, newErrs);
+			newErrs = validateField('tags', state.tags, newErrs, state);
 		}
 
 		if (state.type === ToolImplType.HTTP) {
-			newErrs = validateField('httpUrl', state.httpUrl, newErrs);
-			newErrs = validateField('httpHeaders', state.httpHeaders, newErrs);
-			newErrs = validateField('httpQuery', state.httpQuery, newErrs);
-			newErrs = validateField('httpResponseCodes', state.httpResponseCodes, newErrs);
-			newErrs = validateField('httpTimeoutMS', state.httpTimeoutMS, newErrs);
+			newErrs = validateField('httpUrl', state.httpUrl, newErrs, state);
+			newErrs = validateField('httpHeaders', state.httpHeaders, newErrs, state);
+			newErrs = validateField('httpQuery', state.httpQuery, newErrs, state);
+			newErrs = validateField('httpResponseCodes', state.httpResponseCodes, newErrs, state);
+			newErrs = validateField('httpTimeoutMS', state.httpTimeoutMS, newErrs, state);
 		}
 
 		return newErrs;
@@ -423,10 +428,15 @@ function AddEditToolModalContent({
 	};
 
 	const handleInput = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+		if (isSubmitting) {
+			return;
+		}
+
 		const { name, value, type, checked } = e.target as HTMLInputElement;
 		const newVal = type === 'checkbox' ? checked : value;
+		const nextFormData = { ...formData, [name]: newVal } as ToolFormData;
 
-		setFormData(prev => ({ ...prev, [name]: newVal }));
+		setFormData(nextFormData);
 
 		if (
 			[
@@ -443,25 +453,25 @@ function AddEditToolModalContent({
 				'tags',
 			].includes(name)
 		) {
-			setErrors(prev => validateField(name as keyof ErrorState, String(newVal), prev));
+			setErrors(previousErrors => {
+				if (['slug', 'version', 'type'].includes(name)) {
+					return validateForm(nextFormData);
+				}
+
+				return validateField(name as keyof ErrorState, String(newVal), previousErrors, nextFormData);
+			});
 		}
 	};
+	// oxlint-disable-next-line jsreact-hooks/refs
+	const formIsValid = Object.values(validateForm(formData)).every(error => !error);
+	const requiredFieldsPresent =
+		formData.displayName.trim() &&
+		formData.slug.trim() &&
+		formData.version.trim() &&
+		formData.argSchema.trim() &&
+		(formData.type === ToolImplType.HTTP ? formData.httpUrl.trim() : true);
 
-	const isAllValid = useMemo(() => {
-		if (isViewMode) {
-			return true;
-		}
-
-		const hasErrs = Object.values(errors).some(Boolean);
-		const required =
-			formData.displayName.trim() &&
-			formData.slug.trim() &&
-			formData.version.trim() &&
-			formData.argSchema.trim() &&
-			(formData.type === ToolImplType.HTTP ? formData.httpUrl.trim() : true);
-
-		return Boolean(required) && !hasErrs;
-	}, [errors, formData, isViewMode]);
+	const isAllValid = isViewMode || (!isSubmitting && formIsValid && Boolean(requiredFieldsPresent));
 
 	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
 		e.preventDefault();
@@ -594,8 +604,8 @@ function AddEditToolModalContent({
 
 	return (
 		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
-			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-hidden rounded-2xl p-0">
-				<div className="max-h-[80vh] overflow-y-auto p-4 sm:p-6">
+			<div className="modal-box bg-base-200 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-3xl overflow-hidden rounded-2xl p-0">
+				<div className="app-scrollbar-thin max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6">
 					<ModalHeader
 						title={headerTitle}
 						description="Configure immutable tool versions and their HTTP runtime behavior."

@@ -574,6 +574,10 @@ function AddEditSkillModalContent({
 	};
 
 	const handleInput = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+		if (isSubmitting) {
+			return;
+		}
+
 		const target = e.target as HTMLInputElement;
 		const { name, value, type, checked } = target;
 		const newVal = type === 'checkbox' ? checked : value;
@@ -639,11 +643,15 @@ function AddEditSkillModalContent({
 		setIsSubmitting(true);
 		void onSubmit(payload)
 			.then(() => {
-				requestClose(true);
+				if (!unmountingRef.current) {
+					requestClose(true);
+				}
 			})
 			.catch((err: unknown) => {
-				const msg = err instanceof Error ? err.message : 'Failed to save skill.';
-				setSubmitError(msg);
+				if (!unmountingRef.current) {
+					const msg = err instanceof Error ? err.message : 'Failed to save skill.';
+					setSubmitError(msg);
+				}
 			})
 			.finally(() => {
 				if (!unmountingRef.current) {
@@ -662,8 +670,8 @@ function AddEditSkillModalContent({
 
 	return (
 		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
-			<div className="modal-box bg-base-200 max-h-[85vh] max-w-5xl overflow-hidden rounded-2xl p-0">
-				<div className="max-h-[85vh] overflow-y-auto p-4 sm:p-6">
+			<div className="modal-box bg-base-200 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-5xl overflow-hidden rounded-2xl p-0">
+				<div className="app-scrollbar-thin max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6">
 					<ModalHeader
 						title={headerTitle}
 						description="Manage filesystem skill metadata, rendering behavior, resources, and runtime visibility."
@@ -673,7 +681,7 @@ function AddEditSkillModalContent({
 						closeDisabled={isSubmitting}
 					/>
 
-					<form noValidate onSubmit={handleSubmit} className={MANAGEMENT_MODAL_FORM_CLASS}>
+					<form noValidate onSubmit={handleSubmit} className={MANAGEMENT_MODAL_FORM_CLASS} aria-busy={isSubmitting}>
 						{submitError && (
 							<div className="alert alert-error rounded-2xl text-sm">
 								<div className="flex items-center gap-2">

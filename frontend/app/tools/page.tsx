@@ -82,6 +82,7 @@ export default function ToolsPage() {
 	const [alertMsg, setAlertMsg] = useState('');
 
 	const [bundleToDelete, setBundleToDelete] = useState<ToolBundle | null>(null);
+	const [isDeletingBundle, setIsDeletingBundle] = useState(false);
 	const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
 	const refreshBundleTools = useCallback(
@@ -246,22 +247,32 @@ export default function ToolsPage() {
 						partial.tags
 					);
 				}
-
-				await refreshBundleTools(bundleID);
 			} catch (err) {
 				console.error('Save tool failed:', err);
 				throw new Error(getErrorMessage(err, 'Failed to save tool.'), { cause: err });
+			}
+
+			try {
+				await refreshBundleTools(bundleID);
+			} catch (refreshError) {
+				console.error('Tool version was saved but bundle refresh failed:', refreshError);
+				setAlertMsg(
+					'The tool version was saved, but the bundle could not be refreshed. Use Retry on the bundle before creating, deleting, or changing another tool.'
+				);
+				setShowAlert(true);
 			}
 		},
 		[bundles, refreshBundleTools]
 	);
 
 	const handleBundleDelete = async () => {
-		if (!bundleToDelete) {
+		if (!bundleToDelete || isDeletingBundle) {
 			return;
 		}
+
 		const bundleData = (bundles ?? []).find(item => item.bundle.id === bundleToDelete.id);
 		if (!bundleData || bundleData.toolLoadError || bundleData.tools.length > 0) {
+			setBundleToDelete(null);
 			setAlertMsg(
 				bundleData?.toolLoadError
 					? 'Reload this bundle before deleting it.'
@@ -271,6 +282,7 @@ export default function ToolsPage() {
 			return;
 		}
 
+		setIsDeletingBundle(true);
 		try {
 			await toolStoreAPI.deleteToolBundle(bundleToDelete.id);
 			setBundles(prev => (prev ?? []).filter(bd => bd.bundle.id !== bundleToDelete.id));
@@ -279,6 +291,7 @@ export default function ToolsPage() {
 			setAlertMsg('Failed to delete tool bundle.');
 			setShowAlert(true);
 		} finally {
+			setIsDeletingBundle(false);
 			setBundleToDelete(null);
 		}
 	};
@@ -359,7 +372,9 @@ export default function ToolsPage() {
 				<DeleteConfirmationModal
 					isOpen={bundleToDelete !== null}
 					onClose={() => {
-						setBundleToDelete(null);
+						if (!isDeletingBundle) {
+							setBundleToDelete(null);
+						}
 					}}
 					onConfirm={handleBundleDelete}
 					title="Delete Tool Bundle"

@@ -77,8 +77,8 @@ function MCPOAuthAuthorizationModalContent({
 
 	return (
 		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
-			<div className="modal-box bg-base-200 max-w-2xl rounded-2xl p-0">
-				<div className="p-6">
+			<div className="modal-box bg-base-200 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-2xl overflow-y-auto rounded-2xl p-0">
+				<div className="app-scrollbar-thin p-4 sm:p-6">
 					<div className="mb-4 flex items-start justify-between gap-4">
 						<div>
 							<h3 className="text-lg font-bold">OAuth authorization required</h3>
@@ -156,7 +156,7 @@ function MCPOAuthAuthorizationModalContent({
 								<div className="alert alert-error rounded-2xl text-sm">
 									<div className="flex items-center gap-2">
 										<FiAlertCircle size={14} />
-										<span>{authHealth?.lastError}</span>
+										<span>{cancelError}</span>
 									</div>
 								</div>
 							)}
