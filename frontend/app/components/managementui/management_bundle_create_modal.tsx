@@ -1,5 +1,5 @@
 import type { SubmitEventHandler } from 'react';
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
@@ -40,6 +40,15 @@ const EMPTY_FORM: BundleFormData = {
 	displayName: '',
 	description: '',
 };
+
+function normalizeBundleSlugInput(value: string): string {
+	return value
+		.toLowerCase()
+		.replaceAll(/[^a-z0-9]+/g, '-')
+		.replaceAll(/-+/g, '-')
+		.replaceAll(/^-|-$/g, '')
+		.slice(0, 64);
+}
 
 function normalizeIdentity(value: string): string {
 	return value.trim().toLowerCase();
@@ -95,6 +104,7 @@ function ManagementBundleCreateModalContent({
 	const [submitted, setSubmitted] = useState(false);
 	const [submitError, setSubmitError] = useState('');
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const submittingRef = useRef(false);
 
 	const slugID = useId();
 	const displayNameID = useId();
@@ -112,7 +122,9 @@ function ManagementBundleCreateModalContent({
 	});
 
 	const updateField = (field: keyof BundleFormData, value: string) => {
-		setFormData(previous => ({ ...previous, [field]: value }));
+		const nextValue = field === 'slug' ? normalizeBundleSlugInput(value) : value;
+
+		setFormData(previous => ({ ...previous, [field]: nextValue }));
 		if (submitError) {
 			setSubmitError('');
 		}
@@ -129,7 +141,7 @@ function ManagementBundleCreateModalContent({
 		event.preventDefault();
 		event.stopPropagation();
 
-		if (isSubmitting) {
+		if (isSubmitting || submittingRef.current) {
 			return;
 		}
 
@@ -145,6 +157,7 @@ function ManagementBundleCreateModalContent({
 		const description = formData.description.trim();
 
 		setIsSubmitting(true);
+		submittingRef.current = true;
 		try {
 			await onSubmit(slug, displayName, description || undefined);
 			if (!unmountingRef.current) {
@@ -155,6 +168,7 @@ function ManagementBundleCreateModalContent({
 				setSubmitError(getErrorMessage(error, failureMessage));
 			}
 		} finally {
+			submittingRef.current = false;
 			if (!unmountingRef.current) {
 				setIsSubmitting(false);
 			}
@@ -203,9 +217,11 @@ function ManagementBundleCreateModalContent({
 								onChange={event => {
 									updateField('slug', event.currentTarget.value);
 								}}
+								autoCapitalize="none"
 								onBlur={() => {
 									markTouched('slug');
 								}}
+								placeholder="my-custom-bundle"
 								spellCheck="false"
 								autoComplete="off"
 								autoFocus

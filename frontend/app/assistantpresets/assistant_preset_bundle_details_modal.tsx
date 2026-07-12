@@ -1,12 +1,8 @@
-import { useEffect, useRef } from 'react';
-
-import { createPortal } from 'react-dom';
-
-import { FiX } from 'react-icons/fi';
-
 import type { AssistantPresetBundle } from '@/spec/assistantpreset';
 
-import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ManagementDetailsModal } from '@/components/managementui/management_details_modal';
+import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
+import { ManagementInfoRow } from '@/components/managementui/management_info_row';
 
 import { formatDateish } from '@/assistantpresets/lib/assistant_preset_utils';
 
@@ -17,103 +13,36 @@ interface AssistantPresetBundleDetailsModalProps {
 }
 
 export function AssistantPresetBundleDetailsModal({ isOpen, onClose, bundle }: AssistantPresetBundleDetailsModalProps) {
-	const dialogRef = useRef<HTMLDialogElement | null>(null);
-
-	useEffect(() => {
-		if (!isOpen) {
-			return;
-		}
-
-		const dialog = dialogRef.current;
-		if (!dialog) {
-			return;
-		}
-
-		if (!dialog.open) {
-			dialog.showModal();
-		}
-
-		return () => {
-			if (dialog.open) {
-				dialog.close();
-			}
-		};
-	}, [isOpen]);
-
-	const handleDialogClose = () => {
-		onClose();
-	};
-
 	if (!isOpen || !bundle) {
 		return null;
 	}
 
-	return createPortal(
-		<dialog ref={dialogRef} className="modal" onClose={handleDialogClose}>
-			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-hidden rounded-2xl p-0">
-				<div className="max-h-[80vh] overflow-y-auto p-6">
-					<div className="mb-4 flex items-center justify-between">
-						<h3 className="text-lg font-bold">Assistant Preset Bundle Details</h3>
-						<button
-							type="button"
-							className="btn btn-sm btn-circle bg-base-300"
-							onClick={() => dialogRef.current?.close()}
-							aria-label="Close"
-						>
-							<FiX size={12} />
-						</button>
-					</div>
-
-					<div className="space-y-3 text-sm">
-						<div className="grid grid-cols-12 gap-2">
-							<div className="col-span-3 font-semibold">Display Name</div>
-							<div className="col-span-9">{bundle.displayName || '-'}</div>
-						</div>
-						<div className="grid grid-cols-12 gap-2">
-							<div className="col-span-3 font-semibold">Slug</div>
-							<div className="col-span-9">{bundle.slug}</div>
-						</div>
-						<div className="grid grid-cols-12 gap-2">
-							<div className="col-span-3 font-semibold">ID</div>
-							<div className="col-span-9">{bundle.id}</div>
-						</div>
-						<div className="grid grid-cols-12 gap-2">
-							<div className="col-span-3 font-semibold">Built-in</div>
-							<div className="col-span-9">{bundle.isBuiltIn ? 'Yes' : 'No'}</div>
-						</div>
-						<div className="grid grid-cols-12 gap-2">
-							<div className="col-span-3 font-semibold">Enabled</div>
-							<div className="col-span-9">{bundle.isEnabled ? 'Yes' : 'No'}</div>
-						</div>
-						<div className="grid grid-cols-12 gap-2">
-							<div className="col-span-3 font-semibold">Description</div>
-							<div className="col-span-9 whitespace-pre-wrap">{bundle.description || '-'}</div>
-						</div>
-						<div className="grid grid-cols-12 gap-2">
-							<div className="col-span-3 font-semibold">Created</div>
-							<div className="col-span-9">{formatDateish(bundle.createdAt)}</div>
-						</div>
-						<div className="grid grid-cols-12 gap-2">
-							<div className="col-span-3 font-semibold">Modified</div>
-							<div className="col-span-9">{formatDateish(bundle.modifiedAt)}</div>
-						</div>
-						{bundle.softDeletedAt && (
-							<div className="grid grid-cols-12 gap-2">
-								<div className="col-span-3 font-semibold">Soft Deleted</div>
-								<div className="col-span-9">{formatDateish(bundle.softDeletedAt)}</div>
-							</div>
-						)}
-					</div>
-
-					<div className="modal-action">
-						<button type="button" className="btn bg-base-300 rounded-xl" onClick={() => dialogRef.current?.close()}>
-							Close
-						</button>
-					</div>
-				</div>
-			</div>
-			<ModalBackdrop enabled={true} />
-		</dialog>,
-		document.body
+	return (
+		<ManagementDetailsModal
+			isOpen={isOpen}
+			onClose={onClose}
+			title="Assistant Preset Bundle Details"
+			modalKey={`assistant-preset-bundle:${bundle.id}:${String(bundle.modifiedAt)}`}
+		>
+			<ManagementInfoGrid>
+				<ManagementInfoRow label="Display Name">{bundle.displayName || '—'}</ManagementInfoRow>
+				<ManagementInfoRow label="Slug" mono>
+					{bundle.slug}
+				</ManagementInfoRow>
+				<ManagementInfoRow label="ID" mono>
+					{bundle.id}
+				</ManagementInfoRow>
+				<ManagementInfoRow label="Built-in">{bundle.isBuiltIn ? 'Yes' : 'No'}</ManagementInfoRow>
+				<ManagementInfoRow label="Enabled">{bundle.isEnabled ? 'Yes' : 'No'}</ManagementInfoRow>
+				<ManagementInfoRow label="Description">
+					<span className="whitespace-pre-wrap">{bundle.description || '—'}</span>
+				</ManagementInfoRow>
+				<ManagementInfoRow label="Created">{formatDateish(bundle.createdAt)}</ManagementInfoRow>
+				<ManagementInfoRow label="Modified">{formatDateish(bundle.modifiedAt)}</ManagementInfoRow>
+				{bundle.softDeletedAt ? (
+					<ManagementInfoRow label="Soft deleted">{formatDateish(bundle.softDeletedAt)}</ManagementInfoRow>
+				) : null}
+			</ManagementInfoGrid>
+		</ManagementDetailsModal>
 	);
 }

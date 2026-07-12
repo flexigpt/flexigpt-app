@@ -11,12 +11,19 @@ import { SkillType } from '@/spec/skill';
 import { omitManyKeys } from '@/lib/obj_utils';
 import { validateSlug, validateTags } from '@/lib/text_utils';
 
+import { useDialogController } from '@/hooks/use_dialog_controller';
+
 import { skillStoreAPI } from '@/apis/baseapi';
 
 import { Dropdown } from '@/components/dropdown';
+import { MANAGEMENT_MODAL_FORM_CLASS } from '@/components/managementui/management_class_consts';
+import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
+import { ManagementInfoRow } from '@/components/managementui/management_info_row';
 import { MetadataPill } from '@/components/managementui/metadata_pill';
+import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 import { ModalField } from '@/components/modal/modal_field';
+import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
 import { ReadOnlyValue } from '@/components/read_only_value';
 
@@ -324,9 +331,12 @@ function AddEditSkillModalContent({
 	const artifactFrontmatter = stringifySkillFrontmatter(artifactSkill?.rawFrontmatter);
 	const scaffoldArgumentError = validateScaffoldArgumentLines(scaffoldArgumentsText);
 
-	const dialogRef = useRef<HTMLDialogElement | null>(null);
+	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
+		onClose,
+		blockCancel: !isViewMode,
+		isBusy: isSubmitting,
+	});
 	const nameInputRef = useRef<HTMLInputElement | null>(null);
-	const isUnmountingRef = useRef(false);
 
 	const scaffoldArguments = useMemo(() => parseScaffoldArgumentLines(scaffoldArgumentsText), [scaffoldArgumentsText]);
 	const scaffoldMarkdown = useMemo(
@@ -421,63 +431,18 @@ function AddEditSkillModalContent({
 	const isAllValid = isViewMode ? true : !isSubmitting && Object.values(validateForm(formData)).every(error => !error);
 
 	useEffect(() => {
-		const dialog = dialogRef.current;
-		if (!dialog) {
+		if (!isAddMode) {
 			return;
 		}
 
-		if (!dialog.open) {
-			try {
-				dialog.showModal();
-			} catch {
-				// Ignore if the dialog cannot be shown; keep rendering safely.
-			}
-		}
-
-		let focusTimer: number | undefined;
-
-		if (isAddMode) {
-			focusTimer = window.setTimeout(() => {
-				if (dialog.open) {
-					nameInputRef.current?.focus();
-				}
-			}, 0);
-		}
+		const focusTimer = window.setTimeout(() => {
+			nameInputRef.current?.focus();
+		}, 0);
 
 		return () => {
-			isUnmountingRef.current = true;
-
-			if (focusTimer !== undefined) {
-				window.clearTimeout(focusTimer);
-			}
-
-			if (dialog.open) {
-				dialog.close();
-			}
+			window.clearTimeout(focusTimer);
 		};
 	}, [isAddMode]);
-
-	const requestClose = (force = false) => {
-		if (isSubmitting && !force) {
-			return;
-		}
-
-		const dialog = dialogRef.current;
-
-		if (dialog?.open) {
-			dialog.close();
-			return;
-		}
-
-		onClose();
-	};
-
-	const handleDialogClose = () => {
-		if (isUnmountingRef.current) {
-			return;
-		}
-		onClose();
-	};
 
 	const prefillCandidates = prefillSkills ?? existingSkills;
 	const copyableSkills = useMemo(
@@ -681,7 +646,7 @@ function AddEditSkillModalContent({
 				setSubmitError(msg);
 			})
 			.finally(() => {
-				if (!isUnmountingRef.current) {
+				if (!unmountingRef.current) {
 					setIsSubmitting(false);
 				}
 			});
@@ -696,34 +661,19 @@ function AddEditSkillModalContent({
 				: 'Add Skill or Template';
 
 	return (
-		<dialog
-			ref={dialogRef}
-			className="modal"
-			onClose={handleDialogClose}
-			onCancel={e => {
-				// Form mode: block Esc close. View mode: allow.
-				if (!isViewMode) {
-					e.preventDefault();
-				}
-			}}
-		>
+		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
 			<div className="modal-box bg-base-200 max-h-[85vh] max-w-5xl overflow-hidden rounded-2xl p-0">
 				<div className="max-h-[85vh] overflow-y-auto p-4 sm:p-6">
-					<div className="mb-4 flex items-center justify-between">
-						<h3 className="text-lg font-bold">{headerTitle}</h3>
-						<button
-							type="button"
-							className="btn btn-sm btn-circle bg-base-300"
-							onClick={() => {
-								requestClose(false);
-							}}
-							aria-label="Close"
-						>
-							<FiX size={12} />
-						</button>
-					</div>
+					<ModalHeader
+						title={headerTitle}
+						description="Manage filesystem skill metadata, rendering behavior, resources, and runtime visibility."
+						onClose={() => {
+							requestClose();
+						}}
+						closeDisabled={isSubmitting}
+					/>
 
-					<form noValidate onSubmit={handleSubmit} className="space-y-4">
+					<form noValidate onSubmit={handleSubmit} className={MANAGEMENT_MODAL_FORM_CLASS}>
 						{submitError && (
 							<div className="alert alert-error rounded-2xl text-sm">
 								<div className="flex items-center gap-2">
@@ -1096,244 +1046,255 @@ function AddEditSkillModalContent({
 
 						{artifactSkill && !isForkMode && (
 							<>
-								<div className="divider">Artifact metadata</div>
-								<div className="grid grid-cols-12 gap-2 text-sm">
-									<div className="col-span-3 font-semibold">Insert</div>
-									<div className="col-span-9 space-y-1">
-										<div className="flex items-center gap-2">
-											<MetadataPill>{getSkillInsertLabel(artifactSkill.insert)}</MetadataPill>
-											{normalizedArtifactInsert.isDefaulted && <MetadataPill>Default behavior</MetadataPill>}
-										</div>
-										<div className="text-base-content/70 text-xs">
-											{getSkillInsertDescription(artifactSkill.insert)}
-										</div>
-									</div>
-
-									<div className="col-span-3 font-semibold">Arguments</div>
-									<div className="col-span-9 space-y-2">
-										<div className="text-base-content/70 text-xs">
-											{getSkillArgumentCountLabel(artifactSkill.arguments)}
-										</div>
-										{artifactArgumentLines.length > 0 ? (
-											<ul className="space-y-1">
-												{artifactArgumentLines.map((line, idx) => (
-													<li
-														key={`${line}-${idx}`}
-														className="bg-base-100 rounded-xl px-3 py-2 text-xs whitespace-pre-wrap"
-													>
-														{line}
-													</li>
-												))}
-											</ul>
-										) : (
-											<div className="text-base-content/70 text-xs">No arguments declared.</div>
-										)}
-									</div>
-
-									<div className="col-span-3 font-semibold">Resources</div>
-									<div className="col-span-9 space-y-2">
-										<div className="flex flex-wrap items-center gap-2">
-											<MetadataPill title={getSkillResourceTooltip(artifactSkill.resources)}>
-												{getSkillResourceCountLabel(artifactSkill.resources)}
-											</MetadataPill>
-											<span className="text-base-content/70 text-xs">
-												Resource files are regular files under the skill folder. They are not automatically executed or
-												rendered by this page.
-											</span>
-										</div>
-										{artifactSkill.resources?.locations?.length ? (
-											<ul className="space-y-1">
-												{artifactSkill.resources.locations.map(location => (
-													<li key={location} className="bg-base-100 rounded-xl px-3 py-2 font-mono text-xs break-all">
-														{location}
-													</li>
-												))}
-											</ul>
-										) : null}
-									</div>
-
-									<div className="col-span-3 font-semibold">Digest</div>
-									<div className="col-span-9 font-mono text-xs break-all">{artifactSkill.digest || '-'}</div>
-
-									<div className="col-span-3 font-semibold">Runtime warnings</div>
-									<div className="col-span-9 space-y-1">
-										{artifactSkill.runtimeWarnings?.length ? (
-											<ul className="list-disc space-y-1 pl-5 text-xs">
-												{artifactSkill.runtimeWarnings.map((warning, idx) => (
-													<li key={`${idx}-${warning}`}>{warning}</li>
-												))}
-											</ul>
-										) : (
-											<div className="text-base-content/70 text-xs">No runtime warnings recorded.</div>
-										)}
-									</div>
-
-									<div className="col-span-3 font-semibold">Raw frontmatter</div>
-									<div className="col-span-9">
-										{artifactFrontmatter ? (
-											<pre className="bg-base-100 max-h-56 overflow-auto rounded-2xl p-3 text-xs whitespace-pre-wrap">
-												{artifactFrontmatter}
-											</pre>
-										) : (
-											<div className="text-base-content/70 text-xs">No raw frontmatter captured.</div>
-										)}
-									</div>
-								</div>
-
-								<div className="divider">Store metadata</div>
-								<div className="grid grid-cols-12 gap-2 text-sm">
-									<div className="col-span-3 font-semibold">ID</div>
-									<div className="col-span-9 break-all">{artifactSkill.id}</div>
-									<div className="col-span-3 font-semibold">Schema</div>
-									<div className="col-span-9">{artifactSkill.schemaVersion}</div>
-									<div className="col-span-3 font-semibold">Type</div>
-									<div className="col-span-9">{artifactSkill.type}</div>
-									<div className="col-span-3 font-semibold">Location</div>
-									<div className="col-span-9">
-										<div className="flex flex-wrap items-center gap-2">
-											<span className="break-all">{artifactSkill.location || '-'}</span>
-											{artifactSkill.location ? (
-												<button type="button" className="btn btn-xs btn-ghost rounded-xl" onClick={copyLocation}>
-													<FiCopy size={12} />
-													<span className="ml-1">{locationCopied ? 'Copied' : 'Copy'}</span>
-												</button>
-											) : null}
-										</div>
-										<div className="text-base-content/70 mt-1 text-xs">
-											To update resources or edit SKILL.md directly, change files in this folder and then re-enable the
-											skill or restart the app to refresh runtime metadata.
-										</div>
-									</div>
-									<div className="col-span-3 font-semibold">Tags</div>
-									<div className="col-span-9">
-										{artifactSkill.tags?.length ? (
-											<div className="flex flex-wrap gap-1">
-												{artifactSkill.tags.map(tag => (
-													<MetadataPill key={tag}>{tag}</MetadataPill>
-												))}
-											</div>
-										) : (
-											<div className="text-base-content/70 text-xs">No tags.</div>
-										)}
-									</div>
-									<div className="col-span-3 font-semibold">Built-in</div>
-									<div className="col-span-9">{artifactSkill.isBuiltIn ? 'Yes' : 'No'}</div>
-									<div className="col-span-3 font-semibold">Presence</div>
-									<div className="col-span-9">{artifactSkill.presence?.status ?? 'unknown'}</div>
-									<div className="col-span-3 font-semibold">Created</div>
-									<div className="col-span-9">{String(artifactSkill.createdAt)}</div>
-									<div className="col-span-3 font-semibold">Modified</div>
-									<div className="col-span-9">{String(artifactSkill.modifiedAt)}</div>
-								</div>
-
-								<div className="divider">Render preview</div>
-								<div className="alert alert-info rounded-2xl text-sm">
-									<div className="space-y-1">
-										<div className="font-semibold">Preview the rendered skill body</div>
-										<div>
-											This uses the runtime render API only. It does not mutate the stored skill record or the source
-											files on disk.
-										</div>
-										<div>Preview requires the skill to be enabled and indexed in the runtime.</div>
-									</div>
-								</div>
-
-								<div className="space-y-3">
-									{artifactArguments.length > 0 ? (
-										<div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-											{artifactArguments.map(arg => (
-												<div key={arg.name} className="border-base-content/10 rounded-2xl border p-3">
-													<div className="flex items-start justify-between gap-2">
-														<div>
-															<div className="font-medium">{arg.name}</div>
-															{arg.description ? (
-																<div className="text-base-content/70 mt-1 text-xs">{arg.description}</div>
-															) : null}
-														</div>
-														{arg.default ? <MetadataPill label="Default">{arg.default}</MetadataPill> : null}
+								<ModalSection title="Artifact metadata">
+									<ManagementInfoGrid>
+										<ManagementInfoRow label="Artifact fields" className="sm:grid-cols-1">
+											<div className="grid grid-cols-12 gap-2 text-sm">
+												<div className="col-span-3 font-semibold">Insert</div>
+												<div className="col-span-9 space-y-1">
+													<div className="flex items-center gap-2">
+														<MetadataPill>{getSkillInsertLabel(artifactSkill.insert)}</MetadataPill>
+														{normalizedArtifactInsert.isDefaulted && <MetadataPill>Default behavior</MetadataPill>}
 													</div>
-													<input
-														type="text"
-														className="input bg-base-100 mt-3 w-full rounded-xl"
-														value={previewArgs[arg.name] ?? ''}
-														onChange={e => {
-															setPreviewArgs(prev => ({
-																...prev,
-																[arg.name]: e.target.value,
-															}));
-															setPreviewResult(null);
-															setPreviewError('');
-														}}
-														spellCheck="false"
-														autoComplete="off"
-													/>
+													<div className="text-base-content/70 text-xs">
+														{getSkillInsertDescription(artifactSkill.insert)}
+													</div>
 												</div>
-											))}
-										</div>
-									) : (
-										<div className="text-base-content/70 text-xs">
-											This skill declares no arguments. Rendering uses empty string substitutions and frontmatter
-											defaults only.
-										</div>
-									)}
 
-									<div className="flex flex-wrap gap-2">
-										<button
-											type="button"
-											className="btn btn-sm btn-primary rounded-xl"
-											onClick={handleRenderPreview}
-											disabled={previewLoading}
-										>
-											{previewLoading ? <span className="loading loading-spinner loading-xs" /> : null}
-											<span className={previewLoading ? 'ml-2' : ''}>Render Preview</span>
-										</button>
-										<button
-											type="button"
-											className="btn btn-sm btn-ghost rounded-xl"
-											onClick={resetPreviewArgs}
-											disabled={previewLoading}
-										>
-											Reset Arguments
-										</button>
+												<div className="col-span-3 font-semibold">Arguments</div>
+												<div className="col-span-9 space-y-2">
+													<div className="text-base-content/70 text-xs">
+														{getSkillArgumentCountLabel(artifactSkill.arguments)}
+													</div>
+													{artifactArgumentLines.length > 0 ? (
+														<ul className="space-y-1">
+															{artifactArgumentLines.map((line, idx) => (
+																<li
+																	key={`${line}-${idx}`}
+																	className="bg-base-100 rounded-xl px-3 py-2 text-xs whitespace-pre-wrap"
+																>
+																	{line}
+																</li>
+															))}
+														</ul>
+													) : (
+														<div className="text-base-content/70 text-xs">No arguments declared.</div>
+													)}
+												</div>
+
+												<div className="col-span-3 font-semibold">Resources</div>
+												<div className="col-span-9 space-y-2">
+													<div className="flex flex-wrap items-center gap-2">
+														<MetadataPill title={getSkillResourceTooltip(artifactSkill.resources)}>
+															{getSkillResourceCountLabel(artifactSkill.resources)}
+														</MetadataPill>
+														<span className="text-base-content/70 text-xs">
+															Resource files are regular files under the skill folder. They are not automatically
+															executed or rendered by this page.
+														</span>
+													</div>
+													{artifactSkill.resources?.locations?.length ? (
+														<ul className="space-y-1">
+															{artifactSkill.resources.locations.map(location => (
+																<li
+																	key={location}
+																	className="bg-base-100 rounded-xl px-3 py-2 font-mono text-xs break-all"
+																>
+																	{location}
+																</li>
+															))}
+														</ul>
+													) : null}
+												</div>
+
+												<div className="col-span-3 font-semibold">Digest</div>
+												<div className="col-span-9 font-mono text-xs break-all">{artifactSkill.digest || '-'}</div>
+
+												<div className="col-span-3 font-semibold">Runtime warnings</div>
+												<div className="col-span-9 space-y-1">
+													{artifactSkill.runtimeWarnings?.length ? (
+														<ul className="list-disc space-y-1 pl-5 text-xs">
+															{artifactSkill.runtimeWarnings.map((warning, idx) => (
+																<li key={`${idx}-${warning}`}>{warning}</li>
+															))}
+														</ul>
+													) : (
+														<div className="text-base-content/70 text-xs">No runtime warnings recorded.</div>
+													)}
+												</div>
+
+												<div className="col-span-3 font-semibold">Raw frontmatter</div>
+												<div className="col-span-9">
+													{artifactFrontmatter ? (
+														<pre className="bg-base-100 max-h-56 overflow-auto rounded-2xl p-3 text-xs whitespace-pre-wrap">
+															{artifactFrontmatter}
+														</pre>
+													) : (
+														<div className="text-base-content/70 text-xs">No raw frontmatter captured.</div>
+													)}
+												</div>
+											</div>
+										</ManagementInfoRow>
+									</ManagementInfoGrid>
+								</ModalSection>
+
+								<ModalSection title="Store metadata">
+									<ManagementInfoGrid>
+										<ManagementInfoRow label="ID" mono>
+											{artifactSkill.id}
+										</ManagementInfoRow>
+										<ManagementInfoRow label="Schema version">{artifactSkill.schemaVersion}</ManagementInfoRow>
+										<ManagementInfoRow label="Type">{artifactSkill.type}</ManagementInfoRow>
+										<ManagementInfoRow label="Location">
+											<div className="space-y-2">
+												<div className="col-span-3 font-semibold">Type</div>
+												<div className="flex flex-wrap items-center gap-2">
+													<span className="break-all">{artifactSkill.location || '-'}</span>
+													{artifactSkill.location ? (
+														<button type="button" className="btn btn-xs btn-ghost rounded-xl" onClick={copyLocation}>
+															<FiCopy size={12} />
+															<span className="ml-1">{locationCopied ? 'Copied' : 'Copy'}</span>
+														</button>
+													) : null}
+												</div>
+												<div className="text-base-content/70 mt-1 text-xs">
+													To update resources or edit SKILL.md directly, change files in this folder and then re-enable
+													the skill or restart the app to refresh runtime metadata.
+												</div>
+											</div>
+										</ManagementInfoRow>
+										<ManagementInfoRow label="Tags">
+											{artifactSkill.tags?.length ? (
+												<div className="flex flex-wrap gap-1">
+													{artifactSkill.tags.map(tag => (
+														<MetadataPill key={tag}>{tag}</MetadataPill>
+													))}
+												</div>
+											) : (
+												<div className="text-base-content/70 text-xs">No tags.</div>
+											)}
+										</ManagementInfoRow>
+										<ManagementInfoRow label="Built-in">{artifactSkill.isBuiltIn ? 'Yes' : 'No'}</ManagementInfoRow>
+										<ManagementInfoRow label="Presence">
+											{artifactSkill.presence?.status ?? 'unknown'}
+										</ManagementInfoRow>
+										<ManagementInfoRow label="Created">{String(artifactSkill.createdAt)}</ManagementInfoRow>
+										<ManagementInfoRow label="Modified">{String(artifactSkill.modifiedAt)}</ManagementInfoRow>
+									</ManagementInfoGrid>
+								</ModalSection>
+
+								<ModalSection
+									title="Render preview"
+									description="Preview uses the runtime renderer and does not modify source files or stored metadata."
+								>
+									<div className="alert alert-info rounded-2xl text-sm">
+										<div className="space-y-1">
+											<div className="font-semibold">Preview the rendered skill body</div>
+											<div>
+												This uses the runtime render API only. It does not mutate the stored skill record or the source
+												files on disk.
+											</div>
+											<div>Preview requires the skill to be enabled and indexed in the runtime.</div>
+										</div>
 									</div>
 
-									{previewError && (
-										<div className="alert alert-error rounded-2xl text-sm">
-											<div className="flex items-center gap-2">
-												<FiAlertCircle size={14} />
-												<span>{previewError}</span>
+									<div className="space-y-3">
+										{artifactArguments.length > 0 ? (
+											<div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+												{artifactArguments.map(arg => (
+													<div key={arg.name} className="border-base-content/10 rounded-2xl border p-3">
+														<div className="flex items-start justify-between gap-2">
+															<div>
+																<div className="font-medium">{arg.name}</div>
+																{arg.description ? (
+																	<div className="text-base-content/70 mt-1 text-xs">{arg.description}</div>
+																) : null}
+															</div>
+															{arg.default ? <MetadataPill label="Default">{arg.default}</MetadataPill> : null}
+														</div>
+														<input
+															type="text"
+															className="input bg-base-100 mt-3 w-full rounded-xl"
+															value={previewArgs[arg.name] ?? ''}
+															onChange={e => {
+																setPreviewArgs(prev => ({
+																	...prev,
+																	[arg.name]: e.target.value,
+																}));
+																setPreviewResult(null);
+																setPreviewError('');
+															}}
+															spellCheck="false"
+															autoComplete="off"
+														/>
+													</div>
+												))}
 											</div>
-										</div>
-									)}
+										) : (
+											<div className="text-base-content/70 text-xs">
+												This skill declares no arguments. Rendering uses empty string substitutions and frontmatter
+												defaults only.
+											</div>
+										)}
 
-									{previewResult && (
-										<div className="space-y-3">
-											<div className="flex flex-wrap items-center gap-2 text-xs">
-												<MetadataPill label="Insert">{previewResult.insert}</MetadataPill>
-												{Object.keys(previewResult.appliedArguments ?? {}).length > 0 ? (
-													<span className="text-base-content/70">Applied arguments captured from the renderer.</span>
+										<div className="flex flex-wrap gap-2">
+											<button
+												type="button"
+												className="btn btn-sm btn-primary rounded-xl"
+												onClick={handleRenderPreview}
+												disabled={previewLoading}
+											>
+												{previewLoading ? <span className="loading loading-spinner loading-xs" /> : null}
+												<span className={previewLoading ? 'ml-2' : ''}>Render Preview</span>
+											</button>
+											<button
+												type="button"
+												className="btn btn-sm btn-ghost rounded-xl"
+												onClick={resetPreviewArgs}
+												disabled={previewLoading}
+											>
+												Reset Arguments
+											</button>
+										</div>
+
+										{previewError && (
+											<div className="alert alert-error rounded-2xl text-sm">
+												<div className="flex items-center gap-2">
+													<FiAlertCircle size={14} />
+													<span>{previewError}</span>
+												</div>
+											</div>
+										)}
+
+										{previewResult && (
+											<div className="space-y-3">
+												<div className="flex flex-wrap items-center gap-2 text-xs">
+													<MetadataPill label="Insert">{previewResult.insert}</MetadataPill>
+													{Object.keys(previewResult.appliedArguments ?? {}).length > 0 ? (
+														<span className="text-base-content/70">Applied arguments captured from the renderer.</span>
+													) : null}
+												</div>
+												<pre className="bg-base-100 max-h-72 overflow-auto rounded-2xl p-3 text-xs whitespace-pre-wrap">
+													{previewResult.text || '(Rendered output is empty.)'}
+												</pre>
+												{previewResult.warnings?.length ? (
+													<div className="space-y-1">
+														<div className="text-xs font-semibold">Warnings</div>
+														<ul className="list-disc space-y-1 pl-5 text-xs">
+															{previewResult.warnings.map((warning, idx) => (
+																<li key={`${idx}-${warning}`}>{warning}</li>
+															))}
+														</ul>
+													</div>
 												) : null}
 											</div>
-											<pre className="bg-base-100 max-h-72 overflow-auto rounded-2xl p-3 text-xs whitespace-pre-wrap">
-												{previewResult.text || '(Rendered output is empty.)'}
-											</pre>
-											{previewResult.warnings?.length ? (
-												<div className="space-y-1">
-													<div className="text-xs font-semibold">Warnings</div>
-													<ul className="list-disc space-y-1 pl-5 text-xs">
-														{previewResult.warnings.map((warning, idx) => (
-															<li key={`${idx}-${warning}`}>{warning}</li>
-														))}
-													</ul>
-												</div>
-											) : null}
-										</div>
-									)}
-								</div>
+										)}
+									</div>
+								</ModalSection>
 							</>
 						)}
 
-						<div className="modal-action">
+						<ModalActions>
 							<button
 								type="button"
 								className="btn bg-base-300 rounded-xl"
@@ -1350,7 +1311,7 @@ function AddEditSkillModalContent({
 									{isSubmitting ? 'Saving…' : 'Save'}
 								</button>
 							)}
-						</div>
+						</ModalActions>
 					</form>
 				</div>
 			</div>

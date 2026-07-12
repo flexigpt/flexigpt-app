@@ -20,10 +20,17 @@ import { validateSlug } from '@/lib/text_utils';
 import { DEFAULT_SEMVER, isSemverVersion, suggestNextMinorVersion } from '@/lib/version_utils';
 
 import { useAsyncResource } from '@/hooks/use_async_resource';
+import { useDialogController } from '@/hooks/use_dialog_controller';
 
 import { Dropdown } from '@/components/dropdown';
 import { MANAGEMENT_MODAL_FORM_CLASS } from '@/components/managementui/management_class_consts';
+import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
+import { ManagementInfoRow } from '@/components/managementui/management_info_row';
+import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalField } from '@/components/modal/modal_field';
+import { ModalHeader } from '@/components/modal/modal_header';
+import { ModalSection } from '@/components/modal/modal_section';
 
 import { MCPSelectionSection } from '@/assistantpresets/components/mcp_selection_section';
 import { AssistantPresetModelPatchEditor } from '@/assistantpresets/components/model_patch_editor';
@@ -632,9 +639,12 @@ function AddEditAssistantPresetModalContent({
 	const initialPresetSlug = initialData?.preset?.slug;
 	const initialPresetVersion = initialData?.preset?.version;
 
-	const dialogRef = useRef<HTMLDialogElement | null>(null);
-	const isUnmountingRef = useRef(false);
 	const forceCatalogReloadRef = useRef(false);
+	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
+		onClose,
+		blockCancel: !isViewMode,
+		isBusy: isSubmitting,
+	});
 
 	const loadCatalogResource = useCallback(async (signal: AbortSignal): Promise<AssistantPresetEditorCatalog> => {
 		const force = forceCatalogReloadRef.current;
@@ -657,60 +667,12 @@ function AddEditAssistantPresetModalContent({
 		: '';
 
 	useEffect(() => {
-		const dialog = dialogRef.current;
-		if (!dialog) {
-			return;
-		}
-
-		if (!dialog.open) {
-			try {
-				dialog.showModal();
-			} catch {
-				// keep safe
-			}
-		}
-
-		return () => {
-			isUnmountingRef.current = true;
-
-			if (dialog.open) {
-				dialog.close();
-			}
-		};
-	}, []);
-
-	useEffect(() => {
 		if (restoredInitialMCPContextRef.current) {
 			return;
 		}
 		restoredInitialMCPContextRef.current = true;
 		mcpState.restoreContext(initialData?.preset.startingMCPContext);
 	}, [initialData?.preset.startingMCPContext, mcpState]);
-
-	const requestClose = useCallback(
-		(force = false) => {
-			if (isSubmitting && !force) {
-				return;
-			}
-
-			const dialog = dialogRef.current;
-
-			if (dialog?.open) {
-				dialog.close();
-				return;
-			}
-
-			onClose();
-		},
-		[isSubmitting, onClose]
-	);
-
-	const handleDialogClose = useCallback(() => {
-		if (isUnmountingRef.current) {
-			return;
-		}
-		onClose();
-	}, [onClose]);
 
 	const prefillSourceMap = useMemo<Record<string, PresetItem>>(() => {
 		const sourceItems = copyablePresets ?? existingPresets;
@@ -1507,11 +1469,11 @@ function AddEditAssistantPresetModalContent({
 			await onSubmit(payload);
 			requestClose(true);
 		} catch (error) {
-			if (!isUnmountingRef.current) {
+			if (!unmountingRef.current) {
 				setSubmitError(getErrorMessage(error, 'Failed to save assistant preset.'));
 			}
 		} finally {
-			if (!isUnmountingRef.current) {
+			if (!unmountingRef.current) {
 				setIsSubmitting(false);
 			}
 		}
@@ -1525,32 +1487,23 @@ function AddEditAssistantPresetModalContent({
 				: 'Add Assistant Preset';
 
 	return (
-		<dialog
-			ref={dialogRef}
-			className="modal"
-			onClose={handleDialogClose}
-			onCancel={e => {
-				if (!isViewMode) {
-					e.preventDefault();
-				}
-			}}
-		>
+		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-5xl overflow-hidden rounded-2xl p-0">
 				<div className="max-h-[80vh] overflow-y-auto p-4 sm:p-6">
-					<div className="mb-4 flex items-center justify-between">
-						<h3 className="text-lg font-bold">{headerTitle}</h3>
-						<button
-							type="button"
-							className="btn btn-sm btn-circle bg-base-300"
-							onClick={() => {
-								requestClose();
-							}}
-							disabled={isSubmitting}
-							aria-label="Close"
-						>
-							<FiX size={12} />
-						</button>
-					</div>
+					<ModalHeader
+						title={headerTitle}
+						description={
+							isViewMode
+								? 'Inspect the saved starting configuration.'
+								: isEditMode
+									? 'Create an immutable next version of this assistant preset.'
+									: 'Define reusable starting text, model, tools, skills, and MCP context.'
+						}
+						onClose={() => {
+							requestClose();
+						}}
+						closeDisabled={isSubmitting}
+					/>
 
 					<form
 						noValidate
@@ -1611,71 +1564,77 @@ function AddEditAssistantPresetModalContent({
 							</div>
 						)}
 
-						{effectiveMode === 'add' && (
-							<div className="grid grid-cols-12 items-center gap-2">
-								<label className="label col-span-3">
-									<span className="text-sm">Prefill from Existing</span>
-								</label>
+						<ModalSection
+							title="Identity and presentation"
+							description="Use a stable slug and version. Versions are immutable once saved."
+						>
+							{effectiveMode === 'add' && (
+								<div className="grid grid-cols-12 items-center gap-2">
+									<label className="label col-span-3">
+										<span className="text-sm">Prefill from Existing</span>
+									</label>
 
-								<div className="col-span-9 flex items-center gap-2">
-									{!prefillMode && (
-										<button
-											type="button"
-											className="btn btn-sm btn-ghost flex items-center rounded-xl"
-											onClick={() => {
-												setPrefillMode(true);
-											}}
-											disabled={prefillKeys.length === 0}
-											title={
-												prefillKeys.length === 0 ? 'No existing assistant presets are available to copy.' : undefined
-											}
-										>
-											<FiUpload size={14} />
-											<span className="ml-1">Copy Existing Preset</span>
-										</button>
-									)}
-
-									{prefillMode && (
-										<>
-											<Dropdown<string>
-												dropdownItems={prefillDropdownItems}
-												orderedKeys={prefillKeys}
-												selectedKey={selectedPrefillKey ?? ''}
-												onChange={key => {
-													setSelectedPrefillKey(key);
-													applyPrefill(key);
-													setPrefillMode(false);
-												}}
-												disabled={prefillKeys.length === 0}
-												filterDisabled={false}
-												title="Select assistant preset to copy"
-												getDisplayName={key =>
-													prefillDropdownItems[key]?.displayName ?? 'Select assistant preset to copy'
-												}
-											/>
+									<div className="col-span-9 flex items-center gap-2">
+										{!prefillMode && (
 											<button
 												type="button"
-												className="btn btn-sm btn-ghost rounded-xl"
+												className="btn btn-sm btn-ghost flex items-center rounded-xl"
 												onClick={() => {
-													setPrefillMode(false);
-													setSelectedPrefillKey(null);
+													setPrefillMode(true);
 												}}
-												title="Cancel prefill"
+												disabled={prefillKeys.length === 0}
+												title={
+													prefillKeys.length === 0 ? 'No existing assistant presets are available to copy.' : undefined
+												}
 											>
-												<FiX size={12} />
+												<FiUpload size={14} />
+												<span className="ml-1">Copy Existing Preset</span>
 											</button>
-										</>
-									)}
-								</div>
-							</div>
-						)}
+										)}
 
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
-								<span className="text-sm">Display Name*</span>
-							</label>
-							<div className="col-span-9">
+										{prefillMode && (
+											<>
+												<Dropdown<string>
+													dropdownItems={prefillDropdownItems}
+													orderedKeys={prefillKeys}
+													selectedKey={selectedPrefillKey ?? ''}
+													onChange={key => {
+														setSelectedPrefillKey(key);
+														applyPrefill(key);
+														setPrefillMode(false);
+													}}
+													disabled={prefillKeys.length === 0}
+													filterDisabled={false}
+													title="Select assistant preset to copy"
+													getDisplayName={key =>
+														prefillDropdownItems[key]?.displayName ?? 'Select assistant preset to copy'
+													}
+												/>
+												<button
+													type="button"
+													className="btn btn-sm btn-ghost rounded-xl"
+													onClick={() => {
+														setPrefillMode(false);
+														setSelectedPrefillKey(null);
+													}}
+													title="Cancel prefill"
+												>
+													<FiX size={12} />
+												</button>
+											</>
+										)}
+									</div>
+								</div>
+							)}
+
+							<ModalField
+								label="Display Name"
+								htmlFor="assistant-preset-display-name"
+								required
+								error={errors.displayName}
+							>
 								<input
+									id="assistant-preset-display-name"
 									type="text"
 									value={formData.displayName}
 									onChange={e => {
@@ -1689,388 +1648,382 @@ function AddEditAssistantPresetModalContent({
 									autoFocus={!isViewMode}
 									aria-invalid={Boolean(errors.displayName)}
 								/>
-								{errors.displayName && (
-									<div className="label">
-										<span className="text-error flex items-center gap-1">
-											<FiAlertCircle size={12} /> {errors.displayName}
-										</span>
-									</div>
-								)}
-							</div>
-						</div>
+							</ModalField>
 
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
-								<span className="text-sm">Slug*</span>
-								<span className="tooltip tooltip-right" data-tip="Short URL-friendly identifier">
-									<FiHelpCircle size={12} />
-								</span>
-							</label>
-							<div className="col-span-9">
-								<input
-									type="text"
-									value={formData.slug}
-									onChange={e => {
-										const value = e.target.value;
-										updateFormData(prev => ({ ...prev, slug: value }));
-									}}
-									className={`input w-full rounded-xl ${errors.slug ? 'input-error' : ''}`}
-									spellCheck="false"
-									autoComplete="off"
-									readOnly={isViewMode || isEditMode}
-									aria-invalid={Boolean(errors.slug)}
-								/>
-								{errors.slug && (
-									<div className="label">
-										<span className="text-error flex items-center gap-1">
-											<FiAlertCircle size={12} /> {errors.slug}
-										</span>
-									</div>
-								)}
-							</div>
-						</div>
-
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
-								<span className="text-sm">Version*</span>
-								<span className="tooltip tooltip-right" data-tip="Versions are immutable. Edit creates a new version.">
-									<FiHelpCircle size={12} />
-								</span>
-							</label>
-							<div className="col-span-9">
-								<input
-									type="text"
-									value={formData.version}
-									onChange={e => {
-										const value = e.target.value;
-										updateFormData(prev => ({ ...prev, version: value }));
-									}}
-									readOnly={isViewMode}
-									className={`input w-full rounded-xl ${errors.version ? 'input-error' : ''}`}
-									spellCheck="false"
-									autoComplete="off"
-									aria-invalid={Boolean(errors.version)}
-									placeholder={DEFAULT_SEMVER}
-								/>
-								{isEditMode && initialData?.preset && (
-									<div className="label">
-										<span className="text-base-content/70 text-xs">
-											Current: {initialData.preset.version} · Suggested next: {suggestedNextVersion}
-											{!isSemverVersion(initialData.preset.version) ? ' (current is not semver)' : ''}
-										</span>
-									</div>
-								)}
-								{errors.version && (
-									<div className="label">
-										<span className="text-error flex items-center gap-1">
-											<FiAlertCircle size={12} /> {errors.version}
-										</span>
-									</div>
-								)}
-							</div>
-						</div>
-
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3 cursor-pointer">
-								<span className="text-sm">Enabled</span>
-							</label>
-							<div className="col-span-9">
-								<input
-									type="checkbox"
-									checked={formData.isEnabled}
-									onChange={e => {
-										updateFormData(prev => ({ ...prev, isEnabled: e.target.checked }));
-									}}
-									className="toggle toggle-accent"
-									disabled={isViewMode}
-								/>
-							</div>
-						</div>
-
-						<div className="grid grid-cols-12 items-start gap-2">
-							<label className="label col-span-3">
-								<span className="text-sm">Description</span>
-							</label>
-							<div className="col-span-9">
-								<textarea
-									value={formData.description}
-									onChange={e => {
-										const value = e.target.value;
-										updateFormData(prev => ({ ...prev, description: value }));
-									}}
-									readOnly={isViewMode}
-									className="textarea h-20 w-full rounded-xl"
-									spellCheck="false"
-								/>
-							</div>
-						</div>
-
-						<div className="grid grid-cols-12 items-start gap-2">
-							<label className="label col-span-3">
-								<span className="text-sm">Starting Text</span>
-								<span
-									className="tooltip tooltip-right"
-									data-tip="Optional starting text for the user, inserted into the composer only when the composer text is empty."
-								>
-									<FiHelpCircle size={12} />
-								</span>
-							</label>
-							<div className="col-span-9">
-								<textarea
-									value={formData.startingText}
-									onChange={e => {
-										const value = e.target.value;
-										updateFormData(prev => ({ ...prev, startingText: value }));
-									}}
-									readOnly={isViewMode}
-									className="textarea h-28 w-full rounded-xl"
-									spellCheck="false"
-									placeholder="Optional prompt to start the user off..."
-								/>
-								<div className="label">
-									<span className="text-base-content/70 text-xs">
-										Used as a starter prompt when this preset is applied and the composer has no text.
+							<div className="grid grid-cols-12 items-center gap-2">
+								<label className="label col-span-3">
+									<span className="text-sm">Slug*</span>
+									<span className="tooltip tooltip-right" data-tip="Short URL-friendly identifier">
+										<FiHelpCircle size={12} />
 									</span>
+								</label>
+								<div className="col-span-9">
+									<input
+										type="text"
+										value={formData.slug}
+										onChange={e => {
+											const value = e.target.value;
+											updateFormData(prev => ({ ...prev, slug: value }));
+										}}
+										className={`input w-full rounded-xl ${errors.slug ? 'input-error' : ''}`}
+										spellCheck="false"
+										autoComplete="off"
+										readOnly={isViewMode || isEditMode}
+										aria-invalid={Boolean(errors.slug)}
+									/>
+									{errors.slug && (
+										<div className="label">
+											<span className="text-error flex items-center gap-1">
+												<FiAlertCircle size={12} /> {errors.slug}
+											</span>
+										</div>
+									)}
 								</div>
 							</div>
-						</div>
-						<div className="divider">Starting Model</div>
 
-						<div className="grid grid-cols-12 items-start gap-2">
-							<label className="label col-span-3">
-								<span className="text-sm">Model Preset</span>
-								<span
-									className="tooltip tooltip-right"
-									data-tip="Optional starting model preset reference. Must resolve and be enabled."
-								>
-									<FiHelpCircle size={12} />
-								</span>
-							</label>
-							<div className="col-span-9">
-								<div className={errors.modelPreset ? 'ring-error/50 rounded-2xl ring-1' : ''}>
-									<Dropdown<string>
-										dropdownItems={modelPresetDropdownItems}
-										orderedKeys={modelPresetOrderedKeys}
-										selectedKey={formData.startingModelPresetKey}
+							<div className="grid grid-cols-12 items-center gap-2">
+								<label className="label col-span-3">
+									<span className="text-sm">Version*</span>
+									<span
+										className="tooltip tooltip-right"
+										data-tip="Versions are immutable. Edit creates a new version."
+									>
+										<FiHelpCircle size={12} />
+									</span>
+								</label>
+								<div className="col-span-9">
+									<input
+										type="text"
+										value={formData.version}
+										onChange={e => {
+											const value = e.target.value;
+											updateFormData(prev => ({ ...prev, version: value }));
+										}}
+										readOnly={isViewMode}
+										className={`input w-full rounded-xl ${errors.version ? 'input-error' : ''}`}
+										spellCheck="false"
+										autoComplete="off"
+										aria-invalid={Boolean(errors.version)}
+										placeholder={DEFAULT_SEMVER}
+									/>
+									{isEditMode && initialData?.preset && (
+										<div className="label">
+											<span className="text-base-content/70 text-xs">
+												Current: {initialData.preset.version} · Suggested next: {suggestedNextVersion}
+												{!isSemverVersion(initialData.preset.version) ? ' (current is not semver)' : ''}
+											</span>
+										</div>
+									)}
+									{errors.version && (
+										<div className="label">
+											<span className="text-error flex items-center gap-1">
+												<FiAlertCircle size={12} /> {errors.version}
+											</span>
+										</div>
+									)}
+								</div>
+							</div>
+
+							<div className="grid grid-cols-12 items-center gap-2">
+								<label className="label col-span-3 cursor-pointer">
+									<span className="text-sm">Enabled</span>
+								</label>
+								<div className="col-span-9">
+									<input
+										type="checkbox"
+										checked={formData.isEnabled}
+										onChange={e => {
+											updateFormData(prev => ({ ...prev, isEnabled: e.target.checked }));
+										}}
+										className="toggle toggle-accent"
+										disabled={isViewMode}
+									/>
+								</div>
+							</div>
+
+							<div className="grid grid-cols-12 items-start gap-2">
+								<label className="label col-span-3">
+									<span className="text-sm">Description</span>
+								</label>
+								<div className="col-span-9">
+									<textarea
+										value={formData.description}
+										onChange={e => {
+											const value = e.target.value;
+											updateFormData(prev => ({ ...prev, description: value }));
+										}}
+										readOnly={isViewMode}
+										className="textarea h-20 w-full rounded-xl"
+										spellCheck="false"
+									/>
+								</div>
+							</div>
+
+							<div className="grid grid-cols-12 items-start gap-2">
+								<label className="label col-span-3">
+									<span className="text-sm">Starting Text</span>
+									<span
+										className="tooltip tooltip-right"
+										data-tip="Optional starting text for the user, inserted into the composer only when the composer text is empty."
+									>
+										<FiHelpCircle size={12} />
+									</span>
+								</label>
+								<div className="col-span-9">
+									<textarea
+										value={formData.startingText}
+										onChange={e => {
+											const value = e.target.value;
+											updateFormData(prev => ({ ...prev, startingText: value }));
+										}}
+										readOnly={isViewMode}
+										className="textarea h-28 w-full rounded-xl"
+										spellCheck="false"
+										placeholder="Optional prompt to start the user off..."
+									/>
+									<div className="label">
+										<span className="text-base-content/70 text-xs">
+											Used as a starter prompt when this preset is applied and the composer has no text.
+										</span>
+									</div>
+								</div>
+							</div>
+						</ModalSection>
+
+						<ModalSection title="Runtime" description="Choose the starting model and optional runtime patch.">
+							<div className="grid grid-cols-12 items-start gap-2">
+								<label className="label col-span-3">
+									<span className="text-sm">Model Preset</span>
+									<span
+										className="tooltip tooltip-right"
+										data-tip="Optional starting model preset reference. Must resolve and be enabled."
+									>
+										<FiHelpCircle size={12} />
+									</span>
+								</label>
+								<div className="col-span-9">
+									<div className={errors.modelPreset ? 'ring-error/50 rounded-2xl ring-1' : ''}>
+										<Dropdown<string>
+											dropdownItems={modelPresetDropdownItems}
+											orderedKeys={modelPresetOrderedKeys}
+											selectedKey={formData.startingModelPresetKey}
+											onChange={value => {
+												updateFormData(prev => ({
+													...prev,
+													startingModelPresetKey: value,
+													startingIncludeModelSystemPrompt: value ? prev.startingIncludeModelSystemPrompt : '',
+												}));
+											}}
+											disabled={isViewMode || catalogPending || Boolean(catalogError)}
+											filterDisabled={false}
+											placeholderLabel="None"
+											title="Select model preset"
+											getDisplayName={key => {
+												if (!key) {
+													return 'None';
+												}
+												const option = modelOptionByKey.get(key);
+												if (option) {
+													return option.isSelectable
+														? option.label
+														: `${option.label} — ${option.availabilityReason ?? 'Unavailable'}`;
+												}
+												return `Unavailable (${key})`;
+											}}
+										/>
+									</div>
+
+									{currentModelOption && (
+										<div className="label">
+											<span
+												className={`text-xs ${currentModelOption.isSelectable ? 'text-base-content/70' : 'text-warning'}`}
+											>
+												{currentModelOption.isSelectable
+													? `${currentModelOption.providerPreset.displayName || currentModelOption.providerPreset.name} / ${
+															currentModelOption.modelPreset.displayName || currentModelOption.modelPreset.name
+														}`
+													: currentModelOption.availabilityReason}
+											</span>
+										</div>
+									)}
+
+									{errors.modelPreset && (
+										<div className="label">
+											<span className="text-error flex items-center gap-1">
+												<FiAlertCircle size={12} /> {errors.modelPreset}
+											</span>
+										</div>
+									)}
+								</div>
+							</div>
+
+							<div className="grid grid-cols-12 items-center gap-2">
+								<label className="label col-span-3">
+									<span className="text-sm">Include Model System Prompt</span>
+									<span
+										className="tooltip tooltip-right"
+										data-tip="Optional. Not Set leaves the user's current choice unchanged."
+									>
+										<FiHelpCircle size={12} />
+									</span>
+								</label>
+								<div className="col-span-9">
+									<Dropdown<TriStateBoolean>
+										dropdownItems={TRI_STATE_DROPDOWN_ITEMS}
+										orderedKeys={TRI_STATE_ORDERED_KEYS}
+										selectedKey={formData.startingIncludeModelSystemPrompt}
 										onChange={value => {
 											updateFormData(prev => ({
 												...prev,
-												startingModelPresetKey: value,
-												startingIncludeModelSystemPrompt: value ? prev.startingIncludeModelSystemPrompt : '',
+												startingIncludeModelSystemPrompt: value,
 											}));
 										}}
-										disabled={isViewMode || catalogPending || Boolean(catalogError)}
+										disabled={isViewMode || !formData.startingModelPresetKey}
 										filterDisabled={false}
-										placeholderLabel="None"
-										title="Select model preset"
-										getDisplayName={key => {
-											if (!key) {
-												return 'None';
-											}
-											const option = modelOptionByKey.get(key);
-											if (option) {
-												return option.isSelectable
-													? option.label
-													: `${option.label} — ${option.availabilityReason ?? 'Unavailable'}`;
-											}
-											return `Unavailable (${key})`;
-										}}
+										placeholderLabel="Not Set"
+										title="Model system prompt inclusion"
+										getDisplayName={getIncludeModelSystemPromptLabel}
 									/>
 								</div>
-
-								{currentModelOption && (
-									<div className="label">
-										<span
-											className={`text-xs ${currentModelOption.isSelectable ? 'text-base-content/70' : 'text-warning'}`}
-										>
-											{currentModelOption.isSelectable
-												? `${currentModelOption.providerPreset.displayName || currentModelOption.providerPreset.name} / ${
-														currentModelOption.modelPreset.displayName || currentModelOption.modelPreset.name
-													}`
-												: currentModelOption.availabilityReason}
-										</span>
-									</div>
-								)}
-
-								{errors.modelPreset && (
-									<div className="label">
-										<span className="text-error flex items-center gap-1">
-											<FiAlertCircle size={12} /> {errors.modelPreset}
-										</span>
-									</div>
-								)}
 							</div>
-						</div>
 
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
-								<span className="text-sm">Include Model System Prompt</span>
-								<span
-									className="tooltip tooltip-right"
-									data-tip="Optional. Not Set leaves the user's current choice unchanged."
-								>
-									<FiHelpCircle size={12} />
-								</span>
-							</label>
-							<div className="col-span-9">
-								<Dropdown<TriStateBoolean>
-									dropdownItems={TRI_STATE_DROPDOWN_ITEMS}
-									orderedKeys={TRI_STATE_ORDERED_KEYS}
-									selectedKey={formData.startingIncludeModelSystemPrompt}
-									onChange={value => {
-										updateFormData(prev => ({
-											...prev,
-											startingIncludeModelSystemPrompt: value,
-										}));
-									}}
-									disabled={isViewMode || !formData.startingModelPresetKey}
-									filterDisabled={false}
-									placeholderLabel="Not Set"
-									title="Model system prompt inclusion"
-									getDisplayName={getIncludeModelSystemPromptLabel}
-								/>
-							</div>
-						</div>
+							<AssistantPresetModelPatchEditor
+								isViewMode={isViewMode}
+								modelPatch={formData.modelPatch}
+								error={errors.modelPatch}
+								onPatchChange={updateModelPatch}
+								canSeedFromSelectedModel={Boolean(currentModelOption)}
+								onSeedFromSelectedModel={seedModelPatchFromSelectedModel}
+							/>
+						</ModalSection>
 
-						<AssistantPresetModelPatchEditor
-							isViewMode={isViewMode}
-							modelPatch={formData.modelPatch}
-							error={errors.modelPatch}
-							onPatchChange={updateModelPatch}
-							canSeedFromSelectedModel={Boolean(currentModelOption)}
-							onSeedFromSelectedModel={seedModelPatchFromSelectedModel}
-						/>
+						<ModalSection
+							title="Tool selections"
+							description="Choose enabled tools compatible with the starting model."
+						>
+							{errors.startingToolSelections && (
+								<div className="text-error flex items-center gap-1 text-sm">
+									<FiAlertCircle size={12} /> {errors.startingToolSelections}
+								</div>
+							)}
 
-						<div className="divider">Tool Selections</div>
+							<ToolSelectionSection
+								isViewMode={isViewMode}
+								disabled={catalogPending || Boolean(catalogError)}
+								availableOptions={availableToolOptions}
+								selectedOptionKey={effectiveNextToolKey}
+								onSelectedOptionKeyChange={handleToolOptionKeyChange}
+								onAdd={handleAddToolSelection}
+								emptyOptionsLabel="No eligible tools available"
+								items={toolDisplayItems}
+								emptyState="No tool selections configured."
+								onMoveUp={handleMoveToolUp}
+								onMoveDown={handleMoveToolDown}
+								onRemove={handleRemoveTool}
+								onAutoExecuteChange={handleToolAutoExecuteChange}
+								onUserArgsChange={handleToolUserArgsChange}
+							/>
+						</ModalSection>
 
-						{errors.startingToolSelections && (
-							<div className="text-error flex items-center gap-1 text-sm">
-								<FiAlertCircle size={12} /> {errors.startingToolSelections}
-							</div>
-						)}
+						<ModalSection
+							title="Instruction skills"
+							description="Configure instruction insertion or skill-session preload."
+						>
+							<p className="text-base-content/70 text-xs">
+								Add instruction skills as either system instructions or skill-session selections.
+								<span className="font-mono"> useAsInstructions</span> renders simple, argumentless, resource-free
+								instruction skills into LLM instructions. It cannot be combined with active session preload.
+								Argument-backed or resource-backed instruction skills should be enabled or activated through the skill
+								lifecycle instead.
+							</p>
 
-						<ToolSelectionSection
-							isViewMode={isViewMode}
-							disabled={catalogPending || Boolean(catalogError)}
-							availableOptions={availableToolOptions}
-							selectedOptionKey={effectiveNextToolKey}
-							onSelectedOptionKeyChange={handleToolOptionKeyChange}
-							onAdd={handleAddToolSelection}
-							emptyOptionsLabel="No eligible tools available"
-							items={toolDisplayItems}
-							emptyState="No tool selections configured."
-							onMoveUp={handleMoveToolUp}
-							onMoveDown={handleMoveToolDown}
-							onRemove={handleRemoveTool}
-							onAutoExecuteChange={handleToolAutoExecuteChange}
-							onUserArgsChange={handleToolUserArgsChange}
-						/>
+							{errors.startingSkillSelections && (
+								<div className="text-error flex items-center gap-1 text-sm">
+									<FiAlertCircle size={12} /> {errors.startingSkillSelections}
+								</div>
+							)}
 
-						<div className="divider">Instruction Skills</div>
+							<SkillSelectionSection
+								isViewMode={isViewMode}
+								disabled={catalogPending || Boolean(catalogError)}
+								availableOptions={availableSkillOptions}
+								selectedOptionKey={effectiveNextSkillKey}
+								onSelectedOptionKeyChange={handleSkillOptionKeyChange}
+								onAdd={handleAddSkillRef}
+								emptyOptionsLabel="No eligible skills available"
+								items={skillDisplayItems}
+								emptyState="No skills selected."
+								onMoveUp={handleMoveSkillUp}
+								onMoveDown={handleMoveSkillDown}
+								onRemove={handleRemoveSkill}
+								onPreLoadAsActiveChange={handleSkillPreLoadChange}
+								onUseAsInstructionsChange={handleSkillUseAsInstructionsChange}
+							/>
+						</ModalSection>
 
-						<p className="text-base-content/70 text-xs">
-							Add instruction skills as either system instructions or skill-session selections.
-							<span className="font-mono"> useAsInstructions</span> renders simple, argumentless, resource-free
-							instruction skills into LLM instructions. It cannot be combined with active session preload.
-							Argument-backed or resource-backed instruction skills should be enabled or activated through the skill
-							lifecycle instead.
-						</p>
+						<ModalSection
+							title="MCP context"
+							description="Optional server, tool, resource, template, and prompt selections."
+						>
+							<p className="text-base-content/70 text-xs">
+								Optional starting MCP servers, tools, resources, resource templates, prompts, and argument values for
+								the next chat turn.
+							</p>
 
-						{errors.startingSkillSelections && (
-							<div className="text-error flex items-center gap-1 text-sm">
-								<FiAlertCircle size={12} /> {errors.startingSkillSelections}
-							</div>
-						)}
+							{!isViewMode && <MCPSelectionSection mcpState={mcpState} />}
 
-						<SkillSelectionSection
-							isViewMode={isViewMode}
-							disabled={catalogPending || Boolean(catalogError)}
-							availableOptions={availableSkillOptions}
-							selectedOptionKey={effectiveNextSkillKey}
-							onSelectedOptionKeyChange={handleSkillOptionKeyChange}
-							onAdd={handleAddSkillRef}
-							emptyOptionsLabel="No eligible skills available"
-							items={skillDisplayItems}
-							emptyState="No skills selected."
-							onMoveUp={handleMoveSkillUp}
-							onMoveDown={handleMoveSkillDown}
-							onRemove={handleRemoveSkill}
-							onPreLoadAsActiveChange={handleSkillPreLoadChange}
-							onUseAsInstructionsChange={handleSkillUseAsInstructionsChange}
-						/>
+							{mcpState.requiredArgumentMissingCount > 0 && !isViewMode ? (
+								<div className="text-warning flex items-center gap-1 text-sm">
+									<FiAlertCircle size={12} /> Fill {mcpState.requiredArgumentMissingCount} required MCP argument
+									{mcpState.requiredArgumentMissingCount === 1 ? '' : 's'} before saving.
+								</div>
+							) : null}
 
-						<div className="divider">MCP Context</div>
+							{isViewMode && (
+								<div className="space-y-3">
+									{mcpDisplayItems.map(item => (
+										<div key={item.key} className="border-base-content/10 rounded-2xl border p-3">
+											<div className="font-medium">{item.title}</div>
+											<div className="text-base-content/70 mt-1 text-xs">{item.subtitle}</div>
+											{item.statusLabel && (
+												<div className="badge badge-warning mt-2 rounded-xl">{item.statusLabel}</div>
+											)}
+										</div>
+									))}
 
-						<p className="text-base-content/70 text-xs">
-							Optional starting MCP servers, tools, resources, resource templates, prompts, and argument values for the
-							next chat turn.
-						</p>
-
-						{!isViewMode && <MCPSelectionSection mcpState={mcpState} />}
-
-						{mcpState.requiredArgumentMissingCount > 0 && !isViewMode ? (
-							<div className="text-warning flex items-center gap-1 text-sm">
-								<FiAlertCircle size={12} /> Fill {mcpState.requiredArgumentMissingCount} required MCP argument
-								{mcpState.requiredArgumentMissingCount === 1 ? '' : 's'} before saving.
-							</div>
-						) : null}
-
-						{isViewMode && (
-							<div className="space-y-3">
-								{mcpDisplayItems.map(item => (
-									<div key={item.key} className="border-base-content/10 rounded-2xl border p-3">
-										<div className="font-medium">{item.title}</div>
-										<div className="text-base-content/70 mt-1 text-xs">{item.subtitle}</div>
-										{item.statusLabel && <div className="badge badge-warning mt-2 rounded-xl">{item.statusLabel}</div>}
-									</div>
-								))}
-
-								{mcpDisplayItems.length === 0 ? (
-									<div className="text-base-content/70 text-sm">No MCP context configured.</div>
-								) : null}
-							</div>
-						)}
+									{mcpDisplayItems.length === 0 ? (
+										<div className="text-base-content/70 text-sm">No MCP context configured.</div>
+									) : null}
+								</div>
+							)}
+						</ModalSection>
 
 						{isViewMode && initialData?.preset && (
-							<>
-								<div className="divider">Metadata</div>
-								<div className="grid grid-cols-12 gap-2 text-sm">
-									<div className="col-span-3 font-semibold">Version</div>
-									<div className="col-span-9">{initialData.preset.version}</div>
-
-									<div className="col-span-3 font-semibold">Built-in</div>
-									<div className="col-span-9">{initialData.preset.isBuiltIn ? 'Yes' : 'No'}</div>
-
-									<div className="col-span-3 font-semibold">Model Ref</div>
-									<div className="col-span-9">
+							<ModalSection title="Metadata">
+								<ManagementInfoGrid>
+									<ManagementInfoRow label="Version">{initialData.preset.version}</ManagementInfoRow>
+									<ManagementInfoRow label="Built-in">{initialData.preset.isBuiltIn ? 'Yes' : 'No'}</ManagementInfoRow>
+									<ManagementInfoRow label="Model reference">
 										{currentModelOption?.label ?? (formData.startingModelPresetKey || '—')}
-									</div>
-
-									<div className="col-span-3 font-semibold">Model Patch</div>
-									<div className="col-span-9">
+									</ManagementInfoRow>
+									<ManagementInfoRow label="Model patch">
 										{hasAssistantPresetModelPatch(initialData.preset.startingModelPresetPatch) ? 'Configured' : 'None'}
-									</div>
-
-									<div className="col-span-3 font-semibold">Include Model System Prompt</div>
-									<div className="col-span-9">
+									</ManagementInfoRow>
+									<ManagementInfoRow label="Include model system prompt">
 										{formData.startingModelPresetKey
 											? getIncludeModelSystemPromptLabel(formData.startingIncludeModelSystemPrompt)
 											: '—'}
-									</div>
-
-									<div className="col-span-3 font-semibold">Created</div>
-									<div className="col-span-9">{formatDateish(initialData.preset.createdAt)}</div>
-
-									<div className="col-span-3 font-semibold">Modified</div>
-									<div className="col-span-9">{formatDateish(initialData.preset.modifiedAt)}</div>
-
-									<div className="col-span-3 font-semibold">Patch Stream</div>
-									<div className="col-span-9">{getTriStateLabel(formData.modelPatch.stream)}</div>
-								</div>
-							</>
+									</ManagementInfoRow>
+									<ManagementInfoRow label="Created">{formatDateish(initialData.preset.createdAt)}</ManagementInfoRow>
+									<ManagementInfoRow label="Modified">{formatDateish(initialData.preset.modifiedAt)}</ManagementInfoRow>
+									<ManagementInfoRow label="Patch stream">
+										{getTriStateLabel(formData.modelPatch.stream)}
+									</ManagementInfoRow>
+								</ManagementInfoGrid>
+							</ModalSection>
 						)}
 
-						<div className="modal-action">
+						<ModalActions>
 							<button
 								type="button"
 								className="btn bg-base-300 rounded-xl"
@@ -2086,7 +2039,7 @@ function AddEditAssistantPresetModalContent({
 									{isSubmitting ? 'Saving…' : 'Save'}
 								</button>
 							)}
-						</div>
+						</ModalActions>
 					</form>
 				</div>
 			</div>

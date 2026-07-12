@@ -1,5 +1,5 @@
 import type { SubmitEventHandler } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
@@ -7,6 +7,8 @@ import { FiAlertCircle, FiX } from 'react-icons/fi';
 
 import type { MCPServerConfig, MCPServerSetupInput, MCPServerSetupInputValue } from '@/spec/mcp';
 import { MCPServerSetupInputKind } from '@/spec/mcp';
+
+import { useDialogController } from '@/hooks/use_dialog_controller';
 
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 
@@ -47,48 +49,11 @@ function MCPServerSetupModalContent({
 	const [submitError, setSubmitError] = useState('');
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
-	const dialogRef = useRef<HTMLDialogElement | null>(null);
-	const isUnmountingRef = useRef(false);
-
-	useEffect(() => {
-		const dialog = dialogRef.current;
-		if (!dialog) {
-			return;
-		}
-		if (!dialog.open) {
-			try {
-				dialog.showModal();
-			} catch {
-				// keep rendering safely
-			}
-		}
-		return () => {
-			isUnmountingRef.current = true;
-			if (dialog.open) {
-				dialog.close();
-			}
-		};
-	}, []);
-
-	const requestClose = () => {
-		if (isSubmitting) {
-			return;
-		}
-
-		const dialog = dialogRef.current;
-		if (dialog?.open) {
-			dialog.close();
-			return;
-		}
-		onClose();
-	};
-
-	const handleDialogClose = () => {
-		if (isUnmountingRef.current) {
-			return;
-		}
-		onClose();
-	};
+	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
+		onClose,
+		blockCancel: true,
+		isBusy: isSubmitting,
+	});
 
 	const updateRow = (id: string, patch: Partial<RowState>) => {
 		setRows(prev => ({ ...prev, [id]: { ...prev[id], ...patch } }));
@@ -161,32 +126,22 @@ function MCPServerSetupModalContent({
 		setIsSubmitting(true);
 		try {
 			await onSubmit(values, reset);
-			if (!isUnmountingRef.current) {
-				const dialog = dialogRef.current;
-				if (dialog?.open) {
-					dialog.close();
-				}
+			if (!unmountingRef.current) {
+				requestClose(true);
 			}
 		} catch (error) {
-			if (!isUnmountingRef.current) {
+			if (!unmountingRef.current) {
 				setSubmitError(error instanceof Error ? error.message : 'Failed to apply setup.');
 			}
 		} finally {
-			if (!isUnmountingRef.current) {
+			if (!unmountingRef.current) {
 				setIsSubmitting(false);
 			}
 		}
 	};
 
 	return (
-		<dialog
-			ref={dialogRef}
-			className="modal"
-			onClose={handleDialogClose}
-			onCancel={e => {
-				e.preventDefault();
-			}}
-		>
+		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-hidden rounded-2xl p-0">
 				<div className="max-h-[80vh] overflow-y-auto p-6">
 					<div className="mb-4 flex items-center justify-between">
@@ -199,7 +154,9 @@ function MCPServerSetupModalContent({
 						<button
 							type="button"
 							className="btn btn-sm btn-circle bg-base-300"
-							onClick={requestClose}
+							onClick={() => {
+								requestClose();
+							}}
 							aria-label="Close"
 							disabled={isSubmitting}
 						>
@@ -311,7 +268,9 @@ function MCPServerSetupModalContent({
 							<button
 								type="button"
 								className="btn bg-base-300 rounded-xl"
-								onClick={requestClose}
+								onClick={() => {
+									requestClose();
+								}}
 								disabled={isSubmitting}
 							>
 								Cancel

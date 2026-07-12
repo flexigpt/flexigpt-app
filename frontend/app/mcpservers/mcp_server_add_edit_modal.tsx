@@ -1,5 +1,5 @@
 import type { ChangeEvent, SubmitEventHandler } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { createPortal } from 'react-dom';
 
@@ -11,6 +11,8 @@ import { MCPApprovalRule, MCPExecutionMode, MCPHTTPAuthMode, MCPTransportType, M
 import { validateHTTPURLSecurity } from '@/lib/http_input_utils';
 import { omitManyKeys } from '@/lib/obj_utils';
 import { validateSlug } from '@/lib/text_utils';
+
+import { useDialogController } from '@/hooks/use_dialog_controller';
 
 import type { DropdownItem } from '@/components/dropdown';
 import { Dropdown } from '@/components/dropdown';
@@ -380,8 +382,11 @@ function AddEditMCPServerModalContent({
 	const [deletedStdioSecretRows, setDeletedStdioSecretRows] = useState<SecretEnvRow[]>([]);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
-	const dialogRef = useRef<HTMLDialogElement | null>(null);
-	const isUnmountingRef = useRef(false);
+	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
+		onClose,
+		blockCancel: true,
+		isBusy: isSubmitting,
+	});
 
 	const prefillSourceMap = useMemo<Record<string, MCPServerConfig>>(
 		() => Object.fromEntries(prefillServers.map(server => [buildMCPServerPrefillKey(server), server] as const)),
@@ -403,51 +408,6 @@ function AddEditMCPServerModalContent({
 			),
 		[prefillSourceMap]
 	);
-
-	useEffect(() => {
-		const dialog = dialogRef.current;
-		if (!dialog) {
-			return;
-		}
-
-		if (!dialog.open) {
-			try {
-				dialog.showModal();
-			} catch {
-				// Ignore showModal errors and keep rendering safely.
-			}
-		}
-
-		return () => {
-			isUnmountingRef.current = true;
-
-			if (dialog.open) {
-				dialog.close();
-			}
-		};
-	}, []);
-
-	const requestClose = () => {
-		if (isSubmitting) {
-			return;
-		}
-
-		const dialog = dialogRef.current;
-
-		if (dialog?.open) {
-			dialog.close();
-			return;
-		}
-
-		onClose();
-	};
-
-	const handleDialogClose = () => {
-		if (isUnmountingRef.current) {
-			return;
-		}
-		onClose();
-	};
 
 	const validateForm = useCallback(
 		(state: MCPServerFormData): ErrorState => {
@@ -954,21 +914,16 @@ function AddEditMCPServerModalContent({
 		setIsSubmitting(true);
 		try {
 			await onSubmit(buildServerInput());
-			if (!isUnmountingRef.current) {
-				const dialog = dialogRef.current;
-				if (dialog?.open) {
-					dialog.close();
-				} else {
-					onClose();
-				}
+			if (!unmountingRef.current) {
+				requestClose(true);
 			}
 		} catch (error) {
-			if (!isUnmountingRef.current) {
+			if (!unmountingRef.current) {
 				const msg = error instanceof Error ? error.message : 'Failed to save MCP server.';
 				setSubmitError(msg);
 			}
 		} finally {
-			if (!isUnmountingRef.current) {
+			if (!unmountingRef.current) {
 				setIsSubmitting(false);
 			}
 		}
@@ -977,14 +932,7 @@ function AddEditMCPServerModalContent({
 	const headerTitle = isEditMode ? 'Edit MCP Server' : 'Add MCP Server';
 
 	return (
-		<dialog
-			ref={dialogRef}
-			className="modal"
-			onClose={handleDialogClose}
-			onCancel={e => {
-				e.preventDefault();
-			}}
-		>
+		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-4xl overflow-hidden rounded-2xl p-0">
 				<div className="max-h-[80vh] overflow-y-auto p-4 sm:p-6">
 					<div className="mb-4 flex items-center justify-between">
@@ -992,7 +940,9 @@ function AddEditMCPServerModalContent({
 						<button
 							type="button"
 							className="btn btn-sm btn-circle bg-base-300"
-							onClick={requestClose}
+							onClick={() => {
+								requestClose();
+							}}
 							aria-label="Close"
 							disabled={isSubmitting}
 						>
@@ -1823,7 +1773,9 @@ function AddEditMCPServerModalContent({
 							<button
 								type="button"
 								className="btn bg-base-300 rounded-xl"
-								onClick={requestClose}
+								onClick={() => {
+									requestClose();
+								}}
 								disabled={isSubmitting}
 							>
 								Cancel

@@ -21,9 +21,17 @@ import { validateSlug, validateTags } from '@/lib/text_utils';
 import { MessageEnterValidURL, validateUrlForInput } from '@/lib/url_utils';
 import { DEFAULT_SEMVER, isSemverVersion, suggestNextMinorVersion } from '@/lib/version_utils';
 
+import { useDialogController } from '@/hooks/use_dialog_controller';
+
 import { Dropdown } from '@/components/dropdown';
 import { MANAGEMENT_MODAL_FORM_CLASS } from '@/components/managementui/management_class_consts';
+import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
+import { ManagementInfoRow } from '@/components/managementui/management_info_row';
+import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
+import { ModalField } from '@/components/modal/modal_field';
+import { ModalHeader } from '@/components/modal/modal_header';
+import { ModalSection } from '@/components/modal/modal_section';
 import { ReadOnlyValue } from '@/components/read_only_value';
 
 interface ToolItem {
@@ -206,10 +214,13 @@ function AddEditToolModalContent({
 	const [submitError, setSubmitError] = useState('');
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
-	const dialogRef = useRef<HTMLDialogElement | null>(null);
+	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
+		onClose,
+		blockCancel: !isViewMode,
+		isBusy: isSubmitting,
+	});
 	const displayNameInputRef = useRef<HTMLInputElement | null>(null);
 	const httpUrlInputRef = useRef<HTMLInputElement | null>(null);
-	const ignoreCloseRef = useRef(false);
 
 	const copyableTools = useMemo(
 		() => existingTools.filter(item => item.tool.type === ToolImplType.HTTP),
@@ -237,15 +248,6 @@ function AddEditToolModalContent({
 	);
 
 	useEffect(() => {
-		const dialog = dialogRef.current;
-		if (!dialog) {
-			return;
-		}
-
-		if (!dialog.open) {
-			dialog.showModal();
-		}
-
 		const focusTimer = window.setTimeout(() => {
 			if (!isViewMode) {
 				displayNameInputRef.current?.focus();
@@ -254,20 +256,8 @@ function AddEditToolModalContent({
 
 		return () => {
 			window.clearTimeout(focusTimer);
-			ignoreCloseRef.current = true;
-
-			if (dialog.open) {
-				dialog.close();
-			}
 		};
 	}, [isViewMode]);
-
-	const handleDialogClose = () => {
-		if (ignoreCloseRef.current) {
-			return;
-		}
-		onClose();
-	};
 
 	const validateField = (field: keyof ErrorState, val: string, currentErrors: ErrorState): ErrorState => {
 		let newErrs: ErrorState = { ...currentErrors };
@@ -579,14 +569,14 @@ function AddEditToolModalContent({
 			version: formData.version,
 		})
 			.then(() => {
-				dialogRef.current?.close();
+				requestClose(true);
 			})
 			.catch((err: unknown) => {
 				const msg = err instanceof Error ? err.message : 'Failed to save tool.';
 				setSubmitError(msg);
 			})
 			.finally(() => {
-				if (!ignoreCloseRef.current) {
+				if (!unmountingRef.current) {
 					setIsSubmitting(false);
 				}
 			});
@@ -603,30 +593,17 @@ function AddEditToolModalContent({
 	const headerTitle = effectiveMode === 'view' ? 'View Tool' : effectiveMode === 'edit' ? 'Edit Tool' : 'Add Tool';
 
 	return (
-		<dialog
-			ref={dialogRef}
-			className="modal"
-			onClose={handleDialogClose}
-			onCancel={e => {
-				if (!isViewMode) {
-					e.preventDefault();
-				}
-			}}
-		>
+		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
 			<div className="modal-box bg-base-200 max-h-[80vh] max-w-3xl overflow-hidden rounded-2xl p-0">
 				<div className="max-h-[80vh] overflow-y-auto p-4 sm:p-6">
-					<div className="mb-4 flex items-center justify-between">
-						<h3 className="text-lg font-bold">{headerTitle}</h3>
-						<button
-							type="button"
-							className="btn btn-sm btn-circle bg-base-300 rounded-xl"
-							onClick={() => dialogRef.current?.close()}
-							aria-label="Close"
-							disabled={isSubmitting}
-						>
-							<FiX size={12} />
-						</button>
-					</div>
+					<ModalHeader
+						title={headerTitle}
+						description="Configure immutable tool versions and their HTTP runtime behavior."
+						onClose={() => {
+							requestClose();
+						}}
+						closeDisabled={isSubmitting}
+					/>
 
 					<form noValidate onSubmit={handleSubmit} className={MANAGEMENT_MODAL_FORM_CLASS}>
 						{submitError && (
@@ -706,32 +683,21 @@ function AddEditToolModalContent({
 							</div>
 						)}
 
-						<div className="grid grid-cols-12 items-center gap-2">
-							<label className="label col-span-3">
-								<span className="text-sm">Display Name*</span>
-							</label>
-							<div className="col-span-9">
-								<input
-									ref={displayNameInputRef}
-									type="text"
-									name="displayName"
-									value={formData.displayName}
-									onChange={handleInput}
-									readOnly={isViewMode}
-									className={`input w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
-									spellCheck="false"
-									autoComplete="off"
-									aria-invalid={Boolean(errors.displayName)}
-								/>
-								{errors.displayName && (
-									<div className="label">
-										<span className="text-error flex items-center gap-1">
-											<FiAlertCircle size={12} /> {errors.displayName}
-										</span>
-									</div>
-								)}
-							</div>
-						</div>
+						<ModalField label="Display Name" htmlFor="tool-display-name" required error={errors.displayName}>
+							<input
+								id="tool-display-name"
+								ref={displayNameInputRef}
+								type="text"
+								name="displayName"
+								value={formData.displayName}
+								onChange={handleInput}
+								readOnly={isViewMode}
+								className={`input w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
+								spellCheck="false"
+								autoComplete="off"
+								aria-invalid={Boolean(errors.displayName)}
+							/>
+						</ModalField>
 
 						<div className="grid grid-cols-12 items-center gap-2">
 							<label className="label col-span-3">
@@ -1257,30 +1223,27 @@ function AddEditToolModalContent({
 						</div>
 
 						{isViewMode && initialData?.tool && (
-							<>
-								<div className="divider">Metadata</div>
-								<div className="grid grid-cols-12 gap-2 text-sm">
-									<div className="col-span-3 font-semibold">ID</div>
-									<div className="col-span-9">{initialData.tool.id}</div>
-									<div className="col-span-3 font-semibold">Schema</div>
-									<div className="col-span-9">{initialData.tool.schemaVersion}</div>
-									<div className="col-span-3 font-semibold">LLM Tool Type</div>
-									<div className="col-span-9">{initialData.tool.llmToolType}</div>
-									<div className="col-span-3 font-semibold">Built-in</div>
-									<div className="col-span-9">{initialData.tool.isBuiltIn ? 'Yes' : 'No'}</div>
-									<div className="col-span-3 font-semibold">Created</div>
-									<div className="col-span-9">{initialData.tool.createdAt}</div>
-									<div className="col-span-3 font-semibold">Modified</div>
-									<div className="col-span-9">{initialData.tool.modifiedAt}</div>
-								</div>
-							</>
+							<ModalSection title="Metadata">
+								<ManagementInfoGrid>
+									<ManagementInfoRow label="ID" mono>
+										{initialData.tool.id}
+									</ManagementInfoRow>
+									<ManagementInfoRow label="Schema version">{initialData.tool.schemaVersion}</ManagementInfoRow>
+									<ManagementInfoRow label="LLM tool type">{initialData.tool.llmToolType}</ManagementInfoRow>
+									<ManagementInfoRow label="Built-in">{initialData.tool.isBuiltIn ? 'Yes' : 'No'}</ManagementInfoRow>
+									<ManagementInfoRow label="Created">{initialData.tool.createdAt}</ManagementInfoRow>
+									<ManagementInfoRow label="Modified">{initialData.tool.modifiedAt}</ManagementInfoRow>
+								</ManagementInfoGrid>
+							</ModalSection>
 						)}
 
-						<div className="modal-action">
+						<ModalActions>
 							<button
 								type="button"
 								className="btn bg-base-300 rounded-xl"
-								onClick={() => dialogRef.current?.close()}
+								onClick={() => {
+									requestClose();
+								}}
 								disabled={isSubmitting}
 							>
 								{isViewMode ? 'Close' : 'Cancel'}
@@ -1290,7 +1253,7 @@ function AddEditToolModalContent({
 									{isSubmitting ? 'Saving...' : 'Save'}
 								</button>
 							)}
-						</div>
+						</ModalActions>
 					</form>
 				</div>
 			</div>

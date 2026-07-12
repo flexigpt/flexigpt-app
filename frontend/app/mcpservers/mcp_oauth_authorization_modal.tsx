@@ -1,11 +1,11 @@
-import { useEffect, useRef } from 'react';
-
 import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiExternalLink, FiX } from 'react-icons/fi';
 
 import type { MCPAuthHealth, MCPServerConfig } from '@/spec/mcp';
 import { MCPAuthHealthState } from '@/spec/mcp';
+
+import { useDialogController } from '@/hooks/use_dialog_controller';
 
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 
@@ -32,8 +32,10 @@ function MCPOAuthAuthorizationModalContent({
 	onOpenURL,
 	onCancel,
 }: MCPOAuthAuthorizationModalProps) {
-	const dialogRef = useRef<HTMLDialogElement | null>(null);
-	const isUnmountingRef = useRef(false);
+	const { dialogRef, requestClose, handleClose, handleCancel } = useDialogController({
+		onClose,
+		blockCancel: true,
+	});
 
 	const authState = getEffectiveMCPAuthHealthState(server ?? undefined, authHealth);
 	const authorizationURL = isMCPAuthActionable(authHealth, server ?? undefined)
@@ -42,56 +44,8 @@ function MCPOAuthAuthorizationModalContent({
 	const isPending = authState === MCPAuthHealthState.MCPAuthHealthStateAuthorizationPending;
 	const isAuthorized = authState === MCPAuthHealthState.MCPAuthHealthStateAuthorized;
 
-	useEffect(() => {
-		const dialog = dialogRef.current;
-		if (!dialog) {
-			return;
-		}
-
-		if (!dialog.open) {
-			try {
-				dialog.showModal();
-			} catch {
-				// Another modal may already be open. Keep rendering safely.
-			}
-		}
-
-		return () => {
-			isUnmountingRef.current = true;
-
-			if (dialog.open) {
-				dialog.close();
-			}
-		};
-	}, []);
-
-	const requestClose = () => {
-		const dialog = dialogRef.current;
-
-		if (dialog?.open) {
-			dialog.close();
-			return;
-		}
-
-		onClose();
-	};
-
-	const handleDialogClose = () => {
-		if (isUnmountingRef.current) {
-			return;
-		}
-		onClose();
-	};
-
 	return (
-		<dialog
-			ref={dialogRef}
-			className="modal"
-			onClose={handleDialogClose}
-			onCancel={e => {
-				e.preventDefault();
-			}}
-		>
+		<dialog ref={dialogRef} className="modal" onClose={handleClose} onCancel={handleCancel}>
 			<div className="modal-box bg-base-200 max-w-2xl rounded-2xl p-0">
 				<div className="p-6">
 					<div className="mb-4 flex items-start justify-between gap-4">
@@ -106,7 +60,9 @@ function MCPOAuthAuthorizationModalContent({
 						<button
 							type="button"
 							className="btn btn-sm btn-circle bg-base-300"
-							onClick={requestClose}
+							onClick={() => {
+								requestClose();
+							}}
 							aria-label="Close"
 						>
 							<FiX size={12} />
@@ -187,7 +143,13 @@ function MCPOAuthAuthorizationModalContent({
 							<span className="ml-1">Open authorization page</span>
 						</button>
 
-						<button type="button" className="btn bg-base-300 rounded-xl" onClick={requestClose}>
+						<button
+							type="button"
+							className="btn bg-base-300 rounded-xl"
+							onClick={() => {
+								requestClose();
+							}}
+						>
 							Close
 						</button>
 					</div>

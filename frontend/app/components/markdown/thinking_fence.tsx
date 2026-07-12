@@ -42,7 +42,7 @@ export function ThinkingFence({
 	defaultOpen = false,
 	open,
 	onOpenChange,
-	maxHeightClass = 'max-h-[50vh]',
+	maxHeightClass = 'max-h-[40vh]',
 	streaming = false,
 	maxRows,
 	autoScroll,
