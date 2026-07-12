@@ -511,19 +511,25 @@ function AddEditSkillModalContent({
 				previewArgs
 			);
 
-			setPreviewResult({
-				text: resp.text,
-				insert: resp.insert,
-				appliedArguments: resp.appliedArguments ?? {},
-				warnings: resp.warnings ?? [],
-			});
+			if (!unmountingRef.current) {
+				setPreviewResult({
+					text: resp.text,
+					insert: resp.insert,
+					appliedArguments: resp.appliedArguments ?? {},
+					warnings: resp.warnings ?? [],
+				});
+			}
 		} catch (err) {
-			setPreviewResult(null);
-			setPreviewError(err instanceof Error && err.message.trim() ? err.message : 'Failed to render skill preview.');
+			if (!unmountingRef.current) {
+				setPreviewResult(null);
+				setPreviewError(err instanceof Error && err.message.trim() ? err.message : 'Failed to render skill preview.');
+			}
 		} finally {
-			setPreviewLoading(false);
+			if (!unmountingRef.current) {
+				setPreviewLoading(false);
+			}
 		}
-	}, [artifactSkill, initialData, previewArgs]);
+	}, [artifactSkill, initialData, previewArgs, unmountingRef]);
 
 	const changeCreationMode = (nextMode: 'create' | 'register') => {
 		setCreationMode(nextMode);

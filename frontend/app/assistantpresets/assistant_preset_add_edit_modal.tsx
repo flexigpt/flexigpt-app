@@ -900,12 +900,11 @@ function AddEditAssistantPresetModalContent({
 							nextErrors.modelPatch = 'JSON schema body must be a JSON object.';
 						}
 					}
-
-					if (!nextErrors.modelPatch && !hasConfiguredModelPatchFormValues(state.modelPatch)) {
-						nextErrors.modelPatch =
-							'Choose at least one runtime, reasoning, or output override, or turn off the starting model patch.';
-					}
 				}
+			}
+			if (!nextErrors.modelPatch && !hasConfiguredModelPatchFormValues(state.modelPatch)) {
+				nextErrors.modelPatch =
+					'Choose at least one runtime, reasoning, or output override, or turn off the starting model patch.';
 			}
 
 			if (state.startingToolSelections.length > 0) {

@@ -223,7 +223,7 @@ export function getEffectiveMCPAuthHealthState(
 
 	if (authMode === MCPHTTPAuthMode.MCPHTTPAuthAPIKey || authMode === MCPHTTPAuthMode.MCPHTTPAuthClientCredentials) {
 		const configuredByServer = isNonInteractiveMCPAuthConfigured(server, authMode);
-		const nonInteractiveConfigured = authHealth?.configured ?? configuredByServer;
+		const nonInteractiveConfigured = server ? configuredByServer : authHealth?.configured === true;
 
 		// Config is authoritative for non-interactive auth. Do not let a stale
 		// "authorized" health response make an unconfigured server look ready.
@@ -245,6 +245,15 @@ export function getEffectiveMCPAuthHealthState(
 	}
 
 	if (authMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth && !authHealth) {
+		return MCPAuthHealthState.MCPAuthHealthStateAuthorizationNeeded;
+	}
+
+	if (
+		authMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth &&
+		authHealth &&
+		!authHealth.configured &&
+		state === MCPAuthHealthState.MCPAuthHealthStateAuthorized
+	) {
 		return MCPAuthHealthState.MCPAuthHealthStateAuthorizationNeeded;
 	}
 
@@ -387,7 +396,7 @@ export function getMCPServerAuthHealthBadgeClass(server?: MCPAuthDisplayServer, 
 		(authMode === MCPHTTPAuthMode.MCPHTTPAuthAPIKey || authMode === MCPHTTPAuthMode.MCPHTTPAuthClientCredentials) &&
 		state === MCPAuthHealthState.MCPAuthHealthStateAuthorized
 	) {
-		return 'badge-ghost';
+		return `${STATUS_BADGE_LAYOUT} badge-ghost`;
 	}
 
 	return getMCPAuthHealthBadgeClass(state);

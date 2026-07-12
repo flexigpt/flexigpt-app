@@ -579,11 +579,15 @@ function AddEditToolModalContent({
 			version: formData.version,
 		})
 			.then(() => {
-				requestClose(true);
+				if (!unmountingRef.current) {
+					requestClose(true);
+				}
 			})
 			.catch((err: unknown) => {
-				const msg = err instanceof Error ? err.message : 'Failed to save tool.';
-				setSubmitError(msg);
+				if (!unmountingRef.current) {
+					const msg = err instanceof Error ? err.message : 'Failed to save tool.';
+					setSubmitError(msg);
+				}
 			})
 			.finally(() => {
 				if (!unmountingRef.current) {

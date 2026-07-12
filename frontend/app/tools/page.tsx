@@ -189,6 +189,18 @@ export default function ToolsPage() {
 				throw new Error('Tool bundle not found.');
 			}
 
+			if (bundleData.bundle.isBuiltIn) {
+				throw new Error('Cannot add or create new tool versions in a built-in bundle.');
+			}
+
+			if (!bundleData.bundle.isEnabled) {
+				throw new Error('Enable the tool bundle before adding or creating a new tool version.');
+			}
+
+			if (toolToEdit?.isBuiltIn) {
+				throw new Error('Built-in tools cannot create new versions from this UI.');
+			}
+
 			if (toolToEdit && toolToEdit.type !== ToolImplType.HTTP) {
 				throw new Error('Only HTTP tools can create new versions from this UI.');
 			}

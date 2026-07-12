@@ -39,7 +39,6 @@ function MCPOAuthAuthorizationModalContent({
 
 	const { dialogRef, requestClose, handleClose, handleCancel, unmountingRef } = useDialogController({
 		onClose,
-		blockCancel: true,
 		isBusy: isCancelling,
 	});
 

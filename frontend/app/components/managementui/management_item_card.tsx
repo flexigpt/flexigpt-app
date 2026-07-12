@@ -34,7 +34,9 @@ export function ManagementItemCard({
 					{subtitle ? <div className="text-base-content/60 mt-1 text-xs wrap-break-word">{subtitle}</div> : null}
 
 					{description ? (
-						<div className="text-base-content/70 mt-2 max-h-16 overflow-hidden text-sm">{description}</div>
+						<div className="text-base-content/70 mt-2 max-h-16 overflow-hidden text-sm wrap-break-word whitespace-pre-wrap">
+							{description}
+						</div>
 					) : null}
 				</div>
 

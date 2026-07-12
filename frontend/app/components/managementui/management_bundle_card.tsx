@@ -59,7 +59,9 @@ export function ManagementBundleCard({
 				) : null}
 			</div>
 
-			{description ? <div className="text-base-content/70 mt-3 text-sm">{description}</div> : null}
+			{description ? (
+				<div className="text-base-content/70 mt-3 text-sm wrap-break-word whitespace-pre-wrap">{description}</div>
+			) : null}
 			{metadata ? <div className="mt-3 flex flex-wrap gap-2">{metadata}</div> : null}
 			{children}
 			{actionLeading || actions ? <ActionRow leading={actionLeading}>{actions}</ActionRow> : null}

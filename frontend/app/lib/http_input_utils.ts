@@ -110,11 +110,19 @@ export function parseStringRecordJSON(raw: string, label: string): Record<string
 
 export function parseHTTPHeadersJSON(raw: string, label = 'Headers'): Record<string, string> {
 	const headers = parseStringRecordJSON(raw, label);
+	const seenHeaderNames = new Set<string>();
 
 	for (const [name, value] of Object.entries(headers)) {
 		if (!HTTP_HEADER_NAME_RE.test(name)) {
 			throw new Error(`${label} contains an invalid header name: "${name}".`);
 		}
+
+		const normalizedName = name.toLowerCase();
+		if (seenHeaderNames.has(normalizedName)) {
+			throw new Error(`${label} contains duplicate header name: "${name}".`);
+		}
+		seenHeaderNames.add(normalizedName);
+
 		if (HTTP_HEADER_CONTROL_CHAR_RE.test(value)) {
 			throw new Error(`${label} value for "${name}" must not contain CR, LF, or NUL.`);
 		}

@@ -736,6 +736,9 @@ function AddEditMCPServerModalContent({
 			defaultPolicy,
 			toolPolicies,
 			appsPolicy,
+			// Setup definitions are server metadata, not editable form fields.
+			// Preserve them so ordinary edits do not erase setup requirements.
+			...(initialData?.setup ? { setup: initialData.setup } : {}),
 		};
 
 		if (formData.transport === MCPTransportType.MCPTransportTypeStdio) {
@@ -810,6 +813,7 @@ function AddEditMCPServerModalContent({
 		const apiKeyHeaderName = formData.apiKeyHeaderName.trim() || 'Authorization';
 		const originalAPIKeyHeaderName = formData.apiKeyOriginalHeaderName.trim();
 
+		const existingSecretHeaderRefs = initialData?.streamableHttp?.secretHeaderRefs ?? {};
 		const existingAPIKeyRef = formData.apiKeyExistingRef?.trim() ?? '';
 		const apiKeyHeaderChanged =
 			Boolean(existingAPIKeyRef) &&
@@ -819,12 +823,33 @@ function AddEditMCPServerModalContent({
 			Boolean(existingAPIKeyRef) && (formData.apiKeyDeleteExisting || !isAPIKey || apiKeyHeaderChanged);
 		const apiKeyRef = isAPIKey && existingAPIKeyRef && !shouldDeleteAPIKey ? existingAPIKeyRef : undefined;
 		const apiKeyFullValue = formData.apiKeyValue ? `${formData.apiKeyValuePrefix}${formData.apiKeyValue}` : '';
+		const shouldRemoveManagedAPIKeyRef = (headerName: string) =>
+			Boolean(existingAPIKeyRef) &&
+			Boolean(originalAPIKeyHeaderName) &&
+			sameHTTPHeaderName(headerName, originalAPIKeyHeaderName) &&
+			(shouldDeleteAPIKey || apiKeyHeaderChanged || !isAPIKey);
+		let secretHeaderRefs: Record<string, string> = Object.fromEntries(
+			Object.entries(existingSecretHeaderRefs).filter(([headerName]) => !shouldRemoveManagedAPIKeyRef(headerName))
+		);
+
+		if (apiKeyRef) {
+			for (const headerName of Object.keys(secretHeaderRefs)) {
+				if (sameHTTPHeaderName(headerName, apiKeyHeaderName)) {
+					secretHeaderRefs = omitManyKeys(secretHeaderRefs, [headerName]);
+				}
+			}
+
+			secretHeaderRefs[apiKeyHeaderName] = apiKeyRef;
+		}
 
 		const streamableHttp = {
 			url: formData.httpURL.trim(),
 			timeoutMS: normalizePositiveInteger(formData.httpTimeoutMS),
 			authMode: formData.httpAuthMode,
-			secretHeaderRefs: apiKeyRef ? { [apiKeyHeaderName]: apiKeyRef } : undefined,
+			// General headers are not editable in this modal. Preserve them on
+			// PUT rather than silently deleting existing non-secret headers.
+			...(initialData?.streamableHttp?.headers ? { headers: { ...initialData.streamableHttp.headers } } : {}),
+			secretHeaderRefs: Object.keys(secretHeaderRefs).length > 0 ? secretHeaderRefs : undefined,
 			clientCredentialRef,
 			clientIDMetadataDocumentURL:
 				formData.httpAuthMode === MCPHTTPAuthMode.MCPHTTPAuthOAuth

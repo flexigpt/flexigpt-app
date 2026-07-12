@@ -237,7 +237,8 @@ function isOAuthAuthorizationRelevant(server: MCPServerConfig, authHealth?: MCPA
 // oxlint-disable-next-line no-restricted-exports
 export default function MCPServersPage() {
 	const [bundles, setBundles] = useState<BundleData[]>([]);
-	const [loading, setLoading] = useState(true);
+	const [isInitialLoading, setIsInitialLoading] = useState(true);
+	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [pageLoadError, setPageLoadError] = useState<unknown>(undefined);
 	const [resourceWarnings, setResourceWarnings] = useState<string[]>([]);
 
@@ -245,12 +246,16 @@ export default function MCPServersPage() {
 	const [alertMsg, setAlertMsg] = useState('');
 
 	const [bundleToDeleteID, setBundleToDeleteID] = useState<string | null>(null);
+	const [isDeletingBundle, setIsDeletingBundle] = useState(false);
 	const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 	const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 	const [settingsView, setSettingsView] = useState<MCPSettingsView | undefined>(undefined);
 	const [oauthAuthorizationTarget, setOAuthAuthorizationTarget] = useState<OAuthAuthorizationTarget | null>(null);
 
 	const bundlesRef = useRef<BundleData[]>(bundles);
+	const mountedRef = useRef(false);
+	const pageLoadRequestIDRef = useRef(0);
+	const hasLoadedPageRef = useRef(false);
 
 	const bundleToDelete =
 		bundleToDeleteID === null
@@ -260,6 +265,15 @@ export default function MCPServersPage() {
 	useEffect(() => {
 		bundlesRef.current = bundles;
 	}, [bundles]);
+
+	useEffect(() => {
+		mountedRef.current = true;
+
+		return () => {
+			mountedRef.current = false;
+			pageLoadRequestIDRef.current += 1;
+		};
+	}, []);
 
 	const loadRuntimeAndAuth = useCallback(
 		async (bundleID: string, servers: MCPServerConfig[], knownPendingAuthorizations?: MCPOAuthAuthorization[]) => {
@@ -474,22 +488,46 @@ export default function MCPServersPage() {
 	);
 
 	const fetchAll = useCallback(async () => {
-		setLoading(true);
+		const requestID = pageLoadRequestIDRef.current + 1;
+		pageLoadRequestIDRef.current = requestID;
+		const isInitialRequest = !hasLoadedPageRef.current;
+
+		if (isInitialRequest) {
+			setIsInitialLoading(true);
+		} else {
+			setIsRefreshing(true);
+		}
+
 		setPageLoadError(undefined);
 
 		try {
 			const resource = await loadMCPPageResource();
+			if (!mountedRef.current || pageLoadRequestIDRef.current !== requestID) {
+				return;
+			}
+
 			setBundles(resource.bundles);
 			setSettingsView(resource.settingsView);
 			setResourceWarnings(resource.warnings);
+			hasLoadedPageRef.current = true;
 		} catch (error) {
+			if (!mountedRef.current || pageLoadRequestIDRef.current !== requestID) {
+				return;
+			}
+
 			console.error('Failed to load MCP bundles:', error);
 			setPageLoadError(error);
 			setAlertMsg(getErrorMessage(error, 'Failed to load MCP bundles. Please try again.'));
 			setShowAlert(true);
 			throw error;
 		} finally {
-			setLoading(false);
+			if (mountedRef.current && pageLoadRequestIDRef.current === requestID) {
+				if (isInitialRequest) {
+					setIsInitialLoading(false);
+				}
+
+				setIsRefreshing(false);
+			}
 		}
 	}, [loadMCPPageResource]);
 
@@ -705,7 +743,10 @@ export default function MCPServersPage() {
 				throw new Error('MCP server ID cannot be changed.');
 			}
 
-			await mcpAPI.putMCPServer(bundleID, input.serverID, input.initialPayload ?? input.payload);
+			const isCreatingServer = serverToEditID === undefined;
+			if (isCreatingServer || !input.initialPayload) {
+				await mcpAPI.putMCPServer(bundleID, input.serverID, input.initialPayload ?? input.payload);
+			}
 
 			const finalPayload = clonePayload(input.payload);
 			let requiresFinalPut = Boolean(input.initialPayload);
@@ -930,7 +971,7 @@ export default function MCPServersPage() {
 	);
 
 	const handleBundleDelete = useCallback(async () => {
-		if (!bundleToDeleteID) {
+		if (!bundleToDeleteID || isDeletingBundle) {
 			return;
 		}
 
@@ -953,6 +994,7 @@ export default function MCPServersPage() {
 			return;
 		}
 
+		setIsDeletingBundle(true);
 		try {
 			await mcpAPI.deleteMCPBundle(bundleToDeleteID);
 
@@ -962,9 +1004,10 @@ export default function MCPServersPage() {
 			setAlertMsg(getErrorMessage(error, 'Failed to delete MCP bundle.'));
 			setShowAlert(true);
 		} finally {
+			setIsDeletingBundle(false);
 			setBundleToDeleteID(null);
 		}
-	}, [bundleToDeleteID, bundles]);
+	}, [bundleToDeleteID, bundles, isDeletingBundle]);
 
 	const handleAddBundle = useCallback(
 		async (slug: string, display: string, description?: string) => {
@@ -1031,7 +1074,7 @@ export default function MCPServersPage() {
 			setShowAlert(true);
 		}
 	}, []);
-	if (loading) {
+	if (isInitialLoading) {
 		return <Loader text="Loading MCP servers…" />;
 	}
 
@@ -1074,7 +1117,7 @@ export default function MCPServersPage() {
 						<ManagementResourceError
 							title="MCP servers could not be loaded"
 							error={pageLoadError}
-							isRetrying={loading}
+							isRetrying={isRefreshing}
 							onRetry={fetchAll}
 						/>
 					) : null}
@@ -1126,12 +1169,14 @@ export default function MCPServersPage() {
 				<DeleteConfirmationModal
 					isOpen={bundleToDelete !== null}
 					onClose={() => {
-						setBundleToDeleteID(null);
+						if (!isDeletingBundle) {
+							setBundleToDeleteID(null);
+						}
 					}}
 					onConfirm={handleBundleDelete}
 					title="Delete MCP Bundle"
 					message={`Delete empty MCP bundle "${bundleToDelete?.displayName ?? ''}"? Remove all servers first.`}
-					confirmButtonText="Delete"
+					confirmButtonText={isDeletingBundle ? 'Deleting...' : 'Delete'}
 				/>
 
 				<ManagementBundleCreateModal
