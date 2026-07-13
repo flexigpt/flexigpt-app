@@ -11,7 +11,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/assistantpreset/spec"
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
-	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	skillSpec "github.com/flexigpt/flexigpt-app/internal/skill/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
@@ -89,9 +88,7 @@ func validateAssistantPresetStructure(preset *spec.AssistantPreset) error {
 	if err := validateStartingText(preset.StartingText); err != nil {
 		return err
 	}
-	if err := validateStartingModelPresetPatch(preset.StartingModelPresetPatch); err != nil {
-		return err
-	}
+
 	if err := validateStartingMCPContextStructure(preset.StartingMCPContext); err != nil {
 		return err
 	}
@@ -238,30 +235,6 @@ func validateAssistantPresetReferences(
 
 	if err := validateStartingMCPContextReferences(ctx, preset.StartingMCPContext, lookups); err != nil {
 		return err
-	}
-
-	return nil
-}
-
-func validateStartingModelPresetPatch(patch *modelpresetSpec.ModelPresetPatch) error {
-	if patch == nil {
-		return nil
-	}
-
-	hasSystemPrompt, err := jsonFieldPresentAndNonNull(patch, "systemPrompt")
-	if err != nil {
-		return fmt.Errorf("startingModelPresetPatch: %w", err)
-	}
-	if hasSystemPrompt {
-		return errors.New("startingModelPresetPatch.systemPrompt must be nil")
-	}
-
-	hasCapabilitiesOverride, err := jsonFieldPresentAndNonNull(patch, "capabilitiesOverride")
-	if err != nil {
-		return fmt.Errorf("startingModelPresetPatch: %w", err)
-	}
-	if hasCapabilitiesOverride {
-		return errors.New("startingModelPresetPatch.capabilitiesOverride must be nil")
 	}
 
 	return nil

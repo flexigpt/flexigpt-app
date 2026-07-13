@@ -22,7 +22,6 @@ import type {
 	AssistantPresetPreparedApplication,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import {
-	applyAssistantPresetModelPatch,
 	normalizeAssistantPresetMCPContext,
 	normalizeAssistantPresetSkillRefs,
 	normalizeAssistantPresetToolChoices,
@@ -609,11 +608,6 @@ export function useAssistantContextState(): AssistantContextController {
 				nextSelectedModel = {
 					...matchedModel,
 				};
-				hasModelSelection = true;
-			}
-
-			if (preset.startingModelPresetPatch) {
-				nextSelectedModel = applyAssistantPresetModelPatch(nextSelectedModel, preset.startingModelPresetPatch);
 				hasModelSelection = true;
 			}
 

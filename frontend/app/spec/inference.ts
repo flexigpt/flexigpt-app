@@ -119,10 +119,11 @@ export interface JSONSchemaParam {
 	strict?: boolean;
 }
 
-export interface OutputFormat {
+interface OutputFormat {
 	kind: OutputFormatKind;
 	jsonSchemaParam?: JSONSchemaParam;
 }
+
 export interface OutputParam {
 	format?: OutputFormat;
 	verbosity?: OutputVerbosity;

@@ -1,26 +1,11 @@
 import type { MCPConversationContext } from '@/spec/mcp';
-import type { ModelPresetPatch, ModelPresetRef } from '@/spec/modelpreset';
+import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { SkillSelection } from '@/spec/skill';
 import type { ToolSelection } from '@/spec/tool';
 
 export const BASE_ASSISTANT_PRESET_SLUG = 'base';
 export const BASE_ASSISTANT_PRESET_BUNDLEID = '019d2423-01b0-7f87-be39-fe02d844453a';
 export const BASE_ASSISTANT_PRESET_VERSION = 'v1.0.0';
-
-/**
- * Assistant preset write-time subset of ModelPresetPatch.
- *
- * Mirrors Go validation for assistant presets:
- * - systemPrompt must be nil
- * - capabilitiesOverride must be nil
- */
-export type AssistantPresetStartingModelPresetPatch = Omit<
-	ModelPresetPatch,
-	'systemPrompt' | 'capabilitiesOverride'
-> & {
-	systemPrompt?: never;
-	capabilitiesOverride?: never;
-};
 
 export interface AssistantPreset {
 	schemaVersion: string;
@@ -33,7 +18,6 @@ export interface AssistantPreset {
 	isBuiltIn: boolean;
 	startingText?: string;
 	startingModelPresetRef?: ModelPresetRef;
-	startingModelPresetPatch?: AssistantPresetStartingModelPresetPatch;
 	startingIncludeModelSystemPrompt?: boolean;
 	startingToolSelections?: ToolSelection[];
 	startingSkillSelections?: SkillSelection[];
@@ -77,7 +61,6 @@ export interface PutAssistantPresetPayload {
 	isEnabled: boolean;
 	startingText?: string;
 	startingModelPresetRef?: ModelPresetRef;
-	startingModelPresetPatch?: AssistantPresetStartingModelPresetPatch;
 	startingIncludeModelSystemPrompt?: boolean;
 	startingToolSelections?: ToolSelection[];
 	startingSkillSelections?: SkillSelection[];

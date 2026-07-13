@@ -939,174 +939,6 @@ export namespace spec {
 		    return a;
 		}
 	}
-	export class JSONSchemaParam {
-	    name: string;
-	    description?: string;
-	    schema?: Record<string, any>;
-	    strict?: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new JSONSchemaParam(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.name = source["name"];
-	        this.description = source["description"];
-	        this.schema = source["schema"];
-	        this.strict = source["strict"];
-	    }
-	}
-	export class OutputFormat {
-	    kind: string;
-	    jsonSchemaParam?: JSONSchemaParam;
-	
-	    static createFrom(source: any = {}) {
-	        return new OutputFormat(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.kind = source["kind"];
-	        this.jsonSchemaParam = this.convertValues(source["jsonSchemaParam"], JSONSchemaParam);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class OutputParam {
-	    format?: OutputFormat;
-	    verbosity?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new OutputParam(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.format = this.convertValues(source["format"], OutputFormat);
-	        this.verbosity = source["verbosity"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class CacheControl {
-	    kind: string;
-	    ttl?: string;
-	    key?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new CacheControl(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.kind = source["kind"];
-	        this.ttl = source["ttl"];
-	        this.key = source["key"];
-	    }
-	}
-	export class ReasoningParam {
-	    type: string;
-	    level: string;
-	    tokens: number;
-	    summaryStyle?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ReasoningParam(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.type = source["type"];
-	        this.level = source["level"];
-	        this.tokens = source["tokens"];
-	        this.summaryStyle = source["summaryStyle"];
-	    }
-	}
-	export class ModelPresetPatch {
-	    stream?: boolean;
-	    maxPromptLength?: number;
-	    maxOutputLength?: number;
-	    temperature?: number;
-	    reasoning?: ReasoningParam;
-	    systemPrompt?: string;
-	    timeout?: number;
-	    cacheControl?: CacheControl;
-	    outputParam?: OutputParam;
-	    stopSequences?: string[];
-	    additionalParametersRawJSON?: string;
-	    capabilitiesOverride?: capabilityoverride.ModelCapabilitiesOverride;
-	
-	    static createFrom(source: any = {}) {
-	        return new ModelPresetPatch(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.stream = source["stream"];
-	        this.maxPromptLength = source["maxPromptLength"];
-	        this.maxOutputLength = source["maxOutputLength"];
-	        this.temperature = source["temperature"];
-	        this.reasoning = this.convertValues(source["reasoning"], ReasoningParam);
-	        this.systemPrompt = source["systemPrompt"];
-	        this.timeout = source["timeout"];
-	        this.cacheControl = this.convertValues(source["cacheControl"], CacheControl);
-	        this.outputParam = this.convertValues(source["outputParam"], OutputParam);
-	        this.stopSequences = source["stopSequences"];
-	        this.additionalParametersRawJSON = source["additionalParametersRawJSON"];
-	        this.capabilitiesOverride = this.convertValues(source["capabilitiesOverride"], capabilityoverride.ModelCapabilitiesOverride);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class ModelPresetRef {
 	    providerName: string;
 	    modelPresetID: string;
@@ -1132,7 +964,6 @@ export namespace spec {
 	    isBuiltIn: boolean;
 	    startingText?: string;
 	    startingModelPresetRef?: ModelPresetRef;
-	    startingModelPresetPatch?: ModelPresetPatch;
 	    startingIncludeModelSystemPrompt?: boolean;
 	    startingToolSelections?: ToolSelection[];
 	    startingSkillSelections?: SkillSelection[];
@@ -1158,7 +989,6 @@ export namespace spec {
 	        this.isBuiltIn = source["isBuiltIn"];
 	        this.startingText = source["startingText"];
 	        this.startingModelPresetRef = this.convertValues(source["startingModelPresetRef"], ModelPresetRef);
-	        this.startingModelPresetPatch = this.convertValues(source["startingModelPresetPatch"], ModelPresetPatch);
 	        this.startingIncludeModelSystemPrompt = source["startingIncludeModelSystemPrompt"];
 	        this.startingToolSelections = this.convertValues(source["startingToolSelections"], ToolSelection);
 	        this.startingSkillSelections = this.convertValues(source["startingSkillSelections"], SkillSelection);
@@ -1301,7 +1131,22 @@ export namespace spec {
 	        this.nonEmpty = source["nonEmpty"];
 	    }
 	}
+	export class CacheControl {
+	    kind: string;
+	    ttl?: string;
+	    key?: string;
 	
+	    static createFrom(source: any = {}) {
+	        return new CacheControl(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.ttl = source["ttl"];
+	        this.key = source["key"];
+	    }
+	}
 	export class CancelPendingMCPOAuthAuthorizationRequest {
 	    BundleID: string;
 	    ServerID: string;
@@ -2416,6 +2261,106 @@ export namespace spec {
 		    }
 		    return a;
 		}
+	}
+	export class JSONSchemaParam {
+	    name: string;
+	    description?: string;
+	    schema?: Record<string, any>;
+	    strict?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new JSONSchemaParam(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.schema = source["schema"];
+	        this.strict = source["strict"];
+	    }
+	}
+	export class OutputFormat {
+	    kind: string;
+	    jsonSchemaParam?: JSONSchemaParam;
+	
+	    static createFrom(source: any = {}) {
+	        return new OutputFormat(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.jsonSchemaParam = this.convertValues(source["jsonSchemaParam"], JSONSchemaParam);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class OutputParam {
+	    format?: OutputFormat;
+	    verbosity?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new OutputParam(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.format = this.convertValues(source["format"], OutputFormat);
+	        this.verbosity = source["verbosity"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ReasoningParam {
+	    type: string;
+	    level: string;
+	    tokens: number;
+	    summaryStyle?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReasoningParam(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.level = source["level"];
+	        this.tokens = source["tokens"];
+	        this.summaryStyle = source["summaryStyle"];
+	    }
 	}
 	export class ModelParam {
 	    name: string;
@@ -8100,7 +8045,6 @@ export namespace spec {
 	
 	
 	
-	
 	export class PatchAssistantPresetBundleRequestBody {
 	    isEnabled: boolean;
 	
@@ -9346,7 +9290,6 @@ export namespace spec {
 	    isEnabled: boolean;
 	    startingText?: string;
 	    startingModelPresetRef?: ModelPresetRef;
-	    startingModelPresetPatch?: ModelPresetPatch;
 	    startingIncludeModelSystemPrompt?: boolean;
 	    startingToolSelections?: ToolSelection[];
 	    startingSkillSelections?: SkillSelection[];
@@ -9363,7 +9306,6 @@ export namespace spec {
 	        this.isEnabled = source["isEnabled"];
 	        this.startingText = source["startingText"];
 	        this.startingModelPresetRef = this.convertValues(source["startingModelPresetRef"], ModelPresetRef);
-	        this.startingModelPresetPatch = this.convertValues(source["startingModelPresetPatch"], ModelPresetPatch);
 	        this.startingIncludeModelSystemPrompt = source["startingIncludeModelSystemPrompt"];
 	        this.startingToolSelections = this.convertValues(source["startingToolSelections"], ToolSelection);
 	        this.startingSkillSelections = this.convertValues(source["startingSkillSelections"], SkillSelection);

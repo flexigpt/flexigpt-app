@@ -209,10 +209,6 @@ function buildPresetModelPreviewState(preset: AssistantPreset): Record<string, u
 		state.modelRef = preset.startingModelPresetRef;
 	}
 
-	if (preset.startingModelPresetPatch) {
-		Object.assign(state, preset.startingModelPresetPatch);
-	}
-
 	if (preset.startingIncludeModelSystemPrompt !== undefined) {
 		state.includeModelSystemPrompt = preset.startingIncludeModelSystemPrompt;
 	}

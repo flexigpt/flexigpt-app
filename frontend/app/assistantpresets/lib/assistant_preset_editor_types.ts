@@ -1,13 +1,4 @@
 import type { AssistantPreset } from '@/spec/assistantpreset';
-import type {
-	CacheControlKind,
-	CacheControlTTL,
-	OutputFormatKind,
-	OutputVerbosity,
-	ReasoningLevel,
-	ReasoningSummaryStyle,
-	ReasoningType,
-} from '@/spec/inference';
 import type { MCPConversationContext } from '@/spec/mcp';
 import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { SkillSelection } from '@/spec/skill';
@@ -33,37 +24,6 @@ export interface ErrorState {
 	startingMCPContext?: string;
 }
 
-export interface ModelPatchFormData {
-	enabled: boolean;
-	stream: TriStateBoolean;
-	maxPromptLength: string;
-	maxOutputLength: string;
-	temperature: string;
-	timeout: string;
-	stopSequencesText: string;
-	additionalParametersRawJSON: string;
-
-	cacheControlEnabled: boolean;
-	cacheControlKind: CacheControlKind;
-	cacheControlTTL: '' | CacheControlTTL;
-	cacheControlKey: string;
-
-	reasoningEnabled: boolean;
-	reasoningType: ReasoningType;
-	reasoningLevel: ReasoningLevel;
-	reasoningTokens: string;
-	reasoningSummaryStyle: '' | ReasoningSummaryStyle;
-
-	outputEnabled: boolean;
-	outputVerbosity: '' | OutputVerbosity;
-	outputFormatEnabled: boolean;
-	outputFormatKind: OutputFormatKind;
-	outputJSONSchemaName: string;
-	outputJSONSchemaDescription: string;
-	outputJSONSchemaRaw: string;
-	outputJSONSchemaStrictMode: TriStateBoolean;
-}
-
 interface ToolSelectionFormItem {
 	toolRef: ToolRef;
 	autoExecuteMode: TriStateBoolean;
@@ -81,7 +41,6 @@ export interface AssistantPresetFormData {
 	startingModelPresetKey: string;
 	startingModelPresetRef?: ModelPresetRef;
 	startingIncludeModelSystemPrompt: TriStateBoolean;
-	modelPatch: ModelPatchFormData;
 
 	startingToolSelections: ToolSelectionFormItem[];
 	startingSkillSelections: SkillSelection[];

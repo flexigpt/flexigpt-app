@@ -28,7 +28,6 @@ func cloneAssistantPreset(in spec.AssistantPreset) spec.AssistantPreset {
 	out := in
 
 	out.StartingModelPresetRef = cloneJSONValue(in.StartingModelPresetRef)
-	out.StartingModelPresetPatch = cloneJSONValue(in.StartingModelPresetPatch)
 	if in.StartingIncludeModelSystemPrompt != nil {
 		v := *in.StartingIncludeModelSystemPrompt
 		out.StartingIncludeModelSystemPrompt = &v

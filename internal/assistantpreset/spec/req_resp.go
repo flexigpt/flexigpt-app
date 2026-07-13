@@ -73,11 +73,6 @@ type PutAssistantPresetRequestBody struct {
 	StartingText           string                          `json:"startingText,omitempty"`
 	StartingModelPresetRef *modelpresetSpec.ModelPresetRef `json:"startingModelPresetRef,omitempty"`
 
-	// Validation rules:
-	//   - systemPrompt must be nil
-	//   - capabilitiesOverride must be nil
-	StartingModelPresetPatch *modelpresetSpec.ModelPresetPatch `json:"startingModelPresetPatch,omitempty"`
-
 	StartingIncludeModelSystemPrompt *bool                           `json:"startingIncludeModelSystemPrompt,omitempty"`
 	StartingToolSelections           []toolSpec.ToolSelection        `json:"startingToolSelections,omitempty"`
 	StartingSkillSelections          []skillSpec.SkillSelection      `json:"startingSkillSelections,omitempty"`

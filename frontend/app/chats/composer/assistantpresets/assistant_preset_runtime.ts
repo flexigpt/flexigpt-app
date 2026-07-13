@@ -10,12 +10,10 @@ import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
-import { cloneJSONLike } from '@/lib/jsonschema_utils';
 import { areComparableValuesEqual } from '@/lib/obj_utils';
 
 import type { SystemInstructionSource } from '@/chats/composer/skills/prompt_utils';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
-import { sanitizeUIChatOptionByCapabilities } from '@/modelpresets/lib/capabilities_override';
 import { areSkillRefListsEqual } from '@/skills/lib/skill_identity_utils';
 import { areToolChoiceListsEqual } from '@/tools/lib/tool_choice_utils';
 
@@ -139,142 +137,12 @@ export function areAssistantRuntimeSnapshotsEqual(
 	);
 }
 
-function hasOwn(value: object, key: string): boolean {
-	return Object.hasOwn(value, key);
-}
-
-function mergePatchObject<T>(baseValue: T | undefined, patchValue: unknown): T {
-	if (patchValue === undefined) {
-		return baseValue as T;
-	}
-
-	if (patchValue === null || Array.isArray(patchValue) || typeof patchValue !== 'object') {
-		return cloneJSONLike(patchValue) as T;
-	}
-
-	const baseObject =
-		baseValue && typeof baseValue === 'object' && !Array.isArray(baseValue)
-			? (baseValue as Record<string, unknown>)
-			: {};
-
-	const next: Record<string, unknown> = {
-		...baseObject,
-	};
-
-	for (const [key, nestedPatchValue] of Object.entries(patchValue as Record<string, unknown>)) {
-		next[key] = mergePatchObject(baseObject[key], nestedPatchValue);
-	}
-
-	return next as T;
-}
-
-function pickManagedPatchShape(patchValue: unknown, currentValue: unknown): unknown {
-	if (patchValue === undefined) {
-		return undefined;
-	}
-
-	if (patchValue === null || Array.isArray(patchValue) || typeof patchValue !== 'object') {
-		return cloneJSONLike(currentValue);
-	}
-
-	const currentObject =
-		currentValue && typeof currentValue === 'object' && !Array.isArray(currentValue)
-			? (currentValue as Record<string, unknown>)
-			: {};
-
-	const next: Record<string, unknown> = {};
-
-	for (const [key, nestedPatchValue] of Object.entries(patchValue as Record<string, unknown>)) {
-		next[key] = pickManagedPatchShape(nestedPatchValue, currentObject[key]);
-	}
-
-	return next;
-}
-
 export function buildAssistantPresetIdentityKey(
 	bundleID: string,
 	assistantPresetSlug: string,
 	version: string
 ): string {
 	return `${bundleID}/${assistantPresetSlug}@${version}`;
-}
-
-export function applyAssistantPresetModelPatch(
-	base: UIChatOption,
-	patch?: AssistantPreset['startingModelPresetPatch']
-): UIChatOption {
-	if (!patch) {
-		return sanitizeUIChatOptionByCapabilities({
-			...base,
-		});
-	}
-
-	const next: UIChatOption = {
-		...base,
-	};
-
-	const patchHasTemperature = hasOwn(patch, 'temperature');
-	const patchHasReasoning = hasOwn(patch, 'reasoning');
-
-	if (hasOwn(patch, 'stream') && patch.stream !== undefined) {
-		next.stream = patch.stream;
-	}
-
-	if (hasOwn(patch, 'maxPromptLength') && patch.maxPromptLength !== undefined) {
-		next.maxPromptLength = patch.maxPromptLength;
-	}
-
-	if (hasOwn(patch, 'maxOutputLength') && patch.maxOutputLength !== undefined) {
-		next.maxOutputLength = patch.maxOutputLength;
-	}
-
-	if (patchHasTemperature) {
-		if (patch.temperature === undefined) {
-			delete next.temperature;
-		} else {
-			next.temperature = patch.temperature;
-			if (!patchHasReasoning) {
-				delete next.reasoning;
-			}
-		}
-	}
-
-	if (patchHasReasoning) {
-		if (patch.reasoning === undefined) {
-			delete next.reasoning;
-		} else {
-			next.reasoning = mergePatchObject(next.reasoning, patch.reasoning);
-			if (!patchHasTemperature) {
-				delete next.temperature;
-			}
-		}
-	}
-
-	if (hasOwn(patch, 'outputParam')) {
-		if (patch.outputParam === undefined) {
-			delete next.outputParam;
-		} else {
-			next.outputParam = mergePatchObject(next.outputParam, patch.outputParam);
-		}
-	}
-
-	if (hasOwn(patch, 'stopSequences')) {
-		next.stopSequences = patch.stopSequences ? [...patch.stopSequences] : undefined;
-	}
-
-	if (hasOwn(patch, 'timeout') && patch.timeout !== undefined) {
-		next.timeout = patch.timeout;
-	}
-
-	if (hasOwn(patch, 'cacheControl')) {
-		next.cacheControl = patch.cacheControl ? cloneJSONLike(patch.cacheControl) : undefined;
-	}
-
-	if (hasOwn(patch, 'additionalParametersRawJSON')) {
-		next.additionalParametersRawJSON = patch.additionalParametersRawJSON?.trim() || undefined;
-	}
-
-	return sanitizeUIChatOptionByCapabilities(next);
 }
 
 export function buildAssistantPresetModelComparisonState(
@@ -289,49 +157,6 @@ export function buildAssistantPresetModelComparisonState(
 			providerName: selectedModel.providerName,
 			modelPresetID: selectedModel.modelPresetID,
 		};
-	}
-
-	const patch = preset.startingModelPresetPatch;
-	if (patch) {
-		if (hasOwn(patch, 'stream')) {
-			modelState.stream = selectedModel.stream;
-		}
-
-		if (hasOwn(patch, 'maxPromptLength')) {
-			modelState.maxPromptLength = selectedModel.maxPromptLength;
-		}
-
-		if (hasOwn(patch, 'maxOutputLength')) {
-			modelState.maxOutputLength = selectedModel.maxOutputLength;
-		}
-
-		if (hasOwn(patch, 'temperature')) {
-			modelState.temperature = selectedModel.temperature;
-		}
-
-		if (hasOwn(patch, 'reasoning')) {
-			modelState.reasoning = pickManagedPatchShape(patch.reasoning, selectedModel.reasoning);
-		}
-
-		if (hasOwn(patch, 'outputParam')) {
-			modelState.outputParam = pickManagedPatchShape(patch.outputParam, selectedModel.outputParam);
-		}
-
-		if (hasOwn(patch, 'stopSequences')) {
-			modelState.stopSequences = selectedModel.stopSequences;
-		}
-
-		if (hasOwn(patch, 'timeout')) {
-			modelState.timeout = selectedModel.timeout;
-		}
-
-		if (hasOwn(patch, 'cacheControl')) {
-			modelState.cacheControl = selectedModel.cacheControl;
-		}
-
-		if (hasOwn(patch, 'additionalParametersRawJSON')) {
-			modelState.additionalParametersRawJSON = selectedModel.additionalParametersRawJSON;
-		}
 	}
 
 	if (preset.startingIncludeModelSystemPrompt !== undefined) {

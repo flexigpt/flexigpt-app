@@ -47,20 +47,6 @@ export function arraysEqual(a: string[] = [], b: string[] = []): boolean {
 	return a.every((value, index) => value === b[index]);
 }
 
-export function parsePositiveInteger(value: string): number | undefined {
-	const trimmed = value.trim();
-	if (!trimmed) {
-		return undefined;
-	}
-
-	const parsed = Number(trimmed);
-	if (!Number.isInteger(parsed) || parsed <= 0) {
-		return undefined;
-	}
-
-	return parsed;
-}
-
 export function parseOptionalNumber(val: string, defaultVal?: number): number | undefined {
 	const trimmed = val.trim();
 	if (trimmed === '' || !trimmed) {

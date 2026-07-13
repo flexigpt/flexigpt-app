@@ -748,12 +748,6 @@ func TestValidateAssistantPresetReferences(t *testing.T) {
 	}
 }
 
-func TestValidateStartingModelPresetPatch_Nil(t *testing.T) {
-	if err := validateStartingModelPresetPatch(nil); err != nil {
-		t.Fatalf("validateStartingModelPresetPatch(nil) error: %v", err)
-	}
-}
-
 func TestJSONHelpers(t *testing.T) {
 	t.Run("jsonFieldPresentAndNonNull", func(t *testing.T) {
 		tests := []struct {

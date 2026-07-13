@@ -94,7 +94,7 @@ export interface ModelCapabilitiesOverride {
 	paramDialect?: ParamDialectOverride;
 }
 
-export interface ModelPresetPatch {
+interface ModelPresetPatch {
 	stream?: boolean;
 	maxPromptLength?: number;
 	maxOutputLength?: number;

@@ -5,9 +5,6 @@ import { createPortal } from 'react-dom';
 
 import { FiAlertCircle, FiHelpCircle, FiRefreshCw, FiUpload, FiX } from 'react-icons/fi';
 
-import type { AssistantPreset, AssistantPresetStartingModelPresetPatch } from '@/spec/assistantpreset';
-import type { JSONSchemaParam, OutputFormat, OutputParam } from '@/spec/inference';
-import { CacheControlKind, OutputFormatKind, ReasoningLevel, ReasoningType } from '@/spec/inference';
 import type { MCPConversationContext } from '@/spec/mcp';
 import { MCPToolExposure } from '@/spec/mcp';
 import type { AssistantModelPresetOption } from '@/spec/modelpreset';
@@ -15,8 +12,7 @@ import type { AssistantSkillOption } from '@/spec/skill';
 import type { AssistantToolOption } from '@/spec/tool';
 import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
-import { isJSONObject, tryParseJSONObject } from '@/lib/jsonschema_utils';
-import { parseOptionalNumber, parsePositiveInteger } from '@/lib/obj_utils';
+import { tryParseJSONObject } from '@/lib/jsonschema_utils';
 import { validateSlug } from '@/lib/text_utils';
 import { DEFAULT_SEMVER, isSemverVersion, suggestNextMinorVersion } from '@/lib/version_utils';
 
@@ -34,7 +30,6 @@ import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
 
 import { MCPSelectionSection } from '@/assistantpresets/components/mcp_selection_section';
-import { AssistantPresetModelPatchEditor } from '@/assistantpresets/components/model_patch_editor';
 import { SkillSelectionSection } from '@/assistantpresets/components/skill_selection_section';
 import { ToolSelectionSection } from '@/assistantpresets/components/tool_selection_section';
 import type { AssistantPresetEditorCatalog } from '@/assistantpresets/lib/assistant_preset_catalog';
@@ -43,7 +38,6 @@ import type {
 	AssistantPresetFormData,
 	ErrorState,
 	ModalMode,
-	ModelPatchFormData,
 	OrderedDisplayItem,
 	PresetItem,
 	SimpleSelectableOption,
@@ -60,11 +54,9 @@ import {
 	cloneSkillSelection,
 	formatDateish,
 	hasAssistantPresetMCPContext,
-	hasAssistantPresetModelPatch,
 } from '@/assistantpresets/lib/assistant_preset_utils';
 import { normalizeAssistantPresetMCPContext } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import { useComposerMCP } from '@/chats/composer/mcp/use_composer_mcp';
-import { buildEffectiveModelParamFromModelPreset } from '@/modelpresets/lib/modelpreset_effective_defaults';
 import {
 	getSkillInstructionPromptEligibilityReason,
 	getSkillPreloadEligibilityReason,
@@ -143,16 +135,6 @@ function removeItemAtIndex<T>(items: readonly T[], index: number): T[] {
 
 function updateItemAtIndex<T>(items: readonly T[], index: number, updater: (item: T) => T): T[] {
 	return items.map((item, itemIndex) => (itemIndex === index ? updater(item) : item));
-}
-
-function getTriStateLabel(value: TriStateBoolean): string {
-	if (value === 'true') {
-		return 'Force On';
-	}
-	if (value === 'false') {
-		return 'Force Off';
-	}
-	return 'Not Set';
 }
 
 function getToolAutoExecuteLabel(value: TriStateBoolean): string {
@@ -282,124 +264,6 @@ function buildAssistantPresetPrefillKey(item: PresetItem): string {
 	return `${item.bundleID}:${item.preset.id}:${item.preset.version}`;
 }
 
-function buildModelPatchSeedFormData(modelOption?: AssistantModelPresetOption): ModelPatchFormData {
-	const base = getDefaultModelPatchFormData();
-	if (!modelOption) {
-		return base;
-	}
-
-	const effective = buildEffectiveModelParamFromModelPreset(modelOption.modelPreset);
-
-	return {
-		...base,
-		enabled: true,
-		stream: booleanToTriState(effective.stream),
-		maxPromptLength: String(effective.maxPromptLength),
-		maxOutputLength: String(effective.maxOutputLength),
-		temperature: effective.temperature !== undefined ? String(effective.temperature) : '',
-		timeout: String(effective.timeout),
-		stopSequencesText: (effective.stopSequences ?? []).join('\n'),
-		additionalParametersRawJSON: effective.additionalParametersRawJSON ?? '',
-
-		cacheControlEnabled: effective.cacheControl !== undefined,
-		cacheControlKind: effective.cacheControl?.kind ?? base.cacheControlKind,
-		cacheControlTTL: effective.cacheControl?.ttl ?? '',
-		cacheControlKey: effective.cacheControl?.key ?? '',
-
-		reasoningEnabled: effective.reasoning !== undefined,
-		reasoningType: effective.reasoning?.type ?? base.reasoningType,
-		reasoningLevel: effective.reasoning?.level ?? base.reasoningLevel,
-		reasoningTokens:
-			effective.reasoning?.tokens !== undefined ? String(effective.reasoning.tokens) : base.reasoningTokens,
-		reasoningSummaryStyle: effective.reasoning?.summaryStyle ?? '',
-
-		outputEnabled: effective.outputParam !== undefined,
-		outputVerbosity: effective.outputParam?.verbosity ?? '',
-		outputFormatEnabled: effective.outputParam?.format !== undefined,
-		outputFormatKind: effective.outputParam?.format?.kind ?? base.outputFormatKind,
-		outputJSONSchemaName: effective.outputParam?.format?.jsonSchemaParam?.name ?? '',
-		outputJSONSchemaDescription: effective.outputParam?.format?.jsonSchemaParam?.description ?? '',
-		outputJSONSchemaRaw: effective.outputParam?.format?.jsonSchemaParam?.schema
-			? JSON.stringify(effective.outputParam.format.jsonSchemaParam.schema, null, 2)
-			: '',
-		outputJSONSchemaStrictMode: booleanToTriState(effective.outputParam?.format?.jsonSchemaParam?.strict),
-	};
-}
-
-function getDefaultModelPatchFormData(): ModelPatchFormData {
-	return {
-		enabled: false,
-		stream: '',
-		maxPromptLength: '',
-		maxOutputLength: '',
-		temperature: '',
-		timeout: '',
-		stopSequencesText: '',
-		additionalParametersRawJSON: '',
-
-		cacheControlEnabled: false,
-		cacheControlKind: CacheControlKind.Ephemeral,
-		cacheControlTTL: '',
-		cacheControlKey: '',
-
-		reasoningEnabled: false,
-		reasoningType: ReasoningType.SingleWithLevels,
-		reasoningLevel: ReasoningLevel.Medium,
-		reasoningTokens: '1024',
-		reasoningSummaryStyle: '',
-
-		outputEnabled: false,
-		outputVerbosity: '',
-		outputFormatEnabled: false,
-		outputFormatKind: OutputFormatKind.Text,
-		outputJSONSchemaName: '',
-		outputJSONSchemaDescription: '',
-		outputJSONSchemaRaw: '',
-		outputJSONSchemaStrictMode: '',
-	};
-}
-
-function getInitialModelPatchFormData(patch?: AssistantPreset['startingModelPresetPatch']): ModelPatchFormData {
-	const base = getDefaultModelPatchFormData();
-
-	if (!patch) {
-		return base;
-	}
-
-	return {
-		enabled: hasAssistantPresetModelPatch(patch),
-		stream: booleanToTriState(patch.stream),
-		maxPromptLength: patch.maxPromptLength !== undefined ? String(patch.maxPromptLength) : '',
-		maxOutputLength: patch.maxOutputLength !== undefined ? String(patch.maxOutputLength) : '',
-		temperature: patch.temperature !== undefined ? String(patch.temperature) : '',
-		timeout: patch.timeout !== undefined ? String(patch.timeout) : '',
-		stopSequencesText: (patch.stopSequences ?? []).join('\n'),
-		additionalParametersRawJSON: patch.additionalParametersRawJSON ?? '',
-
-		cacheControlEnabled: patch.cacheControl !== undefined,
-		cacheControlKind: patch.cacheControl?.kind ?? base.cacheControlKind,
-		cacheControlTTL: patch.cacheControl?.ttl ?? '',
-		cacheControlKey: patch.cacheControl?.key ?? '',
-
-		reasoningEnabled: patch.reasoning !== undefined,
-		reasoningType: patch.reasoning?.type ?? base.reasoningType,
-		reasoningLevel: patch.reasoning?.level ?? base.reasoningLevel,
-		reasoningTokens: patch.reasoning?.tokens !== undefined ? String(patch.reasoning.tokens) : base.reasoningTokens,
-		reasoningSummaryStyle: patch.reasoning?.summaryStyle ?? '',
-
-		outputEnabled: patch.outputParam !== undefined,
-		outputVerbosity: patch.outputParam?.verbosity ?? '',
-		outputFormatEnabled: patch.outputParam?.format !== undefined,
-		outputFormatKind: patch.outputParam?.format?.kind ?? OutputFormatKind.Text,
-		outputJSONSchemaName: patch.outputParam?.format?.jsonSchemaParam?.name ?? '',
-		outputJSONSchemaDescription: patch.outputParam?.format?.jsonSchemaParam?.description ?? '',
-		outputJSONSchemaRaw: patch.outputParam?.format?.jsonSchemaParam?.schema
-			? JSON.stringify(patch.outputParam.format.jsonSchemaParam.schema, null, 2)
-			: '',
-		outputJSONSchemaStrictMode: booleanToTriState(patch.outputParam?.format?.jsonSchemaParam?.strict),
-	};
-}
-
 function getInitialFormData(
 	initialData: PresetItem | undefined,
 	existingPresets: PresetItem[],
@@ -425,7 +289,6 @@ function getInitialFormData(
 					}
 				: undefined,
 			startingIncludeModelSystemPrompt: booleanToTriState(src.startingIncludeModelSystemPrompt),
-			modelPatch: getInitialModelPatchFormData(src.startingModelPresetPatch),
 			startingToolSelections: (src.startingToolSelections ?? []).map(selection => ({
 				toolRef: {
 					bundleID: selection.toolRef.bundleID,
@@ -450,139 +313,10 @@ function getInitialFormData(
 		startingModelPresetKey: '',
 		startingModelPresetRef: undefined,
 		startingIncludeModelSystemPrompt: '',
-		modelPatch: getDefaultModelPatchFormData(),
 		startingToolSelections: [],
 		startingSkillSelections: [],
 		startingMCPContext: undefined,
 	};
-}
-
-function hasConfiguredModelPatchFormValues(modelPatch: ModelPatchFormData): boolean {
-	return (
-		modelPatch.stream !== '' ||
-		modelPatch.maxPromptLength.trim().length > 0 ||
-		modelPatch.maxOutputLength.trim().length > 0 ||
-		modelPatch.temperature.trim().length > 0 ||
-		modelPatch.timeout.trim().length > 0 ||
-		modelPatch.stopSequencesText.trim().length > 0 ||
-		modelPatch.additionalParametersRawJSON.trim().length > 0 ||
-		modelPatch.cacheControlEnabled ||
-		modelPatch.reasoningEnabled ||
-		(modelPatch.outputEnabled && (modelPatch.outputVerbosity !== '' || modelPatch.outputFormatEnabled))
-	);
-}
-
-function buildModelPatchFromFormData(
-	modelPatch: ModelPatchFormData
-): AssistantPresetStartingModelPresetPatch | undefined {
-	if (!modelPatch.enabled) {
-		return undefined;
-	}
-
-	const patch: AssistantPresetStartingModelPresetPatch = {};
-
-	const stream = triStateToBoolean(modelPatch.stream);
-	if (stream !== undefined) {
-		patch.stream = stream;
-	}
-
-	const maxPromptLength = parsePositiveInteger(modelPatch.maxPromptLength);
-	if (maxPromptLength !== undefined) {
-		patch.maxPromptLength = maxPromptLength;
-	}
-
-	const maxOutputLength = parsePositiveInteger(modelPatch.maxOutputLength);
-	if (maxOutputLength !== undefined) {
-		patch.maxOutputLength = maxOutputLength;
-	}
-
-	const temperature = parseOptionalNumber(modelPatch.temperature);
-	if (temperature !== undefined) {
-		patch.temperature = temperature;
-	}
-
-	const timeout = parsePositiveInteger(modelPatch.timeout);
-	if (timeout !== undefined) {
-		patch.timeout = timeout;
-	}
-
-	const stopSequences = modelPatch.stopSequencesText
-		.split('\n')
-		.map(item => item.trim())
-		.filter(Boolean);
-	if (stopSequences.length > 0) {
-		patch.stopSequences = [...new Set(stopSequences)];
-	}
-
-	if (modelPatch.additionalParametersRawJSON.trim()) {
-		patch.additionalParametersRawJSON = modelPatch.additionalParametersRawJSON.trim();
-	}
-
-	if (modelPatch.cacheControlEnabled) {
-		const cacheControlKey = modelPatch.cacheControlKey.trim();
-		patch.cacheControl = {
-			kind: modelPatch.cacheControlKind,
-			...(modelPatch.cacheControlTTL ? { ttl: modelPatch.cacheControlTTL } : {}),
-			...(cacheControlKey ? { key: cacheControlKey } : {}),
-		};
-	}
-
-	const reasoningTokens = parsePositiveInteger(modelPatch.reasoningTokens);
-	if (modelPatch.reasoningEnabled && reasoningTokens !== undefined) {
-		patch.reasoning = {
-			type: modelPatch.reasoningType,
-			level: modelPatch.reasoningLevel,
-			tokens: reasoningTokens,
-			...(modelPatch.reasoningSummaryStyle ? { summaryStyle: modelPatch.reasoningSummaryStyle } : {}),
-		};
-	}
-
-	if (modelPatch.outputEnabled) {
-		const outputParam: OutputParam = {};
-
-		if (modelPatch.outputVerbosity) {
-			outputParam.verbosity = modelPatch.outputVerbosity;
-		}
-
-		if (modelPatch.outputFormatEnabled) {
-			const format: OutputFormat = {
-				kind: modelPatch.outputFormatKind,
-			};
-
-			if (modelPatch.outputFormatKind === OutputFormatKind.JSONSchema) {
-				const jsonSchemaParam: JSONSchemaParam = {
-					name: modelPatch.outputJSONSchemaName.trim(),
-				};
-
-				const description = modelPatch.outputJSONSchemaDescription.trim();
-				if (description) {
-					jsonSchemaParam.description = description;
-				}
-
-				if (modelPatch.outputJSONSchemaRaw.trim()) {
-					const parsed = tryParseJSONObject(modelPatch.outputJSONSchemaRaw.trim());
-					if (parsed.ok && isJSONObject(parsed.value)) {
-						jsonSchemaParam.schema = parsed.value;
-					}
-				}
-
-				const strict = triStateToBoolean(modelPatch.outputJSONSchemaStrictMode);
-				if (strict !== undefined) {
-					jsonSchemaParam.strict = strict;
-				}
-
-				format.jsonSchemaParam = jsonSchemaParam;
-			}
-
-			outputParam.format = format;
-		}
-
-		if (outputParam.format !== undefined || outputParam.verbosity !== undefined) {
-			patch.outputParam = outputParam;
-		}
-	}
-
-	return hasAssistantPresetModelPatch(patch) ? patch : undefined;
 }
 
 function createOptionMap<T extends { key: string }>(items: readonly T[]): Map<string, T> {
@@ -832,89 +566,6 @@ function AddEditAssistantPresetModalContent({
 				}
 			}
 
-			if (state.modelPatch.enabled) {
-				if (!state.startingModelPresetKey) {
-					nextErrors.modelPatch = 'Select a starting model preset before defining a starting model patch.';
-				}
-
-				if (
-					state.modelPatch.maxPromptLength.trim() &&
-					parsePositiveInteger(state.modelPatch.maxPromptLength) === undefined
-				) {
-					nextErrors.modelPatch = 'Max prompt length must be a positive integer.';
-				}
-
-				if (
-					!nextErrors.modelPatch &&
-					state.modelPatch.maxOutputLength.trim() &&
-					parsePositiveInteger(state.modelPatch.maxOutputLength) === undefined
-				) {
-					nextErrors.modelPatch = 'Max output length must be a positive integer.';
-				}
-
-				if (
-					!nextErrors.modelPatch &&
-					state.modelPatch.temperature.trim() &&
-					parseOptionalNumber(state.modelPatch.temperature) === undefined
-				) {
-					nextErrors.modelPatch = 'Temperature must be a valid number.';
-				} else if (
-					!nextErrors.modelPatch &&
-					state.modelPatch.temperature.trim() &&
-					(Number(state.modelPatch.temperature) < 0 || Number(state.modelPatch.temperature) > 1)
-				) {
-					nextErrors.modelPatch = 'Temperature must be between 0 and 1.';
-				}
-
-				if (
-					!nextErrors.modelPatch &&
-					state.modelPatch.timeout.trim() &&
-					parsePositiveInteger(state.modelPatch.timeout) === undefined
-				) {
-					nextErrors.modelPatch = 'Timeout must be a positive integer.';
-				}
-
-				if (!nextErrors.modelPatch && state.modelPatch.additionalParametersRawJSON.trim()) {
-					const parsed = tryParseJSONObject(state.modelPatch.additionalParametersRawJSON.trim());
-					if (!parsed.ok) {
-						nextErrors.modelPatch = 'Additional parameters raw JSON must be valid JSON.';
-					} else if (!isJSONObject(parsed.value)) {
-						nextErrors.modelPatch = 'Additional parameters raw JSON must be a JSON object.';
-					}
-				}
-
-				if (!nextErrors.modelPatch && state.modelPatch.reasoningEnabled) {
-					if (!state.modelPatch.reasoningTokens.trim()) {
-						nextErrors.modelPatch = 'Reasoning tokens are required when reasoning override is enabled.';
-					} else if (parsePositiveInteger(state.modelPatch.reasoningTokens) === undefined) {
-						nextErrors.modelPatch = 'Reasoning tokens must be a positive integer.';
-					}
-				}
-
-				if (
-					!nextErrors.modelPatch &&
-					state.modelPatch.outputEnabled &&
-					state.modelPatch.outputFormatEnabled &&
-					state.modelPatch.outputFormatKind === OutputFormatKind.JSONSchema
-				) {
-					if (!state.modelPatch.outputJSONSchemaName.trim()) {
-						nextErrors.modelPatch = 'JSON schema output format requires a schema name.';
-					} else if (state.modelPatch.outputJSONSchemaRaw.trim()) {
-						const parsed = tryParseJSONObject(state.modelPatch.outputJSONSchemaRaw.trim());
-						if (!parsed.ok) {
-							nextErrors.modelPatch = 'JSON schema body must be valid JSON.';
-						} else if (!isJSONObject(parsed.value)) {
-							nextErrors.modelPatch = 'JSON schema body must be a JSON object.';
-						}
-					}
-				}
-			}
-
-			if (state.modelPatch.enabled && !nextErrors.modelPatch && !hasConfiguredModelPatchFormValues(state.modelPatch)) {
-				nextErrors.modelPatch =
-					'Choose at least one runtime, reasoning, or output override, or turn off the starting model patch.';
-			}
-
 			if (state.startingToolSelections.length > 0) {
 				const keys = state.startingToolSelections.map(selection => buildToolRefKey(selection.toolRef));
 				if (new Set(keys).size !== keys.length) {
@@ -1080,30 +731,6 @@ function AddEditAssistantPresetModalContent({
 	const currentModelOption = selectedStartingModelOption;
 
 	const hasMissingSelectedModel = Boolean(formData.startingModelPresetKey) && currentModelOption === undefined;
-
-	const seedModelPatchFromSelectedModel = useCallback(() => {
-		if (!currentModelOption) {
-			return;
-		}
-
-		updateFormData(prev => ({
-			...prev,
-			modelPatch: buildModelPatchSeedFormData(currentModelOption),
-		}));
-	}, [currentModelOption, updateFormData]);
-
-	const updateModelPatch = useCallback(
-		(patch: Partial<ModelPatchFormData>) => {
-			updateFormData(prev => ({
-				...prev,
-				modelPatch: {
-					...prev.modelPatch,
-					...patch,
-				},
-			}));
-		},
-		[updateFormData]
-	);
 
 	const modelPresetDropdownItems = useMemo<Record<string, { isEnabled: boolean }>>(() => {
 		const items: Record<string, { isEnabled: boolean }> = {
@@ -1497,7 +1124,6 @@ function AddEditAssistantPresetModalContent({
 				isEnabled: formData.isEnabled,
 				startingText: formData.startingText.trim() || undefined,
 				startingModelPresetRef,
-				startingModelPresetPatch: buildModelPatchFromFormData(formData.modelPatch),
 				startingIncludeModelSystemPrompt: startingModelPresetRef
 					? triStateToBoolean(formData.startingIncludeModelSystemPrompt)
 					: undefined,
@@ -1933,15 +1559,6 @@ function AddEditAssistantPresetModalContent({
 									/>
 								</div>
 							</div>
-
-							<AssistantPresetModelPatchEditor
-								isViewMode={isViewMode}
-								modelPatch={formData.modelPatch}
-								error={errors.modelPatch}
-								onPatchChange={updateModelPatch}
-								canSeedFromSelectedModel={Boolean(currentModelOption)}
-								onSeedFromSelectedModel={seedModelPatchFromSelectedModel}
-							/>
 						</ModalSection>
 
 						<ModalSection
@@ -2053,9 +1670,6 @@ function AddEditAssistantPresetModalContent({
 									<ManagementInfoRow label="Model reference">
 										{currentModelOption?.label ?? (formData.startingModelPresetKey || '—')}
 									</ManagementInfoRow>
-									<ManagementInfoRow label="Model patch">
-										{hasAssistantPresetModelPatch(initialData.preset.startingModelPresetPatch) ? 'Configured' : 'None'}
-									</ManagementInfoRow>
 									<ManagementInfoRow label="Include model system prompt">
 										{formData.startingModelPresetKey
 											? getIncludeModelSystemPromptLabel(formData.startingIncludeModelSystemPrompt)
@@ -2063,9 +1677,6 @@ function AddEditAssistantPresetModalContent({
 									</ManagementInfoRow>
 									<ManagementInfoRow label="Created">{formatDateish(initialData.preset.createdAt)}</ManagementInfoRow>
 									<ManagementInfoRow label="Modified">{formatDateish(initialData.preset.modifiedAt)}</ManagementInfoRow>
-									<ManagementInfoRow label="Patch stream">
-										{getTriStateLabel(formData.modelPatch.stream)}
-									</ManagementInfoRow>
 								</ManagementInfoGrid>
 							</ModalSection>
 						)}

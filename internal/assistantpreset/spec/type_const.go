@@ -57,11 +57,6 @@ type AssistantPreset struct {
 
 	StartingModelPresetRef *modelpresetSpec.ModelPresetRef `json:"startingModelPresetRef,omitempty"`
 
-	// Validation rules:
-	//   - systemPrompt must be nil
-	//   - capabilitiesOverride must be nil
-	StartingModelPresetPatch *modelpresetSpec.ModelPresetPatch `json:"startingModelPresetPatch,omitempty"`
-
 	// Nil means the preset does not express a preference.
 	StartingIncludeModelSystemPrompt *bool `json:"startingIncludeModelSystemPrompt,omitempty"`
 

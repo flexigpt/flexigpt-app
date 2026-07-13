@@ -1,8 +1,4 @@
-import type {
-	AssistantPreset,
-	AssistantPresetStartingModelPresetPatch,
-	PutAssistantPresetPayload,
-} from '@/spec/assistantpreset';
+import type { AssistantPreset, PutAssistantPresetPayload } from '@/spec/assistantpreset';
 import type { MCPConversationContext } from '@/spec/mcp';
 import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { SkillRef, SkillSelection } from '@/spec/skill';
@@ -14,9 +10,6 @@ export interface AssistantPresetUpsertInput extends PutAssistantPresetPayload {
 	slug: string;
 	version: string;
 }
-
-type AssistantPresetModelPatchLike =
-	AssistantPreset['startingModelPresetPatch'] | AssistantPresetStartingModelPresetPatch | undefined;
 
 export function buildModelPresetRefKey(ref: ModelPresetRef): string {
 	return `${ref.providerName}/${ref.modelPresetID}`;
@@ -116,60 +109,6 @@ export function formatDateish(value: string | Date | undefined | null): string {
 	return value;
 }
 
-export function hasAssistantPresetModelPatch(patch: AssistantPresetModelPatchLike): boolean {
-	if (!patch) {
-		return false;
-	}
-
-	return (
-		patch.stream !== undefined ||
-		patch.maxPromptLength !== undefined ||
-		patch.maxOutputLength !== undefined ||
-		patch.temperature !== undefined ||
-		patch.cacheControl !== undefined ||
-		patch.outputParam !== undefined ||
-		(patch.stopSequences?.length ?? 0) > 0 ||
-		patch.reasoning !== undefined ||
-		patch.timeout !== undefined ||
-		(patch.additionalParametersRawJSON ?? '').trim().length > 0
-	);
-}
-
-function cloneStartingModelPatch(
-	patch?: AssistantPresetStartingModelPresetPatch
-): AssistantPresetStartingModelPresetPatch | undefined {
-	if (!patch || !hasAssistantPresetModelPatch(patch)) {
-		return undefined;
-	}
-
-	return {
-		...patch,
-		cacheControl: patch.cacheControl ? { ...patch.cacheControl } : undefined,
-		stopSequences: patch.stopSequences ? [...patch.stopSequences] : undefined,
-		reasoning: patch.reasoning
-			? {
-					...patch.reasoning,
-				}
-			: undefined,
-		outputParam: patch.outputParam
-			? {
-					...patch.outputParam,
-					format: patch.outputParam.format
-						? {
-								...patch.outputParam.format,
-								jsonSchemaParam: patch.outputParam.format.jsonSchemaParam
-									? {
-											...patch.outputParam.format.jsonSchemaParam,
-											schema: cloneJSONLike(patch.outputParam.format.jsonSchemaParam.schema),
-										}
-									: undefined,
-							}
-						: undefined,
-				}
-			: undefined,
-	};
-}
-
 export function toPutAssistantPresetPayload(input: AssistantPresetUpsertInput): PutAssistantPresetPayload {
 	const payload: PutAssistantPresetPayload = {
 		displayName: input.displayName.trim(),
@@ -191,11 +130,6 @@ export function toPutAssistantPresetPayload(input: AssistantPresetUpsertInput): 
 			providerName: input.startingModelPresetRef.providerName,
 			modelPresetID: input.startingModelPresetRef.modelPresetID,
 		};
-	}
-
-	const startingModelPresetPatch = cloneStartingModelPatch(input.startingModelPresetPatch);
-	if (startingModelPresetPatch) {
-		payload.startingModelPresetPatch = startingModelPresetPatch;
 	}
 
 	if (input.startingModelPresetRef && input.startingIncludeModelSystemPrompt !== undefined) {

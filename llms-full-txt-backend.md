@@ -502,8 +502,6 @@ Validation highlights:
 - `StartingModelPresetRef` must resolve and be enabled
 - `StartingToolSelections` must resolve to enabled tools. Skill that need to be sent as `instructions` should set `useAsInstructions` true, and not have any `arguments` set in the skill along with `insert` either empty or `instructions`.
 - `StartingSkillSelections` must resolve to enabled skills
-- `StartingModelPresetPatch` must not set `systemPrompt`
-- `StartingModelPresetPatch` must not set `capabilitiesOverride`
 
 Useful detail:
 

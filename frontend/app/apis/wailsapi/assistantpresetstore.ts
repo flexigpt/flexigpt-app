@@ -161,23 +161,12 @@ export class WailsAssistantPresetStoreAPI implements IAssistantPresetStoreAPI {
 		version: string,
 		payload: PutAssistantPresetPayload
 	): Promise<void> {
-		const rawPatch = payload.startingModelPresetPatch as
-			{ systemPrompt?: unknown; capabilitiesOverride?: unknown } | undefined;
-
-		if (rawPatch?.systemPrompt !== undefined) {
-			throw new Error('startingModelPresetPatch.systemPrompt is not allowed for assistant presets');
-		}
-		if (rawPatch?.capabilitiesOverride !== undefined) {
-			throw new Error('startingModelPresetPatch.capabilitiesOverride is not allowed for assistant presets');
-		}
-
 		const body = omitUndefined({
 			displayName: payload.displayName,
 			description: payload.description,
 			isEnabled: payload.isEnabled,
 			startingText: payload.startingText,
 			startingModelPresetRef: payload.startingModelPresetRef,
-			startingModelPresetPatch: payload.startingModelPresetPatch,
 			startingIncludeModelSystemPrompt: payload.startingIncludeModelSystemPrompt,
 			startingToolSelections: payload.startingToolSelections,
 			startingSkillSelections: payload.startingSkillSelections,
