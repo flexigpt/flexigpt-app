@@ -807,15 +807,9 @@ export function SkillsBottomBarChip({
 								{resources} resource{resources === 1 ? '' : 's'}
 							</span>
 						) : null}
-						{isInstruction && args.length === 0 && resources === 0 ? (
-							<span className="badge badge-ghost badge-xs" title="Can be copied or forked as plain instructions.">
-								simple
-							</span>
-						) : null}
 						{instructionSourceSelected ? (
 							<span className="badge badge-secondary badge-xs">System instructions</span>
 						) : null}
-						<span className="badge badge-ghost badge-xs">{item.isBuiltIn ? 'built-in' : 'custom'}</span>
 						{!item.skillDefinition.isEnabled ? <span className="badge badge-warning badge-xs">Disabled</span> : null}
 					</div>
 				</div>

@@ -10,7 +10,7 @@ interface StatusBadgeProps {
 	className?: string;
 }
 
-export function StatusBadge({ children, tone = 'neutral', title, className = '' }: StatusBadgeProps) {
+export function StatusBadge({ children, tone = 'neutral', title, className = 'badge-xs text-xs' }: StatusBadgeProps) {
 	return (
 		<span
 			className={`badge h-auto max-w-full px-2 py-1 text-center leading-tight wrap-break-word whitespace-normal ${STATUS_TONE_CLASSES[tone]} ${className}`}
