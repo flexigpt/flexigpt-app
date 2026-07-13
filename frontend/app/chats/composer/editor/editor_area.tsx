@@ -1778,7 +1778,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 								</div>
 							)}
 							{/* Row: editor with send/stop button on the right */}
-							<div className="flex min-h-16 min-w-0 grow gap-2 overflow-hidden px-1 py-0">
+							<div className="flex min-h-16 min-w-0 grow gap-2 overflow-hidden p-1">
 								<PlateContent
 									ref={contentRef}
 									placeholder="Type message..."
@@ -1804,7 +1804,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 								/>
 							</div>
 							{/* Unified chips bar: attachments, directories, tools, tool calls & outputs (scrollable) */}
-							<div className="w-full min-w-0 shrink-0 items-center overflow-x-auto overscroll-contain p-0 text-xs">
+							<div className="w-full min-w-0 shrink-0 items-center overflow-x-auto overscroll-contain p-1 text-xs">
 								<EditorChipsBar
 									attachments={attachments}
 									directoryGroups={directoryGroups}
