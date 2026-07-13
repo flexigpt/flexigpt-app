@@ -15,9 +15,6 @@ import type { ISettingStoreAPI } from '@/apis/interface';
 import { GetAuthKey, GetSettings, SetAppTheme, SetDebugSettings } from '@/apis/wailsjs/go/main/SettingStoreWrapper';
 import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
 
-/**
- * @public
- */
 export class WailsSettingStoreAPI implements ISettingStoreAPI {
 	async setAppTheme(theme: AppTheme): Promise<void> {
 		const r = {

@@ -1,7 +1,4 @@
-/**
- * @public
- */
-export type JSONPrimitive = string | number | boolean | null;
+type JSONPrimitive = string | number | boolean | null;
 
 export interface JSONObject {
 	[key: string]: JSONValue | undefined;
@@ -33,10 +30,7 @@ export function tryParseJSONObject(raw: string, fieldLabel = 'JSON schema body')
 	}
 }
 
-/**
- * @public
- */
-export function isStringArray(value: unknown): value is string[] {
+function isStringArray(value: unknown): value is string[] {
 	if (!Array.isArray(value)) {
 		return false;
 	}

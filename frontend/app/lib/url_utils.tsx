@@ -55,10 +55,7 @@ const isValidDomainName = (hostname: string): boolean => {
 	return true;
 };
 
-/**
- * @public
- */
-export const normalizeUrl = (value: string): string | null => {
+const normalizeUrl = (value: string): string | null => {
 	const raw = value.trim();
 	if (!raw) {
 		return null;

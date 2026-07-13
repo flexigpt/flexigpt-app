@@ -1,8 +1,6 @@
 // AttachmentKind enumerates contextual attachment categories that can be
 // associated with messages sent to the inference layer.
-/**
- * @public
- */
+
 export enum AttachmentKind {
 	file = 'file',
 	image = 'image',

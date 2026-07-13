@@ -27,9 +27,6 @@ function normalizeProviderPreset(provider: ProviderPreset): ProviderPreset {
 	};
 }
 
-/**
- * @public
- */
 export class WailsModelPresetStoreAPI implements IModelPresetStoreAPI {
 	async getDefaultProvider(): Promise<ProviderName> {
 		const resp = await GetDefaultProvider({});

@@ -2,8 +2,6 @@ import type { UIToolOutput } from '@/spec/inference';
 import type { MCPToolSelection } from '@/spec/mcp';
 
 /**
- * @public
- *
  * Runtime-only handle for one MCP App view. Apps are never persisted; this
  * exists for the lifetime of the rendered iframe.
  */

@@ -1,6 +1,3 @@
-/**
- * @public
- */
 export interface ToolCapabilities {
 	supportedToolTypes: string[];
 	supportedToolPolicyModes: string[];
@@ -8,26 +5,17 @@ export interface ToolCapabilities {
 	maxForcedTools: number;
 }
 
-/**
- * @public
- */
 export interface OutputCapabilities {
 	supportedOutputFormats: string[];
 	supportsVerbosity: boolean;
 }
 
-/**
- * @public
- */
 export interface StopSequenceCapabilities {
 	isSupported: boolean;
 	disallowedWithReasoning: boolean;
 	maxSequences: number;
 }
 
-/**
- * @public
- */
 export interface ReasoningCapabilities {
 	supportedReasoningTypes: string[];
 	supportedReasoningLevels: string[];
@@ -36,9 +24,6 @@ export interface ReasoningCapabilities {
 	temperatureDisallowedWhenEnabled: boolean;
 }
 
-/**
- * @public
- */
 export interface ModelCapabilities {
 	modalitiesIn: string[];
 	modalitiesOut: string[];

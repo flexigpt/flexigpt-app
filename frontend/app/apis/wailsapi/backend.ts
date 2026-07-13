@@ -64,9 +64,6 @@ function isRuntimeAvailable(): boolean {
 	return typeof window !== 'undefined' && 'runtime' in window;
 }
 
-/**
- * @public
- */
 export class WailsLogger implements ILogger {
 	log(...args: unknown[]): void {
 		const msg = formatMessage(args);
@@ -125,9 +122,6 @@ export class WailsLogger implements ILogger {
 	}
 }
 
-/**
- * @public
- */
 export class WailsBackendAPI implements IBackendAPI {
 	appQuit(): void {
 		Quit();

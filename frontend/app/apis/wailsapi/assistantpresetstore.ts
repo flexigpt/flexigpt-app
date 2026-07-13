@@ -69,9 +69,6 @@ function normalizeAssistantPresetListItem(item: AssistantPresetListItem): Assist
 	};
 }
 
-/**
- * @public
- */
 export class WailsAssistantPresetStoreAPI implements IAssistantPresetStoreAPI {
 	async listAssistantPresetBundles(
 		bundleIDs?: string[],

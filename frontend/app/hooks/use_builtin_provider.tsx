@@ -10,7 +10,6 @@ import { getAllProviderPresetsMap } from '@/apis/list_helper';
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Internal cache (module scope = one copy per page-load)                   */
 /* ────────────────────────────────────────────────────────────────────────── */
-let builtInPresets: Readonly<Record<ProviderName, ProviderPreset>> | null = null;
 let builtInAuthKeys: ReadonlySet<AuthKeyName> | null = null;
 let initPromise: Promise<void> | null = null;
 
@@ -23,9 +22,6 @@ export function initBuiltIns(): Promise<void> {
 		/* One single call to the remote/helper func */
 		const allPresets = await getAllProviderPresetsMap(true);
 		const builtIns = filterBuiltInPresets(allPresets);
-
-		/* Freeze to guarantee immutability */
-		builtInPresets = Object.freeze(builtIns);
 
 		/* No need for a second fetch – just derive the key set now. */
 		builtInAuthKeys = Object.freeze(new Set(Object.keys(builtIns)));
@@ -41,20 +37,7 @@ function filterBuiltInPresets(presets: Record<ProviderName, ProviderPreset>): Re
 	>;
 }
 
-/**
- * @public
- */
-export function getBuiltInPresetsSync(): Readonly<Record<ProviderName, ProviderPreset>> {
-	if (!builtInPresets) {
-		throw new Error('initBuiltIns() has not finished');
-	}
-	return builtInPresets;
-}
-
-/**
- * @public
- */
-export function getBuiltInProviderAuthKeyNamesSync(): ReadonlySet<AuthKeyName> {
+function getBuiltInProviderAuthKeyNamesSync(): ReadonlySet<AuthKeyName> {
 	if (!builtInAuthKeys) {
 		throw new Error('initBuiltIns() has not finished');
 	}

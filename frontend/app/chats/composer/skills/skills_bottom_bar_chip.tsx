@@ -41,6 +41,8 @@ import {
 import { dedupeSkillRefs, skillRefFromListItem, skillRefKey } from '@/skills/lib/skill_identity_utils';
 
 const SIMPLE_SKILL_NAME_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
+const skillRowActionButtonClasses = 'btn btn-ghost btn-xs rounded-lg';
+const skillRowRemoveActionButtonClasses = `${skillRowActionButtonClasses} text-error`;
 
 interface InstructionSkillDraft {
 	bundleID?: string;
@@ -494,6 +496,7 @@ export function SkillsBottomBarChip({
 	const [isAddInstructionOpen, setIsAddInstructionOpen] = useState(false);
 	const [instructionModalMode, setInstructionModalMode] = useState<'add' | 'fork'>('add');
 	const [instructionDraft, setInstructionDraft] = useState<InstructionSkillDraft | null>(null);
+	const [skillActionError, setSkillActionError] = useState<string | null>(null);
 
 	useEffect(() => {
 		if (isInputLocked) {
@@ -516,33 +519,18 @@ export function SkillsBottomBarChip({
 		[allSkills]
 	);
 
-	const enabledCount = useMemo(() => {
-		if (loading) {
-			return enabledKeySet.size;
-		}
+	const availableEnabledKeySet = useMemo(
+		() => new Set([...enabledKeySet].filter(key => availableSkillKeySet.has(key))),
+		[availableSkillKeySet, enabledKeySet]
+	);
+	const availableActiveKeySet = useMemo(
+		() => new Set([...activeKeySet].filter(key => availableSkillKeySet.has(key) && availableEnabledKeySet.has(key))),
+		[activeKeySet, availableEnabledKeySet, availableSkillKeySet]
+	);
 
-		let count = 0;
-		for (const key of enabledKeySet) {
-			if (availableSkillKeySet.has(key)) {
-				count += 1;
-			}
-		}
-		return count;
-	}, [availableSkillKeySet, enabledKeySet, loading]);
-
-	const activeCount = useMemo(() => {
-		if (loading) {
-			return activeKeySet.size;
-		}
-
-		let count = 0;
-		for (const key of activeKeySet) {
-			if (availableSkillKeySet.has(key)) {
-				count += 1;
-			}
-		}
-		return count;
-	}, [activeKeySet, availableSkillKeySet, loading]);
+	// Persisted refs are not presentation state until the current catalog can resolve them.
+	const enabledCount = availableEnabledKeySet.size;
+	const activeCount = availableActiveKeySet.size;
 
 	const instructionCount = allSkills.filter(s => {
 		return isInstructionSkill(s);
@@ -630,31 +618,50 @@ export function SkillsBottomBarChip({
 		[systemPrompt]
 	);
 
+	const instructionSourceByKey = useMemo(
+		() => new Map(systemPrompt.instructionSources.map(source => [source.identityKey, source] as const)),
+		[systemPrompt.instructionSources]
+	);
+
 	const selectedInstructionSourceKeySet = useMemo(
 		() => new Set(systemPrompt.selectedInstructionSourceKeys),
 		[systemPrompt.selectedInstructionSourceKeys]
 	);
-	const selectedInstructionSourceCount =
-		systemPrompt.selectedInstructionSourceKeys.length + (systemPrompt.includeModelDefault ? 1 : 0);
-
-	const hasConfiguredSkillState = enabledCount > 0 || activeCount > 0 || selectedInstructionSourceCount > 0;
+	const appliedFlattenedInstructionSourceCount = useMemo(
+		() =>
+			systemPrompt.selectedInstructionSourceKeys.reduce((count, key) => {
+				const source = instructionSourceByKey.get(key);
+				return source?.text.trim() ? count + 1 : count;
+			}, 0),
+		[instructionSourceByKey, systemPrompt.selectedInstructionSourceKeys]
+	);
+	const hasAppliedModelDefault = systemPrompt.includeModelDefault && Boolean(systemPrompt.modelDefaultPrompt.trim());
+	const appliedSystemInstructionCount = appliedFlattenedInstructionSourceCount + (hasAppliedModelDefault ? 1 : 0);
+	const configuredCount = enabledCount + appliedSystemInstructionCount;
+	const hasConfiguredSkillState = configuredCount > 0 || activeCount > 0;
+	const hasSelectedSystemInstructionState =
+		systemPrompt.includeModelDefault || systemPrompt.selectedInstructionSourceKeys.length > 0;
+	const hasClearableSkillState =
+		enabledSkillRefs.length > 0 || activeSkillRefs.length > 0 || hasSelectedSystemInstructionState;
 
 	const title = useMemo(() => {
 		const lines: string[] = [
 			shortcut ? `Instruction skills (${shortcut})` : 'Instruction skills',
-			'Enable skills for this chat, activate eligible skills, or select system instruction sources.',
+			'Enable available instruction skills, activate eligible skills, or apply system instruction sources.',
 			'User-message templates are managed in the Templates menu.',
 			hasConfiguredSkillState ? 'Status: Configured' : 'Status: Not configured',
 		];
-
+		if (configuredCount > 0) {
+			lines.push(`Configured entries: ${configuredCount} (available enabled skills + applied system sources).`);
+		}
 		if (enabledCount > 0) {
 			lines.push(`Enabled skills: ${enabledCount}`);
 		}
 		if (activeCount > 0) {
 			lines.push(`Active now: ${activeCount}`);
 		}
-		if (selectedInstructionSourceCount > 0) {
-			lines.push(`System instruction sources: ${selectedInstructionSourceCount}`);
+		if (appliedSystemInstructionCount > 0) {
+			lines.push(`Applied system instruction sources: ${appliedSystemInstructionCount}`);
 		}
 		if (totalCount > 0) {
 			lines.push(`Available: ${totalCount}`);
@@ -663,16 +670,23 @@ export function SkillsBottomBarChip({
 			lines.push('Loading available skills…');
 		}
 		if (loadError) {
-			lines.push('Skill list needs refresh.');
+			lines.push('Skill list needs refresh. Only listed skills are counted.');
+		}
+		if (hasClearableSkillState) {
+			lines.push(
+				'Clear disables skills, turns off the model default for this conversation, and removes flattened instruction sources.'
+			);
 		}
 		return lines.join('\n');
 	}, [
+		configuredCount,
+		appliedSystemInstructionCount,
 		activeCount,
 		enabledCount,
+		hasClearableSkillState,
 		hasConfiguredSkillState,
 		loadError,
 		loading,
-		selectedInstructionSourceCount,
 		shortcut,
 		totalCount,
 	]);
@@ -684,12 +698,8 @@ export function SkillsBottomBarChip({
 			: 'border-transparent';
 
 	const clearConfiguredSkillState = () => {
-		if (enabledCount > 0 || activeCount > 0) {
-			onDisableAll();
-		}
-		if (selectedInstructionSourceCount > 0) {
-			systemPrompt.clearInstructionSources();
-		}
+		onDisableAll();
+		systemPrompt.clearAllSystemPromptState();
 		menu.hide();
 	};
 
@@ -702,6 +712,7 @@ export function SkillsBottomBarChip({
 
 	const openForkInstructionModal = useCallback(
 		async (item: SkillListItem) => {
+			setSkillActionError(null);
 			try {
 				const rendered = await skillStoreAPI.renderSkill(skillRefFromListItem(item), {});
 				const sourceLabel = getSkillDisplayLabel(item);
@@ -721,6 +732,11 @@ export function SkillsBottomBarChip({
 				menu.hide();
 			} catch (error) {
 				console.error('Failed to render skill for fork:', error);
+				setSkillActionError(
+					error instanceof Error && error.message.trim()
+						? error.message
+						: 'Failed to render the instruction skill for fork.'
+				);
 			}
 		},
 		[allSkills, menu]
@@ -729,8 +745,8 @@ export function SkillsBottomBarChip({
 	const renderSkillItem = (item: SkillListItem) => {
 		const ref = skillRefFromListItem(item);
 		const k = skillRefKey(ref);
-		const checked = enabledKeySet.has(k);
-		const isActive = activeKeySet.has(k);
+		const checked = availableEnabledKeySet.has(k);
+		const isActive = availableActiveKeySet.has(k);
 		const isInstruction = isInstructionSkill(item);
 		const label = getSkillDisplayLabel(item);
 		const args = item.skillDefinition.arguments ?? [];
@@ -768,11 +784,16 @@ export function SkillsBottomBarChip({
 				}}
 			>
 				<div className="flex w-full flex-col space-y-1">
-					<div className="flex items-center gap-2">
-						<div className="truncate text-xs font-medium">{label}</div>
-						<span className={`badge badge-xs ${isInstruction ? 'badge-info' : 'badge-secondary'}`}>
+					<div className="flex min-w-0 items-center gap-2">
+						<div className="min-w-0 truncate text-xs font-medium">{label}</div>
+						<span className={`badge badge-xs shrink-0 ${isInstruction ? 'badge-info' : 'badge-secondary'}`}>
 							{isInstruction ? 'instructions' : 'template'}
 						</span>
+						{checked ? (
+							<span className="text-secondary ml-auto shrink-0" title="Enabled for this conversation">
+								<FiCheck size={14} />
+							</span>
+						) : null}
 					</div>
 					<div className="text-base-content/60 truncate text-xs">
 						{item.bundleSlug}/{item.skillSlug} • {item.skillDefinition.name}
@@ -806,8 +827,9 @@ export function SkillsBottomBarChip({
 								{isActive ? (
 									<button
 										type="button"
-										className="btn btn-xs rounded-lg"
+										className={skillRowRemoveActionButtonClasses}
 										disabled={isInputLocked}
+										title="Remove this skill's active session instructions. It remains enabled."
 										onClick={() => {
 											setActiveSkillRefs(prev => prev.filter(activeRef => skillRefKey(activeRef) !== k));
 										}}
@@ -817,12 +839,12 @@ export function SkillsBottomBarChip({
 								) : (
 									<button
 										type="button"
-										className="btn btn-xs rounded-lg"
+										className={skillRowActionButtonClasses}
 										disabled={isInputLocked || !canPreloadActive}
 										title={
 											!canPreloadActive
 												? 'This skill cannot be preloaded as active because it has arguments.'
-												: undefined
+												: 'Load this skill’s instructions into the active session.'
 										}
 										onClick={() => {
 											enableAndActivateSkill(item);
@@ -833,8 +855,10 @@ export function SkillsBottomBarChip({
 								)}
 								<button
 									type="button"
-									className="btn btn-xs rounded-lg"
+									className={skillRowRemoveActionButtonClasses}
 									disabled={isInputLocked}
+									title="Disable this skill and remove its active session instructions."
+
 									onClick={() => {
 										setSkillEnabled(ref, false);
 									}}
@@ -846,8 +870,9 @@ export function SkillsBottomBarChip({
 							<>
 								<button
 									type="button"
-									className="btn btn-xs rounded-lg"
+									className={skillRowActionButtonClasses}
 									disabled={isInputLocked}
+									title="Enable this skill for this conversation."
 									onClick={() => {
 										setSkillEnabled(ref, true);
 									}}
@@ -856,10 +881,13 @@ export function SkillsBottomBarChip({
 								</button>
 								<button
 									type="button"
-									className="btn btn-xs rounded-lg"
+									className={skillRowActionButtonClasses}
+
 									disabled={isInputLocked || !canPreloadActive}
 									title={
-										!canPreloadActive ? 'This skill cannot be preloaded as active because it has arguments.' : undefined
+										!canPreloadActive
+											? 'This skill cannot be preloaded as active because it has arguments.'
+											: 'Enable this skill and load its instructions into the active session.'
 									}
 									onClick={() => {
 										enableAndActivateSkill(item);
@@ -876,7 +904,7 @@ export function SkillsBottomBarChip({
 					{isInstruction ? (
 						<button
 							type="button"
-							className="btn btn-xs rounded-lg"
+							className={instructionSourceSelected ? skillRowRemoveActionButtonClasses : skillRowActionButtonClasses}
 							disabled={isInputLocked || !canUseAsSystemPrompt}
 							title={
 								canUseAsSystemPrompt
@@ -889,11 +917,19 @@ export function SkillsBottomBarChip({
 								if (!canUseAsSystemPrompt) {
 									return;
 								}
+								setSkillActionError(null);
 								if (instructionSourceKnown) {
 									systemPrompt.toggleInstructionSource(instructionSourceKey);
 									return;
 								}
-								void addSkillAsSystemInstructions(item, {});
+								void addSkillAsSystemInstructions(item, {}).catch((error: unknown) => {
+									console.error('Failed to add skill as system instructions:', error);
+									setSkillActionError(
+										error instanceof Error && error.message.trim()
+											? error.message
+											: 'Failed to add this skill as system instructions.'
+									);
+								});
 							}}
 						>
 							{instructionSourceSelected
@@ -907,7 +943,7 @@ export function SkillsBottomBarChip({
 					{isInstruction && args.length === 0 && resources === 0 ? (
 						<button
 							type="button"
-							className="btn btn-xs rounded-lg"
+							className={skillRowActionButtonClasses}
 							disabled={isInputLocked}
 							title="Create a new managed instruction skill from this rendered skill text."
 							onClick={() => {
@@ -939,19 +975,19 @@ export function SkillsBottomBarChip({
 							icon={<FiFilePlus size={14} />}
 							label="Skills"
 							count={
-								enabledCount > 0 ? (
-									<span className="badge badge-success badge-xs bg-success/30">{enabledCount}</span>
+								configuredCount > 0 ? (
+									<span className="badge badge-success badge-xs bg-success/30">{configuredCount}</span>
 								) : undefined
 							}
 							suffix={
-								activeCount > 0 || selectedInstructionSourceCount > 0 ? (
+								activeCount > 0 || appliedSystemInstructionCount > 0 ? (
 									<span className="flex shrink-0 items-center gap-1">
 										{activeCount > 0 ? (
 											<span className="badge badge-info badge-xs bg-info/30">Active {activeCount}</span>
 										) : null}
-										{selectedInstructionSourceCount > 0 ? (
+										{appliedSystemInstructionCount > 0 ? (
 											<span className="badge badge-secondary badge-xs bg-secondary/30">
-												System {selectedInstructionSourceCount}
+												System {appliedSystemInstructionCount}
 											</span>
 										) : null}
 									</span>
@@ -963,7 +999,7 @@ export function SkillsBottomBarChip({
 						/>
 					</MenuButton>
 
-					{hasConfiguredSkillState ? (
+					{hasClearableSkillState ? (
 						<button
 							type="button"
 							className={actionTriggerChipClearButtonClasses}
@@ -971,8 +1007,8 @@ export function SkillsBottomBarChip({
 								stop(event);
 								clearConfiguredSkillState();
 							}}
-							aria-label="Clear skills and system instructions"
-							title="Clear skills and system instructions"
+							aria-label="Clear all skills and system instructions"
+							title="Clear all skills and system instructions"
 							disabled={isInputLocked}
 						>
 							<FiX size={12} />
@@ -992,9 +1028,14 @@ export function SkillsBottomBarChip({
 				<div className="mb-2 flex items-center justify-between gap-2 px-1">
 					<div className="text-base-content/70 text-xs font-semibold">Instruction Skills</div>
 					<div className="text-base-content/60 flex flex-wrap items-center justify-end gap-1 text-xs">
-						<span className="badge badge-ghost badge-xs">Enabled {enabledCount}</span>
-						<span className="badge badge-info badge-xs">Active {activeCount}</span>
-						<span className="badge badge-secondary badge-xs">System {selectedInstructionSourceCount}</span>
+						{configuredCount > 0 ? (
+							<span className="badge badge-success badge-xs">Configured {configuredCount}</span>
+						) : null}
+						{enabledCount > 0 ? <span className="badge badge-ghost badge-xs">Enabled {enabledCount}</span> : null}
+						{activeCount > 0 ? <span className="badge badge-info badge-xs">Active {activeCount}</span> : null}
+						{appliedSystemInstructionCount > 0 ? (
+							<span className="badge badge-secondary badge-xs">System {appliedSystemInstructionCount}</span>
+						) : null}
 						<span className="badge badge-ghost badge-xs">Available {totalCount}</span>
 						<button
 							type="button"
@@ -1032,7 +1073,21 @@ export function SkillsBottomBarChip({
 						</button>
 					</div>
 				) : null}
-
+				{skillActionError ? (
+					<div className="alert alert-error mb-2 rounded-xl text-xs">
+						<FiAlertCircle size={14} className="shrink-0" />
+						<div className="grow">{skillActionError}</div>
+						<button
+							type="button"
+							className="btn btn-ghost btn-xs rounded-lg"
+							onClick={() => {
+								setSkillActionError(null);
+							}}
+						>
+							Dismiss
+						</button>
+					</div>
+				) : null}
 				<SearchableMenuInput
 					open={open}
 					query={searchQuery}
@@ -1058,14 +1113,16 @@ export function SkillsBottomBarChip({
 					<div className="mb-2 flex items-center justify-between gap-2">
 						<div className="flex min-w-0 items-center gap-1">
 							<div className="truncate text-xs font-semibold">System instruction sources</div>
-							<span className="badge badge-secondary badge-xs">{selectedInstructionSourceCount} selected</span>
+							<span className="badge badge-secondary badge-xs">{appliedSystemInstructionCount} applied</span>
 						</div>
 						<button
 							type="button"
 							className="btn btn-ghost btn-xs rounded-lg"
-							title="Clear selected system instruction sources"
+							title="Clear selected model-default and flattened system instruction sources"
+
 							aria-label="Clear selected system instruction sources"
-							disabled={isInputLocked || selectedInstructionSourceCount === 0}
+							disabled={isInputLocked || !hasSelectedSystemInstructionState}
+
 							onClick={event => {
 								stop(event);
 								systemPrompt.clearInstructionSources();
@@ -1121,9 +1178,17 @@ export function SkillsBottomBarChip({
 						))}
 
 						{!systemPrompt.modelDefaultPrompt.trim() && systemPrompt.instructionSources.length === 0 ? (
-							<div className="text-base-content/60 px-2 py-1 text-xs">No instruction sources selected.</div>
+							<div className="text-base-content/60 px-2 py-1 text-xs">
+								No system instruction sources are available in this conversation.
+							</div>
 						) : null}
 					</div>
+					{Boolean(systemPrompt.modelDefaultPrompt.trim()) || systemPrompt.instructionSources.length > 0 ? (
+						<div className="text-base-content/60 mt-2 px-1 text-[10px]">
+							Checked sources are applied to this conversations system prompt. The top-level Skills clear control also
+							turns off the model default and removes all rendered sources.
+						</div>
+					) : null}
 				</div>
 
 				{!loading ? (
@@ -1143,7 +1208,7 @@ export function SkillsBottomBarChip({
 							<div className="flex gap-2">
 								<button
 									type="button"
-									className="btn btn-xs rounded-lg"
+									className="btn btn-ghost btn-xs rounded-lg"
 									disabled={isInputLocked || totalCount === 0 || enabledCount === totalCount}
 									onClick={e => {
 										stop(e);
@@ -1156,17 +1221,16 @@ export function SkillsBottomBarChip({
 
 								<button
 									type="button"
-									className="btn btn-xs rounded-lg"
-									disabled={isInputLocked || enabledCount === 0}
+									className={skillRowRemoveActionButtonClasses}
+									disabled={isInputLocked || (enabledSkillRefs.length === 0 && activeSkillRefs.length === 0)}
 									onClick={e => {
 										stop(e);
 										onDisableAll();
-										menu.hide();
 									}}
-									title="Disable all selected instruction skills and remove active skill session instructions."
+									title="Disable all instruction skills and remove active session instructions. System instruction sources remain selected."
 								>
 									<FiX size={12} />
-									<span className="ml-1">Clear all</span>
+									<span className="ml-1">Disable all</span>
 								</button>
 							</div>
 						) : null}

@@ -1,9 +1,6 @@
 import type { ReactNode } from 'react';
 import { useLayoutEffect, useMemo, useSyncExternalStore } from 'react';
 
-/**
- * @public
- */
 export interface TitleBarSlots {
 	/**
 	 * Extra content on the left, AFTER the fixed app title/version (optional).

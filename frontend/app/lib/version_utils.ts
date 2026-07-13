@@ -150,25 +150,6 @@ export function compareVersionStrings(left: string, right: string): number {
 }
 
 /**
- * @public
- */
-export function validateVersion(version: string): string | undefined {
-	const trimmed = version.trim();
-
-	if (!trimmed) {
-		return 'Version is required.';
-	}
-	if (trimmed.length > 64) {
-		return 'Version must be at most 64 characters.';
-	}
-	if (!/^[a-zA-Z0-9.+-]+$/.test(trimmed)) {
-		return 'Version may only contain letters, numbers, "-", ".", and "+".';
-	}
-
-	return undefined;
-}
-
-/**
  * If `current` is semver-like (`v1.2.3`, `1.2.3`, `1.2.3-alpha`, `1.2.3+build`),
  * returns the next stable minor (`v1.3.0` / `1.3.0`).
  *

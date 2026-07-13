@@ -25,10 +25,7 @@ export interface ModelPresetRef {
 
 type ProviderDisplayName = string;
 
-/**
- * @public
- */
-export interface ToolCapabilitiesOverride {
+interface ToolCapabilitiesOverride {
 	supportedToolTypes?: string[];
 	supportedToolPolicyModes?: string[];
 	supportsParallelToolCalls?: boolean;
@@ -36,36 +33,25 @@ export interface ToolCapabilitiesOverride {
 	supportedClientToolOutputFormats?: string[];
 }
 
-/**
- * @public
- */
-export interface OutputCapabilitiesOverride {
+interface OutputCapabilitiesOverride {
 	supportedOutputFormats?: string[];
 	supportsVerbosity?: boolean;
 }
 
-/**
- * @public
- */
-export interface StopSequenceCapabilitiesOverride {
+interface StopSequenceCapabilitiesOverride {
 	isSupported?: boolean;
 	disallowedWithReasoning?: boolean;
 	maxSequences?: number;
 }
 
-/**
- * @public
- */
-export interface ReasoningTokenBudgetCapabilitiesOverride {
+interface ReasoningTokenBudgetCapabilitiesOverride {
 	minAllowed?: number;
 	maxAllowed?: number;
 	zeroAllowed?: boolean;
 	minusOneAllowed?: boolean;
 }
-/**
- * @public
- */
-export interface ReasoningCapabilitiesOverride {
+
+interface ReasoningCapabilitiesOverride {
 	supportsReasoningConfig?: boolean;
 	supportedReasoningTypes?: string[];
 	supportedReasoningLevels?: string[];
@@ -75,9 +61,6 @@ export interface ReasoningCapabilitiesOverride {
 	temperatureDisallowedWhenEnabled?: boolean;
 }
 
-/**
- * @public
- */
 export interface CacheControlCapabilitiesOverride {
 	supportedKinds?: CacheControlKind[];
 	supportedTTLs?: CacheControlTTL[];
@@ -85,9 +68,6 @@ export interface CacheControlCapabilitiesOverride {
 	supportsTTL?: boolean;
 }
 
-/**
- * @public
- */
 export interface CacheCapabilitiesOverride {
 	supportsAutomaticCaching?: boolean;
 	topLevel?: CacheControlCapabilitiesOverride;
@@ -98,17 +78,11 @@ export interface CacheCapabilitiesOverride {
 	toolOutput?: CacheControlCapabilitiesOverride;
 }
 
-/**
- * @public
- */
-export interface ParamDialectOverride {
+interface ParamDialectOverride {
 	maxOutputTokensParamName?: string;
 	toolChoiceParamStyle?: string;
 }
 
-/**
- * @public
- */
 export interface ModelCapabilitiesOverride {
 	modalitiesIn?: string[];
 	modalitiesOut?: string[];

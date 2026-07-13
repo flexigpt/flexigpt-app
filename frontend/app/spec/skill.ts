@@ -38,9 +38,6 @@ export interface SkillSession {
 	activeSkillRefs: SkillRef[];
 }
 
-/**
- * @public
- */
 export interface SkillResourceInfo {
 	hasResources: boolean;
 	totalCount: number;
@@ -86,9 +83,6 @@ export interface PutSkillArtifactPayload {
 	markdownBody: string;
 }
 
-/**
- * @public
- */
 export interface RenderSkillResponse {
 	text: string;
 	insert: SkillInsert;
@@ -115,20 +109,13 @@ export enum SkillPresenceStatus {
 	Error = 'error',
 }
 
-/**
- * @public
- */
 export interface SkillArgument {
 	name: string;
 	description?: string;
 	default?: string;
 }
-/**
- * @public
- *
- * Mirrors Go: spec.SkillPresence (time.Time -> string)
- */
-export interface SkillPresence {
+
+interface SkillPresence {
 	status: SkillPresenceStatus;
 	lastCheckedAt?: string;
 	lastSeenAt?: string;

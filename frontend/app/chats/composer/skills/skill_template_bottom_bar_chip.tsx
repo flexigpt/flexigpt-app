@@ -14,8 +14,8 @@ import { SkillType } from '@/spec/skill';
 import { skillStoreAPI } from '@/apis/baseapi';
 
 import {
-	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
+	actionTriggerChipSurfaceClasses,
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
@@ -47,7 +47,8 @@ interface SkillTemplateDropdownProps {
 	open: boolean;
 	loading: boolean;
 	items: SkillListItem[];
-	error?: string | null;
+	loadError?: string | null;
+	actionError?: string | null;
 	onRetry?: () => void;
 	onPick: (item: SkillListItem) => void;
 }
@@ -342,7 +343,16 @@ function renderSkillTemplateMenuItem(item: SkillListItem, onPick: (item: SkillLi
 	);
 }
 
-function SkillTemplateDropdown({ store, open, loading, items, error, onRetry, onPick }: SkillTemplateDropdownProps) {
+function SkillTemplateDropdown({
+	store,
+	open,
+	loading,
+	items,
+	loadError,
+	actionError,
+	onRetry,
+	onPick,
+}: SkillTemplateDropdownProps) {
 	const menuContentElement = useStoreState(store, 'contentElement');
 	const [searchQuery, setSearchQuery] = useSearchableMenuState(open);
 
@@ -387,18 +397,32 @@ function SkillTemplateDropdown({ store, open, loading, items, error, onRetry, on
 		>
 			{!open ? null : (
 				<>
+					<div className="mb-2 flex items-center justify-between gap-2 px-1">
+						<div className="text-base-content/70 text-xs font-semibold">Templates</div>
+						<span className="badge badge-ghost badge-xs">Available {items.length}</span>
+					</div>
 					<div className="text-base-content/70 mb-2 px-1 text-xs">
 						Templates are skills with <span className="font-mono">insert: user-message</span>. They render into plain
-						composer text and are not loaded as active skill-session instructions.
+						composer text and do not remain selected after insertion.
 					</div>
-					{error ? (
-						<div className="alert alert-error mb-2 rounded-2xl text-xs">
-							<div className="grow">{error}</div>
+					{loadError ? (
+						<div className="alert alert-warning mb-2 rounded-xl text-xs">
+							<FiAlertCircle size={14} className="shrink-0" />
+							<div className="grow">
+								<div className="font-semibold">Templates could not be refreshed</div>
+								<div>{loadError}</div>
+							</div>
 							{onRetry ? (
 								<button type="button" className="btn btn-xs rounded-lg" onClick={onRetry}>
 									Retry
 								</button>
 							) : null}
+						</div>
+					) : null}
+					{actionError ? (
+						<div className="alert alert-error mb-2 rounded-xl text-xs">
+							<FiAlertCircle size={14} className="shrink-0" />
+							<div className="grow">{actionError}</div>
 						</div>
 					) : null}
 					<SearchableMenuInput
@@ -760,9 +784,11 @@ function SkillTemplateBottomBarChipInner({
 	isInputLocked = false,
 }: SkillTemplateBottomBarChipProps) {
 	const open = useStoreState(store, 'open');
-	const tooltip = shortcut
-		? `Insert template (${shortcut})\nTemplates are user-message skills rendered into plain composer text.`
-		: 'Insert template\nTemplates are user-message skills rendered into plain composer text.';
+	const tooltip = [
+		shortcut ? `Insert template (${shortcut})` : 'Insert template',
+		'Templates are user-message skills rendered into plain composer text.',
+		'Inserted templates do not remain selected, so there is no active count or clear action.',
+	].join('\n');
 	const { items: templates, loading, error: templateLoadError, refresh } = useUserMessageSkillTemplates(open);
 	const [modalItem, setModalItem] = useState<SkillListItem | null>(null);
 	const [templateActionError, setTemplateActionError] = useState<string | null>(null);
@@ -831,16 +857,22 @@ function SkillTemplateBottomBarChipInner({
 
 	return (
 		<div className="relative shrink-0" data-bottom-bar-skill-templates>
-			<HoverTip content={tooltip} placement="top">
-				<MenuButton
-					ref={buttonRef}
-					store={store}
-					disabled={isInputLocked}
-					className={`${actionTriggerChipButtonClasses} hover:text-base-content ${isInputLocked ? 'opacity-60' : ''}`}
-					aria-label={shortcut ? `Insert template (${shortcut})` : 'Insert template'}
+			<HoverTip content={tooltip} placement="top" wrapperElement="div" wrapperClassName="inline-flex max-w-full">
+				<div
+					className={`${actionTriggerChipSurfaceClasses} border ${
+						open ? 'border-base-300 bg-base-300/60' : 'border-transparent'
+					} ${isInputLocked ? 'opacity-60' : ''}`}
 				>
-					<ActionTriggerChipContent icon={<FiFile size={16} />} label="Templates" open={open} />
-				</MenuButton>
+					<MenuButton
+						ref={buttonRef}
+						store={store}
+						disabled={isInputLocked}
+						className="btn btn-xs app-text-neutral h-auto min-h-0 flex-1 gap-0 border-none bg-transparent p-0 text-left font-normal shadow-none hover:bg-transparent"
+						aria-label={shortcut ? `Insert template (${shortcut})` : 'Insert template'}
+					>
+						<ActionTriggerChipContent icon={<FiFile size={14} />} label="Templates" open={open} />
+					</MenuButton>
+				</div>
 			</HoverTip>
 
 			<SkillTemplateDropdown
@@ -848,7 +880,8 @@ function SkillTemplateBottomBarChipInner({
 				open={open}
 				loading={loading}
 				items={templates}
-				error={templateActionError ?? templateLoadError}
+				loadError={templateLoadError}
+				actionError={templateActionError}
 				onRetry={() => {
 					void refresh();
 				}}

@@ -42,6 +42,7 @@ export interface ComposerSystemPromptController {
 	toggleInstructionSource: (identityKey: string) => void;
 	addAndSelectInstructionSkillSource: (draft: RenderedInstructionSkillSource) => void;
 	clearInstructionSources: () => void;
+	clearAllSystemPromptState: () => void;
 	resetForNewConversation: (modelDefaultPrompt: string) => void;
 	restoreConversationContext: (modelDefaultPrompt: string, modelParam?: ModelParam) => void;
 	prepareAssistantPresetInstructionSources: (preset: AssistantPreset) => Promise<ComposerSystemPromptPreparedSelection>;
@@ -219,6 +220,11 @@ export function useComposerSystemPrompt(args: {
 		setPromptSelectionState(null, false, []);
 	}, [setPromptSelectionState]);
 
+	const clearAllSystemPromptState = useCallback(() => {
+		setSkillInstructionSources([]);
+		setPromptSelectionState(null, false, []);
+	}, [setPromptSelectionState]);
+
 	const resetForNewConversation = useCallback(
 		(nextModelDefaultPrompt: string) => {
 			setSkillInstructionSources([]);
@@ -347,6 +353,7 @@ export function useComposerSystemPrompt(args: {
 		toggleInstructionSource,
 		addAndSelectInstructionSkillSource,
 		clearInstructionSources,
+		clearAllSystemPromptState,
 		resetForNewConversation,
 		restoreConversationContext,
 		prepareAssistantPresetInstructionSources,

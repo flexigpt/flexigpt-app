@@ -28,9 +28,6 @@ export let aggregateAPI: IAggregateAPI;
 export let settingstoreAPI: ISettingStoreAPI;
 export let modelPresetStoreAPI: IModelPresetStoreAPI;
 
-/**
- * @public
- */
 export let mcpAPI: IMCPAPI;
 
 export let toolStoreAPI: IToolStoreAPI;

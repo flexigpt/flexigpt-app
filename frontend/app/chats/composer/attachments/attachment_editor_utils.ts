@@ -1,10 +1,7 @@
 import type { Attachment, DirectoryOverflowInfo, UIAttachment } from '@/spec/attachment';
 import { AttachmentContentBlockMode, AttachmentErrorReason, AttachmentKind } from '@/spec/attachment';
 
-/**
- * @public
- */
-export const MAX_SINGLE_ATTACHMENT_BYTES = 16 * 1024 * 1024; // 16 MiB
+const MAX_SINGLE_ATTACHMENT_BYTES = 16 * 1024 * 1024; // 16 MiB
 export const MAX_FILES_PER_DIRECTORY = 128;
 
 // Directory grouping is UI-only.

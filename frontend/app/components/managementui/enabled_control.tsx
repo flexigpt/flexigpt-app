@@ -9,9 +9,6 @@ interface EnabledControlProps {
 	busy?: boolean;
 }
 
-/**
- * @public
- */
 export function EnabledControl({
 	id,
 	checked,

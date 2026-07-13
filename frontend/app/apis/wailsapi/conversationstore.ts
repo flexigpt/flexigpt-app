@@ -14,9 +14,6 @@ import {
 } from '@/apis/wailsjs/go/main/ConversationCollectionWrapper';
 import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
 
-/**
- * @public
- */
 export class WailsConversationStoreAPI implements IConversationStoreAPI {
 	async putConversation(conversation: StoreConversation): Promise<void> {
 		const req = {

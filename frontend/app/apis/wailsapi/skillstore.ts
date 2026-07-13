@@ -36,9 +36,6 @@ import {
 } from '@/apis/wailsjs/go/main/SkillStoreWrapper';
 import type { spec } from '@/apis/wailsjs/go/models';
 
-/**
- * @public
- */
 export class WailsSkillStoreAPI implements ISkillStoreAPI {
 	async listSkillBundles(
 		bundleIDs?: string[],

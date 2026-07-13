@@ -16,6 +16,7 @@ export const Toolbar = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>
 });
 
 /* Grouping container (use with join for button groups) */
+
 /**
  * @public
  */
@@ -188,12 +189,6 @@ const RawToolbarButton = forwardRef<HTMLButtonElement, ToolbarButtonProps>(funct
 // oxlint-disable-next-line react/only-export-components
 export const ToolbarButton = withTooltip(RawToolbarButton);
 
-/* Split button: primary + secondary in a join group */
-/**
- * @public
- */
-export type ToolbarSplitButtonProps = Omit<ToolbarButtonProps, 'isDropdown'>;
-
 /**
  * @public
  */
@@ -202,6 +197,7 @@ export const ToolbarSplitButton = forwardRef<HTMLDivElement, HTMLAttributes<HTML
 		return <div ref={ref} className={cn('join', className)} {...props} />;
 	}
 );
+
 /* Simple grouping wrapper, use ToolbarSeparator between groups */
 export function ToolbarGroup({ className, children, ...props }: HTMLAttributes<HTMLDivElement>) {
 	return (

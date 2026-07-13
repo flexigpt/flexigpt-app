@@ -74,8 +74,6 @@ function normalizeMCPPageSize(pageSize?: number): number {
 }
 
 /**
- * @public
- *
  * Wails bridge for the frontend-facing MCP API.
  */
 export class WailsMCPAPI implements IMCPAPI {

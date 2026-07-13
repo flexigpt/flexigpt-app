@@ -1,8 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 
-/**
- * @public
- */
 export interface UseEventOptions<Ev extends Event = Event, D = unknown> {
 	// Target to attach the listener to (defaults to window if available)
 	target?: EventTarget | null;
@@ -29,9 +26,6 @@ export interface UseEventOptions<Ev extends Event = Event, D = unknown> {
 	pulseMs?: number;
 }
 
-/**
- * @public
- */
 export interface UseEventResult<D = unknown> {
 	// True for pulseMs after each event (or always false if pulseMs not provided)
 	pulse: boolean;

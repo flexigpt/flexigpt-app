@@ -408,8 +408,6 @@ export interface IAssistantPresetStoreAPI {
 }
 
 /**
- * @public
- *
  * Flattened frontend-facing MCP bridge.
  * Heavy structured payloads stay as objects, while simple requests stay flattened.
  */

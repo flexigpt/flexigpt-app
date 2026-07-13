@@ -25,10 +25,7 @@ import { validateHTTPURLSecurity } from '@/lib/http_input_utils';
 
 export const MCP_OAUTH_CLIENT_CREDENTIALS_SLOT = 'clientCredentials';
 
-/**
- * @public
- */
-export interface MCPStdioSecretEnvInput {
+interface MCPStdioSecretEnvInput {
 	envName: string;
 	slot: string;
 	deleteSlot?: string;
@@ -37,20 +34,14 @@ export interface MCPStdioSecretEnvInput {
 	deleteExisting?: boolean;
 }
 
-/**
- * @public
- */
-export interface MCPOAuthClientCredentialsInput {
+interface MCPOAuthClientCredentialsInput {
 	slot: string;
 	existingSecretRef?: string;
 	secretValue?: string;
 	deleteExisting?: boolean;
 }
 
-/**
- * @public
- */
-export interface MCPHTTPHeaderSecretInput {
+interface MCPHTTPHeaderSecretInput {
 	headerName: string;
 	slot: string;
 	deleteSlot?: string;

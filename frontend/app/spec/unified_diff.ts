@@ -1,23 +1,15 @@
-/**
- * @public
- */
 export enum ApplyUnifiedDiffDiagnosticLevel {
 	Info = 'info',
 	Warning = 'warning',
 	Error = 'error',
 }
 
-/**
- * @public
- */
 export interface ApplyUnifiedDiffDiagnostic {
 	level: ApplyUnifiedDiffDiagnosticLevel;
 	code?: string;
 	message: string;
 }
-/**
- * @public
- */
+
 export enum ApplyUnifiedDiffStatus {
 	Applicable = 'applicable',
 	Applied = 'applied',
@@ -27,9 +19,6 @@ export enum ApplyUnifiedDiffStatus {
 	Error = 'error',
 }
 
-/**
- * @public
- */
 export interface ApplyUnifiedDiffFileTarget {
 	fileKey?: string;
 	oldPath?: string;
@@ -45,9 +34,6 @@ export interface ApplyUnifiedDiffArgs {
 	candidatePaths?: string[];
 }
 
-/**
- * @public
- */
 export interface ApplyUnifiedDiffFileOut {
 	ok: boolean;
 	fileKey: string;
@@ -66,10 +52,7 @@ export interface ApplyUnifiedDiffFileOut {
 	deletedLines: number;
 }
 
-/**
- * @public
- */
-export interface ApplyUnifiedDiffSummary {
+interface ApplyUnifiedDiffSummary {
 	files: number;
 	hunks: number;
 	appliedHunks: number;
